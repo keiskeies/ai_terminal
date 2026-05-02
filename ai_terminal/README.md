@@ -1,38 +1,17 @@
-# AI Terminal
+# ai_terminal
 
-AI-Powered Cross-Platform Terminal - 一个集成了 AI 助手的安全 SSH 终端应用。
+A new Flutter project.
 
-## 功能特性
+## Getting Started
 
-- **SSH 终端**: 支持多标签 SSH 连接，基于 dartssh2
-- **AI 助手**: 自然语言转命令，支持流式响应
-- **命令安全**: SafetyGuard 危险命令拦截，需二次确认
-- **安全存储**: 凭据使用 flutter_secure_storage 加密存储
-- **多平台**: 支持 Android、iOS、macOS、Windows、Linux
+This project is a starting point for a Flutter application.
 
-## 快速开始
+A few resources to get you started if this is your first Flutter project:
 
-1. 安装依赖:
-```bash
-cd ai_terminal
-flutter pub get
-```
+- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
+- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
 
-2. 运行应用:
-```bash
-flutter run
-```
-
-3. 构建发布:
-```bash
-flutter build apk --release
-flutter build ios --release
-flutter build macos --release
-```
-
-## 安全设计
-
-- **凭据隔离**: 密码/私钥存储在系统级安全存储，永不明文
-- **命令拦截**: 高危命令自动拦截
-- **二次确认**: 危险操作需输入 CONFIRM 确认
-- **生物识别**: 支持 Face ID / 指纹解锁应用
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.
