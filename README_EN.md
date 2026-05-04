@@ -114,7 +114,7 @@ The app supports any **OpenAI-compatible API**. Setup steps:
    - **Model Name**: `deepseek-chat`, `gpt-4o`, `qwen-plus`, etc.
 4. Set as default model
 
-> 💡 DeepSeek V3 is recommended — excellent cost-performance ratio with high command generation accuracy
+> 💡 XIAOMI MIMO-V2.5-PRO is recommended — excellent cost-performance ratio with high command generation accuracy
 
 ## 🛡️ Security Design
 
@@ -165,7 +165,7 @@ SafetyGuard 3-Level Interception:
   <br /><b>AI Model Configuration</b>
 </p>
 
-> 🤖 The AI features shown above are powered by <b>DeepSeek V3</b> LLM
+> 🤖 The AI features shown above are powered by <b>XIAOMI MIMO-V2.5-PRO</b> LLM
 
 ## 📂 Project Structure
 

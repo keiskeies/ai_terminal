@@ -114,7 +114,7 @@ flutter build ios --release
    - **模型名**: `deepseek-chat`、`gpt-4o`、`qwen-plus` 等
 4. 设为默认模型
 
-> 💡 推荐使用 DeepSeek V3 —— 性价比极高，命令生成准确率优秀
+> 💡 推荐使用 小米 mino-v2.5-pro，命令生成准确率优秀
 
 ## 🛡️ 安全设计
 
@@ -165,7 +165,7 @@ SafetyGuard 三级拦截：
   <br /><b>AI 模型配置</b>
 </p>
 
-> 🤖 以上截图中的 AI 功能由 <b>DeepSeek V3</b> 大模型驱动
+> 🤖 以上截图中的 AI 功能由 <b>小米 mino-v2.5-pro</b> 大模型驱动
 
 ## 📂 项目结构
 

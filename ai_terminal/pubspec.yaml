@@ -37,9 +37,9 @@ dependencies:
   # 生物识别
   local_auth: ^2.1.6
   # 获取应用版本
-  package_info_plus: ^5.0.1
+  package_info_plus: ^9.0.1
   # 文件选择
-  file_picker: ^8.0.0
+  file_picker: ^9.0.0
   # 路径工具
   path: ^1.8.3
   # 字符编码支持 (GBK/BIG5)
