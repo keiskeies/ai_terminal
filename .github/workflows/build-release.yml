@@ -1,0 +1,186 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: '3.41.8'
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+      - name: Install dependencies
+        run: |
+          cd ai_terminal
+          flutter pub get
+      - name: Build macOS
+        run: |
+          cd ai_terminal
+          flutter build macos --release
+      - name: Package macOS
+        run: |
+          cd ai_terminal/build/macos/Build/Products/Release
+          zip -r ${{ github.workspace }}/AI_Terminal_${{ github.ref_name }}_macOS.zip "AI Terminal.app"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: AI_Terminal_${{ github.ref_name }}_macOS.zip
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+      - name: Install dependencies
+        run: |
+          cd ai_terminal
+          flutter pub get
+      - name: Build iOS (no codesign)
+        run: |
+          cd ai_terminal
+          flutter build ios --release --no-codesign
+      - name: Package iOS IPA
+        run: |
+          cd ai_terminal
+          mkdir -p build/ipa/Payload
+          cp -r build/ios/iphoneos/Runner.app build/ipa/Payload/
+          cd build/ipa
+          zip -r ${{ github.workspace }}/AI_Terminal_${{ github.ref_name }}_iOS.ipa Payload/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: AI_Terminal_${{ github.ref_name }}_iOS.ipa
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+      - name: Install dependencies
+        run: |
+          cd ai_terminal
+          flutter pub get
+      - name: Build Android APK
+        run: |
+          cd ai_terminal
+          flutter build apk --release
+      - name: Rename APK
+        run: |
+          cp ai_terminal/build/app/outputs/flutter-apk/app-release.apk AI_Terminal_${{ github.ref_name }}_Android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-build
+          path: AI_Terminal_${{ github.ref_name }}_Android.apk
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+      - name: Install dependencies
+        run: |
+          cd ai_terminal
+          flutter pub get
+      - name: Build Windows
+        run: |
+          cd ai_terminal
+          flutter build windows --release
+      - name: Package Windows
+        shell: pwsh
+        run: |
+          Compress-Archive -Path ai_terminal/build/windows/x64/runner/Release/* -DestinationPath AI_Terminal_${{ github.ref_name }}_Windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: AI_Terminal_${{ github.ref_name }}_Windows.zip
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libblkid-dev liblzma-dev ninja-build libgcrypt20-dev
+      - name: Install dependencies
+        run: |
+          cd ai_terminal
+          flutter pub get
+      - name: Build Linux
+        run: |
+          cd ai_terminal
+          flutter build linux --release
+      - name: Package Linux
+        run: |
+          cd ai_terminal/build/linux/x64/release/bundle
+          tar czf ${{ github.workspace }}/AI_Terminal_${{ github.ref_name }}_Linux_x64.tar.gz .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-build
+          path: AI_Terminal_${{ github.ref_name }}_Linux_x64.tar.gz
+
+  create-release:
+    needs: [build-macos, build-ios, build-android, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: List artifacts
+        run: find artifacts -type f | head -20
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: AI Terminal ${{ github.ref_name }}
+          body: |
+            ## AI Terminal ${{ github.ref_name }}
+
+            ### 🚀 Features
+            - Dual-mode AI Agent (Auto + Assistant)
+            - SafetyGuard 3-level command safety check
+            - Zero-plaintext credential storage
+            - SSH remote terminal with connection pooling
+            - Local PTY terminal support
+            - Streaming AI response
+            - Dark theme with JetBrains Mono font
+            - Cross-platform: macOS, Linux, Windows, Android, iOS
+            - OpenAI-compatible API support
+            - Quick command snippets
+
+            ### 📦 Downloads
+            | Platform | File |
+            |----------|------|
+            | macOS | `AI_Terminal_${{ github.ref_name }}_macOS.zip` |
+            | iOS | `AI_Terminal_${{ github.ref_name }}_iOS.ipa` |
+            | Android | `AI_Terminal_${{ github.ref_name }}_Android.apk` |
+            | Windows | `AI_Terminal_${{ github.ref_name }}_Windows.zip` |
+            | Linux x64 | `AI_Terminal_${{ github.ref_name }}_Linux_x64.tar.gz` |
+          files: |
+            artifacts/**/*
+          draft: false
+          prerelease: false
