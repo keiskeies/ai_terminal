@@ -87,41 +87,70 @@ const double hAppBar = 52.0;
 const double hTabBar = 38.0;
 
 // ===== 阴影系统 =====
-List<BoxShadow> shadowSmall({bool isLight = false}) => [
+const List<BoxShadow> shadowSmallDark = [
   BoxShadow(
-    color: (isLight ? Colors.black : Colors.black).withOpacity(isLight ? 0.06 : 0.2),
+    color: Color(0x33000000), // black.withOpacity(0.2)
     blurRadius: 4,
-    offset: const Offset(0, 1),
+    offset: Offset(0, 1),
   ),
 ];
 
-List<BoxShadow> shadowMedium({bool isLight = false}) => [
+const List<BoxShadow> shadowSmallLight = [
   BoxShadow(
-    color: (isLight ? Colors.black : Colors.black).withOpacity(isLight ? 0.08 : 0.3),
+    color: Color(0x0F000000), // black.withOpacity(0.06)
+    blurRadius: 4,
+    offset: Offset(0, 1),
+  ),
+];
+
+const List<BoxShadow> shadowMediumDark = [
+  BoxShadow(
+    color: Color(0x4D000000), // black.withOpacity(0.3)
     blurRadius: 12,
-    offset: const Offset(0, 4),
+    offset: Offset(0, 4),
   ),
 ];
 
-List<BoxShadow> shadowLarge({bool isLight = false}) => [
+const List<BoxShadow> shadowMediumLight = [
   BoxShadow(
-    color: (isLight ? Colors.black : Colors.black).withOpacity(isLight ? 0.1 : 0.4),
+    color: Color(0x14000000), // black.withOpacity(0.08)
+    blurRadius: 12,
+    offset: Offset(0, 4),
+  ),
+];
+
+const List<BoxShadow> shadowLargeDark = [
+  BoxShadow(
+    color: Color(0x66000000), // black.withOpacity(0.4)
     blurRadius: 24,
-    offset: const Offset(0, 8),
+    offset: Offset(0, 8),
   ),
 ];
 
-List<BoxShadow> get shadowGlow => [
+const List<BoxShadow> shadowLargeLight = [
   BoxShadow(
-    color: cPrimary.withOpacity(0.15),
+    color: Color(0x1A000000), // black.withOpacity(0.1)
+    blurRadius: 24,
+    offset: Offset(0, 8),
+  ),
+];
+
+// 兼容旧调用：默认深色
+List<BoxShadow> shadowSmall({bool isLight = false}) => isLight ? shadowSmallLight : shadowSmallDark;
+List<BoxShadow> shadowMedium({bool isLight = false}) => isLight ? shadowMediumLight : shadowMediumDark;
+List<BoxShadow> shadowLarge({bool isLight = false}) => isLight ? shadowLargeLight : shadowLargeDark;
+
+const List<BoxShadow> shadowGlow = [
+  BoxShadow(
+    color: Color(0x266366F1), // cPrimary.withOpacity(0.15)
     blurRadius: 16,
     spreadRadius: 0,
   ),
 ];
 
-List<BoxShadow> get shadowAgentGlow => [
+const List<BoxShadow> shadowAgentGlow = [
   BoxShadow(
-    color: cAgentGreen.withOpacity(0.15),
+    color: Color(0x2610B981), // cAgentGreen.withOpacity(0.15)
     blurRadius: 16,
     spreadRadius: 0,
   ),

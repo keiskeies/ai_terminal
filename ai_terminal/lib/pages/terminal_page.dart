@@ -83,6 +83,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     'Nord': {'bg': const Color(0xFF2E3440), 'fg': const Color(0xFFD8DEE9)},
   };
 
+  // Markdown 预处理 & 内容分割缓存（避免每次 build 重复解析）
+  final Map<String, String> _markdownCache = {};
+  final Map<String, List<_ContentSegment>> _splitCache = {};
+
   @override
   void initState() {
     super.initState();
@@ -651,96 +655,33 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
-  /// 单个 Tab 项（连接名称 + 关闭x）
+  /// 单个 Tab 项（连接名称 + 关闭x）— 使用独立 widget 避免 hover 触发整页 rebuild
   Widget _buildTabItem(tp.TerminalTab tab, bool isActive, tp.TerminalState terminalState) {
     final tc = ThemeColors.of(context);
-    return GestureDetector(
+    return _TabItem(
+      tab: tab,
+      isActive: isActive,
+      tc: tc,
       onTap: () {
         ref.read(tp.terminalProvider.notifier).setActiveTab(tab.id);
         _switchToTab(tab);
       },
-      child: MouseRegion(
-        onEnter: (_) => setState(() {}),
-        onExit: (_) => setState(() {}),
-        child: Container(
-          height: 32,
-          constraints: const BoxConstraints(maxWidth: 140, minWidth: 60),
-          margin: const EdgeInsets.only(right: 2),
-          padding: const EdgeInsets.only(left: 8, right: 4),
-          decoration: BoxDecoration(
-            color: isActive ? tc.surface : Colors.transparent,
-            borderRadius: BorderRadius.circular(rSmall),
-            border: isActive
-                ? Border.all(color: cPrimary.withOpacity(0.4), width: 1)
-                : null,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 连接状态点
-              Container(
-                width: 5,
-                height: 5,
-                margin: const EdgeInsets.only(right: 5),
-                decoration: BoxDecoration(
-                  color: tab.isConnected ? cSuccess : cDanger,
-                  shape: BoxShape.circle,
-                  boxShadow: tab.isConnected
-                      ? [BoxShadow(color: cSuccess.withOpacity(0.4), blurRadius: 3)]
-                      : null,
-                ),
-              ),
-              // 名称
-              Flexible(
-                child: Text(
-                  tab.title,
-                  style: TextStyle(
-                    color: isActive ? tc.textMain : tc.textSub,
-                    fontSize: fSmall,
-                    fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-              ),
-              // 关闭x
-              GestureDetector(
-                onTap: () async {
-                  // 清除该 tab 的所有状态
-                  ref.read(chatProvider.notifier).removeTab(tab.id);
-                  ref.read(agentProvider.notifier).removeTab(tab.id);
-                  _tabAiInputText.remove(tab.id);
-                  _tabExecutingCommand.remove(tab.id);
-                  _tabExecutedCommands.remove(tab.id);
-                  _tabTerminals.remove(tab.id);
-                  await ref.read(tp.terminalProvider.notifier).closeTab(tab.id);
-                  // 切换到新的活跃 tab
-                  final newActiveTab = ref.read(tp.terminalProvider).activeTab;
-                  if (newActiveTab != null) {
-                    _switchToTab(newActiveTab);
-                  }
-                  if (ref.read(tp.terminalProvider).tabs.isEmpty && mounted) {
-                    _connectLocalTerminal();
-                  }
-                },
-                child: Container(
-                  width: 16,
-                  height: 16,
-                  margin: const EdgeInsets.only(left: 2),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(rXSmall),
-                  ),
-                  child: Icon(
-                    Icons.close,
-                    size: 10,
-                    color: isActive ? tc.textSub : tc.textMuted,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      onClose: () async {
+        ref.read(chatProvider.notifier).removeTab(tab.id);
+        ref.read(agentProvider.notifier).removeTab(tab.id);
+        _tabAiInputText.remove(tab.id);
+        _tabExecutingCommand.remove(tab.id);
+        _tabExecutedCommands.remove(tab.id);
+        _tabTerminals.remove(tab.id);
+        await ref.read(tp.terminalProvider.notifier).closeTab(tab.id);
+        final newActiveTab = ref.read(tp.terminalProvider).activeTab;
+        if (newActiveTab != null) {
+          _switchToTab(newActiveTab);
+        }
+        if (ref.read(tp.terminalProvider).tabs.isEmpty && mounted) {
+          _connectLocalTerminal();
+        }
+      },
     );
   }
 
@@ -1422,10 +1363,24 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   // ==================== Markdown 预处理 ====================
-  /// 将单个换行转为 Markdown 硬换行（两个空格+换行），
+  /// 将单个换行转为 Markdown 硬换行（带缓存）
+  String _preprocessMarkdown(String text) {
+    if (_markdownCache.containsKey(text)) {
+      return _markdownCache[text]!;
+    }
+    final result = _preprocessMarkdownInternal(text);
+    _markdownCache[text] = result;
+    // 限制缓存大小
+    if (_markdownCache.length > 100) {
+      _markdownCache.remove(_markdownCache.keys.first);
+    }
+    return result;
+  }
+
+  /// 内部实现：将单个换行转为 Markdown 硬换行（两个空格+换行），
   /// 让 MarkdownBody 正确显示换行，而不把单换行当空格。
   /// 保持代码块内的换行不变。
-  String _preprocessMarkdown(String text) {
+  String _preprocessMarkdownInternal(String text) {
     final buffer = StringBuffer();
     var inCodeBlock = false;
     final lines = text.split('\n');
@@ -1614,8 +1569,22 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
-  /// 将内容按代码块分割
+  /// 将内容按代码块分割（带缓存）
   List<_ContentSegment> _splitContentByCodeBlocks(String content) {
+    if (_splitCache.containsKey(content)) {
+      return _splitCache[content]!;
+    }
+    final result = _splitContentByCodeBlocksInternal(content);
+    _splitCache[content] = result;
+    // 限制缓存大小
+    if (_splitCache.length > 100) {
+      _splitCache.remove(_splitCache.keys.first);
+    }
+    return result;
+  }
+
+  /// 内部实现：将内容按代码块分割
+  List<_ContentSegment> _splitContentByCodeBlocksInternal(String content) {
     final segments = <_ContentSegment>[];
     final regex = RegExp(r'```[\w]*\s*\n([\s\S]*?)```', multiLine: true);
     int lastEnd = 0;
@@ -2708,4 +2677,110 @@ class _QuickKey {
   final String label;
   final String sequence;
   const _QuickKey(this.label, this.sequence);
+}
+
+/// 独立的 Tab 项 widget，hover 状态自管理，不触发父页面 rebuild
+class _TabItem extends StatefulWidget {
+  final tp.TerminalTab tab;
+  final bool isActive;
+  final ThemeColors tc;
+  final VoidCallback onTap;
+  final VoidCallback onClose;
+
+  const _TabItem({
+    required this.tab,
+    required this.isActive,
+    required this.tc,
+    required this.onTap,
+    required this.onClose,
+  });
+
+  @override
+  State<_TabItem> createState() => _TabItemState();
+}
+
+class _TabItemState extends State<_TabItem> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final tab = widget.tab;
+    final isActive = widget.isActive;
+    final tc = widget.tc;
+
+    Color bgColor;
+    if (isActive) {
+      bgColor = tc.surface;
+    } else if (_isHovered) {
+      bgColor = tc.surface.withOpacity(0.5);
+    } else {
+      bgColor = Colors.transparent;
+    }
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _isHovered = true),
+        onExit: (_) => setState(() => _isHovered = false),
+        child: Container(
+          height: 32,
+          constraints: const BoxConstraints(maxWidth: 140, minWidth: 60),
+          margin: const EdgeInsets.only(right: 2),
+          padding: const EdgeInsets.only(left: 8, right: 4),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(rSmall),
+            border: isActive
+                ? Border.all(color: cPrimary.withOpacity(0.4), width: 1)
+                : null,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 5,
+                height: 5,
+                margin: const EdgeInsets.only(right: 5),
+                decoration: BoxDecoration(
+                  color: tab.isConnected ? cSuccess : cDanger,
+                  shape: BoxShape.circle,
+                  boxShadow: tab.isConnected
+                      ? [BoxShadow(color: cSuccess.withOpacity(0.4), blurRadius: 3)]
+                      : null,
+                ),
+              ),
+              Flexible(
+                child: Text(
+                  tab.title,
+                  style: TextStyle(
+                    color: isActive ? tc.textMain : tc.textSub,
+                    fontSize: fSmall,
+                    fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+              GestureDetector(
+                onTap: widget.onClose,
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  margin: const EdgeInsets.only(left: 2),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(rXSmall),
+                  ),
+                  child: Icon(
+                    Icons.close,
+                    size: 10,
+                    color: isActive ? tc.textSub : tc.textMuted,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -248,7 +248,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         controller: _inputController,
                         maxLines: 5,
                         minLines: 1,
-                        onChanged: (value) => setState(() => _canSend = value.trim().isNotEmpty),
+                        onChanged: (value) {
+                          final canSend = value.trim().isNotEmpty;
+                          if (canSend != _canSend) {
+                            setState(() => _canSend = canSend);
+                          }
+                        },
                         decoration: const InputDecoration(
                           hintText: '输入指令或问题...',
                           border: InputBorder.none,
@@ -257,15 +262,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         onSubmitted: (_) => _sendMessage(),
                       ),
                     ),
-                    IconButton(
-                      icon: chatState.isLoading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(Icons.send, color: _canSend ? cPrimary : cTextSub),
-                      onPressed: _canSend && !chatState.isLoading ? _sendMessage : null,
+                    _SendButton(
+                      isLoading: chatState.isLoading,
+                      canSend: _canSend,
+                      onPressed: _sendMessage,
                     ),
                   ],
                 ),
@@ -302,6 +302,33 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     Clipboard.setData(ClipboardData(text: content));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('已复制到剪贴板')),
+    );
+  }
+}
+
+/// 独立的发送按钮组件，避免输入时 rebuild 整页
+class _SendButton extends StatelessWidget {
+  final bool isLoading;
+  final bool canSend;
+  final VoidCallback onPressed;
+
+  const _SendButton({
+    required this.isLoading,
+    required this.canSend,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: isLoading
+          ? const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(Icons.send, color: canSend ? cPrimary : cTextSub),
+      onPressed: canSend && !isLoading ? onPressed : null,
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/agent_model.dart';
 import '../models/agent_memory.dart';
@@ -7,6 +8,9 @@ import '../services/ai_service.dart';
 import '../services/ssh_service.dart';
 import '../services/command_executor.dart';
 import '../core/hive_init.dart';
+
+/// 流式更新节流间隔（毫秒）
+const int _agentStreamThrottleMs = 80;
 
 /// Agent 状态
 class AgentState {
@@ -114,6 +118,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 当前引擎所属的 tabId（用于回调路由）
   String? _engineTabId;
 
+  /// 流式输出节流
+  String _streamingBuffer = '';
+  Timer? _throttleTimer;
+
   AgentNotifier(this._memory) : super(AgentState());
 
   /// 切换到指定 tab（保存当前状态，加载目标 tab 状态）
@@ -214,19 +222,28 @@ class AgentNotifier extends StateNotifier<AgentState> {
     };
 
     _engine!.onMessage = (msg) {
-      _updateTabState(tabId, (s) {
-        final currentLast = s.lastMessage ?? '';
-        final newLast = currentLast + msg;
-        final items = [...s.chatItems];
-        if (items.isNotEmpty && items.last.role == 'assistant') {
-          items[items.length - 1] = ChatItem(
-            role: 'assistant',
-            content: newLast,
-            isStreaming: s.isRunning,
-          );
-        }
-        return s.copyWith(lastMessage: newLast, chatItems: items);
-      });
+      final currentLast = state.lastMessage ?? '';
+      final newLast = currentLast + msg;
+      _streamingBuffer = newLast;
+      // 节流：限制 UI 更新频率
+      _throttleTimer ??= Timer(
+        const Duration(milliseconds: _agentStreamThrottleMs),
+        () {
+          _throttleTimer = null;
+          if (_streamingBuffer.isNotEmpty) {
+            final items = [...state.chatItems];
+            if (items.isNotEmpty && items.last.role == 'assistant') {
+              items[items.length - 1] = ChatItem(
+                role: 'assistant',
+                content: _streamingBuffer,
+                isStreaming: state.isRunning,
+              );
+            }
+            _updateTabState(tabId, (s) => s.copyWith(lastMessage: _streamingBuffer, chatItems: items));
+            _streamingBuffer = '';
+          }
+        },
+      );
     };
 
     _engine!.onCommandGenerated = (cmd) {

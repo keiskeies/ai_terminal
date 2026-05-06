@@ -9,6 +9,9 @@ import '../utils/ansi_stripper.dart';
 
 const _uuid = Uuid();
 
+/// 流式更新节流间隔（毫秒）
+const int _streamThrottleMs = 80;
+
 /// 聊天状态
 class ChatState {
   final List<ChatMessage> messages;
@@ -67,6 +70,10 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
   /// 当前活跃的 tabId
   String? _activeTabId;
+
+  /// 流式输出节流：累积文本但限制 UI 更新频率
+  String _streamingBuffer = '';
+  Timer? _throttleTimer;
 
   ChatNotifier() : super(ChatState());
 
@@ -150,15 +157,31 @@ class ChatNotifier extends StateNotifier<ChatState> {
       _streamSubscription = stream.listen(
         (chunk) {
           fullResponse += chunk;
-          state = state.copyWith(currentAssistantMessage: fullResponse);
+          _streamingBuffer = fullResponse;
+          // 节流：限制 UI 更新频率，减少 rebuild 次数
+          _throttleTimer ??= Timer(
+            const Duration(milliseconds: _streamThrottleMs),
+            () {
+              _throttleTimer = null;
+              if (_streamingBuffer.isNotEmpty) {
+                state = state.copyWith(currentAssistantMessage: _streamingBuffer);
+              }
+            },
+          );
         },
         onError: (error) {
+          _throttleTimer?.cancel();
+          _throttleTimer = null;
+          _streamingBuffer = '';
           state = state.copyWith(
             isLoading: false,
             error: error.toString(),
           );
         },
         onDone: () {
+          _throttleTimer?.cancel();
+          _throttleTimer = null;
+          _streamingBuffer = '';
           // 添加 AI 消息
           final aiMessage = ChatMessage.create(
             role: 'assistant',
@@ -215,6 +238,9 @@ class ChatNotifier extends StateNotifier<ChatState> {
   /// 取消加载
   void cancelLoading() {
     _streamSubscription?.cancel();
+    _throttleTimer?.cancel();
+    _throttleTimer = null;
+    _streamingBuffer = '';
     state = state.copyWith(
       isLoading: false,
       currentAssistantMessage: null,
@@ -244,6 +270,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   @override
   void dispose() {
     _streamSubscription?.cancel();
+    _throttleTimer?.cancel();
     super.dispose();
   }
 }

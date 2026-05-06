@@ -13,7 +13,8 @@ class SettingsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final agentState = ref.watch(agentProvider);
+    // 只监听需要的 maxSteps，避免 agent 其他状态变化触发 rebuild
+    final maxSteps = ref.watch(agentProvider.select((s) => s.maxSteps));
 
     return Scaffold(
       appBar: AppBar(
@@ -58,7 +59,7 @@ class SettingsPage extends ConsumerWidget {
             icon: Icons.auto_mode_rounded,
             iconColor: cAgentGreen,
             title: 'Agent 设置',
-            subtitle: '最大执行步骤数: ${agentState.maxSteps}',
+            subtitle: '最大执行步骤数: $maxSteps',
             onTap: () => _showMaxStepsDialog(context, ref),
           ),
           _buildListTile(
@@ -106,7 +107,7 @@ class SettingsPage extends ConsumerWidget {
             icon: Icons.info,
             iconColor: cPrimary,
             title: '关于 AI Terminal',
-            subtitle: '版本 1.0.0',
+            subtitle: '版本 1.1.0',
             trailing: TextButton(
               onPressed: () => _checkForUpdate(context),
               child: const Text('检查更新'),

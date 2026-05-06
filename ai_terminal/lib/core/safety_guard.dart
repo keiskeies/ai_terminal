@@ -7,6 +7,9 @@ enum SafetyLevel {
 }
 
 class SafetyGuard {
+  /// 静态缓存，避免 build 时对同一条命令重复正则匹配
+  static final Map<String, SafetyLevel> _cache = {};
+
   // 直接拦截的命令模式
   static final List<RegExp> _blockPatterns = [
     RegExp(r'^rm\s+-rf\s+/\s*$'),
@@ -79,8 +82,24 @@ class SafetyGuard {
     RegExp(r'^export\s+'),
   ];
 
-  /// 检查命令安全等级
+  /// 检查命令安全等级（带缓存）
   static SafetyLevel check(String command) {
+    // 命中缓存直接返回
+    if (_cache.containsKey(command)) {
+      return _cache[command]!;
+    }
+
+    final result = _checkInternal(command);
+    _cache[command] = result;
+    // 限制缓存大小，避免内存泄漏
+    if (_cache.length > 500) {
+      _cache.remove(_cache.keys.first);
+    }
+    return result;
+  }
+
+  /// 内部检查逻辑
+  static SafetyLevel _checkInternal(String command) {
     final cleaned = _cleanCommand(command);
 
     if (cleaned.isEmpty) return SafetyLevel.safe;

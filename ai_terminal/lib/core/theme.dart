@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'constants.dart';
 
 class AppTheme {
-  static ThemeData get darkTheme {
-    return ThemeData.dark().copyWith(
+  static final ThemeData darkTheme = ThemeData.dark().copyWith(
       scaffoldBackgroundColor: cBg,
       appBarTheme: AppBarTheme(
         backgroundColor: cCard,
@@ -109,10 +108,8 @@ class AppTheme {
         collapsedTextColor: cTextMain,
       ),
     );
-  }
 
-  static ThemeData get lightTheme {
-    return ThemeData.light().copyWith(
+  static final ThemeData lightTheme = ThemeData.light().copyWith(
       scaffoldBackgroundColor: cBgLight,
       appBarTheme: AppBarTheme(
         backgroundColor: cCardLight,
@@ -218,5 +215,4 @@ class AppTheme {
         collapsedTextColor: cTextMainLight,
       ),
     );
-  }
 }
