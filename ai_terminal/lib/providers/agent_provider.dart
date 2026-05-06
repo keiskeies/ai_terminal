@@ -17,6 +17,7 @@ class AgentState {
   final List<ChatItem> chatItems; // 统一的消息列表，包含用户和AI消息
   final String? error;
   final int maxSteps;
+  final String? pendingConfirmCommand; // 等待用户确认的危险命令
 
   AgentState({
     this.mode = AgentMode.assistant,
@@ -26,10 +27,12 @@ class AgentState {
     List<ChatItem>? chatItems,
     this.error,
     this.maxSteps = 10,
+    this.pendingConfirmCommand,
   }) : chatItems = chatItems ?? [];
 
   bool get isRunning =>
       status == AgentStatus.thinking || status == AgentStatus.executing;
+  bool get isWaitingConfirm => status == AgentStatus.waitingConfirm && pendingConfirmCommand != null;
 
   AgentState copyWith({
     AgentMode? mode,
@@ -39,6 +42,8 @@ class AgentState {
     List<ChatItem>? chatItems,
     String? error,
     int? maxSteps,
+    String? pendingConfirmCommand,
+    bool clearPendingConfirm = false,
   }) {
     return AgentState(
       mode: mode ?? this.mode,
@@ -48,6 +53,7 @@ class AgentState {
       chatItems: chatItems ?? this.chatItems,
       error: error,
       maxSteps: maxSteps ?? this.maxSteps,
+      pendingConfirmCommand: clearPendingConfirm ? null : (pendingConfirmCommand ?? this.pendingConfirmCommand),
     );
   }
 
@@ -236,7 +242,11 @@ class AgentNotifier extends StateNotifier<AgentState> {
     };
 
     _engine!.onTaskUpdated = (task) {
-      _updateTabState(tabId, (s) => s.copyWith(currentTask: task, status: task.status));
+      _updateTabState(tabId, (s) => s.copyWith(
+        currentTask: task,
+        status: task.status,
+        pendingConfirmCommand: _engine!.pendingConfirmCommand,
+      ));
     };
 
     _engine!.onCompleted = (fullMessage) {
@@ -342,11 +352,25 @@ class AgentNotifier extends StateNotifier<AgentState> {
     _engine?.cancelTask();
   }
 
-  /// 确认执行危险命令（辅助模式）
-  Future<void> confirmDangerousCommand(String command) async {
-    if (_executor != null) {
-      state = state.copyWith(status: AgentStatus.executing);
-      _executor!.execute(command);
+  /// 确认执行危险命令（自动模式）
+  void confirmCommand() {
+    if (_engine != null && _engine!.hasPendingConfirm) {
+      _engine!.confirmDangerousCommand();
+      _updateTabState(_engineTabId ?? '', (s) => s.copyWith(
+        status: AgentStatus.executing,
+        clearPendingConfirm: true,
+      ));
+    }
+  }
+
+  /// 拒绝执行危险命令（自动模式）
+  void rejectCommand() {
+    if (_engine != null && _engine!.hasPendingConfirm) {
+      _engine!.rejectDangerousCommand();
+      _updateTabState(_engineTabId ?? '', (s) => s.copyWith(
+        status: AgentStatus.thinking,
+        clearPendingConfirm: true,
+      ));
     }
   }
 

@@ -69,6 +69,8 @@ class AgentEngine {
   AgentTask? _currentTask;
   AgentMode _mode = AgentMode.assistant;
   String _accumulatedMessage = '';  // 跟踪累积的消息
+  Completer<bool>? _confirmCompleter; // 等待用户确认危险命令的 Completer
+  String? _pendingConfirmCommand; // 当前等待确认的命令
 
   void Function(String)? onThinking;
   void Function(String)? onCommandGenerated;
@@ -94,6 +96,8 @@ class AgentEngine {
   bool get isRunning =>
       _currentTask?.status == AgentStatus.thinking ||
       _currentTask?.status == AgentStatus.executing;
+  bool get hasPendingConfirm => _confirmCompleter != null && !_confirmCompleter!.isCompleted;
+  String? get pendingConfirmCommand => _pendingConfirmCommand;
 
   void setMode(AgentMode mode) => _mode = mode;
 
@@ -147,6 +151,27 @@ class AgentEngine {
       );
       onTaskUpdated?.call(_currentTask!);
     }
+    // 同时取消等待确认
+    if (_confirmCompleter != null && !_confirmCompleter!.isCompleted) {
+      _confirmCompleter!.complete(false);
+    }
+    _pendingConfirmCommand = null;
+  }
+
+  /// 确认执行危险命令（由用户点击确认按钮触发）
+  void confirmDangerousCommand() {
+    if (_confirmCompleter != null && !_confirmCompleter!.isCompleted) {
+      _confirmCompleter!.complete(true);
+    }
+    _pendingConfirmCommand = null;
+  }
+
+  /// 拒绝执行危险命令（由用户点击拒绝按钮触发）
+  void rejectDangerousCommand() {
+    if (_confirmCompleter != null && !_confirmCompleter!.isCompleted) {
+      _confirmCompleter!.complete(false);
+    }
+    _pendingConfirmCommand = null;
   }
 
   Future<void> _executeAssistant(String goal, CommandExecutor? executor) async {
@@ -264,16 +289,15 @@ class AgentEngine {
             onTaskUpdated?.call(_currentTask!);
             return;
           }
-          // 没有命令但也没有完成：AI可能是在询问用户
-          // 将AI回复作为用户消息继续，等待用户输入或继续执行
-          agentLogger.warn('AutoExec', 'AI未生成命令，将继续等待');
-          messages.add(ChatMessage.create(role: 'assistant', content: fullResponse));
-          // 添加一个提示，让AI知道应该继续执行而不是提问
-          messages.add(ChatMessage.create(
-            role: 'user',
-            content: '(请继续执行任务，如果需要用户确认请直接执行最安全合理的默认选项)',
-          ));
-          continue;
+          // 没有命令也没有完成关键词：AI 可能是纯文字回答（问答类任务）
+          // 直接视为任务完成，不再强制 AI 继续执行命令
+          agentLogger.info('AutoExec', 'AI未生成命令，视为任务完成（纯问答或已回答）');
+          _currentTask = _currentTask!.copyWith(
+            status: AgentStatus.completed,
+            completedAt: DateTime.now(),
+          );
+          onTaskUpdated?.call(_currentTask!);
+          return;
         }
 
         final safetyLevel = SafetyGuard.check(command);
@@ -292,20 +316,54 @@ class AgentEngine {
           continue;
         }
 
-        // warn 级别的命令（安装/升级/替换/修改环境等）在自动模式下也暂停，等待用户确认
+        // warn 级别的命令（安装/升级/替换/修改环境等）在自动模式下暂停，等待用户确认
         if (safetyLevel == SafetyLevel.warn) {
           agentLogger.warn('AutoExec', '高风险命令需要确认: $command');
-          final msg = '\n\n⚠️ 高风险命令需要确认: `$command`\n${SafetyGuard.getTip(safetyLevel)}\n请在终端中手动执行或确认后继续。\n';
+
+          // 设置等待确认状态，UI 会显示确认/拒绝按钮
+          _pendingConfirmCommand = command;
+          _confirmCompleter = Completer<bool>();
+
+          final msg = '\n\n⚠️ 高风险命令需要确认: `$command`\n${SafetyGuard.getTip(safetyLevel)}\n请点击下方按钮确认或拒绝。\n';
           _accumulatedMessage += msg;
           onMessage?.call(msg);
 
-          // 将命令展示给用户，但不自动执行，改为跳过此命令让 Agent 继续思考
-          messages.add(ChatMessage.create(role: 'assistant', content: fullResponse));
-          messages.add(ChatMessage.create(
-            role: 'user',
-            content: '上述命令需要用户确认，已被跳过。请继续用只读命令收集信息，或给出其他不需要修改系统的方案。',
-          ));
-          continue;
+          _currentTask = _currentTask!.copyWith(
+            status: AgentStatus.waitingConfirm,
+            currentStep: '等待确认: $command',
+          );
+          onTaskUpdated?.call(_currentTask!);
+
+          // 暂停循环，等待用户确认或拒绝
+          final confirmed = await _confirmCompleter!.future;
+          _confirmCompleter = null;
+          _pendingConfirmCommand = null;
+
+          if (_currentTask?.status == AgentStatus.cancelled) {
+            agentLogger.info('AutoExec', '任务在等待确认期间被取消');
+            return;
+          }
+
+          if (confirmed) {
+            // 用户确认执行
+            agentLogger.info('AutoExec', '用户确认执行危险命令: $command');
+            final confirmMsg = '\n✅ 用户已确认，开始执行...\n';
+            _accumulatedMessage += confirmMsg;
+            onMessage?.call(confirmMsg);
+            // 不 continue，继续往下执行命令
+          } else {
+            // 用户拒绝执行
+            agentLogger.info('AutoExec', '用户拒绝执行危险命令: $command');
+            final rejectMsg = '\n❌ 用户拒绝执行此命令。\n';
+            _accumulatedMessage += rejectMsg;
+            onMessage?.call(rejectMsg);
+            messages.add(ChatMessage.create(role: 'assistant', content: fullResponse));
+            messages.add(ChatMessage.create(
+              role: 'user',
+              content: '用户拒绝执行上述命令。请换一个不需要修改系统的方法，或者仅用只读命令收集信息。如果任务无法在不修改系统的前提下完成，请说明情况并结束任务。',
+            ));
+            continue;
+          }
         }
 
         _currentTask = _currentTask!.copyWith(
@@ -579,8 +637,7 @@ class AgentEngine {
 
   bool _isTaskComplete(String response) {
     final keywords = [
-      '完成', '搞定', '好了', 'done', 'finished', 'completed',
-      '任务已完成', 'success', '成功', '已安装', '已配置', '已创建', '✅'
+      '任务完成', '任务已完成', '✅ 任务完成', '✅任务完成',
     ];
     for (final k in keywords) {
       if (response.contains(k)) return true;

@@ -20,11 +20,24 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   final _inputController = TextEditingController();
   final _scrollController = ScrollController();
   bool _canSend = false;
+  bool _autoScroll = true;
 
   @override
   void initState() {
     super.initState();
-    // chat_page 不再需要 loadSession，聊天状态由 terminal tab 管理
+    // 监听滚动：用户手动上滚时禁用自动滚动
+    _scrollController.addListener(() {
+      if (!_scrollController.hasClients) return;
+      final distanceFromBottom = _scrollController.position.maxScrollExtent - _scrollController.offset;
+      if (distanceFromBottom > 120 && _autoScroll) {
+        _autoScroll = false;
+        setState(() {});
+      }
+      if (distanceFromBottom <= 40 && !_autoScroll) {
+        _autoScroll = true;
+        setState(() {});
+      }
+    });
   }
 
   @override
@@ -38,6 +51,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     final content = _inputController.text.trim();
     if (content.isEmpty) return;
 
+    _autoScroll = true; // 用户发送消息时恢复自动滚动
     ref.read(chatProvider.notifier).sendMessage(
       content,
       hostId: widget.hostId,
@@ -47,6 +61,18 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _scrollToBottom() {
+    if (!_autoScroll) return;
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  void _scrollToBottomManual() {
+    _autoScroll = true;
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
@@ -133,29 +159,53 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           Expanded(
             child: chatState.messages.isEmpty && chatState.currentAssistantMessage == null
                 ? _buildEmptyState()
-                : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(pStandard),
-                    itemCount: chatState.messages.length + (chatState.currentAssistantMessage != null ? 1 : 0),
-                    itemBuilder: (context, index) {
-                      if (chatState.currentAssistantMessage != null &&
-                          index == chatState.messages.length) {
-                        // 正在输入的 AI 消息
-                        return MessageBubble(
-                          message: ChatMessage.create(
-                            role: 'assistant',
-                            content: chatState.currentAssistantMessage!,
-                          ),
-                          isStreaming: true,
-                        );
-                      }
+                : Stack(
+                    children: [
+                      ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(pStandard),
+                        itemCount: chatState.messages.length + (chatState.currentAssistantMessage != null ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (chatState.currentAssistantMessage != null &&
+                              index == chatState.messages.length) {
+                            // 正在输入的 AI 消息
+                            return MessageBubble(
+                              message: ChatMessage.create(
+                                role: 'assistant',
+                                content: chatState.currentAssistantMessage!,
+                              ),
+                              isStreaming: true,
+                            );
+                          }
 
-                      final message = chatState.messages[index];
-                      return MessageBubble(
-                        message: message,
-                        onLongPress: () => _copyMessage(message.content),
-                      );
-                    },
+                          final message = chatState.messages[index];
+                          return MessageBubble(
+                            message: message,
+                            onLongPress: () => _copyMessage(message.content),
+                          );
+                        },
+                      ),
+                      // 回到底部按钮
+                      if (!_autoScroll)
+                        Positioned(
+                          right: 16,
+                          bottom: 16,
+                          child: GestureDetector(
+                            onTap: _scrollToBottomManual,
+                            child: Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: cCard,
+                                borderRadius: BorderRadius.circular(18),
+                                border: Border.all(color: cBorder),
+                                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 6)],
+                              ),
+                              child: Icon(Icons.keyboard_arrow_down, size: 20, color: cTextSub),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
           ),
 

@@ -27,7 +27,7 @@ class _TerminalViewState extends State<TerminalView> {
   static const _colorSchemes = {
     'Monokai': xterm.TerminalTheme(
       cursor: Color(0xFFF8F8F0),
-      selection: Color(0xFF49483E),
+      selection: Color(0x8066D9EF),
       foreground: Color(0xFFF8F8F2),
       background: Color(0xFF0C0C0C),
       black: Color(0xFF272822),
@@ -52,7 +52,7 @@ class _TerminalViewState extends State<TerminalView> {
     ),
     'Dracula': xterm.TerminalTheme(
       cursor: Color(0xFFF8F8F2),
-      selection: Color(0xFF44475A),
+      selection: Color(0x80BD93F9),
       foreground: Color(0xFFF8F8F2),
       background: Color(0xFF282A36),
       black: Color(0xFF21222C),
@@ -77,7 +77,7 @@ class _TerminalViewState extends State<TerminalView> {
     ),
     'Solarized': xterm.TerminalTheme(
       cursor: Color(0xFF93A1A1),
-      selection: Color(0xFF073642),
+      selection: Color(0x80268BD2),
       foreground: Color(0xFF839496),
       background: Color(0xFF002B36),
       black: Color(0xFF073642),
@@ -102,7 +102,7 @@ class _TerminalViewState extends State<TerminalView> {
     ),
     'Nord': xterm.TerminalTheme(
       cursor: Color(0xFFD8DEE9),
-      selection: Color(0xFF434C5E),
+      selection: Color(0x8081A1C1),
       foreground: Color(0xFFD8DEE9),
       background: Color(0xFF2E3440),
       black: Color(0xFF3B4252),

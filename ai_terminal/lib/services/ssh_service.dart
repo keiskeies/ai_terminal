@@ -129,7 +129,7 @@ class SSHService implements CommandExecutor {
 
       _session!.stdout.listen(
         (data) {
-          final output = String.fromCharCodes(data);
+          final output = utf8.decode(data, allowMalformed: true);
           outputController.add(output);
           // 坑 2 修复：检测 prompt 判断命令执行完毕
           _onShellData(output);
@@ -146,7 +146,7 @@ class SSHService implements CommandExecutor {
 
       _session!.stderr.listen(
         (data) {
-          outputController.add(String.fromCharCodes(data));
+          outputController.add(utf8.decode(data, allowMalformed: true));
         },
       );
 
@@ -206,7 +206,24 @@ class SSHService implements CommandExecutor {
       return;
     }
 
-    _session!.write(Uint8List.fromList('$command\n'.codeUnits));
+    // 多行命令（含换行符）需要逐行发送，否则 heredoc 等场景无法正常工作
+    if (command.contains('\n')) {
+      _writeMultiLineCommand(command);
+    } else {
+      _session!.write(Uint8List.fromList('$command\n'.codeUnits));
+    }
+  }
+
+  /// 逐行写入多行命令（heredoc 等）
+  void _writeMultiLineCommand(String command) async {
+    final lines = command.split('\n');
+    for (int i = 0; i < lines.length; i++) {
+      _session!.write(Uint8List.fromList('${lines[i]}\n'.codeUnits));
+      // 每行之间加一点延迟，让 shell 有时间处理
+      if (i < lines.length - 1) {
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+    }
   }
 
   /// 发送原始输入到终端（用于 xterm 输入）

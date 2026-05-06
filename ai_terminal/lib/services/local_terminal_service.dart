@@ -94,7 +94,22 @@ class LocalTerminalService implements CommandExecutor {
 
   /// 执行命令（写入命令 + 回车）
   void execute(String command) {
-    writeToTerminal('$command\r');
+    if (command.contains('\n')) {
+      _executeMultiLine(command);
+    } else {
+      writeToTerminal('$command\r');
+    }
+  }
+
+  /// 逐行写入多行命令（heredoc 等）
+  void _executeMultiLine(String command) async {
+    final lines = command.split('\n');
+    for (int i = 0; i < lines.length; i++) {
+      writeToTerminal('${lines[i]}\r');
+      if (i < lines.length - 1) {
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+    }
   }
 
   /// 调整终端大小（columns=列数, rows=行数）

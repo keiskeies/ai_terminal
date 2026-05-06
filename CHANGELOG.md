@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-05-06
+
+### Added
+- 🎨 AI panel layout redesign: Chrome DevTools-style divider with gradient line
+- 📱 Mobile auto-orientation: landscape → AI right, portrait → AI bottom
+- 🟢 Agent mode green accent color across UI (input border, send button, divider)
+- 🔤 Input box focus border color follows AI/Agent mode accent color
+- 🎯 AI panel position restricted to bottom/right only, always visible
+
+### Changed
+- Divider background color differentiated from AI panel background
+- Improved divider gradient line brightness and visibility
+- Mobile: hidden position buttons and drag handle for cleaner UI
+- "下" button uses rotated "右" button icon for consistency
+
 ## [1.0.0] - 2025-05-02
 
 ### Added
@@ -30,4 +45,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Warning-level commands require explicit CONFIRM input
 - AES secondary encryption available for enhanced security
 
+[1.1.0]: https://github.com/keiskeies/ai_terminal/releases/tag/v1.1.0
 [1.0.0]: https://github.com/keiskeies/ai_terminal/releases/tag/v1.0.0

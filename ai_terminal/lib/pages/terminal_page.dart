@@ -17,14 +17,18 @@ import '../providers/agent_provider.dart';
 import '../models/agent_model.dart';
 import '../models/ai_model_config.dart';
 import '../models/command_snippet.dart';
+import 'package:flutter/services.dart';
 import '../services/ai_service.dart';
 import '../services/ssh_service.dart';
 import '../services/command_executor.dart';
 import '../services/agent_engine.dart';
+import '../core/safety_guard.dart';
 import '../utils/ai_parser.dart';
 import '../models/chat_session.dart';
 import '../widgets/terminal_view.dart' as term_widget;
 
+
+enum _AiPanelPosition { bottom, right }
 
 class TerminalPage extends ConsumerStatefulWidget {
   final String? hostId; // null = 本地终端
@@ -41,14 +45,20 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   String? _connectionError;
   // ====== Per-tab 本地状态 ======
   String? _currentTabId;
-  final Map<String, bool> _tabAiExpanded = {};
   final Map<String, String?> _tabExecutingCommand = {};
   final Map<String, Set<String>> _tabExecutedCommands = {};
   final Map<String, Terminal> _tabTerminals = {}; // 每个 tab 独立的 Terminal 实例
+  final Map<String, String> _tabAiInputText = {}; // 每个 tab 独立的 AI 输入框文字
+
+  // AI 面板位置和大小
+  _AiPanelPosition _aiPanelPosition = _AiPanelPosition.bottom;
+  double _aiPanelRatio = 0.4;
+  static const double _minPanelRatio = 0.15;
+  static const double _maxPanelRatio = 0.7;
+
+  bool get _isMobile => Platform.isAndroid || Platform.isIOS;
 
   // Per-tab 状态便捷访问器（自动根据 _currentTabId 读写对应 tab 的状态）
-  bool get _aiExpanded => _currentTabId != null && (_tabAiExpanded[_currentTabId!] ?? false);
-  set _aiExpanded(bool v) { if (_currentTabId != null) _tabAiExpanded[_currentTabId!] = v; }
   String? get _executingCommand => _currentTabId != null ? _tabExecutingCommand[_currentTabId!] : null;
   set _executingCommand(String? v) { if (_currentTabId != null) _tabExecutingCommand[_currentTabId!] = v; }
   Set<String> get _executedCommands => _currentTabId != null ? (_tabExecutedCommands[_currentTabId!] ??= {}) : {};
@@ -56,6 +66,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   final _scrollController = ScrollController();
   final _chatScrollController = ScrollController();
   bool _showScrollToBottom = false;
+  bool _autoScrollChat = true; // 用户手动上滚时禁用自动滚动
   StreamSubscription<String>? _terminalOutputSubscription;
   StreamSubscription<String>? _tabOutputSubscription; // 终端输出订阅（需随 tab 切换而取消/重建）
   bool _agentInitialized = false;
@@ -89,6 +100,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     });
   }
 
+  /// 手机端根据屏幕方向自动设置 AI 面板位置
+  void _updateMobilePosition(BuildContext context) {
+    if (!_isMobile) return;
+    final orientation = MediaQuery.of(context).orientation;
+    final target = orientation == Orientation.landscape
+        ? _AiPanelPosition.right
+        : _AiPanelPosition.bottom;
+    if (_aiPanelPosition != target) {
+      setState(() => _aiPanelPosition = target);
+    }
+  }
+
   void _loadSettings() {
     try {
       final fontSize = HiveInit.settingsBox.get('terminalFontSize');
@@ -98,12 +121,23 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     } catch (_) {}
     // 加载 Agent 最大步骤数（需在 initAgent 之前加载）
     ref.read(agentProvider.notifier).loadSettings();
-    // 监听聊天滚动，控制"回到底部"按钮显示
+    // 监听聊天滚动，控制"回到底部"按钮显示 & 自动滚动锁定
     _chatScrollController.addListener(() {
-      final show = _chatScrollController.hasClients &&
-          _chatScrollController.position.maxScrollExtent - _chatScrollController.offset > 80;
+      if (!_chatScrollController.hasClients) return;
+      final maxScroll = _chatScrollController.position.maxScrollExtent;
+      final offset = _chatScrollController.offset;
+      final distanceFromBottom = maxScroll - offset;
+      final show = distanceFromBottom > 80;
       if (show != _showScrollToBottom) {
         setState(() => _showScrollToBottom = show);
+      }
+      // 用户手动上滚（距底部超过 120px）时禁用自动滚动
+      if (distanceFromBottom > 120 && _autoScrollChat) {
+        _autoScrollChat = false;
+      }
+      // 用户滚到底部时恢复自动滚动
+      if (distanceFromBottom <= 40 && !_autoScrollChat) {
+        _autoScrollChat = true;
       }
     });
   }
@@ -260,6 +294,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
     // 更新各 provider 的当前 tab（switchTab 已恢复该 tab 的 engine/ssh/model）
     _currentTabId = tab.id;
+    _autoScrollChat = true; // 切换 tab 时重置自动滚动
+    _showScrollToBottom = false;
     ref.read(chatProvider.notifier).switchTab(tab.id, hostId: tab.hostId);
     ref.read(agentProvider.notifier).switchTab(tab.id);
     // 不再调用 setSSHService — switchTab 已恢复该 tab 的 SSH 服务，
@@ -267,8 +303,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
     setState(() {});
   }
-
-  void _toggleAIPanel() => setState(() => _aiExpanded = !_aiExpanded);
 
   void _reconnect() {
     final tab = ref.read(tp.terminalProvider).activeTab;
@@ -418,6 +452,21 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
     final tc = ThemeColors.of(context);
 
+    // 手机端：根据屏幕方向自动设置 AI 面板位置
+    _updateMobilePosition(context);
+
+    // ref.listen 必须在 build 中无条件调用，否则面板收起时 listener 消失会触发 assertion
+    ref.listen(chatProvider, (_, state) {
+      if (state.currentAssistantMessage != null || state.messages.isNotEmpty) {
+        _scrollChatToBottom();
+      }
+    });
+    ref.listen(agentProvider, (_, state) {
+      if (state.chatItems.isNotEmpty) {
+        _scrollChatToBottom();
+      }
+    });
+
     return Scaffold(
       backgroundColor: tc.bg,
       resizeToAvoidBottomInset: true,
@@ -426,65 +475,113 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           // 顶部栏（标签 + 工具）
           _buildTopBar(host, terminalState, activeTab),
 
-          // 终端主体
+          // 终端 + AI 面板主体
           Expanded(
-            child: Stack(
-              children: [
-                _isConnecting
-                    ? _buildConnectingView(host)
-                    : _connectionError != null
-                        ? _buildErrorView()
-                        : term_widget.TerminalView(
-                            terminal: _terminal,
-                            fontSize: _terminalFontSize,
-                            colorScheme: _terminalColorScheme,
-                            onSend: (command) {
-                              final tab = ref.read(tp.terminalProvider).activeTab;
-                              if (tab == null) return;
-                              if (tab.isLocal) {
-                                tab.localService?.execute(command);
-                              } else {
-                                tab.service?.execute(command);
-                              }
-                            },
-                          ),
-                // 连接中断提示（浮在终端右上角）
-                if (activeTab != null && !activeTab.isConnected)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: _buildDisconnectedChip(),
-                  ),
-              ],
-            ),
-          ),
-
-          // AI 对话面板分割线 + 面板
-          AnimatedContainer(
-            duration: animNormal,
-            curve: Curves.easeOutCubic,
-            height: _aiExpanded ? MediaQuery.of(context).size.height * 0.45 : 0,
-            child: _aiExpanded
-                ? Column(
-                    children: [
-                      // 终端/AI 区域分界线
-                      _buildAreaDivider(agentState),
-                      // AI 面板
-                      Expanded(child: _buildAIPanel(chatState, agentState, activeTab)),
-                    ],
-                  )
-                : const SizedBox(),
+            child: _buildMainBody(host, chatState, agentState, activeTab),
           ),
 
           // 快捷按键行（仅 Android / iOS 显示，桌面端不需要）
           if (Platform.isAndroid || Platform.isIOS)
             _buildQuickKeysBar(activeTab),
-
-          // AI 底部输入栏（含模式选择 + 模型切换）
-          _buildBottomBar(chatState, agentState, activeTab),
         ],
       ),
     );
+  }
+
+  /// 主体区域：终端 + AI 面板，根据面板位置切换布局
+  Widget _buildMainBody(dynamic host, ChatState chatState, AgentState agentState, tp.TerminalTab? tab) {
+
+    // 终端视图
+    final terminalView = Stack(
+      children: [
+        _isConnecting
+            ? _buildConnectingView(host)
+            : _connectionError != null
+                ? _buildErrorView()
+                : term_widget.TerminalView(
+                    terminal: _terminal,
+                    fontSize: _terminalFontSize,
+                    colorScheme: _terminalColorScheme,
+                    onSend: (command) {
+                      final t = ref.read(tp.terminalProvider).activeTab;
+                      if (t == null) return;
+                      if (t.isLocal) {
+                        t.localService?.execute(command);
+                      } else {
+                        t.service?.execute(command);
+                      }
+                    },
+                  ),
+        if (tab != null && !tab.isConnected)
+          Positioned(
+            top: 8,
+            right: 8,
+            child: _buildDisconnectedChip(),
+          ),
+      ],
+    );
+
+    // AI 面板始终显示，分割线在终端和 AI 之间
+    return LayoutBuilder(builder: (context, constraints) {
+      final totalW = constraints.maxWidth;
+      final totalH = constraints.maxHeight;
+      final isRight = _aiPanelPosition == _AiPanelPosition.right;
+
+      void onDrag(DragUpdateDetails details) {
+        setState(() {
+          if (isRight) {
+            final pos = details.globalPosition.dx - (context.findRenderObject() as RenderBox).localToGlobal(Offset.zero).dx;
+            _aiPanelRatio = (1 - pos / totalW).clamp(_minPanelRatio, _maxPanelRatio).toDouble();
+          } else {
+            final pos = details.globalPosition.dy - (context.findRenderObject() as RenderBox).localToGlobal(Offset.zero).dy;
+            _aiPanelRatio = (1 - pos / totalH).clamp(_minPanelRatio, _maxPanelRatio).toDouble();
+          }
+        });
+      }
+
+      final tc = ThemeColors.of(context);
+      // 手机端不显示拖拽手柄
+      final dragHandle = _isMobile ? const SizedBox.shrink() : GestureDetector(
+        onPanUpdate: onDrag,
+        child: MouseRegion(
+          cursor: isRight ? SystemMouseCursors.resizeColumn : SystemMouseCursors.resizeRow,
+          child: Container(
+            width: isRight ? 5 : double.infinity,
+            height: isRight ? double.infinity : 5,
+            color: tc.border.withOpacity(0.6),
+          ),
+        ),
+      );
+
+      final divider = _buildAreaDivider(agentState);
+      final aiPanelSize = isRight ? totalW * _aiPanelRatio : totalH * _aiPanelRatio;
+      final aiContent = Column(
+        children: [
+          Expanded(child: _buildAIPanel(chatState, agentState, tab)),
+          _buildBottomBar(chatState, agentState, tab),
+        ],
+      );
+
+      if (isRight) {
+        return Row(
+          children: [
+            Expanded(child: terminalView),
+            dragHandle,
+            divider,
+            SizedBox(width: aiPanelSize, child: aiContent),
+          ],
+        );
+      } else {
+        return Column(
+          children: [
+            Expanded(child: terminalView),
+            dragHandle,
+            divider,
+            SizedBox(height: aiPanelSize, child: aiContent),
+          ],
+        );
+      }
+    });
   }
 
   // ==================== 顶部栏 ====================
@@ -612,7 +709,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                   // 清除该 tab 的所有状态
                   ref.read(chatProvider.notifier).removeTab(tab.id);
                   ref.read(agentProvider.notifier).removeTab(tab.id);
-                  _tabAiExpanded.remove(tab.id);
+                  _tabAiInputText.remove(tab.id);
                   _tabExecutingCommand.remove(tab.id);
                   _tabExecutedCommands.remove(tab.id);
                   _tabTerminals.remove(tab.id);
@@ -926,74 +1023,138 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
-  // ==================== 区域分界线 ====================
+  // ==================== 区域分界线（分割条，位于终端和 AI 面板之间）====================
   Widget _buildAreaDivider(AgentState agentState) {
     final isAgentMode = agentState.mode == AgentMode.automatic;
     final accentColor = isAgentMode ? cAgentGreen : cPrimary;
     final tc = ThemeColors.of(context);
-    return Container(
-      height: 30,
-      decoration: BoxDecoration(
-        color: tc.cardElevated,
-        border: Border(
-          top: BorderSide(color: cWarning.withOpacity(0.8), width: 2),
-          bottom: BorderSide(color: tc.border.withOpacity(0.4), width: 0.5),
-        ),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 12),
-          Container(
-            width: 6, height: 6,
+    final isRight = _aiPanelPosition == _AiPanelPosition.right;
+    // 手机端不显示位置切换按钮
+    final showButtons = !_isMobile;
+
+    // Chrome DevTools 风格的方形布局切换按钮
+    Widget layoutButton(_AiPanelPosition pos, IconData icon, String tooltip) {
+      final isActive = _aiPanelPosition == pos;
+      return Tooltip(
+        message: tooltip,
+        waitDuration: const Duration(milliseconds: 500),
+        child: GestureDetector(
+          onTap: () => setState(() => _aiPanelPosition = pos),
+          child: Container(
+            width: 22,
+            height: 22,
             decoration: BoxDecoration(
-              color: cWarning,
-              shape: BoxShape.circle,
-              boxShadow: [BoxShadow(color: cWarning.withOpacity(0.5), blurRadius: 4)],
+              color: isActive ? accentColor.withOpacity(0.15) : Colors.transparent,
+              borderRadius: BorderRadius.circular(3),
+              border: isActive ? Border.all(color: accentColor.withOpacity(0.5), width: 1) : null,
             ),
+            child: Icon(icon, size: 13, color: isActive ? accentColor : tc.textMuted),
           ),
-          const SizedBox(width: 6),
-          Icon(Icons.horizontal_rule_rounded, size: 14, color: accentColor.withOpacity(0.6)),
-          const SizedBox(width: 6),
-          Text(
-            isAgentMode ? 'AGENT' : 'AI',
-            style: TextStyle(
-              fontSize: fMicro,
-              color: accentColor.withOpacity(0.8),
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.5,
-            ),
+        ),
+      );
+    }
+
+    final label = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6, height: 6,
+          decoration: BoxDecoration(
+            color: cWarning,
+            shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: cWarning.withOpacity(0.5), blurRadius: 4)],
           ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Container(
-              height: 1,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [accentColor.withOpacity(0.2), accentColor.withOpacity(0.0)],
+        ),
+        const SizedBox(width: 6),
+        Text(
+          isAgentMode ? 'AGENT' : 'AI',
+          style: TextStyle(
+            fontSize: fMicro,
+            color: accentColor.withOpacity(0.8),
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1.5,
+          ),
+        ),
+      ],
+    );
+
+    if (isRight) {
+      // 竖向分割条（AI 在右侧时）
+      return Container(
+        width: showButtons ? 32 : 28,
+        decoration: BoxDecoration(
+          color: tc.card,
+          border: Border(right: BorderSide(color: tc.border.withOpacity(0.4), width: 0.5)),
+        ),
+        child: Column(
+          children: [
+            if (showButtons) ...[
+              const SizedBox(height: 4),
+              RotatedBox(quarterTurns: 1, child: layoutButton(_AiPanelPosition.bottom, Icons.view_sidebar_outlined, '下')),
+              const SizedBox(height: 2),
+              layoutButton(_AiPanelPosition.right, Icons.view_sidebar_outlined, '右'),
+            ],
+            const Spacer(),
+            // 竖向彩色射线
+            Expanded(
+              child: Container(
+                width: 1,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [accentColor.withOpacity(0.0), accentColor.withOpacity(0.7), accentColor.withOpacity(0.0)],
+                  ),
                 ),
               ),
             ),
+            const SizedBox(height: 8),
+            RotatedBox(quarterTurns: 3, child: label),
+            const SizedBox(height: 8),
+          ],
+        ),
+      );
+    } else {
+      // 横向分割条（AI 在下方时）
+      return Container(
+        height: 28,
+        decoration: BoxDecoration(
+          color: tc.card,
+          border: Border(
+            bottom: BorderSide(color: tc.border.withOpacity(0.4), width: 0.5),
           ),
-          const SizedBox(width: 12),
-        ],
-      ),
-    );
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 8),
+            label,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Container(
+                height: 1,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [accentColor.withOpacity(0.6), accentColor.withOpacity(0.0)],
+                  ),
+                ),
+              ),
+            ),
+            if (showButtons) ...[
+              const SizedBox(width: 8),
+              RotatedBox(quarterTurns: 1, child: layoutButton(_AiPanelPosition.bottom, Icons.view_sidebar_outlined, '下')),
+              const SizedBox(width: 2),
+              layoutButton(_AiPanelPosition.right, Icons.view_sidebar_outlined, '右'),
+            ],
+            const SizedBox(width: 6),
+          ],
+        ),
+      );
+    }
   }
 
   // ==================== AI 面板 ====================
   Widget _buildAIPanel(ChatState chatState, AgentState agentState, tp.TerminalTab? tab) {
     final tc = ThemeColors.of(context);
-    // 监听消息变化自动滚动
-    ref.listen(chatProvider, (_, state) {
-      if (state.currentAssistantMessage != null || state.messages.isNotEmpty) {
-        _scrollChatToBottom();
-      }
-    });
-    ref.listen(agentProvider, (_, state) {
-      if (state.chatItems.isNotEmpty) {
-        _scrollChatToBottom();
-      }
-    });
 
     return Container(
       decoration: BoxDecoration(
@@ -1002,7 +1163,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       child: Column(
         children: [
           // 状态条
-          if (agentState.isRunning) _buildAgentStatusBar(agentState),
+          if (agentState.isRunning || agentState.isWaitingConfirm) _buildAgentStatusBar(agentState),
+          // 等待确认横幅
+          if (agentState.isWaitingConfirm) _buildConfirmBanner(agentState),
           // 消息列表 + 回到底部按钮
           Expanded(
             child: Stack(
@@ -1016,7 +1179,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                     right: 8,
                     bottom: 8,
                     child: GestureDetector(
-                      onTap: _scrollChatToBottom,
+                      onTap: _scrollChatToBottomManual,
                       child: Container(
                         width: 32,
                         height: 32,
@@ -1044,6 +1207,21 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   void _scrollChatToBottom() {
+    if (!_autoScrollChat) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_chatScrollController.hasClients) {
+        _chatScrollController.animateTo(
+          _chatScrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  /// 用户点击"回到底部"按钮：恢复自动滚动并滚到底部
+  void _scrollChatToBottomManual() {
+    _autoScrollChat = true;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_chatScrollController.hasClients) {
         _chatScrollController.animateTo(
@@ -1109,6 +1287,86 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           GestureDetector(
             onTap: () => _showAgentLogDialog(context),
             child: Icon(Icons.terminal, size: 14, color: ThemeColors.of(context).textSub),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==================== 高风险命令确认横幅 ====================
+  Widget _buildConfirmBanner(AgentState agentState) {
+    final tc = ThemeColors.of(context);
+    final command = agentState.pendingConfirmCommand ?? '';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: cWarning.withOpacity(0.08),
+        border: Border(bottom: BorderSide(color: cWarning.withOpacity(0.3))),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: cWarning, size: 16),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  '高风险命令待确认',
+                  style: TextStyle(fontSize: fSmall, color: cWarning, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: tc.terminalBg,
+              borderRadius: BorderRadius.circular(rSmall),
+            ),
+            child: SelectableText(
+              command,
+              style: TextStyle(
+                fontFamily: 'JetBrainsMono',
+                fontSize: fMono,
+                color: cWarning,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              // 拒绝按钮
+              GestureDetector(
+                onTap: () => ref.read(agentProvider.notifier).rejectCommand(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: tc.surface,
+                    borderRadius: BorderRadius.circular(rSmall),
+                    border: Border.all(color: tc.border),
+                  ),
+                  child: Text('拒绝', style: TextStyle(fontSize: fSmall, color: tc.textSub, fontWeight: FontWeight.w500)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 确认执行按钮
+              GestureDetector(
+                onTap: () => ref.read(agentProvider.notifier).confirmCommand(),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: cWarning.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(rSmall),
+                    border: Border.all(color: cWarning.withOpacity(0.4)),
+                  ),
+                  child: Text('确认执行', style: TextStyle(fontSize: fSmall, color: cWarning, fontWeight: FontWeight.w600)),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -1387,9 +1645,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     return segments;
   }
 
-  /// 带执行按钮的代码块
+  /// 带执行按钮的代码块 — 每条命令独立一行
   Widget _buildCodeBlockWithExecuteButton(String codeBlock, ThemeColors tc, tp.TerminalTab? tab, bool showAutoExecute, bool isLoading) {
-    final commands = AIParser.extractCommands('```bash\n$codeBlock```');
+    final lines = codeBlock.trimRight().split('\n');
+    final canExecute = tab != null && tab.isConnected;
 
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -1401,102 +1660,106 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // 代码内容
-          Padding(
-            padding: const EdgeInsets.all(8),
-            child: SelectableText(
-              codeBlock.trimRight(),
-              style: TextStyle(
-                fontFamily: 'JetBrainsMono',
-                fontSize: fMono,
-                color: tc.terminalGreen,
-                height: 1.5,
+          ...lines.map((line) {
+            final trimmedLine = line.trim();
+            if (trimmedLine.isEmpty) return const SizedBox.shrink();
+
+            // 注释行只显示文字
+            final isComment = trimmedLine.startsWith('#');
+            // 检测安全性
+            final safetyLevel = isComment ? SafetyLevel.safe : SafetyGuard.check(trimmedLine);
+            final dangerous = !isComment && (hasChainOperator(trimmedLine) || safetyLevel != SafetyLevel.safe);
+            final isBlocked = safetyLevel == SafetyLevel.blocked;
+
+            // 命令颜色
+            final cmdColor = isBlocked
+                ? cDanger
+                : dangerous
+                    ? cWarning
+                    : tc.terminalGreen;
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              child: Row(
+                children: [
+                  // 执行按钮
+                  if (!isComment && canExecute && !isLoading)
+                    _buildInlinePlayButton(trimmedLine, dangerous, isBlocked, tc, tab!)
+                  else if (!isComment && canExecute && isLoading)
+                    Icon(Icons.play_arrow, size: 16, color: tc.textMuted.withOpacity(0.4))
+                  else
+                    const SizedBox(width: 16, height: 16),
+
+                  const SizedBox(width: 4),
+                  // 命令文字
+                  Expanded(
+                    child: SelectableText(
+                      trimmedLine,
+                      style: TextStyle(
+                        fontFamily: 'JetBrainsMono',
+                        fontSize: fMono,
+                        color: isComment ? tc.textMuted : cmdColor,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                  // 复制按钮
+                  if (!isComment)
+                    GestureDetector(
+                      onTap: () {
+                        Clipboard.setData(ClipboardData(text: trimmedLine));
+                        ScaffoldMessenger.of(context).clearSnackBars();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('已复制', style: TextStyle(fontSize: fSmall)),
+                            duration: const Duration(seconds: 1),
+                            behavior: SnackBarBehavior.floating,
+                            margin: const EdgeInsets.all(16),
+                          ),
+                        );
+                      },
+                      child: Icon(Icons.copy, size: 13, color: tc.textMuted),
+                    ),
+                ],
               ),
-            ),
-          ),
-          // 执行按钮行
-          if (!isLoading && commands.isNotEmpty && tab != null && tab.isConnected && !showAutoExecute)
-            Container(
-              padding: const EdgeInsets.only(left: 6, right: 6, bottom: 6),
-              child: Wrap(
-                spacing: 4,
-                runSpacing: 4,
-                children: commands.map((cmd) => _buildExecuteButton(cmd, tc, tab)).toList(),
-              ),
-            ),
+            );
+          }),
         ],
       ),
     );
   }
 
-  /// 三角形执行按钮
-  Widget _buildExecuteButton(CommandBlock cmd, ThemeColors tc, tp.TerminalTab tab) {
-    final isExecuting = _executingCommand == cmd.command;
-    final isExecuted = _executedCommands.contains(cmd.command);
+  /// 行内执行按钮（扁平化）
+  Widget _buildInlinePlayButton(String command, bool dangerous, bool isBlocked, ThemeColors tc, tp.TerminalTab tab) {
+    final isExecuting = _executingCommand == command;
+    final isExecuted = _executedCommands.contains(command);
     final hasAnyExecuting = _executingCommand != null;
-    final isDisabled = cmd.isBlocked || (hasAnyExecuting && !isExecuting);
+    final isDisabled = isBlocked || (hasAnyExecuting && !isExecuting);
 
-    final color = cmd.isBlocked
+    final color = isBlocked
         ? cDanger
-        : cmd.dangerous
+        : dangerous
             ? cWarning
-            : isExecuted
-                ? cSuccess
-                : cPrimary;
+            : cPrimary;
 
     return GestureDetector(
-      onTap: isDisabled ? null : () => _executeCommandDirectly(cmd, tab),
-      child: AnimatedContainer(
-        duration: animFast,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-        decoration: BoxDecoration(
-          color: isDisabled
-              ? tc.border.withOpacity(0.3)
-              : color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(rXSmall),
-          border: Border.all(
-            color: isDisabled
-                ? tc.border.withOpacity(0.3)
-                : color.withOpacity(0.2),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // 执行图标
-            if (isExecuting)
-              SizedBox(
-                width: 12, height: 12,
-                child: CircularProgressIndicator(strokeWidth: 1.5, color: color),
-              )
-            else if (isExecuted)
-              Icon(Icons.check_circle, size: 12, color: cSuccess)
-            else if (cmd.isBlocked)
-              Icon(Icons.block, size: 12, color: cDanger)
-            else
-              Icon(Icons.play_arrow_rounded, size: 12, color: color),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                _truncateCommand(cmd.command),
-                style: TextStyle(
-                  fontSize: fMicro,
-                  color: isDisabled ? tc.textMuted : color,
-                  fontFamily: 'JetBrainsMono',
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      ),
+      onTap: isDisabled ? null : () => _executeLineDirectly(command, dangerous, tab),
+      child: isExecuting
+          ? SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 1.5, color: color),
+            )
+          : isBlocked
+              ? Icon(Icons.block, size: 14, color: cDanger)
+              : Icon(Icons.play_arrow, size: 16, color: color),
     );
   }
 
-  /// 直接执行命令（安全命令不弹确认框）
-  Future<void> _executeCommandDirectly(CommandBlock cmd, tp.TerminalTab tab) async {
-    // 危险/复杂命令仍需确认
-    if (cmd.dangerous) {
+  /// 直接执行命令行
+  Future<void> _executeLineDirectly(String command, bool dangerous, tp.TerminalTab tab) async {
+    // 危险/复杂命令需确认
+    if (dangerous) {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
@@ -1516,7 +1779,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                   borderRadius: BorderRadius.circular(rSmall),
                 ),
                 child: SelectableText(
-                  cmd.command,
+                  command,
                   style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: fMono, color: cTerminalGreen),
                 ),
               ),
@@ -1538,17 +1801,20 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       if (confirmed != true) return;
     }
 
-    setState(() => _executingCommand = cmd.command);
+    setState(() => _executingCommand = command);
 
     // 发送命令到终端
-    tab.service?.writeToTerminal('${cmd.command}\n');
+    if (tab.isLocal) {
+      tab.localService?.writeToTerminal('$command\n');
+    } else {
+      tab.service?.writeToTerminal('$command\n');
+    }
 
-    // 模拟执行等待（实际命令执行由终端异步处理，这里给一个短暂延迟表示已发送）
     await Future.delayed(const Duration(milliseconds: 800));
 
     if (mounted) {
       setState(() {
-        _executedCommands.add(cmd.command);
+        _executedCommands.add(command);
         _executingCommand = null;
       });
     }
@@ -1562,9 +1828,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     final tc = ThemeColors.of(context);
 
     return Container(
-      padding: EdgeInsets.only(
-        left: 8, right: 8, top: 4, bottom: MediaQuery.of(context).padding.bottom + 4,
-      ),
+      padding: const EdgeInsets.only(left: 8, right: 8, top: 4, bottom: 4),
       decoration: BoxDecoration(
         color: tc.card,
         border: Border(top: BorderSide(color: tc.border.withOpacity(0.5))),
@@ -1576,28 +1840,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // AI 开关按钮
-              GestureDetector(
-                onTap: _toggleAIPanel,
-                child: AnimatedContainer(
-                  duration: animFast,
-                  height: 26,
-                  width: 26,
-                  decoration: BoxDecoration(
-                    color: _aiExpanded ? (isAgentMode ? cAgentGreen : cPrimary) : tc.surface,
-                    borderRadius: BorderRadius.circular(rSmall),
-                    boxShadow: _aiExpanded ? [
-                      BoxShadow(
-                        color: (isAgentMode ? cAgentGreen : cPrimary).withOpacity(0.3),
-                        blurRadius: 6,
-                      ),
-                    ] : null,
-                  ),
-                  child: Icon(
-                    _aiExpanded ? Icons.chat_bubble : Icons.smart_toy_outlined,
-                    color: _aiExpanded ? Colors.white : tc.textSub,
-                    size: 12,
-                  ),
+              // 模式指示
+              Container(
+                height: 26,
+                width: 26,
+                decoration: BoxDecoration(
+                  color: isAgentMode ? cAgentGreen.withOpacity(0.15) : cPrimary.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(rSmall),
+                ),
+                child: Icon(
+                  isAgentMode ? Icons.smart_toy : Icons.chat_bubble,
+                  color: isAgentMode ? cAgentGreen : cPrimary,
+                  size: 12,
                 ),
               ),
               const SizedBox(width: 4),
@@ -1650,22 +1904,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           ),
           const SizedBox(height: 4),
           // 下方一行：输入框
-          SizedBox(
-            height: 32,
-            child: Container(
-              decoration: BoxDecoration(
-                color: tc.surface,
-                borderRadius: BorderRadius.circular(rSmall),
-                border: Border.all(color: tc.border.withOpacity(0.3)),
-              ),
-              child: _AIPromptInput(
-                enabled: isConnected && !agentState.isRunning,
-                hintText: _getInputHint(isConnected, isAgentMode, agentState.isRunning),
-                onSend: (text) async {
-                  if (!_checkAIModelConfigured()) {
-                    _showAIModelNotConfiguredHint();
-                    return;
+          _AIPromptInput(
+              enabled: isConnected && !agentState.isRunning,
+              hintText: _getInputHint(isConnected, isAgentMode, agentState.isRunning),
+              initialText: _tabAiInputText[_currentTabId ?? ''] ?? '',
+              accentColor: isAgentMode ? cAgentGreen : cPrimary,
+              onChanged: (text) { _tabAiInputText[_currentTabId ?? ''] = text; },
+              onSend: (text) async {
+                if (!_checkAIModelConfigured()) {
+                  _showAIModelNotConfiguredHint();
+                  return;
                   }
+                  _autoScrollChat = true; // 用户发送新消息时恢复自动滚动
                   if (isAgentMode && isConnected) {
                     final tab = ref.read(tp.terminalProvider).activeTab;
                     // 本地终端用 localService，SSH 用 service
@@ -1675,11 +1925,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                   } else {
                     ref.read(chatProvider.notifier).sendMessage(text, hostId: widget.hostId ?? 'local');
                   }
-                  if (!_aiExpanded) setState(() => _aiExpanded = true);
                 },
               ),
-            ),
-          ),
         ],
       ),
     );
@@ -2191,17 +2438,56 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 class _AIPromptInput extends StatefulWidget {
   final bool enabled;
   final String hintText;
+  final String initialText;
   final Function(String) onSend;
+  final ValueChanged<String>? onChanged;
+  final Color accentColor;
 
-  const _AIPromptInput({required this.enabled, required this.hintText, required this.onSend});
+  const _AIPromptInput({
+    super.key,
+    required this.enabled,
+    required this.hintText,
+    this.initialText = '',
+    required this.onSend,
+    this.onChanged,
+    required this.accentColor,
+  });
 
   @override
   State<_AIPromptInput> createState() => _AIPromptInputState();
 }
 
 class _AIPromptInputState extends State<_AIPromptInput> {
-  final _controller = TextEditingController();
+  late TextEditingController _controller;
   final _focusNode = FocusNode();
+  String _lastInitialText = '';
+  bool _isFocused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialText);
+    _lastInitialText = widget.initialText;
+    _controller.addListener(() {
+      widget.onChanged?.call(_controller.text);
+    });
+    _focusNode.addListener(() {
+      final focused = _focusNode.hasFocus;
+      if (focused != _isFocused) {
+        setState(() => _isFocused = focused);
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _AIPromptInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 当 initialText 变化时（切换 tab），同步到 controller
+    if (widget.initialText != _lastInitialText && widget.initialText != _controller.text) {
+      _controller.text = widget.initialText;
+      _lastInitialText = widget.initialText;
+    }
+  }
 
   @override
   void dispose() {
@@ -2220,6 +2506,10 @@ class _AIPromptInputState extends State<_AIPromptInput> {
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
+    final borderColor = _isFocused
+        ? widget.accentColor.withOpacity(0.7)
+        : widget.accentColor.withOpacity(0.4);
+    final disabledBorderColor = tc.border.withOpacity(0.3);
     return TextField(
       controller: _controller,
       focusNode: _focusNode,
@@ -2229,11 +2519,28 @@ class _AIPromptInputState extends State<_AIPromptInput> {
       decoration: InputDecoration(
         hintText: widget.hintText,
         hintStyle: TextStyle(color: tc.textMuted, fontSize: fSmall),
-        border: InputBorder.none,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+        filled: true,
+        fillColor: tc.surface,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(rSmall),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(rSmall),
+          borderSide: BorderSide(color: borderColor),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(rSmall),
+          borderSide: BorderSide(color: borderColor, width: 1.5),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(rSmall),
+          borderSide: BorderSide(color: disabledBorderColor),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         isDense: true,
         suffixIcon: IconButton(
-          icon: Icon(Icons.send_rounded, color: widget.enabled ? cPrimary : cTextMuted, size: 14),
+          icon: Icon(Icons.send_rounded, color: widget.enabled ? widget.accentColor : cTextMuted, size: 14),
           onPressed: _send,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
@@ -2253,17 +2560,36 @@ class _AgentLogDialog extends StatefulWidget {
 class _AgentLogDialogState extends State<_AgentLogDialog> {
   List<String> _logs = [];
   final ScrollController _scrollController = ScrollController();
+  bool _autoScroll = true;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _loadLogs();
-    Timer.periodic(const Duration(seconds: 2), (timer) {
+    // 监听滚动：用户手动上滚时禁用自动滚动，滚到底部时恢复
+    _scrollController.addListener(() {
+      if (!_scrollController.hasClients) return;
+      final distanceFromBottom = _scrollController.position.maxScrollExtent - _scrollController.offset;
+      if (distanceFromBottom > 120 && _autoScroll) {
+        _autoScroll = false;
+        setState(() {});
+      }
+      if (distanceFromBottom <= 40 && !_autoScroll) {
+        _autoScroll = true;
+        setState(() {});
+      }
+    });
+    _refreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       if (!mounted) { timer.cancel(); return; }
       setState(() => _loadLogs());
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: animNormal, curve: Curves.easeOut);
-      }
+      // 下一帧再滚动，给 scrollController listener 时间检测用户是否手动上滚过
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        if (_autoScroll && _scrollController.hasClients) {
+          _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: animNormal, curve: Curves.easeOut);
+        }
+      });
     });
   }
 
@@ -2274,6 +2600,7 @@ class _AgentLogDialogState extends State<_AgentLogDialog> {
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _scrollController.dispose();
     super.dispose();
   }
@@ -2307,28 +2634,57 @@ class _AgentLogDialogState extends State<_AgentLogDialog> {
             ),
             const Divider(color: cBorder, height: 16),
             Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: tc.bg,
-                  borderRadius: BorderRadius.circular(rSmall),
-                ),
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.all(8),
-                  itemCount: _logs.length,
-                  itemBuilder: (context, index) {
-                    final log = _logs[index];
-                    Color color = cTextSub;
-                    if (log.contains('[ERROR]')) color = cDanger;
-                    else if (log.contains('[WARN]')) color = cWarning;
-                    else if (log.contains('[DEBUG]')) color = cTextMuted;
-                    else if (log.contains('[INFO]')) color = cSuccess;
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 0.5),
-                      child: SelectableText(log, style: TextStyle(fontFamily: 'monospace', fontSize: fMicro, color: color)),
-                    );
-                  },
-                ),
+              child: Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      color: tc.bg,
+                      borderRadius: BorderRadius.circular(rSmall),
+                    ),
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(8),
+                      itemCount: _logs.length,
+                      itemBuilder: (context, index) {
+                        final log = _logs[index];
+                        Color color = cTextSub;
+                        if (log.contains('[ERROR]')) color = cDanger;
+                        else if (log.contains('[WARN]')) color = cWarning;
+                        else if (log.contains('[DEBUG]')) color = cTextMuted;
+                        else if (log.contains('[INFO]')) color = cSuccess;
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 0.5),
+                          child: SelectableText(log, style: TextStyle(fontFamily: 'monospace', fontSize: fMicro, color: color)),
+                        );
+                      },
+                    ),
+                  ),
+                  // 回到底部按钮
+                  if (!_autoScroll)
+                    Positioned(
+                      right: 8,
+                      bottom: 8,
+                      child: GestureDetector(
+                        onTap: () {
+                          _autoScroll = true;
+                          if (_scrollController.hasClients) {
+                            _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: animNormal, curve: Curves.easeOut);
+                          }
+                        },
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: tc.cardElevated,
+                            borderRadius: BorderRadius.circular(rFull),
+                            border: Border.all(color: tc.border),
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 6)],
+                          ),
+                          child: Icon(Icons.keyboard_arrow_down, size: 18, color: tc.textSub),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             const SizedBox(height: 8),
