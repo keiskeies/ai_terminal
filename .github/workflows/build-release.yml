@@ -75,6 +75,13 @@ jobs:
         run: |
           cd ai_terminal
           flutter pub get
+      - name: Patch Flutter Gradle settings
+        run: |
+          # Add gradlePluginPortal() to Flutter's settings.gradle.kts so kotlin-dsl plugin can be resolved
+          SETTINGS="$(flutter --no-version-check sdk-path)/packages/flutter_tools/gradle/settings.gradle.kts"
+          if ! grep -q 'gradlePluginPortal' "$SETTINGS"; then
+            sed -i.bak '/mavenCentral()/a\        gradlePluginPortal()' "$SETTINGS"
+          fi
       - name: Build Android APK
         run: |
           cd ai_terminal
