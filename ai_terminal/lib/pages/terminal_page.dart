@@ -2176,14 +2176,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Agent 自动模式下的最大循环次数，超过后任务将中断。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
+            Text('Agent 自动模式下的最大执行步骤数。设为 0 表示无限制，复杂任务不会被中断。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
             const SizedBox(height: 12),
             TextField(
               controller: controller,
               keyboardType: TextInputType.number,
               style: TextStyle(color: cTextMain, fontSize: fBody),
               decoration: InputDecoration(
-                labelText: '步骤数',
+                labelText: '步骤数 (0 = 无限制)',
                 labelStyle: TextStyle(color: cTextSub),
                 enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: cBorder)),
                 focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
@@ -2198,13 +2198,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           ),
           ElevatedButton(
             onPressed: () {
-              final steps = int.tryParse(controller.text) ?? 10;
-              final clamped = steps.clamp(1, 50);
+              final steps = int.tryParse(controller.text) ?? 0;
+              final clamped = steps.clamp(0, 999);
               ref.read(agentProvider.notifier).setMaxSteps(clamped);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('最大步骤数已设为 $clamped'),
+                  content: Text('最大步骤数已设为 ${clamped == 0 ? "无限制" : clamped}'),
                   duration: const Duration(seconds: 1),
                   behavior: SnackBarBehavior.floating,
                 ),

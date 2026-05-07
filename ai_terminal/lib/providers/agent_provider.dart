@@ -30,7 +30,7 @@ class AgentState {
     this.lastMessage,
     List<ChatItem>? chatItems,
     this.error,
-    this.maxSteps = 10,
+    this.maxSteps = 0,
     this.pendingConfirmCommand,
   }) : chatItems = chatItems ?? [];
 
@@ -94,9 +94,8 @@ class ChatItem {
   });
 }
 
-/// Agent Provider — 每个 tab 独立 Agent 状态
+/// Agent Provider — 每个 tab 独立 Agent 状态和记忆
 class AgentNotifier extends StateNotifier<AgentState> {
-  final AgentMemory _memory;
   AgentEngine? _engine;
   CommandExecutor? _executor;
   AIModelConfig? _modelConfig;
@@ -109,6 +108,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
   final Map<String, CommandExecutor?> _tabExecutors = {};
   final Map<String, AIModelConfig?> _tabModelConfigs = {};
 
+  /// 每个 tab 独立的记忆实例
+  final Map<String, AgentMemory> _tabMemories = {};
+
   /// 每个 tab 是否已收集过系统信息
   final Map<String, bool> _tabSysInfoCollected = {};
 
@@ -118,11 +120,18 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 当前引擎所属的 tabId（用于回调路由）
   String? _engineTabId;
 
+  /// 每 tab 的流式累积内容（避免从 state.lastMessage 读取导致数据丢失）
+  final Map<String, String> _tabStreamingContent = {};
+
   /// 流式输出节流
-  String _streamingBuffer = '';
   Timer? _throttleTimer;
 
-  AgentNotifier(this._memory) : super(AgentState());
+  AgentNotifier() : super(AgentState());
+
+  /// 获取当前 tab 的记忆实例（不存在则创建）
+  AgentMemory _getMemory(String tabId) {
+    return _tabMemories.putIfAbsent(tabId, () => AgentMemory());
+  }
 
   /// 切换到指定 tab（保存当前状态，加载目标 tab 状态）
   void switchTab(String tabId) {
@@ -153,12 +162,14 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
   }
 
-  /// 关闭 tab 时清除其状态
+  /// 关闭 tab 时清除其状态和记忆
   void removeTab(String tabId) {
     _tabStates.remove(tabId);
     _tabEngines.remove(tabId);
     _tabExecutors.remove(tabId);
     _tabModelConfigs.remove(tabId);
+    _tabMemories.remove(tabId);
+    _tabStreamingContent.remove(tabId);
     _tabSysInfoCollected.remove(tabId);
     if (_activeTabId == tabId) {
       _activeTabId = null;
@@ -167,19 +178,18 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
   /// 为当前 tab 重新初始化引擎（如果有模型配置）
   void _reinitEngineForCurrentTab() {
-    if (_modelConfig != null) {
+    if (_modelConfig != null && _activeTabId != null) {
+      final memory = _getMemory(_activeTabId!);
       final aiProvider = AIService.create(_modelConfig!);
       _engine = AgentEngine(
         aiProvider: aiProvider,
         modelConfig: _modelConfig!,
-        memory: _memory,
+        memory: memory,
         maxSteps: state.maxSteps,
       );
       _setupEngineCallbacks(_activeTabId!);
-      if (_activeTabId != null) {
-        _tabEngines[_activeTabId!] = _engine!;
-        _tabModelConfigs[_activeTabId!] = _modelConfig;
-      }
+      _tabEngines[_activeTabId!] = _engine!;
+      _tabModelConfigs[_activeTabId!] = _modelConfig;
     }
   }
 
@@ -199,14 +209,18 @@ class AgentNotifier extends StateNotifier<AgentState> {
     required AIProvider aiProvider,
   }) {
     _modelConfig = modelConfig;
+
+    final tabId = _activeTabId ?? '';
+    final memory = _getMemory(tabId);
+
     _engine = AgentEngine(
       aiProvider: aiProvider,
       modelConfig: modelConfig,
-      memory: _memory,
+      memory: memory,
       maxSteps: state.maxSteps,
     );
 
-    _setupEngineCallbacks(_activeTabId ?? '');
+    _setupEngineCallbacks(tabId);
 
     // 保存到当前 tab
     if (_activeTabId != null) {
@@ -222,25 +236,26 @@ class AgentNotifier extends StateNotifier<AgentState> {
     };
 
     _engine!.onMessage = (msg) {
-      final currentLast = state.lastMessage ?? '';
-      final newLast = currentLast + msg;
-      _streamingBuffer = newLast;
+      // 直接往 per-tab 累积器追加，不从 state.lastMessage 读取
+      _tabStreamingContent[tabId] = (_tabStreamingContent[tabId] ?? '') + msg;
       // 节流：限制 UI 更新频率
       _throttleTimer ??= Timer(
         const Duration(milliseconds: _agentStreamThrottleMs),
         () {
           _throttleTimer = null;
-          if (_streamingBuffer.isNotEmpty) {
-            final items = [...state.chatItems];
-            if (items.isNotEmpty && items.last.role == 'assistant') {
-              items[items.length - 1] = ChatItem(
-                role: 'assistant',
-                content: _streamingBuffer,
-                isStreaming: state.isRunning,
-              );
-            }
-            _updateTabState(tabId, (s) => s.copyWith(lastMessage: _streamingBuffer, chatItems: items));
-            _streamingBuffer = '';
+          final content = _tabStreamingContent[tabId];
+          if (content != null && content.isNotEmpty) {
+            _updateTabState(tabId, (s) {
+              final items = [...s.chatItems];
+              if (items.isNotEmpty && items.last.role == 'assistant') {
+                items[items.length - 1] = ChatItem(
+                  role: 'assistant',
+                  content: content,
+                  isStreaming: s.isRunning,
+                );
+              }
+              return s.copyWith(lastMessage: content, chatItems: items);
+            });
           }
         },
       );
@@ -346,6 +361,12 @@ class AgentNotifier extends StateNotifier<AgentState> {
       }
     }
 
+    // 重置流式累积器和节流定时器，防止上次任务残留
+    final currentTabId = _activeTabId ?? '';
+    _tabStreamingContent[currentTabId] = '';
+    _throttleTimer?.cancel();
+    _throttleTimer = null;
+
     // 添加用户消息到 chatItems
     final items = [...state.chatItems, ChatItem(role: 'user', content: goal)];
 
@@ -391,24 +412,22 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
   }
 
-  /// 清空消息
+  /// 清空消息（同时清除引擎对话历史，确保下次对话全新开始）
   void clearMessages() {
+    _engine?.clearHistory();
     state = state.copyWith(chatItems: [], lastMessage: '');
   }
 
-  /// 清空记忆
-  Future<void> clearMemory() async {
-    await _memory.clear();
+  /// 清空当前 tab 的记忆
+  void clearMemory() {
+    if (_activeTabId != null) {
+      _getMemory(_activeTabId!).clear();
+    }
     state = state.copyWith(error: null);
   }
 }
 
 /// Provider
-final agentMemoryProvider = Provider<AgentMemory>((ref) {
-  return AgentMemory();
-});
-
 final agentProvider = StateNotifierProvider<AgentNotifier, AgentState>((ref) {
-  final memory = ref.watch(agentMemoryProvider);
-  return AgentNotifier(memory);
+  return AgentNotifier();
 });

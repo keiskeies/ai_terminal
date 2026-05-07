@@ -1,17 +1,10 @@
-import 'dart:convert';
-import 'package:hive/hive.dart';
-import '../core/hive_init.dart';
-
-part 'agent_memory.g.dart';
-
-/// Agent 记忆条目
-@HiveType(typeId: 10)
+/// Agent 记忆条目（纯内存，不持久化）
 class MemoryEntry {
-  @HiveField(0) final String id;
-  @HiveField(1) final String type;
-  @HiveField(2) final String content;
-  @HiveField(3) final String? metadata;
-  @HiveField(4) final DateTime timestamp;
+  final String id;
+  final String type;
+  final String content;
+  final String? metadata;
+  final DateTime timestamp;
 
   MemoryEntry({
     required this.id,
@@ -23,11 +16,7 @@ class MemoryEntry {
 
   Map<String, dynamic>? get metadataMap {
     if (metadata == null) return null;
-    try {
-      return jsonDecode(metadata!) as Map<String, dynamic>;
-    } catch (_) {
-      return null;
-    }
+    return _parseSimpleJson(metadata!);
   }
 
   static MemoryEntry command(String command, {String? description, String? result}) {
@@ -35,10 +24,7 @@ class MemoryEntry {
       id: 'cmd_${DateTime.now().millisecondsSinceEpoch}',
       type: 'command',
       content: command,
-      metadata: jsonEncode({
-        'description': description,
-        'result': result,
-      }),
+      metadata: '{"description":"$description","result":"$result"}',
     );
   }
 
@@ -47,7 +33,7 @@ class MemoryEntry {
       id: 'sys_${DateTime.now().millisecondsSinceEpoch}',
       type: 'system_info',
       content: info,
-      metadata: jsonEncode({'category': category}),
+      metadata: '{"category":"$category"}',
     );
   }
 
@@ -56,7 +42,7 @@ class MemoryEntry {
       id: 'res_${DateTime.now().millisecondsSinceEpoch}',
       type: 'result',
       content: '$command\n$output',
-      metadata: jsonEncode({'success': success}),
+      metadata: '{"success":$success}',
     );
   }
 
@@ -69,34 +55,61 @@ class MemoryEntry {
   }
 }
 
-/// Agent 记忆系统
+Map<String, dynamic>? _parseSimpleJson(String s) {
+  s = s.trim();
+  if (!s.startsWith('{') || !s.endsWith('}')) return null;
+  final inner = s.substring(1, s.length - 1);
+  final map = <String, dynamic>{};
+  if (inner.isNotEmpty) {
+    for (final pair in inner.split(',')) {
+      final idx = pair.indexOf(':');
+      if (idx > 0) {
+        final key = pair.substring(0, idx).trim();
+        var val = pair.substring(idx + 1).trim();
+        if (val.startsWith('"') && val.endsWith('"')) {
+          val = val.substring(1, val.length - 1);
+        } else if (val == 'true') {
+          map[key] = true;
+          continue;
+        } else if (val == 'false') {
+          map[key] = false;
+          continue;
+        }
+        map[key] = val;
+      }
+    }
+  }
+  return map;
+}
+
+/// Agent 记忆系统（纯内存，每个连接/Tab 独立实例）
 class AgentMemory {
-  static const int _maxEntries = 100;
+  static const int _maxEntries = 50;
   static const int _systemInfoMax = 10;
 
-  Box<MemoryEntry> get _box => HiveInit.agentMemoryBox;
+  final List<MemoryEntry> _entries = [];
 
-  Future<void> add(MemoryEntry entry) async {
-    await _box.put(entry.id, entry);
-    await _trim();
+  void add(MemoryEntry entry) {
+    _entries.add(entry);
+    _trim();
   }
 
-  Future<void> rememberCommand(String command, {String? description}) async {
-    await add(MemoryEntry.command(command, description: description));
+  void rememberCommand(String command, {String? description}) {
+    add(MemoryEntry.command(command, description: description));
   }
 
-  Future<void> rememberResult(String command, String output, {bool success = true}) async {
-    await add(MemoryEntry.result(command, output, success: success));
+  void rememberResult(String command, String output, {bool success = true}) {
+    add(MemoryEntry.result(command, output, success: success));
   }
 
-  Future<void> rememberSystemInfo(String info, {String? category}) async {
-    await add(MemoryEntry.systemInfo(info, category: category));
+  void rememberSystemInfo(String info, {String? category}) {
+    add(MemoryEntry.systemInfo(info, category: category));
   }
 
   List<MemoryEntry> getRecent({int limit = 20}) {
-    final entries = _box.values.toList()
+    final sorted = List<MemoryEntry>.from(_entries)
       ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    return entries.take(limit).toList();
+    return sorted.take(limit).toList();
   }
 
   List<MemoryEntry> getRecentCommands({int limit = 10}) {
@@ -106,7 +119,7 @@ class AgentMemory {
   }
 
   String getSystemSummary() {
-    final systemInfos = _box.values
+    final systemInfos = _entries
         .where((e) => e.type == 'system_info')
         .toList()
         .reversed
@@ -115,7 +128,7 @@ class AgentMemory {
   }
 
   String buildContext() {
-    final recent = getRecent(limit: 30);
+    final recent = getRecent(limit: 10);
     if (recent.isEmpty) return '';
 
     final buffer = StringBuffer();
@@ -124,12 +137,12 @@ class AgentMemory {
     final systemInfos = recent.where((e) => e.type == 'system_info');
     if (systemInfos.isNotEmpty) {
       buffer.writeln('系统环境:');
-      for (final info in systemInfos.take(5)) {
+      for (final info in systemInfos.take(3)) {
         buffer.writeln('  - ${info.content}');
       }
     }
 
-    final commands = recent.where((e) => e.type == 'command').take(5);
+    final commands = recent.where((e) => e.type == 'command').take(3);
     if (commands.isNotEmpty) {
       buffer.writeln('最近命令:');
       for (final cmd in commands) {
@@ -140,27 +153,24 @@ class AgentMemory {
     return buffer.toString();
   }
 
-  Future<void> _trim() async {
-    final all = _box.values.toList()
-      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    if (all.length > _maxEntries) {
-      final toDelete = all.skip(_maxEntries).map((e) => e.id).toList();
-      await _box.deleteAll(toDelete);
+  void _trim() {
+    _entries.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    if (_entries.length > _maxEntries) {
+      _entries.removeRange(_maxEntries, _entries.length);
     }
   }
 
-  Future<void> clear() async {
-    await _box.clear();
+  void clear() {
+    _entries.clear();
   }
 
   Map<String, int> get stats {
-    final entries = _box.values.toList();
     return {
-      'total': entries.length,
-      'commands': entries.where((e) => e.type == 'command').length,
-      'results': entries.where((e) => e.type == 'result').length,
-      'system_info': entries.where((e) => e.type == 'system_info').length,
-      'context': entries.where((e) => e.type == 'context').length,
+      'total': _entries.length,
+      'commands': _entries.where((e) => e.type == 'command').length,
+      'results': _entries.where((e) => e.type == 'result').length,
+      'system_info': _entries.where((e) => e.type == 'system_info').length,
+      'context': _entries.where((e) => e.type == 'context').length,
     };
   }
 }

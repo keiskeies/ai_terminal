@@ -72,6 +72,9 @@ class AgentEngine {
   Completer<bool>? _confirmCompleter; // 等待用户确认危险命令的 Completer
   String? _pendingConfirmCommand; // 当前等待确认的命令
 
+  /// 持久化对话历史，跨 startTask() 调用保留上下文
+  final List<ChatMessage> _conversationHistory = [];
+
   void Function(String)? onThinking;
   void Function(String)? onCommandGenerated;
   void Function(AgentResult)? onCommandExecuted;
@@ -80,13 +83,19 @@ class AgentEngine {
   void Function(String)? onMessage;
   void Function(String)? onCompleted;
 
-  int maxSteps = 10;
+  int maxSteps = 0; // 0 = 无限制
+
+  /// 对话历史最大轮数（每轮 = assistant + user），超出时裁剪最早的轮次
+  static const int _maxConversationRounds = 10;
+
+  /// 单条消息最大字符数，超出截断
+  static const int _maxMessageChars = 1500;
 
   AgentEngine({
     required AIProvider aiProvider,
     required AIModelConfig modelConfig,
     required AgentMemory memory,
-    this.maxSteps = 10,
+    this.maxSteps = 0,
   })  : _aiProvider = aiProvider,
         _modelConfig = modelConfig,
         _memory = memory;
@@ -100,6 +109,11 @@ class AgentEngine {
   String? get pendingConfirmCommand => _pendingConfirmCommand;
 
   void setMode(AgentMode mode) => _mode = mode;
+
+  /// 清空对话历史（开始全新对话时调用）
+  void clearHistory() {
+    _conversationHistory.clear();
+  }
 
   /// 启动 Agent 任务
   /// [goal] 用户目标
@@ -175,17 +189,27 @@ class AgentEngine {
   }
 
   Future<void> _executeAssistant(String goal, CommandExecutor? executor) async {
+    final isNewConversation = _conversationHistory.isEmpty;
+
+    // 更新或创建系统提示
     final systemPrompt = _buildSystemPrompt(executor, autoExecute: false);
-    final messages = <ChatMessage>[];
+    if (isNewConversation) {
+      _conversationHistory.add(ChatMessage.create(role: 'system', content: systemPrompt));
+    } else {
+      _conversationHistory[0] = ChatMessage.create(role: 'system', content: systemPrompt);
+    }
+
+    // 添加用户消息
+    _conversationHistory.add(ChatMessage.create(role: 'user', content: goal));
 
     onMessage?.call('🤔 正在分析你的需求...\n');
 
     String fullResponse = '';
     final stream = await _aiProvider.chatStream(
-      history: messages,
-      prompt: goal,
+      history: _conversationHistory,
+      prompt: '',
       config: _modelConfig,
-      systemPrompt: systemPrompt,
+      systemPrompt: null,
     );
 
     await for (final chunk in stream) {
@@ -193,6 +217,10 @@ class AgentEngine {
       _accumulatedMessage += chunk;
       onMessage?.call(chunk);
     }
+
+    // 将 AI 响应加入历史，确保下次对话有上下文
+    _conversationHistory.add(ChatMessage.create(role: 'assistant', content: fullResponse));
+    _trimMessages(_conversationHistory);
 
     _currentTask = _currentTask!.copyWith(
       status: AgentStatus.waitingConfirm,
@@ -216,28 +244,36 @@ class AgentEngine {
     final maxSteps = this.maxSteps;
     var stepCount = 0;
 
-    _accumulatedMessage = '🚀 开始自动执行任务...\n\n';
-    onMessage?.call('🚀 开始自动执行任务...\n\n');
+    // 判断是否为新对话（决定系统提示和消息格式）
+    final isNewConversation = _conversationHistory.isEmpty;
 
-    final messages = <ChatMessage>[];
-    messages.add(ChatMessage.create(
-      role: 'system',
-      content: _buildSystemPrompt(executor, autoExecute: true),
-    ));
-    messages.add(ChatMessage.create(
-      role: 'user',
-      content: '任务: $goal\n\n请分析任务并开始执行。',
-    ));
-
-    final memoryContext = _memory.buildContext();
-    if (memoryContext.isNotEmpty) {
-      messages.add(ChatMessage.create(role: 'user', content: '\n$memoryContext\n'));
-      agentLogger.info('AutoExec', '添加记忆上下文: ${memoryContext.length} 字符');
+    // 更新或创建系统提示（每次都更新，确保环境信息和记忆是最新的）
+    final systemPrompt = _buildSystemPrompt(executor, autoExecute: true);
+    if (isNewConversation) {
+      _conversationHistory.add(ChatMessage.create(role: 'system', content: systemPrompt));
+    } else {
+      _conversationHistory[0] = ChatMessage.create(role: 'system', content: systemPrompt);
     }
 
-    agentLogger.info('AutoExec', '开始执行循环 (最多 $maxSteps 步)');
+    // 添加用户消息：首次带"任务:"前缀，后续直接追加（保持上下文连贯）
+    _conversationHistory.add(ChatMessage.create(
+      role: 'user',
+      content: isNewConversation ? '任务: $goal\n\n请分析任务并开始执行。' : goal,
+    ));
 
-    while (stepCount < maxSteps) {
+    agentLogger.info('AutoExec', '对话历史: ${_conversationHistory.length} 条消息 (新对话: $isNewConversation)');
+
+    // 仅新对话显示启动提示
+    if (isNewConversation) {
+      _accumulatedMessage = '🚀 开始自动执行任务...\n\n';
+      onMessage?.call('🚀 开始自动执行任务...\n\n');
+    } else {
+      _accumulatedMessage = '';
+    }
+
+    agentLogger.info('AutoExec', '开始执行循环${maxSteps > 0 ? " (最多 $maxSteps 步)" : " (无步数限制)"}');
+
+    while (maxSteps <= 0 || stepCount < maxSteps) {
       stepCount++;
       agentLogger.info('AutoExec', '--- 步骤 $stepCount ---');
 
@@ -250,11 +286,11 @@ class AgentEngine {
 
       String fullResponse = '';
       agentLogger.info('AutoExec', '调用 AI 模型...');
-      agentLogger.debug('AutoExec', '消息历史: ${messages.length} 条');
+      agentLogger.debug('AutoExec', '消息历史: ${_conversationHistory.length} 条');
 
       try {
         final stream = await _aiProvider.chatStream(
-          history: messages,
+          history: _conversationHistory,
           prompt: '',
           config: _modelConfig,
           systemPrompt: null,
@@ -270,6 +306,9 @@ class AgentEngine {
         agentLogger.info('AutoExec', 'AI响应完成，共 $chunkCount 个数据块');
         agentLogger.debug('AutoExec', '响应长度: ${fullResponse.length} 字符');
 
+        // 始终将 AI 响应加入对话历史（确保上下文连贯）
+        _conversationHistory.add(ChatMessage.create(role: 'assistant', content: fullResponse));
+
         final command = _extractCommand(fullResponse);
         agentLogger.info('AutoExec', '提取命令: ${command != null ? "找到" : "未找到"}');
 
@@ -282,16 +321,10 @@ class AgentEngine {
         if (command == null) {
           if (_isTaskComplete(fullResponse)) {
             agentLogger.info('AutoExec', '任务完成 (检测到完成关键词)');
-            _currentTask = _currentTask!.copyWith(
-              status: AgentStatus.completed,
-              completedAt: DateTime.now(),
-            );
-            onTaskUpdated?.call(_currentTask!);
-            return;
+          } else {
+            agentLogger.info('AutoExec', 'AI未生成命令，视为任务完成（纯问答或已回答）');
           }
-          // 没有命令也没有完成关键词：AI 可能是纯文字回答（问答类任务）
-          // 直接视为任务完成，不再强制 AI 继续执行命令
-          agentLogger.info('AutoExec', 'AI未生成命令，视为任务完成（纯问答或已回答）');
+          _trimMessages(_conversationHistory);
           _currentTask = _currentTask!.copyWith(
             status: AgentStatus.completed,
             completedAt: DateTime.now(),
@@ -308,11 +341,11 @@ class AgentEngine {
           final msg = '\n\n🚫 命令被安全系统拦截: $command\n';
           _accumulatedMessage += msg;
           onMessage?.call(msg);
-          messages.add(ChatMessage.create(role: 'assistant', content: fullResponse));
-          messages.add(ChatMessage.create(
+          _conversationHistory.add(ChatMessage.create(
             role: 'user',
             content: '该命令被安全系统拦截，请换一个方法。',
           ));
+          _trimMessages(_conversationHistory);
           continue;
         }
 
@@ -357,11 +390,11 @@ class AgentEngine {
             final rejectMsg = '\n❌ 用户拒绝执行此命令。\n';
             _accumulatedMessage += rejectMsg;
             onMessage?.call(rejectMsg);
-            messages.add(ChatMessage.create(role: 'assistant', content: fullResponse));
-            messages.add(ChatMessage.create(
+            _conversationHistory.add(ChatMessage.create(
               role: 'user',
               content: '用户拒绝执行上述命令。请换一个不需要修改系统的方法，或者仅用只读命令收集信息。如果任务无法在不修改系统的前提下完成，请说明情况并结束任务。',
             ));
+            _trimMessages(_conversationHistory);
             continue;
           }
         }
@@ -385,20 +418,23 @@ class AgentEngine {
 
         onCommandExecuted?.call(result);
 
-        await _memory.rememberCommand(command);
-        await _memory.rememberResult(
+        _memory.rememberCommand(command);
+        _memory.rememberResult(
           command,
           result.output ?? result.error ?? '',
           success: result.success,
         );
 
-        messages.add(ChatMessage.create(role: 'assistant', content: fullResponse));
-
+        // 查询类命令保留完整输出，修改类命令截断
+        final isQuery = _isQueryCommand(command);
         final resultMsg = result.success
-            ? '✅ 命令执行成功\n结果: ${_truncateOutput(result.output)}'
-            : '❌ 命令执行失败\n错误: ${_truncateOutput(result.error)}';
+            ? '✅ 命令执行成功\n结果: ${_truncateOutput(result.output, maxLines: isQuery ? 80 : 8, maxChars: isQuery ? 4000 : 600)}'
+            : '❌ 命令执行失败\n错误: ${_truncateOutput(result.error, maxLines: isQuery ? 80 : 8, maxChars: isQuery ? 4000 : 600)}';
 
-        messages.add(ChatMessage.create(role: 'user', content: resultMsg));
+        _conversationHistory.add(ChatMessage.create(role: 'user', content: resultMsg));
+
+        // 裁剪对话历史，防止上下文膨胀
+        _trimMessages(_conversationHistory);
 
         // 累积到 UI 显示消息
         _accumulatedMessage += '\n$resultMsg';
@@ -415,13 +451,13 @@ class AgentEngine {
     }
 
     _currentTask = _currentTask!.copyWith(
-      status: stepCount >= maxSteps ? AgentStatus.failed : AgentStatus.completed,
+      status: (maxSteps > 0 && stepCount >= maxSteps) ? AgentStatus.failed : AgentStatus.completed,
       completedAt: DateTime.now(),
     );
     onTaskUpdated?.call(_currentTask!);
     agentLogger.info('AutoExec', '=== 执行结束 ===');
 
-    if (stepCount >= maxSteps) {
+    if (maxSteps > 0 && stepCount >= maxSteps) {
       agentLogger.warn('AutoExec', '达到最大执行步数 $maxSteps');
       final msg = '\n\n⚠️ 达到最大执行步数 ($maxSteps)，任务被中断';
       _accumulatedMessage += msg;
@@ -635,6 +671,42 @@ class AgentEngine {
     return cmdKeywords.any((k) => text.toLowerCase().contains(k));
   }
 
+  /// 判断命令是否是查询/只读类命令（输出不应截断，agent 需要完整结果定位问题）
+  bool _isQueryCommand(String command) {
+    final queryPrefixes = [
+      // 文件搜索与内容查找
+      'grep', 'egrep', 'fgrep', 'find', 'locate', 'which', 'where', 'type',
+      // 文件查看
+      'cat', 'head', 'tail', 'less', 'more', 'file', 'stat', 'diff',
+      // 目录列表
+      'ls', 'tree', 'du', 'df',
+      // 系统信息
+      'uname', 'hostname', 'uptime', 'free', 'env', 'printenv', 'pwd',
+      'whoami', 'id', 'date', 'cal',
+      // 进程与服务
+      'ps', 'top', 'htop', 'lsof', 'ss', 'netstat', 'vmstat', 'iostat',
+      // 系统管理（只读子命令）
+      'systemctl status', 'systemctl list', 'systemctl is-',
+      'service status',
+      // 日志查看
+      'journalctl', 'dmesg', 'last', 'lastb', 'w', 'who',
+      // 容器/编排（只读子命令）
+      'docker ps', 'docker images', 'docker logs', 'docker inspect', 'docker search',
+      'kubectl get', 'kubectl describe', 'kubectl logs', 'kubectl top',
+      // 包管理（只读子命令）
+      'apt list', 'apt show', 'apt-cache', 'yum list', 'yum info',
+      'dnf list', 'dnf info', 'rpm -q', 'dpkg -l', 'dpkg -s',
+      // 网络（只读）
+      'ping', 'traceroute', 'dig', 'nslookup', 'host', 'curl', 'wget',
+      'ip addr', 'ip route', 'ip link', 'ifconfig',
+      // 文本统计
+      'wc', 'sort', 'uniq', 'awk', 'sed -n',
+    ];
+
+    final cmdLower = command.trim().toLowerCase();
+    return queryPrefixes.any((prefix) => cmdLower.startsWith(prefix));
+  }
+
   bool _isTaskComplete(String response) {
     final keywords = [
       '任务完成', '任务已完成', '✅ 任务完成', '✅任务完成',
@@ -705,9 +777,40 @@ class AgentEngine {
     }
   }
 
+  /// 裁剪对话历史，保留最近 _maxConversationRounds 轮，并对长消息截断
+  void _trimMessages(List<ChatMessage> messages) {
+    // 保留 system 消息
+    final systemMsgs = messages.where((m) => m.role == 'system').toList();
+    final nonSystemMsgs = messages.where((m) => m.role != 'system').toList();
+
+    // 每轮 = 1 assistant + 1 user，保留最近 _maxConversationRounds 轮
+    final maxNonSystem = _maxConversationRounds * 2;
+    List<ChatMessage> keptNonSystem;
+    if (nonSystemMsgs.length > maxNonSystem) {
+      keptNonSystem = nonSystemMsgs.skip(nonSystemMsgs.length - maxNonSystem).toList();
+      agentLogger.info('TrimMsgs', '裁剪对话历史: ${nonSystemMsgs.length} → ${keptNonSystem.length} 条非系统消息');
+    } else {
+      keptNonSystem = nonSystemMsgs;
+    }
+
+    // 对每条非系统消息截断过长内容
+    for (int i = 0; i < keptNonSystem.length; i++) {
+      final msg = keptNonSystem[i];
+      if (msg.content.length > _maxMessageChars) {
+        final truncated = '...(已截断前 ${msg.content.length - _maxMessageChars} 字符)\n${msg.content.substring(msg.content.length - _maxMessageChars)}';
+        keptNonSystem[i] = ChatMessage.create(role: msg.role, content: truncated);
+      }
+    }
+
+    messages
+      ..clear()
+      ..addAll(systemMsgs)
+      ..addAll(keptNonSystem);
+  }
+
   /// 截断命令输出，保留尾部（长输出有价值的信息通常在末尾，如 "Complete!"）
   /// 最多保留 [maxLines] 行，或 [maxChars] 字符
-  String _truncateOutput(String? output, {int maxLines = 30, int maxChars = 2000}) {
+  String _truncateOutput(String? output, {int maxLines = 8, int maxChars = 600}) {
     if (output == null || output.isEmpty) return '(无输出)';
     if (output.length <= maxChars) return output;
 
@@ -760,7 +863,7 @@ class AgentEngine {
         );
 
         final clean = AnsiStripper.strip(output);
-        await _memory.rememberSystemInfo('已收集 $cat 信息', category: cat);
+        _memory.rememberSystemInfo('已收集 $cat 信息', category: cat);
       }
     } catch (_) {}
   }

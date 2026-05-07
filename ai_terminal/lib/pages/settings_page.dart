@@ -59,7 +59,7 @@ class SettingsPage extends ConsumerWidget {
             icon: Icons.auto_mode_rounded,
             iconColor: cAgentGreen,
             title: 'Agent 设置',
-            subtitle: '最大执行步骤数: $maxSteps',
+            subtitle: '最大执行步骤数: ${maxSteps == 0 ? "无限制" : maxSteps}',
             onTap: () => _showMaxStepsDialog(context, ref),
           ),
           _buildListTile(
@@ -129,14 +129,14 @@ class SettingsPage extends ConsumerWidget {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Agent 自动模式下最多执行的步骤数，超过后任务自动中断。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
+            Text('Agent 自动模式下的最大执行步骤数。设为 0 表示无限制，复杂任务不会被中断。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
             const SizedBox(height: 12),
             TextField(
               controller: controller,
               keyboardType: TextInputType.number,
               style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody),
               decoration: InputDecoration(
-                labelText: '步骤数 (1-50)',
+                labelText: '步骤数 (0 = 无限制)',
                 labelStyle: TextStyle(color: ThemeColors.of(context).textSub),
                 enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: ThemeColors.of(context).border)),
                 focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
@@ -151,8 +151,8 @@ class SettingsPage extends ConsumerWidget {
           ),
           ElevatedButton(
             onPressed: () {
-              final steps = int.tryParse(controller.text) ?? 10;
-              final clamped = steps.clamp(1, 50);
+              final steps = int.tryParse(controller.text) ?? 0;
+              final clamped = steps.clamp(0, 999);
               ref.read(agentProvider.notifier).setMaxSteps(clamped);
               Navigator.pop(ctx);
             },

@@ -3,7 +3,6 @@ import '../models/host_config.dart';
 import '../models/ai_model_config.dart';
 import '../models/chat_session.dart';
 import '../models/command_snippet.dart';
-import '../models/agent_memory.dart';
 import 'credentials_store.dart';
 
 class HiveInit {
@@ -17,14 +16,12 @@ class HiveInit {
     Hive.registerAdapter(ChatMessageAdapter());
     Hive.registerAdapter(CommandBlockAdapter());
     Hive.registerAdapter(CommandSnippetAdapter());
-    Hive.registerAdapter(MemoryEntryAdapter());
 
     // 打开 boxes
     await Hive.openBox<HostConfig>('hosts');
     await Hive.openBox<AIModelConfig>('aiModels');
     await Hive.openBox<ChatSession>('chatSessions');
     await Hive.openBox<CommandSnippet>('snippets');
-    await Hive.openBox<MemoryEntry>('agent_memory');
     await Hive.openBox('settings');
 
     // 初始化凭据存储
@@ -36,6 +33,5 @@ class HiveInit {
   static Box<AIModelConfig> get aiModelsBox => Hive.box<AIModelConfig>('aiModels');
   static Box<ChatSession> get chatSessionsBox => Hive.box<ChatSession>('chatSessions');
   static Box<CommandSnippet> get snippetsBox => Hive.box<CommandSnippet>('snippets');
-  static Box<MemoryEntry> get agentMemoryBox => Hive.box<MemoryEntry>('agent_memory');
   static Box get settingsBox => Hive.box('settings');
 }
