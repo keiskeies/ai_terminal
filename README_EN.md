@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-    <img src="https://img.shields.io/badge/version-1.0.0-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.2.0-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
@@ -205,7 +205,15 @@ ai_terminal/
   - [x] SafetyGuard command safety check
   - [x] Encrypted credential storage
   - [x] Multi-model configuration
-- [ ] v1.1.0 — Enhanced features
+- [x] v1.1.0 — UI enhancement
+  - [x] AI panel layout redesign
+  - [x] Mobile auto-orientation
+  - [x] Agent mode green theme
+- [x] v1.2.0 — Agent intelligence boost
+  - [x] Persistent conversation history across tasks
+  - [x] Query command output no longer truncated
+  - [x] Unlimited execution steps by default
+- [ ] v1.3.0 — Enhanced features
   - [ ] SFTP file transfer
   - [ ] Command execution state machine (Running/Success/Failed/Timeout)
   - [ ] Terminal split view

@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/平台-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-    <img src="https://img.shields.io/badge/version-1.0.0-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.2.0-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
@@ -205,7 +205,15 @@ ai_terminal/
   - [x] SafetyGuard 命令安全校验
   - [x] 凭据加密存储
   - [x] 多模型配置
-- [ ] v1.1.0 — 增强功能
+- [x] v1.1.0 — UI 增强
+  - [x] AI 面板布局重设计
+  - [x] 移动端自动横竖屏适配
+  - [x] Agent 模式绿色主题
+- [x] v1.2.0 — Agent 智能增强
+  - [x] 对话历史持久化，多轮上下文不丢失
+  - [x] 查询类命令输出不截断
+  - [x] 执行步骤数默认无限制
+- [ ] v1.3.0 — 增强功能
   - [ ] SFTP 文件传输
   - [ ] 命令执行状态机 (Running/Success/Failed/Timeout)
   - [ ] 终端分屏
