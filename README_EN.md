@@ -218,8 +218,8 @@ ai_terminal/
   - [ ] Command execution state machine (Running/Success/Failed/Timeout)
   - [ ] Terminal split view
   - [ ] Theme customization
-- [ ] v1.2.0 — Ecosystem expansion
   - [ ] Plugin system
+- [ ] v2.0.0 — Ecosystem expansion
   - [ ] Team collaboration
   - [ ] Command recording & playback
 
