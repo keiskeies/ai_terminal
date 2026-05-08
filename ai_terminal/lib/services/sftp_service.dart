@@ -40,6 +40,13 @@ class SftpEntry {
     return (isDirectory ? 'd' : '-') + owner + group + other;
   }
 
+  String get displayModifiedTime {
+    if (modifiedTime == null) return '--';
+    final d = modifiedTime!;
+    return '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')} '
+        '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+  }
+
   String _permChar(int mode, int bit, String char) =>
       (mode & (1 << bit)) != 0 ? char : '-';
   String _execChar(int mode, int bit) =>
@@ -240,6 +247,24 @@ class SftpService {
       return String.fromCharCodes(data);
     } finally {
       await file.close();
+    }
+  }
+
+  /// 写入文件内容（编辑后保存）
+  Future<void> writeFileContent(String path, String content) async {
+    if (_sftp == null) throw Exception('SFTP 未连接');
+
+    final remoteFile = await _sftp!.open(
+      path,
+      mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.truncate,
+    );
+    try {
+      final data = Uint8List.fromList(content.codeUnits);
+      final stream = Stream.fromIterable([data]);
+      final writer = remoteFile.write(stream);
+      await writer.done;
+    } finally {
+      await remoteFile.close();
     }
   }
 

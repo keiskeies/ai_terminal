@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2025-05-08
+
+### Added
+- 📁 SFTP 面板：桌面端嵌入终端右侧，支持拖拽调整宽度
+- 📝 远程文件编辑：支持预览和编辑服务器文本文件，保存后回写
+- 📤 文件上传功能
+- 🔀 文件排序：按名称/大小/修改时间排序，支持升序/降序
+- 🏠 路径导航：可点击面包屑 + 路径输入框，快速跳转目录
+
+### Changed
+- 📊 文件条目信息顺序调整：大小 → 修改时间 → 权限
+- 🔧 SFTP 面板 per-tab 独立，切换服务器不再重连
+- 🔧 路径面包屑去掉双斜杠，紧贴返回按钮
+
+### Fixed
+- 🐛 修复 SFTP 按钮点击无反应（从首页进入终端时 hostId 为 null）
+- 🐛 修复 tab 切换时 SFTP 面板重建导致重连
+- 🐛 修复 Offstage 子组件抢焦点导致 AI 输入框无法打字
+- 🐛 修复文件上传按钮点击无反应
+
 ## [1.2.0] - 2025-05-07
 
 ### Changed

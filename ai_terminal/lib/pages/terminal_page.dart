@@ -8,6 +8,7 @@ import 'package:xterm/xterm.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../core/credentials_store.dart';
+import '../widgets/sftp_panel.dart';
 import '../core/hive_init.dart';
 import '../core/prompts.dart' as prompts;
 import '../providers/app_providers.dart';
@@ -55,6 +56,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   double _aiPanelRatio = 0.4;
   static const double _minPanelRatio = 0.15;
   static const double _maxPanelRatio = 0.7;
+
+  // SFTP 侧面板（桌面端）- Per-tab 独立状态
+  final Map<String, bool> _tabSftpVisible = {}; // 每个 tab 的 SFTP 面板是否可见
+  double _sftpPanelWidth = 320;
+  static const double _minSftpWidth = 220;
+  static const double _maxSftpWidth = 600;
 
   bool get _isMobile => Platform.isAndroid || Platform.isIOS;
 
@@ -492,7 +499,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
-  /// 主体区域：终端 + AI 面板，根据面板位置切换布局
+  /// 主体区域：终端 + AI 面板 + SFTP 侧面板，根据面板位置切换布局
   Widget _buildMainBody(dynamic host, ChatState chatState, AgentState agentState, tp.TerminalTab? tab) {
 
     // 终端视图
@@ -526,7 +533,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
 
     // AI 面板始终显示，分割线在终端和 AI 之间
-    return LayoutBuilder(builder: (context, constraints) {
+    Widget mainContent = LayoutBuilder(builder: (context, constraints) {
       final totalW = constraints.maxWidth;
       final totalH = constraints.maxHeight;
       final isRight = _aiPanelPosition == _AiPanelPosition.right;
@@ -586,6 +593,69 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         );
       }
     });
+
+    // 桌面端：SFTP 侧面板（per-tab 独立，用 Offstage 保持存活避免重连）
+    final currentTabId = ref.read(tp.terminalProvider).activeTabId;
+    final allTabs = ref.read(tp.terminalProvider).tabs;
+    final visibleSftpTabs = allTabs.where((t) => !t.isLocal && (_tabSftpVisible[t.id] ?? false)).toList();
+    final hasActiveSftp = currentTabId != null && (_tabSftpVisible[currentTabId] ?? false) && !_isMobile;
+
+    if (hasActiveSftp && visibleSftpTabs.isNotEmpty) {
+      final tc = ThemeColors.of(context);
+      return Row(
+        children: [
+          Expanded(child: mainContent),
+          // SFTP 拖拽调整宽度手柄
+          GestureDetector(
+            onPanUpdate: (details) {
+              setState(() {
+                _sftpPanelWidth -= details.delta.dx;
+                _sftpPanelWidth = _sftpPanelWidth.clamp(_minSftpWidth, _maxSftpWidth);
+              });
+            },
+            child: MouseRegion(
+              cursor: SystemMouseCursors.resizeColumn,
+              child: Container(
+                width: 4,
+                color: tc.border.withOpacity(0.6),
+              ),
+            ),
+          ),
+          SizedBox(
+            width: _sftpPanelWidth,
+            child: Stack(
+              children: visibleSftpTabs.map((tab) {
+                final isActive = tab.id == currentTabId;
+                return Offstage(
+                  offstage: !isActive,
+                  child: ExcludeFocus(
+                    excluding: !isActive,
+                    child: SftpPanel(
+                      key: ValueKey('sftp-${tab.id}-${tab.hostId}'),
+                      hostId: tab.hostId,
+                      embedded: true,
+                      onClose: () => setState(() => _tabSftpVisible[tab.id] = false),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      );
+    }
+
+    // 如果切换到本地终端但其他 tab 的 SFTP 面板还在，需要清理
+    if (!_isMobile && currentTabId != null) {
+      final activeTab = ref.read(tp.terminalProvider).activeTab;
+      if (activeTab != null && activeTab.isLocal && (_tabSftpVisible[currentTabId] ?? false)) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) setState(() => _tabSftpVisible[currentTabId] = false);
+        });
+      }
+    }
+
+    return mainContent;
   }
 
   // ==================== 顶部栏 ====================
@@ -673,6 +743,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         _tabExecutingCommand.remove(tab.id);
         _tabExecutedCommands.remove(tab.id);
         _tabTerminals.remove(tab.id);
+        _tabSftpVisible.remove(tab.id);
         await ref.read(tp.terminalProvider.notifier).closeTab(tab.id);
         final newActiveTab = ref.read(tp.terminalProvider).activeTab;
         if (newActiveTab != null) {
@@ -830,7 +901,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         switch (value) {
           case 'reconnect': await _connectToHost(); break;
           case 'clear': _terminal?.write('\x1b[2J\x1b[H'); break;
-          case 'sftp': if (widget.hostId != null) context.push('/sftp/${widget.hostId}'); break;
+          case 'sftp':
+            final sftpTab = ref.read(tp.terminalProvider).activeTab;
+            if (sftpTab != null && !sftpTab.isLocal) {
+              if (_isMobile) {
+                context.push('/sftp/${sftpTab.hostId}');
+              } else {
+                setState(() {
+                  _tabSftpVisible[sftpTab.id] = !(_tabSftpVisible[sftpTab.id] ?? false);
+                });
+              }
+            }
+            break;
           case 'prompt': _showCustomPromptDialog(); break;
           case 'builtInPrompt': _showBuiltInPromptDialog(); break;
           case 'maxsteps': _showMaxStepsDialog(); break;
