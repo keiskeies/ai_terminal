@@ -7,12 +7,18 @@ import 'core/router.dart';
 import 'core/hive_init.dart';
 import 'core/constants.dart';
 import 'providers/app_providers.dart';
+import 'services/knowledge_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 初始化 Hive
   await HiveInit.init();
+
+  // 初始化知识库（异步，不阻塞启动；失败则降级为不可用）
+  KnowledgeService().init().catchError((e) {
+    debugPrint('[main] 知识库初始化失败: $e');
+  });
 
   runApp(const ProviderScope(child: AISTerminalApp()));
 }
@@ -87,7 +93,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'v1.0.0',
+              'v1.3.0',
               style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: 12),
             ),
           ],

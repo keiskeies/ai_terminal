@@ -1,7 +1,7 @@
 name: ai_terminal
 description: AI-Powered Cross-Platform Terminal
 publish_to: 'none'
-version: 1.2.1+4
+version: 1.3.0+5
 
 environment:
   sdk: '>=3.2.0 <4.0.0'
@@ -46,6 +46,11 @@ dependencies:
   charset_converter: ^2.1.1
   # 本地 PTY（真正的伪终端，用于 macOS/Linux/Windows 本地终端）
   flutter_pty: ^0.4.2
+  # SQLite 数据库（知识库 FTS5 全文搜索）
+  sqflite: ^2.3.0
+  sqflite_common_ffi: ^2.3.0
+  # 路径获取（知识库文件存储路径）
+  path_provider: ^2.1.0
 
 dev_dependencies:
   flutter_test:
@@ -59,6 +64,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/
+    - assets/knowledge/
   fonts:
     - family: JetBrainsMono
       fonts:

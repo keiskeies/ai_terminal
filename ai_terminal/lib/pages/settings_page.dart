@@ -7,6 +7,7 @@ import '../core/theme_colors.dart';
 import '../core/hive_init.dart';
 import '../core/prompts.dart';
 import '../providers/agent_provider.dart';
+import '../services/knowledge_service.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -78,6 +79,14 @@ class SettingsPage extends ConsumerWidget {
             subtitle: '追加到内置提示词末尾的额外指令',
             onTap: () => _showCustomPromptDialog(context, ref),
           ),
+          _buildListTile(
+            context,
+            icon: Icons.menu_book_rounded,
+            iconColor: cInfo,
+            title: '更新命令手册知识库',
+            subtitle: '从远程服务器同步最新的软件安装指南',
+            onTap: () => _updateKnowledgeBase(context),
+          ),
 
           const Divider(height: 32),
 
@@ -107,7 +116,7 @@ class SettingsPage extends ConsumerWidget {
             icon: Icons.info,
             iconColor: cPrimary,
             title: '关于 AI Terminal',
-            subtitle: '版本 1.2.1',
+            subtitle: '版本 1.3.0',
             trailing: TextButton(
               onPressed: () => _checkForUpdate(context),
               child: const Text('检查更新'),
@@ -337,6 +346,59 @@ class SettingsPage extends ConsumerWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('检查更新失败: $e'),
+          backgroundColor: cDanger,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<void> _updateKnowledgeBase(BuildContext context) async {
+    // 显示加载对话框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ThemeColors.of(context).cardElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+        title: Text('更新知识库', style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
+        content: Row(
+          children: [
+            const SizedBox(
+              width: 20, height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 16),
+            Text('正在从远程服务器下载...', style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fBody)),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final knowledge = KnowledgeService();
+      await knowledge.ensureInitialized();
+      final result = await knowledge.forceUpdateFromRemote();
+
+      if (!context.mounted) return;
+      Navigator.pop(context); // 关闭加载对话框
+
+      final isSuccess = result.startsWith('更新成功');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result),
+          duration: Duration(seconds: isSuccess ? 2 : 4),
+          backgroundColor: isSuccess ? cSuccess : cDanger,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      Navigator.pop(context); // 关闭加载对话框
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('更新失败: $e'),
           backgroundColor: cDanger,
           behavior: SnackBarBehavior.floating,
         ),

@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/平台-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-    <img src="https://img.shields.io/badge/version-1.2.1-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.0-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
@@ -167,6 +167,40 @@ SafetyGuard 三级拦截：
 
 > 🤖 以上截图中的 AI 功能由 <b>小米 mino-v2.5-pro</b> 大模型驱动
 
+## 📖 实战演示：知识库驱动的自动安装
+
+v1.3.0 新增**命令手册知识库**——内置 150+ 常用软件的官方安装/卸载/更新指南，Agent 会自动匹配知识库，严格按官方推荐方式执行，杜绝 AI 编造命令。
+
+以下演示在 SSH 连接到 Ubuntu 服务器后，输入"安装openclaw"的完整流程：
+
+<table>
+  <tr>
+    <td align="center"><b>① 输入指令</b></td>
+    <td align="center"><b>② 知识库命中，生成命令</b></td>
+  </tr>
+  <tr>
+    <td><img src="./ai_terminal/doc/at_130_1.webp" width="400" /></td>
+    <td><img src="./ai_terminal/doc/at_130_2.webp" width="400" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>③ 自动执行安装</b></td>
+    <td align="center"><b>④ 安装完成验证</b></td>
+  </tr>
+  <tr>
+    <td><img src="./ai_terminal/doc/at_130_3.webp" width="400" /></td>
+    <td><img src="./ai_terminal/doc/at_130_4.webp" width="400" /></td>
+  </tr>
+</table>
+
+**流程解析：**
+
+1. 用户输入"安装openclaw" → Agent 提取操作类型（install）和目标平台（linux）
+2. 知识库命中 `openclaw` 的 `linux-debian` 条目（strict 模式），注入官方安装命令到系统提示词
+3. Agent 严格按照知识库命令执行：先安装 Node.js 22，再 `npm install -g openclaw`
+4. 安装完成后自动验证，运行 `openclaw --version` 确认成功
+
+> 💡 知识库支持按平台精确匹配（如 `linux-debian` vs `linux-rhel` 给出不同包管理器命令），支持从远程服务器一键更新
+
 ## 📂 项目结构
 
 ```
@@ -213,14 +247,28 @@ ai_terminal/
   - [x] 对话历史持久化，多轮上下文不丢失
   - [x] 查询类命令输出不截断
   - [x] 执行步骤数默认无限制
-- [ ] v1.3.0 — 增强功能
+  - [x] SFTP 文件管理 + 远程编辑
+- [x] v1.3.0 — 知识库驱动
+  - [x] 🧠 SQLite FTS5 全文搜索知识库（150+ 软件安装/卸载/更新指南）
+  - [x] 🔄 远程知识库自动同步（启动时从 GitHub 更新，离线可用）
+  - [x] 🎯 平台精确匹配（linux-debian / linux-rhel / macos 等细粒度分发）
+  - [x] 🛡️ LLM 安全规则（strict 强制执行 + 禁止搜索类命令防猜测）
+  - [x] 🔧 知识库构建工具（CSV → SQLite 转换脚本）
+  - [x] 💬 友好的 API 错误提示（401/429/超时等）
+- [ ] v1.4.0 — 体验升级
   - [ ] 命令执行状态机 (Running/Success/Failed/Timeout)
   - [ ] 终端分屏
-  - [ ] 主题自定义
-  - [ ] 插件系统
+  - [ ] 主题自定义（亮色/暗色/跟随系统）
+  - [ ] 快捷键自定义
+- [ ] v1.5.0 — 多机协同
+  - [ ] 批量操作：一次指令多台服务器并行执行
+  - [ ] 服务器分组管理
+  - [ ] 操作日志集中查看
 - [ ] v2.0.0 — 生态拓展
-  - [ ] 团队协作
+  - [ ] 插件系统
+  - [ ] 团队协作 & 权限管理
   - [ ] 命令录制与回放
+  - [ ] AI 自定义 Agent 角色
 
 ## 🤝 贡献
 

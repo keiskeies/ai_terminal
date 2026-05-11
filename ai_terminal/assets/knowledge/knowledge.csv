@@ -1,0 +1,159 @@
+software_name,aliases,op_type,platform,package_manager,summary,steps,commands,pre_requirements,notes,mode
+openclaw,claw,install,linux-debian,npm,"OpenClaw 开源自动化工具，需通过 npm 全局安装","1. 安装 Node.js 22; 2. 使用 npm 全局安装 openclaw","curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -; sudo apt-get install -y nodejs; npm install -g openclaw",nodejs>=22,,strict
+openclaw,claw,install,linux-rhel,npm,"OpenClaw 开源自动化工具，需通过 npm 全局安装","1. 安装 Node.js 22; 2. 使用 npm 全局安装 openclaw","curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -; sudo dnf install -y nodejs; npm install -g openclaw",nodejs>=22,适用 Fedora/RHEL/CentOS,strict
+openclaw,claw,install,macos,npm,"OpenClaw 开源自动化工具","1. 通过 Homebrew 安装 Node.js; 2. npm 全局安装","brew install node@22; npm install -g openclaw",homebrew,,strict
+openclaw,claw,uninstall,all,npm,"卸载 OpenClaw","使用 npm 卸载全局包","npm uninstall -g openclaw",,,strict
+openclaw,claw,update,all,npm,"更新 OpenClaw","使用 npm 更新全局包","npm update -g openclaw",,,strict
+ollama,,install,linux,curl,"本地运行大语言模型","执行官方安装脚本","curl -fsSL https://ollama.com/install.sh | sh",,,官方脚本已自动适配 Debian/RHEL,strict
+ollama,,install,macos,brew,"本地运行大语言模型","使用 Homebrew 安装","brew install ollama",homebrew,,strict
+ollama,,update,all,curl,"更新 Ollama 到最新版本","重新执行官方安装脚本","curl -fsSL https://ollama.com/install.sh | sh",,,strict
+ollama,,uninstall,linux,apt,"卸载 Ollama","停止服务并删除相关文件","sudo systemctl stop ollama; sudo rm -rf /usr/local/bin/ollama /usr/local/lib/ollama",,,strict
+aider,aider-chat,install,all,pip,"AI 结对编程助手","使用 pip 或 uv 安装","python -m pip install aider-install; aider-install",python>=3.10,推荐用 uv 加速,strict
+aider,aider-chat,update,all,pip,"更新 Aider","使用 pip 更新","pip install --upgrade aider",,,strict
+aider,aider-chat,uninstall,all,pip,"卸载 Aider","使用 pip 卸载","pip uninstall aider -y",,,strict
+uv,,install,linux,curl,"极速 Python 包管理器","下载安装脚本并执行","curl -LsSf https://astral.sh/uv/install.sh | sh",,,strict
+uv,,install,macos,brew,"极速 Python 包管理器","使用 Homebrew 安装","brew install uv",homebrew,,strict
+uv,,update,all,curl,"更新 uv","重新执行安装脚本","curl -LsSf https://astral.sh/uv/install.sh | sh",,,strict
+mcp-sdk,modelcontextprotocol-sdk,install,all,npm,"MCP 协议 Node.js SDK","使用 npm 安装","npm install @modelcontextprotocol/sdk",nodejs>=18,,strict
+mcp-sdk-python,,install,all,pip,"MCP 协议 Python SDK","使用 pip 安装","pip install modelcontextprotocol",python>=3.10,,strict
+codex-cli,openai-codex,install,all,npm,"OpenAI 终端代码助手","使用 npm 全局安装","npm install -g @openai/codex",nodejs>=18,,strict
+codex-cli,,update,all,npm,"更新 Codex CLI","使用 npm 更新","npm update -g @openai/codex",,,strict
+nushell,nu,install,linux-debian,apt,"现代化 Unix Shell","通过包管理器安装","sudo apt install nushell",,,也可用 cargo 安装,strict
+nushell,nu,install,linux-rhel,dnf,"现代化 Unix Shell","通过 dnf 安装","sudo dnf install nushell",,,strict
+nushell,nu,install,macos,brew,"现代化 Unix Shell","使用 Homebrew 安装","brew install nushell",homebrew,,strict
+nushell,nu,update,all,cargo,"更新 Nushell","使用 Cargo 更新","cargo install nushell --force",rust,,strict
+starship,,install,all,curl,"Shell 提示符美化工具","执行安装脚本","curl -sS https://starship.rs/install.sh | sh",,,严格来说也可通过包管理器,strict
+starship,,install,macos,brew,"Shell 提示符美化工具","使用 Homebrew 安装","brew install starship",homebrew,,strict
+eza,,install,all,cargo,"现代化 ls 替代品","使用 Cargo 安装","cargo install eza",rust,,strict
+eza,,update,all,cargo,"更新 eza","使用 Cargo 更新","cargo install eza --force",rust,,strict
+bat,,install,all,cargo,"带语法高亮的 cat 替代品","使用 Cargo 安装","cargo install bat",rust,,strict
+bat,,update,all,cargo,"更新 bat","使用 Cargo 更新","cargo install bat --force",rust,,strict
+fd-find,fd,install,all,cargo,"快速文件查找工具","使用 Cargo 安装","cargo install fd-find",rust,命令为 fd,strict
+fd-find,fd,update,all,cargo,"更新 fd","使用 Cargo 更新","cargo install fd-find --force",rust,,strict
+ripgrep,rg,install,all,cargo,"极速文本搜索工具","使用 Cargo 安装","cargo install ripgrep",rust,命令为 rg,strict
+ripgrep,rg,update,all,cargo,"更新 ripgrep","使用 Cargo 更新","cargo install ripgrep --force",rust,,strict
+zoxide,z,install,all,cargo,"智能目录跳转工具","使用 Cargo 安装","cargo install zoxide",rust,,strict
+zoxide,z,update,all,cargo,"更新 zoxide","使用 Cargo 更新","cargo install zoxide --force",rust,,strict
+kubernetes,k8s,install,linux,curl,"容器编排平台 kubectl","使用官方脚本安装","curl -LO ""https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl""; sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl",,,stable 版本,strict
+kubernetes,k8s,install,macos,brew,"容器编排平台 kubectl","使用 Homebrew 安装","brew install kubectl",homebrew,,strict
+kubernetes,k8s,update,all,curl,"更新 kubectl","重新下载最新版本并替换","curl -LO ""https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl""; sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl",,,strict
+helm,,install,all,curl,"Kubernetes 包管理器","执行官方安装脚本","curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash",,,官方脚本全平台,strict
+helm,,update,all,curl,"更新 Helm","重新执行脚本","curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash",,,strict
+k9s,,install,all,brew,"Kubernetes 终端管理界面","使用 Homebrew 安装","brew install k9s",homebrew,Linux 也可用 brew,strict
+k9s,,update,all,brew,"更新 k9s","使用 Homebrew 更新","brew upgrade k9s",,,strict
+docker,,install,linux-debian,curl,"容器引擎","使用官方脚本安装","curl -fsSL https://get.docker.com | sh",,,官方脚本自动适配 Debian/RHEL,strict
+docker,,install,macos,brew,"容器引擎（Docker Desktop）","使用 Homebrew 安装","brew install --cask docker",homebrew,,strict
+docker,,update,all,curl,"更新 Docker","按官方文档或重新执行脚本","curl -fsSL https://get.docker.com | sh",,,strict
+docker,,uninstall,linux-debian,apt,"卸载 Docker","使用 apt 卸载","sudo apt remove docker-ce docker-ce-cli containerd.io -y",,,strict
+nodejs,node,install,linux-debian,nodesource,"JavaScript 运行时 (Node.js 22)","使用 NodeSource 仓库安装","curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -; sudo apt-get install -y nodejs",,,strict
+nodejs,node,install,linux-rhel,nodesource,"JavaScript 运行时 (Node.js 22)","使用 NodeSource RPM 仓库","curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -; sudo dnf install -y nodejs",,,strict
+nodejs,node,install,macos,brew,"JavaScript 运行时","使用 Homebrew 安装","brew install node@22",homebrew,,strict
+nodejs,node,update,linux-debian,nodesource,"更新 Node.js","重新执行安装脚本","curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -; sudo apt-get install -y nodejs",,,strict
+python,python3,install,linux-debian,pyenv,"Python 编程语言 (3.12)","使用 pyenv 安装","curl https://pyenv.run | bash; pyenv install 3.12.0",,,也可用 deadsnakes PPA,strict
+python,python3,install,linux-rhel,pyenv,"Python 编程语言 (3.12)","使用 pyenv 安装","curl https://pyenv.run | bash; pyenv install 3.12.0",,,同 Debian，pyenv 通用,strict
+python,python3,install,macos,brew,"Python 编程语言","使用 Homebrew 安装","brew install python@3.12",homebrew,,strict
+python,python3,update,linux,pyenv,"更新 Python 版本","通过 pyenv 安装新版本","pyenv install 3.12.0; pyenv global 3.12.0",,,strict
+lazygit,,install,linux-debian,apt,"终端 Git 客户端","通过 apt 安装","sudo apt install lazygit",,,也可用 go,strict
+lazygit,,install,linux-rhel,dnf,"终端 Git 客户端","通过 dnf 安装","sudo dnf install lazygit",,,strict
+lazygit,,install,macos,brew,"终端 Git 客户端","使用 Homebrew 安装","brew install lazygit",homebrew,,strict
+lazygit,,update,all,go,"更新 lazygit","使用 Go 重新安装（若通过 go 安装）","go install github.com/jesseduffield/lazygit@latest",go>=1.20,,strict
+fzf,,install,all,git,"模糊搜索工具","克隆仓库并执行安装脚本","git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf; ~/.fzf/install",,,strict
+fzf,,update,all,git,"更新 fzf","拉取最新代码并重新运行安装","cd ~/.fzf && git pull && ./install",,,strict
+delta,,install,all,cargo,"Git diff 语法高亮工具","使用 Cargo 安装","cargo install git-delta",rust,,strict
+delta,,update,all,cargo,"更新 delta","使用 Cargo 更新","cargo install git-delta --force",rust,,strict
+xh,,install,all,cargo,"HTTPie 兼容 JSON HTTP 客户端","使用 Cargo 安装","cargo install xh",rust,,strict
+xh,,update,all,cargo,"更新 xh","使用 Cargo 更新","cargo install xh --force",rust,,strict
+jql,,install,all,cargo,"JSON 查询语言 CLI","使用 Cargo 安装","cargo install jql",rust,,strict
+jql,,update,all,cargo,"更新 jql","使用 Cargo 更新","cargo install jql --force",rust,,strict
+miller,mlr,install,all,cargo,"结构化文本数据处理工具","使用 Cargo 安装","cargo install miller",rust,,strict
+miller,mlr,update,all,cargo,"更新 miller","使用 Cargo 更新","cargo install miller --force",rust,,strict
+cog,,install,all,cargo,"Git 提交信息生成工具","使用 Cargo 安装","cargo install cocogitto",rust,,strict
+devbox,,install,all,curl,"可重现的开发环境","执行安装脚本","curl -fsSL https://get.jetpack.io/devbox | bash",,,strict
+devbox,,update,all,curl,"更新 devbox","重新执行安装脚本","curl -fsSL https://get.jetpack.io/devbox | bash",,,strict
+mise,,install,all,curl,"多语言版本管理器","执行安装脚本","curl https://mise.run | sh",,,strict
+mise,,update,all,curl,"更新 mise","重新执行安装脚本","curl https://mise.run | sh",,,strict
+x-cmd,,install,all,curl,"轻量级命令行工具集","执行安装脚本","curl -fsSL https://get.x-cmd.com | bash",,,strict
+dagger,,install,all,curl,"CI/CD 管道引擎","执行安装脚本","curl -fsSL https://dl.dagger.io/dagger/install.sh | sh",,,strict
+dagger,,update,all,curl,"更新 dagger","重新执行安装脚本","curl -fsSL https://dl.dagger.io/dagger/install.sh | sh",,,strict
+dapr,,install,linux,curl,"分布式应用运行时","执行安装脚本","wget -q https://raw.githubusercontent.com/dapr/cli/master/install/install.sh -O - | /bin/bash",,,strict
+teller,,install,all,go,"环境变量管理工具","使用 Go 安装","go install github.com/tellerops/teller@latest",go>=1.19,,strict
+cosign,,install,all,go,"容器签名工具","使用 Go 安装","go install github.com/sigstore/cosign/v2/cmd/cosign@latest",go>=1.19,,strict
+garnet,,install,linux,curl,"高性能缓存服务器","下载二进制并安装","curl -LO https://github.com/microsoft/garnet/releases/latest/download/garnet-linux-x64.tar.gz; tar -xzf garnet-linux-x64.tar.gz; sudo mv GarnetServer /usr/local/bin/",,,strict
+encore,,install,all,curl,"全栈应用开发平台","执行安装脚本","curl -sS https://encore.dev/install.sh | sh",,,strict
+coder,,install,linux,curl,"云端开发环境","执行安装脚本","curl -fsSL https://coder.com/install.sh | sh",,,strict
+smartcat,,install,all,pip,"AI 代码生成工具","使用 pip 安装","pip install smartcat",python>=3.8,,strict
+ollama-grid,,install,all,npm,"Ollama 分布式调度","使用 npm 安装","npm install -g ollama-grid",nodejs>=18,,strict
+lobe-chat,lobe,install,all,npm,"AI 对话框架","使用 npm 安装","npm install @lobehub/chat",nodejs>=18,,strict
+page-assist,,install,all,npm,"浏览器 AI 助手","使用 npm 安装","npm install -g page-assist",nodejs>=18,,strict
+gpt-oss,,install,all,npm,"开源 GPT 工具","使用 npm 安装","npm install -g gpt-oss",nodejs>=18,,strict
+opencode-cli,,install,all,npm,"AI 辅助 CLI 工具","使用 npm 安装","npm install -g opencode-cli",nodejs>=18,,strict
+deepseek,,install,linux,curl,"DeepSeek 模型本地部署","下载 Ollama 后拉取模型","curl -fsSL https://ollama.com/install.sh | sh; ollama pull deepseek-r1",,,strict
+llamaedge,,install,all,cargo,"边缘 AI 运行时","使用 Cargo 安装","cargo install llamaedge",rust,,strict
+llama.cpp,,install,all,make,"高性能 LLM 推理","克隆仓库并编译","git clone https://github.com/ggerganov/llama.cpp; cd llama.cpp; make",,,strict
+vllm,,install,all,pip,"高性能 LLM 服务引擎","使用 pip 安装","pip install vllm",python>=3.10,,strict
+microsoft.extensions.ai,,install,all,dotnet,".NET AI 扩展库","使用 dotnet 添加包","dotnet add package Microsoft.Extensions.AI",.NET SDK,,strict
+baseai,,install,all,curl,"AI 基础工具链","执行安装脚本","curl -fsSL https://get.baseai.dev | sh",,,strict
+ai-cli,,install,all,npm,"终端 AI 助手","使用 npm 安装","npm install -g ai-cli",nodejs>=18,,strict
+txtai,,install,all,pip,"语义搜索与工作流","使用 pip 安装","pip install txtai",python>=3.9,,strict
+aingdesk,,install,all,npm,"AI 桌面客户端","使用 npm 安装","npm install -g aingdesk",nodejs>=18,,strict
+sourcegraph-cody,,install,all,npm,"代码搜索与 AI 助手","使用 npm 安装","npm install -g @sourcegraph/cody",nodejs>=18,,strict
+langchain,,install,all,pip,"LLM 应用框架","使用 pip 安装","pip install langchain",python>=3.10,,strict
+langchain,,update,all,pip,"更新 LangChain","使用 pip 更新","pip install --upgrade langchain",,,strict
+open-webui,,install,all,docker,"AI 聊天 WebUI","使用 Docker 运行","docker run -d -p 3000:8080 --name open-webui ghcr.io/open-webui/open-webui:main",docker,,strict
+open-webui,,update,all,docker,"更新 Open WebUI","拉取新镜像并重启容器","docker pull ghcr.io/open-webui/open-webui:main; docker restart open-webui",,,strict
+podman,,install,linux-debian,apt,"无守护进程容器引擎","使用 apt 安装","sudo apt-get install -y podman",,,strict
+podman,,install,linux-rhel,dnf,"无守护进程容器引擎","使用 dnf 安装","sudo dnf install -y podman",,,strict
+podman,,install,macos,brew,"无守护进程容器引擎","使用 Homebrew 安装","brew install podman",homebrew,,strict
+oras,,install,all,go,"OCI 注册表客户端","使用 Go 安装","go install oras.land/oras/cmd/oras@latest",go>=1.19,,strict
+grafana,,install,linux-debian,apt,"监控可视化平台","使用 apt 安装","sudo apt-get install -y grafana",,,strict
+grafana,,install,linux-rhel,dnf,"监控可视化平台","使用 dnf 安装","sudo dnf install -y grafana",,,strict
+grafana,,update,linux-debian,apt,"更新 Grafana","使用 apt 更新","sudo apt-get update && sudo apt-get install --only-upgrade grafana",,,strict
+grafana,,uninstall,linux-debian,apt,"卸载 Grafana","使用 apt 卸载","sudo apt remove grafana -y",,,strict
+opentelemetry,,install,all,pip,"可观测性框架 (Python)","使用 pip 安装","pip install opentelemetry-api opentelemetry-sdk",python>=3.7,,strict
+flipt,,install,all,go,"特性开关服务","使用 Go 安装 CLI","go install github.com/flipt-io/flipt@latest",go>=1.19,,strict
+istio,,install,linux,curl,"服务网格","下载 istioctl 并安装","curl -L https://istio.io/downloadIstio | sh -; sudo mv istio-*/bin/istioctl /usr/local/bin/",,,strict
+istio,,update,linux,curl,"更新 Istio","下载最新 istioctl","curl -L https://istio.io/downloadIstio | sh -; sudo mv istio-*/bin/istioctl /usr/local/bin/",,,strict
+istio,,uninstall,linux,curl,"卸载 Istio","删除 istioctl","sudo rm -f /usr/local/bin/istioctl",,,strict
+k3s,,install,linux,curl,"轻量级 Kubernetes","执行官方脚本","curl -sfL https://get.k3s.io | sh -",,,strict
+k3s,,update,linux,curl,"更新 K3s","重新执行脚本","curl -sfL https://get.k3s.io | sh -",,,strict
+k3s,,uninstall,linux,curl,"卸载 K3s","执行卸载脚本","/usr/local/bin/k3s-uninstall.sh",,,strict
+kustomize,,install,all,go,"Kubernetes 配置定制工具","使用 Go 安装","go install sigs.k8s.io/kustomize/kustomize/v5@latest",go>=1.19,,strict
+kustomize,,update,all,go,"更新 Kustomize","使用 Go 重新安装","go install sigs.k8s.io/kustomize/kustomize/v5@latest",,,strict
+terraform,,install,linux-debian,curl,"基础设施即代码工具","添加 HashiCorp 仓库并安装","wget -O- https://apt.releases.hashicorp.com/gpg | gpg --dearmor | sudo tee /usr/share/keyrings/hashicorp-archive-keyring.gpg; echo ""deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main"" | sudo tee /etc/apt/sources.list.d/hashicorp.list; sudo apt update && sudo apt install terraform",,,strict
+terraform,,install,linux-rhel,curl,"基础设施即代码工具","添加 HashiCorp 仓库并安装","sudo dnf install -y dnf-plugins-core; sudo dnf config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo; sudo dnf install terraform",,,strict
+terraform,,install,macos,brew,"基础设施即代码工具","使用 Homebrew 安装","brew install terraform",homebrew,,strict
+pulumi,,install,linux,curl,"现代基础设施即代码平台","执行安装脚本","curl -fsSL https://get.pulumi.com | sh",,,strict
+pulumi,,install,macos,brew,"现代基础设施即代码平台","使用 Homebrew 安装","brew install pulumi",homebrew,,strict
+pulumi,,update,all,curl,"更新 Pulumi","重新执行安装脚本","curl -fsSL https://get.pulumi.com | sh",,,strict
+ansible,,install,linux-debian,apt,"自动化配置管理","使用 apt 安装","sudo apt install ansible",,,strict
+ansible,,install,linux-rhel,dnf,"自动化配置管理","使用 dnf 安装（需 EPEL）","sudo dnf install -y epel-release; sudo dnf install -y ansible",,,strict
+ansible,,install,macos,brew,"自动化配置管理","使用 Homebrew 安装","brew install ansible",homebrew,,strict
+teller,,update,all,go,"更新 Teller","使用 Go 重新安装","go install github.com/tellerops/teller@latest",,,strict
+cosign,,update,all,go,"更新 Cosign","使用 Go 重新安装","go install github.com/sigstore/cosign/v2/cmd/cosign@latest",,,strict
+garnet,,update,linux,curl,"更新 Garnet","下载最新版替换二进制","curl -LO https://github.com/microsoft/garnet/releases/latest/download/garnet-linux-x64.tar.gz; tar -xzf garnet-linux-x64.tar.gz; sudo mv GarnetServer /usr/local/bin/",,,strict
+coder,,update,linux,curl,"更新 Coder","重新执行安装脚本","curl -fsSL https://coder.com/install.sh | sh",,,strict
+smartcat,,update,all,pip,"更新 Smartcat","使用 pip 更新","pip install --upgrade smartcat",,,strict
+lobe-chat,,update,all,npm,"更新 Lobe Chat","使用 npm 更新","npm update -g @lobehub/chat",,,strict
+page-assist,,update,all,npm,"更新 Page Assist","使用 npm 更新","npm update -g page-assist",,,strict
+gpt-oss,,update,all,npm,"更新 GPT-OSS","使用 npm 更新","npm update -g gpt-oss",,,strict
+opencode-cli,,update,all,npm,"更新 OpenCode CLI","使用 npm 更新","npm update -g opencode-cli",,,strict
+deepseek,,update,all,curl,"更新 DeepSeek 模型","拉取最新模型","ollama pull deepseek-r1",,,strict
+llamaedge,,update,all,cargo,"更新 LlamaEdge","使用 Cargo 更新","cargo install llamaedge --force",,,strict
+llama.cpp,,update,all,make,"更新 llama.cpp","拉取最新代码并重新编译","cd llama.cpp; git pull; make clean && make",,,strict
+vllm,,update,all,pip,"更新 vLLM","使用 pip 更新","pip install --upgrade vllm",,,strict
+ai-cli,,update,all,npm,"更新 ai-cli","使用 npm 更新","npm update -g ai-cli",,,strict
+txtai,,update,all,pip,"更新 txtai","使用 pip 更新","pip install --upgrade txtai",,,strict
+aingdesk,,update,all,npm,"更新 AingDesk","使用 npm 更新","npm update -g aingdesk",,,strict
+sourcegraph-cody,,update,all,npm,"更新 Sourcegraph Cody","使用 npm 更新","npm update -g @sourcegraph/cody",,,strict
+nodejs,,uninstall,linux-debian,apt,"卸载 Node.js","使用 apt 卸载","sudo apt remove nodejs -y",,,strict
+nodejs,,uninstall,linux-rhel,dnf,"卸载 Node.js","使用 dnf 卸载","sudo dnf remove nodejs -y",,,strict
+python,,uninstall,linux,pyenv,"卸载 Python 版本","使用 pyenv 卸载","pyenv uninstall 3.12.0",,,strict
+lazygit,,uninstall,linux-debian,apt,"卸载 lazygit","使用 apt 卸载","sudo apt remove lazygit -y",,,strict
+lazygit,,uninstall,linux-rhel,dnf,"卸载 lazygit","使用 dnf 卸载","sudo dnf remove lazygit -y",,,strict
+fzf,,uninstall,all,git,"卸载 fzf","执行卸载脚本","~/.fzf/uninstall",,,strict
+devbox,,uninstall,all,curl,"卸载 devbox","删除二进制文件","rm -f $(which devbox)",,,strict
+mise,,uninstall,all,curl,"卸载 mise","删除二进制文件","rm -f $(which mise)",,,strict
+x-cmd,,uninstall,all,curl,"卸载 x-cmd","执行卸载脚本","~/.x-cmd/bin/uninstall",,,strict
+dagger,,uninstall,all,curl,"卸载 dagger","删除二进制文件","rm -f $(which dagger)",,,strict
+helm,,uninstall,all,curl,"卸载 Helm","删除二进制文件","rm -f $(which helm)",,,strict
+k9s,,uninstall,all,brew,"卸载 k9s","使用 brew 卸载","brew uninstall k9s",,,strict

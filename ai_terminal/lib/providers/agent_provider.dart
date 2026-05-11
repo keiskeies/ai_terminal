@@ -148,6 +148,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _engine = _tabEngines[tabId];
       _executor = _tabExecutors[tabId];
       _modelConfig = _tabModelConfigs[tabId];
+      _engine?.setMode(state.mode); // 切回时同步 mode 到引擎
     } else {
       // 新 tab：全新空状态，但保留 mode、maxSteps 和模型配置
       final prevMode = state.mode;
@@ -187,6 +188,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
         memory: memory,
         maxSteps: state.maxSteps,
       );
+      _engine!.setMode(state.mode); // 同步当前 mode 到新引擎
       _setupEngineCallbacks(_activeTabId!);
       _tabEngines[_activeTabId!] = _engine!;
       _tabModelConfigs[_activeTabId!] = _modelConfig;

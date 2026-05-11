@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
 import '../models/agent_model.dart';
 import '../models/agent_memory.dart';
@@ -8,6 +9,7 @@ import '../models/ai_model_config.dart';
 import '../services/ai_service.dart';
 import '../services/ssh_service.dart';
 import '../services/command_executor.dart';
+import '../services/knowledge_service.dart';
 import '../core/safety_guard.dart';
 import '../core/hive_init.dart';
 import '../core/prompts.dart' as prompts;
@@ -71,6 +73,9 @@ class AgentEngine {
   String _accumulatedMessage = '';  // 跟踪累积的消息
   Completer<bool>? _confirmCompleter; // 等待用户确认危险命令的 Completer
   String? _pendingConfirmCommand; // 当前等待确认的命令
+
+  /// 缓存的知识库注入文本（在 startTask 时查询，在 _buildSystemPrompt 时使用）
+  String? _cachedKnowledgeInjection;
 
   /// 持久化对话历史，跨 startTask() 调用保留上下文
   final List<ChatMessage> _conversationHistory = [];
@@ -138,6 +143,31 @@ class AgentEngine {
     );
     onTaskUpdated?.call(_currentTask!);
 
+    // 查询知识库，缓存注入文本
+    try {
+      final knowledge = KnowledgeService();
+      // 确保知识库已初始化（懒初始化兜底）
+      await knowledge.ensureInitialized();
+      // 检测远程平台：SSH 连接时从 osInfo 推断，否则用本地平台
+      String? knowledgePlatform;
+      if (executor is SSHService) {
+        knowledgePlatform = KnowledgeService.detectPlatformFromOsInfo(executor.osInfo);
+      }
+      _cachedKnowledgeInjection = await knowledge.buildKnowledgeInjection(
+        goal,
+        platform: knowledgePlatform,
+        osInfo: executor is SSHService ? (executor as SSHService).osInfo : null,
+      );
+      if (_cachedKnowledgeInjection != null) {
+        agentLogger.info('AgentEngine', '知识库命中 ✓ (platform=${knowledgePlatform ?? "local"})');
+      } else {
+        agentLogger.info('AgentEngine', '知识库未命中 (platform=${knowledgePlatform ?? "local"})');
+      }
+    } catch (e) {
+      agentLogger.warn('AgentEngine', '知识库查询失败: $e');
+      _cachedKnowledgeInjection = null;
+    }
+
     try {
       if (_mode == AgentMode.automatic) {
         agentLogger.info('AgentEngine', '执行自动模式');
@@ -152,7 +182,7 @@ class AgentEngine {
         status: AgentStatus.failed,
         completedAt: DateTime.now(),
       );
-      onError?.call('执行出错: $e');
+      onError?.call(_friendlyErrorMessage(e));
       onTaskUpdated?.call(_currentTask!);
     }
   }
@@ -445,7 +475,9 @@ class AgentEngine {
           return;
         }
       } catch (e, stack) {
+        final friendlyMsg = _friendlyErrorMessage(e);
         agentLogger.error('AutoExec', '步骤执行异常: $e\n$stack');
+        onError?.call(friendlyMsg);
         break;
       }
     }
@@ -519,6 +551,35 @@ class AgentEngine {
         duration: stopwatch.elapsed,
       );
     }
+  }
+
+  /// 将异常转为用户友好的错误消息
+  String _friendlyErrorMessage(dynamic error) {
+    if (error is DioException) {
+      switch (error.type) {
+        case DioExceptionType.badResponse:
+          final statusCode = error.response?.statusCode;
+          if (statusCode == 401) {
+            return 'API Key 无效或已过期，请在设置中更新 API Key';
+          } else if (statusCode == 429) {
+            return '请求过于频繁，请稍后重试';
+          } else if (statusCode == 400) {
+            return '请求格式错误，请检查 AI 模型配置（模型名称、API 地址等）';
+          } else if (statusCode != null && statusCode >= 500) {
+            return 'AI 服务端错误 ($statusCode)，请稍后重试';
+          }
+          return '请求失败 ($statusCode)';
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+          return '连接 AI 服务超时，请检查网络';
+        case DioExceptionType.connectionError:
+          return '无法连接到 AI 服务，请检查网络和 API 地址';
+        default:
+          return '连接失败: ${error.message ?? "未知错误"}';
+      }
+    }
+    return '执行出错: $error';
   }
 
   String? _extractCommand(String content) {
@@ -739,6 +800,8 @@ class AgentEngine {
     buffer.writeln(prompts.commandFormatRule);
     buffer.writeln();
     buffer.writeln(prompts.behaviorBoundaryRule);
+    buffer.writeln();
+    buffer.writeln(prompts.knowledgeSafetyRule);
 
     // 用户自定义提示词
     String? customPrompt;
@@ -749,6 +812,12 @@ class AgentEngine {
       buffer.writeln();
       buffer.writeln('【用户自定义指令】');
       buffer.writeln(customPrompt);
+    }
+
+    // 知识库注入（异步获取，使用缓存结果）
+    if (_cachedKnowledgeInjection != null) {
+      buffer.writeln();
+      buffer.writeln(_cachedKnowledgeInjection);
     }
 
     if (executor != null) {

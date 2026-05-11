@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-    <img src="https://img.shields.io/badge/version-1.2.1-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.0-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
@@ -167,6 +167,40 @@ SafetyGuard 3-Level Interception:
 
 > 🤖 The AI features shown above are powered by <b>XIAOMI MIMO-V2.5-PRO</b> LLM
 
+## 📖 Demo: Knowledge-Driven Auto Install
+
+v1.3.0 introduces a **Command Manual Knowledge Base** — 150+ official install/uninstall/update guides built in. The Agent automatically matches the knowledge base and strictly follows official recommended methods, eliminating AI-generated hallucinated commands.
+
+Below demonstrates the complete flow after SSH-ing into an Ubuntu server and typing "install openclaw":
+
+<table>
+  <tr>
+    <td align="center"><b>① Enter command</b></td>
+    <td align="center"><b>② Knowledge base hit, generate commands</b></td>
+  </tr>
+  <tr>
+    <td><img src="./ai_terminal/doc/at_130_1.webp" width="400" /></td>
+    <td><img src="./ai_terminal/doc/at_130_2.webp" width="400" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>③ Auto-execute installation</b></td>
+    <td align="center"><b>④ Verify installation</b></td>
+  </tr>
+  <tr>
+    <td><img src="./ai_terminal/doc/at_130_3.webp" width="400" /></td>
+    <td><img src="./ai_terminal/doc/at_130_4.webp" width="400" /></td>
+  </tr>
+</table>
+
+**Flow breakdown:**
+
+1. User types "install openclaw" → Agent extracts operation type (install) and target platform (linux)
+2. Knowledge base matches `openclaw` entry for `linux-debian` (strict mode), injecting official install commands into the system prompt
+3. Agent strictly follows knowledge base commands: install Node.js 22 first, then `npm install -g openclaw`
+4. After installation, automatically verifies by running `openclaw --version`
+
+> 💡 The knowledge base supports platform-specific matching (e.g. `linux-debian` vs `linux-rhel` yield different package manager commands), with one-click remote updates
+
 ## 📂 Project Structure
 
 ```
@@ -213,14 +247,28 @@ ai_terminal/
   - [x] Persistent conversation history across tasks
   - [x] Query command output no longer truncated
   - [x] Unlimited execution steps by default
-- [ ] v1.3.0 — Enhanced features
+  - [x] SFTP file management + remote editing
+- [x] v1.3.0 — Knowledge-driven
+  - [x] 🧠 SQLite FTS5 full-text search knowledge base (150+ software install/uninstall/update guides)
+  - [x] 🔄 Remote knowledge base auto-sync (updates from GitHub on launch, works offline)
+  - [x] 🎯 Platform-specific matching (linux-debian / linux-rhel / macos fine-grained dispatch)
+  - [x] 🛡️ LLM safety rules (strict enforcement + search command prohibition to prevent guessing)
+  - [x] 🔧 Knowledge base build tool (CSV → SQLite conversion script)
+  - [x] 💬 Friendly API error messages (401/429/timeout, etc.)
+- [ ] v1.4.0 — Experience upgrade
   - [ ] Command execution state machine (Running/Success/Failed/Timeout)
   - [ ] Terminal split view
-  - [ ] Theme customization
-  - [ ] Plugin system
+  - [ ] Theme customization (light/dark/follow system)
+  - [ ] Custom keyboard shortcuts
+- [ ] v1.5.0 — Multi-server orchestration
+  - [ ] Batch operations: one command, multiple servers in parallel
+  - [ ] Server group management
+  - [ ] Centralized operation log viewer
 - [ ] v2.0.0 — Ecosystem expansion
-  - [ ] Team collaboration
+  - [ ] Plugin system
+  - [ ] Team collaboration & permission management
   - [ ] Command recording & playback
+  - [ ] Custom AI Agent roles
 
 ## 🤝 Contributing
 

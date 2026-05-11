@@ -5,6 +5,7 @@ import '../models/ai_model_config.dart';
 import '../models/chat_session.dart';
 import '../core/hive_init.dart';
 import '../core/prompts.dart';
+import 'knowledge_service.dart';
 
 abstract class AIProvider {
   Future<Stream<String>> chatStream({
@@ -300,6 +301,21 @@ class AIService {
       hostName: hostName,
       hostAddress: hostAddress,
     );
+
+    // 追加知识库安全规则
+    systemPrompt = '$systemPrompt\n\n$knowledgeSafetyRule';
+
+    // 查询知识库并注入
+    try {
+      final knowledge = KnowledgeService();
+      await knowledge.ensureInitialized();
+      if (knowledge.isInitialized && prompt.isNotEmpty) {
+        final injection = await knowledge.buildKnowledgeInjection(prompt);
+        if (injection != null) {
+          systemPrompt = '$systemPrompt\n\n$injection';
+        }
+      }
+    } catch (_) {}
 
     // 追加用户自定义提示词
     try {

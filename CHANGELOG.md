@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-05-08
+
+### Added
+- 🧠 **Agent 知识库系统**：基于 SQLite FTS5 全文搜索的软件安装知识库
+  - 支持 strict（强制执行）和 suggest（推荐参考）两种模式
+  - 知识库命中时自动注入 LLM 提示词，确保使用正确的包管理器
+  - 知识库未命中时禁止使用搜索类命令（如 apt search），防止猜测
+  - 本地检索响应 < 50ms，支持 10,000+ 条目
+- 🔄 **远程知识库同步**：启动时自动从 GitHub Releases 下载最新 knowledge.db
+  - 支持离线使用：下载失败时使用内置版本
+  - 只更新数据、不升级代码的长期维护模式
+- 🛡️ **LLM 安全规则**：系统提示词新增知识库安全规则
+  - 知识库 strict 模式必须原样执行
+  - 禁止搜索类命令防止猜测安装方式
+  - 无法确定安装方式时必须拒绝并提示
+- 🔧 **知识库构建工具**：提供 CSV → SQLite 转换脚本（tools/csv_to_knowledge.py）
+
 ## [1.2.1] - 2025-05-08
 
 ### Added
@@ -77,5 +94,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Warning-level commands require explicit CONFIRM input
 - AES secondary encryption available for enhanced security
 
+[1.3.0]: https://github.com/keiskeies/ai_terminal/releases/tag/v1.3.0
+[1.2.1]: https://github.com/keiskeies/ai_terminal/releases/tag/v1.2.1
+[1.2.0]: https://github.com/keiskeies/ai_terminal/releases/tag/v1.2.0
 [1.1.0]: https://github.com/keiskeies/ai_terminal/releases/tag/v1.1.0
 [1.0.0]: https://github.com/keiskeies/ai_terminal/releases/tag/v1.0.0
