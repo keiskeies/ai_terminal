@@ -275,6 +275,7 @@ class AIService {
   static AIProvider create(AIModelConfig config) {
     switch (config.provider) {
       case 'openai':
+      case 'ollama':
         return OpenAIProvider();
       case 'qwen':
         return QwenProvider();

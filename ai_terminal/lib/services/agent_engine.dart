@@ -94,7 +94,7 @@ class AgentEngine {
   static const int _maxConversationRounds = 10;
 
   /// 单条消息最大字符数，超出截断
-  static const int _maxMessageChars = 1500;
+  static const int _maxMessageChars = 4000;
 
   AgentEngine({
     required AIProvider aiProvider,
@@ -339,16 +339,18 @@ class AgentEngine {
         // 始终将 AI 响应加入对话历史（确保上下文连贯）
         _conversationHistory.add(ChatMessage.create(role: 'assistant', content: fullResponse));
 
-        final command = _extractCommand(fullResponse);
-        agentLogger.info('AutoExec', '提取命令: ${command != null ? "找到" : "未找到"}');
+        final commands = _extractCommands(fullResponse);
+        agentLogger.info('AutoExec', '提取命令: ${commands.isNotEmpty ? "${commands.length} 条" : "未找到"}');
 
-        if (command != null) {
-          agentLogger.info('AutoExec', '提取的命令: $command');
+        if (commands.isNotEmpty) {
+          for (final c in commands) {
+            agentLogger.info('AutoExec', '提取的命令: $c');
+          }
         } else {
           agentLogger.info('AutoExec', 'AI完整响应:\n$fullResponse');
         }
 
-        if (command == null) {
+        if (commands.isEmpty) {
           if (_isTaskComplete(fullResponse)) {
             agentLogger.info('AutoExec', '任务完成 (检测到完成关键词)');
           } else {
@@ -363,116 +365,121 @@ class AgentEngine {
           return;
         }
 
-        final safetyLevel = SafetyGuard.check(command);
-        agentLogger.info('AutoExec', '安全检查结果: $safetyLevel');
-
-        if (safetyLevel == SafetyLevel.blocked) {
-          agentLogger.warn('AutoExec', '命令被安全系统拦截: $command');
-          final msg = '\n\n🚫 命令被安全系统拦截: $command\n';
-          _accumulatedMessage += msg;
-          onMessage?.call(msg);
-          _conversationHistory.add(ChatMessage.create(
-            role: 'user',
-            content: '该命令被安全系统拦截，请换一个方法。',
-          ));
-          _trimMessages(_conversationHistory);
-          continue;
-        }
-
-        // warn 级别的命令（安装/升级/替换/修改环境等）在自动模式下暂停，等待用户确认
-        if (safetyLevel == SafetyLevel.warn) {
-          agentLogger.warn('AutoExec', '高风险命令需要确认: $command');
-
-          // 设置等待确认状态，UI 会显示确认/拒绝按钮
-          _pendingConfirmCommand = command;
-          _confirmCompleter = Completer<bool>();
-
-          final msg = '\n\n⚠️ 高风险命令需要确认: `$command`\n${SafetyGuard.getTip(safetyLevel)}\n请点击下方按钮确认或拒绝。\n';
-          _accumulatedMessage += msg;
-          onMessage?.call(msg);
-
-          _currentTask = _currentTask!.copyWith(
-            status: AgentStatus.waitingConfirm,
-            currentStep: '等待确认: $command',
-          );
-          onTaskUpdated?.call(_currentTask!);
-
-          // 暂停循环，等待用户确认或拒绝
-          final confirmed = await _confirmCompleter!.future;
-          _confirmCompleter = null;
-          _pendingConfirmCommand = null;
-
+        // 逐条执行命令，收集结果
+        final resultMessages = <String>[];
+        for (final command in commands) {
           if (_currentTask?.status == AgentStatus.cancelled) {
-            agentLogger.info('AutoExec', '任务在等待确认期间被取消');
+            agentLogger.info('AutoExec', '任务被取消');
             return;
           }
 
-          if (confirmed) {
+          final safetyLevel = SafetyGuard.check(command);
+          agentLogger.info('AutoExec', '安全检查结果: $safetyLevel');
+
+          if (safetyLevel == SafetyLevel.blocked) {
+            agentLogger.warn('AutoExec', '命令被安全系统拦截: $command');
+            final msg = '\n\n🚫 命令被安全系统拦截: $command\n';
+            _accumulatedMessage += msg;
+            onMessage?.call(msg);
+            resultMessages.add('🚫 命令被安全系统拦截: $command');
+            continue;
+          }
+
+          // warn 级别的命令（安装/升级/替换/修改环境等）在自动模式下暂停，等待用户确认
+          if (safetyLevel == SafetyLevel.warn) {
+            agentLogger.warn('AutoExec', '高风险命令需要确认: $command');
+
+            // 设置等待确认状态，UI 会显示确认/拒绝按钮
+            _pendingConfirmCommand = command;
+            _confirmCompleter = Completer<bool>();
+
+            final msg = '\n\n⚠️ 高风险命令需要确认: `$command`\n${SafetyGuard.getTip(safetyLevel)}\n请点击下方按钮确认或拒绝。\n';
+            _accumulatedMessage += msg;
+            onMessage?.call(msg);
+
+            _currentTask = _currentTask!.copyWith(
+              status: AgentStatus.waitingConfirm,
+              currentStep: '等待确认: $command',
+            );
+            onTaskUpdated?.call(_currentTask!);
+
+            // 暂停循环，等待用户确认或拒绝
+            final confirmed = await _confirmCompleter!.future;
+            _confirmCompleter = null;
+            _pendingConfirmCommand = null;
+
+            if (_currentTask?.status == AgentStatus.cancelled) {
+              agentLogger.info('AutoExec', '任务在等待确认期间被取消');
+              return;
+            }
+
+            if (!confirmed) {
+              // 用户拒绝执行
+              agentLogger.info('AutoExec', '用户拒绝执行危险命令: $command');
+              final rejectMsg = '\n❌ 用户拒绝执行此命令。\n';
+              _accumulatedMessage += rejectMsg;
+              onMessage?.call(rejectMsg);
+              resultMessages.add('❌ 用户拒绝执行: $command');
+              continue;
+            }
+
             // 用户确认执行
             agentLogger.info('AutoExec', '用户确认执行危险命令: $command');
             final confirmMsg = '\n✅ 用户已确认，开始执行...\n';
             _accumulatedMessage += confirmMsg;
             onMessage?.call(confirmMsg);
-            // 不 continue，继续往下执行命令
-          } else {
-            // 用户拒绝执行
-            agentLogger.info('AutoExec', '用户拒绝执行危险命令: $command');
-            final rejectMsg = '\n❌ 用户拒绝执行此命令。\n';
-            _accumulatedMessage += rejectMsg;
-            onMessage?.call(rejectMsg);
-            _conversationHistory.add(ChatMessage.create(
-              role: 'user',
-              content: '用户拒绝执行上述命令。请换一个不需要修改系统的方法，或者仅用只读命令收集信息。如果任务无法在不修改系统的前提下完成，请说明情况并结束任务。',
-            ));
-            _trimMessages(_conversationHistory);
-            continue;
           }
+
+          _currentTask = _currentTask!.copyWith(
+            status: AgentStatus.executing,
+            currentStep: command,
+          );
+          onTaskUpdated?.call(_currentTask!);
+          onCommandGenerated?.call(command);
+
+          if (safetyLevel == SafetyLevel.info) {
+            agentLogger.info('AutoExec', '低风险操作提示: $command');
+          }
+
+          agentLogger.info('AutoExec', '执行命令: $command');
+          final result = await _executeCommand(executor, command);
+          agentLogger.info('AutoExec', '命令执行结果: success=${result.success}');
+          agentLogger.debug('AutoExec', '输出: ${result.output ?? "无"}');
+          agentLogger.debug('AutoExec', '错误: ${result.error ?? "无"}');
+
+          onCommandExecuted?.call(result);
+
+          _memory.rememberCommand(command);
+          _memory.rememberResult(
+            command,
+            result.output ?? result.error ?? '',
+            success: result.success,
+          );
+
+          // 查询类命令保留完整输出，修改类命令截断
+          final isQuery = _isQueryCommand(command);
+          final outputText = isQuery
+              ? (result.output ?? '(无输出)')
+              : _truncateOutput(result.output, maxLines: 8, maxChars: 600);
+          final errorText = isQuery
+              ? (result.error ?? '(无错误信息)')
+              : _truncateOutput(result.error, maxLines: 8, maxChars: 600);
+          final resultMsg = result.success
+              ? '✅ 命令执行成功\n```bash\n$command\n```\n输出:\n```text\n$outputText\n```'
+              : '❌ 命令执行失败\n```bash\n$command\n```\n错误:\n```text\n$errorText\n```';
+
+          resultMessages.add(resultMsg);
+
+          // 累积到 UI 显示消息（每条命令的结果实时显示）
+          _accumulatedMessage += '\n$resultMsg';
+          onMessage?.call('\n$resultMsg');
         }
 
-        _currentTask = _currentTask!.copyWith(
-          status: AgentStatus.executing,
-          currentStep: command,
-        );
-        onTaskUpdated?.call(_currentTask!);
-        onCommandGenerated?.call(command);
-
-        if (safetyLevel == SafetyLevel.info) {
-          agentLogger.info('AutoExec', '低风险操作提示: $command');
-        }
-
-        agentLogger.info('AutoExec', '执行命令: $command');
-        final result = await _executeCommand(executor, command);
-        agentLogger.info('AutoExec', '命令执行结果: success=${result.success}');
-        agentLogger.debug('AutoExec', '输出: ${result.output ?? "无"}');
-        agentLogger.debug('AutoExec', '错误: ${result.error ?? "无"}');
-
-        onCommandExecuted?.call(result);
-
-        _memory.rememberCommand(command);
-        _memory.rememberResult(
-          command,
-          result.output ?? result.error ?? '',
-          success: result.success,
-        );
-
-        // 查询类命令保留完整输出，修改类命令截断
-        final isQuery = _isQueryCommand(command);
-        final resultMsg = result.success
-            ? '✅ 命令执行成功\n结果: ${_truncateOutput(result.output, maxLines: isQuery ? 80 : 8, maxChars: isQuery ? 4000 : 600)}'
-            : '❌ 命令执行失败\n错误: ${_truncateOutput(result.error, maxLines: isQuery ? 80 : 8, maxChars: isQuery ? 4000 : 600)}';
-
-        _conversationHistory.add(ChatMessage.create(role: 'user', content: resultMsg));
-
-        // 裁剪对话历史，防止上下文膨胀
-        _trimMessages(_conversationHistory);
-
-        // 累积到 UI 显示消息
-        _accumulatedMessage += '\n$resultMsg';
-        onMessage?.call('\n$resultMsg');
-
-        if (_currentTask?.status == AgentStatus.cancelled) {
-          agentLogger.info('AutoExec', '任务被取消');
-          return;
+        // 汇总所有结果作为一条 user 消息发给 AI
+        if (resultMessages.isNotEmpty) {
+          final combinedResult = resultMessages.join('\n\n');
+          _conversationHistory.add(ChatMessage.create(role: 'user', content: combinedResult));
+          _trimMessages(_conversationHistory);
         }
       } catch (e, stack) {
         final friendlyMsg = _friendlyErrorMessage(e);
@@ -683,6 +690,101 @@ class AgentEngine {
     return null;
   }
 
+  /// 从 AI 响应中提取所有可执行命令（支持批量）
+  /// 优先从代码块中提取所有有效命令行，如果没有代码块则回退到单条提取
+  List<String> _extractCommands(String content) {
+    agentLogger.debug('ExtractCmd', '开始批量解析，内容长度: ${content.length}');
+
+    final commands = <String>[];
+
+    // ========== 模式 1: markdown 代码块 (```bash ... ``` 或 ``` ... ```) ==========
+    final codeBlockPatterns = [
+      RegExp(r'```\s*(?:bash|sh|shell)\s*\n([\s\S]*?)```', multiLine: true),
+      RegExp(r'```\s*\n([\s\S]*?)```', multiLine: true),
+      RegExp(r'```\s*(?:bash|sh|shell)\s+([^\n]+)```', multiLine: true),
+    ];
+
+    for (final pattern in codeBlockPatterns) {
+      final match = pattern.firstMatch(content);
+      if (match != null) {
+        final rawBlock = match.group(1)?.trim();
+        if (rawBlock != null && rawBlock.isNotEmpty) {
+          commands.addAll(_parseCodeBlock(rawBlock));
+          if (commands.isNotEmpty) {
+            agentLogger.info('ExtractCmd', '批量模式1提取 ${commands.length} 条命令');
+            return commands;
+          }
+        }
+      }
+    }
+
+    // 回退到单条命令提取
+    final single = _extractCommand(content);
+    if (single != null) {
+      commands.add(single);
+      agentLogger.info('ExtractCmd', '回退单条提取: $single');
+    }
+    return commands;
+  }
+
+  /// 解析代码块，识别 heredoc 并将其作为整体提取
+  List<String> _parseCodeBlock(String rawBlock) {
+    final commands = <String>[];
+    final lines = rawBlock.split('\n');
+
+    int i = 0;
+    while (i < lines.length) {
+      final line = lines[i].trim();
+
+      if (line.isEmpty) {
+        i++;
+        continue;
+      }
+
+      // 检测 heredoc 开始：cat > file << 'EOF' 或 cat > file << EOF 等
+      final heredocStart = RegExp(r'''<<\s*['"]?(\w+)['"]?''');
+      final heredocMatch = heredocStart.firstMatch(line);
+
+      if (heredocMatch != null) {
+        final delimiter = heredocMatch.group(1)!;
+        final heredocLines = <String>[line];
+
+        // 收集 heredoc 内容直到遇到结束标记
+        i++;
+        while (i < lines.length) {
+          final heredocLine = lines[i];
+          heredocLines.add(heredocLine);
+          if (heredocLine.trim() == delimiter) {
+            i++;
+            break;
+          }
+          i++;
+        }
+
+        final heredocCommand = heredocLines.join('\n');
+        commands.add(heredocCommand);
+        agentLogger.info('ExtractCmd', 'heredoc 命令提取: ${heredocCommand.length} 字符');
+        continue;
+      }
+
+      // 非注释、非代码块标记的普通命令行
+      if (line.startsWith('#') && !line.startsWith('#!')) {
+        i++;
+        continue;
+      }
+      if (line.startsWith('```') || line.endsWith('```')) {
+        i++;
+        continue;
+      }
+      if (line.length >= 3) {
+        commands.add(line);
+      }
+      i++;
+    }
+
+    return commands;
+  }
+
   /// 从多行代码块中提取第一条有效命令
   String? _extractFirstCommand(String block) {
     final lines = block.split('\n');
@@ -866,8 +968,16 @@ class AgentEngine {
     for (int i = 0; i < keptNonSystem.length; i++) {
       final msg = keptNonSystem[i];
       if (msg.content.length > _maxMessageChars) {
-        final truncated = '...(已截断前 ${msg.content.length - _maxMessageChars} 字符)\n${msg.content.substring(msg.content.length - _maxMessageChars)}';
-        keptNonSystem[i] = ChatMessage.create(role: msg.role, content: truncated);
+        var truncated = msg.content.substring(msg.content.length - _maxMessageChars);
+        // 确保代码块完整闭合：统计 ``` 数量，奇数则补一个 ```
+        final openCount = '```'.allMatches(truncated).length;
+        if (openCount % 2 != 0) {
+          truncated = '$truncated\n```';
+        }
+        keptNonSystem[i] = ChatMessage.create(
+          role: msg.role,
+          content: '...(已截断前 ${msg.content.length - _maxMessageChars} 字符)\n$truncated',
+        );
       }
     }
 

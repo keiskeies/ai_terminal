@@ -1,9 +1,12 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../core/constants.dart';
+import '../core/theme_colors.dart';
 import '../models/ai_model_config.dart';
 import '../providers/app_providers.dart';
+import '../services/provider_config_service.dart';
 
 class AIModelsPage extends ConsumerStatefulWidget {
   const AIModelsPage({super.key});
@@ -61,19 +64,22 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
   }
 
   Widget _buildModelCard(AIModelConfig model) {
+    final providerInfo = ProviderConfigService.getProviderById(model.provider);
+    final displayName = providerInfo?.name ?? model.provider;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ExpansionTile(
         leading: CircleAvatar(
           backgroundColor: Color(model.providerColorValue),
           child: Text(
-            model.providerIcon,
-            style: const TextStyle(fontSize: 18),
+            model.name.isNotEmpty ? model.name.substring(0, 1).toUpperCase() : '?',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
           ),
         ),
         title: Text(model.name),
         subtitle: Text(
-          '${model.provider} / ${model.modelName}',
+          '$displayName / ${model.modelName}',
           style: TextStyle(color: cTextSub, fontSize: fSmall),
         ),
         trailing: Row(
@@ -146,7 +152,7 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('删除模型'),
-        content: Text('确定要删除 \"${model.name}\" 吗？'),
+        content: Text('确定要删除 "${model.name}" 吗？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -204,6 +210,15 @@ class _AIModelDialogState extends State<AIModelDialog> {
   int _maxTokens = 4096;
   bool _isDefault = false;
   bool _obscureApiKey = true;
+  bool _testing = false;
+  String? _testResult;
+  bool _refreshing = false;
+
+  bool get _isFormComplete =>
+      _nameController.text.trim().isNotEmpty &&
+      _apiKeyController.text.trim().isNotEmpty &&
+      _baseUrlController.text.trim().isNotEmpty &&
+      _modelNameController.text.trim().isNotEmpty;
 
   @override
   void initState() {
@@ -218,6 +233,10 @@ class _AIModelDialogState extends State<AIModelDialog> {
       _maxTokens = widget.model!.maxTokens;
       _isDefault = widget.model!.isDefault;
     }
+    _nameController.addListener(() => setState(() {}));
+    _apiKeyController.addListener(() => setState(() { _testResult = null; }));
+    _baseUrlController.addListener(() => setState(() { _testResult = null; }));
+    _modelNameController.addListener(() => setState(() { _testResult = null; }));
   }
 
   @override
@@ -229,111 +248,456 @@ class _AIModelDialogState extends State<AIModelDialog> {
     super.dispose();
   }
 
+  Future<void> _refreshProviders() async {
+    setState(() => _refreshing = true);
+    final result = await ProviderConfigService.refreshFromRemote();
+    setState(() => _refreshing = false);
+
+    if (!mounted) return;
+
+    if (result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('供应商列表已更新（${result.count} 个供应商）'),
+          backgroundColor: cSuccess,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      setState(() {});
+    } else if (result.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('远程配置为空'),
+          backgroundColor: cWarning,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('更新失败：${result.errorMessage}'),
+          backgroundColor: cDanger,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Future<void> _testConnection() async {
+    if (!_isFormComplete) return;
+    setState(() {
+      _testing = true;
+      _testResult = null;
+    });
+
+    try {
+      final dio = Dio();
+      dio.options.connectTimeout = const Duration(seconds: 10);
+      dio.options.receiveTimeout = const Duration(seconds: 15);
+
+      final response = await dio.post<List<int>>(
+        '${_baseUrlController.text.trim()}/chat/completions',
+        data: {
+          'model': _modelNameController.text.trim(),
+          'messages': [
+            {'role': 'user', 'content': 'hi'},
+          ],
+          'max_tokens': 5,
+          'stream': false,
+        },
+        options: Options(
+          headers: {
+            'Authorization': 'Bearer ${_apiKeyController.text.trim()}',
+            'Content-Type': 'application/json',
+          },
+          responseType: ResponseType.bytes,
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() => _testResult = 'success');
+      } else {
+        setState(() => _testResult = 'HTTP ${response.statusCode}');
+      }
+    } on DioException catch (e) {
+      String msg;
+      switch (e.type) {
+        case DioExceptionType.badResponse:
+          final code = e.response?.statusCode;
+          if (code == 401) {
+            msg = 'API Key 无效或已过期';
+          } else if (code == 429) {
+            msg = '请求过于频繁，请稍后重试';
+          } else if (code == 400) {
+            msg = '请求格式错误，请检查模型名称';
+          } else if (code != null && code >= 500) {
+            msg = '服务端错误 ($code)';
+          } else {
+            msg = '请求失败 ($code)';
+          }
+        case DioExceptionType.connectionTimeout:
+        case DioExceptionType.sendTimeout:
+        case DioExceptionType.receiveTimeout:
+          msg = '连接超时，请检查网络';
+        case DioExceptionType.connectionError:
+          msg = '无法连接，请检查 Base URL';
+        default:
+          msg = '连接失败: ${e.message ?? "未知错误"}';
+      }
+      setState(() => _testResult = msg);
+    } catch (e) {
+      setState(() => _testResult = '测试失败: $e');
+    } finally {
+      setState(() => _testing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.model != null ? '编辑模型' : '添加模型'),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              DropdownButtonFormField<String>(
-                value: _provider,
-                decoration: const InputDecoration(labelText: '提供商'),
-                items: const [
-                  DropdownMenuItem(value: 'openai', child: Text('OpenAI')),
-                  DropdownMenuItem(value: 'qwen', child: Text('通义千问')),
-                  DropdownMenuItem(value: 'ernie', child: Text('文心一言')),
-                ],
+    final tc = ThemeColors.of(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isWide = screenWidth >= 600;
+    final dialogWidth = isWide ? 640.0 : screenWidth * 0.9;
+
+    final providers = ProviderConfigService.providers;
+    final currentProviderInfo = ProviderConfigService.getProviderById(_provider);
+
+    final providerDropdown = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<String>(
+                value: providers.any((p) => p.id == _provider) ? _provider : null,
+                decoration: InputDecoration(
+                  labelText: '提供商',
+                  labelStyle: TextStyle(color: tc.textSub),
+                ),
+                dropdownColor: tc.cardElevated,
+                items: providers.map((p) => DropdownMenuItem(
+                  value: p.id,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(p.icon, style: const TextStyle(fontSize: 16)),
+                      const SizedBox(width: 8),
+                      Flexible(child: Text(p.name, overflow: TextOverflow.ellipsis)),
+                    ],
+                  ),
+                )).toList(),
                 onChanged: (value) {
+                  if (value == null) return;
                   setState(() {
-                    _provider = value!;
-                    if (value == 'openai') {
-                      _baseUrlController.text = 'https://api.openai.com/v1';
-                    } else if (value == 'qwen') {
-                      _baseUrlController.text = 'https://dashscope.aliyuncs.com/api/v1';
-                    } else if (value == 'ernie') {
-                      _baseUrlController.text = 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1';
+                    _provider = value;
+                    _testResult = null;
+                    final info = ProviderConfigService.getProviderById(value);
+                    if (info != null && info.baseUrl.isNotEmpty) {
+                      _baseUrlController.text = info.baseUrl;
                     }
                   });
                 },
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(labelText: '名称'),
-                validator: (v) => v?.isEmpty == true ? '请输入名称' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _apiKeyController,
-                obscureText: _obscureApiKey,
-                decoration: InputDecoration(
-                  labelText: 'API Key',
-                  suffixIcon: IconButton(
-                    icon: Icon(_obscureApiKey ? Icons.visibility : Icons.visibility_off),
-                    onPressed: () => setState(() => _obscureApiKey = !_obscureApiKey),
-                  ),
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              height: 56,
+              child: Tooltip(
+                message: '从服务器更新供应商列表',
+                child: IconButton.outlined(
+                  onPressed: _refreshing ? null : _refreshProviders,
+                  icon: _refreshing
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: tc.textSub),
+                        )
+                      : Icon(Icons.refresh, color: tc.textSub, size: 20),
                 ),
-                validator: (v) => v?.isEmpty == true ? '请输入 API Key' : null,
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _baseUrlController,
-                decoration: const InputDecoration(labelText: 'Base URL'),
-                validator: (v) => v?.isEmpty == true ? '请输入 Base URL' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _modelNameController,
-                decoration: const InputDecoration(labelText: '模型名称'),
-                validator: (v) => v?.isEmpty == true ? '请输入模型名称' : null,
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text('温度: ${_temperature.toStringAsFixed(1)}'),
-                  ),
-                  Expanded(
-                    flex: 2,
-                    child: Slider(
-                      value: _temperature,
-                      min: 0,
-                      max: 1,
-                      divisions: 10,
-                      onChanged: (v) => setState(() => _temperature = v),
+            ),
+          ],
+        ),
+        if (currentProviderInfo != null && currentProviderInfo.description.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              currentProviderInfo.description,
+              style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+    );
+
+    final nameField = TextFormField(
+      controller: _nameController,
+      decoration: InputDecoration(
+        labelText: '名称',
+        labelStyle: TextStyle(color: tc.textSub),
+      ),
+      style: TextStyle(color: tc.textMain),
+      validator: (v) => v?.isEmpty == true ? '请输入名称' : null,
+    );
+
+    final baseUrlField = TextFormField(
+      controller: _baseUrlController,
+      decoration: InputDecoration(
+        labelText: 'Base URL',
+        labelStyle: TextStyle(color: tc.textSub),
+      ),
+      style: TextStyle(color: tc.textMain, fontFamily: 'JetBrainsMono', fontSize: fSmall),
+      validator: (v) => v?.isEmpty == true ? '请输入 Base URL' : null,
+    );
+
+    final apiKeyField = TextFormField(
+      controller: _apiKeyController,
+      obscureText: _obscureApiKey,
+      decoration: InputDecoration(
+        labelText: 'API Key',
+        labelStyle: TextStyle(color: tc.textSub),
+        suffixIcon: IconButton(
+          icon: Icon(_obscureApiKey ? Icons.visibility : Icons.visibility_off, color: tc.textSub),
+          onPressed: () => setState(() => _obscureApiKey = !_obscureApiKey),
+        ),
+      ),
+      style: TextStyle(color: tc.textMain, fontFamily: 'JetBrainsMono'),
+      validator: (v) => v?.isEmpty == true ? '请输入 API Key' : null,
+    );
+
+    final modelNameField = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (currentProviderInfo != null && currentProviderInfo.models.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: currentProviderInfo.models.map((m) {
+                final isSelected = _modelNameController.text.trim() == m.name;
+                return ActionChip(
+                  label: Text(
+                    m.label,
+                    style: TextStyle(
+                      fontSize: fMicro,
+                      color: isSelected ? Colors.white : tc.textMain,
                     ),
                   ),
-                ],
-              ),
-              TextFormField(
-                controller: TextEditingController(text: _maxTokens.toString()),
-                decoration: const InputDecoration(labelText: '最大 Token'),
-                keyboardType: TextInputType.number,
-                onChanged: (v) => _maxTokens = int.tryParse(v) ?? 4096,
-              ),
-              SwitchListTile(
-                title: const Text('设为默认'),
-                value: _isDefault,
-                onChanged: (v) => setState(() => _isDefault = v),
-              ),
+                  avatar: m.free
+                      ? Text('🆓', style: const TextStyle(fontSize: 10))
+                      : null,
+                  backgroundColor: isSelected ? cPrimary : tc.surface,
+                  side: BorderSide(color: isSelected ? cPrimary : tc.border),
+                  onPressed: () {
+                    setState(() {
+                      _modelNameController.text = m.name;
+                      _testResult = null;
+                    });
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+        TextFormField(
+          controller: _modelNameController,
+          decoration: InputDecoration(
+            labelText: '模型名称',
+            labelStyle: TextStyle(color: tc.textSub),
+          ),
+          style: TextStyle(color: tc.textMain, fontFamily: 'JetBrainsMono', fontSize: fSmall),
+          validator: (v) => v?.isEmpty == true ? '请输入模型名称' : null,
+        ),
+      ],
+    );
+
+    final temperatureRow = Row(
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text('温度: ${_temperature.toStringAsFixed(1)}', style: TextStyle(color: tc.textMain, fontSize: fSmall)),
+        ),
+        Expanded(
+          child: Slider(
+            value: _temperature,
+            min: 0,
+            max: 1,
+            divisions: 10,
+            onChanged: (v) => setState(() => _temperature = v),
+          ),
+        ),
+      ],
+    );
+
+    final maxTokensField = TextFormField(
+      controller: TextEditingController(text: _maxTokens.toString()),
+      decoration: InputDecoration(
+        labelText: '最大 Token',
+        labelStyle: TextStyle(color: tc.textSub),
+      ),
+      style: TextStyle(color: tc.textMain),
+      keyboardType: TextInputType.number,
+      onChanged: (v) => _maxTokens = int.tryParse(v) ?? 4096,
+    );
+
+    final defaultSwitch = SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text('设为默认', style: TextStyle(color: tc.textMain)),
+      value: _isDefault,
+      onChanged: (v) => setState(() => _isDefault = v),
+    );
+
+    Widget formContent;
+    if (isWide) {
+      formContent = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          providerDropdown,
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: nameField),
+              const SizedBox(width: 16),
+              Expanded(child: modelNameField),
             ],
+          ),
+          const SizedBox(height: 12),
+          baseUrlField,
+          const SizedBox(height: 12),
+          apiKeyField,
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: temperatureRow),
+              const SizedBox(width: 16),
+              Expanded(child: maxTokensField),
+            ],
+          ),
+          defaultSwitch,
+        ],
+      );
+    } else {
+      formContent = Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          providerDropdown,
+          const SizedBox(height: 12),
+          nameField,
+          const SizedBox(height: 12),
+          modelNameField,
+          const SizedBox(height: 12),
+          baseUrlField,
+          const SizedBox(height: 12),
+          apiKeyField,
+          const SizedBox(height: 12),
+          temperatureRow,
+          maxTokensField,
+          defaultSwitch,
+        ],
+      );
+    }
+
+    return Dialog(
+      backgroundColor: tc.cardElevated,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: dialogWidth,
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      widget.model != null ? '编辑模型' : '添加模型',
+                      style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600),
+                    ),
+                    if (currentProviderInfo != null) ...[
+                      const SizedBox(width: 8),
+                      Text(currentProviderInfo.icon, style: const TextStyle(fontSize: 18)),
+                    ],
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.pop(context),
+                      icon: Icon(Icons.close, color: tc.textSub, size: 20),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: formContent,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ElevatedButton.icon(
+                          onPressed: _isFormComplete && !_testing ? _testConnection : null,
+                          icon: _testing
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              : const Icon(Icons.wifi_tethering, size: 16),
+                          label: Text(_testing ? '测试中...' : '测试'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: cPrimary,
+                            foregroundColor: Colors.white,
+                            disabledBackgroundColor: cPrimary.withOpacity(0.3),
+                            disabledForegroundColor: Colors.white.withOpacity(0.5),
+                          ),
+                        ),
+                        if (_testResult != null) ...[
+                          const SizedBox(width: 8),
+                          Icon(
+                            _testResult == 'success' ? Icons.check_circle : Icons.error,
+                            color: _testResult == 'success' ? cSuccess : cDanger,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 4),
+                          Flexible(
+                            child: Text(
+                              _testResult == 'success' ? '连接成功' : _testResult!,
+                              style: TextStyle(
+                                color: _testResult == 'success' ? cSuccess : cDanger,
+                                fontSize: fSmall,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('取消', style: TextStyle(color: tc.textSub)),
+                    ),
+                    ElevatedButton(
+                      onPressed: _save,
+                      style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
+                      child: const Text('保存'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-        ElevatedButton(
-          onPressed: _save,
-          child: const Text('保存'),
-        ),
-      ],
     );
   }
 

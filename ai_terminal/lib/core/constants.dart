@@ -1,63 +1,84 @@
 import 'package:flutter/material.dart';
 
+// ===== 品牌四色 =====
+// 克莱因蓝 - 主色/行动：导航高亮、主按钮、链接、信息
+const Color cKleinBlue = Color(0xFF3B7DFF);
+const Color cKleinBlueLight = Color(0xFF5A9AFF);
+const Color cKleinBlueDark = Color(0xFF2060D0);
+
+// 莱姆绿 - 智能/成功：Agent、在线、操作成功
+const Color cLimeGreen = Color(0xFF6ECC54);
+const Color cLimeGreenLight = Color(0xFF8FE07A);
+const Color cLimeGreenDark = Color(0xFF4DA83A);
+
+// 中国红 - 危险/重要：错误、删除、断开、离线
+const Color cChineseRed = Color(0xFFC8161D);
+const Color cChineseRedLight = Color(0xFFE03040);
+const Color cChineseRedDark = Color(0xFF9E1018);
+
+// 爱马仕橙 - 警示/关注：警告、待处理、未读、执行中
+const Color cHermesOrange = Color(0xFFEB5C20);
+const Color cHermesOrangeLight = Color(0xFFF07840);
+const Color cHermesOrangeDark = Color(0xFFC44A18);
+
 // ===== 颜色系统 (深色) =====
 // 背景
-const Color cBg = Color(0xFF0B0D11);           // 页面背景
-const Color cCard = Color(0xFF12151C);         // 卡片/组件背景
-const Color cCardElevated = Color(0xFF1A1E28); // 浮层/弹窗背景
-const Color cSurface = Color(0xFF1F2430);      // 表面（hover/active）
+const Color cBg = Color(0xFF0A0A0F);
+const Color cCard = Color(0xFF111118);
+const Color cCardElevated = Color(0xFF1A1A24);
+const Color cSurface = Color(0xFF22222E);
 
 // 边框
-const Color cBorder = Color(0xFF252A36);       // 边框/分割线
-const Color cBorderHover = Color(0xFF2E3446);  // 亮边框（hover）
+const Color cBorder = Color(0xFF2A2A38);
+const Color cBorderHover = Color(0xFF363648);
 
 // 文字
-const Color cTextMain = Color(0xFFE2E8F0);     // 主文字
-const Color cTextSub = Color(0xFF64748B);      // 次文字
-const Color cTextMuted = Color(0xFF475569);    // 更弱的文字
+const Color cTextMain = Color(0xFFF0F0F5);
+const Color cTextSub = Color(0xFF8888A0);
+const Color cTextMuted = Color(0xFF5C5C72);
 
-// 主题色 - 优雅的蓝紫
-const Color cPrimary = Color(0xFF6366F1);      // 主色（Indigo）
-const Color cPrimaryLight = Color(0xFF818CF8); // 浅主色
-const Color cPrimaryDark = Color(0xFF4F46E5);  // 深主色
+// 主题色（克莱因蓝）
+const Color cPrimary = cKleinBlue;
+const Color cPrimaryLight = cKleinBlueLight;
+const Color cPrimaryDark = cKleinBlueDark;
 
-// 语义色
-const Color cSuccess = Color(0xFF22C55E);      // 成功/在线
-const Color cDanger = Color(0xFFEF4444);       // 危险/离线
-const Color cWarning = Color(0xFFF59E0B);      // 警告
-const Color cInfo = Color(0xFF3B82F6);         // 信息
+// 语义色（品牌四色）
+const Color cSuccess = cLimeGreen;
+const Color cDanger = cChineseRed;
+const Color cWarning = cHermesOrange;
+const Color cInfo = cKleinBlue;
 
 // 终端
-const Color cTerminalBg = Color(0xFF080A0F);
-const Color cTerminalGreen = Color(0xFF4ADE80);
+const Color cTerminalBg = Color(0xFF000000);
+const Color cTerminalGreen = cLimeGreen;
 
-// Agent 色
-const Color cAgentGreen = Color(0xFF10B981);
-const Color cAgentGreenLight = Color(0xFF34D399);
+// Agent 色（莱姆绿）
+const Color cAgentGreen = cLimeGreen;
+const Color cAgentGreenLight = cLimeGreenLight;
 
 // ===== 颜色系统 (浅色) =====
-const Color cBgLight = Color(0xFFF8FAFC);
+const Color cBgLight = Color(0xFFF5F5FA);
 const Color cCardLight = Color(0xFFFFFFFF);
 const Color cCardElevatedLight = Color(0xFFFFFFFF);
-const Color cSurfaceLight = Color(0xFFF1F5F9);
-const Color cBorderLightTheme = Color(0xFFE2E8F0);
-const Color cBorderLightHover = Color(0xFFCBD5E1);
-const Color cTextMainLight = Color(0xFF1E293B);
-const Color cTextSubLight = Color(0xFF64748B);
-const Color cTextMutedLight = Color(0xFF94A3B8);
-const Color cTerminalBgLight = Color(0xFFF1F5F9);
-const Color cTerminalGreenLight = Color(0xFF16A34A);
-const Color cAgentGreenLightMode = Color(0xFF059669);
+const Color cSurfaceLight = Color(0xFFEEEEF5);
+const Color cBorderLightTheme = Color(0xFFD8D8E5);
+const Color cBorderLightHover = Color(0xFFC0C0D2);
+const Color cTextMainLight = Color(0xFF1A1A2E);
+const Color cTextSubLight = Color(0xFF6B6B85);
+const Color cTextMutedLight = Color(0xFF9999AD);
+const Color cTerminalBgLight = Color(0xFFF0F0F5);
+const Color cTerminalGreenLight = cLimeGreenDark;
+const Color cAgentGreenLightMode = cLimeGreenDark;
 
 // 渐变色
 const LinearGradient primaryGradient = LinearGradient(
-  colors: [cPrimary, Color(0xFF8B5CF6)],
+  colors: [cKleinBlue, cKleinBlueLight],
   begin: Alignment.topLeft,
   end: Alignment.bottomRight,
 );
 
 const LinearGradient agentGradient = LinearGradient(
-  colors: [cAgentGreen, Color(0xFF059669)],
+  colors: [cLimeGreen, cLimeGreenDark],
   begin: Alignment.topLeft,
   end: Alignment.bottomRight,
 );
@@ -74,9 +95,7 @@ const double rSmall = 10.0;
 const double rMedium = 10.0;
 const double rLarge = 14.0;
 const double rXLarge = 20.0;
-const double rFull = 999.0;  // 胶囊
-
-// 兼容旧名称
+const double rFull = 999.0;
 const double rCard = rLarge;
 const double rButton = rMedium;
 const double rInput = rMedium;
@@ -89,7 +108,7 @@ const double hTabBar = 38.0;
 // ===== 阴影系统 =====
 const List<BoxShadow> shadowSmallDark = [
   BoxShadow(
-    color: Color(0x33000000), // black.withOpacity(0.2)
+    color: Color(0x33000000),
     blurRadius: 4,
     offset: Offset(0, 1),
   ),
@@ -97,7 +116,7 @@ const List<BoxShadow> shadowSmallDark = [
 
 const List<BoxShadow> shadowSmallLight = [
   BoxShadow(
-    color: Color(0x0F000000), // black.withOpacity(0.06)
+    color: Color(0x0F000000),
     blurRadius: 4,
     offset: Offset(0, 1),
   ),
@@ -105,7 +124,7 @@ const List<BoxShadow> shadowSmallLight = [
 
 const List<BoxShadow> shadowMediumDark = [
   BoxShadow(
-    color: Color(0x4D000000), // black.withOpacity(0.3)
+    color: Color(0x4D000000),
     blurRadius: 12,
     offset: Offset(0, 4),
   ),
@@ -113,7 +132,7 @@ const List<BoxShadow> shadowMediumDark = [
 
 const List<BoxShadow> shadowMediumLight = [
   BoxShadow(
-    color: Color(0x14000000), // black.withOpacity(0.08)
+    color: Color(0x14000000),
     blurRadius: 12,
     offset: Offset(0, 4),
   ),
@@ -121,7 +140,7 @@ const List<BoxShadow> shadowMediumLight = [
 
 const List<BoxShadow> shadowLargeDark = [
   BoxShadow(
-    color: Color(0x66000000), // black.withOpacity(0.4)
+    color: Color(0x66000000),
     blurRadius: 24,
     offset: Offset(0, 8),
   ),
@@ -129,20 +148,19 @@ const List<BoxShadow> shadowLargeDark = [
 
 const List<BoxShadow> shadowLargeLight = [
   BoxShadow(
-    color: Color(0x1A000000), // black.withOpacity(0.1)
+    color: Color(0x1A000000),
     blurRadius: 24,
     offset: Offset(0, 8),
   ),
 ];
 
-// 兼容旧调用：默认深色
 List<BoxShadow> shadowSmall({bool isLight = false}) => isLight ? shadowSmallLight : shadowSmallDark;
 List<BoxShadow> shadowMedium({bool isLight = false}) => isLight ? shadowMediumLight : shadowMediumDark;
 List<BoxShadow> shadowLarge({bool isLight = false}) => isLight ? shadowLargeLight : shadowLargeDark;
 
 const List<BoxShadow> shadowGlow = [
   BoxShadow(
-    color: Color(0x266366F1), // cPrimary.withOpacity(0.15)
+    color: Color(0x263B7DFF),
     blurRadius: 16,
     spreadRadius: 0,
   ),
@@ -150,7 +168,7 @@ const List<BoxShadow> shadowGlow = [
 
 const List<BoxShadow> shadowAgentGlow = [
   BoxShadow(
-    color: Color(0x2610B981), // cAgentGreen.withOpacity(0.15)
+    color: Color(0x266ECC54),
     blurRadius: 16,
     spreadRadius: 0,
   ),
@@ -170,10 +188,10 @@ const Duration animSlow = Duration(milliseconds: 400);
 
 // ===== 标签颜色选项 =====
 const List<Color> tagColors = [
-  Color(0xFFEF4444),
-  Color(0xFFF59E0B),
+  cChineseRed,
+  cHermesOrange,
   Color(0xFFEAB308),
-  Color(0xFF22C55E),
-  Color(0xFF3B82F6),
+  cLimeGreen,
+  cKleinBlue,
   Color(0xFF8B5CF6),
 ];

@@ -1,4 +1,5 @@
 import 'package:hive/hive.dart';
+import '../services/provider_config_service.dart';
 
 part 'ai_model_config.g.dart';
 
@@ -8,7 +9,7 @@ class AIModelConfig extends HiveObject {
   late String id;
 
   @HiveField(1)
-  late String provider; // 'openai' | 'qwen' | 'ernie'
+  late String provider;
 
   @HiveField(2)
   late String name;
@@ -45,32 +46,14 @@ class AIModelConfig extends HiveObject {
     this.isDefault = false,
   });
 
-  /// 提供商图标
   String get providerIcon {
-    switch (provider) {
-      case 'openai':
-        return '🤖';
-      case 'qwen':
-        return '🐯';
-      case 'ernie':
-        return '🟠';
-      default:
-        return '💬';
-    }
+    final info = ProviderConfigService.getProviderById(provider);
+    return info?.icon ?? '💬';
   }
 
-  /// 提供商颜色
   int get providerColorValue {
-    switch (provider) {
-      case 'openai':
-        return 0xFF22C55E; // 绿色
-      case 'qwen':
-        return 0xFF3B82F6; // 蓝色
-      case 'ernie':
-        return 0xFF8B5CF6; // 紫色
-      default:
-        return 0xFF6366F1;
-    }
+    final info = ProviderConfigService.getProviderById(provider);
+    return info?.colorValue ?? 0xFF002FA7;
   }
 
   AIModelConfig copyWith({

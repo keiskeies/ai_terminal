@@ -5,6 +5,7 @@ CSV → SQLite (FTS5) 知识库转换脚本
 用法:
 #   python3 csv_to_knowledge.py knowledge.csv knowledge.db
   python3 tools/csv_to_knowledge.py ai_terminal/assets/knowledge/knowledge.csv ai_terminal/assets/knowledge/knowledge.db
+  python3 tools/csv_to_knowledge.py ai_terminal/assets/knowledge/knowledge.csv www/knowledge/knowledge-1.3.0.db
 
 CSV 格式（首行为表头）:
   software_name,aliases,op_type,platform,package_manager,summary,steps,commands,pre_requirements,notes,mode

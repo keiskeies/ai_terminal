@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2025-05-26
+
+### Added
+- 🌐 **20+ AI 供应商预设**：内置 20+ AI 供应商配置（国内 12 家 + 国际 8 家 + Ollama 本地 + 自定义）
+  - 国内：DeepSeek / 通义千问 / 智谱GLM / Kimi / 豆包 / 小米MiMo / MiniMax / 硅基流动 / 阶跃星辰 / 百川 / 讯飞星火 / 腾讯混元
+  - 国际：OpenAI / Claude / Gemini / xAI Grok / Mistral / OpenRouter / Groq
+  - 本地：Ollama（无需 API Key，完全免费）
+- 🔄 **远程供应商配置更新**：从服务器拉取最新供应商列表和模型信息，无需发版即可更新
+- 🏷️ **供应商描述与定价**：选择供应商时显示简介和定价信息
+- 🤖 **预设模型快捷选择**：每个供应商内置推荐模型列表，点击 Chip 一键选择，免费模型带 🆓 标识
+- 🦙 **Ollama 本地部署支持**：显式支持 Ollama 供应商，修正 API 端点路径
+- 📐 **添加模型弹窗优化**：
+  - 宽屏（≥600px）双列布局，窄屏保持单列
+  - 字段顺序调整：提供商 → 名称 → Base URL → API Key → 模型名称
+  - 选择供应商自动填充 Base URL
+  - 供应商下拉框旁增加刷新按钮
+
+### Changed
+- 供应商配置从硬编码改为 JSON 配置文件驱动（assets/config/ai_providers.json）
+- AIModelConfig 的 providerIcon/providerColorValue 改为从 ProviderConfigService 动态获取
+- 模型配置弹窗从 AlertDialog 改为 Dialog，支持自定义宽度
+
 ## [1.3.0] - 2025-05-08
 
 ### Added
@@ -94,6 +116,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Warning-level commands require explicit CONFIRM input
 - AES secondary encryption available for enhanced security
 
+[1.3.1]: https://github.com/keiskeies/ai_terminal/releases/tag/v1.3.1
 [1.3.0]: https://github.com/keiskeies/ai_terminal/releases/tag/v1.3.0
 [1.2.1]: https://github.com/keiskeies/ai_terminal/releases/tag/v1.2.1
 [1.2.0]: https://github.com/keiskeies/ai_terminal/releases/tag/v1.2.0

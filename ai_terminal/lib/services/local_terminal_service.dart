@@ -47,11 +47,17 @@ class LocalTerminalService implements CommandExecutor {
         args = ['-l'];
       }
 
+      final ptyEnv = Map<String, String>.from(Platform.environment);
+      ptyEnv['TERM'] = 'xterm-256color';
+      ptyEnv['CLICOLOR'] = '1';
+      ptyEnv['LSCOLORS'] = 'ExFxCxDxBxegedabagacad';
+      ptyEnv['LS_COLORS'] = 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32';
+
       _pty = Pty.start(
         shell,
         arguments: args,
         workingDirectory: Platform.environment['HOME'] ?? Directory.current.path,
-        environment: Platform.environment,
+        environment: ptyEnv,
         columns: columns,
         rows: rows,
       );
@@ -101,13 +107,14 @@ class LocalTerminalService implements CommandExecutor {
     }
   }
 
-  /// 逐行写入多行命令（heredoc 等）
   void _executeMultiLine(String command) async {
     final lines = command.split('\n');
     for (int i = 0; i < lines.length; i++) {
-      writeToTerminal('${lines[i]}\r');
-      if (i < lines.length - 1) {
-        await Future.delayed(const Duration(milliseconds: 50));
+      _pty!.write(utf8.encode('${lines[i]}\r'));
+      if (i == 0 && lines.first.contains('<<')) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      } else if (i < lines.length - 1) {
+        await Future.delayed(const Duration(milliseconds: 30));
       }
     }
   }
@@ -116,7 +123,8 @@ class LocalTerminalService implements CommandExecutor {
   void resize(int columns, int rows) {
     if (_pty == null || !_isConnected) return;
     if (columns <= 0 || rows <= 0) return;
-    _pty!.resize(columns, rows);
+    // ⚠️ Pty.resize 的参数顺序是 (rows, cols)，注意调换
+    _pty!.resize(rows, columns);
   }
 
   /// 断开连接

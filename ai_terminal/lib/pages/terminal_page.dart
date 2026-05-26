@@ -61,6 +61,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   final Map<String, bool> _tabSftpVisible = {}; // 每个 tab 的 SFTP 面板是否可见
   double _sftpPanelWidth = 320;
   static const double _minSftpWidth = 220;
+
+  // 延迟 resize：记录最后需要同步尺寸的 tab
+  tp.TerminalTab? _lastResizeTab;
   static const double _maxSftpWidth = 600;
 
   bool get _isMobile => Platform.isAndroid || Platform.isIOS;
@@ -81,14 +84,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   // 终端设置
   double _terminalFontSize = 13;
-  String _terminalColorScheme = 'Monokai';
-
-  final _colorSchemes = {
-    'Monokai': {'bg': const Color(0xFF0C0C0C), 'fg': const Color(0xFF4ADE80)},
-    'Dracula': {'bg': const Color(0xFF282A36), 'fg': const Color(0xFFF8F8F2)},
-    'Solarized': {'bg': const Color(0xFF002B36), 'fg': const Color(0xFF839496)},
-    'Nord': {'bg': const Color(0xFF2E3440), 'fg': const Color(0xFFD8DEE9)},
-  };
 
   // Markdown 预处理 & 内容分割缓存（避免每次 build 重复解析）
   final Map<String, String> _markdownCache = {};
@@ -127,8 +122,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     try {
       final fontSize = HiveInit.settingsBox.get('terminalFontSize');
       if (fontSize != null) _terminalFontSize = (fontSize as num).toDouble();
-      final colorScheme = HiveInit.settingsBox.get('terminalColorScheme');
-      if (colorScheme != null) _terminalColorScheme = colorScheme as String;
     } catch (_) {}
     // 加载 Agent 最大步骤数（需在 initAgent 之前加载）
     ref.read(agentProvider.notifier).loadSettings();
@@ -313,6 +306,24 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     // 避免每次切换都重新 collectSystemInfo
 
     setState(() {});
+
+    // 首帧渲染后确保 PTY 尺寸与终端视图同步，修复 Tab 补全时 prompt 被覆盖的问题
+    // 使用 Timer 延迟确保 xterm 内置的 resize 已完成，避免双重 SIGWINCH
+    _lastResizeTab = tab;
+    Timer(const Duration(milliseconds: 150), () {
+      if (!mounted) return;
+      final currentTab = _lastResizeTab;
+      if (currentTab == null) return;
+      final term = _tabTerminals[currentTab.id];
+      if (term == null) return;
+      final termW = term.viewWidth;
+      final termH = term.viewHeight;
+      if (currentTab.isLocal) {
+        currentTab.localService?.resize(termW, termH);
+      } else {
+        currentTab.service?.resize(termW, termH);
+      }
+    });
   }
 
   void _reconnect() {
@@ -512,7 +523,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 : term_widget.TerminalView(
                     terminal: _terminal,
                     fontSize: _terminalFontSize,
-                    colorScheme: _terminalColorScheme,
                     onSend: (command) {
                       final t = ref.read(tp.terminalProvider).activeTab;
                       if (t == null) return;
@@ -791,10 +801,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           final size = double.parse(value.substring(5));
           setState(() => _terminalFontSize = size);
           HiveInit.settingsBox.put('terminalFontSize', size);
-        } else if (value.startsWith('color_')) {
-          final scheme = value.substring(6);
-          setState(() => _terminalColorScheme = scheme);
-          HiveInit.settingsBox.put('terminalColorScheme', scheme);
         }
       },
       itemBuilder: (context) => [
@@ -814,35 +820,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 const SizedBox(width: 12),
               const SizedBox(width: 4),
               Text('${size.toInt()}px', style: TextStyle(fontSize: fSmall, color: _terminalFontSize == size ? cPrimary : tc.textMain)),
-            ],
-          ),
-        )),
-        const PopupMenuDivider(height: 8),
-        PopupMenuItem<String>(
-          enabled: false,
-          height: 28,
-          child: Text('配色', style: TextStyle(fontSize: fMicro, color: cPrimary, fontWeight: FontWeight.w600)),
-        ),
-        ..._colorSchemes.keys.map((scheme) => PopupMenuItem<String>(
-          value: 'color_$scheme',
-          height: 28,
-          child: Row(
-            children: [
-              if (_terminalColorScheme == scheme)
-                Icon(Icons.check, size: 12, color: cPrimary)
-              else
-                const SizedBox(width: 12),
-              const SizedBox(width: 4),
-              Container(
-                width: 12, height: 12,
-                decoration: BoxDecoration(
-                  color: _colorSchemes[scheme]!['bg'],
-                  border: Border.all(color: cBorder),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(scheme, style: TextStyle(fontSize: fSmall, color: _terminalColorScheme == scheme ? cPrimary : tc.textMain)),
             ],
           ),
         )),
@@ -1415,6 +1392,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           isLoading: item.isStreaming && isLast && agentState.isRunning,
           tab: tab,
           showAutoExecute: agentState.mode == AgentMode.automatic,
+          isAgentRunning: agentState.isRunning,
         );
       },
     );
@@ -1533,6 +1511,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     required bool isLoading,
     tp.TerminalTab? tab,
     bool showAutoExecute = false,
+    bool isAgentRunning = false,
   }) {
     final isUser = role == 'user';
     final tc = ThemeColors.of(context);
@@ -1603,7 +1582,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             if (isUser)
               SelectableText(content, style: TextStyle(color: tc.textMain, fontSize: fBody, height: 1.5))
             else
-              _buildAIContent(content, tc, tab, showAutoExecute, isLoading),
+              _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning),
           ],
         ),
       ),
@@ -1611,43 +1590,66 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   /// AI 回复内容渲染：将代码块提取出来，用带执行按钮的自定义 widget 显示
-  Widget _buildAIContent(String content, ThemeColors tc, tp.TerminalTab? tab, bool showAutoExecute, bool isLoading) {
-    final segments = _splitContentByCodeBlocks(content);
+  Widget _buildAIContent(String content, ThemeColors tc, tp.TerminalTab? tab, bool showAutoExecute, bool isLoading, bool isAgentRunning) {
+    // 解析 :::choose 选项1|选项2|选项3::: 格式
+    final optionsRegex = RegExp(r':::choose\s+(.+?):::');
+    final optionsMatch = optionsRegex.firstMatch(content);
+    final List<String> options = optionsMatch != null
+        ? optionsMatch.group(1)!.split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList()
+        : [];
+    // 移除选项标记，保留纯文本内容
+    final cleanContent = optionsMatch != null
+        ? content.replaceFirst(optionsRegex, '').trim()
+        : content;
+
+    final segments = _splitContentByCodeBlocks(cleanContent);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: segments.map((seg) {
-        if (seg.isCodeBlock) {
-          return _buildCodeBlockWithExecuteButton(seg.content, tc, tab, showAutoExecute, isLoading);
-        } else {
-          if (seg.content.trim().isEmpty) return const SizedBox.shrink();
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: MarkdownBody(
-              data: _preprocessMarkdown(seg.content),
-              selectable: true,
-              styleSheet: MarkdownStyleSheet(
-                p: TextStyle(color: tc.textMain, height: 1.5, fontSize: fBody),
-                h1: TextStyle(color: tc.textMain, fontSize: 16, fontWeight: FontWeight.bold),
-                h2: TextStyle(color: tc.textMain, fontSize: 14, fontWeight: FontWeight.bold),
-                h3: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600),
-                code: TextStyle(
-                  fontFamily: 'JetBrainsMono',
-                  fontSize: fMono,
-                  color: tc.terminalGreen,
-                  backgroundColor: tc.terminalBg,
+      children: [
+        ...segments.map((seg) {
+          if (seg.isCodeBlock) {
+            final lang = seg.language;
+            // shell 类语言用带执行按钮的渲染，其他语言用纯文本代码块
+            final isShell = lang == 'bash' || lang == 'sh' || lang == 'shell' || lang == 'zsh';
+            if (isShell) {
+              return _buildCodeBlockWithExecuteButton(seg.content, tc, tab, showAutoExecute, isLoading);
+            } else {
+              return _buildPlainCodeBlock(seg.content, tc);
+            }
+          } else {
+            if (seg.content.trim().isEmpty) return const SizedBox.shrink();
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: MarkdownBody(
+                data: _preprocessMarkdown(seg.content),
+                selectable: true,
+                styleSheet: MarkdownStyleSheet(
+                  p: TextStyle(color: tc.textMain, height: 1.5, fontSize: fBody),
+                  h1: TextStyle(color: tc.textMain, fontSize: 16, fontWeight: FontWeight.bold),
+                  h2: TextStyle(color: tc.textMain, fontSize: 14, fontWeight: FontWeight.bold),
+                  h3: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600),
+                  code: TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    fontSize: fMono,
+                    color: tc.terminalGreen,
+                    backgroundColor: tc.terminalBg,
+                  ),
+                  listBullet: TextStyle(color: cPrimary, fontSize: fBody),
+                  blockquote: TextStyle(color: tc.textSub, fontStyle: FontStyle.italic),
+                  blockquoteDecoration: BoxDecoration(
+                    border: Border(left: BorderSide(color: cPrimary, width: 2)),
+                  ),
+                  blockquotePadding: const EdgeInsets.only(left: 8),
                 ),
-                listBullet: TextStyle(color: cPrimary, fontSize: fBody),
-                blockquote: TextStyle(color: tc.textSub, fontStyle: FontStyle.italic),
-                blockquoteDecoration: BoxDecoration(
-                  border: Border(left: BorderSide(color: cPrimary, width: 2)),
-                ),
-                blockquotePadding: const EdgeInsets.only(left: 8),
+                onTapLink: (text, href, title) {},
               ),
-              onTapLink: (text, href, title) {},
-            ),
-          );
-        }
-      }).toList(),
+            );
+          }
+        }),
+        // 选项按钮
+        if (options.isNotEmpty)
+          _buildOptionButtons(options, tc, isLoading || isAgentRunning),
+      ],
     );
   }
 
@@ -1668,7 +1670,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   /// 内部实现：将内容按代码块分割
   List<_ContentSegment> _splitContentByCodeBlocksInternal(String content) {
     final segments = <_ContentSegment>[];
-    final regex = RegExp(r'```[\w]*\s*\n([\s\S]*?)```', multiLine: true);
+    final regex = RegExp(r'```(\w*)\s*\n([\s\S]*?)```', multiLine: true);
     int lastEnd = 0;
     for (final match in regex.allMatches(content)) {
       // 代码块前的文本
@@ -1678,9 +1680,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           segments.add(_ContentSegment(before, false));
         }
       }
-      // 代码块内容
-      final code = match.group(1) ?? '';
-      segments.add(_ContentSegment(code, true));
+      // 代码块内容和语言标识
+      final lang = match.group(1) ?? '';
+      final code = match.group(2) ?? '';
+      segments.add(_ContentSegment(code, true, language: lang.isEmpty ? null : lang.toLowerCase()));
       lastEnd = match.end;
     }
     // 剩余文本
@@ -1694,6 +1697,84 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       segments.add(_ContentSegment(content, false));
     }
     return segments;
+  }
+
+  /// 纯文本代码块（无执行/复制按钮），用于命令输出等非可执行内容
+  Widget _buildPlainCodeBlock(String codeBlock, ThemeColors tc) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: tc.terminalBg,
+        borderRadius: BorderRadius.circular(rSmall),
+        border: Border.all(color: tc.border),
+      ),
+      child: SelectableText(
+        codeBlock.trimRight(),
+        style: TextStyle(
+          fontFamily: 'JetBrainsMono',
+          fontSize: fMono,
+          color: tc.textSub,
+          height: 1.4,
+        ),
+      ),
+    );
+  }
+
+  /// 选项按钮组 — AI 输出 :::choose A|B|C::: 后渲染为可点击选项
+  Widget _buildOptionButtons(List<String> options, ThemeColors tc, bool disabled) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 6,
+        children: options.asMap().entries.map((entry) {
+          final index = entry.key;
+          final option = entry.value;
+          final isPrimary = index == 0; // 第一个选项用主色高亮
+          final color = isPrimary ? cPrimary : tc.textMain;
+          final bgColor = isPrimary
+              ? cPrimary.withOpacity(disabled ? 0.1 : 0.15)
+              : tc.border.withOpacity(disabled ? 0.3 : 0.6);
+
+          return GestureDetector(
+            onTap: disabled ? null : () => _onOptionSelected(option),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(rSmall),
+                border: Border.all(
+                  color: color.withOpacity(disabled ? 0.2 : 0.4),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (isPrimary) ...[
+                    Icon(Icons.check_circle_outline, size: 14, color: color.withOpacity(disabled ? 0.4 : 1)),
+                    const SizedBox(width: 4),
+                  ],
+                  Text(
+                    option,
+                    style: TextStyle(
+                      fontSize: fSmall,
+                      color: color.withOpacity(disabled ? 0.4 : 1),
+                      fontWeight: isPrimary ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  /// 选项按钮点击处理：将用户选择作为新消息发送给 agent
+  void _onOptionSelected(String option) {
+    ref.read(agentProvider.notifier).startTask(option);
   }
 
   /// 带执行按钮的代码块 — 每条命令独立一行
@@ -2751,7 +2832,9 @@ class _AgentLogDialogState extends State<_AgentLogDialog> {
 class _ContentSegment {
   final String content;
   final bool isCodeBlock;
-  _ContentSegment(this.content, this.isCodeBlock);
+  /// 代码块语言标识（如 bash、text、python 等），非代码块时为 null
+  final String? language;
+  _ContentSegment(this.content, this.isCodeBlock, {this.language});
 }
 
 /// 快捷按键定义

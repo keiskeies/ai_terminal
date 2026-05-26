@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-    <img src="https://img.shields.io/badge/version-1.3.0-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.1-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
@@ -41,6 +41,7 @@ AI Terminal is a cross-platform app that deeply integrates an **AI assistant** w
 | 🔄 **Connection Pool** | SSH connection pooling with reference counting — multiple tabs share the same connection, zero-delay tab switching |
 | 🌊 **Streaming Output** | AI responses render in real-time; terminal command output streams live — no waiting |
 | 🎨 **Dark Minimal** | Carefully tuned dark theme, JetBrains Mono monospace font, native-grade terminal experience |
+| 🌐 **20+ Providers** | Built-in presets for 20+ AI providers (DeepSeek / Qwen / Claude / Gemini / Ollama, etc.), with remote config updates |
 
 ## 🏗️ Tech Stack
 
@@ -52,7 +53,7 @@ Flutter 3.16+ (Dart 3.2+)
 ├── SSH: dartssh2
 ├── Local Terminal: flutter_pty
 ├── Terminal UI: xterm.dart
-├── AI Interface: OpenAI-compatible (DeepSeek / Qwen / GPT / any OpenAI-compatible model)
+├── AI Interface: OpenAI-compatible (DeepSeek / Qwen / GPT / Claude / Gemini / Ollama / 20+ providers)
 └── Markdown: flutter_markdown
 ```
 
@@ -104,17 +105,24 @@ flutter build ios --release
 
 ## 🔧 Configuring AI Models
 
-The app supports any **OpenAI-compatible API**. Setup steps:
+The app comes with **20+ AI provider presets** and supports any **OpenAI-compatible API**:
+
+| Category | Providers |
+|:---|:---|
+| 🏠 Local | Ollama (completely free, no API key needed) |
+| 🇨🇳 China Cloud | DeepSeek / Qwen / GLM / Kimi / Doubao / MiMo / MiniMax / SiliconFlow / StepFun / Baichuan / Spark / Hunyuan |
+| 🌍 Global Cloud | OpenAI / Claude / Gemini / xAI Grok / Mistral / OpenRouter / Groq |
+| 🔧 Custom | Any OpenAI-compatible API endpoint |
+
+Setup steps:
 
 1. Open the app → Settings → AI Model Configuration
 2. Click `+` to add a model
-3. Fill in:
-   - **API Key**: Your API key
-   - **Base URL**: API endpoint (e.g. `https://api.deepseek.com/v1`, `https://api.openai.com/v1`)
-   - **Model Name**: `deepseek-chat`, `gpt-4o`, `qwen-plus`, etc.
-4. Set as default model
+3. Select a provider (Base URL and recommended models are auto-filled)
+4. Enter your API Key and select a model
+5. Set as default model
 
-> 💡 XIAOMI MIMO-V2.5-PRO is recommended — excellent cost-performance ratio with high command generation accuracy
+> 💡 Provider list supports remote updates: click the 🔄 button next to the provider dropdown to fetch the latest providers and models from the server — no app update required
 
 ## 🛡️ Security Design
 
@@ -218,6 +226,7 @@ ai_terminal/
 │   ├── providers/                   # Riverpod state management
 │   ├── services/                    # Service layer
 │   │   ├── ai_service.dart          # AI interface
+│   │   ├── provider_config_service.dart  # Provider config service
 │   │   ├── ssh_service.dart         # SSH connection
 │   │   ├── local_terminal_service.dart  # Local terminal
 │   │   ├── command_executor.dart    # Unified executor interface
@@ -227,7 +236,8 @@ ai_terminal/
 │   └── utils/                       # Utilities
 ├── assets/                          # Assets
 │   ├── fonts/                       # JetBrains Mono font
-│   └── icons/                       # App icons
+│   ├── icons/                       # App icons
+│   └── config/                      # Built-in provider config
 └── pubspec.yaml
 ```
 
@@ -255,6 +265,13 @@ ai_terminal/
   - [x] 🛡️ LLM safety rules (strict enforcement + search command prohibition to prevent guessing)
   - [x] 🔧 Knowledge base build tool (CSV → SQLite conversion script)
   - [x] 💬 Friendly API error messages (401/429/timeout, etc.)
+- [x] v1.3.1 — Provider ecosystem
+  - [x] 🌐 Built-in 20+ AI provider presets (12 China + 8 Global + Ollama local + Custom)
+  - [x] 🔄 Remote provider config updates (fetch latest provider list from server, no app update needed)
+  - [x] 🏷️ Provider descriptions and pricing info (show intro and pricing when selecting a provider)
+  - [x] 🤖 Preset model quick selection (each provider has recommended model list, one-click select)
+  - [x] 🦙 Ollama local deployment support (no API key needed, completely free)
+  - [x] 📐 Add model dialog optimization (wide-screen dual-column layout, field order optimized)
 - [ ] v1.4.0 — Experience upgrade
   - [ ] Command execution state machine (Running/Success/Failed/Timeout)
   - [ ] Terminal split view
@@ -283,6 +300,12 @@ Contributions are welcome! Whether it's bug reports, feature suggestions, or cod
 ## 📄 License
 
 [MIT License](./LICENSE)
+
+---
+
+## ⭐ Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=keiskeies/ai_terminal&type=Date)](https://star-history.com/#keiskeies/ai_terminal&Date)
 
 ---
 

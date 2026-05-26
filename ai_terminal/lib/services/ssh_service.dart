@@ -122,6 +122,7 @@ class SSHService implements CommandExecutor {
       // 打开 Shell
       _session = await _client!.shell(
         pty: SSHPtyConfig(
+          type: 'xterm-256color',
           width: 80,
           height: 24,
         ),
@@ -151,6 +152,16 @@ class SSHService implements CommandExecutor {
       );
 
       _isConnected = true;
+
+      await Future.delayed(const Duration(milliseconds: 300));
+      _session!.write(Uint8List.fromList(utf8.encode(
+        'export LS_COLORS="rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32";'
+        'alias ls="ls --color=auto" 2>/dev/null;'
+        'alias ll="ls -la --color=auto" 2>/dev/null;'
+        'alias grep="grep --color=auto" 2>/dev/null;'
+        'clear\n'
+      )));
+
       outputController.add('\r\n✅ 连接成功\r\n');
       outputController.add('OS: $_osInfo\r\n');
       outputController.add('\$ ');
@@ -188,7 +199,7 @@ class SSHService implements CommandExecutor {
     _completers.add(completer);
 
     // 发送命令
-    _session!.write(Uint8List.fromList('$command\n'.codeUnits));
+    _session!.write(Uint8List.fromList(utf8.encode('$command\n')));
 
     // 超时处理
     return completer.future.timeout(
@@ -206,22 +217,21 @@ class SSHService implements CommandExecutor {
       return;
     }
 
-    // 多行命令（含换行符）需要逐行发送，否则 heredoc 等场景无法正常工作
     if (command.contains('\n')) {
       _writeMultiLineCommand(command);
     } else {
-      _session!.write(Uint8List.fromList('$command\n'.codeUnits));
+      _session!.write(Uint8List.fromList(utf8.encode('$command\n')));
     }
   }
 
-  /// 逐行写入多行命令（heredoc 等）
   void _writeMultiLineCommand(String command) async {
     final lines = command.split('\n');
     for (int i = 0; i < lines.length; i++) {
-      _session!.write(Uint8List.fromList('${lines[i]}\n'.codeUnits));
-      // 每行之间加一点延迟，让 shell 有时间处理
-      if (i < lines.length - 1) {
-        await Future.delayed(const Duration(milliseconds: 50));
+      _session!.write(Uint8List.fromList(utf8.encode('${lines[i]}\n')));
+      if (i == 0 && lines.first.contains('<<')) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      } else if (i < lines.length - 1) {
+        await Future.delayed(const Duration(milliseconds: 30));
       }
     }
   }
@@ -231,7 +241,7 @@ class SSHService implements CommandExecutor {
     if (_session == null || !_isConnected) {
       return;
     }
-    _session!.write(Uint8List.fromList(data.codeUnits));
+    _session!.write(Uint8List.fromList(utf8.encode(data)));
   }
 
   void resize(int columns, int rows) {
