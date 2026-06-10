@@ -8,6 +8,7 @@ import '../pages/ai_models_page.dart';
 import '../pages/snippets_page.dart';
 import '../pages/appearance_page.dart';
 import '../pages/security_page.dart';
+import '../pages/agent_settings_page.dart';
 import '../pages/sftp_page.dart';
 import '../pages/audit_log_page.dart';
 
@@ -72,6 +73,11 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/settings/security',
       builder: (context, state) => const SecurityPage(),
+    ),
+    // Agent 设置
+    GoRoute(
+      path: '/settings/agent',
+      builder: (context, state) => const AgentSettingsPage(),
     ),
     // 快捷命令
     GoRoute(

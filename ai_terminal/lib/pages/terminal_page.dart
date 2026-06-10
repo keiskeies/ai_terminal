@@ -57,6 +57,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   static const double _minPanelRatio = 0.15;
   static const double _maxPanelRatio = 0.7;
 
+  // AI 面板是否可见（P0-1：支持完全收起）
+  bool _isAIPanelVisible = false;
+
   // SFTP 侧面板（桌面端）- Per-tab 独立状态
   final Map<String, bool> _tabSftpVisible = {}; // 每个 tab 的 SFTP 面板是否可见
   double _sftpPanelWidth = 320;
@@ -83,7 +86,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   AIModelConfig? _currentModelConfig;
 
   // 终端设置
-  double _terminalFontSize = 13;
+  double _terminalFontSize = 14; // P0-3: 默认终端字号从 13 改为 14
 
   // Markdown 预处理 & 内容分割缓存（避免每次 build 重复解析）
   final Map<String, String> _markdownCache = {};
@@ -121,7 +124,22 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   void _loadSettings() {
     try {
       final fontSize = HiveInit.settingsBox.get('terminalFontSize');
-      if (fontSize != null) _terminalFontSize = (fontSize as num).toDouble();
+      if (fontSize != null) {
+        _terminalFontSize = (fontSize as num).toDouble();
+      } else {
+        // P0-3: 如果没有设置过，使用新的默认值 14
+        _terminalFontSize = 14;
+        HiveInit.settingsBox.put('terminalFontSize', 14.0);
+      }
+    } catch (_) {
+      _terminalFontSize = 14;
+    }
+    // P0-1: 加载 AI 面板可见性设置，默认收起
+    try {
+      final aiPanelVisible = HiveInit.settingsBox.get('aiPanelVisible');
+      if (aiPanelVisible != null) {
+        _isAIPanelVisible = aiPanelVisible as bool;
+      }
     } catch (_) {}
     // 加载 Agent 最大步骤数（需在 initAgent 之前加载）
     ref.read(agentProvider.notifier).loadSettings();
@@ -542,67 +560,74 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       ],
     );
 
-    // AI 面板始终显示，分割线在终端和 AI 之间
-    Widget mainContent = LayoutBuilder(builder: (context, constraints) {
-      final totalW = constraints.maxWidth;
-      final totalH = constraints.maxHeight;
-      final isRight = _aiPanelPosition == _AiPanelPosition.right;
+    // P0-1: AI 面板支持完全收起
+    Widget mainContent;
+    if (!_isAIPanelVisible) {
+      // AI 面板收起状态：终端占满全屏
+      mainContent = terminalView;
+    } else {
+      // AI 面板展开状态：保持现有分栏布局
+      mainContent = LayoutBuilder(builder: (context, constraints) {
+        final totalW = constraints.maxWidth;
+        final totalH = constraints.maxHeight;
+        final isRight = _aiPanelPosition == _AiPanelPosition.right;
 
-      void onDrag(DragUpdateDetails details) {
-        setState(() {
-          if (isRight) {
-            final pos = details.globalPosition.dx - (context.findRenderObject() as RenderBox).localToGlobal(Offset.zero).dx;
-            _aiPanelRatio = (1 - pos / totalW).clamp(_minPanelRatio, _maxPanelRatio).toDouble();
-          } else {
-            final pos = details.globalPosition.dy - (context.findRenderObject() as RenderBox).localToGlobal(Offset.zero).dy;
-            _aiPanelRatio = (1 - pos / totalH).clamp(_minPanelRatio, _maxPanelRatio).toDouble();
-          }
-        });
-      }
+        void onDrag(DragUpdateDetails details) {
+          setState(() {
+            if (isRight) {
+              final pos = details.globalPosition.dx - (context.findRenderObject() as RenderBox).localToGlobal(Offset.zero).dx;
+              _aiPanelRatio = (1 - pos / totalW).clamp(_minPanelRatio, _maxPanelRatio).toDouble();
+            } else {
+              final pos = details.globalPosition.dy - (context.findRenderObject() as RenderBox).localToGlobal(Offset.zero).dy;
+              _aiPanelRatio = (1 - pos / totalH).clamp(_minPanelRatio, _maxPanelRatio).toDouble();
+            }
+          });
+        }
 
-      final tc = ThemeColors.of(context);
-      // 手机端不显示拖拽手柄
-      final dragHandle = _isMobile ? const SizedBox.shrink() : GestureDetector(
-        onPanUpdate: onDrag,
-        child: MouseRegion(
-          cursor: isRight ? SystemMouseCursors.resizeColumn : SystemMouseCursors.resizeRow,
-          child: Container(
-            width: isRight ? 5 : double.infinity,
-            height: isRight ? double.infinity : 5,
-            color: tc.border.withOpacity(0.6),
+        final tc = ThemeColors.of(context);
+        // 手机端不显示拖拽手柄
+        final dragHandle = _isMobile ? const SizedBox.shrink() : GestureDetector(
+          onPanUpdate: onDrag,
+          child: MouseRegion(
+            cursor: isRight ? SystemMouseCursors.resizeColumn : SystemMouseCursors.resizeRow,
+            child: Container(
+              width: isRight ? 5 : double.infinity,
+              height: isRight ? double.infinity : 5,
+              color: tc.border.withOpacity(0.6),
+            ),
           ),
-        ),
-      );
+        );
 
-      final divider = _buildAreaDivider(agentState);
-      final aiPanelSize = isRight ? totalW * _aiPanelRatio : totalH * _aiPanelRatio;
-      final aiContent = Column(
-        children: [
-          Expanded(child: _buildAIPanel(chatState, agentState, tab)),
-          _buildBottomBar(chatState, agentState, tab),
-        ],
-      );
-
-      if (isRight) {
-        return Row(
+        final divider = _buildAreaDivider(agentState);
+        final aiPanelSize = isRight ? totalW * _aiPanelRatio : totalH * _aiPanelRatio;
+        final aiContent = Column(
           children: [
-            Expanded(child: terminalView),
-            dragHandle,
-            divider,
-            SizedBox(width: aiPanelSize, child: aiContent),
+            Expanded(child: _buildAIPanel(chatState, agentState, tab)),
+            _buildBottomBar(chatState, agentState, tab),
           ],
         );
-      } else {
-        return Column(
-          children: [
-            Expanded(child: terminalView),
-            dragHandle,
-            divider,
-            SizedBox(height: aiPanelSize, child: aiContent),
-          ],
-        );
-      }
-    });
+
+        if (isRight) {
+          return Row(
+            children: [
+              Expanded(child: terminalView),
+              dragHandle,
+              divider,
+              SizedBox(width: aiPanelSize, child: aiContent),
+            ],
+          );
+        } else {
+          return Column(
+            children: [
+              Expanded(child: terminalView),
+              dragHandle,
+              divider,
+              SizedBox(height: aiPanelSize, child: aiContent),
+            ],
+          );
+        }
+      });
+    }
 
     // 桌面端：SFTP 侧面板（per-tab 独立，用 Offstage 保持存活避免重连）
     final currentTabId = ref.read(tp.terminalProvider).activeTabId;
@@ -723,6 +748,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           const SizedBox(width: 6),
           // 连接状态
           _buildConnectionBadge(activeTab),
+          const SizedBox(width: 6),
+          // P0-1: AI 面板展开/收起按钮
+          _buildAIPanelToggleButton(),
           const SizedBox(width: 6),
           // 终端设置按钮
           _buildTerminalSettingsButton(),
@@ -856,6 +884,58 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             style: TextStyle(fontSize: fMicro, color: connected ? cSuccess : cDanger, fontWeight: FontWeight.w500),
           ),
         ],
+      ),
+    );
+  }
+
+  /// P0-1: AI 面板展开/收起按钮
+  Widget _buildAIPanelToggleButton() {
+    final tc = ThemeColors.of(context);
+    final isAgentMode = ref.read(agentProvider).mode == AgentMode.automatic;
+    final accentColor = isAgentMode ? cAgentGreen : cPrimary;
+
+    return Tooltip(
+      message: _isAIPanelVisible ? '收起 AI 面板' : '展开 AI 面板',
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _isAIPanelVisible = !_isAIPanelVisible;
+          });
+          // 持久化状态
+          HiveInit.settingsBox.put('aiPanelVisible', _isAIPanelVisible);
+        },
+        child: AnimatedContainer(
+          duration: animFast,
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: _isAIPanelVisible ? accentColor.withOpacity(0.15) : tc.surface,
+            borderRadius: BorderRadius.circular(rSmall),
+            border: Border.all(
+              color: _isAIPanelVisible ? accentColor.withOpacity(0.4) : tc.border.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                _isAIPanelVisible ? Icons.auto_fix_high : Icons.auto_fix_high_outlined,
+                size: 14,
+                color: _isAIPanelVisible ? accentColor : tc.textSub,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                _isAIPanelVisible ? 'AI' : 'AI',
+                style: TextStyle(
+                  fontSize: fMicro,
+                  color: _isAIPanelVisible ? accentColor : tc.textSub,
+                  fontWeight: _isAIPanelVisible ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1078,6 +1158,34 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       ],
     );
 
+    // P0-1: 收起按钮
+    Widget closeButton() {
+      return Tooltip(
+        message: '收起 AI 面板',
+        waitDuration: const Duration(milliseconds: 500),
+        child: GestureDetector(
+          onTap: () {
+            setState(() => _isAIPanelVisible = false);
+            HiveInit.settingsBox.put('aiPanelVisible', false);
+          },
+          child: Container(
+            width: 22,
+            height: 22,
+            decoration: BoxDecoration(
+              color: accentColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(3),
+              border: Border.all(color: accentColor.withOpacity(0.3), width: 1),
+            ),
+            child: Icon(
+              isRight ? Icons.keyboard_arrow_right : Icons.keyboard_arrow_down,
+              size: 16,
+              color: accentColor,
+            ),
+          ),
+        ),
+      );
+    }
+
     if (isRight) {
       // 竖向分割条（AI 在右侧时）
       return Container(
@@ -1089,6 +1197,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         child: Column(
           children: [
             if (showButtons) ...[
+              const SizedBox(height: 4),
+              closeButton(),
               const SizedBox(height: 4),
               RotatedBox(quarterTurns: 1, child: layoutButton(_AiPanelPosition.bottom, Icons.view_sidebar_outlined, '下')),
               const SizedBox(height: 2),
@@ -1128,7 +1238,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           children: [
             const SizedBox(width: 8),
             label,
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
+            if (showButtons) closeButton(),
+            const SizedBox(width: 8),
             Expanded(
               child: Container(
                 height: 1,
@@ -1163,8 +1275,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       child: Column(
         children: [
           // 状态条
-          if (agentState.isRunning || agentState.isWaitingConfirm) _buildAgentStatusBar(agentState),
-          // 等待确认横幅
+          if (agentState.isRunning || agentState.isWaitingConfirm || agentState.isWaitingChoice) _buildAgentStatusBar(agentState),
+          // 等待确认横幅（仅危险命令确认时显示）
           if (agentState.isWaitingConfirm) _buildConfirmBanner(agentState),
           // 消息列表 + 回到底部按钮
           Expanded(
@@ -1393,6 +1505,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           tab: tab,
           showAutoExecute: agentState.mode == AgentMode.automatic,
           isAgentRunning: agentState.isRunning,
+          isWaitingChoice: agentState.isWaitingChoice,
         );
       },
     );
@@ -1512,6 +1625,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     tp.TerminalTab? tab,
     bool showAutoExecute = false,
     bool isAgentRunning = false,
+    bool isWaitingChoice = false,
   }) {
     final isUser = role == 'user';
     final tc = ThemeColors.of(context);
@@ -1582,7 +1696,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             if (isUser)
               SelectableText(content, style: TextStyle(color: tc.textMain, fontSize: fBody, height: 1.5))
             else
-              _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning),
+              _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning, isWaitingChoice),
           ],
         ),
       ),
@@ -1590,7 +1704,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   /// AI 回复内容渲染：将代码块提取出来，用带执行按钮的自定义 widget 显示
-  Widget _buildAIContent(String content, ThemeColors tc, tp.TerminalTab? tab, bool showAutoExecute, bool isLoading, bool isAgentRunning) {
+  Widget _buildAIContent(String content, ThemeColors tc, tp.TerminalTab? tab, bool showAutoExecute, bool isLoading, bool isAgentRunning, bool isWaitingChoice) {
     // 解析 :::choose 选项1|选项2|选项3::: 格式
     final optionsRegex = RegExp(r':::choose\s+(.+?):::');
     final optionsMatch = optionsRegex.firstMatch(content);
@@ -1646,9 +1760,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             );
           }
         }),
-        // 选项按钮
-        if (options.isNotEmpty)
-          _buildOptionButtons(options, tc, isLoading || isAgentRunning),
+        // 选项按钮（仅等待用户选择时显示，点击后立即隐藏）
+        if (options.isNotEmpty && isWaitingChoice)
+          _buildOptionButtons(options, tc, false),
       ],
     );
   }
@@ -1772,9 +1886,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
-  /// 选项按钮点击处理：将用户选择作为新消息发送给 agent
+  /// 选项按钮点击处理：如果 agent 正在等待选择则回复选择，否则作为新任务发送
   void _onOptionSelected(String option) {
-    ref.read(agentProvider.notifier).startTask(option);
+    final agentState = ref.read(agentProvider);
+    if (agentState.isWaitingChoice) {
+      ref.read(agentProvider.notifier).selectChoice(option);
+    } else {
+      ref.read(agentProvider.notifier).startTask(option);
+    }
   }
 
   /// 带执行按钮的代码块 — 每条命令独立一行

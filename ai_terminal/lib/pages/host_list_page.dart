@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/constants.dart';
 import '../core/credentials_store.dart';
+import '../core/hive_init.dart';
+import '../core/theme_colors.dart';
 import '../models/host_config.dart';
 import '../providers/app_providers.dart';
 import '../widgets/host_card.dart';
@@ -17,11 +19,36 @@ class HostListPage extends ConsumerStatefulWidget {
 class _HostListPageState extends ConsumerState<HostListPage> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
+  // P1-4: 分组展开状态
+  final Map<String, bool> _groupExpanded = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _loadGroupExpandedState();
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// P1-4: 加载分组展开状态
+  void _loadGroupExpandedState() {
+    try {
+      final saved = HiveInit.settingsBox.get('hostGroupExpanded');
+      if (saved != null && saved is Map) {
+        for (final entry in saved.entries) {
+          _groupExpanded[entry.key.toString()] = entry.value as bool;
+        }
+      }
+    } catch (_) {}
+  }
+
+  /// P1-4: 保存分组展开状态
+  void _saveGroupExpandedState() {
+    HiveInit.settingsBox.put('hostGroupExpanded', Map<String, bool>.from(_groupExpanded));
   }
 
   @override
@@ -87,11 +114,16 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                     : hosts.where((h) =>
                         h.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
                         h.host.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                        h.username.toLowerCase().contains(_searchQuery.toLowerCase())
+                        h.username.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+                        h.group.toLowerCase().contains(_searchQuery.toLowerCase())
                       ).toList();
 
                 if (filtered.isEmpty && hosts.isEmpty) {
                   return _buildEmptyState();
+                }
+
+                if (filtered.isEmpty && _searchQuery.isNotEmpty) {
+                  return _buildNoSearchResults();
                 }
 
                 // 分组
@@ -164,53 +196,158 @@ class _HostListPageState extends ConsumerState<HostListPage> {
     );
   }
 
+  /// P1-4: 空状态重设计 - 情感化引导
   Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.storage, size: 64, color: cTextSub),
-          const SizedBox(height: 16),
+          // 终端光标闪烁动画
+          _BlinkingCursor(),
+          const SizedBox(height: 24),
           Text(
-            '暂无服务器',
-            style: TextStyle(color: cTextSub, fontSize: fBody),
+            '还没有服务器',
+            style: TextStyle(
+              color: ThemeColors.of(context).textMain,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '添加第一台服务器，开启 AI 辅助运维之旅',
+            style: TextStyle(
+              color: ThemeColors.of(context).textSub,
+            ),
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () => context.push('/host/edit'),
             icon: const Icon(Icons.add),
             label: const Text('添加服务器'),
+            style: ElevatedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextButton(
+            onPressed: () {
+              // TODO: 打开文档链接
+            },
+            child: const Text('了解功能'),
           ),
         ],
       ),
     );
   }
 
+  /// P1-4: 搜索无结果状态
+  Widget _buildNoSearchResults() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.search_off, size: 48, color: ThemeColors.of(context).textMuted),
+          const SizedBox(height: 16),
+          Text(
+            '未找到匹配的服务器',
+            style: TextStyle(
+              color: ThemeColors.of(context).textSub,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '尝试其他关键词或检查拼写',
+            style: TextStyle(
+              color: ThemeColors.of(context).textMuted,
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextButton.icon(
+            onPressed: () {
+              _searchController.clear();
+              setState(() => _searchQuery = '');
+            },
+            icon: const Icon(Icons.clear),
+            label: const Text('清除搜索'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// P1-4: 分组区域 - 支持展开/收起状态持久化
   Widget _buildGroupSection(String groupName, List<HostConfig> hosts) {
-    return ExpansionTile(
-      initiallyExpanded: true,
-      leading: Icon(Icons.folder, color: cPrimary, size: 20),
-      title: Text(
-        groupName,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-      ),
-      trailing: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: cPrimary,
-          borderRadius: BorderRadius.circular(12),
+    // 默认只展开"默认"分组
+    final isExpanded = _groupExpanded.putIfAbsent(groupName, () => groupName == '默认');
+
+    return Column(
+      children: [
+        // 分组标题栏
+        InkWell(
+          onTap: () {
+            setState(() {
+              _groupExpanded[groupName] = !isExpanded;
+            });
+            _saveGroupExpandedState();
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: pStandard, vertical: 12),
+            child: Row(
+              children: [
+                AnimatedRotation(
+                  turns: isExpanded ? 0.25 : 0,
+                  duration: animFast,
+                  child: Icon(
+                    Icons.chevron_right,
+                    color: cPrimary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.folder, color: cPrimary, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  groupName,
+                  style: TextStyle(
+                    fontSize: fBody,
+                    fontWeight: FontWeight.w600,
+                    color: ThemeColors.of(context).textMain,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: cPrimary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(rFull),
+                  ),
+                  child: Text(
+                    '${hosts.length}',
+                    style: TextStyle(
+                      color: cPrimary,
+                      fontSize: fMicro,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        child: Text(
-          '${hosts.length}',
-          style: const TextStyle(color: Colors.white, fontSize: fSmall),
+        // 分组内容
+        AnimatedCrossFade(
+          firstChild: Column(
+            children: hosts.map((host) => HostCard(
+              host: host,
+              onTap: () => context.push('/terminal/${host.id}'),
+              onEdit: () => context.push('/host/edit/${host.id}'),
+              onDelete: () => _showDeleteDialog(host),
+            )).toList(),
+          ),
+          secondChild: const SizedBox.shrink(),
+          crossFadeState: isExpanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+          duration: animNormal,
         ),
-      ),
-      children: hosts.map((host) => HostCard(
-        host: host,
-        onTap: () => context.push('/terminal/${host.id}'),
-        onEdit: () => context.push('/host/edit/${host.id}'),
-        onDelete: () => _showDeleteDialog(host),
-      )).toList(),
+      ],
     );
   }
 
@@ -241,6 +378,59 @@ class _HostListPageState extends ConsumerState<HostListPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// P1-4: 闪烁光标动画（空状态装饰）
+class _BlinkingCursor extends StatefulWidget {
+  @override
+  State<_BlinkingCursor> createState() => _BlinkingCursorState();
+}
+
+class _BlinkingCursorState extends State<_BlinkingCursor>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Container(
+          width: 64,
+          height: 64,
+          decoration: BoxDecoration(
+            color: cPrimary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(rLarge),
+          ),
+          child: Center(
+            child: Text(
+              '_',
+              style: TextStyle(
+                fontSize: fDisplay,
+                fontWeight: FontWeight.w300,
+                color: cPrimary.withOpacity(0.3 + 0.7 * _controller.value),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

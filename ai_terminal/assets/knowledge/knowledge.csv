@@ -165,3 +165,61 @@ x-cmd,,uninstall,all,curl,"卸载 x-cmd","执行卸载脚本","~/.x-cmd/bin/unin
 dagger,,uninstall,all,curl,"卸载 dagger","删除二进制文件","rm -f $(which dagger); rm -rf ~/.config/dagger",,,strict
 helm,,uninstall,all,curl,"卸载 Helm","删除二进制文件","rm -f $(which helm); rm -rf ~/.config/helm ~/.cache/helm",,,strict
 k9s,,uninstall,all,brew,"卸载 k9s","使用 brew 卸载","brew uninstall k9s",,,strict
+hermes-agent,,install,all,pip,"多智能体构建框架","配置清华镜像后安装","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install hermes-agent",python>=3.10,,strict
+hermes-agent,,update,all,pip,"更新 Hermes Agent","使用清华镜像更新","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install --upgrade hermes-agent",,,strict
+crewai,,install,all,pip,"多智能体协作框架","配置清华镜像后安装","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install crewai",python>=3.10,需额外安装依赖如 pydantic,strict
+crewai,,update,all,pip,"更新 CrewAI","使用清华镜像更新","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install --upgrade crewai",,,strict
+langgraph,,install,all,pip,"有状态多参与者应用框架","配置清华镜像后安装","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install langgraph",python>=3.10,,strict
+langgraph,,update,all,pip,"更新 LangGraph","使用清华镜像更新","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install --upgrade langgraph",,,strict
+autogen,,install,all,pip,"微软多智能体对话框架","配置清华镜像后安装","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install pyautogen",python>=3.10,,strict
+autogen,,update,all,pip,"更新 AutoGen","使用清华镜像更新","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install --upgrade pyautogen",,,strict
+semantic-kernel,,install,all,dotnet,"Microsoft AI 编排 SDK","使用 dotnet 添加包","dotnet add package Microsoft.SemanticKernel",.NET SDK,也有 Python 版 pip install semantic-kernel,strict
+semantic-kernel,,update,all,dotnet,"更新 Semantic Kernel","更新 NuGet 包","dotnet add package Microsoft.SemanticKernel --version <最新版号>",,,strict
+meta-gpt,,install,all,pip,"多智能体元编程框架","配置清华镜像后安装","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install metagpt",python>=3.10,,strict
+meta-gpt,,update,all,pip,"更新 MetaGPT","使用清华镜像更新","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install --upgrade metagpt",,,strict
+chatdev,,install,all,pip,"AI 驱动的软件开发框架","配置清华镜像后安装","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install chatdev",python>=3.10,,strict
+chatdev,,update,all,pip,"更新 ChatDev","使用清华镜像更新","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install --upgrade chatdev",,,strict
+openai-agents-sdk,,install,all,pip,"OpenAI 官方智能体 SDK","配置清华镜像后安装","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install openai-agents",python>=3.10,,strict
+openai-agents-sdk,,update,all,pip,"更新 OpenAI Agents SDK","使用清华镜像更新","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install --upgrade openai-agents",,,strict
+google-adk,,install,all,pip,"Google Agent Development Kit","配置清华镜像后安装","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install google-adk",python>=3.10,,strict
+google-adk,,update,all,pip,"更新 Google ADK","使用清华镜像更新","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install --upgrade google-adk",,,strict
+claude-code,anthropic-claude-code,install,all,npm,"Anthropic 官方终端代码助手","配置淘宝镜像后全局安装","npm config set registry https://registry.npmmirror.com; npm install -g @anthropic-ai/claude-code",nodejs>=18,,strict
+claude-code,,update,all,npm,"更新 Claude Code","使用淘宝镜像更新","npm config set registry https://registry.npmmirror.com; npm update -g @anthropic-ai/claude-code",,,strict
+shell-gpt,sgpt,install,all,pip,"命令行 ChatGPT 客户端","配置清华镜像后安装","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install shell-gpt",python>=3.10,需自行配置 OPENAI_API_KEY,strict
+shell-gpt,sgpt,update,all,pip,"更新 ShellGPT","使用清华镜像更新","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install --upgrade shell-gpt",,,strict
+devenv,,install,all,curl,"声明式开发环境管理器","执行官方安装脚本","curl -fsSL --connect-timeout 30 https://devenv.sh/install.sh | sh",,,也可使用 nix profile install,strict
+devenv,,update,all,curl,"更新 Devenv","重新执行安装脚本","curl -fsSL --connect-timeout 30 https://devenv.sh/install.sh | sh",,,strict
+nix,,install,linux,curl,"声明式包管理器","使用多用户安装脚本","sh <(curl -L --connect-timeout 30 https://nixos.org/nix/install) --daemon",,,国内可用中科大 nix 镜像频道,strict
+nix,nix-channel,configure,linux,nix,"配置 Nix 使用中科大镜像","替换 channels","nix-channel --add https://mirrors.ustc.edu.cn/nix-channels/nixpkgs-unstable nixpkgs; nix-channel --update",,,strict
+modal,,install,all,pip,"云端无服务器 Python 运行环境","配置清华镜像后安装","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install modal",python>=3.10,需注册账号并 token 认证,strict
+modal,,update,all,pip,"更新 Modal","使用清华镜像更新","pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple; pip install --upgrade modal",,,strict
+flyctl,,install,linux,curl,"Fly.io CLI 管理工具","执行官方安装脚本","curl -L --connect-timeout 30 https://fly.io/install.sh | sh",,,国内访问可能较慢,strict
+flyctl,,install,macos,brew,"Fly.io CLI","使用 Homebrew 安装","brew install flyctl",homebrew,,strict
+flyctl,,update,all,curl,"更新 flyctl","重新执行安装脚本","curl -L --connect-timeout 30 https://fly.io/install.sh | sh",,,strict
+railway,,install,all,curl,"Railway CLI 工具","执行安装脚本","curl -fsSL --connect-timeout 30 https://railway.com/install.sh | sh",,,也可用 npm: npm i -g @railway/cli,strict
+railway,,update,all,curl,"更新 Railway CLI","重新执行安装脚本","curl -fsSL --connect-timeout 30 https://railway.com/install.sh | sh",,,strict
+neonctl,,install,all,npm,"Neon 无服务器 Postgres CLI","配置淘宝镜像后全局安装","npm config set registry https://registry.npmmirror.com; npm install -g neonctl",nodejs>=18,,strict
+neonctl,,update,all,npm,"更新 neonctl","使用淘宝镜像更新","npm config set registry https://registry.npmmirror.com; npm update -g neonctl",,,strict
+turso,,install,linux,curl,"Turso 边缘数据库 CLI","执行官方安装脚本","curl -sSfL --connect-timeout 30 https://get.tur.so/install.sh | sh",,,需要登录 turso auth login,strict
+turso,,install,macos,brew,"Turso CLI","使用 Homebrew 安装","brew install tursodatabase/tap/turso",homebrew,,strict
+turso,,update,all,curl,"更新 Turso CLI","重新执行安装脚本","curl -sSfL --connect-timeout 30 https://get.tur.so/install.sh | sh",,,strict
+planetscale,,install,all,brew,"PlanetScale CLI","使用 Homebrew 安装","brew install planetscale/tap/pscale",homebrew,也可用 curl 脚本但 brew 更稳定,strict
+planetscale,,update,all,brew,"更新 pscale","使用 Homebrew 更新","brew upgrade pscale",,,strict
+dragonfly,,install,linux,curl,"高性能内存数据存储（Redis 替代）","下载二进制并安装","curl -LO --connect-timeout 30 https://github.com/dragonflydb/dragonfly/releases/latest/download/dragonfly-x86_64.tar.gz; tar -xzf dragonfly-x86_64.tar.gz; sudo mv dragonfly /usr/local/bin/",,,也可用 Docker 部署,strict
+dragonfly,,update,linux,curl,"更新 Dragonfly","重新下载最新二进制并替换","curl -LO --connect-timeout 30 https://github.com/dragonflydb/dragonfly/releases/latest/download/dragonfly-x86_64.tar.gz; tar -xzf dragonfly-x86_64.tar.gz; sudo mv dragonfly /usr/local/bin/",,,strict
+valkey,,install,linux,curl,"开源高性能键值存储（Redis fork）","下载二进制并安装","curl -LO --connect-timeout 30 https://github.com/valkey-io/valkey/releases/latest/download/valkey-server-linux-x86_64.tar.gz; tar -xzf valkey-server-linux-x86_64.tar.gz; sudo mv valkey-server /usr/local/bin/",,,也可用包管理器或 Docker,strict
+valkey,,update,linux,curl,"更新 Valkey","重新下载最新二进制","curl -LO --connect-timeout 30 https://github.com/valkey-io/valkey/releases/latest/download/valkey-server-linux-x86_64.tar.gz; tar -xzf valkey-server-linux-x86_64.tar.gz; sudo mv valkey-server /usr/local/bin/",,,strict
+greptimedb,,install,linux,curl,"云原生时序数据库","下载二进制并安装","curl -LO --connect-timeout 30 https://github.com/GreptimeTeam/greptimedb/releases/latest/download/greptime-linux-amd64.tgz; tar -xzf greptime-linux-amd64.tgz; sudo mv greptime /usr/local/bin/",,,严格来说也可用 Docker,strict
+greptimedb,,update,linux,curl,"更新 GreptimeDB","重新下载最新二进制","curl -LO --connect-timeout 30 https://github.com/GreptimeTeam/greptimedb/releases/latest/download/greptime-linux-amd64.tgz; tar -xzf greptime-linux-amd64.tgz; sudo mv greptime /usr/local/bin/",,,strict
+risingwave,,install,linux,curl,"实时流处理数据库","下载二进制并安装","curl -LO --connect-timeout 30 https://github.com/risingwavelabs/risingwave/releases/latest/download/risingwave-$(uname -m)-linux.tar.gz; tar -xzf risingwave-*.tar.gz; sudo mv risingwave /usr/local/bin/",,,需要 gcc 等依赖，推荐 Docker 部署,strict
+risingwave,,update,linux,curl,"更新 RisingWave","重新下载最新二进制","curl -LO --connect-timeout 30 https://github.com/risingwavelabs/risingwave/releases/latest/download/risingwave-$(uname -m)-linux.tar.gz; tar -xzf risingwave-*.tar.gz; sudo mv risingwave /usr/local/bin/",,,strict
+tailscale,,install,linux-debian,curl,"零信任网络组网工具","执行官方安装脚本（使用阿里云镜像加速）","curl -fsSL --connect-timeout 30 https://tailscale.com/install.sh | sh",,,国内可使用 tailscale 官方稳定仓库,strict
+tailscale,,install,linux-rhel,curl,"零信任网络组网工具","执行官方安装脚本","curl -fsSL --connect-timeout 30 https://tailscale.com/install.sh | sh",,,strict
+tailscale,,install,macos,brew,"零信任网络组网工具","使用 Homebrew 安装","brew install tailscale",homebrew,,strict
+tailscale,,update,all,curl,"更新 Tailscale","按系统包管理器或重执行安装脚本","curl -fsSL --connect-timeout 30 https://tailscale.com/install.sh | sh",,,strict
+cloudflared,,install,linux-debian,curl,"Cloudflare Tunnel 客户端","下载 deb 包并安装","curl -LO --connect-timeout 30 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb; sudo dpkg -i cloudflared-linux-amd64.deb",,,国内 GitHub 下载可能慢，可使用代理,strict
+cloudflared,,install,linux-rhel,curl,"Cloudflare Tunnel 客户端","下载 rpm 包并安装","curl -LO --connect-timeout 30 https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-x86_64.rpm; sudo rpm -ivh cloudflared-linux-x86_64.rpm",,,strict
+cloudflared,,install,macos,brew,"Cloudflare Tunnel 客户端","使用 Homebrew 安装","brew install cloudflare/cloudflare/cloudflared",homebrew,,strict
+cloudflared,,update,all,curl,"更新 cloudflared","重新下载对应系统的包进行安装","见各平台 install 命令，下载最新版覆盖安装",,,视平台选择对应 install 命令,strict
+headscale,,install,linux,curl,"Tailscale 兼容的开源协调服务器","下载二进制并安装","curl -LO --connect-timeout 30 https://github.com/juanfont/headscale/releases/latest/download/headscale_linux_amd64; chmod +x headscale_linux_amd64; sudo mv headscale_linux_amd64 /usr/local/bin/headscale",,,需要自行编写配置文件,strict
+headscale,,update,linux,curl,"更新 Headscale","重新下载最新二进制并替换","curl -LO --connect-timeout 30 https://github.com/juanfont/headscale/releases/latest/download/headscale_linux_amd64; chmod +x headscale_linux_amd64; sudo mv headscale_linux_amd64 /usr/local/bin/headscale",,,strict

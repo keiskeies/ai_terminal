@@ -74,11 +74,26 @@ class AgentEngine {
   Completer<bool>? _confirmCompleter; // 等待用户确认危险命令的 Completer
   String? _pendingConfirmCommand; // 当前等待确认的命令
 
+  /// 等待用户选择选项的 Completer（ReAct ask 动作 / :::choose A|B|C:::）
+  Completer<String>? _choiceCompleter;
+  List<String> _pendingOptions = []; // 当前等待选择的选项
+
+  /// ReAct 格式重试计数（AI 未遵循格式时递增）
+  int _reactFormatRetryCount = 0;
+  static const int _maxReactFormatRetries = 2;
+
   /// 缓存的知识库注入文本（在 startTask 时查询，在 _buildSystemPrompt 时使用）
   String? _cachedKnowledgeInjection;
 
   /// 持久化对话历史，跨 startTask() 调用保留上下文
   final List<ChatMessage> _conversationHistory = [];
+
+  /// 连续无命令重试计数（防止 AI 只给解释不给命令时过早结束任务）
+  int _noCommandRetryCount = 0;
+  static const int _maxNoCommandRetries = 2;
+
+  /// 默认最大执行步数（maxSteps=0 时的兜底上限，防止无限循环）
+  static const int _defaultMaxSteps = 20;
 
   void Function(String)? onThinking;
   void Function(String)? onCommandGenerated;
@@ -88,7 +103,7 @@ class AgentEngine {
   void Function(String)? onMessage;
   void Function(String)? onCompleted;
 
-  int maxSteps = 0; // 0 = 无限制
+  int maxSteps = 0; // 0 = 无限制（运行时兜底为 _defaultMaxSteps）
 
   /// 对话历史最大轮数（每轮 = assistant + user），超出时裁剪最早的轮次
   static const int _maxConversationRounds = 10;
@@ -112,6 +127,8 @@ class AgentEngine {
       _currentTask?.status == AgentStatus.executing;
   bool get hasPendingConfirm => _confirmCompleter != null && !_confirmCompleter!.isCompleted;
   String? get pendingConfirmCommand => _pendingConfirmCommand;
+  bool get hasPendingChoice => _choiceCompleter != null && !_choiceCompleter!.isCompleted;
+  List<String> get pendingOptions => List.unmodifiable(_pendingOptions);
 
   void setMode(AgentMode mode) => _mode = mode;
 
@@ -129,6 +146,8 @@ class AgentEngine {
     agentLogger.info('AgentEngine', '模式: $_mode');
     agentLogger.info('AgentEngine', '执行器: ${executor != null ? (executor.isConnected ? "已连接" : "未连接") : "无"}');
     _accumulatedMessage = '';  // 重置累积消息
+    _noCommandRetryCount = 0;  // 重置无命令重试计数
+    _reactFormatRetryCount = 0;  // 重置 ReAct 格式重试计数
 
     if (isRunning) {
       agentLogger.warn('AgentEngine', 'Agent 正在执行任务，拒绝新任务');
@@ -200,6 +219,11 @@ class AgentEngine {
       _confirmCompleter!.complete(false);
     }
     _pendingConfirmCommand = null;
+    // 同时取消等待选择
+    if (_choiceCompleter != null && !_choiceCompleter!.isCompleted) {
+      _choiceCompleter!.complete('');
+    }
+    _pendingOptions = [];
   }
 
   /// 确认执行危险命令（由用户点击确认按钮触发）
@@ -216,6 +240,14 @@ class AgentEngine {
       _confirmCompleter!.complete(false);
     }
     _pendingConfirmCommand = null;
+  }
+
+  /// 用户选择了一个选项（:::choose 格式）
+  void selectChoice(String choice) {
+    if (_choiceCompleter != null && !_choiceCompleter!.isCompleted) {
+      _choiceCompleter!.complete(choice);
+    }
+    _pendingOptions = [];
   }
 
   Future<void> _executeAssistant(String goal, CommandExecutor? executor) async {
@@ -260,24 +292,25 @@ class AgentEngine {
   }
 
   Future<void> _executeAutomatic(String goal, CommandExecutor? executor) async {
-    agentLogger.info('AutoExec', '=== 开始自动执行 ===');
+    agentLogger.info('ReAct', '=== 开始 ReAct 自动执行 ===');
 
     if (executor == null || !executor.isConnected) {
       final type = executor == null ? '无执行器' : '未连接';
-      agentLogger.error('AutoExec', '$type!');
+      agentLogger.error('ReAct', '$type!');
       onError?.call('需要连接到终端才能使用自动模式');
       return;
     }
 
-    agentLogger.info('AutoExec', '执行器连接状态: ${executor.isConnected}');
+    agentLogger.info('ReAct', '执行器连接状态: ${executor.isConnected}');
 
-    final maxSteps = this.maxSteps;
+    // maxSteps=0 时使用兜底上限，防止无限循环
+    final maxSteps = this.maxSteps > 0 ? this.maxSteps : _defaultMaxSteps;
     var stepCount = 0;
 
-    // 判断是否为新对话（决定系统提示和消息格式）
+    // 判断是否为新对话
     final isNewConversation = _conversationHistory.isEmpty;
 
-    // 更新或创建系统提示（每次都更新，确保环境信息和记忆是最新的）
+    // 更新或创建系统提示（ReAct 模式专用）
     final systemPrompt = _buildSystemPrompt(executor, autoExecute: true);
     if (isNewConversation) {
       _conversationHistory.add(ChatMessage.create(role: 'system', content: systemPrompt));
@@ -285,13 +318,13 @@ class AgentEngine {
       _conversationHistory[0] = ChatMessage.create(role: 'system', content: systemPrompt);
     }
 
-    // 添加用户消息：首次带"任务:"前缀，后续直接追加（保持上下文连贯）
+    // 添加用户消息
     _conversationHistory.add(ChatMessage.create(
       role: 'user',
       content: isNewConversation ? '任务: $goal\n\n请分析任务并开始执行。' : goal,
     ));
 
-    agentLogger.info('AutoExec', '对话历史: ${_conversationHistory.length} 条消息 (新对话: $isNewConversation)');
+    agentLogger.info('ReAct', '对话历史: ${_conversationHistory.length} 条消息 (新对话: $isNewConversation)');
 
     // 仅新对话显示启动提示
     if (isNewConversation) {
@@ -301,12 +334,16 @@ class AgentEngine {
       _accumulatedMessage = '';
     }
 
-    agentLogger.info('AutoExec', '开始执行循环${maxSteps > 0 ? " (最多 $maxSteps 步)" : " (无步数限制)"}');
+    agentLogger.info('ReAct', '开始 ReAct 循环 (最多 $maxSteps 步)');
 
-    while (maxSteps <= 0 || stepCount < maxSteps) {
+    while (stepCount < maxSteps) {
       stepCount++;
-      agentLogger.info('AutoExec', '--- 步骤 $stepCount ---');
+      _reactFormatRetryCount = 0; // 重置格式重试计数
+      agentLogger.info('ReAct', '--- 步骤 $stepCount ---');
 
+      // ═══════════════════════════════════════════
+      // 阶段1: 思考 (Think) — 调用 AI 获取响应
+      // ═══════════════════════════════════════════
       _currentTask = _currentTask!.copyWith(
         status: AgentStatus.thinking,
         currentStep: '思考中... (第 $stepCount 步)',
@@ -314,198 +351,547 @@ class AgentEngine {
       onTaskUpdated?.call(_currentTask!);
       onThinking?.call('🤔 正在思考下一步...');
 
-      String fullResponse = '';
-      agentLogger.info('AutoExec', '调用 AI 模型...');
-      agentLogger.debug('AutoExec', '消息历史: ${_conversationHistory.length} 条');
-
+      String fullResponse;
       try {
-        final stream = await _aiProvider.chatStream(
-          history: _conversationHistory,
-          prompt: '',
-          config: _modelConfig,
-          systemPrompt: null,
-        );
-
-        int chunkCount = 0;
-        await for (final chunk in stream) {
-          chunkCount++;
-          fullResponse += chunk;
-          _accumulatedMessage += chunk;
-          onMessage?.call(chunk);
-        }
-        agentLogger.info('AutoExec', 'AI响应完成，共 $chunkCount 个数据块');
-        agentLogger.debug('AutoExec', '响应长度: ${fullResponse.length} 字符');
-
-        // 始终将 AI 响应加入对话历史（确保上下文连贯）
-        _conversationHistory.add(ChatMessage.create(role: 'assistant', content: fullResponse));
-
-        final commands = _extractCommands(fullResponse);
-        agentLogger.info('AutoExec', '提取命令: ${commands.isNotEmpty ? "${commands.length} 条" : "未找到"}');
-
-        if (commands.isNotEmpty) {
-          for (final c in commands) {
-            agentLogger.info('AutoExec', '提取的命令: $c');
-          }
-        } else {
-          agentLogger.info('AutoExec', 'AI完整响应:\n$fullResponse');
-        }
-
-        if (commands.isEmpty) {
-          if (_isTaskComplete(fullResponse)) {
-            agentLogger.info('AutoExec', '任务完成 (检测到完成关键词)');
-          } else {
-            agentLogger.info('AutoExec', 'AI未生成命令，视为任务完成（纯问答或已回答）');
-          }
-          _trimMessages(_conversationHistory);
-          _currentTask = _currentTask!.copyWith(
-            status: AgentStatus.completed,
-            completedAt: DateTime.now(),
-          );
-          onTaskUpdated?.call(_currentTask!);
-          return;
-        }
-
-        // 逐条执行命令，收集结果
-        final resultMessages = <String>[];
-        for (final command in commands) {
-          if (_currentTask?.status == AgentStatus.cancelled) {
-            agentLogger.info('AutoExec', '任务被取消');
-            return;
-          }
-
-          final safetyLevel = SafetyGuard.check(command);
-          agentLogger.info('AutoExec', '安全检查结果: $safetyLevel');
-
-          if (safetyLevel == SafetyLevel.blocked) {
-            agentLogger.warn('AutoExec', '命令被安全系统拦截: $command');
-            final msg = '\n\n🚫 命令被安全系统拦截: $command\n';
-            _accumulatedMessage += msg;
-            onMessage?.call(msg);
-            resultMessages.add('🚫 命令被安全系统拦截: $command');
-            continue;
-          }
-
-          // warn 级别的命令（安装/升级/替换/修改环境等）在自动模式下暂停，等待用户确认
-          if (safetyLevel == SafetyLevel.warn) {
-            agentLogger.warn('AutoExec', '高风险命令需要确认: $command');
-
-            // 设置等待确认状态，UI 会显示确认/拒绝按钮
-            _pendingConfirmCommand = command;
-            _confirmCompleter = Completer<bool>();
-
-            final msg = '\n\n⚠️ 高风险命令需要确认: `$command`\n${SafetyGuard.getTip(safetyLevel)}\n请点击下方按钮确认或拒绝。\n';
-            _accumulatedMessage += msg;
-            onMessage?.call(msg);
-
-            _currentTask = _currentTask!.copyWith(
-              status: AgentStatus.waitingConfirm,
-              currentStep: '等待确认: $command',
-            );
-            onTaskUpdated?.call(_currentTask!);
-
-            // 暂停循环，等待用户确认或拒绝
-            final confirmed = await _confirmCompleter!.future;
-            _confirmCompleter = null;
-            _pendingConfirmCommand = null;
-
-            if (_currentTask?.status == AgentStatus.cancelled) {
-              agentLogger.info('AutoExec', '任务在等待确认期间被取消');
-              return;
-            }
-
-            if (!confirmed) {
-              // 用户拒绝执行
-              agentLogger.info('AutoExec', '用户拒绝执行危险命令: $command');
-              final rejectMsg = '\n❌ 用户拒绝执行此命令。\n';
-              _accumulatedMessage += rejectMsg;
-              onMessage?.call(rejectMsg);
-              resultMessages.add('❌ 用户拒绝执行: $command');
-              continue;
-            }
-
-            // 用户确认执行
-            agentLogger.info('AutoExec', '用户确认执行危险命令: $command');
-            final confirmMsg = '\n✅ 用户已确认，开始执行...\n';
-            _accumulatedMessage += confirmMsg;
-            onMessage?.call(confirmMsg);
-          }
-
-          _currentTask = _currentTask!.copyWith(
-            status: AgentStatus.executing,
-            currentStep: command,
-          );
-          onTaskUpdated?.call(_currentTask!);
-          onCommandGenerated?.call(command);
-
-          if (safetyLevel == SafetyLevel.info) {
-            agentLogger.info('AutoExec', '低风险操作提示: $command');
-          }
-
-          agentLogger.info('AutoExec', '执行命令: $command');
-          final result = await _executeCommand(executor, command);
-          agentLogger.info('AutoExec', '命令执行结果: success=${result.success}');
-          agentLogger.debug('AutoExec', '输出: ${result.output ?? "无"}');
-          agentLogger.debug('AutoExec', '错误: ${result.error ?? "无"}');
-
-          onCommandExecuted?.call(result);
-
-          _memory.rememberCommand(command);
-          _memory.rememberResult(
-            command,
-            result.output ?? result.error ?? '',
-            success: result.success,
-          );
-
-          // 查询类命令保留完整输出，修改类命令截断
-          final isQuery = _isQueryCommand(command);
-          final outputText = isQuery
-              ? (result.output ?? '(无输出)')
-              : _truncateOutput(result.output, maxLines: 8, maxChars: 600);
-          final errorText = isQuery
-              ? (result.error ?? '(无错误信息)')
-              : _truncateOutput(result.error, maxLines: 8, maxChars: 600);
-          final resultMsg = result.success
-              ? '✅ 命令执行成功\n```bash\n$command\n```\n输出:\n```text\n$outputText\n```'
-              : '❌ 命令执行失败\n```bash\n$command\n```\n错误:\n```text\n$errorText\n```';
-
-          resultMessages.add(resultMsg);
-
-          // 累积到 UI 显示消息（每条命令的结果实时显示）
-          _accumulatedMessage += '\n$resultMsg';
-          onMessage?.call('\n$resultMsg');
-        }
-
-        // 汇总所有结果作为一条 user 消息发给 AI
-        if (resultMessages.isNotEmpty) {
-          final combinedResult = resultMessages.join('\n\n');
-          _conversationHistory.add(ChatMessage.create(role: 'user', content: combinedResult));
-          _trimMessages(_conversationHistory);
-        }
+        fullResponse = await _callAI();
       } catch (e, stack) {
         final friendlyMsg = _friendlyErrorMessage(e);
-        agentLogger.error('AutoExec', '步骤执行异常: $e\n$stack');
+        agentLogger.error('ReAct', 'AI 调用异常: $e\n$stack');
         onError?.call(friendlyMsg);
         break;
       }
+
+      // 将 AI 响应加入对话历史
+      _conversationHistory.add(ChatMessage.create(role: 'assistant', content: fullResponse));
+
+      // ═══════════════════════════════════════════
+      // 阶段2: 解析 (Parse) — 从 AI 响应中提取结构化动作
+      // ═══════════════════════════════════════════
+      final step = _parseReActResponse(fullResponse);
+      agentLogger.info('ReAct', '解析结果: thought="${step.thought}", action=${step.action}, command=${step.command}, options=${step.options}');
+
+      // ═══════════════════════════════════════════
+      // 阶段3: 行动 (Act) — 根据动作类型执行
+      // ═══════════════════════════════════════════
+      switch (step.action) {
+        case ActionType.finish:
+          agentLogger.info('ReAct', '任务完成 (AI 返回 finish 动作)');
+          _finishTask();
+          return;
+
+        case ActionType.ask:
+          final shouldContinue = await _handleAskAction(step);
+          if (!shouldContinue) return;
+          continue;
+
+        case ActionType.execute:
+          if (step.command == null || step.command!.trim().isEmpty) {
+            // ReAct 解析出了 execute 但无命令 → fallback 到旧方式提取
+            final fallbackCommands = _extractCommands(fullResponse);
+            if (fallbackCommands.isNotEmpty) {
+              agentLogger.info('ReAct', 'ReAct 格式无命令，旧方式提取 ${fallbackCommands.length} 条');
+              final shouldContinue = await _handleExecuteCommands(fallbackCommands, executor);
+              if (!shouldContinue) return;
+              break;
+            }
+            // 两种方式都未提取到命令，发送继续提示
+            final shouldContinue = await _handleNoCommand();
+            if (!shouldContinue) return;
+            continue;
+          }
+          final shouldContinue = await _handleExecuteAction(step, executor);
+          if (!shouldContinue) return;
+      }
+
+      // 检查任务是否被取消
+      if (_currentTask?.status == AgentStatus.cancelled) {
+        agentLogger.info('ReAct', '任务被取消');
+        return;
+      }
     }
 
+    // 达到最大步数
     _currentTask = _currentTask!.copyWith(
-      status: (maxSteps > 0 && stepCount >= maxSteps) ? AgentStatus.failed : AgentStatus.completed,
+      status: (stepCount >= maxSteps) ? AgentStatus.failed : AgentStatus.completed,
       completedAt: DateTime.now(),
     );
     onTaskUpdated?.call(_currentTask!);
-    agentLogger.info('AutoExec', '=== 执行结束 ===');
+    agentLogger.info('ReAct', '=== 执行结束 (步数: $stepCount/$maxSteps) ===');
 
-    if (maxSteps > 0 && stepCount >= maxSteps) {
-      agentLogger.warn('AutoExec', '达到最大执行步数 $maxSteps');
+    if (stepCount >= maxSteps) {
+      agentLogger.warn('ReAct', '达到最大执行步数 $maxSteps');
       final msg = '\n\n⚠️ 达到最大执行步数 ($maxSteps)，任务被中断';
       _accumulatedMessage += msg;
       onMessage?.call(msg);
     } else {
-      // 任务正常完成，通知保存消息
       if (_accumulatedMessage.isNotEmpty) {
         onCompleted?.call(_accumulatedMessage);
       }
+    }
+  }
+
+  /// 调用 AI 模型，流式返回完整响应
+  Future<String> _callAI() async {
+    agentLogger.info('ReAct', '调用 AI 模型...');
+    agentLogger.debug('ReAct', '消息历史: ${_conversationHistory.length} 条');
+
+    String fullResponse = '';
+    final stream = await _aiProvider.chatStream(
+      history: _conversationHistory,
+      prompt: '',
+      config: _modelConfig,
+      systemPrompt: null,
+    );
+
+    int chunkCount = 0;
+    await for (final chunk in stream) {
+      chunkCount++;
+      fullResponse += chunk;
+      _accumulatedMessage += chunk;
+      onMessage?.call(chunk);
+    }
+    agentLogger.info('ReAct', 'AI 响应完成，共 $chunkCount 个数据块，${fullResponse.length} 字符');
+    return fullResponse;
+  }
+
+  /// ═══════════════════════════════════════════════════════
+  /// ReAct 解析器 — 从 AI 响应中提取结构化动作
+  /// ═══════════════════════════════════════════════════════
+  ReActStep _parseReActResponse(String content) {
+    String? thought;
+    ActionType? action;
+    String? command;
+    List<String>? options;
+
+    final lines = content.split('\n');
+
+    for (int i = 0; i < lines.length; i++) {
+      final line = lines[i];
+      final trimmedLine = line.trim();
+
+      // 解析 "思考:" 行（支持中英文冒号）
+      if (trimmedLine.startsWith('思考:') || trimmedLine.startsWith('思考：')) {
+        final sepIdx = trimmedLine.indexOf(trimmedLine.contains('：') ? '：' : ':');
+        thought = trimmedLine.substring(sepIdx + 1).trim();
+        continue;
+      }
+
+      // 解析 "动作:" 行
+      if (trimmedLine.startsWith('动作:') || trimmedLine.startsWith('动作：')) {
+        final sepIdx = trimmedLine.indexOf(trimmedLine.contains('：') ? '：' : ':');
+        final actionStr = trimmedLine.substring(sepIdx + 1).trim().toLowerCase();
+        if (actionStr == 'execute') {
+          action = ActionType.execute;
+        } else if (actionStr == 'finish') {
+          action = ActionType.finish;
+        } else if (actionStr == 'ask') {
+          action = ActionType.ask;
+        }
+        continue;
+      }
+
+      // 解析 "选项:" 行（ask 动作的参数）
+      if (trimmedLine.startsWith('选项:') || trimmedLine.startsWith('选项：')) {
+        final sepIdx = trimmedLine.indexOf(trimmedLine.contains('：') ? '：' : ':');
+        final optionsStr = trimmedLine.substring(sepIdx + 1).trim();
+        options = optionsStr
+            .split('|')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
+        continue;
+      }
+
+      // 解析 "命令:" 行（execute 动作的参数）
+      // 命令可能跨多行（如 heredoc），取 "命令:" 后到响应末尾的所有内容
+      if (trimmedLine.startsWith('命令:') || trimmedLine.startsWith('命令：')) {
+        final sepIdx = line.indexOf(line.contains('：') ? '：' : ':');
+        final cmdFirstLine = line.substring(sepIdx + 1).trim();
+        // 收集后续行直到遇到另一个字段标记或响应结束
+        final cmdLines = <String>[cmdFirstLine];
+        for (int j = i + 1; j < lines.length; j++) {
+          final nextLine = lines[j].trim();
+          // 遇到字段标记则停止
+          if (nextLine.startsWith('思考:') || nextLine.startsWith('思考：') ||
+              nextLine.startsWith('动作:') || nextLine.startsWith('动作：') ||
+              nextLine.startsWith('选项:') || nextLine.startsWith('选项：') ||
+              nextLine.startsWith('命令:') || nextLine.startsWith('命令：')) {
+            break;
+          }
+          cmdLines.add(lines[j]);
+        }
+        command = cmdLines.join('\n').trim();
+        continue;
+      }
+    }
+
+    // ═══ Fallback：AI 未遵循 ReAct 格式 ═══
+    if (action == null) {
+      // 检查旧格式完成标记
+      if (_isTaskComplete(content)) {
+        agentLogger.info('ReAct', 'Fallback: 检测到旧格式完成标记');
+        return ReActStep(
+          thought: thought ?? content,
+          action: ActionType.finish,
+          rawResponse: content,
+        );
+      }
+
+      // 检查旧格式 :::choose 选项
+      final legacyOptions = _extractOptions(content);
+      if (legacyOptions.isNotEmpty) {
+        agentLogger.info('ReAct', 'Fallback: 检测到 :::choose 选项');
+        return ReActStep(
+          thought: thought ?? '',
+          action: ActionType.ask,
+          options: legacyOptions,
+          rawResponse: content,
+        );
+      }
+
+      // 尝试旧格式提取命令
+      final legacyCommands = _extractCommands(content);
+      if (legacyCommands.isNotEmpty) {
+        agentLogger.info('ReAct', 'Fallback: 旧格式提取 ${legacyCommands.length} 条命令');
+        return ReActStep(
+          thought: thought ?? '',
+          action: ActionType.execute,
+          command: legacyCommands.first,
+          options: legacyCommands.length > 1
+              ? legacyCommands.skip(1).toList()
+              : null,
+          rawResponse: content,
+        );
+      }
+
+      // 完全无法解析，视为仅思考
+      agentLogger.info('ReAct', '无法解析 AI 响应为任何已知格式');
+      return ReActStep(
+        thought: thought ?? content,
+        action: ActionType.finish, // 无有效动作，将由 _handleNoCommand 处理
+        rawResponse: content,
+      );
+    }
+
+    return ReActStep(
+      thought: thought ?? '',
+      action: action,
+      command: command,
+      options: options,
+      rawResponse: content,
+    );
+  }
+
+  /// ═══════════════════════════════════════════════════════
+  /// 处理 execute 动作 — 执行单条命令并返回观测
+  /// ═══════════════════════════════════════════════════════
+  /// 返回 true 表示继续循环，false 表示应退出
+  Future<bool> _handleExecuteAction(ReActStep step, CommandExecutor executor) async {
+    final command = step.command!.trim();
+    agentLogger.info('ReAct', '执行命令: $command');
+
+    // 安全检查
+    final safetyLevel = SafetyGuard.check(command);
+    agentLogger.info('ReAct', '安全检查: $safetyLevel');
+
+    if (safetyLevel == SafetyLevel.blocked) {
+      agentLogger.warn('ReAct', '命令被安全系统拦截: $command');
+      final msg = '\n\n🚫 命令被安全系统拦截: $command\n';
+      _accumulatedMessage += msg;
+      onMessage?.call(msg);
+      // 将拦截信息作为观测反馈给 AI
+      final observation = ReActObservation(
+        command: command,
+        output: '命令被安全系统拦截，禁止执行',
+        success: false,
+        error: SafetyGuard.getTip(safetyLevel),
+      );
+      _conversationHistory.add(ChatMessage.create(role: 'user', content: observation.format()));
+      _trimMessages(_conversationHistory);
+      return true; // 继续循环，让 AI 基于观测调整
+    }
+
+    // warn 级别命令需要用户确认
+    if (safetyLevel == SafetyLevel.warn) {
+      agentLogger.warn('ReAct', '高风险命令需要确认: $command');
+      _pendingConfirmCommand = command;
+      _confirmCompleter = Completer<bool>();
+
+      final msg = '\n\n⚠️ 高风险命令需要确认: `$command`\n${SafetyGuard.getTip(safetyLevel)}\n请点击下方按钮确认或拒绝。\n';
+      _accumulatedMessage += msg;
+      onMessage?.call(msg);
+
+      _currentTask = _currentTask!.copyWith(
+        status: AgentStatus.waitingConfirm,
+        currentStep: '等待确认: $command',
+      );
+      onTaskUpdated?.call(_currentTask!);
+
+      // 暂停循环，等待用户确认或拒绝
+      final confirmed = await _confirmCompleter!.future;
+      _confirmCompleter = null;
+      _pendingConfirmCommand = null;
+
+      if (_currentTask?.status == AgentStatus.cancelled) {
+        agentLogger.info('ReAct', '任务在等待确认期间被取消');
+        return false;
+      }
+
+      if (!confirmed) {
+        agentLogger.info('ReAct', '用户拒绝执行危险命令: $command');
+        final rejectMsg = '\n❌ 用户拒绝执行此命令。\n';
+        _accumulatedMessage += rejectMsg;
+        onMessage?.call(rejectMsg);
+        // 将拒绝信息作为观测反馈给 AI
+        final observation = ReActObservation(
+          command: command,
+          output: '用户拒绝执行此命令',
+          success: false,
+          error: '用户拒绝',
+        );
+        _conversationHistory.add(ChatMessage.create(role: 'user', content: observation.format()));
+        _trimMessages(_conversationHistory);
+        return true; // 继续循环，让 AI 尝试其他方案
+      }
+
+      agentLogger.info('ReAct', '用户确认执行危险命令: $command');
+      final confirmMsg = '\n✅ 用户已确认，开始执行...\n';
+      _accumulatedMessage += confirmMsg;
+      onMessage?.call(confirmMsg);
+    }
+
+    // 执行命令
+    _currentTask = _currentTask!.copyWith(
+      status: AgentStatus.executing,
+      currentStep: command,
+    );
+    onTaskUpdated?.call(_currentTask!);
+    onCommandGenerated?.call(command);
+
+    if (safetyLevel == SafetyLevel.info) {
+      agentLogger.info('ReAct', '低风险操作提示: $command');
+    }
+
+    final result = await _executeCommand(executor, command);
+    agentLogger.info('ReAct', '命令执行结果: success=${result.success}');
+
+    onCommandExecuted?.call(result);
+
+    _memory.rememberCommand(command);
+    _memory.rememberResult(
+      command,
+      result.output ?? result.error ?? '',
+      success: result.success,
+    );
+
+    // 格式化观测结果
+    final isQuery = _isQueryCommand(command);
+    final outputText = isQuery
+        ? (result.output ?? '(无输出)')
+        : _truncateOutput(result.output, maxLines: 8, maxChars: 600);
+    final errorText = isQuery
+        ? (result.error ?? '(无错误信息)')
+        : _truncateOutput(result.error, maxLines: 8, maxChars: 600);
+
+    final observation = ReActObservation(
+      command: command,
+      output: result.success ? outputText : errorText,
+      success: result.success,
+      error: result.success ? null : errorText,
+    );
+
+    // 向 UI 显示执行结果
+    final resultMsg = result.success
+        ? '📋 观测: 命令 `$command` 执行成功\n输出:\n$outputText'
+        : '📋 观测: 命令 `$command` 执行失败\n错误:\n$errorText';
+    _accumulatedMessage += '\n$resultMsg';
+    onMessage?.call('\n$resultMsg');
+
+    // 将观测作为 user 消息反馈给 AI（ReAct 核心环节）
+    _conversationHistory.add(ChatMessage.create(role: 'user', content: observation.format()));
+    _trimMessages(_conversationHistory);
+
+    return true; // 继续循环
+  }
+
+  /// 处理多条命令执行（旧格式 fallback）
+  Future<bool> _handleExecuteCommands(List<String> commands, CommandExecutor executor) async {
+    final resultMessages = <String>[];
+
+    for (final command in commands) {
+      if (_currentTask?.status == AgentStatus.cancelled) return false;
+
+      final safetyLevel = SafetyGuard.check(command);
+
+      if (safetyLevel == SafetyLevel.blocked) {
+        final msg = '\n\n🚫 命令被安全系统拦截: $command\n';
+        _accumulatedMessage += msg;
+        onMessage?.call(msg);
+        resultMessages.add('🚫 命令被安全系统拦截: $command');
+        continue;
+      }
+
+      if (safetyLevel == SafetyLevel.warn) {
+        _pendingConfirmCommand = command;
+        _confirmCompleter = Completer<bool>();
+        final msg = '\n\n⚠️ 高风险命令需要确认: `$command`\n${SafetyGuard.getTip(safetyLevel)}\n请点击下方按钮确认或拒绝。\n';
+        _accumulatedMessage += msg;
+        onMessage?.call(msg);
+
+        _currentTask = _currentTask!.copyWith(
+          status: AgentStatus.waitingConfirm,
+          currentStep: '等待确认: $command',
+        );
+        onTaskUpdated?.call(_currentTask!);
+
+        final confirmed = await _confirmCompleter!.future;
+        _confirmCompleter = null;
+        _pendingConfirmCommand = null;
+
+        if (_currentTask?.status == AgentStatus.cancelled) return false;
+
+        if (!confirmed) {
+          final rejectMsg = '\n❌ 用户拒绝执行此命令。\n';
+          _accumulatedMessage += rejectMsg;
+          onMessage?.call(rejectMsg);
+          resultMessages.add('❌ 用户拒绝执行: $command');
+          continue;
+        }
+
+        final confirmMsg = '\n✅ 用户已确认，开始执行...\n';
+        _accumulatedMessage += confirmMsg;
+        onMessage?.call(confirmMsg);
+      }
+
+      _currentTask = _currentTask!.copyWith(
+        status: AgentStatus.executing,
+        currentStep: command,
+      );
+      onTaskUpdated?.call(_currentTask!);
+      onCommandGenerated?.call(command);
+
+      final result = await _executeCommand(executor, command);
+      onCommandExecuted?.call(result);
+
+      _memory.rememberCommand(command);
+      _memory.rememberResult(command, result.output ?? result.error ?? '', success: result.success);
+
+      final isQuery = _isQueryCommand(command);
+      final outputText = isQuery ? (result.output ?? '(无输出)') : _truncateOutput(result.output, maxLines: 8, maxChars: 600);
+      final errorText = isQuery ? (result.error ?? '(无错误信息)') : _truncateOutput(result.error, maxLines: 8, maxChars: 600);
+
+      // 使用 ReAct 观测格式反馈
+      final observation = ReActObservation(
+        command: command,
+        output: result.success ? outputText : errorText,
+        success: result.success,
+        error: result.success ? null : errorText,
+      );
+      resultMessages.add(observation.format());
+
+      final resultMsg = result.success
+          ? '📋 观测: 命令 `$command` 执行成功\n输出:\n$outputText'
+          : '📋 观测: 命令 `$command` 执行失败\n错误:\n$errorText';
+      _accumulatedMessage += '\n$resultMsg';
+      onMessage?.call('\n$resultMsg');
+    }
+
+    // 汇总观测作为 user 消息
+    if (resultMessages.isNotEmpty) {
+      _conversationHistory.add(ChatMessage.create(role: 'user', content: resultMessages.join('\n\n')));
+      _trimMessages(_conversationHistory);
+    }
+
+    return true;
+  }
+
+  /// 处理 ask 动作 — 暂停等待用户选择
+  /// 返回 true 表示继续循环，false 表示应退出
+  Future<bool> _handleAskAction(ReActStep step) async {
+    final options = step.options ?? [];
+    if (options.isEmpty) {
+      agentLogger.warn('ReAct', 'ask 动作但无选项，视为 finish');
+      _finishTask();
+      return false;
+    }
+
+    agentLogger.info('ReAct', '检测到选项，暂停等待用户选择: $options');
+
+    _pendingOptions = options;
+    _choiceCompleter = Completer<String>();
+
+    _currentTask = _currentTask!.copyWith(
+      status: AgentStatus.waitingConfirm,
+      currentStep: '等待选择',
+    );
+    onTaskUpdated?.call(_currentTask!);
+
+    // 暂停循环，等待用户选择
+    final choice = await _choiceCompleter!.future;
+    _choiceCompleter = null;
+    _pendingOptions = [];
+
+    if (_currentTask?.status == AgentStatus.cancelled) {
+      agentLogger.info('ReAct', '任务在等待选择期间被取消');
+      return false;
+    }
+
+    if (choice.isEmpty) {
+      agentLogger.info('ReAct', '用户取消选择');
+      return false;
+    }
+
+    // 将用户选择反馈给 AI
+    agentLogger.info('ReAct', '用户选择了: $choice');
+    final choiceMsg = '\n\n👉 你选择了: $choice\n';
+    _accumulatedMessage += choiceMsg;
+    onMessage?.call(choiceMsg);
+
+    // 以 ReAct 观测格式反馈
+    final observation = '观测: 用户选择了 "$choice"';
+    _conversationHistory.add(ChatMessage.create(role: 'user', content: observation));
+    _trimMessages(_conversationHistory);
+
+    _currentTask = _currentTask!.copyWith(
+      status: AgentStatus.thinking,
+      currentStep: '继续处理...',
+    );
+    onTaskUpdated?.call(_currentTask!);
+
+    return true; // 继续循环
+  }
+
+  /// 处理无命令情况 — 发送继续提示
+  /// 返回 true 表示继续循环，false 表示任务结束
+  Future<bool> _handleNoCommand() async {
+    _noCommandRetryCount++;
+    if (_noCommandRetryCount <= _maxNoCommandRetries) {
+      agentLogger.info('ReAct', 'AI 未生成命令，发送继续提示 (重试 $_noCommandRetryCount/$_maxNoCommandRetries)');
+      final continuePrompt = '请继续执行任务。如果还有需要执行的步骤，请使用以下格式回复：\n\n思考: [你的推理]\n动作: execute\n命令: [要执行的命令]\n\n如果任务已全部完成，请回复：\n\n思考: [总结]\n动作: finish';
+      _accumulatedMessage += '\n\n⏳ 继续执行...\n';
+      onMessage?.call('\n\n⏳ 继续执行...\n');
+      _conversationHistory.add(ChatMessage.create(role: 'user', content: continuePrompt));
+      _trimMessages(_conversationHistory);
+      return true;
+    }
+
+    // 重试次数耗尽，视为任务完成
+    agentLogger.info('ReAct', 'AI 连续未生成命令，视为任务完成');
+    _finishTask();
+    return false;
+  }
+
+  /// 标记任务为已完成（统一的结束逻辑）
+  void _finishTask() {
+    _trimMessages(_conversationHistory);
+    _currentTask = _currentTask!.copyWith(
+      status: AgentStatus.completed,
+      completedAt: DateTime.now(),
+    );
+    onTaskUpdated?.call(_currentTask!);
+    agentLogger.info('AutoExec', '=== 任务完成 ===');
+    if (_accumulatedMessage.isNotEmpty) {
+      onCompleted?.call(_accumulatedMessage);
     }
   }
 
@@ -533,10 +919,12 @@ class AgentEngine {
       stdoutData = await completer.future.timeout(
         const Duration(seconds: 30),
         onTimeout: () {
-          sub?.cancel();
           return stdoutData;
         },
       );
+
+      // 始终取消订阅，防止泄漏
+      await sub.cancel();
 
       stopwatch.stop();
 
@@ -873,11 +1261,27 @@ class AgentEngine {
   bool _isTaskComplete(String response) {
     final keywords = [
       '任务完成', '任务已完成', '✅ 任务完成', '✅任务完成',
+      '已完成', '已全部完成', '全部完成', '所有步骤已完成',
+      '操作完成', '安装完成', '配置完成', '部署完成',
     ];
     for (final k in keywords) {
       if (response.contains(k)) return true;
     }
     return false;
+  }
+
+  /// 从 AI 响应中提取 :::choose A|B|C::: 选项
+  List<String> _extractOptions(String content) {
+    final regex = RegExp(r':::choose\s+(.+?):::');
+    final match = regex.firstMatch(content);
+    if (match == null) return [];
+    final optionsStr = match.group(1);
+    if (optionsStr == null) return [];
+    return optionsStr
+        .split('|')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
   }
 
   String _buildSystemPrompt(CommandExecutor? executor, {required bool autoExecute}) {
@@ -886,20 +1290,20 @@ class AgentEngine {
     buffer.writeln('你是 AI 助手，可以执行命令。');
 
     if (autoExecute) {
-      buffer.writeln('【自动执行模式】');
-      buffer.writeln('1. 分析用户需求');
-      buffer.writeln('2. 每次只执行一条命令');
-      buffer.writeln('3. 分析结果后继续');
-      buffer.writeln('4. 完成后说明结果');
+      buffer.writeln('【ReAct 自动执行模式】');
+      buffer.writeln('你正在使用 ReAct（推理-行动-观测）框架。');
       buffer.writeln();
       buffer.writeln(prompts.agentAutoRule);
+      buffer.writeln();
+      // ReAct 模式下，不再需要旧的命令格式规则（命令写在"命令:"行）
+      // 但仍需行为边界和知识库安全规则
     } else {
       buffer.writeln('【辅助模式】');
       buffer.writeln('生成命令供用户确认执行。');
+      buffer.writeln();
+      buffer.writeln(prompts.commandFormatRule);
     }
 
-    buffer.writeln();
-    buffer.writeln(prompts.commandFormatRule);
     buffer.writeln();
     buffer.writeln(prompts.behaviorBoundaryRule);
     buffer.writeln();
@@ -1036,10 +1440,12 @@ class AgentEngine {
         output = await completer.future.timeout(
           const Duration(seconds: 2),
           onTimeout: () {
-            sub?.cancel();
             return output;
           },
         );
+
+        // 始终取消订阅，防止泄漏
+        await sub.cancel();
 
         final clean = AnsiStripper.strip(output);
         _memory.rememberSystemInfo('已收集 $cat 信息', category: cat);

@@ -21,6 +21,11 @@ const Color cHermesOrange = Color(0xFFEB5C20);
 const Color cHermesOrangeLight = Color(0xFFF07840);
 const Color cHermesOrangeDark = Color(0xFFC44A18);
 
+// P2-7: 新增紫罗兰辅助色 - AI 相关元素强调
+const Color cViolet = Color(0xFF7C5CFF);
+const Color cVioletLight = Color(0xFF9A80FF);
+const Color cVioletDark = Color(0xFF5E3FD9);
+
 // ===== 颜色系统 (深色) =====
 // 背景
 const Color cBg = Color(0xFF0A0A0F);
@@ -58,8 +63,8 @@ const Color cAgentGreenLight = cLimeGreenLight;
 
 // ===== 颜色系统 (浅色) =====
 const Color cBgLight = Color(0xFFF5F5FA);
-const Color cCardLight = Color(0xFFFFFFFF);
-const Color cCardElevatedLight = Color(0xFFFFFFFF);
+const Color cCardLight = Color(0xFFF8F8FC);      // P2-7: 非纯白，微蓝灰
+const Color cCardElevatedLight = Color(0xFFFFFFFF);  // 纯白用于悬浮卡片
 const Color cSurfaceLight = Color(0xFFEEEEF5);
 const Color cBorderLightTheme = Color(0xFFD8D8E5);
 const Color cBorderLightHover = Color(0xFFC0C0D2);
@@ -90,16 +95,16 @@ const LinearGradient surfaceGradient = LinearGradient(
 );
 
 // ===== 圆角系统 =====
-const double rXSmall = 4.0;
-const double rSmall = 10.0;
-const double rMedium = 10.0;
-const double rLarge = 14.0;
-const double rXLarge = 20.0;
+const double rXSmall = 4.0;   // 标签、徽章
+const double rSmall = 6.0;    // 按钮、输入框（原 10→6）
+const double rMedium = 10.0;  // 小卡片、弹窗
+const double rLarge = 16.0;   // 大卡片（原 14→16）
+const double rXLarge = 24.0;  // 页面容器、底部 Sheet（原 20→24）
 const double rFull = 999.0;
-const double rCard = rLarge;
-const double rButton = rMedium;
-const double rInput = rMedium;
-const double rBubble = rXLarge;
+const double rCard = rLarge;      // 16px
+const double rButton = rSmall;    // 6px
+const double rInput = rSmall;     // 6px
+const double rBubble = rMedium;   // 10px
 const double pStandard = 16.0;
 const double pCompact = 12.0;
 const double hAppBar = 52.0;
@@ -175,11 +180,12 @@ const List<BoxShadow> shadowAgentGlow = [
 ];
 
 // ===== 字体 =====
-const double fTitle = 16.0;
-const double fBody = 13.0;
-const double fSmall = 11.0;
-const double fMono = 12.0;
-const double fMicro = 10.0;
+const double fDisplay = 24.0;     // 页面大标题（新增）
+const double fTitle = 18.0;       // 卡片/区域标题（原 16→18）
+const double fBody = 14.0;        // 正文（原 13→14）
+const double fSmall = 12.0;       // 辅助文字（原 11→12）
+const double fMono = 14.0;        // 终端等宽字体（原 12→14）
+const double fMicro = 11.0;       // 标签/徽章（原 10→11）
 
 // ===== 动画 =====
 const Duration animFast = Duration(milliseconds: 150);

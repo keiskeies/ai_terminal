@@ -19,6 +19,9 @@ class TerminalTab {
   LocalTerminalService? localService; // 本地终端
   final StreamController<String> outputController;
 
+  /// 保存输出流订阅，以便关闭时取消
+  StreamSubscription<String>? _outputSubscription;
+
   TerminalTab({
     required this.id,
     required this.hostId,
@@ -30,7 +33,14 @@ class TerminalTab {
 
   bool get isLocal => hostId == 'local';
 
+  /// 设置输出流转发订阅（保存引用以便 dispose 时取消）
+  void setOutputSubscription(StreamSubscription<String> sub) {
+    _outputSubscription = sub;
+  }
+
   void dispose() {
+    _outputSubscription?.cancel();
+    _outputSubscription = null;
     outputController.close();
     localService?.dispose();
   }
@@ -117,12 +127,13 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
       tabs: state.tabs.map((t) => t.id == tabId ? newTab : t).toList(),
     );
 
-    // 监听输出
-    localService.output.listen((data) {
+    // 监听输出（保存订阅以便关闭时取消）
+    final sub = localService.output.listen((data) {
       if (!newTab.outputController.isClosed) {
         newTab.outputController.add(data);
       }
     });
+    newTab.setOutputSubscription(sub);
   }
 
   /// 打开新 SSH 标签（允许重复连接同一服务器）
@@ -180,12 +191,13 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
         tabs: state.tabs.map((t) => t.id == tabId ? newTab : t).toList(),
       );
 
-      // 监听输出
-      service.output.listen((data) {
+      // 监听输出（保存订阅以便关闭时取消）
+      final sub = service.output.listen((data) {
         if (!newTab.outputController.isClosed) {
           newTab.outputController.add(data);
         }
       });
+      newTab.setOutputSubscription(sub);
     } catch (e) {
       newTab.outputController.add('\r\n❌ 连接失败: $e\r\n');
     }

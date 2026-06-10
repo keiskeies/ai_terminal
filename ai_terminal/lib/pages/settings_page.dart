@@ -4,11 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
-import '../core/hive_init.dart';
-import '../core/prompts.dart';
 import '../providers/agent_provider.dart';
 import '../services/knowledge_service.dart';
 
+/// P1-5: 设置页信息架构重组
+/// 按用户任务场景分组：连接管理、AI 与智能、外观与体验、关于
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
@@ -24,8 +24,8 @@ class SettingsPage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(pStandard),
         children: [
-          // 服务器管理
-          _buildSectionTitle('服务器管理'),
+          // ===== 连接管理 =====
+          _buildSectionTitle(context, '连接管理', Icons.link),
           _buildListTile(
             context,
             icon: Icons.dns,
@@ -34,11 +34,19 @@ class SettingsPage extends ConsumerWidget {
             subtitle: '管理 SSH 服务器连接',
             onTap: () => context.push('/hosts'),
           ),
+          _buildListTile(
+            context,
+            icon: Icons.code,
+            iconColor: cPrimary,
+            title: '快捷命令',
+            subtitle: '自定义常用命令模板',
+            onTap: () => context.push('/snippets'),
+          ),
 
-          const Divider(height: 32),
+          const SizedBox(height: 24),
 
-          // 功能配置
-          _buildSectionTitle('功能配置'),
+          // ===== AI 与智能 =====
+          _buildSectionTitle(context, 'AI 与智能', Icons.auto_fix_high),
           _buildListTile(
             context,
             icon: Icons.smart_toy,
@@ -49,68 +57,38 @@ class SettingsPage extends ConsumerWidget {
           ),
           _buildListTile(
             context,
-            icon: Icons.code,
-            iconColor: cPrimary,
-            title: '快捷命令',
-            subtitle: '自定义常用命令模板',
-            onTap: () => context.push('/snippets'),
-          ),
-          _buildListTile(
-            context,
             icon: Icons.auto_mode_rounded,
             iconColor: cAgentGreen,
             title: 'Agent 设置',
             subtitle: '最大执行步骤数: ${maxSteps == 0 ? "无限制" : maxSteps}',
-            onTap: () => _showMaxStepsDialog(context, ref),
-          ),
-          _buildListTile(
-            context,
-            icon: Icons.description_outlined,
-            iconColor: cWarning,
-            title: '内置系统提示词',
-            subtitle: '编辑 AI 的核心提示词（可重置）',
-            onTap: () => _showBuiltInPromptDialog(context, ref),
-          ),
-          _buildListTile(
-            context,
-            icon: Icons.edit_note_rounded,
-            iconColor: cAgentGreen,
-            title: '自定义 AI 提示词',
-            subtitle: '追加到内置提示词末尾的额外指令',
-            onTap: () => _showCustomPromptDialog(context, ref),
+            onTap: () => context.push('/settings/agent'),
           ),
           _buildListTile(
             context,
             icon: Icons.menu_book_rounded,
             iconColor: cInfo,
-            title: '更新命令手册知识库',
+            title: '命令手册知识库',
             subtitle: '从远程服务器同步最新的软件安装指南',
             onTap: () => _updateKnowledgeBase(context),
           ),
 
-          const Divider(height: 32),
+          const SizedBox(height: 24),
 
-          // 外观与安全
-          _buildSectionTitle('外观与安全'),
+          // ===== 外观与体验 =====
+          _buildSectionTitle(context, '外观与体验', Icons.palette),
           _buildListTile(
             context,
             icon: Icons.palette,
             iconColor: cPrimary,
             title: '外观设置',
+            subtitle: '主题模式、终端字体、配色方案',
             onTap: () => context.push('/settings/appearance'),
           ),
-          _buildListTile(
-            context,
-            icon: Icons.security,
-            iconColor: cPrimary,
-            title: '安全设置',
-            onTap: () => context.push('/settings/security'),
-          ),
 
-          const Divider(height: 32),
+          const SizedBox(height: 24),
 
-          // 关于
-          _buildSectionTitle('关于'),
+          // ===== 关于 =====
+          _buildSectionTitle(context, '关于', Icons.info),
           _buildListTile(
             context,
             icon: Icons.info,
@@ -122,67 +100,50 @@ class SettingsPage extends ConsumerWidget {
               child: const Text('检查更新'),
             ),
           ),
+          _buildListTile(
+            context,
+            icon: Icons.security,
+            iconColor: cTextSub,
+            title: '安全设置',
+            subtitle: '生物识别认证',
+            onTap: () => context.push('/settings/security'),
+          ),
         ],
       ),
     );
   }
 
-  void _showMaxStepsDialog(BuildContext context, WidgetRef ref) {
-    final controller = TextEditingController(text: ref.read(agentProvider).maxSteps.toString());
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ThemeColors.of(context).cardElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text('最大执行步骤数', style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Agent 自动模式下的最大执行步骤数。设为 0 表示无限制，复杂任务不会被中断。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody),
-              decoration: InputDecoration(
-                labelText: '步骤数 (0 = 无限制)',
-                labelStyle: TextStyle(color: ThemeColors.of(context).textSub),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: ThemeColors.of(context).border)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
+  /// P1-5: 分组标题带图标和视觉分隔
+  Widget _buildSectionTitle(BuildContext context, String title, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: cPrimary),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: fTitle,
+              fontWeight: FontWeight.w600,
+              color: cPrimary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Container(
+              height: 1,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    cPrimary.withOpacity(0.3),
+                    cPrimary.withOpacity(0.0),
+                  ],
+                ),
               ),
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('取消', style: TextStyle(color: cTextSub)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final steps = int.tryParse(controller.text) ?? 0;
-              final clamped = steps.clamp(0, 999);
-              ref.read(agentProvider.notifier).setMaxSteps(clamped);
-              Navigator.pop(ctx);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
-            child: Text('确定'),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: fBody,
-          fontWeight: FontWeight.w600,
-          color: cPrimary,
-        ),
       ),
     );
   }
@@ -199,134 +160,19 @@ class SettingsPage extends ConsumerWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: Icon(icon, color: iconColor),
+        leading: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: iconColor.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(rSmall),
+          ),
+          child: Icon(icon, color: iconColor, size: 20),
+        ),
         title: Text(title),
         subtitle: subtitle != null ? Text(subtitle, style: TextStyle(color: cTextSub, fontSize: fSmall)) : null,
         trailing: trailing ?? Icon(Icons.chevron_right, color: cTextSub),
         onTap: onTap,
-      ),
-    );
-  }
-
-  void _showCustomPromptDialog(BuildContext context, WidgetRef ref) {
-    String? savedPrompt;
-    try {
-      savedPrompt = HiveInit.settingsBox.get('customSystemPrompt') as String?;
-    } catch (_) {}
-    final controller = TextEditingController(text: savedPrompt ?? '');
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ThemeColors.of(context).cardElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text('自定义 AI 提示词', style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
-        content: SizedBox(
-          width: MediaQuery.of(ctx).size.width * 0.8,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('追加到内置提示词末尾的额外指令，用于调整 AI 的行为风格、输出偏好等。留空则不追加。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                maxLines: 6,
-                minLines: 3,
-                style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody),
-                decoration: InputDecoration(
-                  hintText: '例如：回答使用英文、输出简洁格式、优先使用 Docker...',
-                  hintStyle: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fSmall),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: ThemeColors.of(context).border)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('取消', style: TextStyle(color: cTextSub)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              try {
-                HiveInit.settingsBox.put('customSystemPrompt', controller.text.trim());
-              } catch (_) {}
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('自定义提示词已保存'),
-                  duration: const Duration(seconds: 1),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
-            child: Text('保存'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showBuiltInPromptDialog(BuildContext context, WidgetRef ref) {
-    final currentPrompt = getSystemPrompt();
-    final controller = TextEditingController(text: currentPrompt);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ThemeColors.of(context).cardElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text('内置系统提示词', style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
-        content: SizedBox(
-          width: MediaQuery.of(ctx).size.width * 0.85,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('这是 AI 的核心系统提示词，修改后立即生效。包含 {context} 占位符会被替换为服务器信息。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
-              const SizedBox(height: 8),
-              Text('⚠️ 修改需谨慎，不合适的提示词可能导致 AI 行为异常。可随时点击"重置"恢复默认。', style: TextStyle(color: cWarning, fontSize: fMicro)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                maxLines: 12,
-                minLines: 6,
-                style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fSmall, fontFamily: 'JetBrainsMono'),
-                decoration: InputDecoration(
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: cBorder)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              controller.text = defaultSystemPrompt;
-            },
-            child: Text('重置默认', style: TextStyle(color: cWarning)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text('取消', style: TextStyle(color: cTextSub)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              saveSystemPrompt(controller.text.trim());
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('内置提示词已保存'),
-                  duration: const Duration(seconds: 1),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
-            child: Text('保存'),
-          ),
-        ],
       ),
     );
   }

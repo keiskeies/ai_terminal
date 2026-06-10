@@ -22,6 +22,7 @@ class AgentState {
   final String? error;
   final int maxSteps;
   final String? pendingConfirmCommand; // 等待用户确认的危险命令
+  final List<String> pendingOptions; // 等待用户选择的选项（:::choose A|B|C:::）
 
   AgentState({
     this.mode = AgentMode.assistant,
@@ -32,11 +33,14 @@ class AgentState {
     this.error,
     this.maxSteps = 0,
     this.pendingConfirmCommand,
-  }) : chatItems = chatItems ?? [];
+    List<String>? pendingOptions,
+  }) : chatItems = chatItems ?? [],
+       pendingOptions = pendingOptions ?? [];
 
   bool get isRunning =>
       status == AgentStatus.thinking || status == AgentStatus.executing;
   bool get isWaitingConfirm => status == AgentStatus.waitingConfirm && pendingConfirmCommand != null;
+  bool get isWaitingChoice => status == AgentStatus.waitingConfirm && pendingOptions.isNotEmpty;
 
   AgentState copyWith({
     AgentMode? mode,
@@ -47,7 +51,9 @@ class AgentState {
     String? error,
     int? maxSteps,
     String? pendingConfirmCommand,
+    List<String>? pendingOptions,
     bool clearPendingConfirm = false,
+    bool clearPendingOptions = false,
   }) {
     return AgentState(
       mode: mode ?? this.mode,
@@ -58,6 +64,7 @@ class AgentState {
       error: error,
       maxSteps: maxSteps ?? this.maxSteps,
       pendingConfirmCommand: clearPendingConfirm ? null : (pendingConfirmCommand ?? this.pendingConfirmCommand),
+      pendingOptions: clearPendingOptions ? [] : (pendingOptions ?? this.pendingOptions),
     );
   }
 
@@ -70,6 +77,7 @@ class AgentState {
       case AgentStatus.executing:
         return '⚡ 执行中...';
       case AgentStatus.waitingConfirm:
+        if (pendingOptions.isNotEmpty) return '⏳ 等待选择';
         return '⏳ 等待确认';
       case AgentStatus.completed:
         return '✅ 完成';
@@ -280,6 +288,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
         currentTask: task,
         status: task.status,
         pendingConfirmCommand: _engine!.pendingConfirmCommand,
+        pendingOptions: _engine!.pendingOptions.isNotEmpty ? _engine!.pendingOptions : null,
+        clearPendingOptions: _engine!.pendingOptions.isEmpty,
       ));
     };
 
@@ -414,6 +424,17 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
   }
 
+  /// 用户选择选项（:::choose A|B|C:::）
+  void selectChoice(String choice) {
+    if (_engine != null && _engine!.hasPendingChoice) {
+      _engine!.selectChoice(choice);
+      _updateTabState(_engineTabId ?? '', (s) => s.copyWith(
+        status: AgentStatus.thinking,
+        clearPendingOptions: true,
+      ));
+    }
+  }
+
   /// 清空消息（同时清除引擎对话历史，确保下次对话全新开始）
   void clearMessages() {
     _engine?.clearHistory();
@@ -426,6 +447,13 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _getMemory(_activeTabId!).clear();
     }
     state = state.copyWith(error: null);
+  }
+
+  @override
+  void dispose() {
+    _throttleTimer?.cancel();
+    _throttleTimer = null;
+    super.dispose();
   }
 }
 
