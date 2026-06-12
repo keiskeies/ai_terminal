@@ -20,7 +20,7 @@ const String commandFormatRule = '''
 10. 如果文件内容只有 1-2 行，也可以用单条 echo 命令写入
 ''';
 
-/// Agent 自动模式专属规则（旧版，保留用于辅助模式参考）
+/// Agent 自动模式专属规则（旧版，已弃用）
 const String agentAutoRuleLegacy = '''
 【⚡ 自动执行模式 — 你必须严格遵守以下规则 ⚡】
 

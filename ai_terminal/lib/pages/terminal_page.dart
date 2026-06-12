@@ -60,6 +60,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   // AI 面板是否可见（P0-1：支持完全收起）
   bool _isAIPanelVisible = false;
 
+  // AI 输入框焦点状态（移动端键盘避让）
+  bool _aiInputFocused = false;
+
   // SFTP 侧面板（桌面端）- Per-tab 独立状态
   final Map<String, bool> _tabSftpVisible = {}; // 每个 tab 的 SFTP 面板是否可见
   double _sftpPanelWidth = 320;
@@ -110,6 +113,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   /// 手机端根据屏幕方向自动设置 AI 面板位置
+  /// 切换方向时保持 AI 面板可见状态和面板比例
   void _updateMobilePosition(BuildContext context) {
     if (!_isMobile) return;
     final orientation = MediaQuery.of(context).orientation;
@@ -117,7 +121,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         ? _AiPanelPosition.right
         : _AiPanelPosition.bottom;
     if (_aiPanelPosition != target) {
-      setState(() => _aiPanelPosition = target);
+      // 保存当前面板比例，避免切换时重置
+      final savedRatio = _aiPanelRatio;
+      final savedVisibility = _isAIPanelVisible;
+      setState(() {
+        _aiPanelPosition = target;
+        _aiPanelRatio = savedRatio;
+        _isAIPanelVisible = savedVisibility;
+      });
     }
   }
 
@@ -521,7 +532,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           ),
 
           // 快捷按键行（仅 Android / iOS 显示，桌面端不需要）
-          if (Platform.isAndroid || Platform.isIOS)
+          // 当 AI 输入框获焦（键盘弹出）时隐藏快捷按键栏，节省空间
+          if (Platform.isAndroid || Platform.isIOS && !_aiInputFocused)
             _buildQuickKeysBar(activeTab),
         ],
       ),
@@ -560,11 +572,22 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       ],
     );
 
-    // P0-1: AI 面板支持完全收起
+    // P0-1: AI 面板支持完全收起 + 移动端上滑手势展开
     Widget mainContent;
     if (!_isAIPanelVisible) {
-      // AI 面板收起状态：终端占满全屏
-      mainContent = terminalView;
+      // AI 面板收起状态：终端占满全屏，移动端支持上滑展开 AI 面板
+      mainContent = _isMobile
+          ? GestureDetector(
+              onVerticalDragEnd: (details) {
+                // 上滑速度超过阈值时展开 AI 面板
+                if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
+                  setState(() => _isAIPanelVisible = true);
+                  HiveInit.settingsBox.put('aiPanelVisible', true);
+                }
+              },
+              child: terminalView,
+            )
+          : terminalView;
     } else {
       // AI 面板展开状态：保持现有分栏布局
       mainContent = LayoutBuilder(builder: (context, constraints) {
@@ -586,17 +609,37 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
         final tc = ThemeColors.of(context);
         // 手机端不显示拖拽手柄
-        final dragHandle = _isMobile ? const SizedBox.shrink() : GestureDetector(
-          onPanUpdate: onDrag,
-          child: MouseRegion(
-            cursor: isRight ? SystemMouseCursors.resizeColumn : SystemMouseCursors.resizeRow,
-            child: Container(
-              width: isRight ? 5 : double.infinity,
-              height: isRight ? double.infinity : 5,
-              color: tc.border.withOpacity(0.6),
-            ),
-          ),
-        );
+        final dragHandle = _isMobile
+            ? (isRight ? const SizedBox.shrink() : GestureDetector(
+                // 移动端底部布局：可拖拽调整高度的手柄
+                onPanUpdate: onDrag,
+                child: Container(
+                  height: 20,
+                  width: double.infinity,
+                  color: Colors.transparent,
+                  child: Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: tc.textMuted.withOpacity(0.6),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                ),
+              ))
+            : GestureDetector(
+              onPanUpdate: onDrag,
+              child: MouseRegion(
+                cursor: isRight ? SystemMouseCursors.resizeColumn : SystemMouseCursors.resizeRow,
+                child: Container(
+                  width: isRight ? 5 : double.infinity,
+                  height: isRight ? double.infinity : 5,
+                  color: tc.border.withOpacity(0.6),
+                ),
+              ),
+            );
 
         final divider = _buildAreaDivider(agentState);
         final aiPanelSize = isRight ? totalW * _aiPanelRatio : totalH * _aiPanelRatio;
@@ -617,12 +660,26 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             ],
           );
         } else {
+          // 底部布局：移动端 AI 面板顶部添加下滑收起手势
+          Widget aiPanelWithSwipe = _isMobile
+              ? GestureDetector(
+                  onVerticalDragEnd: (details) {
+                    // 下滑速度超过阈值时收起 AI 面板
+                    if (details.primaryVelocity != null && details.primaryVelocity! > 300) {
+                      setState(() => _isAIPanelVisible = false);
+                      HiveInit.settingsBox.put('aiPanelVisible', false);
+                    }
+                  },
+                  child: SizedBox(height: aiPanelSize, child: aiContent),
+                )
+              : SizedBox(height: aiPanelSize, child: aiContent);
+
           return Column(
             children: [
               Expanded(child: terminalView),
               dragHandle,
               divider,
-              SizedBox(height: aiPanelSize, child: aiContent),
+              aiPanelWithSwipe,
             ],
           );
         }
@@ -891,8 +948,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   /// P0-1: AI 面板展开/收起按钮
   Widget _buildAIPanelToggleButton() {
     final tc = ThemeColors.of(context);
-    final isAgentMode = ref.read(agentProvider).mode == AgentMode.automatic;
-    final accentColor = isAgentMode ? cAgentGreen : cPrimary;
+    final accentColor = cAgentGreen;
 
     return Tooltip(
       message: _isAIPanelVisible ? '收起 AI 面板' : '展开 AI 面板',
@@ -1105,8 +1161,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   // ==================== 区域分界线（分割条，位于终端和 AI 面板之间）====================
   Widget _buildAreaDivider(AgentState agentState) {
-    final isAgentMode = agentState.mode == AgentMode.automatic;
-    final accentColor = isAgentMode ? cAgentGreen : cPrimary;
+    final accentColor = cAgentGreen;
     final tc = ThemeColors.of(context);
     final isRight = _aiPanelPosition == _AiPanelPosition.right;
     // 手机端不显示位置切换按钮
@@ -1147,7 +1202,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         ),
         const SizedBox(width: 6),
         Text(
-          isAgentMode ? 'AGENT' : 'AI',
+          'AGENT',
           style: TextStyle(
             fontSize: fMicro,
             color: accentColor.withOpacity(0.8),
@@ -1282,9 +1337,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           Expanded(
             child: Stack(
               children: [
-                agentState.mode == AgentMode.automatic
-                    ? _buildAgentChatList(agentState, tab)
-                    : _buildChatMessageList(chatState, tab),
+                _buildAgentChatList(agentState, tab),
                 // 回到底部按钮
                 if (_showScrollToBottom)
                   Positioned(
@@ -1503,7 +1556,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           content: item.content,
           isLoading: item.isStreaming && isLast && agentState.isRunning,
           tab: tab,
-          showAutoExecute: agentState.mode == AgentMode.automatic,
+          showAutoExecute: true,
           isAgentRunning: agentState.isRunning,
           isWaitingChoice: agentState.isWaitingChoice,
         );
@@ -2074,12 +2127,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   // ==================== 底部栏 ====================
   Widget _buildBottomBar(ChatState chatState, AgentState agentState, tp.TerminalTab? tab) {
     final isConnected = tab?.isConnected == true;
-    final isAgentMode = agentState.mode == AgentMode.automatic;
     final models = HiveInit.aiModelsBox.values.toList();
     final tc = ThemeColors.of(context);
 
     return Container(
-      padding: const EdgeInsets.only(left: 8, right: 8, top: 4, bottom: 4),
+      padding: EdgeInsets.only(
+        left: 8, right: 8, top: 4,
+        bottom: 4 + (_isMobile ? MediaQuery.of(context).padding.bottom : 0),
+      ),
       decoration: BoxDecoration(
         color: tc.card,
         border: Border(top: BorderSide(color: tc.border.withOpacity(0.5))),
@@ -2091,25 +2146,44 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 模式指示
+              // Agent 模式指示
               Container(
                 height: 26,
                 width: 26,
                 decoration: BoxDecoration(
-                  color: isAgentMode ? cAgentGreen.withOpacity(0.15) : cPrimary.withOpacity(0.15),
+                  color: cAgentGreen.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(rSmall),
                 ),
                 child: Icon(
-                  isAgentMode ? Icons.smart_toy : Icons.chat_bubble,
-                  color: isAgentMode ? cAgentGreen : cPrimary,
+                  Icons.smart_toy,
+                  color: cAgentGreen,
                   size: 12,
                 ),
               ),
               const SizedBox(width: 4),
-              // 辅助/Agent 切换
-              _buildModeSelector(agentState, tc),
+              // Agent 标签
+              Container(
+                height: 26,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: cAgentGreen.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(rXSmall),
+                  border: Border.all(color: cAgentGreen.withOpacity(0.3)),
+                ),
+                child: Center(
+                  child: Text(
+                    'Agent',
+                    style: TextStyle(
+                      fontSize: fSmall,
+                      color: cAgentGreen,
+                      fontWeight: FontWeight.w600,
+                      height: 1.0,
+                    ),
+                  ),
+                ),
+              ),
               const SizedBox(width: 4),
-              // Agent 日志按钮（始终可见）
+              // Agent 日志按钮
               GestureDetector(
                 onTap: () => _showAgentLogDialog(context),
                 child: Container(
@@ -2157,9 +2231,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           // 下方一行：输入框
           _AIPromptInput(
               enabled: isConnected && !agentState.isRunning,
-              hintText: _getInputHint(isConnected, isAgentMode, agentState.isRunning),
+              hintText: _getInputHint(isConnected, agentState.isRunning),
               initialText: _tabAiInputText[_currentTabId ?? ''] ?? '',
-              accentColor: isAgentMode ? cAgentGreen : cPrimary,
+              accentColor: cAgentGreen,
+              onFocusChanged: (focused) {
+                setState(() => _aiInputFocused = focused);
+              },
               onChanged: (text) { _tabAiInputText[_currentTabId ?? ''] = text; },
               onSend: (text) async {
                 if (!_checkAIModelConfigured()) {
@@ -2167,74 +2244,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                   return;
                   }
                   _autoScrollChat = true; // 用户发送新消息时恢复自动滚动
-                  if (isAgentMode && isConnected) {
+                  if (isConnected) {
                     final tab = ref.read(tp.terminalProvider).activeTab;
                     // 本地终端用 localService，SSH 用 service
                     final CommandExecutor? executor = tab?.isLocal == true ? tab?.localService : tab?.service;
                     ref.read(agentProvider.notifier).setExecutor(executor);
                     await ref.read(agentProvider.notifier).startTask(text);
-                  } else {
-                    ref.read(chatProvider.notifier).sendMessage(text, hostId: widget.hostId ?? 'local');
                   }
                 },
               ),
         ],
-      ),
-    );
-  }
-
-  /// 模式选择器 - 紧凑芯片
-  Widget _buildModeSelector(AgentState agentState, ThemeColors tc) {
-    final isAgentMode = agentState.mode == AgentMode.automatic;
-    return Container(
-      height: 30,
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      decoration: BoxDecoration(
-        color: tc.surface,
-        borderRadius: BorderRadius.circular(rSmall),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildModeChip('辅助', !isAgentMode, Icons.edit_note_rounded, cPrimary, tc, () {
-            ref.read(agentProvider.notifier).setMode(AgentMode.assistant);
-          }),
-          _buildModeChip('Agent', isAgentMode, Icons.auto_mode_rounded, cAgentGreen, tc, () {
-            ref.read(agentProvider.notifier).setMode(AgentMode.automatic);
-          }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildModeChip(String label, bool isActive, IconData icon, Color color, ThemeColors tc, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: animFast,
-        height: 26,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: isActive ? color.withOpacity(0.15) : Colors.transparent,
-          borderRadius: BorderRadius.circular(rXSmall),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 12, color: isActive ? color : tc.textMuted),
-            const SizedBox(width: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: fSmall,
-                color: isActive ? color : tc.textMuted,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
-                height: 1.0,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -2313,53 +2332,95 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     final tc = ThemeColors.of(context);
     final isConnected = activeTab?.isConnected == true;
 
-    final keys = [
+    // 高频组合键（始终显示）
+    final coreKeys = [
       _QuickKey('ESC', '\x1b'),
       _QuickKey('Tab', '\t'),
-      _QuickKey('Ctrl+C', '\x03'),
-      _QuickKey('Ctrl+D', '\x04'),
-      _QuickKey('Ctrl+Z', '\x1a'),
-      _QuickKey('Ctrl+L', '\x0c'),
-      _QuickKey('Ctrl+A', '\x01'),
-      _QuickKey('Ctrl+E', '\x05'),
+      _QuickKey('⌃C', '\x03'),
+      _QuickKey('⌃D', '\x04'),
+      _QuickKey('⌃Z', '\x1a'),
+      _QuickKey('⌃L', '\x0c'),
+    ];
+    // readline 快捷键
+    final readlineKeys = [
+      _QuickKey('⌃A', '\x01'),
+      _QuickKey('⌃E', '\x05'),
+      _QuickKey('⌃U', '\x15'),  // 删除行首到光标
+      _QuickKey('⌃K', '\x0b'),  // 删除光标到行尾
+      _QuickKey('⌃W', '\x17'),  // 删除前一个单词
+      _QuickKey('⌃R', '\x12'),  // 搜索历史命令
+    ];
+    // 方向 + 导航键
+    final navKeys = [
       _QuickKey('↑', '\x1b[A'),
       _QuickKey('↓', '\x1b[B'),
       _QuickKey('←', '\x1b[D'),
       _QuickKey('→', '\x1b[C'),
       _QuickKey('Home', '\x1b[H'),
       _QuickKey('End', '\x1b[F'),
+      _QuickKey('PgUp', '\x1b[5~'),
+      _QuickKey('PgDn', '\x1b[6~'),
     ];
+    final keys = [...coreKeys, ...readlineKeys, ...navKeys];
+    // 分组索引：高频键用主色高亮
+    final coreCount = coreKeys.length;
 
     return Container(
-      height: 32,
+      height: 36,
       decoration: BoxDecoration(
         color: tc.card,
         border: Border(top: BorderSide(color: tc.border.withOpacity(0.3))),
       ),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         itemCount: keys.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 3),
+        separatorBuilder: (_, index) {
+          // 在高频键和其他键之间加分隔线
+          if (index == coreCount - 1 || index == coreCount + readlineKeys.length - 1) {
+            return Container(
+              width: 1,
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              color: tc.border.withOpacity(0.4),
+            );
+          }
+          return const SizedBox(width: 3);
+        },
         itemBuilder: (context, index) {
           final key = keys[index];
+          final isCore = index < coreCount;
+          final isNav = index >= coreCount + readlineKeys.length;
           return GestureDetector(
             onTap: isConnected ? () => _sendKey(key.sequence, activeTab) : null,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: tc.surface,
+                color: isCore
+                    ? cPrimary.withOpacity(isConnected ? 0.12 : 0.05)
+                    : isNav
+                        ? cSuccess.withOpacity(isConnected ? 0.08 : 0.03)
+                        : tc.surface,
                 borderRadius: BorderRadius.circular(rXSmall),
-                border: Border.all(color: tc.border.withOpacity(0.3)),
+                border: Border.all(
+                  color: isCore
+                      ? cPrimary.withOpacity(isConnected ? 0.3 : 0.1)
+                      : isNav
+                          ? cSuccess.withOpacity(isConnected ? 0.2 : 0.05)
+                          : tc.border.withOpacity(0.3),
+                ),
               ),
               child: Center(
                 child: Text(
                   key.label,
                   style: TextStyle(
                     fontSize: fMicro,
-                    color: isConnected ? tc.textSub : tc.textMuted,
+                    color: isCore
+                        ? (isConnected ? cPrimary : tc.textMuted)
+                        : isNav
+                            ? (isConnected ? cSuccess : tc.textMuted)
+                            : (isConnected ? tc.textSub : tc.textMuted),
                     fontFamily: 'JetBrainsMono',
-                    fontWeight: FontWeight.w500,
+                    fontWeight: isCore ? FontWeight.w600 : FontWeight.w500,
                     height: 1.0,
                   ),
                 ),
@@ -2381,11 +2442,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   // ==================== 工具方法 ====================
-  String _getInputHint(bool isConnected, bool isAutoMode, bool isRunning) {
+  String _getInputHint(bool isConnected, bool isRunning) {
     if (isRunning) return 'Agent 执行中...';
     if (!isConnected) return '连接终端后可用';
-    if (isAutoMode) return '描述需求，Agent 自动执行...';
-    return '输入问题或命令...';
+    return '描述需求，Agent 自动执行...';
   }
 
   bool _checkAIModelConfigured() {
@@ -2692,6 +2752,7 @@ class _AIPromptInput extends StatefulWidget {
   final String initialText;
   final Function(String) onSend;
   final ValueChanged<String>? onChanged;
+  final ValueChanged<bool>? onFocusChanged;
   final Color accentColor;
 
   const _AIPromptInput({
@@ -2701,6 +2762,7 @@ class _AIPromptInput extends StatefulWidget {
     this.initialText = '',
     required this.onSend,
     this.onChanged,
+    this.onFocusChanged,
     required this.accentColor,
   });
 
@@ -2726,6 +2788,7 @@ class _AIPromptInputState extends State<_AIPromptInput> {
       final focused = _focusNode.hasFocus;
       if (focused != _isFocused) {
         setState(() => _isFocused = focused);
+        widget.onFocusChanged?.call(focused);
       }
     });
   }

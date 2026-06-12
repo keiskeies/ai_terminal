@@ -14,7 +14,6 @@ const int _agentStreamThrottleMs = 80;
 
 /// Agent 状态
 class AgentState {
-  final AgentMode mode;
   final AgentStatus status;
   final AgentTask? currentTask;
   final String? lastMessage;
@@ -22,10 +21,9 @@ class AgentState {
   final String? error;
   final int maxSteps;
   final String? pendingConfirmCommand; // 等待用户确认的危险命令
-  final List<String> pendingOptions; // 等待用户选择的选项（:::choose A|B|C:::）
+  final List<String> pendingOptions; // 等待用户选择的选项
 
   AgentState({
-    this.mode = AgentMode.assistant,
     this.status = AgentStatus.idle,
     this.currentTask,
     this.lastMessage,
@@ -43,7 +41,6 @@ class AgentState {
   bool get isWaitingChoice => status == AgentStatus.waitingConfirm && pendingOptions.isNotEmpty;
 
   AgentState copyWith({
-    AgentMode? mode,
     AgentStatus? status,
     AgentTask? currentTask,
     String? lastMessage,
@@ -56,7 +53,6 @@ class AgentState {
     bool clearPendingOptions = false,
   }) {
     return AgentState(
-      mode: mode ?? this.mode,
       status: status ?? this.status,
       currentTask: currentTask ?? this.currentTask,
       lastMessage: lastMessage ?? this.lastMessage,
@@ -156,13 +152,11 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _engine = _tabEngines[tabId];
       _executor = _tabExecutors[tabId];
       _modelConfig = _tabModelConfigs[tabId];
-      _engine?.setMode(state.mode); // 切回时同步 mode 到引擎
     } else {
-      // 新 tab：全新空状态，但保留 mode、maxSteps 和模型配置
-      final prevMode = state.mode;
+      // 新 tab：全新空状态，但保留 maxSteps 和模型配置
       final prevMaxSteps = state.maxSteps;
       final prevModelConfig = _modelConfig;
-      state = AgentState(mode: prevMode, maxSteps: prevMaxSteps);
+      state = AgentState(maxSteps: prevMaxSteps);
       _engine = null;
       _executor = null;
       _modelConfig = prevModelConfig; // 继承模型配置
@@ -196,7 +190,6 @@ class AgentNotifier extends StateNotifier<AgentState> {
         memory: memory,
         maxSteps: state.maxSteps,
       );
-      _engine!.setMode(state.mode); // 同步当前 mode 到新引擎
       _setupEngineCallbacks(_activeTabId!);
       _tabEngines[_activeTabId!] = _engine!;
       _tabModelConfigs[_activeTabId!] = _modelConfig;
@@ -321,21 +314,6 @@ class AgentNotifier extends StateNotifier<AgentState> {
         _engine!.collectSystemInfo(executor);
       }
     }
-  }
-
-  /// 切换模式
-  void toggleMode() {
-    final newMode = state.mode == AgentMode.assistant
-        ? AgentMode.automatic
-        : AgentMode.assistant;
-    state = state.copyWith(mode: newMode);
-    _engine?.setMode(newMode);
-  }
-
-  /// 设置模式
-  void setMode(AgentMode mode) {
-    state = state.copyWith(mode: mode);
-    _engine?.setMode(mode);
   }
 
   /// 设置最大步骤数

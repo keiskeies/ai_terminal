@@ -1,12 +1,3 @@
-/// Agent 模式枚举
-enum AgentMode {
-  /// 辅助模式：生成命令供用户确认（当前行为）
-  assistant,
-
-  /// 自动模式：AI 自动分析、执行、验证
-  automatic,
-}
-
 /// Agent 执行状态
 enum AgentStatus {
   idle,       // 空闲

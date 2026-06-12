@@ -69,7 +69,6 @@ class AgentEngine {
   final Uuid _uuid = const Uuid();
 
   AgentTask? _currentTask;
-  AgentMode _mode = AgentMode.assistant;
   String _accumulatedMessage = '';  // 跟踪累积的消息
   Completer<bool>? _confirmCompleter; // 等待用户确认危险命令的 Completer
   String? _pendingConfirmCommand; // 当前等待确认的命令
@@ -120,7 +119,6 @@ class AgentEngine {
         _modelConfig = modelConfig,
         _memory = memory;
 
-  AgentMode get mode => _mode;
   AgentTask? get currentTask => _currentTask;
   bool get isRunning =>
       _currentTask?.status == AgentStatus.thinking ||
@@ -130,9 +128,6 @@ class AgentEngine {
   bool get hasPendingChoice => _choiceCompleter != null && !_choiceCompleter!.isCompleted;
   List<String> get pendingOptions => List.unmodifiable(_pendingOptions);
 
-  void setMode(AgentMode mode) => _mode = mode;
-
-  /// 清空对话历史（开始全新对话时调用）
   void clearHistory() {
     _conversationHistory.clear();
   }
@@ -143,7 +138,7 @@ class AgentEngine {
   Future<void> startTask(String goal, CommandExecutor? executor) async {
     agentLogger.info('AgentEngine', '=== 开始任务 ===');
     agentLogger.info('AgentEngine', '目标: $goal');
-    agentLogger.info('AgentEngine', '模式: $_mode');
+    agentLogger.info('AgentEngine', '模式: Agent (ReAct)');
     agentLogger.info('AgentEngine', '执行器: ${executor != null ? (executor.isConnected ? "已连接" : "未连接") : "无"}');
     _accumulatedMessage = '';  // 重置累积消息
     _noCommandRetryCount = 0;  // 重置无命令重试计数
@@ -188,13 +183,8 @@ class AgentEngine {
     }
 
     try {
-      if (_mode == AgentMode.automatic) {
-        agentLogger.info('AgentEngine', '执行自动模式');
-        await _executeAutomatic(goal, executor);
-      } else {
-        agentLogger.info('AgentEngine', '执行辅助模式');
-        await _executeAssistant(goal, executor);
-      }
+      agentLogger.info('AgentEngine', '执行 Agent 模式');
+      await _executeAutomatic(goal, executor);
     } catch (e, stack) {
       agentLogger.error('AgentEngine', '执行异常: $e\n$stack');
       _currentTask = _currentTask!.copyWith(
@@ -250,47 +240,6 @@ class AgentEngine {
     _pendingOptions = [];
   }
 
-  Future<void> _executeAssistant(String goal, CommandExecutor? executor) async {
-    final isNewConversation = _conversationHistory.isEmpty;
-
-    // 更新或创建系统提示
-    final systemPrompt = _buildSystemPrompt(executor, autoExecute: false);
-    if (isNewConversation) {
-      _conversationHistory.add(ChatMessage.create(role: 'system', content: systemPrompt));
-    } else {
-      _conversationHistory[0] = ChatMessage.create(role: 'system', content: systemPrompt);
-    }
-
-    // 添加用户消息
-    _conversationHistory.add(ChatMessage.create(role: 'user', content: goal));
-
-    onMessage?.call('🤔 正在分析你的需求...\n');
-
-    String fullResponse = '';
-    final stream = await _aiProvider.chatStream(
-      history: _conversationHistory,
-      prompt: '',
-      config: _modelConfig,
-      systemPrompt: null,
-    );
-
-    await for (final chunk in stream) {
-      fullResponse += chunk;
-      _accumulatedMessage += chunk;
-      onMessage?.call(chunk);
-    }
-
-    // 将 AI 响应加入历史，确保下次对话有上下文
-    _conversationHistory.add(ChatMessage.create(role: 'assistant', content: fullResponse));
-    _trimMessages(_conversationHistory);
-
-    _currentTask = _currentTask!.copyWith(
-      status: AgentStatus.waitingConfirm,
-      currentStep: '等待用户确认命令',
-    );
-    onTaskUpdated?.call(_currentTask!);
-  }
-
   Future<void> _executeAutomatic(String goal, CommandExecutor? executor) async {
     agentLogger.info('ReAct', '=== 开始 ReAct 自动执行 ===');
 
@@ -311,7 +260,7 @@ class AgentEngine {
     final isNewConversation = _conversationHistory.isEmpty;
 
     // 更新或创建系统提示（ReAct 模式专用）
-    final systemPrompt = _buildSystemPrompt(executor, autoExecute: true);
+    final systemPrompt = _buildSystemPrompt(executor);
     if (isNewConversation) {
       _conversationHistory.add(ChatMessage.create(role: 'system', content: systemPrompt));
     } else {
@@ -1284,25 +1233,15 @@ class AgentEngine {
         .toList();
   }
 
-  String _buildSystemPrompt(CommandExecutor? executor, {required bool autoExecute}) {
+  String _buildSystemPrompt(CommandExecutor? executor) {
     final buffer = StringBuffer();
 
     buffer.writeln('你是 AI 助手，可以执行命令。');
 
-    if (autoExecute) {
-      buffer.writeln('【ReAct 自动执行模式】');
-      buffer.writeln('你正在使用 ReAct（推理-行动-观测）框架。');
-      buffer.writeln();
-      buffer.writeln(prompts.agentAutoRule);
-      buffer.writeln();
-      // ReAct 模式下，不再需要旧的命令格式规则（命令写在"命令:"行）
-      // 但仍需行为边界和知识库安全规则
-    } else {
-      buffer.writeln('【辅助模式】');
-      buffer.writeln('生成命令供用户确认执行。');
-      buffer.writeln();
-      buffer.writeln(prompts.commandFormatRule);
-    }
+    buffer.writeln('【ReAct 自动执行模式】');
+    buffer.writeln('你正在使用 ReAct（推理-行动-观测）框架。');
+    buffer.writeln();
+    buffer.writeln(prompts.agentAutoRule);
 
     buffer.writeln();
     buffer.writeln(prompts.behaviorBoundaryRule);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'dart:io';
 import '../core/constants.dart';
 import '../core/credentials_store.dart';
 import '../core/hive_init.dart';
@@ -336,18 +337,140 @@ class _HostListPageState extends ConsumerState<HostListPage> {
         // 分组内容
         AnimatedCrossFade(
           firstChild: Column(
-            children: hosts.map((host) => HostCard(
-              host: host,
-              onTap: () => context.push('/terminal/${host.id}'),
-              onEdit: () => context.push('/host/edit/${host.id}'),
-              onDelete: () => _showDeleteDialog(host),
-            )).toList(),
+            children: hosts.map((host) => _buildSwipeableHostCard(host)).toList(),
           ),
           secondChild: const SizedBox.shrink(),
           crossFadeState: isExpanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
           duration: animNormal,
         ),
       ],
+    );
+  }
+
+  /// 移动端左滑快捷操作（编辑/删除），桌面端直接 HostCard
+  Widget _buildSwipeableHostCard(HostConfig host) {
+    final isMobile = Platform.isAndroid || Platform.isIOS;
+
+    if (!isMobile) {
+      // 桌面端：直接 HostCard，右键菜单已内置
+      return HostCard(
+        host: host,
+        onTap: () => context.push('/terminal/${host.id}'),
+        onEdit: () => context.push('/host/edit/${host.id}'),
+        onDelete: () => _showDeleteDialog(host),
+      );
+    }
+
+    // 移动端：左滑显示快捷操作
+    return Dismissible(
+      key: ValueKey(host.id),
+      direction: DismissDirection.endToStart, // 仅左滑
+      confirmDismiss: (direction) async => false, // 不自动消失，只显示操作
+      background: Container(
+        margin: const EdgeInsets.symmetric(horizontal: pStandard, vertical: pCompact / 2),
+        padding: const EdgeInsets.only(right: pStandard),
+        decoration: BoxDecoration(
+          color: cPrimary.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(rCard),
+        ),
+        alignment: Alignment.centerRight,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.edit_outlined, color: cPrimary, size: 20),
+            const SizedBox(width: 12),
+            Icon(Icons.delete_outline, color: cDanger, size: 20),
+          ],
+        ),
+      ),
+      // 滑动触发时弹出操作菜单
+      onDismissed: (_) {}, // confirmDismiss 返回 false，不会触发
+      onUpdate: (details) {
+        if (details.reached && !details.previousReached) {
+          // 滑动到达阈值时弹出底部操作菜单
+          _showSwipeActionSheet(host);
+        }
+      },
+      child: HostCard(
+        host: host,
+        onTap: () => context.push('/terminal/${host.id}'),
+        onEdit: () => context.push('/host/edit/${host.id}'),
+        onDelete: () => _showDeleteDialog(host),
+      ),
+    );
+  }
+
+  /// 左滑后弹出的底部操作菜单
+  void _showSwipeActionSheet(HostConfig host) {
+    final tc = ThemeColors.of(context);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: tc.card,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(rLarge)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 拖拽指示条
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: tc.textMuted.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            // 主机名称
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: pStandard, vertical: 8),
+              child: Text(
+                host.name,
+                style: TextStyle(fontSize: fBody, fontWeight: FontWeight.w600, color: tc.textMain),
+              ),
+            ),
+            const Divider(height: 1),
+            // 连接终端
+            ListTile(
+              leading: Icon(Icons.terminal, color: cPrimary),
+              title: const Text('连接终端'),
+              onTap: () {
+                Navigator.pop(context);
+                this.context.push('/terminal/${host.id}');
+              },
+            ),
+            // SFTP
+            ListTile(
+              leading: Icon(Icons.folder_open, color: cPrimary),
+              title: const Text('SFTP'),
+              onTap: () {
+                Navigator.pop(context);
+                this.context.push('/sftp/${host.id}');
+              },
+            ),
+            // 编辑
+            ListTile(
+              leading: Icon(Icons.edit_outlined, color: cPrimary),
+              title: const Text('编辑配置'),
+              onTap: () {
+                Navigator.pop(context);
+                this.context.push('/host/edit/${host.id}');
+              },
+            ),
+            // 删除
+            ListTile(
+              leading: Icon(Icons.delete_outline, color: cDanger),
+              title: Text('删除', style: TextStyle(color: cDanger)),
+              onTap: () {
+                Navigator.pop(context);
+                _showDeleteDialog(host);
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 
