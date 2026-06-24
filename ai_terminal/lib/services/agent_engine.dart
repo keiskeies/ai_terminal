@@ -1675,7 +1675,7 @@ class AgentEngine {
         await sub.cancel();
 
         final clean = AnsiStripper.strip(output);
-        _memory.rememberSystemInfo('已收集 $cat 信息', category: cat);
+        _memory.rememberSystemInfo('$cat: ${clean.trim()}', category: cat);
       }
     } catch (_) {}
   }

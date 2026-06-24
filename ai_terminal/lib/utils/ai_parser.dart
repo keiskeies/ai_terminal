@@ -42,12 +42,11 @@ class AIParser {
 
         // 检查安全等级
         final safetyLevel = SafetyGuard.check(command);
-        // 如果有链式操作符，直接标记为危险
-        final dangerous = hasChainOp || safetyLevel != SafetyLevel.safe;
+        final dangerous = safetyLevel != SafetyLevel.safe;
 
         // 尝试从上下文提取描述
         String? description;
-        if (hasChainOp) {
+        if (hasChainOp && dangerous) {
           description = '⚠️ 复杂命令（包含链式操作符），建议手动执行';
         } else {
           final beforeMatch = cleanedContent.substring(0, match.start);
@@ -94,11 +93,13 @@ class AIParser {
         // 检测链式命令
         final hasChainOp2 = hasChainOperator(command);
         final safetyLevel = SafetyGuard.check(command);
-        final dangerous = hasChainOp2 || safetyLevel != SafetyLevel.safe;
+        final dangerous = safetyLevel != SafetyLevel.safe;
 
         commands.add(CommandBlock.create(
           command: command,
-          description: hasChainOp2 ? '⚠️ 复杂命令（包含链式操作符），建议手动执行' : null,
+          description: hasChainOp2 && dangerous
+              ? '⚠️ 复杂命令（包含链式操作符），建议手动执行'
+              : null,
           dangerous: dangerous,
           safetyLevel: dangerous ? 'warn' : safetyLevel.name,
         ));

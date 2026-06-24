@@ -1882,8 +1882,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
     final canExecute = tab != null && tab.isConnected && showAutoExecute;
     final safetyLevel = SafetyGuard.check(trimmed);
-    final hasChain = hasChainOperator(trimmed);
-    final dangerous = hasChain || safetyLevel != SafetyLevel.safe;
+    final dangerous = safetyLevel != SafetyLevel.safe;
     final isBlocked = safetyLevel == SafetyLevel.blocked;
 
     final cmdColor = isBlocked
@@ -1893,6 +1892,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             : tc.terminalGreen;
 
     final accentColor = isBlocked ? cDanger : dangerous ? cWarning : tc.terminalGreen;
+    final headerBg = isBlocked
+        ? cDanger.withOpacity(0.08)
+        : dangerous
+            ? cWarning.withOpacity(0.08)
+            : cSuccess.withOpacity(0.08);
 
     final block = Container(
       margin: const EdgeInsets.symmetric(vertical: 3),
@@ -1915,7 +1919,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: tc.surface,
+              color: headerBg,
               border: Border(bottom: BorderSide(color: tc.border, width: 0.5)),
             ),
             child: Row(
@@ -2120,7 +2124,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           // 若有对应 result，紧跟在 command 后渲染
           final result = resultMap[event.id];
           if (result != null) {
-            widgets.add(_buildResultCard(result, tc, indent: true));
+            widgets.add(_buildResultCard(result, tc, indent: false));
           }
           break;
         case AgentEventType.result:
@@ -2167,7 +2171,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     final card = Container(
       margin: const EdgeInsets.only(bottom: 8, top: 2),
       decoration: BoxDecoration(
-        color: tc.surface,
+        color: tc.terminalBg,
         borderRadius: BorderRadius.circular(rSmall),
         border: Border.all(color: tc.border),
         boxShadow: [
@@ -3726,7 +3730,8 @@ class _SessionHistoryDialogState extends ConsumerState<_SessionHistoryDialog> {
                 TextButton.icon(
                   onPressed: () async {
                     await ref.read(agentProvider.notifier).newSession();
-                    _loadSessions();
+                    if (!mounted) return;
+                    Navigator.of(context).pop();
                   },
                   icon: Icon(Icons.add, size: 14, color: cPrimary),
                   label: Text('新建', style: TextStyle(fontSize: fSmall, color: cPrimary)),

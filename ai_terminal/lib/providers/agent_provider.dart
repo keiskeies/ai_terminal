@@ -163,15 +163,18 @@ class ChatItem {
     );
   }
 
-  /// 从持久化的 ConvMessage 转换，自动重新解析 content 生成结构化事件
+  /// 从持久化的 ConvMessage 转换，优先使用存储的 events，否则重新解析
   factory ChatItem.fromConvMessage(ConvMessage msg) {
-    // assistant 消息重新解析为结构化事件
     List<AgentEvent> events = const [];
-    if (msg.role == 'assistant' && msg.content.trim().isNotEmpty) {
-      try {
-        events = ReActStreamParser.parse(msg.content);
-      } catch (_) {
-        // 解析失败时保持空事件列表，fallback 到纯文本渲染
+    if (msg.role == 'assistant') {
+      // 优先使用存储的 events（包含执行结果等）
+      if (msg.events != null && msg.events!.isNotEmpty) {
+        events = msg.events!;
+      } else if (msg.content.trim().isNotEmpty) {
+        // 旧数据没有 events 时，fallback 到重新解析
+        try {
+          events = ReActStreamParser.parse(msg.content);
+        } catch (_) {}
       }
     }
     return ChatItem(
@@ -201,8 +204,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 每个 hostId 独立的记忆实例
   final Map<String, AgentMemory> _hostMemories = {};
 
-  /// 每个 hostId 是否已收集过系统信息
-  final Map<String, bool> _hostSysInfoCollected = {};
+  /// 每个 hostId 的系统信息收集 Future（用于等待收集完成）
+  final Map<String, Future<void>> _hostSysInfoFutures = {};
 
   /// 当前活跃的 hostId
   String? _activeHostId;
@@ -294,7 +297,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _hostModelConfigs.remove(hostId);
       _hostMemories.remove(hostId);
       _hostStreamingContent.remove(hostId);
-      _hostSysInfoCollected.remove(hostId);
+      _hostSysInfoFutures.remove(hostId);
     }
     if (_activeHostId == hostId) {
       _activeHostId = null;
@@ -448,6 +451,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
             isStreaming: false,
             events: lastItem.events,
           );
+          // 最后再保存一次（确保 finish 等事件也被持久化）
+          _persistAssistantCompletion(hostId, lastItem.content, events: lastItem.events);
         }
         return s.copyWith(chatItems: items);
       });
@@ -468,8 +473,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
         content: newContent,
         streamingContent: '',
       );
-      // 持久化保存
-      _persistAssistantCompletion(hostId, newContent);
+      // 持久化保存（含 events）
+      _persistAssistantCompletion(hostId, newContent, events: lastItem.events);
       return s.copyWith(chatItems: items);
     });
 
@@ -477,9 +482,13 @@ class AgentNotifier extends StateNotifier<AgentState> {
   }
 
   /// 持久化 assistant 完整响应（流式结束后回写）
-  Future<void> _persistAssistantCompletion(String hostId, String content) async {
+  Future<void> _persistAssistantCompletion(
+    String hostId,
+    String content, {
+    List<AgentEvent>? events,
+  }) async {
     try {
-      await _convService.updateLastAssistantContent(hostId, content);
+      await _convService.updateLastAssistantContent(hostId, content, events: events);
     } catch (_) {}
   }
 
@@ -490,9 +499,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _hostExecutors[_activeHostId!] = executor;
     }
     if (executor != null && _engine != null) {
-      if (_activeHostId != null && !_hostSysInfoCollected.containsKey(_activeHostId)) {
-        _hostSysInfoCollected[_activeHostId!] = true;
-        _engine!.collectSystemInfo(executor);
+      final hostId = _activeHostId;
+      if (hostId != null && !_hostSysInfoFutures.containsKey(hostId)) {
+        _hostSysInfoFutures[hostId] = _engine!.collectSystemInfo(executor);
       }
     }
   }
@@ -563,6 +572,15 @@ class AgentNotifier extends StateNotifier<AgentState> {
     try {
       await _convService.appendMessage(hostId, role: 'assistant', content: '');
     } catch (_) {}
+
+    // 如果系统信息还没收集，先收集再开始任务，避免命令混在一起
+    if (_executor != null && !_hostSysInfoFutures.containsKey(hostId)) {
+      _hostSysInfoFutures[hostId] = _engine!.collectSystemInfo(_executor!);
+    }
+    final sysInfoFuture = _hostSysInfoFutures[hostId];
+    if (sysInfoFuture != null) {
+      await sysInfoFuture;
+    }
 
     await _engine!.startTask(goal, _executor);
 

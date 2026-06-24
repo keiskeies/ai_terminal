@@ -1,5 +1,7 @@
 import 'package:hive/hive.dart';
 
+import 'agent_event.dart';
+
 part 'conversation.g.dart';
 
 /// 会话消息（与具体 AI 模式无关，统一存储用户/AI 对话）
@@ -20,6 +22,9 @@ class ConvMessage extends HiveObject {
   @HiveField(4)
   bool? commandSuccess; // 命令执行是否成功
 
+  @HiveField(5)
+  List<AgentEvent>? events; // 结构化事件列表（含命令执行结果）
+
   ConvMessage();
 
   ConvMessage.create({
@@ -28,6 +33,7 @@ class ConvMessage extends HiveObject {
     DateTime? timestamp,
     this.command,
     this.commandSuccess,
+    this.events,
   }) : timestamp = timestamp ?? DateTime.now();
 
   bool get isUser => role == 'user';

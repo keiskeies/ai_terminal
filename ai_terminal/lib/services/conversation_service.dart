@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
 import '../core/hive_init.dart';
+import '../models/agent_event.dart';
 import '../models/conversation.dart';
 
 /// 会话持久化服务
@@ -129,12 +130,19 @@ class ConversationService {
   }
 
   /// 更新 active 会话的最后一条 assistant 消息内容（用于流式结束后回写完整内容）
-  Future<void> updateLastAssistantContent(String hostId, String content) async {
+  Future<void> updateLastAssistantContent(
+    String hostId,
+    String content, {
+    List<AgentEvent>? events,
+  }) async {
     final conv = getActiveSession(hostId);
     if (conv == null || conv.messages.isEmpty) return;
     final lastIdx = conv.messages.length - 1;
     if (conv.messages[lastIdx].role != 'assistant') return;
     conv.messages[lastIdx].content = content;
+    if (events != null) {
+      conv.messages[lastIdx].events = events;
+    }
     conv.updatedAt = DateTime.now();
     await conv.save();
   }
