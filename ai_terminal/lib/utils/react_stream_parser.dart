@@ -13,6 +13,38 @@ class ReActStreamParser {
 
   static List<AgentEvent> parse(String fullResponse) {
     final events = <AgentEvent>[];
+    var content = fullResponse;
+
+    // 预处理：将 XML tool_call 格式转换为标准 ReAct 格式
+    // 匹配 ---\n<function=...>\n<parameter=command>...</parameter>\n</function>\n--- 格式
+    content = content.replaceAllMapped(
+      RegExp(r'---\s*\n<function=(\w+)>\s*\n<parameter=command>([\s\S]*?)</parameter>\s*\n</function>\s*\n---'),
+      (match) {
+        final funcName = match.group(1)!;
+        final commandValue = match.group(2)!.trim();
+        if (['terminal', 'execute', 'run_command'].contains(funcName)) {
+          return '动作: execute\n命令: $commandValue';
+        }
+        return commandValue;
+      },
+    );
+
+    // 处理没有 --- 分隔符的 XML tool_call 格式
+    content = content.replaceAllMapped(
+      RegExp(r'<function=(\w+)>\s*\n<parameter=command>([\s\S]*?)</parameter>\s*\n</function>'),
+      (match) {
+        final funcName = match.group(1)!;
+        final commandValue = match.group(2)!.trim();
+        if (['terminal', 'execute', 'run_command'].contains(funcName)) {
+          return '动作: execute\n命令: $commandValue';
+        }
+        return commandValue;
+      },
+    );
+
+    // 清理残留的 --- 分隔符（仅当其单独成行时）
+    content = content.replaceAll(RegExp(r'^---\s*$', multiLine: true), '');
+
     _FieldType? currentField;
     final buffer = StringBuffer();
     List<String>? pendingOptions;
@@ -56,10 +88,7 @@ class ReActStreamParser {
       currentField = null;
     }
 
-    // 预处理：将 XML tool_call 转换为标准 ReAct 格式
-    final processed = _convertXmlToolCalls(fullResponse);
-
-    final lines = processed.split('\n');
+    final lines = content.split('\n');
     bool inCodeBlock = false;
     final codeBlockBuffer = StringBuffer();
 
@@ -152,35 +181,6 @@ class ReActStreamParser {
 
     flush();
     return events;
-  }
-
-  /// 将 XML tool_call 格式转换为标准 ReAct 格式
-  static String _convertXmlToolCalls(String input) {
-    // 匹配 <tool_call>...</tool_call> 块
-    final toolCallRegex = RegExp(r'<tool_call>\s*([\s\S]*?)\s*</tool_call>', multiLine: true);
-    return input.replaceAllMapped(toolCallRegex, (match) {
-      final inner = match.group(1) ?? '';
-      final functionMatch = RegExp(r'<function=([^>]+)>').firstMatch(inner);
-      final funcName = functionMatch?.group(1) ?? '';
-      
-      // 提取所有参数
-      final paramRegex = RegExp(r'<parameter=([^>]+)>([\s\S]*?)
-        final name = m.group(1) ?? '';
-        final value = m.group(2) ?? '';
-        params[name] = value;
-      }
-
-      // terminal 类型的工具调用转换为命令
-      if (funcName == 'terminal' || funcName == 'execute' || funcName == 'run_command') {
-        final cmd = params['command'] ?? params['cmd'] ?? '';
-        if (cmd.isNotEmpty) {
-          return '\n动作: execute\n命令: $cmd\n';
-        }
-      }
-      
-      // 其他类型的工具调用，原样返回（作为文本显示）
-      return match.group(0) ?? '';
-    });
   }
 
   /// 将一行文本按 ReAct 关键词分割成多段
