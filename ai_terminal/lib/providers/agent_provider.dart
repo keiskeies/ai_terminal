@@ -419,7 +419,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
     };
 
     _engine!.onCommandExecuted = (result) {
-      // 执行结果已通过 onEvent(AgentEvent.result) 处理
+      // 命令执行完，结果已通过 onEvent(AgentEvent.result) 发出
+      // 此时结果已发给 AI，AI 开始思考下一步，状态改为 thinking
+      _updateHostState(hostId, (s) => s.copyWith(status: AgentStatus.thinking));
     };
 
     _engine!.onError = (error) {

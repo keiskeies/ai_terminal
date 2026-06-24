@@ -536,8 +536,7 @@ class AgentEngine {
       _accumulatedMessage += chunk;
       onMessage?.call(chunk);
 
-      // 流式过程中只做内部检测（用于提前执行命令），不发出 thought/command/text 事件
-      // 让用户通过 streamingContent 看到流畅的纯文本流动
+      // 流式过程中检测完整命令：立即发出 command 事件 + 触发提前执行
       if (onCommandDetected != null && !commandDetectedNotified) {
         final currentEvents = ReActStreamParser.parse(fullResponse);
         // 找第一个已确定完成的 command 事件（不是最后一个）
@@ -550,6 +549,13 @@ class AgentEngine {
                 commandDetectedNotified = true;
                 final finalId = assignFinalId(e);
                 _lastCommandEventId = finalId;
+                // 立即发出 command 事件，让 UI 先显示命令块
+                if (!emittedStableIds.contains(e.id)) {
+                  emittedStableIds.add(e.id);
+                  e.id = finalId;
+                  e.isStreaming = false;
+                  onEvent?.call(e);
+                }
                 onCommandDetected(cmd, finalId);
                 break;
               }
@@ -841,8 +847,6 @@ class AgentEngine {
     final result = await _executeCommand(executor, command);
     agentLogger.info('ReAct', '命令执行结果: success=${result.success}');
 
-    onCommandExecuted?.call(result);
-
     _memory.rememberCommand(command);
     _memory.rememberResult(
       command,
@@ -866,7 +870,7 @@ class AgentEngine {
       error: result.success ? null : errorText,
     );
 
-    // 发出结构化结果事件（commandId 关联到最近的 command 事件）
+    // 先发出结构化结果事件，再通知执行完成
     onEvent?.call(AgentEvent.result(
       commandId: _lastCommandEventId,
       command: command,
@@ -874,6 +878,8 @@ class AgentEngine {
       output: outputText,
       error: result.success ? null : errorText,
     ));
+
+    onCommandExecuted?.call(result);
 
     return _EarlyExecutionResult(
       shouldContinue: true,
