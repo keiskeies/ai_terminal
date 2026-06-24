@@ -67,8 +67,8 @@ class ReActStep {
   /// 推理过程
   final String thought;
 
-  /// 动作类型
-  final ActionType action;
+  /// 动作类型（null 表示 AI 未返回有效动作）
+  final ActionType? action;
 
   /// 命令（execute 时）
   final String? command;
@@ -81,7 +81,7 @@ class ReActStep {
 
   const ReActStep({
     required this.thought,
-    required this.action,
+    this.action,
     this.command,
     this.options,
     required this.rawResponse,

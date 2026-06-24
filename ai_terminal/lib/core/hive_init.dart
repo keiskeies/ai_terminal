@@ -3,6 +3,7 @@ import '../models/host_config.dart';
 import '../models/ai_model_config.dart';
 import '../models/chat_session.dart';
 import '../models/command_snippet.dart';
+import '../models/conversation.dart';
 import 'credentials_store.dart';
 
 class HiveInit {
@@ -16,6 +17,9 @@ class HiveInit {
     Hive.registerAdapter(ChatMessageAdapter());
     Hive.registerAdapter(CommandBlockAdapter());
     Hive.registerAdapter(CommandSnippetAdapter());
+    Hive.registerAdapter(ConvMessageAdapter());
+    Hive.registerAdapter(ConvAgentLogAdapter());
+    Hive.registerAdapter(ConversationAdapter());
 
     // 打开 boxes
     await Hive.openBox<HostConfig>('hosts');
@@ -23,6 +27,8 @@ class HiveInit {
     await Hive.openBox<ChatSession>('chatSessions');
     await Hive.openBox<CommandSnippet>('snippets');
     await Hive.openBox('settings');
+    await Hive.openBox('auditLogs');
+    await Hive.openBox<Conversation>('conversations');
 
     // 初始化凭据存储
     await CredentialsStore.init();
@@ -34,4 +40,6 @@ class HiveInit {
   static Box<ChatSession> get chatSessionsBox => Hive.box<ChatSession>('chatSessions');
   static Box<CommandSnippet> get snippetsBox => Hive.box<CommandSnippet>('snippets');
   static Box get settingsBox => Hive.box('settings');
+  static Box get auditLogsBox => Hive.box('auditLogs');
+  static Box<Conversation> get conversationsBox => Hive.box<Conversation>('conversations');
 }

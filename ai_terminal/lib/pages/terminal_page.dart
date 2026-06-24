@@ -15,17 +15,17 @@ import '../providers/app_providers.dart';
 import '../providers/terminal_provider.dart' as tp;
 import '../providers/chat_provider.dart';
 import '../providers/agent_provider.dart';
-import '../models/agent_model.dart';
 import '../models/ai_model_config.dart';
+import '../models/agent_event.dart';
 import '../models/command_snippet.dart';
 import 'package:flutter/services.dart';
 import '../services/ai_service.dart';
-import '../services/ssh_service.dart';
 import '../services/command_executor.dart';
 import '../services/agent_engine.dart';
+import '../services/conversation_service.dart';
+import '../models/conversation.dart';
 import '../core/safety_guard.dart';
 import '../utils/ai_parser.dart';
-import '../models/chat_session.dart';
 import '../widgets/terminal_view.dart' as term_widget;
 
 
@@ -153,7 +153,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       }
     } catch (_) {}
     // 加载 Agent 最大步骤数（需在 initAgent 之前加载）
-    ref.read(agentProvider.notifier).loadSettings();
+    // 延迟到下一帧，避免在 widget tree build 期间修改 provider state
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(agentProvider.notifier).loadSettings();
+    });
     // 监听聊天滚动，控制"回到底部"按钮显示 & 自动滚动锁定
     _chatScrollController.addListener(() {
       if (!_chatScrollController.hasClients) return;
@@ -330,7 +334,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     _autoScrollChat = true; // 切换 tab 时重置自动滚动
     _showScrollToBottom = false;
     ref.read(chatProvider.notifier).switchTab(tab.id, hostId: tab.hostId);
-    ref.read(agentProvider.notifier).switchTab(tab.id);
+    ref.read(agentProvider.notifier).switchTab(tab.id, hostId: tab.hostId);
     // 不再调用 setSSHService — switchTab 已恢复该 tab 的 SSH 服务，
     // 避免每次切换都重新 collectSystemInfo
 
@@ -833,7 +837,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       },
       onClose: () async {
         ref.read(chatProvider.notifier).removeTab(tab.id);
-        ref.read(agentProvider.notifier).removeTab(tab.id);
+        ref.read(agentProvider.notifier).removeTab(tab.id, hostId: tab.hostId);
         _tabAiInputText.remove(tab.id);
         _tabExecutingCommand.remove(tab.id);
         _tabExecutedCommands.remove(tab.id);
@@ -1552,13 +1556,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         final item = items[index];
         final isLast = index == items.length - 1;
         return _buildMessageBubble(
+          key: ValueKey('agent_${item.role}_$index'),
           role: item.role,
           content: item.content,
+          events: item.events,
+          streamingContent: item.streamingContent,
           isLoading: item.isStreaming && isLast && agentState.isRunning,
           tab: tab,
           showAutoExecute: true,
           isAgentRunning: agentState.isRunning,
           isWaitingChoice: agentState.isWaitingChoice,
+          pendingOptions: agentState.isWaitingChoice && isLast ? agentState.pendingOptions : const [],
         );
       },
     );
@@ -1572,6 +1580,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       itemBuilder: (context, index) {
         if (chatState.currentAssistantMessage != null && index == chatState.messages.length) {
           return _buildMessageBubble(
+            key: const ValueKey('chat_current_assistant'),
             role: 'assistant',
             content: chatState.currentAssistantMessage!,
             isLoading: true,
@@ -1579,6 +1588,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         }
         final message = chatState.messages[index];
         return _buildMessageBubble(
+          key: ValueKey('chat_${message.role}_$index'),
           role: message.role,
           content: message.content,
           isLoading: false,
@@ -1672,6 +1682,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   // ==================== 消息气泡 ====================
   Widget _buildMessageBubble({
+    Key? key,
     required String role,
     required String content,
     required bool isLoading,
@@ -1679,11 +1690,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     bool showAutoExecute = false,
     bool isAgentRunning = false,
     bool isWaitingChoice = false,
+    List<String> pendingOptions = const [],
+    List<AgentEvent> events = const [],
+    String streamingContent = '',
   }) {
     final isUser = role == 'user';
     final tc = ThemeColors.of(context);
 
     return Align(
+      key: key,
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.85),
@@ -1713,31 +1728,42 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: (isUser ? cPrimary : cAgentGreen).withOpacity(0.15),
+                    gradient: LinearGradient(
+                      colors: isUser
+                          ? [cPrimary.withOpacity(0.18), cPrimary.withOpacity(0.08)]
+                          : [cAgentGreen.withOpacity(0.18), cAgentGreen.withOpacity(0.06)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(rXSmall),
+                    border: Border.all(
+                      color: (isUser ? cPrimary : cAgentGreen).withOpacity(0.2),
+                      width: 0.5,
+                    ),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        isUser ? Icons.person_outline : Icons.smart_toy_outlined,
-                        size: 10,
+                        isUser ? Icons.person_outline : Icons.auto_awesome,
+                        size: 11,
                         color: isUser ? cPrimary : cAgentGreen,
                       ),
-                      const SizedBox(width: 3),
+                      const SizedBox(width: 4),
                       Text(
-                        isUser ? '你' : 'AI',
+                        isUser ? '你' : 'AI 助手',
                         style: TextStyle(
                           fontSize: fMicro,
                           color: isUser ? cPrimary : cAgentGreen,
                           fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
                         ),
                       ),
                       if (isLoading) ...[
-                        const SizedBox(width: 4),
-                        SizedBox(width: 8, height: 8, child: CircularProgressIndicator(strokeWidth: 1.2, color: isUser ? cPrimary : cAgentGreen)),
+                        const SizedBox(width: 6),
+                        SizedBox(width: 9, height: 9, child: CircularProgressIndicator(strokeWidth: 1.5, color: isUser ? cPrimary : cAgentGreen)),
                       ],
                     ],
                   ),
@@ -1749,34 +1775,51 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             if (isUser)
               SelectableText(content, style: TextStyle(color: tc.textMain, fontSize: fBody, height: 1.5))
             else
-              _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning, isWaitingChoice),
+              _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning, isWaitingChoice, pendingOptions: pendingOptions, events: events, streamingContent: streamingContent),
           ],
         ),
       ),
     );
   }
 
-  /// AI 回复内容渲染：将代码块提取出来，用带执行按钮的自定义 widget 显示
-  Widget _buildAIContent(String content, ThemeColors tc, tp.TerminalTab? tab, bool showAutoExecute, bool isLoading, bool isAgentRunning, bool isWaitingChoice) {
-    // 解析 :::choose 选项1|选项2|选项3::: 格式
-    final optionsRegex = RegExp(r':::choose\s+(.+?):::');
-    final optionsMatch = optionsRegex.firstMatch(content);
-    final List<String> options = optionsMatch != null
-        ? optionsMatch.group(1)!.split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList()
-        : [];
-    // 移除选项标记，保留纯文本内容
-    final cleanContent = optionsMatch != null
-        ? content.replaceFirst(optionsRegex, '').trim()
-        : content;
+  /// AI 回复内容渲染：优先用结构化事件列表渲染卡片，fallback 到旧的纯文本/ReAct 解析
+  Widget _buildAIContent(
+    String content,
+    ThemeColors tc,
+    tp.TerminalTab? tab,
+    bool showAutoExecute,
+    bool isLoading,
+    bool isAgentRunning,
+    bool isWaitingChoice, {
+    List<String> pendingOptions = const [],
+    List<AgentEvent> events = const [],
+    String streamingContent = '',
+  }) {
+    // 优先使用结构化事件渲染（ReAct 格式已由 ReActStreamParser 正确解析）
+    if (events.isNotEmpty) {
+      // 判断 events 中是否有 AI 输出的内容事件（thought/command/text/ask/finish）
+      // 如果只有 result/info，说明还在流式过程中，需要同时显示 streamingContent
+      final hasAIContentEvents = events.any((e) =>
+          e.isThought || e.isCommand || e.isText || e.isAsk || e.isFinish);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildEventsContent(events, tc, tab, showAutoExecute, isLoading, isWaitingChoice, pendingOptions),
+          // 只有在还没有 AI 内容事件时（流式过程中，只有 result/info），才显示流式纯文本
+          if (!hasAIContentEvents && streamingContent.trim().isNotEmpty)
+            _buildMarkdownText(streamingContent, tc),
+        ],
+      );
+    }
 
-    final segments = _splitContentByCodeBlocks(cleanContent);
+    // 非 Agent 模式：纯 Markdown + 代码块渲染
+    final segments = _splitContentByCodeBlocks(content);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         ...segments.map((seg) {
           if (seg.isCodeBlock) {
             final lang = seg.language;
-            // shell 类语言用带执行按钮的渲染，其他语言用纯文本代码块
             final isShell = lang == 'bash' || lang == 'sh' || lang == 'shell' || lang == 'zsh';
             if (isShell) {
               return _buildCodeBlockWithExecuteButton(seg.content, tc, tab, showAutoExecute, isLoading);
@@ -1785,38 +1828,607 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             }
           } else {
             if (seg.content.trim().isEmpty) return const SizedBox.shrink();
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: MarkdownBody(
-                data: _preprocessMarkdown(seg.content),
-                selectable: true,
-                styleSheet: MarkdownStyleSheet(
-                  p: TextStyle(color: tc.textMain, height: 1.5, fontSize: fBody),
-                  h1: TextStyle(color: tc.textMain, fontSize: 16, fontWeight: FontWeight.bold),
-                  h2: TextStyle(color: tc.textMain, fontSize: 14, fontWeight: FontWeight.bold),
-                  h3: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600),
-                  code: TextStyle(
-                    fontFamily: 'JetBrainsMono',
-                    fontSize: fMono,
-                    color: tc.terminalGreen,
-                    backgroundColor: tc.terminalBg,
-                  ),
-                  listBullet: TextStyle(color: cPrimary, fontSize: fBody),
-                  blockquote: TextStyle(color: tc.textSub, fontStyle: FontStyle.italic),
-                  blockquoteDecoration: BoxDecoration(
-                    border: Border(left: BorderSide(color: cPrimary, width: 2)),
-                  ),
-                  blockquotePadding: const EdgeInsets.only(left: 8),
-                ),
-                onTapLink: (text, href, title) {},
-              ),
-            );
+            return _buildMarkdownText(seg.content, tc);
           }
         }),
-        // 选项按钮（仅等待用户选择时显示，点击后立即隐藏）
-        if (options.isNotEmpty && isWaitingChoice)
-          _buildOptionButtons(options, tc, false),
+        if (isWaitingChoice && pendingOptions.isNotEmpty)
+          _buildOptionButtons(pendingOptions, tc, false),
       ],
+    );
+  }
+
+
+  /// 渲染一段 Markdown 文本（用于 thought/text/info 的自动追加显示）
+  Widget _buildMarkdownText(String text, ThemeColors tc) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: MarkdownBody(
+        data: _preprocessMarkdown(text),
+        selectable: true,
+        styleSheet: MarkdownStyleSheet(
+          p: TextStyle(color: tc.textMain, height: 1.5, fontSize: fBody),
+          h1: TextStyle(color: tc.textMain, fontSize: 16, fontWeight: FontWeight.bold),
+          h2: TextStyle(color: tc.textMain, fontSize: 14, fontWeight: FontWeight.bold),
+          h3: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600),
+          code: TextStyle(
+            fontFamily: 'JetBrainsMono',
+            fontSize: fMono,
+            color: tc.terminalGreen,
+            backgroundColor: tc.terminalBg,
+          ),
+          listBullet: TextStyle(color: cPrimary, fontSize: fBody),
+          blockquote: TextStyle(color: tc.textSub, fontStyle: FontStyle.italic),
+          blockquoteDecoration: BoxDecoration(
+            border: Border(left: BorderSide(color: cPrimary, width: 2)),
+          ),
+          blockquotePadding: const EdgeInsets.only(left: 8),
+        ),
+        onTapLink: (text, href, title) {},
+      ),
+    );
+  }
+
+  /// 统一命令块：左侧三角形执行按钮 + 命令文本 + 右侧复制按钮
+  Widget _buildCommandBlock(
+    String command,
+    ThemeColors tc,
+    tp.TerminalTab? tab,
+    bool showAutoExecute,
+    bool isLoading, {
+    bool indent = false,
+  }) {
+    final trimmed = command.trim();
+    if (trimmed.isEmpty) return const SizedBox.shrink();
+
+    final canExecute = tab != null && tab.isConnected && showAutoExecute;
+    final safetyLevel = SafetyGuard.check(trimmed);
+    final hasChain = hasChainOperator(trimmed);
+    final dangerous = hasChain || safetyLevel != SafetyLevel.safe;
+    final isBlocked = safetyLevel == SafetyLevel.blocked;
+
+    final cmdColor = isBlocked
+        ? cDanger
+        : dangerous
+            ? cWarning
+            : tc.terminalGreen;
+
+    final accentColor = isBlocked ? cDanger : dangerous ? cWarning : tc.terminalGreen;
+
+    final block = Container(
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      decoration: BoxDecoration(
+        color: tc.terminalBg,
+        borderRadius: BorderRadius.circular(rSmall),
+        border: Border.all(color: tc.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          // 顶部栏
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: tc.surface,
+              border: Border(bottom: BorderSide(color: tc.border, width: 0.5)),
+            ),
+            child: Row(
+              children: [
+                // 红黄绿三个小圆点
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF5F56),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFBD2E),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF27C93F),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  isBlocked ? '已拦截' : dangerous ? '需确认' : '可执行',
+                  style: TextStyle(
+                    fontSize: fMicro,
+                    color: accentColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                // 复制按钮
+                _buildCopyButton(trimmed, tc),
+                const SizedBox(width: 4),
+                // 执行按钮
+                if (canExecute && !isLoading && !isBlocked)
+                  _buildExecuteButton(trimmed, dangerous, isBlocked, tc, tab)
+                else if (isBlocked)
+                  Container(
+                    width: 26,
+                    height: 26,
+                    alignment: Alignment.center,
+                    child: Icon(Icons.block, size: 13, color: cDanger),
+                  ),
+              ],
+            ),
+          ),
+          // 命令内容
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // $ 提示符
+                Text(
+                  '\$ ',
+                  style: TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    fontSize: fMono,
+                    color: accentColor,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
+                  ),
+                ),
+                // 命令文本
+                Expanded(
+                  child: SelectableText(
+                    trimmed,
+                    style: TextStyle(
+                      fontFamily: 'JetBrainsMono',
+                      fontSize: fMono,
+                      color: cmdColor,
+                      height: 1.45,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (!indent) return block;
+
+    // 缩进 + 左侧连接线表示从属
+    return Padding(
+      padding: const EdgeInsets.only(left: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 3,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: accentColor.withOpacity(0.5),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(2),
+                    bottomRight: Radius.circular(2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: block),
+        ],
+      ),
+    );
+  }
+
+  /// 复制按钮
+  Widget _buildCopyButton(String text, ThemeColors tc) {
+    return GestureDetector(
+      onTap: () {
+        Clipboard.setData(ClipboardData(text: text));
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('已复制', style: TextStyle(fontSize: fSmall)),
+            duration: const Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      },
+      child: Container(
+        width: 28,
+        height: 28,
+        alignment: Alignment.center,
+        child: Icon(Icons.copy, size: 13, color: tc.textMuted),
+      ),
+    );
+  }
+
+  /// 结构化事件列表渲染：内容自动追加，只有命令单独包装成块
+  ///
+  /// 渲染规则：
+  /// - thought/text/info：合并为连续 Markdown 文本自动追加显示
+  /// - command：单独命令块（执行按钮 + 复制按钮）
+  /// - result：紧跟对应 command 后，用缩进+连接线表示从属
+  /// - ask：问题文本 + 横向选项按钮组
+  /// - finish：完成横幅
+  Widget _buildEventsContent(
+    List<AgentEvent> events,
+    ThemeColors tc,
+    tp.TerminalTab? tab,
+    bool showAutoExecute,
+    bool isLoading,
+    bool isWaitingChoice,
+    List<String> pendingOptions,
+  ) {
+    // 构建事件→结果配对映射：commandId → result
+    final resultMap = <String, AgentEvent>{};
+    for (final e in events) {
+      if (e.isResult && e.commandId != null) {
+        resultMap[e.commandId!] = e;
+      }
+    }
+
+    final widgets = <Widget>[];
+    final textBuffer = StringBuffer();
+
+    void flushText() {
+      final text = textBuffer.toString().trim();
+      if (text.isNotEmpty) {
+        widgets.add(_buildMarkdownText(text, tc));
+        textBuffer.clear();
+      }
+    }
+
+    for (final event in events) {
+      switch (event.type) {
+        case AgentEventType.thought:
+        case AgentEventType.text:
+        case AgentEventType.info:
+          if (event.text != null && event.text!.trim().isNotEmpty) {
+            textBuffer.writeln(event.text);
+          }
+          break;
+        case AgentEventType.command:
+          flushText();
+          widgets.add(_buildCommandBlock(
+            event.command ?? '',
+            tc,
+            tab,
+            showAutoExecute,
+            isLoading,
+          ));
+          // 若有对应 result，紧跟在 command 后渲染
+          final result = resultMap[event.id];
+          if (result != null) {
+            widgets.add(_buildResultCard(result, tc, indent: true));
+          }
+          break;
+        case AgentEventType.result:
+          if (event.commandId == null || !events.any((e) => e.id == event.commandId)) {
+            flushText();
+            widgets.add(_buildResultCard(event, tc, indent: false));
+          }
+          break;
+        case AgentEventType.ask:
+          flushText();
+          widgets.add(_buildAskCard(event, tc, isWaitingChoice));
+          break;
+        case AgentEventType.finish:
+          flushText();
+          widgets.add(_buildFinishCard(event, tc));
+          break;
+      }
+    }
+    flushText();
+
+    // 兜底：若有 pendingOptions 但没有 ask 事件（旧格式），显示选项按钮
+    if (isWaitingChoice && pendingOptions.isNotEmpty && !events.any((e) => e.isAsk)) {
+      widgets.add(_buildOptionButtons(pendingOptions, tc, false));
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
+    );
+  }
+
+  /// 结果卡片：成功/失败状态 + 输出（全部展开显示）
+  /// [indent] 为 true 时用左侧缩进+连接线表示从属于上方命令
+  Widget _buildResultCard(AgentEvent event, ThemeColors tc, {required bool indent}) {
+    final success = event.success ?? false;
+    final output = event.output ?? event.error ?? '(无输出)';
+    final lines = output.split('\n');
+
+    final statusColor = success ? cSuccess : cDanger;
+    final statusBg = success ? cSuccess.withOpacity(0.08) : cDanger.withOpacity(0.08);
+    final statusIcon = success ? Icons.check_circle : Icons.error_rounded;
+    final statusText = success ? '执行成功' : '执行失败';
+
+    final card = Container(
+      margin: const EdgeInsets.only(bottom: 8, top: 2),
+      decoration: BoxDecoration(
+        color: tc.surface,
+        borderRadius: BorderRadius.circular(rSmall),
+        border: Border.all(color: tc.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 状态条
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: statusBg,
+              border: Border(bottom: BorderSide(color: tc.border, width: 0.5)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(statusIcon, size: 10, color: statusColor),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  statusText,
+                  style: TextStyle(
+                    color: statusColor,
+                    fontSize: fMicro,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: tc.textMuted.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '${lines.length} 行',
+                    style: TextStyle(color: tc.textMuted, fontSize: fMicro, fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 输出区 - 全部展开显示
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+            child: SelectableText(
+              output.trimRight(),
+              style: TextStyle(
+                fontFamily: 'JetBrainsMono',
+                fontSize: fMono,
+                color: tc.textSub,
+                height: 1.45,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (!indent) return card;
+
+    // 缩进 + 左侧连接线表示从属
+    return Padding(
+      padding: const EdgeInsets.only(left: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Column(
+            children: [
+              Container(
+                width: 3,
+                height: 12,
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.4),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(2),
+                    bottomRight: Radius.circular(2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: card),
+        ],
+      ),
+    );
+  }
+
+  /// 询问卡片：问题 + 选项按钮
+  Widget _buildAskCard(AgentEvent event, ThemeColors tc, bool isWaitingChoice) {
+    final options = event.options ?? [];
+    final question = event.question ?? '请选择';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cWarning.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(rSmall),
+        border: Border.all(color: cWarning.withOpacity(0.15)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 20,
+                height: 20,
+                margin: const EdgeInsets.only(top: 1),
+                decoration: BoxDecoration(
+                  color: cWarning.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.help_outline, size: 13, color: cWarning),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SelectableText(
+                  question,
+                  style: TextStyle(color: tc.textMain, fontSize: fBody, height: 1.5, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
+          if (options.isNotEmpty && isWaitingChoice) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: options.map((opt) {
+                return _buildOptionChip(opt, tc);
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOptionChip(String label, ThemeColors tc) {
+    return GestureDetector(
+      onTap: () {
+        final notifier = ref.read(agentProvider.notifier);
+        notifier.selectChoice(label);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: tc.surface,
+          borderRadius: BorderRadius.circular(rMedium),
+          border: Border.all(color: cWarning.withOpacity(0.3)),
+          boxShadow: [
+            BoxShadow(
+              color: cWarning.withOpacity(0.05),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.touch_app, size: 12, color: cWarning),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: fSmall,
+                color: cWarning,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 任务完成卡片
+  Widget _buildFinishCard(AgentEvent event, ThemeColors tc) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8, top: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            cSuccess.withOpacity(0.12),
+            cSuccess.withOpacity(0.04),
+          ],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(rSmall),
+        border: Border.all(color: cSuccess.withOpacity(0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: cSuccess.withOpacity(0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: cSuccess.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(Icons.celebration, size: 15, color: cSuccess),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '任务完成',
+                  style: TextStyle(
+                    color: cSuccess,
+                    fontSize: fSmall,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                SelectableText(
+                  event.summary ?? '已完成所有步骤',
+                  style: TextStyle(color: cSuccess.withOpacity(0.85), fontSize: fBody, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1949,94 +2561,28 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     }
   }
 
-  /// 带执行按钮的代码块 — 每条命令独立一行
+  /// 带执行按钮的代码块 — 每条命令独立成块，复用统一命令块样式
   Widget _buildCodeBlockWithExecuteButton(String codeBlock, ThemeColors tc, tp.TerminalTab? tab, bool showAutoExecute, bool isLoading) {
     final lines = codeBlock.trimRight().split('\n');
-    final canExecute = tab != null && tab.isConnected;
+    final children = <Widget>[];
 
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      decoration: BoxDecoration(
-        color: tc.terminalBg,
-        borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: tc.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          ...lines.map((line) {
-            final trimmedLine = line.trim();
-            if (trimmedLine.isEmpty) return const SizedBox.shrink();
+    for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty || trimmed.startsWith('#')) continue;
+      children.add(_buildCommandBlock(trimmed, tc, tab, showAutoExecute, isLoading));
+    }
 
-            // 注释行只显示文字
-            final isComment = trimmedLine.startsWith('#');
-            // 检测安全性
-            final safetyLevel = isComment ? SafetyLevel.safe : SafetyGuard.check(trimmedLine);
-            final dangerous = !isComment && (hasChainOperator(trimmedLine) || safetyLevel != SafetyLevel.safe);
-            final isBlocked = safetyLevel == SafetyLevel.blocked;
+    if (children.isEmpty) return const SizedBox.shrink();
 
-            // 命令颜色
-            final cmdColor = isBlocked
-                ? cDanger
-                : dangerous
-                    ? cWarning
-                    : tc.terminalGreen;
-
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              child: Row(
-                children: [
-                  // 执行按钮
-                  if (!isComment && canExecute && !isLoading)
-                    _buildInlinePlayButton(trimmedLine, dangerous, isBlocked, tc, tab!)
-                  else if (!isComment && canExecute && isLoading)
-                    Icon(Icons.play_arrow, size: 16, color: tc.textMuted.withOpacity(0.4))
-                  else
-                    const SizedBox(width: 16, height: 16),
-
-                  const SizedBox(width: 4),
-                  // 命令文字
-                  Expanded(
-                    child: SelectableText(
-                      trimmedLine,
-                      style: TextStyle(
-                        fontFamily: 'JetBrainsMono',
-                        fontSize: fMono,
-                        color: isComment ? tc.textMuted : cmdColor,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                  // 复制按钮
-                  if (!isComment)
-                    GestureDetector(
-                      onTap: () {
-                        Clipboard.setData(ClipboardData(text: trimmedLine));
-                        ScaffoldMessenger.of(context).clearSnackBars();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('已复制', style: TextStyle(fontSize: fSmall)),
-                            duration: const Duration(seconds: 1),
-                            behavior: SnackBarBehavior.floating,
-                            margin: const EdgeInsets.all(16),
-                          ),
-                        );
-                      },
-                      child: Icon(Icons.copy, size: 13, color: tc.textMuted),
-                    ),
-                ],
-              ),
-            );
-          }),
-        ],
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
     );
   }
 
-  /// 行内执行按钮（扁平化）
-  Widget _buildInlinePlayButton(String command, bool dangerous, bool isBlocked, ThemeColors tc, tp.TerminalTab tab) {
+  /// 命令执行按钮（带背景色的三角形按钮）
+  Widget _buildExecuteButton(String command, bool dangerous, bool isBlocked, ThemeColors tc, tp.TerminalTab tab) {
     final isExecuting = _executingCommand == command;
-    final isExecuted = _executedCommands.contains(command);
     final hasAnyExecuting = _executingCommand != null;
     final isDisabled = isBlocked || (hasAnyExecuting && !isExecuting);
 
@@ -2048,15 +2594,25 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
     return GestureDetector(
       onTap: isDisabled ? null : () => _executeLineDirectly(command, dangerous, tab),
-      child: isExecuting
-          ? SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 1.5, color: color),
-            )
-          : isBlocked
-              ? Icon(Icons.block, size: 14, color: cDanger)
-              : Icon(Icons.play_arrow, size: 16, color: color),
+      child: Container(
+        width: 28,
+        height: 28,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isDisabled ? Colors.transparent : color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(rSmall),
+          border: isDisabled ? null : Border.all(color: color.withOpacity(0.35)),
+        ),
+        child: isExecuting
+            ? SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 1.5, color: color),
+              )
+            : isBlocked
+                ? Icon(Icons.block, size: 14, color: cDanger)
+                : Icon(Icons.play_arrow, size: 18, color: color),
+      ),
     );
   }
 
@@ -2121,6 +2677,59 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         _executedCommands.add(command);
         _executingCommand = null;
       });
+    }
+  }
+
+  // ==================== 斜杠命令 ====================
+  /// 处理斜杠命令，返回 true 表示已处理（不再发送）
+  bool _handleSlashCommand(String command, {required bool isConnected}) {
+    final cmd = command.trim().toLowerCase();
+    switch (cmd) {
+      case '/new':
+        _autoScrollChat = true;
+        ref.read(agentProvider.notifier).newSession();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('已新建会话', style: TextStyle(fontSize: 13)),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+        return true;
+      case '/compact':
+        if (!isConnected) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('请先连接终端', style: TextStyle(fontSize: 13)),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+          return true;
+        }
+        if (!_checkAIModelConfigured()) {
+          _showAIModelNotConfiguredHint();
+          return true;
+        }
+        ref.read(agentProvider.notifier).compact().then((_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('记忆压缩完成', style: TextStyle(fontSize: 13)),
+              duration: const Duration(seconds: 1),
+            ),
+          );
+        }).catchError((e) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('压缩失败: $e', style: const TextStyle(fontSize: 13)),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        });
+        return true;
+      default:
+        // 未知斜杠命令：当作普通文本发送
+        return false;
     }
   }
 
@@ -2196,6 +2805,20 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                   child: Icon(Icons.terminal, size: 12, color: tc.textSub),
                 ),
               ),
+              const SizedBox(width: 4),
+              // 会话历史按钮
+              GestureDetector(
+                onTap: () => _showSessionHistoryPanel(context),
+                child: Container(
+                  height: 26,
+                  width: 26,
+                  decoration: BoxDecoration(
+                    color: tc.surface,
+                    borderRadius: BorderRadius.circular(rSmall),
+                  ),
+                  child: Icon(Icons.history, size: 12, color: tc.textSub),
+                ),
+              ),
               const Spacer(),
               // 运行状态指示
               if (agentState.isRunning)
@@ -2238,21 +2861,24 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 setState(() => _aiInputFocused = focused);
               },
               onChanged: (text) { _tabAiInputText[_currentTabId ?? ''] = text; },
+              onSlashCommand: (command) {
+                return _handleSlashCommand(command, isConnected: isConnected);
+              },
               onSend: (text) async {
                 if (!_checkAIModelConfigured()) {
                   _showAIModelNotConfiguredHint();
                   return;
-                  }
-                  _autoScrollChat = true; // 用户发送新消息时恢复自动滚动
-                  if (isConnected) {
-                    final tab = ref.read(tp.terminalProvider).activeTab;
-                    // 本地终端用 localService，SSH 用 service
-                    final CommandExecutor? executor = tab?.isLocal == true ? tab?.localService : tab?.service;
-                    ref.read(agentProvider.notifier).setExecutor(executor);
-                    await ref.read(agentProvider.notifier).startTask(text);
-                  }
-                },
-              ),
+                }
+                _autoScrollChat = true; // 用户发送新消息时恢复自动滚动
+                if (isConnected) {
+                  final tab = ref.read(tp.terminalProvider).activeTab;
+                  // 本地终端用 localService，SSH 用 service
+                  final CommandExecutor? executor = tab?.isLocal == true ? tab?.localService : tab?.service;
+                  ref.read(agentProvider.notifier).setExecutor(executor);
+                  await ref.read(agentProvider.notifier).startTask(text);
+                }
+              },
+            ),
         ],
       ),
     );
@@ -2506,6 +3132,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     showDialog(context: context, builder: (context) => _AgentLogDialog());
   }
 
+  /// 显示会话历史面板（侧边抽屉式）
+  void _showSessionHistoryPanel(BuildContext context) {
+    showDialog(context: context, builder: (context) => const _SessionHistoryDialog());
+  }
+
   /// 显示最大步骤数设置
   void _showMaxStepsDialog() {
     final controller = TextEditingController(text: ref.read(agentProvider).maxSteps.toString());
@@ -2754,6 +3385,8 @@ class _AIPromptInput extends StatefulWidget {
   final ValueChanged<String>? onChanged;
   final ValueChanged<bool>? onFocusChanged;
   final Color accentColor;
+  /// 斜杠命令回调：返回 true 表示命令已被处理（不再走 onSend）
+  final bool Function(String command)? onSlashCommand;
 
   const _AIPromptInput({
     super.key,
@@ -2764,39 +3397,203 @@ class _AIPromptInput extends StatefulWidget {
     this.onChanged,
     this.onFocusChanged,
     required this.accentColor,
+    this.onSlashCommand,
   });
 
   @override
   State<_AIPromptInput> createState() => _AIPromptInputState();
 }
 
+/// 斜杠命令定义
+class _SlashCommand {
+  final String command;
+  final String description;
+  const _SlashCommand(this.command, this.description);
+}
+
+const List<_SlashCommand> _kSlashCommands = [
+  _SlashCommand('/new', '新建会话'),
+  _SlashCommand('/compact', '压缩记忆（总结早期对话）'),
+];
+
 class _AIPromptInputState extends State<_AIPromptInput> {
   late TextEditingController _controller;
   final _focusNode = FocusNode();
   String _lastInitialText = '';
   bool _isFocused = false;
+  OverlayEntry? _slashOverlay;
+  List<_SlashCommand> _filteredCommands = [];
+  int _highlightedIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialText);
     _lastInitialText = widget.initialText;
-    _controller.addListener(() {
-      widget.onChanged?.call(_controller.text);
-    });
+    _controller.addListener(_onTextChanged);
     _focusNode.addListener(() {
       final focused = _focusNode.hasFocus;
       if (focused != _isFocused) {
         setState(() => _isFocused = focused);
         widget.onFocusChanged?.call(focused);
       }
+      if (!focused) {
+        _hideSlashOverlay();
+      }
     });
+  }
+
+  void _onTextChanged() {
+    widget.onChanged?.call(_controller.text);
+    _detectSlashCommand();
+  }
+
+  /// 检测输入框中的斜杠命令前缀，显示建议
+  void _detectSlashCommand() {
+    final text = _controller.text;
+    // 仅当文本以 / 开头且不含空格时显示建议
+    if (text.startsWith('/') && !text.contains(' ')) {
+      final prefix = text.toLowerCase();
+      final filtered = _kSlashCommands
+          .where((c) => c.command.toLowerCase().startsWith(prefix))
+          .toList();
+      if (filtered.isNotEmpty) {
+        _filteredCommands = filtered;
+        _highlightedIndex = _highlightedIndex.clamp(0, filtered.length - 1);
+        _showSlashOverlay();
+        return;
+      }
+    }
+    _hideSlashOverlay();
+  }
+
+  void _showSlashOverlay() {
+    if (_slashOverlay == null) {
+      _slashOverlay = OverlayEntry(builder: _buildSlashOverlay);
+      Overlay.of(context).insert(_slashOverlay!);
+    } else {
+      _slashOverlay!.markNeedsBuild();
+    }
+  }
+
+  void _hideSlashOverlay() {
+    _slashOverlay?.remove();
+    _slashOverlay = null;
+  }
+
+  Widget _buildSlashOverlay(BuildContext context) {
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null) return const SizedBox.shrink();
+    final size = renderBox.size;
+    final tc = ThemeColors.of(context);
+    return Positioned(
+      bottom: size.height + 4,
+      left: 0,
+      width: size.width,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          decoration: BoxDecoration(
+            color: tc.cardElevated,
+            borderRadius: BorderRadius.circular(rSmall),
+            border: Border.all(color: tc.border.withOpacity(0.5)),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2)),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              for (int i = 0; i < _filteredCommands.length; i++)
+                InkWell(
+                  onTap: () => _selectSlashCommand(_filteredCommands[i]),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    color: i == _highlightedIndex ? widget.accentColor.withOpacity(0.15) : Colors.transparent,
+                    child: Row(
+                      children: [
+                        Text(
+                          _filteredCommands[i].command,
+                          style: TextStyle(
+                            color: i == _highlightedIndex ? widget.accentColor : tc.textMain,
+                            fontSize: fSmall,
+                            fontFamily: 'JetBrainsMono',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _filteredCommands[i].description,
+                            style: TextStyle(color: tc.textSub, fontSize: fMicro),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _selectSlashCommand(_SlashCommand cmd) {
+    _controller.text = cmd.command;
+    _controller.selection = TextSelection.collapsed(offset: cmd.command.length);
+    _hideSlashOverlay();
+  }
+
+  /// 键盘导航：上/下选择，Enter 执行，Esc 关闭
+  void _handleKeyEvent(KeyEvent event) {
+    if (_slashOverlay == null || _filteredCommands.isEmpty) return;
+    if (event is! KeyDownEvent) return;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.arrowDown) {
+      setState(() {
+        _highlightedIndex = (_highlightedIndex + 1) % _filteredCommands.length;
+      });
+      _slashOverlay!.markNeedsBuild();
+      return;
+    }
+    if (key == LogicalKeyboardKey.arrowUp) {
+      setState(() {
+        _highlightedIndex = (_highlightedIndex - 1 + _filteredCommands.length) % _filteredCommands.length;
+      });
+      _slashOverlay!.markNeedsBuild();
+      return;
+    }
+    if (key == LogicalKeyboardKey.tab) {
+      _selectSlashCommand(_filteredCommands[_highlightedIndex]);
+      return;
+    }
+    if (key == LogicalKeyboardKey.escape) {
+      _hideSlashOverlay();
+      return;
+    }
+    if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter) {
+      // 若有高亮的斜杠命令建议，则执行该命令
+      final cmd = _filteredCommands[_highlightedIndex];
+      _controller.clear();
+      _hideSlashOverlay();
+      _executeSlashCommand(cmd);
+      return;
+    }
+  }
+
+  void _executeSlashCommand(_SlashCommand cmd) {
+    final handled = widget.onSlashCommand?.call(cmd.command) ?? false;
+    if (handled) return;
+    // 默认行为：作为普通文本发送
+    widget.onSend(cmd.command);
   }
 
   @override
   void didUpdateWidget(covariant _AIPromptInput oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // 当 initialText 变化时（切换 tab），同步到 controller
     if (widget.initialText != _lastInitialText && widget.initialText != _controller.text) {
       _controller.text = widget.initialText;
       _lastInitialText = widget.initialText;
@@ -2805,6 +3602,8 @@ class _AIPromptInputState extends State<_AIPromptInput> {
 
   @override
   void dispose() {
+    _hideSlashOverlay();
+    _controller.removeListener(_onTextChanged);
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -2813,6 +3612,14 @@ class _AIPromptInputState extends State<_AIPromptInput> {
   void _send() {
     final text = _controller.text.trim();
     if (text.isEmpty || !widget.enabled) return;
+    // 若是斜杠命令，优先走 onSlashCommand
+    if (text.startsWith('/') && widget.onSlashCommand != null) {
+      final handled = widget.onSlashCommand!(text);
+      if (handled) {
+        _controller.clear();
+        return;
+      }
+    }
     widget.onSend(text);
     _controller.clear();
   }
@@ -2824,43 +3631,309 @@ class _AIPromptInputState extends State<_AIPromptInput> {
         ? widget.accentColor.withOpacity(0.7)
         : widget.accentColor.withOpacity(0.4);
     final disabledBorderColor = tc.border.withOpacity(0.3);
-    return TextField(
-      controller: _controller,
+    return KeyboardListener(
       focusNode: _focusNode,
-      enabled: widget.enabled,
-      maxLines: 1,
-      style: TextStyle(color: tc.textMain, fontSize: fSmall),
-      decoration: InputDecoration(
-        hintText: widget.hintText,
-        hintStyle: TextStyle(color: tc.textMuted, fontSize: fSmall),
-        filled: true,
-        fillColor: tc.surface,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(rSmall),
-          borderSide: BorderSide(color: borderColor),
+      onKeyEvent: _handleKeyEvent,
+      child: TextField(
+        controller: _controller,
+        enabled: widget.enabled,
+        maxLines: 1,
+        style: TextStyle(color: tc.textMain, fontSize: fSmall),
+        decoration: InputDecoration(
+          hintText: widget.hintText,
+          hintStyle: TextStyle(color: tc.textMuted, fontSize: fSmall),
+          filled: true,
+          fillColor: tc.surface,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(rSmall),
+            borderSide: BorderSide(color: borderColor),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(rSmall),
+            borderSide: BorderSide(color: borderColor),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(rSmall),
+            borderSide: BorderSide(color: borderColor, width: 1.5),
+          ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(rSmall),
+            borderSide: BorderSide(color: disabledBorderColor),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          isDense: true,
+          suffixIcon: IconButton(
+            icon: Icon(Icons.send_rounded, color: widget.enabled ? widget.accentColor : cTextMuted, size: 14),
+            onPressed: _send,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+          ),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(rSmall),
-          borderSide: BorderSide(color: borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(rSmall),
-          borderSide: BorderSide(color: borderColor, width: 1.5),
-        ),
-        disabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(rSmall),
-          borderSide: BorderSide(color: disabledBorderColor),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        isDense: true,
-        suffixIcon: IconButton(
-          icon: Icon(Icons.send_rounded, color: widget.enabled ? widget.accentColor : cTextMuted, size: 14),
-          onPressed: _send,
-          padding: EdgeInsets.zero,
-          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+        onSubmitted: (_) => _send(),
+      ),
+    );
+  }
+}
+
+// ==================== 会话历史对话框 ====================
+class _SessionHistoryDialog extends ConsumerStatefulWidget {
+  const _SessionHistoryDialog();
+
+  @override
+  ConsumerState<_SessionHistoryDialog> createState() => _SessionHistoryDialogState();
+}
+
+class _SessionHistoryDialogState extends ConsumerState<_SessionHistoryDialog> {
+  List<Conversation> _sessions = [];
+  String? _activeId;
+  final ConversationService _convService = ConversationService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSessions();
+  }
+
+  void _loadSessions() {
+    final agentState = ref.read(agentProvider);
+    final hostId = agentState.hostId ?? 'local';
+    setState(() {
+      _sessions = _convService.listSessions(hostId);
+      _activeId = agentState.conversationId;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    return Dialog(
+      backgroundColor: tc.card,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.55,
+        height: MediaQuery.of(context).size.height * 0.7,
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.history, color: cPrimary, size: 18),
+                const SizedBox(width: 8),
+                Text('会话历史', style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
+                const Spacer(),
+                // 新建会话按钮
+                TextButton.icon(
+                  onPressed: () async {
+                    await ref.read(agentProvider.notifier).newSession();
+                    _loadSessions();
+                  },
+                  icon: Icon(Icons.add, size: 14, color: cPrimary),
+                  label: Text('新建', style: TextStyle(fontSize: fSmall, color: cPrimary)),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                  ),
+                ),
+                IconButton(
+                  icon: Icon(Icons.close, color: tc.textSub, size: 18),
+                  onPressed: () => Navigator.of(context).pop(),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                ),
+              ],
+            ),
+            const Divider(color: cBorder, height: 16),
+            Expanded(
+              child: _sessions.isEmpty
+                  ? Center(child: Text('暂无会话', style: TextStyle(color: tc.textMuted, fontSize: fBody)))
+                  : ListView.builder(
+                      itemCount: _sessions.length,
+                      itemBuilder: (context, index) {
+                        final conv = _sessions[index];
+                        final isActive = conv.id == _activeId;
+                        return _buildSessionTile(conv, isActive, tc);
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
-      onSubmitted: (_) => _send(),
+    );
+  }
+
+  Widget _buildSessionTile(Conversation conv, bool isActive, ThemeColors tc) {
+    final msgCount = conv.messages.length;
+    final hasSummary = conv.summary != null && conv.summary!.isNotEmpty;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      decoration: BoxDecoration(
+        color: isActive ? cPrimary.withOpacity(0.08) : Colors.transparent,
+        borderRadius: BorderRadius.circular(rSmall),
+        border: Border.all(
+          color: isActive ? cPrimary.withOpacity(0.3) : tc.border.withOpacity(0.3),
+        ),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(rSmall),
+        onTap: () async {
+          await ref.read(agentProvider.notifier).switchSession(conv.id);
+          _loadSessions();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        if (isActive)
+                          Container(
+                            width: 6,
+                            height: 6,
+                            margin: const EdgeInsets.only(right: 6),
+                            decoration: const BoxDecoration(
+                              color: cPrimary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        Expanded(
+                          child: Text(
+                            conv.title,
+                            style: TextStyle(
+                              color: isActive ? cPrimary : tc.textMain,
+                              fontSize: fBody,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Text(
+                          '${conv.updatedAt.month}/${conv.updatedAt.day} ${conv.updatedAt.hour.toString().padLeft(2, '0')}:${conv.updatedAt.minute.toString().padLeft(2, '0')}',
+                          style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '$msgCount 条消息',
+                          style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+                        ),
+                        if (hasSummary) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: cAgentGreen.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(rXSmall),
+                            ),
+                            child: Text(
+                              '已压缩',
+                              style: TextStyle(color: cAgentGreen, fontSize: fMicro),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // 重命名按钮
+              IconButton(
+                icon: Icon(Icons.edit_outlined, size: 14, color: tc.textSub),
+                onPressed: () => _showRenameDialog(conv),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                tooltip: '重命名',
+              ),
+              // 删除按钮
+              IconButton(
+                icon: Icon(Icons.delete_outline, size: 14, color: tc.textSub),
+                onPressed: () => _confirmDelete(conv),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                tooltip: '删除',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showRenameDialog(Conversation conv) {
+    final controller = TextEditingController(text: conv.title);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ThemeColors.of(context).cardElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+        title: Text('重命名会话', style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody),
+          decoration: InputDecoration(
+            hintText: '输入会话名称',
+            hintStyle: TextStyle(color: ThemeColors.of(context).textMuted),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('取消', style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fBody)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final title = controller.text.trim();
+              if (title.isNotEmpty) {
+                await _convService.rename(conv.id, title);
+                _loadSessions();
+              }
+              if (!ctx.mounted) return;
+              Navigator.pop(ctx);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
+            child: Text('保存', style: TextStyle(fontSize: fBody)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDelete(Conversation conv) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ThemeColors.of(context).cardElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+        title: Text('删除会话？', style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
+        content: Text('会话「${conv.title}」的所有消息和日志将被永久删除，无法恢复。',
+            style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fSmall)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('取消', style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fBody)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await ref.read(agentProvider.notifier).deleteSession(conv.id);
+              if (!ctx.mounted) return;
+              Navigator.pop(ctx);
+              _loadSessions();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: cDanger, foregroundColor: Colors.white),
+            child: Text('删除', style: TextStyle(fontSize: fBody)),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -2894,16 +3967,22 @@ class _AgentLogDialogState extends State<_AgentLogDialog> {
         setState(() {});
       }
     });
-    _refreshTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
       if (!mounted) { timer.cancel(); return; }
-      setState(() => _loadLogs());
-      // 下一帧再滚动，给 scrollController listener 时间检测用户是否手动上滚过
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        if (_autoScroll && _scrollController.hasClients) {
-          _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: animNormal, curve: Curves.easeOut);
-        }
-      });
+      // 仅当日志数量变化时才 setState，避免无谓重建
+      final newLogs = agentLogger.getLogs();
+      if (newLogs.length != _logs.length) {
+        setState(() {
+          _logs = newLogs.isEmpty ? ['暂无日志...'] : newLogs;
+        });
+        // 下一帧再滚动，给 scrollController listener 时间检测用户是否手动上滚过
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          if (_autoScroll && _scrollController.hasClients) {
+            _scrollController.animateTo(_scrollController.position.maxScrollExtent, duration: animNormal, curve: Curves.easeOut);
+          }
+        });
+      }
     });
   }
 
@@ -2938,6 +4017,23 @@ class _AgentLogDialogState extends State<_AgentLogDialog> {
                 const SizedBox(width: 8),
                 Text('Agent 日志', style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
                 const Spacer(),
+                // 复制全部按钮
+                IconButton(
+                  tooltip: '复制全部日志',
+                  icon: Icon(Icons.copy_all, color: tc.textSub, size: 16),
+                  onPressed: () async {
+                    await Clipboard.setData(ClipboardData(text: _logs.join('\n')));
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('已复制 ${_logs.length} 条日志', style: const TextStyle(fontSize: 13)),
+                        duration: const Duration(seconds: 1),
+                      ),
+                    );
+                  },
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                ),
                 IconButton(
                   icon: Icon(Icons.close, color: tc.textSub, size: 18),
                   onPressed: () => Navigator.of(context).pop(),
@@ -2955,22 +4051,25 @@ class _AgentLogDialogState extends State<_AgentLogDialog> {
                       color: tc.bg,
                       borderRadius: BorderRadius.circular(rSmall),
                     ),
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(8),
-                      itemCount: _logs.length,
-                      itemBuilder: (context, index) {
-                        final log = _logs[index];
-                        Color color = cTextSub;
-                        if (log.contains('[ERROR]')) color = cDanger;
-                        else if (log.contains('[WARN]')) color = cWarning;
-                        else if (log.contains('[DEBUG]')) color = cTextMuted;
-                        else if (log.contains('[INFO]')) color = cSuccess;
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 0.5),
-                          child: SelectableText(log, style: TextStyle(fontFamily: 'monospace', fontSize: fMicro, color: color)),
-                        );
-                      },
+                    // SelectionArea 包裹整个 ListView，实现跨行自由选择复制
+                    child: SelectionArea(
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(8),
+                        itemCount: _logs.length,
+                        itemBuilder: (context, index) {
+                          final log = _logs[index];
+                          Color color = cTextSub;
+                          if (log.contains('[ERROR]')) color = cDanger;
+                          else if (log.contains('[WARN]')) color = cWarning;
+                          else if (log.contains('[DEBUG]')) color = cTextMuted;
+                          else if (log.contains('[INFO]')) color = cSuccess;
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 0.5),
+                            child: Text(log, style: TextStyle(fontFamily: 'monospace', fontSize: fMicro, color: color)),
+                          );
+                        },
+                      ),
                     ),
                   ),
                   // 回到底部按钮
@@ -3024,6 +4123,91 @@ class _QuickKey {
   final String label;
   final String sequence;
   const _QuickKey(this.label, this.sequence);
+}
+
+/// 可折叠卡片：点击头部展开/收起内容
+class _FoldableCard extends StatefulWidget {
+  final String summary;
+  final IconData icon;
+  final Color iconColor;
+  final Color bgColor;
+  final Color borderColor;
+  final ThemeColors tc;
+  final Widget child;
+  final EdgeInsets padding;
+
+  const _FoldableCard({
+    required this.summary,
+    required this.icon,
+    required this.iconColor,
+    required this.bgColor,
+    required this.borderColor,
+    required this.tc,
+    required this.child,
+    this.padding = const EdgeInsets.all(10),
+  });
+
+  @override
+  State<_FoldableCard> createState() => _FoldableCardState();
+}
+
+class _FoldableCardState extends State<_FoldableCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      decoration: BoxDecoration(
+        color: widget.bgColor,
+        borderRadius: BorderRadius.circular(rSmall),
+        border: Border.all(color: widget.borderColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(rSmall),
+              topRight: Radius.circular(rSmall),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              child: Row(
+                children: [
+                  Icon(widget.icon, size: 12, color: widget.iconColor),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      widget.summary,
+                      style: TextStyle(
+                        color: widget.tc.textSub,
+                        fontSize: fMicro,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Icon(
+                    _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    size: 14,
+                    color: widget.tc.textMuted,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded)
+            Padding(
+              padding: widget.padding,
+              child: widget.child,
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 /// 独立的 Tab 项 widget，hover 状态自管理，不触发父页面 rebuild

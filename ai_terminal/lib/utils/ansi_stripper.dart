@@ -1,16 +1,16 @@
 /// ANSI 转义序列清理工具
 class AnsiStripper {
   /// 匹配所有 ANSI 转义序列的正则表达式
-  /// 涵盖：CSI 序列、OSC 序列、单字符控制、字符集选择、两字节序列、BEL、CR
+  /// 涵盖：CSI 序列（含 ? > ! 等私有参数）、OSC 序列、字符集选择、两字节序列、BEL、CR
+  /// CSI 格式：ESC [ <参数字节 0x20-0x3F>* <终止字节 0x40-0x7E>
   static final _ansiRegex = RegExp(
-    r'\x1B(?:\[[0-9;]*[A-Za-z@`]?'      // CSI: ESC [ params final
-    r'|\][0-9]*;?.*?(?:\x07|\x1B\\|\x1B\[)' // OSC: ESC ] params ; content BEL|ST
-    r'|[(][A-Za-z]'                       // Charset: ESC ( letter
-    r'|[)][A-Za-z]'                       // Charset: ESC ) letter
-    r'|[A-Za-z])'                         // Other 2-byte: ESC letter
+    r'\x1B\[[\x20-\x3F]*[\x40-\x7E]'  // CSI: ESC [ 参数字节 终止字节
+    r'|\x1B\][0-9]*;?[^\x07\x1B]*(?:\x07|\x1B\\)' // OSC
+    r'|\x1B[(][A-Za-z]'                   // Charset: ESC ( letter
+    r'|\x1B[)][A-Za-z]'                   // Charset: ESC ) letter
+    r'|\x1B[A-Za-z]'                      // Other 2-byte: ESC letter
     r'|\x07'                              // BEL
-    r'|\x0D'                              // CR
-    r'|\x1B\[[0-9;]*[A-Za-z@`]',         // Standalone CSI sequence
+    r'|\x0D',                             // CR
   );
 
   /// 清理 ANSI 转义序列，返回纯文本
@@ -25,8 +25,8 @@ class AnsiStripper {
     result = result.replaceAll(RegExp(r'\][0-9]*;[^\n\r]*'), '');
 
     // 3. 清理残留的 CSI 参数片段
-    //    例如：[K (清除行的残留)、[?2004h (括号粘贴模式残留)
-    result = result.replaceAll(RegExp(r'\[([0-9;]*[A-Za-z@`]|[?][0-9a-zA-Z;]*)'), '');
+    //    例如：[K (清除行)、[?2004h/[?2004l (括号粘贴模式)、[>0;10;1c 等
+    result = result.replaceAll(RegExp(r'\[[\x20-\x3F]*[\x40-\x7E]'), '');
 
     // 4. 清理控制字符（除 \n \t 外）
     result = result.replaceAll(

@@ -1,13 +1,11 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 import '../models/chat_session.dart';
 import '../models/ai_model_config.dart';
 import '../services/ai_service.dart';
+import '../services/conversation_service.dart';
 import '../core/hive_init.dart';
 import '../utils/ansi_stripper.dart';
-
-const _uuid = Uuid();
 
 /// 流式更新节流间隔（毫秒）
 const int _streamThrottleMs = 80;
@@ -23,6 +21,12 @@ class ChatState {
   // 只保存上一条命令的执行结果
   final String lastCommandOutput;
 
+  /// 当前会话 id（持久化用）
+  final String? conversationId;
+
+  /// 早期对话摘要（压缩后产生）
+  final String? summary;
+
   ChatState({
     this.messages = const [],
     this.isLoading = false,
@@ -30,6 +34,8 @@ class ChatState {
     this.currentHostId,
     this.currentAssistantMessage,
     this.lastCommandOutput = '',
+    this.conversationId,
+    this.summary,
   });
 
   ChatState copyWith({
@@ -39,14 +45,21 @@ class ChatState {
     String? currentHostId,
     String? currentAssistantMessage,
     String? lastCommandOutput,
+    String? conversationId,
+    String? summary,
+    bool clearCurrentHostId = false,
+    bool clearConversationId = false,
+    bool clearSummary = false,
   }) {
     return ChatState(
       messages: messages ?? this.messages,
       isLoading: isLoading ?? this.isLoading,
       error: error,
-      currentHostId: currentHostId ?? this.currentHostId,
+      currentHostId: clearCurrentHostId ? null : (currentHostId ?? this.currentHostId),
       currentAssistantMessage: currentAssistantMessage,
       lastCommandOutput: lastCommandOutput ?? this.lastCommandOutput,
+      conversationId: clearConversationId ? null : (conversationId ?? this.conversationId),
+      summary: clearSummary ? null : (summary ?? this.summary),
     );
   }
 }
@@ -57,7 +70,7 @@ String _tailTruncate(String text, int maxChars) {
   return '...(已截断前 ${text.length - maxChars} 字符)\n${text.substring(text.length - maxChars)}';
 }
 
-/// 聊天 Provider — 每个 tab 独立聊天状态
+/// 聊天 Provider — 每个 hostId 独立聊天状态（持久化）
 final chatProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {
   return ChatNotifier();
 });
@@ -65,42 +78,64 @@ final chatProvider = StateNotifierProvider<ChatNotifier, ChatState>((ref) {
 class ChatNotifier extends StateNotifier<ChatState> {
   StreamSubscription<String>? _streamSubscription;
 
-  /// 每个 tab 的聊天状态缓存
-  final Map<String, ChatState> _tabStates = {};
+  /// 每个 hostId 的聊天状态缓存
+  final Map<String, ChatState> _hostStates = {};
 
-  /// 当前活跃的 tabId
-  String? _activeTabId;
+  /// 当前活跃的 hostId
+  String? _activeHostId;
 
   /// 流式输出节流：累积文本但限制 UI 更新频率
   String _streamingBuffer = '';
   Timer? _throttleTimer;
 
+  final ConversationService _convService = ConversationService();
+
   ChatNotifier() : super(ChatState());
 
-  /// 切换到指定 tab（保存当前状态，加载目标 tab 状态）
+  /// 切换到指定 host（保存当前状态，加载目标 host 状态）
   void switchTab(String tabId, {String? hostId}) {
-    // 保存当前 tab 状态
-    if (_activeTabId != null) {
-      _tabStates[_activeTabId!] = state;
+    final effectiveHostId = hostId ?? 'local';
+
+    if (_activeHostId != null) {
+      _hostStates[_activeHostId!] = state;
     }
 
-    _activeTabId = tabId;
+    _activeHostId = effectiveHostId;
 
-    // 加载目标 tab 状态（若无则创建新的）
-    if (_tabStates.containsKey(tabId)) {
-      state = _tabStates[tabId]!;
+    if (_hostStates.containsKey(effectiveHostId)) {
+      state = _hostStates[effectiveHostId]!;
     } else {
-      // 新 tab：全新空聊天状态
-      state = ChatState(currentHostId: hostId);
+      _restoreFromPersistence(effectiveHostId);
     }
   }
 
+  /// 从持久化恢复
+  void _restoreFromPersistence(String hostId) {
+    final conv = _convService.getActiveSession(hostId);
+    if (conv == null) {
+      state = ChatState(currentHostId: hostId);
+      return;
+    }
+    // 持久化的 ConvMessage 转为 ChatMessage（旧模型）
+    final messages = conv.messages
+        .where((m) => m.role != 'system')
+        .map((m) => ChatMessage.create(role: m.role, content: m.content))
+        .toList();
+    state = ChatState(
+      currentHostId: hostId,
+      conversationId: conv.id,
+      messages: messages,
+      summary: conv.summary,
+    );
+  }
+
   /// 关闭 tab 时清除其聊天记录
-  void removeTab(String tabId) {
-    _tabStates.remove(tabId);
-    // 如果关闭的是当前活跃 tab，重置状态
-    if (_activeTabId == tabId) {
-      _activeTabId = null;
+  void removeTab(String tabId, {String? hostId}) {
+    if (hostId != null) {
+      _hostStates.remove(hostId);
+    }
+    if (_activeHostId == hostId) {
+      _activeHostId = null;
       state = ChatState();
     }
   }
@@ -109,14 +144,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
   Future<void> sendMessage(String content, {String? hostId, AIModelConfig? config}) async {
     if (content.trim().isEmpty) return;
 
-    // 获取默认模型
+    final effectiveHostId = hostId ?? _activeHostId ?? 'local';
+
     final model = config ?? _getDefaultModel();
     if (model == null) {
       state = state.copyWith(error: '请先配置 AI 模型');
       return;
     }
 
-    // 添加用户消息
     final userMessage = ChatMessage.create(
       role: 'user',
       content: content,
@@ -128,19 +163,24 @@ class ChatNotifier extends StateNotifier<ChatState> {
       isLoading: true,
       error: null,
       currentAssistantMessage: '',
-      currentHostId: hostId,
+      currentHostId: effectiveHostId,
     );
 
-    // 构建上下文
-    final context = _buildContext(hostId);
+    // 持久化用户消息
+    try {
+      final conv = await _convService.appendMessage(effectiveHostId, role: 'user', content: content);
+      if (state.conversationId != conv.id) {
+        state = state.copyWith(conversationId: conv.id);
+      }
+    } catch (_) {}
 
-    // 获取历史消息（最近 10 条）
+    final context = _buildContext(effectiveHostId);
+
     final history = updatedMessages.length > 10
         ? updatedMessages.sublist(updatedMessages.length - 10)
         : updatedMessages;
 
-    // 获取主机信息用于系统提示词
-    final host = hostId != null ? HiveInit.hostsBox.get(hostId) : null;
+    final host = effectiveHostId != 'local' ? HiveInit.hostsBox.get(effectiveHostId) : null;
 
     try {
       final stream = await AIService.sendMessage(
@@ -158,7 +198,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
         (chunk) {
           fullResponse += chunk;
           _streamingBuffer = fullResponse;
-          // 节流：限制 UI 更新频率，减少 rebuild 次数
           _throttleTimer ??= Timer(
             const Duration(milliseconds: _streamThrottleMs),
             () {
@@ -182,7 +221,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
           _throttleTimer?.cancel();
           _throttleTimer = null;
           _streamingBuffer = '';
-          // 添加 AI 消息
           final aiMessage = ChatMessage.create(
             role: 'assistant',
             content: fullResponse,
@@ -192,6 +230,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
             isLoading: false,
             currentAssistantMessage: null,
           );
+          // 持久化 assistant 响应
+          _persistAssistant(effectiveHostId, fullResponse);
         },
       );
     } catch (e) {
@@ -202,19 +242,22 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
+  /// 异步持久化 assistant 响应，忽略错误
+  void _persistAssistant(String hostId, String content) {
+    _convService.appendMessage(hostId, role: 'assistant', content: content).then((_) {}).catchError((_) {});
+  }
+
   /// 构建上下文 - 只传上一条命令执行结果
   String? _buildContext(String? hostId) {
     var parts = <String>[];
 
-    // 添加主机上下文
-    if (hostId != null) {
+    if (hostId != null && hostId != 'local') {
       final hostContext = _getHostContext(hostId);
       if (hostContext != null) {
         parts.add('【当前环境】\n$hostContext');
       }
     }
 
-    // 只添加上一条命令执行结果（取尾部，避免浪费 token）
     if (state.lastCommandOutput.isNotEmpty) {
       final truncatedOutput = _tailTruncate(state.lastCommandOutput, 500);
       parts.add('【上一条命令执行结果】\n$truncatedOutput');
@@ -228,11 +271,17 @@ class ChatNotifier extends StateNotifier<ChatState> {
     state = state.copyWith(lastCommandOutput: AnsiStripper.strip(output));
   }
 
-  /// 清空当前 tab 的会话
-  void clearSession() {
+  /// 清空当前 host 的会话（同时清除持久化）
+  Future<void> clearSession() async {
+    final convId = state.conversationId;
     state = ChatState(
       currentHostId: state.currentHostId,
     );
+    if (convId != null) {
+      try {
+        await _convService.clearMessages(convId);
+      } catch (_) {}
+    }
   }
 
   /// 取消加载
