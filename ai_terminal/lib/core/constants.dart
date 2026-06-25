@@ -29,18 +29,19 @@ const Color cVioletDark = Color(0xFF5E3FD9);
 // ===== 颜色系统 (深色) =====
 // 背景
 const Color cBg = Color(0xFF0A0A0F);
-const Color cCard = Color(0xFF111118);
+const Color cCard = Color(0xFF13131B);
 const Color cCardElevated = Color(0xFF1A1A24);
-const Color cSurface = Color(0xFF22222E);
+const Color cSurface = Color(0xFF1F1F2B);
 
 // 边框
-const Color cBorder = Color(0xFF2A2A38);
-const Color cBorderHover = Color(0xFF363648);
+const Color cBorder = Color(0xFF272735);
+const Color cBorderHover = Color(0xFF3F3F50);
 
 // 文字
 const Color cTextMain = Color(0xFFF0F0F5);
-const Color cTextSub = Color(0xFF8888A0);
-const Color cTextMuted = Color(0xFF5C5C72);
+const Color cTextBody = Color(0xFFD4D4E0);
+const Color cTextSub = Color(0xFF9CA3AF);
+const Color cTextMuted = Color(0xFF6B7280);
 
 // 主题色（克莱因蓝）
 const Color cPrimary = cKleinBlue;
@@ -54,7 +55,8 @@ const Color cWarning = cHermesOrange;
 const Color cInfo = cKleinBlue;
 
 // 终端
-const Color cTerminalBg = Color(0xFF000000);
+const Color cTerminalBg = Color(0xFF0D0D12);
+const Color cTerminalOutput = Color(0xFF0A0A0F);
 const Color cTerminalGreen = cLimeGreen;
 
 // Agent 色（莱姆绿）
@@ -62,15 +64,16 @@ const Color cAgentGreen = cLimeGreen;
 const Color cAgentGreenLight = cLimeGreenLight;
 
 // ===== 颜色系统 (浅色) =====
-const Color cBgLight = Color(0xFFF5F5FA);
-const Color cCardLight = Color(0xFFF8F8FC);      // P2-7: 非纯白，微蓝灰
-const Color cCardElevatedLight = Color(0xFFFFFFFF);  // 纯白用于悬浮卡片
+const Color cBgLight = Color(0xFFF8F9FC);
+const Color cCardLight = Color(0xFFFFFFFF);
+const Color cCardElevatedLight = Color(0xFFF1F5F9);
 const Color cSurfaceLight = Color(0xFFEEEEF5);
-const Color cBorderLightTheme = Color(0xFFD8D8E5);
-const Color cBorderLightHover = Color(0xFFC0C0D2);
-const Color cTextMainLight = Color(0xFF1A1A2E);
-const Color cTextSubLight = Color(0xFF6B6B85);
-const Color cTextMutedLight = Color(0xFF9999AD);
+const Color cBorderLightTheme = Color(0xFFE2E8F0);
+const Color cBorderLightHover = Color(0xFFCBD5E1);
+const Color cTextMainLight = Color(0xFF111827);
+const Color cTextBodyLight = Color(0xFF334155);
+const Color cTextSubLight = Color(0xFF64748B);
+const Color cTextMutedLight = Color(0xFF9CA3AF);
 const Color cTerminalBgLight = Color(0xFFF0F0F5);
 const Color cTerminalGreenLight = cLimeGreenDark;
 const Color cAgentGreenLightMode = cLimeGreenDark;
@@ -121,9 +124,9 @@ const List<BoxShadow> shadowSmallDark = [
 
 const List<BoxShadow> shadowSmallLight = [
   BoxShadow(
-    color: Color(0x0F000000),
-    blurRadius: 4,
-    offset: Offset(0, 1),
+    color: Color(0x0A000000),
+    blurRadius: 8,
+    offset: Offset(0, 2),
   ),
 ];
 
@@ -180,12 +183,13 @@ const List<BoxShadow> shadowAgentGlow = [
 ];
 
 // ===== 字体 =====
-const double fDisplay = 24.0;     // 页面大标题（新增）
-const double fTitle = 18.0;       // 卡片/区域标题（原 16→18）
-const double fBody = 14.0;        // 正文（原 13→14）
-const double fSmall = 12.0;       // 辅助文字（原 11→12）
-const double fMono = 14.0;        // 终端等宽字体（原 12→14）
-const double fMicro = 11.0;       // 标签/徽章（原 10→11）
+const double fHero = 28.0;        // 启动页应用名
+const double fDisplay = 24.0;     // 页面大标题
+const double fTitle = 18.0;       // 卡片/区域标题
+const double fBody = 14.0;        // 正文
+const double fSmall = 13.0;       // 辅助文字
+const double fMono = 14.0;        // 终端等宽字体
+const double fMicro = 12.0;       // 标签/徽章
 
 // ===== 动画 =====
 const Duration animFast = Duration(milliseconds: 150);

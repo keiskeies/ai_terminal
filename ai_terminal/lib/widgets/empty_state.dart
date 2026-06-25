@@ -44,7 +44,7 @@ class EmptyStateWidget extends StatelessWidget {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: cPrimary.withOpacity(0.1),
+                  color: cPrimary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(rLarge),
                 ),
                 child: Icon(icon, size: 32, color: cPrimary),

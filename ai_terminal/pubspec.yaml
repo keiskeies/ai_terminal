@@ -40,6 +40,8 @@ dependencies:
   package_info_plus: ^9.0.1
   # 文件选择
   file_picker: ^9.0.0
+  # SVG 渲染
+  flutter_svg: ^2.0.9
   # 路径工具
   path: ^1.8.3
   # 字符编码支持 (GBK/BIG5)
@@ -64,6 +66,9 @@ flutter:
   uses-material-design: true
   assets:
     - assets/icons/
+    - assets/icons/logo_mark.svg
+    - assets/icons/logo_wordmark.svg
+    - assets/icons/logo_mark_light.svg
     - assets/knowledge/
     - assets/config/
   fonts:
@@ -80,6 +85,11 @@ flutter_launcher_icons:
     generate: true
   windows:
     generate: true
+  web:
+    generate: true
+    image_path: "assets/icons/app_icon.png"
+    background_color: "#0A0A0F"
+    theme_color: "#3B7DFF"
   image_path: "assets/icons/app_icon.png"
   adaptive_icon_background: "#0F0F0F"
   adaptive_icon_foreground: "assets/icons/app_icon.png"

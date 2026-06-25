@@ -9,6 +9,7 @@ import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../core/credentials_store.dart';
 import '../widgets/sftp_panel.dart';
+import '../widgets/logo_widget.dart';
 import '../core/hive_init.dart';
 import '../core/prompts.dart' as prompts;
 import '../providers/app_providers.dart';
@@ -25,7 +26,6 @@ import '../services/agent_engine.dart';
 import '../services/conversation_service.dart';
 import '../models/conversation.dart';
 import '../core/safety_guard.dart';
-import '../utils/ai_parser.dart';
 import '../widgets/terminal_view.dart' as term_widget;
 
 
@@ -384,7 +384,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: tc.cardElevated,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(rLarge))),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(rLarge))),
       builder: (context) => Container(
         constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.4),
         child: Column(
@@ -394,7 +394,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  Icon(Icons.add_circle_outline, size: 16, color: cPrimary),
+                  const Icon(Icons.add_circle_outline, size: 16, color: cPrimary),
                   const SizedBox(width: 8),
                   Text('选择服务器新标签连接', style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
                   const Spacer(),
@@ -406,11 +406,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: cPrimary.withOpacity(0.1),
+                        color: cPrimary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(rSmall),
-                        border: Border.all(color: cPrimary.withOpacity(0.2)),
+                        border: Border.all(color: cPrimary.withValues(alpha: 0.2)),
                       ),
-                      child: Text('+ 新建', style: TextStyle(fontSize: fMicro, color: cPrimary, fontWeight: FontWeight.w500)),
+                      child: const Text('+ 新建', style: TextStyle(fontSize: fMicro, color: cPrimary, fontWeight: FontWeight.w500)),
                     ),
                   ),
                 ],
@@ -430,7 +430,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                       width: 8, height: 8,
                       decoration: BoxDecoration(
                         color: host.tagColor != null
-                            ? tagColors.firstWhere((c) => c.value.toString() == host.tagColor, orElse: () => cPrimary)
+                            ? tagColors.firstWhere((c) => c.toARGB32().toString() == host.tagColor, orElse: () => cPrimary)
                             : cPrimary,
                         shape: BoxShape.circle,
                       ),
@@ -458,7 +458,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     final privateKey = await CredentialsStore.get(hostId: host.id, type: 'privateKey');
 
     if (password == null && privateKey == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      final ctx = context;
+      if (!ctx.mounted) return;
+      ScaffoldMessenger.of(ctx).showSnackBar(
         SnackBar(
           content: Text('${host.name} 未配置凭据，请先编辑服务器'),
           backgroundColor: cWarning,
@@ -481,7 +483,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         _switchToTab(tab);
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      final ctx = context;
+      if (!ctx.mounted) return;
+      ScaffoldMessenger.of(ctx).showSnackBar(
         SnackBar(
           content: Text('连接 ${host.name} 失败: $e'),
           backgroundColor: cDanger,
@@ -630,7 +634,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: tc.textMuted.withOpacity(0.6),
+                        color: tc.textMuted.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -644,7 +648,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 child: Container(
                   width: isRight ? 5 : double.infinity,
                   height: isRight ? double.infinity : 5,
-                  color: tc.border.withOpacity(0.6),
+                  color: tc.border.withValues(alpha: 0.6),
                 ),
               ),
             );
@@ -717,7 +721,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               cursor: SystemMouseCursors.resizeColumn,
               child: Container(
                 width: 4,
-                color: tc.border.withOpacity(0.6),
+                color: tc.border.withValues(alpha: 0.6),
               ),
             ),
           ),
@@ -759,37 +763,26 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   // ==================== 顶部栏 ====================
+  /// 三段式结构：左侧品牌区 / 中间标签区 / 右侧操作区
   Widget _buildTopBar(dynamic host, tp.TerminalState terminalState, tp.TerminalTab? activeTab) {
     final tc = ThemeColors.of(context);
     return Container(
       height: hAppBar,
       decoration: BoxDecoration(
-        color: tc.card,
-        border: Border(bottom: BorderSide(color: tc.border.withOpacity(0.6), width: 1)),
+        color: tc.bg,
+        border: Border(bottom: BorderSide(color: tc.border, width: 1)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 设置按钮（替代返回按钮）
-          GestureDetector(
-            onTap: () => context.push('/settings'),
-            child: Container(
-              margin: const EdgeInsets.only(left: 8),
-              height: 32,
-              width: 32,
-              decoration: BoxDecoration(
-                color: tc.surface,
-                borderRadius: BorderRadius.circular(rSmall),
-              ),
-              child: Icon(Icons.settings, size: 14, color: tc.textSub),
-            ),
-          ),
-          const SizedBox(width: 6),
-          // Tab 列表（可横向滚动，含连接名称和关闭x）
+          // 左侧品牌区：LOGO + 应用名，点击返回主页
+          _buildBrandArea(tc),
+          const SizedBox(width: 8),
+          // 中间标签区
           Expanded(
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
               itemCount: terminalState.tabs.length + 1, // +1 for add button
               itemBuilder: (context, index) {
                 // 最后一项是"+"按钮
@@ -810,21 +803,56 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               },
             ),
           ),
-          const SizedBox(width: 6),
-          // 连接状态
-          _buildConnectionBadge(activeTab),
-          const SizedBox(width: 6),
-          // P0-1: AI 面板展开/收起按钮
-          _buildAIPanelToggleButton(),
-          const SizedBox(width: 6),
-          // 终端设置按钮
-          _buildTerminalSettingsButton(),
-          const SizedBox(width: 4),
-          // 菜单
-          _buildToolbarMenu(),
           const SizedBox(width: 8),
+          // 右侧操作区
+          _buildTopBarActions(activeTab, tc),
+          const SizedBox(width: 12),
         ],
       ),
+    );
+  }
+
+  /// 左侧品牌区
+  Widget _buildBrandArea(ThemeColors tc) {
+    return GestureDetector(
+      onTap: () => context.go('/'),
+      child: Container(
+        height: hAppBar,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        color: Colors.transparent,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const LogoWidget(type: LogoType.mark, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'AI Terminal',
+              style: TextStyle(
+                fontSize: fSmall,
+                fontWeight: FontWeight.w500,
+                color: tc.textMain,
+                letterSpacing: -0.3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 右侧操作区：连接状态、AI 面板开关、设置、更多
+  Widget _buildTopBarActions(tp.TerminalTab? activeTab, ThemeColors tc) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildConnectionBadge(activeTab),
+        const SizedBox(width: 6),
+        _buildAIPanelToggleButton(),
+        const SizedBox(width: 6),
+        _buildTerminalSettingsButton(),
+        const SizedBox(width: 6),
+        _buildToolbarMenu(),
+      ],
     );
   }
 
@@ -873,7 +901,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           decoration: BoxDecoration(
             color: tc.surface,
             borderRadius: BorderRadius.circular(rSmall),
-            border: Border.all(color: tc.border.withOpacity(0.3)),
+            border: Border.all(color: tc.border.withValues(alpha: 0.3)),
           ),
           child: Icon(Icons.add, size: 14, color: tc.textSub),
         ),
@@ -897,7 +925,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         }
       },
       itemBuilder: (context) => [
-        PopupMenuItem<String>(
+        const PopupMenuItem<String>(
           enabled: false,
           height: 28,
           child: Text('字号', style: TextStyle(fontSize: fMicro, color: cPrimary, fontWeight: FontWeight.w600)),
@@ -908,7 +936,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           child: Row(
             children: [
               if (_terminalFontSize == size)
-                Icon(Icons.check, size: 12, color: cPrimary)
+                const Icon(Icons.check, size: 12, color: cPrimary)
               else
                 const SizedBox(width: 12),
               const SizedBox(width: 4),
@@ -925,9 +953,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: (connected ? cSuccess : cDanger).withOpacity(0.1),
+        color: (connected ? cSuccess : cDanger).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(rFull),
-        border: Border.all(color: (connected ? cSuccess : cDanger).withOpacity(0.2)),
+        border: Border.all(color: (connected ? cSuccess : cDanger).withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -939,7 +967,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               color: connected ? cSuccess : cDanger,
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(color: (connected ? cSuccess : cDanger).withOpacity(0.5), blurRadius: 4),
+                BoxShadow(color: (connected ? cSuccess : cDanger).withValues(alpha: 0.5), blurRadius: 4),
               ],
             ),
           ),
@@ -973,10 +1001,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           height: 30,
           padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            color: _isAIPanelVisible ? accentColor.withOpacity(0.15) : tc.surface,
+            color: _isAIPanelVisible ? accentColor.withValues(alpha: 0.15) : tc.surface,
             borderRadius: BorderRadius.circular(rSmall),
             border: Border.all(
-              color: _isAIPanelVisible ? accentColor.withOpacity(0.4) : tc.border.withOpacity(0.3),
+              color: _isAIPanelVisible ? accentColor.withValues(alpha: 0.4) : tc.border.withValues(alpha: 0.3),
               width: 1,
             ),
           ),
@@ -1047,7 +1075,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         // 快捷命令
         if (snippets.isNotEmpty) ...[
           const PopupMenuDivider(height: 8),
-          PopupMenuItem<String>(
+          const PopupMenuItem<String>(
             enabled: false,
             height: 24,
             child: Text('快捷命令', style: TextStyle(fontSize: fMicro, color: cPrimary, fontWeight: FontWeight.w600)),
@@ -1086,7 +1114,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          SizedBox(
+          const SizedBox(
             width: 24, height: 24,
             child: CircularProgressIndicator(strokeWidth: 2, color: cPrimary),
           ),
@@ -1105,11 +1133,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 40, color: cDanger),
+            const Icon(Icons.error_outline, size: 40, color: cDanger),
             const SizedBox(height: 12),
             Text('连接失败', style: TextStyle(color: tc.textSub, fontSize: fBody)),
             const SizedBox(height: 6),
-            Text(_connectionError!, style: TextStyle(color: cDanger, fontSize: fSmall), textAlign: TextAlign.center),
+            Text(_connectionError!, style: const TextStyle(color: cDanger, fontSize: fSmall), textAlign: TextAlign.center),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1122,7 +1150,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
                   ),
-                  child: Text('重试', style: TextStyle(fontSize: fBody)),
+                  child: const Text('重试', style: TextStyle(fontSize: fBody)),
                 ),
                 const SizedBox(width: 12),
                 OutlinedButton(
@@ -1133,7 +1161,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
                   ),
-                  child: Text('返回', style: TextStyle(fontSize: fBody)),
+                  child: const Text('返回', style: TextStyle(fontSize: fBody)),
                 ),
               ],
             ),
@@ -1149,17 +1177,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: cDanger.withOpacity(0.15),
+          color: cDanger.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(rFull),
-          border: Border.all(color: cDanger.withOpacity(0.3)),
+          border: Border.all(color: cDanger.withValues(alpha: 0.3)),
         ),
-        child: Row(
+        child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.warning_amber_rounded, color: cDanger, size: 12),
-            const SizedBox(width: 4),
+            SizedBox(width: 4),
             Text('连接中断', style: TextStyle(color: cDanger, fontSize: fMicro, fontWeight: FontWeight.w500)),
-            const SizedBox(width: 4),
+            SizedBox(width: 4),
             Text('重连', style: TextStyle(color: cDanger, fontSize: fMicro, fontWeight: FontWeight.w600, decoration: TextDecoration.underline)),
           ],
         ),
@@ -1187,9 +1215,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             width: 22,
             height: 22,
             decoration: BoxDecoration(
-              color: isActive ? accentColor.withOpacity(0.15) : Colors.transparent,
+              color: isActive ? accentColor.withValues(alpha: 0.15) : Colors.transparent,
               borderRadius: BorderRadius.circular(3),
-              border: isActive ? Border.all(color: accentColor.withOpacity(0.5), width: 1) : null,
+              border: isActive ? Border.all(color: accentColor.withValues(alpha: 0.5), width: 1) : null,
             ),
             child: Icon(icon, size: 13, color: isActive ? accentColor : tc.textMuted),
           ),
@@ -1205,7 +1233,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           decoration: BoxDecoration(
             color: cWarning,
             shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: cWarning.withOpacity(0.5), blurRadius: 4)],
+            boxShadow: [BoxShadow(color: cWarning.withValues(alpha: 0.5), blurRadius: 4)],
           ),
         ),
         const SizedBox(width: 6),
@@ -1213,7 +1241,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           'AGENT',
           style: TextStyle(
             fontSize: fMicro,
-            color: accentColor.withOpacity(0.8),
+            color: accentColor.withValues(alpha: 0.8),
             fontWeight: FontWeight.w700,
             letterSpacing: 1.5,
           ),
@@ -1235,9 +1263,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             width: 22,
             height: 22,
             decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.1),
+              color: accentColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(3),
-              border: Border.all(color: accentColor.withOpacity(0.3), width: 1),
+              border: Border.all(color: accentColor.withValues(alpha: 0.3), width: 1),
             ),
             child: Icon(
               isRight ? Icons.keyboard_arrow_right : Icons.keyboard_arrow_down,
@@ -1255,7 +1283,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         width: showButtons ? 32 : 28,
         decoration: BoxDecoration(
           color: tc.card,
-          border: Border(right: BorderSide(color: tc.border.withOpacity(0.4), width: 0.5)),
+          border: Border(right: BorderSide(color: tc.border.withValues(alpha: 0.4), width: 0.5)),
         ),
         child: Column(
           children: [
@@ -1276,7 +1304,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [accentColor.withOpacity(0.0), accentColor.withOpacity(0.7), accentColor.withOpacity(0.0)],
+                    colors: [accentColor.withValues(alpha: 0.0), accentColor.withValues(alpha: 0.7), accentColor.withValues(alpha: 0.0)],
                   ),
                 ),
               ),
@@ -1294,7 +1322,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         decoration: BoxDecoration(
           color: tc.card,
           border: Border(
-            bottom: BorderSide(color: tc.border.withOpacity(0.4), width: 0.5),
+            bottom: BorderSide(color: tc.border.withValues(alpha: 0.4), width: 0.5),
           ),
         ),
         child: Row(
@@ -1309,7 +1337,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 height: 1,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [accentColor.withOpacity(0.6), accentColor.withOpacity(0.0)],
+                    colors: [accentColor.withValues(alpha: 0.6), accentColor.withValues(alpha: 0.0)],
                   ),
                 ),
               ),
@@ -1361,7 +1389,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                           borderRadius: BorderRadius.circular(rFull),
                           border: Border.all(color: tc.border),
                           boxShadow: [
-                            BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 6),
+                            BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 6),
                           ],
                         ),
                         child: Icon(Icons.keyboard_arrow_down, size: 18, color: tc.textSub),
@@ -1410,12 +1438,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: cAgentGreen.withOpacity(0.06),
-        border: Border(bottom: BorderSide(color: cAgentGreen.withOpacity(0.1))),
+        color: cAgentGreen.withValues(alpha: 0.06),
+        border: Border(bottom: BorderSide(color: cAgentGreen.withValues(alpha: 0.1))),
       ),
       child: Row(
         children: [
-          SizedBox(
+          const SizedBox(
             width: 12, height: 12,
             child: CircularProgressIndicator(
               strokeWidth: 1.5,
@@ -1425,7 +1453,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           const SizedBox(width: 8),
           Text(
             agentState.statusText,
-            style: TextStyle(fontSize: fSmall, color: cAgentGreen, fontWeight: FontWeight.w500),
+            style: const TextStyle(fontSize: fSmall, color: cAgentGreen, fontWeight: FontWeight.w500),
           ),
           if (agentState.currentTask?.currentStep != null) ...[
             const SizedBox(width: 8),
@@ -1449,11 +1477,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: cDanger.withOpacity(0.1),
+                color: cDanger.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(rSmall),
-                border: Border.all(color: cDanger.withOpacity(0.2)),
+                border: Border.all(color: cDanger.withValues(alpha: 0.2)),
               ),
-              child: Text('停止', style: TextStyle(fontSize: fMicro, color: cDanger, fontWeight: FontWeight.w500)),
+              child: const Text('停止', style: TextStyle(fontSize: fMicro, color: cDanger, fontWeight: FontWeight.w500)),
             ),
           ),
           const SizedBox(width: 6),
@@ -1473,16 +1501,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: cWarning.withOpacity(0.08),
-        border: Border(bottom: BorderSide(color: cWarning.withOpacity(0.3))),
+        color: cWarning.withValues(alpha: 0.08),
+        border: Border(bottom: BorderSide(color: cWarning.withValues(alpha: 0.3))),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
               Icon(Icons.warning_amber_rounded, color: cWarning, size: 16),
-              const SizedBox(width: 6),
+              SizedBox(width: 6),
               Expanded(
                 child: Text(
                   '高风险命令待确认',
@@ -1501,7 +1529,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             ),
             child: SelectableText(
               command,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'JetBrainsMono',
                 fontSize: fMono,
                 color: cWarning,
@@ -1532,11 +1560,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                   decoration: BoxDecoration(
-                    color: cWarning.withOpacity(0.15),
+                    color: cWarning.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(rSmall),
-                    border: Border.all(color: cWarning.withOpacity(0.4)),
+                    border: Border.all(color: cWarning.withValues(alpha: 0.4)),
                   ),
-                  child: Text('确认执行', style: TextStyle(fontSize: fSmall, color: cWarning, fontWeight: FontWeight.w600)),
+                  child: const Text('确认执行', style: TextStyle(fontSize: fSmall, color: cWarning, fontWeight: FontWeight.w600)),
                 ),
               ),
             ],
@@ -1710,7 +1738,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
           color: isUser
-              ? cPrimary.withOpacity(0.2)
+              ? cPrimary.withValues(alpha: 0.2)
               : tc.surface,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(rMedium),
@@ -1720,8 +1748,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           ),
           border: Border.all(
             color: isUser
-                ? cPrimary.withOpacity(0.3)
-                : tc.border.withOpacity(0.3),
+                ? cPrimary.withValues(alpha: 0.3)
+                : tc.border.withValues(alpha: 0.3),
           ),
         ),
         child: Column(
@@ -1736,14 +1764,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: isUser
-                          ? [cPrimary.withOpacity(0.18), cPrimary.withOpacity(0.08)]
-                          : [cAgentGreen.withOpacity(0.18), cAgentGreen.withOpacity(0.06)],
+                          ? [cPrimary.withValues(alpha: 0.18), cPrimary.withValues(alpha: 0.08)]
+                          : [cAgentGreen.withValues(alpha: 0.18), cAgentGreen.withValues(alpha: 0.06)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(rXSmall),
                     border: Border.all(
-                      color: (isUser ? cPrimary : cAgentGreen).withOpacity(0.2),
+                      color: (isUser ? cPrimary : cAgentGreen).withValues(alpha: 0.2),
                       width: 0.5,
                     ),
                   ),
@@ -1810,8 +1838,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         children: [
           _buildEventsContent(events, tc, tab, showAutoExecute, isLoading, isWaitingChoice, pendingOptions),
           // 只有在还没有 AI 内容事件时（流式过程中，只有 result/info），才显示流式纯文本
-          if (!hasAIContentEvents && streamingContent.trim().isNotEmpty)
-            _buildMarkdownText(streamingContent, tc),
+          // 流式结束后从历史恢复时 streamingContent 为空，使用持久化的 content 兜底
+          if (!hasAIContentEvents) ...[
+            if (streamingContent.trim().isNotEmpty)
+              _buildMarkdownText(streamingContent, tc)
+            else if (content.trim().isNotEmpty)
+              _buildMarkdownText(content, tc),
+          ],
         ],
       );
     }
@@ -1860,9 +1893,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             color: tc.terminalGreen,
             backgroundColor: tc.terminalBg,
           ),
-          listBullet: TextStyle(color: cPrimary, fontSize: fBody),
+          listBullet: const TextStyle(color: cPrimary, fontSize: fBody),
           blockquote: TextStyle(color: tc.textSub, fontStyle: FontStyle.italic),
-          blockquoteDecoration: BoxDecoration(
+          blockquoteDecoration: const BoxDecoration(
             border: Border(left: BorderSide(color: cPrimary, width: 2)),
           ),
           blockquotePadding: const EdgeInsets.only(left: 8),
@@ -1872,7 +1905,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
-  /// 统一命令块：左侧三角形执行按钮 + 命令文本 + 右侧复制按钮
+  /// 统一命令块：左侧 3px 安全色条 + 命令文本 + 顶部状态标签与操作
   Widget _buildCommandBlock(
     String command,
     ThemeColors tc,
@@ -1897,154 +1930,119 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
     final accentColor = isBlocked ? cDanger : dangerous ? cWarning : tc.terminalGreen;
     final headerBg = isBlocked
-        ? cDanger.withOpacity(0.08)
+        ? cDanger.withValues(alpha: 0.08)
         : dangerous
-            ? cWarning.withOpacity(0.08)
-            : cSuccess.withOpacity(0.08);
+            ? cWarning.withValues(alpha: 0.08)
+            : cSuccess.withValues(alpha: 0.08);
 
     final block = Container(
-      margin: const EdgeInsets.symmetric(vertical: 3),
+      margin: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
-        color: tc.terminalBg,
+        color: tc.terminalOutput,
         borderRadius: BorderRadius.circular(rSmall),
         border: Border.all(color: tc.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          // 顶部栏
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            decoration: BoxDecoration(
-              color: headerBg,
-              border: Border(bottom: BorderSide(color: tc.border, width: 0.5)),
-            ),
-            child: Row(
-              children: [
-                // 红黄绿三个小圆点
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF5F56),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(width: 5),
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFBD2E),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(width: 5),
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF27C93F),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  isBlocked ? '已拦截' : dangerous ? '需确认' : '可执行',
-                  style: TextStyle(
-                    fontSize: fMicro,
-                    color: accentColor,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                // 复制按钮
-                _buildCopyButton(trimmed, tc),
-                const SizedBox(width: 4),
-                // 执行按钮
-                if (canExecute && !isLoading && !isBlocked)
-                  _buildExecuteButton(trimmed, dangerous, isBlocked, tc, tab)
-                else if (isBlocked)
-                  Container(
-                    width: 26,
-                    height: 26,
-                    alignment: Alignment.center,
-                    child: Icon(Icons.block, size: 13, color: cDanger),
-                  ),
-              ],
-            ),
-          ),
-          // 命令内容
-          Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // $ 提示符
-                Text(
-                  '\$ ',
-                  style: TextStyle(
-                    fontFamily: 'JetBrainsMono',
-                    fontSize: fMono,
-                    color: accentColor,
-                    fontWeight: FontWeight.w600,
-                    height: 1.4,
-                  ),
-                ),
-                // 命令文本
-                Expanded(
-                  child: SelectableText(
-                    trimmed,
-                    style: TextStyle(
-                      fontFamily: 'JetBrainsMono',
-                      fontSize: fMono,
-                      color: cmdColor,
-                      height: 1.45,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-
-    if (!indent) return block;
-
-    // 缩进 + 左侧连接线表示从属
-    return Padding(
-      padding: const EdgeInsets.only(left: 16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            children: [
-              Container(
-                width: 3,
-                height: 14,
-                decoration: BoxDecoration(
-                  color: accentColor.withOpacity(0.5),
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(2),
-                    bottomRight: Radius.circular(2),
+          // 左侧 3px 安全色条
+          Container(
+            width: 3,
+            color: accentColor,
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 顶部栏
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: headerBg,
+                    border: Border(bottom: BorderSide(color: tc.border, width: 0.5)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: accentColor.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: Icon(
+                          isBlocked ? Icons.block : dangerous ? Icons.warning_amber : Icons.check,
+                          size: 9,
+                          color: accentColor,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isBlocked ? '已拦截' : dangerous ? '需确认' : '可执行',
+                        style: TextStyle(
+                          fontSize: fMicro,
+                          color: accentColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      // 复制按钮
+                      _buildCopyButton(trimmed, tc),
+                      const SizedBox(width: 4),
+                      // 执行按钮
+                      if (canExecute && !isLoading && !isBlocked)
+                        _buildExecuteButton(trimmed, dangerous, isBlocked, tc, tab)
+                      else if (isBlocked)
+                        Container(
+                          width: 26,
+                          height: 26,
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.block, size: 13, color: cDanger),
+                        ),
+                    ],
                   ),
                 ),
-              ),
-            ],
+                // 命令内容
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // $ 提示符
+                      Text(
+                        '\$ ',
+                        style: TextStyle(
+                          fontFamily: 'JetBrainsMono',
+                          fontSize: fMono,
+                          color: accentColor,
+                          fontWeight: FontWeight.w600,
+                          height: 1.4,
+                        ),
+                      ),
+                      // 命令文本
+                      Expanded(
+                        child: SelectableText(
+                          trimmed,
+                          style: TextStyle(
+                            fontFamily: 'JetBrainsMono',
+                            fontSize: fMono,
+                            color: cmdColor,
+                            height: 1.45,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(width: 10),
-          Expanded(child: block),
         ],
       ),
     );
+
+    return block;
   }
 
   /// 复制按钮
@@ -2054,11 +2052,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         Clipboard.setData(ClipboardData(text: text));
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('已复制', style: TextStyle(fontSize: fSmall)),
-            duration: const Duration(seconds: 1),
+          const SnackBar(
+            content: Text('已复制', style: TextStyle(fontSize: fSmall)),
+            duration: Duration(seconds: 1),
             behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
+            margin: EdgeInsets.all(16),
           ),
         );
       },
@@ -2161,30 +2159,23 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   /// 结果卡片：成功/失败状态 + 输出（全部展开显示）
-  /// [indent] 为 true 时用左侧缩进+连接线表示从属于上方命令
+  /// 背景保持 terminalBg，无左侧缩进，与命令块视觉对齐
   Widget _buildResultCard(AgentEvent event, ThemeColors tc, {required bool indent}) {
     final success = event.success ?? false;
     final output = event.output ?? event.error ?? '(无输出)';
     final lines = output.split('\n');
 
     final statusColor = success ? cSuccess : cDanger;
-    final statusBg = success ? cSuccess.withOpacity(0.08) : cDanger.withOpacity(0.08);
-    final statusIcon = success ? Icons.check_circle : Icons.error_rounded;
+    final statusBg = success ? cSuccess.withValues(alpha: 0.08) : cDanger.withValues(alpha: 0.08);
+    final statusIcon = success ? Icons.check : Icons.close;
     final statusText = success ? '执行成功' : '执行失败';
 
-    final card = Container(
+    return Container(
       margin: const EdgeInsets.only(bottom: 8, top: 2),
       decoration: BoxDecoration(
         color: tc.terminalBg,
         borderRadius: BorderRadius.circular(rSmall),
         border: Border.all(color: tc.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -2200,13 +2191,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             child: Row(
               children: [
                 Container(
-                  width: 16,
-                  height: 16,
+                  width: 14,
+                  height: 14,
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(8),
+                    color: statusColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(7),
                   ),
-                  child: Icon(statusIcon, size: 10, color: statusColor),
+                  child: Icon(statusIcon, size: 9, color: statusColor),
                 ),
                 const SizedBox(width: 6),
                 Text(
@@ -2214,7 +2205,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                   style: TextStyle(
                     color: statusColor,
                     fontSize: fMicro,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     letterSpacing: 0.2,
                   ),
                 ),
@@ -2222,8 +2213,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
-                    color: tc.textMuted.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(4),
+                    color: tc.textMuted.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(rXSmall),
                   ),
                   child: Text(
                     '${lines.length} 行',
@@ -2235,46 +2226,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           ),
           // 输出区 - 全部展开显示
           Padding(
-            padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
             child: SelectableText(
               output.trimRight(),
               style: TextStyle(
                 fontFamily: 'JetBrainsMono',
                 fontSize: fMono,
-                color: tc.textSub,
+                color: tc.textBody,
                 height: 1.45,
               ),
             ),
           ),
-        ],
-      ),
-    );
-
-    if (!indent) return card;
-
-    // 缩进 + 左侧连接线表示从属
-    return Padding(
-      padding: const EdgeInsets.only(left: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Column(
-            children: [
-              Container(
-                width: 3,
-                height: 12,
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.4),
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(2),
-                    bottomRight: Radius.circular(2),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 10),
-          Expanded(child: card),
         ],
       ),
     );
@@ -2288,12 +2250,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: cWarning.withOpacity(0.05),
+        color: cWarning.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: cWarning.withOpacity(0.15)),
+        border: Border.all(color: cWarning.withValues(alpha: 0.15)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.02),
+            color: Colors.black.withValues(alpha: 0.02),
             blurRadius: 4,
             offset: const Offset(0, 1),
           ),
@@ -2310,10 +2272,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 height: 20,
                 margin: const EdgeInsets.only(top: 1),
                 decoration: BoxDecoration(
-                  color: cWarning.withOpacity(0.15),
+                  color: cWarning.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.help_outline, size: 13, color: cWarning),
+                child: const Icon(Icons.help_outline, size: 13, color: cWarning),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -2350,10 +2312,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         decoration: BoxDecoration(
           color: tc.surface,
           borderRadius: BorderRadius.circular(rMedium),
-          border: Border.all(color: cWarning.withOpacity(0.3)),
+          border: Border.all(color: cWarning.withValues(alpha: 0.3)),
           boxShadow: [
             BoxShadow(
-              color: cWarning.withOpacity(0.05),
+              color: cWarning.withValues(alpha: 0.05),
               blurRadius: 4,
               offset: const Offset(0, 1),
             ),
@@ -2362,11 +2324,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.touch_app, size: 12, color: cWarning),
+            const Icon(Icons.touch_app, size: 12, color: cWarning),
             const SizedBox(width: 4),
             Text(
               label,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: fSmall,
                 color: cWarning,
                 fontWeight: FontWeight.w600,
@@ -2386,17 +2348,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            cSuccess.withOpacity(0.12),
-            cSuccess.withOpacity(0.04),
+            cSuccess.withValues(alpha: 0.12),
+            cSuccess.withValues(alpha: 0.04),
           ],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
         ),
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: cSuccess.withOpacity(0.2)),
+        border: Border.all(color: cSuccess.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: cSuccess.withOpacity(0.05),
+            color: cSuccess.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -2408,17 +2370,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             width: 28,
             height: 28,
             decoration: BoxDecoration(
-              color: cSuccess.withOpacity(0.2),
+              color: cSuccess.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(Icons.celebration, size: 15, color: cSuccess),
+            child: const Icon(Icons.celebration, size: 15, color: cSuccess),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   '任务完成',
                   style: TextStyle(
                     color: cSuccess,
@@ -2430,7 +2392,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 const SizedBox(height: 2),
                 SelectableText(
                   event.summary ?? '已完成所有步骤',
-                  style: TextStyle(color: cSuccess.withOpacity(0.85), fontSize: fBody, fontWeight: FontWeight.w500),
+                  style: TextStyle(color: cSuccess.withValues(alpha: 0.85), fontSize: fBody, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -2521,8 +2483,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           final isPrimary = index == 0; // 第一个选项用主色高亮
           final color = isPrimary ? cPrimary : tc.textMain;
           final bgColor = isPrimary
-              ? cPrimary.withOpacity(disabled ? 0.1 : 0.15)
-              : tc.border.withOpacity(disabled ? 0.3 : 0.6);
+              ? cPrimary.withValues(alpha: disabled ? 0.1 : 0.15)
+              : tc.border.withValues(alpha: disabled ? 0.3 : 0.6);
 
           return GestureDetector(
             onTap: disabled ? null : () => _onOptionSelected(option),
@@ -2532,21 +2494,21 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 color: bgColor,
                 borderRadius: BorderRadius.circular(rSmall),
                 border: Border.all(
-                  color: color.withOpacity(disabled ? 0.2 : 0.4),
+                  color: color.withValues(alpha: disabled ? 0.2 : 0.4),
                 ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (isPrimary) ...[
-                    Icon(Icons.check_circle_outline, size: 14, color: color.withOpacity(disabled ? 0.4 : 1)),
+                    Icon(Icons.check_circle_outline, size: 14, color: color.withValues(alpha: disabled ? 0.4 : 1)),
                     const SizedBox(width: 4),
                   ],
                   Text(
                     option,
                     style: TextStyle(
                       fontSize: fSmall,
-                      color: color.withOpacity(disabled ? 0.4 : 1),
+                      color: color.withValues(alpha: disabled ? 0.4 : 1),
                       fontWeight: isPrimary ? FontWeight.w600 : FontWeight.w400,
                     ),
                   ),
@@ -2607,9 +2569,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         height: 28,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isDisabled ? Colors.transparent : color.withOpacity(0.12),
+          color: isDisabled ? Colors.transparent : color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(rSmall),
-          border: isDisabled ? null : Border.all(color: color.withOpacity(0.35)),
+          border: isDisabled ? null : Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: isExecuting
             ? SizedBox(
@@ -2618,7 +2580,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 child: CircularProgressIndicator(strokeWidth: 1.5, color: color),
               )
             : isBlocked
-                ? Icon(Icons.block, size: 14, color: cDanger)
+                ? const Icon(Icons.block, size: 14, color: cDanger)
                 : Icon(Icons.play_arrow, size: 18, color: color),
       ),
     );
@@ -2638,7 +2600,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('⚠️ 此命令较为复杂，建议确认后执行：', style: TextStyle(color: cWarning, fontSize: fSmall)),
+              const Text('⚠️ 此命令较为复杂，建议确认后执行：', style: TextStyle(color: cWarning, fontSize: fSmall)),
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(8),
@@ -2648,7 +2610,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 ),
                 child: SelectableText(
                   command,
-                  style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: fMono, color: cTerminalGreen),
+                  style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: fMono, color: cTerminalGreen),
                 ),
               ),
             ],
@@ -2656,12 +2618,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: Text('取消', style: TextStyle(color: cTextSub, fontSize: fBody)),
+              child: const Text('取消', style: TextStyle(color: cTextSub, fontSize: fBody)),
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, true),
               style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
-              child: Text('执行', style: TextStyle(fontSize: fBody)),
+              child: const Text('执行', style: TextStyle(fontSize: fBody)),
             ),
           ],
         ),
@@ -2697,18 +2659,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         _autoScrollChat = true;
         ref.read(agentProvider.notifier).newSession();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('已新建会话', style: TextStyle(fontSize: 13)),
-            duration: const Duration(seconds: 1),
+          const SnackBar(
+            content: Text('已新建会话', style: TextStyle(fontSize: 13)),
+            duration: Duration(seconds: 1),
           ),
         );
         return true;
       case '/compact':
         if (!isConnected) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('请先连接终端', style: TextStyle(fontSize: 13)),
-              duration: const Duration(seconds: 1),
+            const SnackBar(
+              content: Text('请先连接终端', style: TextStyle(fontSize: 13)),
+              duration: Duration(seconds: 1),
             ),
           );
           return true;
@@ -2720,9 +2682,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         ref.read(agentProvider.notifier).compact().then((_) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Text('记忆压缩完成', style: TextStyle(fontSize: 13)),
-              duration: const Duration(seconds: 1),
+            const SnackBar(
+              content: Text('记忆压缩完成', style: TextStyle(fontSize: 13)),
+              duration: Duration(seconds: 1),
             ),
           );
         }).catchError((e) {
@@ -2749,145 +2711,147 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
     return Container(
       padding: EdgeInsets.only(
-        left: 8, right: 8, top: 4,
-        bottom: 4 + (_isMobile ? MediaQuery.of(context).padding.bottom : 0),
+        left: 12, right: 12, top: 8,
+        bottom: 8 + (_isMobile ? MediaQuery.of(context).padding.bottom : 0),
       ),
       decoration: BoxDecoration(
         color: tc.card,
-        border: Border(top: BorderSide(color: tc.border.withOpacity(0.5))),
+        border: Border(top: BorderSide(color: tc.border)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 上方一行：功能按钮
+          // 工具栏
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Agent 模式指示
+              // Agent 模式胶囊
               Container(
-                height: 26,
-                width: 26,
+                height: 28,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(
-                  color: cAgentGreen.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(rSmall),
+                  color: cAgentGreen.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(rFull),
+                  border: Border.all(color: cAgentGreen.withValues(alpha: 0.25)),
                 ),
-                child: Icon(
-                  Icons.smart_toy,
-                  color: cAgentGreen,
-                  size: 12,
-                ),
-              ),
-              const SizedBox(width: 4),
-              // Agent 标签
-              Container(
-                height: 26,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: cAgentGreen.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(rXSmall),
-                  border: Border.all(color: cAgentGreen.withOpacity(0.3)),
-                ),
-                child: Center(
-                  child: Text(
-                    'Agent',
-                    style: TextStyle(
-                      fontSize: fSmall,
-                      color: cAgentGreen,
-                      fontWeight: FontWeight.w600,
-                      height: 1.0,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.smart_toy, size: 12, color: cAgentGreen),
+                    SizedBox(width: 5),
+                    Text(
+                      'Agent',
+                      style: TextStyle(
+                        fontSize: fSmall,
+                        color: cAgentGreen,
+                        fontWeight: FontWeight.w600,
+                        height: 1.0,
+                      ),
                     ),
-                  ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 4),
-              // Agent 日志按钮
-              GestureDetector(
+              const SizedBox(width: 6),
+              // 日志按钮
+              _buildToolbarIconButton(
+                icon: Icons.terminal_outlined,
+                tooltip: 'Agent 日志',
                 onTap: () => _showAgentLogDialog(context),
-                child: Container(
-                  height: 26,
-                  width: 26,
-                  decoration: BoxDecoration(
-                    color: tc.surface,
-                    borderRadius: BorderRadius.circular(rSmall),
-                  ),
-                  child: Icon(Icons.terminal, size: 12, color: tc.textSub),
-                ),
+                tc: tc,
               ),
               const SizedBox(width: 4),
-              // 会话历史按钮
-              GestureDetector(
+              // 历史按钮
+              _buildToolbarIconButton(
+                icon: Icons.history_outlined,
+                tooltip: '会话历史',
                 onTap: () => _showSessionHistoryPanel(context),
-                child: Container(
-                  height: 26,
-                  width: 26,
-                  decoration: BoxDecoration(
-                    color: tc.surface,
-                    borderRadius: BorderRadius.circular(rSmall),
-                  ),
-                  child: Icon(Icons.history, size: 12, color: tc.textSub),
-                ),
+                tc: tc,
               ),
               const Spacer(),
               // 运行状态指示
               if (agentState.isRunning)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: cAgentGreen.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(rXSmall),
+                    color: cAgentGreen.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(rFull),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      SizedBox(
+                      const SizedBox(
                         width: 10, height: 10,
                         child: CircularProgressIndicator(strokeWidth: 1.5, color: cAgentGreen),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 5),
                       Text(
                         agentState.statusText,
-                        style: TextStyle(fontSize: fMicro, color: cAgentGreen, fontWeight: FontWeight.w500),
+                        style: const TextStyle(fontSize: fMicro, color: cAgentGreen, fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
                 ),
               if (agentState.isRunning)
-                const SizedBox(width: 4),
-              // 模型选择（贴右）
+                const SizedBox(width: 6),
+              // 模型选择
               if (models.isNotEmpty)
                 _buildModelSelector(models, tc),
             ],
           ),
-          const SizedBox(height: 4),
-          // 下方一行：输入框
+          const SizedBox(height: 8),
+          // 输入框
           _AIPromptInput(
-              enabled: isConnected && !agentState.isRunning,
-              hintText: _getInputHint(isConnected, agentState.isRunning),
-              initialText: _tabAiInputText[_currentTabId ?? ''] ?? '',
-              accentColor: cAgentGreen,
-              onFocusChanged: (focused) {
-                setState(() => _aiInputFocused = focused);
-              },
-              onChanged: (text) { _tabAiInputText[_currentTabId ?? ''] = text; },
-              onSlashCommand: (command) {
-                return _handleSlashCommand(command, isConnected: isConnected);
-              },
-              onSend: (text) async {
-                if (!_checkAIModelConfigured()) {
-                  _showAIModelNotConfiguredHint();
-                  return;
-                }
-                _autoScrollChat = true; // 用户发送新消息时恢复自动滚动
-                if (isConnected) {
-                  final tab = ref.read(tp.terminalProvider).activeTab;
-                  // 本地终端用 localService，SSH 用 service
-                  final CommandExecutor? executor = tab?.isLocal == true ? tab?.localService : tab?.service;
-                  ref.read(agentProvider.notifier).setExecutor(executor);
-                  await ref.read(agentProvider.notifier).startTask(text);
-                }
-              },
-            ),
+            enabled: isConnected && !agentState.isRunning,
+            hintText: _getInputHint(isConnected, agentState.isRunning),
+            initialText: _tabAiInputText[_currentTabId ?? ''] ?? '',
+            accentColor: cAgentGreen,
+            onFocusChanged: (focused) {
+              setState(() => _aiInputFocused = focused);
+            },
+            onChanged: (text) { _tabAiInputText[_currentTabId ?? ''] = text; },
+            onSlashCommand: (command) {
+              return _handleSlashCommand(command, isConnected: isConnected);
+            },
+            onSend: (text) async {
+              if (!_checkAIModelConfigured()) {
+                _showAIModelNotConfiguredHint();
+                return;
+              }
+              _autoScrollChat = true; // 用户发送新消息时恢复自动滚动
+              if (isConnected) {
+                final tab = ref.read(tp.terminalProvider).activeTab;
+                // 本地终端用 localService，SSH 用 service
+                final CommandExecutor? executor = tab?.isLocal == true ? tab?.localService : tab?.service;
+                ref.read(agentProvider.notifier).setExecutor(executor);
+                await ref.read(agentProvider.notifier).startTask(text);
+              }
+            },
+          ),
         ],
+      ),
+    );
+  }
+
+  /// 工具栏图标按钮
+  Widget _buildToolbarIconButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+    required ThemeColors tc,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: tc.surface,
+            borderRadius: BorderRadius.circular(rSmall),
+          ),
+          child: Icon(icon, size: 14, color: tc.textSub),
+        ),
       ),
     );
   }
@@ -2905,7 +2869,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         decoration: BoxDecoration(
           color: tc.surface,
           borderRadius: BorderRadius.circular(rSmall),
-          border: Border.all(color: tc.border.withOpacity(0.3)),
+          border: Border.all(color: tc.border.withValues(alpha: 0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -2968,32 +2932,32 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
     // 高频组合键（始终显示）
     final coreKeys = [
-      _QuickKey('ESC', '\x1b'),
-      _QuickKey('Tab', '\t'),
-      _QuickKey('⌃C', '\x03'),
-      _QuickKey('⌃D', '\x04'),
-      _QuickKey('⌃Z', '\x1a'),
-      _QuickKey('⌃L', '\x0c'),
+      const _QuickKey('ESC', '\x1b'),
+      const _QuickKey('Tab', '\t'),
+      const _QuickKey('⌃C', '\x03'),
+      const _QuickKey('⌃D', '\x04'),
+      const _QuickKey('⌃Z', '\x1a'),
+      const _QuickKey('⌃L', '\x0c'),
     ];
     // readline 快捷键
     final readlineKeys = [
-      _QuickKey('⌃A', '\x01'),
-      _QuickKey('⌃E', '\x05'),
-      _QuickKey('⌃U', '\x15'),  // 删除行首到光标
-      _QuickKey('⌃K', '\x0b'),  // 删除光标到行尾
-      _QuickKey('⌃W', '\x17'),  // 删除前一个单词
-      _QuickKey('⌃R', '\x12'),  // 搜索历史命令
+      const _QuickKey('⌃A', '\x01'),
+      const _QuickKey('⌃E', '\x05'),
+      const _QuickKey('⌃U', '\x15'),  // 删除行首到光标
+      const _QuickKey('⌃K', '\x0b'),  // 删除光标到行尾
+      const _QuickKey('⌃W', '\x17'),  // 删除前一个单词
+      const _QuickKey('⌃R', '\x12'),  // 搜索历史命令
     ];
     // 方向 + 导航键
     final navKeys = [
-      _QuickKey('↑', '\x1b[A'),
-      _QuickKey('↓', '\x1b[B'),
-      _QuickKey('←', '\x1b[D'),
-      _QuickKey('→', '\x1b[C'),
-      _QuickKey('Home', '\x1b[H'),
-      _QuickKey('End', '\x1b[F'),
-      _QuickKey('PgUp', '\x1b[5~'),
-      _QuickKey('PgDn', '\x1b[6~'),
+      const _QuickKey('↑', '\x1b[A'),
+      const _QuickKey('↓', '\x1b[B'),
+      const _QuickKey('←', '\x1b[D'),
+      const _QuickKey('→', '\x1b[C'),
+      const _QuickKey('Home', '\x1b[H'),
+      const _QuickKey('End', '\x1b[F'),
+      const _QuickKey('PgUp', '\x1b[5~'),
+      const _QuickKey('PgDn', '\x1b[6~'),
     ];
     final keys = [...coreKeys, ...readlineKeys, ...navKeys];
     // 分组索引：高频键用主色高亮
@@ -3003,7 +2967,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       height: 36,
       decoration: BoxDecoration(
         color: tc.card,
-        border: Border(top: BorderSide(color: tc.border.withOpacity(0.3))),
+        border: Border(top: BorderSide(color: tc.border.withValues(alpha: 0.3))),
       ),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
@@ -3015,7 +2979,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             return Container(
               width: 1,
               margin: const EdgeInsets.symmetric(vertical: 4),
-              color: tc.border.withOpacity(0.4),
+              color: tc.border.withValues(alpha: 0.4),
             );
           }
           return const SizedBox(width: 3);
@@ -3030,17 +2994,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: isCore
-                    ? cPrimary.withOpacity(isConnected ? 0.12 : 0.05)
+                    ? cPrimary.withValues(alpha: isConnected ? 0.12 : 0.05)
                     : isNav
-                        ? cSuccess.withOpacity(isConnected ? 0.08 : 0.03)
+                        ? cSuccess.withValues(alpha: isConnected ? 0.08 : 0.03)
                         : tc.surface,
                 borderRadius: BorderRadius.circular(rXSmall),
                 border: Border.all(
                   color: isCore
-                      ? cPrimary.withOpacity(isConnected ? 0.3 : 0.1)
+                      ? cPrimary.withValues(alpha: isConnected ? 0.3 : 0.1)
                       : isNav
-                          ? cSuccess.withOpacity(isConnected ? 0.2 : 0.05)
-                          : tc.border.withOpacity(0.3),
+                          ? cSuccess.withValues(alpha: isConnected ? 0.2 : 0.05)
+                          : tc.border.withValues(alpha: 0.3),
                 ),
               ),
               child: Center(
@@ -3091,10 +3055,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   void _showAIModelNotConfiguredHint() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
+        content: const Row(
           children: [
             Icon(Icons.warning_amber, color: Colors.white, size: 18),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             Text('请先配置 AI 模型', style: TextStyle(fontSize: fBody)),
           ],
         ),
@@ -3117,15 +3081,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       padding: const EdgeInsets.all(6),
       margin: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: cDanger.withOpacity(0.08),
+        color: cDanger.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: cDanger.withOpacity(0.15)),
+        border: Border.all(color: cDanger.withValues(alpha: 0.15)),
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, color: cDanger, size: 14),
+          const Icon(Icons.error_outline, color: cDanger, size: 14),
           const SizedBox(width: 6),
-          Expanded(child: Text(error, style: TextStyle(color: cDanger, fontSize: fSmall), maxLines: 2, overflow: TextOverflow.ellipsis)),
+          Expanded(child: Text(error, style: const TextStyle(color: cDanger, fontSize: fSmall), maxLines: 2, overflow: TextOverflow.ellipsis)),
         ],
       ),
     );
@@ -3157,13 +3121,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Agent 自动模式下的最大执行步骤数。设为 0 表示无限制，复杂任务不会被中断。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
+            const Text('Agent 自动模式下的最大执行步骤数。设为 0 表示无限制，复杂任务不会被中断。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
             const SizedBox(height: 12),
             TextField(
               controller: controller,
               keyboardType: TextInputType.number,
-              style: TextStyle(color: cTextMain, fontSize: fBody),
-              decoration: InputDecoration(
+              style: const TextStyle(color: cTextMain, fontSize: fBody),
+              decoration: const InputDecoration(
                 labelText: '步骤数 (0 = 无限制)',
                 labelStyle: TextStyle(color: cTextSub),
                 enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: cBorder)),
@@ -3175,7 +3139,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('取消', style: TextStyle(color: cTextSub)),
+            child: const Text('取消', style: TextStyle(color: cTextSub)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -3192,7 +3156,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
-            child: Text('确定'),
+            child: const Text('确定'),
           ),
         ],
       ),
@@ -3224,16 +3188,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('命令: ${snippet.command}', style: TextStyle(color: cTextSub, fontSize: fSmall, fontFamily: 'JetBrainsMono')),
+            Text('命令: ${snippet.command}', style: const TextStyle(color: cTextSub, fontSize: fSmall, fontFamily: 'JetBrainsMono')),
             const SizedBox(height: 12),
             ...variables.map((v) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: TextField(
                 controller: controllers[v],
-                style: TextStyle(color: cTextMain, fontSize: fBody),
+                style: const TextStyle(color: cTextMain, fontSize: fBody),
                 decoration: InputDecoration(
                   labelText: '{{$v}}',
-                  labelStyle: TextStyle(color: cTextSub),
+                  labelStyle: const TextStyle(color: cTextSub),
                   filled: true,
                   fillColor: cSurface,
                 ),
@@ -3242,7 +3206,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text('取消', style: TextStyle(color: cTextSub))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消', style: TextStyle(color: cTextSub))),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
@@ -3253,7 +3217,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
-            child: Text('执行'),
+            child: const Text('执行'),
           ),
         ],
       ),
@@ -3278,14 +3242,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('追加到 AI 系统提示词末尾的自定义指令，可用于调整 AI 行为风格、输出偏好等。留空则不追加。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
+              const Text('追加到 AI 系统提示词末尾的自定义指令，可用于调整 AI 行为风格、输出偏好等。留空则不追加。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
               const SizedBox(height: 12),
               TextField(
                 controller: controller,
                 maxLines: 5,
                 minLines: 2,
-                style: TextStyle(color: cTextMain, fontSize: fBody),
-                decoration: InputDecoration(
+                style: const TextStyle(color: cTextMain, fontSize: fBody),
+                decoration: const InputDecoration(
                   hintText: '例如：回答使用英文、输出简洁格式、优先使用 Docker...',
                   hintStyle: TextStyle(color: cTextMuted, fontSize: fSmall),
                   enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: cBorder)),
@@ -3298,7 +3262,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('取消', style: TextStyle(color: cTextSub)),
+            child: const Text('取消', style: TextStyle(color: cTextSub)),
           ),
           ElevatedButton(
             onPressed: () {
@@ -3307,15 +3271,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               } catch (_) {}
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
+                const SnackBar(
                   content: Text('自定义提示词已保存'),
-                  duration: const Duration(seconds: 1),
+                  duration: Duration(seconds: 1),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
-            child: Text('保存'),
+            child: const Text('保存'),
           ),
         ],
       ),
@@ -3337,16 +3301,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('AI 的核心系统提示词，修改后立即生效。包含 {context} 的位置会被替换为服务器信息。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
+              const Text('AI 的核心系统提示词，修改后立即生效。包含 {context} 的位置会被替换为服务器信息。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
               const SizedBox(height: 6),
-              Text('⚠️ 修改需谨慎，可随时"重置默认"。', style: TextStyle(color: cWarning, fontSize: fMicro)),
+              const Text('⚠️ 修改需谨慎，可随时"重置默认"。', style: TextStyle(color: cWarning, fontSize: fMicro)),
               const SizedBox(height: 10),
               TextField(
                 controller: controller,
                 maxLines: 10,
                 minLines: 5,
-                style: TextStyle(color: cTextMain, fontSize: fSmall, fontFamily: 'JetBrainsMono'),
-                decoration: InputDecoration(
+                style: const TextStyle(color: cTextMain, fontSize: fSmall, fontFamily: 'JetBrainsMono'),
+                decoration: const InputDecoration(
                   enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: cBorder)),
                   focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
                 ),
@@ -3357,26 +3321,26 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         actions: [
           TextButton(
             onPressed: () => controller.text = prompts.defaultSystemPrompt,
-            child: Text('重置默认', style: TextStyle(color: cWarning)),
+            child: const Text('重置默认', style: TextStyle(color: cWarning)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('取消', style: TextStyle(color: cTextSub)),
+            child: const Text('取消', style: TextStyle(color: cTextSub)),
           ),
           ElevatedButton(
             onPressed: () {
               prompts.saveSystemPrompt(controller.text.trim());
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
+                const SnackBar(
                   content: Text('内置提示词已保存'),
-                  duration: const Duration(seconds: 1),
+                  duration: Duration(seconds: 1),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
-            child: Text('保存'),
+            child: const Text('保存'),
           ),
         ],
       ),
@@ -3504,9 +3468,9 @@ class _AIPromptInputState extends State<_AIPromptInput> {
           decoration: BoxDecoration(
             color: tc.cardElevated,
             borderRadius: BorderRadius.circular(rSmall),
-            border: Border.all(color: tc.border.withOpacity(0.5)),
+            border: Border.all(color: tc.border.withValues(alpha: 0.5)),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 2)),
+              BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2)),
             ],
           ),
           child: Column(
@@ -3518,7 +3482,7 @@ class _AIPromptInputState extends State<_AIPromptInput> {
                   onTap: () => _selectSlashCommand(_filteredCommands[i]),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    color: i == _highlightedIndex ? widget.accentColor.withOpacity(0.15) : Colors.transparent,
+                    color: i == _highlightedIndex ? widget.accentColor.withValues(alpha: 0.15) : Colors.transparent,
                     child: Row(
                       children: [
                         Text(
@@ -3636,20 +3600,23 @@ class _AIPromptInputState extends State<_AIPromptInput> {
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
     final borderColor = _isFocused
-        ? widget.accentColor.withOpacity(0.7)
-        : widget.accentColor.withOpacity(0.4);
-    final disabledBorderColor = tc.border.withOpacity(0.3);
+        ? widget.accentColor.withValues(alpha: 0.7)
+        : tc.border.withValues(alpha: 0.5);
+    final disabledBorderColor = tc.border.withValues(alpha: 0.3);
     return KeyboardListener(
       focusNode: _focusNode,
       onKeyEvent: _handleKeyEvent,
       child: TextField(
         controller: _controller,
         enabled: widget.enabled,
-        maxLines: 1,
-        style: TextStyle(color: tc.textMain, fontSize: fSmall),
+        minLines: 1,
+        maxLines: 5,
+        keyboardType: TextInputType.multiline,
+        textInputAction: TextInputAction.newline,
+        style: TextStyle(color: tc.textMain, fontSize: fBody, height: 1.5),
         decoration: InputDecoration(
           hintText: widget.hintText,
-          hintStyle: TextStyle(color: tc.textMuted, fontSize: fSmall),
+          hintStyle: TextStyle(color: tc.textMuted, fontSize: fBody),
           filled: true,
           fillColor: tc.surface,
           border: OutlineInputBorder(
@@ -3662,22 +3629,35 @@ class _AIPromptInputState extends State<_AIPromptInput> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(rSmall),
-            borderSide: BorderSide(color: borderColor, width: 1.5),
+            borderSide: BorderSide(color: widget.accentColor, width: 1.5),
           ),
           disabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(rSmall),
             borderSide: BorderSide(color: disabledBorderColor),
           ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-          isDense: true,
-          suffixIcon: IconButton(
-            icon: Icon(Icons.send_rounded, color: widget.enabled ? widget.accentColor : cTextMuted, size: 14),
-            onPressed: _send,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+          contentPadding: const EdgeInsets.fromLTRB(14, 12, 48, 12),
+          isDense: false,
+          suffixIcon: Padding(
+            padding: const EdgeInsets.all(4),
+            child: GestureDetector(
+              onTap: widget.enabled ? _send : null,
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: widget.enabled ? widget.accentColor : cTextMuted,
+                  borderRadius: BorderRadius.circular(rSmall),
+                ),
+                child: const Icon(
+                  Icons.arrow_upward_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+            ),
           ),
         ),
-        onSubmitted: (_) => _send(),
+        onSubmitted: (_) {},
       ),
     );
   }
@@ -3726,19 +3706,20 @@ class _SessionHistoryDialogState extends ConsumerState<_SessionHistoryDialog> {
           children: [
             Row(
               children: [
-                Icon(Icons.history, color: cPrimary, size: 18),
+                const Icon(Icons.history, color: cPrimary, size: 18),
                 const SizedBox(width: 8),
                 Text('会话历史', style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
                 const Spacer(),
                 // 新建会话按钮
                 TextButton.icon(
                   onPressed: () async {
+                    final ctx = context;
                     await ref.read(agentProvider.notifier).newSession();
-                    if (!mounted) return;
-                    Navigator.of(context).pop();
+                    if (!ctx.mounted) return;
+                    Navigator.of(ctx).pop();
                   },
-                  icon: Icon(Icons.add, size: 14, color: cPrimary),
-                  label: Text('新建', style: TextStyle(fontSize: fSmall, color: cPrimary)),
+                  icon: const Icon(Icons.add, size: 14, color: cPrimary),
+                  label: const Text('新建', style: TextStyle(fontSize: fSmall, color: cPrimary)),
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     minimumSize: Size.zero,
@@ -3777,10 +3758,10 @@ class _SessionHistoryDialogState extends ConsumerState<_SessionHistoryDialog> {
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
-        color: isActive ? cPrimary.withOpacity(0.08) : Colors.transparent,
+        color: isActive ? cPrimary.withValues(alpha: 0.08) : Colors.transparent,
         borderRadius: BorderRadius.circular(rSmall),
         border: Border.all(
-          color: isActive ? cPrimary.withOpacity(0.3) : tc.border.withOpacity(0.3),
+          color: isActive ? cPrimary.withValues(alpha: 0.3) : tc.border.withValues(alpha: 0.3),
         ),
       ),
       child: InkWell(
@@ -3840,10 +3821,10 @@ class _SessionHistoryDialogState extends ConsumerState<_SessionHistoryDialog> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                             decoration: BoxDecoration(
-                              color: cAgentGreen.withOpacity(0.15),
+                              color: cAgentGreen.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(rXSmall),
                             ),
-                            child: Text(
+                            child: const Text(
                               '已压缩',
                               style: TextStyle(color: cAgentGreen, fontSize: fMicro),
                             ),
@@ -3910,7 +3891,7 @@ class _SessionHistoryDialogState extends ConsumerState<_SessionHistoryDialog> {
               Navigator.pop(ctx);
             },
             style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
-            child: Text('保存', style: TextStyle(fontSize: fBody)),
+            child: const Text('保存', style: TextStyle(fontSize: fBody)),
           ),
         ],
       ),
@@ -3939,7 +3920,7 @@ class _SessionHistoryDialogState extends ConsumerState<_SessionHistoryDialog> {
               _loadSessions();
             },
             style: ElevatedButton.styleFrom(backgroundColor: cDanger, foregroundColor: Colors.white),
-            child: Text('删除', style: TextStyle(fontSize: fBody)),
+            child: const Text('删除', style: TextStyle(fontSize: fBody)),
           ),
         ],
       ),
@@ -4022,7 +4003,7 @@ class _AgentLogDialogState extends State<_AgentLogDialog> {
           children: [
             Row(
               children: [
-                Icon(Icons.terminal, color: cPrimary, size: 18),
+                const Icon(Icons.terminal, color: cPrimary, size: 18),
                 const SizedBox(width: 8),
                 Text('Agent 日志', style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
                 const Spacer(),
@@ -4031,9 +4012,10 @@ class _AgentLogDialogState extends State<_AgentLogDialog> {
                   tooltip: '复制全部日志',
                   icon: Icon(Icons.copy_all, color: tc.textSub, size: 16),
                   onPressed: () async {
+                    final ctx = context;
                     await Clipboard.setData(ClipboardData(text: _logs.join('\n')));
-                    if (!mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    if (!ctx.mounted) return;
+                    ScaffoldMessenger.of(ctx).showSnackBar(
                       SnackBar(
                         content: Text('已复制 ${_logs.length} 条日志', style: const TextStyle(fontSize: 13)),
                         duration: const Duration(seconds: 1),
@@ -4069,10 +4051,15 @@ class _AgentLogDialogState extends State<_AgentLogDialog> {
                         itemBuilder: (context, index) {
                           final log = _logs[index];
                           Color color = cTextSub;
-                          if (log.contains('[ERROR]')) color = cDanger;
-                          else if (log.contains('[WARN]')) color = cWarning;
-                          else if (log.contains('[DEBUG]')) color = cTextMuted;
-                          else if (log.contains('[INFO]')) color = cSuccess;
+                          if (log.contains('[ERROR]')) {
+                            color = cDanger;
+                          } else if (log.contains('[WARN]')) {
+                            color = cWarning;
+                          } else if (log.contains('[DEBUG]')) {
+                            color = cTextMuted;
+                          } else if (log.contains('[INFO]')) {
+                            color = cSuccess;
+                          }
                           return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 0.5),
                             child: Text(log, style: TextStyle(fontFamily: 'monospace', fontSize: fMicro, color: color)),
@@ -4100,7 +4087,7 @@ class _AgentLogDialogState extends State<_AgentLogDialog> {
                             color: tc.cardElevated,
                             borderRadius: BorderRadius.circular(rFull),
                             border: Border.all(color: tc.border),
-                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 6)],
+                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 6)],
                           ),
                           child: Icon(Icons.keyboard_arrow_down, size: 18, color: tc.textSub),
                         ),
@@ -4110,7 +4097,7 @@ class _AgentLogDialogState extends State<_AgentLogDialog> {
               ),
             ),
             const SizedBox(height: 8),
-            Text('共 ${_logs.length} 条', style: TextStyle(color: cTextMuted, fontSize: fMicro)),
+            Text('共 ${_logs.length} 条', style: const TextStyle(color: cTextMuted, fontSize: fMicro)),
           ],
         ),
       ),
@@ -4250,9 +4237,9 @@ class _TabItemState extends State<_TabItem> {
 
     Color bgColor;
     if (isActive) {
-      bgColor = tc.surface;
+      bgColor = tc.cardElevated;
     } else if (_isHovered) {
-      bgColor = tc.surface.withOpacity(0.5);
+      bgColor = tc.surface;
     } else {
       bgColor = Colors.transparent;
     }
@@ -4262,61 +4249,82 @@ class _TabItemState extends State<_TabItem> {
       child: MouseRegion(
         onEnter: (_) => setState(() => _isHovered = true),
         onExit: (_) => setState(() => _isHovered = false),
-        child: Container(
-          height: 32,
-          constraints: const BoxConstraints(maxWidth: 140, minWidth: 60),
-          margin: const EdgeInsets.only(right: 2),
-          padding: const EdgeInsets.only(left: 8, right: 4),
+        child: AnimatedContainer(
+          duration: animFast,
+          height: 34,
+          constraints: const BoxConstraints(maxWidth: 160, minWidth: 72),
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          padding: const EdgeInsets.only(left: 10, right: 4),
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(rSmall),
-            border: isActive
-                ? Border.all(color: cPrimary.withOpacity(0.4), width: 1)
-                : null,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
+          child: Stack(
+            alignment: Alignment.center,
             children: [
-              Container(
-                width: 5,
-                height: 5,
-                margin: const EdgeInsets.only(right: 5),
-                decoration: BoxDecoration(
-                  color: tab.isConnected ? cSuccess : cDanger,
-                  shape: BoxShape.circle,
-                  boxShadow: tab.isConnected
-                      ? [BoxShadow(color: cSuccess.withOpacity(0.4), blurRadius: 3)]
-                      : null,
-                ),
-              ),
-              Flexible(
-                child: Text(
-                  tab.title,
-                  style: TextStyle(
-                    color: isActive ? tc.textMain : tc.textSub,
-                    fontSize: fSmall,
-                    fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
+              // 标签内容
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 6,
+                    height: 6,
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: BoxDecoration(
+                      color: tab.isConnected ? cSuccess : cDanger,
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-              ),
-              GestureDetector(
-                onTap: widget.onClose,
-                child: Container(
-                  width: 16,
-                  height: 16,
-                  margin: const EdgeInsets.only(left: 2),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(rXSmall),
+                  Flexible(
+                    child: Text(
+                      tab.title,
+                      style: TextStyle(
+                        color: isActive ? tc.textMain : tc.textSub,
+                        fontSize: fSmall,
+                        fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
                   ),
-                  child: Icon(
-                    Icons.close,
-                    size: 10,
-                    color: isActive ? tc.textSub : tc.textMuted,
+                  // 关闭按钮：hover / active 时显示
+                  AnimatedOpacity(
+                    duration: animFast,
+                    opacity: (_isHovered || isActive) ? 1.0 : 0.0,
+                    child: GestureDetector(
+                      onTap: widget.onClose,
+                      child: Container(
+                        width: 18,
+                        height: 18,
+                        margin: const EdgeInsets.only(left: 4),
+                        decoration: BoxDecoration(
+                          color: _isHovered ? tc.border.withValues(alpha: 0.5) : Colors.transparent,
+                          borderRadius: BorderRadius.circular(rXSmall),
+                        ),
+                        child: Icon(
+                          Icons.close,
+                          size: 10,
+                          color: isActive ? tc.textSub : tc.textMuted,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              // 激活态底部指示线
+              if (isActive)
+                Positioned(
+                  bottom: 0,
+                  left: 6,
+                  right: 6,
+                  child: Container(
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: cPrimary,
+                      borderRadius: BorderRadius.circular(1),
+                    ),
                   ),
                 ),
-              ),
             ],
           ),
         ),

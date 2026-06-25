@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#0B0F19"/>
+    </linearGradient>
+    <linearGradient id="prompt" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#3B7DFF"/>
+      <stop offset="100%" stop-color="#5A9AFF"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2.5" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  <!-- App icon background -->
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg)"/>
+  <!-- Inner terminal frame -->
+  <rect x="20" y="20" width="88" height="88" rx="18" fill="#1A1F2E" stroke="#2A2F3E" stroke-width="2"/>
+  <!-- Terminal prompt: > -->
+  <path d="M42 52 L60 68 L42 84" fill="none" stroke="url(#prompt)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Cursor: _ -->
+  <rect x="62" y="78" width="28" height="8" rx="4" fill="#6ECC54"/>
+  <!-- AI sparkle -->
+  <g transform="translate(92, 38)" filter="url(#glow)">
+    <circle cx="0" cy="0" r="5" fill="#6ECC54"/>
+    <path d="M0 -14 L1.8 -5.2 L10 0 L1.8 5.2 L0 14 L-1.8 5.2 L-10 0 L-1.8 -5.2 Z" fill="#6ECC54"/>
+  </g>
+</svg>

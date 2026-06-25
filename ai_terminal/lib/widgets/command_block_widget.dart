@@ -82,16 +82,16 @@ class CommandBlockWidget extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: cDanger.withOpacity(0.2),
+              color: cDanger.withValues(alpha: 0.2),
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(6),
                 topRight: Radius.circular(6),
               ),
             ),
-            child: Row(
+            child: const Row(
               children: [
                 Icon(Icons.warning_amber, color: cDanger, size: 18),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Text(
                   '⚠️ 复杂命令，请手动复制到终端执行',
                   style: TextStyle(
@@ -109,7 +109,7 @@ class CommandBlockWidget extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: SelectableText(
               data.command,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'JetBrainsMono',
                 fontSize: fMono,
                 color: cTerminalGreen,
@@ -162,7 +162,7 @@ class CommandBlockWidget extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                Text(
+                const Text(
                   '命令',
                   style: TextStyle(fontSize: fSmall, color: cTextSub),
                 ),
@@ -187,7 +187,7 @@ class CommandBlockWidget extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: SelectableText(
               data.command,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'JetBrainsMono',
                 fontSize: fMono,
                 color: cTerminalGreen,
@@ -201,7 +201,7 @@ class CommandBlockWidget extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Text(
                 data.description!,
-                style: TextStyle(fontSize: fSmall, color: cTextSub),
+                style: const TextStyle(fontSize: fSmall, color: cTextSub),
               ),
             ),
 
@@ -217,14 +217,14 @@ class CommandBlockWidget extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
+                  const Text(
                     '执行结果:',
                     style: TextStyle(fontSize: fSmall, color: cTextSub),
                   ),
                   const SizedBox(height: 4),
                   SelectableText(
                     data.output!,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontFamily: 'JetBrainsMono',
                       fontSize: fMono,
                       color: cTextMain,

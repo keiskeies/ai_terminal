@@ -119,12 +119,12 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
         ],
       ),
       body: _logs.isEmpty
-          ? Center(
+          ? const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(Icons.history, size: 48, color: cTextMuted),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   Text('暂无审计日志', style: TextStyle(color: cTextSub, fontSize: fBody)),
                 ],
               ),
@@ -176,9 +176,9 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
-                    color: _safetyColor(safetyLevel).withOpacity(0.1),
+                    color: _safetyColor(safetyLevel).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rXSmall),
-                    border: Border.all(color: _safetyColor(safetyLevel).withOpacity(0.2)),
+                    border: Border.all(color: _safetyColor(safetyLevel).withValues(alpha: 0.2)),
                   ),
                   child: Text(
                     _safetyLabel(safetyLevel),
@@ -190,12 +190,12 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                   ),
                 ),
                 const Spacer(),
-                Text(formattedTime, style: TextStyle(fontSize: fMicro, color: cTextMuted, fontFamily: 'JetBrainsMono')),
+                Text(formattedTime, style: const TextStyle(fontSize: fMicro, color: cTextMuted, fontFamily: 'JetBrainsMono')),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
-                    color: (executed ? cSuccess : cDanger).withOpacity(0.1),
+                    color: (executed ? cSuccess : cDanger).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rXSmall),
                   ),
                   child: Text(
@@ -231,9 +231,9 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
             const SizedBox(height: 4),
             Row(
               children: [
-                Icon(Icons.dns_outlined, size: 10, color: cTextMuted),
+                const Icon(Icons.dns_outlined, size: 10, color: cTextMuted),
                 const SizedBox(width: 4),
-                Text(hostName, style: TextStyle(fontSize: fMicro, color: cTextMuted)),
+                Text(hostName, style: const TextStyle(fontSize: fMicro, color: cTextMuted)),
               ],
             ),
             // 输出（如果有）
@@ -243,7 +243,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: EdgeInsets.zero,
                 dense: true,
-                title: Text('输出', style: TextStyle(fontSize: fMicro, color: cTextMuted)),
+                title: const Text('输出', style: TextStyle(fontSize: fMicro, color: cTextMuted)),
                 children: [
                   Container(
                     width: double.infinity,
@@ -256,7 +256,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                     child: SingleChildScrollView(
                       child: Text(
                         output,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontFamily: 'JetBrainsMono',
                           fontSize: fMicro,
                           color: cTextSub,

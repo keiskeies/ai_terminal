@@ -51,14 +51,14 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.smart_toy, size: 64, color: cTextSub),
+          const Icon(Icons.smart_toy, size: 64, color: cTextSub),
           const SizedBox(height: 16),
-          Text(
+          const Text(
             '还没有 AI 模型',
             style: TextStyle(color: cTextSub, fontSize: fBody),
           ),
           const SizedBox(height: 8),
-          Text(
+          const Text(
             '配置你的第一个 AI 模型，开启智能运维',
             style: TextStyle(color: cTextSub, fontSize: fSmall),
           ),
@@ -115,14 +115,14 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
                       ),
                       if (model.isDefault) ...[
                         const SizedBox(width: 8),
-                        Icon(Icons.star, color: Colors.amber, size: 16),
+                        const Icon(Icons.star, color: Colors.amber, size: 16),
                       ],
                     ],
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '$displayName / ${model.modelName}',
-                    style: TextStyle(color: cTextSub, fontSize: fSmall),
+                    style: const TextStyle(color: cTextSub, fontSize: fSmall),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
@@ -327,10 +327,10 @@ class _AIModelDialogState extends State<AIModelDialog> {
       setState(() {});
     } else if (result.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('远程配置为空'),
+        const SnackBar(
+          content: Text('远程配置为空'),
           backgroundColor: cWarning,
-          duration: const Duration(seconds: 2),
+          duration: Duration(seconds: 2),
         ),
       );
     } else {
@@ -547,7 +547,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                                       color: isSelected ? Colors.white : tc.textMain,
                                     ),
                                   ),
-                                  avatar: m.free ? Text('🆓', style: const TextStyle(fontSize: 10)) : null,
+                                  avatar: m.free ? const Text('🆓', style: TextStyle(fontSize: 10)) : null,
                                   backgroundColor: isSelected ? cPrimary : tc.surface,
                                   side: BorderSide(color: isSelected ? cPrimary : tc.border),
                                   onPressed: () {
@@ -603,7 +603,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: _testResult == 'success' ? cSuccess : cPrimary,
                                   foregroundColor: Colors.white,
-                                  disabledBackgroundColor: cPrimary.withOpacity(0.3),
+                                  disabledBackgroundColor: cPrimary.withValues(alpha: 0.3),
                                 ),
                               ),
                             ),

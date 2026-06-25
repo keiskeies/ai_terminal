@@ -68,71 +68,85 @@ class HostCard extends StatelessWidget {
     final tc = ThemeColors.of(context);
     final lastConnected = _lastConnectedText;
 
+    final tagColor = host.tagColor != null
+        ? Color(int.parse(host.tagColor!.replaceFirst('#', '0xFF')))
+        : null;
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: pStandard, vertical: pCompact / 2),
-      child: Material(
+      decoration: BoxDecoration(
         color: tc.card,
         borderRadius: BorderRadius.circular(rCard),
+        border: Border.all(color: tc.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(rCard),
-          child: Container(
-            height: 88,
-            padding: const EdgeInsets.symmetric(horizontal: pStandard),
-            child: Row(
-              children: [
-                // 状态指示点 + 头像
-                Stack(
-                  alignment: Alignment.topRight,
-                  children: [
-                    // 头像
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: _avatarColor.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(rMedium),
-                      ),
-                      child: Center(
-                        child: Text(
-                          host.name.isNotEmpty ? host.name[0].toUpperCase() : '?',
-                          style: TextStyle(
-                            fontSize: fTitle,
-                            fontWeight: FontWeight.w600,
-                            color: _avatarColor,
-                          ),
-                        ),
-                      ),
-                    ),
-                    // 状态点
-                    Positioned(
-                      top: -2,
-                      right: -2,
-                      child: host.lastStatus == 'success'
-                          ? _PulsingDot(color: _statusColor)
-                          : Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                color: _statusColor,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: tc.card, width: 2),
+          child: Row(
+            children: [
+              // 左侧标签色条
+              Container(
+                width: 3,
+                height: 88,
+                color: tagColor ?? tc.border,
+              ),
+              Expanded(
+                child: Container(
+                  height: 88,
+                  padding: const EdgeInsets.symmetric(horizontal: pStandard),
+                  child: Row(
+                    children: [
+                      // 状态指示点 + 头像
+                      Stack(
+                        alignment: Alignment.topRight,
+                        children: [
+                          // 头像
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: _avatarColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(rMedium),
+                            ),
+                            child: Center(
+                              child: Text(
+                                host.name.isNotEmpty ? host.name[0].toUpperCase() : '?',
+                                style: TextStyle(
+                                  fontSize: fTitle,
+                                  fontWeight: FontWeight.w600,
+                                  color: _avatarColor,
+                                ),
                               ),
                             ),
-                    ),
-                  ],
-                ),
-                const SizedBox(width: 12),
-                // 中间信息
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
+                          ),
+                          // 状态点
+                          Positioned(
+                            top: -2,
+                            right: -2,
+                            child: host.lastStatus == 'success'
+                                ? _PulsingDot(color: _statusColor)
+                                : Container(
+                                    width: 10,
+                                    height: 10,
+                                    decoration: BoxDecoration(
+                                      color: _statusColor,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: tc.card, width: 2),
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: 12),
+                      // 中间信息
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
                               host.name,
                               style: TextStyle(
                                 fontSize: fTitle,
@@ -141,100 +155,89 @@ class HostCard extends StatelessWidget {
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          if (host.tagColor != null) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 32,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: Color(int.parse(host.tagColor!.replaceFirst('#', '0xFF'))),
-                                borderRadius: BorderRadius.circular(2),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${host.username}@${host.host}:${host.port}',
+                              style: TextStyle(
+                                fontSize: fBody,
+                                color: tc.textSub,
                               ),
+                              overflow: TextOverflow.ellipsis,
                             ),
+                            if (lastConnected != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                '最后连接: $lastConnected',
+                                style: TextStyle(
+                                  fontSize: fMicro,
+                                  color: tc.textMuted,
+                                ),
+                              ),
+                            ],
                           ],
+                        ),
+                      ),
+                      // 右侧快捷操作按钮
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // 连接终端按钮
+                          _ActionButton(
+                            icon: Icons.terminal,
+                            tooltip: '连接终端',
+                            onTap: () => context.push('/terminal/${host.id}'),
+                          ),
+                          const SizedBox(width: 4),
+                          // SFTP 按钮
+                          _ActionButton(
+                            icon: Icons.folder_open,
+                            tooltip: 'SFTP',
+                            onTap: () => context.push('/sftp/${host.id}'),
+                          ),
+                          const SizedBox(width: 4),
+                          // 更多菜单
+                          PopupMenuButton<String>(
+                            icon: Icon(Icons.more_vert, color: tc.textSub, size: 20),
+                            onSelected: (value) {
+                              switch (value) {
+                                case 'edit':
+                                  onEdit?.call();
+                                  break;
+                                case 'delete':
+                                  onDelete?.call();
+                                  break;
+                              }
+                            },
+                            itemBuilder: (context) => [
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit, size: 20),
+                                    SizedBox(width: 12),
+                                    Text('编辑'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete, size: 20, color: cDanger),
+                                    SizedBox(width: 12),
+                                    Text('删除', style: TextStyle(color: cDanger)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${host.username}@${host.host}:${host.port}',
-                        style: TextStyle(
-                          fontSize: fBody,
-                          color: tc.textSub,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (lastConnected != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          '最后连接: $lastConnected',
-                          style: TextStyle(
-                            fontSize: fMicro,
-                            color: tc.textMuted,
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
-                // 右侧快捷操作按钮
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 连接终端按钮
-                    _ActionButton(
-                      icon: Icons.terminal,
-                      tooltip: '连接终端',
-                      onTap: () => context.push('/terminal/${host.id}'),
-                    ),
-                    const SizedBox(width: 4),
-                    // SFTP 按钮
-                    _ActionButton(
-                      icon: Icons.folder_open,
-                      tooltip: 'SFTP',
-                      onTap: () => context.push('/sftp/${host.id}'),
-                    ),
-                    const SizedBox(width: 4),
-                    // 更多菜单
-                    PopupMenuButton<String>(
-                      icon: Icon(Icons.more_vert, color: tc.textSub, size: 20),
-                      onSelected: (value) {
-                        switch (value) {
-                          case 'edit':
-                            onEdit?.call();
-                            break;
-                          case 'delete':
-                            onDelete?.call();
-                            break;
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit, size: 20),
-                              SizedBox(width: 12),
-                              Text('编辑'),
-                            ],
-                          ),
-                        ),
-                        PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete, size: 20, color: cDanger),
-                              const SizedBox(width: 12),
-                              Text('删除', style: TextStyle(color: cDanger)),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -256,21 +259,12 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
     return Tooltip(
       message: tooltip,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(rSmall),
-        child: Container(
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: tc.surface,
-            borderRadius: BorderRadius.circular(rSmall),
-          ),
-          child: Icon(icon, size: 16, color: tc.textSub),
-        ),
+      child: IconButton(
+        onPressed: onTap,
+        icon: Icon(icon, size: 18),
+        constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
       ),
     );
   }
@@ -326,7 +320,7 @@ class _PulsingDotState extends State<_PulsingDot>
             ),
             boxShadow: [
               BoxShadow(
-                color: widget.color.withOpacity(0.4 * (1 - _controller.value)),
+                color: widget.color.withValues(alpha: 0.4 * (1 - _controller.value)),
                 blurRadius: 4 * _scaleAnimation.value,
                 spreadRadius: 2 * _scaleAnimation.value,
               ),

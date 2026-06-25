@@ -24,11 +24,13 @@ class ThemeColors {
 
   // 文字
   Color get textMain => isLight ? cTextMainLight : cTextMain;
+  Color get textBody => isLight ? cTextBodyLight : cTextBody;
   Color get textSub => isLight ? cTextSubLight : cTextSub;
   Color get textMuted => isLight ? cTextMutedLight : cTextMuted;
 
   // 终端
   Color get terminalBg => isLight ? cTerminalBgLight : cTerminalBg;
+  Color get terminalOutput => isLight ? cTerminalBgLight : cTerminalOutput;
   Color get terminalGreen => isLight ? cTerminalGreenLight : cTerminalGreen;
 
   // Agent

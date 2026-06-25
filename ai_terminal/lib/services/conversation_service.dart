@@ -126,6 +126,7 @@ class ConversationService {
       commandSuccess: commandSuccess,
     ));
     await conv.save();
+    debugPrint('[ConversationService] appendMessage: hostId=$hostId role=$role contentLength=${content.length} messages=${conv.messages.length}');
     return conv;
   }
 

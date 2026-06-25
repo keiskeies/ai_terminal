@@ -121,7 +121,7 @@ class SSHService implements CommandExecutor {
 
       // 打开 Shell
       _session = await _client!.shell(
-        pty: SSHPtyConfig(
+        pty: const SSHPtyConfig(
           type: 'xterm-256color',
           width: 80,
           height: 24,

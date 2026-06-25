@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/agent_model.dart';
 import '../models/agent_event.dart';
@@ -273,6 +274,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
     if (conv == null) {
       state = AgentState(hostId: hostId, maxSteps: state.maxSteps);
       return;
+    }
+    debugPrint('[AgentNotifier] _restoreFromPersistence: hostId=$hostId messages=${conv.messages.length}');
+    for (final m in conv.messages) {
+      debugPrint('[AgentNotifier]   msg: role=${m.role} contentLength=${m.content.length} events=${m.events?.length}');
     }
     final items = conv.messages
         .where((m) => m.role != 'system')

@@ -42,12 +42,12 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         decoration: BoxDecoration(
-                          color: cPrimary.withOpacity(0.1),
+                          color: cPrimary.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(rSmall),
                         ),
                         child: Text(
                           maxSteps == 0 ? '无限制' : '$maxSteps',
-                          style: TextStyle(
+                          style: const TextStyle(
                             color: cPrimary,
                             fontWeight: FontWeight.w600,
                           ),
@@ -92,21 +92,21 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
           Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ExpansionTile(
-              leading: Icon(Icons.description_outlined, color: cWarning),
-              title: Text('内置系统提示词'),
-              subtitle: Text('编辑 AI 的核心提示词', style: TextStyle(color: cTextSub, fontSize: fSmall)),
+              leading: const Icon(Icons.description_outlined, color: cWarning),
+              title: const Text('内置系统提示词'),
+              subtitle: const Text('编辑 AI 的核心提示词', style: TextStyle(color: cTextSub, fontSize: fSmall)),
               children: [
                 Padding(
                   padding: const EdgeInsets.all(pStandard),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         '这是 AI 的核心系统提示词，修改后立即生效。包含 {context} 占位符会被替换为服务器信息。',
                         style: TextStyle(color: cTextSub, fontSize: fSmall),
                       ),
                       const SizedBox(height: 8),
-                      Text(
+                      const Text(
                         '⚠️ 修改需谨慎，不合适的提示词可能导致 AI 行为异常。可随时点击"重置"恢复默认。',
                         style: TextStyle(color: cWarning, fontSize: fMicro),
                       ),
@@ -123,16 +123,16 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
           Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ExpansionTile(
-              leading: Icon(Icons.edit_note_rounded, color: cAgentGreen),
-              title: Text('自定义提示词'),
-              subtitle: Text('追加到内置提示词末尾的额外指令', style: TextStyle(color: cTextSub, fontSize: fSmall)),
+              leading: const Icon(Icons.edit_note_rounded, color: cAgentGreen),
+              title: const Text('自定义提示词'),
+              subtitle: const Text('追加到内置提示词末尾的额外指令', style: TextStyle(color: cTextSub, fontSize: fSmall)),
               children: [
                 Padding(
                   padding: const EdgeInsets.all(pStandard),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         '追加到内置提示词末尾的额外指令，用于调整 AI 的行为风格、输出偏好等。留空则不追加。',
                         style: TextStyle(color: cTextSub, fontSize: fSmall),
                       ),
@@ -154,7 +154,7 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         title,
-        style: TextStyle(
+        style: const TextStyle(
           fontSize: fTitle,
           fontWeight: FontWeight.w600,
           color: cPrimary,
@@ -200,7 +200,7 @@ class _BuiltInPromptEditorState extends State<_BuiltInPromptEditor> {
           ),
           decoration: InputDecoration(
             enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: ThemeColors.of(context).border)),
-            focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
+            focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
           ),
         ),
         const SizedBox(height: 12),
@@ -210,8 +210,8 @@ class _BuiltInPromptEditorState extends State<_BuiltInPromptEditor> {
               onPressed: () {
                 setState(() => _controller.text = defaultSystemPrompt);
               },
-              icon: Icon(Icons.restore, color: cWarning, size: 18),
-              label: Text('重置默认', style: TextStyle(color: cWarning)),
+              icon: const Icon(Icons.restore, color: cWarning, size: 18),
+              label: const Text('重置默认', style: TextStyle(color: cWarning)),
             ),
             const Spacer(),
             ElevatedButton.icon(
@@ -280,7 +280,7 @@ class _CustomPromptEditorState extends State<_CustomPromptEditor> {
             hintText: '例如：回答使用英文、输出简洁格式、优先使用 Docker...',
             hintStyle: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fSmall),
             enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: ThemeColors.of(context).border)),
-            focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
+            focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
           ),
         ),
         const SizedBox(height: 12),

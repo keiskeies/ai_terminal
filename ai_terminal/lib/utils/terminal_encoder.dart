@@ -11,7 +11,7 @@ class TerminalEncoder {
   };
 
   static Encoding getEncoding(String name) {
-    return _encodingMap[name.toLowerCase()] ?? SystemEncoding();
+    return _encodingMap[name.toLowerCase()] ?? const SystemEncoding();
   }
 
   /// 检测字符串编码

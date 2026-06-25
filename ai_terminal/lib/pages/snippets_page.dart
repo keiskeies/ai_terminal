@@ -42,17 +42,17 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.code, size: 64, color: cTextSub),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text(
             '暂无快捷命令',
             style: TextStyle(color: cTextSub, fontSize: fBody),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             '点击下方按钮添加',
             style: TextStyle(color: cTextSub, fontSize: fSmall),
@@ -71,7 +71,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
           snippet.command,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: TextStyle(
+          style: const TextStyle(
             fontFamily: 'JetBrainsMono',
             fontSize: fSmall,
             color: cTerminalGreen,
@@ -120,10 +120,10 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (snippet.description != null) ...[
-              Text(snippet.description!, style: TextStyle(color: cTextSub)),
+              Text(snippet.description!, style: const TextStyle(color: cTextSub)),
               const SizedBox(height: 16),
             ],
-            Text(
+            const Text(
               '命令:',
               style: TextStyle(color: cTextSub, fontSize: fSmall),
             ),
@@ -136,7 +136,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
               ),
               child: SelectableText(
                 snippet.command,
-                style: TextStyle(
+                style: const TextStyle(
                   fontFamily: 'JetBrainsMono',
                   fontSize: fMono,
                   color: cTerminalGreen,
@@ -263,12 +263,12 @@ class _SnippetDialogState extends State<SnippetDialog> {
               TextFormField(
                 controller: _commandController,
                 maxLines: 4,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: '命令',
                   hintText: '例如: docker exec -it {{container}} /bin/bash',
                   hintStyle: TextStyle(color: cTextSub, fontSize: fSmall),
                 ),
-                style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: fMono),
+                style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: fMono),
                 validator: (v) => v?.isEmpty == true ? '请输入命令' : null,
               ),
               const SizedBox(height: 12),

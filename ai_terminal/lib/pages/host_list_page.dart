@@ -9,6 +9,7 @@ import '../core/theme_colors.dart';
 import '../models/host_config.dart';
 import '../providers/app_providers.dart';
 import '../widgets/host_card.dart';
+import '../widgets/logo_widget.dart';
 
 class HostListPage extends ConsumerStatefulWidget {
   const HostListPage({super.key});
@@ -58,7 +59,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('服务器管理'),
+        title: const LogoWidget(type: LogoType.wordmark, iconSize: 24),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -97,9 +98,9 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.error_outline, size: 48, color: cDanger),
+                    const Icon(Icons.error_outline, size: 48, color: cDanger),
                     const SizedBox(height: 16),
-                    Text('加载失败: $error', style: TextStyle(color: cTextSub)),
+                    Text('加载失败: $error', style: const TextStyle(color: cTextSub)),
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () => ref.read(hostsProvider.notifier).loadHosts(),
@@ -199,43 +200,41 @@ class _HostListPageState extends ConsumerState<HostListPage> {
 
   /// P1-4: 空状态重设计 - 情感化引导
   Widget _buildEmptyState() {
+    final tc = ThemeColors.of(context);
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // 终端光标闪烁动画
-          _BlinkingCursor(),
-          const SizedBox(height: 24),
-          Text(
-            '还没有服务器',
-            style: TextStyle(
-              color: ThemeColors.of(context).textMain,
+      child: Padding(
+        padding: const EdgeInsets.all(pStandard * 2),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // 品牌化插图
+            const LogoWidget(size: 80),
+            const SizedBox(height: 24),
+            Text(
+              '还没有服务器',
+              style: TextStyle(
+                fontSize: fTitle,
+                fontWeight: FontWeight.w600,
+                color: tc.textMain,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '添加第一台服务器，开启 AI 辅助运维之旅',
-            style: TextStyle(
-              color: ThemeColors.of(context).textSub,
+            const SizedBox(height: 8),
+            Text(
+              '添加第一台服务器，开始 AI 辅助的远程管理',
+              style: TextStyle(
+                fontSize: fBody,
+                color: tc.textSub,
+              ),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton.icon(
-            onPressed: () => context.push('/host/edit'),
-            icon: const Icon(Icons.add),
-            label: const Text('添加服务器'),
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => context.push('/host/edit'),
+              icon: const Icon(Icons.add),
+              label: const Text('添加服务器'),
             ),
-          ),
-          const SizedBox(height: 12),
-          TextButton(
-            onPressed: () {
-              // TODO: 打开文档链接
-            },
-            child: const Text('了解功能'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -297,14 +296,14 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                 AnimatedRotation(
                   turns: isExpanded ? 0.25 : 0,
                   duration: animFast,
-                  child: Icon(
+                  child: const Icon(
                     Icons.chevron_right,
                     color: cPrimary,
                     size: 20,
                   ),
                 ),
                 const SizedBox(width: 8),
-                Icon(Icons.folder, color: cPrimary, size: 18),
+                const Icon(Icons.folder, color: cPrimary, size: 18),
                 const SizedBox(width: 8),
                 Text(
                   groupName,
@@ -318,12 +317,12 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: cPrimary.withOpacity(0.1),
+                    color: cPrimary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rFull),
                   ),
                   child: Text(
                     '${hosts.length}',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: cPrimary,
                       fontSize: fMicro,
                       fontWeight: FontWeight.w600,
@@ -370,15 +369,15 @@ class _HostListPageState extends ConsumerState<HostListPage> {
         margin: const EdgeInsets.symmetric(horizontal: pStandard, vertical: pCompact / 2),
         padding: const EdgeInsets.only(right: pStandard),
         decoration: BoxDecoration(
-          color: cPrimary.withOpacity(0.1),
+          color: cPrimary.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(rCard),
         ),
         alignment: Alignment.centerRight,
-        child: Row(
+        child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.edit_outlined, color: cPrimary, size: 20),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Icon(Icons.delete_outline, color: cDanger, size: 20),
           ],
         ),
@@ -419,7 +418,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
               height: 4,
               margin: const EdgeInsets.symmetric(vertical: 12),
               decoration: BoxDecoration(
-                color: tc.textMuted.withOpacity(0.4),
+                color: tc.textMuted.withValues(alpha: 0.4),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -434,7 +433,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             const Divider(height: 1),
             // 连接终端
             ListTile(
-              leading: Icon(Icons.terminal, color: cPrimary),
+              leading: const Icon(Icons.terminal, color: cPrimary),
               title: const Text('连接终端'),
               onTap: () {
                 Navigator.pop(context);
@@ -443,7 +442,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             ),
             // SFTP
             ListTile(
-              leading: Icon(Icons.folder_open, color: cPrimary),
+              leading: const Icon(Icons.folder_open, color: cPrimary),
               title: const Text('SFTP'),
               onTap: () {
                 Navigator.pop(context);
@@ -452,7 +451,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             ),
             // 编辑
             ListTile(
-              leading: Icon(Icons.edit_outlined, color: cPrimary),
+              leading: const Icon(Icons.edit_outlined, color: cPrimary),
               title: const Text('编辑配置'),
               onTap: () {
                 Navigator.pop(context);
@@ -461,8 +460,8 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             ),
             // 删除
             ListTile(
-              leading: Icon(Icons.delete_outline, color: cDanger),
-              title: Text('删除', style: TextStyle(color: cDanger)),
+              leading: const Icon(Icons.delete_outline, color: cDanger),
+              title: const Text('删除', style: TextStyle(color: cDanger)),
               onTap: () {
                 Navigator.pop(context);
                 _showDeleteDialog(host);
@@ -490,7 +489,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
               Navigator.pop(context);
               await CredentialsStore.deleteAll(host.id);
               await ref.read(hostsProvider.notifier).deleteHost(host.id);
-              if (mounted) {
+              if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('删除成功')),
                 );
@@ -505,55 +504,3 @@ class _HostListPageState extends ConsumerState<HostListPage> {
   }
 }
 
-/// P1-4: 闪烁光标动画（空状态装饰）
-class _BlinkingCursor extends StatefulWidget {
-  @override
-  State<_BlinkingCursor> createState() => _BlinkingCursorState();
-}
-
-class _BlinkingCursorState extends State<_BlinkingCursor>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            color: cPrimary.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(rLarge),
-          ),
-          child: Center(
-            child: Text(
-              '_',
-              style: TextStyle(
-                fontSize: fDisplay,
-                fontWeight: FontWeight.w300,
-                color: cPrimary.withOpacity(0.3 + 0.7 * _controller.value),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-}

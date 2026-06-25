@@ -43,7 +43,7 @@ class _SimpleConfirmDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (cmd.description != null) ...[
-            Text(cmd.description!, style: TextStyle(color: cTextSub)),
+            Text(cmd.description!, style: const TextStyle(color: cTextSub)),
             const SizedBox(height: 12),
           ],
           Container(
@@ -54,7 +54,7 @@ class _SimpleConfirmDialog extends StatelessWidget {
             ),
             child: SelectableText(
               cmd.command,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'JetBrainsMono',
                 fontSize: fMono,
                 color: cTerminalGreen,
@@ -98,18 +98,18 @@ class _WarnConfirmDialogState extends State<_WarnConfirmDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Row(
+      title: const Row(
         children: [
           Icon(Icons.warning, color: cWarning),
-          const SizedBox(width: 8),
-          const Text('危险操作确认'),
+          SizedBox(width: 8),
+          Text('危险操作确认'),
         ],
       ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('即将执行:', style: TextStyle(color: cTextSub)),
+          const Text('即将执行:', style: TextStyle(color: cTextSub)),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(12),
@@ -119,7 +119,7 @@ class _WarnConfirmDialogState extends State<_WarnConfirmDialog> {
             ),
             child: SelectableText(
               widget.cmd.command,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'JetBrainsMono',
                 fontSize: fMono,
                 color: cWarning,
@@ -130,14 +130,14 @@ class _WarnConfirmDialogState extends State<_WarnConfirmDialog> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: cDanger.withOpacity(0.1),
+              color: cDanger.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: cDanger.withOpacity(0.3)),
+              border: Border.all(color: cDanger.withValues(alpha: 0.3)),
             ),
-            child: Row(
+            child: const Row(
               children: [
                 Icon(Icons.error_outline, color: cDanger, size: 20),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     '此操作可能造成系统不可用，请谨慎执行！',
@@ -148,7 +148,7 @@ class _WarnConfirmDialogState extends State<_WarnConfirmDialog> {
             ),
           ),
           const SizedBox(height: 16),
-          Text(
+          const Text(
             '请输入 CONFIRM 继续:',
             style: TextStyle(color: cWarning, fontSize: fSmall),
           ),

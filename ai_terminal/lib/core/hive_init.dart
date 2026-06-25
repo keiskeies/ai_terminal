@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../models/host_config.dart';
 import '../models/ai_model_config.dart';
@@ -28,7 +29,15 @@ class HiveInit {
     await Hive.openBox<CommandSnippet>('snippets');
     await Hive.openBox('settings');
     await Hive.openBox('auditLogs');
-    await Hive.openBox<Conversation>('conversations');
+
+    // 会话 box 如果因模型 typeId 变更（开发期 schema 调整）损坏，自动重建
+    try {
+      await Hive.openBox<Conversation>('conversations');
+    } on HiveError catch (e) {
+      debugPrint('[HiveInit] 会话数据无法读取，自动重置: $e');
+      await Hive.deleteBoxFromDisk('conversations');
+      await Hive.openBox<Conversation>('conversations');
+    }
 
     // 初始化凭据存储
     await CredentialsStore.init();

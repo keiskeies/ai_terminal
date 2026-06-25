@@ -25,7 +25,7 @@ class TabBarWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: cBg,
         border: Border(
-          bottom: BorderSide(color: cBorder.withOpacity(0.6), width: 1),
+          bottom: BorderSide(color: cBorder.withValues(alpha: 0.6), width: 1),
         ),
       ),
       child: ListView.builder(
@@ -71,9 +71,9 @@ class _AddTabButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: cSurface,
             borderRadius: BorderRadius.circular(rSmall),
-            border: Border.all(color: cBorder.withOpacity(0.3)),
+            border: Border.all(color: cBorder.withValues(alpha: 0.3)),
           ),
-          child: Icon(Icons.add, size: 16, color: cTextSub),
+          child: const Icon(Icons.add, size: 16, color: cTextSub),
         ),
       ),
     );
@@ -122,15 +122,15 @@ class _TabItemState extends State<_TabItem> {
           padding: const EdgeInsets.only(left: 8, right: 4),
           decoration: BoxDecoration(
             color: bgColor,
-            borderRadius: BorderRadius.only(
+            borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(rMedium),
               topRight: Radius.circular(rMedium),
             ),
             border: isActive
                 ? Border(
-                    top: BorderSide(color: cPrimary, width: 2),
-                    left: BorderSide(color: cBorder.withOpacity(0.3), width: 0.5),
-                    right: BorderSide(color: cBorder.withOpacity(0.3), width: 0.5),
+                    top: const BorderSide(color: cPrimary, width: 2),
+                    left: BorderSide(color: cBorder.withValues(alpha: 0.3), width: 0.5),
+                    right: BorderSide(color: cBorder.withValues(alpha: 0.3), width: 0.5),
                   )
                 : null,
           ),
@@ -146,7 +146,7 @@ class _TabItemState extends State<_TabItem> {
                   color: widget.tab.isConnected ? cSuccess : cDanger,
                   shape: BoxShape.circle,
                   boxShadow: widget.tab.isConnected
-                      ? [BoxShadow(color: cSuccess.withOpacity(0.4), blurRadius: 4)]
+                      ? [BoxShadow(color: cSuccess.withValues(alpha: 0.4), blurRadius: 4)]
                       : null,
                 ),
               ),
@@ -173,7 +173,7 @@ class _TabItemState extends State<_TabItem> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(rXSmall),
                     color: _isHovered
-                        ? cBorder.withOpacity(0.5)
+                        ? cBorder.withValues(alpha: 0.5)
                         : Colors.transparent,
                   ),
                   child: Icon(

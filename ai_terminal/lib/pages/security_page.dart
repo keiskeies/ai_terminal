@@ -115,10 +115,10 @@ class _SecurityPageState extends State<SecurityPage> {
           // 审计日志
           Card(
             child: ListTile(
-              leading: Icon(Icons.history, color: cPrimary),
+              leading: const Icon(Icons.history, color: cPrimary),
               title: const Text('审计日志'),
               subtitle: const Text('查看 AI 命令执行记录'),
-              trailing: Icon(Icons.chevron_right, color: cTextSub),
+              trailing: const Icon(Icons.chevron_right, color: cTextSub),
               onTap: () => context.push('/audit-log'),
             ),
           ),
@@ -128,8 +128,8 @@ class _SecurityPageState extends State<SecurityPage> {
           // 清除数据
           Card(
             child: ListTile(
-              leading: Icon(Icons.delete_forever, color: cDanger),
-              title: Text(
+              leading: const Icon(Icons.delete_forever, color: cDanger),
+              title: const Text(
                 '清除所有数据',
                 style: TextStyle(color: cDanger),
               ),

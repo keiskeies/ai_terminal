@@ -17,14 +17,14 @@ class ColorPickerRow extends StatelessWidget {
   }
 
   String? _colorToHex(Color color) {
-    return '#${color.value.toRadixString(16).substring(2).toUpperCase()}';
+    return '#${color.toARGB32().toRadixString(16).substring(2).toUpperCase()}';
   }
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: tagColors.map((color) {
-        final isSelected = selectedColor != null && _selectedColor.value == color.value;
+        final isSelected = selectedColor != null && _selectedColor == color;
         return GestureDetector(
           onTap: () => onColorSelected(_colorToHex(color)),
           child: Container(

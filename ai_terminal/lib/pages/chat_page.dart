@@ -104,14 +104,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.terminal, size: 64, color: cPrimary),
+                const Icon(Icons.terminal, size: 64, color: cPrimary),
                 const SizedBox(height: 24),
-                Text(
+                const Text(
                   'AI 助手需要在终端中使用',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: cTextMain),
                 ),
                 const SizedBox(height: 12),
-                Text(
+                const Text(
                   '请先连接服务器，进入终端页面后点击右下角的 AI 按钮',
                   style: TextStyle(color: cTextSub),
                   textAlign: TextAlign.center,
@@ -199,9 +199,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                                 color: cCard,
                                 borderRadius: BorderRadius.circular(18),
                                 border: Border.all(color: cBorder),
-                                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 6)],
+                                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 6)],
                               ),
-                              child: Icon(Icons.keyboard_arrow_down, size: 20, color: cTextSub),
+                              child: const Icon(Icons.keyboard_arrow_down, size: 20, color: cTextSub),
                             ),
                           ),
                         ),
@@ -213,7 +213,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           if (chatState.error != null)
             Container(
               padding: const EdgeInsets.all(12),
-              color: cDanger.withOpacity(0.2),
+              color: cDanger.withValues(alpha: 0.2),
               child: Row(
                 children: [
                   const Icon(Icons.error, color: cDanger, size: 16),
@@ -234,7 +234,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
           // 输入区
           Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: cCard,
               border: Border(top: BorderSide(color: cBorder)),
             ),
@@ -278,17 +278,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Widget _buildEmptyState() {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.smart_toy, size: 64, color: cTextSub),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text(
             '有什么可以帮你的？',
             style: TextStyle(color: cTextSub, fontSize: fBody),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             '例如：安装 Docker、查看内存使用',
             style: TextStyle(color: cTextSub, fontSize: fSmall),

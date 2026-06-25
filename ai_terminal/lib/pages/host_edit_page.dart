@@ -256,7 +256,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                                 setState(() {
                                   _privateKeyController.text = content;
                                 });
-                                if (mounted) {
+                                if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text('已读取私钥文件: ${result.files.single.name}'),
@@ -267,7 +267,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                                 }
                               }
                             } catch (e) {
-                              if (mounted) {
+                              if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text('读取文件失败: $e'),
@@ -402,18 +402,18 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: cInfo.withOpacity(0.06),
+                        color: cInfo.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(rSmall),
-                        border: Border.all(color: cInfo.withOpacity(0.15)),
+                        border: Border.all(color: cInfo.withValues(alpha: 0.15)),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline, size: 12, color: cInfo),
+                          const Icon(Icons.info_outline, size: 12, color: cInfo),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
                               '将先连接跳板机，再通过跳板机转发到目标服务器',
-                              style: TextStyle(fontSize: fMicro, color: cInfo.withOpacity(0.8)),
+                              style: TextStyle(fontSize: fMicro, color: cInfo.withValues(alpha: 0.8)),
                             ),
                           ),
                         ],
@@ -495,7 +495,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
-      style: TextStyle(
+      style: const TextStyle(
         fontSize: fBody,
         fontWeight: FontWeight.w600,
         color: cPrimary,

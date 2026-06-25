@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../core/constants.dart';
+import '../core/theme_colors.dart';
 import '../models/chat_session.dart';
+import 'logo_widget.dart';
 
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
@@ -18,15 +20,16 @@ class MessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == 'user';
+    final tc = ThemeColors.of(context);
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.8,
+          maxWidth: MediaQuery.of(context).size.width * 0.72,
         ),
         margin: EdgeInsets.only(
-          bottom: 12,
+          bottom: 16,
           left: isUser ? 48 : 0,
           right: isUser ? 0 : 48,
         ),
@@ -36,15 +39,15 @@ class MessageBubble extends StatelessWidget {
             // 头像和名称
             if (!isUser)
               Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 4),
+                padding: const EdgeInsets.only(left: 4, bottom: 6),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.smart_toy, size: 14, color: cPrimary),
-                    const SizedBox(width: 4),
+                    const LogoWidget(type: LogoType.mark, size: 16),
+                    const SizedBox(width: 6),
                     Text(
                       'AI 助手',
-                      style: TextStyle(fontSize: fSmall, color: cTextSub),
+                      style: TextStyle(fontSize: fSmall, color: tc.textSub, fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -54,20 +57,23 @@ class MessageBubble extends StatelessWidget {
             GestureDetector(
               onLongPress: onLongPress,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: isUser ? cPrimary : cCard,
+                  color: isUser ? cPrimary : tc.card,
                   borderRadius: BorderRadius.only(
-                    topLeft: const Radius.circular(12),
-                    topRight: const Radius.circular(12),
-                    bottomLeft: Radius.circular(isUser ? 12 : 0),
-                    bottomRight: Radius.circular(isUser ? 0 : 12),
+                    topLeft: const Radius.circular(rBubble),
+                    topRight: const Radius.circular(rBubble),
+                    bottomLeft: Radius.circular(isUser ? rBubble : rXSmall),
+                    bottomRight: Radius.circular(isUser ? rXSmall : rBubble),
                   ),
+                  border: isUser
+                      ? null
+                      : Border.all(color: tc.border),
                 ),
                 child: isUser
                     ? Text(
                         message.content,
-                        style: const TextStyle(color: Colors.white, fontSize: fBody),
+                        style: const TextStyle(color: Colors.white, fontSize: fBody, height: 1.5),
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -76,44 +82,45 @@ class MessageBubble extends StatelessWidget {
                             data: message.content,
                             selectable: true,
                             styleSheet: MarkdownStyleSheet(
-                              p: const TextStyle(color: cTextMain, fontSize: fBody),
+                              p: TextStyle(color: tc.textBody, fontSize: fBody, height: 1.5),
                               code: TextStyle(
                                 fontFamily: 'JetBrainsMono',
                                 fontSize: fMono,
-                                color: cTerminalGreen,
-                                backgroundColor: const Color(0xFF2D2D2D),
+                                color: tc.terminalGreen,
+                                backgroundColor: tc.terminalBg,
                               ),
                               codeblockDecoration: BoxDecoration(
-                                color: const Color(0xFF1E1E1E),
-                                borderRadius: BorderRadius.circular(8),
+                                color: tc.terminalOutput,
+                                borderRadius: BorderRadius.circular(rSmall),
+                                border: Border.all(color: tc.border),
                               ),
-                              blockquote: TextStyle(color: cTextSub),
-                              blockquoteDecoration: BoxDecoration(
+                              blockquote: TextStyle(color: tc.textSub),
+                              blockquoteDecoration: const BoxDecoration(
                                 border: Border(
-                                  left: BorderSide(color: cBorder, width: 3),
+                                  left: BorderSide(color: cPrimary, width: 2),
                                 ),
                               ),
-                              h1: TextStyle(color: cTextMain, fontSize: 18, fontWeight: FontWeight.bold),
-                              h2: TextStyle(color: cTextMain, fontSize: 16, fontWeight: FontWeight.bold),
-                              h3: TextStyle(color: cTextMain, fontSize: 14, fontWeight: FontWeight.bold),
-                              listBullet: TextStyle(color: cTextMain),
-                              strong: const TextStyle(color: cTextMain, fontWeight: FontWeight.bold),
-                              em: TextStyle(color: cTextMain, fontStyle: FontStyle.italic),
-                              a: TextStyle(color: cPrimary),
-                              tableHead: TextStyle(color: cTextMain, fontWeight: FontWeight.bold),
-                              tableBody: TextStyle(color: cTextMain),
-                              tableBorder: TableBorder.all(color: cBorder),
+                              h1: TextStyle(color: tc.textMain, fontSize: fTitle, fontWeight: FontWeight.bold),
+                              h2: TextStyle(color: tc.textMain, fontSize: fBody + 2, fontWeight: FontWeight.bold),
+                              h3: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600),
+                              listBullet: TextStyle(color: tc.textMain),
+                              strong: TextStyle(color: tc.textMain, fontWeight: FontWeight.bold),
+                              em: TextStyle(color: tc.textMain, fontStyle: FontStyle.italic),
+                              a: const TextStyle(color: cPrimary),
+                              tableHead: TextStyle(color: tc.textMain, fontWeight: FontWeight.bold),
+                              tableBody: TextStyle(color: tc.textMain),
+                              tableBorder: TableBorder.all(color: tc.border),
                             ),
                           ),
                           // 流式光标指示器
                           if (isStreaming)
                             Container(
-                              width: 8,
-                              height: 16,
-                              margin: const EdgeInsets.only(top: 4),
-                              decoration: BoxDecoration(
+                              width: 6,
+                              height: 14,
+                              margin: const EdgeInsets.only(top: 6),
+                              decoration: const BoxDecoration(
                                 color: cPrimary,
-                                borderRadius: BorderRadius.circular(2),
+                                borderRadius: BorderRadius.all(Radius.circular(1)),
                               ),
                             ),
                         ],
@@ -126,7 +133,7 @@ class MessageBubble extends StatelessWidget {
               padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
               child: Text(
                 _formatTime(message.timestamp),
-                style: TextStyle(fontSize: 10, color: cTextSub),
+                style: TextStyle(fontSize: fMicro, color: tc.textMuted),
               ),
             ),
           ],
