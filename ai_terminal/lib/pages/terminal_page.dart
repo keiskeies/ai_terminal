@@ -290,6 +290,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       if (_terminal != null) _terminal!.write(data);
     });
     _terminal?.onOutput = (data) {
+      if (!tab.isConnected) {
+        _reconnect();
+        return;
+      }
       if (tab.isLocal) {
         tab.localService?.writeToTerminal(data);
       } else {

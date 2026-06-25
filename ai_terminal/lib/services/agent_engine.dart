@@ -1061,6 +1061,35 @@ class AgentEngine {
   Future<AgentResult> _executeCommand(CommandExecutor executor, String command) async {
     final stopwatch = Stopwatch()..start();
 
+    // 执行前检查连接状态，断连则尝试重连
+    if (!executor.isConnected) {
+      agentLogger.warn('AgentEngine', '连接已断开，尝试重连...');
+      onEvent?.call(AgentEvent.info('连接已断开，正在重连...'));
+      if (executor is SSHService) {
+        // SSH 连接断开，通知上层需要重连（返回错误让 agent loop 停止）
+        return AgentResult(
+          success: false,
+          error: 'SSH 连接已断开，请重连后重试',
+          duration: stopwatch.elapsed,
+        );
+      }
+      // 本地终端断开，尝试重启
+      try {
+        // 本地终端无法重连，直接报错
+        return AgentResult(
+          success: false,
+          error: '本地终端已退出，请重新打开终端',
+          duration: stopwatch.elapsed,
+        );
+      } catch (e) {
+        return AgentResult(
+          success: false,
+          error: '重连失败: $e',
+          duration: stopwatch.elapsed,
+        );
+      }
+    }
+
     try {
       final completer = Completer<String>();
       String stdoutData = '';
