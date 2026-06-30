@@ -235,6 +235,17 @@ class AgentEngine {
     _conversationSummary = null;
   }
 
+  /// 从持久化消息恢复引擎对话历史（切换会话时调用）
+  /// [messages] 已摘要索引之后的消息（含 user/assistant，不含 system）
+  /// [summary] 对话摘要（如有）
+  /// system 消息会在下次 startTask 时由 _buildSystemPrompt 重建
+  void restoreHistory(List<ChatMessage> messages, {String? summary}) {
+    _conversationHistory.clear();
+    _conversationSummary = summary;
+    _conversationHistory.addAll(messages);
+    agentLogger.info('RestoreHistory', '恢复引擎历史: ${messages.length} 条消息, summary=${summary != null ? "有" : "无"}');
+  }
+
   /// 设置对话摘要（压缩后 / 恢复会话时调用），下次构建系统提示时会注入
   void setConversationSummary(String? summary) {
     _conversationSummary = summary;
@@ -395,8 +406,11 @@ class AgentEngine {
     final systemPrompt = _buildSystemPrompt(executor);
     if (isNewConversation) {
       _conversationHistory.add(ChatMessage.create(role: 'system', content: systemPrompt));
-    } else {
+    } else if (_conversationHistory.isNotEmpty && _conversationHistory[0].role == 'system') {
       _conversationHistory[0] = ChatMessage.create(role: 'system', content: systemPrompt);
+    } else {
+      // 恢复历史后索引 0 不是 system 消息，需在开头插入
+      _conversationHistory.insert(0, ChatMessage.create(role: 'system', content: systemPrompt));
     }
 
     // 添加用户消息
@@ -523,7 +537,7 @@ class AgentEngine {
 
     // 达到最大步数
     _currentTask = _currentTask!.copyWith(
-      status: (stepCount >= maxSteps) ? AgentStatus.failed : AgentStatus.completed,
+      status: AgentStatus.completed,
       completedAt: DateTime.now(),
     );
     onTaskUpdated?.call(_currentTask!);
@@ -667,6 +681,7 @@ class AgentEngine {
 
   /// ═══════════════════════════════════════════════════════
   /// ReAct 解析器 — 从 AI 响应中提取结构化动作
+  /// 命令提取复用 ReActStreamParser，正确处理多行 heredoc
   /// ═══════════════════════════════════════════════════════
   ReActStep _parseReActResponse(String content) {
     String? thought;
@@ -674,23 +689,22 @@ class AgentEngine {
     String? command;
     List<String>? options;
 
-    // 从代码块提取命令
-    command = _extractCommandFromCodeBlock(content);
-
-    // 解析关键词行
-    final lines = content.split('\n');
-    for (int i = 0; i < lines.length; i++) {
-      final line = lines[i];
-      final trimmedLine = line.trim();
-
-      // 解析 "思考:" 行
-      if (trimmedLine.startsWith('思考:') || trimmedLine.startsWith('思考：')) {
-        final sepIdx = trimmedLine.indexOf(trimmedLine.contains('：') ? '：' : ':');
-        thought = trimmedLine.substring(sepIdx + 1).trim();
-        continue;
+    // 使用 ReActStreamParser 统一提取命令（正确处理多行 heredoc 和代码块）
+    final events = ReActStreamParser.parse(content);
+    for (final e in events) {
+      if (e.isCommand && command == null) {
+        command = e.command;
+      } else if (e.type == AgentEventType.thought && thought == null) {
+        thought = e.text;
+      } else if (e.type == AgentEventType.ask && options == null) {
+        options = e.options;
       }
+    }
 
-      // 解析 "动作:" 行
+    // 解析动作行（ReActStreamParser 不提取动作类型，需单独解析）
+    final lines = content.split('\n');
+    for (final line in lines) {
+      final trimmedLine = line.trim();
       if (trimmedLine.startsWith('动作:') || trimmedLine.startsWith('动作：')) {
         final sepIdx = trimmedLine.indexOf(trimmedLine.contains('：') ? '：' : ':');
         final actionStr = trimmedLine.substring(sepIdx + 1).trim().toLowerCase();
@@ -701,38 +715,7 @@ class AgentEngine {
         } else if (actionStr == 'ask') {
           action = ActionType.ask;
         }
-        continue;
-      }
-
-      // 解析 "选项:" 行
-      if (trimmedLine.startsWith('选项:') || trimmedLine.startsWith('选项：')) {
-        final sepIdx = trimmedLine.indexOf(trimmedLine.contains('：') ? '：' : ':');
-        final optionsStr = trimmedLine.substring(sepIdx + 1).trim();
-        options = optionsStr
-            .split('|')
-            .map((s) => s.trim())
-            .where((s) => s.isNotEmpty)
-            .toList();
-        continue;
-      }
-
-      // 如果没有从代码块提取到命令，从 "命令:" 关键词提取
-      if (command == null && (trimmedLine.startsWith('命令:') || trimmedLine.startsWith('命令：'))) {
-        final sepIdx = line.indexOf(line.contains('：') ? '：' : ':');
-        var cmdText = line.substring(sepIdx + 1).trim();
-        // 处理命令中包含"思考:"的情况：分割命令和思考
-        final thoughtInCmd = _findThoughtInText(cmdText);
-        if (thoughtInCmd != null) {
-          command = cmdText.substring(0, thoughtInCmd.index).trim();
-          final thoughtPart = cmdText.substring(thoughtInCmd.index).trim();
-          final tSepIdx = thoughtPart.indexOf(thoughtPart.contains('：') ? '：' : ':');
-          if (tSepIdx != -1) {
-            thought = thoughtPart.substring(tSepIdx + 1).trim();
-          }
-        } else {
-          command = cmdText;
-        }
-        continue;
+        break;
       }
     }
 
@@ -757,7 +740,8 @@ class AgentEngine {
       if (thought != null && thought!.isNotEmpty) {
         return ReActStep(thought: thought, action: null, rawResponse: content);
       }
-      return ReActStep(thought: thought ?? content, action: ActionType.finish, rawResponse: content);
+      // 无法识别格式 → 不结束任务，交给 _handleNoCommand 重试
+      return ReActStep(thought: thought ?? content, action: null, rawResponse: content);
     }
 
     return ReActStep(
@@ -767,37 +751,6 @@ class AgentEngine {
       options: options,
       rawResponse: content,
     );
-  }
-
-  /// 在文本中查找"思考:"的位置
-  ({int index, String separator})? _findThoughtInText(String text) {
-    for (final sep in ['思考:', '思考：']) {
-      final idx = text.indexOf(sep);
-      if (idx > 0) {
-        return (index: idx, separator: sep);
-      }
-    }
-    return null;
-  }
-
-  /// 从代码块中提取命令
-  String? _extractCommandFromCodeBlock(String content) {
-    final codeBlockRegex = RegExp(r'```(?:bash|sh|shell)?\s*\n([\s\S]*?)```', multiLine: true);
-    final match = codeBlockRegex.firstMatch(content);
-    if (match != null) {
-      final code = match.group(1)?.trim();
-      if (code != null && code.isNotEmpty) {
-        // 取第一行有效命令
-        final lines = code.split('\n').where((l) {
-          final trimmed = l.trim();
-          return trimmed.isNotEmpty && !trimmed.startsWith('#');
-        }).toList();
-        if (lines.isNotEmpty) {
-          return lines.first.trim();
-        }
-      }
-    }
-    return null;
   }
 
   /// ═══════════════════════════════════════════════════════

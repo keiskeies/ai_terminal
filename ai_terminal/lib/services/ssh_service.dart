@@ -241,43 +241,68 @@ class SSHService implements CommandExecutor {
     // 追加 echo 标记，命令完成后输出 "EXITCODE_N:0" 格式
     final wrappedCommand = '$command; echo "$marker\$?"';
 
-    final completer = Completer<String>();
-    _completers.add(completer);
+    // 独立流监听：等待 marker 出现（比 prompt regex 更可靠）
+    final buffer = StringBuffer();
+    final doneCompleter = Completer<void>();
+    StreamSubscription<String>? sub;
+
+    sub = outputController.stream.listen(
+      (data) {
+        buffer.write(data);
+        if (!doneCompleter.isCompleted && buffer.toString().contains(marker)) {
+          doneCompleter.complete();
+        }
+      },
+      onError: (e) {
+        if (!doneCompleter.isCompleted) {
+          doneCompleter.completeError(e);
+        }
+      },
+    );
 
     _session!.write(Uint8List.fromList(utf8.encode('$wrappedCommand\n')));
 
-    String rawOutput;
     try {
-      rawOutput = await Future.any([
-        completer.future,
-        Future.delayed(timeout, () => _outputBuffer.toString()).then((v) {
-          throw TimeoutException('命令执行超时');
-        }),
-        if (cancelToken != null) cancelToken.future.then((_) => _outputBuffer.toString()),
+      await Future.any([
+        doneCompleter.future,
+        Future.delayed(timeout, () => throw TimeoutException('命令执行超时')),
+        if (cancelToken != null) cancelToken.future,
       ]);
     } on TimeoutException {
-      _completers.remove(completer);
+      await sub.cancel();
       stopwatch.stop();
       return CommandResult(
-        stdout: _outputBuffer.toString(),
+        stdout: buffer.toString(),
         stderr: '',
         exitCode: -1,
         duration: stopwatch.elapsed,
         timedOut: true,
       );
     } catch (e) {
-      _completers.remove(completer);
+      await sub.cancel();
       stopwatch.stop();
       return CommandResult(
-        stdout: '',
+        stdout: buffer.toString(),
         stderr: e.toString(),
         exitCode: -1,
         duration: stopwatch.elapsed,
       );
     }
 
-    _completers.remove(completer);
+    await sub.cancel();
     stopwatch.stop();
+
+    var rawOutput = buffer.toString();
+
+    // 取消时 marker 可能未出现
+    if (!rawOutput.contains(marker)) {
+      return CommandResult(
+        stdout: rawOutput,
+        stderr: '',
+        exitCode: -1,
+        duration: stopwatch.elapsed,
+      );
+    }
 
     // 从输出中提取退出码
     final exitCodeRegex = RegExp('$marker(\\d+)');
@@ -285,18 +310,15 @@ class SSHService implements CommandExecutor {
     int exitCode = 0;
     if (match != null) {
       exitCode = int.tryParse(match.group(1) ?? '0') ?? 0;
-      // 移除标记行
       rawOutput = rawOutput.replaceAll('$marker$exitCode', '');
     }
 
     // 清理输出：移除命令回显和末尾 prompt
     var cleanOutput = rawOutput;
-    // 移除开头的命令回显
     final cmdEchoIdx = cleanOutput.indexOf(wrappedCommand);
-    if (cmdEchoIdx == 0) {
-      cleanOutput = cleanOutput.substring(wrappedCommand.length);
+    if (cmdEchoIdx >= 0) {
+      cleanOutput = cleanOutput.substring(cmdEchoIdx + wrappedCommand.length);
     }
-    // 移除末尾的 prompt 标记
     cleanOutput = cleanOutput.replaceAll(RegExp(r'[\]\$#]\s*$'), '').trim();
 
     return CommandResult(

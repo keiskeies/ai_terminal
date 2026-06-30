@@ -5,6 +5,7 @@ import '../models/agent_model.dart';
 import '../models/agent_event.dart';
 import '../models/agent_memory.dart';
 import '../models/ai_model_config.dart';
+import '../models/chat_session.dart';
 import '../models/conversation.dart';
 import '../services/agent_engine.dart';
 import '../services/ai_service.dart';
@@ -296,6 +297,33 @@ class AgentNotifier extends StateNotifier<AgentState> {
     );
   }
 
+  /// 从持久化恢复引擎对话历史（切换会话 / 新建引擎时调用）
+  /// 只恢复 summarizedUpToIndex 之后的消息（已摘要的不再恢复）
+  void _restoreEngineHistory() {
+    if (_engine == null) return;
+    final convId = state.conversationId;
+    if (convId == null) {
+      _engine!.clearHistory();
+      return;
+    }
+    final conv = HiveInit.conversationsBox.get(convId);
+    if (conv == null) {
+      _engine!.clearHistory();
+      return;
+    }
+    // 提取 summarizedUpToIndex 之后的非 system 消息
+    final startIdx = conv.summarizedUpToIndex > 0
+        ? conv.summarizedUpToIndex
+        : 0;
+    final msgs = <ChatMessage>[];
+    for (int i = startIdx; i < conv.messages.length; i++) {
+      final m = conv.messages[i];
+      if (m.role == 'system') continue;
+      msgs.add(ChatMessage.create(role: m.role, content: m.content));
+    }
+    _engine!.restoreHistory(msgs, summary: conv.summary);
+  }
+
   /// 关闭 tab/host 时清除其状态和记忆
   void removeTab(String tabId, {String? hostId}) {
     // 旧接口兼容：tabId 不再用于状态隔离，仅清理可能的引用
@@ -328,10 +356,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _setupEngineCallbacks(hostId);
       _hostEngines[hostId] = _engine!;
       _hostModelConfigs[hostId] = _modelConfig;
-      // 恢复对话摘要到引擎（切换会话后重建上下文）
-      if (state.summary != null) {
-        _engine!.setConversationSummary(state.summary);
-      }
+      // 从持久化恢复引擎对话历史和摘要
+      _restoreEngineHistory();
     }
   }
 
@@ -691,8 +717,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final hostId = _activeHostId;
     if (hostId == null) return;
     _convService.setActive(hostId, conversationId);
-    _engine?.clearHistory();
     _restoreFromPersistence(hostId);
+    // 从持久化恢复引擎对话历史（不含已摘要的消息，那些已压缩为 summary）
+    _restoreEngineHistory();
   }
 
   /// 重命名会话
@@ -741,7 +768,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final rounds = conv.messages.where((m) => m.role != 'system').length ~/ 2;
     final needsCompact = rounds >= _compactThresholdRounds || conv.totalChars >= _compactThresholdChars;
     if (needsCompact && !state.isCompacting) {
-      compact().catchError((_) {});
+      compact().catchError((e) { debugPrint('[AgentNotifier] 自动压缩失败: $e'); });
     }
   }
 
@@ -765,6 +792,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final startIdx = conv.summarizedUpToIndex > nonSysStart
         ? conv.summarizedUpToIndex - nonSysStart
         : 0;
+
+    // 没有新的未摘要消息可压缩（startIdx 已追上保留边界）
+    if (startIdx >= allMsgs.length - keepCount) return;
 
     final toSummarize = allMsgs.sublist(startIdx, allMsgs.length - keepCount);
     if (toSummarize.isEmpty) return;

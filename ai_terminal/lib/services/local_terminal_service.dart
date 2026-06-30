@@ -159,43 +159,68 @@ class LocalTerminalService implements CommandExecutor {
     final marker = 'EXITCODE_$_markerSeq:';
     final wrappedCommand = '$command; echo "$marker\$?"';
 
-    final completer = Completer<String>();
-    _completers.add(completer);
+    // 独立流监听：等待 marker 出现（比 prompt regex 更可靠）
+    final buffer = StringBuffer();
+    final doneCompleter = Completer<void>();
+    StreamSubscription<String>? sub;
+
+    sub = _outputController.stream.listen(
+      (data) {
+        buffer.write(data);
+        if (!doneCompleter.isCompleted && buffer.toString().contains(marker)) {
+          doneCompleter.complete();
+        }
+      },
+      onError: (e) {
+        if (!doneCompleter.isCompleted) {
+          doneCompleter.completeError(e);
+        }
+      },
+    );
 
     _pty!.write(utf8.encode('$wrappedCommand\r'));
 
-    String rawOutput;
     try {
-      rawOutput = await Future.any([
-        completer.future,
-        Future.delayed(timeout, () => _outputBuffer.toString()).then((v) {
-          throw TimeoutException('命令执行超时');
-        }),
-        if (cancelToken != null) cancelToken.future.then((_) => _outputBuffer.toString()),
+      await Future.any([
+        doneCompleter.future,
+        Future.delayed(timeout, () => throw TimeoutException('命令执行超时')),
+        if (cancelToken != null) cancelToken.future,
       ]);
     } on TimeoutException {
-      _completers.remove(completer);
+      await sub.cancel();
       stopwatch.stop();
       return CommandResult(
-        stdout: _outputBuffer.toString(),
+        stdout: buffer.toString(),
         stderr: '',
         exitCode: -1,
         duration: stopwatch.elapsed,
         timedOut: true,
       );
     } catch (e) {
-      _completers.remove(completer);
+      await sub.cancel();
       stopwatch.stop();
       return CommandResult(
-        stdout: '',
+        stdout: buffer.toString(),
         stderr: e.toString(),
         exitCode: -1,
         duration: stopwatch.elapsed,
       );
     }
 
-    _completers.remove(completer);
+    await sub.cancel();
     stopwatch.stop();
+
+    var rawOutput = buffer.toString();
+
+    // 取消时 marker 可能未出现
+    if (!rawOutput.contains(marker)) {
+      return CommandResult(
+        stdout: rawOutput,
+        stderr: '',
+        exitCode: -1,
+        duration: stopwatch.elapsed,
+      );
+    }
 
     // 从输出中提取退出码
     final exitCodeRegex = RegExp('$marker(\\d+)');
@@ -209,8 +234,8 @@ class LocalTerminalService implements CommandExecutor {
     // 清理输出
     var cleanOutput = rawOutput;
     final cmdEchoIdx = cleanOutput.indexOf(wrappedCommand);
-    if (cmdEchoIdx == 0) {
-      cleanOutput = cleanOutput.substring(wrappedCommand.length);
+    if (cmdEchoIdx >= 0) {
+      cleanOutput = cleanOutput.substring(cmdEchoIdx + wrappedCommand.length);
     }
     cleanOutput = cleanOutput.replaceAll(RegExp(r'[\]\$#>]\s*$'), '').trim();
 
