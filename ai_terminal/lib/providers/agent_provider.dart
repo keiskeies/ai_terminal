@@ -221,9 +221,6 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 每 hostId 独立的流式输出节流 Timer
   final Map<String, Timer> _hostThrottleTimers = {};
 
-  /// 流式输出节流（旧字段，保留兼容，实际使用 _hostThrottleTimers）
-  Timer? _throttleTimer;
-
   final ConversationService _convService = ConversationService();
 
   /// 日志订阅取消函数
@@ -583,8 +580,6 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
     final hostId = _activeHostId ?? 'local';
     _hostStreamingContent[hostId] = '';
-    _throttleTimer?.cancel();
-    _throttleTimer = null;
 
     // 持久化用户消息
     try {
@@ -682,7 +677,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
     if (hostId != null && convId != null) {
       try {
         await _convService.clearMessages(convId);
-      } catch (e) { debugPrint('[AgentNotifier] 清空消息失败: $e'); }
+      } catch (e) {
+        agentLogger.error('AgentNotifier', '清空持久化消息失败: $e');
+        state = state.copyWith(error: '清空消息失败: $e');
+      }
     }
   }
 
@@ -826,11 +824,13 @@ class AgentNotifier extends StateNotifier<AgentState> {
           state = state.copyWith(isCompacting: false);
         }
       } else {
+        // 压缩返回空（AI 无响应或消息太少）
+        agentLogger.warn('AgentNotifier', '对话压缩未产生摘要（AI 返回空或消息不足）');
         state = state.copyWith(isCompacting: false);
       }
     } catch (e) {
-      debugPrint('[AgentNotifier] compact 失败: $e');
-      state = state.copyWith(isCompacting: false);
+      agentLogger.error('AgentNotifier', '对话压缩失败: $e');
+      state = state.copyWith(isCompacting: false, error: '对话压缩失败: $e');
     }
   }
 
@@ -854,8 +854,6 @@ class AgentNotifier extends StateNotifier<AgentState> {
       timer.cancel();
     }
     _hostThrottleTimers.clear();
-    _throttleTimer?.cancel();
-    _throttleTimer = null;
     _logUnsubscribe?.call();
     super.dispose();
   }

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants.dart';
 import '../models/chat_session.dart';
-import '../utils/ai_parser.dart';
 
 class CommandBlockWidget extends StatelessWidget {
   final CommandBlock data;
@@ -16,8 +15,9 @@ class CommandBlockWidget extends StatelessWidget {
     this.onCopy,
   });
 
-  /// 是否包含链式操作符
-  bool get _hasChainOperator => hasChainOperator(data.command);
+  /// 是否包含链式操作符（&&、||、;、|）
+  bool get _hasChainOperator =>
+      RegExp(r'&&|\|\||;|\|').hasMatch(data.command);
 
   Color get _safetyColor {
     switch (data.safetyLevel) {

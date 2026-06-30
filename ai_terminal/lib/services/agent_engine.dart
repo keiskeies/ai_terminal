@@ -171,10 +171,6 @@ class AgentEngine {
   /// 命令执行取消令牌：cancelTask 时 complete，_executeCommand 据此提前退出
   Completer<void>? _commandCancelToken;
 
-  /// ReAct 格式重试计数（AI 未遵循格式时递增）
-  int _reactFormatRetryCount = 0;
-  static const int _maxReactFormatRetries = 2;
-
   /// 缓存的知识库注入文本（在 startTask 时查询，在 _buildSystemPrompt 时使用）
   String? _cachedKnowledgeInjection;
 
@@ -277,7 +273,6 @@ class AgentEngine {
     agentLogger.info('AgentEngine', '执行器: ${executor != null ? (executor.isConnected ? "已连接" : "未连接") : "无"}');
     _accumulatedMessage = '';  // 重置累积消息
     _noCommandRetryCount = 0;  // 重置无命令重试计数
-    _reactFormatRetryCount = 0;  // 重置 ReAct 格式重试计数
 
     if (isRunning) {
       agentLogger.warn('AgentEngine', 'Agent 正在执行任务，拒绝新任务');
@@ -433,7 +428,6 @@ class AgentEngine {
 
     while (stepCount < maxSteps) {
       stepCount++;
-      _reactFormatRetryCount = 0; // 重置格式重试计数
       agentLogger.info('ReAct', '--- 步骤 $stepCount ---');
 
       // ═══════════════════════════════════════════
@@ -458,7 +452,7 @@ class AgentEngine {
                 _currentTask?.status != AgentStatus.cancelled) {
               _earlyExecutionCommand = command;
               _earlyExecutionCompleter = Completer<_EarlyExecutionResult>();
-              _runCommandWithSafety(command, executor).then((result) {
+              _runCommandWithSafety(command, executor, commandId: commandId).then((result) {
                 if (_earlyExecutionCompleter?.isCompleted == false) {
                   _earlyExecutionCompleter?.complete(result);
                 }
@@ -793,8 +787,13 @@ class AgentEngine {
   String? _earlyExecutionCommand;
 
   /// 执行命令（含安全检查、用户确认、执行、发 result 事件），返回执行结果和观测
-  Future<_EarlyExecutionResult> _runCommandWithSafety(String command, CommandExecutor executor) async {
-    agentLogger.info('ReAct', '执行命令: $command');
+  /// [commandId] 用于关联 result 事件与 command 事件（流式提前执行时由 _callAI 传入）
+  Future<_EarlyExecutionResult> _runCommandWithSafety(
+    String command,
+    CommandExecutor executor, {
+    String? commandId,
+  }) async {
+    agentLogger.info('ReAct', '执行命令: $command (commandId=$commandId)');
 
     // 安全检查
     final safetyLevel = SafetyGuard.check(command);
@@ -891,7 +890,7 @@ class AgentEngine {
 
     // 先发出结构化结果事件，再通知执行完成
     onEvent?.call(AgentEvent.result(
-      commandId: _lastCommandEventId,
+      commandId: commandId ?? _lastCommandEventId,
       command: command,
       success: result.success,
       output: outputText,
@@ -978,6 +977,15 @@ class AgentEngine {
         error: result.success ? null : errorText,
       );
       resultMessages.add(observation.format());
+
+      // 发出结构化结果事件（与 _runCommandWithSafety 保持一致）
+      onEvent?.call(AgentEvent.result(
+        commandId: '',
+        command: command,
+        success: result.success,
+        output: outputText,
+        error: result.success ? null : errorText,
+      ));
     }
 
     // 汇总观测作为 user 消息
@@ -1507,20 +1515,6 @@ class AgentEngine {
       if (response.contains(k)) return true;
     }
     return false;
-  }
-
-  /// 从 AI 响应中提取 :::choose A|B|C::: 选项
-  List<String> _extractOptions(String content) {
-    final regex = RegExp(r':::choose\s+(.+?):::');
-    final match = regex.firstMatch(content);
-    if (match == null) return [];
-    final optionsStr = match.group(1);
-    if (optionsStr == null) return [];
-    return optionsStr
-        .split('|')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
   }
 
   String _buildSystemPrompt(CommandExecutor? executor) {

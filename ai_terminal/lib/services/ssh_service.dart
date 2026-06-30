@@ -198,26 +198,6 @@ class SSHService implements CommandExecutor {
     }
   }
 
-  /// 执行命令并等待完成（旧接口，保留兼容）
-  Future<String> executeAndWaitLegacy(String command, {int timeoutSec = 30}) async {
-    if (_session == null || !_isConnected) {
-      throw SSHConnectionError('未连接');
-    }
-
-    final completer = Completer<String>();
-    _completers.add(completer);
-
-    _session!.write(Uint8List.fromList(utf8.encode('$command\n')));
-
-    return completer.future.timeout(
-      Duration(seconds: timeoutSec),
-      onTimeout: () {
-        _completers.remove(completer);
-        throw TimeoutException('命令执行超时');
-      },
-    );
-  }
-
   /// 执行命令并等待完成，返回结构化结果（含退出码）
   /// 通过在命令后追加 echo "EXITCODE:$?" 来捕获退出码
   @override
