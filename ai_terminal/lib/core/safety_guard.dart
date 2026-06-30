@@ -7,7 +7,7 @@ enum SafetyLevel {
 }
 
 class SafetyGuard {
-  /// 静态缓存，避免 build 时对同一条命令重复正则匹配
+  /// 静态缓存，避免对同一条命令重复正则匹配
   static final Map<String, SafetyLevel> _cache = {};
 
   // 直接拦截的命令模式
@@ -36,7 +36,7 @@ class SafetyGuard {
     RegExp(r'^mkfs\.(ext4|xfs|btrfs)\s+/dev/'),
     RegExp(r'^dd\s+if=.*of=/dev/'),
     RegExp(r'^rm\s+-rf\s+/'),
-    // 安装/升级/替换软件包（可能改变系统状态）
+    // 安装/升级/替换软件包
     RegExp(r'^sudo\s+(apt|apt-get)\s+(install|upgrade|dist-upgrade|remove|purge)\s+'),
     RegExp(r'^sudo\s+yum\s+(install|update|remove|erase)\s+'),
     RegExp(r'^sudo\s+dnf\s+(install|upgrade|remove)\s+'),
@@ -46,7 +46,7 @@ class SafetyGuard {
     // 修改环境配置
     RegExp(r'(>>|>)\s*(/etc/profile|/etc/environment|/etc/bashrc|~/\.bashrc|~/\.zshrc|~/\.bash_profile|~/\.profile)\s*$'),
     RegExp(r'^sudo\s+(tee|sed|echo.*>)\s+.*(/etc/profile|/etc/environment|/etc/bashrc)\s*$'),
-    // alternatives/update-alternatives 切换默认版本
+    // alternatives/update-alternatives
     RegExp(r'^sudo\s+update-alternatives\s+--set\s+'),
     RegExp(r'^sudo\s+alternatives\s+--set\s+'),
     // 卸载操作
@@ -61,7 +61,7 @@ class SafetyGuard {
     RegExp(r'^sudo\s+mv\s+.*\s+/etc/'),
   ];
 
-  // 仅高亮提示的命令模式（低风险修改或网络操作）
+  // 仅高亮提示的命令模式
   static final List<RegExp> _infoPatterns = [
     RegExp(r'curl\s+http'),
     RegExp(r'wget\s+http'),
@@ -69,74 +69,102 @@ class SafetyGuard {
     RegExp(r'^(firewall-cmd|ufw|iptables).*port'),
     RegExp(r'^systemctl\s+(start|restart|reload)\s+'),
     RegExp(r'^service\s+\w+\s+(start|restart|reload)'),
-    // 非sudo的安装（用户空间）
     RegExp(r'^npm\s+install\s+-g'),
     RegExp(r'^pip\s+install\s+'),
     RegExp(r'^brew\s+install\s+'),
-    // update 软件源索引（不安装）
     RegExp(r'^sudo\s+(apt|apt-get)\s+update\s*$'),
     RegExp(r'^sudo\s+yum\s+makecache'),
-    // 查看类 update-alternatives（仅列表）
     RegExp(r'^update-alternatives\s+--(list|display)\s+'),
-    // 低风险环境变量 export（当前会话）
     RegExp(r'^export\s+'),
   ];
 
   /// 检查命令安全等级（带缓存）
   static SafetyLevel check(String command) {
-    // 命中缓存直接返回
     if (_cache.containsKey(command)) {
       return _cache[command]!;
     }
 
     final result = _checkInternal(command);
     _cache[command] = result;
-    // 限制缓存大小，避免内存泄漏
     if (_cache.length > 500) {
       _cache.remove(_cache.keys.first);
     }
     return result;
   }
 
-  /// 内部检查逻辑
+  /// 内部检查逻辑：对完整命令的所有子命令分别检查
   static SafetyLevel _checkInternal(String command) {
-    final cleaned = _cleanCommand(command);
+    // 拆分链式命令，对每个子命令分别检查，取最高危险等级
+    final subCommands = _splitCommands(command);
+    var maxLevel = SafetyLevel.safe;
 
-    if (cleaned.isEmpty) return SafetyLevel.safe;
+    for (final sub in subCommands) {
+      final cleaned = _removeComments(sub).trim();
+      if (cleaned.isEmpty) continue;
 
-    // 先检查 block 模式
+      final level = _checkSingle(cleaned);
+      if (_compareLevel(level, maxLevel) > 0) {
+        maxLevel = level;
+      }
+      // 如果已经是 blocked，直接返回
+      if (maxLevel == SafetyLevel.blocked) return maxLevel;
+    }
+
+    return maxLevel;
+  }
+
+  /// 检查单条命令（不含链式操作符）
+  static SafetyLevel _checkSingle(String command) {
     for (final pattern in _blockPatterns) {
-      if (pattern.hasMatch(cleaned)) {
+      if (pattern.hasMatch(command)) {
         return SafetyLevel.blocked;
       }
     }
-
-    // 再检查 warn 模式
     for (final pattern in _warnPatterns) {
-      if (pattern.hasMatch(cleaned)) {
+      if (pattern.hasMatch(command)) {
         return SafetyLevel.warn;
       }
     }
-
-    // 检查 info 模式
     for (final pattern in _infoPatterns) {
-      if (pattern.hasMatch(cleaned)) {
+      if (pattern.hasMatch(command)) {
         return SafetyLevel.info;
       }
     }
-
     return SafetyLevel.safe;
   }
 
-  /// 清理命令：移除注释和管道符后的部分
-  static String _cleanCommand(String command) {
-    // 移除 # 注释
-    var cleaned = command.split('#').first.trim();
-    // 移除管道符后的部分
-    cleaned = cleaned.split('|').first.trim();
-    // 移除 && || 后的部分
-    cleaned = cleaned.split(RegExp(r'&&|\|\|')).first.trim();
-    return cleaned;
+  /// 拆分链式命令：按 && || ; | 分割，返回所有子命令
+  /// 注意：不处理 $() 和反引号内的内容（保守处理，宁可误报也不漏报）
+  static List<String> _splitCommands(String command) {
+    // 先按换行符拆分（多行命令的每行可能是独立命令）
+    final lines = command.split('\n');
+    final results = <String>[];
+
+    for (final line in lines) {
+      // 按 && || ; | 拆分
+      // 使用正则匹配这些操作符，保留操作符之间的内容
+      final parts = line.split(RegExp(r'&&|\|\||;|\|'));
+      results.addAll(parts);
+    }
+
+    return results;
+  }
+
+  /// 移除行内注释（# 之后的内容，但不是 #! 且不在引号内）
+  static String _removeComments(String command) {
+    // 简化处理：取第一个 # 之前的内容（# 前有空格或行首才算注释）
+    final hashIdx = command.indexOf(' #');
+    if (hashIdx >= 0) {
+      return command.substring(0, hashIdx);
+    }
+    if (command.startsWith('#')) return '';
+    return command;
+  }
+
+  /// 比较安全等级：blocked > warn > info > safe
+  static int _compareLevel(SafetyLevel a, SafetyLevel b) {
+    const order = [SafetyLevel.safe, SafetyLevel.info, SafetyLevel.warn, SafetyLevel.blocked];
+    return order.indexOf(a) - order.indexOf(b);
   }
 
   /// 获取提示文案

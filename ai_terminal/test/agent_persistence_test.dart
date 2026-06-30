@@ -64,6 +64,20 @@ class FakeCommandExecutor implements CommandExecutor {
 
   @override
   void writeToTerminal(String data) {}
+
+  @override
+  Future<CommandResult> executeAndWait(
+    String command, {
+    Duration timeout = const Duration(seconds: 60),
+    Completer<void>? cancelToken,
+  }) async {
+    return CommandResult(
+      stdout: 'fake output for $command',
+      stderr: '',
+      exitCode: 0,
+      duration: const Duration(milliseconds: 10),
+    );
+  }
 }
 
 void main() {

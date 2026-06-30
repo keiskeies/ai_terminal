@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_pty/flutter_pty.dart';
 import 'command_executor.dart';
 
@@ -12,6 +13,12 @@ class LocalTerminalService implements CommandExecutor {
   bool _isConnected = false;
   bool _isExited = false;
 
+  // 命令执行等待：prompt 检测
+  final StringBuffer _outputBuffer = StringBuffer();
+  final _promptRegex = RegExp(r'[\]\$#>]\s*$');
+  final List<Completer<String>> _completers = [];
+  int _markerSeq = 0;
+
   bool get isConnected => _isConnected;
   Stream<String> get output => _outputController.stream;
 
@@ -20,16 +27,13 @@ class LocalTerminalService implements CommandExecutor {
     if (_isConnected) return;
 
     try {
-      // 检测 shell 类型
       String shell;
       List<String> args;
 
       if (Platform.isWindows) {
-        // Windows: 使用 cmd.exe
         shell = 'cmd.exe';
         args = [];
       } else {
-        // macOS / Linux: 优先使用用户登录 shell
         final userShell = Platform.environment['SHELL'];
         if (userShell != null && File(userShell).existsSync()) {
           shell = userShell;
@@ -42,8 +46,6 @@ class LocalTerminalService implements CommandExecutor {
         } else {
           shell = 'bash';
         }
-        // macOS Catalina 及以上默认 zsh；其他系统默认 bash
-        // 使用 -l 以 login shell 模式启动（加载 ~/.zshrc / ~/.bash_profile 等）
         args = ['-l'];
       }
 
@@ -64,22 +66,39 @@ class LocalTerminalService implements CommandExecutor {
 
       _isConnected = true;
 
-      // 监听 PTY 输出（stdout + stderr 合并）
       _pty!.output.listen(
         (data) {
           if (!_outputController.isClosed && !_isExited) {
-            _outputController.add(utf8.decode(data, allowMalformed: true));
+            final output = utf8.decode(data, allowMalformed: true);
+            _outputController.add(output);
+            _onPtyData(output);
           }
         },
         onDone: _handleExit,
-        onError: (_) => _handleExit(),
+        onError: (e) {
+          debugPrint('[LocalTerminal] 输出错误: $e');
+          _handleExit();
+        },
       );
 
-      // 监听进程退出
       _pty!.exitCode.then((_) => _handleExit());
     } catch (e) {
       _outputController.add('\r\n\x1b[31m✗ 本地终端启动失败: $e\x1b[0m\r\n');
       _isConnected = false;
+    }
+  }
+
+  void _onPtyData(String data) {
+    _outputBuffer.write(data);
+    // 检测 prompt
+    if (_promptRegex.hasMatch(data)) {
+      for (final c in _completers) {
+        if (!c.isCompleted) {
+          c.complete(_outputBuffer.toString());
+        }
+      }
+      _completers.clear();
+      _outputBuffer.clear();
     }
   }
 
@@ -119,11 +138,94 @@ class LocalTerminalService implements CommandExecutor {
     }
   }
 
-  /// 调整终端大小（columns=列数, rows=行数）
+  /// 执行命令并等待完成，返回结构化结果（含退出码）
+  @override
+  Future<CommandResult> executeAndWait(
+    String command, {
+    Duration timeout = const Duration(seconds: 60),
+    Completer<void>? cancelToken,
+  }) async {
+    if (_pty == null || !_isConnected) {
+      return CommandResult(
+        stdout: '',
+        stderr: '未连接',
+        exitCode: -1,
+        duration: Duration.zero,
+      );
+    }
+
+    final stopwatch = Stopwatch()..start();
+    _markerSeq++;
+    final marker = 'EXITCODE_$_markerSeq:';
+    final wrappedCommand = '$command; echo "$marker\$?"';
+
+    final completer = Completer<String>();
+    _completers.add(completer);
+
+    _pty!.write(utf8.encode('$wrappedCommand\r'));
+
+    String rawOutput;
+    try {
+      rawOutput = await Future.any([
+        completer.future,
+        Future.delayed(timeout, () => _outputBuffer.toString()).then((v) {
+          throw TimeoutException('命令执行超时');
+        }),
+        if (cancelToken != null) cancelToken.future.then((_) => _outputBuffer.toString()),
+      ]);
+    } on TimeoutException {
+      _completers.remove(completer);
+      stopwatch.stop();
+      return CommandResult(
+        stdout: _outputBuffer.toString(),
+        stderr: '',
+        exitCode: -1,
+        duration: stopwatch.elapsed,
+        timedOut: true,
+      );
+    } catch (e) {
+      _completers.remove(completer);
+      stopwatch.stop();
+      return CommandResult(
+        stdout: '',
+        stderr: e.toString(),
+        exitCode: -1,
+        duration: stopwatch.elapsed,
+      );
+    }
+
+    _completers.remove(completer);
+    stopwatch.stop();
+
+    // 从输出中提取退出码
+    final exitCodeRegex = RegExp('$marker(\\d+)');
+    final match = exitCodeRegex.firstMatch(rawOutput);
+    int exitCode = 0;
+    if (match != null) {
+      exitCode = int.tryParse(match.group(1) ?? '0') ?? 0;
+      rawOutput = rawOutput.replaceAll('$marker$exitCode', '');
+    }
+
+    // 清理输出
+    var cleanOutput = rawOutput;
+    final cmdEchoIdx = cleanOutput.indexOf(wrappedCommand);
+    if (cmdEchoIdx == 0) {
+      cleanOutput = cleanOutput.substring(wrappedCommand.length);
+    }
+    cleanOutput = cleanOutput.replaceAll(RegExp(r'[\]\$#>]\s*$'), '').trim();
+
+    return CommandResult(
+      stdout: cleanOutput,
+      stderr: '',
+      exitCode: exitCode,
+      duration: stopwatch.elapsed,
+    );
+  }
+
+  /// 调整终端大小
   void resize(int columns, int rows) {
     if (_pty == null || !_isConnected) return;
     if (columns <= 0 || rows <= 0) return;
-    // ⚠️ Pty.resize 的参数顺序是 (rows, cols)，注意调换
     _pty!.resize(rows, columns);
   }
 
@@ -142,6 +244,6 @@ class LocalTerminalService implements CommandExecutor {
     _outputController.close();
   }
 
-  /// 是否支持本地终端（仅桌面平台）
+  /// 是否支持本地终端
   static bool get isSupported => Platform.isMacOS || Platform.isLinux || Platform.isWindows;
 }

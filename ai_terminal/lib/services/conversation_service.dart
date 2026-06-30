@@ -103,6 +103,9 @@ class ConversationService {
 
   /// 删除会话
   Future<void> delete(String conversationId) async {
+    // 取消该会话的待刷盘 Timer，防止已删除会话被 Timer 复活
+    _flushTimers[conversationId]?.cancel();
+    _flushTimers.remove(conversationId);
     await _box.delete(conversationId);
   }
 

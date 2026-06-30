@@ -175,7 +175,7 @@ class ChatItem {
         // 旧数据没有 events 时，fallback 到重新解析
         try {
           events = ReActStreamParser.parse(msg.content);
-        } catch (_) {}
+        } catch (e) { debugPrint('[AgentNotifier] 事件解析失败: $e'); }
       }
     }
     return ChatItem(
@@ -217,7 +217,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 每 hostId 的流式累积内容
   final Map<String, String> _hostStreamingContent = {};
 
-  /// 流式输出节流
+  /// 每 hostId 独立的流式输出节流 Timer
+  final Map<String, Timer> _hostThrottleTimers = {};
+
+  /// 流式输出节流（旧字段，保留兼容，实际使用 _hostThrottleTimers）
   Timer? _throttleTimer;
 
   final ConversationService _convService = ConversationService();
@@ -263,7 +266,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _restoreFromPersistence(effectiveHostId);
       _engine = null;
       _executor = null;
-      _modelConfig = _modelConfig; // 保留默认模型配置
+      // 恢复该 host 的模型配置，或保留当前全局配置
+      _modelConfig = _hostModelConfigs[effectiveHostId] ?? _modelConfig;
       _reinitEngineForCurrentHost();
     }
   }
@@ -324,6 +328,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _setupEngineCallbacks(hostId);
       _hostEngines[hostId] = _engine!;
       _hostModelConfigs[hostId] = _modelConfig;
+      // 恢复对话摘要到引擎（切换会话后重建上下文）
+      if (state.summary != null) {
+        _engine!.setConversationSummary(state.summary);
+      }
     }
   }
 
@@ -383,10 +391,11 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
     _engine!.onMessage = (msg) {
       _hostStreamingContent[hostId] = (_hostStreamingContent[hostId] ?? '') + msg;
-      _throttleTimer ??= Timer(
+      // 每 hostId 独立节流 Timer，避免多 host 互相阻塞
+      _hostThrottleTimers[hostId] ??= Timer(
         const Duration(milliseconds: _agentStreamThrottleMs),
         () {
-          _throttleTimer = null;
+          _hostThrottleTimers.remove(hostId);
           final content = _hostStreamingContent[hostId];
           if (content != null) {
             _updateHostState(hostId, (s) {
@@ -496,7 +505,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
   }) async {
     try {
       await _convService.updateLastAssistantContent(hostId, content, events: events);
-    } catch (_) {}
+    } catch (e) { debugPrint('[AgentNotifier] 持久化 assistant 内容失败: $e'); }
   }
 
   /// 设置命令执行器（SSH 或本地 PTY，仅首次连接时收集系统信息）
@@ -519,7 +528,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
     _engine?.maxSteps = steps;
     try {
       HiveInit.settingsBox.put('agentMaxSteps', steps);
-    } catch (_) {}
+    } catch (e) { debugPrint('[AgentNotifier] 保存 maxSteps 失败: $e'); }
   }
 
   /// 加载设置
@@ -531,7 +540,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
         state = state.copyWith(maxSteps: steps);
         _engine?.maxSteps = steps;
       }
-    } catch (_) {}
+    } catch (e) { debugPrint('[AgentNotifier] 加载设置失败: $e'); }
   }
 
   /// 开始任务
@@ -558,7 +567,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       if (state.conversationId != conv.id) {
         state = state.copyWith(conversationId: conv.id, hostId: hostId);
       }
-    } catch (_) {}
+    } catch (e) { debugPrint('[AgentNotifier] 持久化用户消息失败: $e'); }
 
     // 添加用户消息到 chatItems
     final items = [...state.chatItems, ChatItem(role: 'user', content: goal)];
@@ -578,7 +587,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
     // 持久化 assistant 占位（流式过程中通过 onMessage 累积，结束时回写完整内容）
     try {
       await _convService.appendMessage(hostId, role: 'assistant', content: '');
-    } catch (_) {}
+    } catch (e) { debugPrint('[AgentNotifier] 持久化 assistant 占位失败: $e'); }
 
     // 如果系统信息还没收集，先收集再开始任务，避免命令混在一起
     if (_executor != null && !_hostSysInfoFutures.containsKey(hostId)) {
@@ -647,7 +656,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
     if (hostId != null && convId != null) {
       try {
         await _convService.clearMessages(convId);
-      } catch (_) {}
+      } catch (e) { debugPrint('[AgentNotifier] 清空消息失败: $e'); }
     }
   }
 
@@ -741,27 +750,36 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final hostId = _activeHostId;
     final convId = state.conversationId;
     if (hostId == null || convId == null || _engine == null) return;
+    if (state.isCompacting) return; // 防止并发压缩
 
     final conv = HiveInit.conversationsBox.get(convId);
     if (conv == null) return;
 
-    // 待压缩 = 已摘要后所有消息 - 保留的最近 N 轮
+    // 待压缩 = 已摘要索引之后的所有非系统消息 - 保留的最近 N 轮
     final allMsgs = conv.messages.where((m) => m.role != 'system').toList();
     final keepCount = _compactKeepRounds * 2;
     if (allMsgs.length <= keepCount) return; // 太少不压缩
 
-    final toSummarize = allMsgs.sublist(0, allMsgs.length - keepCount);
+    // 从 summarizedUpToIndex 之后开始压缩（避免重复压缩已摘要的消息）
+    final nonSysStart = conv.messages.indexWhere((m) => m.role != 'system');
+    final startIdx = conv.summarizedUpToIndex > nonSysStart
+        ? conv.summarizedUpToIndex - nonSysStart
+        : 0;
+
+    final toSummarize = allMsgs.sublist(startIdx, allMsgs.length - keepCount);
     if (toSummarize.isEmpty) return;
 
     state = state.copyWith(isCompacting: true);
     try {
-      // 转换 ConvMessage 为元组列表传给 engine
       final tuples = toSummarize
           .map((m) => (role: m.role, content: m.content))
           .toList();
       final summaryText = await _engine!.summarize(tuples);
       if (summaryText != null && summaryText.isNotEmpty) {
         await _convService.applySummary(convId, summaryText);
+        // 同步引擎内存：注入摘要到系统提示 + 裁剪已摘要的旧消息
+        _engine!.setConversationSummary(summaryText);
+        _engine!.syncAfterCompact(_compactKeepRounds);
         // 同步到 UI 状态
         final restored = HiveInit.conversationsBox.get(convId);
         if (restored != null) {
@@ -780,13 +798,32 @@ class AgentNotifier extends StateNotifier<AgentState> {
       } else {
         state = state.copyWith(isCompacting: false);
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[AgentNotifier] compact 失败: $e');
       state = state.copyWith(isCompacting: false);
     }
   }
 
   @override
   void dispose() {
+    // 停止所有引擎任务并清空回调，防止 dispose 后回调仍写 state
+    for (final engine in _hostEngines.values) {
+      engine.cancelTask();
+      engine.onMessage = null;
+      engine.onEvent = null;
+      engine.onThinking = null;
+      engine.onCommandGenerated = null;
+      engine.onCommandExecuted = null;
+      engine.onError = null;
+      engine.onTaskUpdated = null;
+      engine.onCompleted = null;
+    }
+    _hostEngines.clear();
+    // 取消所有节流 Timer
+    for (final timer in _hostThrottleTimers.values) {
+      timer.cancel();
+    }
+    _hostThrottleTimers.clear();
     _throttleTimer?.cancel();
     _throttleTimer = null;
     _logUnsubscribe?.call();

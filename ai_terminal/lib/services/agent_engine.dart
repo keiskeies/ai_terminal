@@ -86,7 +86,7 @@ class AgentLogger {
       for (final l in listeners) {
         try {
           l(level, tag, message, timestamp);
-        } catch (_) {}
+        } catch (e) { debugPrint('[AgentLogger] 日志监听器异常: $e'); }
       }
     }
   }
@@ -112,7 +112,8 @@ class AgentLogger {
     _fileWriting = true;
     try {
       await file.writeAsString(pending, mode: FileMode.append, flush: false);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[AgentLogger] 日志文件写入失败: $e');
       // 写入失败时把内容放回缓冲区，下次再试
       _fileBuffer.write(pending);
     } finally {
@@ -177,6 +178,9 @@ class AgentEngine {
   /// 缓存的知识库注入文本（在 startTask 时查询，在 _buildSystemPrompt 时使用）
   String? _cachedKnowledgeInjection;
 
+  /// 对话摘要（由 compact 产生，注入系统提示供 AI 回顾早期对话）
+  String? _conversationSummary;
+
   /// 持久化对话历史，跨 startTask() 调用保留上下文
   final List<ChatMessage> _conversationHistory = [];
 
@@ -228,6 +232,28 @@ class AgentEngine {
 
   void clearHistory() {
     _conversationHistory.clear();
+    _conversationSummary = null;
+  }
+
+  /// 设置对话摘要（压缩后 / 恢复会话时调用），下次构建系统提示时会注入
+  void setConversationSummary(String? summary) {
+    _conversationSummary = summary;
+  }
+
+  /// 压缩后同步内存历史：移除已摘要的旧消息，保留最近 N 轮
+  /// 使内存中的 _conversationHistory 与持久化层（Conversation.messages）保持一致
+  void syncAfterCompact(int keepRecentRounds) {
+    final systemMsgs = _conversationHistory.where((m) => m.role == 'system').toList();
+    final nonSystemMsgs = _conversationHistory.where((m) => m.role != 'system').toList();
+    final keepCount = keepRecentRounds * 2;
+    if (nonSystemMsgs.length > keepCount) {
+      final kept = nonSystemMsgs.skip(nonSystemMsgs.length - keepCount).toList();
+      _conversationHistory
+        ..clear()
+        ..addAll(systemMsgs)
+        ..addAll(kept);
+      agentLogger.info('SyncCompact', '同步内存历史: ${nonSystemMsgs.length} → ${kept.length} 条非系统消息');
+    }
   }
 
   /// 启动 Agent 任务
@@ -414,7 +440,8 @@ class AgentEngine {
         fullResponse = await _callAI(
           onCommandDetected: (command, commandId) {
             // 检测到完整命令，启动提前执行（异步，不阻塞AI流式输出）
-            if (_earlyExecutionCompleter == null) {
+            if (_earlyExecutionCompleter == null &&
+                _currentTask?.status != AgentStatus.cancelled) {
               _earlyExecutionCommand = command;
               _earlyExecutionCompleter = Completer<_EarlyExecutionResult>();
               _runCommandWithSafety(command, executor).then((result) {
@@ -534,6 +561,7 @@ class AgentEngine {
     final stableIdToFinalId = <String, String>{}; // 稳定 ID → 最终全局唯一 ID 的映射
     int globalEventSeq = 0; // 全局事件序号
     bool commandDetectedNotified = false; // 是否已通知过命令检测（一轮只通知一次）
+    Timer? watchdog; // AI 流式超时看门狗
 
     String assignFinalId(AgentEvent e) {
       final stableId = e.id; // 解析器生成的稳定 ID（内容哈希）
@@ -547,39 +575,60 @@ class AgentEngine {
       return finalId;
     }
 
-    await for (final chunk in stream) {
-      chunkCount++;
-      fullResponse += chunk;
-      _accumulatedMessage += chunk;
-      onMessage?.call(chunk);
+    // 超时看门狗：如果 120 秒内没有新 chunk 到达，强制结束流
+    bool streamTimedOut = false;
+    void resetWatchdog() {
+      watchdog?.cancel();
+      watchdog = Timer(const Duration(seconds: 120), () {
+        streamTimedOut = true;
+        agentLogger.error('ReAct', 'AI 流式输出超时（120s 无数据），强制中断');
+      });
+    }
+    resetWatchdog();
 
-      // 流式过程中检测完整命令：立即发出 command 事件 + 触发提前执行
-      if (onCommandDetected != null && !commandDetectedNotified) {
-        final currentEvents = ReActStreamParser.parse(fullResponse);
-        // 找第一个已确定完成的 command 事件（不是最后一个）
-        if (currentEvents.length > 1) {
-          for (int i = 0; i < currentEvents.length - 1; i++) {
-            final e = currentEvents[i];
-            if (e.isCommand) {
-              final cmd = e.command ?? '';
-              if (cmd.isNotEmpty) {
-                commandDetectedNotified = true;
-                final finalId = assignFinalId(e);
-                _lastCommandEventId = finalId;
-                // 立即发出 command 事件，让 UI 先显示命令块
-                if (!emittedStableIds.contains(e.id)) {
-                  emittedStableIds.add(e.id);
-                  e.id = finalId;
-                  e.isStreaming = false;
-                  onEvent?.call(e);
+    try {
+      await for (final chunk in stream) {
+        if (streamTimedOut) break;
+        resetWatchdog();
+        chunkCount++;
+        fullResponse += chunk;
+        _accumulatedMessage += chunk;
+        onMessage?.call(chunk);
+
+        // 流式过程中检测完整命令：立即发出 command 事件 + 触发提前执行
+        if (onCommandDetected != null && !commandDetectedNotified) {
+          final currentEvents = ReActStreamParser.parse(fullResponse);
+          // 找第一个已确定完成的 command 事件（不是最后一个）
+          if (currentEvents.length > 1) {
+            for (int i = 0; i < currentEvents.length - 1; i++) {
+              final e = currentEvents[i];
+              if (e.isCommand) {
+                final cmd = e.command ?? '';
+                if (cmd.isNotEmpty) {
+                  commandDetectedNotified = true;
+                  final finalId = assignFinalId(e);
+                  _lastCommandEventId = finalId;
+                  // 立即发出 command 事件，让 UI 先显示命令块
+                  if (!emittedStableIds.contains(e.id)) {
+                    emittedStableIds.add(e.id);
+                    e.id = finalId;
+                    e.isStreaming = false;
+                    onEvent?.call(e);
+                  }
+                  onCommandDetected(cmd, finalId);
+                  break;
                 }
-                onCommandDetected(cmd, finalId);
-                break;
               }
             }
           }
         }
       }
+    } finally {
+      watchdog?.cancel();
+    }
+
+    if (streamTimedOut && fullResponse.isEmpty) {
+      throw TimeoutException('AI 响应超时（120s 无数据）');
     }
 
     // 流式结束：一次性发出所有事件
@@ -1078,65 +1127,29 @@ class AgentEngine {
   Future<AgentResult> _executeCommand(CommandExecutor executor, String command) async {
     final stopwatch = Stopwatch()..start();
 
-    // 执行前检查连接状态，断连则尝试重连
+    // 执行前检查连接状态
     if (!executor.isConnected) {
-      agentLogger.warn('AgentEngine', '连接已断开，尝试重连...');
-      onEvent?.call(AgentEvent.info('连接已断开，正在重连...'));
-      if (executor is SSHService) {
-        // SSH 连接断开，通知上层需要重连（返回错误让 agent loop 停止）
-        return AgentResult(
-          success: false,
-          error: 'SSH 连接已断开，请重连后重试',
-          duration: stopwatch.elapsed,
-        );
-      }
-      // 本地终端断开，尝试重启
-      try {
-        // 本地终端无法重连，直接报错
-        return AgentResult(
-          success: false,
-          error: '本地终端已退出，请重新打开终端',
-          duration: stopwatch.elapsed,
-        );
-      } catch (e) {
-        return AgentResult(
-          success: false,
-          error: '重连失败: $e',
-          duration: stopwatch.elapsed,
-        );
-      }
+      agentLogger.warn('AgentEngine', '连接已断开');
+      return AgentResult(
+        success: false,
+        error: executor is SSHService
+            ? 'SSH 连接已断开，请重连后重试'
+            : '本地终端已退出，请重新打开终端',
+        duration: stopwatch.elapsed,
+      );
     }
 
+    // 创建取消令牌，cancelTask 时 complete 触发提前退出
+    _commandCancelToken = Completer<void>();
+
     try {
-      final completer = Completer<String>();
-      String stdoutData = '';
-      StreamSubscription<String>? sub;
-
-      // 创建取消令牌，cancelTask 时 complete 触发提前退出
-      _commandCancelToken = Completer<void>();
-
-      // 监听输出流（PTY 流永不关闭，依赖超时）
-      sub = executor.output.listen(
-        (data) => stdoutData += data,
-        onDone: () {
-          if (!completer.isCompleted) completer.complete(stdoutData);
-        },
+      final result = await executor.executeAndWait(
+        command,
+        timeout: const Duration(seconds: 60),
+        cancelToken: _commandCancelToken,
       );
 
-      // 写入命令 + 回车
-      executor.execute(command);
-
-      // 等待输出、超时或取消（三者取最先到达的）
-      stdoutData = await Future.any([
-        completer.future,
-        Future.delayed(const Duration(seconds: 30), () => stdoutData),
-        _commandCancelToken!.future.then((_) => stdoutData),
-      ]);
-
-      // 始终取消订阅，防止泄漏
-      await sub.cancel();
       _commandCancelToken = null;
-
       stopwatch.stop();
 
       // 用户取消：返回已取消结果，让上层退出循环
@@ -1148,17 +1161,16 @@ class AgentEngine {
         );
       }
 
-      // 清理 ANSI 转义序列，避免在消息气泡中显示乱码
-      var cleanOutput = AnsiStripper.strip(stdoutData);
-
-      // 清理 PTY 回显的命令本身（输出开头通常包含刚执行的命令行）
+      // 清理 ANSI 转义序列
+      var cleanOutput = AnsiStripper.strip(result.stdout);
+      // 清理 PTY 回显的命令本身
       cleanOutput = _stripCommandEcho(cleanOutput, command);
 
       return AgentResult.fromCommand(
         command: command,
         stdout: cleanOutput,
-        stderr: '',
-        exitCode: 0,
+        stderr: result.stderr,
+        exitCode: result.exitCode,
         duration: stopwatch.elapsed,
       );
     } catch (e) {
@@ -1577,7 +1589,7 @@ class AgentEngine {
     String? customPrompt;
     try {
       customPrompt = _getCustomPrompt();
-    } catch (_) {}
+    } catch (e) { debugPrint('[AgentEngine] 读取自定义提示词失败: $e'); }
     if (customPrompt != null && customPrompt.isNotEmpty) {
       buffer.writeln();
       buffer.writeln('【用户自定义指令】');
@@ -1588,6 +1600,13 @@ class AgentEngine {
     if (_cachedKnowledgeInjection != null) {
       buffer.writeln();
       buffer.writeln(_cachedKnowledgeInjection);
+    }
+
+    // 早期对话摘要（压缩后产生，帮助 AI 回顾早期对话）
+    if (_conversationSummary != null && _conversationSummary!.isNotEmpty) {
+      buffer.writeln();
+      buffer.writeln('【早期对话摘要】');
+      buffer.writeln(_conversationSummary);
     }
 
     if (executor != null) {
@@ -1611,7 +1630,8 @@ class AgentEngine {
     try {
       final box = HiveInit.settingsBox;
       return box.get('customSystemPrompt') as String?;
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[AgentEngine] 读取自定义提示词失败: $e');
       return null;
     }
   }
@@ -1742,7 +1762,7 @@ class AgentEngine {
         final clean = AnsiStripper.strip(output);
         _memory.rememberSystemInfo('$cat: ${clean.trim()}', category: cat);
       }
-    } catch (_) {}
+    } catch (e) { debugPrint('[AgentEngine] 收集系统信息失败: $e'); }
   }
 }
 

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
+import 'package:flutter/foundation.dart';
 import '../models/host_config.dart';
 import 'command_executor.dart';
 
@@ -37,10 +38,13 @@ class SSHService implements CommandExecutor {
   SSHClient? _jumpClient;
   SSHSocket? _jumpSocket;
 
-  // 坑 2 修复：命令执行等待相关
+  // 命令执行等待：用唯一标记 + 退出码检测
   final StringBuffer _outputBuffer = StringBuffer();
-  final _promptRegex = RegExp(r'[\]\$#]\s*$'); // 匹配 ]$ # 结尾
-  final _completers = <Completer<String>>[];
+  final _promptRegex = RegExp(r'[\]\$#]\s*$');
+  final List<Completer<String>> _completers = [];
+
+  // 唯一标记计数器，用于检测命令完成
+  int _markerSeq = 0;
 
   SSHService(this.config);
 
@@ -54,7 +58,6 @@ class SSHService implements CommandExecutor {
     String? password,
     String? privateKeyContent,
     String? passphrase,
-    // 跳板机参数
     HostConfig? jumpHostConfig,
     String? jumpPassword,
     String? jumpPrivateKeyContent,
@@ -66,8 +69,12 @@ class SSHService implements CommandExecutor {
       if (jumpHostConfig != null) {
         outputController.add('通过跳板机 ${jumpHostConfig.host} 中转连接...\n');
 
-        // 1. 先连接跳板机
-        _jumpSocket = await SSHSocket.connect(jumpHostConfig.host, jumpHostConfig.port);
+        // 1. 先连接跳板机（加超时）
+        _jumpSocket = await SSHSocket.connect(
+          jumpHostConfig.host,
+          jumpHostConfig.port,
+          timeout: const Duration(seconds: 15),
+        );
         _jumpClient = SSHClient(
           _jumpSocket!,
           username: jumpHostConfig.username,
@@ -77,7 +84,7 @@ class SSHService implements CommandExecutor {
               : null,
         );
 
-        // 2. 通过跳板机端口转发到目标（forwardLocal 返回 SSHForwardChannel，实现了 SSHSocket）
+        // 2. 通过跳板机端口转发到目标
         final forwardSocket = await _jumpClient!.forwardLocal(
           config.host,
           config.port,
@@ -85,8 +92,12 @@ class SSHService implements CommandExecutor {
 
         _socket = forwardSocket;
       } else {
-        // 直连
-        _socket = await SSHSocket.connect(config.host, config.port);
+        // 直连（加超时）
+        _socket = await SSHSocket.connect(
+          config.host,
+          config.port,
+          timeout: const Duration(seconds: 15),
+        );
       }
 
       _client = SSHClient(
@@ -100,14 +111,12 @@ class SSHService implements CommandExecutor {
             : null,
       );
 
-      // 验证连通性（简化版，避免环境差异问题）
+      // 验证连通性
       try {
         final echoResult = await _client!.execute("echo 'OK'");
-        final echoOutput = await echoResult.stdout.cast<List<int>>().transform(utf8.decoder).join();
-        // 放宽验证条件，只要没有异常就算成功
+        await echoResult.stdout.cast<List<int>>().transform(utf8.decoder).join();
         outputController.add('连接验证通过\n');
       } catch (e) {
-        // 验证失败不影响连接建立，继续
         outputController.add('连接验证跳过: $e\n');
       }
 
@@ -115,7 +124,8 @@ class SSHService implements CommandExecutor {
       try {
         final sysInfo = await _client!.execute('uname -s -m');
         _osInfo = (await sysInfo.stdout.cast<List<int>>().transform(utf8.decoder).join()).trim();
-      } catch (_) {
+      } catch (e) {
+        debugPrint('[SSHService] 获取系统信息失败: $e');
         _osInfo = 'Unknown';
       }
 
@@ -132,7 +142,6 @@ class SSHService implements CommandExecutor {
         (data) {
           final output = utf8.decode(data, allowMalformed: true);
           outputController.add(output);
-          // 坑 2 修复：检测 prompt 判断命令执行完毕
           _onShellData(output);
         },
         onError: (error) {
@@ -173,7 +182,7 @@ class SSHService implements CommandExecutor {
     }
   }
 
-  /// 坑 2 修复：Shell 数据回调 - 检测 prompt
+  /// Shell 数据回调 - 检测 prompt 判断命令执行完毕
   void _onShellData(String data) {
     _outputBuffer.write(data);
 
@@ -189,8 +198,8 @@ class SSHService implements CommandExecutor {
     }
   }
 
-  /// 坑 2 修复：执行命令并等待完成
-  Future<String> executeAndWait(String command, {int timeoutSec = 30}) async {
+  /// 执行命令并等待完成（旧接口，保留兼容）
+  Future<String> executeAndWaitLegacy(String command, {int timeoutSec = 30}) async {
     if (_session == null || !_isConnected) {
       throw SSHConnectionError('未连接');
     }
@@ -198,16 +207,103 @@ class SSHService implements CommandExecutor {
     final completer = Completer<String>();
     _completers.add(completer);
 
-    // 发送命令
     _session!.write(Uint8List.fromList(utf8.encode('$command\n')));
 
-    // 超时处理
     return completer.future.timeout(
       Duration(seconds: timeoutSec),
       onTimeout: () {
         _completers.remove(completer);
         throw TimeoutException('命令执行超时');
       },
+    );
+  }
+
+  /// 执行命令并等待完成，返回结构化结果（含退出码）
+  /// 通过在命令后追加 echo "EXITCODE:$?" 来捕获退出码
+  @override
+  Future<CommandResult> executeAndWait(
+    String command, {
+    Duration timeout = const Duration(seconds: 60),
+    Completer<void>? cancelToken,
+  }) async {
+    if (_session == null || !_isConnected) {
+      return CommandResult(
+        stdout: '',
+        stderr: '未连接',
+        exitCode: -1,
+        duration: Duration.zero,
+      );
+    }
+
+    final stopwatch = Stopwatch()..start();
+    _markerSeq++;
+    final marker = 'EXITCODE_$_markerSeq:';
+    // 追加 echo 标记，命令完成后输出 "EXITCODE_N:0" 格式
+    final wrappedCommand = '$command; echo "$marker\$?"';
+
+    final completer = Completer<String>();
+    _completers.add(completer);
+
+    _session!.write(Uint8List.fromList(utf8.encode('$wrappedCommand\n')));
+
+    String rawOutput;
+    try {
+      rawOutput = await Future.any([
+        completer.future,
+        Future.delayed(timeout, () => _outputBuffer.toString()).then((v) {
+          throw TimeoutException('命令执行超时');
+        }),
+        if (cancelToken != null) cancelToken.future.then((_) => _outputBuffer.toString()),
+      ]);
+    } on TimeoutException {
+      _completers.remove(completer);
+      stopwatch.stop();
+      return CommandResult(
+        stdout: _outputBuffer.toString(),
+        stderr: '',
+        exitCode: -1,
+        duration: stopwatch.elapsed,
+        timedOut: true,
+      );
+    } catch (e) {
+      _completers.remove(completer);
+      stopwatch.stop();
+      return CommandResult(
+        stdout: '',
+        stderr: e.toString(),
+        exitCode: -1,
+        duration: stopwatch.elapsed,
+      );
+    }
+
+    _completers.remove(completer);
+    stopwatch.stop();
+
+    // 从输出中提取退出码
+    final exitCodeRegex = RegExp('$marker(\\d+)');
+    final match = exitCodeRegex.firstMatch(rawOutput);
+    int exitCode = 0;
+    if (match != null) {
+      exitCode = int.tryParse(match.group(1) ?? '0') ?? 0;
+      // 移除标记行
+      rawOutput = rawOutput.replaceAll('$marker$exitCode', '');
+    }
+
+    // 清理输出：移除命令回显和末尾 prompt
+    var cleanOutput = rawOutput;
+    // 移除开头的命令回显
+    final cmdEchoIdx = cleanOutput.indexOf(wrappedCommand);
+    if (cmdEchoIdx == 0) {
+      cleanOutput = cleanOutput.substring(wrappedCommand.length);
+    }
+    // 移除末尾的 prompt 标记
+    cleanOutput = cleanOutput.replaceAll(RegExp(r'[\]\$#]\s*$'), '').trim();
+
+    return CommandResult(
+      stdout: cleanOutput,
+      stderr: '',
+      exitCode: exitCode,
+      duration: stopwatch.elapsed,
     );
   }
 
