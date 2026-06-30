@@ -167,6 +167,9 @@ class AgentEngine {
   Completer<String>? _choiceCompleter;
   List<String> _pendingOptions = []; // 当前等待选择的选项
 
+  /// 命令执行取消令牌：cancelTask 时 complete，_executeCommand 据此提前退出
+  Completer<void>? _commandCancelToken;
+
   /// ReAct 格式重试计数（AI 未遵循格式时递增）
   int _reactFormatRetryCount = 0;
   static const int _maxReactFormatRetries = 2;
@@ -200,7 +203,7 @@ class AgentEngine {
   int maxSteps = 0; // 0 = 无限制（运行时兜底为 _defaultMaxSteps）
 
   /// 对话历史最大轮数（每轮 = assistant + user），超出时裁剪最早的轮次
-  static const int _maxConversationRounds = 10;
+  static const int _maxConversationRounds = 40;
 
   /// 单条消息最大字符数，超出截断
   static const int _maxMessageChars = 4000;
@@ -292,7 +295,11 @@ class AgentEngine {
   }
 
   void cancelTask() {
-    if (_currentTask != null && isRunning) {
+    // 无论当前处于何种状态（thinking/executing/waitingConfirm），都标记为取消
+    if (_currentTask != null &&
+        _currentTask!.status != AgentStatus.cancelled &&
+        _currentTask!.status != AgentStatus.completed &&
+        _currentTask!.status != AgentStatus.failed) {
       _currentTask = _currentTask!.copyWith(
         status: AgentStatus.cancelled,
         completedAt: DateTime.now(),
@@ -309,6 +316,10 @@ class AgentEngine {
       _choiceCompleter!.complete('');
     }
     _pendingOptions = [];
+    // 取消正在执行的命令
+    if (_commandCancelToken != null && !_commandCancelToken!.isCompleted) {
+      _commandCancelToken!.complete();
+    }
   }
 
   /// 确认执行危险命令（由用户点击确认按钮触发）
@@ -423,6 +434,12 @@ class AgentEngine {
 
       // 将 AI 响应加入对话历史
       _conversationHistory.add(ChatMessage.create(role: 'assistant', content: fullResponse));
+
+      // 用户在 AI 流式输出期间点了取消
+      if (_currentTask?.status == AgentStatus.cancelled) {
+        agentLogger.info('ReAct', 'AI 响应期间任务被取消');
+        return;
+      }
 
       // ═══════════════════════════════════════════
       // 阶段2: 解析 (Parse) — 从 AI 响应中提取结构化动作
@@ -1095,6 +1112,9 @@ class AgentEngine {
       String stdoutData = '';
       StreamSubscription<String>? sub;
 
+      // 创建取消令牌，cancelTask 时 complete 触发提前退出
+      _commandCancelToken = Completer<void>();
+
       // 监听输出流（PTY 流永不关闭，依赖超时）
       sub = executor.output.listen(
         (data) => stdoutData += data,
@@ -1106,18 +1126,27 @@ class AgentEngine {
       // 写入命令 + 回车
       executor.execute(command);
 
-      // 等待输出或超时（PTY 命令默认 30 秒超时）
-      stdoutData = await completer.future.timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          return stdoutData;
-        },
-      );
+      // 等待输出、超时或取消（三者取最先到达的）
+      stdoutData = await Future.any([
+        completer.future,
+        Future.delayed(const Duration(seconds: 30), () => stdoutData),
+        _commandCancelToken!.future.then((_) => stdoutData),
+      ]);
 
       // 始终取消订阅，防止泄漏
       await sub.cancel();
+      _commandCancelToken = null;
 
       stopwatch.stop();
+
+      // 用户取消：返回已取消结果，让上层退出循环
+      if (_currentTask?.status == AgentStatus.cancelled) {
+        return AgentResult(
+          success: false,
+          error: '用户取消了任务',
+          duration: stopwatch.elapsed,
+        );
+      }
 
       // 清理 ANSI 转义序列，避免在消息气泡中显示乱码
       var cleanOutput = AnsiStripper.strip(stdoutData);
@@ -1134,6 +1163,7 @@ class AgentEngine {
       );
     } catch (e) {
       stopwatch.stop();
+      _commandCancelToken = null;
       return AgentResult(
         success: false,
         error: e.toString(),

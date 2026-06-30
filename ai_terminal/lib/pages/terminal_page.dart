@@ -48,6 +48,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   String? _currentTabId;
   final Map<String, String?> _tabExecutingCommand = {};
   final Map<String, Set<String>> _tabExecutedCommands = {};
+  final Map<String, String?> _tabPendingConfirm = {}; // 等待内联确认的危险命令
   final Map<String, Terminal> _tabTerminals = {}; // 每个 tab 独立的 Terminal 实例
   final Map<String, String> _tabAiInputText = {}; // 每个 tab 独立的 AI 输入框文字
 
@@ -78,6 +79,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   String? get _executingCommand => _currentTabId != null ? _tabExecutingCommand[_currentTabId!] : null;
   set _executingCommand(String? v) { if (_currentTabId != null) _tabExecutingCommand[_currentTabId!] = v; }
   Set<String> get _executedCommands => _currentTabId != null ? (_tabExecutedCommands[_currentTabId!] ??= {}) : {};
+  String? get _pendingConfirmCommand => _currentTabId != null ? _tabPendingConfirm[_currentTabId!] : null;
+  set _pendingConfirmCommand(String? v) { if (_currentTabId != null) _tabPendingConfirm[_currentTabId!] = v; }
 
   final _scrollController = ScrollController();
   final _chatScrollController = ScrollController();
@@ -873,6 +876,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         _tabAiInputText.remove(tab.id);
         _tabExecutingCommand.remove(tab.id);
         _tabExecutedCommands.remove(tab.id);
+        _tabPendingConfirm.remove(tab.id);
         _tabTerminals.remove(tab.id);
         _tabSftpVisible.remove(tab.id);
         await ref.read(tp.terminalProvider.notifier).closeTab(tab.id);
@@ -1990,10 +1994,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                       // 复制按钮
                       _buildCopyButton(trimmed, tc),
                       const SizedBox(width: 4),
-                      // 执行按钮
-                      if (canExecute && !isLoading && !isBlocked)
-                        _buildExecuteButton(trimmed, dangerous, isBlocked, tc, tab)
-                      else if (isBlocked)
+                      // 执行按钮 或 内联确认按钮
+                      if (canExecute && !isLoading && !isBlocked) ...[
+                        if (dangerous && _pendingConfirmCommand == trimmed) ...[
+                          // 危险命令待确认：显示取消 + 确认按钮
+                          _buildInlineConfirmButtons(trimmed, tc),
+                        ] else ...[
+                          _buildExecuteButton(trimmed, dangerous, isBlocked, tc, tab),
+                        ],
+                      ] else if (isBlocked)
                         Container(
                           width: 26,
                           height: 26,
@@ -2586,50 +2595,58 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
+  /// 危险命令内联确认/取消按钮（替代弹窗）
+  Widget _buildInlineConfirmButtons(String command, ThemeColors tc) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 取消按钮
+        GestureDetector(
+          onTap: () => setState(() => _pendingConfirmCommand = null),
+          child: Container(
+            height: 28,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: tc.surface,
+              borderRadius: BorderRadius.circular(rSmall),
+              border: Border.all(color: tc.border),
+            ),
+            child: Text('取消', style: TextStyle(fontSize: fSmall, color: tc.textSub, fontWeight: FontWeight.w500)),
+          ),
+        ),
+        const SizedBox(width: 4),
+        // 确认执行按钮
+        GestureDetector(
+          onTap: () {
+            final tab = ref.read(tp.terminalProvider).activeTab;
+            if (tab != null) _executeLineDirectly(command, true, tab);
+          },
+          child: Container(
+            height: 28,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: cWarning.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(rSmall),
+              border: Border.all(color: cWarning.withValues(alpha: 0.4)),
+            ),
+            child: const Text('确认执行', style: TextStyle(fontSize: fSmall, color: cWarning, fontWeight: FontWeight.w600)),
+          ),
+        ),
+      ],
+    );
+  }
+
   /// 直接执行命令行
   Future<void> _executeLineDirectly(String command, bool dangerous, tp.TerminalTab tab) async {
-    // 危险/复杂命令需确认
-    if (dangerous) {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: ThemeColors.of(context).cardElevated,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-          title: Text('确认执行', style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('⚠️ 此命令较为复杂，建议确认后执行：', style: TextStyle(color: cWarning, fontSize: fSmall)),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: ThemeColors.of(context).terminalBg,
-                  borderRadius: BorderRadius.circular(rSmall),
-                ),
-                child: SelectableText(
-                  command,
-                  style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: fMono, color: cTerminalGreen),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('取消', style: TextStyle(color: cTextSub, fontSize: fBody)),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
-              child: const Text('执行', style: TextStyle(fontSize: fBody)),
-            ),
-          ],
-        ),
-      );
-      if (confirmed != true) return;
+    // 危险命令：首次点击展开内联确认按钮，第二次点击确认才执行
+    if (dangerous && _pendingConfirmCommand != command) {
+      setState(() => _pendingConfirmCommand = command);
+      return;
     }
+    // 确认执行或安全命令直接执行
+    setState(() => _pendingConfirmCommand = null);
 
     setState(() => _executingCommand = command);
 
