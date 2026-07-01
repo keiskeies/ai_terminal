@@ -30,10 +30,17 @@ jobs:
         run: |
           cd ai_terminal
           flutter build macos --release
-      - name: Package macOS
+      - name: Ad-hoc sign & package macOS
         run: |
+          APP_PATH="ai_terminal/build/macos/Build/Products/Release/AI Terminal.app"
+          # Ad-hoc 签名(无 Apple Developer ID 时的最佳实践)
+          # 避免某些 macOS 版本直接提示"已损坏",降级为"无法验证开发者"
+          codesign --force --deep --options runtime --sign - "$APP_PATH"
+          # 验证签名
+          codesign --verify --verbose=2 "$APP_PATH" || true
+          # 打包成 zip
           cd ai_terminal/build/macos/Build/Products/Release
-          zip -r ${{ github.workspace }}/AI_Terminal_${{ github.ref_name }}_macOS.zip "AI Terminal.app"
+          zip -r -y ${{ github.workspace }}/AI_Terminal_${{ github.ref_name }}_macOS.zip "AI Terminal.app"
       - uses: actions/upload-artifact@v4
         with:
           name: macos-build
@@ -232,6 +239,21 @@ jobs:
             | Windows | `AI_Terminal_${{ github.ref_name }}_Windows.zip` |
             | Linux x64 | `AI_Terminal_${{ github.ref_name }}_Linux_x64.tar.gz` |
 
+            ### 🍎 macOS 安装须知
+
+            由于本应用未经过 Apple 公证(非 App Store 分发),首次打开 macOS 会提示「无法验证开发者」。请按以下任一方式处理:
+
+            **方式一:命令行(推荐,一行搞定)**
+            ```bash
+            xattr -cr "/Applications/AI Terminal.app"
+            ```
+
+            **方式二:右键打开**
+            1. 解压 zip 后,将 `AI Terminal.app` 拖入 `/Applications`
+            2. 在 Finder 中**右键**点击应用图标,选择「打开」
+            3. 弹出对话框会多出「打开」按钮,点击即可
+            4. 之后可正常打开,不会再提示
+
             ### 📖 文档
 
             - [官网](https://ai-terminal.keiskei.top)
@@ -278,6 +300,21 @@ jobs:
             | Android | `AI_Terminal_${{ github.ref_name }}_Android.apk` |
             | Windows | `AI_Terminal_${{ github.ref_name }}_Windows.zip` |
             | Linux x64 | `AI_Terminal_${{ github.ref_name }}_Linux_x64.tar.gz` |
+
+            ### 🍎 macOS Install Notice
+
+            This app is **not notarized** (distributed outside the App Store). On first launch macOS will show "cannot verify the developer". Use one of the following methods:
+
+            **Option 1: Command line (recommended, one-liner)**
+            ```bash
+            xattr -cr "/Applications/AI Terminal.app"
+            ```
+
+            **Option 2: Right-click open**
+            1. Unzip and drag `AI Terminal.app` into `/Applications`
+            2. In Finder, **right-click** the app icon → "Open"
+            3. The dialog will show an extra "Open" button — click it
+            4. Subsequent launches will not show the warning
 
             ### 📖 Docs
 
