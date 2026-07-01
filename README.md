@@ -2,7 +2,7 @@
   <img src="./docs/logo.png" width="128" height="128" alt="AI Terminal Logo" />
   <h1 align="center">⚡ AI Terminal</h1>
   <p align="center">
-    <strong>AI 驱动的跨平台安全终端</strong>
+    <strong>用自然语言操控服务器，AI 替你敲命令</strong>
   </p>
   <p align="center">
     <a href="https://ai-terminal.keiskei.top" target="_blank">🌐 官网</a> · 
@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/平台-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-    <img src="https://img.shields.io/badge/version-1.3.1-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.3-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
@@ -21,27 +21,150 @@
 
 **中文** | [English](./README_EN.md)
 
-## 🎯 这是什么？
+## 一句话说清楚
 
-AI Terminal 是一个将 **AI 助手** 与 **SSH / 本地终端** 深度集成的跨平台应用。用自然语言告诉 AI 你想做什么，它会生成命令、自动执行、分析结果——全程在安全的沙箱内完成。
+> **不会命令行？没关系。** 打开 AI Terminal，用中文告诉它你要干什么，它帮你连服务器、跑命令、装软件、查问题——全程安全可控。
 
-> 💬 *"帮我检查一下 JDK 安装情况"* → AI 自动执行 `java -version` 并分析结果
->
-> 💬 *"查看磁盘占用"* → AI 自动执行 `df -h` 并给出清理建议
+## 🎯 你是不是遇到过这些情况？
 
-## ✨ 核心亮点
+### 😫 小白 / 非技术人员
+
+- 买了云服务器，打开终端一脸懵——**这黑框框怎么用？**
+- 朋友说"装个 Nginx"，你搜了一堆教程，每篇都不一样
+- 想配个 JDK 环境，`PATH` 改错了，整个终端都废了
+- 服务器被人警告有漏洞，你连怎么检查都不知道
+- 折腾一下午，服务没跑起来，心态先崩了
+
+### 👨‍💻 开发者
+
+- 每次部署都在百度/Google 同样的命令
+- SSH 连上服务器，半天想不起来 `systemctl` 怎么拼
+- 想快速看个日志，还得翻笔记找 `grep` 的参数
+- 多台服务器来回切换，Tab 开了十几个
+
+### 🔧 运维 / DevOps
+
+- 重复劳动：10 台机器装同一个软件，一台台 SSH 过去
+- 操作记录全靠脑子记，出了事回溯不了
+- 新人问"怎么配环境"，你每次都得手把手教
+- 想做个批量巡检，写脚本比手动还慢
+
+### 🧑‍💼 产品经理 / 一人公司
+
+- 技术合伙人离职了，服务器成了黑箱
+- 想看个数据得求人，自己又不会写 SQL
+- 部署新功能要等排期，其实就改个配置的事
+- 一个人干三个人的活，没时间学命令行
+
+**以上所有场景，AI Terminal 一句话搞定。**
+
+## 💡 它能帮你做什么？
+
+### 装软件？一句话的事
+
+> 💬 "帮我装个 Docker"
+
+AI 自动检测系统版本，匹配官方文档，执行安装命令，装完自动验证。不需要你记任何命令。
+
+### 配环境？不用背 PATH
+
+> 💬 "帮我装 Python 3.12 并配好环境变量"
+
+AI 知道 Debian 用 `apt`、CentOS 用 `yum`、macOS 用 `brew`。它不瞎编，严格按官方文档来。
+
+### 查漏洞？比你还紧张
+
+> 💬 "帮我检查服务器有没有安全漏洞"
+
+AI 自动运行系统更新检查、端口扫描、进程审计，生成完整报告告诉你哪些要修。
+
+### 看日志？不用翻笔记
+
+> 💬 "看看 nginx 最近的错误日志"
+
+AI 知道日志在哪、怎么过滤、怎么看。直接给你关键信息，不用你拼 `tail -f`。
+
+### 管服务器？多台也从容
+
+支持 SSH 远程连接，一个界面管多台服务器。连接池复用，切换零延迟。
+
+## 🛡️ 安全？这是最该关心的事
+
+把服务器交给 AI 管，你肯定担心：**密码会不会泄露？AI 会不会把系统搞崩？会不会偷偷装后门？**
+
+AI Terminal 从架构层面回答这三个问题：
+
+### 🔐 密码怎么存的？
+
+```
+你的密码 → 系统级安全存储（macOS Keychain / Android Keystore）
+                ↓
+         本地数据库只存"用了哪个密钥"，不存密码本身
+                ↓
+         永远不会以明文形式出现在日志、配置文件或磁盘上
+```
+
+即使有人拿到你的设备，没有系统级认证（指纹/密码），读出来的也只是一堆加密数据。
+
+### 🤖 AI 能乱来吗？
+
+**不能。** 三道安全关卡层层拦截：
+
+```
+┌─────────────────────────────────────────────────────┐
+│ 第一关：行为边界提示词                                │
+│ AI 系统指令明确禁止：                                  │
+│   ✗ 不能擅自安装/卸载软件                              │
+│   ✗ 不能修改环境变量或系统配置                          │
+│   ✗ 不能执行破坏性操作                                 │
+│   ✓ 用户说"检查/查看"时，只执行只读命令                  │
+│   ✓ 发现问题先报告，不自作主张修复                      │
+└─────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────┐
+│ 第二关：SafetyGuard 命令分级                           │
+│ 每条命令在执行前都会被安全守卫审查：                      │
+│   🔴 blocked → 直接拦截，禁止执行                      │
+│      （rm -rf /、chmod 777、格式化磁盘等）              │
+│   🟡 warn → 弹窗提示，需手动输入 CONFIRM 确认          │
+│      （apt install、systemctl stop、修改防火墙等）      │
+│   🔵 info → 低风险提示，正常执行                       │
+│      （curl、wget、ls、cat 等）                        │
+└─────────────────────────────────────────────────────┘
+                          ↓
+┌─────────────────────────────────────────────────────┐
+│ 第三关：用户确认                                      │
+│ 你始终是最后一道防线。                                  │
+│ 任何 warn 级别的操作，不输入 CONFIRM 就不会执行。        │
+│ 随时可以中断、取消、查看执行历史。                       │
+└─────────────────────────────────────────────────────┘
+```
+
+### 📋 Agent 行为白皮书
+
+| 你能做的 | AI 能做的 | AI 不能做的 |
+|:---|:---|:---|
+| 让 AI 安装软件 | 生成官方安装命令并执行 | 擅自决定装什么版本 |
+| 让 AI 检查安全 | 运行审计命令并报告 | 发现问题后自行修复 |
+| 让 AI 配置环境 | 按官方文档配置 | 修改你没要求的系统参数 |
+| 让 AI 查看日志 | 过滤并展示关键信息 | 删除或修改日志文件 |
+| 让 AI 管理服务 | 启停指定服务 | 启动你没提到的其他服务 |
+
+**一句话总结：AI 是你的助手，不是你的老板。你让它做什么，它就做什么。你没让它做的，它绝对不会碰。**
+
+## ✨ 核心特性
 
 | 特性 | 描述 |
 |:---|:---|
-| 🤖 **双模式 Agent** | **自动模式**：AI 生成命令并自动执行，循环到任务完成；**辅助模式**：AI 生成命令供你确认后执行 |
-| 🛡️ **三重安全防护** | 行为边界提示词 → SafetyGuard 命令分级（safe/warn/blocked）→ 危险操作需输入 CONFIRM 确认 |
-| 🔐 **零明文凭据** | 密码/私钥使用系统级安全存储（Keychain / Keystore），永不明文落盘 |
-| 🖥️ **5 平台原生** | macOS / Linux / Windows / Android / iOS 全平台原生支持 |
-| 📡 **本地 + 远程** | 既支持 SSH 远程连接，也支持本地 PTY 终端，Agent 在两种模式下均可工作 |
-| 🔄 **连接池复用** | SSH 连接池 + 引用计数，多标签共享同一连接，切换标签零延迟 |
-| 🌊 **流式输出** | AI 响应流式渲染，终端命令实时回显，无卡顿等待 |
-| 🎨 **暗色极简** | 精心调校的暗色主题，JetBrains Mono 等宽字体，终端体验原生级 |
-| 🌐 **20+ 供应商** | 内置 20+ AI 供应商预设（DeepSeek / Qwen / Claude / Gemini / Ollama 等），支持远程配置更新 |
+| 🤖 **Agent 智能执行** | AI 自动生成命令并循环执行，直到任务完成 |
+| 🛡️ **三重安全防护** | 行为边界提示词 → SafetyGuard 命令分级 → 危险操作需 CONFIRM 确认 |
+| 🔐 **零明文凭据** | 密码/私钥存储在系统 Keychain / Keystore，永不明文落盘 |
+| 🖥️ **5 平台原生** | macOS / Linux / Windows / Android / iOS 全平台支持 |
+| 📡 **本地 + 远程** | SSH 远程连接 + 本地 PTY 终端，Agent 两种模式均可工作 |
+| 🔄 **连接池复用** | 多标签共享同一 SSH 连接，切换零延迟 |
+| 🌊 **流式输出** | AI 响应实时渲染，终端命令即时回显 |
+| 🧠 **知识库驱动** | 内置 150+ 软件安装/配置指南，严格按官方文档执行，杜绝 AI 编造命令 |
+| 🌐 **20+ 供应商** | DeepSeek / Qwen / Claude / Gemini / Ollama 等，支持远程配置更新 |
 
 ## 🏗️ 技术架构
 
@@ -53,7 +176,7 @@ Flutter 3.16+ (Dart 3.2+)
 ├── SSH: dartssh2
 ├── 本地终端: flutter_pty
 ├── 终端 UI: xterm.dart
-├── AI 接口: OpenAI 兼容 (支持 DeepSeek / Qwen / GPT / Claude / Gemini / Ollama / 20+ 供应商)
+├── AI 接口: OpenAI 兼容 (20+ 供应商)
 └── Markdown: flutter_markdown
 ```
 
@@ -124,122 +247,45 @@ flutter build ios --release
 
 > 💡 供应商列表支持远程更新：点击提供商旁的 🔄 按钮即可从服务器获取最新供应商和模型列表，无需更新应用
 
-## 🛡️ 安全设计
-
-安全是 AI Terminal 的第一优先级：
-
-### 凭据安全
-- 密码/私钥使用 `flutter_secure_storage` 存储到系统 Keychain / Keystore
-- 本地数据库（Hive）只存元数据，永不存储明文凭据
-- 支持 AES 二次加密增强（可选）
-
-### 命令安全
-```
-SafetyGuard 三级拦截：
-├── 🔴 blocked → 直接拦截，禁止执行（如 rm -rf /）
-├── 🟡 warn   → 需输入 CONFIRM 确认（如 apt install, systemctl stop）
-└── 🔵 info   → 低风险提示（如 curl, wget）
-```
-
-### Agent 行为边界
-- 用户说"查看/检查/确认"时，仅执行只读命令
-- 禁止擅自安装/升级/替换/卸载软件
-- 禁止擅自修改环境变量和系统配置
-- 发现问题时先报告，不自作主张修改
-
 ## 📱 截图
 
-<table>
-  <tr>
-    <td align="center"><b>服务器管理</b></td>
-    <td align="center"><b>SSH 终端</b></td>
-  </tr>
-  <tr>
-    <td><img src="./ai_terminal/doc/ai-t1.png" width="400" /></td>
-    <td><img src="./ai_terminal/doc/ai-t2.png" width="400" /></td>
-  </tr>
-  <tr>
-    <td align="center"><b>AI 对话助手</b></td>
-    <td align="center"><b>Agent 自动执行</b></td>
-  </tr>
-  <tr>
-    <td><img src="./ai_terminal/doc/ai-t3.png" width="400" /></td>
-    <td><img src="./ai_terminal/doc/ai-t4.png" width="400" /></td>
-  </tr>
-</table>
+| 服务器管理 | SSH 终端 |
+|:---:|:---:|
+| <img src="./ai_terminal/doc/ai-t1.png" width="400" /> | <img src="./ai_terminal/doc/ai-t2.png" width="400" /> |
+
+| AI 对话助手 | Agent 自动执行 |
+|:---:|:---:|
+| <img src="./ai_terminal/doc/ai-t3.png" width="400" /> | <img src="./ai_terminal/doc/ai-t4.png" width="400" /> |
 
 <p align="center">
   <img src="./ai_terminal/doc/ai-t5.png" width="400" />
   <br /><b>AI 模型配置</b>
 </p>
 
-> 🤖 以上截图中的 AI 功能由 <b>小米 mino-v2.5-pro</b> 大模型驱动
+> 🤖 以上截图中的 AI 功能由 <b>小米 MiMo</b> 大模型驱动
 
 ## 📖 实战演示：知识库驱动的自动安装
 
-v1.3.0 新增**命令手册知识库**——内置 150+ 常用软件的官方安装/卸载/更新指南，Agent 会自动匹配知识库，严格按官方推荐方式执行，杜绝 AI 编造命令。
+v1.3.0 新增**命令手册知识库**——内置 150+ 常用软件的官方安装/卸载/更新指南，Agent 会自动匹配知识库，严格按官方推荐方式执行，**杜绝 AI 编造命令**。
 
-以下演示在 SSH 连接到 Ubuntu 服务器后，输入"安装openclaw"的完整流程：
+以下演示在 SSH 连接到 Ubuntu 服务器后，输入"安装 openclaw"的完整流程：
 
-<table>
-  <tr>
-    <td align="center"><b>① 输入指令</b></td>
-    <td align="center"><b>② 知识库命中，生成命令</b></td>
-  </tr>
-  <tr>
-    <td><img src="./ai_terminal/doc/at_130_1.webp" width="400" /></td>
-    <td><img src="./ai_terminal/doc/at_130_2.webp" width="400" /></td>
-  </tr>
-  <tr>
-    <td align="center"><b>③ 自动执行安装</b></td>
-    <td align="center"><b>④ 安装完成验证</b></td>
-  </tr>
-  <tr>
-    <td><img src="./ai_terminal/doc/at_130_3.webp" width="400" /></td>
-    <td><img src="./ai_terminal/doc/at_130_4.webp" width="400" /></td>
-  </tr>
-</table>
+| ① 输入指令 | ② 知识库命中，生成命令 |
+|:---:|:---:|
+| <img src="./ai_terminal/doc/at_130_1.webp" width="400" /> | <img src="./ai_terminal/doc/at_130_2.webp" width="400" /> |
+
+| ③ 自动执行安装 | ④ 安装完成验证 |
+|:---:|:---:|
+| <img src="./ai_terminal/doc/at_130_3.webp" width="400" /> | <img src="./ai_terminal/doc/at_130_4.webp" width="400" /> |
 
 **流程解析：**
 
-1. 用户输入"安装openclaw" → Agent 提取操作类型（install）和目标平台（linux）
+1. 用户输入"安装 openclaw" → Agent 提取操作类型（install）和目标平台（linux）
 2. 知识库命中 `openclaw` 的 `linux-debian` 条目（strict 模式），注入官方安装命令到系统提示词
 3. Agent 严格按照知识库命令执行：先安装 Node.js 22，再 `npm install -g openclaw`
 4. 安装完成后自动验证，运行 `openclaw --version` 确认成功
 
 > 💡 知识库支持按平台精确匹配（如 `linux-debian` vs `linux-rhel` 给出不同包管理器命令），支持从远程服务器一键更新
-
-## 📂 项目结构
-
-```
-ai_terminal/
-├── lib/
-│   ├── main.dart                    # 应用入口
-│   ├── core/                        # 核心模块
-│   │   ├── theme.dart               # 暗色主题
-│   │   ├── router.dart              # 路由配置
-│   │   ├── prompts.dart             # AI 系统提示词
-│   │   ├── safety_guard.dart        # 命令安全守卫
-│   │   ├── credentials_store.dart   # 凭据加密存储
-│   │   └── hive_init.dart           # 本地存储初始化
-│   ├── models/                      # 数据模型
-│   ├── providers/                   # Riverpod 状态管理
-│   ├── services/                    # 服务层
-│   │   ├── ai_service.dart          # AI 接口
-│   │   ├── provider_config_service.dart  # 供应商配置服务
-│   │   ├── ssh_service.dart         # SSH 连接
-│   │   ├── local_terminal_service.dart  # 本地终端
-│   │   ├── command_executor.dart    # 统一执行接口
-│   │   └── agent_engine.dart        # Agent 自动执行引擎
-│   ├── pages/                       # 页面
-│   ├── widgets/                     # 组件
-│   └── utils/                       # 工具
-├── assets/                          # 资源文件
-│   ├── fonts/                       # JetBrains Mono 字体
-│   ├── icons/                       # 应用图标
-│   └── config/                      # 内置供应商配置
-└── pubspec.yaml
-```
 
 ## 🗺️ 路线图
 
@@ -272,20 +318,6 @@ ai_terminal/
   - [x] 🤖 预设模型快捷选择（每个供应商内置推荐模型列表，一键选择）
   - [x] 🦙 Ollama 本地部署支持（无需 API Key，完全免费）
   - [x] 📐 添加模型弹窗优化（宽屏双列布局、字段顺序优化）
-- [ ] v1.4.0 — 体验升级
-  - [ ] 命令执行状态机 (Running/Success/Failed/Timeout)
-  - [ ] 终端分屏
-  - [ ] 主题自定义（亮色/暗色/跟随系统）
-  - [ ] 快捷键自定义
-- [ ] v1.5.0 — 多机协同
-  - [ ] 批量操作：一次指令多台服务器并行执行
-  - [ ] 服务器分组管理
-  - [ ] 操作日志集中查看
-- [ ] v2.0.0 — 生态拓展
-  - [ ] 插件系统
-  - [ ] 团队协作 & 权限管理
-  - [ ] 命令录制与回放
-  - [ ] AI 自定义 Agent 角色
 
 ## 🤝 贡献
 

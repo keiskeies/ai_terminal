@@ -172,19 +172,83 @@ jobs:
           body: |
             ## AI Terminal ${{ github.ref_name }}
 
-            ### 🚀 Features
-            - Dual-mode AI Agent (Auto + Assistant)
-            - SafetyGuard 3-level command safety check
-            - Zero-plaintext credential storage
-            - SSH remote terminal with connection pooling
-            - Local PTY terminal support
-            - Streaming AI response
-            - Dark theme with JetBrains Mono font
-            - Cross-platform: macOS, Linux, Windows, Android, iOS
-            - OpenAI-compatible API support
-            - Quick command snippets
+            **用自然语言操控服务器，AI 替你敲命令。**
 
-            ### 📦 Downloads
+            AI Terminal 是一款将 AI 助手与 SSH / 本地终端深度集成的跨平台应用。无论你是刚买服务器的小白、不想记命令的开发者、还是需要批量管理服务器的运维人员——打开它，用中文告诉 AI 你要干什么，它帮你连服务器、跑命令、装软件、查问题。全程安全可控。
+
+            ### 🌟 适合谁用？
+
+            - **小白 / 非技术人员**：不会命令行？没关系。"帮我装个 Docker"、"检查服务器漏洞"——一句话搞定
+            - **开发者**：不用每次都百度同样的命令，AI 记得比你清楚
+            - **运维 / DevOps**：告别重复 SSH，Agent 自动执行安装、配置、巡检
+            - **产品经理 / 一人公司**：技术合伙人的活，你一个人也能干
+
+            ### 🚀 核心特性
+
+            - 🤖 **Agent 智能执行**：AI 自动生成命令并循环执行，直到任务完成
+            - 🛡️ **三重安全防护**：行为边界提示词 → SafetyGuard 命令分级（safe/warn/blocked）→ 危险操作需 CONFIRM 确认
+            - 🔐 **零明文凭据**：密码/私钥存储在系统 Keychain / Keystore，永不明文落盘
+            - 🧠 **知识库驱动**：内置 150+ 软件安装/配置指南，严格按官方文档执行，杜绝 AI 编造命令
+            - 🖥️ **5 平台原生**：macOS / Linux / Windows / Android / iOS 全平台支持
+            - 📡 **SSH 远程 + 本地终端**：连接池复用，多标签共享连接，切换零延迟
+            - 🌊 **流式输出**：AI 响应实时渲染，终端命令即时回显
+            - 🌐 **20+ AI 供应商**：DeepSeek / Qwen / Claude / Gemini / Ollama 等，支持远程配置更新
+
+            ### 🛡️ 安全设计
+
+            - **密码存储**：系统级安全存储（macOS Keychain / Android Keystore），本地数据库只存元数据
+            - **命令安全**：SafetyGuard 三级拦截——blocked 直接拦截、warn 需 CONFIRM 确认、info 低风险提示
+            - **Agent 边界**：用户说"检查/查看"时只执行只读命令；禁止擅自安装/修改配置；发现问题先报告不自修
+
+            ### 📦 下载
+
+            | 平台 | 文件 |
+            |------|------|
+            | macOS | `AI_Terminal_${{ github.ref_name }}_macOS.zip` |
+            | iOS | `AI_Terminal_${{ github.ref_name }}_iOS.ipa` |
+            | Android | `AI_Terminal_${{ github.ref_name }}_Android.apk` |
+            | Windows | `AI_Terminal_${{ github.ref_name }}_Windows.zip` |
+            | Linux x64 | `AI_Terminal_${{ github.ref_name }}_Linux_x64.tar.gz` |
+
+            ### 📖 文档
+
+            - [官网](https://ai-terminal.keiskei.top)
+            - [常见问题](https://github.com/keiskeies/ai_terminal/blob/main/QUESTION.md)
+
+            ---
+
+            ## AI Terminal ${{ github.ref_name }}
+
+            **Control your servers with natural language. AI runs the commands for you.**
+
+            AI Terminal is a cross-platform app that deeply integrates an AI assistant with SSH and local terminals. Whether you're a beginner who just rented a VPS, a developer tired of googling commands, or a DevOps engineer managing dozens of servers — open it, tell the AI what you want in plain English (or Chinese), and it handles the rest. Safe, transparent, and under your control.
+
+            ### 🌟 Who is this for?
+
+            - **Beginners**: Never used a terminal? No problem. "Install Docker" or "check for vulnerabilities" — one sentence solves it
+            - **Developers**: Stop googling the same commands. AI remembers them for you
+            - **DevOps / SysAdmins**: Skip repetitive SSH sessions. Agent handles installs, configs, and health checks
+            - **PMs / Solo founders**: Run server operations without a dedicated engineer
+
+            ### 🚀 Core Features
+
+            - 🤖 **Agent Auto-Execution**: AI generates and executes commands in a loop until task completion
+            - 🛡️ **Triple Security**: Behavior boundary prompts → SafetyGuard command classification → Dangerous ops require CONFIRM
+            - 🔐 **Zero Plaintext Credentials**: Passwords/keys in system Keychain / Keystore, never on disk
+            - 🧠 **Knowledge-Driven**: 150+ software install/config guides, follows official docs strictly
+            - 🖥️ **5 Native Platforms**: macOS / Linux / Windows / Android / iOS
+            - 📡 **SSH Remote + Local Terminal**: Connection pooling, shared connections, zero-delay switching
+            - 🌊 **Streaming Output**: Real-time AI responses and terminal output
+            - 🌐 **20+ AI Providers**: DeepSeek / Qwen / Claude / Gemini / Ollama & more
+
+            ### 🛡️ Security
+
+            - **Credential Storage**: System-level secure storage (Keychain / Keystore), metadata only in local DB
+            - **Command Safety**: SafetyGuard 3-level interception — blocked / warn (CONFIRM required) / info
+            - **Agent Boundaries**: Read-only for "check/inspect" requests; no unauthorized installs/modifications; report first, never self-fix
+
+            ### 📥 Downloads
+
             | Platform | File |
             |----------|------|
             | macOS | `AI_Terminal_${{ github.ref_name }}_macOS.zip` |
@@ -192,6 +256,11 @@ jobs:
             | Android | `AI_Terminal_${{ github.ref_name }}_Android.apk` |
             | Windows | `AI_Terminal_${{ github.ref_name }}_Windows.zip` |
             | Linux x64 | `AI_Terminal_${{ github.ref_name }}_Linux_x64.tar.gz` |
+
+            ### 📖 Docs
+
+            - [Website](https://ai-terminal.keiskei.top)
+            - [FAQ](https://github.com/keiskeies/ai_terminal/blob/main/QUESTION.md)
           files: |
             artifacts/**/*
           draft: false

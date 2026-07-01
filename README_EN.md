@@ -2,7 +2,7 @@
   <img src="./docs/logo.png" width="128" height="128" alt="AI Terminal Logo" />
   <h1 align="center">⚡ AI Terminal</h1>
   <p align="center">
-    <strong>AI-Powered Cross-Platform Secure Terminal</strong>
+    <strong>Control your servers with natural language. AI runs the commands for you.</strong>
   </p>
   <p align="center">
     <a href="https://ai-terminal.keiskei.top" target="_blank">🌐 Website</a> · 
@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-    <img src="https://img.shields.io/badge/version-1.3.1-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.3-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
@@ -21,27 +21,148 @@
 
 [中文](./README.md) | **English**
 
-## 🎯 What is this?
+## One sentence to explain it
 
-AI Terminal is a cross-platform app that deeply integrates an **AI assistant** with **SSH / local terminals**. Tell the AI what you want in natural language — it generates commands, executes them, and analyzes results — all within a secure sandbox.
+> **Never used a terminal? No problem.** Open AI Terminal, tell it what you want in plain English — it connects to your server, runs commands, installs software, and troubleshoots issues. All safe and under your control.
 
-> 💬 *"Check my JDK installation"* → AI runs `java -version` automatically and analyzes the result
->
-> 💬 *"Show disk usage"* → AI runs `df -h` and suggests cleanup options
+## 🎯 Sound familiar?
 
-## ✨ Key Features
+### 😫 Beginners / Non-technical users
+
+- You rented a VPS, opened the terminal, and stared at a **black screen** with no idea what to type
+- A friend said "just install Nginx" — you Googled 10 tutorials, each with different commands
+- You tried setting up Java, edited `PATH` wrong, and broke your entire terminal
+- Someone warned you about a server vulnerability — you don't even know how to check
+- After 3 hours of tinkering, nothing works. You're done.
+
+### 👨‍💻 Developers
+
+- You Google the same `chmod` / `systemctl` commands every single time
+- SSH into a server, blank on the exact `grep` flags you need
+- Want to check logs? First, find that bookmark from 6 months ago
+- 15 browser tabs open, switching between servers, losing track of what's where
+
+### 🔧 DevOps / SysAdmins
+
+- Same software on 10 servers? SSH into each one and repeat. Again.
+- "Who changed that config?" — no one remembers, nothing is logged
+- New hire asks "how do I set up the environment?" — you've explained it 5 times this month
+- Want to do a batch health check? Writing the script takes longer than doing it manually
+
+### 🧑‍💼 Product Managers / Solo founders
+
+- Your only developer left. The server is now a black box.
+- You need to check some data but can't write SQL. You have to ask someone.
+- Deploying a config change requires a dev sprint. It's literally one line.
+- You wear 5 hats. You don't have time to learn `vi`.
+
+**Every scenario above? One sentence to AI Terminal solves it.**
+
+## 💡 What can it do for you?
+
+### Install software? Just say it.
+
+> 💬 "Install Docker on this server"
+
+AI detects your OS version, matches official docs, runs the install commands, and verifies it worked. Zero commands to memorize.
+
+### Configure environments? No more PATH headaches.
+
+> 💬 "Set up Python 3.12 with proper environment variables"
+
+AI knows Debian uses `apt`, CentOS uses `yum`, macOS uses `brew`. It doesn't guess — it follows official documentation strictly.
+
+### Check for vulnerabilities? It's more paranoid than you are.
+
+> 💬 "Scan my server for security issues"
+
+AI runs system update checks, port scans, and process audits automatically. You get a full report of what to fix.
+
+### Read logs? No more digging through bookmarks.
+
+> 💬 "Show me recent Nginx errors"
+
+AI knows where logs live, how to filter them, and what matters. Key info, no `tail -f` gymnastics.
+
+### Manage servers? Multiple machines, one interface.
+
+SSH remote connections with connection pooling. Switch between servers with zero delay. Multiple tabs, one shared connection.
+
+## 🛡️ Security: The elephant in the room
+
+Handing your server to an AI sounds terrifying. Three valid concerns:
+
+### 🔐 "Where do my passwords go?"
+
+```
+Your password → System-level secure storage (macOS Keychain / Android Keystore)
+                       ↓
+              Local database stores only "which key was used," never the password itself
+                       ↓
+              Passwords never appear in plaintext in logs, config files, or on disk
+```
+
+Even if someone steals your device, without your biometric/passcode, all they get is encrypted gibberish.
+
+### 🤖 "Can the AI go rogue?"
+
+**No.** Three layers of defense:
+
+```
+┌─────────────────────────────────────────────────────┐
+│ Layer 1: Behavior Boundary Prompts                   │
+│ AI system instructions explicitly prohibit:          │
+│   ✗ Installing/uninstalling software without asking  │
+│   ✗ Modifying env vars or system configs             │
+│   ✗ Running destructive operations                   │
+│   ✓ "Check/inspect" requests → read-only commands    │
+│   ✓ Issues found → report first, never self-fix      │
+└─────────────────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────┐
+│ Layer 2: SafetyGuard Command Classification          │
+│ Every command is reviewed before execution:          │
+│   🔴 blocked → Blocked immediately, never runs       │
+│      (rm -rf /, chmod 777, disk formatting, etc.)    │
+│   🟡 warn → Popup warning, requires CONFIRM input    │
+│      (apt install, systemctl stop, firewall changes)  │
+│   🔵 info → Low-risk heads-up, runs normally         │
+│      (curl, wget, ls, cat, etc.)                     │
+└─────────────────────────────────────────────────────┘
+                         ↓
+┌─────────────────────────────────────────────────────┐
+│ Layer 3: You Are the Final Gate                      │
+│ You are always the last line of defense.             │
+│ warn-level commands don't execute without CONFIRM.   │
+│ You can interrupt, cancel, or review any time.       │
+└─────────────────────────────────────────────────────┘
+```
+
+### 📋 Agent Behavior Charter
+
+| What you can ask | What AI will do | What AI won't do |
+|:---|:---|:---|
+| Install software | Generate official install commands & run them | Decide which version to install on its own |
+| Check security | Run audit commands & report findings | Fix issues without your permission |
+| Configure environment | Follow official docs exactly | Change system params you didn't ask about |
+| Read logs | Filter & show key information | Delete or modify log files |
+| Manage services | Start/stop the services you specified | Start other services you didn't mention |
+
+**TL;DR: AI is your assistant, not your boss. It does what you ask. Nothing more.**
+
+## ✨ Core Features
 
 | Feature | Description |
 |:---|:---|
-| 🤖 **Dual-Mode Agent** | **Auto Mode**: AI generates and executes commands in a loop until task completion; **Assistant Mode**: AI generates commands for your review before execution |
-| 🛡️ **Triple Security** | Behavior boundary prompts → SafetyGuard command classification (safe/warn/blocked) → Dangerous operations require CONFIRM input |
-| 🔐 **Zero Plaintext Credentials** | Passwords/private keys stored in system-level secure storage (Keychain / Keystore), never written to disk in plaintext |
+| 🤖 **Agent Auto-Execution** | AI generates commands and executes them in a loop until task completion |
+| 🛡️ **Triple Security** | Behavior boundary prompts → SafetyGuard command classification → Dangerous ops require CONFIRM |
+| 🔐 **Zero Plaintext Credentials** | Passwords/private keys in system Keychain / Keystore, never on disk in plaintext |
 | 🖥️ **5 Native Platforms** | macOS / Linux / Windows / Android / iOS — full native support |
-| 📡 **Local + Remote** | Supports both SSH remote connections and local PTY terminals; Agent works in both modes |
-| 🔄 **Connection Pool** | SSH connection pooling with reference counting — multiple tabs share the same connection, zero-delay tab switching |
-| 🌊 **Streaming Output** | AI responses render in real-time; terminal command output streams live — no waiting |
-| 🎨 **Dark Minimal** | Carefully tuned dark theme, JetBrains Mono monospace font, native-grade terminal experience |
-| 🌐 **20+ Providers** | Built-in presets for 20+ AI providers (DeepSeek / Qwen / Claude / Gemini / Ollama, etc.), with remote config updates |
+| 📡 **Local + Remote** | SSH remote connections + local PTY terminal; Agent works in both modes |
+| 🔄 **Connection Pool** | SSH connection pooling — multiple tabs share one connection, zero-delay switching |
+| 🌊 **Streaming Output** | AI responses render in real-time; terminal output streams live |
+| 🧠 **Knowledge-Driven** | 150+ software install/config guides built in — follows official docs, no AI hallucination |
+| 🌐 **20+ Providers** | DeepSeek / Qwen / Claude / Gemini / Ollama & more, with remote config updates |
 
 ## 🏗️ Tech Stack
 
@@ -53,7 +174,7 @@ Flutter 3.16+ (Dart 3.2+)
 ├── SSH: dartssh2
 ├── Local Terminal: flutter_pty
 ├── Terminal UI: xterm.dart
-├── AI Interface: OpenAI-compatible (DeepSeek / Qwen / GPT / Claude / Gemini / Ollama / 20+ providers)
+├── AI Interface: OpenAI-compatible (20+ providers)
 └── Markdown: flutter_markdown
 ```
 
@@ -101,7 +222,7 @@ flutter build apk --release
 flutter build ios --release
 ```
 
-> 📥 You can also download pre-built binaries from [Releases](https://github.com/keiskeies/ai_terminal/releases).
+> 📥 Or download pre-built binaries from [Releases](https://github.com/keiskeies/ai_terminal/releases).
 
 ## 🔧 Configuring AI Models
 
@@ -124,122 +245,45 @@ Setup steps:
 
 > 💡 Provider list supports remote updates: click the 🔄 button next to the provider dropdown to fetch the latest providers and models from the server — no app update required
 
-## 🛡️ Security Design
-
-Security is AI Terminal's top priority:
-
-### Credential Security
-- Passwords/private keys stored via `flutter_secure_storage` in system Keychain / Keystore
-- Local database (Hive) stores only metadata — never plaintext credentials
-- Optional AES secondary encryption enhancement
-
-### Command Safety
-```
-SafetyGuard 3-Level Interception:
-├── 🔴 blocked → Directly blocked, execution prohibited (e.g. rm -rf /)
-├── 🟡 warn   → Requires CONFIRM input (e.g. apt install, systemctl stop)
-└── 🔵 info   → Low-risk notification (e.g. curl, wget)
-```
-
-### Agent Behavior Boundaries
-- When user says "check/inspect/verify", only read-only commands are executed
-- No unauthorized install/upgrade/replace/uninstall operations
-- No unauthorized modification of environment variables or system configs
-- Reports findings first — never takes unsolicited action
-
 ## 📱 Screenshots
 
-<table>
-  <tr>
-    <td align="center"><b>Server Management</b></td>
-    <td align="center"><b>SSH Terminal</b></td>
-  </tr>
-  <tr>
-    <td><img src="./ai_terminal/doc/ai-t1.png" width="400" /></td>
-    <td><img src="./ai_terminal/doc/ai-t2.png" width="400" /></td>
-  </tr>
-  <tr>
-    <td align="center"><b>AI Chat Assistant</b></td>
-    <td align="center"><b>Agent Auto-Execution</b></td>
-  </tr>
-  <tr>
-    <td><img src="./ai_terminal/doc/ai-t3.png" width="400" /></td>
-    <td><img src="./ai_terminal/doc/ai-t4.png" width="400" /></td>
-  </tr>
-</table>
+| Server Management | SSH Terminal |
+|:---:|:---:|
+| <img src="./ai_terminal/doc/ai-t1.png" width="400" /> | <img src="./ai_terminal/doc/ai-t2.png" width="400" /> |
+
+| AI Chat Assistant | Agent Auto-Execution |
+|:---:|:---:|
+| <img src="./ai_terminal/doc/ai-t3.png" width="400" /> | <img src="./ai_terminal/doc/ai-t4.png" width="400" /> |
 
 <p align="center">
   <img src="./ai_terminal/doc/ai-t5.png" width="400" />
   <br /><b>AI Model Configuration</b>
 </p>
 
-> 🤖 The AI features shown above are powered by <b>XIAOMI MIMO-V2.5-PRO</b> LLM
+> 🤖 AI features powered by <b>Xiaomi MiMo</b> LLM
 
 ## 📖 Demo: Knowledge-Driven Auto Install
 
-v1.3.0 introduces a **Command Manual Knowledge Base** — 150+ official install/uninstall/update guides built in. The Agent automatically matches the knowledge base and strictly follows official recommended methods, eliminating AI-generated hallucinated commands.
+v1.3.0 introduced a **Command Manual Knowledge Base** — 150+ official install/uninstall/update guides. The Agent automatically matches the knowledge base and strictly follows official methods, **eliminating AI hallucination**.
 
-Below demonstrates the complete flow after SSH-ing into an Ubuntu server and typing "install openclaw":
+Below: typing "install openclaw" after SSH-ing into an Ubuntu server:
 
-<table>
-  <tr>
-    <td align="center"><b>① Enter command</b></td>
-    <td align="center"><b>② Knowledge base hit, generate commands</b></td>
-  </tr>
-  <tr>
-    <td><img src="./ai_terminal/doc/at_130_1.webp" width="400" /></td>
-    <td><img src="./ai_terminal/doc/at_130_2.webp" width="400" /></td>
-  </tr>
-  <tr>
-    <td align="center"><b>③ Auto-execute installation</b></td>
-    <td align="center"><b>④ Verify installation</b></td>
-  </tr>
-  <tr>
-    <td><img src="./ai_terminal/doc/at_130_3.webp" width="400" /></td>
-    <td><img src="./ai_terminal/doc/at_130_4.webp" width="400" /></td>
-  </tr>
-</table>
+| ① Enter command | ② Knowledge base match, generate commands |
+|:---:|:---:|
+| <img src="./ai_terminal/doc/at_130_1.webp" width="400" /> | <img src="./ai_terminal/doc/at_130_2.webp" width="400" /> |
+
+| ③ Auto-execute installation | ④ Verify installation |
+|:---:|:---:|
+| <img src="./ai_terminal/doc/at_130_3.webp" width="400" /> | <img src="./ai_terminal/doc/at_130_4.webp" width="400" /> |
 
 **Flow breakdown:**
 
-1. User types "install openclaw" → Agent extracts operation type (install) and target platform (linux)
-2. Knowledge base matches `openclaw` entry for `linux-debian` (strict mode), injecting official install commands into the system prompt
-3. Agent strictly follows knowledge base commands: install Node.js 22 first, then `npm install -g openclaw`
-4. After installation, automatically verifies by running `openclaw --version`
+1. User types "install openclaw" → Agent extracts operation (install) and platform (linux)
+2. Knowledge base matches `openclaw` for `linux-debian` (strict mode), injecting official install commands
+3. Agent follows knowledge base exactly: installs Node.js 22, then `npm install -g openclaw`
+4. Post-install verification: runs `openclaw --version` to confirm success
 
-> 💡 The knowledge base supports platform-specific matching (e.g. `linux-debian` vs `linux-rhel` yield different package manager commands), with one-click remote updates
-
-## 📂 Project Structure
-
-```
-ai_terminal/
-├── lib/
-│   ├── main.dart                    # App entry
-│   ├── core/                        # Core modules
-│   │   ├── theme.dart               # Dark theme
-│   │   ├── router.dart              # Routing config
-│   │   ├── prompts.dart             # AI system prompts
-│   │   ├── safety_guard.dart        # Command safety guard
-│   │   ├── credentials_store.dart   # Encrypted credential storage
-│   │   └── hive_init.dart           # Local storage init
-│   ├── models/                      # Data models
-│   ├── providers/                   # Riverpod state management
-│   ├── services/                    # Service layer
-│   │   ├── ai_service.dart          # AI interface
-│   │   ├── provider_config_service.dart  # Provider config service
-│   │   ├── ssh_service.dart         # SSH connection
-│   │   ├── local_terminal_service.dart  # Local terminal
-│   │   ├── command_executor.dart    # Unified executor interface
-│   │   └── agent_engine.dart        # Agent auto-execution engine
-│   ├── pages/                       # Pages
-│   ├── widgets/                     # Widgets
-│   └── utils/                       # Utilities
-├── assets/                          # Assets
-│   ├── fonts/                       # JetBrains Mono font
-│   ├── icons/                       # App icons
-│   └── config/                      # Built-in provider config
-└── pubspec.yaml
-```
+> 💡 Knowledge base supports platform-specific matching (`linux-debian` vs `linux-rhel` yield different package manager commands), with one-click remote updates
 
 ## 🗺️ Roadmap
 
@@ -259,37 +303,23 @@ ai_terminal/
   - [x] Unlimited execution steps by default
   - [x] SFTP file management + remote editing
 - [x] v1.3.0 — Knowledge-driven
-  - [x] 🧠 SQLite FTS5 full-text search knowledge base (150+ software install/uninstall/update guides)
-  - [x] 🔄 Remote knowledge base auto-sync (updates from GitHub on launch, works offline)
-  - [x] 🎯 Platform-specific matching (linux-debian / linux-rhel / macos fine-grained dispatch)
-  - [x] 🛡️ LLM safety rules (strict enforcement + search command prohibition to prevent guessing)
-  - [x] 🔧 Knowledge base build tool (CSV → SQLite conversion script)
-  - [x] 💬 Friendly API error messages (401/429/timeout, etc.)
+  - [x] 🧠 SQLite FTS5 full-text search knowledge base (150+ software guides)
+  - [x] 🔄 Remote knowledge base auto-sync (updates from GitHub on launch)
+  - [x] 🎯 Platform-specific matching (linux-debian / linux-rhel / macos)
+  - [x] 🛡️ LLM safety rules (strict enforcement + search command prohibition)
+  - [x] 🔧 Knowledge base build tool (CSV → SQLite)
+  - [x] 💬 Friendly API error messages (401/429/timeout)
 - [x] v1.3.1 — Provider ecosystem
-  - [x] 🌐 Built-in 20+ AI provider presets (12 China + 8 Global + Ollama local + Custom)
-  - [x] 🔄 Remote provider config updates (fetch latest provider list from server, no app update needed)
-  - [x] 🏷️ Provider descriptions and pricing info (show intro and pricing when selecting a provider)
-  - [x] 🤖 Preset model quick selection (each provider has recommended model list, one-click select)
-  - [x] 🦙 Ollama local deployment support (no API key needed, completely free)
-  - [x] 📐 Add model dialog optimization (wide-screen dual-column layout, field order optimized)
-- [ ] v1.4.0 — Experience upgrade
-  - [ ] Command execution state machine (Running/Success/Failed/Timeout)
-  - [ ] Terminal split view
-  - [ ] Theme customization (light/dark/follow system)
-  - [ ] Custom keyboard shortcuts
-- [ ] v1.5.0 — Multi-server orchestration
-  - [ ] Batch operations: one command, multiple servers in parallel
-  - [ ] Server group management
-  - [ ] Centralized operation log viewer
-- [ ] v2.0.0 — Ecosystem expansion
-  - [ ] Plugin system
-  - [ ] Team collaboration & permission management
-  - [ ] Command recording & playback
-  - [ ] Custom AI Agent roles
+  - [x] 🌐 20+ AI provider presets (12 China + 8 Global + Ollama + Custom)
+  - [x] 🔄 Remote provider config updates (no app update needed)
+  - [x] 🏷️ Provider descriptions and pricing info
+  - [x] 🤖 Preset model quick selection (one-click)
+  - [x] 🦙 Ollama local deployment (no API key, completely free)
+  - [x] 📐 Add model dialog optimization (wide-screen dual-column layout)
 
 ## 🤝 Contributing
 
-Contributions are welcome! Whether it's bug reports, feature suggestions, or code submissions.
+Contributions welcome! Bug reports, feature suggestions, or code.
 
 1. Fork this repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)

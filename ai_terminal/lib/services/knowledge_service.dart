@@ -194,7 +194,7 @@ class KnowledgeService {
   static Future<String?> _getRemoteDbUrl() async {
     try {
       final info = await PackageInfo.fromPlatform();
-      final version = info.version; // e.g. "1.3.0"
+      final version = info.version; // e.g. "1.3.3"
       return KnowledgeConfig.remoteDbUrlForVersion(version);
     } catch (e) {
       debugPrint('[KnowledgeService] 获取版本号失败: $e');
