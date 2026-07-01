@@ -552,7 +552,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
   Future<void> switchSession(String conversationId) async {
     final hostId = _registry.activeHostId;
     if (hostId == null) return;
-    // L7 修复：先取消当前任务 + 重置 reducer，避免旧任务的事件/流式内容串台到新会话
+    // 先保存当前流式内容到旧会话（cancelTask 后引擎退出，不再有 onCompleted 触发保存）
+    _flushStreamingToContent(hostId);
+    // L7 修复：取消当前任务 + 重置 reducer，避免旧任务的事件/流式内容串台到新会话
     _engine?.cancelTask();
     _reducer.cancelTimer(hostId);
     _reducer.reset(hostId);

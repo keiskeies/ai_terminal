@@ -5,19 +5,22 @@ import '../models/ai_model_config.dart';
 import '../models/chat_session.dart';
 import '../models/command_snippet.dart';
 import '../models/conversation.dart';
+import '../models/agent_event.dart';
 import 'credentials_store.dart';
 
 class HiveInit {
   static Future<void> init() async {
     await Hive.initFlutter();
 
-    // 注册适配器
+    // 注册适配器（按依赖顺序：AgentEventType → AgentEvent → ConvMessage）
     Hive.registerAdapter(HostConfigAdapter());
     Hive.registerAdapter(AIModelConfigAdapter());
     Hive.registerAdapter(ChatSessionAdapter());
     Hive.registerAdapter(ChatMessageAdapter());
     Hive.registerAdapter(CommandBlockAdapter());
     Hive.registerAdapter(CommandSnippetAdapter());
+    Hive.registerAdapter(AgentEventTypeAdapter());
+    Hive.registerAdapter(AgentEventAdapter());
     Hive.registerAdapter(ConvMessageAdapter());
     Hive.registerAdapter(ConvAgentLogAdapter());
     Hive.registerAdapter(ConversationAdapter());
