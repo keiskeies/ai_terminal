@@ -131,6 +131,8 @@ jobs:
         run: |
           cd ai_terminal
           flutter build windows --release
+        env:
+          CL: /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS
       - name: Package Windows
         shell: pwsh
         run: |
