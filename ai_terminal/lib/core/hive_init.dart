@@ -25,25 +25,33 @@ class HiveInit {
     Hive.registerAdapter(ConvAgentLogAdapter());
     Hive.registerAdapter(ConversationAdapter());
 
-    // 打开 boxes
-    await Hive.openBox<HostConfig>('hosts');
-    await Hive.openBox<AIModelConfig>('aiModels');
-    await Hive.openBox<ChatSession>('chatSessions');
-    await Hive.openBox<CommandSnippet>('snippets');
+    // 打开 boxes（若因 schema 变更导致老数据反序列化失败，自动重建对应 box，避免黑屏）
+    await _openBoxSafe<HostConfig>('hosts');
+    await _openBoxSafe<AIModelConfig>('aiModels');
+    await _openBoxSafe<ChatSession>('chatSessions');
+    await _openBoxSafe<CommandSnippet>('snippets');
     await Hive.openBox('settings');
     await Hive.openBox('auditLogs');
-
-    // 会话 box 如果因模型 typeId 变更（开发期 schema 调整）损坏，自动重建
-    try {
-      await Hive.openBox<Conversation>('conversations');
-    } on HiveError catch (e) {
-      debugPrint('[HiveInit] 会话数据无法读取，自动重置: $e');
-      await Hive.deleteBoxFromDisk('conversations');
-      await Hive.openBox<Conversation>('conversations');
-    }
+    await _openBoxSafe<Conversation>('conversations');
 
     // 初始化凭据存储
     await CredentialsStore.init();
+  }
+
+  /// 安全打开 Hive box:若因 schema 变更/老数据反序列化失败,自动重建 box 避免黑屏
+  static Future<void> _openBoxSafe<T>(String name) async {
+    try {
+      await Hive.openBox<T>(name);
+    } on HiveError catch (e) {
+      debugPrint('[HiveInit] $name box 数据无法读取,自动重置: $e');
+      await Hive.deleteBoxFromDisk(name);
+      await Hive.openBox<T>(name);
+    } on TypeError catch (e) {
+      // 捕获 'type Null is not a subtype of type int' 之类老数据类型不匹配
+      debugPrint('[HiveInit] $name box 老数据类型不匹配,自动重置: $e');
+      await Hive.deleteBoxFromDisk(name);
+      await Hive.openBox<T>(name);
+    }
   }
 
   // Box 引用

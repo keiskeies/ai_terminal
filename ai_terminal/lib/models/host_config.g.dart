@@ -20,18 +20,18 @@ class HostConfigAdapter extends TypeAdapter<HostConfig> {
       ..id = fields[0] as String
       ..name = fields[1] as String
       ..host = fields[2] as String
-      ..port = fields[3] as int
+      ..port = (fields[3] as int?) ?? 22
       ..username = fields[4] as String
       ..authType = fields[10] as String
-      ..group = fields[20] as String
+      ..group = (fields[20] as String?) ?? '默认'
       ..tagColor = fields[21] as String?
       ..jumpHost = fields[22] as String?
-      ..timeout = fields[23] as int
-      ..encoding = fields[24] as String
+      ..timeout = (fields[23] as int?) ?? 30
+      ..encoding = (fields[24] as String?) ?? 'utf-8'
       ..jumpPort = fields[25] as int? ?? 22
       ..jumpUsername = fields[26] as String?
       ..jumpAuthType = fields[27] as String?
-      ..createdAt = fields[30] as DateTime
+      ..createdAt = (fields[30] as DateTime?) ?? DateTime.now()
       ..lastConnectedAt = fields[31] as DateTime?
       ..lastStatus = fields[32] as String?;
   }
