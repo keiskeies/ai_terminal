@@ -30,15 +30,8 @@ jobs:
         run: |
           cd ai_terminal
           flutter build macos --release
-      - name: Ad-hoc sign & package macOS
+      - name: Package macOS
         run: |
-          APP_PATH="ai_terminal/build/macos/Build/Products/Release/AI Terminal.app"
-          # Ad-hoc 签名(无 Apple Developer ID 时的最佳实践)
-          # 避免某些 macOS 版本直接提示"已损坏",降级为"无法验证开发者"
-          codesign --force --deep --options runtime --sign - "$APP_PATH"
-          # 验证签名
-          codesign --verify --verbose=2 "$APP_PATH" || true
-          # 打包成 zip
           cd ai_terminal/build/macos/Build/Products/Release
           zip -r -y ${{ github.workspace }}/AI_Terminal_${{ github.ref_name }}_macOS.zip "AI Terminal.app"
       - uses: actions/upload-artifact@v4
