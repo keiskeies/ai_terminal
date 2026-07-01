@@ -22,6 +22,10 @@ jobs:
         run: |
           cd ai_terminal
           flutter pub get
+      - name: Generate code (build_runner)
+        run: |
+          cd ai_terminal
+          dart run build_runner build --delete-conflicting-outputs
       - name: Build macOS
         run: |
           cd ai_terminal
@@ -47,6 +51,10 @@ jobs:
         run: |
           cd ai_terminal
           flutter pub get
+      - name: Generate code (build_runner)
+        run: |
+          cd ai_terminal
+          dart run build_runner build --delete-conflicting-outputs
       - name: Build iOS (no codesign)
         run: |
           cd ai_terminal
@@ -75,6 +83,10 @@ jobs:
         run: |
           cd ai_terminal
           flutter pub get
+      - name: Generate code (build_runner)
+        run: |
+          cd ai_terminal
+          dart run build_runner build --delete-conflicting-outputs
       - name: Patch Flutter Gradle settings
         run: |
           # Add gradlePluginPortal() to Flutter's settings.gradle.kts so kotlin-dsl plugin can be resolved
@@ -111,6 +123,10 @@ jobs:
         run: |
           cd ai_terminal
           flutter pub get
+      - name: Generate code (build_runner)
+        run: |
+          cd ai_terminal
+          dart run build_runner build --delete-conflicting-outputs
       - name: Build Windows
         run: |
           cd ai_terminal
@@ -140,6 +156,10 @@ jobs:
         run: |
           cd ai_terminal
           flutter pub get
+      - name: Generate code (build_runner)
+        run: |
+          cd ai_terminal
+          dart run build_runner build --delete-conflicting-outputs
       - name: Build Linux
         run: |
           cd ai_terminal
