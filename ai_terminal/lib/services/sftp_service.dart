@@ -133,7 +133,7 @@ class SftpService {
 
       final attr = name.attr;
       final isDir = attr.isDirectory;
-      final entryPath = p.join(path, name.filename);
+      final entryPath = p.posix.join(path, name.filename);
 
       items.add(SftpEntry(
         name: name.filename,

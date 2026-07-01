@@ -5,12 +5,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:path/path.dart' as p;
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
-import '../core/credentials_store.dart';
 import '../providers/app_providers.dart';
+import '../services/sftp_controller.dart';
 import '../services/sftp_service.dart';
-
-/// 排序字段
-enum _SftpSortBy { name, size, modified }
 
 /// 可复用的 SFTP 面板组件，既可用于独立页面也可嵌入终端右侧
 class SftpPanel extends ConsumerStatefulWidget {
@@ -30,166 +27,53 @@ class SftpPanel extends ConsumerStatefulWidget {
 }
 
 class _SftpPanelState extends ConsumerState<SftpPanel> {
-  final SftpService _sftpService = SftpService();
-  List<SftpEntry> _entries = [];
-  String _currentPath = '/';
-  bool _isLoading = false;
-  bool _isConnecting = false;
-  String? _error;
-  final List<String> _pathHistory = [];
-  String? _hostName;
+  late final SftpController _controller;
 
-  // 路径输入模式
+  // 路径输入模式（纯 UI 状态）
   bool _isPathEditing = false;
   final _pathController = TextEditingController();
   final _pathFocusNode = FocusNode();
 
-  // 上传/下载进度
-  bool _isTransferring = false;
-  double _transferProgress = 0;
-  String _transferName = '';
-
-  // 排序
-  _SftpSortBy _sortBy = _SftpSortBy.name;
-  bool _sortAsc = true; // 名称默认升序
-
   @override
   void initState() {
     super.initState();
-    _connectAndLoad();
+    _controller = SftpController();
+    _controller.addListener(_onChanged);
+    _connect();
+  }
+
+  void _onChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _connect() async {
+    final host = ref.read(hostsProvider.notifier).getHostById(widget.hostId);
+    if (host == null) {
+      _controller.setError('主机不存在');
+      return;
+    }
+    await _controller.connectAndLoad(host);
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_onChanged);
     _pathController.dispose();
     _pathFocusNode.dispose();
-    _sftpService.disconnect();
+    _controller.dispose();
     super.dispose();
-  }
-
-  Future<void> _connectAndLoad() async {
-    final host = ref.read(hostsProvider.notifier).getHostById(widget.hostId);
-    if (host == null) {
-      setState(() => _error = '主机不存在');
-      return;
-    }
-
-    _hostName = host.name;
-    setState(() => _isConnecting = true);
-
-    try {
-      final password = await CredentialsStore.get(hostId: host.id, type: 'password');
-      final privateKey = await CredentialsStore.get(hostId: host.id, type: 'privateKey');
-
-      if (password == null && privateKey == null) {
-        setState(() {
-          _isConnecting = false;
-          _error = '未找到登录凭据';
-        });
-        return;
-      }
-
-      await _sftpService.connect(
-        config: host,
-        password: password,
-        privateKeyContent: privateKey,
-      );
-
-      final cwd = await _sftpService.getCurrentDirectory();
-      _currentPath = cwd;
-
-      setState(() => _isConnecting = false);
-      await _loadDirectory(cwd);
-    } catch (e) {
-      setState(() {
-        _isConnecting = false;
-        _error = '连接失败: $e';
-      });
-    }
-  }
-
-  Future<void> _loadDirectory(String path) async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
-
-    try {
-      final entries = await _sftpService.listDirectory(path);
-      setState(() {
-        _currentPath = path;
-        _entries = entries;
-        _sortEntries();
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _error = '读取目录失败: $e';
-      });
-    }
-  }
-
-  void _sortEntries() {
-    _entries.sort((a, b) {
-      // 目录始终在前
-      if (a.isDirectory != b.isDirectory) return a.isDirectory ? -1 : 1;
-
-      int cmp;
-      switch (_sortBy) {
-        case _SftpSortBy.name:
-          cmp = a.name.toLowerCase().compareTo(b.name.toLowerCase());
-        case _SftpSortBy.size:
-          cmp = a.size.compareTo(b.size);
-        case _SftpSortBy.modified:
-          final aTime = a.modifiedTime ?? DateTime.fromMillisecondsSinceEpoch(0);
-          final bTime = b.modifiedTime ?? DateTime.fromMillisecondsSinceEpoch(0);
-          cmp = aTime.compareTo(bTime);
-      }
-      return _sortAsc ? cmp : -cmp;
-    });
-  }
-
-  void _toggleSort(_SftpSortBy sortBy) {
-    setState(() {
-      if (_sortBy == sortBy) {
-        _sortAsc = !_sortAsc;
-      } else {
-        _sortBy = sortBy;
-        _sortAsc = true;
-      }
-      _sortEntries();
-    });
-  }
-
-  Future<void> _navigateTo(String path) async {
-    _pathHistory.add(_currentPath);
-    await _loadDirectory(path);
-  }
-
-  Future<void> _goBack() async {
-    if (_pathHistory.isNotEmpty) {
-      final prev = _pathHistory.removeLast();
-      await _loadDirectory(prev);
-    } else {
-      final parent = p.dirname(_currentPath);
-      if (parent != _currentPath) {
-        await _loadDirectory(parent);
-      }
-    }
   }
 
   void _submitPath() {
     final path = _pathController.text.trim();
     if (path.isNotEmpty) {
       setState(() => _isPathEditing = false);
-      _pathHistory.add(_currentPath);
-      _loadDirectory(path);
+      _controller.navigateTo(path);
     }
   }
 
   void _startPathEditing() {
-    _pathController.text = _currentPath;
+    _pathController.text = _controller.currentPath;
     setState(() => _isPathEditing = true);
     Future.delayed(const Duration(milliseconds: 50), () {
       _pathFocusNode.requestFocus();
@@ -231,7 +115,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
             if (entry.isDirectory)
               _actionTile(Icons.folder_open, '打开', () {
                 Navigator.pop(ctx);
-                _navigateTo(entry.path);
+                _controller.navigateTo(entry.path);
               }),
             if (!entry.isDirectory)
               _actionTile(Icons.download, '下载到本地', () {
@@ -277,27 +161,11 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
   }
 
   Future<void> _downloadFile(SftpEntry entry) async {
-    setState(() {
-      _isTransferring = true;
-      _transferProgress = 0;
-      _transferName = entry.name;
-    });
-
     try {
-      final tempDir = Directory.systemTemp;
-      final localPath = '${tempDir.path}/${entry.name}';
-      await _sftpService.downloadFile(
-        entry.path,
-        localPath,
-        onProgress: (current, total) {
-          setState(() {
-            _transferProgress = total > 0 ? current / total : 0;
-          });
-        },
-      );
-
+      await _controller.downloadFile(entry);
       if (mounted) {
-        setState(() => _isTransferring = false);
+        // 与 controller 内下载路径保持一致（系统临时目录）
+        final localPath = '${Directory.systemTemp.path}/${entry.name}';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('已下载到: $localPath'),
@@ -308,7 +176,6 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isTransferring = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('下载失败: $e'),
@@ -325,7 +192,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
     // 先加载文件内容
     String? content;
     try {
-      content = await _sftpService.readFileContent(entry.path, maxSize: 1024 * 500);
+      content = await _controller.readFile(entry.path);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -420,7 +287,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
                   ElevatedButton(
                     onPressed: hasModified ? () async {
                       try {
-                        await _sftpService.writeFileContent(entry.path, controller.text);
+                        await _controller.writeFile(entry.path, controller.text);
                         if (ctx.mounted) {
                           Navigator.pop(ctx);
                           ScaffoldMessenger.of(ctx).showSnackBar(
@@ -479,9 +346,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
 
     if (confirmed == true && controller.text.isNotEmpty) {
       try {
-        final newPath = p.join(p.dirname(entry.path), controller.text);
-        await _sftpService.rename(entry.path, newPath);
-        await _loadDirectory(_currentPath);
+        await _controller.renameEntry(entry, controller.text);
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -516,12 +381,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
 
     if (confirmed == true) {
       try {
-        if (entry.isDirectory) {
-          await _sftpService.deleteDirectory(entry.path);
-        } else {
-          await _sftpService.deleteFile(entry.path);
-        }
-        await _loadDirectory(_currentPath);
+        await _controller.deleteEntry(entry);
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -557,27 +417,12 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
 
       final fileName = p.basename(localPath);
       // 手动拼接远程路径，避免 p.join 在不同平台行为差异
-      final remotePath = _currentPath == '/'
+      final remotePath = _controller.currentPath == '/'
           ? '/$fileName'
-          : '$_currentPath/$fileName';
-
-      setState(() {
-        _isTransferring = true;
-        _transferProgress = 0;
-        _transferName = fileName;
-      });
+          : '${_controller.currentPath}/$fileName';
 
       try {
-        await _sftpService.uploadFile(
-          localPath,
-          remotePath,
-          onProgress: (current, total) {
-            setState(() {
-              _transferProgress = total > 0 ? current / total : 0;
-            });
-          },
-        );
-
+        await _controller.uploadFile(localPath, remotePath);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -601,8 +446,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
     }
 
     if (mounted) {
-      setState(() => _isTransferring = false);
-      await _loadDirectory(_currentPath);
+      await _controller.loadDirectory(_controller.currentPath);
     }
   }
 
@@ -630,9 +474,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
               if (controller.text.isEmpty) return;
               Navigator.pop(ctx);
               try {
-                final newPath = p.join(_currentPath, controller.text);
-                await _sftpService.createDirectory(newPath);
-                await _loadDirectory(_currentPath);
+                await _controller.createDirectory(controller.text);
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -698,7 +540,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
           // 文件列表
           Expanded(child: _buildBody()),
           // 传输进度条
-          if (_isTransferring) _buildTransferProgress(),
+          if (_controller.isTransferring) _buildTransferProgress(),
         ],
       ),
     );
@@ -715,58 +557,58 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
             'SFTP',
             style: TextStyle(fontSize: fSmall, fontWeight: FontWeight.w600, color: cPrimary),
           ),
-          if (_hostName != null) ...[
+          if (_controller.hostName != null) ...[
             const SizedBox(width: 4),
             Text(
-              '- $_hostName',
+              '- ${_controller.hostName}',
               style: const TextStyle(fontSize: fMicro, color: cTextSub),
               overflow: TextOverflow.ellipsis,
             ),
           ],
           const Spacer(),
           // 排序按钮
-          PopupMenuButton<_SftpSortBy>(
-            icon: Icon(Icons.sort, size: 16, color: _sftpService.isConnected ? cTextSub : cTextMuted),
+          PopupMenuButton<String>(
+            icon: Icon(Icons.sort, size: 16, color: _controller.isConnected ? cTextSub : cTextMuted),
             tooltip: '排序',
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-            onSelected: _toggleSort,
+            onSelected: _controller.toggleSort,
             itemBuilder: (ctx) => [
               PopupMenuItem(
-                value: _SftpSortBy.name,
+                value: SftpSortFields.name,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Text('名称', style: TextStyle(fontSize: fSmall)),
-                    if (_sortBy == _SftpSortBy.name) ...[
+                    if (_controller.sortBy == SftpSortFields.name) ...[
                       const SizedBox(width: 4),
-                      Icon(_sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: cPrimary),
+                      Icon(_controller.sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: cPrimary),
                     ],
                   ],
                 ),
               ),
               PopupMenuItem(
-                value: _SftpSortBy.size,
+                value: SftpSortFields.size,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Text('大小', style: TextStyle(fontSize: fSmall)),
-                    if (_sortBy == _SftpSortBy.size) ...[
+                    if (_controller.sortBy == SftpSortFields.size) ...[
                       const SizedBox(width: 4),
-                      Icon(_sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: cPrimary),
+                      Icon(_controller.sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: cPrimary),
                     ],
                   ],
                 ),
               ),
               PopupMenuItem(
-                value: _SftpSortBy.modified,
+                value: SftpSortFields.modified,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Text('修改时间', style: TextStyle(fontSize: fSmall)),
-                    if (_sortBy == _SftpSortBy.modified) ...[
+                    if (_controller.sortBy == SftpSortFields.modified) ...[
                       const SizedBox(width: 4),
-                      Icon(_sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: cPrimary),
+                      Icon(_controller.sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: cPrimary),
                     ],
                   ],
                 ),
@@ -774,23 +616,23 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
             ],
           ),
           IconButton(
-            icon: Icon(Icons.upload_file, size: 16, color: _sftpService.isConnected ? cTextSub : cTextMuted),
+            icon: Icon(Icons.upload_file, size: 16, color: _controller.isConnected ? cTextSub : cTextMuted),
             tooltip: '上传',
-            onPressed: _sftpService.isConnected ? _uploadFiles : null,
+            onPressed: _controller.isConnected ? _uploadFiles : null,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
           ),
           IconButton(
-            icon: Icon(Icons.create_new_folder_outlined, size: 16, color: _sftpService.isConnected ? cTextSub : cTextMuted),
+            icon: Icon(Icons.create_new_folder_outlined, size: 16, color: _controller.isConnected ? cTextSub : cTextMuted),
             tooltip: '新建目录',
-            onPressed: _sftpService.isConnected ? _showCreateDirectoryDialog : null,
+            onPressed: _controller.isConnected ? _showCreateDirectoryDialog : null,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
           ),
           IconButton(
-            icon: Icon(Icons.refresh, size: 16, color: _sftpService.isConnected ? cTextSub : cTextMuted),
+            icon: Icon(Icons.refresh, size: 16, color: _controller.isConnected ? cTextSub : cTextMuted),
             tooltip: '刷新',
-            onPressed: _sftpService.isConnected ? () => _loadDirectory(_currentPath) : null,
+            onPressed: _controller.isConnected ? () => _controller.loadDirectory(_controller.currentPath) : null,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
           ),
@@ -816,8 +658,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
         children: [
           // 返回按钮
           IconButton(
-            icon: Icon(Icons.arrow_back, size: 14, color: _pathHistory.isNotEmpty ? cPrimary : cTextMuted),
-            onPressed: _pathHistory.isNotEmpty ? _goBack : null,
+            icon: Icon(Icons.arrow_back, size: 14, color: _controller.pathHistory.isNotEmpty ? cPrimary : cTextMuted),
+            onPressed: _controller.pathHistory.isNotEmpty ? _controller.goBack : null,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
           ),
@@ -839,7 +681,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
           // 根目录按钮（右侧）
           IconButton(
             icon: const Icon(Icons.home_outlined, size: 14, color: cPrimary),
-            onPressed: () => _navigateTo('/'),
+            onPressed: () => _controller.navigateTo('/'),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
             tooltip: '根目录',
@@ -867,20 +709,20 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
 
   Widget _buildBreadcrumbPath() {
     // 路径格式：/home/user/docs → 面包屑: /home/user/docs（每段可点击）
-    final parts = _currentPath.split('/').where((s) => s.isNotEmpty).toList();
+    final parts = _controller.currentPath.split('/').where((s) => s.isNotEmpty).toList();
     final widgets = <Widget>[];
 
     if (parts.isEmpty) {
       // 当前就在根目录
-      widgets.add(_pathSegment('/', () => _navigateTo('/')));
+      widgets.add(_pathSegment('/', () => _controller.navigateTo('/')));
     } else {
       // 根斜杠（可点击回到 /）
-      widgets.add(_pathSegment('/', () => _navigateTo('/')));
+      widgets.add(_pathSegment('/', () => _controller.navigateTo('/')));
       // 子路径段，每段前面紧跟斜杠
       for (int i = 0; i < parts.length; i++) {
         final accumulated = '/${parts.sublist(0, i + 1).join('/')}';
         final targetPath = accumulated;
-        widgets.add(_pathSegment(parts[i], () => _navigateTo(targetPath)));
+        widgets.add(_pathSegment(parts[i], () => _controller.navigateTo(targetPath)));
         // 非最后一段后面加斜杠分隔
         if (i < parts.length - 1) {
           widgets.add(const Text('/', style: TextStyle(fontSize: fMicro, color: cTextMuted, fontFamily: 'JetBrainsMono', height: 1.2)));
@@ -915,7 +757,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
   }
 
   Widget _buildBody() {
-    if (_isConnecting) {
+    if (_controller.isConnecting) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -931,7 +773,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
       );
     }
 
-    if (_error != null) {
+    if (_controller.error != null) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -940,10 +782,10 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
             children: [
               const Icon(Icons.error_outline, size: 28, color: cDanger),
               const SizedBox(height: 8),
-              Text(_error!, style: const TextStyle(color: cDanger, fontSize: fMicro), textAlign: TextAlign.center),
+              Text(_controller.error!, style: const TextStyle(color: cDanger, fontSize: fMicro), textAlign: TextAlign.center),
               const SizedBox(height: 12),
               ElevatedButton(
-                onPressed: _connectAndLoad,
+                onPressed: _connect,
                 style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4)),
                 child: const Text('重试', style: TextStyle(fontSize: fSmall)),
               ),
@@ -953,11 +795,11 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
       );
     }
 
-    if (_isLoading) {
+    if (_controller.isLoading) {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2));
     }
 
-    if (_entries.isEmpty) {
+    if (_controller.entries.isEmpty) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -971,10 +813,10 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
     }
 
     return ListView.builder(
-      itemCount: _entries.length,
+      itemCount: _controller.entries.length,
       itemExtent: 32, // 固定行高，紧凑显示
       itemBuilder: (context, index) {
-        final entry = _entries[index];
+        final entry = _controller.entries[index];
         return _buildFileItem(entry);
       },
     );
@@ -989,7 +831,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
     return InkWell(
       onTap: () {
         if (entry.isDirectory) {
-          _navigateTo(entry.path);
+          _controller.navigateTo(entry.path);
         } else {
           _showEntryActions(entry);
         }
@@ -1059,12 +901,12 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
         children: [
           SizedBox(
             width: 12, height: 12,
-            child: CircularProgressIndicator(strokeWidth: 1.5, color: cPrimary, value: _transferProgress),
+            child: CircularProgressIndicator(strokeWidth: 1.5, color: cPrimary, value: _controller.transferProgress),
           ),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              '$_transferName ${(_transferProgress * 100).toStringAsFixed(0)}%',
+              '${_controller.transferName} ${(_controller.transferProgress * 100).toStringAsFixed(0)}%',
               style: const TextStyle(fontSize: 9, color: cPrimary),
               overflow: TextOverflow.ellipsis,
             ),

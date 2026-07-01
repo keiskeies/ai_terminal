@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
@@ -13,144 +12,15 @@ import '../services/ai_service.dart';
 import '../services/ssh_service.dart';
 import '../services/command_executor.dart';
 import '../services/knowledge_service.dart';
+import 'agent_logger.dart';
+export 'agent_logger.dart';
 import '../core/safety_guard.dart';
 import '../core/hive_init.dart';
 import '../core/prompts.dart' as prompts;
 import '../utils/ansi_stripper.dart';
+import '../utils/command_heuristics.dart';
+import '../utils/output_processor.dart';
 import '../utils/react_stream_parser.dart';
-
-/// Agent 日志记录器
-///
-/// 性能优化要点：
-/// 1. 使用循环缓冲区（Queue）替代 List + removeAt(0)，避免 O(n) 移动
-/// 2. 文件写入改为异步 + 批量缓冲（500ms 聚合一次），避免每条日志都同步 IO
-/// 3. 控制台输出改用 debugPrint（release 模式自动禁用），并按级别过滤
-/// 4. 提供同步 getLogs() 用于 UI 读取，避免 UI 卡顿
-class AgentLogger {
-  static final AgentLogger _instance = AgentLogger._internal();
-  factory AgentLogger() => _instance;
-  AgentLogger._internal() : _logFile = _initLogFile();
-
-  /// 循环缓冲区：入队 O(1)，超出容量时 removeFirst O(1)
-  final Queue<String> _logs = Queue();
-  static const int _maxLogs = 1000;
-
-  final File? _logFile;
-
-  /// 文件写入缓冲区：聚合多条件日志一次性异步写入
-  final StringBuffer _fileBuffer = StringBuffer();
-  Timer? _flushTimer;
-  bool _fileWriting = false;
-
-  /// 控制台输出级别控制（避免 release 模式下大量 print 阻塞）
-  /// 仅在 debug 模式输出 INFO/DEBUG，WARN/ERROR 始终输出
-  static bool get _isDebugMode {
-    bool inDebugMode = false;
-    assert(() { inDebugMode = true; return true; }());
-    return inDebugMode;
-  }
-
-  static File? _initLogFile() {
-    try {
-      final dir = Directory.systemTemp;
-      final file = File('${dir.path}/ai_terminal_agent.log');
-      // 异步写入头部，避免阻塞启动
-      file.writeAsString('=== Agent Log Started ${DateTime.now()} ===\n');
-      return file;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  void log(String level, String tag, String message) {
-    final timestamp = DateTime.now();
-    final logEntry = '[$timestamp] [$level] [$tag] $message';
-
-    // 入队循环缓冲区
-    _logs.addLast(logEntry);
-    if (_logs.length > _maxLogs) _logs.removeFirst();
-
-    // 控制台输出：release 模式只输出 WARN/ERROR，debug 模式全量
-    if (level == 'WARN' || level == 'ERROR' || _isDebugMode) {
-      debugPrint(logEntry);
-    }
-
-    // 文件写入：缓冲聚合，500ms 刷一次
-    _fileBuffer.writeln(logEntry);
-    _scheduleFlush();
-
-    // 通知订阅者（会话持久化层订阅，将日志写入对应 Conversation）
-    // 复制监听器列表避免回调中修改列表导致并发问题
-    if (_listeners.isNotEmpty) {
-      final listeners = List<void Function(String, String, String, DateTime)>.from(_listeners);
-      for (final l in listeners) {
-        try {
-          l(level, tag, message, timestamp);
-        } catch (e) { debugPrint('[AgentLogger] 日志监听器异常: $e'); }
-      }
-    }
-  }
-
-  /// 调度异步刷盘（500ms 内的多条日志合并为一次 IO）
-  void _scheduleFlush() {
-    if (_flushTimer != null) return;
-    _flushTimer = Timer(const Duration(milliseconds: 500), _flushToFile);
-  }
-
-  Future<void> _flushToFile() async {
-    _flushTimer = null;
-    if (_fileWriting) {
-      // 上一次还没写完，重新调度
-      _scheduleFlush();
-      return;
-    }
-    final file = _logFile;
-    if (file == null || _fileBuffer.isEmpty) return;
-
-    final pending = _fileBuffer.toString();
-    _fileBuffer.clear();
-    _fileWriting = true;
-    try {
-      await file.writeAsString(pending, mode: FileMode.append, flush: false);
-    } catch (e) {
-      debugPrint('[AgentLogger] 日志文件写入失败: $e');
-      // 写入失败时把内容放回缓冲区，下次再试
-      _fileBuffer.write(pending);
-    } finally {
-      _fileWriting = false;
-    }
-  }
-
-  void debug(String tag, String message) => log('DEBUG', tag, message);
-  void info(String tag, String message) => log('INFO', tag, message);
-  void warn(String tag, String message) => log('WARN', tag, message);
-  void error(String tag, String message) => log('ERROR', tag, message);
-
-  /// 返回日志副本（正序：最早在前，最新在后，UI 滚动到底部看最新）
-  List<String> getLogs() => _logs.toList(growable: false);
-
-  String getLogsAsString() => _logs.join('\n');
-
-  // ═══════════════════════════════════════════
-  // 日志订阅：供会话持久化层订阅，将日志写入对应 Conversation
-  // ═══════════════════════════════════════════
-  final List<void Function(String level, String tag, String message, DateTime timestamp)> _listeners = [];
-
-  /// 订阅日志写入事件（返回取消订阅的函数）
-  void Function() subscribe(void Function(String level, String tag, String message, DateTime timestamp) listener) {
-    _listeners.add(listener);
-    return () => _listeners.remove(listener);
-  }
-
-  /// 确保所有缓冲日志刷盘（应用退出时调用）
-  Future<void> flush() async {
-    _flushTimer?.cancel();
-    _flushTimer = null;
-    await _flushToFile();
-  }
-}
-
-final agentLogger = AgentLogger();
 
 /// Agent 执行引擎 - 核心自动执行系统
 class AgentEngine {
@@ -164,12 +34,26 @@ class AgentEngine {
   Completer<bool>? _confirmCompleter; // 等待用户确认危险命令的 Completer
   String? _pendingConfirmCommand; // 当前等待确认的命令
 
+  /// 任务代际 token：每次 startTask 递增，循环中检查此 token 是否仍为当前任务
+  /// 防止取消+立即发送导致旧循环与新循环并发
+  int _currentTaskGeneration = 0;
+
   /// 等待用户选择选项的 Completer（ReAct ask 动作 / :::choose A|B|C:::）
   Completer<String>? _choiceCompleter;
   List<String> _pendingOptions = []; // 当前等待选择的选项
 
   /// 命令执行取消令牌：cancelTask 时 complete，_executeCommand 据此提前退出
   Completer<void>? _commandCancelToken;
+
+  /// AI 流式订阅：cancelTask 时取消，立即停止消费旧任务流
+  StreamSubscription<String>? _aiStreamSub;
+
+  /// AI 流式超时看门狗（_callAI 内创建，cancelTask 中取消）
+  Timer? _aiWatchdog;
+  bool _aiStreamTimedOut = false;
+
+  /// AI 流式完成 Completer（cancelTask 可 complete 以解除 _callAI 挂起）
+  Completer<void>? _aiDoneCompleter;
 
   /// 缓存的知识库注入文本（在 startTask 时查询，在 _buildSystemPrompt 时使用）
   String? _cachedKnowledgeInjection;
@@ -186,6 +70,9 @@ class AgentEngine {
 
   /// 默认最大执行步数（maxSteps=0 时的兜底上限，防止无限循环）
   static const int _defaultMaxSteps = 20;
+
+  /// _accumulatedMessage 最大字符数（防止长任务内存无界增长）
+  static const int _maxAccumulatedChars = 20000;
 
   void Function(String)? onThinking;
   void Function(String)? onCommandGenerated;
@@ -220,13 +107,21 @@ class AgentEngine {
   AgentTask? get currentTask => _currentTask;
   bool get isRunning =>
       _currentTask?.status == AgentStatus.thinking ||
-      _currentTask?.status == AgentStatus.executing;
+      _currentTask?.status == AgentStatus.executing ||
+      _currentTask?.status == AgentStatus.waitingConfirm;
   bool get hasPendingConfirm => _confirmCompleter != null && !_confirmCompleter!.isCompleted;
   String? get pendingConfirmCommand => _pendingConfirmCommand;
   bool get hasPendingChoice => _choiceCompleter != null && !_choiceCompleter!.isCompleted;
   List<String> get pendingOptions => List.unmodifiable(_pendingOptions);
 
   void clearHistory() {
+    // 清理瞬态字段，避免旧任务残留污染新会话
+    if (isRunning || hasPendingConfirm || hasPendingChoice) {
+      cancelTask();
+    }
+    _accumulatedMessage = '';
+    _noCommandRetryCount = 0;
+    _lastCommandEventId = '';
     _conversationHistory.clear();
     _conversationSummary = null;
   }
@@ -236,6 +131,13 @@ class AgentEngine {
   /// [summary] 对话摘要（如有）
   /// system 消息会在下次 startTask 时由 _buildSystemPrompt 重建
   void restoreHistory(List<ChatMessage> messages, {String? summary}) {
+    // 清理瞬态字段，避免旧任务残留污染切换后的会话
+    if (isRunning || hasPendingConfirm || hasPendingChoice) {
+      cancelTask();
+    }
+    _accumulatedMessage = '';
+    _noCommandRetryCount = 0;
+    _lastCommandEventId = '';
     _conversationHistory.clear();
     _conversationSummary = summary;
     _conversationHistory.addAll(messages);
@@ -280,6 +182,10 @@ class AgentEngine {
       return;
     }
 
+    // 新任务代际，使任何残留的旧循环退出
+    _currentTaskGeneration++;
+    final myGeneration = _currentTaskGeneration;
+
     _currentTask = AgentTask(
       id: _uuid.v4(),
       goal: goal,
@@ -300,7 +206,7 @@ class AgentEngine {
       _cachedKnowledgeInjection = await knowledge.buildKnowledgeInjection(
         goal,
         platform: knowledgePlatform,
-        osInfo: executor is SSHService ? (executor as SSHService).osInfo : null,
+        osInfo: executor is SSHService ? executor.osInfo : null,
       );
       if (_cachedKnowledgeInjection != null) {
         agentLogger.info('AgentEngine', '知识库命中 ✓ (platform=${knowledgePlatform ?? "local"})');
@@ -314,7 +220,7 @@ class AgentEngine {
 
     try {
       agentLogger.info('AgentEngine', '执行 Agent 模式');
-      await _executeAutomatic(goal, executor);
+      await _executeAutomatic(goal, executor, myGeneration);
     } catch (e, stack) {
       agentLogger.error('AgentEngine', '执行异常: $e\n$stack');
       _currentTask = _currentTask!.copyWith(
@@ -338,6 +244,8 @@ class AgentEngine {
       );
       onTaskUpdated?.call(_currentTask!);
     }
+    // 递近代际，使任何残留的旧循环立即退出
+    _currentTaskGeneration++;
     // 同时取消等待确认
     if (_confirmCompleter != null && !_confirmCompleter!.isCompleted) {
       _confirmCompleter!.complete(false);
@@ -352,6 +260,24 @@ class AgentEngine {
     if (_commandCancelToken != null && !_commandCancelToken!.isCompleted) {
       _commandCancelToken!.complete();
     }
+    // 取消 AI 流式订阅，停止消费旧任务流
+    // 注意: cancel() 不触发 onDone，需手动 complete doneCompleter
+    final dc = _aiDoneCompleter;
+    if (dc != null && !dc.isCompleted) dc.complete();
+    _aiStreamSub?.cancel();
+    _aiStreamSub = null;
+    _aiWatchdog?.cancel();
+    _aiWatchdog = null;
+    _aiDoneCompleter = null;
+    // 清理提前执行残留，避免下一轮误用
+    if (_earlyExecutionCompleter != null && !_earlyExecutionCompleter!.isCompleted) {
+      _earlyExecutionCompleter!.complete(_EarlyExecutionResult(
+        shouldContinue: false,
+        command: _earlyExecutionCommand ?? '',
+      ));
+    }
+    _earlyExecutionCompleter = null;
+    _earlyExecutionCommand = null;
   }
 
   /// 确认执行危险命令（由用户点击确认按钮触发）
@@ -378,13 +304,24 @@ class AgentEngine {
     _pendingOptions = [];
   }
 
-  Future<void> _executeAutomatic(String goal, CommandExecutor? executor) async {
+  Future<void> _executeAutomatic(String goal, CommandExecutor? executor, int myGeneration) async {
     agentLogger.info('ReAct', '=== 开始 ReAct 自动执行 ===');
+
+    // 代际失效：说明在 startTask 等待期间被新任务覆盖或取消了
+    if (myGeneration != _currentTaskGeneration) {
+      agentLogger.info('ReAct', '代际失效，放弃执行');
+      return;
+    }
 
     if (executor == null || !executor.isConnected) {
       final type = executor == null ? '无执行器' : '未连接';
       agentLogger.error('ReAct', '$type!');
       onError?.call('需要连接到终端才能使用自动模式');
+      _currentTask = _currentTask!.copyWith(
+        status: AgentStatus.failed,
+        completedAt: DateTime.now(),
+      );
+      onTaskUpdated?.call(_currentTask!);
       return;
     }
 
@@ -430,6 +367,12 @@ class AgentEngine {
       stepCount++;
       agentLogger.info('ReAct', '--- 步骤 $stepCount ---');
 
+      // 代际失效：新任务已启动或已取消，旧循环立即退出
+      if (myGeneration != _currentTaskGeneration) {
+        agentLogger.info('ReAct', '代际失效，旧循环退出');
+        return;
+      }
+
       // ═══════════════════════════════════════════
       // 阶段1: 思考 (Think) — 调用 AI 获取响应
       // ═══════════════════════════════════════════
@@ -452,11 +395,22 @@ class AgentEngine {
                 _currentTask?.status != AgentStatus.cancelled) {
               _earlyExecutionCommand = command;
               _earlyExecutionCompleter = Completer<_EarlyExecutionResult>();
-              _runCommandWithSafety(command, executor, commandId: commandId).then((result) {
-                if (_earlyExecutionCompleter?.isCompleted == false) {
-                  _earlyExecutionCompleter?.complete(result);
-                }
-              });
+              _runCommandWithSafety(command, executor, commandId: commandId, myGeneration: myGeneration).then(
+                (result) {
+                  if (_earlyExecutionCompleter?.isCompleted == false) {
+                    _earlyExecutionCompleter?.complete(result);
+                  }
+                },
+                onError: (Object e) {
+                  agentLogger.error('ReAct', '提前执行异常: $e');
+                  if (_earlyExecutionCompleter?.isCompleted == false) {
+                    _earlyExecutionCompleter?.complete(_EarlyExecutionResult(
+                      shouldContinue: false,
+                      command: command,
+                    ));
+                  }
+                },
+              );
             }
           },
         );
@@ -464,17 +418,32 @@ class AgentEngine {
         final friendlyMsg = _friendlyErrorMessage(e);
         agentLogger.error('ReAct', 'AI 调用异常: $e\n$stack');
         onError?.call(friendlyMsg);
-        break;
+        // L1 修复：AI 异常应标记 failed 并退出，不应走到循环后的 completed 逻辑
+        if (myGeneration == _currentTaskGeneration && _currentTask != null) {
+          _currentTask = _currentTask!.copyWith(
+            status: AgentStatus.failed,
+            completedAt: DateTime.now(),
+          );
+          onTaskUpdated?.call(_currentTask!);
+        }
+        return;
       }
 
-      // 将 AI 响应加入对话历史
-      _conversationHistory.add(ChatMessage.create(role: 'assistant', content: fullResponse));
+      // 代际失效：AI 流式期间被新任务覆盖，旧循环退出
+      // L5 修复：先检查代际，再加入历史，避免旧响应污染新会话
+      if (myGeneration != _currentTaskGeneration) {
+        agentLogger.info('ReAct', 'AI 响应期间代际失效，旧循环退出');
+        return;
+      }
 
       // 用户在 AI 流式输出期间点了取消
       if (_currentTask?.status == AgentStatus.cancelled) {
         agentLogger.info('ReAct', 'AI 响应期间任务被取消');
         return;
       }
+
+      // 将 AI 响应加入对话历史（代际和取消检查通过后）
+      _conversationHistory.add(ChatMessage.create(role: 'assistant', content: fullResponse));
 
       // ═══════════════════════════════════════════
       // 阶段2: 解析 (Parse) — 从 AI 响应中提取结构化动作
@@ -492,7 +461,7 @@ class AgentEngine {
           return;
 
         case ActionType.ask:
-          final shouldContinue = await _handleAskAction(step);
+          final shouldContinue = await _handleAskAction(step, myGeneration: myGeneration);
           if (!shouldContinue) return;
           continue;
 
@@ -502,7 +471,7 @@ class AgentEngine {
             final fallbackCommands = _extractCommands(fullResponse);
             if (fallbackCommands.isNotEmpty) {
               agentLogger.info('ReAct', 'ReAct 格式无命令，旧方式提取 ${fallbackCommands.length} 条');
-              final shouldContinue = await _handleExecuteCommands(fallbackCommands, executor);
+              final shouldContinue = await _handleExecuteCommands(fallbackCommands, executor, myGeneration: myGeneration);
               if (!shouldContinue) return;
               break;
             }
@@ -511,7 +480,7 @@ class AgentEngine {
             if (!shouldContinue) return;
             continue;
           }
-          final shouldContinue = await _handleExecuteAction(step, executor);
+          final shouldContinue = await _handleExecuteAction(step, executor, myGeneration: myGeneration);
           if (!shouldContinue) return;
 
         case null:
@@ -530,6 +499,8 @@ class AgentEngine {
     }
 
     // 达到最大步数
+    // L1 修复：代际失效时不覆盖新任务状态
+    if (myGeneration != _currentTaskGeneration) return;
     _currentTask = _currentTask!.copyWith(
       status: AgentStatus.completed,
       completedAt: DateTime.now(),
@@ -541,6 +512,10 @@ class AgentEngine {
       agentLogger.warn('ReAct', '达到最大执行步数 $maxSteps');
       onEvent?.call(AgentEvent.info('⚠️ 达到最大执行步数 ($maxSteps)，任务被中断'));
       onEvent?.call(AgentEvent.finish(summary: '达到最大执行步数，任务被中断'));
+      // L15 修复：maxSteps 路径也调 onCompleted，确保流式内容 flush 到 content
+      if (_accumulatedMessage.isNotEmpty) {
+        onCompleted?.call(_accumulatedMessage);
+      }
     } else {
       if (_accumulatedMessage.isNotEmpty) {
         onCompleted?.call(_accumulatedMessage);
@@ -550,6 +525,7 @@ class AgentEngine {
 
   /// 调用 AI 模型，流式返回完整响应
   /// [onCommandDetected] 可选回调：流式过程中检测到完整命令时触发，可用于提前执行
+  /// 对可重试错误（429/connectionError/timeout）做指数退避重试，最多 3 次
   Future<String> _callAI({
     void Function(String command, String commandId)? onCommandDetected,
   }) async {
@@ -557,19 +533,37 @@ class AgentEngine {
     agentLogger.debug('ReAct', '消息历史: ${_conversationHistory.length} 条');
 
     String fullResponse = '';
-    final stream = await _aiProvider.chatStream(
-      history: _conversationHistory,
-      prompt: '',
-      config: _modelConfig,
-      systemPrompt: null,
-    );
+    // 重试仅对流建立阶段有效，一旦开始接收 chunk 就不再重试
+    Stream<String> stream;
+    const maxRetries = 3;
+    final backoffDelays = [Duration(seconds: 1), Duration(seconds: 2), Duration(seconds: 4)];
+
+    int attempt = 0;
+    while (true) {
+      attempt++;
+      try {
+        stream = await _aiProvider.chatStream(
+          history: _conversationHistory,
+          prompt: '',
+          config: _modelConfig,
+          systemPrompt: null,
+        );
+        break; // 成功建立流
+      } catch (e) {
+        if (attempt > maxRetries || !_isRetryableError(e)) {
+          rethrow;
+        }
+        agentLogger.warn('ReAct', 'AI 流建立失败（第 $attempt 次），${backoffDelays[attempt - 1].inSeconds}s 后重试: $e');
+        await Future.delayed(backoffDelays[attempt - 1]);
+      }
+    }
 
     int chunkCount = 0;
     final emittedStableIds = <String>{}; // 已发出事件的稳定 ID（内容哈希），用于流式去重
     final stableIdToFinalId = <String, String>{}; // 稳定 ID → 最终全局唯一 ID 的映射
     int globalEventSeq = 0; // 全局事件序号
     bool commandDetectedNotified = false; // 是否已通知过命令检测（一轮只通知一次）
-    Timer? watchdog; // AI 流式超时看门狗
+    // watchdog 已改为实例字段 _aiWatchdog
 
     String assignFinalId(AgentEvent e) {
       final stableId = e.id; // 解析器生成的稳定 ID（内容哈希）
@@ -583,24 +577,33 @@ class AgentEngine {
       return finalId;
     }
 
-    // 超时看门狗：如果 120 秒内没有新 chunk 到达，强制结束流
-    bool streamTimedOut = false;
+    // 超时看门狗：用实例字段以便 cancelTask 取消
+    _aiStreamTimedOut = false;
+    final doneCompleter = Completer<void>();
+    _aiDoneCompleter = doneCompleter;
     void resetWatchdog() {
-      watchdog?.cancel();
-      watchdog = Timer(const Duration(seconds: 120), () {
-        streamTimedOut = true;
+      _aiWatchdog?.cancel();
+      _aiWatchdog = Timer(const Duration(seconds: 120), () {
+        _aiStreamTimedOut = true;
         agentLogger.error('ReAct', 'AI 流式输出超时（120s 无数据），强制中断');
+        _aiStreamSub?.cancel();
+        if (!doneCompleter.isCompleted) doneCompleter.complete();
       });
     }
     resetWatchdog();
 
-    try {
-      await for (final chunk in stream) {
-        if (streamTimedOut) break;
+    _aiStreamSub = stream.listen(
+      (chunk) {
+        if (_aiStreamTimedOut) return;
         resetWatchdog();
         chunkCount++;
         fullResponse += chunk;
+        // B5: 限制 _accumulatedMessage 增长，超出上限只保留尾部
         _accumulatedMessage += chunk;
+        if (_accumulatedMessage.length > _maxAccumulatedChars) {
+          _accumulatedMessage = _accumulatedMessage.substring(
+            _accumulatedMessage.length - _maxAccumulatedChars);
+        }
         onMessage?.call(chunk);
 
         // 流式过程中检测完整命令：立即发出 command 事件 + 触发提前执行
@@ -614,11 +617,13 @@ class AgentEngine {
                 final cmd = e.command ?? '';
                 if (cmd.isNotEmpty) {
                   commandDetectedNotified = true;
+                  // A5 修复：先记录 stableId，再改写为 finalId
+                  final stableId = e.id;
                   final finalId = assignFinalId(e);
                   _lastCommandEventId = finalId;
                   // 立即发出 command 事件，让 UI 先显示命令块
-                  if (!emittedStableIds.contains(e.id)) {
-                    emittedStableIds.add(e.id);
+                  if (!emittedStableIds.contains(stableId)) {
+                    emittedStableIds.add(stableId);
                     e.id = finalId;
                     e.isStreaming = false;
                     onEvent?.call(e);
@@ -630,26 +635,48 @@ class AgentEngine {
             }
           }
         }
-      }
+      },
+      onError: (e) {
+        if (!doneCompleter.isCompleted) doneCompleter.completeError(e);
+      },
+      onDone: () {
+        if (!doneCompleter.isCompleted) doneCompleter.complete();
+      },
+      cancelOnError: true,
+    );
+
+    try {
+      await doneCompleter.future;
     } finally {
-      watchdog?.cancel();
+      _aiWatchdog?.cancel();
+      _aiWatchdog = null;
+      await _aiStreamSub?.cancel();
+      _aiStreamSub = null;
+      if (_aiDoneCompleter == doneCompleter) _aiDoneCompleter = null;
     }
 
-    if (streamTimedOut && fullResponse.isEmpty) {
+    if (_aiStreamTimedOut && fullResponse.isEmpty) {
       throw TimeoutException('AI 响应超时（120s 无数据）');
     }
 
-    // 流式结束：一次性发出所有事件
+    // 流式结束：一次性发出所有事件（e.id 此时是 stableId）
     final events = ReActStreamParser.parse(fullResponse);
+    // L10 修复：只记录第一个 command 事件的 id（主流程只执行第一个命令）
+    bool firstCommandIdSet = false;
     for (final e in events) {
-      if (!emittedStableIds.contains(e.id)) {
-        emittedStableIds.add(e.id);
-        final finalId = assignFinalId(e);
+      final stableId = e.id;
+      if (!emittedStableIds.contains(stableId)) {
+        emittedStableIds.add(stableId);
+        assignFinalId(e); // 此处会改写 e.id 为 finalId
         e.isStreaming = false;
         onEvent?.call(e);
+      } else {
+        // 已发过，确保 _lastCommandEventId 用 finalId
+        e.id = stableIdToFinalId[stableId] ?? e.id;
       }
-      if (e.isCommand) {
-        _lastCommandEventId = stableIdToFinalId[e.id] ?? e.id;
+      if (e.isCommand && !firstCommandIdSet) {
+        _lastCommandEventId = stableIdToFinalId[stableId] ?? e.id;
+        firstCommandIdSet = true;
       }
     }
 
@@ -724,14 +751,14 @@ class AgentEngine {
       if (content.trim().isEmpty) {
         return ReActStep(thought: '', action: null, rawResponse: content);
       }
-      if (_isTaskComplete(content)) {
+      if (isTaskComplete(content)) {
         return ReActStep(thought: thought ?? content, action: ActionType.finish, rawResponse: content);
       }
       if (command != null) {
         return ReActStep(thought: thought ?? '', action: ActionType.execute, command: command, rawResponse: content);
       }
       // 有思考内容但没有命令 → 继续执行，不要结束
-      if (thought != null && thought!.isNotEmpty) {
+      if (thought != null && thought.isNotEmpty) {
         return ReActStep(thought: thought, action: null, rawResponse: content);
       }
       // 无法识别格式 → 不结束任务，交给 _handleNoCommand 重试
@@ -751,7 +778,7 @@ class AgentEngine {
   /// 处理 execute 动作 — 执行单条命令并返回观测
   /// ═══════════════════════════════════════════════════════
   /// 返回 true 表示继续循环，false 表示应退出
-  Future<bool> _handleExecuteAction(ReActStep step, CommandExecutor executor) async {
+  Future<bool> _handleExecuteAction(ReActStep step, CommandExecutor executor, {required int myGeneration}) async {
     final command = step.command!.trim();
 
     // 如果有提前执行的结果（或正在执行中），直接用
@@ -760,6 +787,7 @@ class AgentEngine {
       _earlyExecutionCompleter = null;
       _earlyExecutionCommand = null;
 
+      if (myGeneration != _currentTaskGeneration) return false;
       if (!result.shouldContinue) {
         return false;
       }
@@ -768,10 +796,13 @@ class AgentEngine {
         _conversationHistory.add(ChatMessage.create(role: 'user', content: result.observation!));
         _trimMessages(_conversationHistory);
       }
+      // L2 修复：成功执行命令后重置无命令重试计数
+      _noCommandRetryCount = 0;
       return true;
     }
 
-    final result = await _runCommandWithSafety(command, executor);
+    final result = await _runCommandWithSafety(command, executor, myGeneration: myGeneration);
+    if (myGeneration != _currentTaskGeneration) return false;
     if (!result.shouldContinue) {
       return false;
     }
@@ -779,6 +810,8 @@ class AgentEngine {
       _conversationHistory.add(ChatMessage.create(role: 'user', content: result.observation!));
       _trimMessages(_conversationHistory);
     }
+    // L2 修复：成功执行命令后重置无命令重试计数
+    _noCommandRetryCount = 0;
     return true;
   }
 
@@ -792,6 +825,7 @@ class AgentEngine {
     String command,
     CommandExecutor executor, {
     String? commandId,
+    int? myGeneration,
   }) async {
     agentLogger.info('ReAct', '执行命令: $command (commandId=$commandId)');
 
@@ -829,6 +863,9 @@ class AgentEngine {
       _confirmCompleter = null;
       _pendingConfirmCommand = null;
 
+      if (myGeneration != null && myGeneration != _currentTaskGeneration) {
+        return _EarlyExecutionResult(shouldContinue: false, command: command);
+      }
       if (_currentTask?.status == AgentStatus.cancelled) {
         agentLogger.info('ReAct', '任务在等待确认期间被取消');
         return _EarlyExecutionResult(shouldContinue: false, command: command);
@@ -873,13 +910,13 @@ class AgentEngine {
     );
 
     // 格式化观测结果
-    final isQuery = _isQueryCommand(command);
+    final isQuery = isQueryCommand(command);
     final outputText = isQuery
         ? (result.output ?? '(无输出)')
-        : _truncateOutput(result.output, maxLines: 8, maxChars: 600);
+        : truncateOutput(result.output, maxLines: 8, maxChars: 600);
     final errorText = isQuery
         ? (result.error ?? '(无错误信息)')
-        : _truncateOutput(result.error, maxLines: 8, maxChars: 600);
+        : truncateOutput(result.error, maxLines: 8, maxChars: 600);
 
     final observation = ReActObservation(
       command: command,
@@ -912,94 +949,27 @@ class AgentEngine {
   String _lastCommandEventId = '';
 
   /// 处理多条命令执行（旧格式 fallback）
-  Future<bool> _handleExecuteCommands(List<String> commands, CommandExecutor executor) async {
+  Future<bool> _handleExecuteCommands(List<String> commands, CommandExecutor executor, {required int myGeneration}) async {
     final resultMessages = <String>[];
-
     for (final command in commands) {
       if (_currentTask?.status == AgentStatus.cancelled) return false;
-
-      final safetyLevel = SafetyGuard.check(command);
-
-      if (safetyLevel == SafetyLevel.blocked) {
-        onEvent?.call(AgentEvent.info('🚫 命令被安全系统拦截: $command'));
-        resultMessages.add('🚫 命令被安全系统拦截: $command');
-        continue;
+      if (myGeneration != _currentTaskGeneration) return false;
+      final result = await _runCommandWithSafety(command, executor, myGeneration: myGeneration);
+      if (result.observation != null) {
+        resultMessages.add(result.observation!);
       }
-
-      if (safetyLevel == SafetyLevel.warn) {
-        _pendingConfirmCommand = command;
-        _confirmCompleter = Completer<bool>();
-        onEvent?.call(AgentEvent.info('⚠️ 高风险命令需要确认: `$command`\n${SafetyGuard.getTip(safetyLevel)}'));
-
-        _currentTask = _currentTask!.copyWith(
-          status: AgentStatus.waitingConfirm,
-          currentStep: '等待确认: $command',
-        );
-        onTaskUpdated?.call(_currentTask!);
-
-        final confirmed = await _confirmCompleter!.future;
-        _confirmCompleter = null;
-        _pendingConfirmCommand = null;
-
-        if (_currentTask?.status == AgentStatus.cancelled) return false;
-
-        if (!confirmed) {
-          onEvent?.call(AgentEvent.info('❌ 用户拒绝执行此命令'));
-          resultMessages.add('❌ 用户拒绝执行: $command');
-          continue;
-        }
-
-        onEvent?.call(AgentEvent.info('✅ 用户已确认，开始执行...'));
-      }
-
-      _currentTask = _currentTask!.copyWith(
-        status: AgentStatus.executing,
-        currentStep: command,
-      );
-      onTaskUpdated?.call(_currentTask!);
-      onCommandGenerated?.call(command);
-
-      final result = await _executeCommand(executor, command);
-      onCommandExecuted?.call(result);
-
-      _memory.rememberCommand(command);
-      _memory.rememberResult(command, result.output ?? result.error ?? '', success: result.success);
-
-      final isQuery = _isQueryCommand(command);
-      final outputText = isQuery ? (result.output ?? '(无输出)') : _truncateOutput(result.output, maxLines: 8, maxChars: 600);
-      final errorText = isQuery ? (result.error ?? '(无错误信息)') : _truncateOutput(result.error, maxLines: 8, maxChars: 600);
-
-      // 使用 ReAct 观测格式反馈
-      final observation = ReActObservation(
-        command: command,
-        output: result.success ? outputText : errorText,
-        success: result.success,
-        error: result.success ? null : errorText,
-      );
-      resultMessages.add(observation.format());
-
-      // 发出结构化结果事件（与 _runCommandWithSafety 保持一致）
-      onEvent?.call(AgentEvent.result(
-        commandId: '',
-        command: command,
-        success: result.success,
-        output: outputText,
-        error: result.success ? null : errorText,
-      ));
+      if (!result.shouldContinue) break;
     }
-
-    // 汇总观测作为 user 消息
     if (resultMessages.isNotEmpty) {
       _conversationHistory.add(ChatMessage.create(role: 'user', content: resultMessages.join('\n\n')));
       _trimMessages(_conversationHistory);
     }
-
     return true;
   }
 
   /// 处理 ask 动作 — 暂停等待用户选择
   /// 返回 true 表示继续循环，false 表示应退出
-  Future<bool> _handleAskAction(ReActStep step) async {
+  Future<bool> _handleAskAction(ReActStep step, {required int myGeneration}) async {
     final options = step.options ?? [];
     if (options.isEmpty) {
       agentLogger.warn('ReAct', 'ask 动作但无选项，视为 finish');
@@ -1023,6 +993,7 @@ class AgentEngine {
     _choiceCompleter = null;
     _pendingOptions = [];
 
+    if (myGeneration != _currentTaskGeneration) return false;
     if (_currentTask?.status == AgentStatus.cancelled) {
       agentLogger.info('ReAct', '任务在等待选择期间被取消');
       return false;
@@ -1079,6 +1050,8 @@ class AgentEngine {
     );
     onTaskUpdated?.call(_currentTask!);
     agentLogger.info('AutoExec', '=== 任务完成 ===');
+    // L6 修复：补发 finish 事件，让 UI 显示完成卡片并正确结束渲染状态
+    onEvent?.call(AgentEvent.finish(summary: _accumulatedMessage));
     if (_accumulatedMessage.isNotEmpty) {
       onCompleted?.call(_accumulatedMessage);
     }
@@ -1125,7 +1098,7 @@ class AgentEngine {
       // 清理 ANSI 转义序列
       var cleanOutput = AnsiStripper.strip(result.stdout);
       // 清理 PTY 回显的命令本身
-      cleanOutput = _stripCommandEcho(cleanOutput, command);
+      cleanOutput = stripCommandEcho(cleanOutput, command);
 
       return AgentResult.fromCommand(
         command: command,
@@ -1195,6 +1168,23 @@ class AgentEngine {
     }
   }
 
+  /// 判断 AI 调用错误是否值得重试（429限流 / 连接错误 / 超时）
+  /// 401/400/403 等不可重试
+  bool _isRetryableError(dynamic error) {
+    if (error is TimeoutException) return true;
+    if (error is DioException) {
+      return error.type == DioExceptionType.connectionError ||
+          error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.sendTimeout ||
+          error.type == DioExceptionType.receiveTimeout ||
+          (error.response?.statusCode == 429) ||
+          (error.response != null && error.response!.statusCode! >= 500);
+    }
+    // 网络相关异常字符串兜底
+    final msg = error.toString().toLowerCase();
+    return msg.contains('connection') || msg.contains('timeout') || msg.contains('reset by peer');
+  }
+
   /// 将异常转为用户友好的错误消息
   String _friendlyErrorMessage(dynamic error) {
     if (error is DioException) {
@@ -1259,7 +1249,7 @@ class AgentEngine {
     final backtickMatch = singleBacktick.firstMatch(content);
     if (backtickMatch != null) {
       final cmd = backtickMatch.group(1)?.trim();
-      if (cmd != null && _looksLikeCommand(cmd)) {
+      if (cmd != null && looksLikeCommand(cmd)) {
         agentLogger.info('ExtractCmd', '模式2匹配成功(反引号): $cmd');
         return cmd;
       }
@@ -1299,7 +1289,7 @@ class AgentEngine {
       trimmed = trimmed.replaceFirst(RegExp(r'^[-*]\s*'), '');
 
       for (final prefix in commandPrefixes) {
-        if (RegExp(prefix).hasMatch(trimmed) && _looksLikeCommand(trimmed)) {
+        if (RegExp(prefix).hasMatch(trimmed) && looksLikeCommand(trimmed)) {
           agentLogger.info('ExtractCmd', '模式3匹配成功(前缀): $trimmed');
           return trimmed;
         }
@@ -1311,11 +1301,11 @@ class AgentEngine {
       final trimmed = line.trim();
       if (trimmed.isEmpty || trimmed.startsWith('#')) continue;
       // 跳过明显非命令的行
-      if (_isDescriptiveText(trimmed)) continue;
+      if (isDescriptiveText(trimmed)) continue;
       // 清理列表前缀
       var cleaned = trimmed.replaceFirst(RegExp(r'^\d+[\.\)]\s*'), '');
       cleaned = cleaned.replaceFirst(RegExp(r'^[-*]\s*'), '');
-      if (_looksLikeCommand(cleaned) && cleaned.length >= 3) {
+      if (looksLikeCommand(cleaned) && cleaned.length >= 3) {
         agentLogger.info('ExtractCmd', '模式4匹配成功(宽松): $cleaned');
         return cleaned;
       }
@@ -1427,7 +1417,7 @@ class AgentEngine {
       final cmd = line.trim();
       if (cmd.isEmpty || cmd.startsWith('#')) continue;
       if (cmd.startsWith('```') || cmd.endsWith('```')) continue;
-      if (_looksLikeCommand(cmd)) return cmd;
+      if (looksLikeCommand(cmd)) return cmd;
     }
     // 如果没有找到"像命令"的行，返回第一个非空非注释行
     for (final line in lines) {
@@ -1436,85 +1426,6 @@ class AgentEngine {
       if (cmd.length >= 3) return cmd;
     }
     return null;
-  }
-
-  /// 判断文本是否是描述性文字（而非命令）
-  bool _isDescriptiveText(String text) {
-    // 中文字符占比过高
-    final chineseCount = RegExp(r'[\u4e00-\u9fa5]').allMatches(text).length;
-    if (text.length > 0 && chineseCount / text.length > 0.5) return true;
-    // 常见的说明性开头
-    final descriptiveStarts = ['请', '可以', '需要', '应该', '将', '这个', '该',
-      '命令', '说明', '例如', '如下', '包括', '用于', '表示', '输出', '结果',
-      '检查', '查看', '确认', '注意', '提示', '警告', '步骤'];
-    for (final s in descriptiveStarts) {
-      if (text.startsWith(s)) return true;
-    }
-    return false;
-  }
-
-  bool _looksLikeCommand(String text) {
-    // 检查文本是否看起来像命令
-    if (text.length < 3 || text.length > 500) return false;
-    // 不应该包含太多中文
-    final chineseCount = RegExp(r'[\u4e00-\u9fa5]').allMatches(text).length;
-    if (chineseCount > text.length * 0.3) return false;
-    // 应该包含至少一个常见命令关键词
-    final cmdKeywords = [
-      'sudo', 'yum', 'apt', 'dnf', 'apk', 'curl', 'wget', 'tar',
-      'cat', 'echo', 'export', 'cd', 'mkdir', 'chmod', 'java',
-      'rm', 'cp', 'mv', 'ln', 'systemctl', 'service', 'install',
-      'download', 'extract', 'set', 'export', 'source', 'update'
-    ];
-    return cmdKeywords.any((k) => text.toLowerCase().contains(k));
-  }
-
-  /// 判断命令是否是查询/只读类命令（输出不应截断，agent 需要完整结果定位问题）
-  bool _isQueryCommand(String command) {
-    final queryPrefixes = [
-      // 文件搜索与内容查找
-      'grep', 'egrep', 'fgrep', 'find', 'locate', 'which', 'where', 'type',
-      // 文件查看
-      'cat', 'head', 'tail', 'less', 'more', 'file', 'stat', 'diff',
-      // 目录列表
-      'ls', 'tree', 'du', 'df',
-      // 系统信息
-      'uname', 'hostname', 'uptime', 'free', 'env', 'printenv', 'pwd',
-      'whoami', 'id', 'date', 'cal',
-      // 进程与服务
-      'ps', 'top', 'htop', 'lsof', 'ss', 'netstat', 'vmstat', 'iostat',
-      // 系统管理（只读子命令）
-      'systemctl status', 'systemctl list', 'systemctl is-',
-      'service status',
-      // 日志查看
-      'journalctl', 'dmesg', 'last', 'lastb', 'w', 'who',
-      // 容器/编排（只读子命令）
-      'docker ps', 'docker images', 'docker logs', 'docker inspect', 'docker search',
-      'kubectl get', 'kubectl describe', 'kubectl logs', 'kubectl top',
-      // 包管理（只读子命令）
-      'apt list', 'apt show', 'apt-cache', 'yum list', 'yum info',
-      'dnf list', 'dnf info', 'rpm -q', 'dpkg -l', 'dpkg -s',
-      // 网络（只读）
-      'ping', 'traceroute', 'dig', 'nslookup', 'host', 'curl', 'wget',
-      'ip addr', 'ip route', 'ip link', 'ifconfig',
-      // 文本统计
-      'wc', 'sort', 'uniq', 'awk', 'sed -n',
-    ];
-
-    final cmdLower = command.trim().toLowerCase();
-    return queryPrefixes.any((prefix) => cmdLower.startsWith(prefix));
-  }
-
-  bool _isTaskComplete(String response) {
-    final keywords = [
-      '任务完成', '任务已完成', '✅ 任务完成', '✅任务完成',
-      '已完成', '已全部完成', '全部完成', '所有步骤已完成',
-      '操作完成', '安装完成', '配置完成', '部署完成',
-    ];
-    for (final k in keywords) {
-      if (response.contains(k)) return true;
-    }
-    return false;
   }
 
   String _buildSystemPrompt(CommandExecutor? executor) {
@@ -1622,92 +1533,37 @@ class AgentEngine {
       ..addAll(keptNonSystem);
   }
 
-  /// 截断命令输出，保留尾部（长输出有价值的信息通常在末尾，如 "Complete!"）
-  /// 最多保留 [maxLines] 行，或 [maxChars] 字符
-  String _truncateOutput(String? output, {int maxLines = 8, int maxChars = 600}) {
-    if (output == null || output.isEmpty) return '(无输出)';
-    if (output.length <= maxChars) return output;
-
-    // 按行分割，取尾部行
-    final lines = output.split('\n');
-    if (lines.length <= maxLines) {
-      // 行数不多但字符超限，取尾部字符
-      return '...(输出过长，已截断前 ${output.length - maxChars} 字符)\n${output.substring(output.length - maxChars)}';
-    }
-
-    // 取尾部行
-    final tailLines = lines.skip(lines.length - maxLines).toList();
-    final tailText = tailLines.join('\n');
-    if (tailText.length > maxChars) {
-      return '...(输出过长，已截断)\n${tailText.substring(tailText.length - maxChars)}';
-    }
-    return '...(输出过长，已截断前 ${lines.length - maxLines} 行)\n$tailText';
-  }
-
-  /// 清理 PTY 输出中的命令回显
-  /// 终端在执行命令时会先把输入的命令回显到 stdout，导致结果里包含命令本身
-  String _stripCommandEcho(String output, String command) {
-    if (output.isEmpty || command.isEmpty) return output;
-
-    final trimmedOutput = output.trimLeft();
-    final trimmedCommand = command.trim();
-
-    // 情况 1：输出第一行就是命令本身（最常见）
-    final firstNewline = trimmedOutput.indexOf('\n');
-    final firstLine = firstNewline == -1 ? trimmedOutput : trimmedOutput.substring(0, firstNewline);
-    if (firstLine.trim() == trimmedCommand || firstLine.trim().endsWith(trimmedCommand)) {
-      return firstNewline == -1 ? '' : trimmedOutput.substring(firstNewline + 1).trimLeft();
-    }
-
-    // 情况 2：命令出现在开头，但前面可能有 prompt 残留字符
-    final commandIndex = trimmedOutput.indexOf(trimmedCommand);
-    if (commandIndex >= 0 && commandIndex < 20) {
-      final afterCommand = trimmedOutput.substring(commandIndex + trimmedCommand.length);
-      // 如果命令后紧跟换行，则把这整段视为回显
-      if (afterCommand.startsWith('\n') || afterCommand.startsWith('\r')) {
-        return afterCommand.replaceFirst(RegExp(r'^[\r\n]+'), '').trimLeft();
-      }
-    }
-
-    return output;
-  }
-
   Future<void> collectSystemInfo(CommandExecutor executor) async {
     try {
-      final commands = [
-        ('cat /etc/os-release 2>/dev/null || uname -a', 'os'),
-        ('cat /proc/cpuinfo | grep "model name" | head -1', 'cpu'),
-        ('free -h', 'memory'),
-        ('df -h | head -5', 'disk'),
-      ];
+      // 平台分支：Unix 用 Unix 命令，Windows 用 wmic/systeminfo
+      final isWindowsLocal = executor is! SSHService && Platform.isWindows;
+      final commands = isWindowsLocal
+          ? [
+              // N8: 用 PowerShell + Select-String 兼容中英文系统
+              ('powershell -Command "systeminfo | Select-String \"OS Name|OS Version\""', 'os'),
+              ('powershell -Command "Get-CimInstance Win32_Processor | Select-Object -ExpandProperty Name"', 'cpu'),
+              ('powershell -Command "Get-CimInstance Win32_OperatingSystem | Select-Object TotalVisibleMemorySize,FreePhysicalMemory"', 'memory'),
+              ('powershell -Command "Get-CimInstance Win32_LogicalDisk | Select-Object Size,FreeSpace,Caption"', 'disk'),
+            ]
+          : [
+              ('cat /etc/os-release 2>/dev/null || uname -a', 'os'),
+              ('cat /proc/cpuinfo | grep "model name" | head -1', 'cpu'),
+              ('free -h', 'memory'),
+              ('df -h | head -5', 'disk'),
+            ];
 
       for (final (cmd, cat) in commands) {
-        final completer = Completer<String>();
-        String output = '';
-        StreamSubscription<String>? sub;
-
-        sub = executor.output.listen(
-          (data) => output += data,
-          onDone: () {
-            if (!completer.isCompleted) completer.complete(output);
-          },
-        );
-
-        executor.execute(cmd);
-
-        // 2 秒超时收集系统信息
-        output = await completer.future.timeout(
-          const Duration(seconds: 2),
-          onTimeout: () {
-            return output;
-          },
-        );
-
-        // 始终取消订阅，防止泄漏
-        await sub.cancel();
-
-        final clean = AnsiStripper.strip(output);
-        _memory.rememberSystemInfo('$cat: ${clean.trim()}', category: cat);
+        try {
+          // N8: systeminfo 等命令较慢，给 15s 超时
+          final result = await executor.executeAndWait(
+            cmd,
+            timeout: const Duration(seconds: 15),
+          );
+          final clean = AnsiStripper.strip(result.stdout);
+          _memory.rememberSystemInfo('$cat: ${clean.trim()}', category: cat);
+        } catch (e) {
+          agentLogger.warn('AgentEngine', '收集 $cat 失败: $e');
+        }
       }
     } catch (e) { debugPrint('[AgentEngine] 收集系统信息失败: $e'); }
   }

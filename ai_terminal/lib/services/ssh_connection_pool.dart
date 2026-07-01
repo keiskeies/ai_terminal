@@ -18,6 +18,9 @@ class SSHConnectionPool {
   static final Map<String, _PoolEntry> _pool = {};
   static Timer? _cleanupTimer;
 
+  /// 正在进行的 acquire（去重，避免并发创建多个连接）
+  static final Map<String, Future<SSHService>> _pendingAcquires = {};
+
   /// 获取或创建连接
   static Future<SSHService> acquire(
     String hostId,
@@ -32,19 +35,26 @@ class SSHConnectionPool {
     // 检查是否存在且仍然连接
     if (_pool.containsKey(hostId)) {
       final entry = _pool[hostId]!;
-      // 如果连接仍然有效，复用它
       if (entry.service.isConnected) {
         entry.refCount++;
         entry.lastActive = DateTime.now();
         return entry.service;
       }
-      // 连接已断开，清理旧条目
       entry.service.dispose();
       _pool.remove(hostId);
     }
 
-    final service = SSHService(config);
-    await service.connect(
+    // A7: 并发去重 — 同一 hostId 的并发 acquire 复用同一个 Future
+    if (_pendingAcquires.containsKey(hostId)) {
+      final svc = await _pendingAcquires[hostId]!;
+      if (_pool.containsKey(hostId)) {
+        _pool[hostId]!.refCount++;
+      }
+      return svc;
+    }
+
+    final future = _doAcquire(
+      hostId, config,
       password: password,
       privateKeyContent: privateKeyContent,
       passphrase: passphrase,
@@ -52,6 +62,39 @@ class SSHConnectionPool {
       jumpPassword: jumpPassword,
       jumpPrivateKeyContent: jumpPrivateKeyContent,
     );
+    _pendingAcquires[hostId] = future;
+    try {
+      return await future;
+    } finally {
+      _pendingAcquires.remove(hostId);
+    }
+  }
+
+  static Future<SSHService> _doAcquire(
+    String hostId,
+    HostConfig config, {
+    String? password,
+    String? privateKeyContent,
+    String? passphrase,
+    HostConfig? jumpHostConfig,
+    String? jumpPassword,
+    String? jumpPrivateKeyContent,
+  }) async {
+    final service = SSHService(config);
+    try {
+      await service.connect(
+        password: password,
+        privateKeyContent: privateKeyContent,
+        passphrase: passphrase,
+        jumpHostConfig: jumpHostConfig,
+        jumpPassword: jumpPassword,
+        jumpPrivateKeyContent: jumpPrivateKeyContent,
+      ).timeout(const Duration(seconds: 30));
+    } catch (e) {
+      // N4: 异常时清理 service，避免连接泄漏
+      service.dispose();
+      rethrow;
+    }
 
     _pool[hostId] = _PoolEntry(service: service);
     return service;

@@ -129,6 +129,32 @@ String _tailTruncate(String text, int maxChars) {
 }
 
 /// 系统提示词默认模板（不可修改的常量，用于重置）
+/// 按平台构建系统提示词（Windows 用 PowerShell/cmd 语义，Unix 用 bash 语义）
+/// [isWindows] true=Windows 本地终端，false=Unix/SSH 远程
+String buildDefaultSystemPrompt({bool isWindows = false}) {
+  if (isWindows) {
+    return '''
+你是一个专业的 Windows 运维助手，负责将用户自然语言转换为安全的 shell 命令（PowerShell/cmd.exe）。
+
+$commandFormatRule
+
+$behaviorBoundaryRule
+
+$knowledgeSafetyRule
+
+【安全约束】
+• 优先使用包管理器 (winget/choco/scoop)
+• 修改系统配置前，必须生成备份命令
+• Windows 不支持 heredoc，写入多行文件用 Set-Content 或 here-string @'...'@
+• 禁止生成高危命令（如格式化磁盘、删除系统文件）
+
+【当前环境】
+{context}
+''';
+  }
+  return defaultSystemPrompt;
+}
+
 const String defaultSystemPrompt = '''
 你是一个专业的 Linux 运维助手，负责将用户自然语言转换为安全的 shell 命令。
 
@@ -152,13 +178,14 @@ $knowledgeSafetyRule
 /// 系统提示词模板（向后兼容）
 const String systemPrompt = defaultSystemPrompt;
 
-/// 从 Hive 获取系统提示词（用户可编辑，不存在则返回默认值）
-String getSystemPrompt() {
+/// 从 Hive 获取系统提示词（用户可编辑，不存在则按平台返回默认值）
+/// [isWindows] 用于选择 Windows/Unix 专用提示词
+String getSystemPrompt({bool isWindows = false}) {
   try {
     final saved = HiveInit.settingsBox.get('builtInSystemPrompt') as String?;
     if (saved != null && saved.isNotEmpty) return saved;
   } catch (_) {}
-  return defaultSystemPrompt;
+  return buildDefaultSystemPrompt(isWindows: isWindows);
 }
 
 /// 重置系统提示词为默认值
@@ -184,6 +211,7 @@ String buildContextPrompt({
   String? recentOutput,
   String? hostName,
   String? hostAddress,
+  bool isWindows = false,
 }) {
   var context = <String>[];
 
@@ -206,5 +234,5 @@ String buildContextPrompt({
     fullContext = contextStr;
   }
 
-  return getSystemPrompt().replaceAll('{context}', fullContext);
+  return getSystemPrompt(isWindows: isWindows).replaceAll('{context}', fullContext);
 }

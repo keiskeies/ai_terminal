@@ -38,13 +38,11 @@ class SSHService implements CommandExecutor {
   SSHClient? _jumpClient;
   SSHSocket? _jumpSocket;
 
-  // 命令执行等待：用唯一标记 + 退出码检测
-  final StringBuffer _outputBuffer = StringBuffer();
-  final _promptRegex = RegExp(r'[\]\$#]\s*$');
-  final List<Completer<String>> _completers = [];
-
   // 唯一标记计数器，用于检测命令完成
   int _markerSeq = 0;
+
+  // pending 的 doneCompleter，disconnect 时完成避免挂起
+  Completer<void>? _pendingDoneCompleter;
 
   SSHService(this.config);
 
@@ -140,17 +138,19 @@ class SSHService implements CommandExecutor {
 
       _session!.stdout.listen(
         (data) {
-          final output = utf8.decode(data, allowMalformed: true);
-          outputController.add(output);
-          _onShellData(output);
+          outputController.add(utf8.decode(data, allowMalformed: true));
         },
         onError: (error) {
           outputController.add('\r\n[错误] $error\r\n');
           _isConnected = false;
         },
         onDone: () {
-          outputController.add('\r\n[连接已关闭]\r\n');
+          if (!outputController.isClosed) {
+            outputController.add('\r\n[连接已关闭]\r\n');
+          }
           _isConnected = false;
+          final p = _pendingDoneCompleter;
+          if (p != null && !p.isCompleted) p.complete();
         },
       );
 
@@ -182,22 +182,6 @@ class SSHService implements CommandExecutor {
     }
   }
 
-  /// Shell 数据回调 - 检测 prompt 判断命令执行完毕
-  void _onShellData(String data) {
-    _outputBuffer.write(data);
-
-    // 检测是否出现 prompt（表示命令执行完毕）
-    if (_promptRegex.hasMatch(data)) {
-      for (final c in _completers) {
-        if (!c.isCompleted) {
-          c.complete(_outputBuffer.toString());
-        }
-      }
-      _completers.clear();
-      _outputBuffer.clear();
-    }
-  }
-
   /// 执行命令并等待完成，返回结构化结果（含退出码）
   /// 通过在命令后追加 echo "EXITCODE:$?" 来捕获退出码
   @override
@@ -220,22 +204,29 @@ class SSHService implements CommandExecutor {
     final marker = 'EXITCODE_$_markerSeq:';
     // 追加 echo 标记，命令完成后输出 "EXITCODE_N:0" 格式
     final wrappedCommand = '$command; echo "$marker\$?"';
+    final donePattern = RegExp('${RegExp.escape(marker)}\\d+');
 
     // 独立流监听：等待 marker 出现（比 prompt regex 更可靠）
     final buffer = StringBuffer();
     final doneCompleter = Completer<void>();
+    _pendingDoneCompleter = doneCompleter;
     StreamSubscription<String>? sub;
 
     sub = outputController.stream.listen(
       (data) {
         buffer.write(data);
-        if (!doneCompleter.isCompleted && buffer.toString().contains(marker)) {
+        if (!doneCompleter.isCompleted && donePattern.hasMatch(buffer.toString())) {
           doneCompleter.complete();
         }
       },
       onError: (e) {
         if (!doneCompleter.isCompleted) {
           doneCompleter.completeError(e);
+        }
+      },
+      onDone: () {
+        if (!doneCompleter.isCompleted) {
+          doneCompleter.complete();
         }
       },
     );
@@ -250,6 +241,7 @@ class SSHService implements CommandExecutor {
       ]);
     } on TimeoutException {
       await sub.cancel();
+      if (_pendingDoneCompleter == doneCompleter) _pendingDoneCompleter = null;
       stopwatch.stop();
       return CommandResult(
         stdout: buffer.toString(),
@@ -260,6 +252,7 @@ class SSHService implements CommandExecutor {
       );
     } catch (e) {
       await sub.cancel();
+      if (_pendingDoneCompleter == doneCompleter) _pendingDoneCompleter = null;
       stopwatch.stop();
       return CommandResult(
         stdout: buffer.toString(),
@@ -270,6 +263,7 @@ class SSHService implements CommandExecutor {
     }
 
     await sub.cancel();
+    if (_pendingDoneCompleter == doneCompleter) _pendingDoneCompleter = null;
     stopwatch.stop();
 
     var rawOutput = buffer.toString();
@@ -348,6 +342,8 @@ class SSHService implements CommandExecutor {
 
   Future<void> disconnect() async {
     _isConnected = false;
+    final p = _pendingDoneCompleter;
+    if (p != null && !p.isCompleted) p.complete();
     _session?.close();
     _client?.close();
     _socket?.destroy();

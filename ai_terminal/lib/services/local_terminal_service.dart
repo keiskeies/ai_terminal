@@ -13,11 +13,13 @@ class LocalTerminalService implements CommandExecutor {
   bool _isConnected = false;
   bool _isExited = false;
 
-  // 命令执行等待：prompt 检测
-  final StringBuffer _outputBuffer = StringBuffer();
-  final _promptRegex = RegExp(r'[\]\$#>]\s*$');
-  final List<Completer<String>> _completers = [];
   int _markerSeq = 0;
+
+  // pending 的 doneCompleter，disconnect 时完成避免挂起
+  Completer<void>? _pendingDoneCompleter;
+
+  // 当前 shell 类型（影响 wrappedCommand 拼接语法）
+  bool _isPowerShell = false;
 
   bool get isConnected => _isConnected;
   Stream<String> get output => _outputController.stream;
@@ -31,8 +33,16 @@ class LocalTerminalService implements CommandExecutor {
       List<String> args;
 
       if (Platform.isWindows) {
-        shell = 'cmd.exe';
-        args = [];
+        // Windows 优先 PowerShell（支持 ANSI/更丰富命令），回退 cmd.exe
+        if (File('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe').existsSync()) {
+          shell = 'powershell.exe';
+          args = ['-NoLogo'];
+          _isPowerShell = true;
+        } else {
+          shell = 'cmd.exe';
+          args = [];
+          _isPowerShell = false;
+        }
       } else {
         final userShell = Platform.environment['SHELL'];
         if (userShell != null && File(userShell).existsSync()) {
@@ -51,14 +61,18 @@ class LocalTerminalService implements CommandExecutor {
 
       final ptyEnv = Map<String, String>.from(Platform.environment);
       ptyEnv['TERM'] = 'xterm-256color';
-      ptyEnv['CLICOLOR'] = '1';
-      ptyEnv['LSCOLORS'] = 'ExFxCxDxBxegedabagacad';
-      ptyEnv['LS_COLORS'] = 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32';
+      if (!Platform.isWindows) {
+        ptyEnv['CLICOLOR'] = '1';
+        ptyEnv['LSCOLORS'] = 'ExFxCxDxBxegedabagacad';
+        ptyEnv['LS_COLORS'] = 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32';
+      }
 
       _pty = Pty.start(
         shell,
         arguments: args,
-        workingDirectory: Platform.environment['HOME'] ?? Directory.current.path,
+        workingDirectory: Platform.isWindows
+            ? (Platform.environment['USERPROFILE'] ?? Directory.current.path)
+            : (Platform.environment['HOME'] ?? Directory.current.path),
         environment: ptyEnv,
         columns: columns,
         rows: rows,
@@ -69,9 +83,7 @@ class LocalTerminalService implements CommandExecutor {
       _pty!.output.listen(
         (data) {
           if (!_outputController.isClosed && !_isExited) {
-            final output = utf8.decode(data, allowMalformed: true);
-            _outputController.add(output);
-            _onPtyData(output);
+            _outputController.add(utf8.decode(data, allowMalformed: true));
           }
         },
         onDone: _handleExit,
@@ -88,24 +100,12 @@ class LocalTerminalService implements CommandExecutor {
     }
   }
 
-  void _onPtyData(String data) {
-    _outputBuffer.write(data);
-    // 检测 prompt
-    if (_promptRegex.hasMatch(data)) {
-      for (final c in _completers) {
-        if (!c.isCompleted) {
-          c.complete(_outputBuffer.toString());
-        }
-      }
-      _completers.clear();
-      _outputBuffer.clear();
-    }
-  }
-
   void _handleExit() {
     if (_isExited) return;
     _isExited = true;
     _isConnected = false;
+    final p = _pendingDoneCompleter;
+    if (p != null && !p.isCompleted) p.complete();
     if (!_outputController.isClosed) {
       _outputController.add('\r\n\x1b[90m[进程已退出]\x1b[0m\r\n');
     }
@@ -157,23 +157,35 @@ class LocalTerminalService implements CommandExecutor {
     final stopwatch = Stopwatch()..start();
     _markerSeq++;
     final marker = 'EXITCODE_$_markerSeq:';
-    final wrappedCommand = '$command; echo "$marker\$?"';
+    // 平台+shell 分支：PowerShell 用 ; 和 $LASTEXITCODE，cmd 用 & 和 %errorlevel%
+    final wrappedCommand = Platform.isWindows
+        ? (_isPowerShell
+            ? '$command; echo "$marker\$LASTEXITCODE"'
+            : '$command & echo $marker%errorlevel%')
+        : '$command; echo "$marker\$?"';
+    final donePattern = RegExp('${RegExp.escape(marker)}\\d+');
 
     // 独立流监听：等待 marker 出现（比 prompt regex 更可靠）
     final buffer = StringBuffer();
     final doneCompleter = Completer<void>();
+    _pendingDoneCompleter = doneCompleter;
     StreamSubscription<String>? sub;
 
     sub = _outputController.stream.listen(
       (data) {
         buffer.write(data);
-        if (!doneCompleter.isCompleted && buffer.toString().contains(marker)) {
+        if (!doneCompleter.isCompleted && donePattern.hasMatch(buffer.toString())) {
           doneCompleter.complete();
         }
       },
       onError: (e) {
         if (!doneCompleter.isCompleted) {
           doneCompleter.completeError(e);
+        }
+      },
+      onDone: () {
+        if (!doneCompleter.isCompleted) {
+          doneCompleter.complete();
         }
       },
     );
@@ -188,6 +200,7 @@ class LocalTerminalService implements CommandExecutor {
       ]);
     } on TimeoutException {
       await sub.cancel();
+      if (_pendingDoneCompleter == doneCompleter) _pendingDoneCompleter = null;
       stopwatch.stop();
       return CommandResult(
         stdout: buffer.toString(),
@@ -198,6 +211,7 @@ class LocalTerminalService implements CommandExecutor {
       );
     } catch (e) {
       await sub.cancel();
+      if (_pendingDoneCompleter == doneCompleter) _pendingDoneCompleter = null;
       stopwatch.stop();
       return CommandResult(
         stdout: buffer.toString(),
@@ -208,6 +222,7 @@ class LocalTerminalService implements CommandExecutor {
     }
 
     await sub.cancel();
+    if (_pendingDoneCompleter == doneCompleter) _pendingDoneCompleter = null;
     stopwatch.stop();
 
     var rawOutput = buffer.toString();
@@ -259,6 +274,8 @@ class LocalTerminalService implements CommandExecutor {
     if (_isExited) return;
     _isExited = true;
     _isConnected = false;
+    final p = _pendingDoneCompleter;
+    if (p != null && !p.isCompleted) p.complete();
     _pty?.kill();
     _pty = null;
   }

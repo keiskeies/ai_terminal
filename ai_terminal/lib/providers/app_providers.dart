@@ -1,12 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/hive_init.dart';
+import '../core/credentials_store.dart';
 import '../models/host_config.dart';
 import '../models/ai_model_config.dart';
 import '../models/command_snippet.dart';
 import '../models/chat_session.dart';
-import 'package:uuid/uuid.dart';
-
-const _uuid = Uuid();
 
 // ===== 主机 Provider =====
 final hostsProvider = StateNotifierProvider<HostsNotifier, AsyncValue<List<HostConfig>>>((ref) {
@@ -69,7 +67,33 @@ class AIModelsNotifier extends StateNotifier<List<AIModelConfig>> {
   }
 
   void loadModels() {
-    state = HiveInit.aiModelsBox.values.toList();
+    final models = HiveInit.aiModelsBox.values.toList();
+    // 异步从 CredentialsStore 注入 apiKey（Hive 中只存空占位）
+    // 不阻塞 UI，注入完成后 state 会自动刷新（调用方在 await 后再 loadModels 一次）
+    _injectApiKeys(models);
+    state = models;
+  }
+
+  /// 异步从 CredentialsStore 注入 apiKey 到内存模型
+  /// 兼容旧数据：若 Hive 中 apiKey 非空（旧版本明文存储），迁移到 CredentialsStore
+  Future<void> _injectApiKeys(List<AIModelConfig> models) async {
+    var changed = false;
+    for (final m in models) {
+      final storedKey = await CredentialsStore.get(hostId: m.id, type: 'apiKey');
+      if (storedKey != null) {
+        m.apiKey = storedKey;
+      } else if (m.apiKey.isNotEmpty) {
+        // 旧数据迁移：Hive 中有明文 apiKey，转移到 CredentialsStore
+        await CredentialsStore.save(hostId: m.id, type: 'apiKey', value: m.apiKey);
+        m.apiKey = ''; // 清空 Hive 引用（下次 put 时会落盘空值）
+        changed = true;
+      }
+    }
+    if (changed) {
+      for (final m in models) {
+        await HiveInit.aiModelsBox.put(m.id, m);
+      }
+    }
   }
 
   AIModelConfig? get defaultModel {
@@ -87,7 +111,14 @@ class AIModelsNotifier extends StateNotifier<List<AIModelConfig>> {
         await HiveInit.aiModelsBox.put(m.id, m);
       }
     }
+    // apiKey 走 CredentialsStore，Hive 中只存空占位
+    final apiKey = config.apiKey;
+    config.apiKey = '';
     await HiveInit.aiModelsBox.put(config.id, config);
+    if (apiKey.isNotEmpty) {
+      await CredentialsStore.save(hostId: config.id, type: 'apiKey', value: apiKey);
+      config.apiKey = apiKey; // 内存中保留供当前会话使用
+    }
     loadModels();
   }
 
@@ -100,12 +131,18 @@ class AIModelsNotifier extends StateNotifier<List<AIModelConfig>> {
         }
       }
     }
+    // apiKey 走 CredentialsStore
+    final apiKey = config.apiKey;
+    config.apiKey = '';
     await HiveInit.aiModelsBox.put(config.id, config);
+    await CredentialsStore.save(hostId: config.id, type: 'apiKey', value: apiKey);
+    config.apiKey = apiKey;
     loadModels();
   }
 
   Future<void> deleteModel(String id) async {
     await HiveInit.aiModelsBox.delete(id);
+    await CredentialsStore.delete(hostId: id, type: 'apiKey');
     // 如果删除的是默认模型，设为第一个为默认
     if (state.isNotEmpty && !state.first.isDefault) {
       final first = state.first.copyWith(isDefault: true);
