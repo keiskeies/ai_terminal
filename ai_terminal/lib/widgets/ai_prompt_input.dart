@@ -4,11 +4,18 @@ import '../core/constants.dart';
 import '../core/theme_colors.dart';
 
 /// AI 输入框，支持斜杠命令建议
+///
+/// 键盘约定（与主流 AI 对话平台一致）：
+/// - Enter / NumpadEnter：发送（若斜杠命令浮层打开则选中高亮命令）
+/// - Shift + Enter：换行
+/// - ↑ / ↓ / Tab / Esc：斜杠浮层导航
 class AIPromptInput extends StatefulWidget {
   final bool enabled;
+  final bool isRunning;
   final String hintText;
   final String initialText;
   final Function(String) onSend;
+  final VoidCallback? onStop;
   final ValueChanged<String>? onChanged;
   final ValueChanged<bool>? onFocusChanged;
   final Color accentColor;
@@ -18,9 +25,11 @@ class AIPromptInput extends StatefulWidget {
   const AIPromptInput({
     super.key,
     required this.enabled,
+    this.isRunning = false,
     required this.hintText,
     this.initialText = '',
     required this.onSend,
+    this.onStop,
     this.onChanged,
     this.onFocusChanged,
     required this.accentColor,
@@ -174,41 +183,61 @@ class _AIPromptInputState extends State<AIPromptInput> {
     _hideSlashOverlay();
   }
 
-  /// 键盘导航：上/下选择，Enter 执行，Esc 关闭
-  void _handleKeyEvent(KeyEvent event) {
-    if (_slashOverlay == null || _filteredCommands.isEmpty) return;
-    if (event is! KeyDownEvent) return;
+  /// 键盘事件：Enter 发送、Shift+Enter 换行、斜杠浮层导航
+  /// 返回 KeyEventResult.handled 表示消费事件（阻止 TextField 默认行为，如换行）；
+  /// 返回 KeyEventResult.ignored 表示放行，让 TextField 走默认处理（如 Shift+Enter 换行）。
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
     final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.arrowDown) {
-      setState(() {
-        _highlightedIndex = (_highlightedIndex + 1) % _filteredCommands.length;
-      });
-      _slashOverlay!.markNeedsBuild();
-      return;
+
+    // 斜杠命令浮层导航（仅浮层打开时）
+    final slashActive = _slashOverlay != null && _filteredCommands.isNotEmpty;
+    if (slashActive) {
+      if (key == LogicalKeyboardKey.arrowDown) {
+        setState(() {
+          _highlightedIndex = (_highlightedIndex + 1) % _filteredCommands.length;
+        });
+        _slashOverlay!.markNeedsBuild();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.arrowUp) {
+        setState(() {
+          _highlightedIndex = (_highlightedIndex - 1 + _filteredCommands.length) % _filteredCommands.length;
+        });
+        _slashOverlay!.markNeedsBuild();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.tab) {
+        _selectSlashCommand(_filteredCommands[_highlightedIndex]);
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.escape) {
+        _hideSlashOverlay();
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter) {
+        // 浮层打开时 Enter 选中高亮命令（不发送）
+        final cmd = _filteredCommands[_highlightedIndex];
+        _controller.clear();
+        _hideSlashOverlay();
+        _executeSlashCommand(cmd);
+        return KeyEventResult.handled;
+      }
     }
-    if (key == LogicalKeyboardKey.arrowUp) {
-      setState(() {
-        _highlightedIndex = (_highlightedIndex - 1 + _filteredCommands.length) % _filteredCommands.length;
-      });
-      _slashOverlay!.markNeedsBuild();
-      return;
-    }
-    if (key == LogicalKeyboardKey.tab) {
-      _selectSlashCommand(_filteredCommands[_highlightedIndex]);
-      return;
-    }
-    if (key == LogicalKeyboardKey.escape) {
-      _hideSlashOverlay();
-      return;
-    }
+
+    // Enter / NumpadEnter：发送（Shift+Enter 走默认换行）
     if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter) {
-      // 若有高亮的斜杠命令建议，则执行该命令
-      final cmd = _filteredCommands[_highlightedIndex];
-      _controller.clear();
-      _hideSlashOverlay();
-      _executeSlashCommand(cmd);
-      return;
+      final shift = HardwareKeyboard.instance.isShiftPressed;
+      if (!shift) {
+        // 无 Shift：发送。无论是否发送成功都消费事件，
+        // 避免空输入按 Enter 也产生换行。
+        _send();
+        return KeyEventResult.handled;
+      }
+      // 有 Shift：换行，放行让 TextField 走默认行为
     }
+
+    return KeyEventResult.ignored;
   }
 
   void _executeSlashCommand(SlashCommand cmd) {
@@ -237,6 +266,8 @@ class _AIPromptInputState extends State<AIPromptInput> {
   }
 
   void _send() {
+    // 运行中不发送（按终止按钮才能中断）
+    if (widget.isRunning) return;
     final text = _controller.text.trim();
     if (text.isEmpty || !widget.enabled) return;
     // 若是斜杠命令，优先走 onSlashCommand
@@ -258,7 +289,15 @@ class _AIPromptInputState extends State<AIPromptInput> {
         ? widget.accentColor.withValues(alpha: 0.7)
         : tc.border.withValues(alpha: 0.5);
     final disabledBorderColor = tc.border.withValues(alpha: 0.3);
-    return KeyboardListener(
+
+    // 运行中：发送按钮变为终止按钮（外圆内方）
+    final running = widget.isRunning;
+
+    // 使用 Focus(onKeyEvent:) 而非 KeyboardListener：
+    // KeyboardListener 的 onKeyEvent 返回 void，无法消费事件，Enter 会继续传播到
+    // TextField 触发换行。Focus 的 onKeyEvent 返回 KeyEventResult，
+    // 返回 handled 可消费事件，阻止 TextField 默认行为。
+    return Focus(
       focusNode: _focusNode,
       onKeyEvent: _handleKeyEvent,
       child: TextField(
@@ -295,19 +334,36 @@ class _AIPromptInputState extends State<AIPromptInput> {
           suffixIcon: Padding(
             padding: const EdgeInsets.all(4),
             child: GestureDetector(
-              onTap: widget.enabled ? _send : null,
+              onTap: running
+                  ? widget.onStop
+                  : (widget.enabled ? _send : null),
               child: Container(
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: widget.enabled ? widget.accentColor : cTextMuted,
+                  // 运行中：外圆红色背景；空闲：accent 色
+                  color: running
+                      ? cDanger.withValues(alpha: 0.9)
+                      : (widget.enabled ? widget.accentColor : cTextMuted),
                   borderRadius: BorderRadius.circular(rSmall),
                 ),
-                child: const Icon(
-                  Icons.arrow_upward_rounded,
-                  color: Colors.white,
-                  size: 18,
-                ),
+                child: running
+                    ? // 外圆内方：外层圆形容器 + 内层白色方块
+                      Center(
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.arrow_upward_rounded,
+                        color: Colors.white,
+                        size: 18,
+                      ),
               ),
             ),
           ),

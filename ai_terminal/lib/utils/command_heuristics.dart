@@ -86,3 +86,67 @@ bool isTaskComplete(String response) {
   }
   return false;
 }
+
+/// 按命令类型返回合适的执行超时。
+/// - 长时间运行类（安全扫描/包管理/系统信息/大文件操作）：10 分钟
+/// - 中等耗时类（服务状态/日志/进程/编译/下载）：3 分钟
+/// - 默认：60 秒
+Duration getCommandTimeout(String command) {
+  final cmd = command.trim().toLowerCase();
+
+  // 10 分钟：长时间运行类
+  const longTimeout = Duration(minutes: 10);
+  const longPrefixes = <String>[
+    // 安全扫描
+    'lynis', 'nikto', 'nmap', 'clamscan', 'rkhunter', 'chkrootkit', 'aide',
+    // 包管理（安装/升级/更新）
+    'apt install', 'apt-get install', 'apt upgrade', 'apt-get upgrade',
+    'apt update', 'apt-get update', 'apt dist-upgrade',
+    'yum install', 'yum update', 'yum upgrade',
+    'dnf install', 'dnf update', 'dnf upgrade',
+    'apk add', 'pacman -S', 'pacman -Syu',
+    'pip install', 'pip3 install', 'npm install', 'yarn install',
+    'gem install', 'cargo install', 'go install', 'composer install',
+    'brew install', 'brew upgrade', 'winget install', 'choco install',
+    'scoop install',
+    // 系统信息/补丁
+    'systeminfo', 'wmic', 'get-ciminstance', 'get-wmiobject',
+    'dism /online', 'dism /image',
+    // 大文件/全盘操作
+    'find /', 'find ~', 'locate ', 'updatedb',
+    'dd if=', 'rsync', 'tar -', 'zip -r', 'unzip',
+    // 编译构建（可能较长）
+    'make', 'cmake', 'cargo build', 'npm run build', 'yarn build',
+    'gradle build', 'mvn ', 'mvn clean',
+  ];
+  for (final p in longPrefixes) {
+    if (cmd.startsWith(p)) return longTimeout;
+  }
+
+  // 3 分钟：中等耗时类
+  const mediumTimeout = Duration(minutes: 3);
+  const mediumPrefixes = <String>[
+    // 服务/进程状态
+    'systemctl status', 'systemctl restart', 'systemctl start', 'systemctl stop',
+    'service ', 'journalctl', 'dmesg',
+    // 进程查看（top/htop 交互式，但 agent 用时通常快速）
+    'ps aux', 'ps -ef', 'top -', 'htop',
+    // 网络诊断
+    'ping ', 'traceroute', 'tracepath', 'curl ', 'wget ',
+    'nslookup', 'dig ', 'host ',
+    // 下载（小文件）
+    'git clone', 'git pull', 'git fetch',
+    // 容器操作
+    'docker build', 'docker pull', 'docker run', 'docker exec',
+    'kubectl apply', 'kubectl delete', 'kubectl exec',
+    // 编译运行
+    'go build', 'go test', 'go run', 'cargo run', 'cargo test',
+    'python ', 'python3 ', 'node ', 'ruby ',
+  ];
+  for (final p in mediumPrefixes) {
+    if (cmd.startsWith(p)) return mediumTimeout;
+  }
+
+  // 默认 60 秒
+  return const Duration(seconds: 60);
+}

@@ -1079,7 +1079,7 @@ class AgentEngine {
     try {
       final result = await executor.executeAndWait(
         command,
-        timeout: const Duration(seconds: 60),
+        timeout: getCommandTimeout(command),
         cancelToken: _commandCancelToken,
       );
 

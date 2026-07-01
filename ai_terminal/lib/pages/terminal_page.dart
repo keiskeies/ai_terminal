@@ -1374,8 +1374,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       ),
       child: Column(
         children: [
-          // 状态条
-          if (agentState.isRunning || agentState.isWaitingConfirm || agentState.isWaitingChoice) _buildAgentStatusBar(agentState),
           // 等待确认横幅（仅危险命令确认时显示）
           if (agentState.isWaitingConfirm) _buildConfirmBanner(agentState),
           // 消息列表 + 回到底部按钮
@@ -1441,66 +1439,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         );
       }
     });
-  }
-
-  Widget _buildAgentStatusBar(AgentState agentState) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: cAgentGreen.withValues(alpha: 0.06),
-        border: Border(bottom: BorderSide(color: cAgentGreen.withValues(alpha: 0.1))),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(
-            width: 12, height: 12,
-            child: CircularProgressIndicator(
-              strokeWidth: 1.5,
-              color: cAgentGreen,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            agentState.statusText,
-            style: const TextStyle(fontSize: fSmall, color: cAgentGreen, fontWeight: FontWeight.w500),
-          ),
-          if (agentState.currentTask?.currentStep != null) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: cSurface,
-                borderRadius: BorderRadius.circular(rXSmall),
-              ),
-              child: Text(
-                _truncateCommand(agentState.currentTask!.currentStep!),
-                style: TextStyle(fontSize: fMicro, color: ThemeColors.of(context).textSub, fontFamily: 'JetBrainsMono'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-          const Spacer(),
-          GestureDetector(
-            onTap: () => ref.read(agentProvider.notifier).cancel(),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: cDanger.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(rSmall),
-                border: Border.all(color: cDanger.withValues(alpha: 0.2)),
-              ),
-              child: const Text('停止', style: TextStyle(fontSize: fMicro, color: cDanger, fontWeight: FontWeight.w500)),
-            ),
-          ),
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: () => _showAgentLogDialog(context),
-            child: Icon(Icons.terminal, size: 14, color: ThemeColors.of(context).textSub),
-          ),
-        ],
-      ),
-    );
   }
 
   // ==================== 高风险命令确认横幅 ====================
@@ -2178,7 +2116,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           const SizedBox(height: 8),
           // 输入框
           AIPromptInput(
-            enabled: isConnected && !agentState.isRunning,
+            enabled: isConnected,
+            isRunning: agentState.isRunning,
             hintText: _getInputHint(isConnected, agentState.isRunning),
             initialText: _tabAiInputText[_currentTabId ?? ''] ?? '',
             accentColor: cAgentGreen,
@@ -2189,6 +2128,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             onSlashCommand: (command) {
               return _handleSlashCommand(command, isConnected: isConnected);
             },
+            onStop: () => ref.read(agentProvider.notifier).cancel(),
             onSend: (text) async {
               if (!_checkAIModelConfigured()) {
                 _showAIModelNotConfiguredHint();
@@ -2470,11 +2410,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         ],
       ),
     );
-  }
-
-  String _truncateCommand(String command) {
-    if (command.length <= 40) return command;
-    return '${command.substring(0, 40)}...';
   }
 
   void _showAgentLogDialog(BuildContext context) {
