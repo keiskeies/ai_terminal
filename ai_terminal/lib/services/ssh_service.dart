@@ -49,6 +49,9 @@ class SSHService implements CommandExecutor {
   bool get isConnected => _isConnected;
   String get osInfo => _osInfo;
   Stream<String> get output => outputController.stream;
+  /// 暴露内部 SSHClient（只读），供 SFTP 等子工具复用连接
+  /// 调用方不得 close 此 client，生命周期由 SSHService 管理
+  SSHClient? get client => _client;
   SSHConnectionState get state =>
       _isConnected ? SSHConnectionState.connected : SSHConnectionState.disconnected;
 

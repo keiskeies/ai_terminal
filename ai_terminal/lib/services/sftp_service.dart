@@ -53,6 +53,31 @@ class SftpEntry {
       (mode & (1 << bit)) != 0 ? 'x' : '-';
 }
 
+/// 目录上传结果
+class UploadDirectoryResult {
+  int totalFiles = 0;
+  int uploadedFiles = 0;
+  List<String> failedFiles = [];
+  List<String> errors = [];
+
+  bool get allSuccess => failedFiles.isEmpty;
+
+  String get summary {
+    final buffer = StringBuffer();
+    buffer.writeln('上传完成: $uploadedFiles/$totalFiles 个文件');
+    if (failedFiles.isNotEmpty) {
+      buffer.writeln('失败 ${failedFiles.length} 个:');
+      for (final f in failedFiles.take(5)) {
+        buffer.writeln('  - $f');
+      }
+      if (failedFiles.length > 5) {
+        buffer.writeln('  ...(共 ${failedFiles.length} 个失败)');
+      }
+    }
+    return buffer.toString().trimRight();
+  }
+}
+
 /// SFTP 服务
 class SftpService {
   SSHClient? _client;
@@ -117,6 +142,106 @@ class SftpService {
     } catch (e) {
       _isConnected = false;
       rethrow;
+    }
+  }
+
+  /// 复用已有 SSH 连接打开 SFTP 子系统（避免重新建连）
+  /// 用于 agent 工具调用场景：从 SSHService 拿到已认证的 SSHClient
+  Future<void> attachToClient(SSHClient client) async {
+    try {
+      _client = client;
+      _sftp = await client.sftp();
+      _isConnected = true;
+    } catch (e) {
+      _isConnected = false;
+      rethrow;
+    }
+  }
+
+  /// 递归上传本地目录到远程
+  /// [localDir] 本地目录绝对路径
+  /// [remoteDir] 远程目标目录绝对路径（不存在会自动创建）
+  /// [excludeNames] 要跳过的文件/目录名（如 node_modules、.git）
+  /// [onProgress] 进度回调 (uploadedFiles, totalFiles)
+  Future<UploadDirectoryResult> uploadDirectory(
+    String localDir,
+    String remoteDir, {
+    List<String> excludeNames = const ['node_modules', '.git', '.DS_Store'],
+    void Function(int uploaded, int total)? onProgress,
+  }) async {
+    if (_sftp == null) throw Exception('SFTP 未连接');
+
+    final localDirObj = Directory(localDir);
+    if (!await localDirObj.exists()) {
+      throw Exception('本地目录不存在: $localDir');
+    }
+
+    final result = UploadDirectoryResult();
+    final allFiles = <File>[];
+
+    // 1. 收集所有要上传的文件（排除指定目录）
+    await for (final entity in localDirObj.list(recursive: true, followLinks: false)) {
+      if (entity is File) {
+        // 检查路径里是否包含排除目录
+        final relative = p.relative(entity.path, from: localDir);
+        final parts = p.split(relative);
+        final excluded = parts.any((part) => excludeNames.contains(part));
+        if (!excluded) {
+          allFiles.add(entity);
+        }
+      }
+    }
+    result.totalFiles = allFiles.length;
+
+    // 2. 确保远程根目录存在
+    await _ensureRemoteDir(remoteDir);
+
+    // 3. 逐个上传
+    for (final file in allFiles) {
+      final relative = p.relative(file.path, from: localDir);
+      // R6: 远程路径用 posix join
+      final remotePath = p.posix.join(remoteDir, p.posix.split(relative).join('/'));
+      final remoteParent = p.posix.dirname(remotePath);
+
+      // 确保远程父目录存在
+      await _ensureRemoteDir(remoteParent);
+
+      try {
+        await uploadFile(file.path, remotePath);
+        result.uploadedFiles++;
+        onProgress?.call(result.uploadedFiles, result.totalFiles);
+      } catch (e) {
+        result.failedFiles.add(relative);
+        result.errors.add('$relative: $e');
+      }
+    }
+
+    return result;
+  }
+
+  /// 递归确保远程目录存在（类似 mkdir -p）
+  Future<void> _ensureRemoteDir(String remotePath) async {
+    if (_sftp == null) throw Exception('SFTP 未连接');
+    if (remotePath.isEmpty || remotePath == '.' || remotePath == '/') return;
+
+    // 检查是否已存在
+    try {
+      final stat = await _sftp!.stat(remotePath);
+      if (stat.isDirectory) return;
+    } catch (_) {
+      // 不存在，继续创建
+    }
+
+    // 递归创建父目录
+    final parent = p.posix.dirname(remotePath);
+    if (parent != remotePath) {
+      await _ensureRemoteDir(parent);
+    }
+
+    try {
+      await _sftp!.mkdir(remotePath);
+    } catch (_) {
+      // 可能已被并发创建，忽略
     }
   }
 

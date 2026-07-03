@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
@@ -12,6 +13,7 @@ import '../services/ai_service.dart';
 import '../services/ssh_service.dart';
 import '../services/command_executor.dart';
 import '../services/knowledge_service.dart';
+import 'agent_tool.dart';
 import 'agent_logger.dart';
 export 'agent_logger.dart';
 import '../core/safety_guard.dart';
@@ -21,6 +23,7 @@ import '../utils/ansi_stripper.dart';
 import '../utils/command_heuristics.dart';
 import '../utils/output_processor.dart';
 import '../utils/react_stream_parser.dart';
+import '../utils/rollback_advisor.dart';
 
 /// Agent 执行引擎 - 核心自动执行系统
 class AgentEngine {
@@ -89,6 +92,18 @@ class AgentEngine {
 
   int maxSteps = 0; // 0 = 无限制（运行时兜底为 _defaultMaxSteps）
 
+  /// 当前引擎所属的 hostId（用于知识库经验匹配和多 host 隔离）
+  String? hostId;
+
+  /// 工具注册表 — 管理 AI 可调用的非 shell 工具（如 SFTP 上传）
+  final AgentToolRegistry _tools = AgentToolRegistry();
+
+  /// R2: 清理工具持有的资源（文件同步的 watcher/timer 等）
+  /// 在 agent_provider dispose 时调用
+  void disposeTools() {
+    _tools.fileSyncService.dispose();
+  }
+
   /// 对话历史最大轮数（每轮 = assistant + user），超出时裁剪最早的轮次
   static const int _maxConversationRounds = 40;
 
@@ -100,6 +115,7 @@ class AgentEngine {
     required AIModelConfig modelConfig,
     required AgentMemory memory,
     this.maxSteps = 0,
+    this.hostId,
   })  : _aiProvider = aiProvider,
         _modelConfig = modelConfig,
         _memory = memory;
@@ -207,6 +223,7 @@ class AgentEngine {
         goal,
         platform: knowledgePlatform,
         osInfo: executor is SSHService ? executor.osInfo : null,
+        hostId: hostId,
       );
       if (_cachedKnowledgeInjection != null) {
         agentLogger.info('AgentEngine', '知识库命中 ✓ (platform=${knowledgePlatform ?? "local"})');
@@ -483,6 +500,10 @@ class AgentEngine {
           final shouldContinue = await _handleExecuteAction(step, executor, myGeneration: myGeneration);
           if (!shouldContinue) return;
 
+        case ActionType.tool:
+          final shouldContinue = await _handleToolAction(step, executor, myGeneration: myGeneration);
+          if (!shouldContinue) return;
+
         case null:
           // 空响应或只有思考内容 → 发送继续提示
           agentLogger.info('ReAct', 'AI 未返回有效动作，发送继续提示');
@@ -723,9 +744,11 @@ class AgentEngine {
     }
 
     // 解析动作行（ReActStreamParser 不提取动作类型，需单独解析）
+    String? toolName;
+    Map<String, dynamic>? toolArgs;
     final lines = content.split('\n');
-    for (final line in lines) {
-      final trimmedLine = line.trim();
+    for (var i = 0; i < lines.length; i++) {
+      final trimmedLine = lines[i].trim();
       if (trimmedLine.startsWith('动作:') || trimmedLine.startsWith('动作：')) {
         final sepIdx = trimmedLine.indexOf(trimmedLine.contains('：') ? '：' : ':');
         final actionStr = trimmedLine.substring(sepIdx + 1).trim().toLowerCase();
@@ -735,6 +758,32 @@ class AgentEngine {
           action = ActionType.finish;
         } else if (actionStr == 'ask') {
           action = ActionType.ask;
+        } else if (actionStr == 'tool') {
+          action = ActionType.tool;
+          // 解析后续的 工具: 和 参数: 行
+          for (var j = i + 1; j < lines.length && j < i + 5; j++) {
+            final tl = lines[j].trim();
+            if (tl.startsWith('工具:') || tl.startsWith('工具：')) {
+              final sep = tl.indexOf(tl.contains('：') ? '：' : ':');
+              toolName = tl.substring(sep + 1).trim();
+            } else if (tl.startsWith('参数:') || tl.startsWith('参数：')) {
+              final sep = tl.indexOf(tl.contains('：') ? '：' : ':');
+              final argsStr = tl.substring(sep + 1).trim();
+              try {
+                final parsed = jsonDecode(argsStr);
+                if (parsed is Map<String, dynamic>) {
+                  toolArgs = parsed;
+                }
+              } catch (e) {
+                agentLogger.warn('ReAct', '工具参数 JSON 解析失败: $e, raw=$argsStr');
+              }
+            } else if (tl.isEmpty) {
+              continue;
+            } else {
+              // 遇到非工具/参数行，停止
+              break;
+            }
+          }
         }
         break;
       }
@@ -770,6 +819,8 @@ class AgentEngine {
       action: action,
       command: command,
       options: options,
+      toolName: toolName,
+      toolArgs: toolArgs,
       rawResponse: content,
     );
   }
@@ -899,6 +950,29 @@ class AgentEngine {
       agentLogger.info('ReAct', '低风险操作提示: $command');
     }
 
+    // 失败回滚：修改类命令执行前做快照（只读，不影响原命令）
+    PreSnapshot? snapshot;
+    final modifyTarget = RollbackAdvisor.analyze(command);
+    if (modifyTarget != null) {
+      final snapshotCmd = RollbackAdvisor.buildSnapshotCommand(modifyTarget);
+      if (snapshotCmd != null) {
+        agentLogger.info('Rollback', '检测到修改类命令，执行预快照: ${modifyTarget.type}');
+        try {
+          final snapshotResult = await _executeCommand(executor, snapshotCmd);
+          snapshot = PreSnapshot(
+            target: modifyTarget,
+            snapshotCommand: snapshotCmd,
+            snapshotOutput: snapshotResult.success ? snapshotResult.output : null,
+          );
+          if (snapshotResult.success && (snapshotResult.output?.isNotEmpty ?? false)) {
+            agentLogger.info('Rollback', '快照已记录: ${snapshotResult.output?.length ?? 0} 字符');
+          }
+        } catch (e) {
+          agentLogger.warn('Rollback', '快照执行失败(忽略): $e');
+        }
+      }
+    }
+
     final result = await _executeCommand(executor, command);
     agentLogger.info('ReAct', '命令执行结果: success=${result.success}');
 
@@ -918,9 +992,22 @@ class AgentEngine {
         ? (result.error ?? '(无错误信息)')
         : truncateOutput(result.error, maxLines: 8, maxChars: 600);
 
+    // 失败回滚：命令失败时，把快照+回滚建议注入观测，AI 会看到并建议回滚
+    String? rollbackHint;
+    if (!result.success && snapshot != null) {
+      rollbackHint = RollbackAdvisor.buildRollbackSuggestion(snapshot.target, snapshot.snapshotOutput);
+      if (rollbackHint != null) {
+        agentLogger.info('Rollback', '命令失败，已生成回滚建议: $rollbackHint');
+      }
+    }
+
     final observation = ReActObservation(
       command: command,
-      output: result.success ? outputText : errorText,
+      output: result.success
+          ? outputText
+          : (rollbackHint != null
+              ? '$errorText\n\n【失败回滚提示】修改前已快照:\n${snapshot?.snapshotOutput ?? "(无快照)"}\n$rollbackHint'
+              : errorText),
       success: result.success,
       error: result.success ? null : errorText,
     );
@@ -931,7 +1018,7 @@ class AgentEngine {
       command: command,
       success: result.success,
       output: outputText,
-      error: result.success ? null : errorText,
+      error: result.success ? null : (rollbackHint != null ? '$errorText\n\n$rollbackHint' : errorText),
     ));
 
     onCommandExecuted?.call(result);
@@ -1020,6 +1107,119 @@ class AgentEngine {
     onTaskUpdated?.call(_currentTask!);
 
     return true; // 继续循环
+  }
+
+  /// ═══════════════════════════════════════════════════════
+  /// 处理 tool 动作 — 调用非 shell 工具（如 SFTP 上传）
+  /// ═══════════════════════════════════════════════════════
+  /// 返回 true 表示继续循环，false 表示应退出
+  Future<bool> _handleToolAction(ReActStep step, CommandExecutor executor, {required int myGeneration}) async {
+    final toolName = step.toolName?.trim() ?? '';
+    final args = step.toolArgs ?? {};
+
+    if (toolName.isEmpty) {
+      agentLogger.warn('ReAct', 'tool 动作但未指定工具名');
+      onEvent?.call(AgentEvent.info('⚠️ AI 调用工具但未指定工具名'));
+      final observation = '观测: 工具调用失败 — 未指定工具名';
+      _conversationHistory.add(ChatMessage.create(role: 'user', content: observation));
+      _trimMessages(_conversationHistory);
+      _noCommandRetryCount++;
+      if (_noCommandRetryCount >= _maxNoCommandRetries) {
+        agentLogger.warn('ReAct', '工具调用重试次数耗尽');
+        return false;
+      }
+      return true;
+    }
+
+    final tool = _tools.get(toolName);
+    if (tool == null) {
+      agentLogger.warn('ReAct', '未知工具: $toolName');
+      onEvent?.call(AgentEvent.info('⚠️ 未知工具: $toolName'));
+      final available = _tools.all.map((t) => t.name).join(', ');
+      final observation = '观测: 工具 $toolName 不存在。可用工具: $available';
+      _conversationHistory.add(ChatMessage.create(role: 'user', content: observation));
+      _trimMessages(_conversationHistory);
+      return true;
+    }
+
+    agentLogger.info('ReAct', '调用工具: $toolName, 参数: $args');
+    onEvent?.call(AgentEvent.info('🔧 调用工具: $toolName'));
+
+    // 设置执行状态
+    _currentTask = _currentTask!.copyWith(
+      status: AgentStatus.executing,
+      currentStep: '执行工具 $toolName',
+    );
+    onTaskUpdated?.call(_currentTask!);
+
+    try {
+      final result = await tool.execute(
+        executor: executor,
+        args: args,
+        onProgress: (msg) {
+          agentLogger.info('Tool', '[$toolName] $msg');
+          onEvent?.call(AgentEvent.info('  $msg'));
+        },
+      );
+
+      // R1: await 后做代际检查
+      if (myGeneration != _currentTaskGeneration) return false;
+      if (_currentTask?.status == AgentStatus.cancelled) {
+        agentLogger.info('ReAct', '工具执行期间任务被取消');
+        return false;
+      }
+
+      agentLogger.info('ReAct', '工具 $toolName 执行结果: success=${result.success}');
+
+      // 发 result 事件
+      onEvent?.call(AgentEvent.result(
+        commandId: _lastCommandEventId.isNotEmpty ? _lastCommandEventId : 'tool_${DateTime.now().millisecondsSinceEpoch}',
+        success: result.success,
+        output: result.success ? result.output : null,
+        error: result.success ? null : (result.error ?? result.output),
+        command: '$toolName ${jsonEncode(args)}',
+      ));
+
+      // 构造观测反馈给 AI
+      final observation = ReActObservation(
+        command: '$toolName(${jsonEncode(args)})',
+        output: result.success ? result.output : (result.output.isNotEmpty ? result.output : '(无输出)'),
+        success: result.success,
+        error: result.success ? null : result.error,
+      ).format();
+      _conversationHistory.add(ChatMessage.create(role: 'user', content: observation));
+      _trimMessages(_conversationHistory);
+
+      // 工具执行成功视为有效进展，重置无命令重试计数
+      if (result.success) {
+        _noCommandRetryCount = 0;
+      }
+
+      // 恢复 thinking 状态
+      _currentTask = _currentTask!.copyWith(
+        status: AgentStatus.thinking,
+        currentStep: '思考中...',
+      );
+      onTaskUpdated?.call(_currentTask!);
+
+      return true;
+    } catch (e) {
+      agentLogger.error('ReAct', '工具 $toolName 执行异常: $e');
+      onEvent?.call(AgentEvent.info('❌ 工具 $toolName 执行异常: $e'));
+
+      if (myGeneration != _currentTaskGeneration) return false;
+
+      final observation = '观测: 工具 $toolName 执行异常 — $e';
+      _conversationHistory.add(ChatMessage.create(role: 'user', content: observation));
+      _trimMessages(_conversationHistory);
+
+      _currentTask = _currentTask!.copyWith(
+        status: AgentStatus.thinking,
+        currentStep: '思考中...',
+      );
+      onTaskUpdated?.call(_currentTask!);
+      return true;
+    }
   }
 
   /// 处理无命令情况 — 发送继续提示
@@ -1458,6 +1658,13 @@ class AgentEngine {
     if (_cachedKnowledgeInjection != null) {
       buffer.writeln();
       buffer.writeln(_cachedKnowledgeInjection);
+    }
+
+    // 工具能力注入（告诉 AI 有哪些非 shell 工具可用）
+    final toolsPrompt = _tools.buildToolsPrompt();
+    if (toolsPrompt.isNotEmpty) {
+      buffer.writeln();
+      buffer.writeln(toolsPrompt);
     }
 
     // 早期对话摘要（压缩后产生，帮助 AI 回顾早期对话）

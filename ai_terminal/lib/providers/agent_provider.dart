@@ -13,6 +13,7 @@ import '../services/agent_stream_reducer.dart';
 import '../services/ai_service.dart';
 import '../services/command_executor.dart';
 import '../services/conversation_service.dart';
+import '../services/knowledge_service.dart';
 import '../core/hive_init.dart';
 import '../models/agent_state.dart';
 import '../models/chat_item.dart';
@@ -166,6 +167,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
         engine.onTaskUpdated = null;
         engine.onCompleted = null;
         engine.cancelTask();
+        // R2: 清理工具资源（file_sync 的 watcher/timer/SFTP 等）
+        engine.disposeTools();
       }
       _registry.removeHost(hostId);
       _reducer.cancelTimer(hostId);
@@ -185,6 +188,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
         modelConfig: _modelConfig!,
         memory: memory,
         maxSteps: state.maxSteps,
+        hostId: hostId,
       );
       _setupEngineCallbacks(hostId);
       _registry.setEngine(hostId, _engine!);
@@ -219,6 +223,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       modelConfig: modelConfig,
       memory: memory,
       maxSteps: state.maxSteps,
+      hostId: hostId,
     );
 
     _setupEngineCallbacks(hostId);
@@ -325,6 +330,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
           );
           // 最后再保存一次（确保 finish 等事件也被持久化）
           _persistAssistantCompletion(hostId, lastItem.content, events: lastItem.events);
+          // 记录成功经验到用户经验库（异步，不阻塞 UI）
+          _recordLearningFromTask(hostId, items, fullMessage);
         }
         return s.copyWith(chatItems: items);
       });
@@ -352,6 +359,65 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
     _reducer.cancelTimer(hostId);
     _reducer.reset(hostId);
+  }
+
+  /// 任务成功完成后，将经验记录到用户经验库（异步，不阻塞 UI）
+  /// 使用捕获的 hostId（R3：不使用 activeHostId，避免切换 host 后写错库）
+  void _recordLearningFromTask(String hostId, List<ChatItem> items, String aiSummary) {
+    Future.microtask(() async {
+      try {
+        // 取最后一条用户消息作为原始请求
+        String? userRequest;
+        for (var i = items.length - 1; i >= 0; i--) {
+          if (items[i].role == 'user') {
+            userRequest = items[i].content;
+            break;
+          }
+        }
+        if (userRequest == null || userRequest.trim().isEmpty) return;
+
+        // 从最后一条 assistant 消息的 events 提取执行过的命令
+        ChatItem? lastAssistant;
+        for (var i = items.length - 1; i >= 0; i--) {
+          if (items[i].role == 'assistant') {
+            lastAssistant = items[i];
+            break;
+          }
+        }
+        if (lastAssistant == null) return;
+
+        final commands = <String>[];
+        for (final event in lastAssistant.events) {
+          if (event.isCommand && event.command != null && event.command!.isNotEmpty) {
+            commands.add(event.command!);
+          }
+        }
+        if (commands.isEmpty) return;
+
+        // R8：截断过长内容，防止无界增长
+        final truncatedRequest = userRequest.length > 500
+            ? userRequest.substring(0, 500)
+            : userRequest;
+        final truncatedSummary = aiSummary.length > 1000
+            ? aiSummary.substring(0, 1000)
+            : aiSummary;
+        final executedCommands = commands.join('\n');
+        final truncatedCommands = executedCommands.length > 2000
+            ? executedCommands.substring(0, 2000)
+            : executedCommands;
+
+        final knowledge = KnowledgeService();
+        await knowledge.ensureInitialized();
+        await knowledge.recordLearning(
+          hostId: hostId,
+          userRequest: truncatedRequest,
+          executedCommands: truncatedCommands,
+          aiSummary: truncatedSummary,
+        );
+      } catch (e) {
+        debugPrint('[AgentNotifier] _recordLearningFromTask 失败: $e');
+      }
+    });
   }
 
   /// 持久化 assistant 完整响应（流式结束后回写）
@@ -435,7 +501,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       chatItems: items,
       lastMessage: '',
       currentTask: null,
-      error: null,
+      clearError: true,
     );
 
     // 添加一条空的 AI 消息占位
@@ -526,7 +592,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
     if (_registry.activeHostId != null) {
       _getMemory(_registry.activeHostId!).clear();
     }
-    state = state.copyWith(error: null);
+    state = state.copyWith(clearError: true);
   }
 
   // ═══════════════════════════════════════════
@@ -698,6 +764,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
       engine.onError = null;
       engine.onTaskUpdated = null;
       engine.onCompleted = null;
+      // R2: 清理工具资源（如文件同步的 watcher 和 timer）
+      engine.disposeTools();
     }
     _registry.dispose();
     _reducer.dispose();

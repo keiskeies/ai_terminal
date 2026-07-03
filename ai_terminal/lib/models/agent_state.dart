@@ -59,13 +59,14 @@ class AgentState {
     bool clearHostId = false,
     bool clearConversationId = false,
     bool clearSummary = false,
+    bool clearError = false,
   }) {
     return AgentState(
       status: status ?? this.status,
       currentTask: currentTask ?? this.currentTask,
       lastMessage: lastMessage ?? this.lastMessage,
       chatItems: chatItems ?? this.chatItems,
-      error: error,
+      error: clearError ? null : (error ?? this.error),
       maxSteps: maxSteps ?? this.maxSteps,
       pendingConfirmCommand: clearPendingConfirm ? null : (pendingConfirmCommand ?? this.pendingConfirmCommand),
       pendingOptions: clearPendingOptions ? [] : (pendingOptions ?? this.pendingOptions),

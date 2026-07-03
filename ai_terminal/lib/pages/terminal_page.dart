@@ -95,6 +95,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   StreamSubscription<String>? _tabOutputSubscription; // 终端输出订阅（需随 tab 切换而取消/重建）
   bool _agentInitialized = false;
   AIModelConfig? _currentModelConfig;
+  /// 智能补全上下文（当前主机信息）
+  String? _completionContext;
 
   // 终端设置
   double _terminalFontSize = 14; // P0-3: 默认终端字号从 13 改为 14
@@ -522,6 +524,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     final activeTab = terminalState.activeTab;
 
     final tc = ThemeColors.of(context);
+
+    // 缓存补全上下文（当前主机信息）
+    _completionContext = host != null
+        ? '主机: ${host.name}, 地址: ${host.host}:${host.port}, 用户: ${host.username}'
+        : null;
 
     // 手机端：根据屏幕方向自动设置 AI 面板位置
     _updateMobilePosition(context);
@@ -2121,6 +2128,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             hintText: _getInputHint(isConnected, agentState.isRunning),
             initialText: _tabAiInputText[_currentTabId ?? ''] ?? '',
             accentColor: cAgentGreen,
+            modelConfig: _currentModelConfig,
+            completionContext: _completionContext,
             onFocusChanged: (focused) {
               setState(() => _aiInputFocused = focused);
             },

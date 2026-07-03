@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../models/ai_model_config.dart';
+import '../services/completion_service.dart';
 
 /// AI 输入框，支持斜杠命令建议
 ///
@@ -21,6 +24,10 @@ class AIPromptInput extends StatefulWidget {
   final Color accentColor;
   /// 斜杠命令回调：返回 true 表示命令已被处理（不再走 onSend）
   final bool Function(String command)? onSlashCommand;
+  /// AI 模型配置（用于智能补全，为 null 时禁用补全）
+  final AIModelConfig? modelConfig;
+  /// 补全上下文（如当前主机信息，可为空）
+  final String? completionContext;
 
   const AIPromptInput({
     super.key,
@@ -34,6 +41,8 @@ class AIPromptInput extends StatefulWidget {
     this.onFocusChanged,
     required this.accentColor,
     this.onSlashCommand,
+    this.modelConfig,
+    this.completionContext,
   });
 
   @override
@@ -61,6 +70,12 @@ class _AIPromptInputState extends State<AIPromptInput> {
   List<SlashCommand> _filteredCommands = [];
   int _highlightedIndex = 0;
 
+  // 智能补全状态
+  final CompletionService _completionService = CompletionService();
+  Timer? _completionDebounce;
+  String? _completionSuggestion;
+  bool _completionLoading = false;
+
   @override
   void initState() {
     super.initState();
@@ -82,6 +97,83 @@ class _AIPromptInputState extends State<AIPromptInput> {
   void _onTextChanged() {
     widget.onChanged?.call(_controller.text);
     _detectSlashCommand();
+    _scheduleCompletion();
+  }
+
+  /// 调度智能补全（debounce 300ms）
+  void _scheduleCompletion() {
+    // 无 modelConfig 时不补全
+    if (widget.modelConfig == null) {
+      _clearCompletion();
+      return;
+    }
+    // 运行中不补全
+    if (widget.isRunning) {
+      _clearCompletion();
+      return;
+    }
+    // 斜杠命令浮层打开时不补全（已有专门建议）
+    if (_slashOverlay != null) {
+      _clearCompletion();
+      return;
+    }
+
+    final text = _controller.text;
+    // 输入太短不补全
+    if (text.trim().length < 3) {
+      _clearCompletion();
+      return;
+    }
+
+    // 用户继续输入：补全建议可能已过时，清除并重新请求
+    if (_completionSuggestion != null) {
+      _clearCompletion();
+    }
+
+    _completionDebounce?.cancel();
+    _completionDebounce = Timer(const Duration(milliseconds: 300), () {
+      _requestCompletion(text);
+    });
+  }
+
+  /// 请求补全
+  void _requestCompletion(String text) {
+    if (widget.modelConfig == null) return;
+    setState(() => _completionLoading = true);
+
+    _completionService.complete(
+      input: text,
+      config: widget.modelConfig!,
+      context: widget.completionContext,
+      onResult: (suggestion) {
+        if (!mounted) return;
+        setState(() {
+          _completionSuggestion = suggestion;
+          _completionLoading = false;
+        });
+      },
+    );
+  }
+
+  /// 清除补全建议
+  void _clearCompletion() {
+    if (_completionSuggestion != null || _completionLoading) {
+      setState(() {
+        _completionSuggestion = null;
+        _completionLoading = false;
+      });
+    }
+    _completionService.cancel();
+  }
+
+  /// 接受补全建议（Tab 键）
+  void _acceptCompletion() {
+    if (_completionSuggestion == null || _completionSuggestion!.isEmpty) return;
+    final currentText = _controller.text;
+    final newText = currentText + _completionSuggestion!;
+    _controller.text = newText;
+    _controller.selection = TextSelection.collapsed(offset: newText.length);
+    _clearCompletion();
   }
 
   /// 检测输入框中的斜杠命令前缀，显示建议
@@ -237,6 +329,14 @@ class _AIPromptInputState extends State<AIPromptInput> {
       // 有 Shift：换行，放行让 TextField 走默认行为
     }
 
+    // Tab：接受智能补全建议（有建议时）
+    if (key == LogicalKeyboardKey.tab) {
+      if (_completionSuggestion != null && _completionSuggestion!.isNotEmpty) {
+        _acceptCompletion();
+        return KeyEventResult.handled;
+      }
+    }
+
     return KeyEventResult.ignored;
   }
 
@@ -259,6 +359,8 @@ class _AIPromptInputState extends State<AIPromptInput> {
   @override
   void dispose() {
     _hideSlashOverlay();
+    _completionDebounce?.cancel();
+    _completionService.cancel();
     _controller.removeListener(_onTextChanged);
     _controller.dispose();
     _focusNode.dispose();
@@ -331,6 +433,17 @@ class _AIPromptInputState extends State<AIPromptInput> {
           ),
           contentPadding: const EdgeInsets.fromLTRB(14, 12, 48, 12),
           isDense: false,
+          // 智能补全建议：显示在输入框下方，Tab 接受
+          helperText: _completionSuggestion != null
+              ? '建议: $_completionSuggestion  (Tab 接受)'
+              : (_completionLoading ? '正在生成补全建议...' : null),
+          helperStyle: TextStyle(
+            color: _completionSuggestion != null
+                ? widget.accentColor.withValues(alpha: 0.8)
+                : tc.textMuted,
+            fontSize: fSmall,
+            fontStyle: FontStyle.italic,
+          ),
           suffixIcon: Padding(
             padding: const EdgeInsets.all(4),
             child: GestureDetector(

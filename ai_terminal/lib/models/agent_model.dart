@@ -60,6 +60,9 @@ enum ActionType {
 
   /// 询问用户选择
   ask,
+
+  /// 调用工具（如 SFTP 上传等非 shell 能力）
+  tool,
 }
 
 /// ReAct 步骤 — 从 AI 响应中解析的结构化动作
@@ -76,6 +79,12 @@ class ReActStep {
   /// 选项（ask 时）
   final List<String>? options;
 
+  /// 工具名（tool 时）
+  final String? toolName;
+
+  /// 工具参数（tool 时，已解析的 JSON Map）
+  final Map<String, dynamic>? toolArgs;
+
   /// 原始 AI 响应（用于 fallback 和 UI 显示）
   final String rawResponse;
 
@@ -84,12 +93,14 @@ class ReActStep {
     this.action,
     this.command,
     this.options,
+    this.toolName,
+    this.toolArgs,
     required this.rawResponse,
   });
 
   @override
   String toString() =>
-      'ReActStep(thought: $thought, action: $action, command: $command, options: $options)';
+      'ReActStep(thought: $thought, action: $action, command: $command, options: $options, toolName: $toolName)';
 }
 
 /// ReAct 观测结果 — 命令执行后反馈给 AI 的标准格式

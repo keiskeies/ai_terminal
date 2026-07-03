@@ -18,8 +18,11 @@ class KnowledgeConfig {
   static String remoteDbUrlForVersion(String version) =>
       '$remoteBaseUrl/knowledge-$version.db';
 
-  /// 本地数据库文件名
+  /// 本地数据库文件名（官方库，可被远程覆盖）
   static const String dbFileName = 'knowledge.db';
+
+  /// 用户经验库文件名（独立文件，永不被远程覆盖）
+  static const String userDbFileName = 'user_learnings.db';
 
   /// 内置数据库的 asset 路径
   static const String bundledAssetPath = 'assets/knowledge/knowledge.db';
@@ -29,6 +32,12 @@ class KnowledgeConfig {
 
   /// 最大返回条目数
   static const int maxResults = 3;
+
+  /// 用户经验库容量上限（R8：必须有上限防止无限增长）
+  static const int userLearningsCapacity = 500;
+
+  /// 超过容量时淘汰的条目数
+  static const int userLearningsEvictBatch = 50;
 }
 
 /// 知识库服务 — SQLite FTS5 全文搜索 + 远程同步 + 离线兜底
@@ -38,11 +47,15 @@ class KnowledgeService {
   KnowledgeService._internal();
 
   Database? _db;
+  /// 用户经验库（独立 db 文件，永不被远程覆盖）
+  Database? _userDb;
   bool _initialized = false;
   bool _initializing = false;
 
   /// 获取数据库实例
   Database? get db => _db;
+  /// 获取用户经验库实例
+  Database? get userDb => _userDb;
   bool get isInitialized => _initialized;
 
   /// 初始化知识库
@@ -108,6 +121,9 @@ class KnowledgeService {
         _db = await openDatabase(dbPath, version: 1, onCreate: _onCreate);
         await _validateFts5Index();
       }
+
+      // 初始化用户经验库（独立文件，不参与远程更新）
+      await _initUserLearningsDb();
 
       _initialized = true;
 
@@ -294,6 +310,86 @@ class KnowledgeService {
     await db.close();
   }
 
+  /// 初始化用户经验库（独立 db 文件，永不被远程覆盖）
+  Future<void> _initUserLearningsDb() async {
+    try {
+      final appDir = await getApplicationSupportDirectory();
+      final dbPath = p.join(appDir.path, 'knowledge', KnowledgeConfig.userDbFileName);
+      final dbDir = Directory(p.dirname(dbPath));
+      if (!await dbDir.exists()) {
+        await dbDir.create(recursive: true);
+      }
+      _userDb = await openDatabase(dbPath, version: 1, onCreate: _onCreateUserLearnings);
+      // 验证 FTS5 索引
+      try {
+        await _userDb!.rawQuery('SELECT count(*) as c FROM user_learnings_fts LIMIT 1');
+      } catch (e) {
+        debugPrint('[KnowledgeService] 用户经验库 FTS5 索引缺失，重建: $e');
+        await _onCreateUserLearnings(_userDb!, 1);
+      }
+      final count = await _userDb!.rawQuery('SELECT count(*) as c FROM user_learnings');
+      final total = (count.first['c'] as int?) ?? 0;
+      debugPrint('[KnowledgeService] 用户经验库初始化成功，共 $total 条经验');
+    } catch (e) {
+      debugPrint('[KnowledgeService] 用户经验库初始化失败: $e');
+    }
+  }
+
+  /// 创建用户经验库表和 FTS5 索引
+  Future<void> _onCreateUserLearnings(Database db, int version) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS user_learnings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        host_id TEXT DEFAULT '',
+        software_name TEXT NOT NULL DEFAULT '',
+        op_type TEXT NOT NULL DEFAULT 'install',
+        platform TEXT DEFAULT 'linux',
+        summary TEXT DEFAULT '',
+        commands TEXT DEFAULT '',
+        notes TEXT DEFAULT '',
+        source TEXT DEFAULT 'agent',
+        created_at INTEGER NOT NULL,
+        hit_count INTEGER DEFAULT 0,
+        last_used_at INTEGER NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE VIRTUAL TABLE IF NOT EXISTS user_learnings_fts USING fts5(
+        software_name,
+        op_type,
+        platform,
+        summary,
+        commands,
+        notes,
+        content=user_learnings,
+        content_rowid=id
+      )
+    ''');
+
+    // FTS5 自动同步触发器
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS user_learnings_ai AFTER INSERT ON user_learnings BEGIN
+        INSERT INTO user_learnings_fts(rowid, software_name, op_type, platform, summary, commands, notes)
+        VALUES (new.id, new.software_name, new.op_type, new.platform, new.summary, new.commands, new.notes);
+      END
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS user_learnings_ad AFTER DELETE ON user_learnings BEGIN
+        INSERT INTO user_learnings_fts(user_learnings_fts, rowid, software_name, op_type, platform, summary, commands, notes)
+        VALUES ('delete', old.id, old.software_name, old.op_type, old.platform, old.summary, old.commands, old.notes);
+      END
+    ''');
+    await db.execute('''
+      CREATE TRIGGER IF NOT EXISTS user_learnings_au AFTER UPDATE ON user_learnings BEGIN
+        INSERT INTO user_learnings_fts(user_learnings_fts, rowid, software_name, op_type, platform, summary, commands, notes)
+        VALUES ('delete', old.id, old.software_name, old.op_type, old.platform, old.summary, old.commands, old.notes);
+        INSERT INTO user_learnings_fts(rowid, software_name, op_type, platform, summary, commands, notes)
+        VALUES (new.id, new.software_name, new.op_type, new.platform, new.summary, new.commands, new.notes);
+      END
+    ''');
+  }
+
   /// 创建数据库表和 FTS5 索引
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
@@ -362,6 +458,151 @@ class KnowledgeService {
     } catch (e) {
       debugPrint('[KnowledgeService] FTS5 索引不存在，尝试重建: $e');
       await _onCreate(_db!, 1);
+    }
+  }
+
+  /// 记录一次成功的任务经验到用户经验库
+  /// 由 agent_provider 在任务完成（onCompleted）时调用
+  /// [userRequest] 用户原始请求（用于提取软件名和操作类型）
+  /// [executedCommands] 实际执行成功的命令（换行分隔）
+  /// [aiSummary] AI 的完成总结
+  Future<void> recordLearning({
+    String? hostId,
+    required String userRequest,
+    required String executedCommands,
+    required String aiSummary,
+    String? platform,
+  }) async {
+    if (_userDb == null) {
+      debugPrint('[KnowledgeService] recordLearning 跳过: 用户经验库未初始化');
+      return;
+    }
+    // 空请求或空命令不记录（无价值）
+    if (userRequest.trim().isEmpty || executedCommands.trim().isEmpty) {
+      return;
+    }
+
+    try {
+      // 提取软件名和操作类型（复用现有启发式）
+      final opType = extractOpType(userRequest) ?? 'install';
+      final keywords = _extractKeywords(userRequest);
+      final softwareName = keywords.isNotEmpty ? keywords.first : 'unknown';
+      final effectivePlatform = platform ?? detectPlatform() ?? 'linux';
+
+      // R8: 容量上限检查，超限则淘汰最久未用 + 命中次数最少的
+      final countResult = await _userDb!.rawQuery('SELECT count(*) as c FROM user_learnings');
+      final total = (countResult.first['c'] as int?) ?? 0;
+      if (total >= KnowledgeConfig.userLearningsCapacity) {
+        await _userDb!.rawDelete(
+          'DELETE FROM user_learnings WHERE id IN ('
+          'SELECT id FROM user_learnings ORDER BY hit_count ASC, last_used_at ASC LIMIT ?)',
+          [KnowledgeConfig.userLearningsEvictBatch],
+        );
+        debugPrint('[KnowledgeService] 用户经验库超容，淘汰 ${KnowledgeConfig.userLearningsEvictBatch} 条');
+      }
+
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await _userDb!.insert('user_learnings', {
+        'host_id': hostId ?? '',
+        'software_name': softwareName,
+        'op_type': opType,
+        'platform': effectivePlatform,
+        'summary': aiSummary.isNotEmpty ? aiSummary : userRequest,
+        'commands': executedCommands,
+        'notes': '',
+        'source': 'agent',
+        'created_at': now,
+        'hit_count': 0,
+        'last_used_at': now,
+      });
+      debugPrint('[KnowledgeService] 记录经验: software=$softwareName, op=$opType, platform=$effectivePlatform');
+    } catch (e) {
+      debugPrint('[KnowledgeService] recordLearning 失败: $e');
+    }
+  }
+
+  /// 搜索用户经验库（内部使用，结果会与官方库合并）
+  Future<List<KnowledgeSearchResult>> _searchUserLearnings(
+    String query, {
+    String? opType,
+    String? platform,
+    String? hostId,
+  }) async {
+    if (_userDb == null) return [];
+    try {
+      final keywords = _extractKeywords(query);
+      if (keywords.isEmpty) return [];
+      final ftsQuery = keywords.map((k) => '$k*').join(' AND ');
+
+      var where = '';
+      final args = <dynamic>[ftsQuery];
+      if (opType != null) {
+        where += ' AND ul.op_type = ?';
+        args.add(opType);
+      }
+      if (platform != null) {
+        where += ' AND (ul.platform = ? OR ul.platform = ?)';
+        args.add(platform);
+        args.add('all');
+      }
+
+      // 同 host 的经验优先（实际验证过），其次通用经验
+      var orderClause = 'ORDER BY ft.rank';
+      if (hostId != null && hostId.isNotEmpty) {
+        orderClause = 'ORDER BY (ul.host_id = ?) DESC, ft.rank';
+        args.add(hostId);
+      }
+
+      final results = await _userDb!.rawQuery('''
+        SELECT ul.*, ft.rank as score
+        FROM user_learnings_fts ft
+        JOIN user_learnings ul ON ft.rowid = ul.id
+        WHERE user_learnings_fts MATCH ? $where
+        $orderClause
+        LIMIT ?
+      ''', [...args, KnowledgeConfig.maxResults]);
+
+      // 更新命中次数和最后使用时间（后台执行，不阻塞）
+      if (results.isNotEmpty) {
+        final now = DateTime.now().millisecondsSinceEpoch;
+        final ids = results.map((r) => r['id'] as int).toList();
+        for (final id in ids) {
+          await _userDb!.rawUpdate(
+            'UPDATE user_learnings SET hit_count = hit_count + 1, last_used_at = ? WHERE id = ?',
+            [now, id],
+          );
+        }
+      }
+
+      return results.map((row) {
+        final score = (row['score'] as num?)?.toDouble() ?? 0.0;
+        return KnowledgeSearchResult(
+          guide: SoftwareGuide(
+            softwareName: row['software_name'] as String? ?? '',
+            opType: row['op_type'] as String? ?? 'install',
+            platform: row['platform'] as String? ?? 'linux',
+            summary: row['summary'] as String? ?? '',
+            commands: row['commands'] as String? ?? '',
+            notes: row['notes'] as String? ?? '',
+            mode: 'flexible',
+          ),
+          score: score.abs(),
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('[KnowledgeService] _searchUserLearnings 失败: $e');
+      return [];
+    }
+  }
+
+  /// 获取用户经验库统计
+  Future<int> getUserLearningsCount() async {
+    if (_userDb == null) return 0;
+    try {
+      final result = await _userDb!.rawQuery('SELECT count(*) as c FROM user_learnings');
+      return (result.first['c'] as int?) ?? 0;
+    } catch (_) {
+      return 0;
     }
   }
 
@@ -560,53 +801,77 @@ class KnowledgeService {
 
   /// 构建知识库注入文本（给 LLM system prompt）
   /// 返回 null 表示未命中知识库
-  Future<String?> buildKnowledgeInjection(String userInput, {String? platform, String? osInfo}) async {
+  /// [hostId] 当前主机 ID，用于优先匹配该主机上验证过的经验
+  Future<String?> buildKnowledgeInjection(String userInput, {String? platform, String? osInfo, String? hostId}) async {
     final opType = extractOpType(userInput);
     final effectivePlatform = platform ?? detectPlatform();
-    debugPrint('[KnowledgeService] buildKnowledgeInjection: input="$userInput", opType=$opType, platform=$effectivePlatform');
+    debugPrint('[KnowledgeService] buildKnowledgeInjection: input="$userInput", opType=$opType, platform=$effectivePlatform, hostId=$hostId');
 
-    var results = await search(
+    // 1. 查用户经验库（同 host 优先，实际验证过的经验权重更高）
+    final userResults = await _searchUserLearnings(
+      userInput,
+      opType: opType,
+      platform: effectivePlatform,
+      hostId: hostId,
+    );
+
+    // 2. 查官方库
+    var officialResults = await search(
       userInput,
       opType: opType,
       platform: effectivePlatform,
     );
 
-    if (results.isEmpty) {
+    // 官方库阈值过滤（保留原逻辑）
+    if (officialResults.isNotEmpty) {
+      final topOfficial = officialResults.first;
+      if (topOfficial.score < KnowledgeConfig.matchThreshold && officialResults.length == 1) {
+        debugPrint('[KnowledgeService] 官方库命中但分数低于阈值，跳过官方部分');
+        officialResults = [];
+      }
+    }
+
+    // 官方库发行版排序（保留原逻辑）
+    if (officialResults.length > 1 && osInfo != null && osInfo.isNotEmpty) {
+      officialResults = _sortByDistroMatch(officialResults, osInfo);
+    }
+
+    if (userResults.isEmpty && officialResults.isEmpty) {
       debugPrint('[KnowledgeService] 知识库未命中: "$userInput" (opType=$opType, platform=$effectivePlatform)');
       return null;
     }
 
-    // 检查最高分是否超过阈值
-    final topResult = results.first;
-    debugPrint('[KnowledgeService] 最高分: ${topResult.score}, 阈值: ${KnowledgeConfig.matchThreshold}, 软件名: ${topResult.guide.softwareName}');
-
-    if (topResult.score < KnowledgeConfig.matchThreshold && results.length == 1) {
-      debugPrint('[KnowledgeService] 命中但分数低于阈值，跳过');
-      return null;
-    }
-
-    // 智能排序：如果有多条平台细分的条目（如 linux-debian / linux-rhel），
-    // 根据 osInfo 优先选择最匹配发行版的条目
-    if (results.length > 1 && osInfo != null && osInfo.isNotEmpty) {
-      results = _sortByDistroMatch(results, osInfo);
-    }
-
     final buffer = StringBuffer();
-    buffer.writeln('【本地知识库】');
 
-    for (final result in results) {
-      final guide = result.guide;
-      buffer.writeln('---');
-      if (guide.mode == 'strict') {
-        buffer.writeln('本地已验证知识库要求使用以下命令执行${SoftwareGuide.opTypeLabel(guide.opType)} ${guide.softwareName}，'
-            '你必须严格照做，不得修改、不得使用其他包管理器：');
-      } else {
-        buffer.writeln('官方推荐方法如下，你可以调整非包管理器部分的参数，但不得更换包管理器：');
+    // 用户经验优先注入（本机验证过）
+    if (userResults.isNotEmpty) {
+      buffer.writeln('【本机验证经验】');
+      for (final result in userResults) {
+        final guide = result.guide;
+        buffer.writeln('---');
+        buffer.writeln('此操作在本机或同类环境已成功执行过，参考命令如下（可按实际情况调整参数）：');
+        buffer.writeln(guide.buildInjectionText());
       }
-      buffer.writeln(guide.buildInjectionText());
+      buffer.writeln();
     }
 
-    debugPrint('[KnowledgeService] 知识库命中 ✓: ${results.map((r) => r.guide.softwareName).join(", ")}');
+    // 官方知识库作为补充
+    if (officialResults.isNotEmpty) {
+      buffer.writeln('【本地知识库】');
+      for (final result in officialResults) {
+        final guide = result.guide;
+        buffer.writeln('---');
+        if (guide.mode == 'strict') {
+          buffer.writeln('本地已验证知识库要求使用以下命令执行${SoftwareGuide.opTypeLabel(guide.opType)} ${guide.softwareName}，'
+              '你必须严格照做，不得修改、不得使用其他包管理器：');
+        } else {
+          buffer.writeln('官方推荐方法如下，你可以调整非包管理器部分的参数，但不得更换包管理器：');
+        }
+        buffer.writeln(guide.buildInjectionText());
+      }
+    }
+
+    debugPrint('[KnowledgeService] 知识库命中 ✓: user=${userResults.length}条, official=${officialResults.length}条');
     return buffer.toString();
   }
 
@@ -710,7 +975,9 @@ class KnowledgeService {
   /// 关闭数据库
   Future<void> close() async {
     await _db?.close();
+    await _userDb?.close();
     _db = null;
+    _userDb = null;
     _initialized = false;
   }
 }

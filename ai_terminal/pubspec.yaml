@@ -40,6 +40,8 @@ dependencies:
   package_info_plus: ^9.0.1
   # 文件选择
   file_picker: ^9.0.0
+  # 文件监听（用于本地↔远端双向同步）
+  watcher: ^1.1.0
   # SVG 渲染
   flutter_svg: ^2.0.9
   # 路径工具
