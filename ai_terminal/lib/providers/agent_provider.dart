@@ -75,6 +75,16 @@ class AgentNotifier extends StateNotifier<AgentState> {
   void switchTab(String tabId, {String? hostId}) {
     final effectiveHostId = hostId ?? 'local';
 
+    // R3: 切换前取消当前 host 的运行任务并重置 reducer，避免旧 tab 的流式 chunk 串台到新会话
+    final oldHostId = _registry.activeHostId;
+    if (oldHostId != null && oldHostId != effectiveHostId) {
+      if (_engine != null && _engine!.isRunning) {
+        _engine!.cancelTask();
+      }
+      _reducer.cancelTimer(oldHostId);
+      _reducer.reset(oldHostId);
+    }
+
     // 保存当前 host 状态
     _registry.saveActiveState(state);
 
@@ -97,6 +107,20 @@ class AgentNotifier extends StateNotifier<AgentState> {
       // 恢复该 host 的模型配置，或保留当前全局配置
       _modelConfig = _registry.getModelConfig(effectiveHostId) ?? _modelConfig;
       _reinitEngineForCurrentHost();
+    }
+
+    // R3: 编排模式状态同步 — 确保 engine 的编排开关与 state.isOrchestratorMode 一致
+    // 防止 engine 被重新初始化后编排标志丢失，但 state 仍为 true 的不一致情况
+    _syncOrchestratorMode();
+  }
+
+  /// 同步编排模式：让 engine 的 _orchestratorMode 与 state.isOrchestratorMode 保持一致
+  void _syncOrchestratorMode() {
+    if (_engine == null) return;
+    if (state.isOrchestratorMode && !_engine!.isOrchestratorMode) {
+      _engine!.enableOrchestrator(_registry);
+    } else if (!state.isOrchestratorMode && _engine!.isOrchestratorMode) {
+      _engine!.disableOrchestrator();
     }
   }
 
@@ -593,6 +617,36 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _getMemory(_registry.activeHostId!).clear();
     }
     state = state.copyWith(clearError: true);
+  }
+
+  // ═══════════════════════════════════════════
+  // 多机编排模式
+  // ═══════════════════════════════════════════
+
+  /// 启用多机编排模式
+  /// 启用后，AI 可使用 exec_on/exec_batch/check_connectivity 工具跨主机调度
+  void enableOrchestratorMode() {
+    if (_engine == null) {
+      state = state.copyWith(error: '请先初始化 Agent 和连接主机');
+      return;
+    }
+    _engine!.enableOrchestrator(_registry);
+    state = state.copyWith(isOrchestratorMode: true, clearError: true);
+  }
+
+  /// 禁用多机编排模式
+  void disableOrchestratorMode() {
+    _engine?.disableOrchestrator();
+    state = state.copyWith(isOrchestratorMode: false);
+  }
+
+  /// 切换编排模式
+  void toggleOrchestratorMode() {
+    if (state.isOrchestratorMode) {
+      disableOrchestratorMode();
+    } else {
+      enableOrchestratorMode();
+    }
   }
 
   // ═══════════════════════════════════════════

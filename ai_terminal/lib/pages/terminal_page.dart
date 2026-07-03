@@ -2121,15 +2121,24 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             ],
           ),
           const SizedBox(height: 8),
+          // 多机编排模式状态横幅
+          if (agentState.isOrchestratorMode)
+            _buildOrchestratorBanner(tc),
+          if (agentState.isOrchestratorMode)
+            const SizedBox(height: 8),
           // 输入框
           AIPromptInput(
             enabled: isConnected,
             isRunning: agentState.isRunning,
-            hintText: _getInputHint(isConnected, agentState.isRunning),
+            hintText: _getInputHint(isConnected, agentState.isRunning, agentState.isOrchestratorMode),
             initialText: _tabAiInputText[_currentTabId ?? ''] ?? '',
             accentColor: cAgentGreen,
             modelConfig: _currentModelConfig,
             completionContext: _completionContext,
+            isOrchestratorMode: agentState.isOrchestratorMode,
+            onToggleOrchestrator: () {
+              ref.read(agentProvider.notifier).toggleOrchestratorMode();
+            },
             onFocusChanged: (focused) {
               setState(() => _aiInputFocused = focused);
             },
@@ -2366,9 +2375,57 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   // ==================== 工具方法 ====================
-  String _getInputHint(bool isConnected, bool isRunning) {
+  /// 多机编排模式状态横幅：显示已连接主机数和模式提示
+  Widget _buildOrchestratorBanner(ThemeColors tc) {
+    // 统计已连接的 SSH 主机数（从终端 tab 中读取）
+    final tabs = ref.read(tp.terminalProvider).tabs;
+    final connectedCount = tabs.where((t) => t.isConnected && !t.isLocal).length;
+    final totalHosts = HiveInit.hostsBox.values.length;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: cWarning.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(rSmall),
+        border: Border.all(color: cWarning.withValues(alpha: 0.4), width: 1),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.hub, size: 14, color: cWarning),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              '多机编排模式 · 已连接 $connectedCount/$totalHosts 台主机',
+              style: TextStyle(
+                fontSize: fMicro,
+                color: tc.textMain,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: () => ref.read(agentProvider.notifier).disableOrchestratorMode(),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: tc.surface,
+                borderRadius: BorderRadius.circular(rSmall),
+              ),
+              child: Text(
+                '退出',
+                style: TextStyle(fontSize: fMicro, color: tc.textSub),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getInputHint(bool isConnected, bool isRunning, bool isOrchestrator) {
     if (isRunning) return 'Agent 执行中...';
     if (!isConnected) return '连接终端后可用';
+    if (isOrchestrator) return '多机编排模式：描述跨主机任务，如"同步所有服务器时间"';
     return '描述需求，Agent 自动执行...';
   }
 

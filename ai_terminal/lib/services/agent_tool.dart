@@ -6,6 +6,8 @@ import 'command_executor.dart';
 import 'sftp_service.dart';
 import 'ssh_service.dart';
 import 'file_sync_service.dart';
+import 'multi_host_executor.dart';
+import 'agent_host_registry.dart';
 
 /// Agent 工具调用结果
 class ToolResult {
@@ -185,6 +187,9 @@ class SftpUploadTool extends AgentTool {
     } catch (e) {
       debugPrint('[SftpUploadTool] 上传失败: $e');
       return ToolResult.failure('上传失败: $e');
+    } finally {
+      // R2: 仅关闭 SFTP 子系统通道，不关闭借用的 SSHClient
+      sftp.closeSftpOnly();
     }
   }
 
@@ -301,17 +306,359 @@ class FileSyncTool extends AgentTool {
   }
 }
 
+/// 多机编排：在指定 host 上执行命令
+/// 仅在编排模式下可用
+class ExecOnTool extends AgentTool {
+  final MultiHostExecutor _executor;
+
+  ExecOnTool(this._executor);
+
+  @override
+  String get name => 'exec_on';
+
+  @override
+  String get description => '【多机编排】在指定主机上执行命令。用于跨主机调度操作。'
+      '仅在编排模式下可用；非编排模式请用普通 execute。';
+
+  @override
+  String get paramSpec => '{"hostId":"目标主机ID(必填)","command":"要执行的命令(必填)","timeout":"超时秒数(可选,默认60)"}';
+
+  @override
+  Future<ToolResult> execute({
+    required CommandExecutor executor,
+    required Map<String, dynamic> args,
+    void Function(String message)? onProgress,
+  }) async {
+    final hostId = args['hostId']?.toString() ?? '';
+    final command = args['command']?.toString() ?? '';
+    final timeoutSec = int.tryParse(args['timeout']?.toString() ?? '') ?? 60;
+
+    if (hostId.isEmpty || command.isEmpty) {
+      return ToolResult.failure('参数缺失: hostId 和 command 为必填项');
+    }
+
+    onProgress?.call('[$hostId] 执行: $command');
+    final result = await _executor.executeOn(
+      hostId,
+      command,
+      timeout: Duration(seconds: timeoutSec),
+    );
+
+    if (result == null) {
+      return ToolResult.failure('主机 $hostId 未连接或不存在');
+    }
+
+    final mark = result.success ? '✓' : '✗';
+    // R8: 截断输出，避免 MB 级日志注入对话历史
+    final output = _truncate(result.stdout, 2000);
+    final err = _truncate(result.stderr, 1000);
+    final summary = '[$hostId] $mark (exit=${result.exitCode})';
+    final detail = result.success
+        ? (output.isNotEmpty ? output : '(无输出)')
+        : 'stderr: $err';
+
+    if (result.success) {
+      return ToolResult.success('$summary\n$detail');
+    } else {
+      return ToolResult(
+        success: false,
+        output: '$summary\n$detail',
+        error: '主机 $hostId 命令失败 (exit=${result.exitCode})',
+      );
+    }
+  }
+
+  String _truncate(String s, int maxLen) {
+    if (s.length <= maxLen) return s;
+    return '${s.substring(0, maxLen)}...(${s.length} chars)';
+  }
+}
+
+/// 多机编排：批量执行同一命令到多台主机
+class ExecBatchTool extends AgentTool {
+  final MultiHostExecutor _executor;
+
+  ExecBatchTool(this._executor);
+
+  @override
+  String get name => 'exec_batch';
+
+  @override
+  String get description => '【多机编排】批量执行同一命令到多台主机（串行）。'
+      '适用于时间同步、日志清理、配置检查等批量运维场景。'
+      '一台失败不影响其他主机（除非 stopOnFailure=true）。';
+
+  @override
+  String get paramSpec => '{"hostIds":"主机ID列表(必填,逗号分隔,如web1,web2,db1)","command":"要执行的命令(必填)","timeout":"超时秒数(可选,默认60)","stopOnFailure":"某台失败是否停止后续(true/false,默认false)"}';
+
+  @override
+  Future<ToolResult> execute({
+    required CommandExecutor executor,
+    required Map<String, dynamic> args,
+    void Function(String message)? onProgress,
+  }) async {
+    final hostIdsStr = args['hostIds']?.toString() ?? '';
+    final command = args['command']?.toString() ?? '';
+    final timeoutSec = int.tryParse(args['timeout']?.toString() ?? '') ?? 60;
+    final stopOnFailure = args['stopOnFailure'] == true || args['stopOnFailure'] == 'true';
+
+    if (hostIdsStr.isEmpty || command.isEmpty) {
+      return ToolResult.failure('参数缺失: hostIds 和 command 为必填项');
+    }
+
+    final hostIds = hostIdsStr.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+    if (hostIds.isEmpty) {
+      return ToolResult.failure('hostIds 解析后为空');
+    }
+
+    onProgress?.call('批量执行: $command → ${hostIds.length} 台主机');
+    final results = await _executor.executeBatch(
+      hostIds,
+      command,
+      timeout: Duration(seconds: timeoutSec),
+      stopOnFailure: stopOnFailure,
+    );
+
+    final summary = MultiHostExecutor.formatBatchResult(command, results);
+    final allSuccess = results.values.every((r) => r.success);
+    if (allSuccess) {
+      return ToolResult.success(summary);
+    } else {
+      final failedCount = results.values.where((r) => !r.success).length;
+      return ToolResult(
+        success: false,
+        output: summary,
+        error: '$failedCount/${hostIds.length} 台主机执行失败',
+      );
+    }
+  }
+}
+
+/// 多机编排：跨机连通性测试
+class CheckConnectivityTool extends AgentTool {
+  final MultiHostExecutor _executor;
+
+  CheckConnectivityTool(this._executor);
+
+  @override
+  String get name => 'check_connectivity';
+
+  @override
+  String get description => '【多机编排】从一台主机测试到目标主机的端口连通性。'
+      '用于部署前验证网络依赖（如 web→db:3306、web→redis:6379）。'
+      '源主机必须是已连接的编排参与者。';
+
+  @override
+  String get paramSpec => '{"fromHostId":"源主机ID(必填,命令从这台机执行)","targetHost":"目标主机IP或域名(必填)","port":"目标端口(必填)","timeout":"超时秒数(可选,默认5)"}';
+
+  @override
+  Future<ToolResult> execute({
+    required CommandExecutor executor,
+    required Map<String, dynamic> args,
+    void Function(String message)? onProgress,
+  }) async {
+    final fromHostId = args['fromHostId']?.toString() ?? '';
+    final targetHost = args['targetHost']?.toString() ?? '';
+    final port = int.tryParse(args['port']?.toString() ?? '') ?? 0;
+    final timeoutSec = int.tryParse(args['timeout']?.toString() ?? '') ?? 5;
+
+    if (fromHostId.isEmpty || targetHost.isEmpty || port <= 0) {
+      return ToolResult.failure('参数缺失或无效: fromHostId、targetHost、port(正整数) 为必填项');
+    }
+
+    onProgress?.call('[$fromHostId → $targetHost:$port] 测试连通性...');
+    final result = await _executor.checkConnectivity(
+      fromHostId: fromHostId,
+      targetHost: targetHost,
+      port: port,
+      timeout: Duration(seconds: timeoutSec),
+    );
+
+    if (result.reachable) {
+      return ToolResult.success(result.summary);
+    } else {
+      return ToolResult(
+        success: false,
+        output: result.summary,
+        error: result.detail ?? '不可达',
+      );
+    }
+  }
+}
+
+/// 多机编排：跨机上传文件/目录到指定主机
+/// 复用 SftpService，但通过 hostId 路由到目标主机的 SSHClient
+class UploadToTool extends AgentTool {
+  final MultiHostExecutor _executor;
+
+  UploadToTool(this._executor);
+
+  @override
+  String get name => 'upload_to';
+
+  @override
+  String get description => '【多机编排】上传本地文件或目录到指定主机的远程目录。'
+      '用于跨机部署（如把构建产物传到不同服务器）。'
+      '目录上传语义同 sftp_upload：把 local 目录放到 remote 下，自动创建 basename(local) 子目录。';
+
+  @override
+  String get paramSpec => '{"hostId":"目标主机ID(必填)","local":"本地文件/目录绝对路径(必填)","remote":"远程目标父目录(必填,目录上传时自动在其下创建basename子目录)","recursive":"是否递归上传目录(true/false,默认false)","exclude":"排除项(可选,如node_modules,.git)"}';
+
+  @override
+  Future<ToolResult> execute({
+    required CommandExecutor executor,
+    required Map<String, dynamic> args,
+    void Function(String message)? onProgress,
+  }) async {
+    final hostId = args['hostId']?.toString() ?? '';
+    final local = args['local']?.toString() ?? '';
+    final remote = args['remote']?.toString() ?? '';
+    final recursive = args['recursive'] == true || args['recursive'] == 'true';
+    final excludeRaw = args['exclude'];
+
+    if (hostId.isEmpty || local.isEmpty || remote.isEmpty) {
+      return ToolResult.failure('参数缺失: hostId、local、remote 为必填项');
+    }
+
+    // 通过 hostId 获取目标主机的 executor（必须是 SSHService 才能开 SFTP）
+    final targetExecutor = _executor.executorFor(hostId);
+    if (targetExecutor == null) {
+      return ToolResult.failure('主机 $hostId 未连接或不存在');
+    }
+    if (targetExecutor is! SSHService) {
+      return ToolResult.failure('主机 $hostId 不是 SSH 远程会话，无法 SFTP 上传');
+    }
+    // R1: 捕获 client 到局部变量，避免 await 期间连接断开导致的 TOCTOU 空指针
+    final client = targetExecutor.client;
+    if (client == null) {
+      return ToolResult.failure('主机 $hostId 的 SSH 连接未建立');
+    }
+
+    // 校验本地路径
+    bool isDir;
+    final dir = Directory(local);
+    final file = File(local);
+    if (await dir.exists()) {
+      isDir = true;
+    } else if (await file.exists()) {
+      isDir = false;
+    } else {
+      return ToolResult.failure('本地路径不存在: $local');
+    }
+    if (isDir && !recursive) {
+      return ToolResult.failure('本地路径是目录，请设置 recursive=true 以递归上传');
+    }
+
+    List<String> excludeNames = ['node_modules', '.git', '.DS_Store'];
+    if (excludeRaw != null) {
+      if (excludeRaw is List) {
+        excludeNames = excludeRaw.map((e) => e.toString()).toList();
+      } else if (excludeRaw is String) {
+        excludeNames = excludeRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+      }
+    }
+
+    onProgress?.call('[$hostId] 正在打开 SFTP 子系统...');
+    final sftp = SftpService();
+    try {
+      await sftp.attachToClient(client);
+    } catch (e) {
+      return ToolResult.failure('[$hostId] SFTP 连接失败: $e');
+    }
+
+    try {
+      if (!isDir) {
+        onProgress?.call('[$hostId] 正在上传文件: ${p.basename(local)}');
+        final remoteParent = p.posix.dirname(remote);
+        if (remoteParent.isNotEmpty && remoteParent != '.') {
+          await sftp.createDirectory(remoteParent);
+        }
+        await sftp.uploadFile(local, remote);
+        final size = await file.length();
+        onProgress?.call('[$hostId] 上传完成');
+        return ToolResult.success(
+          '[$hostId] 文件上传成功: $local → $remote (${_formatSize(size)})',
+        );
+      } else {
+        final baseName = p.basename(local);
+        String effectiveRemote = remote;
+        if (p.posix.basename(remote) != baseName) {
+          effectiveRemote = p.posix.join(remote, baseName);
+        }
+        onProgress?.call('[$hostId] 正在递归上传目录: $local → $effectiveRemote');
+        final result = await sftp.uploadDirectory(
+          local,
+          effectiveRemote,
+          excludeNames: excludeNames,
+          onProgress: (uploaded, total) {
+            onProgress?.call('[$hostId] 上传进度: $uploaded/$total 文件');
+          },
+        );
+        if (result.allSuccess) {
+          return ToolResult.success(
+            '[$hostId] ${result.summary}\n目标路径: $effectiveRemote',
+          );
+        } else {
+          return ToolResult(
+            success: false,
+            output: '[$hostId] ${result.summary}\n目标路径: $effectiveRemote',
+            error: '${result.failedFiles.length} 个文件上传失败',
+          );
+        }
+      }
+    } catch (e) {
+      return ToolResult.failure('[$hostId] 上传失败: $e');
+    } finally {
+      // R2: 仅关闭 SFTP 子系统通道，不关闭借用的 SSHClient
+      sftp.closeSftpOnly();
+    }
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+  }
+}
+
 /// Agent 工具注册表 — 管理所有可用的工具
 class AgentToolRegistry {
   final Map<String, AgentTool> _tools = {};
   /// 文件同步服务实例（由 registry 持有，工具共享）
   final FileSyncService fileSyncService = FileSyncService();
+  /// 多机执行器实例（编排模式用）
+  MultiHostExecutor? _multiHostExecutor;
 
   AgentToolRegistry() {
     // 注册默认工具
     register(SftpUploadTool());
     register(FileSyncTool(fileSyncService));
   }
+
+  /// 启用编排模式：注册多机编排工具
+  /// [registry] 来自 AgentNotifier，可访问所有 host 的 executor
+  void enableOrchestrator(AgentHostRegistry registry) {
+    if (_multiHostExecutor != null) return; // 已启用
+    _multiHostExecutor = MultiHostExecutor(registry);
+    register(ExecOnTool(_multiHostExecutor!));
+    register(ExecBatchTool(_multiHostExecutor!));
+    register(CheckConnectivityTool(_multiHostExecutor!));
+    register(UploadToTool(_multiHostExecutor!));
+  }
+
+  /// 禁用编排模式：注销多机编排工具
+  void disableOrchestrator() {
+    _multiHostExecutor = null;
+    _tools.remove('exec_on');
+    _tools.remove('exec_batch');
+    _tools.remove('check_connectivity');
+    _tools.remove('upload_to');
+  }
+
+  bool get isOrchestratorEnabled => _multiHostExecutor != null;
+
+  MultiHostExecutor? get multiHostExecutor => _multiHostExecutor;
 
   void register(AgentTool tool) {
     _tools[tool.name] = tool;

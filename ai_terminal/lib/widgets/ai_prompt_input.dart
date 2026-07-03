@@ -28,6 +28,10 @@ class AIPromptInput extends StatefulWidget {
   final AIModelConfig? modelConfig;
   /// 补全上下文（如当前主机信息，可为空）
   final String? completionContext;
+  /// 是否处于多机编排模式
+  final bool isOrchestratorMode;
+  /// 切换编排模式回调
+  final VoidCallback? onToggleOrchestrator;
 
   const AIPromptInput({
     super.key,
@@ -43,6 +47,8 @@ class AIPromptInput extends StatefulWidget {
     this.onSlashCommand,
     this.modelConfig,
     this.completionContext,
+    this.isOrchestratorMode = false,
+    this.onToggleOrchestrator,
   });
 
   @override
@@ -446,38 +452,71 @@ class _AIPromptInputState extends State<AIPromptInput> {
           ),
           suffixIcon: Padding(
             padding: const EdgeInsets.all(4),
-            child: GestureDetector(
-              onTap: running
-                  ? widget.onStop
-                  : (widget.enabled ? _send : null),
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  // 运行中：外圆红色背景；空闲：accent 色
-                  color: running
-                      ? cDanger.withValues(alpha: 0.9)
-                      : (widget.enabled ? widget.accentColor : cTextMuted),
-                  borderRadius: BorderRadius.circular(rSmall),
-                ),
-                child: running
-                    ? // 外圆内方：外层圆形容器 + 内层白色方块
-                      Center(
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 多机编排模式切换按钮
+                if (widget.onToggleOrchestrator != null)
+                  GestureDetector(
+                    onTap: widget.onToggleOrchestrator,
+                    child: Tooltip(
+                      message: widget.isOrchestratorMode ? '退出编排模式' : '进入多机编排模式',
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        margin: const EdgeInsets.only(right: 4),
+                        decoration: BoxDecoration(
+                          color: widget.isOrchestratorMode
+                              ? cWarning.withValues(alpha: 0.9)
+                              : tc.surface,
+                          border: widget.isOrchestratorMode
+                              ? null
+                              : Border.all(color: tc.border.withValues(alpha: 0.5)),
+                          borderRadius: BorderRadius.circular(rSmall),
                         ),
-                      )
-                    : const Icon(
-                        Icons.arrow_upward_rounded,
-                        color: Colors.white,
-                        size: 18,
+                        child: Icon(
+                          Icons.hub_outlined,
+                          color: widget.isOrchestratorMode ? Colors.white : tc.textMuted,
+                          size: 18,
+                        ),
                       ),
-              ),
+                    ),
+                  ),
+                // 发送/终止按钮
+                GestureDetector(
+                  onTap: running
+                      ? widget.onStop
+                      : (widget.enabled ? _send : null),
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      // 运行中：外圆红色背景；空闲：accent 色
+                      color: running
+                          ? cDanger.withValues(alpha: 0.9)
+                          : (widget.enabled ? widget.accentColor : cTextMuted),
+                      borderRadius: BorderRadius.circular(rSmall),
+                    ),
+                    child: running
+                        ? // 外圆内方：外层圆形容器 + 内层白色方块
+                          Center(
+                            child: Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                          )
+                        : const Icon(
+                            Icons.arrow_upward_rounded,
+                            color: Colors.white,
+                            size: 18,
+                          ),
+                  ),
+                ),
+              ],
             ),
           ),
         ),

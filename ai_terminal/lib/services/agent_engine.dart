@@ -14,6 +14,7 @@ import '../services/ssh_service.dart';
 import '../services/command_executor.dart';
 import '../services/knowledge_service.dart';
 import 'agent_tool.dart';
+import 'agent_host_registry.dart' as agent_host_registry;
 import 'agent_logger.dart';
 export 'agent_logger.dart';
 import '../core/safety_guard.dart';
@@ -98,10 +99,18 @@ class AgentEngine {
   /// 工具注册表 — 管理 AI 可调用的非 shell 工具（如 SFTP 上传）
   final AgentToolRegistry _tools = AgentToolRegistry();
 
+  /// 多机编排模式开关
+  bool _orchestratorMode = false;
+
+  bool get isOrchestratorMode => _orchestratorMode;
+
   /// R2: 清理工具持有的资源（文件同步的 watcher/timer 等）
   /// 在 agent_provider dispose 时调用
   void disposeTools() {
     _tools.fileSyncService.dispose();
+    // 同步重置编排标志，避免 _orchestratorMode 与 _tools.multiHostExecutor 不一致
+    _orchestratorMode = false;
+    _tools.disableOrchestrator();
   }
 
   /// 对话历史最大轮数（每轮 = assistant + user），超出时裁剪最早的轮次
@@ -1667,6 +1676,12 @@ class AgentEngine {
       buffer.writeln(toolsPrompt);
     }
 
+    // 多机编排模式注入
+    if (_orchestratorMode && _tools.multiHostExecutor != null) {
+      buffer.writeln();
+      buffer.writeln(_buildOrchestratorPrompt());
+    }
+
     // 早期对话摘要（压缩后产生，帮助 AI 回顾早期对话）
     if (_conversationSummary != null && _conversationSummary!.isNotEmpty) {
       buffer.writeln();
@@ -1689,6 +1704,68 @@ class AgentEngine {
     if (memory.isNotEmpty) buffer.writeln('\n$memory');
 
     return buffer.toString();
+  }
+
+  /// 构建多机编排模式 system prompt 段落
+  String _buildOrchestratorPrompt() {
+    final executor = _tools.multiHostExecutor!;
+    final hostList = executor.buildHostListText();
+    return '''【多机编排模式】
+你正在多机编排模式下工作，需要跨多台主机调度操作。
+
+【可用主机清单】
+$hostList
+
+【编排规则】
+1. 跨主机执行命令必须用工具调用，不要用普通 execute：
+   动作: tool
+   工具: exec_on
+   参数: {"hostId":"web1","command":"systemctl status nginx","timeout":"30"}
+
+2. 批量执行同一命令到多机（如时间同步、日志清理）：
+   动作: tool
+   工具: exec_batch
+   参数: {"hostIds":"web1,web2,db1","command":"ntpdate ntp.aliyun.com","stopOnFailure":"false"}
+
+3. 跨机连通性测试（部署前验证网络依赖）：
+   动作: tool
+   工具: check_connectivity
+   参数: {"fromHostId":"web1","targetHost":"192.168.1.20","port":"3306"}
+
+4. 跨机上传文件/目录到指定主机（部署构建产物等）：
+   动作: tool
+   工具: upload_to
+   参数: {"hostId":"web1","local":"/path/to/dist","remote":"/var/www","recursive":"true"}
+
+5. 高风险操作（restart/stop/修改配置/删除）必须先用 ask 询问用户确认
+6. 一台主机失败时，用 ask 询问用户选择：中止/跳过该台继续/重试
+7. 不要假设主机间网络互通，关键依赖（如 web→db）必须用 check_connectivity 验证
+8. 普通 execute 命令仍可用，但只在当前活跃主机执行，不跨主机
+9. 部署类任务建议分阶段：规划 → 用 ask 确认矩阵 → 执行 → 验证连通性''';
+  }
+
+  /// 启用多机编排模式
+  /// [registry] 来自 AgentNotifier，提供对所有 host executor 的访问
+  void enableOrchestrator(agent_host_registry.AgentHostRegistry registry) {
+    if (_orchestratorMode) return;
+    _orchestratorMode = true;
+    _tools.enableOrchestrator(registry);
+    // 强制下次 startTask 重建 system prompt
+    _invalidateSystemPromptCache();
+  }
+
+  /// 禁用多机编排模式
+  void disableOrchestrator() {
+    if (!_orchestratorMode) return;
+    _orchestratorMode = false;
+    _tools.disableOrchestrator();
+    _invalidateSystemPromptCache();
+  }
+
+  /// 使 system prompt 缓存失效（下次 startTask 重建）
+  void _invalidateSystemPromptCache() {
+    // 清空对话历史中的 system 消息，强制重建
+    _conversationHistory.removeWhere((m) => m.role == 'system');
   }
 
   String? _getCustomPrompt() {

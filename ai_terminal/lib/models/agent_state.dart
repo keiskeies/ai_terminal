@@ -19,6 +19,8 @@ class AgentState {
   final String? summary;
   /// 是否正在压缩
   final bool isCompacting;
+  /// 是否处于多机编排模式
+  final bool isOrchestratorMode;
 
   AgentState({
     this.status = AgentStatus.idle,
@@ -33,6 +35,7 @@ class AgentState {
     this.conversationId,
     this.summary,
     this.isCompacting = false,
+    this.isOrchestratorMode = false,
   })  : chatItems = chatItems ?? [],
         pendingOptions = pendingOptions ?? [];
 
@@ -60,6 +63,7 @@ class AgentState {
     bool clearConversationId = false,
     bool clearSummary = false,
     bool clearError = false,
+    bool? isOrchestratorMode,
   }) {
     return AgentState(
       status: status ?? this.status,
@@ -74,6 +78,7 @@ class AgentState {
       conversationId: clearConversationId ? null : (conversationId ?? this.conversationId),
       summary: clearSummary ? null : (summary ?? this.summary),
       isCompacting: isCompacting ?? this.isCompacting,
+      isOrchestratorMode: isOrchestratorMode ?? this.isOrchestratorMode,
     );
   }
 

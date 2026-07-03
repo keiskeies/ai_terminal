@@ -407,4 +407,15 @@ class SftpService {
     _jumpClient = null;
     _jumpSocket = null;
   }
+
+  /// 仅关闭 SFTP 子系统通道，不关闭借用的 SSHClient
+  /// 用于 agent 工具（SftpUploadTool/UploadToTool）场景：
+  /// SSHClient 是从 SSHService 借用的，不能在此关闭，否则会断开宿主 SSH 连接
+  void closeSftpOnly() {
+    _isConnected = false;
+    _sftp?.close();
+    _sftp = null;
+    // 不关闭 _client（借用自 SSHService）
+    _client = null;
+  }
 }
