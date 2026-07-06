@@ -6,59 +6,68 @@ enum SafetyLevel {
   blocked, // 直接拦截（不可逆操作）
 }
 
+/// 安全规则：正则模式 + 人类可读的风险说明
+class _SafetyRule {
+  final RegExp pattern;
+  final String reason;
+  const _SafetyRule(this.pattern, this.reason);
+}
+
 class SafetyGuard {
   /// 静态缓存，避免对同一条命令重复正则匹配
   static final Map<String, SafetyLevel> _cache = {};
+  /// 缓存命中的风险说明（含 null，表示已查过但未命中），避免重复匹配
+  static final Map<String, String?> _reasonCache = {};
 
-  // 直接拦截的命令模式
-  static final List<RegExp> _blockPatterns = [
-    RegExp(r'^rm\s+-rf\s+/\s*$'),
-    RegExp(r'^rm\s+-rf\s+\/\*?\s*$'),
-    RegExp(r'^dd\s+if=.*of=/dev/'),
-    RegExp(r'^:\(\)\{\s*:\|\:&\s*\};:', caseSensitive: false),
-    RegExp(r'chmod\s+-R\s+777\s+/'),
-    RegExp(r'^init\s+0\s*$'),
-    RegExp(r'^shutdown\s+-h\s+now'),
-    RegExp(r'^rm\s+-rf\s+/etc/'),
-    RegExp(r'^rm\s+-rf\s+/boot/'),
-    RegExp(r'^rm\s+-rf\s+~'),
-    RegExp(r'^mkfs\.'),
-    RegExp(r'^>\s*/etc/'),
+  // 直接拦截的命令模式（不可逆操作）
+  static final List<_SafetyRule> _blockRules = [
+    _SafetyRule(RegExp(r'^rm\s+-rf\s+/\s*$'), '递归删除根目录，将清空整个文件系统，完全不可恢复'),
+    _SafetyRule(RegExp(r'^rm\s+-rf\s+\/\*?\s*$'), '递归删除根目录下所有内容，将清空整个文件系统，完全不可恢复'),
+    _SafetyRule(RegExp(r'^dd\s+if=.*of=/dev/'), '直接写入块设备，将覆盖目标磁盘所有数据，不可恢复'),
+    _SafetyRule(RegExp(r'^:\(\)\{\s*:\|\:&\s*\};:', caseSensitive: false), 'Fork 炸弹，将瞬间耗尽系统进程资源导致系统崩溃'),
+    _SafetyRule(RegExp(r'chmod\s+-R\s+777\s+/'), '递归修改根目录权限为 777，将破坏所有文件权限，系统将无法正常运行'),
+    _SafetyRule(RegExp(r'^init\s+0\s*$'), '立即关机，所有未保存数据将丢失'),
+    _SafetyRule(RegExp(r'^shutdown\s+-h\s+now'), '立即关机，所有未保存数据将丢失'),
+    _SafetyRule(RegExp(r'^rm\s+-rf\s+/etc/'), '删除 /etc 配置目录，系统将无法启动和运行'),
+    _SafetyRule(RegExp(r'^rm\s+-rf\s+/boot/'), '删除 /boot 启动目录，系统将无法启动'),
+    _SafetyRule(RegExp(r'^rm\s+-rf\s+~'), '递归删除用户主目录，所有用户数据将丢失'),
+    _SafetyRule(RegExp(r'^mkfs\.'), '格式化磁盘，目标分区所有数据将被擦除，不可恢复'),
+    _SafetyRule(RegExp(r'^>\s*/etc/'), '清空系统配置文件，相关服务将无法运行'),
   ];
 
   // 需二次确认的命令模式（高风险修改操作）
-  static final List<RegExp> _warnPatterns = [
+  static final List<_SafetyRule> _warnRules = [
     // 系统级操作
-    RegExp(r'^sudo\s+(reboot|shutdown|halt|poweroff|init\s+)'),
-    RegExp(r'^systemctl\s+(stop|disable)\s+ssh'),
-    RegExp(r'^(iptables|firewall-cmd|ufw).*(-F|--flush|--delete-chain)'),
-    RegExp(r'^fdisk\s+/'),
-    RegExp(r'^mkfs\.(ext4|xfs|btrfs)\s+/dev/'),
-    RegExp(r'^dd\s+if=.*of=/dev/'),
-    RegExp(r'^rm\s+-rf\s+/'),
+    _SafetyRule(RegExp(r'^sudo\s+(reboot|shutdown|halt|poweroff|init\s+)'), '关机/重启服务器，所有运行中的进程将终止，未保存数据丢失'),
+    _SafetyRule(RegExp(r'^systemctl\s+(stop|disable)\s+ssh'), '停止/禁用 SSH 服务，将断开所有远程连接，可能导致无法再次远程登录'),
+    _SafetyRule(RegExp(r'^(iptables|firewall-cmd|ufw).*(-F|--flush|--delete-chain)'), '清空防火墙规则，将影响网络安全策略'),
+    _SafetyRule(RegExp(r'^fdisk\s+/'), '分区操作，错误的分区表修改可能导致磁盘数据丢失'),
+    _SafetyRule(RegExp(r'^mkfs\.(ext4|xfs|btrfs)\s+/dev/'), '格式化分区为文件系统，目标分区所有数据将被擦除'),
+    _SafetyRule(RegExp(r'^dd\s+if=.*of=/dev/'), '直接写入块设备，将覆盖目标磁盘数据'),
+    _SafetyRule(RegExp(r'^rm\s+-rf\s+/'), '递归删除系统目录，可能影响系统运行，不可恢复'),
     // 安装/升级/替换软件包
-    RegExp(r'^sudo\s+(apt|apt-get)\s+(install|upgrade|dist-upgrade|remove|purge)\s+'),
-    RegExp(r'^sudo\s+yum\s+(install|update|remove|erase)\s+'),
-    RegExp(r'^sudo\s+dnf\s+(install|upgrade|remove)\s+'),
-    RegExp(r'^sudo\s+apk\s+add\s+'),
-    RegExp(r'^sudo\s+pacman\s+-S\s+'),
-    RegExp(r'^sudo\s+snap\s+install\s+'),
+    _SafetyRule(RegExp(r'^sudo\s+(apt|apt-get)\s+(install|upgrade|dist-upgrade|remove|purge)\s+'), '安装/升级/卸载软件包，可能改变系统依赖关系，影响其他服务'),
+    _SafetyRule(RegExp(r'^sudo\s+yum\s+(install|update|remove|erase)\s+'), '安装/更新/卸载软件包，可能改变系统依赖关系'),
+    _SafetyRule(RegExp(r'^sudo\s+dnf\s+(install|upgrade|remove)\s+'), '安装/升级/卸载软件包，可能改变系统依赖关系'),
+    _SafetyRule(RegExp(r'^sudo\s+apk\s+add\s+'), '安装软件包，可能改变系统配置'),
+    _SafetyRule(RegExp(r'^sudo\s+pacman\s+-S\s+'), '安装软件包，可能改变系统依赖关系'),
+    _SafetyRule(RegExp(r'^sudo\s+snap\s+install\s+'), '安装 Snap 软件包'),
     // 修改环境配置
-    RegExp(r'(>>|>)\s*(/etc/profile|/etc/environment|/etc/bashrc|~/\.bashrc|~/\.zshrc|~/\.bash_profile|~/\.profile)\s*$'),
-    RegExp(r'^sudo\s+(tee|sed|echo.*>)\s+.*(/etc/profile|/etc/environment|/etc/bashrc)\s*$'),
+    _SafetyRule(RegExp(r'(>>|>)\s*(/etc/profile|/etc/environment|/etc/bashrc|~/\.bashrc|~/\.zshrc|~/\.bash_profile|~/\.profile)\s*$'), '修改 Shell 环境配置文件，可能影响所有用户的登录环境'),
+    _SafetyRule(RegExp(r'^sudo\s+(tee|sed|echo.*>)\s+.*(/etc/profile|/etc/environment|/etc/bashrc)\s*$'), '修改系统级环境配置文件，可能影响所有用户'),
     // alternatives/update-alternatives
-    RegExp(r'^sudo\s+update-alternatives\s+--set\s+'),
-    RegExp(r'^sudo\s+alternatives\s+--set\s+'),
+    _SafetyRule(RegExp(r'^sudo\s+update-alternatives\s+--set\s+'), '修改系统默认程序指向，影响相关命令的默认版本'),
+    _SafetyRule(RegExp(r'^sudo\s+alternatives\s+--set\s+'), '修改系统默认程序指向'),
     // 卸载操作
-    RegExp(r'^sudo\s+(apt|apt-get)\s+(remove|purge|autoremove)\s+'),
-    RegExp(r'^sudo\s+yum\s+remove\s+'),
-    RegExp(r'^sudo\s+dnf\s+remove\s+'),
-    RegExp(r'^sudo\s+pacman\s+-R\s+'),
+    _SafetyRule(RegExp(r'^sudo\s+(apt|apt-get)\s+(remove|purge|autoremove)\s+'), '卸载软件包，依赖该包的其他服务可能无法运行；purge 会同时删除配置文件'),
+    _SafetyRule(RegExp(r'^sudo\s+yum\s+remove\s+'), '卸载软件包，依赖该包的其他服务可能无法运行'),
+    _SafetyRule(RegExp(r'^sudo\s+dnf\s+remove\s+'), '卸载软件包，依赖该包的其他服务可能无法运行'),
+    _SafetyRule(RegExp(r'^sudo\s+pacman\s+-R\s+'), '卸载软件包，依赖该包的其他服务可能无法运行'),
     // 源码编译安装
-    RegExp(r'^sudo\s+make\s+install'),
+    _SafetyRule(RegExp(r'^sudo\s+make\s+install'), '源码编译安装到系统目录，可能覆盖系统已有的同名程序'),
     // 覆盖写入系统文件
-    RegExp(r'^sudo\s+cp\s+.*\s+/etc/'),
-    RegExp(r'^sudo\s+mv\s+.*\s+/etc/'),
+    _SafetyRule(RegExp(r'^sudo\s+cp\s+.*\s+/etc/'), '复制文件到系统配置目录，可能覆盖现有配置'),
+    _SafetyRule(RegExp(r'^sudo\s+mv\s+.*\s+/etc/'), '移动文件到系统配置目录，可能覆盖现有配置'),
   ];
 
   // 仅高亮提示的命令模式
@@ -92,9 +101,8 @@ class SafetyGuard {
     return result;
   }
 
-  /// 内部检查逻辑：对完整命令的所有子命令分别检查
+  /// 内部检查逻辑：对完整命令的所有子命令分别检查，取最高危险等级
   static SafetyLevel _checkInternal(String command) {
-    // 拆分链式命令，对每个子命令分别检查，取最高危险等级
     final subCommands = _splitCommands(command);
     var maxLevel = SafetyLevel.safe;
 
@@ -115,13 +123,13 @@ class SafetyGuard {
 
   /// 检查单条命令（不含链式操作符）
   static SafetyLevel _checkSingle(String command) {
-    for (final pattern in _blockPatterns) {
-      if (pattern.hasMatch(command)) {
+    for (final rule in _blockRules) {
+      if (rule.pattern.hasMatch(command)) {
         return SafetyLevel.blocked;
       }
     }
-    for (final pattern in _warnPatterns) {
-      if (pattern.hasMatch(command)) {
+    for (final rule in _warnRules) {
+      if (rule.pattern.hasMatch(command)) {
         return SafetyLevel.warn;
       }
     }
@@ -131,6 +139,41 @@ class SafetyGuard {
       }
     }
     return SafetyLevel.safe;
+  }
+
+  /// 获取命令的风险说明（人类可读的具体原因）
+  /// 返回命中的第一条规则的说明；未命中返回 null
+  static String? getReason(String command) {
+    if (_reasonCache.containsKey(command)) {
+      return _reasonCache[command];
+    }
+    String? reason;
+    final subCommands = _splitCommands(command);
+    for (final sub in subCommands) {
+      final cleaned = _removeComments(sub).trim();
+      if (cleaned.isEmpty) continue;
+      // 先查 block 规则
+      for (final rule in _blockRules) {
+        if (rule.pattern.hasMatch(cleaned)) {
+          reason = rule.reason;
+          break;
+        }
+      }
+      if (reason != null) break;
+      // 再查 warn 规则
+      for (final rule in _warnRules) {
+        if (rule.pattern.hasMatch(cleaned)) {
+          reason = rule.reason;
+          break;
+        }
+      }
+      if (reason != null) break;
+    }
+    _reasonCache[command] = reason;
+    if (_reasonCache.length > 500) {
+      _reasonCache.remove(_reasonCache.keys.first);
+    }
+    return reason;
   }
 
   /// 拆分链式命令：按 && || ; | 分割，返回所有子命令
@@ -167,7 +210,7 @@ class SafetyGuard {
     return order.indexOf(a) - order.indexOf(b);
   }
 
-  /// 获取提示文案
+  /// 获取提示文案（简短，用于状态标签）
   static String getTip(SafetyLevel level) {
     switch (level) {
       case SafetyLevel.safe:

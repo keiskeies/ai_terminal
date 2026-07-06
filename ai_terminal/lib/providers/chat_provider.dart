@@ -5,6 +5,7 @@ import '../models/ai_model_config.dart';
 import '../services/ai_service.dart';
 import '../services/conversation_service.dart';
 import '../core/hive_init.dart';
+import '../core/credentials_store.dart';
 import '../utils/ansi_stripper.dart';
 
 /// 流式更新节流间隔（毫秒）
@@ -146,7 +147,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
 
     final effectiveHostId = hostId ?? _activeHostId ?? 'local';
 
-    final model = config ?? _getDefaultModel();
+    final model = config ?? await _getDefaultModel();
     if (model == null) {
       state = state.copyWith(error: '请先配置 AI 模型');
       return;
@@ -296,18 +297,28 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
   }
 
-  AIModelConfig? _getDefaultModel() {
+  /// 获取默认模型，并从 CredentialsStore 注入 apiKey
+  /// （Hive 中 apiKey 为空占位，真实 key 存于安全存储）
+  Future<AIModelConfig?> _getDefaultModel() async {
+    AIModelConfig? model;
     try {
-      return HiveInit.aiModelsBox.values.firstWhere((m) => m.isDefault);
+      model = HiveInit.aiModelsBox.values.firstWhere((m) => m.isDefault);
     } catch (_) {
       try {
-        return HiveInit.aiModelsBox.values.isNotEmpty
+        model = HiveInit.aiModelsBox.values.isNotEmpty
             ? HiveInit.aiModelsBox.values.first
             : null;
       } catch (_) {
-        return null;
+        model = null;
       }
     }
+    if (model != null && model.apiKey.isEmpty) {
+      final storedKey = await CredentialsStore.get(hostId: model.id, type: 'apiKey');
+      if (storedKey != null) {
+        model.apiKey = storedKey;
+      }
+    }
+    return model;
   }
 
   String? _getHostContext(String hostId) {

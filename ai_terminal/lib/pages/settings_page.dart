@@ -105,7 +105,7 @@ class SettingsPage extends ConsumerWidget {
                 icon: Icons.info,
                 iconColor: cPrimary,
                 title: '关于 AI Terminal',
-                subtitle: '版本 1.3.3',
+                subtitle: '版本 1.3.4',
                 trailing: TextButton(
                   onPressed: () => _checkForUpdate(context),
                   child: const Text('检查更新'),

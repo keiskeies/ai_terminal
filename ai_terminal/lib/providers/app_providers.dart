@@ -66,11 +66,11 @@ class AIModelsNotifier extends StateNotifier<List<AIModelConfig>> {
     loadModels();
   }
 
-  void loadModels() {
+  Future<void> loadModels() async {
     final models = HiveInit.aiModelsBox.values.toList();
     // 异步从 CredentialsStore 注入 apiKey（Hive 中只存空占位）
-    // 不阻塞 UI，注入完成后 state 会自动刷新（调用方在 await 后再 loadModels 一次）
-    _injectApiKeys(models);
+    // 必须 await：否则 state 在 apiKey 注入完成前就被设置，导致重启后 apiKey 为空
+    await _injectApiKeys(models);
     state = models;
   }
 
@@ -119,7 +119,7 @@ class AIModelsNotifier extends StateNotifier<List<AIModelConfig>> {
       await CredentialsStore.save(hostId: config.id, type: 'apiKey', value: apiKey);
       config.apiKey = apiKey; // 内存中保留供当前会话使用
     }
-    loadModels();
+    await loadModels();
   }
 
   Future<void> updateModel(AIModelConfig config) async {
@@ -137,7 +137,7 @@ class AIModelsNotifier extends StateNotifier<List<AIModelConfig>> {
     await HiveInit.aiModelsBox.put(config.id, config);
     await CredentialsStore.save(hostId: config.id, type: 'apiKey', value: apiKey);
     config.apiKey = apiKey;
-    loadModels();
+    await loadModels();
   }
 
   Future<void> deleteModel(String id) async {
@@ -148,7 +148,7 @@ class AIModelsNotifier extends StateNotifier<List<AIModelConfig>> {
       final first = state.first.copyWith(isDefault: true);
       await HiveInit.aiModelsBox.put(first.id, first);
     }
-    loadModels();
+    await loadModels();
   }
 }
 

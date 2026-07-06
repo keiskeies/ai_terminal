@@ -95,8 +95,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   StreamSubscription<String>? _tabOutputSubscription; // 终端输出订阅（需随 tab 切换而取消/重建）
   bool _agentInitialized = false;
   AIModelConfig? _currentModelConfig;
-  /// 智能补全上下文（当前主机信息）
-  String? _completionContext;
 
   // 终端设置
   double _terminalFontSize = 14; // P0-3: 默认终端字号从 13 改为 14
@@ -190,7 +188,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   Future<void> _initAgent() async {
-    final models = HiveInit.aiModelsBox.values.toList();
+    // 确保 provider 完成从 CredentialsStore 注入 apiKey（重启后 apiKey 来自安全存储）
+    await ref.read(aiModelsProvider.notifier).loadModels();
+    final models = ref.read(aiModelsProvider);
     if (models.isNotEmpty) {
       final defaultModel = models.firstWhere(
         (m) => m.isDefault,
@@ -524,11 +524,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     final activeTab = terminalState.activeTab;
 
     final tc = ThemeColors.of(context);
-
-    // 缓存补全上下文（当前主机信息）
-    _completionContext = host != null
-        ? '主机: ${host.name}, 地址: ${host.host}:${host.port}, 用户: ${host.username}'
-        : null;
 
     // 手机端：根据屏幕方向自动设置 AI 面板位置
     _updateMobilePosition(context);
@@ -1381,8 +1376,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       ),
       child: Column(
         children: [
-          // 等待确认横幅（仅危险命令确认时显示）
-          if (agentState.isWaitingConfirm) _buildConfirmBanner(agentState),
           // 消息列表 + 回到底部按钮
           Expanded(
             child: Stack(
@@ -1448,86 +1441,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     });
   }
 
-  // ==================== 高风险命令确认横幅 ====================
-  Widget _buildConfirmBanner(AgentState agentState) {
-    final tc = ThemeColors.of(context);
-    final command = agentState.pendingConfirmCommand ?? '';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: cWarning.withValues(alpha: 0.08),
-        border: Border(bottom: BorderSide(color: cWarning.withValues(alpha: 0.3))),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: cWarning, size: 16),
-              SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  '高风险命令待确认',
-                  style: TextStyle(fontSize: fSmall, color: cWarning, fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: tc.terminalBg,
-              borderRadius: BorderRadius.circular(rSmall),
-            ),
-            child: SelectableText(
-              command,
-              style: const TextStyle(
-                fontFamily: 'JetBrainsMono',
-                fontSize: fMono,
-                color: cWarning,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              // 拒绝按钮
-              GestureDetector(
-                onTap: () => ref.read(agentProvider.notifier).rejectCommand(),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: tc.surface,
-                    borderRadius: BorderRadius.circular(rSmall),
-                    border: Border.all(color: tc.border),
-                  ),
-                  child: Text('拒绝', style: TextStyle(fontSize: fSmall, color: tc.textSub, fontWeight: FontWeight.w500)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // 确认执行按钮
-              GestureDetector(
-                onTap: () => ref.read(agentProvider.notifier).confirmCommand(),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: cWarning.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(rSmall),
-                    border: Border.all(color: cWarning.withValues(alpha: 0.4)),
-                  ),
-                  child: const Text('确认执行', style: TextStyle(fontSize: fSmall, color: cWarning, fontWeight: FontWeight.w600)),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
   // ==================== Agent 模式统一消息列表 ====================
   Widget _buildAgentChatList(AgentState agentState, tp.TerminalTab? tab) {
     final items = agentState.chatItems;
@@ -1553,6 +1466,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           isAgentRunning: agentState.isRunning,
           isWaitingChoice: agentState.isWaitingChoice,
           pendingOptions: agentState.isWaitingChoice && isLast ? agentState.pendingOptions : const [],
+          enginePendingConfirm: isLast ? agentState.pendingConfirmCommand : null,
         );
       },
     );
@@ -1679,6 +1593,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     List<String> pendingOptions = const [],
     List<AgentEvent> events = const [],
     String streamingContent = '',
+    String? enginePendingConfirm,
   }) {
     final isUser = role == 'user';
     final tc = ThemeColors.of(context);
@@ -1761,7 +1676,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             if (isUser)
               SelectableText(content, style: TextStyle(color: tc.textMain, fontSize: fBody, height: 1.5))
             else
-              _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning, isWaitingChoice, pendingOptions: pendingOptions, events: events, streamingContent: streamingContent),
+              _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning, isWaitingChoice, pendingOptions: pendingOptions, events: events, streamingContent: streamingContent, enginePendingConfirm: enginePendingConfirm),
           ],
         ),
       ),
@@ -1780,7 +1695,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     List<String> pendingOptions = const [],
     List<AgentEvent> events = const [],
     String streamingContent = '',
+    String? enginePendingConfirm,
   }) {
+    // 合并两种待确认来源：引擎自动流程（enginePendingConfirm）和手动播放（_pendingConfirmCommand）
+    final effectivePendingConfirm = enginePendingConfirm ?? _pendingConfirmCommand;
+
+    // 判断某命令是否是引擎等待确认的命令（走 confirmCommand/rejectCommand 路径）
+    bool isEngineConfirm(String command) =>
+        enginePendingConfirm != null && enginePendingConfirm == command.trim();
+
     // 优先使用结构化事件渲染（ReAct 格式已由 ReActStreamParser 正确解析）
     if (events.isNotEmpty) {
       // 判断 events 中是否有 AI 输出的内容事件（thought/command/text/ask/finish）
@@ -1799,14 +1722,26 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             isWaitingChoice: isWaitingChoice,
             pendingOptions: pendingOptions,
             executingCommand: _executingCommand,
-            pendingConfirmCommand: _pendingConfirmCommand,
+            pendingConfirmCommand: effectivePendingConfirm,
             markdownBuilder: _buildMarkdownText,
             onExecuteCommand: _executeLineDirectly,
             onConfirmCommand: (command) {
-              final activeTab = ref.read(tp.terminalProvider).activeTab;
-              if (activeTab != null) _executeLineDirectly(command, true, activeTab);
+              if (isEngineConfirm(command)) {
+                // 引擎自动流程：走 confirmCommand 解析 completer
+                ref.read(agentProvider.notifier).confirmCommand();
+              } else {
+                // 手动播放流程：直接在终端执行
+                final activeTab = ref.read(tp.terminalProvider).activeTab;
+                if (activeTab != null) _executeLineDirectly(command, true, activeTab);
+              }
             },
-            onRejectCommand: () => setState(() => _pendingConfirmCommand = null),
+            onRejectCommand: () {
+              if (enginePendingConfirm != null) {
+                ref.read(agentProvider.notifier).rejectCommand();
+              } else {
+                setState(() => _pendingConfirmCommand = null);
+              }
+            },
             onSelectChoice: _onOptionSelected,
           ),
           // 只有在还没有 AI 内容事件时（流式过程中，只有 result/info），才显示流式纯文本
@@ -1834,13 +1769,23 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               return buildCodeBlockWithExecuteButton(
                 seg.content, tc, tab, showAutoExecute, isLoading,
                 executingCommand: _executingCommand,
-                pendingConfirmCommand: _pendingConfirmCommand,
+                pendingConfirmCommand: effectivePendingConfirm,
                 onExecute: _executeLineDirectly,
                 onConfirm: (command) {
-                  final activeTab = ref.read(tp.terminalProvider).activeTab;
-                  if (activeTab != null) _executeLineDirectly(command, true, activeTab);
+                  if (isEngineConfirm(command)) {
+                    ref.read(agentProvider.notifier).confirmCommand();
+                  } else {
+                    final activeTab = ref.read(tp.terminalProvider).activeTab;
+                    if (activeTab != null) _executeLineDirectly(command, true, activeTab);
+                  }
                 },
-                onReject: () => setState(() => _pendingConfirmCommand = null),
+                onReject: () {
+                  if (enginePendingConfirm != null) {
+                    ref.read(agentProvider.notifier).rejectCommand();
+                  } else {
+                    setState(() => _pendingConfirmCommand = null);
+                  }
+                },
               );
             } else {
               return buildPlainCodeBlock(seg.content, tc);
@@ -2028,7 +1973,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   // ==================== 底部栏 ====================
   Widget _buildBottomBar(ChatState chatState, AgentState agentState, tp.TerminalTab? tab) {
     final isConnected = tab?.isConnected == true;
-    final models = HiveInit.aiModelsBox.values.toList();
+    // 从 provider 读取（已注入 apiKey），而非直接读 Hive
+    final models = ref.read(aiModelsProvider);
     final tc = ThemeColors.of(context);
 
     return Container(
@@ -2047,31 +1993,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Agent 模式胶囊
-              Container(
-                height: 28,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: cAgentGreen.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(rFull),
-                  border: Border.all(color: cAgentGreen.withValues(alpha: 0.25)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.smart_toy, size: 12, color: cAgentGreen),
-                    SizedBox(width: 5),
-                    Text(
-                      'Agent',
-                      style: TextStyle(
-                        fontSize: fSmall,
-                        color: cAgentGreen,
-                        fontWeight: FontWeight.w600,
-                        height: 1.0,
-                      ),
-                    ),
-                  ],
-                ),
+              // Agent / 编排模式胶囊
+              _ModeCapsule(
+                isOrchestratorMode: agentState.isOrchestratorMode,
+                connectedCount: ref.read(tp.terminalProvider).tabs.where((t) => t.isConnected && !t.isLocal).length,
+                totalHosts: HiveInit.hostsBox.values.length,
+                onTap: agentState.isOrchestratorMode ? () => _showOrchestratorHosts(tc) : null,
               ),
               const SizedBox(width: 6),
               // 日志按钮
@@ -2121,11 +2048,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             ],
           ),
           const SizedBox(height: 8),
-          // 多机编排模式状态横幅
-          if (agentState.isOrchestratorMode)
-            _buildOrchestratorBanner(tc),
-          if (agentState.isOrchestratorMode)
-            const SizedBox(height: 8),
           // 输入框
           AIPromptInput(
             enabled: isConnected,
@@ -2133,8 +2055,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             hintText: _getInputHint(isConnected, agentState.isRunning, agentState.isOrchestratorMode),
             initialText: _tabAiInputText[_currentTabId ?? ''] ?? '',
             accentColor: cAgentGreen,
-            modelConfig: _currentModelConfig,
-            completionContext: _completionContext,
             isOrchestratorMode: agentState.isOrchestratorMode,
             onToggleOrchestrator: () {
               ref.read(agentProvider.notifier).toggleOrchestratorMode();
@@ -2375,50 +2295,158 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   // ==================== 工具方法 ====================
-  /// 多机编排模式状态横幅：显示已连接主机数和模式提示
-  Widget _buildOrchestratorBanner(ThemeColors tc) {
-    // 统计已连接的 SSH 主机数（从终端 tab 中读取）
-    final tabs = ref.read(tp.terminalProvider).tabs;
-    final connectedCount = tabs.where((t) => t.isConnected && !t.isLocal).length;
-    final totalHosts = HiveInit.hostsBox.values.length;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: cWarning.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: cWarning.withValues(alpha: 0.4), width: 1),
+  /// 编排模式主机清单浮层（底部弹出）
+  void _showOrchestratorHosts(ThemeColors tc) {
+    final tabs = ref.read(tp.terminalProvider).tabs;
+    final connectedHostIds = <String>{};
+    for (final t in tabs) {
+      if (t.isConnected && !t.isLocal) {
+        connectedHostIds.add(t.hostId);
+      }
+    }
+    final allHosts = HiveInit.hostsBox.values.toList();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: tc.cardElevated,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(rMedium)),
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.hub, size: 14, color: cWarning),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              '多机编排模式 · 已连接 $connectedCount/$totalHosts 台主机',
-              style: TextStyle(
-                fontSize: fMicro,
-                color: tc.textMain,
-                fontWeight: FontWeight.w500,
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 标题栏
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.hub, size: 16, color: cWarning),
+                    const SizedBox(width: 8),
+                    Text(
+                      '多机编排 · 主机清单',
+                      style: TextStyle(
+                        fontSize: fBody,
+                        color: tc.textMain,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${connectedHostIds.length}/${allHosts.length} 已连接',
+                      style: TextStyle(fontSize: fSmall, color: tc.textSub),
+                    ),
+                  ],
+                ),
               ),
-            ),
+              Divider(height: 1, color: tc.border.withValues(alpha: 0.5)),
+              // 主机列表
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(ctx).size.height * 0.4,
+                ),
+                child: allHosts.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Text(
+                          '暂无已保存的主机\n请先在主页添加服务器',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: tc.textMuted, fontSize: fBody),
+                        ),
+                      )
+                    : ListView.builder(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        itemCount: allHosts.length,
+                        itemBuilder: (_, i) {
+                          final host = allHosts[i];
+                          final isConn = connectedHostIds.contains(host.id);
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                            child: Row(
+                              children: [
+                                // 连接状态指示灯
+                                Container(
+                                  width: 8, height: 8,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: isConn ? cAgentGreen : tc.textMuted.withValues(alpha: 0.4),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        host.name,
+                                        style: TextStyle(
+                                          fontSize: fBody,
+                                          color: tc.textMain,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      Text(
+                                        '${host.host}:${host.port} · ${host.username}',
+                                        style: TextStyle(fontSize: fMicro, color: tc.textSub),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  isConn ? '已连接' : '未连接',
+                                  style: TextStyle(
+                                    fontSize: fSmall,
+                                    color: isConn ? cAgentGreen : tc.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+              ),
+              Divider(height: 1, color: tc.border.withValues(alpha: 0.5)),
+              // 底部操作栏
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          Navigator.of(ctx).pop();
+                          ref.read(agentProvider.notifier).disableOrchestratorMode();
+                        },
+                        child: Container(
+                          height: 36,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: cWarning.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(rSmall),
+                            border: Border.all(color: cWarning.withValues(alpha: 0.3)),
+                          ),
+                          child: const Text(
+                            '退出编排模式',
+                            style: TextStyle(
+                              fontSize: fBody,
+                              color: cWarning,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          GestureDetector(
-            onTap: () => ref.read(agentProvider.notifier).disableOrchestratorMode(),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: tc.surface,
-                borderRadius: BorderRadius.circular(rSmall),
-              ),
-              child: Text(
-                '退出',
-                style: TextStyle(fontSize: fMicro, color: tc.textSub),
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -2740,4 +2768,162 @@ class _QuickKey {
   final String label;
   final String sequence;
   const _QuickKey(this.label, this.sequence);
+}
+
+/// Agent / 编排模式胶囊
+/// 非编排模式：绿色 "Agent" 胶囊（不可点击）
+/// 编排模式：橙色 "编排 · X/Y" 胶囊，hub 图标向外发射雷达波纹（象征中枢向多机广播指令）
+class _ModeCapsule extends StatefulWidget {
+  final bool isOrchestratorMode;
+  final int connectedCount;
+  final int totalHosts;
+  final VoidCallback? onTap;
+
+  const _ModeCapsule({
+    required this.isOrchestratorMode,
+    required this.connectedCount,
+    required this.totalHosts,
+    this.onTap,
+  });
+
+  @override
+  State<_ModeCapsule> createState() => _ModeCapsuleState();
+}
+
+class _ModeCapsuleState extends State<_ModeCapsule> with SingleTickerProviderStateMixin {
+  late AnimationController _radarController;
+
+  @override
+  void initState() {
+    super.initState();
+    _radarController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    if (widget.isOrchestratorMode) {
+      _radarController.repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(_ModeCapsule oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isOrchestratorMode != oldWidget.isOrchestratorMode) {
+      if (widget.isOrchestratorMode) {
+        _radarController.repeat();
+      } else {
+        _radarController.stop();
+        _radarController.reset();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _radarController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isOrch = widget.isOrchestratorMode;
+    final accent = isOrch ? cWarning : cAgentGreen;
+
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        height: 28,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(rFull),
+          border: Border.all(color: accent.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // hub 图标 + 雷达波纹
+            SizedBox(
+              width: 14,
+              height: 14,
+              child: Stack(
+                alignment: Alignment.center,
+                clipBehavior: Clip.none,
+                children: [
+                  // 雷达波纹（仅编排模式显示）
+                  if (isOrch)
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _RadarRipplePainter(
+                          progress: _radarController,
+                          color: accent,
+                          rings: 2,
+                        ),
+                      ),
+                    ),
+                  // 图标本体
+                  Icon(Icons.hub, size: 12, color: accent),
+                ],
+              ),
+            ),
+            const SizedBox(width: 5),
+            Text(
+              isOrch ? '编排 · ${widget.connectedCount}/${widget.totalHosts}' : 'Agent',
+              style: TextStyle(
+                fontSize: fSmall,
+                color: accent,
+                fontWeight: FontWeight.w600,
+                height: 1.0,
+              ),
+            ),
+            if (isOrch) ...[
+              const SizedBox(width: 3),
+              Icon(Icons.arrow_drop_down, size: 14, color: accent.withValues(alpha: 0.7)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 雷达波纹画笔：从图标中心向外扩散多个环形波纹，象征中枢向多机广播指令
+class _RadarRipplePainter extends CustomPainter {
+  final Animation<double> progress;
+  final Color color;
+  final int rings;
+
+  _RadarRipplePainter({
+    required this.progress,
+    required this.color,
+    this.rings = 2,
+  }) : super(repaint: progress);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    // 起始半径 = 图标边缘；最大半径 = 容器对角线（波纹会超出 SizedBox 边界，由 Clip.none 允许）
+    final startRadius = size.width / 2;
+    final maxRadius = size.width * 1.8;
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+
+    final baseProgress = progress.value;
+    for (int i = 0; i < rings; i++) {
+      // 每个环错开相位（i / rings）
+      final phase = (baseProgress + i / rings) % 1.0;
+      final radius = startRadius + (maxRadius - startRadius) * phase;
+      // 淡出曲线：前 20% 淡入，后 80% 淡出
+      final alpha = phase < 0.2
+          ? (phase / 0.2) * 0.5
+          : (1 - (phase - 0.2) / 0.8) * 0.5;
+      paint.color = color.withValues(alpha: alpha.clamp(0.0, 0.5));
+      canvas.drawCircle(center, radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RadarRipplePainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.rings != rings;
 }

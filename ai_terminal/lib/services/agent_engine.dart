@@ -895,12 +895,13 @@ class AgentEngine {
 
     if (safetyLevel == SafetyLevel.blocked) {
       agentLogger.warn('ReAct', '命令被安全系统拦截: $command');
-      onEvent?.call(AgentEvent.info('🚫 命令被安全系统拦截: $command'));
+      final reason = SafetyGuard.getReason(command) ?? SafetyGuard.getTip(safetyLevel);
+      onEvent?.call(AgentEvent.info('🚫 命令被安全系统拦截: $command\n原因: $reason'));
       final observation = ReActObservation(
         command: command,
         output: '命令被安全系统拦截，禁止执行',
         success: false,
-        error: SafetyGuard.getTip(safetyLevel),
+        error: reason,
       ).format();
       return _EarlyExecutionResult(shouldContinue: true, observation: observation, command: command);
     }
@@ -911,7 +912,9 @@ class AgentEngine {
       _pendingConfirmCommand = command;
       _confirmCompleter = Completer<bool>();
 
-      onEvent?.call(AgentEvent.info('⚠️ 高风险命令需要确认: `$command`\n${SafetyGuard.getTip(safetyLevel)}'));
+      // 显示具体的风险说明，而非泛泛的"危险操作"
+      final reason = SafetyGuard.getReason(command) ?? SafetyGuard.getTip(safetyLevel);
+      onEvent?.call(AgentEvent.info('⚠️ 高风险命令需要确认: `$command`\n风险说明: $reason'));
 
       _currentTask = _currentTask!.copyWith(
         status: AgentStatus.waitingConfirm,
@@ -1651,6 +1654,8 @@ class AgentEngine {
     buffer.writeln(prompts.behaviorBoundaryRule);
     buffer.writeln();
     buffer.writeln(prompts.knowledgeSafetyRule);
+    buffer.writeln();
+    buffer.writeln(prompts.dangerousCommandExplainRule);
 
     // 用户自定义提示词
     String? customPrompt;

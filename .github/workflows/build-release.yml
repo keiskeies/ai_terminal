@@ -198,28 +198,41 @@ jobs:
 
             AI Terminal 是一款将 AI 助手与 SSH / 本地终端深度集成的跨平台应用。无论你是刚买服务器的小白、不想记命令的开发者、还是需要批量管理服务器的运维人员——打开它，用中文告诉 AI 你要干什么，它帮你连服务器、跑命令、装软件、查问题。全程安全可控。
 
+            ### 🆕 v1.3.4 新功能
+
+            - 🎯 **多机编排模式**：一键开启编排模式，向多台服务器广播同一条指令；工具栏雷达波纹动效实时显示在线数量（编排 · X/Y），点击胶囊查看主机清单与连接状态
+            - 🔧 **AI 工具调用**：Agent 可调用非 shell 工具，支持 `upload_to` 跨机上传、本地↔远程文件同步
+            - 🧠 **经验学习**：Agent 自动记录运维操作经验，下次相似任务复用历史决策
+            - ⚠️ **危险命令双层风险说明**：执行 warn 级命令前，AI 在思考中用自然语言解释"命令会做什么、为什么、有什么风险"；同时 SafetyGuard 返回具体人类可读的风险文案（如"卸载软件包，依赖该包的其他服务可能无法运行"），即使看不懂命令也能判断
+            - 🐛 **修复 API Key 重启失效**：解决重启后需去设置重新点保存才生效的问题
+            - 🎨 **编排模式 UI 优化**：移除独立横幅，融入工具栏胶囊 + 雷达波纹扩散动画，象征"中枢向多机广播指令"
+
             ### 🌟 适合谁用？
 
             - **小白 / 非技术人员**：不会命令行？没关系。"帮我装个 Docker"、"检查服务器漏洞"——一句话搞定
             - **开发者**：不用每次都百度同样的命令，AI 记得比你清楚
-            - **运维 / DevOps**：告别重复 SSH，Agent 自动执行安装、配置、巡检
+            - **运维 / DevOps**：告别重复 SSH，Agent 自动执行安装、配置、巡检；多机编排批量操作
             - **产品经理 / 一人公司**：技术合伙人的活，你一个人也能干
 
             ### 🚀 核心特性
 
-            - 🤖 **Agent 智能执行**：AI 自动生成命令并循环执行，直到任务完成
-            - 🛡️ **三重安全防护**：行为边界提示词 → SafetyGuard 命令分级（safe/warn/blocked）→ 危险操作需 CONFIRM 确认
+            - 🤖 **Agent 智能执行**：AI 自动生成命令并循环执行（ReAct 框架），直到任务完成
+            - 🎯 **多机编排**：单 Agent 调度多台主机，命令按 host 路由执行，状态实时回显
+            - 🛡️ **三重安全防护**：行为边界提示词 → SafetyGuard 命令分级（safe/info/warn/blocked）→ 危险操作需 CONFIRM 确认 + 具体风险说明
             - 🔐 **零明文凭据**：密码/私钥存储在系统 Keychain / Keystore，永不明文落盘
             - 🧠 **知识库驱动**：内置 150+ 软件安装/配置指南，严格按官方文档执行，杜绝 AI 编造命令
+            - 🛠️ **AI 工具调用**：SFTP 跨机上传、文件同步、经验记忆等非 shell 工具
             - 🖥️ **5 平台原生**：macOS / Linux / Windows / Android / iOS 全平台支持
             - 📡 **SSH 远程 + 本地终端**：连接池复用，多标签共享连接，切换零延迟
             - 🌊 **流式输出**：AI 响应实时渲染，终端命令即时回显
             - 🌐 **20+ AI 供应商**：DeepSeek / Qwen / Claude / Gemini / Ollama 等，支持远程配置更新
+            - 💾 **会话持久化**：对话历史与结构化事件本地存储，切换会话不丢失上下文
 
             ### 🛡️ 安全设计
 
             - **密码存储**：系统级安全存储（macOS Keychain / Android Keystore），本地数据库只存元数据
-            - **命令安全**：SafetyGuard 三级拦截——blocked 直接拦截、warn 需 CONFIRM 确认、info 低风险提示
+            - **命令安全**：SafetyGuard 四级拦截——blocked 直接拦截、warn 需 CONFIRM 确认（附具体风险文案）、info 低风险提示、safe 直接执行
+            - **危险命令解释**：AI 在执行 warn 命令前必须在思考中说明命令作用与风险，让看不懂命令的用户也能判断
             - **Agent 边界**：用户说"检查/查看"时只执行只读命令；禁止擅自安装/修改配置；发现问题先报告不自修
 
             ### 📦 下载
@@ -260,28 +273,41 @@ jobs:
 
             AI Terminal is a cross-platform app that deeply integrates an AI assistant with SSH and local terminals. Whether you're a beginner who just rented a VPS, a developer tired of googling commands, or a DevOps engineer managing dozens of servers — open it, tell the AI what you want in plain English (or Chinese), and it handles the rest. Safe, transparent, and under your control.
 
+            ### 🆕 What's New in v1.3.4
+
+            - 🎯 **Multi-Host Orchestration**: Broadcast a single command to multiple servers at once; toolbar radar ripple animation shows live connected count (Orchestration · X/Y), click the capsule to inspect host list and connection status
+            - 🔧 **AI Tool Calling**: Agent can invoke non-shell tools — `upload_to` for cross-host uploads, local↔remote file sync
+            - 🧠 **Experience Learning**: Agent records operational experience and reuses past decisions for similar tasks
+            - ⚠️ **Dual-Layer Risk Explanation for Dangerous Commands**: Before executing warn-level commands, AI explains in plain language what the command does, why, and the risks; SafetyGuard also returns specific human-readable risk text (e.g. "Uninstalling this package may break services depending on it"), so even users who can't read commands can judge
+            - 🐛 **Fix: API Key Lost After Restart**: Resolved the issue where API key appeared invalid after restart and required re-saving in settings
+            - 🎨 **Orchestration UI Polish**: Removed standalone banner, integrated into toolbar capsule with radar ripple animation symbolizing "central hub broadcasting to multiple machines"
+
             ### 🌟 Who is this for?
 
             - **Beginners**: Never used a terminal? No problem. "Install Docker" or "check for vulnerabilities" — one sentence solves it
             - **Developers**: Stop googling the same commands. AI remembers them for you
-            - **DevOps / SysAdmins**: Skip repetitive SSH sessions. Agent handles installs, configs, and health checks
+            - **DevOps / SysAdmins**: Skip repetitive SSH sessions. Agent handles installs, configs, and health checks; orchestrate across multiple hosts
             - **PMs / Solo founders**: Run server operations without a dedicated engineer
 
             ### 🚀 Core Features
 
-            - 🤖 **Agent Auto-Execution**: AI generates and executes commands in a loop until task completion
-            - 🛡️ **Triple Security**: Behavior boundary prompts → SafetyGuard command classification → Dangerous ops require CONFIRM
+            - 🤖 **Agent Auto-Execution**: AI generates and executes commands in a ReAct loop until task completion
+            - 🎯 **Multi-Host Orchestration**: Single Agent dispatches commands across multiple hosts, routed by hostId, with live status feedback
+            - 🛡️ **Triple Security**: Behavior boundary prompts → SafetyGuard command classification → Dangerous ops require CONFIRM + specific risk explanation
             - 🔐 **Zero Plaintext Credentials**: Passwords/keys in system Keychain / Keystore, never on disk
             - 🧠 **Knowledge-Driven**: 150+ software install/config guides, follows official docs strictly
+            - 🛠️ **AI Tool Calling**: SFTP cross-host upload, file sync, experience memory and other non-shell tools
             - 🖥️ **5 Native Platforms**: macOS / Linux / Windows / Android / iOS
             - 📡 **SSH Remote + Local Terminal**: Connection pooling, shared connections, zero-delay switching
             - 🌊 **Streaming Output**: Real-time AI responses and terminal output
             - 🌐 **20+ AI Providers**: DeepSeek / Qwen / Claude / Gemini / Ollama & more
+            - 💾 **Session Persistence**: Conversation history and structured events stored locally, no context loss when switching sessions
 
             ### 🛡️ Security
 
             - **Credential Storage**: System-level secure storage (Keychain / Keystore), metadata only in local DB
-            - **Command Safety**: SafetyGuard 3-level interception — blocked / warn (CONFIRM required) / info
+            - **Command Safety**: SafetyGuard 4-level interception — blocked / warn (CONFIRM required, with specific risk text) / info / safe
+            - **Dangerous Command Explanation**: AI must explain the command's purpose and risk in its thought before executing warn-level commands, so non-technical users can judge
             - **Agent Boundaries**: Read-only for "check/inspect" requests; no unauthorized installs/modifications; report first, never self-fix
 
             ### 📥 Downloads

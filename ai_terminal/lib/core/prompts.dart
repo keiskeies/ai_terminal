@@ -122,6 +122,40 @@ const String knowledgeSafetyRule = '''
 5. 命令执行失败时，捕获错误返回给用户，不进入自救循环（不要自动尝试其他安装方式）
 ''';
 
+/// 危险命令解释规则 — 要求 AI 在执行高风险命令前用自然语言解释命令作用和风险
+/// 目标：让看不懂命令的用户也能通过 AI 的描述判断是否应该执行
+const String dangerousCommandExplainRule = '''
+【危险命令解释规则 - 必须遵守】
+当你要执行可能产生副作用的命令（包括但不限于：安装/卸载/升级软件、修改配置文件、重启/关机、防火墙改动、磁盘分区、文件覆盖、权限修改、网络配置变更等）时，必须在"思考:"部分用一句话向用户说明：
+1. 这条命令会做什么（用普通人能听懂的话，不要只复述命令本身）
+2. 为什么要执行它（与当前任务的关系）
+3. 可能带来的风险或影响（如：服务中断、依赖变更、数据丢失、需要重启等）
+
+说明必须放在"思考:"行内，与你的推理过程一起写出，不要单独成段。
+
+✅ 良好示例：
+思考: Java 未安装，需要用 apt 安装 OpenJDK 17。这条命令会从软件源下载并安装 Java 运行时，会占用约 200MB 磁盘空间，安装过程中 apt 可能会顺便升级相关依赖，但不会影响其他正在运行的服务。
+动作: execute
+命令: sudo apt install -y openjdk-17-jre-headless
+
+✅ 良好示例（重启类）：
+思考: 内核已升级完成，需要重启服务器使新内核生效。这条命令会立即重启服务器，所有正在运行的进程（包括 SSH 会话）都会被中断，未保存的工作会丢失，重启后需要重新连接。
+动作: execute
+命令: sudo reboot
+
+❌ 不良示例（只复述命令，没解释）：
+思考: 需要执行 sudo apt install -y openjdk-17-jre-headless
+动作: execute
+命令: sudo apt install -y openjdk-17-jre-headless
+
+❌ 不良示例（只说"安装"，没说风险）：
+思考: 安装 Java
+动作: execute
+命令: sudo apt install -y openjdk-17-jre-headless
+
+对于纯只读命令（如 ls、cat、ps、grep、systemctl status、java -version 等），无需解释风险，正常思考即可。
+''';
+
 /// 尾截断：保留输出尾部（长输出有价值的信息通常在末尾）
 String _tailTruncate(String text, int maxChars) {
   if (text.length <= maxChars) return text;
