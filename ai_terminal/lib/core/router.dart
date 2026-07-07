@@ -11,6 +11,9 @@ import '../pages/security_page.dart';
 import '../pages/agent_settings_page.dart';
 import '../pages/sftp_page.dart';
 import '../pages/audit_log_page.dart';
+import '../pages/change_records_page.dart';
+import '../pages/change_window_page.dart';
+import '../pages/notification_settings_page.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -99,6 +102,24 @@ final GoRouter appRouter = GoRouter(
         final hostId = state.uri.queryParameters['hostId'];
         return AuditLogPage(hostId: hostId);
       },
+    ),
+    // 变更台账
+    GoRoute(
+      path: '/change-records',
+      builder: (context, state) {
+        final hostId = state.uri.queryParameters['hostId'];
+        return ChangeRecordsPage(hostId: hostId);
+      },
+    ),
+    // 变更窗口/封网期
+    GoRoute(
+      path: '/change-window',
+      builder: (context, state) => const ChangeWindowPage(),
+    ),
+    // 任务完成通知
+    GoRoute(
+      path: '/settings/notification',
+      builder: (context, state) => const NotificationSettingsPage(),
     ),
   ],
 );

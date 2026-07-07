@@ -21,6 +21,8 @@ class AgentState {
   final bool isCompacting;
   /// 是否处于多机编排模式
   final bool isOrchestratorMode;
+  /// 是否处于只读模式（Dry-run）
+  final bool isReadOnlyMode;
 
   AgentState({
     this.status = AgentStatus.idle,
@@ -36,6 +38,7 @@ class AgentState {
     this.summary,
     this.isCompacting = false,
     this.isOrchestratorMode = false,
+    this.isReadOnlyMode = false,
   })  : chatItems = chatItems ?? [],
         pendingOptions = pendingOptions ?? [];
 
@@ -64,6 +67,7 @@ class AgentState {
     bool clearSummary = false,
     bool clearError = false,
     bool? isOrchestratorMode,
+    bool? isReadOnlyMode,
   }) {
     return AgentState(
       status: status ?? this.status,
@@ -79,6 +83,7 @@ class AgentState {
       summary: clearSummary ? null : (summary ?? this.summary),
       isCompacting: isCompacting ?? this.isCompacting,
       isOrchestratorMode: isOrchestratorMode ?? this.isOrchestratorMode,
+      isReadOnlyMode: isReadOnlyMode ?? this.isReadOnlyMode,
     );
   }
 

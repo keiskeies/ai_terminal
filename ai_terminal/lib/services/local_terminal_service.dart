@@ -126,6 +126,25 @@ class LocalTerminalService implements CommandExecutor {
     }
   }
 
+  /// 一次性执行命令并返回 stdout（不走 PTY，使用 Process.run）
+  ///
+  /// 用于监控面板等需要轻量、不污染交互式 shell 的场景。
+  /// 失败返回空字符串。超时默认 5 秒。
+  Future<String> runOnce(String command, {Duration timeout = const Duration(seconds: 5)}) async {
+    try {
+      if (Platform.isWindows) {
+        final result = await Process.run('cmd', ['/c', command]).timeout(timeout);
+        return (result.stdout as String?) ?? '';
+      } else {
+        final result = await Process.run('/bin/sh', ['-c', command]).timeout(timeout);
+        return (result.stdout as String?) ?? '';
+      }
+    } catch (e) {
+      debugPrint('[LocalTerminalService] runOnce 失败 ($command): $e');
+      return '';
+    }
+  }
+
   void _executeMultiLine(String command) async {
     final lines = command.split('\n');
     for (int i = 0; i < lines.length; i++) {

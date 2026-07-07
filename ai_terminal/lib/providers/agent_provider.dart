@@ -122,6 +122,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
     } else if (!state.isOrchestratorMode && _engine!.isOrchestratorMode) {
       _engine!.disableOrchestrator();
     }
+    // 同步只读模式
+    _engine!.setReadOnlyMode(state.isReadOnlyMode);
   }
 
   /// 从持久化恢复会话到内存状态
@@ -647,6 +649,13 @@ class AgentNotifier extends StateNotifier<AgentState> {
     } else {
       enableOrchestratorMode();
     }
+  }
+
+  /// 开启/关闭只读模式（Dry-run）
+  void toggleReadOnlyMode() {
+    final newValue = !state.isReadOnlyMode;
+    _engine?.setReadOnlyMode(newValue);
+    state = state.copyWith(isReadOnlyMode: newValue);
   }
 
   // ═══════════════════════════════════════════

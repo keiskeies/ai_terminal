@@ -18,11 +18,13 @@ import '../widgets/agent_event_cards.dart';
 import '../widgets/tab_item_widget.dart';
 import '../core/hive_init.dart';
 import '../core/prompts.dart' as prompts;
+import '../core/runbook_templates.dart';
 import '../providers/app_providers.dart';
 import '../providers/terminal_provider.dart' as tp;
 import '../providers/chat_provider.dart';
 import '../providers/agent_provider.dart';
 import '../models/ai_model_config.dart';
+import '../models/host_config.dart';
 import '../models/agent_event.dart';
 import '../models/command_snippet.dart';
 import 'package:flutter/services.dart';
@@ -30,6 +32,8 @@ import '../services/ai_service.dart';
 import '../services/command_executor.dart';
 import '../services/agent_engine.dart';
 import '../services/conversation_service.dart';
+import '../services/server_monitor_service.dart';
+import '../widgets/server_monitor_panel.dart';
 import '../models/conversation.dart';
 import '../widgets/terminal_view.dart' as term_widget;
 
@@ -65,6 +69,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   // AI 面板是否可见（P0-1：支持完全收起）
   bool _isAIPanelVisible = false;
+
+  // 服务器监控面板是否可见（终端下方横幅）
+  bool _isMonitorVisible = false;
+
+  // Per-host 监控服务缓存（key = hostId 或 "local"）
+  final Map<String, ServerMonitorService> _monitorServices = {};
 
   // AI 输入框焦点状态（移动端键盘避让）
   bool _aiInputFocused = false;
@@ -158,6 +168,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       final aiPanelVisible = HiveInit.settingsBox.get('aiPanelVisible');
       if (aiPanelVisible != null) {
         _isAIPanelVisible = aiPanelVisible as bool;
+      }
+    } catch (_) {}
+    // 加载监控面板可见性设置，默认收起
+    try {
+      final monitorVisible = HiveInit.settingsBox.get('monitorVisible');
+      if (monitorVisible != null) {
+        _isMonitorVisible = monitorVisible as bool;
       }
     } catch (_) {}
     // 加载 Agent 最大步骤数（需在 initAgent 之前加载）
@@ -594,6 +611,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       ],
     );
 
+    // 监控面板包装：在终端下方插入监控横幅（仅在已连接且开关开启时）
+    final monitorService = _getOrCreateMonitorService(tab);
+    final showMonitor = _isMonitorVisible && monitorService != null;
+    final terminalArea = showMonitor
+        ? Column(
+            children: [
+              Expanded(child: terminalView),
+              ServerMonitorPanel(service: monitorService),
+            ],
+          )
+        : terminalView;
+
     // P0-1: AI 面板支持完全收起 + 移动端上滑手势展开
     Widget mainContent;
     if (!_isAIPanelVisible) {
@@ -607,9 +636,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                   HiveInit.settingsBox.put('aiPanelVisible', true);
                 }
               },
-              child: terminalView,
+              child: terminalArea,
             )
-          : terminalView;
+          : terminalArea;
     } else {
       // AI 面板展开状态：保持现有分栏布局
       mainContent = LayoutBuilder(builder: (context, constraints) {
@@ -675,7 +704,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         if (isRight) {
           return Row(
             children: [
-              Expanded(child: terminalView),
+              Expanded(child: terminalArea),
               dragHandle,
               divider,
               SizedBox(width: aiPanelSize, child: aiContent),
@@ -698,7 +727,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
           return Column(
             children: [
-              Expanded(child: terminalView),
+              Expanded(child: terminalArea),
               dragHandle,
               divider,
               aiPanelWithSwipe,
@@ -858,6 +887,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         _buildConnectionBadge(activeTab),
         const SizedBox(width: 6),
         _buildAIPanelToggleButton(),
+        const SizedBox(width: 6),
+        _buildMonitorToggleButton(),
         const SizedBox(width: 6),
         _buildTerminalSettingsButton(),
         const SizedBox(width: 6),
@@ -1043,6 +1074,76 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
+
+  /// 服务器监控面板开关按钮（终端下方横幅）
+  Widget _buildMonitorToggleButton() {
+    final tc = ThemeColors.of(context);
+    final accentColor = cKleinBlue;
+    final activeTab = ref.read(tp.terminalProvider).activeTab;
+    final canShow = activeTab != null && activeTab.isConnected;
+
+    return Tooltip(
+      message: _isMonitorVisible ? '收起监控面板' : '展开监控面板',
+      child: GestureDetector(
+        onTap: canShow ? () {
+          setState(() {
+            _isMonitorVisible = !_isMonitorVisible;
+          });
+          HiveInit.settingsBox.put('monitorVisible', _isMonitorVisible);
+        } : null,
+        child: AnimatedContainer(
+          duration: animFast,
+          height: 30,
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          decoration: BoxDecoration(
+            color: _isMonitorVisible ? accentColor.withValues(alpha: 0.15) : tc.surface,
+            borderRadius: BorderRadius.circular(rSmall),
+            border: Border.all(
+              color: _isMonitorVisible ? accentColor.withValues(alpha: 0.4) : tc.border.withValues(alpha: 0.3),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.monitor_heart_outlined,
+                size: 14,
+                color: _isMonitorVisible ? accentColor : (canShow ? tc.textSub : tc.textMuted),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '监控',
+                style: TextStyle(
+                  fontSize: fMicro,
+                  color: _isMonitorVisible ? accentColor : (canShow ? tc.textSub : tc.textMuted),
+                  fontWeight: _isMonitorVisible ? FontWeight.w600 : FontWeight.normal,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 获取或创建当前 tab 对应的监控服务
+  ServerMonitorService? _getOrCreateMonitorService(tp.TerminalTab? tab) {
+    if (tab == null || !tab.isConnected) return null;
+    final hostId = tab.isLocal ? 'local' : (tab.hostId ?? 'local');
+    var svc = _monitorServices[hostId];
+    if (svc == null) {
+      final executor = tab.isLocal ? tab.localService : tab.service;
+      svc = ServerMonitorService(executor: executor, isLocal: tab.isLocal);
+      _monitorServices[hostId] = svc;
+    } else if (svc.executor != (tab.isLocal ? tab.localService : tab.service)) {
+      // 服务实例变了（重连），重置历史
+      svc.reset();
+      _monitorServices[hostId] = ServerMonitorService(executor: tab.isLocal ? tab.localService : tab.service, isLocal: tab.isLocal);
+      svc = _monitorServices[hostId]!;
+    }
+    return svc;
+  }
   Widget _buildToolbarMenu() {
     final tc = ThemeColors.of(context);
     final snippets = HiveInit.snippetsBox.values.toList();
@@ -2016,6 +2117,25 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 onTap: () => _showSessionHistoryPanel(context),
                 tc: tc,
               ),
+              const SizedBox(width: 4),
+              // 只读模式（Dry-run）切换
+              _buildToolbarIconButton(
+                icon: agentState.isReadOnlyMode ? Icons.lock : Icons.lock_open_outlined,
+                tooltip: agentState.isReadOnlyMode ? '只读模式已开启（点击关闭）' : '只读模式（Dry-run）',
+                onTap: () {
+                  ref.read(agentProvider.notifier).toggleReadOnlyMode();
+                },
+                tc: tc,
+                active: agentState.isReadOnlyMode,
+              ),
+              const SizedBox(width: 4),
+              // 运维模板（Runbook）
+              _buildToolbarIconButton(
+                icon: Icons.bolt_outlined,
+                tooltip: '运维模板',
+                onTap: () => _showRunbookTemplates(tc),
+                tc: tc,
+              ),
               const Spacer(),
               // 运行状态指示
               if (agentState.isRunning)
@@ -2093,6 +2213,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     required String tooltip,
     required VoidCallback onTap,
     required ThemeColors tc,
+    bool active = false,
   }) {
     return Tooltip(
       message: tooltip,
@@ -2102,10 +2223,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           width: 28,
           height: 28,
           decoration: BoxDecoration(
-            color: tc.surface,
+            color: active ? cWarning.withValues(alpha: 0.15) : tc.surface,
             borderRadius: BorderRadius.circular(rSmall),
+            border: active ? Border.all(color: cWarning.withValues(alpha: 0.4)) : null,
           ),
-          child: Icon(icon, size: 14, color: tc.textSub),
+          child: Icon(icon, size: 14, color: active ? cWarning : tc.textSub),
         ),
       ),
     );
@@ -2306,9 +2428,40 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       }
     }
     final allHosts = HiveInit.hostsBox.values.toList();
+    // 按分组聚合
+    final grouped = <String, List<HostConfig>>{};
+    for (final h in allHosts) {
+      grouped.putIfAbsent(h.group, () => []).add(h);
+    }
+    final groupNames = grouped.keys.toList()..sort();
 
     showModalBottomSheet(
       context: context,
+      backgroundColor: tc.cardElevated,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(rMedium)),
+      ),
+      builder: (ctx) {
+        return _OrchestratorHostsSheet(
+          tc: tc,
+          allHosts: allHosts,
+          grouped: grouped,
+          groupNames: groupNames,
+          connectedHostIds: connectedHostIds,
+          onExit: () {
+            Navigator.of(ctx).pop();
+            ref.read(agentProvider.notifier).disableOrchestratorMode();
+          },
+        );
+      },
+    );
+  }
+
+  /// 运维模板选择浮层
+  void _showRunbookTemplates(ThemeColors tc) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
       backgroundColor: tc.cardElevated,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(rMedium)),
@@ -2318,15 +2471,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 标题栏
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: Row(
                   children: [
-                    const Icon(Icons.hub, size: 16, color: cWarning),
+                    const Icon(Icons.bolt, size: 16, color: cPrimary),
                     const SizedBox(width: 8),
                     Text(
-                      '多机编排 · 主机清单',
+                      '运维模板',
                       style: TextStyle(
                         fontSize: fBody,
                         color: tc.textMain,
@@ -2335,112 +2487,43 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                     ),
                     const Spacer(),
                     Text(
-                      '${connectedHostIds.length}/${allHosts.length} 已连接',
+                      '点击一键执行',
                       style: TextStyle(fontSize: fSmall, color: tc.textSub),
                     ),
                   ],
                 ),
               ),
               Divider(height: 1, color: tc.border.withValues(alpha: 0.5)),
-              // 主机列表
-              ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxHeight: MediaQuery.of(ctx).size.height * 0.4,
-                ),
-                child: allHosts.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          '暂无已保存的主机\n请先在主页添加服务器',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: tc.textMuted, fontSize: fBody),
-                        ),
-                      )
-                    : ListView.builder(
-                        shrinkWrap: true,
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        itemCount: allHosts.length,
-                        itemBuilder: (_, i) {
-                          final host = allHosts[i];
-                          final isConn = connectedHostIds.contains(host.id);
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-                            child: Row(
-                              children: [
-                                // 连接状态指示灯
-                                Container(
-                                  width: 8, height: 8,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: isConn ? cAgentGreen : tc.textMuted.withValues(alpha: 0.4),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        host.name,
-                                        style: TextStyle(
-                                          fontSize: fBody,
-                                          color: tc.textMain,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${host.host}:${host.port} · ${host.username}',
-                                        style: TextStyle(fontSize: fMicro, color: tc.textSub),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Text(
-                                  isConn ? '已连接' : '未连接',
-                                  style: TextStyle(
-                                    fontSize: fSmall,
-                                    color: isConn ? cAgentGreen : tc.textMuted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-              ),
-              Divider(height: 1, color: tc.border.withValues(alpha: 0.5)),
-              // 底部操作栏
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          Navigator.of(ctx).pop();
-                          ref.read(agentProvider.notifier).disableOrchestratorMode();
-                        },
-                        child: Container(
-                          height: 36,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: cWarning.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(rSmall),
-                            border: Border.all(color: cWarning.withValues(alpha: 0.3)),
-                          ),
-                          child: const Text(
-                            '退出编排模式',
-                            style: TextStyle(
-                              fontSize: fBody,
-                              color: cWarning,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
+              Flexible(
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: RunbookTemplates.all.length,
+                  itemBuilder: (_, i) {
+                    final tpl = RunbookTemplates.all[i];
+                    return ListTile(
+                      leading: Text(tpl.icon, style: const TextStyle(fontSize: 22)),
+                      title: Text(
+                        tpl.name,
+                        style: TextStyle(
+                          fontSize: fBody,
+                          color: tc.textMain,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                    ),
-                  ],
+                      subtitle: Text(
+                        tpl.description,
+                        style: TextStyle(fontSize: fSmall, color: tc.textSub),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      onTap: () {
+                        Navigator.of(ctx).pop();
+                        // 把模板 prompt 发送给 Agent 启动任务
+                        _sendRunbookPrompt(tpl.prompt);
+                      },
+                    );
+                  },
                 ),
               ),
             ],
@@ -2448,6 +2531,30 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         );
       },
     );
+  }
+
+  /// 发送 Runbook 模板 prompt 到 Agent
+  void _sendRunbookPrompt(String prompt) async {
+    // 复用输入框发送逻辑：校验模型配置、连接状态，并显式 setExecutor
+    if (!_checkAIModelConfigured()) {
+      _showAIModelNotConfiguredHint();
+      return;
+    }
+    final tab = ref.read(tp.terminalProvider).activeTab;
+    if (tab == null || !tab.isConnected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('请先连接终端（SSH 或本地终端）后再使用运维模板'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    _autoScrollChat = true;
+    // 本地终端用 localService，SSH 用 service
+    final CommandExecutor? executor = tab.isLocal == true ? tab.localService : tab.service;
+    ref.read(agentProvider.notifier).setExecutor(executor);
+    await ref.read(agentProvider.notifier).startTask(prompt);
   }
 
   String _getInputHint(bool isConnected, bool isRunning, bool isOrchestrator) {
@@ -2926,4 +3033,225 @@ class _RadarRipplePainter extends CustomPainter {
   @override
   bool shouldRepaint(_RadarRipplePainter oldDelegate) =>
       oldDelegate.color != color || oldDelegate.rings != rings;
+}
+
+/// 编排模式主机清单浮层（带分组筛选）
+class _OrchestratorHostsSheet extends StatefulWidget {
+  final ThemeColors tc;
+  final List<HostConfig> allHosts;
+  final Map<String, List<HostConfig>> grouped;
+  final List<String> groupNames;
+  final Set<String> connectedHostIds;
+  final VoidCallback onExit;
+
+  const _OrchestratorHostsSheet({
+    required this.tc,
+    required this.allHosts,
+    required this.grouped,
+    required this.groupNames,
+    required this.connectedHostIds,
+    required this.onExit,
+  });
+
+  @override
+  State<_OrchestratorHostsSheet> createState() => _OrchestratorHostsSheetState();
+}
+
+class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
+  String? _selectedGroup; // null = 全部
+
+  List<HostConfig> get _filteredHosts {
+    if (_selectedGroup == null) return widget.allHosts;
+    return widget.grouped[_selectedGroup] ?? [];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = widget.tc;
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 标题栏
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Row(
+              children: [
+                const Icon(Icons.hub, size: 16, color: cWarning),
+                const SizedBox(width: 8),
+                Text(
+                  '多机编排 · 主机清单',
+                  style: TextStyle(
+                    fontSize: fBody,
+                    color: tc.textMain,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${widget.connectedHostIds.length}/${widget.allHosts.length} 已连接',
+                  style: TextStyle(fontSize: fSmall, color: tc.textSub),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: tc.border.withValues(alpha: 0.5)),
+          // 分组筛选 chip 行
+          if (widget.groupNames.length > 1)
+            SizedBox(
+              height: 44,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                children: [
+                  _buildGroupChip(tc, '全部', _selectedGroup == null),
+                  for (final g in widget.groupNames)
+                    _buildGroupChip(tc, g, _selectedGroup == g),
+                ],
+              ),
+            ),
+          // 主机列表
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.4,
+            ),
+            child: widget.allHosts.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      '暂无已保存的主机\n请先在主页添加服务器',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: tc.textMuted, fontSize: fBody),
+                    ),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: _filteredHosts.length,
+                    itemBuilder: (_, i) {
+                      final host = _filteredHosts[i];
+                      final isConn = widget.connectedHostIds.contains(host.id);
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 8, height: 8,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isConn ? cAgentGreen : tc.textMuted.withValues(alpha: 0.4),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        host.name,
+                                        style: TextStyle(
+                                          fontSize: fBody,
+                                          color: tc.textMain,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: tc.textMuted.withValues(alpha: 0.12),
+                                          borderRadius: BorderRadius.circular(rSmall),
+                                        ),
+                                        child: Text(
+                                          host.group,
+                                          style: TextStyle(fontSize: fMicro, color: tc.textSub),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Text(
+                                    '${host.host}:${host.port} · ${host.username}',
+                                    style: TextStyle(fontSize: fMicro, color: tc.textSub),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Text(
+                              isConn ? '已连接' : '未连接',
+                              style: TextStyle(
+                                fontSize: fSmall,
+                                color: isConn ? cAgentGreen : tc.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+          ),
+          Divider(height: 1, color: tc.border.withValues(alpha: 0.5)),
+          // 底部操作栏
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: widget.onExit,
+                    child: Container(
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: cWarning.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(rSmall),
+                        border: Border.all(color: cWarning.withValues(alpha: 0.3)),
+                      ),
+                      child: const Text(
+                        '退出编排模式',
+                        style: TextStyle(
+                          fontSize: fBody,
+                          color: cWarning,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGroupChip(ThemeColors tc, String label, bool selected) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedGroup = selected ? null : label),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: selected ? cWarning.withValues(alpha: 0.15) : tc.textMuted.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(rSmall),
+            border: Border.all(
+              color: selected ? cWarning.withValues(alpha: 0.4) : tc.border.withValues(alpha: 0.3),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: fSmall,
+              color: selected ? cWarning : tc.textSub,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -319,6 +319,21 @@ class SSHService implements CommandExecutor {
     }
   }
 
+  /// 一次性执行命令并返回 stdout（不走 PTY，使用 exec channel）
+  ///
+  /// 用于监控面板等需要轻量、不污染交互式 shell 的场景。
+  /// 失败返回空字符串。超时默认 5 秒。
+  Future<String> runOnce(String command, {Duration timeout = const Duration(seconds: 5)}) async {
+    if (_client == null || !_isConnected) return '';
+    try {
+      final result = await _client!.execute(command).timeout(timeout);
+      return await result.stdout.cast<List<int>>().transform(utf8.decoder).join();
+    } catch (e) {
+      debugPrint('[SSHService] runOnce 失败 ($command): $e');
+      return '';
+    }
+  }
+
   void _writeMultiLineCommand(String command) async {
     final lines = command.split('\n');
     for (int i = 0; i < lines.length; i++) {

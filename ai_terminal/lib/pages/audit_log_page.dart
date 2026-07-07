@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../utils/audit_logger.dart';
@@ -16,14 +17,23 @@ class AuditLogPage extends ConsumerStatefulWidget {
 
 class _AuditLogPageState extends ConsumerState<AuditLogPage> {
   List<Map<String, dynamic>> _logs = [];
+  List<Map<String, dynamic>> _filteredLogs = [];
   bool _showOnlyBlocked = false;
   String? _filterHostId;
+  String _searchQuery = '';
+  final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _filterHostId = widget.hostId;
     _loadLogs();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   void _loadLogs() {
@@ -33,11 +43,56 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
       _logs = AuditLogger.getRecentLogs(limit: 200);
     }
 
-    if (_showOnlyBlocked) {
-      _logs = _logs.where((log) => log['safetyLevel'] == 'blocked').toList();
-    }
+    _applyFilter();
+  }
 
+  void _applyFilter() {
+    var result = _logs;
+    if (_showOnlyBlocked) {
+      result = result.where((log) => log['safetyLevel'] == 'blocked').toList();
+    }
+    if (_searchQuery.isNotEmpty) {
+      final q = _searchQuery.toLowerCase();
+      result = result.where((log) {
+        final cmd = (log['command'] as String? ?? '').toLowerCase();
+        final hostId = (log['hostId'] as String? ?? '').toLowerCase();
+        final output = (log['output'] as String? ?? '').toLowerCase();
+        return cmd.contains(q) || hostId.contains(q) || output.contains(q);
+      }).toList();
+    }
+    _filteredLogs = result;
     setState(() {});
+  }
+
+  void _exportLogs() {
+    if (_filteredLogs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('没有可导出的日志'), behavior: SnackBarBehavior.floating),
+      );
+      return;
+    }
+    final buffer = StringBuffer();
+    buffer.writeln('# 审计日志导出');
+    buffer.writeln('# 导出时间: ${DateTime.now().toIso8601String()}');
+    buffer.writeln('# 总条数: ${_filteredLogs.length}');
+    buffer.writeln('---');
+    for (final log in _filteredLogs) {
+      buffer.writeln('[${log['timestamp']}] host=${log['hostId']} level=${log['safetyLevel']} executed=${log['executed']}');
+      buffer.writeln('  cmd: ${log['command']}');
+      if (log['output'] != null && (log['output'] as String).isNotEmpty) {
+        buffer.writeln('  out: ${log['output']}');
+      }
+      buffer.writeln('');
+    }
+    final text = buffer.toString();
+    Clipboard.setData(ClipboardData(text: text));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('已复制 ${_filteredLogs.length} 条日志到剪贴板'),
+        backgroundColor: cSuccess,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Color _safetyColor(String level) {
@@ -87,10 +142,16 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(_filterHostId != null ? '审计日志' : '全部审计日志'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.download, size: 20),
+            tooltip: '导出日志',
+            onPressed: _exportLogs,
+          ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.filter_list, size: 20),
             onSelected: (value) {
@@ -118,25 +179,75 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
           ),
         ],
       ),
-      body: _logs.isEmpty
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.history, size: 48, color: cTextMuted),
-                  SizedBox(height: 8),
-                  Text('暂无审计日志', style: TextStyle(color: cTextSub, fontSize: fBody)),
-                ],
+      body: Column(
+        children: [
+          // 搜索框
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: pStandard, vertical: 8),
+            child: TextField(
+              controller: _searchController,
+              style: TextStyle(color: tc.textMain, fontSize: fBody),
+              decoration: InputDecoration(
+                hintText: '搜索命令、主机ID、输出...',
+                hintStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
+                prefixIcon: Icon(Icons.search, size: 18, color: tc.textSub),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(Icons.clear, size: 18, color: tc.textSub),
+                        onPressed: () {
+                          _searchController.clear();
+                          _searchQuery = '';
+                          _applyFilter();
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: tc.card,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(rSmall),
+                  borderSide: BorderSide(color: tc.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(rSmall),
+                  borderSide: BorderSide(color: tc.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(rSmall),
+                  borderSide: BorderSide(color: cPrimary),
+                ),
+                isDense: true,
               ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(pStandard),
-              itemCount: _logs.length,
-              itemBuilder: (context, index) {
-                final log = _logs[index];
-                return _buildLogCard(log);
+              onChanged: (value) {
+                _searchQuery = value.trim();
+                _applyFilter();
               },
             ),
+          ),
+          Expanded(
+            child: _filteredLogs.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.history, size: 48, color: tc.textMuted),
+                        const SizedBox(height: 8),
+                        Text(_searchQuery.isNotEmpty ? '未匹配到日志' : '暂无审计日志',
+                            style: TextStyle(color: tc.textSub, fontSize: fBody)),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(pStandard, 0, pStandard, pStandard),
+                    itemCount: _filteredLogs.length,
+                    itemBuilder: (context, index) {
+                      final log = _filteredLogs[index];
+                      return _buildLogCard(log);
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 

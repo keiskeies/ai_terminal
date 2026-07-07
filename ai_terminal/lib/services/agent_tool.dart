@@ -622,6 +622,514 @@ class UploadToTool extends AgentTool {
   }
 }
 
+/// 多机编排：广播上传 — 把本地文件/目录同时分发到多台主机
+class BroadcastUploadTool extends AgentTool {
+  final MultiHostExecutor _executor;
+  BroadcastUploadTool(this._executor);
+
+  @override
+  String get name => 'broadcast_upload';
+
+  @override
+  String get description => '【多机编排】把本地文件/目录广播分发到多台主机的相同远程目录。'
+      '用于批量部署（如把配置文件/构建产物同步到一组服务器）。'
+      '执行是串行的，每台主机的结果单独报告。';
+
+  @override
+  String get paramSpec => '{"hostIds":["hostId1","hostId2"],"local":"本地文件/目录绝对路径(必填)","remote":"远程目标父目录(必填)","recursive":"是否递归(true/false,默认false)"}';
+
+  @override
+  Future<ToolResult> execute({
+    required CommandExecutor executor,
+    required Map<String, dynamic> args,
+    void Function(String message)? onProgress,
+  }) async {
+    final hostIdsRaw = args['hostIds'];
+    final local = args['local']?.toString() ?? '';
+    final remote = args['remote']?.toString() ?? '';
+    final recursive = args['recursive'] == true || args['recursive'] == 'true';
+
+    if (local.isEmpty || remote.isEmpty) {
+      return ToolResult.failure('参数缺失: local、remote 为必填项');
+    }
+    List<String> hostIds = [];
+    if (hostIdsRaw is List) {
+      hostIds = hostIdsRaw.map((e) => e.toString()).toList();
+    } else if (hostIdsRaw is String) {
+      hostIds = hostIdsRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    }
+    if (hostIds.isEmpty) {
+      return ToolResult.failure('参数缺失: hostIds 为必填项（数组或逗号分隔）');
+    }
+
+    // 复用 UploadToTool 的逻辑：逐台上传
+    final uploadTool = UploadToTool(_executor);
+    final results = <String>[];
+    int successCount = 0;
+    for (final hid in hostIds) {
+      onProgress?.call('[$hid] 正在分发...');
+      final r = await uploadTool.execute(
+        executor: executor,
+        args: {
+          'hostId': hid,
+          'local': local,
+          'remote': remote,
+          'recursive': recursive,
+        },
+        onProgress: onProgress,
+      );
+      if (r.success) {
+        successCount++;
+        results.add('[$hid] ✓ ${r.output}');
+      } else {
+        results.add('[$hid] ✗ ${r.error ?? r.output}');
+      }
+    }
+
+    final summary = '广播分发完成: $successCount/${hostIds.length} 成功\n${results.join('\n')}';
+    return successCount == hostIds.length
+        ? ToolResult.success(summary)
+        : ToolResult(success: successCount > 0, output: summary, error: '${hostIds.length - successCount} 台失败');
+  }
+}
+
+/// 多机编排：文件采集 — 从多台主机下载同名文件到本地（带 hostId 后缀）
+class CollectFileTool extends AgentTool {
+  final MultiHostExecutor _executor;
+  CollectFileTool(this._executor);
+
+  @override
+  String get name => 'collect_file';
+
+  @override
+  String get description => '【多机编排】从多台主机采集同名远程文件到本地目录，每个文件自动加 hostId 后缀。'
+      '用于配置对比、日志收集等场景。';
+
+  @override
+  String get paramSpec => '{"hostIds":["hostId1","hostId2"],"remote":"远程文件绝对路径(必填)","localDir":"本地保存目录(必填)"}';
+
+  @override
+  Future<ToolResult> execute({
+    required CommandExecutor executor,
+    required Map<String, dynamic> args,
+    void Function(String message)? onProgress,
+  }) async {
+    final hostIdsRaw = args['hostIds'];
+    final remote = args['remote']?.toString() ?? '';
+    final localDir = args['localDir']?.toString() ?? '';
+
+    if (remote.isEmpty || localDir.isEmpty) {
+      return ToolResult.failure('参数缺失: remote、localDir 为必填项');
+    }
+    List<String> hostIds = [];
+    if (hostIdsRaw is List) {
+      hostIds = hostIdsRaw.map((e) => e.toString()).toList();
+    } else if (hostIdsRaw is String) {
+      hostIds = hostIdsRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    }
+    if (hostIds.isEmpty) {
+      return ToolResult.failure('参数缺失: hostIds 为必填项');
+    }
+
+    // 确保本地目录存在
+    final dir = Directory(localDir);
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+
+    final remoteBasename = p.posix.basename(remote);
+    final sftp = SftpService();
+    final results = <String>[];
+    int successCount = 0;
+
+    for (final hid in hostIds) {
+      onProgress?.call('[$hid] 正在采集 $remote ...');
+      final targetExecutor = _executor.executorFor(hid);
+      if (targetExecutor == null || targetExecutor is! SSHService) {
+        results.add('[$hid] ✗ 主机未连接或非 SSH 会话');
+        continue;
+      }
+      final client = targetExecutor.client;
+      if (client == null) {
+        results.add('[$hid] ✗ SSH 连接未建立');
+        continue;
+      }
+      try {
+        await sftp.attachToClient(client);
+        final localPath = p.join(localDir, '${hid}_$remoteBasename');
+        await sftp.downloadFile(remote, localPath);
+        successCount++;
+        results.add('[$hid] ✓ 已保存到 $localPath');
+      } catch (e) {
+        results.add('[$hid] ✗ 采集失败: $e');
+      } finally {
+        sftp.closeSftpOnly();
+      }
+    }
+
+    final summary = '采集完成: $successCount/${hostIds.length} 成功\n${results.join('\n')}';
+    return successCount == hostIds.length
+        ? ToolResult.success(summary)
+        : ToolResult(success: successCount > 0, output: summary, error: '${hostIds.length - successCount} 台失败');
+  }
+}
+
+/// 多机编排：日志聚合搜索 — 在多台主机上同时 grep 关键词，按主机分段返回
+class MultiGrepTool extends AgentTool {
+  final MultiHostExecutor _executor;
+  MultiGrepTool(this._executor);
+
+  @override
+  String get name => 'multi_grep';
+
+  @override
+  String get description => '【多机编排】在多台主机上同时 grep 搜索日志/文件，结果按主机分段聚合。'
+      '用于跨机排障（如"在所有 web 机器 grep ERROR access.log 最近 100 行"）。'
+      '注意：命令在远程执行，grep 语法须兼容目标 shell。';
+
+  @override
+  String get paramSpec => '{"hostIds":["hostId1","hostId2"],"pattern":"搜索关键词(必填,正则)","files":"要搜索的文件路径(必填,多个用逗号分隔)","tail":"仅搜索文件末尾N行(可选,如1000)","ignoreCase":"是否忽略大小写(true/false,默认false)"}';
+
+  @override
+  Future<ToolResult> execute({
+    required CommandExecutor executor,
+    required Map<String, dynamic> args,
+    void Function(String message)? onProgress,
+  }) async {
+    final hostIdsRaw = args['hostIds'];
+    final pattern = args['pattern']?.toString() ?? '';
+    final files = args['files']?.toString() ?? '';
+    final tail = args['tail']?.toString();
+    final ignoreCase = args['ignoreCase'] == true || args['ignoreCase'] == 'true';
+
+    if (pattern.isEmpty || files.isEmpty) {
+      return ToolResult.failure('参数缺失: pattern、files 为必填项');
+    }
+    List<String> hostIds = [];
+    if (hostIdsRaw is List) {
+      hostIds = hostIdsRaw.map((e) => e.toString()).toList();
+    } else if (hostIdsRaw is String) {
+      hostIds = hostIdsRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    }
+    if (hostIds.isEmpty) {
+      return ToolResult.failure('参数缺失: hostIds 为必填项');
+    }
+
+    // 构造 grep 命令：支持 tail + ignoreCase
+    final safePattern = pattern.replaceAll("'", "'\\''");
+    final grepFlags = ignoreCase ? '-iE' : '-E';
+    final fileList = files.split(',').map((f) => f.trim()).where((f) => f.isNotEmpty).join(' ');
+    String cmd;
+    if (tail != null && tail.isNotEmpty) {
+      final n = int.tryParse(tail) ?? 1000;
+      cmd = "tail -n $n $fileList | grep $grepFlags '$safePattern'";
+    } else {
+      cmd = "grep $grepFlags '$safePattern' $fileList";
+    }
+
+    final results = <String>[];
+    int hitCount = 0;
+    for (final hid in hostIds) {
+      onProgress?.call('[$hid] 正在搜索...');
+      final r = await _executor.executeOn(hid, cmd, timeout: const Duration(seconds: 30));
+      if (r == null) {
+        results.add('=== [$hid] 主机未连接 ===');
+        continue;
+      }
+      final out = r.stdout.trim();
+      if (out.isEmpty) {
+        results.add('=== [$hid] 无匹配 ===');
+      } else {
+        hitCount++;
+        final truncated = out.length > 2000 ? '${out.substring(0, 2000)}\n...(已截断)' : out;
+        results.add('=== [$hid] 命中 ${out.split('\n').length} 行 ===\n$truncated');
+      }
+    }
+
+    final summary = '多机搜索完成: $hitCount/${hostIds.length} 台命中\n\n${results.join('\n\n')}';
+    return ToolResult.success(summary);
+  }
+}
+
+/// 多机编排：文件 diff — 对比多台主机上同名文件的内容差异
+class DiffFilesTool extends AgentTool {
+  final MultiHostExecutor _executor;
+  DiffFilesTool(this._executor);
+
+  @override
+  String get name => 'diff_files';
+
+  @override
+  String get description => '【多机编排】对比多台主机上同名远程文件的内容差异。'
+      '用于检查配置是否一致（如对比所有 nginx.conf）。'
+      '返回每台主机文件的 md5 和两两 diff 摘要。';
+
+  @override
+  String get paramSpec => '{"hostIds":["hostId1","hostId2"],"remote":"远程文件绝对路径(必填)"}';
+
+  @override
+  Future<ToolResult> execute({
+    required CommandExecutor executor,
+    required Map<String, dynamic> args,
+    void Function(String message)? onProgress,
+  }) async {
+    final hostIdsRaw = args['hostIds'];
+    final remote = args['remote']?.toString() ?? '';
+
+    if (remote.isEmpty) {
+      return ToolResult.failure('参数缺失: remote 为必填项');
+    }
+    List<String> hostIds = [];
+    if (hostIdsRaw is List) {
+      hostIds = hostIdsRaw.map((e) => e.toString()).toList();
+    } else if (hostIdsRaw is String) {
+      hostIds = hostIdsRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    }
+    if (hostIds.length < 2) {
+      return ToolResult.failure('diff 至少需要 2 台主机');
+    }
+
+    // 采集每台主机的 md5 和内容
+    final md5Results = <String, String>{};
+    final contentResults = <String, String>{};
+    for (final hid in hostIds) {
+      onProgress?.call('[$hid] 正在读取 $remote ...');
+      final r = await _executor.executeOn(
+        hid,
+        "md5sum '$remote' 2>/dev/null; echo '---CONTENT---'; cat '$remote' 2>/dev/null | head -200",
+        timeout: const Duration(seconds: 15),
+      );
+      if (r == null) {
+        md5Results[hid] = '未连接';
+        contentResults[hid] = '';
+        continue;
+      }
+      final out = r.stdout;
+      final md5Match = RegExp(r'^([a-f0-9]{32})').firstMatch(out);
+      md5Results[hid] = md5Match?.group(1) ?? '读取失败';
+      final contentStart = out.indexOf('---CONTENT---');
+      contentResults[hid] = contentStart >= 0 ? out.substring(contentStart + 13).trim() : '';
+    }
+
+    // 构建 md5 对比表
+    final buffer = StringBuffer();
+    buffer.writeln('文件: $remote');
+    buffer.writeln('MD5 对比:');
+    for (final hid in hostIds) {
+      buffer.writeln('  [$hid] ${md5Results[hid]}');
+    }
+
+    // 检查是否全部一致
+    final uniqueMd5 = md5Results.values.toSet();
+    if (uniqueMd5.length == 1) {
+      buffer.writeln('\n✅ 所有主机文件一致（MD5: ${uniqueMd5.first}）');
+    } else {
+      buffer.writeln('\n⚠️ 文件不一致，发现 ${uniqueMd5.length} 种版本');
+      for (final hid in hostIds) {
+        final content = contentResults[hid] ?? '';
+        final lines = content.split('\n');
+        final preview = lines.take(10).join('\n');
+        buffer.writeln('\n--- [$hid] 前 10 行 ---');
+        buffer.writeln(preview);
+      }
+    }
+
+    return ToolResult.success(buffer.toString().trimRight());
+  }
+}
+
+/// 证书到期监控工具
+///
+/// 支持 3 种检查：
+/// 1. 远程 HTTPS 证书：通过 executor 在远程主机执行 openssl s_client -connect host:443
+/// 2. 本地证书文件：通过 executor 读取 cert.pem 文件，用 openssl x509 解析
+/// 3. SSH host key 指纹：通过 executor 读取 /etc/ssh/ 下的公钥指纹
+class CertMonitorTool extends AgentTool {
+  @override
+  String get name => 'cert_check';
+
+  @override
+  String get description => '检查 HTTPS/SSL 证书到期时间或 SSH host key 指纹。'
+      '用于证书到期监控、安全审计。返回证书有效期剩余天数、到期日期、颁发者等。';
+
+  @override
+  String get paramSpec => '{"mode":"remote|local_file|ssh_hostkey(必填)","host":"远程HTTPS主机名或IP(mode=remote时必填)","port":"HTTPS端口(默认443)","certPath":"本地证书文件路径(mode=local_file时必填)"}';
+
+  @override
+  Future<ToolResult> execute({
+    required CommandExecutor executor,
+    required Map<String, dynamic> args,
+    void Function(String message)? onProgress,
+  }) async {
+    final mode = args['mode']?.toString() ?? '';
+    if (mode.isEmpty) {
+      return ToolResult.failure('参数缺失: mode 必填（remote/local_file/ssh_hostkey）');
+    }
+
+    if (mode == 'remote') {
+      final host = args['host']?.toString() ?? '';
+      final port = int.tryParse(args['port']?.toString() ?? '') ?? 443;
+      if (host.isEmpty) {
+        return ToolResult.failure('mode=remote 需要 host 参数');
+      }
+      // R7: 校验 host 格式（防 shell 注入）
+      if (!RegExp(r'^[a-zA-Z0-9.\-]+$').hasMatch(host)) {
+        return ToolResult.failure('host 格式非法（仅允许字母、数字、点、连字符）');
+      }
+      if (port < 1 || port > 65535) {
+        return ToolResult.failure('port 范围非法（1-65535）');
+      }
+
+      onProgress?.call('正在检查 $host:$port 的 HTTPS 证书...');
+      // 通过 executor 在已连接主机上执行 openssl 命令
+      // 用 -servername 启用 SNI；用 2>/dev/null 屏蔽 s_client 的握手交互输出
+      final cmd = "echo | openssl s_client -connect $host:$port -servername $host 2>/dev/null "
+          "| openssl x509 -noout -dates -issuer -subject 2>/dev/null";
+      try {
+        final result = await executor.executeAndWait(cmd, timeout: const Duration(seconds: 15));
+        if (!result.success) {
+          return ToolResult.failure('openssl 执行失败: ${result.stderr}', output: result.stdout);
+        }
+        final output = result.stdout.trim();
+        if (output.isEmpty) {
+          return ToolResult.failure('$host:$port 未返回证书（可能非 HTTPS 或端口不通）');
+        }
+        // 解析 notBefore/notAfter
+        final parsed = _parseCertOutput(output, host, port);
+        return ToolResult.success(parsed);
+      } catch (e) {
+        return ToolResult.failure('检查异常: $e');
+      }
+    }
+
+    if (mode == 'local_file') {
+      final certPath = args['certPath']?.toString() ?? '';
+      if (certPath.isEmpty) {
+        return ToolResult.failure('mode=local_file 需要 certPath 参数');
+      }
+      // R7: 校验路径不含 shell 元字符（防注入；单引号防护可被单引号突破）
+      if (RegExp(r"[';`$\\|&><\n\r]").hasMatch(certPath)) {
+        return ToolResult.failure('certPath 含非法字符（禁止引号/分号/管道/反引号等）');
+      }
+      onProgress?.call('正在解析本地证书: $certPath');
+      final cmd = "openssl x509 -in '$certPath' -noout -dates -issuer -subject 2>&1";
+      try {
+        final result = await executor.executeAndWait(cmd, timeout: const Duration(seconds: 10));
+        if (!result.success) {
+          return ToolResult.failure('openssl 执行失败: ${result.stderr}', output: result.stdout);
+        }
+        final output = result.stdout.trim();
+        if (output.isEmpty || output.contains('unable to load certificate')) {
+          return ToolResult.failure('无法加载证书: $certPath', output: output);
+        }
+        final parsed = _parseCertOutput(output, certPath, null);
+        return ToolResult.success(parsed);
+      } catch (e) {
+        return ToolResult.failure('检查异常: $e');
+      }
+    }
+
+    if (mode == 'ssh_hostkey') {
+      onProgress?.call('正在读取 SSH host key 指纹...');
+      // 列出 /etc/ssh/ 下所有 host key 的指纹
+      final cmd = "for f in /etc/ssh/ssh_host_*_key.pub; do "
+          "ssh-keygen -lf \"\$f\" 2>/dev/null; "
+          "done";
+      try {
+        final result = await executor.executeAndWait(cmd, timeout: const Duration(seconds: 10));
+        if (!result.success) {
+          return ToolResult.failure('ssh-keygen 执行失败: ${result.stderr}', output: result.stdout);
+        }
+        final output = result.stdout.trim();
+        if (output.isEmpty) {
+          return ToolResult.failure('未找到 host key（可能权限不足或路径不存在）');
+        }
+        return ToolResult.success('SSH Host Key 指纹:\n$output');
+      } catch (e) {
+        return ToolResult.failure('检查异常: $e');
+      }
+    }
+
+    return ToolResult.failure('未知 mode: $mode（支持 remote/local_file/ssh_hostkey）');
+  }
+
+  /// 解析 openssl x509 -dates -issuer -subject 输出
+  String _parseCertOutput(String output, String target, int? port) {
+    String? notBefore;
+    String? notAfter;
+    String? issuer;
+    String? subject;
+
+    for (final line in output.split('\n')) {
+      final l = line.trim();
+      if (l.startsWith('notBefore=')) notBefore = l.substring('notBefore='.length);
+      if (l.startsWith('notAfter=')) notAfter = l.substring('notAfter='.length);
+      if (l.startsWith('issuer=')) issuer = l.substring('issuer='.length);
+      if (l.startsWith('subject=')) subject = l.substring('subject='.length);
+    }
+
+    if (notAfter == null) {
+      return '无法解析证书到期时间。原始输出:\n$output';
+    }
+
+    // 计算剩余天数
+    int daysLeft = -1;
+    try {
+      // openssl 输出格式如: Aug 14 12:00:00 2025 GMT
+      final dt = _parseOpenSslDate(notAfter);
+      if (dt != null) {
+        daysLeft = dt.difference(DateTime.now()).inDays;
+      }
+    } catch (_) {}
+
+    final targetDesc = port != null ? '$target:$port' : target;
+    final buffer = StringBuffer();
+    buffer.writeln('证书目标: $targetDesc');
+    buffer.writeln('主题: ${subject ?? "(未知)"}');
+    buffer.writeln('颁发者: ${issuer ?? "(未知)"}');
+    buffer.writeln('生效时间: ${notBefore ?? "(未知)"}');
+    buffer.writeln('过期时间: $notAfter');
+    if (daysLeft >= 0) {
+      buffer.writeln('剩余天数: $daysLeft 天');
+      if (daysLeft <= 0) {
+        buffer.writeln('⚠️ 状态: 已过期');
+      } else if (daysLeft <= 30) {
+        buffer.writeln('⚠️ 状态: 即将到期（30 天内）');
+      } else if (daysLeft <= 90) {
+        buffer.writeln('状态: 注意（90 天内到期）');
+      } else {
+        buffer.writeln('状态: 正常');
+      }
+    }
+    return buffer.toString().trimRight();
+  }
+
+  /// 解析 openssl 日期格式（如 "Aug 14 12:00:00 2025 GMT"）
+  DateTime? _parseOpenSslDate(String s) {
+    try {
+      // 简单解析：用 Locale 不敏感的方式手动解析
+      final months = {
+        'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+        'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12,
+      };
+      final parts = s.split(RegExp(r'\s+'));
+      if (parts.length < 5) return null;
+      final mon = months[parts[0]];
+      if (mon == null) return null;
+      final day = int.parse(parts[1]);
+      // parts[2] = HH:MM:SS
+      final timeParts = parts[2].split(':');
+      final hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+      final second = int.parse(timeParts[2]);
+      final year = int.parse(parts[3]);
+      return DateTime.utc(year, mon, day, hour, minute, second).toLocal();
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
 /// Agent 工具注册表 — 管理所有可用的工具
 class AgentToolRegistry {
   final Map<String, AgentTool> _tools = {};
@@ -634,6 +1142,7 @@ class AgentToolRegistry {
     // 注册默认工具
     register(SftpUploadTool());
     register(FileSyncTool(fileSyncService));
+    register(CertMonitorTool());
   }
 
   /// 启用编排模式：注册多机编排工具
@@ -645,6 +1154,10 @@ class AgentToolRegistry {
     register(ExecBatchTool(_multiHostExecutor!));
     register(CheckConnectivityTool(_multiHostExecutor!));
     register(UploadToTool(_multiHostExecutor!));
+    register(BroadcastUploadTool(_multiHostExecutor!));
+    register(CollectFileTool(_multiHostExecutor!));
+    register(MultiGrepTool(_multiHostExecutor!));
+    register(DiffFilesTool(_multiHostExecutor!));
   }
 
   /// 禁用编排模式：注销多机编排工具
@@ -654,6 +1167,10 @@ class AgentToolRegistry {
     _tools.remove('exec_batch');
     _tools.remove('check_connectivity');
     _tools.remove('upload_to');
+    _tools.remove('broadcast_upload');
+    _tools.remove('collect_file');
+    _tools.remove('multi_grep');
+    _tools.remove('diff_files');
   }
 
   bool get isOrchestratorEnabled => _multiHostExecutor != null;

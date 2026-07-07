@@ -55,6 +55,8 @@ dependencies:
   sqflite_common_ffi: ^2.3.0
   # 路径获取（知识库文件存储路径）
   path_provider: ^2.1.0
+  # 图表（服务器监控面板的 CPU/内存/带宽折线图）
+  fl_chart: ^0.68.0
 
 dev_dependencies:
   flutter_test:
@@ -95,3 +97,11 @@ flutter_launcher_icons:
   image_path: "assets/icons/app_icon.png"
   adaptive_icon_background: "#0F0F0F"
   adaptive_icon_foreground: "assets/icons/app_icon.png"
+
+# 使用系统自带的 SQLite，避免从 GitHub 下载预编译库（网络不稳定时构建失败）
+# macOS 自带 libsqlite3.dylib (3.51.0, 支持 FTS5)
+# Linux 需安装 libsqlite3-dev；Windows 需 sqlite3.dll
+hooks:
+  user_defines:
+    sqlite3:
+      source: system

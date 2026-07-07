@@ -8,12 +8,16 @@ import 'core/constants.dart';
 import 'providers/app_providers.dart';
 import 'services/knowledge_service.dart';
 import 'services/provider_config_service.dart';
+import 'services/change_window_service.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await HiveInit.init();
   await ProviderConfigService.init();
+  ChangeWindowService.load();
+  NotificationService.load();
 
   KnowledgeService().init().catchError((e) {
     debugPrint('[main] 知识库初始化失败: $e');

@@ -25,6 +25,10 @@ import '../utils/command_heuristics.dart';
 import '../utils/output_processor.dart';
 import '../utils/react_stream_parser.dart';
 import '../utils/rollback_advisor.dart';
+import '../utils/audit_logger.dart';
+import 'change_record_service.dart';
+import 'change_window_service.dart';
+import 'notification_service.dart';
 
 /// Agent 执行引擎 - 核心自动执行系统
 class AgentEngine {
@@ -103,6 +107,11 @@ class AgentEngine {
   bool _orchestratorMode = false;
 
   bool get isOrchestratorMode => _orchestratorMode;
+
+  /// 只读模式（Dry-run）开关：开启后只允许 safe 级命令执行，info/warn/blocked 全部拒绝
+  bool _readOnlyMode = false;
+
+  bool get isReadOnlyMode => _readOnlyMode;
 
   /// R2: 清理工具持有的资源（文件同步的 watcher/timer 等）
   /// 在 agent_provider dispose 时调用
@@ -249,12 +258,22 @@ class AgentEngine {
       await _executeAutomatic(goal, executor, myGeneration);
     } catch (e, stack) {
       agentLogger.error('AgentEngine', '执行异常: $e\n$stack');
-      _currentTask = _currentTask!.copyWith(
+      // R1: 代际检查 — 旧任务抛异常时不能覆盖新任务状态
+      if (myGeneration != _currentTaskGeneration) {
+        agentLogger.info('AgentEngine', '代际已变更，跳过失败状态写入');
+        return;
+      }
+      final startTime = _currentTask?.createdAt;
+      _currentTask = _currentTask?.copyWith(
         status: AgentStatus.failed,
         completedAt: DateTime.now(),
       );
-      onError?.call(_friendlyErrorMessage(e));
-      onTaskUpdated?.call(_currentTask!);
+      if (_currentTask != null) {
+        onError?.call(_friendlyErrorMessage(e));
+        onTaskUpdated?.call(_currentTask!);
+        // 任务失败通知
+        _notifyTaskCompletion(success: false, startTime: startTime, error: e.toString());
+      }
     }
   }
 
@@ -446,11 +465,16 @@ class AgentEngine {
         onError?.call(friendlyMsg);
         // L1 修复：AI 异常应标记 failed 并退出，不应走到循环后的 completed 逻辑
         if (myGeneration == _currentTaskGeneration && _currentTask != null) {
+          final startTime = _currentTask!.createdAt;
           _currentTask = _currentTask!.copyWith(
             status: AgentStatus.failed,
             completedAt: DateTime.now(),
           );
           onTaskUpdated?.call(_currentTask!);
+          // R5: 失败路径也要 emit finish 事件，避免 UI 卡 running
+          onEvent?.call(AgentEvent.finish(summary: '任务失败: $friendlyMsg'));
+          // 任务失败通知（与外层 catch 保持一致）
+          _notifyTaskCompletion(success: false, startTime: startTime, error: e.toString());
         }
         return;
       }
@@ -893,10 +917,52 @@ class AgentEngine {
     final safetyLevel = SafetyGuard.check(command);
     agentLogger.info('ReAct', '安全检查: $safetyLevel');
 
+    // 变更窗口/封网期检查：非 safe 级命令在封网期被拒绝
+    final (windowAllowed, windowReason) = ChangeWindowService.checkCommand(command);
+    if (!windowAllowed) {
+      agentLogger.warn('ReAct', '封网期拦截修改性命令: $command');
+      onEvent?.call(AgentEvent.info('🚫 封网期拦截\n命令: `$command`\n$windowReason'));
+      final observation = ReActObservation(
+        command: command,
+        output: '封网期内禁止执行修改性命令（仅允许只读命令）',
+        success: false,
+        error: windowReason ?? '封网期拦截',
+      ).format();
+      return _EarlyExecutionResult(shouldContinue: true, observation: observation, command: command);
+    }
+
+    // 只读模式（Dry-run）：非 safe 级命令直接拒绝，不执行
+    if (_readOnlyMode && safetyLevel != SafetyLevel.safe) {
+      agentLogger.warn('ReAct', '只读模式拦截非只读命令: $command');
+      final reason = SafetyGuard.getReason(command) ?? SafetyGuard.getTip(safetyLevel);
+      onEvent?.call(AgentEvent.info('🔒 只读模式已开启，此命令被拒绝执行: `$command`\n等级: $safetyLevel\n说明: $reason'));
+      final observation = ReActObservation(
+        command: command,
+        output: '只读模式下禁止执行非只读命令（当前等级: $safetyLevel）',
+        success: false,
+        error: '只读模式拦截',
+      ).format();
+      return _EarlyExecutionResult(shouldContinue: true, observation: observation, command: command);
+    }
+
     if (safetyLevel == SafetyLevel.blocked) {
       agentLogger.warn('ReAct', '命令被安全系统拦截: $command');
       final reason = SafetyGuard.getReason(command) ?? SafetyGuard.getTip(safetyLevel);
       onEvent?.call(AgentEvent.info('🚫 命令被安全系统拦截: $command\n原因: $reason'));
+      // 审计日志：被拦截的命令也要记录（executed=false）
+      if (hostId != null) {
+        try {
+          await AuditLogger.log(
+            hostId: hostId!,
+            command: command,
+            safetyLevel: safetyLevel.name,
+            output: reason,
+            executed: false,
+          );
+        } catch (e) {
+          agentLogger.warn('Audit', '审计日志写入失败(拦截分支): $e');
+        }
+      }
       final observation = ReActObservation(
         command: command,
         output: '命令被安全系统拦截，禁止执行',
@@ -1035,12 +1101,48 @@ class AgentEngine {
 
     onCommandExecuted?.call(result);
 
+    // 变更台账：非 safe 级命令（即修改性命令）记录到台账，便于事后追溯和回滚
+    // safe 级命令（ls/cat/grep 等只读命令）不记录，避免台账膨胀
+    if (safetyLevel != SafetyLevel.safe && hostId != null) {
+      try {
+        await ChangeRecordService.record(
+          hostId: hostId!,
+          command: command,
+          success: result.success,
+          conversationId: _currentTask?.id,
+        );
+      } catch (e) {
+        // R8: 持久化失败不可静默吞掉，需记录日志带上下文
+        agentLogger.warn('ChangeRecord', '记录变更台账失败(忽略): hostId=$hostId, cmd=$command, err=$e');
+      }
+      // 审计日志：记录非 safe 级命令的执行情况（含执行结果摘要）
+      try {
+        await AuditLogger.log(
+          hostId: hostId!,
+          command: command,
+          safetyLevel: safetyLevel.name,
+          output: result.success
+              ? (result.output?.isNotEmpty == true ? _truncateForAudit(result.output!) : null)
+              : (result.error?.isNotEmpty == true ? _truncateForAudit(result.error!) : null),
+          executed: true,
+        );
+      } catch (e) {
+        agentLogger.warn('Audit', '审计日志写入失败(忽略): hostId=$hostId, cmd=$command, err=$e');
+      }
+    }
+
     return _EarlyExecutionResult(
       shouldContinue: true,
       observation: observation.format(),
       command: command,
       success: result.success,
     );
+  }
+
+  /// 审计日志输出截断（避免 MB 级日志膨胀审计 box）
+  static String _truncateForAudit(String s) {
+    if (s.length <= 500) return s;
+    return '${s.substring(0, 500)}...(${s.length} chars)';
   }
 
   /// 最近一次 command 事件 id（用于 result 关联）
@@ -1256,6 +1358,7 @@ class AgentEngine {
   /// 标记任务为已完成（统一的结束逻辑）
   void _finishTask() {
     _trimMessages(_conversationHistory);
+    final startTime = _currentTask?.createdAt;
     _currentTask = _currentTask!.copyWith(
       status: AgentStatus.completed,
       completedAt: DateTime.now(),
@@ -1267,6 +1370,28 @@ class AgentEngine {
     if (_accumulatedMessage.isNotEmpty) {
       onCompleted?.call(_accumulatedMessage);
     }
+    // 任务完成通知（异步，不阻塞引擎）
+    _notifyTaskCompletion(success: true, startTime: startTime);
+  }
+
+  /// 推送任务完成通知（异步触发，不阻塞引擎主流程）
+  void _notifyTaskCompletion({required bool success, DateTime? startTime, String? error}) {
+    final task = _currentTask;
+    if (task == null) return;
+    final duration = startTime != null ? DateTime.now().difference(startTime) : null;
+    // 异步推送，不 await，避免阻塞 UI；用独立 async 块 + try/catch 避免 catchError 类型问题
+    () async {
+      try {
+        await NotificationService.notifyTaskCompletion(
+          goal: task.goal,
+          success: success,
+          duration: duration,
+          error: error,
+        );
+      } catch (e) {
+        agentLogger.warn('Notification', '推送通知失败: $e');
+      }
+    }();
   }
 
   /// 执行单条命令（支持 SSH 和本地 PTY）
@@ -1687,6 +1812,15 @@ class AgentEngine {
       buffer.writeln(_buildOrchestratorPrompt());
     }
 
+    // 只读模式（Dry-run）注入
+    if (_readOnlyMode) {
+      buffer.writeln();
+      buffer.writeln('【只读模式 / Dry-run】');
+      buffer.writeln('当前已开启只读模式，你只能执行只读命令（如 ls/cat/ps/grep/systemctl status 等）。');
+      buffer.writeln('任何可能产生副作用的命令（安装/修改/重启/删除等）都会被系统直接拒绝，不需要询问用户确认。');
+      buffer.writeln('若任务必须修改系统才能完成，请用 finish 动作告知用户"当前为只读模式，请关闭后重试"。');
+    }
+
     // 早期对话摘要（压缩后产生，帮助 AI 回顾早期对话）
     if (_conversationSummary != null && _conversationSummary!.isNotEmpty) {
       buffer.writeln();
@@ -1764,6 +1898,14 @@ $hostList
     if (!_orchestratorMode) return;
     _orchestratorMode = false;
     _tools.disableOrchestrator();
+    _invalidateSystemPromptCache();
+  }
+
+  /// 开启/关闭只读模式（Dry-run）
+  /// 开启后 AI 只能执行只读命令（SafetyLevel.safe），任何修改性命令直接拒绝
+  void setReadOnlyMode(bool enabled) {
+    if (_readOnlyMode == enabled) return;
+    _readOnlyMode = enabled;
     _invalidateSystemPromptCache();
   }
 

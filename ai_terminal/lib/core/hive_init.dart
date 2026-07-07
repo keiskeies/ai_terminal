@@ -6,13 +6,14 @@ import '../models/chat_session.dart';
 import '../models/command_snippet.dart';
 import '../models/conversation.dart';
 import '../models/agent_event.dart';
+import '../models/change_record.dart';
 import 'credentials_store.dart';
 
 class HiveInit {
   static Future<void> init() async {
     await Hive.initFlutter();
 
-    // 注册适配器（按依赖顺序：AgentEventType → AgentEvent → ConvMessage）
+    // 注册适配器（按依赖顺序：AgentEventType → AgentEvent → ConvMessage → ChangeType → ChangeRecord）
     Hive.registerAdapter(HostConfigAdapter());
     Hive.registerAdapter(AIModelConfigAdapter());
     Hive.registerAdapter(ChatSessionAdapter());
@@ -24,6 +25,8 @@ class HiveInit {
     Hive.registerAdapter(ConvMessageAdapter());
     Hive.registerAdapter(ConvAgentLogAdapter());
     Hive.registerAdapter(ConversationAdapter());
+    Hive.registerAdapter(ChangeTypeAdapter());
+    Hive.registerAdapter(ChangeRecordAdapter());
 
     // 打开 boxes（若因 schema 变更导致老数据反序列化失败，自动重建对应 box，避免黑屏）
     await _openBoxSafe<HostConfig>('hosts');
@@ -33,6 +36,7 @@ class HiveInit {
     await Hive.openBox('settings');
     await Hive.openBox('auditLogs');
     await _openBoxSafe<Conversation>('conversations');
+    await _openBoxSafe<ChangeRecord>('changeRecords');
 
     // 初始化凭据存储
     await CredentialsStore.init();
@@ -62,4 +66,5 @@ class HiveInit {
   static Box get settingsBox => Hive.box('settings');
   static Box get auditLogsBox => Hive.box('auditLogs');
   static Box<Conversation> get conversationsBox => Hive.box<Conversation>('conversations');
+  static Box<ChangeRecord> get changeRecordsBox => Hive.box<ChangeRecord>('changeRecords');
 }

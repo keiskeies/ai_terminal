@@ -300,12 +300,8 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                   _buildSectionTitle('分组与标签'),
                   const SizedBox(height: 12),
 
-                  TextFormField(
-                    controller: _groupController,
-                    decoration: const InputDecoration(
-                      labelText: '分组',
-                    ),
-                  ),
+                  // 分组：下拉候选 + 自由输入（新建分组）
+                  _buildGroupField(),
                   const SizedBox(height: 12),
 
                   const Text('标签颜色', style: TextStyle(color: cTextSub)),
@@ -500,6 +496,43 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
         fontWeight: FontWeight.w600,
         color: cPrimary,
       ),
+    );
+  }
+
+  /// 分组字段：下拉候选（来自现有分组）+ 自由输入（新建分组）
+  Widget _buildGroupField() {
+    // 收集现有分组（去重，保留出现顺序）
+    final hosts = ref.read(hostsProvider).valueOrNull ?? [];
+    final existingGroups = <String>{};
+    for (final h in hosts) {
+      existingGroups.add(h.group);
+    }
+    final groupList = existingGroups.toList()..sort();
+    if (!groupList.contains('默认')) groupList.insert(0, '默认');
+
+    return Row(
+      children: [
+        Expanded(
+          child: TextFormField(
+            controller: _groupController,
+            decoration: const InputDecoration(
+              labelText: '分组',
+              hintText: '输入或选择分组',
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        PopupMenuButton<String>(
+          icon: const Icon(Icons.arrow_drop_down, size: 20),
+          tooltip: '选择已有分组',
+          onSelected: (value) {
+            setState(() => _groupController.text = value);
+          },
+          itemBuilder: (_) => groupList
+              .map((g) => PopupMenuItem(value: g, child: Text(g)))
+              .toList(),
+        ),
+      ],
     );
   }
 
