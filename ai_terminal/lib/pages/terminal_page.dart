@@ -70,8 +70,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   // AI 面板是否可见（P0-1：支持完全收起）
   bool _isAIPanelVisible = false;
 
-  // 服务器监控面板是否可见（终端下方横幅）
-  bool _isMonitorVisible = false;
+  // 服务器监控面板可见的 hostId 集合（每个 host 开关独立）
+  final Set<String> _monitorVisibleHosts = {};
 
   // Per-host 监控服务缓存（key = hostId 或 "local"）
   final Map<String, ServerMonitorService> _monitorServices = {};
@@ -170,11 +170,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         _isAIPanelVisible = aiPanelVisible as bool;
       }
     } catch (_) {}
-    // 加载监控面板可见性设置，默认收起
+    // 加载监控面板可见的 host 列表（per-host 独立开关）
     try {
-      final monitorVisible = HiveInit.settingsBox.get('monitorVisible');
-      if (monitorVisible != null) {
-        _isMonitorVisible = monitorVisible as bool;
+      final raw = HiveInit.settingsBox.get('monitorVisibleHosts');
+      if (raw is List) {
+        _monitorVisibleHosts.addAll(raw.cast<String>());
       }
     } catch (_) {}
     // 加载 Agent 最大步骤数（需在 initAgent 之前加载）
@@ -611,9 +611,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       ],
     );
 
-    // 监控面板包装：在终端下方插入监控横幅（仅在已连接且开关开启时）
+    // 监控面板包装：在终端下方插入监控横幅（仅在已连接且该 host 开关开启时）
     final monitorService = _getOrCreateMonitorService(tab);
-    final showMonitor = _isMonitorVisible && monitorService != null;
+    final currentHostId = tab != null && tab.isConnected
+        ? (tab.isLocal ? 'local' : (tab.hostId ?? 'local'))
+        : null;
+    final showMonitor = currentHostId != null &&
+        _monitorVisibleHosts.contains(currentHostId) &&
+        monitorService != null;
     final terminalArea = showMonitor
         ? Column(
             children: [
@@ -1081,25 +1086,35 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     final accentColor = cKleinBlue;
     final activeTab = ref.read(tp.terminalProvider).activeTab;
     final canShow = activeTab != null && activeTab.isConnected;
+    // per-host 开关状态
+    final hostId = activeTab != null && activeTab.isConnected
+        ? (activeTab.isLocal ? 'local' : (activeTab.hostId ?? 'local'))
+        : null;
+    final isOn = hostId != null && _monitorVisibleHosts.contains(hostId);
 
     return Tooltip(
-      message: _isMonitorVisible ? '收起监控面板' : '展开监控面板',
+      message: isOn ? '收起监控面板' : '展开监控面板',
       child: GestureDetector(
         onTap: canShow ? () {
           setState(() {
-            _isMonitorVisible = !_isMonitorVisible;
+            if (isOn) {
+              _monitorVisibleHosts.remove(hostId);
+            } else {
+              _monitorVisibleHosts.add(hostId!);
+            }
           });
-          HiveInit.settingsBox.put('monitorVisible', _isMonitorVisible);
+          // 持久化为 List
+          HiveInit.settingsBox.put('monitorVisibleHosts', _monitorVisibleHosts.toList());
         } : null,
         child: AnimatedContainer(
           duration: animFast,
           height: 30,
           padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            color: _isMonitorVisible ? accentColor.withValues(alpha: 0.15) : tc.surface,
+            color: isOn ? accentColor.withValues(alpha: 0.15) : tc.surface,
             borderRadius: BorderRadius.circular(rSmall),
             border: Border.all(
-              color: _isMonitorVisible ? accentColor.withValues(alpha: 0.4) : tc.border.withValues(alpha: 0.3),
+              color: isOn ? accentColor.withValues(alpha: 0.4) : tc.border.withValues(alpha: 0.3),
               width: 1,
             ),
           ),
@@ -1109,15 +1124,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               Icon(
                 Icons.monitor_heart_outlined,
                 size: 14,
-                color: _isMonitorVisible ? accentColor : (canShow ? tc.textSub : tc.textMuted),
+                color: isOn ? accentColor : (canShow ? tc.textSub : tc.textMuted),
               ),
               const SizedBox(width: 4),
               Text(
                 '监控',
                 style: TextStyle(
                   fontSize: fMicro,
-                  color: _isMonitorVisible ? accentColor : (canShow ? tc.textSub : tc.textMuted),
-                  fontWeight: _isMonitorVisible ? FontWeight.w600 : FontWeight.normal,
+                  color: isOn ? accentColor : (canShow ? tc.textSub : tc.textMuted),
+                  fontWeight: isOn ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
             ],
