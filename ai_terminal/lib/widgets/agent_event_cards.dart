@@ -171,7 +171,7 @@ class AgentEventContent extends StatelessWidget {
       decoration: BoxDecoration(
         color: tc.terminalBg,
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: tc.border),
+        border: Border.all(color: cBorder, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -350,25 +350,11 @@ class AgentEventContent extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8, top: 4),
       padding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            cSuccess.withValues(alpha: 0.12),
-            cSuccess.withValues(alpha: 0.04),
-          ],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ),
+        color: cSuccessBg,
         borderRadius: BorderRadius.circular(rSmall),
         border: Border.all(color: cSuccess.withValues(alpha: 0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: cSuccess.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
       ),
       child: Row(
         children: [

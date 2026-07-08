@@ -71,22 +71,40 @@ class _HostListPageState extends ConsumerState<HostListPage> {
         children: [
           // 搜索栏
           Padding(
-            padding: const EdgeInsets.all(pStandard),
+            padding: const EdgeInsets.fromLTRB(pStandard, 0, pStandard, pStandard),
             child: TextField(
               controller: _searchController,
               onChanged: (value) => setState(() => _searchQuery = value),
+              style: const TextStyle(fontSize: fBody),
               decoration: InputDecoration(
                 hintText: '搜索服务器...',
-                prefixIcon: const Icon(Icons.search, color: cTextSub),
+                hintStyle: TextStyle(color: ThemeColors.of(context).textMuted),
+                filled: true,
+                fillColor: cCard,
+                prefixIcon: const Icon(Icons.search, color: cTextSub, size: 18),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear, color: cTextSub),
+                        icon: const Icon(Icons.clear, color: cTextSub, size: 16),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
                         },
                       )
                     : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(rSmall),
+                  borderSide: const BorderSide(color: cBorder, width: 1),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(rSmall),
+                  borderSide: const BorderSide(color: cBorder, width: 1),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(rSmall),
+                  borderSide: const BorderSide(color: cPrimary, width: 1),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                isDense: true,
               ),
             ),
           ),

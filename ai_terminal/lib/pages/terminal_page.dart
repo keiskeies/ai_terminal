@@ -1489,6 +1489,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     return Container(
       decoration: BoxDecoration(
         color: tc.cardElevated,
+        border: Border(
+          top: BorderSide(color: cBorder, width: 1),
+        ),
       ),
       child: Column(
         children: [

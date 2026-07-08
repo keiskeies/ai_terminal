@@ -1,6 +1,6 @@
 import 'dart:async';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../services/server_monitor_service.dart';
@@ -360,51 +360,45 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
         child: Material(
           color: Colors.transparent,
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 360),
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: tc.cardElevated,
-            borderRadius: BorderRadius.circular(rSmall),
-            border: Border.all(color: tc.border, width: 0.5),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.4),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 标题
-              Row(
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: fSmall,
-                      color: tc.textMain,
-                      fontWeight: FontWeight.w600,
+            width: 360,
+            decoration: BoxDecoration(
+              color: cCardElevated,
+              borderRadius: BorderRadius.circular(rMedium),
+              border: Border.all(color: cBorder, width: 1),
+              boxShadow: shadowXl,
+            ),
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 标题
+                Row(
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: fSmall,
+                        color: tc.textMain,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: _hideOverlay,
-                    child: Icon(Icons.close, size: 12, color: tc.textMuted),
-                  ),
-                ],
-              ),
-              Divider(height: 6, color: tc.border.withValues(alpha: 0.3)),
-              // 网络/磁盘浮层使用专用表格布局，其他使用左右两栏
-              if (metric == 'netUp' || metric == 'netDown')
-                _buildNetOverlayContent(tc, snap)
-              else if (metric == 'disk')
-                _buildDiskOverlayContent(tc, snap)
-              else
-                _buildTwoColumnRows(tc, rows),
-            ],
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: _hideOverlay,
+                      child: Icon(Icons.close, size: 12, color: tc.textMuted),
+                    ),
+                  ],
+                ),
+                Divider(height: 6, color: tc.border.withValues(alpha: 0.3)),
+                // 网络/磁盘浮层使用专用表格布局，其他使用左右两栏
+                if (metric == 'netUp' || metric == 'netDown')
+                  _buildNetOverlayContent(tc, snap)
+                else if (metric == 'disk')
+                  _buildDiskOverlayContent(tc, snap)
+                else
+                  _buildTwoColumnRows(tc, rows),
+              ],
             ),
           ),
         ),

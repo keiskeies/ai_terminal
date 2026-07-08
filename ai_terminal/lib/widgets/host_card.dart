@@ -10,7 +10,7 @@ import '../models/host_config.dart';
 /// - 增加最后连接时间
 /// - 快捷操作按钮外露（连接、SFTP）
 /// - 状态点增加脉冲动画
-class HostCard extends StatelessWidget {
+class HostCard extends StatefulWidget {
   final HostConfig host;
   final VoidCallback? onTap;
   final VoidCallback? onEdit;
@@ -24,8 +24,15 @@ class HostCard extends StatelessWidget {
     this.onDelete,
   });
 
+  @override
+  State<HostCard> createState() => _HostCardState();
+}
+
+class _HostCardState extends State<HostCard> {
+  bool _isHovered = false;
+
   Color get _statusColor {
-    switch (host.lastStatus) {
+    switch (widget.host.lastStatus) {
       case 'success':
         return cSuccess;
       case 'failed':
@@ -35,7 +42,6 @@ class HostCard extends StatelessWidget {
     }
   }
 
-  /// 生成头像背景色（基于名称哈希）
   Color get _avatarColor {
     final colors = [
       cPrimary,
@@ -46,16 +52,15 @@ class HostCard extends StatelessWidget {
       const Color(0xFF06B6D4),
     ];
     int hash = 0;
-    for (var i = 0; i < host.name.length; i++) {
-      hash = host.name.codeUnitAt(i) + ((hash << 5) - hash);
+    for (var i = 0; i < widget.host.name.length; i++) {
+      hash = widget.host.name.codeUnitAt(i) + ((hash << 5) - hash);
     }
     return colors[hash.abs() % colors.length];
   }
 
-  /// 格式化最后连接时间
   String? get _lastConnectedText {
-    if (host.lastConnectedAt == null) return null;
-    final diff = DateTime.now().difference(host.lastConnectedAt!);
+    if (widget.host.lastConnectedAt == null) return null;
+    final diff = DateTime.now().difference(widget.host.lastConnectedAt!);
     if (diff.inMinutes < 1) return '刚刚';
     if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
     if (diff.inHours < 24) return '${diff.inHours}小时前';
@@ -68,29 +73,31 @@ class HostCard extends StatelessWidget {
     final tc = ThemeColors.of(context);
     final lastConnected = _lastConnectedText;
 
-    final tagColor = host.tagColor != null
-        ? Color(int.parse(host.tagColor!.replaceFirst('#', '0xFF')))
+    final tagColor = widget.host.tagColor != null
+        ? Color(int.parse(widget.host.tagColor!.replaceFirst('#', '0xFF')))
         : null;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: pStandard, vertical: pCompact / 2),
-      decoration: BoxDecoration(
-        color: tc.card,
-        borderRadius: BorderRadius.circular(rCard),
-        border: Border.all(color: tc.border),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: animFast,
+          margin: const EdgeInsets.symmetric(horizontal: pStandard, vertical: pCompact / 2),
+          decoration: BoxDecoration(
+            color: _isHovered ? cCardElevated : tc.card,
+            borderRadius: BorderRadius.circular(rCard),
+            border: Border.all(color: cBorder, width: 1),
+          ),
+          clipBehavior: Clip.antiAlias,
           child: Row(
             children: [
-              // 左侧标签色条
               Container(
                 width: 3,
                 height: 88,
-                color: tagColor ?? tc.border,
+                color: tagColor ?? cBorder,
               ),
               Expanded(
                 child: Container(
@@ -98,21 +105,19 @@ class HostCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: pStandard),
                   child: Row(
                     children: [
-                      // 状态指示点 + 头像
                       Stack(
                         alignment: Alignment.topRight,
                         children: [
-                          // 头像
                           Container(
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: _avatarColor.withValues(alpha: 0.15),
+                              color: _avatarColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(rMedium),
                             ),
                             child: Center(
                               child: Text(
-                                host.name.isNotEmpty ? host.name[0].toUpperCase() : '?',
+                                widget.host.name.isNotEmpty ? widget.host.name[0].toUpperCase() : '?',
                                 style: TextStyle(
                                   fontSize: fTitle,
                                   fontWeight: FontWeight.w600,
@@ -121,11 +126,10 @@ class HostCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          // 状态点
                           Positioned(
-                            top: -2,
-                            right: -2,
-                            child: host.lastStatus == 'success'
+                            top: -1,
+                            right: -1,
+                            child: widget.host.lastStatus == 'success'
                                 ? _PulsingDot(color: _statusColor)
                                 : Container(
                                     width: 10,
@@ -140,14 +144,13 @@ class HostCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(width: 12),
-                      // 中间信息
                       Expanded(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              host.name,
+                              widget.host.name,
                               style: TextStyle(
                                 fontSize: fTitle,
                                 fontWeight: FontWeight.w600,
@@ -157,7 +160,7 @@ class HostCard extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${host.username}@${host.host}:${host.port}',
+                              '${widget.host.username}@${widget.host.host}:${widget.host.port}',
                               style: TextStyle(
                                 fontSize: fBody,
                                 color: tc.textSub,
@@ -177,34 +180,30 @@ class HostCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      // 右侧快捷操作按钮
                       Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // 连接终端按钮
                           _ActionButton(
                             icon: Icons.terminal,
                             tooltip: '连接终端',
-                            onTap: () => context.push('/terminal/${host.id}'),
+                            onTap: () => context.push('/terminal/${widget.host.id}'),
                           ),
-                          const SizedBox(width: 4),
-                          // SFTP 按钮
+                          const SizedBox(width: 2),
                           _ActionButton(
                             icon: Icons.folder_open,
                             tooltip: 'SFTP',
-                            onTap: () => context.push('/sftp/${host.id}'),
+                            onTap: () => context.push('/sftp/${widget.host.id}'),
                           ),
-                          const SizedBox(width: 4),
-                          // 更多菜单
+                          const SizedBox(width: 2),
                           PopupMenuButton<String>(
                             icon: Icon(Icons.more_vert, color: tc.textSub, size: 20),
                             onSelected: (value) {
                               switch (value) {
                                 case 'edit':
-                                  onEdit?.call();
+                                  widget.onEdit?.call();
                                   break;
                                 case 'delete':
-                                  onDelete?.call();
+                                  widget.onDelete?.call();
                                   break;
                               }
                             },

@@ -83,13 +83,13 @@ class AgentCommandBlock extends StatelessWidget {
       decoration: BoxDecoration(
         color: tc.terminalOutput,
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: tc.border),
+        border: Border.all(color: cBorder, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 左侧 3px 安全色条
+          // 左侧色条
           Container(
             width: 3,
             color: accentColor,

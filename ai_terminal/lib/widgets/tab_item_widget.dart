@@ -113,14 +113,11 @@ class _TabItemWidgetState extends State<TabItemWidget> {
               if (isActive)
                 Positioned(
                   bottom: 0,
-                  left: 6,
-                  right: 6,
+                  left: 8,
+                  right: 8,
                   child: Container(
                     height: 2,
-                    decoration: BoxDecoration(
-                      color: cPrimary,
-                      borderRadius: BorderRadius.circular(1),
-                    ),
+                    color: cPrimary,
                   ),
                 ),
             ],

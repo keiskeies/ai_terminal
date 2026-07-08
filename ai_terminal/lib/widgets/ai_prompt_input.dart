@@ -129,55 +129,30 @@ class _AIPromptInputState extends State<AIPromptInput> {
     final size = renderBox.size;
     final tc = ThemeColors.of(context);
     return Positioned(
-      bottom: size.height + 4,
+      bottom: size.height + 6,
       left: 0,
       width: size.width,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          decoration: BoxDecoration(
-            color: tc.cardElevated,
-            borderRadius: BorderRadius.circular(rSmall),
-            border: Border.all(color: tc.border.withValues(alpha: 0.5)),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 2)),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (int i = 0; i < _filteredCommands.length; i++)
-                InkWell(
-                  onTap: () => _selectSlashCommand(_filteredCommands[i]),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    color: i == _highlightedIndex ? widget.accentColor.withValues(alpha: 0.15) : Colors.transparent,
-                    child: Row(
-                      children: [
-                        Text(
-                          _filteredCommands[i].command,
-                          style: TextStyle(
-                            color: i == _highlightedIndex ? widget.accentColor : tc.textMain,
-                            fontSize: fSmall,
-                            fontFamily: 'JetBrainsMono',
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            _filteredCommands[i].description,
-                            style: TextStyle(color: tc.textSub, fontSize: fMicro),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: cCardElevated,
+          borderRadius: BorderRadius.circular(rSmall),
+          border: Border.all(color: cBorder, width: 1),
+          boxShadow: shadowLg,
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (int i = 0; i < _filteredCommands.length; i++)
+              _SlashCommandItem(
+                command: _filteredCommands[i],
+                isHighlighted: i == _highlightedIndex,
+                accentColor: widget.accentColor,
+                tc: tc,
+                onTap: () => _selectSlashCommand(_filteredCommands[i]),
+              ),
+          ],
         ),
       ),
     );
@@ -291,18 +266,9 @@ class _AIPromptInputState extends State<AIPromptInput> {
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
-    final borderColor = _isFocused
-        ? widget.accentColor.withValues(alpha: 0.7)
-        : tc.border.withValues(alpha: 0.5);
-    final disabledBorderColor = tc.border.withValues(alpha: 0.3);
-
-    // 运行中：发送按钮变为终止按钮（外圆内方）
     final running = widget.isRunning;
+    final accent = widget.accentColor;
 
-    // 使用 Focus(onKeyEvent:) 而非 KeyboardListener：
-    // KeyboardListener 的 onKeyEvent 返回 void，无法消费事件，Enter 会继续传播到
-    // TextField 触发换行。Focus 的 onKeyEvent 返回 KeyEventResult，
-    // 返回 handled 可消费事件，阻止 TextField 默认行为。
     return Focus(
       focusNode: _focusNode,
       onKeyEvent: _handleKeyEvent,
@@ -318,96 +284,173 @@ class _AIPromptInputState extends State<AIPromptInput> {
           hintText: widget.hintText,
           hintStyle: TextStyle(color: tc.textMuted, fontSize: fBody),
           filled: true,
-          fillColor: tc.surface,
+          fillColor: cCard,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(rSmall),
-            borderSide: BorderSide(color: borderColor),
+            borderSide: const BorderSide(color: cBorder, width: 1),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(rSmall),
-            borderSide: BorderSide(color: borderColor),
+            borderSide: const BorderSide(color: cBorder, width: 1),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(rSmall),
-            borderSide: BorderSide(color: widget.accentColor, width: 1.5),
+            borderSide: BorderSide(color: accent, width: 1),
           ),
           disabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(rSmall),
-            borderSide: BorderSide(color: disabledBorderColor),
+            borderSide: BorderSide(color: cBorder.withValues(alpha: 0.5)),
           ),
-          contentPadding: const EdgeInsets.fromLTRB(14, 12, 48, 12),
-          isDense: false,
+          contentPadding: const EdgeInsets.fromLTRB(12, 10, 46, 10),
+          isDense: true,
           suffixIcon: Padding(
             padding: const EdgeInsets.all(4),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 多机编排模式切换按钮
                 if (widget.onToggleOrchestrator != null)
-                  GestureDetector(
-                    onTap: widget.onToggleOrchestrator,
-                    child: Tooltip(
-                      message: widget.isOrchestratorMode ? '退出编排模式' : '进入多机编排模式',
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        margin: const EdgeInsets.only(right: 4),
-                        decoration: BoxDecoration(
-                          color: widget.isOrchestratorMode
-                              ? cWarning.withValues(alpha: 0.9)
-                              : tc.surface,
-                          border: widget.isOrchestratorMode
-                              ? null
-                              : Border.all(color: tc.border.withValues(alpha: 0.5)),
-                          borderRadius: BorderRadius.circular(rSmall),
-                        ),
-                        child: Icon(
-                          Icons.hub_outlined,
-                          color: widget.isOrchestratorMode ? Colors.white : tc.textMuted,
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                  ),
-                // 发送/终止按钮
-                GestureDetector(
-                  onTap: running
-                      ? widget.onStop
-                      : (widget.enabled ? _send : null),
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      // 运行中：外圆红色背景；空闲：accent 色
-                      color: running
-                          ? cDanger.withValues(alpha: 0.9)
-                          : (widget.enabled ? widget.accentColor : cTextMuted),
-                      borderRadius: BorderRadius.circular(rSmall),
-                    ),
-                    child: running
-                        ? // 外圆内方：外层圆形容器 + 内层白色方块
-                          Center(
-                            child: Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          )
-                        : const Icon(
-                            Icons.arrow_upward_rounded,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                  ),
-                ),
+                  _buildOrchestratorButton(),
+                _buildSendButton(running),
               ],
             ),
           ),
         ),
         onSubmitted: (_) {},
+      ),
+    );
+  }
+
+  Widget _buildOrchestratorButton() {
+    final isOrch = widget.isOrchestratorMode;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onToggleOrchestrator,
+        child: AnimatedContainer(
+          duration: animFast,
+          width: 28,
+          height: 28,
+          margin: const EdgeInsets.only(right: 4),
+          decoration: BoxDecoration(
+            color: isOrch ? cWarning : cSurface,
+            borderRadius: BorderRadius.circular(rXSmall),
+          ),
+          child: Tooltip(
+            message: isOrch ? '退出编排模式' : '进入多机编排模式',
+            child: Icon(
+              Icons.hub_outlined,
+              color: isOrch ? Colors.white : cTextMuted,
+              size: 15,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSendButton(bool running) {
+    final canSend = widget.enabled && !running;
+    final bgColor = running
+        ? cDanger
+        : canSend
+            ? cPrimary
+            : cTextMuted.withValues(alpha: 0.5);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: running
+            ? widget.onStop
+            : (canSend ? _send : null),
+        child: AnimatedContainer(
+          duration: animFast,
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(rXSmall),
+          ),
+          child: running
+              ? Center(
+                  child: Container(
+                    width: 9,
+                    height: 9,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(
+                  Icons.arrow_upward_rounded,
+                  color: Colors.white,
+                  size: 15,
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SlashCommandItem extends StatefulWidget {
+  final SlashCommand command;
+  final bool isHighlighted;
+  final Color accentColor;
+  final ThemeColors tc;
+  final VoidCallback onTap;
+
+  const _SlashCommandItem({
+    required this.command,
+    required this.isHighlighted,
+    required this.accentColor,
+    required this.tc,
+    required this.onTap,
+  });
+
+  @override
+  State<_SlashCommandItem> createState() => _SlashCommandItemState();
+}
+
+class _SlashCommandItemState extends State<_SlashCommandItem> {
+  bool _isHovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = widget.isHighlighted || _isHovered;
+    return MouseRegion(
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: animFast,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          color: active
+              ? widget.accentColor.withValues(alpha: 0.12)
+              : Colors.transparent,
+          child: Row(
+            children: [
+              Text(
+                widget.command.command,
+                style: TextStyle(
+                  color: active ? widget.accentColor : widget.tc.textMain,
+                  fontSize: fSmall,
+                  fontFamily: 'JetBrainsMono',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  widget.command.description,
+                  style: TextStyle(
+                    color: widget.tc.textSub,
+                    fontSize: fMicro,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
