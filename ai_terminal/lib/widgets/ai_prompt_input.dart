@@ -268,6 +268,8 @@ class _AIPromptInputState extends State<AIPromptInput> {
     final tc = ThemeColors.of(context);
     final running = widget.isRunning;
     final accent = widget.accentColor;
+    final isOrch = widget.isOrchestratorMode;
+    final effectiveAccent = isOrch ? cWarning : accent;
 
     return Focus(
       focusNode: _focusNode,
@@ -287,15 +289,18 @@ class _AIPromptInputState extends State<AIPromptInput> {
           fillColor: cCard,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(rSmall),
-            borderSide: const BorderSide(color: cBorder, width: 1),
+            borderSide: BorderSide(color: effectiveAccent, width: 1),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(rSmall),
-            borderSide: const BorderSide(color: cBorder, width: 1),
+            borderSide: BorderSide(
+              color: isOrch ? cWarning : cBorder,
+              width: 1,
+            ),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(rSmall),
-            borderSide: BorderSide(color: accent, width: 1),
+            borderSide: BorderSide(color: effectiveAccent, width: 1),
           ),
           disabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(rSmall),
@@ -350,10 +355,12 @@ class _AIPromptInputState extends State<AIPromptInput> {
 
   Widget _buildSendButton(bool running) {
     final canSend = widget.enabled && !running;
+    final isOrch = widget.isOrchestratorMode;
+    final sendColor = isOrch ? cWarning : cPrimary;
     final bgColor = running
         ? cDanger
         : canSend
-            ? cPrimary
+            ? sendColor
             : cTextMuted.withValues(alpha: 0.5);
 
     return MouseRegion(

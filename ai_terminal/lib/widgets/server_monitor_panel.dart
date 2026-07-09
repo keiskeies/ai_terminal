@@ -32,10 +32,29 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
   Timer? _timer;
   ServerSnapshot? _last;
   bool _isCollecting = false;
+  int _consecutiveFailures = 0; // 连续失败次数，>=2 时显示失败状态
 
   // 浮层控制
   OverlayEntry? _overlayEntry;
   String? _activeMetric; // 当前展示浮层的指标名
+  Offset? _mousePosition; // 鼠标全局位置，用于浮层定位
+
+  static const double _overlayMouseGap = 6;
+
+  /// 按指标类型返回浮层宽度
+  /// 网络/磁盘有表格 → 340；系统信息有长文本 → 320；其他两栏数字 → 280
+  double _overlayWidthFor(String metric) {
+    switch (metric) {
+      case 'netUp':
+      case 'netDown':
+      case 'disk':
+        return 340;
+      case 'uptime':
+        return 320;
+      default:
+        return 280;
+    }
+  }
 
   @override
   void initState() {
@@ -58,40 +77,66 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
   Future<void> _collectNow() async {
     if (!mounted) return;
     if (_isCollecting) return;
-    setState(() => _isCollecting = true);
+    _isCollecting = true;
     try {
       final snap = await widget.service.collect();
       if (!mounted) return;
       setState(() {
         _last = snap;
-        _isCollecting = false;
+        _consecutiveFailures = 0;
       });
+      _isCollecting = false;
       // 如果浮层正在显示，刷新浮层数据
       if (_overlayEntry != null && _activeMetric != null) {
         _updateOverlayContent();
       }
     } catch (_) {
       if (!mounted) return;
-      setState(() => _isCollecting = false);
+      _isCollecting = false;
+      setState(() => _consecutiveFailures++);
     }
   }
 
-  // ==================== 浮层管理 ====================
+  // ==================== 工具函数 ====================
 
-  void _showOverlay(String metric) {
-    if (_activeMetric == metric && _overlayEntry != null) return;
-    _hideOverlay();
+  /// 根据使用率百分比返回对应颜色
+  /// < 80%: 正常色, 80~95%: 警告橙, >= 95%: 危险红
+  Color _colorByPercent(double percent, Color normal) {
+    if (percent >= 95) return cDanger;
+    if (percent >= 80) return cWarning;
+    return normal;
+  }
+
+  void _showOverlay(String metric, Offset mousePosition) {
+    _mousePosition = mousePosition;
+    if (_activeMetric == metric && _overlayEntry != null) {
+      _overlayEntry!.markNeedsBuild();
+      return;
+    }
     _activeMetric = metric;
+    if (_overlayEntry != null) {
+      _overlayEntry!.remove();
+      _overlayEntry = null;
+    }
     _overlayEntry = OverlayEntry(
       builder: (ctx) => _buildOverlay(metric),
     );
     Overlay.of(context, rootOverlay: true).insert(_overlayEntry!);
   }
 
-  void _hideOverlay() {
+  /// 轻量级位置更新：只更新鼠标位置并重建浮层
+  /// 不经过条件检查，不受 widget tree 重建影响
+  void _updateOverlayPosition(Offset mousePosition) {
+    _mousePosition = mousePosition;
+    _overlayEntry?.markNeedsBuild();
+  }
+
+  void _hideOverlay([String? metric]) {
+    if (metric != null && _activeMetric != metric) return;
     _overlayEntry?.remove();
     _overlayEntry = null;
     _activeMetric = null;
+    _mousePosition = null;
   }
 
   void _updateOverlayContent() {
@@ -101,11 +146,50 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
 
   // ==================== 构建 ====================
 
+  /// 采集状态指示器
+  /// 绿点=正常, 红点=连续失败, 灰点=未采集
+  Widget _buildStatusIndicator(ThemeColors tc) {
+    final isFailed = _consecutiveFailures >= 2;
+    final hasData = _last != null;
+    final dotColor = isFailed
+        ? cDanger
+        : hasData
+            ? cSuccess
+            : tc.textMuted.withValues(alpha: 0.5);
+    final tooltip = isFailed
+        ? '采集失败（连续 $_consecutiveFailures 次）'
+        : hasData
+            ? '采集中'
+            : '等待数据';
+
+    return Tooltip(
+      message: tooltip,
+      preferBelow: false,
+      child: Container(
+        width: 16,
+        height: widget.height,
+        alignment: Alignment.center,
+        child: Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: dotColor,
+            shape: BoxShape.circle,
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
     final snap = _last;
     final history = widget.service.history;
+    final isStale = _consecutiveFailures >= 2; // 数据是否过期（采集失败）
+
+    // 数据过期时所有指标变灰
+    Color staleColor(Color c) => isStale ? tc.textMuted : c;
 
     return Container(
       width: double.infinity,
@@ -132,30 +216,17 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
             mainAxisSize: MainAxisSize.min,
             mainAxisAlignment: MainAxisAlignment.start,
             children: [
-              _buildMetricChip(
-                metric: 'user',
-                icon: Icons.person_outline,
-                label: '用户',
-                value: (snap?.hostname.isNotEmpty ?? false) ? snap!.hostname : '-',
-                color: cKleinBlue,
-                valueMaxWidth: 120,
-              ),
-              _divider(tc),
-              _buildMetricChip(
-                metric: 'uptime',
-                icon: Icons.access_time,
-                label: '开机',
-                value: snap?.uptime ?? '-',
-                color: cKleinBlue,
-                valueMaxWidth: 100,
-              ),
-              _divider(tc),
-              _buildMetricChip(
-                metric: 'disk',
-                icon: Icons.storage,
-                label: '磁盘',
-                value: '${(snap?.diskPercent ?? 0).toStringAsFixed(1)}%',
-                color: cKleinBlue,
+              // 采集状态指示器
+              _buildStatusIndicator(tc),
+              const SizedBox(width: 4),
+              _buildMetricChipWithChart(
+                metric: 'cpu',
+                icon: Icons.bolt,
+                label: 'CPU',
+                value: '${(snap?.cpuPercent ?? 0).toStringAsFixed(1)}%',
+                color: staleColor(_colorByPercent(snap?.cpuPercent ?? 0, cPrimary)),
+                chartData: history.map((s) => s.cpuPercent).toList(),
+                chartMax: 100,
               ),
               _divider(tc),
               _buildMetricChipWithChart(
@@ -165,18 +236,8 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
                 value: snap != null && snap.memTotalMB > 0
                     ? '${_formatGB(snap.memUsedMB)}/${_formatGB(snap.memTotalMB)}'
                     : '-',
-                color: cViolet,
+                color: staleColor(_colorByPercent(snap?.memPercent ?? 0, cSuccess)),
                 chartData: history.map((s) => s.memPercent).toList(),
-                chartMax: 100,
-              ),
-              _divider(tc),
-              _buildMetricChipWithChart(
-                metric: 'cpu',
-                icon: Icons.bolt,
-                label: 'CPU',
-                value: '${(snap?.cpuPercent ?? 0).toStringAsFixed(1)}%',
-                color: cKleinBlue,
-                chartData: history.map((s) => s.cpuPercent).toList(),
                 chartMax: 100,
               ),
               _divider(tc),
@@ -185,7 +246,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
                 icon: Icons.arrow_upward,
                 label: '上传',
                 value: _formatRate(snap?.netUpKBps ?? 0),
-                color: cLimeGreen,
+                color: staleColor(cPrimary),
                 chartData: history.map((s) => s.netUpKBps).toList(),
                 chartMax: null, // 自适应
               ),
@@ -195,9 +256,35 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
                 icon: Icons.arrow_downward,
                 label: '下载',
                 value: _formatRate(snap?.netDownKBps ?? 0),
-                color: cHermesOrange,
+                color: staleColor(cSuccess),
                 chartData: history.map((s) => s.netDownKBps).toList(),
                 chartMax: null,
+              ),
+              _divider(tc),
+              _buildMetricChip(
+                metric: 'disk',
+                icon: Icons.storage,
+                label: '磁盘',
+                value: '${(snap?.diskPercent ?? 0).toStringAsFixed(1)}%',
+                color: staleColor(_colorByPercent(snap?.diskPercent ?? 0, cWarning)),
+              ),
+              _divider(tc),
+              _buildMetricChip(
+                metric: 'uptime',
+                icon: Icons.access_time,
+                label: '开机',
+                value: snap?.uptime ?? '-',
+                color: isStale ? tc.textMuted : tc.textSub,
+                valueMaxWidth: 100,
+              ),
+              _divider(tc),
+              _buildMetricChip(
+                metric: 'user',
+                icon: Icons.person_outline,
+                label: '用户',
+                value: (snap?.hostname.isNotEmpty ?? false) ? snap!.hostname : '-',
+                color: isStale ? tc.textMuted : tc.textSub,
+                valueMaxWidth: 120,
               ),
             ],
           ),
@@ -228,8 +315,10 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
     return _MetricHoverWrapper(
       metric: metric,
       activeMetric: _activeMetric,
+      color: color,
       onShow: _showOverlay,
       onHide: _hideOverlay,
+      onHoverMove: _updateOverlayPosition,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
         child: Row(
@@ -258,6 +347,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
   }
 
   /// 带图表的指标项（内存/CPU/上传/下载）
+  /// hover 只在图表区域触发，避免在图标/文字区域频繁切换
   Widget _buildMetricChipWithChart({
     required String metric,
     required IconData icon,
@@ -268,36 +358,38 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
     double? chartMax,
   }) {
     final tc = ThemeColors.of(context);
-    return _MetricHoverWrapper(
-      metric: metric,
-      activeMetric: _activeMetric,
-      onShow: _showOverlay,
-      onHide: _hideOverlay,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 11, color: color),
-            const SizedBox(width: 3),
-            Text('$label ', style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: fMicro,
-                color: color,
-                fontWeight: FontWeight.w600,
-                fontFamily: 'JetBrainsMono',
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: color),
+          const SizedBox(width: 3),
+          Text('$label ', style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: fMicro,
+              color: color,
+              fontWeight: FontWeight.w600,
+              fontFamily: 'JetBrainsMono',
             ),
-            const SizedBox(width: 4),
-            SizedBox(
+          ),
+          const SizedBox(width: 4),
+          _MetricHoverWrapper(
+            metric: metric,
+            activeMetric: _activeMetric,
+            color: color,
+            onShow: _showOverlay,
+            onHide: _hideOverlay,
+            onHoverMove: _updateOverlayPosition,
+            child: SizedBox(
               width: 60,
               height: widget.height - 4,
               child: _buildMiniChart(chartData, color, chartMax),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -309,18 +401,24 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
         child: Text('…', style: TextStyle(fontSize: 10, color: color.withValues(alpha: 0.5))),
       );
     }
+    // 降采样：60px 宽最多 60 个点，数据多时按桶取最大最小值保留趋势
+    const targetPoints = 60;
+    final sampled = data.length <= targetPoints
+        ? data
+        : _downsample(data, targetPoints);
+
     final spots = <FlSpot>[];
-    for (int i = 0; i < data.length; i++) {
-      spots.add(FlSpot(i.toDouble(), data[i].clamp(0, max ?? double.infinity)));
+    for (int i = 0; i < sampled.length; i++) {
+      spots.add(FlSpot(i.toDouble(), sampled[i].clamp(0, max ?? double.infinity)));
     }
-    final actualMax = max ?? data.fold<double>(0, (a, b) => a > b ? a : b) * 1.2;
+    final actualMax = max ?? sampled.fold<double>(0, (a, b) => a > b ? a : b) * 1.2;
 
     return LineChart(
       LineChartData(
         minY: 0,
         maxY: actualMax <= 0 ? 1 : actualMax,
         minX: 0,
-        maxX: (data.length - 1).toDouble(),
+        maxX: (sampled.length - 1).toDouble(),
         gridData: const FlGridData(show: false),
         titlesData: const FlTitlesData(show: false),
         borderData: FlBorderData(show: false),
@@ -343,6 +441,41 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
     );
   }
 
+  /// 降采样：将数据按桶取最大最小值，保留峰值趋势
+  List<double> _downsample(List<double> data, int targetCount) {
+    if (data.length <= targetCount) return data;
+    // 目标点数的一半作为桶数（每个桶取 2 个点：最小+最大）
+    final bucketSize = data.length / (targetCount / 2).floor();
+    final result = <double>[];
+    for (int i = 0; i < data.length; i += bucketSize.toInt()) {
+      final end = (i + bucketSize.toInt()).clamp(0, data.length);
+      final bucket = data.sublist(i, end);
+      if (bucket.isEmpty) continue;
+      double mn = bucket.first;
+      double mx = bucket.first;
+      for (final v in bucket) {
+        if (v < mn) mn = v;
+        if (v > mx) mx = v;
+      }
+      // 先放最小，再放最大，保持顺序
+      if (mn == mx) {
+        result.add(mn);
+      } else {
+        // 按在桶中的顺序添加，保证折线走势正确
+        final minIdx = bucket.indexOf(mn);
+        final maxIdx = bucket.indexOf(mx);
+        if (minIdx < maxIdx) {
+          result.add(mn);
+          result.add(mx);
+        } else {
+          result.add(mx);
+          result.add(mn);
+        }
+      }
+    }
+    return result;
+  }
+
   // ==================== 浮层内容 ====================
 
   Widget _buildOverlay(String metric) {
@@ -351,16 +484,60 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
     if (snap == null) return const SizedBox.shrink();
 
     final (title, rows) = _getOverlayData(metric, snap);
+    final screenSize = MediaQuery.of(context).size;
+    final mouse = _mousePosition ?? Offset.zero;
+    const margin = 8.0;
+
+    // 浮层宽度：按内容需求 + 屏幕宽度上限
+    final overlayWidth = _overlayWidthFor(metric).clamp(
+      0.0,
+      screenSize.width - margin * 2,
+    );
+
+    // 计算鼠标上下方的可用空间
+    final spaceBelow = screenSize.height - mouse.dy - _overlayMouseGap - margin;
+    final spaceAbove = mouse.dy - _overlayMouseGap - margin;
+
+    // 默认放下方（top 定位），下方空间不够且上方更宽裕时放上方（bottom 定位）
+    final placeBelow = spaceBelow >= 200 || spaceBelow >= spaceAbove;
+
+    // 水平定位
+    var left = mouse.dx + _overlayMouseGap;
+    if (left + overlayWidth > screenSize.width - margin) {
+      left = mouse.dx - overlayWidth - _overlayMouseGap;
+    }
+    if (left < margin) left = margin;
+    if (left + overlayWidth > screenSize.width - margin) {
+      left = screenSize.width - overlayWidth - margin;
+    }
+
+    // 垂直定位
+    final double? positionedTop;
+    final double? positionedBottom;
+    final double maxContentHeight;
+
+    if (placeBelow) {
+      // 放下方：浮层顶部紧贴鼠标下方
+      positionedTop = mouse.dy + _overlayMouseGap;
+      positionedBottom = null;
+      maxContentHeight = spaceBelow;
+    } else {
+      // 放上方：浮层底部紧贴鼠标上方
+      positionedTop = null;
+      positionedBottom = screenSize.height - mouse.dy + _overlayMouseGap;
+      maxContentHeight = spaceAbove;
+    }
+
     return Positioned(
-      // 浮层位置：全屏水平居中，固定在面板上方
-      bottom: widget.height + 4,
-      left: 0,
-      right: 0,
-      child: Center(
+      left: left,
+      top: positionedTop,
+      bottom: positionedBottom,
+      width: overlayWidth,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxContentHeight),
         child: Material(
           color: Colors.transparent,
           child: Container(
-            width: 360,
             decoration: BoxDecoration(
               color: cCardElevated,
               borderRadius: BorderRadius.circular(rMedium),
@@ -391,11 +568,13 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
                   ],
                 ),
                 Divider(height: 6, color: tc.border.withValues(alpha: 0.3)),
-                // 网络/磁盘浮层使用专用表格布局，其他使用左右两栏
+                // 网络/磁盘 → 表格布局；系统信息 → 单栏（长文本）；其他 → 两栏
                 if (metric == 'netUp' || metric == 'netDown')
                   _buildNetOverlayContent(tc, snap)
                 else if (metric == 'disk')
                   _buildDiskOverlayContent(tc, snap)
+                else if (metric == 'uptime')
+                  _buildSingleColumnRows(tc, rows)
                 else
                   _buildTwoColumnRows(tc, rows),
               ],
@@ -450,12 +629,17 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
               children: sorted.take(8).map((iface) {
                 final totalErr = iface.rxErrors + iface.txErrors;
                 final totalDrop = iface.rxDropped + iface.txDropped;
+                final hasIssue = totalErr > 0 || totalDrop > 0;
+                final issueColor = hasIssue
+                    ? (totalErr > 0 ? cDanger : cWarning)
+                    : tc.textMuted;
                 return _buildNetTableRow(
                   tc,
                   name: iface.name,
                   traffic: '${_formatBytes(iface.rxBytes)} / ${_formatBytes(iface.txBytes)}',
                   rate: '${_formatRate(iface.downKBps)} / ${_formatRate(iface.upKBps)}',
-                  issues: totalErr > 0 || totalDrop > 0 ? '$totalErr/$totalDrop' : '-',
+                  issues: hasIssue ? '$totalErr/$totalDrop' : '-',
+                  issuesColor: issueColor,
                 );
               }).toList(),
             ),
@@ -493,6 +677,30 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
       children: [
         _buildTwoColumnRows(tc, summary),
         const SizedBox(height: 8),
+        // 总使用率进度条
+        Container(
+          height: 6,
+          decoration: BoxDecoration(
+            color: tc.border.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(3),
+          ),
+          child: LayoutBuilder(
+            builder: (ctx, constraints) {
+              final w = constraints.maxWidth * (overallPercent / 100).clamp(0.0, 1.0);
+              return Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  width: w,
+                  decoration: BoxDecoration(
+                    color: _colorByPercent(overallPercent, cSuccess),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 10),
         Text(
           '分区明细',
           style: TextStyle(fontSize: fMicro, color: tc.textSub, fontWeight: FontWeight.w600),
@@ -536,51 +744,106 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
   }) {
     final textColor = isHeader ? tc.textMuted : tc.textSub;
     final fontWeight = isHeader ? FontWeight.w500 : FontWeight.w500;
-    final percentColor = isHeader
+    final barColor = isHeader
         ? tc.textMuted
-        : usePercent >= 90
-            ? cDanger
-            : usePercent >= 75
-                ? cHermesOrange
-                : cLimeGreen;
+        : _colorByPercent(usePercent, cSuccess);
+
+    if (isHeader) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        decoration: BoxDecoration(
+          border: Border(bottom: BorderSide(color: tc.border.withValues(alpha: 0.3), width: 0.5)),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 70,
+              child: Text(
+                mount,
+                style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono'),
+                textAlign: TextAlign.left,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                used,
+                style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono'),
+                textAlign: TextAlign.left,
+              ),
+            ),
+            const SizedBox(width: 6),
+            SizedBox(
+              width: 50,
+              child: Text(
+                percent,
+                style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono'),
+                textAlign: TextAlign.right,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      decoration: BoxDecoration(
-        border: isHeader
-            ? Border(bottom: BorderSide(color: tc.border.withValues(alpha: 0.3), width: 0.5))
-            : null,
-      ),
-      child: Row(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 挂载点（左对齐）
-          SizedBox(
-            width: 70,
-            child: Text(
-              mount,
-              style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono'),
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.left,
-            ),
+          Row(
+            children: [
+              SizedBox(
+                width: 70,
+                child: Text(
+                  mount,
+                  style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono'),
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.left,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  used,
+                  style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono'),
+                  textAlign: TextAlign.left,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
+              SizedBox(
+                width: 50,
+                child: Text(
+                  percent,
+                  style: TextStyle(fontSize: fMicro, color: barColor, fontWeight: FontWeight.w600, fontFamily: 'JetBrainsMono'),
+                  textAlign: TextAlign.right,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 6),
-          // 已用/总量（flex 填满）
-          Expanded(
-            child: Text(
-              used,
-              style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono'),
-              textAlign: TextAlign.left,
-              overflow: TextOverflow.ellipsis,
+          const SizedBox(height: 4),
+          // 进度条
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              color: tc.border.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
             ),
-          ),
-          const SizedBox(width: 6),
-          // 使用率（右对齐，带颜色）
-          SizedBox(
-            width: 50,
-            child: Text(
-              percent,
-              style: TextStyle(fontSize: fMicro, color: percentColor, fontWeight: FontWeight.w600, fontFamily: 'JetBrainsMono'),
-              textAlign: TextAlign.right,
+            child: LayoutBuilder(
+              builder: (ctx, constraints) {
+                final w = constraints.maxWidth * (usePercent / 100).clamp(0.0, 1.0);
+                return Align(
+                  alignment: Alignment.centerLeft,
+                  child: Container(
+                    width: w,
+                    decoration: BoxDecoration(
+                      color: barColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -596,12 +859,17 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
     required String rate,
     required String issues,
     bool isHeader = false,
+    Color? issuesColor,
   }) {
     final style = TextStyle(
       fontSize: fMicro,
       color: isHeader ? tc.textMuted : tc.textSub,
       fontWeight: isHeader ? FontWeight.w500 : FontWeight.normal,
       fontFamily: isHeader ? null : 'JetBrainsMono',
+    );
+    final issuesStyle = style.copyWith(
+      color: issuesColor ?? style.color,
+      fontWeight: issuesColor != null ? FontWeight.w600 : style.fontWeight,
     );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 1.5),
@@ -633,7 +901,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
             width: 36,
             child: Align(
               alignment: Alignment.centerRight,
-              child: Text(issues, style: style),
+              child: Text(issues, style: issuesStyle),
             ),
           ),
         ],
@@ -641,9 +909,8 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
     );
   }
 
-  /// 构建左右两栏的数据行
+  /// 构建左右两栏的数据行（适用于短数字/短文本 value）
   Widget _buildTwoColumnRows(ThemeColors tc, List<(String, String)> rows) {
-    // 将 rows 分成左右两组
     final mid = (rows.length / 2).ceil();
     final left = rows.sublist(0, mid);
     final right = rows.sublist(mid);
@@ -658,6 +925,43 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
     );
   }
 
+  /// 构建单栏数据行（适用于可能有长文本 value 的场景，如系统信息）
+  Widget _buildSingleColumnRows(ThemeColors tc, List<(String, String)> rows) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: rows.map((r) {
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                width: 70,
+                child: Text(
+                  r.$1,
+                  style: TextStyle(fontSize: fMicro, color: tc.textMuted),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  r.$2,
+                  style: TextStyle(
+                    fontSize: fMicro,
+                    color: tc.textSub,
+                    fontFamily: 'JetBrainsMono',
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.right,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildColumn(ThemeColors tc, List<(String, String)> rows) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -665,19 +969,24 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 1),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 r.$1,
                 style: TextStyle(fontSize: fMicro, color: tc.textMuted),
               ),
               const Spacer(),
-              Text(
-                r.$2,
-                style: TextStyle(
-                  fontSize: fMicro,
-                  color: tc.textSub,
-                  fontFamily: 'JetBrainsMono',
-                  fontWeight: FontWeight.w500,
+              Expanded(
+                flex: 2,
+                child: Text(
+                  r.$2,
+                  style: TextStyle(
+                    fontSize: fMicro,
+                    color: tc.textSub,
+                    fontFamily: 'JetBrainsMono',
+                    fontWeight: FontWeight.w500,
+                  ),
+                  textAlign: TextAlign.right,
                 ),
               ),
             ],
@@ -708,15 +1017,15 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
         return (
           '内存详情',
           [
-            ('总内存', '${_formatMB(s.memTotalMB)}'),
-            ('已用', '${_formatMB(s.memUsedMB)}'),
-            ('可用', '${_formatMB(s.memAvailableMB)}'),
-            ('空闲', '${_formatMB(s.memFreeMB)}'),
-            ('缓存', '${_formatMB(s.memCachedMB)}'),
-            ('缓冲', '${_formatMB(s.memBuffersMB)}'),
+            ('总内存', _formatMB(s.memTotalMB)),
+            ('已用', _formatMB(s.memUsedMB)),
+            ('可用', _formatMB(s.memAvailableMB)),
+            ('空闲', _formatMB(s.memFreeMB)),
+            ('缓存', _formatMB(s.memCachedMB)),
+            ('缓冲', _formatMB(s.memBuffersMB)),
             ('使用率', '${s.memPercent.toStringAsFixed(1)}%'),
-            ('Swap 总量', '${_formatMB(s.swapTotalMB)}'),
-            ('Swap 已用', '${_formatMB(s.swapUsedMB)}'),
+            ('Swap 总量', _formatMB(s.swapTotalMB)),
+            ('Swap 已用', _formatMB(s.swapUsedMB)),
           ],
         );
       case 'disk':
@@ -794,15 +1103,19 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
 class _MetricHoverWrapper extends StatefulWidget {
   final String metric;
   final String? activeMetric;
-  final void Function(String metric) onShow;
-  final VoidCallback onHide;
+  final Color color;
+  final void Function(String metric, Offset mousePosition) onShow;
+  final void Function(String metric) onHide;
+  final void Function(Offset mousePosition) onHoverMove;
   final Widget child;
 
   const _MetricHoverWrapper({
     required this.metric,
     required this.activeMetric,
+    required this.color,
     required this.onShow,
     required this.onHide,
+    required this.onHoverMove,
     required this.child,
   });
 
@@ -816,36 +1129,35 @@ class _MetricHoverWrapperState extends State<_MetricHoverWrapper> {
   @override
   Widget build(BuildContext context) {
     final isActive = widget.activeMetric == widget.metric;
-    final tc = ThemeColors.of(context);
 
     return MouseRegion(
-      onEnter: (_) {
+      onEnter: (event) {
         if (!_isHovered) {
           _isHovered = true;
-          widget.onShow(widget.metric);
+          widget.onShow(widget.metric, event.position);
+        }
+      },
+      onHover: (event) {
+        if (_isHovered) {
+          widget.onHoverMove(event.position);
         }
       },
       onExit: (_) {
         _isHovered = false;
-        // 延迟隐藏，让鼠标能移到浮层上
-        Future.delayed(const Duration(milliseconds: 200), () {
-          if (!_isHovered && mounted) {
-            widget.onHide();
-          }
-        });
+        widget.onHide(widget.metric);
       },
       child: GestureDetector(
-        onTap: () {
+        onTapDown: (details) {
           if (isActive) {
-            widget.onHide();
+            widget.onHide(widget.metric);
           } else {
-            widget.onShow(widget.metric);
+            widget.onShow(widget.metric, details.globalPosition);
           }
         },
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
           decoration: BoxDecoration(
-            color: isActive ? cPrimary.withValues(alpha: 0.08) : Colors.transparent,
+            color: isActive ? widget.color.withValues(alpha: 0.12) : Colors.transparent,
             borderRadius: BorderRadius.circular(rXSmall),
           ),
           child: widget.child,
