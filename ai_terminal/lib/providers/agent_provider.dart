@@ -14,7 +14,9 @@ import '../services/ai_service.dart';
 import '../services/command_executor.dart';
 import '../services/conversation_service.dart';
 import '../services/knowledge_service.dart';
-import '../core/hive_init.dart';
+import '../core/credentials_store.dart';
+import '../services/daos.dart';
+import '../core/l10n_holder.dart';
 import '../models/agent_state.dart';
 import '../models/chat_item.dart';
 export '../models/agent_state.dart';
@@ -40,6 +42,13 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
   /// 流式内容 reducer：管理每个 host 的流式累积和节流
   final AgentStreamReducer _reducer = AgentStreamReducer();
+
+  /// 每个 host 上次持久化的 assistant 内容长度，用于控制流式过程定期刷盘频率
+  final Map<String, int> _lastPersistedLen = {};
+
+  /// 每个 host 的持久化写入链：串行化 save 操作，防止并发写入导致事件丢失
+  /// 解决 onEvent 中 fire-and-forget 持久化的竞态问题
+  final Map<String, Future<void>> _persistChain = {};
 
   /// 当前引擎所属的 hostId（用于回调路由）
   String? _engineHostId;
@@ -68,6 +77,22 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _registry.setMemory(hostId, memory);
     }
     return memory;
+  }
+
+  /// 从安全存储加载 sudo 密码并注入到指定 engine
+  /// R3: 传入 engine 实例避免 tab 切换后写到错误的 engine
+  void _loadSudoPasswordForHost(String hostId, AgentEngine engine) {
+    Future.microtask(() async {
+      try {
+        final sudoPassword = await CredentialsStore.get(
+          hostId: hostId,
+          type: 'sudoPassword',
+        );
+        engine.setSudoPassword(sudoPassword);
+      } catch (e) {
+        debugPrint('[AgentNotifier] 加载 sudo 密码失败 (hostId=$hostId): $e');
+      }
+    });
   }
 
   /// 切换到指定 host（保存当前状态，加载目标 host 状态）
@@ -151,7 +176,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
   }
 
   /// 从持久化恢复引擎对话历史（切换会话 / 新建引擎时调用）
-  /// 只恢复 summarizedUpToIndex 之后的消息（已摘要的不再恢复）
+  /// 传 AI 时优先用 effectiveContent (summary ?? content)
   void _restoreEngineHistory() {
     if (_engine == null) return;
     final convId = state.conversationId;
@@ -159,22 +184,18 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _engine!.clearHistory();
       return;
     }
-    final conv = HiveInit.conversationsBox.get(convId);
+    final conv = ConversationsDao.getCachedById(convId);
     if (conv == null) {
       _engine!.clearHistory();
       return;
     }
-    // 提取 summarizedUpToIndex 之后的非 system 消息
-    final startIdx = conv.summarizedUpToIndex > 0
-        ? conv.summarizedUpToIndex
-        : 0;
+    // 提取所有非 system 消息，传 AI 时用 effectiveContent
     final msgs = <ChatMessage>[];
-    for (int i = startIdx; i < conv.messages.length; i++) {
-      final m = conv.messages[i];
+    for (final m in conv.messages) {
       if (m.role == 'system') continue;
-      msgs.add(ChatMessage.create(role: m.role, content: m.content));
+      msgs.add(ChatMessage.create(role: m.role, content: m.effectiveContent));
     }
-    _engine!.restoreHistory(msgs, summary: conv.summary);
+    _engine!.restoreHistory(msgs);
   }
 
   /// 关闭 tab/host 时清除其状态和记忆
@@ -199,7 +220,14 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _registry.removeHost(hostId);
       _reducer.cancelTimer(hostId);
       _reducer.reset(hostId);
-      if (_engineHostId == hostId) _engineHostId = null;
+      _lastPersistedLen.remove(hostId);
+      _persistChain.remove(hostId);
+      // 如果移除的是当前活跃 host，清空引用防止后续操作命中已 disposed 的引擎
+      if (_engineHostId == hostId) {
+        _engineHostId = null;
+        _engine = null;
+        _executor = null;
+      }
     }
   }
 
@@ -221,6 +249,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _registry.setModelConfig(hostId, _modelConfig);
       // 从持久化恢复引擎对话历史和摘要
       _restoreEngineHistory();
+      // 从安全存储加载 sudo 密码注入到 engine
+      _loadSudoPasswordForHost(hostId, _engine!);
     }
   }
 
@@ -244,6 +274,21 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final hostId = _registry.activeHostId ?? 'local';
     final memory = _getMemory(hostId);
 
+    // 若旧引擎存在（如切换 AI 模型时），先安全清理：清空回调 → cancelTask → disposeTools
+    // 防止旧引擎的回调继续写当前 host 的 state，造成双引擎并发污染
+    if (_engine != null) {
+      _engine!.onMessage = null;
+      _engine!.onThinking = null;
+      _engine!.onEvent = null;
+      _engine!.onCommandGenerated = null;
+      _engine!.onCommandExecuted = null;
+      _engine!.onError = null;
+      _engine!.onTaskUpdated = null;
+      _engine!.onCompleted = null;
+      _engine!.cancelTask();
+      _engine!.disposeTools();
+    }
+
     _engine = AgentEngine(
       aiProvider: aiProvider,
       modelConfig: modelConfig,
@@ -259,6 +304,12 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _registry.setEngine(_registry.activeHostId!, _engine!);
       _registry.setModelConfig(_registry.activeHostId!, _modelConfig);
     }
+
+    // 恢复引擎对话历史（切换模型后 AI 仍能看到之前的对话上下文）
+    _restoreEngineHistory();
+
+    // 从安全存储加载 sudo 密码注入到 engine
+    _loadSudoPasswordForHost(hostId, _engine!);
   }
 
   void _setupEngineCallbacks(String hostId) {
@@ -289,10 +340,21 @@ class AgentNotifier extends StateNotifier<AgentState> {
           _updateHostState(hostId, (s) {
             final items = [...s.chatItems];
             if (items.isNotEmpty && items.last.role == 'assistant') {
-              items[items.length - 1] = items.last.copyWith(
+              final lastItem = items.last;
+              // 保持原有设计：streamingContent 存放当前轮增量，content 存放已固化的内容
+              // UI 渲染时优先显示 streamingContent（流式效果），content 作为兜底
+              items[items.length - 1] = lastItem.copyWith(
                 streamingContent: content,
                 isStreaming: true,
               );
+              // 周期性持久化：将 content + streamingContent 合并写入磁盘
+              // 防止 app 异常退出时丢失全部流式内容（events 由 onCompleted 时统一回写）
+              final fullContent = lastItem.content + content;
+              final lastLen = _lastPersistedLen[hostId] ?? 0;
+              if (fullContent.length - lastLen > 500) {
+                _lastPersistedLen[hostId] = fullContent.length;
+                _persistAssistantCompletion(hostId, fullContent, events: lastItem.events);
+              }
             }
             return s.copyWith(lastMessage: content, chatItems: items);
           });
@@ -302,7 +364,11 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
     /// 结构化事件回调：追加事件（不清空 streamingContent，避免流式过程中闪烁）
     _engine!.onEvent = (event) {
+      // R3: 必须从正确的 host 状态读取数据，不能直接用 state（活跃 host）
+      // 否则非活跃 host 的事件会被持久化到错误的会话
+      AgentState? hostState;
       _updateHostState(hostId, (s) {
+        hostState = s; // 捕获更新前的 host 状态引用
         final items = [...s.chatItems];
         if (items.isEmpty || items.last.role != 'assistant') return s;
         final lastItem = items.last;
@@ -311,8 +377,16 @@ class AgentNotifier extends StateNotifier<AgentState> {
           events: events,
           isStreaming: s.isRunning,
         );
-        return s.copyWith(chatItems: items);
+        hostState = s.copyWith(chatItems: items); // 捕获更新后的状态
+        return hostState!;
       });
+      // 命令/结果事件即时持久化：使用 hostState（正确 host 的状态）而非 state（活跃 host）
+      if (event.type == AgentEventType.command || event.type == AgentEventType.result) {
+        final items = hostState?.chatItems ?? state.chatItems;
+        if (items.isNotEmpty && items.last.role == 'assistant') {
+          _persistAssistantCompletion(hostId, items.last.content, events: items.last.events);
+        }
+      }
     };
 
     _engine!.onCommandGenerated = (cmd) {
@@ -328,16 +402,36 @@ class AgentNotifier extends StateNotifier<AgentState> {
     _engine!.onError = (error) {
       // 出错时也保存当前内容
       _flushStreamingToContent(hostId);
-      _updateHostState(hostId, (s) => s.copyWith(error: error));
+      _updateHostState(hostId, (s) {
+        // AI 调用失败时 assistant 消息可能为空（无流式内容）
+        // 用错误信息填充并持久化，确保引擎重建恢复时 AI 能看到上下文
+        final items = [...s.chatItems];
+        if (items.isNotEmpty && items.last.role == 'assistant' && items.last.content.isEmpty) {
+          final errorMsg = '⚠️ $error';
+          items[items.length - 1] = ChatItem(
+            role: 'assistant',
+            content: errorMsg,
+            isStreaming: false,
+          );
+          _persistAssistantCompletion(hostId, errorMsg);
+          return s.copyWith(chatItems: items, error: error);
+        }
+        return s.copyWith(error: error);
+      });
     };
 
     _engine!.onTaskUpdated = (task) {
+      // 任务进入终态时清除 error：让之前因 isRunning 拒绝等设置的 error 不残留
+      final isTerminal = task.status == AgentStatus.completed ||
+          task.status == AgentStatus.failed ||
+          task.status == AgentStatus.cancelled;
       _updateHostState(hostId, (s) => s.copyWith(
         currentTask: task,
         status: task.status,
         pendingConfirmCommand: _engine!.pendingConfirmCommand,
         pendingOptions: _engine!.pendingOptions.isNotEmpty ? _engine!.pendingOptions : null,
         clearPendingOptions: _engine!.pendingOptions.isEmpty,
+        clearError: isTerminal,
       ));
     };
 
@@ -378,7 +472,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
         content: newContent,
         streamingContent: '',
       );
-      // 持久化保存（含 events）
+      // 持久化保存（含 events），并更新已持久化长度
+      _lastPersistedLen[hostId] = newContent.length;
       _persistAssistantCompletion(hostId, newContent, events: lastItem.events);
       return s.copyWith(chatItems: items);
     });
@@ -447,14 +542,23 @@ class AgentNotifier extends StateNotifier<AgentState> {
   }
 
   /// 持久化 assistant 完整响应（流式结束后回写）
+  /// 使用串行化链防止并发写入竞态：多个事件快速到达时，按顺序执行 save
   Future<void> _persistAssistantCompletion(
     String hostId,
     String content, {
     List<AgentEvent>? events,
   }) async {
-    try {
-      await _convService.updateLastAssistantContent(hostId, content, events: events);
-    } catch (e) { debugPrint('[AgentNotifier] 持久化 assistant 内容失败: $e'); }
+    // 串行化：接在上一次持久化之后执行，防止并发 save 覆盖
+    final prev = _persistChain[hostId] ?? Future.value();
+    final next = prev.then((_) async {
+      try {
+        await _convService.updateLastAssistantContent(hostId, content, events: events);
+      } catch (e) {
+        debugPrint('[AgentNotifier] 持久化 assistant 内容失败 (hostId=$hostId): $e');
+      }
+    });
+    _persistChain[hostId] = next;
+    return next;
   }
 
   /// 设置命令执行器（SSH 或本地 PTY，仅首次连接时收集系统信息）
@@ -468,6 +572,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
       if (hostId != null && !_registry.hasSysInfoFuture(hostId)) {
         _registry.setSysInfoFuture(hostId, _engine!.collectSystemInfo(executor));
       }
+      // 连接建立后（重新）加载 sudo 密码，覆盖 host 配置变更后的场景
+      if (hostId != null) {
+        _loadSudoPasswordForHost(hostId, _engine!);
+      }
     }
   }
 
@@ -475,15 +583,14 @@ class AgentNotifier extends StateNotifier<AgentState> {
   void setMaxSteps(int steps) {
     state = state.copyWith(maxSteps: steps);
     _engine?.maxSteps = steps;
-    try {
-      HiveInit.settingsBox.put('agentMaxSteps', steps);
-    } catch (e) { debugPrint('[AgentNotifier] 保存 maxSteps 失败: $e'); }
+    SettingsDao.set('agentMaxSteps', steps)
+        .catchError((e) { debugPrint('[AgentNotifier] 保存 maxSteps 失败: $e'); });
   }
 
   /// 加载设置
   void loadSettings() {
     try {
-      final saved = HiveInit.settingsBox.get('agentMaxSteps');
+      final saved = SettingsDao.getCached('agentMaxSteps');
       if (saved != null) {
         final steps = (saved is int) ? saved : (saved as num).toInt();
         state = state.copyWith(maxSteps: steps);
@@ -494,14 +601,32 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
   /// 开始任务
   Future<void> startTask(String goal) async {
+    // 防重复发送：小白用户可能快速点击多次发送按钮
+    // 必须在持久化之前同步检查，否则会产生孤儿消息（用户消息重复但无 AI 回复）
+    if (_engine != null && _engine!.isRunning) {
+      state = state.copyWith(error: 'Agent 正在执行任务，请等待完成');
+      return;
+    }
+
     if (_engine == null) {
       if (_modelConfig != null) {
         _reinitEngineForCurrentHost();
       }
       if (_engine == null) {
-        state = state.copyWith(error: '请先配置 AI 模型');
+        state = state.copyWith(error: L10n.str.pleaseConfigAIModel);
         return;
       }
+    }
+
+    // 检查终端连接：小白可能不知道 SSH 已断开，继续发任务会失败
+    if (_executor != null && !_executor!.isConnected) {
+      state = state.copyWith(error: '终端未连接，请先连接终端');
+      return;
+    }
+
+    // 输入校验：超长消息截断，防止小白粘贴 MB 级文本撑爆 AI 上下文
+    if (goal.length > 10000) {
+      goal = '${goal.substring(0, 10000)}\n\n${L10n.str.orchInputTruncated}';
     }
 
     final hostId = _registry.activeHostId ?? 'local';
@@ -510,17 +635,32 @@ class AgentNotifier extends StateNotifier<AgentState> {
     // 确保日志路由到正确的 host（startTask 可能从非 UI 线程触发）
     agentLogger.currentHostId = hostId;
 
-    // 持久化用户消息
+    // 持久化用户消息 + assistant 占位（原子写入，消除两次 save 之间的崩溃窗口）
+    String? convId;
     try {
-      final conv = await _convService.appendMessage(hostId, role: 'user', content: goal);
-      // 同步会话 id 到 state（首次创建时）
-      if (state.conversationId != conv.id) {
-        state = state.copyWith(conversationId: conv.id, hostId: hostId);
-      }
-    } catch (e) { debugPrint('[AgentNotifier] 持久化用户消息失败: $e'); }
+      final conv = await _convService.appendMessagePair(
+        hostId,
+        userContent: goal,
+        assistantContent: '',
+      );
+      convId = conv.id;
+    } catch (e) {
+      // R8: 持久化失败必须告知用户，不能静默吞掉后继续启动引擎制造假象
+      agentLogger.error('AgentNotifier', '持久化消息失败: $e');
+      state = state.copyWith(error: '${L10n.str.messageSaveFailed}: $e');
+      return;
+    }
 
-    // 添加用户消息到 chatItems
-    final items = [...state.chatItems, ChatItem(role: 'user', content: goal)];
+    // 同步会话 id 到 state（首次创建时）
+    if (state.conversationId != convId) {
+      state = state.copyWith(conversationId: convId, hostId: hostId);
+    }
+
+    // 添加用户消息 + AI 占位到 chatItems
+    final items = [...state.chatItems,
+      ChatItem(role: 'user', content: goal),
+      ChatItem(role: 'assistant', content: '', isStreaming: true),
+    ];
 
     state = state.copyWith(
       status: AgentStatus.thinking,
@@ -529,15 +669,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
       currentTask: null,
       clearError: true,
     );
-
-    // 添加一条空的 AI 消息占位
-    final itemsWithAI = [...state.chatItems, ChatItem(role: 'assistant', content: '', isStreaming: true)];
-    state = state.copyWith(chatItems: itemsWithAI);
-
-    // 持久化 assistant 占位（流式过程中通过 onMessage 累积，结束时回写完整内容）
-    try {
-      await _convService.appendMessage(hostId, role: 'assistant', content: '');
-    } catch (e) { debugPrint('[AgentNotifier] 持久化 assistant 占位失败: $e'); }
+    // 重置该 host 的持久化长度计数器（新 assistant 消息从 0 开始累积）
+    _lastPersistedLen[hostId] = 0;
 
     // 如果系统信息还没收集，先收集再开始任务，避免命令混在一起
     if (_executor != null && !_registry.hasSysInfoFuture(hostId)) {
@@ -560,6 +693,20 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final hostId = _engineHostId;
     if (hostId != null) {
       _flushStreamingToContent(hostId);
+      // 如果流式内容为空（thinking 阶段取消），assistant 占位仍为空
+      // 填充取消提示并持久化，避免恢复后出现空 assistant 消息
+      _updateHostState(hostId, (s) {
+        final items = [...s.chatItems];
+        if (items.isNotEmpty && items.last.role == 'assistant' &&
+            items.last.content.isEmpty && items.last.streamingContent.isEmpty) {
+          items[items.length - 1] = items.last.copyWith(
+            content: L10n.str.taskCancelled,
+            isStreaming: false,
+          );
+          _persistAssistantCompletion(hostId, L10n.str.taskCancelled, events: items.last.events);
+        }
+        return s.copyWith(chatItems: items);
+      });
     }
     _engine?.cancelTask();
   }
@@ -608,7 +755,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
         await _convService.clearMessages(convId);
       } catch (e) {
         agentLogger.error('AgentNotifier', '清空持久化消息失败: $e');
-        state = state.copyWith(error: '清空消息失败: $e');
+        state = state.copyWith(error: '${L10n.str.clearMessagesFailed}: $e');
       }
     }
   }
@@ -629,7 +776,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 启用后，AI 可使用 exec_on/exec_batch/check_connectivity 工具跨主机调度
   void enableOrchestratorMode() {
     if (_engine == null) {
-      state = state.copyWith(error: '请先初始化 Agent 和连接主机');
+      state = state.copyWith(error: L10n.str.agentNotInitialized);
       return;
     }
     _engine!.enableOrchestrator(_registry);
@@ -732,10 +879,14 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final convId = _registry.getState(taskHostId)?.conversationId;
     if (convId == null) return;
 
-    final conv = HiveInit.conversationsBox.get(convId);
+    final conv = ConversationsDao.getCachedById(convId);
     if (conv == null) return;
 
-    final rounds = conv.messages.where((m) => m.role != 'system').length ~/ 2;
+    // 统计未压缩的消息（summary 为空的非系统消息）
+    final unsummarized = conv.messages.where((m) =>
+        m.role != 'system' && (m.summary == null || m.summary!.isEmpty));
+    final rounds = unsummarized.length ~/ 2;
+    // 基于有效内容计算字符数（已压缩的用 summary 长度）
     final needsCompact = rounds >= _compactThresholdRounds || conv.totalChars >= _compactThresholdChars;
     final isCompacting = _registry.getState(taskHostId)?.isCompacting ?? false;
     if (needsCompact && !isCompacting) {
@@ -743,8 +894,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
   }
 
-  /// 手动/自动压缩：用 AI 总结早期对话为摘要，保留最近 N 轮原文
-  /// [taskHostId] 指定要压缩的 host，避免操作错误的活跃 host
+  /// 压缩对话：一次性调用 AI 将早期消息逐条压缩，写入 ConvMessage.summary
+  /// 保留最近 N 轮原文不压缩，确保 AI 有足够近期上下文
+  /// 压缩期间加锁（isCompacting），UI 显示"会话压缩中"横幅
   Future<void> compact([String? taskHostId]) async {
     final hostId = taskHostId ?? _registry.activeHostId;
     if (hostId == null) return;
@@ -756,69 +908,99 @@ class AgentNotifier extends StateNotifier<AgentState> {
     if (hostState == null) return;
     if (hostState.isCompacting) return; // 防止并发压缩
 
-    final conv = HiveInit.conversationsBox.get(convId);
+    final conv = ConversationsDao.getCachedById(convId);
     if (conv == null) return;
 
-    // 待压缩 = 已摘要索引之后的所有非系统消息 - 保留的最近 N 轮
+    // 待压缩 = 所有非系统消息中 summary 为空的，排除最近 N 轮（保留原文给 AI 近期上下文）
     final allMsgs = conv.messages.where((m) => m.role != 'system').toList();
-    final keepCount = _compactKeepRounds * 2;
+    const keepCount = _compactKeepRounds * 2;
     if (allMsgs.length <= keepCount) return; // 太少不压缩
 
-    // 从 summarizedUpToIndex 之后开始压缩（避免重复压缩已摘要的消息）
-    final nonSysStart = conv.messages.indexWhere((m) => m.role != 'system');
-    final startIdx = conv.summarizedUpToIndex > nonSysStart
-        ? conv.summarizedUpToIndex - nonSysStart
-        : 0;
-
-    // 没有新的未摘要消息可压缩（startIdx 已追上保留边界）
-    if (startIdx >= allMsgs.length - keepCount) return;
-
-    final toSummarize = allMsgs.sublist(startIdx, allMsgs.length - keepCount);
+    // 待压缩范围：除最近 keepCount 条之外，且尚未有 summary 的消息
+    final toSummarize = <ConvMessage>[];
+    for (int i = 0; i < allMsgs.length - keepCount; i++) {
+      final m = allMsgs[i];
+      if (m.summary == null || m.summary!.isEmpty) {
+        toSummarize.add(m);
+      }
+    }
     if (toSummarize.isEmpty) return;
 
-    // L8 修复：用 _updateHostState 更新指定 host，避免覆盖活跃 host
+    // 加锁 + UI 提示
     _updateHostState(hostId, (s) => s.copyWith(isCompacting: true));
+
     try {
-      final tuples = toSummarize
-          .map((m) => (role: m.role, content: m.content))
-          .toList();
-      final summaryText = await engine.summarize(tuples);
-      if (summaryText != null && summaryText.isNotEmpty) {
-        await _convService.applySummary(convId, summaryText);
-        // 同步引擎内存：注入摘要到系统提示 + 裁剪已摘要的旧消息
-        engine.setConversationSummary(summaryText);
-        engine.syncAfterCompact(_compactKeepRounds);
-        // 同步到 UI 状态
-        final restored = HiveInit.conversationsBox.get(convId);
-        if (restored != null) {
-          final items = restored.messages
-              .where((m) => m.role != 'system')
-              .map((m) => ChatItem.fromConvMessage(m))
-              .toList();
-          _updateHostState(hostId, (s) => s.copyWith(
-            chatItems: items,
-            summary: restored.summary,
-            isCompacting: false,
-          ));
-        } else {
-          _updateHostState(hostId, (s) => s.copyWith(isCompacting: false));
+      // 构造压缩输入
+      final tuples = <({int index, String role, String content, String? command, bool? commandSuccess})>[];
+      for (int i = 0; i < toSummarize.length; i++) {
+        final m = toSummarize[i];
+        tuples.add((
+          index: i,
+          role: m.role,
+          content: m.content,
+          command: m.command,
+          commandSuccess: m.commandSuccess,
+        ));
+      }
+
+      final summaries = await engine.summarizeMessages(tuples);
+      if (summaries == null || summaries.isEmpty) {
+        agentLogger.warn('AgentNotifier', '对话压缩未产生摘要（AI 返回空或解析失败）');
+        _updateHostState(hostId, (s) => s.copyWith(isCompacting: false));
+        return;
+      }
+
+      // 逐条写入 ConvMessage.summary
+      for (final (idx, summary) in summaries) {
+        if (idx >= 0 && idx < toSummarize.length) {
+          toSummarize[idx].summary = summary;
         }
+      }
+      conv.updatedAt = DateTime.now();
+      await ConversationsDao.upsert(conv);
+
+      // 同步引擎内存历史：用 effectiveContent 重建，使后续 AI 调用使用压缩后的内容
+      _syncEngineHistoryAfterCompact(hostId, convId);
+
+      // 更新 UI 状态
+      final restored = ConversationsDao.getCachedById(convId);
+      if (restored != null) {
+        final items = restored.messages
+            .where((m) => m.role != 'system')
+            .map((m) => ChatItem.fromConvMessage(m))
+            .toList();
+        _updateHostState(hostId, (s) => s.copyWith(
+          chatItems: items,
+          isCompacting: false,
+        ));
       } else {
-        // 压缩返回空（AI 无响应或消息太少）
-        agentLogger.warn('AgentNotifier', '对话压缩未产生摘要（AI 返回空或消息不足）');
         _updateHostState(hostId, (s) => s.copyWith(isCompacting: false));
       }
     } catch (e) {
       agentLogger.error('AgentNotifier', '对话压缩失败: $e');
-      _updateHostState(hostId, (s) => s.copyWith(isCompacting: false, error: '对话压缩失败: $e'));
+      _updateHostState(hostId, (s) => s.copyWith(isCompacting: false, error: '${L10n.str.compactFailed}: $e'));
     }
+  }
+
+  /// 压缩后同步引擎内存历史：用 effectiveContent 重建 _conversationHistory
+  void _syncEngineHistoryAfterCompact(String hostId, String convId) {
+    final engine = _registry.getEngine(hostId);
+    if (engine == null) return;
+    final conv = ConversationsDao.getCachedById(convId);
+    if (conv == null) return;
+
+    final msgs = <ChatMessage>[];
+    for (final m in conv.messages) {
+      if (m.role == 'system') continue;
+      msgs.add(ChatMessage.create(role: m.role, content: m.effectiveContent));
+    }
+    engine.restoreHistory(msgs);
   }
 
   @override
   void dispose() {
-    // 停止所有引擎任务并清空回调，防止 dispose 后回调仍写 state
+    // R2: 先清空所有回调，再 cancelTask，防止 cancelTask 触发的 onTaskUpdated 写已 disposed 的 state
     for (final engine in _registry.engines) {
-      engine.cancelTask();
       engine.onMessage = null;
       engine.onEvent = null;
       engine.onThinking = null;
@@ -827,6 +1009,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       engine.onError = null;
       engine.onTaskUpdated = null;
       engine.onCompleted = null;
+      engine.cancelTask();
       // R2: 清理工具资源（如文件同步的 watcher 和 timer）
       engine.disposeTools();
     }

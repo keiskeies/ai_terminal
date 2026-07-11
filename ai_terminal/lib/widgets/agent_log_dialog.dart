@@ -112,7 +112,7 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                 ),
               ],
             ),
-            const Divider(color: cBorder, height: 16),
+            Divider(color: tc.border, height: 16),
             Expanded(
               child: Stack(
                 children: [
@@ -129,13 +129,13 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                         itemCount: _logs.length,
                         itemBuilder: (context, index) {
                           final log = _logs[index];
-                          Color color = cTextSub;
+                          Color color = tc.textSub;
                           if (log.contains('[ERROR]')) {
                             color = cDanger;
                           } else if (log.contains('[WARN]')) {
                             color = cWarning;
                           } else if (log.contains('[DEBUG]')) {
-                            color = cTextMuted;
+                            color = tc.textMuted;
                           } else if (log.contains('[INFO]')) {
                             color = cSuccess;
                           }
@@ -176,7 +176,7 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
               ),
             ),
             const SizedBox(height: 8),
-            Text('共 ${_logs.length} 条', style: const TextStyle(color: cTextMuted, fontSize: fMicro)),
+            Text('共 ${_logs.length} 条', style: TextStyle(color: tc.textMuted, fontSize: fMicro)),
           ],
         ),
       ),

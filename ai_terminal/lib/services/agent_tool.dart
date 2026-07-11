@@ -8,6 +8,7 @@ import 'ssh_service.dart';
 import 'file_sync_service.dart';
 import 'multi_host_executor.dart';
 import 'agent_host_registry.dart';
+import '../core/l10n_holder.dart';
 
 /// Agent 工具调用结果
 class ToolResult {
@@ -103,7 +104,7 @@ class SftpUploadTool extends AgentTool {
     } else if (await file.exists()) {
       isDir = false;
     } else {
-      return ToolResult.failure('本地路径不存在: $local');
+      return ToolResult.failure(L10n.str.orchToolLocalNotFound(local));
     }
 
     // 如果是目录但没指定 recursive，提示
@@ -334,10 +335,10 @@ class ExecOnTool extends AgentTool {
     final timeoutSec = int.tryParse(args['timeout']?.toString() ?? '') ?? 60;
 
     if (hostId.isEmpty || command.isEmpty) {
-      return ToolResult.failure('参数缺失: hostId 和 command 为必填项');
+      return ToolResult.failure(L10n.str.orchToolParamMissing('hostId 和 command'));
     }
 
-    onProgress?.call('[$hostId] 执行: $command');
+    onProgress?.call(L10n.str.orchToolExecProgress(hostId, command));
     final result = await _executor.executeOn(
       hostId,
       command,
@@ -345,7 +346,7 @@ class ExecOnTool extends AgentTool {
     );
 
     if (result == null) {
-      return ToolResult.failure('主机 $hostId 未连接或不存在');
+      return ToolResult.failure(L10n.str.orchToolHostNotConnected(hostId));
     }
 
     final mark = result.success ? '✓' : '✗';
@@ -354,7 +355,7 @@ class ExecOnTool extends AgentTool {
     final err = _truncate(result.stderr, 1000);
     final summary = '[$hostId] $mark (exit=${result.exitCode})';
     final detail = result.success
-        ? (output.isNotEmpty ? output : '(无输出)')
+        ? (output.isNotEmpty ? output : L10n.str.orchToolNoOutput)
         : 'stderr: $err';
 
     if (result.success) {
@@ -384,7 +385,7 @@ class ExecBatchTool extends AgentTool {
   String get name => 'exec_batch';
 
   @override
-  String get description => '【多机编排】批量执行同一命令到多台主机（串行）。'
+  String get description => '【多机编排】批量执行同一命令到多台主机（只读命令并行执行，修改性命令串行执行）。'
       '适用于时间同步、日志清理、配置检查等批量运维场景。'
       '一台失败不影响其他主机（除非 stopOnFailure=true）。';
 
@@ -403,15 +404,15 @@ class ExecBatchTool extends AgentTool {
     final stopOnFailure = args['stopOnFailure'] == true || args['stopOnFailure'] == 'true';
 
     if (hostIdsStr.isEmpty || command.isEmpty) {
-      return ToolResult.failure('参数缺失: hostIds 和 command 为必填项');
+      return ToolResult.failure(L10n.str.orchToolParamMissing('hostIds 和 command'));
     }
 
     final hostIds = hostIdsStr.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
     if (hostIds.isEmpty) {
-      return ToolResult.failure('hostIds 解析后为空');
+      return ToolResult.failure(L10n.str.orchToolHostIdsEmpty);
     }
 
-    onProgress?.call('批量执行: $command → ${hostIds.length} 台主机');
+    onProgress?.call(L10n.str.orchToolBatchProgress(command, hostIds.length));
     final results = await _executor.executeBatch(
       hostIds,
       command,
@@ -428,7 +429,7 @@ class ExecBatchTool extends AgentTool {
       return ToolResult(
         success: false,
         output: summary,
-        error: '$failedCount/${hostIds.length} 台主机执行失败',
+        error: L10n.str.orchToolBatchFailed(failedCount, hostIds.length),
       );
     }
   }
@@ -463,10 +464,10 @@ class CheckConnectivityTool extends AgentTool {
     final timeoutSec = int.tryParse(args['timeout']?.toString() ?? '') ?? 5;
 
     if (fromHostId.isEmpty || targetHost.isEmpty || port <= 0) {
-      return ToolResult.failure('参数缺失或无效: fromHostId、targetHost、port(正整数) 为必填项');
+      return ToolResult.failure(L10n.str.orchToolConnParamMissing);
     }
 
-    onProgress?.call('[$fromHostId → $targetHost:$port] 测试连通性...');
+    onProgress?.call(L10n.str.orchToolConnProgress(fromHostId, targetHost, port.toString()));
     final result = await _executor.checkConnectivity(
       fromHostId: fromHostId,
       targetHost: targetHost,
@@ -480,7 +481,7 @@ class CheckConnectivityTool extends AgentTool {
       return ToolResult(
         success: false,
         output: result.summary,
-        error: result.detail ?? '不可达',
+        error: result.detail ?? L10n.str.orchUnreachable,
       );
     }
   }
@@ -517,21 +518,21 @@ class UploadToTool extends AgentTool {
     final excludeRaw = args['exclude'];
 
     if (hostId.isEmpty || local.isEmpty || remote.isEmpty) {
-      return ToolResult.failure('参数缺失: hostId、local、remote 为必填项');
+      return ToolResult.failure(L10n.str.orchToolUploadParamMissing);
     }
 
     // 通过 hostId 获取目标主机的 executor（必须是 SSHService 才能开 SFTP）
     final targetExecutor = _executor.executorFor(hostId);
     if (targetExecutor == null) {
-      return ToolResult.failure('主机 $hostId 未连接或不存在');
+      return ToolResult.failure(L10n.str.orchToolHostNotConnected(hostId));
     }
     if (targetExecutor is! SSHService) {
-      return ToolResult.failure('主机 $hostId 不是 SSH 远程会话，无法 SFTP 上传');
+      return ToolResult.failure(L10n.str.orchToolNotSshSession(hostId));
     }
     // R1: 捕获 client 到局部变量，避免 await 期间连接断开导致的 TOCTOU 空指针
     final client = targetExecutor.client;
     if (client == null) {
-      return ToolResult.failure('主机 $hostId 的 SSH 连接未建立');
+      return ToolResult.failure(L10n.str.orchToolSshNotEstablished(hostId));
     }
 
     // 校验本地路径
@@ -543,10 +544,10 @@ class UploadToTool extends AgentTool {
     } else if (await file.exists()) {
       isDir = false;
     } else {
-      return ToolResult.failure('本地路径不存在: $local');
+      return ToolResult.failure(L10n.str.orchToolLocalNotFound(local));
     }
     if (isDir && !recursive) {
-      return ToolResult.failure('本地路径是目录，请设置 recursive=true 以递归上传');
+      return ToolResult.failure(L10n.str.orchToolLocalIsDir);
     }
 
     List<String> excludeNames = ['node_modules', '.git', '.DS_Store'];
@@ -558,7 +559,7 @@ class UploadToTool extends AgentTool {
       }
     }
 
-    onProgress?.call('[$hostId] 正在打开 SFTP 子系统...');
+    onProgress?.call(L10n.str.orchToolSftpOpening(hostId));
     final sftp = SftpService();
     try {
       await sftp.attachToClient(client);
@@ -1032,7 +1033,7 @@ class CertMonitorTool extends AgentTool {
     if (mode == 'ssh_hostkey') {
       onProgress?.call('正在读取 SSH host key 指纹...');
       // 列出 /etc/ssh/ 下所有 host key 的指纹
-      final cmd = "for f in /etc/ssh/ssh_host_*_key.pub; do "
+      const cmd = "for f in /etc/ssh/ssh_host_*_key.pub; do "
           "ssh-keygen -lf \"\$f\" 2>/dev/null; "
           "done";
       try {

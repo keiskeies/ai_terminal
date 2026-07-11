@@ -102,6 +102,11 @@ class RollbackAdvisor {
             'echo "--- 行数/大小 ---" && '
             'wc -lc "$path" 2>/dev/null || echo "文件不存在或无法读取"';
       case ModifyTargetType.service:
+        // update-alternatives 快照
+        if (target.command.contains('update-alternatives')) {
+          return 'update-alternatives --display ${target.name} 2>/dev/null | head -10 || '
+              'echo "alternatives 状态未知"';
+        }
         return 'systemctl status ${target.name} 2>/dev/null | head -10 || '
             'service ${target.name} status 2>/dev/null | head -10 || '
             'echo "服务状态未知"';
@@ -124,17 +129,64 @@ class RollbackAdvisor {
   static String? buildRollbackSuggestion(ModifyTarget target, String? snapshotOutput) {
     switch (target.type) {
       case ModifyTargetType.configFile:
+        // crontab 特殊处理
+        if (target.name == 'crontab') {
+          return '回滚建议: crontab 已被修改。如需恢复，参考快照中的原 crontab 内容，'
+              '用 crontab < backup_file 恢复';
+        }
         return '回滚建议: ${target.name} 修改前快照见上方输出。'
             '若需恢复，请从版本控制(git)、包管理器重装或同环境节点拷贝原文件';
       case ModifyTargetType.service:
+        // update-alternatives 特殊回滚
+        if (target.command.contains('update-alternatives --set')) {
+          return '回滚建议: sudo update-alternatives --auto ${target.name} '
+              '(恢复自动模式，或用 --set 指向原版本)';
+        }
+        // systemctl enable/disable 特殊回滚
+        if (target.command.contains('systemctl enable ')) {
+          return '回滚建议: sudo systemctl disable ${target.name} (撤销 enable)';
+        }
+        if (target.command.contains('systemctl disable ')) {
+          return '回滚建议: sudo systemctl enable ${target.name} (撤销 disable)';
+        }
         return '回滚建议: 参考快照中的修改前状态，'
             'sudo systemctl start ${target.name} (如原为运行) 或 stop (如原为停止)';
       case ModifyTargetType.package:
         return '回滚建议: sudo apt remove ${target.name} 或 sudo yum remove ${target.name}  '
             '(回滚安装操作)';
       case ModifyTargetType.permission:
+        // 解析原权限并生成具体回滚命令
+        final cmd = target.command;
+        final chmodMatch = RegExp(r'chmod\s+(\S+)\s+(.+)').firstMatch(cmd);
+        if (chmodMatch != null) {
+          return '回滚建议: 参考快照中的原权限，用以下命令恢复: '
+              'chmod <原权限> ${chmodMatch.group(2)} (原权限见 ls -la 输出)';
+        }
+        final chownMatch = RegExp(r'chown\s+(\S+)\s+(.+)').firstMatch(cmd);
+        if (chownMatch != null) {
+          return '回滚建议: 参考快照中的原属主，用以下命令恢复: '
+              'chown <原属主:原组> ${chownMatch.group(2)} (原属主见 ls -la 输出)';
+        }
+        if (cmd.contains('useradd')) {
+          final userMatch = RegExp(r'useradd\s+(?:.*?\s+)?(\S+)\s*$').firstMatch(cmd);
+          final user = userMatch?.group(1) ?? '新用户';
+          return '回滚建议: sudo userdel -r $user (删除刚创建的用户及家目录)';
+        }
         return '回滚建议: 参考快照中的原权限(ls -la 输出)，用 chmod/chown 恢复';
       case ModifyTargetType.fileWrite:
+        // mv 命令可以生成具体的回滚命令
+        final mvMatch = RegExp(r'^mv\s+(\S+)\s+(\S+)').firstMatch(target.command);
+        if (mvMatch != null) {
+          final src = mvMatch.group(1)!;
+          final dst = mvMatch.group(2)!;
+          return '回滚建议: mv $dst $src (将文件移回原位置)';
+        }
+        // ln -s 可以生成具体的回滚命令（兼容 -sf / -snf 等 flag 变体）
+        final lnMatch = RegExp(r'^ln\s+-\w*s\w*\s+\S+\s+(\S+)').firstMatch(target.command);
+        if (lnMatch != null) {
+          final linkPath = lnMatch.group(1)!;
+          return '回滚建议: rm $linkPath (删除刚创建的符号链接)';
+        }
         return '回滚建议: 参考快照中的原文件信息，从备份或版本控制恢复 ${target.name}';
       case ModifyTargetType.unknown:
         return null;
@@ -174,6 +226,21 @@ class RollbackAdvisor {
         }
       }
     }
+    // mv 命令（任何位置）— 记录源和目标用于回滚
+    // 跳过明显的备份操作（目标以 .bak/.old/.backup/.orig 结尾），这类操作风险低
+    final mvMatch = RegExp(r'^mv\s+(\S+)\s+(\S+)').firstMatch(cmd);
+    if (mvMatch != null) {
+      final dst = mvMatch.group(2)!;
+      final isBackup = RegExp(r'\.(bak|old|backup|orig)$', caseSensitive: false).hasMatch(dst);
+      if (!isBackup) {
+        return ModifyTarget(type: ModifyTargetType.fileWrite, name: dst, command: cmd);
+      }
+    }
+    // ln -s 创建符号链接（兼容 -sf / -snf 等 flag 变体）
+    final lnMatch = RegExp(r'^ln\s+-\w*s\w*\s+(\S+)\s+(\S+)').firstMatch(cmd);
+    if (lnMatch != null) {
+      return ModifyTarget(type: ModifyTargetType.fileWrite, name: lnMatch.group(2)!, command: cmd);
+    }
     // cat > / echo > / tee 写入文件
     final writeMatch = RegExp(r'(?:cat|echo|tee)\s+>?\\?\s*(\S+)').firstMatch(cmd);
     if (writeMatch != null) {
@@ -186,6 +253,10 @@ class RollbackAdvisor {
     final heredocMatch = RegExp(r"cat\s*>\s*(\S+)\s*<<").firstMatch(cmd);
     if (heredocMatch != null) {
       return ModifyTarget(type: ModifyTargetType.fileWrite, name: heredocMatch.group(1)!, command: cmd);
+    }
+    // crontab 操作（替换/编辑）
+    if (cmdLower.startsWith('crontab ') && !cmdLower.contains('-l')) {
+      return ModifyTarget(type: ModifyTargetType.configFile, name: 'crontab', command: cmd);
     }
     return null;
   }
@@ -207,6 +278,15 @@ class RollbackAdvisor {
         command: cmdLower,
       );
     }
+    // update-alternatives --set
+    final altMatch = RegExp(r'update-alternatives\s+--set\s+(\S+)').firstMatch(cmdLower);
+    if (altMatch != null) {
+      return ModifyTarget(
+        type: ModifyTargetType.service,
+        name: altMatch.group(1)!,
+        command: cmdLower,
+      );
+    }
     return null;
   }
 
@@ -218,8 +298,8 @@ class RollbackAdvisor {
       RegExp(r'apk\s+add\s+(\S+)'),
       RegExp(r'pip\s+install\s+(\S+)'),
       RegExp(r'pip3\s+install\s+(\S+)'),
-      RegExp(r'npm\s+install\s+(\S+)'),
-      RegExp(r'npm\s+i\s+(\S+)'),
+      RegExp(r'npm\s+install\s+(?:-g\s+)?(\S+)'),
+      RegExp(r'npm\s+i\s+(?:-g\s+)?(\S+)'),
     ];
     for (final p in patterns) {
       final m = p.firstMatch(cmdLower);

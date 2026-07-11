@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/agent_provider.dart';
 import '../services/conversation_service.dart';
 import '../models/conversation.dart';
@@ -36,6 +37,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final tc = ThemeColors.of(context);
     return Dialog(
       backgroundColor: tc.card,
@@ -51,7 +53,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
               children: [
                 const Icon(Icons.history, color: cPrimary, size: 18),
                 const SizedBox(width: 8),
-                Text('会话历史', style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
+                Text(l10n.terminalSessionHistory, style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
                 const Spacer(),
                 // 新建会话按钮
                 TextButton.icon(
@@ -62,7 +64,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
                     Navigator.of(ctx).pop();
                   },
                   icon: const Icon(Icons.add, size: 14, color: cPrimary),
-                  label: const Text('新建', style: TextStyle(fontSize: fSmall, color: cPrimary)),
+                  label: Text(l10n.sessionNew, style: const TextStyle(fontSize: fSmall, color: cPrimary)),
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     minimumSize: Size.zero,
@@ -76,10 +78,10 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
                 ),
               ],
             ),
-            const Divider(color: cBorder, height: 16),
+            Divider(color: tc.border, height: 16),
             Expanded(
               child: _sessions.isEmpty
-                  ? Center(child: Text('暂无会话', style: TextStyle(color: tc.textMuted, fontSize: fBody)))
+                  ? Center(child: Text(l10n.sessionNoSessions, style: TextStyle(color: tc.textMuted, fontSize: fBody)))
                   : ListView.builder(
                       itemCount: _sessions.length,
                       itemBuilder: (context, index) {
@@ -96,6 +98,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
   }
 
   Widget _buildSessionTile(Conversation conv, bool isActive, ThemeColors tc) {
+    final l10n = AppLocalizations.of(context)!;
     final msgCount = conv.messages.length;
     final hasSummary = conv.summary != null && conv.summary!.isNotEmpty;
     return Container(
@@ -156,7 +159,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          '$msgCount 条消息',
+                          l10n.sessionMessageCount(msgCount),
                           style: TextStyle(color: tc.textMuted, fontSize: fMicro),
                         ),
                         if (hasSummary) ...[
@@ -164,12 +167,12 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                             decoration: BoxDecoration(
-                              color: cAgentGreen.withValues(alpha: 0.15),
+                              color: tc.agentGreen.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(rXSmall),
                             ),
-                            child: const Text(
-                              '已压缩',
-                              style: TextStyle(color: cAgentGreen, fontSize: fMicro),
+                            child: Text(
+                              l10n.sessionCompressed,
+                              style: TextStyle(color: tc.agentGreen, fontSize: fMicro),
                             ),
                           ),
                         ],
@@ -184,7 +187,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
                 onPressed: () => _showRenameDialog(conv),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                tooltip: '重命名',
+                tooltip: l10n.sessionRename,
               ),
               // 删除按钮
               IconButton(
@@ -192,7 +195,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
                 onPressed: () => _confirmDelete(conv),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                tooltip: '删除',
+                tooltip: l10n.delete,
               ),
             ],
           ),
@@ -202,26 +205,27 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
   }
 
   void _showRenameDialog(Conversation conv) {
+    final l10n = AppLocalizations.of(context)!;
     final controller = TextEditingController(text: conv.title);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: ThemeColors.of(context).cardElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text('重命名会话', style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
+        title: Text(l10n.sessionRenameTitle, style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
         content: TextField(
           controller: controller,
           autofocus: true,
           style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody),
           decoration: InputDecoration(
-            hintText: '输入会话名称',
+            hintText: l10n.sessionRenameHint,
             hintStyle: TextStyle(color: ThemeColors.of(context).textMuted),
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('取消', style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fBody)),
+            child: Text(l10n.commonCancel, style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fBody)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -234,7 +238,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
               Navigator.pop(ctx);
             },
             style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
-            child: const Text('保存', style: TextStyle(fontSize: fBody)),
+            child: Text(l10n.save, style: const TextStyle(fontSize: fBody)),
           ),
         ],
       ),
@@ -242,18 +246,19 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
   }
 
   void _confirmDelete(Conversation conv) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: ThemeColors.of(context).cardElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text('删除会话？', style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
-        content: Text('会话「${conv.title}」的所有消息和日志将被永久删除，无法恢复。',
+        title: Text(l10n.sessionDeleteTitle, style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
+        content: Text(l10n.sessionDeleteConfirm(conv.title),
             style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fSmall)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('取消', style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fBody)),
+            child: Text(l10n.commonCancel, style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fBody)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -263,7 +268,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
               _loadSessions();
             },
             style: ElevatedButton.styleFrom(backgroundColor: cDanger, foregroundColor: Colors.white),
-            child: const Text('删除', style: TextStyle(fontSize: fBody)),
+            child: Text(l10n.delete, style: const TextStyle(fontSize: fBody)),
           ),
         ],
       ),

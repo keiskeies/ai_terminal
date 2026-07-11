@@ -4,8 +4,9 @@ import 'package:go_router/go_router.dart';
 import 'dart:io';
 import '../core/constants.dart';
 import '../core/credentials_store.dart';
-import '../core/hive_init.dart';
+import '../services/daos.dart';
 import '../core/theme_colors.dart';
+import '../l10n/app_localizations.dart';
 import '../models/host_config.dart';
 import '../providers/app_providers.dart';
 import '../widgets/host_card.dart';
@@ -39,7 +40,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
   /// P1-4: 加载分组展开状态
   void _loadGroupExpandedState() {
     try {
-      final saved = HiveInit.settingsBox.get('hostGroupExpanded');
+      final saved = SettingsDao.getCached('hostGroupExpanded');
       if (saved != null && saved is Map) {
         for (final entry in saved.entries) {
           _groupExpanded[entry.key.toString()] = entry.value as bool;
@@ -50,11 +51,13 @@ class _HostListPageState extends ConsumerState<HostListPage> {
 
   /// P1-4: 保存分组展开状态
   void _saveGroupExpandedState() {
-    HiveInit.settingsBox.put('hostGroupExpanded', Map<String, bool>.from(_groupExpanded));
+    SettingsDao.set('hostGroupExpanded', Map<String, bool>.from(_groupExpanded));
   }
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final hostsAsync = ref.watch(hostsProvider);
 
     return Scaffold(
@@ -77,14 +80,14 @@ class _HostListPageState extends ConsumerState<HostListPage> {
               onChanged: (value) => setState(() => _searchQuery = value),
               style: const TextStyle(fontSize: fBody),
               decoration: InputDecoration(
-                hintText: '搜索服务器...',
+                hintText: l10n.hostListSearchHint,
                 hintStyle: TextStyle(color: ThemeColors.of(context).textMuted),
                 filled: true,
-                fillColor: cCard,
-                prefixIcon: const Icon(Icons.search, color: cTextSub, size: 18),
+                fillColor: tc.card,
+                prefixIcon: Icon(Icons.search, color: tc.textSub, size: 18),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
-                        icon: const Icon(Icons.clear, color: cTextSub, size: 16),
+                        icon: Icon(Icons.clear, color: tc.textSub, size: 16),
                         onPressed: () {
                           _searchController.clear();
                           setState(() => _searchQuery = '');
@@ -93,11 +96,11 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                     : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(rSmall),
-                  borderSide: const BorderSide(color: cBorder, width: 1),
+                  borderSide: BorderSide(color: tc.border, width: 1),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(rSmall),
-                  borderSide: const BorderSide(color: cBorder, width: 1),
+                  borderSide: BorderSide(color: tc.border, width: 1),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(rSmall),
@@ -118,11 +121,11 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                   children: [
                     const Icon(Icons.error_outline, size: 48, color: cDanger),
                     const SizedBox(height: 16),
-                    Text('加载失败: $error', style: const TextStyle(color: cTextSub)),
+                    Text(l10n.hostListLoadFailed('$error'), style: TextStyle(color: tc.textSub)),
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () => ref.read(hostsProvider.notifier).loadHosts(),
-                      child: const Text('重试'),
+                      child: Text(l10n.retry),
                     ),
                   ],
                 ),
@@ -178,38 +181,39 @@ class _HostListPageState extends ConsumerState<HostListPage> {
   }
 
   void _showTipDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.lightbulb, color: Colors.amber),
-            SizedBox(width: 8),
-            Text('AI 助手使用提示'),
+            const Icon(Icons.lightbulb, color: Colors.amber),
+            const SizedBox(width: 8),
+            Text(l10n.hostListAITipTitle),
           ],
         ),
-        content: const Column(
+        content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('AI 助手需要在连接服务器后使用：'),
-            SizedBox(height: 12),
-            Text('1️⃣  点击服务器卡片进入终端'),
-            SizedBox(height: 8),
-            Text('2️⃣  连接成功后，右下角会出现 AI 按钮'),
-            SizedBox(height: 8),
-            Text('3️⃣  点击 AI 按钮，开始智能命令助手'),
-            SizedBox(height: 12),
+            Text(l10n.hostListAITipIntro),
+            const SizedBox(height: 12),
+            Text(l10n.hostListAITipStep1),
+            const SizedBox(height: 8),
+            Text(l10n.hostListAITipStep2),
+            const SizedBox(height: 8),
+            Text(l10n.hostListAITipStep3),
+            const SizedBox(height: 12),
             Text(
-              '💡 AI 可以帮你生成命令、解释输出、排查问题',
-              style: TextStyle(color: Colors.grey),
+              l10n.hostListAITipNote,
+              style: const TextStyle(color: Colors.grey),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('知道了'),
+            child: Text(l10n.commonGotIt),
           ),
         ],
       ),
@@ -219,6 +223,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
   /// P1-4: 空状态重设计 - 情感化引导
   Widget _buildEmptyState() {
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(pStandard * 2),
@@ -229,7 +234,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             const LogoWidget(size: 80),
             const SizedBox(height: 24),
             Text(
-              '还没有服务器',
+              l10n.hostListNoServers,
               style: TextStyle(
                 fontSize: fTitle,
                 fontWeight: FontWeight.w600,
@@ -238,7 +243,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              '添加第一台服务器，开始 AI 辅助的远程管理',
+              l10n.hostListAddFirstServer,
               style: TextStyle(
                 fontSize: fBody,
                 color: tc.textSub,
@@ -249,7 +254,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             ElevatedButton.icon(
               onPressed: () => context.push('/host/edit'),
               icon: const Icon(Icons.add),
-              label: const Text('添加服务器'),
+              label: Text(l10n.addServer),
             ),
           ],
         ),
@@ -259,6 +264,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
 
   /// P1-4: 搜索无结果状态
   Widget _buildNoSearchResults() {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -266,14 +272,14 @@ class _HostListPageState extends ConsumerState<HostListPage> {
           Icon(Icons.search_off, size: 48, color: ThemeColors.of(context).textMuted),
           const SizedBox(height: 16),
           Text(
-            '未找到匹配的服务器',
+            l10n.hostListNoSearchResults,
             style: TextStyle(
               color: ThemeColors.of(context).textSub,
             ),
           ),
           const SizedBox(height: 8),
           Text(
-            '尝试其他关键词或检查拼写',
+            l10n.hostListNoSearchResultsHint,
             style: TextStyle(
               color: ThemeColors.of(context).textMuted,
             ),
@@ -285,7 +291,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
               setState(() => _searchQuery = '');
             },
             icon: const Icon(Icons.clear),
-            label: const Text('清除搜索'),
+            label: Text(l10n.hostListClearSearch),
           ),
         ],
       ),
@@ -294,6 +300,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
 
   /// P1-4: 分组区域 - 支持展开/收起状态持久化
   Widget _buildGroupSection(String groupName, List<HostConfig> hosts) {
+    final l10n = AppLocalizations.of(context)!;
     // 默认只展开"默认"分组
     final isExpanded = _groupExpanded.putIfAbsent(groupName, () => groupName == '默认');
 
@@ -324,7 +331,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                 const Icon(Icons.folder, color: cPrimary, size: 18),
                 const SizedBox(width: 8),
                 Text(
-                  groupName,
+                  groupName == '默认' ? l10n.hostDefaultGroup : groupName,
                   style: TextStyle(
                     fontSize: fBody,
                     fontWeight: FontWeight.w600,
@@ -420,6 +427,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
   /// 左滑后弹出的底部操作菜单
   void _showSwipeActionSheet(HostConfig host) {
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       backgroundColor: tc.card,
@@ -452,7 +460,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             // 连接终端
             ListTile(
               leading: const Icon(Icons.terminal, color: cPrimary),
-              title: const Text('连接终端'),
+              title: Text(l10n.hostListConnectTerminal),
               onTap: () {
                 Navigator.pop(context);
                 this.context.push('/terminal/${host.id}');
@@ -470,7 +478,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             // 编辑
             ListTile(
               leading: const Icon(Icons.edit_outlined, color: cPrimary),
-              title: const Text('编辑配置'),
+              title: Text(l10n.hostListEditConfig),
               onTap: () {
                 Navigator.pop(context);
                 this.context.push('/host/edit/${host.id}');
@@ -479,7 +487,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             // 删除
             ListTile(
               leading: const Icon(Icons.delete_outline, color: cDanger),
-              title: const Text('删除', style: TextStyle(color: cDanger)),
+              title: Text(l10n.delete, style: const TextStyle(color: cDanger)),
               onTap: () {
                 Navigator.pop(context);
                 _showDeleteDialog(host);
@@ -492,15 +500,16 @@ class _HostListPageState extends ConsumerState<HostListPage> {
   }
 
   void _showDeleteDialog(HostConfig host) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('删除服务器'),
-        content: Text('确定要删除 "${host.name}" 吗？\n\n同时将删除保存的凭据。'),
+        title: Text(l10n.hostListDeleteServer),
+        content: Text(l10n.hostListDeleteConfirm(host.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(l10n.commonCancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -509,12 +518,12 @@ class _HostListPageState extends ConsumerState<HostListPage> {
               await ref.read(hostsProvider.notifier).deleteHost(host.id);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('删除成功')),
+                  SnackBar(content: Text(l10n.hostListDeleteSuccess)),
                 );
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: cDanger),
-            child: const Text('删除'),
+            child: Text(l10n.delete),
           ),
         ],
       ),

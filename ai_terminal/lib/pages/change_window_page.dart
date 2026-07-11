@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../l10n/app_localizations.dart';
 import '../services/change_window_service.dart';
 
 /// 变更窗口/封网期设置页
@@ -33,6 +34,7 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
   }
 
   Future<void> _save() async {
+    final l10n = AppLocalizations.of(context)!;
     final cfg = ChangeWindowConfig(
       enabled: _enabled,
       startHour: _startHour,
@@ -43,8 +45,8 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
       await ChangeWindowService.save(cfg);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('封网期配置已保存'),
+        SnackBar(
+          content: Text(l10n.changeWindowSaved),
           backgroundColor: cSuccess,
           behavior: SnackBarBehavior.floating,
         ),
@@ -53,7 +55,7 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('保存失败: $e'),
+          content: Text(l10n.changeWindowSaveFailed(e.toString())),
           backgroundColor: cDanger,
           behavior: SnackBarBehavior.floating,
         ),
@@ -64,22 +66,31 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
   String _fmtHour(int h) => '${h.toString().padLeft(2, '0')}:00';
 
   String _describeWindow() {
+    final l10n = AppLocalizations.of(context)!;
     final start = _fmtHour(_startHour);
     final end = _fmtHour(_endHour);
-    if (_startHour == _endHour) return '全天允许';
+    if (_startHour == _endHour) return l10n.changeWindowAllDayAllowed;
     String window;
     if (_startHour < _endHour) {
-      window = '$start - $end（同日）';
+      window = '$start - $end';
     } else {
-      window = '$start - 次日 $end（跨夜）';
+      window = l10n.changeWindowToNextDay(start, end);
     }
     if (_selectedWeekdays.isEmpty) {
-      return '$window，每天';
+      return l10n.changeWindowEveryDay(window);
     }
-    const names = {1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六', 7: '日'};
+    final names = {
+      1: l10n.changeWindowWeekdayMon,
+      2: l10n.changeWindowWeekdayTue,
+      3: l10n.changeWindowWeekdayWed,
+      4: l10n.changeWindowWeekdayThu,
+      5: l10n.changeWindowWeekdayFri,
+      6: l10n.changeWindowWeekdaySat,
+      7: l10n.changeWindowWeekdaySun,
+    };
     final days = _selectedWeekdays.toList()..sort();
-    final dayStr = days.map((d) => '周${names[d]}').join('、');
-    return '$window，仅 $dayStr';
+    final dayStr = days.map((d) => names[d]!).join('、');
+    return l10n.changeWindowOnlyDays(window, dayStr);
   }
 
   @override
@@ -88,11 +99,15 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('变更窗口 / 封网期')),
-      body: ListView(
-        padding: const EdgeInsets.all(pStandard),
-        children: [
+      appBar: AppBar(title: Text(l10n.changeWindowTitle)),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: ListView(
+            padding: const EdgeInsets.all(pStandard),
+            children: [
           // 启用开关
           Card(
             color: tc.card,
@@ -110,15 +125,15 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('启用封网期', style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
-                            Text('启用后，仅允许在配置窗口内执行修改性命令',
+                            Text(l10n.changeWindowEnable, style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
+                            Text(l10n.changeWindowEnableHint,
                                 style: TextStyle(color: tc.textSub, fontSize: fSmall)),
                           ],
                         ),
                       ),
                       Switch(
                         value: _enabled,
-                        activeColor: cWarning,
+                        activeThumbColor: cWarning,
                         onChanged: (v) => setState(() => _enabled = v),
                       ),
                     ],
@@ -135,11 +150,11 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline, size: 14, color: cWarning),
+                          const Icon(Icons.info_outline, size: 14, color: cWarning),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              '当前窗口：${_describeWindow()}\n窗口外时间，AI 执行修改性命令将被拒绝（只读命令不受影响）。',
+                              l10n.changeWindowCurrentWindowInfo(_describeWindow()),
                               style: TextStyle(color: tc.textBody, fontSize: fMicro, height: 1.5),
                             ),
                           ),
@@ -156,7 +171,7 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
             const SizedBox(height: 16),
 
             // 时间窗口
-            _buildSectionTitle('时间窗口'),
+            _buildSectionTitle(l10n.changeWindowAllowedWindow),
             Card(
               color: tc.card,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rCard)),
@@ -165,7 +180,7 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('允许变更的开始时间', style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+                    Text(l10n.changeWindowStartHour, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
                     const SizedBox(height: 4),
                     Row(
                       children: [
@@ -190,13 +205,13 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
                           child: Text(
                             _fmtHour(_startHour),
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: cPrimary, fontWeight: FontWeight.w600, fontSize: fBody),
+                            style: const TextStyle(color: cPrimary, fontWeight: FontWeight.w600, fontSize: fBody),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text('允许变更的结束时间', style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+                    Text(l10n.changeWindowEndHour, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
                     const SizedBox(height: 4),
                     Row(
                       children: [
@@ -221,13 +236,13 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
                           child: Text(
                             _fmtHour(_endHour),
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: cPrimary, fontWeight: FontWeight.w600, fontSize: fBody),
+                            style: const TextStyle(color: cPrimary, fontWeight: FontWeight.w600, fontSize: fBody),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Text('提示：开始 > 结束 表示跨夜窗口（如 22:00 - 次日 06:00）',
+                    Text(l10n.changeWindowCrossDayHint,
                         style: TextStyle(color: tc.textMuted, fontSize: fMicro)),
                   ],
                 ),
@@ -237,7 +252,7 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
             const SizedBox(height: 16),
 
             // 星期选择
-            _buildSectionTitle('允许的星期（不选 = 每天）'),
+            _buildSectionTitle(l10n.changeWindowWeekdaysTitle),
             Card(
               color: tc.card,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rCard)),
@@ -248,10 +263,18 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
                   runSpacing: 8,
                   children: List.generate(7, (i) {
                     final day = i + 1;
-                    const names = {1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六', 7: '日'};
+                    final dayNames = {
+                      1: l10n.changeWindowWeekdayMon,
+                      2: l10n.changeWindowWeekdayTue,
+                      3: l10n.changeWindowWeekdayWed,
+                      4: l10n.changeWindowWeekdayThu,
+                      5: l10n.changeWindowWeekdayFri,
+                      6: l10n.changeWindowWeekdaySat,
+                      7: l10n.changeWindowWeekdaySun,
+                    };
                     final selected = _selectedWeekdays.contains(day);
                     return FilterChip(
-                      label: Text('周${names[day]}'),
+                      label: Text(dayNames[day]!),
                       selected: selected,
                       onSelected: (v) {
                         setState(() {
@@ -282,13 +305,15 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
           FilledButton.icon(
             onPressed: _save,
             icon: const Icon(Icons.save, size: 16),
-            label: const Text('保存配置'),
+            label: Text(l10n.changeWindowSaveConfig),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(44),
               backgroundColor: cPrimary,
             ),
           ),
         ],
+          ),
+        ),
       ),
     );
   }

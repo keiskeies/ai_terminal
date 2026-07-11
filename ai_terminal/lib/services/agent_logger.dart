@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// Agent 日志记录器
 ///
@@ -13,13 +14,16 @@ import 'package:flutter/foundation.dart';
 class AgentLogger {
   static final AgentLogger _instance = AgentLogger._internal();
   factory AgentLogger() => _instance;
-  AgentLogger._internal() : _logFile = _initLogFile();
+  AgentLogger._internal() : _logFile = null {
+    // 异步初始化日志文件，避免阻塞启动
+    _initLogFileAsync();
+  }
 
   /// 循环缓冲区：入队 O(1)，超出容量时 removeFirst O(1)
   final Queue<String> _logs = Queue();
   static const int _maxLogs = 1000;
 
-  final File? _logFile;
+  File? _logFile;
 
   /// 当前日志路由的 hostId（由 AgentNotifier 在切换 host 时设置）
   /// 订阅器据此将日志写入对应会话，避免多 host 串台
@@ -38,15 +42,18 @@ class AgentLogger {
     return inDebugMode;
   }
 
-  static File? _initLogFile() {
+  /// 异步初始化日志文件：写入应用文档目录（持久化），append 模式
+  Future<void> _initLogFileAsync() async {
     try {
-      final dir = Directory.systemTemp;
-      final file = File('${dir.path}/ai_terminal_agent.log');
-      // 异步写入头部，避免阻塞启动
-      file.writeAsString('=== Agent Log Started ${DateTime.now()} ===\n');
-      return file;
+      final dir = await getApplicationDocumentsDirectory();
+      _logFile = File('${dir.path}/agent.log');
+      // 启动时写入分隔标记（append 模式，保留历史日志）
+      _logFile!.writeAsString(
+        '\n=== Agent Log Started ${DateTime.now()} ===\n',
+        mode: FileMode.append,
+      );
     } catch (e) {
-      return null;
+      debugPrint('[AgentLogger] 日志文件初始化失败: $e');
     }
   }
 
@@ -93,19 +100,52 @@ class AgentLogger {
       return;
     }
     final file = _logFile;
-    if (file == null || _fileBuffer.isEmpty) return;
+    if (file == null || _fileBuffer.isEmpty) {
+      // 日志文件初始化失败时清空缓冲区，防止 StringBuffer 无限增长导致 OOM
+      if (file == null && _fileBuffer.length > 10000) {
+        _fileBuffer.clear();
+      }
+      return;
+    }
 
     final pending = _fileBuffer.toString();
     _fileBuffer.clear();
     _fileWriting = true;
     try {
       await file.writeAsString(pending, mode: FileMode.append, flush: false);
+      // 日志轮转：文件超过 5MB 时保留尾部 2MB，防止无限增长
+      await _rotateIfNeeded(file);
     } catch (e) {
       debugPrint('[AgentLogger] 日志文件写入失败: $e');
       // 写入失败时把内容放回缓冲区，下次再试
       _fileBuffer.write(pending);
     } finally {
       _fileWriting = false;
+    }
+  }
+
+  /// 日志文件轮转：超过 5MB 时保留尾部 2MB
+  static const int _maxLogSize = 5 * 1024 * 1024;  // 5MB
+  static const int _keepLogSize = 2 * 1024 * 1024;  // 2MB
+
+  Future<void> _rotateIfNeeded(File file) async {
+    try {
+      final size = await file.length();
+      if (size < _maxLogSize) return;
+      // 原子轮转：先写临时文件再 rename，防止 truncate 和 writeFrom 之间崩溃导致日志清空
+      final tail = await file.open(mode: FileMode.read);
+      List<int> tailBytes;
+      try {
+        await tail.setPosition(size - _keepLogSize);
+        tailBytes = await tail.read(_keepLogSize);
+      } finally {
+        await tail.close();
+      }
+      final tmpFile = File('${file.path}.tmp');
+      await tmpFile.writeAsBytes(tailBytes, flush: true);
+      await tmpFile.rename(file.path);
+    } catch (e) {
+      debugPrint('[AgentLogger] 日志轮转失败: $e');
     }
   }
 

@@ -152,6 +152,14 @@ class AgentTask {
   final AgentStatus status;
   final DateTime createdAt;
   final DateTime? completedAt;
+  /// 预估总步骤数（AI 首次回复时可从思考中推断，初始为 null）
+  final int? totalStepsEstimate;
+  /// 已用时间（秒），从任务开始计算
+  final int? elapsedSeconds;
+  /// 成功执行的命令数
+  final int successCount;
+  /// 失败执行的命令数
+  final int failureCount;
 
   AgentTask({
     required this.id,
@@ -162,6 +170,10 @@ class AgentTask {
     this.status = AgentStatus.idle,
     DateTime? createdAt,
     this.completedAt,
+    this.totalStepsEstimate,
+    this.elapsedSeconds,
+    this.successCount = 0,
+    this.failureCount = 0,
   })  : steps = steps ?? [],
         results = results ?? [],
         createdAt = createdAt ?? DateTime.now();
@@ -172,6 +184,10 @@ class AgentTask {
     List<AgentResult>? results,
     AgentStatus? status,
     DateTime? completedAt,
+    int? totalStepsEstimate,
+    int? elapsedSeconds,
+    int? successCount,
+    int? failureCount,
   }) {
     return AgentTask(
       id: id,
@@ -182,6 +198,10 @@ class AgentTask {
       status: status ?? this.status,
       createdAt: createdAt,
       completedAt: completedAt ?? this.completedAt,
+      totalStepsEstimate: totalStepsEstimate ?? this.totalStepsEstimate,
+      elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
+      successCount: successCount ?? this.successCount,
+      failureCount: failureCount ?? this.failureCount,
     );
   }
 

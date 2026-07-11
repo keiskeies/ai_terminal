@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../l10n/app_localizations.dart';
 import '../utils/audit_logger.dart';
 import '../providers/app_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -65,16 +66,17 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
   }
 
   void _exportLogs() {
+    final l10n = AppLocalizations.of(context)!;
     if (_filteredLogs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('没有可导出的日志'), behavior: SnackBarBehavior.floating),
+        SnackBar(content: Text(l10n.auditLogNoRecordsToCopy), behavior: SnackBarBehavior.floating),
       );
       return;
     }
     final buffer = StringBuffer();
-    buffer.writeln('# 审计日志导出');
-    buffer.writeln('# 导出时间: ${DateTime.now().toIso8601String()}');
-    buffer.writeln('# 总条数: ${_filteredLogs.length}');
+    buffer.writeln(l10n.auditLogExportHeader);
+    buffer.writeln(l10n.auditLogExportTime(DateTime.now().toIso8601String()));
+    buffer.writeln(l10n.auditLogExportTotal(_filteredLogs.length));
     buffer.writeln('---');
     for (final log in _filteredLogs) {
       buffer.writeln('[${log['timestamp']}] host=${log['hostId']} level=${log['safetyLevel']} executed=${log['executed']}');
@@ -88,7 +90,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('已复制 ${_filteredLogs.length} 条日志到剪贴板'),
+        content: Text(l10n.auditLogCopied(_filteredLogs.length)),
         backgroundColor: cSuccess,
         behavior: SnackBarBehavior.floating,
       ),
@@ -106,7 +108,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
       case 'blocked':
         return cDanger;
       default:
-        return cTextSub;
+        return ThemeColors.of(context).textSub;
     }
   }
 
@@ -126,15 +128,16 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
   }
 
   String _safetyLabel(String level) {
+    final l10n = AppLocalizations.of(context)!;
     switch (level) {
       case 'safe':
-        return '安全';
+        return l10n.auditLogSafetySafe;
       case 'warning':
-        return '警告';
+        return l10n.auditLogSafetyWarning;
       case 'danger':
-        return '危险';
+        return l10n.auditLogSafetyDanger;
       case 'blocked':
-        return '已阻止';
+        return l10n.auditLogSafetyBlocked;
       default:
         return level;
     }
@@ -143,13 +146,14 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_filterHostId != null ? '审计日志' : '全部审计日志'),
+        title: Text(_filterHostId != null ? l10n.auditLogTitle : l10n.auditLogAllTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.download, size: 20),
-            tooltip: '导出日志',
+            tooltip: l10n.auditLogCopyTooltip,
             onPressed: _exportLogs,
           ),
           PopupMenuButton<String>(
@@ -171,16 +175,19 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
               _loadLogs();
             },
             itemBuilder: (ctx) => [
-              const PopupMenuItem(value: 'all', child: Text('全部日志')),
-              const PopupMenuItem(value: 'blocked', child: Text('仅已阻止')),
+              PopupMenuItem(value: 'all', child: Text(l10n.auditLogFilterAll)),
+              PopupMenuItem(value: 'blocked', child: Text(l10n.auditLogFilterBlocked)),
               if (widget.hostId != null)
-                const PopupMenuItem(value: 'thisHost', child: Text('仅当前主机')),
+                PopupMenuItem(value: 'thisHost', child: Text(l10n.auditLogFilterThisHost)),
             ],
           ),
         ],
       ),
-      body: Column(
-        children: [
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: Column(
+            children: [
           // 搜索框
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: pStandard, vertical: 8),
@@ -188,7 +195,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
               controller: _searchController,
               style: TextStyle(color: tc.textMain, fontSize: fBody),
               decoration: InputDecoration(
-                hintText: '搜索命令、主机ID、输出...',
+                hintText: l10n.auditLogSearchHint,
                 hintStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
                 prefixIcon: Icon(Icons.search, size: 18, color: tc.textSub),
                 suffixIcon: _searchQuery.isNotEmpty
@@ -214,7 +221,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(rSmall),
-                  borderSide: BorderSide(color: cPrimary),
+                  borderSide: const BorderSide(color: cPrimary),
                 ),
                 isDense: true,
               ),
@@ -232,7 +239,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                       children: [
                         Icon(Icons.history, size: 48, color: tc.textMuted),
                         const SizedBox(height: 8),
-                        Text(_searchQuery.isNotEmpty ? '未匹配到日志' : '暂无审计日志',
+                        Text(_searchQuery.isNotEmpty ? l10n.auditLogNoMatch : l10n.auditLogEmpty,
                             style: TextStyle(color: tc.textSub, fontSize: fBody)),
                       ],
                     ),
@@ -247,11 +254,15 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                   ),
           ),
         ],
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildLogCard(Map<String, dynamic> log) {
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final safetyLevel = log['safetyLevel'] as String? ?? 'unknown';
     final executed = log['executed'] as bool? ?? false;
     final timestamp = log['timestamp'] as String? ?? '';
@@ -301,7 +312,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                   ),
                 ),
                 const Spacer(),
-                Text(formattedTime, style: const TextStyle(fontSize: fMicro, color: cTextMuted, fontFamily: 'JetBrainsMono')),
+                Text(formattedTime, style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono')),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -310,7 +321,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                     borderRadius: BorderRadius.circular(rXSmall),
                   ),
                   child: Text(
-                    executed ? '已执行' : '未执行',
+                    executed ? l10n.auditLogExecuted : l10n.auditLogNotExecuted,
                     style: TextStyle(
                       fontSize: fMicro,
                       color: executed ? cSuccess : cDanger,
@@ -326,7 +337,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
               width: double.infinity,
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: ThemeColors.of(context).bg,
+                color: tc.bg,
                 borderRadius: BorderRadius.circular(rXSmall),
               ),
               child: SelectableText(
@@ -334,7 +345,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                 style: TextStyle(
                   fontFamily: 'JetBrainsMono',
                   fontSize: fMono,
-                  color: ThemeColors.of(context).terminalGreen,
+                  color: tc.terminalGreen,
                 ),
               ),
             ),
@@ -342,9 +353,9 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
             const SizedBox(height: 4),
             Row(
               children: [
-                const Icon(Icons.dns_outlined, size: 10, color: cTextMuted),
+                Icon(Icons.dns_outlined, size: 10, color: tc.textMuted),
                 const SizedBox(width: 4),
-                Text(hostName, style: const TextStyle(fontSize: fMicro, color: cTextMuted)),
+                Text(hostName, style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
               ],
             ),
             // 输出（如果有）
@@ -354,23 +365,23 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: EdgeInsets.zero,
                 dense: true,
-                title: const Text('输出', style: TextStyle(fontSize: fMicro, color: cTextMuted)),
+                title: Text(l10n.auditLogOutput, style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
                 children: [
                   Container(
                     width: double.infinity,
                     constraints: const BoxConstraints(maxHeight: 120),
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: ThemeColors.of(context).bg,
+                      color: tc.bg,
                       borderRadius: BorderRadius.circular(rXSmall),
                     ),
                     child: SingleChildScrollView(
                       child: Text(
                         output,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'JetBrainsMono',
                           fontSize: fMicro,
-                          color: cTextSub,
+                          color: tc.textSub,
                         ),
                         maxLines: null,
                       ),

@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
-import '../core/hive_init.dart';
 import '../core/safety_guard.dart';
+import 'daos.dart';
 
 /// 变更窗口（封网期）配置
 ///
@@ -68,9 +68,9 @@ class ChangeWindowService {
   static bool _loaded = false;
 
   /// 加载配置（启动时调用一次）
-  static void load() {
+  static Future<void> load() async {
     try {
-      final raw = HiveInit.settingsBox.get(_key);
+      final raw = SettingsDao.getCached(_key);
       if (raw is Map) {
         _cache = ChangeWindowConfig.fromJson(Map<dynamic, dynamic>.from(raw));
       }
@@ -90,7 +90,7 @@ class ChangeWindowService {
   static Future<void> save(ChangeWindowConfig cfg) async {
     _cache = cfg;
     try {
-      await HiveInit.settingsBox.put(_key, cfg.toJson());
+      await SettingsDao.set(_key, cfg.toJson());
     } catch (e) {
       debugPrint('[ChangeWindow] 保存配置失败: $e');
       rethrow;

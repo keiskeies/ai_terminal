@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants.dart';
+import '../core/theme_colors.dart';
 import '../models/chat_session.dart';
 
 class CommandBlockWidget extends StatelessWidget {
@@ -19,10 +20,10 @@ class CommandBlockWidget extends StatelessWidget {
   bool get _hasChainOperator =>
       RegExp(r'&&|\|\||;|\|').hasMatch(data.command);
 
-  Color get _safetyColor {
+  Color _safetyColor(BuildContext context) {
     switch (data.safetyLevel) {
       case 'blocked':
-        return cTextSub;
+        return ThemeColors.of(context).textSub;
       case 'warn':
         return cWarning;
       case 'info':
@@ -61,17 +62,18 @@ class CommandBlockWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     // 链式命令特殊处理：显示警告，禁用直接执行
     if (_hasChainOperator) {
-      return _buildChainCommandCard();
+      return _buildChainCommandCard(context);
     }
 
-    return _buildNormalCard();
+    return _buildNormalCard(context);
   }
 
   /// 链式命令卡片 - 强制显示警告
-  Widget _buildChainCommandCard() {
+  Widget _buildChainCommandCard(BuildContext context) {
+    final tc = ThemeColors.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
+        color: tc.terminalBg,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: cDanger, width: 2),
       ),
@@ -109,10 +111,10 @@ class CommandBlockWidget extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: SelectableText(
               data.command,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'JetBrainsMono',
                 fontSize: fMono,
-                color: cTerminalGreen,
+                color: tc.terminalGreen,
               ),
             ),
           ),
@@ -147,12 +149,13 @@ class CommandBlockWidget extends StatelessWidget {
   }
 
   /// 普通命令卡片
-  Widget _buildNormalCard() {
+  Widget _buildNormalCard(BuildContext context) {
+    final tc = ThemeColors.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1E1E1E),
+        color: tc.terminalBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: cBorder),
+        border: Border.all(color: tc.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,19 +165,19 @@ class CommandBlockWidget extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                const Text(
+                Text(
                   '命令',
-                  style: TextStyle(fontSize: fSmall, color: cTextSub),
+                  style: TextStyle(fontSize: fSmall, color: tc.textSub),
                 ),
                 const Spacer(),
                 if (data.safetyLevel != 'safe')
                   Row(
                     children: [
-                      Icon(_safetyIcon, color: _safetyColor, size: 16),
+                      Icon(_safetyIcon, color: _safetyColor(context), size: 16),
                       const SizedBox(width: 4),
                       Text(
                         _safetyLabel,
-                        style: TextStyle(fontSize: fSmall, color: _safetyColor),
+                        style: TextStyle(fontSize: fSmall, color: _safetyColor(context)),
                       ),
                     ],
                   ),
@@ -187,10 +190,10 @@ class CommandBlockWidget extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: SelectableText(
               data.command,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'JetBrainsMono',
                 fontSize: fMono,
-                color: cTerminalGreen,
+                color: tc.terminalGreen,
               ),
             ),
           ),
@@ -201,7 +204,7 @@ class CommandBlockWidget extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Text(
                 data.description!,
-                style: const TextStyle(fontSize: fSmall, color: cTextSub),
+                style: TextStyle(fontSize: fSmall, color: tc.textSub),
               ),
             ),
 
@@ -211,23 +214,23 @@ class CommandBlockWidget extends StatelessWidget {
               margin: const EdgeInsets.all(12),
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFF1A1A2E),
+                color: tc.surface,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
+                  Text(
                     '执行结果:',
-                    style: TextStyle(fontSize: fSmall, color: cTextSub),
+                    style: TextStyle(fontSize: fSmall, color: tc.textSub),
                   ),
                   const SizedBox(height: 4),
                   SelectableText(
                     data.output!,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'JetBrainsMono',
                       fontSize: fMono,
-                      color: cTextMain,
+                      color: tc.textMain,
                     ),
                     maxLines: 10,
                   ),
@@ -249,8 +252,8 @@ class CommandBlockWidget extends StatelessWidget {
                   icon: const Icon(Icons.copy, size: 16),
                   label: const Text('复制'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: cTextSub,
-                    side: const BorderSide(color: cBorder),
+                    foregroundColor: tc.textSub,
+                    side: BorderSide(color: tc.border),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -259,7 +262,7 @@ class CommandBlockWidget extends StatelessWidget {
                   icon: const Icon(Icons.play_arrow, size: 16),
                   label: const Text('执行'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _safetyColor,
+                    backgroundColor: _safetyColor(context),
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(rButton),

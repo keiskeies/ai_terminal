@@ -5,21 +5,24 @@
     <strong>Control your servers with natural language. AI runs the commands for you.</strong>
   </p>
   <p align="center">
-    <a href="https://ai-terminal.keiskei.top" target="_blank">🌐 Website</a> · 
-    <a href="https://github.com/keiskeies/ai_terminal/releases" target="_blank">📦 Download</a> · 
+    <a href="https://ai-terminal.keiskei.top" target="_blank">🌐 Website</a> ·
+    <a href="https://github.com/keiskeies/ai_terminal/releases" target="_blank">📦 Download</a> ·
     <a href="./QUESTION.md">❓ FAQ</a>
   </p>
   <p align="center">
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-    <img src="https://img.shields.io/badge/version-1.3.4-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.5-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
 ---
 
-[中文](./README.md) | **English**
+**🌍 Language:**
+[中文](./README.md) | **English** | [日本語](./README_JA.md) | [Deutsch](./README_DE.md) | [Français](./README_FR.md) | [Español](./README_ES.md) | [한국어](./README_KO.md) | [Русский](./README_RU.md) | [Português](./README_PT.md) | [Italiano](./README_IT.md)
+
+---
 
 ## One sentence to explain it
 
@@ -57,6 +60,65 @@
 - You wear 5 hats. You don't have time to learn `vi`.
 
 **Every scenario above? One sentence to AI Terminal solves it.**
+
+## 🆕 What's New in v1.3.5
+
+v1.3.5 is a major update featuring **5 new core capabilities**: Server Monitoring, Change Records, Ops Runbooks, Notification Center, and Glassmorphism UI — a complete upgrade for DevOps efficiency.
+
+### 📊 Real-time Server Monitoring Dashboard
+
+> No more manually typing `top`, `df`, `free` — all metrics at a glance
+
+| Real-time Monitoring Overview | Per-Host Toggle |
+|:---:|:---:|
+| <img src="./ai_terminal/doc/主界面.jpg" width="400" /> | <img src="./ai_terminal/doc/设置页面.jpg" width="400" /> |
+
+- **CPU / Memory / Disk / Network** — four core metrics refreshed in real-time
+- **Multi-host parallel monitoring** — view all your servers from one dashboard
+- **Per-host independent toggle** — turn off monitoring for any machine anytime
+- Auto-highlight abnormal metrics — spot issues instantly
+
+### 📝 Change Records & Audit Logs
+
+> Who changed what, and when? Fully traceable. Post-incident forensics made easy.
+
+- **Auto-log all Agent operations**: command execution, file changes, config modifications
+- **Change window management**: planned vs emergency changes, categorized
+- **Full audit logs**: operator, timestamp, command, result, exit code — all queryable
+- **Rollback suggestions**: AI analyzes change impact and recommends rollback plans
+
+### 📋 Ops Runbooks
+
+| Runbook List | Executing |
+|:---:|:---:|
+| <img src="./ai_terminal/doc/运维工作流.jpg" width="400" /> | <img src="./ai_terminal/doc/多机编排.jpg" width="400" /> |
+
+- **Built-in common ops templates**: system inspection, security hardening, log cleanup, service deployment, and more
+- **One-click execution**: no more typing commands step by step — runbooks execute automatically
+- **Multi-host orchestration**: run the same workflow on multiple servers in parallel or sequentially
+- **Custom runbooks**: create your own ops playbooks and codify team knowledge
+
+### 🔔 Notification Center
+
+- **Task completion alerts** — get notified the moment long-running tasks finish
+- **Anomaly alerts** — monitoring threshold breaches, command failures, pushed instantly
+- **Security reminders** — high-risk operations, suspicious behavior, early warnings
+- **Configurable notification policies** — you decide which events trigger notifications
+
+### 🎨 Glassmorphism UI Redesign
+
+| Settings (Chinese) | Settings (English) |
+|:---:|:---:|
+| <img src="./ai_terminal/doc/设置页面.jpg" width="400" /> | <img src="./ai_terminal/doc/设置页面_英文版.jpg" width="400" /> |
+
+- Brand new **GlassCard glassmorphism card design** with clearer visual hierarchy
+- **Theme system refactor** — custom theme colors, corner radius, blur intensity
+- Smoother animated transitions, more refined interaction feedback
+- **15+ languages** with one-click switching
+
+| Multi-language Settings |
+|:---:|
+| <img src="./ai_terminal/doc/多语言设置.jpg" width="400" /> |
 
 ## 💡 What can it do for you?
 
@@ -147,6 +209,7 @@ Even if someone steals your device, without your biometric/passcode, all they ge
 | Configure environment | Follow official docs exactly | Change system params you didn't ask about |
 | Read logs | Filter & show key information | Delete or modify log files |
 | Manage services | Start/stop the services you specified | Start other services you didn't mention |
+| Run workflows | Execute pre-defined steps automatically | Skip critical steps or modify the process |
 
 **TL;DR: AI is your assistant, not your boss. It does what you ask. Nothing more.**
 
@@ -155,6 +218,10 @@ Even if someone steals your device, without your biometric/passcode, all they ge
 | Feature | Description |
 |:---|:---|
 | 🤖 **Agent Auto-Execution** | AI generates commands and executes them in a loop until task completion |
+| 📊 **Server Monitoring** | Real-time CPU/memory/disk/network dashboard, multi-host parallel |
+| 📝 **Change Records** | Full audit logs, traceable operations, rollback-ready |
+| 📋 **Ops Runbooks** | Built-in Runbook templates, one-click common ops tasks |
+| 🔔 **Notification Center** | Task completion, anomaly alerts, security reminders — pushed instantly |
 | 🛡️ **Triple Security** | Behavior boundary prompts → SafetyGuard command classification → Dangerous ops require CONFIRM |
 | 🔐 **Zero Plaintext Credentials** | Passwords/private keys in system Keychain / Keystore, never on disk in plaintext |
 | 🖥️ **5 Native Platforms** | macOS / Linux / Windows / Android / iOS — full native support |
@@ -163,6 +230,7 @@ Even if someone steals your device, without your biometric/passcode, all they ge
 | 🌊 **Streaming Output** | AI responses render in real-time; terminal output streams live |
 | 🧠 **Knowledge-Driven** | 150+ software install/config guides built in — follows official docs, no AI hallucination |
 | 🌐 **20+ Providers** | DeepSeek / Qwen / Claude / Gemini / Ollama & more, with remote config updates |
+| 🌍 **15+ Languages** | Chinese / English / Japanese / Korean / French / German / Spanish / Russian / Portuguese & more |
 
 ## 🏗️ Tech Stack
 
@@ -175,7 +243,9 @@ Flutter 3.16+ (Dart 3.2+)
 ├── Local Terminal: flutter_pty
 ├── Terminal UI: xterm.dart
 ├── AI Interface: OpenAI-compatible (20+ providers)
-└── Markdown: flutter_markdown
+├── Monitoring: Server dashboard (CPU/memory/disk/network)
+├── Ops: Change records + Audit logs + Runbook workflows
+└── UI: GlassCard glassmorphism + Multi-theme + 15+ languages
 ```
 
 ## 🚀 Getting Started
@@ -247,18 +317,17 @@ Setup steps:
 
 ## 📱 Screenshots
 
-| Server Management | SSH Terminal |
+| Main UI (Monitor + Terminal) | Multi-Host Orchestration |
 |:---:|:---:|
-| <img src="./ai_terminal/doc/ai-t1.png" width="400" /> | <img src="./ai_terminal/doc/ai-t2.png" width="400" /> |
+| <img src="./ai_terminal/doc/主界面.jpg" width="400" /> | <img src="./ai_terminal/doc/多机编排.jpg" width="400" /> |
 
-| AI Chat Assistant | Agent Auto-Execution |
+| Ops Runbooks | Settings Page |
 |:---:|:---:|
-| <img src="./ai_terminal/doc/ai-t3.png" width="400" /> | <img src="./ai_terminal/doc/ai-t4.png" width="400" /> |
+| <img src="./ai_terminal/doc/运维工作流.jpg" width="400" /> | <img src="./ai_terminal/doc/设置页面.jpg" width="400" /> |
 
-<p align="center">
-  <img src="./ai_terminal/doc/ai-t5.png" width="400" />
-  <br /><b>AI Model Configuration</b>
-</p>
+| Multi-language Settings |
+|:---:|
+| <img src="./ai_terminal/doc/多语言设置.jpg" width="400" /> |
 
 > 🤖 AI features powered by <b>Xiaomi MiMo</b> LLM
 
@@ -316,6 +385,14 @@ Below: typing "install openclaw" after SSH-ing into an Ubuntu server:
   - [x] 🤖 Preset model quick selection (one-click)
   - [x] 🦙 Ollama local deployment (no API key, completely free)
   - [x] 📐 Add model dialog optimization (wide-screen dual-column layout)
+- [x] v1.3.5 — Ops Capability Mega Upgrade
+  - [x] 📊 Real-time server monitoring (CPU/memory/disk/network, multi-host parallel)
+  - [x] 📝 Change records & audit logs (full operation history, traceable & rollback-ready)
+  - [x] 📋 Ops Runbooks (built-in templates + custom, one-click execution)
+  - [x] 🔔 Notification Center (task completion, anomaly alerts, security reminders)
+  - [x] 🎨 Glassmorphism UI redesign (GlassCard design, theme system upgrade)
+  - [x] 🌍 15+ languages localization
+  - [x] 📺 Multi-host orchestration (run workflows across servers in parallel/serial)
 
 ## 🤝 Contributing
 

@@ -322,12 +322,10 @@ class SftpService {
 
     final sink = File(localPath).openWrite();
     try {
-      int offset = 0;
       await for (final chunk in file.read(onProgress: (bytesRead) {
         onProgress?.call(bytesRead, totalSize);
       })) {
         sink.add(chunk);
-        offset += chunk.length;
       }
     } finally {
       await sink.close();

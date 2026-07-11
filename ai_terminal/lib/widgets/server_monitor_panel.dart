@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../l10n/app_localizations.dart';
 import '../services/server_monitor_service.dart';
 
 /// 服务器监控面板 — 单行紧凑布局（30px 高）
@@ -151,16 +152,17 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
   Widget _buildStatusIndicator(ThemeColors tc) {
     final isFailed = _consecutiveFailures >= 2;
     final hasData = _last != null;
+    final l10n = AppLocalizations.of(context)!;
     final dotColor = isFailed
         ? cDanger
         : hasData
             ? cSuccess
             : tc.textMuted.withValues(alpha: 0.5);
     final tooltip = isFailed
-        ? '采集失败（连续 $_consecutiveFailures 次）'
+        ? l10n.monitorCollectingFailed(_consecutiveFailures)
         : hasData
-            ? '采集中'
-            : '等待数据';
+            ? l10n.monitorCollecting
+            : l10n.monitorWaitingData;
 
     return Tooltip(
       message: tooltip,
@@ -184,6 +186,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final snap = _last;
     final history = widget.service.history;
     final isStale = _consecutiveFailures >= 2; // 数据是否过期（采集失败）
@@ -232,7 +235,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
               _buildMetricChipWithChart(
                 metric: 'mem',
                 icon: Icons.memory,
-                label: '内存',
+                label: l10n.monitorMemory,
                 value: snap != null && snap.memTotalMB > 0
                     ? '${_formatGB(snap.memUsedMB)}/${_formatGB(snap.memTotalMB)}'
                     : '-',
@@ -272,7 +275,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
               _buildMetricChip(
                 metric: 'uptime',
                 icon: Icons.access_time,
-                label: '开机',
+                label: l10n.monitorUptime,
                 value: snap?.uptime ?? '-',
                 color: isStale ? tc.textMuted : tc.textSub,
                 valueMaxWidth: 100,
@@ -281,7 +284,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
               _buildMetricChip(
                 metric: 'user',
                 icon: Icons.person_outline,
-                label: '用户',
+                label: l10n.monitorUser,
                 value: (snap?.hostname.isNotEmpty ?? false) ? snap!.hostname : '-',
                 color: isStale ? tc.textMuted : tc.textSub,
                 valueMaxWidth: 120,
@@ -539,9 +542,9 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
           color: Colors.transparent,
           child: Container(
             decoration: BoxDecoration(
-              color: cCardElevated,
+              color: tc.cardElevated,
               borderRadius: BorderRadius.circular(rMedium),
-              border: Border.all(color: cBorder, width: 1),
+              border: Border.all(color: tc.border, width: 1),
               boxShadow: shadowXl,
             ),
             padding: const EdgeInsets.all(12),
@@ -587,13 +590,14 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
 
   /// 网络浮层专用内容：汇总 + 接口明细表格
   Widget _buildNetOverlayContent(ThemeColors tc, ServerSnapshot s) {
+    final l10n = AppLocalizations.of(context)!;
     // 汇总信息
     final summary = [
-      ('总下行速率', _formatRate(s.netDownKBps)),
-      ('总上行速率', _formatRate(s.netUpKBps)),
-      ('累计下载', _formatBytes(s.netTotalDownBytes)),
-      ('累计上传', _formatBytes(s.netTotalUpBytes)),
-      ('接口数', '${s.interfaces.length}'),
+      (l10n.monitorNetTotalDown, _formatRate(s.netDownKBps)),
+      (l10n.monitorNetTotalUp, _formatRate(s.netUpKBps)),
+      (l10n.monitorNetTotalDownloaded, _formatBytes(s.netTotalDownBytes)),
+      (l10n.monitorNetTotalUploaded, _formatBytes(s.netTotalUpBytes)),
+      (l10n.monitorNetInterfaceCount, '${s.interfaces.length}'),
     ];
 
     // 接口按总流量排序，活跃接口在前
@@ -608,17 +612,17 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
         const SizedBox(height: 8),
         // 接口明细表
         Text(
-          '接口明细',
+          l10n.monitorNetInterfaceDetail,
           style: TextStyle(fontSize: fMicro, color: tc.textSub, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 4),
         // 表头
         _buildNetTableRow(
           tc,
-          name: '接口',
-          traffic: '总流量 ↓/↑',
-          rate: '速率 ↓/↑',
-          issues: '错/丢',
+          name: l10n.monitorNetColInterface,
+          traffic: l10n.monitorNetColTraffic,
+          rate: l10n.monitorNetColRate,
+          issues: l10n.monitorNetColIssues,
           isHeader: true,
         ),
         // 表体（最多展示 8 个接口，避免浮层过高）
@@ -649,7 +653,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              '还有 ${sorted.length - 8} 个接口未显示',
+              l10n.monitorNetMoreInterfaces(sorted.length - 8),
               style: TextStyle(fontSize: fMicro, color: tc.textMuted),
             ),
           ),
@@ -659,17 +663,18 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
 
   /// 磁盘浮层专用内容：根分区汇总 + 分区明细表格
   Widget _buildDiskOverlayContent(ThemeColors tc, ServerSnapshot s) {
+    final l10n = AppLocalizations.of(context)!;
     final partitions = s.diskPartitions;
     final totalDisk = partitions.fold<double>(0, (sum, p) => sum + p.totalGB);
     final usedDisk = partitions.fold<double>(0, (sum, p) => sum + p.usedGB);
     final overallPercent = totalDisk > 0 ? (usedDisk / totalDisk * 100) : 0.0;
 
     final summary = [
-      ('总容量', '${totalDisk.toStringAsFixed(1)} GB'),
-      ('已用', '${usedDisk.toStringAsFixed(1)} GB'),
-      ('可用', '${(totalDisk - usedDisk).toStringAsFixed(1)} GB'),
-      ('总使用率', '${overallPercent.toStringAsFixed(1)}%'),
-      ('分区数', '${partitions.length}'),
+      (l10n.monitorDiskTotal, '${totalDisk.toStringAsFixed(1)} GB'),
+      (l10n.monitorDiskUsed, '${usedDisk.toStringAsFixed(1)} GB'),
+      (l10n.monitorDiskAvailable, '${(totalDisk - usedDisk).toStringAsFixed(1)} GB'),
+      (l10n.monitorDiskOverallUsage, '${overallPercent.toStringAsFixed(1)}%'),
+      (l10n.monitorDiskPartitionCount, '${partitions.length}'),
     ];
 
     return Column(
@@ -702,15 +707,15 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
         ),
         const SizedBox(height: 10),
         Text(
-          '分区明细',
+          l10n.monitorDiskPartitionDetail,
           style: TextStyle(fontSize: fMicro, color: tc.textSub, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 4),
         _buildDiskTableRow(
           tc,
-          mount: '挂载点',
-          used: '已用/总量',
-          percent: '使用率',
+          mount: l10n.monitorDiskColMount,
+          used: l10n.monitorDiskColUsage,
+          percent: l10n.monitorDiskColPercent,
           isHeader: true,
         ),
         ConstrainedBox(
@@ -998,71 +1003,72 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
 
   /// 返回浮层标题 + 数据行（label, value）
   (String, List<(String, String)>) _getOverlayData(String metric, ServerSnapshot s) {
+    final l10n = AppLocalizations.of(context)!;
     switch (metric) {
       case 'cpu':
         return (
-          'CPU 详情',
+          l10n.monitorCpuDetail,
           [
-            ('总使用率', '${s.cpuPercent.toStringAsFixed(1)}%'),
-            ('用户态', '${s.cpuUser.toStringAsFixed(1)}%'),
-            ('内核态', '${s.cpuSystem.toStringAsFixed(1)}%'),
-            ('空闲', '${s.cpuIdle.toStringAsFixed(1)}%'),
-            ('1分钟负载', s.loadAvg1.toStringAsFixed(2)),
-            ('5分钟负载', s.loadAvg5.toStringAsFixed(2)),
-            ('15分钟负载', s.loadAvg15.toStringAsFixed(2)),
-            ('进程数', '${s.processCount}'),
+            (l10n.monitorCpuTotalUsage, '${s.cpuPercent.toStringAsFixed(1)}%'),
+            (l10n.monitorCpuUser, '${s.cpuUser.toStringAsFixed(1)}%'),
+            (l10n.monitorCpuSystem, '${s.cpuSystem.toStringAsFixed(1)}%'),
+            (l10n.monitorCpuIdle, '${s.cpuIdle.toStringAsFixed(1)}%'),
+            (l10n.monitorLoad1, s.loadAvg1.toStringAsFixed(2)),
+            (l10n.monitorLoad5, s.loadAvg5.toStringAsFixed(2)),
+            (l10n.monitorLoad15, s.loadAvg15.toStringAsFixed(2)),
+            (l10n.monitorProcessCount, '${s.processCount}'),
           ],
         );
       case 'mem':
         return (
-          '内存详情',
+          l10n.monitorMemoryDetail,
           [
-            ('总内存', _formatMB(s.memTotalMB)),
-            ('已用', _formatMB(s.memUsedMB)),
-            ('可用', _formatMB(s.memAvailableMB)),
-            ('空闲', _formatMB(s.memFreeMB)),
-            ('缓存', _formatMB(s.memCachedMB)),
-            ('缓冲', _formatMB(s.memBuffersMB)),
-            ('使用率', '${s.memPercent.toStringAsFixed(1)}%'),
-            ('Swap 总量', _formatMB(s.swapTotalMB)),
-            ('Swap 已用', _formatMB(s.swapUsedMB)),
+            (l10n.monitorMemoryTotal, _formatMB(s.memTotalMB)),
+            (l10n.monitorDiskUsed, _formatMB(s.memUsedMB)),
+            (l10n.monitorDiskAvailable, _formatMB(s.memAvailableMB)),
+            (l10n.monitorMemoryFree, _formatMB(s.memFreeMB)),
+            (l10n.monitorMemoryCached, _formatMB(s.memCachedMB)),
+            (l10n.monitorMemoryBuffers, _formatMB(s.memBuffersMB)),
+            (l10n.monitorMemoryUsage, '${s.memPercent.toStringAsFixed(1)}%'),
+            (l10n.monitorSwapTotal, _formatMB(s.swapTotalMB)),
+            (l10n.monitorSwapUsed, _formatMB(s.swapUsedMB)),
           ],
         );
       case 'disk':
         return (
-          '磁盘详情',
+          l10n.monitorDiskDetail,
           [
-            ('总量', '${s.diskTotalGB.toStringAsFixed(1)} GB'),
-            ('已用', '${s.diskUsedGB.toStringAsFixed(1)} GB'),
-            ('可用', '${s.diskFreeGB.toStringAsFixed(1)} GB'),
-            ('使用率', '${s.diskPercent.toStringAsFixed(1)}%'),
+            (l10n.monitorDiskTotal2, '${s.diskTotalGB.toStringAsFixed(1)} GB'),
+            (l10n.monitorDiskUsed, '${s.diskUsedGB.toStringAsFixed(1)} GB'),
+            (l10n.monitorDiskAvailable, '${s.diskFreeGB.toStringAsFixed(1)} GB'),
+            (l10n.monitorDiskUsage, '${s.diskPercent.toStringAsFixed(1)}%'),
           ],
         );
       case 'netUp':
       case 'netDown':
         return (
-          '网络详情',
+          l10n.monitorNetDetail,
           const [],
         );
       case 'user':
         return (
-          '用户与会话',
+          l10n.monitorUserSession,
           [
-            ('登录用户数', '${s.userCount}'),
-            ('进程数', '${s.processCount}'),
-            ('1分钟负载', s.loadAvg1.toStringAsFixed(2)),
-            ('5分钟负载', s.loadAvg5.toStringAsFixed(2)),
+            (l10n.monitorLoginUsers, '${s.userCount}'),
+            (l10n.monitorProcessCount, '${s.processCount}'),
+            (l10n.monitorLoad1, s.loadAvg1.toStringAsFixed(2)),
+            (l10n.monitorLoad5, s.loadAvg5.toStringAsFixed(2)),
           ],
         );
       case 'uptime':
         return (
-          '系统信息',
+          l10n.monitorSystemInfo,
           [
-            ('开机时长', s.uptime),
-            ('内核版本', s.kernelVersion.isEmpty ? '-' : s.kernelVersion),
-            ('1分钟负载', s.loadAvg1.toStringAsFixed(2)),
-            ('5分钟负载', s.loadAvg5.toStringAsFixed(2)),
-            ('15分钟负载', s.loadAvg15.toStringAsFixed(2)),
+            (l10n.monitorUptimeLabel, s.uptime),
+            (l10n.monitorKernelVersion, s.kernelVersion.isEmpty ? '-' : s.kernelVersion),
+            (l10n.monitorLoad1, s.loadAvg1.toStringAsFixed(2)),
+            (l10n.monitorLoad5, s.loadAvg5.toStringAsFixed(2)),
+            (l10n.monitorLoad15, s.loadAvg15.toStringAsFixed(2)),
           ],
         );
       default:

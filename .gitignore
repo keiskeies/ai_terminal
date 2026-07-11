@@ -51,6 +51,9 @@ ai_terminal/build/
 *.g.dart
 *.freezed.dart
 
+# Flutter gen_l10n 生成的国际化文件
+ai_terminal/lib/l10n/app_localizations*.dart
+
 # macOS
 *.xcworkspace
 *.xcuserdata

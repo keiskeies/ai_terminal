@@ -6,6 +6,7 @@ import '../services/ssh_service.dart';
 import '../services/local_terminal_service.dart';
 import '../services/ssh_connection_pool.dart';
 import '../core/credentials_store.dart';
+import '../core/l10n_holder.dart';
 
 const _uuid = Uuid();
 
@@ -108,7 +109,7 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
     final newTab = TerminalTab(
       id: tabId,
       hostId: 'local',
-      title: '本地',
+      title: L10n.str.terminalLocalTab,
     );
 
     state = state.copyWith(

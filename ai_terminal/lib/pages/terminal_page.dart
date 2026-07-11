@@ -8,6 +8,8 @@ import 'package:xterm/xterm.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../core/credentials_store.dart';
+import '../core/l10n_holder.dart';
+import '../l10n/app_localizations.dart';
 import '../widgets/sftp_panel.dart';
 import '../widgets/logo_widget.dart';
 import '../widgets/ai_prompt_input.dart';
@@ -16,10 +18,11 @@ import '../widgets/agent_log_dialog.dart';
 import '../widgets/agent_command_block.dart';
 import '../widgets/agent_event_cards.dart';
 import '../widgets/tab_item_widget.dart';
-import '../core/hive_init.dart';
+import '../services/daos.dart';
 import '../core/prompts.dart' as prompts;
-import '../core/runbook_templates.dart';
+import '../models/runbook.dart';
 import '../providers/app_providers.dart';
+import '../providers/runbook_provider.dart';
 import '../providers/terminal_provider.dart' as tp;
 import '../providers/chat_provider.dart';
 import '../providers/agent_provider.dart';
@@ -27,14 +30,10 @@ import '../models/ai_model_config.dart';
 import '../models/host_config.dart';
 import '../models/agent_event.dart';
 import '../models/command_snippet.dart';
-import 'package:flutter/services.dart';
 import '../services/ai_service.dart';
 import '../services/command_executor.dart';
-import '../services/agent_engine.dart';
-import '../services/conversation_service.dart';
 import '../services/server_monitor_service.dart';
 import '../widgets/server_monitor_panel.dart';
-import '../models/conversation.dart';
 import '../widgets/terminal_view.dart' as term_widget;
 
 
@@ -103,7 +102,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   bool _autoScrollChat = true; // 用户手动上滚时禁用自动滚动
   StreamSubscription<String>? _terminalOutputSubscription;
   StreamSubscription<String>? _tabOutputSubscription; // 终端输出订阅（需随 tab 切换而取消/重建）
-  bool _agentInitialized = false;
   AIModelConfig? _currentModelConfig;
 
   // 终端设置
@@ -152,27 +150,27 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   void _loadSettings() {
     try {
-      final fontSize = HiveInit.settingsBox.get('terminalFontSize');
+      final fontSize = SettingsDao.getCached('terminalFontSize');
       if (fontSize != null) {
         _terminalFontSize = (fontSize as num).toDouble();
       } else {
         // P0-3: 如果没有设置过，使用新的默认值 14
         _terminalFontSize = 14;
-        HiveInit.settingsBox.put('terminalFontSize', 14.0);
+        SettingsDao.set('terminalFontSize', 14.0);
       }
     } catch (_) {
       _terminalFontSize = 14;
     }
     // P0-1: 加载 AI 面板可见性设置，默认收起
     try {
-      final aiPanelVisible = HiveInit.settingsBox.get('aiPanelVisible');
+      final aiPanelVisible = SettingsDao.getCached('aiPanelVisible');
       if (aiPanelVisible != null) {
         _isAIPanelVisible = aiPanelVisible as bool;
       }
     } catch (_) {}
     // 加载监控面板可见的 host 列表（per-host 独立开关）
     try {
-      final raw = HiveInit.settingsBox.get('monitorVisibleHosts');
+      final raw = SettingsDao.getCached('monitorVisibleHosts');
       if (raw is List) {
         _monitorVisibleHosts.addAll(raw.cast<String>());
       }
@@ -219,7 +217,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         modelConfig: defaultModel,
         aiProvider: aiProvider,
       );
-      _agentInitialized = true;
     }
   }
 
@@ -235,9 +232,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   Future<void> _connectToHost() async {
+    final l10n = AppLocalizations.of(context)!;
     final host = ref.read(hostsProvider.notifier).getHostById(widget.hostId!);
     if (host == null) {
-      setState(() => _connectionError = '主机不存在');
+      setState(() => _connectionError = l10n.terminalHostNotFound);
       return;
     }
 
@@ -250,7 +248,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       if (password == null && privateKey == null) {
         setState(() {
           _isConnecting = false;
-          _connectionError = '❌ 未找到登录凭据\n\n请重新编辑服务器，填写密码或私钥后保存。';
+          _connectionError = l10n.noCredentials;
         });
         return;
       }
@@ -263,7 +261,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
       final tab = ref.read(tp.terminalProvider).activeTab;
       if (tab == null || !tab.isConnected) {
-        throw Exception('连接失败，请检查网络和凭据');
+        throw Exception(L10n.str.connectionFailedHint);
       }
 
       // SSH 连接成功后设置 executor
@@ -277,15 +275,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         final errorMsg = e.toString();
         String hint;
         if (errorMsg.contains('Connection refused')) {
-          hint = '服务器拒绝连接，请检查 SSH 端口是否正确';
+          hint = L10n.str.connErrRefused;
         } else if (errorMsg.contains('timeout') || errorMsg.contains('Timeout')) {
-          hint = '连接超时，请检查网络或服务器是否可达';
+          hint = L10n.str.connErrTimeout;
         } else if (errorMsg.contains('authentication') || errorMsg.contains('Auth')) {
-          hint = '认证失败，请检查用户名和密码/私钥是否正确';
+          hint = L10n.str.connErrAuth;
         } else if (errorMsg.contains('No route to host')) {
-          hint = '无法到达主机，请检查服务器地址是否正确';
+          hint = L10n.str.connErrNoRoute;
         } else {
-          hint = '请检查网络连接和服务器状态';
+          hint = L10n.str.connErrGeneric;
         }
         _connectionError = '$errorMsg\n\n💡 $hint';
       });
@@ -294,12 +292,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   /// 连接本地终端
   Future<void> _connectLocalTerminal() async {
+    final l10n = AppLocalizations.of(context)!;
     try {
       await ref.read(tp.terminalProvider.notifier).openLocalTab();
 
       final tab = ref.read(tp.terminalProvider).activeTab;
       if (tab == null) {
-        setState(() => _connectionError = '本地终端启动失败');
+        setState(() => _connectionError = l10n.terminalLocalStartFailed);
         return;
       }
 
@@ -308,7 +307,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
       _switchToTab(tab);
     } catch (e) {
-      setState(() => _connectionError = '本地终端启动失败: $e');
+      setState(() => _connectionError = l10n.terminalLocalStartFailedWithError('$e'));
     }
   }
 
@@ -401,13 +400,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   void _showAddHostDialog() {
     // 弹出已保存服务器列表供选择（允许重复连接）
-    final hosts = HiveInit.hostsBox.values.toList();
+    final hosts = HostsDao.cached.toList();
     if (hosts.isEmpty) {
       context.push('/host/edit');
       return;
     }
 
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     showModalBottomSheet(
       context: context,
       backgroundColor: tc.cardElevated,
@@ -423,7 +423,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 children: [
                   const Icon(Icons.add_circle_outline, size: 16, color: cPrimary),
                   const SizedBox(width: 8),
-                  Text('选择服务器新标签连接', style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
+                  Text(l10n.terminalSelectServerForNewTab, style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
                   const Spacer(),
                   GestureDetector(
                     onTap: () {
@@ -437,7 +437,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                         borderRadius: BorderRadius.circular(rSmall),
                         border: Border.all(color: cPrimary.withValues(alpha: 0.2)),
                       ),
-                      child: const Text('+ 新建', style: TextStyle(fontSize: fMicro, color: cPrimary, fontWeight: FontWeight.w500)),
+                      child: Text(l10n.terminalCreateNew, style: const TextStyle(fontSize: fMicro, color: cPrimary, fontWeight: FontWeight.w500)),
                     ),
                   ),
                 ],
@@ -481,6 +481,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   /// 在新标签中连接服务器
   Future<void> _connectToNewTab(dynamic host) async {
+    final l10n = AppLocalizations.of(context)!;
     final password = await CredentialsStore.get(hostId: host.id, type: 'password');
     final privateKey = await CredentialsStore.get(hostId: host.id, type: 'privateKey');
 
@@ -489,7 +490,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       if (!ctx.mounted) return;
       ScaffoldMessenger.of(ctx).showSnackBar(
         SnackBar(
-          content: Text('${host.name} 未配置凭据，请先编辑服务器'),
+          content: Text(l10n.terminalHostNoCredentials(host.name)),
           backgroundColor: cWarning,
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
@@ -514,7 +515,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       if (!ctx.mounted) return;
       ScaffoldMessenger.of(ctx).showSnackBar(
         SnackBar(
-          content: Text('连接 ${host.name} 失败: $e'),
+          content: Text(l10n.terminalConnectHostFailed(host.name, '$e')),
           backgroundColor: cDanger,
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
@@ -614,7 +615,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     // 监控面板包装：在终端下方插入监控横幅（仅在已连接且该 host 开关开启时）
     final monitorService = _getOrCreateMonitorService(tab);
     final currentHostId = tab != null && tab.isConnected
-        ? (tab.isLocal ? 'local' : (tab.hostId ?? 'local'))
+        ? (tab.isLocal ? 'local' : tab.hostId)
         : null;
     final showMonitor = currentHostId != null &&
         _monitorVisibleHosts.contains(currentHostId) &&
@@ -638,7 +639,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 // 上滑速度超过阈值时展开 AI 面板
                 if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
                   setState(() => _isAIPanelVisible = true);
-                  HiveInit.settingsBox.put('aiPanelVisible', true);
+                  SettingsDao.set('aiPanelVisible', true);
                 }
               },
               child: terminalArea,
@@ -723,7 +724,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                     // 下滑速度超过阈值时收起 AI 面板
                     if (details.primaryVelocity != null && details.primaryVelocity! > 300) {
                       setState(() => _isAIPanelVisible = false);
-                      HiveInit.settingsBox.put('aiPanelVisible', false);
+                      SettingsDao.set('aiPanelVisible', false);
                     }
                   },
                   child: SizedBox(height: aiPanelSize, child: aiContent),
@@ -905,6 +906,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   /// 单个 Tab 项（连接名称 + 关闭x）— 使用独立 widget 避免 hover 触发整页 rebuild
   Widget _buildTabItem(tp.TerminalTab tab, bool isActive, tp.TerminalState terminalState) {
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return TabItemWidget(
       tab: tab,
       isActive: isActive,
@@ -914,6 +916,22 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         _switchToTab(tab);
       },
       onClose: () async {
+        // 小白用户误触关闭按钮时提示：如果正在运行任务，先确认
+        final agentState = ref.read(agentProvider);
+        if (agentState.isRunning && tab.id == ref.read(tp.terminalProvider).activeTab?.id) {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: Text(l10n.terminalTaskRunning),
+              content: Text(l10n.terminalCloseTabConfirm),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.commonCancel)),
+                TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.close)),
+              ],
+            ),
+          );
+          if (confirmed != true) return;
+        }
         ref.read(chatProvider.notifier).removeTab(tab.id);
         ref.read(agentProvider.notifier).removeTab(tab.id, hostId: tab.hostId);
         _tabAiInputText.remove(tab.id);
@@ -937,8 +955,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   /// "+" 新标签按钮
   Widget _buildAddTabButton() {
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Tooltip(
-      message: '新连接',
+      message: l10n.terminalNewConnection,
       child: GestureDetector(
         onTap: _showAddHostDialog,
         child: Container(
@@ -959,6 +978,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   /// 终端设置按钮（字号、配色）
   Widget _buildTerminalSettingsButton() {
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return PopupMenuButton<String>(
       icon: Icon(Icons.text_fields, color: tc.textSub, size: 18),
       color: tc.cardElevated,
@@ -968,14 +988,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         if (value.startsWith('font_')) {
           final size = double.parse(value.substring(5));
           setState(() => _terminalFontSize = size);
-          HiveInit.settingsBox.put('terminalFontSize', size);
+          SettingsDao.set('terminalFontSize', size);
         }
       },
       itemBuilder: (context) => [
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           enabled: false,
           height: 28,
-          child: Text('字号', style: TextStyle(fontSize: fMicro, color: cPrimary, fontWeight: FontWeight.w600)),
+          child: Text(l10n.terminalFontSize(_terminalFontSize.toInt()), style: const TextStyle(fontSize: fMicro, color: cPrimary, fontWeight: FontWeight.w600)),
         ),
         ...[8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 18.0, 20.0, 22.0, 24.0].map((size) => PopupMenuItem<String>(
           value: 'font_$size',
@@ -997,6 +1017,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   Widget _buildConnectionBadge(tp.TerminalTab? tab) {
     final connected = tab?.isConnected == true;
+    final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -1020,7 +1041,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           ),
           const SizedBox(width: 5),
           Text(
-            connected ? '已连接' : '离线',
+            connected ? l10n.terminalConnected : l10n.terminalOffline,
             style: TextStyle(fontSize: fMicro, color: connected ? cSuccess : cDanger, fontWeight: FontWeight.w500),
           ),
         ],
@@ -1031,17 +1052,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   /// P0-1: AI 面板展开/收起按钮
   Widget _buildAIPanelToggleButton() {
     final tc = ThemeColors.of(context);
-    final accentColor = cAgentGreen;
+    final accentColor = tc.agentGreen;
+    final l10n = AppLocalizations.of(context)!;
 
     return Tooltip(
-      message: _isAIPanelVisible ? '收起 AI 面板' : '展开 AI 面板',
+      message: _isAIPanelVisible ? l10n.terminalCollapseAIPanel : l10n.terminalExpandAIPanel,
       child: GestureDetector(
         onTap: () {
           setState(() {
             _isAIPanelVisible = !_isAIPanelVisible;
           });
           // 持久化状态
-          HiveInit.settingsBox.put('aiPanelVisible', _isAIPanelVisible);
+          SettingsDao.set('aiPanelVisible', _isAIPanelVisible);
         },
         child: AnimatedContainer(
           duration: animFast,
@@ -1083,17 +1105,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   /// 服务器监控面板开关按钮（终端下方横幅）
   Widget _buildMonitorToggleButton() {
     final tc = ThemeColors.of(context);
-    final accentColor = cKleinBlue;
+    const accentColor = cKleinBlue;
     final activeTab = ref.read(tp.terminalProvider).activeTab;
     final canShow = activeTab != null && activeTab.isConnected;
     // per-host 开关状态
     final hostId = activeTab != null && activeTab.isConnected
-        ? (activeTab.isLocal ? 'local' : (activeTab.hostId ?? 'local'))
+        ? (activeTab.isLocal ? 'local' : activeTab.hostId)
         : null;
     final isOn = hostId != null && _monitorVisibleHosts.contains(hostId);
+    final l10n = AppLocalizations.of(context)!;
 
     return Tooltip(
-      message: isOn ? '收起监控面板' : '展开监控面板',
+      message: isOn ? l10n.terminalCollapseMonitorPanel : l10n.terminalExpandMonitorPanel,
       child: GestureDetector(
         onTap: canShow ? () {
           setState(() {
@@ -1104,7 +1127,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             }
           });
           // 持久化为 List
-          HiveInit.settingsBox.put('monitorVisibleHosts', _monitorVisibleHosts.toList());
+          SettingsDao.set('monitorVisibleHosts', _monitorVisibleHosts.toList());
         } : null,
         child: AnimatedContainer(
           duration: animFast,
@@ -1128,7 +1151,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               ),
               const SizedBox(width: 4),
               Text(
-                '监控',
+                l10n.terminalMonitor,
                 style: TextStyle(
                   fontSize: fMicro,
                   color: isOn ? accentColor : (canShow ? tc.textSub : tc.textMuted),
@@ -1145,7 +1168,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   /// 获取或创建当前 tab 对应的监控服务
   ServerMonitorService? _getOrCreateMonitorService(tp.TerminalTab? tab) {
     if (tab == null || !tab.isConnected) return null;
-    final hostId = tab.isLocal ? 'local' : (tab.hostId ?? 'local');
+    final hostId = tab.isLocal ? 'local' : tab.hostId;
     var svc = _monitorServices[hostId];
     if (svc == null) {
       final executor = tab.isLocal ? tab.localService : tab.service;
@@ -1161,7 +1184,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
   Widget _buildToolbarMenu() {
     final tc = ThemeColors.of(context);
-    final snippets = HiveInit.snippetsBox.values.toList();
+    final l10n = AppLocalizations.of(context)!;
+    final snippets = SnippetsDao.cached.toList();
     return PopupMenuButton<String>(
       icon: Icon(Icons.more_horiz, color: tc.textSub, size: 20),
       color: tc.cardElevated,
@@ -1170,7 +1194,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       onSelected: (value) async {
         if (value.startsWith('snippet:')) {
           final snippetId = value.substring(8);
-          final snippet = HiveInit.snippetsBox.get(snippetId);
+          final snippet = SnippetsDao.getCachedById(snippetId);
           if (snippet != null) _executeSnippet(snippet);
           return;
         }
@@ -1196,25 +1220,25 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         }
       },
       itemBuilder: (context) => [
-        _menuItem('reconnect', Icons.refresh_rounded, '重连'),
-        _menuItem('clear', Icons.cleaning_services_rounded, '清屏'),
+        _menuItem('reconnect', Icons.refresh_rounded, l10n.terminalReconnect),
+        _menuItem('clear', Icons.cleaning_services_rounded, l10n.terminalClearScreen),
         _menuItem('sftp', Icons.folder_outlined, 'SFTP'),
         // 快捷命令
         if (snippets.isNotEmpty) ...[
           const PopupMenuDivider(height: 8),
-          const PopupMenuItem<String>(
+          PopupMenuItem<String>(
             enabled: false,
             height: 24,
-            child: Text('快捷命令', style: TextStyle(fontSize: fMicro, color: cPrimary, fontWeight: FontWeight.w600)),
+            child: Text(l10n.quickCommands, style: const TextStyle(fontSize: fMicro, color: cPrimary, fontWeight: FontWeight.w600)),
           ),
           ...snippets.take(5).map((s) => _menuItem('snippet:${s.id}', Icons.terminal, s.name)),
         ],
         const PopupMenuDivider(height: 8),
-        _menuItem('prompt', Icons.edit_note_rounded, '自定义提示词'),
-        _menuItem('builtInPrompt', Icons.description_outlined, '内置提示词'),
-        _menuItem('maxsteps', Icons.auto_mode_rounded, '最大步骤数'),
+        _menuItem('prompt', Icons.edit_note_rounded, L10n.str.menuItemCustomPrompt),
+        _menuItem('builtInPrompt', Icons.description_outlined, L10n.str.menuItemBuiltinPrompt),
+        _menuItem('maxsteps', Icons.auto_mode_rounded, l10n.terminalMaxSteps),
         const PopupMenuDivider(height: 8),
-        _menuItem('settings', Icons.settings_outlined, '设置'),
+        _menuItem('settings', Icons.settings_outlined, l10n.settings),
       ],
     );
   }
@@ -1237,6 +1261,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   // ==================== 连接中/错误 ====================
   Widget _buildConnectingView(dynamic host) {
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -1246,7 +1271,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             child: CircularProgressIndicator(strokeWidth: 2, color: cPrimary),
           ),
           const SizedBox(height: 12),
-          Text('正在连接 ${host?.host}...', style: TextStyle(color: tc.textSub, fontSize: fBody)),
+          Text(l10n.terminalConnecting(host?.host ?? ''), style: TextStyle(color: tc.textSub, fontSize: fBody)),
         ],
       ),
     );
@@ -1254,6 +1279,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   Widget _buildErrorView() {
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -1262,7 +1288,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           children: [
             const Icon(Icons.error_outline, size: 40, color: cDanger),
             const SizedBox(height: 12),
-            Text('连接失败', style: TextStyle(color: tc.textSub, fontSize: fBody)),
+            Text(L10n.str.connectionFailed, style: TextStyle(color: tc.textSub, fontSize: fBody)),
             const SizedBox(height: 6),
             Text(_connectionError!, style: const TextStyle(color: cDanger, fontSize: fSmall), textAlign: TextAlign.center),
             const SizedBox(height: 16),
@@ -1277,7 +1303,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
                   ),
-                  child: const Text('重试', style: TextStyle(fontSize: fBody)),
+                  child: Text(l10n.retry, style: const TextStyle(fontSize: fBody)),
                 ),
                 const SizedBox(width: 12),
                 OutlinedButton(
@@ -1288,7 +1314,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
                   ),
-                  child: const Text('返回', style: TextStyle(fontSize: fBody)),
+                  child: Text(l10n.commonBack, style: const TextStyle(fontSize: fBody)),
                 ),
               ],
             ),
@@ -1299,6 +1325,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   Widget _buildDisconnectedChip() {
+    final l10n = AppLocalizations.of(context)!;
     return GestureDetector(
       onTap: _reconnect,
       child: Container(
@@ -1308,14 +1335,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           borderRadius: BorderRadius.circular(rFull),
           border: Border.all(color: cDanger.withValues(alpha: 0.3)),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.warning_amber_rounded, color: cDanger, size: 12),
-            SizedBox(width: 4),
-            Text('连接中断', style: TextStyle(color: cDanger, fontSize: fMicro, fontWeight: FontWeight.w500)),
-            SizedBox(width: 4),
-            Text('重连', style: TextStyle(color: cDanger, fontSize: fMicro, fontWeight: FontWeight.w600, decoration: TextDecoration.underline)),
+            const Icon(Icons.warning_amber_rounded, color: cDanger, size: 12),
+            const SizedBox(width: 4),
+            Text(l10n.connectionInterrupted, style: const TextStyle(color: cDanger, fontSize: fMicro, fontWeight: FontWeight.w500)),
+            const SizedBox(width: 4),
+            Text(l10n.terminalReconnect, style: const TextStyle(color: cDanger, fontSize: fMicro, fontWeight: FontWeight.w600, decoration: TextDecoration.underline)),
           ],
         ),
       ),
@@ -1324,8 +1351,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   // ==================== 区域分界线（分割条，位于终端和 AI 面板之间）====================
   Widget _buildAreaDivider(AgentState agentState) {
-    final accentColor = cAgentGreen;
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final accentColor = tc.agentGreen;
     final isRight = _aiPanelPosition == _AiPanelPosition.right;
     // 手机端不显示位置切换按钮
     final showButtons = !_isMobile;
@@ -1379,12 +1407,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     // P0-1: 收起按钮
     Widget closeButton() {
       return Tooltip(
-        message: '收起 AI 面板',
+        message: l10n.terminalCollapseAIPanel,
         waitDuration: const Duration(milliseconds: 500),
         child: GestureDetector(
           onTap: () {
             setState(() => _isAIPanelVisible = false);
-            HiveInit.settingsBox.put('aiPanelVisible', false);
+            SettingsDao.set('aiPanelVisible', false);
           },
           child: Container(
             width: 22,
@@ -1418,9 +1446,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               const SizedBox(height: 4),
               closeButton(),
               const SizedBox(height: 4),
-              RotatedBox(quarterTurns: 1, child: layoutButton(_AiPanelPosition.bottom, Icons.view_sidebar_outlined, '下')),
+              RotatedBox(quarterTurns: 1, child: layoutButton(_AiPanelPosition.bottom, Icons.view_sidebar_outlined, l10n.terminalLayoutBottom)),
               const SizedBox(height: 2),
-              layoutButton(_AiPanelPosition.right, Icons.view_sidebar_outlined, '右'),
+              layoutButton(_AiPanelPosition.right, Icons.view_sidebar_outlined, l10n.terminalLayoutRight),
             ],
             const Spacer(),
             // 竖向彩色射线
@@ -1471,9 +1499,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             ),
             if (showButtons) ...[
               const SizedBox(width: 8),
-              RotatedBox(quarterTurns: 1, child: layoutButton(_AiPanelPosition.bottom, Icons.view_sidebar_outlined, '下')),
+              RotatedBox(quarterTurns: 1, child: layoutButton(_AiPanelPosition.bottom, Icons.view_sidebar_outlined, l10n.terminalLayoutBottom)),
               const SizedBox(width: 2),
-              layoutButton(_AiPanelPosition.right, Icons.view_sidebar_outlined, '右'),
+              layoutButton(_AiPanelPosition.right, Icons.view_sidebar_outlined, l10n.terminalLayoutRight),
             ],
             const SizedBox(width: 6),
           ],
@@ -1490,11 +1518,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       decoration: BoxDecoration(
         color: tc.cardElevated,
         border: Border(
-          top: BorderSide(color: cBorder, width: 1),
+          top: BorderSide(color: tc.border, width: 1),
         ),
       ),
       child: Column(
         children: [
+          // 会话压缩中横幅
+          if (agentState.isCompacting)
+            _buildCompactingBanner(tc),
           // 消息列表 + 回到底部按钮
           Expanded(
             child: Stack(
@@ -1533,6 +1564,43 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
+  /// 会话压缩中横幅
+  Widget _buildCompactingBanner(ThemeColors tc) {
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: cPrimaryBg,
+        border: Border(
+          bottom: BorderSide(color: cPrimary.withValues(alpha: 0.3)),
+        ),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(strokeWidth: 1.5, color: cPrimary),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            L10n.str.compacting,
+            style: const TextStyle(
+              color: cPrimary,
+              fontSize: fSmall,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            l10n.terminalCompactingHistory,
+            style: TextStyle(color: tc.textSub, fontSize: fMicro),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _scrollChatToBottom() {
     if (!_autoScrollChat) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1562,9 +1630,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   // ==================== Agent 模式统一消息列表 ====================
   Widget _buildAgentChatList(AgentState agentState, tp.TerminalTab? tab) {
+    final l10n = AppLocalizations.of(context)!;
     final items = agentState.chatItems;
     if (items.isEmpty) {
-      return Center(child: Text('输入需求开始自动执行...', style: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fBody)));
+      return Center(child: Text(l10n.terminalInputHintEmpty, style: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fBody)));
     }
     return ListView.builder(
       controller: _chatScrollController,
@@ -1586,32 +1655,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           isWaitingChoice: agentState.isWaitingChoice,
           pendingOptions: agentState.isWaitingChoice && isLast ? agentState.pendingOptions : const [],
           enginePendingConfirm: isLast ? agentState.pendingConfirmCommand : null,
-        );
-      },
-    );
-  }
-
-  Widget _buildChatMessageList(ChatState chatState, tp.TerminalTab? tab) {
-    return ListView.builder(
-      controller: _chatScrollController,
-      padding: const EdgeInsets.all(8),
-      itemCount: chatState.messages.length + (chatState.currentAssistantMessage != null ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (chatState.currentAssistantMessage != null && index == chatState.messages.length) {
-          return _buildMessageBubble(
-            key: const ValueKey('chat_current_assistant'),
-            role: 'assistant',
-            content: chatState.currentAssistantMessage!,
-            isLoading: true,
-          );
-        }
-        final message = chatState.messages[index];
-        return _buildMessageBubble(
-          key: ValueKey('chat_${message.role}_$index'),
-          role: message.role,
-          content: message.content,
-          isLoading: false,
-          tab: tab,
         );
       },
     );
@@ -1716,6 +1759,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }) {
     final isUser = role == 'user';
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Align(
       key: key,
@@ -1753,13 +1797,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                     gradient: LinearGradient(
                       colors: isUser
                           ? [cPrimary.withValues(alpha: 0.18), cPrimary.withValues(alpha: 0.08)]
-                          : [cAgentGreen.withValues(alpha: 0.18), cAgentGreen.withValues(alpha: 0.06)],
+                          : [tc.agentGreen.withValues(alpha: 0.18), tc.agentGreen.withValues(alpha: 0.06)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(rXSmall),
                     border: Border.all(
-                      color: (isUser ? cPrimary : cAgentGreen).withValues(alpha: 0.2),
+                      color: (isUser ? cPrimary : tc.agentGreen).withValues(alpha: 0.2),
                       width: 0.5,
                     ),
                   ),
@@ -1769,21 +1813,21 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                       Icon(
                         isUser ? Icons.person_outline : Icons.auto_awesome,
                         size: 11,
-                        color: isUser ? cPrimary : cAgentGreen,
+                        color: isUser ? cPrimary : tc.agentGreen,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        isUser ? '你' : 'AI 助手',
+                        isUser ? l10n.terminalRoleYou : l10n.commonAIAssistant,
                         style: TextStyle(
                           fontSize: fMicro,
-                          color: isUser ? cPrimary : cAgentGreen,
+                          color: isUser ? cPrimary : tc.agentGreen,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.3,
                         ),
                       ),
                       if (isLoading) ...[
                         const SizedBox(width: 6),
-                        SizedBox(width: 9, height: 9, child: CircularProgressIndicator(strokeWidth: 1.5, color: isUser ? cPrimary : cAgentGreen)),
+                        SizedBox(width: 9, height: 9, child: CircularProgressIndicator(strokeWidth: 1.5, color: isUser ? cPrimary : tc.agentGreen)),
                       ],
                     ],
                   ),
@@ -2039,24 +2083,25 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   // ==================== 斜杠命令 ====================
   /// 处理斜杠命令，返回 true 表示已处理（不再发送）
   bool _handleSlashCommand(String command, {required bool isConnected}) {
+    final l10n = AppLocalizations.of(context)!;
     final cmd = command.trim().toLowerCase();
     switch (cmd) {
       case '/new':
         _autoScrollChat = true;
         ref.read(agentProvider.notifier).newSession();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('已新建会话', style: TextStyle(fontSize: 13)),
-            duration: Duration(seconds: 1),
+          SnackBar(
+            content: Text(l10n.terminalSessionCreated, style: const TextStyle(fontSize: 13)),
+            duration: const Duration(seconds: 1),
           ),
         );
         return true;
       case '/compact':
         if (!isConnected) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('请先连接终端', style: TextStyle(fontSize: 13)),
-              duration: Duration(seconds: 1),
+            SnackBar(
+              content: Text(l10n.terminalConnectTerminalFirst, style: const TextStyle(fontSize: 13)),
+              duration: const Duration(seconds: 1),
             ),
           );
           return true;
@@ -2068,16 +2113,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         ref.read(agentProvider.notifier).compact().then((_) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('记忆压缩完成', style: TextStyle(fontSize: 13)),
-              duration: Duration(seconds: 1),
+            SnackBar(
+              content: Text(l10n.terminalCompactionDone, style: const TextStyle(fontSize: 13)),
+              duration: const Duration(seconds: 1),
             ),
           );
         }).catchError((e) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('压缩失败: $e', style: const TextStyle(fontSize: 13)),
+              content: Text(l10n.terminalCompactionFailed('$e'), style: const TextStyle(fontSize: 13)),
               duration: const Duration(seconds: 2),
             ),
           );
@@ -2095,6 +2140,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     // 从 provider 读取（已注入 apiKey），而非直接读 Hive
     final models = ref.read(aiModelsProvider);
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       padding: EdgeInsets.only(
@@ -2116,14 +2162,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               _ModeCapsule(
                 isOrchestratorMode: agentState.isOrchestratorMode,
                 connectedCount: ref.read(tp.terminalProvider).tabs.where((t) => t.isConnected && !t.isLocal).length,
-                totalHosts: HiveInit.hostsBox.values.length,
+                totalHosts: HostsDao.cached.length,
                 onTap: agentState.isOrchestratorMode ? () => _showOrchestratorHosts(tc) : null,
               ),
               const SizedBox(width: 6),
               // 日志按钮
               _buildToolbarIconButton(
                 icon: Icons.terminal_outlined,
-                tooltip: 'Agent 日志',
+                tooltip: l10n.terminalAgentLog,
                 onTap: () => _showAgentLogDialog(context),
                 tc: tc,
               ),
@@ -2131,7 +2177,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               // 历史按钮
               _buildToolbarIconButton(
                 icon: Icons.history_outlined,
-                tooltip: '会话历史',
+                tooltip: l10n.terminalSessionHistory,
                 onTap: () => _showSessionHistoryPanel(context),
                 tc: tc,
               ),
@@ -2139,7 +2185,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               // 只读模式（Dry-run）切换
               _buildToolbarIconButton(
                 icon: agentState.isReadOnlyMode ? Icons.lock : Icons.lock_open_outlined,
-                tooltip: agentState.isReadOnlyMode ? '只读模式已开启（点击关闭）' : '只读模式（Dry-run）',
+                tooltip: agentState.isReadOnlyMode ? l10n.terminalReadOnlyOn : l10n.terminalReadOnlyOff,
                 onTap: () {
                   ref.read(agentProvider.notifier).toggleReadOnlyMode();
                 },
@@ -2150,7 +2196,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               // 运维模板（Runbook）
               _buildToolbarIconButton(
                 icon: Icons.bolt_outlined,
-                tooltip: '运维模板',
+                tooltip: l10n.terminalRunbookTemplates,
                 onTap: () => _showRunbookTemplates(tc),
                 tc: tc,
               ),
@@ -2160,20 +2206,20 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: cAgentGreen.withValues(alpha: 0.1),
+                    color: tc.agentGreen.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rFull),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const SizedBox(
+                      SizedBox(
                         width: 10, height: 10,
-                        child: CircularProgressIndicator(strokeWidth: 1.5, color: cAgentGreen),
+                        child: CircularProgressIndicator(strokeWidth: 1.5, color: tc.agentGreen),
                       ),
                       const SizedBox(width: 5),
                       Text(
                         agentState.statusText,
-                        style: const TextStyle(fontSize: fMicro, color: cAgentGreen, fontWeight: FontWeight.w500),
+                        style: TextStyle(fontSize: fMicro, color: tc.agentGreen, fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
@@ -2192,7 +2238,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             isRunning: agentState.isRunning,
             hintText: _getInputHint(isConnected, agentState.isRunning, agentState.isOrchestratorMode),
             initialText: _tabAiInputText[_currentTabId ?? ''] ?? '',
-            accentColor: cAgentGreen,
+            accentColor: tc.agentGreen,
             isOrchestratorMode: agentState.isOrchestratorMode,
             onToggleOrchestrator: () {
               ref.read(agentProvider.notifier).toggleOrchestratorMode();
@@ -2253,36 +2299,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   /// 模型选择器 - 紧凑按钮
   Widget _buildModelSelector(List<AIModelConfig> models, ThemeColors tc) {
+    final l10n = AppLocalizations.of(context)!;
     return PopupMenuButton<String>(
       onSelected: (modelId) {
         final model = models.firstWhere((m) => m.id == modelId);
         _switchModel(model);
       },
-      child: Container(
-        height: 30,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        decoration: BoxDecoration(
-          color: tc.surface,
-          borderRadius: BorderRadius.circular(rSmall),
-          border: Border.all(color: tc.border.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.psychology_outlined, size: 12, color: tc.textMuted),
-            const SizedBox(width: 3),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 80),
-              child: Text(
-                _currentModelConfig?.name ?? '模型',
-                style: TextStyle(fontSize: fSmall, color: tc.textSub, height: 1.0),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            Icon(Icons.unfold_more, size: 10, color: tc.textMuted),
-          ],
-        ),
-      ),
       offset: const Offset(0, -70),
       color: tc.cardElevated,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
@@ -2317,6 +2339,31 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           ),
         );
       }).toList(),
+      child: Container(
+        height: 30,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        decoration: BoxDecoration(
+          color: tc.surface,
+          borderRadius: BorderRadius.circular(rSmall),
+          border: Border.all(color: tc.border.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.psychology_outlined, size: 12, color: tc.textMuted),
+            const SizedBox(width: 3),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 80),
+              child: Text(
+                _currentModelConfig?.name ?? l10n.terminalModel,
+                style: TextStyle(fontSize: fSmall, color: tc.textSub, height: 1.0),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Icon(Icons.unfold_more, size: 10, color: tc.textMuted),
+          ],
+        ),
+      ),
     );
   }
 
@@ -2445,7 +2492,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         connectedHostIds.add(t.hostId);
       }
     }
-    final allHosts = HiveInit.hostsBox.values.toList();
+    final allHosts = HostsDao.cached.toList();
     // 按分组聚合
     final grouped = <String, List<HostConfig>>{};
     for (final h in allHosts) {
@@ -2475,8 +2522,31 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
-  /// 运维模板选择浮层
+  /// 运维工作流选择浮层（从持久化的 Runbook 加载）
   void _showRunbookTemplates(ThemeColors tc) {
+    final l10n = AppLocalizations.of(context)!;
+    final runbooks = ref.read(runbooksProvider);
+    final grouped = <RunbookCategory, List<Runbook>>{};
+    for (final rb in runbooks) {
+      grouped.putIfAbsent(rb.category, () => []).add(rb);
+    }
+    const order = [
+      RunbookCategory.inspection,
+      RunbookCategory.security,
+      RunbookCategory.deployment,
+      RunbookCategory.troubleshooting,
+      RunbookCategory.maintenance,
+      RunbookCategory.custom,
+    ];
+    final categoryLabels = {
+      RunbookCategory.inspection: l10n.runbookCategoryInspection,
+      RunbookCategory.security: l10n.runbookCategorySecurity,
+      RunbookCategory.deployment: l10n.runbookCategoryDeployment,
+      RunbookCategory.troubleshooting: l10n.runbookCategoryTroubleshooting,
+      RunbookCategory.maintenance: l10n.runbookCategoryMaintenance,
+      RunbookCategory.custom: l10n.runbookCategoryCustom,
+    };
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -2496,7 +2566,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                     const Icon(Icons.bolt, size: 16, color: cPrimary),
                     const SizedBox(width: 8),
                     Text(
-                      '运维模板',
+                      l10n.runbooks,
                       style: TextStyle(
                         fontSize: fBody,
                         color: tc.textMain,
@@ -2504,46 +2574,52 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                       ),
                     ),
                     const Spacer(),
-                    Text(
-                      '点击一键执行',
-                      style: TextStyle(fontSize: fSmall, color: tc.textSub),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.of(ctx).pop();
+                        context.push('/runbooks');
+                      },
+                      icon: const Icon(Icons.settings_outlined, size: 14),
+                      label: Text(l10n.terminalManage),
+                      style: TextButton.styleFrom(
+                        foregroundColor: cPrimary,
+                        minimumSize: const Size(0, 28),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        textStyle: const TextStyle(fontSize: fSmall),
+                      ),
                     ),
                   ],
                 ),
               ),
               Divider(height: 1, color: tc.border.withValues(alpha: 0.5)),
-              Flexible(
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  itemCount: RunbookTemplates.all.length,
-                  itemBuilder: (_, i) {
-                    final tpl = RunbookTemplates.all[i];
-                    return ListTile(
-                      leading: Text(tpl.icon, style: const TextStyle(fontSize: 22)),
-                      title: Text(
-                        tpl.name,
-                        style: TextStyle(
-                          fontSize: fBody,
-                          color: tc.textMain,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      subtitle: Text(
-                        tpl.description,
-                        style: TextStyle(fontSize: fSmall, color: tc.textSub),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      onTap: () {
-                        Navigator.of(ctx).pop();
-                        // 把模板 prompt 发送给 Agent 启动任务
-                        _sendRunbookPrompt(tpl.prompt);
-                      },
-                    );
-                  },
+              if (runbooks.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+                  child: Column(
+                    children: [
+                      Icon(Icons.auto_awesome_motion, size: 40, color: tc.textSub),
+                      const SizedBox(height: 8),
+                      Text(l10n.terminalNoRunbooks, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+                      const SizedBox(height: 4),
+                      Text(l10n.terminalNoRunbooksHint, style: TextStyle(color: tc.textSub, fontSize: fMicro)),
+                    ],
+                  ),
+                )
+              else
+                Flexible(
+                  child: ListView(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    children: [
+                      for (final cat in order)
+                        if (grouped[cat] != null && grouped[cat]!.isNotEmpty) ...[
+                          _buildRunbookSectionHeader(tc, categoryLabels[cat]!, grouped[cat]!.length),
+                          for (final rb in grouped[cat]!)
+                            _buildRunbookTile(tc, ctx, rb),
+                        ],
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         );
@@ -2551,18 +2627,97 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
-  /// 发送 Runbook 模板 prompt 到 Agent
-  void _sendRunbookPrompt(String prompt) async {
-    // 复用输入框发送逻辑：校验模型配置、连接状态，并显式 setExecutor
+  Widget _buildRunbookSectionHeader(ThemeColors tc, String label, int count) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: fMicro,
+              color: tc.textSub,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '$count',
+            style: TextStyle(fontSize: fMicro, color: tc.textSub),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRunbookTile(ThemeColors tc, BuildContext sheetCtx, Runbook rb) {
+    final l10n = AppLocalizations.of(context)!;
+    final isAgent = rb.type == RunbookType.agent;
+    final typeColor = isAgent ? cPrimary : cSuccess;
+    return ListTile(
+      leading: Text(
+        rb.icon.isEmpty ? '📋' : rb.icon,
+        style: const TextStyle(fontSize: 22),
+      ),
+      title: Row(
+        children: [
+          Flexible(
+            child: Text(
+              rb.name,
+              style: TextStyle(
+                fontSize: fBody,
+                color: tc.textMain,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+            decoration: BoxDecoration(
+              color: typeColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(rXSmall),
+              border: Border.all(color: typeColor.withValues(alpha: 0.5)),
+            ),
+            child: Text(
+              isAgent ? 'AI' : l10n.terminalRunbookTypeCommand,
+              style: TextStyle(color: typeColor, fontSize: fMicro),
+            ),
+          ),
+        ],
+      ),
+      subtitle: Text(
+        rb.description ?? '',
+        style: TextStyle(fontSize: fSmall, color: tc.textSub),
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+      ),
+      onTap: () {
+        Navigator.of(sheetCtx).pop();
+        if (isAgent) {
+          _sendRunbookPrompt(rb);
+        } else {
+          _sendRunbookCommand(rb);
+        }
+      },
+    );
+  }
+
+  /// 发送 Runbook（agent 类型）prompt 到 Agent 执行
+  void _sendRunbookPrompt(Runbook rb) async {
+    // 校验模型配置、连接状态，并显式 setExecutor
     if (!_checkAIModelConfigured()) {
       _showAIModelNotConfiguredHint();
       return;
     }
     final tab = ref.read(tp.terminalProvider).activeTab;
     if (tab == null || !tab.isConnected) {
+      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('请先连接终端（SSH 或本地终端）后再使用运维模板'),
+        SnackBar(
+          content: Text(l10n.terminalConnectTerminalForRunbook),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -2572,35 +2727,182 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     // 本地终端用 localService，SSH 用 service
     final CommandExecutor? executor = tab.isLocal == true ? tab.localService : tab.service;
     ref.read(agentProvider.notifier).setExecutor(executor);
-    await ref.read(agentProvider.notifier).startTask(prompt);
+    await ref.read(runbooksProvider.notifier).incrementRunCount(rb.id);
+    await ref.read(agentProvider.notifier).startTask(rb.content);
+  }
+
+  /// 执行 Runbook（command 类型）：变量替换后直接在终端执行命令
+  void _sendRunbookCommand(Runbook rb) async {
+    final tab = ref.read(tp.terminalProvider).activeTab;
+    if (tab == null || !tab.isConnected) {
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.terminalConnectTerminalForCommand),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    // 处理变量替换
+    final variables = rb.getAllVariables();
+    final values = <String, String>{};
+    if (variables.isNotEmpty) {
+      final filled = await _showRunbookVariablesDialog(rb, variables);
+      if (filled == null) return; // 用户取消
+      values.addAll(filled);
+      if (rb.hasUnfilledVariables(values)) {
+        if (!mounted) return;
+        final l10n = AppLocalizations.of(context)!;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.terminalUnfilledVariables),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
+    final resolved = rb.resolveContent(values);
+    // 直接写入终端执行
+    if (tab.isLocal) {
+      tab.localService?.writeToTerminal('$resolved\n');
+    } else {
+      tab.service?.writeToTerminal('$resolved\n');
+    }
+    await ref.read(runbooksProvider.notifier).incrementRunCount(rb.id);
+  }
+
+  /// Runbook 变量填写对话框，返回 null 表示用户取消
+  Future<Map<String, String>?> _showRunbookVariablesDialog(
+    Runbook rb,
+    List<String> variables,
+  ) {
+    final l10n = AppLocalizations.of(context)!;
+    final controllers = {
+      for (final v in variables) v: TextEditingController(),
+    };
+    final tc = ThemeColors.of(context);
+    return showDialog<Map<String, String>>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: tc.cardElevated,
+        title: Text(l10n.terminalFillVariables(rb.name), style: TextStyle(color: tc.textMain, fontSize: fBody)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (rb.description != null && rb.description!.isNotEmpty) ...[
+                Text(
+                  rb.description!,
+                  style: TextStyle(color: tc.textSub, fontSize: fSmall),
+                ),
+                const SizedBox(height: pCompact),
+              ],
+              Text(l10n.terminalCommandTemplate, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(pSmall),
+                decoration: BoxDecoration(
+                  color: tc.terminalBg,
+                  borderRadius: BorderRadius.circular(rSmall),
+                  border: Border.all(color: tc.border),
+                ),
+                child: SelectableText(
+                  rb.content,
+                  style: TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    fontSize: fMono,
+                    color: tc.terminalGreen,
+                  ),
+                ),
+              ),
+              const SizedBox(height: pCompact),
+              ...variables.map(
+                (v) => Padding(
+                  padding: const EdgeInsets.only(bottom: pSmall),
+                  child: TextField(
+                    controller: controllers[v],
+                    style: TextStyle(color: tc.textMain, fontSize: fBody),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      labelText: '{{$v}}',
+                      labelStyle: TextStyle(
+                        color: tc.textSub,
+                        fontSize: fSmall,
+                        fontFamily: 'JetBrainsMono',
+                      ),
+                      filled: true,
+                      fillColor: tc.card,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: pCompact,
+                        vertical: pSmall,
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(rInput),
+                        borderSide: BorderSide(color: tc.border),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(rInput),
+                        borderSide: const BorderSide(color: cPrimary),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: Text(l10n.commonCancel),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(
+                dialogCtx,
+                {for (final v in variables) v: controllers[v]!.text.trim()},
+              );
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: cPrimary),
+            child: Text(l10n.commonExecute),
+          ),
+        ],
+      ),
+    );
   }
 
   String _getInputHint(bool isConnected, bool isRunning, bool isOrchestrator) {
-    if (isRunning) return 'Agent 执行中...';
-    if (!isConnected) return '连接终端后可用';
-    if (isOrchestrator) return '多机编排模式：描述跨主机任务，如"同步所有服务器时间"';
-    return '描述需求，Agent 自动执行...';
+    final l10n = AppLocalizations.of(context)!;
+    if (isRunning) return l10n.terminalInputHintRunning;
+    if (!isConnected) return l10n.terminalInputHintDisconnected;
+    if (isOrchestrator) return l10n.terminalInputHintOrchestrator;
+    return l10n.terminalInputHintDefault;
   }
 
   bool _checkAIModelConfigured() {
     try {
-      return HiveInit.aiModelsBox.values.isNotEmpty;
+      return AIModelsDao.cached.isNotEmpty;
     } catch (_) { return false; }
   }
 
   void _showAIModelNotConfiguredHint() {
+    final l10n = AppLocalizations.of(context)!;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Row(
+        content: Row(
           children: [
-            Icon(Icons.warning_amber, color: Colors.white, size: 18),
-            SizedBox(width: 8),
-            Text('请先配置 AI 模型', style: TextStyle(fontSize: fBody)),
+            const Icon(Icons.warning_amber, color: Colors.white, size: 18),
+            const SizedBox(width: 8),
+            Text(l10n.pleaseConfigAIModel, style: const TextStyle(fontSize: fBody)),
           ],
         ),
         backgroundColor: cWarning,
         action: SnackBarAction(
-          label: '配置',
+          label: l10n.terminalConfigure,
           textColor: Colors.white,
           onPressed: () => context.push('/settings/ai'),
         ),
@@ -2642,27 +2944,29 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   /// 显示最大步骤数设置
   void _showMaxStepsDialog() {
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final controller = TextEditingController(text: ref.read(agentProvider).maxSteps.toString());
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: ThemeColors.of(context).cardElevated,
+        backgroundColor: tc.cardElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text('最大执行步骤数', style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
+        title: Text(l10n.terminalMaxStepsTitle, style: TextStyle(color: tc.textMain, fontSize: fBody)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('Agent 自动模式下的最大执行步骤数。设为 0 表示无限制，复杂任务不会被中断。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
+            Text(l10n.terminalMaxStepsDesc, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
             const SizedBox(height: 12),
             TextField(
               controller: controller,
               keyboardType: TextInputType.number,
-              style: const TextStyle(color: cTextMain, fontSize: fBody),
-              decoration: const InputDecoration(
-                labelText: '步骤数 (0 = 无限制)',
-                labelStyle: TextStyle(color: cTextSub),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: cBorder)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
+              style: TextStyle(color: tc.textMain, fontSize: fBody),
+              decoration: InputDecoration(
+                labelText: l10n.terminalMaxStepsLabel,
+                labelStyle: TextStyle(color: tc.textSub),
+                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.border)),
+                focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
               ),
             ),
           ],
@@ -2670,24 +2974,24 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消', style: TextStyle(color: cTextSub)),
+            child: Text(l10n.commonCancel, style: TextStyle(color: tc.textSub)),
           ),
           ElevatedButton(
             onPressed: () {
               final steps = int.tryParse(controller.text) ?? 0;
-              final clamped = steps.clamp(0, 999);
+              final clamped = steps.clamp(0, 100);
               ref.read(agentProvider.notifier).setMaxSteps(clamped);
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text('最大步骤数已设为 ${clamped == 0 ? "无限制" : clamped}'),
+                  content: Text(l10n.terminalMaxStepsSet(clamped)),
                   duration: const Duration(seconds: 1),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
-            child: const Text('确定'),
+            child: Text(l10n.commonConfirm),
           ),
         ],
       ),
@@ -2710,34 +3014,36 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     for (final v in variables) {
       controllers[v] = TextEditingController();
     }
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: ThemeColors.of(context).cardElevated,
-        title: Text(snippet.name, style: TextStyle(color: ThemeColors.of(context).textMain)),
+        backgroundColor: tc.cardElevated,
+        title: Text(snippet.name, style: TextStyle(color: tc.textMain)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('命令: ${snippet.command}', style: const TextStyle(color: cTextSub, fontSize: fSmall, fontFamily: 'JetBrainsMono')),
+            Text(l10n.snippetResolvedCommand(snippet.command), style: TextStyle(color: tc.textSub, fontSize: fSmall, fontFamily: 'JetBrainsMono')),
             const SizedBox(height: 12),
             ...variables.map((v) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: TextField(
                 controller: controllers[v],
-                style: const TextStyle(color: cTextMain, fontSize: fBody),
+                style: TextStyle(color: tc.textMain, fontSize: fBody),
                 decoration: InputDecoration(
                   labelText: '{{$v}}',
-                  labelStyle: const TextStyle(color: cTextSub),
+                  labelStyle: TextStyle(color: tc.textSub),
                   filled: true,
-                  fillColor: cSurface,
+                  fillColor: tc.surface,
                 ),
               ),
             )),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消', style: TextStyle(color: cTextSub))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l10n.commonCancel, style: TextStyle(color: tc.textSub))),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
@@ -2748,7 +3054,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
-            child: const Text('执行'),
+            child: Text(l10n.commonExecute),
           ),
         ],
       ),
@@ -2759,32 +3065,34 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   void _showCustomPromptDialog() {
     String? savedPrompt;
     try {
-      savedPrompt = HiveInit.settingsBox.get('customSystemPrompt') as String?;
+      savedPrompt = SettingsDao.getCached('customSystemPrompt') as String?;
     } catch (_) {}
     final controller = TextEditingController(text: savedPrompt ?? '');
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: ThemeColors.of(context).cardElevated,
+        backgroundColor: tc.cardElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text('自定义 AI 提示词', style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
+        title: Text(L10n.str.customPromptTitle, style: TextStyle(color: tc.textMain, fontSize: fBody)),
         content: SizedBox(
           width: MediaQuery.of(context).size.width * 0.75,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('追加到 AI 系统提示词末尾的自定义指令，可用于调整 AI 行为风格、输出偏好等。留空则不追加。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
+              Text(L10n.str.customPromptDesc, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
               const SizedBox(height: 12),
               TextField(
                 controller: controller,
                 maxLines: 5,
                 minLines: 2,
-                style: const TextStyle(color: cTextMain, fontSize: fBody),
-                decoration: const InputDecoration(
-                  hintText: '例如：回答使用英文、输出简洁格式、优先使用 Docker...',
-                  hintStyle: TextStyle(color: cTextMuted, fontSize: fSmall),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: cBorder)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
+                style: TextStyle(color: tc.textMain, fontSize: fBody),
+                decoration: InputDecoration(
+                  hintText: l10n.terminalCustomPromptHint,
+                  hintStyle: TextStyle(color: tc.textMuted, fontSize: fSmall),
+                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.border)),
+                  focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
                 ),
               ),
             ],
@@ -2793,24 +3101,24 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消', style: TextStyle(color: cTextSub)),
+            child: Text(l10n.commonCancel, style: TextStyle(color: tc.textSub)),
           ),
           ElevatedButton(
             onPressed: () {
               try {
-                HiveInit.settingsBox.put('customSystemPrompt', controller.text.trim());
+                SettingsDao.set('customSystemPrompt', controller.text.trim());
               } catch (_) {}
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('自定义提示词已保存'),
-                  duration: Duration(seconds: 1),
+                SnackBar(
+                  content: Text(L10n.str.customPromptSaved),
+                  duration: const Duration(seconds: 1),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
-            child: const Text('保存'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -2821,29 +3129,31 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   void _showBuiltInPromptDialog() {
     final currentPrompt = prompts.getSystemPrompt();
     final controller = TextEditingController(text: currentPrompt);
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: ThemeColors.of(context).cardElevated,
+        backgroundColor: tc.cardElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text('内置系统提示词', style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
+        title: Text(L10n.str.builtinPromptTitle, style: TextStyle(color: tc.textMain, fontSize: fBody)),
         content: SizedBox(
           width: MediaQuery.of(ctx).size.width * 0.85,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('AI 的核心系统提示词，修改后立即生效。包含 {context} 的位置会被替换为服务器信息。', style: TextStyle(color: cTextSub, fontSize: fSmall)),
+              Text(L10n.str.builtinPromptDesc, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
               const SizedBox(height: 6),
-              const Text('⚠️ 修改需谨慎，可随时"重置默认"。', style: TextStyle(color: cWarning, fontSize: fMicro)),
+              Text(L10n.str.builtinPromptWarning, style: const TextStyle(color: cWarning, fontSize: fMicro)),
               const SizedBox(height: 10),
               TextField(
                 controller: controller,
                 maxLines: 10,
                 minLines: 5,
-                style: const TextStyle(color: cTextMain, fontSize: fSmall, fontFamily: 'JetBrainsMono'),
-                decoration: const InputDecoration(
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: cBorder)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
+                style: TextStyle(color: tc.textMain, fontSize: fSmall, fontFamily: 'JetBrainsMono'),
+                decoration: InputDecoration(
+                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.border)),
+                  focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
                 ),
               ),
             ],
@@ -2852,26 +3162,26 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         actions: [
           TextButton(
             onPressed: () => controller.text = prompts.defaultSystemPrompt,
-            child: const Text('重置默认', style: TextStyle(color: cWarning)),
+            child: Text(l10n.commonResetDefault, style: const TextStyle(color: cWarning)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消', style: TextStyle(color: cTextSub)),
+            child: Text(l10n.commonCancel, style: TextStyle(color: tc.textSub)),
           ),
           ElevatedButton(
             onPressed: () {
               prompts.saveSystemPrompt(controller.text.trim());
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('内置提示词已保存'),
-                  duration: Duration(seconds: 1),
+                SnackBar(
+                  content: Text(L10n.str.builtinPromptSaved),
+                  duration: const Duration(seconds: 1),
                   behavior: SnackBarBehavior.floating,
                 ),
               );
             },
             style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
-            child: const Text('保存'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -2951,8 +3261,10 @@ class _ModeCapsuleState extends State<_ModeCapsule> with SingleTickerProviderSta
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final isOrch = widget.isOrchestratorMode;
-    final accent = isOrch ? cWarning : cAgentGreen;
+    final accent = isOrch ? cWarning : tc.agentGreen;
 
     return GestureDetector(
       onTap: widget.onTap,
@@ -2993,7 +3305,7 @@ class _ModeCapsuleState extends State<_ModeCapsule> with SingleTickerProviderSta
             ),
             const SizedBox(width: 5),
             Text(
-              isOrch ? '编排 · ${widget.connectedCount}/${widget.totalHosts}' : 'Agent',
+              isOrch ? l10n.terminalOrchestratorMode(widget.connectedCount, widget.totalHosts) : 'Agent',
               style: TextStyle(
                 fontSize: fSmall,
                 color: accent,
@@ -3086,6 +3398,7 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
   @override
   Widget build(BuildContext context) {
     final tc = widget.tc;
+    final l10n = AppLocalizations.of(context)!;
     return SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -3098,7 +3411,7 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
                 const Icon(Icons.hub, size: 16, color: cWarning),
                 const SizedBox(width: 8),
                 Text(
-                  '多机编排 · 主机清单',
+                  l10n.terminalOrchestratorHostList,
                   style: TextStyle(
                     fontSize: fBody,
                     color: tc.textMain,
@@ -3107,7 +3420,7 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
                 ),
                 const Spacer(),
                 Text(
-                  '${widget.connectedHostIds.length}/${widget.allHosts.length} 已连接',
+                  l10n.terminalOrchestratorConnected(widget.connectedHostIds.length, widget.allHosts.length),
                   style: TextStyle(fontSize: fSmall, color: tc.textSub),
                 ),
               ],
@@ -3122,7 +3435,7 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 children: [
-                  _buildGroupChip(tc, '全部', _selectedGroup == null),
+                  _buildGroupChip(tc, l10n.commonAll, _selectedGroup == null),
                   for (final g in widget.groupNames)
                     _buildGroupChip(tc, g, _selectedGroup == g),
                 ],
@@ -3137,7 +3450,7 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
                 ? Padding(
                     padding: const EdgeInsets.all(24),
                     child: Text(
-                      '暂无已保存的主机\n请先在主页添加服务器',
+                      l10n.terminalNoHostsSaved,
                       textAlign: TextAlign.center,
                       style: TextStyle(color: tc.textMuted, fontSize: fBody),
                     ),
@@ -3157,7 +3470,7 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
                               width: 8, height: 8,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: isConn ? cAgentGreen : tc.textMuted.withValues(alpha: 0.4),
+                                color: isConn ? tc.agentGreen : tc.textMuted.withValues(alpha: 0.4),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -3198,10 +3511,10 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
                               ),
                             ),
                             Text(
-                              isConn ? '已连接' : '未连接',
+                              isConn ? l10n.terminalConnected : l10n.terminalStatusNotConnected,
                               style: TextStyle(
                                 fontSize: fSmall,
-                                color: isConn ? cAgentGreen : tc.textMuted,
+                                color: isConn ? tc.agentGreen : tc.textMuted,
                               ),
                             ),
                           ],
@@ -3227,9 +3540,9 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
                         borderRadius: BorderRadius.circular(rSmall),
                         border: Border.all(color: cWarning.withValues(alpha: 0.3)),
                       ),
-                      child: const Text(
-                        '退出编排模式',
-                        style: TextStyle(
+                      child: Text(
+                        l10n.terminalExitOrchestrator,
+                        style: const TextStyle(
                           fontSize: fBody,
                           color: cWarning,
                           fontWeight: FontWeight.w500,

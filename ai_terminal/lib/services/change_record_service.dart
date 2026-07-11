@@ -1,8 +1,8 @@
 import 'package:uuid/uuid.dart';
-import '../core/hive_init.dart';
 import '../core/safety_guard.dart';
 import '../models/change_record.dart';
 import 'command_executor.dart';
+import 'daos.dart';
 import '../utils/audit_logger.dart' show AuditLogger;
 
 /// 变更台账服务 — 记录每次修改性命令，支持查询和回滚
@@ -105,33 +105,28 @@ class ChangeRecordService {
       username: username,
       conversationId: conversationId,
     );
-    await HiveInit.changeRecordsBox.put(record.id, record);
+    await ChangeRecordsDao.upsert(record);
     return record;
   }
 
   /// 标记某条记录已回滚
   static Future<void> markRolledBack(String recordId) async {
-    final record = HiveInit.changeRecordsBox.get(recordId);
+    final record = ChangeRecordsDao.getCachedById(recordId);
     if (record != null) {
       record.rolledBack = true;
-      await record.save();
+      await ChangeRecordsDao.upsert(record);
     }
   }
 
   /// 查询某主机的变更历史（按时间倒序）
   static List<ChangeRecord> getHistory(String hostId, {int limit = 100}) {
-    final records = HiveInit.changeRecordsBox.values
-        .where((r) => r.hostId == hostId)
-        .toList();
-    records.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    return records.take(limit).toList();
+    return ChangeRecordsDao.getCachedByHost(hostId, limit: limit);
   }
 
   /// 查询所有主机的变更历史（按时间倒序）
   static List<ChangeRecord> getAllHistory({int limit = 200}) {
-    final records = HiveInit.changeRecordsBox.values.toList();
-    records.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-    return records.take(limit).toList();
+    final all = ChangeRecordsDao.cachedAll;
+    return all.take(limit).toList();
   }
 
   /// 执行回滚

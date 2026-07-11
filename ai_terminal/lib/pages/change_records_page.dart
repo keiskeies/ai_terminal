@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../l10n/app_localizations.dart';
 import '../models/change_record.dart';
 import '../providers/app_providers.dart';
 import '../services/change_record_service.dart';
@@ -42,6 +43,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
   }
 
   Color _typeColor(ChangeType type) {
+    final tc = ThemeColors.of(context);
     switch (type) {
       case ChangeType.install:
         return cKleinBlue;
@@ -60,7 +62,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       case ChangeType.modifyConfig:
         return cViolet;
       case ChangeType.other:
-        return cTextSub;
+        return tc.textSub;
     }
   }
 
@@ -88,25 +90,26 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
   }
 
   String _typeLabel(ChangeType type) {
+    final l10n = AppLocalizations.of(context)!;
     switch (type) {
       case ChangeType.install:
-        return '安装';
+        return l10n.changeRecordTypeInstall;
       case ChangeType.uninstall:
-        return '卸载';
+        return l10n.changeRecordTypeUninstall;
       case ChangeType.startService:
-        return '启动服务';
+        return l10n.changeRecordTypeStartService;
       case ChangeType.stopService:
-        return '停止服务';
+        return l10n.changeRecordTypeStopService;
       case ChangeType.restartService:
-        return '重启服务';
+        return l10n.changeRecordTypeRestartService;
       case ChangeType.permission:
-        return '权限修改';
+        return l10n.changeRecordTypePermission;
       case ChangeType.fileOperation:
-        return '文件操作';
+        return l10n.changeRecordTypeFileOperation;
       case ChangeType.modifyConfig:
-        return '修改配置';
+        return l10n.changeRecordTypeModifyConfig;
       case ChangeType.other:
-        return '其他';
+        return l10n.changeRecordTypeOther;
     }
   }
 
@@ -117,6 +120,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
 
   void _confirmRollback(ChangeRecord record) {
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final host = ref.read(hostsProvider.notifier).getHostById(record.hostId);
     final hostName = host?.name ?? record.hostId;
 
@@ -125,12 +129,12 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       builder: (ctx) => AlertDialog(
         backgroundColor: tc.cardElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text('确认回滚', style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
+        title: Text(l10n.changeRecordConfirmRollback, style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('将在主机 $hostName 上执行回滚命令：',
+            Text(l10n.changeRecordRollbackOnHost(hostName),
                 style: TextStyle(color: tc.textSub, fontSize: fSmall)),
             const SizedBox(height: 8),
             Container(
@@ -150,7 +154,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
               ),
             ),
             const SizedBox(height: 8),
-            Text('原始命令: ${record.command}',
+            Text(l10n.changeRecordOriginalCommand(record.command),
                 style: TextStyle(color: tc.textMuted, fontSize: fMicro),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis),
@@ -159,7 +163,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('取消', style: TextStyle(color: tc.textSub)),
+            child: Text(l10n.commonCancel, style: TextStyle(color: tc.textSub)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -170,7 +174,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
               Navigator.pop(ctx);
               _executeRollback(record);
             },
-            child: const Text('确认回滚'),
+            child: Text(l10n.changeRecordConfirmRollback),
           ),
         ],
       ),
@@ -178,9 +182,10 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
   }
 
   Future<void> _executeRollback(ChangeRecord record) async {
+    final l10n = AppLocalizations.of(context)!;
     if (record.rollbackCommand == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('此记录不支持自动回滚'), behavior: SnackBarBehavior.floating),
+        SnackBar(content: Text(l10n.changeRecordNotRollbackable), behavior: SnackBarBehavior.floating),
       );
       return;
     }
@@ -198,7 +203,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
     if (targetTab == null || targetTab.service == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('主机 ${record.hostId} 未连接，无法回滚。请先连接该主机。'),
+          content: Text(l10n.changeRecordHostNotConnected(record.hostId)),
           backgroundColor: cDanger,
           behavior: SnackBarBehavior.floating,
         ),
@@ -209,7 +214,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
     final executor = targetTab.service!;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('正在执行回滚: ${record.rollbackCommand}'),
+        content: Text(l10n.changeRecordRollingBack(record.rollbackCommand!)),
         duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
       ),
@@ -224,7 +229,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       if (!mounted) return;
       if (result == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('回滚失败: 无法执行'), backgroundColor: cDanger,
+          SnackBar(content: Text(l10n.changeRecordRollbackFailedNoExec), backgroundColor: cDanger,
               behavior: SnackBarBehavior.floating),
         );
         return;
@@ -232,7 +237,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       if (result.success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('回滚成功: ${record.rollbackCommand}'),
+            content: Text(l10n.changeRecordRollbackSuccess(record.rollbackCommand!)),
             backgroundColor: cSuccess,
             behavior: SnackBarBehavior.floating,
           ),
@@ -241,7 +246,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('回滚失败: ${result.stderr}'),
+            content: Text(l10n.changeRecordRollbackFailed(result.stderr)),
             backgroundColor: cDanger,
             behavior: SnackBarBehavior.floating,
           ),
@@ -251,7 +256,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('回滚异常: $e'),
+          content: Text(l10n.changeRecordRollbackError(e.toString())),
           backgroundColor: cDanger,
           behavior: SnackBarBehavior.floating,
         ),
@@ -262,9 +267,10 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_filterHostId != null ? '变更台账' : '全部变更台账'),
+        title: Text(_filterHostId != null ? l10n.changeRecordTitle : l10n.changeRecordAllTitle),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.filter_list, size: 20),
@@ -285,38 +291,44 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
               _loadRecords();
             },
             itemBuilder: (ctx) => [
-              const PopupMenuItem(value: 'all', child: Text('全部记录')),
-              const PopupMenuItem(value: 'rollbackable', child: Text('仅可回滚')),
+              PopupMenuItem(value: 'all', child: Text(l10n.changeRecordFilterAll)),
+              PopupMenuItem(value: 'rollbackable', child: Text(l10n.changeRecordFilterRollbackable)),
               if (widget.hostId != null)
-                const PopupMenuItem(value: 'thisHost', child: Text('仅当前主机')),
+                PopupMenuItem(value: 'thisHost', child: Text(l10n.changeRecordFilterThisHost)),
             ],
           ),
         ],
       ),
-      body: _records.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.history, size: 48, color: tc.textMuted),
-                  const SizedBox(height: 8),
-                  Text('暂无变更记录', style: TextStyle(color: tc.textSub, fontSize: fBody)),
-                  const SizedBox(height: 4),
-                  Text('执行修改性命令（如安装、启停服务）后会自动记录',
-                      style: TextStyle(color: tc.textMuted, fontSize: fSmall)),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(pStandard),
-              itemCount: _records.length,
-              itemBuilder: (context, index) => _buildRecordCard(_records[index]),
-            ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: _records.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.history, size: 48, color: tc.textMuted),
+                      const SizedBox(height: 8),
+                      Text(l10n.changeRecordEmpty, style: TextStyle(color: tc.textSub, fontSize: fBody)),
+                      const SizedBox(height: 4),
+                      Text(l10n.changeRecordEmptyHint,
+                          style: TextStyle(color: tc.textMuted, fontSize: fSmall)),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(pStandard),
+                  itemCount: _records.length,
+                  itemBuilder: (context, index) => _buildRecordCard(_records[index]),
+                ),
+        ),
+      ),
     );
   }
 
   Widget _buildRecordCard(ChangeRecord record) {
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final host = ref.read(hostsProvider.notifier).getHostById(record.hostId);
     final hostName = host?.name ?? record.hostId;
     final typeColor = _typeColor(record.type);
@@ -359,12 +371,12 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                     decoration: BoxDecoration(
-                      color: cTextSub.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(rXSmall),
-                    ),
-                    child: const Text(
-                      '已回滚',
-                      style: TextStyle(fontSize: fMicro, color: cTextSub, fontWeight: FontWeight.w500),
+                      color: tc.textSub.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(rXSmall),
+                  ),
+                  child: Text(
+                      l10n.changeRecordRolledBack,
+                      style: TextStyle(fontSize: fMicro, color: tc.textSub, fontWeight: FontWeight.w500),
                     ),
                   ),
                 const Spacer(),
@@ -379,7 +391,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
                     borderRadius: BorderRadius.circular(rXSmall),
                   ),
                   child: Text(
-                    record.success ? '成功' : '失败',
+                    record.success ? l10n.changeRecordSuccess : l10n.changeRecordFailed,
                     style: TextStyle(
                       fontSize: fMicro,
                       color: record.success ? cSuccess : cDanger,
@@ -419,7 +431,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
                   TextButton.icon(
                     onPressed: () => _confirmRollback(record),
                     icon: const Icon(Icons.undo, size: 14),
-                    label: const Text('回滚', style: TextStyle(fontSize: fMicro)),
+                    label: Text(l10n.changeRecordRollbackButton, style: const TextStyle(fontSize: fMicro)),
                     style: TextButton.styleFrom(
                       foregroundColor: cWarning,
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),

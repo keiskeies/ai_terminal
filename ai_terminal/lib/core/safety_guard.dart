@@ -21,18 +21,28 @@ class SafetyGuard {
 
   // 直接拦截的命令模式（不可逆操作）
   static final List<_SafetyRule> _blockRules = [
-    _SafetyRule(RegExp(r'^rm\s+-rf\s+/\s*$'), '递归删除根目录，将清空整个文件系统，完全不可恢复'),
-    _SafetyRule(RegExp(r'^rm\s+-rf\s+\/\*?\s*$'), '递归删除根目录下所有内容，将清空整个文件系统，完全不可恢复'),
+    _SafetyRule(RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+/\s*$'), '递归删除根目录，将清空整个文件系统，完全不可恢复'),
+    _SafetyRule(RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+\/\*?\s*$'), '递归删除根目录下所有内容，将清空整个文件系统，完全不可恢复'),
     _SafetyRule(RegExp(r'^dd\s+if=.*of=/dev/'), '直接写入块设备，将覆盖目标磁盘所有数据，不可恢复'),
     _SafetyRule(RegExp(r'^:\(\)\{\s*:\|\:&\s*\};:', caseSensitive: false), 'Fork 炸弹，将瞬间耗尽系统进程资源导致系统崩溃'),
     _SafetyRule(RegExp(r'chmod\s+-R\s+777\s+/'), '递归修改根目录权限为 777，将破坏所有文件权限，系统将无法正常运行'),
     _SafetyRule(RegExp(r'^init\s+0\s*$'), '立即关机，所有未保存数据将丢失'),
     _SafetyRule(RegExp(r'^shutdown\s+-h\s+now'), '立即关机，所有未保存数据将丢失'),
-    _SafetyRule(RegExp(r'^rm\s+-rf\s+/etc/'), '删除 /etc 配置目录，系统将无法启动和运行'),
-    _SafetyRule(RegExp(r'^rm\s+-rf\s+/boot/'), '删除 /boot 启动目录，系统将无法启动'),
-    _SafetyRule(RegExp(r'^rm\s+-rf\s+~'), '递归删除用户主目录，所有用户数据将丢失'),
+    _SafetyRule(RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+/etc/'), '删除 /etc 配置目录，系统将无法启动和运行'),
+    _SafetyRule(RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+/boot/'), '删除 /boot 启动目录，系统将无法启动'),
+    _SafetyRule(RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+~'), '递归删除用户主目录，所有用户数据将丢失'),
     _SafetyRule(RegExp(r'^mkfs\.'), '格式化磁盘，目标分区所有数据将被擦除，不可恢复'),
     _SafetyRule(RegExp(r'^>\s*/etc/'), '清空系统配置文件，相关服务将无法运行'),
+    // 新增：常见高危操作
+    _SafetyRule(RegExp(r'^crontab\s+-r\b'), '清空当前用户的所有定时任务，所有 cron 作业将丢失且不可恢复'),
+    _SafetyRule(RegExp(r'^systemctl\s+mask\s+'), '屏蔽系统服务，被 mask 的服务将无法启动，需手动 unmask 恢复'),
+    _SafetyRule(RegExp(r'iptables\s+.*-P\s+(INPUT|OUTPUT|FORWARD)\s+DROP'), '设置防火墙默认策略为 DROP，将立即断开所有网络连接，可能导致远程无法访问'),
+    _SafetyRule(RegExp(r'echo\s+c\s*>\s*/proc/sysrq-trigger'), '触发 SysRq 崩溃，将导致系统立即崩溃重启'),
+    _SafetyRule(RegExp(r'^pkill\s+-9\b'), '强制杀死所有匹配进程，可能导致数据损坏或服务异常'),
+    _SafetyRule(RegExp(r'^killall\s+-9\b'), '强制杀死所有同名进程，可能导致数据损坏或服务异常'),
+    _SafetyRule(RegExp(r'^kill\s+-9\s+-1\b'), '杀死所有用户进程（kill -9 -1），将终止除 init 外的所有进程'),
+    _SafetyRule(RegExp(r'^>\s*/dev/sda'), '清空磁盘设备数据，将破坏磁盘分区表和所有数据'),
+    _SafetyRule(RegExp(r'^swapoff\s+-a\b'), '关闭所有交换分区，内存不足时系统将直接 OOM 杀进程'),
   ];
 
   // 需二次确认的命令模式（高风险修改操作）
@@ -103,6 +113,11 @@ class SafetyGuard {
 
   /// 内部检查逻辑：对完整命令的所有子命令分别检查，取最高危险等级
   static SafetyLevel _checkInternal(String command) {
+    // 先对完整命令做一次检查（处理 fork 炸弹等本身含 | ; 字符的单条命令，
+    // 这类命令会被 _splitCommands 拆分导致无法匹配整体模式）
+    final fullLevel = _checkSingle(command);
+    if (fullLevel == SafetyLevel.blocked) return fullLevel;
+
     final subCommands = _splitCommands(command);
     var maxLevel = SafetyLevel.safe;
 
@@ -123,22 +138,46 @@ class SafetyGuard {
 
   /// 检查单条命令（不含链式操作符）
   static SafetyLevel _checkSingle(String command) {
+    // 命令规范化：防止通过空格变化、引号包裹等绕过安全检查
+    final normalized = _normalizeCommand(command);
     for (final rule in _blockRules) {
-      if (rule.pattern.hasMatch(command)) {
+      if (rule.pattern.hasMatch(normalized)) {
         return SafetyLevel.blocked;
       }
     }
     for (final rule in _warnRules) {
-      if (rule.pattern.hasMatch(command)) {
+      if (rule.pattern.hasMatch(normalized)) {
         return SafetyLevel.warn;
       }
     }
     for (final pattern in _infoPatterns) {
-      if (pattern.hasMatch(command)) {
+      if (pattern.hasMatch(normalized)) {
         return SafetyLevel.info;
       }
     }
     return SafetyLevel.safe;
+  }
+
+  /// 命令规范化：去除常见绕过手法
+  /// - 合并多余空格
+  /// - 去除命令名周围的引号（如 "rm" → rm）
+  /// - 去除反斜杠转义（如 r\m → rm）
+  static String _normalizeCommand(String command) {
+    var cmd = command.trim();
+    // 去除命令名周围的引号：匹配开头的 "xxx" 或 'xxx" 并去除引号
+    // 注意：replaceFirst 不支持 $1 反向引用，必须用 replaceFirstMapped
+    cmd = cmd.replaceFirstMapped(
+      RegExp(r'''^["\']([a-zA-Z_][\w.-]*)["\']'''),
+      (m) => m.group(1)!,
+    );
+    // 去除反斜杠转义：r\m → rm（仅命令名部分）
+    cmd = cmd.replaceFirstMapped(
+      RegExp(r'^([a-zA-Z])(\\)([a-zA-Z])'),
+      (m) => '${m.group(1)}${m.group(3)}',
+    );
+    // 合并多余空格
+    cmd = cmd.replaceAll(RegExp(r'\s{2,}'), ' ');
+    return cmd;
   }
 
   /// 获取命令的风险说明（人类可读的具体原因）
@@ -148,26 +187,48 @@ class SafetyGuard {
       return _reasonCache[command];
     }
     String? reason;
-    final subCommands = _splitCommands(command);
-    for (final sub in subCommands) {
-      final cleaned = _removeComments(sub).trim();
-      if (cleaned.isEmpty) continue;
-      // 先查 block 规则
-      for (final rule in _blockRules) {
-        if (rule.pattern.hasMatch(cleaned)) {
-          reason = rule.reason;
-          break;
-        }
+
+    // 先对完整命令做一次检查（处理 fork 炸弹等本身含 | ; 字符的单条命令）
+    final fullNormalized = _normalizeCommand(command);
+    for (final rule in _blockRules) {
+      if (rule.pattern.hasMatch(fullNormalized)) {
+        reason = rule.reason;
+        break;
       }
-      if (reason != null) break;
-      // 再查 warn 规则
+    }
+    if (reason == null) {
       for (final rule in _warnRules) {
-        if (rule.pattern.hasMatch(cleaned)) {
+        if (rule.pattern.hasMatch(fullNormalized)) {
           reason = rule.reason;
           break;
         }
       }
-      if (reason != null) break;
+    }
+
+    // 如果完整命令未命中，再逐条检查拆分后的子命令
+    if (reason == null) {
+      final subCommands = _splitCommands(command);
+      for (final sub in subCommands) {
+        final cleaned = _removeComments(sub).trim();
+        if (cleaned.isEmpty) continue;
+        final normalized = _normalizeCommand(cleaned);
+        // 先查 block 规则
+        for (final rule in _blockRules) {
+          if (rule.pattern.hasMatch(normalized)) {
+            reason = rule.reason;
+            break;
+          }
+        }
+        if (reason != null) break;
+        // 再查 warn 规则
+        for (final rule in _warnRules) {
+          if (rule.pattern.hasMatch(normalized)) {
+            reason = rule.reason;
+            break;
+          }
+        }
+        if (reason != null) break;
+      }
     }
     _reasonCache[command] = reason;
     if (_reasonCache.length > 500) {
@@ -195,12 +256,23 @@ class SafetyGuard {
 
   /// 移除行内注释（# 之后的内容，但不是 #! 且不在引号内）
   static String _removeComments(String command) {
-    // 简化处理：取第一个 # 之前的内容（# 前有空格或行首才算注释）
-    final hashIdx = command.indexOf(' #');
-    if (hashIdx >= 0) {
-      return command.substring(0, hashIdx);
+    // 简化处理：扫描 # 之前的内容，跳过引号内的 #
+    final chars = command.codeUnits;
+    bool inSingle = false;
+    bool inDouble = false;
+    for (int i = 0; i < chars.length; i++) {
+      final c = chars[i];
+      if (c == 0x27 && !inDouble) {
+        inSingle = !inSingle;  // '
+      } else if (c == 0x22 && !inSingle) {
+        inDouble = !inDouble;  // "
+      } else if (c == 0x23 && !inSingle && !inDouble) {  // #
+        // # 前需有空格或位于行首才算注释
+        if (i == 0 || chars[i - 1] == 0x20) {
+          return command.substring(0, i);
+        }
+      }
     }
-    if (command.startsWith('#')) return '';
     return command;
   }
 

@@ -18,13 +18,15 @@ import 'agent_host_registry.dart' as agent_host_registry;
 import 'agent_logger.dart';
 export 'agent_logger.dart';
 import '../core/safety_guard.dart';
-import '../core/hive_init.dart';
+import '../core/l10n_holder.dart';
+import 'daos.dart';
 import '../core/prompts.dart' as prompts;
 import '../utils/ansi_stripper.dart';
 import '../utils/command_heuristics.dart';
 import '../utils/output_processor.dart';
 import '../utils/react_stream_parser.dart';
 import '../utils/rollback_advisor.dart';
+import '../utils/command_extractor.dart';
 import '../utils/audit_logger.dart';
 import 'change_record_service.dart';
 import 'change_window_service.dart';
@@ -41,6 +43,12 @@ class AgentEngine {
   String _accumulatedMessage = '';  // 跟踪累积的消息
   Completer<bool>? _confirmCompleter; // 等待用户确认危险命令的 Completer
   String? _pendingConfirmCommand; // 当前等待确认的命令
+
+  /// 任务开始时间（用于计算 elapsedSeconds 进度）
+  DateTime? _taskStartTime;
+
+  /// 当前执行步数（_executeAutomatic 循环计数，供进度文本使用）
+  int _currentStepCount = 0;
 
   /// 任务代际 token：每次 startTask 递增，循环中检查此 token 是否仍为当前任务
   /// 防止取消+立即发送导致旧循环与新循环并发
@@ -65,9 +73,6 @@ class AgentEngine {
 
   /// 缓存的知识库注入文本（在 startTask 时查询，在 _buildSystemPrompt 时使用）
   String? _cachedKnowledgeInjection;
-
-  /// 对话摘要（由 compact 产生，注入系统提示供 AI 回顾早期对话）
-  String? _conversationSummary;
 
   /// 持久化对话历史，跨 startTask() 调用保留上下文
   final List<ChatMessage> _conversationHistory = [];
@@ -113,6 +118,10 @@ class AgentEngine {
 
   bool get isReadOnlyMode => _readOnlyMode;
 
+  /// sudo 密码：执行 sudo 命令时检测到密码提示后自动注入（不写入命令本身/审计日志）
+  /// 由 AgentNotifier 从 CredentialsStore 加载并设置
+  String? _sudoPassword;
+
   /// R2: 清理工具持有的资源（文件同步的 watcher/timer 等）
   /// 在 agent_provider dispose 时调用
   void disposeTools() {
@@ -148,6 +157,27 @@ class AgentEngine {
   bool get hasPendingChoice => _choiceCompleter != null && !_choiceCompleter!.isCompleted;
   List<String> get pendingOptions => List.unmodifiable(_pendingOptions);
 
+  /// 构建进度步骤文本：第 N 步 | ✅成功数 ❌失败数 | 已用秒数
+  String _progressStepText() {
+    final elapsed = _taskStartTime != null
+        ? DateTime.now().difference(_taskStartTime!).inSeconds
+        : 0;
+    final s = _currentTask?.successCount ?? 0;
+    final f = _currentTask?.failureCount ?? 0;
+    return '第 $_currentStepCount 步 | ✅$s ❌$f | ${elapsed}s';
+  }
+
+  /// 刷新 elapsedSeconds 并通知任务更新（在每次 onTaskUpdated 前调用）
+  void _notifyTaskUpdate() {
+    if (_currentTask == null) return;
+    if (_taskStartTime != null) {
+      final elapsed = DateTime.now().difference(_taskStartTime!).inSeconds;
+      _currentTask = _currentTask!.copyWith(elapsedSeconds: elapsed);
+    }
+    final updateCb = onTaskUpdated;
+    if (updateCb != null) updateCb(_currentTask!);
+  }
+
   void clearHistory() {
     // 清理瞬态字段，避免旧任务残留污染新会话
     if (isRunning || hasPendingConfirm || hasPendingChoice) {
@@ -157,7 +187,6 @@ class AgentEngine {
     _noCommandRetryCount = 0;
     _lastCommandEventId = '';
     _conversationHistory.clear();
-    _conversationSummary = null;
   }
 
   /// 从持久化消息恢复引擎对话历史（切换会话时调用）
@@ -173,14 +202,8 @@ class AgentEngine {
     _noCommandRetryCount = 0;
     _lastCommandEventId = '';
     _conversationHistory.clear();
-    _conversationSummary = summary;
     _conversationHistory.addAll(messages);
     agentLogger.info('RestoreHistory', '恢复引擎历史: ${messages.length} 条消息, summary=${summary != null ? "有" : "无"}');
-  }
-
-  /// 设置对话摘要（压缩后 / 恢复会话时调用），下次构建系统提示时会注入
-  void setConversationSummary(String? summary) {
-    _conversationSummary = summary;
   }
 
   /// 压缩后同步内存历史：移除已摘要的旧消息，保留最近 N 轮
@@ -212,20 +235,22 @@ class AgentEngine {
 
     if (isRunning) {
       agentLogger.warn('AgentEngine', 'Agent 正在执行任务，拒绝新任务');
-      onError?.call('Agent 正在执行任务，请等待完成');
+      onError?.call(L10n.str.agentRunning);
       return;
     }
 
     // 新任务代际，使任何残留的旧循环退出
     _currentTaskGeneration++;
     final myGeneration = _currentTaskGeneration;
+    _taskStartTime = DateTime.now();  // 记录任务开始时间，用于进度计算
+    _currentStepCount = 0;
 
     _currentTask = AgentTask(
       id: _uuid.v4(),
       goal: goal,
       status: AgentStatus.thinking,
     );
-    onTaskUpdated?.call(_currentTask!);
+    _notifyTaskUpdate();
 
     // 查询知识库，缓存注入文本
     try {
@@ -269,8 +294,20 @@ class AgentEngine {
         completedAt: DateTime.now(),
       );
       if (_currentTask != null) {
+        // 如果最后一条是 user 消息（无 assistant 响应），添加错误消息保持历史完整
+        if (_conversationHistory.isNotEmpty &&
+            _conversationHistory.last.role == 'user') {
+          _conversationHistory.add(ChatMessage.create(
+            role: 'assistant',
+            content: '${L10n.str.taskExecutionError}: ${_friendlyErrorMessage(e)}',
+          ));
+        }
+        // R5: 所有终态路径必须 emit finish 事件 + flush 流式内容到持久化
+        // 但失败路径不调用 onCompleted（它会触发 _recordLearningFromTask 污染知识库）
+        // 只 emit finish 事件让 UI 停止流式状态，流式内容由 onError 回调中的 error 状态替代
+        onEvent?.call(AgentEvent.finish(summary: '⚠️ 任务异常终止: ${_friendlyErrorMessage(e)}'));
         onError?.call(_friendlyErrorMessage(e));
-        onTaskUpdated?.call(_currentTask!);
+        _notifyTaskUpdate();
         // 任务失败通知
         _notifyTaskCompletion(success: false, startTime: startTime, error: e.toString());
       }
@@ -287,7 +324,7 @@ class AgentEngine {
         status: AgentStatus.cancelled,
         completedAt: DateTime.now(),
       );
-      onTaskUpdated?.call(_currentTask!);
+      _notifyTaskUpdate();
     }
     // 递近代际，使任何残留的旧循环立即退出
     _currentTaskGeneration++;
@@ -361,12 +398,12 @@ class AgentEngine {
     if (executor == null || !executor.isConnected) {
       final type = executor == null ? '无执行器' : '未连接';
       agentLogger.error('ReAct', '$type!');
-      onError?.call('需要连接到终端才能使用自动模式');
+      onError?.call(L10n.str.terminalNotConnected);
       _currentTask = _currentTask!.copyWith(
         status: AgentStatus.failed,
         completedAt: DateTime.now(),
       );
-      onTaskUpdated?.call(_currentTask!);
+      _notifyTaskUpdate();
       return;
     }
 
@@ -421,12 +458,13 @@ class AgentEngine {
       // ═══════════════════════════════════════════
       // 阶段1: 思考 (Think) — 调用 AI 获取响应
       // ═══════════════════════════════════════════
+      _currentStepCount = stepCount;
       _currentTask = _currentTask!.copyWith(
         status: AgentStatus.thinking,
-        currentStep: '思考中... (第 $stepCount 步)',
+        currentStep: _progressStepText(),
       );
-      onTaskUpdated?.call(_currentTask!);
-      onThinking?.call('🤔 正在思考下一步...');
+      _notifyTaskUpdate();
+      onThinking?.call(L10n.str.thinkingNextStep);
 
       String fullResponse;
       try {
@@ -462,17 +500,26 @@ class AgentEngine {
       } catch (e, stack) {
         final friendlyMsg = _friendlyErrorMessage(e);
         agentLogger.error('ReAct', 'AI 调用异常: $e\n$stack');
-        onError?.call(friendlyMsg);
         // L1 修复：AI 异常应标记 failed 并退出，不应走到循环后的 completed 逻辑
         if (myGeneration == _currentTaskGeneration && _currentTask != null) {
+          // 将错误信息作为 assistant 消息加入历史，保持 user/assistant 交替完整性
+          // 这样下次任务（如用户发"继续"）时 AI 能看到之前的上下文
+          final errorMsg = '⚠️ AI 调用失败: $friendlyMsg';
+          _accumulatedMessage = errorMsg;
+          onMessage?.call(errorMsg);
+          _conversationHistory.add(ChatMessage.create(
+            role: 'assistant',
+            content: errorMsg,
+          ));
+          onError?.call(friendlyMsg);
           final startTime = _currentTask!.createdAt;
           _currentTask = _currentTask!.copyWith(
             status: AgentStatus.failed,
             completedAt: DateTime.now(),
           );
-          onTaskUpdated?.call(_currentTask!);
+          _notifyTaskUpdate();
           // R5: 失败路径也要 emit finish 事件，避免 UI 卡 running
-          onEvent?.call(AgentEvent.finish(summary: '任务失败: $friendlyMsg'));
+          onEvent?.call(AgentEvent.finish(summary: '${L10n.str.taskFailed}: $friendlyMsg'));
           // 任务失败通知（与外层 catch 保持一致）
           _notifyTaskCompletion(success: false, startTime: startTime, error: e.toString());
         }
@@ -559,7 +606,7 @@ class AgentEngine {
       status: AgentStatus.completed,
       completedAt: DateTime.now(),
     );
-    onTaskUpdated?.call(_currentTask!);
+    _notifyTaskUpdate();
     agentLogger.info('ReAct', '=== 执行结束 (步数: $stepCount/$maxSteps) ===');
 
     if (stepCount >= maxSteps) {
@@ -590,7 +637,7 @@ class AgentEngine {
     // 重试仅对流建立阶段有效，一旦开始接收 chunk 就不再重试
     Stream<String> stream;
     const maxRetries = 3;
-    final backoffDelays = [Duration(seconds: 1), Duration(seconds: 2), Duration(seconds: 4)];
+    final backoffDelays = [const Duration(seconds: 1), const Duration(seconds: 2), const Duration(seconds: 4)];
 
     int attempt = 0;
     while (true) {
@@ -917,6 +964,22 @@ class AgentEngine {
     final safetyLevel = SafetyGuard.check(command);
     agentLogger.info('ReAct', '安全检查: $safetyLevel');
 
+    // 审计日志（执行前写入）：即使执行中崩溃，也能追溯"曾发起过这条命令"
+    // 所有命令都记录（含 safe 级），因为 cat /etc/shadow 等只读命令也可能泄露敏感信息
+    if (hostId != null) {
+      try {
+        await AuditLogger.log(
+          hostId: hostId!,
+          command: command,
+          safetyLevel: safetyLevel.name,
+          output: null, // 执行前无输出，执行后会追加一条带结果的记录
+          executed: false,
+        );
+      } catch (e) {
+        agentLogger.warn('Audit', '审计日志写入失败(执行前): $e');
+      }
+    }
+
     // 变更窗口/封网期检查：非 safe 级命令在封网期被拒绝
     final (windowAllowed, windowReason) = ChangeWindowService.checkCommand(command);
     if (!windowAllowed) {
@@ -949,7 +1012,7 @@ class AgentEngine {
       agentLogger.warn('ReAct', '命令被安全系统拦截: $command');
       final reason = SafetyGuard.getReason(command) ?? SafetyGuard.getTip(safetyLevel);
       onEvent?.call(AgentEvent.info('🚫 命令被安全系统拦截: $command\n原因: $reason'));
-      // 审计日志：被拦截的命令也要记录（executed=false）
+      // 审计日志：被拦截的命令追加记录（执行前已写一条 executed=false）
       if (hostId != null) {
         try {
           await AuditLogger.log(
@@ -986,7 +1049,7 @@ class AgentEngine {
         status: AgentStatus.waitingConfirm,
         currentStep: '等待确认: $command',
       );
-      onTaskUpdated?.call(_currentTask!);
+      _notifyTaskUpdate();
 
       final confirmed = await _confirmCompleter!.future;
       _confirmCompleter = null;
@@ -1019,9 +1082,9 @@ class AgentEngine {
     // 执行命令
     _currentTask = _currentTask!.copyWith(
       status: AgentStatus.executing,
-      currentStep: command,
+      currentStep: _progressStepText(),
     );
-    onTaskUpdated?.call(_currentTask!);
+    _notifyTaskUpdate();
     onCommandGenerated?.call(command);
 
     if (safetyLevel == SafetyLevel.info) {
@@ -1054,6 +1117,12 @@ class AgentEngine {
     final result = await _executeCommand(executor, command);
     agentLogger.info('ReAct', '命令执行结果: success=${result.success}');
 
+    // 更新命令成功/失败计数
+    _currentTask = _currentTask!.copyWith(
+      successCount: _currentTask!.successCount + (result.success ? 1 : 0),
+      failureCount: _currentTask!.failureCount + (result.success ? 0 : 1),
+    );
+
     _memory.rememberCommand(command);
     _memory.rememberResult(
       command,
@@ -1062,12 +1131,13 @@ class AgentEngine {
     );
 
     // 格式化观测结果
+    // R8: 即使是查询命令也强制上限（20000 字符），防止 cat huge_file / journalctl 等输出撑爆 AI 上下文
     final isQuery = isQueryCommand(command);
     final outputText = isQuery
-        ? (result.output ?? '(无输出)')
+        ? _truncateQueryOutput(result.output)
         : truncateOutput(result.output, maxLines: 8, maxChars: 600);
     final errorText = isQuery
-        ? (result.error ?? '(无错误信息)')
+        ? _truncateQueryOutput(result.error)
         : truncateOutput(result.error, maxLines: 8, maxChars: 600);
 
     // 失败回滚：命令失败时，把快照+回滚建议注入观测，AI 会看到并建议回滚
@@ -1115,19 +1185,23 @@ class AgentEngine {
         // R8: 持久化失败不可静默吞掉，需记录日志带上下文
         agentLogger.warn('ChangeRecord', '记录变更台账失败(忽略): hostId=$hostId, cmd=$command, err=$e');
       }
-      // 审计日志：记录非 safe 级命令的执行情况（含执行结果摘要）
+    }
+
+    // 审计日志（执行后）：记录执行结果，与执行前的 executed=false 形成完整审计链
+    // 所有命令都记录（含 safe 级），执行前已写 executed=false，这里写 executed=true + 结果
+    if (hostId != null) {
       try {
         await AuditLogger.log(
           hostId: hostId!,
           command: command,
           safetyLevel: safetyLevel.name,
           output: result.success
-              ? (result.output?.isNotEmpty == true ? _truncateForAudit(result.output!) : null)
-              : (result.error?.isNotEmpty == true ? _truncateForAudit(result.error!) : null),
+              ? (result.output?.isNotEmpty == true ? _truncateForAudit(result.output!) : '(无输出)')
+              : (result.error?.isNotEmpty == true ? _truncateForAudit(result.error!) : '(无错误信息)'),
           executed: true,
         );
       } catch (e) {
-        agentLogger.warn('Audit', '审计日志写入失败(忽略): hostId=$hostId, cmd=$command, err=$e');
+        agentLogger.warn('Audit', '审计日志写入失败(执行后): hostId=$hostId, cmd=$command, err=$e');
       }
     }
 
@@ -1143,6 +1217,16 @@ class AgentEngine {
   static String _truncateForAudit(String s) {
     if (s.length <= 500) return s;
     return '${s.substring(0, 500)}...(${s.length} chars)';
+  }
+
+  /// 查询命令输出截断：保留尾部 20000 字符（错误信息通常在末尾）
+  /// R8: 查询命令不截断会导致 cat/journalctl/find 等输出撑爆 AI 上下文
+  static const int _maxQueryOutputChars = 20000;
+  static String _truncateQueryOutput(String? output) {
+    if (output == null || output.isEmpty) return '(无输出)';
+    if (output.length <= _maxQueryOutputChars) return output;
+    return '...(输出过长，已截断前 ${output.length - _maxQueryOutputChars} 字符)\n'
+        '${output.substring(output.length - _maxQueryOutputChars)}';
   }
 
   /// 最近一次 command 事件 id（用于 result 关联）
@@ -1187,7 +1271,7 @@ class AgentEngine {
       status: AgentStatus.waitingConfirm,
       currentStep: '等待选择',
     );
-    onTaskUpdated?.call(_currentTask!);
+    _notifyTaskUpdate();
 
     // 暂停循环，等待用户选择
     final choice = await _choiceCompleter!.future;
@@ -1218,7 +1302,7 @@ class AgentEngine {
       status: AgentStatus.thinking,
       currentStep: '继续处理...',
     );
-    onTaskUpdated?.call(_currentTask!);
+    _notifyTaskUpdate();
 
     return true; // 继续循环
   }
@@ -1234,12 +1318,14 @@ class AgentEngine {
     if (toolName.isEmpty) {
       agentLogger.warn('ReAct', 'tool 动作但未指定工具名');
       onEvent?.call(AgentEvent.info('⚠️ AI 调用工具但未指定工具名'));
-      final observation = '观测: 工具调用失败 — 未指定工具名';
+      const observation = '观测: 工具调用失败 — 未指定工具名';
       _conversationHistory.add(ChatMessage.create(role: 'user', content: observation));
       _trimMessages(_conversationHistory);
       _noCommandRetryCount++;
       if (_noCommandRetryCount >= _maxNoCommandRetries) {
         agentLogger.warn('ReAct', '工具调用重试次数耗尽');
+        // R5: 所有终态路径必须设终态 + emit finish + flush 流式内容
+        _finishTask(success: false, summary: L10n.str.toolRetryExhausted);
         return false;
       }
       return true;
@@ -1264,7 +1350,7 @@ class AgentEngine {
       status: AgentStatus.executing,
       currentStep: '执行工具 $toolName',
     );
-    onTaskUpdated?.call(_currentTask!);
+    _notifyTaskUpdate();
 
     try {
       final result = await tool.execute(
@@ -1314,7 +1400,7 @@ class AgentEngine {
         status: AgentStatus.thinking,
         currentStep: '思考中...',
       );
-      onTaskUpdated?.call(_currentTask!);
+      _notifyTaskUpdate();
 
       return true;
     } catch (e) {
@@ -1331,7 +1417,7 @@ class AgentEngine {
         status: AgentStatus.thinking,
         currentStep: '思考中...',
       );
-      onTaskUpdated?.call(_currentTask!);
+      _notifyTaskUpdate();
       return true;
     }
   }
@@ -1342,7 +1428,7 @@ class AgentEngine {
     _noCommandRetryCount++;
     if (_noCommandRetryCount <= _maxNoCommandRetries) {
       agentLogger.info('ReAct', 'AI 未生成命令，发送继续提示 (重试 $_noCommandRetryCount/$_maxNoCommandRetries)');
-      final continuePrompt = '请继续执行任务。如果还有需要执行的步骤，请使用以下格式回复：\n\n思考: [你的推理]\n动作: execute\n命令: [要执行的命令]\n\n如果任务已全部完成，请回复：\n\n思考: [总结]\n动作: finish';
+      const continuePrompt = '请继续执行任务。如果还有需要执行的步骤，请使用以下格式回复：\n\n思考: [你的推理]\n动作: execute\n命令: [要执行的命令]\n\n如果任务已全部完成，请回复：\n\n思考: [总结]\n动作: finish';
       onEvent?.call(AgentEvent.info('⏳ 继续执行...'));
       _conversationHistory.add(ChatMessage.create(role: 'user', content: continuePrompt));
       _trimMessages(_conversationHistory);
@@ -1356,22 +1442,23 @@ class AgentEngine {
   }
 
   /// 标记任务为已完成（统一的结束逻辑）
-  void _finishTask() {
+  void _finishTask({bool success = true, String? summary}) {
     _trimMessages(_conversationHistory);
     final startTime = _currentTask?.createdAt;
     _currentTask = _currentTask!.copyWith(
-      status: AgentStatus.completed,
+      status: success ? AgentStatus.completed : AgentStatus.failed,
       completedAt: DateTime.now(),
     );
-    onTaskUpdated?.call(_currentTask!);
-    agentLogger.info('AutoExec', '=== 任务完成 ===');
+    _notifyTaskUpdate();
+    agentLogger.info('AutoExec', '=== 任务${success ? "完成" : "终止"} ===');
     // L6 修复：补发 finish 事件，让 UI 显示完成卡片并正确结束渲染状态
-    onEvent?.call(AgentEvent.finish(summary: _accumulatedMessage));
-    if (_accumulatedMessage.isNotEmpty) {
-      onCompleted?.call(_accumulatedMessage);
+    final finishSummary = summary ?? _accumulatedMessage;
+    onEvent?.call(AgentEvent.finish(summary: finishSummary));
+    if (finishSummary.isNotEmpty) {
+      onCompleted?.call(finishSummary);
     }
     // 任务完成通知（异步，不阻塞引擎）
-    _notifyTaskCompletion(success: true, startTime: startTime);
+    _notifyTaskCompletion(success: success, startTime: startTime);
   }
 
   /// 推送任务完成通知（异步触发，不阻塞引擎主流程）
@@ -1413,6 +1500,46 @@ class AgentEngine {
     // 创建取消令牌，cancelTask 时 complete 触发提前退出
     _commandCancelToken = Completer<void>();
 
+    // sudo 密码自动注入：当命令包含 sudo 且已配置密码时，监控输出流检测密码提示
+    // 检测到 "[sudo] password" 或行尾 "Password:" 后通过 writeToTerminal 写入密码
+    // 密码不会出现在命令本身或审计日志中（仅写入终端 stdin）
+    // 支持多次注入：命令链中可能有多条 sudo（如 sudo cmd1 && sudo cmd2）
+    StreamSubscription<String>? sudoSub;
+    int sudoInjectCount = 0;
+    if (_sudoPassword != null && _sudoPassword!.isNotEmpty && _isSudoCommand(command)) {
+      final tailBuffer = StringBuffer();
+      // 只匹配 [sudo] 前缀的密码提示，不匹配泛化的 "Password:"
+      // 避免 mysql/ssh/su 等其他程序的密码提示触发误注入，导致密码泄露到终端
+      final sudoPromptPattern = RegExp(
+        r'\[sudo\] password for',
+        caseSensitive: false,
+      );
+      sudoSub = executor.output.listen(
+        (data) {
+          tailBuffer.write(data);
+          // 仅保留尾部 300 字符，避免长输出导致缓冲区无界增长
+          if (tailBuffer.length > 300) {
+            final s = tailBuffer.toString();
+            tailBuffer.clear();
+            tailBuffer.write(s.substring(s.length - 300));
+          }
+          // 清理 ANSI 后匹配，避免转义序列干扰提示检测
+          final cleaned = AnsiStripper.strip(tailBuffer.toString());
+          if (sudoPromptPattern.hasMatch(cleaned)) {
+            executor.writeToTerminal('$_sudoPassword\n');
+            sudoInjectCount++;
+            // 注入后清空缓冲区，防止同一段提示重复匹配，同时允许下次 sudo 提示再次注入
+            tailBuffer.clear();
+            agentLogger.info('Sudo', '检测到 sudo 密码提示，已自动注入密码 (第 $sudoInjectCount 次)');
+          }
+        },
+        onError: (e) {
+          agentLogger.warn('Sudo', 'sudo 监控订阅错误: $e');
+        },
+        onDone: () {},
+      );
+    }
+
     try {
       final result = await executor.executeAndWait(
         command,
@@ -1422,6 +1549,7 @@ class AgentEngine {
 
       _commandCancelToken = null;
       stopwatch.stop();
+      await sudoSub?.cancel();
 
       // 用户取消：返回已取消结果，让上层退出循环
       if (_currentTask?.status == AgentStatus.cancelled) {
@@ -1447,6 +1575,7 @@ class AgentEngine {
     } catch (e) {
       stopwatch.stop();
       _commandCancelToken = null;
+      await sudoSub?.cancel();
       return AgentResult(
         success: false,
         error: e.toString(),
@@ -1455,36 +1584,48 @@ class AgentEngine {
     }
   }
 
-  /// 压缩对话：调用 AI 总结一组消息为简短摘要
+  /// 一次性压缩对话：调用 AI 将一组消息逐条压缩，返回每条消息对应的压缩摘要
   ///
-  /// 输入是 ConvMessage 列表（来自 persistence 层），但为避免循环依赖，
-  /// 这里接收通用的 (role, content) 元组列表，由调用方转换。
-  ///
-  /// 返回 null 表示压缩失败或无内容。
-  Future<String?> summarize(List<({String role, String content})> messages) async {
+  /// 输入是 (index, role, content, command, commandSuccess) 元组列表。
+  /// 返回 List<(int index, String summary)>，长度 <= 输入（AI 可能合并部分消息）。
+  /// 返回 null 表示压缩失败。
+  Future<List<(int index, String summary)>?> summarizeMessages(
+    List<({int index, String role, String content, String? command, bool? commandSuccess})> messages,
+  ) async {
     if (messages.isEmpty) return null;
 
-    agentLogger.info('Compact', '开始压缩 ${messages.length} 条消息');
+    agentLogger.info('Compact', '开始一次性压缩 ${messages.length} 条消息');
 
+    // 构造压缩 prompt：要求 AI 输出 JSON 数组，每个元素 {index, summary}
     final buffer = StringBuffer();
-    buffer.writeln('请将以下对话历史总结为简洁的摘要，保留关键信息：');
-    buffer.writeln('- 用户的核心目标和需求');
-    buffer.writeln('- 已经执行过的关键命令和结果（成功/失败）');
-    buffer.writeln('- 当前系统状态（已安装的软件、版本等）');
-    buffer.writeln('- 遗留的问题或下一步计划');
-    buffer.writeln('摘要应控制在 500 字以内，用要点形式输出，不要包含客套话。');
+    buffer.writeln('你是对话压缩助手。请将以下对话历史逐条压缩为简洁摘要。');
+    buffer.writeln();
+    buffer.writeln('压缩规则：');
+    buffer.writeln('- 用户的废话/寒暄/重复表述压缩为一句话意图');
+    buffer.writeln('- 查询类命令（ls/cat/ps/grep/find/df 等）的输出结果：只保留关键结论，冗长输出直接丢弃');
+    buffer.writeln('- 修改类命令（install/restart/stop/rm/config 等）：只保留"执行成功"或"失败原因"');
+    buffer.writeln('- AI 的思考和推理：压缩为关键决策和结论，去掉推理过程');
+    buffer.writeln('- 保留所有关键信息：用户目标、已执行命令、系统状态、遗留问题、下一步计划');
+    buffer.writeln('- 每条摘要控制在 200 字以内');
+    buffer.writeln('- 不要编造未出现的信息');
+    buffer.writeln();
+    buffer.writeln('输出格式：JSON 数组，每个元素 {"index": 消息序号, "summary": "压缩摘要"}');
+    buffer.writeln('只输出 JSON，不要解释，不要 markdown 代码块标记。');
     buffer.writeln();
     buffer.writeln('=== 对话历史 ===');
     for (final m in messages) {
       final label = m.role == 'user' ? '用户' : 'AI';
-      buffer.writeln('$label: ${m.content}');
+      buffer.writeln('[$m.index] $label: ${m.content}');
+      if (m.command != null) {
+        buffer.writeln('  [命令] ${m.command} → ${m.commandSuccess == true ? "成功" : m.commandSuccess == false ? "失败" : "未知"}');
+      }
       buffer.writeln('---');
     }
 
     final prompt = buffer.toString();
 
     try {
-      final history = [ChatMessage.create(role: 'system', content: '你是对话压缩助手，只输出摘要内容，不要解释。')];
+      final history = [ChatMessage.create(role: 'system', content: '你是对话压缩助手，只输出 JSON 数组，不要解释。')];
       final stream = await _aiProvider.chatStream(
         history: history,
         prompt: prompt,
@@ -1492,15 +1633,70 @@ class AgentEngine {
         systemPrompt: null,
       );
 
-      final summary = StringBuffer();
-      await for (final chunk in stream) {
-        summary.write(chunk);
+      final raw = StringBuffer();
+      // 压缩看门狗：防止 AI 流式卡住导致 compact 永久挂起
+      await for (final chunk in stream.timeout(
+        const Duration(seconds: 120),
+        onTimeout: (sink) {
+          agentLogger.warn('Compact', '压缩流超时(120s)，终止并使用已收集内容');
+          sink.close();
+        },
+      )) {
+        raw.write(chunk);
       }
-      final result = summary.toString().trim();
-      agentLogger.info('Compact', '压缩完成，摘要长度: ${result.length}');
-      return result.isEmpty ? null : result;
+
+      final result = _parseCompactJson(raw.toString().trim(), messages);
+      if (result == null || result.isEmpty) {
+        agentLogger.warn('Compact', '压缩结果解析失败或为空');
+        return null;
+      }
+      agentLogger.info('Compact', '压缩完成: ${result.length} 条摘要');
+      return result;
     } catch (e, stack) {
       agentLogger.error('Compact', '压缩失败: $e\n$stack');
+      return null;
+    }
+  }
+
+  /// 解析 AI 返回的 JSON 数组为 (index, summary) 列表
+  /// 容错处理：去掉 markdown 代码块标记、提取 JSON 数组片段
+  List<(int index, String summary)>? _parseCompactJson(
+    String raw,
+    List<({int index, String role, String content, String? command, bool? commandSuccess})> messages,
+  ) {
+    try {
+      // 去掉可能的 markdown 代码块标记
+      var jsonStr = raw;
+      if (jsonStr.startsWith('```')) {
+        // 去掉首行 ```json 或 ```
+        final firstNewline = jsonStr.indexOf('\n');
+        if (firstNewline > 0) jsonStr = jsonStr.substring(firstNewline + 1);
+        // 去掉末尾 ```
+        if (jsonStr.endsWith('```')) {
+          jsonStr = jsonStr.substring(0, jsonStr.length - 3);
+        }
+      }
+      jsonStr = jsonStr.trim();
+
+      // 找到第一个 [ 和最后一个 ]，提取 JSON 数组
+      final start = jsonStr.indexOf('[');
+      final end = jsonStr.lastIndexOf(']');
+      if (start < 0 || end < 0 || end <= start) return null;
+      jsonStr = jsonStr.substring(start, end + 1);
+
+      final list = jsonDecode(jsonStr) as List;
+      final result = <(int, String)>[];
+      for (final item in list) {
+        if (item is! Map) continue;
+        final idx = item['index'];
+        final summary = item['summary'];
+        if (idx is int && summary is String && summary.trim().isNotEmpty) {
+          result.add((idx, summary.trim()));
+        }
+      }
+      return result;
+    } catch (e) {
+      agentLogger.warn('Compact', 'JSON 解析失败: $e, raw: ${raw.substring(0, raw.length > 200 ? 200 : raw.length)}');
       return null;
     }
   }
@@ -1529,246 +1725,40 @@ class AgentEngine {
         case DioExceptionType.badResponse:
           final statusCode = error.response?.statusCode;
           if (statusCode == 401) {
-            return 'API Key 无效或已过期，请在设置中更新 API Key';
+            return L10n.str.errApiKeyInvalid;
           } else if (statusCode == 429) {
-            return '请求过于频繁，请稍后重试';
+            return L10n.str.errRateLimit;
           } else if (statusCode == 400) {
-            return '请求格式错误，请检查 AI 模型配置（模型名称、API 地址等）';
+            return L10n.str.errBadRequest;
           } else if (statusCode != null && statusCode >= 500) {
-            return 'AI 服务端错误 ($statusCode)，请稍后重试';
+            return L10n.str.errServerError(statusCode);
           }
-          return '请求失败 ($statusCode)';
+          return L10n.str.errRequestFailed(statusCode ?? 0);
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.sendTimeout:
         case DioExceptionType.receiveTimeout:
-          return '连接 AI 服务超时，请检查网络';
+          return L10n.str.errConnectionTimeout;
         case DioExceptionType.connectionError:
-          return '无法连接到 AI 服务，请检查网络和 API 地址';
+          return L10n.str.errConnectionError;
         default:
-          return '连接失败: ${error.message ?? "未知错误"}';
+          return L10n.str.errConnectionFailed(error.message ?? 'Unknown');
       }
     }
-    return '执行出错: $error';
+    return L10n.str.errExecutionError(error.toString());
   }
 
-  String? _extractCommand(String content) {
-    agentLogger.debug('ExtractCmd', '开始解析，内容长度: ${content.length}');
-    agentLogger.debug('ExtractCmd', '内容前500字符: ${content.length > 500 ? content.substring(0, 500) : content}');
-
-    // ========== 模式 1: markdown 代码块 (```bash ... ``` 或 ``` ... ```) ==========
-    // 放宽匹配：允许 ``` 后无换行、允许 bash/sh/shell 标识符后直接跟内容
-    final codeBlockPatterns = [
-      // ```bash \n content ```
-      RegExp(r'```\s*(?:bash|sh|shell)\s*\n([\s\S]*?)```', multiLine: true),
-      // ``` \n content ``` （无语言标识）
-      RegExp(r'```\s*\n([\s\S]*?)```', multiLine: true),
-      // ```bash content ``` （单行代码块，无换行）
-      RegExp(r'```\s*(?:bash|sh|shell)\s+([^\n]+)```', multiLine: true),
-    ];
-
-    for (final pattern in codeBlockPatterns) {
-      final match = pattern.firstMatch(content);
-      if (match != null) {
-        final rawBlock = match.group(1)?.trim();
-        if (rawBlock != null && rawBlock.isNotEmpty) {
-          // 代码块可能包含多行命令，取第一行有效命令
-          final command = _extractFirstCommand(rawBlock);
-          if (command != null) {
-            agentLogger.info('ExtractCmd', '模式1匹配成功: $command');
-            return command;
-          }
-        }
-      }
-    }
-
-    // ========== 模式 2: 单个反引号包裹的命令 ==========
-    final singleBacktick = RegExp(r'`([^`\n]+)`');
-    final backtickMatch = singleBacktick.firstMatch(content);
-    if (backtickMatch != null) {
-      final cmd = backtickMatch.group(1)?.trim();
-      if (cmd != null && looksLikeCommand(cmd)) {
-        agentLogger.info('ExtractCmd', '模式2匹配成功(反引号): $cmd');
-        return cmd;
-      }
-    }
-
-    // ========== 模式 3: 独立行的命令（常见命令前缀）==========
-    final commandPrefixes = [
-      r'^sudo\s+', r'^yum\s+', r'^apt\s+', r'^apt-get\s+', r'^dnf\s+',
-      r'^apk\s+', r'^pacman\s+', r'^brew\s+', r'^curl\s+', r'^wget\s+',
-      r'^tar\s+', r'^unzip\s+', r'^cat\s+', r'^echo\s+', r'^export\s+',
-      r'^source\s+', r'^cd\s+', r'^mkdir\s+', r'^chmod\s+', r'^chown\s+',
-      r'^rm\s+', r'^cp\s+', r'^mv\s+', r'^ln\s+', r'^systemctl\s+',
-      r'^service\s+', r'^java\s+', r'^javac\s+', r'^python\s+',
-      r'^pip\s+', r'^npm\s+', r'^node\s+', r'^git\s+', r'^docker\s+',
-      r'^kubectl\s+', r'^ls\s+', r'^grep\s+', r'^find\s+', r'^head\s+',
-      r'^tail\s+', r'^which\s+', r'^where\s+', r'^type\s+',
-      r'^uname\s+', r'^date\s+', r'^whoami\s+', r'^id\s+',
-      r'^pwd\s+', r'^env\s+', r'^printenv\s+', r'^sed\s+',
-      r'^awk\s+', r'^sort\s+', r'^uniq\s+', r'^wc\s+',
-      r'^chmod\s+', r'^chgrp\s+', r'^touch\s+', r'^dd\s+',
-    ];
-
-    final lines = content.split('\n');
-    for (final line in lines) {
-      var trimmed = line.trim();
-      // 跳过说明性文字行
-      if (trimmed.startsWith('#') || trimmed.startsWith('//') ||
-          trimmed.startsWith('请') || trimmed.startsWith('执行') ||
-          trimmed.startsWith('命令') || trimmed.startsWith('说明') ||
-          trimmed.startsWith('注意') || trimmed.startsWith('提示') ||
-          trimmed.startsWith('警告') || trimmed.startsWith('- ') ||
-          trimmed.startsWith('* ')) {
-        continue;
-      }
-      // 清理可能的列表前缀 (1. 2. 3. 或 - *)
-      trimmed = trimmed.replaceFirst(RegExp(r'^\d+[\.\)]\s*'), '');
-      trimmed = trimmed.replaceFirst(RegExp(r'^[-*]\s*'), '');
-
-      for (final prefix in commandPrefixes) {
-        if (RegExp(prefix).hasMatch(trimmed) && looksLikeCommand(trimmed)) {
-          agentLogger.info('ExtractCmd', '模式3匹配成功(前缀): $trimmed');
-          return trimmed;
-        }
-      }
-    }
-
-    // ========== 模式 4: 宽松提取 — 从内容中找任何像命令的独立行 ==========
-    for (final line in lines) {
-      final trimmed = line.trim();
-      if (trimmed.isEmpty || trimmed.startsWith('#')) continue;
-      // 跳过明显非命令的行
-      if (isDescriptiveText(trimmed)) continue;
-      // 清理列表前缀
-      var cleaned = trimmed.replaceFirst(RegExp(r'^\d+[\.\)]\s*'), '');
-      cleaned = cleaned.replaceFirst(RegExp(r'^[-*]\s*'), '');
-      if (looksLikeCommand(cleaned) && cleaned.length >= 3) {
-        agentLogger.info('ExtractCmd', '模式4匹配成功(宽松): $cleaned');
-        return cleaned;
-      }
-    }
-
-    agentLogger.warn('ExtractCmd', '所有模式均未匹配到命令');
-    return null;
-  }
-
-  /// 从 AI 响应中提取所有可执行命令（支持批量）
-  /// 优先从代码块中提取所有有效命令行，如果没有代码块则回退到单条提取
-  List<String> _extractCommands(String content) {
-    agentLogger.debug('ExtractCmd', '开始批量解析，内容长度: ${content.length}');
-
-    final commands = <String>[];
-
-    // ========== 模式 1: markdown 代码块 (```bash ... ``` 或 ``` ... ```) ==========
-    final codeBlockPatterns = [
-      RegExp(r'```\s*(?:bash|sh|shell)\s*\n([\s\S]*?)```', multiLine: true),
-      RegExp(r'```\s*\n([\s\S]*?)```', multiLine: true),
-      RegExp(r'```\s*(?:bash|sh|shell)\s+([^\n]+)```', multiLine: true),
-    ];
-
-    for (final pattern in codeBlockPatterns) {
-      final match = pattern.firstMatch(content);
-      if (match != null) {
-        final rawBlock = match.group(1)?.trim();
-        if (rawBlock != null && rawBlock.isNotEmpty) {
-          commands.addAll(_parseCodeBlock(rawBlock));
-          if (commands.isNotEmpty) {
-            agentLogger.info('ExtractCmd', '批量模式1提取 ${commands.length} 条命令');
-            return commands;
-          }
-        }
-      }
-    }
-
-    // 回退到单条命令提取
-    final single = _extractCommand(content);
-    if (single != null) {
-      commands.add(single);
-      agentLogger.info('ExtractCmd', '回退单条提取: $single');
-    }
-    return commands;
-  }
-
-  /// 解析代码块，识别 heredoc 并将其作为整体提取
-  List<String> _parseCodeBlock(String rawBlock) {
-    final commands = <String>[];
-    final lines = rawBlock.split('\n');
-
-    int i = 0;
-    while (i < lines.length) {
-      final line = lines[i].trim();
-
-      if (line.isEmpty) {
-        i++;
-        continue;
-      }
-
-      // 检测 heredoc 开始：cat > file << 'EOF' 或 cat > file << EOF 等
-      final heredocStart = RegExp(r'''<<\s*['"]?(\w+)['"]?''');
-      final heredocMatch = heredocStart.firstMatch(line);
-
-      if (heredocMatch != null) {
-        final delimiter = heredocMatch.group(1)!;
-        final heredocLines = <String>[line];
-
-        // 收集 heredoc 内容直到遇到结束标记
-        i++;
-        while (i < lines.length) {
-          final heredocLine = lines[i];
-          heredocLines.add(heredocLine);
-          if (heredocLine.trim() == delimiter) {
-            i++;
-            break;
-          }
-          i++;
-        }
-
-        final heredocCommand = heredocLines.join('\n');
-        commands.add(heredocCommand);
-        agentLogger.info('ExtractCmd', 'heredoc 命令提取: ${heredocCommand.length} 字符');
-        continue;
-      }
-
-      // 非注释、非代码块标记的普通命令行
-      if (line.startsWith('#') && !line.startsWith('#!')) {
-        i++;
-        continue;
-      }
-      if (line.startsWith('```') || line.endsWith('```')) {
-        i++;
-        continue;
-      }
-      if (line.length >= 3) {
-        commands.add(line);
-      }
-      i++;
-    }
-
-    return commands;
-  }
-
-  /// 从多行代码块中提取第一条有效命令
-  String? _extractFirstCommand(String block) {
-    final lines = block.split('\n');
-    for (final line in lines) {
-      final cmd = line.trim();
-      if (cmd.isEmpty || cmd.startsWith('#')) continue;
-      if (cmd.startsWith('```') || cmd.endsWith('```')) continue;
-      if (looksLikeCommand(cmd)) return cmd;
-    }
-    // 如果没有找到"像命令"的行，返回第一个非空非注释行
-    for (final line in lines) {
-      final cmd = line.trim();
-      if (cmd.isEmpty || cmd.startsWith('#') || cmd.startsWith('```')) continue;
-      if (cmd.length >= 3) return cmd;
-    }
-    return null;
-  }
+  /// 从 AI 响应中提取所有可执行命令（委托给 CommandExtractor）
+  List<String> _extractCommands(String content) => CommandExtractor.extractCommands(content);
 
   String _buildSystemPrompt(CommandExecutor? executor) {
     final buffer = StringBuffer();
 
     buffer.writeln('你是 AI 助手，可以执行命令。');
+
+    // 语言自适应：让 AI 根据用户使用的语言回复
+    buffer.writeln('【语言要求】');
+    buffer.writeln("Always respond in the same language the user uses. If the user speaks Japanese, reply in Japanese; if French, reply in French; if Chinese, reply in Chinese; and so on. Your thinking, explanations, and summaries must all follow the user's language. Commands and technical terms remain as-is.");
+    buffer.writeln();
 
     buffer.writeln('【ReAct 自动执行模式】');
     buffer.writeln('你正在使用 ReAct（推理-行动-观测）框架。');
@@ -1821,12 +1811,7 @@ class AgentEngine {
       buffer.writeln('若任务必须修改系统才能完成，请用 finish 动作告知用户"当前为只读模式，请关闭后重试"。');
     }
 
-    // 早期对话摘要（压缩后产生，帮助 AI 回顾早期对话）
-    if (_conversationSummary != null && _conversationSummary!.isNotEmpty) {
-      buffer.writeln();
-      buffer.writeln('【早期对话摘要】');
-      buffer.writeln(_conversationSummary);
-    }
+    // 注：早期对话摘要已改为逐条写入 ConvMessage.summary，不再在 system prompt 中注入
 
     if (executor != null) {
       buffer.writeln('\n【系统环境】');
@@ -1909,6 +1894,17 @@ $hostList
     _invalidateSystemPromptCache();
   }
 
+  /// 设置 sudo 密码（由 AgentNotifier 从安全存储加载后调用）
+  /// 传 null/空字符串则关闭 sudo 自动注入
+  void setSudoPassword(String? password) {
+    _sudoPassword = (password != null && password.isNotEmpty) ? password : null;
+  }
+
+  /// 判断命令是否调用了 sudo（作为命令词，避免匹配 sudoers 等单词）
+  bool _isSudoCommand(String command) {
+    return RegExp(r'(^|[\s;&|`(])sudo([\s]|$)').hasMatch(command);
+  }
+
   /// 使 system prompt 缓存失效（下次 startTask 重建）
   void _invalidateSystemPromptCache() {
     // 清空对话历史中的 system 消息，强制重建
@@ -1917,8 +1913,7 @@ $hostList
 
   String? _getCustomPrompt() {
     try {
-      final box = HiveInit.settingsBox;
-      return box.get('customSystemPrompt') as String?;
+      return SettingsDao.getCached('customSystemPrompt') as String?;
     } catch (e) {
       debugPrint('[AgentEngine] 读取自定义提示词失败: $e');
       return null;
@@ -1932,7 +1927,7 @@ $hostList
     final nonSystemMsgs = messages.where((m) => m.role != 'system').toList();
 
     // 每轮 = 1 assistant + 1 user，保留最近 _maxConversationRounds 轮
-    final maxNonSystem = _maxConversationRounds * 2;
+    const maxNonSystem = _maxConversationRounds * 2;
     List<ChatMessage> keptNonSystem;
     if (nonSystemMsgs.length > maxNonSystem) {
       keptNonSystem = nonSystemMsgs.skip(nonSystemMsgs.length - maxNonSystem).toList();
@@ -1971,7 +1966,7 @@ $hostList
       final commands = isWindowsLocal
           ? [
               // N8: 用 PowerShell + Select-String 兼容中英文系统
-              ('powershell -Command "systeminfo | Select-String \"OS Name|OS Version\""', 'os'),
+              ('powershell -Command "systeminfo | Select-String "OS Name|OS Version""', 'os'),
               ('powershell -Command "Get-CimInstance Win32_Processor | Select-Object -ExpandProperty Name"', 'cpu'),
               ('powershell -Command "Get-CimInstance Win32_OperatingSystem | Select-Object TotalVisibleMemorySize,FreePhysicalMemory"', 'memory'),
               ('powershell -Command "Get-CimInstance Win32_LogicalDisk | Select-Object Size,FreeSpace,Caption"', 'disk'),

@@ -1,15 +1,17 @@
 import '../models/host_config.dart';
-import '../core/hive_init.dart';
+import '../core/safety_guard.dart';
 import 'agent_host_registry.dart';
 import 'command_executor.dart';
+import 'daos.dart';
 import '../models/orchestrator_state.dart';
+import '../core/l10n_holder.dart';
 
 /// 多机执行器：在单个 AgentEngine 内部按 hostId 路由命令
 ///
 /// 关键设计（R3 兼容）：
 /// - 不切换 _registry.activeHostId，避免 UI 串台
 /// - 每次执行都从 registry 取最新的 executor，不持有引用
-/// - 批量执行是串行的（for 循环），不是并发
+/// - 批量执行按命令安全等级分流：只读命令并行，修改性命令串行
 class MultiHostExecutor {
   final AgentHostRegistry _registry;
 
@@ -23,13 +25,13 @@ class MultiHostExecutor {
 
   /// 获取指定 host 的 HostConfig（用于显示名、IP 等）
   HostConfig? hostConfigFor(String hostId) {
-    return HiveInit.hostsBox.get(hostId);
+    return HostsDao.getCachedById(hostId);
   }
 
   /// 获取所有已连接的主机 id 列表
   List<String> get connectedHostIds {
     final ids = <String>[];
-    for (final host in HiveInit.hostsBox.values) {
+    for (final host in HostsDao.cached) {
       final executor = _registry.getExecutor(host.id);
       if (executor != null && executor.isConnected) {
         ids.add(host.id);
@@ -52,7 +54,7 @@ class MultiHostExecutor {
     if (!executor.isConnected) {
       return CommandResult(
         stdout: '',
-        stderr: '主机 $hostId 未连接',
+        stderr: L10n.str.orchHostNotConnected(hostId),
         exitCode: -1,
         duration: Duration.zero,
       );
@@ -62,15 +64,21 @@ class MultiHostExecutor {
     } catch (e) {
       return CommandResult(
         stdout: '',
-        stderr: '执行异常: $e',
+        stderr: L10n.str.orchExecException(e.toString()),
         exitCode: -1,
         duration: Duration.zero,
       );
     }
   }
 
-  /// 批量执行：同一命令在多台机上串行执行
-  /// [stopOnFailure] 为 true 时，某台失败则停止后续；为 false 时继续执行其他
+  /// 批量执行：同一命令在多台机上执行
+  ///
+  /// - 只读命令（SafetyLevel.safe）并行执行，提升多机查询效率
+  /// - 修改性命令（非 safe 级）串行执行，便于逐台确认与失败即止
+  ///
+  /// [stopOnFailure] 语义：
+  /// - 串行模式：某台失败则停止后续主机，未执行的主机标记为 skipped
+  /// - 并行模式：所有主机都会执行完，stopOnFailure 仅影响后续批次
   Future<Map<String, CommandResult>> executeBatch(
     List<String> hostIds,
     String command, {
@@ -78,13 +86,29 @@ class MultiHostExecutor {
     bool stopOnFailure = false,
   }) async {
     final results = <String, CommandResult>{};
+
+    // R4/R8：用 SafetyGuard 判定安全等级，只读命令并行
+    final level = SafetyGuard.check(command);
+    if (level == SafetyLevel.safe) {
+      // 并行执行：单台异常/失败不影响其他主机
+      final futures = <Future<void>>[];
+      for (final hostId in hostIds) {
+        futures.add(
+          _executeOneAndStore(hostId, command, timeout: timeout, results: results),
+        );
+      }
+      await Future.wait(futures);
+      return results;
+    }
+
+    // 串行执行：修改性命令逐台执行，支持 stopOnFailure
     for (int i = 0; i < hostIds.length; i++) {
       final hostId = hostIds[i];
       final result = await executeOn(hostId, command, timeout: timeout);
       if (result == null) {
         results[hostId] = CommandResult(
           stdout: '',
-          stderr: '主机 $hostId 未连接',
+          stderr: L10n.str.orchHostNotConnected(hostId),
           exitCode: -1,
           duration: Duration.zero,
         );
@@ -97,7 +121,7 @@ class MultiHostExecutor {
         for (int j = i + 1; j < hostIds.length; j++) {
           results[hostIds[j]] = CommandResult(
             stdout: '',
-            stderr: '已跳过（前序主机失败）',
+            stderr: L10n.str.orchSkippedPreviousFailed,
             exitCode: -1,
             duration: Duration.zero,
           );
@@ -106,6 +130,37 @@ class MultiHostExecutor {
       }
     }
     return results;
+  }
+
+  /// 在单台主机执行命令并把结果写入共享 map（并行模式下使用）
+  /// 单台异常被捕获并转为失败结果，不影响其他主机的 Future
+  Future<void> _executeOneAndStore(
+    String hostId,
+    String command, {
+    required Duration timeout,
+    required Map<String, CommandResult> results,
+  }) async {
+    try {
+      final result = await executeOn(hostId, command, timeout: timeout);
+      if (result == null) {
+        results[hostId] = CommandResult(
+          stdout: '',
+          stderr: L10n.str.orchHostNotConnected(hostId),
+          exitCode: -1,
+          duration: Duration.zero,
+        );
+      } else {
+        results[hostId] = result;
+      }
+    } catch (e) {
+      // R2/R8：单台异常不传播，避免 Future.wait 因一个失败而丢失其他结果
+      results[hostId] = CommandResult(
+        stdout: '',
+        stderr: L10n.str.orchExecException(e.toString()),
+        exitCode: -1,
+        duration: Duration.zero,
+      );
+    }
   }
 
   /// 跨机连通性测试：从 fromHostId 的 executor 上执行网络探测命令
@@ -123,7 +178,7 @@ class MultiHostExecutor {
         targetHost: targetHost,
         port: port,
         reachable: false,
-        detail: '源主机 $fromHostId 未连接',
+        detail: L10n.str.orchSourceNotConnected(fromHostId),
         elapsed: DateTime.now().difference(start),
       );
     }
@@ -135,7 +190,7 @@ class MultiHostExecutor {
         targetHost: targetHost,
         port: port,
         reachable: false,
-        detail: 'targetHost 格式非法（仅允许 IP 或域名字符）',
+        detail: L10n.str.orchInvalidTarget,
         elapsed: DateTime.now().difference(start),
       );
     }
@@ -154,7 +209,7 @@ class MultiHostExecutor {
         targetHost: targetHost,
         port: port,
         reachable: reachable,
-        detail: reachable ? null : (result.stderr.isNotEmpty ? result.stderr : '连接超时或被拒绝'),
+        detail: reachable ? null : (result.stderr.isNotEmpty ? result.stderr : L10n.str.orchConnectTimeout),
         elapsed: elapsed,
       );
     } catch (e) {
@@ -163,7 +218,7 @@ class MultiHostExecutor {
         targetHost: targetHost,
         port: port,
         reachable: false,
-        detail: '探测异常: $e',
+        detail: L10n.str.orchProbeException(e.toString()),
         elapsed: DateTime.now().difference(start),
       );
     }
@@ -178,14 +233,14 @@ class MultiHostExecutor {
 
   /// 构建主机清单文本（用于 system prompt 注入）
   String buildHostListText() {
-    final hosts = HiveInit.hostsBox.values.toList();
-    if (hosts.isEmpty) return '（暂无已配置的主机）';
+    final hosts = HostsDao.cached;
+    if (hosts.isEmpty) return L10n.str.orchNoHostsConfigured;
 
     final buffer = StringBuffer();
     for (final host in hosts) {
       final executor = _registry.getExecutor(host.id);
       final connected = executor?.isConnected ?? false;
-      final status = connected ? '已连接' : '未连接';
+      final status = connected ? L10n.str.orchHostConnected : L10n.str.orchHostDisconnected;
       buffer.writeln('- ${host.id} (${host.name}, ${host.host}): $status');
     }
     return buffer.toString().trimRight();
@@ -197,16 +252,16 @@ class MultiHostExecutor {
     Map<String, CommandResult> results,
   ) {
     final buffer = StringBuffer();
-    buffer.writeln('批量执行: $command');
+    buffer.writeln(L10n.str.orchBatchExec(command));
     final successCount = results.values.where((r) => r.success).length;
-    buffer.writeln('结果: $successCount/${results.length} 成功');
+    buffer.writeln(L10n.str.orchBatchResult(successCount, results.length));
     for (final entry in results.entries) {
       final hostId = entry.key;
       final r = entry.value;
       final mark = r.success ? '✓' : '✗';
       final detail = r.success
-          ? (r.stdout.isNotEmpty ? _truncate(r.stdout, 200) : '(无输出)')
-          : '错误: ${_truncate(r.stderr.isNotEmpty ? r.stderr : '未知', 200)}';
+          ? (r.stdout.isNotEmpty ? _truncate(r.stdout, 200) : L10n.str.orchNoOutput)
+          : L10n.str.orchErrorPrefix(_truncate(r.stderr.isNotEmpty ? r.stderr : L10n.str.orchUnknown, 200));
       buffer.writeln('[$hostId] $mark $detail');
     }
     return buffer.toString().trimRight();

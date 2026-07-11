@@ -6,6 +6,7 @@ import '../pages/chat_page.dart';
 import '../pages/settings_page.dart';
 import '../pages/ai_models_page.dart';
 import '../pages/snippets_page.dart';
+import '../pages/runbooks_page.dart';
 import '../pages/appearance_page.dart';
 import '../pages/security_page.dart';
 import '../pages/agent_settings_page.dart';
@@ -86,6 +87,11 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/snippets',
       builder: (context, state) => const SnippetsPage(),
+    ),
+    // 运维工作流
+    GoRoute(
+      path: '/runbooks',
+      builder: (context, state) => const RunbooksPage(),
     ),
     // SFTP 文件浏览器
     GoRoute(

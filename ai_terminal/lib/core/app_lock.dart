@@ -1,13 +1,13 @@
 import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
-import 'hive_init.dart';
+import '../services/daos.dart';
 
 class AppLock {
   static final _localAuth = LocalAuthentication();
 
   /// 初始化应用锁
   static Future<bool> init() async {
-    final enabled = HiveInit.settingsBox.get('appLockEnabled', defaultValue: false);
+    final enabled = SettingsDao.getCached('appLockEnabled', defaultValue: false);
     if (!enabled) return true;
 
     // 如果启用了应用锁，验证身份
@@ -39,16 +39,16 @@ class AppLock {
 
   /// 检查是否启用应用锁
   static Future<bool> isEnabled() async {
-    return HiveInit.settingsBox.get('appLockEnabled', defaultValue: false);
+    return SettingsDao.getCached('appLockEnabled', defaultValue: false);
   }
 
   /// 启用应用锁
   static Future<void> enable() async {
-    await HiveInit.settingsBox.put('appLockEnabled', true);
+    await SettingsDao.set('appLockEnabled', true);
   }
 
   /// 禁用应用锁
   static Future<void> disable() async {
-    await HiveInit.settingsBox.put('appLockEnabled', false);
+    await SettingsDao.set('appLockEnabled', false);
   }
 }

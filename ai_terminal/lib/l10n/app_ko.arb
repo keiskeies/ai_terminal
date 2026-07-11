@@ -1,0 +1,1254 @@
+{
+  "@@locale": "ko",
+  "about": "정보",
+  "aboutApp": "AI 터미널 정보",
+  "addServer": "서버 추가",
+  "address": "주소",
+  "agentNotInitialized": "에이전트를 초기화하고 먼저 호스트에 연결하세요",
+  "agentRunning": "에이전트가 작업을 실행 중입니다. 완료될 때까지 기다려주세요",
+  "agentSettingAutoExecSection": "AI Auto Execution",
+  "agentSettingBuiltInPrompt": "AI Built-in Instructions",
+  "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",
+  "agentSettingBuiltInPromptSubtitle": "Modify AI's basic instructions",
+  "agentSettingBuiltInSaved": "AI built-in instructions saved",
+  "agentSettingCustomPromptHint": "e.g., Respond in English, use concise format, prefer Docker...",
+  "agentSettingExtraPrompt": "Additional Instructions",
+  "agentSettingExtraPromptDesc": "Additional requirements appended to built-in instructions to adjust AI's response style. Leave empty to skip.",
+  "agentSettingExtraPromptSaved": "Additional instructions saved",
+  "agentSettingExtraPromptSubtitle": "Additional requirements appended to built-in instructions",
+  "agentSettingHundredSteps": "100 steps",
+  "agentSettingMaxStepsDesc": "Maximum number of steps AI takes when executing commands automatically. Set to 0 for unlimited steps; complex tasks will not be interrupted.",
+  "agentSettingMaxStepsLabel": "Max steps AI can execute automatically",
+  "agentSettingPromptSection": "AI Prompts",
+  "agentSettingPromptWarning": "⚠️ Modify with caution. Inappropriate prompts may cause abnormal AI behavior. Click \"Reset\" to restore defaults at any time.",
+  "agentSettingTitle": "Agent Settings",
+  "agentSettings": "에이전트",
+  "agentSettingsDesc": "AI가 자동 실행하는 최대 단계 수 (0 = 무제한)",
+  "aiAndIntelligence": "AI",
+  "aiModelAdd": "Add Model",
+  "aiModelApiKeyInvalid": "Invalid API Key",
+  "aiModelApiKeyRequired": "Please enter an API Key",
+  "aiModelBaseUrlRequired": "Please enter a Base URL",
+  "aiModelCannotConnect": "Unable to connect",
+  "aiModelConfig": "AI 모델",
+  "aiModelConfigDesc": "API 키와 모델 매개변수 설정",
+  "aiModelConnectionTimeout": "Connection timeout",
+  "aiModelDeleteConfirm": "Are you sure you want to delete \"{name}\"?",
+  "aiModelDeleteTitle": "Delete Model",
+  "aiModelEditTitle": "Edit Model",
+  "aiModelEmptySubtitle": "Add your first AI to let it work for you",
+  "aiModelEmptyTitle": "No AI models yet",
+  "aiModelMaxTokens": "Max Response Tokens",
+  "aiModelModelName": "Model Name",
+  "aiModelModelNameRequired": "Please enter a model name",
+  "aiModelNameError": "Incorrect model name",
+  "aiModelNameRequired": "Please enter a name",
+  "aiModelProvider": "AI Provider",
+  "aiModelProvidersUpdated": "Provider list updated ({count} providers)",
+  "aiModelRefreshProviders": "Refresh provider list",
+  "aiModelRemoteConfigEmpty": "Remote configuration is empty",
+  "aiModelRequestFailed": "Request failed ({code})",
+  "aiModelServerError": "Server error ({code})",
+  "aiModelSetAsDefault": "Set as default model",
+  "aiModelSetDefault": "Set as Default",
+  "aiModelTemperature": "Randomness",
+  "aiModelTest": "Test",
+  "aiModelTestFailed": "Test failed",
+  "aiModelTitle": "AI Model Configuration",
+  "aiModelTooManyRequests": "Too many requests",
+  "aiModelUpdateFailed": "Update failed: {error}",
+  "aiPanel": "AI 패널",
+  "appTitle": "AI 터미널",
+  "appearance": "외관",
+  "appearanceDesc": "다크/라이트 모드, 글꼴 크기, 색상 테마",
+  "appearanceDisplayMode": "Display Mode",
+  "appearanceDisplayModeDesc": "Choose dark or light interface",
+  "appearanceFontSizeDesc": "Drag the slider to adjust terminal text size",
+  "appearanceTitle": "Appearance Settings",
+  "auditLog": "활동 로그",
+  "auditLogAllTitle": "All Audit Logs",
+  "auditLogCopied": "Copied {count} logs to clipboard",
+  "auditLogCopyTooltip": "Copy Records",
+  "auditLogDesc": "누가 언제 어떤 명령을 실행했는지 확인",
+  "auditLogEmpty": "No audit logs",
+  "auditLogExecuted": "Executed",
+  "auditLogExportHeader": "# Audit Log Export",
+  "auditLogExportTime": "# Export time: {time}",
+  "auditLogExportTotal": "# Total: {count}",
+  "auditLogFilterAll": "All Records",
+  "auditLogFilterBlocked": "Only Blocked",
+  "auditLogFilterThisHost": "Only Current Host",
+  "auditLogNoMatch": "No matching records",
+  "auditLogNoRecordsToCopy": "No records to copy",
+  "auditLogNotExecuted": "Not Executed",
+  "auditLogOutput": "Output",
+  "auditLogSafetyBlocked": "Blocked",
+  "auditLogSafetyDanger": "Danger",
+  "auditLogSafetySafe": "Safe",
+  "auditLogSafetyWarning": "Warning",
+  "auditLogSearchHint": "Search command, server, output...",
+  "auditLogTitle": "Audit Log",
+  "authMethod": "인증 방식",
+  "builtinPromptDesc": "AI 시스템의 핵심 프롬프트로 즉시 적용됩니다. 'context' 자리표시자는 서버 정보로 대체됩니다.",
+  "builtinPromptSaved": "기본 제공 프롬프트가 저장되었습니다",
+  "builtinPromptTitle": "기본 제공 시스템 프롬프트",
+  "builtinPromptWarning": "⚠️ 주의하여 편집하세요. 언제든지 재설정할 수 있습니다.",
+  "cancel": "취소",
+  "changeRecordAllTitle": "All Change Records",
+  "changeRecordConfirmRollback": "Confirm Rollback",
+  "changeRecordEmpty": "No change records",
+  "changeRecordEmptyHint": "Changes (such as installing, starting/stopping services) will be recorded automatically",
+  "changeRecordFailed": "Failed",
+  "changeRecordFilterAll": "All Records",
+  "changeRecordFilterRollbackable": "Only Rollbackable",
+  "changeRecordFilterThisHost": "Only Current Host",
+  "changeRecordHostNotConnected": "Server {hostId} is not connected, cannot roll back. Please connect to the server first.",
+  "changeRecordNotRollbackable": "This record does not support automatic rollback",
+  "changeRecordOriginalCommand": "Original command: {command}",
+  "changeRecordRollbackButton": "Rollback",
+  "changeRecordRollbackError": "Rollback error: {error}",
+  "changeRecordRollbackFailed": "Rollback failed: {stderr}",
+  "changeRecordRollbackFailedNoExec": "Rollback failed: cannot execute",
+  "changeRecordRollbackOnHost": "The following rollback command will be executed on server {hostName}:",
+  "changeRecordRollbackSuccess": "Rollback succeeded: {command}",
+  "changeRecordRolledBack": "Rolled Back",
+  "changeRecordRollingBack": "Rolling back: {command}",
+  "changeRecordSuccess": "Success",
+  "changeRecordTitle": "Change Records",
+  "changeRecordTypeFileOperation": "File Operation",
+  "changeRecordTypeInstall": "Install",
+  "changeRecordTypeModifyConfig": "Config Change",
+  "changeRecordTypeOther": "Other",
+  "changeRecordTypePermission": "Permission Change",
+  "changeRecordTypeRestartService": "Restart Service",
+  "changeRecordTypeStartService": "Start Service",
+  "changeRecordTypeStopService": "Stop Service",
+  "changeRecordTypeUninstall": "Uninstall",
+  "changeRecords": "변경 이력",
+  "changeRecordsDesc": "모든 변경 사항을 추적하고 문제 발생 시 되돌리기",
+  "changeWindow": "안전 시간대",
+  "changeWindowAllDayAllowed": "Allowed all day",
+  "changeWindowAllowedWindow": "Allowed Window",
+  "changeWindowCrossDayHint": "Tip: A start time later than the end time means overnight (e.g., 22:00 to next day 06:00)",
+  "changeWindowCurrentWindowInfo": "Current allowed window: {window}\nCommands that make changes will be rejected at other times (read-only commands are not affected).",
+  "changeWindowDesc": "변경을 지정된 안전한 시간대로 제한",
+  "changeWindowEnable": "Enable Safe Window",
+  "changeWindowEnableHint": "When enabled, changes can only be made during the set window",
+  "changeWindowEndHour": "End hour",
+  "changeWindowEveryDay": "{window}, every day",
+  "changeWindowOnlyDays": "{window}, only {days}",
+  "changeWindowSaveConfig": "Save Config",
+  "changeWindowSaveFailed": "Save failed: {error}",
+  "changeWindowSaved": "Safe window settings saved",
+  "changeWindowStartHour": "Start hour",
+  "changeWindowTitle": "Safe Window",
+  "changeWindowToNextDay": "{start} to next day {end}",
+  "changeWindowWeekdayFri": "Fri",
+  "changeWindowWeekdayMon": "Mon",
+  "changeWindowWeekdaySat": "Sat",
+  "changeWindowWeekdaySun": "Sun",
+  "changeWindowWeekdayThu": "Thu",
+  "changeWindowWeekdayTue": "Tue",
+  "changeWindowWeekdayWed": "Wed",
+  "changeWindowWeekdaysTitle": "Which days are allowed (none = every day)",
+  "chatBackToServerList": "Back to server list",
+  "chatClearSession": "Clear session",
+  "chatConnectServerHint": "Please connect to a server first, then tap the AI button in the bottom right on the terminal page",
+  "chatEmptyHint": "e.g. install Docker, check memory usage",
+  "chatEmptyTitle": "How can I help you?",
+  "chatInputHint": "Type a command or question...",
+  "chatNeedTerminal": "AI assistant needs to be used in a terminal",
+  "clearMessagesFailed": "메시지 삭제에 실패했습니다",
+  "close": "닫기",
+  "commonAIAssistant": "AI Assistant",
+  "commonAdvancedSettings": "Advanced Settings",
+  "commonAll": "All",
+  "commonBack": "Back",
+  "commonCancel": "Cancel",
+  "commonCommand": "Command",
+  "commonConfirm": "OK",
+  "commonCopiedToClipboard": "Copied to clipboard",
+  "commonDescription": "Description",
+  "commonExecute": "Execute",
+  "commonGotIt": "Got it",
+  "commonName": "Name",
+  "commonResetDefault": "Reset to Default",
+  "commonUnlimited": "Unlimited",
+  "compactFailed": "대화 압축에 실패했습니다",
+  "compacting": "대화를 압축하는 중...",
+  "confirm": "확인",
+  "connErrAuth": "인증에 실패했습니다. 사용자 이름과 비밀번호/키를 확인하세요",
+  "connErrGeneric": "네트워크 연결과 서버 상태를 확인하세요",
+  "connErrNoRoute": "호스트에 대한 경로가 없습니다. 서버 주소를 확인하세요",
+  "connErrRefused": "서버가 연결을 거부했습니다. SSH 포트를 확인하세요",
+  "connErrTimeout": "연결 시간이 초과되었습니다. 네트워크나 서버 가용성을 확인하세요",
+  "connecting": "연결 중...",
+  "connectionFailed": "연결 실패",
+  "connectionFailedHint": "연결에 실패했습니다. 네트워크와 자격 증명을 확인하세요",
+  "connectionInterrupted": "연결이 중단되었습니다",
+  "connectionManagement": "연결",
+  "connectionSuccess": "연결 성공",
+  "copy": "복사",
+  "customPromptDesc": "AI 시스템 프롬프트에 추가되는 사용자 지정 지시사항입니다. AI 동작, 출력 스타일 등을 조정하는 데 사용됩니다. 비워두면 건너뜁니다.",
+  "customPromptSaved": "사용자 지정 프롬프트가 저장되었습니다",
+  "customPromptTitle": "사용자 지정 AI 프롬프트",
+  "darkMode": "다크 모드",
+  "delete": "삭제",
+  "deleteConfirm": "삭제하시겠습니까?",
+  "edit": "편집",
+  "editServer": "서버 편집",
+  "english": "English",
+  "errApiKeyInvalid": "API 키가 유효하지 않거나 만료되었습니다. 설정에서 업데이트하세요",
+  "errBadRequest": "잘못된 요청입니다. AI 모델 설정(모델 이름, API URL 등)을 확인하세요",
+  "errConnectionError": "AI 서비스에 연결할 수 없습니다. 네트워크와 API URL을 확인하세요",
+  "errConnectionFailed": "연결 실패: {message}",
+  "errConnectionTimeout": "AI 서비스 연결 시간이 초과되었습니다. 네트워크를 확인하세요",
+  "errExecutionError": "실행 오류: {error}",
+  "errRateLimit": "요청이 너무 많습니다. 나중에 다시 시도하세요",
+  "errRequestFailed": "요청 실패({code})",
+  "errServerError": "AI 서버 오류({code})입니다. 나중에 다시 시도하세요",
+  "errorOccurred": "오류가 발생했습니다",
+  "fieldRequired": "이 항목은 필수입니다",
+  "followSystem": "시스템 설정 따르기",
+  "group": "그룹",
+  "hostEditAuthTypeLabel": "Authentication Method *",
+  "hostEditConfigSavedButCredFailed": "⚠️ Configuration saved, but {error}. Please retry.",
+  "hostEditConnectionTimeout": "Connection timeout: {timeout}s",
+  "hostEditDefaultGroup": "Default",
+  "hostEditEncodingLabel": "Character Encoding",
+  "hostEditGroupHint": "Enter or select a group",
+  "hostEditGroupLabel": "Group",
+  "hostEditHostHint": "IP address or domain",
+  "hostEditHostLabel": "Host Address *",
+  "hostEditHostRequired": "Please enter the host address",
+  "hostEditJumpAuthTypeLabel": "Jump Host Authentication",
+  "hostEditJumpHostFlowHint": "Will first connect to the jump host, then forward to the target server through it",
+  "hostEditJumpHostLabel": "Jump Host Address *",
+  "hostEditJumpPasswordLabel": "Jump Host Password",
+  "hostEditJumpPortLabel": "Jump Host Port",
+  "hostEditJumpPrivateKeyContent": "Jump Host Private Key Content",
+  "hostEditJumpUsernameLabel": "Jump Host Username",
+  "hostEditMoreSettings": "More Settings",
+  "hostEditNameHint": "e.g., Production Server",
+  "hostEditNameLabel": "Name *",
+  "hostEditNameRequired": "Please enter a name",
+  "hostEditPassphraseLabel": "Passphrase (optional)",
+  "hostEditPassword": "Password",
+  "hostEditPasswordSaveFailed": "Failed to save password",
+  "hostEditPastePrivateKey": "Paste Private Key",
+  "hostEditPastePrivateKeySubtitle": "Turn off to select from file",
+  "hostEditPortLabel": "Port",
+  "hostEditPrivateKey": "Private Key",
+  "hostEditPrivateKeyContent": "Private Key Content",
+  "hostEditPrivateKeyFileRead": "Private key file loaded: {name}",
+  "hostEditPrivateKeySaveFailed": "Failed to save private key",
+  "hostEditReadFileFailed": "Failed to read file: {error}",
+  "hostEditSave": "💾 Save",
+  "hostEditSaveSuccess": "✅ Saved successfully",
+  "hostEditSectionAuth": "Authentication",
+  "hostEditSectionBasic": "Basic Information",
+  "hostEditSectionGroupTag": "Group & Tag",
+  "hostEditSectionJumpHost": "Jump Host / Bastion",
+  "hostEditSectionSudo": "Privilege Escalation (sudo)",
+  "hostEditSelect": "Select",
+  "hostEditSelectGroupTooltip": "Select an existing group",
+  "hostEditSelectPrivateKeyFile": "Select Private Key File",
+  "hostEditSudoPasswordDesc": "Once configured, this password will be auto-filled when AI encounters a sudo password prompt. It is saved via system secure storage and never appears in commands or logs.",
+  "hostEditSudoPasswordHint": "Auto-injected when AI runs sudo commands",
+  "hostEditSudoPasswordLabel": "Sudo Password (optional)",
+  "hostEditTagColor": "Tag Color",
+  "hostEditTimeoutSeconds": "{timeout}s",
+  "hostEditTitleEdit": "Edit Server",
+  "hostEditTitleNew": "New Server",
+  "hostEditUseJumpHost": "Use Jump Host",
+  "hostEditUseJumpHostSubtitle": "Connect via jump host / bastion",
+  "hostEditUsernameLabel": "Username",
+  "hostListAITipIntro": "AI assistant is available after connecting to a server:",
+  "hostListAITipNote": "💡 AI can help you generate commands, explain output, and troubleshoot issues",
+  "hostListAITipStep1": "1️⃣  Tap a server card to open the terminal",
+  "hostListAITipStep2": "2️⃣  After connecting, the AI button appears in the bottom right",
+  "hostListAITipStep3": "3️⃣  Tap the AI button to start the smart command assistant",
+  "hostListAITipTitle": "AI assistant usage tips",
+  "hostListAddFirstServer": "Add your first server to start AI-assisted remote management",
+  "hostListClearSearch": "Clear search",
+  "hostListConnectTerminal": "Connect terminal",
+  "hostListDeleteConfirm": "Are you sure you want to delete \"{hostName}\"?\n\nSaved credentials will also be deleted.",
+  "hostListDeleteServer": "Delete server",
+  "hostListDeleteSuccess": "Deleted successfully",
+  "hostListEditConfig": "Edit configuration",
+  "hostListLoadFailed": "Failed to load: {error}",
+  "hostListNoSearchResults": "No matching servers found",
+  "hostListNoSearchResultsHint": "Try different keywords or check spelling",
+  "hostListNoServers": "No servers yet",
+  "hostListSearchHint": "Search servers...",
+  "knowledgeBase": "지식 베이스",
+  "knowledgeBaseDesc": "최신 가이드로 명령어 매뉴얼 업데이트",
+  "language": "언어",
+  "languageDesc": "인터페이스 언어 선택",
+  "languageDialogTitle": "Select Language",
+  "languageFollowSystem": "Follow System",
+  "lightMode": "라이트 모드",
+  "menuItemBuiltinPrompt": "기본 제공 프롬프트",
+  "menuItemCustomPrompt": "사용자 지정 프롬프트",
+  "messageSaveFailed": "메시지 저장에 실패했습니다. 작업이 시작되지 않았습니다",
+  "name": "이름",
+  "nickname": "별명",
+  "noCredentials": "❌ 자격 증명을 찾을 수 없습니다\n\n서버를 편집하여 비밀번호 또는 개인 키를 입력하세요.",
+  "notificationAlways": "Every time",
+  "notificationAlwaysSubtitle": "Send a notification when a task finishes or fails",
+  "notificationEnable": "Enable task completion notifications",
+  "notificationEnableHint": "Automatically send a message when a task finishes or fails",
+  "notificationEnterUrlFirst": "Please fill in the notification URL first",
+  "notificationFailedOnly": "Only on failure",
+  "notificationFailedOnlySubtitle": "Only send a notification when a task fails",
+  "notificationInstructionsBody": "1. Add a \"bot\" in your DingTalk/Feishu/WeCom group to get the webhook URL\n2. Paste the URL into the input box above\n3. Click \"Send test notification\" to check if you can receive it\n4. From now on, a message will be sent to the group automatically when a task finishes or fails",
+  "notificationInstructionsTitle": "Instructions",
+  "notificationInvalidUrl": "Invalid URL format: {error}",
+  "notificationSaveConfig": "Save Config",
+  "notificationSaveFailed": "Save failed: {error}",
+  "notificationSaved": "Notification settings saved",
+  "notificationSendTest": "Send test notification",
+  "notificationSending": "Sending...",
+  "notificationTestFailed": "Test failed: {error}",
+  "notificationTestSendFailed": "Send failed, please check the notification URL",
+  "notificationTestSent": "Test notification sent, please check your group",
+  "notificationTitle": "Task Completion Notifications",
+  "notificationTriggerTitle": "When to send notifications",
+  "notificationWebhookSupport": "Supports: DingTalk, Feishu, WeCom group, Slack, etc.",
+  "notificationWebhookUrl": "Webhook URL",
+  "notifications": "알림",
+  "notificationsDesc": "작업 완료 시 메시지 받기",
+  "ok": "확인",
+  "password": "비밀번호",
+  "passwordAuth": "비밀번호",
+  "pleaseConfigAIModel": "먼저 AI 모델을 설정하세요",
+  "port": "포트",
+  "privateKey": "개인 키",
+  "privateKeyAuth": "개인 키",
+  "quickCommands": "스니펫",
+  "quickCommandsDesc": "자주 쓰는 명령어를 저장해 한 번에 실행",
+  "retry": "재시도",
+  "runbookBuiltinCannotDelete": "Built-in templates cannot be deleted",
+  "runbookBuiltinNotEditable": "Built-in templates are not editable. Use \"Clone\" to create a copy and modify it.",
+  "runbookBuiltinTag": "Built-in",
+  "runbookCategoryCustom": "Custom",
+  "runbookCategoryDeployment": "Deployment",
+  "runbookCategoryInspection": "Inspection",
+  "runbookCategoryMaintenance": "Maintenance",
+  "runbookCategorySecurity": "Security",
+  "runbookCategoryTroubleshooting": "Troubleshooting",
+  "runbookClipboardEmpty": "Clipboard is empty",
+  "runbookCloneTooltip": "Clone",
+  "runbookClonedToast": "Cloned as custom runbook: {name}",
+  "runbookContentAgent": "Prompt Content",
+  "runbookContentAgentHint": "e.g., Check disk usage of '{host}' and provide suggestions",
+  "runbookContentCommand": "Command Content",
+  "runbookContentCommandHint": "e.g., ssh '{user}'@'{host}' df -h",
+  "runbookContentRequired": "Please enter the content",
+  "runbookCreate": "Create",
+  "runbookDeleteConfirm": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
+  "runbookDeleteTitle": "Delete Runbook",
+  "runbookDeleteTooltip": "Delete",
+  "runbookDeletedToast": "Deleted",
+  "runbookEditTitle": "Edit Runbook",
+  "runbookEditTooltip": "Edit",
+  "runbookEmptyFiltered": "No matching runbooks. Try adjusting the filters.",
+  "runbookEmptyHint": "Tap the bottom-right button to create a runbook",
+  "runbookEmptyTitle": "No runbooks yet",
+  "runbookFieldCategory": "Category",
+  "runbookFieldDescription": "Description (optional)",
+  "runbookFieldIcon": "Icon",
+  "runbookFieldName": "Name",
+  "runbookFieldType": "Type",
+  "runbookFilterAll": "All",
+  "runbookImportButton": "Import",
+  "runbookImportHint": "Copy JSON from the official open platform and paste it here",
+  "runbookImportPasteHint": "Paste JSON content here…",
+  "runbookImportSuccess": "Successfully imported {count} runbooks",
+  "runbookImportTitle": "Import Runbooks",
+  "runbookImportTooltip": "Import Runbook",
+  "runbookJsonParseFailed": "JSON parse failed: {error}",
+  "runbookNameRequired": "Please enter a name",
+  "runbookNewTitle": "New Runbook",
+  "runbookPasteFromClipboard": "Paste from Clipboard",
+  "runbookPasteJsonFirst": "Please paste JSON content first",
+  "runbookRunCount": "Run {count} times",
+  "runbookSearchHint": "Search runbook name or description",
+  "runbookTitle": "Runbooks",
+  "runbookTypeAgentDesc": "Natural language prompt, executed by AI via ReAct framework",
+  "runbookTypeAgentOption": "AI Execute",
+  "runbookTypeAgentTag": "AI Execute",
+  "runbookTypeCommand": "Direct Execute",
+  "runbookTypeCommandDesc": "Execute commands directly in terminal after variable substitution",
+  "runbookUseInTerminal": "Please use this in the terminal page",
+  "runbooks": "런북",
+  "runbooksDesc": "반복 업무를 재사용 가능한 템플릿으로",
+  "save": "저장",
+  "scrollToBottom": "맨 아래로 스크롤",
+  "search": "검색",
+  "securityAllDataCleared": "All data has been cleared",
+  "securityAppLockSubtitleOff": "When disabled, no verification is needed to open the app",
+  "securityAppLockSubtitleOn": "Opening the app requires {biometricType} or password",
+  "securityAuditLogSubtitle": "View the execution record of each command",
+  "securityAuditLogTitle": "Audit Log",
+  "securityAuthenticateReason": "Verify your identity to enable app lock",
+  "securityBiometricFaceId": "Face ID",
+  "securityBiometricFingerprint": "Fingerprint",
+  "securityBiometricGeneric": "Biometrics",
+  "securityBiometricNotSupported": "⚠️ Device does not support fingerprint or face ID",
+  "securityBiometricStatusTitle": "Fingerprint / Face ID Status",
+  "securityBiometricSupported": "✅ Supports {biometricType}",
+  "securityClearAllData": "Clear All Data",
+  "securityClearAllDataSubtitle": "Delete all servers, chat history, and passwords (irreversible)",
+  "securityClearConfirmPrompt": "Please type DELETE to confirm:",
+  "securityClearFailed": "Clear failed: {error}",
+  "securityClearIrreversible": "This action cannot be undone!",
+  "securityClearItemAiModels": "• AI model settings",
+  "securityClearItemChats": "• Chat history",
+  "securityClearItemPasswords": "• All passwords",
+  "securityClearItemServers": "• Server list",
+  "securityClearItemSnippets": "• Quick commands",
+  "securityClearWarning": "This action will delete all data, including:",
+  "securityConfirmDelete": "Confirm Delete",
+  "securityDangerAction": "⚠️ Dangerous Action",
+  "securityEnableAppLock": "Enable App Lock",
+  "securitySettings": "보안",
+  "securitySettingsDesc": "지문 또는 Face ID로 앱 잠금 해제",
+  "securityTitle": "Security Settings",
+  "selectFile": "파일 선택",
+  "send": "전송",
+  "serverList": "서버",
+  "serverListDesc": "원격 서버를 추가하고 관리",
+  "settings": "설정",
+  "settingsAI": "AI & Intelligence",
+  "settingsAIModel": "AI Model Config",
+  "settingsAIModelDesc": "Configure AI API key and model",
+  "settingsAbout": "About",
+  "settingsAboutApp": "About AI Terminal",
+  "settingsAgent": "Agent Settings",
+  "settingsAgentDesc": "Max auto-execute steps (0 = unlimited: {steps})",
+  "settingsAppearance": "Appearance",
+  "settingsAppearanceSettings": "Appearance",
+  "settingsAppearanceSettingsDesc": "Switch dark/light mode, adjust font size",
+  "settingsAuditLog": "Activity Log",
+  "settingsAuditLogDesc": "Records who ran each command and when",
+  "settingsChangeRecords": "Change Records",
+  "settingsChangeRecordsDesc": "Track all changes, undo if something goes wrong",
+  "settingsChangeWindow": "Safe Hours",
+  "settingsChangeWindowDesc": "Set safe time windows; changes blocked outside them",
+  "settingsCheckUpdate": "Check for Updates",
+  "settingsConnection": "Connections",
+  "settingsHosts": "Servers",
+  "settingsHostsDesc": "Add and edit remote servers to connect to",
+  "settingsKnowledge": "Command Manual",
+  "settingsKnowledgeDesc": "Update command manual for latest install guides",
+  "settingsLanguage": "Language",
+  "settingsLanguageDesc": "Choose interface language",
+  "settingsNotification": "Task Notifications",
+  "settingsNotificationDesc": "Get notified when a task finishes",
+  "settingsRunbooks": "Runbooks",
+  "settingsRunbooksDesc": "Turn common ops tasks into templates, run in one tap",
+  "settingsSecurity": "Security",
+  "settingsSecurityDesc": "Unlock the app with fingerprint or Face ID",
+  "settingsSnippets": "Snippets",
+  "settingsSnippetsDesc": "Save frequently used commands for one-tap execution",
+  "settingsTitle": "Settings",
+  "settingsVersion": "Version 1.3.4",
+  "simplifiedChinese": "简体中文",
+  "snippetCommandHint": "e.g., docker exec -it '{container}' /bin/bash",
+  "snippetCommandLabel": "Command:",
+  "snippetCommandRequired": "Please enter the command",
+  "snippetCopyCommand": "Copy Command",
+  "snippetDeleteConfirm": "Are you sure you want to delete \"{name}\"?",
+  "snippetDeleteTitle": "Delete Snippet",
+  "snippetEditTitle": "Edit Snippet",
+  "snippetEmptyHint": "Tap the button below to add one",
+  "snippetEmptyTitle": "No snippets yet",
+  "snippetFieldCommand": "Command",
+  "snippetFieldDescription": "Description (optional)",
+  "snippetNameRequired": "Please enter a name",
+  "snippetNewTitle": "New Snippet",
+  "snippetResolvedCommand": "Command: {command}",
+  "snippetTitle": "Snippets",
+  "taskAborted": "⚠️ 작업이 중단되었습니다",
+  "taskCancelled": "⚠️ 작업이 취소되었습니다",
+  "taskCompleted": "작업이 완료되었습니다",
+  "taskExecutionError": "⚠️ 작업 실행 오류",
+  "taskFailed": "작업이 실패했습니다",
+  "taskMaxSteps": "최대 단계에 도달하여 작업이 중단되었습니다",
+  "taskTerminated": "작업이 종료되었습니다",
+  "terminalAgentLog": "Agent log",
+  "terminalClearScreen": "Clear screen",
+  "terminalCloseTabConfirm": "Closing this tab will cancel the running task. Are you sure?",
+  "terminalCollapseAIPanel": "Collapse AI panel",
+  "terminalCollapseMonitorPanel": "Collapse monitor panel",
+  "terminalCommandLabel": "Command: {command}",
+  "terminalCommandTemplate": "Command template:",
+  "terminalCompactingHistory": "AI is compressing conversation history",
+  "terminalCompactionDone": "Memory compression completed",
+  "terminalCompactionFailed": "Compression failed: {error}",
+  "terminalConfigure": "Configure",
+  "terminalConnectHostFailed": "Failed to connect to {hostName}: {error}",
+  "terminalConnectTerminalFirst": "Please connect to a terminal first",
+  "terminalConnectTerminalForCommand": "Please connect to a terminal before executing commands",
+  "terminalConnectTerminalForRunbook": "Please connect to a terminal (SSH or local) before using runbooks",
+  "terminalConnected": "Connected",
+  "terminalConnecting": "Connecting to {host}...",
+  "terminalCreateNew": "+ New",
+  "terminalCustomPromptHint": "e.g. respond in English, use concise output format, prefer Docker...",
+  "terminalExitOrchestrator": "Exit orchestration mode",
+  "terminalExpandAIPanel": "Expand AI panel",
+  "terminalExpandMonitorPanel": "Expand monitor panel",
+  "terminalFillVariables": "Fill variables - {name}",
+  "terminalFontSize": "터미널 글꼴 크기: {size}px",
+  "terminalHostNoCredentials": "{hostName} has no credentials configured. Please edit the server first.",
+  "terminalHostNotFound": "Host not found",
+  "terminalInputHintDefault": "Describe your request, Agent will execute automatically...",
+  "terminalInputHintDisconnected": "Available after connecting to a terminal",
+  "terminalInputHintEmpty": "Type a request to start auto-execution...",
+  "terminalInputHintOrchestrator": "Multi-host orchestration mode: describe cross-host tasks, e.g. \"sync time on all servers\"",
+  "terminalInputHintRunning": "Agent is running...",
+  "terminalLayoutBottom": "Bottom",
+  "terminalLayoutRight": "Right",
+  "terminalLocalStartFailed": "Failed to start local terminal",
+  "terminalLocalStartFailedWithError": "Failed to start local terminal: {error}",
+  "terminalManage": "Manage",
+  "terminalMaxSteps": "Max steps",
+  "terminalMaxStepsDesc": "Maximum execution steps in Agent auto mode. Set to 0 for unlimited; complex tasks will not be interrupted.",
+  "terminalMaxStepsLabel": "Steps (0 = unlimited)",
+  "terminalMaxStepsSet": "Max steps set to {value}",
+  "terminalMaxStepsTitle": "Maximum execution steps",
+  "terminalModel": "Model",
+  "terminalMonitor": "Monitor",
+  "terminalNewConnection": "New connection",
+  "terminalNoHostsSaved": "No saved hosts\nPlease add a server on the home page first",
+  "terminalNoRunbooks": "No runbooks available",
+  "terminalNoRunbooksHint": "Click \"Manage\" to create a runbook",
+  "terminalNotConnected": "자동 모드를 사용하려면 먼저 터미널에 연결하세요",
+  "terminalNotReady": "터미널이 연결되지 않았습니다. 먼저 연결하세요",
+  "terminalOffline": "Offline",
+  "terminalOrchestratorConnected": "{connected}/{total} connected",
+  "terminalOrchestratorHostList": "Multi-host orchestration · Host list",
+  "terminalOrchestratorMode": "Orchestrate · {connected}/{total}",
+  "terminalReadOnlyOff": "Read-only mode (Dry-run)",
+  "terminalReadOnlyOn": "Read-only mode is on (click to turn off)",
+  "terminalReconnect": "Reconnect",
+  "terminalRoleYou": "You",
+  "terminalRunbookTemplates": "Runbook templates",
+  "terminalRunbookTypeCommand": "Command",
+  "terminalSelectServerForNewTab": "Select a server to connect in a new tab",
+  "terminalSessionCreated": "New session created",
+  "terminalSessionHistory": "Session history",
+  "terminalStatusNotConnected": "Not connected",
+  "terminalTaskRunning": "Task is running",
+  "terminalUnfilledVariables": "Some variables are unfilled. Execution cancelled.",
+  "testConnection": "연결 테스트",
+  "themeMode": "테마 모드",
+  "thinkingNextStep": "🤔 다음 단계를 생각하는 중...",
+  "toolRetryExhausted": "도구 재시도 한도를 초과하여 작업이 종료되었습니다",
+  "username": "사용자 이름",
+  "@aiModelDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@aiModelProvidersUpdated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@aiModelRequestFailed": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "@aiModelServerError": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "@aiModelUpdateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@auditLogCopied": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@auditLogExportTime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@auditLogExportTotal": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@changeRecordHostNotConnected": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordOriginalCommand": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordRollbackError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordRollbackFailed": {
+    "placeholders": {
+      "stderr": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordRollbackOnHost": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordRollbackSuccess": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordRollingBack": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeWindowCurrentWindowInfo": {
+    "placeholders": {
+      "window": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeWindowEveryDay": {
+    "placeholders": {
+      "window": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeWindowOnlyDays": {
+    "placeholders": {
+      "window": {
+        "type": "String"
+      },
+      "days": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeWindowSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeWindowToNextDay": {
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "@errConnectionFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "@errExecutionError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@errRequestFailed": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "@errServerError": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "@hostEditConfigSavedButCredFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@hostEditConnectionTimeout": {
+    "placeholders": {
+      "timeout": {
+        "type": "int"
+      }
+    }
+  },
+  "@hostEditPrivateKeyFileRead": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@hostEditReadFileFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@hostEditTimeoutSeconds": {
+    "placeholders": {
+      "timeout": {
+        "type": "int"
+      }
+    }
+  },
+  "@hostListDeleteConfirm": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      }
+    }
+  },
+  "@hostListLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@notificationInvalidUrl": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@notificationSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@notificationTestFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@runbookClonedToast": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@runbookDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@runbookImportSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@runbookJsonParseFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@runbookRunCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@securityAppLockSubtitleOn": {
+    "placeholders": {
+      "biometricType": {
+        "type": "String"
+      }
+    }
+  },
+  "@securityBiometricSupported": {
+    "placeholders": {
+      "biometricType": {
+        "type": "String"
+      }
+    }
+  },
+  "@securityClearFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@settingsAgentDesc": {
+    "placeholders": {
+      "steps": {
+        "type": "int"
+      }
+    }
+  },
+  "@snippetDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@snippetResolvedCommand": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalCommandLabel": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalCompactionFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalConnectHostFailed": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalConnecting": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalFillVariables": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalFontSize": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "@terminalHostNoCredentials": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalLocalStartFailedWithError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalMaxStepsSet": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "@terminalOrchestratorConnected": {
+    "placeholders": {
+      "connected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@terminalOrchestratorMode": {
+    "placeholders": {
+      "connected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "monitorCollecting": "수집 중",
+  "monitorWaitingData": "데이터 대기 중",
+  "monitorMemory": "메모리",
+  "monitorUpload": "업로드",
+  "monitorDownload": "다운로드",
+  "monitorDisk": "디스크",
+  "monitorUptime": "가동 시간",
+  "monitorUser": "사용자",
+  "monitorNetTotalDown": "총 다운로드 속도",
+  "monitorNetTotalUp": "총 업로드 속도",
+  "monitorNetTotalDownloaded": "누적 다운로드",
+  "monitorNetTotalUploaded": "누적 업로드",
+  "monitorNetInterfaceCount": "인터페이스 수",
+  "monitorNetInterfaceDetail": "인터페이스 상세",
+  "monitorNetColInterface": "인터페이스",
+  "monitorNetColTraffic": "총 트래픽 ↓/↑",
+  "monitorNetColRate": "속도 ↓/↑",
+  "monitorNetColIssues": "오류/드롭",
+  "monitorDiskTotal": "전체 용량",
+  "monitorDiskUsed": "사용 중",
+  "monitorDiskAvailable": "사용 가능",
+  "monitorDiskOverallUsage": "전체 사용률",
+  "monitorDiskPartitionCount": "파티션 수",
+  "monitorDiskPartitionDetail": "파티션 상세",
+  "monitorDiskColMount": "마운트 지점",
+  "monitorDiskColUsage": "사용/전체",
+  "monitorDiskColPercent": "사용률",
+  "monitorCpuDetail": "CPU 상세",
+  "monitorCpuTotalUsage": "전체 사용률",
+  "monitorCpuUser": "사용자",
+  "monitorCpuSystem": "시스템",
+  "monitorCpuIdle": "유휴",
+  "monitorLoad1": "1분 부하",
+  "monitorLoad5": "5분 부하",
+  "monitorLoad15": "15분 부하",
+  "monitorProcessCount": "프로세스 수",
+  "monitorMemoryDetail": "메모리 상세",
+  "monitorMemoryTotal": "전체 메모리",
+  "monitorMemoryFree": "여유",
+  "monitorMemoryCached": "캐시",
+  "monitorMemoryBuffers": "버퍼",
+  "monitorMemoryUsage": "사용률",
+  "monitorSwapTotal": "Swap 전체",
+  "monitorSwapUsed": "Swap 사용",
+  "monitorDiskDetail": "디스크 상세",
+  "monitorDiskTotal2": "전체",
+  "monitorDiskUsage": "사용률",
+  "monitorNetDetail": "네트워크 상세",
+  "monitorUserSession": "사용자 및 세션",
+  "monitorLoginUsers": "로그인 사용자 수",
+  "monitorSystemInfo": "시스템 정보",
+  "monitorUptimeLabel": "가동 시간",
+  "monitorKernelVersion": "커널 버전",
+  "monitorErrorCollecting": "수집 중",
+  "monitorErrorNotConnected": "연결 안 됨",
+  "monitorErrorEmptyOutput": "수집 출력이 비어 있음",
+  "terminalLocalTab": "로컬",
+  "sessionNew": "새로 만들기",
+  "sessionNoSessions": "세션 없음",
+  "sessionCompressed": "압축됨",
+  "sessionRename": "이름 변경",
+  "sessionRenameTitle": "세션 이름 변경",
+  "sessionRenameHint": "세션 이름 입력",
+  "sessionDeleteTitle": "세션 삭제?",
+  "runbookJsonTopLevelArray": "JSON 최상위는 배열이어야 합니다",
+  "hostDefaultGroup": "기본",
+  "orchEnterMode": "다중 호스트 오케스트레이션 모드 진입",
+  "orchExitMode": "오케스트레이션 모드 종료",
+  "orchInvalidTarget": "targetHost 형식이 잘못됨 (IP 또는 도메인 문자만 허용)",
+  "orchConnectTimeout": "연결 시간 초과 또는 거부됨",
+  "orchNoHostsConfigured": "(구성된 호스트 없음)",
+  "orchHostConnected": "연결됨",
+  "orchHostDisconnected": "연결 끊김",
+  "orchNoOutput": "(출력 없음)",
+  "orchUnknown": "알 수 없음",
+  "orchUnreachable": "접근 불가",
+  "orchToolNoOutput": "(출력 없음)",
+  "orchToolHostIdsEmpty": "hostIds 파싱 후 비어 있음",
+  "orchToolConnParamMissing": "매개변수 누락 또는 무효: fromHostId, targetHost, port(양의 정수) 필수",
+  "orchToolUploadParamMissing": "매개변수 누락: hostId, local, remote 필수",
+  "orchToolLocalIsDir": "로컬 경로가 디렉터리임, recursive=true 설정 시 재귀 업로드",
+  "orchAgentRunning": "Agent가 작업 실행 중, 완료 대기",
+  "orchInputTruncated": "...(입력이 너무 김, 잘림)",
+  "orchSkippedPreviousFailed": "건너뜀 (이전 호스트 실패)",
+  "monitorCollectingFailed": "수집 실패 (연속 {count}회)",
+  "monitorNetMoreInterfaces": "{count}개 인터페이스 미표시",
+  "sessionMessageCount": "메시지 {count}개",
+  "sessionDeleteConfirm": "세션 \"{title}\"의 모든 메시지와 로그가 영구적으로 삭제되며 복구할 수 없습니다.",
+  "runbookCopy": "{name} (사본)",
+  "orchHostNotConnected": "호스트 {hostId} 연결 안 됨",
+  "orchExecException": "실행 예외: {error}",
+  "orchSourceNotConnected": "소스 호스트 {hostId} 연결 안 됨",
+  "orchProbeException": "프로브 예외: {error}",
+  "orchBatchExec": "일괄 실행: {command}",
+  "orchBatchResult": "결과: {success}/{total} 성공",
+  "orchErrorPrefix": "오류: {detail}",
+  "orchToolParamMissing": "매개변수 누락: {params} 필수",
+  "orchToolHostNotConnected": "호스트 {hostId} 연결 안 됨 또는 존재하지 않음",
+  "orchToolHostFailed": "호스트 {hostId} 명령 실패 (exit={exitCode})",
+  "orchToolBatchProgress": "일괄 실행: {command} → {count}개 호스트",
+  "orchToolBatchFailed": "{failed}/{total}개 호스트 실패",
+  "orchToolConnProgress": "[{fromHostId} → {targetHost}:{port}] 연결 테스트 중...",
+  "orchToolNotSshSession": "호스트 {hostId}는 SSH 원격 세션이 아님, SFTP 업로드 불가",
+  "orchToolSshNotEstablished": "호스트 {hostId}의 SSH 연결이 설정되지 않음",
+  "orchToolLocalNotFound": "로컬 경로가 존재하지 않음: {path}",
+  "orchToolSftpOpening": "[{hostId}] SFTP 하위 시스템 여는 중...",
+  "orchToolExecProgress": "[{hostId}] 실행: {command}",
+  "orchTaskAbnormal": "⚠️ 작업 비정상 종료: {error}",
+  "@monitorCollectingFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@monitorNetMoreInterfaces": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@sessionMessageCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@sessionDeleteConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "@runbookCopy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchHostNotConnected": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchExecException": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchSourceNotConnected": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchProbeException": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchBatchExec": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchBatchResult": {
+    "placeholders": {
+      "success": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@orchErrorPrefix": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolParamMissing": {
+    "placeholders": {
+      "params": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolHostNotConnected": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolHostFailed": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      },
+      "exitCode": {
+        "type": "int"
+      }
+    }
+  },
+  "@orchToolBatchProgress": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@orchToolBatchFailed": {
+    "placeholders": {
+      "failed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@orchToolConnProgress": {
+    "placeholders": {
+      "fromHostId": {
+        "type": "String"
+      },
+      "targetHost": {
+        "type": "String"
+      },
+      "port": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolNotSshSession": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolSshNotEstablished": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolLocalNotFound": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolSftpOpening": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolExecProgress": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      },
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchTaskAbnormal": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  }
+}

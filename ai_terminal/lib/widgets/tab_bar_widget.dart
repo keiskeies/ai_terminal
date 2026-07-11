@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../core/constants.dart';
+import '../core/theme_colors.dart';
 import '../providers/terminal_provider.dart';
+import '../l10n/app_localizations.dart';
 
 class TabBarWidget extends StatelessWidget {
   final List<TerminalTab> tabs;
@@ -20,12 +22,13 @@ class TabBarWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     return Container(
       height: hTabBar,
       decoration: BoxDecoration(
-        color: cBg,
+        color: tc.bg,
         border: Border(
-          bottom: BorderSide(color: cBorder.withValues(alpha: 0.6), width: 1),
+          bottom: BorderSide(color: tc.border.withValues(alpha: 0.6), width: 1),
         ),
       ),
       child: ListView.builder(
@@ -60,8 +63,10 @@ class _AddTabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Tooltip(
-      message: '新连接',
+      message: l10n.terminalNewConnection,
       child: GestureDetector(
         onTap: onTap,
         child: Container(
@@ -69,11 +74,11 @@ class _AddTabButton extends StatelessWidget {
           height: 32,
           margin: const EdgeInsets.only(left: 2, right: 2, top: 0, bottom: 0),
           decoration: BoxDecoration(
-            color: cSurface,
+            color: tc.surface,
             borderRadius: BorderRadius.circular(rSmall),
-            border: Border.all(color: cBorder.withValues(alpha: 0.3)),
+            border: Border.all(color: tc.border.withValues(alpha: 0.3)),
           ),
-          child: const Icon(Icons.add, size: 16, color: cTextSub),
+          child: Icon(Icons.add, size: 16, color: tc.textSub),
         ),
       ),
     );
@@ -102,11 +107,12 @@ class _TabItemState extends State<_TabItem> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     final isActive = widget.isActive;
     final bgColor = isActive
-        ? cCard
+        ? tc.card
         : _isHovered
-            ? cSurface
+            ? tc.surface
             : Colors.transparent;
 
     return GestureDetector(
@@ -129,8 +135,8 @@ class _TabItemState extends State<_TabItem> {
             border: isActive
                 ? Border(
                     top: const BorderSide(color: cPrimary, width: 2),
-                    left: BorderSide(color: cBorder.withValues(alpha: 0.3), width: 0.5),
-                    right: BorderSide(color: cBorder.withValues(alpha: 0.3), width: 0.5),
+                    left: BorderSide(color: tc.border.withValues(alpha: 0.3), width: 0.5),
+                    right: BorderSide(color: tc.border.withValues(alpha: 0.3), width: 0.5),
                   )
                 : null,
           ),
@@ -155,7 +161,7 @@ class _TabItemState extends State<_TabItem> {
                 child: Text(
                   widget.tab.title,
                   style: TextStyle(
-                    color: isActive ? cTextMain : cTextSub,
+                    color: isActive ? tc.textMain : tc.textSub,
                     fontSize: fSmall,
                     fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
                   ),
@@ -173,13 +179,13 @@ class _TabItemState extends State<_TabItem> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(rXSmall),
                     color: _isHovered
-                        ? cBorder.withValues(alpha: 0.5)
+                        ? tc.border.withValues(alpha: 0.5)
                         : Colors.transparent,
                   ),
                   child: Icon(
                     Icons.close,
                     size: 12,
-                    color: _isHovered ? cTextSub : cTextMuted,
+                    color: _isHovered ? tc.textSub : tc.textMuted,
                   ),
                 ),
               ),

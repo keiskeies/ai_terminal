@@ -1,8 +1,10 @@
+import '../services/daos.dart';
+
 /// 判断文本是否是描述性文字（而非命令）
 bool isDescriptiveText(String text) {
   // 中文字符占比过高
   final chineseCount = RegExp(r'[\u4e00-\u9fa5]').allMatches(text).length;
-  if (text.length > 0 && chineseCount / text.length > 0.5) return true;
+  if (text.isNotEmpty && chineseCount / text.length > 0.5) return true;
   // 常见的说明性开头
   final descriptiveStarts = ['请', '可以', '需要', '应该', '将', '这个', '该',
     '命令', '说明', '例如', '如下', '包括', '用于', '表示', '输出', '结果',
@@ -91,22 +93,35 @@ bool isTaskComplete(String response) {
 /// - 长时间运行类（安全扫描/包管理/系统信息/大文件操作）：10 分钟
 /// - 中等耗时类（服务状态/日志/进程/编译/下载）：3 分钟
 /// - 默认：60 秒
+/// 用户可通过设置 `commandTimeoutMultiplier` 调整超时倍数（如 2.0 = 所有超时翻倍）
 Duration getCommandTimeout(String command) {
   final cmd = command.trim().toLowerCase();
 
+  // 读取用户配置的超时倍数（默认 1.0，clamp 到 [0.5, 10.0]）
+  // 下限 0.5：低于此值时 (3 * multiplier).round() 会归零，导致 medium 命令瞬间超时
+  double multiplier = 1.0;
+  try {
+    final saved = SettingsDao.getCached('commandTimeoutMultiplier');
+    if (saved != null) {
+      multiplier = (double.tryParse(saved.toString()) ?? 1.0).clamp(0.5, 10.0);
+    }
+  } catch (_) {}
+
   // 10 分钟：长时间运行类
-  const longTimeout = Duration(minutes: 10);
+  final longTimeout = Duration(minutes: (10 * multiplier).round());
   const longPrefixes = <String>[
     // 安全扫描
     'lynis', 'nikto', 'nmap', 'clamscan', 'rkhunter', 'chkrootkit', 'aide',
-    // 包管理（安装/升级/更新）
+    // 包管理（安装/升级/更新/卸载）
     'apt install', 'apt-get install', 'apt upgrade', 'apt-get upgrade',
     'apt update', 'apt-get update', 'apt dist-upgrade',
+    'apt autoremove', 'apt remove', 'apt purge',
     'yum install', 'yum update', 'yum upgrade',
     'dnf install', 'dnf update', 'dnf upgrade',
     'apk add', 'pacman -S', 'pacman -Syu',
-    'pip install', 'pip3 install', 'npm install', 'yarn install',
-    'gem install', 'cargo install', 'go install', 'composer install',
+    'pip install', 'pip3 install', 'npm install', 'npm ci',
+    'yarn install', 'gem install', 'cargo install',
+    'go install', 'composer install',
     'brew install', 'brew upgrade', 'winget install', 'choco install',
     'scoop install',
     // 系统信息/补丁
@@ -118,13 +133,25 @@ Duration getCommandTimeout(String command) {
     // 编译构建（可能较长）
     'make', 'cmake', 'cargo build', 'npm run build', 'yarn build',
     'gradle build', 'mvn ', 'mvn clean',
+    // 基础设施编排（可达数十分钟）
+    'terraform apply', 'terraform plan', 'terraform destroy',
+    'ansible-playbook', 'ansible-galaxy',
+    'helm install', 'helm upgrade', 'helm template',
+    // 磁盘检查/修复
+    'fsck', 'e2fsck', 'xfs_repair', 'btrfs check',
+    'restorecon', 'setfiles',
+    // 容器镜像推送/构建
+    'docker push', 'docker build', 'docker compose',
+    'docker-compose',
+    // 包配置修复
+    'dpkg --configure',
   ];
   for (final p in longPrefixes) {
     if (cmd.startsWith(p)) return longTimeout;
   }
 
   // 3 分钟：中等耗时类
-  const mediumTimeout = Duration(minutes: 3);
+  final mediumTimeout = Duration(minutes: (3 * multiplier).round());
   const mediumPrefixes = <String>[
     // 服务/进程状态
     'systemctl status', 'systemctl restart', 'systemctl start', 'systemctl stop',
@@ -148,5 +175,5 @@ Duration getCommandTimeout(String command) {
   }
 
   // 默认 60 秒
-  return const Duration(seconds: 60);
+  return Duration(seconds: (60 * multiplier).round());
 }

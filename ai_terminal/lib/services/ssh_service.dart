@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import '../models/host_config.dart';
@@ -46,8 +45,10 @@ class SSHService implements CommandExecutor {
 
   SSHService(this.config);
 
+  @override
   bool get isConnected => _isConnected;
   String get osInfo => _osInfo;
+  @override
   Stream<String> get output => outputController.stream;
   /// 暴露内部 SSHClient（只读），供 SFTP 等子工具复用连接
   /// 调用方不得 close 此 client，生命周期由 SSHService 管理
@@ -202,6 +203,20 @@ class SSHService implements CommandExecutor {
       );
     }
 
+    // 后台→前台假连接检测：app 从后台恢复后 SSH socket 可能已死但 _isConnected 仍为 true
+    // 通过发送空命令（echo）检测连接是否真的活着
+    try {
+      _session!.write(Uint8List.fromList(utf8.encode('\n')));
+    } catch (e) {
+      _isConnected = false;
+      return CommandResult(
+        stdout: '',
+        stderr: 'SSH 连接已断开（后台恢复检测失败），请重新连接',
+        exitCode: -1,
+        duration: Duration.zero,
+      );
+    }
+
     final stopwatch = Stopwatch()..start();
     _markerSeq++;
     final marker = 'EXITCODE_$_markerSeq:';
@@ -243,6 +258,10 @@ class SSHService implements CommandExecutor {
         if (cancelToken != null) cancelToken.future,
       ]);
     } on TimeoutException {
+      // 发送 Ctrl+C 中断远程命令，防止后台进程继续输出污染下一条命令
+      try {
+        _session!.write(Uint8List.fromList(utf8.encode('\x03')));
+      } catch (_) {}
       await sub.cancel();
       if (_pendingDoneCompleter == doneCompleter) _pendingDoneCompleter = null;
       stopwatch.stop();
@@ -271,8 +290,11 @@ class SSHService implements CommandExecutor {
 
     var rawOutput = buffer.toString();
 
-    // 取消时 marker 可能未出现
+    // 取消时 marker 可能未出现 — 发送 Ctrl+C 停止可能仍在运行的命令
     if (!rawOutput.contains(marker)) {
+      try {
+        _session!.write(Uint8List.fromList(utf8.encode('\x03')));
+      } catch (_) {}
       return CommandResult(
         stdout: rawOutput,
         stderr: '',
@@ -306,6 +328,7 @@ class SSHService implements CommandExecutor {
     );
   }
 
+  @override
   void execute(String command) {
     if (_session == null || !_isConnected) {
       outputController.add('[错误] 未连接\r\n');
@@ -347,6 +370,7 @@ class SSHService implements CommandExecutor {
   }
 
   /// 发送原始输入到终端（用于 xterm 输入）
+  @override
   void writeToTerminal(String data) {
     if (_session == null || !_isConnected) {
       return;

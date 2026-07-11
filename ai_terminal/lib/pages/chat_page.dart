@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/constants.dart';
+import '../core/theme_colors.dart';
+import '../l10n/app_localizations.dart';
 import '../models/chat_session.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/message_bubble.dart';
@@ -84,6 +86,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final chatState = ref.watch(chatProvider);
 
     ref.listen(chatProvider, (_, state) {
@@ -96,7 +100,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     if (widget.hostId == null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('AI 助手'),
+          title: Text(l10n.commonAIAssistant),
         ),
         body: Center(
           child: Padding(
@@ -106,21 +110,21 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               children: [
                 const Icon(Icons.terminal, size: 64, color: cPrimary),
                 const SizedBox(height: 24),
-                const Text(
-                  'AI 助手需要在终端中使用',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: cTextMain),
+                Text(
+                  l10n.chatNeedTerminal,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: tc.textMain),
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  '请先连接服务器，进入终端页面后点击右下角的 AI 按钮',
-                  style: TextStyle(color: cTextSub),
+                Text(
+                  l10n.chatConnectServerHint,
+                  style: TextStyle(color: tc.textSub),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 32),
                 ElevatedButton.icon(
                   onPressed: () => context.go('/'),
                   icon: const Icon(Icons.arrow_back),
-                  label: const Text('返回服务器列表'),
+                  label: Text(l10n.chatBackToServerList),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: cPrimary,
                     foregroundColor: Colors.white,
@@ -135,7 +139,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI 助手'),
+        title: Text(l10n.commonAIAssistant),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -148,7 +152,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
               }
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 'clear', child: Text('清空会话')),
+              PopupMenuItem(value: 'clear', child: Text(l10n.chatClearSession)),
             ],
           ),
         ],
@@ -196,12 +200,12 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                               width: 36,
                               height: 36,
                               decoration: BoxDecoration(
-                                color: cCard,
+                                color: tc.card,
                                 borderRadius: BorderRadius.circular(18),
-                                border: Border.all(color: cBorder),
+                                border: Border.all(color: tc.border),
                                 boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 6)],
                               ),
-                              child: const Icon(Icons.keyboard_arrow_down, size: 20, color: cTextSub),
+                              child: Icon(Icons.keyboard_arrow_down, size: 20, color: tc.textSub),
                             ),
                           ),
                         ),
@@ -234,9 +238,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
           // 输入区
           Container(
-            decoration: const BoxDecoration(
-              color: cCard,
-              border: Border(top: BorderSide(color: cBorder)),
+            decoration: BoxDecoration(
+              color: tc.card,
+              border: Border(top: BorderSide(color: tc.border)),
             ),
             child: SafeArea(
               child: Padding(
@@ -254,10 +258,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                             setState(() => _canSend = canSend);
                           }
                         },
-                        decoration: const InputDecoration(
-                          hintText: '输入指令或问题...',
+                        decoration: InputDecoration(
+                          hintText: l10n.chatInputHint,
                           border: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         ),
                         onSubmitted: (_) => _sendMessage(),
                       ),
@@ -278,20 +282,22 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   Widget _buildEmptyState() {
-    return const Center(
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.smart_toy, size: 64, color: cTextSub),
-          SizedBox(height: 16),
+          Icon(Icons.smart_toy, size: 64, color: tc.textSub),
+          const SizedBox(height: 16),
           Text(
-            '有什么可以帮你的？',
-            style: TextStyle(color: cTextSub, fontSize: fBody),
+            l10n.chatEmptyTitle,
+            style: TextStyle(color: tc.textSub, fontSize: fBody),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
-            '例如：安装 Docker、查看内存使用',
-            style: TextStyle(color: cTextSub, fontSize: fSmall),
+            l10n.chatEmptyHint,
+            style: TextStyle(color: tc.textSub, fontSize: fSmall),
           ),
         ],
       ),
@@ -299,9 +305,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   }
 
   void _copyMessage(String content) {
+    final l10n = AppLocalizations.of(context)!;
     Clipboard.setData(ClipboardData(text: content));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('已复制到剪贴板')),
+      SnackBar(content: Text(l10n.commonCopiedToClipboard)),
     );
   }
 }
@@ -320,6 +327,7 @@ class _SendButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     return IconButton(
       icon: isLoading
           ? const SizedBox(
@@ -327,7 +335,7 @@ class _SendButton extends StatelessWidget {
               height: 24,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : Icon(Icons.send, color: canSend ? cPrimary : cTextSub),
+          : Icon(Icons.send, color: canSend ? cPrimary : tc.textSub),
       onPressed: canSend && !isLoading ? onPressed : null,
     );
   }

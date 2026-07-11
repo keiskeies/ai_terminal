@@ -5,21 +5,24 @@
     <strong>用自然语言操控服务器，AI 替你敲命令</strong>
   </p>
   <p align="center">
-    <a href="https://ai-terminal.keiskei.top" target="_blank">🌐 官网</a> · 
-    <a href="https://github.com/keiskeies/ai_terminal/releases" target="_blank">📦 下载</a> · 
+    <a href="https://ai-terminal.keiskei.top" target="_blank">🌐 官网</a> ·
+    <a href="https://github.com/keiskeies/ai_terminal/releases" target="_blank">📦 下载</a> ·
     <a href="./QUESTION.md">❓ 常见问题</a>
   </p>
   <p align="center">
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/平台-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-    <img src="https://img.shields.io/badge/version-1.3.4-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.5-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
 ---
 
-**中文** | [English](./README_EN.md)
+**🌍 语言：**
+**中文** | [English](./README_EN.md) | [日本語](./README_JA.md) | [Deutsch](./README_DE.md) | [Français](./README_FR.md) | [Español](./README_ES.md) | [한국어](./README_KO.md) | [Русский](./README_RU.md) | [Português](./README_PT.md) | [Italiano](./README_IT.md)
+
+---
 
 ## 一句话说清楚
 
@@ -57,6 +60,65 @@
 - 一个人干三个人的活，没时间学命令行
 
 **以上所有场景，AI Terminal 一句话搞定。**
+
+## 🆕 v1.3.5 新功能
+
+v1.3.5 是一次重大更新，新增 **服务器监控**、**变更台账**、**运维工作流**、**通知中心**、**玻璃态 UI** 五大核心功能，全方位提升运维效率。
+
+### 📊 服务器实时监控面板
+
+> 不再需要手动敲 `top`、`df`、`free`——所有指标一目了然
+
+| 实时监控概览 | 按主机独立开关 |
+|:---:|:---:|
+| <img src="./ai_terminal/doc/主界面.jpg" width="400" /> | <img src="./ai_terminal/doc/设置页面.jpg" width="400" /> |
+
+- **CPU / 内存 / 磁盘 / 网络** 四大核心指标实时刷新
+- **多主机并行监控**，一个面板看遍所有服务器状态
+- **按主机独立开关**，不想监控的机器可随时关闭
+- 异常指标自动高亮，一眼发现问题
+
+### 📝 变更台账 & 审计日志
+
+> 谁在什么时候改了什么？有据可查，出事可追溯
+
+- **自动记录所有 Agent 操作**：命令执行、文件修改、配置变更
+- **变更窗口管理**：计划内变更 vs 紧急变更，分类管理
+- **完整审计日志**：操作人、时间、命令、结果、退出码，全部可查
+- **变更回滚建议**：AI 自动分析变更影响，给出回滚方案
+
+### 📋 运维工作流 (Runbook)
+
+| 工作流列表 | 执行中 |
+|:---:|:---:|
+| <img src="./ai_terminal/doc/运维工作流.jpg" width="400" /> | <img src="./ai_terminal/doc/多机编排.jpg" width="400" /> |
+
+- **内置常用运维模板**：系统巡检、安全加固、日志清理、服务部署等
+- **一键执行**：不用再一步步敲命令，工作流自动按步骤执行
+- **多机编排**：同一工作流可在多台服务器上并行/串行执行
+- **自定义工作流**：支持创建自己的运维手册，沉淀团队经验
+
+### 🔔 通知中心
+
+- **任务完成提醒**：长任务跑完了第一时间通知你
+- **异常告警**：监控指标异常、命令执行失败，即时推送
+- **安全提醒**：高风险操作、可疑行为，提前预警
+- **可配置通知策略**：哪些事件需要通知，自己说了算
+
+### 🎨 玻璃态 UI 重构
+
+| 设置页面（中文） | 设置页面（英文） |
+|:---:|:---:|
+| <img src="./ai_terminal/doc/设置页面.jpg" width="400" /> | <img src="./ai_terminal/doc/设置页面_英文版.jpg" width="400" /> |
+
+- 全新 **GlassCard 玻璃态卡片**设计，视觉层次更清晰
+- **主题系统重构**，支持自定义主题色、圆角、模糊度
+- 更流畅的动画过渡，更细腻的交互反馈
+- **15+ 语言**本地化支持，一键切换
+
+| 多语言设置 |
+|:---:|
+| <img src="./ai_terminal/doc/多语言设置.jpg" width="400" /> |
 
 ## 💡 它能帮你做什么？
 
@@ -149,6 +211,7 @@ AI Terminal 从架构层面回答这三个问题：
 | 让 AI 配置环境 | 按官方文档配置 | 修改你没要求的系统参数 |
 | 让 AI 查看日志 | 过滤并展示关键信息 | 删除或修改日志文件 |
 | 让 AI 管理服务 | 启停指定服务 | 启动你没提到的其他服务 |
+| 让 AI 执行工作流 | 按预设步骤自动执行 | 跳过关键步骤或擅自修改流程 |
 
 **一句话总结：AI 是你的助手，不是你的老板。你让它做什么，它就做什么。你没让它做的，它绝对不会碰。**
 
@@ -157,6 +220,10 @@ AI Terminal 从架构层面回答这三个问题：
 | 特性 | 描述 |
 |:---|:---|
 | 🤖 **Agent 智能执行** | AI 自动生成命令并循环执行，直到任务完成 |
+| 📊 **服务器监控** | CPU/内存/磁盘/网络实时监控面板，多主机并行 |
+| 📝 **变更台账** | 完整审计日志，操作可追溯，变更可回滚 |
+| 📋 **运维工作流** | 内置 Runbook 模板，一键执行常见运维任务 |
+| 🔔 **通知中心** | 任务完成、异常告警、安全提醒，即时推送 |
 | 🛡️ **三重安全防护** | 行为边界提示词 → SafetyGuard 命令分级 → 危险操作需 CONFIRM 确认 |
 | 🔐 **零明文凭据** | 密码/私钥存储在系统 Keychain / Keystore，永不明文落盘 |
 | 🖥️ **5 平台原生** | macOS / Linux / Windows / Android / iOS 全平台支持 |
@@ -165,6 +232,7 @@ AI Terminal 从架构层面回答这三个问题：
 | 🌊 **流式输出** | AI 响应实时渲染，终端命令即时回显 |
 | 🧠 **知识库驱动** | 内置 150+ 软件安装/配置指南，严格按官方文档执行，杜绝 AI 编造命令 |
 | 🌐 **20+ 供应商** | DeepSeek / Qwen / Claude / Gemini / Ollama 等，支持远程配置更新 |
+| 🌍 **15+ 语言** | 中文/英文/日语/韩语/法语/德语/西班牙语/俄语/葡萄牙语等 |
 
 ## 🏗️ 技术架构
 
@@ -177,7 +245,9 @@ Flutter 3.16+ (Dart 3.2+)
 ├── 本地终端: flutter_pty
 ├── 终端 UI: xterm.dart
 ├── AI 接口: OpenAI 兼容 (20+ 供应商)
-└── Markdown: flutter_markdown
+├── 监控: 服务器监控面板 (CPU/内存/磁盘/网络)
+├── 运维: 变更台账 + 审计日志 + Runbook 工作流
+└── UI: GlassCard 玻璃态设计 + 多主题 + 15+ 语言
 ```
 
 ## 🚀 快速开始
@@ -249,18 +319,17 @@ flutter build ios --release
 
 ## 📱 截图
 
-| 服务器管理 | SSH 终端 |
+| 主界面（监控 + 终端） | 多机编排 |
 |:---:|:---:|
-| <img src="./ai_terminal/doc/ai-t1.png" width="400" /> | <img src="./ai_terminal/doc/ai-t2.png" width="400" /> |
+| <img src="./ai_terminal/doc/主界面.jpg" width="400" /> | <img src="./ai_terminal/doc/多机编排.jpg" width="400" /> |
 
-| AI 对话助手 | Agent 自动执行 |
+| 运维工作流 | 设置页面 |
 |:---:|:---:|
-| <img src="./ai_terminal/doc/ai-t3.png" width="400" /> | <img src="./ai_terminal/doc/ai-t4.png" width="400" /> |
+| <img src="./ai_terminal/doc/运维工作流.jpg" width="400" /> | <img src="./ai_terminal/doc/设置页面.jpg" width="400" /> |
 
-<p align="center">
-  <img src="./ai_terminal/doc/ai-t5.png" width="400" />
-  <br /><b>AI 模型配置</b>
-</p>
+| 多语言设置 |
+|:---:|
+| <img src="./ai_terminal/doc/多语言设置.jpg" width="400" /> |
 
 > 🤖 以上截图中的 AI 功能由 <b>小米 MiMo</b> 大模型驱动
 
@@ -318,6 +387,14 @@ v1.3.0 新增**命令手册知识库**——内置 150+ 常用软件的官方安
   - [x] 🤖 预设模型快捷选择（每个供应商内置推荐模型列表，一键选择）
   - [x] 🦙 Ollama 本地部署支持（无需 API Key，完全免费）
   - [x] 📐 添加模型弹窗优化（宽屏双列布局、字段顺序优化）
+- [x] v1.3.5 — 运维能力大升级
+  - [x] 📊 服务器实时监控面板（CPU/内存/磁盘/网络，多主机并行）
+  - [x] 📝 变更台账 & 审计日志（完整操作记录，可追溯可回滚）
+  - [x] 📋 运维工作流 Runbook（内置模板 + 自定义，一键执行）
+  - [x] 🔔 通知中心（任务完成、异常告警、安全提醒）
+  - [x] 🎨 玻璃态 UI 重构（GlassCard 设计，主题系统升级）
+  - [x] 🌍 15+ 语言本地化支持
+  - [x] 📺 多机编排（同一工作流在多服务器上并行/串行执行）
 
 ## 🤝 贡献
 

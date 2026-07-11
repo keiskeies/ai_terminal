@@ -21,7 +21,9 @@ class LocalTerminalService implements CommandExecutor {
   // 当前 shell 类型（影响 wrappedCommand 拼接语法）
   bool _isPowerShell = false;
 
+  @override
   bool get isConnected => _isConnected;
+  @override
   Stream<String> get output => _outputController.stream;
 
   /// 启动本地 PTY shell
@@ -112,12 +114,14 @@ class LocalTerminalService implements CommandExecutor {
   }
 
   /// 向终端写入数据（用户键盘输入）
+  @override
   void writeToTerminal(String data) {
     if (_pty == null || !_isConnected) return;
     _pty!.write(utf8.encode(data));
   }
 
   /// 执行命令（写入命令 + 回车）
+  @override
   void execute(String command) {
     if (command.contains('\n')) {
       _executeMultiLine(command);
@@ -218,6 +222,10 @@ class LocalTerminalService implements CommandExecutor {
         if (cancelToken != null) cancelToken.future,
       ]);
     } on TimeoutException {
+      // 发送 Ctrl+C 中断本地命令，防止后台进程继续输出污染下一条命令
+      try {
+        _pty!.write(utf8.encode('\x03'));
+      } catch (_) {}
       await sub.cancel();
       if (_pendingDoneCompleter == doneCompleter) _pendingDoneCompleter = null;
       stopwatch.stop();
@@ -246,8 +254,11 @@ class LocalTerminalService implements CommandExecutor {
 
     var rawOutput = buffer.toString();
 
-    // 取消时 marker 可能未出现
+    // 取消时 marker 可能未出现 — 发送 Ctrl+C 停止可能仍在运行的命令
     if (!rawOutput.contains(marker)) {
+      try {
+        _pty!.write(utf8.encode('\x03'));
+      } catch (_) {}
       return CommandResult(
         stdout: rawOutput,
         stderr: '',

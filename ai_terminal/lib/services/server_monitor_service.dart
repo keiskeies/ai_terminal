@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import '../core/l10n_holder.dart';
 import 'ssh_service.dart';
 import 'local_terminal_service.dart';
 
@@ -266,7 +267,7 @@ class ServerMonitorService {
       // 上一次还没结束，返回上一次成功数据（如有），否则空快照
       return _history.isNotEmpty
           ? _history.last
-          : ServerSnapshot(timestamp: DateTime.now(), error: '采集进行中');
+          : ServerSnapshot(timestamp: DateTime.now(), error: L10n.str.monitorErrorCollecting);
     }
     _isCollecting = true;
     try {
@@ -354,7 +355,7 @@ class ServerMonitorService {
   ServerSnapshot _parseLinuxOutput(String raw) {
     final now = DateTime.now();
     if (raw.isEmpty) {
-      return ServerSnapshot(timestamp: now, error: '采集输出为空');
+      return ServerSnapshot(timestamp: now, error: L10n.str.monitorErrorEmptyOutput);
     }
 
     final sections = _splitSections(raw);
@@ -580,7 +581,7 @@ class ServerMonitorService {
   ServerSnapshot _parseMacOSOutput(String raw) {
     final now = DateTime.now();
     if (raw.isEmpty) {
-      return ServerSnapshot(timestamp: now, error: '采集输出为空');
+      return ServerSnapshot(timestamp: now, error: L10n.str.monitorErrorEmptyOutput);
     }
 
     final sections = _splitSections(raw);
@@ -618,12 +619,19 @@ class ServerMonitorService {
         if (m != null) {
           final key = m.group(1)!.trim().toLowerCase();
           final val = double.tryParse(m.group(2)!.replaceAll('.', '').trim()) ?? 0;
-          if (key.contains('active')) pagesActive = val;
-          else if (key.contains('free')) pagesFree = val;
-          else if (key.contains('wired')) pagesWired = val;
-          else if (key.contains('occupied by compressor') || key.contains('compressor')) pagesCompressed = val;
-          else if (key.contains('inactive')) pagesInactive = val;
-          else if (key.contains('speculative')) pagesSpeculative = val;
+          if (key.contains('active')) {
+            pagesActive = val;
+          } else if (key.contains('free')) {
+            pagesFree = val;
+          } else if (key.contains('wired')) {
+            pagesWired = val;
+          } else if (key.contains('occupied by compressor') || key.contains('compressor')) {
+            pagesCompressed = val;
+          } else if (key.contains('inactive')) {
+            pagesInactive = val;
+          } else if (key.contains('speculative')) {
+            pagesSpeculative = val;
+          }
         }
       }
       final memSizeRaw = sections['MEMSIZE']?.trim() ?? '0';
@@ -853,7 +861,7 @@ class ServerMonitorService {
   }
 
   Future<ServerSnapshot> _collectWindowsLocal(LocalTerminalService local) async {
-    final ps = '''
+    const ps = '''
 echo @@CPU@@
 wmic cpu get loadpercentage /value | findstr LoadPercentage
 echo @@MEM@@
@@ -883,7 +891,7 @@ echo @@END@@
   ServerSnapshot _parseWindowsOutput(String raw) {
     final now = DateTime.now();
     if (raw.isEmpty) {
-      return ServerSnapshot(timestamp: now, error: '采集输出为空');
+      return ServerSnapshot(timestamp: now, error: L10n.str.monitorErrorEmptyOutput);
     }
 
     final sections = _splitSections(raw);
@@ -1080,8 +1088,8 @@ echo @@END@@
         currentSection = m.group(1);
         sections[currentSection!] = '';
       } else if (currentSection != null) {
-        final existing = sections[currentSection!] ?? '';
-        sections[currentSection!] = existing.isEmpty ? line : '$existing\n$line';
+        final existing = sections[currentSection] ?? '';
+        sections[currentSection] = existing.isEmpty ? line : '$existing\n$line';
       }
     }
     return sections;

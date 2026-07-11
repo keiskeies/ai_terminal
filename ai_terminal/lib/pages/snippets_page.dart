@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../core/constants.dart';
+import '../core/theme_colors.dart';
+import '../l10n/app_localizations.dart';
 import '../models/command_snippet.dart';
 import '../providers/app_providers.dart';
 
@@ -17,11 +19,12 @@ class SnippetsPage extends ConsumerStatefulWidget {
 class _SnippetsPageState extends ConsumerState<SnippetsPage> {
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final snippets = ref.watch(snippetsProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('快捷命令'),
+        title: Text(l10n.snippetTitle),
       ),
       body: snippets.isEmpty
           ? _buildEmptyState()
@@ -42,20 +45,22 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
   }
 
   Widget _buildEmptyState() {
-    return const Center(
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.code, size: 64, color: cTextSub),
-          SizedBox(height: 16),
+          Icon(Icons.code, size: 64, color: tc.textSub),
+          const SizedBox(height: 16),
           Text(
-            '暂无快捷命令',
-            style: TextStyle(color: cTextSub, fontSize: fBody),
+            l10n.snippetEmptyTitle,
+            style: TextStyle(color: tc.textSub, fontSize: fBody),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
-            '点击下方按钮添加',
-            style: TextStyle(color: cTextSub, fontSize: fSmall),
+            l10n.snippetEmptyHint,
+            style: TextStyle(color: tc.textSub, fontSize: fSmall),
           ),
         ],
       ),
@@ -63,6 +68,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
   }
 
   Widget _buildSnippetCard(CommandSnippet snippet) {
+    final tc = ThemeColors.of(context);
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
@@ -71,10 +77,10 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
           snippet.command,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'JetBrainsMono',
             fontSize: fSmall,
-            color: cTerminalGreen,
+            color: tc.terminalGreen,
           ),
         ),
         trailing: IconButton(
@@ -104,6 +110,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
   }
 
   void _showExecuteDialog(CommandSnippet snippet) {
+    final l10n = AppLocalizations.of(context)!;
     final variables = snippet.getAllVariables();
     final controllers = <String, TextEditingController>{};
 
@@ -113,33 +120,35 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) {
+        final tc = ThemeColors.of(context);
+        return AlertDialog(
         title: Text(snippet.name),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (snippet.description != null) ...[
-              Text(snippet.description!, style: const TextStyle(color: cTextSub)),
+              Text(snippet.description!, style: TextStyle(color: tc.textSub)),
               const SizedBox(height: 16),
             ],
-            const Text(
-              '命令:',
-              style: TextStyle(color: cTextSub, fontSize: fSmall),
+            Text(
+              l10n.snippetCommandLabel,
+              style: TextStyle(color: tc.textSub, fontSize: fSmall),
             ),
             const SizedBox(height: 4),
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E),
+                color: tc.terminalBg,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: SelectableText(
                 snippet.command,
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'JetBrainsMono',
                   fontSize: fMono,
-                  color: cTerminalGreen,
+                  color: tc.terminalGreen,
                 ),
               ),
             ),
@@ -160,7 +169,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(l10n.commonCancel),
           ),
           ElevatedButton(
             onPressed: () {
@@ -170,31 +179,33 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
               );
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: SelectableText('命令: $resolved'),
+                  content: SelectableText(l10n.snippetResolvedCommand(resolved)),
                   action: SnackBarAction(
-                    label: '复制',
+                    label: l10n.copy,
                     onPressed: () {},
                   ),
                 ),
               );
             },
-            child: const Text('复制命令'),
+            child: Text(l10n.snippetCopyCommand),
           ),
         ],
-      ),
+      );
+      },
     );
   }
 
   void _showDeleteDialog(CommandSnippet snippet) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('删除命令'),
-        content: Text('确定要删除 "${snippet.name}" 吗？'),
+        title: Text(l10n.snippetDeleteTitle),
+        content: Text(l10n.snippetDeleteConfirm(snippet.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(l10n.commonCancel),
           ),
           ElevatedButton(
             onPressed: () {
@@ -202,7 +213,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
               ref.read(snippetsProvider.notifier).deleteSnippet(snippet.id);
             },
             style: ElevatedButton.styleFrom(backgroundColor: cDanger),
-            child: const Text('删除'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -246,8 +257,10 @@ class _SnippetDialogState extends State<SnippetDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
-      title: Text(widget.snippet != null ? '编辑命令' : '新建命令'),
+      title: Text(widget.snippet != null ? l10n.snippetEditTitle : l10n.snippetNewTitle),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -256,25 +269,25 @@ class _SnippetDialogState extends State<SnippetDialog> {
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(labelText: '名称'),
-                validator: (v) => v?.isEmpty == true ? '请输入名称' : null,
+                decoration: InputDecoration(labelText: l10n.commonName),
+                validator: (v) => v?.isEmpty == true ? l10n.snippetNameRequired : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _commandController,
                 maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: '命令',
+                decoration: InputDecoration(
+                  labelText: l10n.commonCommand,
                   hintText: '例如: docker exec -it {{container}} /bin/bash',
-                  hintStyle: TextStyle(color: cTextSub, fontSize: fSmall),
+                  hintStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
                 ),
                 style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: fMono),
-                validator: (v) => v?.isEmpty == true ? '请输入命令' : null,
+                validator: (v) => v?.isEmpty == true ? l10n.snippetCommandRequired : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _descriptionController,
-                decoration: const InputDecoration(labelText: '描述 (可选)'),
+                decoration: InputDecoration(labelText: l10n.snippetFieldDescription),
               ),
             ],
           ),
@@ -283,11 +296,11 @@ class _SnippetDialogState extends State<SnippetDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
+          child: Text(l10n.commonCancel),
         ),
         ElevatedButton(
           onPressed: _save,
-          child: const Text('保存'),
+          child: Text(l10n.save),
         ),
       ],
     );

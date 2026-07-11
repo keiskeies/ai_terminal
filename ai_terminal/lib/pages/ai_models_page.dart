@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../l10n/app_localizations.dart';
 import '../models/ai_model_config.dart';
 import '../providers/app_providers.dart';
 import '../services/provider_config_service.dart';
@@ -22,11 +23,12 @@ class AIModelsPage extends ConsumerStatefulWidget {
 class _AIModelsPageState extends ConsumerState<AIModelsPage> {
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final models = ref.watch(aiModelsProvider);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AI 模型配置'),
+        title: Text(l10n.aiModelTitle),
       ),
       body: models.isEmpty
           ? _buildEmptyState()
@@ -47,26 +49,28 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
   }
 
   Widget _buildEmptyState() {
+    final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.smart_toy, size: 64, color: cTextSub),
+          Icon(Icons.smart_toy, size: 64, color: tc.textSub),
           const SizedBox(height: 16),
-          const Text(
-            '还没有 AI 模型',
-            style: TextStyle(color: cTextSub, fontSize: fBody),
+          Text(
+            l10n.aiModelEmptyTitle,
+            style: TextStyle(color: tc.textSub, fontSize: fBody),
           ),
           const SizedBox(height: 8),
-          const Text(
-            '配置你的第一个 AI 模型，开启智能运维',
-            style: TextStyle(color: cTextSub, fontSize: fSmall),
+          Text(
+            l10n.aiModelEmptySubtitle,
+            style: TextStyle(color: tc.textSub, fontSize: fSmall),
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () => _showModelDialog(),
             icon: const Icon(Icons.add),
-            label: const Text('添加模型'),
+            label: Text(l10n.aiModelAdd),
           ),
         ],
       ),
@@ -75,6 +79,8 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
 
   /// P1-6: 简化模型卡片 - 固定高度，操作按钮外露
   Widget _buildModelCard(AIModelConfig model) {
+    final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     final providerInfo = ProviderConfigService.getProviderById(model.provider);
     final displayName = providerInfo?.name ?? model.provider;
 
@@ -108,7 +114,7 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
                           style: TextStyle(
                             fontSize: fBody,
                             fontWeight: FontWeight.w600,
-                            color: ThemeColors.of(context).textMain,
+                            color: tc.textMain,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -122,7 +128,7 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
                   const SizedBox(height: 4),
                   Text(
                     '$displayName / ${model.modelName}',
-                    style: const TextStyle(color: cTextSub, fontSize: fSmall),
+                    style: TextStyle(color: tc.textSub, fontSize: fSmall),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
@@ -136,21 +142,21 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
                 if (!model.isDefault)
                   _ActionButton(
                     icon: Icons.star_border,
-                    tooltip: '设为默认',
+                    tooltip: l10n.aiModelSetDefault,
                     onTap: () => _setDefault(model),
                   ),
                 const SizedBox(width: 4),
                 // 编辑
                 _ActionButton(
                   icon: Icons.edit,
-                  tooltip: '编辑',
+                  tooltip: l10n.edit,
                   onTap: () => _showModelDialog(model),
                 ),
                 const SizedBox(width: 4),
                 // 删除
                 _ActionButton(
                   icon: Icons.delete,
-                  tooltip: '删除',
+                  tooltip: l10n.delete,
                   color: cDanger,
                   onTap: () => _deleteModel(model),
                 ),
@@ -168,15 +174,16 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
   }
 
   void _deleteModel(AIModelConfig model) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('删除模型'),
-        content: Text('确定要删除 "${model.name}" 吗？'),
+        title: Text(l10n.aiModelDeleteTitle),
+        content: Text(l10n.aiModelDeleteConfirm(model.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(l10n.commonCancel),
           ),
           ElevatedButton(
             onPressed: () {
@@ -184,7 +191,7 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
               ref.read(aiModelsProvider.notifier).deleteModel(model.id);
             },
             style: ElevatedButton.styleFrom(backgroundColor: cDanger),
-            child: const Text('删除'),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -272,7 +279,6 @@ class _AIModelDialogState extends State<AIModelDialog> {
   bool _obscureApiKey = true;
   bool _testing = false;
   String? _testResult;
-  bool _showAdvanced = false;
   bool _refreshing = false;
 
   bool get _isFormComplete =>
@@ -316,10 +322,11 @@ class _AIModelDialogState extends State<AIModelDialog> {
 
     if (!mounted) return;
 
+    final l10n = AppLocalizations.of(context)!;
     if (result.isSuccess) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('供应商列表已更新（${result.count} 个供应商）'),
+          content: Text(l10n.aiModelProvidersUpdated(result.count ?? 0)),
           backgroundColor: cSuccess,
           duration: const Duration(seconds: 2),
         ),
@@ -327,16 +334,16 @@ class _AIModelDialogState extends State<AIModelDialog> {
       setState(() {});
     } else if (result.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('远程配置为空'),
+        SnackBar(
+          content: Text(l10n.aiModelRemoteConfigEmpty),
           backgroundColor: cWarning,
-          duration: Duration(seconds: 2),
+          duration: const Duration(seconds: 2),
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('更新失败：${result.errorMessage}'),
+          content: Text(l10n.aiModelUpdateFailed(result.errorMessage ?? '')),
           backgroundColor: cDanger,
           duration: const Duration(seconds: 3),
         ),
@@ -346,6 +353,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
 
   Future<void> _testConnection() async {
     if (!_isFormComplete) return;
+    final l10n = AppLocalizations.of(context)!;
     setState(() {
       _testing = true;
       _testResult = null;
@@ -386,28 +394,28 @@ class _AIModelDialogState extends State<AIModelDialog> {
         case DioExceptionType.badResponse:
           final code = e.response?.statusCode;
           if (code == 401) {
-            msg = 'API Key 无效';
+            msg = l10n.aiModelApiKeyInvalid;
           } else if (code == 429) {
-            msg = '请求过于频繁';
+            msg = l10n.aiModelTooManyRequests;
           } else if (code == 400) {
-            msg = '模型名称错误';
+            msg = l10n.aiModelNameError;
           } else if (code != null && code >= 500) {
-            msg = '服务端错误 ($code)';
+            msg = l10n.aiModelServerError(code);
           } else {
-            msg = '请求失败 ($code)';
+            msg = l10n.aiModelRequestFailed(code ?? 0);
           }
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.sendTimeout:
         case DioExceptionType.receiveTimeout:
-          msg = '连接超时';
+          msg = l10n.aiModelConnectionTimeout;
         case DioExceptionType.connectionError:
-          msg = '无法连接';
+          msg = l10n.aiModelCannotConnect;
         default:
-          msg = '连接失败';
+          msg = l10n.aiModelCannotConnect;
       }
       setState(() => _testResult = msg);
     } catch (e) {
-      setState(() => _testResult = '测试失败');
+      setState(() => _testResult = l10n.aiModelTestFailed);
     } finally {
       setState(() => _testing = false);
     }
@@ -415,6 +423,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final tc = ThemeColors.of(context);
     final providers = ProviderConfigService.providers;
     final currentProviderInfo = ProviderConfigService.getProviderById(_provider);
@@ -439,7 +448,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                 Row(
                   children: [
                     Text(
-                      widget.model != null ? '编辑模型' : '添加模型',
+                      widget.model != null ? l10n.aiModelEditTitle : l10n.aiModelAdd,
                       style: TextStyle(color: tc.textMain, fontSize: fTitle, fontWeight: FontWeight.w600),
                     ),
                     if (currentProviderInfo != null) ...[
@@ -467,9 +476,9 @@ class _AIModelDialogState extends State<AIModelDialog> {
                           children: [
                             Expanded(
                               child: DropdownButtonFormField<String>(
-                                value: providers.any((p) => p.id == _provider) ? _provider : null,
+                                initialValue: providers.any((p) => p.id == _provider) ? _provider : null,
                                 decoration: InputDecoration(
-                                  labelText: '提供商',
+                                  labelText: l10n.aiModelProvider,
                                   labelStyle: TextStyle(color: tc.textSub),
                                 ),
                                 dropdownColor: tc.cardElevated,
@@ -501,7 +510,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                             SizedBox(
                               height: 56,
                               child: Tooltip(
-                                message: '更新供应商列表',
+                                message: l10n.aiModelRefreshProviders,
                                 child: IconButton.outlined(
                                   onPressed: _refreshing ? null : _refreshProviders,
                                   icon: _refreshing
@@ -522,11 +531,11 @@ class _AIModelDialogState extends State<AIModelDialog> {
                         TextFormField(
                           controller: _nameController,
                           decoration: InputDecoration(
-                            labelText: '名称',
+                            labelText: l10n.name,
                             labelStyle: TextStyle(color: tc.textSub),
                           ),
                           style: TextStyle(color: tc.textMain),
-                          validator: (v) => v?.isEmpty == true ? '请输入名称' : null,
+                          validator: (v) => v?.isEmpty == true ? l10n.aiModelNameRequired : null,
                         ),
                         const SizedBox(height: 16),
 
@@ -563,11 +572,11 @@ class _AIModelDialogState extends State<AIModelDialog> {
                         TextFormField(
                           controller: _modelNameController,
                           decoration: InputDecoration(
-                            labelText: '模型名称',
+                            labelText: l10n.aiModelModelName,
                             labelStyle: TextStyle(color: tc.textSub),
                           ),
                           style: TextStyle(color: tc.textMain, fontFamily: 'JetBrainsMono', fontSize: fSmall),
-                          validator: (v) => v?.isEmpty == true ? '请输入模型名称' : null,
+                          validator: (v) => v?.isEmpty == true ? l10n.aiModelModelNameRequired : null,
                         ),
                         const SizedBox(height: 16),
 
@@ -588,7 +597,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                                   ),
                                 ),
                                 style: TextStyle(color: tc.textMain, fontFamily: 'JetBrainsMono', fontSize: fSmall),
-                                validator: (v) => v?.isEmpty == true ? '请输入 API Key' : null,
+                                validator: (v) => v?.isEmpty == true ? l10n.aiModelApiKeyRequired : null,
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -599,7 +608,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                                 icon: _testing
                                     ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                                     : const Icon(Icons.wifi_tethering, size: 16),
-                                label: Text(_testing ? '...' : '测试'),
+                                label: Text(_testing ? '...' : l10n.aiModelTest),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: _testResult == 'success' ? cSuccess : cPrimary,
                                   foregroundColor: Colors.white,
@@ -622,7 +631,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
-                                  _testResult == 'success' ? '连接成功' : _testResult!,
+                                  _testResult == 'success' ? l10n.connectionSuccess : _testResult!,
                                   style: TextStyle(
                                     color: _testResult == 'success' ? cSuccess : cDanger,
                                     fontSize: fMicro,
@@ -637,7 +646,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                         // 设为默认
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
-                          title: Text('设为默认模型', style: TextStyle(color: tc.textMain, fontSize: fBody)),
+                          title: Text(l10n.aiModelSetAsDefault, style: TextStyle(color: tc.textMain, fontSize: fBody)),
                           value: _isDefault,
                           onChanged: (v) => setState(() => _isDefault = v),
                         ),
@@ -647,7 +656,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                         // 高级设置（折叠面板）
                         ExpansionTile(
                           tilePadding: EdgeInsets.zero,
-                          title: Text('高级设置', style: TextStyle(color: tc.textSub, fontSize: fBody)),
+                          title: Text(l10n.commonAdvancedSettings, style: TextStyle(color: tc.textSub, fontSize: fBody)),
                           children: [
                             const SizedBox(height: 8),
                             // Base URL
@@ -658,7 +667,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                                 labelStyle: TextStyle(color: tc.textSub),
                               ),
                               style: TextStyle(color: tc.textMain, fontFamily: 'JetBrainsMono', fontSize: fSmall),
-                              validator: (v) => v?.isEmpty == true ? '请输入 Base URL' : null,
+                              validator: (v) => v?.isEmpty == true ? l10n.aiModelBaseUrlRequired : null,
                             ),
                             const SizedBox(height: 16),
                             // Temperature
@@ -666,7 +675,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                               children: [
                                 SizedBox(
                                   width: 80,
-                                  child: Text('温度', style: TextStyle(color: tc.textMain, fontSize: fSmall)),
+                                  child: Text(l10n.aiModelTemperature, style: TextStyle(color: tc.textMain, fontSize: fSmall)),
                                 ),
                                 Expanded(
                                   child: Slider(
@@ -692,7 +701,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                             TextFormField(
                               controller: TextEditingController(text: _maxTokens.toString()),
                               decoration: InputDecoration(
-                                labelText: '最大 Token',
+                                labelText: l10n.aiModelMaxTokens,
                                 labelStyle: TextStyle(color: tc.textSub),
                               ),
                               style: TextStyle(color: tc.textMain),
@@ -716,7 +725,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.pop(context),
-                      child: Text('取消', style: TextStyle(color: tc.textSub)),
+                      child: Text(l10n.commonCancel, style: TextStyle(color: tc.textSub)),
                     ),
                     const SizedBox(width: 8),
                     ElevatedButton(
@@ -725,7 +734,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                         backgroundColor: cPrimary,
                         foregroundColor: Colors.white,
                       ),
-                      child: const Text('保存'),
+                      child: Text(l10n.save),
                     ),
                   ],
                 ),

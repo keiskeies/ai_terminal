@@ -100,38 +100,30 @@ class AgentEvent extends HiveObject {
         type = AgentEventType.thought,
         timestamp = DateTime.now();
 
-  AgentEvent.command(this.command, {String? id, bool? dangerous, bool? blocked})
+  AgentEvent.command(this.command, {String? id, this.dangerous, this.blocked})
       : id = id ?? _genId(),
         type = AgentEventType.command,
-        timestamp = DateTime.now(),
-        dangerous = dangerous,
-        blocked = blocked;
+        timestamp = DateTime.now();
 
   AgentEvent.result({
-    required String commandId,
-    required bool success,
-    String? output,
-    String? error,
-    String? command,
+    required this.commandId,
+    required this.success,
+    this.output,
+    this.error,
+    this.command,
   })  : id = _genId(),
         type = AgentEventType.result,
-        timestamp = DateTime.now(),
-        commandId = commandId,
-        success = success,
-        output = output,
-        error = error,
-        command = command;
+        timestamp = DateTime.now();
 
   AgentEvent.ask(this.question, this.options, {String? id})
       : id = id ?? _genId(),
         type = AgentEventType.ask,
         timestamp = DateTime.now();
 
-  AgentEvent.finish({String? summary, String? id})
+  AgentEvent.finish({this.summary, String? id})
       : id = id ?? _genId(),
         type = AgentEventType.finish,
-        timestamp = DateTime.now(),
-        summary = summary;
+        timestamp = DateTime.now();
 
   AgentEvent.text(this.text, {String? id})
       : id = id ?? _genId(),

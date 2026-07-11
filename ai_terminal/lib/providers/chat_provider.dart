@@ -4,7 +4,7 @@ import '../models/chat_session.dart';
 import '../models/ai_model_config.dart';
 import '../services/ai_service.dart';
 import '../services/conversation_service.dart';
-import '../core/hive_init.dart';
+import '../services/daos.dart';
 import '../core/credentials_store.dart';
 import '../utils/ansi_stripper.dart';
 
@@ -181,7 +181,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
         ? updatedMessages.sublist(updatedMessages.length - 10)
         : updatedMessages;
 
-    final host = effectiveHostId != 'local' ? HiveInit.hostsBox.get(effectiveHostId) : null;
+    final host = effectiveHostId != 'local' ? HostsDao.getCachedById(effectiveHostId) : null;
 
     try {
       final stream = await AIService.sendMessage(
@@ -298,15 +298,15 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   /// 获取默认模型，并从 CredentialsStore 注入 apiKey
-  /// （Hive 中 apiKey 为空占位，真实 key 存于安全存储）
+  /// （DB 中 apiKey 为空占位，真实 key 存于安全存储）
   Future<AIModelConfig?> _getDefaultModel() async {
     AIModelConfig? model;
     try {
-      model = HiveInit.aiModelsBox.values.firstWhere((m) => m.isDefault);
+      model = AIModelsDao.cached.firstWhere((m) => m.isDefault);
     } catch (_) {
       try {
-        model = HiveInit.aiModelsBox.values.isNotEmpty
-            ? HiveInit.aiModelsBox.values.first
+        model = AIModelsDao.cached.isNotEmpty
+            ? AIModelsDao.cached.first
             : null;
       } catch (_) {
         model = null;
@@ -322,7 +322,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   }
 
   String? _getHostContext(String hostId) {
-    final host = HiveInit.hostsBox.get(hostId);
+    final host = HostsDao.getCachedById(hostId);
     if (host == null) return null;
     return '${host.host} (${host.username})';
   }

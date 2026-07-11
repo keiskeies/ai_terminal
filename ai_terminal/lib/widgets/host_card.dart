@@ -38,7 +38,7 @@ class _HostCardState extends State<HostCard> {
       case 'failed':
         return cDanger;
       default:
-        return cTextSub;
+        return ThemeColors.of(context).textSub;
     }
   }
 
@@ -87,9 +87,9 @@ class _HostCardState extends State<HostCard> {
           duration: animFast,
           margin: const EdgeInsets.symmetric(horizontal: pStandard, vertical: pCompact / 2),
           decoration: BoxDecoration(
-            color: _isHovered ? cCardElevated : tc.card,
+            color: _isHovered ? tc.cardElevated : tc.card,
             borderRadius: BorderRadius.circular(rCard),
-            border: Border.all(color: cBorder, width: 1),
+            border: Border.all(color: tc.border, width: 1),
           ),
           clipBehavior: Clip.antiAlias,
           child: Row(
@@ -97,7 +97,7 @@ class _HostCardState extends State<HostCard> {
               Container(
                 width: 3,
                 height: 88,
-                color: tagColor ?? cBorder,
+                color: tagColor ?? tc.border,
               ),
               Expanded(
                 child: Container(

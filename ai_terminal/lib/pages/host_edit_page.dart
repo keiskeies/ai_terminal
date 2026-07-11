@@ -10,6 +10,8 @@ import '../core/credentials_store.dart';
 import '../models/host_config.dart';
 import '../providers/app_providers.dart';
 import '../widgets/color_picker_row.dart';
+import '../l10n/app_localizations.dart';
+import '../core/l10n_holder.dart';
 
 const _uuid = Uuid();
 
@@ -31,7 +33,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
   final _passwordController = TextEditingController();
   final _privateKeyController = TextEditingController();
   final _passphraseController = TextEditingController();
-  final _groupController = TextEditingController(text: '默认');
+  final _groupController = TextEditingController();
 
   String _authType = 'password';
   String? _tagColor;
@@ -43,12 +45,14 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
   final _jumpUsernameController = TextEditingController(text: 'root');
   final _jumpPasswordController = TextEditingController();
   final _jumpPrivateKeyController = TextEditingController();
+  final _sudoPasswordController = TextEditingController();
   String? _jumpAuthType = 'password';
   bool _obscurePassword = true;
   bool _obscurePassphrase = true;
   bool _obscurePrivateKey = true;
   bool _obscureJumpPassword = true;
   bool _obscureJumpPrivateKey = true;
+  bool _obscureSudoPassword = true;
   bool _jumpExpanded = false; // 跳板机区域展开状态
 
   bool get _isEditing => widget.hostId != null;
@@ -59,6 +63,8 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
     super.initState();
     if (_isEditing) {
       _loadExistingHost();
+    } else {
+      _groupController.text = L10n.str.hostDefaultGroup;
     }
   }
 
@@ -71,7 +77,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
       _portController.text = host.port.toString();
       _usernameController.text = host.username;
       _authType = host.authType;
-      _groupController.text = host.group;
+      _groupController.text = host.group == '默认' ? L10n.str.hostDefaultGroup : host.group;
       _tagColor = host.tagColor;
       _timeout = host.timeout;
       _encoding = host.encoding;
@@ -99,6 +105,10 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
         _jumpPrivateKeyController.text = jumpPrivateKey ?? '';
       }
 
+      // 加载 sudo 密码（用于 AI 执行 sudo 命令时自动注入）
+      final sudoPassword = await CredentialsStore.get(hostId: host.id, type: 'sudoPassword');
+      _sudoPasswordController.text = sudoPassword ?? '';
+
       setState(() {});
     }
   }
@@ -118,14 +128,17 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
     _jumpUsernameController.dispose();
     _jumpPasswordController.dispose();
     _jumpPrivateKeyController.dispose();
+    _sudoPasswordController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditing ? '编辑服务器' : '新建服务器'),
+        title: Text(_isEditing ? l10n.hostEditTitleEdit : l10n.hostEditTitleNew),
       ),
       body: Form(
         key: _formKey,
@@ -136,18 +149,18 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                 padding: const EdgeInsets.all(pStandard),
                 children: [
                   // 基本信息
-                  _buildSectionTitle('基本信息'),
+                  _buildSectionTitle(l10n.hostEditSectionBasic),
                   const SizedBox(height: 12),
 
                   TextFormField(
                     controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: '名称 *',
-                      hintText: '例如: 生产服务器',
+                    decoration: InputDecoration(
+                      labelText: l10n.hostEditNameLabel,
+                      hintText: l10n.hostEditNameHint,
                     ),
                     maxLength: 20,
                     validator: (value) {
-                      if (value == null || value.isEmpty) return '请输入名称';
+                      if (value == null || value.isEmpty) return l10n.hostEditNameRequired;
                       return null;
                     },
                   ),
@@ -155,12 +168,12 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
 
                   TextFormField(
                     controller: _hostController,
-                    decoration: const InputDecoration(
-                      labelText: '主机地址 *',
-                      hintText: 'IP 地址或域名',
+                    decoration: InputDecoration(
+                      labelText: l10n.hostEditHostLabel,
+                      hintText: l10n.hostEditHostHint,
                     ),
                     validator: (value) {
-                      if (value == null || value.isEmpty) return '请输入主机地址';
+                      if (value == null || value.isEmpty) return l10n.hostEditHostRequired;
                       return null;
                     },
                   ),
@@ -171,8 +184,8 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                       Expanded(
                         child: TextFormField(
                           controller: _portController,
-                          decoration: const InputDecoration(
-                            labelText: '端口',
+                          decoration: InputDecoration(
+                            labelText: l10n.port,
                           ),
                           keyboardType: TextInputType.number,
                         ),
@@ -182,8 +195,8 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                         flex: 2,
                         child: TextFormField(
                           controller: _usernameController,
-                          decoration: const InputDecoration(
-                            labelText: '用户名',
+                          decoration: InputDecoration(
+                            labelText: l10n.hostEditUsernameLabel,
                           ),
                         ),
                       ),
@@ -192,17 +205,17 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                   const SizedBox(height: 24),
 
                   // 认证方式
-                  _buildSectionTitle('认证方式'),
+                  _buildSectionTitle(l10n.hostEditSectionAuth),
                   const SizedBox(height: 12),
 
                   DropdownButtonFormField<String>(
-                    value: _authType,
-                    decoration: const InputDecoration(
-                      labelText: '认证方式 *',
+                    initialValue: _authType,
+                    decoration: InputDecoration(
+                      labelText: l10n.hostEditAuthTypeLabel,
                     ),
-                    items: const [
-                      DropdownMenuItem(value: 'password', child: Text('密码')),
-                      DropdownMenuItem(value: 'privateKey', child: Text('私钥')),
+                    items: [
+                      DropdownMenuItem(value: 'password', child: Text(l10n.hostEditPassword)),
+                      DropdownMenuItem(value: 'privateKey', child: Text(l10n.hostEditPrivateKey)),
                     ],
                     onChanged: (value) => setState(() => _authType = value!),
                   ),
@@ -214,7 +227,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       decoration: InputDecoration(
-                        labelText: '密码',
+                        labelText: l10n.hostEditPassword,
                         suffixIcon: IconButton(
                           icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
                           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
@@ -225,8 +238,8 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                   // 私钥输入
                   if (_authType == 'privateKey') ...[
                     SwitchListTile(
-                      title: const Text('粘贴私钥'),
-                      subtitle: const Text('关闭则从文件选择'),
+                      title: Text(l10n.hostEditPastePrivateKey),
+                      subtitle: Text(l10n.hostEditPastePrivateKeySubtitle),
                       value: _obscurePrivateKey,
                       onChanged: (value) => setState(() => _obscurePrivateKey = value),
                     ),
@@ -234,21 +247,21 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                       TextFormField(
                         controller: _privateKeyController,
                         maxLines: 6,
-                        decoration: const InputDecoration(
-                          labelText: '私钥内容',
+                        decoration: InputDecoration(
+                          labelText: l10n.hostEditPrivateKeyContent,
                           hintText: '-----BEGIN OPENSSH PRIVATE KEY-----\n...',
                         ),
                       )
                     else
                       ListTile(
-                        title: const Text('选择私钥文件'),
+                        title: Text(l10n.hostEditSelectPrivateKeyFile),
                         trailing: TextButton(
                           onPressed: () async {
                             try {
                               final result = await FilePicker.platform.pickFiles(
                                 type: FileType.custom,
                                 allowedExtensions: ['pem', 'key', 'ppk', 'id_rsa', '*'],
-                                dialogTitle: '选择私钥文件',
+                                dialogTitle: l10n.hostEditSelectPrivateKeyFile,
                               );
                               if (result != null && result.files.single.path != null) {
                                 final file = File(result.files.single.path!);
@@ -259,7 +272,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('已读取私钥文件: ${result.files.single.name}'),
+                                      content: Text(l10n.hostEditPrivateKeyFileRead(result.files.single.name)),
                                       duration: const Duration(seconds: 2),
                                       behavior: SnackBarBehavior.floating,
                                     ),
@@ -270,7 +283,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('读取文件失败: $e'),
+                                    content: Text(l10n.hostEditReadFileFailed(e.toString())),
                                     backgroundColor: cDanger,
                                     behavior: SnackBarBehavior.floating,
                                   ),
@@ -278,7 +291,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                               }
                             }
                           },
-                          child: const Text('选择'),
+                          child: Text(l10n.hostEditSelect),
                         ),
                       ),
                     const SizedBox(height: 8),
@@ -286,7 +299,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                       controller: _passphraseController,
                       obscureText: _obscurePassphrase,
                       decoration: InputDecoration(
-                        labelText: '私钥密码 (可选)',
+                        labelText: l10n.hostEditPassphraseLabel,
                         suffixIcon: IconButton(
                           icon: Icon(_obscurePassphrase ? Icons.visibility : Icons.visibility_off),
                           onPressed: () => setState(() => _obscurePassphrase = !_obscurePassphrase),
@@ -297,14 +310,14 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                   const SizedBox(height: 24),
 
                   // 分组与标签
-                  _buildSectionTitle('分组与标签'),
+                  _buildSectionTitle(l10n.hostEditSectionGroupTag),
                   const SizedBox(height: 12),
 
                   // 分组：下拉候选 + 自由输入（新建分组）
                   _buildGroupField(),
                   const SizedBox(height: 12),
 
-                  const Text('标签颜色', style: TextStyle(color: cTextSub)),
+                  Text(l10n.hostEditTagColor, style: TextStyle(color: tc.textSub)),
                   const SizedBox(height: 8),
                   ColorPickerRow(
                     selectedColor: _tagColor,
@@ -313,15 +326,15 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                   const SizedBox(height: 24),
 
                   // 高级设置
-                  _buildSectionTitle('高级设置'),
+                  _buildSectionTitle(l10n.commonAdvancedSettings),
                   const SizedBox(height: 12),
 
                   // 跳板机/堡垒机配置（内联）
-                  _buildSectionTitle('跳板机 / 堡垒机'),
+                  _buildSectionTitle(l10n.hostEditSectionJumpHost),
                   const SizedBox(height: 8),
                   SwitchListTile(
-                    title: const Text('使用跳板机'),
-                    subtitle: const Text('通过跳板机/堡垒机中转连接'),
+                    title: Text(l10n.hostEditUseJumpHost),
+                    subtitle: Text(l10n.hostEditUseJumpHostSubtitle),
                     value: _jumpExpanded,
                     onChanged: (value) => setState(() => _jumpExpanded = value),
                   ),
@@ -329,10 +342,10 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                     const SizedBox(height: 8),
                     TextFormField(
                       controller: _jumpHostController,
-                      decoration: const InputDecoration(
-                        labelText: '跳板机地址 *',
-                        hintText: 'IP 地址或域名',
-                        prefixIcon: Icon(Icons.swap_horiz, size: 16),
+                      decoration: InputDecoration(
+                        labelText: l10n.hostEditJumpHostLabel,
+                        hintText: l10n.hostEditHostHint,
+                        prefixIcon: const Icon(Icons.swap_horiz, size: 16),
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -341,7 +354,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                         Expanded(
                           child: TextFormField(
                             controller: _jumpPortController,
-                            decoration: const InputDecoration(labelText: '跳板机端口'),
+                            decoration: InputDecoration(labelText: l10n.hostEditJumpPortLabel),
                             keyboardType: TextInputType.number,
                           ),
                         ),
@@ -350,18 +363,18 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                           flex: 2,
                           child: TextFormField(
                             controller: _jumpUsernameController,
-                            decoration: const InputDecoration(labelText: '跳板机用户名'),
+                            decoration: InputDecoration(labelText: l10n.hostEditJumpUsernameLabel),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: _jumpAuthType,
-                      decoration: const InputDecoration(labelText: '跳板机认证方式'),
-                      items: const [
-                        DropdownMenuItem(value: 'password', child: Text('密码')),
-                        DropdownMenuItem(value: 'privateKey', child: Text('私钥')),
+                      initialValue: _jumpAuthType,
+                      decoration: InputDecoration(labelText: l10n.hostEditJumpAuthTypeLabel),
+                      items: [
+                        DropdownMenuItem(value: 'password', child: Text(l10n.hostEditPassword)),
+                        DropdownMenuItem(value: 'privateKey', child: Text(l10n.hostEditPrivateKey)),
                       ],
                       onChanged: (value) => setState(() => _jumpAuthType = value),
                     ),
@@ -372,7 +385,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                         controller: _jumpPasswordController,
                         obscureText: _obscureJumpPassword,
                         decoration: InputDecoration(
-                          labelText: '跳板机密码',
+                          labelText: l10n.hostEditJumpPasswordLabel,
                           suffixIcon: IconButton(
                             icon: Icon(_obscureJumpPassword ? Icons.visibility : Icons.visibility_off),
                             onPressed: () => setState(() => _obscureJumpPassword = !_obscureJumpPassword),
@@ -386,7 +399,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                         obscureText: _obscureJumpPrivateKey,
                         maxLines: 4,
                         decoration: InputDecoration(
-                          labelText: '跳板机私钥内容',
+                          labelText: l10n.hostEditJumpPrivateKeyContent,
                           hintText: '-----BEGIN OPENSSH PRIVATE KEY-----\n...',
                           suffixIcon: IconButton(
                             icon: Icon(_obscureJumpPrivateKey ? Icons.visibility : Icons.visibility_off),
@@ -408,7 +421,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              '将先连接跳板机，再通过跳板机转发到目标服务器',
+                              l10n.hostEditJumpHostFlowHint,
                               style: TextStyle(fontSize: fMicro, color: cInfo.withValues(alpha: 0.8)),
                             ),
                           ),
@@ -418,27 +431,65 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                   ],
                   const SizedBox(height: 16),
 
+                  // 权限提升 (sudo) — AI 执行 sudo 命令时自动注入此密码
+                  _buildSectionTitle(l10n.hostEditSectionSudo),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _sudoPasswordController,
+                    obscureText: _obscureSudoPassword,
+                    decoration: InputDecoration(
+                      labelText: l10n.hostEditSudoPasswordLabel,
+                      hintText: l10n.hostEditSudoPasswordHint,
+                      suffixIcon: IconButton(
+                        icon: Icon(_obscureSudoPassword ? Icons.visibility : Icons.visibility_off),
+                        onPressed: () => setState(() => _obscureSudoPassword = !_obscureSudoPassword),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: cInfo.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(rSmall),
+                      border: Border.all(color: cInfo.withValues(alpha: 0.15)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.info_outline, size: 12, color: cInfo),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            l10n.hostEditSudoPasswordDesc,
+                            style: TextStyle(fontSize: fMicro, color: cInfo.withValues(alpha: 0.8)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
                   ExpansionTile(
-                    title: const Text('更多设置'),
+                    title: Text(l10n.hostEditMoreSettings),
                     children: [
                       Padding(
                         padding: const EdgeInsets.all(pStandard),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('连接超时: $_timeout 秒'),
+                            Text(l10n.hostEditConnectionTimeout(_timeout)),
                             Slider(
                               value: _timeout.toDouble(),
                               min: 10,
                               max: 120,
                               divisions: 11,
-                              label: '$_timeout 秒',
+                              label: l10n.hostEditTimeoutSeconds(_timeout),
                               onChanged: (value) => setState(() => _timeout = value.toInt()),
                             ),
                             const SizedBox(height: 12),
                             DropdownButtonFormField<String>(
-                              value: _encoding,
-                              decoration: const InputDecoration(labelText: '字符编码'),
+                              initialValue: _encoding,
+                              decoration: InputDecoration(labelText: l10n.hostEditEncodingLabel),
                               items: const [
                                 DropdownMenuItem(value: 'utf-8', child: Text('UTF-8')),
                                 DropdownMenuItem(value: 'gbk', child: Text('GBK')),
@@ -460,15 +511,15 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
               height: 64,
               padding: const EdgeInsets.symmetric(horizontal: pStandard, vertical: 8),
               decoration: BoxDecoration(
-                color: ThemeColors.of(context).card,
-                border: Border(top: BorderSide(color: ThemeColors.of(context).border)),
+                color: tc.card,
+                border: Border(top: BorderSide(color: tc.border)),
               ),
               child: Row(
                 children: [
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => context.pop(),
-                      child: const Text('取消'),
+                      child: Text(l10n.commonCancel),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -476,7 +527,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                     flex: 2,
                     child: ElevatedButton(
                       onPressed: _saveHost,
-                      child: const Text('💾 保存'),
+                      child: Text(l10n.hostEditSave),
                     ),
                   ),
                 ],
@@ -501,6 +552,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
 
   /// 分组字段：下拉候选（来自现有分组）+ 自由输入（新建分组）
   Widget _buildGroupField() {
+    final l10n = AppLocalizations.of(context)!;
     // 收集现有分组（去重，保留出现顺序）
     final hosts = ref.read(hostsProvider).valueOrNull ?? [];
     final existingGroups = <String>{};
@@ -508,23 +560,25 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
       existingGroups.add(h.group);
     }
     final groupList = existingGroups.toList()..sort();
-    if (!groupList.contains('默认')) groupList.insert(0, '默认');
+    if (!groupList.any((g) => g == '默认' || g == L10n.str.hostDefaultGroup)) {
+      groupList.insert(0, L10n.str.hostDefaultGroup);
+    }
 
     return Row(
       children: [
         Expanded(
           child: TextFormField(
             controller: _groupController,
-            decoration: const InputDecoration(
-              labelText: '分组',
-              hintText: '输入或选择分组',
+            decoration: InputDecoration(
+              labelText: l10n.hostEditGroupLabel,
+              hintText: l10n.hostEditGroupHint,
             ),
           ),
         ),
         const SizedBox(width: 8),
         PopupMenuButton<String>(
           icon: const Icon(Icons.arrow_drop_down, size: 20),
-          tooltip: '选择已有分组',
+          tooltip: l10n.hostEditSelectGroupTooltip,
           onSelected: (value) {
             setState(() => _groupController.text = value);
           },
@@ -538,6 +592,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
 
   Future<void> _saveHost() async {
     if (!_formKey.currentState!.validate()) return;
+    final l10n = AppLocalizations.of(context)!;
 
     final hostId = _isEditing ? _existingHost!.id : _uuid.v4();
     final config = HostConfig.create(
@@ -547,7 +602,9 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
       port: int.tryParse(_portController.text) ?? 22,
       username: _usernameController.text.trim(),
       authType: _authType,
-      group: _groupController.text.trim().isEmpty ? '默认' : _groupController.text.trim(),
+      group: _groupController.text.trim().isEmpty || _groupController.text.trim() == L10n.str.hostDefaultGroup
+          ? '默认'
+          : _groupController.text.trim(),
       tagColor: _tagColor,
       jumpHost: _jumpExpanded ? _jumpHostController.text.trim() : null,
       jumpPort: int.tryParse(_jumpPortController.text) ?? 22,
@@ -568,7 +625,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
         value: _passwordController.text,
       );
       if (!credentialsSaved) {
-        credentialsError = '密码保存失败';
+        credentialsError = l10n.hostEditPasswordSaveFailed;
       }
     } else if (_authType == 'privateKey' && _privateKeyController.text.isNotEmpty) {
       credentialsSaved = await CredentialsStore.save(
@@ -577,7 +634,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
         value: _privateKeyController.text,
       );
       if (!credentialsSaved) {
-        credentialsError = '私钥保存失败';
+        credentialsError = l10n.hostEditPrivateKeySaveFailed;
       }
     }
     
@@ -606,6 +663,18 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
       }
     }
 
+    // 保存 sudo 密码（用于 AI 执行 sudo 命令时自动注入）
+    // 非空则保存，为空则删除（关闭 sudo 自动注入）
+    if (_sudoPasswordController.text.isNotEmpty) {
+      await CredentialsStore.save(
+        hostId: hostId,
+        type: 'sudoPassword',
+        value: _sudoPasswordController.text,
+      );
+    } else {
+      await CredentialsStore.delete(hostId: hostId, type: 'sudoPassword');
+    }
+
     // 保存配置
     if (_isEditing) {
       await ref.read(hostsProvider.notifier).updateHost(config);
@@ -617,14 +686,14 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
       if (credentialsError != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('⚠️ 配置保存成功，但 $credentialsError，请重试'),
+            content: Text(l10n.hostEditConfigSavedButCredFailed(credentialsError)),
             backgroundColor: Colors.orange,
             duration: const Duration(seconds: 4),
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('✅ 保存成功')),
+          SnackBar(content: Text(l10n.hostEditSaveSuccess)),
         );
       }
       context.pop();

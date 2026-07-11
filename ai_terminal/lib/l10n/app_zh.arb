@@ -1,0 +1,1254 @@
+{
+  "@@locale": "zh",
+  "about": "关于",
+  "aboutApp": "关于 AI Terminal",
+  "addServer": "添加服务器",
+  "address": "地址",
+  "agentNotInitialized": "请先初始化 Agent 和连接主机",
+  "agentRunning": "Agent 正在执行任务，请等待完成",
+  "agentSettingAutoExecSection": "AI 自动执行",
+  "agentSettingBuiltInPrompt": "AI 内置指令",
+  "agentSettingBuiltInPromptDesc": "这是 AI 的基本指令，修改后立即生效。里面的「context」会被替换成服务器信息。",
+  "agentSettingBuiltInPromptSubtitle": "修改 AI 的基本指令",
+  "agentSettingBuiltInSaved": "AI 内置指令已保存",
+  "agentSettingCustomPromptHint": "例如：回答使用英文、输出简洁格式、优先使用 Docker...",
+  "agentSettingExtraPrompt": "额外指令",
+  "agentSettingExtraPromptDesc": "加在内置指令后面的额外要求，可以调整 AI 的回答风格。留空则不追加。",
+  "agentSettingExtraPromptSaved": "额外指令已保存",
+  "agentSettingExtraPromptSubtitle": "加在内置指令后面的额外要求",
+  "agentSettingHundredSteps": "100步",
+  "agentSettingMaxStepsDesc": "AI 自动执行命令时，最多走几步。设为 0 表示不限步数，复杂任务不会被中途打断。",
+  "agentSettingMaxStepsLabel": "AI 最多自动执行几步",
+  "agentSettingPromptSection": "AI 提示词",
+  "agentSettingPromptWarning": "⚠️ 修改需谨慎，不合适的提示词可能导致 AI 行为异常。可随时点击\"重置\"恢复默认。",
+  "agentSettingTitle": "Agent 设置",
+  "agentSettings": "Agent 设置",
+  "agentSettingsDesc": "AI 最多自动执行几步（0=不限制）",
+  "aiAndIntelligence": "AI 与智能",
+  "aiModelAdd": "添加模型",
+  "aiModelApiKeyInvalid": "API Key 无效",
+  "aiModelApiKeyRequired": "请输入 API Key",
+  "aiModelBaseUrlRequired": "请输入 Base URL",
+  "aiModelCannotConnect": "无法连接",
+  "aiModelConfig": "AI 模型配置",
+  "aiModelConfigDesc": "配置 AI 的密钥和模型",
+  "aiModelConnectionTimeout": "连接超时",
+  "aiModelDeleteConfirm": "确定要删除 \"{name}\" 吗？",
+  "aiModelDeleteTitle": "删除模型",
+  "aiModelEditTitle": "编辑模型",
+  "aiModelEmptySubtitle": "添加你的第一个 AI，让 AI 帮你干活",
+  "aiModelEmptyTitle": "还没有 AI 模型",
+  "aiModelMaxTokens": "最长回复字数",
+  "aiModelModelName": "模型名称",
+  "aiModelModelNameRequired": "请输入模型名称",
+  "aiModelNameError": "模型名称错误",
+  "aiModelNameRequired": "请输入名称",
+  "aiModelProvider": "AI 服务商",
+  "aiModelProvidersUpdated": "服务商列表已更新（{count} 个服务商）",
+  "aiModelRefreshProviders": "更新服务商列表",
+  "aiModelRemoteConfigEmpty": "远程配置为空",
+  "aiModelRequestFailed": "请求失败 ({code})",
+  "aiModelServerError": "服务端错误 ({code})",
+  "aiModelSetAsDefault": "设为默认模型",
+  "aiModelSetDefault": "设为默认",
+  "aiModelTemperature": "随机度",
+  "aiModelTest": "测试",
+  "aiModelTestFailed": "测试失败",
+  "aiModelTitle": "AI 模型配置",
+  "aiModelTooManyRequests": "请求过于频繁",
+  "aiModelUpdateFailed": "更新失败：{error}",
+  "aiPanel": "AI 面板",
+  "appTitle": "AI Terminal",
+  "appearance": "外观设置",
+  "appearanceDesc": "切换深色/浅色模式，调整字体大小",
+  "appearanceDisplayMode": "显示模式",
+  "appearanceDisplayModeDesc": "选择深色或浅色界面",
+  "appearanceFontSizeDesc": "拖动滑块调整终端文字大小",
+  "appearanceTitle": "外观设置",
+  "auditLog": "操作日志",
+  "auditLogAllTitle": "全部操作记录",
+  "auditLogCopied": "已复制 {count} 条日志到剪贴板",
+  "auditLogCopyTooltip": "复制记录",
+  "auditLogDesc": "记录每条命令是谁、什么时候执行的",
+  "auditLogEmpty": "暂无操作记录",
+  "auditLogExecuted": "已执行",
+  "auditLogExportHeader": "# 操作记录导出",
+  "auditLogExportTime": "# 导出时间: {time}",
+  "auditLogExportTotal": "# 总条数: {count}",
+  "auditLogFilterAll": "全部记录",
+  "auditLogFilterBlocked": "仅已阻止",
+  "auditLogFilterThisHost": "仅当前主机",
+  "auditLogNoMatch": "未匹配到记录",
+  "auditLogNoRecordsToCopy": "没有可复制的记录",
+  "auditLogNotExecuted": "未执行",
+  "auditLogOutput": "输出",
+  "auditLogSafetyBlocked": "已阻止",
+  "auditLogSafetyDanger": "危险",
+  "auditLogSafetySafe": "安全",
+  "auditLogSafetyWarning": "警告",
+  "auditLogSearchHint": "搜索命令、服务器、输出...",
+  "auditLogTitle": "操作记录",
+  "authMethod": "认证方式",
+  "builtinPromptDesc": "AI 的核心系统提示词，修改后立即生效。包含「context」的位置会被替换为服务器信息。",
+  "builtinPromptSaved": "内置提示词已保存",
+  "builtinPromptTitle": "内置系统提示词",
+  "builtinPromptWarning": "⚠️ 修改需谨慎，可随时\"重置默认\"。",
+  "cancel": "取消",
+  "changeRecordAllTitle": "全部改动记录",
+  "changeRecordConfirmRollback": "确认撤销",
+  "changeRecordEmpty": "暂无改动记录",
+  "changeRecordEmptyHint": "做改动操作（如安装、启停服务）后会自动记录",
+  "changeRecordFailed": "失败",
+  "changeRecordFilterAll": "全部记录",
+  "changeRecordFilterRollbackable": "仅可撤销",
+  "changeRecordFilterThisHost": "仅当前主机",
+  "changeRecordHostNotConnected": "服务器 {hostId} 未连接，无法撤销。请先连接该服务器。",
+  "changeRecordNotRollbackable": "此记录不支持自动撤销",
+  "changeRecordOriginalCommand": "原命令: {command}",
+  "changeRecordRollbackButton": "撤销",
+  "changeRecordRollbackError": "撤销出错: {error}",
+  "changeRecordRollbackFailed": "撤销失败: {stderr}",
+  "changeRecordRollbackFailedNoExec": "撤销失败: 无法执行",
+  "changeRecordRollbackOnHost": "将在服务器 {hostName} 上执行撤销命令：",
+  "changeRecordRollbackSuccess": "撤销成功: {command}",
+  "changeRecordRolledBack": "已撤销",
+  "changeRecordRollingBack": "正在撤销: {command}",
+  "changeRecordSuccess": "成功",
+  "changeRecordTitle": "改动记录",
+  "changeRecordTypeFileOperation": "文件操作",
+  "changeRecordTypeInstall": "安装",
+  "changeRecordTypeModifyConfig": "修改配置",
+  "changeRecordTypeOther": "其他",
+  "changeRecordTypePermission": "权限修改",
+  "changeRecordTypeRestartService": "重启服务",
+  "changeRecordTypeStartService": "启动服务",
+  "changeRecordTypeStopService": "停止服务",
+  "changeRecordTypeUninstall": "卸载",
+  "changeRecords": "变更记录",
+  "changeRecordsDesc": "记录所有改动操作，出问题可以撤销",
+  "changeWindow": "安全时段",
+  "changeWindowAllDayAllowed": "全天允许",
+  "changeWindowAllowedWindow": "允许时段",
+  "changeWindowCrossDayHint": "提示：开始时间晚于结束时间表示跨夜（如 22:00 到第二天 06:00）",
+  "changeWindowCurrentWindowInfo": "当前允许时段：{window}\n其他时间做改动的命令会被拒绝（查看类命令不受影响）。",
+  "changeWindowDesc": "设定安全时段，其他时间禁止做改动",
+  "changeWindowEnable": "启用安全时段",
+  "changeWindowEnableHint": "启用后，只能在设定时段内做改动",
+  "changeWindowEndHour": "到几点结束",
+  "changeWindowEveryDay": "{window}，每天",
+  "changeWindowOnlyDays": "{window}，仅 {days}",
+  "changeWindowSaveConfig": "保存配置",
+  "changeWindowSaveFailed": "保存失败: {error}",
+  "changeWindowSaved": "安全时段设置已保存",
+  "changeWindowStartHour": "从几点开始允许",
+  "changeWindowTitle": "安全时段",
+  "changeWindowToNextDay": "{start} 到第二天 {end}",
+  "changeWindowWeekdayFri": "周五",
+  "changeWindowWeekdayMon": "周一",
+  "changeWindowWeekdaySat": "周六",
+  "changeWindowWeekdaySun": "周日",
+  "changeWindowWeekdayThu": "周四",
+  "changeWindowWeekdayTue": "周二",
+  "changeWindowWeekdayWed": "周三",
+  "changeWindowWeekdaysTitle": "哪几天允许（不选 = 每天）",
+  "chatBackToServerList": "返回服务器列表",
+  "chatClearSession": "清空会话",
+  "chatConnectServerHint": "请先连接服务器，进入终端页面后点击右下角的 AI 按钮",
+  "chatEmptyHint": "例如：安装 Docker、查看内存使用",
+  "chatEmptyTitle": "有什么可以帮你的？",
+  "chatInputHint": "输入指令或问题...",
+  "chatNeedTerminal": "AI 助手需要在终端中使用",
+  "clearMessagesFailed": "清空消息失败",
+  "close": "关闭",
+  "commonAIAssistant": "AI 助手",
+  "commonAdvancedSettings": "高级设置",
+  "commonAll": "全部",
+  "commonBack": "返回",
+  "commonCancel": "取消",
+  "commonCommand": "命令",
+  "commonConfirm": "确定",
+  "commonCopiedToClipboard": "已复制到剪贴板",
+  "commonDescription": "描述",
+  "commonExecute": "执行",
+  "commonGotIt": "知道了",
+  "commonName": "名称",
+  "commonResetDefault": "重置默认",
+  "commonUnlimited": "无限制",
+  "compactFailed": "对话压缩失败",
+  "compacting": "会话压缩中...",
+  "confirm": "确认",
+  "connErrAuth": "认证失败，请检查用户名和密码/私钥是否正确",
+  "connErrGeneric": "请检查网络连接和服务器状态",
+  "connErrNoRoute": "无法到达主机，请检查服务器地址是否正确",
+  "connErrRefused": "服务器拒绝连接，请检查 SSH 端口是否正确",
+  "connErrTimeout": "连接超时，请检查网络或服务器是否可达",
+  "connecting": "连接中...",
+  "connectionFailed": "连接失败",
+  "connectionFailedHint": "连接失败，请检查网络和凭据",
+  "connectionInterrupted": "连接中断",
+  "connectionManagement": "连接管理",
+  "connectionSuccess": "连接成功",
+  "copy": "复制",
+  "customPromptDesc": "追加到 AI 系统提示词末尾的自定义指令，可用于调整 AI 行为风格、输出偏好等。留空则不追加。",
+  "customPromptSaved": "自定义提示词已保存",
+  "customPromptTitle": "自定义 AI 提示词",
+  "darkMode": "深色模式",
+  "delete": "删除",
+  "deleteConfirm": "确认删除？",
+  "edit": "编辑",
+  "editServer": "编辑服务器",
+  "english": "English",
+  "errApiKeyInvalid": "API Key 无效或已过期，请在设置中更新 API Key",
+  "errBadRequest": "请求格式错误，请检查 AI 模型配置（模型名称、API 地址等）",
+  "errConnectionError": "无法连接到 AI 服务，请检查网络和 API 地址",
+  "errConnectionFailed": "连接失败: {message}",
+  "errConnectionTimeout": "连接 AI 服务超时，请检查网络",
+  "errExecutionError": "执行出错: {error}",
+  "errRateLimit": "请求过于频繁，请稍后重试",
+  "errRequestFailed": "请求失败 ({code})",
+  "errServerError": "AI 服务端错误 ({code})，请稍后重试",
+  "errorOccurred": "发生错误",
+  "fieldRequired": "此项为必填",
+  "followSystem": "跟随系统",
+  "group": "分组",
+  "hostEditAuthTypeLabel": "认证方式 *",
+  "hostEditConfigSavedButCredFailed": "⚠️ 配置保存成功，但 {error}，请重试",
+  "hostEditConnectionTimeout": "连接超时: {timeout} 秒",
+  "hostEditDefaultGroup": "默认",
+  "hostEditEncodingLabel": "字符编码",
+  "hostEditGroupHint": "输入或选择分组",
+  "hostEditGroupLabel": "分组",
+  "hostEditHostHint": "IP 地址或域名",
+  "hostEditHostLabel": "主机地址 *",
+  "hostEditHostRequired": "请输入主机地址",
+  "hostEditJumpAuthTypeLabel": "跳板机认证方式",
+  "hostEditJumpHostFlowHint": "将先连接跳板机，再通过跳板机转发到目标服务器",
+  "hostEditJumpHostLabel": "跳板机地址 *",
+  "hostEditJumpPasswordLabel": "跳板机密码",
+  "hostEditJumpPortLabel": "跳板机端口",
+  "hostEditJumpPrivateKeyContent": "跳板机私钥内容",
+  "hostEditJumpUsernameLabel": "跳板机用户名",
+  "hostEditMoreSettings": "更多设置",
+  "hostEditNameHint": "例如: 生产服务器",
+  "hostEditNameLabel": "名称 *",
+  "hostEditNameRequired": "请输入名称",
+  "hostEditPassphraseLabel": "私钥密码 (可选)",
+  "hostEditPassword": "密码",
+  "hostEditPasswordSaveFailed": "密码保存失败",
+  "hostEditPastePrivateKey": "粘贴私钥",
+  "hostEditPastePrivateKeySubtitle": "关闭则从文件选择",
+  "hostEditPortLabel": "端口",
+  "hostEditPrivateKey": "私钥",
+  "hostEditPrivateKeyContent": "私钥内容",
+  "hostEditPrivateKeyFileRead": "已读取私钥文件: {name}",
+  "hostEditPrivateKeySaveFailed": "私钥保存失败",
+  "hostEditReadFileFailed": "读取文件失败: {error}",
+  "hostEditSave": "💾 保存",
+  "hostEditSaveSuccess": "✅ 保存成功",
+  "hostEditSectionAuth": "认证方式",
+  "hostEditSectionBasic": "基本信息",
+  "hostEditSectionGroupTag": "分组与标签",
+  "hostEditSectionJumpHost": "跳板机 / 堡垒机",
+  "hostEditSectionSudo": "权限提升 (sudo)",
+  "hostEditSelect": "选择",
+  "hostEditSelectGroupTooltip": "选择已有分组",
+  "hostEditSelectPrivateKeyFile": "选择私钥文件",
+  "hostEditSudoPasswordDesc": "配置后，AI 执行 sudo 命令遇到密码提示时会自动填写此密码。密码通过系统安全存储保存，不会出现在命令或日志中。",
+  "hostEditSudoPasswordHint": "AI 执行 sudo 命令时自动注入",
+  "hostEditSudoPasswordLabel": "sudo 密码 (可选)",
+  "hostEditTagColor": "标签颜色",
+  "hostEditTimeoutSeconds": "{timeout} 秒",
+  "hostEditTitleEdit": "编辑服务器",
+  "hostEditTitleNew": "新建服务器",
+  "hostEditUseJumpHost": "使用跳板机",
+  "hostEditUseJumpHostSubtitle": "通过跳板机/堡垒机中转连接",
+  "hostEditUsernameLabel": "用户名",
+  "hostListAITipIntro": "AI 助手需要在连接服务器后使用：",
+  "hostListAITipNote": "💡 AI 可以帮你生成命令、解释输出、排查问题",
+  "hostListAITipStep1": "1️⃣  点击服务器卡片进入终端",
+  "hostListAITipStep2": "2️⃣  连接成功后，右下角会出现 AI 按钮",
+  "hostListAITipStep3": "3️⃣  点击 AI 按钮，开始智能命令助手",
+  "hostListAITipTitle": "AI 助手使用提示",
+  "hostListAddFirstServer": "添加第一台服务器，开始 AI 辅助的远程管理",
+  "hostListClearSearch": "清除搜索",
+  "hostListConnectTerminal": "连接终端",
+  "hostListDeleteConfirm": "确定要删除 \"{hostName}\" 吗？\n\n同时将删除保存的凭据。",
+  "hostListDeleteServer": "删除服务器",
+  "hostListDeleteSuccess": "删除成功",
+  "hostListEditConfig": "编辑配置",
+  "hostListLoadFailed": "加载失败: {error}",
+  "hostListNoSearchResults": "未找到匹配的服务器",
+  "hostListNoSearchResultsHint": "尝试其他关键词或检查拼写",
+  "hostListNoServers": "还没有服务器",
+  "hostListSearchHint": "搜索服务器...",
+  "knowledgeBase": "命令手册",
+  "knowledgeBaseDesc": "更新命令手册，获取最新安装教程",
+  "language": "语言",
+  "languageDesc": "选择界面显示语言",
+  "languageDialogTitle": "选择语言",
+  "languageFollowSystem": "跟随系统",
+  "lightMode": "浅色模式",
+  "menuItemBuiltinPrompt": "内置提示词",
+  "menuItemCustomPrompt": "自定义提示词",
+  "messageSaveFailed": "消息保存失败，任务未启动",
+  "name": "名称",
+  "nickname": "昵称",
+  "noCredentials": "❌ 未找到登录凭据\n\n请重新编辑服务器，填写密码或私钥后保存。",
+  "notificationAlways": "每次都通知",
+  "notificationAlwaysSubtitle": "任务做完和失败都发通知",
+  "notificationEnable": "启用任务完成通知",
+  "notificationEnableHint": "任务做完或失败时自动发消息",
+  "notificationEnterUrlFirst": "请先填写通知地址",
+  "notificationFailedOnly": "只在失败时通知",
+  "notificationFailedOnlySubtitle": "只有任务失败时才发通知",
+  "notificationInstructionsBody": "1. 在钉钉/飞书/企业微信群中添加一个\"机器人\"，拿到通知地址\n2. 把地址粘贴到上面输入框\n3. 点\"发送测试通知\"看看能不能收到\n4. 以后任务做完或失败时会自动发消息到群里",
+  "notificationInstructionsTitle": "使用说明",
+  "notificationInvalidUrl": "地址格式不对: {error}",
+  "notificationSaveConfig": "保存配置",
+  "notificationSaveFailed": "保存失败: {error}",
+  "notificationSaved": "通知配置已保存",
+  "notificationSendTest": "发送测试通知",
+  "notificationSending": "发送中...",
+  "notificationTestFailed": "测试失败: {error}",
+  "notificationTestSendFailed": "发送失败，请检查通知地址",
+  "notificationTestSent": "测试通知已发送，请去群里看看",
+  "notificationTitle": "任务完成通知",
+  "notificationTriggerTitle": "什么时候发通知",
+  "notificationWebhookSupport": "支持：钉钉、飞书、企业微信群、Slack 等",
+  "notificationWebhookUrl": "通知地址",
+  "notifications": "任务通知",
+  "notificationsDesc": "任务做完后自动发消息通知你",
+  "ok": "确定",
+  "password": "密码",
+  "passwordAuth": "密码认证",
+  "pleaseConfigAIModel": "请先配置 AI 模型",
+  "port": "端口",
+  "privateKey": "私钥",
+  "privateKeyAuth": "私钥认证",
+  "quickCommands": "快捷命令",
+  "quickCommandsDesc": "保存常用命令，下次一键执行",
+  "retry": "重试",
+  "runbookBuiltinCannotDelete": "内置模板不可删除",
+  "runbookBuiltinNotEditable": "内置模板不可编辑，请使用\"克隆\"创建副本后修改",
+  "runbookBuiltinTag": "内置",
+  "runbookCategoryCustom": "自定义",
+  "runbookCategoryDeployment": "部署",
+  "runbookCategoryInspection": "巡检",
+  "runbookCategoryMaintenance": "日常维护",
+  "runbookCategorySecurity": "安全",
+  "runbookCategoryTroubleshooting": "故障排查",
+  "runbookClipboardEmpty": "剪贴板为空",
+  "runbookCloneTooltip": "克隆",
+  "runbookClonedToast": "已克隆为自定义工作流：{name}",
+  "runbookContentAgent": "Prompt 内容",
+  "runbookContentAgentHint": "例如: 检查 '{host}' 的磁盘使用情况并给出建议",
+  "runbookContentCommand": "命令内容",
+  "runbookContentCommandHint": "例如: ssh '{user}'@'{host}' df -h",
+  "runbookContentRequired": "请输入内容",
+  "runbookCreate": "创建",
+  "runbookDeleteConfirm": "确定要删除 \"{name}\" 吗？此操作不可撤销。",
+  "runbookDeleteTitle": "删除工作流",
+  "runbookDeleteTooltip": "删除",
+  "runbookDeletedToast": "已删除",
+  "runbookEditTitle": "编辑工作流",
+  "runbookEditTooltip": "编辑",
+  "runbookEmptyFiltered": "没有匹配的工作流，试试调整筛选条件",
+  "runbookEmptyHint": "点击右下角按钮新建工作流",
+  "runbookEmptyTitle": "暂无运维工作流",
+  "runbookFieldCategory": "分类",
+  "runbookFieldDescription": "描述 (可选)",
+  "runbookFieldIcon": "图标",
+  "runbookFieldName": "名称",
+  "runbookFieldType": "类型",
+  "runbookFilterAll": "全部",
+  "runbookImportButton": "导入",
+  "runbookImportHint": "从官网开放平台复制 JSON 后粘贴到此处",
+  "runbookImportPasteHint": "在此粘贴 JSON 内容…",
+  "runbookImportSuccess": "成功导入 {count} 个工作流",
+  "runbookImportTitle": "导入运维工作流",
+  "runbookImportTooltip": "导入工作流",
+  "runbookJsonParseFailed": "JSON 解析失败：{error}",
+  "runbookNameRequired": "请输入名称",
+  "runbookNewTitle": "新建工作流",
+  "runbookPasteFromClipboard": "从剪贴板粘贴",
+  "runbookPasteJsonFirst": "请先粘贴 JSON 内容",
+  "runbookRunCount": "执行 {count} 次",
+  "runbookSearchHint": "搜索工作流名称或描述",
+  "runbookTitle": "运维工作流",
+  "runbookTypeAgentDesc": "自然语言 prompt，AI 按 ReAct 框架执行",
+  "runbookTypeAgentOption": "AI 执行",
+  "runbookTypeAgentTag": "AI执行",
+  "runbookTypeCommand": "直接执行",
+  "runbookTypeCommandDesc": "变量替换后在终端直接执行命令",
+  "runbookUseInTerminal": "请在终端页面使用",
+  "runbooks": "运维工作流",
+  "runbooksDesc": "把常用运维操作存成模板，一键运行",
+  "save": "保存",
+  "scrollToBottom": "回到底部",
+  "search": "搜索",
+  "securityAllDataCleared": "所有数据已清除",
+  "securityAppLockSubtitleOff": "关闭后打开 App 不需要验证",
+  "securityAppLockSubtitleOn": "打开 App 时需要{biometricType}或密码",
+  "securityAuditLogSubtitle": "查看每条命令的执行记录",
+  "securityAuditLogTitle": "操作记录",
+  "securityAuthenticateReason": "验证身份以启用应用锁",
+  "securityBiometricFaceId": "面容 ID",
+  "securityBiometricFingerprint": "指纹",
+  "securityBiometricGeneric": "生物识别",
+  "securityBiometricNotSupported": "⚠️ 设备不支持指纹或面容",
+  "securityBiometricStatusTitle": "指纹/面容状态",
+  "securityBiometricSupported": "✅ 支持 {biometricType}",
+  "securityClearAllData": "清除所有数据",
+  "securityClearAllDataSubtitle": "删除所有服务器、聊天记录、密码（无法恢复）",
+  "securityClearConfirmPrompt": "请输入 DELETE 确认:",
+  "securityClearFailed": "清除失败: {error}",
+  "securityClearIrreversible": "此操作无法撤销！",
+  "securityClearItemAiModels": "• AI 模型设置",
+  "securityClearItemChats": "• 聊天记录",
+  "securityClearItemPasswords": "• 所有密码",
+  "securityClearItemServers": "• 服务器列表",
+  "securityClearItemSnippets": "• 快捷命令",
+  "securityClearWarning": "此操作将删除所有数据，包括:",
+  "securityConfirmDelete": "确认删除",
+  "securityDangerAction": "⚠️ 危险操作",
+  "securityEnableAppLock": "启用应用锁",
+  "securitySettings": "安全设置",
+  "securitySettingsDesc": "用指纹或面容解锁 App",
+  "securityTitle": "安全设置",
+  "selectFile": "选择文件",
+  "send": "发送",
+  "serverList": "服务器列表",
+  "serverListDesc": "添加、编辑你要远程连接的服务器",
+  "settings": "设置",
+  "settingsAI": "AI 与智能",
+  "settingsAIModel": "AI 模型配置",
+  "settingsAIModelDesc": "配置 AI 的密钥和模型",
+  "settingsAbout": "关于",
+  "settingsAboutApp": "关于 AI Terminal",
+  "settingsAgent": "Agent 设置",
+  "settingsAgentDesc": "AI 最多自动执行几步（0=不限制: {steps}）",
+  "settingsAppearance": "外观与体验",
+  "settingsAppearanceSettings": "外观设置",
+  "settingsAppearanceSettingsDesc": "切换深色/浅色模式，调整字体大小",
+  "settingsAuditLog": "操作记录",
+  "settingsAuditLogDesc": "记录每条命令是谁、什么时候执行的",
+  "settingsChangeRecords": "改动记录",
+  "settingsChangeRecordsDesc": "记录所有改动操作，出问题可以撤销",
+  "settingsChangeWindow": "安全时段",
+  "settingsChangeWindowDesc": "设定安全时段，其他时间禁止做改动",
+  "settingsCheckUpdate": "检查更新",
+  "settingsConnection": "连接管理",
+  "settingsHosts": "服务器列表",
+  "settingsHostsDesc": "添加、编辑你要远程连接的服务器",
+  "settingsKnowledge": "命令手册",
+  "settingsKnowledgeDesc": "更新命令手册，获取最新安装教程",
+  "settingsLanguage": "语言",
+  "settingsLanguageDesc": "选择界面语言",
+  "settingsNotification": "任务完成通知",
+  "settingsNotificationDesc": "任务做完后自动发消息通知你",
+  "settingsRunbooks": "运维工作流",
+  "settingsRunbooksDesc": "把常用运维操作存成模板，一键运行",
+  "settingsSecurity": "安全设置",
+  "settingsSecurityDesc": "用指纹或面容解锁 App",
+  "settingsSnippets": "快捷命令",
+  "settingsSnippetsDesc": "保存常用命令，下次一键执行",
+  "settingsTitle": "设置",
+  "settingsVersion": "版本 1.3.4",
+  "simplifiedChinese": "简体中文",
+  "snippetCommandHint": "例如: docker exec -it '{container}' /bin/bash",
+  "snippetCommandLabel": "命令:",
+  "snippetCommandRequired": "请输入命令",
+  "snippetCopyCommand": "复制命令",
+  "snippetDeleteConfirm": "确定要删除 \"{name}\" 吗？",
+  "snippetDeleteTitle": "删除命令",
+  "snippetEditTitle": "编辑命令",
+  "snippetEmptyHint": "点击下方按钮添加",
+  "snippetEmptyTitle": "暂无快捷命令",
+  "snippetFieldCommand": "命令",
+  "snippetFieldDescription": "描述 (可选)",
+  "snippetNameRequired": "请输入名称",
+  "snippetNewTitle": "新建命令",
+  "snippetResolvedCommand": "命令: {command}",
+  "snippetTitle": "快捷命令",
+  "taskAborted": "⚠️ 任务异常终止",
+  "taskCancelled": "⚠️ 任务已取消",
+  "taskCompleted": "任务已完成",
+  "taskExecutionError": "⚠️ 任务执行异常",
+  "taskFailed": "任务失败",
+  "taskMaxSteps": "达到最大执行步数，任务被中断",
+  "taskTerminated": "任务已终止",
+  "terminalAgentLog": "Agent 日志",
+  "terminalClearScreen": "清屏",
+  "terminalCloseTabConfirm": "关闭此标签页将取消正在运行的任务，确定关闭吗？",
+  "terminalCollapseAIPanel": "收起 AI 面板",
+  "terminalCollapseMonitorPanel": "收起监控面板",
+  "terminalCommandLabel": "命令: {command}",
+  "terminalCommandTemplate": "命令模板:",
+  "terminalCompactingHistory": "AI 正在压缩历史对话",
+  "terminalCompactionDone": "记忆压缩完成",
+  "terminalCompactionFailed": "压缩失败: {error}",
+  "terminalConfigure": "配置",
+  "terminalConnectHostFailed": "连接 {hostName} 失败: {error}",
+  "terminalConnectTerminalFirst": "请先连接终端",
+  "terminalConnectTerminalForCommand": "请先连接终端后再执行命令",
+  "terminalConnectTerminalForRunbook": "请先连接终端（SSH 或本地终端）后再使用运维工作流",
+  "terminalConnected": "已连接",
+  "terminalConnecting": "正在连接 {host}...",
+  "terminalCreateNew": "+ 新建",
+  "terminalCustomPromptHint": "例如：回答使用英文、输出简洁格式、优先使用 Docker...",
+  "terminalExitOrchestrator": "退出编排模式",
+  "terminalExpandAIPanel": "展开 AI 面板",
+  "terminalExpandMonitorPanel": "展开监控面板",
+  "terminalFillVariables": "填写变量 - {name}",
+  "terminalFontSize": "终端字体大小: {size}px",
+  "terminalHostNoCredentials": "{hostName} 未配置凭据，请先编辑服务器",
+  "terminalHostNotFound": "主机不存在",
+  "terminalInputHintDefault": "描述需求，Agent 自动执行...",
+  "terminalInputHintDisconnected": "连接终端后可用",
+  "terminalInputHintEmpty": "输入需求开始自动执行...",
+  "terminalManage": "管理",
+  "terminalInputHintOrchestrator": "多机编排模式：描述跨主机任务，如\"同步所有服务器时间\"",
+  "terminalInputHintRunning": "Agent 执行中...",
+  "terminalLayoutBottom": "下",
+  "terminalLayoutRight": "右",
+  "terminalLocalStartFailed": "本地终端启动失败",
+  "terminalLocalStartFailedWithError": "本地终端启动失败: {error}",
+  "terminalMaxSteps": "最大步骤数",
+  "terminalMaxStepsDesc": "Agent 自动模式下的最大执行步骤数。设为 0 表示无限制，复杂任务不会被中断。",
+  "terminalMaxStepsLabel": "步骤数 (0 = 无限制)",
+  "terminalMaxStepsSet": "最大步骤数已设为 {value}",
+  "terminalMaxStepsTitle": "最大执行步骤数",
+  "terminalModel": "模型",
+  "terminalMonitor": "监控",
+  "terminalNewConnection": "新连接",
+  "terminalNoHostsSaved": "暂无已保存的主机\n请先在主页添加服务器",
+  "terminalNoRunbooks": "暂无运维工作流",
+  "terminalNoRunbooksHint": "点击\"管理\"新建工作流",
+  "terminalNotConnected": "需要连接到终端才能使用自动模式",
+  "terminalNotReady": "终端未连接，请先连接终端",
+  "terminalOffline": "离线",
+  "terminalOrchestratorConnected": "{connected}/{total} 已连接",
+  "terminalOrchestratorHostList": "多机编排 · 主机清单",
+  "terminalOrchestratorMode": "编排 · {connected}/{total}",
+  "terminalReadOnlyOff": "只读模式（Dry-run）",
+  "terminalReadOnlyOn": "只读模式已开启（点击关闭）",
+  "terminalReconnect": "重连",
+  "terminalRoleYou": "你",
+  "terminalRunbookTemplates": "运维模板",
+  "terminalRunbookTypeCommand": "命令",
+  "terminalSelectServerForNewTab": "选择服务器新标签连接",
+  "terminalSessionCreated": "已新建会话",
+  "terminalSessionHistory": "会话历史",
+  "terminalStatusNotConnected": "未连接",
+  "terminalTaskRunning": "任务正在运行",
+  "terminalUnfilledVariables": "存在未填写的变量，已取消执行",
+  "testConnection": "测试连接",
+  "themeMode": "主题模式",
+  "thinkingNextStep": "🤔 正在思考下一步...",
+  "toolRetryExhausted": "工具调用重试次数耗尽，任务终止",
+  "username": "用户名",
+  "@aiModelDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@aiModelProvidersUpdated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@aiModelRequestFailed": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "@aiModelServerError": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "@aiModelUpdateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@auditLogCopied": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@auditLogExportTime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@auditLogExportTotal": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@changeRecordHostNotConnected": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordOriginalCommand": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordRollbackError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordRollbackFailed": {
+    "placeholders": {
+      "stderr": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordRollbackOnHost": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordRollbackSuccess": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordRollingBack": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeWindowCurrentWindowInfo": {
+    "placeholders": {
+      "window": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeWindowEveryDay": {
+    "placeholders": {
+      "window": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeWindowOnlyDays": {
+    "placeholders": {
+      "window": {
+        "type": "String"
+      },
+      "days": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeWindowSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeWindowToNextDay": {
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "@errConnectionFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "@errExecutionError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@errRequestFailed": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "@errServerError": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "@hostEditConfigSavedButCredFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@hostEditConnectionTimeout": {
+    "placeholders": {
+      "timeout": {
+        "type": "int"
+      }
+    }
+  },
+  "@hostEditPrivateKeyFileRead": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@hostEditReadFileFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@hostEditTimeoutSeconds": {
+    "placeholders": {
+      "timeout": {
+        "type": "int"
+      }
+    }
+  },
+  "@hostListDeleteConfirm": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      }
+    }
+  },
+  "@hostListLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@notificationInvalidUrl": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@notificationSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@notificationTestFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@runbookClonedToast": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@runbookDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@runbookImportSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@runbookJsonParseFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@runbookRunCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@securityAppLockSubtitleOn": {
+    "placeholders": {
+      "biometricType": {
+        "type": "String"
+      }
+    }
+  },
+  "@securityBiometricSupported": {
+    "placeholders": {
+      "biometricType": {
+        "type": "String"
+      }
+    }
+  },
+  "@securityClearFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@settingsAgentDesc": {
+    "placeholders": {
+      "steps": {
+        "type": "int"
+      }
+    }
+  },
+  "@snippetDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@snippetResolvedCommand": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalCommandLabel": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalCompactionFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalConnectHostFailed": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalConnecting": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalFillVariables": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalFontSize": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "@terminalHostNoCredentials": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalLocalStartFailedWithError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalMaxStepsSet": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "@terminalOrchestratorConnected": {
+    "placeholders": {
+      "connected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@terminalOrchestratorMode": {
+    "placeholders": {
+      "connected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "monitorCollecting": "采集中",
+  "monitorWaitingData": "等待数据",
+  "monitorMemory": "内存",
+  "monitorUpload": "上传",
+  "monitorDownload": "下载",
+  "monitorDisk": "磁盘",
+  "monitorUptime": "开机",
+  "monitorUser": "用户",
+  "monitorNetTotalDown": "总下行速率",
+  "monitorNetTotalUp": "总上行速率",
+  "monitorNetTotalDownloaded": "累计下载",
+  "monitorNetTotalUploaded": "累计上传",
+  "monitorNetInterfaceCount": "接口数",
+  "monitorNetInterfaceDetail": "接口明细",
+  "monitorNetColInterface": "接口",
+  "monitorNetColTraffic": "总流量 ↓/↑",
+  "monitorNetColRate": "速率 ↓/↑",
+  "monitorNetColIssues": "错/丢",
+  "monitorDiskTotal": "总容量",
+  "monitorDiskUsed": "已用",
+  "monitorDiskAvailable": "可用",
+  "monitorDiskOverallUsage": "总使用率",
+  "monitorDiskPartitionCount": "分区数",
+  "monitorDiskPartitionDetail": "分区明细",
+  "monitorDiskColMount": "挂载点",
+  "monitorDiskColUsage": "已用/总量",
+  "monitorDiskColPercent": "使用率",
+  "monitorCpuDetail": "CPU 详情",
+  "monitorCpuTotalUsage": "总使用率",
+  "monitorCpuUser": "用户态",
+  "monitorCpuSystem": "内核态",
+  "monitorCpuIdle": "空闲",
+  "monitorLoad1": "1分钟负载",
+  "monitorLoad5": "5分钟负载",
+  "monitorLoad15": "15分钟负载",
+  "monitorProcessCount": "进程数",
+  "monitorMemoryDetail": "内存详情",
+  "monitorMemoryTotal": "总内存",
+  "monitorMemoryFree": "空闲",
+  "monitorMemoryCached": "缓存",
+  "monitorMemoryBuffers": "缓冲",
+  "monitorMemoryUsage": "使用率",
+  "monitorSwapTotal": "Swap 总量",
+  "monitorSwapUsed": "Swap 已用",
+  "monitorDiskDetail": "磁盘详情",
+  "monitorDiskTotal2": "总量",
+  "monitorDiskUsage": "使用率",
+  "monitorNetDetail": "网络详情",
+  "monitorUserSession": "用户与会话",
+  "monitorLoginUsers": "登录用户数",
+  "monitorSystemInfo": "系统信息",
+  "monitorUptimeLabel": "开机时长",
+  "monitorKernelVersion": "内核版本",
+  "monitorErrorCollecting": "采集进行中",
+  "monitorErrorNotConnected": "未连接",
+  "monitorErrorEmptyOutput": "采集输出为空",
+  "terminalLocalTab": "本地",
+  "sessionNew": "新建",
+  "sessionNoSessions": "暂无会话",
+  "sessionCompressed": "已压缩",
+  "sessionRename": "重命名",
+  "sessionRenameTitle": "重命名会话",
+  "sessionRenameHint": "输入会话名称",
+  "sessionDeleteTitle": "删除会话？",
+  "runbookJsonTopLevelArray": "JSON 顶层应为数组",
+  "hostDefaultGroup": "默认",
+  "orchEnterMode": "进入多机编排模式",
+  "orchExitMode": "退出编排模式",
+  "orchInvalidTarget": "targetHost 格式非法（仅允许 IP 或域名字符）",
+  "orchConnectTimeout": "连接超时或被拒绝",
+  "orchNoHostsConfigured": "（暂无已配置的主机）",
+  "orchHostConnected": "已连接",
+  "orchHostDisconnected": "未连接",
+  "orchNoOutput": "(无输出)",
+  "orchUnknown": "未知",
+  "orchUnreachable": "不可达",
+  "orchToolNoOutput": "(无输出)",
+  "orchToolHostIdsEmpty": "hostIds 解析后为空",
+  "orchToolConnParamMissing": "参数缺失或无效: fromHostId、targetHost、port(正整数) 为必填项",
+  "orchToolUploadParamMissing": "参数缺失: hostId、local、remote 为必填项",
+  "orchToolLocalIsDir": "本地路径是目录，请设置 recursive=true 以递归上传",
+  "orchAgentRunning": "Agent 正在执行任务，请等待完成",
+  "orchInputTruncated": "...(输入过长，已截断)",
+  "orchSkippedPreviousFailed": "已跳过（前序主机失败）",
+  "monitorCollectingFailed": "采集失败（连续 {count} 次）",
+  "monitorNetMoreInterfaces": "还有 {count} 个接口未显示",
+  "sessionMessageCount": "{count} 条消息",
+  "sessionDeleteConfirm": "会话「{title}」的所有消息和日志将被永久删除，无法恢复。",
+  "runbookCopy": "{name} (副本)",
+  "orchHostNotConnected": "主机 {hostId} 未连接",
+  "orchExecException": "执行异常: {error}",
+  "orchSourceNotConnected": "源主机 {hostId} 未连接",
+  "orchProbeException": "探测异常: {error}",
+  "orchBatchExec": "批量执行: {command}",
+  "orchBatchResult": "结果: {success}/{total} 成功",
+  "orchErrorPrefix": "错误: {detail}",
+  "orchToolParamMissing": "参数缺失: {params} 为必填项",
+  "orchToolHostNotConnected": "主机 {hostId} 未连接或不存在",
+  "orchToolHostFailed": "主机 {hostId} 命令失败 (exit={exitCode})",
+  "orchToolBatchProgress": "批量执行: {command} → {count} 台主机",
+  "orchToolBatchFailed": "{failed}/{total} 台主机执行失败",
+  "orchToolConnProgress": "[{fromHostId} → {targetHost}:{port}] 测试连通性...",
+  "orchToolNotSshSession": "主机 {hostId} 不是 SSH 远程会话，无法 SFTP 上传",
+  "orchToolSshNotEstablished": "主机 {hostId} 的 SSH 连接未建立",
+  "orchToolLocalNotFound": "本地路径不存在: {path}",
+  "orchToolSftpOpening": "[{hostId}] 正在打开 SFTP 子系统...",
+  "orchToolExecProgress": "[{hostId}] 执行: {command}",
+  "orchTaskAbnormal": "⚠️ 任务异常终止: {error}",
+  "@monitorCollectingFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@monitorNetMoreInterfaces": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@sessionMessageCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@sessionDeleteConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "@runbookCopy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchHostNotConnected": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchExecException": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchSourceNotConnected": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchProbeException": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchBatchExec": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchBatchResult": {
+    "placeholders": {
+      "success": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@orchErrorPrefix": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolParamMissing": {
+    "placeholders": {
+      "params": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolHostNotConnected": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolHostFailed": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      },
+      "exitCode": {
+        "type": "int"
+      }
+    }
+  },
+  "@orchToolBatchProgress": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@orchToolBatchFailed": {
+    "placeholders": {
+      "failed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@orchToolConnProgress": {
+    "placeholders": {
+      "fromHostId": {
+        "type": "String"
+      },
+      "targetHost": {
+        "type": "String"
+      },
+      "port": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolNotSshSession": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolSshNotEstablished": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolLocalNotFound": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolSftpOpening": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolExecProgress": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      },
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchTaskAbnormal": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  }
+}

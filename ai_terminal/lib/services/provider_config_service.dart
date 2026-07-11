@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
-import 'package:hive/hive.dart';
+import 'daos.dart';
 
-const String _boxName = 'provider_config';
 const String _providersKey = 'providers_json';
 const String _versionKey = 'providers_version';
 const String _remoteConfigUrl = 'https://ai-terminal.keiskei.top/config/ai_providers.json';
@@ -111,7 +110,6 @@ class ProviderInfo {
 }
 
 class ProviderConfigService {
-  static Box? _box;
   static List<ProviderInfo> _providers = [];
   static bool _initialized = false;
 
@@ -119,9 +117,8 @@ class ProviderConfigService {
 
   static Future<void> init() async {
     if (_initialized) return;
-    _box = await Hive.openBox(_boxName);
 
-    final cached = _box?.get(_providersKey) as String?;
+    final cached = SettingsDao.getCached(_providersKey) as String?;
     if (cached != null && cached.isNotEmpty) {
       try {
         _providers = _parseProvidersJson(cached);
@@ -201,7 +198,7 @@ class ProviderConfigService {
           _providers = newProviders;
           await _saveProviders(_providers);
           final version = response.headers.value('etag') ?? DateTime.now().millisecondsSinceEpoch.toString();
-          await _box?.put(_versionKey, version);
+          await SettingsDao.set(_versionKey, version);
           return RefreshResult.success(newProviders.length);
         }
         return RefreshResult.empty();
@@ -227,7 +224,7 @@ class ProviderConfigService {
 
   static Future<void> _saveProviders(List<ProviderInfo> providers) async {
     final jsonList = providers.map((p) => p.toJson()).toList();
-    await _box?.put(_providersKey, jsonEncode({'providers': jsonList}));
+    await SettingsDao.set(_providersKey, jsonEncode({'providers': jsonList}));
   }
 
   static List<ProviderInfo> _parseProvidersJson(String jsonStr) {

@@ -83,7 +83,7 @@ class AgentCommandBlock extends StatelessWidget {
       decoration: BoxDecoration(
         color: tc.terminalOutput,
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: cBorder, width: 1),
+        border: Border.all(color: tc.border, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: Row(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/constants.dart';
+import '../core/theme_colors.dart';
 import '../models/chat_session.dart';
 
 Future<bool> showConfirmDialog(BuildContext context, CommandBlock cmd) async {
@@ -36,6 +37,7 @@ class _SimpleConfirmDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     return AlertDialog(
       title: const Text('确认执行命令'),
       content: Column(
@@ -43,21 +45,21 @@ class _SimpleConfirmDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (cmd.description != null) ...[
-            Text(cmd.description!, style: const TextStyle(color: cTextSub)),
+            Text(cmd.description!, style: TextStyle(color: tc.textSub)),
             const SizedBox(height: 12),
           ],
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
+              color: tc.terminalBg,
               borderRadius: BorderRadius.circular(8),
             ),
             child: SelectableText(
               cmd.command,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'JetBrainsMono',
                 fontSize: fMono,
-                color: cTerminalGreen,
+                color: tc.terminalGreen,
               ),
             ),
           ),
@@ -97,6 +99,7 @@ class _WarnConfirmDialogState extends State<_WarnConfirmDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     return AlertDialog(
       title: const Row(
         children: [
@@ -109,12 +112,12 @@ class _WarnConfirmDialogState extends State<_WarnConfirmDialog> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('即将执行:', style: TextStyle(color: cTextSub)),
+          Text('即将执行:', style: TextStyle(color: tc.textSub)),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E),
+              color: tc.terminalBg,
               borderRadius: BorderRadius.circular(8),
             ),
             child: SelectableText(

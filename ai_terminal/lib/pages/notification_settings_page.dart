@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../l10n/app_localizations.dart';
 import '../services/notification_service.dart';
 
 /// 任务完成通知设置页
@@ -38,13 +39,14 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   }
 
   Future<void> _save() async {
+    final l10n = AppLocalizations.of(context)!;
     final url = _webhookController.text.trim();
     if (_enabled && url.isNotEmpty) {
       final err = NotificationService.validateWebhookUrl(url);
       if (err != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('URL 校验失败: $err'),
+            content: Text(l10n.notificationInvalidUrl(err)),
             backgroundColor: cDanger,
             behavior: SnackBarBehavior.floating,
           ),
@@ -61,8 +63,8 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       await NotificationService.save(cfg);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('通知配置已保存'),
+        SnackBar(
+          content: Text(l10n.notificationSaved),
           backgroundColor: cSuccess,
           behavior: SnackBarBehavior.floating,
         ),
@@ -71,7 +73,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('保存失败: $e'),
+          content: Text(l10n.notificationSaveFailed(e.toString())),
           backgroundColor: cDanger,
           behavior: SnackBarBehavior.floating,
         ),
@@ -80,10 +82,11 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   }
 
   Future<void> _testNotification() async {
+    final l10n = AppLocalizations.of(context)!;
     final url = _webhookController.text.trim();
     if (url.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先填写 webhook URL'), behavior: SnackBarBehavior.floating),
+        SnackBar(content: Text(l10n.notificationEnterUrlFirst), behavior: SnackBarBehavior.floating),
       );
       return;
     }
@@ -91,7 +94,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     if (err != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('URL 校验失败: $err'),
+          content: Text(l10n.notificationInvalidUrl(err)),
           backgroundColor: cDanger,
           behavior: SnackBarBehavior.floating,
         ),
@@ -106,7 +109,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(ok ? '测试通知已发送，请检查目标群' : '推送失败，请检查 webhook URL'),
+          content: Text(ok ? l10n.notificationTestSent : l10n.notificationTestSendFailed),
           backgroundColor: ok ? cSuccess : cDanger,
           behavior: SnackBarBehavior.floating,
         ),
@@ -115,7 +118,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('测试失败: $e'),
+          content: Text(l10n.notificationTestFailed(e.toString())),
           backgroundColor: cDanger,
           behavior: SnackBarBehavior.floating,
         ),
@@ -131,11 +134,15 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(title: const Text('任务完成通知')),
-      body: ListView(
-        padding: const EdgeInsets.all(pStandard),
-        children: [
+      appBar: AppBar(title: Text(l10n.notificationTitle)),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: ListView(
+            padding: const EdgeInsets.all(pStandard),
+            children: [
           // 启用开关
           Card(
             color: tc.card,
@@ -151,15 +158,15 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('启用任务完成通知', style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
-                        Text('任务完成或失败时向 webhook 推送通知',
+                        Text(l10n.notificationEnable, style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
+                        Text(l10n.notificationEnableHint,
                             style: TextStyle(color: tc.textSub, fontSize: fSmall)),
                       ],
                     ),
                   ),
                   Switch(
                     value: _enabled,
-                    activeColor: cWarning,
+                    activeThumbColor: cWarning,
                     onChanged: (v) => setState(() => _enabled = v),
                   ),
                 ],
@@ -171,7 +178,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             const SizedBox(height: 16),
 
             // Webhook URL
-            _buildSectionTitle('Webhook URL'),
+            _buildSectionTitle(l10n.notificationWebhookUrl),
             Card(
               color: tc.card,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rCard)),
@@ -200,12 +207,12 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(rSmall),
-                          borderSide: BorderSide(color: cPrimary),
+                          borderSide: const BorderSide(color: cPrimary),
                         ),
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text('支持：钉钉、飞书、企业微信群机器人、Slack、自定义 HTTP endpoint',
+                    Text(l10n.notificationWebhookSupport,
                         style: TextStyle(color: tc.textMuted, fontSize: fMicro)),
                   ],
                 ),
@@ -215,36 +222,36 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             const SizedBox(height: 16),
 
             // 触发条件
-            _buildSectionTitle('触发条件'),
+            _buildSectionTitle(l10n.notificationTriggerTitle),
             Card(
               color: tc.card,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rCard)),
               child: Padding(
                 padding: const EdgeInsets.all(pStandard),
-                child: Column(
-                  children: [
-                    RadioListTile<String>(
-                      value: 'failedOnly',
-                      groupValue: _trigger,
-                      onChanged: (v) => setState(() => _trigger = v ?? 'failedOnly'),
-                      title: const Text('仅失败时推送'),
-                      subtitle: const Text('只有任务失败时才推送通知'),
-                      activeColor: cPrimary,
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                    Divider(color: tc.border, height: 1),
-                    RadioListTile<String>(
-                      value: 'always',
-                      groupValue: _trigger,
-                      onChanged: (v) => setState(() => _trigger = v ?? 'always'),
-                      title: const Text('总是推送'),
-                      subtitle: const Text('任务完成和失败都推送通知'),
-                      activeColor: cPrimary,
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ],
+                child: RadioGroup<String>(
+                  groupValue: _trigger,
+                  onChanged: (v) => setState(() => _trigger = v ?? 'failedOnly'),
+                  child: Column(
+                    children: [
+                      RadioListTile<String>(
+                        value: 'failedOnly',
+                        title: Text(l10n.notificationFailedOnly),
+                        subtitle: Text(l10n.notificationFailedOnlySubtitle),
+                        activeColor: cPrimary,
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      Divider(color: tc.border, height: 1),
+                      RadioListTile<String>(
+                        value: 'always',
+                        title: Text(l10n.notificationAlways),
+                        subtitle: Text(l10n.notificationAlwaysSubtitle),
+                        activeColor: cPrimary,
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -257,7 +264,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
               icon: _testing
                   ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.send, size: 16),
-              label: Text(_testing ? '发送中...' : '发送测试通知'),
+              label: Text(_testing ? l10n.notificationSending : l10n.notificationSendTest),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(44),
                 foregroundColor: cPrimary,
@@ -272,7 +279,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
           FilledButton.icon(
             onPressed: _save,
             icon: const Icon(Icons.save, size: 16),
-            label: const Text('保存配置'),
+            label: Text(l10n.notificationSaveConfig),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(44),
               backgroundColor: cPrimary,
@@ -294,23 +301,22 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.info_outline, size: 14, color: cInfo),
+                    const Icon(Icons.info_outline, size: 14, color: cInfo),
                     const SizedBox(width: 6),
-                    Text('使用说明', style: TextStyle(color: cInfo, fontSize: fSmall, fontWeight: FontWeight.w600)),
+                    Text(l10n.notificationInstructionsTitle, style: const TextStyle(color: cInfo, fontSize: fSmall, fontWeight: FontWeight.w600)),
                   ],
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '1. 在钉钉/飞书/企业微信群中添加"自定义机器人"，获取 webhook URL\n'
-                  '2. 将 URL 粘贴到上方输入框\n'
-                  '3. 点击"发送测试通知"验证是否生效\n'
-                  '4. 此后 Agent 任务完成/失败时会自动推送通知到该群',
+                  l10n.notificationInstructionsBody,
                   style: TextStyle(color: tc.textBody, fontSize: fMicro, height: 1.6),
                 ),
               ],
             ),
           ),
         ],
+          ),
+        ),
       ),
     );
   }

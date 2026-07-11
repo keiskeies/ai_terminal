@@ -1,8 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
-import 'package:hive/hive.dart';
 import 'package:uuid/uuid.dart';
-import '../core/hive_init.dart';
+import 'daos.dart';
 import '../models/agent_event.dart';
 import '../models/conversation.dart';
 
@@ -11,16 +10,15 @@ import '../models/conversation.dart';
 /// 设计要点：
 /// - 每个 hostId（含 'local'）对应一个 project，可有多个会话
 /// - 每个 project 同时只有一个 active 会话（用户切到该服务器时自动加载）
-/// - 写盘策略：消息追加用 `box.put` 覆盖整个对象（Hive 二进制增量编码，单条消息写入开销很小）
+/// - 写盘策略：消息追加用 `ConversationsDao.upsert` 覆盖整个对象
 /// - 节流：批量场景下用 `appendToActive` 累积，由调用方控制 flush 时机
+/// - sync 读路径使用 ConversationsDao 内存缓存
 class ConversationService {
   static final ConversationService _instance = ConversationService._internal();
   factory ConversationService() => _instance;
   ConversationService._internal();
 
   static const _uuid = Uuid();
-
-  Box<Conversation> get _box => HiveInit.conversationsBox;
 
   // ═══════════════════════════════════════════
   // 会话生命周期
@@ -31,11 +29,11 @@ class ConversationService {
     required String hostId,
     String? title,
   }) {
-    // 将同 project 的其他会话设为 inactive
-    for (final conv in _box.values.toList()) {
+    // 将同 project 的其他会话设为 inactive（同步更新缓存）
+    for (final conv in ConversationsDao.cached) {
       if (conv.hostId == hostId && conv.isActive) {
         conv.isActive = false;
-        conv.save();
+        ConversationsDao.upsert(conv); // fire-and-forget 写库
       }
     }
 
@@ -44,7 +42,7 @@ class ConversationService {
       hostId: hostId,
       title: title ?? _defaultTitle(),
     );
-    _box.put(conv.id, conv);
+    ConversationsDao.upsert(conv); // fire-and-forget 写库 + 同步更新缓存
     return conv;
   }
 
@@ -56,10 +54,7 @@ class ConversationService {
   /// 获取指定 project 的当前 active 会话（没有则返回 null）
   Conversation? getActiveSession(String hostId) {
     try {
-      for (final conv in _box.values) {
-        if (conv.hostId == hostId && conv.isActive) return conv;
-      }
-      return null;
+      return ConversationsDao.getCachedActiveByHost(hostId);
     } catch (e) {
       debugPrint('[ConversationService] getActiveSession 失败: $e');
       return null;
@@ -75,30 +70,20 @@ class ConversationService {
 
   /// 列出指定 project 的所有会话（按 updatedAt 倒序）
   List<Conversation> listSessions(String hostId) {
-    final list = _box.values.where((c) => c.hostId == hostId).toList();
-    list.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-    return list;
+    return ConversationsDao.getCachedByHost(hostId);
   }
 
   /// 切换 active 会话（同 project 其他会话设为 inactive）
   void setActive(String hostId, String conversationId) {
-    for (final conv in _box.values.toList()) {
-      if (conv.hostId == hostId) {
-        final shouldActive = conv.id == conversationId;
-        if (conv.isActive != shouldActive) {
-          conv.isActive = shouldActive;
-          conv.save();
-        }
-      }
-    }
+    ConversationsDao.setActive(conversationId, hostId); // fire-and-forget 写库 + 同步更新缓存
   }
 
   /// 重命名会话
   Future<void> rename(String conversationId, String title) async {
-    final conv = _box.get(conversationId);
+    final conv = ConversationsDao.getCachedById(conversationId);
     if (conv == null) return;
     conv.title = title;
-    await conv.save();
+    await ConversationsDao.upsert(conv);
   }
 
   /// 删除会话
@@ -106,7 +91,7 @@ class ConversationService {
     // 取消该会话的待刷盘 Timer，防止已删除会话被 Timer 复活
     _flushTimers[conversationId]?.cancel();
     _flushTimers.remove(conversationId);
-    await _box.delete(conversationId);
+    await ConversationsDao.delete(conversationId);
   }
 
   // ═══════════════════════════════════════════
@@ -128,8 +113,34 @@ class ConversationService {
       command: command,
       commandSuccess: commandSuccess,
     ));
-    await conv.save();
+    try {
+      await ConversationsDao.upsert(conv);
+    } catch (e) {
+      // R8: 持久化失败不可静默吞掉 — 回滚内存中的消息追加，保持内存与磁盘一致
+      if (conv.messages.isNotEmpty) conv.messages.removeLast();
+      rethrow;
+    }
     debugPrint('[ConversationService] appendMessage: hostId=$hostId role=$role contentLength=${content.length} messages=${conv.messages.length}');
+    return conv;
+  }
+
+  /// 原子追加 user + assistant 消息对（消除两次 save 之间的崩溃窗口）
+  /// 防止崩溃后留下孤儿 user 消息（有用户提问但无 AI 回复占位）
+  Future<Conversation> appendMessagePair(
+    String hostId, {
+    required String userContent,
+    required String assistantContent,
+  }) async {
+    final conv = getOrCreateActiveSession(hostId);
+    conv.addMessage(ConvMessage.create(role: 'user', content: userContent));
+    conv.addMessage(ConvMessage.create(role: 'assistant', content: assistantContent));
+    try {
+      await ConversationsDao.upsert(conv);
+    } catch (e) {
+      // 回滚两条消息追加
+      if (conv.messages.length >= 2) conv.messages.removeRange(conv.messages.length - 2, conv.messages.length);
+      rethrow;
+    }
     return conv;
   }
 
@@ -148,7 +159,12 @@ class ConversationService {
       conv.messages[lastIdx].events = events;
     }
     conv.updatedAt = DateTime.now();
-    await conv.save();
+    try {
+      await ConversationsDao.upsert(conv);
+    } catch (e) {
+      debugPrint('[ConversationService] updateLastAssistantContent 保存失败 (hostId=$hostId): $e');
+      rethrow;
+    }
   }
 
   /// 追加 Agent 日志到 active 会话
@@ -177,7 +193,10 @@ class ConversationService {
     _flushTimers[conv.id]?.cancel();
     _flushTimers[conv.id] = Timer(const Duration(seconds: 5), () {
       _flushTimers.remove(conv.id);
-      conv.save();
+      // await upsert 确保 agent 日志落盘；fire-and-forget 会在 app 退出时丢失
+      ConversationsDao.upsert(conv).catchError((e) {
+        debugPrint('[ConversationService] agent 日志延迟保存失败: $e');
+      });
     });
   }
 
@@ -185,8 +204,8 @@ class ConversationService {
   Future<void> flush(String conversationId) async {
     _flushTimers[conversationId]?.cancel();
     _flushTimers.remove(conversationId);
-    final conv = _box.get(conversationId);
-    if (conv != null) await conv.save();
+    final conv = ConversationsDao.getCachedById(conversationId);
+    if (conv != null) await ConversationsDao.upsert(conv);
   }
 
   Future<void> flushAll() async {
@@ -194,8 +213,13 @@ class ConversationService {
       timer.cancel();
     }
     _flushTimers.clear();
-    for (final conv in _box.values) {
-      await conv.save();
+    // 每个 upsert 独立 try/catch：单个会话保存失败不影响其他会话
+    for (final conv in ConversationsDao.cached) {
+      try {
+        await ConversationsDao.upsert(conv);
+      } catch (e) {
+        debugPrint('[ConversationService] flushAll: 会话 ${conv.id} 保存失败: $e');
+      }
     }
   }
 
@@ -203,30 +227,53 @@ class ConversationService {
   // 记忆压缩
   // ═══════════════════════════════════════════
 
-  /// 写入压缩摘要并推进 summarizedUpToIndex
-  Future<void> applySummary(String conversationId, String summary) async {
-    final conv = _box.get(conversationId);
+  /// 合并摘要最大字符数：超出时截断旧摘要尾部，保留新摘要完整
+  static const int _maxSummaryChars = 4000;
+
+  /// 写入压缩摘要并物理删除已摘要的旧消息
+  /// [deleteCount] 需要从 conv.messages 头部删除的消息条数（由 compact 计算并传入）
+  /// 删除后 summarizedUpToIndex 重置为 0，后续新消息从 0 开始追加
+  Future<void> applySummary(String conversationId, String summary, {int deleteCount = 0}) async {
+    final conv = ConversationsDao.getCachedById(conversationId);
     if (conv == null) return;
     // 如果已有旧摘要，合并（旧摘要 + 新摘要）
     if (conv.summary != null && conv.summary!.isNotEmpty) {
-      conv.summary = '${conv.summary}\n\n---\n\n$summary';
+      final merged = '${conv.summary}\n\n---\n\n$summary';
+      // 长对话场景下 summary 无限增长会撑爆 AI 上下文
+      // 超出上限时截断旧摘要（保留尾部=较新的摘要），新摘要始终完整保留
+      if (merged.length > _maxSummaryChars) {
+        final keepOld = _maxSummaryChars - summary.length - 5;
+        if (keepOld > 0) {
+          conv.summary = '...${conv.summary!.substring(conv.summary!.length - keepOld)}\n\n---\n\n$summary';
+        } else {
+          conv.summary = summary.length > _maxSummaryChars
+              ? summary.substring(summary.length - _maxSummaryChars)
+              : summary;
+        }
+      } else {
+        conv.summary = merged;
+      }
     } else {
       conv.summary = summary;
     }
-    conv.summarizedUpToIndex = conv.messages.length;
+    // 物理删除已摘要的旧消息，防止小白用户长对话场景下 conv.messages 无限增长
+    if (deleteCount > 0 && deleteCount <= conv.messages.length) {
+      conv.messages.removeRange(0, deleteCount);
+    }
+    conv.summarizedUpToIndex = 0;
     conv.updatedAt = DateTime.now();
-    await conv.save();
+    await ConversationsDao.upsert(conv);
   }
 
   /// 清空会话（删除所有消息和摘要，但保留会话本身）
   Future<void> clearMessages(String conversationId) async {
-    final conv = _box.get(conversationId);
+    final conv = ConversationsDao.getCachedById(conversationId);
     if (conv == null) return;
     conv.messages.clear();
     conv.agentLogs.clear();
     conv.summary = null;
     conv.summarizedUpToIndex = 0;
     conv.updatedAt = DateTime.now();
-    await conv.save();
+    await ConversationsDao.upsert(conv);
   }
 }

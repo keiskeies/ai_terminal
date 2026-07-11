@@ -1,7 +1,8 @@
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter/foundation.dart' hide Key;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:hive/hive.dart';
+import '../services/daos.dart';
 
 /// macOS Keychain 配置
 const _macOsOptions = MacOsOptions(
@@ -12,16 +13,15 @@ const _macOsOptions = MacOsOptions(
 ///
 /// 优先使用 flutter_secure_storage（系统安全存储，如 macOS Keychain）。
 /// 当系统安全存储不可用时（如未签名应用、Keychain 锁定等），
-/// 降级到 Hive + AES-256-CBC 加密存储（非明文）。
+/// 降级到 SQLite + AES-256-CBC 加密存储（非明文）。
 ///
 /// 旧版本数据迁移：自动检测旧 Hive credentials box 中的明文数据，
 /// 读取后加密保存并删除明文。
 class CredentialsStore {
   static late FlutterSecureStorage _storage;
-  static Box<String>? _fallbackBox;
   static bool _initialized = false;
 
-  // AES 加密密钥（固定种子，用于 Hive 降级场景）
+  // AES 加密密钥（固定种子，用于降级场景）
   // 注意：这不如系统 Keychain 安全，但远优于明文存储
   static final _encryptionKey = Key.fromUtf8(
     'A1TerminalSecureKey2024XYZ!@#\$%^',
@@ -42,13 +42,6 @@ class CredentialsStore {
       aOptions: AndroidOptions(encryptedSharedPreferences: true),
       iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
     );
-
-    // 打开 Hive 降级 box（加密存储用）
-    try {
-      _fallbackBox = await Hive.openBox<String>('credentials_fallback');
-    } catch (e) {
-      debugPrint('CredentialsStore: 降级 box 打开失败: $e');
-    }
 
     _initialized = true;
     debugPrint('CredentialsStore: 初始化完成');
@@ -89,14 +82,14 @@ class CredentialsStore {
           debugPrint('CredentialsStore: 迁移到 secure_storage 失败 ($key): $e');
         }
 
-        // secure_storage 失败时迁移到加密 Hive
+        // secure_storage 失败时迁移到加密 SQLite
         if (!saved) {
           try {
             final encrypted = _encrypt(value);
-            await _fallbackBox?.put(key, encrypted);
+            await CredentialsFallbackDao.put(key.toString(), encrypted);
             saved = true;
           } catch (e) {
-            debugPrint('CredentialsStore: 迁移到加密 Hive 失败 ($key): $e');
+            debugPrint('CredentialsStore: 迁移到加密 SQLite 失败 ($key): $e');
           }
         }
 
@@ -162,14 +155,14 @@ class CredentialsStore {
       debugPrint('Stack: $stack');
     }
 
-    // 2. 降级：AES 加密写入 Hive
+    // 2. 降级：AES 加密写入 SQLite
     try {
       final encrypted = _encrypt(value);
-      await _fallbackBox?.put(key, encrypted);
-      debugPrint('✅ CredentialsStore: 保存到加密 Hive 成功 hostId=$hostId type=$type');
+      await CredentialsFallbackDao.put(key, encrypted);
+      debugPrint('✅ CredentialsStore: 保存到加密 SQLite 成功 hostId=$hostId type=$type');
       return true;
     } catch (e) {
-      debugPrint('❌ CredentialsStore: 加密 Hive 保存也失败: $e');
+      debugPrint('❌ CredentialsStore: 加密 SQLite 保存也失败: $e');
       return false;
     }
   }
@@ -190,21 +183,21 @@ class CredentialsStore {
         return value;
       }
     } catch (e) {
-      debugPrint('⚠️ CredentialsStore: Keychain 读取失败，尝试加密 Hive: $e');
+      debugPrint('⚠️ CredentialsStore: Keychain 读取失败，尝试加密 SQLite: $e');
     }
 
-    // 2. 降级：从加密 Hive 读取
+    // 2. 降级：从加密 SQLite 读取
     try {
-      final encrypted = _fallbackBox?.get(key);
+      final encrypted = await CredentialsFallbackDao.get(key);
       if (encrypted != null) {
         final decrypted = _decrypt(encrypted);
         if (decrypted != null) {
-          debugPrint('CredentialsStore: 从加密 Hive 恢复凭据 hostId=$hostId type=$type');
+          debugPrint('CredentialsStore: 从加密 SQLite 恢复凭据 hostId=$hostId type=$type');
           return decrypted;
         }
       }
     } catch (e) {
-      debugPrint('CredentialsStore: 加密 Hive 读取失败: $e');
+      debugPrint('CredentialsStore: 加密 SQLite 读取失败: $e');
     }
 
     debugPrint('⚠️ CredentialsStore: 未找到凭据 hostId=$hostId type=$type');
@@ -225,9 +218,9 @@ class CredentialsStore {
       debugPrint('CredentialsStore: Keychain 删除失败: $e');
     }
     try {
-      await _fallbackBox?.delete(key);
+      await CredentialsFallbackDao.delete(key);
     } catch (e) {
-      debugPrint('CredentialsStore: 加密 Hive 删除失败: $e');
+      debugPrint('CredentialsStore: 加密 SQLite 删除失败: $e');
     }
     debugPrint('CredentialsStore: 删除凭据 hostId=$hostId type=$type');
   }
@@ -236,5 +229,6 @@ class CredentialsStore {
   static Future<void> deleteAll(String hostId) async {
     await delete(hostId: hostId, type: 'password');
     await delete(hostId: hostId, type: 'privateKey');
+    await delete(hostId: hostId, type: 'sudoPassword');
   }
 }

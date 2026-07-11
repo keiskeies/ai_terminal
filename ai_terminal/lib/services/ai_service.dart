@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../models/ai_model_config.dart';
 import '../models/chat_session.dart';
-import '../core/hive_init.dart';
 import '../core/prompts.dart';
+import 'daos.dart';
 import 'knowledge_service.dart';
 
 abstract class AIProvider {
@@ -17,7 +17,11 @@ abstract class AIProvider {
 }
 
 class OpenAIProvider implements AIProvider {
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 120),
+    sendTimeout: const Duration(seconds: 30),
+  ));
 
   @override
   Future<Stream<String>> chatStream({
@@ -178,7 +182,11 @@ class QwenProvider implements AIProvider {
 }
 
 class ErnieProvider implements AIProvider {
-  final Dio _dio = Dio();
+  final Dio _dio = Dio(BaseOptions(
+    connectTimeout: const Duration(seconds: 30),
+    receiveTimeout: const Duration(seconds: 120),
+    sendTimeout: const Duration(seconds: 30),
+  ));
 
   @override
   Future<Stream<String>> chatStream({
@@ -187,10 +195,38 @@ class ErnieProvider implements AIProvider {
     required AIModelConfig config,
     String? systemPrompt,
   }) async {
-    // 百度文心 API 格式（不支持 system 消息）
-    final messages = <Map<String, dynamic>>[
-      {'role': 'user', 'content': prompt},
-    ];
+    // 百度文心 API 格式（不支持 system 角色）
+    // 将 system prompt 合并到第一条 user 消息中
+    final messages = <Map<String, dynamic>>[];
+
+    // 构建带 system 上下文的历史消息
+    // 遍历 history，遇到 system 消息时缓存，遇到第一条 user 时合并注入
+    String? pendingSystem;
+    for (final m in history) {
+      if (m.role == 'system') {
+        // 多条 system 消息时累加（后一条覆盖前一条，保留最新）
+        pendingSystem = m.content;
+      } else {
+        if (m.role == 'user' && pendingSystem != null && messages.isEmpty) {
+          // 第一条 user 消息前注入缓存的 system prompt
+          messages.add({'role': 'user', 'content': '$pendingSystem\n\n${m.content}'});
+          pendingSystem = null;
+        } else {
+          messages.add({'role': m.role, 'content': m.content});
+        }
+      }
+    }
+
+    // 当前 prompt 注入 system prompt
+    // 优先用参数 systemPrompt；若 history 中有未被消费的 system（如 history 首条非 user），则合并两者
+    String effectivePrompt = prompt;
+    final effectiveSystem = systemPrompt != null && systemPrompt.isNotEmpty
+        ? (pendingSystem != null ? '$systemPrompt\n\n$pendingSystem' : systemPrompt)
+        : pendingSystem;
+    if (effectiveSystem != null && effectiveSystem.isNotEmpty) {
+      effectivePrompt = '$effectiveSystem\n\n$prompt';
+    }
+    messages.add({'role': 'user', 'content': effectivePrompt});
 
     try {
       final Response<ResponseBody> response = await _dio.post<ResponseBody>(
@@ -320,7 +356,7 @@ class AIService {
 
     // 追加用户自定义提示词
     try {
-      final customPrompt = HiveInit.settingsBox.get('customSystemPrompt') as String?;
+      final customPrompt = SettingsDao.getCached('customSystemPrompt') as String?;
       if (customPrompt != null && customPrompt.isNotEmpty) {
         systemPrompt = '$systemPrompt\n\n【用户自定义指令】\n$customPrompt';
       }

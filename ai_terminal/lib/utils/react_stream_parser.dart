@@ -7,7 +7,12 @@ class ReActStreamParser {
 
   static String _stableId(AgentEventType type, String content) {
     final bytes = utf8.encode('${type.name}:$content');
-    final hash = bytes.fold<int>(0, (h, b) => h * 31 + b);
+    // FNV-1a 64-bit hash — collision resistance far superior to h*31+b (int32)
+    int hash = 0xcbf29ce484222325;
+    for (final b in bytes) {
+      hash ^= b;
+      hash = (hash * 0x100000001b3) & 0x7FFFFFFFFFFFFFFF;
+    }
     return 'evt_${hash.toRadixString(16)}';
   }
 

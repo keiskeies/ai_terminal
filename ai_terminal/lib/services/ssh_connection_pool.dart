@@ -4,12 +4,11 @@ import 'ssh_service.dart';
 
 class _PoolEntry {
   final SSHService service;
-  int refCount;
+  int refCount = 1;
   DateTime lastActive;
 
   _PoolEntry({
     required this.service,
-    this.refCount = 1,
     DateTime? lastActive,
   }) : lastActive = lastActive ?? DateTime.now();
 }

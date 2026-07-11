@@ -113,30 +113,31 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
             ),
             const Divider(height: 1),
             if (entry.isDirectory)
-              _actionTile(Icons.folder_open, '打开', () {
+              _actionTile(context, Icons.folder_open, '打开', () {
                 Navigator.pop(ctx);
                 _controller.navigateTo(entry.path);
               }),
             if (!entry.isDirectory)
-              _actionTile(Icons.download, '下载到本地', () {
+              _actionTile(context, Icons.download, '下载到本地', () {
                 Navigator.pop(ctx);
                 _downloadFile(entry);
               }),
             if (!entry.isDirectory)
-              _actionTile(Icons.visibility, '预览内容', () {
+              _actionTile(context, Icons.visibility, '预览内容', () {
                 Navigator.pop(ctx);
                 _editOrPreviewFile(entry, readOnly: true);
               }),
             if (!entry.isDirectory)
-              _actionTile(Icons.edit_outlined, '编辑', () {
+              _actionTile(context, Icons.edit_outlined, '编辑', () {
                 Navigator.pop(ctx);
                 _editOrPreviewFile(entry, readOnly: false);
               }),
-            _actionTile(Icons.drive_file_rename_outline, '重命名', () {
+            _actionTile(context, Icons.drive_file_rename_outline, '重命名', () {
               Navigator.pop(ctx);
               _renameEntry(entry);
             }),
             _actionTile(
+              context,
               Icons.delete,
               entry.isDirectory ? '删除目录' : '删除文件',
               () {
@@ -151,10 +152,11 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
     );
   }
 
-  Widget _actionTile(IconData icon, String label, VoidCallback onTap, {Color? color}) {
+  Widget _actionTile(BuildContext context, IconData icon, String label, VoidCallback onTap, {Color? color}) {
+    final tc = ThemeColors.of(context);
     return ListTile(
       dense: true,
-      leading: Icon(icon, color: color ?? cTextSub, size: 18),
+      leading: Icon(icon, color: color ?? tc.textSub, size: 18),
       title: Text(label, style: TextStyle(color: color, fontSize: fSmall)),
       onTap: onTap,
     );
@@ -204,6 +206,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
 
     if (!mounted) return;
 
+    final tc = ThemeColors.of(context);
     final controller = TextEditingController(text: content);
     bool hasModified = false;
 
@@ -213,7 +216,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return AlertDialog(
-              backgroundColor: Theme.of(context).dialogBackgroundColor,
+              backgroundColor: DialogTheme.of(context).backgroundColor,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
               titlePadding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
               contentPadding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
@@ -233,10 +236,10 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: cTextMuted.withValues(alpha: 0.15),
+                        color: tc.textMuted.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Text('只读', style: TextStyle(fontSize: 9, color: cTextMuted)),
+                      child: Text('只读', style: TextStyle(fontSize: 9, color: tc.textMuted)),
                     ),
                   if (!readOnly && hasModified)
                     Container(
@@ -254,7 +257,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
                 height: MediaQuery.of(context).size.height * 0.55,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: ThemeColors.of(context).bg,
+                    color: tc.bg,
                     borderRadius: BorderRadius.circular(rSmall),
                   ),
                   padding: const EdgeInsets.all(6),
@@ -263,10 +266,10 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
                     maxLines: null,
                     expands: true,
                     readOnly: readOnly,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontFamily: 'JetBrainsMono',
                       fontSize: fMono,
-                      color: cTerminalGreen,
+                      color: tc.terminalGreen,
                     ),
                     decoration: const InputDecoration(
                       border: InputBorder.none,
@@ -322,7 +325,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(context).dialogBackgroundColor,
+        backgroundColor: DialogTheme.of(context).backgroundColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
         title: const Text('重命名', style: TextStyle(fontSize: fSmall)),
         content: TextField(
@@ -361,7 +364,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(context).dialogBackgroundColor,
+        backgroundColor: DialogTheme.of(context).backgroundColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
         title: const Text('确认删除', style: TextStyle(color: cDanger, fontSize: fSmall)),
         content: Text('确定删除 "${entry.name}" 吗？此操作不可恢复。', style: const TextStyle(fontSize: fSmall)),
@@ -455,7 +458,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: Theme.of(context).dialogBackgroundColor,
+        backgroundColor: DialogTheme.of(context).backgroundColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
         title: const Text('新建目录', style: TextStyle(fontSize: fSmall)),
         content: TextField(
@@ -508,16 +511,17 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
     }
   }
 
-  Color _getFileIconColor(SftpEntry entry) {
+  Color _getFileIconColor(BuildContext context, SftpEntry entry) {
     if (entry.isDirectory) return cWarning;
+    final tc = ThemeColors.of(context);
     final ext = p.extension(entry.name).toLowerCase();
     switch (ext) {
       case '.py': case '.js': case '.ts': case '.dart': case '.java':
       case '.go': case '.rs': case '.c': case '.cpp': case '.sh': return cPrimary;
-      case '.json': case '.yaml': case '.yml': case '.xml': case '.toml': return cAgentGreen;
+      case '.json': case '.yaml': case '.yml': case '.xml': case '.toml': return tc.agentGreen;
       case '.jpg': case '.jpeg': case '.png': case '.gif': case '.svg': return cInfo;
-      case '.zip': case '.tar': case '.gz': case '.bz2': return cTextSub;
-      default: return cTextSub;
+      case '.zip': case '.tar': case '.gz': case '.bz2': return tc.textSub;
+      default: return tc.textSub;
     }
   }
 
@@ -561,14 +565,14 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
             const SizedBox(width: 4),
             Text(
               '- ${_controller.hostName}',
-              style: const TextStyle(fontSize: fMicro, color: cTextSub),
+              style: TextStyle(fontSize: fMicro, color: tc.textSub),
               overflow: TextOverflow.ellipsis,
             ),
           ],
           const Spacer(),
           // 排序按钮
           PopupMenuButton<String>(
-            icon: Icon(Icons.sort, size: 16, color: _controller.isConnected ? cTextSub : cTextMuted),
+            icon: Icon(Icons.sort, size: 16, color: _controller.isConnected ? tc.textSub : tc.textMuted),
             tooltip: '排序',
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
@@ -616,21 +620,21 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
             ],
           ),
           IconButton(
-            icon: Icon(Icons.upload_file, size: 16, color: _controller.isConnected ? cTextSub : cTextMuted),
+            icon: Icon(Icons.upload_file, size: 16, color: _controller.isConnected ? tc.textSub : tc.textMuted),
             tooltip: '上传',
             onPressed: _controller.isConnected ? _uploadFiles : null,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
           ),
           IconButton(
-            icon: Icon(Icons.create_new_folder_outlined, size: 16, color: _controller.isConnected ? cTextSub : cTextMuted),
+            icon: Icon(Icons.create_new_folder_outlined, size: 16, color: _controller.isConnected ? tc.textSub : tc.textMuted),
             tooltip: '新建目录',
             onPressed: _controller.isConnected ? _showCreateDirectoryDialog : null,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
           ),
           IconButton(
-            icon: Icon(Icons.refresh, size: 16, color: _controller.isConnected ? cTextSub : cTextMuted),
+            icon: Icon(Icons.refresh, size: 16, color: _controller.isConnected ? tc.textSub : tc.textMuted),
             tooltip: '刷新',
             onPressed: _controller.isConnected ? () => _controller.loadDirectory(_controller.currentPath) : null,
             padding: EdgeInsets.zero,
@@ -638,7 +642,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
           ),
           if (widget.onClose != null)
             IconButton(
-              icon: const Icon(Icons.close, size: 16, color: cTextSub),
+              icon: Icon(Icons.close, size: 16, color: tc.textSub),
               tooltip: '关闭',
               onPressed: widget.onClose,
               padding: EdgeInsets.zero,
@@ -658,7 +662,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
         children: [
           // 返回按钮
           IconButton(
-            icon: Icon(Icons.arrow_back, size: 14, color: _controller.pathHistory.isNotEmpty ? cPrimary : cTextMuted),
+            icon: Icon(Icons.arrow_back, size: 14, color: _controller.pathHistory.isNotEmpty ? cPrimary : tc.textMuted),
             onPressed: _controller.pathHistory.isNotEmpty ? _controller.goBack : null,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
@@ -672,7 +676,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
           // 编辑路径按钮
           if (!_isPathEditing)
             IconButton(
-              icon: const Icon(Icons.edit_outlined, size: 13, color: cTextMuted),
+              icon: Icon(Icons.edit_outlined, size: 13, color: tc.textMuted),
               onPressed: _startPathEditing,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
@@ -692,16 +696,17 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
   }
 
   Widget _buildPathInput() {
+    final tc = ThemeColors.of(context);
     return TextField(
       controller: _pathController,
       focusNode: _pathFocusNode,
-      style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: fMicro, color: cTextMain),
+      style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: fMicro, color: tc.textMain),
       decoration: InputDecoration(
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), gapPadding: 0),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: const BorderSide(color: cPrimary, width: 1)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: const BorderSide(color: cBorder, width: 0.5)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: tc.border, width: 0.5)),
       ),
       onSubmitted: (_) => _submitPath(),
     );
@@ -709,6 +714,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
 
   Widget _buildBreadcrumbPath() {
     // 路径格式：/home/user/docs → 面包屑: /home/user/docs（每段可点击）
+    final tc = ThemeColors.of(context);
     final parts = _controller.currentPath.split('/').where((s) => s.isNotEmpty).toList();
     final widgets = <Widget>[];
 
@@ -725,7 +731,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
         widgets.add(_pathSegment(parts[i], () => _controller.navigateTo(targetPath)));
         // 非最后一段后面加斜杠分隔
         if (i < parts.length - 1) {
-          widgets.add(const Text('/', style: TextStyle(fontSize: fMicro, color: cTextMuted, fontFamily: 'JetBrainsMono', height: 1.2)));
+          widgets.add(Text('/', style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono', height: 1.2)));
         }
       }
     }
@@ -757,17 +763,18 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
   }
 
   Widget _buildBody() {
+    final tc = ThemeColors.of(context);
     if (_controller.isConnecting) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            SizedBox(
+            const SizedBox(
               width: 20, height: 20,
               child: CircularProgressIndicator(strokeWidth: 2, color: cPrimary),
             ),
-            SizedBox(height: 8),
-            Text('正在连接...', style: TextStyle(color: cTextSub, fontSize: fSmall)),
+            const SizedBox(height: 8),
+            Text('正在连接...', style: TextStyle(color: tc.textSub, fontSize: fSmall)),
           ],
         ),
       );
@@ -800,13 +807,13 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
     }
 
     if (_controller.entries.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.folder_open, size: 32, color: cTextMuted),
-            SizedBox(height: 6),
-            Text('空目录', style: TextStyle(color: cTextSub, fontSize: fSmall)),
+            Icon(Icons.folder_open, size: 32, color: tc.textMuted),
+            const SizedBox(height: 6),
+            Text('空目录', style: TextStyle(color: tc.textSub, fontSize: fSmall)),
           ],
         ),
       );
@@ -823,6 +830,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
   }
 
   Widget _buildFileItem(SftpEntry entry) {
+    final tc = ThemeColors.of(context);
     // 右侧信息: 大小、修改时间、权限
     final sizeStr = entry.isDirectory ? '--' : entry.displaySize;
     final timeStr = entry.displayModifiedTime;
@@ -844,7 +852,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
         ),
         child: Row(
           children: [
-            Icon(_getFileIcon(entry), size: 15, color: _getFileIconColor(entry)),
+            Icon(_getFileIcon(entry), size: 15, color: _getFileIconColor(context, entry)),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
@@ -862,7 +870,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
               width: 52,
               child: Text(
                 sizeStr,
-                style: const TextStyle(fontSize: 9, color: cTextMuted, fontFamily: 'JetBrainsMono'),
+                style: TextStyle(fontSize: 9, color: tc.textMuted, fontFamily: 'JetBrainsMono'),
                 textAlign: TextAlign.right,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -873,7 +881,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
               width: 80,
               child: Text(
                 timeStr,
-                style: const TextStyle(fontSize: 9, color: cTextMuted, fontFamily: 'JetBrainsMono'),
+                style: TextStyle(fontSize: 9, color: tc.textMuted, fontFamily: 'JetBrainsMono'),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -881,7 +889,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
             // 权限
             Text(
               permStr,
-              style: const TextStyle(fontSize: 9, color: cTextMuted, fontFamily: 'JetBrainsMono'),
+              style: TextStyle(fontSize: 9, color: tc.textMuted, fontFamily: 'JetBrainsMono'),
             ),
           ],
         ),

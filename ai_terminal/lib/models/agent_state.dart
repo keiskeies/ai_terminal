@@ -92,8 +92,14 @@ class AgentState {
       case AgentStatus.idle:
         return '就绪';
       case AgentStatus.thinking:
+        if (currentTask?.currentStep != null && currentTask!.currentStep!.isNotEmpty) {
+          return '🤔 ${currentTask!.currentStep}';
+        }
         return '🤔 思考中...';
       case AgentStatus.executing:
+        if (currentTask?.currentStep != null && currentTask!.currentStep!.isNotEmpty) {
+          return '⚡ ${currentTask!.currentStep}';
+        }
         return '⚡ 执行中...';
       case AgentStatus.waitingConfirm:
         if (pendingOptions.isNotEmpty) return '⏳ 等待选择';

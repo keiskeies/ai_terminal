@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../core/constants.dart';
 import '../widgets/sftp_panel.dart';
 
 /// SFTP 独立页面（移动端使用）

@@ -1,4 +1,7 @@
 /// 多机编排状态模型
+library;
+
+import '../core/l10n_holder.dart';
 
 /// 编排阶段
 enum OrchestratorPhase {
@@ -103,7 +106,7 @@ class ConnectivityResult {
     if (reachable) {
       return '$fromHostId → $targetHost:$port ✓ (${ms}ms)';
     }
-    return '$fromHostId → $targetHost:$port ✗ (${detail ?? "不可达"})';
+    return '$fromHostId → $targetHost:$port ✗ (${detail ?? L10n.str.orchUnreachable})';
   }
 }
 

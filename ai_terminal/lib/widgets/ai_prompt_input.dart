@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../l10n/app_localizations.dart';
 
 /// AI 输入框，支持斜杠命令建议
 ///
@@ -67,6 +68,9 @@ class _AIPromptInputState extends State<AIPromptInput> {
   List<SlashCommand> _filteredCommands = [];
   int _highlightedIndex = 0;
 
+  /// 输入字符上限
+  static const int _maxLength = 50000;
+
   @override
   void initState() {
     super.initState();
@@ -88,6 +92,7 @@ class _AIPromptInputState extends State<AIPromptInput> {
   void _onTextChanged() {
     widget.onChanged?.call(_controller.text);
     _detectSlashCommand();
+    setState(() {}); // 更新字符计数器
   }
 
   /// 检测输入框中的斜杠命令前缀，显示建议
@@ -134,9 +139,9 @@ class _AIPromptInputState extends State<AIPromptInput> {
       width: size.width,
       child: Container(
         decoration: BoxDecoration(
-          color: cCardElevated,
+          color: tc.cardElevated,
           borderRadius: BorderRadius.circular(rSmall),
-          border: Border.all(color: cBorder, width: 1),
+          border: Border.all(color: tc.border, width: 1),
           boxShadow: shadowLg,
         ),
         padding: const EdgeInsets.symmetric(vertical: 4),
@@ -271,61 +276,100 @@ class _AIPromptInputState extends State<AIPromptInput> {
     final isOrch = widget.isOrchestratorMode;
     final effectiveAccent = isOrch ? cWarning : accent;
 
+    final charCount = _controller.text.length;
+    // 接近上限（80%）时变橙色提示
+    final counterColor = charCount > _maxLength * 0.8
+        ? cWarning
+        : tc.textSub;
+
     return Focus(
       focusNode: _focusNode,
       onKeyEvent: _handleKeyEvent,
-      child: TextField(
-        controller: _controller,
-        enabled: widget.enabled,
-        minLines: 1,
-        maxLines: 5,
-        keyboardType: TextInputType.multiline,
-        textInputAction: TextInputAction.newline,
-        style: TextStyle(color: tc.textMain, fontSize: fBody, height: 1.5),
-        decoration: InputDecoration(
-          hintText: widget.hintText,
-          hintStyle: TextStyle(color: tc.textMuted, fontSize: fBody),
-          filled: true,
-          fillColor: cCard,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(rSmall),
-            borderSide: BorderSide(color: effectiveAccent, width: 1),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          TextField(
+            controller: _controller,
+            enabled: widget.enabled,
+            minLines: 1,
+            maxLines: 5,
+            maxLength: _maxLength,
+            keyboardType: TextInputType.multiline,
+            textInputAction: TextInputAction.newline,
+            // 过滤控制字符：防止小白粘贴二进制内容导致 JSON 序列化失败或数据污染
+            inputFormatters: [
+              FilteringTextInputFormatter.deny(
+                RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]'),
+              ),
+            ],
+            style: TextStyle(color: tc.textMain, fontSize: fBody, height: 1.5),
+            decoration: InputDecoration(
+              hintText: widget.hintText,
+              hintStyle: TextStyle(color: tc.textMuted, fontSize: fBody),
+              counterText: '', // 隐藏自带计数器，用自定义边框计数器
+              filled: true,
+              fillColor: tc.card,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(rSmall),
+                borderSide: BorderSide(color: effectiveAccent, width: 1),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(rSmall),
+                borderSide: BorderSide(
+                  color: isOrch ? cWarning : tc.border,
+                  width: 1,
+                ),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(rSmall),
+                borderSide: BorderSide(color: effectiveAccent, width: 1),
+              ),
+              disabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(rSmall),
+                borderSide: BorderSide(color: tc.border.withValues(alpha: 0.5)),
+              ),
+              contentPadding: const EdgeInsets.fromLTRB(12, 10, 46, 10),
+              isDense: true,
+              suffixIcon: Padding(
+                padding: const EdgeInsets.all(4),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.onToggleOrchestrator != null)
+                      _buildOrchestratorButton(),
+                    _buildSendButton(running),
+                  ],
+                ),
+              ),
+            ),
+            onSubmitted: (_) {},
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(rSmall),
-            borderSide: BorderSide(
-              color: isOrch ? cWarning : cBorder,
-              width: 1,
+          // 字符计数器：覆盖在底边框左侧，中线与边框对齐
+          Positioned(
+            left: 12,
+            bottom: -5.5,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              color: tc.card,
+              child: Text(
+                '$charCount / $_maxLength',
+                style: TextStyle(
+                  color: counterColor,
+                  fontSize: fMicro,
+                  fontFamily: 'JetBrainsMono',
+                  height: 1,
+                ),
+              ),
             ),
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(rSmall),
-            borderSide: BorderSide(color: effectiveAccent, width: 1),
-          ),
-          disabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(rSmall),
-            borderSide: BorderSide(color: cBorder.withValues(alpha: 0.5)),
-          ),
-          contentPadding: const EdgeInsets.fromLTRB(12, 10, 46, 10),
-          isDense: true,
-          suffixIcon: Padding(
-            padding: const EdgeInsets.all(4),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (widget.onToggleOrchestrator != null)
-                  _buildOrchestratorButton(),
-                _buildSendButton(running),
-              ],
-            ),
-          ),
-        ),
-        onSubmitted: (_) {},
+        ],
       ),
     );
   }
 
   Widget _buildOrchestratorButton() {
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final isOrch = widget.isOrchestratorMode;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -337,14 +381,14 @@ class _AIPromptInputState extends State<AIPromptInput> {
           height: 28,
           margin: const EdgeInsets.only(right: 4),
           decoration: BoxDecoration(
-            color: isOrch ? cWarning : cSurface,
+            color: isOrch ? cWarning : tc.surface,
             borderRadius: BorderRadius.circular(rXSmall),
           ),
           child: Tooltip(
-            message: isOrch ? '退出编排模式' : '进入多机编排模式',
+            message: isOrch ? l10n.orchExitMode : l10n.orchEnterMode,
             child: Icon(
               Icons.hub_outlined,
-              color: isOrch ? Colors.white : cTextMuted,
+              color: isOrch ? Colors.white : tc.textMuted,
               size: 15,
             ),
           ),
@@ -354,6 +398,7 @@ class _AIPromptInputState extends State<AIPromptInput> {
   }
 
   Widget _buildSendButton(bool running) {
+    final tc = ThemeColors.of(context);
     final canSend = widget.enabled && !running;
     final isOrch = widget.isOrchestratorMode;
     final sendColor = isOrch ? cWarning : cPrimary;
@@ -361,7 +406,7 @@ class _AIPromptInputState extends State<AIPromptInput> {
         ? cDanger
         : canSend
             ? sendColor
-            : cTextMuted.withValues(alpha: 0.5);
+            : tc.textMuted.withValues(alpha: 0.5);
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,

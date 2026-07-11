@@ -25,6 +25,11 @@ class ConvMessage extends HiveObject {
   @HiveField(5)
   List<AgentEvent>? events; // 结构化事件列表（含命令执行结果）
 
+  /// 压缩后的摘要内容：传给 AI 用，为空时回退到 content
+  /// UI 展示始终用 content（原文），AI 读取用 summary ?? content
+  @HiveField(6)
+  String? summary;
+
   ConvMessage();
 
   ConvMessage.create({
@@ -34,10 +39,14 @@ class ConvMessage extends HiveObject {
     this.command,
     this.commandSuccess,
     this.events,
+    this.summary,
   }) : timestamp = timestamp ?? DateTime.now();
 
   bool get isUser => role == 'user';
   bool get isAssistant => role == 'assistant';
+
+  /// 传给 AI 的有效内容：有压缩摘要用摘要，否则用原文
+  String get effectiveContent => (summary != null && summary!.isNotEmpty) ? summary! : content;
 }
 
 /// Agent 日志条目（与会话关联存储）
@@ -83,11 +92,12 @@ class Conversation extends HiveObject {
   @HiveField(4)
   late List<ConvAgentLog> agentLogs;
 
-  /// 早期对话的 AI 摘要（压缩后产生）
+  /// 早期对话的 AI 摘要（旧机制，新压缩改为逐条写入 ConvMessage.summary）
+  /// 保留字段避免 Hive 反序列化失败，新逻辑不再使用
   @HiveField(5)
   String? summary;
 
-  /// 已纳入 summary 的消息下标（exclusive），下次压缩从这里继续
+  /// 已纳入 summary 的消息下标（旧机制，新压缩不再使用）
   @HiveField(6)
   int summarizedUpToIndex = 0;
 
@@ -131,24 +141,6 @@ class Conversation extends HiveObject {
     }
   }
 
-  /// 待压缩的原始消息（已摘要过的跳过）
-  List<ConvMessage> get toSummarize => summarizedUpToIndex < messages.length
-      ? messages.sublist(summarizedUpToIndex)
-      : [];
-
-  /// 有效上下文 = summary + 最近原文消息
-  List<ConvMessage> get effectiveMessages {
-    final result = <ConvMessage>[];
-    if (summary != null && summary!.isNotEmpty) {
-      result.add(ConvMessage.create(
-        role: 'system',
-        content: '【早期对话摘要】\n$summary',
-      ));
-    }
-    result.addAll(messages.sublist(summarizedUpToIndex));
-    return result;
-  }
-
-  /// 估算消息总字符数（用于压缩阈值判断）
-  int get totalChars => messages.fold<int>(0, (sum, m) => sum + m.content.length);
+  /// 估算消息总字符数（用于压缩阈值判断，基于 effectiveContent）
+  int get totalChars => messages.fold<int>(0, (sum, m) => sum + m.effectiveContent.length);
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/constants.dart';
+import '../core/theme_colors.dart';
 
 /// 主按钮：填充背景 + 文字白，用于主要操作
 class PrimaryButton extends StatefulWidget {
@@ -125,19 +126,22 @@ class _SecondaryButtonState extends State<SecondaryButton> {
   bool _isPressed = false;
 
   Color get _textColor {
-    if (widget.isDisabled || widget.isLoading) return cTextMuted;
-    return cTextMain;
+    final tc = ThemeColors.of(context);
+    if (widget.isDisabled || widget.isLoading) return tc.textMuted;
+    return tc.textMain;
   }
 
   Color get _borderColor {
-    if (widget.isDisabled || widget.isLoading) return cBorder;
-    if (_isHovered) return cBorderHover;
-    return cBorder;
+    final tc = ThemeColors.of(context);
+    if (widget.isDisabled || widget.isLoading) return tc.border;
+    if (_isHovered) return tc.borderHover;
+    return tc.border;
   }
 
   Color get _bgColor {
-    if (_isPressed) return cSurface;
-    if (_isHovered) return cCardElevated;
+    final tc = ThemeColors.of(context);
+    if (_isPressed) return tc.surface;
+    if (_isHovered) return tc.cardElevated;
     return Colors.transparent;
   }
 
@@ -175,7 +179,7 @@ class _SecondaryButtonState extends State<SecondaryButton> {
                   height: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(cTextSub),
+                    valueColor: AlwaysStoppedAnimation<Color>(ThemeColors.of(context).textSub),
                   ),
                 )
               else ...[
@@ -227,13 +231,15 @@ class _TextButtonXState extends State<TextButtonX> {
   bool _isHovered = false;
 
   Color get _textColor {
-    if (widget.isDisabled) return cTextMuted;
-    return widget.color ?? cTextSub;
+    final tc = ThemeColors.of(context);
+    if (widget.isDisabled) return tc.textMuted;
+    return widget.color ?? tc.textSub;
   }
 
   @override
   Widget build(BuildContext context) {
     final disabled = widget.isDisabled || widget.onPressed == null;
+    final tc = ThemeColors.of(context);
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
@@ -244,7 +250,7 @@ class _TextButtonXState extends State<TextButtonX> {
           duration: animFast,
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: _isHovered && !disabled ? cSurface : Colors.transparent,
+            color: _isHovered && !disabled ? tc.surface : Colors.transparent,
             borderRadius: BorderRadius.circular(rXSmall),
           ),
           child: Row(
@@ -291,12 +297,13 @@ class CardX extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     return Container(
       padding: padding ?? const EdgeInsets.all(pStandard),
       decoration: BoxDecoration(
-        color: color ?? cCard,
+        color: color ?? tc.card,
         borderRadius: borderRadius ?? BorderRadius.circular(rCard),
-        border: Border.all(color: borderColor ?? cBorder, width: 1),
+        border: Border.all(color: borderColor ?? tc.border, width: 1),
         boxShadow: shadows ?? shadowSm,
       ),
       child: child,
@@ -321,13 +328,14 @@ class Popover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     return Container(
       width: width,
       constraints: maxHeight != null ? BoxConstraints(maxHeight: maxHeight!) : null,
       decoration: BoxDecoration(
-        color: cCardElevated,
+        color: tc.cardElevated,
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: cBorder, width: 1),
+        border: Border.all(color: tc.border, width: 1),
         boxShadow: shadowLg,
       ),
       padding: padding ?? const EdgeInsets.all(6),
@@ -365,13 +373,15 @@ class _IconButtonXState extends State<IconButtonX> {
   bool _isHovered = false;
 
   Color get _iconColor {
-    if (widget.isDisabled) return cTextMuted;
-    return widget.color ?? cTextSub;
+    final tc = ThemeColors.of(context);
+    if (widget.isDisabled) return tc.textMuted;
+    return widget.color ?? tc.textSub;
   }
 
   @override
   Widget build(BuildContext context) {
     final disabled = widget.isDisabled || widget.onPressed == null;
+    final tc = ThemeColors.of(context);
     final btn = MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
@@ -383,7 +393,7 @@ class _IconButtonXState extends State<IconButtonX> {
           width: widget.size,
           height: widget.size,
           decoration: BoxDecoration(
-            color: _isHovered && !disabled ? cSurface : Colors.transparent,
+            color: _isHovered && !disabled ? tc.surface : Colors.transparent,
             borderRadius: BorderRadius.circular(rXSmall),
           ),
           child: Icon(widget.icon, size: widget.iconSize, color: _iconColor),

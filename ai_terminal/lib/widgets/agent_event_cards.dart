@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../models/agent_event.dart';
@@ -171,7 +172,7 @@ class AgentEventContent extends StatelessWidget {
       decoration: BoxDecoration(
         color: tc.terminalBg,
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: cBorder, width: 1),
+        border: Border.all(color: tc.border, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -383,12 +384,40 @@ class AgentEventContent extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 2),
-                SelectableText(
-                  event.summary ?? '已完成所有步骤',
-                  style: TextStyle(
-                      color: cSuccess.withValues(alpha: 0.85),
+                MarkdownBody(
+                  data: event.summary ?? '已完成所有步骤',
+                  selectable: true,
+                  styleSheet: MarkdownStyleSheet(
+                    p: TextStyle(
+                      color: cSuccess.withValues(alpha: 0.9),
                       fontSize: fBody,
-                      fontWeight: FontWeight.w500),
+                      fontWeight: FontWeight.w500,
+                      height: 1.5,
+                    ),
+                    h1: TextStyle(
+                      color: cSuccess,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    h2: TextStyle(
+                      color: cSuccess,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    h3: TextStyle(
+                      color: cSuccess,
+                      fontSize: fBody,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    code: TextStyle(
+                      fontFamily: 'JetBrainsMono',
+                      fontSize: fMono,
+                      backgroundColor: cSuccess.withValues(alpha: 0.1),
+                    ),
+                    listBullet: const TextStyle(color: cSuccess),
+                    strong: const TextStyle(color: cSuccess, fontWeight: FontWeight.bold),
+                    a: const TextStyle(color: cSuccess),
+                  ),
                 ),
               ],
             ),

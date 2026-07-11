@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants.dart';
-import '../core/hive_init.dart';
+import '../services/daos.dart';
 import '../core/prompts.dart';
 import '../core/theme_colors.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/agent_provider.dart';
 
 /// P1-5: Agent 设置页面
@@ -18,17 +19,22 @@ class AgentSettingsPage extends ConsumerStatefulWidget {
 class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     final maxSteps = ref.watch(agentProvider.select((s) => s.maxSteps));
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Agent 设置'),
+        title: Text(l10n.agentSettingTitle),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(pStandard),
-        children: [
-          // 最大执行步骤数
-          _buildSectionTitle('执行控制'),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 960),
+          child: ListView(
+            padding: const EdgeInsets.all(pStandard),
+            children: [
+              // 最大执行步骤数
+              _buildSectionTitle(l10n.agentSettingAutoExecSection),
           Card(
             child: Padding(
               padding: const EdgeInsets.all(pStandard),
@@ -38,7 +44,7 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('最大执行步骤数', style: TextStyle(color: ThemeColors.of(context).textMain)),
+                      Text(l10n.agentSettingMaxStepsLabel, style: TextStyle(color: ThemeColors.of(context).textMain)),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                         decoration: BoxDecoration(
@@ -46,7 +52,7 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                           borderRadius: BorderRadius.circular(rSmall),
                         ),
                         child: Text(
-                          maxSteps == 0 ? '无限制' : '$maxSteps',
+                          maxSteps == 0 ? l10n.commonUnlimited : '$maxSteps',
                           style: const TextStyle(
                             color: cPrimary,
                             fontWeight: FontWeight.w600,
@@ -57,16 +63,16 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Agent 自动模式下的最大执行步骤数。设为 0 表示无限制，复杂任务不会被中断。',
+                    l10n.agentSettingMaxStepsDesc,
                     style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fSmall),
                   ),
                   const SizedBox(height: 12),
                   Slider(
-                    value: maxSteps.toDouble(),
+                    value: maxSteps.clamp(0, 100).toDouble(),
                     min: 0,
-                    max: 50,
-                    divisions: 50,
-                    label: maxSteps == 0 ? '无限制' : '$maxSteps',
+                    max: 100,
+                    divisions: 100,
+                    label: maxSteps == 0 ? l10n.commonUnlimited : '$maxSteps',
                     onChanged: (value) {
                       ref.read(agentProvider.notifier).setMaxSteps(value.toInt());
                     },
@@ -74,8 +80,8 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('无限制', style: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fMicro)),
-                      Text('50步', style: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fMicro)),
+                      Text(l10n.commonUnlimited, style: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fMicro)),
+                      Text(l10n.agentSettingHundredSteps, style: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fMicro)),
                     ],
                   ),
                 ],
@@ -86,29 +92,29 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
           const SizedBox(height: 24),
 
           // 提示词设置
-          _buildSectionTitle('提示词设置'),
+          _buildSectionTitle(l10n.agentSettingPromptSection),
 
           // 内置系统提示词（折叠面板）
           Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ExpansionTile(
               leading: const Icon(Icons.description_outlined, color: cWarning),
-              title: const Text('内置系统提示词'),
-              subtitle: const Text('编辑 AI 的核心提示词', style: TextStyle(color: cTextSub, fontSize: fSmall)),
+              title: Text(l10n.agentSettingBuiltInPrompt),
+              subtitle: Text(l10n.agentSettingBuiltInPromptSubtitle, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
               children: [
                 Padding(
                   padding: const EdgeInsets.all(pStandard),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        '这是 AI 的核心系统提示词，修改后立即生效。包含 {context} 占位符会被替换为服务器信息。',
-                        style: TextStyle(color: cTextSub, fontSize: fSmall),
+                      Text(
+                        l10n.agentSettingBuiltInPromptDesc,
+                        style: TextStyle(color: tc.textSub, fontSize: fSmall),
                       ),
                       const SizedBox(height: 8),
-                      const Text(
-                        '⚠️ 修改需谨慎，不合适的提示词可能导致 AI 行为异常。可随时点击"重置"恢复默认。',
-                        style: TextStyle(color: cWarning, fontSize: fMicro),
+                      Text(
+                        l10n.agentSettingPromptWarning,
+                        style: const TextStyle(color: cWarning, fontSize: fMicro),
                       ),
                       const SizedBox(height: 12),
                       _BuiltInPromptEditor(),
@@ -123,18 +129,18 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
           Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: ExpansionTile(
-              leading: const Icon(Icons.edit_note_rounded, color: cAgentGreen),
-              title: const Text('自定义提示词'),
-              subtitle: const Text('追加到内置提示词末尾的额外指令', style: TextStyle(color: cTextSub, fontSize: fSmall)),
+              leading: Icon(Icons.edit_note_rounded, color: tc.agentGreen),
+              title: Text(l10n.agentSettingExtraPrompt),
+              subtitle: Text(l10n.agentSettingExtraPromptSubtitle, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
               children: [
                 Padding(
                   padding: const EdgeInsets.all(pStandard),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        '追加到内置提示词末尾的额外指令，用于调整 AI 的行为风格、输出偏好等。留空则不追加。',
-                        style: TextStyle(color: cTextSub, fontSize: fSmall),
+                      Text(
+                        l10n.agentSettingExtraPromptDesc,
+                        style: TextStyle(color: tc.textSub, fontSize: fSmall),
                       ),
                       const SizedBox(height: 12),
                       _CustomPromptEditor(),
@@ -144,7 +150,9 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
               ],
             ),
           ),
-        ],
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -187,6 +195,7 @@ class _BuiltInPromptEditorState extends State<_BuiltInPromptEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
         TextField(
@@ -211,22 +220,22 @@ class _BuiltInPromptEditorState extends State<_BuiltInPromptEditor> {
                 setState(() => _controller.text = defaultSystemPrompt);
               },
               icon: const Icon(Icons.restore, color: cWarning, size: 18),
-              label: const Text('重置默认', style: TextStyle(color: cWarning)),
+              label: Text(l10n.commonResetDefault, style: const TextStyle(color: cWarning)),
             ),
             const Spacer(),
             ElevatedButton.icon(
               onPressed: () {
                 saveSystemPrompt(_controller.text.trim());
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('内置提示词已保存'),
-                    duration: Duration(seconds: 1),
+                  SnackBar(
+                    content: Text(l10n.agentSettingBuiltInSaved),
+                    duration: const Duration(seconds: 1),
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
               },
               icon: const Icon(Icons.save, size: 18),
-              label: const Text('保存'),
+              label: Text(l10n.save),
               style: ElevatedButton.styleFrom(
                 backgroundColor: cPrimary,
                 foregroundColor: Colors.white,
@@ -253,7 +262,7 @@ class _CustomPromptEditorState extends State<_CustomPromptEditor> {
     super.initState();
     String? savedPrompt;
     try {
-      savedPrompt = HiveInit.settingsBox.get('customSystemPrompt') as String?;
+      savedPrompt = SettingsDao.getCached('customSystemPrompt') as String?;
     } catch (_) {}
     _controller = TextEditingController(text: savedPrompt ?? '');
   }
@@ -266,6 +275,7 @@ class _CustomPromptEditorState extends State<_CustomPromptEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Column(
       children: [
         TextField(
@@ -277,7 +287,7 @@ class _CustomPromptEditorState extends State<_CustomPromptEditor> {
             fontSize: fBody,
           ),
           decoration: InputDecoration(
-            hintText: '例如：回答使用英文、输出简洁格式、优先使用 Docker...',
+            hintText: l10n.agentSettingCustomPromptHint,
             hintStyle: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fSmall),
             enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: ThemeColors.of(context).border)),
             focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
@@ -290,18 +300,18 @@ class _CustomPromptEditorState extends State<_CustomPromptEditor> {
             ElevatedButton.icon(
               onPressed: () {
                 try {
-                  HiveInit.settingsBox.put('customSystemPrompt', _controller.text.trim());
+                  SettingsDao.set('customSystemPrompt', _controller.text.trim());
                 } catch (_) {}
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('自定义提示词已保存'),
-                    duration: Duration(seconds: 1),
+                  SnackBar(
+                    content: Text(l10n.agentSettingExtraPromptSaved),
+                    duration: const Duration(seconds: 1),
                     behavior: SnackBarBehavior.floating,
                   ),
                 );
               },
               icon: const Icon(Icons.save, size: 18),
-              label: const Text('保存'),
+              label: Text(l10n.save),
               style: ElevatedButton.styleFrom(
                 backgroundColor: cPrimary,
                 foregroundColor: Colors.white,

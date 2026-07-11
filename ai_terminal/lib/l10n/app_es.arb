@@ -1,0 +1,1254 @@
+{
+  "@@locale": "es",
+  "about": "Acerca de",
+  "aboutApp": "Acerca de AI Terminal",
+  "addServer": "Añadir servidor",
+  "address": "Dirección",
+  "agentNotInitialized": "Inicialice el agente y conéctese primero a un host",
+  "agentRunning": "El agente está ejecutando una tarea, espere",
+  "agentSettingAutoExecSection": "AI Auto Execution",
+  "agentSettingBuiltInPrompt": "AI Built-in Instructions",
+  "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",
+  "agentSettingBuiltInPromptSubtitle": "Modify AI's basic instructions",
+  "agentSettingBuiltInSaved": "AI built-in instructions saved",
+  "agentSettingCustomPromptHint": "e.g., Respond in English, use concise format, prefer Docker...",
+  "agentSettingExtraPrompt": "Additional Instructions",
+  "agentSettingExtraPromptDesc": "Additional requirements appended to built-in instructions to adjust AI's response style. Leave empty to skip.",
+  "agentSettingExtraPromptSaved": "Additional instructions saved",
+  "agentSettingExtraPromptSubtitle": "Additional requirements appended to built-in instructions",
+  "agentSettingHundredSteps": "100 steps",
+  "agentSettingMaxStepsDesc": "Maximum number of steps AI takes when executing commands automatically. Set to 0 for unlimited steps; complex tasks will not be interrupted.",
+  "agentSettingMaxStepsLabel": "Max steps AI can execute automatically",
+  "agentSettingPromptSection": "AI Prompts",
+  "agentSettingPromptWarning": "⚠️ Modify with caution. Inappropriate prompts may cause abnormal AI behavior. Click \"Reset\" to restore defaults at any time.",
+  "agentSettingTitle": "Agent Settings",
+  "agentSettings": "Agente",
+  "agentSettingsDesc": "Máximo de pasos que la IA ejecuta automáticamente (0 = ilimitado)",
+  "aiAndIntelligence": "IA",
+  "aiModelAdd": "Add Model",
+  "aiModelApiKeyInvalid": "Invalid API Key",
+  "aiModelApiKeyRequired": "Please enter an API Key",
+  "aiModelBaseUrlRequired": "Please enter a Base URL",
+  "aiModelCannotConnect": "Unable to connect",
+  "aiModelConfig": "Modelos de IA",
+  "aiModelConfigDesc": "Configura claves API y parámetros del modelo",
+  "aiModelConnectionTimeout": "Connection timeout",
+  "aiModelDeleteConfirm": "Are you sure you want to delete \"{name}\"?",
+  "aiModelDeleteTitle": "Delete Model",
+  "aiModelEditTitle": "Edit Model",
+  "aiModelEmptySubtitle": "Add your first AI to let it work for you",
+  "aiModelEmptyTitle": "No AI models yet",
+  "aiModelMaxTokens": "Max Response Tokens",
+  "aiModelModelName": "Model Name",
+  "aiModelModelNameRequired": "Please enter a model name",
+  "aiModelNameError": "Incorrect model name",
+  "aiModelNameRequired": "Please enter a name",
+  "aiModelProvider": "AI Provider",
+  "aiModelProvidersUpdated": "Provider list updated ({count} providers)",
+  "aiModelRefreshProviders": "Refresh provider list",
+  "aiModelRemoteConfigEmpty": "Remote configuration is empty",
+  "aiModelRequestFailed": "Request failed ({code})",
+  "aiModelServerError": "Server error ({code})",
+  "aiModelSetAsDefault": "Set as default model",
+  "aiModelSetDefault": "Set as Default",
+  "aiModelTemperature": "Randomness",
+  "aiModelTest": "Test",
+  "aiModelTestFailed": "Test failed",
+  "aiModelTitle": "AI Model Configuration",
+  "aiModelTooManyRequests": "Too many requests",
+  "aiModelUpdateFailed": "Update failed: {error}",
+  "aiPanel": "Panel de IA",
+  "appTitle": "AI Terminal",
+  "appearance": "Apariencia",
+  "appearanceDesc": "Modo oscuro/claro, tamaño de fuente, esquema de color",
+  "appearanceDisplayMode": "Display Mode",
+  "appearanceDisplayModeDesc": "Choose dark or light interface",
+  "appearanceFontSizeDesc": "Drag the slider to adjust terminal text size",
+  "appearanceTitle": "Appearance Settings",
+  "auditLog": "Registro de actividad",
+  "auditLogAllTitle": "All Audit Logs",
+  "auditLogCopied": "Copied {count} logs to clipboard",
+  "auditLogCopyTooltip": "Copy Records",
+  "auditLogDesc": "Ver quién ejecutó qué comando y cuándo",
+  "auditLogEmpty": "No audit logs",
+  "auditLogExecuted": "Executed",
+  "auditLogExportHeader": "# Audit Log Export",
+  "auditLogExportTime": "# Export time: {time}",
+  "auditLogExportTotal": "# Total: {count}",
+  "auditLogFilterAll": "All Records",
+  "auditLogFilterBlocked": "Only Blocked",
+  "auditLogFilterThisHost": "Only Current Host",
+  "auditLogNoMatch": "No matching records",
+  "auditLogNoRecordsToCopy": "No records to copy",
+  "auditLogNotExecuted": "Not Executed",
+  "auditLogOutput": "Output",
+  "auditLogSafetyBlocked": "Blocked",
+  "auditLogSafetyDanger": "Danger",
+  "auditLogSafetySafe": "Safe",
+  "auditLogSafetyWarning": "Warning",
+  "auditLogSearchHint": "Search command, server, output...",
+  "auditLogTitle": "Audit Log",
+  "authMethod": "Método de autenticación",
+  "builtinPromptDesc": "Prompt central del sistema de IA, surte efecto inmediatamente. El marcador 'context' se reemplazará con la información del servidor.",
+  "builtinPromptSaved": "Prompt integrado guardado",
+  "builtinPromptTitle": "Prompt del sistema integrado",
+  "builtinPromptWarning": "⚠️ Edite con precaución, puede restablecerlo en cualquier momento.",
+  "cancel": "Cancelar",
+  "changeRecordAllTitle": "All Change Records",
+  "changeRecordConfirmRollback": "Confirm Rollback",
+  "changeRecordEmpty": "No change records",
+  "changeRecordEmptyHint": "Changes (such as installing, starting/stopping services) will be recorded automatically",
+  "changeRecordFailed": "Failed",
+  "changeRecordFilterAll": "All Records",
+  "changeRecordFilterRollbackable": "Only Rollbackable",
+  "changeRecordFilterThisHost": "Only Current Host",
+  "changeRecordHostNotConnected": "Server {hostId} is not connected, cannot roll back. Please connect to the server first.",
+  "changeRecordNotRollbackable": "This record does not support automatic rollback",
+  "changeRecordOriginalCommand": "Original command: {command}",
+  "changeRecordRollbackButton": "Rollback",
+  "changeRecordRollbackError": "Rollback error: {error}",
+  "changeRecordRollbackFailed": "Rollback failed: {stderr}",
+  "changeRecordRollbackFailedNoExec": "Rollback failed: cannot execute",
+  "changeRecordRollbackOnHost": "The following rollback command will be executed on server {hostName}:",
+  "changeRecordRollbackSuccess": "Rollback succeeded: {command}",
+  "changeRecordRolledBack": "Rolled Back",
+  "changeRecordRollingBack": "Rolling back: {command}",
+  "changeRecordSuccess": "Success",
+  "changeRecordTitle": "Change Records",
+  "changeRecordTypeFileOperation": "File Operation",
+  "changeRecordTypeInstall": "Install",
+  "changeRecordTypeModifyConfig": "Config Change",
+  "changeRecordTypeOther": "Other",
+  "changeRecordTypePermission": "Permission Change",
+  "changeRecordTypeRestartService": "Restart Service",
+  "changeRecordTypeStartService": "Start Service",
+  "changeRecordTypeStopService": "Stop Service",
+  "changeRecordTypeUninstall": "Uninstall",
+  "changeRecords": "Historial de cambios",
+  "changeRecordsDesc": "Rastrea todos los cambios y deshace si algo falla",
+  "changeWindow": "Horas seguras",
+  "changeWindowAllDayAllowed": "Allowed all day",
+  "changeWindowAllowedWindow": "Allowed Window",
+  "changeWindowCrossDayHint": "Tip: A start time later than the end time means overnight (e.g., 22:00 to next day 06:00)",
+  "changeWindowCurrentWindowInfo": "Current allowed window: {window}\nCommands that make changes will be rejected at other times (read-only commands are not affected).",
+  "changeWindowDesc": "Restringe los cambios a ventanas de tiempo seguras designadas",
+  "changeWindowEnable": "Enable Safe Window",
+  "changeWindowEnableHint": "When enabled, changes can only be made during the set window",
+  "changeWindowEndHour": "End hour",
+  "changeWindowEveryDay": "{window}, every day",
+  "changeWindowOnlyDays": "{window}, only {days}",
+  "changeWindowSaveConfig": "Save Config",
+  "changeWindowSaveFailed": "Save failed: {error}",
+  "changeWindowSaved": "Safe window settings saved",
+  "changeWindowStartHour": "Start hour",
+  "changeWindowTitle": "Safe Window",
+  "changeWindowToNextDay": "{start} to next day {end}",
+  "changeWindowWeekdayFri": "Fri",
+  "changeWindowWeekdayMon": "Mon",
+  "changeWindowWeekdaySat": "Sat",
+  "changeWindowWeekdaySun": "Sun",
+  "changeWindowWeekdayThu": "Thu",
+  "changeWindowWeekdayTue": "Tue",
+  "changeWindowWeekdayWed": "Wed",
+  "changeWindowWeekdaysTitle": "Which days are allowed (none = every day)",
+  "chatBackToServerList": "Back to server list",
+  "chatClearSession": "Clear session",
+  "chatConnectServerHint": "Please connect to a server first, then tap the AI button in the bottom right on the terminal page",
+  "chatEmptyHint": "e.g. install Docker, check memory usage",
+  "chatEmptyTitle": "How can I help you?",
+  "chatInputHint": "Type a command or question...",
+  "chatNeedTerminal": "AI assistant needs to be used in a terminal",
+  "clearMessagesFailed": "Error al borrar los mensajes",
+  "close": "Cerrar",
+  "commonAIAssistant": "AI Assistant",
+  "commonAdvancedSettings": "Advanced Settings",
+  "commonAll": "All",
+  "commonBack": "Back",
+  "commonCancel": "Cancel",
+  "commonCommand": "Command",
+  "commonConfirm": "OK",
+  "commonCopiedToClipboard": "Copied to clipboard",
+  "commonDescription": "Description",
+  "commonExecute": "Execute",
+  "commonGotIt": "Got it",
+  "commonName": "Name",
+  "commonResetDefault": "Reset to Default",
+  "commonUnlimited": "Unlimited",
+  "compactFailed": "Error al compactar la conversación",
+  "compacting": "Compactando conversación...",
+  "confirm": "Confirmar",
+  "connErrAuth": "Autenticación fallida, verifique el usuario y la contraseña/clave",
+  "connErrGeneric": "Verifique la conexión de red y el estado del servidor",
+  "connErrNoRoute": "No hay ruta al host, verifique la dirección del servidor",
+  "connErrRefused": "El servidor rechazó la conexión, verifique el puerto SSH",
+  "connErrTimeout": "Tiempo de conexión agotado, verifique la red o la disponibilidad del servidor",
+  "connecting": "Conectando...",
+  "connectionFailed": "Conexión fallida",
+  "connectionFailedHint": "Conexión fallida, verifique la red y las credenciales",
+  "connectionInterrupted": "Conexión interrumpida",
+  "connectionManagement": "Conexiones",
+  "connectionSuccess": "Conexión exitosa",
+  "copy": "Copiar",
+  "customPromptDesc": "Instrucciones personalizadas que se añaden al prompt del sistema de IA. Sirven para ajustar el comportamiento de la IA, el estilo de salida, etc. Déjelo vacío para omitir.",
+  "customPromptSaved": "Prompt personalizado guardado",
+  "customPromptTitle": "Prompt de IA personalizado",
+  "darkMode": "Oscuro",
+  "delete": "Eliminar",
+  "deleteConfirm": "¿Confirmar eliminación?",
+  "edit": "Editar",
+  "editServer": "Editar servidor",
+  "english": "English",
+  "errApiKeyInvalid": "La clave de API es inválida o ha expirado, actualícela en la configuración",
+  "errBadRequest": "Solicitud incorrecta, verifique la configuración del modelo de IA (nombre del modelo, URL de API, etc.)",
+  "errConnectionError": "No se puede conectar al servicio de IA, verifique la red y la URL de la API",
+  "errConnectionFailed": "Conexión fallida: {message}",
+  "errConnectionTimeout": "Tiempo de conexión agotado, verifique la red",
+  "errExecutionError": "Error de ejecución: {error}",
+  "errRateLimit": "Demasiadas solicitudes, inténtelo más tarde",
+  "errRequestFailed": "Solicitud fallida ({code})",
+  "errServerError": "Error del servidor de IA ({code}), inténtelo más tarde",
+  "errorOccurred": "Ocurrió un error",
+  "fieldRequired": "Este campo es obligatorio",
+  "followSystem": "Sistema",
+  "group": "Grupo",
+  "hostEditAuthTypeLabel": "Authentication Method *",
+  "hostEditConfigSavedButCredFailed": "⚠️ Configuration saved, but {error}. Please retry.",
+  "hostEditConnectionTimeout": "Connection timeout: {timeout}s",
+  "hostEditDefaultGroup": "Default",
+  "hostEditEncodingLabel": "Character Encoding",
+  "hostEditGroupHint": "Enter or select a group",
+  "hostEditGroupLabel": "Group",
+  "hostEditHostHint": "IP address or domain",
+  "hostEditHostLabel": "Host Address *",
+  "hostEditHostRequired": "Please enter the host address",
+  "hostEditJumpAuthTypeLabel": "Jump Host Authentication",
+  "hostEditJumpHostFlowHint": "Will first connect to the jump host, then forward to the target server through it",
+  "hostEditJumpHostLabel": "Jump Host Address *",
+  "hostEditJumpPasswordLabel": "Jump Host Password",
+  "hostEditJumpPortLabel": "Jump Host Port",
+  "hostEditJumpPrivateKeyContent": "Jump Host Private Key Content",
+  "hostEditJumpUsernameLabel": "Jump Host Username",
+  "hostEditMoreSettings": "More Settings",
+  "hostEditNameHint": "e.g., Production Server",
+  "hostEditNameLabel": "Name *",
+  "hostEditNameRequired": "Please enter a name",
+  "hostEditPassphraseLabel": "Passphrase (optional)",
+  "hostEditPassword": "Password",
+  "hostEditPasswordSaveFailed": "Failed to save password",
+  "hostEditPastePrivateKey": "Paste Private Key",
+  "hostEditPastePrivateKeySubtitle": "Turn off to select from file",
+  "hostEditPortLabel": "Port",
+  "hostEditPrivateKey": "Private Key",
+  "hostEditPrivateKeyContent": "Private Key Content",
+  "hostEditPrivateKeyFileRead": "Private key file loaded: {name}",
+  "hostEditPrivateKeySaveFailed": "Failed to save private key",
+  "hostEditReadFileFailed": "Failed to read file: {error}",
+  "hostEditSave": "💾 Save",
+  "hostEditSaveSuccess": "✅ Saved successfully",
+  "hostEditSectionAuth": "Authentication",
+  "hostEditSectionBasic": "Basic Information",
+  "hostEditSectionGroupTag": "Group & Tag",
+  "hostEditSectionJumpHost": "Jump Host / Bastion",
+  "hostEditSectionSudo": "Privilege Escalation (sudo)",
+  "hostEditSelect": "Select",
+  "hostEditSelectGroupTooltip": "Select an existing group",
+  "hostEditSelectPrivateKeyFile": "Select Private Key File",
+  "hostEditSudoPasswordDesc": "Once configured, this password will be auto-filled when AI encounters a sudo password prompt. It is saved via system secure storage and never appears in commands or logs.",
+  "hostEditSudoPasswordHint": "Auto-injected when AI runs sudo commands",
+  "hostEditSudoPasswordLabel": "Sudo Password (optional)",
+  "hostEditTagColor": "Tag Color",
+  "hostEditTimeoutSeconds": "{timeout}s",
+  "hostEditTitleEdit": "Edit Server",
+  "hostEditTitleNew": "New Server",
+  "hostEditUseJumpHost": "Use Jump Host",
+  "hostEditUseJumpHostSubtitle": "Connect via jump host / bastion",
+  "hostEditUsernameLabel": "Username",
+  "hostListAITipIntro": "AI assistant is available after connecting to a server:",
+  "hostListAITipNote": "💡 AI can help you generate commands, explain output, and troubleshoot issues",
+  "hostListAITipStep1": "1️⃣  Tap a server card to open the terminal",
+  "hostListAITipStep2": "2️⃣  After connecting, the AI button appears in the bottom right",
+  "hostListAITipStep3": "3️⃣  Tap the AI button to start the smart command assistant",
+  "hostListAITipTitle": "AI assistant usage tips",
+  "hostListAddFirstServer": "Add your first server to start AI-assisted remote management",
+  "hostListClearSearch": "Clear search",
+  "hostListConnectTerminal": "Connect terminal",
+  "hostListDeleteConfirm": "Are you sure you want to delete \"{hostName}\"?\n\nSaved credentials will also be deleted.",
+  "hostListDeleteServer": "Delete server",
+  "hostListDeleteSuccess": "Deleted successfully",
+  "hostListEditConfig": "Edit configuration",
+  "hostListLoadFailed": "Failed to load: {error}",
+  "hostListNoSearchResults": "No matching servers found",
+  "hostListNoSearchResultsHint": "Try different keywords or check spelling",
+  "hostListNoServers": "No servers yet",
+  "hostListSearchHint": "Search servers...",
+  "knowledgeBase": "Base de conocimiento",
+  "knowledgeBaseDesc": "Actualiza el manual de comandos con las guías más recientes",
+  "language": "Idioma",
+  "languageDesc": "Elige el idioma de la interfaz",
+  "languageDialogTitle": "Select Language",
+  "languageFollowSystem": "Follow System",
+  "lightMode": "Claro",
+  "menuItemBuiltinPrompt": "Prompt integrado",
+  "menuItemCustomPrompt": "Prompt personalizado",
+  "messageSaveFailed": "Error al guardar el mensaje, tarea no iniciada",
+  "name": "Nombre",
+  "nickname": "Apodo",
+  "noCredentials": "❌ No se encontraron credenciales\n\nEdite el servidor e introduzca la contraseña o la clave privada.",
+  "notificationAlways": "Every time",
+  "notificationAlwaysSubtitle": "Send a notification when a task finishes or fails",
+  "notificationEnable": "Enable task completion notifications",
+  "notificationEnableHint": "Automatically send a message when a task finishes or fails",
+  "notificationEnterUrlFirst": "Please fill in the notification URL first",
+  "notificationFailedOnly": "Only on failure",
+  "notificationFailedOnlySubtitle": "Only send a notification when a task fails",
+  "notificationInstructionsBody": "1. Add a \"bot\" in your DingTalk/Feishu/WeCom group to get the webhook URL\n2. Paste the URL into the input box above\n3. Click \"Send test notification\" to check if you can receive it\n4. From now on, a message will be sent to the group automatically when a task finishes or fails",
+  "notificationInstructionsTitle": "Instructions",
+  "notificationInvalidUrl": "Invalid URL format: {error}",
+  "notificationSaveConfig": "Save Config",
+  "notificationSaveFailed": "Save failed: {error}",
+  "notificationSaved": "Notification settings saved",
+  "notificationSendTest": "Send test notification",
+  "notificationSending": "Sending...",
+  "notificationTestFailed": "Test failed: {error}",
+  "notificationTestSendFailed": "Send failed, please check the notification URL",
+  "notificationTestSent": "Test notification sent, please check your group",
+  "notificationTitle": "Task Completion Notifications",
+  "notificationTriggerTitle": "When to send notifications",
+  "notificationWebhookSupport": "Supports: DingTalk, Feishu, WeCom group, Slack, etc.",
+  "notificationWebhookUrl": "Webhook URL",
+  "notifications": "Notificaciones",
+  "notificationsDesc": "Recibe un mensaje cuando terminen las tareas",
+  "ok": "OK",
+  "password": "Contraseña",
+  "passwordAuth": "Contraseña",
+  "pleaseConfigAIModel": "Configure primero un modelo de IA",
+  "port": "Puerto",
+  "privateKey": "Clave privada",
+  "privateKeyAuth": "Clave privada",
+  "quickCommands": "Fragmentos",
+  "quickCommandsDesc": "Guarda comandos frecuentes para ejecución con un toque",
+  "retry": "Reintentar",
+  "runbookBuiltinCannotDelete": "Built-in templates cannot be deleted",
+  "runbookBuiltinNotEditable": "Built-in templates are not editable. Use \"Clone\" to create a copy and modify it.",
+  "runbookBuiltinTag": "Built-in",
+  "runbookCategoryCustom": "Custom",
+  "runbookCategoryDeployment": "Deployment",
+  "runbookCategoryInspection": "Inspection",
+  "runbookCategoryMaintenance": "Maintenance",
+  "runbookCategorySecurity": "Security",
+  "runbookCategoryTroubleshooting": "Troubleshooting",
+  "runbookClipboardEmpty": "Clipboard is empty",
+  "runbookCloneTooltip": "Clone",
+  "runbookClonedToast": "Cloned as custom runbook: {name}",
+  "runbookContentAgent": "Prompt Content",
+  "runbookContentAgentHint": "e.g., Check disk usage of '{host}' and provide suggestions",
+  "runbookContentCommand": "Command Content",
+  "runbookContentCommandHint": "e.g., ssh '{user}'@'{host}' df -h",
+  "runbookContentRequired": "Please enter the content",
+  "runbookCreate": "Create",
+  "runbookDeleteConfirm": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
+  "runbookDeleteTitle": "Delete Runbook",
+  "runbookDeleteTooltip": "Delete",
+  "runbookDeletedToast": "Deleted",
+  "runbookEditTitle": "Edit Runbook",
+  "runbookEditTooltip": "Edit",
+  "runbookEmptyFiltered": "No matching runbooks. Try adjusting the filters.",
+  "runbookEmptyHint": "Tap the bottom-right button to create a runbook",
+  "runbookEmptyTitle": "No runbooks yet",
+  "runbookFieldCategory": "Category",
+  "runbookFieldDescription": "Description (optional)",
+  "runbookFieldIcon": "Icon",
+  "runbookFieldName": "Name",
+  "runbookFieldType": "Type",
+  "runbookFilterAll": "All",
+  "runbookImportButton": "Import",
+  "runbookImportHint": "Copy JSON from the official open platform and paste it here",
+  "runbookImportPasteHint": "Paste JSON content here…",
+  "runbookImportSuccess": "Successfully imported {count} runbooks",
+  "runbookImportTitle": "Import Runbooks",
+  "runbookImportTooltip": "Import Runbook",
+  "runbookJsonParseFailed": "JSON parse failed: {error}",
+  "runbookNameRequired": "Please enter a name",
+  "runbookNewTitle": "New Runbook",
+  "runbookPasteFromClipboard": "Paste from Clipboard",
+  "runbookPasteJsonFirst": "Please paste JSON content first",
+  "runbookRunCount": "Run {count} times",
+  "runbookSearchHint": "Search runbook name or description",
+  "runbookTitle": "Runbooks",
+  "runbookTypeAgentDesc": "Natural language prompt, executed by AI via ReAct framework",
+  "runbookTypeAgentOption": "AI Execute",
+  "runbookTypeAgentTag": "AI Execute",
+  "runbookTypeCommand": "Direct Execute",
+  "runbookTypeCommandDesc": "Execute commands directly in terminal after variable substitution",
+  "runbookUseInTerminal": "Please use this in the terminal page",
+  "runbooks": "Runbooks",
+  "runbooksDesc": "Convierte operaciones rutinarias en plantillas reutilizables",
+  "save": "Guardar",
+  "scrollToBottom": "Desplazar al final",
+  "search": "Buscar",
+  "securityAllDataCleared": "All data has been cleared",
+  "securityAppLockSubtitleOff": "When disabled, no verification is needed to open the app",
+  "securityAppLockSubtitleOn": "Opening the app requires {biometricType} or password",
+  "securityAuditLogSubtitle": "View the execution record of each command",
+  "securityAuditLogTitle": "Audit Log",
+  "securityAuthenticateReason": "Verify your identity to enable app lock",
+  "securityBiometricFaceId": "Face ID",
+  "securityBiometricFingerprint": "Fingerprint",
+  "securityBiometricGeneric": "Biometrics",
+  "securityBiometricNotSupported": "⚠️ Device does not support fingerprint or face ID",
+  "securityBiometricStatusTitle": "Fingerprint / Face ID Status",
+  "securityBiometricSupported": "✅ Supports {biometricType}",
+  "securityClearAllData": "Clear All Data",
+  "securityClearAllDataSubtitle": "Delete all servers, chat history, and passwords (irreversible)",
+  "securityClearConfirmPrompt": "Please type DELETE to confirm:",
+  "securityClearFailed": "Clear failed: {error}",
+  "securityClearIrreversible": "This action cannot be undone!",
+  "securityClearItemAiModels": "• AI model settings",
+  "securityClearItemChats": "• Chat history",
+  "securityClearItemPasswords": "• All passwords",
+  "securityClearItemServers": "• Server list",
+  "securityClearItemSnippets": "• Quick commands",
+  "securityClearWarning": "This action will delete all data, including:",
+  "securityConfirmDelete": "Confirm Delete",
+  "securityDangerAction": "⚠️ Dangerous Action",
+  "securityEnableAppLock": "Enable App Lock",
+  "securitySettings": "Seguridad",
+  "securitySettingsDesc": "Desbloquea la app con huella o Face ID",
+  "securityTitle": "Security Settings",
+  "selectFile": "Seleccionar archivo",
+  "send": "Enviar",
+  "serverList": "Servidores",
+  "serverListDesc": "Añadir y gestionar servidores remotos para conectarse",
+  "settings": "Configuración",
+  "settingsAI": "AI & Intelligence",
+  "settingsAIModel": "AI Model Config",
+  "settingsAIModelDesc": "Configure AI API key and model",
+  "settingsAbout": "About",
+  "settingsAboutApp": "About AI Terminal",
+  "settingsAgent": "Agent Settings",
+  "settingsAgentDesc": "Max auto-execute steps (0 = unlimited: {steps})",
+  "settingsAppearance": "Appearance",
+  "settingsAppearanceSettings": "Appearance",
+  "settingsAppearanceSettingsDesc": "Switch dark/light mode, adjust font size",
+  "settingsAuditLog": "Activity Log",
+  "settingsAuditLogDesc": "Records who ran each command and when",
+  "settingsChangeRecords": "Change Records",
+  "settingsChangeRecordsDesc": "Track all changes, undo if something goes wrong",
+  "settingsChangeWindow": "Safe Hours",
+  "settingsChangeWindowDesc": "Set safe time windows; changes blocked outside them",
+  "settingsCheckUpdate": "Check for Updates",
+  "settingsConnection": "Connections",
+  "settingsHosts": "Servers",
+  "settingsHostsDesc": "Add and edit remote servers to connect to",
+  "settingsKnowledge": "Command Manual",
+  "settingsKnowledgeDesc": "Update command manual for latest install guides",
+  "settingsLanguage": "Language",
+  "settingsLanguageDesc": "Choose interface language",
+  "settingsNotification": "Task Notifications",
+  "settingsNotificationDesc": "Get notified when a task finishes",
+  "settingsRunbooks": "Runbooks",
+  "settingsRunbooksDesc": "Turn common ops tasks into templates, run in one tap",
+  "settingsSecurity": "Security",
+  "settingsSecurityDesc": "Unlock the app with fingerprint or Face ID",
+  "settingsSnippets": "Snippets",
+  "settingsSnippetsDesc": "Save frequently used commands for one-tap execution",
+  "settingsTitle": "Settings",
+  "settingsVersion": "Version 1.3.4",
+  "simplifiedChinese": "简体中文",
+  "snippetCommandHint": "e.g., docker exec -it '{container}' /bin/bash",
+  "snippetCommandLabel": "Command:",
+  "snippetCommandRequired": "Please enter the command",
+  "snippetCopyCommand": "Copy Command",
+  "snippetDeleteConfirm": "Are you sure you want to delete \"{name}\"?",
+  "snippetDeleteTitle": "Delete Snippet",
+  "snippetEditTitle": "Edit Snippet",
+  "snippetEmptyHint": "Tap the button below to add one",
+  "snippetEmptyTitle": "No snippets yet",
+  "snippetFieldCommand": "Command",
+  "snippetFieldDescription": "Description (optional)",
+  "snippetNameRequired": "Please enter a name",
+  "snippetNewTitle": "New Snippet",
+  "snippetResolvedCommand": "Command: {command}",
+  "snippetTitle": "Snippets",
+  "taskAborted": "⚠️ Tarea abortada",
+  "taskCancelled": "⚠️ Tarea cancelada",
+  "taskCompleted": "Tarea completada",
+  "taskExecutionError": "⚠️ Error de ejecución de tarea",
+  "taskFailed": "Tarea fallida",
+  "taskMaxSteps": "Máximo de pasos alcanzado, tarea interrumpida",
+  "taskTerminated": "Tarea terminada",
+  "terminalAgentLog": "Agent log",
+  "terminalClearScreen": "Clear screen",
+  "terminalCloseTabConfirm": "Closing this tab will cancel the running task. Are you sure?",
+  "terminalCollapseAIPanel": "Collapse AI panel",
+  "terminalCollapseMonitorPanel": "Collapse monitor panel",
+  "terminalCommandLabel": "Command: {command}",
+  "terminalCommandTemplate": "Command template:",
+  "terminalCompactingHistory": "AI is compressing conversation history",
+  "terminalCompactionDone": "Memory compression completed",
+  "terminalCompactionFailed": "Compression failed: {error}",
+  "terminalConfigure": "Configure",
+  "terminalConnectHostFailed": "Failed to connect to {hostName}: {error}",
+  "terminalConnectTerminalFirst": "Please connect to a terminal first",
+  "terminalConnectTerminalForCommand": "Please connect to a terminal before executing commands",
+  "terminalConnectTerminalForRunbook": "Please connect to a terminal (SSH or local) before using runbooks",
+  "terminalConnected": "Connected",
+  "terminalConnecting": "Connecting to {host}...",
+  "terminalCreateNew": "+ New",
+  "terminalCustomPromptHint": "e.g. respond in English, use concise output format, prefer Docker...",
+  "terminalExitOrchestrator": "Exit orchestration mode",
+  "terminalExpandAIPanel": "Expand AI panel",
+  "terminalExpandMonitorPanel": "Expand monitor panel",
+  "terminalFillVariables": "Fill variables - {name}",
+  "terminalFontSize": "Tamaño de fuente del terminal: {size}px",
+  "terminalHostNoCredentials": "{hostName} has no credentials configured. Please edit the server first.",
+  "terminalHostNotFound": "Host not found",
+  "terminalInputHintDefault": "Describe your request, Agent will execute automatically...",
+  "terminalInputHintDisconnected": "Available after connecting to a terminal",
+  "terminalInputHintEmpty": "Type a request to start auto-execution...",
+  "terminalInputHintOrchestrator": "Multi-host orchestration mode: describe cross-host tasks, e.g. \"sync time on all servers\"",
+  "terminalInputHintRunning": "Agent is running...",
+  "terminalLayoutBottom": "Bottom",
+  "terminalLayoutRight": "Right",
+  "terminalLocalStartFailed": "Failed to start local terminal",
+  "terminalLocalStartFailedWithError": "Failed to start local terminal: {error}",
+  "terminalManage": "Manage",
+  "terminalMaxSteps": "Max steps",
+  "terminalMaxStepsDesc": "Maximum execution steps in Agent auto mode. Set to 0 for unlimited; complex tasks will not be interrupted.",
+  "terminalMaxStepsLabel": "Steps (0 = unlimited)",
+  "terminalMaxStepsSet": "Max steps set to {value}",
+  "terminalMaxStepsTitle": "Maximum execution steps",
+  "terminalModel": "Model",
+  "terminalMonitor": "Monitor",
+  "terminalNewConnection": "New connection",
+  "terminalNoHostsSaved": "No saved hosts\nPlease add a server on the home page first",
+  "terminalNoRunbooks": "No runbooks available",
+  "terminalNoRunbooksHint": "Click \"Manage\" to create a runbook",
+  "terminalNotConnected": "Conecte primero una terminal para usar el modo automático",
+  "terminalNotReady": "Terminal no conectada, conecte primero",
+  "terminalOffline": "Offline",
+  "terminalOrchestratorConnected": "{connected}/{total} connected",
+  "terminalOrchestratorHostList": "Multi-host orchestration · Host list",
+  "terminalOrchestratorMode": "Orchestrate · {connected}/{total}",
+  "terminalReadOnlyOff": "Read-only mode (Dry-run)",
+  "terminalReadOnlyOn": "Read-only mode is on (click to turn off)",
+  "terminalReconnect": "Reconnect",
+  "terminalRoleYou": "You",
+  "terminalRunbookTemplates": "Runbook templates",
+  "terminalRunbookTypeCommand": "Command",
+  "terminalSelectServerForNewTab": "Select a server to connect in a new tab",
+  "terminalSessionCreated": "New session created",
+  "terminalSessionHistory": "Session history",
+  "terminalStatusNotConnected": "Not connected",
+  "terminalTaskRunning": "Task is running",
+  "terminalUnfilledVariables": "Some variables are unfilled. Execution cancelled.",
+  "testConnection": "Probar conexión",
+  "themeMode": "Modo de tema",
+  "thinkingNextStep": "🤔 Pensando en el siguiente paso...",
+  "toolRetryExhausted": "Límite de reintentos de herramientas excedido, tarea terminada",
+  "username": "Nombre de usuario",
+  "@aiModelDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@aiModelProvidersUpdated": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@aiModelRequestFailed": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "@aiModelServerError": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "@aiModelUpdateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@auditLogCopied": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@auditLogExportTime": {
+    "placeholders": {
+      "time": {
+        "type": "String"
+      }
+    }
+  },
+  "@auditLogExportTotal": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@changeRecordHostNotConnected": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordOriginalCommand": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordRollbackError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordRollbackFailed": {
+    "placeholders": {
+      "stderr": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordRollbackOnHost": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordRollbackSuccess": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeRecordRollingBack": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeWindowCurrentWindowInfo": {
+    "placeholders": {
+      "window": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeWindowEveryDay": {
+    "placeholders": {
+      "window": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeWindowOnlyDays": {
+    "placeholders": {
+      "window": {
+        "type": "String"
+      },
+      "days": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeWindowSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@changeWindowToNextDay": {
+    "placeholders": {
+      "start": {
+        "type": "String"
+      },
+      "end": {
+        "type": "String"
+      }
+    }
+  },
+  "@errConnectionFailed": {
+    "placeholders": {
+      "message": {
+        "type": "String"
+      }
+    }
+  },
+  "@errExecutionError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@errRequestFailed": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "@errServerError": {
+    "placeholders": {
+      "code": {
+        "type": "int"
+      }
+    }
+  },
+  "@hostEditConfigSavedButCredFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@hostEditConnectionTimeout": {
+    "placeholders": {
+      "timeout": {
+        "type": "int"
+      }
+    }
+  },
+  "@hostEditPrivateKeyFileRead": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@hostEditReadFileFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@hostEditTimeoutSeconds": {
+    "placeholders": {
+      "timeout": {
+        "type": "int"
+      }
+    }
+  },
+  "@hostListDeleteConfirm": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      }
+    }
+  },
+  "@hostListLoadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@notificationInvalidUrl": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@notificationSaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@notificationTestFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@runbookClonedToast": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@runbookDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@runbookImportSuccess": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@runbookJsonParseFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@runbookRunCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@securityAppLockSubtitleOn": {
+    "placeholders": {
+      "biometricType": {
+        "type": "String"
+      }
+    }
+  },
+  "@securityBiometricSupported": {
+    "placeholders": {
+      "biometricType": {
+        "type": "String"
+      }
+    }
+  },
+  "@securityClearFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@settingsAgentDesc": {
+    "placeholders": {
+      "steps": {
+        "type": "int"
+      }
+    }
+  },
+  "@snippetDeleteConfirm": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@snippetResolvedCommand": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalCommandLabel": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalCompactionFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalConnectHostFailed": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalConnecting": {
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalFillVariables": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalFontSize": {
+    "placeholders": {
+      "size": {
+        "type": "int"
+      }
+    }
+  },
+  "@terminalHostNoCredentials": {
+    "placeholders": {
+      "hostName": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalLocalStartFailedWithError": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@terminalMaxStepsSet": {
+    "placeholders": {
+      "value": {
+        "type": "int"
+      }
+    }
+  },
+  "@terminalOrchestratorConnected": {
+    "placeholders": {
+      "connected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@terminalOrchestratorMode": {
+    "placeholders": {
+      "connected": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "monitorCollecting": "Recopilando",
+  "monitorWaitingData": "Esperando datos",
+  "monitorMemory": "Memoria",
+  "monitorUpload": "Subida",
+  "monitorDownload": "Descarga",
+  "monitorDisk": "Disco",
+  "monitorUptime": "Tiempo activo",
+  "monitorUser": "Usuario",
+  "monitorNetTotalDown": "Tasa total de bajada",
+  "monitorNetTotalUp": "Tasa total de subida",
+  "monitorNetTotalDownloaded": "Total descargado",
+  "monitorNetTotalUploaded": "Total subido",
+  "monitorNetInterfaceCount": "Nº de interfaces",
+  "monitorNetInterfaceDetail": "Detalles de interfaz",
+  "monitorNetColInterface": "Interfaz",
+  "monitorNetColTraffic": "Tráfico total ↓/↑",
+  "monitorNetColRate": "Tasa ↓/↑",
+  "monitorNetColIssues": "Err/Pérd",
+  "monitorDiskTotal": "Total",
+  "monitorDiskUsed": "Usado",
+  "monitorDiskAvailable": "Disponible",
+  "monitorDiskOverallUsage": "Uso general",
+  "monitorDiskPartitionCount": "Nº de particiones",
+  "monitorDiskPartitionDetail": "Detalles de partición",
+  "monitorDiskColMount": "Montaje",
+  "monitorDiskColUsage": "Usado/Total",
+  "monitorDiskColPercent": "Uso",
+  "monitorCpuDetail": "Detalles de CPU",
+  "monitorCpuTotalUsage": "Uso total",
+  "monitorCpuUser": "Usuario",
+  "monitorCpuSystem": "Sistema",
+  "monitorCpuIdle": "Inactivo",
+  "monitorLoad1": "Carga 1min",
+  "monitorLoad5": "Carga 5min",
+  "monitorLoad15": "Carga 15min",
+  "monitorProcessCount": "Nº de procesos",
+  "monitorMemoryDetail": "Detalles de memoria",
+  "monitorMemoryTotal": "Total",
+  "monitorMemoryFree": "Libre",
+  "monitorMemoryCached": "Caché",
+  "monitorMemoryBuffers": "Búferes",
+  "monitorMemoryUsage": "Uso",
+  "monitorSwapTotal": "Swap total",
+  "monitorSwapUsed": "Swap usado",
+  "monitorDiskDetail": "Detalles de disco",
+  "monitorDiskTotal2": "Total",
+  "monitorDiskUsage": "Uso",
+  "monitorNetDetail": "Detalles de red",
+  "monitorUserSession": "Usuarios y sesiones",
+  "monitorLoginUsers": "Usuarios conectados",
+  "monitorSystemInfo": "Información del sistema",
+  "monitorUptimeLabel": "Tiempo activo",
+  "monitorKernelVersion": "Versión del kernel",
+  "monitorErrorCollecting": "Recopilando",
+  "monitorErrorNotConnected": "No conectado",
+  "monitorErrorEmptyOutput": "Salida de recopilación vacía",
+  "terminalLocalTab": "Local",
+  "sessionNew": "Nuevo",
+  "sessionNoSessions": "Sin sesiones",
+  "sessionCompressed": "Comprimido",
+  "sessionRename": "Renombrar",
+  "sessionRenameTitle": "Renombrar sesión",
+  "sessionRenameHint": "Introducir nombre de sesión",
+  "sessionDeleteTitle": "¿Eliminar sesión?",
+  "runbookJsonTopLevelArray": "El nivel superior de JSON debe ser un array",
+  "hostDefaultGroup": "Predeterminado",
+  "orchEnterMode": "Entrar en modo de orquestación multi-host",
+  "orchExitMode": "Salir del modo de orquestación",
+  "orchInvalidTarget": "Formato targetHost inválido (solo se permiten caracteres IP o de dominio)",
+  "orchConnectTimeout": "Conexión agotada o rechazada",
+  "orchNoHostsConfigured": "(Sin hosts configurados)",
+  "orchHostConnected": "Conectado",
+  "orchHostDisconnected": "Desconectado",
+  "orchNoOutput": "(Sin salida)",
+  "orchUnknown": "Desconocido",
+  "orchUnreachable": "Inalcanzable",
+  "orchToolNoOutput": "(Sin salida)",
+  "orchToolHostIdsEmpty": "hostIds vacío tras el análisis",
+  "orchToolConnParamMissing": "Falta parámetro o es inválido: fromHostId, targetHost, port (entero positivo) son obligatorios",
+  "orchToolUploadParamMissing": "Falta parámetro: hostId, local, remote son obligatorios",
+  "orchToolLocalIsDir": "La ruta local es un directorio, establece recursive=true para subir recursivamente",
+  "orchAgentRunning": "Agent está ejecutando una tarea, espere a que termine",
+  "orchInputTruncated": "...(entrada demasiado larga, truncada)",
+  "orchSkippedPreviousFailed": "Omitido (host anterior falló)",
+  "monitorCollectingFailed": "Recopilación fallida ({count} veces consecutivas)",
+  "monitorNetMoreInterfaces": "{count} interfaces más no mostradas",
+  "sessionMessageCount": "{count} mensajes",
+  "sessionDeleteConfirm": "Todos los mensajes y registros de la sesión \"{title}\" se eliminarán permanentemente y no se podrán recuperar.",
+  "runbookCopy": "{name} (Copia)",
+  "orchHostNotConnected": "Host {hostId} no conectado",
+  "orchExecException": "Excepción de ejecución: {error}",
+  "orchSourceNotConnected": "Host de origen {hostId} no conectado",
+  "orchProbeException": "Excepción de sondeo: {error}",
+  "orchBatchExec": "Ejecutar en lote: {command}",
+  "orchBatchResult": "Resultado: {success}/{total} correctos",
+  "orchErrorPrefix": "Error: {detail}",
+  "orchToolParamMissing": "Falta parámetro: {params} es obligatorio",
+  "orchToolHostNotConnected": "Host {hostId} no conectado o inexistente",
+  "orchToolHostFailed": "Comando del host {hostId} falló (exit={exitCode})",
+  "orchToolBatchProgress": "Ejecutar en lote: {command} → {count} hosts",
+  "orchToolBatchFailed": "{failed}/{total} hosts fallaron",
+  "orchToolConnProgress": "[{fromHostId} → {targetHost}:{port}] Probando conectividad...",
+  "orchToolNotSshSession": "Host {hostId} no es una sesión SSH remota, no se puede subir por SFTP",
+  "orchToolSshNotEstablished": "La conexión SSH del host {hostId} no está establecida",
+  "orchToolLocalNotFound": "La ruta local no existe: {path}",
+  "orchToolSftpOpening": "[{hostId}] Abriendo subsistema SFTP...",
+  "orchToolExecProgress": "[{hostId}] Ejecutar: {command}",
+  "orchTaskAbnormal": "⚠️ Tarea terminada anormalmente: {error}",
+  "@monitorCollectingFailed": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@monitorNetMoreInterfaces": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@sessionMessageCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@sessionDeleteConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "@runbookCopy": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchHostNotConnected": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchExecException": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchSourceNotConnected": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchProbeException": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchBatchExec": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchBatchResult": {
+    "placeholders": {
+      "success": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@orchErrorPrefix": {
+    "placeholders": {
+      "detail": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolParamMissing": {
+    "placeholders": {
+      "params": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolHostNotConnected": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolHostFailed": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      },
+      "exitCode": {
+        "type": "int"
+      }
+    }
+  },
+  "@orchToolBatchProgress": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "@orchToolBatchFailed": {
+    "placeholders": {
+      "failed": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "@orchToolConnProgress": {
+    "placeholders": {
+      "fromHostId": {
+        "type": "String"
+      },
+      "targetHost": {
+        "type": "String"
+      },
+      "port": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolNotSshSession": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolSshNotEstablished": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolLocalNotFound": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolSftpOpening": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchToolExecProgress": {
+    "placeholders": {
+      "hostId": {
+        "type": "String"
+      },
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "@orchTaskAbnormal": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  }
+}
