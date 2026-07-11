@@ -198,14 +198,44 @@ jobs:
 
             AI Terminal 是一款将 AI 助手与 SSH / 本地终端深度集成的跨平台应用。无论你是刚买服务器的小白、不想记命令的开发者、还是需要批量管理服务器的运维人员——打开它，用中文告诉 AI 你要干什么，它帮你连服务器、跑命令、装软件、查问题。全程安全可控。
 
-            ### 🆕 v1.3.4 新功能
+            ### 🆕 v1.3.5 新功能 · 运维能力大升级
 
-            - 🎯 **多机编排模式**：一键开启编排模式，向多台服务器广播同一条指令；工具栏雷达波纹动效实时显示在线数量（编排 · X/Y），点击胶囊查看主机清单与连接状态
-            - 🔧 **AI 工具调用**：Agent 可调用非 shell 工具，支持 `upload_to` 跨机上传、本地↔远程文件同步
-            - 🧠 **经验学习**：Agent 自动记录运维操作经验，下次相似任务复用历史决策
-            - ⚠️ **危险命令双层风险说明**：执行 warn 级命令前，AI 在思考中用自然语言解释"命令会做什么、为什么、有什么风险"；同时 SafetyGuard 返回具体人类可读的风险文案（如"卸载软件包，依赖该包的其他服务可能无法运行"），即使看不懂命令也能判断
-            - 🐛 **修复 API Key 重启失效**：解决重启后需去设置重新点保存才生效的问题
-            - 🎨 **编排模式 UI 优化**：移除独立横幅，融入工具栏胶囊 + 雷达波纹扩散动画，象征"中枢向多机广播指令"
+            v1.3.5 是一次重大更新，新增**服务器监控**、**变更台账**、**运维工作流**、**通知中心**、**玻璃态 UI** 五大核心功能，全方位提升运维效率。
+
+            #### 📊 服务器实时监控面板
+            - **CPU / 内存 / 磁盘 / 网络** 四大核心指标实时刷新
+            - **多主机并行监控**，一个面板看遍所有服务器状态
+            - **按主机独立开关**，不想监控的机器可随时关闭
+            - 异常指标自动高亮，一眼发现问题
+
+            #### 📝 变更台账 & 审计日志
+            - **自动记录所有 Agent 操作**：命令执行、文件修改、配置变更
+            - **变更窗口管理**：计划内变更 vs 紧急变更，分类管理
+            - **完整审计日志**：操作人、时间、命令、结果、退出码，全部可查
+            - **变更回滚建议**：AI 自动分析变更影响，给出回滚方案
+
+            #### 📋 运维工作流 (Runbook)
+            - **内置常用运维模板**：系统巡检、安全加固、日志清理、服务部署等
+            - **一键执行**：不用再一步步敲命令，工作流自动按步骤执行
+            - **多机编排**：同一工作流可在多台服务器上并行/串行执行
+            - **自定义工作流**：支持创建自己的运维手册，沉淀团队经验
+
+            #### 🔔 通知中心
+            - **任务完成提醒**：长任务跑完了第一时间通知你
+            - **异常告警**：监控指标异常、命令执行失败，即时推送
+            - **安全提醒**：高风险操作、可疑行为，提前预警
+            - **可配置通知策略**：哪些事件需要通知，自己说了算
+
+            #### 🎨 玻璃态 UI 重构
+            - 全新 **GlassCard 玻璃态卡片**设计，视觉层次更清晰
+            - **主题系统重构**，支持自定义主题色、圆角、模糊度
+            - 更流畅的动画过渡，更细腻的交互反馈
+            - **15+ 语言**本地化支持，一键切换
+
+            #### 🔧 其他改进
+            - Agent 总结输出支持 Markdown 渲染（标题、列表、加粗等格式）
+            - 性能优化：终端渲染更流畅，长任务响应更及时
+            - 修复若干已知问题，提升稳定性
 
             ### 🌟 适合谁用？
 
@@ -217,12 +247,17 @@ jobs:
             ### 🚀 核心特性
 
             - 🤖 **Agent 智能执行**：AI 自动生成命令并循环执行（ReAct 框架），直到任务完成
+            - 📊 **服务器监控**：CPU/内存/磁盘/网络实时监控面板，多主机并行
+            - 📝 **变更台账**：完整审计日志，操作可追溯，变更可回滚
+            - 📋 **运维工作流**：内置 Runbook 模板，一键执行常见运维任务
+            - 🔔 **通知中心**：任务完成、异常告警、安全提醒，即时推送
             - 🎯 **多机编排**：单 Agent 调度多台主机，命令按 host 路由执行，状态实时回显
-            - 🛡️ **三重安全防护**：行为边界提示词 → SafetyGuard 命令分级（safe/info/warn/blocked）→ 危险操作需 CONFIRM 确认 + 具体风险说明
+            - 🛡️ **三重安全防护**：行为边界提示词 → SafetyGuard 命令分级 → 危险操作需 CONFIRM 确认
             - 🔐 **零明文凭据**：密码/私钥存储在系统 Keychain / Keystore，永不明文落盘
             - 🧠 **知识库驱动**：内置 150+ 软件安装/配置指南，严格按官方文档执行，杜绝 AI 编造命令
             - 🛠️ **AI 工具调用**：SFTP 跨机上传、文件同步、经验记忆等非 shell 工具
             - 🖥️ **5 平台原生**：macOS / Linux / Windows / Android / iOS 全平台支持
+            - 🌍 **15+ 语言**：中文/英文/日语/韩语/法语/德语/西班牙语/俄语/葡萄牙语等
             - 📡 **SSH 远程 + 本地终端**：连接池复用，多标签共享连接，切换零延迟
             - 🌊 **流式输出**：AI 响应实时渲染，终端命令即时回显
             - 🌐 **20+ AI 供应商**：DeepSeek / Qwen / Claude / Gemini / Ollama 等，支持远程配置更新
@@ -231,9 +266,9 @@ jobs:
             ### 🛡️ 安全设计
 
             - **密码存储**：系统级安全存储（macOS Keychain / Android Keystore），本地数据库只存元数据
-            - **命令安全**：SafetyGuard 四级拦截——blocked 直接拦截、warn 需 CONFIRM 确认（附具体风险文案）、info 低风险提示、safe 直接执行
-            - **危险命令解释**：AI 在执行 warn 命令前必须在思考中说明命令作用与风险，让看不懂命令的用户也能判断
+            - **命令安全**：SafetyGuard 四级拦截——blocked 直接拦截、warn 需 CONFIRM 确认、info 低风险提示、safe 直接执行
             - **Agent 边界**：用户说"检查/查看"时只执行只读命令；禁止擅自安装/修改配置；发现问题先报告不自修
+            - **变更审计**：所有 Agent 操作自动记录，支持审计追溯和回滚建议
 
             ### 📦 下载
 
@@ -263,6 +298,7 @@ jobs:
             ### 📖 文档
 
             - [官网](https://ai-terminal.keiskei.top)
+            - [README（多语言）](https://github.com/keiskeies/ai_terminal#readme)
             - [常见问题](https://github.com/keiskeies/ai_terminal/blob/main/QUESTION.md)
 
             ---
@@ -273,14 +309,44 @@ jobs:
 
             AI Terminal is a cross-platform app that deeply integrates an AI assistant with SSH and local terminals. Whether you're a beginner who just rented a VPS, a developer tired of googling commands, or a DevOps engineer managing dozens of servers — open it, tell the AI what you want in plain English (or Chinese), and it handles the rest. Safe, transparent, and under your control.
 
-            ### 🆕 What's New in v1.3.4
+            ### 🆕 What's New in v1.3.5 · Ops Capability Mega Upgrade
 
-            - 🎯 **Multi-Host Orchestration**: Broadcast a single command to multiple servers at once; toolbar radar ripple animation shows live connected count (Orchestration · X/Y), click the capsule to inspect host list and connection status
-            - 🔧 **AI Tool Calling**: Agent can invoke non-shell tools — `upload_to` for cross-host uploads, local↔remote file sync
-            - 🧠 **Experience Learning**: Agent records operational experience and reuses past decisions for similar tasks
-            - ⚠️ **Dual-Layer Risk Explanation for Dangerous Commands**: Before executing warn-level commands, AI explains in plain language what the command does, why, and the risks; SafetyGuard also returns specific human-readable risk text (e.g. "Uninstalling this package may break services depending on it"), so even users who can't read commands can judge
-            - 🐛 **Fix: API Key Lost After Restart**: Resolved the issue where API key appeared invalid after restart and required re-saving in settings
-            - 🎨 **Orchestration UI Polish**: Removed standalone banner, integrated into toolbar capsule with radar ripple animation symbolizing "central hub broadcasting to multiple machines"
+            v1.3.5 is a major update featuring **5 new core capabilities**: Server Monitoring, Change Records, Ops Runbooks, Notification Center, and Glassmorphism UI — a complete upgrade for DevOps efficiency.
+
+            #### 📊 Real-time Server Monitoring Dashboard
+            - **CPU / Memory / Disk / Network** — four core metrics refreshed in real-time
+            - **Multi-host parallel monitoring** — view all your servers from one dashboard
+            - **Per-host independent toggle** — turn off monitoring for any machine anytime
+            - Auto-highlight abnormal metrics — spot issues instantly
+
+            #### 📝 Change Records & Audit Logs
+            - **Auto-log all Agent operations**: command execution, file changes, config modifications
+            - **Change window management**: planned vs emergency changes, categorized
+            - **Full audit logs**: operator, timestamp, command, result, exit code — all queryable
+            - **Rollback suggestions**: AI analyzes change impact and recommends rollback plans
+
+            #### 📋 Ops Runbooks
+            - **Built-in common ops templates**: system inspection, security hardening, log cleanup, service deployment, and more
+            - **One-click execution**: no more typing commands step by step — runbooks execute automatically
+            - **Multi-host orchestration**: run the same workflow on multiple servers in parallel or sequentially
+            - **Custom runbooks**: create your own ops playbooks and codify team knowledge
+
+            #### 🔔 Notification Center
+            - **Task completion alerts** — get notified the moment long-running tasks finish
+            - **Anomaly alerts** — monitoring threshold breaches, command failures, pushed instantly
+            - **Security reminders** — high-risk operations, suspicious behavior, early warnings
+            - **Configurable notification policies** — you decide which events trigger notifications
+
+            #### 🎨 Glassmorphism UI Redesign
+            - Brand new **GlassCard glassmorphism card design** with clearer visual hierarchy
+            - **Theme system refactor** — custom theme colors, corner radius, blur intensity
+            - Smoother animated transitions, more refined interaction feedback
+            - **15+ languages** with one-click switching
+
+            #### 🔧 Other Improvements
+            - Agent summary output supports Markdown rendering (headings, lists, bold, etc.)
+            - Performance optimizations: smoother terminal rendering, faster long-task response
+            - Various bug fixes and stability improvements
 
             ### 🌟 Who is this for?
 
@@ -292,12 +358,17 @@ jobs:
             ### 🚀 Core Features
 
             - 🤖 **Agent Auto-Execution**: AI generates and executes commands in a ReAct loop until task completion
+            - 📊 **Server Monitoring**: Real-time CPU/memory/disk/network dashboard, multi-host parallel
+            - 📝 **Change Records**: Full audit logs, traceable operations, rollback-ready
+            - 📋 **Ops Runbooks**: Built-in Runbook templates, one-click common ops tasks
+            - 🔔 **Notification Center**: Task completion, anomaly alerts, security reminders — pushed instantly
             - 🎯 **Multi-Host Orchestration**: Single Agent dispatches commands across multiple hosts, routed by hostId, with live status feedback
-            - 🛡️ **Triple Security**: Behavior boundary prompts → SafetyGuard command classification → Dangerous ops require CONFIRM + specific risk explanation
+            - 🛡️ **Triple Security**: Behavior boundary prompts → SafetyGuard command classification → Dangerous ops require CONFIRM
             - 🔐 **Zero Plaintext Credentials**: Passwords/keys in system Keychain / Keystore, never on disk
             - 🧠 **Knowledge-Driven**: 150+ software install/config guides, follows official docs strictly
             - 🛠️ **AI Tool Calling**: SFTP cross-host upload, file sync, experience memory and other non-shell tools
             - 🖥️ **5 Native Platforms**: macOS / Linux / Windows / Android / iOS
+            - 🌍 **15+ Languages**: Chinese / English / Japanese / Korean / French / German / Spanish / Russian / Portuguese & more
             - 📡 **SSH Remote + Local Terminal**: Connection pooling, shared connections, zero-delay switching
             - 🌊 **Streaming Output**: Real-time AI responses and terminal output
             - 🌐 **20+ AI Providers**: DeepSeek / Qwen / Claude / Gemini / Ollama & more
@@ -306,9 +377,9 @@ jobs:
             ### 🛡️ Security
 
             - **Credential Storage**: System-level secure storage (Keychain / Keystore), metadata only in local DB
-            - **Command Safety**: SafetyGuard 4-level interception — blocked / warn (CONFIRM required, with specific risk text) / info / safe
-            - **Dangerous Command Explanation**: AI must explain the command's purpose and risk in its thought before executing warn-level commands, so non-technical users can judge
+            - **Command Safety**: SafetyGuard 4-level interception — blocked / warn (CONFIRM required) / info / safe
             - **Agent Boundaries**: Read-only for "check/inspect" requests; no unauthorized installs/modifications; report first, never self-fix
+            - **Change Auditing**: All Agent operations automatically logged, with audit trail and rollback suggestions
 
             ### 📥 Downloads
 
@@ -338,6 +409,7 @@ jobs:
             ### 📖 Docs
 
             - [Website](https://ai-terminal.keiskei.top)
+            - [README (multi-language)](https://github.com/keiskeies/ai_terminal#readme)
             - [FAQ](https://github.com/keiskeies/ai_terminal/blob/main/QUESTION.md)
           files: |
             artifacts/**/*
