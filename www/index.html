@@ -1,0 +1,3717 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Terminal — AI-Powered Cross-Platform Terminal</title>
+  <meta name="description" content="Next-generation terminal with built-in AI agent, SSH client, server monitoring, ops runbooks and safety guard. Available on macOS, Windows, Linux, iOS & Android.">
+  <link rel="icon" href="img/logo.png">
+  <link rel="preconnect" href="https://fonts.loli.net">
+  <link rel="preconnect" href="https://gstatic.loli.net" crossorigin>
+  <link href="https://fonts.loli.net/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    /* ========== THEME VARIABLES ========== */
+    [data-theme="dark"] {
+      --bg-primary: #050508;
+      --bg-secondary: #0a0a12;
+      --bg-card: #0d0d18;
+      --bg-terminal: #080810;
+      --text-primary: #e8e8f5;
+      --text-secondary: #7a7a95;
+      --text-dim: #4a4a65;
+      --accent-purple: #8b5cf6;
+      --accent-purple-light: #a78bfa;
+      --accent-cyan: #22d3ee;
+      --accent-cyan-light: #67e8f9;
+      --accent-green: #10b981;
+      --accent-green-light: #34d399;
+      --accent-pink: #ec4899;
+      --accent-yellow: #fbbf24;
+      --accent-glow-purple: rgba(139, 92, 246, 0.2);
+      --accent-glow-cyan: rgba(34, 211, 238, 0.15);
+      --accent-glow-green: rgba(16, 185, 129, 0.15);
+      --green: #10b981;
+      --green-dim: rgba(16, 185, 129, 0.12);
+      --red: #f87171;
+      --yellow: #fbbf24;
+      --cyan: #22d3ee;
+      --border: rgba(255, 255, 255, 0.06);
+      --border-bright: rgba(139, 92, 246, 0.4);
+      --shadow: rgba(0, 0, 0, 0.6);
+      --nav-bg: rgba(5, 5, 8, 0.4);
+      --nav-bg-scrolled: rgba(5, 5, 8, 0.85);
+      --overlay: rgba(0, 0, 0, 0.75);
+      --glass-bg: rgba(255, 255, 255, 0.03);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --grid-line: rgba(139, 92, 246, 0.06);
+    }
+
+    [data-theme="light"] {
+      --bg-primary: #fafafc;
+      --bg-secondary: #f5f5f9;
+      --bg-card: #ffffff;
+      --bg-terminal: #1a1a2e;
+      --text-primary: #1a1a2e;
+      --text-secondary: #52526b;
+      --text-dim: #8a8aa5;
+      --accent-purple: #7c3aed;
+      --accent-purple-light: #8b5cf6;
+      --accent-cyan: #0891b2;
+      --accent-cyan-light: #06b6d4;
+      --accent-green: #059669;
+      --accent-green-light: #10b981;
+      --accent-pink: #db2777;
+      --accent-yellow: #d97706;
+      --accent-glow-purple: rgba(124, 58, 237, 0.08);
+      --accent-glow-cyan: rgba(8, 145, 178, 0.06);
+      --accent-glow-green: rgba(5, 150, 105, 0.06);
+      --green: #059669;
+      --green-dim: rgba(5, 150, 105, 0.08);
+      --red: #dc2626;
+      --yellow: #d97706;
+      --cyan: #0891b2;
+      --border: rgba(0, 0, 0, 0.06);
+      --border-bright: rgba(124, 58, 237, 0.2);
+      --shadow: rgba(0, 0, 0, 0.06);
+      --nav-bg: rgba(250, 250, 252, 0.7);
+      --nav-bg-scrolled: rgba(255, 255, 255, 0.9);
+      --overlay: rgba(0, 0, 0, 0.5);
+      --glass-bg: rgba(255, 255, 255, 0.7);
+      --glass-border: rgba(0, 0, 0, 0.06);
+      --grid-line: rgba(124, 58, 237, 0.04);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: 'Space Grotesk', sans-serif;
+      line-height: 1.6;
+      overflow-x: hidden;
+      transition: background 0.4s ease, color 0.4s ease;
+      position: relative;
+    }
+
+    /* ========== CYBER GRID BACKGROUND ========== */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+      background-size: 80px 80px;
+      pointer-events: none;
+      z-index: 2;
+      mask-image: radial-gradient(ellipse at 50% 0%, black 20%, transparent 70%);
+      -webkit-mask-image: radial-gradient(ellipse at 50% 0%, black 20%, transparent 70%);
+      opacity: 0.6;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 2;
+      opacity: 0;
+    }
+
+    /* ========== GLOW ORBS ========== */
+    .glow-orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.12;
+      pointer-events: none;
+      z-index: 1;
+      animation: floatOrb 30s ease-in-out infinite;
+    }
+    .glow-orb.purple {
+      width: 600px; height: 600px;
+      background: var(--accent-purple);
+      top: -200px; left: -150px;
+      animation-delay: 0s;
+    }
+    .glow-orb.cyan {
+      width: 500px; height: 500px;
+      background: var(--accent-cyan);
+      top: 30%; right: -150px;
+      animation-delay: -10s;
+      opacity: 0.08;
+    }
+    .glow-orb.green {
+      display: none;
+    }
+
+    @keyframes floatOrb {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      33% { transform: translate(40px, -30px) scale(1.1); }
+      66% { transform: translate(-30px, 20px) scale(0.95); }
+    }
+
+    /* ========== NAVBAR ========== */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      padding: 0 2rem;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(20px) saturate(1.2);
+      -webkit-backdrop-filter: blur(20px) saturate(1.2);
+      background: var(--nav-bg);
+      border-bottom: 1px solid transparent;
+      transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                  height 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                  border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+                  box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    nav.scrolled {
+      height: 56px;
+      background: var(--nav-bg-scrolled);
+      border-bottom-color: var(--border);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .nav-brand {
+      display: flex; align-items: center; gap: 10px;
+      text-decoration: none; color: var(--text-primary);
+      position: relative;
+    }
+
+    .nav-brand-icon {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700; font-size: 14px; color: white;
+      position: relative;
+    }
+    .nav-brand-icon::after {
+      content: '';
+      position: absolute;
+      inset: -1px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+      filter: blur(6px);
+      opacity: 0.2;
+      z-index: -1;
+    }
+
+    .nav-brand-text {
+      font-weight: 700; font-size: 1.05rem; letter-spacing: -0.02em;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .nav-brand-text .cursor {
+      display: inline-block;
+      width: 7px; height: 14px;
+      background: var(--accent-green);
+      margin-left: 2px;
+      animation: blink 1s step-end infinite;
+      vertical-align: middle;
+    }
+
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+    .nav-center {
+      display: flex; align-items: center; gap: 1.75rem; list-style: none;
+    }
+
+    .nav-center a {
+      color: var(--text-secondary); text-decoration: none;
+      font-size: 0.85rem; font-weight: 500; transition: color 0.2s;
+      font-family: 'JetBrains Mono', monospace;
+      position: relative;
+    }
+    .nav-center a::before {
+      content: '>';
+      position: absolute;
+      left: -12px;
+      opacity: 0;
+      color: var(--accent-cyan);
+      transition: opacity 0.2s, left 0.2s;
+    }
+    .nav-center a:hover { color: var(--text-primary); }
+    .nav-center a:hover::before { opacity: 1; left: -10px; }
+
+    .nav-actions {
+      display: flex; align-items: center; gap: 0.6rem;
+    }
+
+    .nav-icon-btn {
+      background: none; border: 1px solid var(--border); color: var(--text-secondary);
+      width: 34px; height: 34px; border-radius: 6px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.9rem; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .nav-icon-btn:hover {
+      border-color: var(--accent-purple);
+      color: var(--accent-purple-light);
+      background: var(--accent-glow-purple);
+    }
+
+    .lang-dropdown {
+      position: relative;
+    }
+
+    .lang-dropdown-btn {
+      background: none; border: 1px solid var(--border); color: var(--text-secondary);
+      padding: 0 12px; height: 34px; border-radius: 6px; cursor: pointer;
+      display: flex; align-items: center; gap: 6px;
+      font-size: 0.8rem; font-weight: 500; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .lang-dropdown-btn:hover {
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan-light);
+      background: var(--accent-glow-cyan);
+    }
+    .lang-dropdown-btn .arrow {
+      font-size: 0.55rem; transition: transform 0.2s;
+    }
+    .lang-dropdown.open .lang-dropdown-btn .arrow { transform: rotate(180deg); }
+
+    .lang-dropdown-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      min-width: 170px;
+      background: var(--glass-bg);
+      backdrop-filter: blur(20px) saturate(1.5);
+      -webkit-backdrop-filter: blur(20px) saturate(1.5);
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      padding: 4px;
+      list-style: none;
+      box-shadow: 0 10px 40px var(--shadow);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-6px) scale(0.96);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 200;
+    }
+    .lang-dropdown.open .lang-dropdown-menu {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0) scale(1);
+    }
+
+    .lang-dropdown-menu li {
+      padding: 7px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.15s;
+      color: var(--text-secondary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .lang-dropdown-menu li:hover {
+      background: var(--accent-glow-purple);
+      color: var(--text-primary);
+    }
+    .lang-dropdown-menu li.active {
+      color: var(--accent-purple-light);
+      font-weight: 600;
+      background: var(--accent-glow-purple);
+    }
+    .lang-dropdown-menu li .check { opacity: 0; font-size: 0.7rem; }
+    .lang-dropdown-menu li.active .check { opacity: 1; }
+
+    .nav-cta {
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+      color: white !important;
+      padding: 7px 16px; border-radius: 6px;
+      font-weight: 600 !important; font-size: 0.82rem !important;
+      text-decoration: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+      font-family: 'JetBrains Mono', monospace;
+      position: relative;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+    .nav-cta::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 6px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      opacity: 0;
+      transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .nav-cta:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+    }
+    .nav-cta:hover::before { opacity: 1; }
+    .nav-cta span { position: relative; z-index: 1; }
+
+    .mobile-toggle {
+      display: none; background: none; border: none;
+      color: var(--text-primary); font-size: 1.3rem; cursor: pointer;
+      width: 34px; height: 34px;
+      display: none; align-items: center; justify-content: center;
+    }
+
+    /* ========== HERO ========== */
+    .hero {
+      min-height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: 100px 1.5rem 60px;
+      position: relative;
+      z-index: 10;
+    }
+
+    .hero-status-badge {
+      position: absolute;
+      top: 100px; left: 2rem;
+      display: flex; flex-direction: column; gap: 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      text-align: left;
+    }
+    .hero-status-badge .status-line {
+      display: flex; align-items: center; gap: 8px;
+      color: var(--text-dim);
+    }
+    .hero-status-badge .status-line .label { color: var(--text-dim); }
+    .hero-status-badge .status-line .value { color: var(--accent-green); }
+    .hero-status-badge .status-line .dot {
+      width: 6px; height: 6px;
+      background: var(--accent-green);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    .hero-status-badge .ascii-art {
+      color: var(--accent-purple);
+      opacity: 0.4;
+      line-height: 1.1;
+      font-size: 0.6rem;
+    }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .hero-eyebrow {
+      display: inline-flex; align-items: center; gap: 10px;
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem; font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 1.75rem;
+      background: var(--bg-card);
+      position: relative;
+    }
+    .hero-eyebrow::before {
+      content: '$ ';
+      opacity: 0.5;
+      color: var(--accent-green);
+    }
+    .hero-eyebrow .dot {
+      width: 6px; height: 6px; background: var(--accent-green);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    .hero h1 {
+      font-size: clamp(2.5rem, 7vw, 5rem); font-weight: 700;
+      letter-spacing: -0.04em; line-height: 1.05;
+      margin-bottom: 1.5rem;
+      font-family: 'Space Grotesk', sans-serif;
+    }
+
+    .hero h1 .line-1 {
+      display: block;
+      color: var(--text-primary);
+      opacity: 0;
+      animation: slideInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s forwards;
+    }
+
+    .hero h1 .line-2 {
+      display: block;
+      background: linear-gradient(135deg, var(--accent-purple-light) 0%, var(--accent-cyan-light) 100%);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      animation: slideInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.25s forwards;
+      opacity: 0;
+    }
+
+    @keyframes slideInUp {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .hero-sub {
+      font-size: clamp(0.95rem, 2vw, 1.15rem); color: var(--text-secondary);
+      max-width: 620px; margin-bottom: 2.25rem; font-weight: 400;
+      line-height: 1.75;
+      opacity: 0;
+      animation: slideInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
+    }
+
+    .hero-actions {
+      display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;
+      opacity: 0;
+      animation: slideInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.55s forwards;
+    }
+
+    .btn-primary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 28px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+      color: white;
+      text-decoration: none; border-radius: 6px; font-weight: 600;
+      font-size: 0.9rem; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      font-family: 'JetBrains Mono', monospace;
+      position: relative;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+    .btn-primary::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 6px;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      opacity: 0;
+      transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(139, 92, 246, 0.25);
+    }
+    .btn-primary:hover::before { opacity: 1; }
+    .btn-primary > * { position: relative; z-index: 1; }
+
+    .btn-secondary {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 28px; background: transparent; color: var(--text-primary);
+      text-decoration: none; border-radius: 6px; font-weight: 600;
+      font-size: 0.9rem; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      border: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace;
+      position: relative;
+      overflow: hidden;
+    }
+    .btn-secondary:hover {
+      border-color: var(--accent-purple);
+      color: var(--accent-purple-light);
+      background: var(--accent-glow-purple);
+      transform: translateY(-1px);
+    }
+
+    /* ========== TERMINAL DEMO ========== */
+    .hero-terminal {
+      margin-top: 3rem; width: 100%; max-width: 1200px;
+      opacity: 0;
+      animation: slideInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.7s forwards;
+    }
+
+    .hero-demo-window {
+      width: 100%;
+      background: var(--card-bg);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.6),
+                  0 0 0 1px rgba(139, 92, 246, 0.1);
+    }
+    .hero-demo-container {
+      width: 100%;
+      height: 640px;
+      background: #0a0a0f;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero-demo-container iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+
+    /* ========== SECTION COMMON ========== */
+    section { position: relative; z-index: 10; }
+
+    .section-header {
+      max-width: 1100px;
+      margin: 0 auto 3rem;
+      text-align: center;
+    }
+
+    .section-label {
+      display: inline-flex; align-items: center; gap: 10px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem; font-weight: 500;
+      color: var(--accent-purple-light);
+      text-transform: none;
+      letter-spacing: 0.02em;
+      margin-bottom: 1rem;
+      opacity: 0.9;
+    }
+    .section-label::before {
+      content: '//';
+      opacity: 0.6;
+      color: var(--text-dim);
+      font-weight: 400;
+    }
+
+    .section-title {
+      font-size: clamp(1.8rem, 4.5vw, 2.8rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.75rem;
+      line-height: 1.2;
+    }
+
+    .section-desc {
+      color: var(--text-secondary);
+      font-size: 1rem;
+      max-width: 560px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    /* ========== SCREENSHOTS / SHOWCASES ========== */
+    .screenshots {
+      padding: 100px 0;
+      position: relative;
+    }
+    .screenshots::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-purple), transparent);
+      opacity: 0.2;
+    }
+
+    /* ===== Demo Window (shared) ===== */
+    .demo-window {
+      width: 100%;
+      background: var(--card-bg);
+      border-radius: 14px;
+      overflow: hidden;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.6),
+                  0 0 0 1px rgba(139, 92, 246, 0.1);
+    }
+    [data-theme="light"] .demo-window {
+      box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.2),
+                  0 0 0 1px rgba(139, 92, 246, 0.1);
+    }
+    .demo-window-bar {
+      display: none;
+    }
+    .demo-iframe-container {
+      width: 100%;
+      height: 680px;
+      background: #0a0a0f;
+      position: relative;
+      overflow: hidden;
+    }
+    .demo-iframe-container iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+      display: block;
+    }
+    .demo-badge {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      padding: 6px 14px;
+      background: rgba(139, 92, 246, 0.9);
+      color: white;
+      font-size: 12px;
+      border-radius: 20px;
+      font-weight: 600;
+      backdrop-filter: blur(10px);
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* Feature highlights grid */
+    .feature-highlights {
+      max-width: 1200px;
+      margin: 80px auto 0;
+      padding: 0 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    .fh-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 28px;
+      transition: all 0.3s ease;
+    }
+    .fh-card:hover {
+      border-color: var(--accent-purple);
+      transform: translateY(-4px);
+      box-shadow: 0 10px 30px -10px rgba(139, 92, 246, 0.3);
+    }
+    .fh-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(34, 211, 238, 0.15));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 16px;
+    }
+    .fh-card h3 {
+      font-size: 1.1rem;
+      margin: 0 0 8px 0;
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+    .fh-card p {
+      font-size: 0.9rem;
+      margin: 0;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .showcases {
+      max-width: 1200px;
+      margin: 80px auto 0;
+      display: flex;
+      flex-direction: column;
+      gap: 100px;
+      padding: 0 1.5rem;
+    }
+
+    .showcase-item {
+      display: flex;
+      align-items: center;
+      gap: 60px;
+    }
+
+    .showcase-item.reverse {
+      flex-direction: row-reverse;
+    }
+
+    .showcase-image {
+      flex: 0 0 58%;
+      position: relative;
+      cursor: pointer;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .showcase-image::before {
+      content: '';
+      position: absolute; inset: 0;
+      border-radius: 12px;
+      padding: 1px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0;
+      transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .showcase-image:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 20px 40px var(--shadow);
+      border-color: var(--border-bright);
+    }
+
+    .showcase-image:hover::before {
+      opacity: 0.5;
+    }
+
+    .showcase-image img {
+      width: 100%;
+      display: block;
+      transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      z-index: 1;
+    }
+
+    .showcase-image:hover img {
+      transform: scale(1.02);
+    }
+
+    .showcase-image-glow {
+      position: absolute;
+      inset: -20%;
+      background: radial-gradient(circle at 50% 50%, var(--accent-glow-purple), transparent 60%);
+      opacity: 0;
+      transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .showcase-image:hover .showcase-image-glow {
+      opacity: 0.3;
+    }
+
+    .showcase-content {
+      flex: 1;
+    }
+
+    .showcase-item:not(.reverse) .showcase-content {
+      text-align: left;
+    }
+
+    .showcase-item.reverse .showcase-content {
+      text-align: right;
+    }
+
+    .showcase-tag {
+      display: inline-block;
+      padding: 4px 12px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--accent-cyan);
+      background: var(--accent-glow-cyan);
+      border: 1px solid rgba(34, 211, 238, 0.2);
+      border-radius: 4px;
+      margin-bottom: 16px;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .showcase-tag::before {
+      content: '$ ';
+      opacity: 0.6;
+    }
+
+    .showcase-title {
+      font-size: 1.75rem;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: 24px;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .showcase-features {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 24px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .showcase-features li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 0.95rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .showcase-item.reverse .showcase-features li {
+      flex-direction: row-reverse;
+    }
+
+    .check-icon {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--accent-glow-green);
+      color: var(--accent-green);
+      border-radius: 50%;
+      font-size: 0.75rem;
+      font-weight: 700;
+      margin-top: 2px;
+    }
+
+    .showcase-desc {
+      font-size: 0.92rem;
+      color: var(--text-dim);
+      line-height: 1.7;
+    }
+
+    .screenshot-note {
+      text-align: center;
+      max-width: 1100px; margin: 3rem auto 0;
+      font-size: 0.75rem; color: var(--text-dim);
+      letter-spacing: 0.01em;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .screenshot-note::before { content: '// '; color: var(--accent-purple); }
+
+    /* ========== NEW FEATURES (v1.3.5) ========== */
+    .new-features {
+      padding: 100px 1.5rem;
+      position: relative;
+      background: var(--bg-secondary);
+      transition: background 0.4s ease;
+    }
+    .new-features::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-purple), transparent);
+      opacity: 0.2;
+    }
+
+    .new-features-grid {
+      max-width: 1100px; margin: 0 auto;
+      display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem;
+    }
+
+    .nf-card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px) saturate(1.4);
+      -webkit-backdrop-filter: blur(16px) saturate(1.4);
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      padding: 26px 18px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+      text-align: center;
+    }
+
+    .nf-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 50%; transform: translateX(-50%);
+      width: 60%; height: 1px;
+      background: var(--nf-color);
+      opacity: 0;
+      transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .nf-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--nf-color);
+      box-shadow: 0 10px 30px var(--shadow);
+    }
+    .nf-card:hover::before { opacity: 0.6; }
+
+    .nf-card.green { --nf-color: var(--accent-green); --nf-glow: var(--accent-glow-green); }
+    .nf-card.cyan { --nf-color: var(--accent-cyan); --nf-glow: var(--accent-glow-cyan); }
+    .nf-card.purple { --nf-color: var(--accent-purple); --nf-glow: var(--accent-glow-purple); }
+    .nf-card.yellow { --nf-color: var(--accent-yellow); --nf-glow: rgba(251, 191, 36, 0.15); }
+    .nf-card.pink { --nf-color: var(--accent-pink); --nf-glow: rgba(236, 72, 153, 0.15); }
+
+    .nf-icon {
+      font-size: 2rem;
+      margin-bottom: 14px;
+      display: block;
+    }
+
+    .nf-card h3 {
+      font-size: 0.92rem; font-weight: 600; margin-bottom: 6px;
+      letter-spacing: -0.01em; line-height: 1.4;
+      color: var(--nf-color);
+    }
+
+    .nf-card p {
+      color: var(--text-secondary); font-size: 0.78rem; line-height: 1.55;
+    }
+
+    /* ========== FEATURES ========== */
+    .features {
+      padding: 100px 1.5rem; position: relative;
+    }
+    .features::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-purple), transparent);
+      opacity: 0.2;
+    }
+
+    .features-grid {
+      max-width: 1100px; margin: 0 auto;
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem;
+      position: relative;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px 20px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-purple-light), transparent);
+      opacity: 0;
+      transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .feature-card:hover {
+      border-color: var(--border-bright);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px var(--shadow);
+      background: var(--bg-secondary);
+    }
+    .feature-card:hover::before { opacity: 0.4; }
+
+    .feature-card .code-num {
+      position: absolute;
+      top: 10px; right: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      opacity: 0.4;
+    }
+
+    .feature-icon {
+      width: 44px; height: 44px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.25rem; margin-bottom: 16px;
+    }
+    .feature-icon.ai { background: var(--accent-glow-purple); color: var(--accent-purple-light); }
+    .feature-icon.safety { background: var(--green-dim); color: var(--accent-green); }
+    .feature-icon.ssh { background: var(--accent-glow-cyan); color: var(--accent-cyan-light); }
+    .feature-icon.pty { background: rgba(251, 191, 36, 0.1); color: var(--accent-yellow); }
+    .feature-icon.encrypt { background: rgba(248, 113, 113, 0.1); color: var(--red); }
+    .feature-icon.cross { background: var(--accent-glow-purple); color: var(--accent-purple-light); }
+    .feature-icon.monitor { background: var(--accent-glow-cyan); color: var(--accent-cyan-light); }
+    .feature-icon.audit { background: rgba(251, 191, 36, 0.1); color: var(--accent-yellow); }
+    .feature-icon.runbook { background: rgba(168, 85, 247, 0.1); color: #a855f7; }
+    .feature-icon.notify { background: rgba(236, 72, 153, 0.1); color: var(--accent-pink); }
+    .feature-icon.orchestrate { background: var(--accent-glow-purple); color: var(--accent-purple-light); }
+    .feature-icon.knowledge { background: var(--green-dim); color: var(--accent-green); }
+
+    .feature-card h3 {
+      font-size: 0.95rem; font-weight: 600; margin-bottom: 6px;
+      letter-spacing: -0.01em;
+      line-height: 1.35;
+    }
+    .feature-card p {
+      color: var(--text-secondary);
+      font-size: 0.8rem;
+      line-height: 1.6;
+    }
+
+    /* ========== HOW IT WORKS ========== */
+    .how-it-works {
+      padding: 100px 1.5rem; background: var(--bg-secondary);
+      position: relative; transition: background 0.4s ease;
+    }
+    .how-it-works::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-purple), transparent);
+      opacity: 0.2;
+    }
+
+    .how-steps {
+      max-width: 800px; margin: 0 auto;
+      position: relative;
+    }
+    .how-steps::before {
+      content: '';
+      position: absolute;
+      left: 32px; top: 50px; bottom: 30px;
+      width: 1px;
+      background: linear-gradient(180deg, var(--accent-purple), var(--accent-purple-light));
+      opacity: 0.2;
+    }
+
+    .step {
+      display: flex; gap: 1.75rem; align-items: flex-start;
+      padding: 1.75rem 0;
+      position: relative;
+      padding-left: 0;
+    }
+
+    .step-num {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.78rem;
+      color: var(--accent-purple-light);
+      background: var(--bg-card);
+      width: 44px; height: 44px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; flex-shrink: 0;
+      position: relative;
+      z-index: 2;
+      border: 1px solid var(--border);
+    }
+
+    .step-content h3 {
+      font-size: 1.1rem; font-weight: 600; margin-bottom: 6px;
+      padding-top: 8px;
+    }
+    .step-content p {
+      color: var(--text-secondary); font-size: 0.9rem; line-height: 1.65;
+    }
+    .step-content code {
+      font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
+      background: var(--accent-glow-purple);
+      color: var(--accent-purple-light);
+      padding: 2px 8px; border-radius: 4px;
+      border: 1px solid rgba(139, 92, 246, 0.2);
+    }
+
+    /* ========== PLATFORMS ========== */
+    .platforms {
+      padding: 100px 1.5rem; text-align: center;
+      position: relative;
+    }
+    .platforms::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-purple), transparent);
+      opacity: 0.2;
+    }
+
+    .platform-grid {
+      display: flex; justify-content: center; gap: 1.25rem;
+      flex-wrap: wrap; max-width: 900px; margin: 0 auto;
+    }
+
+    .platform-item {
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      padding: 24px 28px; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: 10px;
+      min-width: 110px; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .platform-item:hover {
+      border-color: var(--border-bright);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px var(--shadow);
+      background: var(--bg-secondary);
+    }
+    .platform-item .icon { font-size: 1.8rem; }
+    .platform-item .name {
+      font-size: 0.82rem; font-weight: 600; color: var(--text-secondary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ========== DOWNLOAD ========== */
+    .download {
+      padding: 100px 1.5rem; background: var(--bg-secondary);
+      text-align: center; position: relative; transition: background 0.4s ease;
+    }
+    .download::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-purple), transparent);
+      opacity: 0.2;
+    }
+    .download::after {
+      content: ''; position: absolute;
+      bottom: -200px; left: 50%; transform: translateX(-50%);
+      width: 600px; height: 600px;
+      background: radial-gradient(ellipse, var(--accent-glow-purple) 0%, transparent 70%);
+      pointer-events: none;
+      opacity: 0.5;
+    }
+
+    .download-cards {
+      display: flex; justify-content: center; gap: 1rem;
+      flex-wrap: wrap; max-width: 900px; margin: 0 auto;
+    }
+
+    .download-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px 20px;
+      min-width: 140px;
+      text-decoration: none;
+      color: inherit;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex; flex-direction: column; align-items: center; gap: 10px;
+      position: relative;
+      overflow: hidden;
+    }
+    .download-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 1px;
+      background: var(--accent-purple-light);
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      opacity: 0.6;
+    }
+    .download-card:hover {
+      border-color: var(--border-bright);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 32px var(--shadow);
+      background: var(--bg-secondary);
+    }
+    .download-card:hover::before { transform: scaleX(1); }
+
+    .download-card .icon { font-size: 2rem; }
+    .download-card .label {
+      font-weight: 600; font-size: 0.9rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .download-card .hint {
+      font-size: 0.72rem; color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .download-card .badge {
+      font-size: 0.62rem; padding: 3px 8px; border-radius: 4px;
+      background: var(--accent-glow-purple);
+      color: var(--accent-purple-light);
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      border: 1px solid rgba(139, 92, 246, 0.2);
+    }
+
+    .download-card.featured {
+      border-color: var(--border-bright);
+      box-shadow: 0 4px 20px var(--accent-glow-purple);
+    }
+    .download-card.featured .new-tag {
+      position: absolute;
+      top: 8px; right: 8px;
+      font-size: 0.6rem;
+      padding: 2px 6px;
+      background: linear-gradient(135deg, var(--accent-green), var(--accent-cyan));
+      color: white;
+      border-radius: 4px;
+      font-weight: 700;
+      animation: newGlow 2s ease-in-out infinite;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    @keyframes newGlow {
+      0%, 100% { box-shadow: 0 0 8px var(--accent-glow-green); }
+      50% { box-shadow: 0 0 16px var(--accent-glow-cyan); }
+    }
+
+    /* ========== VERSION LIST ========== */
+    .version-list {
+      display: flex; flex-direction: column; gap: 0.6rem;
+      max-width: 560px; margin: 0 auto;
+    }
+
+    .version-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 14px 20px; background: var(--bg-card);
+      border: 1px solid var(--border); border-radius: 8px;
+      text-decoration: none; color: inherit; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+    .version-item::before {
+      content: '';
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 3px;
+      background: linear-gradient(180deg, var(--accent-purple), var(--accent-cyan));
+      transform: scaleY(0);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .version-item:hover {
+      border-color: var(--border-bright);
+      transform: translateX(4px);
+      box-shadow: 0 6px 20px var(--shadow);
+      background: var(--bg-secondary);
+    }
+    .version-item:hover::before { transform: scaleY(1); }
+
+    .version-info {
+      display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+    }
+    .version-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600; font-size: 0.92rem; color: var(--text-primary);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .version-name .latest-badge {
+      font-size: 0.62rem;
+      padding: 2px 6px;
+      background: var(--accent-glow-green);
+      color: var(--accent-green);
+      border-radius: 4px;
+      font-weight: 700;
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+    .version-date {
+      font-size: 0.75rem; color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .version-meta {
+      display: flex; align-items: center; gap: 10px;
+      color: var(--text-secondary);
+    }
+    .version-size {
+      font-size: 0.82rem; font-weight: 500;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--accent-cyan-light);
+    }
+    .version-item svg {
+      color: var(--accent-purple-light); transition: transform 0.3s;
+    }
+    .version-item:hover svg { transform: translateX(2px); }
+
+    /* ========== CTA ========== */
+    .cta { padding: 100px 1.5rem; text-align: center; position: relative; }
+
+    .cta-box {
+      max-width: 680px; margin: 0 auto;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 56px 40px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .cta-box:hover {
+      border-color: var(--border-bright);
+      box-shadow: 0 20px 60px var(--shadow);
+    }
+    .cta-box::before {
+      content: ''; position: absolute;
+      top: -1px; left: 15%; right: 15%; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent-purple-light), transparent);
+      opacity: 0.4;
+    }
+    .cta-box h2 {
+      font-size: clamp(1.6rem, 4vw, 2.3rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      margin-bottom: 1rem;
+    }
+    .cta-box p {
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+      font-size: 1rem;
+      line-height: 1.7;
+    }
+
+    /* ========== FOOTER ========== */
+    footer {
+      padding: 40px 1.5rem;
+      border-top: 1px solid var(--border);
+      position: relative;
+      z-index: 10;
+      background: var(--bg-primary);
+    }
+
+    .footer-terminal {
+      max-width: 1100px; margin: 0 auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+    }
+
+    .footer-prompt {
+      display: flex; align-items: center; gap: 8px;
+      color: var(--text-dim);
+      margin-bottom: 12px;
+    }
+    .footer-prompt .prompt-symbol { color: var(--accent-green); }
+    .footer-prompt .prompt-path { color: var(--accent-cyan); }
+    .footer-prompt .prompt-cmd { color: var(--text-secondary); }
+
+    .footer-output {
+      color: var(--text-dim);
+      padding-left: 2ch;
+      line-height: 1.8;
+    }
+
+    .footer-content {
+      max-width: 1100px; margin: 24px auto 0;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 1rem;
+      padding-top: 20px;
+      border-top: 1px dashed var(--border);
+    }
+    .footer-brand {
+      display: flex; align-items: center; gap: 8px;
+      font-weight: 600; font-size: 0.88rem;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .footer-links { display: flex; gap: 1.75rem; flex-wrap: wrap; }
+    .footer-links a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.82rem;
+      transition: color 0.2s;
+      font-family: 'JetBrains Mono', monospace;
+      position: relative;
+    }
+    .footer-links a::before {
+      content: '$ ';
+      color: var(--accent-purple);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .footer-links a:hover { color: var(--text-primary); }
+    .footer-links a:hover::before { opacity: 1; }
+
+    .footer-copy {
+      color: var(--text-dim);
+      font-size: 0.72rem;
+      margin-top: 1.5rem;
+      text-align: center;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .footer-copy::before { content: '// '; color: var(--accent-purple); }
+    .footer-icp {
+      margin-top: 0.5rem;
+      text-align: center;
+      font-size: 0.8rem;
+    }
+    .footer-icp a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+    .footer-icp a:hover {
+      color: var(--text-primary);
+      text-decoration: underline;
+    }
+
+    /* ========== ANIMATIONS ========== */
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: all 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+
+    /* ========== IMAGE LIGHTBOX ========== */
+    .lightbox {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      background: var(--overlay);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      align-items: center;
+      justify-content: center;
+      cursor: zoom-out;
+    }
+    .lightbox.active { display: flex; }
+    .lightbox img {
+      max-width: 90vw; max-height: 85vh;
+      border-radius: 10px;
+      box-shadow: 0 25px 80px rgba(0,0,0,0.5);
+      border: 1px solid var(--border);
+    }
+
+    /* ========== RESPONSIVE ========== */
+    @media (max-width: 768px) {
+      nav { padding: 0 1rem; height: 56px; }
+      .nav-center { display: none; }
+      .mobile-toggle { display: flex; }
+      .nav-center.open {
+        display: flex; flex-direction: column; position: absolute;
+        top: 56px; left: 0; right: 0;
+        background: var(--nav-bg-scrolled);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        padding: 1.25rem 1rem;
+        border-bottom: 1px solid var(--border);
+        gap: 0.85rem;
+      }
+      .nav-center a { font-size: 0.9rem; }
+      .nav-center a::before { display: none; }
+
+      .hero { padding-top: 80px; }
+      .hero-status-badge { display: none; }
+      .hero-terminal { margin-top: 2.5rem; }
+
+      .new-features-grid { grid-template-columns: repeat(2, 1fr); }
+      .features-grid { grid-template-columns: 1fr; }
+      .showcase-item { flex-direction: column !important; gap: 32px; }
+      .showcase-image { flex: none; width: 100%; }
+      .showcase-content { text-align: center !important; }
+      .showcase-features li { flex-direction: row !important; justify-content: center; }
+      .showcase-title { font-size: 1.5rem; }
+      .showcases { gap: 60px; }
+      .step { flex-direction: column; gap: 0.75rem; }
+      .how-steps::before { left: 21px; }
+      .download-cards { gap: 0.75rem; }
+      .download-card { min-width: 120px; padding: 18px 14px; }
+      .cta-box { padding: 36px 24px; }
+      .footer-content { flex-direction: column; gap: 1rem; text-align: center; }
+      .lang-dropdown-menu { right: -30px; min-width: 150px; }
+      .nav-cta span { display: none; }
+      .nav-cta { padding: 7px 10px; }
+      .hero-demo-container { height: 420px; }
+    }
+
+    @media (min-width: 769px) and (max-width: 1024px) {
+      .new-features-grid { grid-template-columns: repeat(3, 1fr); }
+      .features-grid { grid-template-columns: repeat(2, 1fr); }
+      .showcase-item { gap: 40px; }
+      .showcase-title { font-size: 1.6rem; }
+      .showcases { gap: 80px; }
+      .hero-status-badge { display: none; }
+    }
+
+    /* ========== PARTICLE CANVAS ========== */
+    #particleCanvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    /* ========== MOUSE GLOW ========== */
+    .mouse-glow {
+      position: fixed;
+      width: 400px;
+      height: 400px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--accent-glow-purple) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0.06;
+      transform: translate(-50%, -50%);
+      transition: opacity 0.3s ease;
+      filter: blur(60px);
+    }
+
+    @media (max-width: 768px) {
+      .mouse-glow { display: none; }
+    }
+
+    /* ========== GRID FLOW ANIMATION ========== */
+    body::before {
+      animation: gridFlow 120s linear infinite;
+    }
+
+    @keyframes gridFlow {
+      0% { background-position: 0 0, 0 0; }
+      100% { background-position: 80px 80px, 80px 80px; }
+    }
+
+    /* ========== GRADIENT BORDER BUTTONS (removed - kept for reference) ========== */
+
+    /* ========== GLITCH EFFECT (removed - kept for reference) ========== */
+    /* ========== CRT SCANLINES & NOISE (removed - kept for reference) ========== */
+
+    /* ========== CARD HOVER ENHANCEMENT ========== */
+    .feature-card,
+    .nf-card,
+    .download-card,
+    .platform-item {
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PARTICLE CANVAS -->
+  <canvas id="particleCanvas"></canvas>
+
+  <!-- MOUSE GLOW -->
+  <div class="mouse-glow" id="mouseGlow"></div>
+
+  <!-- GLOW ORBS -->
+  <div class="glow-orb purple"></div>
+  <div class="glow-orb cyan"></div>
+  <div class="glow-orb green"></div>
+
+  <!-- NAVBAR -->
+  <nav id="navbar">
+    <a href="#" class="nav-brand">
+      <div class="nav-brand-icon">&gt;_</div>
+      <span class="nav-brand-text">AI Terminal<span class="cursor"></span></span>
+    </a>
+    <ul class="nav-center" id="navLinks">
+      <li><a href="#screenshots" data-i18n="nav_screenshots">Screenshots</a></li>
+      <li><a href="#new-features" data-i18n="nav_new_features">What's New</a></li>
+      <li><a href="#features" data-i18n="nav_features">Features</a></li>
+      <li><a href="#how-it-works" data-i18n="nav_how">How it works</a></li>
+      <li><a href="#platforms" data-i18n="nav_platforms">Platforms</a></li>
+      <li><a href="#download" data-i18n="nav_download">Download</a></li>
+    </ul>
+    <div class="nav-actions">
+      <div class="lang-dropdown" id="langDropdown">
+        <button class="lang-dropdown-btn" id="langToggleBtn">
+          <span id="langLabel">中文</span>
+          <span class="arrow">▼</span>
+        </button>
+        <ul class="lang-dropdown-menu" id="langMenu">
+          <li data-lang="zh" class="active"><span>中文</span><span class="check">✓</span></li>
+          <li data-lang="en"><span>English</span><span class="check">✓</span></li>
+          <li data-lang="ja"><span>日本語</span><span class="check">✓</span></li>
+          <li data-lang="de"><span>Deutsch</span><span class="check">✓</span></li>
+          <li data-lang="fr"><span>Français</span><span class="check">✓</span></li>
+          <li data-lang="ru"><span>Русский</span><span class="check">✓</span></li>
+          <li data-lang="es"><span>Español</span><span class="check">✓</span></li>
+          <li data-lang="ko"><span>한국어</span><span class="check">✓</span></li>
+          <li data-lang="pt"><span>Português</span><span class="check">✓</span></li>
+          <li data-lang="it"><span>Italiano</span><span class="check">✓</span></li>
+        </ul>
+      </div>
+      <button class="nav-icon-btn" id="themeToggle" title="Toggle Theme">☀</button>
+      <a href="https://github.com/keiskeies/ai_terminal" target="_blank" class="nav-cta">
+        <span>GitHub</span>
+      </a>
+    </div>
+    <button class="mobile-toggle" id="mobileToggle">☰</button>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-status-badge">
+      <div class="ascii-art">
+        ╔══════════════╗<br>
+        ║  AI TERMINAL ║<br>
+        ╚══════════════╝
+      </div>
+      <div class="status-line"><span class="label">version</span><span class="value">v1.3.5</span></div>
+      <div class="status-line"><span class="label">status</span><span class="dot"></span><span class="value">STABLE</span></div>
+      <div class="status-line"><span class="label">build</span><span class="value">20250711</span></div>
+    </div>
+
+    <div class="hero-eyebrow">
+      <span class="dot"></span>
+      <span data-i18n="hero_badge">v1.3.5 Released — Ops Mega Upgrade</span>
+    </div>
+    <h1>
+      <span class="line-1" data-i18n="hero_title_1">The Terminal,</span>
+      <span class="line-2" data-i18n="hero_title_2">Reimagined with AI</span>
+    </h1>
+    <p class="hero-sub" data-i18n="hero_sub">A next-generation SSH &amp; local terminal with built-in AI agent, server monitoring, ops runbooks, 3-level safety guard, and zero-plaintext credential storage. Available everywhere you code.</p>
+    <div class="hero-actions">
+      <a href="#download" class="btn-primary">
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span data-i18n="btn_download">Download</span>
+      </a>
+      <a href="https://github.com/keiskeies/ai_terminal" target="_blank" class="btn-secondary">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        <span data-i18n="btn_github">Star on GitHub</span>
+      </a>
+    </div>
+
+    <div class="hero-terminal">
+      <div class="demo-window hero-demo-window">
+        <div class="demo-iframe-container hero-demo-container">
+          <iframe src="demo.html" title="AI Terminal Live Demo"></iframe>
+          <div class="demo-badge">DEMO · 交互演示</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCREENSHOTS -->
+  <section class="screenshots" id="screenshots">
+    <div class="section-header reveal">
+      <div class="section-label" data-i18n="screenshots_label">Screenshots</div>
+      <h2 class="section-title" data-i18n="screenshots_title">See it in action</h2>
+      <p class="section-desc" data-i18n="screenshots_desc">Real screenshots from AI Terminal v1.3.5 on macOS.</p>
+    </div>
+
+    <!-- Feature Highlights Grid -->
+    <div class="feature-highlights reveal">
+      <div class="fh-card">
+        <div class="fh-icon">🤖</div>
+        <h3 data-i18n="fh1_title">AI Agent 智能执行</h3>
+        <p data-i18n="fh1_desc">用自然语言描述需求，AI 自动生成并执行命令，支持多步推理和自动纠错。</p>
+      </div>
+      <div class="fh-card">
+        <div class="fh-icon">💻</div>
+        <h3 data-i18n="fh2_title">完整 xterm 终端</h3>
+        <p data-i18n="fh2_desc">真实的 SSH 和本地 PTY 终端，支持实时流式输出、交互式命令、颜色和快捷键。</p>
+      </div>
+      <div class="fh-card">
+        <div class="fh-icon">📊</div>
+        <h3 data-i18n="fh3_title">服务器监控</h3>
+        <p data-i18n="fh3_desc">实时监控 CPU、内存、磁盘、网络，异常自动高亮告警，历史趋势一目了然。</p>
+      </div>
+      <div class="fh-card">
+        <div class="fh-icon">🔄</div>
+        <h3 data-i18n="fh4_title">多机编排</h3>
+        <p data-i18n="fh4_desc">一键广播命令到多台服务器，实时回显独立显示，批量运维像说话一样简单。</p>
+      </div>
+      <div class="fh-card">
+        <div class="fh-icon">🛡️</div>
+        <h3 data-i18n="fh5_title">三级安全防护</h3>
+        <p data-i18n="fh5_desc">SafetyGuard 自动分类：安全自动执行、警告需确认、危险需明确批准。</p>
+      </div>
+      <div class="fh-card">
+        <div class="fh-icon">📁</div>
+        <h3 data-i18n="fh6_title">SFTP 文件管理</h3>
+        <p data-i18n="fh6_desc">内置图形化 SFTP 文件浏览器，拖拽上传下载，远程文件管理像本地一样方便。</p>
+      </div>
+    </div>
+
+    <div class="showcases">
+
+      <!-- Showcase 2: Multi-Orchestration - Text left, image right -->
+      <div class="showcase-item reverse reveal">
+        <div class="showcase-image" onclick="openLightbox('img/multi-orchestration.jpg')">
+          <img src="img/multi-orchestration.jpg" alt="Multi-Server Orchestration" loading="lazy">
+          <div class="showcase-image-glow"></div>
+        </div>
+        <div class="showcase-content">
+          <div class="showcase-tag" data-i18n="showcase2_subtitle">Batch Manage Multiple Servers</div>
+          <h3 class="showcase-title" data-i18n="showcase2_title">One Operation, N Servers Simultaneously</h3>
+          <ul class="showcase-features">
+            <li><span class="check-icon">✓</span><span data-i18n="showcase2_p1">One-click orchestration mode: broadcast the same command to all selected servers</span></li>
+            <li><span class="check-icon">✓</span><span data-i18n="showcase2_p2">Real-time status echo: each machine's execution results displayed independently, progress at a glance</span></li>
+            <li><span class="check-icon">✓</span><span data-i18n="showcase2_p3">Route commands by host: AI auto-generates adapted commands based on different host environments</span></li>
+            <li><span class="check-icon">✓</span><span data-i18n="showcase2_p4">Radar ripple animation: dynamic display of online host count, full of tech感</span></li>
+          </ul>
+          <p class="showcase-desc" data-i18n="showcase2_desc">Upgrading one machine is an operation, upgrading a hundred machines is also an operation. Multi-orchestration makes batch ops as simple as talking.</p>
+        </div>
+      </div>
+
+      <!-- Showcase 3: Runbooks - Image left, text right -->
+      <div class="showcase-item reveal">
+        <div class="showcase-image" onclick="openLightbox('img/runbooks.jpg')">
+          <img src="img/runbooks.jpg" alt="Ops Runbooks" loading="lazy">
+          <div class="showcase-image-glow"></div>
+        </div>
+        <div class="showcase-content">
+          <div class="showcase-tag" data-i18n="showcase3_subtitle">One-Click Runbook Execution</div>
+          <h3 class="showcase-title" data-i18n="showcase3_title">Turn Experience into Runbooks</h3>
+          <ul class="showcase-features">
+            <li><span class="check-icon">✓</span><span data-i18n="showcase3_p1">Built-in common templates: system inspection, security hardening, log cleanup, service deployment…</span></li>
+            <li><span class="check-icon">✓</span><span data-i18n="showcase3_p2">Custom workflows: record your ops SOPs as Runbooks, even newcomers can execute with one click</span></li>
+            <li><span class="check-icon">✓</span><span data-i18n="showcase3_p3">Multi-machine parallel execution: same workflow runs serially/parallelly on multiple servers</span></li>
+            <li><span class="check-icon">✓</span><span data-i18n="showcase3_p4">Complete execution logs: every step's input and output recorded, traceable and auditable</span></li>
+          </ul>
+          <p class="showcase-desc" data-i18n="showcase3_desc">Let workflows handle repetitive operations, save your energy for problems that truly need thinking.</p>
+        </div>
+      </div>
+
+      <!-- Showcase 4: Settings - Text left, image right -->
+      <div class="showcase-item reverse reveal">
+        <div class="showcase-image" onclick="openLightbox('img/settings-zh.jpg')">
+          <img src="img/settings-zh.jpg" alt="Settings Center" loading="lazy">
+          <div class="showcase-image-glow"></div>
+        </div>
+        <div class="showcase-content">
+          <div class="showcase-tag" data-i18n="showcase4_subtitle">Rich Personalization Options</div>
+          <h3 class="showcase-title" data-i18n="showcase4_title">Your Terminal, Your Rules</h3>
+          <ul class="showcase-features">
+            <li><span class="check-icon">✓</span><span data-i18n="showcase4_p1">AI model configuration: 20+ providers one-click access, supports custom API endpoints</span></li>
+            <li><span class="check-icon">✓</span><span data-i18n="showcase4_p2">Theme appearance: glass UI, customizable theme color, corner radius, blur intensity</span></li>
+            <li><span class="check-icon">✓</span><span data-i18n="showcase4_p3">Security settings: app lock, biometric authentication, SafetyGuard sensitivity adjustment</span></li>
+            <li><span class="check-icon">✓</span><span data-i18n="showcase4_p4">Notification management: which events need reminding, entirely up to you</span></li>
+          </ul>
+          <p class="showcase-desc" data-i18n="showcase4_desc">From model selection to interface style, from security policy to notification preferences, everything can be adjusted to your habits.</p>
+        </div>
+      </div>
+
+      <!-- Showcase 5: Multi-language - Image left, text right -->
+      <div class="showcase-item reveal">
+        <div class="showcase-image" onclick="openLightbox('img/language-settings.jpg')">
+          <img src="img/language-settings.jpg" alt="Multi-language Settings" loading="lazy">
+          <div class="showcase-image-glow"></div>
+        </div>
+        <div class="showcase-content">
+          <div class="showcase-tag" data-i18n="showcase5_subtitle">Global User Choice</div>
+          <h3 class="showcase-title" data-i18n="showcase5_title">15+ Languages for Users Worldwide</h3>
+          <ul class="showcase-features">
+            <li><span class="check-icon">✓</span><span data-i18n="showcase5_p1">Full localization: Chinese, English, Japanese, Korean, French, German, Spanish…</span></li>
+            <li><span class="check-icon">✓</span><span data-i18n="showcase5_p2">One-click switch: tap in settings to change interface language</span></li>
+            <li><span class="check-icon">✓</span><span data-i18n="showcase5_p3">Community-driven: welcome to contribute more language translations</span></li>
+          </ul>
+          <p class="showcase-desc" data-i18n="showcase5_desc">Wherever you come from, AI Terminal can work in your most familiar language.</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="screenshot-note reveal" data-i18n="screenshots_note">以上截图中的 AI 功能由 小米 mino-v2.5-pro 大模型驱动</p>
+  </section>
+
+  <!-- NEW FEATURES (v1.3.5) -->
+  <section class="new-features" id="new-features">
+    <div class="section-header reveal">
+      <div class="section-label" data-i18n="new_label">What's New in v1.3.5</div>
+      <h2 class="section-title" data-i18n="new_title">Ops Mega Upgrade</h2>
+      <p class="section-desc" data-i18n="new_desc">5 powerful new features for modern DevOps and SRE teams.</p>
+    </div>
+    <div class="new-features-grid reveal">
+      <div class="nf-card green">
+        <span class="nf-icon">📊</span>
+        <h3 data-i18n="nf1_title">Server Monitoring</h3>
+        <p data-i18n="nf1_desc">Real-time CPU, memory, disk &amp; network monitoring across all your servers.</p>
+      </div>
+      <div class="nf-card cyan">
+        <span class="nf-icon">📝</span>
+        <h3 data-i18n="nf2_title">Change Records &amp; Audit Logs</h3>
+        <p data-i18n="nf2_desc">Full audit trail of every operation with searchable change history.</p>
+      </div>
+      <div class="nf-card purple">
+        <span class="nf-icon">📋</span>
+        <h3 data-i18n="nf3_title">Ops Runbooks</h3>
+        <p data-i18n="nf3_desc">Save and reuse operational workflows. One-click execution of complex tasks.</p>
+      </div>
+      <div class="nf-card yellow">
+        <span class="nf-icon">🔔</span>
+        <h3 data-i18n="nf4_title">Notification Center</h3>
+        <p data-i18n="nf4_desc">Stay informed with alerts for monitoring, task completion, and system events.</p>
+      </div>
+      <div class="nf-card pink">
+        <span class="nf-icon">🎨</span>
+        <h3 data-i18n="nf5_title">Glassmorphism UI</h3>
+        <p data-i18n="nf5_desc">Beautiful glassmorphism design with smoother animations and refined visuals.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FEATURES -->
+  <section class="features" id="features">
+    <div class="section-header reveal">
+      <div class="section-label" data-i18n="features_label">Core Features</div>
+      <h2 class="section-title" data-i18n="features_title">Built for developers<br>who demand more</h2>
+      <p class="section-desc" data-i18n="features_desc">Every feature designed with security, speed, and intelligence in mind.</p>
+    </div>
+    <div class="features-grid reveal">
+      <div class="feature-card">
+        <span class="code-num">01</span>
+        <div class="feature-icon ai">⚡</div>
+        <h3 data-i18n="f1_title">Dual-mode AI Agent</h3>
+        <p data-i18n="f1_desc">Auto mode executes complete workflows. Assistant mode guides you step-by-step. You choose the level of autonomy.</p>
+      </div>
+      <div class="feature-card">
+        <span class="code-num">02</span>
+        <div class="feature-icon monitor">📊</div>
+        <h3 data-i18n="f2_title">Server Monitoring</h3>
+        <p data-i18n="f2_desc">Real-time monitoring of CPU, memory, disk, and network across all your servers with historical trend charts.</p>
+      </div>
+      <div class="feature-card">
+        <span class="code-num">03</span>
+        <div class="feature-icon safety">🛡</div>
+        <h3 data-i18n="f3_title">SafetyGuard</h3>
+        <p data-i18n="f3_desc">3-level safety classification — Safe / Warning / Dangerous. Every AI-generated command is checked before execution.</p>
+      </div>
+      <div class="feature-card">
+        <span class="code-num">04</span>
+        <div class="feature-icon audit">📝</div>
+        <h3 data-i18n="f4_title">Change Records &amp; Audit Logs</h3>
+        <p data-i18n="f4_desc">Complete audit trail of every operation. Searchable change history with timestamps, operators, and details.</p>
+      </div>
+      <div class="feature-card">
+        <span class="code-num">05</span>
+        <div class="feature-icon ssh">🔐</div>
+        <h3 data-i18n="f5_title">SSH Remote Terminal</h3>
+        <p data-i18n="f5_desc">Full SSH client with connection pooling, multi-session support, and real-time streaming output.</p>
+      </div>
+      <div class="feature-card">
+        <span class="code-num">06</span>
+        <div class="feature-icon runbook">📋</div>
+        <h3 data-i18n="f6_title">Ops Runbooks</h3>
+        <p data-i18n="f6_desc">Create reusable operational workflows. Save complex multi-step tasks as runbooks for one-click execution.</p>
+      </div>
+      <div class="feature-card">
+        <span class="code-num">07</span>
+        <div class="feature-icon pty">💻</div>
+        <h3 data-i18n="f7_title">Local PTY Terminal</h3>
+        <p data-i18n="f7_desc">Real pseudo-terminal on macOS, Linux &amp; Windows. Run any local command with full interactive support.</p>
+      </div>
+      <div class="feature-card">
+        <span class="code-num">08</span>
+        <div class="feature-icon notify">🔔</div>
+        <h3 data-i18n="f8_title">Notification Center</h3>
+        <p data-i18n="f8_desc">Unified notification center for monitoring alerts, task completions, and system events. Never miss an update.</p>
+      </div>
+      <div class="feature-card">
+        <span class="code-num">09</span>
+        <div class="feature-icon encrypt">🔒</div>
+        <h3 data-i18n="f9_title">Zero-Plaintext Storage</h3>
+        <p data-i18n="f9_desc">Credentials encrypted at the system level. Optional biometric unlock with Face ID / Touch ID / Fingerprint.</p>
+      </div>
+      <div class="feature-card">
+        <span class="code-num">10</span>
+        <div class="feature-icon orchestrate">🎛</div>
+        <h3 data-i18n="f10_title">Multi-Server Orchestration</h3>
+        <p data-i18n="f10_desc">Execute commands across multiple servers simultaneously. Batch operations and coordinated deployments made easy.</p>
+      </div>
+      <div class="feature-card">
+        <span class="code-num">11</span>
+        <div class="feature-icon knowledge">📚</div>
+        <h3 data-i18n="f11_title">Knowledge Base Driven</h3>
+        <p data-i18n="f11_desc">Offline knowledge base powers the AI with domain-specific expertise. Downloadable and always improving.</p>
+      </div>
+      <div class="feature-card">
+        <span class="code-num">12</span>
+        <div class="feature-icon cross">🌐</div>
+        <h3 data-i18n="f12_title">Cross-Platform</h3>
+        <p data-i18n="f12_desc">One codebase, all platforms. macOS, Windows, Linux, iOS &amp; Android — built with Flutter.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="how-it-works" id="how-it-works">
+    <div class="how-steps">
+      <div class="section-header reveal" style="text-align: left; margin-bottom: 2rem;">
+        <div class="section-label" data-i18n="how_label">How it works</div>
+        <h2 class="section-title" data-i18n="how_title">AI that understands<br>your intent</h2>
+        <p class="section-desc" style="margin: 0;" data-i18n="how_desc">Describe what you want in natural language. AI Terminal handles the rest.</p>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">01</div>
+        <div class="step-content">
+          <h3 data-i18n="s1_title">Describe your task</h3>
+          <p data-i18n="s1_desc">Type in natural language: <code>"检查所有服务器CPU使用率"</code> or <code>"deploy to staging"</code></p>
+        </div>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">02</div>
+        <div class="step-content">
+          <h3 data-i18n="s2_title">AI generates commands</h3>
+          <p data-i18n="s2_desc">AI Agent parses your intent and generates the exact shell commands needed, streaming the response in real-time.</p>
+        </div>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">03</div>
+        <div class="step-content">
+          <h3 data-i18n="s3_title">SafetyGuard validates</h3>
+          <p data-i18n="s3_desc">Every command is classified: <span style="color: var(--green)">Safe</span> runs automatically, <span style="color: var(--yellow)">Warning</span> asks for confirmation, <span style="color: var(--red)">Dangerous</span> requires explicit approval.</p>
+        </div>
+      </div>
+      <div class="step reveal">
+        <div class="step-num">04</div>
+        <div class="step-content">
+          <h3 data-i18n="s4_title">Execute with confidence</h3>
+          <p data-i18n="s4_desc">Commands run on local or remote terminals. Results are fed back to AI for multi-step reasoning and follow-up.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLATFORMS -->
+  <section class="platforms" id="platforms">
+    <div class="section-header reveal">
+      <div class="section-label" data-i18n="platforms_label">Platforms</div>
+      <h2 class="section-title" data-i18n="platforms_title">One app, every platform</h2>
+      <p class="section-desc" data-i18n="platforms_desc">Seamless experience across all your devices.</p>
+    </div>
+    <div class="platform-grid reveal">
+      <div class="platform-item"><span class="icon">💻</span><span class="name">macOS</span></div>
+      <div class="platform-item"><span class="icon">🖥</span><span class="name">Windows</span></div>
+      <div class="platform-item"><span class="icon">🔳</span><span class="name">Linux</span></div>
+      <div class="platform-item"><span class="icon">📱</span><span class="name">iOS</span></div>
+      <div class="platform-item"><span class="icon">🤖</span><span class="name">Android</span></div>
+    </div>
+  </section>
+
+  <!-- DOWNLOAD -->
+  <section class="download" id="download">
+    <div class="section-header reveal">
+      <div class="section-label" data-i18n="download_label">Download</div>
+      <h2 class="section-title" data-i18n="download_title">Get AI Terminal</h2>
+      <p class="section-desc" data-i18n="download_desc">Free and open source. Download v1.3.5 for your platform.</p>
+    </div>
+    <div class="download-cards reveal">
+      <a href="https://github.com/keiskeies/ai_terminal/releases/download/v1.3.5/AI_Terminal_v1.3.5_macOS.zip" class="download-card featured">
+        <span class="new-tag">NEW</span>
+        <span class="icon">💻</span>
+        <span class="label">macOS</span>
+        <span class="hint">.zip · 72 MB</span>
+        <span class="badge">Intel + Apple Silicon</span>
+      </a>
+      <a href="https://github.com/keiskeies/ai_terminal/releases/download/v1.3.5/AI_Terminal_v1.3.5_Windows.zip" class="download-card">
+        <span class="icon">🖥</span>
+        <span class="label">Windows</span>
+        <span class="hint">.zip · 18 MB</span>
+        <span class="badge">x64</span>
+      </a>
+      <a href="https://github.com/keiskeies/ai_terminal/releases/download/v1.3.5/AI_Terminal_v1.3.5_Linux_x64.tar.gz" class="download-card">
+        <span class="icon">🔳</span>
+        <span class="label">Linux</span>
+        <span class="hint">.tar.gz · 24 MB</span>
+        <span class="badge">x64</span>
+      </a>
+      <a href="https://github.com/keiskeies/ai_terminal/releases/download/v1.3.5/AI_Terminal_v1.3.5_iOS.ipa" class="download-card">
+        <span class="icon">📱</span>
+        <span class="label">iOS</span>
+        <span class="hint">.ipa · 16 MB</span>
+        <span class="badge">Alt Store / Sideload</span>
+      </a>
+      <a href="https://github.com/keiskeies/ai_terminal/releases/download/v1.3.5/AI_Terminal_v1.3.5_Android.apk" class="download-card">
+        <span class="icon">🤖</span>
+        <span class="label">Android</span>
+        <span class="hint">.apk · 65 MB</span>
+        <span class="badge">arm64-v8a</span>
+      </a>
+    </div>
+    
+    <!-- Knowledge Data Versions -->
+    <div class="reveal" style="max-width: 900px; margin: 3rem auto 0; text-align: center;">
+      <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);" data-i18n="knowledge_title">Knowledge Database Versions</h3>
+      <p style="color: var(--text-secondary); margin-bottom: 1.75rem; font-size: 0.9rem;" data-i18n="knowledge_desc">Download the knowledge database for offline AI assistance. Choose the version that matches your app.</p>
+      
+      <div class="version-list" id="knowledgeVersions">
+        <!-- Versions will be dynamically loaded by JavaScript -->
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <div class="cta-box reveal">
+      <h2 data-i18n="cta_title">Ready to transform<br>your terminal?</h2>
+      <p data-i18n="cta_desc">Open source, free forever. Start using AI Terminal v1.3.5 today.</p>
+      <a href="https://github.com/keiskeies/ai_terminal" target="_blank" class="btn-primary" style="margin: 0 auto;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        <span data-i18n="cta_btn">View on GitHub</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-terminal">
+      <div class="footer-prompt">
+        <span class="prompt-symbol">➜</span>
+        <span class="prompt-path">~/ai-terminal</span>
+        <span class="prompt-cmd">cat LICENSE</span>
+      </div>
+      <div class="footer-output">
+        MIT License — Copyright (c) 2025 keiskei<br>
+        Open source. Built with ❤️ for developers.
+      </div>
+    </div>
+    <div class="footer-content">
+      <div class="footer-brand">
+        <div class="nav-brand-icon" style="width: 26px; height: 26px; font-size: 11px; border-radius: 6px;">&gt;_</div>
+        AI Terminal
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/keiskeies/ai_terminal" target="_blank">GitHub</a>
+        <a href="https://github.com/keiskeies/ai_terminal/releases" target="_blank" data-i18n="footer_releases">Releases</a>
+        <a href="https://github.com/keiskeies/ai_terminal/issues" target="_blank" data-i18n="footer_issues">Issues</a>
+        <a href="https://github.com/keiskeies/ai_terminal/blob/main/LICENSE" target="_blank">MIT License</a>
+      </div>
+    </div>
+    <p class="footer-copy">© 2025 keiskei. All rights reserved.</p>
+    <p class="footer-icp"><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">赣ICP备18001605号-2</a></p>
+  </footer>
+
+  <!-- LIGHTBOX -->
+  <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+    <img id="lightboxImg" src="" alt="Screenshot">
+  </div>
+
+  <script>
+    // ========== KNOWLEDGE VERSIONS DATA ==========
+    const knowledgeVersions = [
+      {
+        version: '1.3.5',
+        date: '2025-07-11',
+        size: '86 KB',
+        isLatest: true
+      },
+      {
+        version: '1.3.4',
+        date: '2025-06-28',
+        size: '82 KB',
+        isLatest: false
+      },
+      {
+        version: '1.3.3',
+        date: '2025-06-15',
+        size: '78 KB',
+        isLatest: false
+      },
+      {
+        version: '1.3.1',
+        date: '2025-05-20',
+        size: '72 KB',
+        isLatest: false
+      },
+      {
+        version: '1.3.0',
+        date: '2025-05-11',
+        size: '68 KB',
+        isLatest: false
+      },
+      {
+        version: '1.2.1',
+        date: '2025-04-28',
+        size: '68 KB',
+        isLatest: false
+      }
+    ];
+
+    function renderKnowledgeVersions() {
+      const container = document.getElementById('knowledgeVersions');
+      if (!container) return;
+      
+      container.innerHTML = knowledgeVersions.map(v => `
+        <a href="knowledge/knowledge-${v.version}.db" download class="version-item">
+          <div class="version-info">
+            <span class="version-name">v${v.version} ${v.isLatest ? '<span class="latest-badge">' + (i18n[currentLang]?.knowledge_latest || 'Latest') + '</span>' : ''}</span>
+            <span class="version-date">${v.isLatest ? (i18n[currentLang]?.knowledge_latest || 'Latest') : v.date}</span>
+          </div>
+          <div class="version-meta">
+            <span class="version-size">${v.size}</span>
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </div>
+        </a>
+      `).join('');
+    }
+
+    // ========== I18N ==========
+    const i18n = {
+      en: {
+        nav_screenshots: 'Screenshots',
+        nav_new_features: "What's New",
+        nav_features: 'Features',
+        nav_how: 'How it works',
+        nav_platforms: 'Platforms',
+        nav_download: 'Download',
+        hero_badge: 'v1.3.5 Released — Ops Mega Upgrade',
+        hero_title_1: 'The Terminal,',
+        hero_title_2: 'Reimagined with AI',
+        hero_sub: 'A next-generation SSH & local terminal with built-in AI agent, server monitoring, ops runbooks, 3-level safety guard, and zero-plaintext credential storage. Available everywhere you code.',
+        btn_download: 'Download',
+        btn_github: 'Star on GitHub',
+        demo_cmd: '"Check CPU usage on all servers"',
+        demo_scan: 'Scanning 5 servers...',
+        demo_analyze: 'Analyzing task...',
+        demo_safe: '— Read-only monitoring detected',
+        demo_suggest: 'server-04 is at 78% — suggest checking top processes?',
+        demo_done: 'Monitoring complete ',
+        screenshots_label: 'Screenshots',
+        screenshots_title: 'See it in action',
+        screenshots_desc: 'Real screenshots from AI Terminal v1.3.5 on macOS.',
+        screenshots_note: 'AI features in the above screenshots are powered by Xiaomi mino-v2.5-pro LLM.',
+        demo_caption: 'Interactive live demo',
+        demo_caption_sub: '— try clicking tabs, sending messages, browsing files to experience AI Terminal',
+        fh1_title: 'AI Agent Smart Execution',
+        fh1_desc: 'Describe needs in natural language, AI auto-generates and runs commands with multi-step reasoning and auto-correction.',
+        fh2_title: 'Full xterm Terminal',
+        fh2_desc: 'Real SSH and local PTY terminal with real-time streaming output, interactive commands, colors and shortcuts.',
+        fh3_title: 'Server Monitoring',
+        fh3_desc: 'Real-time CPU, memory, disk, network monitoring with auto-highlight anomalies and historical trend charts.',
+        fh4_title: 'Multi-Host Orchestration',
+        fh4_desc: 'Broadcast commands to multiple servers with one click, independent real-time display, batch ops made simple.',
+        fh5_title: 'Triple Safety Guard',
+        fh5_desc: 'SafetyGuard auto-classification: safe auto-execute, warning needs confirm, danger requires explicit approval.',
+        fh6_title: 'SFTP File Manager',
+        fh6_desc: 'Built-in graphical SFTP file browser, drag-and-drop upload/download, remote file management like local.',
+        ss_main: 'Main Interface — AI Agent & Terminal',
+        ss_orchestrate: 'Multi-Server Orchestration',
+        ss_runbooks: 'Ops Runbooks Workflow',
+        ss_settings: 'Settings Page (Chinese)',
+        ss_settings_en: 'Settings Page (English)',
+        ss_lang: 'Multi-language Settings',
+        ss_kb1: 'Knowledge Base Demo 1',
+        ss_kb2: 'Knowledge Base Demo 2',
+        ss_kb3: 'Knowledge Base Demo 3',
+        ss_kb4: 'Knowledge Base Demo 4',
+        showcase1_title: 'All-in-One Ops Console',
+        showcase1_subtitle: 'AI Agent + Terminal + Server Monitoring',
+        showcase1_p1: 'AI Agent smart execution: describe needs in natural language, AI auto-generates and runs commands',
+        showcase1_p2: 'Real-time terminal output: full xterm terminal, command execution at a glance',
+        showcase1_p3: 'Server monitoring panel: real-time CPU/memory/disk/network metrics, auto-highlight anomalies',
+        showcase1_p4: 'Multi-tab switching: multiple hosts, multiple sessions, all managed in one window',
+        showcase1_desc: 'AI chat on the left, live terminal on the right, monitoring panel on top, command input at the bottom. Everything under control.',
+        showcase2_title: 'One Operation, N Servers Simultaneously',
+        showcase2_subtitle: 'Batch Manage Multiple Servers',
+        showcase2_p1: 'One-click orchestration mode: broadcast the same command to all selected servers',
+        showcase2_p2: 'Real-time status echo: each machine\'s execution results displayed independently, progress at a glance',
+        showcase2_p3: 'Route commands by host: AI auto-generates adapted commands based on different host environments',
+        showcase2_p4: 'Radar ripple animation: dynamic display of online host count, full of tech style',
+        showcase2_desc: 'Upgrading one machine is an operation, upgrading a hundred machines is also an operation. Multi-orchestration makes batch ops as simple as talking.',
+        showcase3_title: 'Turn Experience into Runbooks',
+        showcase3_subtitle: 'One-Click Runbook Execution',
+        showcase3_p1: 'Built-in common templates: system inspection, security hardening, log cleanup, service deployment…',
+        showcase3_p2: 'Custom workflows: record your ops SOPs as Runbooks, even newcomers can execute with one click',
+        showcase3_p3: 'Multi-machine parallel execution: same workflow runs serially/parallelly on multiple servers',
+        showcase3_p4: 'Complete execution logs: every step\'s input and output recorded, traceable and auditable',
+        showcase3_desc: 'Let workflows handle repetitive operations, save your energy for problems that truly need thinking.',
+        showcase4_title: 'Your Terminal, Your Rules',
+        showcase4_subtitle: 'Rich Personalization Options',
+        showcase4_p1: 'AI model configuration: 20+ providers one-click access, supports custom API endpoints',
+        showcase4_p2: 'Theme appearance: glass UI, customizable theme color, corner radius, blur intensity',
+        showcase4_p3: 'Security settings: app lock, biometric authentication, SafetyGuard sensitivity adjustment',
+        showcase4_p4: 'Notification management: which events need reminding, entirely up to you',
+        showcase4_desc: 'From model selection to interface style, from security policy to notification preferences, everything can be adjusted to your habits.',
+        showcase5_title: '15+ Languages for Users Worldwide',
+        showcase5_subtitle: 'Global User Choice',
+        showcase5_p1: 'Full localization: Chinese, English, Japanese, Korean, French, German, Spanish…',
+        showcase5_p2: 'One-click switch: tap in settings to change interface language',
+        showcase5_p3: 'Community-driven: welcome to contribute more language translations',
+        showcase5_desc: 'Wherever you come from, AI Terminal can work in your most familiar language.',
+        new_label: "What's New in v1.3.5",
+        new_title: 'Ops Mega Upgrade',
+        new_desc: '5 powerful new features for modern DevOps and SRE teams.',
+        nf1_title: 'Server Monitoring',
+        nf1_desc: 'Real-time CPU, memory, disk & network monitoring across all your servers.',
+        nf2_title: 'Change Records & Audit Logs',
+        nf2_desc: 'Full audit trail of every operation with searchable change history.',
+        nf3_title: 'Ops Runbooks',
+        nf3_desc: 'Save and reuse operational workflows. One-click execution of complex tasks.',
+        nf4_title: 'Notification Center',
+        nf4_desc: 'Stay informed with alerts for monitoring, task completion, and system events.',
+        nf5_title: 'Glassmorphism UI',
+        nf5_desc: 'Beautiful glassmorphism design with smoother animations and refined visuals.',
+        features_label: 'Core Features',
+        features_title: 'Built for developers<br>who demand more',
+        features_desc: 'Every feature designed with security, speed, and intelligence in mind.',
+        f1_title: 'Dual-mode AI Agent',
+        f1_desc: 'Auto mode executes complete workflows. Assistant mode guides you step-by-step. You choose the level of autonomy.',
+        f2_title: 'Server Monitoring',
+        f2_desc: 'Real-time monitoring of CPU, memory, disk, and network across all your servers with historical trend charts.',
+        f3_title: 'SafetyGuard',
+        f3_desc: '3-level safety classification — Safe / Warning / Dangerous. Every AI-generated command is checked before execution.',
+        f4_title: 'Change Records & Audit Logs',
+        f4_desc: 'Complete audit trail of every operation. Searchable change history with timestamps, operators, and details.',
+        f5_title: 'SSH Remote Terminal',
+        f5_desc: 'Full SSH client with connection pooling, multi-session support, and real-time streaming output.',
+        f6_title: 'Ops Runbooks',
+        f6_desc: 'Create reusable operational workflows. Save complex multi-step tasks as runbooks for one-click execution.',
+        f7_title: 'Local PTY Terminal',
+        f7_desc: 'Real pseudo-terminal on macOS, Linux & Windows. Run any local command with full interactive support.',
+        f8_title: 'Notification Center',
+        f8_desc: 'Unified notification center for monitoring alerts, task completions, and system events. Never miss an update.',
+        f9_title: 'Zero-Plaintext Storage',
+        f9_desc: 'Credentials encrypted at the system level. Optional biometric unlock with Face ID / Touch ID / Fingerprint.',
+        f10_title: 'Multi-Server Orchestration',
+        f10_desc: 'Execute commands across multiple servers simultaneously. Batch operations and coordinated deployments made easy.',
+        f11_title: 'Knowledge Base Driven',
+        f11_desc: 'Offline knowledge base powers the AI with domain-specific expertise. Downloadable and always improving.',
+        f12_title: 'Cross-Platform',
+        f12_desc: 'One codebase, all platforms. macOS, Windows, Linux, iOS & Android — built with Flutter.',
+        how_label: 'How it works',
+        how_title: 'AI that understands<br>your intent',
+        how_desc: 'Describe what you want in natural language. AI Terminal handles the rest.',
+        s1_title: 'Describe your task',
+        s1_desc: 'Type in natural language: <code>"Check CPU usage on all servers"</code> or <code>"deploy to staging"</code>',
+        s2_title: 'AI generates commands',
+        s2_desc: 'AI Agent parses your intent and generates the exact shell commands needed, streaming the response in real-time.',
+        s3_title: 'SafetyGuard validates',
+        s3_desc: 'Every command is classified: <span style="color: var(--green)">Safe</span> runs automatically, <span style="color: var(--yellow)">Warning</span> asks for confirmation, <span style="color: var(--red)">Dangerous</span> requires explicit approval.',
+        s4_title: 'Execute with confidence',
+        s4_desc: 'Commands run on local or remote terminals. Results are fed back to AI for multi-step reasoning and follow-up.',
+        platforms_label: 'Platforms',
+        platforms_title: 'One app, every platform',
+        platforms_desc: 'Seamless experience across all your devices.',
+        download_label: 'Download',
+        download_title: 'Get AI Terminal',
+        download_desc: 'Free and open source. Download v1.3.5 for your platform.',
+        knowledge_title: 'Knowledge Database Versions',
+        knowledge_desc: 'Download the knowledge database for offline AI assistance. Choose the version that matches your app.',
+        knowledge_latest: 'Latest',
+        cta_title: 'Ready to transform<br>your terminal?',
+        cta_desc: 'Open source, free forever. Start using AI Terminal v1.3.5 today.',
+        cta_btn: 'View on GitHub',
+        footer_releases: 'Releases',
+        footer_issues: 'Issues',
+      },
+      zh: {
+        nav_screenshots: '截图',
+        nav_new_features: '新功能',
+        nav_features: '功能',
+        nav_how: '工作原理',
+        nav_platforms: '平台',
+        nav_download: '下载',
+        hero_badge: 'v1.3.5 已发布 — 运维大升级',
+        hero_title_1: '终端，',
+        hero_title_2: '因 AI 而重生',
+        hero_sub: '下一代 SSH 与本地终端，内置 AI 智能代理、服务器监控、运维工作流、三级安全防护、零明文凭证存储。在你所有的设备上可用。',
+        btn_download: '下载',
+        btn_github: 'GitHub 加星',
+        demo_cmd: '"检查所有服务器CPU使用率"',
+        demo_scan: '正在扫描 5 台服务器...',
+        demo_analyze: '正在分析任务...',
+        demo_safe: '— 检测到只读监控操作',
+        demo_suggest: 'server-04 使用率 78% — 建议查看占用最高的进程？',
+        demo_done: '监控完成 ',
+        screenshots_label: '截图',
+        screenshots_title: '一睹为快',
+        screenshots_desc: 'AI Terminal v1.3.5 在 macOS 上的实际截图。',
+        screenshots_note: '以上截图中的 AI 功能由 小米 mino-v2.5-pro 大模型驱动',
+        demo_caption: '可交互的真实界面演示',
+        demo_caption_sub: '· 试试点击标签页、发送消息、浏览文件，感受 AI Terminal 的真实体验',
+        fh1_title: 'AI Agent 智能执行',
+        fh1_desc: '用自然语言描述需求，AI 自动生成并执行命令，支持多步推理和自动纠错。',
+        fh2_title: '完整 xterm 终端',
+        fh2_desc: '真实的 SSH 和本地 PTY 终端，支持实时流式输出、交互式命令、颜色和快捷键。',
+        fh3_title: '服务器监控',
+        fh3_desc: '实时监控 CPU、内存、磁盘、网络，异常自动高亮告警，历史趋势一目了然。',
+        fh4_title: '多机编排',
+        fh4_desc: '一键广播命令到多台服务器，实时回显独立显示，批量运维像说话一样简单。',
+        fh5_title: '三级安全防护',
+        fh5_desc: 'SafetyGuard 自动分类：安全自动执行、警告需确认、危险需明确批准。',
+        fh6_title: 'SFTP 文件管理',
+        fh6_desc: '内置图形化 SFTP 文件浏览器，拖拽上传下载，远程文件管理像本地一样方便。',
+        ss_main: '主界面 — AI Agent & 终端',
+        ss_orchestrate: '多机编排',
+        ss_runbooks: '运维工作流',
+        ss_settings: '设置页面（中文版）',
+        ss_settings_en: '设置页面（英文版）',
+        ss_lang: '多语言设置',
+        ss_kb1: '知识库演示 1',
+        ss_kb2: '知识库演示 2',
+        ss_kb3: '知识库演示 3',
+        ss_kb4: '知识库演示 4',
+        showcase1_title: '主界面 · 一站式运维控制台',
+        showcase1_subtitle: 'AI Agent + 终端 + 服务器监控',
+        showcase1_p1: 'AI Agent 智能执行：自然语言描述需求，AI 自动生成并执行命令',
+        showcase1_p2: '实时终端输出：完整的 xterm 终端，命令执行过程一目了然',
+        showcase1_p3: '服务器监控面板：CPU/内存/磁盘/网络实时指标，异常自动高亮',
+        showcase1_p4: '多标签页切换：多主机、多会话，一个窗口全部管理',
+        showcase1_desc: '左边是 AI 对话区，右边是实时终端，上方有监控面板，下方是命令输入。一切尽在掌握。',
+        showcase2_title: '多机编排 · 一台的操作，N 台同时执行',
+        showcase2_subtitle: '批量管理多台服务器',
+        showcase2_p1: '一键开启编排模式：广播同一条指令到所有选中的服务器',
+        showcase2_p2: '实时状态回显：每台机器的执行结果独立显示，进度一目了然',
+        showcase2_p3: '按主机路由命令：AI 自动根据不同主机环境生成适配的命令',
+        showcase2_p4: '雷达波纹动效：动态显示在线主机数量，科技感十足',
+        showcase2_desc: '升级一台机器是操作，升级一百台机器也是操作。多机编排让批量运维像说话一样简单。',
+        showcase3_title: '运维工作流 · 把经验沉淀为 Runbook',
+        showcase3_subtitle: 'Runbook 一键执行',
+        showcase3_p1: '内置常用模板：系统巡检、安全加固、日志清理、服务部署…',
+        showcase3_p2: '自定义工作流：把你的运维 SOP 录制成 Runbook，新人也能一键操作',
+        showcase3_p3: '多机并行执行：同一工作流在多台服务器上串行/并行执行',
+        showcase3_p4: '完整执行日志：每一步的输入输出都有记录，可追溯可审计',
+        showcase3_desc: '重复的操作交给工作流，把精力留给真正需要思考的问题。',
+        showcase4_title: '设置中心 · 你的终端你说了算',
+        showcase4_subtitle: '丰富的个性化选项',
+        showcase4_p1: 'AI 模型配置：20+ 供应商一键接入，支持自定义 API 端点',
+        showcase4_p2: '主题外观：玻璃态 UI，可自定义主题色、圆角、模糊度',
+        showcase4_p3: '安全设置：应用锁、生物识别、SafetyGuard 敏感度调节',
+        showcase4_p4: '通知管理：哪些事件需要提醒，完全由你控制',
+        showcase4_desc: '从模型选择到界面风格，从安全策略到通知偏好，每一项都可以按你的习惯调整。',
+        showcase5_title: '15+ 语言 · 全球用户都能用',
+        showcase5_subtitle: '全球用户的选择',
+        showcase5_p1: '完整本地化：中文、英文、日语、韩语、法语、德语、西班牙语…',
+        showcase5_p2: '一键切换：设置里轻点即可更换界面语言',
+        showcase5_p3: '社区驱动：欢迎贡献更多语言翻译',
+        showcase5_desc: '无论你来自哪里，AI Terminal 都能用你最熟悉的语言工作。',
+        new_label: 'v1.3.5 新功能',
+        new_title: '运维大升级',
+        new_desc: '面向现代 DevOps 和 SRE 团队的 5 大全新功能。',
+        nf1_title: '服务器监控',
+        nf1_desc: '实时监控所有服务器的 CPU、内存、磁盘和网络状态。',
+        nf2_title: '变更台账 & 审计日志',
+        nf2_desc: '完整的操作审计追踪，可搜索的变更历史记录。',
+        nf3_title: '运维工作流',
+        nf3_desc: '保存并复用运维工作流。一键执行复杂任务。',
+        nf4_title: '通知中心',
+        nf4_desc: '监控告警、任务完成、系统事件，一切尽在掌握。',
+        nf5_title: '玻璃态 UI',
+        nf5_desc: '精美的玻璃态设计，更流畅的动画和精致的视觉效果。',
+        features_label: '核心功能',
+        features_title: '为追求极致的<br>开发者而生',
+        features_desc: '每一个功能都以安全、速度和智能为核心设计。',
+        f1_title: '双模式 AI 代理',
+        f1_desc: '自动模式执行完整工作流，助手模式逐步引导。你来选择自主级别。',
+        f2_title: '服务器监控',
+        f2_desc: '实时监控所有服务器的 CPU、内存、磁盘和网络，支持历史趋势图表。',
+        f3_title: '安全防护',
+        f3_desc: '三级安全分类 — 安全 / 警告 / 危险。每条 AI 生成的命令执行前都会经过检查。',
+        f4_title: '变更台账 & 审计日志',
+        f4_desc: '完整的操作审计追踪。可搜索的变更历史，包含时间、操作人、详细信息。',
+        f5_title: 'SSH 远程终端',
+        f5_desc: '完整的 SSH 客户端，支持连接池、多会话和实时流式输出。',
+        f6_title: '运维工作流',
+        f6_desc: '创建可复用的运维工作流。将复杂的多步骤任务保存为 Runbook，一键执行。',
+        f7_title: '本地 PTY 终端',
+        f7_desc: 'macOS、Linux 和 Windows 上的真实伪终端。支持交互式运行任何本地命令。',
+        f8_title: '通知中心',
+        f8_desc: '统一的通知中心，集成监控告警、任务完成和系统事件。重要信息不再错过。',
+        f9_title: '零明文存储',
+        f9_desc: '凭证在系统级加密存储。支持 Face ID / Touch ID / 指纹生物识别解锁。',
+        f10_title: '多机编排',
+        f10_desc: '同时在多台服务器上执行命令。批量操作和协调部署变得轻而易举。',
+        f11_title: '知识库驱动',
+        f11_desc: '离线知识库为 AI 提供领域专业知识。可下载，持续更新。',
+        f12_title: '跨平台',
+        f12_desc: '一套代码，全平台运行。macOS、Windows、Linux、iOS 和 Android — 基于 Flutter 构建。',
+        how_label: '工作原理',
+        how_title: '理解你意图的<br>AI',
+        how_desc: '用自然语言描述你的需求，AI Terminal 为你完成剩下的工作。',
+        s1_title: '描述你的任务',
+        s1_desc: '用自然语言输入：<code>"检查所有服务器CPU使用率"</code> 或 <code>"部署到预发布环境"</code>',
+        s2_title: 'AI 生成命令',
+        s2_desc: 'AI 代理解析你的意图，生成精确的 shell 命令，并实时流式输出响应。',
+        s3_title: '安全防护验证',
+        s3_desc: '每条命令被分类：<span style="color: var(--green)">安全</span>自动执行，<span style="color: var(--yellow)">警告</span>需要确认，<span style="color: var(--red)">危险</span>需要明确批准。',
+        s4_title: '放心执行',
+        s4_desc: '命令在本地或远程终端执行。执行结果反馈给 AI 进行多步推理和后续操作。',
+        platforms_label: '平台',
+        platforms_title: '一个应用，全平台覆盖',
+        platforms_desc: '在你所有设备上提供一致的体验。',
+        download_label: '下载',
+        download_title: '获取 AI Terminal',
+        download_desc: '开源免费，下载 v1.3.5 版本到你的平台。',
+        knowledge_title: '知识库数据库版本',
+        knowledge_desc: '下载知识库数据库以支持离线 AI 助手功能。请选择与您的应用版本匹配的数据库。',
+        knowledge_latest: '最新版本',
+        cta_title: '准备好升级<br>你的终端了吗？',
+        cta_desc: '开源、永久免费。立即开始使用 AI Terminal v1.3.5。',
+        cta_btn: '在 GitHub 上查看',
+        footer_releases: '发布版本',
+        footer_issues: '问题反馈',
+      },
+      ja: {
+        nav_screenshots: 'スクリーンショット',
+        nav_new_features: '新機能',
+        nav_features: '機能',
+        nav_how: '仕組み',
+        nav_platforms: 'プラットフォーム',
+        nav_download: 'ダウンロード',
+        hero_badge: 'v1.3.5 リリース — 運用大幅アップグレード',
+        hero_title_1: 'ターミナル、',
+        hero_title_2: 'AIで再構築',
+        hero_sub: 'AIエージェント、サーバー監視、運用ランブック、3段階セーフティガード、ゼロ平文資格情報ストレージを搭載した次世代SSH＆ローカルターミナル。あなたのコーディング環境で利用可能。',
+        btn_download: 'ダウンロード',
+        btn_github: 'GitHubでスター',
+        demo_cmd: '"全サーバーのCPU使用率を確認"',
+        demo_scan: '5台のサーバーをスキャン中...',
+        demo_analyze: 'タスクを分析中...',
+        demo_safe: '— 読み取り専用監視を検出',
+        demo_suggest: 'server-04 が 78% — トッププロセスを確認しますか？',
+        demo_done: '監視完了 ',
+        screenshots_label: 'スクリーンショット',
+        screenshots_title: '実際の動作',
+        screenshots_desc: 'macOS上のAI Terminal v1.3.5の実際のスクリーンショット。',
+        screenshots_note: '上記のスクリーンショットのAI機能はXiaomi mino-v2.5-pro LLMによって駆動されています。',
+        ss_main: 'メインインターフェース — AIエージェント＆ターミナル',
+        ss_orchestrate: 'マルチサーバーオーケストレーション',
+        ss_runbooks: '運用ランブックワークフロー',
+        ss_settings: '設定ページ（中国語）',
+        ss_settings_en: '設定ページ（英語）',
+        ss_lang: '多言語設定',
+        ss_kb1: 'ナレッジベースデモ 1',
+        ss_kb2: 'ナレッジベースデモ 2',
+        ss_kb3: 'ナレッジベースデモ 3',
+        ss_kb4: 'ナレッジベースデモ 4',
+        showcase1_title: 'オールインワン運用コンソール',
+        showcase1_subtitle: 'AI Agent + ターミナル + サーバー監視',
+        showcase1_p1: 'AI Agent スマート実行：自然言語でニーズを記述すると、AIがコマンドを自動生成して実行',
+        showcase1_p2: 'リアルタイムターミナル出力：完全なxtermターミナルで、コマンド実行が一目でわかる',
+        showcase1_p3: 'サーバー監視パネル：CPU/メモリ/ディスク/ネットワークのリアルタイム指標、異常を自動強調表示',
+        showcase1_p4: 'マルチタブ切り替え：複数ホスト、複数セッションを1つのウィンドウで管理',
+        showcase1_desc: '左側はAIチャット、右側はライブターミナル、上部に監視パネル、下部にコマンド入力。すべてが制御下にあります。',
+        showcase2_title: '1回の操作でN台同時実行',
+        showcase2_subtitle: '複数サーバーの一括管理',
+        showcase2_p1: 'ワンクリックオーケストレーションモード：選択したすべてのサーバーに同じコマンドをブロードキャスト',
+        showcase2_p2: 'リアルタイムステータスエコー：各マシンの実行結果が個別に表示され、進行状況が一目でわかる',
+        showcase2_p3: 'ホスト別ルーティング：異なるホスト環境に合わせてAIが適応したコマンドを自動生成',
+        showcase2_p4: 'レーダーリップルアニメーション：オンラインホスト数を動的に表示、テクノ感満載',
+        showcase2_desc: '1台のマシンをアップグレードするのも操作なら、100台のマシンをアップグレードするのも同じ操作です。マルチオーケストレーションで一括運用が話すように簡単になります。',
+        showcase3_title: '経験をRunbookに',
+        showcase3_subtitle: 'ワンクリックRunbook実行',
+        showcase3_p1: 'よく使うテンプレートを内蔵：システム検査、セキュリティ強化、ログクリーンアップ、サービスデプロイ…',
+        showcase3_p2: 'カスタムワークフロー：運用SOPをRunbookとして記録すれば、新人でもワンクリックで操作可能',
+        showcase3_p3: 'マルチマシン並列実行：同じワークフローを複数サーバーで直列/並列実行',
+        showcase3_p4: '完全な実行ログ：すべてのステップの入出力が記録され、追跡可能で監査にも対応',
+        showcase3_desc: '繰り返しの作業はワークフローに任せて、本当に考える必要のある問題にエネルギーを注ぎましょう。',
+        showcase4_title: 'あなたのターミナルはあなた次第',
+        showcase4_subtitle: '豊富なカスタマイズオプション',
+        showcase4_p1: 'AIモデル設定：20以上のプロバイダーにワンクリックで接続、カスタムAPIエンドポイントにも対応',
+        showcase4_p2: 'テーマ外観：ガラスUI、テーマカラー、角丸、ぼかし強度をカスタマイズ可能',
+        showcase4_p3: 'セキュリティ設定：アプリロック、生体認証、SafetyGuard感度調整',
+        showcase4_p4: '通知管理：どのイベントを通知するかは完全にあなた次第',
+        showcase4_desc: 'モデル選択からインターフェーススタイル、セキュリティポリシーから通知設定まで、すべてをあなたの習慣に合わせて調整できます。',
+        showcase5_title: '世界中のユーザーのための15以上の言語',
+        showcase5_subtitle: 'グローバルユーザーの選択',
+        showcase5_p1: '完全なローカライズ：中国語、英語、日本語、韓国語、フランス語、ドイツ語、スペイン語…',
+        showcase5_p2: 'ワンクリック切り替え：設定画面でタップするだけでインターフェース言語を変更可能',
+        showcase5_p3: 'コミュニティ主導：さらなる言語翻訳の貢献を歓迎します',
+        showcase5_desc: 'どこから来ても、AI Terminalはあなたが最も慣れ親しんだ言語で動作します。',
+        new_label: 'v1.3.5の新機能',
+        new_title: '運用大幅アップグレード',
+        new_desc: 'モダンなDevOpsとSREチームのための5つの強力な新機能。',
+        nf1_title: 'サーバー監視',
+        nf1_desc: '全サーバーのCPU、メモリ、ディスク、ネットワークをリアルタイムで監視。',
+        nf2_title: '変更記録＆監査ログ',
+        nf2_desc: '検索可能な変更履歴を持つ完全な監査証跡。',
+        nf3_title: '運用ランブック',
+        nf3_desc: '運用ワークフローを保存して再利用。複雑なタスクをワンクリックで実行。',
+        nf4_title: '通知センター',
+        nf4_desc: '監視アラート、タスク完了、システムイベントの通知で常に最新情報を入手。',
+        nf5_title: 'グラスモーフィズムUI',
+        nf5_desc: '美しいグラスモーフィズムデザイン、よりスムーズなアニメーションと洗練されたビジュアル。',
+        features_label: 'コア機能',
+        features_title: 'より多くを求める<br>開発者のために',
+        features_desc: 'すべての機能はセキュリティ、速度、インテリジェンスを考慮して設計されています。',
+        f1_title: 'デュアルモードAIエージェント',
+        f1_desc: '自動モードは完全なワークフローを実行。アシスタントモードは段階的にガイド。自律レベルを選択できます。',
+        f2_title: 'サーバー監視',
+        f2_desc: '履歴トレンドチャート付きで、全サーバーのCPU、メモリ、ディスク、ネットワークをリアルタイム監視。',
+        f3_title: 'セーフティガード',
+        f3_desc: '3段階の安全分類 — 安全 / 警告 / 危険。AIが生成したすべてのコマンドは実行前にチェックされます。',
+        f4_title: '変更記録＆監査ログ',
+        f4_desc: 'すべての操作の完全な監査証跡。タイムスタンプ、操作者、詳細を含む検索可能な変更履歴。',
+        f5_title: 'SSHリモートターミナル',
+        f5_desc: 'コネクションプーリング、マルチセッションサポート、リアルタイムストリーミング出力を備えたフルSSHクライアント。',
+        f6_title: '運用ランブック',
+        f6_desc: '再利用可能な運用ワークフローを作成。複雑な多段階タスクをランブックとして保存し、ワンクリックで実行。',
+        f7_title: 'ローカルPTYターミナル',
+        f7_desc: 'macOS、Linux、Windows上のリアルな擬似端末。完全なインタラクティブサポートで任意のローカルコマンドを実行。',
+        f8_title: '通知センター',
+        f8_desc: '監視アラート、タスク完了、システムイベントのための統一通知センター。更新を見逃しません。',
+        f9_title: 'ゼロ平文ストレージ',
+        f9_desc: '資格情報はシステムレベルで暗号化。Face ID / Touch ID / 指紋による生体認証ロック解除もオプションでサポート。',
+        f10_title: 'マルチサーバーオーケストレーション',
+        f10_desc: '複数のサーバーで同時にコマンドを実行。バッチ操作と調整されたデプロイが簡単に。',
+        f11_title: 'ナレッジベース駆動',
+        f11_desc: 'オフラインナレッジベースがAIにドメイン固有の専門知識を提供。ダウンロード可能で常に改善中。',
+        f12_title: 'クロスプラットフォーム',
+        f12_desc: '1つのコードベースで全プラットフォームに対応。macOS、Windows、Linux、iOS、Android — Flutterで構築。',
+        how_label: '仕組み',
+        how_title: 'あなたの意図を理解する<br>AI',
+        how_desc: '自然言語でやりたいことを説明してください。AI Terminalが残りの作業を処理します。',
+        s1_title: 'タスクを説明',
+        s1_desc: '自然言語で入力：<code>"全サーバーのCPU使用率を確認"</code> または <code>"ステージング環境にデプロイ"</code>',
+        s2_title: 'AIがコマンドを生成',
+        s2_desc: 'AIエージェントが意図を解析し、必要な正確なシェルコマンドを生成し、応答をリアルタイムでストリーミングします。',
+        s3_title: 'セーフティガードが検証',
+        s3_desc: 'すべてのコマンドは分類されます：<span style="color: var(--green)">安全</span>は自動実行、<span style="color: var(--yellow)">警告</span>は確認が必要、<span style="color: var(--red)">危険</span>は明示的な承認が必要です。',
+        s4_title: '自信を持って実行',
+        s4_desc: 'コマンドはローカルまたはリモート端末で実行されます。結果はAIにフィードバックされ、多段階の推論とフォローアップが行われます。',
+        platforms_label: 'プラットフォーム',
+        platforms_title: '1つのアプリ、全プラットフォーム',
+        platforms_desc: 'すべてのデバイスでシームレスな体験。',
+        download_label: 'ダウンロード',
+        download_title: 'AI Terminalを入手',
+        download_desc: '無料でオープンソース。お使いのプラットフォームにv1.3.5をダウンロードしてください。',
+        knowledge_title: 'ナレッジベースデータベースバージョン',
+        knowledge_desc: 'オフラインAIアシスタントのためのナレッジベースデータベースをダウンロードしてください。アプリのバージョンに一致するバージョンを選択してください。',
+        knowledge_latest: '最新',
+        cta_title: 'ターミナルを<br>変える準備はできましたか？',
+        cta_desc: 'オープンソース、永久無料。今すぐAI Terminal v1.3.5の使用を開始してください。',
+        cta_btn: 'GitHubで見る',
+        footer_releases: 'リリース',
+        footer_issues: '問題',
+      },
+      de: {
+        nav_screenshots: 'Screenshots',
+        nav_new_features: 'Neuigkeiten',
+        nav_features: 'Funktionen',
+        nav_how: 'So funktioniert es',
+        nav_platforms: 'Plattformen',
+        nav_download: 'Download',
+        hero_badge: 'v1.3.5 veröffentlicht — Ops Mega-Upgrade',
+        hero_title_1: 'Das Terminal,',
+        hero_title_2: 'neu gedacht mit KI',
+        hero_sub: 'Ein Next-Generation SSH- und Lokalterminal mit integriertem KI-Agenten, Server-Überwachung, Ops-Runbooks, 3-stufiger Sicherheitswache und Null-Klartext-Anmeldeinformationsspeicherung. Überall verfügbar, wo Sie codieren.',
+        btn_download: 'Herunterladen',
+        btn_github: 'Auf GitHub starren',
+        demo_cmd: '"CPU-Auslastung aller Server prüfen"',
+        demo_scan: '5 Server werden gescannt...',
+        demo_analyze: 'Aufgabe wird analysiert...',
+        demo_safe: '— Nur-Lesen-Überwachung erkannt',
+        demo_suggest: 'server-04 bei 78% — Top-Prozesse prüfen?',
+        demo_done: 'Überwachung abgeschlossen ',
+        screenshots_label: 'Screenshots',
+        screenshots_title: 'In Aktion sehen',
+        screenshots_desc: 'Echte Screenshots von AI Terminal v1.3.5 auf macOS.',
+        screenshots_note: 'KI-Funktionen in den obigen Screenshots werden von Xiaomi mino-v2.5-pro LLM angetrieben.',
+        ss_main: 'Hauptoberfläche — KI-Agent & Terminal',
+        ss_orchestrate: 'Multi-Server-Orchestrierung',
+        ss_runbooks: 'Ops-Runbooks-Workflow',
+        ss_settings: 'Einstellungsseite (Chinesisch)',
+        ss_settings_en: 'Einstellungsseite (Englisch)',
+        ss_lang: 'Mehrsprachige Einstellungen',
+        ss_kb1: 'Wissensdatenbank-Demo 1',
+        ss_kb2: 'Wissensdatenbank-Demo 2',
+        ss_kb3: 'Wissensdatenbank-Demo 3',
+        ss_kb4: 'Wissensdatenbank-Demo 4',
+        showcase1_title: 'All-in-One Ops-Konsole',
+        showcase1_subtitle: 'KI-Agent + Terminal + Server-Überwachung',
+        showcase1_p1: 'KI-Agent intelligente Ausführung: Beschreiben Sie Bedürfnisse in natürlicher Sprache, KI generiert und führt Befehle automatisch aus',
+        showcase1_p2: 'Echtzeit-Terminalausgabe: Vollständiges xterm-Terminal, Befehlsausführung auf einen Blick',
+        showcase1_p3: 'Server-Überwachungsfeld: Echtzeit-CPU/Arbeitsspeicher/Festplatte/Netzwerk-Metriken, Anomalien werden automatisch hervorgehoben',
+        showcase1_p4: 'Multi-Tab-Umschaltung: Mehrere Hosts, mehrere Sitzungen, alle in einem Fenster verwaltet',
+        showcase1_desc: 'Links der KI-Chat, rechts das Live-Terminal, oben das Überwachungsfeld, unten die Befehlseingabe. Alles unter Kontrolle.',
+        showcase2_title: 'Eine Operation, N Server gleichzeitig',
+        showcase2_subtitle: 'Mehrere Server stapelweise verwalten',
+        showcase2_p1: 'Orchestrierungsmodus mit einem Klick: Gleichen Befehl an alle ausgewählten Server senden',
+        showcase2_p2: 'Echtzeit-Statusrückmeldung: Ausführungsergebnisse jedes Rechners unabhängig angezeigt, Fortschritt auf einen Blick',
+        showcase2_p3: 'Befehle nach Host routen: KI generiert automatisch angepasste Befehle basierend auf verschiedenen Host-Umgebungen',
+        showcase2_p4: 'Radar-Wellen-Animation: Dynamische Anzeige der Anzahl Online-Hosts, voller Tech-Look',
+        showcase2_desc: 'Ein Rechner upgraden ist eine Operation, hundert Rechner upgraden ist auch eine Operation. Multi-Orchestrierung macht Stapelbetrieb so einfach wie Sprechen.',
+        showcase3_title: 'Erfahrung zu Runbooks machen',
+        showcase3_subtitle: 'Runbook-Ausführung mit einem Klick',
+        showcase3_p1: 'Eingebaute gängige Vorlagen: Systemprüfung, Sicherheitsverstärkung, Protokollbereinigung, Dienstbereitstellung…',
+        showcase3_p2: 'Benutzerdefinierte Workflows: Speichern Sie Ihre Betriebs-SOPs als Runbooks, auch Neueinsteiger können mit einem Klick ausführen',
+        showcase3_p3: 'Multi-Maschine parallele Ausführung: Gleicher Workflow wird seriell/parallel auf mehreren Servern ausgeführt',
+        showcase3_p4: 'Vollständige Ausführungsprotokolle: Eingabe und Ausgabe jedes Schritts aufgezeichnet, rückverfolgbar und auditierbar',
+        showcase3_desc: 'Lassen Sie Workflows wiederholende Operationen erledigen und sparen Sie Ihre Energie für Probleme, die wirklich Denken erfordern.',
+        showcase4_title: 'Ihr Terminal, Ihre Regeln',
+        showcase4_subtitle: 'Umfangreiche Personalisierungsoptionen',
+        showcase4_p1: 'KI-Modell-Konfiguration: 20+ Anbieter mit einem Klick, unterstützt benutzerdefinierte API-Endpunkte',
+        showcase4_p2: 'Thema-Erscheinungsbild: Glas-UI, anpassbare Themenfarbe, Eckradius, Weichzeichnungsstärke',
+        showcase4_p3: 'Sicherheitseinstellungen: App-Sperre, biometrische Authentifizierung, SafetyGuard-Empfindlichkeitsanpassung',
+        showcase4_p4: 'Benachrichtigungsverwaltung: Welche Ereignisse erinnert werden müssen, liegt ganz bei Ihnen',
+        showcase4_desc: 'Von der Modellauswahl bis zum Interface-Stil, von der Sicherheitsrichtlinie bis zu den Benachrichtigungseinstellungen – alles kann an Ihre Gewohnheiten angepasst werden.',
+        showcase5_title: '15+ Sprachen für Benutzer weltweit',
+        showcase5_subtitle: 'Die Wahl globaler Benutzer',
+        showcase5_p1: 'Volle Lokalisierung: Chinesisch, Englisch, Japanisch, Koreanisch, Französisch, Deutsch, Spanisch…',
+        showcase5_p2: 'Umschaltung mit einem Klick: Tippen Sie in den Einstellungen, um die Oberflächensprache zu ändern',
+        showcase5_p3: 'Community-gesteuert: Willkommen, weitere Sprachübersetzungen beizutragen',
+        showcase5_desc: 'Wo immer Sie herkommen, AI Terminal kann in Ihrer vertrautesten Sprache arbeiten.',
+        new_label: 'Neu in v1.3.5',
+        new_title: 'Ops Mega-Upgrade',
+        new_desc: '5 leistungsstarke neue Funktionen für moderne DevOps- und SRE-Teams.',
+        nf1_title: 'Server-Überwachung',
+        nf1_desc: 'Echtzeit-Überwachung von CPU, Speicher, Festplatte & Netzwerk auf allen Ihren Servern.',
+        nf2_title: 'Änderungsdatensätze & Audit-Logs',
+        nf2_desc: 'Vollständige Audit-Spur jedes Vorgangs mit durchsuchbarer Änderungshistorie.',
+        nf3_title: 'Ops-Runbooks',
+        nf3_desc: 'Betriebsabläufe speichern und wiederverwenden. Komplexe Aufgaben mit einem Klick ausführen.',
+        nf4_title: 'Benachrichtigungszentrum',
+        nf4_desc: 'Bleiben Sie informiert mit Warnungen für Überwachung, Aufgabenabschluss und Systemereignisse.',
+        nf5_title: 'Glassmorphismus UI',
+        nf5_desc: 'Wunderschönes Glassmorphismus-Design mit flüssigeren Animationen und verfeinerten visuellen Elementen.',
+        features_label: 'Kernfunktionen',
+        features_title: 'Für Entwickler gebaut,<br>die mehr verlangen',
+        features_desc: 'Jede Funktion mit Blick auf Sicherheit, Geschwindigkeit und Intelligenz entwickelt.',
+        f1_title: 'Dual-Modus KI-Agent',
+        f1_desc: 'Automatikmodus führt vollständige Workflows aus. Assistentenmodus führt Sie Schritt für Schritt. Sie wählen das Autonomieniveau.',
+        f2_title: 'Server-Überwachung',
+        f2_desc: 'Echtzeit-Überwachung von CPU, Speicher, Festplatte und Netzwerk auf allen Servern mit historischen Trenddiagrammen.',
+        f3_title: 'Sicherheitswache',
+        f3_desc: '3-stufige Sicherheitsklassifizierung — Sicher / Warnung / Gefährlich. Jede KI-generierte Befehl wird vor der Ausführung geprüft.',
+        f4_title: 'Änderungsdatensätze & Audit-Logs',
+        f4_desc: 'Vollständige Audit-Spur jedes Vorgangs. Durchsuchbare Änderungshistorie mit Zeitstempeln, Betreibern und Details.',
+        f5_title: 'SSH-Remoteterminal',
+        f5_desc: 'Vollständiger SSH-Client mit Verbindungspooling, Multi-Sitzungs-Unterstützung und Echtzeit-Streaming-Ausgabe.',
+        f6_title: 'Ops-Runbooks',
+        f6_desc: 'Wiederverwendbare Betriebsabläufe erstellen. Komplexe Mehrschrittaufgaben als Runbooks speichern und mit einem Klick ausführen.',
+        f7_title: 'Lokales PTY-Terminal',
+        f7_desc: 'Echtes Pseudoterminal auf macOS, Linux & Windows. Führen Sie jeden lokalen Befehl mit voller interaktiver Unterstützung aus.',
+        f8_title: 'Benachrichtigungszentrum',
+        f8_desc: 'Einheitliches Benachrichtigungszentrum für Überwachungswarnungen, Aufgabenabschlüsse und Systemereignisse. Nie wieder ein Update verpassen.',
+        f9_title: 'Null-Klartext-Speicherung',
+        f9_desc: 'Anmeldeinformationen auf Systemebene verschlüsselt. Optionale biometrische Entsperrung mit Face ID / Touch ID / Fingerabdruck.',
+        f10_title: 'Multi-Server-Orchestrierung',
+        f10_desc: 'Gleichzeitige Befehlsausführung auf mehreren Servern. Batch-Operationen und koordinierte Bereitstellungen leicht gemacht.',
+        f11_title: 'Wissensdatenbank-gesteuert',
+        f11_desc: 'Offline-Wissensdatenbank versorgt die KI mit domänenspezifischem Fachwissen. Herunterladbar und ständig verbessernd.',
+        f12_title: 'Plattformübergreifend',
+        f12_desc: 'Eine Codebasis, alle Plattformen. macOS, Windows, Linux, iOS & Android — mit Flutter gebaut.',
+        how_label: 'So funktioniert es',
+        how_title: 'KI, die Ihre<br>Absicht versteht',
+        how_desc: 'Beschreiben Sie, was Sie wollen, in natürlicher Sprache. AI Terminal erledigt den Rest.',
+        s1_title: 'Beschreiben Sie Ihre Aufgabe',
+        s1_desc: 'Geben Sie in natürlicher Sprache ein: <code>"CPU-Auslastung aller Server prüfen"</code> oder <code>"auf Staging bereitstellen"</code>',
+        s2_title: 'KI generiert Befehle',
+        s2_desc: 'Der KI-Agent analysiert Ihre Absicht und generiert die genauen Shell-Befehle, die benötigt werden, und streamt die Antwort in Echtzeit.',
+        s3_title: 'Sicherheitswache prüft',
+        s3_desc: 'Jeder Befehl wird klassifiziert: <span style="color: var(--green)">Sicher</span> wird automatisch ausgeführt, <span style="color: var(--yellow)">Warnung</span> erfordert Bestätigung, <span style="color: var(--red)">Gefährlich</span> erfordert ausdrückliche Genehmigung.',
+        s4_title: 'Vertrauenswürdig ausführen',
+        s4_desc: 'Befehle werden auf lokalen oder Remote-Terminals ausgeführt. Ergebnisse werden zur mehrstufigen Inferenz und Nachverfolgung an die KI zurückgespielt.',
+        platforms_label: 'Plattformen',
+        platforms_title: 'Eine App, jede Plattform',
+        platforms_desc: 'Nahtlose Erfahrung auf all Ihren Geräten.',
+        download_label: 'Download',
+        download_title: 'AI Terminal holen',
+        download_desc: 'Kostenlos und Open Source. Laden Sie v1.3.5 für Ihre Plattform herunter.',
+        knowledge_title: 'Wissensdatenbank-Versionen',
+        knowledge_desc: 'Laden Sie die Wissensdatenbank für Offline-KI-Unterstützung herunter. Wählen Sie die Version, die zu Ihrer App passt.',
+        knowledge_latest: 'Neueste',
+        cta_title: 'Bereit, Ihr Terminal<br>zu transformieren?',
+        cta_desc: 'Open Source, für immer kostenlos. Starten Sie noch heute mit AI Terminal v1.3.5.',
+        cta_btn: 'Auf GitHub ansehen',
+        footer_releases: 'Releases',
+        footer_issues: 'Probleme',
+      },
+      fr: {
+        nav_screenshots: 'Captures',
+        nav_new_features: 'Nouveautés',
+        nav_features: 'Fonctionnalités',
+        nav_how: 'Fonctionnement',
+        nav_platforms: 'Plateformes',
+        nav_download: 'Téléchargement',
+        hero_badge: 'v1.3.5 publié — Mise à jour majeure Ops',
+        hero_title_1: 'Le Terminal,',
+        hero_title_2: 'réinventé avec l\'IA',
+        hero_sub: 'Un terminal SSH et local de nouvelle génération avec agent IA intégré, surveillance des serveurs, runbooks Ops, garde de sécurité à 3 niveaux et stockage des identifiants sans texte clair. Disponible partout où vous codez.',
+        btn_download: 'Télécharger',
+        btn_github: 'Star sur GitHub',
+        demo_cmd: '"Vérifier l\'utilisation CPU de tous les serveurs"',
+        demo_scan: 'Analyse de 5 serveurs...',
+        demo_analyze: 'Analyse de la tâche...',
+        demo_safe: '— Surveillance en lecture seule détectée',
+        demo_suggest: 'server-04 à 78% — vérifier les processus principaux ?',
+        demo_done: 'Surveillance terminée ',
+        screenshots_label: 'Captures d\'écran',
+        screenshots_title: 'Voyez-le en action',
+        screenshots_desc: 'Vraies captures d\'écran d\'AI Terminal v1.3.5 sur macOS.',
+        screenshots_note: 'Les fonctionnalités IA des captures ci-dessus sont propulsées par Xiaomi mino-v2.5-pro LLM.',
+        ss_main: 'Interface principale — Agent IA & Terminal',
+        ss_orchestrate: 'Orchestration multi-serveurs',
+        ss_runbooks: 'Workflow des Runbooks Ops',
+        ss_settings: 'Page des paramètres (Chinois)',
+        ss_settings_en: 'Page des paramètres (Anglais)',
+        ss_lang: 'Paramètres multilingues',
+        ss_kb1: 'Démo Base de connaissances 1',
+        ss_kb2: 'Démo Base de connaissances 2',
+        ss_kb3: 'Démo Base de connaissances 3',
+        ss_kb4: 'Démo Base de connaissances 4',
+        showcase1_title: 'Console Ops tout-en-un',
+        showcase1_subtitle: 'Agent IA + Terminal + Surveillance serveur',
+        showcase1_p1: 'Exécution intelligente par l\'agent IA : décrivez vos besoins en langage naturel, l\'IA génère et exécute les commandes automatiquement',
+        showcase1_p2: 'Sortie terminal en temps réel : terminal xterm complet, exécution des commandes en un coup d\'œil',
+        showcase1_p3: 'Panneau de surveillance serveur : métriques en temps réel CPU/mémoire/disque/réseau, anomalies mises en évidence automatiquement',
+        showcase1_p4: 'Commutation multi-onglets : plusieurs hôtes, plusieurs sessions, le tout géré dans une seule fenêtre',
+        showcase1_desc: 'Le chat IA à gauche, le terminal en direct à droite, le panneau de surveillance en haut, la saisie de commandes en bas. Tout sous contrôle.',
+        showcase2_title: 'Une opération, N serveurs simultanément',
+        showcase2_subtitle: 'Gérer plusieurs serveurs en lot',
+        showcase2_p1: 'Mode orchestration en un clic : diffuser la même commande à tous les serveurs sélectionnés',
+        showcase2_p2: 'Écho d\'état en temps réel : résultats d\'exécution de chaque machine affichés indépendamment, progression en un coup d\'œil',
+        showcase2_p3: 'Routage des commandes par hôte : l\'IA génère automatiquement des commandes adaptées selon les différents environnements hôtes',
+        showcase2_p4: 'Animation d\'ondes radar : affichage dynamique du nombre d\'hôtes en ligne, plein de style tech',
+        showcase2_desc: 'Mettre à jour une machine est une opération, mettre à jour cent machines est aussi une opération. L\'orchestration multi-serveurs rend les opérations en lot aussi simples que de parler.',
+        showcase3_title: 'Transformer l\'expérience en Runbooks',
+        showcase3_subtitle: 'Exécution Runbook en un clic',
+        showcase3_p1: 'Modèles courants intégrés : inspection système, renforcement sécurité, nettoyage logs, déploiement de services…',
+        showcase3_p2: 'Workflows personnalisés : enregistrez vos SOP d\'exploitation en tant que Runbooks, même les nouveaux peuvent exécuter en un clic',
+        showcase3_p3: 'Exécution multi-machines parallèle : même workflow exécuté en série/parallèle sur plusieurs serveurs',
+        showcase3_p4: 'Journaux d\'exécution complets : entrée et sortie de chaque étape enregistrées, traçables et auditable',
+        showcase3_desc: 'Laissez les workflows gérer les opérations répétitives, économisez votre énergie pour les problèmes qui nécessitent vraiment de la réflexion.',
+        showcase4_title: 'Votre terminal, vos règles',
+        showcase4_subtitle: 'Riches options de personnalisation',
+        showcase4_p1: 'Configuration du modèle IA : 20+ fournisseurs en un clic, prend en charge les points de terminaison API personnalisés',
+        showcase4_p2: 'Apparence du thème : UI en verre, couleur de thème personnalisable, rayon des coins, intensité du flou',
+        showcase4_p3: 'Paramètres de sécurité : verrouillage de l\'app, authentification biométrique, réglage de la sensibilité SafetyGuard',
+        showcase4_p4: 'Gestion des notifications : quels événements doivent être rappelés, c\'est entièrement à vous',
+        showcase4_desc: 'Du choix du modèle au style de l\'interface, de la politique de sécurité aux préférences de notification, tout peut être ajusté à vos habitudes.',
+        showcase5_title: '15+ langues pour les utilisateurs du monde entier',
+        showcase5_subtitle: 'Le choix des utilisateurs mondiaux',
+        showcase5_p1: 'Localisation complète : chinois, anglais, japonais, coréen, français, allemand, espagnol…',
+        showcase5_p2: 'Changement en un clic : tapez dans les paramètres pour changer la langue de l\'interface',
+        showcase5_p3: 'Animé par la communauté : bienvenue à contribuer à plus de traductions de langues',
+        showcase5_desc: 'D\'où que vous veniez, AI Terminal peut travailler dans votre langue la plus familière.',
+              new_label: 'Nouveautés v1.3.5',
+        new_title: 'Mise à jour majeure Ops',
+        new_desc: '5 nouvelles fonctionnalités puissantes pour les équipes DevOps et SRE modernes.',
+        nf1_title: 'Surveillance Serveur',
+        nf1_desc: 'Surveillance en temps réel CPU, mémoire, disque & réseau sur tous vos serveurs.',
+        nf2_title: 'Journal des modifications & Audit',
+        nf2_desc: 'Piste d\'audit complète de chaque opération avec historique des modifications consultable.',
+        nf3_title: 'Runbooks Ops',
+        nf3_desc: 'Sauvegardez et réutilisez les flux de travail opérationnels. Exécution en un clic de tâches complexes.',
+        nf4_title: 'Centre de notifications',
+        nf4_desc: 'Restez informé avec les alertes de surveillance, les tâches terminées et les événements système.',
+        nf5_title: 'UI Glassmorphism',
+        nf5_desc: 'Beau design glassmorphism avec des animations plus fluides et des visuels raffinés.',
+        features_label: 'Fonctionnalités principales',
+        features_title: 'Conçu pour les développeurs<br>qui exigent plus',
+        features_desc: 'Chaque fonctionnalité conçue avec la sécurité, la vitesse et l\'intelligence à l\'esprit.',
+        f1_title: 'Agent IA double mode',
+        f1_desc: 'Le mode automatique exécute des workflows complets. Le mode assistant vous guide étape par étape. Vous choisissez le niveau d\'autonomie.',
+        f2_title: 'Surveillance Serveur',
+        f2_desc: 'Surveillance en temps réel du CPU, mémoire, disque et réseau sur tous vos serveurs avec graphiques de tendance historiques.',
+        f3_title: 'Garde de sécurité',
+        f3_desc: 'Classification de sécurité à 3 niveaux — Sûr / Avertissement / Dangereux. Chaque commande générée par l\'IA est vérifiée avant exécution.',
+        f4_title: 'Journal des modifications & Audit',
+        f4_desc: 'Piste d\'audit complète de chaque opération. Historique des modifications consultable avec horodatages, opérateurs et détails.',
+        f5_title: 'Terminal SSH distant',
+        f5_desc: 'Client SSH complet avec mise en pool de connexions, support multi-sessions et sortie en streaming en temps réel.',
+        f6_title: 'Runbooks Ops',
+        f6_desc: 'Créez des flux de travail opérationnels réutilisables. Sauvegardez des tâches complexes multi-étapes comme runbooks pour une exécution en un clic.',
+        f7_title: 'Terminal PTY local',
+        f7_desc: 'Vrai pseudo-terminal sur macOS, Linux & Windows. Exécutez n\'importe quelle commande locale avec un support interactif complet.',
+        f8_title: 'Centre de notifications',
+        f8_desc: 'Centre de notification unifié pour les alertes de surveillance, les tâches terminées et les événements système. Ne manquez jamais une mise à jour.',
+        f9_title: 'Stockage sans texte clair',
+        f9_desc: 'Identifiants chiffrés au niveau système. Déverrouillage biométrique optionnel avec Face ID / Touch ID / Empreinte digitale.',
+        f10_title: 'Orchestration multi-serveurs',
+        f10_desc: 'Exécutez des commandes sur plusieurs serveurs simultanément. Opérations par lots et déploiements coordonnés facilités.',
+        f11_title: 'Piloté par base de connaissances',
+        f11_desc: 'La base de connaissances hors ligne alimente l\'IA avec une expertise spécifique au domaine. Téléchargeable et en constante amélioration.',
+        f12_title: 'Multiplateforme',
+        f12_desc: 'Une base de code, toutes les plateformes. macOS, Windows, Linux, iOS & Android — construit avec Flutter.',
+        how_label: 'Fonctionnement',
+        how_title: 'L\'IA qui comprend<br>votre intention',
+        how_desc: 'Décrivez ce que vous voulez en langage naturel. AI Terminal s\'occupe du reste.',
+        s1_title: 'Décrivez votre tâche',
+        s1_desc: 'Tapez en langage naturel : <code>"Vérifier l\'utilisation CPU de tous les serveurs"</code> ou <code>"déployer sur staging"</code>',
+        s2_title: 'L\'IA génère des commandes',
+        s2_desc: 'L\'agent IA analyse votre intention et génère les commandes shell exactes nécessaires, diffusant la réponse en temps réel.',
+        s3_title: 'La garde de sécurité valide',
+        s3_desc: 'Chaque commande est classée : <span style="color: var(--green)">Sûr</span> s\'exécute automatiquement, <span style="color: var(--yellow)">Avertissement</span> demande confirmation, <span style="color: var(--red)">Dangereux</span> nécessite une approbation explicite.',
+        s4_title: 'Exécutez en toute confiance',
+        s4_desc: 'Les commandes s\'exécutent sur des terminaux locaux ou distants. Les résultats sont renvoyés à l\'IA pour raisonnement multi-étapes et suivi.',
+        platforms_label: 'Plateformes',
+        platforms_title: 'Une application, toutes les plateformes',
+        platforms_desc: 'Expérience transparente sur tous vos appareils.',
+        download_label: 'Téléchargement',
+        download_title: 'Obtenir AI Terminal',
+        download_desc: 'Gratuit et open source. Téléchargez v1.3.5 pour votre plateforme.',
+        knowledge_title: 'Versions de la base de connaissances',
+        knowledge_desc: 'Téléchargez la base de connaissances pour l\'assistance IA hors ligne. Choisissez la version correspondant à votre application.',
+        knowledge_latest: 'Dernier',
+        cta_title: 'Prêt à transformer<br>votre terminal ?',
+        cta_desc: 'Open source, gratuit pour toujours. Commencez dès aujourd\'hui avec AI Terminal v1.3.5.',
+        cta_btn: 'Voir sur GitHub',
+        footer_releases: 'Versions',
+        footer_issues: 'Problèmes',
+      },
+      ru: {
+        nav_screenshots: 'Скриншоты',
+        nav_new_features: 'Новое',
+        nav_features: 'Возможности',
+        nav_how: 'Как работает',
+        nav_platforms: 'Платформы',
+        nav_download: 'Скачать',
+        hero_badge: 'v1.3.5 выпущен — крупное обновление Ops',
+        hero_title_1: 'Терминал,',
+        hero_title_2: 'переосмысленный с ИИ',
+        hero_sub: 'Терминал SSH и локальный терминал нового поколения со встроенным ИИ-агентом, мониторингом серверов, Ops-ранбуками, 3-уровневой защитой и нулевым хранением учетных данных в открытом виде. Доступно везде, где вы пишете код.',
+        btn_download: 'Скачать',
+        btn_github: 'Поставить звезду',
+        demo_cmd: '"Проверить загрузку CPU всех серверов"',
+        demo_scan: 'Сканируется 5 серверов...',
+        demo_analyze: 'Анализ задачи...',
+        demo_safe: '— обнаружен мониторинг только для чтения',
+        demo_suggest: 'server-04 на 78% — проверить топ-процессы?',
+        demo_done: 'Мониторинг завершен ',
+        screenshots_label: 'Скриншоты',
+        screenshots_title: 'Посмотрите в действии',
+        screenshots_desc: 'Реальные скриншоты AI Terminal v1.3.5 на macOS.',
+        screenshots_note: 'ИИ-функции на скриншотах работают на Xiaomi mino-v2.5-pro LLM.',
+        ss_main: 'Главный интерфейс — ИИ-агент и терминал',
+        ss_orchestrate: 'Мультисерверная оркестрация',
+        ss_runbooks: 'Рабочий процесс Ops-ранбуков',
+        ss_settings: 'Страница настроек (китайский)',
+        ss_settings_en: 'Страница настроек (английский)',
+        ss_lang: 'Многоязычные настройки',
+        ss_kb1: 'Демо базы знаний 1',
+        ss_kb2: 'Демо базы знаний 2',
+        ss_kb3: 'Демо базы знаний 3',
+        ss_kb4: 'Демо базы знаний 4',
+        showcase1_title: 'Унифицированная консоль эксплуатации',
+        showcase1_subtitle: 'ИИ-агент + Терминал + Мониторинг серверов',
+        showcase1_p1: 'Умное выполнение ИИ-агентом: опишите потребности на естественном языке, ИИ автоматически генерирует и выполняет команды',
+        showcase1_p2: 'Вывод терминала в реальном времени: полноценный xterm-терминал, выполнение команд на виду',
+        showcase1_p3: 'Панель мониторинга серверов: метрики CPU/памяти/диска/сети в реальном времени, аномалии автоматически подсвечиваются',
+        showcase1_p4: 'Переключение между вкладками: несколько хостов, несколько сессий — всё управляется в одном окне',
+        showcase1_desc: 'Слева ИИ-чат, справа живой терминал, сверху панель мониторинга, снизу ввод команд. Всё под контролем.',
+        showcase2_title: 'Одна операция — N серверов одновременно',
+        showcase2_subtitle: 'Пакетное управление несколькими серверами',
+        showcase2_p1: 'Режим оркестрации в один клик: отправка одной команды всем выбранным серверам',
+        showcase2_p2: 'Отображение статуса в реальном времени: результаты выполнения каждой машины показываются отдельно, прогресс на виду',
+        showcase2_p3: 'Маршрутизация команд по хостам: ИИ автоматически генерирует адаптированные команды под разные среды хостов',
+        showcase2_p4: 'Анимация радиальных волн: динамическое отображение количества онлайн-хостов, стильно и технологично',
+        showcase2_desc: 'Обновить одну машину — операция, обновить сто машин — тоже операция. Мультиоркестрация делает пакетную эксплуатацию такой же простой, как разговор.',
+        showcase3_title: 'Превратите опыт в ранбуки',
+        showcase3_subtitle: 'Выполнение ранбуков в один клик',
+        showcase3_p1: 'Встроенные шаблоны: инспекция системы, усиление безопасности, очистка логов, развёртывание сервисов…',
+        showcase3_p2: 'Пользовательские рабочие процессы: записывайте свои эксплуатационные SOP в виде ранбуков — даже новички смогут выполнять в один клик',
+        showcase3_p3: 'Параллельное выполнение на нескольких машинах: один и тот же workflow выполняется последовательно/параллельно на нескольких серверах',
+        showcase3_p4: 'Полные журналы выполнения: ввод и вывод каждого шага записываются, можно отследить и провести аудит',
+        showcase3_desc: 'Пусть рабочие процессы берут на себя повторяющиеся операции, а вы сбережёте энергию для задач, которые действительно требуют размышлений.',
+        showcase4_title: 'Ваш терминал — ваши правила',
+        showcase4_subtitle: 'Богатые опции персонализации',
+        showcase4_p1: 'Конфигурация ИИ-модели: 20+ провайдеров в один клик, поддержка пользовательских API-точек',
+        showcase4_p2: 'Внешний вид темы: стеклянный интерфейс, настраиваемый цвет темы, радиус скругления, степень размытия',
+        showcase4_p3: 'Настройки безопасности: блокировка приложения, биометрическая аутентификация, регулировка чувствительности SafetyGuard',
+        showcase4_p4: 'Управление уведомлениями: о каких событиях напоминать — решать вам',
+        showcase4_desc: 'От выбора модели до стиля интерфейса, от политики безопасности до предпочтений по уведомлениям — всё можно настроить под ваши привычки.',
+        showcase5_title: 'Более 15 языков для пользователей по всему миру',
+        showcase5_subtitle: 'Выбор глобальных пользователей',
+        showcase5_p1: 'Полная локализация: китайский, английский, японский, корейский, французский, немецкий, испанский…',
+        showcase5_p2: 'Переключение в один клик: нажмите в настройках, чтобы сменить язык интерфейса',
+        showcase5_p3: 'Развитие сообществом: приветствуется вклад в переводы на новые языки',
+        showcase5_desc: 'Откуда бы вы ни были, AI Terminal может работать на вашем родном языке.',
+        new_label: 'Новое в v1.3.5',
+        new_title: 'Крупное обновление Ops',
+        new_desc: '5 мощных новых функций для современных DevOps и SRE-команд.',
+        nf1_title: 'Мониторинг серверов',
+        nf1_desc: 'Мониторинг CPU, памяти, диска и сети в реальном времени на всех ваших серверах.',
+        nf2_title: 'Журналы изменений и аудита',
+        nf2_desc: 'Полный аудит всех операций с итерируемой историей изменений.',
+        nf3_title: 'Ops-ранбуки',
+        nf3_desc: 'Сохраняйте и повторяйте рабочие процессы. Одним кликом запускайте сложные задачи.',
+        nf4_title: 'Центр уведомлений',
+        nf4_desc: 'Будьте в курсе с оповещениями о мониторинге, завершении задач и системных событиях.',
+        nf5_title: 'Glassmorphism UI',
+        nf5_desc: 'Красивый дизайн glassmorphism с более плавными анимациями и доработанными визуальными элементами.',
+        features_label: 'Основные возможности',
+        features_title: 'Создано для разработчиков,<br>которые требуют большего',
+        features_desc: 'Каждая функция создана с мыслью о безопасности, скорости и интеллекте.',
+        f1_title: 'ИИ-агент с двумя режимами',
+        f1_desc: 'Автоматический режим выполняет полные рабочие процессы. Режим помощника ведет вас шаг за шагом. Вы выбираете уровень автономии.',
+        f2_title: 'Мониторинг серверов',
+        f2_desc: 'Мониторинг CPU, памяти, диска и сети в реальном времени на всех серверах с графиками исторических трендов.',
+        f3_title: 'Защитная система',
+        f3_desc: '3-уровневая классификация безопасности — Безопасно / Предупреждение / Опасно. Каждая команда ИИ проверяется перед выполнением.',
+        f4_title: 'Журналы изменений и аудита',
+        f4_desc: 'Полный аудит всех операций. Итерируемая история изменений с отметками времени, операторами и деталями.',
+        f5_title: 'Удаленный SSH-терминал',
+        f5_desc: 'Полноценный SSH-клиент с пулом соединений, поддержкой нескольких сессий и потоковым выводом в реальном времени.',
+        f6_title: 'Ops-ранбуки',
+        f6_desc: 'Создавайте повторно используемые операционные рабочие процессы. Сохраняйте сложные многошаговые задачи как ранбуки для запуска одним кликом.',
+        f7_title: 'Локальный PTY-терминал',
+        f7_desc: 'Настоящий псевдотерминал на macOS, Linux и Windows. Выполняйте любые локальные команды с полной интерактивной поддержкой.',
+        f8_title: 'Центр уведомлений',
+        f8_desc: 'Единый центр уведомлений для оповещений о мониторинге, завершенных задач и системных событий. Никогда не пропускайте обновления.',
+        f9_title: 'Хранение без открытого текста',
+        f9_desc: 'Учетные данные зашифрованы на системном уровне. Опциональная биометрическая разблокировка с Face ID / Touch ID / отпечатком пальца.',
+        f10_title: 'Мультисерверная оркестрация',
+        f10_desc: 'Выполняйте команды на нескольких серверах одновременно. Пакетные операции и скоординированные развертывания стали проще.',
+        f11_title: 'На основе базы знаний',
+        f11_desc: 'Оффлайн-база знаний снабжает ИИ предметно-специфической экспертизой. Загружается и постоянно улучшается.',
+        f12_title: 'Кроссплатформенность',
+        f12_desc: 'Одна кодовая база, все платформы. macOS, Windows, Linux, iOS и Android — создано с Flutter.',
+        how_label: 'Как работает',
+        how_title: 'ИИ, который понимает<br>ваше намерение',
+        how_desc: 'Опишите, что вы хотите, на естественном языке. AI Terminal сделает остальное.',
+        s1_title: 'Опишите вашу задачу',
+        s1_desc: 'Введите на естественном языке: <code>"Проверить загрузку CPU всех серверов"</code> или <code>"развернуть на стейджинге"</code>',
+        s2_title: 'ИИ генерирует команды',
+        s2_desc: 'ИИ-агент анализирует ваше намерение и генерирует точные необходимые shell-команды, передавая ответ в потоке в реальном времени.',
+        s3_title: 'Защитная система проверяет',
+        s3_desc: 'Каждая команда классифицируется: <span style="color: var(--green)">Безопасно</span> выполняется автоматически, <span style="color: var(--yellow)">Предупреждение</span> требует подтверждения, <span style="color: var(--red)">Опасно</span> требует явного одобрения.',
+        s4_title: 'Выполняйте с уверенностью',
+        s4_desc: 'Команды выполняются на локальных или удаленных терминалах. Результаты возвращаются в ИИ для многошаговых рассуждений и доработки.',
+        platforms_label: 'Платформы',
+        platforms_title: 'Одно приложение, все платформы',
+        platforms_desc: 'Бесперебойная работа на всех ваших устройствах.',
+        download_label: 'Скачать',
+        download_title: 'Получить AI Terminal',
+        download_desc: 'Бесплатно и с открытым исходным кодом. Скачайте v1.3.5 для вашей платформы.',
+        knowledge_title: 'Версии базы знаний',
+        knowledge_desc: 'Скачайте базу знаний для оффлайн-поддержки ИИ. Выберите версию, соответствующую вашему приложению.',
+        knowledge_latest: 'Последняя',
+        cta_title: 'Готовы трансформировать<br>ваш терминал?',
+        cta_desc: 'Открытый исходный код, бесплатно навсегда. Начните сегодня с AI Terminal v1.3.5.',
+        cta_btn: 'Посмотреть на GitHub',
+        footer_releases: 'Релизы',
+        footer_issues: 'Проблемы',
+      },
+      es: {
+        nav_screenshots: 'Capturas',
+        nav_new_features: 'Novedades',
+        nav_features: 'Funciones',
+        nav_how: 'Cómo funciona',
+        nav_platforms: 'Plataformas',
+        nav_download: 'Descargar',
+        hero_badge: 'v1.3.5 lanzado — Actualización masiva de Ops',
+        hero_title_1: 'La Terminal,',
+        hero_title_2: 'reinventada con IA',
+        hero_sub: 'Una terminal SSH y local de nueva generación con agente de IA integrado, monitoreo de servidores, runbooks de Ops, guardia de seguridad de 3 niveles y almacenamiento de credenciales sin texto plano. Disponible donde quiera que codifiques.',
+        btn_download: 'Descargar',
+        btn_github: 'Dar estrella en GitHub',
+        demo_cmd: '"Verificar uso de CPU de todos los servidores"',
+        demo_scan: 'Escaneando 5 servidores...',
+        demo_analyze: 'Analizando tarea...',
+        demo_safe: '— Monitoreo de solo lectura detectado',
+        demo_suggest: 'server-04 al 78% — ¿verificar procesos principales?',
+        demo_done: 'Monitoreo completado ',
+        screenshots_label: 'Capturas de pantalla',
+        screenshots_title: 'Velo en acción',
+        screenshots_desc: 'Capturas reales de AI Terminal v1.3.5 en macOS.',
+        screenshots_note: 'Las funciones de IA en las capturas anteriores son impulsadas por Xiaomi mino-v2.5-pro LLM.',
+        ss_main: 'Interfaz principal — Agente IA y Terminal',
+        ss_orchestrate: 'Orquestación multi-servidor',
+        ss_runbooks: 'Flujo de trabajo de Runbooks Ops',
+        ss_settings: 'Página de configuración (Chino)',
+        ss_settings_en: 'Página de configuración (Inglés)',
+        ss_lang: 'Configuraciones multilingües',
+        ss_kb1: 'Demo Base de conocimientos 1',
+        ss_kb2: 'Demo Base de conocimientos 2',
+        ss_kb3: 'Demo Base de conocimientos 3',
+        ss_kb4: 'Demo Base de conocimientos 4',
+        showcase1_title: 'Consola de Ops Todo en Uno',
+        showcase1_subtitle: 'Agente IA + Terminal + Monitoreo de Servidores',
+        showcase1_p1: 'Ejecución inteligente por agente IA: describe necesidades en lenguaje natural, la IA genera y ejecuta comandos automáticamente',
+        showcase1_p2: 'Salida de terminal en tiempo real: terminal xterm completo, ejecución de comandos de un vistazo',
+        showcase1_p3: 'Panel de monitoreo de servidores: métricas en tiempo real de CPU/memoria/disco/red, anomalías resaltadas automáticamente',
+        showcase1_p4: 'Cambio multi-pestaña: múltiples hosts, múltiples sesiones, todo gestionado en una sola ventana',
+        showcase1_desc: 'Chat IA a la izquierda, terminal en vivo a la derecha, panel de monitoreo arriba, entrada de comandos abajo. Todo bajo control.',
+        showcase2_title: 'Una Operación, N Servidores Simultáneamente',
+        showcase2_subtitle: 'Gestionar múltiples servidores por lotes',
+        showcase2_p1: 'Modo orquestación con un clic: enviar el mismo comando a todos los servidores seleccionados',
+        showcase2_p2: 'Eco de estado en tiempo real: resultados de ejecución de cada máquina mostrados independientemente, progreso de un vistazo',
+        showcase2_p3: 'Enrutar comandos por host: la IA genera automáticamente comandos adaptados según diferentes entornos de host',
+        showcase2_p4: 'Animación de ondas radar: visualización dinámica del número de hosts en línea, con mucho estilo tech',
+        showcase2_desc: 'Actualizar una máquina es una operación, actualizar cien máquinas también es una operación. La orquestación múltiple hace que las operaciones por lotes sean tan sencillas como hablar.',
+        showcase3_title: 'Convierte la Experiencia en Runbooks',
+        showcase3_subtitle: 'Ejecución de Runbook con un clic',
+        showcase3_p1: 'Plantillas comunes integradas: inspección de sistema, endurecimiento de seguridad, limpieza de registros, despliegue de servicios…',
+        showcase3_p2: 'Workflows personalizados: graba tus SOPs de ops como Runbooks, incluso los nuevos pueden ejecutar con un clic',
+        showcase3_p3: 'Ejecución multi-máquina en paralelo: mismo workflow ejecutado en serie/paralelo en múltiples servidores',
+        showcase3_p4: 'Registros de ejecución completos: entrada y salida de cada paso registradas, trazables y auditables',
+        showcase3_desc: 'Deja que los workflows manejen las operaciones repetitivas, ahorra tu energía para problemas que realmente requieren pensamiento.',
+        showcase4_title: 'Tu Terminal, Tus Reglas',
+        showcase4_subtitle: 'Ricas opciones de personalización',
+        showcase4_p1: 'Configuración del modelo IA: 20+ proveedores con un clic, soporta endpoints API personalizados',
+        showcase4_p2: 'Apariencia del tema: UI de cristal, color de tema personalizable, radio de esquinas, intensidad de desenfoque',
+        showcase4_p3: 'Ajustes de seguridad: bloqueo de app, autenticación biométrica, ajuste de sensibilidad SafetyGuard',
+        showcase4_p4: 'Gestión de notificaciones: qué eventos necesitan recordatorio, depende totalmente de ti',
+        showcase4_desc: 'Desde la selección del modelo hasta el estilo de la interfaz, desde la política de seguridad hasta las preferencias de notificación, todo puede ajustarse a tus hábitos.',
+        showcase5_title: '15+ Idiomas para Usuarios de Todo el Mundo',
+        showcase5_subtitle: 'La elección de usuarios globales',
+        showcase5_p1: 'Localización completa: chino, inglés, japonés, coreano, francés, alemán, español…',
+        showcase5_p2: 'Cambio con un clic: toca en ajustes para cambiar el idioma de la interfaz',
+        showcase5_p3: 'Impulsado por la comunidad: bienvenido a contribuir con más traducciones de idiomas',
+        showcase5_desc: 'De dondequiera que vengas, AI Terminal puede trabajar en tu idioma más familiar.',
+        new_label: 'Nuevo en v1.3.5',
+        new_title: 'Actualización masiva de Ops',
+        new_desc: '5 nuevas funciones potentes para equipos modernos de DevOps y SRE.',
+        nf1_title: 'Monitoreo de Servidores',
+        nf1_desc: 'Monitoreo en tiempo real de CPU, memoria, disco y red en todos tus servidores.',
+        nf2_title: 'Registros de cambios y Auditoría',
+        nf2_desc: 'Rastro de auditoría completo de cada operación con historial de cambios buscable.',
+        nf3_title: 'Runbooks Ops',
+        nf3_desc: 'Guarda y reutiliza flujos de trabajo operativos. Ejecución de tareas complejas con un clic.',
+        nf4_title: 'Centro de notificaciones',
+        nf4_desc: 'Mantente informado con alertas de monitoreo, tareas completadas y eventos del sistema.',
+        nf5_title: 'UI Glassmorphism',
+        nf5_desc: 'Hermoso diseño glassmorphism con animaciones más fluidas y elementos visuales refinados.',
+        features_label: 'Funciones principales',
+        features_title: 'Construido para desarrolladores<br>que exigen más',
+        features_desc: 'Cada función diseñada pensando en la seguridad, velocidad e inteligencia.',
+        f1_title: 'Agente IA de modo dual',
+        f1_desc: 'El modo automático ejecuta flujos de trabajo completos. El modo asistente te guía paso a paso. Tú eliges el nivel de autonomía.',
+        f2_title: 'Monitoreo de Servidores',
+        f2_desc: 'Monitoreo en tiempo real de CPU, memoria, disco y red en todos tus servidores con gráficos de tendencias históricas.',
+        f3_title: 'Guardia de seguridad',
+        f3_desc: 'Clasificación de seguridad de 3 niveles — Seguro / Advertencia / Peligroso. Cada comando generado por IA se verifica antes de la ejecución.',
+        f4_title: 'Registros de cambios y Auditoría',
+        f4_desc: 'Rastro de auditoría completo de cada operación. Historial de cambios buscable con marcas de tiempo, operadores y detalles.',
+        f5_title: 'Terminal SSH remota',
+        f5_desc: 'Cliente SSH completo con agrupación de conexiones, soporte multi-sesión y salida en streaming en tiempo real.',
+        f6_title: 'Runbooks Ops',
+        f6_desc: 'Crea flujos de trabajo operativos reutilizables. Guarda tareas complejas de múltiples pasos como runbooks para ejecución con un clic.',
+        f7_title: 'Terminal PTY local',
+        f7_desc: 'Pseudo-terminal real en macOS, Linux y Windows. Ejecuta cualquier comando local con soporte interactivo completo.',
+        f8_title: 'Centro de notificaciones',
+        f8_desc: 'Centro de notificaciones unificado para alertas de monitoreo, tareas completadas y eventos del sistema. Nunca te pierdas una actualización.',
+        f9_title: 'Almacenamiento sin texto plano',
+        f9_desc: 'Credenciales cifradas a nivel del sistema. Desbloqueo biométrico opcional con Face ID / Touch ID / Huella digital.',
+        f10_title: 'Orquestación multi-servidor',
+        f10_desc: 'Ejecuta comandos en múltiples servidores simultáneamente. Operaciones por lotes y despliegues coordinados simplificados.',
+        f11_title: 'Impulsado por base de conocimientos',
+        f11_desc: 'La base de conocimientos offline alimenta la IA con experiencia específica del dominio. Descargable y en constante mejora.',
+        f12_title: 'Multiplataforma',
+        f12_desc: 'Una base de código, todas las plataformas. macOS, Windows, Linux, iOS y Android — construido con Flutter.',
+        how_label: 'Cómo funciona',
+        how_title: 'IA que entiende<br>tu intención',
+        how_desc: 'Describe lo que quieres en lenguaje natural. AI Terminal hace el resto.',
+        s1_title: 'Describe tu tarea',
+        s1_desc: 'Escribe en lenguaje natural: <code>"Verificar uso de CPU de todos los servidores"</code> o <code>"desplegar en staging"</code>',
+        s2_title: 'IA genera comandos',
+        s2_desc: 'El agente de IA analiza tu intención y genera los comandos shell exactos necesarios, transmitiendo la respuesta en tiempo real.',
+        s3_title: 'La guardia de seguridad valida',
+        s3_desc: 'Cada comando se clasifica: <span style="color: var(--green)">Seguro</span> se ejecuta automáticamente, <span style="color: var(--yellow)">Advertencia</span> requiere confirmación, <span style="color: var(--red)">Peligroso</span> requiere aprobación explícita.',
+        s4_title: 'Ejecuta con confianza',
+        s4_desc: 'Los comandos se ejecutan en terminales locales o remotos. Los resultados se envían de vuelta a la IA para razonamiento de múltiples pasos y seguimiento.',
+        platforms_label: 'Plataformas',
+        platforms_title: 'Una aplicación, todas las plataformas',
+        platforms_desc: 'Experiencia perfecta en todos tus dispositivos.',
+        download_label: 'Descargar',
+        download_title: 'Obtener AI Terminal',
+        download_desc: 'Gratis y de código abierto. Descarga v1.3.5 para tu plataforma.',
+        knowledge_title: 'Versiones de la base de conocimientos',
+        knowledge_desc: 'Descarga la base de conocimientos para soporte de IA offline. Elige la versión que coincida con tu aplicación.',
+        knowledge_latest: 'Última',
+        cta_title: '¿Listo para transformar<br>tu terminal?',
+        cta_desc: 'Código abierto, gratis para siempre. Comienza hoy con AI Terminal v1.3.5.',
+        cta_btn: 'Ver en GitHub',
+        footer_releases: 'Lanzamientos',
+        footer_issues: 'Problemas',
+      },
+      ko: {
+        nav_screenshots: '스크린샷',
+        nav_new_features: '새 기능',
+        nav_features: '기능',
+        nav_how: '작동 방식',
+        nav_platforms: '플랫폼',
+        nav_download: '다운로드',
+        hero_badge: 'v1.3.5 출시 — Ops 대형 업그레이드',
+        hero_title_1: '터미널,',
+        hero_title_2: 'AI로 재탄생하다',
+        hero_sub: '내장 AI 에이전트, 서버 모니터링, Ops 런북, 3단계 보안 가드, 제로 평문 자격 증명 저장소를 갖춘 차세대 SSH 및 로컬 터미널. 코딩하는 어디서나 사용할 수 있습니다.',
+        btn_download: '다운로드',
+        btn_github: 'GitHub 별 달기',
+        demo_cmd: '"모든 서버 CPU 사용량 확인"',
+        demo_scan: '5개 서버 스캔 중...',
+        demo_analyze: '작업 분석 중...',
+        demo_safe: '— 읽기 전용 모니터링 감지됨',
+        demo_suggest: 'server-04 78% — 상위 프로세스 확인할까요?',
+        demo_done: '모니터링 완료 ',
+        screenshots_label: '스크린샷',
+        screenshots_title: '실제 모습 보기',
+        screenshots_desc: 'macOS에서 AI Terminal v1.3.5 실제 스크린샷.',
+        screenshots_note: '위 스크린샷의 AI 기능은 Xiaomi mino-v2.5-pro LLM으로 구동됩니다.',
+        ss_main: '메인 인터페이스 — AI 에이전트 & 터미널',
+        ss_orchestrate: '멀티 서버 오케스트레이션',
+        ss_runbooks: 'Ops 런북 워크플로우',
+        ss_settings: '설정 페이지 (중국어)',
+        ss_settings_en: '설정 페이지 (영어)',
+        ss_lang: '다국어 설정',
+        ss_kb1: '지식 베이스 데모 1',
+        ss_kb2: '지식 베이스 데모 2',
+        ss_kb3: '지식 베이스 데모 3',
+        ss_kb4: '지식 베이스 데모 4',
+        showcase1_title: '올인원 운영 콘솔',
+        showcase1_subtitle: 'AI 에이전트 + 터미널 + 서버 모니터링',
+        showcase1_p1: 'AI 에이전트 스마트 실행: 자연어로 요구사항을 설명하면 AI가 자동으로 명령을 생성하고 실행',
+        showcase1_p2: '실시간 터미널 출력: 완전한 xterm 터미널로 명령 실행 과정을 한눈에 확인',
+        showcase1_p3: '서버 모니터링 패널: CPU/메모리/디스크/네트워크 실시간 지표, 이상 징후 자동 강조 표시',
+        showcase1_p4: '멀티 탭 전환: 여러 호스트, 여러 세션을 하나의 창에서 모두 관리',
+        showcase1_desc: '왼쪽은 AI 채팅, 오른쪽은 라이브 터미널, 위쪽은 모니터링 패널, 아래쪽은 명령 입력. 모든 것이 통제됩니다.',
+        showcase2_title: '한 번의 작업으로 N대 동시 실행',
+        showcase2_subtitle: '여러 서버 일괄 관리',
+        showcase2_p1: '원클릭 오케스트레이션 모드: 선택한 모든 서버에 동일한 명령 브로드캐스트',
+        showcase2_p2: '실시간 상태 에코: 각 머신의 실행 결과가 독립적으로 표시되어 진행 상황을 한눈에 확인',
+        showcase2_p3: '호스트별 명령 라우팅: 다른 호스트 환경에 맞춰 AI가 자동으로 적응된 명령 생성',
+        showcase2_p4: '레이더 리플 애니메이션: 온라인 호스트 수 동적 표시, 테크 감각 넘침',
+        showcase2_desc: '머신 한 대 업그레이드하는 것도 작업이지만, 백 대 업그레이드하는 것도 같은 작업입니다. 멀티 오케스트레이션으로 일괄 운영이 말하기처럼 쉬워집니다.',
+        showcase3_title: '경험을 Runbook으로',
+        showcase3_subtitle: '원클릭 Runbook 실행',
+        showcase3_p1: '내장된 일반 템플릿: 시스템 검사, 보안 강화, 로그 정리, 서비스 배포…',
+        showcase3_p2: '커스텀 워크플로우: 운영 SOP를 Runbook으로 녹화하면 신입도 원클릭으로 실행 가능',
+        showcase3_p3: '멀티 머신 병렬 실행: 동일한 워크플로우를 여러 서버에서 직렬/병렬로 실행',
+        showcase3_p4: '완전한 실행 로그: 모든 단계의 입출력이 기록되어 추적 및 감사 가능',
+        showcase3_desc: '반복적인 작업은 워크플로우에 맡기고, 정말 생각이 필요한 문제에 에너지를 아끼세요.',
+        showcase4_title: '당신의 터미널은 당신이 정합니다',
+        showcase4_subtitle: '풍부한 개인화 옵션',
+        showcase4_p1: 'AI 모델 설정: 20+ 제공업체 원클릭 접속, 커스텀 API 엔드포인트 지원',
+        showcase4_p2: '테마 외관: 유리 UI, 테마 색상, 모서리 둥글기, 흐림 강도 맞춤 설정 가능',
+        showcase4_p3: '보안 설정: 앱 잠금, 생체 인증, SafetyGuard 감도 조절',
+        showcase4_p4: '알림 관리: 어떤 이벤트를 알릴지는 전적으로 당신이 결정',
+        showcase4_desc: '모델 선택부터 인터페이스 스타일까지, 보안 정책부터 알림 설정까지 모든 것을 당신의 습관에 맞춰 조정할 수 있습니다.',
+        showcase5_title: '전 세계 사용자를 위한 15개 이상의 언어',
+        showcase5_subtitle: '글로벌 사용자의 선택',
+        showcase5_p1: '완전한 현지화: 중국어, 영어, 일본어, 한국어, 프랑스어, 독일어, 스페인어…',
+        showcase5_p2: '원클릭 전환: 설정에서 탭 한 번으로 인터페이스 언어 변경',
+        showcase5_p3: '커뮤니티 주도: 더 많은 언어 번역 기여를 환영합니다',
+        showcase5_desc: '어디에서 오셨든, AI Terminal은 당신이 가장 익숙한 언어로 작업할 수 있습니다.',
+        new_label: 'v1.3.5 새로운 기능',
+        new_title: 'Ops 대형 업그레이드',
+        new_desc: '현대적인 DevOps 및 SRE 팀을 위한 5가지 강력한 새 기능.',
+        nf1_title: '서버 모니터링',
+        nf1_desc: '모든 서버에서 CPU, 메모리, 디스크 및 네트워크 실시간 모니터링.',
+        nf2_title: '변경 기록 & 감사 로그',
+        nf2_desc: '검색 가능한 변경 기록으로 모든 작업의 완전한 감사 추적.',
+        nf3_title: 'Ops 런북',
+        nf3_desc: '운영 워크플로우를 저장하고 재사용하세요. 복잡한 작업을 한 번의 클릭으로 실행.',
+        nf4_title: '알림 센터',
+        nf4_desc: '모니터링 알림, 작업 완료 및 시스템 이벤트로 정보를 놓치지 마세요.',
+        nf5_title: 'Glassmorphism UI',
+        nf5_desc: '더 부드러운 애니메이션과 세련된 시각적 요소를 갖춘 아름다운 glassmorphism 디자인.',
+        features_label: '핵심 기능',
+        features_title: '더 많은 것을 요구하는<br>개발자를 위해 제작',
+        features_desc: '보안, 속도, 지능을 염두에 두고 설계된 모든 기능.',
+        f1_title: '이중 모드 AI 에이전트',
+        f1_desc: '자동 모드는 완전한 워크플로우를 실행합니다. 어시스턴트 모드는 단계별로 안내합니다. 자율성 수준은 당신이 선택합니다.',
+        f2_title: '서버 모니터링',
+        f2_desc: '역사적 추세 그래프와 함께 모든 서버에서 CPU, 메모리, 디스크 및 네트워크 실시간 모니터링.',
+        f3_title: '보안 가드',
+        f3_desc: '3단계 보안 분류 — 안전 / 경고 / 위험. AI가 생성한 모든 명령은 실행 전에 검증됩니다.',
+        f4_title: '변경 기록 & 감사 로그',
+        f4_desc: '모든 작업의 완전한 감사 추적. 타임스탬프, 운영자 및 세부 정보가 포함된 검색 가능한 변경 기록.',
+        f5_title: 'SSH 원격 터미널',
+        f5_desc: '연결 풀링, 다중 세션 지원 및 실시간 스트리밍 출력을 갖춘 완전한 SSH 클라이언트.',
+        f6_title: 'Ops 런북',
+        f6_desc: '재사용 가능한 운영 워크플로우를 생성하세요. 복잡한 다단계 작업을 런북으로 저장하여 한 번의 클릭으로 실행.',
+        f7_title: '로컬 PTY 터미널',
+        f7_desc: 'macOS, Linux 및 Windows에서 실제 의사 터미널. 완전한 대화형 지원으로 모든 로컬 명령을 실행하세요.',
+        f8_title: '알림 센터',
+        f8_desc: '모니터링 알림, 작업 완료 및 시스템 이벤트를 위한 통합 알림 센터. 업데이트를 놓치지 마세요.',
+        f9_title: '제로 평문 저장',
+        f9_desc: '시스템 수준에서 암호화된 자격 증명. Face ID / Touch ID / 지문으로 선택적 생체 인식 잠금 해제.',
+        f10_title: '멀티 서버 오케스트레이션',
+        f10_desc: '여러 서버에서 동시에 명령을 실행하세요. 일괄 작업 및 조정된 배포가 간단해집니다.',
+        f11_title: '지식 베이스 기반',
+        f11_desc: '오프라인 지식 베이스가 도메인별 전문 지식을 AI에 제공합니다. 다운로드 가능하며 지속적으로 개선됩니다.',
+        f12_title: '크로스 플랫폼',
+        f12_desc: '하나의 코드베이스, 모든 플랫폼. macOS, Windows, Linux, iOS 및 Android — Flutter로 제작.',
+        how_label: '작동 방식',
+        how_title: '당신의 의도를 이해하는<br>AI',
+        how_desc: '자연어로 원하는 것을 설명하세요. AI Terminal이 나머지를 처리합니다.',
+        s1_title: '작업 설명하기',
+        s1_desc: '자연어로 입력: <code>"모든 서버 CPU 사용량 확인"</code> 또는 <code>"스테이징에 배포"</code>',
+        s2_title: 'AI가 명령 생성',
+        s2_desc: 'AI 에이전트가 당신의 의도를 분석하고 필요한 정확한 셸 명령을 생성하며 실시간으로 응답을 스트리밍합니다.',
+        s3_title: '보안 가드가 검증',
+        s3_desc: '모든 명령은 분류됩니다: <span style="color: var(--green)">안전</span>은 자동 실행, <span style="color: var(--yellow)">경고</span>는 확인 필요, <span style="color: var(--red)">위험</span>은 명시적 승인 필요.',
+        s4_title: '자신 있게 실행',
+        s4_desc: '명령은 로컬 또는 원격 터미널에서 실행됩니다. 결과는 다단계 추론 및 후속 조치를 위해 AI로 다시 전달됩니다.',
+        platforms_label: '플랫폼',
+        platforms_title: '하나의 앱, 모든 플랫폼',
+        platforms_desc: '모든 기기에서 완벽한 경험.',
+        download_label: '다운로드',
+        download_title: 'AI Terminal 받기',
+        download_desc: '무료 오픈 소스. 당신의 플랫폼에 v1.3.5를 다운로드하세요.',
+        knowledge_title: '지식 베이스 버전',
+        knowledge_desc: '오프라인 AI 지원을 위한 지식 베이스를 다운로드하세요. 앱과 일치하는 버전을 선택하세요.',
+        knowledge_latest: '최신',
+        cta_title: '당신의 터미널을<br>바꿀 준비가 되셨나요?',
+        cta_desc: '오픈 소스, 영원히 무료. 지금 AI Terminal v1.3.5를 시작하세요.',
+        cta_btn: 'GitHub에서 보기',
+        footer_releases: '릴리스',
+        footer_issues: '이슈',
+      },
+      pt: {
+        nav_screenshots: 'Capturas',
+        nav_new_features: 'Novidades',
+        nav_features: 'Recursos',
+        nav_how: 'Como funciona',
+        nav_platforms: 'Plataformas',
+        nav_download: 'Baixar',
+        hero_badge: 'v1.3.5 lançado — Atualização massiva Ops',
+        hero_title_1: 'O Terminal,',
+        hero_title_2: 'reinventado com IA',
+        hero_sub: 'Um terminal SSH e local de nova geração com agente de IA integrado, monitoramento de servidores, runbooks Ops, guarda de segurança de 3 níveis e armazenamento de credenciais sem texto simples. Disponível onde quer que você codifique.',
+        btn_download: 'Baixar',
+        btn_github: 'Dar estrela no GitHub',
+        demo_cmd: '"Verificar uso de CPU de todos os servidores"',
+        demo_scan: 'Escaneando 5 servidores...',
+        demo_analyze: 'Analisando tarefa...',
+        demo_safe: '— Monitoramento somente leitura detectado',
+        demo_suggest: 'server-04 em 78% — verificar processos principais?',
+        demo_done: 'Monitoramento concluído ',
+        screenshots_label: 'Capturas de tela',
+        screenshots_title: 'Veja em ação',
+        screenshots_desc: 'Capturas reais do AI Terminal v1.3.5 no macOS.',
+        screenshots_note: 'Os recursos de IA nas capturas acima são alimentados por Xiaomi mino-v2.5-pro LLM.',
+        ss_main: 'Interface principal — Agente IA & Terminal',
+        ss_orchestrate: 'Orquestração multi-servidor',
+        ss_runbooks: 'Fluxo de trabalho Runbooks Ops',
+        ss_settings: 'Página de configurações (Chinês)',
+        ss_settings_en: 'Página de configurações (Inglês)',
+        ss_lang: 'Configurações multilíngues',
+        ss_kb1: 'Demo Base de conhecimento 1',
+        ss_kb2: 'Demo Base de conhecimento 2',
+        ss_kb3: 'Demo Base de conhecimento 3',
+        ss_kb4: 'Demo Base de conhecimento 4',
+        showcase1_title: 'Console de Ops Tudo-em-Um',
+        showcase1_subtitle: 'Agente IA + Terminal + Monitoramento de Servidores',
+        showcase1_p1: 'Execução inteligente do agente IA: descreva necessidades em linguagem natural, a IA gera e executa comandos automaticamente',
+        showcase1_p2: 'Saída de terminal em tempo real: terminal xterm completo, execução de comandos de relance',
+        showcase1_p3: 'Painel de monitoramento de servidores: métricas em tempo real de CPU/memória/disco/rede, anomalias destacadas automaticamente',
+        showcase1_p4: 'Troca multi-aba: múltiplos hosts, múltiplas sessões, tudo gerenciado em uma única janela',
+        showcase1_desc: 'Chat IA à esquerda, terminal ao vivo à direita, painel de monitoramento no topo, entrada de comandos na parte inferior. Tudo sob controle.',
+        showcase2_title: 'Uma Operação, N Servidores Simultaneamente',
+        showcase2_subtitle: 'Gerenciar múltiplos servidores em lote',
+        showcase2_p1: 'Modo orquestração com um clique: enviar o mesmo comando para todos os servidores selecionados',
+        showcase2_p2: 'Eco de status em tempo real: resultados de execução de cada máquina exibidos independentemente, progresso de relance',
+        showcase2_p3: 'Rotear comandos por host: a IA gera automaticamente comandos adaptados com base em diferentes ambientes de host',
+        showcase2_p4: 'Animação de ondas de radar: exibição dinâmica do número de hosts online, cheio de estilo tech',
+        showcase2_desc: 'Atualizar uma máquina é uma operação, atualizar cem máquinas também é uma operação. A orquestração múltipla torna as operações em lote tão simples quanto falar.',
+        showcase3_title: 'Transforme Experiência em Runbooks',
+        showcase3_subtitle: 'Execução de Runbook com um clique',
+        showcase3_p1: 'Modelos comuns integrados: inspeção de sistema, fortalecimento de segurança, limpeza de logs, implantação de serviços…',
+        showcase3_p2: 'Workflows personalizados: grave seus SOPs de ops como Runbooks, até mesmo novatos podem executar com um clique',
+        showcase3_p3: 'Execução multi-máquina em paralelo: mesmo workflow executado em série/paralelo em vários servidores',
+        showcase3_p4: 'Logs de execução completos: entrada e saída de cada passo registradas, rastreáveis e auditáveis',
+        showcase3_desc: 'Deixe que os workflows lidem com operações repetitivas, economize sua energia para problemas que realmente precisam de pensamento.',
+        showcase4_title: 'Seu Terminal, Suas Regras',
+        showcase4_subtitle: 'Ricas opções de personalização',
+        showcase4_p1: 'Configuração do modelo IA: 20+ provedores com um clique, suporta endpoints API personalizados',
+        showcase4_p2: 'Aparência do tema: UI de vidro, cor do tema personalizável, raio dos cantos, intensidade do desfoque',
+        showcase4_p3: 'Configurações de segurança: bloqueio de app, autenticação biométrica, ajuste de sensibilidade do SafetyGuard',
+        showcase4_p4: 'Gerenciamento de notificações: quais eventos precisam de lembrete, é totalmente com você',
+        showcase4_desc: 'Da seleção do modelo ao estilo da interface, da política de segurança às preferências de notificação, tudo pode ser ajustado aos seus hábitos.',
+        showcase5_title: '15+ Idiomas para Usuários em Todo o Mundo',
+        showcase5_subtitle: 'A escolha de usuários globais',
+        showcase5_p1: 'Localização completa: chinês, inglês, japonês, coreano, francês, alemão, espanhol…',
+        showcase5_p2: 'Troca com um clique: toque nas configurações para mudar o idioma da interface',
+        showcase5_p3: 'Impulsionado pela comunidade: bem-vindo a contribuir com mais traduções de idiomas',
+        showcase5_desc: 'De onde quer que você venha, o AI Terminal pode trabalhar no seu idioma mais familiar.',
+        new_label: 'Novo em v1.3.5',
+        new_title: 'Atualização massiva Ops',
+        new_desc: '5 novos recursos poderosos para equipes modernas de DevOps e SRE.',
+        nf1_title: 'Monitoramento de Servidores',
+        nf1_desc: 'Monitoramento em tempo real de CPU, memória, disco e rede em todos os seus servidores.',
+        nf2_title: 'Registros de alterações e Auditoria',
+        nf2_desc: 'Rastro de auditoria completo de cada operação com histórico de alterações pesquisável.',
+        nf3_title: 'Runbooks Ops',
+        nf3_desc: 'Salve e reutilize fluxos de trabalho operacionais. Execução de tarefas complexas com um clique.',
+        nf4_title: 'Centro de notificações',
+        nf4_desc: 'Fique informado com alertas de monitoramento, tarefas concluídas e eventos do sistema.',
+        nf5_title: 'UI Glassmorphism',
+        nf5_desc: 'Lindo design glassmorphism com animações mais fluidas e elementos visuais refinados.',
+        features_label: 'Recursos principais',
+        features_title: 'Construído para desenvolvedores<br>que exigem mais',
+        features_desc: 'Cada recurso projetado com segurança, velocidade e inteligência em mente.',
+        f1_title: 'Agente IA de modo duplo',
+        f1_desc: 'O modo automático executa fluxos de trabalho completos. O modo assistente guia você passo a passo. Você escolhe o nível de autonomia.',
+        f2_title: 'Monitoramento de Servidores',
+        f2_desc: 'Monitoramento em tempo real de CPU, memória, disco e rede em todos seus servidores com gráficos de tendências históricas.',
+        f3_title: 'Guarda de segurança',
+        f3_desc: 'Classificação de segurança de 3 níveis — Seguro / Aviso / Perigoso. Cada comando gerado por IA é verificado antes da execução.',
+        f4_title: 'Registros de alterações e Auditoria',
+        f4_desc: 'Rastro de auditoria completo de cada operação. Histórico de alterações pesquisável com carimbos de data/hora, operadores e detalhes.',
+        f5_title: 'Terminal SSH remoto',
+        f5_desc: 'Cliente SSH completo com pool de conexões, suporte multi-sessão e saída em streaming em tempo real.',
+        f6_title: 'Runbooks Ops',
+        f6_desc: 'Crie fluxos de trabalho operacionais reutilizáveis. Salve tarefas complexas de várias etapas como runbooks para execução com um clique.',
+        f7_title: 'Terminal PTY local',
+        f7_desc: 'Pseudo-terminal real em macOS, Linux e Windows. Execute qualquer comando local com suporte interativo completo.',
+        f8_title: 'Centro de notificações',
+        f8_desc: 'Centro de notificações unificado para alertas de monitoramento, tarefas concluídas e eventos do sistema. Nunca perca uma atualização.',
+        f9_title: 'Armazenamento sem texto simples',
+        f9_desc: 'Credenciais criptografadas em nível de sistema. Desbloqueio biométrico opcional com Face ID / Touch ID / Impressão digital.',
+        f10_title: 'Orquestração multi-servidor',
+        f10_desc: 'Execute comandos em vários servidores simultaneamente. Operações em lote e implantações coordenadas simplificadas.',
+        f11_title: 'Baseado em base de conhecimento',
+        f11_desc: 'A base de conhecimento offline alimenta a IA com expertise específica do domínio. Baixável e em constante melhoria.',
+        f12_title: 'Multiplataforma',
+        f12_desc: 'Uma base de código, todas as plataformas. macOS, Windows, Linux, iOS e Android — construído com Flutter.',
+        how_label: 'Como funciona',
+        how_title: 'IA que entende<br>sua intenção',
+        how_desc: 'Descreva o que você quer em linguagem natural. AI Terminal faz o resto.',
+        s1_title: 'Descreva sua tarefa',
+        s1_desc: 'Digite em linguagem natural: <code>"Verificar uso de CPU de todos os servidores"</code> ou <code>"implantar em staging"</code>',
+        s2_title: 'IA gera comandos',
+        s2_desc: 'O agente de IA analisa sua intenção e gera os comandos shell exatos necessários, transmitindo a resposta em tempo real.',
+        s3_title: 'A guarda de segurança valida',
+        s3_desc: 'Cada comando é classificado: <span style="color: var(--green)">Seguro</span> executa automaticamente, <span style="color: var(--yellow)">Aviso</span> requer confirmação, <span style="color: var(--red)">Perigoso</span> requer aprovação explícita.',
+        s4_title: 'Execute com confiança',
+        s4_desc: 'Os comandos são executados em terminais locais ou remotos. Os resultados são enviados de volta à IA para raciocínio de várias etapas e acompanhamento.',
+        platforms_label: 'Plataformas',
+        platforms_title: 'Um app, todas as plataformas',
+        platforms_desc: 'Experiência perfeita em todos seus dispositivos.',
+        download_label: 'Baixar',
+        download_title: 'Obter AI Terminal',
+        download_desc: 'Gratuito e de código aberto. Baixe v1.3.5 para sua plataforma.',
+        knowledge_title: 'Versões da base de conhecimento',
+        knowledge_desc: 'Baixe a base de conhecimento para suporte de IA offline. Escolha a versão que corresponde ao seu app.',
+        knowledge_latest: 'Mais recente',
+        cta_title: 'Pronto para transformar<br>seu terminal?',
+        cta_desc: 'Código aberto, grátis para sempre. Comece hoje com AI Terminal v1.3.5.',
+        cta_btn: 'Ver no GitHub',
+        footer_releases: 'Lançamentos',
+        footer_issues: 'Problemas',
+      },
+      it: {
+        nav_screenshots: 'Screenshot',
+        nav_new_features: 'Novità',
+        nav_features: 'Funzionalità',
+        nav_how: 'Come funziona',
+        nav_platforms: 'Piattaforme',
+        nav_download: 'Scarica',
+        hero_badge: 'v1.3.5 rilasciato — Aggiornamento massivo Ops',
+        hero_title_1: 'Il Terminale,',
+        hero_title_2: 'reinventato con l\'IA',
+        hero_sub: 'Un terminale SSH e locale di nuova generazione con agente IA integrato, monitoraggio server, runbooks Ops, guardia di sicurezza a 3 livelli e archiviazione credenziali zero testo in chiaro. Disponibile ovunque tu scriva codice.',
+        btn_download: 'Scarica',
+        btn_github: 'Metti stella su GitHub',
+        demo_cmd: '"Verifica utilizzo CPU di tutti i server"',
+        demo_scan: 'Scansione di 5 server...',
+        demo_analyze: 'Analisi attività...',
+        demo_safe: '— Rilevato monitoraggio di sola lettura',
+        demo_suggest: 'server-04 al 78% — verificare processi principali?',
+        demo_done: 'Monitoraggio completato ',
+        screenshots_label: 'Screenshot',
+        screenshots_title: 'Vedi in azione',
+        screenshots_desc: 'Screenshot reali di AI Terminal v1.3.5 su macOS.',
+        screenshots_note: 'Le funzionalità IA negli screenshot sopra sono alimentate da Xiaomi mino-v2.5-pro LLM.',
+        ss_main: 'Interfaccia principale — Agente IA & Terminale',
+        ss_orchestrate: 'Orchestrazione multi-server',
+        ss_runbooks: 'Flusso di lavoro Runbooks Ops',
+        ss_settings: 'Pagina impostazioni (Cinese)',
+        ss_settings_en: 'Pagina impostazioni (Inglese)',
+        ss_lang: 'Impostazioni multilingua',
+        ss_kb1: 'Demo Base di conoscenza 1',
+        ss_kb2: 'Demo Base di conoscenza 2',
+        ss_kb3: 'Demo Base di conoscenza 3',
+        ss_kb4: 'Demo Base di conoscenza 4',
+        showcase1_title: 'Console Ops All-in-One',
+        showcase1_subtitle: 'Agente IA + Terminale + Monitoraggio Server',
+        showcase1_p1: 'Esecuzione intelligente agente IA: descrivi le esigenze in linguaggio naturale, l\'IA genera ed esegue automaticamente i comandi',
+        showcase1_p2: 'Output terminale in tempo reale: terminale xterm completo, esecuzione comandi a prima vista',
+        showcase1_p3: 'Pannello monitoraggio server: metriche in tempo reale CPU/memoria/disco/rete, anomalie evidenziate automaticamente',
+        showcase1_p4: 'Cambio multi-scheda: più host, più sessioni, tutto gestito in un\'unica finestra',
+        showcase1_desc: 'Chat IA a sinistra, terminale live a destra, pannello di monitoraggio in alto, input comandi in basso. Tutto sotto controllo.',
+        showcase2_title: 'Un\'Operazione, N Server Simultaneamente',
+        showcase2_subtitle: 'Gestisci più server in batch',
+        showcase2_p1: 'Modalità orchestrazione con un clic: invia lo stesso comando a tutti i server selezionati',
+        showcase2_p2: 'Eco stato in tempo reale: risultati di esecuzione di ogni macchina visualizzati indipendentemente, progresso a prima vista',
+        showcase2_p3: 'Instrada comandi per host: l\'IA genera automaticamente comandi adattati in base ai diversi ambienti host',
+        showcase2_p4: 'Animazione onde radar: visualizzazione dinamica del numero di host online, pieno di stile tech',
+        showcase2_desc: 'Aggiornare una macchina è un\'operazione, aggiornarne cento è sempre un\'operazione. La multi-orchestrazione rende le operazioni batch semplici come parlare.',
+        showcase3_title: 'Trasforma l\'Esperienza in Runbook',
+        showcase3_subtitle: 'Esecuzione Runbook con un clic',
+        showcase3_p1: 'Modelli comuni integrati: ispezione sistema, rafforzamento sicurezza, pulizia log, distribuzione servizi…',
+        showcase3_p2: 'Workflow personalizzati: registra i tuoi SOP operativi come Runbook, anche i nuovi possono eseguire con un clic',
+        showcase3_p3: 'Esecuzione multi-macchina parallela: stesso workflow eseguito in serie/parallelo su più server',
+        showcase3_p4: 'Log di esecuzione completi: input e output di ogni passaggio registrati, tracciabili e verificabili',
+        showcase3_desc: 'Lascia che i workflow gestiscano le operazioni ripetitive, risparmia la tua energia per i problemi che richiedono davvero pensiero.',
+        showcase4_title: 'Il Tuo Terminale, le Tue Regole',
+        showcase4_subtitle: 'Riche opzioni di personalizzazione',
+        showcase4_p1: 'Configurazione modello IA: 20+ provider con un clic, supporta endpoint API personalizzati',
+        showcase4_p2: 'Aspetto tema: UI vetro, colore tema personalizzabile, raggio angoli, intensità sfocatura',
+        showcase4_p3: 'Impostazioni sicurezza: blocco app, autenticazione biométrica, regolazione sensibilità SafetyGuard',
+        showcase4_p4: 'Gestione notifiche: quali eventi devono ricordare, dipende tutto da te',
+        showcase4_desc: 'Dalla selezione del modello allo stile dell\'interfaccia, dalla politica di sicurezza alle preferenze di notifica, tutto può essere adattato alle tue abitudini.',
+        showcase5_title: '15+ Lingue per Utenti di Tutto il Mondo',
+        showcase5_subtitle: 'La scelta degli utenti globali',
+        showcase5_p1: 'Localizzazione completa: cinese, inglese, giapponese, coreano, francese, tedesco, spagnolo…',
+        showcase5_p2: 'Cambio con un clic: tocca nelle impostazioni per cambiare la lingua dell\'interfaccia',
+        showcase5_p3: 'Guidato dalla comunità: benvenuto a contribuire con più traduzioni linguistiche',
+        showcase5_desc: 'Da ovunque tu venga, AI Terminal può lavorare nella tua lingua più familiare.',
+              new_label: 'Novità in v1.3.5',
+        new_title: 'Aggiornamento massivo Ops',
+        new_desc: '5 nuove potenti funzionalità per team DevOps e SRE moderni.',
+        nf1_title: 'Monitoraggio Server',
+        nf1_desc: 'Monitoraggio in tempo reale di CPU, memoria, disco e rete su tutti i tuoi server.',
+        nf2_title: 'Registri modifiche & Audit',
+        nf2_desc: 'Traccia di controllo completa di ogni operazione con cronologia modifiche ricercabile.',
+        nf3_title: 'Runbooks Ops',
+        nf3_desc: 'Salva e riutilizza i flussi di lavoro operativi. Esecuzione di attività complesse con un clic.',
+        nf4_title: 'Centro notifiche',
+        nf4_desc: 'Rimani informato con avvisi di monitoraggio, attività completate ed eventi di sistema.',
+        nf5_title: 'UI Glassmorphism',
+        nf5_desc: 'Bellissimo design glassmorphism con animazioni più fluide ed elementi visivi raffinati.',
+        features_label: 'Funzionalità principali',
+        features_title: 'Costruito per gli sviluppatori<br>che esigono di più',
+        features_desc: 'Ogni funzionalità progettata con sicurezza, velocità e intelligenza in mente.',
+        f1_title: 'Agente IA a doppia modalità',
+        f1_desc: 'La modalità automatica esegue flussi di lavoro completi. La modalità assistente ti guida passo dopo passo. Tu scegli il livello di autonomia.',
+        f2_title: 'Monitoraggio Server',
+        f2_desc: 'Monitoraggio in tempo reale di CPU, memoria, disco e rete su tutti i server con grafici di tendenza storici.',
+        f3_title: 'Guardia di sicurezza',
+        f3_desc: 'Classificazione di sicurezza a 3 livelli — Sicuro / Avvertimento / Pericoloso. Ogni comando generato dall\'IA viene verificato prima dell\'esecuzione.',
+        f4_title: 'Registri modifiche & Audit',
+        f4_desc: 'Traccia di controllo completa di ogni operazione. Cronologia modifiche ricercabile con timestamp, operatori e dettagli.',
+        f5_title: 'Terminale SSH remoto',
+        f5_desc: 'Client SSH completo con pool di connessioni, supporto multi-sessione e output in streaming in tempo reale.',
+        f6_title: 'Runbooks Ops',
+        f6_desc: 'Crea flussi di lavoro operativi riutilizzabili. Salva attività complesse a più passaggi come runbooks per l\'esecuzione con un clic.',
+        f7_title: 'Terminale PTY locale',
+        f7_desc: 'Vero pseudoterminale su macOS, Linux e Windows. Esegui qualsiasi comando locale con supporto interattivo completo.',
+        f8_title: 'Centro notifiche',
+        f8_desc: 'Centro notifiche unificato per avvisi di monitoraggio, attività completate ed eventi di sistema. Non perdere mai un aggiornamento.',
+        f9_title: 'Archiviazione zero testo in chiaro',
+        f9_desc: 'Credenziali crittografate a livello di sistema. Sblocco biometrico opzionale con Face ID / Touch ID / Impronta digitale.',
+        f10_title: 'Orchestrazione multi-server',
+        f10_desc: 'Esegui comandi su più server simultaneamente. Operazioni batch e distribuzioni coordinate semplificate.',
+        f11_title: 'Basato su base di conoscenza',
+        f11_desc: 'La base di conoscenza offline alimenta l\'IA con competenze specifiche del dominio. Scaricabile e in costante miglioramento.',
+        f12_title: 'Multipiattaforma',
+        f12_desc: 'Un\'unica base di codice, tutte le piattaforme. macOS, Windows, Linux, iOS e Android — costruito con Flutter.',
+        how_label: 'Come funziona',
+        how_title: 'IA che comprende<br>la tua intenzione',
+        how_desc: 'Descrivi cosa vuoi in linguaggio naturale. AI Terminal fa il resto.',
+        s1_title: 'Descrivi la tua attività',
+        s1_desc: 'Digita in linguaggio naturale: <code>"Verifica utilizzo CPU di tutti i server"</code> o <code>"distribuisci in staging"</code>',
+        s2_title: 'L\'IA genera comandi',
+        s2_desc: 'L\'agente IA analizza la tua intenzione e genera gli esatti comandi shell necessari, trasmettendo la risposta in tempo reale.',
+        s3_title: 'La guardia di sicurezza valida',
+        s3_desc: 'Ogni comando viene classificato: <span style="color: var(--green)">Sicuro</span> si esegue automaticamente, <span style="color: var(--yellow)">Avvertimento</span> richiede conferma, <span style="color: var(--red)">Pericoloso</span> richiede approvazione esplicita.',
+        s4_title: 'Esegui con fiducia',
+        s4_desc: 'I comandi vengono eseguiti su terminali locali o remoti. I risultati vengono reinviati all\'IA per il ragionamento a più passaggi e il follow-up.',
+        platforms_label: 'Piattaforme',
+        platforms_title: 'Un\'app, tutte le piattaforme',
+        platforms_desc: 'Esperienza fluida su tutti i tuoi dispositivi.',
+        download_label: 'Scarica',
+        download_title: 'Ottieni AI Terminal',
+        download_desc: 'Gratuito e open source. Scarica v1.3.5 per la tua piattaforma.',
+        knowledge_title: 'Versioni della base di conoscenza',
+        knowledge_desc: 'Scarica la base di conoscenza per il supporto IA offline. Scegli la versione corrispondente alla tua app.',
+        knowledge_latest: 'Ultima',
+        cta_title: 'Pronto a trasformare<br>il tuo terminale?',
+        cta_desc: 'Open source, gratis per sempre. Inizia oggi con AI Terminal v1.3.5.',
+        cta_btn: 'Vedi su GitHub',
+        footer_releases: 'Release',
+        footer_issues: 'Problemi',
+      },
+    };
+
+    const langNames = {
+      zh: '简体中文',
+      en: 'English',
+      ja: '日本語',
+      de: 'Deutsch',
+      fr: 'Français',
+      ru: 'Русский',
+      es: 'Español',
+      ko: '한국어',
+      pt: 'Português',
+      it: 'Italiano'
+    };
+
+    let currentLang = localStorage.getItem('lang') || 'zh';
+    let currentTheme = localStorage.getItem('theme') || 'dark';
+
+    function setTheme(theme) {
+      currentTheme = theme;
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+      const themeToggle = document.getElementById('themeToggle');
+      if (themeToggle) {
+        themeToggle.textContent = theme === 'dark' ? '☀️' : '🌙';
+      }
+    }
+
+    function setLang(lang) {
+      currentLang = lang;
+      localStorage.setItem('lang', lang);
+      const t = i18n[lang];
+      
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (t[key]) {
+          el.innerHTML = t[key];
+        }
+      });
+
+      const langLabel = document.getElementById('langLabel');
+      if (langLabel) {
+        langLabel.textContent = langNames[lang];
+      }
+
+      const langDropdown = document.getElementById('langDropdown');
+      if (langDropdown) {
+        langDropdown.classList.remove('open');
+      }
+
+      renderKnowledgeVersions();
+    }
+
+    function toggleTheme() {
+      setTheme(currentTheme === 'dark' ? 'light' : 'dark');
+    }
+
+    function toggleLangDropdown() {
+      const dropdown = document.getElementById('langDropdown');
+      dropdown.classList.toggle('open');
+    }
+
+    function toggleMobileMenu() {
+      const mobileMenu = document.getElementById('navLinks');
+      const menuBtn = document.getElementById('mobileToggle');
+      mobileMenu.classList.toggle('open');
+      menuBtn.classList.toggle('open');
+    }
+
+    document.addEventListener('click', (e) => {
+      const langDropdown = document.getElementById('langDropdown');
+      if (langDropdown && !langDropdown.contains(e.target)) {
+        langDropdown.classList.remove('open');
+      }
+    });
+
+    function handleScroll() {
+      const navbar = document.getElementById('navbar');
+      if (!navbar) return;
+      if (window.scrollY > 50) {
+        navbar.classList.add('scrolled');
+      } else {
+        navbar.classList.remove('scrolled');
+      }
+    }
+
+    window.addEventListener('scroll', handleScroll);
+
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, observerOptions);
+
+    function openLightbox(src, alt) {
+      const lightbox = document.getElementById('lightbox');
+      const lightboxImg = document.getElementById('lightboxImg');
+      lightboxImg.src = src;
+      lightboxImg.alt = alt;
+      lightbox.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      const lightbox = document.getElementById('lightbox');
+      lightbox.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeLightbox();
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      setTheme(currentTheme);
+      setLang(currentLang);
+      handleScroll();
+
+      document.querySelectorAll('.reveal').forEach(el => {
+        observer.observe(el);
+      });
+
+      document.querySelectorAll('.screenshot-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const img = card.querySelector('img');
+          if (img) {
+            openLightbox(img.src, img.alt);
+          }
+        });
+      });
+
+      const langToggleBtn = document.getElementById('langToggleBtn');
+      if (langToggleBtn) {
+        langToggleBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleLangDropdown();
+        });
+      }
+
+      const langMenuItems = document.querySelectorAll('#langMenu li');
+      langMenuItems.forEach(item => {
+        item.addEventListener('click', () => {
+          const lang = item.getAttribute('data-lang');
+          setLang(lang);
+          langMenuItems.forEach(i => i.classList.remove('active'));
+          item.classList.add('active');
+        });
+      });
+
+      const themeToggle = document.getElementById('themeToggle');
+      if (themeToggle) {
+        themeToggle.addEventListener('click', toggleTheme);
+      }
+
+      const mobileToggle = document.getElementById('mobileToggle');
+      if (mobileToggle) {
+        mobileToggle.addEventListener('click', toggleMobileMenu);
+      }
+    });
+
+    // ========== PARTICLE CANVAS ==========
+    (function() {
+      const canvas = document.getElementById('particleCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      let particles = [];
+      let isMobile = window.innerWidth <= 768;
+      let animationId = null;
+
+      function getThemeColors() {
+        const styles = getComputedStyle(document.documentElement);
+        return {
+          purple: styles.getPropertyValue('--accent-purple').trim() || '#8b5cf6'
+        };
+      }
+
+      function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        isMobile = window.innerWidth <= 768;
+        initParticles();
+      }
+
+      function initParticles() {
+        particles = [];
+        const count = isMobile ? 15 : 35;
+        const colors = getThemeColors();
+
+        for (let i = 0; i < count; i++) {
+          particles.push({
+            x: Math.random() * canvas.width,
+            y: Math.random() * canvas.height,
+            vx: (Math.random() - 0.5) * 0.2,
+            vy: (Math.random() - 0.5) * 0.2,
+            radius: Math.random() * 1.2 + 0.5,
+            color: colors.purple,
+            opacity: Math.random() * 0.25 + 0.15
+          });
+        }
+      }
+
+      function drawParticles() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+
+          p.x += p.vx;
+          p.y += p.vy;
+
+          if (p.x < 0) { p.x = 0; p.vx *= -1; }
+          if (p.x > canvas.width) { p.x = canvas.width; p.vx *= -1; }
+          if (p.y < 0) { p.y = 0; p.vy *= -1; }
+          if (p.y > canvas.height) { p.y = canvas.height; p.vy *= -1; }
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+          ctx.fillStyle = p.color;
+          ctx.globalAlpha = p.opacity;
+          ctx.fill();
+        }
+
+        ctx.globalAlpha = 1;
+        animationId = requestAnimationFrame(drawParticles);
+      }
+
+      window.addEventListener('resize', resizeCanvas);
+
+      const observer = new MutationObserver(() => {
+        initParticles();
+      });
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+      resizeCanvas();
+      drawParticles();
+    })();
+
+    // ========== MOUSE GLOW ==========
+    (function() {
+      const glow = document.getElementById('mouseGlow');
+      if (!glow) return;
+      if ('ontouchstart' in window) return;
+
+      let mouseX = window.innerWidth / 2;
+      let mouseY = window.innerHeight / 2;
+      let currentX = mouseX;
+      let currentY = mouseY;
+      let animationId = null;
+
+      document.addEventListener('mousemove', (e) => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+      });
+
+      function animate() {
+        currentX += (mouseX - currentX) * 0.1;
+        currentY += (mouseY - currentY) * 0.1;
+        glow.style.transform = `translate(${currentX}px, ${currentY}px) translate(-50%, -50%)`;
+        animationId = requestAnimationFrame(animate);
+      }
+
+      animate();
+    })();
+
+  </script>
+</body>
+</html>

@@ -1,0 +1,74 @@
+/* ========== LOCAL FONTS ========== */
+/* JetBrains Mono - Monospace font for terminal and code */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./fonts/JetBrainsMono-Regular.woff2') format('woff2'),
+       url('./fonts/JetBrainsMono-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./fonts/JetBrainsMono-Medium.woff2') format('woff2'),
+       url('./fonts/JetBrainsMono-Medium.woff') format('woff');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('./fonts/JetBrainsMono-Bold.woff2') format('woff2'),
+       url('./fonts/JetBrainsMono-Bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Space Grotesk - Sans-serif font for headings and body text */
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('./fonts/SpaceGrotesk-Light.woff2') format('woff2'),
+       url('./fonts/SpaceGrotesk-Light.woff') format('woff');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('./fonts/SpaceGrotesk-Regular.woff2') format('woff2'),
+       url('./fonts/SpaceGrotesk-Regular.woff') format('woff');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('./fonts/SpaceGrotesk-Medium.woff2') format('woff2'),
+       url('./fonts/SpaceGrotesk-Medium.woff') format('woff');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('./fonts/SpaceGrotesk-SemiBold.woff2') format('woff2'),
+       url('./fonts/SpaceGrotesk-SemiBold.woff') format('woff');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('./fonts/SpaceGrotesk-Bold.woff2') format('woff2'),
+       url('./fonts/SpaceGrotesk-Bold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

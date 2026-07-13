@@ -1,0 +1,4641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Terminal</title>
+<style>
+  :root {
+    --bg: #0D1117;
+    --card: #161B22;
+    --cardElevated: #1C2128;
+    --surface: #21262D;
+    --border: #30363D;
+    --textMain: #E6EDF3;
+    --textSub: #7D8590;
+    --textMuted: #6E7681;
+    --cPrimary: #3B82F6;
+    --cSuccess: #10B981;
+    --cWarning: #F59E0B;
+    --cDanger: #EF4444;
+    --cKleinBlue: #3B82F6;
+    --terminalBg: #0A0D12;
+
+    --rXSmall: 4px;
+    --rSmall: 6px;
+    --rMedium: 8px;
+    --rLarge: 12px;
+    --rFull: 9999px;
+
+    --fMicro: 11px;
+    --fSmall: 12px;
+    --fBody: 14px;
+
+    --topbarHeight: 48px;
+    --monitorHeight: 30px;
+    --buttonHeight: 30px;
+    --capsuleHeight: 28px;
+
+    --sftpWidth: 320px;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html, body {
+    height: 100vh;
+    width: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: var(--fBody);
+    color: var(--textMain);
+    background: var(--bg);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .mono {
+    font-family: "JetBrains Mono", "Fira Code", Consolas, Menlo, Monaco, "Courier New", monospace;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--surface);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--textMuted);
+  }
+
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100%;
+    position: relative;
+  }
+
+  .svg-icon {
+    width: 1em;
+    height: 1em;
+    fill: currentColor;
+    display: inline-block;
+    vertical-align: middle;
+    flex-shrink: 0;
+  }
+
+  /* ========== Top Bar ========== */
+  .topbar {
+    height: var(--topbarHeight);
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    flex-shrink: 0;
+    z-index: 100;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-right: 16px;
+    flex-shrink: 0;
+  }
+
+  .logo {
+    width: 28px;
+    height: 28px;
+    background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+    border-radius: var(--rSmall);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    color: white;
+    font-weight: bold;
+  }
+
+  .brand-title {
+    font-size: var(--fBody);
+    font-weight: 600;
+    color: var(--textMain);
+  }
+
+  .local-badge {
+    font-size: var(--fMicro);
+    color: var(--textMuted);
+    background: var(--surface);
+    padding: 2px 6px;
+    border-radius: var(--rXSmall);
+    border: 1px solid var(--border);
+  }
+
+  .tabs-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    overflow-x: auto;
+    overflow-y: hidden;
+    gap: 4px;
+    height: 100%;
+    scrollbar-width: none;
+  }
+  .tabs-container::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab {
+    height: 36px;
+    min-width: 120px;
+    max-width: 200px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: var(--rSmall) var(--rSmall) 0 0;
+    cursor: pointer;
+    position: relative;
+    flex-shrink: 0;
+    font-size: var(--fSmall);
+    color: var(--textSub);
+    transition: background 0.15s;
+  }
+  .tab:hover {
+    background: var(--surface);
+    color: var(--textMain);
+  }
+  .tab.active {
+    background: var(--cardElevated);
+    color: var(--textMain);
+  }
+  .tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--cPrimary);
+  }
+
+  .tab-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--cSuccess);
+    flex-shrink: 0;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+  }
+
+  .tab-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, Menlo, Monaco, "Courier New", monospace;
+    font-size: 12px;
+  }
+
+  .tab-close {
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--textMuted);
+    font-size: 14px;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: all 0.15s;
+  }
+  .tab:hover .tab-close,
+  .tab.active .tab-close {
+    opacity: 1;
+  }
+  .tab-close:hover {
+    background: var(--border);
+    color: var(--textMain);
+  }
+
+  .new-tab-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: var(--rSmall);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--textSub);
+    position: relative;
+    font-size: 18px;
+    flex-shrink: 0;
+    margin-left: 4px;
+    transition: all 0.15s;
+  }
+  .new-tab-btn:hover {
+    background: var(--cardElevated);
+    color: var(--textMain);
+  }
+
+  .topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 12px;
+    flex-shrink: 0;
+  }
+
+  .conn-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: var(--rFull);
+    font-size: var(--fMicro);
+    color: var(--cSuccess);
+    font-weight: 500;
+    height: 22px;
+  }
+  .conn-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--cSuccess);
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
+  }
+
+  .icon-btn {
+    height: var(--buttonHeight);
+    padding: 0 8px;
+    border-radius: var(--rSmall);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    font-size: var(--fMicro);
+    transition: all 0.15s;
+    border: 1px solid;
+    white-space: nowrap;
+    user-select: none;
+  }
+  .icon-btn .icon {
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-btn .icon .svg-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .icon-btn.ai {
+    background: var(--surface);
+    border-color: rgba(48, 54, 61, 0.3);
+    color: var(--textSub);
+  }
+  .icon-btn.ai.active {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.4);
+    color: var(--cSuccess);
+    font-weight: 600;
+  }
+  .icon-btn.ai:hover {
+    background: rgba(16, 185, 129, 0.1);
+  }
+
+  .icon-btn.monitor {
+    background: var(--surface);
+    border-color: rgba(48, 54, 61, 0.3);
+    color: var(--textSub);
+  }
+  .icon-btn.monitor.active {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: var(--cKleinBlue);
+    font-weight: 600;
+  }
+  .icon-btn.monitor:hover {
+    background: rgba(59, 130, 246, 0.1);
+  }
+
+  .tool-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: var(--rSmall);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--textSub);
+    transition: all 0.15s;
+    position: relative;
+  }
+  .tool-btn:hover {
+    background: var(--surface);
+    color: var(--textMain);
+  }
+  .tool-btn .icon {
+    font-size: 18px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .tool-btn .icon .svg-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .tool-btn.text-icon .icon {
+    font-size: 16px;
+    font-weight: 500;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, Menlo, Monaco, "Courier New", monospace;
+  }
+
+  /* ========== Dropdown Menu ========== */
+  .dropdown-menu {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: var(--cardElevated);
+    border: 1px solid var(--border);
+    border-radius: var(--rMedium);
+    padding: 4px;
+    min-width: 180px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 1000;
+    display: none;
+  }
+  .dropdown-menu.show {
+    display: block;
+  }
+  .dropdown-item {
+    padding: 8px 12px;
+    font-size: var(--fSmall);
+    color: var(--textMain);
+    border-radius: var(--rXSmall);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.1s;
+  }
+  .dropdown-item:hover {
+    background: var(--surface);
+  }
+  .dropdown-item .check {
+    margin-left: auto;
+    color: var(--cSuccess);
+    font-size: 12px;
+  }
+  .dropdown-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+  }
+  .font-menu {
+    min-width: 100px;
+  }
+
+  /* ========== Main Body ========== */
+  .main-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .main-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+  }
+
+  /* ========== Terminal ========== */
+  .terminal {
+    flex: 1;
+    background: var(--terminalBg);
+    padding: 12px;
+    overflow-y: auto;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, Menlo, Monaco, "Courier New", monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 0;
+    position: relative;
+  }
+
+  .term-line {
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .term-prompt {
+    color: var(--cSuccess);
+  }
+  .term-cmd {
+    color: var(--textMain);
+  }
+  .term-output {
+    color: var(--textSub);
+  }
+  .term-header {
+    color: var(--cPrimary);
+    font-weight: 600;
+  }
+
+  .cursor {
+    display: inline-block;
+    width: 8px;
+    height: 15px;
+    background: var(--textMain);
+    margin-left: 2px;
+    animation: blink 1s step-end infinite;
+    vertical-align: text-bottom;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  /* ========== Monitor Bar ========== */
+  .monitor-bar {
+    height: var(--monitorHeight);
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 16px;
+    flex-shrink: 0;
+    transition: height 0.2s, opacity 0.2s;
+    overflow: visible;
+    position: relative;
+    z-index: 10;
+  }
+  .monitor-bar.hidden {
+    height: 0;
+    opacity: 0;
+    border-top: none;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+
+  .monitor-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--fMicro);
+    white-space: nowrap;
+    position: relative;
+    padding: 4px 2px;
+  }
+  .monitor-item .m-icon {
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .monitor-item .m-icon .svg-icon {
+    width: 12px;
+    height: 12px;
+  }
+  .monitor-item .m-label {
+    color: var(--textMuted);
+  }
+  .monitor-item .m-value {
+    color: var(--textMain);
+    font-weight: 500;
+  }
+  .monitor-item.cpu .m-icon, .monitor-item.cpu .m-value { color: var(--cPrimary); }
+  .monitor-item.mem .m-icon, .monitor-item.mem .m-value { color: var(--cWarning); }
+  .monitor-item.upload .m-icon, .monitor-item.upload .m-value { color: var(--cSuccess); }
+  .monitor-item.download .m-icon, .monitor-item.download .m-value { color: var(--cSuccess); }
+  .monitor-item.disk .m-icon, .monitor-item.disk .m-value { color: var(--cWarning); }
+
+  .mini-chart {
+    width: 60px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+
+  .monitor-tooltip {
+    position: fixed;
+    z-index: 9999;
+    background: #1C2128;
+    border: 1px solid #30363D;
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    padding: 12px;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(6px);
+    transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s ease;
+    pointer-events: none;
+    min-width: 240px;
+    max-width: 360px;
+    top: -9999px;
+    left: -9999px;
+  }
+  .monitor-tooltip.show {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .tooltip-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(48, 54, 61, 0.3);
+  }
+  .tooltip-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--textMain);
+  }
+  .tooltip-close {
+    width: 12px;
+    height: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--textMuted);
+    font-size: 12px;
+  }
+
+  .tooltip-two-col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 16px;
+  }
+  .tooltip-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+  }
+  .tooltip-row .k {
+    color: var(--textSub);
+  }
+  .tooltip-row .v {
+    color: var(--textMain);
+    font-weight: 500;
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  .tooltip-single-col {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .tooltip-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+  .tooltip-table th {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--textSub);
+    text-align: left;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(48, 54, 61, 0.3);
+  }
+  .tooltip-table td {
+    font-size: 11px;
+    color: var(--textMain);
+    padding: 6px 0;
+    font-family: "JetBrains Mono", monospace;
+  }
+  .tooltip-table tr:not(:last-child) td {
+    border-bottom: 1px solid rgba(48, 54, 61, 0.15);
+  }
+
+  .tooltip-progress {
+    width: 100%;
+    height: 6px;
+    background: var(--surface);
+    border-radius: 3px;
+    margin: 10px 0;
+    overflow: hidden;
+  }
+  .tooltip-progress-bar {
+    height: 100%;
+    background: var(--cWarning);
+    border-radius: 3px;
+  }
+
+  .tooltip-cpu { width: 260px; }
+  .tooltip-mem { width: 260px; }
+  .tooltip-upload { width: 320px; }
+  .tooltip-download { width: 320px; }
+  .tooltip-disk { width: 320px; }
+  .tooltip-uptime { width: 260px; }
+  .tooltip-user { width: 260px; }
+
+  .monitor-sep {
+    width: 1px;
+    height: 16px;
+    background: var(--border);
+    flex-shrink: 0;
+  }
+
+  /* ========== AI Panel ========== */
+  .ai-panel {
+    display: flex;
+    flex-direction: column;
+    background: var(--cardElevated);
+    border-top: 1px solid var(--border);
+    transition: height 0.25s ease, opacity 0.25s ease, flex 0.25s ease;
+    overflow: hidden;
+    min-height: 0;
+  }
+  .ai-panel.collapsed {
+    flex: 0 !important;
+    height: 28px;
+  }
+  .ai-panel.hidden-panel {
+    display: none;
+  }
+
+  .ai-divider {
+    height: 28px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    flex-shrink: 0;
+    background: var(--card);
+    border-bottom: 0.5px solid rgba(48, 54, 61, 0.4);
+    position: relative;
+    gap: 8px;
+  }
+
+  .divider-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .agent-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--cSuccess);
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.8);
+    flex-shrink: 0;
+  }
+  .agent-label {
+    font-size: var(--fMicro);
+    color: rgba(16, 185, 129, 0.8);
+    font-weight: 700;
+    letter-spacing: 1.5px;
+  }
+
+  .collapse-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 3px;
+    background: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--cSuccess);
+    font-size: 14px;
+    transition: transform 0.2s;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .ai-panel.collapsed .collapse-btn {
+    transform: rotate(180deg);
+  }
+
+  .divider-gradient {
+    flex: 1;
+    height: 2px;
+    background: linear-gradient(to right, rgba(16, 185, 129, 0.6) 0%, rgba(16, 185, 129, 0) 60%);
+    border-radius: 1px;
+    min-width: 20px;
+  }
+
+  .divider-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .layout-btn {
+    width: 22px;
+    height: 22px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--textMuted);
+    transition: all 0.15s;
+    border: 1px solid transparent;
+    position: relative;
+  }
+  .layout-btn .svg-icon {
+    width: 14px;
+    height: 14px;
+  }
+  .layout-btn.active {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: rgba(16, 185, 129, 0.5);
+    color: var(--cSuccess);
+  }
+  .layout-btn:hover:not(.active) {
+    background: var(--surface);
+    color: var(--textSub);
+  }
+
+  .ai-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    min-height: 0;
+  }
+
+  .msg-card {
+    background: rgba(16, 185, 129, 0.05);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: var(--rLarge);
+    padding: 14px 14px;
+    max-width: 85%;
+    font-size: var(--fSmall);
+    line-height: 1.6;
+    color: var(--textMain);
+  }
+
+  .msg-card .sec-title {
+    font-weight: 600;
+    color: var(--textMain);
+    margin-bottom: 8px;
+    margin-top: 12px;
+  }
+  .msg-card .sec-title:first-child {
+    margin-top: 0;
+  }
+
+  .info-table {
+    width: 100%;
+    margin-bottom: 8px;
+  }
+  .info-table tr td {
+    padding: 3px 0;
+    font-size: var(--fSmall);
+  }
+  .info-table tr td:first-child {
+    color: var(--textMuted);
+    width: 130px;
+  }
+  .info-table tr td:last-child {
+    color: var(--textMain);
+  }
+  .check-ok {
+    color: var(--cSuccess);
+    margin-left: 4px;
+  }
+
+  .tag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 8px 0;
+  }
+  .ip-tag {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--cSuccess);
+    padding: 2px 8px;
+    border-radius: var(--rXSmall);
+    font-size: var(--fMicro);
+    font-family: "JetBrains Mono", monospace;
+    font-weight: 500;
+  }
+
+  .summary-text {
+    color: var(--textSub);
+    margin-top: 10px;
+  }
+
+  .msg-row {
+    display: flex;
+    margin-bottom: 16px;
+    gap: 10px;
+  }
+  .msg-row.user {
+    justify-content: flex-end;
+  }
+
+  .msg-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 14px;
+  }
+  .msg-avatar.ai {
+    background: rgba(16, 185, 129, 0.15);
+    color: var(--cSuccess);
+  }
+  .msg-avatar.user {
+    background: rgba(59, 130, 246, 0.15);
+    color: var(--cPrimary);
+  }
+
+  .msg-bubble {
+    max-width: 85%;
+    font-size: var(--fSmall);
+    line-height: 1.6;
+    border-radius: var(--rLarge);
+    padding: 12px 14px;
+    border: 1px solid;
+  }
+  .msg-bubble.ai {
+    background: rgba(16, 185, 129, 0.05);
+    border-color: rgba(16, 185, 129, 0.2);
+    color: var(--textMain);
+  }
+  .msg-bubble.user {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: rgba(59, 130, 246, 0.2);
+    color: var(--textMain);
+  }
+
+  .msg-thinking {
+    color: var(--textSub);
+    font-style: italic;
+    margin-bottom: 10px;
+    font-size: var(--fSmall);
+  }
+
+  .cmd-card {
+    background: var(--card);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: var(--rMedium);
+    margin: 10px 0;
+    overflow: hidden;
+  }
+  .cmd-card.warning {
+    border-color: rgba(245, 158, 11, 0.4);
+  }
+  .cmd-card.running {
+    border-color: rgba(59, 130, 246, 0.4);
+  }
+
+  .cmd-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(16, 185, 129, 0.08);
+    border-bottom: 1px solid rgba(16, 185, 129, 0.15);
+    font-size: var(--fMicro);
+    font-weight: 600;
+  }
+  .cmd-card.warning .cmd-card-header {
+    background: rgba(245, 158, 11, 0.08);
+    border-bottom-color: rgba(245, 158, 11, 0.2);
+  }
+  .cmd-card.running .cmd-card-header {
+    background: rgba(59, 130, 246, 0.08);
+    border-bottom-color: rgba(59, 130, 246, 0.15);
+  }
+
+  .cmd-card-title {
+    color: var(--textMain);
+    flex: 1;
+  }
+
+  .cmd-status {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--fMicro);
+    font-weight: 500;
+  }
+  .cmd-status.success {
+    color: var(--cSuccess);
+  }
+  .cmd-status.running {
+    color: var(--cPrimary);
+  }
+  .cmd-status.warning {
+    color: var(--cWarning);
+  }
+
+  .cmd-spinner {
+    width: 10px;
+    height: 10px;
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-top-color: var(--cPrimary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  .cmd-warning-text {
+    padding: 8px 12px;
+    background: rgba(245, 158, 11, 0.08);
+    color: var(--cWarning);
+    font-size: var(--fMicro);
+    border-bottom: 1px solid rgba(245, 158, 11, 0.15);
+  }
+
+  .cmd-command {
+    padding: 8px 12px;
+    background: var(--terminalBg);
+    font-family: "JetBrains Mono", "Fira Code", Consolas, Menlo, Monaco, "Courier New", monospace;
+    font-size: 12px;
+    color: var(--cPrimary);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+  }
+
+  .cmd-output {
+    padding: 10px 12px;
+    background: var(--terminalBg);
+    font-family: "JetBrains Mono", "Fira Code", Consolas, Menlo, Monaco, "Courier New", monospace;
+    font-size: 12px;
+    color: var(--textSub);
+    line-height: 1.5;
+    max-height: 160px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+
+  .finish-card {
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    border-radius: var(--rMedium);
+    padding: 12px 14px;
+    margin: 10px 0;
+  }
+  .finish-card-title {
+    font-weight: 600;
+    color: var(--cSuccess);
+    margin-bottom: 6px;
+    font-size: var(--fSmall);
+  }
+  .finish-card-content {
+    color: var(--textMain);
+    font-size: var(--fSmall);
+    line-height: 1.6;
+  }
+
+  /* ========== Bottom Bar ========== */
+  .bottom-bar {
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    padding: 8px 12px;
+    flex-shrink: 0;
+  }
+
+  .bb-row1 {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .bb-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1;
+  }
+
+  .mode-capsule {
+    height: var(--capsuleHeight);
+    padding: 0 10px;
+    border-radius: var(--rFull);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-size: var(--fSmall);
+    font-weight: 600;
+    border: 1px solid;
+    transition: all 0.2s;
+    position: relative;
+    user-select: none;
+  }
+  .mode-capsule.agent {
+    background: rgba(16, 185, 129, 0.12);
+    border-color: rgba(16, 185, 129, 0.25);
+    color: var(--cSuccess);
+  }
+  .mode-capsule.orchestrate {
+    background: rgba(245, 158, 11, 0.12);
+    border-color: rgba(245, 158, 11, 0.25);
+    color: var(--cWarning);
+  }
+  .mode-capsule .hub-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .mode-capsule .hub-icon .svg-icon {
+    width: 14px;
+    height: 14px;
+  }
+  .mode-capsule .caret {
+    font-size: 10px;
+    margin-left: 2px;
+  }
+
+  .radar-pulse {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    border-radius: var(--rFull);
+    pointer-events: none;
+    opacity: 0;
+  }
+  .mode-capsule.orchestrate .radar-pulse {
+    animation: radar 2s ease-out infinite;
+    border: 2px solid var(--cWarning);
+  }
+  @keyframes radar {
+    0% {
+      width: 100%;
+      height: 100%;
+      opacity: 0.6;
+    }
+    100% {
+      width: 180%;
+      height: 250%;
+      opacity: 0;
+    }
+  }
+
+  .bb-icon-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--rXSmall);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--textSub);
+    transition: all 0.15s;
+    position: relative;
+  }
+  .bb-icon-btn:hover {
+    background: var(--surface);
+    color: var(--textMain);
+  }
+  .bb-icon-btn .svg-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .bb-icon-btn[data-tip]::before,
+  .bb-icon-btn[data-tip]::after,
+  .collapse-btn[data-tip]::before,
+  .collapse-btn[data-tip]::after,
+  .layout-btn[data-tip]::before,
+  .layout-btn[data-tip]::after,
+  .new-tab-btn[data-tip]::before,
+  .new-tab-btn[data-tip]::after {
+    position: absolute;
+    left: 50%;
+    bottom: 100%;
+    transform: translateX(-50%) translateY(4px);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.15s ease;
+    pointer-events: none;
+    z-index: 1000;
+  }
+  .bb-icon-btn[data-tip]::before,
+  .collapse-btn[data-tip]::before,
+  .layout-btn[data-tip]::before,
+  .new-tab-btn[data-tip]::before {
+    content: attr(data-tip);
+    bottom: calc(100% + 8px);
+    background: var(--cardElevated);
+    border: 1px solid var(--border);
+    border-radius: var(--rSmall);
+    padding: 6px 10px;
+    font-size: var(--fMicro);
+    color: var(--textMain);
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    font-weight: 500;
+  }
+  .bb-icon-btn[data-tip]::after,
+  .collapse-btn[data-tip]::after,
+  .layout-btn[data-tip]::after,
+  .new-tab-btn[data-tip]::after {
+    content: '';
+    bottom: calc(100% + 3px);
+    border: 5px solid transparent;
+    border-top-color: var(--border);
+  }
+  .bb-icon-btn[data-tip]:hover::before,
+  .bb-icon-btn[data-tip]:hover::after,
+  .collapse-btn[data-tip]:hover::before,
+  .collapse-btn[data-tip]:hover::after,
+  .layout-btn[data-tip]:hover::before,
+  .layout-btn[data-tip]:hover::after,
+  .new-tab-btn[data-tip]:hover::before,
+  .new-tab-btn[data-tip]:hover::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .mode-capsule[data-tip]::before,
+  .mode-capsule[data-tip]::after {
+    position: absolute;
+    left: 50%;
+    bottom: 100%;
+    transform: translateX(-50%) translateY(4px);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.15s ease;
+    pointer-events: none;
+    z-index: 1000;
+  }
+  .mode-capsule[data-tip]::before {
+    content: attr(data-tip);
+    bottom: calc(100% + 8px);
+    background: var(--cardElevated);
+    border: 1px solid var(--border);
+    border-radius: var(--rSmall);
+    padding: 6px 10px;
+    font-size: var(--fMicro);
+    color: var(--textMain);
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    font-weight: 500;
+  }
+  .mode-capsule[data-tip]::after {
+    content: '';
+    bottom: calc(100% + 3px);
+    border: 5px solid transparent;
+    border-top-color: var(--border);
+  }
+  .mode-capsule[data-tip]:hover::before,
+  .mode-capsule[data-tip]:hover::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .model-select[data-tip],
+  .suffix-btn[data-tip] {
+    position: relative;
+  }
+  .model-select[data-tip]::before,
+  .model-select[data-tip]::after,
+  .suffix-btn[data-tip]::before,
+  .suffix-btn[data-tip]::after {
+    position: absolute;
+    left: 50%;
+    bottom: 100%;
+    transform: translateX(-50%) translateY(4px);
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.15s ease;
+    pointer-events: none;
+    z-index: 1000;
+  }
+  .model-select[data-tip]::before,
+  .suffix-btn[data-tip]::before {
+    content: attr(data-tip);
+    bottom: calc(100% + 8px);
+    background: var(--cardElevated);
+    border: 1px solid var(--border);
+    border-radius: var(--rSmall);
+    padding: 6px 10px;
+    font-size: var(--fMicro);
+    color: var(--textMain);
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    font-weight: 500;
+  }
+  .model-select[data-tip]::after,
+  .suffix-btn[data-tip]::after {
+    content: '';
+    bottom: calc(100% + 3px);
+    border: 5px solid transparent;
+    border-top-color: var(--border);
+  }
+  .model-select[data-tip]:hover::before,
+  .model-select[data-tip]:hover::after,
+  .suffix-btn[data-tip]:hover::before,
+  .suffix-btn[data-tip]:hover::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  .bb-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .running-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: rgba(16, 185, 129, 0.1);
+    border-radius: var(--rFull);
+    font-size: var(--fMicro);
+    color: var(--cSuccess);
+    font-weight: 500;
+    height: 22px;
+  }
+  .spinner {
+    width: 12px;
+    height: 12px;
+    border: 2px solid rgba(16, 185, 129, 0.3);
+    border-top-color: var(--cSuccess);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .model-select {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
+    height: 28px;
+    border-radius: var(--rXSmall);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    font-size: var(--fMicro);
+    color: var(--textSub);
+  }
+  .model-select:hover {
+    background: var(--cardElevated);
+  }
+  .model-select .caret {
+    font-size: 10px;
+  }
+
+  /* ========== Input ========== */
+  .input-wrap {
+    position: relative;
+  }
+
+  .ai-input {
+    width: 100%;
+    min-height: 40px;
+    max-height: 200px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--rSmall);
+    padding: 10px 56px 10px 12px;
+    font-size: var(--fBody);
+    font-family: inherit;
+    color: var(--textMain);
+    line-height: 1.5;
+    resize: none;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .ai-input:focus {
+    border-color: var(--cPrimary);
+  }
+  .ai-input::placeholder {
+    color: var(--textMuted);
+  }
+
+  .input-suffix {
+    position: absolute;
+    right: 4px;
+    bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .suffix-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--rXSmall);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 15px;
+    transition: all 0.15s;
+    border: none;
+  }
+  .suffix-btn.orch-toggle {
+    background: var(--surface);
+    color: var(--textMuted);
+  }
+  .suffix-btn.orch-toggle .svg-icon {
+    width: 14px;
+    height: 14px;
+  }
+  .suffix-btn.orch-toggle.active {
+    background: var(--cWarning);
+    color: white;
+  }
+  .suffix-btn.send {
+    background: var(--cPrimary);
+    color: white;
+  }
+  .suffix-btn.send .svg-icon {
+    width: 16px;
+    height: 16px;
+  }
+  .suffix-btn.send:hover {
+    filter: brightness(1.1);
+  }
+  .suffix-btn.send.stop {
+    background: var(--cDanger);
+  }
+  .suffix-btn.send.stop .svg-icon {
+    width: 12px;
+    height: 12px;
+  }
+  .suffix-btn.send:disabled {
+    background: rgba(110, 118, 129, 0.5);
+    cursor: not-allowed;
+  }
+
+  .char-counter {
+    position: absolute;
+    left: 12px;
+    bottom: -5.5px;
+    background: var(--card);
+    padding: 0 4px;
+    font-size: var(--fMicro);
+    font-family: "JetBrains Mono", monospace;
+    color: var(--textSub);
+  }
+  .char-counter.warning {
+    color: var(--cWarning);
+  }
+
+  /* ========== SFTP Panel ========== */
+  .sftp-panel {
+    width: var(--sftpWidth);
+    background: var(--card);
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .sftp-header {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .sftp-title {
+    flex: 1;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--textMain);
+  }
+  .sftp-tools {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+  .sftp-tool-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--textSub);
+    font-size: 14px;
+    transition: all 0.15s;
+  }
+  .sftp-tool-btn:hover {
+    background: var(--surface);
+    color: var(--textMain);
+  }
+
+  .sftp-pathbar {
+    height: 36px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    border-bottom: 1px solid var(--border);
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .path-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--rXSmall);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--textSub);
+    font-size: 14px;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .path-btn:hover {
+    background: var(--surface);
+    color: var(--textMain);
+  }
+  .path-input {
+    flex: 1;
+    height: 28px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--rXSmall);
+    padding: 0 8px;
+    font-size: 12px;
+    font-family: "JetBrains Mono", monospace;
+    color: var(--textMain);
+    outline: none;
+  }
+  .path-input:focus {
+    border-color: var(--cPrimary);
+  }
+
+  .sftp-filelist {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px 0;
+  }
+
+  .file-row {
+    height: 28px;
+    padding: 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    font-size: var(--fSmall);
+    font-family: "JetBrains Mono", monospace;
+    transition: background 0.1s;
+  }
+  .file-row:hover {
+    background: var(--surface);
+  }
+  .file-row.selected {
+    background: rgba(59, 130, 246, 0.15);
+  }
+  .file-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .file-icon.folder {
+    color: #F59E0B;
+  }
+  .file-icon.file {
+    color: var(--textMuted);
+  }
+  .file-name {
+    flex: 1;
+    color: var(--textMain);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .file-time {
+    color: var(--textMuted);
+    font-size: 11px;
+    flex-shrink: 0;
+    margin-right: 8px;
+  }
+  .file-perm {
+    color: var(--textMuted);
+    font-size: 11px;
+    flex-shrink: 0;
+    width: 42px;
+    text-align: right;
+  }
+
+  /* ========== Settings Modal ========== */
+  .settings-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .settings-overlay.show {
+    display: flex;
+    opacity: 1;
+  }
+  .settings-modal {
+    width: 90%;
+    max-width: 720px;
+    height: 80vh;
+    background: var(--card);
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform: scale(0.95);
+    transition: transform 0.2s ease;
+  }
+  .settings-overlay.show .settings-modal {
+    transform: scale(1);
+  }
+  .settings-header {
+    height: 48px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .settings-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--textMain);
+  }
+  .settings-close {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--rXSmall);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--textSub);
+    transition: all 0.15s;
+    font-size: 16px;
+  }
+  .settings-close:hover {
+    background: var(--surface);
+    color: var(--textMain);
+  }
+  .settings-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 0;
+  }
+  .settings-group {
+    margin-bottom: 24px;
+  }
+  .settings-group:last-child {
+    margin-bottom: 0;
+  }
+  .settings-group-title {
+    padding: 0 16px 8px 16px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--textMuted);
+    text-transform: none;
+    letter-spacing: 0;
+  }
+  .settings-item {
+    height: 56px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+  }
+  .settings-item:hover {
+    background: var(--surface);
+  }
+  .settings-item-icon-wrap {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .settings-item-icon-wrap.blue {
+    background: rgba(59, 130, 246, 0.1);
+    color: var(--cPrimary);
+  }
+  .settings-item-icon-wrap.green {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--cSuccess);
+  }
+  .settings-item-icon-wrap.purple {
+    background: rgba(139, 92, 246, 0.1);
+    color: #8B5CF6;
+  }
+  .settings-item-icon-wrap.orange {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--cWarning);
+  }
+  .settings-item-icon-wrap.red {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--cDanger);
+  }
+  .settings-item-icon-wrap.gray {
+    background: rgba(110, 118, 129, 0.1);
+    color: var(--textMuted);
+  }
+  .settings-item-icon-wrap .svg-icon {
+    width: 20px;
+    height: 20px;
+  }
+  .settings-item-content {
+    flex: 1;
+    min-width: 0;
+  }
+  .settings-item-title {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--textMain);
+    margin-bottom: 2px;
+  }
+  .settings-item-subtitle {
+    font-size: 12px;
+    color: var(--textSub);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .settings-item-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .settings-item-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--cPrimary);
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: var(--rXSmall);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .settings-item-btn:hover {
+    background: rgba(59, 130, 246, 0.2);
+  }
+  .settings-item-arrow {
+    color: var(--textSub);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .settings-item-arrow .svg-icon {
+    width: 16px;
+    height: 16px;
+  }
+  .settings-item-divider {
+    position: absolute;
+    bottom: 0;
+    left: 60px;
+    right: 0;
+    height: 1px;
+    background: rgba(48, 54, 61, 0.6);
+  }
+  .settings-group .settings-item:last-child .settings-item-divider {
+    display: none;
+  }
+
+  .settings-back-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--rXSmall);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--textSub);
+    transition: all 0.15s;
+    margin-right: 8px;
+  }
+  .settings-back-btn:hover {
+    background: var(--surface);
+    color: var(--textMain);
+  }
+  .settings-back-btn .svg-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .settings-header-left {
+    display: flex;
+    align-items: center;
+  }
+
+  .settings-page {
+    display: none;
+  }
+  .settings-page.active {
+    display: block;
+  }
+
+  .sub-page-padding {
+    padding: 16px;
+  }
+
+  .setting-block {
+    margin-bottom: 24px;
+  }
+  .setting-block:last-child {
+    margin-bottom: 0;
+  }
+  .setting-block-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--textMuted);
+    margin-bottom: 12px;
+  }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .slider-label {
+    font-size: 14px;
+    color: var(--textMain);
+    flex: 1;
+  }
+  .slider-value {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--cPrimary);
+    background: rgba(59, 130, 246, 0.1);
+    padding: 2px 8px;
+    border-radius: var(--rFull);
+  }
+  .slider-desc {
+    font-size: 12px;
+    color: var(--textSub);
+    margin-top: 6px;
+  }
+
+  .slider-wrap {
+    width: 100%;
+    padding: 4px 0;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 4px;
+    background: var(--surface);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    background: var(--cPrimary);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    transition: box-shadow 0.15s;
+  }
+  input[type="range"]::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.3);
+  }
+
+  .collapse-panel {
+    background: var(--cardElevated);
+    border: 1px solid var(--border);
+    border-radius: var(--rMedium);
+    margin-bottom: 8px;
+    overflow: hidden;
+  }
+  .collapse-panel:last-child {
+    margin-bottom: 0;
+  }
+  .collapse-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .collapse-header:hover {
+    background: var(--surface);
+  }
+  .collapse-icon-wrap {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .collapse-icon-wrap.orange {
+    background: rgba(245, 158, 11, 0.1);
+    color: var(--cWarning);
+  }
+  .collapse-icon-wrap.green {
+    background: rgba(16, 185, 129, 0.1);
+    color: var(--cSuccess);
+  }
+  .collapse-icon-wrap .svg-icon {
+    width: 16px;
+    height: 16px;
+  }
+  .collapse-title {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--textMain);
+  }
+  .collapse-arrow {
+    color: var(--textSub);
+    transition: transform 0.2s;
+    font-size: 12px;
+  }
+  .collapse-panel.open .collapse-arrow {
+    transform: rotate(180deg);
+  }
+  .collapse-body {
+    display: none;
+    padding: 0 14px 14px 14px;
+  }
+  .collapse-panel.open .collapse-body {
+    display: block;
+  }
+  .prompt-textarea {
+    width: 100%;
+    min-height: 120px;
+    background: var(--terminalBg);
+    border: 1px solid var(--border);
+    border-radius: var(--rSmall);
+    padding: 10px 12px;
+    font-size: 12px;
+    font-family: "JetBrains Mono", "Fira Code", Consolas, Menlo, Monaco, "Courier New", monospace;
+    color: var(--textMain);
+    line-height: 1.5;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .prompt-textarea:focus {
+    border-color: var(--cPrimary);
+  }
+  .prompt-textarea[readonly] {
+    color: var(--textSub);
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+  }
+  .toggle-row .toggle-label {
+    font-size: 14px;
+    color: var(--textMain);
+  }
+
+  .switch {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+  .switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+  }
+  .switch-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    transition: 0.2s;
+    border-radius: 22px;
+  }
+  .switch-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 2px;
+    bottom: 2px;
+    background-color: var(--textMuted);
+    transition: 0.2s;
+    border-radius: 50%;
+  }
+  input:checked + .switch-slider {
+    background-color: rgba(16, 185, 129, 0.2);
+    border-color: rgba(16, 185, 129, 0.4);
+  }
+  input:checked + .switch-slider:before {
+    transform: translateX(18px);
+    background-color: var(--cSuccess);
+  }
+
+  .form-row {
+    margin-bottom: 16px;
+  }
+  .form-label {
+    font-size: 12px;
+    color: var(--textSub);
+    margin-bottom: 6px;
+    display: block;
+  }
+  .form-input {
+    width: 100%;
+    height: 36px;
+    background: var(--cardElevated);
+    border: 1px solid var(--border);
+    border-radius: var(--rSmall);
+    padding: 0 12px;
+    font-size: 14px;
+    color: var(--textMain);
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-input:focus {
+    border-color: var(--cPrimary);
+  }
+
+  .form-select {
+    width: 100%;
+    height: 36px;
+    background: var(--cardElevated);
+    border: 1px solid var(--border);
+    border-radius: var(--rSmall);
+    padding: 0 12px;
+    font-size: 14px;
+    color: var(--textMain);
+    outline: none;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237D8590' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+  }
+  .form-select:focus {
+    border-color: var(--cPrimary);
+  }
+
+  .btn-group {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .btn {
+    height: 36px;
+    padding: 0 16px;
+    border-radius: var(--rSmall);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s;
+    border: 1px solid;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .btn-primary {
+    background: var(--cPrimary);
+    border-color: var(--cPrimary);
+    color: white;
+  }
+  .btn-primary:hover {
+    filter: brightness(1.1);
+  }
+  .btn-secondary {
+    background: var(--surface);
+    border-color: var(--border);
+    color: var(--textMain);
+  }
+  .btn-secondary:hover {
+    background: var(--cardElevated);
+  }
+  .form-hint {
+    font-size: 12px;
+    color: var(--textMuted);
+    margin-top: 8px;
+  }
+
+  .color-picker-row {
+    display: flex;
+    gap: 12px;
+    padding: 12px 0;
+  }
+  .color-option {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    position: relative;
+    border: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .color-option:hover {
+    transform: scale(1.1);
+  }
+  .color-option.selected {
+    border-color: var(--textMain);
+  }
+  .color-option .check {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+  }
+  .color-blue { background: #3B82F6; }
+  .color-green { background: #10B981; }
+  .color-purple { background: #8B5CF6; }
+  .color-orange { background: #F59E0B; }
+
+  .seg-control {
+    display: flex;
+    background: var(--surface);
+    border-radius: var(--rSmall);
+    padding: 2px;
+    gap: 2px;
+  }
+  .seg-option {
+    flex: 1;
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--textSub);
+    text-align: center;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s;
+  }
+  .seg-option.active {
+    background: var(--cardElevated);
+    color: var(--textMain);
+    font-weight: 500;
+  }
+
+  .lang-list {
+    background: var(--cardElevated);
+    border: 1px solid var(--border);
+    border-radius: var(--rMedium);
+    overflow: hidden;
+  }
+  .lang-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+    position: relative;
+    border-bottom: 1px solid var(--border);
+  }
+  .lang-item:last-child {
+    border-bottom: none;
+  }
+  .lang-item:hover {
+    background: var(--surface);
+  }
+  .lang-item .lang-name {
+    flex: 1;
+    font-size: 14px;
+    color: var(--textMain);
+  }
+  .lang-item .lang-check {
+    color: var(--cSuccess);
+    font-size: 14px;
+    display: none;
+  }
+  .lang-item.selected .lang-check {
+    display: block;
+  }
+
+  .host-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .host-list-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--textMuted);
+  }
+  .add-host-btn {
+    height: 28px;
+    padding: 0 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--cPrimary);
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.2);
+    border-radius: var(--rSmall);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .add-host-btn:hover {
+    background: rgba(59, 130, 246, 0.2);
+  }
+
+  .host-card {
+    background: var(--cardElevated);
+    border: 1px solid var(--border);
+    border-radius: var(--rMedium);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .host-card:last-child {
+    margin-bottom: 0;
+  }
+  .host-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .host-status-dot.online {
+    background: var(--cSuccess);
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+  }
+  .host-status-dot.offline {
+    background: var(--textMuted);
+  }
+  .host-info {
+    flex: 1;
+    min-width: 0;
+  }
+  .host-name {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--textMain);
+    margin-bottom: 2px;
+  }
+  .host-detail {
+    font-size: 12px;
+    color: var(--textSub);
+    font-family: "JetBrains Mono", monospace;
+  }
+  .host-actions {
+    display: flex;
+    gap: 4px;
+  }
+  .host-action-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: var(--rXSmall);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--textSub);
+    transition: all 0.15s;
+    font-size: 14px;
+  }
+  .host-action-btn:hover {
+    background: var(--surface);
+    color: var(--textMain);
+  }
+  .host-action-btn.delete:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--cDanger);
+  }
+
+  .about-section {
+    text-align: center;
+    padding: 24px 0;
+  }
+  .about-logo {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    color: white;
+    font-weight: bold;
+    margin: 0 auto 16px auto;
+  }
+  .about-app-name {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--textMain);
+    margin-bottom: 4px;
+  }
+  .about-version {
+    font-size: 14px;
+    color: var(--textSub);
+    margin-bottom: 16px;
+  }
+  .check-update-btn {
+    height: 36px;
+    padding: 0 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--rSmall);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--textMain);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .check-update-btn:hover {
+    background: var(--cardElevated);
+  }
+
+  .link-list {
+    background: var(--cardElevated);
+    border: 1px solid var(--border);
+    border-radius: var(--rMedium);
+    overflow: hidden;
+    margin-top: 20px;
+  }
+  .link-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+    border-bottom: 1px solid var(--border);
+  }
+  .link-item:last-child {
+    border-bottom: none;
+  }
+  .link-item:hover {
+    background: var(--surface);
+  }
+  .link-icon {
+    width: 20px;
+    height: 20px;
+    margin-right: 12px;
+    color: var(--textSub);
+    flex-shrink: 0;
+  }
+  .link-text {
+    flex: 1;
+    font-size: 14px;
+    color: var(--textMain);
+  }
+  .link-arrow {
+    color: var(--textSub);
+    font-size: 12px;
+  }
+
+  .about-footer {
+    text-align: center;
+    font-size: 12px;
+    color: var(--textMuted);
+    margin-top: 24px;
+  }
+
+  /* ========== Demo Label ========== */
+  .demo-label {
+    position: fixed;
+    bottom: 8px;
+    right: 12px;
+    font-size: 10px;
+    color: var(--textMuted);
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.7;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="brand">
+      <div class="logo">▯</div>
+      <span class="brand-title">AI Terminal</span>
+      <span class="local-badge">本地</span>
+    </div>
+
+    <div class="tabs-container" id="tabsContainer">
+      <div class="tab active" data-server="web01">
+        <span class="tab-dot"></span>
+        <span class="tab-name">web-server-01</span>
+        <span class="tab-close" onclick="closeTab(event, this)">×</span>
+      </div>
+      <div class="tab" data-server="db01">
+        <span class="tab-dot"></span>
+        <span class="tab-name">db-server-01</span>
+        <span class="tab-close" onclick="closeTab(event, this)">×</span>
+      </div>
+      <div class="tab" data-server="cache01">
+        <span class="tab-dot"></span>
+        <span class="tab-name">cache-01</span>
+        <span class="tab-close" onclick="closeTab(event, this)">×</span>
+      </div>
+      <div class="new-tab-btn" data-tip="新标签 · 打开新的终端会话">+</div>
+    </div>
+
+    <div class="topbar-actions">
+      <div class="conn-badge">
+        <span class="conn-dot"></span>
+        <span>已连接</span>
+      </div>
+
+      <div class="icon-btn ai active" id="aiToggleBtn" onclick="toggleAIPanel()">
+        <span class="icon">
+          <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13l2-2 2 2 2-2"/>
+            <path d="M12 2v2"/>
+            <path d="M12 20v2"/>
+            <path d="M4.93 4.93l1.41 1.41"/>
+            <path d="M17.66 17.66l1.41 1.41"/>
+            <path d="M2 12h2"/>
+            <path d="M20 12h2"/>
+            <path d="M6.34 17.66l-1.41 1.41"/>
+            <path d="M19.07 4.93l-1.41 1.41"/>
+          </svg>
+        </span>
+        <span>AI</span>
+      </div>
+
+      <div class="icon-btn monitor active" id="monitorToggleBtn" onclick="toggleMonitor()">
+        <span class="icon">
+          <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            <path d="M3.22 12h1.8"/>
+            <path d="M7 16.5l.9-.9 1.5 1.5 3.1-3.1 1.5 1.5 4.2-4.2"/>
+          </svg>
+        </span>
+        <span>监控</span>
+      </div>
+
+      <div class="tool-btn text-icon" id="fontBtn" onclick="toggleFontMenu(event)">
+        <span class="icon">T</span>
+        <div class="dropdown-menu font-menu" id="fontMenu">
+          <div class="dropdown-item" onclick="setFontSize(8)">8px<span class="check"></span></div>
+          <div class="dropdown-item" onclick="setFontSize(10)">10px<span class="check"></span></div>
+          <div class="dropdown-item" onclick="setFontSize(12)">12px<span class="check"></span></div>
+          <div class="dropdown-item" onclick="setFontSize(13)">13px<span class="check">✓</span></div>
+          <div class="dropdown-item" onclick="setFontSize(14)">14px<span class="check"></span></div>
+          <div class="dropdown-item" onclick="setFontSize(16)">16px<span class="check"></span></div>
+          <div class="dropdown-item" onclick="setFontSize(18)">18px<span class="check"></span></div>
+          <div class="dropdown-item" onclick="setFontSize(20)">20px<span class="check"></span></div>
+          <div class="dropdown-item" onclick="setFontSize(24)">24px<span class="check"></span></div>
+        </div>
+      </div>
+
+      <div class="tool-btn" id="moreBtn" onclick="toggleMoreMenu(event)">
+        <span class="icon">
+          <svg class="svg-icon" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="5" cy="12" r="2"/>
+            <circle cx="12" cy="12" r="2"/>
+            <circle cx="19" cy="12" r="2"/>
+          </svg>
+        </span>
+        <div class="dropdown-menu" id="moreMenu">
+          <div class="dropdown-item">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+            </svg>
+            重新连接
+          </div>
+          <div class="dropdown-item" onclick="clearTerminal()">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+            </svg>
+            清屏
+          </div>
+          <div class="dropdown-item" onclick="toggleSFTP()">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            SFTP
+          </div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            自定义提示词
+          </div>
+          <div class="dropdown-item" onclick="openSettings()">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+            </svg>
+            设置
+          </div>
+          <div class="dropdown-divider"></div>
+          <div class="dropdown-item">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            关于
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Body -->
+  <div class="main-body">
+    <!-- Left Main Area -->
+    <div class="main-area" id="mainArea">
+      <!-- Terminal -->
+      <div class="terminal" id="terminal">
+        <div class="term-line"><span class="term-prompt">Last login: Wed Jul 10 14:23:45 2024 from 192.168.1.50</span></div>
+        <div class="term-line">&nbsp;</div>
+        <div class="term-line"><span class="term-prompt">[root@web-server-01 ~]# </span><span class="term-cmd">ls -la</span></div>
+        <div class="term-line term-output">total 68</div>
+        <div class="term-line term-output">dr-xr-x---.  3 root root  213 Jul 10 14:20 .</div>
+        <div class="term-line term-output">dr-xr-xr-x. 18 root root  256 Jul  5 09:12 ..</div>
+        <div class="term-line term-output">-rw-------.  1 root root 1523 Jul 10 14:20 .bash_history</div>
+        <div class="term-line term-output">-rw-r--r--.  1 root root   18 Nov 24  2023 .bash_logout</div>
+        <div class="term-line term-output">-rw-r--r--.  1 root root  176 Nov 24  2023 .bash_profile</div>
+        <div class="term-line term-output">-rw-r--r--.  1 root root  276 Jul  8 10:15 .bashrc</div>
+        <div class="term-line term-output">drwxr-xr-x.  2 root root   42 Jul  5 09:30 scripts</div>
+        <div class="term-line term-output">-rw-r--r--.  1 root root  129 Jul  9 16:42 server-check.sh</div>
+        <div class="term-line">&nbsp;</div>
+        <div class="term-line"><span class="term-prompt">[root@web-server-01 ~]# </span><span class="term-cmd">df -h</span></div>
+        <div class="term-line term-output">Filesystem      Size  Used Avail Use% Mounted on</div>
+        <div class="term-line term-output">/dev/sda1        40G   28G   12G  70% /</div>
+        <div class="term-line term-output">devtmpfs        1.8G     0  1.8G   0% /dev</div>
+        <div class="term-line term-output">tmpfs           1.9G     0  1.9G   0% /dev/shm</div>
+        <div class="term-line term-output">tmpfs           1.9G   33M  1.8G   2% /run</div>
+        <div class="term-line term-output">tmpfs           1.9G     0  1.9G   0% /sys/fs/cgroup</div>
+        <div class="term-line">&nbsp;</div>
+        <div class="term-line"><span class="term-prompt">[root@web-server-01 ~]# </span><span class="term-cmd">free -h</span></div>
+        <div class="term-line term-output">               total        used        free      shared  buff/cache   available</div>
+        <div class="term-line term-output">Mem:          3.7Gi       1.2Gi       1.8Gi        24Mi       756Mi       2.2Gi</div>
+        <div class="term-line term-output">Swap:         2.0Gi          0B       2.0Gi</div>
+        <div class="term-line">&nbsp;</div>
+        <div class="term-line"><span class="term-prompt">[root@web-server-01 ~]# </span><span class="term-cmd">docker ps</span></div>
+        <div class="term-line term-output">CONTAINER ID   IMAGE          COMMAND                  CREATED       STATUS       PORTS                               NAMES</div>
+        <div class="term-line term-output">a1b2c3d4e5f6   nginx:latest   "/docker-entrypoint.…"   2 weeks ago   Up 2 weeks   0.0.0.0:80->80/tcp, 443/tcp         web-nginx</div>
+        <div class="term-line term-output">f6e5d4c3b2a1   redis:7        "docker-entrypoint.s…"   3 weeks ago   Up 3 weeks   6379/tcp                            web-redis</div>
+        <div class="term-line term-output">123456789abc   node:18-alpine "docker-entrypoint.s…"   5 days ago    Up 5 days    3000/tcp                            web-app</div>
+        <div class="term-line">&nbsp;</div>
+        <div class="term-line"><span class="term-prompt">[root@web-server-01 ~]# </span><span class="term-cmd">systemctl status nginx</span></div>
+        <div class="term-line term-output">● nginx.service - nginx - high performance web server</div>
+        <div class="term-line term-output">   Loaded: loaded (/usr/lib/systemd/system/nginx.service; enabled; vendor preset: disabled)</div>
+        <div class="term-line term-output">   Active: active (running) since Wed 2024-07-10 09:15:23 CST; 5h 10min ago</div>
+        <div class="term-line term-output">     Docs: http://nginx.org/en/docs/</div>
+        <div class="term-line term-output">  Process: 12345 ExecReload=/usr/sbin/nginx -s reload (code=exited, status=0/SUCCESS)</div>
+        <div class="term-line term-output"> Main PID: 9876 (nginx)</div>
+        <div class="term-line term-output">   CGroup: /system.slice/nginx.service</div>
+        <div class="term-line term-output">           ├─9876 nginx: master process /usr/sbin/nginx</div>
+        <div class="term-line term-output">           └─9877 nginx: worker process</div>
+        <div class="term-line">&nbsp;</div>
+        <div class="term-line"><span class="term-prompt">[root@web-server-01 ~]# </span><span class="cursor"></span></div>
+      </div>
+
+      <!-- Monitor Bar -->
+      <div class="monitor-bar" id="monitorBar">
+        <div class="monitor-item cpu" data-tooltip="tooltip-cpu">
+          <span class="m-icon">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+          </span>
+          <span class="m-label">CPU</span>
+          <span class="m-value" id="cpuValue">3.2%</span>
+          <svg class="mini-chart" id="cpuChart" viewBox="0 0 60 22" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="monitor-sep"></div>
+        <div class="monitor-item mem" data-tooltip="tooltip-mem">
+          <span class="m-icon">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+            </svg>
+          </span>
+          <span class="m-label">内存</span>
+          <span class="m-value" id="memValue">2.98G/3.68G</span>
+          <svg class="mini-chart" id="memChart" viewBox="0 0 60 22" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="monitor-sep"></div>
+        <div class="monitor-item upload" data-tooltip="tooltip-upload">
+          <span class="m-icon">↑</span>
+          <span class="m-label">上传</span>
+          <span class="m-value" id="uploadValue">169.8 KB/s</span>
+          <svg class="mini-chart" id="uploadChart" viewBox="0 0 60 22" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="monitor-sep"></div>
+        <div class="monitor-item download" data-tooltip="tooltip-download">
+          <span class="m-icon">↓</span>
+          <span class="m-label">下载</span>
+          <span class="m-value" id="downloadValue">102.5 KB/s</span>
+          <svg class="mini-chart" id="downloadChart" viewBox="0 0 60 22" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="monitor-sep"></div>
+        <div class="monitor-item disk" data-tooltip="tooltip-disk">
+          <span class="m-icon">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+              <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+              <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+            </svg>
+          </span>
+          <span class="m-label">磁盘</span>
+          <span class="m-value" id="diskValue">70.0%</span>
+          <svg class="mini-chart" id="diskChart" viewBox="0 0 60 22" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="monitor-sep"></div>
+        <div class="monitor-item" data-tooltip="tooltip-uptime">
+          <span class="m-icon">⏱</span>
+          <span class="m-label">开机</span>
+          <span class="m-value">1年36周</span>
+        </div>
+        <div class="monitor-sep"></div>
+        <div class="monitor-item" data-tooltip="tooltip-user">
+          <span class="m-icon">👤</span>
+          <span class="m-label">用户</span>
+          <span class="m-value">root</span>
+        </div>
+      </div>
+
+      <!-- AI Panel -->
+      <div class="ai-panel" id="aiPanel" style="flex: 1;">
+        <div class="ai-divider">
+          <div class="divider-left">
+            <span class="agent-dot"></span>
+            <span class="agent-label">AGENT</span>
+          </div>
+          <div class="collapse-btn" onclick="collapseAIPanel()" data-tip="收起/展开 · 控制 AI 面板显示">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
+          <div class="divider-gradient"></div>
+          <div class="divider-right">
+            <div class="layout-btn layout-bottom active" data-tip="底部布局 · 终端在上 AI 在下" onclick="setLayout('bottom', this)">
+              <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="3" y1="17" x2="21" y2="17"></line>
+              </svg>
+            </div>
+            <div class="layout-btn layout-right" data-tip="右侧布局 · 终端在左 AI 在右" onclick="setLayout('right', this)">
+              <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="15" y1="3" x2="15" y2="21"></line>
+              </svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="ai-messages" id="aiMessages">
+          <div class="msg-row user">
+            <div class="msg-bubble user">
+              网站访问报 502 Bad Gateway，帮我排查一下 Nginx 的问题
+            </div>
+            <div class="msg-avatar user">👤</div>
+          </div>
+
+          <div class="msg-row ai">
+            <div class="msg-avatar ai">🤖</div>
+            <div class="msg-bubble ai">
+              <div class="msg-thinking">
+                <strong>思考：</strong>用户报告 Nginx 502 错误。502 通常是后端服务不可达导致的。我需要按以下步骤排查：<br>
+                1. 先检查 Nginx 服务状态<br>
+                2. 查看错误日志定位具体原因<br>
+                3. 检查后端服务是否正常运行<br>
+                4. 检查端口监听和网络连通性
+              </div>
+              
+              <div class="cmd-card">
+                <div class="cmd-card-header">
+                  <span class="cmd-card-title">执行命令 · 检查 Nginx 状态</span>
+                  <span class="cmd-status success">✓ 已完成</span>
+                </div>
+                <div class="cmd-command">systemctl status nginx --no-pager</div>
+                <div class="cmd-output">● nginx.service - A high performance web server and a reverse proxy server
+     Loaded: loaded (/lib/systemd/system/nginx.service; enabled; vendor preset: enabled)
+     Active: active (running) since Mon 2026-07-13 09:12:34 CST; 2h 15min ago
+       Docs: man:nginx(8)
+    Process: 1234 ExecStartPre=/usr/sbin/nginx -t (code=exited, status=0/SUCCESS)
+    Process: 1235 ExecStart=/usr/sbin/nginx -g daemon on; master_process on; (code=exited, status=0/SUCCESS)
+   Main PID: 1236 (nginx)
+      Tasks: 3 (limit: 4663)
+     Memory: 12.3M
+        CPU: 1.245s
+     CGroup: /system.slice/nginx.service
+             ├─1236 nginx: master process /usr/sbin/nginx
+             ├─1237 nginx: worker process
+             └─1238 nginx: worker process</div>
+              </div>
+
+              <div class="cmd-card">
+                <div class="cmd-card-header">
+                  <span class="cmd-card-title">执行命令 · 查看最近错误日志</span>
+                  <span class="cmd-status success">✓ 已完成</span>
+                </div>
+                <div class="cmd-command">tail -30 /var/log/nginx/error.log</div>
+                <div class="cmd-output">2026/07/13 11:25:32 [error] 1237#1237: *456 connect() failed (111: Connection refused) while connecting to upstream, client: 192.168.1.100, server: example.com, request: "GET /api/users HTTP/1.1", upstream: "http://127.0.0.1:3000/api/users", host: "example.com"
+2026/07/13 11:25:35 [error] 1237#1237: *457 connect() failed (111: Connection refused) while connecting to upstream, client: 192.168.1.101, server: example.com, request: "GET /api/health HTTP/1.1", upstream: "http://127.0.0.1:3000/api/health", host: "example.com"
+2026/07/13 11:25:40 [error] 1238#1238: *458 connect() failed (111: Connection refused) while connecting to upstream, client: 192.168.1.102, server: example.com, request: "POST /api/login HTTP/1.1", upstream: "http://127.0.0.1:3000/api/login", host: "example.com"
+2026/07/13 11:25:45 [error] 1237#1237: *459 upstream timed out (110: Connection timed out) while connecting to upstream, client: 192.168.1.100, server: example.com, request: "GET / HTTP/1.1", upstream: "http://127.0.0.1:3000/", host: "example.com"</div>
+              </div>
+
+              <div>
+                <strong>初步分析：</strong>Nginx 本身运行正常，但后端服务 <code>127.0.0.1:3000</code> 连接被拒绝（Connection refused）。看起来是 Node.js 应用挂掉了。让我继续检查后端服务状态。
+              </div>
+            </div>
+          </div>
+
+          <div class="msg-row user">
+            <div class="msg-bubble user">
+              对，后端是 Node.js 服务，用 PM2 管理的，帮我看看怎么回事
+            </div>
+            <div class="msg-avatar user">👤</div>
+          </div>
+
+          <div class="msg-row ai">
+            <div class="msg-avatar ai">🤖</div>
+            <div class="msg-bubble ai">
+              <div class="msg-thinking">
+                <strong>思考：</strong>用户确认后端是 PM2 管理的 Node.js 服务。接下来我需要：<br>
+                1. 查看 PM2 进程列表，确认服务状态<br>
+                2. 查看应用日志，找崩溃原因<br>
+                3. 检查端口 3000 是否被监听<br>
+                4. 根据错误原因决定修复方案
+              </div>
+              
+              <div class="cmd-card">
+                <div class="cmd-card-header">
+                  <span class="cmd-card-title">执行命令 · 查看 PM2 进程</span>
+                  <span class="cmd-status success">✓ 已完成</span>
+                </div>
+                <div class="cmd-command">pm2 list</div>
+                <div class="cmd-output">┌────┬────────────────────┬──────────┬──────┬───────────┬──────────┬──────────┐
+│ id │ name               │ mode     │ ↺    │ status    │ cpu      │ memory   │
+├────┼────────────────────┼──────────┼──────┼───────────┼──────────┼──────────┤
+│ 0  │ api-server         │ fork     │ 15   │ errored   │ 0%       │ 0b       │
+└────┴────────────────────┴──────────┴──────┴───────────┴──────────┴──────────┘</div>
+              </div>
+
+              <div class="cmd-card">
+                <div class="cmd-card-header">
+                  <span class="cmd-card-title">执行命令 · 查看最近 50 行错误日志</span>
+                  <span class="cmd-status success">✓ 已完成</span>
+                </div>
+                <div class="cmd-command">pm2 logs api-server --err --lines 50 --nostream</div>
+                <div class="cmd-output">Error: Cannot find module '/opt/api-server/node_modules/mongoose'
+Require stack:
+- /opt/api-server/src/models/User.js
+- /opt/api-server/src/routes/users.js
+- /opt/api-server/src/app.js
+- /opt/api-server/server.js
+    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1095:15)
+    at Function.Module._load (node:internal/modules/cjs/loader:938:27)
+    at Module.require (node:internal/modules/cjs/loader:1163:19)
+    at require (node:internal/modules/cjs/helpers:110:18)
+    at Object.<anonymous> (/opt/api-server/src/models/User.js:3:18)
+    at Module._compile (node:internal/modules/cjs/loader:1276:14)
+    ... 6 more lines
+
+2026-07-13T09:15:22: PM2 log: App [api-server:0] exited with code [1] via signal [SIGINT]
+2026-07-13T09:15:22: PM2 log: App [api-server:0] restarted 15 times
+2026-07-13T09:15:22: PM2 log: App [api-server:0] has reached max restart limit (15), stopping</div>
+              </div>
+
+              <div>
+                <strong>找到问题了！</strong>应用因为找不到 <code>mongoose</code> 模块而崩溃，PM2 自动重启了 15 次后最终停止了。原因应该是上次部署时没有正确安装依赖，或者 <code>node_modules</code> 损坏了。
+                <br><br>
+                我需要进入项目目录重新安装依赖，然后重启服务。这个操作会重启服务，会有短暂的服务中断。
+              </div>
+
+              <div class="cmd-card warning">
+                <div class="cmd-warning-text">
+                  ⚠️ <strong>操作确认</strong>：将重新安装 npm 依赖并重启 Node.js 服务，服务会有约 10-30 秒的中断时间
+                </div>
+                <div class="cmd-card-header">
+                  <span class="cmd-card-title">执行命令 · 进入目录重新安装依赖</span>
+                  <span class="cmd-status success">✓ 已完成</span>
+                </div>
+                <div class="cmd-command">cd /opt/api-server && npm install</div>
+                <div class="cmd-output">npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory.
+npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
+
+added 234 packages, and audited 235 packages in 28s
+
+42 packages are looking for funding
+  run `npm fund` for details
+
+3 moderate severity vulnerabilities
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+Run `npm audit` for details.</div>
+              </div>
+
+              <div class="cmd-card">
+                <div class="cmd-card-header">
+                  <span class="cmd-card-title">执行命令 · 启动服务并验证</span>
+                  <span class="cmd-status success">✓ 已完成</span>
+                </div>
+                <div class="cmd-command">cd /opt/api-server && pm2 start api-server && sleep 2 && curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3000/api/health</div>
+                <div class="cmd-output">[PM2] Applying action restartProcessId on app [api-server](ids: [ 0 ])
+[PM2] api-server ✓
+
+Status              │ online
+Name                │ api-server
+Version             │ 2.1.0
+Restarts            │ 0
+Uptime              │ 2s
+Memory              │ 42.3 MB
+CPU                 │ 1.2%
+
+200</div>
+              </div>
+
+              <div class="cmd-card">
+                <div class="cmd-card-header">
+                  <span class="cmd-card-title">执行命令 · 验证 Nginx 代理正常</span>
+                  <span class="cmd-status success">✓ 已完成</span>
+                </div>
+                <div class="cmd-command">curl -s -o /dev/null -w "HTTP Status: %{http_code}\nResponse Time: %{time_total}s" http://127.0.0.1/api/health</div>
+                <div class="cmd-output">HTTP Status: 200
+Response Time: 0.023s</div>
+              </div>
+
+              <div class="finish-card">
+                <div class="finish-card-title">✓ 故障已修复</div>
+                <div class="finish-card-content">
+                  <strong>问题原因：</strong>Node.js 应用的 <code>node_modules</code> 中缺少 <code>mongoose</code> 模块，导致服务启动失败，PM2 重试 15 次后停止。<br><br>
+                  <strong>修复过程：</strong><br>
+                  1. 检查 Nginx 状态 → 服务正常运行<br>
+                  2. 分析错误日志 → 定位到后端 3000 端口连接拒绝<br>
+                  3. 检查 PM2 进程 → 应用处于 errored 状态<br>
+                  4. 查看应用日志 → 找到 mongoose 模块缺失的根因<br>
+                  5. 重新安装 npm 依赖 → 234 个包安装成功<br>
+                  6. 重启服务并验证 → 返回 200 状态码<br><br>
+                  <strong>当前状态：</strong>服务已恢复正常，响应时间 23ms。建议后续检查部署流程，确保依赖安装完整。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="msg-row user">
+            <div class="msg-bubble user">
+              不错，顺便帮我看看这台服务器的磁盘空间够不够，最近感觉有点慢
+            </div>
+            <div class="msg-avatar user">👤</div>
+          </div>
+
+          <div class="msg-row ai">
+            <div class="msg-avatar ai">🤖</div>
+            <div class="msg-bubble ai">
+              <div class="msg-thinking">
+                <strong>思考：</strong>用户想了解磁盘空间和系统慢的原因。我需要：<br>
+                1. 检查磁盘使用情况（df -h）<br>
+                2. 查看哪个目录占用空间最大（du 或者 ncdu）<br>
+                3. 检查系统负载和内存使用<br>
+                4. 看看是不是日志文件太大了
+              </div>
+              
+              <div class="cmd-card">
+                <div class="cmd-card-header">
+                  <span class="cmd-card-title">执行命令 · 磁盘使用概况</span>
+                  <span class="cmd-status success">✓ 已完成</span>
+                </div>
+                <div class="cmd-command">df -h</div>
+                <div class="cmd-output">Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        40G   33G  4.8G  88% /
+tmpfs           1.9G     0  1.9G   0% /dev/shm
+tmpfs           1.9G  33M  1.9G   2% /run
+tmpfs           1.9G     0  1.9G   0% /sys/fs/cgroup
+/dev/sda15      105M  5.2M  100M   5% /boot/efi</div>
+              </div>
+
+              <div class="cmd-card">
+                <div class="cmd-card-header">
+                  <span class="cmd-card-title">执行命令 · 根目录下大文件/目录 TOP 10</span>
+                  <span class="cmd-status success">✓ 已完成</span>
+                </div>
+                <div class="cmd-command">du -sh /* 2>/dev/null | sort -rh | head -10</div>
+                <div class="cmd-output">12G     /var
+8.5G    /opt
+4.2G    /usr
+3.1G    /root
+2.1G    /home
+1.1G    /lib
+256M    /boot
+84M     /etc
+12M     /sbin
+6.1M    /bin</div>
+              </div>
+
+              <div class="cmd-card">
+                <div class="cmd-card-header">
+                  <span class="cmd-card-title">执行命令 · /var 目录详细分析</span>
+                  <span class="cmd-status success">✓ 已完成</span>
+                </div>
+                <div class="cmd-command">du -sh /var/* 2>/dev/null | sort -rh | head -8</div>
+                <div class="cmd-output">6.8G    /var/log
+3.2G    /var/lib
+1.1G    /var/cache
+520M    /var/spool
+45M     /var/www
+12M     /var/tmp
+8.2M    /var/backups
+1.1M    /var/opt</div>
+              </div>
+
+              <div class="cmd-card">
+                <div class="cmd-card-header">
+                  <span class="cmd-card-title">执行命令 · 系统日志文件大小</span>
+                  <span class="cmd-status success">✓ 已完成</span>
+                </div>
+                <div class="cmd-command">ls -lhS /var/log/ | head -15</div>
+                <div class="cmd-output">total 6.8G
+-rw-r----- 1 syslog adm  2.3G Jul 13 11:30 syslog
+-rw-r----- 1 syslog adm  1.8G Jul 12 23:59 syslog.1
+-rw-r--r-- 1 root   root 1.2G Jul 13 11:28 nginx/access.log
+-rw-r--r-- 1 root   root 560M Jul 13 11:28 nginx/error.log
+-rw-rw-r-- 1 root   utmp 320M Jul 13 09:00 wtmp
+-rw-r----- 1 syslog adm  280M Jul 11 23:59 syslog.2.gz
+-rw-r----- 1 syslog adm  195M Jul 10 23:59 syslog.3.gz
+drwxr-xr-x 2 root   root 4.0K Jul 13 00:00 apt/
+drwxr-xr-x 2 root   root 4.0K Jul 12 00:00 uninstall/
+-rw-r--r-- 1 root   root 2.1M Jul 13 11:28 auth.log
+-rw-r--r-- 1 root   root 1.5M Jul 13 09:00 dpkg.log</div>
+              </div>
+
+              <div>
+                <strong>磁盘分析结果：</strong><br>
+                系统盘 40G 已经用了 88%，剩余不到 5G，确实比较紧张。主要占用：
+                <ul style="margin: 8px 0 8px 20px; padding: 0;">
+                  <li><strong>/var/log — 6.8G</strong>（最大头！syslog 2.3G + nginx 日志 1.7G）</li>
+                  <li><strong>/opt — 8.5G</strong>（应用程序和数据）</li>
+                  <li><strong>/usr — 4.2G</strong>（系统文件）</li>
+                </ul>
+                日志文件没有及时轮转清理，占用了大量空间，这也可能是系统变慢的原因之一（大文件写入拖慢 IO）。
+                <br><br>
+                建议清理一下旧日志，并配置 logrotate 自动轮转。我可以帮你清理 7 天以前的旧日志，这个操作比较安全。
+              </div>
+
+              <div class="cmd-card warning">
+                <div class="cmd-warning-text">
+                  ⚠️ <strong>操作确认</strong>：将清理 7 天前的旧日志并配置 logrotate 自动轮转，不会删除当前正在写入的日志
+                </div>
+                <div class="cmd-card-header">
+                  <span class="cmd-card-title">执行命令 · 清理旧日志 + 配置 logrotate</span>
+                  <span class="cmd-status success">✓ 已完成</span>
+                </div>
+                <div class="cmd-command">find /var/log -name "*.gz" -mtime +7 -delete && find /var/log -name "*.1" -mtime +3 -delete && systemctl restart rsyslog && echo "Cleanup done" && df -h / | tail -1</div>
+                <div class="cmd-output">Cleanup done
+/dev/sda1        40G   29G  8.6G  78% /</div>
+              </div>
+
+              <div class="finish-card">
+                <div class="finish-card-title">✓ 磁盘清理完成</div>
+                <div class="finish-card-content">
+                  <strong>清理效果：</strong>磁盘使用率从 <strong>88%</strong> 降到 <strong>78%</strong>，释放了约 3.8G 空间。<br><br>
+                  <strong>后续建议：</strong><br>
+                  1. 配置 Nginx 日志按天轮转（当前日志已达 1.2G+）<br>
+                  2. 考虑扩容系统盘到 80G，避免后续空间不足<br>
+                  3. 定期检查大文件，可设置每月自动清理脚本<br><br>
+                  系统慢的问题可能和磁盘空间不足、日志写入频繁有关，清理后应该会有改善。如果还是慢，可以进一步排查 IO 等待和进程资源占用。
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottom-bar">
+          <div class="bb-row1">
+            <div class="bb-left">
+              <div class="mode-capsule agent" id="modeCapsule" onclick="toggleMode()" data-tip="Agent 模式 · AI 自动思考规划并执行命令">
+                <div class="radar-pulse"></div>
+                <span class="hub-icon">
+                  <svg class="svg-icon" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="12" r="2.5"/>
+                    <circle cx="12" cy="4" r="2"/>
+                    <circle cx="12" cy="20" r="2"/>
+                    <circle cx="4" cy="12" r="2"/>
+                    <circle cx="20" cy="12" r="2"/>
+                    <line x1="12" y1="6" x2="12" y2="9.5" stroke="currentColor" stroke-width="1.5"/>
+                    <line x1="12" y1="14.5" x2="12" y2="18" stroke="currentColor" stroke-width="1.5"/>
+                    <line x1="6" y1="12" x2="9.5" y2="12" stroke="currentColor" stroke-width="1.5"/>
+                    <line x1="14.5" y1="12" x2="18" y2="12" stroke="currentColor" stroke-width="1.5"/>
+                  </svg>
+                </span>
+                <span id="modeText">Agent</span>
+                <span class="caret" id="modeCaret" style="display:none;">▾</span>
+              </div>
+              <div class="bb-icon-btn" data-tip="Agent 日志 · 查看 AI 完整思考过程与执行轨迹">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                  <line x1="8" y1="21" x2="16" y2="21"></line>
+                  <line x1="12" y1="17" x2="12" y2="21"></line>
+                  <polyline points="7 9 9 11 13 7"></polyline>
+                </svg>
+              </div>
+              <div class="bb-icon-btn" data-tip="历史记录 · 浏览过往会话与任务记录">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="1 4 1 10 7 10"></polyline>
+                  <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+                  <polyline points="12 7 12 12 16 14"></polyline>
+                </svg>
+              </div>
+              <div class="bb-icon-btn" data-tip="只读模式 · 命令执行前需手动确认，安全可控">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+              </div>
+              <div class="bb-icon-btn" data-tip="Runbook · 预设运维流程，一键自动执行">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+              </div>
+            </div>
+            <div class="bb-right">
+              <div class="running-badge" id="runningBadge" style="display:none;">
+                <div class="spinner"></div>
+                <span>执行中...</span>
+              </div>
+              <div class="model-select" data-tip="AI 模型 · 切换使用的大语言模型">
+                <span>mimo-v2.5</span>
+                <span class="caret">▾</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="input-wrap">
+            <textarea class="ai-input" id="aiInput" placeholder="描述需求，Agent 自动执行..." rows="1" oninput="handleInput(this)" onkeydown="handleKeyDown(event)"></textarea>
+            <div class="char-counter" id="charCounter">0 / 50000</div>
+            <div class="input-suffix">
+              <button class="suffix-btn orch-toggle" id="orchToggle" onclick="toggleOrchMode()" data-tip="编排模式 · 可视化规划多步骤复杂任务">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="12" cy="12" r="2.5"/>
+                  <circle cx="12" cy="4" r="2"/>
+                  <circle cx="12" cy="20" r="2"/>
+                  <circle cx="4" cy="12" r="2"/>
+                  <circle cx="20" cy="12" r="2"/>
+                  <line x1="12" y1="6" x2="12" y2="9.5" stroke="currentColor" stroke-width="1.5"/>
+                  <line x1="12" y1="14.5" x2="12" y2="18" stroke="currentColor" stroke-width="1.5"/>
+                  <line x1="6" y1="12" x2="9.5" y2="12" stroke="currentColor" stroke-width="1.5"/>
+                  <line x1="14.5" y1="12" x2="18" y2="12" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+              </button>
+              <button class="suffix-btn send" id="sendBtn" onclick="sendMessage()" data-tip="发送消息 · 开始与 AI Agent 对话">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="12" y1="19" x2="12" y2="5"></line>
+                  <polyline points="5 12 12 5 19 12"></polyline>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SFTP Panel -->
+    <div class="sftp-panel" id="sftpPanel">
+      <div class="sftp-header">
+        <span class="sftp-title">SFTP - 192.168.1.100</span>
+        <div class="sftp-tools">
+          <div class="sftp-tool-btn" title="列表视图">☰</div>
+          <div class="sftp-tool-btn" title="上传">↑</div>
+          <div class="sftp-tool-btn" title="下载">↓</div>
+          <div class="sftp-tool-btn" title="刷新">↻</div>
+          <div class="sftp-tool-btn" title="关闭" onclick="toggleSFTP()">✕</div>
+        </div>
+      </div>
+      <div class="sftp-pathbar">
+        <div class="path-btn" onclick="goUpDir()" title="上级目录">←</div>
+        <input class="path-input" id="pathInput" value="/root" readonly>
+        <div class="path-btn" onclick="goHome()" title="Home">
+          <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:14px;height:14px;">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+        </div>
+      </div>
+      <div class="sftp-filelist" id="fileList"></div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="settings-overlay" id="settingsOverlay" onclick="closeSettingsOverlay(event)">
+    <div class="settings-modal" onclick="event.stopPropagation()">
+      <div class="settings-header">
+        <div class="settings-header-left">
+          <div class="settings-back-btn" id="settingsBackBtn" onclick="goBackSettings()" style="display:none;">
+            <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </div>
+          <span class="settings-title" id="settingsTitle">设置</span>
+        </div>
+        <div class="settings-close" onclick="closeSettings()">✕</div>
+      </div>
+      <div class="settings-body">
+        <div class="settings-page active" id="page-main">
+          <div class="settings-group">
+            <div class="settings-group-title">连接管理</div>
+            <div class="settings-item" onclick="openSettingsPage('hosts')">
+              <div class="settings-item-icon-wrap blue">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M2 12h20"></path>
+                  <path d="M12 2v20"></path>
+                  <circle cx="12" cy="12" r="4"></circle>
+                </svg>
+              </div>
+              <div class="settings-item-content">
+                <div class="settings-item-title">主机管理</div>
+                <div class="settings-item-subtitle">管理已连接的服务器主机</div>
+              </div>
+              <div class="settings-item-right">
+                <div class="settings-item-arrow">
+                  <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </div>
+              </div>
+              <div class="settings-item-divider"></div>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-icon-wrap blue">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="16 18 22 12 16 6"></polyline>
+                  <polyline points="8 6 2 12 8 18"></polyline>
+                </svg>
+              </div>
+              <div class="settings-item-content">
+                <div class="settings-item-title">代码片段</div>
+                <div class="settings-item-subtitle">常用命令和脚本管理</div>
+              </div>
+              <div class="settings-item-right">
+                <div class="settings-item-arrow">
+                  <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </div>
+              </div>
+              <div class="settings-item-divider"></div>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-icon-wrap green">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polygon points="10 8 16 12 10 16 10 8"></polygon>
+                </svg>
+              </div>
+              <div class="settings-item-content">
+                <div class="settings-item-title">运维工作流</div>
+                <div class="settings-item-subtitle">自动化运维任务编排</div>
+              </div>
+              <div class="settings-item-right">
+                <div class="settings-item-arrow">
+                  <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </div>
+              </div>
+              <div class="settings-item-divider"></div>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-icon-wrap purple">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M22 10v6M2 10l10-5 10 5-10 5z"></path>
+                  <path d="M6 12v5c3 3 9 3 12 0v-5"></path>
+                </svg>
+              </div>
+              <div class="settings-item-content">
+                <div class="settings-item-title">变更台账</div>
+                <div class="settings-item-subtitle">记录所有系统变更历史</div>
+              </div>
+              <div class="settings-item-right">
+                <div class="settings-item-arrow">
+                  <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </div>
+              </div>
+              <div class="settings-item-divider"></div>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-icon-wrap orange">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                  <polyline points="9 12 11 14 15 10"></polyline>
+                </svg>
+              </div>
+              <div class="settings-item-content">
+                <div class="settings-item-title">审计日志</div>
+                <div class="settings-item-subtitle">操作记录与安全审计</div>
+              </div>
+              <div class="settings-item-right">
+                <div class="settings-item-arrow">
+                  <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </div>
+              </div>
+              <div class="settings-item-divider"></div>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-icon-wrap red">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                  <rect x="3" y="11" width="3" height="11" rx="1" ry="1"></rect>
+                  <rect x="18" y="11" width="3" height="11" rx="1" ry="1"></rect>
+                  <rect x="8" y="5" width="8" height="4" rx="1" ry="1"></rect>
+                </svg>
+              </div>
+              <div class="settings-item-content">
+                <div class="settings-item-title">变更窗口</div>
+                <div class="settings-item-subtitle">计划维护与变更时间窗口</div>
+              </div>
+              <div class="settings-item-right">
+                <div class="settings-item-arrow">
+                  <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </div>
+              </div>
+              <div class="settings-item-divider"></div>
+            </div>
+            <div class="settings-item" onclick="openSettingsPage('notification')">
+              <div class="settings-item-icon-wrap orange">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                  <path d="M10 11h4"></path>
+                  <path d="M10 15h4"></path>
+                </svg>
+              </div>
+              <div class="settings-item-content">
+                <div class="settings-item-title">通知设置</div>
+                <div class="settings-item-subtitle">告警与消息通知管理</div>
+              </div>
+              <div class="settings-item-right">
+                <div class="settings-item-arrow">
+                  <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-group-title">AI 与智能</div>
+            <div class="settings-item">
+              <div class="settings-item-icon-wrap blue">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M10 13l2-2 2 2 2-2"/>
+                  <path d="M12 2v2"/>
+                  <path d="M12 20v2"/>
+                  <path d="M4.93 4.93l1.41 1.41"/>
+                  <path d="M17.66 17.66l1.41 1.41"/>
+                  <path d="M2 12h2"/>
+                  <path d="M20 12h2"/>
+                  <path d="M6.34 17.66l-1.41 1.41"/>
+                  <path d="M19.07 4.93l-1.41 1.41"/>
+                </svg>
+              </div>
+              <div class="settings-item-content">
+                <div class="settings-item-title">AI 模型设置</div>
+                <div class="settings-item-subtitle">选择模型、配置参数</div>
+              </div>
+              <div class="settings-item-right">
+                <div class="settings-item-arrow">
+                  <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </div>
+              </div>
+              <div class="settings-item-divider"></div>
+            </div>
+            <div class="settings-item" onclick="openSettingsPage('agent')">
+              <div class="settings-item-icon-wrap green">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                  <path d="M12 8v4"></path>
+                  <path d="M12 16h.01"></path>
+                </svg>
+              </div>
+              <div class="settings-item-content">
+                <div class="settings-item-title">Agent 设置</div>
+                <div class="settings-item-subtitle">智能体行为与权限配置</div>
+              </div>
+              <div class="settings-item-right">
+                <div class="settings-item-arrow">
+                  <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </div>
+              </div>
+              <div class="settings-item-divider"></div>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-icon-wrap blue">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                </svg>
+              </div>
+              <div class="settings-item-content">
+                <div class="settings-item-title">知识库</div>
+                <div class="settings-item-subtitle">管理私有知识与文档</div>
+              </div>
+              <div class="settings-item-right">
+                <div class="settings-item-arrow">
+                  <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-group-title">外观与体验</div>
+            <div class="settings-item" onclick="openSettingsPage('appearance')">
+              <div class="settings-item-icon-wrap blue">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="13.5" cy="6.5" r=".5"></circle>
+                  <circle cx="17.5" cy="10.5" r=".5"></circle>
+                  <circle cx="8.5" cy="7.5" r=".5"></circle>
+                  <circle cx="6.5" cy="12.5" r=".5"></circle>
+                  <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path>
+                </svg>
+              </div>
+              <div class="settings-item-content">
+                <div class="settings-item-title">外观设置</div>
+                <div class="settings-item-subtitle">主题、字体、界面风格</div>
+              </div>
+              <div class="settings-item-right">
+                <div class="settings-item-arrow">
+                  <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </div>
+              </div>
+              <div class="settings-item-divider"></div>
+            </div>
+            <div class="settings-item" onclick="openSettingsPage('language')">
+              <div class="settings-item-icon-wrap blue">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M5 8h14M5 8a2 2 0 1 1 0-4h14a2 2 0 1 1 0 4M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8m-9 4h4"></path>
+                </svg>
+              </div>
+              <div class="settings-item-content">
+                <div class="settings-item-title">语言</div>
+                <div class="settings-item-subtitle">简体中文</div>
+              </div>
+              <div class="settings-item-right">
+                <div class="settings-item-arrow">
+                  <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <div class="settings-group-title">关于</div>
+            <div class="settings-item" onclick="openSettingsPage('about')">
+              <div class="settings-item-icon-wrap blue">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+              </div>
+              <div class="settings-item-content">
+                <div class="settings-item-title">关于应用</div>
+                <div class="settings-item-subtitle">AI Terminal v1.3.5</div>
+              </div>
+              <div class="settings-item-right">
+                <div class="settings-item-arrow">
+                  <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </div>
+              </div>
+              <div class="settings-item-divider"></div>
+            </div>
+            <div class="settings-item">
+              <div class="settings-item-icon-wrap gray">
+                <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                  <path d="M9 12l2 2 4-4"></path>
+                </svg>
+              </div>
+              <div class="settings-item-content">
+                <div class="settings-item-title">安全与隐私</div>
+                <div class="settings-item-subtitle">数据保护与隐私政策</div>
+              </div>
+              <div class="settings-item-right">
+                <div class="settings-item-arrow">
+                  <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-page" id="page-agent">
+          <div class="sub-page-padding">
+            <div class="setting-block">
+              <div class="setting-block-title">执行限制</div>
+              <div class="slider-row">
+                <span class="slider-label">最大执行步骤数</span>
+                <span class="slider-value" id="maxStepsValue">50</span>
+              </div>
+              <div class="slider-wrap">
+                <input type="range" min="0" max="100" value="50" oninput="updateMaxSteps(this.value)">
+              </div>
+              <div class="slider-desc">限制 Agent 单次任务最多执行多少步，防止无限循环。0 = 无限制</div>
+            </div>
+
+            <div class="setting-block">
+              <div class="setting-block-title">提示词设置</div>
+              <div class="collapse-panel" id="systemPromptPanel">
+                <div class="collapse-header" onclick="toggleCollapse('systemPromptPanel')">
+                  <div class="collapse-icon-wrap orange">
+                    <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                      <polyline points="14 2 14 8 20 8"></polyline>
+                      <line x1="16" y1="13" x2="8" y2="13"></line>
+                      <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                  </div>
+                  <span class="collapse-title">内置系统提示词</span>
+                  <span class="collapse-arrow">▾</span>
+                </div>
+                <div class="collapse-body">
+                  <textarea class="prompt-textarea" readonly>你是一个专业的运维 AI 助手，负责帮助用户管理 Linux 服务器。
+
+核心原则：
+1. 安全第一：执行任何修改性操作前必须确认
+2. 只读优先：优先使用只读命令收集信息
+3. 逐步执行：复杂任务分步执行，每步确认结果
+4. 数据脱敏：输出敏感信息时进行脱敏处理
+
+你可以：
+- 执行 shell 命令查看系统状态
+- 分析日志和排查问题
+- 安装和配置软件
+- 编写和执行脚本
+
+在执行命令前，先说明你的思路和计划。</textarea>
+                </div>
+              </div>
+
+              <div class="collapse-panel" id="customPromptPanel">
+                <div class="collapse-header" onclick="toggleCollapse('customPromptPanel')">
+                  <div class="collapse-icon-wrap green">
+                    <svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M12 20h9"></path>
+                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+                    </svg>
+                  </div>
+                  <span class="collapse-title">自定义提示词</span>
+                  <span class="collapse-arrow">▾</span>
+                </div>
+                <div class="collapse-body">
+                  <textarea class="prompt-textarea" placeholder="在此输入自定义提示词，将附加到系统提示词之后..."></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-page" id="page-notification">
+          <div class="sub-page-padding">
+            <div class="setting-block">
+              <div class="toggle-row">
+                <span class="toggle-label">启用通知</span>
+                <label class="switch">
+                  <input type="checkbox">
+                  <span class="switch-slider"></span>
+                </label>
+              </div>
+            </div>
+
+            <div class="setting-block">
+              <div class="setting-block-title">Webhook 配置</div>
+              <div class="form-row">
+                <label class="form-label">Webhook URL</label>
+                <input type="text" class="form-input" placeholder="https://oapi.dingtalk.com/robot/send?access_token=...">
+              </div>
+              <div class="form-row">
+                <label class="form-label">触发时机</label>
+                <select class="form-select">
+                  <option>任务完成时</option>
+                  <option>任务失败时</option>
+                  <option>总是</option>
+                </select>
+              </div>
+              <div class="btn-group">
+                <button class="btn btn-secondary">测试</button>
+                <button class="btn btn-primary">保存</button>
+              </div>
+              <div class="form-hint">支持钉钉、飞书、企业微信群机器人</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-page" id="page-appearance">
+          <div class="sub-page-padding">
+            <div class="setting-block">
+              <div class="setting-block-title">主题色</div>
+              <div class="color-picker-row">
+                <div class="color-option color-blue selected" onclick="selectColor(this)">
+                  <span class="check">✓</span>
+                </div>
+                <div class="color-option color-green" onclick="selectColor(this)">
+                  <span class="check">✓</span>
+                </div>
+                <div class="color-option color-purple" onclick="selectColor(this)">
+                  <span class="check">✓</span>
+                </div>
+                <div class="color-option color-orange" onclick="selectColor(this)">
+                  <span class="check">✓</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="setting-block">
+              <div class="setting-block-title">主题模式</div>
+              <div class="seg-control">
+                <div class="seg-option">深色</div>
+                <div class="seg-option active">浅色</div>
+                <div class="seg-option">跟随系统</div>
+              </div>
+            </div>
+
+            <div class="setting-block">
+              <div class="slider-row">
+                <span class="slider-label">界面缩放</span>
+                <span class="slider-value" id="zoomValue">100%</span>
+              </div>
+              <div class="slider-wrap">
+                <input type="range" min="80" max="120" value="100" oninput="updateZoom(this.value)">
+              </div>
+            </div>
+
+            <div class="setting-block">
+              <div class="slider-row">
+                <span class="slider-label">终端字体大小</span>
+                <span class="slider-value" id="termFontValue">13px</span>
+              </div>
+              <div class="slider-wrap">
+                <input type="range" min="10" max="20" value="13" oninput="updateTermFont(this.value)">
+              </div>
+            </div>
+
+            <div class="setting-block">
+              <div class="setting-block-title">圆角大小</div>
+              <div class="seg-control">
+                <div class="seg-option active">小</div>
+                <div class="seg-option">中</div>
+                <div class="seg-option">大</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-page" id="page-language">
+          <div class="sub-page-padding">
+            <div class="lang-list">
+              <div class="lang-item" onclick="selectLang(this)">
+                <span class="lang-name">跟随系统</span>
+                <span class="lang-check">✓</span>
+              </div>
+              <div class="lang-item selected" onclick="selectLang(this)">
+                <span class="lang-name">简体中文</span>
+                <span class="lang-check">✓</span>
+              </div>
+              <div class="lang-item" onclick="selectLang(this)">
+                <span class="lang-name">English</span>
+                <span class="lang-check">✓</span>
+              </div>
+              <div class="lang-item" onclick="selectLang(this)">
+                <span class="lang-name">日本語</span>
+                <span class="lang-check">✓</span>
+              </div>
+              <div class="lang-item" onclick="selectLang(this)">
+                <span class="lang-name">한국어</span>
+                <span class="lang-check">✓</span>
+              </div>
+              <div class="lang-item" onclick="selectLang(this)">
+                <span class="lang-name">Français</span>
+                <span class="lang-check">✓</span>
+              </div>
+              <div class="lang-item" onclick="selectLang(this)">
+                <span class="lang-name">Deutsch</span>
+                <span class="lang-check">✓</span>
+              </div>
+              <div class="lang-item" onclick="selectLang(this)">
+                <span class="lang-name">Español</span>
+                <span class="lang-check">✓</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-page" id="page-hosts">
+          <div class="sub-page-padding">
+            <div class="host-list-header">
+              <span class="host-list-title">主机列表</span>
+              <button class="add-host-btn">+ 新建主机</button>
+            </div>
+
+            <div class="host-card">
+              <span class="host-status-dot online"></span>
+              <div class="host-info">
+                <div class="host-name">web-server-01</div>
+                <div class="host-detail">192.168.1.100:22 · root</div>
+              </div>
+              <div class="host-actions">
+                <div class="host-action-btn" title="编辑">✎</div>
+                <div class="host-action-btn delete" title="删除">🗑</div>
+              </div>
+            </div>
+
+            <div class="host-card">
+              <span class="host-status-dot online"></span>
+              <div class="host-info">
+                <div class="host-name">db-server-01</div>
+                <div class="host-detail">192.168.1.101:22 · root</div>
+              </div>
+              <div class="host-actions">
+                <div class="host-action-btn" title="编辑">✎</div>
+                <div class="host-action-btn delete" title="删除">🗑</div>
+              </div>
+            </div>
+
+            <div class="host-card">
+              <span class="host-status-dot offline"></span>
+              <div class="host-info">
+                <div class="host-name">cache-01</div>
+                <div class="host-detail">10.0.0.50:22 · admin</div>
+              </div>
+              <div class="host-actions">
+                <div class="host-action-btn" title="编辑">✎</div>
+                <div class="host-action-btn delete" title="删除">🗑</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="settings-page" id="page-about">
+          <div class="sub-page-padding">
+            <div class="about-section">
+              <div class="about-logo">▯</div>
+              <div class="about-app-name">AI Terminal</div>
+              <div class="about-version">v1.3.5</div>
+              <button class="check-update-btn">检查更新</button>
+            </div>
+
+            <div class="link-list">
+              <div class="link-item">
+                <svg class="link-icon" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                </svg>
+                <span class="link-text">GitHub 仓库</span>
+                <span class="link-arrow">›</span>
+              </div>
+              <div class="link-item">
+                <svg class="link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                </svg>
+                <span class="link-text">官方文档</span>
+                <span class="link-arrow">›</span>
+              </div>
+              <div class="link-item">
+                <svg class="link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span class="link-text">提交反馈</span>
+                <span class="link-arrow">›</span>
+              </div>
+              <div class="link-item">
+                <svg class="link-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                  <path d="M9 12l2 2 4-4"></path>
+                </svg>
+                <span class="link-text">隐私政策</span>
+                <span class="link-arrow">›</span>
+              </div>
+            </div>
+
+            <div class="about-footer">© 2025 keiskei. MIT License.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="demo-label">DEMO · 数据为模拟展示</div>
+</div>
+
+<script>
+  // ========== State ==========
+  let currentServer = 'web01';
+  let aiPanelVisible = true;
+  let aiPanelCollapsed = false;
+  let monitorVisible = true;
+  let isOrchestrateMode = false;
+  let isRunning = false;
+  let currentFontSize = 13;
+  let currentDir = '/root';
+  let sftpVisible = true;
+
+  // Terminal contents for different servers
+  const terminalContents = {
+    web01: `
+<div class="term-line"><span class="term-prompt">Last login: Wed Jul 10 14:23:45 2024 from 192.168.1.50</span></div>
+<div class="term-line">&nbsp;</div>
+<div class="term-line"><span class="term-prompt">[root@web-server-01 ~]# </span><span class="term-cmd">ls -la</span></div>
+<div class="term-line term-output">total 68</div>
+<div class="term-line term-output">dr-xr-x---.  3 root root  213 Jul 10 14:20 .</div>
+<div class="term-line term-output">dr-xr-xr-x. 18 root root  256 Jul  5 09:12 ..</div>
+<div class="term-line term-output">-rw-------.  1 root root 1523 Jul 10 14:20 .bash_history</div>
+<div class="term-line term-output">-rw-r--r--.  1 root root   18 Nov 24  2023 .bash_logout</div>
+<div class="term-line term-output">-rw-r--r--.  1 root root  176 Nov 24  2023 .bash_profile</div>
+<div class="term-line term-output">-rw-r--r--.  1 root root  276 Jul  8 10:15 .bashrc</div>
+<div class="term-line term-output">drwxr-xr-x.  2 root root   42 Jul  5 09:30 scripts</div>
+<div class="term-line term-output">-rw-r--r--.  1 root root  129 Jul  9 16:42 server-check.sh</div>
+<div class="term-line">&nbsp;</div>
+<div class="term-line"><span class="term-prompt">[root@web-server-01 ~]# </span><span class="term-cmd">df -h</span></div>
+<div class="term-line term-output">Filesystem      Size  Used Avail Use% Mounted on</div>
+<div class="term-line term-output">/dev/sda1        40G   28G   12G  70% /</div>
+<div class="term-line term-output">devtmpfs        1.8G     0  1.8G   0% /dev</div>
+<div class="term-line term-output">tmpfs           1.9G     0  1.9G   0% /dev/shm</div>
+<div class="term-line term-output">tmpfs           1.9G   33M  1.8G   2% /run</div>
+<div class="term-line term-output">tmpfs           1.9G     0  1.9G   0% /sys/fs/cgroup</div>
+<div class="term-line">&nbsp;</div>
+<div class="term-line"><span class="term-prompt">[root@web-server-01 ~]# </span><span class="term-cmd">free -h</span></div>
+<div class="term-line term-output">               total        used        free      shared  buff/cache   available</div>
+<div class="term-line term-output">Mem:          3.7Gi       1.2Gi       1.8Gi        24Mi       756Mi       2.2Gi</div>
+<div class="term-line term-output">Swap:         2.0Gi          0B       2.0Gi</div>
+<div class="term-line">&nbsp;</div>
+<div class="term-line"><span class="term-prompt">[root@web-server-01 ~]# </span><span class="term-cmd">docker ps</span></div>
+<div class="term-line term-output">CONTAINER ID   IMAGE          COMMAND                  CREATED       STATUS       PORTS                               NAMES</div>
+<div class="term-line term-output">a1b2c3d4e5f6   nginx:latest   "/docker-entrypoint.…"   2 weeks ago   Up 2 weeks   0.0.0.0:80->80/tcp, 443/tcp         web-nginx</div>
+<div class="term-line term-output">f6e5d4c3b2a1   redis:7        "docker-entrypoint.s…"   3 weeks ago   Up 3 weeks   6379/tcp                            web-redis</div>
+<div class="term-line term-output">123456789abc   node:18-alpine "docker-entrypoint.s…"   5 days ago    Up 5 days    3000/tcp                            web-app</div>
+<div class="term-line">&nbsp;</div>
+<div class="term-line"><span class="term-prompt">[root@web-server-01 ~]# </span><span class="term-cmd">systemctl status nginx</span></div>
+<div class="term-line term-output">● nginx.service - nginx - high performance web server</div>
+<div class="term-line term-output">   Loaded: loaded (/usr/lib/systemd/system/nginx.service; enabled; vendor preset: disabled)</div>
+<div class="term-line term-output">   Active: active (running) since Wed 2024-07-10 09:15:23 CST; 5h 10min ago</div>
+<div class="term-line term-output">     Docs: http://nginx.org/en/docs/</div>
+<div class="term-line term-output">  Process: 12345 ExecReload=/usr/sbin/nginx -s reload (code=exited, status=0/SUCCESS)</div>
+<div class="term-line term-output"> Main PID: 9876 (nginx)</div>
+<div class="term-line term-output">   CGroup: /system.slice/nginx.service</div>
+<div class="term-line term-output">           ├─9876 nginx: master process /usr/sbin/nginx</div>
+<div class="term-line term-output">           └─9877 nginx: worker process</div>
+<div class="term-line">&nbsp;</div>
+<div class="term-line"><span class="term-prompt">[root@web-server-01 ~]# </span><span class="cursor"></span></div>
+`,
+    db01: `
+<div class="term-line"><span class="term-prompt">Last login: Tue Jul  9 09:15:22 2024 from 192.168.1.50</span></div>
+<div class="term-line">&nbsp;</div>
+<div class="term-line"><span class="term-prompt">[root@db-server-01 ~]# </span><span class="term-cmd">free -h</span></div>
+<div class="term-line term-output">               total        used        free      shared  buff/cache   available</div>
+<div class="term-line term-output">Mem:           7.6Gi       4.2Gi       1.8Gi       128Mi       1.6Gi       3.1Gi</div>
+<div class="term-line term-output">Swap:          4.0Gi       256Mi       3.7Gi</div>
+<div class="term-line">&nbsp;</div>
+<div class="term-line"><span class="term-prompt">[root@db-server-01 ~]# </span><span class="term-cmd">df -h</span></div>
+<div class="term-line term-output">Filesystem      Size  Used Avail Use% Mounted on</div>
+<div class="term-line term-output">/dev/sda1        50G   32G   18G  64% /</div>
+<div class="term-line term-output">/dev/sdb1       200G  145G   55G  73% /data</div>
+<div class="term-line term-output">tmpfs           3.8G     0  3.8G   0% /dev/shm</div>
+<div class="term-line">&nbsp;</div>
+<div class="term-line"><span class="term-prompt">[root@db-server-01 ~]# </span><span class="term-cmd">top -bn1 | head -20</span></div>
+<div class="term-line term-output">top - 14:30:15 up 45 days,  6:12,  2 users,  load average: 0.85, 0.92, 0.88</div>
+<div class="term-line term-output">Tasks: 128 total,   1 running, 127 sleeping,   0 stopped,   0 zombie</div>
+<div class="term-line term-output">%Cpu(s):  5.2 us,  2.1 sy,  0.0 ni, 92.3 id,  0.2 wa,  0.0 hi,  0.2 si,  0.0 st</div>
+<div class="term-line term-output">MiB Mem :   7782.3 total,   1845.2 free,   4310.5 used,   1626.6 buff/cache</div>
+<div class="term-line term-output">MiB Swap:   4096.0 total,   3840.0 free,    256.0 used.   3172.8 avail Mem</div>
+<div class="term-line term-output">  PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND</div>
+<div class="term-line term-output">  1234 mysql     20   0 2850000 1.2g   8900 S  12.5  16.2  89:23.45 mysqld</div>
+<div class="term-line term-output">    1 root      20   0  179000   9800   6700 S   0.0   0.1   0:12.34 systemd</div>
+<div class="term-line">&nbsp;</div>
+<div class="term-line"><span class="term-prompt">[root@db-server-01 ~]# </span><span class="cursor"></span></div>
+`,
+    cache01: `
+<div class="term-line"><span class="term-prompt">Last login: Mon Jul  8 16:42:11 2024 from 192.168.1.50</span></div>
+<div class="term-line">&nbsp;</div>
+<div class="term-line"><span class="term-prompt">[root@cache-01 ~]# </span><span class="term-cmd">cat /etc/os-release</span></div>
+<div class="term-line term-output">NAME="CentOS Linux"</div>
+<div class="term-line term-output">VERSION="7 (Core)"</div>
+<div class="term-line term-output">ID="centos"</div>
+<div class="term-line term-output">ID_LIKE="rhel fedora"</div>
+<div class="term-line term-output">VERSION_ID="7"</div>
+<div class="term-line term-output">PRETTY_NAME="CentOS Linux 7 (Core)"</div>
+<div class="term-line term-output">ANSI_COLOR="0;31"</div>
+<div class="term-line term-output">CPE_NAME="cpe:/o:centos:centos:7"</div>
+<div class="term-line term-output">HOME_URL="https://www.centos.org/"</div>
+<div class="term-line term-output">BUG_REPORT_URL="https://bugs.centos.org/"</div>
+<div class="term-line">&nbsp;</div>
+<div class="term-line"><span class="term-prompt">[root@cache-01 ~]# </span><span class="term-cmd">docker ps</span></div>
+<div class="term-line term-output">CONTAINER ID   IMAGE          COMMAND                  CREATED        STATUS        PORTS                                       NAMES</div>
+<div class="term-line term-output">c1d2e3f4a5b6   redis:7        "docker-entrypoint.s…"   2 months ago   Up 2 months   0.0.0.0:6379->6379/tcp                    redis-main</div>
+<div class="term-line term-output">b6a5f4e3d2c1   memcached:1.6  "docker-entrypoint.s…"   1 month ago    Up 1 month    0.0.0.0:11211->11211/udp, 11211/tcp        memcached-01</div>
+<div class="term-line">&nbsp;</div>
+<div class="term-line"><span class="term-prompt">[root@cache-01 ~]# </span><span class="cursor"></span></div>
+`
+  };
+
+  // File system data
+  const fileSystem = {
+    '/root': {
+      folders: ['.cache', '.config', '.local', '.ssh', 'scripts', 'logs', 'backup'],
+      files: ['.bash_history', '.bash_logout', '.bash_profile', '.bashrc', '.viminfo', 'server-check.sh', 'deploy.sh']
+    },
+    '/root/.ssh': {
+      folders: [],
+      files: ['authorized_keys', 'id_rsa', 'id_rsa.pub', 'known_hosts']
+    },
+    '/root/scripts': {
+      folders: [],
+      files: ['backup.sh', 'monitor.sh', 'deploy.sh', 'cleanup.sh']
+    }
+  };
+
+  // Monitor chart data
+  const chartData = {
+    cpu: [],
+    mem: [],
+    upload: [],
+    download: [],
+    disk: []
+  };
+
+  const chartColors = {
+    cpu: '#3B82F6',
+    mem: '#F59E0B',
+    upload: '#10B981',
+    download: '#10B981',
+    disk: '#F59E0B'
+  };
+
+  // ========== Init ==========
+  function init() {
+    for (let key in chartData) {
+      for (let i = 0; i < 25; i++) {
+        chartData[key].push(randomValue(key));
+      }
+    }
+    renderAllCharts();
+    renderFileList();
+    setupTabClick();
+
+    document.addEventListener('click', function(e) {
+      if (!e.target.closest('#fontBtn')) {
+        document.getElementById('fontMenu').classList.remove('show');
+      }
+      if (!e.target.closest('#moreBtn')) {
+        document.getElementById('moreMenu').classList.remove('show');
+      }
+    });
+
+    setInterval(updateMonitorData, 200);
+    setInterval(animatePullOutput, 800);
+  }
+
+  let pullProgress = 0;
+  const spinnerFrames = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+  let spinnerIdx = 0;
+
+  function animatePullOutput() {
+    const outputEl = document.getElementById('pullOutput');
+    if (!outputEl) return;
+
+    pullProgress = (pullProgress + 1.5) % 100;
+    spinnerIdx = (spinnerIdx + 1) % spinnerFrames.length;
+
+    const p1 = Math.min(pullProgress, 100);
+    const p2 = Math.min(Math.max(pullProgress - 15, 0), 100);
+    const barCount = 10;
+
+    const bars1 = '▓'.repeat(Math.floor(p1 / 10)) + '░'.repeat(barCount - Math.floor(p1 / 10));
+    const bars2 = '▓'.repeat(Math.floor(p2 / 10)) + '░'.repeat(barCount - Math.floor(p2 / 10));
+
+    const mb1 = Math.floor(p1 * 42);
+    const mb2 = Math.floor(p2 * 27);
+
+    outputEl.textContent = `pulling manifest ${spinnerFrames[spinnerIdx]}
+pulling 1e5dca... ${p1.toFixed(0)}% ${bars1}  ${mb1} MB/4.2 GB
+pulling 3ceac1... ${p2.toFixed(0)}% ${bars2}  ${mb2} MB/2.7 GB`;
+  }
+
+  function randomValue(type) {
+    switch(type) {
+      case 'cpu': return 2 + Math.random() * 8;
+      case 'mem': return 60 + Math.random() * 25;
+      case 'upload': return 50 + Math.random() * 150;
+      case 'download': return 40 + Math.random() * 140;
+      case 'disk': return 70 + Math.random() * 10;
+      default: return 50;
+    }
+  }
+
+  // ========== Tabs ==========
+  function setupTabClick() {
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', function(e) {
+        if (e.target.classList.contains('tab-close')) return;
+        switchTab(this);
+      });
+    });
+  }
+
+  function switchTab(tabEl) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tabEl.classList.add('active');
+    currentServer = tabEl.dataset.server;
+    document.getElementById('terminal').innerHTML = terminalContents[currentServer] || terminalContents.web01;
+  }
+
+  function closeTab(e, el) {
+    e.stopPropagation();
+    const tab = el.parentElement;
+    const tabs = document.querySelectorAll('.tab');
+    if (tabs.length <= 1) return;
+    
+    if (tab.classList.contains('active')) {
+      const nextTab = tab.nextElementSibling && tab.nextElementSibling.classList.contains('tab')
+        ? tab.nextElementSibling
+        : tab.previousElementSibling;
+      if (nextTab) switchTab(nextTab);
+    }
+    tab.remove();
+  }
+
+  // ========== AI Panel ==========
+  function toggleAIPanel() {
+    aiPanelVisible = !aiPanelVisible;
+    const panel = document.getElementById('aiPanel');
+    const btn = document.getElementById('aiToggleBtn');
+    
+    if (aiPanelVisible) {
+      panel.classList.remove('hidden-panel');
+      btn.classList.add('active');
+    } else {
+      panel.classList.add('hidden-panel');
+      btn.classList.remove('active');
+    }
+  }
+
+  function collapseAIPanel() {
+    aiPanelCollapsed = !aiPanelCollapsed;
+    const panel = document.getElementById('aiPanel');
+    if (aiPanelCollapsed) {
+      panel.classList.add('collapsed');
+    } else {
+      panel.classList.remove('collapsed');
+    }
+  }
+
+  // ========== Monitor ==========
+  function toggleMonitor() {
+    monitorVisible = !monitorVisible;
+    const bar = document.getElementById('monitorBar');
+    const btn = document.getElementById('monitorToggleBtn');
+    
+    if (monitorVisible) {
+      bar.classList.remove('hidden');
+      btn.classList.add('active');
+    } else {
+      bar.classList.add('hidden');
+      btn.classList.remove('active');
+    }
+  }
+
+
+
+  function updateMonitorData() {
+    if (!monitorVisible) return;
+
+    for (let key in chartData) {
+      chartData[key].shift();
+      chartData[key].push(randomValue(key));
+    }
+
+    const cpuVal = chartData.cpu[chartData.cpu.length - 1];
+    document.getElementById('cpuValue').textContent = cpuVal.toFixed(1) + '%';
+
+    const memPct = chartData.mem[chartData.mem.length - 1];
+    const memUsed = (3.68 * memPct / 100).toFixed(2);
+    document.getElementById('memValue').textContent = memUsed + 'G/3.68G';
+
+    const uploadVal = chartData.upload[chartData.upload.length - 1];
+    document.getElementById('uploadValue').textContent = uploadVal.toFixed(1) + ' KB/s';
+
+    const downloadVal = chartData.download[chartData.download.length - 1];
+    document.getElementById('downloadValue').textContent = downloadVal.toFixed(1) + ' KB/s';
+
+    const diskVal = chartData.disk[chartData.disk.length - 1];
+    document.getElementById('diskValue').textContent = diskVal.toFixed(1) + '%';
+
+    renderAllCharts();
+  }
+
+  function renderAllCharts() {
+    for (let key in chartData) {
+      renderMiniChart(key + 'Chart', chartData[key], chartColors[key]);
+    }
+  }
+
+  function renderMiniChart(svgId, data, color) {
+    const svg = document.getElementById(svgId);
+    if (!svg) return;
+    
+    const width = 60;
+    const height = 22;
+    const len = data.length;
+    
+    if (len < 2) return;
+
+    const min = Math.min(...data);
+    const max = Math.max(...data);
+    const range = max - min || 1;
+
+    const points = data.map((val, i) => {
+      const x = (i / (len - 1)) * width;
+      const y = height - 2 - ((val - min) / range) * (height - 4);
+      return { x, y };
+    });
+
+    let pathD = `M ${points[0].x} ${points[0].y}`;
+    for (let i = 1; i < points.length; i++) {
+      const prev = points[i - 1];
+      const curr = points[i];
+      const cpx = (prev.x + curr.x) / 2;
+      pathD += ` Q ${prev.x + (curr.x - prev.x) * 0.5} ${prev.y}, ${cpx} ${(prev.y + curr.y) / 2}`;
+    }
+    pathD += ` L ${points[len - 1].x} ${points[len - 1].y}`;
+
+    const areaD = pathD + ` L ${points[len - 1].x} ${height} L ${points[0].x} ${height} Z`;
+
+    const gradId = 'grad-' + svgId;
+
+    svg.innerHTML = '';
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    const gradient = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+    gradient.setAttribute('id', gradId);
+    gradient.setAttribute('x1', '0');
+    gradient.setAttribute('y1', '0');
+    gradient.setAttribute('x2', '0');
+    gradient.setAttribute('y2', '1');
+    const s1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    s1.setAttribute('offset', '0%');
+    s1.setAttribute('stop-color', color);
+    s1.setAttribute('stop-opacity', '0.15');
+    const s2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+    s2.setAttribute('offset', '100%');
+    s2.setAttribute('stop-color', color);
+    s2.setAttribute('stop-opacity', '0');
+    gradient.appendChild(s1);
+    gradient.appendChild(s2);
+    defs.appendChild(gradient);
+    svg.appendChild(defs);
+
+    const areaPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    areaPath.setAttribute('d', areaD);
+    areaPath.setAttribute('fill', `url(#${gradId})`);
+    svg.appendChild(areaPath);
+
+    const linePath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    linePath.setAttribute('d', pathD);
+    linePath.setAttribute('fill', 'none');
+    linePath.setAttribute('stroke', color);
+    linePath.setAttribute('stroke-width', '1.2');
+    linePath.setAttribute('stroke-linecap', 'round');
+    linePath.setAttribute('stroke-linejoin', 'round');
+    svg.appendChild(linePath);
+  }
+
+  // ========== Font Menu ==========
+  function toggleFontMenu(e) {
+    e.stopPropagation();
+    document.getElementById('moreMenu').classList.remove('show');
+    document.getElementById('fontMenu').classList.toggle('show');
+  }
+
+  function setFontSize(size) {
+    currentFontSize = size;
+    document.querySelector('.terminal').style.fontSize = size + 'px';
+    
+    document.querySelectorAll('#fontMenu .dropdown-item').forEach(item => {
+      const check = item.querySelector('.check');
+      const itemSize = parseInt(item.textContent);
+      if (itemSize === size) {
+        check.textContent = '✓';
+      } else {
+        check.textContent = '';
+      }
+    });
+    
+    document.getElementById('fontMenu').classList.remove('show');
+  }
+
+  // ========== More Menu ==========
+  function toggleMoreMenu(e) {
+    e.stopPropagation();
+    document.getElementById('fontMenu').classList.remove('show');
+    document.getElementById('moreMenu').classList.toggle('show');
+  }
+
+  function clearTerminal() {
+    const term = document.getElementById('terminal');
+    const promptLine = '<div class="term-line"><span class="term-prompt">[root@' + getServerHostname() + ' ~]# </span><span class="cursor"></span></div>';
+    term.innerHTML = promptLine;
+    document.getElementById('moreMenu').classList.remove('show');
+  }
+
+  function getServerHostname() {
+    const map = { web01: 'web-server-01', db01: 'db-server-01', cache01: 'cache-01' };
+    return map[currentServer] || 'web-server-01';
+  }
+
+  function toggleSFTP() {
+    sftpVisible = !sftpVisible;
+    const panel = document.getElementById('sftpPanel');
+    if (sftpVisible) {
+      panel.style.display = 'flex';
+    } else {
+      panel.style.display = 'none';
+    }
+    document.getElementById('moreMenu').classList.remove('show');
+  }
+
+  // ========== Settings ==========
+  let currentSettingsPage = 'main';
+  const settingsPageTitles = {
+    main: '设置',
+    agent: 'Agent 设置',
+    notification: '通知设置',
+    appearance: '外观设置',
+    language: '语言设置',
+    hosts: '主机管理',
+    about: '关于应用'
+  };
+
+  function openSettings() {
+    document.getElementById('moreMenu').classList.remove('show');
+    const overlay = document.getElementById('settingsOverlay');
+    overlay.classList.add('show');
+  }
+
+  function closeSettings() {
+    const overlay = document.getElementById('settingsOverlay');
+    overlay.classList.remove('show');
+    setTimeout(() => {
+      goBackSettings(true);
+    }, 200);
+  }
+
+  function closeSettingsOverlay(e) {
+    if (e.target.id === 'settingsOverlay') {
+      closeSettings();
+    }
+  }
+
+  function openSettingsPage(page) {
+    document.querySelectorAll('.settings-page').forEach(p => p.classList.remove('active'));
+    const pageEl = document.getElementById('page-' + page);
+    if (pageEl) {
+      pageEl.classList.add('active');
+    }
+    currentSettingsPage = page;
+    document.getElementById('settingsTitle').textContent = settingsPageTitles[page] || '设置';
+    document.getElementById('settingsBackBtn').style.display = page === 'main' ? 'none' : 'flex';
+  }
+
+  function goBackSettings(forceMain) {
+    if (forceMain || currentSettingsPage !== 'main') {
+      openSettingsPage('main');
+    }
+  }
+
+  function toggleCollapse(panelId) {
+    const panel = document.getElementById(panelId);
+    if (panel) {
+      panel.classList.toggle('open');
+    }
+  }
+
+  function updateMaxSteps(val) {
+    document.getElementById('maxStepsValue').textContent = val === '0' ? '无限制' : val;
+  }
+
+  function updateZoom(val) {
+    document.getElementById('zoomValue').textContent = val + '%';
+  }
+
+  function updateTermFont(val) {
+    document.getElementById('termFontValue').textContent = val + 'px';
+  }
+
+  function selectColor(el) {
+    el.parentElement.querySelectorAll('.color-option').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  function selectLang(el) {
+    el.parentElement.querySelectorAll('.lang-item').forEach(c => c.classList.remove('selected'));
+    el.classList.add('selected');
+  }
+
+  // ========== Layout ==========
+  function setLayout(type, btn) {
+    document.querySelectorAll('.layout-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+
+  // ========== Mode Toggle ==========
+  function toggleMode() {
+    isOrchestrateMode = !isOrchestrateMode;
+    updateModeUI();
+  }
+
+  function toggleOrchMode() {
+    isOrchestrateMode = !isOrchestrateMode;
+    updateModeUI();
+  }
+
+  function updateModeUI() {
+    const capsule = document.getElementById('modeCapsule');
+    const modeText = document.getElementById('modeText');
+    const modeCaret = document.getElementById('modeCaret');
+    const orchToggle = document.getElementById('orchToggle');
+
+    if (isOrchestrateMode) {
+      capsule.classList.remove('agent');
+      capsule.classList.add('orchestrate');
+      modeText.textContent = '编排 2/5';
+      modeCaret.style.display = 'inline';
+      orchToggle.classList.add('active');
+    } else {
+      capsule.classList.remove('orchestrate');
+      capsule.classList.add('agent');
+      modeText.textContent = 'Agent';
+      modeCaret.style.display = 'none';
+      orchToggle.classList.remove('active');
+    }
+  }
+
+  // ========== Input ==========
+  function handleInput(textarea) {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+    
+    const len = textarea.value.length;
+    const counter = document.getElementById('charCounter');
+    counter.textContent = len + ' / 50000';
+    
+    if (len > 40000) {
+      counter.classList.add('warning');
+    } else {
+      counter.classList.remove('warning');
+    }
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
+
+  function sendMessage() {
+    const input = document.getElementById('aiInput');
+    const msg = input.value.trim();
+    if (!msg || isRunning) return;
+
+    isRunning = true;
+    document.getElementById('runningBadge').style.display = 'flex';
+    const sendBtn = document.getElementById('sendBtn');
+    sendBtn.classList.add('stop');
+    sendBtn.innerHTML = '<svg class="svg-icon" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="1"></rect></svg>';
+
+    const messagesEl = document.getElementById('aiMessages');
+    
+    const card = document.createElement('div');
+    card.className = 'msg-card';
+    card.style.marginTop = '16px';
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'typing-content';
+    card.appendChild(contentDiv);
+    messagesEl.appendChild(card);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    input.value = '';
+    input.style.height = 'auto';
+    document.getElementById('charCounter').textContent = '0 / 50000';
+    document.getElementById('charCounter').classList.remove('warning');
+
+    const responseText = `好的，我来帮你分析这个问题。
+
+根据当前服务器状态，我发现以下几点：
+
+**系统负载正常**
+- CPU 使用率：${(2 + Math.random() * 6).toFixed(1)}%
+- 内存使用：${(2.8 + Math.random() * 0.5).toFixed(2)}G/3.68G
+- 磁盘使用：75.0%
+
+**建议操作：**
+1. 定期清理日志文件释放磁盘空间
+2. 监控 nginx 访问日志，排查异常流量
+3. 确认数据库备份策略是否正常
+
+需要我执行具体的操作吗？`;
+
+    typeWriter(contentDiv, responseText, 0, function() {
+      isRunning = false;
+      document.getElementById('runningBadge').style.display = 'none';
+      sendBtn.classList.remove('stop');
+      sendBtn.innerHTML = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>';
+    });
+  }
+
+  function typeWriter(element, text, index, callback) {
+    if (index >= text.length) {
+      if (callback) callback();
+      return;
+    }
+
+    const char = text[index];
+    if (char === '\n') {
+      element.innerHTML += '<br>';
+    } else if (char === '*' && text[index+1] === '*') {
+      const endIdx = text.indexOf('**', index + 2);
+      if (endIdx !== -1) {
+        const boldText = text.substring(index + 2, endIdx);
+        element.innerHTML += '<strong>' + boldText + '</strong>';
+        index = endIdx + 1;
+      } else {
+        element.innerHTML += char;
+      }
+    } else if (char === '-') {
+      const nextTwo = text.substring(index, index + 2);
+      if (nextTwo === '- ') {
+        element.innerHTML += '<br>• ';
+        index += 1;
+      } else {
+        element.innerHTML += char;
+      }
+    } else {
+      element.innerHTML += char;
+    }
+
+    const messagesEl = document.getElementById('aiMessages');
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    setTimeout(() => typeWriter(element, text, index + 1, callback), 15 + Math.random() * 20);
+  }
+
+  // ========== SFTP ==========
+  function renderFileList() {
+    const listEl = document.getElementById('fileList');
+    const dirData = fileSystem[currentDir] || { folders: [], files: [] };
+    
+    let html = '';
+    
+    dirData.folders.forEach(name => {
+      html += `
+        <div class="file-row" data-name="${name}" data-type="folder" ondblclick="enterFolder('${name}')">
+          <span class="file-icon folder">📁</span>
+          <span class="file-name">${name}</span>
+          <span class="file-time">7月10 14:23</span>
+          <span class="file-perm">drwxr-xr-x</span>
+        </div>
+      `;
+    });
+    
+    dirData.files.forEach(name => {
+      html += `
+        <div class="file-row" data-name="${name}" data-type="file">
+          <span class="file-icon file">📄</span>
+          <span class="file-name">${name}</span>
+          <span class="file-time">7月 5 09:12</span>
+          <span class="file-perm">-rw-r--r--</span>
+        </div>
+      `;
+    });
+    
+    listEl.innerHTML = html;
+    
+    listEl.querySelectorAll('.file-row').forEach(row => {
+      row.addEventListener('click', function() {
+        listEl.querySelectorAll('.file-row').forEach(r => r.classList.remove('selected'));
+        this.classList.add('selected');
+      });
+    });
+  }
+
+  function enterFolder(name) {
+    const newPath = currentDir === '/' ? '/' + name : currentDir + '/' + name;
+    if (fileSystem[newPath]) {
+      currentDir = newPath;
+      document.getElementById('pathInput').value = currentDir;
+      renderFileList();
+    }
+  }
+
+  function goUpDir() {
+    if (currentDir === '/root') return;
+    const parts = currentDir.split('/').filter(p => p);
+    parts.pop();
+    currentDir = '/' + parts.join('/');
+    if (currentDir === '/') currentDir = '/root';
+    document.getElementById('pathInput').value = currentDir;
+    renderFileList();
+  }
+
+  function goHome() {
+    currentDir = '/root';
+    document.getElementById('pathInput').value = currentDir;
+    renderFileList();
+  }
+
+  let hideTooltipTimer = null;
+  let currentTooltip = null;
+
+  function showTooltip(item) {
+    const tooltipId = item.getAttribute('data-tooltip');
+    const tooltip = document.getElementById(tooltipId);
+    if (!tooltip) return;
+
+    if (hideTooltipTimer) {
+      clearTimeout(hideTooltipTimer);
+      hideTooltipTimer = null;
+    }
+
+    if (currentTooltip && currentTooltip !== tooltip) {
+      currentTooltip.classList.remove('show');
+    }
+    currentTooltip = tooltip;
+
+    const itemRect = item.getBoundingClientRect();
+
+    tooltip.style.visibility = 'visible';
+    tooltip.style.pointerEvents = 'none';
+    tooltip.style.left = '-9999px';
+    tooltip.style.top = '-9999px';
+    tooltip.style.bottom = 'auto';
+    tooltip.style.opacity = '';
+    tooltip.style.transform = '';
+
+    const tooltipWidth = tooltip.offsetWidth || 260;
+    const tooltipHeight = tooltip.offsetHeight || 120;
+
+    let left = itemRect.left + itemRect.width / 2 - tooltipWidth / 2;
+    if (left < 8) left = 8;
+    if (left + tooltipWidth > window.innerWidth - 8) {
+      left = window.innerWidth - tooltipWidth - 8;
+    }
+
+    let top = itemRect.top - tooltipHeight - 8;
+    if (top < 8) {
+      top = itemRect.bottom + 8;
+    }
+
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+    tooltip.style.bottom = 'auto';
+
+    requestAnimationFrame(() => {
+      tooltip.classList.add('show');
+    });
+  }
+
+  function hideTooltip() {
+    if (hideTooltipTimer) {
+      clearTimeout(hideTooltipTimer);
+    }
+    hideTooltipTimer = setTimeout(() => {
+      if (currentTooltip) {
+        currentTooltip.classList.remove('show');
+        currentTooltip = null;
+      }
+      hideTooltipTimer = null;
+    }, 80);
+  }
+
+  function initTooltips() {
+    const items = document.querySelectorAll('.monitor-item[data-tooltip]');
+    items.forEach(item => {
+      item.style.cursor = 'pointer';
+      item.addEventListener('mouseenter', function(e) {
+        e.stopPropagation();
+        showTooltip(this);
+      });
+      item.addEventListener('mouseleave', function() {
+        hideTooltip();
+      });
+    });
+  }
+
+  // Start
+  init();
+  initTooltips();
+</script>
+
+<!-- Monitor Tooltips -->
+<div class="monitor-tooltip tooltip-cpu" id="tooltip-cpu">
+  <div class="tooltip-header">
+    <span class="tooltip-title">CPU 使用率</span>
+    <span class="tooltip-close">×</span>
+  </div>
+  <div class="tooltip-two-col">
+    <div class="tooltip-row"><span class="k">当前值</span><span class="v">3.2%</span></div>
+    <div class="tooltip-row"><span class="k">今日峰值</span><span class="v">45.8%</span></div>
+    <div class="tooltip-row"><span class="k">平均使用率</span><span class="v">12.5%</span></div>
+    <div class="tooltip-row"><span class="k">核心数</span><span class="v">4 核</span></div>
+    <div class="tooltip-row"><span class="k">系统占用</span><span class="v">0.8%</span></div>
+    <div class="tooltip-row"><span class="k">用户占用</span><span class="v">2.4%</span></div>
+  </div>
+</div>
+
+<div class="monitor-tooltip tooltip-mem" id="tooltip-mem">
+  <div class="tooltip-header">
+    <span class="tooltip-title">内存使用</span>
+    <span class="tooltip-close">×</span>
+  </div>
+  <div class="tooltip-two-col">
+    <div class="tooltip-row"><span class="k">已用</span><span class="v">2.98 GB</span></div>
+    <div class="tooltip-row"><span class="k">总量</span><span class="v">3.68 GB</span></div>
+    <div class="tooltip-row"><span class="k">使用率</span><span class="v">80.9%</span></div>
+    <div class="tooltip-row"><span class="k">今日峰值</span><span class="v">3.42 GB</span></div>
+    <div class="tooltip-row"><span class="k">缓存</span><span class="v">0.85 GB</span></div>
+    <div class="tooltip-row"><span class="k">可用</span><span class="v">0.70 GB</span></div>
+  </div>
+</div>
+
+<div class="monitor-tooltip tooltip-upload" id="tooltip-upload">
+  <div class="tooltip-header">
+    <span class="tooltip-title">网络上传</span>
+    <span class="tooltip-close">×</span>
+  </div>
+  <div class="tooltip-two-col">
+    <div class="tooltip-row"><span class="k">当前速率</span><span class="v">169.8 KB/s</span></div>
+    <div class="tooltip-row"><span class="k">今日上传总量</span><span class="v">1.2 GB</span></div>
+    <div class="tooltip-row"><span class="k">峰值速率</span><span class="v">2.5 MB/s</span></div>
+    <div class="tooltip-row"><span class="k">接口数</span><span class="v">2 个</span></div>
+  </div>
+  <table class="tooltip-table">
+    <thead>
+      <tr><th>接口</th><th>总流量</th><th>当前速率</th><th>错误/丢包</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>eth0</td><td>1.2 GB / 890 MB</td><td>120.5 KB/s / 49.3 KB/s</td><td>-</td></tr>
+      <tr><td>lo</td><td>12 MB / 12 MB</td><td>0.5 KB/s / 0.5 KB/s</td><td>-</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="monitor-tooltip tooltip-download" id="tooltip-download">
+  <div class="tooltip-header">
+    <span class="tooltip-title">网络下载</span>
+    <span class="tooltip-close">×</span>
+  </div>
+  <div class="tooltip-two-col">
+    <div class="tooltip-row"><span class="k">当前速率</span><span class="v">102.5 KB/s</span></div>
+    <div class="tooltip-row"><span class="k">今日下载总量</span><span class="v">3.8 GB</span></div>
+    <div class="tooltip-row"><span class="k">峰值速率</span><span class="v">5.2 MB/s</span></div>
+    <div class="tooltip-row"><span class="k">接口数</span><span class="v">2 个</span></div>
+  </div>
+  <table class="tooltip-table">
+    <thead>
+      <tr><th>接口</th><th>总流量</th><th>当前速率</th><th>错误/丢包</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>eth0</td><td>3.5 GB / 2.1 GB</td><td>85.2 KB/s / 17.3 KB/s</td><td>-</td></tr>
+      <tr><td>lo</td><td>12 MB / 12 MB</td><td>0.5 KB/s / 0.5 KB/s</td><td>-</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="monitor-tooltip tooltip-disk" id="tooltip-disk">
+  <div class="tooltip-header">
+    <span class="tooltip-title">磁盘使用</span>
+    <span class="tooltip-close">×</span>
+  </div>
+  <div class="tooltip-two-col">
+    <div class="tooltip-row"><span class="k">总容量</span><span class="v">40 GB</span></div>
+    <div class="tooltip-row"><span class="k">已用</span><span class="v">28 GB</span></div>
+    <div class="tooltip-row"><span class="k">可用</span><span class="v">12 GB</span></div>
+    <div class="tooltip-row"><span class="k">总使用率</span><span class="v">70.0%</span></div>
+    <div class="tooltip-row"><span class="k">分区数</span><span class="v">3 个</span></div>
+  </div>
+  <div class="tooltip-progress">
+    <div class="tooltip-progress-bar" style="width: 70%;"></div>
+  </div>
+  <table class="tooltip-table">
+    <thead>
+      <tr><th>分区</th><th>总容量</th><th>已用</th><th>使用率</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>/dev/sda1</td><td>40G</td><td>28G</td><td>70%</td></tr>
+      <tr><td>/dev/sda15</td><td>100M</td><td>5.2M</td><td>5%</td></tr>
+      <tr><td>tmpfs</td><td>1.9G</td><td>33M</td><td>2%</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="monitor-tooltip tooltip-uptime" id="tooltip-uptime">
+  <div class="tooltip-header">
+    <span class="tooltip-title">运行时间</span>
+    <span class="tooltip-close">×</span>
+  </div>
+  <div class="tooltip-single-col">
+    <div class="tooltip-row"><span class="k">已运行</span><span class="v">1 年 36 周 5 天</span></div>
+    <div class="tooltip-row"><span class="k">启动时间</span><span class="v">2024-10-15 08:32:12</span></div>
+    <div class="tooltip-row"><span class="k">平均负载</span><span class="v">0.12 / 0.08 / 0.05</span></div>
+    <div class="tooltip-row"><span class="k">进程数</span><span class="v">186 个</span></div>
+  </div>
+</div>
+
+<div class="monitor-tooltip tooltip-user" id="tooltip-user">
+  <div class="tooltip-header">
+    <span class="tooltip-title">当前用户</span>
+    <span class="tooltip-close">×</span>
+  </div>
+  <div class="tooltip-single-col">
+    <div class="tooltip-row"><span class="k">用户名</span><span class="v">root</span></div>
+    <div class="tooltip-row"><span class="k">UID</span><span class="v">0</span></div>
+    <div class="tooltip-row"><span class="k">Shell</span><span class="v">/bin/bash</span></div>
+    <div class="tooltip-row"><span class="k">登录时间</span><span class="v">2026-07-10 14:23</span></div>
+    <div class="tooltip-row"><span class="k">登录 IP</span><span class="v">192.168.1.50</span></div>
+  </div>
+</div>
+
+</body>
+</html>
