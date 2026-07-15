@@ -1,9 +1,11 @@
 #include "flutter_window.h"
 
 #include <optional>
+#include <flutter/method_channel.h>
+#include <flutter/standard_method_codec.h>
 
 #include "flutter/generated_plugin_registrant.h"
-#include "security_plugin.h"
+#include "security_util.h"
 
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
@@ -26,9 +28,33 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
-  // 注册安全插件（DPAPI 主密钥管理）
-  SecurityPlugin::RegisterWithRegistrar(
-      flutter_controller_->engine()->GetRegistrarForPlugin("SecurityPlugin"));
+
+  // 注册安全 MethodChannel（DPAPI 主密钥管理）
+  // 直接用 engine messenger 创建 channel，不走 plugin 注册机制
+  {
+    auto channel =
+        std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+            flutter_controller_->engine()->messenger(),
+            "com.keiskei.aiterminal/security",
+            &flutter::StandardMethodCodec::GetInstance());
+
+    channel->SetMethodCallHandler(
+        [](const flutter::MethodCall<flutter::EncodableValue>& call,
+           std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+               result) {
+          if (call.method_name() == "getMasterKey") {
+            auto key = GetOrCreateMasterKey();
+            if (!key.empty()) {
+              result->Success(flutter::EncodableValue(key));
+            } else {
+              result->Error("KEY_ERROR", "Failed to get or create master key");
+            }
+          } else {
+            result->NotImplemented();
+          }
+        });
+  }
+
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {

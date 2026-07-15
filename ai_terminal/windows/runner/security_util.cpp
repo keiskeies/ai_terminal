@@ -1,17 +1,12 @@
-#include "security_plugin.h"
+#include "security_util.h"
 
 #include <windows.h>
 #include <wincrypt.h>
 #include <shlobj.h>
 #include <string>
-#include <vector>
 #include <fstream>
 
 #pragma comment(lib, "Crypt32.lib")
-
-// Windows DPAPI 安全插件实现
-// 主密钥用 CryptProtectData 加密后存文件，绑定当前 Windows 用户账户
-// 换用户或换机器无法解密
 
 namespace {
 
@@ -71,9 +66,8 @@ std::vector<uint8_t> GenerateRandomKey() {
     CryptGenRandom(hProv, 32, key.data());
     CryptReleaseContext(hProv, 0);
   } else {
-    // 极端回退：用时间戳 + UUID
-    LARGE_INTEGER freq, counter;
-    QueryPerformanceFrequency(&freq);
+    // 极端回退：用时间戳
+    LARGE_INTEGER counter;
     QueryPerformanceCounter(&counter);
     srand(static_cast<unsigned>(counter.QuadPart % UINT_MAX));
     for (int i = 0; i < 32; i++) {
@@ -85,45 +79,7 @@ std::vector<uint8_t> GenerateRandomKey() {
 
 }  // namespace
 
-void SecurityPlugin::RegisterWithRegistrar(
-    flutter::PluginRegistrarWindows* registrar) {
-  auto plugin = std::make_unique<SecurityPlugin>(registrar);
-  auto channel = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
-      registrar->messenger(), "com.keiskei.aiterminal/security",
-      &flutter::StandardMethodCodec::GetInstance());
-
-  channel->SetMethodCallHandler(
-      [plugin_pointer = plugin.get()](const auto& call, auto result) {
-        plugin_pointer->HandleMethodCall(call, std::move(result));
-      });
-
-  registrar->AddPlugin(std::move(plugin));
-}
-
-SecurityPlugin::SecurityPlugin(
-    flutter::PluginRegistrarWindows* registrar)
-    : registrar_(registrar) {}
-
-SecurityPlugin::~SecurityPlugin() {}
-
-void SecurityPlugin::HandleMethodCall(
-    const flutter::EncodableValue& method_call,
-    std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
-  const auto& method = std::get<std::string>(method_call);
-
-  if (method == "getMasterKey") {
-    auto key = GetOrCreateMasterKey();
-    if (!key.empty()) {
-      result->Success(flutter::EncodableValue(key));
-    } else {
-      result->Error("KEY_ERROR", "Failed to get or create master key");
-    }
-  } else {
-    result->NotImplemented();
-  }
-}
-
-std::vector<uint8_t> SecurityPlugin::GetOrCreateMasterKey() {
+std::vector<uint8_t> GetOrCreateMasterKey() {
   auto key_path = GetKeyFilePath();
 
   // 1. 尝试读取已存在的密钥文件

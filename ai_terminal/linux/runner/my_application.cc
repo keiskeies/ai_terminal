@@ -140,7 +140,10 @@ std::vector<uint8_t> GetMasterKeyFromMachineId() {
 }
 
 // MethodChannel 回调：返回主密钥
-void security_method_call_handler(FlMethodCall* method_call) {
+// 注意：Flutter Linux SDK 3.x 要求 handler 签名为 (channel, method_call, user_data)
+void security_method_call_handler(FlMethodChannel* channel,
+                                  FlMethodCall* method_call,
+                                  gpointer user_data) {
   const gchar* method = fl_method_call_get_name(method_call);
   if (g_strcmp0(method, "getMasterKey") == 0) {
     auto key = GetMasterKeyFromMachineId();
