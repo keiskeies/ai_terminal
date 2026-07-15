@@ -453,7 +453,7 @@
   "settingsSnippets": "Snippets",
   "settingsSnippetsDesc": "Save frequently used commands for one-tap execution",
   "settingsTitle": "Settings",
-  "settingsVersion": "Version 1.3.4",
+  "settingsVersion": "Version 1.3.5",
   "simplifiedChinese": "简体中文",
   "snippetCommandHint": "e.g., docker exec -it '{container}' /bin/bash",
   "snippetCommandLabel": "Command:",

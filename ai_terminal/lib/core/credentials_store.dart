@@ -1,5 +1,6 @@
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter/foundation.dart' hide Key;
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive/hive.dart';
 import '../services/daos.dart';
@@ -9,11 +10,19 @@ const _macOsOptions = MacOsOptions(
   accessibility: KeychainAccessibility.first_unlock_this_device,
 );
 
+/// 平台通道（用于获取 OS 级主密钥）
+const _platform = MethodChannel('com.keiskei.aiterminal/security');
+
 /// 凭据管理器
 ///
 /// 优先使用 flutter_secure_storage（系统安全存储，如 macOS Keychain）。
 /// 当系统安全存储不可用时（如未签名应用、Keychain 锁定等），
 /// 降级到 SQLite + AES-256-CBC 加密存储（非明文）。
+///
+/// AES 主密钥通过 OS 原生 API 获取（不再硬编码在源码中）：
+/// - macOS: Keychain 存储随机生成的 32 字节主密钥
+/// - Windows: DPAPI (CryptProtectData) 保护主密钥，绑定用户账户
+/// - Linux: /etc/machine-id 派生主密钥，绑定机器
 ///
 /// 旧版本数据迁移：自动检测旧 Hive credentials box 中的明文数据，
 /// 读取后加密保存并删除明文。
@@ -21,12 +30,14 @@ class CredentialsStore {
   static late FlutterSecureStorage _storage;
   static bool _initialized = false;
 
-  // AES 加密密钥（固定种子，用于降级场景）
-  // 注意：这不如系统 Keychain 安全，但远优于明文存储
-  static final _encryptionKey = Key.fromUtf8(
+  /// OS 级主密钥（通过 MethodChannel 从原生平台获取）
+  static Key? _masterKey;
+  static Encrypter? _encrypter;
+
+  /// 旧版硬编码密钥（仅用于解密旧格式数据，不再用于新加密）
+  static final _legacyKey = Key.fromUtf8(
     'A1TerminalSecureKey2024XYZ!@#\$%^',
   );
-  static final _encrypter = Encrypter(AES(_encryptionKey));
 
   /// 生成密码学安全随机 IV（每次加密独立 IV，避免固定 IV 的频率分析风险）
   static IV _generateIv() {
@@ -34,6 +45,10 @@ class CredentialsStore {
   }
 
   /// 初始化
+  ///
+  /// 完整初始化流程：加载主密钥 → 初始化 secure_storage → 迁移旧数据
+  /// 注意：此方法依赖 DbInit 已初始化（迁移旧数据时需写入 SQLite）
+  /// 若只需主密钥（如 DbInit 加密 DB 需要），请调用 [loadMasterKey]
   static Future<void> init() async {
     if (_initialized) return;
 
@@ -43,11 +58,56 @@ class CredentialsStore {
       iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
     );
 
+    // 从原生平台获取主密钥（若未提前加载）
+    await loadMasterKey();
+
     _initialized = true;
     debugPrint('CredentialsStore: 初始化完成');
 
     // 迁移旧数据
     await _migrateLegacyData();
+  }
+
+  /// 仅加载 OS 主密钥（不依赖 DbInit，可在 DbInit.init() 之前调用）
+  ///
+  /// 用途：DbInit 需要 OS 主密钥作为 SQLCipher 密码，
+  /// 但 CredentialsStore.init() 的迁移逻辑又依赖 DbInit，
+  /// 形成循环依赖。此方法打破循环：
+  /// 1. main.dart 先调用 loadMasterKey() 获取主密钥
+  /// 2. 再调用 DbInit.init() 用主密钥打开加密 DB
+  /// 3. 最后调用 CredentialsStore.init() 完成迁移
+  static Future<void> loadMasterKey() async {
+    if (_masterKey != null) return; // 已加载
+
+    try {
+      final result = await _platform.invokeMethod<Uint8List>('getMasterKey');
+      if (result != null && result.length == 32) {
+        _masterKey = Key(result);
+        _encrypter = Encrypter(AES(_masterKey!));
+        debugPrint('CredentialsStore: 主密钥已从原生平台获取');
+        return;
+      }
+    } catch (e) {
+      debugPrint('CredentialsStore: 获取原生主密钥失败: $e');
+    }
+
+    // 降级：如果原生平台不可用，使用旧版密钥（保证向后兼容）
+    // 这种情况只会在非桌面平台或开发环境出现
+    debugPrint('CredentialsStore: 降级使用旧版密钥（不推荐）');
+    _masterKey = _legacyKey;
+    _encrypter = Encrypter(AES(_masterKey!));
+  }
+
+  /// 获取数据库加密密码（基于 OS 主密钥的 base64 编码）
+  ///
+  /// 用于 SQLite3MultipleCiphers 全库加密的 PRAGMA key
+  /// 必须在 [loadMasterKey] 之后调用
+  static String getDatabasePassword() {
+    if (_masterKey == null) {
+      // 极端情况：loadMasterKey 未调用，使用 legacy key
+      return _legacyKey.base64;
+    }
+    return _masterKey!.base64;
   }
 
   /// 确保已初始化
@@ -111,23 +171,38 @@ class CredentialsStore {
   /// 加密（随机 IV，格式: ivBase64:cipherBase64）
   static String _encrypt(String plainText) {
     final iv = _generateIv();
-    final encrypted = _encrypter.encrypt(plainText, iv: iv);
+    final encrypted = _encrypter!.encrypt(plainText, iv: iv);
     return '${iv.base64}:${encrypted.base64}';
   }
 
   /// 解密（兼容新格式 iv:cipher 和旧格式纯 cipher）
+  /// 新数据用 OS 主密钥加密，旧数据用硬编码密钥加密
   static String? _decrypt(String cipherText) {
     try {
       if (cipherText.contains(':')) {
+        // 新格式: ivBase64:cipherBase64（用当前主密钥解密）
         final parts = cipherText.split(':');
         if (parts.length == 2) {
           final iv = IV.fromBase64(parts[0]);
-          return _encrypter.decrypt64(parts[1], iv: iv);
+          return _encrypter!.decrypt64(parts[1], iv: iv);
         }
       }
-      // 旧格式: 纯 cipherBase64（固定 IV，向后兼容）
-      return _encrypter.decrypt64(cipherText, iv: IV.fromUtf8('A1TerminalIV2024'));
+      // 旧格式: 纯 cipherBase64（固定 IV，用旧版密钥解密）
+      // 用旧版密钥创建临时解密器
+      final legacyEncrypter = Encrypter(AES(_legacyKey));
+      return legacyEncrypter.decrypt64(cipherText, iv: IV.fromUtf8('A1TerminalIV2024'));
     } catch (e) {
+      // 尝试交叉解密：新格式用旧密钥
+      try {
+        if (cipherText.contains(':')) {
+          final parts = cipherText.split(':');
+          if (parts.length == 2) {
+            final iv = IV.fromBase64(parts[0]);
+            final legacyEncrypter = Encrypter(AES(_legacyKey));
+            return legacyEncrypter.decrypt64(parts[1], iv: iv);
+          }
+        }
+      } catch (_) {}
       debugPrint('CredentialsStore: 解密失败: $e');
       return null;
     }

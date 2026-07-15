@@ -34,7 +34,9 @@ void main() {
       } catch (_) {}
     };
 
-    // 初始化 SQLite 数据库
+    // 先加载 OS 主密钥（不依赖 DB），用于 SQLCipher 全库加密
+    await CredentialsStore.loadMasterKey();
+    // 初始化加密 SQLite 数据库（用 OS 主密钥作为 PRAGMA key）
     await DbInit.init();
     // 迁移旧 Hive 数据（一次性，幂等）
     await HiveMigrator.migrate();
@@ -42,7 +44,7 @@ void main() {
     await DbInit.reloadCaches();
     // 初始化内置运维工作流模板（首次安装时写入，已有则跳过）
     await BuiltinRunbooks.initBuiltin();
-    // 初始化凭据存储
+    // 完成凭据存储初始化（迁移旧凭据数据，依赖 DbInit 已就绪）
     await CredentialsStore.init();
     await ProviderConfigService.init();
     await ChangeWindowService.load();
