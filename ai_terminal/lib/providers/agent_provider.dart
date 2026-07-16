@@ -104,6 +104,21 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final oldHostId = _registry.activeHostId;
     if (oldHostId != null && oldHostId != effectiveHostId) {
       if (_engine != null && _engine!.isRunning) {
+        // R2: 先 flush 流式内容到 content，再清空回调
+        // 否则清空回调后 cancelTask 中的 onCompleted 是 null，不会触发 _flushStreamingToContent，
+        // _reducer.reset 会直接丢弃 streamingContent，导致切走 tab 时正在流式输出的内容丢失
+        _flushStreamingToContent(oldHostId);
+        // R2: 先清空回调再 cancel，与 removeTab/init/dispose 路径保持一致
+        // 避免 cancelTask 触发的 onTaskUpdated/onEvent 写到已切换的新 host state
+        // engine 实例保留在 registry 中，切回来时 _setupEngineCallbacks 会重新绑定回调
+        _engine!.onMessage = null;
+        _engine!.onThinking = null;
+        _engine!.onEvent = null;
+        _engine!.onCommandGenerated = null;
+        _engine!.onCommandExecuted = null;
+        _engine!.onError = null;
+        _engine!.onTaskUpdated = null;
+        _engine!.onCompleted = null;
         _engine!.cancelTask();
       }
       _reducer.cancelTimer(oldHostId);
@@ -124,6 +139,11 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _executor = _registry.getExecutor(effectiveHostId);
       _modelConfig = _registry.getModelConfig(effectiveHostId);
       _engineHostId = effectiveHostId;
+      // R2: 切走时清空了旧 engine 的回调，切回来必须重新绑定
+      // 否则 engine 收到事件后无法通知 UI，导致任务运行但 UI 不更新
+      if (_engine != null) {
+        _setupEngineCallbacks(effectiveHostId);
+      }
     } else {
       // 新 host：从持久化恢复，或创建新会话
       _restoreFromPersistence(effectiveHostId);
@@ -274,9 +294,13 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final hostId = _registry.activeHostId ?? 'local';
     final memory = _getMemory(hostId);
 
-    // 若旧引擎存在（如切换 AI 模型时），先安全清理：清空回调 → cancelTask → disposeTools
+    // 若旧引擎存在（如切换 AI 模型时），先安全清理：flush 流式 → 清空回调 → cancelTask → disposeTools
     // 防止旧引擎的回调继续写当前 host 的 state，造成双引擎并发污染
     if (_engine != null) {
+      // R2: 先 flush 流式内容到 content，再清空回调
+      // 否则清空回调后 cancelTask 中的 onCompleted 是 null，不会触发 _flushStreamingToContent，
+      // 新引擎的 onThinking 会 reset reducer，导致切换模型时正在流式输出的内容丢失
+      _flushStreamingToContent(hostId);
       _engine!.onMessage = null;
       _engine!.onThinking = null;
       _engine!.onEvent = null;
@@ -438,6 +462,11 @@ class AgentNotifier extends StateNotifier<AgentState> {
     _engine!.onCompleted = (fullMessage) {
       // 任务完成：累积最后一轮内容并保存
       _flushStreamingToContent(hostId);
+      // 仅成功完成的任务记录经验到用户经验库
+      // cancelTask / _finishTask(success:false) / maxSteps 耗尽都会调 onCompleted 以 flush 流式内容，
+      // 但这些路径的任务不完整（cancelled / failed），不应记录到知识库（避免污染学习经验）
+      final taskStatus = _engine?.currentTask?.status;
+      final shouldRecordLearning = taskStatus == AgentStatus.completed;
       _updateHostState(hostId, (s) {
         final items = [...s.chatItems];
         if (items.isNotEmpty && items.last.role == 'assistant') {
@@ -450,8 +479,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
           );
           // 最后再保存一次（确保 finish 等事件也被持久化）
           _persistAssistantCompletion(hostId, lastItem.content, events: lastItem.events);
-          // 记录成功经验到用户经验库（异步，不阻塞 UI）
-          _recordLearningFromTask(hostId, items, fullMessage);
+          // 仅成功完成的任务记录经验到用户经验库（cancelled/failed 不记录）
+          if (shouldRecordLearning) {
+            _recordLearningFromTask(hostId, items, fullMessage);
+          }
         }
         return s.copyWith(chatItems: items);
       });
@@ -554,7 +585,11 @@ class AgentNotifier extends StateNotifier<AgentState> {
       try {
         await _convService.updateLastAssistantContent(hostId, content, events: events);
       } catch (e) {
-        debugPrint('[AgentNotifier] 持久化 assistant 内容失败 (hostId=$hostId): $e');
+        // R8: 持久化失败不可静默吞掉，需暴露到 UI 让用户感知数据丢失风险
+        agentLogger.error('Persist', '持久化 assistant 内容失败 (hostId=$hostId): $e');
+        _updateHostState(hostId, (s) => s.copyWith(
+          error: '会话保存失败，重启后此条消息可能丢失: $e',
+        ));
       }
     });
     _persistChain[hostId] = next;

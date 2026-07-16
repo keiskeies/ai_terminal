@@ -81,6 +81,7 @@ The following rules are distilled from real bugs found in code review. Each rule
 
 - **Whoever creates a resource owns its cleanup.** If you create a `Service`/`Engine`/`Subscription`/`Timer` inside a method, that method (or its `finally` block) is responsible for disposing it on all paths (success, error, cancel, timeout). Leaked SSH connections and orphaned subscriptions have historically caused resource exhaustion.
 - **Clear callbacks BEFORE calling `cancel()`.** `cancelTask()` synchronously fires `onTaskUpdated`, which invokes still-bound callbacks. If you clear callbacks after `cancel()`, the cancel-triggered callback writes stale state. Order: null all callbacks → `cancelTask()` → remove from registry.
+- **Flush in-flight state BEFORE nulling callbacks that carry it.** Clearing a callback silently cuts its implicit responsibilities. `cancelTask` relies on `onCompleted` to flush in-flight streaming content to `content` and persistence; `onEvent`/`onTaskUpdated` carry state writes. If you null `onCompleted` before `cancelTask` (e.g. to prevent cross-host state writes during `switchTab`/`init` model switch), the flush never fires, and the subsequent `_reducer.reset()` or the new engine's `onThinking` silently drops the streaming content the user was just reading. Order: flush streaming → null callbacks → `cancelTask()` → reset reducers. This applies to `switchTab`, `init` (model switch), `removeTab`, and any path that nulls callbacks before cancel.
 - **Guard `StreamController.add` with `isClosed`.** Calling `add` on a closed controller throws `StateError`. Any `onDone`/`onError` callback that writes to a controller MUST check `!controller.isClosed` first. This commonly fires when `dispose()` closes the controller while a session `onDone` microtask is pending.
 
 ### R3. Multi-host / session isolation
@@ -101,6 +102,8 @@ The following rules are distilled from real bugs found in code review. Each rule
 - **All terminal paths MUST behave consistently.** Whether the task ends by AI `finish`, max-steps exhaustion, no-command retry exhaustion, or error — every path must: (1) set a terminal status, (2) emit a `finish` event, (3) call `onCompleted` to flush streaming content. Divergent paths cause UI to get stuck in "running" or lose the last streaming chunk.
 - **Retry/step counters MUST reset on success.** A "no-command retry count" that only increments and never resets will eventually trigger false termination on long tasks where intermittent no-command responses are normal. Reset to 0 after every successful command execution.
 - **Do not mutate shared history before the generation check.** Adding an AI response to `_conversationHistory` before checking `myGeneration` pollutes the new session's history with the old task's response. Always: generation check → cancel check → then mutate history.
+- **Whitelist over blacklist for terminal-state gating.** `!isCancelled` is a blacklist — it silently admits `failed` and any future terminal state. Use `status == completed` (whitelist) when gating "should record/side-effect" (e.g. recording a learning entry to the knowledge base). `cancelTask`, `_finishTask(success:false)`, and `maxSteps` exhaustion ALL invoke `onCompleted` to flush streaming content; a blacklist gate like `if (!isCancelled) recordLearning()` lets `failed` paths pollute the knowledge base with incomplete tasks. When a new terminal state is added later, whitelist gates automatically skip it; blacklist gates silently admit it.
+- **When fixing a side-effect on one path, enumerate ALL paths that invoke the same callback.** `onCompleted` is called from `cancelTask`, `_finishTask(success:true)`, `_finishTask(success:false)`, and `maxSteps` exhaustion. A side-effect fix that only considers `cancelTask` (e.g. adding `if (!isCancelled)` to block knowledge-base pollution) leaves `failed` paths still polluting. Before merging any side-effect fix, grep every caller of the callback/method and verify each terminal path's behavior against the fix. Side-effects to check: knowledge-base writes, persistence, notifications, audit logs, telemetry.
 
 ### R6. Cross-platform compatibility
 
@@ -127,7 +130,7 @@ The following rules are distilled from real bugs found in code review. Each rule
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **ai_terminal** (3725 symbols, 11158 relationships, 255 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **ai_terminal** (4230 symbols, 11821 relationships, 269 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 

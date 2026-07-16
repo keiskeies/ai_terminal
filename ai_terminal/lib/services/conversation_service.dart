@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import 'agent_logger.dart';
 import 'daos.dart';
 import '../models/agent_event.dart';
 import '../models/conversation.dart';
@@ -195,7 +196,8 @@ class ConversationService {
       _flushTimers.remove(conv.id);
       // await upsert 确保 agent 日志落盘；fire-and-forget 会在 app 退出时丢失
       ConversationsDao.upsert(conv).catchError((e) {
-        debugPrint('[ConversationService] agent 日志延迟保存失败: $e');
+        // R8: 日志刷盘失败不可静默吞掉，warn 级记录便于排查
+        agentLogger.warn('ConvService', 'agent 日志延迟保存失败 (convId=${conv.id}): $e');
       });
     });
   }
@@ -218,7 +220,8 @@ class ConversationService {
       try {
         await ConversationsDao.upsert(conv);
       } catch (e) {
-        debugPrint('[ConversationService] flushAll: 会话 ${conv.id} 保存失败: $e');
+        // R8: app 退出时刷盘失败不可静默吞掉，warn 级记录便于事后排查
+        agentLogger.warn('ConvService', 'flushAll: 会话 ${conv.id} 保存失败: $e');
       }
     }
   }

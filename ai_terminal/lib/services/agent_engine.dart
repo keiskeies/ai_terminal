@@ -42,6 +42,7 @@ class AgentEngine {
   AgentTask? _currentTask;
   String _accumulatedMessage = '';  // 跟踪累积的消息
   Completer<bool>? _confirmCompleter; // 等待用户确认危险命令的 Completer
+  Timer? _confirmTimeoutTimer; // 确认超时定时器，cancelTask 时需 cancel
   String? _pendingConfirmCommand; // 当前等待确认的命令
 
   /// 任务开始时间（用于计算 elapsedSeconds 进度）
@@ -265,6 +266,11 @@ class AgentEngine {
       final knowledge = KnowledgeService();
       // 确保知识库已初始化（懒初始化兜底）
       await knowledge.ensureInitialized();
+      // R1: await 后检查代际，避免旧任务的知识库结果覆盖新任务的 _cachedKnowledgeInjection
+      if (myGeneration != _currentTaskGeneration) {
+        agentLogger.info('AgentEngine', '知识库初始化期间代际失效，放弃任务');
+        return;
+      }
       // 检测远程平台：SSH 连接时从 osInfo 推断，否则用本地平台
       String? knowledgePlatform;
       if (executor is SSHService) {
@@ -276,6 +282,11 @@ class AgentEngine {
         osInfo: executor is SSHService ? executor.osInfo : null,
         hostId: hostId,
       );
+      // R1: 第二次 await 后再次检查代际
+      if (myGeneration != _currentTaskGeneration) {
+        agentLogger.info('AgentEngine', '知识库查询期间代际失效，放弃任务');
+        return;
+      }
       if (_cachedKnowledgeInjection != null) {
         agentLogger.info('AgentEngine', '知识库命中 ✓ (platform=${knowledgePlatform ?? "local"})');
       } else {
@@ -324,10 +335,11 @@ class AgentEngine {
 
   void cancelTask() {
     // 无论当前处于何种状态（thinking/executing/waitingConfirm），都标记为取消
-    if (_currentTask != null &&
+    final wasActive = _currentTask != null &&
         _currentTask!.status != AgentStatus.cancelled &&
         _currentTask!.status != AgentStatus.completed &&
-        _currentTask!.status != AgentStatus.failed) {
+        _currentTask!.status != AgentStatus.failed;
+    if (wasActive) {
       _currentTask = _currentTask!.copyWith(
         status: AgentStatus.cancelled,
         completedAt: DateTime.now(),
@@ -341,6 +353,9 @@ class AgentEngine {
       _confirmCompleter!.complete(false);
     }
     _pendingConfirmCommand = null;
+    // R2: cancel 确认超时定时器，避免 Timer 泄漏
+    _confirmTimeoutTimer?.cancel();
+    _confirmTimeoutTimer = null;
     // 同时取消等待选择
     if (_choiceCompleter != null && !_choiceCompleter!.isCompleted) {
       _choiceCompleter!.complete('');
@@ -350,10 +365,12 @@ class AgentEngine {
     if (_commandCancelToken != null && !_commandCancelToken!.isCompleted) {
       _commandCancelToken!.complete();
     }
+    _commandCancelToken = null;
     // 取消编排任务（覆盖整个 ReAct 循环周期，批量命令通过它立即中断）
     if (_orchestratorCancelToken != null && !_orchestratorCancelToken!.isCompleted) {
       _orchestratorCancelToken!.complete();
     }
+    _orchestratorCancelToken = null;
     // 取消 AI 流式订阅，停止消费旧任务流
     // 注意: cancel() 不触发 onDone，需手动 complete doneCompleter
     final dc = _aiDoneCompleter;
@@ -372,6 +389,19 @@ class AgentEngine {
     }
     _earlyExecutionCompleter = null;
     _earlyExecutionCommand = null;
+
+    // R5: cancel 是终态路径，必须 emit finish 事件，让 UI 停止流式渲染状态
+    // 否则依赖 finish 事件关闭"运行中"动画的 UI 会卡住
+    if (wasActive) {
+      final finishSummary = _accumulatedMessage.isNotEmpty
+          ? _accumulatedMessage
+          : '任务已取消';
+      onEvent?.call(AgentEvent.finish(summary: finishSummary));
+      // flush 流式内容到持久化（与 _finishTask 的 onCompleted 路径对齐）
+      if (_accumulatedMessage.isNotEmpty) {
+        onCompleted?.call(_accumulatedMessage);
+      }
+    }
   }
 
   /// 确认执行危险命令（由用户点击确认按钮触发）
@@ -623,14 +653,17 @@ class AgentEngine {
     // 达到最大步数
     // L1 修复：代际失效时不覆盖新任务状态
     if (myGeneration != _currentTaskGeneration) return;
+    // R5: 步数耗尽是异常终止，应标记 failed 而非 completed
+    // 标 completed 会误导用户以为任务成功完成
+    final hitMaxSteps = stepCount >= maxSteps;
     _currentTask = _currentTask!.copyWith(
-      status: AgentStatus.completed,
+      status: hitMaxSteps ? AgentStatus.failed : AgentStatus.completed,
       completedAt: DateTime.now(),
     );
     _notifyTaskUpdate();
     agentLogger.info('ReAct', '=== 执行结束 (步数: $stepCount/$maxSteps) ===');
 
-    if (stepCount >= maxSteps) {
+    if (hitMaxSteps) {
       agentLogger.warn('ReAct', '达到最大执行步数 $maxSteps');
       onEvent?.call(AgentEvent.info('⚠️ 达到最大执行步数 ($maxSteps)，任务被中断'));
       onEvent?.call(AgentEvent.finish(summary: '达到最大执行步数，任务被中断'));
@@ -684,6 +717,13 @@ class AgentEngine {
         }
         agentLogger.warn('ReAct', 'AI 流建立失败（第 $attempt 次），${backoffDelays[attempt - 1].inSeconds}s 后重试: $e');
         await Future.delayed(backoffDelays[attempt - 1]);
+        // R1: 退避期间任务可能被取消或覆盖，代际变更则放弃重试
+        // 否则已取消的任务会继续发起新的 chatStream 调用，浪费 API 配额
+        // _executeAutomatic 在 _callAI 返回后会做代际检查，此处提前剪枝
+        if (_currentTask?.status == AgentStatus.cancelled) {
+          agentLogger.info('ReAct', '退避期间任务被取消，放弃重试');
+          throw StateError('任务已取消');
+        }
       }
     }
 
@@ -1068,6 +1108,14 @@ class AgentEngine {
       agentLogger.warn('ReAct', '高风险命令需要确认: $command');
       _pendingConfirmCommand = command;
       _confirmCompleter = Completer<bool>();
+      // 超时定时器：10 分钟无响应自动拒绝，避免任务永久卡在 waitingConfirm
+      // 用实例字段以便 cancelTask 能 cancel 它
+      _confirmTimeoutTimer = Timer(const Duration(minutes: 10), () {
+        if (_confirmCompleter != null && !_confirmCompleter!.isCompleted) {
+          agentLogger.warn('ReAct', '确认超时(10min)，自动拒绝: $command');
+          _confirmCompleter!.complete(false);
+        }
+      });
 
       // 显示具体的风险说明，而非泛泛的"危险操作"
       final reason = SafetyGuard.getReason(command) ?? SafetyGuard.getTip(safetyLevel);
@@ -1080,6 +1128,8 @@ class AgentEngine {
       _notifyTaskUpdate();
 
       final confirmed = await _confirmCompleter!.future;
+      _confirmTimeoutTimer?.cancel();
+      _confirmTimeoutTimer = null;
       _confirmCompleter = null;
       _pendingConfirmCommand = null;
 
@@ -1127,7 +1177,11 @@ class AgentEngine {
       if (snapshotCmd != null) {
         agentLogger.info('Rollback', '检测到修改类命令，执行预快照: ${modifyTarget.type}');
         try {
-          final snapshotResult = await _executeCommand(executor, snapshotCmd);
+          final snapshotResult = await _executeCommand(executor, snapshotCmd, myGeneration: myGeneration);
+          // R1: 快照执行后检查代际，避免旧任务快照污染新任务
+          if (myGeneration != null && myGeneration != _currentTaskGeneration) {
+            return _EarlyExecutionResult(shouldContinue: false, command: command);
+          }
           snapshot = PreSnapshot(
             target: modifyTarget,
             snapshotCommand: snapshotCmd,
@@ -1142,8 +1196,15 @@ class AgentEngine {
       }
     }
 
-    final result = await _executeCommand(executor, command);
+    final result = await _executeCommand(executor, command, myGeneration: myGeneration);
     agentLogger.info('ReAct', '命令执行结果: success=${result.success}');
+
+    // R1: 主命令执行后检查代际，避免旧任务结果污染新任务的统计/事件流
+    // 若代际已变更（cancel + 立即新任务），不再更新 _currentTask 统计、不再 emit result 事件
+    if (myGeneration != null && myGeneration != _currentTaskGeneration) {
+      agentLogger.info('ReAct', '命令执行后代际失效，丢弃结果不污染新任务');
+      return _EarlyExecutionResult(shouldContinue: false, command: command);
+    }
 
     // 更新命令成功/失败计数
     _currentTask = _currentTask!.copyWith(
@@ -1267,7 +1328,11 @@ class AgentEngine {
     for (final command in commands) {
       if (_currentTask?.status == AgentStatus.cancelled) return false;
       if (myGeneration != _currentTaskGeneration) return false;
-      final result = await _runCommandWithSafety(command, executor, myGeneration: myGeneration);
+      // R4: 为每条 fallback 命令生成独立的 commandId，并先发 command 事件
+      // 否则所有 result 会关联到同一个 _lastCommandEventId，导致 UI 错误地把每个结果卡片链接到最后一条命令
+      final cmdId = 'evt_fallback_${_uuid.v4().substring(0, 8)}';
+      onEvent?.call(AgentEvent.command(command, id: cmdId));
+      final result = await _runCommandWithSafety(command, executor, commandId: cmdId, myGeneration: myGeneration);
       if (result.observation != null) {
         resultMessages.add(result.observation!);
       }
@@ -1510,7 +1575,8 @@ class AgentEngine {
   }
 
   /// 执行单条命令（支持 SSH 和本地 PTY）
-  Future<AgentResult> _executeCommand(CommandExecutor executor, String command) async {
+  /// [myGeneration] 任务代际，用于 await 后识别"取消 + 立即新任务"竞态
+  Future<AgentResult> _executeCommand(CommandExecutor executor, String command, {int? myGeneration}) async {
     final stopwatch = Stopwatch()..start();
 
     // 执行前检查连接状态
@@ -1579,8 +1645,10 @@ class AgentEngine {
       stopwatch.stop();
       await sudoSub?.cancel();
 
-      // 用户取消：返回已取消结果，让上层退出循环
-      if (_currentTask?.status == AgentStatus.cancelled) {
+      // R1: 用户取消或代际失效（cancelTask + 立即新任务）→ 返回已取消结果
+      // 仅检查 status==cancelled 无法识别"cancel + 立即新任务"场景（新任务会把 status 重置为 thinking）
+      if (_currentTask?.status == AgentStatus.cancelled ||
+          (myGeneration != null && myGeneration != _currentTaskGeneration)) {
         return AgentResult(
           success: false,
           error: '用户取消了任务',

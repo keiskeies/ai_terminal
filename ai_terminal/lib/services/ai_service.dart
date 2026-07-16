@@ -16,6 +16,33 @@ abstract class AIProvider {
   });
 }
 
+/// 将 Dio 异常映射为用户友好的错误消息（OpenAI / Ernie 等 provider 共用）
+String mapDioError(dynamic error) {
+  if (error is DioException) {
+    switch (error.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return '连接超时，请检查网络';
+      case DioExceptionType.badResponse:
+        final statusCode = error.response?.statusCode;
+        if (statusCode == 401) {
+          return 'API Key 无效或已过期';
+        } else if (statusCode == 429) {
+          return '请求过于频繁，请稍后重试';
+        } else if (statusCode == 400) {
+          return '请求格式错误，请检查 API 配置';
+        }
+        return '服务器错误: $statusCode';
+      case DioExceptionType.connectionError:
+        return '无法连接到 AI 服务，请检查网络';
+      default:
+        return '连接失败: ${error.message}';
+    }
+  }
+  return '发生未知错误: $error';
+}
+
 class OpenAIProvider implements AIProvider {
   final Dio _dio = Dio(BaseOptions(
     connectTimeout: const Duration(seconds: 30),
@@ -135,31 +162,7 @@ class OpenAIProvider implements AIProvider {
     }
   }
 
-  String _mapError(dynamic error) {
-    if (error is DioException) {
-      switch (error.type) {
-        case DioExceptionType.connectionTimeout:
-        case DioExceptionType.sendTimeout:
-        case DioExceptionType.receiveTimeout:
-          return '连接超时，请检查网络';
-        case DioExceptionType.badResponse:
-          final statusCode = error.response?.statusCode;
-          if (statusCode == 401) {
-            return 'API Key 无效或已过期';
-          } else if (statusCode == 429) {
-            return '请求过于频繁，请稍后重试';
-          } else if (statusCode == 400) {
-            return '请求格式错误，请检查 API 配置';
-          }
-          return '服务器错误: $statusCode';
-        case DioExceptionType.connectionError:
-          return '无法连接到 AI 服务，请检查网络';
-        default:
-          return '连接失败: ${error.message}';
-      }
-    }
-    return '发生未知错误: $error';
-  }
+  String _mapError(dynamic error) => mapDioError(error);
 }
 
 class QwenProvider implements AIProvider {
@@ -289,7 +292,8 @@ class ErnieProvider implements AIProvider {
           }
         },
         onError: (error) {
-          streamController.addError(error.toString());
+          // 与 OpenAIProvider 保持一致：映射为友好消息
+          streamController.addError(mapDioError(error));
           streamController.close();
         },
         onDone: () {

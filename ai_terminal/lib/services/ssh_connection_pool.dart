@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import '../models/host_config.dart';
 import 'ssh_service.dart';
 
@@ -100,6 +101,8 @@ class SSHConnectionPool {
   }
 
   /// 释放连接
+  /// 异步执行 disconnect（关闭 SSH session/socket 是异步操作）
+  /// 调用方无需 await — 引用计数已同步递减，连接已从池中移除
   static void release(String hostId) {
     if (!_pool.containsKey(hostId)) return;
 
@@ -107,8 +110,16 @@ class SSHConnectionPool {
     entry.refCount--;
 
     if (entry.refCount <= 0) {
-      entry.service.disconnect();
       _pool.remove(hostId);
+      // R2: 异步 disconnect，不阻塞调用方；失败仅记录日志
+      () async {
+        try {
+          await entry.service.disconnect();
+        } catch (e) {
+          // disconnect 失败通常是无害的（连接已断开），仅记录
+          debugPrint('[SSHConnectionPool] disconnect 失败 (hostId=$hostId): $e');
+        }
+      }();
     }
   }
 

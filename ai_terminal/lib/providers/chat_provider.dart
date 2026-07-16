@@ -6,6 +6,7 @@ import '../services/ai_service.dart';
 import '../services/conversation_service.dart';
 import '../services/daos.dart';
 import '../core/credentials_store.dart';
+import '../services/agent_logger.dart';
 import '../utils/ansi_stripper.dart';
 
 /// 流式更新节流间隔（毫秒）
@@ -173,7 +174,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
       if (state.conversationId != conv.id) {
         state = state.copyWith(conversationId: conv.id);
       }
-    } catch (_) {}
+    } catch (e) {
+      // R8: 持久化失败不可静默吞掉，需暴露到 UI 让用户感知
+      agentLogger.error('ChatNotifier', '持久化用户消息失败 (hostId=$effectiveHostId): $e');
+      state = state.copyWith(error: '消息保存失败: $e');
+    }
 
     final context = _buildContext(effectiveHostId);
 
@@ -243,9 +248,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
     }
   }
 
-  /// 异步持久化 assistant 响应，忽略错误
+  /// 异步持久化 assistant 响应
   void _persistAssistant(String hostId, String content) {
-    _convService.appendMessage(hostId, role: 'assistant', content: content).then((_) {}).catchError((_) {});
+    _convService.appendMessage(hostId, role: 'assistant', content: content).then((_) {}).catchError((e) {
+      // R8: 持久化失败不可静默吞掉
+      agentLogger.error('ChatNotifier', '持久化 assistant 响应失败 (hostId=$hostId): $e');
+      state = state.copyWith(error: 'AI 响应保存失败: $e');
+    });
   }
 
   /// 构建上下文 - 只传上一条命令执行结果
@@ -281,7 +290,11 @@ class ChatNotifier extends StateNotifier<ChatState> {
     if (convId != null) {
       try {
         await _convService.clearMessages(convId);
-      } catch (_) {}
+      } catch (e) {
+        // R8: 持久化失败不可静默吞掉
+        agentLogger.error('ChatNotifier', '清空会话失败 (convId=$convId): $e');
+        state = state.copyWith(error: '清空会话失败: $e');
+      }
     }
   }
 
