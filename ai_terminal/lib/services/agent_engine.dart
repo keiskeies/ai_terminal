@@ -61,6 +61,14 @@ class AgentEngine {
   /// 命令执行取消令牌：cancelTask 时 complete，_executeCommand 据此提前退出
   Completer<void>? _commandCancelToken;
 
+  /// 编排任务的取消令牌：覆盖整个 ReAct 循环周期（比 _commandCancelToken 生命周期长）。
+  /// 在 _executeAutomatic 开始时创建并注入到 MultiHostExecutor，cancelTask 时 complete。
+  /// 编排工具的 executeAndWait 通过它响应取消，否则点停止后批量命令会跑到 timeout 才停。
+  Completer<void>? _orchestratorCancelToken;
+
+  /// 暴露当前编排取消令牌给调试/监控用。
+  Completer<void>? get currentCancelToken => _orchestratorCancelToken ?? _commandCancelToken;
+
   /// AI 流式订阅：cancelTask 时取消，立即停止消费旧任务流
   StreamSubscription<String>? _aiStreamSub;
 
@@ -342,6 +350,10 @@ class AgentEngine {
     if (_commandCancelToken != null && !_commandCancelToken!.isCompleted) {
       _commandCancelToken!.complete();
     }
+    // 取消编排任务（覆盖整个 ReAct 循环周期，批量命令通过它立即中断）
+    if (_orchestratorCancelToken != null && !_orchestratorCancelToken!.isCompleted) {
+      _orchestratorCancelToken!.complete();
+    }
     // 取消 AI 流式订阅，停止消费旧任务流
     // 注意: cancel() 不触发 onDone，需手动 complete doneCompleter
     final dc = _aiDoneCompleter;
@@ -408,6 +420,15 @@ class AgentEngine {
     }
 
     agentLogger.info('ReAct', '执行器连接状态: ${executor.isConnected}');
+
+    // 创建编排取消令牌：覆盖整个 ReAct 循环周期，注入到 MultiHostExecutor。
+    // cancelTask 会 complete 它，编排里的批量 executeAndWait 据此立即中断。
+    // 旧任务残留的 token 先丢弃（理论上 cancelTask 已 complete 过）。
+    _orchestratorCancelToken = Completer<void>();
+    final mhe = _tools.multiHostExecutor;
+    if (mhe != null) {
+      mhe.cancelToken = _orchestratorCancelToken;
+    }
 
     // maxSteps=0 时使用兜底上限，防止无限循环
     final maxSteps = this.maxSteps > 0 ? this.maxSteps : _defaultMaxSteps;
@@ -621,6 +642,13 @@ class AgentEngine {
       if (_accumulatedMessage.isNotEmpty) {
         onCompleted?.call(_accumulatedMessage);
       }
+    }
+
+    // 清理编排取消令牌（ReAct 循环结束）
+    _orchestratorCancelToken = null;
+    final mhe2 = _tools.multiHostExecutor;
+    if (mhe2 != null) {
+      mhe2.cancelToken = null;
     }
   }
 

@@ -18,7 +18,24 @@ class AgentHostRegistry {
   String? get activeHostId => _activeHostId;
   AgentState? getState(String hostId) => _states[hostId];
   AgentEngine? getEngine(String hostId) => _engines[hostId];
-  CommandExecutor? getExecutor(String hostId) => _executors[hostId];
+
+  /// 获取指定 host 的命令执行器。
+  ///
+  /// 历史问题：registry 持有的 executor 引用可能因 tab 关闭/重连/空闲清理
+  /// 而变成陈旧快照（SSHService 已 dispose、isConnected=false）。编排层
+  /// 拿到这种陈旧引用会误报"主机未连接"，而 UI 端从 terminalProvider.tabs
+  /// 取的是新 tab 的实时状态，造成"UI 显示已连接、编排却报未连接"。
+  ///
+  /// 修复：实时校验 isConnected，断开则自愈清理引用并返回 null，让调用方
+  /// 走"未连接"分支而不是拿陈旧 executor 假装能跑。
+  CommandExecutor? getExecutor(String hostId) {
+    final executor = _executors[hostId];
+    if (executor != null && !executor.isConnected) {
+      _executors[hostId] = null;
+      return null;
+    }
+    return executor;
+  }
   AIModelConfig? getModelConfig(String hostId) => _modelConfigs[hostId];
   AgentMemory? getMemory(String hostId) => _memories[hostId];
   bool hasState(String hostId) => _states.containsKey(hostId);

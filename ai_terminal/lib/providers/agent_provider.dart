@@ -561,20 +561,32 @@ class AgentNotifier extends StateNotifier<AgentState> {
     return next;
   }
 
-  /// 设置命令执行器（SSH 或本地 PTY，仅首次连接时收集系统信息）
-  void setExecutor(CommandExecutor? executor) {
-    _executor = executor;
-    if (_registry.activeHostId != null) {
-      _registry.setExecutor(_registry.activeHostId!, executor);
-    }
-    if (executor != null && _engine != null) {
-      final hostId = _registry.activeHostId;
-      if (hostId != null && !_registry.hasSysInfoFuture(hostId)) {
-        _registry.setSysInfoFuture(hostId, _engine!.collectSystemInfo(executor));
-      }
-      // 连接建立后（重新）加载 sudo 密码，覆盖 host 配置变更后的场景
-      if (hostId != null) {
+  /// 设置命令执行器（SSH 或本地 PTY，仅首次连接时收集系统信息）。
+  ///
+  /// [hostId] 显式指定 executor 所属的 host，避免用 `_registry.activeHostId`
+  /// 顶替——后者在后台重连/多 tab 切换场景下可能是另一个 host，会把 A 的
+  /// executor 错写到 B 槽位（违反 AGENTS.md R3）。调用方应传 `tab.hostId`。
+  void setExecutor(CommandExecutor? executor, {required String hostId}) {
+    // 写入 registry 时永远用传入的 hostId
+    _registry.setExecutor(hostId, executor);
+
+    // 仅当传入的 hostId 正好是当前活跃 host 时，才更新本地 _executor 缓存
+    // 和触发系统信息收集；否则这是非活跃 host 的后台连接更新，不应污染
+    // 当前活跃 host 的状态。
+    if (_registry.activeHostId == hostId) {
+      _executor = executor;
+      if (executor != null && _engine != null) {
+        if (!_registry.hasSysInfoFuture(hostId)) {
+          _registry.setSysInfoFuture(hostId, _engine!.collectSystemInfo(executor));
+        }
+        // 连接建立后（重新）加载 sudo 密码，覆盖 host 配置变更后的场景
         _loadSudoPasswordForHost(hostId, _engine!);
+      }
+    } else if (executor != null) {
+      // 非活跃 host 的后台连接：用该 host 自己的 engine 收集系统信息
+      final engine = _registry.getEngine(hostId);
+      if (engine != null && !_registry.hasSysInfoFuture(hostId)) {
+        _registry.setSysInfoFuture(hostId, engine.collectSystemInfo(executor));
       }
     }
   }

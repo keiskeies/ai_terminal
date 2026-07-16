@@ -17,6 +17,22 @@ class MultiHostExecutor {
 
   MultiHostExecutor(this._registry);
 
+  /// 当前任务的取消令牌（由 AgentEngine 在任务开始时注入）。
+  /// 所有 executeAndWait 调用都会带上这个 token，用户点停止按钮时
+  /// cancelTask() complete 它，编排里正在执行的远程命令立即中断。
+  /// 串行模式的 for 循环也会每轮检查它提前 break。
+  Completer<void>? _cancelToken;
+
+  /// 由 AgentEngine 调用：注入当前任务的取消令牌
+  set cancelToken(Completer<void>? token) => _cancelToken = token;
+
+  /// 当前是否已取消（供串行循环每轮检查用）
+  bool get _isCancelled => _cancelToken?.isCompleted ?? false;
+
+  /// 公开版取消检查：供 agent_tool 里的逐台循环每轮检查用。
+  /// 当 cancelTask 触发后，工具的 for 循环应立即 break，不再派发新主机。
+  bool get isCancelled => _isCancelled;
+
   /// 获取指定 host 的 executor
   /// 返回 null 表示该 host 未连接或不存在
   CommandExecutor? executorFor(String hostId) {
@@ -60,7 +76,7 @@ class MultiHostExecutor {
       );
     }
     try {
-      return await executor.executeAndWait(command, timeout: timeout);
+      return await executor.executeAndWait(command, timeout: timeout, cancelToken: _cancelToken);
     } catch (e) {
       return CommandResult(
         stdout: '',
@@ -87,6 +103,19 @@ class MultiHostExecutor {
   }) async {
     final results = <String, CommandResult>{};
 
+    // 取消提前检查：若进入 executeBatch 时已取消，直接全部标记 skipped
+    if (_isCancelled) {
+      for (final hostId in hostIds) {
+        results[hostId] = CommandResult(
+          stdout: '',
+          stderr: L10n.str.orchSkippedPreviousFailed,
+          exitCode: -1,
+          duration: Duration.zero,
+        );
+      }
+      return results;
+    }
+
     // R4/R8：用 SafetyGuard 判定安全等级，只读命令并行
     final level = SafetyGuard.check(command);
     if (level == SafetyLevel.safe) {
@@ -103,6 +132,18 @@ class MultiHostExecutor {
 
     // 串行执行：修改性命令逐台执行，支持 stopOnFailure
     for (int i = 0; i < hostIds.length; i++) {
+      // 每轮开始前检查取消：cancelTask 触发后立即停止派发新命令
+      if (_isCancelled) {
+        for (int j = i; j < hostIds.length; j++) {
+          results[hostIds[j]] = CommandResult(
+            stdout: '',
+            stderr: L10n.str.orchSkippedPreviousFailed,
+            exitCode: -1,
+            duration: Duration.zero,
+          );
+        }
+        break;
+      }
       final hostId = hostIds[i];
       final result = await executeOn(hostId, command, timeout: timeout);
       if (result == null) {
@@ -114,6 +155,18 @@ class MultiHostExecutor {
         );
       } else {
         results[hostId] = result;
+      }
+      // 取消后停止后续派发（执行中的命令已由 executeAndWait 内部提前返回）
+      if (_isCancelled) {
+        for (int j = i + 1; j < hostIds.length; j++) {
+          results[hostIds[j]] = CommandResult(
+            stdout: '',
+            stderr: L10n.str.orchSkippedPreviousFailed,
+            exitCode: -1,
+            duration: Duration.zero,
+          );
+        }
+        break;
       }
       // R5: 用合成后的 results[hostId] 判断失败，确保 null（未连接）也触发 stopOnFailure
       if (stopOnFailure && !results[hostId]!.success) {
@@ -200,7 +253,7 @@ class MultiHostExecutor {
     final probeCmd = "timeout 3 bash -c 'cat < /dev/tcp/$targetHost/$port' "
         "&& echo 'CONNECT_OK' || echo 'CONNECT_FAIL'";
     try {
-      final result = await executor.executeAndWait(probeCmd, timeout: timeout);
+      final result = await executor.executeAndWait(probeCmd, timeout: timeout, cancelToken: _cancelToken);
       final elapsed = DateTime.now().difference(start);
       final output = result.stdout;
       final reachable = output.contains('CONNECT_OK');

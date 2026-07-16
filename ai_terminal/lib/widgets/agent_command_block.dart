@@ -60,7 +60,11 @@ class AgentCommandBlock extends StatelessWidget {
     final tab = this.tab;
     final canExecute = tab != null && tab.isConnected && showAutoExecute;
     final safetyLevel = SafetyGuard.check(trimmed);
-    final dangerous = safetyLevel != SafetyLevel.safe;
+    // 只有 warn / blocked 级才视为危险命令，需要用户确认。
+    // info 级（如 npm install、systemctl restart、git clone）引擎会自动执行，
+    // 这里若也标黄会与实际行为不一致——显示"需确认"却直接跑，造成误导。
+    final dangerous =
+        safetyLevel == SafetyLevel.warn || safetyLevel == SafetyLevel.blocked;
     final isBlocked = safetyLevel == SafetyLevel.blocked;
     final isWaitingConfirm = pendingConfirmCommand == trimmed;
 

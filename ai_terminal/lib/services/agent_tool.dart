@@ -744,6 +744,10 @@ class CollectFileTool extends AgentTool {
     int successCount = 0;
 
     for (final hid in hostIds) {
+      if (_executor.isCancelled) {
+        results.add('[$hid] ✗ 已取消，跳过');
+        continue;
+      }
       onProgress?.call('[$hid] 正在采集 $remote ...');
       final targetExecutor = _executor.executorFor(hid);
       if (targetExecutor == null || targetExecutor is! SSHService) {
@@ -831,6 +835,10 @@ class MultiGrepTool extends AgentTool {
     final results = <String>[];
     int hitCount = 0;
     for (final hid in hostIds) {
+      if (_executor.isCancelled) {
+        results.add('=== [$hid] 已取消，跳过 ===');
+        continue;
+      }
       onProgress?.call('[$hid] 正在搜索...');
       final r = await _executor.executeOn(hid, cmd, timeout: const Duration(seconds: 30));
       if (r == null) {
@@ -894,6 +902,11 @@ class DiffFilesTool extends AgentTool {
     final md5Results = <String, String>{};
     final contentResults = <String, String>{};
     for (final hid in hostIds) {
+      if (_executor.isCancelled) {
+        md5Results[hid] = '已取消';
+        contentResults[hid] = '';
+        continue;
+      }
       onProgress?.call('[$hid] 正在读取 $remote ...');
       final r = await _executor.executeOn(
         hid,

@@ -264,8 +264,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         throw Exception(L10n.str.connectionFailedHint);
       }
 
-      // SSH 连接成功后设置 executor
-      ref.read(agentProvider.notifier).setExecutor(tab.service);
+      // SSH 连接成功后设置 executor（R3：显式传 tab.hostId，避免用 activeHostId 顶替）
+      ref.read(agentProvider.notifier).setExecutor(tab.service, hostId: tab.hostId);
 
       _switchToTab(tab);
       setState(() => _isConnecting = false);
@@ -303,7 +303,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       }
 
       // 本地终端连接成功后立即设置 executor，使 Agent 模式可用
-      ref.read(agentProvider.notifier).setExecutor(tab.localService);
+      ref.read(agentProvider.notifier).setExecutor(tab.localService, hostId: tab.hostId);
 
       _switchToTab(tab);
     } catch (e) {
@@ -918,6 +918,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       onClose: () async {
         // 小白用户误触关闭按钮时提示：如果正在运行任务，先确认
         final agentState = ref.read(agentProvider);
+        // 编排模式运行中：编排可能涉及任意已连接 host，关闭任一 tab 都会
+        // 让该 host 的 executor 变成陈旧引用，导致编排误报"未连接"。
+        // 直接拦截，要求用户先等编排完成或取消编排。
+        if (agentState.isOrchestratorMode && agentState.isRunning) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(l10n.orchAgentRunning),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          return;
+        }
         if (agentState.isRunning && tab.id == ref.read(tp.terminalProvider).activeTab?.id) {
           final confirmed = await showDialog<bool>(
             context: context,
@@ -2261,7 +2273,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 final tab = ref.read(tp.terminalProvider).activeTab;
                 // 本地终端用 localService，SSH 用 service
                 final CommandExecutor? executor = tab?.isLocal == true ? tab?.localService : tab?.service;
-                ref.read(agentProvider.notifier).setExecutor(executor);
+                ref.read(agentProvider.notifier).setExecutor(executor, hostId: tab?.hostId ?? 'local');
                 await ref.read(agentProvider.notifier).startTask(text);
               }
             },
@@ -2726,7 +2738,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     _autoScrollChat = true;
     // 本地终端用 localService，SSH 用 service
     final CommandExecutor? executor = tab.isLocal == true ? tab.localService : tab.service;
-    ref.read(agentProvider.notifier).setExecutor(executor);
+    ref.read(agentProvider.notifier).setExecutor(executor, hostId: tab.hostId);
     await ref.read(runbooksProvider.notifier).incrementRunCount(rb.id);
     await ref.read(agentProvider.notifier).startTask(rb.content);
   }
