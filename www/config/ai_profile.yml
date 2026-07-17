@@ -1,6 +1,6 @@
 # AI 供应商预设配置
 # 前端 AI 配置管理页从此文件读取供应商列表，无需前端发版即可更新
-# 数据截至 2026-05-15，各厂商定价可能调整，请以官网为准
+# 数据截至 2026-07-17，各厂商定价可能调整，请以官网为准
 
 providers:
   # ==================== 本地部署 ====================
@@ -31,13 +31,33 @@ providers:
         label: "Mistral 7B"
         free: true
 
+  # ==================== 免费平台 ====================
+  - id: agnes
+    name: "Agnes AI"
+    provider: OPENAI
+    baseUrl: "https://apihub.agnes-ai.com/v1"
+    region: GLOBAL
+    description: "新加坡 Sapiens AI 旗下，全模态永久免费，不绑卡无试用期"
+    apiKeyUrl: "https://platform.agnes-ai.com/"
+    websiteUrl: "https://agnes-ai.com/"
+    models:
+      - name: "agnes-2.0-flash"
+        label: "Agnes 2.0 Flash 文本 (免费推荐)"
+        free: true
+      - name: "agnes-image-2.1-flash"
+        label: "Agnes Image 2.1 Flash 图片"
+        free: true
+      - name: "agnes-video"
+        label: "Agnes Video 视频"
+        free: true
+
   # ==================== 国内云服务 ====================
   - id: deepseek
     name: "DeepSeek 深度求索"
     provider: OPENAI
     baseUrl: "https://api.deepseek.com/v1"
     region: CN
-    description: "V4 Flash 输入¥1/输出¥2/M，V4 Pro 2.5折中(¥3/¥6)，1M上下文384K输出"
+    description: "V4 Flash ¥0.14/¥0.28/M，V4 Pro ¥0.435/¥0.87/M（永久降价75%），缓存1/10价，1M上下文384K输出"
     apiKeyUrl: "https://platform.deepseek.com/api_keys"
     tokenPlanUrl: "https://platform.deepseek.com/usage"
     websiteUrl: "https://platform.deepseek.com"
@@ -52,18 +72,22 @@ providers:
     provider: OPENAI
     baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
     region: CN
-    description: "Qwen3.6 最新一代，Flash 输入 ¥0.15/M 起，100万tokens免费"
+    description: "Qwen3.7 万亿参数旗舰，Turbo/Flash 每月100万token永久免费"
     apiKeyUrl: "https://bailian.console.aliyun.com/"
     tokenPlanUrl: "https://bailian.console.aliyun.com/"
     codingPlanUrl: "https://tongyi.aliyun.com/pricing"
     websiteUrl: "https://tongyi.aliyun.com"
     models:
-      - name: "qwen3.6-max-preview"
-        label: "Qwen3.6 Max 旗舰 (推荐)"
-      - name: "qwen3.6-plus"
-        label: "Qwen3.6 Plus 均衡"
-      - name: "qwen3.6-flash"
-        label: "Qwen3.6 Flash 极速"
+      - name: "qwen3.7-max-preview"
+        label: "Qwen3.7 Max 旗舰 (推荐)"
+      - name: "qwen3.7-plus-preview"
+        label: "Qwen3.7 Plus 均衡"
+      - name: "qwen-turbo"
+        label: "Qwen Turbo 免费"
+        free: true
+      - name: "qwen-flash"
+        label: "Qwen Flash 免费"
+        free: true
       - name: "qwq-plus"
         label: "QwQ Plus 推理"
       - name: "qwen-coder-turbo"
@@ -74,20 +98,20 @@ providers:
     provider: OPENAI
     baseUrl: "https://open.bigmodel.cn/api/paas/v4"
     region: CN
-    description: "GLM-5.1 最新旗舰 200K 上下文，Flash 免费，Coding ¥49/月"
+    description: "GLM-5.2 最新旗舰 1M上下文 128K输出，面向长周期 Coding Agent 优化，Flash 免费"
     apiKeyUrl: "https://open.bigmodel.cn/usercenter/apikeys"
     tokenPlanUrl: "https://open.bigmodel.cn/usercenter/overview"
     codingPlanUrl: "https://open.bigmodel.cn/pricing"
     websiteUrl: "https://open.bigmodel.cn"
     models:
+      - name: "glm-5.2"
+        label: "GLM-5.2 最新旗舰 (推荐)"
       - name: "glm-5.1"
-        label: "GLM-5.1 最新旗舰 (推荐)"
+        label: "GLM-5.1"
       - name: "glm-5"
-        label: "GLM-5 745B"
+        label: "GLM-5"
       - name: "glm-5-turbo"
         label: "GLM-5 Turbo 快速"
-      - name: "glm-4.7"
-        label: "GLM-4.7"
       - name: "glm-4-flash"
         label: "GLM-4 Flash 免费"
         free: true
@@ -97,18 +121,20 @@ providers:
     provider: OPENAI
     baseUrl: "https://api.moonshot.cn/v1"
     region: CN
-    description: "K2.6 开源 1T 参数，原生视觉+Agent 集群，长文本最强"
+    description: "Kimi K3 全球最大开源模型 2.8万亿参数，KDA 混合线性注意力，1M上下文"
     apiKeyUrl: "https://platform.moonshot.cn/console/api-keys"
     tokenPlanUrl: "https://platform.moonshot.cn/console/usage"
     codingPlanUrl: "https://platform.moonshot.cn/code"
     websiteUrl: "https://platform.moonshot.cn"
     models:
+      - name: "kimi-k3"
+        label: "Kimi K3 最新旗舰 (推荐)"
       - name: "k2.6"
-        label: "Kimi K2.6 最新 (推荐)"
+        label: "Kimi K2.6"
       - name: "k2.5"
-        label: "Kimi K2.5 旗舰"
-      - name: "k2"
-        label: "Kimi K2"
+        label: "Kimi K2.5"
+      - name: "k2-thinking"
+        label: "Kimi K2 Thinking 推理"
       - name: "moonshot-v1-128k"
         label: "Moonshot V1 128K"
 
@@ -117,14 +143,16 @@ providers:
     provider: OPENAI
     baseUrl: "https://ark.cn-beijing.volces.com/api/v3"
     region: CN
-    description: "Seed 2.0 全系 256K 上下文，Pro 接近 Claude Sonnet 但更便宜"
+    description: "Doubao 2.1 Pro 最新旗舰，Seed Evolving 一次接入自动升级，最低¥0.15/M起"
     apiKeyUrl: "https://www.volcengine.com/product/doubao"
     tokenPlanUrl: "https://console.volcengine.com/ark"
     codingPlanUrl: "https://www.volcengine.com/product/doubao"
     websiteUrl: "https://www.volcengine.com/product/doubao"
     models:
-      - name: "doubao-seed-2.0-pro"
-        label: "Seed 2.0 Pro 旗舰 (推荐)"
+      - name: "doubao-seed-evolving"
+        label: "Seed Evolving 自动升级 (推荐)"
+      - name: "doubao-2.1-pro"
+        label: "Doubao 2.1 Pro 旗舰"
       - name: "doubao-seed-2.0-code"
         label: "Seed 2.0 Code 代码"
       - name: "doubao-seed-2.0-lite"
@@ -137,7 +165,7 @@ providers:
     provider: OPENAI
     baseUrl: "https://api.xiaomimimo.com/v1"
     region: CN
-    description: "V2.5 Flash 输入 $0.1/M 全网最低，Pro 1T参数 1M上下文"
+    description: "MiMo V2.5 系列 2026.4 开源，5月永久降价99%，KVCache 压缩1/7"
     apiKeyUrl: "https://platform.xiaomimimo.com/"
     tokenPlanUrl: "https://platform.xiaomimimo.com/"
     codingPlanUrl: "https://platform.xiaomimimo.com/"
@@ -158,11 +186,11 @@ providers:
     provider: OPENAI
     baseUrl: "https://api.minimax.chat/v1"
     region: CN
-    description: "M2.7 230B 接近 Claude Opus 4.6，入门 ¥29/月"
+    description: "M2.7 开源 Agent 旗舰，首个深度参与自我迭代训练的模型，入门¥29/月"
     apiKeyUrl: "https://platform.minimaxi.com/"
     tokenPlanUrl: "https://platform.minimaxi.com/"
     codingPlanUrl: "https://platform.minimaxi.com/pricing"
-    websiteUrl: "https://platform.minimaxi.com"
+    websiteUrl: "https://www.minimaxi.com"
     models:
       - name: "MiniMax-M2.7"
         label: "M2.7 最新旗舰 (推荐)"
@@ -176,7 +204,7 @@ providers:
     provider: OPENAI
     baseUrl: "https://api.siliconflow.cn/v1"
     region: CN
-    description: "API 聚合平台，DeepSeek V4 Flash 等模型免费"
+    description: "国内 API 聚合平台，DeepSeek V4 Flash 等模型免费，新用户送额度"
     apiKeyUrl: "https://cloud.siliconflow.cn/account/ak"
     tokenPlanUrl: "https://cloud.siliconflow.cn/account/usage"
     websiteUrl: "https://siliconflow.cn"
@@ -197,16 +225,16 @@ providers:
     provider: OPENAI
     baseUrl: "https://api.stepfun.com/v1"
     region: CN
-    description: "Step 3.5 Flash 专为 Agent 设计 350TPS，Coding ¥25/月半价中"
+    description: "Step 3.5 Flash 专为 Agent 设计 350TPS，2603 最新版，Coding ¥25/月半价中"
     apiKeyUrl: "https://platform.stepfun.com/"
     tokenPlanUrl: "https://platform.stepfun.com/pricing"
     codingPlanUrl: "https://platform.stepfun.com/step_plan"
     websiteUrl: "https://www.stepfun.com"
     models:
-      - name: "step-3.5-flash"
-        label: "Step 3.5 Flash (推荐)"
       - name: "step-3.5-flash-2603"
-        label: "Step 3.5 Flash 2603 最新"
+        label: "Step 3.5 Flash 2603 最新 (推荐)"
+      - name: "step-3.5-flash"
+        label: "Step 3.5 Flash"
       - name: "step-2"
         label: "Step 2 旗舰"
 
@@ -267,14 +295,16 @@ providers:
     provider: OPENAI
     baseUrl: "https://api.openai.com/v1"
     region: GLOBAL
-    description: "GPT-5.5 输入 $5/M / 输出 $30/M，1.05M 上下文"
+    description: "GPT-5.6 最新旗舰 1.5M上下文，输入$5/M 输出$30/M"
     apiKeyUrl: "https://platform.openai.com/api-keys"
     tokenPlanUrl: "https://platform.openai.com/usage"
     codingPlanUrl: "https://openai.com/pricing"
     websiteUrl: "https://platform.openai.com"
     models:
+      - name: "gpt-5.6"
+        label: "GPT-5.6 最新旗舰 (推荐)"
       - name: "gpt-5.5"
-        label: "GPT-5.5 最新旗舰 (推荐)"
+        label: "GPT-5.5"
       - name: "gpt-5"
         label: "GPT-5"
       - name: "gpt-4o"
@@ -291,17 +321,19 @@ providers:
     provider: OPENAI
     baseUrl: "https://api.anthropic.com/v1"
     region: GLOBAL
-    description: "Opus 4.6 输入 $5/M / Sonnet 4.6 $3/M，Prompt缓存降90%"
+    description: "Sonnet 5 默认模型限时$2/$10/M，Opus 4.8 旗舰，Prompt缓存降90%"
     apiKeyUrl: "https://console.anthropic.com/settings/keys"
     tokenPlanUrl: "https://console.anthropic.com/settings/cost"
     codingPlanUrl: "https://claude.com/pricing"
     websiteUrl: "https://www.anthropic.com"
     models:
-      - name: "claude-opus-4-6-20260401"
-        label: "Claude Opus 4.6 旗舰 (推荐)"
-      - name: "claude-sonnet-4-6-20260401"
+      - name: "claude-sonnet-5"
+        label: "Claude Sonnet 5 默认 (推荐)"
+      - name: "claude-opus-4-8"
+        label: "Claude Opus 4.8 旗舰"
+      - name: "claude-sonnet-4-6"
         label: "Claude Sonnet 4.6 均衡"
-      - name: "claude-haiku-4-5-20250514"
+      - name: "claude-haiku-4-5"
         label: "Claude Haiku 4.5 经济"
 
   - id: gemini
@@ -309,13 +341,15 @@ providers:
     provider: OPENAI
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai"
     region: GLOBAL
-    description: "3.1 Pro $2/M输入，Flash-Lite $0.1/M，2M上下文"
+    description: "Gemini 3.1 Pro 能力翻倍价格不变 $2/$12/M，Flash 有免费额度，1M-2M上下文"
     apiKeyUrl: "https://aistudio.google.com/apikey"
     tokenPlanUrl: "https://aistudio.google.com/apikey"
     websiteUrl: "https://aistudio.google.com"
     models:
       - name: "gemini-3.1-pro"
         label: "Gemini 3.1 Pro 最新 (推荐)"
+      - name: "gemini-3-flash"
+        label: "Gemini 3 Flash 极速"
       - name: "gemini-2.5-pro"
         label: "Gemini 2.5 Pro"
       - name: "gemini-2.5-flash"
@@ -328,13 +362,15 @@ providers:
     provider: OPENAI
     baseUrl: "https://api.x.ai/v1"
     region: GLOBAL
-    description: "Grok 4 Fast 输入 $0.2/M 输出 $0.5/M，2M上下文"
+    description: "Grok 4.5 最新 $2/$6/M 约为 Claude Opus 4.8 的1/4，2M上下文"
     apiKeyUrl: "https://console.x.ai/"
     tokenPlanUrl: "https://console.x.ai/usage"
     websiteUrl: "https://x.ai"
     models:
+      - name: "grok-4.5"
+        label: "Grok 4.5 最新 (推荐)"
       - name: "grok-4"
-        label: "Grok 4 旗舰 (推荐)"
+        label: "Grok 4"
       - name: "grok-4-fast"
         label: "Grok 4 Fast 快速"
       - name: "grok-3"
@@ -345,15 +381,15 @@ providers:
     provider: OPENAI
     baseUrl: "https://api.mistral.ai/v1"
     region: GLOBAL
-    description: "Large 3 $2/M / Small 3.1 $0.2/M，Apache 2.0 开源"
+    description: "Large 3 稀疏MoE $0.8/$2.4/M 约GPT-4o半价，Small 3 Apache 2.0 开源"
     apiKeyUrl: "https://console.mistral.ai/api-keys"
     tokenPlanUrl: "https://console.mistral.ai/usage"
     websiteUrl: "https://mistral.ai"
     models:
       - name: "mistral-large-3"
         label: "Mistral Large 3 (推荐)"
-      - name: "mistral-small-3.1"
-        label: "Mistral Small 3.1 经济"
+      - name: "mistral-small-3"
+        label: "Mistral Small 3 开源经济"
       - name: "codestral-latest"
         label: "Codestral 代码"
 
@@ -362,26 +398,28 @@ providers:
     provider: OPENAI
     baseUrl: "https://openrouter.ai/api/v1"
     region: GLOBAL
-    description: "API 聚合平台，一个 Key 调用 400+ 模型，按需付费"
+    description: "国际 API 聚合平台，一个 Key 调用 400+ 模型，按需付费"
     apiKeyUrl: "https://openrouter.ai/settings/keys"
     tokenPlanUrl: "https://openrouter.ai/settings/credits"
     websiteUrl: "https://openrouter.ai"
     models:
       - name: "deepseek/deepseek-v4-flash"
         label: "DeepSeek V4 Flash"
-      - name: "anthropic/claude-sonnet-4-6"
-        label: "Claude Sonnet 4.6"
+      - name: "anthropic/claude-sonnet-5"
+        label: "Claude Sonnet 5"
       - name: "google/gemini-3.1-pro"
         label: "Gemini 3.1 Pro"
-      - name: "openai/gpt-5.5"
-        label: "GPT-5.5"
+      - name: "openai/gpt-5.6"
+        label: "GPT-5.6"
+      - name: "x-ai/grok-4.5"
+        label: "Grok 4.5"
 
   - id: groq
     name: "Groq"
     provider: OPENAI
     baseUrl: "https://api.groq.com/openai/v1"
     region: GLOBAL
-    description: "超低延迟推理，Llama 3.3 70B 免费额度"
+    description: "LPU 超低延迟推理 549 t/s，每天免费 300-400万 token"
     apiKeyUrl: "https://console.groq.com/keys"
     tokenPlanUrl: "https://console.groq.com/usage"
     websiteUrl: "https://groq.com"
