@@ -8,6 +8,7 @@ import 'ssh_service.dart';
 import 'file_sync_service.dart';
 import 'multi_host_executor.dart';
 import 'agent_host_registry.dart';
+import 'project_tools.dart';
 import '../core/l10n_holder.dart';
 
 /// Agent 工具调用结果
@@ -1157,6 +1158,10 @@ class AgentToolRegistry {
     register(SftpUploadTool());
     register(FileSyncTool(fileSyncService));
     register(CertMonitorTool());
+    // 本地项目分析/构建/打包工具（用于"本地项目部署到服务器"工作流）
+    register(ProjectAnalyzeTool());
+    register(BuildProjectTool());
+    register(PackageProjectTool());
   }
 
   /// 启用编排模式：注册多机编排工具

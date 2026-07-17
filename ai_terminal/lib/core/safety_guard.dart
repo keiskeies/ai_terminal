@@ -1,9 +1,21 @@
+import 'dart:io' show Platform;
+
 /// 命令安全等级
 enum SafetyLevel {
   safe,    // 安全（只读命令）
   info,    // 仅提示（低风险修改）
   warn,    // 需二次确认（高风险修改）
   blocked, // 直接拦截（不可逆操作）
+}
+
+/// 路径安全检查结果
+class PathSafetyResult {
+  final SafetyLevel level;
+  final String? reason;
+
+  const PathSafetyResult(this.level, this.reason);
+
+  bool get isAllowed => level == SafetyLevel.safe || level == SafetyLevel.info;
 }
 
 /// 安全规则：正则模式 + 人类可读的风险说明
@@ -299,5 +311,195 @@ class SafetyGuard {
   /// 是否需要二次确认
   static bool requireConfirm(SafetyLevel level) {
     return level == SafetyLevel.warn || level == SafetyLevel.blocked;
+  }
+
+  // ════════════════════════════════════════════════════════════════
+  // 路径安全检查（用于本地项目分析/构建/打包工具）
+  // ════════════════════════════════════════════════════════════════
+
+  /// 全局路径黑名单（绝对路径前缀，永远禁止访问）
+  /// 用于防止 AI 读取 SSH 私钥、系统配置、root 目录等敏感位置
+  static const List<String> _blockedPathPrefixes = [
+    '/etc',
+    '/root',
+    '/var/log',
+    '/proc',
+    '/sys',
+    '/dev',
+    '/boot',
+    '/srv',
+    '/run',
+    '/usr/local/etc',
+  ];
+
+  /// 敏感文件名模式（黑名单，永远禁止读取）
+  static final List<RegExp> _blockedFilePatterns = [
+    RegExp(r'^id_rsa$'),
+    RegExp(r'^id_rsa\.pub$'),
+    RegExp(r'^id_ed25519$'),
+    RegExp(r'^id_ed25519\.pub$'),
+    RegExp(r'^id_ecdsa$'),
+    RegExp(r'^id_dsa$'),
+    RegExp(r'^\.pem$'),
+    RegExp(r'\.key$'),
+    RegExp(r'^credentials(\.json|\.yaml|\.yml)?$'),
+    RegExp(r'^\.env\.production$'),
+    RegExp(r'^\.env\.prod$'),
+    RegExp(r'^\.env\.local$'),
+    RegExp(r'^shadow$'),
+    RegExp(r'^passwd$'),
+    RegExp(r'^\.netrc$'),
+    RegExp(r'^\.htpasswd$'),
+  ];
+
+  /// 敏感目录名（路径分段匹配，黑名单）
+  static const List<String> _blockedDirNames = [
+    '.ssh',
+    '.gnupg',
+    '.aws',
+    '.docker',
+    '.kube',
+  ];
+
+  /// 用户主目录下的敏感路径（运行时拼接 $HOME）
+  static const List<String> _homeBlockedSuffixes = [
+    '.ssh',
+    '.gnupg',
+    '.aws',
+    '.docker',
+    '.kube',
+    '.config/google-chrome',
+    '.config/Code',
+    '.password-store',
+  ];
+
+  /// 检查路径安全性
+  ///
+  /// [path] 待检查的路径（绝对路径）
+  /// [projectRoot] 可选：用户授权的项目根目录，在项目内视为安全
+  /// [isWrite] 是否为写操作（写操作更严格）
+  ///
+  /// 返回 PathSafetyResult，包含等级和说明
+  static PathSafetyResult checkPath(String path, {String? projectRoot, bool isWrite = false}) {
+    if (path.isEmpty) {
+      return const PathSafetyResult(SafetyLevel.warn, '路径为空');
+    }
+
+    // 规范化路径（去尾斜杠、合并重复斜杠）
+    final normalized = _normalizePath(path);
+    if (normalized.isEmpty) {
+      return const PathSafetyResult(SafetyLevel.warn, '路径规范化后为空');
+    }
+
+    // 1. 检查是否在项目根目录内（最高优先级白名单）
+    if (projectRoot != null && projectRoot.isNotEmpty) {
+      final root = _normalizePath(projectRoot);
+      if (_isPathWithin(normalized, root)) {
+        // 项目内：检查是否命中文件名/目录黑名单
+        final fileName = normalized.split('/').last;
+        for (final pattern in _blockedFilePatterns) {
+          if (pattern.hasMatch(fileName)) {
+            return PathSafetyResult(SafetyLevel.blocked, '敏感文件: $fileName（即使项目内也禁止访问）');
+          }
+        }
+        // 检查路径分段是否含敏感目录名
+        for (final segment in normalized.split('/')) {
+          if (_blockedDirNames.contains(segment)) {
+            return PathSafetyResult(SafetyLevel.blocked, '敏感目录: $segment（禁止访问）');
+          }
+        }
+        return const PathSafetyResult(SafetyLevel.safe, null);
+      }
+    }
+
+    // 2. 检查全局路径黑名单前缀
+    for (final prefix in _blockedPathPrefixes) {
+      if (normalized == prefix || normalized.startsWith('$prefix/')) {
+        return PathSafetyResult(SafetyLevel.blocked, '系统目录 $prefix 禁止访问');
+      }
+    }
+
+    // 3. 检查用户主目录下的敏感路径
+    final home = _getHomeDir();
+    if (home != null) {
+      for (final suffix in _homeBlockedSuffixes) {
+        final sensitivePath = '$home/$suffix';
+        if (normalized == sensitivePath || normalized.startsWith('$sensitivePath/')) {
+          return PathSafetyResult(SafetyLevel.blocked, '敏感目录 ~/$suffix 禁止访问');
+        }
+      }
+      // 直接读 ~/.ssh/id_rsa 这种情况已被上面覆盖
+    }
+
+    // 4. 检查文件名黑名单（项目外也要查）
+    final fileName = normalized.split('/').last;
+    for (final pattern in _blockedFilePatterns) {
+      if (pattern.hasMatch(fileName)) {
+        return PathSafetyResult(SafetyLevel.blocked, '敏感文件: $fileName');
+      }
+    }
+
+    // 5. 检查路径分段中的敏感目录
+    for (final segment in normalized.split('/')) {
+      if (_blockedDirNames.contains(segment)) {
+        return PathSafetyResult(SafetyLevel.blocked, '敏感目录: $segment 禁止访问');
+      }
+    }
+
+    // 6. 项目外的路径需确认（防止 AI 乱跑）
+    return PathSafetyResult(
+      SafetyLevel.warn,
+      '路径不在授权的项目目录内: $normalized',
+    );
+  }
+
+  /// 路径规范化：合并重复斜杠、去尾斜杠、解析 . 和 ..
+  static String _normalizePath(String path) {
+    var p = path.replaceAll(RegExp(r'\\'), '/'); // Windows 路径转 POSIX
+    p = p.replaceAll(RegExp(r'/+'), '/'); // 合并重复斜杠
+    // 简单解析 . 和 ..
+    final segments = <String>[];
+    for (final seg in p.split('/')) {
+      if (seg.isEmpty || seg == '.') continue;
+      if (seg == '..') {
+        if (segments.isNotEmpty) segments.removeLast();
+        continue;
+      }
+      segments.add(seg);
+    }
+    final result = segments.join('/');
+    return path.startsWith('/') ? '/$result' : result;
+  }
+
+  /// 判断 path 是否在 root 目录内（规范化后的路径）
+  static bool _isPathWithin(String path, String root) {
+    if (path == root) return true;
+    return path.startsWith('$root/');
+  }
+
+  /// 获取用户主目录（用于检查 ~/.ssh 等）
+  static String? _getHomeDir() {
+    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+    return home != null ? _normalizePath(home) : null;
+  }
+
+  /// 检查路径是否允许读取（综合判断，给工具层用）
+  /// [path] 待读取路径
+  /// [projectRoot] 项目根目录
+  /// [sourceCodeGranted] 是否已获得源码读取授权（会话级）
+  static PathSafetyResult checkReadPath(String path, {
+    String? projectRoot,
+    bool sourceCodeGranted = false,
+  }) {
+    final result = checkPath(path, projectRoot: projectRoot, isWrite: false);
+    // blocked 永远不允许
+    if (result.level == SafetyLevel.blocked) return result;
+    // safe 直接放行
+    if (result.level == SafetyLevel.safe) return result;
+    // warn：若已授权则放行，否则需确认
+    if (sourceCodeGranted) {
+      return const PathSafetyResult(SafetyLevel.safe, null);
+    }
+    return result;
   }
 }

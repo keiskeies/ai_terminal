@@ -62,6 +62,19 @@ class AgentEngine {
   /// 命令执行取消令牌：cancelTask 时 complete，_executeCommand 据此提前退出
   Completer<void>? _commandCancelToken;
 
+  /// 会话级源码读取授权状态（R7 安全）
+  /// 当 AI 需要读取项目源码文件（L3 级别）时，首次弹窗询问用户
+  /// 用户确认后会话内有效，任务结束自动失效
+  /// false = 未授权（默认），true = 已授权
+  /// 当前由 system prompt 规则约束 AI 行为，未来可在 _executeCommand 中
+  /// 对 cat/head/tail 等读取命令做路径校验时使用此字段
+  // ignore: unused_field
+  bool _sessionSourceCodeGranted = false;
+
+  /// 当前任务的项目根目录（用于路径白名单判断）
+  /// 由 project_analyze 工具首次调用时设置，任务结束后重置
+  String? _currentProjectRoot;
+
   /// 编排任务的取消令牌：覆盖整个 ReAct 循环周期（比 _commandCancelToken 生命周期长）。
   /// 在 _executeAutomatic 开始时创建并注入到 MultiHostExecutor，cancelTask 时 complete。
   /// 编排工具的 executeAndWait 通过它响应取消，否则点停止后批量命令会跑到 timeout 才停。
@@ -1445,6 +1458,15 @@ class AgentEngine {
     );
     _notifyTaskUpdate();
 
+    // 本地项目部署工作流：记录项目根目录用于路径白名单
+    if (toolName == 'project_analyze' || toolName == 'build_project' || toolName == 'package_project') {
+      final projectPath = args['path']?.toString() ?? '';
+      if (projectPath.isNotEmpty && _currentProjectRoot == null) {
+        _currentProjectRoot = projectPath;
+        agentLogger.info('ReAct', '已记录项目根目录: $projectPath');
+      }
+    }
+
     try {
       final result = await tool.execute(
         executor: executor,
@@ -1552,6 +1574,9 @@ class AgentEngine {
     }
     // 任务完成通知（异步，不阻塞引擎）
     _notifyTaskCompletion(success: success, startTime: startTime);
+    // 重置会话级本地项目状态（R2：资源生命周期 — 任务结束清理）
+    _sessionSourceCodeGranted = false;
+    _currentProjectRoot = null;
   }
 
   /// 推送任务完成通知（异步触发，不阻塞引擎主流程）
@@ -1892,6 +1917,12 @@ class AgentEngine {
       buffer.writeln(toolsPrompt);
     }
 
+    // 本地项目部署工作流提示（仅在本地终端会话时注入）
+    if (executor != null && executor is! SSHService) {
+      buffer.writeln();
+      buffer.writeln(_buildLocalDeployPrompt());
+    }
+
     // 多机编排模式注入
     if (_orchestratorMode && _tools.multiHostExecutor != null) {
       buffer.writeln();
@@ -1962,6 +1993,47 @@ $hostList
 7. 不要假设主机间网络互通，关键依赖（如 web→db）必须用 check_connectivity 验证
 8. 普通 execute 命令仍可用，但只在当前活跃主机执行，不跨主机
 9. 部署类任务建议分阶段：规划 → 用 ask 确认矩阵 → 执行 → 验证连通性''';
+  }
+
+  /// 构建本地项目部署工作流 system prompt 段落
+  /// 当用户在本地终端会话中提到"部署本地项目""打包项目"等需求时，引导 AI 使用新工具
+  String _buildLocalDeployPrompt() {
+    return '''【本地项目部署工作流】
+当前为本地终端会话。当用户要求"部署本地项目到服务器""打包项目""构建项目"等场景时，按以下工作流执行：
+
+【标准部署流程】
+1. 分析项目（必选第一步）：
+   动作: tool
+   工具: project_analyze
+   参数: {"path":"/Users/用户名/项目路径"}
+   说明: 读取 package.json/pubspec.yaml/Cargo.toml 等元数据，识别项目类型和构建命令。不读源码。
+
+2. 构建项目：
+   动作: tool
+   工具: build_project
+   参数: {"path":"/Users/用户名/项目路径","command":"npm run build"}
+   说明: command 可省略，工具会根据项目类型自动推断。在项目目录本地执行。
+
+3. 打包构建产物：
+   动作: tool
+   工具: package_project
+   参数: {"path":"/Users/用户名/项目路径","artifact_dir":"build/web","format":"tar.gz"}
+   说明: artifact_dir 用 project_analyze 识别的"构建产物目录"。输出到 /tmp/ 下。
+
+4. 上传到服务器（需要切换到 SSH 远程会话，或使用多机编排 upload_to 工具）：
+   动作: tool
+   工具: sftp_upload
+   参数: {"local":"/tmp/项目名-时间戳.tar.gz","remote":"/var/www","recursive":"false"}
+
+【关键规则】
+1. 必须先 project_analyze 再 build_project，不要跳过分析直接构建
+2. 构建失败时，用 ask 动作询问用户："构建失败，错误如下，要我尝试修复吗？还是停下来等您处理？"
+3. 不要自行重试构建超过 2 次，避免越改越乱
+4. 构建产物目录由 project_analyze 返回的"构建产物目录"字段决定，不要凭猜测
+5. 敏感文件（.env.production / id_rsa / *.key / .ssh/ 等）被安全策略禁止访问，不要尝试读取
+6. 项目外路径需用户确认，不要随意 cd 到项目外目录
+7. 同一时刻只允许一个构建任务运行，构建锁会自动串行化
+8. 用户路径可能含空格，工具已自动处理双引号转义，不要手动拼接路径''';
   }
 
   /// 启用多机编排模式
