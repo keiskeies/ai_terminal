@@ -7,6 +7,7 @@ import '../core/theme_colors.dart';
 import '../l10n/app_localizations.dart';
 import '../models/ai_model_config.dart';
 import '../providers/app_providers.dart';
+import '../services/daos.dart';
 import '../services/provider_config_service.dart';
 
 /// P1-6: AI 模型配置页面简化
@@ -275,6 +276,9 @@ class _AIModelDialogState extends State<AIModelDialog> {
   String _provider = 'openai';
   double _temperature = 0.3;
   int _maxTokens = 4096;
+  int _contextWindow = 0;
+  String? _fallbackModelId;
+  bool _supportsFunctionCalling = false;
   bool _isDefault = false;
   bool _obscureApiKey = true;
   bool _testing = false;
@@ -298,6 +302,9 @@ class _AIModelDialogState extends State<AIModelDialog> {
       _provider = widget.model!.provider;
       _temperature = widget.model!.temperature;
       _maxTokens = widget.model!.maxTokens;
+      _contextWindow = widget.model!.contextWindow;
+      _fallbackModelId = widget.model!.fallbackModelId;
+      _supportsFunctionCalling = widget.model!.supportsFunctionCalling;
       _isDefault = widget.model!.isDefault;
     }
     _nameController.addListener(() => setState(() {}));
@@ -708,6 +715,61 @@ class _AIModelDialogState extends State<AIModelDialog> {
                               keyboardType: TextInputType.number,
                               onChanged: (v) => _maxTokens = int.tryParse(v) ?? 4096,
                             ),
+                            // Context Window（0 = 使用默认 32768）
+                            TextFormField(
+                              controller: TextEditingController(text: _contextWindow.toString()),
+                              decoration: InputDecoration(
+                                labelText: '上下文窗口 (0=默认 32768)',
+                                labelStyle: TextStyle(color: tc.textSub),
+                                helperText: '模型最大上下文长度，用于自动裁剪对话历史',
+                                helperStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
+                              ),
+                              style: TextStyle(color: tc.textMain),
+                              keyboardType: TextInputType.number,
+                              onChanged: (v) => _contextWindow = int.tryParse(v) ?? 0,
+                            ),
+                            // Fallback 模型选择（P1-4）
+                            // 主模型重试 maxRetries 次仍失败时，自动切换到该备用模型重试一次
+                            Builder(builder: (context) {
+                              final allModels = AIModelsDao.cached;
+                              // 排除自身（防止 fallback 指向自己导致死循环）
+                              final candidates = allModels
+                                  .where((m) => widget.model == null || m.id != widget.model!.id)
+                                  .toList();
+                              return DropdownButtonFormField<String?>(
+                                initialValue: _fallbackModelId,
+                                decoration: InputDecoration(
+                                  labelText: '备用模型 (可选)',
+                                  labelStyle: TextStyle(color: tc.textSub),
+                                  helperText: '主模型失败时自动切换到此模型重试',
+                                  helperStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
+                                ),
+                                style: TextStyle(color: tc.textMain),
+                                items: [
+                                  const DropdownMenuItem<String?>(
+                                    value: null,
+                                    child: Text('无备用模型', style: TextStyle(color: Colors.grey)),
+                                  ),
+                                  ...candidates.map((m) => DropdownMenuItem<String?>(
+                                    value: m.id,
+                                    child: Text('${m.name} (${m.modelName})', style: TextStyle(color: tc.textMain)),
+                                  )),
+                                ],
+                                onChanged: (v) => setState(() => _fallbackModelId = v),
+                              );
+                            }),
+                            const SizedBox(height: 8),
+                            // P2-6: Function Calling 开关
+                            SwitchListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text('Function Calling', style: TextStyle(color: tc.textMain, fontSize: fBody)),
+                              subtitle: Text(
+                                '原生工具调用（OpenAI tools API），仅支持该协议的模型开启',
+                                style: TextStyle(color: tc.textSub, fontSize: fSmall),
+                              ),
+                              value: _supportsFunctionCalling,
+                              onChanged: (v) => setState(() => _supportsFunctionCalling = v),
+                            ),
                           ],
                         ),
                       ],
@@ -758,6 +820,9 @@ class _AIModelDialogState extends State<AIModelDialog> {
       modelName: _modelNameController.text.trim(),
       temperature: _temperature,
       maxTokens: _maxTokens,
+      contextWindow: _contextWindow,
+      fallbackModelId: _fallbackModelId,
+      supportsFunctionCalling: _supportsFunctionCalling,
       isDefault: _isDefault,
     );
 

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
 import '../core/db_init.dart';
 import '../models/host_config.dart';
@@ -160,6 +161,9 @@ class AIModelsDao {
     'id': m.id, 'provider': m.provider, 'name': m.name,
     'apiKey': m.apiKey, 'baseUrl': m.baseUrl, 'modelName': m.modelName,
     'temperature': m.temperature, 'maxTokens': m.maxTokens,
+    'contextWindow': m.contextWindow,
+    'fallbackModelId': m.fallbackModelId,
+    'supportsFunctionCalling': m.supportsFunctionCalling ? 1 : 0,
     'isDefault': m.isDefault ? 1 : 0,
   };
 
@@ -173,6 +177,9 @@ class AIModelsDao {
       ..modelName = r['modelName'] as String
       ..temperature = (r['temperature'] as num?)?.toDouble() ?? 0.3
       ..maxTokens = r['maxTokens'] as int? ?? 4096
+      ..contextWindow = r['contextWindow'] as int? ?? 0
+      ..fallbackModelId = r['fallbackModelId'] as String?
+      ..supportsFunctionCalling = (r['supportsFunctionCalling'] as int?) == 1
       ..isDefault = (r['isDefault'] as int?) == 1;
     return m;
   }
@@ -724,6 +731,17 @@ class SettingsDao {
 
   static Future<void> set(String key, dynamic value) async {
     _cache[key] = value;
+    // R8: 持久化失败必须暴露（不能 silent catch）
+    // 测试环境（widget_test）下 DbInit 未初始化，降级为只写缓存并 debugPrint
+    // 生产环境 DbInit 必然已初始化（main.dart 顺序），不会走此分支
+    // 不用 agentLogger.warn：会触发 AgentLogger._scheduleFlush() 创建 500ms Timer，
+    // 在测试环境下不被清理导致 "Timer is still pending" 错误。
+    // debugPrint 在 debug 模式下输出控制台（开发可见），release 模式 no-op
+    // 但 release 模式下生产环境不会触发此分支，无数据丢失风险。
+    if (!DbInit.isInitialized) {
+      debugPrint('[SettingsDao] WARN: DbInit 未初始化，set($key) 仅写缓存，未持久化');
+      return;
+    }
     final encoded = jsonEncode(value);
     await DbInit.db.insert('settings', {'key': key, 'value': encoded},
         conflictAlgorithm: ConflictAlgorithm.replace);
@@ -731,6 +749,11 @@ class SettingsDao {
 
   static Future<void> remove(String key) async {
     _cache.remove(key);
+    // R8: 与 set() 一致的防御：DbInit 未初始化时仅清缓存
+    if (!DbInit.isInitialized) {
+      debugPrint('[SettingsDao] WARN: DbInit 未初始化，remove($key) 仅清缓存，未持久化');
+      return;
+    }
     await DbInit.db.delete('settings', where: 'key = ?', whereArgs: [key]);
   }
 

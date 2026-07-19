@@ -1,26 +1,14 @@
-import 'package:hive/hive.dart';
-
-part 'agent_event.g.dart';
-
 /// Agent 事件类型枚举
 ///
 /// 用于结构化渲染 Agent 的输出：思考、命令、结果、询问、完成、普通文本。
 /// 每种事件对应一个独立的 UI 卡片，避免把所有内容混在一个字符串里。
-@HiveType(typeId: 20)
 enum AgentEventType {
-  @HiveField(0)
   thought, // 思考文本
-  @HiveField(1)
   command, // 命令（待执行或已执行）
-  @HiveField(2)
   result, // 命令执行结果
-  @HiveField(3)
   ask, // 询问用户选择
-  @HiveField(4)
   finish, // 任务完成
-  @HiveField(5)
   text, // 普通文本（非 ReAct 格式）
-  @HiveField(6)
   info, // 状态提示（🚀 开始、⏳ 继续执行等）
 }
 
@@ -29,64 +17,48 @@ enum AgentEventType {
 /// 设计要点：
 /// - 每个事件有唯一 id，便于流式更新时定位
 /// - 命令事件有 commandId，结果事件通过 commandId 关联到对应命令
-/// - 持久化时整个事件列表存到 Conversation.messages（用 Hive 适配器）
-@HiveType(typeId: 21)
-class AgentEvent extends HiveObject {
-  @HiveField(0)
+/// - 持久化时整个事件列表存到 Conversation.messages
+class AgentEvent {
   late String id;
 
-  @HiveField(1)
   late AgentEventType type;
 
-  @HiveField(2)
   late DateTime timestamp;
 
   /// 文本内容（thought/text/info 用）
-  @HiveField(3)
   String? text;
 
   /// 命令内容（command/result 用）
-  @HiveField(4)
   String? command;
 
   /// 命令关联 id（result 用，指向对应 command 的 id）
-  @HiveField(5)
   String? commandId;
 
   /// 命令是否危险（command 用）
-  @HiveField(6)
   bool? dangerous;
 
   /// 命令是否被安全系统拦截（command 用）
-  @HiveField(7)
   bool? blocked;
 
   /// 执行是否成功（result 用）
-  @HiveField(8)
   bool? success;
 
   /// 命令输出（result 用）
-  @HiveField(9)
   String? output;
 
   /// 错误信息（result 用）
-  @HiveField(10)
   String? error;
 
   /// 选项列表（ask 用）
-  @HiveField(11)
   List<String>? options;
 
   /// 询问的问题文本（ask 用）
-  @HiveField(12)
   String? question;
 
   /// 完成摘要（finish 用）
-  @HiveField(13)
   String? summary;
 
   /// 事件是否已完成流式接收（用于流式渲染判断）
-  @HiveField(14)
   bool isStreaming = false;
 
   AgentEvent();

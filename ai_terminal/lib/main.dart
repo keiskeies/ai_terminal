@@ -16,7 +16,8 @@ import 'services/notification_service.dart';
 import 'services/conversation_service.dart';
 import 'services/agent_logger.dart';
 import 'services/ssh_connection_pool.dart';
-import 'services/hive_migrator.dart';
+import 'services/crash_reporter.dart';
+import 'services/health_check_service.dart';
 import 'core/builtin_runbooks.dart';
 
 void main() {
@@ -25,22 +26,34 @@ void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
-    // Flutter framework 异常（Widget build/布局溢出等）— 记录日志而非崩溃
+    // P2-8: CrashReporter 初始化（独立 crash.log，与 agent.log 分离提高信噪比）
+    // 必须在其他初始化之前完成，否则后续 init 失败时无法记录到 crash 文件
+    await crashReporter.init().catchError((e) {
+      debugPrint('[main] CrashReporter 初始化失败: $e');
+    });
+
+    // Flutter framework 异常（Widget build/布局溢出等）— 记录日志 + 写入 crash.log
     FlutterError.onError = (details) {
       FlutterError.presentError(details);
       try {
         agentLogger.error('FlutterError',
             '框架异常: ${details.exception}\n${details.stack}');
       } catch (_) {}
+      // P2-8: 同步写入 crash.log（独立于 agentLogger，保证结构化字段）
+      crashReporter.report(
+        details.exception,
+        details.stack,
+        context: 'FlutterError',
+      ).catchError((e) {
+        debugPrint('[main] crashReporter 写入失败: $e');
+      });
     };
 
     // 先加载 OS 主密钥（不依赖 DB），用于 SQLCipher 全库加密
     await CredentialsStore.loadMasterKey();
     // 初始化加密 SQLite 数据库（用 OS 主密钥作为 PRAGMA key）
     await DbInit.init();
-    // 迁移旧 Hive 数据（一次性，幂等）
-    await HiveMigrator.migrate();
-    // 迁移后重新加载 DAO 内存缓存，保证 sync 读路径数据一致
+    // 重新加载 DAO 内存缓存，保证 sync 读路径数据一致
     await DbInit.reloadCaches();
     // 初始化内置运维工作流模板（首次安装时写入，已有则跳过）
     await BuiltinRunbooks.initBuiltin();
@@ -58,6 +71,10 @@ void main() {
     // 防止用户打开多个 tab 后连接泄漏导致文件描述符耗尽
     SSHConnectionPool.startIdleCleanup(const Duration(minutes: 10));
 
+    // P2-8: 启动健康检查服务（每 5 分钟检查磁盘可写性 + SSH 池活性）
+    // 发现异常通过 agentLogger 输出 WARN/ERROR，不阻塞主流程
+    healthCheckService.start();
+
     // 注册应用生命周期监听：在退出时刷盘，避免丢失未持久化的对话/日志
     // AppLifecycleObserver 通过 WidgetsBinding.instance.addObserver 持有引用，不会被 GC
     AppLifecycleObserver();
@@ -73,6 +90,14 @@ void main() {
       // agentLogger 本身不可用时，只能 debugPrint
       debugPrint('[ZONE] agentLogger 不可用: $error');
     }
+    // P2-8: 同步写入 crash.log（独立于 agentLogger，保证结构化字段）
+    crashReporter.report(
+      error,
+      stack,
+      context: 'Zone',
+    ).catchError((e) {
+      debugPrint('[ZONE] crashReporter 写入失败: $e');
+    });
   });
 }
 
@@ -135,6 +160,12 @@ class AppLifecycleObserver with WidgetsBindingObserver {
         await DbInit.close().timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('[AppLifecycle] DbInit.close 失败: $e');
+      }
+      // P2-8: 停止健康检查定时器（避免 detached 后仍占用资源）
+      try {
+        await healthCheckService.stop().timeout(const Duration(seconds: 1));
+      } catch (e) {
+        debugPrint('[AppLifecycle] healthCheckService.stop 失败: $e');
       }
     }
   }

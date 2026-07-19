@@ -257,12 +257,16 @@ class AgentNotifier extends StateNotifier<AgentState> {
     if (_modelConfig != null && hostId != null) {
       final memory = _getMemory(hostId);
       final aiProvider = AIService.create(_modelConfig!);
+      // P1-4: 加载 fallback 模型（如有配置）
+      final fallback = _loadFallbackFor(_modelConfig!);
       _engine = AgentEngine(
         aiProvider: aiProvider,
         modelConfig: _modelConfig!,
         memory: memory,
         maxSteps: state.maxSteps,
         hostId: hostId,
+        fallbackProvider: fallback?.$1,
+        fallbackConfig: fallback?.$2,
       );
       _setupEngineCallbacks(hostId);
       _registry.setEngine(hostId, _engine!);
@@ -271,6 +275,26 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _restoreEngineHistory();
       // 从安全存储加载 sudo 密码注入到 engine
       _loadSudoPasswordForHost(hostId, _engine!);
+    }
+  }
+
+  /// P1-4: 加载 fallback AIProvider 和 AIModelConfig
+  /// 根据 modelConfig.fallbackModelId 查询备用模型配置并创建 provider
+  /// 返回 null 表示无 fallback 或 fallback 模型不存在
+  (AIProvider, AIModelConfig)? _loadFallbackFor(AIModelConfig config) {
+    final fallbackId = config.fallbackModelId;
+    if (fallbackId == null || fallbackId.isEmpty) return null;
+    try {
+      final fallbackConfig = AIModelsDao.getCachedById(fallbackId);
+      if (fallbackConfig == null) {
+        debugPrint('[AgentNotifier] fallback 模型不存在: $fallbackId');
+        return null;
+      }
+      final provider = AIService.create(fallbackConfig);
+      return (provider, fallbackConfig);
+    } catch (e) {
+      debugPrint('[AgentNotifier] 加载 fallback 模型失败: $e');
+      return null;
     }
   }
 
@@ -319,6 +343,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
       memory: memory,
       maxSteps: state.maxSteps,
       hostId: hostId,
+      fallbackProvider: _loadFallbackFor(modelConfig)?.$1,
+      fallbackConfig: _loadFallbackFor(modelConfig)?.$2,
     );
 
     _setupEngineCallbacks(hostId);
@@ -499,9 +525,12 @@ class AgentNotifier extends StateNotifier<AgentState> {
       if (items.isEmpty || items.last.role != 'assistant') return s;
       final lastItem = items.last;
       final newContent = lastItem.content + streamingContent;
+      // isStreaming 必须置 false：流式已结束，UI 停止显示"运行中"光标和停止按钮
+      // 之前遗漏此字段导致 cancel() 后 UI 仍显示 streaming 状态
       items[items.length - 1] = lastItem.copyWith(
         content: newContent,
         streamingContent: '',
+        isStreaming: false,
       );
       // 持久化保存（含 events），并更新已持久化长度
       _lastPersistedLen[hostId] = newContent.length;
@@ -736,26 +765,50 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
   /// 取消任务
   void cancel() {
-    // 取消前先保存当前内容
+    // 取消前先保存当前流式内容到 content（_flushStreamingToContent 会同时 isStreaming: false）
     final hostId = _engineHostId;
     if (hostId != null) {
       _flushStreamingToContent(hostId);
-      // 如果流式内容为空（thinking 阶段取消），assistant 占位仍为空
-      // 填充取消提示并持久化，避免恢复后出现空 assistant 消息
+      // 兜底：所有终态路径都必须强制 isStreaming: false，避免 UI 卡在"运行中"
+      // 覆盖两种场景：
+      //   1. thinking 阶段取消（streamingContent 为空，_flushStreamingToContent 提前 return）
+      //      → 填充"任务已取消"提示，避免空 assistant 消息
+      //   2. streamingContent 非空但被 _flushStreamingToContent 合并后，仍需兜底确保 isStreaming: false
       _updateHostState(hostId, (s) {
         final items = [...s.chatItems];
-        if (items.isNotEmpty && items.last.role == 'assistant' &&
-            items.last.content.isEmpty && items.last.streamingContent.isEmpty) {
-          items[items.length - 1] = items.last.copyWith(
-            content: L10n.str.taskCancelled,
-            isStreaming: false,
-          );
-          _persistAssistantCompletion(hostId, L10n.str.taskCancelled, events: items.last.events);
+        if (items.isEmpty || items.last.role != 'assistant') return s;
+        final lastItem = items.last;
+        final newContent = lastItem.content.isEmpty
+            ? L10n.str.taskCancelled
+            : lastItem.content;
+        items[items.length - 1] = lastItem.copyWith(
+          content: newContent,
+          isStreaming: false,
+        );
+        // 仅当 content 有变化时持久化（避免无谓 IO）
+        if (lastItem.content != newContent) {
+          _persistAssistantCompletion(hostId, newContent, events: lastItem.events);
         }
         return s.copyWith(chatItems: items);
       });
     }
     _engine?.cancelTask();
+  }
+
+  /// P2-7: 暂停任务
+  void pause() {
+    if (_engine == null || !_engine!.isRunning) return;
+    _engine!.pauseTask();
+  }
+
+  /// P2-7: 恢复任务
+  Future<void> resume() async {
+    if (_engine == null || _engine!.currentTask == null) return;
+    final executor = _executor;
+    await _engine!.resumeTask(executor);
+    // 任务结束后检查是否需要自动压缩
+    final hostId = _engineHostId;
+    if (hostId != null) _maybeAutoCompact(hostId);
   }
 
   /// 确认执行危险命令（自动模式）

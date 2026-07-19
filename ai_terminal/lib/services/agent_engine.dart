@@ -17,16 +17,19 @@ import 'agent_tool.dart';
 import 'agent_host_registry.dart' as agent_host_registry;
 import 'agent_logger.dart';
 export 'agent_logger.dart';
+import 'agent_tracer.dart';
 import '../core/safety_guard.dart';
 import '../core/l10n_holder.dart';
 import 'daos.dart';
 import '../core/prompts.dart' as prompts;
 import '../utils/ansi_stripper.dart';
 import '../utils/command_heuristics.dart';
+import '../utils/json_repair.dart';
 import '../utils/output_processor.dart';
 import '../utils/react_stream_parser.dart';
 import '../utils/rollback_advisor.dart';
 import '../utils/command_extractor.dart';
+import '../utils/token_estimator.dart';
 import '../utils/audit_logger.dart';
 import 'change_record_service.dart';
 import 'change_window_service.dart';
@@ -79,6 +82,15 @@ class AgentEngine {
 
   /// AI 流式完成 Completer（cancelTask 可 complete 以解除 _callAI 挂起）
   Completer<void>? _aiDoneCompleter;
+
+  /// AI HTTP 请求取消令牌（_callAI 内创建，cancelTask 中触发）
+  /// 比 _aiStreamSub.cancel() 更彻底：直接关闭底层 Dio HTTP 连接
+  /// 避免取消任务后 API 仍在流式输出消耗配额
+  CancelToken? _aiCancelToken;
+
+  /// 备用 AI Provider（主模型重试 maxRetries 次仍失败时切换）
+  AIProvider? _fallbackProvider;
+  AIModelConfig? _fallbackConfig;
 
   /// 缓存的知识库注入文本（在 startTask 时查询，在 _buildSystemPrompt 时使用）
   String? _cachedKnowledgeInjection;
@@ -152,15 +164,27 @@ class AgentEngine {
     required AgentMemory memory,
     this.maxSteps = 0,
     this.hostId,
+    AIProvider? fallbackProvider,
+    AIModelConfig? fallbackConfig,
   })  : _aiProvider = aiProvider,
         _modelConfig = modelConfig,
-        _memory = memory;
+        _memory = memory,
+        _fallbackProvider = fallbackProvider,
+        _fallbackConfig = fallbackConfig;
+
+  /// 设置/更新 fallback 模型（运行时切换备用模型用）
+  void setFallbackModel(AIProvider? provider, AIModelConfig? config) {
+    _fallbackProvider = provider;
+    _fallbackConfig = config;
+  }
 
   AgentTask? get currentTask => _currentTask;
   bool get isRunning =>
       _currentTask?.status == AgentStatus.thinking ||
       _currentTask?.status == AgentStatus.executing ||
       _currentTask?.status == AgentStatus.waitingConfirm;
+  /// P2-7: 任务是否已暂停（可恢复）
+  bool get isPaused => _currentTask?.status == AgentStatus.paused;
   bool get hasPendingConfirm => _confirmCompleter != null && !_confirmCompleter!.isCompleted;
   String? get pendingConfirmCommand => _pendingConfirmCommand;
   bool get hasPendingChoice => _choiceCompleter != null && !_choiceCompleter!.isCompleted;
@@ -192,9 +216,7 @@ class AgentEngine {
     if (isRunning || hasPendingConfirm || hasPendingChoice) {
       cancelTask();
     }
-    _accumulatedMessage = '';
-    _noCommandRetryCount = 0;
-    _lastCommandEventId = '';
+    _resetTransientState();
     _conversationHistory.clear();
   }
 
@@ -207,12 +229,42 @@ class AgentEngine {
     if (isRunning || hasPendingConfirm || hasPendingChoice) {
       cancelTask();
     }
-    _accumulatedMessage = '';
-    _noCommandRetryCount = 0;
-    _lastCommandEventId = '';
+    _resetTransientState();
     _conversationHistory.clear();
     _conversationHistory.addAll(messages);
     agentLogger.info('RestoreHistory', '恢复引擎历史: ${messages.length} 条消息, summary=${summary != null ? "有" : "无"}');
+  }
+
+  /// 重置所有任务相关瞬态字段（不清理 _conversationHistory）
+  /// 用于 clearHistory / restoreHistory / startTask 开头
+  /// R2: 确保旧任务残留的 Completer/Subscription/Timer/CancelToken 不污染新任务
+  void _resetTransientState() {
+    _accumulatedMessage = '';
+    _noCommandRetryCount = 0;
+    _lastCommandEventId = '';
+    _currentTask = null;
+    _taskStartTime = null;
+    _currentStepCount = 0;
+    // 清理取消令牌（防御性，cancelTask 应该已处理过）
+    _aiWatchdog?.cancel();
+    _aiWatchdog = null;
+    _aiStreamTimedOut = false;
+    _aiStreamSub?.cancel();
+    _aiStreamSub = null;
+    _aiDoneCompleter = null;
+    _aiCancelToken = null;
+    _commandCancelToken = null;
+    _orchestratorCancelToken = null;
+    _earlyExecutionCompleter = null;
+    _earlyExecutionCommand = null;
+    _confirmTimeoutTimer?.cancel();
+    _confirmTimeoutTimer = null;
+    _confirmCompleter = null;
+    _pendingConfirmCommand = null;
+    _choiceCompleter = null;
+    _pendingOptions = [];
+    // 注意：不递增 _currentTaskGeneration — 那是 startTask 的职责
+    // 这里只清状态，不失效代际（cancelTask 已失效过的话不需要再失效）
   }
 
   /// 压缩后同步内存历史：移除已摘要的旧消息，保留最近 N 轮
@@ -239,14 +291,17 @@ class AgentEngine {
     agentLogger.info('AgentEngine', '目标: $goal');
     agentLogger.info('AgentEngine', '模式: Agent (ReAct)');
     agentLogger.info('AgentEngine', '执行器: ${executor != null ? (executor.isConnected ? "已连接" : "未连接") : "无"}');
-    _accumulatedMessage = '';  // 重置累积消息
-    _noCommandRetryCount = 0;  // 重置无命令重试计数
 
     if (isRunning) {
       agentLogger.warn('AgentEngine', 'Agent 正在执行任务，拒绝新任务');
       onError?.call(L10n.str.agentRunning);
       return;
     }
+
+    // R2: startTask 开头彻底重置瞬态字段
+    // 不依赖 cancelTask 清理（旧任务可能正常 completed 后未清理）
+    // 保证新任务起点干净：无残留 Completer/Subscription/Timer/CancelToken
+    _resetTransientState();
 
     // 新任务代际，使任何残留的旧循环退出
     _currentTaskGeneration++;
@@ -260,6 +315,9 @@ class AgentEngine {
       status: AgentStatus.thinking,
     );
     _notifyTaskUpdate();
+
+    // P0-2: trace 任务开始
+    AgentTracer.instance.startTask(_currentTask!.id, goal, hostId: hostId);
 
     // 查询知识库，缓存注入文本
     try {
@@ -345,6 +403,13 @@ class AgentEngine {
         completedAt: DateTime.now(),
       );
       _notifyTaskUpdate();
+      // P0-2: trace 任务取消
+      AgentTracer.instance.endTask(
+        _currentTask!.id,
+        status: 'cancelled',
+        summary: '用户取消任务',
+        hostId: hostId,
+      );
     }
     // 递近代际，使任何残留的旧循环立即退出
     _currentTaskGeneration++;
@@ -375,6 +440,13 @@ class AgentEngine {
     // 注意: cancel() 不触发 onDone，需手动 complete doneCompleter
     final dc = _aiDoneCompleter;
     if (dc != null && !dc.isCompleted) dc.complete();
+    // 取消底层 Dio HTTP 请求：比 _aiStreamSub.cancel() 更彻底
+    // 直接关闭 TCP 连接，避免取消任务后 API 仍在流式输出消耗配额
+    // 防御性 if 包裹：cancelToken 可能已 completed（Dio 二次 cancel 会触发 warning）
+    if (_aiCancelToken != null && !_aiCancelToken!.isCancelled) {
+      _aiCancelToken!.cancel('用户取消任务');
+    }
+    _aiCancelToken = null;
     _aiStreamSub?.cancel();
     _aiStreamSub = null;
     _aiWatchdog?.cancel();
@@ -400,6 +472,104 @@ class AgentEngine {
       // flush 流式内容到持久化（与 _finishTask 的 onCompleted 路径对齐）
       if (_accumulatedMessage.isNotEmpty) {
         onCompleted?.call(_accumulatedMessage);
+      }
+    }
+  }
+
+  /// P2-7: 暂停当前任务
+  /// 行为：标记 status=paused，让 ReAct 循环在下一轮检查时退出。
+  /// 与 cancelTask 的关键区别：
+  ///   - 不递近代际（保留 myGeneration，resumeTask 时可继续）
+  ///   - 不 emit finish 事件（任务未结束，UI 保持"已暂停"状态）
+  ///   - 不清理 _conversationHistory（恢复后继续对话）
+  ///   - 不调用 onCompleted（不 flush 流式内容到持久化）
+  ///   - 但会取消正在执行的命令和 AI 流（让阻塞的 await 立即返回）
+  void pauseTask() {
+    if (_currentTask == null) return;
+    final s = _currentTask!.status;
+    // 只在 thinking/executing/waitingConfirm 时允许暂停
+    if (s != AgentStatus.thinking &&
+        s != AgentStatus.executing &&
+        s != AgentStatus.waitingConfirm) {
+      return;
+    }
+    _currentTask = _currentTask!.copyWith(status: AgentStatus.paused);
+    _notifyTaskUpdate();
+    agentLogger.info('AgentEngine', '任务已暂停 (暂停前状态: $s)');
+
+    // 取消正在执行的命令（不递近代际，恢复时由用户重新发起 startTask 或继续）
+    if (_commandCancelToken != null && !_commandCancelToken!.isCompleted) {
+      _commandCancelToken!.complete();
+    }
+    if (_orchestratorCancelToken != null && !_orchestratorCancelToken!.isCompleted) {
+      _orchestratorCancelToken!.complete();
+    }
+    // 取消 AI 流式订阅
+    final dc = _aiDoneCompleter;
+    if (dc != null && !dc.isCompleted) dc.complete();
+    if (_aiCancelToken != null && !_aiCancelToken!.isCancelled) {
+      _aiCancelToken!.cancel('用户暂停任务');
+    }
+    _aiStreamSub?.cancel();
+    _aiStreamSub = null;
+    _aiWatchdog?.cancel();
+    _aiWatchdog = null;
+    _aiDoneCompleter = null;
+    _aiCancelToken = null;
+    // 取消等待确认 / 选择（让 await 立即返回）
+    if (_confirmCompleter != null && !_confirmCompleter!.isCompleted) {
+      _confirmCompleter!.complete(false);
+    }
+    if (_choiceCompleter != null && !_choiceCompleter!.isCompleted) {
+      _choiceCompleter!.complete('');
+    }
+    // R2: 取消确认超时定时器，避免暂停后定时器仍占用资源
+    // （恢复时 _resetTransientState 会再次清理，但暂停期间不该让定时器空转）
+    _confirmTimeoutTimer?.cancel();
+    _confirmTimeoutTimer = null;
+    // 通知 UI 暂停（info 事件，不是 finish）
+    onEvent?.call(AgentEvent.info('⏸️ 任务已暂停，可点击恢复继续'));
+  }
+
+  /// P2-7: 恢复已暂停的任务
+  /// 实现：清除 paused 状态，重新调用 _executeAutomatic 触发 ReAct 循环
+  /// （会复用 _conversationHistory 中已累积的上下文）
+  /// [executor] 当前命令执行器；若为 null 则无法恢复
+  Future<void> resumeTask(CommandExecutor? executor) async {
+    if (_currentTask == null || _currentTask!.status != AgentStatus.paused) {
+      return;
+    }
+    if (executor == null || !executor.isConnected) {
+      onError?.call(L10n.str.terminalNotConnected);
+      return;
+    }
+    // 在 _resetTransientState 之前捕获 goal（reset 会清空 _currentTask）
+    final goal = _currentTask!.goal;
+    agentLogger.info('AgentEngine', '恢复已暂停的任务: $goal');
+    // 清理瞬态字段但保留 _conversationHistory（恢复上下文）
+    _resetTransientState();
+    _currentTaskGeneration++;
+    final myGeneration = _currentTaskGeneration;
+    _taskStartTime = DateTime.now();
+    _currentStepCount = 0;
+    _currentTask = AgentTask(
+      id: _uuid.v4(),
+      goal: goal,
+      status: AgentStatus.thinking,
+    );
+    _notifyTaskUpdate();
+    AgentTracer.instance.startTask(_currentTask!.id, '恢复: $goal', hostId: hostId);
+    onEvent?.call(AgentEvent.info('▶️ 任务已恢复，继续执行...'));
+    try {
+      await _executeAutomatic(goal, executor, myGeneration);
+    } catch (e, stack) {
+      agentLogger.error('AgentEngine', '恢复执行异常: $e\n$stack');
+      if (myGeneration == _currentTaskGeneration && _currentTask != null) {
+        _currentTask = _currentTask!.copyWith(
+          status: AgentStatus.failed,
+          completedAt: DateTime.now(),
+        );
+        _notifyTaskUpdate();
       }
     }
   }
@@ -506,6 +676,13 @@ class AgentEngine {
         return;
       }
 
+      // P2-7: 暂停检查 — pauseTask 设置 status=paused 后旧循环退出
+      // resumeTask 会创建新代际+新任务壳，由新循环接管
+      if (_currentTask?.status == AgentStatus.paused) {
+        agentLogger.info('ReAct', '任务已暂停，循环退出');
+        return;
+      }
+
       // ═══════════════════════════════════════════
       // 阶段1: 思考 (Think) — 调用 AI 获取响应
       // ═══════════════════════════════════════════
@@ -523,6 +700,7 @@ class AgentEngine {
         _earlyExecutionCompleter = null;
         _earlyExecutionCommand = null;
         fullResponse = await _callAI(
+          myGeneration: myGeneration,
           onCommandDetected: (command, commandId) {
             // 检测到完整命令，启动提前执行（异步，不阻塞AI流式输出）
             if (_earlyExecutionCompleter == null &&
@@ -549,10 +727,22 @@ class AgentEngine {
           },
         );
       } catch (e, stack) {
-        final friendlyMsg = _friendlyErrorMessage(e);
-        agentLogger.error('ReAct', 'AI 调用异常: $e\n$stack');
+        // R1: 区分"取消/代际变更"和真正的 AI 调用异常
+        // 前者是正常流程的一部分（用户点了取消或新任务覆盖），不应记 error 日志
+        final isCancellation = e is StateError &&
+            (e.message == '任务已取消' || e.message == '任务已被新任务覆盖');
+        if (isCancellation) {
+          agentLogger.info('ReAct', 'AI 调用因取消/代际变更终止: ${e.message}');
+        } else {
+          agentLogger.error('ReAct', 'AI 调用异常: $e\n$stack');
+        }
         // L1 修复：AI 异常应标记 failed 并退出，不应走到循环后的 completed 逻辑
         if (myGeneration == _currentTaskGeneration && _currentTask != null) {
+          if (isCancellation) {
+            // 取消场景：cancelTask 已设置 status=cancelled 并 emit finish，不重复处理
+            return;
+          }
+          final friendlyMsg = _friendlyErrorMessage(e);
           // 将错误信息作为 assistant 消息加入历史，保持 user/assistant 交替完整性
           // 这样下次任务（如用户发"继续"）时 AI 能看到之前的上下文
           final errorMsg = '⚠️ AI 调用失败: $friendlyMsg';
@@ -687,9 +877,11 @@ class AgentEngine {
 
   /// 调用 AI 模型，流式返回完整响应
   /// [onCommandDetected] 可选回调：流式过程中检测到完整命令时触发，可用于提前执行
+  /// [myGeneration] 任务代际，用于退避期间识别"取消 + 立即新任务"竞态
   /// 对可重试错误（429/connectionError/timeout）做指数退避重试，最多 3 次
   Future<String> _callAI({
     void Function(String command, String commandId)? onCommandDetected,
+    int? myGeneration,
   }) async {
     agentLogger.info('ReAct', '调用 AI 模型...');
     agentLogger.debug('ReAct', '消息历史: ${_conversationHistory.length} 条');
@@ -700,26 +892,96 @@ class AgentEngine {
     const maxRetries = 3;
     final backoffDelays = [const Duration(seconds: 1), const Duration(seconds: 2), const Duration(seconds: 4)];
 
+    // P1-4: Fallback 模型 — 主模型 maxRetries 次重试仍失败时切换备用模型重试一次
+    var activeProvider = _aiProvider;
+    var activeConfig = _modelConfig;
+    var fallbackAttempted = false;
     int attempt = 0;
     while (true) {
+      // R1: 循环顶部先检查代际/取消，避免 cancelTask 后又立刻进入新一轮 chatStream 调用
+      // 之前只在退避后检查，但首轮重试前没有检查，导致取消的任务仍会发起新请求
+      if (myGeneration != null && myGeneration != _currentTaskGeneration) {
+        throw StateError('任务已被新任务覆盖');
+      }
+      if (_currentTask?.status == AgentStatus.cancelled) {
+        throw StateError('任务已取消');
+      }
       attempt++;
+      // P0-2: trace AI 调用开始
+      final taskId = _currentTask?.id;
+      if (taskId != null) {
+        AgentTracer.instance.emitSync(TraceEvent(
+          taskId: taskId,
+          hostId: hostId,
+          type: TraceEventType.aiCallStart,
+          generation: myGeneration,
+          step: _currentStepCount,
+          payload: {
+            'attempt': attempt,
+            'retry': attempt > 1,
+            'fallback': fallbackAttempted,
+            'model': activeConfig.modelName,
+            'history_len': _conversationHistory.length,
+          },
+        ));
+      }
       try {
-        stream = await _aiProvider.chatStream(
+        // 不在此处加 .timeout()：底层 Dio 已配置 connectTimeout=30s / receiveTimeout=120s，
+        // 用 .timeout() 抛 TimeoutException 时不会取消 Dio 请求，会导致连接泄漏。
+        // 改用 CancelToken 机制：cancelTask 触发后立即关闭底层 HTTP 连接，毫秒级响应。
+        // 每轮重试都创建新 token（旧 token 可能已被 cancel）。
+        final token = CancelToken();
+        _aiCancelToken = token;
+        // P2-6: 模型支持 FC 时，构建 tools schema 传入
+        List<Map<String, dynamic>>? toolsSchema;
+        if (activeConfig.supportsFunctionCalling) {
+          toolsSchema = _tools.buildOpenAIToolsSchema();
+          if (toolsSchema.isEmpty) toolsSchema = null;
+        }
+        stream = await activeProvider.chatStream(
           history: _conversationHistory,
           prompt: '',
-          config: _modelConfig,
+          config: activeConfig,
           systemPrompt: null,
+          cancelToken: token,
+          tools: toolsSchema,
         );
         break; // 成功建立流
       } catch (e) {
+        // 取消导致的异常不重试（重试会消耗新 API 配额且违背用户意图）
+        if (_isCancellationError(e) ||
+            (myGeneration != null && myGeneration != _currentTaskGeneration) ||
+            _currentTask?.status == AgentStatus.cancelled) {
+          rethrow;
+        }
         if (attempt > maxRetries || !_isRetryableError(e)) {
+          // P1-4: 主模型重试耗尽，切换到 fallback 模型重试一次
+          if (!fallbackAttempted &&
+              _fallbackProvider != null &&
+              _fallbackConfig != null) {
+            agentLogger.warn('ReAct',
+                '主模型 ${activeConfig.modelName} 重试 $attempt 次仍失败，切换 fallback 模型 ${_fallbackConfig!.modelName}: $e');
+            fallbackAttempted = true;
+            attempt = 0;
+            activeProvider = _fallbackProvider!;
+            activeConfig = _fallbackConfig!;
+            // 通知 UI：模型已切换
+            onEvent?.call(AgentEvent.info('⚠️ 主模型 ${_modelConfig.modelName} 不可用，已切换到备用模型 ${activeConfig.modelName}'));
+            continue;
+          }
           rethrow;
         }
         agentLogger.warn('ReAct', 'AI 流建立失败（第 $attempt 次），${backoffDelays[attempt - 1].inSeconds}s 后重试: $e');
         await Future.delayed(backoffDelays[attempt - 1]);
-        // R1: 退避期间任务可能被取消或覆盖，代际变更则放弃重试
-        // 否则已取消的任务会继续发起新的 chatStream 调用，浪费 API 配额
-        // _executeAutomatic 在 _callAI 返回后会做代际检查，此处提前剪枝
+        // R1: 退避期间任务可能被取消或被新任务覆盖
+        // 旧实现只检查 status==cancelled，无法识别"cancel + 立即 startTask"场景
+        // （新任务把 status 重置为 thinking，旧检查会通过，导致旧任务继续发起新 chatStream
+        // 调用、消耗 API 配额、并把旧响应通过 onMessage 写到新任务的 UI 流）
+        // 修复：同时检查代际和取消状态，任一失效都放弃重试
+        if (myGeneration != null && myGeneration != _currentTaskGeneration) {
+          agentLogger.info('ReAct', '退避期间代际已变更（新任务已启动），放弃重试');
+          throw StateError('任务已被新任务覆盖');
+        }
         if (_currentTask?.status == AgentStatus.cancelled) {
           agentLogger.info('ReAct', '退避期间任务被取消，放弃重试');
           throw StateError('任务已取消');
@@ -814,14 +1076,31 @@ class AgentEngine {
       cancelOnError: true,
     );
 
+    // 在 finally 前记录 cancel 状态（finally 会清理 _aiCancelToken 引用）
+    final wasCancelled = _aiCancelToken?.isCancelled ?? false;
     try {
       await doneCompleter.future;
+    } catch (e) {
+      // R1: 如果 cancel 触发了 DioException(cancel) 错误路径，统一转换为 StateError
+      // 让外层 catch 用 _isCancellationError 识别走取消路径（不重试、不记 error 日志）
+      if (wasCancelled || _isCancellationError(e)) {
+        throw StateError('任务已取消');
+      }
+      rethrow;
     } finally {
       _aiWatchdog?.cancel();
       _aiWatchdog = null;
       await _aiStreamSub?.cancel();
       _aiStreamSub = null;
       if (_aiDoneCompleter == doneCompleter) _aiDoneCompleter = null;
+      // R2: 清理 CancelToken 引用（已完成的请求 token 无需保留）
+      _aiCancelToken = null;
+    }
+
+    // 取消导致的提前结束：抛 StateError 让外层 catch 走取消路径
+    // 不抛 TimeoutException（那是超时场景）— 区分路径避免误报
+    if (wasCancelled) {
+      throw StateError('任务已取消');
     }
 
     if (_aiStreamTimedOut && fullResponse.isEmpty) {
@@ -866,6 +1145,31 @@ class AgentEngine {
     }
 
     agentLogger.info('ReAct', 'AI 响应完成，共 $chunkCount 个数据块，${fullResponse.length} 字符');
+    // P0-2 + P1-3: trace AI 调用结束，附 token 估算
+    final endTaskId = _currentTask?.id;
+    if (endTaskId != null) {
+      // 估算 prompt tokens：system 消息 + 对话历史 + 当前 prompt
+      // 注意：这里只能粗估，因为 system prompt 在 provider 层构建
+      final promptTokens = TokenEstimator.estimateHistory(_conversationHistory);
+      final completionTokens = TokenEstimator.estimateText(fullResponse);
+      AgentTracer.instance.emitSync(TraceEvent(
+        taskId: endTaskId,
+        hostId: hostId,
+        type: TraceEventType.aiCallEnd,
+        generation: myGeneration,
+        step: _currentStepCount,
+        payload: {
+          'chunks': chunkCount,
+          'chars': fullResponse.length,
+          'attempt': attempt,
+          'retry': attempt > 1,
+          'fallback': fallbackAttempted,
+          'model': activeConfig.modelName,
+          'prompt_tokens': promptTokens,
+          'completion_tokens': completionTokens,
+        },
+      ));
+    }
     return fullResponse;
   }
 
@@ -917,13 +1221,12 @@ class AgentEngine {
             } else if (tl.startsWith('参数:') || tl.startsWith('参数：')) {
               final sep = tl.indexOf(tl.contains('：') ? '：' : ':');
               final argsStr = tl.substring(sep + 1).trim();
-              try {
-                final parsed = jsonDecode(argsStr);
-                if (parsed is Map<String, dynamic>) {
-                  toolArgs = parsed;
-                }
-              } catch (e) {
-                agentLogger.warn('ReAct', '工具参数 JSON 解析失败: $e, raw=$argsStr');
+              // 使用 JsonRepair 容错解析：AI 输出可能带尾随逗号/单引号/未引用 key 等
+              final parsed = JsonRepair.extractMap(argsStr);
+              if (parsed != null) {
+                toolArgs = parsed;
+              } else {
+                agentLogger.warn('ReAct', '工具参数 JSON 解析失败, raw=$argsStr');
               }
             } else if (tl.isEmpty) {
               continue;
@@ -1028,6 +1331,69 @@ class AgentEngine {
   }) async {
     agentLogger.info('ReAct', '执行命令: $command (commandId=$commandId)');
 
+    // P0-2: trace 命令执行开始
+    final traceTaskId = _currentTask?.id;
+    if (traceTaskId != null) {
+      AgentTracer.instance.emitSync(TraceEvent(
+        taskId: traceTaskId,
+        hostId: hostId,
+        type: TraceEventType.commandStart,
+        generation: myGeneration,
+        step: _currentStepCount,
+        payload: {
+          if (commandId != null) 'command_id': commandId,
+          'command': command,
+        },
+      ));
+    }
+    // 局部状态追踪：finally 中统一 emit commandEnd
+    var cmdSuccess = false;
+    var cmdReason = 'unknown';
+    var outputChars = 0;
+
+    try {
+      return await _runCommandWithSafetyInner(
+        command, executor,
+        commandId: commandId,
+        myGeneration: myGeneration,
+        traceTaskId: traceTaskId,
+        onSuccess: (s, reason, chars) {
+          cmdSuccess = s;
+          cmdReason = reason;
+          outputChars = chars;
+        },
+      );
+    } catch (e) {
+      cmdReason = 'exception';
+      rethrow;
+    } finally {
+      if (traceTaskId != null) {
+        AgentTracer.instance.emitSync(TraceEvent(
+          taskId: traceTaskId,
+          hostId: hostId,
+          type: TraceEventType.commandEnd,
+          generation: myGeneration,
+          step: _currentStepCount,
+          payload: {
+            if (commandId != null) 'command_id': commandId,
+            'success': cmdSuccess,
+            'reason': cmdReason,
+            if (outputChars > 0) 'output_chars': outputChars,
+          },
+        ));
+      }
+    }
+  }
+
+  /// _runCommandWithSafety 的内部实现（不含 trace，由外层 wrapper 统一记录）
+  Future<_EarlyExecutionResult> _runCommandWithSafetyInner(
+    String command,
+    CommandExecutor executor, {
+    String? commandId,
+    int? myGeneration,
+    String? traceTaskId,
+    required void Function(bool success, String reason, int outputChars) onSuccess,
+  }) async {
     // 安全检查
     final safetyLevel = SafetyGuard.check(command);
     agentLogger.info('ReAct', '安全检查: $safetyLevel');
@@ -1059,6 +1425,7 @@ class AgentEngine {
         success: false,
         error: windowReason ?? '封网期拦截',
       ).format();
+      onSuccess(false, 'window_blocked', 0);
       return _EarlyExecutionResult(shouldContinue: true, observation: observation, command: command);
     }
 
@@ -1073,6 +1440,7 @@ class AgentEngine {
         success: false,
         error: '只读模式拦截',
       ).format();
+      onSuccess(false, 'read_only_blocked', 0);
       return _EarlyExecutionResult(shouldContinue: true, observation: observation, command: command);
     }
 
@@ -1100,6 +1468,7 @@ class AgentEngine {
         success: false,
         error: reason,
       ).format();
+      onSuccess(false, 'safety_blocked', 0);
       return _EarlyExecutionResult(shouldContinue: true, observation: observation, command: command);
     }
 
@@ -1134,10 +1503,12 @@ class AgentEngine {
       _pendingConfirmCommand = null;
 
       if (myGeneration != null && myGeneration != _currentTaskGeneration) {
+        onSuccess(false, 'generation_invalid_during_confirm', 0);
         return _EarlyExecutionResult(shouldContinue: false, command: command);
       }
       if (_currentTask?.status == AgentStatus.cancelled) {
         agentLogger.info('ReAct', '任务在等待确认期间被取消');
+        onSuccess(false, 'cancelled_during_confirm', 0);
         return _EarlyExecutionResult(shouldContinue: false, command: command);
       }
 
@@ -1150,6 +1521,7 @@ class AgentEngine {
           success: false,
           error: '用户拒绝',
         ).format();
+        onSuccess(false, 'user_rejected', 0);
         return _EarlyExecutionResult(shouldContinue: true, observation: observation, command: command);
       }
 
@@ -1180,6 +1552,7 @@ class AgentEngine {
           final snapshotResult = await _executeCommand(executor, snapshotCmd, myGeneration: myGeneration);
           // R1: 快照执行后检查代际，避免旧任务快照污染新任务
           if (myGeneration != null && myGeneration != _currentTaskGeneration) {
+            onSuccess(false, 'generation_invalid_after_snapshot', 0);
             return _EarlyExecutionResult(shouldContinue: false, command: command);
           }
           snapshot = PreSnapshot(
@@ -1203,6 +1576,7 @@ class AgentEngine {
     // 若代际已变更（cancel + 立即新任务），不再更新 _currentTask 统计、不再 emit result 事件
     if (myGeneration != null && myGeneration != _currentTaskGeneration) {
       agentLogger.info('ReAct', '命令执行后代际失效，丢弃结果不污染新任务');
+      onSuccess(result.success, 'generation_invalid_after_exec', 0);
       return _EarlyExecutionResult(shouldContinue: false, command: command);
     }
 
@@ -1294,6 +1668,7 @@ class AgentEngine {
       }
     }
 
+    onSuccess(result.success, 'completed', outputText.length);
     return _EarlyExecutionResult(
       shouldContinue: true,
       observation: observation.format(),
@@ -1325,24 +1700,41 @@ class AgentEngine {
   /// 处理多条命令执行（旧格式 fallback）
   Future<bool> _handleExecuteCommands(List<String> commands, CommandExecutor executor, {required int myGeneration}) async {
     final resultMessages = <String>[];
+    var aborted = false;
     for (final command in commands) {
-      if (_currentTask?.status == AgentStatus.cancelled) return false;
-      if (myGeneration != _currentTaskGeneration) return false;
+      if (_currentTask?.status == AgentStatus.cancelled) {
+        aborted = true;
+        break;
+      }
+      if (myGeneration != _currentTaskGeneration) {
+        aborted = true;
+        break;
+      }
       // R4: 为每条 fallback 命令生成独立的 commandId，并先发 command 事件
       // 否则所有 result 会关联到同一个 _lastCommandEventId，导致 UI 错误地把每个结果卡片链接到最后一条命令
       final cmdId = 'evt_fallback_${_uuid.v4().substring(0, 8)}';
       onEvent?.call(AgentEvent.command(command, id: cmdId));
       final result = await _runCommandWithSafety(command, executor, commandId: cmdId, myGeneration: myGeneration);
+      // R1: 命令执行后再次检查代际（执行期间可能被取消/新任务覆盖）
+      if (myGeneration != _currentTaskGeneration) {
+        aborted = true;
+        break;
+      }
       if (result.observation != null) {
         resultMessages.add(result.observation!);
       }
-      if (!result.shouldContinue) break;
+      if (!result.shouldContinue) {
+        aborted = true;
+        break;
+      }
     }
+    // 即使中断也保留已收集的观测（用户能看到部分命令的执行结果）
     if (resultMessages.isNotEmpty) {
       _conversationHistory.add(ChatMessage.create(role: 'user', content: resultMessages.join('\n\n')));
       _trimMessages(_conversationHistory);
     }
-    return true;
+    // 中断时返回 false 让上层退出循环；正常完成返回 true
+    return !aborted;
   }
 
   /// 处理 ask 动作 — 暂停等待用户选择
@@ -1432,6 +1824,13 @@ class AgentEngine {
       final observation = '观测: 工具 $toolName 不存在。可用工具: $available';
       _conversationHistory.add(ChatMessage.create(role: 'user', content: observation));
       _trimMessages(_conversationHistory);
+      // 与 toolName.isEmpty 路径一致：累计重试次数，防止 AI 反复调用不存在的工具造成死循环
+      _noCommandRetryCount++;
+      if (_noCommandRetryCount >= _maxNoCommandRetries) {
+        agentLogger.warn('ReAct', '未知工具调用重试次数耗尽');
+        _finishTask(success: false, summary: L10n.str.toolRetryExhausted);
+        return false;
+      }
       return true;
     }
 
@@ -1528,9 +1927,10 @@ class AgentEngine {
       return true;
     }
 
-    // 重试次数耗尽，视为任务完成
-    agentLogger.info('ReAct', 'AI 连续未生成命令，视为任务完成');
-    _finishTask();
+    // 重试次数耗尽 — AI 连续多次未生成有效命令，说明它已经陷入解释循环或无能力继续
+    // R5: 此为异常终止，必须标记 failed，不能默认 completed 误导用户以为任务成功
+    agentLogger.warn('ReAct', 'AI 连续 $_noCommandRetryCount 次未生成命令，任务终止 (failed)');
+    _finishTask(success: false, summary: 'AI 连续未生成有效命令，任务终止');
     return false;
   }
 
@@ -1550,6 +1950,45 @@ class AgentEngine {
     if (finishSummary.isNotEmpty) {
       onCompleted?.call(finishSummary);
     }
+    // P0-2: trace 任务结束
+    final taskId = _currentTask?.id;
+    if (taskId != null) {
+      AgentTracer.instance.endTask(
+        taskId,
+        status: success ? 'completed' : 'failed',
+        summary: finishSummary,
+        hostId: hostId,
+      );
+    }
+    // R2: 任务终态后清理瞬态资源（不依赖下次 startTask 才清理）
+    // 避免正常 completed 后 _orchestratorCancelToken/_earlyExecutionCompleter 等仍指向旧资源
+    // 注意：不清理 _currentTask / _accumulatedMessage / _conversationHistory —
+    //   这些是任务结果数据，需要保留供 UI 显示和下次"继续"对话
+    _aiWatchdog?.cancel();
+    _aiWatchdog = null;
+    _aiStreamTimedOut = false;
+    _aiStreamSub?.cancel();
+    _aiStreamSub = null;
+    _aiDoneCompleter = null;
+    _aiCancelToken = null;
+    _commandCancelToken = null;
+    _orchestratorCancelToken = null;
+    final mhe = _tools.multiHostExecutor;
+    if (mhe != null) {
+      mhe.cancelToken = null;
+    }
+    if (_earlyExecutionCompleter != null && !_earlyExecutionCompleter!.isCompleted) {
+      _earlyExecutionCompleter!.complete(_EarlyExecutionResult(
+        shouldContinue: false,
+        command: _earlyExecutionCommand ?? '',
+      ));
+    }
+    _earlyExecutionCompleter = null;
+    _earlyExecutionCommand = null;
+    _confirmTimeoutTimer?.cancel();
+    _confirmTimeoutTimer = null;
+    // 不清 _confirmCompleter / _choiceCompleter — _finishTask 调用前已退出等待状态
+
     // 任务完成通知（异步，不阻塞引擎）
     _notifyTaskCompletion(success: success, startTime: startTime);
   }
@@ -1814,6 +2253,18 @@ class AgentEngine {
     return msg.contains('connection') || msg.contains('timeout') || msg.contains('reset by peer');
   }
 
+  /// 判断 AI 调用错误是否因取消（取消不可重试，重试违背用户意图）
+  /// - DioExceptionType.cancel：Dio CancelToken.cancel() 触发的异常
+  /// - StateError('任务已取消'/'任务已被新任务覆盖')：上层代际检查抛出
+  bool _isCancellationError(dynamic error) {
+    if (error is DioException && error.type == DioExceptionType.cancel) return true;
+    if (error is StateError &&
+        (error.message == '任务已取消' || error.message == '任务已被新任务覆盖')) {
+      return true;
+    }
+    return false;
+  }
+
   /// 将异常转为用户友好的错误消息
   String _friendlyErrorMessage(dynamic error) {
     if (error is DioException) {
@@ -2016,43 +2467,73 @@ $hostList
     }
   }
 
-  /// 裁剪对话历史，保留最近 _maxConversationRounds 轮，并对长消息截断
+  /// 裁剪对话历史：token-aware 裁剪 + 轮数兜底 + 长消息截断
+  ///
+  /// 三层策略：
+  /// 1. 单条消息截断：超过 _maxMessageChars 的内容保留尾部
+  /// 2. 轮数兜底：保留最近 _maxConversationRounds 轮（防止极端情况 token 估算偏低）
+  /// 3. token-aware 裁剪：估算非系统消息总 token 数，超出 contextWindow * 0.7 时
+  ///    丢弃最早的非系统消息，直到总 token 数降至阈值以下
+  ///
+  /// 阈值 0.7 留出 30% 给 system prompt + 当前 user prompt + completion
+  @visibleForTesting
+  void trimMessagesForTesting(List<ChatMessage> messages) => _trimMessages(messages);
+
   void _trimMessages(List<ChatMessage> messages) {
     // 保留 system 消息
     final systemMsgs = messages.where((m) => m.role == 'system').toList();
     final nonSystemMsgs = messages.where((m) => m.role != 'system').toList();
 
-    // 每轮 = 1 assistant + 1 user，保留最近 _maxConversationRounds 轮
-    const maxNonSystem = _maxConversationRounds * 2;
-    List<ChatMessage> keptNonSystem;
-    if (nonSystemMsgs.length > maxNonSystem) {
-      keptNonSystem = nonSystemMsgs.skip(nonSystemMsgs.length - maxNonSystem).toList();
-      agentLogger.info('TrimMsgs', '裁剪对话历史: ${nonSystemMsgs.length} → ${keptNonSystem.length} 条非系统消息');
-    } else {
-      keptNonSystem = nonSystemMsgs;
+    // 第 1 层：单条消息截断（先截断再做 token 估算，避免单条消息撑爆预算）
+    final truncated = <ChatMessage>[];
+    for (final msg in nonSystemMsgs) {
+      if (msg.content.length > _maxMessageChars) {
+        var t = msg.content.substring(msg.content.length - _maxMessageChars);
+        // 确保代码块完整闭合：统计 ``` 数量，奇数则补一个 ```
+        final openCount = '```'.allMatches(t).length;
+        if (openCount % 2 != 0) {
+          t = '$t\n```';
+        }
+        truncated.add(ChatMessage.create(
+          role: msg.role,
+          content: '...(已截断前 ${msg.content.length - _maxMessageChars} 字符)\n$t',
+        ));
+      } else {
+        truncated.add(msg);
+      }
     }
 
-    // 对每条非系统消息截断过长内容
-    for (int i = 0; i < keptNonSystem.length; i++) {
-      final msg = keptNonSystem[i];
-      if (msg.content.length > _maxMessageChars) {
-        var truncated = msg.content.substring(msg.content.length - _maxMessageChars);
-        // 确保代码块完整闭合：统计 ``` 数量，奇数则补一个 ```
-        final openCount = '```'.allMatches(truncated).length;
-        if (openCount % 2 != 0) {
-          truncated = '$truncated\n```';
-        }
-        keptNonSystem[i] = ChatMessage.create(
-          role: msg.role,
-          content: '...(已截断前 ${msg.content.length - _maxMessageChars} 字符)\n$truncated',
-        );
+    // 第 2 层：轮数兜底裁剪
+    const maxNonSystem = _maxConversationRounds * 2;
+    var kept = truncated.length > maxNonSystem
+        ? truncated.skip(truncated.length - maxNonSystem).toList()
+        : truncated;
+    if (kept.length != truncated.length) {
+      agentLogger.info('TrimMsgs', '轮数裁剪: ${truncated.length} → ${kept.length} 条');
+    }
+
+    // 第 3 层：token-aware 裁剪（保留最近消息，丢弃最早的）
+    final contextWindow = _modelConfig.effectiveContextWindow;
+    final tokenBudget = (contextWindow * 0.7).round();
+    var totalTokens = TokenEstimator.estimateHistory(kept);
+    if (totalTokens > tokenBudget) {
+      final originalCount = kept.length;
+      // 从最早开始丢弃，直到总 token 数降至预算以下或仅剩 2 条
+      while (kept.length > 2 && totalTokens > tokenBudget) {
+        final removed = kept.removeAt(0);
+        totalTokens -= TokenEstimator.estimateMessage(removed);
       }
+      agentLogger.info(
+        'TrimMsgs',
+        'token-aware 裁剪: $originalCount → ${kept.length} 条, '
+        'tokens=$totalTokens/$tokenBudget (ctx=$contextWindow)',
+      );
     }
 
     messages
       ..clear()
       ..addAll(systemMsgs)
-      ..addAll(keptNonSystem);
+      ..addAll(kept);
   }
 
   Future<void> collectSystemInfo(CommandExecutor executor) async {

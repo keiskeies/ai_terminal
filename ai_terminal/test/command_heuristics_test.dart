@@ -54,6 +54,133 @@ void main() {
     test('前后空格被去除', () {
       expect(isQueryCommand('  ls -la  '), isTrue);
     });
+
+    // 新增：硬件/资源查看类只读命令
+    test('lscpu 返回 true', () {
+      expect(isQueryCommand('lscpu'), isTrue);
+    });
+
+    test('lsblk 返回 true', () {
+      expect(isQueryCommand('lsblk'), isTrue);
+    });
+
+    test('lspci 返回 true', () {
+      expect(isQueryCommand('lspci -vv'), isTrue);
+    });
+
+    test('lsusb 返回 true', () {
+      expect(isQueryCommand('lsusb'), isTrue);
+    });
+
+    test('sar 返回 true', () {
+      expect(isQueryCommand('sar -u 1 3'), isTrue);
+    });
+
+    test('iotop 返回 true', () {
+      expect(isQueryCommand('iotop -n 1'), isTrue);
+    });
+
+    // 新增：systemctl 只读子命令
+    test('systemctl show 返回 true', () {
+      expect(isQueryCommand('systemctl show nginx'), isTrue);
+    });
+
+    test('systemctl is-active 返回 true', () {
+      expect(isQueryCommand('systemctl is-active nginx'), isTrue);
+    });
+
+    test('systemctl is-enabled 返回 true', () {
+      expect(isQueryCommand('systemctl is-enabled nginx'), isTrue);
+    });
+
+    // 新增：docker 只读子命令
+    test('docker stats 返回 true', () {
+      expect(isQueryCommand('docker stats --no-stream'), isTrue);
+    });
+
+    test('docker history 返回 true', () {
+      expect(isQueryCommand('docker history nginx'), isTrue);
+    });
+
+    test('docker version 返回 true', () {
+      expect(isQueryCommand('docker version'), isTrue);
+    });
+
+    // 新增：git 只读子命令
+    test('git status 返回 true', () {
+      expect(isQueryCommand('git status'), isTrue);
+    });
+
+    test('git log 返回 true', () {
+      expect(isQueryCommand('git log --oneline -10'), isTrue);
+    });
+
+    test('git diff 返回 true', () {
+      expect(isQueryCommand('git diff HEAD~1'), isTrue);
+    });
+
+    // 新增：网络/防火墙只读
+    test('iptables -L 返回 true', () {
+      expect(isQueryCommand('iptables -L -n -v'), isTrue);
+    });
+
+    test('ufw status 返回 true', () {
+      expect(isQueryCommand('ufw status verbose'), isTrue);
+    });
+
+    test('crontab -l 返回 true', () {
+      expect(isQueryCommand('crontab -l'), isTrue);
+    });
+
+    // 修复验证：交互式命令应返回 false
+    test('top 返回 false（交互式）', () {
+      expect(isQueryCommand('top'), isFalse);
+    });
+
+    test('htop 返回 false（交互式）', () {
+      expect(isQueryCommand('htop'), isFalse);
+    });
+
+    test('less 文件 返回 false（交互式分页器）', () {
+      expect(isQueryCommand('less file.txt'), isFalse);
+    });
+
+    test('more 文件 返回 false（交互式分页器）', () {
+      expect(isQueryCommand('more file.txt'), isFalse);
+    });
+
+    test('tail -f 日志 返回 false（持续跟踪）', () {
+      expect(isQueryCommand('tail -f /var/log/syslog'), isFalse);
+    });
+
+    test('tail --follow 日志 返回 false（持续跟踪，长选项形式）', () {
+      expect(isQueryCommand('tail --follow=name /var/log/syslog'), isFalse);
+    });
+
+    test('tail --follow 日志 返回 false（持续跟踪，无参长选项）', () {
+      expect(isQueryCommand('tail --follow /var/log/syslog'), isFalse);
+    });
+
+    test('tailf 日志 返回 false（持续跟踪）', () {
+      expect(isQueryCommand('tailf /var/log/syslog'), isFalse);
+    });
+
+    test('man ls 返回 false（交互式手册）', () {
+      expect(isQueryCommand('man ls'), isFalse);
+    });
+
+    test('vim file 返回 false（交互式编辑器）', () {
+      expect(isQueryCommand('vim file.txt'), isFalse);
+    });
+
+    test('top -n 1 -b 返回 false（top 即使带参数也排除，agent 应用 ps 替代）', () {
+      expect(isQueryCommand('top -n 1 -b'), isFalse);
+    });
+
+    // 普通 tail 仍应返回 true（非跟踪模式）
+    test('tail -100 file 返回 true', () {
+      expect(isQueryCommand('tail -100 /var/log/syslog'), isTrue);
+    });
   });
 
   group('getCommandTimeout', () {
@@ -252,6 +379,36 @@ void main() {
 
     test('空字符串返回 false', () {
       expect(isTaskComplete(''), isFalse);
+    });
+
+    test('安装已完成（行尾模式）返回 true', () {
+      expect(isTaskComplete('安装已完成'), isTrue);
+    });
+
+    test('部署完成。（带句末标点）返回 true', () {
+      expect(isTaskComplete('部署完成。'), isTrue);
+    });
+
+    test('✅ 任务完成。 （emoji + 标点）返回 true', () {
+      expect(isTaskComplete('✅ 任务完成。'), isTrue);
+    });
+
+    // 误触发修复：AI 思考过程中提到关键词不应判定为完成
+    test('我会检查任务完成情况 返回 false（行尾有"情况"）', () {
+      expect(isTaskComplete('我会检查任务完成情况'), isFalse);
+    });
+
+    test('如果安装完成则继续 返回 false（行尾有"则继续"）', () {
+      expect(isTaskComplete('如果安装完成则继续'), isFalse);
+    });
+
+    test('已完成了上述步骤 返回 false（关键词后跟动词）', () {
+      expect(isTaskComplete('已完成了上述步骤'), isFalse);
+    });
+
+    test('AI 长篇思考中偶然出现"任务完成" 返回 false（行过长）', () {
+      const longLine = '我现在需要检查系统状态，包括服务运行情况、日志输出、端口监听等，任务完成情况的评估需要等所有检查都做完才能下结论。';
+      expect(isTaskComplete(longLine), isFalse);
     });
   });
 }

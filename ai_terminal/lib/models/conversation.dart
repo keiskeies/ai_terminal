@@ -1,33 +1,21 @@
-import 'package:hive/hive.dart';
-
 import 'agent_event.dart';
 
-part 'conversation.g.dart';
-
 /// 会话消息（与具体 AI 模式无关，统一存储用户/AI 对话）
-@HiveType(typeId: 10)
-class ConvMessage extends HiveObject {
-  @HiveField(0)
+class ConvMessage {
   late String role; // 'user' | 'assistant' | 'system'
 
-  @HiveField(1)
   late String content;
 
-  @HiveField(2)
   late DateTime timestamp;
 
-  @HiveField(3)
   String? command; // 若该消息对应一条执行的命令，记录命令原文
 
-  @HiveField(4)
   bool? commandSuccess; // 命令执行是否成功
 
-  @HiveField(5)
   List<AgentEvent>? events; // 结构化事件列表（含命令执行结果）
 
   /// 压缩后的摘要内容：传给 AI 用，为空时回退到 content
   /// UI 展示始终用 content（原文），AI 读取用 summary ?? content
-  @HiveField(6)
   String? summary;
 
   ConvMessage();
@@ -50,18 +38,13 @@ class ConvMessage extends HiveObject {
 }
 
 /// Agent 日志条目（与会话关联存储）
-@HiveType(typeId: 11)
-class ConvAgentLog extends HiveObject {
-  @HiveField(0)
+class ConvAgentLog {
   late DateTime timestamp;
 
-  @HiveField(1)
   late String level; // 'DEBUG' | 'INFO' | 'WARN' | 'ERROR'
 
-  @HiveField(2)
   late String tag;
 
-  @HiveField(3)
   late String message;
 
   ConvAgentLog();
@@ -75,40 +58,29 @@ class ConvAgentLog extends HiveObject {
 }
 
 /// 会话（归属于某个 hostId project，含压缩摘要）
-@HiveType(typeId: 12)
-class Conversation extends HiveObject {
-  @HiveField(0)
+class Conversation {
   late String id;
 
-  @HiveField(1)
   late String hostId; // 服务器 id 或 'local'
 
-  @HiveField(2)
   late String title;
 
-  @HiveField(3)
   late List<ConvMessage> messages;
 
-  @HiveField(4)
   late List<ConvAgentLog> agentLogs;
 
   /// 早期对话的 AI 摘要（旧机制，新压缩改为逐条写入 ConvMessage.summary）
-  /// 保留字段避免 Hive 反序列化失败，新逻辑不再使用
-  @HiveField(5)
+  /// 保留字段避免反序列化失败，新逻辑不再使用
   String? summary;
 
   /// 已纳入 summary 的消息下标（旧机制，新压缩不再使用）
-  @HiveField(6)
   int summarizedUpToIndex = 0;
 
-  @HiveField(7)
   late DateTime createdAt;
 
-  @HiveField(8)
   late DateTime updatedAt;
 
   /// 是否为当前活跃会话（每个 hostId 只有一个 active）
-  @HiveField(9)
   bool isActive = false;
 
   Conversation();

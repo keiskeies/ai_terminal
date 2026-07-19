@@ -1,5 +1,12 @@
 import 'dart:async';
 
+import 'pty_output_detector.dart';
+
+// CommandFailureKind / PtyOutputDetector / CommandFailureDiagnostic 集中定义在
+// pty_output_detector.dart，这里统一导出，方便调用方一处导入。
+export 'pty_output_detector.dart'
+    show CommandFailureDiagnostic, CommandFailureKind, PtyOutputDetector;
+
 /// 命令执行结果（包含退出码）
 class CommandResult {
   final String stdout;
@@ -8,15 +15,24 @@ class CommandResult {
   final Duration duration;
   final bool timedOut;
 
+  /// 失败原因细分（用于 AI 决策：重试 / 修正命令 / 重连）
+  final CommandFailureKind failureKind;
+
+  /// 人类可读的失败诊断（非空时配合 failureKind 使用）
+  /// 例如 "Shell syntax error: unexpected token ';'"
+  final String? failureReason;
+
   CommandResult({
     required this.stdout,
     required this.stderr,
     required this.exitCode,
     required this.duration,
     this.timedOut = false,
+    this.failureKind = CommandFailureKind.none,
+    this.failureReason,
   });
 
-  bool get success => exitCode == 0 && !timedOut;
+  bool get success => exitCode == 0 && !timedOut && failureKind == CommandFailureKind.none;
 }
 
 /// 终端命令执行器接口

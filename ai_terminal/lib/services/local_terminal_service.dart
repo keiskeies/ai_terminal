@@ -162,6 +162,14 @@ class LocalTerminalService implements CommandExecutor {
   }
 
   /// 执行命令并等待完成，返回结构化结果（含退出码）
+  ///
+  /// 改进点同 [SshService.executeAndWait]：
+  /// 1. buffer 上限（R8 合规，保留尾部 256KB）
+  /// 2. Shell 语法错误快速失败（bash/sh/zsh 解析错误）
+  /// 3. PS2 提示符检测（引号未闭合）
+  /// 4. 交互式密码提示检测
+  /// 5. PTY 进程退出区分正常/异常
+  /// 6. marker 后停止写入 buffer
   @override
   Future<CommandResult> executeAndWait(
     String command, {
@@ -174,6 +182,8 @@ class LocalTerminalService implements CommandExecutor {
         stderr: '未连接',
         exitCode: -1,
         duration: Duration.zero,
+        failureKind: CommandFailureKind.disconnected,
+        failureReason: '本地 PTY 未连接',
       );
     }
 
@@ -188,26 +198,56 @@ class LocalTerminalService implements CommandExecutor {
         : '$command; echo "$marker\$?"';
     final donePattern = RegExp('${RegExp.escape(marker)}\\d+');
 
+    // R8: buffer 必须有上限，保留尾部（最新输出）
+    const maxBufferChars = 256 * 1024; // 256KB
+
     // 独立流监听：等待 marker 出现（比 prompt regex 更可靠）
     final buffer = StringBuffer();
     final doneCompleter = Completer<void>();
+    var markerSeen = false;
+    var abnormalReason = <String?>[];
     _pendingDoneCompleter = doneCompleter;
     StreamSubscription<String>? sub;
 
     sub = _outputController.stream.listen(
       (data) {
+        if (doneCompleter.isCompleted) return;
         buffer.write(data);
-        if (!doneCompleter.isCompleted && donePattern.hasMatch(buffer.toString())) {
+        if (buffer.length > maxBufferChars) {
+          final truncated = buffer.toString();
+          buffer
+            ..clear()
+            ..write(truncated.substring(truncated.length - maxBufferChars));
+        }
+        final snapshot = buffer.toString();
+        if (donePattern.hasMatch(snapshot)) {
+          markerSeen = true;
+          doneCompleter.complete();
+          return;
+        }
+        final diag = PtyOutputDetector.detect(
+          buffer: snapshot,
+          marker: marker,
+          elapsedMs: stopwatch.elapsedMilliseconds,
+          isWindows: Platform.isWindows,
+        );
+        if (diag != null) {
+          abnormalReason.add(diag.reason);
           doneCompleter.complete();
         }
       },
       onError: (e) {
         if (!doneCompleter.isCompleted) {
-          doneCompleter.completeError(e);
+          abnormalReason.add('Stream error: $e');
+          doneCompleter.complete();
         }
       },
       onDone: () {
         if (!doneCompleter.isCompleted) {
+          if (!markerSeen) {
+            abnormalReason.add('本地 PTY 进程已退出');
+            _isConnected = false;
+          }
           doneCompleter.complete();
         }
       },
@@ -222,7 +262,6 @@ class LocalTerminalService implements CommandExecutor {
         if (cancelToken != null) cancelToken.future,
       ]);
     } on TimeoutException {
-      // 发送 Ctrl+C 中断本地命令，防止后台进程继续输出污染下一条命令
       try {
         _pty!.write(utf8.encode('\x03'));
       } catch (_) {}
@@ -235,6 +274,8 @@ class LocalTerminalService implements CommandExecutor {
         exitCode: -1,
         duration: stopwatch.elapsed,
         timedOut: true,
+        failureKind: CommandFailureKind.timeout,
+        failureReason: '命令执行超时 (${timeout.inSeconds}s)',
       );
     } catch (e) {
       await sub.cancel();
@@ -245,6 +286,8 @@ class LocalTerminalService implements CommandExecutor {
         stderr: e.toString(),
         exitCode: -1,
         duration: stopwatch.elapsed,
+        failureKind: CommandFailureKind.unknown,
+        failureReason: e.toString(),
       );
     }
 
@@ -254,16 +297,28 @@ class LocalTerminalService implements CommandExecutor {
 
     var rawOutput = buffer.toString();
 
-    // 取消时 marker 可能未出现 — 发送 Ctrl+C 停止可能仍在运行的命令
-    if (!rawOutput.contains(marker)) {
+    if (!markerSeen) {
       try {
         _pty!.write(utf8.encode('\x03'));
       } catch (_) {}
+      final reason = abnormalReason.isNotEmpty
+          ? abnormalReason.join('; ')
+          : (rawOutput.contains(marker) ? 'marker 出现但未触发完成' : '命令未完成');
+      CommandFailureKind kind = CommandFailureKind.unknown;
+      if (reason.contains('syntax error') || reason.contains('PS2')) {
+        kind = CommandFailureKind.syntaxError;
+      } else if (reason.contains('交互式') || reason.contains('password')) {
+        kind = CommandFailureKind.interactivePrompt;
+      } else if (reason.contains('进程已退出')) {
+        kind = CommandFailureKind.disconnected;
+      }
       return CommandResult(
         stdout: rawOutput,
         stderr: '',
         exitCode: -1,
         duration: stopwatch.elapsed,
+        failureKind: kind,
+        failureReason: reason,
       );
     }
 

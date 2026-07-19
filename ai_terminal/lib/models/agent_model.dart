@@ -7,7 +7,14 @@ enum AgentStatus {
   completed, // 任务完成
   failed,    // 任务失败
   cancelled, // 用户取消
+  paused,    // P2-7: 用户暂停（可恢复）
 }
+
+/// P2-7: 判断状态是否为终态（不会再变化）
+bool isTerminalStatus(AgentStatus s) =>
+    s == AgentStatus.completed ||
+    s == AgentStatus.failed ||
+    s == AgentStatus.cancelled;
 
 /// Agent 执行结果
 class AgentResult {
@@ -208,6 +215,8 @@ class AgentTask {
   String get progress {
     if (status == AgentStatus.completed) return '✅ 完成';
     if (status == AgentStatus.failed) return '❌ 失败';
+    if (status == AgentStatus.cancelled) return '🚫 已取消';
+    if (status == AgentStatus.paused) return '⏸️ 已暂停';
     if (status == AgentStatus.executing) return '⚡ 执行中: $currentStep';
     if (status == AgentStatus.thinking) return '🤔 思考中...';
     return '⏳ 等待';

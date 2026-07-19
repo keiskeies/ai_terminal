@@ -13,7 +13,7 @@ import 'credentials_store.dart';
 /// 升级时通过 onUpgrade 回调做增量迁移。
 class DbInit {
   static Database? _db;
-  static const int _schemaVersion = 1;
+  static const int _schemaVersion = 4;
 
   /// 数据库文件名
   static const String dbFileName = 'app_data.db';
@@ -54,7 +54,27 @@ class DbInit {
     // 检测旧明文 DB 并迁移到加密格式（仅首次升级时执行）
     await _migratePlaintextDbIfNeeded(dbPath, password);
 
-    _db = await openDatabase(
+    // 尝试打开加密 DB；若密钥不匹配（ad-hoc 重签名导致 Keychain 主密钥变化），
+    // 直接删除旧加密 DB 并新建 — 绝不从 .bak 恢复，否则每次密钥变化都会
+    // 把数据库回退到 .bak 的旧状态，丢失用户在旧密钥期间产生的所有数据。
+    try {
+      _db = await _openEncryptedDb(dbPath, password);
+    } catch (e) {
+      debugPrint('[DbInit] 打开加密 DB 失败（密钥可能变化），新建空 DB: $e');
+      // 备份无法解密的 DB（用户后续可手动找回数据），再删除让 onCreate 重建
+      await _archiveUnopenableDb(dbPath);
+      _db = await _openEncryptedDb(dbPath, password);
+    }
+
+    // 加载所有 DAO 内存缓存（供 sync 读路径使用）
+    await _loadAllCaches();
+
+    debugPrint('[DbInit] 初始化成功: $dbPath (v$_schemaVersion, encrypted)');
+  }
+
+  /// 打开加密 DB（设置 PRAGMA key）
+  static Future<Database> _openEncryptedDb(String dbPath, String password) {
+    return openDatabase(
       dbPath,
       version: _schemaVersion,
       onConfigure: (db) async {
@@ -65,11 +85,41 @@ class DbInit {
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+  }
 
-    // 加载所有 DAO 内存缓存（供 sync 读路径使用）
-    await _loadAllCaches();
-
-    debugPrint('[DbInit] 初始化成功: $dbPath (v$_schemaVersion, encrypted)');
+  /// 备份无法打开的加密 DB（用户后续可手动恢复数据），然后删除让 onCreate 重建
+  ///
+  /// 重要：**绝不用 .bak 覆盖当前 DB**。
+  /// 旧实现从 .bak 明文备份恢复，导致每次 Keychain 主密钥变化（ad-hoc 重签名）
+  /// 都把数据库回退到 .bak 的状态，丢失用户在旧密钥期间产生的所有数据。
+  /// 现在改为：保留旧加密 DB 为 `.unopenable-{timestamp}.db`（供事后调查），
+  /// 删除当前 dbPath，让 _openEncryptedDb 的 onCreate 重新创建空 DB。
+  static Future<void> _archiveUnopenableDb(String dbPath) async {
+    final dbFile = File(dbPath);
+    if (!await dbFile.exists()) return;
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final archivePath = '$dbPath.unopenable-$timestamp.db';
+    try {
+      await dbFile.rename(archivePath);
+      debugPrint('[DbInit] 无法打开的加密 DB 已归档: $archivePath');
+      // 仅保留最近 1 个归档，避免磁盘堆积
+      final dir = Directory(p.dirname(dbPath));
+      await for (final entity in dir.list()) {
+        final name = p.basename(entity.path);
+        if (name.startsWith('$dbFileName.unopenable-') &&
+            name.endsWith('.db') &&
+            entity.path != archivePath) {
+          try {
+            await entity.delete();
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      debugPrint('[DbInit] 归档失败，直接删除: $e');
+      try {
+        await dbFile.delete();
+      } catch (_) {}
+    }
   }
 
   /// 检测旧明文 DB 并迁移到加密格式
@@ -79,6 +129,12 @@ class DbInit {
   /// 1. 用无密码方式打开旧 DB，读取所有表 schema 和数据到内存
   /// 2. 关闭旧 DB，重命名为 .bak 备份
   /// 3. 用密码创建新加密 DB，重建 schema 并写入数据
+  ///
+  /// 重要：**只在 dbPath 是明文 SQLite 时触发**。
+  /// 旧实现的"恢复中断迁移"分支（.bak 存在但 dbPath 不存在时把 .bak 重命名为 dbPath）
+  /// 会导致用户每次重装/Keychain 重置后，数据库被回退到 .bak 的旧状态。
+  /// 现在改为：dbPath 不存在就直接新建，绝不把 .bak 当 dbPath 用。
+  /// .bak 仅作为只读历史快照保留，不再参与自动恢复流程。
   static Future<void> _migratePlaintextDbIfNeeded(
     String dbPath,
     String password,
@@ -86,13 +142,6 @@ class DbInit {
     final dbFile = File(dbPath);
     final backupPath = '$dbPath$_dbBackupSuffix';
     final backupFile = File(backupPath);
-
-    // 恢复中断的迁移：若 .bak 存在但 dbPath 不存在，说明上次迁移中途崩溃
-    // 从 .bak 恢复 dbPath，让后续逻辑重新尝试迁移
-    if (await backupFile.exists() && !await dbFile.exists()) {
-      debugPrint('[DbInit] 检测到迁移中断（.bak 存在但 DB 不存在），从备份恢复...');
-      await backupFile.rename(dbPath);
-    }
 
     if (!await dbFile.exists()) {
       return; // 新建 DB，无需迁移
@@ -248,6 +297,9 @@ class DbInit {
         modelName TEXT NOT NULL,
         temperature REAL NOT NULL DEFAULT 0.3,
         maxTokens INTEGER NOT NULL DEFAULT 4096,
+        contextWindow INTEGER NOT NULL DEFAULT 0,
+        fallbackModelId TEXT,
+        supportsFunctionCalling INTEGER NOT NULL DEFAULT 0,
         isDefault INTEGER NOT NULL DEFAULT 0
       )
     ''');
@@ -376,10 +428,24 @@ class DbInit {
 
   /// 升级数据库（未来版本在此追加迁移脚本）
   static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    // 示例：
-    // if (oldVersion < 2) {
-    //   await db.execute('ALTER TABLE hosts ADD COLUMN newField TEXT');
-    // }
+    // v2: ai_models 添加 contextWindow 字段（用于 token-aware 上下文裁剪）
+    if (oldVersion < 2) {
+      await db.execute(
+        'ALTER TABLE ai_models ADD COLUMN contextWindow INTEGER NOT NULL DEFAULT 0',
+      );
+    }
+    // v3: ai_models 添加 fallbackModelId 字段（用于主模型失败时切换备用模型）
+    if (oldVersion < 3) {
+      await db.execute(
+        'ALTER TABLE ai_models ADD COLUMN fallbackModelId TEXT',
+      );
+    }
+    // v4: ai_models 添加 supportsFunctionCalling 字段（P2-6: 原生 Function Calling 支持）
+    if (oldVersion < 4) {
+      await db.execute(
+        'ALTER TABLE ai_models ADD COLUMN supportsFunctionCalling INTEGER NOT NULL DEFAULT 0',
+      );
+    }
   }
 
   /// 关闭数据库

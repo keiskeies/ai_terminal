@@ -4,15 +4,29 @@ import 'package:dio/dio.dart';
 import '../models/ai_model_config.dart';
 import '../models/chat_session.dart';
 import '../core/prompts.dart';
+import '../utils/tool_call_accumulator.dart';
 import 'daos.dart';
 import 'knowledge_service.dart';
 
 abstract class AIProvider {
+  /// 调用 AI 模型返回流式响应。
+  ///
+  /// [cancelToken] 可选取消令牌：
+  /// - 传入后，调用方可通过 `cancelToken.cancel()` 立即取消底层 HTTP 请求和流监听
+  /// - 不依赖 Dio 内置的 receiveTimeout 兜底，做到毫秒级响应
+  /// - 取消后，stream 会以 onError(DioException.cancel) 结束
+  ///
+  /// [tools] 可选：P2-6 原生 Function Calling 工具 schema（OpenAI tools API 格式）。
+  /// 传入后 OpenAIProvider 会将其附加到请求 body，并解析 delta.tool_calls。
+  /// 当前实现：收到 tool_calls 时，转换为 ReAct 文本格式（"动作: tool / 工具: X / 参数: {...}"）
+  /// 投递到 stream，由 AgentEngine 的现有解析路径处理。其他 provider 忽略此参数。
   Future<Stream<String>> chatStream({
     required List<ChatMessage> history,
     required String prompt,
     required AIModelConfig config,
     String? systemPrompt,
+    CancelToken? cancelToken,
+    List<Map<String, dynamic>>? tools,
   });
 }
 
@@ -56,6 +70,8 @@ class OpenAIProvider implements AIProvider {
     required String prompt,
     required AIModelConfig config,
     String? systemPrompt,
+    CancelToken? cancelToken,
+    List<Map<String, dynamic>>? tools,
   }) async {
     final effectiveSystemPrompt = systemPrompt ?? buildContextPrompt();
     final messages = <Map<String, dynamic>>[
@@ -64,16 +80,24 @@ class OpenAIProvider implements AIProvider {
       {'role': 'user', 'content': prompt},
     ];
 
+    // P2-6: 构建 request body；如果传入了 tools，附加到请求
+    final requestBody = <String, dynamic>{
+      'model': config.modelName,
+      'messages': messages,
+      'stream': true,
+      'temperature': config.temperature,
+      'max_tokens': config.maxTokens,
+    };
+    if (tools != null && tools.isNotEmpty) {
+      requestBody['tools'] = tools;
+      // 不强制 tool_choice：让模型自主决定是否调用工具
+      // 默认 'auto' 即可，避免无谓的工具调用
+    }
+
     try {
       final Response<ResponseBody> response = await _dio.post<ResponseBody>(
         '${config.baseUrl}/chat/completions',
-        data: {
-          'model': config.modelName,
-          'messages': messages,
-          'stream': true,
-          'temperature': config.temperature,
-          'max_tokens': config.maxTokens,
-        },
+        data: requestBody,
         options: Options(
           headers: {
             'Authorization': 'Bearer ${config.apiKey}',
@@ -81,73 +105,116 @@ class OpenAIProvider implements AIProvider {
           },
           responseType: ResponseType.stream,
         ),
+        cancelToken: cancelToken,
       );
 
       final streamController = StreamController<String>();
       String buffer = '';
+      // P2-6: tool_calls 累积器（仅当传入 tools 时启用）
+      final toolCallAcc = tools != null && tools.isNotEmpty
+          ? ToolCallAccumulator()
+          : null;
+
+      if (cancelToken != null) {
+        cancelToken.whenCancel.then((err) {
+          if (!streamController.isClosed) {
+            streamController.addError(err);
+            streamController.close();
+          }
+        });
+      }
+
+      void processLine(String line) {
+        if (line == 'data: [DONE]') {
+          // P2-6: 流结束前若有累积的 tool_calls，转换为 ReAct 文本投递
+          if (toolCallAcc != null && toolCallAcc.hasPendingCalls) {
+            final calls = toolCallAcc.finalize();
+            if (calls.isNotEmpty) {
+              final reactText = ToolCallAccumulator.toReActText(calls);
+              if (!streamController.isClosed) {
+                streamController.add(reactText);
+              }
+            }
+          }
+          if (!streamController.isClosed) {
+            streamController.close();
+          }
+          return;
+        }
+        if (line.startsWith('data: ')) {
+          final data = line.substring(6);
+          try {
+            final json = jsonDecode(data) as Map<String, dynamic>;
+            final choices = json['choices'] as List?;
+            if (choices != null && choices.isNotEmpty) {
+              final delta = choices[0]['delta'] as Map?;
+              if (delta != null) {
+                // 普通文本内容
+                final content = delta['content'];
+                if (content != null && content.toString().isNotEmpty) {
+                  if (!streamController.isClosed) {
+                    streamController.add(content.toString());
+                  }
+                }
+                // P2-6: tool_calls 增量累积
+                if (toolCallAcc != null && delta['tool_calls'] != null) {
+                  toolCallAcc.addDelta(delta['tool_calls'] as List);
+                }
+                // finish_reason='tool_calls' 时立即投递（部分 provider 不会发 [DONE]）
+                final finishReason = choices[0]['finish_reason'];
+                if (finishReason == 'tool_calls' && toolCallAcc != null) {
+                  final calls = toolCallAcc.finalize();
+                  if (calls.isNotEmpty) {
+                    final reactText = ToolCallAccumulator.toReActText(calls);
+                    if (!streamController.isClosed) {
+                      streamController.add(reactText);
+                    }
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            // 忽略解析错误，继续处理下一行
+          }
+        }
+      }
 
       response.data!.stream.listen(
         (chunk) {
-          // 关键修复：使用 utf8 解码，而不是 toString()
           String text;
           try {
             text = utf8.decode(chunk);
           } catch (_) {
             text = chunk.toString();
           }
-          
           buffer += text;
-          
-          // 处理 buffer 中的所有完整行
           final lines = buffer.split('\n');
-          buffer = lines.last; // 保留不完整的最后一行
-          
+          buffer = lines.last;
           for (int i = 0; i < lines.length - 1; i++) {
             final line = lines[i].trim();
             if (line.isEmpty) continue;
-            
-            if (line == 'data: [DONE]') {
-              streamController.close();
-              return;
-            }
-            
-            if (line.startsWith('data: ')) {
-              final data = line.substring(6);
-              try {
-                final json = jsonDecode(data) as Map<String, dynamic>;
-                final choices = json['choices'] as List?;
-                if (choices != null && choices.isNotEmpty) {
-                  final delta = choices[0]['delta'] as Map?;
-                  if (delta != null) {
-                    final content = delta['content'];
-                    if (content != null && content.toString().isNotEmpty) {
-                      streamController.add(content.toString());
-                    }
-                  }
-                }
-              } catch (e) {
-                // 忽略解析错误，继续处理下一行
-              }
-            }
+            processLine(line);
           }
         },
         onError: (error) {
-          streamController.addError(_mapError(error));
-          streamController.close();
+          if (!streamController.isClosed) {
+            streamController.addError(_mapError(error));
+            streamController.close();
+          }
         },
         onDone: () {
-          // 处理可能剩余的 buffer 内容
+          // 处理剩余 buffer
           if (buffer.isNotEmpty) {
             final line = buffer.trim();
-            if (line.startsWith('data: ') && line != 'data: [DONE]') {
-              final data = line.substring(6);
-              try {
-                final json = jsonDecode(data) as Map<String, dynamic>;
-                final content = json['choices']?[0]?['delta']?['content'];
-                if (content != null && content.toString().isNotEmpty) {
-                  streamController.add(content.toString());
-                }
-              } catch (_) {}
+            if (line.startsWith('data: ')) {
+              processLine(line);
+            }
+          }
+          // P2-6: 兜底 — 若 stream 关闭时仍有未投递的 tool_calls，在此投递
+          if (toolCallAcc != null && toolCallAcc.hasPendingCalls && !streamController.isClosed) {
+            final calls = toolCallAcc.finalize();
+            if (calls.isNotEmpty) {
+              streamController.add(ToolCallAccumulator.toReActText(calls));
             }
           }
           if (!streamController.isClosed) {
@@ -172,6 +239,8 @@ class QwenProvider implements AIProvider {
     required String prompt,
     required AIModelConfig config,
     String? systemPrompt,
+    CancelToken? cancelToken,
+    List<Map<String, dynamic>>? tools,
   }) async {
     // 通义千问兼容 OpenAI API 格式
     final provider = OpenAIProvider();
@@ -180,6 +249,8 @@ class QwenProvider implements AIProvider {
       prompt: prompt,
       config: config,
       systemPrompt: systemPrompt,
+      cancelToken: cancelToken,
+      tools: tools,
     );
   }
 }
@@ -197,6 +268,8 @@ class ErnieProvider implements AIProvider {
     required String prompt,
     required AIModelConfig config,
     String? systemPrompt,
+    CancelToken? cancelToken,
+    List<Map<String, dynamic>>? tools,
   }) async {
     // 百度文心 API 格式（不支持 system 角色）
     // 将 system prompt 合并到第一条 user 消息中
@@ -246,10 +319,21 @@ class ErnieProvider implements AIProvider {
           },
           responseType: ResponseType.stream,
         ),
+        cancelToken: cancelToken,
       );
 
       final streamController = StreamController<String>();
       String buffer = '';
+
+      // 与 OpenAIProvider 一致：cancelToken 触发时主动关闭 streamController
+      if (cancelToken != null) {
+        cancelToken.whenCancel.then((err) {
+          if (!streamController.isClosed) {
+            streamController.addError(err);
+            streamController.close();
+          }
+        });
+      }
 
       response.data!.stream.listen(
         (chunk) {
@@ -259,20 +343,20 @@ class ErnieProvider implements AIProvider {
           } catch (_) {
             text = chunk.toString();
           }
-          
+
           buffer += text;
           final lines = buffer.split('\n');
           buffer = lines.last;
-          
+
           for (int i = 0; i < lines.length - 1; i++) {
             final line = lines[i].trim();
             if (line.isEmpty) continue;
-            
+
             if (line == 'data: [DONE]') {
               streamController.close();
               return;
             }
-            
+
             if (line.startsWith('data: ')) {
               final data = line.substring(6);
               try {
@@ -334,6 +418,7 @@ class AIService {
     String? context,
     String? hostName,
     String? hostAddress,
+    CancelToken? cancelToken,
   }) async {
     final provider = create(config);
     // 构建带主机信息的系统提示词
@@ -371,6 +456,7 @@ class AIService {
       prompt: prompt,
       config: config,
       systemPrompt: systemPrompt,
+      cancelToken: cancelToken,
     );
   }
 }

@@ -1,64 +1,42 @@
-import 'package:hive/hive.dart';
-
-part 'host_config.g.dart';
-
-@HiveType(typeId: 0)
-class HostConfig extends HiveObject {
-  @HiveField(0)
+class HostConfig {
   late String id;
 
-  @HiveField(1)
   late String name;
 
-  @HiveField(2)
   late String host;
 
-  @HiveField(3)
   int port = 22;
 
-  @HiveField(4)
   late String username;
 
   // 认证方式（不含明文密码）
-  @HiveField(10)
   late String authType; // 'password' | 'privateKey'
 
   // 分组
-  @HiveField(20)
   String group = "默认";
 
-  @HiveField(21)
   String? tagColor;
 
   // 跳板机/堡垒机配置（内联，和主服务器在一条连接信息里）
-  @HiveField(22)
   String? jumpHost; // 跳板机地址（IP或域名）
 
-  @HiveField(25)
   int jumpPort = 22; // 跳板机端口
 
-  @HiveField(26)
   String? jumpUsername; // 跳板机用户名
 
-  @HiveField(27)
   String? jumpAuthType; // 跳板机认证方式: 'password' | 'privateKey'
 
   // 连接超时（秒）
-  @HiveField(23)
   int timeout = 30;
 
   // 字符编码
-  @HiveField(24)
   String encoding = "utf-8";
 
   // 元数据
-  @HiveField(30)
   late DateTime createdAt;
 
-  @HiveField(31)
   DateTime? lastConnectedAt;
 
-  @HiveField(32)
   String? lastStatus; // 'success' | 'failed' | 'timeout'
 
   HostConfig();

@@ -2,7 +2,6 @@ import 'package:encrypt/encrypt.dart';
 import 'package:flutter/foundation.dart' hide Key;
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:hive/hive.dart';
 import '../services/daos.dart';
 
 /// macOS Keychain 配置
@@ -23,9 +22,6 @@ const _platform = MethodChannel('com.keiskei.aiterminal/security');
 /// - macOS: Keychain 存储随机生成的 32 字节主密钥
 /// - Windows: DPAPI (CryptProtectData) 保护主密钥，绑定用户账户
 /// - Linux: /etc/machine-id 派生主密钥，绑定机器
-///
-/// 旧版本数据迁移：自动检测旧 Hive credentials box 中的明文数据，
-/// 读取后加密保存并删除明文。
 class CredentialsStore {
   static late FlutterSecureStorage _storage;
   static bool _initialized = false;
@@ -34,7 +30,7 @@ class CredentialsStore {
   static Key? _masterKey;
   static Encrypter? _encrypter;
 
-  /// 旧版硬编码密钥（仅用于解密旧格式数据，不再用于新加密）
+  /// 旧版本硬编码密钥（仅用于解密旧格式数据，不再用于新加密）
   static final _legacyKey = Key.fromUtf8(
     'A1TerminalSecureKey2024XYZ!@#\$%^',
   );
@@ -46,8 +42,8 @@ class CredentialsStore {
 
   /// 初始化
   ///
-  /// 完整初始化流程：加载主密钥 → 初始化 secure_storage → 迁移旧数据
-  /// 注意：此方法依赖 DbInit 已初始化（迁移旧数据时需写入 SQLite）
+  /// 完整初始化流程：加载主密钥 → 初始化 secure_storage
+  /// 注意：此方法依赖 DbInit 已初始化（fallback 写入 SQLite 需要）
   /// 若只需主密钥（如 DbInit 加密 DB 需要），请调用 [loadMasterKey]
   static Future<void> init() async {
     if (_initialized) return;
@@ -63,19 +59,16 @@ class CredentialsStore {
 
     _initialized = true;
     debugPrint('CredentialsStore: 初始化完成');
-
-    // 迁移旧数据
-    await _migrateLegacyData();
   }
 
   /// 仅加载 OS 主密钥（不依赖 DbInit，可在 DbInit.init() 之前调用）
   ///
   /// 用途：DbInit 需要 OS 主密钥作为 SQLCipher 密码，
-  /// 但 CredentialsStore.init() 的迁移逻辑又依赖 DbInit，
+  /// 但 CredentialsStore.init() 又依赖 DbInit，
   /// 形成循环依赖。此方法打破循环：
   /// 1. main.dart 先调用 loadMasterKey() 获取主密钥
   /// 2. 再调用 DbInit.init() 用主密钥打开加密 DB
-  /// 3. 最后调用 CredentialsStore.init() 完成迁移
+  /// 3. 最后调用 CredentialsStore.init() 完成 fallback 路径就绪
   static Future<void> loadMasterKey() async {
     if (_masterKey != null) return; // 已加载
 
@@ -114,57 +107,6 @@ class CredentialsStore {
   static Future<void> _ensureInitialized() async {
     if (!_initialized) {
       await init();
-    }
-  }
-
-  /// 迁移旧版本明文数据
-  /// 旧版本将凭据明文存入 Hive 'credentials' box，此处读取并迁移到安全存储
-  static Future<void> _migrateLegacyData() async {
-    try {
-      final legacyBox = await Hive.openBox<String>('credentials');
-      if (legacyBox.isEmpty) {
-        await legacyBox.close();
-        return;
-      }
-
-      debugPrint('CredentialsStore: 检测到旧版明文数据，开始迁移...');
-      var migrated = 0;
-      for (final key in legacyBox.keys.toList()) {
-        final value = legacyBox.get(key);
-        if (value == null || value.isEmpty) continue;
-
-        // 优先迁移到 secure_storage
-        var saved = false;
-        try {
-          await _storage.write(key: key.toString(), value: value);
-          saved = true;
-        } catch (e) {
-          debugPrint('CredentialsStore: 迁移到 secure_storage 失败 ($key): $e');
-        }
-
-        // secure_storage 失败时迁移到加密 SQLite
-        if (!saved) {
-          try {
-            final encrypted = _encrypt(value);
-            await CredentialsFallbackDao.put(key.toString(), encrypted);
-            saved = true;
-          } catch (e) {
-            debugPrint('CredentialsStore: 迁移到加密 SQLite 失败 ($key): $e');
-          }
-        }
-
-        if (saved) {
-          await legacyBox.delete(key);
-          migrated++;
-        }
-      }
-
-      if (migrated > 0) {
-        debugPrint('CredentialsStore: 迁移完成，共 $migrated 条凭据');
-      }
-      await legacyBox.close();
-    } catch (e) {
-      debugPrint('CredentialsStore: 旧数据迁移跳过: $e');
     }
   }
 

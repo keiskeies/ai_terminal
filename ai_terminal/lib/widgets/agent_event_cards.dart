@@ -387,6 +387,8 @@ class AgentEventContent extends StatelessWidget {
                 MarkdownBody(
                   data: event.summary ?? '已完成所有步骤',
                   selectable: true,
+                  // 规避 flutter_markdown 0.6.23 在 selectable=true 时无条件调用 onSelectionChanged!() 的 bug
+                  onSelectionChanged: (_, __, ___) {},
                   styleSheet: MarkdownStyleSheet(
                     p: TextStyle(
                       color: cSuccess.withValues(alpha: 0.9),

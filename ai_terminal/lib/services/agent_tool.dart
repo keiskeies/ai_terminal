@@ -44,6 +44,25 @@ abstract class AgentTool {
   /// 返回 JSON schema 描述字符串
   String get paramSpec;
 
+  /// P2-6: 返回 OpenAI tools API 格式的 JSON schema。
+  /// 默认实现基于 paramSpec 生成一个宽松的 schema（type=object + 任意属性）。
+  /// 子类可重写以提供精确的参数类型。
+  /// 返回 null 表示该工具不参与 FC（仅文本协议可用）。
+  Map<String, dynamic>? toJsonSchema() {
+    // 默认实现：宽松 schema，让 AI 自由填参数，由 execute 内部校验
+    return {
+      'type': 'object',
+      'properties': {
+        'args': {
+          'type': 'object',
+          'description': paramSpec,
+          'additionalProperties': true,
+        },
+      },
+      'additionalProperties': true,
+    };
+  }
+
   /// 执行工具
   /// [executor] 当前命令执行器（可能是 SSHService 或本地终端）
   /// [args] AI 传入的参数（已解析的 Map）
@@ -353,18 +372,38 @@ class ExecOnTool extends AgentTool {
     // R8: 截断输出，避免 MB 级日志注入对话历史
     final output = _truncate(result.stdout, 2000);
     final err = _truncate(result.stderr, 1000);
-    final summary = '[$hostId] $mark (exit=${result.exitCode})';
+    // failureKind 让 AI 区分"命令失败"vs"环境问题"，避免盲目重试：
+    // - syntaxError → 修正命令（不要重试原命令）
+    // - interactivePrompt → 提示用户需要交互凭据
+    // - disconnected → 重连而非重试命令
+    // - timeout → 可能需要更长超时或拆分命令
+    final kindLabel = result.failureKind != CommandFailureKind.none
+        ? ' [${result.failureKind.name.toUpperCase()}]'
+        : (result.timedOut ? ' [TIMEOUT]' : '');
+    final summary = '[$hostId] $mark (exit=${result.exitCode})$kindLabel';
+    // 失败时必须同时回传 stdout 和 stderr：
+    // PTY 模式下 stderr 已合并进 stdout（result.stderr 恒为空），
+    // bash 的 "syntax error"、"command not found" 等关键诊断信息都在 stdout 里。
+    // 旧实现只回传 'stderr: $err'，导致 AI 看不到任何错误文本，
+    // 只能根据命令结构（如 nohup ... &）臆测"后台启动成功"。
     final detail = result.success
         ? (output.isNotEmpty ? output : L10n.str.orchToolNoOutput)
-        : 'stderr: $err';
+        : (output.isNotEmpty
+            ? (err.isNotEmpty ? 'stdout: $output\nstderr: $err' : 'output: $output')
+            : (err.isNotEmpty ? 'stderr: $err' : L10n.str.orchToolNoOutput));
+    // 失败原因（人类可读诊断，指导 AI 修正命令而非盲目重试）
+    final reasonLine = (result.failureReason != null && result.failureReason!.isNotEmpty)
+        ? '\nreason: ${result.failureReason}'
+        : '';
 
     if (result.success) {
       return ToolResult.success('$summary\n$detail');
     } else {
       return ToolResult(
         success: false,
-        output: '$summary\n$detail',
-        error: '主机 $hostId 命令失败 (exit=${result.exitCode})',
+        output: '$summary\n$detail$reasonLine',
+        error: '主机 $hostId 命令失败 (exit=${result.exitCode})'
+            '${result.failureKind != CommandFailureKind.none ? ' kind=${result.failureKind.name}' : ''}',
       );
     }
   }
@@ -1220,5 +1259,26 @@ class AgentToolRegistry {
     buffer.writeln('工具: sftp_upload');
     buffer.writeln('参数: {"local":"/Users/x/proj/dist","remote":"/var/www/myapp","recursive":true}');
     return buffer.toString().trimRight();
+  }
+
+  /// P2-6: 构建 OpenAI tools API 格式的工具 schema 列表。
+  /// 用于在 _callAI 中传给支持 Function Calling 的模型。
+  /// 返回的每个元素结构：{type:'function', function:{name, description, parameters}}
+  /// toJsonSchema() 返回 null 的工具会被跳过（不参与 FC）。
+  List<Map<String, dynamic>> buildOpenAIToolsSchema() {
+    final result = <Map<String, dynamic>>[];
+    for (final tool in _tools.values) {
+      final schema = tool.toJsonSchema();
+      if (schema == null) continue;
+      result.add({
+        'type': 'function',
+        'function': {
+          'name': tool.name,
+          'description': tool.description,
+          'parameters': schema,
+        },
+      });
+    }
+    return result;
   }
 }
