@@ -93,14 +93,18 @@ void main() {
       expect(calls[0].id, 'call_2');
     });
 
-    test('toReActText 转换为 ReAct 格式', () {
+    test('toReActText 转换为 ReAct 多行 key:value 格式（不再用 JSON）', () {
       final calls = [
         const ToolCall(id: 'call_1', name: 'sftp_upload', arguments: '{"local":"/a","remote":"/b"}'),
       ];
       final text = ToolCallAccumulator.toReActText(calls);
       expect(text, contains('动作: tool'));
       expect(text, contains('工具: sftp_upload'));
-      expect(text, contains('参数: {"local":"/a","remote":"/b"}'));
+      expect(text, contains('参数:'));
+      // 关键：不再以 { 开头（ToolArgsParser 已拒绝 JSON 格式）
+      expect(text, isNot(contains('参数: {')));
+      expect(text, contains('  local: /a'));
+      expect(text, contains('  remote: /b'));
     });
 
     test('toReActText 多个 tool_call 用空行分隔', () {
@@ -115,12 +119,50 @@ void main() {
       expect(text.split('\n\n').length, greaterThanOrEqualTo(2));
     });
 
-    test('空 arguments 替换为 {}', () {
+    test('空 arguments 输出空 参数: 行', () {
       final calls = [
         const ToolCall(id: '1', name: 'tool_a', arguments: ''),
       ];
       final text = ToolCallAccumulator.toReActText(calls);
-      expect(text, contains('参数: {}'));
+      expect(text, contains('参数:'));
+      expect(text, isNot(contains('参数: {}')));
+    });
+
+    test('List 参数输出为逗号分隔（兼容 ToolArgsParser 的列表字段约定）', () {
+      final calls = [
+        const ToolCall(
+          id: 'call_1',
+          name: 'exec_batch',
+          arguments: '{"hostIds":["web1","web2","db1"],"command":"uptime"}',
+        ),
+      ];
+      final text = ToolCallAccumulator.toReActText(calls);
+      expect(text, contains('  hostIds: web1,web2,db1'));
+      expect(text, contains('  command: uptime'));
+    });
+
+    test('bool 参数输出为字符串 true/false', () {
+      final calls = [
+        const ToolCall(
+          id: 'call_1',
+          name: 'sftp_upload',
+          arguments: '{"local":"/a","recursive":true}',
+        ),
+      ];
+      final text = ToolCallAccumulator.toReActText(calls);
+      expect(text, contains('  recursive: true'));
+    });
+
+    test('int 参数输出为数字字符串', () {
+      final calls = [
+        const ToolCall(
+          id: 'call_1',
+          name: 'exec_on',
+          arguments: '{"hostId":"web1","timeout":30}',
+        ),
+      ];
+      final text = ToolCallAccumulator.toReActText(calls);
+      expect(text, contains('  timeout: 30'));
     });
 
     test('arguments 缺失尾部 } 自动修复', () {
@@ -171,6 +213,28 @@ void main() {
       expect(second, isEmpty);
       // hasPendingCalls 也应为 false
       expect(acc.hasPendingCalls, isFalse);
+    });
+
+    test('toReActText 开头自带换行（与已有 thought 文本拼接时保证 "动作:" 独立成行）', () {
+      // 场景：OpenAI FC 协议允许 delta.content 和 delta.tool_calls 同时存在
+      // AI 先输出 thought "好的，我来执行工具"，再触发 tool_calls
+      // 若 toReActText 开头无换行，拼接后变成 "好的，我来执行工具动作: tool\n..."
+      // _parseReActResponse 找不到独立的 "动作:" 行，工具调用被忽略
+      final calls = [
+        const ToolCall(id: '1', name: 'sftp_upload', arguments: '{"local":"/a"}'),
+      ];
+      final thought = '好的，我来执行工具';
+      final reactText = ToolCallAccumulator.toReActText(calls);
+      // 模拟 _callAI 中的 fullResponse += chunk
+      final fullResponse = thought + reactText;
+      // 关键断言：fullResponse 中必须存在独立的 "动作: tool" 行
+      // 即某行 trim 后正好是 "动作: tool"，不能与其他文本拼接
+      final lines = fullResponse.split('\n');
+      final hasStandaloneActionLine =
+          lines.any((l) => l.trim() == '动作: tool');
+      expect(hasStandaloneActionLine, isTrue,
+          reason: 'thought + tool_calls 拼接后 "动作: tool" 必须独立成行，'
+              '否则 _parseReActResponse 会忽略工具调用。fullResponse=$fullResponse');
     });
   });
 }

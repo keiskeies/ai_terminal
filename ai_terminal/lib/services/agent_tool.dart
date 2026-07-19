@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'command_executor.dart';
@@ -9,6 +11,7 @@ import 'file_sync_service.dart';
 import 'multi_host_executor.dart';
 import 'agent_host_registry.dart';
 import '../core/l10n_holder.dart';
+import '../utils/tool_args_parser.dart';
 
 /// Agent 工具调用结果
 class ToolResult {
@@ -31,7 +34,7 @@ class ToolResult {
 
 /// Agent 工具抽象
 /// 工具是 agent_engine 之外的能力扩展点。
-/// AI 通过 "动作: tool" + "工具: xxx" + "参数: {json}" 协议调用。
+/// AI 通过 "动作: tool" + "工具: xxx" + "参数:" + 多行 key:value 协议调用。
 /// 引擎拦截后路由到对应工具的 execute 方法。
 abstract class AgentTool {
   /// 工具名（AI 调用时使用，如 sftp_upload）
@@ -91,7 +94,7 @@ class SftpUploadTool extends AgentTool {
       '例如 local=/path/story、remote=/tmp → 实际传到 /tmp/story；若 remote 已含同名末段（如 /tmp/story）则不重复追加。';
 
   @override
-  String get paramSpec => '''{"local":"本地路径(必填)","remote":"远程目标父目录(必填,目录上传时会自动在其下创建basename子目录)","recursive":"是否递归上传目录(true/false,默认false)","exclude":"排除项(可选,如node_modules,.git)"}''';
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n  local: 本地路径（必填）\n  remote: 远程目标父目录（必填，目录上传时自动在其下创建 basename 子目录）\n  recursive: 是否递归上传目录（true/false，默认 false）\n  exclude: 排除项（可选，逗号分隔，如 node_modules,.git）';
 
   @override
   Future<ToolResult> execute({
@@ -100,10 +103,10 @@ class SftpUploadTool extends AgentTool {
     void Function(String message)? onProgress,
   }) async {
     // 参数校验
-    final local = args['local']?.toString() ?? '';
-    final remote = args['remote']?.toString() ?? '';
-    final recursive = args['recursive'] == true || args['recursive'] == 'true';
-    final excludeRaw = args['exclude'];
+    final local = ToolArgsParser.getString(args, 'local');
+    final remote = ToolArgsParser.getString(args, 'remote');
+    final recursive = ToolArgsParser.getBool(args, 'recursive');
+    final excludeArg = ToolArgsParser.getStringList(args, 'exclude');
 
     if (local.isEmpty || remote.isEmpty) {
       return ToolResult.failure('参数缺失: local 和 remote 为必填项');
@@ -135,14 +138,9 @@ class SftpUploadTool extends AgentTool {
     }
 
     // 解析排除列表
-    List<String> excludeNames = ['node_modules', '.git', '.DS_Store'];
-    if (excludeRaw != null) {
-      if (excludeRaw is List) {
-        excludeNames = excludeRaw.map((e) => e.toString()).toList();
-      } else if (excludeRaw is String) {
-        excludeNames = excludeRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-      }
-    }
+    List<String> excludeNames = excludeArg.isEmpty
+        ? ['node_modules', '.git', '.DS_Store']
+        : excludeArg;
 
     onProgress?.call('正在打开 SFTP 子系统...');
     debugPrint('[SftpUploadTool] 开始上传: local=$local, remote=$remote, recursive=$recursive');
@@ -243,7 +241,7 @@ class FileSyncTool extends AgentTool {
       '否则 story 内的文件会被平铺到 remoteDir 根下。';
 
   @override
-  String get paramSpec => '''{"action":"start|stop|status","localDir":"本地目录完整路径(start必填)","remoteDir":"远程目录完整路径(start必填,应含目标子目录名,如/tmp/story而非/tmp)","direction":"localToRemote|bidirectional(默认)","exclude":"排除项(可选)"}''';
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n  action: start|stop|status（必填）\n  localDir: 本地目录完整路径（start 必填）\n  remoteDir: 远程目录完整路径（start 必填，应含目标子目录名，如 /tmp/story 而非 /tmp）\n  direction: localToRemote|bidirectional（默认 localToRemote）\n  exclude: 排除项（可选，逗号分隔）';
 
   @override
   Future<ToolResult> execute({
@@ -251,7 +249,7 @@ class FileSyncTool extends AgentTool {
     required Map<String, dynamic> args,
     void Function(String message)? onProgress,
   }) async {
-    final action = args['action']?.toString() ?? '';
+    final action = ToolArgsParser.getString(args, 'action');
 
     if (action == 'status') {
       final running = _service.isRunning;
@@ -270,10 +268,10 @@ class FileSyncTool extends AgentTool {
     }
 
     if (action == 'start') {
-      final localDir = args['localDir']?.toString() ?? '';
-      final remoteDir = args['remoteDir']?.toString() ?? '';
-      final directionStr = args['direction']?.toString() ?? 'localToRemote';
-      final excludeRaw = args['exclude'];
+      final localDir = ToolArgsParser.getString(args, 'localDir');
+      final remoteDir = ToolArgsParser.getString(args, 'remoteDir');
+      final directionStr = ToolArgsParser.getString(args, 'direction', defaultValue: 'localToRemote');
+      final excludeArg = ToolArgsParser.getStringList(args, 'exclude');
 
       if (localDir.isEmpty || remoteDir.isEmpty) {
         return ToolResult.failure('start 需要 localDir 和 remoteDir 参数');
@@ -292,12 +290,9 @@ class FileSyncTool extends AgentTool {
           ? SyncDirection.bidirectional
           : SyncDirection.localToRemote;
 
-      List<String> excludeNames = ['node_modules', '.git', '.DS_Store'];
-      if (excludeRaw is List) {
-        excludeNames = excludeRaw.map((e) => e.toString()).toList();
-      } else if (excludeRaw is String) {
-        excludeNames = excludeRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-      }
+      List<String> excludeNames = excludeArg.isEmpty
+          ? ['node_modules', '.git', '.DS_Store']
+          : excludeArg;
 
       final config = SyncConfig(
         localDir: localDir,
@@ -341,7 +336,7 @@ class ExecOnTool extends AgentTool {
       '仅在编排模式下可用；非编排模式请用普通 execute。';
 
   @override
-  String get paramSpec => '{"hostId":"目标主机ID(必填)","command":"要执行的命令(必填)","timeout":"超时秒数(可选,默认60)"}';
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n  hostId: 目标主机 ID（必填）\n  command: 要执行的命令（必填）\n  timeout: 超时秒数（可选，默认 60）';
 
   @override
   Future<ToolResult> execute({
@@ -349,9 +344,9 @@ class ExecOnTool extends AgentTool {
     required Map<String, dynamic> args,
     void Function(String message)? onProgress,
   }) async {
-    final hostId = args['hostId']?.toString() ?? '';
-    final command = args['command']?.toString() ?? '';
-    final timeoutSec = int.tryParse(args['timeout']?.toString() ?? '') ?? 60;
+    final hostId = ToolArgsParser.getString(args, 'hostId');
+    final command = ToolArgsParser.getString(args, 'command');
+    final timeoutSec = ToolArgsParser.getInt(args, 'timeout', defaultValue: 60);
 
     if (hostId.isEmpty || command.isEmpty) {
       return ToolResult.failure(L10n.str.orchToolParamMissing('hostId 和 command'));
@@ -429,7 +424,7 @@ class ExecBatchTool extends AgentTool {
       '一台失败不影响其他主机（除非 stopOnFailure=true）。';
 
   @override
-  String get paramSpec => '{"hostIds":"主机ID列表(必填,逗号分隔,如web1,web2,db1)","command":"要执行的命令(必填)","timeout":"超时秒数(可选,默认60)","stopOnFailure":"某台失败是否停止后续(true/false,默认false)"}';
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，逗号分隔，如 web1,web2,db1）\n  command: 要执行的命令（必填）\n  timeout: 超时秒数（可选，默认 60）\n  stopOnFailure: 某台失败是否停止后续（true/false，默认 false）';
 
   @override
   Future<ToolResult> execute({
@@ -437,18 +432,13 @@ class ExecBatchTool extends AgentTool {
     required Map<String, dynamic> args,
     void Function(String message)? onProgress,
   }) async {
-    final hostIdsStr = args['hostIds']?.toString() ?? '';
-    final command = args['command']?.toString() ?? '';
-    final timeoutSec = int.tryParse(args['timeout']?.toString() ?? '') ?? 60;
-    final stopOnFailure = args['stopOnFailure'] == true || args['stopOnFailure'] == 'true';
+    final command = ToolArgsParser.getString(args, 'command');
+    final timeoutSec = ToolArgsParser.getInt(args, 'timeout', defaultValue: 60);
+    final stopOnFailure = ToolArgsParser.getBool(args, 'stopOnFailure');
+    final hostIds = ToolArgsParser.getStringList(args, 'hostIds');
 
-    if (hostIdsStr.isEmpty || command.isEmpty) {
+    if (hostIds.isEmpty || command.isEmpty) {
       return ToolResult.failure(L10n.str.orchToolParamMissing('hostIds 和 command'));
-    }
-
-    final hostIds = hostIdsStr.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-    if (hostIds.isEmpty) {
-      return ToolResult.failure(L10n.str.orchToolHostIdsEmpty);
     }
 
     onProgress?.call(L10n.str.orchToolBatchProgress(command, hostIds.length));
@@ -489,7 +479,7 @@ class CheckConnectivityTool extends AgentTool {
       '源主机必须是已连接的编排参与者。';
 
   @override
-  String get paramSpec => '{"fromHostId":"源主机ID(必填,命令从这台机执行)","targetHost":"目标主机IP或域名(必填)","port":"目标端口(必填)","timeout":"超时秒数(可选,默认5)"}';
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n  fromHostId: 源主机 ID（必填，命令从这台机执行）\n  targetHost: 目标主机 IP 或域名（必填）\n  port: 目标端口（必填）\n  timeout: 超时秒数（可选，默认 5）';
 
   @override
   Future<ToolResult> execute({
@@ -497,10 +487,10 @@ class CheckConnectivityTool extends AgentTool {
     required Map<String, dynamic> args,
     void Function(String message)? onProgress,
   }) async {
-    final fromHostId = args['fromHostId']?.toString() ?? '';
-    final targetHost = args['targetHost']?.toString() ?? '';
-    final port = int.tryParse(args['port']?.toString() ?? '') ?? 0;
-    final timeoutSec = int.tryParse(args['timeout']?.toString() ?? '') ?? 5;
+    final fromHostId = ToolArgsParser.getString(args, 'fromHostId');
+    final targetHost = ToolArgsParser.getString(args, 'targetHost');
+    final port = ToolArgsParser.getInt(args, 'port');
+    final timeoutSec = ToolArgsParser.getInt(args, 'timeout', defaultValue: 5);
 
     if (fromHostId.isEmpty || targetHost.isEmpty || port <= 0) {
       return ToolResult.failure(L10n.str.orchToolConnParamMissing);
@@ -542,7 +532,7 @@ class UploadToTool extends AgentTool {
       '目录上传语义同 sftp_upload：把 local 目录放到 remote 下，自动创建 basename(local) 子目录。';
 
   @override
-  String get paramSpec => '{"hostId":"目标主机ID(必填)","local":"本地文件/目录绝对路径(必填)","remote":"远程目标父目录(必填,目录上传时自动在其下创建basename子目录)","recursive":"是否递归上传目录(true/false,默认false)","exclude":"排除项(可选,如node_modules,.git)"}';
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n  hostId: 目标主机 ID（必填）\n  local: 本地文件/目录绝对路径（必填）\n  remote: 远程目标父目录（必填，目录上传时自动在其下创建 basename 子目录）\n  recursive: 是否递归上传目录（true/false，默认 false）\n  exclude: 排除项（可选，逗号分隔，如 node_modules,.git）';
 
   @override
   Future<ToolResult> execute({
@@ -550,11 +540,11 @@ class UploadToTool extends AgentTool {
     required Map<String, dynamic> args,
     void Function(String message)? onProgress,
   }) async {
-    final hostId = args['hostId']?.toString() ?? '';
-    final local = args['local']?.toString() ?? '';
-    final remote = args['remote']?.toString() ?? '';
-    final recursive = args['recursive'] == true || args['recursive'] == 'true';
-    final excludeRaw = args['exclude'];
+    final hostId = ToolArgsParser.getString(args, 'hostId');
+    final local = ToolArgsParser.getString(args, 'local');
+    final remote = ToolArgsParser.getString(args, 'remote');
+    final recursive = ToolArgsParser.getBool(args, 'recursive');
+    final excludeArg = ToolArgsParser.getStringList(args, 'exclude');
 
     if (hostId.isEmpty || local.isEmpty || remote.isEmpty) {
       return ToolResult.failure(L10n.str.orchToolUploadParamMissing);
@@ -589,14 +579,9 @@ class UploadToTool extends AgentTool {
       return ToolResult.failure(L10n.str.orchToolLocalIsDir);
     }
 
-    List<String> excludeNames = ['node_modules', '.git', '.DS_Store'];
-    if (excludeRaw != null) {
-      if (excludeRaw is List) {
-        excludeNames = excludeRaw.map((e) => e.toString()).toList();
-      } else if (excludeRaw is String) {
-        excludeNames = excludeRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-      }
-    }
+    List<String> excludeNames = excludeArg.isEmpty
+        ? ['node_modules', '.git', '.DS_Store']
+        : excludeArg;
 
     onProgress?.call(L10n.str.orchToolSftpOpening(hostId));
     final sftp = SftpService();
@@ -676,7 +661,7 @@ class BroadcastUploadTool extends AgentTool {
       '执行是串行的，每台主机的结果单独报告。';
 
   @override
-  String get paramSpec => '{"hostIds":["hostId1","hostId2"],"local":"本地文件/目录绝对路径(必填)","remote":"远程目标父目录(必填)","recursive":"是否递归(true/false,默认false)"}';
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，逗号分隔，如 web1,web2）\n  local: 本地文件/目录绝对路径（必填）\n  remote: 远程目标父目录（必填）\n  recursive: 是否递归（true/false，默认 false）';
 
   @override
   Future<ToolResult> execute({
@@ -684,19 +669,13 @@ class BroadcastUploadTool extends AgentTool {
     required Map<String, dynamic> args,
     void Function(String message)? onProgress,
   }) async {
-    final hostIdsRaw = args['hostIds'];
-    final local = args['local']?.toString() ?? '';
-    final remote = args['remote']?.toString() ?? '';
-    final recursive = args['recursive'] == true || args['recursive'] == 'true';
+    final hostIds = ToolArgsParser.getStringList(args, 'hostIds');
+    final local = ToolArgsParser.getString(args, 'local');
+    final remote = ToolArgsParser.getString(args, 'remote');
+    final recursive = ToolArgsParser.getBool(args, 'recursive');
 
     if (local.isEmpty || remote.isEmpty) {
       return ToolResult.failure('参数缺失: local、remote 为必填项');
-    }
-    List<String> hostIds = [];
-    if (hostIdsRaw is List) {
-      hostIds = hostIdsRaw.map((e) => e.toString()).toList();
-    } else if (hostIdsRaw is String) {
-      hostIds = hostIdsRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     }
     if (hostIds.isEmpty) {
       return ToolResult.failure('参数缺失: hostIds 为必填项（数组或逗号分隔）');
@@ -746,7 +725,7 @@ class CollectFileTool extends AgentTool {
       '用于配置对比、日志收集等场景。';
 
   @override
-  String get paramSpec => '{"hostIds":["hostId1","hostId2"],"remote":"远程文件绝对路径(必填)","localDir":"本地保存目录(必填)"}';
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，逗号分隔）\n  remote: 远程文件绝对路径（必填）\n  localDir: 本地保存目录（必填）';
 
   @override
   Future<ToolResult> execute({
@@ -754,18 +733,12 @@ class CollectFileTool extends AgentTool {
     required Map<String, dynamic> args,
     void Function(String message)? onProgress,
   }) async {
-    final hostIdsRaw = args['hostIds'];
-    final remote = args['remote']?.toString() ?? '';
-    final localDir = args['localDir']?.toString() ?? '';
+    final hostIds = ToolArgsParser.getStringList(args, 'hostIds');
+    final remote = ToolArgsParser.getString(args, 'remote');
+    final localDir = ToolArgsParser.getString(args, 'localDir');
 
     if (remote.isEmpty || localDir.isEmpty) {
       return ToolResult.failure('参数缺失: remote、localDir 为必填项');
-    }
-    List<String> hostIds = [];
-    if (hostIdsRaw is List) {
-      hostIds = hostIdsRaw.map((e) => e.toString()).toList();
-    } else if (hostIdsRaw is String) {
-      hostIds = hostIdsRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     }
     if (hostIds.isEmpty) {
       return ToolResult.failure('参数缺失: hostIds 为必填项');
@@ -832,7 +805,7 @@ class MultiGrepTool extends AgentTool {
       '注意：命令在远程执行，grep 语法须兼容目标 shell。';
 
   @override
-  String get paramSpec => '{"hostIds":["hostId1","hostId2"],"pattern":"搜索关键词(必填,正则)","files":"要搜索的文件路径(必填,多个用逗号分隔)","tail":"仅搜索文件末尾N行(可选,如1000)","ignoreCase":"是否忽略大小写(true/false,默认false)"}';
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，逗号分隔）\n  pattern: 搜索关键词（必填，正则）\n  files: 要搜索的文件路径（必填，多个用逗号分隔）\n  tail: 仅搜索文件末尾 N 行（可选，如 1000）\n  ignoreCase: 是否忽略大小写（true/false，默认 false）';
 
   @override
   Future<ToolResult> execute({
@@ -840,20 +813,14 @@ class MultiGrepTool extends AgentTool {
     required Map<String, dynamic> args,
     void Function(String message)? onProgress,
   }) async {
-    final hostIdsRaw = args['hostIds'];
-    final pattern = args['pattern']?.toString() ?? '';
-    final files = args['files']?.toString() ?? '';
-    final tail = args['tail']?.toString();
-    final ignoreCase = args['ignoreCase'] == true || args['ignoreCase'] == 'true';
+    final hostIds = ToolArgsParser.getStringList(args, 'hostIds');
+    final pattern = ToolArgsParser.getString(args, 'pattern');
+    final files = ToolArgsParser.getString(args, 'files');
+    final tail = ToolArgsParser.getString(args, 'tail');
+    final ignoreCase = ToolArgsParser.getBool(args, 'ignoreCase');
 
     if (pattern.isEmpty || files.isEmpty) {
       return ToolResult.failure('参数缺失: pattern、files 为必填项');
-    }
-    List<String> hostIds = [];
-    if (hostIdsRaw is List) {
-      hostIds = hostIdsRaw.map((e) => e.toString()).toList();
-    } else if (hostIdsRaw is String) {
-      hostIds = hostIdsRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     }
     if (hostIds.isEmpty) {
       return ToolResult.failure('参数缺失: hostIds 为必填项');
@@ -864,7 +831,7 @@ class MultiGrepTool extends AgentTool {
     final grepFlags = ignoreCase ? '-iE' : '-E';
     final fileList = files.split(',').map((f) => f.trim()).where((f) => f.isNotEmpty).join(' ');
     String cmd;
-    if (tail != null && tail.isNotEmpty) {
+    if (tail.isNotEmpty) {
       final n = int.tryParse(tail) ?? 1000;
       cmd = "tail -n $n $fileList | grep $grepFlags '$safePattern'";
     } else {
@@ -913,7 +880,7 @@ class DiffFilesTool extends AgentTool {
       '返回每台主机文件的 md5 和两两 diff 摘要。';
 
   @override
-  String get paramSpec => '{"hostIds":["hostId1","hostId2"],"remote":"远程文件绝对路径(必填)"}';
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，至少 2 台，逗号分隔）\n  remote: 远程文件绝对路径（必填）';
 
   @override
   Future<ToolResult> execute({
@@ -921,17 +888,11 @@ class DiffFilesTool extends AgentTool {
     required Map<String, dynamic> args,
     void Function(String message)? onProgress,
   }) async {
-    final hostIdsRaw = args['hostIds'];
-    final remote = args['remote']?.toString() ?? '';
+    final hostIds = ToolArgsParser.getStringList(args, 'hostIds');
+    final remote = ToolArgsParser.getString(args, 'remote');
 
     if (remote.isEmpty) {
       return ToolResult.failure('参数缺失: remote 为必填项');
-    }
-    List<String> hostIds = [];
-    if (hostIdsRaw is List) {
-      hostIds = hostIdsRaw.map((e) => e.toString()).toList();
-    } else if (hostIdsRaw is String) {
-      hostIds = hostIdsRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
     }
     if (hostIds.length < 2) {
       return ToolResult.failure('diff 至少需要 2 台主机');
@@ -1006,7 +967,7 @@ class CertMonitorTool extends AgentTool {
       '用于证书到期监控、安全审计。返回证书有效期剩余天数、到期日期、颁发者等。';
 
   @override
-  String get paramSpec => '{"mode":"remote|local_file|ssh_hostkey(必填)","host":"远程HTTPS主机名或IP(mode=remote时必填)","port":"HTTPS端口(默认443)","certPath":"本地证书文件路径(mode=local_file时必填)"}';
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n  mode: remote|local_file|ssh_hostkey（必填）\n  host: 远程 HTTPS 主机名或 IP（mode=remote 时必填）\n  port: HTTPS 端口（默认 443）\n  certPath: 本地证书文件路径（mode=local_file 时必填）';
 
   @override
   Future<ToolResult> execute({
@@ -1014,14 +975,14 @@ class CertMonitorTool extends AgentTool {
     required Map<String, dynamic> args,
     void Function(String message)? onProgress,
   }) async {
-    final mode = args['mode']?.toString() ?? '';
+    final mode = ToolArgsParser.getString(args, 'mode');
     if (mode.isEmpty) {
       return ToolResult.failure('参数缺失: mode 必填（remote/local_file/ssh_hostkey）');
     }
 
     if (mode == 'remote') {
-      final host = args['host']?.toString() ?? '';
-      final port = int.tryParse(args['port']?.toString() ?? '') ?? 443;
+      final host = ToolArgsParser.getString(args, 'host');
+      final port = ToolArgsParser.getInt(args, 'port', defaultValue: 443);
       if (host.isEmpty) {
         return ToolResult.failure('mode=remote 需要 host 参数');
       }
@@ -1056,7 +1017,7 @@ class CertMonitorTool extends AgentTool {
     }
 
     if (mode == 'local_file') {
-      final certPath = args['certPath']?.toString() ?? '';
+      final certPath = ToolArgsParser.getString(args, 'certPath');
       if (certPath.isEmpty) {
         return ToolResult.failure('mode=local_file 需要 certPath 参数');
       }
@@ -1183,6 +1144,401 @@ class CertMonitorTool extends AgentTool {
   }
 }
 
+/// 文件写入工具（绕过 shell 命令构造，从根本上避免转义/换行/EOF 问题）
+///
+/// **设计动机**：AI 用 `echo` / `cat <<EOF` / `sed` 写文件时，内容含 `$`、`\`、`"`、`'`、
+/// 或 EOF 字符串都会导致写入失败或内容损坏。本工具让 AI 通过 SFTP 直接写入远程文件，
+/// 完全绕过 shell，字符和换行符原样保留。
+///
+/// **使用方式**：
+/// - 小文件（< 8KB）：一次调用，mode=write，提供完整 content_b64
+/// - 大文件（>= 8KB）：分块调用，先 mode=write 写第一块，再 mode=append 追加后续块
+///   每块保持 < 8KB 原文（base64 编码后约 11KB），AI 算 base64 不会出错
+///
+/// **鲁棒性设计**：
+/// - H2: append 模式要求文件已存在，防止误用导致内容拼接到不期望的文件
+/// - H3/H5: mode=write 覆盖已存在文件前自动备份到 .bak.{timestamp}，写入失败自动回滚
+/// - 备份机制可通过 backup: false 关闭（如新建文件场景，避免无意义备份）
+///
+/// **大文件替代方案**：超过 8KB 的文件建议在本地编辑好（用本地编辑器/工具），
+/// 然后用 sftp_upload 工具上传，避免 AI 输出大文本时丢字符。
+class FileWriteTool extends AgentTool {
+  @override
+  String get name => 'file_write';
+
+  @override
+  String get description => '直接写入远程文件内容（绕过 shell，避免转义/换行/EOF 问题）。'
+      '推荐用于：新建配置文件、整体重写文件、写入含特殊字符的脚本。'
+      '大文件需分块：第一次 mode=write，后续 mode=append 追加。'
+      '覆盖已存在文件时自动备份到 .bak.{timestamp}，失败自动回滚。'
+      'append 模式要求文件已存在。仅适用于 SSH 远程会话。';
+
+  @override
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n'
+      '  path: 远程文件绝对路径（必填，如 /etc/nginx/conf.d/default.conf）\n'
+      '  content_b64: 文件内容的 base64 编码（必填。AI 自己生成 base64，工具解码后写入。'
+      '单次建议 < 8KB 原文；超限请分块：第一次 mode=write，后续 mode=append）\n'
+      '  mode: write | append（可选，默认 write。append 用于分块写入场景追加到文件末尾）\n'
+      '  backup: true | false（可选，默认 true。仅 mode=write 且文件已存在时生效，'
+      '自动备份原文件到 {path}.bak.{timestamp}）';
+
+  /// 单次写入大小上限（原文，未 base64）：8KB
+  /// 超过此值的 content_b64 会被拒绝，强制 AI 分块写入
+  static const int _maxChunkSize = 8 * 1024;
+
+  /// 备份文件大小上限：10MB（更大的文件应该走 sftp_upload，不应整体重写）
+  static const int _maxBackupSize = 10 * 1024 * 1024;
+
+  @override
+  Future<ToolResult> execute({
+    required CommandExecutor executor,
+    required Map<String, dynamic> args,
+    void Function(String message)? onProgress,
+  }) async {
+    final path = ToolArgsParser.getString(args, 'path');
+    final contentB64 = ToolArgsParser.getString(args, 'content_b64');
+    final mode = ToolArgsParser.getString(args, 'mode', defaultValue: 'write');
+    final backup = ToolArgsParser.getBool(args, 'backup', defaultValue: true);
+
+    if (path.isEmpty) {
+      return ToolResult.failure('参数缺失: path 为必填项');
+    }
+    if (contentB64.isEmpty) {
+      return ToolResult.failure('参数缺失: content_b64 为必填项');
+    }
+    if (mode != 'write' && mode != 'append') {
+      return ToolResult.failure('参数错误: mode 只能是 write 或 append，实际值为 "$mode"');
+    }
+
+    // base64 解码
+    final Uint8List contentBytes;
+    try {
+      contentBytes = base64Decode(contentB64);
+    } catch (e) {
+      return ToolResult.failure('content_b64 base64 解码失败: $e');
+    }
+
+    // 大小限制：避免 AI 一次输出过大 base64 出错
+    if (contentBytes.length > _maxChunkSize) {
+      return ToolResult.failure(
+        '单次写入内容过大 (${contentBytes.length} 字节 > $_maxChunkSize 字节)。'
+        '请分块写入：第一次 mode=write 写入前 8KB，后续 mode=append 追加剩余内容。'
+        '提示：每次调用前在本地把内容切成 < 8KB 的块，分别 base64 编码后调用本工具。',
+      );
+    }
+
+    onProgress?.call('正在${mode == 'write' ? '写入' : '追加'} $path (${contentBytes.length} 字节)...');
+
+    // SSH 远程会话：用 SFTP 直接写入
+    if (executor is SSHService) {
+      final client = executor.client;
+      if (client == null) {
+        return ToolResult.failure('SSH 连接未建立，无法打开 SFTP');
+      }
+      final sftp = SftpService();
+      try {
+        await sftp.attachToClient(client);
+      } catch (e) {
+        return ToolResult.failure('SFTP 连接失败: $e');
+      }
+
+      String? backupPath; // 用于失败时回滚
+      try {
+        // 创建父目录（如 /etc/nginx/conf.d/ 不存在）
+        final parentDir = p.posix.dirname(path);
+        if (parentDir.isNotEmpty && parentDir != '/' && parentDir != '.') {
+          await sftp.createDirectory(parentDir);
+        }
+
+        // H2: append 模式要求文件已存在
+        if (mode == 'append') {
+          final stat = await sftp.statFile(path);
+          if (stat == null) {
+            return ToolResult.failure(
+              'append 模式要求文件已存在，但 $path 不存在。'
+              '请先调用 file_write mode=write 创建文件，再用 mode=append 追加后续块。',
+            );
+          }
+        }
+
+        // H3/H5: write 模式覆盖前自动备份
+        if (mode == 'write' && backup) {
+          final existingStat = await sftp.statFile(path);
+          if (existingStat != null) {
+            final fileSize = existingStat.size ?? 0;
+            if (fileSize > _maxBackupSize) {
+              return ToolResult.failure(
+                '原文件过大 ($fileSize 字节 > $_maxBackupSize 字节)，无法自动备份。'
+                '请先手动备份（如 cp $path $path.manual.bak），再用 backup: false 调用本工具。',
+              );
+            }
+            backupPath = '$path.bak.${DateTime.now().millisecondsSinceEpoch}';
+            onProgress?.call('正在备份原文件到 $backupPath ...');
+            try {
+              await sftp.copyFile(path, backupPath!);
+            } catch (e) {
+              return ToolResult.failure('备份原文件失败: $e。已中止写入，原文件未被修改。');
+            }
+          }
+        }
+
+        // 写入
+        if (mode == 'write') {
+          await sftp.writeFileBytes(path, contentBytes);
+        } else {
+          await sftp.appendFileBytes(path, contentBytes);
+        }
+
+        onProgress?.call('写入完成');
+        final msg = StringBuffer()
+          ..writeln('文件${mode == 'write' ? '写入' : '追加'}成功: $path (${contentBytes.length} 字节)');
+        if (backupPath != null) {
+          msg.writeln('  原文件已备份: $backupPath');
+          msg.writeln('  如需回滚: mv $backupPath $path');
+        }
+        return ToolResult.success(msg.toString().trimRight());
+      } catch (e) {
+        // H3 失败回滚：恢复备份
+        if (backupPath != null) {
+          onProgress?.call('写入失败，正在回滚 ...');
+          try {
+            await sftp.copyFile(backupPath!, path);
+            return ToolResult.failure(
+              'SFTP 写入失败: $e\n已自动回滚：原文件已从备份 $backupPath 恢复。',
+            );
+          } catch (rollbackErr) {
+            return ToolResult.failure(
+              'SFTP 写入失败: $e\n回滚也失败: $rollbackErr。'
+              '原文件可能已损坏，请手动从备份 $backupPath 恢复：mv $backupPath $path',
+            );
+          }
+        }
+        return ToolResult.failure('SFTP 写入失败: $e');
+      } finally {
+        sftp.closeSftpOnly();
+      }
+    }
+
+    return ToolResult.failure('file_write 仅支持 SSH 远程会话，当前为本地终端');
+  }
+}
+
+/// 文件补丁工具（基于字符串替换 + 唯一性校验 + 原子性保护）
+///
+/// **设计动机**：配置文件小改动（如改端口、改 server_name）用 file_write 整体重写
+/// 浪费 token，且 AI 容易漏掉原文件其他部分。本工具让 AI 只提供 old/new 字符串，
+/// Dart 层读取文件 → 替换 → 写回，完全绕过 shell。
+///
+/// **替换语义**：
+/// - 读取原文件 → 统计 old 出现次数
+/// - 若 != 1，报错：唯一性校验失败，让 AI 提供更长上下文
+/// - 若 == 1，replace 后写回
+///
+/// **鲁棒性设计**：
+/// - H1 原子性：read 时记录 (size, mtime)，write 前再 stat 校验，
+///   若不一致说明文件被外部修改，拒绝写入避免覆盖外部更新
+/// - 自动备份：写回前 copy 到 .bak.{timestamp}，写入失败自动回滚
+/// - backup: false 可关闭备份（如修改临时文件）
+///
+/// **old/new 支持多行**：通过 base64 编码传递，避免单行参数无法承载换行符
+class FilePatchTool extends AgentTool {
+  @override
+  String get name => 'file_patch';
+
+  @override
+  String get description => '通过字符串替换修改远程文件（绕过 shell，避免 sed 转义问题）。'
+      '推荐用于：改一两行配置、替换变量值、修改 server_name 等小改动。'
+      'old 必须在文件中唯一出现，否则报错让 AI 提供更长上下文。'
+      'old 和 new 用 base64 编码传递，支持多行内容。'
+      '原子性保护：若读取后文件被外部修改，拒绝写入。';
+
+  @override
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n'
+      '  path: 远程文件绝对路径（必填）\n'
+      '  old_b64: 要替换的原文的 base64 编码（必填。必须在文件中唯一出现，否则报错）\n'
+      '  new_b64: 新内容的 base64 编码（必填。可为空字符串表示删除 old）\n'
+      '  backup: true | false（可选，默认 true。自动备份原文件到 {path}.bak.{timestamp}，'
+      '失败时自动回滚）';
+
+  /// 文件大小上限：1MB（patch 仅适用于小配置文件，大文件请用 file_write 整体重写）
+  static const int _maxFileSize = 1024 * 1024;
+
+  @override
+  Future<ToolResult> execute({
+    required CommandExecutor executor,
+    required Map<String, dynamic> args,
+    void Function(String message)? onProgress,
+  }) async {
+    final path = ToolArgsParser.getString(args, 'path');
+    final oldB64 = ToolArgsParser.getString(args, 'old_b64');
+    final newB64 = ToolArgsParser.getString(args, 'new_b64');
+    final backup = ToolArgsParser.getBool(args, 'backup', defaultValue: true);
+
+    if (path.isEmpty) {
+      return ToolResult.failure('参数缺失: path 为必填项');
+    }
+    if (oldB64.isEmpty) {
+      return ToolResult.failure('参数缺失: old_b64 为必填项');
+    }
+    // new_b64 允许为空（表示删除 old）
+
+    // base64 解码
+    String oldStr;
+    String newStr;
+    try {
+      oldStr = utf8.decode(base64Decode(oldB64));
+    } catch (e) {
+      return ToolResult.failure('old_b64 base64 解码失败: $e');
+    }
+    try {
+      // new_b64 可空 → 解码为空字符串
+      newStr = newB64.isEmpty ? '' : utf8.decode(base64Decode(newB64));
+    } catch (e) {
+      return ToolResult.failure('new_b64 base64 解码失败: $e');
+    }
+
+    onProgress?.call('正在读取 $path ...');
+
+    // SSH 远程会话
+    if (executor is SSHService) {
+      final client = executor.client;
+      if (client == null) {
+        return ToolResult.failure('SSH 连接未建立，无法打开 SFTP');
+      }
+      final sftp = SftpService();
+      try {
+        await sftp.attachToClient(client);
+      } catch (e) {
+        return ToolResult.failure('SFTP 连接失败: $e');
+      }
+
+      String? backupPath; // 用于失败时回滚
+      try {
+        // H1 原子性：read 时记录文件 (size, mtime)
+        final beforeStat = await sftp.statFile(path);
+        if (beforeStat == null) {
+          return ToolResult.failure(
+            '文件不存在: $path。file_patch 仅能修改已存在的文件，'
+            '如需新建文件请用 file_write。',
+          );
+        }
+        final beforeSize = beforeStat.size ?? 0;
+        final beforeMtime = beforeStat.modifyTime ?? 0;
+
+        // 读取原文件
+        final bytes = await sftp.readFileBytes(path, maxSize: _maxFileSize + 1);
+        if (bytes.length > _maxFileSize) {
+          return ToolResult.failure(
+            '文件过大 (${bytes.length} 字节 > $_maxFileSize 字节)。'
+            'patch 仅适用于 < 1MB 的配置文件，大文件请用 file_write 整体重写。',
+          );
+        }
+        final content = utf8.decode(bytes, allowMalformed: true);
+
+        // 唯一性校验：统计 old 出现次数
+        final occurrences = _countOccurrences(content, oldStr);
+        if (occurrences == 0) {
+          return ToolResult.failure(
+            'old 在文件中未找到。请检查 old 是否正确（包括前后空白、换行符）。',
+            output: '提示：old 必须与文件内容完全匹配。'
+                '建议先用 cat 命令查看文件内容，再选取要替换的精确字符串。',
+          );
+        }
+        if (occurrences > 1) {
+          return ToolResult.failure(
+            'old 在文件中出现 $occurrences 次，无法确定替换哪个。'
+            '请提供更长的上下文（包含前后行）使 old 唯一。',
+            output: 'old 内容预览: ${oldStr.length > 100 ? '${oldStr.substring(0, 100)}...' : oldStr}',
+          );
+        }
+
+        // 替换
+        final newContent = content.replaceFirst(oldStr, newStr);
+
+        // H1 原子性：write 前再 stat 一次，若 size/mtime 变化则拒绝写入
+        final afterStat = await sftp.statFile(path);
+        if (afterStat != null) {
+          final afterSize = afterStat.size ?? 0;
+          final afterMtime = afterStat.modifyTime ?? 0;
+          if (afterSize != beforeSize || afterMtime != beforeMtime) {
+            return ToolResult.failure(
+              '原子性校验失败：文件在读取后被外部修改 '
+              '(before: size=$beforeSize, mtime=$beforeMtime; '
+              'after: size=$afterSize, mtime=$afterMtime)。'
+              '已中止写入，请用 cat 重新查看文件内容后再次尝试 file_patch。',
+            );
+          }
+        }
+
+        // 自动备份
+        if (backup) {
+          backupPath = '$path.bak.${DateTime.now().millisecondsSinceEpoch}';
+          onProgress?.call('正在备份原文件到 $backupPath ...');
+          try {
+            await sftp.copyFile(path, backupPath!);
+          } catch (e) {
+            return ToolResult.failure('备份原文件失败: $e。已中止写入，原文件未被修改。');
+          }
+        }
+
+        // 写回
+        await sftp.writeFileBytes(path, Uint8List.fromList(utf8.encode(newContent)));
+
+        onProgress?.call('替换完成');
+        final msg = StringBuffer()
+          ..writeln('文件已修改: $path')
+          ..writeln('  替换: ${oldStr.length} 字节 → ${newStr.length} 字节')
+          ..writeln('  文件大小: ${bytes.length} → ${newContent.length} 字节');
+        if (backupPath != null) {
+          msg.writeln('  原文件已备份: $backupPath');
+          msg.writeln('  如需回滚: mv $backupPath $path');
+        }
+        return ToolResult.success(msg.toString().trimRight());
+      } catch (e) {
+        // 失败回滚：恢复备份
+        if (backupPath != null) {
+          onProgress?.call('写入失败，正在回滚 ...');
+          try {
+            await sftp.copyFile(backupPath!, path);
+            return ToolResult.failure(
+              'file_patch 写入失败: $e\n已自动回滚：原文件已从备份 $backupPath 恢复。',
+            );
+          } catch (rollbackErr) {
+            return ToolResult.failure(
+              'file_patch 写入失败: $e\n回滚也失败: $rollbackErr。'
+              '原文件可能已损坏，请手动从备份 $backupPath 恢复：mv $backupPath $path',
+            );
+          }
+        }
+        return ToolResult.failure('file_patch 失败: $e');
+      } finally {
+        sftp.closeSftpOnly();
+      }
+    }
+
+    return ToolResult.failure('file_patch 仅支持 SSH 远程会话，当前为本地终端');
+  }
+
+  /// 统计 substring 在 string 中出现的次数（非重叠）
+  static int _countOccurrences(String string, String sub) {
+    if (sub.isEmpty) return 0;
+    int count = 0;
+    int idx = 0;
+    while ((idx = string.indexOf(sub, idx)) != -1) {
+      count++;
+      idx += sub.length;
+    }
+    return count;
+  }
+
+  /// @visibleForTesting — 暴露 _countOccurrences 给单元测试
+  /// 不在运行时代码中调用
+  @visibleForTesting
+  static int countOccurrencesForTest(String string, String sub) {
+    return _countOccurrences(string, sub);
+  }
+}
+
 /// Agent 工具注册表 — 管理所有可用的工具
 class AgentToolRegistry {
   final Map<String, AgentTool> _tools = {};
@@ -1196,6 +1552,10 @@ class AgentToolRegistry {
     register(SftpUploadTool());
     register(FileSyncTool(fileSyncService));
     register(CertMonitorTool());
+    // 文件编辑工具：默认模式即可用，不依赖编排模式
+    // 注册在默认层，保证任何 SSH 会话都能直接编辑文件
+    register(FileWriteTool());
+    register(FilePatchTool());
   }
 
   /// 启用编排模式：注册多机编排工具
@@ -1245,19 +1605,23 @@ class AgentToolRegistry {
     if (_tools.isEmpty) return '';
     final buffer = StringBuffer();
     buffer.writeln('【可用工具】');
-    buffer.writeln('当需要执行非 shell 命令的操作时（如上传文件），使用 "动作: tool" 调用工具。');
+    buffer.writeln('当需要执行非 shell 命令的操作时（如上传文件、跨机执行），使用 "动作: tool" 调用工具。');
     buffer.writeln();
     for (final tool in _tools.values) {
       buffer.writeln('工具: ${tool.name}');
       buffer.writeln('  说明: ${tool.description}');
-      buffer.writeln('  参数: ${tool.paramSpec}');
+      buffer.writeln('  $tool.paramSpec');
       buffer.writeln();
     }
-    buffer.writeln('工具调用格式示例:');
+    buffer.writeln('工具调用格式示例（参数必须用多行 key:value 格式，不要用 JSON）:');
     buffer.writeln('思考: 需要把本地 dist 目录上传到服务器');
     buffer.writeln('动作: tool');
     buffer.writeln('工具: sftp_upload');
-    buffer.writeln('参数: {"local":"/Users/x/proj/dist","remote":"/var/www/myapp","recursive":true}');
+    buffer.writeln('参数:');
+    buffer.writeln('  local: /Users/x/proj/dist');
+    buffer.writeln('  remote: /var/www/myapp');
+    buffer.writeln('  recursive: true');
+    buffer.writeln('  exclude: node_modules,.git');
     return buffer.toString().trimRight();
   }
 

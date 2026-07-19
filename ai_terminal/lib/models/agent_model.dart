@@ -132,16 +132,19 @@ class ReActObservation {
   });
 
   /// 格式化为 AI 可理解的观测文本
+  /// command 含换行（如多行参数的工具调用）时不用反引号包裹，避免单行反引号跨多行造成歧义
   String format() {
+    final isMultiline = command.contains('\n');
+    final cmdRef = isMultiline ? command : '`$command`';
     final buffer = StringBuffer();
     if (success) {
-      buffer.writeln('观测: 命令 `$command` 执行成功');
+      buffer.writeln('观测: 命令 $cmdRef 执行成功');
       if (output.isNotEmpty) {
         buffer.writeln('输出:');
         buffer.writeln(output);
       }
     } else {
-      buffer.writeln('观测: 命令 `$command` 执行失败');
+      buffer.writeln('观测: 命令 $cmdRef 执行失败');
       buffer.writeln('错误:');
       buffer.writeln(error ?? output);
     }

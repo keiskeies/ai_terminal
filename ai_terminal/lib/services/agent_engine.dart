@@ -24,8 +24,8 @@ import 'daos.dart';
 import '../core/prompts.dart' as prompts;
 import '../utils/ansi_stripper.dart';
 import '../utils/command_heuristics.dart';
-import '../utils/json_repair.dart';
 import '../utils/output_processor.dart';
+import '../utils/tool_args_parser.dart';
 import '../utils/react_stream_parser.dart';
 import '../utils/rollback_advisor.dart';
 import '../utils/command_extractor.dart';
@@ -1212,29 +1212,11 @@ class AgentEngine {
           action = ActionType.ask;
         } else if (actionStr == 'tool') {
           action = ActionType.tool;
-          // 解析后续的 工具: 和 参数: 行
-          for (var j = i + 1; j < lines.length && j < i + 5; j++) {
-            final tl = lines[j].trim();
-            if (tl.startsWith('工具:') || tl.startsWith('工具：')) {
-              final sep = tl.indexOf(tl.contains('：') ? '：' : ':');
-              toolName = tl.substring(sep + 1).trim();
-            } else if (tl.startsWith('参数:') || tl.startsWith('参数：')) {
-              final sep = tl.indexOf(tl.contains('：') ? '：' : ':');
-              final argsStr = tl.substring(sep + 1).trim();
-              // 使用 JsonRepair 容错解析：AI 输出可能带尾随逗号/单引号/未引用 key 等
-              final parsed = JsonRepair.extractMap(argsStr);
-              if (parsed != null) {
-                toolArgs = parsed;
-              } else {
-                agentLogger.warn('ReAct', '工具参数 JSON 解析失败, raw=$argsStr');
-              }
-            } else if (tl.isEmpty) {
-              continue;
-            } else {
-              // 遇到非工具/参数行，停止
-              break;
-            }
-          }
+          // 解析后续的 工具: 和 参数: 行（多行 key:value 格式）
+          // 抽成静态方法以便单元测试覆盖端到端解析链路
+          final toolResult = parseToolAction(lines, i + 1);
+          toolName = toolResult.$1;
+          toolArgs = toolResult.$2;
         }
         break;
       }
@@ -1274,6 +1256,65 @@ class AgentEngine {
       toolArgs: toolArgs,
       rawResponse: content,
     );
+  }
+
+  /// 解析 "动作: tool" 行之后的 工具: 和 参数: 行。
+  /// 返回 (toolName, toolArgs)，未找到时对应字段为 null。
+  ///
+  /// 抽成静态方法以便单元测试覆盖端到端解析链路：
+  /// FC tool_calls → ToolCallAccumulator.toReActText → (拼接 thought)
+  /// → _parseReActResponse → parseToolAction → toolName/toolArgs
+  static (String?, Map<String, dynamic>?) parseToolAction(
+      List<String> lines, int startIndex) {
+    String? toolName;
+    Map<String, dynamic>? toolArgs;
+
+    for (var j = startIndex; j < lines.length; j++) {
+      final tl = lines[j];
+      final tlTrim = tl.trim();
+      // 遇到新的 ReAct 关键词行 → 停止收集
+      // （'工具:' 不在此列，因为它是 tool 动作的必填字段）
+      if (tlTrim.startsWith('思考:') || tlTrim.startsWith('思考：') ||
+          tlTrim.startsWith('动作:') || tlTrim.startsWith('动作：') ||
+          tlTrim.startsWith('命令:') || tlTrim.startsWith('命令：') ||
+          tlTrim.startsWith('选项:') || tlTrim.startsWith('选项：') ||
+          tlTrim.startsWith('观测:') || tlTrim.startsWith('观测：')) {
+        break;
+      }
+      if (tlTrim.startsWith('工具:') || tlTrim.startsWith('工具：')) {
+        final sep = tlTrim.indexOf(tlTrim.contains('：') ? '：' : ':');
+        toolName = tlTrim.substring(sep + 1).trim();
+      } else if (tlTrim.startsWith('参数:') || tlTrim.startsWith('参数：')) {
+        // 收集参数：参数: 行本身 + 后续所有缩进行（多行 key:value 格式）
+        final sep = tlTrim.indexOf(tlTrim.contains('：') ? '：' : ':');
+        final argsBuffer = StringBuffer()
+          ..writeln(tlTrim.substring(sep + 1));
+        // 收集后续缩进行（2 空格或 Tab 开头）
+        for (var k = j + 1; k < lines.length; k++) {
+          final pl = lines[k];
+          if (pl.isEmpty) continue;
+          // 缩进行：以空格或 Tab 开头且非空
+          if (pl.startsWith(' ') || pl.startsWith('\t')) {
+            argsBuffer.writeln(pl);
+          } else {
+            break;
+          }
+        }
+        final parsed = ToolArgsParser.parse(argsBuffer.toString());
+        if (parsed != null) {
+          toolArgs = parsed;
+        } else {
+          agentLogger.warn('ReAct', '工具参数解析失败, raw=$argsBuffer');
+        }
+        break; // 参数解析完成后停止扫描后续行
+      } else if (tlTrim.isEmpty) {
+        continue;
+      } else {
+        // 遇到非工具/参数行，停止
+        break;
+      }
+    }
+    return (toolName, toolArgs);
   }
 
   /// ═══════════════════════════════════════════════════════
@@ -1793,6 +1834,24 @@ class AgentEngine {
   }
 
   /// ═══════════════════════════════════════════════════════
+  /// 把工具参数格式化为展示用文本（多行 key:value 格式，与 ReAct 调用格式一致）
+  /// 用于 AgentEvent.result.command 和 ReActObservation.command
+  /// 避免 AI 从观测/事件里看到 JSON 格式而被"带偏"
+  static String _formatToolCommandForDisplay(String toolName, Map<String, dynamic> args) {
+    if (args.isEmpty) return toolName;
+    final buffer = StringBuffer()
+      ..writeln(toolName);
+    for (final entry in args.entries) {
+      final v = entry.value;
+      if (v is List) {
+        buffer.writeln('  ${entry.key}: ${v.join(',')}');
+      } else {
+        buffer.writeln('  ${entry.key}: $v');
+      }
+    }
+    return buffer.toString().trimRight();
+  }
+
   /// 处理 tool 动作 — 调用非 shell 工具（如 SFTP 上传）
   /// ═══════════════════════════════════════════════════════
   /// 返回 true 表示继续循环，false 表示应退出
@@ -1869,12 +1928,14 @@ class AgentEngine {
         success: result.success,
         output: result.success ? result.output : null,
         error: result.success ? null : (result.error ?? result.output),
-        command: '$toolName ${jsonEncode(args)}',
+        // UI 展示用：工具名 + 多行参数（与 ReAct 文本格式一致）
+        command: _formatToolCommandForDisplay(toolName, args),
       ));
 
       // 构造观测反馈给 AI
+      // 注意：观测里的 command 用多行格式展示参数，避免 AI 从观测里学到 JSON 格式
       final observation = ReActObservation(
-        command: '$toolName(${jsonEncode(args)})',
+        command: _formatToolCommandForDisplay(toolName, args),
         output: result.success ? result.output : (result.output.isNotEmpty ? result.output : '(无输出)'),
         success: result.success,
         error: result.success ? null : result.error,
@@ -2391,22 +2452,35 @@ $hostList
 1. 跨主机执行命令必须用工具调用，不要用普通 execute：
    动作: tool
    工具: exec_on
-   参数: {"hostId":"web1","command":"systemctl status nginx","timeout":"30"}
+   参数:
+     hostId: web1
+     command: systemctl status nginx
+     timeout: 30
 
 2. 批量执行同一命令到多机（如时间同步、日志清理）：
    动作: tool
    工具: exec_batch
-   参数: {"hostIds":"web1,web2,db1","command":"ntpdate ntp.aliyun.com","stopOnFailure":"false"}
+   参数:
+     hostIds: web1,web2,db1
+     command: ntpdate ntp.aliyun.com
+     stopOnFailure: false
 
 3. 跨机连通性测试（部署前验证网络依赖）：
    动作: tool
    工具: check_connectivity
-   参数: {"fromHostId":"web1","targetHost":"192.168.1.20","port":"3306"}
+   参数:
+     fromHostId: web1
+     targetHost: 192.168.1.20
+     port: 3306
 
 4. 跨机上传文件/目录到指定主机（部署构建产物等）：
    动作: tool
    工具: upload_to
-   参数: {"hostId":"web1","local":"/path/to/dist","remote":"/var/www","recursive":"true"}
+   参数:
+     hostId: web1
+     local: /path/to/dist
+     remote: /var/www
+     recursive: true
 
 5. 高风险操作（restart/stop/修改配置/删除）必须先用 ask 询问用户确认
 6. 一台主机失败时，用 ask 询问用户选择：中止/跳过该台继续/重试

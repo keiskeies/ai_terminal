@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
@@ -299,6 +300,41 @@ class SftpService {
     await _sftp!.remove(path);
   }
 
+  /// 获取文件属性（大小 + 修改时间），用于 H1 原子性校验和 H2 文件存在校验
+  /// 文件不存在时返回 null
+  Future<SftpFileAttrs?> statFile(String path) async {
+    if (_sftp == null) throw Exception('SFTP 未连接');
+    try {
+      return await _sftp!.stat(path);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 远程文件复制（用于 H3/H5 备份）
+  /// 通过 read → write 实现，不依赖服务端 cp 命令（跨平台兼容）
+  Future<void> copyFile(String srcPath, String dstPath) async {
+    if (_sftp == null) throw Exception('SFTP 未连接');
+
+    // 读源文件
+    final srcFile = await _sftp!.open(srcPath);
+    final bytes = await srcFile.readBytes();
+    await srcFile.close();
+
+    // 写目标
+    final dstFile = await _sftp!.open(
+      dstPath,
+      mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.truncate,
+    );
+    try {
+      final stream = Stream.fromIterable([bytes]);
+      final writer = dstFile.write(stream);
+      await writer.done;
+    } finally {
+      await dstFile.close();
+    }
+  }
+
   /// 删除目录
   Future<void> deleteDirectory(String path) async {
     if (_sftp == null) throw Exception('SFTP 未连接');
@@ -367,7 +403,8 @@ class SftpService {
     final file = await _sftp!.open(path);
     try {
       final data = await file.readBytes(length: maxSize);
-      return String.fromCharCodes(data);
+      // UTF-8 解码：String.fromCharCodes 不处理多字节字符，会导致中文乱码
+      return utf8.decode(data, allowMalformed: true);
     } finally {
       await file.close();
     }
@@ -382,8 +419,79 @@ class SftpService {
       mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.truncate,
     );
     try {
-      final data = Uint8List.fromList(content.codeUnits);
+      // UTF-8 编码：避免 codeUnits 直接转 List 导致多字节字符损坏
+      final data = Uint8List.fromList(utf8.encode(content));
       final stream = Stream.fromIterable([data]);
+      final writer = remoteFile.write(stream);
+      await writer.done;
+    } finally {
+      await remoteFile.close();
+    }
+  }
+
+  /// 追加文件内容（分块写入场景：AI 多次调用 file_write mode=append）
+  ///
+  /// 设计理由：AI 一次输出大文件 base64 易出错（>10KB 风险高），
+  /// 强制分块写入：第一次 mode=write，后续 mode=append，每块保持小尺寸
+  /// 保证 base64 编码不会算错。
+  Future<void> appendFileContent(String path, String content) async {
+    if (_sftp == null) throw Exception('SFTP 未连接');
+
+    final remoteFile = await _sftp!.open(
+      path,
+      mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.append,
+    );
+    try {
+      final data = Uint8List.fromList(utf8.encode(content));
+      final stream = Stream.fromIterable([data]);
+      final writer = remoteFile.write(stream);
+      await writer.done;
+    } finally {
+      await remoteFile.close();
+    }
+  }
+
+  /// 读取文件字节（用于 file_patch 唯一性校验和替换）
+  Future<Uint8List> readFileBytes(String path, {int maxSize = 1024 * 1024}) async {
+    if (_sftp == null) throw Exception('SFTP 未连接');
+
+    final file = await _sftp!.open(path);
+    try {
+      return await file.readBytes(length: maxSize);
+    } finally {
+      await file.close();
+    }
+  }
+
+  /// 写入文件字节（truncate 模式，完全覆盖原文件）
+  /// 用于 file_write mode=write
+  Future<void> writeFileBytes(String path, Uint8List bytes) async {
+    if (_sftp == null) throw Exception('SFTP 未连接');
+
+    final remoteFile = await _sftp!.open(
+      path,
+      mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.truncate,
+    );
+    try {
+      final stream = Stream.fromIterable([bytes]);
+      final writer = remoteFile.write(stream);
+      await writer.done;
+    } finally {
+      await remoteFile.close();
+    }
+  }
+
+  /// 追加文件字节（append 模式，写到文件末尾）
+  /// 用于 file_write mode=append（分块写入场景）
+  Future<void> appendFileBytes(String path, Uint8List bytes) async {
+    if (_sftp == null) throw Exception('SFTP 未连接');
+
+    final remoteFile = await _sftp!.open(
+      path,
+      mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.append,
+    );
+    try {
+      final stream = Stream.fromIterable([bytes]);
       final writer = remoteFile.write(stream);
       await writer.done;
     } finally {

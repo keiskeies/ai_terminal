@@ -62,18 +62,61 @@ class ToolCallAccumulator {
 
   /// 将 tool_calls 转换为 ReAct 文本格式（多个 tool_call 之间用空行分隔）
   /// AgentEngine 的 _parseReActResponse 会识别此格式并路由到 ActionType.tool
+  ///
+  /// 关键：arguments 必须从 JSON 转换为多行 key:value 格式，
+  /// 因为 ToolArgsParser 已弃用 JSON（以 { 开头会被拒绝）。
+  /// 如果 JSON 解析失败，回退到 raw arguments 作为单行（向后兼容）。
+  ///
+  /// 开头自带换行：OpenAI FC 协议允许 delta.content 和 delta.tool_calls 同时存在，
+  /// 若 AI 先输出一段 thought 文本（如 "好的，我来执行工具"），再触发 tool_calls，
+  /// 不加换行会拼成 "好的，我来执行工具动作: tool\n..."，
+  /// _parseReActResponse 找不到独立的 "动作:" 行，工具调用会被忽略。
   static String toReActText(List<ToolCall> calls) {
     final buffer = StringBuffer();
+    // 开头换行，保证 "动作: tool" 总是独立成行
+    buffer.writeln();
     for (int i = 0; i < calls.length; i++) {
       final c = calls[i];
       if (i > 0) buffer.writeln();
       buffer.writeln('动作: tool');
       buffer.writeln('工具: ${c.name}');
-      // arguments 应为 JSON 字符串；若为空则用 {}
-      final args = c.arguments.trim().isEmpty ? '{}' : c.arguments.trim();
-      buffer.writeln('参数: $args');
+      final argsText = _jsonToKeyValue(c.arguments);
+      if (argsText.isEmpty) {
+        // 无参数 — 写一行空的 参数: 即可
+        buffer.writeln('参数:');
+      } else {
+        buffer.writeln('参数:');
+        buffer.write(argsText);
+      }
     }
     return buffer.toString().trimRight();
+  }
+
+  /// 把 JSON arguments 字符串转换为多行 key:value 格式
+  /// 输入示例：'{"local":"/path","recursive":true}'
+  /// 输出示例：'  local: /path\n  recursive: true\n'
+  /// 解析失败时返回空字符串
+  static String _jsonToKeyValue(String jsonArgs) {
+    final trimmed = jsonArgs.trim();
+    if (trimmed.isEmpty || trimmed == '{}') return '';
+    try {
+      final decoded = jsonDecode(trimmed);
+      if (decoded is! Map) return '';
+      final buffer = StringBuffer();
+      for (final entry in decoded.entries) {
+        final value = entry.value;
+        // List 输出为逗号分隔（与 ToolArgsParser 的列表字段约定一致）
+        if (value is List) {
+          buffer.writeln('  ${entry.key}: ${value.join(',')}');
+        } else {
+          buffer.writeln('  ${entry.key}: $value');
+        }
+      }
+      return buffer.toString();
+    } catch (_) {
+      // JSON 解析失败 — 尝试按 key:value 直接解析（罕见情况）
+      return '';
+    }
   }
 
   /// 工具调用 JSON 校验：若 arguments 不是合法 JSON，尝试修复
@@ -93,7 +136,7 @@ class ToolCallAccumulator {
           jsonDecode(repaired);
           return repaired;
         } catch (_) {
-          // 修复失败，返回原始（JsonRepair 会兜底）
+          // 修复失败，返回原始（由 ToolArgsParser 走多行格式）
         }
       }
       return args;

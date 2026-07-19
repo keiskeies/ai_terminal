@@ -18,8 +18,9 @@ abstract class AIProvider {
   ///
   /// [tools] 可选：P2-6 原生 Function Calling 工具 schema（OpenAI tools API 格式）。
   /// 传入后 OpenAIProvider 会将其附加到请求 body，并解析 delta.tool_calls。
-  /// 当前实现：收到 tool_calls 时，转换为 ReAct 文本格式（"动作: tool / 工具: X / 参数: {...}"）
-  /// 投递到 stream，由 AgentEngine 的现有解析路径处理。其他 provider 忽略此参数。
+  /// 当前实现：收到 tool_calls 时，转换为 ReAct 多行 key:value 格式
+  /// （"动作: tool / 工具: X / 参数: /   key: value"）投递到 stream，
+  /// 由 AgentEngine 的现有解析路径（ToolArgsParser）处理。其他 provider 忽略此参数。
   Future<Stream<String>> chatStream({
     required List<ChatMessage> history,
     required String prompt,
