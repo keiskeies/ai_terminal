@@ -18,6 +18,16 @@ const String commandFormatRule = '''
    ❌ echo 'echo hello' >> /tmp/test.sh
    注意：heredoc 的结束标记 EOF 必须单独占一行，前面不能有空格
 10. 如果文件内容只有 1-2 行，也可以用单条 echo 命令写入
+11. **远程文件编辑优先使用 file_write / file_patch 工具，不要用 echo/heredoc/sed**：
+    - 新建文件、整体重写、写入含特殊字符（\$ \\ " '）的脚本/配置 → 用 `file_write` 工具
+      （base64 传输，绕过 shell 转义，避免 EOF 边界、变量替换、引号嵌套等问题）
+    - 改一两行配置（如改端口、改 server_name）→ 用 `file_patch` 工具
+      （字符串替换 + 唯一性校验 + 原子性保护，AI 只需提供 old/new，工具 Dart 层处理）
+    - 内容 > 8KB → 分块调用 file_write：第一次 mode=write，后续 mode=append
+    - **超大文件（如完整应用代码、大日志）建议改用 sftp_upload**：
+      先在本地用编辑器/工具把文件编辑好，再用 sftp_upload 上传，避免 AI 输出大文本丢字符
+    - 本地终端（非 SSH）才用 echo/heredoc
+    - sftp_upload 仅用于上传本地已存在的文件/目录到远程，不用于编辑远程文件内容
 ''';
 
 /// ReAct 自动执行模式专属规则
@@ -41,6 +51,16 @@ const String agentAutoRule = '''
   - "思考:"行应包含面向用户的提问说明（如背景、为什么要问）
   - "选项:"行的每项文字会显示为用户可点击的按钮，应简洁明确
   - 选项文字应让用户一看就懂，避免技术术语
+- tool：调用非 shell 工具（如上传文件、跨机执行、证书检查等）。
+  必须在"工具:"行指定工具名，"参数:"行之后用多行 key:value 格式提供参数。
+  参数格式示例：
+    动作: tool
+    工具: sftp_upload
+    参数:
+      local: /Users/x/proj/dist
+      remote: /var/www/myapp
+      recursive: true
+  注意：参数值不要加引号、不要用 JSON 格式；每行一个参数，"键: 值"格式。
 
 📌 ReAct 工作流程：
 1. 收到任务或观测结果 → 先思考（分析、推理、规划）
@@ -99,12 +119,51 @@ EOF
 动作: ask
 选项: 确认执行计划 | 取消
 
+✅ 示例8（调用工具 — 上传文件到服务器）：
+思考: 需要把本地 dist 目录上传到服务器的 /var/www/myapp 下
+动作: tool
+工具: sftp_upload
+参数:
+  local: /Users/x/proj/dist
+  remote: /var/www/myapp
+  recursive: true
+  exclude: node_modules,.git
+
+✅ 示例9（调用工具 — 多机批量执行）：
+思考: 需要同时在 web1、web2、db1 三台机器上检查 nginx 状态
+动作: tool
+工具: exec_batch
+参数:
+  hostIds: web1,web2,db1
+  command: systemctl status nginx
+  timeout: 30
+
+✅ 示例10（远程文件编辑 — 新建配置文件，用 file_write 绕过 shell 转义）：
+思考: 需要在远程机器新建 nginx 配置文件，内容含 \$ 和引号，heredoc 容易出错，用 file_write
+动作: tool
+工具: file_write
+参数:
+  path: /etc/nginx/conf.d/default.conf
+  content_b64: c2VydmVyIHsKICBsaXN0ZW4gODA7CiAgc2VydmVyX25hbWUgZXhhbXBsZS5jb207CiAgbG9jYXRpb24gLyB7CiAgICBwcm94eV9wYXNzIGh0dHA6Ly8xMjcuMC4wLjE6ODA4MDsKICB9Cn0K
+  mode: write
+
+✅ 示例11（远程文件小改动 — 用 file_patch 做字符串替换）：
+思考: 把 nginx 监听端口从 80 改成 8080，只需替换一处，用 file_patch 不必整体重写
+动作: tool
+工具: file_patch
+参数:
+  path: /etc/nginx/nginx.conf
+  old_b64: bGlzdGVuIDgwOw==
+  new_b64: bGlzdGVuIDgwODA7
+
 ⚠️ 禁止事项：
 - 禁止使用 ```bash 代码块输出命令，命令只能写在"命令:"行
 - 禁止在"命令:"行写注释或说明文字
 - 禁止跳过"思考:"直接行动
 - 禁止一次执行多条命令（禁止用 &&、||、; 连接多条命令）
 - 禁止说"请确认""请执行"，直接执行即可
+- **远程 SSH 会话禁止用 echo/heredoc/sed 编辑远程文件**，必须用 file_write / file_patch 工具
+  （echo/heredoc 走 shell 会有转义/换行/EOF 边界问题；file_write/file_patch 走 SFTP 直传字节，绕过 shell）
 ''';
 
 /// 行为边界规则 — 防止 Agent 擅自修改系统

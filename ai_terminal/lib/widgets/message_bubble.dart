@@ -71,7 +71,7 @@ class MessageBubble extends StatelessWidget {
                       : Border.all(color: tc.border),
                 ),
                 child: isUser
-                    ? Text(
+                    ? SelectableText(
                         message.content,
                         style: const TextStyle(color: Colors.white, fontSize: fBody, height: 1.5),
                       )
@@ -81,6 +81,8 @@ class MessageBubble extends StatelessWidget {
                           MarkdownBody(
                             data: message.content,
                             selectable: true,
+                            // 规避 flutter_markdown 0.6.23 在 selectable=true 时无条件调用 onSelectionChanged!() 的 bug
+                            onSelectionChanged: (_, __, ___) {},
                             styleSheet: MarkdownStyleSheet(
                               p: TextStyle(color: tc.textBody, fontSize: fBody, height: 1.5),
                               code: TextStyle(

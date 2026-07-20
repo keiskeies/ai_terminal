@@ -1,22 +1,12 @@
-import 'package:hive/hive.dart';
-
-part 'chat_session.g.dart';
-
-@HiveType(typeId: 2)
-class ChatSession extends HiveObject {
-  @HiveField(0)
+class ChatSession {
   late String id;
 
-  @HiveField(1)
   String? hostId;
 
-  @HiveField(2)
   late List<ChatMessage> messages;
 
-  @HiveField(3)
   late DateTime createdAt;
 
-  @HiveField(4)
   late DateTime updatedAt;
 
   ChatSession();
@@ -35,18 +25,13 @@ class ChatSession extends HiveObject {
   }
 }
 
-@HiveType(typeId: 4)
-class ChatMessage extends HiveObject {
-  @HiveField(0)
+class ChatMessage {
   late String role; // 'user' | 'assistant' | 'system'
 
-  @HiveField(1)
   late String content;
 
-  @HiveField(2)
   late DateTime timestamp;
 
-  @HiveField(3)
   List<CommandBlock>? commandBlocks;
 
   ChatMessage();
@@ -63,21 +48,15 @@ class ChatMessage extends HiveObject {
   bool get isSystem => role == 'system';
 }
 
-@HiveType(typeId: 5)
-class CommandBlock extends HiveObject {
-  @HiveField(0)
+class CommandBlock {
   late String command;
 
-  @HiveField(1)
   String? description;
 
-  @HiveField(2)
   late bool dangerous;
 
-  @HiveField(3)
   late String safetyLevel; // 'safe' | 'info' | 'warn' | 'blocked'
 
-  @HiveField(4)
   String? output;
 
   CommandBlock();

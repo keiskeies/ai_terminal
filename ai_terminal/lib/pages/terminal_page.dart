@@ -85,6 +85,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   // 延迟 resize：记录最后需要同步尺寸的 tab
   tp.TerminalTab? _lastResizeTab;
+  // R2: 保留 _switchToTab 的 150ms resize Timer 引用，便于切换 tab / dispose 时取消
+  // 旧实现 inline 创建 Timer 不保留引用，导致 widget_test 中 dispose 后 Timer 仍 pending
+  Timer? _resizeTimer;
   static const double _maxSftpWidth = 600;
 
   bool get _isMobile => Platform.isAndroid || Platform.isIOS;
@@ -372,8 +375,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
     // 首帧渲染后确保 PTY 尺寸与终端视图同步，修复 Tab 补全时 prompt 被覆盖的问题
     // 使用 Timer 延迟确保 xterm 内置的 resize 已完成，避免双重 SIGWINCH
+    // R2: 保留 Timer 引用，切换 tab / dispose 时取消，避免 Timer 在 widget 销毁后仍 pending
     _lastResizeTab = tab;
-    Timer(const Duration(milliseconds: 150), () {
+    _resizeTimer?.cancel();
+    _resizeTimer = Timer(const Duration(milliseconds: 150), () {
       if (!mounted) return;
       final currentTab = _lastResizeTab;
       if (currentTab == null) return;
@@ -389,12 +394,47 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     });
   }
 
-  void _reconnect() {
+  /// 在当前 tab 上重连（SSH 或本地终端）
+  /// 保留 tabId、终端历史内容、订阅，仅替换底层 service
+  Future<void> _reconnect() async {
     final tab = ref.read(tp.terminalProvider).activeTab;
-    if (tab != null && tab.isLocal) {
-      _connectLocalTerminal();
-    } else {
-      _connectToHost();
+    if (tab == null) {
+      // 没有活跃 tab，回退到首次连接流程
+      if (widget.hostId == null) {
+        _connectLocalTerminal();
+      } else {
+        _connectToHost();
+      }
+      return;
+    }
+
+    setState(() => _isConnecting = true);
+    try {
+      if (tab.isLocal) {
+        final newTab = await ref.read(tp.terminalProvider.notifier).reconnectLocal(tab.id);
+        if (newTab != null && newTab.localService != null) {
+          // 重新绑定 executor（service 已更新）
+          ref.read(agentProvider.notifier).setExecutor(newTab.localService, hostId: newTab.hostId);
+          // 重新绑定终端输入监听（旧闭包持有的是旧 localService 引用）
+          _tabOutputSubscription?.cancel();
+          _tabOutputSubscription = _setupTerminalListener(newTab);
+        }
+      } else {
+        final host = ref.read(hostsProvider.notifier).getHostById(tab.hostId);
+        if (host == null) {
+          setState(() => _connectionError = L10n.str.terminalHostNotFound);
+          return;
+        }
+        final newTab = await ref.read(tp.terminalProvider.notifier).reconnect(tab.id, host);
+        if (newTab != null && newTab.service != null) {
+          ref.read(agentProvider.notifier).setExecutor(newTab.service, hostId: newTab.hostId);
+          // 重新绑定终端输入监听（旧闭包持有的是旧 service 引用）
+          _tabOutputSubscription?.cancel();
+          _tabOutputSubscription = _setupTerminalListener(newTab);
+        }
+      }
+    } finally {
+      setState(() => _isConnecting = false);
     }
   }
 
@@ -526,6 +566,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   @override
   void dispose() {
+    _resizeTimer?.cancel();
+    _resizeTimer = null;
     _tabOutputSubscription?.cancel();
     _terminalOutputSubscription?.cancel();
     _scrollController.dispose();
@@ -1211,7 +1253,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           return;
         }
         switch (value) {
-          case 'reconnect': await _connectToHost(); break;
+          case 'reconnect': await _reconnect(); break;
           case 'clear': _terminal?.write('\x1b[2J\x1b[H'); break;
           case 'sftp':
             final sftpTab = ref.read(tp.terminalProvider).activeTab;
@@ -1984,6 +2026,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       child: MarkdownBody(
         data: _preprocessMarkdown(text),
         selectable: true,
+        // 规避 flutter_markdown 0.6.23 在 selectable=true 时无条件调用 onSelectionChanged!() 的 bug
+        onSelectionChanged: (_, __, ___) {},
         styleSheet: MarkdownStyleSheet(
           p: TextStyle(color: tc.textMain, height: 1.5, fontSize: fBody),
           h1: TextStyle(color: tc.textMain, fontSize: 16, fontWeight: FontWeight.bold),

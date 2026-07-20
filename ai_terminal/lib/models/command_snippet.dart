@@ -1,25 +1,14 @@
-import 'package:hive/hive.dart';
-
-part 'command_snippet.g.dart';
-
-@HiveType(typeId: 3)
-class CommandSnippet extends HiveObject {
-  @HiveField(0)
+class CommandSnippet {
   late String id;
 
-  @HiveField(1)
   late String name;
 
-  @HiveField(2)
   late String command;
 
-  @HiveField(3)
   String? description;
 
-  @HiveField(4)
   List<String> variables = [];
 
-  @HiveField(5)
   late DateTime createdAt;
 
   CommandSnippet();

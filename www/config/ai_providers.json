@@ -1,6 +1,22 @@
 {
-  "version": 2,
+  "version": 3,
   "providers": [
+    {
+      "id": "agnes",
+      "name": "Agnes AI 永久免费",
+      "provider": "OPENAI",
+      "baseUrl": "https://apihub.agnes-ai.com/v1",
+      "region": "GLOBAL",
+      "description": "新加坡 Sapiens AI 旗下，文本/图像/视频 API 全部永久免费，OpenAI 兼容。Agnes-2.0-Flash 文本模型对标 GPT-5.4",
+      "apiKeyUrl": "https://agnes-ai.com/dashboard/api-keys",
+      "tokenPlanUrl": "https://agnes-ai.com/pricing",
+      "websiteUrl": "https://agnes-ai.com",
+      "icon": "🦋",
+      "color": "0xFF00BFA5",
+      "models": [
+        { "name": "Agnes-2.0-Flash", "label": "Agnes 2.0 Flash 文本 (推荐免费)", "free": true }
+      ]
+    },
     {
       "id": "ollama",
       "name": "Ollama (本地)",
@@ -21,37 +37,20 @@
       ]
     },
     {
-      "id": "agnes",
-      "name": "Agnes AI",
-      "provider": "OPENAI",
-      "baseUrl": "https://apihub.agnes-ai.com/v1",
-      "region": "GLOBAL",
-      "description": "新加坡 Sapiens AI 旗下，全模态永久免费，不绑卡无试用期",
-      "apiKeyUrl": "https://platform.agnes-ai.com/",
-      "websiteUrl": "https://agnes-ai.com/",
-      "icon": "🦢",
-      "color": "0xFF10B981",
-      "models": [
-        { "name": "agnes-2.0-flash", "label": "Agnes 2.0 Flash 文本 (免费推荐)", "free": true },
-        { "name": "agnes-image-2.1-flash", "label": "Agnes Image 2.1 Flash 图片", "free": true },
-        { "name": "agnes-video", "label": "Agnes Video 视频", "free": true }
-      ]
-    },
-    {
       "id": "deepseek",
       "name": "DeepSeek 深度求索",
       "provider": "OPENAI",
-      "baseUrl": "https://api.deepseek.com/v1",
+      "baseUrl": "https://api.deepseek.com",
       "region": "CN",
-      "description": "V4 Flash ¥0.14/¥0.28/M，V4 Pro ¥0.435/¥0.87/M（永久降价75%），缓存1/10价，1M上下文384K输出",
+      "description": "V4 系列 1M 上下文 + thinking 模式，Flash $0.14/$0.28、Pro $0.435/$0.87 每百万 Token。deepseek-chat/reasoner 旧名 2026/7/24 弃用，对应 V4-Flash 的非思考/思考模式",
       "apiKeyUrl": "https://platform.deepseek.com/api_keys",
       "tokenPlanUrl": "https://platform.deepseek.com/usage",
       "websiteUrl": "https://platform.deepseek.com",
       "icon": "🐋",
       "color": "0xFF4D6BFE",
       "models": [
-        { "name": "deepseek-v4-flash", "label": "V4 Flash 极速 (推荐)" },
-        { "name": "deepseek-v4-pro", "label": "V4 Pro 旗舰" }
+        { "name": "deepseek-v4-flash", "label": "DeepSeek V4 Flash 1M 上下文 (推荐)" },
+        { "name": "deepseek-v4-pro", "label": "DeepSeek V4 Pro 旗舰" }
       ]
     },
     {
@@ -60,7 +59,7 @@
       "provider": "OPENAI",
       "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
       "region": "CN",
-      "description": "Qwen3.7 万亿参数旗舰，Turbo/Flash 每月100万token永久免费",
+      "description": "Qwen3.7 系列 1M 上下文，max 旗舰 / plus 均衡 / flash 极速；旧版 3.6/3.5 仍可调",
       "apiKeyUrl": "https://bailian.console.aliyun.com/",
       "tokenPlanUrl": "https://bailian.console.aliyun.com/",
       "codingPlanUrl": "https://tongyi.aliyun.com/pricing",
@@ -68,12 +67,12 @@
       "icon": "🐯",
       "color": "0xFF002FA7",
       "models": [
-        { "name": "qwen3.7-max-preview", "label": "Qwen3.7 Max 旗舰 (推荐)" },
-        { "name": "qwen3.7-plus-preview", "label": "Qwen3.7 Plus 均衡" },
-        { "name": "qwen-turbo", "label": "Qwen Turbo 免费", "free": true },
-        { "name": "qwen-flash", "label": "Qwen Flash 免费", "free": true },
-        { "name": "qwq-plus", "label": "QwQ Plus 推理" },
-        { "name": "qwen-coder-turbo", "label": "Qwen Coder 代码" }
+        { "name": "qwen3.7-max", "label": "Qwen3.7 Max 旗舰 1M 上下文 (推荐)" },
+        { "name": "qwen3.7-plus", "label": "Qwen3.7 Plus 均衡 1M (推荐编程)" },
+        { "name": "qwen3.6-flash", "label": "Qwen3.6 Flash 极速 1M" },
+        { "name": "qwen3-coder-plus", "label": "Qwen3 Coder Plus 480B 代码" },
+        { "name": "qwen3-coder-next", "label": "Qwen3 Coder Next" },
+        { "name": "qwen-long", "label": "Qwen Long 10M 超长上下文" }
       ]
     },
     {
@@ -82,7 +81,7 @@
       "provider": "OPENAI",
       "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
       "region": "CN",
-      "description": "GLM-5.2 最新旗舰 1M上下文 128K输出，面向长周期 Coding Agent 优化，Flash 免费",
+      "description": "GLM-5.2 当前旗舰 (1M 上下文，百炼平衡档推荐)，GLM-5.1/4.7 旧版仍可调",
       "apiKeyUrl": "https://open.bigmodel.cn/usercenter/apikeys",
       "tokenPlanUrl": "https://open.bigmodel.cn/usercenter/overview",
       "codingPlanUrl": "https://open.bigmodel.cn/pricing",
@@ -90,10 +89,10 @@
       "icon": "🔮",
       "color": "0xFF6C5CE7",
       "models": [
-        { "name": "glm-5.2", "label": "GLM-5.2 最新旗舰 (推荐)" },
-        { "name": "glm-5.1", "label": "GLM-5.1" },
-        { "name": "glm-5", "label": "GLM-5" },
-        { "name": "glm-5-turbo", "label": "GLM-5 Turbo 快速" },
+        { "name": "glm-5.2", "label": "GLM-5.2 旗舰 1M 上下文 (推荐)" },
+        { "name": "glm-5.1", "label": "GLM-5.1 198K 上下文" },
+        { "name": "glm-4.7", "label": "GLM-4.7 198K" },
+        { "name": "glm-4.6", "label": "GLM-4.6 355B 开源" },
         { "name": "glm-4-flash", "label": "GLM-4 Flash 免费", "free": true }
       ]
     },
@@ -103,7 +102,7 @@
       "provider": "OPENAI",
       "baseUrl": "https://api.moonshot.cn/v1",
       "region": "CN",
-      "description": "Kimi K3 全球最大开源模型 2.8万亿参数，KDA 混合线性注意力，1M上下文",
+      "description": "K2.7 Code 当前最强 Coding 模型 (¥2/¥8/¥32)，K2.6 通用旗舰 256K 上下文 (¥1.1/¥6.5/¥27)",
       "apiKeyUrl": "https://platform.moonshot.cn/console/api-keys",
       "tokenPlanUrl": "https://platform.moonshot.cn/console/usage",
       "codingPlanUrl": "https://platform.moonshot.cn/code",
@@ -111,11 +110,13 @@
       "icon": "🌙",
       "color": "0xFF1A1A2E",
       "models": [
-        { "name": "kimi-k3", "label": "Kimi K3 最新旗舰 (推荐)" },
-        { "name": "k2.6", "label": "Kimi K2.6" },
-        { "name": "k2.5", "label": "Kimi K2.5" },
-        { "name": "k2-thinking", "label": "Kimi K2 Thinking 推理" },
-        { "name": "moonshot-v1-128k", "label": "Moonshot V1 128K" }
+        { "name": "kimi-k2.7-code", "label": "Kimi K2.7 Code 当前最强 Coding (推荐)" },
+        { "name": "kimi-k2.7-code-highspeed", "label": "Kimi K2.7 Code 高速版" },
+        { "name": "kimi-k2.6", "label": "Kimi K2.6 通用旗舰 256K" },
+        { "name": "kimi-k2.5", "label": "Kimi K2.5 多模态 256K" },
+        { "name": "kimi-k2-0905-preview", "label": "Kimi K2 0905 Preview" },
+        { "name": "kimi-k2-thinking", "label": "Kimi K2 Thinking 长思考" },
+        { "name": "kimi-k2-thinking-turbo", "label": "Kimi K2 Thinking Turbo" }
       ]
     },
     {
@@ -124,7 +125,7 @@
       "provider": "OPENAI",
       "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
       "region": "CN",
-      "description": "Doubao 2.1 Pro 最新旗舰，Seed Evolving 一次接入自动升级，最低¥0.15/M起",
+      "description": "豆包 Seed 2.1-pro 生产级旗舰 / Evolving 1M 长上下文 Coding / 2.0-mini 低成本；旧版 1.6 仍可调用",
       "apiKeyUrl": "https://www.volcengine.com/product/doubao",
       "tokenPlanUrl": "https://console.volcengine.com/ark",
       "codingPlanUrl": "https://www.volcengine.com/product/doubao",
@@ -132,11 +133,11 @@
       "icon": "🫘",
       "color": "0xFFFE2C55",
       "models": [
-        { "name": "doubao-seed-evolving", "label": "Seed Evolving 自动升级 (推荐)" },
-        { "name": "doubao-2.1-pro", "label": "Doubao 2.1 Pro 旗舰" },
-        { "name": "doubao-seed-2.0-code", "label": "Seed 2.0 Code 代码" },
-        { "name": "doubao-seed-2.0-lite", "label": "Seed 2.0 Lite 轻量" },
-        { "name": "doubao-seed-2.0-mini", "label": "Seed 2.0 Mini 最经济" }
+        { "name": "doubao-seed-evolving", "label": "Doubao Seed Evolving 1M 上下文 (推荐 Coding)" },
+        { "name": "doubao-seed-2-1-pro", "label": "Doubao Seed 2.1 Pro 生产级旗舰" },
+        { "name": "doubao-seed-2-1-turbo", "label": "Doubao Seed 2.1 Turbo 均衡" },
+        { "name": "doubao-seed-2-0-mini", "label": "Doubao Seed 2.0 Mini 低成本" },
+        { "name": "doubao-seed-1-6-251015", "label": "Doubao Seed 1.6 251015 旧版" }
       ]
     },
     {
@@ -145,18 +146,17 @@
       "provider": "OPENAI",
       "baseUrl": "https://api.xiaomimimo.com/v1",
       "region": "CN",
-      "description": "MiMo V2.5 系列 2026.4 开源，5月永久降价99%，KVCache 压缩1/7",
-      "apiKeyUrl": "https://platform.xiaomimimo.com/",
-      "tokenPlanUrl": "https://platform.xiaomimimo.com/",
-      "codingPlanUrl": "https://platform.xiaomimimo.com/",
+      "description": "V2 全系列已于 2026/6/30 下线，现仅提供 V2.5 系列；2026/5/27 永久降价最高 99%",
+      "apiKeyUrl": "https://platform.xiaomimimo.com/console/api-keys",
+      "tokenPlanUrl": "https://platform.xiaomimimo.com/token-plan",
+      "codingPlanUrl": "https://mimo.mi.com/docs/zh-CN/integration/claude-code",
       "websiteUrl": "https://platform.xiaomimimo.com",
       "icon": "📱",
       "color": "0xFFFF6900",
       "models": [
-        { "name": "mimo-v2.5-pro", "label": "MiMo V2.5 Pro (推荐)" },
-        { "name": "mimo-v2.5-flash", "label": "MiMo V2.5 Flash 极速" },
-        { "name": "mimo-v2-pro", "label": "MiMo V2 Pro" },
-        { "name": "mimo-v2-flash", "label": "MiMo V2 Flash 免费", "free": true }
+        { "name": "mimo-v2.5-pro", "label": "MiMo V2.5 Pro 旗舰 (推荐)" },
+        { "name": "mimo-v2.5-pro-ultraspeed", "label": "MiMo V2.5 Pro UltraSpeed 1000 t/s" },
+        { "name": "mimo-v2.5", "label": "MiMo V2.5 1M 上下文" }
       ]
     },
     {
@@ -165,17 +165,18 @@
       "provider": "OPENAI",
       "baseUrl": "https://api.minimax.chat/v1",
       "region": "CN",
-      "description": "M2.7 开源 Agent 旗舰，首个深度参与自我迭代训练的模型，入门¥29/月",
+      "description": "M3 (2026/6/1 发布) 当前旗舰，面向 Agent 推理/工具调用/代码/长上下文任务",
       "apiKeyUrl": "https://platform.minimaxi.com/",
       "tokenPlanUrl": "https://platform.minimaxi.com/",
       "codingPlanUrl": "https://platform.minimaxi.com/pricing",
-      "websiteUrl": "https://www.minimaxi.com",
+      "websiteUrl": "https://platform.minimaxi.com",
       "icon": "🎯",
       "color": "0xFF00D4AA",
       "models": [
-        { "name": "MiniMax-M2.7", "label": "M2.7 最新旗舰 (推荐)" },
-        { "name": "MiniMax-M2.7-Highspeed", "label": "M2.7 高速版" },
-        { "name": "MiniMax-M2.5", "label": "M2.5 开源经济" }
+        { "name": "MiniMax-M3", "label": "MiniMax M3 最新旗舰 (推荐)" },
+        { "name": "MiniMax-M2.7", "label": "MiniMax M2.7" },
+        { "name": "MiniMax-M2.7-Highspeed", "label": "MiniMax M2.7 Highspeed 高速" },
+        { "name": "MiniMax-M2.5", "label": "MiniMax M2.5 经济" }
       ]
     },
     {
@@ -184,17 +185,17 @@
       "provider": "OPENAI",
       "baseUrl": "https://api.siliconflow.cn/v1",
       "region": "CN",
-      "description": "国内 API 聚合平台，DeepSeek V4 Flash 等模型免费，新用户送额度",
+      "description": "API 聚合平台，DeepSeek V4 / Qwen3 等模型免费",
       "apiKeyUrl": "https://cloud.siliconflow.cn/account/ak",
       "tokenPlanUrl": "https://cloud.siliconflow.cn/account/usage",
       "websiteUrl": "https://siliconflow.cn",
       "icon": "🌊",
       "color": "0xFF7C3AED",
       "models": [
-        { "name": "deepseek-ai/DeepSeek-V4-Flash", "label": "DeepSeek V4 Flash", "free": true },
-        { "name": "Qwen/Qwen3-8B", "label": "Qwen3 8B 免费", "free": true },
+        { "name": "deepseek-ai/DeepSeek-V4-Flash", "label": "DeepSeek V4 Flash 免费", "free": true },
         { "name": "deepseek-ai/DeepSeek-V4-Pro", "label": "DeepSeek V4 Pro" },
-        { "name": "Pro/deepseek-ai/DeepSeek-R1", "label": "DeepSeek R1" }
+        { "name": "Qwen/Qwen3.6-Flash", "label": "Qwen3.6 Flash 免费", "free": true },
+        { "name": "Qwen/Qwen3.7-Plus", "label": "Qwen3.7 Plus" }
       ]
     },
     {
@@ -203,17 +204,18 @@
       "provider": "OPENAI",
       "baseUrl": "https://api.stepfun.com/v1",
       "region": "CN",
-      "description": "Step 3.5 Flash 专为 Agent 设计 350TPS，2603 最新版，Coding ¥25/月半价中",
+      "description": "Step 3.7 Flash 多模态推理旗舰，原生支持图片/视频输入，三档推理强度",
       "apiKeyUrl": "https://platform.stepfun.com/",
       "tokenPlanUrl": "https://platform.stepfun.com/pricing",
-      "codingPlanUrl": "https://platform.stepfun.com/step_plan",
+      "codingPlanUrl": "https://platform.stepfun.com/step-plan",
       "websiteUrl": "https://www.stepfun.com",
       "icon": "🚀",
       "color": "0xFFE11D48",
       "models": [
-        { "name": "step-3.5-flash-2603", "label": "Step 3.5 Flash 2603 最新 (推荐)" },
+        { "name": "step-3.7-flash", "label": "Step 3.7 Flash 多模态 (推荐)" },
+        { "name": "step-3.5-flash-2603", "label": "Step 3.5 Flash 2603 Agent 优化" },
         { "name": "step-3.5-flash", "label": "Step 3.5 Flash" },
-        { "name": "step-2", "label": "Step 2 旗舰" }
+        { "name": "step-2", "label": "Step 2" }
       ]
     },
     {
@@ -222,15 +224,17 @@
       "provider": "OPENAI",
       "baseUrl": "https://api.baichuan-ai.com/v1",
       "region": "CN",
-      "description": "百川智能，中文理解能力强",
+      "description": "百川智能，Baichuan4-Turbo 高速 / Baichuan4-Air 轻量",
       "apiKeyUrl": "https://platform.baichuan-ai.com/console/apikey",
       "tokenPlanUrl": "https://platform.baichuan-ai.com/console/usage",
       "websiteUrl": "https://www.baichuan-ai.com",
       "icon": "🏔️",
       "color": "0xFF2563EB",
       "models": [
+        { "name": "Baichuan4-Turbo", "label": "Baichuan4 Turbo 高速 (推荐)" },
+        { "name": "Baichuan4-Air", "label": "Baichuan4 Air 轻量" },
         { "name": "Baichuan4", "label": "Baichuan4 旗舰" },
-        { "name": "Baichuan3-Turbo", "label": "Baichuan3 Turbo" }
+        { "name": "Baichuan3-Turbo-128k", "label": "Baichuan3 Turbo 128K" }
       ]
     },
     {
@@ -257,16 +261,17 @@
       "provider": "OPENAI",
       "baseUrl": "https://hunyuan.tencentcloudapi.com/v1",
       "region": "CN",
-      "description": "混元 Lite 完全免费，Turbo S 最新旗舰，腾讯云旗下",
+      "description": "Hunyuan-a13b 通用最便宜 (¥0.5/¥2)，role-latest 角色扮演 (¥2.4/¥9.6)，translation 翻译；逐步迁移至 TokenHub",
       "apiKeyUrl": "https://cloud.tencent.com/product/hunyuan",
       "tokenPlanUrl": "https://console.cloud.tencent.com/hunyuan",
       "websiteUrl": "https://cloud.tencent.com/product/hunyuan",
       "icon": "☁️",
       "color": "0xFF006EFF",
       "models": [
-        { "name": "hunyuan-turbo-s", "label": "混元 Turbo S 最新 (推荐)" },
-        { "name": "hunyuan-turbo", "label": "混元 Turbo" },
-        { "name": "hunyuan-lite", "label": "混元 Lite 免费", "free": true }
+        { "name": "Hunyuan-a13b", "label": "Hunyuan A13B 通用最便宜 (推荐)" },
+        { "name": "Hunyuan-role-latest", "label": "Hunyuan Role 角色扮演" },
+        { "name": "Hunyuan-translation", "label": "Hunyuan Translation 翻译" },
+        { "name": "Hunyuan-translation-lite", "label": "Hunyuan Translation Lite 翻译轻量" }
       ]
     },
     {
@@ -275,7 +280,7 @@
       "provider": "OPENAI",
       "baseUrl": "https://api.openai.com/v1",
       "region": "GLOBAL",
-      "description": "GPT-5.6 最新旗舰 1.5M上下文，输入$5/M 输出$30/M",
+      "description": "GPT-5.5 旗舰 $5/$30、GPT-5.4 均衡 $2.5/$15、GPT-5.4-mini 经济 $0.75/$4.5 每百万 Token，1M 上下文",
       "apiKeyUrl": "https://platform.openai.com/api-keys",
       "tokenPlanUrl": "https://platform.openai.com/usage",
       "codingPlanUrl": "https://openai.com/pricing",
@@ -283,13 +288,11 @@
       "icon": "🤖",
       "color": "0xFF6ECC54",
       "models": [
-        { "name": "gpt-5.6", "label": "GPT-5.6 最新旗舰 (推荐)" },
-        { "name": "gpt-5.5", "label": "GPT-5.5" },
-        { "name": "gpt-5", "label": "GPT-5" },
+        { "name": "gpt-5.5", "label": "GPT-5.5 旗舰 (推荐)" },
+        { "name": "gpt-5.4", "label": "GPT-5.4 均衡" },
+        { "name": "gpt-5.4-mini", "label": "GPT-5.4 Mini 经济" },
         { "name": "gpt-4o", "label": "GPT-4o" },
-        { "name": "gpt-4o-mini", "label": "GPT-4o Mini 经济" },
-        { "name": "o3", "label": "o3 推理" },
-        { "name": "o3-mini", "label": "o3-mini 推理经济" }
+        { "name": "gpt-4o-mini", "label": "GPT-4o Mini" }
       ]
     },
     {
@@ -298,7 +301,7 @@
       "provider": "OPENAI",
       "baseUrl": "https://api.anthropic.com/v1",
       "region": "GLOBAL",
-      "description": "Sonnet 5 默认模型限时$2/$10/M，Opus 4.8 旗舰，Prompt缓存降90%",
+      "description": "Claude Fable 5 (2026/6/9 GA) 当前最强大模型；Opus 4.8 推荐 agentic coding；Mythos 5 邀请制",
       "apiKeyUrl": "https://console.anthropic.com/settings/keys",
       "tokenPlanUrl": "https://console.anthropic.com/settings/cost",
       "codingPlanUrl": "https://claude.com/pricing",
@@ -306,10 +309,9 @@
       "icon": "🎭",
       "color": "0xFFD4A574",
       "models": [
-        { "name": "claude-sonnet-5", "label": "Claude Sonnet 5 默认 (推荐)" },
-        { "name": "claude-opus-4-8", "label": "Claude Opus 4.8 旗舰" },
-        { "name": "claude-sonnet-4-6", "label": "Claude Sonnet 4.6 均衡" },
-        { "name": "claude-haiku-4-5", "label": "Claude Haiku 4.5 经济" }
+        { "name": "claude-fable-5", "label": "Claude Fable 5 旗舰 (推荐)" },
+        { "name": "claude-opus-4-8", "label": "Claude Opus 4.8 Agentic Coding" },
+        { "name": "claude-mythos-5", "label": "Claude Mythos 5 (邀请制)" }
       ]
     },
     {
@@ -318,18 +320,18 @@
       "provider": "OPENAI",
       "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
       "region": "GLOBAL",
-      "description": "Gemini 3.1 Pro 能力翻倍价格不变 $2/$12/M，Flash 有免费额度，1M-2M上下文",
+      "description": "Gemini 3.5 系列最新稳定版，Gemini 3 Pro/Flash 仍可用，2.5 系列兜底",
       "apiKeyUrl": "https://aistudio.google.com/apikey",
       "tokenPlanUrl": "https://aistudio.google.com/apikey",
       "websiteUrl": "https://aistudio.google.com",
       "icon": "💎",
       "color": "0xFF4285F4",
       "models": [
-        { "name": "gemini-3.1-pro", "label": "Gemini 3.1 Pro 最新 (推荐)" },
-        { "name": "gemini-3-flash", "label": "Gemini 3 Flash 极速" },
+        { "name": "gemini-3.5-flash", "label": "Gemini 3.5 Flash 最新稳定 (推荐)" },
+        { "name": "gemini-3-pro", "label": "Gemini 3 Pro" },
+        { "name": "gemini-3-flash", "label": "Gemini 3 Flash" },
         { "name": "gemini-2.5-pro", "label": "Gemini 2.5 Pro" },
-        { "name": "gemini-2.5-flash", "label": "Gemini 2.5 Flash" },
-        { "name": "gemini-2.5-flash-lite", "label": "Gemini 2.5 Flash Lite 最经济" }
+        { "name": "gemini-2.5-flash", "label": "Gemini 2.5 Flash 经济" }
       ]
     },
     {
@@ -338,16 +340,16 @@
       "provider": "OPENAI",
       "baseUrl": "https://api.x.ai/v1",
       "region": "GLOBAL",
-      "description": "Grok 4.5 最新 $2/$6/M 约为 Claude Opus 4.8 的1/4，2M上下文",
+      "description": "Grok 4.5 (2026/7/9 发布) 当前最智能最快模型，知识截止 2026/2/1",
       "apiKeyUrl": "https://console.x.ai/",
       "tokenPlanUrl": "https://console.x.ai/usage",
       "websiteUrl": "https://x.ai",
       "icon": "⚡",
       "color": "0xFF0F0F0F",
       "models": [
-        { "name": "grok-4.5", "label": "Grok 4.5 最新 (推荐)" },
+        { "name": "grok-4.5", "label": "Grok 4.5 最新旗舰 (推荐)" },
+        { "name": "grok-4.20", "label": "Grok 4.20" },
         { "name": "grok-4", "label": "Grok 4" },
-        { "name": "grok-4-fast", "label": "Grok 4 Fast 快速" },
         { "name": "grok-3", "label": "Grok 3" }
       ]
     },
@@ -357,15 +359,15 @@
       "provider": "OPENAI",
       "baseUrl": "https://api.mistral.ai/v1",
       "region": "GLOBAL",
-      "description": "Large 3 稀疏MoE $0.8/$2.4/M 约GPT-4o半价，Small 3 Apache 2.0 开源",
+      "description": "Large 3 旗舰 / Small 4 开源 Apache 2.0 / Codestral 精通 80+ 编程语言",
       "apiKeyUrl": "https://console.mistral.ai/api-keys",
       "tokenPlanUrl": "https://console.mistral.ai/usage",
       "websiteUrl": "https://mistral.ai",
       "icon": "🌀",
       "color": "0xFFF97316",
       "models": [
-        { "name": "mistral-large-3", "label": "Mistral Large 3 (推荐)" },
-        { "name": "mistral-small-3", "label": "Mistral Small 3 开源经济" },
+        { "name": "mistral-large-3", "label": "Mistral Large 3 旗舰 (推荐)" },
+        { "name": "mistral-small-4", "label": "Mistral Small 4 开源" },
         { "name": "codestral-latest", "label": "Codestral 代码" }
       ]
     },
@@ -375,18 +377,19 @@
       "provider": "OPENAI",
       "baseUrl": "https://openrouter.ai/api/v1",
       "region": "GLOBAL",
-      "description": "国际 API 聚合平台，一个 Key 调用 400+ 模型，按需付费",
+      "description": "API 聚合平台，一个 Key 调用 400+ 模型，含 GPT-5.6 系列 / Kimi K3 / Meta Muse Spark 1.1",
       "apiKeyUrl": "https://openrouter.ai/settings/keys",
       "tokenPlanUrl": "https://openrouter.ai/settings/credits",
       "websiteUrl": "https://openrouter.ai",
       "icon": "🔀",
       "color": "0xFF6D28D9",
       "models": [
-        { "name": "deepseek/deepseek-v4-flash", "label": "DeepSeek V4 Flash" },
-        { "name": "anthropic/claude-sonnet-5", "label": "Claude Sonnet 5" },
-        { "name": "google/gemini-3.1-pro", "label": "Gemini 3.1 Pro" },
-        { "name": "openai/gpt-5.6", "label": "GPT-5.6" },
-        { "name": "x-ai/grok-4.5", "label": "Grok 4.5" }
+        { "name": "moonshotai/kimi-k2.7-code", "label": "Kimi K2.7 Code (推荐 Coding)" },
+        { "name": "moonshotai/kimi-k2.6", "label": "Kimi K2.6 通用旗舰" },
+        { "name": "anthropic/claude-fable-5", "label": "Claude Fable 5" },
+        { "name": "openai/gpt-5.5", "label": "GPT-5.5 旗舰" },
+        { "name": "google/gemini-3.5-flash", "label": "Gemini 3.5 Flash" },
+        { "name": "zhipuai/glm-5.2", "label": "GLM-5.2 编码旗舰" }
       ]
     },
     {
@@ -395,7 +398,7 @@
       "provider": "OPENAI",
       "baseUrl": "https://api.groq.com/openai/v1",
       "region": "GLOBAL",
-      "description": "LPU 超低延迟推理 549 t/s，每天免费 300-400万 token",
+      "description": "超低延迟推理，Llama 3.3 70B 280 t/s，GPT-OSS 120B 500 t/s",
       "apiKeyUrl": "https://console.groq.com/keys",
       "tokenPlanUrl": "https://console.groq.com/usage",
       "websiteUrl": "https://groq.com",
@@ -404,7 +407,8 @@
       "models": [
         { "name": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B (推荐)" },
         { "name": "llama-3.1-8b-instant", "label": "Llama 3.1 8B 快速" },
-        { "name": "mixtral-8x7b-32768", "label": "Mixtral 8x7B" }
+        { "name": "openai/gpt-oss-120b", "label": "GPT-OSS 120B OpenAI 开源" },
+        { "name": "openai/gpt-oss-20b", "label": "GPT-OSS 20B 经济" }
       ]
     },
     {

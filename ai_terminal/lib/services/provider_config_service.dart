@@ -1,10 +1,19 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'daos.dart';
 
 const String _providersKey = 'providers_json';
+/// 本地 asset 内置版本号存储键。App 升级时若内置版本号 > 缓存版本号，
+/// 则强制丢弃旧缓存重新从 asset 加载，保证用户在 App 升级后能拿到最新内置配置。
 const String _versionKey = 'providers_version';
+/// 远程配置 ETag 存储键（仅用于追踪上次刷新状态，不参与 asset 升级判断）
+const String _remoteEtagKey = 'providers_remote_etag';
+/// 本地 asset 的内置版本号。每次修改 assets/config/ai_providers.json 后递增此值，
+/// 启动时若缓存版本号 < 此值则强制丢弃旧缓存重新从 asset 加载，
+/// 保证 App 升级后用户能拿到最新内置配置。
+const int _embeddedVersion = 4;
 const String _remoteConfigUrl = 'https://ai-terminal.keiskei.top/config/ai_providers.json';
 
 class ModelInfo {
@@ -118,12 +127,29 @@ class ProviderConfigService {
   static Future<void> init() async {
     if (_initialized) return;
 
+    // 本地 asset 版本号升级时，强制丢弃旧缓存重新从 asset 加载
+    // 否则用户在 App 升级后仍会看到旧 provider 配置
+    final cachedVersionStr = SettingsDao.getCached(_versionKey) as String?;
+    final cachedVersion = int.tryParse(cachedVersionStr ?? '') ?? 0;
+    final cacheStale = cachedVersion < _embeddedVersion;
+
+    if (cacheStale) {
+      debugPrint('[ProviderConfig] 缓存版本 $cachedVersion < embedded $_embeddedVersion，丢弃旧缓存重载 asset');
+      _providers = await _loadEmbedded();
+      await _saveProviders(_providers);
+      // 用本地 asset 版本号初始化缓存，保证后续启动不再重复重载
+      await SettingsDao.set(_versionKey, _embeddedVersion.toString());
+      _initialized = true;
+      return;
+    }
+
     final cached = SettingsDao.getCached(_providersKey) as String?;
     if (cached != null && cached.isNotEmpty) {
       try {
         _providers = _parseProvidersJson(cached);
       } catch (_) {
         _providers = await _loadEmbedded();
+        await _saveProviders(_providers);
       }
     } else {
       _providers = await _loadEmbedded();
@@ -197,8 +223,8 @@ class ProviderConfigService {
         if (newProviders.isNotEmpty) {
           _providers = newProviders;
           await _saveProviders(_providers);
-          final version = response.headers.value('etag') ?? DateTime.now().millisecondsSinceEpoch.toString();
-          await SettingsDao.set(_versionKey, version);
+          final etag = response.headers.value('etag') ?? DateTime.now().millisecondsSinceEpoch.toString();
+          await SettingsDao.set(_remoteEtagKey, etag);
           return RefreshResult.success(newProviders.length);
         }
         return RefreshResult.empty();

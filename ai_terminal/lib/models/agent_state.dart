@@ -110,6 +110,8 @@ class AgentState {
         return '❌ 失败';
       case AgentStatus.cancelled:
         return '🚫 已取消';
+      case AgentStatus.paused:
+        return '⏸️ 已暂停';
     }
   }
 }

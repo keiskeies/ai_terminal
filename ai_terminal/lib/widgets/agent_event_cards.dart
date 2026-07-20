@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
@@ -67,11 +68,11 @@ class AgentEventContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _buildEventsContent();
+    return _buildEventsContent(context);
   }
 
   /// 结构化事件列表渲染：内容自动追加，只有命令单独包装成块
-  Widget _buildEventsContent() {
+  Widget _buildEventsContent(BuildContext context) {
     // 构建事件→结果配对映射：commandId → result
     final resultMap = <String, AgentEvent>{};
     for (final e in events) {
@@ -117,14 +118,14 @@ class AgentEventContent extends StatelessWidget {
           // 若有对应 result，紧跟在 command 后渲染
           final result = resultMap[event.id];
           if (result != null) {
-            widgets.add(_buildResultCard(result, tc));
+            widgets.add(_buildResultCard(result, tc, context));
           }
           break;
         case AgentEventType.result:
           if (event.commandId == null ||
               !events.any((e) => e.id == event.commandId)) {
             flushText();
-            widgets.add(_buildResultCard(event, tc));
+            widgets.add(_buildResultCard(event, tc, context));
           }
           break;
         case AgentEventType.ask:
@@ -155,7 +156,7 @@ class AgentEventContent extends StatelessWidget {
 
   /// 结果卡片：成功/失败状态 + 输出（全部展开显示）
   /// 背景保持 terminalBg，无左侧缩进，与命令块视觉对齐
-  Widget _buildResultCard(AgentEvent event, ThemeColors tc) {
+  Widget _buildResultCard(AgentEvent event, ThemeColors tc, BuildContext context) {
     final success = event.success ?? false;
     final output = event.output ?? event.error ?? '(无输出)';
     final lines = output.split('\n');
@@ -224,6 +225,8 @@ class AgentEventContent extends StatelessWidget {
                         fontWeight: FontWeight.w500),
                   ),
                 ),
+                // 复制按钮：与命令块体验一致，一键复制输出
+                _buildCopyButton(output, tc, context),
               ],
             ),
           ),
@@ -241,6 +244,30 @@ class AgentEventContent extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 复制按钮（与 AgentCommandBlock._buildCopyButton 行为一致）
+  Widget _buildCopyButton(String text, ThemeColors tc, BuildContext context) {
+    return GestureDetector(
+      onTap: () {
+        Clipboard.setData(ClipboardData(text: text));
+        ScaffoldMessenger.of(context).clearSnackBars();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('已复制', style: TextStyle(fontSize: fSmall)),
+            duration: Duration(seconds: 1),
+            behavior: SnackBarBehavior.floating,
+            margin: EdgeInsets.all(16),
+          ),
+        );
+      },
+      child: Container(
+        width: 28,
+        height: 28,
+        alignment: Alignment.center,
+        child: Icon(Icons.copy, size: 13, color: tc.textMuted),
       ),
     );
   }
@@ -387,6 +414,8 @@ class AgentEventContent extends StatelessWidget {
                 MarkdownBody(
                   data: event.summary ?? '已完成所有步骤',
                   selectable: true,
+                  // 规避 flutter_markdown 0.6.23 在 selectable=true 时无条件调用 onSelectionChanged!() 的 bug
+                  onSelectionChanged: (_, __, ___) {},
                   styleSheet: MarkdownStyleSheet(
                     p: TextStyle(
                       color: cSuccess.withValues(alpha: 0.9),

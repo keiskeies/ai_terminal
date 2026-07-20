@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -9,6 +10,8 @@ import '../l10n/app_localizations.dart';
 import '../providers/agent_provider.dart';
 import '../providers/app_providers.dart';
 import '../services/knowledge_service.dart';
+import '../services/crash_reporter.dart';
+import '../services/health_check_service.dart';
 
 /// P1-5: 设置页信息架构重组
 /// 按用户任务场景分组：连接管理、AI 与智能、外观与体验、关于
@@ -172,6 +175,13 @@ class SettingsPage extends ConsumerWidget {
                     subtitle: l10n.settingsSecurityDesc,
                     onTap: () => context.push('/settings/security'),
                   ),
+                  _SettingItem(
+                    icon: Icons.bug_report_outlined,
+                    iconColor: cWarning,
+                    title: '诊断',
+                    subtitle: _diagnosticsSubtitle(),
+                    onTap: () => _showDiagnosticsDialog(context),
+                  ),
                 ],
               ),
             ],
@@ -325,6 +335,146 @@ class SettingsPage extends ConsumerWidget {
         ),
       );
     }
+  }
+
+  /// P2-8: 诊断入口副标题 — 显示崩溃次数或正常状态
+  String _diagnosticsSubtitle() {
+    final count = crashReporter.sessionCrashCount;
+    if (count > 0) {
+      return '本次会话崩溃 $count 次';
+    }
+    final lastTime = crashReporter.lastCrashTime;
+    if (lastTime != null) {
+      return '上次崩溃: ${_formatTime(lastTime)}';
+    }
+    return '查看崩溃日志与健康状态';
+  }
+
+  String _formatTime(DateTime t) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${t.year}-${two(t.month)}-${two(t.day)} ${two(t.hour)}:${two(t.minute)}';
+  }
+
+  /// P2-8: 诊断对话框 — 展示版本/SSH池/磁盘/崩溃日志
+  Future<void> _showDiagnosticsDialog(BuildContext context) async {
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    PackageInfo? info;
+    try {
+      info = await PackageInfo.fromPlatform();
+    } catch (_) {}
+    // 触发一次手动健康检查
+    final snap = await healthCheckService.checkNow();
+    if (!context.mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: tc.cardElevated,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+        title: Row(
+          children: [
+            Icon(Icons.bug_report_outlined, color: cWarning, size: 22),
+            const SizedBox(width: 8),
+            Text('诊断', style: TextStyle(color: tc.textMain, fontSize: fTitle)),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _diagRow(tc, '应用版本', '${info?.version ?? "unknown"}+${info?.buildNumber ?? "0"}'),
+                _diagRow(tc, '本次会话崩溃', '${crashReporter.sessionCrashCount} 次'),
+                _diagRow(tc, '上次崩溃时间',
+                    crashReporter.lastCrashTime != null
+                        ? _formatTime(crashReporter.lastCrashTime!)
+                        : '无'),
+                if (crashReporter.lastCrashSummary != null)
+                  _diagRow(tc, '上次崩溃摘要', crashReporter.lastCrashSummary!),
+                const Divider(height: 24),
+                Text('健康检查', style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                _diagRow(tc, 'SSH 池连接', '${snap.sshTotalConnections} 个 (ref=${snap.sshTotalRefCount})'),
+                _diagRow(tc, '已死连接', snap.sshDeadConnections > 0
+                    ? '${snap.sshDeadConnections} 个 (需关注)'
+                    : '0'),
+                _diagRow(tc, '磁盘可写', snap.diskWritable ? '是' : '否 (致命问题!)'),
+                _diagRow(tc, '检查时间', _formatTime(snap.timestamp)),
+                const Divider(height: 24),
+                Row(
+                  children: [
+                    TextButton.icon(
+                      icon: const Icon(Icons.copy, size: 16),
+                      label: const Text('复制崩溃日志'),
+                      onPressed: () async {
+                        final content = await crashReporter.readLog();
+                        if (!ctx.mounted) return;
+                        if (content.isEmpty) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                            content: const Text('崩溃日志为空'),
+                            behavior: SnackBarBehavior.floating,
+                          ));
+                          return;
+                        }
+                        await Clipboard.setData(ClipboardData(text: content));
+                        if (!ctx.mounted) return;
+                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                          content: Text('已复制 ${content.length} 字符'),
+                          backgroundColor: cSuccess,
+                          behavior: SnackBarBehavior.floating,
+                        ));
+                      },
+                    ),
+                    TextButton.icon(
+                      icon: const Icon(Icons.delete_outline, size: 16),
+                      label: const Text('清除'),
+                      onPressed: () async {
+                        await crashReporter.clearLog();
+                        if (!ctx.mounted) return;
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                          content: const Text('已清除崩溃日志'),
+                          backgroundColor: cSuccess,
+                          behavior: SnackBarBehavior.floating,
+                        ));
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(l10n.close),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 诊断对话框内的 "字段: 值" 行
+  Widget _diagRow(ThemeColors tc, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(label, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+          ),
+          Expanded(
+            child: Text(value, style: TextStyle(color: tc.textMain, fontSize: fSmall)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _updateKnowledgeBase(BuildContext context) async {
