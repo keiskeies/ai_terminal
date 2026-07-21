@@ -23,6 +23,8 @@ class AgentState {
   final bool isOrchestratorMode;
   /// 是否处于只读模式（Dry-run）
   final bool isReadOnlyMode;
+  /// 联网搜索会话级开关（与全局开关 OR 合并；运行中切换下次任务生效）
+  final bool isWebSearchEnabled;
 
   AgentState({
     this.status = AgentStatus.idle,
@@ -39,6 +41,7 @@ class AgentState {
     this.isCompacting = false,
     this.isOrchestratorMode = false,
     this.isReadOnlyMode = false,
+    this.isWebSearchEnabled = false,
   })  : chatItems = chatItems ?? [],
         pendingOptions = pendingOptions ?? [];
 
@@ -68,6 +71,7 @@ class AgentState {
     bool clearError = false,
     bool? isOrchestratorMode,
     bool? isReadOnlyMode,
+    bool? isWebSearchEnabled,
   }) {
     return AgentState(
       status: status ?? this.status,
@@ -84,6 +88,7 @@ class AgentState {
       isCompacting: isCompacting ?? this.isCompacting,
       isOrchestratorMode: isOrchestratorMode ?? this.isOrchestratorMode,
       isReadOnlyMode: isReadOnlyMode ?? this.isReadOnlyMode,
+      isWebSearchEnabled: isWebSearchEnabled ?? this.isWebSearchEnabled,
     );
   }
 

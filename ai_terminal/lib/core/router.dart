@@ -10,6 +10,7 @@ import '../pages/runbooks_page.dart';
 import '../pages/appearance_page.dart';
 import '../pages/security_page.dart';
 import '../pages/agent_settings_page.dart';
+import '../pages/web_search_settings_page.dart';
 import '../pages/sftp_page.dart';
 import '../pages/audit_log_page.dart';
 import '../pages/change_records_page.dart';
@@ -82,6 +83,11 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/settings/agent',
       builder: (context, state) => const AgentSettingsPage(),
+    ),
+    // 联网搜索设置
+    GoRoute(
+      path: '/settings/web_search',
+      builder: (context, state) => const WebSearchSettingsPage(),
     ),
     // 快捷命令
     GoRoute(

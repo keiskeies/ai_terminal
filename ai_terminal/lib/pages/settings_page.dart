@@ -114,6 +114,13 @@ class SettingsPage extends ConsumerWidget {
                     onTap: () => context.push('/settings/agent'),
                   ),
                   _SettingItem(
+                    icon: Icons.travel_explore_rounded,
+                    iconColor: cInfo,
+                    title: '联网搜索',
+                    subtitle: 'AI 知识不足时主动搜索网络（web_search / fetch_url）',
+                    onTap: () => context.push('/settings/web_search'),
+                  ),
+                  _SettingItem(
                     icon: Icons.menu_book_rounded,
                     iconColor: cInfo,
                     title: l10n.settingsKnowledge,

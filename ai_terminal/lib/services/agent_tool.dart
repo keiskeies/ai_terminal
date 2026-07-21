@@ -12,6 +12,7 @@ import 'multi_host_executor.dart';
 import 'agent_host_registry.dart';
 import '../core/l10n_holder.dart';
 import '../utils/tool_args_parser.dart';
+import 'web_tools.dart';
 
 /// Agent 工具调用结果
 class ToolResult {
@@ -1693,6 +1694,29 @@ class AgentToolRegistry {
     _tools.remove('multi_grep');
     _tools.remove('diff_files');
   }
+
+  /// 启用联网搜索工具：注册 web_search / fetch_url
+  ///
+  /// 调用时机：由 AgentEngine.startTask 根据"全局开关 + 会话级开关"合并后调用。
+  /// 工具一旦注册，buildToolsPrompt / buildOpenAIToolsSchema 自动把它注入 system prompt
+  /// 和 FC schema，AI 在下一轮 ReAct 中即可看到并调用。
+  void enableWebTools() {
+    if (!_tools.containsKey('web_search')) {
+      register(WebSearchTool());
+    }
+    if (!_tools.containsKey('fetch_url')) {
+      register(FetchUrlTool());
+    }
+  }
+
+  /// 禁用联网搜索工具：注销 web_search / fetch_url
+  void disableWebTools() {
+    _tools.remove('web_search');
+    _tools.remove('fetch_url');
+  }
+
+  /// 当前是否已注册联网工具
+  bool get isWebToolsEnabled => _tools.containsKey('web_search');
 
   bool get isOrchestratorEnabled => _multiHostExecutor != null;
 

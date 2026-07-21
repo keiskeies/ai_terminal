@@ -169,6 +169,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
     // 同步只读模式
     _engine!.setReadOnlyMode(state.isReadOnlyMode);
+    // 同步联网搜索会话级开关
+    _engine!.setWebSearchEnabled(state.isWebSearchEnabled);
   }
 
   /// 从持久化恢复会话到内存状态
@@ -910,6 +912,16 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final newValue = !state.isReadOnlyMode;
     _engine?.setReadOnlyMode(newValue);
     state = state.copyWith(isReadOnlyMode: newValue);
+  }
+
+  /// 开启/关闭联网搜索（会话级，覆盖全局开关）
+  ///
+  /// 运行中切换不影响当前任务（system prompt 已构建），
+  /// 下次 startTask 时工具注册状态会按新值同步。
+  void toggleWebSearch() {
+    final newValue = !state.isWebSearchEnabled;
+    _engine?.setWebSearchEnabled(newValue);
+    state = state.copyWith(isWebSearchEnabled: newValue);
   }
 
   // ═══════════════════════════════════════════

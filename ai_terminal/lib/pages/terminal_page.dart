@@ -2249,6 +2249,19 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 active: agentState.isReadOnlyMode,
               ),
               const SizedBox(width: 4),
+              // 联网搜索切换（会话级，覆盖全局开关；下次任务生效）
+              _buildToolbarIconButton(
+                icon: Icons.travel_explore_rounded,
+                tooltip: agentState.isWebSearchEnabled
+                    ? '联网搜索：已启用（下次任务生效）'
+                    : '联网搜索：未启用（点击启用，下次任务生效）',
+                onTap: () {
+                  ref.read(agentProvider.notifier).toggleWebSearch();
+                },
+                tc: tc,
+                active: agentState.isWebSearchEnabled,
+              ),
+              const SizedBox(width: 4),
               // 运维模板（Runbook）
               _buildToolbarIconButton(
                 icon: Icons.bolt_outlined,

@@ -21,6 +21,7 @@ import 'agent_tracer.dart';
 import '../core/safety_guard.dart';
 import '../core/l10n_holder.dart';
 import 'daos.dart';
+import 'web_search_config.dart';
 import '../core/prompts.dart' as prompts;
 import '../utils/ansi_stripper.dart';
 import '../utils/command_heuristics.dart';
@@ -169,6 +170,18 @@ class AgentEngine {
 
   /// 只读模式（Dry-run）开关：开启后只允许 safe 级命令执行，info/warn/blocked 全部拒绝
   bool _readOnlyMode = false;
+
+  /// 联网搜索会话级开关（与全局开关 OR 合并）
+  ///
+  /// 合并规则：enabled = _webSearchEnabled || WebSearchConfig.load().enabled
+  /// - 全局开 + 会话关 → 仍联网（全局默认）
+  /// - 全局关 + 会话开 → 联网（会话临时启用）
+  /// - 全局关 + 会话关 → 不联网
+  ///
+  /// 运行中切换不影响当前任务（system prompt 仅在 startTask 时构建一次，
+  /// 符合 R3 精神：避免运行中修改 system prompt 导致上下文混乱）。
+  /// 切换后下次 startTask 生效。
+  bool _webSearchEnabled = false;
 
   bool get isReadOnlyMode => _readOnlyMode;
 
@@ -2537,10 +2550,25 @@ class AgentEngine {
     }
 
     // 工具能力注入（告诉 AI 有哪些非 shell 工具可用）
+    // 同步联网工具注册状态：合并全局开关 + 会话级开关
+    // 必须在 buildToolsPrompt 之前调用，保证 system prompt 与 _tools 状态一致
+    _syncWebToolsRegistration();
     final toolsPrompt = _tools.buildToolsPrompt();
     if (toolsPrompt.isNotEmpty) {
       buffer.writeln();
       buffer.writeln(toolsPrompt);
+    }
+
+    // 联网搜索能力提示（仅当工具已注册时注入，引导 AI 主动使用）
+    if (_tools.isWebToolsEnabled) {
+      buffer.writeln();
+      buffer.writeln('【联网搜索】');
+      buffer.writeln('你已具备联网能力：可使用 web_search 工具搜索最新信息，用 fetch_url 抓取网页正文。');
+      buffer.writeln('何时使用：');
+      buffer.writeln('- 你的训练数据可能过时（如最新版本号、近期新闻、新发布的软件包）');
+      buffer.writeln('- 遇到不熟悉的错误信息、概念、API');
+      buffer.writeln('- 用户明确要求"查一下"或"搜索"');
+      buffer.writeln('何时不使用：你已有把握的知识不要盲目搜索，避免浪费配额。优先用已有知识 + 知识库 + 命令执行解决任务。');
     }
 
     // 本地项目部署工作流提示（仅在本地终端会话时注入）
@@ -2699,6 +2727,34 @@ $hostList
     if (_readOnlyMode == enabled) return;
     _readOnlyMode = enabled;
     _invalidateSystemPromptCache();
+  }
+
+  /// 联网搜索会话级开关是否启用
+  bool get isWebSearchEnabled => _webSearchEnabled;
+
+  /// 开启/关闭联网搜索（会话级，覆盖全局开关）
+  ///
+  /// 运行中切换不影响当前任务（system prompt 仅在 startTask 时构建），
+  /// 下次 startTask 时 [_syncWebToolsRegistration] 会根据新值同步工具注册状态。
+  void setWebSearchEnabled(bool enabled) {
+    if (_webSearchEnabled == enabled) return;
+    _webSearchEnabled = enabled;
+    _invalidateSystemPromptCache();
+  }
+
+  /// 同步联网工具注册状态到当前合并开关
+  ///
+  /// 在 [_buildSystemPrompt] 内、调用 `_tools.buildToolsPrompt()` 之前调用，
+  /// 保证 system prompt 与工具注册状态一致。
+  /// 合并规则：会话级开关 OR 全局开关。
+  void _syncWebToolsRegistration() {
+    final globalEnabled = WebSearchConfig.load().enabled;
+    final shouldEnable = _webSearchEnabled || globalEnabled;
+    if (shouldEnable && !_tools.isWebToolsEnabled) {
+      _tools.enableWebTools();
+    } else if (!shouldEnable && _tools.isWebToolsEnabled) {
+      _tools.disableWebTools();
+    }
   }
 
   /// 设置 sudo 密码（由 AgentNotifier 从安全存储加载后调用）
