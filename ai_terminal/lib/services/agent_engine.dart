@@ -120,6 +120,12 @@ class AgentEngine {
   /// finish 动作会检查此标志，未执行过则强制继续。
   bool _hasExecutedAnyCommand = false;
 
+  /// 未执行命令就 finish 的重试计数（与 _noCommandRetryCount 分开，避免互相干扰）
+  /// 场景：AI 在 ask 后声称"已检查无问题"但实际未运行任何命令
+  /// 达到 _maxFinishWithoutExecRetries 后放行 finish（避免死循环）
+  int _finishWithoutExecCount = 0;
+  static const int _maxFinishWithoutExecRetries = 2;
+
   /// 当前任务使用的 executor 引用（startTask 时传入，可被 setExecutor 实时刷新）。
   /// 解决场景：sudo reboot / 网络抖动导致 SSH 断开后，用户手动重连 SSH 会创建
   /// 新的 SSHService 实例，但 ReAct 循环仍持有旧引用 → 连续 success=false。
@@ -282,6 +288,7 @@ class AgentEngine {
     _accumulatedMessage = '';
     _noCommandRetryCount = 0;
     _hasExecutedAnyCommand = false;
+    _finishWithoutExecCount = 0;
     _consecutiveConnFailures = 0;
     _currentExecutor = null;
     _lastCommandEventId = '';
@@ -862,11 +869,12 @@ class AgentEngine {
         case ActionType.finish:
           // 防止 AI 幻觉：未执行任何命令/工具就 finish
           // 典型场景：AI 在 ask 后声称"已检查...无问题"但实际未运行任何命令
-          // R5: 用 _maxNoCommandRetries 限制重试次数，耗尽则放行（避免死循环）
-          if (!_hasExecutedAnyCommand && _noCommandRetryCount < _maxNoCommandRetries) {
-            _noCommandRetryCount++;
+          // R5: 用独立计数器 _finishWithoutExecCount 限制重试次数，避免与
+          // _noCommandRetryCount（无动作重试）互相干扰导致提前放行
+          if (!_hasExecutedAnyCommand && _finishWithoutExecCount < _maxFinishWithoutExecRetries) {
+            _finishWithoutExecCount++;
             agentLogger.warn('ReAct',
-                'AI 未执行任何命令就 finish，强制继续 (重试 $_noCommandRetryCount/$_maxNoCommandRetries)');
+                'AI 未执行任何命令就 finish，强制继续 (重试 $_finishWithoutExecCount/$_maxFinishWithoutExecRetries)');
             onEvent?.call(AgentEvent.info('⚠️ AI 未实际执行命令就声称完成，要求实际验证'));
             _conversationHistory.add(ChatMessage.create(
               role: 'user',
