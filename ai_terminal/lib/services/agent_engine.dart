@@ -115,8 +115,22 @@ class AgentEngine {
   int _noCommandRetryCount = 0;
   static const int _maxNoCommandRetries = 2;
 
-  /// 默认最大执行步数（maxSteps=0 时的兜底上限，防止无限循环）
-  static const int _defaultMaxSteps = 20;
+  /// 本任务是否实际执行过命令/工具（防止 AI 幻觉：未执行任何命令就 finish）
+  /// 在 _runCommandWithSafety 和 _handleToolAction 中置 true；
+  /// finish 动作会检查此标志，未执行过则强制继续。
+  bool _hasExecutedAnyCommand = false;
+
+  /// 当前任务使用的 executor 引用（startTask 时传入，可被 setExecutor 实时刷新）。
+  /// 解决场景：sudo reboot / 网络抖动导致 SSH 断开后，用户手动重连 SSH 会创建
+  /// 新的 SSHService 实例，但 ReAct 循环仍持有旧引用 → 连续 success=false。
+  /// AgentNotifier.setExecutor 会同步刷新此字段，_executeAutomatic 循环每步取最新值。
+  CommandExecutor? _currentExecutor;
+
+  /// 连续连接失败计数（防止 AI 在 SSH 断开后反复尝试命令空转）
+  /// 每次命令因"连接已断开"失败时递增，成功执行命令时重置
+  /// 达到 _maxConnFailRetries 时暂停任务并提示用户重连
+  int _consecutiveConnFailures = 0;
+  static const int _maxConnFailRetries = 3;
 
   /// _accumulatedMessage 最大字符数（防止长任务内存无界增长）
   static const int _maxAccumulatedChars = 20000;
@@ -163,6 +177,19 @@ class AgentEngine {
     // 同步重置编排标志，避免 _orchestratorMode 与 _tools.multiHostExecutor 不一致
     _orchestratorMode = false;
     _tools.disableOrchestrator();
+  }
+
+  /// 运行时刷新 executor 引用（用户重连 SSH 后由 AgentNotifier.setExecutor 调用）。
+  /// 解决场景：sudo reboot / 网络抖动导致旧 SSHService 断开后，用户手动重连
+  /// 创建新 SSHService 实例，但 ReAct 循环仍持有旧引用 → 连续 success=false。
+  /// 此方法把新 executor 注入到 _currentExecutor，循环下一步会自动使用新引用。
+  void setExecutor(CommandExecutor? executor) {
+    if (executor == null) return;
+    final old = _currentExecutor;
+    _currentExecutor = executor;
+    if (old != executor) {
+      agentLogger.info('AgentEngine', 'executor 已刷新 (old.isConnected=${old?.isConnected}, new.isConnected=${executor.isConnected})');
+    }
   }
 
   /// 对话历史最大轮数（每轮 = assistant + user），超出时裁剪最早的轮次
@@ -254,6 +281,9 @@ class AgentEngine {
   void _resetTransientState() {
     _accumulatedMessage = '';
     _noCommandRetryCount = 0;
+    _hasExecutedAnyCommand = false;
+    _consecutiveConnFailures = 0;
+    _currentExecutor = null;
     _lastCommandEventId = '';
     _currentTask = null;
     _taskStartTime = null;
@@ -315,6 +345,7 @@ class AgentEngine {
     // 不依赖 cancelTask 清理（旧任务可能正常 completed 后未清理）
     // 保证新任务起点干净：无残留 Completer/Subscription/Timer/CancelToken
     _resetTransientState();
+    _currentExecutor = executor; // 保存 executor 引用，支持运行时刷新
 
     // 新任务代际，使任何残留的旧循环退出
     _currentTaskGeneration++;
@@ -370,6 +401,17 @@ class AgentEngine {
 
     try {
       agentLogger.info('AgentEngine', '执行 Agent 模式');
+      // _executeAutomatic 要求非空 executor，此处显式检查避免调用方误传 null
+      if (executor == null) {
+        agentLogger.error('AgentEngine', '执行器为 null，无法启动任务');
+        onError?.call(L10n.str.terminalNotConnected);
+        _currentTask = _currentTask!.copyWith(
+          status: AgentStatus.failed,
+          completedAt: DateTime.now(),
+        );
+        _notifyTaskUpdate();
+        return;
+      }
       await _executeAutomatic(goal, executor, myGeneration);
     } catch (e, stack) {
       agentLogger.error('AgentEngine', '执行异常: $e\n$stack');
@@ -561,6 +603,7 @@ class AgentEngine {
     agentLogger.info('AgentEngine', '恢复已暂停的任务: $goal');
     // 清理瞬态字段但保留 _conversationHistory（恢复上下文）
     _resetTransientState();
+    _currentExecutor = executor; // 保存 executor 引用，支持运行时刷新
     _currentTaskGeneration++;
     final myGeneration = _currentTaskGeneration;
     _taskStartTime = DateTime.now();
@@ -611,7 +654,7 @@ class AgentEngine {
     _pendingOptions = [];
   }
 
-  Future<void> _executeAutomatic(String goal, CommandExecutor? executor, int myGeneration) async {
+  Future<void> _executeAutomatic(String goal, CommandExecutor executor, int myGeneration) async {
     agentLogger.info('ReAct', '=== 开始 ReAct 自动执行 ===');
 
     // 代际失效：说明在 startTask 等待期间被新任务覆盖或取消了
@@ -620,9 +663,8 @@ class AgentEngine {
       return;
     }
 
-    if (executor == null || !executor.isConnected) {
-      final type = executor == null ? '无执行器' : '未连接';
-      agentLogger.error('ReAct', '$type!');
+    if (!executor.isConnected) {
+      agentLogger.error('ReAct', '执行器未连接!');
       onError?.call(L10n.str.terminalNotConnected);
       _currentTask = _currentTask!.copyWith(
         status: AgentStatus.failed,
@@ -643,8 +685,10 @@ class AgentEngine {
       mhe.cancelToken = _orchestratorCancelToken;
     }
 
-    // maxSteps=0 时使用兜底上限，防止无限循环
-    final maxSteps = this.maxSteps > 0 ? this.maxSteps : _defaultMaxSteps;
+    // maxSteps=0 表示无限制（用户在设置里拖到 0 即"无限制"）
+    // 死循环防护由 _noCommandRetryCount（连续无命令 2 次即终止）承担
+    final maxSteps = this.maxSteps;
+    final isUnlimited = maxSteps == 0;
     var stepCount = 0;
 
     // 判断是否为新对话
@@ -677,9 +721,9 @@ class AgentEngine {
       _accumulatedMessage = '';
     }
 
-    agentLogger.info('ReAct', '开始 ReAct 循环 (最多 $maxSteps 步)');
+    agentLogger.info('ReAct', '开始 ReAct 循环 (${isUnlimited ? "无限制" : "最多 $maxSteps 步"})');
 
-    while (stepCount < maxSteps) {
+    while (isUnlimited || stepCount < maxSteps) {
       stepCount++;
       agentLogger.info('ReAct', '--- 步骤 $stepCount ---');
 
@@ -694,6 +738,15 @@ class AgentEngine {
       if (_currentTask?.status == AgentStatus.paused) {
         agentLogger.info('ReAct', '任务已暂停，循环退出');
         return;
+      }
+
+      // 刷新 executor 引用：AgentNotifier.setExecutor 可能在用户重连后
+      // 更新了 _currentExecutor（如 sudo reboot 后用户手动重连 SSH）。
+      // 每步取最新值，避免循环持有已断开的旧 SSHService 引用。
+      final refreshed = _currentExecutor;
+      if (refreshed != null && refreshed != executor) {
+        executor = refreshed;
+        agentLogger.info('ReAct', '检测到 executor 已刷新，使用新引用 (isConnected=${executor.isConnected})');
       }
 
       // ═══════════════════════════════════════════
@@ -807,6 +860,24 @@ class AgentEngine {
       // ═══════════════════════════════════════════
       switch (step.action) {
         case ActionType.finish:
+          // 防止 AI 幻觉：未执行任何命令/工具就 finish
+          // 典型场景：AI 在 ask 后声称"已检查...无问题"但实际未运行任何命令
+          // R5: 用 _maxNoCommandRetries 限制重试次数，耗尽则放行（避免死循环）
+          if (!_hasExecutedAnyCommand && _noCommandRetryCount < _maxNoCommandRetries) {
+            _noCommandRetryCount++;
+            agentLogger.warn('ReAct',
+                'AI 未执行任何命令就 finish，强制继续 (重试 $_noCommandRetryCount/$_maxNoCommandRetries)');
+            onEvent?.call(AgentEvent.info('⚠️ AI 未实际执行命令就声称完成，要求实际验证'));
+            _conversationHistory.add(ChatMessage.create(
+              role: 'user',
+              content: '你尚未执行任何命令就声称任务完成，这不被允许。'
+                  '请立即使用 动作: execute 实际执行命令验证你的判断，'
+                  '所有结论必须有命令输出作为依据。如果任务确实无需执行命令（如纯解释/分析），'
+                  '请在思考中明确说明为什么无需执行命令。',
+            ));
+            _trimMessages(_conversationHistory);
+            continue;
+          }
           agentLogger.info('ReAct', '任务完成 (AI 返回 finish 动作)');
           _finishTask();
           return;
@@ -853,18 +924,19 @@ class AgentEngine {
       }
     }
 
-    // 达到最大步数
+    // 循环结束：可能是步数耗尽，也可能是无限制模式下 AI 主动 finish / noCommand 熔断
     // L1 修复：代际失效时不覆盖新任务状态
     if (myGeneration != _currentTaskGeneration) return;
     // R5: 步数耗尽是异常终止，应标记 failed 而非 completed
     // 标 completed 会误导用户以为任务成功完成
-    final hitMaxSteps = stepCount >= maxSteps;
+    // 无限制模式下永远不会 hitMaxSteps（循环只会因 finish/noCommand/cancel 退出）
+    final hitMaxSteps = !isUnlimited && stepCount >= maxSteps;
     _currentTask = _currentTask!.copyWith(
       status: hitMaxSteps ? AgentStatus.failed : AgentStatus.completed,
       completedAt: DateTime.now(),
     );
     _notifyTaskUpdate();
-    agentLogger.info('ReAct', '=== 执行结束 (步数: $stepCount/$maxSteps) ===');
+    agentLogger.info('ReAct', '=== 执行结束 (步数: $stepCount/${isUnlimited ? "∞" : maxSteps}) ===');
 
     if (hitMaxSteps) {
       agentLogger.warn('ReAct', '达到最大执行步数 $maxSteps');
@@ -1383,6 +1455,8 @@ class AgentEngine {
     String? commandId,
     int? myGeneration,
   }) async {
+    // 标记本任务已实际执行过命令（防止 AI 幻觉 finish）
+    _hasExecutedAnyCommand = true;
     agentLogger.info('ReAct', '执行命令: $command (commandId=$commandId)');
 
     // P0-2: trace 命令执行开始
@@ -1916,6 +1990,9 @@ class AgentEngine {
     );
     _notifyTaskUpdate();
 
+    // 标记本任务已实际执行过工具（防止 AI 幻觉 finish）
+    _hasExecutedAnyCommand = true;
+
     // 本地项目部署工作流：记录项目根目录用于路径白名单
     if (toolName == 'project_analyze' || toolName == 'build_project' || toolName == 'package_project') {
       final projectPath = args['path']?.toString() ?? '';
@@ -1926,6 +2003,9 @@ class AgentEngine {
     }
 
     try {
+      // 注入当前任务的取消令牌给工具，让工具内部调用 executeAndWait / writeFileViaPty
+      // 时能透传 cancelToken，cancelTask 时立即中断工具内的命令执行。
+      tool.cancelToken = _orchestratorCancelToken ?? _commandCancelToken;
       final result = await tool.execute(
         executor: executor,
         args: args,
@@ -1943,6 +2023,13 @@ class AgentEngine {
       }
 
       agentLogger.info('ReAct', '工具 $toolName 执行结果: success=${result.success}');
+      if (!result.success) {
+        // 失败时把 error/output 也打到日志，避免 AI 看不到失败原因瞎试
+        final detail = result.error?.isNotEmpty == true
+            ? result.error
+            : (result.output.isNotEmpty ? result.output : '(无错误详情)');
+        agentLogger.warn('ReAct', '工具 $toolName 失败详情: $detail');
+      }
 
       // 发 result 事件
       onEvent?.call(AgentEvent.result(
@@ -2105,15 +2192,34 @@ class AgentEngine {
     final stopwatch = Stopwatch()..start();
 
     // 执行前检查连接状态
+    // 自愈：若传入的 executor 已断开，但 _currentExecutor 已被 setExecutor 刷新（用户重连），
+    // 改用新 executor。避免循环持有旧 SSHService 引用导致连续失败。
     if (!executor.isConnected) {
-      agentLogger.warn('AgentEngine', '连接已断开');
-      return AgentResult(
-        success: false,
-        error: executor is SSHService
-            ? 'SSH 连接已断开，请重连后重试'
-            : '本地终端已退出，请重新打开终端',
-        duration: stopwatch.elapsed,
-      );
+      final refreshed = _currentExecutor;
+      if (refreshed != null && refreshed != executor && refreshed.isConnected) {
+        agentLogger.info('AgentEngine', '检测到旧 executor 断开，自愈切换到新 executor');
+        executor = refreshed;
+      } else {
+        _consecutiveConnFailures++;
+        agentLogger.warn('AgentEngine',
+            '连接已断开 (连续 $_consecutiveConnFailures/$_maxConnFailRetries)');
+        // 连续多次断开 → 返回明确错误引导 AI 用 ask 动作等待用户重连
+        final isSSH = executor is SSHService;
+        final hint = _consecutiveConnFailures >= _maxConnFailRetries
+            ? '（已连续失败 $_consecutiveConnFailures 次，请立即使用 动作: ask 询问用户是否已重连，'
+                '不要再尝试执行命令）'
+            : '（请使用 动作: ask 询问用户是否已重连，或等待用户重连后继续）';
+        return AgentResult(
+          success: false,
+          error: isSSH
+              ? 'SSH 连接已断开，请重连后重试$hint'
+              : '本地终端已退出，请重新打开终端$hint',
+          duration: stopwatch.elapsed,
+        );
+      }
+    } else {
+      // 连接正常：重置连续失败计数
+      _consecutiveConnFailures = 0;
     }
 
     // 创建取消令牌，cancelTask 时 complete 触发提前退出

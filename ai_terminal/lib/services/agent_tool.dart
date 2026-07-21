@@ -1,12 +1,12 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'command_executor.dart';
 import 'sftp_service.dart';
 import 'ssh_service.dart';
+import 'local_terminal_service.dart';
 import 'file_sync_service.dart';
 import 'multi_host_executor.dart';
 import 'agent_host_registry.dart';
@@ -47,6 +47,13 @@ abstract class AgentTool {
   /// 返回 JSON schema 描述字符串
   String get paramSpec;
 
+  /// 当前任务取消令牌（由 AgentEngine 在 execute 前注入）
+  ///
+  /// 工具内部调用 [CommandExecutor.executeAndWait] / [CommandExecutor.writeFileViaPty]
+  /// 时应透传此令牌，让 cancelTask 能立即中断正在执行的命令或文件写入。
+  /// 串行 Agent 模型下保证一次只有一个 tool 在执行，因此单字段安全。
+  Completer<void>? cancelToken;
+
   /// P2-6: 返回 OpenAI tools API 格式的 JSON schema。
   /// 默认实现基于 paramSpec 生成一个宽松的 schema（type=object + 任意属性）。
   /// 子类可重写以提供精确的参数类型。
@@ -70,6 +77,9 @@ abstract class AgentTool {
   /// [executor] 当前命令执行器（可能是 SSHService 或本地终端）
   /// [args] AI 传入的参数（已解析的 Map）
   /// [onProgress] 进度回调（可选）
+  ///
+  /// 子类如需响应取消，应读取 [cancelToken] 并透传给 executor.executeAndWait /
+  /// writeFileViaPty。基类只提供字段，不强制要求子类使用。
   Future<ToolResult> execute({
     required CommandExecutor executor,
     required Map<String, dynamic> args,
@@ -1243,6 +1253,7 @@ class FileWriteTool extends AgentTool {
       }
 
       String? backupPath; // 用于失败时回滚
+      String? sftpError;  // SFTP 失败原因（非 null 时触发 PTY fallback）
       try {
         // 创建父目录（如 /etc/nginx/conf.d/ 不存在）
         final parentDir = p.posix.dirname(path);
@@ -1298,28 +1309,125 @@ class FileWriteTool extends AgentTool {
         }
         return ToolResult.success(msg.toString().trimRight());
       } catch (e) {
+        sftpError = e.toString();
         // H3 失败回滚：恢复备份
         if (backupPath != null) {
-          onProgress?.call('写入失败，正在回滚 ...');
+          onProgress?.call('SFTP 写入失败，正在回滚备份 ...');
           try {
             await sftp.copyFile(backupPath!, path);
-            return ToolResult.failure(
-              'SFTP 写入失败: $e\n已自动回滚：原文件已从备份 $backupPath 恢复。',
-            );
+            onProgress?.call('原文件已从备份恢复');
           } catch (rollbackErr) {
-            return ToolResult.failure(
-              'SFTP 写入失败: $e\n回滚也失败: $rollbackErr。'
-              '原文件可能已损坏，请手动从备份 $backupPath 恢复：mv $backupPath $path',
-            );
+            // 回滚失败也继续走 PTY fallback（PTY 会覆盖原文件）
+            onProgress?.call('备份回滚失败: $rollbackErr，将尝试 PTY 写入');
           }
         }
-        return ToolResult.failure('SFTP 写入失败: $e');
       } finally {
         sftp.closeSftpOnly();
       }
+
+      // SFTP 失败 → PTY stdin fallback（绕过 SFTP 子系统，继承当前 shell 权限）
+      // 适用于：SFTP 子系统被禁用 / 当前用户对目标路径无写权限 / 已 sudo -i 进 root
+      // 走到这行说明 try 块抛了异常（catch 已执行，sftpError 已被赋值）
+      if (mode == 'write') {
+        onProgress?.call('SFTP 写入失败，尝试 PTY stdin 模式 (cat > file)...');
+        final backupInfo = backupPath != null
+            ? '\n  注意：SFTP 流程已备份原文件到 $backupPath，PTY 写入成功后可手动删除该备份'
+            : '';
+
+        // 第一次：cat > /path（适用于 root shell 或用户有权限）
+        var ptyResult = await executor.writeFileViaPty(
+          path: path,
+          content: contentBytes,
+          useSudo: false,
+          timeout: const Duration(seconds: 30),
+          cancelToken: cancelToken,
+        );
+        if (ptyResult.success) {
+          return ToolResult.success(
+            '文件写入成功（PTY stdin 模式 cat）: $path (${contentBytes.length} 字节)$backupInfo',
+          );
+        }
+        // cancelToken 触发时不再尝试 sudo tee，直接返回
+        if (cancelToken != null && cancelToken!.isCompleted) {
+          return ToolResult.failure('用户取消任务，PTY 写入中止');
+        }
+        onProgress?.call('cat 写入失败: ${ptyResult.failureReason}，尝试 sudo tee ...');
+
+        // 第二次：sudo tee /path > /dev/null（适用于非 root + sudo 可用）
+        final ptyResult2 = await executor.writeFileViaPty(
+          path: path,
+          content: contentBytes,
+          useSudo: true,
+          timeout: const Duration(seconds: 30),
+          cancelToken: cancelToken,
+        );
+        if (ptyResult2.success) {
+          return ToolResult.success(
+            '文件写入成功（PTY stdin + sudo tee）: $path (${contentBytes.length} 字节)$backupInfo',
+          );
+        }
+
+        // 两种 PTY 模式都失败
+        return ToolResult.failure(
+          'SFTP 与 PTY stdin 均失败。\n'
+          'SFTP 错误: $sftpError\n'
+          'PTY cat 错误: ${ptyResult.failureReason ?? ptyResult.stderr}\n'
+          'PTY sudo tee 错误: ${ptyResult2.failureReason ?? ptyResult2.stderr}\n'
+          '建议：检查 SSH 用户对 $path 的写权限，或确认 sudo 是否可用（NOPASSWD 或已缓存密码）。'
+          '${backupPath != null ? "\n如需回滚: mv $backupPath $path" : ""}',
+        );
+      }
+
+      // append 模式不走 PTY fallback（PTY stdin 无法精确追加）
+      return ToolResult.failure('SFTP 追加写入失败: $sftpError。append 模式不支持 PTY fallback，请检查 SFTP 子系统。');
     }
 
-    return ToolResult.failure('file_write 仅支持 SSH 远程会话，当前为本地终端');
+    // 本地终端：直接走 PTY stdin（Unix）
+    if (executor is LocalTerminalService) {
+      onProgress?.call('本地终端：尝试 PTY stdin 模式 (cat > file)...');
+      final ptyResult = await executor.writeFileViaPty(
+        path: path,
+        content: contentBytes,
+        useSudo: false,
+        timeout: const Duration(seconds: 30),
+        cancelToken: cancelToken,
+      );
+      if (ptyResult.success) {
+        return ToolResult.success(
+          '文件写入成功（本地 PTY stdin）: $path (${contentBytes.length} 字节)',
+        );
+      }
+      if (ptyResult.failureKind == CommandFailureKind.permissionDenied ||
+          ptyResult.failureReason?.contains('Permission denied') == true) {
+        // cancelToken 触发时不再尝试 sudo tee
+        if (cancelToken != null && cancelToken!.isCompleted) {
+          return ToolResult.failure('用户取消任务，PTY 写入中止');
+        }
+        onProgress?.call('cat 写入权限不足，尝试 sudo tee ...');
+        final ptyResult2 = await executor.writeFileViaPty(
+          path: path,
+          content: contentBytes,
+          useSudo: true,
+          timeout: const Duration(seconds: 30),
+          cancelToken: cancelToken,
+        );
+        if (ptyResult2.success) {
+          return ToolResult.success(
+            '文件写入成功（本地 PTY stdin + sudo tee）: $path (${contentBytes.length} 字节)',
+          );
+        }
+        return ToolResult.failure(
+          '本地 PTY 写入失败。\n'
+          'cat 错误: ${ptyResult.failureReason ?? ptyResult.stderr}\n'
+          'sudo tee 错误: ${ptyResult2.failureReason ?? ptyResult2.stderr}',
+        );
+      }
+      return ToolResult.failure(
+        '本地 PTY 写入失败: ${ptyResult.failureReason ?? ptyResult.stderr}',
+      );
+    }
+
+    return ToolResult.failure('file_write 仅支持 SSHService / LocalTerminalService，当前 executor 类型不支持');
   }
 }
 

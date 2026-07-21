@@ -18,6 +18,9 @@ enum CommandFailureKind {
   /// 连接断开（SSH 网络断开 / 本地 PTY 进程退出）
   disconnected,
 
+  /// 权限不足（写入/读取被拒绝，需要 sudo 或切换用户）
+  permissionDenied,
+
   /// 取消执行
   cancelled,
 

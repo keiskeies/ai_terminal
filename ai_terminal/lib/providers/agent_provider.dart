@@ -640,6 +640,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
     if (_registry.activeHostId == hostId) {
       _executor = executor;
       if (executor != null && _engine != null) {
+        // 同步刷新 engine 的 executor 引用：解决 sudo reboot 后用户重连 SSH
+        // 创建新 SSHService 实例，但 ReAct 循环仍持有旧引用导致连续失败的问题。
+        _engine!.setExecutor(executor);
         if (!_registry.hasSysInfoFuture(hostId)) {
           _registry.setSysInfoFuture(hostId, _engine!.collectSystemInfo(executor));
         }
@@ -649,8 +652,12 @@ class AgentNotifier extends StateNotifier<AgentState> {
     } else if (executor != null) {
       // 非活跃 host 的后台连接：用该 host 自己的 engine 收集系统信息
       final engine = _registry.getEngine(hostId);
-      if (engine != null && !_registry.hasSysInfoFuture(hostId)) {
-        _registry.setSysInfoFuture(hostId, engine.collectSystemInfo(executor));
+      if (engine != null) {
+        // 同步刷新该 host engine 的 executor 引用（与活跃 host 同等处理）
+        engine.setExecutor(executor);
+        if (!_registry.hasSysInfoFuture(hostId)) {
+          _registry.setSysInfoFuture(hostId, engine.collectSystemInfo(executor));
+        }
       }
     }
   }

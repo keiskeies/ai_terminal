@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'pty_output_detector.dart';
 
@@ -54,6 +55,29 @@ abstract class CommandExecutor {
   Future<CommandResult> executeAndWait(
     String command, {
     Duration timeout = const Duration(seconds: 60),
+    Completer<void>? cancelToken,
+  });
+
+  /// 通过 PTY stdin 写入文件（绕过 shell 转义，继承当前 shell 权限）
+  ///
+  /// **设计动机**：SFTP 在以下场景会失败 ——
+  /// 1. 当前 SSH 用户对目标路径无写权限（如普通用户写 /etc/yum.repos.d/）
+  /// 2. SFTP 子系统被禁用（硬化的服务器或 rbash）
+  /// 此时通过 PTY stdin 写文件可绕开这两个限制：
+  /// - 发送 `cat > /path`（或 `sudo tee /path > /dev/null`）让 shell 进入 stdin 等待状态
+  /// - 逐行发送文件内容，作为 cat/tee 的 stdin
+  /// - 末尾 Ctrl+D 结束
+  ///
+  /// 文件内容**不经过 shell 解析**，`$`/反引号/`[`/`"` 等都是字面字符。
+  /// 继承当前 shell 的权限（用户已 `sudo -i` 进 root 时直接有权限写 /etc/）。
+  ///
+  /// [useSudo] 为 true 时用 `sudo tee /path > /dev/null`，适用于非 root shell
+  /// （需 sudo NOPASSWD 或已缓存密码，否则会卡在密码提示）。
+  Future<CommandResult> writeFileViaPty({
+    required String path,
+    required Uint8List content,
+    bool useSudo = false,
+    Duration timeout = const Duration(seconds: 30),
     Completer<void>? cancelToken,
   });
 

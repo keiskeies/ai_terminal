@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
 import 'package:ai_terminal/services/agent_engine.dart';
@@ -32,6 +33,24 @@ class _MockExecutor implements CommandExecutor {
       stderr: '',
       exitCode: 0,
       duration: Duration.zero,
+    );
+  }
+
+  @override
+  Future<CommandResult> writeFileViaPty({
+    required String path,
+    required Uint8List content,
+    bool useSudo = false,
+    Duration timeout = const Duration(seconds: 30),
+    Completer<void>? cancelToken,
+  }) async {
+    return CommandResult(
+      stdout: '',
+      stderr: 'mock 不支持 PTY 写文件',
+      exitCode: -1,
+      duration: Duration.zero,
+      failureKind: CommandFailureKind.unknown,
+      failureReason: 'mock 不支持 PTY 写文件',
     );
   }
 

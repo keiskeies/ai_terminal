@@ -1,6 +1,7 @@
 import Cocoa
 import FlutterMacOS
 import Security
+import CryptoKit
 
 @main
 class AppDelegate: FlutterAppDelegate {
@@ -40,7 +41,23 @@ class AppDelegate: FlutterAppDelegate {
   /// 旧 Keychain 条目可能因签名不匹配无法读取（errSecAuthFailed）。
   /// 此时必须先删除旧条目再添加新条目，否则 SecItemAdd 会因 duplicate 静默失败，
   /// 导致每次启动生成不同主密钥 → 加密 DB 无法解密 → 启动黑屏。
+  ///
+  /// Debug 构建的特殊处理：
+  /// 由于 debug 模式下 `flutter run` 每次都 ad-hoc 重签名，Keychain 条目每次都不可读，
+  /// 会导致加密 DB 每次启动都被删除重建 → 用户数据每次 debug 启动都丢失。
+  /// 因此 debug 构建改用**稳定派生密钥**（基于固定 seed 的 SHA-256），
+  /// 不再走 Keychain。这样每次 debug 启动主密钥一致，加密 DB 能稳定打开。
+  /// Release 构建仍走 Keychain 保持高安全性。
   private func getOrCreateMasterKey() -> FlutterStandardTypedData {
+    #if DEBUG
+    // Debug 构建：用稳定派生密钥（SHA-256 of 固定 seed），不依赖 Keychain
+    // 注意：安全性较低（密钥可从二进制反编译得到），仅用于开发期 debug。
+    // 严禁用于 release 构建。
+    let stableSeed = "com.keiskei.aiterminal.debug.masterkey.v1".data(using: .utf8)!
+    let digest = SHA256.hash(data: stableSeed)
+    return FlutterStandardTypedData(bytes: Data(digest))
+    #else
+    // Release 构建：走 Keychain 原有逻辑
     let key = "com.keiskei.aiterminal.masterkey"
 
     // 1. 尝试从 Keychain 读取
@@ -92,6 +109,7 @@ class AppDelegate: FlutterAppDelegate {
     }
 
     return FlutterStandardTypedData(bytes: keyData)
+    #endif
   }
 
   override func applicationDidFinishLaunching(_ notification: Notification) {
