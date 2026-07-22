@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:io' show Platform, Process;
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:encrypt/encrypt.dart';
 import 'package:flutter/foundation.dart' hide Key;
 import 'package:flutter/services.dart';
@@ -72,23 +75,75 @@ class CredentialsStore {
   static Future<void> loadMasterKey() async {
     if (_masterKey != null) return; // 已加载
 
+    // 策略 1（macOS 主路径）：通过 Dart Process.run 调用 ioreg 获取 IOPlatformUUID
+    //
+    // 为什么不用平台通道作为主路径？
+    // 平台通道在 `open`（LaunchServices）启动时可能因 Flutter 引擎/窗口初始化
+    // 时序问题而失败（返回 null），导致降级到 legacy key → 密钥在 IOPlatformUUID
+    // 和 legacy 之间交替 → 每次启动都解不开上次的 DB → 归档 → 数据丢失。
+    //
+    // Dart Process.run 直接 fork/exec，不依赖 Flutter 引擎状态，启动方式无关
+    // （`open` vs 终端 vs `flutter run` 均一致），彻底消除密钥交替问题。
+    if (Platform.isMacOS) {
+      final key = await _deriveKeyFromIOPlatformUUID();
+      if (key != null) {
+        _masterKey = key;
+        _encrypter = Encrypter(AES(_masterKey!));
+        debugPrint('CredentialsStore: 主密钥已从 IOPlatformUUID 派生 (Dart Process.run)');
+        return;
+      }
+    }
+
+    // 策略 2（备用）：平台通道（AppDelegate.swift 的 getMasterKey）
     try {
       final result = await _platform.invokeMethod<Uint8List>('getMasterKey');
       if (result != null && result.length == 32) {
         _masterKey = Key(result);
         _encrypter = Encrypter(AES(_masterKey!));
-        debugPrint('CredentialsStore: 主密钥已从原生平台获取');
+        debugPrint('CredentialsStore: 主密钥已从原生平台获取（备用路径）');
         return;
       }
     } catch (e) {
       debugPrint('CredentialsStore: 获取原生主密钥失败: $e');
     }
 
-    // 降级：如果原生平台不可用，使用旧版密钥（保证向后兼容）
-    // 这种情况只会在非桌面平台或开发环境出现
-    debugPrint('CredentialsStore: 降级使用旧版密钥（不推荐）');
+    // 策略 3（降级）：legacy key（仅在其他方式全部失败时使用）
+    debugPrint('CredentialsStore: ⚠️ 降级使用旧版密钥（不推荐，可能导致数据不兼容）');
     _masterKey = _legacyKey;
     _encrypter = Encrypter(AES(_masterKey!));
+  }
+
+  /// 通过 ioreg 命令获取 IOPlatformUUID 并派生 SHA-256 主密钥
+  ///
+  /// IOPlatformUUID 是 macOS 系统安装时生成的硬件 UUID，重装系统才会变化，
+  /// 不随应用签名/build/重签名变化，适合作为密钥派生源。
+  static Future<Key?> _deriveKeyFromIOPlatformUUID() async {
+    try {
+      final result = await Process.run(
+        '/usr/sbin/ioreg',
+        ['-rd1', '-c', 'IOPlatformExpertDevice'],
+      );
+      if (result.exitCode != 0) {
+        debugPrint('CredentialsStore: ioreg 退出码 ${result.exitCode}');
+        return null;
+      }
+      final output = result.stdout as String;
+      final match =
+          RegExp(r'"IOPlatformUUID"\s*=\s*"([^"]+)"').firstMatch(output);
+      final uuid = match?.group(1);
+      if (uuid == null || uuid.isEmpty) {
+        debugPrint('CredentialsStore: ioreg 输出中未找到 IOPlatformUUID');
+        return null;
+      }
+      final seed = 'com.keiskei.aiterminal.masterkey.v2:$uuid';
+      final digest = crypto.sha256.convert(utf8.encode(seed));
+      debugPrint(
+          'CredentialsStore: IOPlatformUUID 获取成功 (prefix: ${uuid.substring(0, 8)})');
+      return Key(Uint8List.fromList(digest.bytes));
+    } catch (e) {
+      debugPrint('CredentialsStore: ioreg 执行异常: $e');
+      return null;
+    }
   }
 
   /// 获取数据库加密密码（基于 OS 主密钥的 base64 编码）

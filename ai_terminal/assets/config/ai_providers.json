@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "providers": [
     {
       "id": "agnes",
@@ -14,7 +14,7 @@
       "icon": "🦋",
       "color": "0xFF00BFA5",
       "models": [
-        { "name": "Agnes-2.0-Flash", "label": "Agnes 2.0 Flash 文本 (推荐免费)", "free": true }
+        { "name": "Agnes-2.0-Flash", "label": "Agnes 2.0 Flash 文本 (推荐免费)", "free": true, "max_tokens": 8192, "context_window": 128000, "supports_function_calling": true }
       ]
     },
     {
@@ -28,12 +28,12 @@
       "icon": "🦙",
       "color": "0xFF6366F1",
       "models": [
-        { "name": "qwen3:8b", "label": "Qwen3 8B", "free": true },
-        { "name": "qwen3:14b", "label": "Qwen3 14B", "free": true },
-        { "name": "deepseek-r1:8b", "label": "DeepSeek R1 8B", "free": true },
-        { "name": "llama3.3:8b", "label": "Llama3.3 8B", "free": true },
-        { "name": "gemma3:4b", "label": "Gemma3 4B", "free": true },
-        { "name": "mistral:7b", "label": "Mistral 7B", "free": true }
+        { "name": "qwen3:8b", "label": "Qwen3 8B", "free": true, "max_tokens": 8192, "context_window": 131072, "supports_function_calling": true },
+        { "name": "qwen3:14b", "label": "Qwen3 14B", "free": true, "max_tokens": 8192, "context_window": 131072, "supports_function_calling": true },
+        { "name": "deepseek-r1:8b", "label": "DeepSeek R1 8B", "free": true, "max_tokens": 8192, "context_window": 131072, "supports_function_calling": false },
+        { "name": "llama3.3:8b", "label": "Llama3.3 8B", "free": true, "max_tokens": 4096, "context_window": 131072, "supports_function_calling": true },
+        { "name": "gemma3:4b", "label": "Gemma3 4B", "free": true, "max_tokens": 8192, "context_window": 131072, "supports_function_calling": false },
+        { "name": "mistral:7b", "label": "Mistral 7B", "free": true, "max_tokens": 8192, "context_window": 32768, "supports_function_calling": true }
       ]
     },
     {
@@ -49,8 +49,8 @@
       "icon": "🐋",
       "color": "0xFF4D6BFE",
       "models": [
-        { "name": "deepseek-v4-flash", "label": "DeepSeek V4 Flash 1M 上下文 (推荐)" },
-        { "name": "deepseek-v4-pro", "label": "DeepSeek V4 Pro 旗舰" }
+        { "name": "deepseek-v4-flash", "label": "DeepSeek V4 Flash 1M 上下文 (推荐)", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "deepseek-v4-pro", "label": "DeepSeek V4 Pro 旗舰", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true }
       ]
     },
     {
@@ -67,12 +67,13 @@
       "icon": "🐯",
       "color": "0xFF002FA7",
       "models": [
-        { "name": "qwen3.7-max", "label": "Qwen3.7 Max 旗舰 1M 上下文 (推荐)" },
-        { "name": "qwen3.7-plus", "label": "Qwen3.7 Plus 均衡 1M (推荐编程)" },
-        { "name": "qwen3.6-flash", "label": "Qwen3.6 Flash 极速 1M" },
-        { "name": "qwen3-coder-plus", "label": "Qwen3 Coder Plus 480B 代码" },
-        { "name": "qwen3-coder-next", "label": "Qwen3 Coder Next" },
-        { "name": "qwen-long", "label": "Qwen Long 10M 超长上下文" }
+        { "name": "qwen3.8-max-preview", "label": "Qwen3.8 Max Preview 2.4T (推荐)", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "qwen3.7-max", "label": "Qwen3.7 Max 旗舰 1M 上下文", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "qwen3.7-plus", "label": "Qwen3.7 Plus 均衡 1M (推荐编程)", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "qwen3.6-flash", "label": "Qwen3.6 Flash 极速 1M", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "qwen3-coder-plus", "label": "Qwen3 Coder Plus 480B 代码", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "qwen3-coder-next", "label": "Qwen3 Coder Next", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "qwen-long", "label": "Qwen Long 10M 超长上下文", "max_tokens": 8192, "context_window": 10485760, "supports_function_calling": true }
       ]
     },
     {
@@ -89,11 +90,11 @@
       "icon": "🔮",
       "color": "0xFF6C5CE7",
       "models": [
-        { "name": "glm-5.2", "label": "GLM-5.2 旗舰 1M 上下文 (推荐)" },
-        { "name": "glm-5.1", "label": "GLM-5.1 198K 上下文" },
-        { "name": "glm-4.7", "label": "GLM-4.7 198K" },
-        { "name": "glm-4.6", "label": "GLM-4.6 355B 开源" },
-        { "name": "glm-4-flash", "label": "GLM-4 Flash 免费", "free": true }
+        { "name": "glm-5.2", "label": "GLM-5.2 旗舰 1M 上下文 (推荐)", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "glm-5.1", "label": "GLM-5.1 198K 上下文", "max_tokens": 4096, "context_window": 198000, "supports_function_calling": true },
+        { "name": "glm-4.7", "label": "GLM-4.7 198K", "max_tokens": 4096, "context_window": 198000, "supports_function_calling": true },
+        { "name": "glm-4.6", "label": "GLM-4.6 355B 开源", "max_tokens": 4096, "context_window": 131072, "supports_function_calling": true },
+        { "name": "glm-4-flash", "label": "GLM-4 Flash 免费", "free": true, "max_tokens": 4096, "context_window": 131072, "supports_function_calling": true }
       ]
     },
     {
@@ -102,7 +103,7 @@
       "provider": "OPENAI",
       "baseUrl": "https://api.moonshot.cn/v1",
       "region": "CN",
-      "description": "K2.7 Code 当前最强 Coding 模型 (¥2/¥8/¥32)，K2.6 通用旗舰 256K 上下文 (¥1.1/¥6.5/¥27)",
+      "description": "K3 (2026/7/16) 全球最大开源 2.8T 参数，1M 上下文 (¥2/¥20/¥100)；K2.7 Code 编程旗舰 (¥2/¥8/¥32)；K2.6 通用旗舰 256K (¥1.1/¥6.5/¥27)",
       "apiKeyUrl": "https://platform.moonshot.cn/console/api-keys",
       "tokenPlanUrl": "https://platform.moonshot.cn/console/usage",
       "codingPlanUrl": "https://platform.moonshot.cn/code",
@@ -110,13 +111,14 @@
       "icon": "🌙",
       "color": "0xFF1A1A2E",
       "models": [
-        { "name": "kimi-k2.7-code", "label": "Kimi K2.7 Code 当前最强 Coding (推荐)" },
-        { "name": "kimi-k2.7-code-highspeed", "label": "Kimi K2.7 Code 高速版" },
-        { "name": "kimi-k2.6", "label": "Kimi K2.6 通用旗舰 256K" },
-        { "name": "kimi-k2.5", "label": "Kimi K2.5 多模态 256K" },
-        { "name": "kimi-k2-0905-preview", "label": "Kimi K2 0905 Preview" },
-        { "name": "kimi-k2-thinking", "label": "Kimi K2 Thinking 长思考" },
-        { "name": "kimi-k2-thinking-turbo", "label": "Kimi K2 Thinking Turbo" }
+        { "name": "kimi-k3", "label": "Kimi K3 全球最大开源 2.8T (推荐)", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "kimi-k2.7-code", "label": "Kimi K2.7 Code 编程", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "kimi-k2.7-code-highspeed", "label": "Kimi K2.7 Code 高速版", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "kimi-k2.6", "label": "Kimi K2.6 通用旗舰 256K", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "kimi-k2.5", "label": "Kimi K2.5 多模态 256K", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "kimi-k2-0905-preview", "label": "Kimi K2 0905 Preview", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "kimi-k2-thinking", "label": "Kimi K2 Thinking 长思考", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "kimi-k2-thinking-turbo", "label": "Kimi K2 Thinking Turbo", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true }
       ]
     },
     {
@@ -133,11 +135,11 @@
       "icon": "🫘",
       "color": "0xFFFE2C55",
       "models": [
-        { "name": "doubao-seed-evolving", "label": "Doubao Seed Evolving 1M 上下文 (推荐 Coding)" },
-        { "name": "doubao-seed-2-1-pro", "label": "Doubao Seed 2.1 Pro 生产级旗舰" },
-        { "name": "doubao-seed-2-1-turbo", "label": "Doubao Seed 2.1 Turbo 均衡" },
-        { "name": "doubao-seed-2-0-mini", "label": "Doubao Seed 2.0 Mini 低成本" },
-        { "name": "doubao-seed-1-6-251015", "label": "Doubao Seed 1.6 251015 旧版" }
+        { "name": "doubao-seed-evolving", "label": "Doubao Seed Evolving 1M 上下文 (推荐 Coding)", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "doubao-seed-2-1-pro", "label": "Doubao Seed 2.1 Pro 生产级旗舰", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "doubao-seed-2-1-turbo", "label": "Doubao Seed 2.1 Turbo 均衡", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "doubao-seed-2-0-mini", "label": "Doubao Seed 2.0 Mini 低成本", "max_tokens": 4096, "context_window": 262144, "supports_function_calling": true },
+        { "name": "doubao-seed-1-6-251015", "label": "Doubao Seed 1.6 251015 旧版", "max_tokens": 4096, "context_window": 262144, "supports_function_calling": true }
       ]
     },
     {
@@ -154,9 +156,9 @@
       "icon": "📱",
       "color": "0xFFFF6900",
       "models": [
-        { "name": "mimo-v2.5-pro", "label": "MiMo V2.5 Pro 旗舰 (推荐)" },
-        { "name": "mimo-v2.5-pro-ultraspeed", "label": "MiMo V2.5 Pro UltraSpeed 1000 t/s" },
-        { "name": "mimo-v2.5", "label": "MiMo V2.5 1M 上下文" }
+        { "name": "mimo-v2.5-pro", "label": "MiMo V2.5 Pro 旗舰 (推荐)", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "mimo-v2.5-pro-ultraspeed", "label": "MiMo V2.5 Pro UltraSpeed 1000 t/s", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "mimo-v2.5", "label": "MiMo V2.5 1M 上下文", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true }
       ]
     },
     {
@@ -173,10 +175,10 @@
       "icon": "🎯",
       "color": "0xFF00D4AA",
       "models": [
-        { "name": "MiniMax-M3", "label": "MiniMax M3 最新旗舰 (推荐)" },
-        { "name": "MiniMax-M2.7", "label": "MiniMax M2.7" },
-        { "name": "MiniMax-M2.7-Highspeed", "label": "MiniMax M2.7 Highspeed 高速" },
-        { "name": "MiniMax-M2.5", "label": "MiniMax M2.5 经济" }
+        { "name": "MiniMax-M3", "label": "MiniMax M3 最新旗舰 (推荐)", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "MiniMax-M2.7", "label": "MiniMax M2.7", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "MiniMax-M2.7-Highspeed", "label": "MiniMax M2.7 Highspeed 高速", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "MiniMax-M2.5", "label": "MiniMax M2.5 经济", "max_tokens": 4096, "context_window": 262144, "supports_function_calling": true }
       ]
     },
     {
@@ -192,10 +194,10 @@
       "icon": "🌊",
       "color": "0xFF7C3AED",
       "models": [
-        { "name": "deepseek-ai/DeepSeek-V4-Flash", "label": "DeepSeek V4 Flash 免费", "free": true },
-        { "name": "deepseek-ai/DeepSeek-V4-Pro", "label": "DeepSeek V4 Pro" },
-        { "name": "Qwen/Qwen3.6-Flash", "label": "Qwen3.6 Flash 免费", "free": true },
-        { "name": "Qwen/Qwen3.7-Plus", "label": "Qwen3.7 Plus" }
+        { "name": "deepseek-ai/DeepSeek-V4-Flash", "label": "DeepSeek V4 Flash 免费", "free": true, "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "deepseek-ai/DeepSeek-V4-Pro", "label": "DeepSeek V4 Pro", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "Qwen/Qwen3.6-Flash", "label": "Qwen3.6 Flash 免费", "free": true, "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "Qwen/Qwen3.7-Plus", "label": "Qwen3.7 Plus", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true }
       ]
     },
     {
@@ -212,10 +214,10 @@
       "icon": "🚀",
       "color": "0xFFE11D48",
       "models": [
-        { "name": "step-3.7-flash", "label": "Step 3.7 Flash 多模态 (推荐)" },
-        { "name": "step-3.5-flash-2603", "label": "Step 3.5 Flash 2603 Agent 优化" },
-        { "name": "step-3.5-flash", "label": "Step 3.5 Flash" },
-        { "name": "step-2", "label": "Step 2" }
+        { "name": "step-3.7-flash", "label": "Step 3.7 Flash 多模态 (推荐)", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "step-3.5-flash-2603", "label": "Step 3.5 Flash 2603 Agent 优化", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "step-3.5-flash", "label": "Step 3.5 Flash", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "step-2", "label": "Step 2", "max_tokens": 4096, "context_window": 32768, "supports_function_calling": false }
       ]
     },
     {
@@ -231,10 +233,10 @@
       "icon": "🏔️",
       "color": "0xFF2563EB",
       "models": [
-        { "name": "Baichuan4-Turbo", "label": "Baichuan4 Turbo 高速 (推荐)" },
-        { "name": "Baichuan4-Air", "label": "Baichuan4 Air 轻量" },
-        { "name": "Baichuan4", "label": "Baichuan4 旗舰" },
-        { "name": "Baichuan3-Turbo-128k", "label": "Baichuan3 Turbo 128K" }
+        { "name": "Baichuan4-Turbo", "label": "Baichuan4 Turbo 高速 (推荐)", "max_tokens": 4096, "context_window": 131072, "supports_function_calling": true },
+        { "name": "Baichuan4-Air", "label": "Baichuan4 Air 轻量", "max_tokens": 4096, "context_window": 32768, "supports_function_calling": true },
+        { "name": "Baichuan4", "label": "Baichuan4 旗舰", "max_tokens": 4096, "context_window": 131072, "supports_function_calling": true },
+        { "name": "Baichuan3-Turbo-128k", "label": "Baichuan3 Turbo 128K", "max_tokens": 4096, "context_window": 131072, "supports_function_calling": false }
       ]
     },
     {
@@ -250,9 +252,9 @@
       "icon": "✨",
       "color": "0xFFFF6B00",
       "models": [
-        { "name": "4.0Ultra", "label": "Spark 4.0 Ultra (推荐)" },
-        { "name": "max-3", "label": "Spark Max" },
-        { "name": "lite", "label": "Spark Lite 免费", "free": true }
+        { "name": "4.0Ultra", "label": "Spark 4.0 Ultra (推荐)", "max_tokens": 4096, "context_window": 131072, "supports_function_calling": true },
+        { "name": "max-3", "label": "Spark Max", "max_tokens": 4096, "context_window": 32768, "supports_function_calling": true },
+        { "name": "lite", "label": "Spark Lite 免费", "free": true, "max_tokens": 4096, "context_window": 8192, "supports_function_calling": false }
       ]
     },
     {
@@ -268,10 +270,10 @@
       "icon": "☁️",
       "color": "0xFF006EFF",
       "models": [
-        { "name": "Hunyuan-a13b", "label": "Hunyuan A13B 通用最便宜 (推荐)" },
-        { "name": "Hunyuan-role-latest", "label": "Hunyuan Role 角色扮演" },
-        { "name": "Hunyuan-translation", "label": "Hunyuan Translation 翻译" },
-        { "name": "Hunyuan-translation-lite", "label": "Hunyuan Translation Lite 翻译轻量" }
+        { "name": "Hunyuan-a13b", "label": "Hunyuan A13B 通用最便宜 (推荐)", "max_tokens": 4096, "context_window": 32768, "supports_function_calling": true },
+        { "name": "Hunyuan-role-latest", "label": "Hunyuan Role 角色扮演", "max_tokens": 4096, "context_window": 32768, "supports_function_calling": false },
+        { "name": "Hunyuan-translation", "label": "Hunyuan Translation 翻译", "max_tokens": 4096, "context_window": 32768, "supports_function_calling": false },
+        { "name": "Hunyuan-translation-lite", "label": "Hunyuan Translation Lite 翻译轻量", "max_tokens": 4096, "context_window": 32768, "supports_function_calling": false }
       ]
     },
     {
@@ -288,11 +290,11 @@
       "icon": "🤖",
       "color": "0xFF6ECC54",
       "models": [
-        { "name": "gpt-5.5", "label": "GPT-5.5 旗舰 (推荐)" },
-        { "name": "gpt-5.4", "label": "GPT-5.4 均衡" },
-        { "name": "gpt-5.4-mini", "label": "GPT-5.4 Mini 经济" },
-        { "name": "gpt-4o", "label": "GPT-4o" },
-        { "name": "gpt-4o-mini", "label": "GPT-4o Mini" }
+        { "name": "gpt-5.5", "label": "GPT-5.5 旗舰 (推荐)", "max_tokens": 16384, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "gpt-5.4", "label": "GPT-5.4 均衡", "max_tokens": 16384, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "gpt-5.4-mini", "label": "GPT-5.4 Mini 经济", "max_tokens": 16384, "context_window": 409600, "supports_function_calling": true },
+        { "name": "gpt-4o", "label": "GPT-4o", "max_tokens": 16384, "context_window": 131072, "supports_function_calling": true },
+        { "name": "gpt-4o-mini", "label": "GPT-4o Mini", "max_tokens": 16384, "context_window": 131072, "supports_function_calling": true }
       ]
     },
     {
@@ -309,9 +311,9 @@
       "icon": "🎭",
       "color": "0xFFD4A574",
       "models": [
-        { "name": "claude-fable-5", "label": "Claude Fable 5 旗舰 (推荐)" },
-        { "name": "claude-opus-4-8", "label": "Claude Opus 4.8 Agentic Coding" },
-        { "name": "claude-mythos-5", "label": "Claude Mythos 5 (邀请制)" }
+        { "name": "claude-fable-5", "label": "Claude Fable 5 旗舰 (推荐)", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "claude-opus-4-8", "label": "Claude Opus 4.8 Agentic Coding", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "claude-mythos-5", "label": "Claude Mythos 5 (邀请制)", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true }
       ]
     },
     {
@@ -327,11 +329,11 @@
       "icon": "💎",
       "color": "0xFF4285F4",
       "models": [
-        { "name": "gemini-3.5-flash", "label": "Gemini 3.5 Flash 最新稳定 (推荐)" },
-        { "name": "gemini-3-pro", "label": "Gemini 3 Pro" },
-        { "name": "gemini-3-flash", "label": "Gemini 3 Flash" },
-        { "name": "gemini-2.5-pro", "label": "Gemini 2.5 Pro" },
-        { "name": "gemini-2.5-flash", "label": "Gemini 2.5 Flash 经济" }
+        { "name": "gemini-3.5-flash", "label": "Gemini 3.5 Flash 最新稳定 (推荐)", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "gemini-3-pro", "label": "Gemini 3 Pro", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "gemini-3-flash", "label": "Gemini 3 Flash", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "gemini-2.5-pro", "label": "Gemini 2.5 Pro", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "gemini-2.5-flash", "label": "Gemini 2.5 Flash 经济", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true }
       ]
     },
     {
@@ -347,10 +349,10 @@
       "icon": "⚡",
       "color": "0xFF0F0F0F",
       "models": [
-        { "name": "grok-4.5", "label": "Grok 4.5 最新旗舰 (推荐)" },
-        { "name": "grok-4.20", "label": "Grok 4.20" },
-        { "name": "grok-4", "label": "Grok 4" },
-        { "name": "grok-3", "label": "Grok 3" }
+        { "name": "grok-4.5", "label": "Grok 4.5 最新旗舰 (推荐)", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "grok-4.20", "label": "Grok 4.20", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "grok-4", "label": "Grok 4", "max_tokens": 8192, "context_window": 131072, "supports_function_calling": true },
+        { "name": "grok-3", "label": "Grok 3", "max_tokens": 8192, "context_window": 131072, "supports_function_calling": true }
       ]
     },
     {
@@ -366,9 +368,9 @@
       "icon": "🌀",
       "color": "0xFFF97316",
       "models": [
-        { "name": "mistral-large-3", "label": "Mistral Large 3 旗舰 (推荐)" },
-        { "name": "mistral-small-4", "label": "Mistral Small 4 开源" },
-        { "name": "codestral-latest", "label": "Codestral 代码" }
+        { "name": "mistral-large-3", "label": "Mistral Large 3 旗舰 (推荐)", "max_tokens": 8192, "context_window": 131072, "supports_function_calling": true },
+        { "name": "mistral-small-4", "label": "Mistral Small 4 开源", "max_tokens": 8192, "context_window": 32768, "supports_function_calling": true },
+        { "name": "codestral-latest", "label": "Codestral 代码", "max_tokens": 8192, "context_window": 32768, "supports_function_calling": true }
       ]
     },
     {
@@ -384,12 +386,13 @@
       "icon": "🔀",
       "color": "0xFF6D28D9",
       "models": [
-        { "name": "moonshotai/kimi-k2.7-code", "label": "Kimi K2.7 Code (推荐 Coding)" },
-        { "name": "moonshotai/kimi-k2.6", "label": "Kimi K2.6 通用旗舰" },
-        { "name": "anthropic/claude-fable-5", "label": "Claude Fable 5" },
-        { "name": "openai/gpt-5.5", "label": "GPT-5.5 旗舰" },
-        { "name": "google/gemini-3.5-flash", "label": "Gemini 3.5 Flash" },
-        { "name": "zhipuai/glm-5.2", "label": "GLM-5.2 编码旗舰" }
+        { "name": "moonshotai/kimi-k3", "label": "Kimi K3 2.8T 开源旗舰 (推荐 Coding)", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "moonshotai/kimi-k2.7-code", "label": "Kimi K2.7 Code 编程", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "moonshotai/kimi-k2.6", "label": "Kimi K2.6 通用旗舰", "max_tokens": 8192, "context_window": 262144, "supports_function_calling": true },
+        { "name": "anthropic/claude-fable-5", "label": "Claude Fable 5", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "openai/gpt-5.5", "label": "GPT-5.5 旗舰", "max_tokens": 16384, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "google/gemini-3.5-flash", "label": "Gemini 3.5 Flash", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true },
+        { "name": "zhipuai/glm-5.2", "label": "GLM-5.2 编码旗舰", "max_tokens": 8192, "context_window": 1048576, "supports_function_calling": true }
       ]
     },
     {
@@ -405,10 +408,10 @@
       "icon": "⚡",
       "color": "0xFFF55036",
       "models": [
-        { "name": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B (推荐)" },
-        { "name": "llama-3.1-8b-instant", "label": "Llama 3.1 8B 快速" },
-        { "name": "openai/gpt-oss-120b", "label": "GPT-OSS 120B OpenAI 开源" },
-        { "name": "openai/gpt-oss-20b", "label": "GPT-OSS 20B 经济" }
+        { "name": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B (推荐)", "max_tokens": 32768, "context_window": 131072, "supports_function_calling": true },
+        { "name": "llama-3.1-8b-instant", "label": "Llama 3.1 8B 快速", "max_tokens": 8192, "context_window": 131072, "supports_function_calling": true },
+        { "name": "openai/gpt-oss-120b", "label": "GPT-OSS 120B OpenAI 开源", "max_tokens": 32768, "context_window": 131072, "supports_function_calling": true },
+        { "name": "openai/gpt-oss-20b", "label": "GPT-OSS 20B 经济", "max_tokens": 8192, "context_window": 131072, "supports_function_calling": true }
       ]
     },
     {

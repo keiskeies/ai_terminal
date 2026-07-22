@@ -198,6 +198,30 @@ jobs:
 
             AI Terminal 是一款将 AI 助手与 SSH / 本地终端深度集成的跨平台应用。无论你是刚买服务器的小白、不想记命令的开发者、还是需要批量管理服务器的运维人员——打开它，用中文告诉 AI 你要干什么，它帮你连服务器、跑命令、装软件、查问题。全程安全可控。
 
+            ### 🆕 v1.3.6 新功能 · AI 能力扩展 & 数据安全加固
+
+            v1.3.6 聚焦 **AI 能力扩展**与**数据安全加固**，新增联网搜索、模型配置完善，并彻底修复了 macOS 开发模式下每次构建后数据丢失的关键 bug。
+
+            #### 🔍 AI 联网搜索
+            - **7 大搜索引擎**：Bing 网页抓取 / DuckDuckGo / Brave Search API / SearXNG 自托管 / Tavily / Bing API / SerpAPI
+            - **完全免费方案**：Bing HTML 抓取 + DuckDuckGo 兜底，无需任何 API Key
+            - **智能降级链**：主搜索引擎失败时自动切换备用引擎
+            - **网页内容抓取**：`fetch_url` 工具按需抓取网页正文
+            - **两级开关**：全局设置开关 + 每会话独立开关
+
+            #### 🤖 AI 模型配置完善
+            - **模型参数补全**：47 个预设模型补充 `max_tokens` / `context_window` / `supports_function_calling` 字段
+            - **新增模型**：Kimi K3、Qwen3.8-max-preview
+            - **备用模型修复**：修复下拉框无法选择/输入的 bug
+            - **原生 Function Calling**：支持按模型开关，兼容小模型
+
+            #### 🔐 macOS 数据安全修复（关键修复）
+            - **根因**：ad-hoc 签名下每次构建 cdhash 变化 → Keychain 不可读 → 主密钥丢失 → 数据库被归档重建
+            - **稳定密钥方案**：改用 `IOPlatformUUID` 派生 SHA-256 密钥，不依赖应用签名
+            - **Dart 端密钥派生**：`Process.run('ioreg')` 绕开不稳定的平台通道
+            - **历史数据自动恢复**：从 `.bak` 备份一次性恢复历史数据
+            - **旧密钥兼容**：候选密钥列表尝试解密旧数据库
+
             ### 🆕 v1.3.5 新功能 · 运维能力大升级
 
             v1.3.5 是一次重大更新，新增**服务器监控**、**变更台账**、**运维工作流**、**通知中心**、**玻璃态 UI** 五大核心功能，全方位提升运维效率。
@@ -308,6 +332,30 @@ jobs:
             **Control your servers with natural language. AI runs the commands for you.**
 
             AI Terminal is a cross-platform app that deeply integrates an AI assistant with SSH and local terminals. Whether you're a beginner who just rented a VPS, a developer tired of googling commands, or a DevOps engineer managing dozens of servers — open it, tell the AI what you want in plain English (or Chinese), and it handles the rest. Safe, transparent, and under your control.
+
+            ### 🆕 What's New in v1.3.6 · AI Capability Expansion & Data Security Hardening
+
+            v1.3.6 focuses on **expanding AI capabilities** and **hardening data security** — adding web search, refining model configs, and permanently fixing the critical bug where macOS dev builds wiped the database after every `flutter build`.
+
+            #### 🔍 AI Web Search
+            - **7 search engines**: Bing HTML scraping / DuckDuckGo / Brave Search API / SearXNG self-hosted / Tavily / Bing API / SerpAPI
+            - **Completely free option**: Bing HTML scraping + DuckDuckGo fallback, no API key required
+            - **Smart fallback chain**: automatically switches to a backup engine on failure
+            - **Web page fetching**: `fetch_url` tool grabs page content on demand
+            - **Two-level toggle**: global settings switch + per-session toggle
+
+            #### 🤖 AI Model Config Refinement
+            - **Model params filled in**: added `max_tokens` / `context_window` / `supports_function_calling` for 47 preset models
+            - **New models**: Kimi K3, Qwen3.8-max-preview
+            - **Fallback model fix**: fixed a bug where the dropdown couldn't be selected or typed into
+            - **Native Function Calling**: per-model toggle, compatible with smaller models
+
+            #### 🔐 macOS Data Security Fix (Critical)
+            - **Root cause**: ad-hoc signing changed cdhash each build → Keychain unreadable → master key lost → DB archived and rebuilt empty
+            - **Stable key scheme**: derives SHA-256 key from `IOPlatformUUID`, independent of app signing
+            - **Dart-side key derivation**: `Process.run('ioreg')` bypasses the unreliable platform channel
+            - **Automatic data recovery**: one-time recovery of historical data from `.bak` backup
+            - **Legacy key compat**: candidate-key list tries to decrypt old databases
 
             ### 🆕 What's New in v1.3.5 · Ops Capability Mega Upgrade
 

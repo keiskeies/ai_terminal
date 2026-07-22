@@ -570,6 +570,11 @@ class _AIModelDialogState extends State<AIModelDialog> {
                                     setState(() {
                                       _modelNameController.text = m.name;
                                       _testResult = null;
+                                      // 自动回填模型参数（仅当内置预设值有效时）
+                                      // 用户后续仍可在高级设置中手动覆盖
+                                      if (m.maxTokens > 0) _maxTokens = m.maxTokens;
+                                      if (m.contextWindow > 0) _contextWindow = m.contextWindow;
+                                      _supportsFunctionCalling = m.supportsFunctionCalling;
                                     });
                                   },
                                 );
@@ -704,6 +709,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                                 ),
                               ],
                             ),
+                            const SizedBox(height: 16),
                             // Max Tokens
                             TextFormField(
                               controller: TextEditingController(text: _maxTokens.toString()),
@@ -715,6 +721,7 @@ class _AIModelDialogState extends State<AIModelDialog> {
                               keyboardType: TextInputType.number,
                               onChanged: (v) => _maxTokens = int.tryParse(v) ?? 4096,
                             ),
+                            const SizedBox(height: 16),
                             // Context Window（0 = 使用默认 32768）
                             TextFormField(
                               controller: TextEditingController(text: _contextWindow.toString()),
@@ -728,20 +735,28 @@ class _AIModelDialogState extends State<AIModelDialog> {
                               keyboardType: TextInputType.number,
                               onChanged: (v) => _contextWindow = int.tryParse(v) ?? 0,
                             ),
+                            const SizedBox(height: 16),
                             // Fallback 模型选择（P1-4）
                             // 主模型重试 maxRetries 次仍失败时，自动切换到该备用模型重试一次
+                            // 仅可选择已保存的其他模型，候选列表排除自身防死循环
                             Builder(builder: (context) {
                               final allModels = AIModelsDao.cached;
-                              // 排除自身（防止 fallback 指向自己导致死循环）
                               final candidates = allModels
                                   .where((m) => widget.model == null || m.id != widget.model!.id)
                                   .toList();
+                              // 修正：initialValue 必须存在于候选列表中，否则 DropdownButtonFormField
+                              // 会因找不到匹配项而无法展开。常见场景：fallback 指向的模型已被删除。
+                              final effectiveValue = (candidates.any((m) => m.id == _fallbackModelId))
+                                  ? _fallbackModelId
+                                  : null;
                               return DropdownButtonFormField<String?>(
-                                initialValue: _fallbackModelId,
+                                value: effectiveValue,
                                 decoration: InputDecoration(
                                   labelText: '备用模型 (可选)',
                                   labelStyle: TextStyle(color: tc.textSub),
-                                  helperText: '主模型失败时自动切换到此模型重试',
+                                  helperText: candidates.isEmpty
+                                      ? '请先保存当前模型，再返回设置备用模型'
+                                      : '主模型失败时自动切换到此模型重试',
                                   helperStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
                                 ),
                                 style: TextStyle(color: tc.textMain),
@@ -755,7 +770,9 @@ class _AIModelDialogState extends State<AIModelDialog> {
                                     child: Text('${m.name} (${m.modelName})', style: TextStyle(color: tc.textMain)),
                                   )),
                                 ],
-                                onChanged: (v) => setState(() => _fallbackModelId = v),
+                                onChanged: candidates.isEmpty
+                                    ? null // 无候选时禁用选择
+                                    : (v) => setState(() => _fallbackModelId = v),
                               );
                             }),
                             const SizedBox(height: 8),

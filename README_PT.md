@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-    <img src="https://img.shields.io/badge/version-1.3.5-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.6-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
@@ -61,9 +61,9 @@
 
 **Todos os cenários acima? Uma frase para o AI Terminal resolve.**
 
-## 🆕 Novidades na v1.3.5
+## 🆕 Novidades na v1.3.6
 
-A v1.3.5 é uma atualização importante com **5 novas funcionalidades principais**: Monitoramento do servidor, Registro de alterações, Runbooks Ops, Central de notificações e UI de glassmorfismo — uma atualização completa para a eficiência de DevOps.
+A v1.3.6 é uma atualização importante com **5 novas funcionalidades principais**: Monitoramento do servidor, Registro de alterações, Runbooks Ops, Central de notificações e UI de glassmorfismo — uma atualização completa para a eficiência de DevOps.
 
 ### 📊 Painel de Monitoramento do Servidor em Tempo Real
 
@@ -385,7 +385,7 @@ Abaixo: digitando "install openclaw" após conectar por SSH em um servidor Ubunt
   - [x] 🤖 Seleção rápida de modelo predefinido (com um clique)
   - [x] 🦙 Implantação local Ollama (sem chave API, totalmente gratuito)
   - [x] 📐 Otimização da caixa de diálogo de adição de modelo (layout de duas colunas em tela ampla)
-- [x] v1.3.5 — Mega Atualização de Capacidades de Ops
+- [x] v1.3.6 — Mega Atualização de Capacidades de Ops
   - [x] 📊 Monitoramento de servidor em tempo real (CPU/memória/disco/rede, multi-host paralelo)
   - [x] 📝 Registros de alteração e logs de auditoria (histórico completo de operações, rastreável e pronto para rollback)
   - [x] 📋 Runbooks Ops (modelos integrados + personalizados, execução com um clique)

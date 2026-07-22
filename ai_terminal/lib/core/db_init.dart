@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:crypto/crypto.dart' as crypto;
 import 'dart:io';
+import 'dart:convert';
 import '../services/daos.dart';
 import 'credentials_store.dart';
 
@@ -54,22 +56,141 @@ class DbInit {
     // 检测旧明文 DB 并迁移到加密格式（仅首次升级时执行）
     await _migratePlaintextDbIfNeeded(dbPath, password);
 
-    // 尝试打开加密 DB；若密钥不匹配（ad-hoc 重签名导致 Keychain 主密钥变化），
-    // 直接删除旧加密 DB 并新建 — 绝不从 .bak 恢复，否则每次密钥变化都会
-    // 把数据库回退到 .bak 的旧状态，丢失用户在旧密钥期间产生的所有数据。
+    // 尝试打开加密 DB；若密钥不匹配，尝试旧密钥候选列表后再决定是否归档。
+    //
+    // 历史背景：早期版本 Keychain 主密钥会因 ad-hoc 重签名变化，导致每次 build 后
+    // 密钥不同 → 加密 DB 解不开 → 数据丢失。现已改用 IOPlatformUUID 派生稳定密钥，
+    // 但用户历史 DB 可能由旧密钥加密。这里尝试候选密钥列表解密旧库：
+    //   1. 当前主密钥（IOPlatformUUID 派生）
+    //   2. debug 稳定密钥（SHA256 of "com.keiskei.aiterminal.debug.masterkey.v1"）
+    //   3. legacy 硬编码密钥（'A1TerminalSecureKey2024XYZ!@#$%^'）
+    // 任一成功即用该密钥解出数据 → 用当前主密钥重加密保存。
+    // 全部失败才归档 + 新建空 DB。
     try {
       _db = await _openEncryptedDb(dbPath, password);
     } catch (e) {
-      debugPrint('[DbInit] 打开加密 DB 失败（密钥可能变化），新建空 DB: $e');
-      // 备份无法解密的 DB（用户后续可手动找回数据），再删除让 onCreate 重建
-      await _archiveUnopenableDb(dbPath);
+      debugPrint('[DbInit] 当前密钥打开失败，尝试旧密钥候选列表: $e');
+      final recovered = await _tryRecoverWithLegacyKeys(dbPath, password);
+      if (recovered) {
+        debugPrint('[DbInit] ✅ 旧密钥解密成功，数据已用当前密钥重加密');
+      } else {
+        debugPrint('[DbInit] ❌ 所有旧密钥均失败，归档旧 DB 并新建空 DB');
+        await _archiveUnopenableDb(dbPath);
+      }
       _db = await _openEncryptedDb(dbPath, password);
     }
 
+    // 从 .bak 恢复历史数据（一次性，必须在 _loadAllCaches 之前执行）
+    // .bak 是明文→加密迁移时生成的明文备份。如果当前 DB 是新建的空库
+    // （因密钥交替问题导致数据丢失），从 .bak 恢复用户数据。
+    // 顺序很重要：先恢复到 DB，再加载缓存，否则缓存为空 → UI 显示空数据。
+    await _recoverFromBakIfNeeded(dbPath);
+
     // 加载所有 DAO 内存缓存（供 sync 读路径使用）
+    // 必须在 _recoverFromBakIfNeeded 之后，确保缓存包含已恢复的数据
     await _loadAllCaches();
 
     debugPrint('[DbInit] 初始化成功: $dbPath (v$_schemaVersion, encrypted)');
+  }
+
+  /// 从 .bak（明文备份）恢复数据到当前加密 DB
+  ///
+  /// 触发条件：
+  /// 1. .bak 文件存在且为明文 SQLite
+  /// 2. 未曾恢复过（migration_meta 中无 bak_recovered 标记）
+  ///
+  /// 恢复策略：INSERT OR IGNORE，跳过已存在的行（PK 冲突）
+  /// 跳过的表：
+  /// - migration_meta：避免覆盖迁移标记
+  /// - credentials_fallback：旧密钥加密的凭据无法用新密钥解密
+  static Future<void> _recoverFromBakIfNeeded(String dbPath) async {
+    final bakPath = '$dbPath$_dbBackupSuffix';
+    final bakFile = File(bakPath);
+    if (!await bakFile.exists()) return;
+
+    // 检查是否已恢复过
+    try {
+      final rows = await _db!.query(
+        'migration_meta',
+        where: 'key = ?',
+        whereArgs: ['bak_recovered'],
+      );
+      if (rows.isNotEmpty) return; // 已恢复过
+    } catch (_) {
+      return; // 表不存在或其他错误，跳过
+    }
+
+    // 检查 .bak 是否为明文 SQLite
+    bool isPlaintext = false;
+    try {
+      final raf = await bakFile.open();
+      try {
+        final header = await raf.read(16);
+        const sqliteHeader = [
+          0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66,
+          0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00,
+        ];
+        isPlaintext = header.length == 16;
+        for (int i = 0; isPlaintext && i < 16; i++) {
+          if (header[i] != sqliteHeader[i]) isPlaintext = false;
+        }
+      } finally {
+        await raf.close();
+      }
+    } catch (_) {
+      return;
+    }
+    if (!isPlaintext) return;
+
+    debugPrint('[DbInit] 检测到 .bak 明文备份，开始恢复数据...');
+
+    // 跳过的表（避免覆盖迁移标记 / 导入无法解密的旧凭据）
+    const skipTables = {'migration_meta', 'credentials_fallback'};
+
+    final bakDb = await openDatabase(bakPath, readOnly: true);
+    try {
+      final tables = await bakDb.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' "
+        "AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
+      );
+      int totalRecovered = 0;
+      for (final t in tables) {
+        final name = t['name'] as String;
+        if (skipTables.contains(name)) continue;
+        try {
+          final rows = await bakDb.query(name);
+          if (rows.isEmpty) continue;
+          int recovered = 0;
+          for (final row in rows) {
+            try {
+              await _db!.insert(
+                name,
+                row,
+                conflictAlgorithm: ConflictAlgorithm.ignore,
+              );
+              recovered++;
+            } catch (_) {
+              // 列不匹配等错误，跳过该行
+            }
+          }
+          totalRecovered += recovered;
+          debugPrint('[DbInit] 从 .bak 恢复表 $name: $recovered/${rows.length} 行');
+        } catch (e) {
+          debugPrint('[DbInit] 恢复表 $name 失败: $e');
+        }
+      }
+      debugPrint('[DbInit] ✅ 从 .bak 恢复完成，共 $totalRecovered 行');
+    } finally {
+      await bakDb.close();
+    }
+
+    // 标记已恢复（避免重复导入）
+    try {
+      await _db!.insert('migration_meta', {
+        'key': 'bak_recovered',
+        'value': DateTime.now().millisecondsSinceEpoch.toString(),
+      });
+    } catch (_) {}
   }
 
   /// 打开加密 DB（设置 PRAGMA key）
@@ -85,6 +206,131 @@ class DbInit {
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+  }
+
+  /// 尝试用历史主密钥候选列表解密旧 DB。
+  ///
+  /// 迁移策略：找到能解密的旧密钥后，读出全部表数据 → 删除旧文件 →
+  /// 用当前主密钥新建加密 DB → 写回数据。这样用户从任意旧版本升级到
+  /// IOPlatformUUID 密钥方案都能无感保留数据。
+  ///
+  /// 候选密钥：
+  /// 1. debug 稳定密钥（SHA256 of "com.keiskei.aiterminal.debug.masterkey.v1"）
+  ///    - 用于 debug 构建产生的旧 DB
+  /// 2. legacy 硬编码密钥（'A1TerminalSecureKey2024XYZ!@#$%^'）
+  ///    - 用于更早期版本产生的 DB
+  ///
+  /// 返回 true 表示恢复成功；false 表示所有候选密钥都失败。
+  static Future<bool> _tryRecoverWithLegacyKeys(
+    String dbPath,
+    String currentPassword,
+  ) async {
+    // 候选密钥列表（base64 编码，与 CredentialsStore.getDatabasePassword 格式一致）
+    final candidates = <String>[
+      // debug 稳定密钥：SHA256 of "com.keiskei.aiterminal.debug.masterkey.v1"
+      _sha256Base64('com.keiskei.aiterminal.debug.masterkey.v1'),
+      // legacy 硬编码密钥的 base64
+      // CredentialsStore.getDatabasePassword() 返回 _masterKey.base64，
+      // legacy key 是 Key.fromUtf8('A1TerminalSecureKey2024XYZ!@#$%^')，
+      // 所以密码 = base64(utf8('A1TerminalSecureKey2024XYZ!@#$%^'))
+      base64.encode(utf8.encode('A1TerminalSecureKey2024XYZ!@#\$%^')),
+    ];
+
+    for (int i = 0; i < candidates.length; i++) {
+      final candidate = candidates[i];
+      debugPrint('[DbInit] 尝试候选密钥 #${i + 1}/${candidates.length}');
+      try {
+        // 尝试用候选密钥打开旧 DB（只读模式）
+        final oldDb = await openDatabase(
+          dbPath,
+          readOnly: true,
+          onConfigure: (db) async {
+            await db.execute("PRAGMA key = '${_escapeSqlString(candidate)}';");
+          },
+        );
+        try {
+          // 触发一次实际查询验证密钥正确（错误密钥下 query 会抛 SqlException）
+          await oldDb.rawQuery('SELECT count(*) FROM sqlite_master');
+          debugPrint('[DbInit] 候选密钥 #${i + 1} 解密成功，开始迁移数据');
+
+          // 读出所有表 schema 和数据
+          final tables = await oldDb.rawQuery(
+            "SELECT name, sql FROM sqlite_master WHERE type='table' "
+            "AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'android_%'",
+          );
+          final List<Map<String, dynamic>> tableData = [];
+          final List<String> schemaSqls = [];
+          for (final t in tables) {
+            final name = t['name'] as String;
+            final sql = t['sql'] as String?;
+            if (sql != null) schemaSqls.add(sql);
+            final rows = await oldDb.query(name);
+            tableData.add({'name': name, 'rows': rows});
+          }
+          final indexes = await oldDb.rawQuery(
+            "SELECT sql FROM sqlite_master WHERE type='index' AND sql IS NOT NULL",
+          );
+          for (final idx in indexes) {
+            final sql = idx['sql'] as String?;
+            if (sql != null) schemaSqls.add(sql);
+          }
+          await oldDb.close();
+
+          // 删除旧加密 DB，用当前密钥新建
+          final dbFile = File(dbPath);
+          if (await dbFile.exists()) {
+            await dbFile.delete();
+          }
+          final newDb = await openDatabase(
+            dbPath,
+            version: _schemaVersion,
+            onConfigure: (db) async {
+              await db.execute("PRAGMA key = '${_escapeSqlString(currentPassword)}';");
+            },
+            onCreate: (db, version) async {
+              final batch = db.batch();
+              for (final sql in schemaSqls) {
+                batch.execute(sql);
+              }
+              await batch.commit(noResult: true);
+              for (final td in tableData) {
+                final name = td['name'] as String;
+                final rows = td['rows'] as List<Map<String, dynamic>>;
+                if (rows.isEmpty) continue;
+                final batch = db.batch();
+                for (final row in rows) {
+                  batch.insert(name, row);
+                }
+                await batch.commit(noResult: true);
+                debugPrint('[DbInit] 恢复表 $name: ${rows.length} 行');
+              }
+            },
+          );
+          await newDb.close();
+          return true;
+        } catch (e) {
+          // 该候选密钥解密失败，关闭连接尝试下一个
+          try {
+            await oldDb.close();
+          } catch (_) {}
+          debugPrint('[DbInit] 候选密钥 #${i + 1} 失败: $e');
+        }
+      } catch (e) {
+        debugPrint('[DbInit] 候选密钥 #${i + 1} 打开失败: $e');
+      }
+    }
+    return false;
+  }
+
+  /// SHA-256 哈希并返回 base64 编码（用于派生 debug 稳定密钥）
+  ///
+  /// 与 AppDelegate.swift 中 debug 分支保持一致：
+  ///   SHA256(stableSeed) → 32 字节 raw bytes → base64 编码
+  /// CredentialsStore.getDatabasePassword() 返回的就是这个 base64 字符串。
+  static String _sha256Base64(String input) {
+    final bytes = utf8.encode(input);
+    final digest = crypto.sha256.convert(bytes);
+    return base64.encode(digest.bytes);
   }
 
   /// 备份无法打开的加密 DB（用户后续可手动恢复数据），然后删除让 onCreate 重建

@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-    <img src="https://img.shields.io/badge/version-1.3.5-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.6-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
@@ -61,9 +61,9 @@
 
 **Tutti gli scenari sopra? Una frase ad AI Terminal li risolve.**
 
-## 🆕 Novità nella v1.3.5
+## 🆕 Novità nella v1.3.6
 
-La v1.3.5 è un aggiornamento importante che presenta **5 nuove funzionalità principali**: Monitoraggio del server, Registro delle modifiche, Runbook Ops, Centro notifiche e UI glassmorfismo — un aggiornamento completo per l'efficienza DevOps.
+La v1.3.6 è un aggiornamento importante che presenta **5 nuove funzionalità principali**: Monitoraggio del server, Registro delle modifiche, Runbook Ops, Centro notifiche e UI glassmorfismo — un aggiornamento completo per l'efficienza DevOps.
 
 ### 📊 Dashboard di Monitoraggio Server in Tempo Reale
 
@@ -392,7 +392,7 @@ Di seguito: digitare "installa openclaw" dopo essersi connessi in SSH a un serve
   - [x] 🤖 Selezione rapida modelli preimpostati (con un clic)
   - [x] 🦙 Distribuzione locale Ollama (nessuna chiave API, completamente gratuito)
   - [x] 📐 Ottimizzazione dialogo aggiungi modello (layout a due colonne per schermi larghi)
-- [x] v1.3.5 — Aggiornamento Massivo Capacità Ops
+- [x] v1.3.6 — Aggiornamento Massivo Capacità Ops
   - [x] 📊 Monitoraggio server in tempo reale (CPU/memoria/disco/rete, multi-host parallelo)
   - [x] 📝 Registro delle modifiche e log di audit (cronologia operazioni completa, tracciabile e pronta per il rollback)
   - [x] 📋 Runbook Ops (modelli integrati + personalizzati, esecuzione con un clic)

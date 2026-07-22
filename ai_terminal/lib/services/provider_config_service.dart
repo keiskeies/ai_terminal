@@ -13,18 +13,27 @@ const String _remoteEtagKey = 'providers_remote_etag';
 /// 本地 asset 的内置版本号。每次修改 assets/config/ai_providers.json 后递增此值，
 /// 启动时若缓存版本号 < 此值则强制丢弃旧缓存重新从 asset 加载，
 /// 保证 App 升级后用户能拿到最新内置配置。
-const int _embeddedVersion = 4;
+const int _embeddedVersion = 7;
 const String _remoteConfigUrl = 'https://ai-terminal.keiskei.top/config/ai_providers.json';
 
 class ModelInfo {
   final String name;
   final String label;
   final bool free;
+  /// 最大输出 tokens（0 表示未知，由 UI/模型层用默认值）
+  final int maxTokens;
+  /// 上下文窗口（0 表示未知，AIModelConfig.effectiveContextWindow 回退到 32768）
+  final int contextWindow;
+  /// 是否支持 OpenAI 原生 Function Calling（tools API）
+  final bool supportsFunctionCalling;
 
   const ModelInfo({
     required this.name,
     required this.label,
     this.free = false,
+    this.maxTokens = 0,
+    this.contextWindow = 0,
+    this.supportsFunctionCalling = false,
   });
 
   factory ModelInfo.fromJson(Map<String, dynamic> json) {
@@ -32,6 +41,9 @@ class ModelInfo {
       name: json['name'] as String? ?? '',
       label: json['label'] as String? ?? '',
       free: json['free'] as bool? ?? false,
+      maxTokens: (json['max_tokens'] as num?)?.toInt() ?? 0,
+      contextWindow: (json['context_window'] as num?)?.toInt() ?? 0,
+      supportsFunctionCalling: json['supports_function_calling'] as bool? ?? false,
     );
   }
 
@@ -39,6 +51,9 @@ class ModelInfo {
         'name': name,
         'label': label,
         if (free) 'free': free,
+        if (maxTokens > 0) 'max_tokens': maxTokens,
+        if (contextWindow > 0) 'context_window': contextWindow,
+        if (supportsFunctionCalling) 'supports_function_calling': supportsFunctionCalling,
       };
 }
 

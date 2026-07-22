@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/平台-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-    <img src="https://img.shields.io/badge/version-1.3.5-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.6-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
@@ -60,6 +60,38 @@
 - 一个人干三个人的活，没时间学命令行
 
 **以上所有场景，AI Terminal 一句话搞定。**
+
+## 🆕 v1.3.6 新功能
+
+v1.3.6 聚焦 **AI 能力扩展**与**数据安全加固**，新增联网搜索、模型配置完善，并彻底修复了 macOS 开发模式下每次构建后数据丢失的关键 bug。
+
+### 🔍 AI 联网搜索
+
+> AI 不再只靠自身知识——遇到不确定的问题，自动联网搜索查证
+
+- **7 大搜索引擎**：Bing 网页抓取 / DuckDuckGo / Brave Search API / SearXNG 自托管 / Tavily / Bing API / SerpAPI，总有一款适合你
+- **完全免费方案**：Bing HTML 抓取 + DuckDuckGo 兜底，无需任何 API Key 即可使用
+- **智能降级链**：主搜索引擎失败时自动切换到备用引擎，保证可用性
+- **网页内容抓取**：`fetch_url` 工具可抓取指定网页正文，AI 自主判断是否需要深入阅读
+- **两级开关**：全局设置开关 + 每会话独立开关，灵活控制联网行为
+- **ReAct 循环集成**：搜索失败不触发重试死循环，错误分类与现有工具链一致
+
+### 🤖 AI 模型配置完善
+
+- **模型参数补全**：为 47 个预设模型补充 `max_tokens` / `context_window` / `supports_function_calling` 字段（基于官方文档核实）
+- **新增模型**：Kimi K3、Qwen3.8-max-preview
+- **备用模型修复**：修复备用模型下拉框无法选择/输入的 bug
+- **原生 Function Calling**：支持按模型开关 Function Calling，兼容不支持该特性的小模型
+
+### 🔐 macOS 数据安全修复（关键修复）
+
+> 修复了开发模式下每次 `flutter build` 后数据库被重置为空的严重 bug
+
+- **根因**：ad-hoc 签名下每次构建 cdhash 变化，Keychain 条目不可读 → 主密钥丢失 → 加密数据库解不开 → 归档并新建空库
+- **稳定密钥方案**：改用 `IOPlatformUUID`（硬件级 UUID）派生 SHA-256 密钥，不依赖应用签名，debug/release/profile 三种构建模式密钥一致
+- **Dart 端密钥派生**：用 `Process.run('ioreg')` 直接获取 UUID，绕开不稳定的平台通道，消除 `open` 启动时间歇性失败导致的密钥交替
+- **历史数据自动恢复**：从 `.bak` 明文备份一次性恢复历史数据（主机、会话、审计日志等），无感迁移
+- **旧密钥兼容**：候选密钥列表尝试解密旧数据库，任一成功即用新密钥重加密
 
 ## 🆕 v1.3.5 新功能
 
@@ -240,7 +272,7 @@ AI Terminal 从架构层面回答这三个问题：
 Flutter 3.16+ (Dart 3.2+)
 ├── 状态管理: Riverpod
 ├── 路由: GoRouter
-├── 本地存储: Hive + flutter_secure_storage
+├── 本地存储: SQLite3MultipleCiphers (全库加密) + flutter_secure_storage
 ├── SSH: dartssh2
 ├── 本地终端: flutter_pty
 ├── 终端 UI: xterm.dart
@@ -387,6 +419,11 @@ v1.3.0 新增**命令手册知识库**——内置 150+ 常用软件的官方安
   - [x] 🤖 预设模型快捷选择（每个供应商内置推荐模型列表，一键选择）
   - [x] 🦙 Ollama 本地部署支持（无需 API Key，完全免费）
   - [x] 📐 添加模型弹窗优化（宽屏双列布局、字段顺序优化）
+- [x] v1.3.6 — AI 能力扩展 & 数据安全加固
+  - [x] 🔍 AI 联网搜索（7 大引擎 + 免费方案 + 智能降级 + 网页抓取）
+  - [x] 🤖 模型配置完善（47 模型参数补全 + Kimi K3 + Qwen3.8-max-preview）
+  - [x] 🔐 macOS 数据丢失 bug 修复（IOPlatformUUID 稳定密钥 + 历史数据自动恢复）
+  - [x] 🛠️ 备用模型选择 bug 修复 + 原生 Function Calling 开关
 - [x] v1.3.5 — 运维能力大升级
   - [x] 📊 服务器实时监控面板（CPU/内存/磁盘/网络，多主机并行）
   - [x] 📝 变更台账 & 审计日志（完整操作记录，可追溯可回滚）

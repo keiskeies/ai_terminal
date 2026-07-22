@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-    <img src="https://img.shields.io/badge/version-1.3.5-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.6-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
@@ -61,9 +61,9 @@
 
 **위의 모든 상황? AI Terminal에 한 문장 말하면 해결됩니다.**
 
-## 🆕 v1.3.5의 새로운 기능
+## 🆕 v1.3.6의 새로운 기능
 
-v1.3.5는 **5가지 새로운 핵심 기능**을 탑재한 주요 업데이트입니다: 서버 모니터링, 변경 기록, Ops 런북, 알림 센터, 글래스몰피즘 UI — DevOps 효율성을 위한 완전한 업그레이드.
+v1.3.6는 **5가지 새로운 핵심 기능**을 탑재한 주요 업데이트입니다: 서버 모니터링, 변경 기록, Ops 런북, 알림 센터, 글래스몰피즘 UI — DevOps 효율성을 위한 완전한 업그레이드.
 
 ### 📊 실시간 서버 모니터링 대시보드
 
@@ -385,7 +385,7 @@ v1.3.0에서는 **명령 매뉴얼 지식 베이스**를 도입했습니다 — 
   - [x] 🤖 프리셋 모델 빠른 선택 (원클릭)
   - [x] 🦙 Ollama 로컬 배포 (API 키 없음, 완전 무료)
   - [x] 📐 모델 추가 대화상자 최적화 (와이드 스크린 2열 레이아웃)
-- [x] v1.3.5 — Ops 기능 메가 업그레이드
+- [x] v1.3.6 — Ops 기능 메가 업그레이드
   - [x] 📊 실시간 서버 모니터링 (CPU/메모리/디스크/네트워크, 멀티 호스트 병렬)
   - [x] 📝 변경 기록 & 감사 로그 (완전한 작업 기록, 추적 가능 & 롤백 준비)
   - [x] 📋 Ops 런북 (내장 템플릿 + 커스텀, 원클릭 실행)

@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Plateforme" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="Licence" />
-    <img src="https://img.shields.io/badge/version-1.3.5-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.6-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
@@ -61,9 +61,9 @@
 
 **Tous ces scénarios ? Une phrase à AI Terminal et c'est réglé.**
 
-## 🆕 Nouveautés de la v1.3.5
+## 🆕 Nouveautés de la v1.3.6
 
-La v1.3.5 est une mise à jour majeure avec **5 nouvelles fonctionnalités principales** : Surveillance du serveur, Journal des changements, Runbooks Ops, Centre de notifications, et UI glassmorphisme — une amélioration complète pour l'efficacité DevOps.
+La v1.3.6 est une mise à jour majeure avec **5 nouvelles fonctionnalités principales** : Surveillance du serveur, Journal des changements, Runbooks Ops, Centre de notifications, et UI glassmorphisme — une amélioration complète pour l'efficacité DevOps.
 
 ### 📊 Tableau de bord de surveillance serveur en temps réel
 
@@ -385,7 +385,7 @@ Ci-dessous : taper « installer openclaw » après s'être connecté en SSH à u
   - [x] 🤖 Sélection rapide de modèles préréglés (en un clic)
   - [x] 🦙 Déploiement local Ollama (pas de clé API, complètement gratuit)
   - [x] 📐 Optimisation de la boîte de dialogue d'ajout de modèle (disposition à deux colonnes pour grand écran)
-- [x] v1.3.5 — Mise à niveau majeure des capacités Ops
+- [x] v1.3.6 — Mise à niveau majeure des capacités Ops
   - [x] 📊 Surveillance serveur en temps réel (CPU/mémoire/disque/réseau, multi-hôtes parallèle)
   - [x] 📝 Journal des changements & journaux d'audit (historique complet des opérations, traçable & prêt pour la restauration)
   - [x] 📋 Runbooks Ops (modèles intégrés + personnalisés, exécution en un clic)

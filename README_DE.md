@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Plattform" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="Lizenz" />
-    <img src="https://img.shields.io/badge/version-1.3.5-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.6-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
@@ -61,9 +61,9 @@
 
 **Jedes oben genannte Szenario? Ein Satz an AI Terminal löst es.**
 
-## 🆕 Neu in v1.3.5
+## 🆕 Neu in v1.3.6
 
-v1.3.5 ist ein wichtiges Update mit **5 neuen Kernfähigkeiten**: Server-Überwachung, Änderungsprotokoll, Ops-Runbooks, Benachrichtigungszentrum und Glassmorphismus UI — ein komplettes Upgrade für die DevOps-Effizienz.
+v1.3.6 ist ein wichtiges Update mit **5 neuen Kernfähigkeiten**: Server-Überwachung, Änderungsprotokoll, Ops-Runbooks, Benachrichtigungszentrum und Glassmorphismus UI — ein komplettes Upgrade für die DevOps-Effizienz.
 
 ### 📊 Echtzeit-Server-Überwachungs-Dashboard
 
@@ -389,7 +389,7 @@ Unten: Eingabe von "install openclaw" nach SSH auf einem Ubuntu-Server:
   - [x] 🤖 Voreingestellte Modell-Schnellauswahl (Ein-Klick)
   - [x] 🦙 Ollama lokale Bereitstellung (kein API-Schlüssel, völlig kostenlos)
   - [x] 📐 Dialog zum Hinzufügen von Modellen optimiert (Breitbild-Zweispalten-Layout)
-- [x] v1.3.5 — Ops-Fähigkeiten Mega-Upgrade
+- [x] v1.3.6 — Ops-Fähigkeiten Mega-Upgrade
   - [x] 📊 Echtzeit-Server-Überwachung (CPU/Speicher/Festplatte/Netzwerk, Mehrhost-parallel)
   - [x] 📝 Änderungsprotokoll & Audit-Logs (vollständige Betriebsgeschichte, nachverfolgbar & rollback-bereit)
   - [x] 📋 Ops-Runbooks (integrierte Vorlagen + benutzerdefiniert, Ein-Klick-Ausführung)

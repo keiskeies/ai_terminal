@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Plataforma" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="Licencia" />
-    <img src="https://img.shields.io/badge/version-1.3.5-orange?style=flat-square" alt="Versión" />
+    <img src="https://img.shields.io/badge/version-1.3.6-orange?style=flat-square" alt="Versión" />
   </p>
 </p>
 
@@ -61,9 +61,9 @@
 
 **¿Todos los escenarios anteriores? Una frase a AI Terminal lo resuelve.**
 
-## 🆕 Novedades en v1.3.5
+## 🆕 Novedades en v1.3.6
 
-v1.3.5 es una actualización importante con **5 nuevas capacidades principales**: Monitoreo del servidor, Registro de cambios, Runbooks Ops, Centro de notificaciones y UI de glassmorfismo — una actualización completa para la eficiencia de DevOps.
+v1.3.6 es una actualización importante con **5 nuevas capacidades principales**: Monitoreo del servidor, Registro de cambios, Runbooks Ops, Centro de notificaciones y UI de glassmorfismo — una actualización completa para la eficiencia de DevOps.
 
 ### 📊 Panel de monitoreo del servidor en tiempo real
 
@@ -385,7 +385,7 @@ A continuación: escribir "instalar openclaw" después de conectarse por SSH a u
   - [x] 🤖 Selección rápida de modelos preestablecidos (un clic)
   - [x] 🦙 Implementación local de Ollama (sin clave API, completamente gratis)
   - [x] 📐 Optimización del diálogo de añadir modelo (diseño de dos columnas en pantalla ancha)
-- [x] v1.3.5 — Mega actualización de capacidades de Ops
+- [x] v1.3.6 — Mega actualización de capacidades de Ops
   - [x] 📊 Monitoreo del servidor en tiempo real (CPU/memoria/disco/red, paralelo de múltiples hosts)
   - [x] 📝 Registros de cambios y registros de auditoría (historial completo de operaciones, rastreable y listo para reversión)
   - [x] 📋 Runbooks Ops (plantillas integradas + personalizadas, ejecución con un clic)

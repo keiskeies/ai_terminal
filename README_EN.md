@@ -13,7 +13,7 @@
     <img src="https://img.shields.io/badge/Flutter-3.16+-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platform" />
     <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="License" />
-    <img src="https://img.shields.io/badge/version-1.3.5-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.6-orange?style=flat-square" alt="Version" />
   </p>
 </p>
 
@@ -60,6 +60,38 @@
 - You wear 5 hats. You don't have time to learn `vi`.
 
 **Every scenario above? One sentence to AI Terminal solves it.**
+
+## 🆕 What's New in v1.3.6
+
+v1.3.6 focuses on **expanding AI capabilities** and **hardening data security** — adding web search, refining model configs, and permanently fixing the critical bug where macOS dev builds wiped the database after every `flutter build`.
+
+### 🔍 AI Web Search
+
+> AI is no longer limited to its own knowledge — it can now search the web when it needs to verify something
+
+- **7 search engines**: Bing HTML scraping / DuckDuckGo / Brave Search API / SearXNG self-hosted / Tavily / Bing API / SerpAPI — pick what works for you
+- **Completely free option**: Bing HTML scraping + DuckDuckGo fallback, no API key required at all
+- **Smart fallback chain**: when the primary engine fails, it automatically switches to a backup engine for maximum availability
+- **Web page fetching**: the `fetch_url` tool grabs page content so AI can decide whether to dig deeper
+- **Two-level toggle**: global settings switch + per-session toggle for fine-grained control
+- **ReAct loop integration**: search failures don't trigger retry loops; error classification is consistent with the existing toolchain
+
+### 🤖 AI Model Config Refinement
+
+- **Model params filled in**: added `max_tokens` / `context_window` / `supports_function_calling` for all 47 preset models (verified against official docs)
+- **New models**: Kimi K3, Qwen3.8-max-preview
+- **Fallback model fix**: fixed a bug where the fallback model dropdown couldn't be selected or typed into
+- **Native Function Calling**: per-model toggle for Function Calling, compatible with smaller models that lack this feature
+
+### 🔐 macOS Data Security Fix (Critical)
+
+> Fixed a severe bug where the database was reset to empty after every `flutter build` in dev mode
+
+- **Root cause**: under ad-hoc signing, each build changed the cdhash, making Keychain entries unreadable → master key lost → encrypted DB couldn't be decrypted → archived and replaced with an empty DB
+- **Stable key scheme**: now derives a SHA-256 key from `IOPlatformUUID` (a hardware-level UUID), independent of app signing — the key stays identical across debug/release/profile builds
+- **Dart-side key derivation**: uses `Process.run('ioreg')` to fetch the UUID directly, bypassing the unreliable platform channel and eliminating key alternation caused by intermittent `open`-launch failures
+- **Automatic data recovery**: one-time recovery of historical data (hosts, conversations, audit logs, etc.) from the `.bak` plaintext backup — seamless migration
+- **Legacy key compat**: a candidate-key list tries to decrypt old databases; if any key works, the data is re-encrypted with the new key
 
 ## 🆕 What's New in v1.3.5
 
@@ -238,7 +270,7 @@ Even if someone steals your device, without your biometric/passcode, all they ge
 Flutter 3.16+ (Dart 3.2+)
 ├── State Management: Riverpod
 ├── Routing: GoRouter
-├── Local Storage: Hive + flutter_secure_storage
+├── Local Storage: SQLite3MultipleCiphers (fully encrypted) + flutter_secure_storage
 ├── SSH: dartssh2
 ├── Local Terminal: flutter_pty
 ├── Terminal UI: xterm.dart
@@ -385,6 +417,11 @@ Below: typing "install openclaw" after SSH-ing into an Ubuntu server:
   - [x] 🤖 Preset model quick selection (one-click)
   - [x] 🦙 Ollama local deployment (no API key, completely free)
   - [x] 📐 Add model dialog optimization (wide-screen dual-column layout)
+- [x] v1.3.6 — AI Capability Expansion & Data Security Hardening
+  - [x] 🔍 AI web search (7 engines + free option + smart fallback + page fetching)
+  - [x] 🤖 Model config refinement (47 models with filled params + Kimi K3 + Qwen3.8-max-preview)
+  - [x] 🔐 macOS data loss bug fix (IOPlatformUUID stable key + automatic data recovery)
+  - [x] 🛠️ Fallback model selection bug fix + native Function Calling toggle
 - [x] v1.3.5 — Ops Capability Mega Upgrade
   - [x] 📊 Real-time server monitoring (CPU/memory/disk/network, multi-host parallel)
   - [x] 📝 Change records & audit logs (full operation history, traceable & rollback-ready)
