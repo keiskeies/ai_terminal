@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart' as xterm;
@@ -222,21 +223,29 @@ class _TerminalViewState extends State<TerminalView> {
             defaultTargetPlatform == TargetPlatform.macOS ||
             defaultTargetPlatform == TargetPlatform.linux);
 
-    return xterm.TerminalView(
-      widget.terminal!,
-      controller: _controller,
-      focusNode: _focusNode,
-      autofocus: true,
-      hardwareKeyboardOnly: isDesktop,
-      onKeyEvent: _handleKeyEvent,
-      onSecondaryTapUp: (details, cell) {
-        _showContextMenu(details.globalPosition);
+    // 用 Listener 在外层直接监听原始指针事件，不依赖 xterm 内部的
+    // 手势处理器。Listener 不参与手势竞技，不会干扰 xterm 的左键选区
+    // 和键盘焦点，但能在手势竞技之前接收到所有指针事件。
+    return Listener(
+      onPointerDown: (event) {
+        // kSecondaryButton = 2，对应右键（Mac 双指点击触控板 / Windows 右键）
+        if (event.buttons == kSecondaryButton) {
+          _showContextMenu(event.position);
+        }
       },
-      textStyle: xterm.TerminalStyle(
-        fontSize: widget.fontSize,
-        fontFamily: 'JetBrainsMono, Menlo, Monaco, Courier New, monospace',
+      child: xterm.TerminalView(
+        widget.terminal!,
+        controller: _controller,
+        focusNode: _focusNode,
+        autofocus: true,
+        hardwareKeyboardOnly: isDesktop,
+        onKeyEvent: _handleKeyEvent,
+        textStyle: xterm.TerminalStyle(
+          fontSize: widget.fontSize,
+          fontFamily: 'JetBrainsMono, Menlo, Monaco, Courier New, monospace',
+        ),
+        theme: _theme,
       ),
-      theme: _theme,
     );
   }
 }
