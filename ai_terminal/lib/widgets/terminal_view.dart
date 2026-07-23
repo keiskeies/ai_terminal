@@ -22,6 +22,8 @@ class TerminalView extends StatefulWidget {
 
 class _TerminalViewState extends State<TerminalView> {
   final FocusNode _focusNode = FocusNode();
+  // TerminalController 用于管理终端选区，右键复制时读取选中文本
+  final xterm.TerminalController _controller = xterm.TerminalController();
 
   static const _theme = xterm.TerminalTheme(
     cursor: Color(0xFF6ECC54),
@@ -75,6 +77,7 @@ class _TerminalViewState extends State<TerminalView> {
   @override
   void dispose() {
     _focusNode.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -149,6 +152,45 @@ class _TerminalViewState extends State<TerminalView> {
     return label;
   }
 
+  /// 右键弹出自定义上下文菜单（复制 / 粘贴）
+  void _showContextMenu(Offset globalPosition) {
+    final terminal = widget.terminal;
+    if (terminal == null) return;
+
+    final tc = ThemeColors.of(context);
+    final selection = _controller.selection;
+    final hasSelection = selection != null &&
+        terminal.buffer.getText(selection).trim().isNotEmpty;
+
+    final overlay = Overlay.of(context);
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (ctx) => _TerminalContextMenu(
+        position: globalPosition,
+        hasSelection: hasSelection,
+        themeColors: tc,
+        onCopy: hasSelection
+            ? () {
+                final text = terminal.buffer.getText(selection);
+                Clipboard.setData(ClipboardData(text: text));
+                _controller.clearSelection();
+                entry.remove();
+              }
+            : null,
+        onPaste: () {
+          Clipboard.getData('text/plain').then((data) {
+            if (data?.text != null && data!.text!.isNotEmpty) {
+              terminal.paste(data.text!);
+            }
+          });
+          entry.remove();
+        },
+        onDismiss: () => entry.remove(),
+      ),
+    );
+    overlay.insert(entry);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.terminal == null) {
@@ -182,15 +224,211 @@ class _TerminalViewState extends State<TerminalView> {
 
     return xterm.TerminalView(
       widget.terminal!,
+      controller: _controller,
       focusNode: _focusNode,
       autofocus: true,
       hardwareKeyboardOnly: isDesktop,
       onKeyEvent: _handleKeyEvent,
+      onSecondaryTapUp: (details, cell) {
+        _showContextMenu(details.globalPosition);
+      },
       textStyle: xterm.TerminalStyle(
         fontSize: widget.fontSize,
         fontFamily: 'JetBrainsMono, Menlo, Monaco, Courier New, monospace',
       ),
       theme: _theme,
+    );
+  }
+}
+
+/// 终端右键上下文菜单
+/// 跟随鼠标光标位置弹出，支持明暗主题，点击外部或 ESC 关闭
+class _TerminalContextMenu extends StatefulWidget {
+  final Offset position;
+  final bool hasSelection;
+  final ThemeColors themeColors;
+  final VoidCallback? onCopy;
+  final VoidCallback? onPaste;
+  final VoidCallback onDismiss;
+
+  const _TerminalContextMenu({
+    required this.position,
+    required this.hasSelection,
+    required this.themeColors,
+    required this.onCopy,
+    required this.onPaste,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_TerminalContextMenu> createState() => _TerminalContextMenuState();
+}
+
+class _TerminalContextMenuState extends State<_TerminalContextMenu> {
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNode.requestFocus();
+    });
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = widget.themeColors;
+    final size = MediaQuery.of(context).size;
+
+    // 菜单尺寸预估
+    const menuWidth = 168.0;
+    const menuHeight = 88.0;
+    const menuItemHeight = 36.0;
+
+    // 计算菜单位置，避免超出屏幕边界
+    double left = widget.position.dx;
+    double top = widget.position.dy;
+    if (left + menuWidth > size.width - 8) {
+      left = size.width - menuWidth - 8;
+    }
+    if (top + menuHeight > size.height - 8) {
+      top = size.height - menuHeight - 8;
+    }
+    if (left < 8) left = 8;
+    if (top < 8) top = 8;
+
+    return Stack(
+      children: [
+        // 透明遮罩，点击关闭菜单
+        Positioned.fill(
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: widget.onDismiss,
+            onSecondaryTapDown: (_) => widget.onDismiss(),
+            child: const SizedBox.expand(),
+          ),
+        ),
+        // 菜单主体
+        Positioned(
+          left: left,
+          top: top,
+          child: Focus(
+            focusNode: _focusNode,
+            onKeyEvent: (node, event) {
+              if (event is KeyDownEvent &&
+                  event.logicalKey == LogicalKeyboardKey.escape) {
+                widget.onDismiss();
+                return KeyEventResult.handled;
+              }
+              return KeyEventResult.ignored;
+            },
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                width: menuWidth,
+                decoration: BoxDecoration(
+                  color: tc.cardElevated,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: tc.border, width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: tc.isLight
+                          ? Colors.black.withValues(alpha: 0.12)
+                          : Colors.black.withValues(alpha: 0.5),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildMenuItem(
+                      icon: Icons.copy_rounded,
+                      label: '复制',
+                      shortcut: '⌘C',
+                      enabled: widget.onCopy != null,
+                      onTap: widget.onCopy,
+                      tc: tc,
+                      isFirst: true,
+                      menuItemHeight: menuItemHeight,
+                    ),
+                    Container(height: 1, color: tc.border),
+                    _buildMenuItem(
+                      icon: Icons.paste_rounded,
+                      label: '粘贴',
+                      shortcut: '⌘V',
+                      enabled: true,
+                      onTap: widget.onPaste,
+                      tc: tc,
+                      isLast: true,
+                      menuItemHeight: menuItemHeight,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String label,
+    required String shortcut,
+    required bool enabled,
+    required VoidCallback? onTap,
+    required ThemeColors tc,
+    required double menuItemHeight,
+    bool isFirst = false,
+    bool isLast = false,
+  }) {
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.vertical(
+        top: Radius.circular(isFirst ? 8 : 0),
+        bottom: Radius.circular(isLast ? 8 : 0),
+      ),
+      child: Container(
+        height: menuItemHeight,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: enabled ? tc.textMain : tc.textMuted,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: enabled ? tc.textMain : tc.textMuted,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+            Text(
+              shortcut,
+              style: TextStyle(
+                fontSize: 12,
+                color: enabled ? tc.textSub : tc.textMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
