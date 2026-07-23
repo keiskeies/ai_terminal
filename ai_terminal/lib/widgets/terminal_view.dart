@@ -87,17 +87,21 @@ class _TerminalViewState extends State<TerminalView> {
       );
     }
 
-    return Focus(
+    // 将 _focusNode 直接传给 xterm.TerminalView，使其内部的 onKeyEvent
+    // 和 IME 连接都注册在同一个 FocusNode 上。
+    // 若用外层 Focus 包裹且不传 focusNode，xterm 会自建一个 child FocusNode，
+    // 键盘事件从 primary focus 向上传播，不会向下到达 child，导致输入全部丢失
+    // （Windows 上首次未点击终端直接敲键盘即无反应；macOS/Linux 因点击触发
+    // requestKeyboard 而掩盖了此问题）。
+    return xterm.TerminalView(
+      widget.terminal!,
       focusNode: _focusNode,
       autofocus: true,
-      child: xterm.TerminalView(
-        widget.terminal!,
-        textStyle: xterm.TerminalStyle(
-          fontSize: widget.fontSize,
-          fontFamily: 'JetBrainsMono, Menlo, Monaco, Courier New, monospace',
-        ),
-        theme: _theme,
+      textStyle: xterm.TerminalStyle(
+        fontSize: widget.fontSize,
+        fontFamily: 'JetBrainsMono, Menlo, Monaco, Courier New, monospace',
       ),
+      theme: _theme,
     );
   }
 }
