@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart' as xterm;
 import '../core/theme_colors.dart';
 
@@ -87,16 +89,33 @@ class _TerminalViewState extends State<TerminalView> {
       );
     }
 
-    // 将 _focusNode 直接传给 xterm.TerminalView，使其内部的 onKeyEvent
-    // 和 IME 连接都注册在同一个 FocusNode 上。
-    // 若用外层 Focus 包裹且不传 focusNode，xterm 会自建一个 child FocusNode，
-    // 键盘事件从 primary focus 向上传播，不会向下到达 child，导致输入全部丢失
-    // （Windows 上首次未点击终端直接敲键盘即无反应；macOS/Linux 因点击触发
-    // requestKeyboard 而掩盖了此问题）。
+    // 桌面平台使用 hardwareKeyboardOnly：直接从硬件键盘事件的 character
+    // 获取输入，绕过 TextInput.attach / IME 路径。
+    //
+    // xterm 默认走 CustomTextEdit → TextInput.attach 建立 IME 连接，但：
+    // 1. Windows 上 IME 框架会过度介入，拦截普通字符导致无法输入
+    // 2. _focusNode.requestFocus() 在 CustomTextEdit listener 添加前执行时，
+    //    _onFocusChange 不触发，TextInput 连接永不建立
+    //
+    // hardwareKeyboardOnly 路径走 CustomKeyboardListener，直接从
+    // KeyEvent.character 提取字符，不依赖 IME。
+    final isDesktop = !kIsWeb &&
+        (defaultTargetPlatform == TargetPlatform.windows ||
+            defaultTargetPlatform == TargetPlatform.macOS ||
+            defaultTargetPlatform == TargetPlatform.linux);
+
     return xterm.TerminalView(
       widget.terminal!,
       focusNode: _focusNode,
       autofocus: true,
+      hardwareKeyboardOnly: isDesktop,
+      // CustomKeyboardListener._onKeyEvent 对所有事件类型（含 KeyUpEvent）
+      // 都尝试 onInsert，而 _handleKeyEvent 对 KeyUpEvent 返回 ignored，
+      // 导致字符重复。这里拦截 KeyUpEvent 阻止重复插入。
+      onKeyEvent: (node, event) {
+        if (event is KeyUpEvent) return KeyEventResult.handled;
+        return KeyEventResult.ignored;
+      },
       textStyle: xterm.TerminalStyle(
         fontSize: widget.fontSize,
         fontFamily: 'JetBrainsMono, Menlo, Monaco, Courier New, monospace',
