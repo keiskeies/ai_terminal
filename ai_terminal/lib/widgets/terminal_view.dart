@@ -25,6 +25,7 @@ class _TerminalViewState extends State<TerminalView> {
   final FocusNode _focusNode = FocusNode();
   // TerminalController 用于管理终端选区，右键复制时读取选中文本
   final xterm.TerminalController _controller = xterm.TerminalController();
+  final GlobalKey _terminalContainerKey = GlobalKey();
 
   static const _theme = xterm.TerminalTheme(
     cursor: Color(0xFF6ECC54),
@@ -226,14 +227,25 @@ class _TerminalViewState extends State<TerminalView> {
     // 用 Listener 在外层直接监听原始指针事件，不依赖 xterm 内部的
     // 手势处理器。Listener 不参与手势竞技，不会干扰 xterm 的左键选区
     // 和键盘焦点，但能在手势竞技之前接收到所有指针事件。
+    //
+    // 事件分发顺序：Listener → xterm.TerminalView 内部手势 → xterm.TerminalView
+    // 所以右侧也能收到。
     return Listener(
       onPointerDown: (event) {
-        // kSecondaryButton = 2，对应右键（Mac 双指点击触控板 / Windows 右键）
+        // onPointerDown 会收到所有鼠标按钮按下+触摸。
+        // kSecondaryButton = 2，对应右键（Mac 双指点击 / Windows 右键）
         if (event.buttons == kSecondaryButton) {
-          _showContextMenu(event.position);
+          // event.position 是相对 Listener 的局部坐标，转换为全局坐标
+          final renderBox =
+              _terminalContainerKey.currentContext?.findRenderObject();
+          if (renderBox is RenderBox) {
+            _showContextMenu(renderBox.localToGlobal(event.position));
+          }
         }
       },
-      child: xterm.TerminalView(
+      child: Container(
+        key: _terminalContainerKey,
+        child: xterm.TerminalView(
         widget.terminal!,
         controller: _controller,
         focusNode: _focusNode,
@@ -245,6 +257,7 @@ class _TerminalViewState extends State<TerminalView> {
           fontFamily: 'JetBrainsMono, Menlo, Monaco, Courier New, monospace',
         ),
         theme: _theme,
+      ),
       ),
     );
   }
