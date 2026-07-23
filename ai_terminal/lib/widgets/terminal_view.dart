@@ -1,6 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart' as xterm;
 import '../core/theme_colors.dart';
 
@@ -22,6 +20,7 @@ class TerminalView extends StatefulWidget {
 
 class _TerminalViewState extends State<TerminalView> {
   final FocusNode _focusNode = FocusNode();
+  final _xtermKey = GlobalKey<xterm.TerminalViewState>();
 
   static const _theme = xterm.TerminalTheme(
     cursor: Color(0xFF6ECC54),
@@ -55,6 +54,7 @@ class _TerminalViewState extends State<TerminalView> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _focusNode.requestFocus();
+        _xtermKey.currentState?.requestKeyboard();
       }
     });
   }
@@ -65,7 +65,13 @@ class _TerminalViewState extends State<TerminalView> {
     if (widget.terminal != null && widget.terminal != oldWidget.terminal) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
+          // unfocus 后重新 requestFocus，触发 xterm CustomTextEdit 的
+          // _onFocusChange listener，确保 TextInput 连接正确建立。
+          // 仅 requestFocus 在 listener 已添加但焦点未变化时不触发回调。
+          _focusNode.unfocus();
           _focusNode.requestFocus();
+          // 主动调用 requestKeyboard() 确保 TextInput 连接建立
+          _xtermKey.currentState?.requestKeyboard();
         }
       });
     }
@@ -89,33 +95,21 @@ class _TerminalViewState extends State<TerminalView> {
       );
     }
 
-    // 桌面平台使用 hardwareKeyboardOnly：直接从硬件键盘事件的 character
-    // 获取输入，绕过 TextInput.attach / IME 路径。
+    // 使用 xterm 默认的 CustomTextEdit 路径（hardwareKeyboardOnly=false）。
     //
-    // xterm 默认走 CustomTextEdit → TextInput.attach 建立 IME 连接，但：
-    // 1. Windows 上 IME 框架会过度介入，拦截普通字符导致无法输入
-    // 2. _focusNode.requestFocus() 在 CustomTextEdit listener 添加前执行时，
-    //    _onFocusChange 不触发，TextInput 连接永不建立
+    // hardwareKeyboardOnly=true 走 CustomKeyboardListener，依赖
+    // KeyEvent.character 获取字符。但 Windows 上 KeyDownEvent.character
+    // 可能为 null（WM_KEYDOWN 不含字符信息，字符在 WM_CHAR 中），
+    // 导致普通字母键无法输入。
     //
-    // hardwareKeyboardOnly 路径走 CustomKeyboardListener，直接从
-    // KeyEvent.character 提取字符，不依赖 IME。
-    final isDesktop = !kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.windows ||
-            defaultTargetPlatform == TargetPlatform.macOS ||
-            defaultTargetPlatform == TargetPlatform.linux);
-
+    // 默认路径通过 TextInput.attach → WM_CHAR 获取字符，
+    // 不依赖 KeyEvent.character。通过 requestKeyboard() 确保
+    // TextInput 连接正确建立。
     return xterm.TerminalView(
+      key: _xtermKey,
       widget.terminal!,
       focusNode: _focusNode,
       autofocus: true,
-      hardwareKeyboardOnly: isDesktop,
-      // CustomKeyboardListener._onKeyEvent 对所有事件类型（含 KeyUpEvent）
-      // 都尝试 onInsert，而 _handleKeyEvent 对 KeyUpEvent 返回 ignored，
-      // 导致字符重复。这里拦截 KeyUpEvent 阻止重复插入。
-      onKeyEvent: (node, event) {
-        if (event is KeyUpEvent) return KeyEventResult.handled;
-        return KeyEventResult.ignored;
-      },
       textStyle: xterm.TerminalStyle(
         fontSize: widget.fontSize,
         fontFamily: 'JetBrainsMono, Menlo, Monaco, Courier New, monospace',
