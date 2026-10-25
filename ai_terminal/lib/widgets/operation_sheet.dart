@@ -9,6 +9,7 @@ import '../models/agent_event.dart';
 import '../models/agent_model.dart';
 import '../models/operation_report.dart';
 import '../models/plan_step.dart';
+import '../utils/agent_ui_text.dart';
 import 'plan_panel.dart';
 
 /// 操作单：一轮 Agent 任务的结论 + 元数据 + 可折叠证据
@@ -59,8 +60,9 @@ class OperationSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ui = AgentUiText.of(context);
     final statusColor = _statusColor();
-    final statusLabel = _statusLabel();
+    final statusLabel = _statusLabel(ui);
     final planSteps = (plan != null && plan!.isNotEmpty) ? plan! : report.plan;
 
     return Column(
@@ -87,7 +89,7 @@ class OperationSheet extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      report.goal.isEmpty ? '任务记录' : report.goal,
+                      report.goal.isEmpty ? ui.taskRecord : report.goal,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -98,15 +100,7 @@ class OperationSheet extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      _metaItems().join(' · '),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: tc.textMuted,
-                        fontSize: fMicro,
-                      ),
-                    ),
+                    _buildMetaLine(ui),
                   ],
                 ),
               ),
@@ -145,13 +139,13 @@ class OperationSheet extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.warning_amber, size: 12, color: cWarning),
+                Icon(Icons.warning_amber, size: 12, color: tc.warn),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
-                    '计划仍有未收尾步骤，请核对是否全部完成',
+                    ui.planWarning,
                     style: TextStyle(
-                      color: cWarning,
+                      color: tc.warn,
                       fontSize: fMicro,
                       height: 1.35,
                     ),
@@ -166,9 +160,9 @@ class OperationSheet extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           decoration: BoxDecoration(
-            color: tc.terminalBg.withValues(alpha: 0.55),
+            color: tc.card,
             borderRadius: BorderRadius.circular(rSmall),
-            border: Border.all(color: tc.border.withValues(alpha: 0.6)),
+            border: Border.all(color: tc.border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -176,9 +170,9 @@ class OperationSheet extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    '结论',
+                    ui.conclusion,
                     style: TextStyle(
-                      color: tc.textMuted,
+                      color: tc.textSub,
                       fontSize: fMicro,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.5,
@@ -186,15 +180,15 @@ class OperationSheet extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   if (report.verified)
-                    _badge('有验证证据', cSuccess)
+                    _badge(ui.verifiedEvidence, tc.ok)
                   else if (report.aiGenerated)
-                    _badge('AI 结论', tc.textMuted),
+                    _badge(ui.aiConclusion, tc.textSub),
                   const Spacer(),
                   GestureDetector(
                     onTap: () => _copyConclusion(context),
                     child: Padding(
                       padding: const EdgeInsets.all(2),
-                      child: Icon(Icons.copy, size: 12, color: tc.textMuted),
+                      child: Icon(Icons.copy, size: 12, color: tc.textSub),
                     ),
                   ),
                 ],
@@ -228,20 +222,20 @@ class OperationSheet extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: cPrimary.withValues(alpha: 0.1),
+                  color: tc.brand.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(rXSmall),
-                  border: Border.all(color: cPrimary.withValues(alpha: 0.3)),
+                  border: Border.all(color: tc.brand.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.play_circle_outline,
-                        size: 13, color: cPrimary),
+                    Icon(Icons.play_circle_outline,
+                        size: 13, color: tc.brand),
                     const SizedBox(width: 4),
                     Text(
-                      '继续任务',
+                      ui.continueTask,
                       style: TextStyle(
-                        color: cPrimary,
+                        color: tc.brand,
                         fontSize: fMicro,
                         fontWeight: FontWeight.w600,
                       ),
@@ -259,9 +253,9 @@ class OperationSheet extends StatelessWidget {
           Row(
             children: [
               Text(
-                '变更与回滚',
+                ui.changesAndRollback,
                 style: TextStyle(
-                  color: tc.textMuted,
+                  color: tc.textSub,
                   fontSize: fMicro,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.5,
@@ -269,7 +263,7 @@ class OperationSheet extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                '${report.changes.length} 项',
+                ui.itemsCount(report.changes.length),
                 style: TextStyle(color: tc.textMuted, fontSize: fMicro),
               ),
               const Spacer(),
@@ -285,7 +279,7 @@ class OperationSheet extends StatelessWidget {
                             size: 11, color: tc.textSub),
                         const SizedBox(width: 3),
                         Text(
-                          '审计记录',
+                          ui.auditLog,
                           style: TextStyle(
                             color: tc.textSub,
                             fontSize: fMicro,
@@ -303,7 +297,7 @@ class OperationSheet extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: 2),
               child: Text(
-                '还有 ${report.changes.length - 5} 项变更，详见审计记录',
+                ui.moreChanges(report.changes.length - 5),
                 style: TextStyle(color: tc.textMuted, fontSize: fMicro),
               ),
             ),
@@ -320,20 +314,31 @@ class OperationSheet extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: tc.surface,
+                        color: tc.cardElevated,
                         borderRadius: BorderRadius.circular(rSmall),
                         border: Border.all(color: tc.border),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.arrow_forward,
-                              size: 11, color: tc.textMuted),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Icon(Icons.arrow_forward,
+                                size: 11, color: tc.brand),
+                          ),
                           const SizedBox(width: 4),
-                          Text(
-                            action,
-                            style:
-                                TextStyle(color: tc.textSub, fontSize: fSmall),
+                          Flexible(
+                            child: Text(
+                              action,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: tc.textBody,
+                                  fontSize: fSmall,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w500),
+                            ),
                           ),
                         ],
                       ),
@@ -347,7 +352,7 @@ class OperationSheet extends StatelessWidget {
         // 证据层
         _ExpandableEvidence(
           tc: tc,
-          summary: _evidenceSummary(),
+          summary: _evidenceSummary(ui),
           details: report.details,
           markdownBuilder: markdownBuilder,
           hasEvidence: hasEvidence,
@@ -375,11 +380,14 @@ class OperationSheet extends StatelessWidget {
     Clipboard.setData(ClipboardData(text: buffer.toString().trimRight()));
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('操作单已复制', style: TextStyle(fontSize: fSmall)),
-        duration: Duration(seconds: 1),
+      SnackBar(
+        content: Text(
+          AgentUiText.of(context).operationCopied,
+          style: const TextStyle(fontSize: fSmall),
+        ),
+        duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.all(16),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -387,56 +395,83 @@ class OperationSheet extends StatelessWidget {
   Color _statusColor() {
     switch (report.finishState) {
       case 'failed':
-        return cDanger;
+        return tc.error;
       case 'cancelled':
       case 'interrupted':
-        return cWarning;
+        return tc.warn;
       default:
-        return cSuccess;
+        return tc.ok;
     }
   }
 
-  String _statusLabel() {
+  String _statusLabel(AgentUiText ui) {
     switch (report.finishState) {
       case 'failed':
-        return '失败';
+        return ui.failed;
       case 'cancelled':
-        return '已取消';
+        return ui.cancelled;
       case 'interrupted':
-        return '已中断';
+        return ui.interrupted;
       default:
-        return '完成';
+        return ui.completed;
     }
   }
 
-  List<String> _metaItems() {
-    final items = <String>[];
+  Widget _buildMetaLine(AgentUiText ui) {
+    final items = <Widget>[];
+    void add(String text, Color color, {bool mono = false, double? maxWidth}) {
+      final widget = Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontSize: fMicro,
+          fontFamily: mono ? 'JetBrainsMono' : null,
+          fontWeight: FontWeight.w500,
+        ),
+      );
+      items.add(maxWidth == null
+          ? widget
+          : ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: widget,
+            ));
+    }
+
     final host = report.hostId;
     if (host != null && host.isNotEmpty) {
-      items.add(host == 'local' ? '本地' : host);
+      add(host == 'local' ? '本地' : host, tc.textSub,
+          mono: true, maxWidth: 200);
     }
-    items.add(_formatElapsed(report.elapsedSeconds));
-    if (report.stepIndex > 0) items.add('第 ${report.stepIndex} 步');
+    add(_formatElapsed(report.elapsedSeconds, ui), tc.gold, mono: true);
+    if (report.stepIndex > 0) add(ui.step(report.stepIndex), tc.textSub);
     if (report.commandCount > 0) {
-      items.add(report.commandFailureCount > 0
-          ? '${report.commandCount} 条命令 · ${report.commandFailureCount} 失败'
-          : '${report.commandCount} 条命令');
+      add(ui.commandCount(report.commandCount), tc.textSub);
+      if (report.commandFailureCount > 0) {
+        add(ui.failureCount(report.commandFailureCount), tc.error, mono: true);
+      }
     }
     final changeCount = report.changes.isNotEmpty
         ? report.changes.length
         : report.changeRecordIds.length;
-    if (changeCount > 0) {
-      items.add('$changeCount 项变更');
-    }
-    return items;
+    if (changeCount > 0) add(ui.changesCount(changeCount), tc.textSub);
+
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Wrap(
+      spacing: 6,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: items,
+    );
   }
 
   Widget _buildStateBadge(OperationBadge badge) {
     final color = badge.level == 'success'
-        ? cSuccess
+        ? tc.ok
         : badge.level == 'warning'
-            ? cWarning
-            : tc.textMuted;
+            ? tc.warn
+            : tc.textSub;
     final icon = badge.level == 'success'
         ? Icons.check_circle_outline
         : badge.level == 'warning'
@@ -473,15 +508,15 @@ class OperationSheet extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 5),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
       decoration: BoxDecoration(
-        color: tc.surface.withValues(alpha: 0.6),
+        color: tc.cardElevated,
         borderRadius: BorderRadius.circular(rXSmall),
-        border: Border.all(color: tc.border.withValues(alpha: 0.7)),
+        border: Border.all(color: tc.border),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(_changeIcon(change.type),
-              size: 13, color: cWarning.withValues(alpha: 0.9)),
+              size: 13, color: tc.gold.withValues(alpha: 0.9)),
           const SizedBox(width: 6),
           Expanded(
             child: Column(
@@ -492,7 +527,7 @@ class OperationSheet extends StatelessWidget {
                     Text(
                       _changeTypeLabel(change.type),
                       style: TextStyle(
-                        color: cWarning,
+                        color: tc.gold,
                         fontSize: fMicro,
                         fontWeight: FontWeight.w600,
                       ),
@@ -509,6 +544,7 @@ class OperationSheet extends StatelessWidget {
                             color: tc.textBody,
                             fontSize: fMicro,
                             fontFamily: 'JetBrainsMono',
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
@@ -523,7 +559,7 @@ class OperationSheet extends StatelessWidget {
                         Text(
                           '+${change.additions}',
                           style: TextStyle(
-                            color: cSuccess,
+                            color: tc.ok,
                             fontSize: fMicro,
                             fontFamily: 'JetBrainsMono',
                             fontWeight: FontWeight.w600,
@@ -536,7 +572,7 @@ class OperationSheet extends StatelessWidget {
                         Text(
                           '-${change.deletions}',
                           style: TextStyle(
-                            color: cDanger,
+                            color: tc.error,
                             fontSize: fMicro,
                             fontFamily: 'JetBrainsMono',
                             fontWeight: FontWeight.w600,
@@ -556,11 +592,12 @@ class OperationSheet extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: rolledBack
-                        ? cSuccess
+                        ? tc.ok
                         : change.canRollback
-                            ? tc.textMuted
-                            : cWarning,
+                            ? tc.textSub
+                            : tc.warn,
                     fontSize: fMicro,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
@@ -568,13 +605,13 @@ class OperationSheet extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           if (rolledBack)
-            _badge('已回滚', cSuccess)
+            _badge('已回滚', tc.ok)
           else if (change.canRollback && onRollbackChange != null)
             _buildRollbackButton(change)
           else
             _badge(
               change.canRollback ? '可回滚' : '需人工',
-              change.canRollback ? cSuccess : tc.textMuted,
+              change.canRollback ? tc.ok : tc.textMuted,
             ),
         ],
       ),
@@ -583,7 +620,7 @@ class OperationSheet extends StatelessWidget {
 
   Widget _buildRollbackButton(OperationChange change) {
     final enabled = !rollbackBusy;
-    final color = enabled ? cSuccess : tc.textMuted;
+    final color = enabled ? tc.ok : tc.textMuted;
     return GestureDetector(
       onTap: enabled
           ? () => onRollbackChange?.call(change, report.hostId)
@@ -657,11 +694,11 @@ class OperationSheet extends StatelessWidget {
     }
   }
 
-  String _evidenceSummary() {
+  String _evidenceSummary(AgentUiText ui) {
     if (report.commandCount > 0) {
-      return '${report.commandCount} 条命令';
+      return ui.commandCount(report.commandCount);
     }
-    return '思考与执行记录';
+    return ui.thinkingAndExecution;
   }
 
   Widget _badge(String text, Color color) {
@@ -679,8 +716,8 @@ class OperationSheet extends StatelessWidget {
     );
   }
 
-  static String _formatElapsed(int seconds) {
-    if (seconds <= 0) return '不足 1s';
+  static String _formatElapsed(int seconds, AgentUiText ui) {
+    if (seconds <= 0) return ui.lessThanOneSecond;
     if (seconds < 60) return '${seconds}s';
     final m = seconds ~/ 60;
     final s = seconds % 60;
@@ -717,6 +754,7 @@ class _ExpandableEvidenceState extends State<_ExpandableEvidence> {
   @override
   Widget build(BuildContext context) {
     final tc = widget.tc;
+    final ui = AgentUiText.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -730,21 +768,29 @@ class _ExpandableEvidenceState extends State<_ExpandableEvidence> {
                 Icon(
                   _expanded ? Icons.expand_more : Icons.chevron_right,
                   size: 16,
-                  color: tc.textMuted,
+                  color: tc.textSub,
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '过程与证据',
+                  ui.processAndEvidence,
                   style: TextStyle(
-                    color: tc.textSub,
+                    color: tc.textBody,
                     fontSize: fSmall,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(width: 6),
-                Text(
-                  '· ${widget.summary}',
-                  style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+                Expanded(
+                  child: Text(
+                    '· ${widget.summary}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: tc.textSub,
+                      fontSize: fMicro,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -757,17 +803,17 @@ class _ExpandableEvidenceState extends State<_ExpandableEvidence> {
               margin: const EdgeInsets.only(top: 4, bottom: 6),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: tc.terminalBg.withValues(alpha: 0.4),
+                color: tc.card,
                 borderRadius: BorderRadius.circular(rSmall),
-                border: Border.all(color: tc.border.withValues(alpha: 0.6)),
+                border: Border.all(color: tc.border),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '完整总结',
+                    ui.fullSummary,
                     style: TextStyle(
-                      color: tc.textMuted,
+                      color: tc.textSub,
                       fontSize: fMicro,
                       fontWeight: FontWeight.w600,
                     ),
@@ -784,8 +830,12 @@ class _ExpandableEvidenceState extends State<_ExpandableEvidence> {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Text(
-                '没有可展开的执行记录',
-                style: TextStyle(color: tc.textMuted, fontSize: fSmall),
+                ui.noEvidence,
+                style: TextStyle(
+                  color: tc.textSub,
+                  fontSize: fSmall,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
         ],
@@ -869,7 +919,7 @@ class _CollapsibleEventStreamState extends State<CollapsibleEventStream> {
             Expanded(
               child: Text(
                 text,
-                style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+                style: TextStyle(color: tc.textSub, fontSize: fMicro),
               ),
             ),
             Text(
@@ -970,7 +1020,7 @@ class _LiveOperationBarState extends State<LiveOperationBar> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: tc.surface,
+        color: tc.card,
         borderRadius: BorderRadius.circular(rSmall),
         border: Border.all(color: tc.border),
       ),
@@ -1000,12 +1050,7 @@ class _LiveOperationBarState extends State<LiveOperationBar> {
                   ),
                 ),
                 const SizedBox(height: 2),
-                Text(
-                  _metaText(task, elapsed),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: tc.textMuted, fontSize: fMicro),
-                ),
+                _buildLiveMeta(task, elapsed),
               ],
             ),
           ),
@@ -1019,7 +1064,7 @@ class _LiveOperationBarState extends State<LiveOperationBar> {
             _iconButton(
               icon: Icons.play_arrow,
               tooltip: '恢复',
-              color: cSuccess,
+              color: tc.ok,
               onTap: widget.onResume,
             )
           else if (_isRunning)
@@ -1032,7 +1077,7 @@ class _LiveOperationBarState extends State<LiveOperationBar> {
           _iconButton(
             icon: Icons.stop,
             tooltip: '停止',
-            color: cDanger,
+            color: tc.error,
             onTap: widget.onStop,
           ),
         ],
@@ -1040,20 +1085,43 @@ class _LiveOperationBarState extends State<LiveOperationBar> {
     );
   }
 
-  String _metaText(AgentTask task, int elapsed) {
-    final parts = <String>[task.phase ?? _phaseLabel()];
-    if (task.stepIndex > 0) parts.add('第 ${task.stepIndex} 步');
-    parts.add(_formatElapsed(elapsed));
+  Widget _buildLiveMeta(AgentTask task, int elapsed) {
+    final tc = widget.tc;
+    final ui = AgentUiText.of(context);
+    final items = <Widget>[];
+    void add(String text, Color color, {bool mono = false}) {
+      items.add(Text(
+        text,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontSize: fMicro,
+          fontFamily: mono ? 'JetBrainsMono' : null,
+          fontWeight: FontWeight.w500,
+        ),
+      ));
+    }
+
+    add(task.phase ?? _phaseLabel(), tc.textSub);
+    if (task.stepIndex > 0) add('第 ${task.stepIndex} 步', tc.textSub);
+    add(_formatElapsed(elapsed, ui), tc.gold, mono: true);
     if (task.successCount > 0 || task.failureCount > 0) {
-      parts.add(task.failureCount > 0
-          ? '${task.successCount} 成功 · ${task.failureCount} 失败'
-          : '${task.successCount} 条命令');
+      add('${task.successCount} 成功', tc.textSub);
+      if (task.failureCount > 0) {
+        add('${task.failureCount} 失败', tc.error, mono: true);
+      }
     }
     if (widget.plan.isNotEmpty) {
       final done = widget.plan.where((s) => s.isDone).length;
-      parts.add('计划 $done/${widget.plan.length}');
+      add('计划 $done/${widget.plan.length}', tc.textSub);
     }
-    return parts.join(' · ');
+    return Wrap(
+      spacing: 6,
+      runSpacing: 2,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: items,
+    );
   }
 
   String _phaseLabel() {
@@ -1081,17 +1149,17 @@ class _LiveOperationBarState extends State<LiveOperationBar> {
     switch (widget.status) {
       case AgentStatus.thinking:
       case AgentStatus.executing:
-        return cSuccess;
+        return tc.brand;
       case AgentStatus.waitingConfirm:
-        return cWarning;
+        return tc.warn;
       case AgentStatus.paused:
         return tc.textMuted;
       case AgentStatus.failed:
-        return cDanger;
+        return tc.error;
       case AgentStatus.cancelled:
-        return cWarning;
+        return tc.warn;
       case AgentStatus.completed:
-        return cSuccess;
+        return tc.ok;
       case AgentStatus.idle:
         return tc.textMuted;
     }
@@ -1113,8 +1181,8 @@ class _LiveOperationBarState extends State<LiveOperationBar> {
     );
   }
 
-  static String _formatElapsed(int seconds) {
-    if (seconds <= 0) return '不足 1s';
+  static String _formatElapsed(int seconds, AgentUiText ui) {
+    if (seconds <= 0) return ui.lessThanOneSecond;
     if (seconds < 60) return '${seconds}s';
     final m = seconds ~/ 60;
     final s = seconds % 60;

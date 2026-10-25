@@ -126,8 +126,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   icon: const Icon(Icons.arrow_back),
                   label: Text(l10n.chatBackToServerList),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: cPrimary,
-                    foregroundColor: Colors.white,
+                    backgroundColor: tc.brand,
+                    foregroundColor: tc.isLight ? Colors.white : cBg,
                   ),
                 ),
               ],

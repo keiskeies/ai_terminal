@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../models/plan_step.dart';
+import '../utils/agent_ui_text.dart';
 
 /// 执行清单：展示模型声明的计划步骤与状态
 ///
@@ -48,16 +49,17 @@ class _PlanPanelState extends State<PlanPanel> {
     final steps = widget.steps;
     if (steps.isEmpty) return const SizedBox.shrink();
     final tc = widget.tc;
-    final counts = _counts();
+    final ui = AgentUiText.of(context);
+    final counts = _counts(ui);
     final currentIndex = steps
         .indexWhere((s) => s.status == PlanStepStatus.inProgress);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: tc.surface.withValues(alpha: 0.45),
+        color: tc.card,
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: tc.border.withValues(alpha: 0.7)),
+        border: Border.all(color: tc.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -72,7 +74,7 @@ class _PlanPanelState extends State<PlanPanel> {
                   Icon(Icons.checklist_rounded, size: 15, color: tc.textSub),
                   const SizedBox(width: 6),
                   Text(
-                    '执行清单',
+                    ui.planTitle,
                     style: TextStyle(
                       color: tc.textMain,
                       fontSize: fSmall,
@@ -81,8 +83,12 @@ class _PlanPanelState extends State<PlanPanel> {
                   ),
                   const SizedBox(width: 6),
                   Text(
-                    'AI 计划',
-                    style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+                    ui.planByAi,
+                    style: TextStyle(
+                      color: tc.textSub,
+                      fontSize: fMicro,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -91,21 +97,25 @@ class _PlanPanelState extends State<PlanPanel> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.right,
-                      style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+                      style: TextStyle(
+                        color: tc.textSub,
+                        fontSize: fMicro,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 4),
                   Icon(
                     _expanded ? Icons.expand_more : Icons.chevron_right,
                     size: 16,
-                    color: tc.textMuted,
+                    color: tc.textSub,
                   ),
                 ],
               ),
             ),
           ),
           if (_expanded) ...[
-            Divider(height: 0.5, thickness: 0.5, color: tc.border),
+            Divider(height: 0.5, thickness: 0.5, color: tc.hairline),
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
               child: Column(
@@ -124,8 +134,12 @@ class _PlanPanelState extends State<PlanPanel> {
                       child: InkWell(
                         onTap: () => setState(() => _showAll = true),
                         child: Text(
-                          '展开全部 ${steps.length} 项',
-                          style: TextStyle(color: cPrimary, fontSize: fMicro),
+                          ui.expandAll(steps.length),
+                          style: TextStyle(
+                            color: tc.brand,
+                            fontSize: fMicro,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
                     ),
@@ -148,22 +162,21 @@ class _PlanPanelState extends State<PlanPanel> {
     final (icon, color) = _statusVisual(step.status);
     final isCurrent = step.status == PlanStepStatus.inProgress;
     final titleColor = switch (step.status) {
-      PlanStepStatus.completed || PlanStepStatus.skipped => tc.textMuted,
-      PlanStepStatus.failed => cDanger,
+      PlanStepStatus.completed => tc.textSub,
+      PlanStepStatus.skipped => tc.textMuted,
+      PlanStepStatus.failed => tc.error,
       PlanStepStatus.inProgress => tc.textMain,
-      PlanStepStatus.pending => tc.textSub,
+      PlanStepStatus.pending => tc.textBody,
     };
 
     return Container(
       margin: const EdgeInsets.only(bottom: 2),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
-        color: isCurrent
-            ? cPrimary.withValues(alpha: 0.07)
-            : Colors.transparent,
+        color: isCurrent ? tc.surface : Colors.transparent,
         borderRadius: BorderRadius.circular(rXSmall),
         border: isCurrent
-            ? Border.all(color: cPrimary.withValues(alpha: 0.2))
+            ? Border.all(color: tc.brand.withValues(alpha: 0.28))
             : null,
       ),
       child: Row(
@@ -185,7 +198,7 @@ class _PlanPanelState extends State<PlanPanel> {
                     fontSize: fSmall,
                     height: 1.35,
                     fontWeight:
-                        isCurrent ? FontWeight.w600 : FontWeight.w400,
+                        isCurrent ? FontWeight.w600 : FontWeight.w500,
                     decoration: step.status == PlanStepStatus.skipped
                         ? TextDecoration.lineThrough
                         : null,
@@ -199,7 +212,7 @@ class _PlanPanelState extends State<PlanPanel> {
                   Row(
                     children: [
                       Icon(Icons.terminal,
-                          size: 10, color: tc.textMuted),
+                          size: 10, color: tc.textSub),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
@@ -207,9 +220,10 @@ class _PlanPanelState extends State<PlanPanel> {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: tc.textMuted,
+                            color: tc.textSub,
                             fontSize: fMicro,
                             fontFamily: 'JetBrainsMono',
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
@@ -226,9 +240,10 @@ class _PlanPanelState extends State<PlanPanel> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: tc.textMuted,
+                color: tc.textSub,
                 fontSize: fMicro,
                 fontFamily: 'JetBrainsMono',
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -241,19 +256,19 @@ class _PlanPanelState extends State<PlanPanel> {
     final tc = widget.tc;
     switch (status) {
       case PlanStepStatus.completed:
-        return (Icons.check_circle, cSuccess);
+        return (Icons.check_circle, tc.ok);
       case PlanStepStatus.inProgress:
-        return (Icons.radio_button_checked, cPrimary);
+        return (Icons.radio_button_checked, tc.brand);
       case PlanStepStatus.failed:
-        return (Icons.error, cDanger);
+        return (Icons.error, tc.error);
       case PlanStepStatus.skipped:
         return (Icons.remove_circle_outline, tc.textMuted);
       case PlanStepStatus.pending:
-        return (Icons.radio_button_unchecked, tc.textMuted);
+        return (Icons.radio_button_unchecked, tc.textSub);
     }
   }
 
-  String _counts() {
+  String _counts(AgentUiText ui) {
     final total = widget.steps.length;
     final completed = widget.steps
         .where((s) => s.status == PlanStepStatus.completed)
@@ -269,11 +284,13 @@ class _PlanPanelState extends State<PlanPanel> {
     final skipped = widget.steps
         .where((s) => s.status == PlanStepStatus.skipped)
         .length;
-    final parts = <String>['$total 项', '$completed 完成'];
-    if (inProgress > 0) parts.add('$inProgress 进行中');
-    if (failed > 0) parts.add('$failed 失败');
-    if (skipped > 0) parts.add('$skipped 跳过');
-    if (pending > 0) parts.add('$pending 待处理');
-    return parts.join(' · ');
+    return ui.planCounts(
+      total: total,
+      completed: completed,
+      inProgress: inProgress,
+      failed: failed,
+      skipped: skipped,
+      pending: pending,
+    );
   }
 }

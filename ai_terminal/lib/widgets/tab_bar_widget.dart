@@ -134,7 +134,7 @@ class _TabItemState extends State<_TabItem> {
             ),
             border: isActive
                 ? Border(
-                    top: const BorderSide(color: cPrimary, width: 2),
+                    top: BorderSide(color: tc.brand, width: 2),
                     left: BorderSide(color: tc.border.withValues(alpha: 0.3), width: 0.5),
                     right: BorderSide(color: tc.border.withValues(alpha: 0.3), width: 0.5),
                   )

@@ -59,7 +59,7 @@ class MessageBubble extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
-                  color: isUser ? cPrimary : tc.card,
+                  color: isUser ? tc.brand : tc.card,
                   borderRadius: BorderRadius.only(
                     topLeft: const Radius.circular(rBubble),
                     topRight: const Radius.circular(rBubble),
@@ -73,7 +73,12 @@ class MessageBubble extends StatelessWidget {
                 child: isUser
                     ? SelectableText(
                         message.content,
-                        style: const TextStyle(color: Colors.white, fontSize: fBody, height: 1.5),
+                        style: TextStyle(
+                        color: tc.isLight ? Colors.white : cBg,
+                        fontSize: fBody,
+                        height: 1.5,
+                        fontWeight: FontWeight.w500,
+                      ),
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -84,11 +89,17 @@ class MessageBubble extends StatelessWidget {
                             // 规避 flutter_markdown 0.6.23 在 selectable=true 时无条件调用 onSelectionChanged!() 的 bug
                             onSelectionChanged: (_, __, ___) {},
                             styleSheet: MarkdownStyleSheet(
-                              p: TextStyle(color: tc.textBody, fontSize: fBody, height: 1.5),
+                              p: TextStyle(
+                                color: tc.textBody,
+                                fontSize: fBody,
+                                height: 1.5,
+                                fontWeight: FontWeight.w500,
+                              ),
                               code: TextStyle(
                                 fontFamily: 'JetBrainsMono',
                                 fontSize: fMono,
-                                color: tc.terminalGreen,
+                                fontWeight: FontWeight.w500,
+                                color: tc.textMain,
                                 backgroundColor: tc.terminalBg,
                               ),
                               codeblockDecoration: BoxDecoration(
@@ -97,9 +108,9 @@ class MessageBubble extends StatelessWidget {
                                 border: Border.all(color: tc.border),
                               ),
                               blockquote: TextStyle(color: tc.textSub),
-                              blockquoteDecoration: const BoxDecoration(
+                              blockquoteDecoration: BoxDecoration(
                                 border: Border(
-                                  left: BorderSide(color: cPrimary, width: 2),
+                                  left: BorderSide(color: tc.brand, width: 2),
                                 ),
                               ),
                               h1: TextStyle(color: tc.textMain, fontSize: fTitle, fontWeight: FontWeight.bold),
@@ -108,7 +119,7 @@ class MessageBubble extends StatelessWidget {
                               listBullet: TextStyle(color: tc.textMain),
                               strong: TextStyle(color: tc.textMain, fontWeight: FontWeight.bold),
                               em: TextStyle(color: tc.textMain, fontStyle: FontStyle.italic),
-                              a: const TextStyle(color: cPrimary),
+                              a: TextStyle(color: tc.brand),
                               tableHead: TextStyle(color: tc.textMain, fontWeight: FontWeight.bold),
                               tableBody: TextStyle(color: tc.textMain),
                               tableBorder: TableBorder.all(color: tc.border),
@@ -120,9 +131,9 @@ class MessageBubble extends StatelessWidget {
                               width: 6,
                               height: 14,
                               margin: const EdgeInsets.only(top: 6),
-                              decoration: const BoxDecoration(
-                                color: cPrimary,
-                                borderRadius: BorderRadius.all(Radius.circular(1)),
+                              decoration: BoxDecoration(
+                                color: tc.brand,
+                                borderRadius: const BorderRadius.all(Radius.circular(1)),
                               ),
                             ),
                         ],

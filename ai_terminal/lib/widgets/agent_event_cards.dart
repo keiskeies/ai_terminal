@@ -187,10 +187,10 @@ class AgentEventContent extends StatelessWidget {
     final hostResults = event.hostResults;
     final showMatrix = hostResults != null && hostResults.length > 1;
 
-    final statusColor = success ? cSuccess : cDanger;
+    final statusColor = success ? tc.ok : tc.error;
     final statusBg = success
-        ? cSuccess.withValues(alpha: 0.08)
-        : cDanger.withValues(alpha: 0.08);
+        ? tc.ok.withValues(alpha: 0.08)
+        : tc.error.withValues(alpha: 0.08);
     final statusIcon = success ? Icons.check : Icons.close;
     final statusText = success
         ? '执行成功'
@@ -246,23 +246,23 @@ class AgentEventContent extends StatelessWidget {
                     runSpacing: 2,
                     children: [
                       if (!success && event.exitCode != null)
-                        _metaChip('退出码 ${event.exitCode}', cDanger),
+                        _metaChip('退出码 ${event.exitCode}', tc.error),
                       if (event.durationMs != null)
                         _metaChip(
-                            _formatDuration(event.durationMs!), tc.textMuted),
+                            _formatDuration(event.durationMs!), tc.gold),
                       if (event.outputTruncated == true)
                         _metaChip(
                           event.outputTotalChars != null
                               ? '已截断 ${event.outputTotalChars} 字符'
                               : '已截断',
-                          cWarning,
+                          tc.warn,
                         ),
                       if (event.diffAdditions != null)
-                        _metaChip('+${event.diffAdditions}', cSuccess),
+                        _metaChip('+${event.diffAdditions}', tc.ok),
                       if (event.diffDeletions != null)
-                        _metaChip('-${event.diffDeletions}', cDanger),
+                        _metaChip('-${event.diffDeletions}', tc.error),
                       if (!showMatrix)
-                        _metaChip('${lines.length} 行', tc.textMuted),
+                        _metaChip('${lines.length} 行', tc.textSub),
                     ],
                   ),
                 ),
@@ -288,7 +288,7 @@ class AgentEventContent extends StatelessWidget {
                       _failureActionButton(
                         icon: Icons.wifi_tethering,
                         label: '重连',
-                        color: cWarning,
+                        color: tc.warn,
                         onTap: () => onReconnectHost!(event),
                       ),
                     if (onRetryFailedCommand != null &&
@@ -296,7 +296,7 @@ class AgentEventContent extends StatelessWidget {
                       _failureActionButton(
                         icon: Icons.refresh,
                         label: '让 AI 重试',
-                        color: cPrimary,
+                        color: tc.brand,
                         onTap: () => onRetryFailedCommand!(event),
                       ),
                   ],
@@ -323,6 +323,7 @@ class AgentEventContent extends StatelessWidget {
                       fontSize: fMono,
                       color: tc.textBody,
                       height: 1.45,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 if (!showMatrix &&
@@ -384,7 +385,7 @@ class AgentEventContent extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.lightbulb_outline, size: 13, color: cWarning),
+          Icon(Icons.lightbulb_outline, size: 13, color: tc.brand),
           const SizedBox(width: 5),
           Expanded(
             child: Text(
@@ -393,6 +394,7 @@ class AgentEventContent extends StatelessWidget {
                 color: tc.textSub,
                 fontSize: fMicro,
                 height: 1.35,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -487,7 +489,7 @@ class AgentEventContent extends StatelessWidget {
         width: 28,
         height: 28,
         alignment: Alignment.center,
-        child: Icon(Icons.copy, size: 13, color: tc.textMuted),
+        child: Icon(Icons.copy, size: 13, color: tc.textSub),
       ),
     );
   }
@@ -500,9 +502,9 @@ class AgentEventContent extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: cWarning.withValues(alpha: 0.05),
+        color: tc.brand.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: cWarning.withValues(alpha: 0.15)),
+        border: Border.all(color: tc.brand.withValues(alpha: 0.18)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -522,11 +524,11 @@ class AgentEventContent extends StatelessWidget {
                 height: 20,
                 margin: const EdgeInsets.only(top: 1),
                 decoration: BoxDecoration(
-                  color: cWarning.withValues(alpha: 0.15),
+                  color: tc.brand.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.help_outline,
-                    size: 13, color: cWarning),
+                child: Icon(Icons.help_outline,
+                    size: 13, color: tc.brand),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -565,10 +567,10 @@ class AgentEventContent extends StatelessWidget {
         decoration: BoxDecoration(
           color: tc.surface,
           borderRadius: BorderRadius.circular(rMedium),
-          border: Border.all(color: cWarning.withValues(alpha: 0.3)),
+          border: Border.all(color: tc.brand.withValues(alpha: 0.3)),
           boxShadow: [
             BoxShadow(
-              color: cWarning.withValues(alpha: 0.05),
+              color: tc.brand.withValues(alpha: 0.05),
               blurRadius: 4,
               offset: const Offset(0, 1),
             ),
@@ -577,13 +579,13 @@ class AgentEventContent extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.touch_app, size: 12, color: cWarning),
+            Icon(Icons.touch_app, size: 12, color: tc.brand),
             const SizedBox(width: 4),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: fSmall,
-                color: cWarning,
+                color: tc.brand,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -598,29 +600,29 @@ class AgentEventContent extends StatelessWidget {
     final state = event.finishState ?? AgentFinishState.success;
     final (accent, background, title, icon, defaultSummary) = switch (state) {
       AgentFinishState.success => (
-          cSuccess,
-          cSuccessBg,
+          tc.ok,
+          tc.okBg,
           '任务完成',
           Icons.celebration,
           '已完成所有步骤',
         ),
       AgentFinishState.cancelled => (
-          cWarning,
-          cWarningBg,
+          tc.warn,
+          tc.warnBg,
           '任务已取消',
           Icons.cancel_outlined,
           '任务已取消',
         ),
       AgentFinishState.failed => (
-          cDanger,
-          cDangerBg,
+          tc.error,
+          tc.errorBg,
           '任务失败',
           Icons.error_outline,
           '任务执行失败',
         ),
       AgentFinishState.interrupted => (
-          cWarning,
-          cWarningBg,
+          tc.warn,
+          tc.warnBg,
           '任务已中断',
           Icons.pause_circle_outline,
           '任务被中断',
@@ -828,9 +830,9 @@ Widget buildOptionButtons(
         final index = entry.key;
         final option = entry.value;
         final isPrimary = index == 0; // 第一个选项用主色高亮
-        final color = isPrimary ? cPrimary : tc.textMain;
+        final color = isPrimary ? tc.brand : tc.textMain;
         final bgColor = isPrimary
-            ? cPrimary.withValues(alpha: disabled ? 0.1 : 0.15)
+            ? tc.brand.withValues(alpha: disabled ? 0.1 : 0.15)
             : tc.border.withValues(alpha: disabled ? 0.3 : 0.6);
 
         return GestureDetector(

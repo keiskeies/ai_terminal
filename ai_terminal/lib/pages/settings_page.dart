@@ -42,14 +42,14 @@ class SettingsPage extends ConsumerWidget {
                 items: [
                   _SettingItem(
                     icon: Icons.dns,
-                    iconColor: cPrimary,
+                    iconColor: tc.brand,
                     title: l10n.settingsHosts,
                     subtitle: l10n.settingsHostsDesc,
                     onTap: () => context.push('/hosts'),
                   ),
                   _SettingItem(
                     icon: Icons.code,
-                    iconColor: cPrimary,
+                    iconColor: tc.brand,
                     title: l10n.settingsSnippets,
                     subtitle: l10n.settingsSnippetsDesc,
                     onTap: () => context.push('/snippets'),
@@ -101,7 +101,7 @@ class SettingsPage extends ConsumerWidget {
                 items: [
                   _SettingItem(
                     icon: Icons.smart_toy,
-                    iconColor: cPrimary,
+                    iconColor: tc.brand,
                     title: l10n.settingsAIModel,
                     subtitle: l10n.settingsAIModelDesc,
                     onTap: () => context.push('/settings/ai'),
@@ -139,14 +139,14 @@ class SettingsPage extends ConsumerWidget {
                 items: [
                   _SettingItem(
                     icon: Icons.palette,
-                    iconColor: cPrimary,
+                    iconColor: tc.brand,
                     title: l10n.settingsAppearanceSettings,
                     subtitle: l10n.settingsAppearanceSettingsDesc,
                     onTap: () => context.push('/settings/appearance'),
                   ),
                   _SettingItem(
                     icon: Icons.language,
-                    iconColor: cPrimary,
+                    iconColor: tc.brand,
                     title: l10n.settingsLanguage,
                     subtitle: _getLanguageName(
                       SettingsDao.getCached('locale', defaultValue: 'system') as String,
@@ -166,7 +166,7 @@ class SettingsPage extends ConsumerWidget {
                 items: [
                   _SettingItem(
                     icon: Icons.info,
-                    iconColor: cPrimary,
+                    iconColor: tc.brand,
                     title: l10n.settingsAboutApp,
                     subtitle: l10n.settingsVersion,
                     trailing: TextButton(
@@ -644,18 +644,18 @@ class _LanguageDialogState extends State<_LanguageDialog> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
-                    color: isSelected ? cPrimary.withValues(alpha: 0.1) : Colors.transparent,
+                    color: isSelected ? tc.brand.withValues(alpha: 0.1) : Colors.transparent,
                     borderRadius: BorderRadius.circular(rSmall),
                   ),
                   child: Row(
                     children: [
                       Icon(
                         isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                        color: isSelected ? cPrimary : tc.textMuted,
+                        color: isSelected ? tc.brand : tc.textMuted,
                         size: 18,
                       ),
                       const SizedBox(width: 10),
-                      Text(name, style: TextStyle(color: isSelected ? cPrimary : tc.textMain, fontSize: fBody)),
+                      Text(name, style: TextStyle(color: isSelected ? tc.brand : tc.textMain, fontSize: fBody)),
                     ],
                   ),
                 ),

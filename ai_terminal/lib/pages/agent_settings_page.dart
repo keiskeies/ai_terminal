@@ -196,6 +196,7 @@ class _BuiltInPromptEditorState extends State<_BuiltInPromptEditor> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     return Column(
       children: [
         TextField(
@@ -237,8 +238,8 @@ class _BuiltInPromptEditorState extends State<_BuiltInPromptEditor> {
               icon: const Icon(Icons.save, size: 18),
               label: Text(l10n.save),
               style: ElevatedButton.styleFrom(
-                backgroundColor: cPrimary,
-                foregroundColor: Colors.white,
+                backgroundColor: tc.brand,
+                foregroundColor: tc.isLight ? Colors.white : cBg,
               ),
             ),
           ],
@@ -276,6 +277,7 @@ class _CustomPromptEditorState extends State<_CustomPromptEditor> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     return Column(
       children: [
         TextField(
@@ -313,8 +315,8 @@ class _CustomPromptEditorState extends State<_CustomPromptEditor> {
               icon: const Icon(Icons.save, size: 18),
               label: Text(l10n.save),
               style: ElevatedButton.styleFrom(
-                backgroundColor: cPrimary,
-                foregroundColor: Colors.white,
+                backgroundColor: tc.brand,
+                foregroundColor: tc.isLight ? Colors.white : cBg,
               ),
             ),
           ],

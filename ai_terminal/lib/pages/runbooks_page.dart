@@ -111,8 +111,8 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showEditDialog(),
-        backgroundColor: cPrimary,
-        child: const Icon(Icons.add, color: Colors.white),
+        backgroundColor: tc.brand,
+        child: Icon(Icons.add, color: tc.isLight ? Colors.white : cBg),
       ),
     );
   }
@@ -396,6 +396,7 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
   // 底部操作行：执行 / 编辑 / 克隆（内置）/ 删除（自定义）
   Widget _buildActionRow(Runbook rb) {
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     return Row(
       children: [
         // 执行按钮（主操作）
@@ -404,8 +405,8 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
           icon: const Icon(Icons.play_arrow, size: 16),
           label: Text(l10n.commonExecute),
           style: ElevatedButton.styleFrom(
-            backgroundColor: cPrimary,
-            foregroundColor: Colors.white,
+            backgroundColor: tc.brand,
+            foregroundColor: tc.isLight ? Colors.white : cBg,
             padding: const EdgeInsets.symmetric(horizontal: pCompact),
             minimumSize: const Size(0, 30),
             textStyle: const TextStyle(fontSize: fSmall),
@@ -614,7 +615,10 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
                 {for (final v in variables) v: controllers[v]!.text.trim()},
               );
             },
-            style: ElevatedButton.styleFrom(backgroundColor: cPrimary),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: tc.brand,
+              foregroundColor: tc.isLight ? Colors.white : cBg,
+            ),
             child: Text(l10n.commonExecute),
           ),
         ],
@@ -879,7 +883,10 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
         if (!isBuiltin)
           ElevatedButton(
             onPressed: _save,
-            style: ElevatedButton.styleFrom(backgroundColor: cPrimary),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: tc.brand,
+              foregroundColor: tc.isLight ? Colors.white : cBg,
+            ),
             child: Text(isEdit ? l10n.save : l10n.runbookCreate),
           ),
       ],
@@ -1220,7 +1227,10 @@ class _RunbookImportDialogState extends State<_RunbookImportDialog> {
         ),
         ElevatedButton(
           onPressed: _importing ? null : _doImport,
-          style: ElevatedButton.styleFrom(backgroundColor: cPrimary),
+          style: ElevatedButton.styleFrom(
+              backgroundColor: tc.brand,
+              foregroundColor: tc.isLight ? Colors.white : cBg,
+            ),
           child: _importing
               ? const SizedBox(
                   width: 14,

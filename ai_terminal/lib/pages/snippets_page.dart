@@ -20,6 +20,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     final snippets = ref.watch(snippetsProvider);
 
     return Scaffold(
@@ -38,8 +39,8 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showSnippetDialog(),
-        backgroundColor: cPrimary,
-        child: const Icon(Icons.add, color: Colors.white),
+        backgroundColor: tc.brand,
+        child: Icon(Icons.add, color: tc.isLight ? Colors.white : cBg),
       ),
     );
   }

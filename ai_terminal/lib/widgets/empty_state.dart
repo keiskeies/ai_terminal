@@ -44,10 +44,10 @@ class EmptyStateWidget extends StatelessWidget {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: cPrimary.withValues(alpha: 0.1),
+                  color: tc.brand.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(rLarge),
                 ),
-                child: Icon(icon, size: 32, color: cPrimary),
+                child: Icon(icon, size: 32, color: tc.brand),
               ),
             const SizedBox(height: 24),
             // 标题

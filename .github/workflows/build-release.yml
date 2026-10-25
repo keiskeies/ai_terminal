@@ -203,6 +203,25 @@ jobs:
 
             AI Terminal 是一款将 AI 助手与 SSH / 本地终端深度集成的跨平台应用。无论你是刚买服务器的小白、不想记命令的开发者、还是需要批量管理服务器的运维人员——打开它，用中文告诉 AI 你要干什么，它帮你连服务器、跑命令、装软件、查问题。全程安全可控。
 
+            ### 🆕 v1.3.8 新功能 · 石墨青主题 & 可读性升级
+
+            v1.3.8 统一深/浅色视觉系统，提升 Agent 操作单在英文和浅色环境下的可读性，并重写项目 README。
+
+            #### 🎨 石墨青主题
+            - 深色/浅色两套石墨底 + 品牌青交互 + 金色数据强调
+            - 提高正文/计划/元信息字重，发丝级边框分层更清晰
+            - Material 单选、滑杆、输入焦点统一品牌色
+
+            #### 💬 对话与终端
+            - 用户消息改为品牌青淡染气泡，与 AI 中性气泡明确区分
+            - 新增浅色终端 ANSI 调色板，深色终端改为石墨黑
+            - Agent 操作单/执行清单文案支持英文/中文，其它语言英文兜底
+
+            #### 🧹 文档与质量
+            - README 全面重写：版本、模型/供应商、语言、功能数量与真实能力对齐
+            - 移除过期截图和失效图片链接，改用英文深色界面截图
+            - 继续包含 1.3.7 的操作单、文件传输/编辑安全加固
+
             ### 🆕 v1.3.7 新功能 · Agent 操作单 & 文件安全加固
 
             v1.3.7 聚焦 **Agent 回答可读性** 与 **文件操作安全**：思考、计划、执行、结果按“操作单”分层展示；上传、下载、修改文件全链路加固，中文/emoji 内容不再依赖模型手算 base64。
@@ -369,6 +388,25 @@ jobs:
             **Control your servers with natural language. AI runs the commands for you.**
 
             AI Terminal is a cross-platform app that deeply integrates an AI assistant with SSH and local terminals. Whether you're a beginner who just rented a VPS, a developer tired of googling commands, or a DevOps engineer managing dozens of servers — open it, tell the AI what you want in plain English (or Chinese), and it handles the rest. Safe, transparent, and under your control.
+
+            ### 🆕 What's New in v1.3.8 · Graphite Theme & Readability
+
+            v1.3.8 unifies the dark/light visual system, improves the Agent operation sheet in English and light mode, and rewrites the project README.
+
+            #### 🎨 Graphite theme
+            - Graphite surfaces with brand-cyan interaction and gold data accents in both dark and light mode
+            - Higher text weights for body, plan and metadata text, plus hairline borders for clearer hierarchy
+            - Brand color applied to Material radios, sliders and input focus states
+
+            #### 💬 Conversations & terminal
+            - User messages now use a soft brand-cyan bubble, clearly separated from neutral AI bubbles
+            - New light terminal ANSI palette; dark terminal background changed to graphite black
+            - Agent operation sheet and plan labels support English/Chinese, with English fallback for other locales
+
+            #### 🧹 Docs & quality
+            - README rewritten with accurate versions, provider/model/language counts and capabilities
+            - Removed outdated screenshots and broken image links; added English dark-mode screenshots
+            - Still includes the v1.3.7 operation sheet and file transfer/edit safety work
 
             ### 🆕 What's New in v1.3.7 · Agent Operation Sheet & File Safety
 

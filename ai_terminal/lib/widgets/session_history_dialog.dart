@@ -206,6 +206,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
 
   void _showRenameDialog(Conversation conv) {
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     final controller = TextEditingController(text: conv.title);
     showDialog(
       context: context,
@@ -237,7 +238,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
               if (!ctx.mounted) return;
               Navigator.pop(ctx);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: tc.brand, foregroundColor: tc.isLight ? Colors.white : cBg),
             child: Text(l10n.save, style: const TextStyle(fontSize: fBody)),
           ),
         ],

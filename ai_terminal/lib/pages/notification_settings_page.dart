@@ -267,8 +267,8 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
               label: Text(_testing ? l10n.notificationSending : l10n.notificationSendTest),
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size.fromHeight(44),
-                foregroundColor: cPrimary,
-                side: BorderSide(color: cPrimary.withValues(alpha: 0.5)),
+                foregroundColor: tc.brand,
+                side: BorderSide(color: tc.brand.withValues(alpha: 0.5)),
               ),
             ),
           ],
@@ -282,7 +282,8 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             label: Text(l10n.notificationSaveConfig),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(44),
-              backgroundColor: cPrimary,
+              backgroundColor: tc.brand,
+              foregroundColor: tc.isLight ? Colors.white : cBg,
             ),
           ),
 

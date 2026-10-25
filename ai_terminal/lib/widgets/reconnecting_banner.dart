@@ -20,9 +20,9 @@ class ReconnectingBanner extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: cWarning.withValues(alpha: 0.08),
+        color: tc.warn.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: cWarning.withValues(alpha: 0.25)),
+        border: Border.all(color: tc.warn.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
@@ -31,7 +31,7 @@ class ReconnectingBanner extends StatelessWidget {
             height: 12,
             child: CircularProgressIndicator(
               strokeWidth: 1.5,
-              color: cWarning,
+              color: tc.warn,
             ),
           ),
           const SizedBox(width: 7),
@@ -41,7 +41,7 @@ class ReconnectingBanner extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                color: cWarning,
+                color: tc.warn,
                 fontSize: fSmall,
                 fontWeight: FontWeight.w500,
               ),

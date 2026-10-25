@@ -23,13 +23,13 @@ class InterruptedTurnBanner extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: cWarning.withValues(alpha: 0.08),
+        color: tc.warn.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: cWarning.withValues(alpha: 0.25)),
+        border: Border.all(color: tc.warn.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.pause_circle_outline, size: 16, color: cWarning),
+          Icon(Icons.pause_circle_outline, size: 16, color: tc.warn),
           const SizedBox(width: 7),
           Expanded(
             child: Column(
@@ -38,7 +38,7 @@ class InterruptedTurnBanner extends StatelessWidget {
                 Text(
                   '任务已中断',
                   style: TextStyle(
-                    color: cWarning,
+                    color: tc.warn,
                     fontSize: fSmall,
                     fontWeight: FontWeight.w600,
                   ),
@@ -61,20 +61,20 @@ class InterruptedTurnBanner extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
-                  color: cPrimary.withValues(alpha: 0.1),
+                  color: tc.brand.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(rXSmall),
-                  border: Border.all(color: cPrimary.withValues(alpha: 0.3)),
+                  border: Border.all(color: tc.brand.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.play_circle_outline,
-                        size: 12, color: cPrimary),
+                    Icon(Icons.play_circle_outline,
+                        size: 12, color: tc.brand),
                     const SizedBox(width: 4),
                     Text(
                       '继续任务',
                       style: TextStyle(
-                        color: cPrimary,
+                        color: tc.brand,
                         fontSize: fMicro,
                         fontWeight: FontWeight.w600,
                       ),

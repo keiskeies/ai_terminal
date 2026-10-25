@@ -25,6 +25,7 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     final models = ref.watch(aiModelsProvider);
 
     return Scaffold(
@@ -43,8 +44,8 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showModelDialog(),
-        backgroundColor: cPrimary,
-        child: const Icon(Icons.add, color: Colors.white),
+        backgroundColor: tc.brand,
+        child: Icon(Icons.add, color: tc.isLight ? Colors.white : cBg),
       ),
     );
   }
@@ -564,8 +565,8 @@ class _AIModelDialogState extends State<AIModelDialog> {
                                     ),
                                   ),
                                   avatar: m.free ? const Text('🆓', style: TextStyle(fontSize: 10)) : null,
-                                  backgroundColor: isSelected ? cPrimary : tc.surface,
-                                  side: BorderSide(color: isSelected ? cPrimary : tc.border),
+                                  backgroundColor: isSelected ? tc.brand : tc.surface,
+                                  side: BorderSide(color: isSelected ? tc.brand : tc.border),
                                   onPressed: () {
                                     setState(() {
                                       _modelNameController.text = m.name;
@@ -622,9 +623,9 @@ class _AIModelDialogState extends State<AIModelDialog> {
                                     : const Icon(Icons.wifi_tethering, size: 16),
                                 label: Text(_testing ? '...' : l10n.aiModelTest),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: _testResult == 'success' ? cSuccess : cPrimary,
+                                  backgroundColor: _testResult == 'success' ? cSuccess : tc.brand,
                                   foregroundColor: Colors.white,
-                                  disabledBackgroundColor: cPrimary.withValues(alpha: 0.3),
+                                  disabledBackgroundColor: tc.brand.withValues(alpha: 0.3),
                                 ),
                               ),
                             ),
@@ -810,8 +811,8 @@ class _AIModelDialogState extends State<AIModelDialog> {
                     ElevatedButton(
                       onPressed: _save,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: cPrimary,
-                        foregroundColor: Colors.white,
+                        backgroundColor: tc.brand,
+                        foregroundColor: tc.isLight ? Colors.white : cBg,
                       ),
                       child: Text(l10n.save),
                     ),

@@ -302,7 +302,12 @@ class _AIPromptInputState extends State<AIPromptInput> {
                 RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]'),
               ),
             ],
-            style: TextStyle(color: tc.textMain, fontSize: fBody, height: 1.5),
+            style: TextStyle(
+              color: tc.textMain,
+              fontSize: fBody,
+              height: 1.5,
+              fontWeight: FontWeight.w500,
+            ),
             decoration: InputDecoration(
               hintText: widget.hintText,
               hintStyle: TextStyle(color: tc.textMuted, fontSize: fBody),
@@ -316,7 +321,7 @@ class _AIPromptInputState extends State<AIPromptInput> {
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(rSmall),
                 borderSide: BorderSide(
-                  color: isOrch ? cWarning : tc.border,
+                  color: isOrch ? tc.warn : tc.border,
                   width: 1,
                 ),
               ),
@@ -381,14 +386,14 @@ class _AIPromptInputState extends State<AIPromptInput> {
           height: 28,
           margin: const EdgeInsets.only(right: 4),
           decoration: BoxDecoration(
-            color: isOrch ? cWarning : tc.surface,
+            color: isOrch ? tc.warn : tc.surface,
             borderRadius: BorderRadius.circular(rXSmall),
           ),
           child: Tooltip(
             message: isOrch ? l10n.orchExitMode : l10n.orchEnterMode,
             child: Icon(
               Icons.hub_outlined,
-              color: isOrch ? Colors.white : tc.textMuted,
+              color: isOrch ? (tc.isLight ? Colors.white : cBg) : tc.textMuted,
               size: 15,
             ),
           ),
@@ -401,9 +406,9 @@ class _AIPromptInputState extends State<AIPromptInput> {
     final tc = ThemeColors.of(context);
     final canSend = widget.enabled && !running;
     final isOrch = widget.isOrchestratorMode;
-    final sendColor = isOrch ? cWarning : cPrimary;
+    final sendColor = isOrch ? tc.warn : tc.brand;
     final bgColor = running
-        ? cDanger
+        ? tc.error
         : canSend
             ? sendColor
             : tc.textMuted.withValues(alpha: 0.5);
@@ -427,12 +432,12 @@ class _AIPromptInputState extends State<AIPromptInput> {
                   child: Container(
                     width: 9,
                     height: 9,
-                    color: Colors.white,
+                    color: tc.isLight ? Colors.white : cBg,
                   ),
                 )
-              : const Icon(
+              : Icon(
                   Icons.arrow_upward_rounded,
-                  color: Colors.white,
+                  color: tc.isLight ? Colors.white : cBg,
                   size: 15,
                 ),
         ),

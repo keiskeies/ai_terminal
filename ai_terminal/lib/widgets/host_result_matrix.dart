@@ -40,7 +40,7 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
       children: [
         Row(
           children: [
-            Icon(Icons.dns_outlined, size: 13, color: tc.textMuted),
+            Icon(Icons.dns_outlined, size: 13, color: tc.textSub),
             const SizedBox(width: 5),
             Expanded(
               child: Text(
@@ -49,7 +49,7 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: failed > 0 ? cDanger : tc.textSub,
+                  color: failed > 0 ? tc.error : tc.textSub,
                   fontSize: fMicro,
                   fontWeight: FontWeight.w600,
                 ),
@@ -63,20 +63,20 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                   decoration: BoxDecoration(
-                    color: cWarning.withValues(alpha: 0.1),
+                    color: tc.brand.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rXSmall),
                     border:
-                        Border.all(color: cWarning.withValues(alpha: 0.3)),
+                        Border.all(color: tc.brand.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.refresh, size: 11, color: cWarning),
+                      Icon(Icons.refresh, size: 11, color: tc.brand),
                       const SizedBox(width: 3),
                       Text(
                         '重试失败主机',
                         style: TextStyle(
-                          color: cWarning,
+                          color: tc.brand,
                           fontSize: fMicro,
                           fontWeight: FontWeight.w600,
                         ),
@@ -96,7 +96,7 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
 
   Widget _buildRow(String hostId, HostExecutionResult result) {
     final tc = widget.tc;
-    final color = result.success ? cSuccess : cDanger;
+    final color = result.success ? tc.ok : tc.error;
     final expanded = _expandedHosts.contains(hostId);
     final detail = (result.success ? result.output : (result.error ?? result.output)) ?? '';
     final preview = _firstLine(detail);
@@ -111,7 +111,7 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
       decoration: BoxDecoration(
         color: result.success
             ? Colors.transparent
-            : cDanger.withValues(alpha: 0.05),
+            : tc.error.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(rXSmall),
       ),
       child: Column(

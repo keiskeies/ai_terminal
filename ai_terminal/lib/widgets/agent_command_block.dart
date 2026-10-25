@@ -84,27 +84,27 @@ class AgentCommandBlock extends StatelessWidget {
         !isTool && !executed && pendingConfirmCommand == trimmed;
 
     final cmdColor = isBlocked
-        ? cDanger
+        ? tc.error
         : dangerous
-            ? cWarning
+            ? tc.warn
             : isTool
                 ? tc.textBody
-                : tc.terminalGreen;
+                : tc.textMain;
 
     final accentColor = isBlocked
-        ? cDanger
+        ? tc.error
         : dangerous
-            ? cWarning
+            ? tc.warn
             : isTool
-                ? cPrimary
-                : tc.terminalGreen;
+                ? tc.brand
+                : tc.ok;
     final headerBg = isBlocked
-        ? cDanger.withValues(alpha: 0.08)
+        ? tc.error.withValues(alpha: 0.08)
         : dangerous
-            ? cWarning.withValues(alpha: 0.08)
+            ? tc.warn.withValues(alpha: 0.08)
             : isTool
-                ? cPrimary.withValues(alpha: 0.06)
-                : cSuccess.withValues(alpha: 0.08);
+                ? tc.brand.withValues(alpha: 0.06)
+                : tc.ok.withValues(alpha: 0.08);
 
     final block = Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -191,7 +191,7 @@ class AgentCommandBlock extends StatelessWidget {
                           width: 26,
                           height: 26,
                           alignment: Alignment.center,
-                          child: const Icon(Icons.block, size: 13, color: cDanger),
+                          child: Icon(Icons.block, size: 13, color: tc.error),
                         ),
                     ],
                   ),
@@ -222,6 +222,7 @@ class AgentCommandBlock extends StatelessWidget {
                             fontSize: fMono,
                             color: cmdColor,
                             height: 1.45,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                       ),
@@ -249,7 +250,7 @@ class AgentCommandBlock extends StatelessWidget {
     required bool requiresConfirm,
   }) {
     final explanation = RiskExplainer.explain(command);
-    final color = isBlocked ? cDanger : cWarning;
+    final color = isBlocked ? tc.error : tc.warn;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
@@ -286,14 +287,19 @@ class AgentCommandBlock extends StatelessWidget {
           const SizedBox(height: 3),
           Text(
             explanation.impact,
-            style: TextStyle(color: tc.textBody, fontSize: fMicro, height: 1.35),
+            style: TextStyle(
+              color: tc.textBody,
+              fontSize: fMicro,
+              height: 1.35,
+              fontWeight: FontWeight.w500,
+            ),
           ),
           if (explanation.reason != null &&
               explanation.reason!.trim().isNotEmpty) ...[
             const SizedBox(height: 2),
             Text(
               '风险：${explanation.reason}',
-              style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+              style: TextStyle(color: tc.textSub, fontSize: fMicro),
             ),
           ],
           const SizedBox(height: 2),
@@ -304,8 +310,9 @@ class AgentCommandBlock extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: explanation.canRollback ? tc.textMuted : color,
+              color: explanation.canRollback ? tc.textSub : color,
               fontSize: fMicro,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -332,7 +339,7 @@ class AgentCommandBlock extends StatelessWidget {
         width: 28,
         height: 28,
         alignment: Alignment.center,
-        child: Icon(Icons.copy, size: 13, color: tc.textMuted),
+        child: Icon(Icons.copy, size: 13, color: tc.textSub),
       ),
     );
   }
@@ -345,10 +352,10 @@ class AgentCommandBlock extends StatelessWidget {
     final isDisabled = isBlocked || (hasAnyExecuting && !isExecuting);
 
     final color = isBlocked
-        ? cDanger
+        ? tc.error
         : dangerous
-            ? cWarning
-            : cPrimary;
+            ? tc.warn
+            : tc.brand;
 
     return GestureDetector(
       onTap: isDisabled ? null : () => onExecute?.call(command, dangerous, tab),
@@ -368,7 +375,7 @@ class AgentCommandBlock extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 1.5, color: color),
               )
             : isBlocked
-                ? const Icon(Icons.block, size: 14, color: cDanger)
+                ? Icon(Icons.block, size: 14, color: tc.error)
                 : Icon(Icons.play_arrow, size: 18, color: color),
       ),
     );
@@ -407,14 +414,14 @@ class AgentCommandBlock extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 10),
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: cWarning.withValues(alpha: 0.15),
+              color: tc.warn.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(rSmall),
-              border: Border.all(color: cWarning.withValues(alpha: 0.4)),
+              border: Border.all(color: tc.warn.withValues(alpha: 0.4)),
             ),
-            child: const Text('确认执行',
+            child: Text('确认执行',
                 style: TextStyle(
                     fontSize: fSmall,
-                    color: cWarning,
+                    color: tc.warn,
                     fontWeight: FontWeight.w600)),
           ),
         ),

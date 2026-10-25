@@ -32,14 +32,19 @@ class _PrimaryButtonState extends State<PrimaryButton> {
   bool _isPressed = false;
 
   Color get _bgColor {
-    if (widget.isDisabled || widget.isLoading) return cPrimary.withValues(alpha: 0.5);
-    if (_isPressed) return cPrimaryActive;
-    if (_isHovered) return cPrimaryHover;
-    return cPrimary;
+    final tc = ThemeColors.of(context);
+    if (widget.isDisabled || widget.isLoading) {
+      return tc.brand.withValues(alpha: 0.5);
+    }
+    if (_isPressed) return tc.brandPressed;
+    if (_isHovered) return tc.brandHover;
+    return tc.brand;
   }
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    final fg = tc.isLight ? Colors.white : cBg;
     final disabled = widget.isDisabled || widget.isLoading || widget.onPressed == null;
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
@@ -71,18 +76,18 @@ class _PrimaryButtonState extends State<PrimaryButton> {
                   height: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white.withValues(alpha: 0.8)),
+                    valueColor: AlwaysStoppedAnimation<Color>(fg.withValues(alpha: 0.8)),
                   ),
                 )
               else ...[
                 if (widget.icon != null) ...[
-                  Icon(widget.icon, size: 14, color: Colors.white),
+                  Icon(widget.icon, size: 14, color: fg),
                   const SizedBox(width: 6),
                 ],
                 Text(
                   widget.text,
                   style: TextStyle(
-                    color: Colors.white,
+                    color: fg,
                     fontSize: widget.fontSize,
                     fontWeight: FontWeight.w500,
                   ),

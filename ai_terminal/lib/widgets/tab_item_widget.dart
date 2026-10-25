@@ -117,7 +117,7 @@ class _TabItemWidgetState extends State<TabItemWidget> {
                   right: 8,
                   child: Container(
                     height: 2,
-                    color: cPrimary,
+                    color: tc.brand,
                   ),
                 ),
             ],

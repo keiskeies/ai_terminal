@@ -41,41 +41,80 @@ const Color cTerminalGreen = cSuccess;
 const Color cAgentGreenLight = cLimeGreenLight;
 
 
-// ===== 颜色系统 (深色) =====
-const Color cBg = Color(0xFF0D1117);
-const Color cCard = Color(0xFF161B22);
-const Color cCardElevated = Color(0xFF1C2128);
-const Color cSurface = Color(0xFF21262D);
-const Color cBorder = Color(0xFF30363D);
-const Color cBorderHover = Color(0xFF484F58);
+// ===== 颜色系统 (深色 · 石墨青) =====
+// 中性石墨底：层级靠 surface 阶梯 + 发丝线，不靠大面积色块。
+const Color cBg = Color(0xFF0B0D0D);
+const Color cCard = Color(0xFF111414);
+const Color cCardElevated = Color(0xFF171B1B);
+const Color cSurface = Color(0xFF1E2323);
+// 发丝线：默认 12% 白，交互/焦点 22%，内部分隔 7%。
+const Color cBorder = Color(0x1FFFFFFF);
+const Color cBorderHover = Color(0x38FFFFFF);
+const Color cHairline = Color(0x12FFFFFF);
 
 // 文字
-const Color cTextMain = Color(0xFFE6EDF3);
-const Color cTextBody = Color(0xFFB1BAC4);
-const Color cTextSub = Color(0xFF7D8590);
-const Color cTextMuted = Color(0xFF6E7681);
+const Color cTextMain = Color(0xFFF1F3F1);
+const Color cTextBody = Color(0xFFB8BEBA);
+const Color cTextSub = Color(0xFF858D88);
+const Color cTextMuted = Color(0xFF6F7671);
 
 // 终端
-const Color cTerminalBg = Color(0xFF0A0D12);
-const Color cTerminalOutput = Color(0xFF0D1117);
+const Color cTerminalBg = Color(0xFF080A0A);
+const Color cTerminalOutput = Color(0xFF0E1111);
+
+// ===== 品牌强调色（深色）=====
+// 青色只用于交互、进行中状态与链接；金色只用于第二数据色（耗时/统计）。
+const Color cBrand = Color(0xFF45C8C3);
+const Color cBrandHover = Color(0xFF6ADDD8);
+const Color cBrandPressed = Color(0xFF2FA9A5);
+const Color cBrandBg = Color(0x1A45C8C3);
+const Color cGold = Color(0xFFE0AF63);
+const Color cGoldBg = Color(0x1AE0AF63);
+
+// 深色语义状态：比旧版更柔和，警告偏橙以区分金色。
+const Color cStatusOk = Color(0xFF6FD39A);
+const Color cStatusOkBg = Color(0x1A6FD39A);
+const Color cStatusWarn = Color(0xFFF09A5C);
+const Color cStatusWarnBg = Color(0x1AF09A5C);
+const Color cStatusError = Color(0xFFF07C86);
+const Color cStatusErrorBg = Color(0x1AF07C86);
 
 // Agent 色 = 成功绿
 const Color cAgentGreen = cSuccess;
 
-// ===== 颜色系统 (浅色) =====
-const Color cBgLight = Color(0xFFF6F8FA);
-const Color cCardLight = Color(0xFFFFFFFF);
-const Color cCardElevatedLight = Color(0xFFF6F8FA);
-const Color cSurfaceLight = Color(0xFFEAEFF2);
-const Color cBorderLightTheme = Color(0xFFD0D7DE);
-const Color cBorderLightHover = Color(0xFFAFB8C1);
-const Color cTextMainLight = Color(0xFF1F2328);
-const Color cTextBodyLight = Color(0xFF444D56);
-const Color cTextSubLight = Color(0xFF6E7781);
-const Color cTextMutedLight = Color(0xFF8C959F);
+// ===== 颜色系统 (浅色 · 石墨青) =====
+// 浅色底同样用中性石墨阶，青色改为深青以保证白底小字号可读。
+const Color cBgLight = Color(0xFFF3F5F3);
+const Color cCardLight = Color(0xFFFBFCFB);
+const Color cCardElevatedLight = Color(0xFFFFFFFF);
+const Color cSurfaceLight = Color(0xFFE7ECE8);
+// 浅色发丝线：默认 14% 黑，交互 23% 黑，内部分隔 7% 黑。
+const Color cBorderLightTheme = Color(0x24000000);
+const Color cBorderLightHover = Color(0x3A000000);
+const Color cHairlineLight = Color(0x12000000);
+const Color cTextMainLight = Color(0xFF171B19);
+const Color cTextBodyLight = Color(0xFF4B534E);
+const Color cTextSubLight = Color(0xFF68716B);
+const Color cTextMutedLight = Color(0xFF8A938D);
 const Color cTerminalBgLight = Color(0xFFFFFFFF);
-const Color cTerminalGreenLight = Color(0xFF1A7F37);
-const Color cAgentGreenLightMode = Color(0xFF1A7F37);
+const Color cTerminalOutputLight = Color(0xFFFBFCFB);
+const Color cTerminalGreenLight = Color(0xFF1B7F4B);
+const Color cAgentGreenLightMode = Color(0xFF1B7F4B);
+
+// 浅色品牌青：深青在白底上约 5:1，filled button 白字约 5.2:1。
+const Color cBrandLight = Color(0xFF0B7A75);
+const Color cBrandLightHover = Color(0xFF096B67);
+const Color cBrandLightPressed = Color(0xFF075955);
+const Color cBrandLightBg = Color(0x140B7A75);
+// 浅色数据金色 / 语义状态色。
+const Color cGoldLight = Color(0xFF8A5D0A);
+const Color cGoldBgLight = Color(0x148A5D0A);
+const Color cStatusOkLight = Color(0xFF1B7F4B);
+const Color cStatusOkBgLight = Color(0x141B7F4B);
+const Color cStatusWarnLight = Color(0xFFA65B00);
+const Color cStatusWarnBgLight = Color(0x14A65B00);
+const Color cStatusErrorLight = Color(0xFFB42318);
+const Color cStatusErrorBgLight = Color(0x14B42318);
 
 // ===== 圆角系统 =====
 const double rXSmall = 4.0;

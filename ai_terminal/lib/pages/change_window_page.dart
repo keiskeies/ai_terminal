@@ -308,7 +308,8 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
             label: Text(l10n.changeWindowSaveConfig),
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(44),
-              backgroundColor: cPrimary,
+              backgroundColor: tc.brand,
+              foregroundColor: tc.isLight ? Colors.white : cBg,
             ),
           ),
         ],

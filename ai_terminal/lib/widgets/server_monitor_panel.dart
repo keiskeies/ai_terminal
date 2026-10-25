@@ -227,7 +227,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
                 icon: Icons.bolt,
                 label: 'CPU',
                 value: '${(snap?.cpuPercent ?? 0).toStringAsFixed(1)}%',
-                color: staleColor(_colorByPercent(snap?.cpuPercent ?? 0, cPrimary)),
+                color: staleColor(_colorByPercent(snap?.cpuPercent ?? 0, tc.brand)),
                 chartData: history.map((s) => s.cpuPercent).toList(),
                 chartMax: 100,
               ),
@@ -249,7 +249,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
                 icon: Icons.arrow_upward,
                 label: '上传',
                 value: _formatRate(snap?.netUpKBps ?? 0),
-                color: staleColor(cPrimary),
+                color: staleColor(tc.brand),
                 chartData: history.map((s) => s.netUpKBps).toList(),
                 chartMax: null, // 自适应
               ),

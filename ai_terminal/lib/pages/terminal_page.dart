@@ -478,7 +478,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  const Icon(Icons.add_circle_outline, size: 16, color: cPrimary),
+                  Icon(Icons.add_circle_outline, size: 16, color: tc.brand),
                   const SizedBox(width: 8),
                   Text(l10n.terminalSelectServerForNewTab, style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
                   const Spacer(),
@@ -490,11 +490,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: cPrimary.withValues(alpha: 0.1),
+                        color: tc.brand.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(rSmall),
-                        border: Border.all(color: cPrimary.withValues(alpha: 0.2)),
+                        border: Border.all(color: tc.brand.withValues(alpha: 0.25)),
                       ),
-                      child: Text(l10n.terminalCreateNew, style: const TextStyle(fontSize: fMicro, color: cPrimary, fontWeight: FontWeight.w500)),
+                      child: Text(l10n.terminalCreateNew, style: TextStyle(fontSize: fMicro, color: tc.brand, fontWeight: FontWeight.w500)),
                     ),
                   ),
                 ],
@@ -1066,7 +1066,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         PopupMenuItem<String>(
           enabled: false,
           height: 28,
-          child: Text(l10n.terminalFontSize(_terminalFontSize.toInt()), style: const TextStyle(fontSize: fMicro, color: cPrimary, fontWeight: FontWeight.w600)),
+          child: Text(l10n.terminalFontSize(_terminalFontSize.toInt()), style: TextStyle(fontSize: fMicro, color: tc.brand, fontWeight: FontWeight.w600)),
         ),
         ...[8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 18.0, 20.0, 22.0, 24.0].map((size) => PopupMenuItem<String>(
           value: 'font_$size',
@@ -1074,11 +1074,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           child: Row(
             children: [
               if (_terminalFontSize == size)
-                const Icon(Icons.check, size: 12, color: cPrimary)
+                Icon(Icons.check, size: 12, color: tc.brand)
               else
                 const SizedBox(width: 12),
               const SizedBox(width: 4),
-              Text('${size.toInt()}px', style: TextStyle(fontSize: fSmall, color: _terminalFontSize == size ? cPrimary : tc.textMain)),
+              Text('${size.toInt()}px', style: TextStyle(fontSize: fSmall, color: _terminalFontSize == size ? tc.brand : tc.textMain)),
             ],
           ),
         )),
@@ -1300,7 +1300,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           PopupMenuItem<String>(
             enabled: false,
             height: 24,
-            child: Text(l10n.quickCommands, style: const TextStyle(fontSize: fMicro, color: cPrimary, fontWeight: FontWeight.w600)),
+            child: Text(l10n.quickCommands, style: TextStyle(fontSize: fMicro, color: tc.brand, fontWeight: FontWeight.w600)),
           ),
           ...snippets.take(5).map((s) => _menuItem('snippet:${s.id}', Icons.terminal, s.name)),
         ],
@@ -1337,9 +1337,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(
+          SizedBox(
             width: 24, height: 24,
-            child: CircularProgressIndicator(strokeWidth: 2, color: cPrimary),
+            child: CircularProgressIndicator(strokeWidth: 2, color: tc.brand),
           ),
           const SizedBox(height: 12),
           Text(l10n.terminalConnecting(host?.host ?? ''), style: TextStyle(color: tc.textSub, fontSize: fBody)),
@@ -1357,11 +1357,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 40, color: cDanger),
+            Icon(Icons.error_outline, size: 40, color: tc.error),
             const SizedBox(height: 12),
             Text(L10n.str.connectionFailed, style: TextStyle(color: tc.textSub, fontSize: fBody)),
             const SizedBox(height: 6),
-            Text(_connectionError!, style: const TextStyle(color: cDanger, fontSize: fSmall), textAlign: TextAlign.center),
+            Text(_connectionError!, style: TextStyle(color: tc.error, fontSize: fSmall), textAlign: TextAlign.center),
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -1369,8 +1369,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 ElevatedButton(
                   onPressed: _connectToHost,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: cPrimary,
-                    foregroundColor: Colors.white,
+                    backgroundColor: tc.brand,
+                    foregroundColor: tc.isLight ? Colors.white : cBg,
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
                   ),
@@ -1641,23 +1641,23 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: cPrimaryBg,
+        color: tc.brandBg,
         border: Border(
-          bottom: BorderSide(color: cPrimary.withValues(alpha: 0.3)),
+          bottom: BorderSide(color: tc.brand.withValues(alpha: 0.3)),
         ),
       ),
       child: Row(
         children: [
-          const SizedBox(
+          SizedBox(
             width: 14,
             height: 14,
-            child: CircularProgressIndicator(strokeWidth: 1.5, color: cPrimary),
+            child: CircularProgressIndicator(strokeWidth: 1.5, color: tc.brand),
           ),
           const SizedBox(width: 8),
           Text(
             L10n.str.compacting,
-            style: const TextStyle(
-              color: cPrimary,
+            style: TextStyle(
+              color: tc.brand,
               fontSize: fSmall,
               fontWeight: FontWeight.w500,
             ),
@@ -1847,9 +1847,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         margin: const EdgeInsets.only(bottom: 8),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          color: isUser
-              ? cPrimary.withValues(alpha: 0.2)
-              : tc.surface,
+          color: isUser ? tc.userBubble : tc.card,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(rMedium),
             topRight: const Radius.circular(rMedium),
@@ -1857,9 +1855,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             bottomRight: Radius.circular(isUser ? rXSmall : rMedium),
           ),
           border: Border.all(
-            color: isUser
-                ? cPrimary.withValues(alpha: 0.3)
-                : tc.border.withValues(alpha: 0.3),
+            color: isUser ? tc.userBubbleBorder : tc.border,
           ),
         ),
         child: Column(
@@ -1872,16 +1868,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: isUser
-                          ? [cPrimary.withValues(alpha: 0.18), cPrimary.withValues(alpha: 0.08)]
-                          : [tc.agentGreen.withValues(alpha: 0.18), tc.agentGreen.withValues(alpha: 0.06)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                    color: tc.brand.withValues(
+                        alpha: isUser ? 0.14 : 0.1),
                     borderRadius: BorderRadius.circular(rXSmall),
                     border: Border.all(
-                      color: (isUser ? cPrimary : tc.agentGreen).withValues(alpha: 0.2),
+                      color: tc.brand.withValues(
+                          alpha: isUser ? 0.32 : 0.25),
                       width: 0.5,
                     ),
                   ),
@@ -1891,21 +1883,21 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                       Icon(
                         isUser ? Icons.person_outline : Icons.auto_awesome,
                         size: 11,
-                        color: isUser ? cPrimary : tc.agentGreen,
+                        color: tc.brand,
                       ),
                       const SizedBox(width: 4),
                       Text(
                         isUser ? l10n.terminalRoleYou : l10n.commonAIAssistant,
                         style: TextStyle(
                           fontSize: fMicro,
-                          color: isUser ? cPrimary : tc.agentGreen,
+                          color: tc.brand,
                           fontWeight: FontWeight.w700,
                           letterSpacing: 0.3,
                         ),
                       ),
                       if (isLoading) ...[
                         const SizedBox(width: 6),
-                        SizedBox(width: 9, height: 9, child: CircularProgressIndicator(strokeWidth: 1.5, color: isUser ? cPrimary : tc.agentGreen)),
+                        SizedBox(width: 9, height: 9, child: CircularProgressIndicator(strokeWidth: 1.5, color: tc.brand)),
                       ],
                     ],
                   ),
@@ -1915,7 +1907,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             const SizedBox(height: 4),
             // 内容
             if (isUser)
-              SelectableText(content, style: TextStyle(color: tc.textMain, fontSize: fBody, height: 1.5))
+              SelectableText(
+                content,
+                style: TextStyle(
+                  color: tc.textMain,
+                  fontSize: fBody,
+                  height: 1.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              )
             else
               _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning, isWaitingChoice, pendingOptions: pendingOptions, events: events, streamingContent: streamingContent, turnGoal: turnGoal, enginePendingConfirm: enginePendingConfirm),
           ],
@@ -2023,7 +2023,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                   style: TextStyle(
                     fontFamily: 'JetBrainsMono',
                     fontSize: fMono,
-                    color: cWarning,
+                    color: tc.warn,
                   ),
                 ),
               ),
@@ -2042,7 +2042,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('确认回滚', style: TextStyle(color: cSuccess)),
+            child: Text('确认回滚', style: TextStyle(color: tc.ok)),
           ),
         ],
       ),
@@ -2532,20 +2532,30 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         // 规避 flutter_markdown 0.6.23 在 selectable=true 时无条件调用 onSelectionChanged!() 的 bug
         onSelectionChanged: (_, __, ___) {},
         styleSheet: MarkdownStyleSheet(
-          p: TextStyle(color: tc.textMain, height: 1.5, fontSize: fBody),
+          p: TextStyle(
+            color: tc.textMain,
+            height: 1.5,
+            fontSize: fBody,
+            fontWeight: FontWeight.w500,
+          ),
           h1: TextStyle(color: tc.textMain, fontSize: 16, fontWeight: FontWeight.bold),
           h2: TextStyle(color: tc.textMain, fontSize: 14, fontWeight: FontWeight.bold),
           h3: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600),
           code: TextStyle(
             fontFamily: 'JetBrainsMono',
             fontSize: fMono,
-            color: tc.terminalGreen,
+            fontWeight: FontWeight.w500,
+            color: tc.textMain,
             backgroundColor: tc.terminalBg,
           ),
-          listBullet: const TextStyle(color: cPrimary, fontSize: fBody),
-          blockquote: TextStyle(color: tc.textSub, fontStyle: FontStyle.italic),
-          blockquoteDecoration: const BoxDecoration(
-            border: Border(left: BorderSide(color: cPrimary, width: 2)),
+          listBullet: TextStyle(color: tc.brand, fontSize: fBody),
+          blockquote: TextStyle(
+            color: tc.textSub,
+            fontStyle: FontStyle.italic,
+            fontWeight: FontWeight.w500,
+          ),
+          blockquoteDecoration: BoxDecoration(
+            border: Border(left: BorderSide(color: tc.brand, width: 2)),
           ),
           blockquotePadding: const EdgeInsets.only(left: 8),
         ),
@@ -2805,7 +2815,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: tc.agentGreen.withValues(alpha: 0.1),
+                    color: tc.brand.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rFull),
                   ),
                   child: Row(
@@ -2813,12 +2823,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                     children: [
                       SizedBox(
                         width: 10, height: 10,
-                        child: CircularProgressIndicator(strokeWidth: 1.5, color: tc.agentGreen),
+                        child: CircularProgressIndicator(strokeWidth: 1.5, color: tc.brand),
                       ),
                       const SizedBox(width: 5),
                       Text(
                         agentState.status == AgentStatus.executing ? '执行中' : '思考中',
-                        style: TextStyle(fontSize: fMicro, color: tc.agentGreen, fontWeight: FontWeight.w500),
+                        style: TextStyle(fontSize: fMicro, color: tc.brand, fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
@@ -2837,7 +2847,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             isRunning: agentState.isRunning,
             hintText: _getInputHint(isConnected, agentState.isRunning, agentState.isOrchestratorMode),
             initialText: _tabAiInputText[_currentTabId ?? ''] ?? '',
-            accentColor: tc.agentGreen,
+            accentColor: tc.brand,
             isOrchestratorMode: agentState.isOrchestratorMode,
             onToggleOrchestrator: () {
               ref.read(agentProvider.notifier).toggleOrchestratorMode();
@@ -2917,7 +2927,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               Container(
                 width: 6, height: 6,
                 decoration: BoxDecoration(
-                  color: isActive ? cPrimary : Colors.transparent,
+                  color: isActive ? tc.brand : Colors.transparent,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -2926,7 +2936,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 m.name,
                 style: TextStyle(
                   fontSize: fSmall,
-                  color: isActive ? cPrimary : ThemeColors.of(context).textMain,
+                  color: isActive ? tc.brand : tc.textMain,
                 ),
               ),
               const SizedBox(width: 4),
@@ -3035,16 +3045,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: isCore
-                    ? cPrimary.withValues(alpha: isConnected ? 0.12 : 0.05)
+                    ? tc.brand.withValues(alpha: isConnected ? 0.12 : 0.05)
                     : isNav
-                        ? cSuccess.withValues(alpha: isConnected ? 0.08 : 0.03)
+                        ? tc.ok.withValues(alpha: isConnected ? 0.08 : 0.03)
                         : tc.surface,
                 borderRadius: BorderRadius.circular(rXSmall),
                 border: Border.all(
                   color: isCore
-                      ? cPrimary.withValues(alpha: isConnected ? 0.3 : 0.1)
+                      ? tc.brand.withValues(alpha: isConnected ? 0.3 : 0.1)
                       : isNav
-                          ? cSuccess.withValues(alpha: isConnected ? 0.2 : 0.05)
+                          ? tc.ok.withValues(alpha: isConnected ? 0.2 : 0.05)
                           : tc.border.withValues(alpha: 0.3),
                 ),
               ),
@@ -3054,9 +3064,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                   style: TextStyle(
                     fontSize: fMicro,
                     color: isCore
-                        ? (isConnected ? cPrimary : tc.textMuted)
+                        ? (isConnected ? tc.brand : tc.textMuted)
                         : isNav
-                            ? (isConnected ? cSuccess : tc.textMuted)
+                            ? (isConnected ? tc.ok : tc.textMuted)
                             : (isConnected ? tc.textSub : tc.textMuted),
                     fontFamily: 'JetBrainsMono',
                     fontWeight: isCore ? FontWeight.w600 : FontWeight.w500,
@@ -3162,7 +3172,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                 child: Row(
                   children: [
-                    const Icon(Icons.bolt, size: 16, color: cPrimary),
+                    Icon(Icons.bolt, size: 16, color: tc.brand),
                     const SizedBox(width: 8),
                     Text(
                       l10n.runbooks,
@@ -3181,7 +3191,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                       icon: const Icon(Icons.settings_outlined, size: 14),
                       label: Text(l10n.terminalManage),
                       style: TextButton.styleFrom(
-                        foregroundColor: cPrimary,
+                        foregroundColor: tc.brand,
                         minimumSize: const Size(0, 28),
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         textStyle: const TextStyle(fontSize: fSmall),
@@ -3252,7 +3262,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   Widget _buildRunbookTile(ThemeColors tc, BuildContext sheetCtx, Runbook rb) {
     final l10n = AppLocalizations.of(context)!;
     final isAgent = rb.type == RunbookType.agent;
-    final typeColor = isAgent ? cPrimary : cSuccess;
+    final typeColor = isAgent ? tc.brand : tc.ok;
     return ListTile(
       leading: Text(
         rb.icon.isEmpty ? '📋' : rb.icon,
@@ -3445,7 +3455,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(rInput),
-                        borderSide: const BorderSide(color: cPrimary),
+                        borderSide: BorderSide(color: tc.brand),
                       ),
                     ),
                   ),
@@ -3466,7 +3476,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 {for (final v in variables) v: controllers[v]!.text.trim()},
               );
             },
-            style: ElevatedButton.styleFrom(backgroundColor: cPrimary),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: tc.brand,
+              foregroundColor: tc.isLight ? Colors.white : cBg,
+            ),
             child: Text(l10n.commonExecute),
           ),
         ],
@@ -3565,7 +3578,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 labelText: l10n.terminalMaxStepsLabel,
                 labelStyle: TextStyle(color: tc.textSub),
                 enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.border)),
-                focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
+                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.brand)),
               ),
             ),
           ],
@@ -3589,7 +3602,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 ),
               );
             },
-            style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: tc.brand,
+                foregroundColor: tc.isLight ? Colors.white : cBg,
+              ),
             child: Text(l10n.commonConfirm),
           ),
         ],
@@ -3652,7 +3668,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 tab!.service!.execute(resolved);
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: tc.brand,
+                foregroundColor: tc.isLight ? Colors.white : cBg,
+              ),
             child: Text(l10n.commonExecute),
           ),
         ],
@@ -3691,7 +3710,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                   hintText: l10n.terminalCustomPromptHint,
                   hintStyle: TextStyle(color: tc.textMuted, fontSize: fSmall),
                   enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.border)),
-                  focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
+                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.brand)),
                 ),
               ),
             ],
@@ -3716,7 +3735,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 ),
               );
             },
-            style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: tc.brand,
+                foregroundColor: tc.isLight ? Colors.white : cBg,
+              ),
             child: Text(l10n.save),
           ),
         ],
@@ -3752,7 +3774,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 style: TextStyle(color: tc.textMain, fontSize: fSmall, fontFamily: 'JetBrainsMono'),
                 decoration: InputDecoration(
                   enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.border)),
-                  focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
+                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.brand)),
                 ),
               ),
             ],
@@ -3779,7 +3801,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 ),
               );
             },
-            style: ElevatedButton.styleFrom(backgroundColor: cPrimary, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: tc.brand,
+                foregroundColor: tc.isLight ? Colors.white : cBg,
+              ),
             child: Text(l10n.save),
           ),
         ],

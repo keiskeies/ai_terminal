@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart' as xterm;
+import '../core/constants.dart';
 import '../core/theme_colors.dart';
 
 class TerminalView extends StatefulWidget {
@@ -27,31 +28,60 @@ class _TerminalViewState extends State<TerminalView> {
   final xterm.TerminalController _controller = xterm.TerminalController();
   final GlobalKey _terminalContainerKey = GlobalKey();
 
-  static const _theme = xterm.TerminalTheme(
-    cursor: Color(0xFF6ECC54),
-    selection: Color(0x803B7DFF),
-    foreground: Color(0xFFF0F0F5),
-    background: Color(0xFF000000),
-    black: Color(0xFF1A1A24),
-    red: Color(0xFFC8161D),
-    green: Color(0xFF6ECC54),
-    yellow: Color(0xFFEB5C20),
-    blue: Color(0xFF3B7DFF),
-    magenta: Color(0xFFC83080),
-    cyan: Color(0xFF3DB8E8),
-    white: Color(0xFFE8E8F0),
-    brightBlack: Color(0xFF4A4A5A),
-    brightRed: Color(0xFFE03040),
-    brightGreen: Color(0xFF8FE07A),
-    brightYellow: Color(0xFFF07840),
-    brightBlue: Color(0xFF5A9AFF),
-    brightMagenta: Color(0xFFF070C0),
-    brightCyan: Color(0xFF5CD0F0),
+  static const _darkTheme = xterm.TerminalTheme(
+    cursor: cBrand,
+    selection: Color(0x4D45C8C3),
+    foreground: Color(0xFFE6ECE8),
+    background: cTerminalBg,
+    black: Color(0xFF1A1D1C),
+    red: cStatusError,
+    green: cStatusOk,
+    yellow: cStatusWarn,
+    blue: Color(0xFF6AA9FF),
+    magenta: Color(0xFFD98AD9),
+    cyan: cBrand,
+    white: Color(0xFFE6ECE8),
+    brightBlack: Color(0xFF6F7671),
+    brightRed: Color(0xFFFF9AA2),
+    brightGreen: Color(0xFF8FE7B4),
+    brightYellow: Color(0xFFF2C276),
+    brightBlue: Color(0xFF8CC0FF),
+    brightMagenta: Color(0xFFE9A8E9),
+    brightCyan: cBrandHover,
     brightWhite: Color(0xFFFFFFFF),
-    searchHitBackground: Color(0xFF1A1A24),
-    searchHitBackgroundCurrent: Color(0xFF2A2A38),
-    searchHitForeground: Color(0xFFF0F0F5),
+    searchHitBackground: Color(0xFF1A2423),
+    searchHitBackgroundCurrent: Color(0xFF243331),
+    searchHitForeground: Color(0xFFF1F3F1),
   );
+
+  static const _lightTheme = xterm.TerminalTheme(
+    cursor: cBrandLight,
+    selection: Color(0x330B7A75),
+    foreground: Color(0xFF1A1F1D),
+    background: cTerminalOutputLight,
+    black: Color(0xFF2A2F2C),
+    red: cStatusErrorLight,
+    green: cStatusOkLight,
+    yellow: cGoldLight,
+    blue: Color(0xFF1F5FA8),
+    magenta: Color(0xFF8A3A8A),
+    cyan: cBrandLight,
+    white: Color(0xFF6F7872),
+    brightBlack: cTextMutedLight,
+    brightRed: Color(0xFFD14343),
+    brightGreen: Color(0xFF2E9B63),
+    brightYellow: Color(0xFFA66F00),
+    brightBlue: Color(0xFF2E7BC4),
+    brightMagenta: Color(0xFFA94FA9),
+    brightCyan: Color(0xFF159792),
+    brightWhite: cTextMainLight,
+    searchHitBackground: Color(0xFFDFF3F1),
+    searchHitBackgroundCurrent: Color(0xFFC9EAE7),
+    searchHitForeground: Color(0xFF171B19),
+  );
+
+  xterm.TerminalTheme get _theme =>
+      ThemeColors.of(context).isLight ? _lightTheme : _darkTheme;
 
   @override
   void initState() {

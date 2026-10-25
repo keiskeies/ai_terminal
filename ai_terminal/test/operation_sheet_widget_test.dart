@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ai_terminal/core/theme.dart';
 import 'package:ai_terminal/core/theme_colors.dart';
+import 'package:ai_terminal/l10n/app_localizations.dart';
 import 'package:ai_terminal/models/agent_event.dart';
 import 'package:ai_terminal/models/agent_model.dart';
 import 'package:ai_terminal/models/operation_report.dart';
@@ -10,21 +12,32 @@ import 'package:ai_terminal/widgets/agent_event_cards.dart';
 import 'package:ai_terminal/widgets/operation_sheet.dart';
 import 'package:ai_terminal/widgets/plan_panel.dart';
 
-Widget _wrap(Widget child) {
+Widget _wrapWithTheme(
+  Widget child,
+  ThemeData theme, {
+  Locale locale = const Locale('zh'),
+}) {
   return MaterialApp(
-    theme: ThemeData.dark(),
+    theme: theme,
+    locale: locale,
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: SingleChildScrollView(
         child: Builder(
-          builder: (context) => Theme(
-            data: ThemeData.dark(),
-            child: child,
-          ),
+          builder: (context) => child,
         ),
       ),
     ),
   );
 }
+
+Widget _wrap(Widget child) => _wrapWithTheme(child, AppTheme.darkTheme);
+
+Widget _wrapLight(Widget child) => _wrapWithTheme(child, AppTheme.lightTheme);
+
+Widget _wrapEnglish(Widget child) =>
+    _wrapWithTheme(child, AppTheme.darkTheme, locale: const Locale('en'));
 
 void main() {
   group('OperationSheet', () {
@@ -87,9 +100,12 @@ void main() {
       expect(find.text('Nginx 已安装并运行。'), findsOneWidget);
       expect(find.text('完成'), findsOneWidget);
       expect(find.text('AI 结论'), findsOneWidget);
-      expect(
-          find.text('web-01 · 4m12s · 第 9 步 · 9 条命令 · 1 失败 · 2 项变更'),
-          findsOneWidget);
+      expect(find.text('web-01'), findsOneWidget);
+      expect(find.text('4m12s'), findsOneWidget);
+      expect(find.text('第 9 步'), findsOneWidget);
+      expect(find.text('9 条命令'), findsOneWidget);
+      expect(find.text('1 失败'), findsOneWidget);
+      expect(find.text('2 项变更'), findsOneWidget);
       expect(find.text('nginx 运行中'), findsOneWidget);
       expect(find.text('端口 443 监听'), findsOneWidget);
       expect(find.text('执行清单'), findsOneWidget);
@@ -556,6 +572,84 @@ void main() {
       await tester.tap(find.text('让 AI 重试'));
       expect(retried?.command, 'apt install nginx');
     });
+
+    testWidgets('OperationSheet renders in light theme without overflow',
+        (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      const report = OperationReport(
+        operationId: 'op-light',
+        goal: '检查服务器安全配置并给出迁移建议',
+        hostId: 'web-01',
+        elapsedSeconds: 42,
+        stepIndex: 11,
+        commandSuccessCount: 5,
+        commandFailureCount: 4,
+        conclusion: '服务器存在 SSH 配置风险，建议先备份再修改。',
+        changeRecordIds: ['c1'],
+        nextActions: ['备份 sshd_config', '限制 22 端口来源 IP'],
+        plan: [
+          PlanStep(title: '检查系统版本', status: PlanStepStatus.completed),
+          PlanStep(title: '检查高危组件', status: PlanStepStatus.inProgress),
+        ],
+        finishState: 'success',
+      );
+
+      await tester.pumpWidget(_wrapLight(Builder(
+        builder: (context) => OperationSheet(
+          report: report,
+          tc: ThemeColors.of(context),
+          markdownBuilder: (text, tc) => Text(text),
+          evidenceBuilder: () => const Text('EVIDENCE'),
+        ),
+      )));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('完成'), findsOneWidget);
+      expect(find.text('检查高危组件'), findsOneWidget);
+      expect(find.text('备份 sshd_config'), findsOneWidget);
+    });
+
+    testWidgets('OperationSheet renders English Agent chrome', (tester) async {
+      const report = OperationReport(
+        operationId: 'op-en',
+        goal: 'Check the server version',
+        hostId: 'web-01',
+        elapsedSeconds: 3,
+        stepIndex: 2,
+        commandSuccessCount: 1,
+        commandFailureCount: 0,
+        conclusion: 'CentOS 8.4.2105 is running and is EOL.',
+        plan: [
+          PlanStep(title: 'Check release', status: PlanStepStatus.completed),
+          PlanStep(title: 'Check packages', status: PlanStepStatus.inProgress),
+        ],
+        finishState: 'success',
+      );
+
+      await tester.pumpWidget(_wrapEnglish(Builder(
+        builder: (context) => OperationSheet(
+          report: report,
+          tc: ThemeColors.of(context),
+          markdownBuilder: (text, tc) => Text(text),
+          evidenceBuilder: () => const Text('EVIDENCE'),
+        ),
+      )));
+      await tester.pump();
+
+      expect(find.text('Completed'), findsOneWidget);
+      expect(find.text('Execution Plan'), findsOneWidget);
+      expect(find.text('AI plan'), findsOneWidget);
+      expect(find.text('2 items · 1 done · 1 in progress'), findsOneWidget);
+      expect(find.text('Conclusion'), findsOneWidget);
+      expect(find.text('Process & evidence'), findsOneWidget);
+      expect(find.text('Step 2'), findsOneWidget);
+      expect(find.text('1 command'), findsOneWidget);
+    });
   });
 
   group('LiveOperationBar', () {
@@ -589,9 +683,9 @@ void main() {
       )));
 
       expect(find.text('部署 Nginx'), findsOneWidget);
-      expect(find.textContaining('检查环境'), findsOneWidget);
-      expect(find.textContaining('第 3 步'), findsOneWidget);
-      expect(find.textContaining('计划 1/3'), findsOneWidget);
+      expect(find.textContaining('检查环境', findRichText: true), findsOneWidget);
+      expect(find.textContaining('第 3 步', findRichText: true), findsOneWidget);
+      expect(find.textContaining('计划 1/3', findRichText: true), findsOneWidget);
 
       await tester.tap(find.byTooltip('暂停'));
       await tester.tap(find.byTooltip('停止'));
@@ -617,7 +711,7 @@ void main() {
         ),
       )));
 
-      expect(find.textContaining('已暂停'), findsOneWidget);
+      expect(find.textContaining('已暂停', findRichText: true), findsOneWidget);
       await tester.tap(find.byTooltip('恢复'));
       expect(resumed, isTrue);
     });

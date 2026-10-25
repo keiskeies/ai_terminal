@@ -174,8 +174,8 @@ class _HostListPageState extends ConsumerState<HostListPage> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showTipDialog(context),
-        backgroundColor: cPrimary,
-        child: const Icon(Icons.smart_toy, color: Colors.white),
+        backgroundColor: tc.brand,
+        child: Icon(Icons.smart_toy, color: tc.isLight ? Colors.white : cBg),
       ),
     );
   }
