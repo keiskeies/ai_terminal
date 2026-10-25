@@ -247,7 +247,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
               _buildMetricChipWithChart(
                 metric: 'netUp',
                 icon: Icons.arrow_upward,
-                label: '上传',
+                label: l10n.monitorUpload,
                 value: _formatRate(snap?.netUpKBps ?? 0),
                 color: staleColor(tc.brand),
                 chartData: history.map((s) => s.netUpKBps).toList(),
@@ -257,7 +257,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
               _buildMetricChipWithChart(
                 metric: 'netDown',
                 icon: Icons.arrow_downward,
-                label: '下载',
+                label: l10n.monitorDownload,
                 value: _formatRate(snap?.netDownKBps ?? 0),
                 color: staleColor(cSuccess),
                 chartData: history.map((s) => s.netDownKBps).toList(),
@@ -267,7 +267,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
               _buildMetricChip(
                 metric: 'disk',
                 icon: Icons.storage,
-                label: '磁盘',
+                label: l10n.monitorDisk,
                 value: '${(snap?.diskPercent ?? 0).toStringAsFixed(1)}%',
                 color: staleColor(_colorByPercent(snap?.diskPercent ?? 0, cWarning)),
               ),
