@@ -56,6 +56,10 @@ jobs:
         run: |
           cd ai_terminal
           dart run build_runner build --delete-conflicting-outputs
+      # 现有 iOS 工程是 CocoaPods 结构；Flutter 3.47 默认启用 SPM，
+      # 在缺少 SPM 集成信息的旧工程上会报 "Xcode workspace not found"。
+      - name: Disable Swift Package Manager
+        run: flutter config --no-enable-swift-package-manager
       - name: Build iOS (no codesign)
         run: |
           cd ai_terminal
