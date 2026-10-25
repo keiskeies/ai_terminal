@@ -31,7 +31,7 @@ dependencies:
   # 终端组件
   xterm: ^4.0.0
   # SSH 客户端
-  dartssh2: ^2.8.2
+  dartssh2: ^3.3.1
   # Markdown 渲染
   flutter_markdown: ^0.6.18
   # 字体
@@ -111,3 +111,8 @@ hooks:
   user_defines:
     sqlite3:
       source: sqlite3mc
+
+# dartssh2 3.x 依赖 pointycastle ^4；encrypt 5.0.3 仍限制 ^3.6.2。
+# 在 encrypt 发布兼容版本前，统一使用 pointycastle 4（API 兼容，见回归测试）。
+dependency_overrides:
+  pointycastle: ^4.0.0

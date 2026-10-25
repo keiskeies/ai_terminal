@@ -4,6 +4,7 @@ import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../core/safety_guard.dart';
 import '../providers/terminal_provider.dart' as tp;
+import '../utils/risk_explainer.dart';
 
 /// 统一命令块：左侧 3px 安全色条 + 命令文本 + 顶部状态标签与操作
 ///
@@ -21,6 +22,12 @@ class AgentCommandBlock extends StatelessWidget {
 
   /// 当前等待内联确认的危险命令（与 [command] 相等时显示确认/取消按钮）
   final String? pendingConfirmCommand;
+
+  /// 是否为工具调用（非 shell 命令）：不显示执行按钮，避免把工具参数当命令执行
+  final bool isTool;
+
+  /// 是否已有执行结果：用于区分"执行前确认"和"历史变更影响"
+  final bool executed;
 
   /// 执行命令回调（点击执行按钮时触发）
   final void Function(String command, bool dangerous, tp.TerminalTab tab)?
@@ -41,6 +48,8 @@ class AgentCommandBlock extends StatelessWidget {
     this.isLoading = false,
     this.executingCommand,
     this.pendingConfirmCommand,
+    this.isTool = false,
+    this.executed = false,
     this.onExecute,
     this.onConfirm,
     this.onReject,
@@ -58,29 +67,44 @@ class AgentCommandBlock extends StatelessWidget {
 
     // 用局部变量保证 tab 的空提升
     final tab = this.tab;
-    final canExecute = tab != null && tab.isConnected && showAutoExecute;
+    final canExecute = tab != null &&
+        tab.isConnected &&
+        showAutoExecute &&
+        !isTool &&
+        !executed;
     final safetyLevel = SafetyGuard.check(trimmed);
     // 只有 warn / blocked 级才视为危险命令，需要用户确认。
     // info 级（如 npm install、systemctl restart、git clone）引擎会自动执行，
     // 这里若也标黄会与实际行为不一致——显示"需确认"却直接跑，造成误导。
-    final dangerous =
-        safetyLevel == SafetyLevel.warn || safetyLevel == SafetyLevel.blocked;
-    final isBlocked = safetyLevel == SafetyLevel.blocked;
-    final isWaitingConfirm = pendingConfirmCommand == trimmed;
+    final dangerous = !isTool &&
+        (safetyLevel == SafetyLevel.warn ||
+            safetyLevel == SafetyLevel.blocked);
+    final isBlocked = !isTool && safetyLevel == SafetyLevel.blocked;
+    final isWaitingConfirm =
+        !isTool && !executed && pendingConfirmCommand == trimmed;
 
     final cmdColor = isBlocked
         ? cDanger
         : dangerous
             ? cWarning
-            : tc.terminalGreen;
+            : isTool
+                ? tc.textBody
+                : tc.terminalGreen;
 
-    final accentColor =
-        isBlocked ? cDanger : dangerous ? cWarning : tc.terminalGreen;
+    final accentColor = isBlocked
+        ? cDanger
+        : dangerous
+            ? cWarning
+            : isTool
+                ? cPrimary
+                : tc.terminalGreen;
     final headerBg = isBlocked
         ? cDanger.withValues(alpha: 0.08)
         : dangerous
             ? cWarning.withValues(alpha: 0.08)
-            : cSuccess.withValues(alpha: 0.08);
+            : isTool
+                ? cPrimary.withValues(alpha: 0.06)
+                : cSuccess.withValues(alpha: 0.08);
 
     final block = Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -121,18 +145,28 @@ class AgentCommandBlock extends StatelessWidget {
                           borderRadius: BorderRadius.circular(7),
                         ),
                         child: Icon(
-                          isBlocked
-                              ? Icons.block
-                              : dangerous
-                                  ? Icons.warning_amber
-                                  : Icons.check,
+                          isTool
+                              ? Icons.build
+                              : isBlocked
+                                  ? Icons.block
+                                  : dangerous
+                                      ? Icons.warning_amber
+                                      : Icons.check,
                           size: 9,
                           color: accentColor,
                         ),
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        isBlocked ? '已拦截' : dangerous ? '需确认' : '可执行',
+                        isTool
+                            ? '工具调用'
+                            : isBlocked
+                                ? '已拦截'
+                                : dangerous
+                                    ? '需确认'
+                                    : executed
+                                        ? '已运行'
+                                        : '可执行',
                         style: TextStyle(
                           fontSize: fMicro,
                           color: accentColor,
@@ -143,7 +177,7 @@ class AgentCommandBlock extends StatelessWidget {
                       // 复制按钮
                       _buildCopyButton(trimmed, tc, context),
                       const SizedBox(width: 4),
-                      // 执行按钮 或 内联确认按钮
+                      // 执行按钮 或 内联确认按钮（工具调用不提供执行）
                       if (canExecute && !isLoading && !isBlocked) ...[
                         if (dangerous && isWaitingConfirm) ...[
                           // 危险命令待确认：显示取消 + 确认按钮
@@ -168,9 +202,9 @@ class AgentCommandBlock extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // $ 提示符
+                      // $ 提示符 / 工具调用前缀
                       Text(
-                        '\$ ',
+                        isTool ? '› ' : '\$ ',
                         style: TextStyle(
                           fontFamily: 'JetBrainsMono',
                           fontSize: fMono,
@@ -194,6 +228,10 @@ class AgentCommandBlock extends StatelessWidget {
                     ],
                   ),
                 ),
+                // 变更类命令的影响说明（远程场景下比命令本身更重要）
+                if (dangerous || RiskExplainer.isMutating(trimmed))
+                  _buildRiskPanel(tc, isBlocked, trimmed,
+                      requiresConfirm: dangerous),
               ],
             ),
           ),
@@ -202,6 +240,77 @@ class AgentCommandBlock extends StatelessWidget {
     );
 
     return block;
+  }
+
+  Widget _buildRiskPanel(
+    ThemeColors tc,
+    bool isBlocked,
+    String command, {
+    required bool requiresConfirm,
+  }) {
+    final explanation = RiskExplainer.explain(command);
+    final color = isBlocked ? cDanger : cWarning;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(rXSmall),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(isBlocked ? Icons.block : Icons.warning_amber,
+                  size: 13, color: color),
+              const SizedBox(width: 5),
+              Text(
+                isBlocked
+                    ? '该命令已被安全策略拦截'
+                    : executed
+                        ? '变更影响'
+                        : requiresConfirm
+                            ? '执行前请确认影响'
+                            : '变更影响',
+                style: TextStyle(
+                  color: color,
+                  fontSize: fMicro,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            explanation.impact,
+            style: TextStyle(color: tc.textBody, fontSize: fMicro, height: 1.35),
+          ),
+          if (explanation.reason != null &&
+              explanation.reason!.trim().isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              '风险：${explanation.reason}',
+              style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+            ),
+          ],
+          const SizedBox(height: 2),
+          Text(
+            explanation.canRollback
+                ? '回滚：${explanation.rollbackCommand}'
+                : '回滚：无自动回滚，建议先快照',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: explanation.canRollback ? tc.textMuted : color,
+              fontSize: fMicro,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 复制按钮

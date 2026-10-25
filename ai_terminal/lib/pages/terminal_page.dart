@@ -17,7 +17,12 @@ import '../widgets/session_history_dialog.dart';
 import '../widgets/agent_log_dialog.dart';
 import '../widgets/agent_command_block.dart';
 import '../widgets/agent_event_cards.dart';
+import '../widgets/operation_sheet.dart';
+import '../widgets/plan_panel.dart';
+import '../widgets/interrupted_turn_banner.dart';
+import '../widgets/reconnecting_banner.dart';
 import '../widgets/tab_item_widget.dart';
+import '../utils/interrupted_turn_detector.dart';
 import '../services/daos.dart';
 import '../core/prompts.dart' as prompts;
 import '../models/runbook.dart';
@@ -29,10 +34,15 @@ import '../providers/agent_provider.dart';
 import '../models/ai_model_config.dart';
 import '../models/host_config.dart';
 import '../models/agent_event.dart';
+import '../models/agent_model.dart';
+import '../models/operation_report.dart';
+import '../models/plan_step.dart';
 import '../models/command_snippet.dart';
 import '../services/ai_service.dart';
 import '../services/command_executor.dart';
 import '../services/server_monitor_service.dart';
+import '../services/change_record_service.dart';
+import '../models/change_record.dart';
 import '../widgets/server_monitor_panel.dart';
 import '../widgets/terminal_view.dart' as term_widget;
 
@@ -59,6 +69,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   final Map<String, String?> _tabPendingConfirm = {}; // 等待内联确认的危险命令
   final Map<String, Terminal> _tabTerminals = {}; // 每个 tab 独立的 Terminal 实例
   final Map<String, String> _tabAiInputText = {}; // 每个 tab 独立的 AI 输入框文字
+
+  /// 已成功回滚的变更 id（用于操作单即时反馈）
+  final Set<String> _rolledBackChangeIds = {};
+  bool _rollbackBusy = false;
+
+  /// 正在重连的主机名称（非 null 时显示"连接恢复中"横幅）
+  String? _reconnectingHostLabel;
 
   // AI 面板位置和大小
   _AiPanelPosition _aiPanelPosition = _AiPanelPosition.bottom;
@@ -1696,12 +1713,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       itemBuilder: (context, index) {
         final item = items[index];
         final isLast = index == items.length - 1;
+        final turnGoal = item.role == 'assistant' &&
+                index > 0 &&
+                items[index - 1].role == 'user'
+            ? items[index - 1].content
+            : null;
         return _buildMessageBubble(
           key: ValueKey('agent_${item.role}_$index'),
           role: item.role,
           content: item.content,
           events: item.events,
           streamingContent: item.streamingContent,
+          turnGoal: turnGoal,
           isLoading: item.isStreaming && isLast && agentState.isRunning,
           tab: tab,
           showAutoExecute: true,
@@ -1809,6 +1832,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     List<String> pendingOptions = const [],
     List<AgentEvent> events = const [],
     String streamingContent = '',
+    String? turnGoal,
     String? enginePendingConfirm,
   }) {
     final isUser = role == 'user';
@@ -1893,11 +1917,408 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             if (isUser)
               SelectableText(content, style: TextStyle(color: tc.textMain, fontSize: fBody, height: 1.5))
             else
-              _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning, isWaitingChoice, pendingOptions: pendingOptions, events: events, streamingContent: streamingContent, enginePendingConfirm: enginePendingConfirm),
+              _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning, isWaitingChoice, pendingOptions: pendingOptions, events: events, streamingContent: streamingContent, turnGoal: turnGoal, enginePendingConfirm: enginePendingConfirm),
           ],
         ),
       ),
     );
+  }
+
+  /// 取本轮最后一个操作单报告（终态唯一）
+  OperationReport? _findOperationReport(List<AgentEvent> events) {
+    for (var i = events.length - 1; i >= 0; i--) {
+      final event = events[i];
+      if (event.isReport && event.operationReport != null) {
+        return event.operationReport;
+      }
+    }
+    return null;
+  }
+
+  /// 取当前尚未产出结果的命令（运行中用于计划步骤下的"当前命令"）
+  String? _findRunningCommand(List<AgentEvent> events) {
+    final completed = <String>{};
+    for (final event in events) {
+      if (event.isResult && event.commandId != null) {
+        completed.add(event.commandId!);
+      }
+    }
+    for (var i = events.length - 1; i >= 0; i--) {
+      final event = events[i];
+      if (event.isCommand && !completed.contains(event.id)) {
+        final command = (event.command ?? '').trim();
+        if (command.isNotEmpty) return command;
+      }
+    }
+    return null;
+  }
+
+  /// 取本轮最新的执行计划（模型每次输出完整计划，最后一个为准）
+  List<PlanStep> _findLatestPlan(List<AgentEvent> events) {
+    for (var i = events.length - 1; i >= 0; i--) {
+      final event = events[i];
+      if (event.isPlan &&
+          event.planSteps != null &&
+          event.planSteps!.isNotEmpty) {
+        return event.planSteps!;
+      }
+    }
+    return const [];
+  }
+
+  /// 执行一条变更的回滚：主机必须已连接，执行前二次确认，执行后写审计
+  Future<void> _executeRollback(OperationChange change, String? hostId) async {
+    if (_rollbackBusy) return;
+    final rollbackCommand = change.rollbackCommand?.trim() ?? '';
+    if (rollbackCommand.isEmpty) {
+      _showOperationMessage('该变更没有可执行的回滚命令', isError: true);
+      return;
+    }
+
+    final targetHost =
+        (hostId != null && hostId.trim().isNotEmpty) ? hostId.trim() : 'local';
+    tp.TerminalTab? targetTab;
+    for (final tab in ref.read(tp.terminalProvider).tabs) {
+      if (tab.hostId == targetHost && tab.isConnected) {
+        targetTab = tab;
+        break;
+      }
+    }
+    if (targetTab == null) {
+      _showOperationMessage(
+        '主机 ${targetHost == 'local' ? '本地' : targetHost} 未连接，无法执行回滚',
+        isError: true,
+      );
+      return;
+    }
+
+    final tc = ThemeColors.of(context);
+    final hostLabel = targetHost == 'local' ? '本地' : targetHost;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: tc.cardElevated,
+        title: const Text('确认回滚'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('主机：$hostLabel',
+                  style: TextStyle(color: tc.textMain, fontSize: fSmall)),
+              const SizedBox(height: 8),
+              Text('将执行回滚命令：',
+                  style: TextStyle(color: tc.textSub, fontSize: fMicro)),
+              const SizedBox(height: 4),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: tc.terminalBg,
+                  borderRadius: BorderRadius.circular(rXSmall),
+                  border: Border.all(color: tc.border),
+                ),
+                child: SelectableText(
+                  rollbackCommand,
+                  style: TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    fontSize: fMono,
+                    color: cWarning,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '回滚会修改服务器状态，并写入审计记录。',
+                style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('确认回滚', style: TextStyle(color: cSuccess)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _rollbackBusy = true);
+    try {
+      final executor =
+          targetTab.isLocal ? targetTab.localService : targetTab.service;
+      if (executor == null || !executor.isConnected) {
+        _showOperationMessage('主机连接已断开，回滚未执行', isError: true);
+        return;
+      }
+
+      final cached = ChangeRecordsDao.getCachedById(change.id);
+      final type =
+          ChangeType.values.asNameMap()[change.type] ?? ChangeType.other;
+      final record = ChangeRecord(
+        id: change.id,
+        hostId: targetHost,
+        command: change.command,
+        type: cached?.type ?? type,
+        rollbackCommand: rollbackCommand,
+        timestamp: cached?.timestamp ?? DateTime.now(),
+        success: true,
+      );
+      final result =
+          await ChangeRecordService.executeRollback(record, executor);
+      if (!mounted) return;
+      if (result == null) {
+        _showOperationMessage('回滚未执行：主机未连接或没有回滚命令', isError: true);
+      } else if (result.success) {
+        setState(() => _rolledBackChangeIds.add(change.id));
+        _showOperationMessage('回滚成功：$rollbackCommand');
+      } else {
+        final reason = result.stderr.trim().isNotEmpty
+            ? result.stderr.trim()
+            : '退出码 ${result.exitCode}';
+        _showOperationMessage('回滚失败：$reason', isError: true);
+      }
+    } catch (e) {
+      if (mounted) _showOperationMessage('回滚异常：$e', isError: true);
+    } finally {
+      if (mounted) setState(() => _rollbackBusy = false);
+    }
+  }
+
+  /// 断线失败一键重连当前主机
+  Future<void> _reconnectHost(AgentEvent event) async {
+    final targetHost =
+        (event.hostId != null && event.hostId!.trim().isNotEmpty)
+            ? event.hostId!.trim()
+            : 'local';
+    final activeTab = ref.read(tp.terminalProvider).activeTab;
+    if (activeTab == null || activeTab.hostId != targetHost) {
+      _showOperationMessage('请先切换到该主机再重连', isError: true);
+      return;
+    }
+    if (activeTab.isLocal) {
+      _showOperationMessage('本地终端不需要重连，请检查终端进程', isError: true);
+      return;
+    }
+    final config = HostsDao.getCachedById(targetHost);
+    if (config == null) {
+      _showOperationMessage('找不到主机配置，无法重连', isError: true);
+      return;
+    }
+
+    _showOperationMessage('正在重连 ${activeTab.title} ...');
+    if (mounted) {
+      setState(() => _reconnectingHostLabel = activeTab.title);
+    }
+    try {
+      final tab = await ref
+          .read(tp.terminalProvider.notifier)
+          .reconnect(activeTab.id, config);
+      if (!mounted) return;
+      if (tab == null || !tab.isConnected) {
+        _showOperationMessage('重连失败，请检查网络或密码', isError: true);
+        return;
+      }
+      final executor = tab.isLocal ? tab.localService : tab.service;
+      ref
+          .read(agentProvider.notifier)
+          .setExecutor(executor, hostId: tab.hostId);
+      _showOperationMessage('重连成功');
+    } catch (e) {
+      if (mounted) _showOperationMessage('重连异常：$e', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _reconnectingHostLabel = null);
+      }
+    }
+  }
+
+  /// 中断/失败后继续：带上次目标和执行清单开启新一轮，要求先核对状态
+  Future<void> _continueOperation(OperationReport report) {
+    final reason = report.isCancelled
+        ? '用户取消'
+        : report.isInterrupted
+            ? '达到步数上限'
+            : '执行失败';
+    return _startContinuation(
+      goal: report.goal,
+      plan: report.plan,
+      reason: reason,
+      hostId: report.hostId,
+    );
+  }
+
+  Future<void> _continueInterruptedTurn({
+    String? goal,
+    required List<PlanStep> plan,
+    String? hostId,
+  }) {
+    return _startContinuation(
+      goal: goal ?? '',
+      plan: plan,
+      reason: '应用退出或连接中断',
+      hostId: hostId,
+    );
+  }
+
+  Future<void> _startContinuation({
+    required String goal,
+    required List<PlanStep> plan,
+    required String reason,
+    String? hostId,
+  }) async {
+    if (ref.read(agentProvider).isRunning) {
+      _showOperationMessage('Agent 正在执行，请稍后再试', isError: true);
+      return;
+    }
+    if (!_checkAIModelConfigured()) {
+      _showAIModelNotConfiguredHint();
+      return;
+    }
+    final activeTab = ref.read(tp.terminalProvider).activeTab;
+    if (activeTab == null) {
+      _showOperationMessage('请先连接主机再继续任务', isError: true);
+      return;
+    }
+    final targetHost =
+        (hostId != null && hostId.trim().isNotEmpty) ? hostId.trim() : activeTab.hostId;
+    if (activeTab.hostId != targetHost) {
+      _showOperationMessage('请先切换到该主机再继续任务', isError: true);
+      return;
+    }
+    final executor =
+        activeTab.isLocal ? activeTab.localService : activeTab.service;
+    if (!activeTab.isConnected || executor == null || !executor.isConnected) {
+      _showOperationMessage('请先连接主机再继续任务', isError: true);
+      return;
+    }
+
+    final planBlock = plan.isEmpty
+        ? ''
+        : '\n上次执行清单：\n'
+            '${plan.map((s) => '- [${_planStatusMarker(s.status)}] ${s.title}').join('\n')}\n';
+    final goalText = goal.trim().isEmpty ? '上一步任务' : goal.trim();
+    final prompt = '继续完成之前的目标：$goalText\n$planBlock'
+        '上次任务因$reason中断。请先检查当前服务器状态，避免重复已完成或已生效的操作，然后从中断处继续。';
+    _autoScrollChat = true;
+    ref
+        .read(agentProvider.notifier)
+        .setExecutor(executor, hostId: activeTab.hostId);
+    await ref.read(agentProvider.notifier).startTask(prompt);
+  }
+
+  String _planStatusMarker(PlanStepStatus status) {
+    switch (status) {
+      case PlanStepStatus.completed:
+        return 'x';
+      case PlanStepStatus.inProgress:
+        return '>';
+      case PlanStepStatus.failed:
+        return '!';
+      case PlanStepStatus.skipped:
+        return '-';
+      case PlanStepStatus.pending:
+        return ' ';
+    }
+  }
+
+  /// 多主机矩阵：只重试失败主机
+  Future<void> _retryFailedHosts(List<String> failedHostIds) async {
+    final hosts = failedHostIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet()
+        .toList();
+    if (hosts.isEmpty) return;
+    if (ref.read(agentProvider).isRunning) {
+      _showOperationMessage('Agent 正在执行，请稍后再试', isError: true);
+      return;
+    }
+    if (!_checkAIModelConfigured()) {
+      _showAIModelNotConfiguredHint();
+      return;
+    }
+
+    final activeTab = ref.read(tp.terminalProvider).activeTab;
+    final executor =
+        activeTab?.isLocal == true ? activeTab?.localService : activeTab?.service;
+    if (activeTab == null ||
+        !activeTab.isConnected ||
+        executor == null ||
+        !executor.isConnected) {
+      _showOperationMessage('请先连接一台主机再重试', isError: true);
+      return;
+    }
+
+    final prompt = '上一步批量执行在以下主机失败：${hosts.join(', ')}。'
+        '请先分析各主机的失败原因，修复后只重试这些主机；'
+        '如果某台主机已断开，请先提示我重连；如果需要多机编排，请提示我开启编排模式。';
+    _autoScrollChat = true;
+    ref
+        .read(agentProvider.notifier)
+        .setExecutor(executor, hostId: activeTab.hostId);
+    await ref.read(agentProvider.notifier).startTask(prompt);
+  }
+
+  /// 失败命令重试：把失败上下文带回新一轮 Agent 任务
+  Future<void> _retryFailedCommand(AgentEvent event) async {
+    final command = (event.command ?? '').trim();
+    if (command.isEmpty) return;
+    if (ref.read(agentProvider).isRunning) {
+      _showOperationMessage('Agent 正在执行，请稍后再试', isError: true);
+      return;
+    }
+    if (!_checkAIModelConfigured()) {
+      _showAIModelNotConfiguredHint();
+      return;
+    }
+
+    final targetHost =
+        (event.hostId != null && event.hostId!.trim().isNotEmpty)
+            ? event.hostId!.trim()
+            : 'local';
+    final activeTab = ref.read(tp.terminalProvider).activeTab;
+    if (activeTab == null ||
+        activeTab.hostId != targetHost ||
+        !activeTab.isConnected) {
+      _showOperationMessage('请先切换/重连到该主机再重试', isError: true);
+      return;
+    }
+    final executor = activeTab.isLocal
+        ? activeTab.localService
+        : activeTab.service;
+    if (executor == null || !executor.isConnected) {
+      _showOperationMessage('主机连接已断开，请先重连', isError: true);
+      return;
+    }
+
+    final errorLine = (event.error ?? '').trim().split('\n').first.trim();
+    final reason = errorLine.isNotEmpty ? '：$errorLine' : '';
+    final prompt = '上一步命令 `$command` 执行失败$reason。'
+        '请先分析失败原因，修复后重试；如果需要我确认或重连，请明确告诉我。';
+    _autoScrollChat = true;
+    ref
+        .read(agentProvider.notifier)
+        .setExecutor(executor, hostId: activeTab.hostId);
+    await ref.read(agentProvider.notifier).startTask(prompt);
+  }
+
+  void _showOperationMessage(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(message, style: const TextStyle(fontSize: fSmall)),
+      duration: Duration(seconds: isError ? 4 : 2),
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.all(16),
+      backgroundColor: isError ? cDanger.withValues(alpha: 0.95) : null,
+    ));
   }
 
   /// AI 回复内容渲染：优先用结构化事件列表渲染卡片，fallback 到旧的纯文本/ReAct 解析
@@ -1912,6 +2333,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     List<String> pendingOptions = const [],
     List<AgentEvent> events = const [],
     String streamingContent = '',
+    String? turnGoal,
     String? enginePendingConfirm,
   }) {
     // 合并两种待确认来源：引擎自动流程（enginePendingConfirm）和手动播放（_pendingConfirmCommand）
@@ -1923,15 +2345,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
     // 优先使用结构化事件渲染（ReAct 格式已由 ReActStreamParser 正确解析）
     if (events.isNotEmpty) {
-      // 判断 events 中是否有 AI 输出的内容事件（thought/command/text/ask/finish）
-      // 如果只有 result/info，说明还在流式过程中，需要同时显示 streamingContent
-      final hasAIContentEvents = events.any((e) =>
-          e.isThought || e.isCommand || e.isText || e.isAsk || e.isFinish);
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          AgentEventContent(
-            events: events,
+      Widget buildEventContent(List<AgentEvent> source) => AgentEventContent(
+            events: source,
             tc: tc,
             tab: tab,
             showAutoExecute: showAutoExecute,
@@ -1960,9 +2375,97 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               }
             },
             onSelectChoice: _onOptionSelected,
+            onRetryFailedCommand: _retryFailedCommand,
+            onReconnectHost: _reconnectHost,
+            onRetryFailedHosts: _retryFailedHosts,
+          );
+
+      // 有操作单报告：结论先行 + 证据折叠；finish 卡片不再重复展示
+      final report = _findOperationReport(events);
+      if (report != null) {
+        final evidenceEvents = events
+            .where((e) => !e.isReport && !e.isFinish)
+            .toList(growable: false);
+        final hasAIContentEvidence = evidenceEvents.any(
+            (e) => e.isThought || e.isCommand || e.isText || e.isAsk);
+        final hasFallbackText = streamingContent.trim().isNotEmpty ||
+            content.trim().isNotEmpty;
+        Widget buildEvidence() => Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (evidenceEvents.isNotEmpty)
+                  buildEventContent(evidenceEvents),
+                // 流式结束后从历史恢复时 streamingContent 为空，使用持久化 content 兜底
+                if (!hasAIContentEvidence) ...[
+                  if (streamingContent.trim().isNotEmpty)
+                    _buildMarkdownText(streamingContent, tc)
+                  else if (content.trim().isNotEmpty)
+                    _buildMarkdownText(content, tc),
+                ],
+              ],
+            );
+        return OperationSheet(
+          report: report,
+          tc: tc,
+          markdownBuilder: _buildMarkdownText,
+          hasEvidence: evidenceEvents.isNotEmpty || hasFallbackText,
+          evidenceBuilder: buildEvidence,
+          plan: report.plan.isNotEmpty ? report.plan : _findLatestPlan(events),
+          rolledBackChangeIds: _rolledBackChangeIds,
+          onRollbackChange: _executeRollback,
+          rollbackBusy: _rollbackBusy,
+          onOpenAudit: () {
+            final host = report.hostId;
+            final query = (host != null && host.isNotEmpty)
+                ? '?hostId=${Uri.encodeComponent(host)}'
+                : '';
+            context.push('/audit-log$query');
+          },
+          onContinueOperation: () => _continueOperation(report),
+        );
+      }
+
+      // 旧会话/进行中：保持原有事件流渲染
+      // 判断 events 中是否有 AI 输出的内容事件（thought/command/text/ask/finish）
+      // 如果只有 result/info，说明还在流式过程中，需要同时显示 streamingContent
+      final hasAIContentEvents = events.any((e) =>
+          e.isThought || e.isCommand || e.isText || e.isAsk || e.isFinish);
+      final plan = _findLatestPlan(events);
+      final interrupted = !isAgentRunning &&
+          !isLoading &&
+          !isWaitingChoice &&
+          isInterruptedTurn(events);
+      final runningCommand =
+          isAgentRunning ? _findRunningCommand(events) : null;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 历史中断回合：明确标记并允许继续
+          if (interrupted)
+            InterruptedTurnBanner(
+              tc: tc,
+              goal: turnGoal,
+              onContinue: () => _continueInterruptedTurn(
+                goal: turnGoal,
+                plan: plan,
+                hostId: lastEventHostId(events),
+              ),
+            ),
+          // 执行清单常驻在事件流上方，运行中也始终可见
+          if (plan.isNotEmpty)
+            PlanPanel(
+              steps: plan,
+              tc: tc,
+              currentCommand: runningCommand,
+            ),
+          // 运行中只展示最近事件，更早的折叠成一行；终态无 report 时保持原样
+          CollapsibleEventStream(
+            events: events,
+            tc: tc,
+            isRunning: isAgentRunning,
+            builder: buildEventContent,
           ),
           // 只有在还没有 AI 内容事件时（流式过程中，只有 result/info），才显示流式纯文本
-          // 流式结束后从历史恢复时 streamingContent 为空，使用持久化的 content 兜底
           if (!hasAIContentEvents) ...[
             if (streamingContent.trim().isNotEmpty)
               _buildMarkdownText(streamingContent, tc)
@@ -2210,6 +2713,33 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // 重连状态
+          if (_reconnectingHostLabel != null)
+            ReconnectingBanner(
+              tc: tc,
+              hostLabel: _reconnectingHostLabel!,
+            ),
+          // 常驻运行条：目标 / 阶段 / 步数 / 计时 / 计划进度 / 暂停停止
+          if (agentState.currentTask != null &&
+              (agentState.isRunning ||
+                  agentState.status == AgentStatus.paused ||
+                  agentState.status == AgentStatus.waitingConfirm))
+            LiveOperationBar(
+              task: agentState.currentTask,
+              status: agentState.status,
+              tc: tc,
+              plan: agentState.chatItems.isNotEmpty &&
+                      agentState.chatItems.last.role == 'assistant'
+                  ? _findLatestPlan(agentState.chatItems.last.events)
+                  : const [],
+              onPause: () => ref.read(agentProvider.notifier).pause(),
+              onResume: () => ref.read(agentProvider.notifier).resume(),
+              onStop: () => ref.read(agentProvider.notifier).cancel(),
+              onOpenTerminal: () {
+                setState(() => _isAIPanelVisible = false);
+                SettingsDao.set('aiPanelVisible', false);
+              },
+            ),
           // 工具栏
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -2287,7 +2817,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                       ),
                       const SizedBox(width: 5),
                       Text(
-                        agentState.statusText,
+                        agentState.status == AgentStatus.executing ? '执行中' : '思考中',
                         style: TextStyle(fontSize: fMicro, color: tc.agentGreen, fontWeight: FontWeight.w500),
                       ),
                     ],

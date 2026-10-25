@@ -91,6 +91,50 @@ void main() {
     });
   });
 
+  group('SafetyGuard.check - 删除类命令需要确认', () {
+    test('rm 单文件返回 warn', () {
+      expect(SafetyGuard.check('rm /tmp/foo.txt'), SafetyLevel.warn);
+    });
+
+    test('rm -rf 非系统目录返回 warn', () {
+      expect(SafetyGuard.check('rm -rf /tmp/cache'), SafetyLevel.warn);
+    });
+
+    test('sudo rm 返回 warn', () {
+      expect(SafetyGuard.check('sudo rm /tmp/foo.txt'), SafetyLevel.warn);
+    });
+
+    test('unlink 返回 warn', () {
+      expect(SafetyGuard.check('unlink /tmp/foo.txt'), SafetyLevel.warn);
+    });
+
+    test('shred 返回 warn', () {
+      expect(SafetyGuard.check('shred -u /tmp/secret.txt'), SafetyLevel.warn);
+    });
+
+    test('find -delete 返回 warn', () {
+      expect(
+        SafetyGuard.check('find /tmp -name "*.log" -delete'),
+        SafetyLevel.warn,
+      );
+    });
+
+    test('truncate -s 0 返回 warn', () {
+      expect(
+        SafetyGuard.check('truncate -s 0 /var/log/app.log'),
+        SafetyLevel.warn,
+      );
+    });
+
+    test('rm -rf / 仍为 blocked（block 优先于 warn）', () {
+      expect(SafetyGuard.check('rm -rf /'), SafetyLevel.blocked);
+    });
+
+    test('rm 命令的 getReason 返回删除风险说明', () {
+      expect(SafetyGuard.getReason('rm /tmp/foo.txt'), contains('不可恢复'));
+    });
+  });
+
   group('SafetyGuard.check - info 命令', () {
     test('curl http:// 返回 info', () {
       expect(

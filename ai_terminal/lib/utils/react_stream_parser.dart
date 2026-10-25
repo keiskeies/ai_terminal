@@ -1,9 +1,16 @@
 import 'dart:convert';
 import '../models/agent_event.dart';
+import '../models/plan_step.dart';
 
 /// ReAct 格式解析器，支持标准 ReAct 和 XML tool_call 两种格式
 class ReActStreamParser {
-  static const _keywords = ['思考:', '思考：', '动作:', '动作：', '命令:', '命令：', '选项:', '选项：'];
+  static const _keywords = [
+    '思考:', '思考：',
+    '计划:', '计划：',
+    '动作:', '动作：',
+    '命令:', '命令：',
+    '选项:', '选项：',
+  ];
 
   static String _stableId(AgentEventType type, String content) {
     final bytes = utf8.encode('${type.name}:$content');
@@ -81,6 +88,16 @@ class ReActStreamParser {
           }
           pendingOptions = null;
           break;
+        case _FieldType.plan:
+          final steps = _parsePlanSteps(value);
+          if (steps.isNotEmpty) {
+            final key = steps
+                .map((s) => '${s.status.name}:${s.title}')
+                .join('|');
+            final id = _stableId(AgentEventType.plan, key);
+            events.add(AgentEvent.plan(steps, id: id));
+          }
+          break;
         case _FieldType.text:
           if (value.isNotEmpty) {
             final id = _stableId(AgentEventType.text, value);
@@ -146,6 +163,11 @@ class ReActStreamParser {
               currentField = _FieldType.thought;
               if (content.isNotEmpty) buffer.writeln(content);
               break;
+            case '计划':
+              flush();
+              currentField = _FieldType.plan;
+              if (content.isNotEmpty) buffer.writeln(content);
+              break;
             case '动作':
               flush();
               break;
@@ -161,7 +183,10 @@ class ReActStreamParser {
               break;
           }
         } else {
-          if (currentField == _FieldType.thought || currentField == _FieldType.command || currentField == _FieldType.text) {
+          if (currentField == _FieldType.thought ||
+              currentField == _FieldType.command ||
+              currentField == _FieldType.text ||
+              currentField == _FieldType.plan) {
             buffer.writeln(seg);
           } else if (currentField == _FieldType.options) {
             flush();
@@ -225,6 +250,76 @@ class ReActStreamParser {
         .replaceAll(RegExp(r'\n?```\s*$'), '')
         .trim();
   }
+
+  /// 解析计划块：
+  /// - [ ] 待处理 / [>] 进行中 / [x] 完成 / [!] 失败 / [-] 跳过
+  /// 也接受【进行中】、[已完成] 等中文标记。只接受列表行，避免把散文当步骤。
+  static List<PlanStep> _parsePlanSteps(String block) {
+    final steps = <PlanStep>[];
+    for (final rawLine in block.split('\n')) {
+      final line = rawLine.trim();
+      if (line.isEmpty || line.startsWith('```')) continue;
+
+      final bullet = RegExp(r'^(?:[-*•]|\d+[.)、])\s+').firstMatch(line);
+      var rest = bullet == null ? line : line.substring(bullet.end);
+      PlanStepStatus status = PlanStepStatus.pending;
+      String title = rest;
+
+      final box =
+          RegExp(r'^[\[【(（]\s*([^\]】)）]+)\s*[\]】)）]\s*').firstMatch(rest);
+      if (box != null) {
+        status = _parsePlanMarker(box.group(1)!);
+        title = rest.substring(box.end).trim();
+      } else if (bullet == null) {
+        // 没有列表标记也没有状态框 → 视为说明文字，不当作步骤
+        continue;
+      }
+
+      title = title.replaceFirst(RegExp(r'^[-–—:：]\s*'), '').trim();
+      if (title.isEmpty) continue;
+      steps.add(PlanStep(title: _clip(title, 160), status: status));
+      if (steps.length >= 30) break;
+    }
+    return steps;
+  }
+
+  static PlanStepStatus _parsePlanMarker(String raw) {
+    final marker = raw.trim().toLowerCase();
+    switch (marker) {
+      case 'x':
+      case '✓':
+      case '√':
+      case '完成':
+      case '已完成':
+      case 'done':
+      case 'completed':
+        return PlanStepStatus.completed;
+      case '>':
+      case '→':
+      case '进行中':
+      case '当前':
+      case 'doing':
+      case 'current':
+      case 'inprogress':
+      case 'in progress':
+        return PlanStepStatus.inProgress;
+      case '!':
+      case '失败':
+      case 'failed':
+        return PlanStepStatus.failed;
+      case '-':
+      case '跳过':
+      case 'skipped':
+        return PlanStepStatus.skipped;
+      default:
+        return PlanStepStatus.pending;
+    }
+  }
+
+  static String _clip(String s, int max) {
+    if (s.length <= max) return s;
+    return '${s.substring(0, max)}…';
+  }
 }
 
 class _KeywordMatch {
@@ -233,4 +328,4 @@ class _KeywordMatch {
   _KeywordMatch(this.position, this.keyword);
 }
 
-enum _FieldType { thought, command, options, text }
+enum _FieldType { thought, command, options, text, plan }

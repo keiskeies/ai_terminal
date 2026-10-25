@@ -6,6 +6,8 @@ import '../core/theme_colors.dart';
 import '../models/agent_event.dart';
 import '../providers/terminal_provider.dart' as tp;
 import 'agent_command_block.dart';
+import 'host_result_matrix.dart';
+import 'output_viewer_sheet.dart';
 
 /// 结构化事件列表渲染：内容自动追加，只有命令单独包装成块
 ///
@@ -48,6 +50,15 @@ class AgentEventContent extends StatelessWidget {
   /// 选项选择回调（ask 选项 chip / 选项按钮组共用）
   final void Function(String choice)? onSelectChoice;
 
+  /// 失败命令重试回调（由页面负责构造新一轮任务）
+  final void Function(AgentEvent event)? onRetryFailedCommand;
+
+  /// 断线重连回调（仅 disconnected 失败显示）
+  final void Function(AgentEvent event)? onReconnectHost;
+
+  /// 多主机矩阵重试失败主机回调
+  final void Function(List<String> failedHostIds)? onRetryFailedHosts;
+
   const AgentEventContent({
     super.key,
     required this.events,
@@ -64,6 +75,9 @@ class AgentEventContent extends StatelessWidget {
     this.onConfirmCommand,
     this.onRejectCommand,
     this.onSelectChoice,
+    this.onRetryFailedCommand,
+    this.onReconnectHost,
+    this.onRetryFailedHosts,
   });
 
   @override
@@ -103,6 +117,10 @@ class AgentEventContent extends StatelessWidget {
           break;
         case AgentEventType.command:
           flushText();
+          final isTool =
+              event.toolName != null && event.toolName != 'exec_command';
+          // 若有对应 result，紧跟在 command 后渲染
+          final result = resultMap[event.id];
           widgets.add(AgentCommandBlock(
             command: event.command ?? '',
             tc: tc,
@@ -111,12 +129,12 @@ class AgentEventContent extends StatelessWidget {
             isLoading: isLoading,
             executingCommand: executingCommand,
             pendingConfirmCommand: pendingConfirmCommand,
+            isTool: isTool,
+            executed: result != null,
             onExecute: onExecuteCommand,
             onConfirm: onConfirmCommand,
             onReject: onRejectCommand,
           ));
-          // 若有对应 result，紧跟在 command 后渲染
-          final result = resultMap[event.id];
           if (result != null) {
             widgets.add(_buildResultCard(result, tc, context));
           }
@@ -135,6 +153,12 @@ class AgentEventContent extends StatelessWidget {
         case AgentEventType.finish:
           flushText();
           widgets.add(_buildFinishCard(event, tc));
+          break;
+        case AgentEventType.report:
+          // 操作单由 OperationSheet 单独渲染，证据层忽略
+          break;
+        case AgentEventType.plan:
+          // 执行清单由 PlanPanel 单独渲染，证据层忽略
           break;
       }
     }
@@ -160,13 +184,17 @@ class AgentEventContent extends StatelessWidget {
     final success = event.success ?? false;
     final output = event.output ?? event.error ?? '(无输出)';
     final lines = output.split('\n');
+    final hostResults = event.hostResults;
+    final showMatrix = hostResults != null && hostResults.length > 1;
 
     final statusColor = success ? cSuccess : cDanger;
     final statusBg = success
         ? cSuccess.withValues(alpha: 0.08)
         : cDanger.withValues(alpha: 0.08);
     final statusIcon = success ? Icons.check : Icons.close;
-    final statusText = success ? '执行成功' : '执行失败';
+    final statusText = success
+        ? '执行成功'
+        : _failureLabel(event.failureKind);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8, top: 2),
@@ -209,20 +237,33 @@ class AgentEventContent extends StatelessWidget {
                     letterSpacing: 0.2,
                   ),
                 ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(
-                    color: tc.textMuted.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(rXSmall),
-                  ),
-                  child: Text(
-                    '${lines.length} 行',
-                    style: TextStyle(
-                        color: tc.textMuted,
-                        fontSize: fMicro,
-                        fontWeight: FontWeight.w500),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 4,
+                    runSpacing: 2,
+                    children: [
+                      if (!success && event.exitCode != null)
+                        _metaChip('退出码 ${event.exitCode}', cDanger),
+                      if (event.durationMs != null)
+                        _metaChip(
+                            _formatDuration(event.durationMs!), tc.textMuted),
+                      if (event.outputTruncated == true)
+                        _metaChip(
+                          event.outputTotalChars != null
+                              ? '已截断 ${event.outputTotalChars} 字符'
+                              : '已截断',
+                          cWarning,
+                        ),
+                      if (event.diffAdditions != null)
+                        _metaChip('+${event.diffAdditions}', cSuccess),
+                      if (event.diffDeletions != null)
+                        _metaChip('-${event.diffDeletions}', cDanger),
+                      if (!showMatrix)
+                        _metaChip('${lines.length} 行', tc.textMuted),
+                    ],
                   ),
                 ),
                 // 复制按钮：与命令块体验一致，一键复制输出
@@ -230,22 +271,201 @@ class AgentEventContent extends StatelessWidget {
               ],
             ),
           ),
-          // 输出区 - 全部展开显示
+          if (!success) _buildFailureHint(event.failureKind, tc),
+          if (!success &&
+              (onRetryFailedCommand != null || onReconnectHost != null))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    if (event.failureKind == 'disconnected' &&
+                        onReconnectHost != null)
+                      _failureActionButton(
+                        icon: Icons.wifi_tethering,
+                        label: '重连',
+                        color: cWarning,
+                        onTap: () => onReconnectHost!(event),
+                      ),
+                    if (onRetryFailedCommand != null &&
+                        (event.command ?? '').trim().isNotEmpty)
+                      _failureActionButton(
+                        icon: Icons.refresh,
+                        label: '让 AI 重试',
+                        color: cPrimary,
+                        onTap: () => onRetryFailedCommand!(event),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          // 输出区：多主机用矩阵，单主机保持原始输出
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-            child: SelectableText(
-              output.trimRight(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (showMatrix)
+                  HostResultMatrix(
+                    results: hostResults,
+                    tc: tc,
+                    onRetryFailedHosts: onRetryFailedHosts,
+                  )
+                else
+                  SelectableText(
+                    output.trimRight(),
+                    style: TextStyle(
+                      fontFamily: 'JetBrainsMono',
+                      fontSize: fMono,
+                      color: tc.textBody,
+                      height: 1.45,
+                    ),
+                  ),
+                if (!showMatrix &&
+                    event.outputTail != null &&
+                    event.outputTail!.trim().isNotEmpty)
+                  _RawOutputTail(
+                    tail: event.outputTail!,
+                    totalChars: event.outputTotalChars,
+                    tc: tc,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _failureActionButton({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(rXSmall),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: color),
+            const SizedBox(width: 4),
+            Text(
+              label,
               style: TextStyle(
-                fontFamily: 'JetBrainsMono',
-                fontSize: fMono,
-                color: tc.textBody,
-                height: 1.45,
+                color: color,
+                fontSize: fMicro,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFailureHint(String? failureKind, ThemeColors tc) {
+    final hint = _failureHint(failureKind);
+    if (hint == null) return const SizedBox.shrink();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.lightbulb_outline, size: 13, color: cWarning),
+          const SizedBox(width: 5),
+          Expanded(
+            child: Text(
+              hint,
+              style: TextStyle(
+                color: tc.textSub,
+                fontSize: fMicro,
+                height: 1.35,
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  String? _failureHint(String? failureKind) {
+    switch (failureKind) {
+      case 'disconnected':
+        return '连接已断开。建议先重连服务器，再重试本步。';
+      case 'timeout':
+        return '执行超时。建议延长超时，或把命令拆小后重试。';
+      case 'permissionDenied':
+        return '权限不足。建议使用 sudo 重试，或更换有权限的用户。';
+      case 'interactivePrompt':
+        return '命令在等待输入。建议改用非交互参数（如 -y / --batch）后重试。';
+      case 'syntaxError':
+        return '命令语法错误，未执行。建议修正命令后重试。';
+      case 'cancelled':
+        return '执行已取消。可以重新发起本步。';
+      case 'unknown':
+        return '执行失败。建议查看输出后修正并重试。';
+      default:
+        return null;
+    }
+  }
+
+  Widget _metaChip(String text, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(right: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(rXSmall),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: fMicro,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+
+  String _failureLabel(String? failureKind) {
+    switch (failureKind) {
+      case 'disconnected':
+        return '连接已断开';
+      case 'timeout':
+        return '执行超时';
+      case 'permissionDenied':
+        return '权限不足';
+      case 'interactivePrompt':
+        return '等待输入';
+      case 'syntaxError':
+        return '命令语法错误';
+      case 'cancelled':
+        return '已取消';
+      default:
+        return '执行失败';
+    }
+  }
+
+  String _formatDuration(int ms) {
+    if (ms < 1000) return '${ms}ms';
+    final seconds = ms / 1000;
+    if (seconds < 60) return '${seconds.toStringAsFixed(1)}s';
+    final minutes = seconds ~/ 60;
+    return '${minutes}m${(seconds % 60).round()}s';
   }
 
   /// 复制按钮（与 AgentCommandBlock._buildCopyButton 行为一致）
@@ -373,38 +593,70 @@ class AgentEventContent extends StatelessWidget {
     );
   }
 
-  /// 任务完成卡片
+  /// 任务终态卡片（完成 / 取消 / 失败 / 中断）
   Widget _buildFinishCard(AgentEvent event, ThemeColors tc) {
+    final state = event.finishState ?? AgentFinishState.success;
+    final (accent, background, title, icon, defaultSummary) = switch (state) {
+      AgentFinishState.success => (
+          cSuccess,
+          cSuccessBg,
+          '任务完成',
+          Icons.celebration,
+          '已完成所有步骤',
+        ),
+      AgentFinishState.cancelled => (
+          cWarning,
+          cWarningBg,
+          '任务已取消',
+          Icons.cancel_outlined,
+          '任务已取消',
+        ),
+      AgentFinishState.failed => (
+          cDanger,
+          cDangerBg,
+          '任务失败',
+          Icons.error_outline,
+          '任务执行失败',
+        ),
+      AgentFinishState.interrupted => (
+          cWarning,
+          cWarningBg,
+          '任务已中断',
+          Icons.pause_circle_outline,
+          '任务被中断',
+        ),
+    };
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8, top: 4),
       padding:
           const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: cSuccessBg,
+        color: background,
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: cSuccess.withValues(alpha: 0.2)),
+        border: Border.all(color: accent.withValues(alpha: 0.2)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 28,
             height: 28,
             decoration: BoxDecoration(
-              color: cSuccess.withValues(alpha: 0.2),
+              color: accent.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(Icons.celebration,
-                size: 15, color: cSuccess),
+            child: Icon(icon, size: 15, color: accent),
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '任务完成',
+                Text(
+                  title,
                   style: TextStyle(
-                    color: cSuccess,
+                    color: accent,
                     fontSize: fSmall,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.3,
@@ -412,40 +664,40 @@ class AgentEventContent extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 MarkdownBody(
-                  data: event.summary ?? '已完成所有步骤',
+                  data: event.summary ?? defaultSummary,
                   selectable: true,
                   // 规避 flutter_markdown 0.6.23 在 selectable=true 时无条件调用 onSelectionChanged!() 的 bug
                   onSelectionChanged: (_, __, ___) {},
                   styleSheet: MarkdownStyleSheet(
                     p: TextStyle(
-                      color: cSuccess.withValues(alpha: 0.9),
+                      color: accent.withValues(alpha: 0.9),
                       fontSize: fBody,
                       fontWeight: FontWeight.w500,
                       height: 1.5,
                     ),
                     h1: TextStyle(
-                      color: cSuccess,
+                      color: accent,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
                     h2: TextStyle(
-                      color: cSuccess,
+                      color: accent,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
                     h3: TextStyle(
-                      color: cSuccess,
+                      color: accent,
                       fontSize: fBody,
                       fontWeight: FontWeight.w600,
                     ),
                     code: TextStyle(
                       fontFamily: 'JetBrainsMono',
                       fontSize: fMono,
-                      backgroundColor: cSuccess.withValues(alpha: 0.1),
+                      backgroundColor: accent.withValues(alpha: 0.1),
                     ),
-                    listBullet: const TextStyle(color: cSuccess),
-                    strong: const TextStyle(color: cSuccess, fontWeight: FontWeight.bold),
-                    a: const TextStyle(color: cSuccess),
+                    listBullet: TextStyle(color: accent),
+                    strong: TextStyle(color: accent, fontWeight: FontWeight.bold),
+                    a: TextStyle(color: accent),
                   ),
                 ),
               ],
@@ -456,6 +708,108 @@ class AgentEventContent extends StatelessWidget {
     );
   }
 
+}
+
+class _RawOutputTail extends StatefulWidget {
+  final String tail;
+  final int? totalChars;
+  final ThemeColors tc;
+
+  const _RawOutputTail({
+    required this.tail,
+    required this.totalChars,
+    required this.tc,
+  });
+
+  @override
+  State<_RawOutputTail> createState() => _RawOutputTailState();
+}
+
+class _RawOutputTailState extends State<_RawOutputTail> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = widget.tc;
+    return Container(
+      margin: const EdgeInsets.only(top: 6),
+      decoration: BoxDecoration(
+        color: tc.terminalBg.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(rXSmall),
+        border: Border.all(color: tc.border.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          InkWell(
+            onTap: () => setState(() => _expanded = !_expanded),
+            borderRadius: BorderRadius.circular(rXSmall),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+              child: Row(
+                children: [
+                  Icon(Icons.subject, size: 12, color: tc.textMuted),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      widget.totalChars != null
+                          ? '原始输出尾部 · 共 ${widget.totalChars} 字符'
+                          : '原始输出尾部',
+                      style: TextStyle(color: tc.textSub, fontSize: fMicro),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => showOutputViewer(
+                      context,
+                      text: widget.tail,
+                      tc: tc,
+                      title: '原始输出尾部',
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: Icon(Icons.open_in_full,
+                          size: 13, color: tc.textMuted),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    _expanded ? Icons.expand_less : Icons.expand_more,
+                    size: 14,
+                    color: tc.textMuted,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (_expanded)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.fromLTRB(7, 0, 7, 7),
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(
+                color: tc.terminalBg,
+                borderRadius: BorderRadius.circular(rXSmall),
+              ),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 220),
+                child: SingleChildScrollView(
+                  primary: false,
+                  child: SelectableText(
+                    widget.tail,
+                    style: TextStyle(
+                      fontFamily: 'JetBrainsMono',
+                      fontSize: fMicro,
+                      color: tc.textBody,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 /// 选项按钮组 — AI 输出 :::choose A|B|C::: 后渲染为可点击选项

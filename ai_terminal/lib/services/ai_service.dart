@@ -65,6 +65,30 @@ class OpenAIProvider implements AIProvider {
     sendTimeout: const Duration(seconds: 30),
   ));
 
+  /// 构建 OpenAI 兼容的 messages 数组。
+  ///
+  /// 严格实现（如 Agens/OpenAI/部分网关）会拒绝 content 为空的消息，
+  /// 因此必须过滤空历史消息，并且 prompt 为空时不能追加空 user 消息
+  /// （Agent 模式传 prompt: ''，历史里已包含用户任务）。
+  static List<Map<String, dynamic>> buildRequestMessages({
+    required List<ChatMessage> history,
+    required String prompt,
+    String? systemPrompt,
+  }) {
+    final messages = <Map<String, dynamic>>[];
+    if (systemPrompt != null && systemPrompt.trim().isNotEmpty) {
+      messages.add({'role': 'system', 'content': systemPrompt});
+    }
+    for (final m in history) {
+      if (m.content.trim().isEmpty) continue;
+      messages.add({'role': m.role, 'content': m.content});
+    }
+    if (prompt.trim().isNotEmpty) {
+      messages.add({'role': 'user', 'content': prompt});
+    }
+    return messages;
+  }
+
   @override
   Future<Stream<String>> chatStream({
     required List<ChatMessage> history,
@@ -75,11 +99,11 @@ class OpenAIProvider implements AIProvider {
     List<Map<String, dynamic>>? tools,
   }) async {
     final effectiveSystemPrompt = systemPrompt ?? buildContextPrompt();
-    final messages = <Map<String, dynamic>>[
-      {'role': 'system', 'content': effectiveSystemPrompt},
-      ...history.map((m) => {'role': m.role, 'content': m.content}),
-      {'role': 'user', 'content': prompt},
-    ];
+    final messages = buildRequestMessages(
+      history: history,
+      prompt: prompt,
+      systemPrompt: effectiveSystemPrompt,
+    );
 
     // P2-6: 构建 request body；如果传入了 tools，附加到请求
     final requestBody = <String, dynamic>{

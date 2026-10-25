@@ -5,7 +5,10 @@ import 'package:dio/dio.dart';
 import 'package:ai_terminal/services/agent_engine.dart';
 import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/command_executor.dart';
+import 'package:ai_terminal/models/agent_event.dart';
 import 'package:ai_terminal/models/agent_memory.dart';
+import 'package:ai_terminal/models/agent_model.dart';
+import 'package:ai_terminal/models/plan_step.dart';
 import 'package:ai_terminal/models/ai_model_config.dart';
 import 'package:ai_terminal/models/chat_session.dart';
 import 'package:ai_terminal/core/l10n_holder.dart';
@@ -13,6 +16,8 @@ import 'package:ai_terminal/l10n/app_localizations_zh.dart';
 
 /// 用于集成测试的 Mock CommandExecutor
 class _MockExecutor implements CommandExecutor {
+  String stdout = '';
+
   @override
   bool get isConnected => true;
 
@@ -29,12 +34,15 @@ class _MockExecutor implements CommandExecutor {
     Completer<void>? cancelToken,
   }) async {
     return CommandResult(
-      stdout: '',
+      stdout: stdout,
       stderr: '',
       exitCode: 0,
       duration: Duration.zero,
     );
   }
+
+  @override
+  Future<String> runOnce(String command, {Duration timeout = const Duration(seconds: 5)}) async => '';
 
   @override
   Future<CommandResult> writeFileViaPty({
@@ -278,6 +286,191 @@ void main() {
       await engine.startTask('test goal', _MockExecutor());
       // 验证：fallback provider 被调用过
       expect(fallbackProvider.callCount, greaterThanOrEqualTo(1));
+    });
+  });
+
+  group('操作单 report 发射', () {
+    test('finish 发射 success report，结论来自四段式思考', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 先确认系统状态\n动作: execute\n命令: echo hi\n',
+      ]);
+      provider.enqueueStream([
+        '思考: 结论: 检查完成\n现状: echo 输出正常\n变更: 无\n建议: 无\n动作: finish\n',
+      ]);
+
+      final engine = makeEngine(provider: provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+      await engine.startTask('检查状态', _MockExecutor());
+
+      final reportEvents = events.where((e) => e.isReport).toList();
+      expect(reportEvents, hasLength(1));
+      final report = reportEvents.single.operationReport!;
+      expect(report.finishState, 'success');
+      expect(report.conclusion, '检查完成');
+      expect(report.goal, '检查状态');
+      expect(report.commandSuccessCount, 1);
+      expect(report.hostId, 'test-host');
+      expect(report.operationId, isNotEmpty);
+
+      final reportIndex = events.indexOf(reportEvents.single);
+      final finishIndex = events.indexWhere((e) => e.isFinish);
+      expect(finishIndex, greaterThan(reportIndex),
+          reason: 'report 必须先于 finish 发射');
+    });
+
+    test('校验命令生成状态徽标并标记 verified', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 检查服务状态\n动作: execute\n命令: systemctl is-active nginx\n',
+      ]);
+      provider.enqueueStream([
+        '思考: 结论: Nginx 运行中\n现状: active\n变更: 无\n建议: 无\n动作: finish\n',
+      ]);
+
+      final engine = makeEngine(provider: provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+      await engine.startTask('检查 Nginx', _MockExecutor()..stdout = 'active');
+
+      final report = events
+          .where((e) => e.isReport)
+          .single
+          .operationReport!;
+      expect(report.stateBadges, hasLength(1));
+      expect(report.stateBadges.single.text, 'nginx 运行中');
+      expect(report.stateBadges.single.level, 'success');
+      expect(report.verified, isTrue);
+    });
+
+    test('模型计划写入 report，并随步骤发出 plan 事件', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 先检查系统\n计划:\n- [x] 检查系统\n- [>] 安装 Nginx\n- [ ] 验证服务\n'
+            '动作: execute\n命令: echo hi\n',
+      ]);
+      provider.enqueueStream([
+        '思考: 结论: 完成\n现状: 已检查\n变更: 无\n建议: 无\n'
+            '计划:\n- [x] 检查系统\n- [x] 安装 Nginx\n- [x] 验证服务\n'
+            '动作: finish\n',
+      ]);
+
+      final engine = makeEngine(provider: provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+      await engine.startTask('安装测试', _MockExecutor());
+
+      expect(events.where((e) => e.isPlan), hasLength(2));
+      final report =
+          events.where((e) => e.isReport).single.operationReport!;
+      expect(report.plan, hasLength(3));
+      expect(report.plan[0].title, '检查系统');
+      expect(
+        report.plan.every((s) => s.status == PlanStepStatus.completed),
+        isTrue,
+      );
+    });
+
+    test('finish 思考为空时结论使用模板，不回退 ReAct 文本', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 执行命令\n动作: execute\n命令: echo hi\n',
+      ]);
+      provider.enqueueStream([
+        '动作: finish\n',
+      ]);
+
+      final engine = makeEngine(provider: provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+      await engine.startTask('空总结测试', _MockExecutor());
+
+      final report = events
+          .where((e) => e.isReport)
+          .single
+          .operationReport!;
+      expect(report.finishState, 'success');
+      expect(report.conclusion, '任务已完成，共执行 1 条命令。');
+      expect(report.conclusion, isNot(contains('动作:')));
+      expect(report.details, isNull);
+    });
+
+    test('截断结果保留原始输出尾部', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 输出测试\n动作: execute\n命令: echo hi\n',
+      ]);
+      provider.enqueueStream([
+        '思考: 结论: 完成\n现状: ok\n变更: 无\n建议: 无\n动作: finish\n',
+      ]);
+      final longOutput =
+          List.generate(200, (i) => 'line $i').join('\n');
+
+      final engine = makeEngine(provider: provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+      await engine.startTask('输出测试', _MockExecutor()..stdout = longOutput);
+
+      final resultEvent = events.firstWhere(
+        (e) => e.isResult && e.toolName == 'exec_command',
+      );
+      expect(resultEvent.outputTail, isNotNull);
+      expect(resultEvent.outputTail, contains('line 199'));
+      expect(resultEvent.outputTruncated, isTrue);
+    });
+
+    test('暂停恢复保留 operationId、步数与命令计数', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 第一步\n动作: execute\n命令: echo hi\n',
+      ]);
+      provider.enqueueHangingStream();
+      provider.enqueueStream([
+        '思考: 结论: 完成\n现状: ok\n变更: 无\n建议: 无\n动作: finish\n',
+      ]);
+
+      final engine = makeEngine(provider: provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+      final executor = _MockExecutor();
+
+      final running = engine.startTask('恢复测试', executor);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      engine.pauseTask();
+      await running;
+
+      expect(engine.currentTask?.status, AgentStatus.paused);
+      final operationId = engine.currentTask!.operationId;
+
+      await engine.resumeTask(executor);
+
+      final report =
+          events.where((e) => e.isReport).single.operationReport!;
+      expect(report.finishState, 'success');
+      expect(report.operationId, operationId);
+      expect(report.stepIndex, greaterThanOrEqualTo(2));
+      expect(report.commandSuccessCount, greaterThanOrEqualTo(1));
+    });
+
+    test('用户取消发射 cancelled report', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueHangingStream();
+
+      final engine = makeEngine(provider: provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+
+      final running = engine.startTask('取消测试', _MockExecutor());
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      engine.cancelTask();
+      await running;
+
+      final reportEvents = events.where((e) => e.isReport).toList();
+      expect(reportEvents, hasLength(1));
+      final report = reportEvents.single.operationReport!;
+      expect(report.finishState, 'cancelled');
+      expect(report.conclusion, contains('已取消'));
     });
   });
 }

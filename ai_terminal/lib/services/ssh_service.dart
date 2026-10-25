@@ -178,7 +178,9 @@ class SSHService implements CommandExecutor {
         'alias ls="ls --color=auto" 2>/dev/null;'
         'alias ll="ls -la --color=auto" 2>/dev/null;'
         'alias grep="grep --color=auto" 2>/dev/null;'
-        'clear\n'
+        // 用 ANSI 清屏，避免最小化容器没有 clear 命令时打印
+        // "clear: command not found" 并把初始化命令留在屏幕上
+        'printf \'\\033[2J\\033[H\'\n'
       )));
 
       outputController.add('\r\n✅ 连接成功\r\n');
@@ -238,8 +240,9 @@ class SSHService implements CommandExecutor {
     final stopwatch = Stopwatch()..start();
     _markerSeq++;
     final marker = 'EXITCODE_$_markerSeq:';
-    // 追加 echo 标记，命令完成后输出 "EXITCODE_N:0" 格式
-    final wrappedCommand = '$command; echo "$marker\$?"';
+    // 标记必须另起一行：`command; echo` 会破坏 heredoc 的结束行
+    // （EOF; echo ... 不再被识别为结束标记），导致多行文件写入永远不结束。
+    final wrappedCommand = '$command\necho "$marker\$?"';
     final donePattern = RegExp('${RegExp.escape(marker)}\\d+');
 
     // R8: buffer 必须有上限，保留尾部（最新输出），避免 cat huge_file OOM
@@ -523,8 +526,14 @@ class SSHService implements CommandExecutor {
     final stopwatch = Stopwatch()..start();
     _markerSeq++;
     final marker = 'EXITCODE_$_markerSeq:';
-    // 写入命令后追加 echo marker：cat/tee 接收完 stdin 退出后，shell 执行下一条 echo
-    final wrappedCommand = '$writeCmd; echo "$marker\$?"';
+    // 关闭终端输入的行尾转换，否则 PTY 的 ICRNL 会把 CRLF 中的 \r 变成 \n，
+    // 导致通过 PTY fallback 写入的文件与原文不一致。写入完成后恢复原 stty。
+    final wrappedCommand =
+        '__ai_terminal_stty=\$(stty -g 2>/dev/null); '
+        'stty -icrnl -inlcr -igncr 2>/dev/null; '
+        '$writeCmd; __ai_terminal_ec=\$?; '
+        '[ -n "\$__ai_terminal_stty" ] && stty "\$__ai_terminal_stty" 2>/dev/null; '
+        'echo "$marker\$__ai_terminal_ec"';
     final donePattern = RegExp('${RegExp.escape(marker)}\\d+');
 
     const maxBufferChars = 256 * 1024;
@@ -627,9 +636,19 @@ class SSHService implements CommandExecutor {
     }
 
     // 4. 发送 Ctrl+D 结束 stdin
+    // 终端处于 canonical 模式时，Ctrl+D 只会“提交当前行”：
+    // - 内容以 \n 结尾：缓冲区为空，一次 Ctrl+D 即 EOF
+    // - 内容不以 \n 结尾：第一次 Ctrl+D 只把残留内容交给 cat，cat 仍在等输入，
+    //   必须再发一次 Ctrl+D 才会产生 EOF（否则 cat 永久阻塞直到超时）
     if (!doneCompleter.isCompleted) {
       try {
         _session!.write(Uint8List.fromList(utf8.encode('\x04')));
+        if (!hasTrailingNewline) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          if (!doneCompleter.isCompleted) {
+            _session!.write(Uint8List.fromList(utf8.encode('\x04')));
+          }
+        }
       } catch (e) {
         abnormalReason.add('发送 EOF 失败: $e');
         if (!doneCompleter.isCompleted) doneCompleter.complete();
@@ -775,6 +794,7 @@ class SSHService implements CommandExecutor {
   ///
   /// 用于监控面板等需要轻量、不污染交互式 shell 的场景。
   /// 失败返回空字符串。超时默认 5 秒。
+  @override
   Future<String> runOnce(String command, {Duration timeout = const Duration(seconds: 5)}) async {
     if (_client == null || !_isConnected) return '';
     try {

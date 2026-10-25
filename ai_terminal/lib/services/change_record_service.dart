@@ -9,13 +9,62 @@ import '../utils/audit_logger.dart' show AuditLogger;
 class ChangeRecordService {
   static const _uuid = Uuid();
 
+  /// 去除 sudo 前缀，便于统一匹配；保留原始命令用于生成回滚命令
+  static String _stripSudo(String command) {
+    return command.trim().replaceFirst(
+          RegExp(r'^sudo\s+(?:-u\s+\S+\s+)?(?:-[A-Za-z]+\s+)*'),
+          '',
+        );
+  }
+
+  static bool _hasSudo(String command) =>
+      RegExp(r'^sudo\s+').hasMatch(command.trim());
+
+  static const _fileChangeTools = {
+    'file_write',
+    'file_patch',
+    'sftp_upload',
+    'sftp_download',
+    'upload_to',
+    'file_sync',
+  };
+
+  static bool isFileChangeTool(String toolName) =>
+      _fileChangeTools.contains(toolName);
+
+  /// 文件工具没有 shell 命令原文，生成一条稳定的台账描述
+  static String describeFileToolChange(
+      String toolName, Map<String, dynamic> args) {
+    final path = (args['path'] ?? '').toString().trim();
+    final remote =
+        ((args['remote'] ?? args['remoteDir']) ?? '').toString().trim();
+    final local =
+        ((args['local'] ?? args['localDir']) ?? '').toString().trim();
+    final targetHost = (args['hostId'] ?? '').toString().trim();
+    switch (toolName) {
+      case 'file_write':
+      case 'file_patch':
+        return path.isEmpty ? toolName : '$toolName $path';
+      case 'sftp_upload':
+        return 'sftp_upload $local -> $remote';
+      case 'sftp_download':
+        return 'sftp_download $remote -> $local';
+      case 'upload_to':
+        return 'upload_to ${targetHost.isEmpty ? '' : '$targetHost:'}$remote';
+      case 'file_sync':
+        return 'file_sync $local -> $remote';
+      default:
+        return toolName;
+    }
+  }
+
   /// 根据 SafetyGuard 规则推断变更类型
   static ChangeType inferType(String command) {
-    final c = command.trim();
-    if (RegExp(r'^sudo\s+(apt|apt-get|yum|dnf|apk|pacman|snap|brew)\s+(install|add|-S)').hasMatch(c)) {
+    final c = _stripSudo(command);
+    if (RegExp(r'^(apt|apt-get|yum|dnf|apk|pacman|snap|brew)\s+(install|add|-S)').hasMatch(c)) {
       return ChangeType.install;
     }
-    if (RegExp(r'^sudo\s+(apt|apt-get|yum|dnf|apk|pacman)\s+(remove|purge|erase|-R|autoremove)').hasMatch(c)) {
+    if (RegExp(r'^(apt|apt-get|yum|dnf|apk|pacman)\s+(remove|purge|erase|-R|autoremove)').hasMatch(c)) {
       return ChangeType.uninstall;
     }
     if (RegExp(r'^systemctl\s+start').hasMatch(c)) return ChangeType.startService;
@@ -25,7 +74,7 @@ class ChangeRecordService {
     if (RegExp(r'^service\s+\w+\s+stop').hasMatch(c)) return ChangeType.stopService;
     if (RegExp(r'^service\s+\w+\s+restart').hasMatch(c)) return ChangeType.restartService;
     if (RegExp(r'chmod|chown').hasMatch(c)) return ChangeType.permission;
-    if (RegExp(r'^sudo\s+(cp|mv|rm|mkdir|tee|sed|echo.*>)').hasMatch(c) ||
+    if (RegExp(r'^(cp|mv|rm|mkdir|tee|sed|echo.*>)').hasMatch(c) ||
         RegExp(r'(>>|>)\s*(/etc/|~/)').hasMatch(c)) {
       return ChangeType.fileOperation;
     }
@@ -34,19 +83,20 @@ class ChangeRecordService {
 
   /// 生成回滚命令（基于命令类型）
   static String? buildRollbackCommand(String command, ChangeType type) {
-    final c = command.trim();
+    final c = _stripSudo(command);
+    final prefix = _hasSudo(command) ? 'sudo ' : '';
     switch (type) {
       case ChangeType.install:
         // apt install nginx → apt remove nginx
-        final match = RegExp(r'^sudo\s+(apt|apt-get|yum|dnf|apk|pacman|snap|brew)\s+(install|add|-S)\s+(\S+)').firstMatch(c);
+        final match = RegExp(r'^(apt|apt-get|yum|dnf|apk|pacman|snap|brew)\s+(install|add|-S)\s+(\S+)').firstMatch(c);
         if (match != null) {
           final pm = match.group(1)!;
           final pkg = match.group(3)!;
-          if (pm == 'apt' || pm == 'apt-get') return 'sudo $pm remove $pkg';
-          if (pm == 'yum' || pm == 'dnf') return 'sudo $pm remove $pkg';
-          if (pm == 'apk') return 'sudo $pm del $pkg';
-          if (pm == 'pacman') return 'sudo $pm -R $pkg';
-          if (pm == 'snap') return 'sudo snap remove $pkg';
+          if (pm == 'apt' || pm == 'apt-get') return '${prefix}$pm remove $pkg';
+          if (pm == 'yum' || pm == 'dnf') return '${prefix}$pm remove $pkg';
+          if (pm == 'apk') return '${prefix}$pm del $pkg';
+          if (pm == 'pacman') return '${prefix}$pm -R $pkg';
+          if (pm == 'snap') return '${prefix}snap remove $pkg';
           if (pm == 'brew') return 'brew uninstall $pkg';
         }
         return null;
@@ -56,15 +106,15 @@ class ChangeRecordService {
       case ChangeType.startService:
         // systemctl start nginx → systemctl stop nginx
         final match = RegExp(r'^systemctl\s+start\s+(\S+)').firstMatch(c);
-        if (match != null) return 'systemctl stop ${match.group(1)}';
+        if (match != null) return '${prefix}systemctl stop ${match.group(1)}';
         final m2 = RegExp(r'^service\s+(\w+)\s+start').firstMatch(c);
-        if (m2 != null) return 'service ${m2.group(1)} stop';
+        if (m2 != null) return '${prefix}service ${m2.group(1)} stop';
         return null;
       case ChangeType.stopService:
         final match = RegExp(r'^systemctl\s+stop\s+(\S+)').firstMatch(c);
-        if (match != null) return 'systemctl start ${match.group(1)}';
+        if (match != null) return '${prefix}systemctl start ${match.group(1)}';
         final m2 = RegExp(r'^service\s+(\w+)\s+stop').firstMatch(c);
-        if (m2 != null) return 'service ${m2.group(1)} start';
+        if (m2 != null) return '${prefix}service ${m2.group(1)} start';
         return null;
       case ChangeType.restartService:
         // 重启不可逆，返回 null
@@ -90,9 +140,11 @@ class ChangeRecordService {
     required bool success,
     String? username,
     String? conversationId,
+    ChangeType? forceType,
   }) async {
-    final type = inferType(command);
-    final rollbackCmd = buildRollbackCommand(command, type);
+    final type = forceType ?? inferType(command);
+    final rollbackCmd =
+        forceType != null ? null : buildRollbackCommand(command, type);
     final record = ChangeRecord(
       id: _uuid.v4(),
       hostId: hostId,

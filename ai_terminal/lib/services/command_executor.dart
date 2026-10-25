@@ -81,6 +81,11 @@ abstract class CommandExecutor {
     Completer<void>? cancelToken,
   });
 
+  /// 静默执行命令并返回 stdout（不写入交互终端）
+  ///
+  /// 用于监控采集、系统信息探测等内部操作：这些命令不应出现在用户终端里。
+  Future<String> runOnce(String command, {Duration timeout = const Duration(seconds: 5)});
+
   /// 直接写入终端（用于交互式输入）
   void writeToTerminal(String data);
 }

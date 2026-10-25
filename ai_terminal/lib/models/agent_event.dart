@@ -1,3 +1,7 @@
+import 'host_execution_result.dart';
+import 'operation_report.dart';
+import 'plan_step.dart';
+
 /// Agent 事件类型枚举
 ///
 /// 用于结构化渲染 Agent 的输出：思考、命令、结果、询问、完成、普通文本。
@@ -10,6 +14,19 @@ enum AgentEventType {
   finish, // 任务完成
   text, // 普通文本（非 ReAct 格式）
   info, // 状态提示（🚀 开始、⏳ 继续执行等）
+  report, // 操作单报告（终态生成一次）
+  plan, // 模型声明的执行计划
+}
+
+/// 任务终态（finish 事件用）
+///
+/// finish 事件不只代表成功：取消、失败、达到步数上限也会走 finish 路径
+/// 以关闭 UI 的运行状态，因此必须显式区分终态，避免取消被显示成“任务完成”。
+enum AgentFinishState {
+  success,
+  cancelled,
+  failed,
+  interrupted,
 }
 
 /// Agent 结构化事件基类
@@ -58,6 +75,49 @@ class AgentEvent {
   /// 完成摘要（finish 用）
   String? summary;
 
+  /// 任务终态（finish 用）；null 兼容旧数据，按成功处理
+  AgentFinishState? finishState;
+
+  /// 事件所属主机（command/result/report 用）
+  String? hostId;
+
+  /// 工具名（command/result 用），如 exec_command / file_write
+  String? toolName;
+
+  /// 风险等级（command 用）：safe / info / warn / blocked
+  String? riskLevel;
+
+  /// 命令耗时（result 用）
+  int? durationMs;
+
+  /// 退出码（result 用）
+  int? exitCode;
+
+  /// 失败类型（result 用）：timeout / disconnected / permissionDenied 等
+  String? failureKind;
+
+  /// 截断前输出字符数（result 用）
+  int? outputTotalChars;
+
+  /// 输出是否被截断（result 用）
+  bool? outputTruncated;
+
+  /// 原始输出尾部（result 用，最大 8KB）
+  String? outputTail;
+
+  /// 文件补丁行级改动（result 用）
+  int? diffAdditions;
+  int? diffDeletions;
+
+  /// 操作单报告（report 用）
+  OperationReport? operationReport;
+
+  /// 执行计划（plan 用）
+  List<PlanStep>? planSteps;
+
+  /// 多主机批量结果（result 用）
+  Map<String, HostExecutionResult>? hostResults;
+
   /// 事件是否已完成流式接收（用于流式渲染判断）
   bool isStreaming = false;
 
@@ -72,8 +132,15 @@ class AgentEvent {
         type = AgentEventType.thought,
         timestamp = DateTime.now();
 
-  AgentEvent.command(this.command, {String? id, this.dangerous, this.blocked})
-      : id = id ?? _genId(),
+  AgentEvent.command(
+    this.command, {
+    String? id,
+    this.dangerous,
+    this.blocked,
+    this.hostId,
+    this.toolName,
+    this.riskLevel,
+  })  : id = id ?? _genId(),
         type = AgentEventType.command,
         timestamp = DateTime.now();
 
@@ -83,6 +150,17 @@ class AgentEvent {
     this.output,
     this.error,
     this.command,
+    this.hostId,
+    this.toolName,
+    this.durationMs,
+    this.exitCode,
+    this.failureKind,
+    this.outputTotalChars,
+    this.outputTruncated,
+    this.outputTail,
+    this.diffAdditions,
+    this.diffDeletions,
+    this.hostResults,
   })  : id = _genId(),
         type = AgentEventType.result,
         timestamp = DateTime.now();
@@ -92,8 +170,11 @@ class AgentEvent {
         type = AgentEventType.ask,
         timestamp = DateTime.now();
 
-  AgentEvent.finish({this.summary, String? id})
-      : id = id ?? _genId(),
+  AgentEvent.finish({
+    this.summary,
+    this.finishState = AgentFinishState.success,
+    String? id,
+  })  : id = id ?? _genId(),
         type = AgentEventType.finish,
         timestamp = DateTime.now();
 
@@ -105,6 +186,16 @@ class AgentEvent {
   AgentEvent.info(this.text, {String? id})
       : id = id ?? _genId(),
         type = AgentEventType.info,
+        timestamp = DateTime.now();
+
+  AgentEvent.report(this.operationReport, {String? id, this.hostId})
+      : id = id ?? _genId(),
+        type = AgentEventType.report,
+        timestamp = DateTime.now();
+
+  AgentEvent.plan(this.planSteps, {String? id, this.hostId})
+      : id = id ?? _genId(),
+        type = AgentEventType.plan,
         timestamp = DateTime.now();
 
   static String _genId() =>
@@ -119,6 +210,8 @@ class AgentEvent {
   bool get isFinish => type == AgentEventType.finish;
   bool get isText => type == AgentEventType.text;
   bool get isInfo => type == AgentEventType.info;
+  bool get isReport => type == AgentEventType.report;
+  bool get isPlan => type == AgentEventType.plan;
 
   /// 事件状态：待执行 / 执行中 / 成功 / 失败 / 被拦截
   String get statusLabel {

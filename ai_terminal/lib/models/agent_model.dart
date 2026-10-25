@@ -1,3 +1,5 @@
+import 'plan_step.dart';
+
 /// Agent 执行状态
 enum AgentStatus {
   idle,       // 空闲
@@ -24,12 +26,16 @@ class AgentResult {
   final int? exitCode;
   final Duration? duration;
 
+  /// 失败类型（CommandFailureKind.name），成功时为 null
+  final String? failureKind;
+
   AgentResult({
     required this.success,
     this.output,
     this.error,
     this.exitCode,
     this.duration,
+    this.failureKind,
   });
 
   factory AgentResult.fromCommand({
@@ -38,6 +44,7 @@ class AgentResult {
     required String stderr,
     required int exitCode,
     required Duration duration,
+    String? failureKind,
   }) {
     return AgentResult(
       success: exitCode == 0,
@@ -45,6 +52,7 @@ class AgentResult {
       error: stderr.isNotEmpty ? stderr : null,
       exitCode: exitCode,
       duration: duration,
+      failureKind: failureKind,
     );
   }
 
@@ -92,6 +100,9 @@ class ReActStep {
   /// 工具参数（tool 时，已解析的 JSON Map）
   final Map<String, dynamic>? toolArgs;
 
+  /// 模型声明的执行计划（可选）
+  final List<PlanStep>? plan;
+
   /// 原始 AI 响应（用于 fallback 和 UI 显示）
   final String rawResponse;
 
@@ -102,6 +113,7 @@ class ReActStep {
     this.options,
     this.toolName,
     this.toolArgs,
+    this.plan,
     required this.rawResponse,
   });
 
@@ -155,8 +167,16 @@ class ReActObservation {
 /// Agent 任务
 class AgentTask {
   final String id;
+
+  /// 稳定操作 id：暂停/恢复不变，用于关联变更台账与操作单
+  final String? operationId;
+
   final String goal;           // 用户目标
   final String? currentStep;   // 当前步骤描述
+
+  /// 展示层阶段文案：理解需求 / 检查环境 / 执行变更 / 验证结果 / 整理结论
+  final String? phase;
+
   final List<String> steps;    // 执行步骤历史
   final List<AgentResult> results;  // 执行结果
   final AgentStatus status;
@@ -166,6 +186,8 @@ class AgentTask {
   final int? totalStepsEstimate;
   /// 已用时间（秒），从任务开始计算
   final int? elapsedSeconds;
+  /// 当前步号（引擎循环计数）
+  final int stepIndex;
   /// 成功执行的命令数
   final int successCount;
   /// 失败执行的命令数
@@ -173,8 +195,10 @@ class AgentTask {
 
   AgentTask({
     required this.id,
+    this.operationId,
     required this.goal,
     this.currentStep,
+    this.phase,
     List<String>? steps,
     List<AgentResult>? results,
     this.status = AgentStatus.idle,
@@ -182,6 +206,7 @@ class AgentTask {
     this.completedAt,
     this.totalStepsEstimate,
     this.elapsedSeconds,
+    this.stepIndex = 0,
     this.successCount = 0,
     this.failureCount = 0,
   })  : steps = steps ?? [],
@@ -189,20 +214,25 @@ class AgentTask {
         createdAt = createdAt ?? DateTime.now();
 
   AgentTask copyWith({
+    String? operationId,
     String? currentStep,
+    String? phase,
     List<String>? steps,
     List<AgentResult>? results,
     AgentStatus? status,
     DateTime? completedAt,
     int? totalStepsEstimate,
     int? elapsedSeconds,
+    int? stepIndex,
     int? successCount,
     int? failureCount,
   }) {
     return AgentTask(
       id: id,
+      operationId: operationId ?? this.operationId,
       goal: goal,
       currentStep: currentStep ?? this.currentStep,
+      phase: phase ?? this.phase,
       steps: steps ?? this.steps,
       results: results ?? this.results,
       status: status ?? this.status,
@@ -210,6 +240,7 @@ class AgentTask {
       completedAt: completedAt ?? this.completedAt,
       totalStepsEstimate: totalStepsEstimate ?? this.totalStepsEstimate,
       elapsedSeconds: elapsedSeconds ?? this.elapsedSeconds,
+      stepIndex: stepIndex ?? this.stepIndex,
       successCount: successCount ?? this.successCount,
       failureCount: failureCount ?? this.failureCount,
     );

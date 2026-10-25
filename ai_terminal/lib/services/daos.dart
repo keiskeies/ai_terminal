@@ -8,6 +8,9 @@ import '../models/chat_session.dart';
 import '../models/command_snippet.dart';
 import '../models/conversation.dart';
 import '../models/agent_event.dart';
+import '../models/operation_report.dart';
+import '../models/plan_step.dart';
+import '../models/host_execution_result.dart';
 import '../models/change_record.dart';
 import '../models/runbook.dart';
 
@@ -481,10 +484,24 @@ class ConversationsDao {
     'dangerous': e.dangerous, 'blocked': e.blocked,
     'success': e.success, 'output': e.output, 'error': e.error,
     'options': e.options, 'question': e.question, 'summary': e.summary,
+    'finishState': e.finishState?.name,
+    'hostId': e.hostId, 'toolName': e.toolName, 'riskLevel': e.riskLevel,
+    'durationMs': e.durationMs, 'exitCode': e.exitCode,
+    'failureKind': e.failureKind,
+    'outputTotalChars': e.outputTotalChars,
+    'outputTruncated': e.outputTruncated,
+    'outputTail': e.outputTail,
+    'diffAdditions': e.diffAdditions,
+    'diffDeletions': e.diffDeletions,
+    'operationReport': e.operationReport?.toJson(),
+    'planSteps': e.planSteps?.map((s) => s.toJson()).toList(growable: false),
+    'hostResults': e.hostResults?.map(
+        (hostId, r) => MapEntry(hostId, r.toJson())),
     'isStreaming': e.isStreaming,
   };
 
   static AgentEvent _eventFromJson(Map<String, dynamic> j) {
+    final rawReport = j['operationReport'];
     final e = AgentEvent()
       ..id = j['id'] as String
       ..type = AgentEventType.values.byName(j['type'] as String)
@@ -500,8 +517,48 @@ class ConversationsDao {
       ..options = (j['options'] as List?)?.map((e) => e as String).toList()
       ..question = j['question'] as String?
       ..summary = j['summary'] as String?
+      ..finishState =
+          AgentFinishState.values.asNameMap()[j['finishState'] as String?]
+      ..hostId = j['hostId'] as String?
+      ..toolName = j['toolName'] as String?
+      ..riskLevel = j['riskLevel'] as String?
+      ..durationMs = (j['durationMs'] as num?)?.toInt()
+      ..exitCode = (j['exitCode'] as num?)?.toInt()
+      ..failureKind = j['failureKind'] as String?
+      ..outputTotalChars = (j['outputTotalChars'] as num?)?.toInt()
+      ..outputTruncated = j['outputTruncated'] as bool?
+      ..outputTail = j['outputTail'] as String?
+      ..diffAdditions = (j['diffAdditions'] as num?)?.toInt()
+      ..diffDeletions = (j['diffDeletions'] as num?)?.toInt()
+      ..operationReport = rawReport is Map
+          ? OperationReport.fromJson(Map<String, dynamic>.from(rawReport))
+          : null
+      ..planSteps = _planSteps(j['planSteps'])
+      ..hostResults = _hostResults(j['hostResults'])
       ..isStreaming = j['isStreaming'] as bool? ?? false;
     return e;
+  }
+
+  static Map<String, HostExecutionResult>? _hostResults(Object? raw) {
+    if (raw is! Map) return null;
+    final results = <String, HostExecutionResult>{};
+    raw.forEach((key, value) {
+      if (key is String && value is Map) {
+        results[key] = HostExecutionResult.fromJson(
+            Map<String, dynamic>.from(value));
+      }
+    });
+    return results.isEmpty ? null : results;
+  }
+
+  static List<PlanStep>? _planSteps(Object? raw) {
+    if (raw is! List) return null;
+    final steps = raw
+        .whereType<Map>()
+        .map((e) => PlanStep.fromJson(Map<String, dynamic>.from(e)))
+        .where((e) => e.title.trim().isNotEmpty)
+        .toList(growable: false);
+    return steps.isEmpty ? null : steps;
   }
 
   static Map<String, dynamic> _logToJson(ConvAgentLog l) => {

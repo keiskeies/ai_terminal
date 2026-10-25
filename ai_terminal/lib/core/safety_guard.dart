@@ -59,6 +59,12 @@ class SafetyGuard {
 
   // 需二次确认的命令模式（高风险修改操作）
   static final List<_SafetyRule> _warnRules = [
+    // 文件/目录删除：任何形式的删除都不可恢复，必须让用户确认
+    // （rm -rf / 等系统级删除已被 _blockRules 直接拦截，此处覆盖其余删除）
+    _SafetyRule(RegExp(r'^(sudo\s+)?rm\s+'), '删除文件或目录，操作不可恢复，请确认目标路径'),
+    _SafetyRule(RegExp(r'^(sudo\s+)?(unlink|shred)\s+'), '删除/粉碎文件，操作不可恢复，请确认目标路径'),
+    _SafetyRule(RegExp(r'\bfind\b.*\s-delete\b'), '批量删除匹配的文件，操作不可恢复，请确认匹配范围'),
+    _SafetyRule(RegExp(r'^(sudo\s+)?truncate\s+.*-s\s*0\b'), '清空文件内容，原数据不可恢复，请确认目标文件'),
     // 系统级操作
     _SafetyRule(RegExp(r'^sudo\s+(reboot|shutdown|halt|poweroff|init\s+)'), '关机/重启服务器，所有运行中的进程将终止，未保存数据丢失'),
     _SafetyRule(RegExp(r'^systemctl\s+(stop|disable)\s+ssh'), '停止/禁用 SSH 服务，将断开所有远程连接，可能导致无法再次远程登录'),

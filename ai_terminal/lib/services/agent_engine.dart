@@ -6,6 +6,9 @@ import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
 import '../models/agent_model.dart';
 import '../models/agent_event.dart';
+import '../models/operation_report.dart';
+import '../models/plan_step.dart';
+import '../models/change_record.dart';
 import '../models/agent_memory.dart';
 import '../models/chat_session.dart';
 import '../models/ai_model_config.dart';
@@ -29,6 +32,7 @@ import '../utils/output_processor.dart';
 import '../utils/tool_args_parser.dart';
 import '../utils/react_stream_parser.dart';
 import '../utils/rollback_advisor.dart';
+import '../utils/verification_detector.dart';
 import '../utils/command_extractor.dart';
 import '../utils/token_estimator.dart';
 import '../utils/audit_logger.dart';
@@ -54,6 +58,27 @@ class AgentEngine {
 
   /// 当前执行步数（_executeAutomatic 循环计数，供进度文本使用）
   int _currentStepCount = 0;
+
+  /// 暂停/恢复时的步数偏移：恢复后步数继续累计，不归零
+  int _stepOffset = 0;
+
+  /// 稳定操作 id：startTask 生成，resumeTask 沿用
+  String? _operationId;
+
+  /// 每个 operation 只发一次 report
+  bool _reportEmitted = false;
+
+  /// 本操作产生的变更记录 id（按执行顺序，最多保留 100 条）
+  final List<String> _operationChangeIds = [];
+
+  /// 本操作成功的变更摘要（随 report 持久化，渲染时不再查库）
+  final List<OperationChange> _operationChanges = [];
+
+  /// 确定性验证徽标（最多 6 条）
+  final List<OperationBadge> _operationBadges = [];
+
+  /// 模型声明的执行计划（跨暂停/恢复保留）
+  List<PlanStep> _currentPlan = const [];
 
   /// 任务代际 token：每次 startTask 递增，循环中检查此 token 是否仍为当前任务
   /// 防止取消+立即发送导致旧循环与新循环并发
@@ -259,12 +284,26 @@ class AgentEngine {
     return '第 $_currentStepCount 步 | ✅$s ❌$f | ${elapsed}s';
   }
 
+  /// 按命令类型派生展示阶段（不参与状态机）
+  String _phaseForCommand(String command, SafetyLevel level) {
+    if (isQueryCommand(command)) return '检查环境';
+    if (level == SafetyLevel.warn || level == SafetyLevel.blocked) {
+      return '执行变更';
+    }
+    return '执行命令';
+  }
+
   /// 刷新 elapsedSeconds 并通知任务更新（在每次 onTaskUpdated 前调用）
   void _notifyTaskUpdate() {
     if (_currentTask == null) return;
     if (_taskStartTime != null) {
       final elapsed = DateTime.now().difference(_taskStartTime!).inSeconds;
-      _currentTask = _currentTask!.copyWith(elapsedSeconds: elapsed);
+      _currentTask = _currentTask!.copyWith(
+        elapsedSeconds: elapsed,
+        stepIndex: _currentStepCount,
+      );
+    } else {
+      _currentTask = _currentTask!.copyWith(stepIndex: _currentStepCount);
     }
     final updateCb = onTaskUpdated;
     if (updateCb != null) updateCb(_currentTask!);
@@ -308,6 +347,13 @@ class AgentEngine {
     _currentTask = null;
     _taskStartTime = null;
     _currentStepCount = 0;
+    _stepOffset = 0;
+    _operationId = null;
+    _reportEmitted = false;
+    _operationChangeIds.clear();
+    _operationChanges.clear();
+    _operationBadges.clear();
+    _currentPlan = const [];
     // 清理取消令牌（防御性，cancelTask 应该已处理过）
     _aiWatchdog?.cancel();
     _aiWatchdog = null;
@@ -372,11 +418,14 @@ class AgentEngine {
     final myGeneration = _currentTaskGeneration;
     _taskStartTime = DateTime.now();  // 记录任务开始时间，用于进度计算
     _currentStepCount = 0;
+    _operationId = _uuid.v4(); // 稳定操作 id：本轮任务及其暂停/恢复共用
 
     _currentTask = AgentTask(
       id: _uuid.v4(),
+      operationId: _operationId,
       goal: goal,
       status: AgentStatus.thinking,
+      phase: '理解需求',
     );
     _notifyTaskUpdate();
 
@@ -430,6 +479,15 @@ class AgentEngine {
           completedAt: DateTime.now(),
         );
         _notifyTaskUpdate();
+        // R5: 该路径原先既无 finish 也无 report，补成完整终态
+        _emitOperationReport(
+          finishState: AgentFinishState.failed,
+          reason: L10n.str.terminalNotConnected,
+        );
+        onEvent?.call(AgentEvent.finish(
+          summary: L10n.str.terminalNotConnected,
+          finishState: AgentFinishState.failed,
+        ));
         return;
       }
       await _executeAutomatic(goal, executor, myGeneration);
@@ -457,7 +515,14 @@ class AgentEngine {
         // R5: 所有终态路径必须 emit finish 事件 + flush 流式内容到持久化
         // 但失败路径不调用 onCompleted（它会触发 _recordLearningFromTask 污染知识库）
         // 只 emit finish 事件让 UI 停止流式状态，流式内容由 onError 回调中的 error 状态替代
-        onEvent?.call(AgentEvent.finish(summary: '⚠️ 任务异常终止: ${_friendlyErrorMessage(e)}'));
+        _emitOperationReport(
+          finishState: AgentFinishState.failed,
+          reason: _friendlyErrorMessage(e),
+        );
+        onEvent?.call(AgentEvent.finish(
+          summary: '⚠️ 任务异常终止: ${_friendlyErrorMessage(e)}',
+          finishState: AgentFinishState.failed,
+        ));
         onError?.call(_friendlyErrorMessage(e));
         _notifyTaskUpdate();
         // 任务失败通知
@@ -475,6 +540,7 @@ class AgentEngine {
     if (wasActive) {
       _currentTask = _currentTask!.copyWith(
         status: AgentStatus.cancelled,
+        phase: '已取消',
         completedAt: DateTime.now(),
       );
       _notifyTaskUpdate();
@@ -543,7 +609,12 @@ class AgentEngine {
       final finishSummary = _accumulatedMessage.isNotEmpty
           ? _accumulatedMessage
           : '任务已取消';
-      onEvent?.call(AgentEvent.finish(summary: finishSummary));
+      // 取消是终态：先发操作单报告，再发 finish
+      _emitOperationReport(finishState: AgentFinishState.cancelled);
+      onEvent?.call(AgentEvent.finish(
+        summary: finishSummary,
+        finishState: AgentFinishState.cancelled,
+      ));
       // flush 流式内容到持久化（与 _finishTask 的 onCompleted 路径对齐）
       if (_accumulatedMessage.isNotEmpty) {
         onCompleted?.call(_accumulatedMessage);
@@ -568,7 +639,10 @@ class AgentEngine {
         s != AgentStatus.waitingConfirm) {
       return;
     }
-    _currentTask = _currentTask!.copyWith(status: AgentStatus.paused);
+    _currentTask = _currentTask!.copyWith(
+      status: AgentStatus.paused,
+      phase: '已暂停',
+    );
     _notifyTaskUpdate();
     agentLogger.info('AgentEngine', '任务已暂停 (暂停前状态: $s)');
 
@@ -618,20 +692,46 @@ class AgentEngine {
       onError?.call(L10n.str.terminalNotConnected);
       return;
     }
-    // 在 _resetTransientState 之前捕获 goal（reset 会清空 _currentTask）
+    // 在 _resetTransientState 之前捕获 goal 与 operationId（reset 会清空 _currentTask）
     final goal = _currentTask!.goal;
+    final operationId = _currentTask!.operationId ?? _operationId;
+    final plan = _currentPlan;
+    final previousStepCount = _currentStepCount;
+    final previousSuccessCount = _currentTask!.successCount;
+    final previousFailureCount = _currentTask!.failureCount;
+    final previousElapsed = _currentTask!.elapsedSeconds ?? 0;
+    final previousStartedAt = _taskStartTime ?? _currentTask!.createdAt;
+    final hadExecutedAnyCommand = _hasExecutedAnyCommand;
+    final previousChangeIds = List<String>.of(_operationChangeIds);
+    final previousChanges = List<OperationChange>.of(_operationChanges);
+    final previousBadges = List<OperationBadge>.of(_operationBadges);
     agentLogger.info('AgentEngine', '恢复已暂停的任务: $goal');
     // 清理瞬态字段但保留 _conversationHistory（恢复上下文）
     _resetTransientState();
     _currentExecutor = executor; // 保存 executor 引用，支持运行时刷新
     _currentTaskGeneration++;
     final myGeneration = _currentTaskGeneration;
-    _taskStartTime = DateTime.now();
-    _currentStepCount = 0;
+    // 恢复后继续累计步数/耗时/成功失败数，不从零开始
+    _taskStartTime = previousStartedAt;
+    _currentStepCount = previousStepCount;
+    _stepOffset = previousStepCount;
+    _hasExecutedAnyCommand = hadExecutedAnyCommand;
+    _operationChangeIds.addAll(previousChangeIds);
+    _operationChanges.addAll(previousChanges);
+    _operationBadges.addAll(previousBadges);
+    _operationId = operationId ?? _uuid.v4();
+    _currentPlan = plan;
     _currentTask = AgentTask(
       id: _uuid.v4(),
+      operationId: _operationId,
       goal: goal,
       status: AgentStatus.thinking,
+      phase: '继续执行',
+      createdAt: previousStartedAt,
+      elapsedSeconds: previousElapsed,
+      stepIndex: previousStepCount,
+      successCount: previousSuccessCount,
+      failureCount: previousFailureCount,
     );
     _notifyTaskUpdate();
     AgentTracer.instance.startTask(_currentTask!.id, '恢复: $goal', hostId: hostId);
@@ -646,6 +746,15 @@ class AgentEngine {
           completedAt: DateTime.now(),
         );
         _notifyTaskUpdate();
+        // R5: 恢复失败同样必须有 report + finish
+        _emitOperationReport(
+          finishState: AgentFinishState.failed,
+          reason: _friendlyErrorMessage(e),
+        );
+        onEvent?.call(AgentEvent.finish(
+          summary: '${L10n.str.taskFailed}: ${_friendlyErrorMessage(e)}',
+          finishState: AgentFinishState.failed,
+        ));
       }
     }
   }
@@ -691,6 +800,15 @@ class AgentEngine {
         completedAt: DateTime.now(),
       );
       _notifyTaskUpdate();
+      // R5: 未连接是终态，补 report + finish
+      _emitOperationReport(
+        finishState: AgentFinishState.failed,
+        reason: L10n.str.terminalNotConnected,
+      );
+      onEvent?.call(AgentEvent.finish(
+        summary: L10n.str.terminalNotConnected,
+        finishState: AgentFinishState.failed,
+      ));
       return;
     }
 
@@ -709,7 +827,8 @@ class AgentEngine {
     // 死循环防护由 _noCommandRetryCount（连续无命令 2 次即终止）承担
     final maxSteps = this.maxSteps;
     final isUnlimited = maxSteps == 0;
-    var stepCount = 0;
+    // 恢复任务时从已执行步数继续，而不是从 0 重新计数
+    var stepCount = _stepOffset;
 
     // 判断是否为新对话
     final isNewConversation = _conversationHistory.isEmpty;
@@ -775,6 +894,7 @@ class AgentEngine {
       _currentStepCount = stepCount;
       _currentTask = _currentTask!.copyWith(
         status: AgentStatus.thinking,
+        phase: '思考中',
         currentStep: _progressStepText(),
       );
       _notifyTaskUpdate();
@@ -846,7 +966,14 @@ class AgentEngine {
           );
           _notifyTaskUpdate();
           // R5: 失败路径也要 emit finish 事件，避免 UI 卡 running
-          onEvent?.call(AgentEvent.finish(summary: '${L10n.str.taskFailed}: $friendlyMsg'));
+          _emitOperationReport(
+            finishState: AgentFinishState.failed,
+            reason: friendlyMsg,
+          );
+          onEvent?.call(AgentEvent.finish(
+            summary: '${L10n.str.taskFailed}: $friendlyMsg',
+            finishState: AgentFinishState.failed,
+          ));
           // 任务失败通知（与外层 catch 保持一致）
           _notifyTaskCompletion(success: false, startTime: startTime, error: e.toString());
         }
@@ -874,6 +1001,10 @@ class AgentEngine {
       // ═══════════════════════════════════════════
       final step = _parseReActResponse(fullResponse);
       agentLogger.info('ReAct', '解析结果: thought="${step.thought}", action=${step.action}, command=${step.command}, options=${step.options}');
+      // 计划是持久状态：每次模型输出完整计划时替换，不追加快照
+      if (step.plan != null && step.plan!.isNotEmpty) {
+        _currentPlan = List<PlanStep>.unmodifiable(step.plan!);
+      }
 
       // ═══════════════════════════════════════════
       // 阶段3: 行动 (Act) — 根据动作类型执行
@@ -900,7 +1031,9 @@ class AgentEngine {
             continue;
           }
           agentLogger.info('ReAct', '任务完成 (AI 返回 finish 动作)');
-          _finishTask();
+          // 把 finish 的思考文本作为报告来源；不要回退到 _accumulatedMessage
+          final finishThought = step.thought.trim();
+          _finishTask(summary: finishThought.isNotEmpty ? finishThought : null);
           return;
 
         case ActionType.ask:
@@ -962,7 +1095,11 @@ class AgentEngine {
     if (hitMaxSteps) {
       agentLogger.warn('ReAct', '达到最大执行步数 $maxSteps');
       onEvent?.call(AgentEvent.info('⚠️ 达到最大执行步数 ($maxSteps)，任务被中断'));
-      onEvent?.call(AgentEvent.finish(summary: '达到最大执行步数，任务被中断'));
+      _emitOperationReport(finishState: AgentFinishState.interrupted);
+      onEvent?.call(AgentEvent.finish(
+        summary: '达到最大执行步数，任务被中断',
+        finishState: AgentFinishState.interrupted,
+      ));
       // L15 修复：maxSteps 路径也调 onCompleted，确保流式内容 flush 到 content
       if (_accumulatedMessage.isNotEmpty) {
         onCompleted?.call(_accumulatedMessage);
@@ -1163,6 +1300,7 @@ class AgentEngine {
                     emittedStableIds.add(stableId);
                     e.id = finalId;
                     e.isStreaming = false;
+                    _enrichCommandEvent(e);
                     onEvent?.call(e);
                   }
                   onCommandDetected(cmd, finalId);
@@ -1223,6 +1361,7 @@ class AgentEngine {
         emittedStableIds.add(stableId);
         assignFinalId(e); // 此处会改写 e.id 为 finalId
         e.isStreaming = false;
+        _enrichCommandEvent(e);
         onEvent?.call(e);
       } else {
         // 已发过，确保 _lastCommandEventId 用 finalId
@@ -1288,6 +1427,7 @@ class AgentEngine {
     ActionType? action;
     String? command;
     List<String>? options;
+    List<PlanStep>? plan;
 
     // 使用 ReActStreamParser 统一提取命令（正确处理多行 heredoc 和代码块）
     final events = ReActStreamParser.parse(content);
@@ -1298,6 +1438,9 @@ class AgentEngine {
         thought = e.text;
       } else if (e.type == AgentEventType.ask && options == null) {
         options = e.options;
+      } else if (e.isPlan && e.planSteps != null && e.planSteps!.isNotEmpty) {
+        // 同一响应里出现多份计划时，最后一份是最新状态
+        plan = e.planSteps;
       }
     }
 
@@ -1340,17 +1483,38 @@ class AgentEngine {
         return ReActStep(thought: '', action: null, rawResponse: content);
       }
       if (isTaskComplete(content)) {
-        return ReActStep(thought: thought ?? content, action: ActionType.finish, rawResponse: content);
+        return ReActStep(
+          thought: thought ?? content,
+          action: ActionType.finish,
+          plan: plan,
+          rawResponse: content,
+        );
       }
       if (command != null) {
-        return ReActStep(thought: thought ?? '', action: ActionType.execute, command: command, rawResponse: content);
+        return ReActStep(
+          thought: thought ?? '',
+          action: ActionType.execute,
+          command: command,
+          plan: plan,
+          rawResponse: content,
+        );
       }
       // 有思考内容但没有命令 → 继续执行，不要结束
       if (thought != null && thought.isNotEmpty) {
-        return ReActStep(thought: thought, action: null, rawResponse: content);
+        return ReActStep(
+          thought: thought,
+          action: null,
+          plan: plan,
+          rawResponse: content,
+        );
       }
       // 无法识别格式 → 不结束任务，交给 _handleNoCommand 重试
-      return ReActStep(thought: thought ?? content, action: null, rawResponse: content);
+      return ReActStep(
+        thought: thought ?? content,
+        action: null,
+        plan: plan,
+        rawResponse: content,
+      );
     }
 
     return ReActStep(
@@ -1360,6 +1524,7 @@ class AgentEngine {
       options: options,
       toolName: toolName,
       toolArgs: toolArgs,
+      plan: plan,
       rawResponse: content,
     );
   }
@@ -1641,6 +1806,7 @@ class AgentEngine {
 
       _currentTask = _currentTask!.copyWith(
         status: AgentStatus.waitingConfirm,
+        phase: '等待确认',
         currentStep: '等待确认: $command',
       );
       _notifyTaskUpdate();
@@ -1681,6 +1847,7 @@ class AgentEngine {
     // 执行命令
     _currentTask = _currentTask!.copyWith(
       status: AgentStatus.executing,
+      phase: _phaseForCommand(command, safetyLevel),
       currentStep: _progressStepText(),
     );
     _notifyTaskUpdate();
@@ -1752,6 +1919,19 @@ class AgentEngine {
         ? _truncateQueryOutput(result.error)
         : truncateOutput(result.error, maxLines: 8, maxChars: 600);
 
+    // 保留原始输出尾部：事件里的 output 只有 8 行/600 字符，证据层需要更多上下文
+    String? outputTail;
+    if (!isQuery) {
+      const maxTailChars = 8000;
+      final raw = result.success ? result.output : result.error;
+      final shown = result.success ? outputText : errorText;
+      if (raw != null && raw.isNotEmpty && raw.length > shown.length) {
+        outputTail = raw.length <= maxTailChars
+            ? raw
+            : raw.substring(raw.length - maxTailChars);
+      }
+    }
+
     // 失败回滚：命令失败时，把快照+回滚建议注入观测，AI 会看到并建议回滚
     String? rollbackHint;
     if (!result.success && snapshot != null) {
@@ -1773,26 +1953,62 @@ class AgentEngine {
     );
 
     // 先发出结构化结果事件，再通知执行完成
+    final rawOutputLength = result.success
+        ? (result.output?.length ?? 0)
+        : (result.error?.length ?? 0);
+    final shownOutputLength = result.success ? outputText.length : errorText.length;
     onEvent?.call(AgentEvent.result(
       commandId: commandId ?? _lastCommandEventId,
       command: command,
       success: result.success,
       output: outputText,
       error: result.success ? null : (rollbackHint != null ? '$errorText\n\n$rollbackHint' : errorText),
+      hostId: hostId,
+      toolName: 'exec_command',
+      durationMs: result.duration?.inMilliseconds,
+      exitCode: result.exitCode,
+      failureKind: result.failureKind,
+      outputTotalChars: rawOutputLength,
+      outputTruncated: rawOutputLength > shownOutputLength,
+      outputTail: outputTail,
     ));
 
     onCommandExecuted?.call(result);
+
+    // 确定性验证：只对格式稳定的只读校验命令产出徽标
+    final badge = VerificationDetector.detect(
+      command: command,
+      output: result.success ? result.output : result.error,
+      success: result.success,
+    );
+    if (badge != null &&
+        _operationBadges.length < 6 &&
+        !_operationBadges.any((b) => b.text == badge.text)) {
+      _operationBadges.add(badge);
+      _currentTask = _currentTask!.copyWith(phase: '验证结果');
+      _notifyTaskUpdate();
+    }
 
     // 变更台账：非 safe 级命令（即修改性命令）记录到台账，便于事后追溯和回滚
     // safe 级命令（ls/cat/grep 等只读命令）不记录，避免台账膨胀
     if (safetyLevel != SafetyLevel.safe && hostId != null) {
       try {
-        await ChangeRecordService.record(
+        final record = await ChangeRecordService.record(
           hostId: hostId!,
           command: command,
           success: result.success,
-          conversationId: _currentTask?.id,
+          conversationId: _currentTask?.operationId ?? _operationId,
         );
+        if (record.success && _operationChanges.length < 100) {
+          _operationChangeIds.add(record.id);
+          _operationChanges.add(OperationChange(
+            id: record.id,
+            command: record.command,
+            type: record.type.name,
+            rollbackCommand: record.rollbackCommand,
+            success: record.success,
+          ));
+        }
       } catch (e) {
         // R8: 持久化失败不可静默吞掉，需记录日志带上下文
         agentLogger.warn('ChangeRecord', '记录变更台账失败(忽略): hostId=$hostId, cmd=$command, err=$e');
@@ -1846,6 +2062,17 @@ class AgentEngine {
   /// 由 _callAI 流式解析时更新，_handleExecuteAction 执行命令后用它关联 result
   String _lastCommandEventId = '';
 
+  /// 为 shell command 事件补主机/工具/风险元数据（供操作单证据层使用）
+  void _enrichCommandEvent(AgentEvent e) {
+    if (!e.isCommand) return;
+    e.hostId ??= hostId;
+    e.toolName ??= 'exec_command';
+    final cmd = (e.command ?? '').trim();
+    if (cmd.isNotEmpty) {
+      e.riskLevel ??= SafetyGuard.check(cmd).name;
+    }
+  }
+
   /// 处理多条命令执行（旧格式 fallback）
   Future<bool> _handleExecuteCommands(List<String> commands, CommandExecutor executor, {required int myGeneration}) async {
     final resultMessages = <String>[];
@@ -1892,7 +2119,8 @@ class AgentEngine {
     final options = step.options ?? [];
     if (options.isEmpty) {
       agentLogger.warn('ReAct', 'ask 动作但无选项，视为 finish');
-      _finishTask();
+      final thought = step.thought.trim();
+      _finishTask(summary: thought.isNotEmpty ? thought : null);
       return false;
     }
 
@@ -1903,6 +2131,7 @@ class AgentEngine {
 
     _currentTask = _currentTask!.copyWith(
       status: AgentStatus.waitingConfirm,
+      phase: '等待选择',
       currentStep: '等待选择',
     );
     _notifyTaskUpdate();
@@ -1945,17 +2174,22 @@ class AgentEngine {
   /// 把工具参数格式化为展示用文本（多行 key:value 格式，与 ReAct 调用格式一致）
   /// 用于 AgentEvent.result.command 和 ReActObservation.command
   /// 避免 AI 从观测/事件里看到 JSON 格式而被"带偏"
-  static String _formatToolCommandForDisplay(String toolName, Map<String, dynamic> args) {
+  static String _formatToolCommandForDisplay(
+    String toolName,
+    Map<String, dynamic> args, {
+    int maxValueChars = 0,
+  }) {
     if (args.isEmpty) return toolName;
     final buffer = StringBuffer()
       ..writeln(toolName);
     for (final entry in args.entries) {
       final v = entry.value;
-      if (v is List) {
-        buffer.writeln('  ${entry.key}: ${v.join(',')}');
-      } else {
-        buffer.writeln('  ${entry.key}: $v');
-      }
+      final raw = v is List ? v.join(',') : '$v';
+      // UI 展示时截断大参数（如 file_write 的 base64 内容），避免证据层被塞爆
+      final display = maxValueChars > 0 && raw.length > maxValueChars
+          ? '${raw.substring(0, maxValueChars)}… (${raw.length} 字符)'
+          : raw;
+      buffer.writeln('  ${entry.key}: $display');
     }
     return buffer.toString().trimRight();
   }
@@ -1963,6 +2197,63 @@ class AgentEngine {
   /// 处理 tool 动作 — 调用非 shell 工具（如 SFTP 上传）
   /// ═══════════════════════════════════════════════════════
   /// 返回 true 表示继续循环，false 表示应退出
+  /// 文件工具不在 shell 变更台账里，这里补一条变更 + 审计，保证“可追溯”覆盖文件编辑
+  Future<void> _recordToolFileChange({
+    required String toolName,
+    required Map<String, dynamic> args,
+    required ToolResult result,
+  }) async {
+    if (!ChangeRecordService.isFileChangeTool(toolName)) return;
+    final explicitHost = (args['hostId'] ?? '').toString().trim();
+    final targetHost = explicitHost.isNotEmpty ? explicitHost : (hostId ?? 'local');
+    final description =
+        ChangeRecordService.describeFileToolChange(toolName, args);
+
+    try {
+      final record = await ChangeRecordService.record(
+        hostId: targetHost,
+        command: description,
+        success: result.success,
+        conversationId: _currentTask?.operationId ?? _operationId,
+        forceType: ChangeType.fileOperation,
+      );
+      if (record.success && _operationChanges.length < 100) {
+        _operationChangeIds.add(record.id);
+        _operationChanges.add(OperationChange(
+          id: record.id,
+          command: description,
+          type: record.type.name,
+          rollbackCommand: null,
+          success: true,
+          additions: result.diffAdditions,
+          deletions: result.diffDeletions,
+        ));
+      }
+    } catch (e) {
+      agentLogger.warn('ChangeRecord',
+          '记录文件变更失败(忽略): host=$targetHost, op=$description, err=$e');
+    }
+
+    try {
+      await AuditLogger.log(
+        hostId: targetHost,
+        command: description,
+        safetyLevel: SafetyLevel.warn.name,
+        output: result.success
+            ? (result.output.isNotEmpty
+                ? _truncateForAudit(result.output)
+                : '(无输出)')
+            : (result.error?.isNotEmpty == true
+                ? _truncateForAudit(result.error!)
+                : '(无错误信息)'),
+        executed: true,
+      );
+    } catch (e) {
+      agentLogger.warn('Audit',
+          '记录文件变更审计失败(忽略): host=$targetHost, op=$description, err=$e');
+    }
+  }
+
   Future<bool> _handleToolAction(ReActStep step, CommandExecutor executor, {required int myGeneration}) async {
     final toolName = step.toolName?.trim() ?? '';
     final args = step.toolArgs ?? {};
@@ -2002,11 +2293,21 @@ class AgentEngine {
     }
 
     agentLogger.info('ReAct', '调用工具: $toolName, 参数: $args');
-    onEvent?.call(AgentEvent.info('🔧 调用工具: $toolName'));
+    // R4: 工具调用必须有独立的 command 事件和 id，不能复用上一条 shell 命令的 id
+    final toolUiDisplay =
+        _formatToolCommandForDisplay(toolName, args, maxValueChars: 160);
+    final toolCommandEvent = AgentEvent.command(
+      toolUiDisplay,
+      id: 'evt_tool_${_uuid.v4().substring(0, 8)}',
+      hostId: hostId,
+      toolName: toolName,
+    );
+    onEvent?.call(toolCommandEvent);
 
     // 设置执行状态
     _currentTask = _currentTask!.copyWith(
       status: AgentStatus.executing,
+      phase: '执行工具',
       currentStep: '执行工具 $toolName',
     );
     _notifyTaskUpdate();
@@ -2023,6 +2324,7 @@ class AgentEngine {
       }
     }
 
+    final toolStopwatch = Stopwatch()..start();
     try {
       // 注入当前任务的取消令牌给工具，让工具内部调用 executeAndWait / writeFileViaPty
       // 时能透传 cancelToken，cancelTask 时立即中断工具内的命令执行。
@@ -2052,15 +2354,37 @@ class AgentEngine {
         agentLogger.warn('ReAct', '工具 $toolName 失败详情: $detail');
       }
 
-      // 发 result 事件
+      // 发 result 事件：关联本次工具自己的 command id，并带上耗时/主机/工具名
+      toolStopwatch.stop();
+      const maxToolEventChars = 8000;
+      final toolOutput = result.success ? result.output : (result.error ?? result.output);
+      final toolOutputTruncated = toolOutput.length > maxToolEventChars;
+      final toolOutputForUi = toolOutputTruncated
+          ? '${toolOutput.substring(0, maxToolEventChars)}\n...(输出已截断)'
+          : toolOutput;
       onEvent?.call(AgentEvent.result(
-        commandId: _lastCommandEventId.isNotEmpty ? _lastCommandEventId : 'tool_${DateTime.now().millisecondsSinceEpoch}',
+        commandId: toolCommandEvent.id,
         success: result.success,
-        output: result.success ? result.output : null,
-        error: result.success ? null : (result.error ?? result.output),
-        // UI 展示用：工具名 + 多行参数（与 ReAct 文本格式一致）
-        command: _formatToolCommandForDisplay(toolName, args),
+        output: result.success ? toolOutputForUi : null,
+        error: result.success ? null : toolOutputForUi,
+        // UI 展示用：工具名 + 多行参数（大参数已截断，避免证据层膨胀）
+        command: toolUiDisplay,
+        hostId: hostId,
+        toolName: toolName,
+        durationMs: toolStopwatch.elapsedMilliseconds,
+        outputTotalChars: toolOutput.length,
+        outputTruncated: toolOutputTruncated,
+        diffAdditions: result.diffAdditions,
+        diffDeletions: result.diffDeletions,
+        hostResults: result.hostResults,
       ));
+
+      // 文件类工具补变更台账 + 审计（shell 变更在 _handleExecuteAction 里记录）
+      await _recordToolFileChange(
+        toolName: toolName,
+        args: args,
+        result: result,
+      );
 
       // 构造观测反馈给 AI
       // 注意：观测里的 command 用多行格式展示参数，避免 AI 从观测里学到 JSON 格式
@@ -2087,8 +2411,22 @@ class AgentEngine {
 
       return true;
     } catch (e) {
+      toolStopwatch.stop();
       agentLogger.error('ReAct', '工具 $toolName 执行异常: $e');
       onEvent?.call(AgentEvent.info('❌ 工具 $toolName 执行异常: $e'));
+      // 工具异常也要有 result 事件，避免证据层只有命令没有结果
+      onEvent?.call(AgentEvent.result(
+        commandId: toolCommandEvent.id,
+        success: false,
+        error: e.toString(),
+        command: toolUiDisplay,
+        hostId: hostId,
+        toolName: toolName,
+        durationMs: toolStopwatch.elapsedMilliseconds,
+        failureKind: CommandFailureKind.unknown.name,
+        outputTotalChars: e.toString().length,
+        outputTruncated: false,
+      ));
 
       if (myGeneration != _currentTaskGeneration) return false;
 
@@ -2125,21 +2463,111 @@ class AgentEngine {
     return false;
   }
 
+  /// 生成并发出操作单报告（每个 operation 只发一次）
+  ///
+  /// 必须覆盖所有终态路径，且在 finish 事件之前调用。
+  /// 成功路径的结论来自模型总结；取消/失败/中断使用确定性模板，绝不回退到
+  /// `_accumulatedMessage`（那是完整 ReAct 文本，会给用户造成误导）。
+  void _emitOperationReport({
+    required AgentFinishState finishState,
+    String? summary,
+    String? reason,
+  }) {
+    if (_reportEmitted) return;
+    final task = _currentTask;
+    if (task == null) return;
+
+    final rawSummary = (summary ?? '').trim();
+    final reasonLine = (reason ?? rawSummary).trim().split('\n').first.trim();
+    final isSuccess = finishState == AgentFinishState.success;
+    final fallback = _defaultConclusion(finishState, reason: reasonLine);
+    final conclusion = isSuccess
+        ? OperationReport.extractConclusion(rawSummary, fallback: fallback)
+        : fallback;
+    final details =
+        isSuccess ? OperationReport.extractDetails(rawSummary, conclusion: conclusion) : null;
+
+    final nowElapsed = _taskStartTime != null
+        ? DateTime.now().difference(_taskStartTime!).inSeconds
+        : 0;
+    final report = OperationReport(
+      operationId: task.operationId ?? _operationId ?? task.id,
+      taskId: task.id,
+      goal: task.goal,
+      hostId: hostId,
+      elapsedSeconds: nowElapsed > (task.elapsedSeconds ?? 0)
+          ? nowElapsed
+          : (task.elapsedSeconds ?? 0),
+      stepIndex: task.stepIndex > 0 ? task.stepIndex : _currentStepCount,
+      commandSuccessCount: task.successCount,
+      commandFailureCount: task.failureCount,
+      conclusion: conclusion,
+      details: details,
+      nextActions:
+          isSuccess ? OperationReport.extractNextActions(rawSummary) : const [],
+      changeRecordIds: List<String>.unmodifiable(_operationChangeIds),
+      changes: List<OperationChange>.unmodifiable(_operationChanges),
+      plan: List<PlanStep>.unmodifiable(_currentPlan),
+      stateBadges:
+          isSuccess ? List<OperationBadge>.unmodifiable(_operationBadges) : const [],
+      verified: isSuccess &&
+          _operationBadges.any((b) => b.level == 'success'),
+      aiGenerated: isSuccess && rawSummary.isNotEmpty,
+      finishState: finishState.name,
+    );
+
+    _reportEmitted = true;
+    onEvent?.call(AgentEvent.report(report, hostId: hostId));
+  }
+
+  String _defaultConclusion(AgentFinishState state, {String? reason}) {
+    final step = _currentStepCount > 0 ? '第 $_currentStepCount 步' : '当前步骤';
+    switch (state) {
+      case AgentFinishState.success:
+        final count = _currentTask?.successCount ?? 0;
+        return count > 0 ? '任务已完成，共执行 $count 条命令。' : '任务已完成。';
+      case AgentFinishState.cancelled:
+        return '任务已取消于$step。';
+      case AgentFinishState.failed:
+        final r = (reason ?? '').trim();
+        return r.isEmpty ? '任务执行失败。' : '任务执行失败：$r';
+      case AgentFinishState.interrupted:
+        return '任务在$step达到步数上限后中断。';
+    }
+  }
+
   /// 标记任务为已完成（统一的结束逻辑）
   void _finishTask({bool success = true, String? summary}) {
     _trimMessages(_conversationHistory);
     final startTime = _currentTask?.createdAt;
     _currentTask = _currentTask!.copyWith(
       status: success ? AgentStatus.completed : AgentStatus.failed,
+      phase: success ? '整理结论' : '执行失败',
       completedAt: DateTime.now(),
     );
     _notifyTaskUpdate();
     agentLogger.info('AutoExec', '=== 任务${success ? "完成" : "终止"} ===');
-    // L6 修复：补发 finish 事件，让 UI 显示完成卡片并正确结束渲染状态
+    // R5: 先发操作单报告，再发 finish（消费方看到 finish 即停止渲染）
     final finishSummary = summary ?? _accumulatedMessage;
-    onEvent?.call(AgentEvent.finish(summary: finishSummary));
-    if (finishSummary.isNotEmpty) {
-      onCompleted?.call(finishSummary);
+    // 报告结论只接受模型显式总结；summary 为空时用确定性模板，
+    // 绝不把 _accumulatedMessage（完整 ReAct 文本）当结论。
+    _emitOperationReport(
+      finishState: success ? AgentFinishState.success : AgentFinishState.failed,
+      summary: success ? summary : null,
+      reason: success ? null : summary,
+    );
+    // L6 修复：补发 finish 事件，让 UI 显示完成卡片并正确结束渲染状态
+    onEvent?.call(AgentEvent.finish(
+      summary: finishSummary,
+      finishState: success ? AgentFinishState.success : AgentFinishState.failed,
+    ));
+    // onCompleted 仍传完整累积文本：知识库学习需要完整上下文，
+    // 操作单结论只使用 step.thought 生成的 finishSummary。
+    final completionMessage = _accumulatedMessage.isNotEmpty
+        ? _accumulatedMessage
+        : finishSummary;
+    if (completionMessage.isNotEmpty) {
+      onCompleted?.call(completionMessage);
     }
     // P0-2: trace 任务结束
     final taskId = _currentTask?.id;
@@ -2236,6 +2664,7 @@ class AgentEngine {
               ? 'SSH 连接已断开，请重连后重试$hint'
               : '本地终端已退出，请重新打开终端$hint',
           duration: stopwatch.elapsed,
+          failureKind: CommandFailureKind.disconnected.name,
         );
       }
     } else {
@@ -2305,6 +2734,7 @@ class AgentEngine {
           success: false,
           error: '用户取消了任务',
           duration: stopwatch.elapsed,
+          failureKind: CommandFailureKind.cancelled.name,
         );
       }
 
@@ -2319,6 +2749,9 @@ class AgentEngine {
         stderr: result.stderr,
         exitCode: result.exitCode,
         duration: stopwatch.elapsed,
+        failureKind: result.failureKind == CommandFailureKind.none
+            ? null
+            : result.failureKind.name,
       );
     } catch (e) {
       stopwatch.stop();
@@ -2328,6 +2761,7 @@ class AgentEngine {
         success: false,
         error: e.toString(),
         duration: stopwatch.elapsed,
+        failureKind: CommandFailureKind.unknown.name,
       );
     }
   }
@@ -2873,13 +3307,16 @@ $hostList
 
       for (final (cmd, cat) in commands) {
         try {
+          // 走独立通道/进程：系统信息探测不应回显到用户的交互终端
           // N8: systeminfo 等命令较慢，给 15s 超时
-          final result = await executor.executeAndWait(
+          final out = await executor.runOnce(
             cmd,
             timeout: const Duration(seconds: 15),
           );
-          final clean = AnsiStripper.strip(result.stdout);
-          _memory.rememberSystemInfo('$cat: ${clean.trim()}', category: cat);
+          final clean = AnsiStripper.strip(out);
+          if (clean.trim().isNotEmpty) {
+            _memory.rememberSystemInfo('$cat: ${clean.trim()}', category: cat);
+          }
         } catch (e) {
           agentLogger.warn('AgentEngine', '收集 $cat 失败: $e');
         }

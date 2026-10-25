@@ -432,8 +432,12 @@ class AgentNotifier extends StateNotifier<AgentState> {
         hostState = s.copyWith(chatItems: items); // 捕获更新后的状态
         return hostState!;
       });
-      // 命令/结果事件即时持久化：使用 hostState（正确 host 的状态）而非 state（活跃 host）
-      if (event.type == AgentEventType.command || event.type == AgentEventType.result) {
+      // 命令/结果/操作单报告即时持久化：使用 hostState（正确 host 的状态）而非 state（活跃 host）
+      // report 必须即时落盘：取消且无累积文本时不会触发 onCompleted，否则报告会丢
+      if (event.type == AgentEventType.command ||
+          event.type == AgentEventType.result ||
+          event.type == AgentEventType.report ||
+          event.type == AgentEventType.plan) {
         final items = hostState?.chatItems ?? state.chatItems;
         if (items.isNotEmpty && items.last.role == 'assistant') {
           _persistAssistantCompletion(hostId, items.last.content, events: items.last.events);

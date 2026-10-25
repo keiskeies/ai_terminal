@@ -291,7 +291,7 @@ class FileSyncService {
 
       // 确保远端父目录存在
       final remoteParent = p.posix.dirname(remotePath);
-      await _sftp.createDirectory(remoteParent);
+      await _sftp.ensureDirectory(remoteParent);
 
       await _sftp.uploadFile(localPath, remotePath);
 

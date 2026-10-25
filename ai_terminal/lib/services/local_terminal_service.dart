@@ -39,8 +39,10 @@ class LocalTerminalService implements CommandExecutor {
       if (Platform.isWindows) {
         // Windows 优先 PowerShell（支持 ANSI/更丰富命令），回退 cmd.exe
         if (File('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe').existsSync()) {
-          shell = 'powershell.exe';
-          args = ['-NoLogo'];
+          // flutter_pty 的 ConPTY 下直接启动 powershell.exe 会立即静默退出（无法获得
+          // 有效控制台句柄），由 cmd.exe 托管后 PowerShell 才能正常交互
+          shell = 'cmd.exe';
+          args = ['/K', 'powershell.exe', '-NoLogo'];
           _isPowerShell = true;
         } else {
           shell = 'cmd.exe';
@@ -97,7 +99,10 @@ class LocalTerminalService implements CommandExecutor {
         },
       );
 
-      _pty!.exitCode.then((_) => _handleExit());
+      _pty!.exitCode.then((code) {
+        debugPrint('[LocalTerminal] 进程退出, code=$code shell=$shell');
+        _handleExit();
+      });
     } catch (e) {
       _outputController.add('\r\n\x1b[31m✗ 本地终端启动失败: $e\x1b[0m\r\n');
       _isConnected = false;
@@ -139,6 +144,7 @@ class LocalTerminalService implements CommandExecutor {
   ///
   /// 用于监控面板等需要轻量、不污染交互式 shell 的场景。
   /// 失败返回空字符串。超时默认 5 秒。
+  @override
   Future<String> runOnce(String command, {Duration timeout = const Duration(seconds: 5)}) async {
     try {
       if (Platform.isWindows) {
@@ -200,7 +206,7 @@ class LocalTerminalService implements CommandExecutor {
         ? (_isPowerShell
             ? '$command; echo "$marker\$LASTEXITCODE"'
             : '$command & echo $marker%errorlevel%')
-        : '$command; echo "$marker\$?"';
+        : '$command\necho "$marker\$?"';
     final donePattern = RegExp('${RegExp.escape(marker)}\\d+');
 
     // R8: buffer 必须有上限，保留尾部（最新输出）
@@ -541,9 +547,17 @@ class LocalTerminalService implements CommandExecutor {
     }
 
     // 4. 发送 Ctrl+D 结束 stdin
+    // canonical 模式下第一次 Ctrl+D 只提交当前行；内容无尾换行时必须再发一次 EOF，
+    // 否则 cat 会一直等待输入直到超时。
     if (!doneCompleter.isCompleted) {
       try {
         _pty!.write(utf8.encode('\x04'));
+        if (!hasTrailingNewline) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          if (!doneCompleter.isCompleted) {
+            _pty!.write(utf8.encode('\x04'));
+          }
+        }
       } catch (e) {
         abnormalReason.add('发送 EOF 失败: $e');
         if (!doneCompleter.isCompleted) doneCompleter.complete();

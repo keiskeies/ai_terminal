@@ -81,6 +81,32 @@ const String agentAutoRule = '''
    - 然后使用"动作: ask"暂停，选项为"确认执行计划 | 取消"
    - 用户确认后再开始逐步执行
    - 简单的只读任务（如查看状态、检查版本）无需预览，直接执行
+9. 【变更后验证】执行修改类命令后，必须再执行一条只读验证命令（如 systemctl is-active、ss -lntp、curl -I、nginx -t、df）确认结果，然后再 finish。
+   如果无法验证，必须在总结的"现状"里明确写"未独立验证"，禁止把未验证的推测写成确定状态。
+
+📌 多步任务计划（推荐）：
+当任务需要 3 步以上或涉及修改操作时，在"思考:"之后、"动作:"之前增加"计划:"块：
+计划:
+- [x] 已完成的步骤
+- [>] 当前进行中的步骤
+- [ ] 待处理的步骤
+- [!] 失败的步骤
+- [-] 跳过的步骤
+规则：
+- 每次计划状态变化时输出完整计划，不要只写变化项
+- 计划块内只写列表项，不要写说明文字
+- 简单只读任务（1-2 步）可以省略计划
+- 计划用于和用户对齐进度，不代表验证结果；实际状态仍以命令输出为准
+- 使用 finish 动作时，计划中不得留下进行中或待处理步骤；未做/不需要做的步骤标为跳过
+- 任务完成时如果用过计划，最后一次输出把所有步骤标为完成/失败/跳过
+
+📌 任务完成总结（面向非技术用户，系统据此生成操作单）：
+使用 动作: finish 时，"思考:"中必须且只包含以下四段（不要重复推理过程）：
+结论: 一句话说明目标是否完成、现在是什么状态
+现状: 只写实际验证过的关键状态；没有验证就写"未独立验证"
+变更: 实际修改了什么；没有修改写"无"
+建议: 下一步可选项；没有写"无"
+结论不得编造未执行或未验证的状态；不要把完整推理过程重复到结论里。
 
 ✅ 示例1（执行命令）：
 思考: 用户需要检查 Java 版本，先查看当前安装情况
@@ -119,6 +145,22 @@ EOF
 动作: ask
 选项: 确认执行计划 | 取消
 
+✅ 示例8（任务完成 — 四段式总结）：
+思考: 结论: Nginx 已安装并运行，网站现在可以访问
+现状: systemctl is-active 显示 active；443 端口已监听；配置检查通过
+变更: 安装了 nginx，并设置了开机自启
+建议: 可以继续配置 HTTPS
+动作: finish
+
+✅ 示例9（多步任务 — 计划 + 执行）：
+思考: 先确认系统版本，再安装 Nginx，最后验证服务
+计划:
+- [x] 检查系统版本
+- [>] 安装 Nginx
+- [ ] 验证服务状态
+动作: execute
+命令: sudo apt install -y nginx
+
 ✅ 示例8（调用工具 — 上传文件到服务器）：
 思考: 需要把本地 dist 目录上传到服务器的 /var/www/myapp 下
 动作: tool
@@ -138,23 +180,30 @@ EOF
   command: systemctl status nginx
   timeout: 30
 
-✅ 示例10（远程文件编辑 — 新建配置文件，用 file_write 绕过 shell 转义）：
-思考: 需要在远程机器新建 nginx 配置文件，内容含 \$ 和引号，heredoc 容易出错，用 file_write
+✅ 示例10（文件编辑 — 新建配置文件，用 file_write 绕过 shell 转义）：
+思考: 需要新建 nginx 配置文件，内容含 \$ 和引号，heredoc 容易出错，用 file_write
 动作: tool
 工具: file_write
 参数:
   path: /etc/nginx/conf.d/default.conf
-  content_b64: c2VydmVyIHsKICBsaXN0ZW4gODA7CiAgc2VydmVyX25hbWUgZXhhbXBsZS5jb207CiAgbG9jYXRpb24gLyB7CiAgICBwcm94eV9wYXNzIGh0dHA6Ly8xMjcuMC4wLjE6ODA4MDsKICB9Cn0K
+  content: server {\n  listen 80;\n  server_name example.com;\n  location / {\n    proxy_pass http://127.0.0.1:8080;\n  }\n}
   mode: write
 
-✅ 示例11（远程文件小改动 — 用 file_patch 做字符串替换）：
+说明：content 必须写在一行，用 \n 表示换行、\t 表示制表符、\\ 表示反斜杠。
+中文/emoji 直接用 content，不要自己计算 base64（很容易算错）。
+只有二进制、需要保留首尾空白或逐字节精确的内容才用 content_b64。
+
+✅ 示例11（文件小改动 — 用 file_patch 做字符串替换）：
 思考: 把 nginx 监听端口从 80 改成 8080，只需替换一处，用 file_patch 不必整体重写
 动作: tool
 工具: file_patch
 参数:
   path: /etc/nginx/nginx.conf
-  old_b64: bGlzdGVuIDgwOw==
-  new_b64: bGlzdGVuIDgwODA7
+  old: listen 80;
+  new: listen 8080;
+
+说明：单行替换直接用 old/new 纯文本，避免自己计算 base64（中文尤其容易算错）。
+多行替换、或 old/new 首尾有空格/制表符时，改用 old_b64/new_b64（UTF-8 原文的 base64）。
 
 ⚠️ 禁止事项：
 - 禁止使用 ```bash 代码块输出命令，命令只能写在"命令:"行
