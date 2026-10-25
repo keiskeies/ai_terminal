@@ -3,8 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Terminal — AI-Powered Cross-Platform Terminal</title>
-  <meta name="description" content="Next-generation terminal with built-in AI agent, SSH client, server monitoring, ops runbooks and safety guard. Available on macOS, Windows, Linux, iOS & Android.">
+  <title>AI Terminal — 用自然语言操作服务器，AI 执行命令</title>
+  <meta name="description" content="AI Terminal 把 AI 助手、SSH 远程终端和本地终端放进同一个跨平台应用。Agent 规划、执行并校验服务器操作，输出结论优先的操作单；支持 SFTP 上传下载、原子写入、字节级补丁与回滚。">
+  <meta name="theme-color" content="#0B0D0D">
+  <link rel="canonical" href="https://ai-terminal.keiskei.top/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="AI Terminal">
+  <meta property="og:title" content="AI Terminal — 用自然语言操作服务器">
+  <meta property="og:description" content="Agent 规划、执行并校验服务器操作，输出可追溯的操作单。SSH / 本地终端 / SFTP / 多机编排，一个应用完成。">
+  <meta property="og:image" content="https://ai-terminal.keiskei.top/img/server-audit-dark-en.png">
+  <meta property="og:url" content="https://ai-terminal.keiskei.top/">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="AI Terminal — 用自然语言操作服务器">
+  <meta name="twitter:description" content="Agent 规划、执行并校验服务器操作，输出可追溯的操作单。">
+  <meta name="twitter:image" content="https://ai-terminal.keiskei.top/img/server-audit-dark-en.png">
   <link rel="icon" href="img/logo.png">
   <link rel="preconnect" href="https://fonts.loli.net">
   <link rel="preconnect" href="https://gstatic.loli.net" crossorigin>
@@ -12,79 +24,86 @@
   <style>
     /* ========== THEME VARIABLES ========== */
     [data-theme="dark"] {
-      --bg-primary: #050508;
-      --bg-secondary: #0a0a12;
-      --bg-card: #0d0d18;
-      --bg-terminal: #080810;
-      --text-primary: #e8e8f5;
-      --text-secondary: #7a7a95;
-      --text-dim: #4a4a65;
-      --accent-purple: #8b5cf6;
-      --accent-purple-light: #a78bfa;
-      --accent-cyan: #22d3ee;
-      --accent-cyan-light: #67e8f9;
-      --accent-green: #10b981;
-      --accent-green-light: #34d399;
-      --accent-pink: #ec4899;
-      --accent-yellow: #fbbf24;
-      --accent-glow-purple: rgba(139, 92, 246, 0.2);
-      --accent-glow-cyan: rgba(34, 211, 238, 0.15);
-      --accent-glow-green: rgba(16, 185, 129, 0.15);
-      --green: #10b981;
-      --green-dim: rgba(16, 185, 129, 0.12);
-      --red: #f87171;
-      --yellow: #fbbf24;
-      --cyan: #22d3ee;
-      --border: rgba(255, 255, 255, 0.06);
-      --border-bright: rgba(139, 92, 246, 0.4);
-      --shadow: rgba(0, 0, 0, 0.6);
-      --nav-bg: rgba(5, 5, 8, 0.4);
-      --nav-bg-scrolled: rgba(5, 5, 8, 0.85);
+      --bg-primary: #0B0D0D;
+      --bg-secondary: #0E1111;
+      --bg-card: #111414;
+      --bg-terminal: #080A0A;
+      --text-primary: #F1F3F1;
+      --text-secondary: #B8BEBA;
+      --text-dim: #6F7671;
+      --accent-purple: #E0AF63;
+      --accent-purple-light: #F0C98A;
+      --accent-cyan: #45C8C3;
+      --accent-cyan-light: #6FE0DB;
+      --accent-green: #6FD39A;
+      --accent-green-light: #8CE5AE;
+      --accent-pink: #D98A93;
+      --accent-yellow: #E0AF63;
+      --accent-glow-purple: rgba(224, 175, 99, 0.12);
+      --accent-glow-cyan: rgba(69, 200, 195, 0.12);
+      --accent-glow-green: rgba(111, 211, 154, 0.12);
+      --green: #6FD39A;
+      --green-dim: rgba(111, 211, 154, 0.12);
+      --red: #F07C86;
+      --yellow: #E0AF63;
+      --cyan: #45C8C3;
+      --border: rgba(255, 255, 255, 0.07);
+      --border-bright: rgba(69, 200, 195, 0.35);
+      --shadow: rgba(0, 0, 0, 0.55);
+      --nav-bg: rgba(11, 13, 13, 0.55);
+      --nav-bg-scrolled: rgba(11, 13, 13, 0.9);
       --overlay: rgba(0, 0, 0, 0.75);
       --glass-bg: rgba(255, 255, 255, 0.03);
       --glass-border: rgba(255, 255, 255, 0.08);
-      --grid-line: rgba(139, 92, 246, 0.06);
+      --grid-line: rgba(69, 200, 195, 0.05);
+      --card-bg: var(--bg-card);
+      --border-color: var(--border);
     }
 
     [data-theme="light"] {
-      --bg-primary: #fafafc;
-      --bg-secondary: #f5f5f9;
-      --bg-card: #ffffff;
-      --bg-terminal: #1a1a2e;
-      --text-primary: #1a1a2e;
-      --text-secondary: #52526b;
-      --text-dim: #8a8aa5;
-      --accent-purple: #7c3aed;
-      --accent-purple-light: #8b5cf6;
-      --accent-cyan: #0891b2;
-      --accent-cyan-light: #06b6d4;
-      --accent-green: #059669;
-      --accent-green-light: #10b981;
-      --accent-pink: #db2777;
-      --accent-yellow: #d97706;
-      --accent-glow-purple: rgba(124, 58, 237, 0.08);
-      --accent-glow-cyan: rgba(8, 145, 178, 0.06);
-      --accent-glow-green: rgba(5, 150, 105, 0.06);
-      --green: #059669;
-      --green-dim: rgba(5, 150, 105, 0.08);
-      --red: #dc2626;
-      --yellow: #d97706;
-      --cyan: #0891b2;
-      --border: rgba(0, 0, 0, 0.06);
-      --border-bright: rgba(124, 58, 237, 0.2);
-      --shadow: rgba(0, 0, 0, 0.06);
-      --nav-bg: rgba(250, 250, 252, 0.7);
-      --nav-bg-scrolled: rgba(255, 255, 255, 0.9);
+      --bg-primary: #F3F5F3;
+      --bg-secondary: #E9EEEA;
+      --bg-card: #FBFCFB;
+      --bg-terminal: #101413;
+      --text-primary: #171B19;
+      --text-secondary: #4B534E;
+      --text-dim: #8A938D;
+      --accent-purple: #A6701F;
+      --accent-purple-light: #8A5A14;
+      --accent-cyan: #0B7A75;
+      --accent-cyan-light: #09615D;
+      --accent-green: #0F7B52;
+      --accent-green-light: #0B6342;
+      --accent-pink: #A34250;
+      --accent-yellow: #A6701F;
+      --accent-glow-purple: rgba(166, 112, 31, 0.09);
+      --accent-glow-cyan: rgba(11, 122, 117, 0.08);
+      --accent-glow-green: rgba(15, 123, 82, 0.08);
+      --green: #0F7B52;
+      --green-dim: rgba(15, 123, 82, 0.09);
+      --red: #B42318;
+      --yellow: #A6701F;
+      --cyan: #0B7A75;
+      --border: rgba(23, 27, 25, 0.09);
+      --border-bright: rgba(11, 122, 117, 0.35);
+      --shadow: rgba(23, 27, 25, 0.1);
+      --nav-bg: rgba(243, 245, 243, 0.75);
+      --nav-bg-scrolled: rgba(251, 252, 251, 0.92);
       --overlay: rgba(0, 0, 0, 0.5);
-      --glass-bg: rgba(255, 255, 255, 0.7);
-      --glass-border: rgba(0, 0, 0, 0.06);
-      --grid-line: rgba(124, 58, 237, 0.04);
+      --glass-bg: rgba(251, 252, 251, 0.75);
+      --glass-border: rgba(23, 27, 25, 0.08);
+      --grid-line: rgba(11, 122, 117, 0.04);
+      --card-bg: var(--bg-card);
+      --border-color: var(--border);
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     html {
       scroll-behavior: smooth;
+      scroll-padding-top: 72px;
+      overflow-x: hidden;
+      overflow-x: clip;
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
     }
@@ -95,6 +114,7 @@
       font-family: 'Space Grotesk', sans-serif;
       line-height: 1.6;
       overflow-x: hidden;
+      overflow-x: clip;
       transition: background 0.4s ease, color 0.4s ease;
       position: relative;
     }
@@ -332,10 +352,10 @@
     .lang-dropdown-menu li.active .check { opacity: 1; }
 
     .nav-cta {
-      background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
-      color: white !important;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      color: #07100F !important;
       padding: 7px 16px; border-radius: 6px;
-      font-weight: 600 !important; font-size: 0.82rem !important;
+      font-weight: 700 !important; font-size: 0.82rem !important;
       text-decoration: none; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
       font-family: 'JetBrains Mono', monospace;
       position: relative;
@@ -346,13 +366,13 @@
       position: absolute;
       inset: 0;
       border-radius: 6px;
-      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
       opacity: 0;
       transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .nav-cta:hover {
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.25);
+      box-shadow: 0 4px 12px rgba(69, 200, 195, 0.25);
     }
     .nav-cta:hover::before { opacity: 1; }
     .nav-cta span { position: relative; z-index: 1; }
@@ -470,9 +490,9 @@
     .btn-primary {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 14px 28px;
-      background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
-      color: white;
-      text-decoration: none; border-radius: 6px; font-weight: 600;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      color: #07100F;
+      text-decoration: none; border-radius: 6px; font-weight: 700;
       font-size: 0.9rem; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       font-family: 'JetBrains Mono', monospace;
       position: relative;
@@ -485,13 +505,13 @@
       position: absolute;
       inset: 0;
       border-radius: 6px;
-      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
       opacity: 0;
       transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .btn-primary:hover {
       transform: translateY(-1px);
-      box-shadow: 0 6px 20px rgba(139, 92, 246, 0.25);
+      box-shadow: 0 6px 20px rgba(69, 200, 195, 0.28);
     }
     .btn-primary:hover::before { opacity: 1; }
     .btn-primary > * { position: relative; z-index: 1; }
@@ -507,9 +527,9 @@
       overflow: hidden;
     }
     .btn-secondary:hover {
-      border-color: var(--accent-purple);
-      color: var(--accent-purple-light);
-      background: var(--accent-glow-purple);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan-light);
+      background: var(--accent-glow-cyan);
       transform: translateY(-1px);
     }
 
@@ -522,16 +542,17 @@
 
     .hero-demo-window {
       width: 100%;
-      background: var(--card-bg);
+      background: var(--bg-card);
       border-radius: 14px;
       overflow: hidden;
-      box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.6),
-                  0 0 0 1px rgba(139, 92, 246, 0.1);
+      border: 1px solid var(--border);
+      box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.65),
+                  0 0 0 1px rgba(69, 200, 195, 0.08);
     }
     .hero-demo-container {
       width: 100%;
-      height: 640px;
-      background: #0a0a0f;
+      aspect-ratio: 1364 / 768;
+      background: var(--bg-terminal);
       position: relative;
       overflow: hidden;
     }
@@ -541,6 +562,67 @@
       border: none;
       display: block;
     }
+    .hero-video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      background: var(--bg-terminal);
+    }
+    .hero-demo-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 0 14px;
+      height: 38px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+    }
+    .hero-demo-bar .window-dots {
+      display: flex;
+      gap: 6px;
+      margin-right: 4px;
+    }
+    .hero-demo-bar .window-dots span {
+      width: 9px; height: 9px; border-radius: 50%;
+      background: var(--text-dim);
+      opacity: 0.45;
+    }
+    .hero-demo-bar .window-dots span:first-child { background: var(--red); opacity: 0.7; }
+    .hero-demo-bar .window-dots span:nth-child(2) { background: var(--yellow); opacity: 0.7; }
+    .hero-demo-bar .window-dots span:nth-child(3) { background: var(--green); opacity: 0.7; }
+    .hero-demo-tab {
+      color: var(--text-secondary);
+      padding: 4px 10px;
+      border-radius: 4px;
+      text-decoration: none;
+    }
+    .hero-demo-tab.active {
+      color: var(--accent-cyan-light);
+      background: var(--accent-glow-cyan);
+      border: 1px solid rgba(69, 200, 195, 0.20);
+    }
+    .hero-demo-tab.link { margin-left: auto; color: var(--text-dim); transition: color .2s; }
+    .hero-demo-tab.link:hover { color: var(--accent-cyan-light); }
+    .hero-demo-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 4px 0;
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      text-align: left;
+    }
+    .hero-demo-meta a {
+      color: var(--accent-cyan-light);
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .hero-demo-meta a:hover { text-decoration: underline; }
 
     /* ========== SECTION COMMON ========== */
     section { position: relative; z-index: 10; }
@@ -599,16 +681,16 @@
     /* ===== Demo Window (shared) ===== */
     .demo-window {
       width: 100%;
-      background: var(--card-bg);
+      background: var(--bg-card);
       border-radius: 14px;
       overflow: hidden;
-      border: 1px solid var(--border-color);
+      border: 1px solid var(--border);
       box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.6),
-                  0 0 0 1px rgba(139, 92, 246, 0.1);
+                  0 0 0 1px rgba(69, 200, 195, 0.08);
     }
     [data-theme="light"] .demo-window {
-      box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.2),
-                  0 0 0 1px rgba(139, 92, 246, 0.1);
+      box-shadow: 0 40px 100px -30px rgba(23, 27, 25, 0.2),
+                  0 0 0 1px rgba(11, 122, 117, 0.1);
     }
     .demo-window-bar {
       display: none;
@@ -631,8 +713,9 @@
       bottom: 16px;
       right: 16px;
       padding: 6px 14px;
-      background: rgba(139, 92, 246, 0.9);
-      color: white;
+      background: rgba(11, 13, 13, 0.78);
+      color: var(--accent-cyan-light);
+      border: 1px solid rgba(69, 200, 195, 0.28);
       font-size: 12px;
       border-radius: 20px;
       font-weight: 600;
@@ -786,7 +869,7 @@
       font-weight: 500;
       color: var(--accent-cyan);
       background: var(--accent-glow-cyan);
-      border: 1px solid rgba(34, 211, 238, 0.2);
+      border: 1px solid rgba(69, 200, 195, 0.22);
       border-radius: 4px;
       margin-bottom: 16px;
       font-family: 'JetBrains Mono', monospace;
@@ -857,7 +940,63 @@
     }
     .screenshot-note::before { content: '// '; color: var(--accent-purple); }
 
-    /* ========== NEW FEATURES (v1.3.6) ========== */
+    /* ===== Operations gallery ===== */
+    .ops-gallery {
+      max-width: 1200px;
+      margin: 64px auto 0;
+      padding: 0 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+    .ops-card {
+      position: relative;
+      margin: 0;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      background: var(--bg-card);
+      cursor: pointer;
+      transition: border-color .3s ease, transform .3s ease, box-shadow .3s ease;
+    }
+    .ops-card:hover {
+      border-color: var(--border-bright);
+      transform: translateY(-2px);
+      box-shadow: 0 16px 34px var(--shadow);
+    }
+    .ops-card img {
+      width: 100%;
+      display: block;
+      aspect-ratio: 1364 / 768;
+      object-fit: cover;
+      transition: transform .5s cubic-bezier(.4, 0, .2, 1);
+    }
+    .ops-card:hover img { transform: scale(1.02); }
+    .ops-caption {
+      position: absolute;
+      left: 0; right: 0; bottom: 0;
+      padding: 38px 16px 13px;
+      background: linear-gradient(transparent, rgba(5, 8, 8, 0.94));
+      text-align: left;
+      pointer-events: none;
+    }
+    [data-theme="light"] .ops-caption {
+      background: linear-gradient(transparent, rgba(251, 252, 251, 0.96));
+    }
+    .ops-caption strong {
+      display: block;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+    .ops-caption span {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ========== NEW FEATURES (v1.3.8) ========== */
     .new-features {
       padding: 100px 1.5rem;
       position: relative;
@@ -994,10 +1133,13 @@
     .feature-icon.cross { background: var(--accent-glow-purple); color: var(--accent-purple-light); }
     .feature-icon.monitor { background: var(--accent-glow-cyan); color: var(--accent-cyan-light); }
     .feature-icon.audit { background: rgba(251, 191, 36, 0.1); color: var(--accent-yellow); }
-    .feature-icon.runbook { background: rgba(168, 85, 247, 0.1); color: #a855f7; }
+    .feature-icon.runbook { background: var(--accent-glow-purple); color: var(--accent-purple-light); }
     .feature-icon.notify { background: rgba(236, 72, 153, 0.1); color: var(--accent-pink); }
     .feature-icon.orchestrate { background: var(--accent-glow-purple); color: var(--accent-purple-light); }
     .feature-icon.knowledge { background: var(--green-dim); color: var(--accent-green); }
+    .feature-icon.files { background: var(--accent-glow-cyan); color: var(--accent-cyan-light); }
+    .feature-icon.theme { background: var(--accent-glow-purple); color: var(--accent-purple-light); }
+    .feature-icon.search { background: var(--accent-glow-cyan); color: var(--accent-cyan-light); }
 
     .feature-card h3 {
       font-size: 0.95rem; font-weight: 600; margin-bottom: 6px;
@@ -1108,6 +1250,7 @@
     .download {
       padding: 100px 1.5rem; background: var(--bg-secondary);
       text-align: center; position: relative; transition: background 0.4s ease;
+      overflow: hidden;
     }
     .download::before {
       content: '';
@@ -1437,7 +1580,16 @@
       .hero-terminal { margin-top: 2.5rem; }
 
       .new-features-grid { grid-template-columns: repeat(2, 1fr); }
+      .new-features-grid > .nf-card:last-child:nth-child(odd) {
+        grid-column: 1 / -1;
+        width: 50%;
+        justify-self: center;
+      }
       .features-grid { grid-template-columns: 1fr; }
+      .feature-highlights { grid-template-columns: 1fr; margin-top: 56px; }
+      .ops-gallery { grid-template-columns: 1fr; margin-top: 44px; }
+      .hero-demo-meta { flex-direction: column; align-items: flex-start; gap: 6px; }
+      .hero-demo-tab.link { display: none; }
       .showcase-item { flex-direction: column !important; gap: 32px; }
       .showcase-image { flex: none; width: 100%; }
       .showcase-content { text-align: center !important; }
@@ -1453,12 +1605,32 @@
       .lang-dropdown-menu { right: -30px; min-width: 150px; }
       .nav-cta span { display: none; }
       .nav-cta { padding: 7px 10px; }
-      .hero-demo-container { height: 420px; }
+      .glow-orb, .showcase-image-glow { display: none; }
+    }
+
+    @media (max-width: 1024px) {
+      nav { padding: 0 1rem; height: 56px; }
+      .nav-center { display: none; }
+      .nav-center.open {
+        display: flex; flex-direction: column; position: absolute;
+        top: 56px; left: 0; right: 0;
+        background: var(--nav-bg-scrolled);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        padding: 1.25rem 1rem;
+        border-bottom: 1px solid var(--border);
+        gap: 0.85rem;
+      }
+      .nav-center a { font-size: 0.9rem; }
+      .nav-center a::before { display: none; }
+      .mobile-toggle { display: flex; }
     }
 
     @media (min-width: 769px) and (max-width: 1024px) {
       .new-features-grid { grid-template-columns: repeat(3, 1fr); }
       .features-grid { grid-template-columns: repeat(2, 1fr); }
+      .feature-highlights { grid-template-columns: repeat(2, 1fr); }
+      .ops-gallery { grid-template-columns: repeat(2, 1fr); }
       .showcase-item { gap: 40px; }
       .showcase-title { font-size: 1.6rem; }
       .showcases { gap: 80px; }
@@ -1491,8 +1663,24 @@
       filter: blur(60px);
     }
 
+    @media (max-width: 480px) {
+      .nav-brand-text { font-size: 0.95rem; }
+      .nav-actions { gap: 0.35rem; }
+      .nav-cta { display: none; }
+      .lang-dropdown-btn { padding: 0 8px; gap: 4px; white-space: nowrap; }
+      .lang-dropdown-btn #langLabel { white-space: nowrap; }
+    }
+
     @media (max-width: 768px) {
       .mouse-glow { display: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hero-video { display: none; }
+      .hero-demo-container {
+        background: url('img/server-audit-dark-en.png') center / cover no-repeat;
+      }
+      .reveal { opacity: 1; transform: none; transition: none; }
     }
 
     /* ========== GRID FLOW ANIMATION ========== */
@@ -1544,7 +1732,7 @@
   <div class="glow-orb green"></div>
 
   <!-- NAVBAR -->
-  <nav id="navbar">
+  <nav id="navbar" aria-label="Main navigation">
     <a href="#" class="nav-brand">
       <div class="nav-brand-icon">&gt;_</div>
       <span class="nav-brand-text">AI Terminal<span class="cursor"></span></span>
@@ -1581,7 +1769,7 @@
         <span>GitHub</span>
       </a>
     </div>
-    <button class="mobile-toggle" id="mobileToggle">☰</button>
+    <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle navigation">☰</button>
   </nav>
 
   <!-- HERO -->
@@ -1592,37 +1780,49 @@
         ║  AI TERMINAL ║<br>
         ╚══════════════╝
       </div>
-      <div class="status-line"><span class="label">version</span><span class="value">v1.3.6</span></div>
+      <div class="status-line"><span class="label">version</span><span class="value">v1.3.8</span></div>
       <div class="status-line"><span class="label">status</span><span class="dot"></span><span class="value">STABLE</span></div>
-      <div class="status-line"><span class="label">build</span><span class="value">20250711</span></div>
+      <div class="status-line"><span class="label">build</span><span class="value">20261025</span></div>
     </div>
 
     <div class="hero-eyebrow">
       <span class="dot"></span>
-      <span data-i18n="hero_badge">v1.3.6 Released — Ops Mega Upgrade</span>
+      <span data-i18n="hero_badge">v1.3.8 已发布 — Agent 操作单 &amp; 文件安全</span>
     </div>
     <h1>
-      <span class="line-1" data-i18n="hero_title_1">AI时代，不懂命令？也可运维服务器！</span>
-      <span class="line-2" data-i18n="hero_title_2">让服务器理解你直白的自然语言</span>
+      <span class="line-1" data-i18n="hero_title_1">把目标交给 AI</span>
+      <span class="line-2" data-i18n="hero_title_2">服务器操作，自动完成并留下结论</span>
     </h1>
-    <p class="hero-sub" data-i18n="hero_sub">A next-generation SSH &amp; local terminal with built-in AI agent, server monitoring, ops runbooks, 3-level safety guard, and zero-plaintext credential storage. Available everywhere you code.</p>
+    <p class="hero-sub" data-i18n="hero_sub">AI Terminal 不只是聊天终端：Agent 会规划步骤、通过 SSH 或本地终端执行命令、校验结果，并输出结论优先的操作单。危险操作先经 SafetyGuard 和你确认；文件上传下载、原子写入与字节级补丁都可追溯。</p>
     <div class="hero-actions">
       <a href="#download" class="btn-primary">
         <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <span data-i18n="btn_download">Download</span>
+        <span data-i18n="btn_download">下载</span>
       </a>
       <a href="https://github.com/keiskeies/ai_terminal" target="_blank" class="btn-secondary">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
-        <span data-i18n="btn_github">Star on GitHub</span>
+        <span data-i18n="btn_github">GitHub 加星</span>
       </a>
     </div>
 
     <div class="hero-terminal">
       <div class="demo-window hero-demo-window">
-        <div class="demo-iframe-container hero-demo-container">
-          <iframe src="demo.html" title="AI Terminal Live Demo"></iframe>
-          <div class="demo-badge">DEMO · 交互演示</div>
+        <div class="hero-demo-bar">
+          <div class="window-dots"><span></span><span></span><span></span></div>
+          <span class="hero-demo-tab active" data-i18n="hero_demo_tab">Agent Workflow</span>
+          <a href="demo.html" target="_blank" rel="noopener" class="hero-demo-tab link" data-i18n="hero_demo_open">Interactive Demo ↗</a>
         </div>
+        <div class="hero-demo-container">
+          <video class="hero-video" autoplay muted loop playsinline preload="metadata" poster="img/server-audit-dark-en.png" aria-label="AI Terminal Agent workflow demo">
+            <source src="img/agent-audit-workflow.mp4" type="video/mp4">
+            <source src="img/agent-audit-workflow.webm" type="video/webm">
+          </video>
+          <div class="demo-badge" data-i18n="hero_demo_badge">REAL WORKFLOW · 真实巡检</div>
+        </div>
+      </div>
+      <div class="hero-demo-meta">
+        <span data-i18n="hero_demo_caption">真实模型 · 5 步计划 · 8 条命令 · 只读服务器巡检</span>
+        <a href="demo.html" target="_blank" rel="noopener" data-i18n="hero_demo_link">打开交互演示 →</a>
       </div>
     </div>
   </section>
@@ -1632,15 +1832,15 @@
     <div class="section-header reveal">
       <div class="section-label" data-i18n="screenshots_label">Screenshots</div>
       <h2 class="section-title" data-i18n="screenshots_title">See it in action</h2>
-      <p class="section-desc" data-i18n="screenshots_desc">Real screenshots from AI Terminal v1.3.6 on macOS.</p>
+      <p class="section-desc" data-i18n="screenshots_desc">真实运行界面 · AI Terminal v1.3.8 · 石墨青深色主题</p>
     </div>
 
     <!-- Feature Highlights Grid -->
     <div class="feature-highlights reveal">
       <div class="fh-card">
-        <div class="fh-icon">🤖</div>
-        <h3 data-i18n="fh1_title">AI Agent 智能执行</h3>
-        <p data-i18n="fh1_desc">用自然语言描述需求，AI 自动生成并执行命令，支持多步推理和自动纠错。</p>
+        <div class="fh-icon">🧭</div>
+        <h3 data-i18n="fh1_title">Agent 操作单</h3>
+        <p data-i18n="fh1_desc">结论优先，执行计划、命令证据与变更台账分层展示，长任务也能一眼看懂。</p>
       </div>
       <div class="fh-card">
         <div class="fh-icon">💻</div>
@@ -1655,133 +1855,123 @@
       <div class="fh-card">
         <div class="fh-icon">🔄</div>
         <h3 data-i18n="fh4_title">多机编排</h3>
-        <p data-i18n="fh4_desc">一键广播命令到多台服务器，实时回显独立显示，批量运维像说话一样简单。</p>
+        <p data-i18n="fh4_desc">一键广播命令到多台服务器，按主机展示状态、耗时和输出，批量运维像说话一样简单。</p>
       </div>
       <div class="fh-card">
         <div class="fh-icon">🛡️</div>
-        <h3 data-i18n="fh5_title">三级安全防护</h3>
-        <p data-i18n="fh5_desc">SafetyGuard 自动分类：安全自动执行、警告需确认、危险需明确批准。</p>
+        <h3 data-i18n="fh5_title">四级安全防护</h3>
+        <p data-i18n="fh5_desc">SafetyGuard 将命令分为 safe / info / warn / blocked，危险操作需要明确批准。</p>
       </div>
       <div class="fh-card">
         <div class="fh-icon">📁</div>
-        <h3 data-i18n="fh6_title">SFTP 文件管理</h3>
-        <p data-i18n="fh6_desc">内置图形化 SFTP 文件浏览器，拖拽上传下载，远程文件管理像本地一样方便。</p>
+        <h3 data-i18n="fh6_title">SFTP 与安全文件编辑</h3>
+        <p data-i18n="fh6_desc">上传下载原子替换，file_write / file_patch 绕过 shell，保留 BOM、CRLF 和原始字节。</p>
       </div>
     </div>
 
     <div class="showcases">
 
-      <!-- Showcase 2: Multi-Orchestration - Text left, image right -->
+      <!-- Showcase 1: Agent Operation Sheet - Text left, image right -->
       <div class="showcase-item reverse reveal">
-        <div class="showcase-image" onclick="openLightbox('img/multi-orchestration.jpg')">
-          <img src="img/multi-orchestration.jpg" alt="Multi-Server Orchestration" loading="lazy">
+        <div class="showcase-image" onclick="openLightbox('img/server-audit-dark-en.png')">
+          <img src="img/server-audit-dark-en.png" alt="Agent Operation Sheet" loading="lazy">
           <div class="showcase-image-glow"></div>
         </div>
         <div class="showcase-content">
-          <div class="showcase-tag" data-i18n="showcase2_subtitle">Batch Manage Multiple Servers</div>
-          <h3 class="showcase-title" data-i18n="showcase2_title">One Operation, N Servers Simultaneously</h3>
+          <div class="showcase-tag" data-i18n="showcase1_subtitle">结论优先的 Agent 操作单</div>
+          <h3 class="showcase-title" data-i18n="showcase1_title">不只看命令，更看结果与证据</h3>
           <ul class="showcase-features">
-            <li><span class="check-icon">✓</span><span data-i18n="showcase2_p1">One-click orchestration mode: broadcast the same command to all selected servers</span></li>
-            <li><span class="check-icon">✓</span><span data-i18n="showcase2_p2">Real-time status echo: each machine's execution results displayed independently, progress at a glance</span></li>
-            <li><span class="check-icon">✓</span><span data-i18n="showcase2_p3">Route commands by host: AI auto-generates adapted commands based on different host environments</span></li>
-            <li><span class="check-icon">✓</span><span data-i18n="showcase2_p4">Radar ripple animation: dynamic display of online host count, full of tech感</span></li>
+            <li><span class="check-icon">✓</span><span data-i18n="showcase1_p1">结论先行：任务结束先给状态、变更与建议</span></li>
+            <li><span class="check-icon">✓</span><span data-i18n="showcase1_p2">执行计划：模型声明的步骤、完成计数与当前步骤</span></li>
+            <li><span class="check-icon">✓</span><span data-i18n="showcase1_p3">过程证据：命令、输出、耗时、退出码按需展开</span></li>
+            <li><span class="check-icon">✓</span><span data-i18n="showcase1_p4">变更台账：文件与命令变更可追溯、可回滚</span></li>
           </ul>
-          <p class="showcase-desc" data-i18n="showcase2_desc">Upgrading one machine is an operation, upgrading a hundred machines is also an operation. Multi-orchestration makes batch ops as simple as talking.</p>
+          <p class="showcase-desc" data-i18n="showcase1_desc">把思考、命令和输出分层收纳，长任务也不再是一团流水账。</p>
         </div>
       </div>
 
-      <!-- Showcase 3: Runbooks - Image left, text right -->
-      <div class="showcase-item reveal">
-        <div class="showcase-image" onclick="openLightbox('img/runbooks.jpg')">
-          <img src="img/runbooks.jpg" alt="Ops Runbooks" loading="lazy">
-          <div class="showcase-image-glow"></div>
-        </div>
-        <div class="showcase-content">
-          <div class="showcase-tag" data-i18n="showcase3_subtitle">One-Click Runbook Execution</div>
-          <h3 class="showcase-title" data-i18n="showcase3_title">Turn Experience into Runbooks</h3>
-          <ul class="showcase-features">
-            <li><span class="check-icon">✓</span><span data-i18n="showcase3_p1">Built-in common templates: system inspection, security hardening, log cleanup, service deployment…</span></li>
-            <li><span class="check-icon">✓</span><span data-i18n="showcase3_p2">Custom workflows: record your ops SOPs as Runbooks, even newcomers can execute with one click</span></li>
-            <li><span class="check-icon">✓</span><span data-i18n="showcase3_p3">Multi-machine parallel execution: same workflow runs serially/parallelly on multiple servers</span></li>
-            <li><span class="check-icon">✓</span><span data-i18n="showcase3_p4">Complete execution logs: every step's input and output recorded, traceable and auditable</span></li>
-          </ul>
-          <p class="showcase-desc" data-i18n="showcase3_desc">Let workflows handle repetitive operations, save your energy for problems that truly need thinking.</p>
-        </div>
-      </div>
-
-      <!-- Showcase 4: Settings - Text left, image right -->
-      <div class="showcase-item reverse reveal">
-        <div class="showcase-image" onclick="openLightbox('img/settings-zh.jpg')">
-          <img src="img/settings-zh.jpg" alt="Settings Center" loading="lazy">
-          <div class="showcase-image-glow"></div>
-        </div>
-        <div class="showcase-content">
-          <div class="showcase-tag" data-i18n="showcase4_subtitle">Rich Personalization Options</div>
-          <h3 class="showcase-title" data-i18n="showcase4_title">Your Terminal, Your Rules</h3>
-          <ul class="showcase-features">
-            <li><span class="check-icon">✓</span><span data-i18n="showcase4_p1">AI model configuration: 20+ providers one-click access, supports custom API endpoints</span></li>
-            <li><span class="check-icon">✓</span><span data-i18n="showcase4_p2">Theme appearance: glass UI, customizable theme color, corner radius, blur intensity</span></li>
-            <li><span class="check-icon">✓</span><span data-i18n="showcase4_p3">Security settings: app lock, biometric authentication, SafetyGuard sensitivity adjustment</span></li>
-            <li><span class="check-icon">✓</span><span data-i18n="showcase4_p4">Notification management: which events need reminding, entirely up to you</span></li>
-          </ul>
-          <p class="showcase-desc" data-i18n="showcase4_desc">From model selection to interface style, from security policy to notification preferences, everything can be adjusted to your habits.</p>
-        </div>
-      </div>
-
-      <!-- Showcase 5: Multi-language - Image left, text right -->
-      <div class="showcase-item reveal">
-        <div class="showcase-image" onclick="openLightbox('img/language-settings.jpg')">
-          <img src="img/language-settings.jpg" alt="Multi-language Settings" loading="lazy">
-          <div class="showcase-image-glow"></div>
-        </div>
-        <div class="showcase-content">
-          <div class="showcase-tag" data-i18n="showcase5_subtitle">Global User Choice</div>
-          <h3 class="showcase-title" data-i18n="showcase5_title">15+ Languages for Users Worldwide</h3>
-          <ul class="showcase-features">
-            <li><span class="check-icon">✓</span><span data-i18n="showcase5_p1">Full localization: Chinese, English, Japanese, Korean, French, German, Spanish…</span></li>
-            <li><span class="check-icon">✓</span><span data-i18n="showcase5_p2">One-click switch: tap in settings to change interface language</span></li>
-            <li><span class="check-icon">✓</span><span data-i18n="showcase5_p3">Community-driven: welcome to contribute more language translations</span></li>
-          </ul>
-          <p class="showcase-desc" data-i18n="showcase5_desc">Wherever you come from, AI Terminal can work in your most familiar language.</p>
-        </div>
-      </div>
     </div>
 
-    <p class="screenshot-note reveal" data-i18n="screenshots_note">以上截图中的 AI 功能由 小米 mino-v2.5-pro 大模型驱动</p>
+    <div class="ops-gallery reveal">
+      <figure class="ops-card" onclick="openLightbox('img/server-list-dark-en.png')">
+        <img src="img/server-list-dark-en.png" alt="Server inventory" loading="lazy">
+        <figcaption class="ops-caption">
+          <strong data-i18n="gal1_title">服务器管理</strong>
+          <span data-i18n="gal1_desc">分组 · 搜索 · 快速连接</span>
+        </figcaption>
+      </figure>
+      <figure class="ops-card" onclick="openLightbox('img/sftp-dark-en.png')">
+        <img src="img/sftp-dark-en.png" alt="SFTP file manager" loading="lazy">
+        <figcaption class="ops-caption">
+          <strong data-i18n="gal2_title">SFTP 文件管理</strong>
+          <span data-i18n="gal2_desc">浏览 · 上传下载 · 预览编辑</span>
+        </figcaption>
+      </figure>
+      <figure class="ops-card" onclick="openLightbox('img/change-records-dark-en.png')">
+        <img src="img/change-records-dark-en.png" alt="Change records and audit" loading="lazy">
+        <figcaption class="ops-caption">
+          <strong data-i18n="gal3_title">变更记录与审计</strong>
+          <span data-i18n="gal3_desc">操作人 · 时间 · 结果 · 退出码</span>
+        </figcaption>
+      </figure>
+      <figure class="ops-card" onclick="openLightbox('img/settings-overview-dark-en.png')">
+        <img src="img/settings-overview-dark-en.png" alt="Operations toolkit" loading="lazy">
+        <figcaption class="ops-caption">
+          <strong data-i18n="gal4_title">运维工具链</strong>
+          <span data-i18n="gal4_desc">Runbook · 安全时段 · 任务通知</span>
+        </figcaption>
+      </figure>
+      <figure class="ops-card" onclick="openLightbox('img/settings-dark-en.png')">
+        <img src="img/settings-dark-en.png" alt="Appearance and themes" loading="lazy">
+        <figcaption class="ops-caption">
+          <strong data-i18n="gal5_title">外观与主题</strong>
+          <span data-i18n="gal5_desc">深色 / 浅色 · 终端字号</span>
+        </figcaption>
+      </figure>
+      <figure class="ops-card" onclick="openLightbox('img/operation-sheet-dark-en.png')">
+        <img src="img/operation-sheet-dark-en.png" alt="Execution plan and conclusion" loading="lazy">
+        <figcaption class="ops-caption">
+          <strong data-i18n="gal6_title">执行计划与结论</strong>
+          <span data-i18n="gal6_desc">计划步骤 · 风险结论 · 下一步建议</span>
+        </figcaption>
+      </figure>
+    </div>
+
+    <p class="screenshot-note reveal" data-i18n="screenshots_note">截图来自真实运行界面；Agent 内容由本地 OpenAI 兼容模型驱动。</p>
   </section>
 
-  <!-- NEW FEATURES (v1.3.6) -->
+  <!-- NEW FEATURES (v1.3.8) -->
   <section class="new-features" id="new-features">
     <div class="section-header reveal">
-      <div class="section-label" data-i18n="new_label">What's New in v1.3.6</div>
-      <h2 class="section-title" data-i18n="new_title">AI Web Search &amp; Data Security</h2>
-      <p class="section-desc" data-i18n="new_desc">AI now searches the web, model configs are refined, and macOS data loss is permanently fixed.</p>
+      <div class="section-label" data-i18n="new_label">v1.3.8 新功能</div>
+      <h2 class="section-title" data-i18n="new_title">Agent 操作单 &amp; 文件安全</h2>
+      <p class="section-desc" data-i18n="new_desc">把命令流水账变成可读、可查、可回滚的运维记录。</p>
     </div>
     <div class="new-features-grid reveal">
       <div class="nf-card green">
-        <span class="nf-icon">🔍</span>
-        <h3 data-i18n="nf1_title">AI Web Search</h3>
-        <p data-i18n="nf1_desc">7 search engines with smart fallback. Free Bing HTML + DuckDuckGo option needs no API key. AI fetches web pages on demand.</p>
+        <span class="nf-icon">🧭</span>
+        <h3 data-i18n="nf1_title">Agent 操作单</h3>
+        <p data-i18n="nf1_desc">结论优先：任务结束先给结论，再展开执行计划、命令证据、变更台账与下一步建议。</p>
       </div>
       <div class="nf-card cyan">
-        <span class="nf-icon">🤖</span>
-        <h3 data-i18n="nf2_title">Model Config Refinement</h3>
-        <p data-i18n="nf2_desc">47 preset models with filled max_tokens / context_window / function_calling params. New Kimi K3 &amp; Qwen3.8-max-preview.</p>
+        <span class="nf-icon">📦</span>
+        <h3 data-i18n="nf2_title">远程文件传输</h3>
+        <p data-i18n="nf2_desc">SFTP 上传/下载支持目录递归，临时文件 + rename 原子替换；失败不会截断原文件。</p>
       </div>
       <div class="nf-card purple">
-        <span class="nf-icon">🔐</span>
-        <h3 data-i18n="nf3_title">macOS Data Security Fix</h3>
-        <p data-i18n="nf3_desc">Permanently fixed database loss after every build. IOPlatformUUID-derived stable key + automatic historical data recovery.</p>
+        <span class="nf-icon">✍️</span>
+        <h3 data-i18n="nf3_title">安全写入与补丁</h3>
+        <p data-i18n="nf3_desc">file_write / file_patch 绕过 shell；按字节替换，保留 BOM、CRLF 与非 UTF-8 内容。</p>
       </div>
       <div class="nf-card yellow">
-        <span class="nf-icon">📊</span>
-        <h3 data-i18n="nf4_title">Server Monitoring</h3>
-        <p data-i18n="nf4_desc">Real-time CPU, memory, disk &amp; network monitoring across all your servers.</p>
+        <span class="nf-icon">🎨</span>
+        <h3 data-i18n="nf4_title">石墨青主题</h3>
+        <p data-i18n="nf4_desc">深色 / 浅色石墨青配色，青色标记交互与当前状态，金色强调数据。</p>
       </div>
       <div class="nf-card pink">
-        <span class="nf-icon">📋</span>
-        <h3 data-i18n="nf5_title">Ops Runbooks &amp; Audit</h3>
-        <p data-i18n="nf5_desc">Reusable workflows, multi-host orchestration, full audit logs and glassmorphism UI.</p>
+        <span class="nf-icon">🧩</span>
+        <h3 data-i18n="nf5_title">多主机与失败恢复</h3>
+        <p data-i18n="nf5_desc">批量操作按主机展示状态与耗时；权限、断线、超时可重试失败主机或继续任务。</p>
       </div>
     </div>
   </section>
@@ -1810,7 +2000,7 @@
         <span class="code-num">03</span>
         <div class="feature-icon safety">🛡</div>
         <h3 data-i18n="f3_title">SafetyGuard</h3>
-        <p data-i18n="f3_desc">3-level safety classification — Safe / Warning / Dangerous. Every AI-generated command is checked before execution.</p>
+        <p data-i18n="f3_desc">4-level safety classification — safe / info / warn / blocked. Every AI-generated command is checked before execution.</p>
       </div>
       <div class="feature-card">
         <span class="code-num">04</span>
@@ -1858,13 +2048,31 @@
         <span class="code-num">11</span>
         <div class="feature-icon knowledge">📚</div>
         <h3 data-i18n="f11_title">Knowledge Base Driven</h3>
-        <p data-i18n="f11_desc">Offline knowledge base powers the AI with domain-specific expertise. Downloadable and always improving.</p>
+        <p data-i18n="f11_desc">An offline knowledge base gives the AI 300+ software install and config entries, matched by platform and updatable.</p>
       </div>
       <div class="feature-card">
         <span class="code-num">12</span>
         <div class="feature-icon cross">🌐</div>
         <h3 data-i18n="f12_title">Cross-Platform</h3>
         <p data-i18n="f12_desc">One codebase, all platforms. macOS, Windows, Linux, iOS &amp; Android — built with Flutter.</p>
+      </div>
+      <div class="feature-card">
+        <span class="code-num">13</span>
+        <div class="feature-icon files">📦</div>
+        <h3 data-i18n="f13_title">SFTP &amp; Safe File Edits</h3>
+        <p data-i18n="f13_desc">Recursive upload/download with atomic replace; file_write / file_patch preserve encoding and skip shell escaping.</p>
+      </div>
+      <div class="feature-card">
+        <span class="code-num">14</span>
+        <div class="feature-icon theme">🎨</div>
+        <h3 data-i18n="f14_title">Graphite Theme</h3>
+        <p data-i18n="f14_desc">Dark and light graphite palettes with cyan interaction states, gold data emphasis, and adjustable terminal font size.</p>
+      </div>
+      <div class="feature-card">
+        <span class="code-num">15</span>
+        <div class="feature-icon search">🔎</div>
+        <h3 data-i18n="f15_title">AI Web Search</h3>
+        <p data-i18n="f15_desc">7 search engines with smart fallback; Bing HTML and DuckDuckGo options need no API key, and the Agent fetches pages on demand.</p>
       </div>
     </div>
   </section>
@@ -1887,22 +2095,22 @@
       <div class="step reveal">
         <div class="step-num">02</div>
         <div class="step-content">
-          <h3 data-i18n="s2_title">AI generates commands</h3>
-          <p data-i18n="s2_desc">AI Agent parses your intent and generates the exact shell commands needed, streaming the response in real-time.</p>
+          <h3 data-i18n="s2_title">AI plans and generates commands</h3>
+          <p data-i18n="s2_desc">The Agent turns your goal into an execution plan and exact shell commands, streaming progress as it works.</p>
         </div>
       </div>
       <div class="step reveal">
         <div class="step-num">03</div>
         <div class="step-content">
           <h3 data-i18n="s3_title">SafetyGuard validates</h3>
-          <p data-i18n="s3_desc">Every command is classified: <span style="color: var(--green)">Safe</span> runs automatically, <span style="color: var(--yellow)">Warning</span> asks for confirmation, <span style="color: var(--red)">Dangerous</span> requires explicit approval.</p>
+          <p data-i18n="s3_desc">Every command is classified: <span style="color: var(--green)">safe</span> and <span style="color: var(--cyan)">info</span> proceed, <span style="color: var(--yellow)">warn</span> needs confirmation, <span style="color: var(--red)">blocked</span> is refused.</p>
         </div>
       </div>
       <div class="step reveal">
         <div class="step-num">04</div>
         <div class="step-content">
-          <h3 data-i18n="s4_title">Execute with confidence</h3>
-          <p data-i18n="s4_desc">Commands run on local or remote terminals. Results are fed back to AI for multi-step reasoning and follow-up.</p>
+          <h3 data-i18n="s4_title">Execute, verify, conclude</h3>
+          <p data-i18n="s4_desc">Commands run on local or remote terminals; output, exit codes, duration, and changes land in the operation sheet before the AI concludes.</p>
         </div>
       </div>
     </div>
@@ -1929,38 +2137,38 @@
     <div class="section-header reveal">
       <div class="section-label" data-i18n="download_label">Download</div>
       <h2 class="section-title" data-i18n="download_title">Get AI Terminal</h2>
-      <p class="section-desc" data-i18n="download_desc">Free and open source. Download v1.3.6 for your platform.</p>
+      <p class="section-desc" data-i18n="download_desc">开源免费。下载 v1.3.8，选择你的平台。</p>
     </div>
     <div class="download-cards reveal">
-      <a href="https://github.com/keiskeies/ai_terminal/releases/download/v1.3.6/AI_Terminal_v1.3.6_macOS.zip" class="download-card featured">
+      <a href="https://github.com/keiskeies/ai_terminal/releases/download/v1.3.8/AI_Terminal_v1.3.8_macOS.zip" class="download-card featured">
         <span class="new-tag">NEW</span>
         <span class="icon">💻</span>
         <span class="label">macOS</span>
-        <span class="hint">.zip · 72 MB</span>
+        <span class="hint">.zip · 26 MB</span>
         <span class="badge">Intel + Apple Silicon</span>
       </a>
-      <a href="https://github.com/keiskeies/ai_terminal/releases/download/v1.3.6/AI_Terminal_v1.3.6_Windows.zip" class="download-card">
+      <a href="https://github.com/keiskeies/ai_terminal/releases/download/v1.3.8/AI_Terminal_v1.3.8_Windows.zip" class="download-card">
         <span class="icon">🖥</span>
         <span class="label">Windows</span>
-        <span class="hint">.zip · 18 MB</span>
+        <span class="hint">.zip · 16 MB</span>
         <span class="badge">x64</span>
       </a>
-      <a href="https://github.com/keiskeies/ai_terminal/releases/download/v1.3.6/AI_Terminal_v1.3.6_Linux_x64.tar.gz" class="download-card">
+      <a href="https://github.com/keiskeies/ai_terminal/releases/download/v1.3.8/AI_Terminal_v1.3.8_Linux_x64.tar.gz" class="download-card">
         <span class="icon">🔳</span>
         <span class="label">Linux</span>
-        <span class="hint">.tar.gz · 24 MB</span>
+        <span class="hint">.tar.gz · 14 MB</span>
         <span class="badge">x64</span>
       </a>
-      <a href="https://github.com/keiskeies/ai_terminal/releases/download/v1.3.6/AI_Terminal_v1.3.6_iOS.ipa" class="download-card">
+      <a href="https://github.com/keiskeies/ai_terminal/releases/download/v1.3.8/AI_Terminal_v1.3.8_iOS.ipa" class="download-card">
         <span class="icon">📱</span>
         <span class="label">iOS</span>
-        <span class="hint">.ipa · 16 MB</span>
-        <span class="badge">Alt Store / Sideload</span>
+        <span class="hint">.ipa · 12 MB</span>
+        <span class="badge">AltStore / Sideload</span>
       </a>
-      <a href="https://github.com/keiskeies/ai_terminal/releases/download/v1.3.6/AI_Terminal_v1.3.6_Android.apk" class="download-card">
+      <a href="https://github.com/keiskeies/ai_terminal/releases/download/v1.3.8/AI_Terminal_v1.3.8_Android.apk" class="download-card">
         <span class="icon">🤖</span>
         <span class="label">Android</span>
-        <span class="hint">.apk · 65 MB</span>
+        <span class="hint">.apk · 77 MB</span>
         <span class="badge">arm64-v8a</span>
       </a>
     </div>
@@ -1979,8 +2187,8 @@
   <!-- CTA -->
   <section class="cta">
     <div class="cta-box reveal">
-      <h2 data-i18n="cta_title">Ready to transform<br>your terminal?</h2>
-      <p data-i18n="cta_desc">Open source, free forever. Start using AI Terminal v1.3.6 today.</p>
+      <h2 data-i18n="cta_title">准备好升级<br>你的终端了吗？</h2>
+      <p data-i18n="cta_desc">开源、永久免费。立即开始使用 AI Terminal v1.3.8。</p>
       <a href="https://github.com/keiskeies/ai_terminal" target="_blank" class="btn-primary" style="margin: 0 auto;">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
         <span data-i18n="cta_btn">View on GitHub</span>
@@ -1997,7 +2205,7 @@
         <span class="prompt-cmd">cat LICENSE</span>
       </div>
       <div class="footer-output">
-        MIT License — Copyright (c) 2025 keiskei<br>
+        MIT License — Copyright (c) 2025 AI Terminal<br>
         Open source. Built with ❤️ for developers.
       </div>
     </div>
@@ -2013,12 +2221,12 @@
         <a href="https://github.com/keiskeies/ai_terminal/blob/main/LICENSE" target="_blank">MIT License</a>
       </div>
     </div>
-    <p class="footer-copy">© 2025 keiskei. All rights reserved.</p>
+    <p class="footer-copy">© 2026 AI Terminal. All rights reserved.</p>
     <p class="footer-icp"><a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">赣ICP备18001605号-2</a></p>
   </footer>
 
   <!-- LIGHTBOX -->
-  <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <div class="lightbox" id="lightbox" onclick="closeLightbox()" role="dialog" aria-modal="true" aria-label="Screenshot preview">
     <img id="lightboxImg" src="" alt="Screenshot">
   </div>
 
@@ -2026,39 +2234,45 @@
     // ========== KNOWLEDGE VERSIONS DATA ==========
     const knowledgeVersions = [
       {
-        version: '1.3.6',
-        date: '2025-07-11',
-        size: '86 KB',
+        version: '1.3.8',
+        date: '2026-10-25',
+        size: '160 KB',
         isLatest: true
+      },
+      {
+        version: '1.3.5',
+        date: '2025-07-05',
+        size: '124 KB',
+        isLatest: false
       },
       {
         version: '1.3.4',
         date: '2025-06-28',
-        size: '82 KB',
+        size: '124 KB',
         isLatest: false
       },
       {
         version: '1.3.3',
         date: '2025-06-15',
-        size: '78 KB',
+        size: '124 KB',
         isLatest: false
       },
       {
         version: '1.3.1',
         date: '2025-05-20',
-        size: '72 KB',
+        size: '124 KB',
         isLatest: false
       },
       {
         version: '1.3.0',
         date: '2025-05-11',
-        size: '68 KB',
+        size: '124 KB',
         isLatest: false
       },
       {
         version: '1.2.1',
         date: '2025-04-28',
-        size: '68 KB',
+        size: '80 KB',
         isLatest: false
       }
     ];
@@ -2071,7 +2285,7 @@
         <a href="knowledge/knowledge-${v.version}.db" download class="version-item">
           <div class="version-info">
             <span class="version-name">v${v.version} ${v.isLatest ? '<span class="latest-badge">' + (i18n[currentLang]?.knowledge_latest || 'Latest') + '</span>' : ''}</span>
-            <span class="version-date">${v.isLatest ? (i18n[currentLang]?.knowledge_latest || 'Latest') : v.date}</span>
+            <span class="version-date">${v.date}</span>
           </div>
           <div class="version-meta">
             <span class="version-size">${v.size}</span>
@@ -3443,6 +3657,152 @@
       },
     };
 
+    // ========== v1.3.8 COPY (EN/zh authored; other locales fall back to English) ==========
+    const i18nV138 = {
+      zh: {
+        page_title: 'AI Terminal — 用自然语言操作服务器，AI 执行命令',
+        meta_desc: 'AI Terminal 把 AI 助手、SSH 远程终端和本地终端放进同一个跨平台应用。Agent 规划、执行并校验服务器操作，输出结论优先的操作单；支持 SFTP 上传下载、原子写入、字节级补丁与回滚。',
+        hero_badge: 'v1.3.8 已发布 — Agent 操作单 & 文件安全',
+        hero_title_1: '把目标交给 AI',
+        hero_title_2: '服务器操作，自动完成并留下结论',
+        hero_sub: 'AI Terminal 不只是聊天终端：Agent 会规划步骤、通过 SSH 或本地终端执行命令、校验结果，并输出结论优先的操作单。危险操作先经 SafetyGuard 和你确认；文件上传下载、原子写入与字节级补丁都可追溯。',
+        hero_demo_tab: 'Agent 工作流',
+        hero_demo_open: '交互演示 ↗',
+        hero_demo_badge: '真实工作流 · 服务器巡检',
+        hero_demo_caption: '真实模型 · 5 步计划 · 8 条命令 · 只读服务器巡检',
+        hero_demo_link: '打开交互演示 →',
+        screenshots_desc: '真实运行界面 · AI Terminal v1.3.8 · 石墨青深色主题',
+        screenshots_note: '截图来自真实运行界面；Agent 内容由本地 OpenAI 兼容模型驱动。',
+        fh1_title: 'Agent 操作单',
+        fh1_desc: '结论优先，执行计划、命令证据与变更台账分层展示，长任务也能一眼看懂。',
+        fh4_desc: '一键广播命令到多台服务器，按主机展示状态、耗时和输出，批量运维像说话一样简单。',
+        fh5_title: '四级安全防护',
+        fh5_desc: 'SafetyGuard 将命令分为 safe / info / warn / blocked，危险操作需要明确批准。',
+        fh6_title: 'SFTP 与安全文件编辑',
+        fh6_desc: '上传下载原子替换，file_write / file_patch 绕过 shell，保留 BOM、CRLF 和原始字节。',
+        showcase1_subtitle: '结论优先的 Agent 操作单',
+        showcase1_title: '不只看命令，更看结果与证据',
+        showcase1_p1: '结论先行：任务结束先给状态、变更与建议',
+        showcase1_p2: '执行计划：模型声明的步骤、完成计数与当前步骤',
+        showcase1_p3: '过程证据：命令、输出、耗时、退出码按需展开',
+        showcase1_p4: '变更台账：文件与命令变更可追溯、可回滚',
+        showcase1_desc: '把思考、命令和输出分层收纳，长任务也不再是一团流水账。',
+        gal1_title: '服务器管理',
+        gal1_desc: '分组 · 搜索 · 快速连接',
+        gal2_title: 'SFTP 文件管理',
+        gal2_desc: '浏览 · 上传下载 · 预览编辑',
+        gal3_title: '变更记录与审计',
+        gal3_desc: '操作人 · 时间 · 结果 · 退出码',
+        gal4_title: '运维工具链',
+        gal4_desc: 'Runbook · 安全时段 · 任务通知',
+        gal5_title: '外观与主题',
+        gal5_desc: '深色 / 浅色 · 终端字号',
+        gal6_title: '执行计划与结论',
+        gal6_desc: '计划步骤 · 风险结论 · 下一步建议',
+        new_label: 'v1.3.8 新功能',
+        new_title: 'Agent 操作单 & 文件安全',
+        new_desc: '把命令流水账变成可读、可查、可回滚的运维记录。',
+        nf1_title: 'Agent 操作单',
+        nf1_desc: '结论优先：任务结束先给结论，再展开执行计划、命令证据、变更台账与下一步建议。',
+        nf2_title: '远程文件传输',
+        nf2_desc: 'SFTP 上传/下载支持目录递归，临时文件 + rename 原子替换；失败不会截断原文件。',
+        nf3_title: '安全写入与补丁',
+        nf3_desc: 'file_write / file_patch 绕过 shell；按字节替换，保留 BOM、CRLF 与非 UTF-8 内容。',
+        nf4_title: '石墨青主题',
+        nf4_desc: '深色 / 浅色石墨青配色，青色标记交互与当前状态，金色强调数据。',
+        nf5_title: '多主机与失败恢复',
+        nf5_desc: '批量操作按主机展示状态与耗时；权限、断线、超时可重试失败主机或继续任务。',
+        f3_desc: '四级安全分类 — safe / info / warn / blocked。每条 AI 生成的命令执行前都会检查。',
+        f13_title: 'SFTP 与安全文件编辑',
+        f13_desc: '目录递归上传下载、原子替换；file_write / file_patch 保留编码并绕过 shell 转义。',
+        f11_desc: '离线知识库为 AI 提供 300+ 条软件安装与配置经验，按平台匹配命令，可下载更新。',
+        f14_title: '石墨青主题',
+        f14_desc: '深色与浅色两套石墨青配色，青色标记交互，金色强调数据，终端字号可调。',
+        f15_title: 'AI 联网搜索',
+        f15_desc: '7 种搜索引擎 + 智能降级；Bing HTML 与 DuckDuckGo 免费方案无需 API Key，Agent 按需抓取网页。',
+        s2_title: 'AI 生成计划与命令',
+        s2_desc: 'Agent 把目标拆成执行计划和精确命令，并在执行过程中流式展示进度。',
+        s3_desc: '每条命令被分类：<span style="color: var(--green)">safe</span> 与 <span style="color: var(--cyan)">info</span> 直接执行，<span style="color: var(--yellow)">warn</span> 需确认，<span style="color: var(--red)">blocked</span> 直接拒绝。',
+        s4_title: '执行、校验、给结论',
+        s4_desc: '命令在本地或远程终端执行；输出、退出码、耗时和变更写入操作单，AI 再给出结论。',
+        download_desc: '开源免费。下载 v1.3.8，选择你的平台。',
+        cta_desc: '开源、永久免费。立即开始使用 AI Terminal v1.3.8。',
+      },
+      en: {
+        page_title: 'AI Terminal — Operate servers in natural language',
+        meta_desc: 'AI Terminal combines an AI assistant, SSH terminal, and local terminal in one cross-platform app. The Agent plans, runs, and verifies server operations and reports a conclusion-first operation sheet, with SFTP transfers, atomic writes, byte-level patches, and rollback.',
+        hero_badge: 'v1.3.8 Released — Agent Operation Sheet & File Safety',
+        hero_title_1: 'Give AI the goal',
+        hero_title_2: 'Server work gets done, with evidence',
+        hero_sub: 'AI Terminal is more than a chat wrapper: the Agent plans, runs commands over SSH or a local terminal, verifies results, and reports a conclusion-first operation sheet. Risky actions pass SafetyGuard and your confirmation; uploads, atomic writes, and byte-level patches stay traceable.',
+        hero_demo_tab: 'Agent Workflow',
+        hero_demo_open: 'Interactive Demo ↗',
+        hero_demo_badge: 'REAL WORKFLOW · SERVER AUDIT',
+        hero_demo_caption: 'Real model · 5-step plan · 8 commands · read-only audit',
+        hero_demo_link: 'Open the interactive demo →',
+        screenshots_desc: 'Real product screens · AI Terminal v1.3.8 · Graphite dark theme',
+        screenshots_note: 'Screenshots come from a real running build; Agent content is powered by a local OpenAI-compatible model.',
+        fh1_title: 'Agent Operation Sheet',
+        fh1_desc: 'Conclusion first, with execution plan, command evidence, and change ledger layered so even long tasks stay readable.',
+        fh4_desc: 'Broadcast a command to multiple servers and see per-host status, duration, and output. Batch ops stay simple.',
+        fh5_title: 'Four-level Safety Guard',
+        fh5_desc: 'SafetyGuard classifies commands as safe / info / warn / blocked. Risky actions need explicit approval.',
+        fh6_title: 'SFTP & Safe File Edits',
+        fh6_desc: 'Atomic upload/download, file_write / file_patch without shell escaping, preserving BOM, CRLF, and original bytes.',
+        showcase1_subtitle: 'Conclusion-first Agent Operation Sheet',
+        showcase1_title: 'Results and evidence, not just commands',
+        showcase1_p1: 'Conclusion first: status, changes, and next actions at the end of every task',
+        showcase1_p2: 'Execution plan: model-declared steps, done counts, and the active step',
+        showcase1_p3: 'Evidence on demand: command, output, duration, and exit code',
+        showcase1_p4: 'Change ledger: file and command changes traceable and rollback-ready',
+        showcase1_desc: 'Thinking, commands, and output are layered, so even long tasks stay readable.',
+        gal1_title: 'Server inventory',
+        gal1_desc: 'Groups · search · quick connect',
+        gal2_title: 'SFTP file manager',
+        gal2_desc: 'Browse · upload/download · preview & edit',
+        gal3_title: 'Change records & audit',
+        gal3_desc: 'Operator · time · result · exit code',
+        gal4_title: 'Operations toolkit',
+        gal4_desc: 'Runbooks · safe hours · task notifications',
+        gal5_title: 'Appearance & themes',
+        gal5_desc: 'Dark / light · terminal font size',
+        gal6_title: 'Execution plan & conclusion',
+        gal6_desc: 'Plan steps · risk conclusion · next actions',
+        new_label: "What's New in v1.3.8",
+        new_title: 'Agent Operation Sheet & File Safety',
+        new_desc: 'Turn a command transcript into a readable, auditable, rollback-ready operations record.',
+        nf1_title: 'Agent Operation Sheet',
+        nf1_desc: 'Conclusion first: status, changes, and next actions, with plan, command evidence, and change ledger on demand.',
+        nf2_title: 'Remote file transfer',
+        nf2_desc: 'SFTP upload/download with recursive directories and temp-file + rename atomic replace; failures never truncate the original.',
+        nf3_title: 'Safe writes & patches',
+        nf3_desc: 'file_write / file_patch bypass the shell; byte-level edits preserve BOM, CRLF, and non-UTF-8 content.',
+        nf4_title: 'Graphite theme',
+        nf4_desc: 'Dark and light graphite palettes: cyan marks interaction and current state, gold emphasizes data.',
+        nf5_title: 'Multi-host & recovery',
+        nf5_desc: 'Per-host status and duration for batch runs; retry failed hosts or resume after permission, disconnect, or timeout errors.',
+        f3_desc: '4-level safety classification — safe / info / warn / blocked. Every AI-generated command is checked before execution.',
+        f13_title: 'SFTP & Safe File Edits',
+        f13_desc: 'Recursive upload/download with atomic replace; file_write / file_patch preserve encoding and skip shell escaping.',
+        f11_desc: 'An offline knowledge base gives the AI 300+ software install and config entries, matched by platform and updatable.',
+        f14_title: 'Graphite Theme',
+        f14_desc: 'Dark and light graphite palettes with cyan interaction states, gold data emphasis, and adjustable terminal font size.',
+        f15_title: 'AI Web Search',
+        f15_desc: '7 search engines with smart fallback; Bing HTML and DuckDuckGo options need no API key, and the Agent fetches pages on demand.',
+        s2_title: 'AI plans and generates commands',
+        s2_desc: 'The Agent turns your goal into an execution plan and exact shell commands, streaming progress as it works.',
+        s3_desc: 'Every command is classified: <span style="color: var(--green)">safe</span> and <span style="color: var(--cyan)">info</span> proceed, <span style="color: var(--yellow)">warn</span> needs confirmation, <span style="color: var(--red)">blocked</span> is refused.',
+        s4_title: 'Execute, verify, conclude',
+        s4_desc: 'Commands run on local or remote terminals; output, exit codes, duration, and changes land in the operation sheet before the AI concludes.',
+        download_desc: 'Free and open source. Download v1.3.8 for your platform.',
+        cta_desc: 'Open source, free forever. Start using AI Terminal v1.3.8 today.',
+      },
+    };
+
+    Object.assign(i18n.zh, i18nV138.zh);
+    Object.assign(i18n.en, i18nV138.en);
+    const englishFirstKeys = new Set(Object.keys(i18nV138.en));
+
     const langNames = {
       zh: '简体中文',
       en: 'English',
@@ -3456,8 +3816,11 @@
       it: 'Italiano'
     };
 
-    let currentLang = localStorage.getItem('lang') || 'zh';
-    let currentTheme = localStorage.getItem('theme') || 'dark';
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentLang = urlParams.get('lang') || localStorage.getItem('lang') || 'zh';
+    let currentTheme = urlParams.get('theme') || localStorage.getItem('theme') || 'dark';
+    currentLang = i18n[currentLang] ? currentLang : 'zh';
+    currentTheme = currentTheme === 'light' ? 'light' : 'dark';
 
     function setTheme(theme) {
       currentTheme = theme;
@@ -3470,21 +3833,41 @@
     }
 
     function setLang(lang) {
-      currentLang = lang;
-      localStorage.setItem('lang', lang);
-      const t = i18n[lang];
-      
+      currentLang = i18n[lang] ? lang : 'en';
+      localStorage.setItem('lang', currentLang);
+      const t = {...i18n.en, ...i18n[currentLang]};
+      const htmlLang = {
+        zh: 'zh-CN', en: 'en', ja: 'ja', de: 'de', fr: 'fr',
+        ru: 'ru', es: 'es', ko: 'ko', pt: 'pt', it: 'it'
+      }[currentLang] || currentLang;
+      document.documentElement.lang = htmlLang;
+
+      if (t.page_title) {
+        document.title = t.page_title;
+      }
+      const metaDesc = document.querySelector('meta[name="description"]');
+      if (metaDesc && t.meta_desc) {
+        metaDesc.setAttribute('content', t.meta_desc);
+      }
+
       document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
-        if (t[key]) {
-          el.innerHTML = t[key];
+        const value = (currentLang !== 'zh' && currentLang !== 'en' && englishFirstKeys.has(key))
+          ? i18n.en[key]
+          : t[key];
+        if (value) {
+          el.innerHTML = value;
         }
       });
 
       const langLabel = document.getElementById('langLabel');
       if (langLabel) {
-        langLabel.textContent = langNames[lang];
+        langLabel.textContent = langNames[currentLang];
       }
+
+      document.querySelectorAll('#langMenu li').forEach(item => {
+        item.classList.toggle('active', item.getAttribute('data-lang') === currentLang);
+      });
 
       const langDropdown = document.getElementById('langDropdown');
       if (langDropdown) {
@@ -3492,12 +3875,6 @@
       }
 
       renderKnowledgeVersions();
-
-      // 通知 demo iframe 切换语言
-      const demoIframe = document.querySelector('iframe[src="demo.html"]');
-      if (demoIframe && demoIframe.contentWindow) {
-        demoIframe.contentWindow.postMessage({ type: 'langChange', lang: lang }, '*');
-      }
     }
 
     function toggleTheme() {
@@ -3552,7 +3929,7 @@
       const lightbox = document.getElementById('lightbox');
       const lightboxImg = document.getElementById('lightboxImg');
       lightboxImg.src = src;
-      lightboxImg.alt = alt;
+      lightboxImg.alt = alt || 'Screenshot';
       lightbox.classList.add('active');
       document.body.style.overflow = 'hidden';
     }
@@ -3612,16 +3989,13 @@
       if (mobileToggle) {
         mobileToggle.addEventListener('click', toggleMobileMenu);
       }
-    });
 
-    // 页面加载后通知 demo iframe 当前语言
-    window.addEventListener('load', function() {
-      const demoIframe = document.querySelector('iframe[src="demo.html"]');
-      if (demoIframe && demoIframe.contentWindow) {
-        setTimeout(function() {
-          demoIframe.contentWindow.postMessage({ type: 'langChange', lang: currentLang }, '*');
-        }, 500);
-      }
+      document.querySelectorAll('#navLinks a').forEach(link => {
+        link.addEventListener('click', () => {
+          document.getElementById('navLinks')?.classList.remove('open');
+          mobileToggle?.classList.remove('open');
+        });
+      });
     });
 
     // ========== PARTICLE CANVAS ==========
