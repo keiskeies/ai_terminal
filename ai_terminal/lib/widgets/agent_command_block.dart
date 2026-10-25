@@ -4,6 +4,7 @@ import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../core/safety_guard.dart';
 import '../providers/terminal_provider.dart' as tp;
+import '../utils/agent_ui_text.dart';
 import '../utils/risk_explainer.dart';
 
 /// 统一命令块：左侧 3px 安全色条 + 命令文本 + 顶部状态标签与操作
@@ -62,6 +63,7 @@ class AgentCommandBlock extends StatelessWidget {
 
   /// 统一命令块：左侧 3px 安全色条 + 命令文本 + 顶部状态标签与操作
   Widget _buildCommandBlock(BuildContext context) {
+    final ui = AgentUiText.of(context);
     final trimmed = command.trim();
     if (trimmed.isEmpty) return const SizedBox.shrink();
 
@@ -159,14 +161,14 @@ class AgentCommandBlock extends StatelessWidget {
                       const SizedBox(width: 6),
                       Text(
                         isTool
-                            ? '工具调用'
+                            ? ui.toolCall
                             : isBlocked
-                                ? '已拦截'
+                                ? ui.blocked
                                 : dangerous
-                                    ? '需确认'
+                                    ? ui.needsConfirm
                                     : executed
-                                        ? '已运行'
-                                        : '可执行',
+                                        ? ui.executedLabel
+                                        : ui.executable,
                         style: TextStyle(
                           fontSize: fMicro,
                           color: accentColor,
@@ -181,7 +183,7 @@ class AgentCommandBlock extends StatelessWidget {
                       if (canExecute && !isLoading && !isBlocked) ...[
                         if (dangerous && isWaitingConfirm) ...[
                           // 危险命令待确认：显示取消 + 确认按钮
-                          _buildInlineConfirmButtons(trimmed, tc),
+                          _buildInlineConfirmButtons(trimmed, tc, ui),
                         ] else ...[
                           _buildExecuteButton(
                               trimmed, dangerous, isBlocked, tc, tab),
@@ -231,7 +233,7 @@ class AgentCommandBlock extends StatelessWidget {
                 ),
                 // 变更类命令的影响说明（远程场景下比命令本身更重要）
                 if (dangerous || RiskExplainer.isMutating(trimmed))
-                  _buildRiskPanel(tc, isBlocked, trimmed,
+                  _buildRiskPanel(tc, ui, isBlocked, trimmed,
                       requiresConfirm: dangerous),
               ],
             ),
@@ -245,6 +247,7 @@ class AgentCommandBlock extends StatelessWidget {
 
   Widget _buildRiskPanel(
     ThemeColors tc,
+    AgentUiText ui,
     bool isBlocked,
     String command, {
     required bool requiresConfirm,
@@ -270,12 +273,12 @@ class AgentCommandBlock extends StatelessWidget {
               const SizedBox(width: 5),
               Text(
                 isBlocked
-                    ? '该命令已被安全策略拦截'
+                    ? ui.riskBlocked
                     : executed
-                        ? '变更影响'
+                        ? ui.changeImpact
                         : requiresConfirm
-                            ? '执行前请确认影响'
-                            : '变更影响',
+                            ? ui.confirmImpact
+                            : ui.changeImpact,
                 style: TextStyle(
                   color: color,
                   fontSize: fMicro,
@@ -298,15 +301,15 @@ class AgentCommandBlock extends StatelessWidget {
               explanation.reason!.trim().isNotEmpty) ...[
             const SizedBox(height: 2),
             Text(
-              '风险：${explanation.reason}',
+              ui.riskPrefix(explanation.reason!),
               style: TextStyle(color: tc.textSub, fontSize: fMicro),
             ),
           ],
           const SizedBox(height: 2),
           Text(
             explanation.canRollback
-                ? '回滚：${explanation.rollbackCommand}'
-                : '回滚：无自动回滚，建议先快照',
+                ? ui.rollbackPrefix(explanation.rollbackCommand ?? '')
+                : ui.noRollbackSnapshot,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
@@ -382,7 +385,8 @@ class AgentCommandBlock extends StatelessWidget {
   }
 
   /// 危险命令内联确认/取消按钮（替代弹窗）
-  Widget _buildInlineConfirmButtons(String command, ThemeColors tc) {
+  Widget _buildInlineConfirmButtons(
+      String command, ThemeColors tc, AgentUiText ui) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -398,7 +402,7 @@ class AgentCommandBlock extends StatelessWidget {
               borderRadius: BorderRadius.circular(rSmall),
               border: Border.all(color: tc.border),
             ),
-            child: Text('取消',
+            child: Text(ui.cancel,
                 style: TextStyle(
                     fontSize: fSmall,
                     color: tc.textSub,
@@ -418,7 +422,7 @@ class AgentCommandBlock extends StatelessWidget {
               borderRadius: BorderRadius.circular(rSmall),
               border: Border.all(color: tc.warn.withValues(alpha: 0.4)),
             ),
-            child: Text('确认执行',
+            child: Text(ui.confirmExecute,
                 style: TextStyle(
                     fontSize: fSmall,
                     color: tc.warn,

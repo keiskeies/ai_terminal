@@ -1013,6 +1013,7 @@ class _LiveOperationBarState extends State<LiveOperationBar> {
     final task = widget.task;
     if (task == null) return const SizedBox.shrink();
     final tc = widget.tc;
+    final ui = AgentUiText.of(context);
     final statusColor = _statusColor(tc);
     final elapsed = DateTime.now().difference(task.createdAt).inSeconds;
 
@@ -1040,7 +1041,7 @@ class _LiveOperationBarState extends State<LiveOperationBar> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  task.goal.isEmpty ? 'Agent 任务' : task.goal,
+                  task.goal.isEmpty ? ui.agentTask : task.goal,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -1056,27 +1057,27 @@ class _LiveOperationBarState extends State<LiveOperationBar> {
           ),
           _iconButton(
             icon: Icons.terminal,
-            tooltip: '在终端查看',
+            tooltip: ui.openInTerminal,
             color: tc.textSub,
             onTap: widget.onOpenTerminal,
           ),
           if (widget.status == AgentStatus.paused)
             _iconButton(
               icon: Icons.play_arrow,
-              tooltip: '恢复',
+              tooltip: ui.resume,
               color: tc.ok,
               onTap: widget.onResume,
             )
           else if (_isRunning)
             _iconButton(
               icon: Icons.pause,
-              tooltip: '暂停',
+              tooltip: ui.pause,
               color: tc.textSub,
               onTap: widget.onPause,
             ),
           _iconButton(
             icon: Icons.stop,
-            tooltip: '停止',
+            tooltip: ui.stop,
             color: tc.error,
             onTap: widget.onStop,
           ),
@@ -1103,18 +1104,21 @@ class _LiveOperationBarState extends State<LiveOperationBar> {
       ));
     }
 
-    add(task.phase ?? _phaseLabel(), tc.textSub);
-    if (task.stepIndex > 0) add('第 ${task.stepIndex} 步', tc.textSub);
+    final phase = (task.phase != null && task.phase!.trim().isNotEmpty)
+        ? ui.phase(task.phase)
+        : _phaseLabelForStatus(ui);
+    add(phase, tc.textSub);
+    if (task.stepIndex > 0) add(ui.step(task.stepIndex), tc.textSub);
     add(_formatElapsed(elapsed, ui), tc.gold, mono: true);
     if (task.successCount > 0 || task.failureCount > 0) {
-      add('${task.successCount} 成功', tc.textSub);
+      add(ui.successCount(task.successCount), tc.textSub);
       if (task.failureCount > 0) {
-        add('${task.failureCount} 失败', tc.error, mono: true);
+        add(ui.failureCount(task.failureCount), tc.error, mono: true);
       }
     }
     if (widget.plan.isNotEmpty) {
       final done = widget.plan.where((s) => s.isDone).length;
-      add('计划 $done/${widget.plan.length}', tc.textSub);
+      add(ui.planProgress(done, widget.plan.length), tc.textSub);
     }
     return Wrap(
       spacing: 6,
@@ -1124,24 +1128,24 @@ class _LiveOperationBarState extends State<LiveOperationBar> {
     );
   }
 
-  String _phaseLabel() {
+  String _phaseLabelForStatus(AgentUiText ui) {
     switch (widget.status) {
       case AgentStatus.thinking:
-        return '思考中';
+        return ui.thinking;
       case AgentStatus.executing:
-        return '执行中';
+        return ui.executing;
       case AgentStatus.waitingConfirm:
-        return '等待确认';
+        return ui.waitingConfirm;
       case AgentStatus.paused:
-        return '已暂停';
+        return ui.paused;
       case AgentStatus.completed:
-        return '已完成';
+        return ui.completed;
       case AgentStatus.failed:
-        return '失败';
+        return ui.failed;
       case AgentStatus.cancelled:
-        return '已取消';
+        return ui.cancelled;
       case AgentStatus.idle:
-        return '就绪';
+        return ui.idle;
     }
   }
 

@@ -5,6 +5,7 @@ import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../models/agent_event.dart';
 import '../providers/terminal_provider.dart' as tp;
+import '../utils/agent_ui_text.dart';
 import 'agent_command_block.dart';
 import 'host_result_matrix.dart';
 import 'output_viewer_sheet.dart';
@@ -181,6 +182,7 @@ class AgentEventContent extends StatelessWidget {
   /// 结果卡片：成功/失败状态 + 输出（全部展开显示）
   /// 背景保持 terminalBg，无左侧缩进，与命令块视觉对齐
   Widget _buildResultCard(AgentEvent event, ThemeColors tc, BuildContext context) {
+    final ui = AgentUiText.of(context);
     final success = event.success ?? false;
     final output = event.output ?? event.error ?? '(无输出)';
     final lines = output.split('\n');
@@ -193,8 +195,8 @@ class AgentEventContent extends StatelessWidget {
         : tc.error.withValues(alpha: 0.08);
     final statusIcon = success ? Icons.check : Icons.close;
     final statusText = success
-        ? '执行成功'
-        : _failureLabel(event.failureKind);
+        ? ui.resultSuccess
+        : ui.failureLabel(event.failureKind);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8, top: 2),
@@ -246,15 +248,15 @@ class AgentEventContent extends StatelessWidget {
                     runSpacing: 2,
                     children: [
                       if (!success && event.exitCode != null)
-                        _metaChip('退出码 ${event.exitCode}', tc.error),
+                        _metaChip(ui.exitCode(event.exitCode!), tc.error),
                       if (event.durationMs != null)
                         _metaChip(
                             _formatDuration(event.durationMs!), tc.gold),
                       if (event.outputTruncated == true)
                         _metaChip(
                           event.outputTotalChars != null
-                              ? '已截断 ${event.outputTotalChars} 字符'
-                              : '已截断',
+                              ? ui.truncated(event.outputTotalChars)
+                              : ui.truncated(),
                           tc.warn,
                         ),
                       if (event.diffAdditions != null)
@@ -262,7 +264,7 @@ class AgentEventContent extends StatelessWidget {
                       if (event.diffDeletions != null)
                         _metaChip('-${event.diffDeletions}', tc.error),
                       if (!showMatrix)
-                        _metaChip('${lines.length} 行', tc.textSub),
+                        _metaChip(ui.outputLines(lines.length), tc.textSub),
                     ],
                   ),
                 ),
@@ -271,7 +273,7 @@ class AgentEventContent extends StatelessWidget {
               ],
             ),
           ),
-          if (!success) _buildFailureHint(event.failureKind, tc),
+          if (!success) _buildFailureHint(event.failureKind, tc, ui),
           if (!success &&
               (onRetryFailedCommand != null || onReconnectHost != null))
             Padding(
@@ -376,8 +378,9 @@ class AgentEventContent extends StatelessWidget {
     );
   }
 
-  Widget _buildFailureHint(String? failureKind, ThemeColors tc) {
-    final hint = _failureHint(failureKind);
+  Widget _buildFailureHint(
+      String? failureKind, ThemeColors tc, AgentUiText ui) {
+    final hint = ui.failureHint(failureKind);
     if (hint == null) return const SizedBox.shrink();
     return Container(
       width: double.infinity,
@@ -403,27 +406,6 @@ class AgentEventContent extends StatelessWidget {
     );
   }
 
-  String? _failureHint(String? failureKind) {
-    switch (failureKind) {
-      case 'disconnected':
-        return '连接已断开。建议先重连服务器，再重试本步。';
-      case 'timeout':
-        return '执行超时。建议延长超时，或把命令拆小后重试。';
-      case 'permissionDenied':
-        return '权限不足。建议使用 sudo 重试，或更换有权限的用户。';
-      case 'interactivePrompt':
-        return '命令在等待输入。建议改用非交互参数（如 -y / --batch）后重试。';
-      case 'syntaxError':
-        return '命令语法错误，未执行。建议修正命令后重试。';
-      case 'cancelled':
-        return '执行已取消。可以重新发起本步。';
-      case 'unknown':
-        return '执行失败。建议查看输出后修正并重试。';
-      default:
-        return null;
-    }
-  }
-
   Widget _metaChip(String text, Color color) {
     return Container(
       margin: const EdgeInsets.only(right: 4),
@@ -441,25 +423,6 @@ class AgentEventContent extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _failureLabel(String? failureKind) {
-    switch (failureKind) {
-      case 'disconnected':
-        return '连接已断开';
-      case 'timeout':
-        return '执行超时';
-      case 'permissionDenied':
-        return '权限不足';
-      case 'interactivePrompt':
-        return '等待输入';
-      case 'syntaxError':
-        return '命令语法错误';
-      case 'cancelled':
-        return '已取消';
-      default:
-        return '执行失败';
-    }
   }
 
   String _formatDuration(int ms) {
