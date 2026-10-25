@@ -109,7 +109,7 @@ Instead of stacking thinking, commands, and output into one long chat transcript
 |:---:|:---:|
 | <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-dark-en.png" width="440" /> |
 
-- **Agent audit result**: a real Agent builds a plan, runs commands and reports risks; evidence can be expanded.
+- **Agent audit result**: a real Agent builds a plan, runs commands and reports risks; live CPU/memory/disk/network metrics stay visible and evidence can be expanded.
 - **Server inventory**: groups, search, quick terminal/SFTP actions.
 - **SFTP file manager**: browse remote directories, upload/download, preview and edit.
 - **Change records & audit**: command, time, result and host are traceable; host IPs are redacted.

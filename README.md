@@ -109,7 +109,7 @@ AI Terminal 是一个把 AI 助手、SSH 远程终端和本地终端放在同一
 |:---:|:---:|
 | <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-dark-en.png" width="440" /> |
 
-- **Agent 巡检结果**：真实 Agent 生成计划、执行命令并输出风险结论；过程与证据可展开。
+- **Agent 巡检结果**：真实 Agent 生成计划、执行命令并输出风险结论；底部同时显示 CPU/内存/磁盘/网络实时监控，执行证据可展开。
 - **服务器管理**：分组、搜索、快速连接、打开终端或 SFTP。
 - **SFTP 文件管理**：浏览远端目录、上传/下载、预览与编辑。
 - **变更记录与审计**：命令、时间、结果和主机可追溯；截图中的主机 IP 已隐藏。
