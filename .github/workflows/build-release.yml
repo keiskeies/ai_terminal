@@ -7,7 +7,8 @@ on:
   workflow_dispatch:
 
 env:
-  FLUTTER_VERSION: '3.41.8'
+  # lockfile 要求 Flutter >= 3.44；使用本地已验证的 3.47.8 构建
+  FLUTTER_VERSION: '3.47.8'
 
 jobs:
   build-macos:
@@ -198,6 +199,38 @@ jobs:
 
             AI Terminal 是一款将 AI 助手与 SSH / 本地终端深度集成的跨平台应用。无论你是刚买服务器的小白、不想记命令的开发者、还是需要批量管理服务器的运维人员——打开它，用中文告诉 AI 你要干什么，它帮你连服务器、跑命令、装软件、查问题。全程安全可控。
 
+            ### 🆕 v1.3.7 新功能 · Agent 操作单 & 文件安全加固
+
+            v1.3.7 聚焦 **Agent 回答可读性** 与 **文件操作安全**：思考、计划、执行、结果按“操作单”分层展示；上传、下载、修改文件全链路加固，中文/emoji 内容不再依赖模型手算 base64。
+
+            #### 🧭 Agent 操作单
+            - **结论优先**：任务完成先给结论，再展开现状、变更与建议
+            - **计划/任务清单**：模型声明的步骤、进度计数与当前步骤命令一目了然
+            - **证据折叠**：命令、输出、耗时、退出码、失败分类收进证据层，主答案保持干净
+            - **变更台账与回滚**：文件/命令变更可追溯，支持一键回滚
+            - **失败恢复**：权限不足/断线/超时给出针对性操作，可重试失败主机或继续任务
+            - **多主机结果矩阵**：广播/批量操作按主机展示状态、耗时与输出
+
+            #### 📁 文件传输与编辑安全
+            - **新增 `sftp_download`**：Agent 可直接从服务器下载单文件或目录，自动创建本地目录
+            - **传输原子化**：上传/下载先写临时文件再替换，失败不会截断原文件
+            - **目录完整性**：递归上传/下载保留空目录，支持排除 `node_modules`/`.git`
+            - **本地文件编辑**：Windows/macOS/Linux 本地 `file_write` 支持写入/追加/备份，`file_patch` 支持本地补丁
+            - **字节级编辑**：`file_patch` 保留 BOM、CRLF 与非 UTF-8 字节
+            - **中文更可靠**：`file_write`/`file_patch` 支持纯文本参数，避免模型手算中文 base64 出错
+            - **SFTP 编辑器防截断**：大文件/非 UTF-8 拒绝打开，BOM 原样保留，保存失败自动恢复
+
+            #### 🐛 关键修复
+            - 修复 Windows 目录上传把嵌套文件平铺成带反斜杠文件名
+            - 修复 `broadcast_upload` 单文件把目录名当文件名
+            - 修复下载失败可能留下半成品、本地父路径是文件时误建目录
+            - 修复 SFTP 编辑器打开大文件后保存截断文件
+            - 升级 `dartssh2 3.3.1`，支持 SFTP `posix-rename` 原子替换
+
+            #### ✅ 质量验证
+            - 375 个单元/Widget 测试通过
+            - 16 个真实 SSH + 真实 LLM 端到端测试通过（上传/下载/改文件/多主机编排）
+
             ### 🆕 v1.3.6 新功能 · AI 能力扩展 & 数据安全加固
 
             v1.3.6 聚焦 **AI 能力扩展**与**数据安全加固**，新增联网搜索、模型配置完善，并彻底修复了 macOS 开发模式下每次构建后数据丢失的关键 bug。
@@ -332,6 +365,38 @@ jobs:
             **Control your servers with natural language. AI runs the commands for you.**
 
             AI Terminal is a cross-platform app that deeply integrates an AI assistant with SSH and local terminals. Whether you're a beginner who just rented a VPS, a developer tired of googling commands, or a DevOps engineer managing dozens of servers — open it, tell the AI what you want in plain English (or Chinese), and it handles the rest. Safe, transparent, and under your control.
+
+            ### 🆕 What's New in v1.3.7 · Agent Operation Sheet & File Safety
+
+            v1.3.7 focuses on **Agent answer readability** and **file operation safety**: thinking, plans, execution and results are now layered into an "operation sheet"; upload, download and editing are hardened end-to-end, and Chinese/emoji content no longer depends on the model computing base64 by hand.
+
+            #### 🧭 Agent Operation Sheet
+            - **Conclusion first**: get the result up front, then the current state, changes and recommendations
+            - **Plan/task checklist**: model-declared steps, progress counts and the command under the active step
+            - **Folded evidence**: commands, output, duration, exit code and failure category stay in an evidence layer
+            - **Change ledger & rollback**: file/command changes are traceable and can be rolled back
+            - **Failure recovery**: targeted actions for permission, disconnect and timeout failures; retry failed hosts or continue the task
+            - **Multi-host result matrix**: broadcast/batch operations show per-host status, duration and output
+
+            #### 📁 File Transfer & Editing Safety
+            - **New `sftp_download`**: the Agent can download single files or directories from a server, creating local directories automatically
+            - **Atomic transfers**: upload/download write to a temporary file before replacing, so failures never truncate the original
+            - **Directory integrity**: recursive transfers preserve empty directories and support excluding `node_modules`/`.git`
+            - **Local editing**: `file_write` now supports write/append/backup on Windows/macOS/Linux, and `file_patch` supports local files
+            - **Byte-level patches**: `file_patch` preserves BOM, CRLF and non-UTF-8 bytes
+            - **Reliable Chinese text**: `file_write`/`file_patch` accept plain-text parameters, so the model no longer has to compute Chinese base64
+            - **SFTP editor protection**: oversized/non-UTF-8 files are refused, BOM is preserved, and saves restore the original on failure
+
+            #### 🐛 Key Fixes
+            - Fixed Windows directory uploads flattening nested files into names containing backslashes
+            - Fixed `broadcast_upload` treating the target directory as the file name for single-file uploads
+            - Fixed partial files left by failed downloads and accidental directory creation when the local parent is a file
+            - Fixed the SFTP editor truncating large files on save
+            - Upgraded to `dartssh2 3.3.1` for SFTP `posix-rename` atomic replacement
+
+            #### ✅ Quality
+            - 375 unit/widget tests passing
+            - 16 real SSH + real LLM end-to-end tests passing (upload/download/edit/multi-host orchestration)
 
             ### 🆕 What's New in v1.3.6 · AI Capability Expansion & Data Security Hardening
 
