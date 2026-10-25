@@ -87,20 +87,34 @@ Instead of stacking thinking, commands, and output into one long chat transcript
 - **5 platforms**: macOS, Linux, Windows, Android, iOS
 - Local PTY and SSH terminals with a shared connection pool across tabs
 
-## Screenshots
+## Watch it work (GIF)
 
-| Agent operation sheet + live metrics | Operations toolkit |
+<p align="center">
+  <img src="./docs/screenshots/agent-audit-workflow-dark-en.gif" width="900" alt="AI agent server audit workflow" />
+  <br />
+  <sub>A real 5-step server audit: plan → command execution → result cards → operation-sheet conclusion (English UI / dark theme)</sub>
+</p>
+
+## Screenshots: server management & operations
+
+| Agent audit result | Server inventory |
 |:---:|:---:|
-| <img src="./docs/screenshots/operation-sheet-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> |
+| <img src="./docs/screenshots/server-audit-dark-en.png" width="440" /> | <img src="./docs/screenshots/server-list-dark-en.png" width="440" /> |
 
-| Change records & audit | Appearance & themes |
+| SFTP file manager | Change records & audit |
 |:---:|:---:|
-| <img src="./docs/screenshots/change-records-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-dark-en.png" width="440" /> |
+| <img src="./docs/screenshots/sftp-dark-en.png" width="440" /> | <img src="./docs/screenshots/change-records-dark-en.png" width="440" /> |
 
-- **Agent Operation Sheet**: goal, execution plan, verified conclusion, next actions and folded evidence; live CPU/memory/disk/network metrics stay visible below the terminal.
-- **Operations toolkit**: servers, snippets, runbooks, change records, activity log, safe hours and notifications in one place.
-- **Change records**: command, time, result and host are traceable; host IPs are redacted in the screenshot.
-- **Appearance & themes**: switch between graphite dark/light themes and adjust terminal font size.
+| Operations toolkit | Appearance & themes |
+|:---:|:---:|
+| <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-dark-en.png" width="440" /> |
+
+- **Agent audit result**: a real Agent builds a plan, runs commands and reports risks; evidence can be expanded.
+- **Server inventory**: groups, search, quick terminal/SFTP actions.
+- **SFTP file manager**: browse remote directories, upload/download, preview and edit.
+- **Change records & audit**: command, time, result and host are traceable; host IPs are redacted.
+- **Operations toolkit**: runbooks, activity log, safe hours and task notifications in one place.
+- **Appearance & themes**: graphite dark/light themes and terminal font size.
 
 ## Download
 

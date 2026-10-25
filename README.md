@@ -87,20 +87,34 @@ AI Terminal 是一个把 AI 助手、SSH 远程终端和本地终端放在同一
 - **5 个平台**：macOS、Linux、Windows、Android、iOS
 - 本地 PTY 终端 + SSH 终端，多标签共享连接池
 
-## 截图
+## 看它怎么工作（GIF）
 
-| Agent 操作单 + 实时监控 | 运维工具与自动化 |
+<p align="center">
+  <img src="./docs/screenshots/agent-audit-workflow-dark-en.gif" width="900" alt="AI agent server audit workflow" />
+  <br />
+  <sub>真实模型执行 5 步服务器巡检：计划 → 命令执行 → 结果卡片 → 操作单结论（界面英文 / 深色）</sub>
+</p>
+
+## 截图：服务器管理与运维
+
+| Agent 巡检结果 | 服务器管理 |
 |:---:|:---:|
-| <img src="./docs/screenshots/operation-sheet-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> |
+| <img src="./docs/screenshots/server-audit-dark-en.png" width="440" /> | <img src="./docs/screenshots/server-list-dark-en.png" width="440" /> |
 
-| 变更记录与审计 | 外观与主题 |
+| SFTP 文件管理 | 变更记录与审计 |
 |:---:|:---:|
-| <img src="./docs/screenshots/change-records-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-dark-en.png" width="440" /> |
+| <img src="./docs/screenshots/sftp-dark-en.png" width="440" /> | <img src="./docs/screenshots/change-records-dark-en.png" width="440" /> |
 
-- **Agent 操作单**：目标、执行计划、验证结论、变更建议和证据折叠；底部同时显示 CPU/内存/磁盘/网络监控。
-- **运维工具**：服务器、快捷命令、Runbook、变更记录、操作日志、安全时段、任务通知集中在一个入口。
-- **变更记录**：命令、时间、结果和主机可追溯；截图中的主机 IP 已隐藏。
-- **外观与主题**：深色/浅色石墨青主题切换、终端字号调整。
+| 运维工具总览 | 外观与主题 |
+|:---:|:---:|
+| <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-dark-en.png" width="440" /> |
+
+- **Agent 巡检结果**：真实 Agent 生成计划、执行命令并输出风险结论；过程与证据可展开。
+- **服务器管理**：分组、搜索、快速连接、打开终端或 SFTP。
+- **SFTP 文件管理**：浏览远端目录、上传/下载、预览与编辑。
+- **变更记录与审计**：命令、时间、结果和主机可追溯；截图中的主机 IP 已隐藏。
+- **运维工具总览**：Runbook、Activity Log、Safe Hours、Task Notifications 集中入口。
+- **外观与主题**：深色/浅色石墨青主题、终端字号调整。
 
 ## 下载安装
 
