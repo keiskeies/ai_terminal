@@ -7,13 +7,12 @@
   <p align="center">
     <a href="https://ai-terminal.keiskei.top">Website</a> ·
     <a href="https://github.com/keiskeies/ai_terminal/releases">Download</a> ·
-    <a href="./QUESTION.md">FAQ</a> ·
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
     <img src="https://img.shields.io/badge/version-1.3.8-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
-    <img src="https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platforms" />
+    <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
     <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License" />
   </p>
@@ -22,23 +21,38 @@
 **Language:**
 [中文](./README.md) | **English** | [日本語](./README_JA.md) | [Deutsch](./README_DE.md) | [Français](./README_FR.md) | [Español](./README_ES.md) | [한국어](./README_KO.md) | [Русский](./README_RU.md) | [Português](./README_PT.md) | [Italiano](./README_IT.md)
 
+**Navigate:**
+[Highlights](#highlights) · [Screenshots](#screenshots-server-management--operations) · [Download](#download) · [Run from source](#run-from-source) · [Security model](#security-model) · [Star History](#star-history)
+
 ---
 
 <p align="center">
-  <img src="./docs/screenshots/operation-sheet-dark-en.png" width="920" alt="AI Terminal operation sheet" />
+  <img src="./docs/screenshots/agent-audit-workflow-dark-en.gif" width="960" alt="AI agent server audit workflow" />
   <br />
-  <sub>English UI · Graphite theme · conclusion-first Agent operation sheet</sub>
+  <sub>A real Agent audit: plan → command execution → result cards → conclusion and risks; English UI / dark theme</sub>
 </p>
 
-## What is AI Terminal?
+<p align="center">
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.3.8</strong></a>
+  ·
+  <a href="https://ai-terminal.keiskei.top">Visit the website</a>
+</p>
 
-AI Terminal combines an AI assistant, SSH terminal, and local terminal in one cross-platform app. Describe a goal in plain language; the Agent plans, runs commands, checks results, and reports a conclusion. Risky operations go through safety checks and your confirmation first.
+## Why AI Terminal
 
-It is built for real server operations, not just a chat wrapper around a shell:
+A chat assistant tells you what to run. AI Terminal runs it on your servers and leaves a traceable operation sheet behind.
 
-- Remote connections can be slow or drop, so tasks need recovery, retry, and continuation
-- Files, permissions, and encodings break easily, so writes, transfers, and patches need verification and rollback
-- Users need to know what the AI did, so every command, exit code, duration, and change stays visible
+| Chat-style assistant | AI Terminal |
+|---|---|
+| Hands you a command you may need to edit | Executes and verifies it over SSH or a local terminal |
+| Loses context when the chat ends | Keeps plan, commands, exit codes, evidence, and conclusion layered together |
+| Makes you re-describe the problem after a failure | Retries, reconnects, resumes the task, and offers targeted recovery |
+| File changes by manual copy-paste | SFTP upload/download, atomic writes, byte-level patches, and rollback |
+| Switching between machines by hand | Multi-host orchestration, batch execution, per-host result matrix |
+
+## At a glance
+
+`5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `300+ knowledge entries` · `7 web search engines`
 
 ## Highlights
 
@@ -53,7 +67,14 @@ Instead of stacking thinking, commands, and output into one long chat transcript
 - **Failure recovery**: targeted actions for permission, disconnect, and timeout failures
 - **Multi-host matrix**: batch/broadcast operations show per-host status, duration, and output
 
-### Remote file operations
+### Servers & connections
+
+- SSH remote terminal and local PTY terminal with a shared connection pool across tabs
+- Server groups, search, quick connect, and one-click terminal or SFTP
+- Live CPU, memory, disk, and upload/download monitors across multiple hosts
+- Reconnect handling, disconnect notices, session persistence, and per-tab isolation
+
+### File transfer & editing
 
 - `sftp_upload` / `sftp_download`: upload and download files, including recursive directories
 - `file_write` / `file_patch`: write files or apply string replacements without shell escaping
@@ -64,7 +85,6 @@ Instead of stacking thinking, commands, and output into one long chat transcript
 
 ### Operations toolbelt
 
-- **Server monitoring**: CPU, memory, disk, and network across multiple hosts
 - **Runbooks**: built-in inspection, security, deployment, and maintenance templates, plus custom runbooks
 - **Change records & audit log**: operator, time, command, result, and exit code
 - **Safe hours**: restrict when changes are allowed
@@ -79,21 +99,13 @@ Instead of stacking thinking, commands, and output into one long chat transcript
 - Knowledge base with 300+ software installation/configuration entries, matched by platform
 - API keys stay in OS secure storage; no plaintext keys in logs or config files
 
-### Experience
+### Experience & security
 
 - **Graphite theme**: dark and light palettes; cyan for interaction/current state, gold for data emphasis
 - **English/Chinese Agent UI**: operation sheet and plan labels support English and Chinese first; other locales fall back to English
 - **14 UI languages**: 简体中文, English, 日本語, 한국어, Deutsch, Français, Русский, Español, Português, العربية, Italiano, हिन्दी, ไทย, Tiếng Việt
 - **5 platforms**: macOS, Linux, Windows, Android, iOS
-- Local PTY and SSH terminals with a shared connection pool across tabs
-
-## Watch it work (GIF)
-
-<p align="center">
-  <img src="./docs/screenshots/agent-audit-workflow-dark-en.gif" width="900" alt="AI agent server audit workflow" />
-  <br />
-  <sub>A real 5-step server audit: plan → command execution → result cards → operation-sheet conclusion (English UI / dark theme)</sub>
-</p>
+- OS Keychain / Keystore credential storage, SafetyGuard command classification, and confirmation for risky operations
 
 ## Screenshots: server management & operations
 
@@ -110,10 +122,10 @@ Instead of stacking thinking, commands, and output into one long chat transcript
 | <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-dark-en.png" width="440" /> |
 
 - **Agent audit result**: a real Agent builds a plan, runs commands and reports risks; live CPU/memory/disk/network metrics stay visible and evidence can be expanded.
-- **Server inventory**: groups, search, quick terminal/SFTP actions.
+- **Server inventory**: groups, search, quick connect, and terminal/SFTP shortcuts.
 - **SFTP file manager**: browse remote directories, upload/download, preview and edit.
-- **Change records & audit**: command, time, result and host are traceable; host IPs are redacted.
-- **Operations toolkit**: runbooks, activity log, safe hours and task notifications in one place.
+- **Change records & audit**: command, time, result and host are traceable; host IPs in the screenshot are redacted.
+- **Operations toolkit**: runbooks, activity log, safe hours, and task notifications in one place.
 - **Appearance & themes**: graphite dark/light themes and terminal font size.
 
 ## Download
@@ -223,11 +235,20 @@ Real SSH and real-LLM E2E tests are enabled through environment variables and do
 - 14 languages cover the core UI; the newest Agent operation-sheet labels are English/Chinese first, with English fallback for other locales
 - Directory transfers are sequential; symbolic links are skipped by default
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=keiskeies%2Fai_terminal&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=keiskeies/ai_terminal&type=date&theme=dark&legend=top-left&sealed_token=FyozRNo4egxPOTdwfQfIh_ItOuNI-LZtpst2jeS2Gij7eQM6E1dCuh5rEFqtt1tsTUl-Xd_dLxLB3EmT6sUa_1idF4fWaEt4sbKFPGffv_7NHI0x_IMAmogzraL-oGSWWLk9Uz3J1Zt9FOQP4i6fwNr1HlQKFadRU2OQvJlETxLesUzXwkg3xpd9wRia" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=keiskeies/ai_terminal&type=date&legend=top-left&sealed_token=FyozRNo4egxPOTdwfQfIh_ItOuNI-LZtpst2jeS2Gij7eQM6E1dCuh5rEFqtt1tsTUl-Xd_dLxLB3EmT6sUa_1idF4fWaEt4sbKFPGffv_7NHI0x_IMAmogzraL-oGSWWLk9Uz3J1Zt9FOQP4i6fwNr1HlQKFadRU2OQvJlETxLesUzXwkg3xpd9wRia" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=keiskeies/ai_terminal&type=date&legend=top-left&sealed_token=FyozRNo4egxPOTdwfQfIh_ItOuNI-LZtpst2jeS2Gij7eQM6E1dCuh5rEFqtt1tsTUl-Xd_dLxLB3EmT6sUa_1idF4fWaEt4sbKFPGffv_7NHI0x_IMAmogzraL-oGSWWLk9Uz3J1Zt9FOQP4i6fwNr1HlQKFadRU2OQvJlETxLesUzXwkg3xpd9wRia" />
+ </picture>
+</a>
+
 ## Links
 
 - [Website](https://ai-terminal.keiskei.top)
 - [Releases](https://github.com/keiskeies/ai_terminal/releases)
-- [FAQ](./QUESTION.md)
 - [Operation Sheet design doc](./docs/agent-operation-sheet-design.md)
 - [Issue Tracker](https://github.com/keiskeies/ai_terminal/issues)
 

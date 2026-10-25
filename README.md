@@ -7,13 +7,12 @@
   <p align="center">
     <a href="https://ai-terminal.keiskei.top">官网</a> ·
     <a href="https://github.com/keiskeies/ai_terminal/releases">下载</a> ·
-    <a href="./QUESTION.md">常见问题</a> ·
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
     <img src="https://img.shields.io/badge/version-1.3.8-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
-    <img src="https://img.shields.io/badge/platforms-macOS%20%7C%20Linux%20%7C%20Windows%20%7C%20Android%20%7C%20iOS-green?style=flat-square" alt="Platforms" />
+    <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
     <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License" />
   </p>
@@ -22,23 +21,38 @@
 **语言：**
 **中文** | [English](./README_EN.md) | [日本語](./README_JA.md) | [Deutsch](./README_DE.md) | [Français](./README_FR.md) | [Español](./README_ES.md) | [한국어](./README_KO.md) | [Русский](./README_RU.md) | [Português](./README_PT.md) | [Italiano](./README_IT.md)
 
+**导航：**
+[核心能力](#核心能力) · [场景截图](#场景截图服务器管理与运维) · [下载安装](#下载安装) · [从源码运行](#从源码运行) · [安全设计](#安全设计) · [Star History](#star-history)
+
 ---
 
 <p align="center">
-  <img src="./docs/screenshots/operation-sheet-dark-en.png" width="920" alt="AI Terminal operation sheet" />
+  <img src="./docs/screenshots/agent-audit-workflow-dark-en.gif" width="960" alt="AI agent server audit workflow" />
   <br />
-  <sub>英文界面 · 石墨青深色主题 · 结论优先的 Agent 操作单</sub>
+  <sub>真实 Agent 巡检：计划 → 命令执行 → 结果卡片 → 结论与风险；英文界面 / 深色主题</sub>
 </p>
 
-## AI Terminal 是什么
+<p align="center">
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.3.8</strong></a>
+  ·
+  <a href="https://ai-terminal.keiskei.top">访问官网</a>
+</p>
 
-AI Terminal 是一个把 AI 助手、SSH 远程终端和本地终端放在同一个界面里的跨平台工具。你用自然语言描述目标，Agent 负责规划、执行命令、检查结果并给出结论；危险操作会先经过安全校验和你的确认。
+## 为什么是 AI Terminal
 
-它面向真实的服务器操作场景，而不是只会聊天的终端壳：
+普通聊天助手只告诉你怎么做；AI Terminal 直接在你的服务器上完成它，并把过程留成可追溯的操作单。
 
-- 远程连接可能是慢的、会断的，因此界面要能恢复、重试和继续任务
-- 服务器上的文件、权限和编码很容易出错，因此写入、上传、下载和补丁都要可验证、可回滚
-- 用户需要知道 AI 做了什么，因此每条命令、退出码、耗时和变更都要能看到
+| 普通聊天式助手 | AI Terminal |
+|---|---|
+| 给出一段可能需要修改的命令 | 在 SSH / 本地终端实际执行并校验 |
+| 对话结束就丢失上下文 | 计划、命令、退出码、证据和结论分层保留 |
+| 出错后只能重新描述 | 支持重试、重连、继续任务和失败恢复 |
+| 文件修改靠手工复制 | SFTP 上传/下载、原子写入、字节级补丁与回滚 |
+| 多台机器来回切 | 多主机编排、批量执行和按主机结果矩阵 |
+
+## 一眼看懂
+
+`5 个平台` · `14 种界面语言` · `22 个 AI 供应商` · `90+ 预设模型` · `300+ 知识库条目` · `7 种联网搜索源`
 
 ## 核心能力
 
@@ -53,7 +67,14 @@ AI Terminal 是一个把 AI 助手、SSH 远程终端和本地终端放在同一
 - **失败恢复**：权限不足、断线、超时会给出针对性动作，可重试失败主机或继续任务
 - **多主机矩阵**：批量/广播操作按主机展示状态、耗时和输出
 
-### 远程文件操作
+### 服务器与连接管理
+
+- SSH 远程终端 + 本地 PTY 终端，多标签共享连接池
+- 服务器分组、搜索、快速连接，一键打开终端或 SFTP
+- CPU、内存、磁盘、上传/下载实时监控条，多主机并行查看
+- 重连、断线提示、会话持久化和多标签隔离
+
+### 文件传输与编辑
 
 - `sftp_upload` / `sftp_download`：本地上传、服务器下载，支持单文件和目录递归
 - `file_write` / `file_patch`：绕过 shell 直接写文件或做字符串替换
@@ -62,9 +83,8 @@ AI Terminal 是一个把 AI 助手、SSH 远程终端和本地终端放在同一
 - 普通文本可直接用 `content` / `old` / `new`，不必让模型手算中文 base64
 - SFTP 编辑器会拒绝超大/非 UTF-8 文件，保存失败自动恢复
 
-### 运维工具
+### 运维工具链
 
-- **服务器监控**：CPU、内存、磁盘、网络，多主机并行查看
 - **Runbook 工作流**：内置巡检、安全、部署、维护模板，也支持自定义
 - **变更记录与审计日志**：操作人、时间、命令、结果、退出码可追溯
 - **安全时段**：限制允许修改的时间窗口
@@ -79,23 +99,15 @@ AI Terminal 是一个把 AI 助手、SSH 远程终端和本地终端放在同一
 - 知识库包含 300+ 条软件安装/配置条目，按平台匹配命令
 - API Key 只保存在系统安全存储中，不写入日志或明文配置
 
-### 体验
+### 体验与安全
 
 - **石墨青主题**：深色与浅色两套配色；青色用于交互与当前状态，金色用于数据强调
 - **中英文 Agent UI**：Agent 操作单和计划面板优先支持英文/中文，其它语言回退英文
 - **14 种界面语言**：简体中文、English、日本語、한국어、Deutsch、Français、Русский、Español、Português、العربية、Italiano、हिन्दी、ไทย、Tiếng Việt
 - **5 个平台**：macOS、Linux、Windows、Android、iOS
-- 本地 PTY 终端 + SSH 终端，多标签共享连接池
+- 系统 Keychain / Keystore 凭据存储、SafetyGuard 命令分级和危险操作确认
 
-## 看它怎么工作（GIF）
-
-<p align="center">
-  <img src="./docs/screenshots/agent-audit-workflow-dark-en.gif" width="900" alt="AI agent server audit workflow" />
-  <br />
-  <sub>真实模型执行 5 步服务器巡检：计划 → 命令执行 → 结果卡片 → 操作单结论（界面英文 / 深色）</sub>
-</p>
-
-## 截图：服务器管理与运维
+## 场景截图：服务器管理与运维
 
 | Agent 巡检结果 | 服务器管理 |
 |:---:|:---:|
@@ -223,11 +235,20 @@ flutter test
 - 14 种语言覆盖核心界面；最新 Agent 操作单文案目前以英文/中文为主，其它语言回退英文
 - 目录传输暂不并发，符号链接默认跳过
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=keiskeies%2Fai_terminal&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=keiskeies/ai_terminal&type=date&theme=dark&legend=top-left&sealed_token=FyozRNo4egxPOTdwfQfIh_ItOuNI-LZtpst2jeS2Gij7eQM6E1dCuh5rEFqtt1tsTUl-Xd_dLxLB3EmT6sUa_1idF4fWaEt4sbKFPGffv_7NHI0x_IMAmogzraL-oGSWWLk9Uz3J1Zt9FOQP4i6fwNr1HlQKFadRU2OQvJlETxLesUzXwkg3xpd9wRia" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=keiskeies/ai_terminal&type=date&legend=top-left&sealed_token=FyozRNo4egxPOTdwfQfIh_ItOuNI-LZtpst2jeS2Gij7eQM6E1dCuh5rEFqtt1tsTUl-Xd_dLxLB3EmT6sUa_1idF4fWaEt4sbKFPGffv_7NHI0x_IMAmogzraL-oGSWWLk9Uz3J1Zt9FOQP4i6fwNr1HlQKFadRU2OQvJlETxLesUzXwkg3xpd9wRia" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=keiskeies/ai_terminal&type=date&legend=top-left&sealed_token=FyozRNo4egxPOTdwfQfIh_ItOuNI-LZtpst2jeS2Gij7eQM6E1dCuh5rEFqtt1tsTUl-Xd_dLxLB3EmT6sUa_1idF4fWaEt4sbKFPGffv_7NHI0x_IMAmogzraL-oGSWWLk9Uz3J1Zt9FOQP4i6fwNr1HlQKFadRU2OQvJlETxLesUzXwkg3xpd9wRia" />
+ </picture>
+</a>
+
 ## 链接
 
 - [官网](https://ai-terminal.keiskei.top)
 - [Releases](https://github.com/keiskeies/ai_terminal/releases)
-- [常见问题](./QUESTION.md)
 - [操作单设计文档](./docs/agent-operation-sheet-design.md)
 - [Issue Tracker](https://github.com/keiskeies/ai_terminal/issues)
 
