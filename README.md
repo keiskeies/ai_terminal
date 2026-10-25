@@ -89,9 +89,18 @@ AI Terminal 是一个把 AI 助手、SSH 远程终端和本地终端放在同一
 
 ## 截图
 
-| Agent 操作单（英文 / 深色） | 外观设置（英文 / 深色） |
+| Agent 操作单 + 实时监控 | 运维工具与自动化 |
 |:---:|:---:|
-| <img src="./docs/screenshots/operation-sheet-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-dark-en.png" width="440" /> |
+| <img src="./docs/screenshots/operation-sheet-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> |
+
+| 变更记录与审计 | 外观与主题 |
+|:---:|:---:|
+| <img src="./docs/screenshots/change-records-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-dark-en.png" width="440" /> |
+
+- **Agent 操作单**：目标、执行计划、验证结论、变更建议和证据折叠；底部同时显示 CPU/内存/磁盘/网络监控。
+- **运维工具**：服务器、快捷命令、Runbook、变更记录、操作日志、安全时段、任务通知集中在一个入口。
+- **变更记录**：命令、时间、结果和主机可追溯；截图中的主机 IP 已隐藏。
+- **外观与主题**：深色/浅色石墨青主题切换、终端字号调整。
 
 ## 下载安装
 

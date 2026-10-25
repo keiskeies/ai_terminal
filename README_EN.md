@@ -89,9 +89,18 @@ Instead of stacking thinking, commands, and output into one long chat transcript
 
 ## Screenshots
 
-| Agent operation sheet (English / dark) | Appearance settings (English / dark) |
+| Agent operation sheet + live metrics | Operations toolkit |
 |:---:|:---:|
-| <img src="./docs/screenshots/operation-sheet-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-dark-en.png" width="440" /> |
+| <img src="./docs/screenshots/operation-sheet-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> |
+
+| Change records & audit | Appearance & themes |
+|:---:|:---:|
+| <img src="./docs/screenshots/change-records-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-dark-en.png" width="440" /> |
+
+- **Agent Operation Sheet**: goal, execution plan, verified conclusion, next actions and folded evidence; live CPU/memory/disk/network metrics stay visible below the terminal.
+- **Operations toolkit**: servers, snippets, runbooks, change records, activity log, safe hours and notifications in one place.
+- **Change records**: command, time, result and host are traceable; host IPs are redacted in the screenshot.
+- **Appearance & themes**: switch between graphite dark/light themes and adjust terminal font size.
 
 ## Download
 
