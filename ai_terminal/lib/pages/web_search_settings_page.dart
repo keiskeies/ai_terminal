@@ -8,6 +8,7 @@ import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../services/web_search_config.dart';
 import '../services/web_search_service.dart';
+import '../core/app_toast.dart';
 
 /// 联网搜索设置页（多后端聚合）
 ///
@@ -1308,7 +1309,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
   void _showSnack(String message, {bool error = false}) {
     if (!mounted) return;
     final tc = ThemeColors.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
+    showTopSnackBar(context, 
       SnackBar(
         content: Text(message),
         duration: const Duration(seconds: 2),

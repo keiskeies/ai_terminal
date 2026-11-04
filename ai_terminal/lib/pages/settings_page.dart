@@ -12,6 +12,7 @@ import '../providers/app_providers.dart';
 import '../services/knowledge_service.dart';
 import '../services/crash_reporter.dart';
 import '../services/health_check_service.dart';
+import '../core/app_toast.dart';
 
 /// P1-5: 设置页信息架构重组
 /// 按用户任务场景分组：连接管理、AI 与智能、外观与体验、关于
@@ -180,7 +181,7 @@ class SettingsPage extends ConsumerWidget {
                       onPressed: () => _checkForUpdate(context),
                       child: Text(l10n.settingsCheckUpdate),
                     ),
-                    onTap: () {},
+                    onTap: () => _showAboutApp(context),
                   ),
                   _SettingItem(
                     icon: Icons.security,
@@ -326,13 +327,25 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
+  Future<void> _showAboutApp(BuildContext context) async {
+    final info = await PackageInfo.fromPlatform();
+    if (!context.mounted) return;
+    showAboutDialog(
+      context: context,
+      applicationName: 'AI Terminal',
+      applicationVersion: info.version,
+      applicationLegalese:
+          '本应用使用 MiSans 字体（© Xiaomi）。\nThis app uses the MiSans font (© Xiaomi).',
+    );
+  }
+
   Future<void> _checkForUpdate(BuildContext context) async {
     final l10n = AppLocalizations.of(context)!;
     try {
       final info = await PackageInfo.fromPlatform();
       if (!context.mounted) return;
       // 简单实现：显示当前版本信息
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(
           content: Text('${l10n.settingsVersion}: ${info.version}'),
           duration: const Duration(seconds: 2),
@@ -341,7 +354,7 @@ class SettingsPage extends ConsumerWidget {
       );
     } catch (e) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(
           content: Text('$e'),
           backgroundColor: cDanger,
@@ -427,7 +440,7 @@ class SettingsPage extends ConsumerWidget {
                         final content = await crashReporter.readLog();
                         if (!ctx.mounted) return;
                         if (content.isEmpty) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                          showTopSnackBar(ctx, const SnackBar(
                             content: Text('崩溃日志为空'),
                             behavior: SnackBarBehavior.floating,
                           ));
@@ -435,7 +448,7 @@ class SettingsPage extends ConsumerWidget {
                         }
                         await Clipboard.setData(ClipboardData(text: content));
                         if (!ctx.mounted) return;
-                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                        showTopSnackBar(ctx, SnackBar(
                           content: Text('已复制 ${content.length} 字符'),
                           backgroundColor: cSuccess,
                           behavior: SnackBarBehavior.floating,
@@ -449,7 +462,7 @@ class SettingsPage extends ConsumerWidget {
                         await crashReporter.clearLog();
                         if (!ctx.mounted) return;
                         Navigator.pop(ctx);
-                        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                        showTopSnackBar(ctx, const SnackBar(
                           content: Text('已清除崩溃日志'),
                           backgroundColor: cSuccess,
                           behavior: SnackBarBehavior.floating,
@@ -523,7 +536,7 @@ class SettingsPage extends ConsumerWidget {
       Navigator.pop(context); // 关闭加载对话框
 
       final isSuccess = result.startsWith('更新成功') || result.startsWith('Update success');
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(
           content: Text(result),
           duration: Duration(seconds: isSuccess ? 2 : 4),
@@ -535,7 +548,7 @@ class SettingsPage extends ConsumerWidget {
       if (!context.mounted) return;
       Navigator.pop(context); // 关闭加载对话框
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(
           content: Text('$e'),
           backgroundColor: cDanger,
