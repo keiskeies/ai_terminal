@@ -6,6 +6,8 @@
   "address": "Địa chỉ",
   "agentNotInitialized": "Vui lòng khởi tạo Agent và kết nối máy chủ trước",
   "agentRunning": "Tác nhân đang thực thi tác vụ, vui lòng đợi",
+  "agentSettingAiTimeoutDesc": "Bị coi là quá hạn nếu không có đầu ra từ mô hình trong khoảng này. Tăng lên với mô hình cục bộ chậm.",
+  "agentSettingAiTimeoutLabel": "Hết thời gian phản hồi AI",
   "agentSettingAutoExecSection": "AI Auto Execution",
   "agentSettingBuiltInPrompt": "AI Built-in Instructions",
   "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",

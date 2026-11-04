@@ -338,7 +338,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
                   fontSize: fMicro,
                   color: tc.textSub,
                   fontWeight: FontWeight.w500,
-                  fontFamily: 'JetBrainsMono',
+                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -375,7 +375,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
               fontSize: fMicro,
               color: color,
               fontWeight: FontWeight.w600,
-              fontFamily: 'JetBrainsMono',
+              fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
             ),
           ),
           const SizedBox(width: 4),
@@ -765,7 +765,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
               width: 70,
               child: Text(
                 mount,
-                style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono'),
+                style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
                 textAlign: TextAlign.left,
               ),
             ),
@@ -773,7 +773,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
             Expanded(
               child: Text(
                 used,
-                style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono'),
+                style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
                 textAlign: TextAlign.left,
               ),
             ),
@@ -782,7 +782,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
               width: 50,
               child: Text(
                 percent,
-                style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono'),
+                style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
                 textAlign: TextAlign.right,
               ),
             ),
@@ -802,7 +802,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
                 width: 70,
                 child: Text(
                   mount,
-                  style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono'),
+                  style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.left,
                 ),
@@ -811,7 +811,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
               Expanded(
                 child: Text(
                   used,
-                  style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono'),
+                  style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
                   textAlign: TextAlign.left,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -821,7 +821,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
                 width: 50,
                 child: Text(
                   percent,
-                  style: TextStyle(fontSize: fMicro, color: barColor, fontWeight: FontWeight.w600, fontFamily: 'JetBrainsMono'),
+                  style: TextStyle(fontSize: fMicro, color: barColor, fontWeight: FontWeight.w600, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
                   textAlign: TextAlign.right,
                 ),
               ),
@@ -871,6 +871,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
       color: isHeader ? tc.textMuted : tc.textSub,
       fontWeight: isHeader ? FontWeight.w500 : FontWeight.normal,
       fontFamily: isHeader ? null : 'JetBrainsMono',
+      fontFamilyFallback: isHeader ? null : kMonoFontFallback,
     );
     final issuesStyle = style.copyWith(
       color: issuesColor ?? style.color,
@@ -954,7 +955,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
                   style: TextStyle(
                     fontSize: fMicro,
                     color: tc.textSub,
-                    fontFamily: 'JetBrainsMono',
+                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                     fontWeight: FontWeight.w500,
                   ),
                   textAlign: TextAlign.right,
@@ -988,7 +989,7 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
                   style: TextStyle(
                     fontSize: fMicro,
                     color: tc.textSub,
-                    fontFamily: 'JetBrainsMono',
+                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                     fontWeight: FontWeight.w500,
                   ),
                   textAlign: TextAlign.right,

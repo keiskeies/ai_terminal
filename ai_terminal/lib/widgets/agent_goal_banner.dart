@@ -122,7 +122,7 @@ class AgentGoalBanner extends StatelessWidget {
                   style: TextStyle(
                     color: tc.textSub,
                     fontSize: fMicro,
-                    fontFamily: 'JetBrainsMono',
+                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                   ),
                 ),
                 if (!isFinished)

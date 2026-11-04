@@ -18,6 +18,7 @@ class _NullProvider implements AIProvider {
     required AIModelConfig config,
     String? systemPrompt,
     CancelToken? cancelToken,
+    Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
   }) async =>

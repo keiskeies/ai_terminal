@@ -11,6 +11,7 @@ import '../models/token_usage.dart';
 import '../models/plan_step.dart';
 import '../utils/agent_ui_text.dart';
 import 'plan_panel.dart';
+import '../core/app_toast.dart';
 
 /// 操作单：一轮 Agent 任务的结论 + 元数据 + 可折叠证据
 ///
@@ -403,8 +404,8 @@ class OperationSheet extends StatelessWidget {
       }
     }
     Clipboard.setData(ClipboardData(text: buffer.toString().trimRight()));
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
+    clearTopToast();
+    showTopSnackBar(context, 
       SnackBar(
         content: Text(
           AgentUiText.of(context).operationCopied,
@@ -453,6 +454,7 @@ class OperationSheet extends StatelessWidget {
           color: color,
           fontSize: fMicro,
           fontFamily: mono ? 'JetBrainsMono' : null,
+          fontFamilyFallback: mono ? kMonoFontFallback : null,
           fontWeight: FontWeight.w500,
         ),
       );
@@ -567,7 +569,7 @@ class OperationSheet extends StatelessWidget {
                           style: TextStyle(
                             color: tc.textBody,
                             fontSize: fMicro,
-                            fontFamily: 'JetBrainsMono',
+                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -585,7 +587,7 @@ class OperationSheet extends StatelessWidget {
                           style: TextStyle(
                             color: tc.ok,
                             fontSize: fMicro,
-                            fontFamily: 'JetBrainsMono',
+                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -597,7 +599,7 @@ class OperationSheet extends StatelessWidget {
                           style: TextStyle(
                             color: tc.error,
                             fontSize: fMicro,
-                            fontFamily: 'JetBrainsMono',
+                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -900,6 +902,7 @@ List<Widget> buildMetricItems({
         color: color,
         fontSize: fMicro,
         fontFamily: mono ? 'JetBrainsMono' : null,
+        fontFamilyFallback: mono ? kMonoFontFallback : null,
         fontWeight: FontWeight.w500,
       ),
     ));
@@ -1049,7 +1052,7 @@ class AgentMetricsBar extends StatelessWidget {
               style: TextStyle(
                 color: tc.gold,
                 fontSize: fMicro,
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -1220,6 +1223,7 @@ class _LiveOperationBarState extends State<LiveOperationBar> {
           color: color,
           fontSize: fMicro,
           fontFamily: mono ? 'JetBrainsMono' : null,
+          fontFamilyFallback: mono ? kMonoFontFallback : null,
           fontWeight: FontWeight.w500,
         ),
       ));

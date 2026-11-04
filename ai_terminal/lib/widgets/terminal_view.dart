@@ -284,7 +284,8 @@ class _TerminalViewState extends State<TerminalView> {
         onKeyEvent: _handleKeyEvent,
         textStyle: xterm.TerminalStyle(
           fontSize: widget.fontSize,
-          fontFamily: 'JetBrainsMono, Menlo, Monaco, Courier New, monospace',
+          fontFamily: 'JetBrainsMono',
+          fontFamilyFallback: kMonoFontFallback,
         ),
         theme: _theme,
       ),

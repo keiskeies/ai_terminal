@@ -6,6 +6,7 @@ import '../core/theme_colors.dart';
 import '../l10n/app_localizations.dart';
 import '../models/command_snippet.dart';
 import '../providers/app_providers.dart';
+import '../core/app_toast.dart';
 
 const _uuid = Uuid();
 
@@ -79,7 +80,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontFamily: 'JetBrainsMono',
+            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
             fontSize: fSmall,
             color: tc.terminalGreen,
           ),
@@ -147,7 +148,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
               child: SelectableText(
                 snippet.command,
                 style: TextStyle(
-                  fontFamily: 'JetBrainsMono',
+                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                   fontSize: fMono,
                   color: tc.terminalGreen,
                 ),
@@ -178,7 +179,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
               final resolved = snippet.resolveCommand(
                 controllers.map((k, c) => MapEntry(k, c.text)),
               );
-              ScaffoldMessenger.of(context).showSnackBar(
+              showTopSnackBar(context, 
                 SnackBar(
                   content: SelectableText(l10n.snippetResolvedCommand(resolved)),
                   action: SnackBarAction(
@@ -282,7 +283,7 @@ class _SnippetDialogState extends State<SnippetDialog> {
                   hintText: '例如: docker exec -it {{container}} /bin/bash',
                   hintStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
                 ),
-                style: const TextStyle(fontFamily: 'JetBrainsMono', fontSize: fMono),
+                style: const TextStyle(fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback, fontSize: fMono),
                 validator: (v) => v?.isEmpty == true ? l10n.snippetCommandRequired : null,
               ),
               const SizedBox(height: 12),

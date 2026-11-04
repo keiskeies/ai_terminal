@@ -82,10 +82,15 @@ flutter:
     - assets/icons/logo_mark_light.svg
     - assets/knowledge/
     - assets/config/
+    - assets/fonts/MiSans/MiSans-License.pdf
   fonts:
+    - family: MiSans
+      fonts:
+        - asset: assets/fonts/MiSans/MiSans-VF.ttf
     - family: JetBrainsMono
       fonts:
         - asset: assets/fonts/JetBrainsMono-Regular.ttf
+          weight: 400
         - asset: assets/fonts/JetBrainsMono-Bold.ttf
           weight: 700
 

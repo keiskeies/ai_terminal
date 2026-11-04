@@ -188,6 +188,9 @@ const List<BoxShadow> shadowLargeLight = shadowLg;
 const List<BoxShadow> shadowXLLight = shadowXl;
 
 // ===== 字体 =====
+const String kFontFamily = 'MiSans';
+const List<String> kMonoFontFallback = <String>[kFontFamily];
+
 const double fHero = 28.0;
 const double fDisplay = 24.0;
 const double fTitle = 16.0;

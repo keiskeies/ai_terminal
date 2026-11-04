@@ -130,12 +130,22 @@ class ConversationService {
 
   /// 原子追加 user + assistant 消息对（消除两次 save 之间的崩溃窗口）
   /// 防止崩溃后留下孤儿 user 消息（有用户提问但无 AI 回复占位）
+  ///
+  /// [conversationId] 指定时写入该会话，而不是 host 当前的 active 会话。
+  /// 多 tab 并行场景必须走这条路径：另一个 tab 新建会话会改变 host 的
+  /// active 会话，但正在执行的任务仍应写回自己开始时所在的会话。
   Future<Conversation> appendMessagePair(
     String hostId, {
     required String userContent,
     required String assistantContent,
+    String? conversationId,
   }) async {
-    final conv = getOrCreateActiveSession(hostId);
+    final conv = conversationId == null
+        ? getOrCreateActiveSession(hostId)
+        : ConversationsDao.getCachedById(conversationId);
+    if (conv == null) {
+      throw StateError('conversation not found: $conversationId');
+    }
     final isFirstUserMessage = !conv.messages.any((m) => m.isUser);
     conv.addMessage(ConvMessage.create(role: 'user', content: userContent));
     conv.addMessage(ConvMessage.create(role: 'assistant', content: assistantContent));
@@ -150,13 +160,16 @@ class ConversationService {
     return conv;
   }
 
-  /// 更新 active 会话的最后一条 assistant 消息内容（用于流式结束后回写完整内容）
+  /// 更新指定会话的最后一条 assistant 消息内容（用于流式结束后回写完整内容）
   Future<void> updateLastAssistantContent(
     String hostId,
     String content, {
     List<AgentEvent>? events,
+    String? conversationId,
   }) async {
-    final conv = getActiveSession(hostId);
+    final conv = conversationId == null
+        ? getActiveSession(hostId)
+        : ConversationsDao.getCachedById(conversationId);
     if (conv == null || conv.messages.isEmpty) return;
     final lastIdx = conv.messages.length - 1;
     if (conv.messages[lastIdx].role != 'assistant') return;
@@ -168,7 +181,9 @@ class ConversationService {
     try {
       await ConversationsDao.upsert(conv);
     } catch (e) {
-      debugPrint('[ConversationService] updateLastAssistantContent 保存失败 (hostId=$hostId): $e');
+      debugPrint(
+          '[ConversationService] updateLastAssistantContent 保存失败 '
+          '(hostId=$hostId, conversationId=${conv.id}): $e');
       rethrow;
     }
   }
@@ -179,8 +194,11 @@ class ConversationService {
     required String level,
     required String tag,
     required String message,
+    String? conversationId,
   }) async {
-    final conv = getActiveSession(hostId);
+    final conv = conversationId == null
+        ? getActiveSession(hostId)
+        : ConversationsDao.getCachedById(conversationId);
     if (conv == null) return;
     conv.addAgentLog(ConvAgentLog.create(
       timestamp: DateTime.now(),

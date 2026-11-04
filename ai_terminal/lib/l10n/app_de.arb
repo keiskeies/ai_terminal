@@ -6,6 +6,8 @@
   "address": "Adresse",
   "agentNotInitialized": "Bitte initialisieren Sie den Agenten und verbinden Sie sich zuerst mit einem Host",
   "agentRunning": "Agent führt Aufgabe aus, bitte warten",
+  "agentSettingAiTimeoutDesc": "Als Zeitüberschreitung gewertet, wenn so lange keine Modellausgabe eintrifft. Für langsame lokale Modelle erhöhen.",
+  "agentSettingAiTimeoutLabel": "KI-Antwort-Timeout",
   "agentSettingAutoExecSection": "AI Auto Execution",
   "agentSettingBuiltInPrompt": "AI Built-in Instructions",
   "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",

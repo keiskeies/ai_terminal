@@ -3,6 +3,7 @@ import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../l10n/app_localizations.dart';
 import '../services/change_window_service.dart';
+import '../core/app_toast.dart';
 
 /// 变更窗口/封网期设置页
 ///
@@ -44,7 +45,7 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
     try {
       await ChangeWindowService.save(cfg);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(
           content: Text(l10n.changeWindowSaved),
           backgroundColor: cSuccess,
@@ -53,7 +54,7 @@ class _ChangeWindowPageState extends State<ChangeWindowPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(
           content: Text(l10n.changeWindowSaveFailed(e.toString())),
           backgroundColor: cDanger,

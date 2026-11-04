@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/app_toast.dart';
 
 /// 打开原始输出查看器（底部面板，支持搜索与复制）
 Future<void> showOutputViewer(
@@ -97,8 +98,8 @@ class _OutputViewerSheetState extends State<OutputViewerSheet> {
                       color: tc.textSub,
                       onTap: () {
                         Clipboard.setData(ClipboardData(text: widget.text));
-                        ScaffoldMessenger.of(context).clearSnackBars();
-                        ScaffoldMessenger.of(context).showSnackBar(
+                        clearTopToast();
+                        showTopSnackBar(context, 
                           const SnackBar(
                             content: Text('已复制',
                                 style: TextStyle(fontSize: fSmall)),
@@ -169,7 +170,7 @@ class _OutputViewerSheetState extends State<OutputViewerSheet> {
                     child: SelectableText(
                       display,
                       style: TextStyle(
-                        fontFamily: 'JetBrainsMono',
+                        fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                         fontSize: fMono,
                         color: tc.textBody,
                         height: 1.4,

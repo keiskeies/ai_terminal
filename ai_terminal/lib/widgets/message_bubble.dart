@@ -96,7 +96,7 @@ class MessageBubble extends StatelessWidget {
                                 fontWeight: FontWeight.w500,
                               ),
                               code: TextStyle(
-                                fontFamily: 'JetBrainsMono',
+                                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                                 fontSize: fMono,
                                 fontWeight: FontWeight.w500,
                                 color: tc.textMain,

@@ -6,6 +6,8 @@
   "address": "주소",
   "agentNotInitialized": "에이전트를 초기화하고 먼저 호스트에 연결하세요",
   "agentRunning": "에이전트가 작업을 실행 중입니다. 완료될 때까지 기다려주세요",
+  "agentSettingAiTimeoutDesc": "이 시간 동안 모델 출력이 없으면 시간 초과로 판단합니다. 느린 로컬 모델은 값을 늘리세요.",
+  "agentSettingAiTimeoutLabel": "AI 응답 시간 초과",
   "agentSettingAutoExecSection": "AI Auto Execution",
   "agentSettingBuiltInPrompt": "AI Built-in Instructions",
   "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",

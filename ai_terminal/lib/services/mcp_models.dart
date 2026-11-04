@@ -240,6 +240,41 @@ class McpServerConfig {
         autoConnect: true,
         toolExposure: McpToolExposure.readOnly,
       );
+
+  /// 官方 filesystem MCP（stdio，通过 npx 启动）
+  ///
+  /// [directory] 会成为服务端唯一的允许访问目录；可以传多个目录（用换行分隔）。
+  static McpServerConfig presetFilesystem(String directory) {
+    final dirs = directory
+        .split(RegExp(r'[\r\n]+'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    return McpServerConfig(
+      id: 'filesystem',
+      name: 'filesystem',
+      transport: McpTransportKind.stdio,
+      command: 'npx',
+      args: ['-y', '@modelcontextprotocol/server-filesystem', ...dirs],
+      enabled: true,
+      autoConnect: true,
+      toolExposure: McpToolExposure.readOnly,
+    );
+  }
+
+  /// Upstash Context7 MCP（stdio，通过 npx 启动）
+  ///
+  /// 无 Key 可用（低额度）；更高额度可在 env 填 CONTEXT7_API_KEY。
+  static McpServerConfig presetContext7() => const McpServerConfig(
+        id: 'context7',
+        name: 'context7',
+        transport: McpTransportKind.stdio,
+        command: 'npx',
+        args: ['-y', '@upstash/context7-mcp'],
+        enabled: true,
+        autoConnect: true,
+        toolExposure: McpToolExposure.readOnly,
+      );
 }
 
 /// 服务器连接状态

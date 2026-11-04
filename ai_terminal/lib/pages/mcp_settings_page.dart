@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
@@ -8,6 +9,7 @@ import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../services/mcp_manager.dart';
 import '../services/mcp_models.dart';
+import '../core/app_toast.dart';
 
 /// MCP 服务器设置页
 class McpSettingsPage extends StatefulWidget {
@@ -84,6 +86,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     ThemeColors tc,
   ) {
     final connected = runtimes.where((r) => r.isConnected).length;
+    final enabled = manager.enabled;
     return Container(
       padding: const EdgeInsets.all(pStandard),
       decoration: BoxDecoration(
@@ -100,8 +103,10 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '已连接 $connected/${runtimes.length} 个服务器 · '
-                  '已暴露 ${manager.exposedToolCount} 个工具',
+                  enabled
+                      ? '已连接 $connected/${runtimes.length} 个服务器 · '
+                          'Agent 可用 ${manager.exposedToolCount} 个工具'
+                      : 'MCP 总开关已关闭 · 已连接 0/${runtimes.length} 个服务器',
                   style: TextStyle(
                     color: tc.textMain,
                     fontSize: fBody,
@@ -113,14 +118,49 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'MCP 工具通过 Function Calling 暴露给 Agent；默认只启用 readOnly 工具，'
+            'MCP 工具通过 Function Calling 提供给 Agent；默认只启用 readOnly 工具，'
             'destructive 工具会走用户确认，只读模式下非只读工具会被拦截。'
             'stdio 仅桌面端可用。',
             style: TextStyle(color: tc.textSub, fontSize: fSmall, height: 1.5),
           ),
+          const SizedBox(height: 6),
+          Divider(height: 1, color: tc.hairline),
+          Row(
+            children: [
+              Switch(
+                value: enabled,
+                onChanged: (value) =>
+                    unawaited(_setGlobalEnabled(value)),
+                activeThumbColor: tc.brand,
+                activeTrackColor: tc.brandBg,
+                inactiveThumbColor: tc.textMuted,
+                inactiveTrackColor: tc.surface,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '启用 MCP（总开关）。关闭后断开所有服务器，Agent 不再看到 MCP 工具；'
+                  '各服务器的启用配置会保留，重新打开后按配置恢复连接。',
+                  style: TextStyle(
+                    color: tc.textSub,
+                    fontSize: fSmall,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _setGlobalEnabled(bool value) async {
+    try {
+      await McpManager.instance.setGlobalEnabled(value);
+    } catch (e) {
+      _snack('切换 MCP 总开关失败：$e', error: true);
+    }
   }
 
   Widget _buildQuickAdd(ThemeColors tc) {
@@ -139,6 +179,16 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
           label: const Text('Parallel MCP'),
           avatar: const Icon(Icons.add_link, size: 15),
           onPressed: () => _addPreset(McpServerConfig.presetParallel()),
+        ),
+        ActionChip(
+          label: const Text('Filesystem'),
+          avatar: const Icon(Icons.folder_outlined, size: 15),
+          onPressed: () => unawaited(_addFilesystemPreset()),
+        ),
+        ActionChip(
+          label: const Text('Context7'),
+          avatar: const Icon(Icons.menu_book_outlined, size: 15),
+          onPressed: () => _addPreset(McpServerConfig.presetContext7()),
         ),
         ActionChip(
           label: const Text('自定义'),
@@ -184,6 +234,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
   Widget _buildServerCard(McpServerRuntime runtime, ThemeColors tc) {
     final config = runtime.config;
     final statusColor = _statusColor(runtime.status, tc);
+    final globalEnabled = McpManager.instance.enabled;
     return Container(
       decoration: BoxDecoration(
         color: tc.card,
@@ -293,13 +344,16 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
                   )
                 else
                   OutlinedButton.icon(
-                    onPressed: () {
-                      if (runtime.isConnected) {
-                        unawaited(McpManager.instance.disconnect(config.id));
-                      } else {
-                        unawaited(McpManager.instance.connect(config.id));
-                      }
-                    },
+                    onPressed: !globalEnabled
+                        ? null
+                        : () {
+                            if (runtime.isConnected) {
+                              unawaited(
+                                  McpManager.instance.disconnect(config.id));
+                            } else {
+                              unawaited(McpManager.instance.connect(config.id));
+                            }
+                          },
                     icon: Icon(
                       runtime.isConnected
                           ? Icons.link_off
@@ -323,22 +377,27 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
                 runtime.prompts.isNotEmpty ||
                 runtime.logs.isNotEmpty) ...[
               const SizedBox(height: 4),
-              Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  childrenPadding: const EdgeInsets.only(bottom: 8),
-                  title: Text(
-                    '工具与能力',
-                    style: TextStyle(color: tc.textBody, fontSize: fSmall),
+              Material(
+                type: MaterialType.transparency,
+                child: Theme(
+                  data: Theme.of(context)
+                      .copyWith(dividerColor: Colors.transparent),
+                  child: ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    childrenPadding: const EdgeInsets.only(bottom: 8),
+                    title: Text(
+                      '工具与能力',
+                      style: TextStyle(color: tc.textBody, fontSize: fSmall),
+                    ),
+                    children: [
+                      if (runtime.tools.isNotEmpty) _buildTools(runtime, tc),
+                      if (runtime.resources.isNotEmpty)
+                        _buildResources(runtime, tc),
+                      if (runtime.prompts.isNotEmpty)
+                        _buildPrompts(runtime, tc),
+                      _buildLogs(runtime, tc),
+                    ],
                   ),
-                  children: [
-                    if (runtime.tools.isNotEmpty) _buildTools(runtime, tc),
-                    if (runtime.resources.isNotEmpty)
-                      _buildResources(runtime, tc),
-                    if (runtime.prompts.isNotEmpty) _buildPrompts(runtime, tc),
-                    _buildLogs(runtime, tc),
-                  ],
                 ),
               ),
             ],
@@ -349,6 +408,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
   }
 
   Widget _authBanner(McpServerRuntime runtime, ThemeColors tc) {
+    final globalEnabled = McpManager.instance.enabled;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(10),
@@ -369,8 +429,10 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
             runSpacing: 8,
             children: [
               FilledButton.icon(
-                onPressed: () =>
-                    unawaited(McpManager.instance.login(runtime.config.id)),
+                onPressed: globalEnabled
+                    ? () =>
+                        unawaited(McpManager.instance.login(runtime.config.id))
+                    : null,
                 icon: const Icon(Icons.login, size: 15),
                 label: const Text('登录授权'),
               ),
@@ -476,7 +538,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
             )
           else
             Text(
-              exposed ? '已暴露' : '未暴露',
+              exposed ? 'Agent 可用' : '未开放',
               style: TextStyle(
                 color: exposed ? tc.ok : tc.textMuted,
                 fontSize: fMicro,
@@ -596,7 +658,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
               style: TextStyle(
                 color: tc.textMuted,
                 fontSize: fMicro,
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                 height: 1.35,
               ),
             ),
@@ -664,6 +726,24 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
 
   void _addPreset(McpServerConfig preset) {
     _openEditor(preset.copyWith(id: _newId()), isNew: true);
+  }
+
+  Future<void> _addFilesystemPreset() async {
+    String? directory;
+    try {
+      directory = await FilePicker.platform.getDirectoryPath(
+        dialogTitle: '选择 filesystem MCP 允许访问的目录',
+      );
+    } catch (e) {
+      _snack('打开目录选择器失败：$e', error: true);
+      return;
+    }
+    if (directory == null || directory.trim().isEmpty) return;
+    _openEditor(
+      McpServerConfig.presetFilesystem(directory.trim())
+          .copyWith(id: _newId()),
+      isNew: true,
+    );
   }
 
   String _newId() => 'mcpx_${const Uuid().v4().substring(0, 8)}';
@@ -848,7 +928,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
   void _snack(String message, {bool error = false}) {
     if (!mounted) return;
     final tc = ThemeColors.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
+    showTopSnackBar(context, 
       SnackBar(
         content: Text(message),
         duration: const Duration(seconds: 2),
@@ -1007,7 +1087,14 @@ class _McpServerEditorDialogState extends State<_McpServerEditorDialog> {
                       const SizedBox(height: 12),
                       _field('环境变量（每行 KEY=VALUE）', _env, maxLines: 3),
                       const SizedBox(height: 6),
-                      _hint('Windows 下 npx / pnpm / yarn / uvx 会自动补 .cmd；stdio 仅桌面端可用。'),
+                      _hint(
+                        '需要本机安装 Node.js。Windows 下 npx/pnpm/yarn/uvx 会自动补 .cmd。\n'
+                        'filesystem：npx -y @modelcontextprotocol/server-filesystem <允许目录>，'
+                        '可传多个目录（每个参数一个）。\n'
+                        'context7：npx -y @upstash/context7-mcp；可无 Key 使用，'
+                        '更高额度在环境变量填 CONTEXT7_API_KEY。\n'
+                        '首次运行 npx 会联网下载包，可能较慢。',
+                      ),
                     ] else ...[
                       _field('服务器 URL', _url, hint: 'https://example.com/mcp'),
                       const SizedBox(height: 12),
@@ -1026,7 +1113,7 @@ class _McpServerEditorDialogState extends State<_McpServerEditorDialog> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<McpToolExposure>(
                       initialValue: _exposure,
-                      decoration: const InputDecoration(labelText: '工具暴露策略'),
+                      decoration: const InputDecoration(labelText: 'Agent 可用工具'),
                       items: const [
                         DropdownMenuItem(
                           value: McpToolExposure.readOnly,
@@ -1048,8 +1135,8 @@ class _McpServerEditorDialogState extends State<_McpServerEditorDialog> {
                     const SizedBox(height: 8),
                     _switchRow('启用服务器', _enabled, (v) => setState(() => _enabled = v)),
                     _switchRow('应用启动时自动连接', _autoConnect, (v) => setState(() => _autoConnect = v)),
-                    _switchRow('把资源暴露给 Agent', _exposeResources, (v) => setState(() => _exposeResources = v)),
-                    _switchRow('把提示词暴露给 Agent', _exposePrompts, (v) => setState(() => _exposePrompts = v)),
+                    _switchRow('允许 Agent 使用资源', _exposeResources, (v) => setState(() => _exposeResources = v)),
+                    _switchRow('允许 Agent 使用提示词', _exposePrompts, (v) => setState(() => _exposePrompts = v)),
                     if (_transport == McpTransportKind.streamableHttp) ...[
                       Divider(color: tc.hairline, height: 24),
                       _switchRow('使用 OAuth 授权', _oauth, (v) => setState(() => _oauth = v)),

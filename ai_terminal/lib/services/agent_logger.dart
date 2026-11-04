@@ -29,6 +29,24 @@ class AgentLogger {
   /// 订阅器据此将日志写入对应会话，避免多 host 串台
   String? currentHostId;
 
+  /// 任务执行期间通过 Zone 携带 conversationId。同一服务器可能同时有多个
+  /// tab 在跑任务，仅靠 [currentHostId] 无法区分该写进哪个会话。
+  static final Object _conversationZoneKey = Object();
+
+  /// 在指定会话的日志作用域内执行 [body]。
+  /// 异步任务中的 await / Timer / 子任务会继承该 Zone，从而把日志写回
+  /// 任务开始时所在的会话，而不是 host 当前 active 会话。
+  Future<T> runWithConversation<T>(
+    String? conversationId,
+    Future<T> Function() body,
+  ) {
+    if (conversationId == null) return body();
+    return runZoned(
+      body,
+      zoneValues: {_conversationZoneKey: conversationId},
+    );
+  }
+
   /// 文件写入缓冲区：聚合多条件日志一次性异步写入
   final StringBuffer _fileBuffer = StringBuffer();
   Timer? _flushTimer;
@@ -77,10 +95,12 @@ class AgentLogger {
     // 通知订阅者（会话持久化层订阅，将日志写入对应 Conversation）
     // 复制监听器列表避免回调中修改列表导致并发问题
     if (_listeners.isNotEmpty) {
-      final listeners = List<void Function(String, String, String, DateTime, String?)>.from(_listeners);
+      final conversationId = Zone.current[_conversationZoneKey] as String?;
+      final listeners =
+          List<void Function(String, String, String, DateTime, String?, String?)>.from(_listeners);
       for (final l in listeners) {
         try {
-          l(level, tag, message, timestamp, currentHostId);
+          l(level, tag, message, timestamp, currentHostId, conversationId);
         } catch (e) { debugPrint('[AgentLogger] 日志监听器异常: $e'); }
       }
     }
@@ -162,11 +182,15 @@ class AgentLogger {
   // ═══════════════════════════════════════════
   // 日志订阅：供会话持久化层订阅，将日志写入对应 Conversation
   // ═══════════════════════════════════════════
-  final List<void Function(String level, String tag, String message, DateTime timestamp, String? hostId)> _listeners = [];
+  final List<void Function(String level, String tag, String message, DateTime timestamp, String? hostId, String? conversationId)> _listeners = [];
 
   /// 订阅日志写入事件（返回取消订阅的函数）
-  /// 回调参数 hostId 是日志产生时的当前 hostId，订阅方据此路由到对应会话
-  void Function() subscribe(void Function(String level, String tag, String message, DateTime timestamp, String? hostId) listener) {
+  /// 回调参数 hostId 是日志产生时的当前 hostId；conversationId 是任务通过
+  /// [runWithConversation] 绑定的会话 id，存在时优先按会话路由。
+  void Function() subscribe(
+      void Function(String level, String tag, String message, DateTime timestamp,
+              String? hostId, String? conversationId)
+          listener) {
     _listeners.add(listener);
     return () => _listeners.remove(listener);
   }

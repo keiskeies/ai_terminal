@@ -6,6 +6,8 @@
   "address": "ที่อยู่",
   "agentNotInitialized": "กรุณาเริ่มต้นเอเจนต์และเชื่อมต่อโฮสต์ก่อน",
   "agentRunning": "เอเจนต์กำลังทำงาน กรุณารอ",
+  "agentSettingAiTimeoutDesc": "ถือว่าหมดเวลาหากไม่มีเอาต์พุตจากโมเดลตามระยะนี้ เพิ่มค่าเมื่อใช้โมเดลโลคอลที่ช้า",
+  "agentSettingAiTimeoutLabel": "หมดเวลาตอบสนอง AI",
   "agentSettingAutoExecSection": "AI Auto Execution",
   "agentSettingBuiltInPrompt": "AI Built-in Instructions",
   "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",

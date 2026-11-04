@@ -6,6 +6,8 @@
   "address": "Dirección",
   "agentNotInitialized": "Inicialice el agente y conéctese primero a un host",
   "agentRunning": "El agente está ejecutando una tarea, espere",
+  "agentSettingAiTimeoutDesc": "Se considera agotado si no llega ninguna salida del modelo durante este tiempo. Auméntalo para modelos locales lentos.",
+  "agentSettingAiTimeoutLabel": "Tiempo de espera de respuesta de IA",
   "agentSettingAutoExecSection": "AI Auto Execution",
   "agentSettingBuiltInPrompt": "AI Built-in Instructions",
   "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",

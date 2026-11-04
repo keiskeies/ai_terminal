@@ -25,6 +25,7 @@ class AppTheme {
           color: cTextMain,
           fontSize: fTitle,
           fontWeight: FontWeight.w500,
+          fontFamily: kFontFamily,
         ),
         iconTheme: IconThemeData(color: cTextSub),
         surfaceTintColor: Colors.transparent,
@@ -61,9 +62,10 @@ class AppTheme {
           borderSide: const BorderSide(color: cStatusError, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        hintStyle: const TextStyle(color: cTextMuted),
+        hintStyle: const TextStyle(color: cTextMuted, fontFamily: kFontFamily),
       ),
-      textTheme: const TextTheme(
+      primaryTextTheme: ThemeData.dark().primaryTextTheme.apply(fontFamily: kFontFamily),
+      textTheme: ThemeData.dark().textTheme.merge(const TextTheme(
         bodyMedium: TextStyle(
           color: cTextMain,
           fontSize: fBody,
@@ -75,7 +77,7 @@ class AppTheme {
           fontWeight: FontWeight.w500,
         ),
         titleLarge: TextStyle(color: cTextMain, fontSize: fTitle, fontWeight: FontWeight.w500),
-      ),
+      )).apply(fontFamily: kFontFamily),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ButtonStyle(
           backgroundColor: WidgetStateProperty.resolveWith((states) {
@@ -165,8 +167,10 @@ class AppTheme {
         backgroundColor: cSurface,
         selectedColor: cBrand.withValues(alpha: 0.14),
         disabledColor: cSurface.withValues(alpha: 0.5),
-        labelStyle: const TextStyle(color: cTextBody, fontSize: fMicro, fontWeight: FontWeight.w500),
-        secondaryLabelStyle: const TextStyle(color: cBrand, fontSize: fMicro, fontWeight: FontWeight.w500),
+        labelStyle: const TextStyle(
+            color: cTextBody, fontSize: fMicro, fontWeight: FontWeight.w500, fontFamily: kFontFamily),
+        secondaryLabelStyle: const TextStyle(
+            color: cBrand, fontSize: fMicro, fontWeight: FontWeight.w500, fontFamily: kFontFamily),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(rFull),
@@ -180,8 +184,8 @@ class AppTheme {
         indicatorColor: cBrand,
         labelColor: cTextMain,
         unselectedLabelColor: cTextSub,
-        labelStyle: TextStyle(fontSize: fSmall, fontWeight: FontWeight.w500),
-        unselectedLabelStyle: TextStyle(fontSize: fSmall),
+        labelStyle: TextStyle(fontSize: fSmall, fontWeight: FontWeight.w500, fontFamily: kFontFamily),
+        unselectedLabelStyle: TextStyle(fontSize: fSmall, fontFamily: kFontFamily),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: cBrand,
@@ -195,7 +199,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(rSmall),
           border: Border.all(color: cBorder),
         ),
-        textStyle: const TextStyle(color: cTextMain, fontSize: fSmall),
+        textStyle: const TextStyle(color: cTextMain, fontSize: fSmall, fontFamily: kFontFamily),
       ),
       dividerTheme: const DividerThemeData(
         color: cHairline,
@@ -203,7 +207,7 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: cCardElevated,
-        contentTextStyle: const TextStyle(color: cTextMain),
+        contentTextStyle: const TextStyle(color: cTextMain, fontFamily: kFontFamily),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(rButton),
         ),
@@ -257,6 +261,7 @@ class AppTheme {
           color: cTextMainLight,
           fontSize: fTitle,
           fontWeight: FontWeight.w500,
+          fontFamily: kFontFamily,
         ),
         iconTheme: IconThemeData(color: cTextSubLight),
         surfaceTintColor: Colors.transparent,
@@ -293,9 +298,10 @@ class AppTheme {
           borderSide: const BorderSide(color: cStatusErrorLight, width: 1.5),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        hintStyle: const TextStyle(color: cTextMutedLight),
+        hintStyle: const TextStyle(color: cTextMutedLight, fontFamily: kFontFamily),
       ),
-      textTheme: const TextTheme(
+      primaryTextTheme: ThemeData.light().primaryTextTheme.apply(fontFamily: kFontFamily),
+      textTheme: ThemeData.light().textTheme.merge(const TextTheme(
         bodyMedium: TextStyle(
           color: cTextMainLight,
           fontSize: fBody,
@@ -307,7 +313,7 @@ class AppTheme {
           fontWeight: FontWeight.w500,
         ),
         titleLarge: TextStyle(color: cTextMainLight, fontSize: fTitle, fontWeight: FontWeight.w500),
-      ),
+      )).apply(fontFamily: kFontFamily),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ButtonStyle(
           backgroundColor: WidgetStateProperty.resolveWith((states) {
@@ -397,8 +403,10 @@ class AppTheme {
         backgroundColor: cSurfaceLight,
         selectedColor: cBrandLight.withValues(alpha: 0.12),
         disabledColor: cSurfaceLight.withValues(alpha: 0.5),
-        labelStyle: const TextStyle(color: cTextMainLight, fontSize: fMicro, fontWeight: FontWeight.w500),
-        secondaryLabelStyle: const TextStyle(color: cBrandLight, fontSize: fMicro, fontWeight: FontWeight.w500),
+        labelStyle: const TextStyle(
+            color: cTextMainLight, fontSize: fMicro, fontWeight: FontWeight.w500, fontFamily: kFontFamily),
+        secondaryLabelStyle: const TextStyle(
+            color: cBrandLight, fontSize: fMicro, fontWeight: FontWeight.w500, fontFamily: kFontFamily),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(rFull),
@@ -412,8 +420,8 @@ class AppTheme {
         indicatorColor: cBrandLight,
         labelColor: cTextMainLight,
         unselectedLabelColor: cTextSubLight,
-        labelStyle: TextStyle(fontSize: fSmall, fontWeight: FontWeight.w500),
-        unselectedLabelStyle: TextStyle(fontSize: fSmall),
+        labelStyle: TextStyle(fontSize: fSmall, fontWeight: FontWeight.w500, fontFamily: kFontFamily),
+        unselectedLabelStyle: TextStyle(fontSize: fSmall, fontFamily: kFontFamily),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: cBrandLight,
@@ -427,7 +435,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(rSmall),
           border: Border.all(color: cBorderLightTheme),
         ),
-        textStyle: const TextStyle(color: cTextMainLight, fontSize: fSmall),
+        textStyle: const TextStyle(color: cTextMainLight, fontSize: fSmall, fontFamily: kFontFamily),
       ),
       dividerTheme: const DividerThemeData(
         color: cHairlineLight,
@@ -435,7 +443,7 @@ class AppTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: cCardElevatedLight,
-        contentTextStyle: const TextStyle(color: cTextMainLight),
+        contentTextStyle: const TextStyle(color: cTextMainLight, fontFamily: kFontFamily),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(rButton),
         ),

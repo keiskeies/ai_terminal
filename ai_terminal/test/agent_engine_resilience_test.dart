@@ -44,7 +44,9 @@ class _MockExecutor implements CommandExecutor {
   }
 
   @override
-  Future<String> runOnce(String command, {Duration timeout = const Duration(seconds: 5)}) async => '';
+  Future<String> runOnce(String command,
+          {Duration timeout = const Duration(seconds: 5)}) async =>
+      '';
 
   @override
   Future<CommandResult> writeFileViaPty({
@@ -103,6 +105,7 @@ class _MockAIProvider implements AIProvider {
     required AIModelConfig config,
     String? systemPrompt,
     CancelToken? cancelToken,
+    Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
   }) async {
@@ -342,11 +345,9 @@ void main() {
       await engine.startTask('检查 GDM 状态', _MockExecutor()..stdout = 'active');
 
       final report = events.where((e) => e.isReport).single.operationReport!;
-      expect(report.conclusion, 'GDM 运行正常',
-          reason: '结论不能被 finish 思考里的自述顶替');
+      expect(report.conclusion, 'GDM 运行正常', reason: '结论不能被 finish 思考里的自述顶替');
       expect(report.answerBody, contains('## GDM 运行状态正常'));
-      expect(report.answerBody, isNot(contains('结论:')),
-          reason: '四段字段不属于回答正文');
+      expect(report.answerBody, isNot(contains('结论:')), reason: '四段字段不属于回答正文');
       expect(report.details, contains('现状:'));
       // 回答正文不再作为 text 事件落进证据层
       expect(events.where((e) => e.isText), isEmpty);
@@ -369,10 +370,7 @@ void main() {
       engine.onEvent = events.add;
       await engine.startTask('检查 Nginx', _MockExecutor()..stdout = 'active');
 
-      final report = events
-          .where((e) => e.isReport)
-          .single
-          .operationReport!;
+      final report = events.where((e) => e.isReport).single.operationReport!;
       expect(report.stateBadges, hasLength(1));
       expect(report.stateBadges.single.text, 'nginx 运行中');
       expect(report.stateBadges.single.level, 'success');
@@ -397,8 +395,7 @@ void main() {
       await engine.startTask('安装测试', _MockExecutor());
 
       expect(events.where((e) => e.isPlan), hasLength(2));
-      final report =
-          events.where((e) => e.isReport).single.operationReport!;
+      final report = events.where((e) => e.isReport).single.operationReport!;
       expect(report.plan, hasLength(3));
       expect(report.plan[0].title, '检查系统');
       expect(
@@ -421,10 +418,7 @@ void main() {
       engine.onEvent = events.add;
       await engine.startTask('空总结测试', _MockExecutor());
 
-      final report = events
-          .where((e) => e.isReport)
-          .single
-          .operationReport!;
+      final report = events.where((e) => e.isReport).single.operationReport!;
       expect(report.finishState, 'success');
       expect(report.conclusion, '任务已完成，共执行 1 条命令。');
       expect(report.conclusion, isNot(contains('动作:')));
@@ -439,8 +433,7 @@ void main() {
       provider.enqueueStream([
         '思考: 结论: 完成\n现状: ok\n变更: 无\n建议: 无\n动作: finish\n',
       ]);
-      final longOutput =
-          List.generate(200, (i) => 'line $i').join('\n');
+      final longOutput = List.generate(200, (i) => 'line $i').join('\n');
 
       final engine = makeEngine(provider: provider);
       final events = <AgentEvent>[];
@@ -480,8 +473,7 @@ void main() {
 
       await engine.resumeTask(executor);
 
-      final report =
-          events.where((e) => e.isReport).single.operationReport!;
+      final report = events.where((e) => e.isReport).single.operationReport!;
       expect(report.finishState, 'success');
       expect(report.operationId, operationId);
       expect(report.stepIndex, greaterThanOrEqualTo(2));
@@ -506,6 +498,83 @@ void main() {
       final report = reportEvents.single.operationReport!;
       expect(report.finishState, 'cancelled');
       expect(report.conclusion, contains('已取消'));
+    });
+  });
+
+  group('finish 中的选择请求兜底', () {
+    Future<void> waitForChoice(AgentEngine engine) async {
+      final deadline = DateTime.now().add(const Duration(seconds: 5));
+      while (!engine.hasPendingChoice) {
+        if (DateTime.now().isAfter(deadline)) {
+          fail('未进入等待选择状态: status=${engine.currentTask?.status}');
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+    }
+
+    test('finish 正文里的 A/B 选择请求转为 ask 并等待点选', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 需要用户在两种安装方式中选择\n'
+            '回答: Docker 有两种安装方式：\n'
+            'A. 使用官方源安装\n'
+            'B. 使用清华镜像安装\n'
+            '请回复选择 A 还是 B。\n'
+            '动作: finish\n',
+      ]);
+      provider.enqueueStream([
+        '思考: 用户选了官方源\n动作: execute\n命令: echo install\n',
+      ]);
+      provider.enqueueStream([
+        '思考: 完成\n回答: 已安装\n结论: 完成\n现状: ok\n变更: 无\n建议: 无\n动作: finish\n',
+      ]);
+
+      final engine = makeEngine(provider: provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+
+      final running = engine.startTask('安装docker', _MockExecutor());
+      await waitForChoice(engine);
+
+      expect(engine.pendingOptions, ['A. 使用官方源安装', 'B. 使用清华镜像安装']);
+      expect(events.where((e) => e.isAsk), hasLength(1),
+          reason: '正文提取出的选项需要补发一条 ask 事件');
+
+      engine.selectChoice('A. 使用官方源安装');
+      await running;
+
+      expect(provider.callCount, 3);
+      expect(provider.receivedHistories[1].last.content,
+          contains('用户选择了 "A. 使用官方源安装"'));
+    });
+
+    test('漏写 动作: ask 但有 选项: 行时按 ask 等待，不重复发事件', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 需要用户确认是否继续\n选项: 继续安装 | 先不装\n',
+      ]);
+      provider.enqueueStream([
+        '思考: 用户确认继续\n动作: execute\n命令: echo install\n',
+      ]);
+      provider.enqueueStream([
+        '思考: 完成\n动作: finish\n',
+      ]);
+
+      final engine = makeEngine(provider: provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+
+      final running = engine.startTask('继续安装', _MockExecutor());
+      await waitForChoice(engine);
+
+      expect(engine.pendingOptions, ['继续安装', '先不装']);
+      expect(events.where((e) => e.isAsk), hasLength(1),
+          reason: '选项行已由流式解析器发过 ask，不能重复');
+
+      engine.selectChoice('继续安装');
+      await running;
+
+      expect(provider.callCount, 3);
     });
   });
 }

@@ -6,6 +6,8 @@
   "address": "पता",
   "agentNotInitialized": "कृपया एजेंट आरंभ करें और पहले होस्ट से कनेक्ट करें",
   "agentRunning": "एजेंट कार्य निष्पादित कर रहा है, कृपया प्रतीक्षा करें",
+  "agentSettingAiTimeoutDesc": "इतने समय तक मॉडल से कोई आउटपुट न आने पर समय-सीमा मानी जाएगी। धीमे स्थानीय मॉडल के लिए इसे बढ़ाएँ।",
+  "agentSettingAiTimeoutLabel": "AI प्रतिक्रिया समय-सीमा",
   "agentSettingAutoExecSection": "AI Auto Execution",
   "agentSettingBuiltInPrompt": "AI Built-in Instructions",
   "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",

@@ -6,6 +6,8 @@
   "address": "Адрес",
   "agentNotInitialized": "Сначала инициализируйте агента и подключитесь к хосту",
   "agentRunning": "Агент выполняет задачу, подождите",
+  "agentSettingAiTimeoutDesc": "Считается превышенным, если за это время не пришло ни одного ответа модели. Увеличьте для медленных локальных моделей.",
+  "agentSettingAiTimeoutLabel": "Тайм-аут ответа ИИ",
   "agentSettingAutoExecSection": "AI Auto Execution",
   "agentSettingBuiltInPrompt": "AI Built-in Instructions",
   "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",

@@ -3,6 +3,7 @@ import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../l10n/app_localizations.dart';
 import '../services/notification_service.dart';
+import '../core/app_toast.dart';
 
 /// 任务完成通知设置页
 ///
@@ -44,7 +45,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     if (_enabled && url.isNotEmpty) {
       final err = NotificationService.validateWebhookUrl(url);
       if (err != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showTopSnackBar(context, 
           SnackBar(
             content: Text(l10n.notificationInvalidUrl(err)),
             backgroundColor: cDanger,
@@ -62,7 +63,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     try {
       await NotificationService.save(cfg);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(
           content: Text(l10n.notificationSaved),
           backgroundColor: cSuccess,
@@ -71,7 +72,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(
           content: Text(l10n.notificationSaveFailed(e.toString())),
           backgroundColor: cDanger,
@@ -85,14 +86,14 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     final l10n = AppLocalizations.of(context)!;
     final url = _webhookController.text.trim();
     if (url.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(content: Text(l10n.notificationEnterUrlFirst), behavior: SnackBarBehavior.floating),
       );
       return;
     }
     final err = NotificationService.validateWebhookUrl(url);
     if (err != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(
           content: Text(l10n.notificationInvalidUrl(err)),
           backgroundColor: cDanger,
@@ -107,7 +108,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     try {
       final ok = await NotificationService.sendTest();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(
           content: Text(ok ? l10n.notificationTestSent : l10n.notificationTestSendFailed),
           backgroundColor: ok ? cSuccess : cDanger,
@@ -116,7 +117,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(
           content: Text(l10n.notificationTestFailed(e.toString())),
           backgroundColor: cDanger,

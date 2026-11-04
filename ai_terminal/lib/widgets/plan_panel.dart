@@ -236,7 +236,7 @@ class _PlanPanelState extends State<PlanPanel> {
                           style: TextStyle(
                             color: tc.textSub,
                             fontSize: fMicro,
-                            fontFamily: 'JetBrainsMono',
+                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -256,7 +256,7 @@ class _PlanPanelState extends State<PlanPanel> {
               style: TextStyle(
                 color: tc.textSub,
                 fontSize: fMicro,
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                 fontWeight: FontWeight.w500,
               ),
             ),

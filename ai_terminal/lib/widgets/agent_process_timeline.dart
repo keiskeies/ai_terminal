@@ -299,7 +299,8 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
                       style: TextStyle(
                         color: isTool ? tc.brand : tc.ok,
                         fontSize: fMicro,
-                        fontFamily: 'monospace',
+                        fontFamily: 'JetBrainsMono',
+                        fontFamilyFallback: kMonoFontFallback,
                       ),
                     ),
                   ),
@@ -375,7 +376,8 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
             commandEvent.command ?? '',
             style: TextStyle(
               fontSize: fMicro,
-              fontFamily: 'monospace',
+              fontFamily: 'JetBrainsMono',
+              fontFamilyFallback: kMonoFontFallback,
               color: tc.textSub,
             ),
           ),

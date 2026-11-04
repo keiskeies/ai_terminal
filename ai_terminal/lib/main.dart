@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -23,6 +24,21 @@ import 'services/mcp_manager.dart';
 import 'core/builtin_runbooks.dart';
 
 void main() {
+  LicenseRegistry.addLicense(() async* {
+    yield const LicenseEntryWithLineBreaks(
+      <String>['MiSans'],
+      'MiSans Font Intellectual Property License Agreement\n'
+      'Copyright © 2020-2023 Beijing Xiaomi Mobile Software Co., Ltd. All Rights Reserved.\n\n'
+      'MiSans is free for personal and commercial use, including embedding in software. '
+      'The software must specifically indicate that it uses MiSans fonts; the fonts must not be '
+      'modified, rented, sublicensed or redistributed separately; the copyright notice and the '
+      'license agreement must be retained.\n\n'
+      '本应用使用 MiSans 字体。MiSans 可免费商用并允许嵌入软件，但须注明使用了 MiSans 字体，'
+      '不得修改或单独再分发字体，并保留版权声明与本许可协议。\n\n'
+      'Full agreement: https://hyperos.mi.com/font-download/MiSans字体知识产权许可协议.pdf',
+    );
+  });
+
   // 全局异常兜底：捕获所有未处理的异步异常，防止 app 直接崩溃
   // 涉及服务器操作的软件不能因单个异常而崩溃，必须有兜底机制
   runZonedGuarded(() async {

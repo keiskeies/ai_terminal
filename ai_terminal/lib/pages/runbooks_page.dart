@@ -7,6 +7,7 @@ import '../core/theme_colors.dart';
 import '../l10n/app_localizations.dart';
 import '../models/runbook.dart';
 import '../providers/runbook_provider.dart';
+import '../core/app_toast.dart';
 
 const _uuid = Uuid();
 
@@ -560,7 +561,7 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
                 child: SelectableText(
                   rb.content,
                   style: TextStyle(
-                    fontFamily: 'JetBrainsMono',
+                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                     fontSize: fMono,
                     color: tc.terminalGreen,
                   ),
@@ -580,7 +581,7 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
                       labelStyle: TextStyle(
                         color: tc.textSub,
                         fontSize: fSmall,
-                        fontFamily: 'JetBrainsMono',
+                        fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                       ),
                       filled: true,
                       fillColor: tc.cardElevated,
@@ -735,7 +736,7 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
 
   void _toast(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    showTopSnackBar(context, 
       SnackBar(
         content: Text(msg),
         duration: const Duration(seconds: 2),
@@ -849,7 +850,7 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
                   enabled: !isBuiltin,
                   maxLines: 5,
                   style: TextStyle(
-                    fontFamily: 'JetBrainsMono',
+                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                     fontSize: fMono,
                     color: tc.textMain,
                   ),
@@ -1162,7 +1163,7 @@ class _RunbookImportDialogState extends State<_RunbookImportDialog> {
                 '  }\n'
                 ']',
                 style: TextStyle(
-                  fontFamily: 'JetBrainsMono',
+                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                   fontSize: fMono,
                   color: tc.terminalGreen,
                   height: 1.4,
@@ -1175,7 +1176,7 @@ class _RunbookImportDialogState extends State<_RunbookImportDialog> {
               controller: _controller,
               maxLines: 12,
               style: TextStyle(
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                 fontSize: fMono,
                 color: tc.textMain,
               ),

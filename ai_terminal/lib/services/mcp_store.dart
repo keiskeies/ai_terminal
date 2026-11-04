@@ -14,7 +14,19 @@ class McpStore {
   McpStore._();
 
   static const String _settingsKey = 'mcpServers';
+  static const String _globalEnabledKey = 'mcpEnabled';
   static const String _credHostId = '__mcp__';
+
+  /// 全局 MCP 总开关（默认开启，保持旧行为）
+  static bool loadGlobalEnabled() {
+    final raw = SettingsDao.getCached(_globalEnabledKey, defaultValue: true);
+    if (raw is bool) return raw;
+    if (raw is String) return raw.toLowerCase() != 'false';
+    return true;
+  }
+
+  static Future<void> saveGlobalEnabled(bool value) =>
+      SettingsDao.set(_globalEnabledKey, value);
 
   static List<McpServerConfig> loadCachedConfigs() {
     final raw = SettingsDao.getCached(_settingsKey);

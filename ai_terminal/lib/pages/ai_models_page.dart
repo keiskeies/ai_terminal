@@ -11,6 +11,7 @@ import '../models/ai_endpoint.dart';
 import '../providers/app_providers.dart';
 import '../services/daos.dart';
 import '../services/provider_config_service.dart';
+import '../core/app_toast.dart';
 
 /// AI 模型配置：一个端点（Base URL + API Key + 协议）下挂多个模型。
 ///
@@ -130,7 +131,7 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
                           style: TextStyle(
                             color: tc.textSub,
                             fontSize: fSmall,
-                            fontFamily: 'JetBrainsMono',
+                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                           ),
                         ),
                       ],
@@ -572,7 +573,7 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
 
   void _showSnack(String message, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
+    showTopSnackBar(context, 
       SnackBar(
         content: Text(message),
         backgroundColor: isError ? cDanger : cSuccess,
@@ -729,7 +730,7 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                           ),
                           style: TextStyle(
                             color: tc.textMain,
-                            fontFamily: 'JetBrainsMono',
+                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                             fontSize: fSmall,
                           ),
                         ),
@@ -762,7 +763,7 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                               ),
                               style: TextStyle(
                                 color: tc.textMain,
-                                fontFamily: 'JetBrainsMono',
+                                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                                 fontSize: fSmall,
                               ),
                               validator: (v) => (v == null || v.trim().isEmpty)
@@ -975,7 +976,7 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                   style: TextStyle(
                     color: tc.textSub,
                     fontSize: fMicro,
-                    fontFamily: 'JetBrainsMono',
+                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                   ),
                 ),
               ],
@@ -1249,7 +1250,7 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
                                 ),
                                 style: TextStyle(
                                   color: tc.textMain,
-                                  fontFamily: 'JetBrainsMono',
+                                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                                   fontSize: fSmall,
                                 ),
                                 validator: (v) =>
@@ -1343,7 +1344,7 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
                                       style: TextStyle(
                                         color: tc.textMain,
                                         fontSize: fSmall,
-                                        fontFamily: 'JetBrainsMono',
+                                        fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                                       ),
                                     ),
                                   ),
@@ -1362,7 +1363,7 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
                                       style: TextStyle(
                                         color: tc.textMain,
                                         fontSize: fSmall,
-                                        fontFamily: 'JetBrainsMono',
+                                        fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                                       ),
                                     ),
                                   ),
@@ -1560,7 +1561,7 @@ class _ModelFetchDialogState extends State<_ModelFetchDialog> {
                         style: TextStyle(
                           color: tc.textMain,
                           fontSize: fSmall,
-                          fontFamily: 'JetBrainsMono',
+                          fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                         )),
                     value: _selected.contains(id),
                     onChanged: (v) {

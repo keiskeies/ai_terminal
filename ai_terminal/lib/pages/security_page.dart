@@ -6,6 +6,7 @@ import '../core/credentials_store.dart';
 import '../services/daos.dart';
 import '../core/theme_colors.dart';
 import '../l10n/app_localizations.dart';
+import '../core/app_toast.dart';
 
 class SecurityPage extends StatefulWidget {
   const SecurityPage({super.key});
@@ -232,7 +233,7 @@ class _SecurityPageState extends State<SecurityPage> {
       if (mounted) {
         Navigator.pop(context); // 关闭加载
         final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
+        showTopSnackBar(context, 
           SnackBar(content: Text(l10n.securityAllDataCleared)),
         );
       }
@@ -240,7 +241,7 @@ class _SecurityPageState extends State<SecurityPage> {
       if (mounted) {
         Navigator.pop(context);
         final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
+        showTopSnackBar(context, 
           SnackBar(content: Text(l10n.securityClearFailed(e.toString()))),
         );
       }

@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import '../models/chat_session.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/message_bubble.dart';
+import '../core/app_toast.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
   final String? hostId;
@@ -307,7 +308,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   void _copyMessage(String content) {
     final l10n = AppLocalizations.of(context)!;
     Clipboard.setData(ClipboardData(text: content));
-    ScaffoldMessenger.of(context).showSnackBar(
+    showTopSnackBar(context, 
       SnackBar(content: Text(l10n.commonCopiedToClipboard)),
     );
   }

@@ -33,6 +33,7 @@ class _ScriptedAI implements AIProvider {
     required AIModelConfig config,
     String? systemPrompt,
     CancelToken? cancelToken,
+    Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
   }) async {
@@ -145,7 +146,8 @@ void main() {
           report = reportEvent.operationReport!;
           expect(report.finishState, 'success');
           expect(report.plan, hasLength(3));
-          expect(report.plan.every((s) => s.status.name == 'completed'), isTrue);
+          expect(
+              report.plan.every((s) => s.status.name == 'completed'), isTrue);
           expect(report.stateBadges.map((b) => b.text).join(','),
               contains('端口 22 监听'));
           expect(report.verified, isTrue);

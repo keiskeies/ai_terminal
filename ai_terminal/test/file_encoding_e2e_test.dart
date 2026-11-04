@@ -32,6 +32,7 @@ class _ScriptedAI implements AIProvider {
     required AIModelConfig config,
     String? systemPrompt,
     CancelToken? cancelToken,
+    Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
   }) async {
@@ -127,7 +128,11 @@ void main() {
           '\$HOME `whoami` "double" \'single\' \\backslash';
 
       try {
-          await connectE2ESsh(ssh, password: _sshPassword!, user: _sshUser!, host: _sshHost!, port: _sshPort);
+        await connectE2ESsh(ssh,
+            password: _sshPassword!,
+            user: _sshUser!,
+            host: _sshHost!,
+            port: _sshPort);
         expect(ssh.isConnected, isTrue);
         connected = true;
         await ssh.executeAndWait('mkdir -p $dir');
@@ -164,10 +169,7 @@ void main() {
 
         await engine.startTask('写入并修改编码测试文件', ssh);
 
-        final report = events
-            .where((e) => e.isReport)
-            .single
-            .operationReport!;
+        final report = events.where((e) => e.isReport).single.operationReport!;
         expect(report.finishState, 'success');
         final results = events.where((e) => e.isResult).toList();
         expect(results, isNotEmpty);
@@ -208,8 +210,8 @@ void main() {
             'AI_TERMINAL_EOF';
         final heredocResult = await ssh.executeAndWait(heredoc);
         expect(heredocResult.success, isTrue);
-        expect(await _readBytes(ssh, shellPath),
-            utf8.encode('$shellContent\n'));
+        expect(
+            await _readBytes(ssh, shellPath), utf8.encode('$shellContent\n'));
       } finally {
         if (connected) {
           try {

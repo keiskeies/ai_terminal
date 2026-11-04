@@ -8,6 +8,7 @@ import '../providers/app_providers.dart';
 import '../services/change_record_service.dart';
 import '../services/command_executor.dart';
 import '../providers/terminal_provider.dart' as tp;
+import '../core/app_toast.dart';
 
 /// 变更台账页面 — 展示修改性命令历史，支持回滚
 class ChangeRecordsPage extends ConsumerStatefulWidget {
@@ -153,7 +154,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
               child: SelectableText(
                 isLocalRestore ? record.rollbackHint : (record.rollbackCommand ?? ''),
                 style: TextStyle(
-                  fontFamily: 'JetBrainsMono',
+                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                   fontSize: fMono,
                   color: tc.terminalGreen,
                 ),
@@ -190,7 +191,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
   Future<void> _executeRollback(ChangeRecord record) async {
     final l10n = AppLocalizations.of(context)!;
     if (!record.isRollbackable) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(content: Text(l10n.changeRecordNotRollbackable), behavior: SnackBarBehavior.floating),
       );
       return;
@@ -211,7 +212,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       }
 
       if (targetTab == null || targetTab.service == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showTopSnackBar(context, 
           SnackBar(
             content: Text(l10n.changeRecordHostNotConnected(record.hostId)),
             backgroundColor: cDanger,
@@ -223,7 +224,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       executor = targetTab.service!;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
+    showTopSnackBar(context, 
       SnackBar(
         content: Text(l10n.changeRecordRollingBack(record.rollbackHint)),
         duration: const Duration(seconds: 1),
@@ -239,14 +240,14 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       );
       if (!mounted) return;
       if (result == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showTopSnackBar(context, 
           SnackBar(content: Text(l10n.changeRecordRollbackFailedNoExec), backgroundColor: cDanger,
               behavior: SnackBarBehavior.floating),
         );
         return;
       }
       if (result.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showTopSnackBar(context, 
           SnackBar(
             content: Text(l10n.changeRecordRollbackSuccess(record.rollbackHint)),
             backgroundColor: cSuccess,
@@ -255,7 +256,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
         );
         _loadRecords();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showTopSnackBar(context, 
           SnackBar(
             content: Text(l10n.changeRecordRollbackFailed(result.stderr)),
             backgroundColor: cDanger,
@@ -265,7 +266,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(
           content: Text(l10n.changeRecordRollbackError(e.toString())),
           backgroundColor: cDanger,
@@ -393,7 +394,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
                 const Spacer(),
                 Text(_formatTime(record.timestamp),
                     style: TextStyle(
-                        fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono')),
+                        fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback)),
                 const SizedBox(width: 6),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -424,7 +425,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
               child: SelectableText(
                 record.command,
                 style: TextStyle(
-                  fontFamily: 'JetBrainsMono',
+                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                   fontSize: fMono,
                   color: tc.terminalGreen,
                 ),

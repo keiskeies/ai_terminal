@@ -31,6 +31,7 @@ void main() {
     tearDown(() async {
       await McpManager.instance.disconnect('test');
       McpManager.instance.loadConfigsForTesting([]);
+      await McpManager.instance.setGlobalEnabled(true);
       await server.stop();
     });
 
@@ -88,8 +89,39 @@ void main() {
       );
     }, timeout: const Timeout(Duration(seconds: 90)));
 
-    test('tools/list_changed 触发能力刷新', () async {
+    test('全局开关关闭后断开并隐藏工具，重新打开恢复连接', () async {
       final manager = McpManager.instance;
+      manager.loadConfigsForTesting([config()]);
+      await manager.connect('test');
+      expect(
+        manager.mcpRuntime('test')!.status,
+        McpServerStatus.connected,
+        reason: manager.mcpRuntime('test')!.error,
+      );
+      expect(manager.buildAgentTools(), isNotEmpty);
+
+      await manager.setGlobalEnabled(false);
+      expect(manager.enabled, isFalse);
+      expect(
+        manager.mcpRuntime('test')!.status,
+        McpServerStatus.disconnected,
+      );
+      expect(manager.buildAgentTools(), isEmpty);
+
+      await manager.setGlobalEnabled(true);
+      for (var i = 0; i < 30; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        if (manager.mcpRuntime('test')!.isConnected) break;
+      }
+      expect(
+        manager.mcpRuntime('test')!.status,
+        McpServerStatus.connected,
+        reason: manager.mcpRuntime('test')!.error,
+      );
+      expect(manager.buildAgentTools(), isNotEmpty);
+    }, timeout: const Timeout(Duration(seconds: 90)));
+
+    test('tools/list_changed 触发能力刷新', () async {      final manager = McpManager.instance;
       manager.loadConfigsForTesting([config()]);
       await manager.connect('test');
       expect(

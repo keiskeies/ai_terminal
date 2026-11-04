@@ -192,11 +192,11 @@ class McpSideToolAdapter extends AgentTool {
   String get description {
     switch (sideKind) {
       case McpSideToolKind.listResources:
-        return '列出 MCP 服务器「$serverName」暴露的资源/资源模板。';
+        return '列出 MCP 服务器「$serverName」提供的资源/资源模板。';
       case McpSideToolKind.readResource:
         return '读取 MCP 服务器「$serverName」的指定资源 URI。';
       case McpSideToolKind.listPrompts:
-        return '列出 MCP 服务器「$serverName」暴露的提示词模板及参数。';
+        return '列出 MCP 服务器「$serverName」提供的提示词模板及参数。';
       case McpSideToolKind.getPrompt:
         return '获取 MCP 服务器「$serverName」的提示词模板内容。';
     }
@@ -270,7 +270,7 @@ class McpSideToolAdapter extends AgentTool {
       switch (sideKind) {
         case McpSideToolKind.listResources:
           if (runtime.resources.isEmpty) {
-            return ToolResult.success('该 MCP 服务器没有暴露资源。');
+            return ToolResult.success('该 MCP 服务器没有提供资源。');
           }
           final buffer = StringBuffer('资源列表：\n');
           for (final resource in runtime.resources) {
@@ -291,7 +291,7 @@ class McpSideToolAdapter extends AgentTool {
           return ToolResult.success(text);
         case McpSideToolKind.listPrompts:
           if (runtime.prompts.isEmpty) {
-            return ToolResult.success('该 MCP 服务器没有暴露提示词。');
+            return ToolResult.success('该 MCP 服务器没有提供提示词。');
           }
           final buffer = StringBuffer('提示词列表：\n');
           for (final prompt in runtime.prompts) {

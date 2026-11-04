@@ -6,6 +6,8 @@
   "address": "地址",
   "agentNotInitialized": "请先初始化 Agent 和连接主机",
   "agentRunning": "Agent 正在执行任务，请等待完成",
+  "agentSettingAiTimeoutDesc": "连续无数据超过该时长即判定超时。本地模型或长思考模型首字较慢时，可适当调大。",
+  "agentSettingAiTimeoutLabel": "AI 响应超时",
   "agentSettingAutoExecSection": "AI 自动执行",
   "agentSettingBuiltInPrompt": "AI 内置指令",
   "agentSettingBuiltInPromptDesc": "这是 AI 的基本指令，修改后立即生效。里面的「context」会被替换成服务器信息。",

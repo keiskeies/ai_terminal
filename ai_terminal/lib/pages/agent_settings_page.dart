@@ -2,6 +2,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants.dart';
+import '../models/ai_model_config.dart';
 import '../services/daos.dart';
 import '../core/prompts.dart';
 import '../core/theme_colors.dart';
@@ -10,6 +11,7 @@ import '../providers/agent_provider.dart';
 import '../services/local_file_policy.dart';
 import '../utils/agent_ui_text.dart';
 import '../utils/local_file_ops.dart';
+import '../core/app_toast.dart';
 
 /// P1-5: Agent 设置页面
 /// 整合最大执行步骤数、内置提示词、自定义提示词
@@ -26,6 +28,8 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
     final l10n = AppLocalizations.of(context)!;
     final tc = ThemeColors.of(context);
     final maxSteps = ref.watch(agentProvider.select((s) => s.maxSteps));
+    final aiTimeoutSeconds =
+        ref.watch(agentProvider.select((s) => s.aiTimeoutSeconds));
 
     return Scaffold(
       appBar: AppBar(
@@ -39,124 +43,216 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
             children: [
               // 最大执行步骤数
               _buildSectionTitle(l10n.agentSettingAutoExecSection),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(pStandard),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(l10n.agentSettingMaxStepsLabel, style: TextStyle(color: ThemeColors.of(context).textMain)),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: cPrimary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(rSmall),
-                        ),
-                        child: Text(
-                          maxSteps == 0 ? l10n.commonUnlimited : '$maxSteps',
-                          style: const TextStyle(
-                            color: cPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    l10n.agentSettingMaxStepsDesc,
-                    style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fSmall),
-                  ),
-                  const SizedBox(height: 12),
-                  Slider(
-                    value: maxSteps.clamp(0, 100).toDouble(),
-                    min: 0,
-                    max: 100,
-                    divisions: 100,
-                    label: maxSteps == 0 ? l10n.commonUnlimited : '$maxSteps',
-                    onChanged: (value) {
-                      ref.read(agentProvider.notifier).setMaxSteps(value.toInt());
-                    },
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(l10n.commonUnlimited, style: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fMicro)),
-                      Text(l10n.agentSettingHundredSteps, style: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fMicro)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // 提示词设置
-          _buildSectionTitle(l10n.agentSettingPromptSection),
-
-          // 内置系统提示词（折叠面板）
-          Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: ExpansionTile(
-              leading: const Icon(Icons.description_outlined, color: cWarning),
-              title: Text(l10n.agentSettingBuiltInPrompt),
-              subtitle: Text(l10n.agentSettingBuiltInPromptSubtitle, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
-              children: [
-                Padding(
+              Card(
+                child: Padding(
                   padding: const EdgeInsets.all(pStandard),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        l10n.agentSettingBuiltInPromptDesc,
-                        style: TextStyle(color: tc.textSub, fontSize: fSmall),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(l10n.agentSettingMaxStepsLabel,
+                              style: TextStyle(
+                                  color: ThemeColors.of(context).textMain)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: cPrimary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(rSmall),
+                            ),
+                            child: Text(
+                              maxSteps == 0
+                                  ? l10n.commonUnlimited
+                                  : '$maxSteps',
+                              style: const TextStyle(
+                                color: cPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        l10n.agentSettingPromptWarning,
-                        style: const TextStyle(color: cWarning, fontSize: fMicro),
+                        l10n.agentSettingMaxStepsDesc,
+                        style: TextStyle(
+                            color: ThemeColors.of(context).textSub,
+                            fontSize: fSmall),
                       ),
                       const SizedBox(height: 12),
-                      _BuiltInPromptEditor(),
+                      Slider(
+                        value: maxSteps.clamp(0, 100).toDouble(),
+                        min: 0,
+                        max: 100,
+                        divisions: 100,
+                        label:
+                            maxSteps == 0 ? l10n.commonUnlimited : '$maxSteps',
+                        onChanged: (value) {
+                          ref
+                              .read(agentProvider.notifier)
+                              .setMaxSteps(value.toInt());
+                        },
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(l10n.commonUnlimited,
+                              style: TextStyle(
+                                  color: ThemeColors.of(context).textMuted,
+                                  fontSize: fMicro)),
+                          Text(l10n.agentSettingHundredSteps,
+                              style: TextStyle(
+                                  color: ThemeColors.of(context).textMuted,
+                                  fontSize: fMicro)),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
+              ),
 
-          // 自定义提示词（折叠面板）
-          Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: ExpansionTile(
-              leading: Icon(Icons.edit_note_rounded, color: tc.agentGreen),
-              title: Text(l10n.agentSettingExtraPrompt),
-              subtitle: Text(l10n.agentSettingExtraPromptSubtitle, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
-              children: [
-                Padding(
+              const SizedBox(height: 12),
+
+              // AI 响应超时
+              Card(
+                child: Padding(
                   padding: const EdgeInsets.all(pStandard),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(l10n.agentSettingAiTimeoutLabel,
+                              style: TextStyle(color: tc.textMain)),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: cPrimary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(rSmall),
+                            ),
+                            child: Text(
+                              '${aiTimeoutSeconds}s',
+                              style: const TextStyle(
+                                color: cPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
                       Text(
-                        l10n.agentSettingExtraPromptDesc,
+                        l10n.agentSettingAiTimeoutDesc,
                         style: TextStyle(color: tc.textSub, fontSize: fSmall),
                       ),
                       const SizedBox(height: 12),
-                      _CustomPromptEditor(),
+                      Slider(
+                        value: aiTimeoutSeconds
+                            .clamp(kMinAiResponseTimeoutSeconds,
+                                kMaxAiResponseTimeoutSeconds)
+                            .toDouble(),
+                        min: kMinAiResponseTimeoutSeconds.toDouble(),
+                        max: kMaxAiResponseTimeoutSeconds.toDouble(),
+                        divisions: (kMaxAiResponseTimeoutSeconds -
+                                kMinAiResponseTimeoutSeconds) ~/
+                            30,
+                        label: '${aiTimeoutSeconds}s',
+                        onChanged: (value) {
+                          ref
+                              .read(agentProvider.notifier)
+                              .setAiTimeoutSeconds(value.round());
+                        },
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('${kMinAiResponseTimeoutSeconds}s',
+                              style: TextStyle(
+                                  color: tc.textMuted, fontSize: fMicro)),
+                          Text('${kMaxAiResponseTimeoutSeconds}s',
+                              style: TextStyle(
+                                  color: tc.textMuted, fontSize: fMicro)),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          // 本地文件访问授权
-          _buildSectionTitle(AgentUiText.of(context).localFileSection),
-          const LocalFileAccessSection(),
+              ),
+
+              const SizedBox(height: 24),
+
+              // 提示词设置
+              _buildSectionTitle(l10n.agentSettingPromptSection),
+
+              // 内置系统提示词（折叠面板）
+              Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ExpansionTile(
+                  leading:
+                      const Icon(Icons.description_outlined, color: cWarning),
+                  title: Text(l10n.agentSettingBuiltInPrompt),
+                  subtitle: Text(l10n.agentSettingBuiltInPromptSubtitle,
+                      style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(pStandard),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.agentSettingBuiltInPromptDesc,
+                            style:
+                                TextStyle(color: tc.textSub, fontSize: fSmall),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            l10n.agentSettingPromptWarning,
+                            style: const TextStyle(
+                                color: cWarning, fontSize: fMicro),
+                          ),
+                          const SizedBox(height: 12),
+                          _BuiltInPromptEditor(),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 自定义提示词（折叠面板）
+              Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ExpansionTile(
+                  leading: Icon(Icons.edit_note_rounded, color: tc.agentGreen),
+                  title: Text(l10n.agentSettingExtraPrompt),
+                  subtitle: Text(l10n.agentSettingExtraPromptSubtitle,
+                      style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(pStandard),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            l10n.agentSettingExtraPromptDesc,
+                            style:
+                                TextStyle(color: tc.textSub, fontSize: fSmall),
+                          ),
+                          const SizedBox(height: 12),
+                          _CustomPromptEditor(),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // 本地文件访问授权
+              _buildSectionTitle(AgentUiText.of(context).localFileSection),
+              const LocalFileAccessSection(),
             ],
           ),
         ),
@@ -214,10 +310,13 @@ class _BuiltInPromptEditorState extends State<_BuiltInPromptEditor> {
             color: ThemeColors.of(context).textMain,
             fontSize: fSmall,
             fontFamily: 'JetBrainsMono',
+            fontFamilyFallback: kMonoFontFallback,
           ),
           decoration: InputDecoration(
-            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: ThemeColors.of(context).border)),
-            focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
+            enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: ThemeColors.of(context).border)),
+            focusedBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: cPrimary)),
           ),
         ),
         const SizedBox(height: 12),
@@ -228,13 +327,15 @@ class _BuiltInPromptEditorState extends State<_BuiltInPromptEditor> {
                 setState(() => _controller.text = defaultSystemPrompt);
               },
               icon: const Icon(Icons.restore, color: cWarning, size: 18),
-              label: Text(l10n.commonResetDefault, style: const TextStyle(color: cWarning)),
+              label: Text(l10n.commonResetDefault,
+                  style: const TextStyle(color: cWarning)),
             ),
             const Spacer(),
             ElevatedButton.icon(
               onPressed: () {
                 saveSystemPrompt(_controller.text.trim());
-                ScaffoldMessenger.of(context).showSnackBar(
+                showTopSnackBar(
+                  context,
                   SnackBar(
                     content: Text(l10n.agentSettingBuiltInSaved),
                     duration: const Duration(seconds: 1),
@@ -297,9 +398,12 @@ class _CustomPromptEditorState extends State<_CustomPromptEditor> {
           ),
           decoration: InputDecoration(
             hintText: l10n.agentSettingCustomPromptHint,
-            hintStyle: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fSmall),
-            enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: ThemeColors.of(context).border)),
-            focusedBorder: const OutlineInputBorder(borderSide: BorderSide(color: cPrimary)),
+            hintStyle: TextStyle(
+                color: ThemeColors.of(context).textMuted, fontSize: fSmall),
+            enabledBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: ThemeColors.of(context).border)),
+            focusedBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: cPrimary)),
           ),
         ),
         const SizedBox(height: 12),
@@ -309,9 +413,11 @@ class _CustomPromptEditorState extends State<_CustomPromptEditor> {
             ElevatedButton.icon(
               onPressed: () {
                 try {
-                  SettingsDao.set('customSystemPrompt', _controller.text.trim());
+                  SettingsDao.set(
+                      'customSystemPrompt', _controller.text.trim());
                 } catch (_) {}
-                ScaffoldMessenger.of(context).showSnackBar(
+                showTopSnackBar(
+                  context,
                   SnackBar(
                     content: Text(l10n.agentSettingExtraPromptSaved),
                     duration: const Duration(seconds: 1),
@@ -398,16 +504,16 @@ class LocalFileAccessSectionState extends State<LocalFileAccessSection> {
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(ui.localFileTrashClear,
-                style: TextStyle(color: tc.error)),
+            child:
+                Text(ui.localFileTrashClear, style: TextStyle(color: tc.error)),
           ),
         ],
       ),
     );
     if (confirmed != true || !mounted) return;
 
-    // messenger 先取：后面有 await，跨异步用 context 会踩到已销毁的 element
-    final messenger = ScaffoldMessenger.of(context);
+    // overlay 先取：后面有 await，跨异步用 context 会踩到已销毁的 element
+    final overlay = Overlay.of(context, rootOverlay: true);
     setState(() => _trashBusy = true);
     final result = await clearTrashEntries(
       _trash.entries,
@@ -418,18 +524,21 @@ class LocalFileAccessSectionState extends State<LocalFileAccessSection> {
     await _loadTrash();
 
     final messages = <String>[
-      ui.localFileTrashCleared(result.removed, formatByteSize(result.bytesFreed)),
+      ui.localFileTrashCleared(
+          result.removed, formatByteSize(result.bytesFreed)),
     ];
     // 拒绝/失败必须说出来：静默少删等于让用户以为已经清干净了
     if (result.refused.isNotEmpty) messages.add(ui.localFileTrashClearRefused);
     if (result.failed.isNotEmpty) {
       messages.add(ui.localFileTrashClearFailed(result.failed.length));
     }
-    messenger.showSnackBar(SnackBar(
-      content: Text(messages.join(' · ')),
-      backgroundColor: result.isClean ? null : tc.warn,
-      behavior: SnackBarBehavior.floating,
-    ));
+    showTopSnackBarInOverlay(
+        overlay,
+        SnackBar(
+          content: Text(messages.join(' · ')),
+          backgroundColor: result.isClean ? null : tc.warn,
+          behavior: SnackBarBehavior.floating,
+        ));
   }
 
   Future<void> _save(LocalFilePolicy next) async {
@@ -511,7 +620,8 @@ class LocalFileAccessSectionState extends State<LocalFileAccessSection> {
               ListTile(
                 dense: true,
                 contentPadding: EdgeInsets.zero,
-                leading: Icon(Icons.folder_outlined, size: 16, color: tc.textSub),
+                leading:
+                    Icon(Icons.folder_outlined, size: 16, color: tc.textSub),
                 title: Text(dir,
                     style: TextStyle(color: tc.textSub, fontSize: fSmall)),
                 trailing: IconButton(

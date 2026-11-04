@@ -355,7 +355,7 @@ class _AIPromptInputState extends State<AIPromptInput> {
                     style: TextStyle(
                       color: counterColor,
                       fontSize: fMicro,
-                      fontFamily: 'JetBrainsMono',
+                      fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                       height: 1,
                     ),
                   ),
@@ -498,7 +498,7 @@ class _SlashCommandItemState extends State<_SlashCommandItem> {
                 style: TextStyle(
                   color: active ? widget.accentColor : widget.tc.textMain,
                   fontSize: fSmall,
-                  fontFamily: 'JetBrainsMono',
+                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                   fontWeight: FontWeight.w600,
                 ),
               ),

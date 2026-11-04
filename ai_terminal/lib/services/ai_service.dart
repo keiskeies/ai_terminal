@@ -26,12 +26,16 @@ abstract class AIProvider {
   /// [onUsage] 可选：provider 在流里给出真实 token 用量时回调。
   /// 可能是累计式（每个 chunk 都带递增的 usage）也可能是末包式，因此**每次都回调**，
   /// 由消费方取最后一次——两种写法下结果都对。不提供 usage 的模型不会回调。
+  ///
+  /// [responseTimeout] 可选：本次请求的 HTTP 空闲超时（连续无数据），
+  /// 覆盖 provider 的默认 receiveTimeout；null 表示沿用默认值。
   Future<Stream<String>> chatStream({
     required List<ChatMessage> history,
     required String prompt,
     required AIModelConfig config,
     String? systemPrompt,
     CancelToken? cancelToken,
+    Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
   });
@@ -141,6 +145,7 @@ class OpenAIProvider implements AIProvider {
     required AIModelConfig config,
     String? systemPrompt,
     CancelToken? cancelToken,
+    Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
   }) async {
@@ -166,6 +171,7 @@ class OpenAIProvider implements AIProvider {
           requestBody,
           cancelToken,
           withStreamOptions: true,
+          responseTimeout: responseTimeout,
         );
       } on DioException catch (e) {
         // 不支持 stream_options 的网关会回 400。一个统计字段不值得把用户的任务
@@ -181,15 +187,15 @@ class OpenAIProvider implements AIProvider {
           requestBody,
           cancelToken,
           withStreamOptions: false,
+          responseTimeout: responseTimeout,
         );
       }
 
       final streamController = StreamController<String>();
       String buffer = '';
       // P2-6: tool_calls 累积器（仅当传入 tools 时启用）
-      final toolCallAcc = tools != null && tools.isNotEmpty
-          ? ToolCallAccumulator()
-          : null;
+      final toolCallAcc =
+          tools != null && tools.isNotEmpty ? ToolCallAccumulator() : null;
 
       if (cancelToken != null) {
         cancelToken.whenCancel.then((err) {
@@ -291,7 +297,9 @@ class OpenAIProvider implements AIProvider {
             }
           }
           // P2-6: 兜底 — 若 stream 关闭时仍有未投递的 tool_calls，在此投递
-          if (toolCallAcc != null && toolCallAcc.hasPendingCalls && !streamController.isClosed) {
+          if (toolCallAcc != null &&
+              toolCallAcc.hasPendingCalls &&
+              !streamController.isClosed) {
             final calls = toolCallAcc.finalize();
             if (calls.isNotEmpty) {
               streamController.add(ToolCallAccumulator.toReActText(calls));
@@ -319,6 +327,7 @@ class OpenAIProvider implements AIProvider {
     Map<String, dynamic> requestBody,
     CancelToken? cancelToken, {
     required bool withStreamOptions,
+    Duration? responseTimeout,
   }) {
     final body = Map<String, dynamic>.of(requestBody);
     if (withStreamOptions) {
@@ -333,6 +342,7 @@ class OpenAIProvider implements AIProvider {
           'Content-Type': 'application/json',
         },
         responseType: ResponseType.stream,
+        receiveTimeout: responseTimeout,
       ),
       cancelToken: cancelToken,
     );
@@ -349,6 +359,7 @@ class QwenProvider implements AIProvider {
     required AIModelConfig config,
     String? systemPrompt,
     CancelToken? cancelToken,
+    Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
   }) async {
@@ -360,6 +371,7 @@ class QwenProvider implements AIProvider {
       config: config,
       systemPrompt: systemPrompt,
       cancelToken: cancelToken,
+      responseTimeout: responseTimeout,
       tools: tools,
       onUsage: onUsage,
     );
@@ -380,6 +392,7 @@ class ErnieProvider implements AIProvider {
     required AIModelConfig config,
     String? systemPrompt,
     CancelToken? cancelToken,
+    Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
   }) async {
@@ -397,7 +410,8 @@ class ErnieProvider implements AIProvider {
       } else {
         if (m.role == 'user' && pendingSystem != null && messages.isEmpty) {
           // 第一条 user 消息前注入缓存的 system prompt
-          messages.add({'role': 'user', 'content': '$pendingSystem\n\n${m.content}'});
+          messages.add(
+              {'role': 'user', 'content': '$pendingSystem\n\n${m.content}'});
           pendingSystem = null;
         } else {
           messages.add({'role': m.role, 'content': m.content});
@@ -409,7 +423,9 @@ class ErnieProvider implements AIProvider {
     // 优先用参数 systemPrompt；若 history 中有未被消费的 system（如 history 首条非 user），则合并两者
     String effectivePrompt = prompt;
     final effectiveSystem = systemPrompt != null && systemPrompt.isNotEmpty
-        ? (pendingSystem != null ? '$systemPrompt\n\n$pendingSystem' : systemPrompt)
+        ? (pendingSystem != null
+            ? '$systemPrompt\n\n$pendingSystem'
+            : systemPrompt)
         : pendingSystem;
     if (effectiveSystem != null && effectiveSystem.isNotEmpty) {
       effectivePrompt = '$effectiveSystem\n\n$prompt';
@@ -430,6 +446,7 @@ class ErnieProvider implements AIProvider {
             'Content-Type': 'application/json',
           },
           responseType: ResponseType.stream,
+          receiveTimeout: responseTimeout,
         ),
         cancelToken: cancelToken,
       );
@@ -560,11 +577,17 @@ class AIService {
 
     // 追加用户自定义提示词
     try {
-      final customPrompt = SettingsDao.getCached('customSystemPrompt') as String?;
+      final customPrompt =
+          SettingsDao.getCached('customSystemPrompt') as String?;
       if (customPrompt != null && customPrompt.isNotEmpty) {
         systemPrompt = '$systemPrompt\n\n【用户自定义指令】\n$customPrompt';
       }
     } catch (_) {}
+
+    final timeoutSeconds =
+        ((SettingsDao.getCached('agentAiTimeoutSeconds') as num?)?.toInt() ??
+                kDefaultAiResponseTimeoutSeconds)
+            .clamp(kMinAiResponseTimeoutSeconds, kMaxAiResponseTimeoutSeconds);
 
     return provider.chatStream(
       history: history,
@@ -572,6 +595,7 @@ class AIService {
       config: config,
       systemPrompt: systemPrompt,
       cancelToken: cancelToken,
+      responseTimeout: Duration(seconds: timeoutSeconds),
     );
   }
 }

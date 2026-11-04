@@ -23,12 +23,14 @@ class McpManager extends ChangeNotifier implements McpToolCaller {
   final Map<String, McpConnection> _connections = {};
   bool _initialized = false;
   bool _disposed = false;
+  bool _enabled = true;
   int _toolsetVersion = 0;
   String _lastSignature = '';
 
   List<McpServerConfig> get configs => List.unmodifiable(_configs);
   Map<String, McpServerRuntime> get runtimes => Map.unmodifiable(_runtimes);
   int get toolsetVersion => _toolsetVersion;
+  bool get enabled => _enabled;
 
   int get connectedCount =>
       _runtimes.values.where((r) => r.isConnected).length;
@@ -48,6 +50,7 @@ class McpManager extends ChangeNotifier implements McpToolCaller {
     if (_initialized || _disposed) return;
     _initialized = true;
     try {
+      _enabled = McpStore.loadGlobalEnabled();
       final loaded = await McpStore.loadAll();
       _configs
         ..clear()
@@ -55,12 +58,15 @@ class McpManager extends ChangeNotifier implements McpToolCaller {
       for (final config in loaded) {
         _runtimes[config.id] = McpServerRuntime(
           config: config,
-          status: config.enabled
+          status: !_enabled
               ? McpServerStatus.disconnected
-              : McpServerStatus.disabled,
+              : config.enabled
+                  ? McpServerStatus.disconnected
+                  : McpServerStatus.disabled,
         );
       }
       if (!_disposed) notifyListeners();
+      if (!_enabled) return;
       for (final config in loaded) {
         if (config.enabled && config.autoConnect) {
           unawaited(connect(config.id));
@@ -71,8 +77,41 @@ class McpManager extends ChangeNotifier implements McpToolCaller {
     }
   }
 
+  /// 全局开关：关闭时断开所有连接并隐藏所有 MCP 工具，但保留服务器配置
+  Future<void> setGlobalEnabled(bool value) async {
+    if (_enabled == value) return;
+    _enabled = value;
+    await McpStore.saveGlobalEnabled(value);
+    if (!value) {
+      final ids = _connections.keys.toList();
+      for (final id in ids) {
+        final connection = _connections.remove(id);
+        if (connection != null) await connection.disconnect();
+      }
+      for (final config in _configs) {
+        _runtimes[config.id] = McpServerRuntime(
+          config: config,
+          status: McpServerStatus.disconnected,
+        );
+      }
+    } else {
+      for (final config in _configs) {
+        if (config.enabled) {
+          unawaited(connect(config.id));
+        } else {
+          _runtimes[config.id] = McpServerRuntime(
+            config: config,
+            status: McpServerStatus.disabled,
+          );
+        }
+      }
+    }
+    _bumpVersionIfNeeded();
+    if (!_disposed) notifyListeners();
+  }
+
   Future<void> connect(String id, {bool interactiveAuth = false}) async {
-    if (_disposed) return;
+    if (_disposed || !_enabled) return;
     final index = _configs.indexWhere((c) => c.id == id);
     if (index < 0) return;
     var config = _configs[index];
@@ -147,8 +186,18 @@ class McpManager extends ChangeNotifier implements McpToolCaller {
       ..addAll(next);
     if (!enabled) {
       await disconnect(id);
-    } else {
+    } else if (_enabled) {
       unawaited(connect(id));
+    } else {
+      final runtime = _runtimes[id];
+      if (runtime != null) {
+        _runtimes[id] = runtime.copyWith(
+          status: McpServerStatus.disconnected,
+          error: '',
+          pendingAuthUrl: '',
+          clearConnectedAt: true,
+        );
+      }
     }
     if (!_disposed) notifyListeners();
   }
@@ -218,6 +267,7 @@ class McpManager extends ChangeNotifier implements McpToolCaller {
   }
 
   List<AgentTool> buildAgentTools() {
+    if (!_enabled) return const [];
     final out = <AgentTool>[];
     final usedNames = <String>{};
     for (final runtime in _runtimes.values) {
@@ -381,6 +431,7 @@ class McpManager extends ChangeNotifier implements McpToolCaller {
 
   @visibleForTesting
   void loadConfigsForTesting(List<McpServerConfig> configs) {
+    _enabled = true;
     for (final connection in _connections.values.toList()) {
       unawaited(connection.disconnect());
     }

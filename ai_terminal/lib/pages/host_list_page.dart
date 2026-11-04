@@ -11,6 +11,7 @@ import '../models/host_config.dart';
 import '../providers/app_providers.dart';
 import '../widgets/host_card.dart';
 import '../widgets/logo_widget.dart';
+import '../core/app_toast.dart';
 
 class HostListPage extends ConsumerStatefulWidget {
   const HostListPage({super.key});
@@ -517,7 +518,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
               await CredentialsStore.deleteAll(host.id);
               await ref.read(hostsProvider.notifier).deleteHost(host.id);
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
+                showTopSnackBar(context, 
                   SnackBar(content: Text(l10n.hostListDeleteSuccess)),
                 );
               }

@@ -9,6 +9,7 @@ import '../utils/agent_ui_text.dart';
 import 'agent_process_timeline.dart';
 import 'host_result_matrix.dart';
 import 'output_viewer_sheet.dart';
+import '../core/app_toast.dart';
 
 /// 结构化事件列表渲染：内容自动追加，只有命令单独包装成块
 ///
@@ -202,11 +203,20 @@ class AgentEventContent extends StatelessWidget {
     flushText();
 
     // 兜底：若有 pendingOptions 但没有 ask 事件（旧格式），显示选项按钮
-    if (isWaitingChoice &&
-        pendingOptions.isNotEmpty &&
-        !events.any((e) => e.isAsk)) {
-      widgets.add(buildOptionButtons(pendingOptions, tc, false,
-          onSelectChoice: onSelectChoice));
+    if (isWaitingChoice && !events.any((e) => e.isAsk)) {
+      if (pendingOptions.isNotEmpty) {
+        widgets.add(buildOptionButtons(pendingOptions, tc, false,
+            onSelectChoice: onSelectChoice));
+      }
+      if (onSelectChoice != null) {
+        widgets.add(Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: AskCustomAnswerField(
+            tc: tc,
+            onSubmit: (answer) => onSelectChoice?.call(answer),
+          ),
+        ));
+      }
     }
 
     return Column(
@@ -366,7 +376,7 @@ class AgentEventContent extends StatelessWidget {
                   SelectableText(
                     output.trimRight(),
                     style: TextStyle(
-                      fontFamily: 'JetBrainsMono',
+                      fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                       fontSize: fMono,
                       color: tc.textBody,
                       height: 1.45,
@@ -483,8 +493,8 @@ class AgentEventContent extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         Clipboard.setData(ClipboardData(text: text));
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
+        clearTopToast();
+        showTopSnackBar(context, 
           const SnackBar(
             content: Text('已复制', style: TextStyle(fontSize: fSmall)),
             duration: Duration(seconds: 1),
@@ -544,14 +554,9 @@ class AgentEventContent extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: SelectableText(
-                  question,
-                  style: TextStyle(
-                      color: tc.textMain,
-                      fontSize: fBody,
-                      height: 1.5,
-                      fontWeight: FontWeight.w500),
-                ),
+                // 问题正文可能带 Markdown（表格/加粗/列表），
+                // 与普通正文共用同一套渲染，避免把表格原样显示成竖线文本。
+                child: markdownBuilder(question, tc),
               ),
             ],
           ),
@@ -563,6 +568,13 @@ class AgentEventContent extends StatelessWidget {
               children: options.map((opt) {
                 return _buildOptionChip(opt, tc, selectable: pending);
               }).toList(),
+            ),
+          ],
+          if (pending && onSelectChoice != null) ...[
+            const SizedBox(height: 10),
+            AskCustomAnswerField(
+              tc: tc,
+              onSubmit: (answer) => onSelectChoice?.call(answer),
             ),
           ],
         ],
@@ -711,7 +723,7 @@ class AgentEventContent extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                     code: TextStyle(
-                      fontFamily: 'JetBrainsMono',
+                      fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                       fontSize: fMono,
                       backgroundColor: accent.withValues(alpha: 0.1),
                     ),
@@ -817,7 +829,7 @@ class _RawOutputTailState extends State<_RawOutputTail> {
                   child: SelectableText(
                     widget.tail,
                     style: TextStyle(
-                      fontFamily: 'JetBrainsMono',
+                      fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                       fontSize: fMicro,
                       color: tc.textBody,
                       height: 1.4,
@@ -890,4 +902,75 @@ Widget buildOptionButtons(
       }).toList(),
     ),
   );
+}
+
+/// ask 选项之外的自由输入：按钮覆盖不到用户想法时，直接回一句话。
+class AskCustomAnswerField extends StatefulWidget {
+  final ThemeColors tc;
+  final void Function(String answer) onSubmit;
+
+  const AskCustomAnswerField({
+    super.key,
+    required this.tc,
+    required this.onSubmit,
+  });
+
+  @override
+  State<AskCustomAnswerField> createState() => _AskCustomAnswerFieldState();
+}
+
+class _AskCustomAnswerFieldState extends State<AskCustomAnswerField> {
+  final _controller = TextEditingController();
+  bool _submitted = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit([String? _]) {
+    final text = _controller.text.trim();
+    if (text.isEmpty || _submitted) return;
+    _submitted = true;
+    widget.onSubmit(text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = widget.tc;
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(rSmall),
+      borderSide: BorderSide(color: tc.border),
+    );
+    return TextField(
+      controller: _controller,
+      style: TextStyle(color: tc.textMain, fontSize: fSmall),
+      cursorColor: tc.brand,
+      textInputAction: TextInputAction.send,
+      onSubmitted: (value) => _submit(value),
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: '按钮都不合适？直接输入你的回答…',
+        hintStyle: TextStyle(color: tc.textMuted, fontSize: fSmall),
+        filled: true,
+        fillColor: tc.surface,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        border: border,
+        enabledBorder: border,
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(rSmall),
+          borderSide: BorderSide(color: tc.brand.withValues(alpha: 0.5)),
+        ),
+        suffixIcon: IconButton(
+          tooltip: '发送自定义回答',
+          icon: Icon(Icons.send, size: 16, color: tc.brand),
+          onPressed: _submit,
+        ),
+        suffixIconConstraints:
+            const BoxConstraints(minWidth: 36, minHeight: 32),
+      ),
+    );
+  }
 }

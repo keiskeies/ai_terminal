@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../services/agent_engine.dart';
+import '../core/app_toast.dart';
 
 /// Agent 日志查看器对话框
 class AgentLogDialog extends StatefulWidget {
@@ -94,7 +95,7 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                     final ctx = context;
                     await Clipboard.setData(ClipboardData(text: _logs.join('\n')));
                     if (!ctx.mounted) return;
-                    ScaffoldMessenger.of(ctx).showSnackBar(
+                    showTopSnackBar(ctx, 
                       SnackBar(
                         content: Text('已复制 ${_logs.length} 条日志', style: const TextStyle(fontSize: 13)),
                         duration: const Duration(seconds: 1),
@@ -141,7 +142,7 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                           }
                           return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 0.5),
-                            child: Text(log, style: TextStyle(fontFamily: 'monospace', fontSize: fMicro, color: color)),
+                            child: Text(log, style: TextStyle(fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback, fontSize: fMicro, color: color)),
                           );
                         },
                       ),

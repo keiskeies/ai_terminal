@@ -6,6 +6,8 @@
   "address": "العنوان",
   "agentNotInitialized": "يرجى تهيئة الوكيل والاتصال بمضيف أولاً",
   "agentRunning": "الوكيل ينفذ مهمة، يرجى الانتظار",
+  "agentSettingAiTimeoutDesc": "تُعد المهلة منتهية إذا لم يصل أي ناتج من النموذج خلال هذه المدة. زد القيمة عند استخدام نماذج محلية بطيئة.",
+  "agentSettingAiTimeoutLabel": "مهلة استجابة الذكاء الاصطناعي",
   "agentSettingAutoExecSection": "AI Auto Execution",
   "agentSettingBuiltInPrompt": "AI Built-in Instructions",
   "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",

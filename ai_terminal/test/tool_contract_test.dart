@@ -75,6 +75,7 @@ class _MockAIProvider implements AIProvider {
     required AIModelConfig config,
     String? systemPrompt,
     CancelToken? cancelToken,
+    Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
   }) async {
@@ -103,8 +104,7 @@ AIModelConfig _makeConfig() => AIModelConfig.create(
       contextWindow: 0,
     );
 
-const String _finishTurn =
-    '思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n';
+const String _finishTurn = '思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n';
 
 void main() {
   setUpAll(() {
@@ -116,7 +116,10 @@ void main() {
 
   group('ToolArgs 类型化访问', () {
     test('getString 兼容 List 与标量', () {
-      const args = ToolArgs({'path': '/etc/hosts', 'hostIds': ['a', 'b']});
+      const args = ToolArgs({
+        'path': '/etc/hosts',
+        'hostIds': ['a', 'b']
+      });
       expect(args.getString('path'), '/etc/hosts');
       expect(args.getString('hostIds'), 'a,b');
       expect(args.getString('missing'), '');
@@ -125,13 +128,19 @@ void main() {
 
     test('requireString 缺失或全空白时抛 ToolArgException', () {
       const args = ToolArgs({'path': '  '});
-      expect(() => args.requireString('path'), throwsA(isA<ToolArgException>()));
-      expect(() => args.requireString('nope'), throwsA(isA<ToolArgException>()));
+      expect(
+          () => args.requireString('path'), throwsA(isA<ToolArgException>()));
+      expect(
+          () => args.requireString('nope'), throwsA(isA<ToolArgException>()));
       expect(const ToolArgs({'path': '/x'}).requireString('path'), '/x');
     });
 
     test('getStringList 处理 List / 逗号 / 方括号 / 中文逗号', () {
-      expect(const ToolArgs({'h': ['a', 'b']}).getStringList('h'), ['a', 'b']);
+      expect(
+          const ToolArgs({
+            'h': ['a', 'b']
+          }).getStringList('h'),
+          ['a', 'b']);
       expect(const ToolArgs({'h': 'a,b'}).getStringList('h'), ['a', 'b']);
       // AI 常把列表写成 JSON 数组字面量；早期实现会得到 ['[a', ' b]']
       expect(const ToolArgs({'h': '[a, b]'}).getStringList('h'), ['a', 'b']);
@@ -175,11 +184,18 @@ void main() {
   group('注册表作用域与 kind 派生', () {
     test('本地项目工具只在本地会话可见（修 D1）', () {
       final registry = AgentToolRegistry();
-      final local = registry.visibleFor(isLocalSession: true).map((t) => t.name);
+      final local =
+          registry.visibleFor(isLocalSession: true).map((t) => t.name);
       final ssh = registry.visibleFor(isLocalSession: false).map((t) => t.name);
-      expect(local, containsAll(['project_analyze', 'build_project', 'package_project']));
-      for (final name in ['project_analyze', 'build_project', 'package_project']) {
-        expect(ssh, isNot(contains(name)), reason: '$name 要求本地 executor，SSH 会话不该看到');
+      expect(local,
+          containsAll(['project_analyze', 'build_project', 'package_project']));
+      for (final name in [
+        'project_analyze',
+        'build_project',
+        'package_project'
+      ]) {
+        expect(ssh, isNot(contains(name)),
+            reason: '$name 要求本地 executor，SSH 会话不该看到');
       }
     });
 
@@ -382,7 +398,8 @@ void main() {
         isFalse,
         reason: '只读工具不该被拦',
       );
-      expect(events.any((e) => e.isCommand && e.toolName == 'cert_check'), isTrue);
+      expect(
+          events.any((e) => e.isCommand && e.toolName == 'cert_check'), isTrue);
     });
   });
 
@@ -429,7 +446,8 @@ void main() {
       expect(rejected.success, isFalse);
       expect(rejected.error, contains('拒绝'));
       expect(
-        provider.receivedHistories.last.any((m) => m.content.contains('用户拒绝执行')),
+        provider.receivedHistories.last
+            .any((m) => m.content.contains('用户拒绝执行')),
         isTrue,
         reason: 'AI 必须收到"用户拒绝"的观测，否则会反复重试同一次删除',
       );
@@ -507,8 +525,7 @@ void main() {
       engine.onEvent = events.add;
       final task = engine.startTask('删掉本机文件', _MockExecutor());
       await pumpEventQueue();
-      expect(engine.hasPendingConfirm, isTrue,
-          reason: '前置条件：任务确实停在等待确认');
+      expect(engine.hasPendingConfirm, isTrue, reason: '前置条件：任务确实停在等待确认');
 
       final pending = engine.pendingConfirmForTesting!;
       engine.pauseTask();
@@ -652,4 +669,3 @@ class _NullSchemaTool extends AgentTool {
   }) async =>
       ToolResult.success('ok');
 }
-

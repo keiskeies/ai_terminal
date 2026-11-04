@@ -12,6 +12,7 @@ import '../providers/app_providers.dart';
 import '../widgets/color_picker_row.dart';
 import '../l10n/app_localizations.dart';
 import '../core/l10n_holder.dart';
+import '../core/app_toast.dart';
 
 const _uuid = Uuid();
 
@@ -270,7 +271,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                                   _privateKeyController.text = content;
                                 });
                                 if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
+                                  showTopSnackBar(context, 
                                     SnackBar(
                                       content: Text(l10n.hostEditPrivateKeyFileRead(result.files.single.name)),
                                       duration: const Duration(seconds: 2),
@@ -281,7 +282,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                               }
                             } catch (e) {
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
+                                showTopSnackBar(context, 
                                   SnackBar(
                                     content: Text(l10n.hostEditReadFileFailed(e.toString())),
                                     backgroundColor: cDanger,
@@ -684,7 +685,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
 
     if (mounted) {
       if (credentialsError != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showTopSnackBar(context, 
           SnackBar(
             content: Text(l10n.hostEditConfigSavedButCredFailed(credentialsError)),
             backgroundColor: Colors.orange,
@@ -692,7 +693,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showTopSnackBar(context, 
           SnackBar(content: Text(l10n.hostEditSaveSuccess)),
         );
       }

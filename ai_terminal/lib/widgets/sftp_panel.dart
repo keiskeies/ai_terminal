@@ -8,6 +8,7 @@ import '../core/theme_colors.dart';
 import '../providers/app_providers.dart';
 import '../services/sftp_controller.dart';
 import '../services/sftp_service.dart';
+import '../core/app_toast.dart';
 
 /// 可复用的 SFTP 面板组件，既可用于独立页面也可嵌入终端右侧
 class SftpPanel extends ConsumerStatefulWidget {
@@ -168,7 +169,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
       if (mounted) {
         // 与 controller 内下载路径保持一致（系统临时目录）
         final localPath = '${Directory.systemTemp.path}/${entry.name}';
-        ScaffoldMessenger.of(context).showSnackBar(
+        showTopSnackBar(context, 
           SnackBar(
             content: Text('已下载到: $localPath'),
             duration: const Duration(seconds: 3),
@@ -178,7 +179,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showTopSnackBar(context, 
           SnackBar(
             content: Text('下载失败: $e'),
             backgroundColor: cDanger,
@@ -197,7 +198,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
       content = await _controller.readFile(entry.path);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showTopSnackBar(context, 
           SnackBar(content: Text('读取失败: $e'), backgroundColor: cDanger),
         );
       }
@@ -267,7 +268,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
                     expands: true,
                     readOnly: readOnly,
                     style: TextStyle(
-                      fontFamily: 'JetBrainsMono',
+                      fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                       fontSize: fMono,
                       color: tc.terminalGreen,
                     ),
@@ -293,7 +294,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
                         await _controller.writeFile(entry.path, controller.text);
                         if (ctx.mounted) {
                           Navigator.pop(ctx);
-                          ScaffoldMessenger.of(ctx).showSnackBar(
+                          showTopSnackBar(ctx, 
                             const SnackBar(
                               content: Text('已保存'),
                               duration: Duration(seconds: 2),
@@ -303,7 +304,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
                         }
                       } catch (e) {
                         if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
+                          showTopSnackBar(ctx, 
                             SnackBar(content: Text('保存失败: $e'), backgroundColor: cDanger),
                           );
                         }
@@ -352,7 +353,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
         await _controller.renameEntry(entry, controller.text);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showTopSnackBar(context, 
             SnackBar(content: Text('重命名失败: $e'), backgroundColor: cDanger),
           );
         }
@@ -387,7 +388,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
         await _controller.deleteEntry(entry);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showTopSnackBar(context, 
             SnackBar(content: Text('删除失败: $e'), backgroundColor: cDanger),
           );
         }
@@ -401,7 +402,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
       result = await FilePicker.platform.pickFiles(allowMultiple: true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        showTopSnackBar(context, 
           SnackBar(
             content: Text('打开文件选择器失败: $e'),
             backgroundColor: cDanger,
@@ -427,7 +428,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
       try {
         await _controller.uploadFile(localPath, remotePath);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showTopSnackBar(context, 
             SnackBar(
               content: Text('已上传: $fileName'),
               duration: const Duration(seconds: 2),
@@ -437,7 +438,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showTopSnackBar(context, 
             SnackBar(
               content: Text('上传 $fileName 失败: $e'),
               backgroundColor: cDanger,
@@ -480,7 +481,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
                 await _controller.createDirectory(controller.text);
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  showTopSnackBar(context, 
                     SnackBar(content: Text('创建目录失败: $e'), backgroundColor: cDanger),
                   );
                 }
@@ -700,7 +701,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
     return TextField(
       controller: _pathController,
       focusNode: _pathFocusNode,
-      style: TextStyle(fontFamily: 'JetBrainsMono', fontSize: fMicro, color: tc.textMain),
+      style: TextStyle(fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback, fontSize: fMicro, color: tc.textMain),
       decoration: InputDecoration(
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -731,7 +732,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
         widgets.add(_pathSegment(parts[i], () => _controller.navigateTo(targetPath)));
         // 非最后一段后面加斜杠分隔
         if (i < parts.length - 1) {
-          widgets.add(Text('/', style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono', height: 1.2)));
+          widgets.add(Text('/', style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback, height: 1.2)));
         }
       }
     }
@@ -753,7 +754,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
       child: Text(
         name,
         style: const TextStyle(
-          fontFamily: 'JetBrainsMono',
+          fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
           fontSize: fMicro,
           color: cPrimary,
           height: 1.2,
@@ -870,7 +871,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
               width: 52,
               child: Text(
                 sizeStr,
-                style: TextStyle(fontSize: 9, color: tc.textMuted, fontFamily: 'JetBrainsMono'),
+                style: TextStyle(fontSize: 9, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
                 textAlign: TextAlign.right,
                 overflow: TextOverflow.ellipsis,
               ),
@@ -881,7 +882,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
               width: 80,
               child: Text(
                 timeStr,
-                style: TextStyle(fontSize: 9, color: tc.textMuted, fontFamily: 'JetBrainsMono'),
+                style: TextStyle(fontSize: 9, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
                 overflow: TextOverflow.ellipsis,
               ),
             ),
@@ -889,7 +890,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
             // 权限
             Text(
               permStr,
-              style: TextStyle(fontSize: 9, color: tc.textMuted, fontFamily: 'JetBrainsMono'),
+              style: TextStyle(fontSize: 9, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
             ),
           ],
         ),

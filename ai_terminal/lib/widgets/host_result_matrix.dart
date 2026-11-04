@@ -155,7 +155,7 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
                                 style: TextStyle(
                                   color: tc.textMain,
                                   fontSize: fSmall,
-                                  fontFamily: 'JetBrainsMono',
+                                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -214,7 +214,7 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
               child: SelectableText(
                 detail,
                 style: TextStyle(
-                  fontFamily: 'JetBrainsMono',
+                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                   fontSize: fMicro,
                   color: tc.textBody,
                   height: 1.4,

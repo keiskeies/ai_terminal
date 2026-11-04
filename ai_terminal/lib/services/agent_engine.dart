@@ -38,6 +38,7 @@ import '../utils/react_stream_parser.dart';
 import '../utils/rollback_advisor.dart';
 import '../utils/verification_detector.dart';
 import '../utils/command_extractor.dart';
+import '../utils/choice_request_detector.dart';
 import '../utils/token_estimator.dart';
 import '../utils/audit_logger.dart';
 import 'change_record_service.dart';
@@ -251,6 +252,11 @@ class AgentEngine {
   /// 当前引擎所属的 hostId（用于知识库经验匹配和多 host 隔离）
   String? hostId;
 
+  /// 当前任务所属的会话 id（由 AgentNotifier 在任务开始/切换会话时设置）。
+  /// 仅用于把日志路由到正确会话；同一服务器多 tab 并行时 hostId 会重复，
+  /// 不能再用它判断日志归属。
+  String? conversationId;
+
   /// 工具注册表 — 管理 AI 可调用的非 shell 工具（如 SFTP 上传）
   final AgentToolRegistry _tools = AgentToolRegistry();
 
@@ -304,6 +310,9 @@ class AgentEngine {
     }
   }
 
+  /// AI 流式响应超时：连续无数据超过该时长即判定超时（Agent 设置页可配置）
+  Duration aiResponseTimeout;
+
   /// 对话历史最大轮数（每轮 = assistant + user），超出时裁剪最早的轮次
   static const int _maxConversationRounds = 40;
 
@@ -315,6 +324,8 @@ class AgentEngine {
     required AIModelConfig modelConfig,
     required AgentMemory memory,
     this.maxSteps = 0,
+    this.aiResponseTimeout =
+        const Duration(seconds: kDefaultAiResponseTimeoutSeconds),
     this.hostId,
     AIProvider? fallbackProvider,
     AIModelConfig? fallbackConfig,
@@ -638,7 +649,14 @@ class AgentEngine {
   /// 启动 Agent 任务
   /// [goal] 用户目标
   /// [executor] 命令执行器，支持 SSHService（远程）或 LocalTerminalService（本地）
-  Future<void> startTask(String goal, CommandExecutor? executor) async {
+  Future<void> startTask(String goal, CommandExecutor? executor) {
+    return agentLogger.runWithConversation(
+      conversationId,
+      () => _startTask(goal, executor),
+    );
+  }
+
+  Future<void> _startTask(String goal, CommandExecutor? executor) async {
     agentLogger.info('AgentEngine', '=== 开始任务 ===');
     agentLogger.info('AgentEngine', '目标: $goal');
     agentLogger.info('AgentEngine', '模式: Agent (ReAct)');
@@ -948,7 +966,14 @@ class AgentEngine {
   /// 实现：清除 paused 状态，重新调用 _executeAutomatic 触发 ReAct 循环
   /// （会复用 _conversationHistory 中已累积的上下文）
   /// [executor] 当前命令执行器；若为 null 则无法恢复
-  Future<void> resumeTask(CommandExecutor? executor) async {
+  Future<void> resumeTask(CommandExecutor? executor) {
+    return agentLogger.runWithConversation(
+      conversationId,
+      () => _resumeTask(executor),
+    );
+  }
+
+  Future<void> _resumeTask(CommandExecutor? executor) async {
     if (_currentTask == null || _currentTask!.status != AgentStatus.paused) {
       return;
     }
@@ -1292,6 +1317,30 @@ class AgentEngine {
       // ═══════════════════════════════════════════
       switch (step.action) {
         case ActionType.finish:
+          // 协议要求提问走 ask，但部分模型会把“请回复选择 A 还是 B”写进
+          // finish 正文：结果 UI 没有按钮，任务却在用户做决定前收尾。
+          // 这里兜底转成真正的 ask，等用户点选后继续循环。
+          final finishChoice = _choiceRequestFromFinish(step);
+          if (finishChoice != null) {
+            agentLogger.warn('ReAct',
+                'finish 正文包含选择请求，转为 ask 等待用户选择: ${finishChoice.options}');
+            if (step.options == null || step.options!.isEmpty) {
+              // 选项: 行由流式解析器发过 ask；正文里提取的选项需要补发事件
+              onEvent?.call(
+                  AgentEvent.ask(finishChoice.question, finishChoice.options));
+            }
+            final shouldContinue = await _handleAskAction(
+              ReActStep(
+                thought: finishChoice.question,
+                action: ActionType.ask,
+                options: finishChoice.options,
+                rawResponse: step.rawResponse,
+              ),
+              myGeneration: myGeneration,
+            );
+            if (!shouldContinue) return;
+            continue;
+          }
           // 防止 AI 幻觉：未执行任何命令/工具就 finish
           // 典型场景：AI 在 ask 后声称"已检查...无问题"但实际未运行任何命令
           // R5: 用独立计数器 _finishWithoutExecCount 限制重试次数，避免与
@@ -1494,6 +1543,7 @@ class AgentEngine {
           config: activeConfig,
           systemPrompt: null,
           cancelToken: token,
+          responseTimeout: aiResponseTimeout,
           tools: toolsSchema,
           onUsage: _recordUsage,
         );
@@ -1568,9 +1618,10 @@ class AgentEngine {
     _aiDoneCompleter = doneCompleter;
     void resetWatchdog() {
       _aiWatchdog?.cancel();
-      _aiWatchdog = Timer(const Duration(seconds: 120), () {
+      _aiWatchdog = Timer(aiResponseTimeout, () {
         _aiStreamTimedOut = true;
-        agentLogger.error('ReAct', 'AI 流式输出超时（120s 无数据），强制中断');
+        agentLogger.error(
+            'ReAct', 'AI 流式输出超时（${aiResponseTimeout.inSeconds}s 无数据），强制中断');
         _aiStreamSub?.cancel();
         if (!doneCompleter.isCompleted) doneCompleter.complete();
       });
@@ -1660,7 +1711,7 @@ class AgentEngine {
     }
 
     if (_aiStreamTimedOut && fullResponse.isEmpty) {
-      throw TimeoutException('AI 响应超时（120s 无数据）');
+      throw TimeoutException('AI 响应超时（${aiResponseTimeout.inSeconds}s 无数据）');
     }
 
     // 流式结束：一次性发出所有事件（e.id 此时是 stableId）
@@ -1793,6 +1844,11 @@ class AgentEngine {
         }
         break;
       }
+    }
+
+    // 有选项但忘了写动作: 说明模型想提问，按 ask 处理，别当 finish 收尾
+    if (action == null && options != null && options.isNotEmpty) {
+      action = ActionType.ask;
     }
 
     // 如果有命令但没有指定动作，默认为 execute
@@ -2583,6 +2639,23 @@ class AgentEngine {
     }
     // 中断时返回 false 让上层退出循环；正常完成返回 true
     return !aborted;
+  }
+
+  /// finish 里的选择请求兜底：显式 选项: 行优先，其次从正文识别。
+  ChoiceRequest? _choiceRequestFromFinish(ReActStep step) {
+    final options = step.options;
+    if (options != null && options.length >= 2) {
+      final answer = step.answer?.trim() ?? '';
+      final question = answer.isNotEmpty ? answer : step.thought.trim();
+      return ChoiceRequest(question, options);
+    }
+    final answer = step.answer?.trim() ?? '';
+    final text = answer.isNotEmpty
+        ? answer
+        : (step.thought.trim().isNotEmpty
+            ? step.thought.trim()
+            : step.rawResponse);
+    return ChoiceRequestDetector.detect(text);
   }
 
   /// 处理 ask 动作 — 暂停等待用户选择
@@ -3399,14 +3472,16 @@ class AgentEngine {
         prompt: prompt,
         config: _modelConfig,
         systemPrompt: null,
+        responseTimeout: aiResponseTimeout,
       );
 
       final raw = StringBuffer();
       // 压缩看门狗：防止 AI 流式卡住导致 compact 永久挂起
       await for (final chunk in stream.timeout(
-        const Duration(seconds: 120),
+        aiResponseTimeout,
         onTimeout: (sink) {
-          agentLogger.warn('Compact', '压缩流超时(120s)，终止并使用已收集内容');
+          agentLogger.warn(
+              'Compact', '压缩流超时(${aiResponseTimeout.inSeconds}s)，终止并使用已收集内容');
           sink.close();
         },
       )) {

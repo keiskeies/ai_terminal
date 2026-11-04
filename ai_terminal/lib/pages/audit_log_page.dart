@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import '../utils/audit_logger.dart';
 import '../providers/app_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/app_toast.dart';
 
 class AuditLogPage extends ConsumerStatefulWidget {
   final String? hostId;
@@ -68,7 +69,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
   void _exportLogs() {
     final l10n = AppLocalizations.of(context)!;
     if (_filteredLogs.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(content: Text(l10n.auditLogNoRecordsToCopy), behavior: SnackBarBehavior.floating),
       );
       return;
@@ -88,7 +89,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
     }
     final text = buffer.toString();
     Clipboard.setData(ClipboardData(text: text));
-    ScaffoldMessenger.of(context).showSnackBar(
+    showTopSnackBar(context, 
       SnackBar(
         content: Text(l10n.auditLogCopied(_filteredLogs.length)),
         backgroundColor: cSuccess,
@@ -312,7 +313,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                   ),
                 ),
                 const Spacer(),
-                Text(formattedTime, style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono')),
+                Text(formattedTime, style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback)),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -343,7 +344,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
               child: SelectableText(
                 command,
                 style: TextStyle(
-                  fontFamily: 'JetBrainsMono',
+                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                   fontSize: fMono,
                   color: tc.terminalGreen,
                 ),
@@ -379,7 +380,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                       child: Text(
                         output,
                         style: TextStyle(
-                          fontFamily: 'JetBrainsMono',
+                          fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                           fontSize: fMicro,
                           color: tc.textSub,
                         ),

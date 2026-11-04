@@ -6,6 +6,8 @@
   "address": "アドレス",
   "agentNotInitialized": "エージェントを初期化し、先にホストに接続してください",
   "agentRunning": "エージェントがタスクを実行中です。完了までお待ちください",
+  "agentSettingAiTimeoutDesc": "この時間モデル出力が届かない場合にタイムアウトと判定します。ローカルモデルや長考モデルでは大きめに設定してください。",
+  "agentSettingAiTimeoutLabel": "AI 応答タイムアウト",
   "agentSettingAutoExecSection": "AI Auto Execution",
   "agentSettingBuiltInPrompt": "AI Built-in Instructions",
   "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",

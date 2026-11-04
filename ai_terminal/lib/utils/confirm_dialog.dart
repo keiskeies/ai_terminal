@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../models/chat_session.dart';
+import '../core/app_toast.dart';
 
 Future<bool> showConfirmDialog(BuildContext context, CommandBlock cmd) async {
   if (cmd.safetyLevel == 'blocked') {
-    ScaffoldMessenger.of(context).showSnackBar(
+    showTopSnackBar(context, 
       const SnackBar(
         content: Text('此命令被安全策略拦截'),
         backgroundColor: cDanger,
@@ -57,7 +58,7 @@ class _SimpleConfirmDialog extends StatelessWidget {
             child: SelectableText(
               cmd.command,
               style: TextStyle(
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                 fontSize: fMono,
                 color: tc.terminalGreen,
               ),
@@ -123,7 +124,7 @@ class _WarnConfirmDialogState extends State<_WarnConfirmDialog> {
             child: SelectableText(
               widget.cmd.command,
               style: const TextStyle(
-                fontFamily: 'JetBrainsMono',
+                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                 fontSize: fMono,
                 color: cWarning,
               ),

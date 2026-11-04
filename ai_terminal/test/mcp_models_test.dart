@@ -48,6 +48,24 @@ void main() {
       expect(exa.enabled, isTrue);
     });
 
+    test('npx 预设：filesystem / context7', () {
+      final fs = McpServerConfig.presetFilesystem('D:\\work');
+      expect(fs.transport, McpTransportKind.stdio);
+      expect(fs.command, 'npx');
+      expect(fs.args, [
+        '-y',
+        '@modelcontextprotocol/server-filesystem',
+        'D:\\work',
+      ]);
+      expect(fs.toolExposure, McpToolExposure.readOnly);
+
+      final ctx = McpServerConfig.presetContext7();
+      expect(ctx.transport, McpTransportKind.stdio);
+      expect(ctx.command, 'npx');
+      expect(ctx.args, ['-y', '@upstash/context7-mcp']);
+      expect(ctx.toolExposure, McpToolExposure.readOnly);
+    });
+
     test('OAuth token 过期判断', () {
       final expired = McpOAuthTokenData(
         accessToken: 'a',

@@ -1,6 +1,7 @@
 import 'agent_model.dart';
 import 'chat_item.dart';
 import 'agent_goal.dart';
+import 'ai_model_config.dart';
 
 /// Agent 状态
 class AgentState {
@@ -10,22 +11,32 @@ class AgentState {
   final List<ChatItem> chatItems; // 统一的消息列表，包含用户和AI消息
   final String? error;
   final int maxSteps;
+
+  /// AI 流式响应超时（秒）：连续无数据超过该时长即判定超时
+  final int aiTimeoutSeconds;
   final String? pendingConfirmCommand; // 等待用户确认的危险命令
   final List<String> pendingOptions; // 等待用户选择的选项
   /// 当前会话所属 hostId（'local' 或服务器 id），用于持久化隔离
   final String? hostId;
+
   /// 当前会话 id（Conversation.id）
   final String? conversationId;
+
   /// 早期对话摘要（压缩后产生，显示在 UI 上让用户感知）
   final String? summary;
+
   /// 是否正在压缩
   final bool isCompacting;
+
   /// 是否处于多机编排模式
   final bool isOrchestratorMode;
+
   /// 是否处于只读模式（Dry-run）
   final bool isReadOnlyMode;
+
   /// 联网搜索会话级开关（与全局开关 OR 合并；运行中切换下次任务生效）
   final bool isWebSearchEnabled;
+
   /// 跨任务持续的目标（host 级状态，切 tab 不丢；null 表示没有目标）
   final AgentGoal? goal;
 
@@ -36,6 +47,7 @@ class AgentState {
     List<ChatItem>? chatItems,
     this.error,
     this.maxSteps = 0,
+    this.aiTimeoutSeconds = kDefaultAiResponseTimeoutSeconds,
     this.pendingConfirmCommand,
     List<String>? pendingOptions,
     this.hostId,
@@ -51,8 +63,10 @@ class AgentState {
 
   bool get isRunning =>
       status == AgentStatus.thinking || status == AgentStatus.executing;
-  bool get isWaitingConfirm => status == AgentStatus.waitingConfirm && pendingConfirmCommand != null;
-  bool get isWaitingChoice => status == AgentStatus.waitingConfirm && pendingOptions.isNotEmpty;
+  bool get isWaitingConfirm =>
+      status == AgentStatus.waitingConfirm && pendingConfirmCommand != null;
+  bool get isWaitingChoice =>
+      status == AgentStatus.waitingConfirm && pendingOptions.isNotEmpty;
 
   AgentState copyWith({
     AgentStatus? status,
@@ -61,6 +75,7 @@ class AgentState {
     List<ChatItem>? chatItems,
     String? error,
     int? maxSteps,
+    int? aiTimeoutSeconds,
     String? pendingConfirmCommand,
     List<String>? pendingOptions,
     String? hostId,
@@ -86,10 +101,15 @@ class AgentState {
       chatItems: chatItems ?? this.chatItems,
       error: clearError ? null : (error ?? this.error),
       maxSteps: maxSteps ?? this.maxSteps,
-      pendingConfirmCommand: clearPendingConfirm ? null : (pendingConfirmCommand ?? this.pendingConfirmCommand),
-      pendingOptions: clearPendingOptions ? [] : (pendingOptions ?? this.pendingOptions),
+      aiTimeoutSeconds: aiTimeoutSeconds ?? this.aiTimeoutSeconds,
+      pendingConfirmCommand: clearPendingConfirm
+          ? null
+          : (pendingConfirmCommand ?? this.pendingConfirmCommand),
+      pendingOptions:
+          clearPendingOptions ? [] : (pendingOptions ?? this.pendingOptions),
       hostId: clearHostId ? null : (hostId ?? this.hostId),
-      conversationId: clearConversationId ? null : (conversationId ?? this.conversationId),
+      conversationId:
+          clearConversationId ? null : (conversationId ?? this.conversationId),
       summary: clearSummary ? null : (summary ?? this.summary),
       isCompacting: isCompacting ?? this.isCompacting,
       isOrchestratorMode: isOrchestratorMode ?? this.isOrchestratorMode,
@@ -104,12 +124,14 @@ class AgentState {
       case AgentStatus.idle:
         return '就绪';
       case AgentStatus.thinking:
-        if (currentTask?.currentStep != null && currentTask!.currentStep!.isNotEmpty) {
+        if (currentTask?.currentStep != null &&
+            currentTask!.currentStep!.isNotEmpty) {
           return '🤔 ${currentTask!.currentStep}';
         }
         return '🤔 思考中...';
       case AgentStatus.executing:
-        if (currentTask?.currentStep != null && currentTask!.currentStep!.isNotEmpty) {
+        if (currentTask?.currentStep != null &&
+            currentTask!.currentStep!.isNotEmpty) {
           return '⚡ ${currentTask!.currentStep}';
         }
         return '⚡ 执行中...';

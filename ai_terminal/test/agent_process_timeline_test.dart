@@ -364,6 +364,23 @@ void main() {
       expect(find.text('有多个 Java 版本可装，选哪个？'), findsOneWidget);
     });
 
+    testWidgets('提问正文走 Markdown 渲染（表格不再显示成竖线文本）', (tester) async {
+      const question = '**重点**\n\n| 方案 | 代价 |\n|---|---|\n| A | 低 |';
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => AgentEventContent(
+          events: [AgentEvent.ask(question, ['继续'])],
+          tc: ThemeColors.of(context),
+          isWaitingChoice: true,
+          pendingOptions: const ['继续'],
+          markdownBuilder: (text, tc) => Text('MD:$text'),
+          onSelectChoice: (_) {},
+        ),
+      )));
+      await tester.pump();
+
+      expect(find.text('MD:$question'), findsOneWidget);
+    });
+
     testWidgets('等待选择时渲染选项且可点击', (tester) async {
       final picked = <String>[];
       await tester.pumpWidget(_wrap(askContent(
@@ -402,6 +419,51 @@ void main() {
       await tester.tap(find.text('Java 8'));
       await tester.pump();
       expect(picked, isEmpty);
+    });
+
+    testWidgets('等待选择时可以输入自定义回答', (tester) async {
+      final picked = <String>[];
+      await tester.pumpWidget(_wrap(askContent(
+        ask: AgentEvent.ask('怎么处理？', ['加入 docker 组', '不加组']),
+        isWaitingChoice: true,
+        onSelectChoice: picked.add,
+      )));
+      await tester.pump();
+
+      expect(find.byType(TextField), findsOneWidget);
+      await tester.enterText(
+          find.byType(TextField), '  用官方脚本安装，但不加组  ');
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pump();
+
+      expect(picked, ['用官方脚本安装，但不加组']);
+    });
+
+    testWidgets('自定义回答为空时不提交', (tester) async {
+      final picked = <String>[];
+      await tester.pumpWidget(_wrap(askContent(
+        ask: AgentEvent.ask('怎么处理？', ['加入 docker 组']),
+        isWaitingChoice: true,
+        onSelectChoice: picked.add,
+      )));
+      await tester.pump();
+
+      await tester.enterText(find.byType(TextField), '   ');
+      await tester.tap(find.byIcon(Icons.send));
+      await tester.pump();
+
+      expect(picked, isEmpty);
+    });
+
+    testWidgets('历史询问不再显示自定义输入框', (tester) async {
+      await tester.pumpWidget(_wrap(askContent(
+        ask: AgentEvent.ask('怎么处理？', ['加入 docker 组']),
+        isWaitingChoice: false,
+        onSelectChoice: (_) {},
+      )));
+      await tester.pump();
+
+      expect(find.byType(TextField), findsNothing);
     });
 
     testWidgets('无提问文字时回落到占位文案', (tester) async {

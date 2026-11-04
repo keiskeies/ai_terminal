@@ -55,6 +55,7 @@ import '../services/change_record_service.dart';
 import '../models/change_record.dart';
 import '../widgets/server_monitor_panel.dart';
 import '../widgets/terminal_view.dart' as term_widget;
+import '../core/app_toast.dart';
 
 
 enum _AiPanelPosition { bottom, right }
@@ -481,7 +482,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     if (connected == null || !mounted) return;
 
     // SSH 连接成功后设置 executor（R3：显式传 tab.hostId，避免用 activeHostId 顶替）
-    ref.read(agentProvider.notifier).setExecutor(connected.service, hostId: connected.hostId);
+    ref.read(agentProvider.notifier).setExecutor(connected.service,
+        hostId: connected.hostId, tabId: connected.id);
     // 过渡视图期间终端还没参与布局，尺寸要等真正渲染后再同步一次
     if (connected.id == _currentTabId) _scheduleSizeSync(connected);
   }
@@ -496,7 +498,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     if (connected == null || !mounted) return;
 
     // 本地终端连接成功后立即设置 executor，使 Agent 模式可用
-    ref.read(agentProvider.notifier).setExecutor(connected.localService, hostId: connected.hostId);
+    ref.read(agentProvider.notifier).setExecutor(connected.localService,
+        hostId: connected.hostId, tabId: connected.id);
     if (connected.id == _currentTabId) _scheduleSizeSync(connected);
   }
 
@@ -609,7 +612,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       if (!mounted) return;
       if (newTab?.localService != null) {
         // 重新绑定 executor（service 已更新）
-        ref.read(agentProvider.notifier).setExecutor(newTab!.localService, hostId: newTab.hostId);
+        ref.read(agentProvider.notifier).setExecutor(newTab!.localService,
+            hostId: newTab.hostId, tabId: newTab.id);
         // 重新绑定终端输入监听（旧闭包持有的是旧 localService 引用）
         _tabOutputSubscription?.cancel();
         _tabOutputSubscription = _setupTerminalListener(newTab);
@@ -624,7 +628,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       newTab = await ref.read(tp.terminalProvider.notifier).reconnect(tab.id, host);
       if (!mounted) return;
       if (newTab?.service != null) {
-        ref.read(agentProvider.notifier).setExecutor(newTab!.service, hostId: newTab.hostId);
+        ref.read(agentProvider.notifier).setExecutor(newTab!.service,
+            hostId: newTab.hostId, tabId: newTab.id);
         // 重新绑定终端输入监听（旧闭包持有的是旧 service 引用）
         _tabOutputSubscription?.cancel();
         _tabOutputSubscription = _setupTerminalListener(newTab);
@@ -703,7 +708,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                       ),
                     ),
                     title: Text(host.name, style: TextStyle(fontSize: fBody, color: tc.textMain)),
-                    subtitle: Text('${host.username}@${host.host}', style: TextStyle(fontSize: fMicro, color: tc.textSub, fontFamily: 'JetBrainsMono')),
+                    subtitle: Text('${host.username}@${host.host}', style: TextStyle(fontSize: fMicro, color: tc.textSub, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback)),
                     trailing: Icon(Icons.open_in_new, size: 14, color: tc.textMuted),
                     onTap: () {
                       Navigator.pop(context);
@@ -1173,7 +1178,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         // 让该 host 的 executor 变成陈旧引用，导致编排误报"未连接"。
         // 直接拦截，要求用户先等编排完成或取消编排。
         if (agentState.isOrchestratorMode && agentState.isRunning) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showTopSnackBar(context, 
             SnackBar(
               content: Text(l10n.orchAgentRunning),
               behavior: SnackBarBehavior.floating,
@@ -1181,7 +1186,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           );
           return;
         }
-        if (agentState.isRunning && tab.id == ref.read(tp.terminalProvider).activeTab?.id) {
+        // 每个 tab 的 Agent 独立运行；关闭后台 tab 也可能取消它自己的任务
+        final tabAgentRunning =
+            ref.read(agentProvider.notifier).isRunningFor(tab.id);
+        if (tabAgentRunning) {
           final confirmed = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
@@ -1579,7 +1587,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             const SizedBox(height: 4),
             Text(
               '${host.username}@${host.host}:${host.port}',
-              style: TextStyle(color: tc.textMuted, fontSize: fMicro, fontFamily: 'JetBrainsMono'),
+              style: TextStyle(color: tc.textMuted, fontSize: fMicro, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
             ),
           ],
         ],
@@ -2412,7 +2420,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 child: SelectableText(
                   isLocalRestore ? change.command : rollbackCommand,
                   style: TextStyle(
-                    fontFamily: 'JetBrainsMono',
+                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                     fontSize: fMono,
                     color: tc.warn,
                   ),
@@ -2527,7 +2535,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       final executor = tab.isLocal ? tab.localService : tab.service;
       ref
           .read(agentProvider.notifier)
-          .setExecutor(executor, hostId: tab.hostId);
+          .setExecutor(executor, hostId: tab.hostId, tabId: tab.id);
       _showOperationMessage('重连成功');
     } catch (e) {
       if (mounted) _showOperationMessage('重连异常：$e', isError: true);
@@ -2608,7 +2616,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     _autoScrollChat = true;
     ref
         .read(agentProvider.notifier)
-        .setExecutor(executor, hostId: activeTab.hostId);
+        .setExecutor(executor, hostId: activeTab.hostId, tabId: activeTab.id);
     await ref.read(agentProvider.notifier).startTask(prompt);
   }
 
@@ -2661,7 +2669,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     _autoScrollChat = true;
     ref
         .read(agentProvider.notifier)
-        .setExecutor(executor, hostId: activeTab.hostId);
+        .setExecutor(executor, hostId: activeTab.hostId, tabId: activeTab.id);
     await ref.read(agentProvider.notifier).startTask(prompt);
   }
 
@@ -2704,14 +2712,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     _autoScrollChat = true;
     ref
         .read(agentProvider.notifier)
-        .setExecutor(executor, hostId: activeTab.hostId);
+        .setExecutor(executor, hostId: activeTab.hostId, tabId: activeTab.id);
     await ref.read(agentProvider.notifier).startTask(prompt);
   }
 
   void _showOperationMessage(String message, {bool isError = false}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+    clearTopToast();
+    showTopSnackBar(context, SnackBar(
       content: Text(message, style: const TextStyle(fontSize: fSmall)),
       duration: Duration(seconds: isError ? 4 : 2),
       behavior: SnackBarBehavior.floating,
@@ -2938,7 +2946,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           h2: TextStyle(color: tc.textMain, fontSize: 14, fontWeight: FontWeight.bold),
           h3: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600),
           code: TextStyle(
-            fontFamily: 'JetBrainsMono',
+            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
             fontSize: fMono,
             fontWeight: FontWeight.w500,
             color: tc.textMain,
@@ -3135,13 +3143,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final CommandExecutor? executor =
         tab?.isLocal == true ? tab?.localService : tab?.service;
     final notifier = ref.read(agentProvider.notifier);
-    notifier.setExecutor(executor, hostId: tab?.hostId ?? 'local');
+    notifier.setExecutor(executor,
+        hostId: tab?.hostId ?? 'local', tabId: tab?.id);
     await notifier.startTask(text);
   }
 
   void _showGoalHint(String message) {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(SnackBar(
+    showTopSnackBar(context, SnackBar(
       content: Text(message, style: const TextStyle(fontSize: 13)),
       duration: const Duration(seconds: 3),
     ));
@@ -3268,7 +3276,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                           c.command,
                           style: TextStyle(
                             color: tc.brand,
-                            fontFamily: 'JetBrainsMono',
+                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                             fontSize: fSmall,
                           ),
                         ),
@@ -3377,7 +3385,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       case '/new':
         _autoScrollChat = true;
         ref.read(agentProvider.notifier).newSession();
-        ScaffoldMessenger.of(context).showSnackBar(
+        showTopSnackBar(context, 
           SnackBar(
             content: Text(l10n.terminalSessionCreated, style: const TextStyle(fontSize: 13)),
             duration: const Duration(seconds: 1),
@@ -3423,7 +3431,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           return true;
         }
         if (!isConnected) {
-          ScaffoldMessenger.of(context).showSnackBar(
+          showTopSnackBar(context, 
             SnackBar(
               content: Text(l10n.terminalConnectTerminalFirst, style: const TextStyle(fontSize: 13)),
               duration: const Duration(seconds: 1),
@@ -3437,7 +3445,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         }
         ref.read(agentProvider.notifier).compact().then((_) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
+          showTopSnackBar(context, 
             SnackBar(
               content: Text(l10n.terminalCompactionDone, style: const TextStyle(fontSize: 13)),
               duration: const Duration(seconds: 1),
@@ -3445,7 +3453,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           );
         }).catchError((e) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
+          showTopSnackBar(context, 
             SnackBar(
               content: Text(l10n.terminalCompactionFailed('$e'), style: const TextStyle(fontSize: 13)),
               duration: const Duration(seconds: 2),
@@ -3941,7 +3949,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                         : isNav
                             ? (isConnected ? tc.ok : tc.textMuted)
                             : (isConnected ? tc.textSub : tc.textMuted),
-                    fontFamily: 'JetBrainsMono',
+                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                     fontWeight: isCore ? FontWeight.w600 : FontWeight.w500,
                     height: 1.0,
                   ),
@@ -4197,7 +4205,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final tab = ref.read(tp.terminalProvider).activeTab;
     if (tab == null || !tab.isConnected) {
       final l10n = AppLocalizations.of(context)!;
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(
           content: Text(l10n.terminalConnectTerminalForRunbook),
           behavior: SnackBarBehavior.floating,
@@ -4208,7 +4216,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     _autoScrollChat = true;
     // 本地终端用 localService，SSH 用 service
     final CommandExecutor? executor = tab.isLocal == true ? tab.localService : tab.service;
-    ref.read(agentProvider.notifier).setExecutor(executor, hostId: tab.hostId);
+    ref.read(agentProvider.notifier).setExecutor(executor,
+        hostId: tab.hostId, tabId: tab.id);
     await ref.read(runbooksProvider.notifier).incrementRunCount(rb.id);
     await ref.read(agentProvider.notifier).startTask(rb.content);
   }
@@ -4218,7 +4227,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final tab = ref.read(tp.terminalProvider).activeTab;
     if (tab == null || !tab.isConnected) {
       final l10n = AppLocalizations.of(context)!;
-      ScaffoldMessenger.of(context).showSnackBar(
+      showTopSnackBar(context, 
         SnackBar(
           content: Text(l10n.terminalConnectTerminalForCommand),
           behavior: SnackBarBehavior.floating,
@@ -4236,7 +4245,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       if (rb.hasUnfilledVariables(values)) {
         if (!mounted) return;
         final l10n = AppLocalizations.of(context)!;
-        ScaffoldMessenger.of(context).showSnackBar(
+        showTopSnackBar(context, 
           SnackBar(
             content: Text(l10n.terminalUnfilledVariables),
             behavior: SnackBarBehavior.floating,
@@ -4295,7 +4304,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 child: SelectableText(
                   rb.content,
                   style: TextStyle(
-                    fontFamily: 'JetBrainsMono',
+                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                     fontSize: fMono,
                     color: tc.terminalGreen,
                   ),
@@ -4314,7 +4323,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                       labelStyle: TextStyle(
                         color: tc.textSub,
                         fontSize: fSmall,
-                        fontFamily: 'JetBrainsMono',
+                        fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                       ),
                       filled: true,
                       fillColor: tc.card,
@@ -4380,7 +4389,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   void _showAIModelNotConfiguredHint() {
     final l10n = AppLocalizations.of(context)!;
-    ScaffoldMessenger.of(context).showSnackBar(
+    showTopSnackBar(context, 
       SnackBar(
         content: Row(
           children: [
@@ -4478,7 +4487,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               final clamped = steps.clamp(0, 100);
               ref.read(agentProvider.notifier).setMaxSteps(clamped);
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
+              showTopSnackBar(context, 
                 SnackBar(
                   content: Text(l10n.terminalMaxStepsSet(clamped)),
                   duration: const Duration(seconds: 1),
@@ -4524,7 +4533,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l10n.snippetResolvedCommand(snippet.command), style: TextStyle(color: tc.textSub, fontSize: fSmall, fontFamily: 'JetBrainsMono')),
+            Text(l10n.snippetResolvedCommand(snippet.command), style: TextStyle(color: tc.textSub, fontSize: fSmall, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback)),
             const SizedBox(height: 12),
             ...variables.map((v) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -4611,7 +4620,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 SettingsDao.set('customSystemPrompt', controller.text.trim());
               } catch (_) {}
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
+              showTopSnackBar(context, 
                 SnackBar(
                   content: Text(L10n.str.customPromptSaved),
                   duration: const Duration(seconds: 1),
@@ -4655,7 +4664,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 controller: controller,
                 maxLines: 10,
                 minLines: 5,
-                style: TextStyle(color: tc.textMain, fontSize: fSmall, fontFamily: 'JetBrainsMono'),
+                style: TextStyle(color: tc.textMain, fontSize: fSmall, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
                 decoration: InputDecoration(
                   enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.border)),
                   focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.brand)),
@@ -4677,7 +4686,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             onPressed: () {
               prompts.saveSystemPrompt(controller.text.trim());
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
+              showTopSnackBar(context, 
                 SnackBar(
                   content: Text(L10n.str.builtinPromptSaved),
                   duration: const Duration(seconds: 1),

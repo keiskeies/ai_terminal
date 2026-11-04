@@ -6,6 +6,7 @@ import '../core/safety_guard.dart';
 import '../providers/terminal_provider.dart' as tp;
 import '../utils/agent_ui_text.dart';
 import '../utils/risk_explainer.dart';
+import '../core/app_toast.dart';
 
 /// 统一命令块：左侧 3px 安全色条 + 命令文本 + 顶部状态标签与操作
 ///
@@ -212,7 +213,7 @@ class AgentCommandBlock extends StatelessWidget {
                       Text(
                         isTool ? '› ' : '\$ ',
                         style: TextStyle(
-                          fontFamily: 'JetBrainsMono',
+                          fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                           fontSize: fMono,
                           color: accentColor,
                           fontWeight: FontWeight.w600,
@@ -224,7 +225,7 @@ class AgentCommandBlock extends StatelessWidget {
                         child: SelectableText(
                           trimmed,
                           style: TextStyle(
-                            fontFamily: 'JetBrainsMono',
+                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                             fontSize: fMono,
                             color: cmdColor,
                             height: 1.45,
@@ -346,8 +347,8 @@ class AgentCommandBlock extends StatelessWidget {
     return GestureDetector(
       onTap: () {
         Clipboard.setData(ClipboardData(text: text));
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
+        clearTopToast();
+        showTopSnackBar(context, 
           const SnackBar(
             content: Text('已复制', style: TextStyle(fontSize: fSmall)),
             duration: Duration(seconds: 1),
@@ -506,7 +507,7 @@ Widget buildPlainCodeBlock(String codeBlock, ThemeColors tc) {
     child: SelectableText(
       codeBlock.trimRight(),
       style: TextStyle(
-        fontFamily: 'JetBrainsMono',
+        fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
         fontSize: fMono,
         color: tc.textSub,
         height: 1.4,

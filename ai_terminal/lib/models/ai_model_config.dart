@@ -1,5 +1,12 @@
 import 'ai_endpoint.dart';
 
+/// AI 流式响应默认超时（秒）：连续无数据超过该时长即判定超时
+const int kDefaultAiResponseTimeoutSeconds = 120;
+
+/// 可配置范围（Agent 设置页滑块的边界）
+const int kMinAiResponseTimeoutSeconds = 30;
+const int kMaxAiResponseTimeoutSeconds = 600;
+
 /// 运行时的模型配置快照：由一个端点和它下面的某个模型拍平而成。
 ///
 /// AgentEngine / AIProvider 只依赖这个对象，因此端点级配置的改造不会
