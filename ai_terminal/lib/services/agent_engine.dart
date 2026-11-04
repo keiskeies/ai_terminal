@@ -450,6 +450,23 @@ class AgentEngine {
 
   @visibleForTesting
   int? get cacheHitForTesting => _cacheHitPercent;
+
+  @visibleForTesting
+  void setTaskStatusForTesting(AgentStatus status) {
+    _currentTask = AgentTask(id: 'test-task', goal: 'test', status: status);
+  }
+
+  @visibleForTesting
+  void seedHistoryForTesting(List<ChatMessage> messages) {
+    _conversationHistory
+      ..clear()
+      ..addAll(messages);
+  }
+
+  @visibleForTesting
+  bool get hasSystemMessageForTesting =>
+      _conversationHistory.any((m) => m.role == 'system');
+
   String? get pendingConfirmCommand => _pendingConfirmCommand;
   bool get hasPendingChoice =>
       _choiceCompleter != null && !_choiceCompleter!.isCompleted;
@@ -1547,6 +1564,17 @@ class AgentEngine {
           tools: toolsSchema,
           onUsage: _recordUsage,
         );
+        // R1: chatStream 返回时可能用户已经点过停止。尤其是 OpenAI-compatible
+        // 实现不保证立刻响应 CancelToken：若这里直接订阅新流，_aiDoneCompleter
+        // 是在 cancelTask 之后才创建的，取消逻辑根本拿不到它，UI 会一直停在
+        // “运行中”直到该流自行结束/超时。这里补一次终态检查。
+        if (token.isCancelled ||
+            _currentTask?.status == AgentStatus.cancelled) {
+          throw StateError('任务已取消');
+        }
+        if (myGeneration != null && myGeneration != _currentTaskGeneration) {
+          throw StateError('任务已被新任务覆盖');
+        }
         break; // 成功建立流
       } catch (e) {
         // 取消导致的异常不重试（重试会消耗新 API 配额且违背用户意图）
@@ -3016,6 +3044,15 @@ class AgentEngine {
         result: result,
       );
 
+      // R1: 台账/审计是 await；用户可能在这期间点了停止或暂停。
+      // 若继续走下面的 status=thinking，会把 cancelled/paused 覆盖回运行态，
+      // UI 就会永远停在“思考中”，点停止看起来完全没反应。
+      if (myGeneration != _currentTaskGeneration) return false;
+      if (_currentTask?.status == AgentStatus.cancelled ||
+          _currentTask?.status == AgentStatus.paused) {
+        return false;
+      }
+
       // 构造观测反馈给 AI
       // 注意：观测里的 command 用多行格式展示参数，避免 AI 从观测里学到 JSON 格式
       final observation = ReActObservation(
@@ -3062,6 +3099,10 @@ class AgentEngine {
       ));
 
       if (myGeneration != _currentTaskGeneration) return false;
+      if (_currentTask?.status == AgentStatus.cancelled ||
+          _currentTask?.status == AgentStatus.paused) {
+        return false;
+      }
 
       final observation = '观测: 工具 $toolName 执行异常 — $e';
       _conversationHistory
@@ -3304,6 +3345,19 @@ class AgentEngine {
   Future<AgentResult> _executeCommand(CommandExecutor executor, String command,
       {int? myGeneration}) async {
     final stopwatch = Stopwatch()..start();
+
+    // R1: 取消可能落在安全检查/快照与真正创建 _commandCancelToken 之间。
+    // 若不在这里拦截，会新建一个没人取消的 token，静默把命令跑完，
+    // 用户看到的就是“已点停止，Agent 还在执行”。
+    if (_currentTask?.status == AgentStatus.cancelled ||
+        (myGeneration != null && myGeneration != _currentTaskGeneration)) {
+      return AgentResult(
+        success: false,
+        error: '用户取消了任务',
+        duration: stopwatch.elapsed,
+        failureKind: CommandFailureKind.cancelled.name,
+      );
+    }
 
     // 目标达成标记不是命令。真机复拍发现模型会把「目标已达成」写进 命令: 块，
     // 丢进 shell 只会得到一条 CommandNotFoundException；提示词只能降低概率，
@@ -3955,7 +4009,12 @@ $hostList
 
   /// 使 system prompt 缓存失效（下次 startTask 重建）
   void _invalidateSystemPromptCache() {
-    // 清空对话历史中的 system 消息，强制重建
+    // 运行中绝不能从 _conversationHistory 里删 system 消息：
+    // 下一次 _callAI 会带着没有协议/工具说明的历史请求模型，常见结果是
+    // 模型不再输出合法的 动作: 行，连续无命令重试后任务被判失败——
+    // 用户看到的就是"点一下联网搜索/只读开关，Agent 就停了"。
+    // 下次 startTask 本来就会重建 system prompt，运行中保留旧缓存即可。
+    if (isRunning || isPaused) return;
     _conversationHistory.removeWhere((m) => m.role == 'system');
   }
 

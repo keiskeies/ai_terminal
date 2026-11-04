@@ -337,6 +337,24 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     }
   }
 
+  /// 活跃 tab 的 Agent 是否忙碌（执行/启动/暂停/等待确认）。
+  /// 只用 `AgentState.isRunning` 会漏掉 paused / waitingConfirm / 启动窗口，
+  /// 此时切模型会重建引擎并取消任务。
+  bool get _activeAgentBusy {
+    final tab = ref.read(tp.terminalProvider).activeTab;
+    if (tab != null) {
+      return ref.read(agentProvider.notifier).isRunningFor(tab.id);
+    }
+    return ref.read(agentProvider).isRunning;
+  }
+
+  /// 仅看 state 的忙碌判断，供 listener 用（不能在里面 ref.read notifier）
+  bool _agentStateBusy(AgentState? s) =>
+      s != null &&
+      (s.isRunning ||
+          s.status == AgentStatus.paused ||
+          s.status == AgentStatus.waitingConfirm);
+
   /// 切换大模型。选择会持久化，但配置里没有「默认模型」这个概念。
   void _switchModel(AIModelConfig model) {
     _currentModelConfig = model;
@@ -351,7 +369,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   /// 应用「端点 + 模型」选择：解析该模型上次的档位（或默认 medium）后重建引擎。
   void _applyModelChoice(AIModelChoice choice, {AIReasoningTier? tier}) {
-    if (ref.read(agentProvider).isRunning) {
+    if (_activeAgentBusy) {
       _showGoalHint(AppLocalizations.of(context)!.terminalModelLockedRunning);
       return;
     }
@@ -371,7 +389,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   /// 只切思考档位，模型不变。
   void _applyReasoningTier(AIReasoningTier tier) {
-    if (ref.read(agentProvider).isRunning) {
+    if (_activeAgentBusy) {
       _showGoalHint(AppLocalizations.of(context)!.terminalModelLockedRunning);
       return;
     }
@@ -400,7 +418,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   void _syncModelWithEndpoints(List<AIEndpoint> endpoints) {
     if (_agentInitInFlight || endpoints.isEmpty) return;
-    if (ref.read(agentProvider).isRunning) {
+    if (_activeAgentBusy) {
       _pendingModelSync = true;
       return;
     }
@@ -797,7 +815,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       _scheduleModelSync();
     });
     ref.listen<AgentState>(agentProvider, (prev, next) {
-      if (_pendingModelSync && prev?.isRunning == true && !next.isRunning) {
+      // paused / waitingConfirm 也算“任务未结束”。只比较 isRunning 会把
+      // 暂停当成结束，在任务仍持有引擎时同步模型并把它取消。
+      if (_pendingModelSync &&
+          _agentStateBusy(prev) &&
+          !_agentStateBusy(next)) {
         _scheduleModelSync();
       }
     });
@@ -3189,6 +3211,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   /// `/model`：切模型。歧义时列候选让用户选，不猜——猜错等于换了一个计费不同的后端。
   bool _handleModelCommand(String? rest) {
+    if (_activeAgentBusy) {
+      _showGoalHint(AppLocalizations.of(context)!.terminalModelLockedRunning);
+      return true;
+    }
     final choices =
         AIModelSelectionService.allChoices(ref.read(aiEndpointsProvider));
     if (choices.isEmpty) {
@@ -3812,7 +3838,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           child: InkWell(
             borderRadius: BorderRadius.circular(rFull),
             onTap: () {
-              if (ref.read(agentProvider).isRunning) {
+              if (_activeAgentBusy) {
                 _showGoalHint(l10n.terminalModelLockedRunning);
                 return;
               }

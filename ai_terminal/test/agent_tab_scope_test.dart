@@ -162,6 +162,21 @@ void main() {
       expect(events.last, isNull, reason: '任务外的日志不应被错误绑定到会话');
     });
 
+    test('启动窗口内点停止会立即退出运行态并记录取消意图', () {
+      final notifier = AgentNotifier();
+      notifier.switchTab('tabA', hostId: 'host1');
+      notifier.beginStartupForTesting('tabA');
+      expect(notifier.isRunningFor('tabA'), isTrue,
+          reason: '任务已显示运行中、但 engine 还没 startTask 的窗口也算忙碌');
+
+      notifier.cancel();
+
+      expect(notifier.state.status, AgentStatus.cancelled);
+      expect(notifier.isStartupCancelRequestedForTesting('tabA'), isTrue,
+          reason: 'startTask 必须在下一个 await 后看到该标记并放弃启动');
+      notifier.endStartupForTesting('tabA');
+    });
+
     test('isRunningFor 能识别后台 tab 的任务', () {
       final notifier = AgentNotifier();
       notifier.switchTab('tabA', hostId: 'host1');

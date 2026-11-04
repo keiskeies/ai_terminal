@@ -168,6 +168,29 @@ AIModelConfig _makeConfig({
   );
 }
 
+/// 不响应 CancelToken 的 provider：chatStream 卡在连接阶段，
+/// 等测试放行后返回一个永不关闭的流。用于覆盖“取消落在建流窗口”的竞态。
+class _SlowConnectProvider implements AIProvider {
+  final started = Completer<void>();
+  final release = Completer<void>();
+
+  @override
+  Future<Stream<String>> chatStream({
+    required List<ChatMessage> history,
+    required String prompt,
+    required AIModelConfig config,
+    String? systemPrompt,
+    CancelToken? cancelToken,
+    Duration? responseTimeout,
+    List<Map<String, dynamic>>? tools,
+    void Function(TokenUsage usage)? onUsage,
+  }) async {
+    if (!started.isCompleted) started.complete();
+    await release.future;
+    return StreamController<String>().stream;
+  }
+}
+
 void main() {
   // 初始化 Flutter binding 和 L10n（agent_engine 内部多处依赖 L10n.str）
   setUpAll(() {
@@ -178,7 +201,7 @@ void main() {
   });
 
   AgentEngine makeEngine({
-    required _MockAIProvider provider,
+    required AIProvider provider,
     AIModelConfig? config,
     AIProvider? fallbackProvider,
     AIModelConfig? fallbackConfig,
@@ -575,6 +598,48 @@ void main() {
       await running;
 
       expect(provider.callCount, 3);
+    });
+  });
+
+  group('取消落在 AI 建流窗口', () {
+    test('provider 忽略 CancelToken 也不能把任务重新拉回运行态', () async {
+      final provider = _SlowConnectProvider();
+      final engine = makeEngine(provider: provider);
+
+      final running = engine.startTask('检查主机', _MockExecutor());
+      await provider.started.future.timeout(const Duration(seconds: 5));
+
+      engine.cancelTask();
+      provider.release.complete();
+
+      await running.timeout(const Duration(seconds: 2),
+          onTimeout: () => fail('取消后仍在等待新建立的 AI 流'));
+      expect(engine.currentTask?.status, AgentStatus.cancelled);
+    });
+  });
+
+  group('运行中切换会话级开关不能清掉 system prompt', () {
+    test('执行中切联网/只读保留 system 消息，终态后才允许失效', () {
+      final engine = makeEngine(provider: _MockAIProvider());
+      engine.seedHistoryForTesting([
+        ChatMessage.create(role: 'system', content: '协议与工具说明'),
+        ChatMessage.create(role: 'user', content: '任务'),
+      ]);
+
+      engine.setTaskStatusForTesting(AgentStatus.executing);
+      engine.setWebSearchEnabled(true);
+      engine.setReadOnlyMode(true);
+      expect(engine.hasSystemMessageForTesting, isTrue,
+          reason: '运行中删 system 消息会让下一轮模型输出非法动作并终止任务');
+
+      engine.setTaskStatusForTesting(AgentStatus.paused);
+      engine.setWebSearchEnabled(false);
+      expect(engine.hasSystemMessageForTesting, isTrue);
+
+      engine.setTaskStatusForTesting(AgentStatus.completed);
+      engine.setWebSearchEnabled(true);
+      expect(engine.hasSystemMessageForTesting, isFalse,
+          reason: '任务结束后允许失效，下一次 startTask 会重建');
     });
   });
 }

@@ -60,6 +60,12 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 正在被某个 tab 启动任务的会话：两个 tab 共享同一会话查看时，必须串行使用
   final Map<String, String> _startingConversations = {};
 
+  /// 启动窗口内用户已点过停止的 tab。
+  /// 此时 state 已显示"运行中"、但 engine.startTask 还没真正执行，
+  /// engine.cancelTask() 会因 _currentTask==null 变成 no-op；必须记住意图，
+  /// 让 startTask 在每个 await 之后放弃启动。
+  final Set<String> _cancelRequestedScopes = {};
+
   /// 当前引擎所属的 scopeId（终端 tab id，用于回调路由）
   String? _engineScopeId;
 
@@ -453,6 +459,19 @@ class AgentNotifier extends StateNotifier<AgentState> {
   bool hasRunningAgentForHostForTesting(String hostId) =>
       _hasRunningAgentForHost(hostId);
 
+  @visibleForTesting
+  void beginStartupForTesting(String scopeId) => _startingScopes.add(scopeId);
+
+  @visibleForTesting
+  void endStartupForTesting(String scopeId) {
+    _startingScopes.remove(scopeId);
+    _cancelRequestedScopes.remove(scopeId);
+  }
+
+  @visibleForTesting
+  bool isStartupCancelRequestedForTesting(String scopeId) =>
+      _cancelRequestedScopes.contains(scopeId);
+
   /// tab-aware 状态更新：如果回调所属 tab 是当前活跃 tab，更新 state；
   /// 否则只更新注册表中的缓存，避免跨 tab 污染
   void _updateScopeState(
@@ -472,9 +491,14 @@ class AgentNotifier extends StateNotifier<AgentState> {
     required AIModelConfig modelConfig,
     required AIProvider aiProvider,
   }) {
-    _modelConfig = modelConfig;
-
     final scopeId = _registry.activeScopeId;
+    // 模型/思考档位切换最终都会走 init（重建引擎）。运行中重建等于取消任务，
+    // 这里做最后一道防线：UI 守卫漏掉时也绝不打断正在执行/暂停/等待确认的任务。
+    if (scopeId != null && isRunningFor(scopeId)) {
+      agentLogger.warn('AgentNotifier', 'Agent 任务进行中，拒绝重建引擎');
+      return;
+    }
+    _modelConfig = modelConfig;
     if (scopeId == null) return;
     final hostId = _registry.getHostId(scopeId) ?? state.hostId ?? 'local';
     final memory = _getMemory(scopeId);
@@ -885,6 +909,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 指定 tab 是否正在执行 Agent 任务。
   /// 关闭后台 tab 时不能只看活跃 tab 的 state，否则会静默取消另一个 tab 的任务。
   bool isRunningFor(String tabId) {
+    if (_startingScopes.contains(tabId)) return true;
     if (_registry.activeScopeId == tabId) {
       return _isStateBusy(state) || _isEngineBusy(_engine);
     }
@@ -997,6 +1022,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
       state = state.copyWith(error: 'Agent 正在执行任务，请等待完成');
       return;
     }
+    // 清掉上一次启动窗口遗留的取消请求
+    _cancelRequestedScopes.remove(scopeId);
     String? claimedConversation;
     try {
       // 会话冲突处理：同一服务器的另一个 tab 若正**执行**在同一会话上，
@@ -1070,6 +1097,13 @@ class AgentNotifier extends StateNotifier<AgentState> {
         return;
       }
 
+      // 用户在落盘窗口内点过停止：engine 还没有 _currentTask，
+      // cancelTask 无法生效，这里按取消收尾并放弃启动。
+      if (_cancelRequestedScopes.remove(scopeId)) {
+        _applyCancelledState(scopeId, engine);
+        return;
+      }
+
       // R1: await 期间用户可能切换 tab / 更换引擎。任务必须继续在发起它的
       // scope 上执行；但若已切到另一台服务器，switchTab 已经取消了这个引擎，
       // 不再启动一个后台任务。
@@ -1129,6 +1163,12 @@ class AgentNotifier extends StateNotifier<AgentState> {
         await sysInfoFuture;
       }
 
+      // 系统信息收集期间用户点了停止
+      if (_cancelRequestedScopes.remove(scopeId)) {
+        _applyCancelledState(scopeId, engine);
+        return;
+      }
+
       // R1: 系统信息收集/切 tab 期间引擎可能已被替换或取消，不能再启动
       if (_registry.getEngine(scopeId) != engine) {
         _applyCancelledState(scopeId, engine);
@@ -1153,6 +1193,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _maybeAutoCompact(scopeId);
     } finally {
       _startingScopes.remove(scopeId);
+      _cancelRequestedScopes.remove(scopeId);
       if (claimedConversation != null &&
           _startingConversations[claimedConversation] == scopeId) {
         _startingConversations.remove(claimedConversation);
@@ -1216,9 +1257,19 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
   /// 取消任务
   void cancel() {
-    // 取消前先保存当前流式内容到 content（_flushStreamingToContent 会同时 isStreaming: false）
-    final scopeId = _engineScopeId;
+    // 以活跃 tab 的当前引擎为准；_engine 只是缓存，切 tab/重建模型后可能滞后
+    final scopeId = _registry.activeScopeId ?? _engineScopeId;
+    final engine = scopeId == null
+        ? _engine
+        : (_registry.getEngine(scopeId) ?? _engine);
+
     if (scopeId != null) {
+      // 任务已显示"运行中"、但 engine.startTask 尚未执行的窗口：
+      // 此时 cancelTask 是 no-op，必须记下取消意图让 startTask 放弃启动
+      if (_startingScopes.contains(scopeId)) {
+        _cancelRequestedScopes.add(scopeId);
+      }
+      // 取消前先保存当前流式内容到 content（_flushStreamingToContent 会同时 isStreaming: false）
       _flushStreamingToContent(scopeId);
       // 兜底：所有终态路径都必须强制 isStreaming: false，避免 UI 卡在"运行中"
       // 覆盖两种场景：
@@ -1227,24 +1278,34 @@ class AgentNotifier extends StateNotifier<AgentState> {
       //   2. streamingContent 非空但被 _flushStreamingToContent 合并后，仍需兜底确保 isStreaming: false
       _updateScopeState(scopeId, (s) {
         final items = [...s.chatItems];
-        if (items.isEmpty || items.last.role != 'assistant') return s;
-        final lastItem = items.last;
-        final newContent = lastItem.content.isEmpty
-            ? L10n.str.taskCancelled
-            : lastItem.content;
-        items[items.length - 1] = lastItem.copyWith(
-          content: newContent,
-          isStreaming: false,
-        );
-        // 仅当 content 有变化时持久化（避免无谓 IO）
-        if (lastItem.content != newContent) {
-          _persistAssistantCompletion(scopeId, newContent,
-              events: lastItem.events);
+        if (items.isNotEmpty && items.last.role == 'assistant') {
+          final lastItem = items.last;
+          final newContent = lastItem.content.isEmpty
+              ? L10n.str.taskCancelled
+              : lastItem.content;
+          items[items.length - 1] = lastItem.copyWith(
+            content: newContent,
+            streamingContent: '',
+            isStreaming: false,
+          );
+          // 仅当 content 有变化时持久化（避免无谓 IO）
+          if (lastItem.content != newContent) {
+            _persistAssistantCompletion(scopeId, newContent,
+                events: lastItem.events);
+          }
         }
-        return s.copyWith(chatItems: items);
+        // 不依赖引擎回调：即使 engine 还没有 _currentTask，UI 也必须马上退出运行态
+        return s.copyWith(
+          status: AgentStatus.cancelled,
+          currentTask: engine?.currentTask,
+          chatItems: items,
+          clearPendingConfirm: true,
+          clearPendingOptions: true,
+          clearError: true,
+        );
       });
     }
-    _engine?.cancelTask();
+    engine?.cancelTask();
   }
 
   /// P2-7: 暂停任务
