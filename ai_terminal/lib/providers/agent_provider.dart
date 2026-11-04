@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/agent_model.dart';
 import '../models/agent_event.dart';
 import '../models/agent_memory.dart';
+import '../models/agent_goal.dart';
 import '../models/ai_model_config.dart';
 import '../models/chat_session.dart';
 import '../models/conversation.dart';
@@ -11,11 +12,13 @@ import '../services/agent_engine.dart';
 import '../services/agent_host_registry.dart';
 import '../services/agent_stream_reducer.dart';
 import '../services/ai_service.dart';
+import '../services/ai_model_selection_service.dart';
 import '../services/command_executor.dart';
 import '../services/conversation_service.dart';
 import '../services/knowledge_service.dart';
 import '../core/credentials_store.dart';
 import '../services/daos.dart';
+import '../utils/goal_continuation.dart';
 import '../core/l10n_holder.dart';
 import '../models/agent_state.dart';
 import '../models/chat_item.dart';
@@ -53,12 +56,20 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 当前引擎所属的 hostId（用于回调路由）
   String? _engineHostId;
 
+  /// 由 UI（terminal_page）注入：弹出掩码输入框向用户索取一个秘密（如 sudo 密码）。
+  /// 返回 null 表示取消。
+  ///
+  /// 明文只经由引擎写进安全存储，不经过 Notifier、state、对话历史与审计日志
+  /// （AGENTS.md R7）—— 所以这里只透传回调，Notifier 自己也不留副本。
+  Future<String?> Function(String title, String message)? secretRequestHandler;
+
   final ConversationService _convService = ConversationService();
 
   /// 日志订阅取消函数
   void Function()? _logUnsubscribe;
 
   AgentNotifier() : super(AgentState()) {
+    _loadStoredGoals();
     // 订阅 AgentLogger，将日志写入产生日志时的 hostId 会话（避免多 host 串台）
     _logUnsubscribe = agentLogger.subscribe((level, tag, message, timestamp, hostId) {
       // 优先用日志产生时的 hostId（currentHostId），回退到当前活跃 host
@@ -280,14 +291,15 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
   }
 
-  /// P1-4: 加载 fallback AIProvider 和 AIModelConfig
-  /// 根据 modelConfig.fallbackModelId 查询备用模型配置并创建 provider
+  /// 加载 fallback AIProvider 和 AIModelConfig
+  /// 根据 modelConfig.fallbackModelId 在新端点/模型目录中查找并创建 provider
   /// 返回 null 表示无 fallback 或 fallback 模型不存在
   (AIProvider, AIModelConfig)? _loadFallbackFor(AIModelConfig config) {
     final fallbackId = config.fallbackModelId;
     if (fallbackId == null || fallbackId.isEmpty) return null;
     try {
-      final fallbackConfig = AIModelsDao.getCachedById(fallbackId);
+      final fallbackConfig =
+          AIModelSelectionService.buildConfig(AIEndpointsDao.cached, fallbackId);
       if (fallbackConfig == null) {
         debugPrint('[AgentNotifier] fallback 模型不存在: $fallbackId');
         return null;
@@ -299,6 +311,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
       return null;
     }
   }
+
+  /// 当前活跃 host 实际使用的模型配置（选择器显示用，避免切 tab 后显示全局值）
+  AIModelConfig? get modelConfig => _modelConfig;
 
   /// tab-aware 状态更新：如果回调所属 host 是当前活跃 host，更新 state；
   /// 否则只更新注册表中的缓存，避免跨 host 污染
@@ -366,6 +381,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
   void _setupEngineCallbacks(String hostId) {
     _engineHostId = hostId;
+    _mirrorGoal(hostId);
+    // 透传而不是捕获：页面可能在引擎创建之后才注册处理器（切 tab、重建 engine）
+    _engine!.onSecretRequest =
+        (title, message) async => secretRequestHandler?.call(title, message);
     _engine!.onThinking = (msg) {
       // 新一轮 AI 流式开始：先把上一轮的 streamingContent 累积到 content 并保存
       _flushStreamingToContent(hostId);
@@ -442,6 +461,11 @@ class AgentNotifier extends StateNotifier<AgentState> {
         if (items.isNotEmpty && items.last.role == 'assistant') {
           _persistAssistantCompletion(hostId, items.last.content, events: items.last.events);
         }
+      }
+      // 目标模式：finish 事件是任务终局唯一可靠的信号（设计 §5-V1），
+      // 放在状态更新之后，确保读到的 currentTask 就是刚结束的那个任务
+      if (event.type == AgentEventType.finish) {
+        _onGoalTaskFinished(hostId, event);
       }
     };
 
@@ -918,6 +942,22 @@ class AgentNotifier extends StateNotifier<AgentState> {
     state = state.copyWith(isReadOnlyMode: newValue);
   }
 
+  /// 按 host 设置只读模式。
+  ///
+  /// 不能用 [toggleReadOnlyMode]：它读 `state`（活跃 host）也写 `state`，
+  /// 调用方若跨 await 持有意图（如 `/plan` 结束时还原），期间用户切了 tab
+  /// 就会把**另一个 host** 的模式改掉（AGENTS.md R3 的那类串台）。
+  void setReadOnlyForHost(String hostId, {required bool enabled}) {
+    _registry.getEngine(hostId)?.setReadOnlyMode(enabled);
+    _updateHostState(hostId, (s) => s.copyWith(isReadOnlyMode: enabled));
+  }
+
+  /// 该 host 当前是否只读。跨 await 的调用方必须按 host 读，不能读 `state`。
+  bool isReadOnlyFor(String hostId) {
+    if (hostId == _registry.activeHostId) return state.isReadOnlyMode;
+    return _registry.getState(hostId)?.isReadOnlyMode ?? false;
+  }
+
   /// 开启/关闭联网搜索（会话级，覆盖全局开关）
   ///
   /// 运行中切换不影响当前任务（system prompt 已构建），
@@ -998,6 +1038,240 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
   /// 判断是否需要自动压缩（任务结束后调用）
   /// [taskHostId] 发起任务的 host，避免切换 host 后压缩错误的会话
+  // ==================== 目标模式（设计 §3.2）====================
+
+  /// hostId → 目标。`AgentState.goal` 是它的 UI 镜像；所有变更都经 [_setGoal]
+  /// 同时写存储与刷状态，避免两份真相各自漂移。
+  final Map<String, AgentGoal> _goals = {};
+
+  /// 已为哪个终局任务发起过续跑。取消与异常可能连着发出两个 finish 事件，
+  /// 不去重就会在一次结束后起两个任务。
+  String? _continuedFromTaskId;
+
+  static const String _goalKeyPrefix = 'agentGoal:';
+
+  static String _goalKey(String hostId) => '$_goalKeyPrefix$hostId';
+
+  /// 启动时把所有 host 的目标读回内存。
+  /// 只读 SettingsDao 的内存缓存（同步），不在 build 期间改 provider state。
+  void _loadStoredGoals() {
+    try {
+      for (final entry in SettingsDao.cachedMap.entries) {
+        if (!entry.key.startsWith(_goalKeyPrefix)) continue;
+        final hostId = entry.key.substring(_goalKeyPrefix.length);
+        final goal = AgentGoal.fromJson(entry.value);
+        if (goal != null) _goals[hostId] = goal;
+      }
+    } catch (e) {
+      // R8: 不能静默吞掉——目标读不回来就等于功能消失
+      debugPrint('[AgentNotifier] 加载目标失败: $e');
+    }
+  }
+
+  /// 引擎为某 host 重建时把目标镜像回该 host 的状态（应用重启后的恢复路径）
+  void _mirrorGoal(String hostId) {
+    final goal = _goals[hostId];
+    _updateHostState(hostId, (s) {
+      if (goal == null) return s.goal == null ? s : s.copyWith(clearGoal: true);
+      return s.copyWith(goal: goal);
+    });
+  }
+
+  /// 只读取，不改状态——供命令回显与测试用
+  AgentGoal? goalFor(String hostId) => _goals[hostId];
+
+  void _setGoal(String hostId, AgentGoal? goal) {
+    if (goal == null) {
+      _goals.remove(hostId);
+    } else {
+      _goals[hostId] = goal;
+    }
+    try {
+      // 空串代表"没有目标"：读侧 AgentGoal.fromJson 会把它当无效数据丢弃
+      SettingsDao.set(_goalKey(hostId), goal?.toJson() ?? '');
+    } catch (e) {
+      debugPrint('[AgentNotifier] 目标存盘失败 (hostId=$hostId): $e');
+    }
+    _updateHostState(hostId, (s) =>
+        goal == null ? s.copyWith(clearGoal: true) : s.copyWith(goal: goal));
+  }
+
+  /// 创建并激活目标。已有活跃目标时返回 null，由调用方提示，不静默覆盖。
+  AgentGoal? createGoal(String hostId, String objective, {int? maxRounds}) {
+    final text = objective.trim();
+    if (text.isEmpty) return null;
+    if (_goals[hostId]?.isActive == true) return null;
+    final now = DateTime.now();
+    final goal = AgentGoal(
+      id: 'goal-${now.microsecondsSinceEpoch}-$hostId',
+      hostId: hostId,
+      objective: text,
+      maxRounds: _clampMaxRounds(maxRounds),
+      createdAt: now,
+      updatedAt: now,
+    );
+    _continuedFromTaskId = null;
+    _setGoal(hostId, goal);
+    return goal;
+  }
+
+  bool pauseGoal(String hostId) {
+    final goal = _goals[hostId];
+    if (goal == null || !goal.isActive) return false;
+    _setGoal(
+      hostId,
+      goal.copyWith(
+        status: AgentGoalStatus.paused,
+        note: '手动暂停',
+        updatedAt: DateTime.now(),
+      ),
+    );
+    return true;
+  }
+
+  /// 恢复。预算已用尽时拒绝——否则下一轮判定立刻以"预算耗尽"结束，
+  /// 用户看到的是"点了恢复什么都没发生"。
+  bool resumeGoal(String hostId) {
+    final goal = _goals[hostId];
+    if (goal == null || goal.status == AgentGoalStatus.active) return false;
+    if (goal.budgetExhausted) {
+      _updateHostState(hostId,
+          (s) => s.copyWith(error: '目标轮次已用尽（${goal.roundsUsed}/${goal.maxRounds}），请用 /goal edit 调整目标或先结束'));
+      return false;
+    }
+    final isForegroundHost = hostId == _registry.activeHostId &&
+        hostId == _engineHostId &&
+        _engine != null;
+    final connectionAlive = _executor?.isConnected ?? false;
+    if (!isForegroundHost || !connectionAlive) {
+      // 与其翻成 active 然后什么都不发生，不如当场说清楚恢复不了的原因
+      _updateHostState(hostId, (s) => s.copyWith(
+          error: isForegroundHost
+              ? '终端未连接，恢复后没有可执行的地方，请先重连'
+              : '该目标属于别的会话，先切回它的会话再恢复'));
+      return false;
+    }
+    final resumed = goal.copyWith(
+      status: AgentGoalStatus.active,
+      clearNote: true,
+      // 恢复后重新计无进展窗口，否则恢复即触发"连续两轮无进展"
+      noProgressRounds: 0,
+      updatedAt: DateTime.now(),
+    );
+    _setGoal(hostId, resumed);
+    if (!shouldKickGoalRound(
+      goalActive: true,
+      isForegroundHost: isForegroundHost,
+      engineRunning: _engine?.isRunning ?? false,
+      connectionAlive: connectionAlive,
+    )) {
+      // 已经有任务在跑：它终局时会自己接上续跑，这里不抢
+      return true;
+    }
+    final prompt = buildGoalContinuationPrompt(resumed);
+    scheduleMicrotask(() {
+      if (_goals[hostId]?.isActive != true) return;
+      if (_engine != null && _engine!.isRunning) return;
+      startTask(prompt);
+    });
+    return true;
+  }
+
+  /// 改目标文本。**保留 roundsUsed 与 maxRounds**：编辑不能用来刷预算。
+  bool editGoal(String hostId, String objective) {
+    final goal = _goals[hostId];
+    final text = objective.trim();
+    if (goal == null || text.isEmpty) return false;
+    _setGoal(
+      hostId,
+      goal.copyWith(objective: text, updatedAt: DateTime.now()),
+    );
+    return true;
+  }
+
+  bool finishGoal(String hostId, {String? note}) {
+    final goal = _goals[hostId];
+    if (goal == null) return false;
+    _setGoal(
+      hostId,
+      goal.copyWith(
+        status: AgentGoalStatus.finished,
+        note: note ?? '手动结束',
+        updatedAt: DateTime.now(),
+      ),
+    );
+    return true;
+  }
+
+  void clearGoal(String hostId) => _setGoal(hostId, null);
+
+  static int _clampMaxRounds(int? raw) {
+    final v = raw ?? AgentGoal.defaultMaxRounds;
+    if (v < 1) return 1;
+    return v > AgentGoal.maxAllowedRounds ? AgentGoal.maxAllowedRounds : v;
+  }
+
+  /// 任务终局时的目标处理。
+  ///
+  /// 挂在 `AgentEvent.finish` 而不是 `onCompleted`（设计 §5-V1）：后者漏掉所有异常
+  /// 失败路径与空输出路径，用它会出现"任务失败了但目标再也不动"。
+  void _onGoalTaskFinished(String hostId, AgentEvent event) {
+    final goal = _goals[hostId];
+    if (goal == null || !goal.isActive) return;
+
+    // 任务对象必须按 host 取对来源：活跃 host 的 currentTask 写在 `state` 里
+    // （startTask / onTaskUpdated 都是直接 `state =`），注册表里那份不随这些写更新。
+    // 早先一律读 `_registry.getState(hostId)`，取到的 currentTask 是 null，
+    // 于是 commandsRun 恒为 0，目标两轮就误判"无进展"——真机复拍暴露的就是这个。
+    final liveTask = hostId == _registry.activeHostId
+        ? state.currentTask
+        : _registry.getState(hostId)?.currentTask;
+    final taskId = liveTask?.id;
+    if (taskId != null && taskId == _continuedFromTaskId) return;
+
+    // 只在目标所属 host 就是当前引擎时续跑。后台 host 上自动执行命令，
+    // 等于在用户没看的机器上动手（AGENTS.md R3 的那类事故）。
+    final isForegroundHost = hostId == _registry.activeHostId &&
+        hostId == _engineHostId &&
+        _engine != null;
+
+    final decision = decideGoalContinuation(
+      goal: goal,
+      finishState: event.finishState,
+      // 本轮干了多少活：stepIndex 每个任务各自从 1 计，跨轮比大小会误判
+      commandsRun: (liveTask?.successCount ?? 0) + (liveTask?.failureCount ?? 0),
+      hadConfirmTimeout: _engine?.hadConfirmTimeout ?? false,
+      connectionAlive: _executor?.isConnected ?? false,
+      isForegroundHost: isForegroundHost,
+      finishSummary: event.text,
+    );
+
+    _setGoal(hostId, decision.goal);
+    if (decision.action != GoalAction.continueRound) {
+      agentLogger.info('Goal', '目标停止自动续跑：${decision.reason}');
+      return;
+    }
+
+    if (!shouldScheduleGoalRound(
+      goal: decision.goal,
+      finishingTaskId: taskId,
+      alreadyContinuedTaskId: _continuedFromTaskId,
+      engineRunning: _engine?.isRunning ?? false,
+    )) {
+      return;
+    }
+    if (taskId != null) _continuedFromTaskId = taskId;
+    final prompt = buildGoalContinuationPrompt(decision.goal);
+    // 延后发起（设计 §5-V2 / D5）：finish 事件在 _finishTask 的资源清理之前发出，
+    // 同步起新任务会让那段清理作用在新任务上——刚建的 streamSub 立刻被 cancel。
+    scheduleMicrotask(() {
+      // 排队期间用户可能按了暂停，也可能自己发了消息：两者都得重查
+      if (_goals[hostId]?.isActive != true) return;
+      if (_engine != null && _engine!.isRunning) return;
+      startTask(prompt);
+    });
+  }
+
   void _maybeAutoCompact(String taskHostId) {
     final convId = _registry.getState(taskHostId)?.conversationId;
     if (convId == null) return;

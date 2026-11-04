@@ -29,7 +29,7 @@ void main() {
     test('W-1: path 缺失 → 报错', () async {
       final result = await tool.execute(
         executor: executor,
-        args: {'content_b64': 'aGVsbG8=', 'mode': 'write'},
+        args: const ToolArgs({'content_b64': 'aGVsbG8=', 'mode': 'write'}),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('path'));
@@ -38,7 +38,7 @@ void main() {
     test('W-2: content_b64 缺失 → 报错', () async {
       final result = await tool.execute(
         executor: executor,
-        args: {'path': '/tmp/test.txt', 'mode': 'write'},
+        args: const ToolArgs({'path': '/tmp/test.txt', 'mode': 'write'}),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('content_b64'));
@@ -47,11 +47,11 @@ void main() {
     test('W-3: mode 非法值 → 报错', () async {
       final result = await tool.execute(
         executor: executor,
-        args: {
+        args: const ToolArgs({
           'path': '/tmp/test.txt',
           'content_b64': 'aGVsbG8=',
           'mode': 'invalid',
-        },
+        }),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('mode'));
@@ -60,11 +60,11 @@ void main() {
     test('W-4: base64 解码失败 → 报错', () async {
       final result = await tool.execute(
         executor: executor,
-        args: {
+        args: const ToolArgs({
           'path': '/tmp/test.txt',
           'content_b64': '!!!not_base64!!!',
           'mode': 'write',
-        },
+        }),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('base64'));
@@ -76,11 +76,11 @@ void main() {
       final bigB64 = base64Encode(utf8.encode(bigContent));
       final result = await tool.execute(
         executor: executor,
-        args: {
+        args: ToolArgs({
           'path': '/tmp/big.txt',
           'content_b64': bigB64,
           'mode': 'write',
-        },
+        }),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('过大'));
@@ -93,11 +93,11 @@ void main() {
       final b64 = base64Encode(utf8.encode(content));
       final result = await tool.execute(
         executor: executor,
-        args: {
+        args: ToolArgs({
           'path': '/tmp/exact.txt',
           'content_b64': b64,
           'mode': 'write',
-        },
+        }),
       );
       // 通过大小校验后，因非 SSH 会话拒绝
       expect(result.success, isFalse);
@@ -108,11 +108,11 @@ void main() {
     test('W-7: 非 SSH 会话 → 拒绝', () async {
       final result = await tool.execute(
         executor: executor,
-        args: {
+        args: const ToolArgs({
           'path': '/tmp/test.txt',
           'content_b64': 'aGVsbG8=',
           'mode': 'write',
-        },
+        }),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('SSH'));
@@ -122,10 +122,10 @@ void main() {
       // 不传 mode，应默认 write，不会报 mode 错误
       final result = await tool.execute(
         executor: executor,
-        args: {
+        args: const ToolArgs({
           'path': '/tmp/test.txt',
           'content_b64': 'aGVsbG8=',
-        },
+        }),
       );
       // 走到非 SSH 拒绝，说明 mode 校验已通过
       expect(result.success, isFalse);
@@ -137,12 +137,12 @@ void main() {
       // backup=false 不应导致参数校验失败
       final result = await tool.execute(
         executor: executor,
-        args: {
+        args: const ToolArgs({
           'path': '/tmp/test.txt',
           'content_b64': 'aGVsbG8=',
           'mode': 'write',
           'backup': 'false',
-        },
+        }),
       );
       // 走到非 SSH 拒绝，说明 backup=false 已被解析
       expect(result.success, isFalse);
@@ -153,11 +153,11 @@ void main() {
     test('W-10: backup 参数缺省 → 默认 true（不报错）', () async {
       final result = await tool.execute(
         executor: executor,
-        args: {
+        args: const ToolArgs({
           'path': '/tmp/test.txt',
           'content_b64': 'aGVsbG8=',
           'mode': 'write',
-        },
+        }),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('SSH'));
@@ -176,7 +176,7 @@ void main() {
     test('P-1: path 缺失 → 报错', () async {
       final result = await tool.execute(
         executor: executor,
-        args: {'old_b64': 'aGVsbG8=', 'new_b64': ''},
+        args: const ToolArgs({'old_b64': 'aGVsbG8=', 'new_b64': ''}),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('path'));
@@ -185,7 +185,7 @@ void main() {
     test('P-2: old_b64 缺失 → 报错', () async {
       final result = await tool.execute(
         executor: executor,
-        args: {'path': '/tmp/test.txt', 'new_b64': ''},
+        args: const ToolArgs({'path': '/tmp/test.txt', 'new_b64': ''}),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('old_b64'));
@@ -194,11 +194,11 @@ void main() {
     test('P-3: old_b64 base64 解码失败 → 报错', () async {
       final result = await tool.execute(
         executor: executor,
-        args: {
+        args: const ToolArgs({
           'path': '/tmp/test.txt',
           'old_b64': '!!!not_base64!!!',
           'new_b64': '',
-        },
+        }),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('base64'));
@@ -207,11 +207,11 @@ void main() {
     test('P-4: new_b64 base64 解码失败 → 报错', () async {
       final result = await tool.execute(
         executor: executor,
-        args: {
+        args: const ToolArgs({
           'path': '/tmp/test.txt',
           'old_b64': 'aGVsbG8=',
           'new_b64': '!!!not_base64!!!',
-        },
+        }),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('new_b64'));
@@ -222,11 +222,11 @@ void main() {
       // 空 new_b64 不应触发 base64 解码错误
       final result = await tool.execute(
         executor: executor,
-        args: {
+        args: const ToolArgs({
           'path': '/tmp/test.txt',
           'old_b64': 'aGVsbG8=',
           'new_b64': '',
-        },
+        }),
       );
       // 走到非 SSH 拒绝，说明 new_b64="" 已通过校验
       expect(result.success, isFalse);
@@ -237,11 +237,11 @@ void main() {
     test('P-6: 非 SSH 会话 → 拒绝', () async {
       final result = await tool.execute(
         executor: executor,
-        args: {
+        args: const ToolArgs({
           'path': '/tmp/test.txt',
           'old_b64': 'aGVsbG8=',
           'new_b64': 'd29ybGQ=',
-        },
+        }),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('SSH'));
@@ -251,12 +251,12 @@ void main() {
       // backup=false 不应导致参数校验失败
       final result = await tool.execute(
         executor: executor,
-        args: {
+        args: const ToolArgs({
           'path': '/tmp/test.txt',
           'old_b64': 'aGVsbG8=',
           'new_b64': 'd29ybGQ=',
           'backup': 'false',
-        },
+        }),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('SSH'));
@@ -266,11 +266,11 @@ void main() {
     test('P-8: backup 参数缺省 → 默认 true（不报错）', () async {
       final result = await tool.execute(
         executor: executor,
-        args: {
+        args: const ToolArgs({
           'path': '/tmp/test.txt',
           'old_b64': 'aGVsbG8=',
           'new_b64': 'd29ybGQ=',
-        },
+        }),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('SSH'));

@@ -11,6 +11,7 @@ import 'l10n/app_localizations.dart';
 import 'providers/app_providers.dart';
 import 'services/knowledge_service.dart';
 import 'services/provider_config_service.dart';
+import 'services/ai_endpoint_migration.dart';
 import 'services/change_window_service.dart';
 import 'services/notification_service.dart';
 import 'services/conversation_service.dart';
@@ -18,6 +19,7 @@ import 'services/agent_logger.dart';
 import 'services/ssh_connection_pool.dart';
 import 'services/crash_reporter.dart';
 import 'services/health_check_service.dart';
+import 'services/mcp_manager.dart';
 import 'core/builtin_runbooks.dart';
 
 void main() {
@@ -60,6 +62,8 @@ void main() {
     // 完成凭据存储初始化（迁移旧凭据数据，依赖 DbInit 已就绪）
     await CredentialsStore.init();
     await ProviderConfigService.init();
+    // 旧「一行一个模型」→「端点 + 模型目录」迁移（幂等，失败下次启动重试）
+    await AIEndpointsMigration.migrateIfNeeded();
     await ChangeWindowService.load();
     await NotificationService.load();
 
@@ -78,6 +82,9 @@ void main() {
     // 注册应用生命周期监听：在退出时刷盘，避免丢失未持久化的对话/日志
     // AppLifecycleObserver 通过 WidgetsBinding.instance.addObserver 持有引用，不会被 GC
     AppLifecycleObserver();
+
+    // MCP 服务器后台加载/连接，不阻塞首屏
+    unawaited(McpManager.instance.init());
 
     runApp(const ProviderScope(child: AISTerminalApp()));
   }, (error, stack) {
@@ -155,6 +162,12 @@ class AppLifecycleObserver with WidgetsBindingObserver {
         await SSHConnectionPool.dispose().timeout(const Duration(seconds: 2));
       } catch (e) {
         debugPrint('[AppLifecycle] SSHConnectionPool.dispose 失败: $e');
+      }
+      // 关闭 MCP HTTP 连接并终止 stdio 子进程
+      try {
+        await McpManager.instance.shutdown().timeout(const Duration(seconds: 3));
+      } catch (e) {
+        debugPrint('[AppLifecycle] McpManager.dispose 失败: $e');
       }
       try {
         await DbInit.close().timeout(const Duration(seconds: 3));

@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'agent_tool.dart';
 import 'command_executor.dart';
 import 'web_search_config.dart';
+import 'web_search_http.dart';
 import 'web_search_service.dart';
 import '../utils/tool_args_parser.dart';
 
@@ -23,9 +24,12 @@ class WebSearchTool extends AgentTool {
   String get name => 'web_search';
 
   @override
+  ToolKind get kind => ToolKind.network;
+
+  @override
   String get description => '联网搜索最新信息（当你的训练数据可能过时、'
-      '或遇到不熟悉的概念/错误/版本号/软件包时使用）。返回标题+URL+摘要列表，'
-      '若需详细内容请配合 fetch_url 工具。';
+      '或遇到不熟悉的概念/错误/版本号/软件包时使用）。会并发查询多个已启用后端，'
+      '按 URL 去重合并后返回标题+URL+摘要列表，若需详细内容请配合 fetch_url 工具。';
 
   @override
   String get paramSpec => '参数列表（多行 key:value 格式）：\n'
@@ -53,11 +57,11 @@ class WebSearchTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final query = ToolArgsParser.getString(args, 'query').trim();
-    final maxResults = ToolArgsParser.getInt(args, 'max_results', defaultValue: 0);
+    final query = args.getString('query').trim();
+    final maxResults = args.getInt('max_results', defaultValue: 0);
 
     if (query.isEmpty) {
       return ToolResult.failure('参数缺失: query 为必填项');
@@ -84,16 +88,32 @@ class WebSearchTool extends AgentTool {
     }
 
     try {
-      final results = await WebSearchService.instance.search(
+      final response = await WebSearchService.instance.search(
         query,
         maxResults: maxResults > 0 ? maxResults : null,
         dioCancelToken: dioCancel,
       );
+      final results = response.results;
       if (results.isEmpty) {
-        return ToolResult.success('搜索完成，但未找到匹配结果。建议调整关键词后重试。');
+        final failed = response.failures
+            .map((r) => '${r.provider.displayName}(${r.error})')
+            .join('、');
+        return ToolResult.success(
+          '搜索完成，但未找到匹配结果（已尝试 ${response.reports.length} 个后端'
+          '${failed.isEmpty ? '' : '；失败/跳过: $failed'}）。建议调整关键词后重试。',
+        );
       }
       final buffer = StringBuffer();
-      buffer.writeln('共 ${results.length} 条结果：');
+      buffer.writeln(
+        '聚合 ${response.successCount}/${response.reports.length} 个后端，'
+        '去重后 ${results.length} 条结果：',
+      );
+      final failures = response.failures;
+      if (failures.isNotEmpty) {
+        buffer.writeln(
+          '失败/跳过: ${failures.map((r) => '${r.provider.displayName}(${r.error})').join('、')}',
+        );
+      }
       buffer.writeln();
       for (var i = 0; i < results.length; i++) {
         buffer.writeln(results[i].toDisplayString(i));
@@ -135,12 +155,15 @@ class FetchUrlTool extends AgentTool {
   /// 默认正文字符上限（R8：无界缓冲必须有 cap）
   static const int _defaultMaxChars = 20000;
 
-  /// 单次请求超时下限（秒）
+  /// 单次请求超时下限（毫秒）
   /// 网页抓取通常比搜索 API 慢，取全局配置与 20s 的较大值
-  static const int _minTimeoutSeconds = 20;
+  static const int _minTimeoutMs = 20000;
 
   @override
   String get name => 'fetch_url';
+
+  @override
+  ToolKind get kind => ToolKind.network;
 
   @override
   String get description => '抓取指定 URL 的网页正文（纯文本格式）。'
@@ -173,11 +196,11 @@ class FetchUrlTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final url = ToolArgsParser.getString(args, 'url').trim();
-    final maxChars = ToolArgsParser.getInt(args, 'max_chars', defaultValue: 0);
+    final url = args.getString('url').trim();
+    final maxChars = args.getInt('max_chars', defaultValue: 0);
 
     if (url.isEmpty) {
       return ToolResult.failure('参数缺失: url 为必填项');
@@ -205,17 +228,19 @@ class FetchUrlTool extends AgentTool {
       });
     }
 
-    // 超时：取全局配置与 _minTimeoutSeconds 的较大值
-    final timeoutSec = WebSearchConfig.load().timeoutSeconds.clamp(_minTimeoutSeconds, 120);
-    final dio = Dio(BaseOptions(
-      connectTimeout: Duration(seconds: timeoutSec),
-      receiveTimeout: Duration(seconds: timeoutSec),
+    // 超时：取全局配置与 _minTimeoutMs 的较大值；出站代理与搜索共用
+    final config = WebSearchConfig.load();
+    final timeoutMs =
+        config.backendTimeoutMs.clamp(_minTimeoutMs, 120000);
+    final dio = createSearchDio(
+      timeout: Duration(milliseconds: timeoutMs),
+      proxy: config.proxy,
       headers: {
         'User-Agent':
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
-    ));
+    );
 
     try {
       final resp = await dio.get<String>(

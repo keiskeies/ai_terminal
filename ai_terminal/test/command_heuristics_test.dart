@@ -274,6 +274,44 @@ void main() {
         const Duration(minutes: 10),
       );
     });
+
+    test('sudo 前缀不参与档位匹配', () {
+      expect(
+        getCommandTimeout('sudo apt update'),
+        const Duration(minutes: 10),
+      );
+      expect(
+        getCommandTimeout('sudo apt-get install nginx'),
+        const Duration(minutes: 10),
+      );
+      expect(
+        getCommandTimeout('sudo systemctl restart nginx'),
+        const Duration(minutes: 3),
+      );
+    });
+
+    test('sudo 选项与环境变量前缀一并剥掉', () {
+      expect(
+        getCommandTimeout('sudo -S apt update'),
+        const Duration(minutes: 10),
+      );
+      expect(
+        getCommandTimeout('LC_ALL=C sudo apt update'),
+        const Duration(minutes: 10),
+      );
+    });
+
+    test('裸 sudo 与无法识别的包装回落到默认档', () {
+      expect(getCommandTimeout('sudo'), const Duration(seconds: 60));
+      expect(getCommandTimeout('sudo -u postgres psql'), const Duration(seconds: 60));
+    });
+
+    test('剥壳不影响 heredoc 多行命令的档位匹配', () {
+      expect(
+        getCommandTimeout('sudo cat > /tmp/a.sh << EOF\necho hi\nEOF'),
+        const Duration(seconds: 60),
+      );
+    });
   });
 
   group('isDescriptiveText', () {

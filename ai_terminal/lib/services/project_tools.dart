@@ -8,6 +8,7 @@ import 'command_executor.dart';
 import 'local_terminal_service.dart';
 import '../core/safety_guard.dart';
 import '../utils/command_heuristics.dart';
+import '../utils/tool_args_parser.dart';
 
 /// 本地项目构建锁 — 全局单例，保证同一时刻只有一个构建任务在运行
 /// 遵循用户决策：单项目串行，避免本地资源争抢
@@ -72,21 +73,25 @@ class ProjectAnalyzeTool extends AgentTool {
   String get name => 'project_analyze';
 
   @override
+  ToolKind get kind => ToolKind.read;
+
+  @override
   String get description => '分析本地项目目录，识别项目类型（Node/Flutter/Java/Rust/Python/Go等）、'
       '构建命令、入口文件、依赖管理器、部署配置。仅读取项目元数据文件（package.json/pubspec.yaml等）和'
       'README/AGENTS.md/CLAUDE.md，不读取源码。用于"本地项目部署到服务器"工作流的第一步。'
       '必须先调用此工具了解项目，再决定构建命令。';
 
   @override
-  String get paramSpec => '{"path":"项目根目录绝对路径(必填)"}';
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n'
+      '  path: 项目根目录绝对路径（必填）';
 
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final path = args['path']?.toString() ?? '';
+    final path = args.getString('path');
     if (path.isEmpty) {
       return ToolResult.failure('参数缺失: path 为必填项');
     }
@@ -435,21 +440,30 @@ class BuildProjectTool extends AgentTool {
   String get name => 'build_project';
 
   @override
+  ToolKind get kind => ToolKind.write;
+
+  @override
+  // 构建/打包改的是产物目录，不是可逐文件回滚的配置变更；台账只收文件级变更
+  bool get recordsChanges => false;
+
+  @override
   String get description => '在本地执行项目构建命令（如 npm run build / flutter build web / cargo build --release）。'
       '自动 cd 到项目目录，使用本地终端执行。构建失败时返回错误日志，请用 ask 动作询问用户"要我尝试修复吗"。'
       '同一时刻只允许一个构建任务运行（串行）。';
 
   @override
-  String get paramSpec => '{"path":"项目根目录绝对路径(必填)","command":"构建命令(可选,默认根据项目类型自动选择)"}';
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n'
+      '  path: 项目根目录绝对路径（必填）\n'
+      '  command: 构建命令（可选，默认按项目类型自动选择）';
 
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final path = args['path']?.toString() ?? '';
-    final command = args['command']?.toString() ?? '';
+    final path = args.getString('path');
+    final command = args.getString('command');
 
     if (path.isEmpty) {
       return ToolResult.failure('参数缺失: path 为必填项');
@@ -618,24 +632,35 @@ class PackageProjectTool extends AgentTool {
   String get name => 'package_project';
 
   @override
+  ToolKind get kind => ToolKind.write;
+
+  @override
+  // 构建/打包改的是产物目录，不是可逐文件回滚的配置变更；台账只收文件级变更
+  bool get recordsChanges => false;
+
+  @override
   String get description => '将构建产物目录打包为 tar.gz 或 zip，便于上传到服务器部署。'
       '在本地执行，使用 tar 或 zip 命令。打包完成后返回文件路径，可用 sftp_upload 上传。'
       '默认排除 .DS_Store / node_modules / .git 等无关文件。';
 
   @override
-  String get paramSpec => '{"path":"项目根目录绝对路径(必填)","artifact_dir":"构建产物目录相对路径(必填,如build/web或dist)","output":"输出文件路径(可选,默认/tmp/<name>-<timestamp>.tar.gz)","format":"格式tar.gz或zip(可选,默认tar.gz)","exclude":"排除项(可选,逗号分隔)"}';
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n'
+      '  path: 项目根目录绝对路径（必填）\n'
+      '  artifact_dir: 构建产物目录相对路径（必填，如 build/web 或 dist）\n'
+      '  output: 输出文件路径（可选，默认 /tmp/<name>-<timestamp>.tar.gz）\n'
+      '  format: 格式 tar.gz 或 zip（可选，默认 tar.gz）\n'
+      '  exclude: 排除项（可选，逗号分隔）';
 
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final path = args['path']?.toString() ?? '';
-    final artifactDir = args['artifact_dir']?.toString() ?? '';
-    final output = args['output']?.toString() ?? '';
-    final format = (args['format']?.toString() ?? 'tar.gz').toLowerCase();
-    final excludeRaw = args['exclude'];
+    final path = args.getString('path');
+    final artifactDir = args.getString('artifact_dir');
+    final output = args.getString('output');
+    final format = args.getString('format', defaultValue: 'tar.gz').toLowerCase();
 
     if (path.isEmpty || artifactDir.isEmpty) {
       return ToolResult.failure('参数缺失: path 和 artifact_dir 为必填项');
@@ -682,14 +707,10 @@ class PackageProjectTool extends AgentTool {
     }
 
     // 解析排除列表
-    List<String> excludes = ['.DS_Store', '.git', 'node_modules', '.svn'];
-    if (excludeRaw != null) {
-      if (excludeRaw is List) {
-        excludes = excludeRaw.map((e) => e.toString()).toList();
-      } else if (excludeRaw is String) {
-        excludes = excludeRaw.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-      }
-    }
+    final excludes = args.getStringList(
+      'exclude',
+      defaultValue: const ['.DS_Store', '.git', 'node_modules', '.svn'],
+    );
 
     // 构建打包命令
     String packageCmd;

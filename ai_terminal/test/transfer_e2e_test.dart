@@ -15,6 +15,8 @@ import 'package:ai_terminal/services/agent_tool.dart';
 import 'package:ai_terminal/services/multi_host_executor.dart';
 import 'package:ai_terminal/services/sftp_service.dart';
 import 'package:ai_terminal/services/ssh_service.dart';
+import 'support/e2e_ssh.dart';
+import 'package:ai_terminal/utils/tool_args_parser.dart';
 
 /// 真实 SSH 服务器的文件传输 E2E：
 /// - 单文件上传/下载、覆盖、CRLF/BOM、无尾换行
@@ -62,7 +64,7 @@ void main() {
         username: _sshUser!,
         authType: 'password',
       ));
-      await ssh.connect(password: _sshPassword!);
+      await connectE2ESsh(ssh, password: _sshPassword!, user: _sshUser!, host: _sshHost!, port: _sshPort);
       expect(ssh.isConnected, isTrue);
 
       sftp = SftpService();
@@ -118,12 +120,12 @@ void main() {
     }) {
       return SftpUploadTool().execute(
         executor: ssh,
-        args: {
+        args: ToolArgs({
           'local': local,
           'remote': remote,
           'recursive': recursive,
           if (exclude != null) 'exclude': exclude,
-        },
+        }),
       );
     }
 
@@ -135,12 +137,12 @@ void main() {
     }) {
       return SftpDownloadTool().execute(
         executor: ssh,
-        args: {
+        args: ToolArgs({
           'remote': remote,
           'local': local,
           'recursive': recursive,
           if (exclude != null) 'exclude': exclude,
-        },
+        }),
       );
     }
 
@@ -454,7 +456,7 @@ void main() {
       const remoteSingle = '$_remoteRoot/orchestration/web1/app 文件 😀.txt';
       final uploadTo = await UploadToTool(multi).execute(
         executor: ssh,
-        args: {'hostId': 'web1', 'local': localPath, 'remote': remoteSingle},
+        args: ToolArgs({'hostId': 'web1', 'local': localPath, 'remote': remoteSingle}),
       );
       expect(uploadTo.success, isTrue,
           reason: uploadTo.error ?? uploadTo.output);
@@ -463,11 +465,11 @@ void main() {
       const remoteBroadcast = '$_remoteRoot/orchestration/broadcast';
       final broadcast = await BroadcastUploadTool(multi).execute(
         executor: ssh,
-        args: {
+        args: ToolArgs({
           'hostIds': ['web1', 'web2'],
           'local': localPath,
           'remote': remoteBroadcast,
-        },
+        }),
       );
       expect(broadcast.success, isTrue,
           reason: broadcast.error ?? broadcast.output);
@@ -480,11 +482,11 @@ void main() {
       final collectDir = Directory(p.join(localRoot.path, 'collect 结果 😀'));
       final collect = await CollectFileTool(multi).execute(
         executor: ssh,
-        args: {
+        args: ToolArgs({
           'hostIds': ['web1', 'web2'],
           'remote': remoteSingle,
           'localDir': collectDir.path,
-        },
+        }),
       );
       expect(collect.success, isTrue, reason: collect.error ?? collect.output);
       final remoteBase = p.posix.basename(remoteSingle);
@@ -511,12 +513,12 @@ void main() {
 
       final result = await FilePatchTool().execute(
         executor: ssh,
-        args: {
+        args: const ToolArgs({
           'path': path,
           'old': 'listen 80;',
           'new': 'listen 8080;',
           'backup': false,
-        },
+        }),
       );
       expect(result.success, isTrue, reason: result.error ?? result.output);
       expect(result.diffAdditions, 1);

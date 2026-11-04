@@ -6,7 +6,24 @@ import 'pty_output_detector.dart';
 // CommandFailureKind / PtyOutputDetector / CommandFailureDiagnostic 集中定义在
 // pty_output_detector.dart，这里统一导出，方便调用方一处导入。
 export 'pty_output_detector.dart'
-    show CommandFailureDiagnostic, CommandFailureKind, PtyOutputDetector;
+    show
+        CommandFailureDiagnostic,
+        CommandFailureKind,
+        PtyOutputDetector,
+        SudoPromptResponder;
+
+/// POSIX shell 的退出码标记包装。
+///
+/// 单行命令用 `;` 接在**同一行**。分成两行时第二行的 echo 会滞留在 tty 输入队列里，
+/// 之后任何读 /dev/tty 的程序（典型是 sudo 读密码）都会把它当成一次输入吃掉 ——
+/// 实测表现为 `[sudo] … 的密码：` 后紧跟"对不起，请重试"，且 marker 永不出现。
+///
+/// 多行命令（heredoc）必须换行：`EOF; echo …` 不再被识别为结束标记，
+/// 文件写入会永远等下去。
+String posixWrapWithExitMarker(String command, String marker) =>
+    command.contains('\n')
+        ? '$command\necho "$marker\$?"'
+        : '$command; echo "$marker\$?"';
 
 /// 命令执行结果（包含退出码）
 class CommandResult {
@@ -52,10 +69,14 @@ abstract class CommandExecutor {
   /// 执行命令并等待完成，返回结构化结果（含退出码）
   /// [timeout] 超时时间，默认 60 秒
   /// [cancelToken] 可选的取消令牌，complete 时立即终止等待
+  /// [sudoPassword] 命令卡在 sudo 密码提示时写入 PTY stdin 的应答密码。
+  ///   默认 null 保持旧行为：命中交互式提示立即中断命令。
+  ///   密码只进终端 stdin，不进命令串、输出缓冲与审计日志（AGENTS.md R7）。
   Future<CommandResult> executeAndWait(
     String command, {
     Duration timeout = const Duration(seconds: 60),
     Completer<void>? cancelToken,
+    String? sudoPassword,
   });
 
   /// 通过 PTY stdin 写入文件（绕过 shell 转义，继承当前 shell 权限）

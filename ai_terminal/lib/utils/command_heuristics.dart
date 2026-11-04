@@ -160,13 +160,43 @@ bool isTaskComplete(String response) {
   return false;
 }
 
+/// 去掉命令开头的提权/环境包装，返回"真正的命令"用于超时档位匹配。
+///
+/// 必要性（AGENTS.md R6）：`getCommandTimeout` 用 `startsWith` 匹配档位，
+/// `sudo apt update` 原串匹配不到 `apt update`，落到 60s 默认值——
+/// 而 apt 在慢网络上远超 60s，必然假失败并触发重试循环。
+///
+/// 已知局限：带值选项（`sudo -u postgres apt update`）剥到 `-u` 即停，
+/// 剩下 `postgres apt update` 匹配不到档位，行为与修复前一致。
+String _unwrapCommand(String cmd) {
+  const wrappers = {'sudo', 'env', 'nohup', 'time', 'exec'};
+  final envAssign = RegExp(r'^[a-z_][a-z0-9_]*=');
+  final tokens = cmd.split(RegExp(r'\s+'));
+  var i = 0;
+  var stripped = false;
+  while (i < tokens.length) {
+    final token = tokens[i];
+    if (!wrappers.contains(token) && !envAssign.hasMatch(token)) break;
+    i++;
+    stripped = true;
+    // 吃掉紧随其后的选项(-S/-E)与环境变量赋值，遇到第一个实义命令词停止
+    while (i < tokens.length &&
+        (tokens[i].startsWith('-') || envAssign.hasMatch(tokens[i]))) {
+      i++;
+    }
+  }
+  if (!stripped) return cmd;
+  final unwrapped = tokens.sublist(i).join(' ');
+  return unwrapped.isEmpty ? cmd : unwrapped;
+}
+
 /// 按命令类型返回合适的执行超时。
 /// - 长时间运行类（安全扫描/包管理/系统信息/大文件操作）：10 分钟
 /// - 中等耗时类（服务状态/日志/进程/编译/下载）：3 分钟
 /// - 默认：60 秒
 /// 用户可通过设置 `commandTimeoutMultiplier` 调整超时倍数（如 2.0 = 所有超时翻倍）
 Duration getCommandTimeout(String command) {
-  final cmd = command.trim().toLowerCase();
+  final cmd = _unwrapCommand(command.trim().toLowerCase());
 
   // 读取用户配置的超时倍数（默认 1.0，clamp 到 [0.5, 10.0]）
   // 下限 0.5：低于此值时 (3 * multiplier).round() 会归零，导致 medium 命令瞬间超时

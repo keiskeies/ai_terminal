@@ -65,12 +65,66 @@ class PtyOutputDetector {
     r'(?:^|\n)\s*(?:dquote|quote|cmdsubst|bquote|curly|paren|)> ',
   );
 
-  /// 交互式密码/确认提示
-  /// 模式：sudo / ssh / scp / mysql 等的密码提示，或 yes/no 确认
+  /// 交互式密码/确认提示（sudo 之外的）
+  ///
+  /// sudo 提示不在这里匹配 —— 见 [SudoPromptResponder]，它按语言中立的
+  /// `[sudo]` 前缀识别，覆盖中文 `[sudo] cjm 的密码：` 这类本地化提示。
+  /// 模式：ssh / scp / mysql 等的密码提示，或 yes/no 确认
   static final _interactivePromptPattern = RegExp(
-    r'(?:\[sudo\]\s*password|Password:\s*$|Enter passphrase|Are you sure you want to continue|^\s*\(yes/no\)|^\s*\(yes/no/\[fingerprint\]\))',
+    r'(?:Password:\s*$|Enter passphrase|Are you sure you want to continue|^\s*\(yes/no\)|^\s*\(yes/no/\[fingerprint\]\))',
     multiLine: true,
   );
+
+  /// sudo 密码提示（语言中立）
+  ///
+  /// sudo 只翻译 "password for %u" 这部分，`[sudo]` 前缀在所有 locale 下保留：
+  ///   en: `[sudo] password for cjm:`  zh: `[sudo] cjm 的密码：`
+  /// 要求提示卡在缓冲尾部（后面紧跟冒号），因此 `grep '[sudo]'` 这类
+  /// 输出里出现 `[sudo]` 的行不会被命中（AGENTS.md R8：不用裸子串判定）。
+  static final _sudoPromptAtEnd = RegExp(r'\[sudo\][^\r\n]*[:：][ \t\r]*$');
+
+  /// less/more 分页器停在等待按键的状态行
+  ///
+  /// 交互式 PTY 中 `journalctl`/`git log`/`systemctl status` 默认把输出交给
+  /// pager，命令不退出，末尾的退出码 marker 永远不会出现 —— 只能干等超时
+  /// （AGENTS.md R6：TTY 下的分页器行为和管道不同）。
+  ///
+  /// 只匹配**缓冲尾部**：状态行由 pager 最后绘制，正文里出现同样文字不算。
+  /// 允许状态行后跟 ANSI 序列（颜色/清行）和空白，覆盖 `(END)` 被
+  /// `\x1b[7m ... \x1b[27m` 包裹的情况。`lines x-y/z` 是 less `-M` 提示；
+  /// `--More--(nn%)` 是 more，百分号会被退格重绘，尾部可能有 `\x08`。
+  static final _pagerStatusAtEnd = RegExp(
+    r'(?:\(END\)|--\s*More\s*--(?:\(\d+%\))?|lines\s+\d+-\d+/\d+)'
+    r'(?:[\s\x08]|\x1B\[[\x20-\x3F]*[\x40-\x7E]'
+    r'|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)'
+    r'|\x1B[(][A-Za-z]'
+    r'|\x1B[)][A-Za-z]'
+    r'|\x1B[A-Za-z])*$',
+  );
+
+  /// 缓冲尾部是否停在 less/more 的分页状态行上
+  ///
+  /// 命中后调用方应向 stdin 发送 `q`，让 pager 退出、命令继续执行到 marker。
+  /// 只看尾部 2KB：状态行一定在最后，遍历 256KB 缓冲没有意义。
+  static bool waitsForPager(String buffer) {
+    const tailLength = 2048;
+    final tail = buffer.length > tailLength
+        ? buffer.substring(buffer.length - tailLength)
+        : buffer;
+    return _pagerStatusAtEnd.hasMatch(tail);
+  }
+
+  /// 当前缓冲尾部是否正卡在 sudo 密码提示上
+  static bool waitsForSudoPassword(String buffer) =>
+      _sudoPromptAtEnd.hasMatch(buffer);
+
+  /// 尾部 sudo 密码提示的匹配（无提示返回 null）
+  ///
+  /// 暴露匹配位置而不只是布尔值：`[sudo]` 之前的内容无法跨行匹配，
+  /// 所以命中的永远是**最后**一段提示，其起始下标可以用来区分"同一个提示的
+  /// 后续增量"和"sudo 重试/命令链里的下一个提示"。
+  static RegExpMatch? sudoPromptMatch(String buffer) =>
+      _sudoPromptAtEnd.firstMatch(buffer);
 
   /// 检测输出并返回失败原因（null 表示未检测到异常）
   ///
@@ -78,6 +132,9 @@ class PtyOutputDetector {
   /// [marker] 当前命令的 marker（"EXITCODE_N:" 形式）
   /// [elapsedMs] 自命令发出后经过的毫秒数
   /// [isWindows] 平台分支（Windows 不做 POSIX shell 检测）
+  /// [sudoPromptWillBeAnswered] 调用方会在命中 sudo 提示时写入密码。
+  ///   为 true 时 sudo 提示不再算异常 —— 否则检测器抢在注入之前 complete()，
+  ///   调用方随即发 Ctrl+C，把刚要接受密码的 sudo 打断（中英文 locale 都会）。
   ///
   /// 注意：marker 字符串本身会出现在命令回显里（如 `echo "EXITCODE_1:$?"`），
   /// 这是正常的。真正的"命令完成"是 marker + 退出码数字。
@@ -89,6 +146,7 @@ class PtyOutputDetector {
     required String marker,
     required int elapsedMs,
     required bool isWindows,
+    bool sudoPromptWillBeAnswered = false,
   }) {
     // 命令真正完成 = marker+数字出现（由调用方 donePattern 判定）
     // 检测器只在尚未完成时识别异常，故检查 buffer 是否含 marker+数字
@@ -130,11 +188,21 @@ class PtyOutputDetector {
     // 4. 交互式密码/确认提示检测（跨平台）
     // 仅在命令发出超过 300ms 后检测（避免命令本身输出 Password: 等字样时误报，
     // 但 sudo 等提示通常在 300ms 内出现，所以仍能及时识别）
-    if (elapsedMs > 300 && _interactivePromptPattern.hasMatch(buffer)) {
-      return CommandFailureDiagnostic(
-        kind: CommandFailureKind.interactivePrompt,
-        reason: '命令进入交互式提示（密码/确认），无法在非交互模式完成',
-      );
+    if (elapsedMs > 300) {
+      // sudo 提示单独判定：调用方持有密码时应答它，而不是把命令打断
+      if (waitsForSudoPassword(buffer)) {
+        if (!sudoPromptWillBeAnswered) {
+          return CommandFailureDiagnostic(
+            kind: CommandFailureKind.interactivePrompt,
+            reason: '命令等待交互式 sudo 密码提示（未配置 sudo 密码）',
+          );
+        }
+      } else if (_interactivePromptPattern.hasMatch(buffer)) {
+        return CommandFailureDiagnostic(
+          kind: CommandFailureKind.interactivePrompt,
+          reason: '命令进入交互式提示（密码/确认），无法在非交互模式完成',
+        );
+      }
     }
 
     return null;
@@ -147,4 +215,25 @@ class CommandFailureDiagnostic {
   final String reason;
 
   CommandFailureDiagnostic({required this.kind, required this.reason});
+}
+
+/// sudo 密码应答状态机（每次 executeAndWait 一个实例）。
+///
+/// [PtyOutputDetector.waitsForSudoPassword] 只在提示卡在缓冲尾部时命中，但同一个
+/// 提示可能分多个 chunk 到达（尾随空格、换行）。这里用提示的起始下标区分：
+/// 下标没变 = 同一段提示的增量，不再应答；下标变大 = sudo 重试或命令链里的下一条
+/// sudo，需要再答一次。答重了会把密码当成新一轮尝试，直接触发"对不起，请重试"。
+class SudoPromptResponder {
+  int _lastAnsweredStart = -1;
+
+  /// 此刻是否应该把密码写入 stdin。
+  bool shouldAnswer(String buffer) {
+    final match = PtyOutputDetector.sudoPromptMatch(buffer);
+    if (match == null) return false;
+    // 缓冲按尾部 256KB 截断后下标会整体前移，此时旧游标已无意义
+    if (_lastAnsweredStart >= buffer.length) _lastAnsweredStart = -1;
+    if (match.start <= _lastAnsweredStart) return false;
+    _lastAnsweredStart = match.start;
+    return true;
+  }
 }

@@ -6,6 +6,7 @@ import '../l10n/app_localizations.dart';
 import '../models/change_record.dart';
 import '../providers/app_providers.dart';
 import '../services/change_record_service.dart';
+import '../services/command_executor.dart';
 import '../providers/terminal_provider.dart' as tp;
 
 /// 变更台账页面 — 展示修改性命令历史，支持回滚
@@ -37,7 +38,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       _records = ChangeRecordService.getAllHistory(limit: 200);
     }
     if (_showOnlyRollbackable) {
-      _records = _records.where((r) => r.rollbackCommand != null && !r.rolledBack).toList();
+      _records = _records.where((r) => r.isRollbackable && !r.rolledBack).toList();
     }
     setState(() {});
   }
@@ -123,6 +124,9 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
     final l10n = AppLocalizations.of(context)!;
     final host = ref.read(hostsProvider.notifier).getHostById(record.hostId);
     final hostName = host?.name ?? record.hostId;
+    // 本机文件还原没有 shell 回滚命令：照远程分支渲染会出现"在服务器 local 上
+    // 执行"加一个空命令框，用户看不出将要发生什么。
+    final isLocalRestore = record.isLocalFileRestore;
 
     showDialog<void>(
       context: context,
@@ -134,7 +138,9 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l10n.changeRecordRollbackOnHost(hostName),
+            Text(isLocalRestore
+                ? l10n.changeRecordRestoreLocalFile
+                : l10n.changeRecordRollbackOnHost(hostName),
                 style: TextStyle(color: tc.textSub, fontSize: fSmall)),
             const SizedBox(height: 8),
             Container(
@@ -145,7 +151,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
                 borderRadius: BorderRadius.circular(rXSmall),
               ),
               child: SelectableText(
-                record.rollbackCommand ?? '',
+                isLocalRestore ? record.rollbackHint : (record.rollbackCommand ?? ''),
                 style: TextStyle(
                   fontFamily: 'JetBrainsMono',
                   fontSize: fMono,
@@ -183,38 +189,43 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
 
   Future<void> _executeRollback(ChangeRecord record) async {
     final l10n = AppLocalizations.of(context)!;
-    if (record.rollbackCommand == null) {
+    if (!record.isRollbackable) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(l10n.changeRecordNotRollbackable), behavior: SnackBarBehavior.floating),
       );
       return;
     }
 
-    // 查找该主机的 SSHService
-    final tabs = ref.read(tp.terminalProvider).tabs;
-    tp.TerminalTab? targetTab;
-    for (final tab in tabs) {
-      if (tab.hostId == record.hostId && tab.isConnected) {
-        targetTab = tab;
-        break;
+    // 本机文件还原不经过 executor，不需要主机在线
+    final isLocalRestore = record.isLocalFileRestore;
+    CommandExecutor? executor;
+    if (!isLocalRestore) {
+      // 查找该主机的 SSHService
+      final tabs = ref.read(tp.terminalProvider).tabs;
+      tp.TerminalTab? targetTab;
+      for (final tab in tabs) {
+        if (tab.hostId == record.hostId && tab.isConnected) {
+          targetTab = tab;
+          break;
+        }
       }
+
+      if (targetTab == null || targetTab.service == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(l10n.changeRecordHostNotConnected(record.hostId)),
+            backgroundColor: cDanger,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+      executor = targetTab.service!;
     }
 
-    if (targetTab == null || targetTab.service == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n.changeRecordHostNotConnected(record.hostId)),
-          backgroundColor: cDanger,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
-    final executor = targetTab.service!;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(l10n.changeRecordRollingBack(record.rollbackCommand!)),
+        content: Text(l10n.changeRecordRollingBack(record.rollbackHint)),
         duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
       ),
@@ -237,7 +248,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       if (result.success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(l10n.changeRecordRollbackSuccess(record.rollbackCommand!)),
+            content: Text(l10n.changeRecordRollbackSuccess(record.rollbackHint)),
             backgroundColor: cSuccess,
             behavior: SnackBarBehavior.floating,
           ),
@@ -427,7 +438,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
                 const SizedBox(width: 4),
                 Text(hostName, style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
                 const Spacer(),
-                if (record.rollbackCommand != null && !record.rolledBack && record.success)
+                if (record.isRollbackable && !record.rolledBack && record.success)
                   TextButton.icon(
                     onPressed: () => _confirmRollback(record),
                     icon: const Icon(Icons.undo, size: 14),

@@ -1,5 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ai_terminal/models/agent_event.dart';
+import 'package:ai_terminal/models/operation_report.dart';
 import 'package:ai_terminal/services/agent_engine.dart';
+import 'package:ai_terminal/utils/react_stream_parser.dart';
 import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 import 'package:ai_terminal/utils/tool_args_parser.dart';
 
@@ -47,7 +50,8 @@ void main() {
         const ToolCall(
           id: 'call_1',
           name: 'exec_batch',
-          arguments: '{"hostIds":"web1,web2,db1","command":"uptime","timeout":30}',
+          arguments:
+              '{"hostIds":"web1,web2,db1","command":"uptime","timeout":30}',
         ),
       ];
       final reactText = ToolCallAccumulator.toReActText(calls);
@@ -166,7 +170,8 @@ void main() {
       // getString：String 值
       expect(ToolArgsParser.getString(args, 'hostId'), 'web1');
       // getString：缺失 → defaultValue
-      expect(ToolArgsParser.getString(args, 'missing', defaultValue: 'fallback'),
+      expect(
+          ToolArgsParser.getString(args, 'missing', defaultValue: 'fallback'),
           'fallback');
       // getStringList：缺失 → 空列表
       expect(ToolArgsParser.getStringList(args, 'missing'), isEmpty);
@@ -189,6 +194,165 @@ void main() {
       // hostId 不在 listKeys 里，保持 String
       expect(result.$2!['hostId'], 'web1');
       expect(result.$2!['hostId'], isA<String>());
+    });
+
+    test('E2E-13: content 写成跨行正文 → 整块不可解析，绝不带着半截内容执行', () {
+      // 真机复现（2026-11-01 22:09，本地 agnes + Docker SSH）：模型把三行中文/emoji
+      // 直接写成跨行正文，旧 parse() 逐行跳过无冒号行 → content 只剩"中文测试"，
+      // file_write 仍报 success=true，服务器上留下 12 字节的半截文件。
+      const response = '''动作: tool
+工具: file_write
+参数:
+  path: /tmp/ai_terminal_llm_cn.txt
+  content: 中文测试
+    emoji 😀🚀
+    结束
+  mode: write''';
+
+      final lines = response.split('\n');
+      final actionLineIdx = lines.indexWhere((l) => l.trim().startsWith('动作:'));
+      final result = AgentEngine.parseToolAction(lines, actionLineIdx + 1);
+
+      // 工具名要保留（engine 才会走到参数校验并给出可执行的纠错观测），
+      // 但参数必须是 null —— 下游 `step.toolArgs ?? const {}` 会让
+      // requireString('content') 抛错，而不是写出半截文件。
+      expect(result.$1, 'file_write');
+      expect(result.$2, isNull);
+    });
+
+    test('E2E-14: 同一内容写成一行 \\n 转义 → 正常解析（纠错后的正确形状）', () {
+      const response = '动作: tool\n'
+          '工具: file_write\n'
+          '参数:\n'
+          '  path: /tmp/ai_terminal_llm_cn.txt\n'
+          r'  content: 中文测试\nemoji 😀🚀\n结束'
+          '\n  mode: write';
+
+      final lines = response.split('\n');
+      final actionLineIdx = lines.indexWhere((l) => l.trim().startsWith('动作:'));
+      final result = AgentEngine.parseToolAction(lines, actionLineIdx + 1);
+
+      expect(result.$2, isNotNull);
+      expect(result.$2!['content'], isNot('中文测试'));
+      expect(result.$2!['content'], r'中文测试\nemoji 😀🚀\n结束');
+    });
+  });
+
+  group('「回答:」块端到端解析', () {
+    test('E2E-8: 回答正文含标题/列表/代码块时完整保留', () {
+      const response = '''思考: 配置已生效
+回答: ## Nginx 已切到 8080
+
+- 监听端口：8080
+- 已备份原配置
+
+```bash
+nginx -t
+```
+
+结论: Nginx 已在 8080 生效
+现状: 8080 已监听
+变更: 改了 listen 指令
+建议: 无
+动作: finish''';
+
+      final answer = AgentEngine.parseAnswerBlock(response.split('\n'));
+      expect(answer, isNotNull);
+      expect(answer, contains('## Nginx 已切到 8080'));
+      expect(answer, contains('- 监听端口：8080'));
+      expect(answer, contains('nginx -t'));
+      // 结构化字段不属于正文
+      expect(answer, isNot(contains('结论:')));
+      expect(answer, isNot(contains('动作:')));
+    });
+
+    test('E2E-9: 正文代码块里出现 动作: 不会被截断', () {
+      const response = '''回答: 下面是 ReAct 的写法示例：
+
+```
+动作: execute
+命令: ls
+```
+
+上面就是格式。
+动作: finish''';
+
+      final answer = AgentEngine.parseAnswerBlock(response.split('\n'));
+      expect(answer, isNotNull);
+      expect(answer, contains('动作: execute'), reason: '围栏内的关键词行不得提前结束正文');
+      expect(answer, contains('上面就是格式。'));
+    });
+
+    test('E2E-10: 正文里的 **结论** 等行内标记不被误切', () {
+      const response = '''回答: 第一行
+**结论**: 这是正文的一部分
+**变更**: 也在正文里
+动作: finish''';
+
+      final answer = AgentEngine.parseAnswerBlock(response.split('\n'));
+      expect(answer, contains('**结论**: 这是正文的一部分'));
+      expect(answer, contains('**变更**: 也在正文里'));
+    });
+
+    test('E2E-11: 流式分块拼接后仍能解析出回答（历史 Bug 3 同型场景）', () {
+      // 模拟 chunk 边界正好切在关键词中间，拼接后必须仍是独立一行
+      const chunks = [
+        '思考: 完成\n回',
+        '答: 服务已启',
+        '动\n结论: ok\n动',
+        '作: finish',
+      ];
+      final full = chunks.join();
+      final answer = AgentEngine.parseAnswerBlock(full.split('\n'));
+      expect(answer, '服务已启动');
+    });
+
+    test('E2E-12: 没有回答块时 answer 为 null，旧格式不受影响', () {
+      const response = '''思考: 结论: 检查完成
+现状: ok
+变更: 无
+建议: 无
+动作: finish''';
+      expect(AgentEngine.parseAnswerBlock(response.split('\n')), isNull);
+    });
+
+    test('E2E-15: 回答 + 四段字段分别解析，且不混进过程事件', () {
+      const response = '''思考: 已经完成验证
+回答: ## Nginx 已切到 8080
+
+服务已重载。
+
+结论: Nginx 已在 8080 端口生效
+现状: systemctl is-active 显示 active
+变更: 修改了 nginx.conf
+建议: 无
+动作: finish''';
+
+      final lines = response.split('\n');
+      final answer = AgentEngine.parseAnswerBlock(lines);
+      final sections = AgentEngine.parseReportSections(lines);
+
+      expect(answer, contains('## Nginx 已切到 8080'));
+      expect(answer, isNot(contains('结论:')));
+      expect(sections, contains('结论: Nginx 已在 8080 端口生效'));
+      expect(sections, contains('现状: systemctl is-active 显示 active'));
+      expect(sections, isNot(contains('动作:')));
+
+      // 结论行取四段字段，而不是 finish 的思考
+      expect(
+        OperationReport.extractConclusion(sections, answerBody: answer),
+        'Nginx 已在 8080 端口生效',
+      );
+
+      // 回答正文与四段字段都不能变成时间线的思考行
+      final events = ReActStreamParser.parse(response);
+      final thoughts = events
+          .where((e) => e.type == AgentEventType.thought)
+          .map((e) => e.text ?? '')
+          .join('\n');
+      expect(thoughts, '已经完成验证');
+      expect(thoughts, isNot(contains('服务已重载')));
+      expect(thoughts, isNot(contains('Nginx 已在 8080 端口生效')));
     });
   });
 }

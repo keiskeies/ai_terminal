@@ -131,6 +131,13 @@ class AgentTracer {
     _disabled = disabled;
   }
 
+  /// 当前 trace 文件路径（`/export` 用它指路）。未启用或初始化失败时为 null。
+  Future<String?> tracePath() async {
+    if (_disabled) return null;
+    await _ensureFile();
+    return _traceFile?.path;
+  }
+
   /// 初始化 trace 文件路径（懒初始化）
   Future<void> _ensureFile() async {
     if (_traceFile != null || _disabled) return;

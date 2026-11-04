@@ -138,7 +138,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
                           ),
                         Expanded(
                           child: Text(
-                            conv.title,
+                            conv.displayTitle,
                             style: TextStyle(
                               color: isActive ? cPrimary : tc.textMain,
                               fontSize: fBody,
@@ -207,7 +207,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
   void _showRenameDialog(Conversation conv) {
     final l10n = AppLocalizations.of(context)!;
     final tc = ThemeColors.of(context);
-    final controller = TextEditingController(text: conv.title);
+    final controller = TextEditingController(text: conv.displayTitle);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -254,7 +254,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
         backgroundColor: ThemeColors.of(context).cardElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
         title: Text(l10n.sessionDeleteTitle, style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
-        content: Text(l10n.sessionDeleteConfirm(conv.title),
+        content: Text(l10n.sessionDeleteConfirm(conv.displayTitle),
             style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fSmall)),
         actions: [
           TextButton(

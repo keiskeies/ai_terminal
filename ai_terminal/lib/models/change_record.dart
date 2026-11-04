@@ -27,6 +27,34 @@ class ChangeRecord {
   /// 回滚说明
   String? rollbackDescription;
 
+  /// 本机文件还原：备份/回收区里的源路径
+  ///
+  /// 与 [rollbackCommand] 互斥使用。回滚命令是丢给当前会话 executor 执行的，
+  /// 而本机文件变更发生在跑 App 的这台机器上 —— 在 SSH 会话里用 `mv` 还原
+  /// 会把命令打到远端，改错机器。所以本机还原必须走 Dart 文件 I/O，
+  /// 由 [localRestoreTo] 指明放回哪里。
+  String? localRestoreFrom;
+
+  /// 本机文件还原：要放回的原路径
+  String? localRestoreTo;
+
+  /// 是否可回滚（有远程回滚命令，或有本机还原对）
+  bool get isRollbackable {
+    if (rollbackCommand?.trim().isNotEmpty ?? false) return true;
+    return (localRestoreFrom?.isNotEmpty ?? false) &&
+        (localRestoreTo?.isNotEmpty ?? false);
+  }
+
+  /// 本机还原对（供 UI 显示"从回收区移回 X"）
+  bool get isLocalFileRestore =>
+      (localRestoreFrom?.isNotEmpty ?? false) &&
+      (localRestoreTo?.isNotEmpty ?? false);
+
+  /// UI 提示文案：本机还原没有"回滚命令"可展示，显示还原目标
+  String get rollbackHint => isLocalFileRestore
+      ? '还原本机文件 → $localRestoreTo'
+      : (rollbackCommand ?? '');
+
   /// 执行时间
   DateTime timestamp;
 
@@ -49,6 +77,8 @@ class ChangeRecord {
     required this.type,
     this.rollbackCommand,
     this.rollbackDescription,
+    this.localRestoreFrom,
+    this.localRestoreTo,
     required this.timestamp,
     required this.success,
     this.username,

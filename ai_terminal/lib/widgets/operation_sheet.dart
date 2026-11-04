@@ -5,9 +5,9 @@ import 'package:flutter/services.dart';
 
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
-import '../models/agent_event.dart';
 import '../models/agent_model.dart';
 import '../models/operation_report.dart';
+import '../models/token_usage.dart';
 import '../models/plan_step.dart';
 import '../utils/agent_ui_text.dart';
 import 'plan_panel.dart';
@@ -64,6 +64,7 @@ class OperationSheet extends StatelessWidget {
     final statusColor = _statusColor();
     final statusLabel = _statusLabel(ui);
     final planSteps = (plan != null && plan!.isNotEmpty) ? plan! : report.plan;
+    final answerBody = _visibleAnswerBody;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,13 +107,11 @@ class OperationSheet extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: statusColor.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(rFull),
-                  border:
-                      Border.all(color: statusColor.withValues(alpha: 0.3)),
+                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
                 ),
                 child: Text(
                   statusLabel,
@@ -198,18 +197,26 @@ class OperationSheet extends StatelessWidget {
                 report.conclusion.isEmpty ? '任务已结束，详见执行记录。' : report.conclusion,
                 tc,
               ),
+              // 回答正文是结论层的正文，不是证据：放在结论卡片下方直接可见，
+              // 折叠进"过程与证据"会让用户看不到 Agent 到底答了什么。
               if (report.stateBadges.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
-                  children:
-                      report.stateBadges.map(_buildStateBadge).toList(),
+                  children: report.stateBadges.map(_buildStateBadge).toList(),
                 ),
               ],
             ],
           ),
         ),
+
+        // 完整回答正文：与"结论 + 验证徽标"分开，避免徽标看起来像在给整篇正文背书
+        if (answerBody != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8, bottom: 2),
+            child: markdownBuilder(answerBody, tc),
+          ),
 
         // 中断/失败后继续
         if (!report.isSuccess && onContinueOperation != null) ...[
@@ -229,8 +236,7 @@ class OperationSheet extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.play_circle_outline,
-                        size: 13, color: tc.brand),
+                    Icon(Icons.play_circle_outline, size: 13, color: tc.brand),
                     const SizedBox(width: 4),
                     Text(
                       ui.continueTask,
@@ -275,8 +281,7 @@ class OperationSheet extends StatelessWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.receipt_long,
-                            size: 11, color: tc.textSub),
+                        Icon(Icons.receipt_long, size: 11, color: tc.textSub),
                         const SizedBox(width: 3),
                         Text(
                           ui.auditLog,
@@ -362,18 +367,38 @@ class OperationSheet extends StatelessWidget {
     );
   }
 
+  /// 回答正文；与结论完全相同时不重复渲染
+  String? get _visibleAnswerBody {
+    final body = report.answerBody?.trim();
+    if (body == null || body.isEmpty) return null;
+    if (_sameText(body, report.conclusion)) return null;
+    return body;
+  }
+
+  static bool _sameText(String a, String b) {
+    String normalize(String s) => s
+        .replaceAll(RegExp(r'^#{1,6}\s*', multiLine: true), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return normalize(a) == normalize(b);
+  }
+
   void _copyConclusion(BuildContext context) {
     final buffer = StringBuffer();
     if (report.goal.trim().isNotEmpty) {
       buffer.writeln('目标：${report.goal.trim()}');
     }
     buffer.writeln('结论：${report.conclusion.trim()}');
+    final answerBody = _visibleAnswerBody;
+    if (answerBody != null) {
+      buffer.writeln();
+      buffer.writeln(answerBody);
+    }
     if (report.changes.isNotEmpty) {
       buffer.writeln('变更：');
       for (final change in report.changes) {
-        final rollback = change.canRollback
-            ? '（可回滚：${change.rollbackCommand}）'
-            : '（无自动回滚）';
+        final rollback =
+            change.canRollback ? '（可回滚：${change.rollbackCommand}）' : '（无自动回滚）';
         buffer.writeln('- ${change.command}$rollback');
       }
     }
@@ -441,8 +466,7 @@ class OperationSheet extends StatelessWidget {
 
     final host = report.hostId;
     if (host != null && host.isNotEmpty) {
-      add(host == 'local' ? '本地' : host, tc.textSub,
-          mono: true, maxWidth: 200);
+      add(host == 'local' ? '本地' : host, tc.textSub, mono: true, maxWidth: 200);
     }
     add(_formatElapsed(report.elapsedSeconds, ui), tc.gold, mono: true);
     if (report.stepIndex > 0) add(ui.step(report.stepIndex), tc.textSub);
@@ -565,8 +589,7 @@ class OperationSheet extends StatelessWidget {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                      if (change.additions != null &&
-                          change.deletions != null)
+                      if (change.additions != null && change.deletions != null)
                         const SizedBox(width: 6),
                       if (change.deletions != null)
                         Text(
@@ -622,9 +645,8 @@ class OperationSheet extends StatelessWidget {
     final enabled = !rollbackBusy;
     final color = enabled ? tc.ok : tc.textMuted;
     return GestureDetector(
-      onTap: enabled
-          ? () => onRollbackChange?.call(change, report.hostId)
-          : null,
+      onTap:
+          enabled ? () => onRollbackChange?.call(change, report.hostId) : null,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
@@ -844,108 +866,207 @@ class _ExpandableEvidenceState extends State<_ExpandableEvidence> {
   }
 }
 
-/// 运行态事件折叠：只展示最近若干事件，更早的收成一行摘要
-///
-/// 终态有 report 时走 OperationSheet 的证据折叠；这里覆盖"仍在运行、
-/// 没有 report"的窗口，避免每多一步就把整屏历史卡片重新铺开。
-class CollapsibleEventStream extends StatefulWidget {
-  final List<AgentEvent> events;
-  final ThemeColors tc;
-  final bool isRunning;
-  final Widget Function(List<AgentEvent> events) builder;
-  final int maxVisible;
-
-  const CollapsibleEventStream({
-    super.key,
-    required this.events,
-    required this.tc,
-    required this.isRunning,
-    required this.builder,
-    this.maxVisible = 8,
-  });
-
-  @override
-  State<CollapsibleEventStream> createState() => _CollapsibleEventStreamState();
+/// 常驻运行条：目标 + 阶段 + 步数 + 计时 + 暂停/停止
+/// 耗时文案（本文件里已有两份同规则的私有副本，新界面统一用这个）。
+String _formatElapsedLabel(int seconds, AgentUiText ui) {
+  if (seconds <= 0) return ui.lessThanOneSecond;
+  if (seconds < 60) return '${seconds}s';
+  final m = seconds ~/ 60;
+  final s = seconds % 60;
+  if (m < 60) return '${m}m${s.toString().padLeft(2, '0')}s';
+  final h = m ~/ 60;
+  return '${h}h${(m % 60).toString().padLeft(2, '0')}m';
 }
 
-class _CollapsibleEventStreamState extends State<CollapsibleEventStream> {
-  bool _expanded = false;
+/// 指标项：轮 / token / 速率 / 缓存命中 / 上下文占用环。
+///
+/// 规则来自设计 §3.1.2——没有出处的数字整项不渲染，而不是渲染成 0。
+/// 运行条与常驻指标条共用这一套：`≈` 与"缺数据不显示"这类判断各写一遍，
+/// 两个界面迟早会互相矛盾。
+List<Widget> buildMetricItems({
+  required AgentTask task,
+  required int? contextWindow,
+  required AgentUiText ui,
+  required ThemeColors tc,
+  required int elapsedSeconds,
+}) {
+  final items = <Widget>[];
+  void add(String text, Color color, {bool mono = false}) {
+    items.add(Text(
+      text,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: color,
+        fontSize: fMicro,
+        fontFamily: mono ? 'JetBrainsMono' : null,
+        fontWeight: FontWeight.w500,
+      ),
+    ));
+  }
+
+  if (task.rounds > 0) add(ui.roundsCount(task.rounds), tc.textSub);
+  // 「步」= 真正执行过的命令/工具数，不是引擎循环计数（stepIndex）。
+  // 循环计数与「轮」几乎相等（一轮一次调用），并排显示等于同一件事说两遍；
+  // 参考界面的 `11 轮 418 步` 里那个大数就是执行数。
+  final executedSteps = task.successCount + task.failureCount;
+  if (executedSteps > 0) add(ui.stepsCount(executedSteps), tc.textSub);
+  if (task.tokenTotal > 0) {
+    add(
+      ui.tokensCount(formatTokenCount(task.tokenTotal),
+          estimated: task.hasEstimatedTokens),
+      tc.textSub,
+      mono: true,
+    );
+    // 速率只在全是实测时给：估算 token 除以真实秒数会得到一个"看着像实测"的速率
+    final wall =
+        elapsedSeconds > 0 ? elapsedSeconds : (task.elapsedSeconds ?? 0);
+    // 分母还要剔掉等待用户确认的墙钟 —— 那段时间引擎没在产出 token，
+    // 算进去测的是人的反应速度（真机观察到 215 tok/s 掉到 174）。
+    // 扣完为 0 说明这一轮几乎全在等人，此时整项不渲染，而不是显示 0 tok/s。
+    final active = wall - task.confirmWaitSeconds;
+    if (!task.hasEstimatedTokens && active > 0) {
+      add(ui.tokPerSec(task.tokenTotal ~/ active), tc.textSub, mono: true);
+    }
+  }
+  final cacheHit = task.cacheHitPercent;
+  if (cacheHit != null) add(ui.cacheHit(cacheHit), tc.textSub);
+
+  if (contextWindow != null && contextWindow > 0 && task.contextTokens > 0) {
+    final raw = (task.contextTokens * 100 / contextWindow).round();
+    final pct = raw < 0 ? 0 : (raw > 100 ? 100 : raw);
+    final ringColor = pct >= 70 ? tc.warn : tc.textSub;
+    items.add(Tooltip(
+      message: ui.contextHint,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 11,
+            height: 11,
+            child: CircularProgressIndicator(
+              value: pct / 100,
+              strokeWidth: 2,
+              color: ringColor,
+            ),
+          ),
+          const SizedBox(width: 5),
+          // 窄面板里这一项必须能缩：Wrap 给子项的是"整行宽度"上限，
+          // 而 min-size Row 里的 Text 若不可缩，就会把整行顶出去（测试里以
+          // RenderFlex overflowed 暴露，真机上会是黄黑条纹）
+          Flexible(
+            child: Text(
+              ui.contextUsed(pct),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: ringColor,
+                fontSize: fMicro,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ));
+  }
+  return items;
+}
+
+/// 常驻指标条：任务进入终态后接管 `LiveOperationBar` 的位置。
+///
+/// 参照界面的底部模块是常驻的，而运行条只在 running / paused / waitingConfirm
+/// 时出现；调用方按状态二选一渲染，所以同一组数字不会同时显示两遍。
+class AgentMetricsBar extends StatelessWidget {
+  final AgentTask task;
+  final ThemeColors tc;
+  final int? contextWindow;
+
+  /// 运行中 = true。此时不重复渲染状态与用时 —— 输入框上方的运行条已经在说
+  /// "跑到哪了"，底边这条只管数字。
+  final bool running;
+
+  const AgentMetricsBar({
+    super.key,
+    required this.task,
+    required this.tc,
+    this.contextWindow,
+    this.running = false,
+  });
+
+  static String statusLabel(AgentStatus status, AgentUiText ui) {
+    switch (status) {
+      case AgentStatus.completed:
+        return ui.completed;
+      case AgentStatus.failed:
+        return ui.failed;
+      case AgentStatus.cancelled:
+        return ui.cancelled;
+      case AgentStatus.paused:
+        return ui.paused;
+      default:
+        return ui.agentTask;
+    }
+  }
+
+  static Color statusColor(ThemeColors tc, AgentStatus status) {
+    switch (status) {
+      case AgentStatus.completed:
+        return tc.ok;
+      case AgentStatus.failed:
+        return tc.error;
+      case AgentStatus.cancelled:
+        return tc.textMuted;
+      default:
+        return tc.textSub;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final total = widget.events.length;
-    final collapsible = widget.isRunning && total > widget.maxVisible;
-    if (!collapsible) {
-      return widget.builder(widget.events);
-    }
-
-    if (_expanded) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    final ui = AgentUiText.of(context);
+    final elapsed = task.elapsedSeconds ?? 0;
+    // 贴窗口底边的细条，不做带边框的卡片：这行在输入框之下，再套一层框会在面板
+    // 底部出现"框中框"。
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 2,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          _toggle('收起过程', Icons.expand_less),
-          widget.builder(widget.events),
-        ],
-      );
-    }
-
-    // 从命令边界开始截取，避免把 result 和它的 command 拆开
-    var start = total - widget.maxVisible;
-    while (start < total && !widget.events[start].isCommand) {
-      start++;
-    }
-    if (start >= total) start = total - widget.maxVisible;
-    final visible = widget.events.sublist(start);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _toggle(_summary(start), Icons.chevron_right),
-        widget.builder(visible),
-      ],
-    );
-  }
-
-  Widget _toggle(String text, IconData icon) {
-    final tc = widget.tc;
-    return InkWell(
-      onTap: () => setState(() => _expanded = !_expanded),
-      borderRadius: BorderRadius.circular(rXSmall),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Row(
-          children: [
-            Icon(icon, size: 15, color: tc.textMuted),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(
-                text,
-                style: TextStyle(color: tc.textSub, fontSize: fMicro),
+          if (!running) ...[
+            Text(
+              statusLabel(task.status, ui),
+              style: TextStyle(
+                color: statusColor(tc, task.status),
+                fontSize: fMicro,
+                fontWeight: FontWeight.w600,
               ),
             ),
             Text(
-              _expanded ? '收起' : '完整过程',
-              style: TextStyle(color: tc.textSub, fontSize: fMicro),
+              _formatElapsedLabel(elapsed, ui),
+              style: TextStyle(
+                color: tc.gold,
+                fontSize: fMicro,
+                fontFamily: 'JetBrainsMono',
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
-        ),
+          ...buildMetricItems(
+            task: task,
+            contextWindow: contextWindow,
+            ui: ui,
+            tc: tc,
+            elapsedSeconds: elapsed,
+          ),
+        ],
       ),
     );
   }
-
-  String _summary(int visibleStart) {
-    final results = widget.events.where((e) => e.isResult).toList();
-    final success = results.where((e) => e.success == true).length;
-    final failed = results.length - success;
-    final hidden = visibleStart;
-    final parts = <String>['更早 $hidden 个事件已折叠'];
-    if (results.isNotEmpty) {
-      parts.add('$success 成功${failed > 0 ? " · $failed 失败" : ""}');
-    }
-    return parts.join(' · ');
-  }
 }
 
-/// 常驻运行条：目标 + 阶段 + 步数 + 计时 + 暂停/停止
 class LiveOperationBar extends StatefulWidget {
   final AgentTask? task;
   final AgentStatus status;
@@ -1108,8 +1229,12 @@ class _LiveOperationBarState extends State<LiveOperationBar> {
         ? ui.phase(task.phase)
         : _phaseLabelForStatus(ui);
     add(phase, tc.textSub);
-    if (task.stepIndex > 0) add(ui.step(task.stepIndex), tc.textSub);
+    // 不再显示 `第 N 步`（引擎循环计数）：底边条的 `N 步` 是执行过的命令数，
+    // 同一屏出现两个都叫"步"、含义不同的数字，等于让用户去猜哪个是真的。
     add(_formatElapsed(elapsed, ui), tc.gold, mono: true);
+    // 数字（轮/步/tok/速率/缓存/占用环）不在这条里：它们统一渲染在输入框之下的
+    // 底边状态条（[AgentMetricsBar]），运行中与终态共用同一位置，任务跑完数字
+    // 不会换地方。这里只留"跑到哪了"。
     if (task.successCount > 0 || task.failureCount > 0) {
       add(ui.successCount(task.successCount), tc.textSub);
       if (task.failureCount > 0) {

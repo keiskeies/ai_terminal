@@ -6,7 +6,7 @@ import '../core/theme_colors.dart';
 import '../models/agent_event.dart';
 import '../providers/terminal_provider.dart' as tp;
 import '../utils/agent_ui_text.dart';
-import 'agent_command_block.dart';
+import 'agent_process_timeline.dart';
 import 'host_result_matrix.dart';
 import 'output_viewer_sheet.dart';
 
@@ -86,18 +86,35 @@ class AgentEventContent extends StatelessWidget {
     return _buildEventsContent(context);
   }
 
-  /// 结构化事件列表渲染：内容自动追加，只有命令单独包装成块
+  /// 结构化事件列表渲染
+  ///
+  /// 事件必须**按原始顺序**交错渲染：过程段（思考 / 命令 / 工具 / 结果）攒成
+  /// 一段交时间线，遇到正文、询问、完成卡就切段。早先把所有过程事件汇总成
+  /// 一条时间线、再把所有正文/询问接在后面，会让询问卡片永远沉在消息底部——
+  /// 用户选完后新执行的命令反而出现在它上面，看起来像选择卡被钉住了。
+  ///
+  /// 命令与结果的配对不能因为切段而丢：结果通过全局 `resultByCommand`
+  /// 挂到对应的命令行上，并在原位置跳过，避免同一个调用渲染两遍。
   Widget _buildEventsContent(BuildContext context) {
-    // 构建事件→结果配对映射：commandId → result
-    final resultMap = <String, AgentEvent>{};
+    final resultByCommand = <String, AgentEvent>{};
+    final commandIds = <String>{};
     for (final e in events) {
-      if (e.isResult && e.commandId != null) {
-        resultMap[e.commandId!] = e;
-      }
+      if (e.isCommand) commandIds.add(e.id);
+    }
+    for (final e in events) {
+      if (!e.isResult) continue;
+      final commandId = e.commandId;
+      // 只登记"确实有对应命令"的结果；孤儿结果要留在原地单独渲染，
+      // 不能被误认为已配对而跳过。
+      if (commandId == null || !commandIds.contains(commandId)) continue;
+      resultByCommand[commandId] = e;
     }
 
     final widgets = <Widget>[];
+    final segment = <AgentEvent>[];
     final textBuffer = StringBuffer();
+    final consumedResults = <String>{};
+    final pendingAskId = isWaitingChoice ? _lastAskId(events) : null;
 
     void flushText() {
       final text = textBuffer.toString().trim();
@@ -107,62 +124,81 @@ class AgentEventContent extends StatelessWidget {
       }
     }
 
+    void flushSegment() {
+      if (segment.isEmpty) return;
+      final segmentEvents = List<AgentEvent>.of(segment);
+      segment.clear();
+      widgets.add(AgentProcessTimeline(
+        key: ValueKey('agent-process-${segmentEvents.first.id}'),
+        events: segmentEvents,
+        tc: tc,
+        tab: tab,
+        showAutoExecute: showAutoExecute,
+        isLoading: isLoading,
+        executingCommand: executingCommand,
+        pendingConfirmCommand: pendingConfirmCommand,
+        onExecuteCommand: onExecuteCommand,
+        onConfirmCommand: onConfirmCommand,
+        onRejectCommand: onRejectCommand,
+        resultBuilder: (ctx, result) => _buildResultCard(result, tc, ctx),
+      ));
+    }
+
     for (final event in events) {
       switch (event.type) {
         case AgentEventType.thought:
-        case AgentEventType.text:
         case AgentEventType.info:
+          flushText();
+          segment.add(event);
+          break;
+        case AgentEventType.command:
+          flushText();
+          segment.add(event);
+          final result = resultByCommand[event.id];
+          if (result != null && consumedResults.add(result.id)) {
+            // 结果紧跟命令行进同一段，时间线才能配对
+            segment.add(result);
+          }
+          break;
+        case AgentEventType.result:
+          // 已挂到命令行，或稍后会随命令行一起渲染
+          if (consumedResults.contains(event.id)) break;
+          if (event.commandId != null &&
+              resultByCommand[event.commandId!]?.id == event.id) {
+            break;
+          }
+          // 找不到命令的孤儿结果仍要露出来
+          flushText();
+          segment.add(event);
+          break;
+        case AgentEventType.text:
+          flushSegment();
           if (event.text != null && event.text!.trim().isNotEmpty) {
             textBuffer.writeln(event.text);
           }
           break;
-        case AgentEventType.command:
-          flushText();
-          final isTool =
-              event.toolName != null && event.toolName != 'exec_command';
-          // 若有对应 result，紧跟在 command 后渲染
-          final result = resultMap[event.id];
-          widgets.add(AgentCommandBlock(
-            command: event.command ?? '',
-            tc: tc,
-            tab: tab,
-            showAutoExecute: showAutoExecute,
-            isLoading: isLoading,
-            executingCommand: executingCommand,
-            pendingConfirmCommand: pendingConfirmCommand,
-            isTool: isTool,
-            executed: result != null,
-            onExecute: onExecuteCommand,
-            onConfirm: onConfirmCommand,
-            onReject: onRejectCommand,
-          ));
-          if (result != null) {
-            widgets.add(_buildResultCard(result, tc, context));
-          }
-          break;
-        case AgentEventType.result:
-          if (event.commandId == null ||
-              !events.any((e) => e.id == event.commandId)) {
-            flushText();
-            widgets.add(_buildResultCard(event, tc, context));
-          }
-          break;
         case AgentEventType.ask:
+          flushSegment();
           flushText();
-          widgets.add(_buildAskCard(event, tc));
+          widgets.add(_buildAskCard(
+            event,
+            tc,
+            pending: event.id == pendingAskId,
+          ));
           break;
         case AgentEventType.finish:
+          flushSegment();
           flushText();
           widgets.add(_buildFinishCard(event, tc));
           break;
         case AgentEventType.report:
-          // 操作单由 OperationSheet 单独渲染，证据层忽略
-          break;
         case AgentEventType.plan:
-          // 执行清单由 PlanPanel 单独渲染，证据层忽略
+          // 操作单由 OperationSheet、执行清单由 PlanPanel 单独渲染；
+          // 它们没有行内内容，不应打断过程段的连续渲染。
           break;
       }
     }
+    flushSegment();
     flushText();
 
     // 兜底：若有 pendingOptions 但没有 ask 事件（旧格式），显示选项按钮
@@ -177,6 +213,15 @@ class AgentEventContent extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: widgets,
     );
+  }
+
+  /// 当前处于等待状态的询问：只允许最后一个 ask 卡片可点。
+  /// 旧询问在历史里继续显示，但不能再被当成当前问题作答。
+  static String? _lastAskId(List<AgentEvent> events) {
+    for (var i = events.length - 1; i >= 0; i--) {
+      if (events[i].isAsk) return events[i].id;
+    }
+    return null;
   }
 
   /// 结果卡片：成功/失败状态 + 输出（全部展开显示）
@@ -458,7 +503,11 @@ class AgentEventContent extends StatelessWidget {
   }
 
   /// 询问卡片：问题 + 选项按钮
-  Widget _buildAskCard(AgentEvent event, ThemeColors tc) {
+  ///
+  /// [pending] 只对当前仍在等待的那一个询问为 true；历史询问保留问题文本，
+  /// 但选项不可再点，避免用户回头误答一个已经结束的问题。
+  Widget _buildAskCard(AgentEvent event, ThemeColors tc,
+      {required bool pending}) {
     final options = event.options ?? [];
     final question = event.question ?? '请选择';
     return Container(
@@ -506,13 +555,13 @@ class AgentEventContent extends StatelessWidget {
               ),
             ],
           ),
-          if (options.isNotEmpty && isWaitingChoice) ...[
+          if (options.isNotEmpty) ...[
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: options.map((opt) {
-                return _buildOptionChip(opt, tc);
+                return _buildOptionChip(opt, tc, selectable: pending);
               }).toList(),
             ),
           ],
@@ -521,16 +570,21 @@ class AgentEventContent extends StatelessWidget {
     );
   }
 
-  Widget _buildOptionChip(String label, ThemeColors tc) {
+  /// [selectable] 为 false 时选项仍在界面上展示（历史回看/任务已推进），
+  /// 只是不可点击 —— 否则用户回头只会看到一张没有选项的"请选择"卡片。
+  Widget _buildOptionChip(String label, ThemeColors tc,
+      {required bool selectable}) {
+    final accent = selectable ? tc.brand : tc.textMuted;
     return GestureDetector(
-      onTap: () => onSelectChoice?.call(label),
+      onTap: selectable ? () => onSelectChoice?.call(label) : null,
       child: Container(
         padding:
             const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
           color: tc.surface,
           borderRadius: BorderRadius.circular(rMedium),
-          border: Border.all(color: tc.brand.withValues(alpha: 0.3)),
+          border: Border.all(
+              color: accent.withValues(alpha: selectable ? 0.3 : 0.18)),
           boxShadow: [
             BoxShadow(
               color: tc.brand.withValues(alpha: 0.05),
@@ -542,13 +596,14 @@ class AgentEventContent extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.touch_app, size: 12, color: tc.brand),
+            Icon(selectable ? Icons.touch_app : Icons.radio_button_unchecked,
+                size: 12, color: accent),
             const SizedBox(width: 4),
             Text(
               label,
               style: TextStyle(
                 fontSize: fSmall,
-                color: tc.brand,
+                color: accent,
                 fontWeight: FontWeight.w600,
               ),
             ),

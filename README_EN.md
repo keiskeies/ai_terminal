@@ -52,7 +52,7 @@ A chat assistant tells you what to run. AI Terminal runs it on your servers and 
 
 ## At a glance
 
-`5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `300+ knowledge entries` · `7 web search engines`
+`5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `26 built-in tools` · `8 slash commands` · `300+ knowledge entries` · `7 web search engines`
 
 ## Highlights
 
@@ -60,12 +60,25 @@ A chat assistant tells you what to run. AI Terminal runs it on your servers and 
 
 Instead of stacking thinking, commands, and output into one long chat transcript, the Agent answer is layered:
 
-- **Conclusion first**: the result, current state, changes, and recommended next steps
+- **Conclusion first**: the result, current state, changes, and recommended next steps — the answer body supports Markdown (headings, lists, code blocks, bold)
+- **Process timeline**: one row per thought, tool call, or terminal command with its status and duration; successful steps collapse to a single line while failures and multi-host results stay expanded
 - **Execution plan**: model-declared steps, progress counts, and the active step
 - **Process & evidence**: commands, output, duration, exit code, and failure category on demand
 - **Change ledger**: file and command changes are traceable, auditable, and rollback-ready
 - **Failure recovery**: targeted actions for permission, disconnect, and timeout failures
 - **Multi-host matrix**: batch/broadcast operations show per-host status, duration, and output
+
+### Goal Mode & Run Metrics
+
+A one-shot command that stops when the turn ends is an assistant. Something that keeps pushing until the goal is met — and knows what it spent — is an operations tool.
+
+- **`/goal <objective>`**: the objective is stored per session, and when a round finishes the next round starts on its own — until the goal is met, you end it, or a stop condition fires
+- **Round budget**: 24 rounds by default, 256 at most. Auto-continuation cannot turn into an unbounded loop
+- **It stops when it should**: you pressed stop, the task errored, a confirmation timed out with nobody to approve it, the terminal dropped, you switched sessions, or two rounds executed no commands at all — each parks the goal with the reason shown, and it never revives itself
+- **Stoppable while it runs**: pause / edit / finish live on the goal banner at the top of the panel, because the input box is disabled during a task — a command-only exit would be no exit at all
+- **Bottom run metrics**: rounds, steps, tokens, tok/s, and a context-usage ring. Real numbers when the provider returns `usage`; the moment any round had to be estimated, the total is prefixed with `≈`. Cache-hit rate is omitted entirely when the provider doesn't report `cached_tokens` — showing 0% for unknown would be a fake conclusion
+- **8 slash commands**: `/new` `/compact` `/goal` `/plan` `/model` `/permission` `/export` `/help`. `/plan` produces a plan without executing anything: it sets read-only temporarily and restores *your* previous setting afterwards, not simply "off"
+- **The Agent panel opens on the right by default**, and remembers the side you chose plus the width you dragged it to
 
 ### Servers & connections
 
@@ -82,6 +95,17 @@ Instead of stacking thinking, commands, and output into one long chat transcript
 - Byte-level patches preserve BOM, CRLF, and non-UTF-8 bytes
 - Plain-text `content` / `old` / `new` parameters avoid model-generated base64 errors for Chinese text
 - The SFTP editor refuses oversized/non-UTF-8 files and restores the original on save failure
+
+### Local file tools
+
+The Agent can also read and write the computer this app runs on, not just your servers:
+
+- 7 tools: `local_file_read` / `local_dir_list` / `local_file_search` to read, `local_file_write` / `local_file_patch` / `local_file_move` / `local_file_delete` to change
+- **Off by default**: enable it under Settings → Agent → Local file access and authorize folders one by one; if the stored config cannot be read it falls back to disabled rather than open
+- **Blacklist beats allowlist**: even inside an authorized folder, `~/.ssh`, `*.key`, `*.pem`, `.env` and similar credential files stay off limits; symlinks resolve against the deepest existing ancestor, so `..` and symlink escapes are rejected
+- Reads need no confirmation; writes and deletions land in the change ledger and can be restored. `local_file_delete` moves files into the trash (`.ai_terminal_trash`, a reserved directory the Agent itself cannot touch); pass `hard: true` to skip the trash
+- Every delete call requires an explicit "Run" click in the UI — cancelling or letting it time out changes nothing. Read-only mode blocks all write tools as well
+- Available inside SSH sessions too: those edits touch this computer, and restoring them never goes through the remote host
 
 ### Operations toolbelt
 
@@ -178,19 +202,21 @@ flutter build apk --release
 flutter build ios --release
 ```
 
-## Configure an AI model
+## Configure AI models
 
 1. Open **Settings → AI Model Config**
-2. Add a model and choose a provider or any OpenAI-compatible endpoint
-3. Enter the Base URL, model name, and API key
-4. Save and set it as the default model
+2. Add an endpoint and choose a provider or any OpenAI-compatible URL
+3. Enter the API key, display name, and API URL; one endpoint can hold multiple models
+4. Maintain the model catalog (context window, max output, reasoning tiers) or use "Fetch available models"
+5. Back in the Agent input footer, tap the model capsule to pick a model and reasoning tier
 
-API keys are stored in OS secure storage; the local database keeps only model metadata.
+There is no "default model": the model in use is whatever the footer picker selected, and the choice is remembered. Unspecified context window / max output default to 256K / 32K and can be overridden per model. API keys are stored in OS secure storage; the local database keeps only endpoint and model metadata.
 
 ## Security model
 
 - **Credentials**: OS Keychain/Keystore plus an AES-encrypted database; no plaintext storage
 - **Command classification**: SafetyGuard classifies commands as blocked / warn / info / safe; risky operations require confirmation
+- **Local files**: off by default, and limited to folders you authorize one by one; the credential blacklist outranks the allowlist, `..` and symlink escapes are rejected, and the trash is a reserved directory the Agent can neither read nor delete
 - **File safety**: backups before writes, rollback on failure, atomic transfers, uniqueness and concurrent-change checks for patches
 - **Traceability**: commands, file changes, exit codes, and failure reasons are recorded in the change ledger and audit log
 - **Boundary**: the AI is an execution assistant, not a privilege-escalation tool; keep least privilege, firewalls, and backups
@@ -223,6 +249,13 @@ flutter test
 Real SSH and real-LLM E2E tests are enabled through environment variables and do not run by default. Coverage includes:
 
 - Operation-sheet parsing/rendering, plan counts, recovery, and rollback
+- Process timeline: the collapse window, failures expanded by default, tool calls never rendered twice, and end-to-end parsing of the `回答:` (answer) protocol block
+- Goal auto-continuation: every row of the terminal-state matrix is asserted (cancel / failure / confirmation timeout / disconnect / switched session / budget exhausted / two rounds without progress / model declares completion), plus the three guards in front of queueing the next round
+- Metric display rules: measured vs estimated `≈`, omitting an item instead of rendering missing data, divide-by-zero guard, context usage capped at 100%, and wrapping rather than overflowing in a narrow panel
+- Slash-command parsing: command name separated from its argument, and subcommands disambiguated from natural language (`/etc/nginx 目录权限` still goes to the model as text)
+- Agent panel persistence: a user who explicitly chose the bottom layout is not flipped by the new right-side default, dirty values fall back, and the ratio is clamped into the legal range
+- Local file tools: folder allowlist, `..` and symlink escapes, credential blacklist, backup/trash/restore, and read-only gating
+- Tool contract: typed `ToolArgs` access, scope visibility, and ledger membership derived from `kind`
 - SFTP upload/download, recursive directories, binary/large-file SHA-256
 - file_write / file_patch with UTF-8, CRLF, BOM, non-UTF-8 bytes, and concurrent-change checks
 - Local/remote file edits and real-model upload/download/edit flows
@@ -230,8 +263,11 @@ Real SSH and real-LLM E2E tests are enabled through environment variables and do
 ## Known limits
 
 - macOS/iOS builds are not notarized/signed; iOS requires your own signing
+- Token counts prefer the provider's `usage`; a call that doesn't return one falls back to a character estimate and the total is then shown with `≈`. Cache-hit rate needs `prompt_tokens_details.cached_tokens` and is simply hidden when the provider omits it
+- Goal auto-continuation only runs while the goal's own session is in the foreground — switch away and the goal parks itself rather than acting on a machine you are not looking at
 - No model is bundled; bring an OpenAI-compatible API key
 - The Agent executes real commands; review confirmations and keep backups in production
+- Once local file access is on, the Agent edits this computer (authorized folders only); trash copies never expire on their own — check the usage and empty it under Settings → Agent when you want the space back
 - 14 languages cover the core UI; the newest Agent operation-sheet labels are English/Chinese first, with English fallback for other locales
 - Directory transfers are sequential; symbolic links are skipped by default
 

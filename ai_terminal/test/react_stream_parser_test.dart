@@ -56,7 +56,8 @@ void main() {
 
   group('ReActStreamParser - XML tool_call 格式转换', () {
     test('带 --- 分隔符的 XML tool_call', () {
-      const response = '---\n<function=terminal>\n<parameter=command>ls -la</parameter>\n</function>\n---';
+      const response =
+          '---\n<function=terminal>\n<parameter=command>ls -la</parameter>\n</function>\n---';
       final events = ReActStreamParser.parse(response);
 
       expect(events.length, 1);
@@ -65,7 +66,8 @@ void main() {
     });
 
     test('不带 --- 分隔符的 XML tool_call', () {
-      const response = '<function=terminal>\n<parameter=command>uptime</parameter>\n</function>';
+      const response =
+          '<function=terminal>\n<parameter=command>uptime</parameter>\n</function>';
       final events = ReActStreamParser.parse(response);
 
       expect(events.length, 1);
@@ -74,7 +76,8 @@ void main() {
     });
 
     test('execute 函数名也能识别', () {
-      const response = '<function=execute>\n<parameter=command>whoami</parameter>\n</function>';
+      const response =
+          '<function=execute>\n<parameter=command>whoami</parameter>\n</function>';
       final events = ReActStreamParser.parse(response);
 
       expect(events.length, 1);
@@ -83,7 +86,8 @@ void main() {
     });
 
     test('run_command 函数名也能识别', () {
-      const response = '<function=run_command>\n<parameter=command>pwd</parameter>\n</function>';
+      const response =
+          '<function=run_command>\n<parameter=command>pwd</parameter>\n</function>';
       final events = ReActStreamParser.parse(response);
 
       expect(events.length, 1);
@@ -92,7 +96,8 @@ void main() {
     });
 
     test('非 terminal 类函数不解析为命令', () {
-      const response = '<function=search>\n<parameter=command>find something</parameter>\n</function>';
+      const response =
+          '<function=search>\n<parameter=command>find something</parameter>\n</function>';
       final events = ReActStreamParser.parse(response);
 
       // 非 terminal/execute/run_command 的函数，命令内容作为普通文本返回
@@ -154,8 +159,7 @@ void main() {
     });
 
     test('思考 + heredoc 命令', () {
-      const response =
-          '思考: 需要写入配置文件\n命令: cat <<EOF\nline1\nline2\nEOF';
+      const response = '思考: 需要写入配置文件\n命令: cat <<EOF\nline1\nline2\nEOF';
       final events = ReActStreamParser.parse(response);
 
       expect(events.length, 2);
@@ -203,6 +207,40 @@ void main() {
       expect(events[0].text, '请用户选择');
       expect(events[1].type, AgentEventType.ask);
       expect(events[1].options, ['继续', '取消']);
+    });
+
+    test('ask 事件携带思考里的提问文字', () {
+      const response = '思考: 检测到 OOM，需要确认处理方式\n选项: 提供修复命令|暂不修改';
+      final events = ReActStreamParser.parse(response);
+
+      final ask = events.firstWhere((e) => e.type == AgentEventType.ask);
+      expect(ask.question, '检测到 OOM，需要确认处理方式');
+      expect(ask.options, ['提供修复命令', '暂不修改']);
+    });
+
+    test('提问取最近一次思考，不是第一条', () {
+      const response = '思考: 先看版本\n命令: java -version\n'
+          '思考: 有多个版本可选\n选项: Java 8|Java 17';
+      final events = ReActStreamParser.parse(response);
+
+      final ask = events.firstWhere((e) => e.type == AgentEventType.ask);
+      expect(ask.question, '有多个版本可选');
+    });
+
+    test('无思考时提问为空，由卡片兜底文案接管', () {
+      final events = ReActStreamParser.parse('选项: A|B');
+
+      expect(events.single.question, isNull);
+    });
+
+    test('提问不跨 ask 事件复用', () {
+      const response = '思考: 只有一个问题\n选项: A|B\n选项: C|D';
+      final events = ReActStreamParser.parse(response);
+
+      final asks = events.where((e) => e.type == AgentEventType.ask).toList();
+      expect(asks.length, 2);
+      expect(asks[0].question, '只有一个问题');
+      expect(asks[1].question, isNull);
     });
   });
 
@@ -292,6 +330,63 @@ void main() {
       expect(events[0].type, AgentEventType.text);
       expect(events[1].type, AgentEventType.command);
       expect(events[1].command, 'echo hello');
+    });
+  });
+
+  group('工具调用协议行不得泄漏成正文', () {
+    test('工具:/参数: 与其缩进参数不产出 text 事件', () {
+      const input = '''思考: 需要读配置
+动作: tool
+工具: local_file_read
+参数:
+  path: D:\\a\\pubspec.yaml
+  max_lines: 60
+''';
+      final events = ReActStreamParser.parse(input);
+      expect(
+        events.where((e) => e.type == AgentEventType.text),
+        isEmpty,
+        reason: '引擎会为这次调用发带参数的 command 事件，正文再显示一遍就是重复',
+      );
+      expect(events.where((e) => e.isThought), isNotEmpty);
+    });
+
+    test('协议块之后的 结论:/现状: 仍归入思考，供操作单解析', () {
+      const input = '''动作: tool
+工具: local_file_read
+参数:
+  path: /etc/a
+结论: 任务完成，已读取配置
+现状: 文件存在且可读取
+变更: 无
+建议: 无
+动作: finish''';
+      final events = ReActStreamParser.parse(input);
+      final thoughts =
+          events.where((e) => e.type == AgentEventType.thought).toList();
+      expect(thoughts, isNotEmpty);
+      final joined = thoughts.map((e) => e.text).join('\n');
+      expect(joined, contains('结论: 任务完成，已读取配置'));
+      expect(joined, contains('现状: 文件存在且可读取'));
+      expect(joined, isNot(contains('local_file_read')), reason: '协议行不能混进思考');
+      expect(
+        events.where((e) => e.type == AgentEventType.text),
+        isEmpty,
+      );
+    });
+
+    test('回答: 正文不进入过程事件（由操作单结论层展示）', () {
+      const input = '''思考: 已确认服务状态
+回答: ## 结果
+服务已启动。
+结论: 服务已启动
+现状: active
+动作: finish''';
+      final events = ReActStreamParser.parse(input);
+      final thoughts =
+          events.where((e) => e.type == AgentEventType.thought).toList();
+      expect(thoughts.map((e) => e.text).join('\n'), '已确认服务状态');
+      expect(events.where((e) => e.type == AgentEventType.text), isEmpty);
     });
   });
 }

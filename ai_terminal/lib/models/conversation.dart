@@ -83,6 +83,52 @@ class Conversation {
   /// 是否为当前活跃会话（每个 hostId 只有一个 active）
   bool isActive = false;
 
+  /// 创建时的默认日期标题形如「会话 11/4 02:34」；仍匹配它才允许自动改写
+  static final RegExp _autoTitlePattern =
+      RegExp(r'^会话\s+\d{1,2}/\d{1,2}\s+\d{1,2}:\d{2}$');
+
+  static const int autoTitleMaxChars = 20;
+
+  bool get hasAutoTitle => _autoTitlePattern.hasMatch(title.trim());
+
+  /// 会话列表展示标题：仍是日期默认标题时，回退到首条用户消息前 20 字
+  String get displayTitle {
+    final stored = title.trim();
+    if (!hasAutoTitle) return stored.isEmpty ? '会话' : stored;
+    final snippet = _firstUserSnippet;
+    return snippet.isEmpty ? stored : snippet;
+  }
+
+  String get _firstUserSnippet {
+    for (final m in messages) {
+      if (!m.isUser) continue;
+      final snippet = snippetFromUserMessage(m.content);
+      if (snippet.isNotEmpty) return snippet;
+    }
+    return '';
+  }
+
+  /// 首条用户消息到达时，把日期默认标题替换成内容摘要。
+  /// 用户手动改过标题（不再匹配默认格式）时不覆盖。
+  void adoptTitleFromFirstMessage(String content) {
+    if (!hasAutoTitle) return;
+    final snippet = snippetFromUserMessage(content);
+    if (snippet.isNotEmpty) title = snippet;
+  }
+
+  /// 首行 + 空白折叠 + 最多 20 个字符（按 rune 截断，避免劈开 emoji）
+  static String snippetFromUserMessage(String content) {
+    final firstLine = content
+        .split(RegExp(r'\r?\n'))
+        .map((line) => line.trim())
+        .firstWhere((line) => line.isNotEmpty, orElse: () => '');
+    final normalized = firstLine.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (normalized.isEmpty) return '';
+    final runes = normalized.runes.toList(growable: false);
+    if (runes.length <= autoTitleMaxChars) return normalized;
+    return '${String.fromCharCodes(runes.take(autoTitleMaxChars))}…';
+  }
+
   Conversation();
 
   Conversation.create({

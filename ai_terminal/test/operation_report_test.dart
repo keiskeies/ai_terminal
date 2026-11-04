@@ -19,6 +19,7 @@ void main() {
         commandSuccessCount: 8,
         commandFailureCount: 1,
         conclusion: 'Nginx 已安装并运行。',
+        answerBody: '## Nginx 已安装并运行\n\n详情见下。',
         details: '结论: ...\n现状: ...',
         stateBadges: [
           OperationBadge(text: '服务运行中', level: 'success'),
@@ -57,6 +58,7 @@ void main() {
       expect(restored.commandSuccessCount, 8);
       expect(restored.commandFailureCount, 1);
       expect(restored.conclusion, 'Nginx 已安装并运行。');
+      expect(restored.answerBody, '## Nginx 已安装并运行\n\n详情见下。');
       expect(restored.details, contains('现状'));
       expect(restored.stateBadges, hasLength(1));
       expect(restored.stateBadges.single.text, '服务运行中');
@@ -96,8 +98,7 @@ void main() {
 变更: 安装了 nginx
 建议: 可以配置 HTTPS''';
 
-      expect(OperationReport.extractConclusion(raw),
-          'Nginx 已安装并运行，网站可以访问');
+      expect(OperationReport.extractConclusion(raw), 'Nginx 已安装并运行，网站可以访问');
     });
 
     test('extractConclusion handles inline sections on one line', () {
@@ -125,20 +126,49 @@ active''';
       expect(OperationReport.extractConclusion('   ', fallback: '已结束'), '已结束');
     });
 
+    test('extractConclusion prefers 结论 section over answer body', () {
+      const raw = '结论: 已完成\n现状: ok\n变更: 无\n建议: 无';
+      expect(
+        OperationReport.extractConclusion(
+          raw,
+          answerBody: '## 另一段标题\n\n正文详情',
+        ),
+        '已完成',
+        reason: '模型显式写的结论字段优先于回答正文',
+      );
+    });
+
+    test('extractConclusion uses answer first paragraph when 结论 missing', () {
+      // 用户现场：finish 的"思考"是自述/道歉，真正结论写在回答正文里
+      const thought = '这已是我第三次把说明文字误当命令，任务已完成，直接收尾。';
+      const answer = '## GDM 运行状态正常\n\nsystemd-logind、gdm 均在运行。';
+      expect(
+        OperationReport.extractConclusion(thought, answerBody: answer),
+        'GDM 运行状态正常',
+        reason: '没有结论字段时，回答正文首段比思考更接近用户要的结论',
+      );
+    });
+
+    test('extractConclusion keeps thinking fallback when answer is empty', () {
+      expect(
+        OperationReport.extractConclusion('先检查了系统版本。'),
+        '先检查了系统版本。',
+      );
+    });
+
     test('extractNextActions reads 建议 items and filters 无', () {
       const raw = '''结论: 完成
 建议:
 - 配置 HTTPS
 1. 开放 80 端口
 无''';
-      expect(OperationReport.extractNextActions(raw),
-          ['配置 HTTPS', '开放 80 端口']);
+      expect(OperationReport.extractNextActions(raw), ['配置 HTTPS', '开放 80 端口']);
     });
 
     test('extractDetails omits content equal to conclusion', () {
       expect(OperationReport.extractDetails('完成', conclusion: '完成'), isNull);
-      expect(OperationReport.extractDetails('结论: 完成\n现状: active'),
-          contains('现状'));
+      expect(
+          OperationReport.extractDetails('结论: 完成\n现状: active'), contains('现状'));
     });
   });
 
@@ -200,6 +230,54 @@ active''';
       expect(event.isReport, isTrue);
       expect(event.operationReport?.operationId, 'op');
       expect(event.hostId, 'web-01');
+    });
+  });
+
+  group('OperationChange.localRestore', () {
+    // 本机文件变更没有 shell 回滚命令，还原信息在台账的 localRestoreFrom/To 里。
+    // 操作单"自包含、渲染时不查数据库"，所以能不能给还原入口全靠这个布尔位 ——
+    // 它一旦在派生或序列化里丢掉，用户重开会话就再也看不到还原入口。
+    OperationChange change({
+      String? rollbackCommand,
+      bool localRestore = false,
+    }) =>
+        OperationChange(
+          id: 'c1',
+          command: 'local_file_delete /srv/x.txt',
+          type: 'fileOperation',
+          rollbackCommand: rollbackCommand,
+          localRestore: localRestore,
+          success: true,
+        );
+
+    test('只有 localRestore 也算可还原（本机变更没有回滚命令）', () {
+      final c = change(localRestore: true);
+      expect(c.rollbackCommand, isNull);
+      expect(c.canRollback, isTrue);
+    });
+
+    test('toJson/fromJson 往返保住 localRestore', () {
+      final c = change(localRestore: true);
+      final back = OperationChange.fromJson(c.toJson());
+      expect(back.localRestore, isTrue);
+      expect(back.canRollback, isTrue);
+    });
+
+    test('旧数据没有该键时按不可还原处理，不冒认', () {
+      final legacy = {
+        'id': 'c1',
+        'command': 'apt install nginx',
+        'type': 'install',
+        'success': true,
+      };
+      final back = OperationChange.fromJson(legacy);
+      expect(back.localRestore, isFalse);
+      expect(back.canRollback, isFalse, reason: '既无回滚命令也无本机标记，不能显示还原入口');
+    });
+
+    test('空白回滚命令不算可还原', () {
+      expect(change(rollbackCommand: '   ').canRollback, isFalse);
+      expect(change(rollbackCommand: 'cp a b').canRollback, isTrue);
     });
   });
 }

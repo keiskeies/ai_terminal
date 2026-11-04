@@ -15,7 +15,7 @@ import 'credentials_store.dart';
 /// 升级时通过 onUpgrade 回调做增量迁移。
 class DbInit {
   static Database? _db;
-  static const int _schemaVersion = 4;
+  static const int _schemaVersion = 6;
 
   /// 数据库文件名
   static const String dbFileName = 'app_data.db';
@@ -550,6 +550,20 @@ class DbInit {
       )
     ''');
 
+    // ===== ai_endpoints =====
+    // 一个端点（Base URL + API Key + 协议）下挂多个模型；apiKey 不落库
+    batch.execute('''
+      CREATE TABLE ai_endpoints (
+        id TEXT PRIMARY KEY,
+        providerId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        baseUrl TEXT NOT NULL,
+        protocol TEXT NOT NULL DEFAULT 'openai',
+        models TEXT NOT NULL DEFAULT '[]',
+        createdAt INTEGER NOT NULL
+      )
+    ''');
+
     // ===== chat_sessions =====
     batch.execute('''
       CREATE TABLE chat_sessions (
@@ -600,6 +614,8 @@ class DbInit {
         type TEXT NOT NULL,
         rollbackCommand TEXT,
         rollbackDescription TEXT,
+        localRestoreFrom TEXT,
+        localRestoreTo TEXT,
         timestamp INTEGER NOT NULL,
         success INTEGER NOT NULL,
         username TEXT,
@@ -692,6 +708,30 @@ class DbInit {
         'ALTER TABLE ai_models ADD COLUMN supportsFunctionCalling INTEGER NOT NULL DEFAULT 0',
       );
     }
+    // v5: change_records 添加本机文件还原对（local_* 工具改的是本机，
+    //     不能用丢给 executor 的 rollbackCommand 还原 —— 那会打到远端机器）
+    if (oldVersion < 5) {
+      await db.execute(
+        'ALTER TABLE change_records ADD COLUMN localRestoreFrom TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE change_records ADD COLUMN localRestoreTo TEXT',
+      );
+    }
+    // v6: 端点级多模型配置（一个端点挂多个模型，去掉默认模型）
+    if (oldVersion < 6) {
+      await db.execute('''
+        CREATE TABLE ai_endpoints (
+          id TEXT PRIMARY KEY,
+          providerId TEXT NOT NULL,
+          name TEXT NOT NULL,
+          baseUrl TEXT NOT NULL,
+          protocol TEXT NOT NULL DEFAULT 'openai',
+          models TEXT NOT NULL DEFAULT '[]',
+          createdAt INTEGER NOT NULL
+        )
+      ''');
+    }
   }
 
   /// 关闭数据库
@@ -711,6 +751,7 @@ class DbInit {
     await Future.wait([
       HostsDao.loadCache(),
       AIModelsDao.loadCache(),
+      AIEndpointsDao.loadCache(),
       ChatSessionsDao.loadCache(),
       SnippetsDao.loadCache(),
       ConversationsDao.loadCache(),

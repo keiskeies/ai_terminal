@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../models/ai_model_config.dart';
 import '../models/chat_session.dart';
+import '../models/token_usage.dart';
 import '../core/prompts.dart';
 import '../utils/tool_call_accumulator.dart';
 import 'daos.dart';
@@ -21,6 +22,10 @@ abstract class AIProvider {
   /// 当前实现：收到 tool_calls 时，转换为 ReAct 多行 key:value 格式
   /// （"动作: tool / 工具: X / 参数: /   key: value"）投递到 stream，
   /// 由 AgentEngine 的现有解析路径（ToolArgsParser）处理。其他 provider 忽略此参数。
+  ///
+  /// [onUsage] 可选：provider 在流里给出真实 token 用量时回调。
+  /// 可能是累计式（每个 chunk 都带递增的 usage）也可能是末包式，因此**每次都回调**，
+  /// 由消费方取最后一次——两种写法下结果都对。不提供 usage 的模型不会回调。
   Future<Stream<String>> chatStream({
     required List<ChatMessage> history,
     required String prompt,
@@ -28,8 +33,21 @@ abstract class AIProvider {
     String? systemPrompt,
     CancelToken? cancelToken,
     List<Map<String, dynamic>>? tools,
+    void Function(TokenUsage usage)? onUsage,
   });
 }
+
+/// 是否该去掉 `stream_options` 再发一次请求。
+///
+/// 规则收紧到"这次确实带了该字段"且"网关回 400"两条同时成立：
+/// - 401/429/500 与这个字段无关，重试只是再打一次配额并拖延真实错误；
+/// - 降级那次本身不能再降级，否则会无限重试；
+/// - 只有 400 值得猜"是不认识这个字段"——OpenAI 兼容网关拒绝未知字段就是 400。
+bool shouldRetryWithoutStreamOptions({
+  required bool sentStreamOptions,
+  required int? statusCode,
+}) =>
+    sentStreamOptions && statusCode == 400;
 
 /// 将 Dio 异常映射为用户友好的错误消息（OpenAI / Ernie 等 provider 共用）
 String mapDioError(dynamic error) {
@@ -89,6 +107,33 @@ class OpenAIProvider implements AIProvider {
     return messages;
   }
 
+  /// 构建 OpenAI Chat Completions 请求体。
+  ///
+  /// reasoning_effort 只在模型配置了非空 API 参数值时发送；空值表示
+  /// "不发送该字段"（off 档），由网关使用自己的默认行为。
+  static Map<String, dynamic> buildChatRequestBody({
+    required AIModelConfig config,
+    required List<Map<String, dynamic>> messages,
+    List<Map<String, dynamic>>? tools,
+  }) {
+    final body = <String, dynamic>{
+      'model': config.modelName,
+      'messages': messages,
+      'stream': true,
+      'temperature': config.temperature,
+      'max_tokens': config.maxTokens,
+    };
+    final effort = config.reasoningEffort?.trim();
+    if (effort != null && effort.isNotEmpty) {
+      body['reasoning_effort'] = effort;
+    }
+    if (tools != null && tools.isNotEmpty) {
+      body['tools'] = tools;
+      // 不强制 tool_choice：让模型自主决定是否调用工具
+    }
+    return body;
+  }
+
   @override
   Future<Stream<String>> chatStream({
     required List<ChatMessage> history,
@@ -97,6 +142,7 @@ class OpenAIProvider implements AIProvider {
     String? systemPrompt,
     CancelToken? cancelToken,
     List<Map<String, dynamic>>? tools,
+    void Function(TokenUsage usage)? onUsage,
   }) async {
     final effectiveSystemPrompt = systemPrompt ?? buildContextPrompt();
     final messages = buildRequestMessages(
@@ -106,32 +152,37 @@ class OpenAIProvider implements AIProvider {
     );
 
     // P2-6: 构建 request body；如果传入了 tools，附加到请求
-    final requestBody = <String, dynamic>{
-      'model': config.modelName,
-      'messages': messages,
-      'stream': true,
-      'temperature': config.temperature,
-      'max_tokens': config.maxTokens,
-    };
-    if (tools != null && tools.isNotEmpty) {
-      requestBody['tools'] = tools;
-      // 不强制 tool_choice：让模型自主决定是否调用工具
-      // 默认 'auto' 即可，避免无谓的工具调用
-    }
+    final requestBody = buildChatRequestBody(
+      config: config,
+      messages: messages,
+      tools: tools,
+    );
 
     try {
-      final Response<ResponseBody> response = await _dio.post<ResponseBody>(
-        '${config.baseUrl}/chat/completions',
-        data: requestBody,
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer ${config.apiKey}',
-            'Content-Type': 'application/json',
-          },
-          responseType: ResponseType.stream,
-        ),
-        cancelToken: cancelToken,
-      );
+      late final Response<ResponseBody> response;
+      try {
+        response = await _postChatCompletions(
+          config,
+          requestBody,
+          cancelToken,
+          withStreamOptions: true,
+        );
+      } on DioException catch (e) {
+        // 不支持 stream_options 的网关会回 400。一个统计字段不值得把用户的任务
+        // 打死，所以去掉它重试一次；其余错误照原路径向上抛给既有错误处理。
+        if (!shouldRetryWithoutStreamOptions(
+          sentStreamOptions: true,
+          statusCode: e.response?.statusCode,
+        )) {
+          rethrow;
+        }
+        response = await _postChatCompletions(
+          config,
+          requestBody,
+          cancelToken,
+          withStreamOptions: false,
+        );
+      }
 
       final streamController = StreamController<String>();
       String buffer = '';
@@ -170,6 +221,10 @@ class OpenAIProvider implements AIProvider {
           final data = line.substring(6);
           try {
             final json = jsonDecode(data) as Map<String, dynamic>;
+            // usage 一般随最后一个 chunk 到达，且那条的 choices 为空数组，
+            // 所以先取 usage 再看 choices；既有 choices 分支不需要为此改动。
+            final usage = TokenUsage.tryParse(json['usage']);
+            if (usage != null) onUsage?.call(usage);
             final choices = json['choices'] as List?;
             if (choices != null && choices.isNotEmpty) {
               final delta = choices[0]['delta'] as Map?;
@@ -254,6 +309,35 @@ class OpenAIProvider implements AIProvider {
     }
   }
 
+  /// 发送流式 chat 请求。
+  ///
+  /// [withStreamOptions] 控制是否附加 `stream_options.include_usage`——这是从流里
+  /// 拿到真实 token 用量的唯一途径，但严格或自建网关可能不认识这个字段，
+  /// 所以调用方收到 400 时会以 false 重试一次，而不是让用户的任务失败。
+  Future<Response<ResponseBody>> _postChatCompletions(
+    AIModelConfig config,
+    Map<String, dynamic> requestBody,
+    CancelToken? cancelToken, {
+    required bool withStreamOptions,
+  }) {
+    final body = Map<String, dynamic>.of(requestBody);
+    if (withStreamOptions) {
+      body['stream_options'] = {'include_usage': true};
+    }
+    return _dio.post<ResponseBody>(
+      '${config.baseUrl}/chat/completions',
+      data: body,
+      options: Options(
+        headers: {
+          'Authorization': 'Bearer ${config.apiKey}',
+          'Content-Type': 'application/json',
+        },
+        responseType: ResponseType.stream,
+      ),
+      cancelToken: cancelToken,
+    );
+  }
+
   String _mapError(dynamic error) => mapDioError(error);
 }
 
@@ -266,6 +350,7 @@ class QwenProvider implements AIProvider {
     String? systemPrompt,
     CancelToken? cancelToken,
     List<Map<String, dynamic>>? tools,
+    void Function(TokenUsage usage)? onUsage,
   }) async {
     // 通义千问兼容 OpenAI API 格式
     final provider = OpenAIProvider();
@@ -276,6 +361,7 @@ class QwenProvider implements AIProvider {
       systemPrompt: systemPrompt,
       cancelToken: cancelToken,
       tools: tools,
+      onUsage: onUsage,
     );
   }
 }
@@ -295,6 +381,7 @@ class ErnieProvider implements AIProvider {
     String? systemPrompt,
     CancelToken? cancelToken,
     List<Map<String, dynamic>>? tools,
+    void Function(TokenUsage usage)? onUsage,
   }) async {
     // 百度文心 API 格式（不支持 system 角色）
     // 将 system prompt 合并到第一条 user 消息中
@@ -386,6 +473,9 @@ class ErnieProvider implements AIProvider {
               final data = line.substring(6);
               try {
                 final json = jsonDecode(data) as Map<String, dynamic>;
+                // 文心在末包给 usage（部分版本不给）；不给就不回调，UI 回落到估算值
+                final usage = TokenUsage.tryParse(json['usage']);
+                if (usage != null) onUsage?.call(usage);
                 final choices = json['choices'] as List?;
                 if (choices != null && choices.isNotEmpty) {
                   final delta = choices[0]['delta'] as Map?;

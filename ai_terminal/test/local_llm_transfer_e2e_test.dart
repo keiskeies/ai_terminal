@@ -17,6 +17,7 @@ import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/command_executor.dart';
 import 'package:ai_terminal/services/local_terminal_service.dart';
 import 'package:ai_terminal/services/sftp_service.dart';
+import 'support/e2e_ssh.dart';
 import 'package:ai_terminal/services/ssh_service.dart';
 
 /// 真实 LLM + 真实 SSH/本地文件系统的端到端测试：
@@ -75,6 +76,7 @@ class _LocalProcessExecutor extends LocalTerminalService {
     String command, {
     Duration timeout = const Duration(seconds: 60),
     Completer<void>? cancelToken,
+    String? sudoPassword,
   }) async {
     final stopwatch = Stopwatch()..start();
     try {
@@ -199,7 +201,7 @@ void main() {
         username: _sshUser!,
         authType: 'password',
       ));
-      await ssh.connect(password: _sshPassword!);
+        await connectE2ESsh(ssh, password: _sshPassword!, user: _sshUser!, host: _sshHost!, port: _sshPort);
       await ssh.executeAndWait('rm -rf ${_shq(remoteRoot)}');
       await ssh.executeAndWait('mkdir -p ${_shq(remoteRoot)}');
       localRoot = await Directory.systemTemp.createTemp('ai_terminal_llm_transfer_');

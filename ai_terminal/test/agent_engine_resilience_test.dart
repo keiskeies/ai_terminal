@@ -10,6 +10,7 @@ import 'package:ai_terminal/models/agent_memory.dart';
 import 'package:ai_terminal/models/agent_model.dart';
 import 'package:ai_terminal/models/plan_step.dart';
 import 'package:ai_terminal/models/ai_model_config.dart';
+import 'package:ai_terminal/models/token_usage.dart';
 import 'package:ai_terminal/models/chat_session.dart';
 import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/l10n/app_localizations_zh.dart';
@@ -32,6 +33,7 @@ class _MockExecutor implements CommandExecutor {
     String command, {
     Duration timeout = const Duration(seconds: 60),
     Completer<void>? cancelToken,
+    String? sudoPassword,
   }) async {
     return CommandResult(
       stdout: stdout,
@@ -102,6 +104,7 @@ class _MockAIProvider implements AIProvider {
     String? systemPrompt,
     CancelToken? cancelToken,
     List<Map<String, dynamic>>? tools,
+    void Function(TokenUsage usage)? onUsage,
   }) async {
     callCount++;
     receivedHistories.add(List.from(history));
@@ -318,6 +321,38 @@ void main() {
       final finishIndex = events.indexWhere((e) => e.isFinish);
       expect(finishIndex, greaterThan(reportIndex),
           reason: 'report 必须先于 finish 发射');
+    });
+
+    test('回答正文与四段字段分离：结论取 结论 行，正文进 answerBody', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 检查 GDM 状态\n动作: execute\n命令: systemctl is-active gdm\n',
+      ]);
+      provider.enqueueStream([
+        // 用户现场：finish 的思考是一段自述/道歉，真正结论写在回答正文里
+        '思考: 这已是我回答正文里的说明文字第三次被误当作命令提交，任务已完成，直接收尾。\n'
+            '回答: ## GDM 运行状态正常\n\nsystemd-logind 与 gdm 均在运行。\n'
+            '结论: GDM 运行正常\n现状: systemd-logind、gdm 运行中\n变更: 无\n建议: 无\n'
+            '动作: finish\n',
+      ]);
+
+      final engine = makeEngine(provider: provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+      await engine.startTask('检查 GDM 状态', _MockExecutor()..stdout = 'active');
+
+      final report = events.where((e) => e.isReport).single.operationReport!;
+      expect(report.conclusion, 'GDM 运行正常',
+          reason: '结论不能被 finish 思考里的自述顶替');
+      expect(report.answerBody, contains('## GDM 运行状态正常'));
+      expect(report.answerBody, isNot(contains('结论:')),
+          reason: '四段字段不属于回答正文');
+      expect(report.details, contains('现状:'));
+      // 回答正文不再作为 text 事件落进证据层
+      expect(events.where((e) => e.isText), isEmpty);
+      final finish = events.where((e) => e.isFinish).single;
+      expect(finish.summary, contains('GDM 运行状态正常'),
+          reason: '目标模式靠 finish 文本里的完成标记判断目标达成');
     });
 
     test('校验命令生成状态徽标并标记 verified', () async {

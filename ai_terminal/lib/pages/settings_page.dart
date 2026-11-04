@@ -121,6 +121,13 @@ class SettingsPage extends ConsumerWidget {
                     onTap: () => context.push('/settings/web_search'),
                   ),
                   _SettingItem(
+                    icon: Icons.hub_outlined,
+                    iconColor: cInfo,
+                    title: 'MCP 服务器',
+                    subtitle: '接入外部 tools / resources / prompts（HTTP / stdio）',
+                    onTap: () => context.push('/settings/mcp'),
+                  ),
+                  _SettingItem(
                     icon: Icons.menu_book_rounded,
                     iconColor: cInfo,
                     title: l10n.settingsKnowledge,
@@ -381,7 +388,7 @@ class SettingsPage extends ConsumerWidget {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
         title: Row(
           children: [
-            Icon(Icons.bug_report_outlined, color: cWarning, size: 22),
+            const Icon(Icons.bug_report_outlined, color: cWarning, size: 22),
             const SizedBox(width: 8),
             Text('诊断', style: TextStyle(color: tc.textMain, fontSize: fTitle)),
           ],
@@ -420,8 +427,8 @@ class SettingsPage extends ConsumerWidget {
                         final content = await crashReporter.readLog();
                         if (!ctx.mounted) return;
                         if (content.isEmpty) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                            content: const Text('崩溃日志为空'),
+                          ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                            content: Text('崩溃日志为空'),
                             behavior: SnackBarBehavior.floating,
                           ));
                           return;
@@ -442,8 +449,8 @@ class SettingsPage extends ConsumerWidget {
                         await crashReporter.clearLog();
                         if (!ctx.mounted) return;
                         Navigator.pop(ctx);
-                        ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
-                          content: const Text('已清除崩溃日志'),
+                        ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+                          content: Text('已清除崩溃日志'),
                           backgroundColor: cSuccess,
                           behavior: SnackBarBehavior.floating,
                         ));

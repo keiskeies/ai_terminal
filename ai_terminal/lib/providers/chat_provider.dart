@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/chat_session.dart';
 import '../models/ai_model_config.dart';
 import '../services/ai_service.dart';
+import '../services/ai_model_selection_service.dart';
 import '../services/conversation_service.dart';
 import '../services/daos.dart';
-import '../core/credentials_store.dart';
 import '../services/agent_logger.dart';
 import '../utils/ansi_stripper.dart';
 
@@ -310,28 +310,14 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
   }
 
-  /// 获取默认模型，并从 CredentialsStore 注入 apiKey
-  /// （DB 中 apiKey 为空占位，真实 key 存于安全存储）
+  /// 获取当前选择的模型（无选择时取第一个可用模型），并注入 API Key。
   Future<AIModelConfig?> _getDefaultModel() async {
-    AIModelConfig? model;
     try {
-      model = AIModelsDao.cached.firstWhere((m) => m.isDefault);
-    } catch (_) {
-      try {
-        model = AIModelsDao.cached.isNotEmpty
-            ? AIModelsDao.cached.first
-            : null;
-      } catch (_) {
-        model = null;
-      }
+      return await AIModelSelectionService.resolveCurrent();
+    } catch (e) {
+      agentLogger.error('ChatNotifier', '解析当前模型失败: $e');
+      return null;
     }
-    if (model != null && model.apiKey.isEmpty) {
-      final storedKey = await CredentialsStore.get(hostId: model.id, type: 'apiKey');
-      if (storedKey != null) {
-        model.apiKey = storedKey;
-      }
-    }
-    return model;
   }
 
   String? _getHostContext(String hostId) {

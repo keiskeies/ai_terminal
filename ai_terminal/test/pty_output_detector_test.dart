@@ -175,4 +175,141 @@ EXITCODE_1:127
       expect(diag!.kind, CommandFailureKind.syntaxError);
     });
   });
+
+  group('sudo 密码提示语言中立识别', () {
+    // sudo 只翻译 "password for %u"，`[sudo]` 前缀各语言保留。
+    // 历史上这里匹配英文整句，中文服务器（用户实机 i78750k）永远命中不了。
+    for (final prompt in [
+      '[sudo] password for cjm: ',
+      '[sudo] cjm 的密码：',
+      '[sudo] Passwort für cjm: ',
+      '[sudo] cjm さんのパスワード: ',
+      '[sudo] contraseña para cjm: ',
+    ]) {
+      test('"$prompt" 识别为 sudo 提示', () {
+        expect(PtyOutputDetector.waitsForSudoPassword(prompt), isTrue);
+      });
+    }
+
+    test('提示已被后续输出顶掉 → 不再算等待密码', () {
+      final buffer = 'sudo apt update\r\n'
+          '[sudo] cjm 的密码：\r\n'
+          '获取:1 http://deb.debian.org stable InRelease [150 kB]\r\n';
+      expect(PtyOutputDetector.waitsForSudoPassword(buffer), isFalse);
+    });
+
+    test('日志里出现的 [sudo] 行不当成等待密码', () {
+      final buffer = "grep '\\[sudo\\]' /var/log/auth.log\r\n"
+          'Nov  3 10:11:12 host sudo: cjm : 3 incorrect password attempts\r\n\$ ';
+      expect(PtyOutputDetector.waitsForSudoPassword(buffer), isFalse);
+    });
+
+    test('未配置密码时中文提示仍报 interactivePrompt', () {
+      final diag = PtyOutputDetector.detect(
+        buffer: '[sudo] cjm 的密码：',
+        marker: 'EXITCODE_1:',
+        elapsedMs: 500,
+        isWindows: false,
+      );
+      expect(diag, isNotNull);
+      expect(diag!.kind, CommandFailureKind.interactivePrompt);
+    });
+
+    test('已配置密码时不中断命令，交给调用方应答', () {
+      final diag = PtyOutputDetector.detect(
+        buffer: '[sudo] cjm 的密码：',
+        marker: 'EXITCODE_1:',
+        elapsedMs: 500,
+        isWindows: false,
+        sudoPromptWillBeAnswered: true,
+      );
+      expect(diag, isNull);
+    });
+
+    test('已配置 sudo 密码也不能把密码喂给其它程序的提示', () {
+      // ssh/macOS 的 Password: 与 sudo 无关，误注入等于把特权密码泄露给别的进程
+      final diag = PtyOutputDetector.detect(
+        buffer: 'ssh deploy@10.0.0.5\r\nPassword: ',
+        marker: 'EXITCODE_1:',
+        elapsedMs: 500,
+        isWindows: false,
+        sudoPromptWillBeAnswered: true,
+      );
+      expect(diag, isNotNull);
+      expect(diag!.kind, CommandFailureKind.interactivePrompt);
+    });
+  });
+
+  group('SudoPromptResponder', () {
+    test('同一段提示分多个 chunk 到达只应答一次', () {
+      final r = SudoPromptResponder();
+      expect(r.shouldAnswer('[sudo] cjm 的密码'), isFalse); // 冒号还没到
+      expect(r.shouldAnswer('[sudo] cjm 的密码：'), isTrue);
+      expect(r.shouldAnswer('[sudo] cjm 的密码： '), isFalse); // 尾随空格是同一提示
+      expect(r.shouldAnswer('[sudo] cjm 的密码：  '), isFalse);
+    });
+
+    test('sudo 重试产生的新提示可以再应答一次', () {
+      final r = SudoPromptResponder();
+      expect(r.shouldAnswer('[sudo] cjm 的密码：'), isTrue);
+      expect(r.shouldAnswer('[sudo] cjm 的密码：'), isFalse);
+      // 答错后 sudo 打印重试并再次把提示打到尾部
+      final retry = '[sudo] cjm 的密码：\r\n对不起，请重试。\r\n[sudo] cjm 的密码：';
+      expect(r.shouldAnswer(retry), isTrue);
+    });
+
+    test('命令链里第二条 sudo 的提示同样能应答', () {
+      final r = SudoPromptResponder();
+      expect(r.shouldAnswer('[sudo] cjm 的密码：'), isTrue);
+      expect(
+        r.shouldAnswer('[sudo] cjm 的密码：\r\nOK\r\n[sudo] cjm 的密码：'),
+        isTrue,
+      );
+    });
+  });
+
+  group('分页器等待检测', () {
+    test('用户原案例：journalctl 停在 less 的 (END)', () {
+      const buffer = 'IDX BOOT ID                          FIRST ENTRY\r\n'
+          ' -1 ba6d79bc62864baba1fa29d7d29b88ea Wed 2026-11-04 00:27:18 CST\r\n'
+          '  0 156cc5d90dde403f9e674bd2bcd53dfd Wed 2026-11-04 00:55:07 CST\r\n'
+          'lines 1-3/3 (END)';
+      expect(PtyOutputDetector.waitsForPager(buffer), isTrue);
+    });
+
+    test('ANSI 包裹的 (END) 状态行', () {
+      const buffer = 'output\r\n\x1B[7m(END)\x1B[27m\x1B[K';
+      expect(PtyOutputDetector.waitsForPager(buffer), isTrue);
+    });
+
+    test('more 的 --More-- 状态行（含退格重绘）', () {
+      expect(
+        PtyOutputDetector.waitsForPager('line\r\n--More--(23%)\x08\x08\x08'),
+        isTrue,
+      );
+      expect(PtyOutputDetector.waitsForPager('line\r\n--More--'), isTrue);
+    });
+
+    test('less -M 的 lines x-y/z 状态行', () {
+      expect(
+        PtyOutputDetector.waitsForPager('...\r\nlines 1-24/100'),
+        isTrue,
+      );
+    });
+
+    test('正文中间的 (END) 不算分页器', () {
+      const buffer = '(END)\r\nIDX BOOT ID\r\n  0 156cc5d90dde403f9e674bd2bcd53dfd';
+      expect(PtyOutputDetector.waitsForPager(buffer), isFalse);
+    });
+
+    test('状态行已滚出尾部窗口 → 不误判', () {
+      final buffer = '(END)${'x' * 3000}';
+      expect(PtyOutputDetector.waitsForPager(buffer), isFalse);
+    });
+
+    test('普通命令输出不误判', () {
+      expect(PtyOutputDetector.waitsForPager('total 0\r\ndrwxr-xr-x 2 root root'), isFalse);
+      expect(PtyOutputDetector.waitsForPager(''), isFalse);
+    });
+  });
 }

@@ -14,6 +14,7 @@ import 'package:ai_terminal/models/host_config.dart';
 import 'package:ai_terminal/services/agent_engine.dart';
 import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/sftp_service.dart';
+import 'support/e2e_ssh.dart';
 import 'package:ai_terminal/services/ssh_service.dart';
 
 Future<Uint8List> _readBytes(SSHService ssh, String path) async {
@@ -64,7 +65,7 @@ void main() {
       var connected = false;
 
       try {
-        await ssh.connect(password: _sshPassword!);
+          await connectE2ESsh(ssh, password: _sshPassword!, user: _sshUser!, host: _sshHost!, port: _sshPort);
         expect(ssh.isConnected, isTrue);
         connected = true;
 
@@ -153,7 +154,7 @@ void main() {
       const path = '/tmp/ai_terminal_llm_cn.txt';
 
       try {
-        await ssh.connect(password: _sshPassword!);
+              await connectE2ESsh(ssh, password: _sshPassword!, user: _sshUser!, host: _sshHost!, port: _sshPort);
         expect(ssh.isConnected, isTrue);
         connected = true;
         await ssh.executeAndWait('rm -f $path');

@@ -46,6 +46,38 @@ class AgentUiText {
       zh ? '没有可展开的执行记录' : 'No execution records to expand';
 
   String step(int n) => zh ? '第 $n 步' : 'Step $n';
+
+  // ── 底部指标带 ──
+  String roundsCount(int n) => zh ? '$n 轮' : '$n rounds';
+  String stepsCount(int n) => zh ? '$n 步' : '$n steps';
+
+  /// 含估算成分时必须带 `≈`：provider 没给 usage 的那些轮是估出来的，
+  /// 把估算说成实测属于失准文案。
+  String tokensCount(String n, {required bool estimated}) =>
+      zh ? '${estimated ? '≈' : ''}$n tok' : '${estimated ? '≈' : ''}$n tok';
+  String tokPerSec(int n) => zh ? '$n tok/s' : '$n tok/s';
+  String cacheHit(int percent) =>
+      zh ? '缓存命中 $percent%' : 'cache hit $percent%';
+  String contextUsed(int percent) => zh ? '上下文 $percent%' : 'ctx $percent%';
+  String get contextHint => zh
+      ? '上下文占用；超过 70% 后引擎会开始丢弃最早的消息'
+      : 'Context usage. Above 70% the engine starts dropping the earliest messages.';
+
+  // ── 目标模式 ──
+  String get goalRunning => zh ? '进行中的目标' : 'Active goal';
+  String get goalPaused => zh ? '已暂停的目标' : 'Paused goal';
+  String get goalFinished => zh ? '已结束的目标' : 'Finished goal';
+  String goalRounds(int used, int max) => zh ? '轮次 $used/$max' : 'rounds $used/$max';
+  String goalRoundsLeft(int n) => zh ? '剩 $n 轮' : '$n left';
+  String get goalEditAction => zh ? '编辑目标' : 'Edit goal';
+  String get goalFinishAction => zh ? '结束目标' : 'Finish goal';
+  String get goalClearAction => zh ? '清除记录' : 'Clear record';
+  String get goalEditTitle => zh ? '编辑目标' : 'Edit goal';
+  String get goalFinishTitle => zh ? '结束这个目标？' : 'Finish this goal?';
+  String get goalFinishBody => zh
+      ? '目标会被标记为结束，正在运行的任务不受影响。'
+      : 'The goal is marked finished. A running task is not affected.';
+  String get goalBudgetExhausted => zh ? '轮次已用尽' : 'Round budget used up';
   String commandCount(int n) =>
       zh ? '$n 条命令' : (n == 1 ? '1 command' : '$n commands');
   String get thinkingAndExecution =>
@@ -188,4 +220,63 @@ class AgentUiText {
   }
 
   String expandAll(int n) => zh ? '展开全部 $n 项' : 'Show all $n';
+
+  // ── 本地文件访问授权（设置 → Agent） ──
+  String get localFileSection =>
+      zh ? '本地文件访问' : 'Local file access';
+  String get localFileEnable =>
+      zh ? '允许 Agent 读写本机文件' : 'Let the agent read and write local files';
+  String get localFileEnableDesc => zh
+      ? '开启后，Agent 可使用 local_file_read / local_file_write 等工具操作这台电脑上的文件。'
+          '未添加授权目录时，任何本机文件操作都会被拒绝。'
+      : 'When enabled, the agent can use local_file_read / local_file_write and friends on this computer. '
+          'With no authorized folders, every local file operation is refused.';
+  String get localFileDirs => zh ? '授权目录' : 'Authorized folders';
+  String get localFileAddDir => zh ? '添加目录' : 'Add folder';
+  String get localFileRemoveDir => zh ? '移除该目录' : 'Remove this folder';
+  String get localFilePickTitle =>
+      zh ? '选择允许 Agent 访问的目录' : 'Choose a folder the agent may access';
+  String get localFileNoDirs =>
+      zh ? '尚未授权任何目录' : 'No folders authorized yet';
+  String get localFileBlacklistHint => zh
+      ? '注意：即使目录已授权，密钥与凭据类文件（~/.ssh、*.key、*.pem、.env 等）仍被禁止访问。'
+      : 'Note: even inside an authorized folder, key and credential files '
+          '(~/.ssh, *.key, *.pem, .env, …) stay off limits.';
+
+  // ── 回收区（local_file_delete 的副本）──
+  String localFileTrashLabel(int count, String size) => zh
+      ? '回收区：$count 项 · 约 $size'
+      : 'Trash: $count items · ~$size';
+  String get localFileTrashEmpty => zh ? '回收区为空' : 'Trash is empty';
+  String get localFileTrashClear => zh ? '清空回收区' : 'Empty trash';
+  String localFileTrashClearBody(int count, String size, int records) => zh
+      ? '清空会永久删除这 $count 项副本（约 $size）。'
+          '之后 $records 条改动记录将无法再还原（记录本身保留，只是捞不回文件）。'
+      : 'This permanently deletes $count saved copies (~$size). '
+          '$records change records will no longer be restorable '
+          '(the records stay, the files do not).';
+  String localFileTrashCleared(int count, String size) => zh
+      ? '已清空回收区：删除 $count 项，释放约 $size'
+      : 'Trash emptied: $count items removed, ~$size freed';
+  String get localFileTrashClearRefused => zh
+      ? '有路径不在回收区内，已跳过未删除'
+      : 'Some paths are outside the trash and were skipped';
+  String localFileTrashClearFailed(int count) => zh
+      ? '$count 项删除失败（可能被其它程序占用）'
+      : '$count items could not be deleted (maybe locked by another app)';
+
+  // ── 过程时间线 ──
+  String get commandLabel => zh ? '终端命令' : 'Command';
+  String get pendingLabel => zh ? '待执行' : 'Pending';
+  String get toolDoneLabel => zh ? '已调用' : 'Called';
+  String get failedLabel => zh ? '失败' : 'Failed';
+  String get processFolded => zh ? '过程已折叠' : 'Process folded';
+  String get collapseProcess => zh ? '展开过程' : 'Show process';
+  String get expandProcess => zh ? '展开' : 'Expand';
+  String get collapse => zh ? '收起' : 'Collapse';
+  String get viewFullOutput => zh ? '查看完整输出' : 'View full output';
+  String toolCallsCount(int n) => zh ? '已调用工具 $n 次' : '$n tool calls';
+  String commandCallsCount(int n) => zh ? '$n 条命令' : '$n commands';
+  String moreSteps(int n) => zh ? '更早 $n 步' : '$n earlier steps';
+  String moreOutputLines(int n) => zh ? '还有 $n 行' : '$n more lines';
 }

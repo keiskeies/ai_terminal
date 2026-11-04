@@ -16,12 +16,17 @@ class PlanPanel extends StatefulWidget {
   /// 当前正在执行的命令（仅运行中传入，展示在第一个进行中步骤下）
   final String? currentCommand;
 
+  /// 展开区限高（像素）。贴底常驻时传入：长计划会把输入框顶出屏幕，
+  /// 所以卡内自己滚动、头部固定。null = 不限高（会话流内的历史回看用法）。
+  final double? maxHeight;
+
   const PlanPanel({
     super.key,
     required this.steps,
     required this.tc,
     this.initiallyExpanded,
     this.currentCommand,
+    this.maxHeight,
   });
 
   @override
@@ -116,39 +121,48 @@ class _PlanPanelState extends State<PlanPanel> {
           ),
           if (_expanded) ...[
             Divider(height: 0.5, thickness: 0.5, color: tc.hairline),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ..._visibleSteps()
-                      .asMap()
-                      .entries
-                      .map((entry) => _buildStepRow(
-                            entry.value,
-                            isCurrentStep: entry.key == currentIndex,
-                          )),
-                  if (steps.length > _collapsedLimit && !_showAll)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: InkWell(
-                        onTap: () => setState(() => _showAll = true),
-                        child: Text(
-                          ui.expandAll(steps.length),
-                          style: TextStyle(
-                            color: tc.brand,
-                            fontSize: fMicro,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+            _buildExpandedList(ui, currentIndex),
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildExpandedList(AgentUiText ui, int currentIndex) {
+    final list = Padding(
+      padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ..._visibleSteps()
+              .asMap()
+              .entries
+              .map((entry) => _buildStepRow(
+                    entry.value,
+                    isCurrentStep: entry.key == currentIndex,
+                  )),
+          if (widget.steps.length > _collapsedLimit && !_showAll)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: InkWell(
+                onTap: () => setState(() => _showAll = true),
+                child: Text(
+                  ui.expandAll(widget.steps.length),
+                  style: TextStyle(
+                    color: widget.tc.brand,
+                    fontSize: fMicro,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (widget.maxHeight == null) return list;
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: widget.maxHeight!),
+      child: SingleChildScrollView(child: list),
     );
   }
 

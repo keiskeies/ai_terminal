@@ -6,7 +6,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
 import 'package:ai_terminal/services/agent_tool.dart';
+import 'package:ai_terminal/utils/tool_args_parser.dart';
 import 'package:ai_terminal/services/local_terminal_service.dart';
+import 'package:ai_terminal/utils/local_file_ops.dart';
 
 /// 本地文件编辑回归测试。
 ///
@@ -44,12 +46,12 @@ void main() {
   }) async {
     final result = await writeTool.execute(
       executor: local,
-      args: {
+      args: ToolArgs({
         'path': path,
         'content_b64': b64(content),
         'mode': mode,
         'backup': backup,
-      },
+      }),
     );
     expect(result.success, isTrue, reason: result.error ?? result.output);
     return result.output;
@@ -65,12 +67,12 @@ void main() {
   }) {
     return patchTool.execute(
       executor: local,
-      args: {
+      args: ToolArgs({
         'path': path,
         'old_b64': oldBytes != null ? b64Bytes(oldBytes) : b64(oldText),
         'new_b64': newBytes != null ? b64Bytes(newBytes) : b64(newText),
         'backup': backup,
-      },
+      }),
     );
   }
 
@@ -120,12 +122,12 @@ void main() {
       final path = p.join(tempDir.path, 'missing.txt');
       final result = await writeTool.execute(
         executor: local,
-        args: {
+        args: ToolArgs({
           'path': path,
           'content_b64': b64('x'),
           'mode': 'append',
           'backup': false,
-        },
+        }),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('append'));
@@ -144,12 +146,12 @@ void main() {
       final path = p.join(tempDir.path, 'escaped.txt');
       final result = await writeTool.execute(
         executor: local,
-        args: {
+        args: ToolArgs({
           'path': path,
           'content': r'第一行：中文 😀\n第二行：\tTab\r\n第三行：C:\\path\\name',
           'mode': 'write',
           'backup': false,
-        },
+        }),
       );
       expect(result.success, isTrue, reason: result.error ?? result.output);
       expect(
@@ -162,12 +164,12 @@ void main() {
       final path = p.join(tempDir.path, 'empty.txt');
       final result = await writeTool.execute(
         executor: local,
-        args: {
+        args: ToolArgs({
           'path': path,
           'content': '',
           'mode': 'write',
           'backup': false,
-        },
+        }),
       );
       expect(result.success, isFalse);
       expect(result.error, contains('为空'));
@@ -179,12 +181,12 @@ void main() {
       await File(other).writeAsString('keep');
       final result = await writeTool.execute(
         executor: local,
-        args: {
+        args: ToolArgs({
           'path': tempDir.path,
           'content_b64': b64('x'),
           'mode': 'write',
           'backup': true,
-        },
+        }),
       );
       expect(result.success, isFalse);
       expect(await File(other).readAsString(), 'keep');
@@ -276,12 +278,12 @@ void main() {
 
       final result = await patchTool.execute(
         executor: local,
-        args: {
+        args: ToolArgs({
           'path': path,
           'old': 'name = 旧值',
           'new': 'name = 新值 😀',
           'backup': false,
-        },
+        }),
       );
 
       expect(result.success, isTrue, reason: result.error ?? result.output);
@@ -294,12 +296,12 @@ void main() {
 
       final result = await patchTool.execute(
         executor: local,
-        args: {
+        args: ToolArgs({
           'path': path,
           'old': 'remove 中文\n',
           'new_b64': '',
           'backup': false,
-        },
+        }),
       );
 
       expect(result.success, isTrue, reason: result.error ?? result.output);
@@ -322,6 +324,74 @@ void main() {
         await File(path).readAsString(),
         '标题\n第一段：已修改 ✅\n第二段：仍保留\n结尾\n',
       );
+    });
+  });
+
+  group('备份失败必须中止写入', () {
+    // 设计稿 §5.2 把"备份失败即中止"列为已覆盖项，但之前没有任何测试：
+    // 真要把备份弄失败只能靠文件锁 / 超长路径 / ACL，都是平台相关且不稳的。
+    // writeLocalFile 因此开了一个 @visibleForTesting 注入点，换这条安全断言。
+    late String target;
+
+    setUp(() async {
+      target = p.join(tempDir.path, 'victim.txt');
+      await File(target).writeAsString('ORIGINAL CONTENT');
+    });
+
+    test('备份抛错时不写入，原内容保持不动', () async {
+      final outcome = await writeLocalFile(
+        path: target,
+        bytes: utf8.encode('OVERWRITTEN'),
+        backupForTesting: (path) async => throw StateError('disk full'),
+      );
+
+      expect(outcome.success, isFalse);
+      expect(outcome.error, contains('已中止写入'));
+      expect(await File(target).readAsString(), 'ORIGINAL CONTENT',
+          reason: '没有回滚路径的覆盖写入不可接受：宁可什么都不做');
+    });
+
+    test('错误文本里带上失败原因，便于 AI 判断下一步', () async {
+      final outcome = await writeLocalFile(
+        path: target,
+        bytes: utf8.encode('x'),
+        backupForTesting: (path) async => throw StateError('EACCES'),
+      );
+      expect(outcome.error, contains('EACCES'));
+    });
+
+    test('backup: false 是用户的显式选择，不因注入点而改变行为', () async {
+      var called = false;
+      final outcome = await writeLocalFile(
+        path: target,
+        bytes: utf8.encode('OVERWRITTEN'),
+        backup: false,
+        backupForTesting: (path) async {
+          called = true;
+          return 'unused';
+        },
+      );
+
+      expect(called, isFalse, reason: '显式关备份时不该再走备份步骤');
+      expect(outcome.success, isTrue);
+      expect(await File(target).readAsString(), 'OVERWRITTEN');
+    });
+
+    test('append 不做备份，因此不会被备份失败挡住', () async {
+      var called = false;
+      final outcome = await writeLocalFile(
+        path: target,
+        bytes: utf8.encode('\nAPPENDED'),
+        append: true,
+        backupForTesting: (path) async {
+          called = true;
+          throw StateError('should not run');
+        },
+      );
+
+      expect(called, isFalse);
+      expect(outcome.success, isTrue);
+      expect(await File(target).readAsString(), 'ORIGINAL CONTENT\nAPPENDED');
     });
   });
 }

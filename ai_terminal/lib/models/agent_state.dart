@@ -1,5 +1,6 @@
 import 'agent_model.dart';
 import 'chat_item.dart';
+import 'agent_goal.dart';
 
 /// Agent 状态
 class AgentState {
@@ -25,6 +26,8 @@ class AgentState {
   final bool isReadOnlyMode;
   /// 联网搜索会话级开关（与全局开关 OR 合并；运行中切换下次任务生效）
   final bool isWebSearchEnabled;
+  /// 跨任务持续的目标（host 级状态，切 tab 不丢；null 表示没有目标）
+  final AgentGoal? goal;
 
   AgentState({
     this.status = AgentStatus.idle,
@@ -42,6 +45,7 @@ class AgentState {
     this.isOrchestratorMode = false,
     this.isReadOnlyMode = false,
     this.isWebSearchEnabled = false,
+    this.goal,
   })  : chatItems = chatItems ?? [],
         pendingOptions = pendingOptions ?? [];
 
@@ -72,6 +76,8 @@ class AgentState {
     bool? isOrchestratorMode,
     bool? isReadOnlyMode,
     bool? isWebSearchEnabled,
+    AgentGoal? goal,
+    bool clearGoal = false,
   }) {
     return AgentState(
       status: status ?? this.status,
@@ -89,6 +95,7 @@ class AgentState {
       isOrchestratorMode: isOrchestratorMode ?? this.isOrchestratorMode,
       isReadOnlyMode: isReadOnlyMode ?? this.isReadOnlyMode,
       isWebSearchEnabled: isWebSearchEnabled ?? this.isWebSearchEnabled,
+      goal: clearGoal ? null : (goal ?? this.goal),
     );
   }
 

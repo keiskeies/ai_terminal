@@ -1,4 +1,5 @@
 import 'package:go_router/go_router.dart';
+import 'route_observer.dart';
 import '../pages/terminal_page.dart';
 import '../pages/host_edit_page.dart';
 import '../pages/host_list_page.dart';
@@ -11,6 +12,7 @@ import '../pages/appearance_page.dart';
 import '../pages/security_page.dart';
 import '../pages/agent_settings_page.dart';
 import '../pages/web_search_settings_page.dart';
+import '../pages/mcp_settings_page.dart';
 import '../pages/sftp_page.dart';
 import '../pages/audit_log_page.dart';
 import '../pages/change_records_page.dart';
@@ -19,6 +21,7 @@ import '../pages/notification_settings_page.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
+  observers: [appRouteObserver],
   routes: [
     // 首页 - 终端
     GoRoute(
@@ -88,6 +91,11 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/settings/web_search',
       builder: (context, state) => const WebSearchSettingsPage(),
+    ),
+    // MCP 服务器
+    GoRoute(
+      path: '/settings/mcp',
+      builder: (context, state) => const McpSettingsPage(),
     ),
     // 快捷命令
     GoRoute(

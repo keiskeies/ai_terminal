@@ -731,11 +731,11 @@ class PlanStep {
 | 能力 | 实现 |
 |---|---|
 | `report` 事件 | `models/agent_event.dart`、`models/operation_report.dart`、`services/daos.dart` |
-| 结论生成 | `_finishTask(summary: step.thought)` → `OperationReport.extractConclusion`；取消/失败/中断用确定性模板 |
+| 结论生成 | `_finishTask(summary: 四段字段, answer: 回答正文)` → `OperationReport.extractConclusion`（结论段 → 回答首段 → 思考首段）；取消/失败/中断用确定性模板 |
 | 终态覆盖 | `_finishTask`、`cancelTask`、maxSteps、AI 调用失败、外层异常、executor 为空、未连接、resume 异常 |
 | 工具事件 | `_handleToolAction` 生成独立 command 事件与 id；result 关联自身 id，不再复用 `_lastCommandEventId` |
 | 结果元数据 | result 事件带 hostId/toolName/durationMs/exitCode/failureKind/outputTotalChars/outputTruncated |
-| 操作单 | `widgets/operation_sheet.dart`：目标头、结论、AI 结论标签、下一步、可折叠证据 |
+| 操作单 | `widgets/operation_sheet.dart`：目标头、结论（含验证徽标）、回答正文、AI 结论标签、下一步、可折叠证据 |
 | 常驻运行条 | `LiveOperationBar`：目标、阶段、步数、计时、暂停/恢复/停止、在终端查看 |
 | 运行态折叠 | `CollapsibleEventStream`：运行中只展示最近事件，更早的折叠为一行摘要 |
 | 变更与回滚 | report 携带成功变更摘要（命令/类型/回滚命令）；操作单显示"可回滚/需人工" |
@@ -764,7 +764,7 @@ class PlanStep {
 | 当前命令映射 | 运行中把"尚未产出结果的命令"显示在第一个进行中计划步骤下；只展示，不自动改步骤状态 |
 | 输出查看器 | 原始输出尾部支持底部面板查看：搜索过滤、复制全部、字符数提示 |
 | 重连状态 | 重连期间显示"正在重连 X · 连接恢复中"常驻横幅 |
-| 提示词 | finish 四段式 + 变更后验证；`_finishTask` 使用 finish 思考作为总结 |
+| 提示词 | finish 四段式 + 变更后验证；四段字段与 `回答:` 正文分开解析，结论取 `结论:` 行 |
 | 旧数据 | 无 report 事件的消息继续走原有事件流渲染 |
 
 ### B.2 实现中的决策

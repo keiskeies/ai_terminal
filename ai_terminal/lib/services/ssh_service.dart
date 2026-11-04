@@ -173,7 +173,10 @@ class SSHService implements CommandExecutor {
       _isConnected = true;
 
       await Future.delayed(const Duration(milliseconds: 300));
+      // 关闭分页器：PTY 下的 journalctl/systemctl/git/man 默认调 less，
+      // 命令停在 (END) 等按键，退出码 marker 永远不会执行。
       _session!.write(Uint8List.fromList(utf8.encode(
+        'export PAGER=cat SYSTEMD_PAGER=cat GIT_PAGER=cat MANPAGER=cat;'
         'export LS_COLORS="rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32";'
         'alias ls="ls --color=auto" 2>/dev/null;'
         'alias ll="ls -la --color=auto" 2>/dev/null;'
@@ -201,7 +204,8 @@ class SSHService implements CommandExecutor {
   /// 1. **buffer 上限**（R8 合规）：保留尾部 256KB，避免 `cat huge_file` OOM
   /// 2. **Shell 语法错误快速失败**：检测到 `bash: syntax error` 等立即返回，不等 60s 超时
   /// 3. **PS2 提示符检测**：引号未闭合导致 bash 进入 `> ` 等待输入时立即返回
-  /// 4. **交互式密码提示检测**：sudo / ssh 等待密码时立即返回
+  /// 4. **交互式密码提示检测**：sudo 提示在传入 sudoPassword 时直接应答 stdin，
+  ///    其它交互式提示（ssh Password:、yes/no）仍立即返回
   /// 5. **SSH 断开区分**：onDone 触发但 marker 未出现 = 异常断开（非正常完成）
   /// 6. **marker 后停止写入 buffer**：避免 history 等命令回显的旧 marker 残留误判
   @override
@@ -209,6 +213,7 @@ class SSHService implements CommandExecutor {
     String command, {
     Duration timeout = const Duration(seconds: 60),
     Completer<void>? cancelToken,
+    String? sudoPassword,
   }) async {
     if (_session == null || !_isConnected) {
       return CommandResult(
@@ -242,7 +247,12 @@ class SSHService implements CommandExecutor {
     final marker = 'EXITCODE_$_markerSeq:';
     // 标记必须另起一行：`command; echo` 会破坏 heredoc 的结束行
     // （EOF; echo ... 不再被识别为结束标记），导致多行文件写入永远不结束。
-    final wrappedCommand = '$command\necho "$marker\$?"';
+    //
+    // 但单行命令必须留在同一行。分成两行时，第二行的 echo 会滞留在 tty 的输入队列里，
+    // sudo 随后打开 /dev/tty 读密码，把 `echo "EXITCODE_1:$?"` 当成第一次密码尝试吃掉
+    // → "对不起，请重试"，而 marker 再也不会出现。用户实机 `sudo apt update`
+    // 反复失败正是这条路径，与 locale 无关。
+    final wrappedCommand = posixWrapWithExitMarker(command, marker);
     final donePattern = RegExp('${RegExp.escape(marker)}\\d+');
 
     // R8: buffer 必须有上限，保留尾部（最新输出），避免 cat huge_file OOM
@@ -255,8 +265,54 @@ class SSHService implements CommandExecutor {
     // 通过 volatile 标记区分 onDone 是正常完成（marker 已出现）还是连接断开
     var markerSeen = false;
     var abnormalReason = <String?>[];
+    var pagerQuitSent = false;
+    var pagerDetections = 0;
+    // sudo 提示应答器：命中提示时把密码写进 stdin，而不是让检测器中断命令
+    final sudoResponder = SudoPromptResponder();
     _pendingDoneCompleters.add(doneCompleter);
     StreamSubscription<String>? sub;
+
+    // 一次求值：marker 完成 → sudo 提示应答 → 异常状态检测。
+    // 抽出来是因为它既要在数据到达时跑，也要在"再也没有数据到达"时跑 ——
+    // 命令停在密码提示上之后就再无输出，只靠流回调会永远等不到第二次判定，
+    // 于是 300ms 门槛形同虚设，只能干满超时。
+    void evaluate() {
+      if (doneCompleter.isCompleted) return;
+      final snapshot = buffer.toString();
+      if (donePattern.hasMatch(snapshot)) {
+        markerSeen = true;
+        doneCompleter.complete();
+        return;
+      }
+      // 分页器等待按键：命令不会自己退出，主动按 q 让后续的 marker 执行。
+      // 400ms 门槛 + 连续两次判定，避开输出恰好以 (END) 结尾但命令仍在跑的误判。
+      final pagerWaiting = stopwatch.elapsedMilliseconds >= 400 &&
+          PtyOutputDetector.waitsForPager(snapshot);
+      pagerDetections = pagerWaiting ? pagerDetections + 1 : 0;
+      if (!pagerQuitSent && pagerDetections >= 2) {
+        pagerQuitSent = true;
+        try {
+          _session?.write(Uint8List.fromList(utf8.encode('q\n')));
+        } catch (_) {}
+      }
+      // sudo 正在等密码：直接应答 stdin。密码只写进终端，不进 buffer/命令/日志。
+      if (sudoPassword != null && sudoResponder.shouldAnswer(snapshot)) {
+        try {
+          _session?.write(Uint8List.fromList(utf8.encode('$sudoPassword\n')));
+        } catch (_) {}
+      }
+      final diag = PtyOutputDetector.detect(
+        buffer: snapshot,
+        marker: marker,
+        elapsedMs: stopwatch.elapsedMilliseconds,
+        isWindows: false,
+        sudoPromptWillBeAnswered: sudoPassword != null,
+      );
+      if (diag != null) {
+        abnormalReason.add(diag.reason);
+        doneCompleter.complete();
+      }
+    }
 
     sub = outputController.stream.listen(
       (data) {
@@ -269,23 +325,7 @@ class SSHService implements CommandExecutor {
             ..clear()
             ..write(truncated.substring(truncated.length - maxBufferChars));
         }
-        final snapshot = buffer.toString();
-        if (donePattern.hasMatch(snapshot)) {
-          markerSeen = true;
-          doneCompleter.complete();
-          return;
-        }
-        // 实时检测异常状态：语法错误 / PS2 提示符 / 交互式密码
-        final diag = PtyOutputDetector.detect(
-          buffer: snapshot,
-          marker: marker,
-          elapsedMs: stopwatch.elapsedMilliseconds,
-          isWindows: false,
-        );
-        if (diag != null) {
-          abnormalReason.add(diag.reason);
-          doneCompleter.complete();
-        }
+        evaluate();
       },
       onError: (e) {
         if (!doneCompleter.isCompleted) {
@@ -308,6 +348,17 @@ class SSHService implements CommandExecutor {
 
     _session!.write(Uint8List.fromList(utf8.encode('$wrappedCommand\n')));
 
+    // 命令停在密码提示上时不再有任何输出，只靠流回调就永远等不到判定。
+    // 定时补一次求值，让"卡在交互提示"在秒级被识别，而不是干满超时。
+    late final Timer recheck;
+    recheck = Timer.periodic(
+      const Duration(milliseconds: 400),
+      (_) {
+        evaluate();
+        if (doneCompleter.isCompleted) recheck.cancel();
+      },
+    );
+
     try {
       await Future.any([
         doneCompleter.future,
@@ -315,10 +366,21 @@ class SSHService implements CommandExecutor {
         if (cancelToken != null) cancelToken.future,
       ]);
     } on TimeoutException {
+      // 分页器不会响应 Ctrl+C，先按 q 退出，否则它会把下一条命令当成按键吃掉
+      if (PtyOutputDetector.waitsForPager(buffer.toString())) {
+        try {
+          _session!.write(Uint8List.fromList(utf8.encode('q\n')));
+        } catch (_) {}
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
       // 发送 Ctrl+C 中断远程命令，防止后台进程继续输出污染下一条命令
       try {
         _session!.write(Uint8List.fromList(utf8.encode('\x03')));
       } catch (_) {}
+      // 同 markerSeen==false 分支：给被打断的程序留出退出窗口，
+      // 否则它会吃掉调用方下一条命令的输入
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      recheck.cancel();
       await sub.cancel();
       _pendingDoneCompleters.remove(doneCompleter);
       stopwatch.stop();
@@ -332,6 +394,7 @@ class SSHService implements CommandExecutor {
         failureReason: '命令执行超时 (${timeout.inSeconds}s)',
       );
     } catch (e) {
+      recheck.cancel();
       await sub.cancel();
       _pendingDoneCompleters.remove(doneCompleter);
       stopwatch.stop();
@@ -345,6 +408,7 @@ class SSHService implements CommandExecutor {
       );
     }
 
+    recheck.cancel();
     await sub.cancel();
     _pendingDoneCompleters.remove(doneCompleter);
     stopwatch.stop();
@@ -353,10 +417,21 @@ class SSHService implements CommandExecutor {
 
     // 异常完成（检测器触发 / onDone 触发但无 marker）
     if (!markerSeen) {
+      // 取消时如果停在分页器上，Ctrl+C 退不出 less，必须先按 q
+      if (PtyOutputDetector.waitsForPager(rawOutput)) {
+        try {
+          _session!.write(Uint8List.fromList(utf8.encode('q\n')));
+        } catch (_) {}
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
       // 取消时 marker 可能未出现 — 发送 Ctrl+C 停止可能仍在运行的命令
       try {
         _session!.write(Uint8List.fromList(utf8.encode('\x03')));
       } catch (_) {}
+      // 等一下再返回：被 Ctrl+C 打断的 sudo 还活着，并且会把 tty 输入队列里的
+      // 字节当密码尝试吃掉。调用方紧接着发的下一条命令（`sudo -k id; echo ...`）
+      // 整条会被吞进密码提示，于是命令根本没跑、marker 永远不出现、只能干等超时。
+      await Future<void>.delayed(const Duration(milliseconds: 300));
 
       final reason = abnormalReason.isNotEmpty
           ? abnormalReason.join('; ')

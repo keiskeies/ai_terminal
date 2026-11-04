@@ -25,6 +25,9 @@ class OperationChange {
   final String command;
   final String type;
   final String? rollbackCommand;
+
+  /// 该变更是本机文件操作，可用"从备份/回收区移回"还原
+  final bool localRestore;
   final bool success;
   final int? additions;
   final int? deletions;
@@ -34,6 +37,7 @@ class OperationChange {
     required this.command,
     required this.type,
     this.rollbackCommand,
+    this.localRestore = false,
     required this.success,
     this.additions,
     this.deletions,
@@ -42,13 +46,15 @@ class OperationChange {
   bool get hasDiff => additions != null || deletions != null;
 
   bool get canRollback =>
-      rollbackCommand != null && rollbackCommand!.trim().isNotEmpty;
+      (rollbackCommand != null && rollbackCommand!.trim().isNotEmpty) ||
+      localRestore;
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'command': command,
         'type': type,
         'rollbackCommand': rollbackCommand,
+        'localRestore': localRestore,
         'success': success,
         'additions': additions,
         'deletions': deletions,
@@ -60,6 +66,7 @@ class OperationChange {
       command: OperationReport._str(json['command']) ?? '',
       type: OperationReport._str(json['type']) ?? 'other',
       rollbackCommand: OperationReport._str(json['rollbackCommand']),
+      localRestore: json['localRestore'] == true,
       success: json['success'] != false,
       additions: (json['additions'] as num?)?.toInt(),
       deletions: (json['deletions'] as num?)?.toInt(),
@@ -83,6 +90,12 @@ class OperationReport {
 
   /// 面向用户的 1-3 句结论
   final String conclusion;
+
+  /// 面向用户的完整回答正文（`回答:` 块）
+  ///
+  /// 结论层直接展示；不能再塞进证据折叠层，否则用户要展开"过程与证据"
+  /// 才能看到 Agent 到底答了什么。
+  final String? answerBody;
 
   /// 模型输出的完整总结（含四段），用于证据层
   final String? details;
@@ -113,6 +126,7 @@ class OperationReport {
     required this.commandSuccessCount,
     required this.commandFailureCount,
     required this.conclusion,
+    this.answerBody,
     this.details,
     this.stateBadges = const [],
     this.changeRecordIds = const [],
@@ -141,8 +155,10 @@ class OperationReport {
         'commandSuccessCount': commandSuccessCount,
         'commandFailureCount': commandFailureCount,
         'conclusion': conclusion,
+        'answerBody': answerBody,
         'details': details,
-        'stateBadges': stateBadges.map((e) => e.toJson()).toList(growable: false),
+        'stateBadges':
+            stateBadges.map((e) => e.toJson()).toList(growable: false),
         'changeRecordIds': changeRecordIds,
         'changes': changes.map((e) => e.toJson()).toList(growable: false),
         'plan': plan.map((e) => e.toJson()).toList(growable: false),
@@ -163,6 +179,7 @@ class OperationReport {
       commandSuccessCount: _int(json['commandSuccessCount']),
       commandFailureCount: _int(json['commandFailureCount']),
       conclusion: _str(json['conclusion']) ?? '',
+      answerBody: _str(json['answerBody']),
       details: _str(json['details']),
       stateBadges: _badges(json['stateBadges']),
       changeRecordIds: _strList(json['changeRecordIds']),
@@ -175,7 +192,8 @@ class OperationReport {
     );
   }
 
-  static String? _str(Object? v) => v is String && v.trim().isNotEmpty ? v : null;
+  static String? _str(Object? v) =>
+      v is String && v.trim().isNotEmpty ? v : null;
 
   static int _int(Object? v) {
     if (v is int) return v;
@@ -227,14 +245,39 @@ class OperationReport {
   static const _maxConclusionChars = 600;
   static const _maxDetailsChars = 8000;
 
-  static String extractConclusion(String? raw, {String fallback = '任务已结束，详见执行记录'}) {
+  static String extractConclusion(
+    String? raw, {
+    String fallback = '任务已结束，详见执行记录',
+    String? answerBody,
+  }) {
     final text = (raw ?? '').replaceAll('\r\n', '\n').trim();
-    if (text.isEmpty) return fallback;
 
+    final sectionValue = _extractSection(text, '结论');
+    if (sectionValue != null) return sectionValue;
+
+    // 没有四段式时，`回答:` 正文的首段比 finish 的"思考:"更接近用户要的结论：
+    // 思考常是给系统看的推理/自述，回答才是写给用户的那句话。
+    final answer = (answerBody ?? '').replaceAll('\r\n', '\n').trim();
+    if (answer.isNotEmpty) {
+      final firstParagraph = answer.split(RegExp(r'\n\s*\n')).first.trim();
+      final cleaned =
+          firstParagraph.replaceFirst(RegExp(r'^#{1,6}\s*'), '').trim();
+      if (cleaned.isNotEmpty) return _clip(cleaned, _maxConclusionChars);
+    }
+
+    if (text.isEmpty) return fallback;
+    // 没有四段式：取第一段（空行分隔），再退回首行
+    final firstParagraph = text.split(RegExp(r'\n\s*\n')).first.trim();
+    final value = _clip(firstParagraph, _maxConclusionChars);
+    return value.isEmpty ? fallback : value;
+  }
+
+  /// 从四段式文本里取某一段（结论/现状/变更/建议）的值
+  static String? _extractSection(String text, String label) {
     final lines = text.split('\n');
     for (var i = 0; i < lines.length; i++) {
       final m = _matchSection(lines[i]);
-      if (m == null || m.$1 != '结论') continue;
+      if (m == null || m.$1 != label) continue;
       final buf = StringBuffer();
       if (m.$2.isNotEmpty) buf.writeln(_cutAtNextSection(m.$2));
       for (var j = i + 1; j < lines.length; j++) {
@@ -242,13 +285,9 @@ class OperationReport {
         buf.writeln(_cutAtNextSection(lines[j]));
       }
       final value = _clip(buf.toString().trim(), _maxConclusionChars);
-      if (value.isNotEmpty) return value;
+      return value.isEmpty ? null : value;
     }
-
-    // 没有四段式：取第一段（空行分隔），再退回首行
-    final firstParagraph = text.split(RegExp(r'\n\s*\n')).first.trim();
-    final value = _clip(firstParagraph, _maxConclusionChars);
-    return value.isEmpty ? fallback : value;
+    return null;
   }
 
   static String? extractDetails(String? raw, {String? conclusion}) {

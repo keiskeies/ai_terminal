@@ -10,11 +10,13 @@ import 'package:ai_terminal/l10n/app_localizations_zh.dart';
 import 'package:ai_terminal/models/agent_event.dart';
 import 'package:ai_terminal/models/agent_memory.dart';
 import 'package:ai_terminal/models/ai_model_config.dart';
+import 'package:ai_terminal/models/token_usage.dart';
 import 'package:ai_terminal/models/chat_session.dart';
 import 'package:ai_terminal/models/host_config.dart';
 import 'package:ai_terminal/services/agent_engine.dart';
 import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/sftp_service.dart';
+import 'support/e2e_ssh.dart';
 import 'package:ai_terminal/services/ssh_service.dart';
 
 class _ScriptedAI implements AIProvider {
@@ -31,6 +33,7 @@ class _ScriptedAI implements AIProvider {
     String? systemPrompt,
     CancelToken? cancelToken,
     List<Map<String, dynamic>>? tools,
+    void Function(TokenUsage usage)? onUsage,
   }) async {
     if (_index >= _responses.length) {
       throw StateError('No scripted response left (call=${_index + 1})');
@@ -124,7 +127,7 @@ void main() {
           '\$HOME `whoami` "double" \'single\' \\backslash';
 
       try {
-        await ssh.connect(password: _sshPassword!);
+          await connectE2ESsh(ssh, password: _sshPassword!, user: _sshUser!, host: _sshHost!, port: _sshPort);
         expect(ssh.isConnected, isTrue);
         connected = true;
         await ssh.executeAndWait('mkdir -p $dir');

@@ -2,14 +2,14 @@ import 'plan_step.dart';
 
 /// Agent 执行状态
 enum AgentStatus {
-  idle,       // 空闲
-  thinking,   // AI 思考中
-  executing,  // 执行命令中
-  waitingConfirm,  // 等待用户确认危险命令
+  idle, // 空闲
+  thinking, // AI 思考中
+  executing, // 执行命令中
+  waitingConfirm, // 等待用户确认危险命令
   completed, // 任务完成
-  failed,    // 任务失败
+  failed, // 任务失败
   cancelled, // 用户取消
-  paused,    // P2-7: 用户暂停（可恢复）
+  paused, // P2-7: 用户暂停（可恢复）
 }
 
 /// P2-7: 判断状态是否为终态（不会再变化）
@@ -103,6 +103,17 @@ class ReActStep {
   /// 模型声明的执行计划（可选）
   final List<PlanStep>? plan;
 
+  /// 面向用户的最终回答正文（finish 时可选，Markdown）
+  ///
+  /// 四段式（结论/现状/变更/建议）是给操作单字段用的；这一字段是"回答"本身，
+  /// 允许写成带标题、列表、代码块的长文，不再被四行模板挤成短句。
+  final String? answer;
+
+  /// `回答:` 之后的操作单四字段块（结论/现状/变更/建议）
+  ///
+  /// 单独解析，避免它被当成回答正文的一部分塞进证据层。
+  final String? sections;
+
   /// 原始 AI 响应（用于 fallback 和 UI 显示）
   final String rawResponse;
 
@@ -114,6 +125,8 @@ class ReActStep {
     this.toolName,
     this.toolArgs,
     this.plan,
+    this.answer,
+    this.sections,
     required this.rawResponse,
   });
 
@@ -171,27 +184,55 @@ class AgentTask {
   /// 稳定操作 id：暂停/恢复不变，用于关联变更台账与操作单
   final String? operationId;
 
-  final String goal;           // 用户目标
-  final String? currentStep;   // 当前步骤描述
+  final String goal; // 用户目标
+  final String? currentStep; // 当前步骤描述
 
   /// 展示层阶段文案：理解需求 / 检查环境 / 执行变更 / 验证结果 / 整理结论
   final String? phase;
 
-  final List<String> steps;    // 执行步骤历史
-  final List<AgentResult> results;  // 执行结果
+  final List<String> steps; // 执行步骤历史
+  final List<AgentResult> results; // 执行结果
   final AgentStatus status;
   final DateTime createdAt;
   final DateTime? completedAt;
+
   /// 预估总步骤数（AI 首次回复时可从思考中推断，初始为 null）
   final int? totalStepsEstimate;
+
   /// 已用时间（秒），从任务开始计算
   final int? elapsedSeconds;
+
   /// 当前步号（引擎循环计数）
   final int stepIndex;
+
   /// 成功执行的命令数
   final int successCount;
+
   /// 失败执行的命令数
   final int failureCount;
+
+  /// AI 请求轮数（含重试），与 trace 的 ai_call_count 同语义
+  final int rounds;
+
+  /// token 总量。[hasEstimatedTokens] 为 true 时其中含估算成分，界面必须显示 ≈
+  final int tokenTotal;
+
+  /// 总量里是否含估算部分（provider 没给 usage 的那几次）
+  final bool hasEstimatedTokens;
+
+  /// 提示缓存命中率 0-100。provider 不提供 cached_tokens 时为 null——界面整项不渲染：
+  /// 显示 0% 会被读成"这个模型没有提示缓存"，那是把未知说成结论。
+  final int? cacheHitPercent;
+
+  /// 最近一次发给模型的 prompt 规模，用于上下文占用环
+  final int contextTokens;
+
+  /// 等待用户确认危险命令/工具所占用的秒数。
+  ///
+  /// [elapsedSeconds] 是墙钟，对用户是事实，不减它；这个值只用来算 `tok/s` 的分母
+  /// ——把"人想了 40 秒"算进引擎吞吐率，速率会从 215 掉到 174，那是测量口径错了
+  /// 而不是模型变慢。
+  final int confirmWaitSeconds;
 
   AgentTask({
     required this.id,
@@ -209,6 +250,12 @@ class AgentTask {
     this.stepIndex = 0,
     this.successCount = 0,
     this.failureCount = 0,
+    this.rounds = 0,
+    this.tokenTotal = 0,
+    this.hasEstimatedTokens = false,
+    this.cacheHitPercent,
+    this.contextTokens = 0,
+    this.confirmWaitSeconds = 0,
   })  : steps = steps ?? [],
         results = results ?? [],
         createdAt = createdAt ?? DateTime.now();
@@ -226,6 +273,13 @@ class AgentTask {
     int? stepIndex,
     int? successCount,
     int? failureCount,
+    int? rounds,
+    int? tokenTotal,
+    bool? hasEstimatedTokens,
+    int? cacheHitPercent,
+    bool clearCacheHitPercent = false,
+    int? contextTokens,
+    int? confirmWaitSeconds,
   }) {
     return AgentTask(
       id: id,
@@ -243,6 +297,14 @@ class AgentTask {
       stepIndex: stepIndex ?? this.stepIndex,
       successCount: successCount ?? this.successCount,
       failureCount: failureCount ?? this.failureCount,
+      rounds: rounds ?? this.rounds,
+      tokenTotal: tokenTotal ?? this.tokenTotal,
+      hasEstimatedTokens: hasEstimatedTokens ?? this.hasEstimatedTokens,
+      cacheHitPercent: clearCacheHitPercent
+          ? null
+          : (cacheHitPercent ?? this.cacheHitPercent),
+      contextTokens: contextTokens ?? this.contextTokens,
+      confirmWaitSeconds: confirmWaitSeconds ?? this.confirmWaitSeconds,
     );
   }
 

@@ -10,12 +10,38 @@ import '../core/l10n_holder.dart';
 
 const _uuid = Uuid();
 
+/// 标签连接阶段
+///
+/// 分成"首连"和"曾连接"两组，是为了让 UI 有别：首连阶段终端还不存在，
+/// 用整块过渡/错误视图；曾连接的标签要保留回滚内容，只用角标提示，
+/// 否则重连时用户刚刚读到的输出会凭空消失。
+enum TabStatus {
+  /// 首次建连中
+  connecting,
+
+  /// 曾连接成功，正在重连
+  reconnecting,
+
+  /// 已连接
+  connected,
+
+  /// 首次建连失败（终端从未建立）
+  failed,
+
+  /// 曾连接成功，当前断开
+  lost,
+}
+
 /// 终端标签
 class TerminalTab {
   final String id;
   final String hostId; // 本地终端为 'local'
   final String title;
-  bool isConnected;
+  TabStatus status;
+
+  /// 连接失败原因（已带分类提示），仅在 [TabStatus.failed] / [TabStatus.lost] 时有值
+  String? connectionError;
+
   SSHService? service; // SSH 连接
   LocalTerminalService? localService; // 本地终端
   final StreamController<String> outputController;
@@ -27,12 +53,26 @@ class TerminalTab {
     required this.id,
     required this.hostId,
     required this.title,
-    this.isConnected = false,
+    this.status = TabStatus.connecting,
     this.service,
     this.localService,
   }) : outputController = StreamController<String>.broadcast();
 
   bool get isLocal => hostId == 'local';
+
+  bool get isConnected => status == TabStatus.connected;
+
+  bool get isConnecting =>
+      status == TabStatus.connecting || status == TabStatus.reconnecting;
+
+  /// 是否曾经建立过连接（决定失败后是"错误整屏"还是"角标可重连"）
+  bool get everConnected => service != null || localService != null;
+
+  /// 标记一次建连失败
+  void markFailed(String error, {required bool hadConnectedBefore}) {
+    status = hadConnectedBefore ? TabStatus.lost : TabStatus.failed;
+    connectionError = error;
+  }
 
   /// 设置输出流转发订阅（保存引用以便关闭时取消）
   void setOutputSubscription(StreamSubscription<String> sub) {
@@ -52,22 +92,6 @@ class TerminalTab {
     _outputSubscription = null;
     outputController.close();
     localService?.dispose();
-  }
-
-  /// 创建副本（用于触发 Riverpod 状态更新）
-  TerminalTab copyWith({
-    bool? isConnected,
-    SSHService? service,
-    LocalTerminalService? localService,
-  }) {
-    return TerminalTab(
-      id: id,
-      hostId: hostId,
-      title: title,
-      isConnected: isConnected ?? this.isConnected,
-      service: service ?? this.service,
-      localService: localService ?? this.localService,
-    );
   }
 }
 
@@ -109,64 +133,117 @@ final terminalProvider = StateNotifierProvider<TerminalNotifier, TerminalState>(
 class TerminalNotifier extends StateNotifier<TerminalState> {
   TerminalNotifier() : super(TerminalState());
 
-  /// 打开本地终端标签
-  Future<void> openLocalTab() async {
-    if (!LocalTerminalService.isSupported) return;
-
-    final tabId = _uuid.v4();
-    final newTab = TerminalTab(
-      id: tabId,
+  /// 注册本地终端标签（不建连）。
+  /// 拆成"注册 + 建连"两步，是为了让页面能立刻切过去显示过渡态，
+  /// 而不是等 PTY 起好才换屏——期间用户看到的还是上一个标签。
+  TerminalTab registerLocalTab() {
+    final tab = TerminalTab(
+      id: _uuid.v4(),
       hostId: 'local',
       title: L10n.str.terminalLocalTab,
     );
-
     state = state.copyWith(
-      tabs: [...state.tabs, newTab],
-      activeTabId: tabId,
+      tabs: [...state.tabs, tab],
+      activeTabId: tab.id,
     );
-
-    final localService = LocalTerminalService();
-    newTab.localService = localService;
-
-    await localService.start();
-    newTab.isConnected = localService.isConnected;
-
-    // 触发状态更新，让 UI 感知 isConnected 变化
-    state = state.copyWith(
-      tabs: state.tabs.map((t) => t.id == tabId ? newTab : t).toList(),
-    );
-
-    // 监听输出（保存订阅以便关闭时取消）
-    final sub = localService.output.listen((data) {
-      if (!newTab.outputController.isClosed) {
-        newTab.outputController.add(data);
-      }
-    });
-    newTab.setOutputSubscription(sub);
+    return tab;
   }
 
-  /// 打开新 SSH 标签（允许重复连接同一服务器）
-  Future<void> openTab(HostConfig config, {String? password, String? privateKeyContent}) async {
-    // 创建新标签（每次都新建，允许重复连接）
-    final tabId = _uuid.v4();
-    final newTab = TerminalTab(
-      id: tabId,
+  /// 在已注册的标签上启动本地 PTY；成功返回该标签，失败返回 null（状态已写入标签）
+  /// [hadConnectedBefore] 覆盖默认的"曾连接"判定，供重连路径保留终端回滚内容
+  Future<TerminalTab?> connectLocalTab(TerminalTab tab,
+      {bool? hadConnectedBefore}) async {
+    final ever = hadConnectedBefore ?? tab.everConnected;
+
+    if (!LocalTerminalService.isSupported) {
+      tab.markFailed(L10n.str.terminalLocalStartFailed, hadConnectedBefore: ever);
+      _publish();
+      return null;
+    }
+
+    final localService = LocalTerminalService();
+    try {
+      await localService.start();
+    } catch (e) {
+      localService.dispose();
+      tab.markFailed(_describeConnectionError(e), hadConnectedBefore: ever);
+      _publish();
+      return null;
+    }
+
+    if (!localService.isConnected) {
+      localService.dispose();
+      tab.markFailed(L10n.str.terminalLocalStartFailed, hadConnectedBefore: ever);
+      _publish();
+      return null;
+    }
+
+    // 建连期间标签可能已被关闭：谁创建谁释放
+    if (!_isOpen(tab.id)) {
+      localService.dispose();
+      return null;
+    }
+
+    tab.localService = localService;
+    tab.connectionError = null;
+    tab.status = TabStatus.connected;
+    _publish();
+
+    final sub = localService.output.listen((data) {
+      if (!tab.outputController.isClosed) {
+        tab.outputController.add(data);
+      }
+    });
+    tab.setOutputSubscription(sub);
+    return tab;
+  }
+
+  /// 注册 SSH 标签（不建连），见 [registerLocalTab] 的拆分为何存在
+  TerminalTab registerTab(HostConfig config) {
+    final tab = TerminalTab(
+      id: _uuid.v4(),
       hostId: config.id,
       title: config.name,
     );
-
     state = state.copyWith(
-      tabs: [...state.tabs, newTab],
-      activeTabId: tabId,
+      tabs: [...state.tabs, tab],
+      activeTabId: tab.id,
     );
+    return tab;
+  }
 
-    // 处理跳板机（内联配置，和主服务器在一条连接信息里）
+  /// 在已注册的标签上建立 SSH 连接；成功返回该标签，失败返回 null（状态已写入标签）
+  Future<TerminalTab?> connectTab(TerminalTab tab, HostConfig config) =>
+      _openSsh(tab, config, hadConnectedBefore: tab.everConnected);
+
+  /// 触发一次状态变更，让监听 terminalProvider 的 UI 重绘
+  void _publish() => state = state.copyWith(tabs: [...state.tabs]);
+
+  bool _isOpen(String tabId) => state.tabs.any((t) => t.id == tabId);
+
+  /// 建连主流程：取凭据 → 组跳板机 → acquire → 绑定输出
+  /// [hadConnectedBefore] 决定失败后是整屏错误（failed）还是角标重连（lost）
+  Future<TerminalTab?> _openSsh(
+    TerminalTab tab,
+    HostConfig config, {
+    required bool hadConnectedBefore,
+  }) async {
+    final password = await CredentialsStore.get(hostId: config.id, type: 'password');
+    final privateKeyContent =
+        await CredentialsStore.get(hostId: config.id, type: 'privateKey');
+
+    if (password == null && privateKeyContent == null) {
+      tab.markFailed(L10n.str.noCredentials,
+          hadConnectedBefore: hadConnectedBefore);
+      _publish();
+      return null;
+    }
+
+    // 跳板机（内联配置，和主服务器在一条连接信息里）
     HostConfig? jumpHostConfig;
     String? jumpPassword;
     String? jumpPrivateKeyContent;
-
     if (config.hasJumpHost) {
-      // 从内联字段构建跳板机 HostConfig
       jumpHostConfig = HostConfig.create(
         id: '${config.id}_jump',
         name: '跳板机 ${config.jumpHost}',
@@ -176,14 +253,15 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
         authType: config.jumpAuthType ?? 'password',
       );
       // 跳板机凭据从 CredentialsStore 获取（key 用主服务器 id + '_jump'）
-      jumpPassword = await CredentialsStore.get(hostId: '${config.id}_jump', type: 'password');
-      jumpPrivateKeyContent = await CredentialsStore.get(hostId: '${config.id}_jump', type: 'privateKey');
+      jumpPassword =
+          await CredentialsStore.get(hostId: '${config.id}_jump', type: 'password');
+      jumpPrivateKeyContent = await CredentialsStore.get(
+          hostId: '${config.id}_jump', type: 'privateKey');
     }
 
-    // 连接（每次新建，用 tabId 做 key 支持重复连接同一服务器）
     try {
       final service = await SSHConnectionPool.acquire(
-        tabId, // 用 tabId 而非 hostId，允许同一服务器多个连接
+        tab.id, // 用 tabId 而非 hostId，允许同一服务器多个连接
         config,
         password: password,
         privateKeyContent: privateKeyContent,
@@ -192,24 +270,41 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
         jumpPrivateKeyContent: jumpPrivateKeyContent,
       );
 
-      newTab.service = service;
-      newTab.isConnected = service.isConnected;
+      // 建连期间用户可能已关掉标签：连接已进池，必须还回去
+      if (!_isOpen(tab.id)) {
+        SSHConnectionPool.release(tab.id);
+        return null;
+      }
 
-      // 触发状态更新，让 UI 感知 isConnected 变化
-      state = state.copyWith(
-        tabs: state.tabs.map((t) => t.id == tabId ? newTab : t).toList(),
-      );
+      tab.service = service;
+      tab.connectionError = null;
+      tab.status = TabStatus.connected;
+      _publish();
 
-      // 监听输出（保存订阅以便关闭时取消）
       final sub = service.output.listen((data) {
-        if (!newTab.outputController.isClosed) {
-          newTab.outputController.add(data);
+        if (!tab.outputController.isClosed) {
+          tab.outputController.add(data);
         }
       });
-      newTab.setOutputSubscription(sub);
+      tab.setOutputSubscription(sub);
+      return tab;
     } catch (e) {
-      newTab.outputController.add('\r\n❌ 连接失败: $e\r\n');
+      tab.markFailed(_describeConnectionError(e),
+          hadConnectedBefore: hadConnectedBefore);
+      _publish();
+      return null;
     }
+  }
+
+  /// 把底层异常翻译成人话 + 分类排查提示
+  String _describeConnectionError(Object error) {
+    final message = error.toString();
+    final hint = L10n.str;
+    if (message.contains('Connection refused')) return '$message\n\n💡 ${hint.connErrRefused}';
+    if (message.contains('timeout') || message.contains('Timeout')) return '$message\n\n💡 ${hint.connErrTimeout}';
+    if (message.contains('authentication') || message.contains('Auth')) return '$message\n\n💡 ${hint.connErrAuth}';
+    if (message.contains('No route to host')) return '$message\n\n💡 ${hint.connErrNoRoute}';
+    return '$message\n\n💡 ${hint.connErrGeneric}';
   }
 
   /// 关闭标签
@@ -271,129 +366,65 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
   }
 
   /// 重连：在原 tab 上重建 SSH 连接（保留 tabId、终端内容、outputController）
-  /// 返回重连后的 tab；失败返回 null。
+  /// 返回重连后的 tab；失败返回 null（原因写在 tab.connectionError）。
   Future<TerminalTab?> reconnect(String tabId, HostConfig config) async {
-    final existingTabIndex = state.tabs.indexWhere((t) => t.id == tabId);
-    if (existingTabIndex < 0) {
-      // 原 tab 已不在列表中（可能已被关闭），回退到 openTab
-      final password = await CredentialsStore.get(hostId: config.id, type: 'password');
-      final privateKey = await CredentialsStore.get(hostId: config.id, type: 'privateKey');
-      await openTab(config, password: password, privateKeyContent: privateKey);
-      return state.activeTab;
+    final existingTab = state.tabs.cast<TerminalTab?>().firstWhere(
+      (t) => t?.id == tabId,
+      orElse: () => null,
+    );
+    if (existingTab == null) {
+      // 原 tab 已不在列表中（可能已被关闭），新建一个
+      return _openSsh(registerTab(config), config, hadConnectedBefore: false);
     }
-    final existingTab = state.tabs[existingTabIndex];
+
+    // 曾连接过 → 保留回滚内容，状态用 reconnecting/lost；首连失败 → connecting/failed
+    final hadConnectedBefore = existingTab.everConnected;
 
     // 1. 取消旧 tab 上的输出订阅（避免旧 service 流到新 service 之间产生串扰）
     existingTab.cancelOutputSubscription();
     // 2. 强制断开旧 SSH 连接（清理连接池）
     await SSHConnectionPool.forceDisconnect(tabId);
 
-    // 3. 重新获取凭据
-    final password = await CredentialsStore.get(hostId: config.id, type: 'password');
-    final privateKey = await CredentialsStore.get(hostId: config.id, type: 'privateKey');
-
-    // 4. 处理跳板机
-    HostConfig? jumpHostConfig;
-    String? jumpPassword;
-    String? jumpPrivateKeyContent;
-    if (config.hasJumpHost) {
-      jumpHostConfig = HostConfig.create(
-        id: '${config.id}_jump',
-        name: '跳板机 ${config.jumpHost}',
-        host: config.jumpHost!,
-        port: config.jumpPort,
-        username: config.jumpUsername ?? 'root',
-        authType: config.jumpAuthType ?? 'password',
-      );
-      jumpPassword = await CredentialsStore.get(hostId: '${config.id}_jump', type: 'password');
-      jumpPrivateKeyContent = await CredentialsStore.get(hostId: '${config.id}_jump', type: 'privateKey');
-    }
-
-    // 5. 标记为连接中
-    existingTab.isConnected = false;
+    // 3. 标记为连接中
     existingTab.service = null;
-    state = state.copyWith(tabs: [...state.tabs]);
+    existingTab.connectionError = null;
+    existingTab.status =
+        hadConnectedBefore ? TabStatus.reconnecting : TabStatus.connecting;
+    _publish();
 
-    // 6. 获取新 SSH 连接（复用原 tabId 作为连接池 key）
-    try {
-      final service = await SSHConnectionPool.acquire(
-        tabId,
-        config,
-        password: password,
-        privateKeyContent: privateKey,
-        jumpHostConfig: jumpHostConfig,
-        jumpPassword: jumpPassword,
-        jumpPrivateKeyContent: jumpPrivateKeyContent,
-      );
-
-      // 7. 替换 tab 上的 service（保留 outputController，UI 订阅保持有效）
-      existingTab.service = service;
-      existingTab.isConnected = service.isConnected;
-
-      // 8. 重新绑定输出订阅
-      final sub = service.output.listen((data) {
-        if (!existingTab.outputController.isClosed) {
-          existingTab.outputController.add(data);
-        }
-      });
-      existingTab.setOutputSubscription(sub);
-
-      state = state.copyWith(tabs: [...state.tabs]);
-      return existingTab;
-    } catch (e) {
-      existingTab.isConnected = false;
-      if (!existingTab.outputController.isClosed) {
-        existingTab.outputController.add('\r\n❌ 重连失败: $e\r\n');
-      }
-      state = state.copyWith(tabs: [...state.tabs]);
-      return null;
-    }
+    return _openSsh(existingTab, config,
+        hadConnectedBefore: hadConnectedBefore);
   }
 
   /// 本地终端重连：在原 tab 上重启 PTY（保留 tabId、终端内容）
-  /// 返回重连后的 tab；失败返回 null。
+  /// 返回重连后的 tab；失败返回 null（原因写在 tab.connectionError）。
   Future<TerminalTab?> reconnectLocal(String tabId) async {
-    final existingTabIndex = state.tabs.indexWhere((t) => t.id == tabId);
-    if (existingTabIndex < 0) {
-      // 原 tab 已不在列表中，回退到 openLocalTab
-      await openLocalTab();
-      return state.activeTab;
+    final existingTab = state.tabs.cast<TerminalTab?>().firstWhere(
+      (t) => t?.id == tabId,
+      orElse: () => null,
+    );
+    if (existingTab == null) {
+      // 原 tab 已不在列表中，新建一个
+      final tab = registerLocalTab();
+      return connectLocalTab(tab);
     }
-    final existingTab = state.tabs[existingTabIndex];
     if (!existingTab.isLocal) return null;
+
+    final hadConnectedBefore = existingTab.everConnected;
 
     // 1. 取消旧输出订阅
     existingTab.cancelOutputSubscription();
     // 2. dispose 旧 localService（PTY 进程可能已退出，释放残留资源）
     existingTab.localService?.dispose();
     existingTab.localService = null;
-    existingTab.isConnected = false;
-    state = state.copyWith(tabs: [...state.tabs]);
+    existingTab.connectionError = null;
+    existingTab.status =
+        hadConnectedBefore ? TabStatus.reconnecting : TabStatus.connecting;
+    _publish();
 
-    // 3. 创建新 localService 并启动
-    try {
-      final newService = LocalTerminalService();
-      await newService.start();
-      existingTab.localService = newService;
-      existingTab.isConnected = newService.isConnected;
-
-      // 4. 绑定新输出订阅
-      final sub = newService.output.listen((data) {
-        if (!existingTab.outputController.isClosed) {
-          existingTab.outputController.add(data);
-        }
-      });
-      existingTab.setOutputSubscription(sub);
-
-      state = state.copyWith(tabs: [...state.tabs]);
-      return existingTab;
-    } catch (e) {
-      if (!existingTab.outputController.isClosed) {
-        existingTab.outputController.add('\r\n❌ 本地终端重启失败: $e\r\n');
-      }
-      state = state.copyWith(tabs: [...state.tabs]);
-      return null;
-    }
+    final result = await connectLocalTab(existingTab,
+        hadConnectedBefore: hadConnectedBefore);
+    return result;
   }
 
   @override

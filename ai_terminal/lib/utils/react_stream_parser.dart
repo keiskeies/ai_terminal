@@ -10,6 +10,11 @@ class ReActStreamParser {
     '动作:', '动作：',
     '命令:', '命令：',
     '选项:', '选项：',
+    // 工具调用协议行与最终回答块必须被识别，否则会掉进"未知行 → text"分支，
+    // 把协议原文当成正文再显示一遍
+    '工具:', '工具：',
+    '参数:', '参数：',
+    '回答:', '回答：',
   ];
 
   static String _stableId(AgentEventType type, String content) {
@@ -30,7 +35,8 @@ class ReActStreamParser {
     // 预处理：将 XML tool_call 格式转换为标准 ReAct 格式
     // 匹配 ---\n<function=...>\n<parameter=command>...</parameter>\n</function>\n--- 格式
     content = content.replaceAllMapped(
-      RegExp(r'---\s*\n<function=(\w+)>\s*\n<parameter=command>([\s\S]*?)</parameter>\s*\n</function>\s*\n---'),
+      RegExp(
+          r'---\s*\n<function=(\w+)>\s*\n<parameter=command>([\s\S]*?)</parameter>\s*\n</function>\s*\n---'),
       (match) {
         final funcName = match.group(1)!;
         final commandValue = match.group(2)!.trim();
@@ -43,7 +49,8 @@ class ReActStreamParser {
 
     // 处理没有 --- 分隔符的 XML tool_call 格式
     content = content.replaceAllMapped(
-      RegExp(r'<function=(\w+)>\s*\n<parameter=command>([\s\S]*?)</parameter>\s*\n</function>'),
+      RegExp(
+          r'<function=(\w+)>\s*\n<parameter=command>([\s\S]*?)</parameter>\s*\n</function>'),
       (match) {
         final funcName = match.group(1)!;
         final commandValue = match.group(2)!.trim();
@@ -60,6 +67,10 @@ class ReActStreamParser {
     _FieldType? currentField;
     final buffer = StringBuffer();
     List<String>? pendingOptions;
+    // 协议把提问文字写在"思考:"里（见 prompts.dart 的 ask 说明），"选项:"行只有按钮文字。
+    // 记住最近一次 flush 的思考内容，作为紧随其后的 ask 事件的提问；
+    // 正文(text)不候选，因为它已作为 Markdown 渲染在卡片上方，重复显示反而嘈杂。
+    String? lastQuestion;
 
     void flush() {
       final value = buffer.toString().trim();
@@ -72,6 +83,7 @@ class ReActStreamParser {
         case _FieldType.thought:
           final id = _stableId(AgentEventType.thought, value);
           events.add(AgentEvent.thought(value, id: id));
+          if (value.isNotEmpty) lastQuestion = value;
           break;
         case _FieldType.command:
           final cleaned = _cleanCommand(value);
@@ -84,16 +96,16 @@ class ReActStreamParser {
           if (pendingOptions != null && pendingOptions!.isNotEmpty) {
             final optsStr = pendingOptions!.join('|');
             final id = _stableId(AgentEventType.ask, optsStr);
-            events.add(AgentEvent.ask(null, pendingOptions, id: id));
+            events.add(AgentEvent.ask(lastQuestion, pendingOptions, id: id));
           }
           pendingOptions = null;
+          lastQuestion = null;
           break;
         case _FieldType.plan:
           final steps = _parsePlanSteps(value);
           if (steps.isNotEmpty) {
-            final key = steps
-                .map((s) => '${s.status.name}:${s.title}')
-                .join('|');
+            final key =
+                steps.map((s) => '${s.status.name}:${s.title}').join('|');
             final id = _stableId(AgentEventType.plan, key);
             events.add(AgentEvent.plan(steps, id: id));
           }
@@ -103,6 +115,14 @@ class ReActStreamParser {
             final id = _stableId(AgentEventType.text, value);
             events.add(AgentEvent.text(value, id: id));
           }
+          break;
+        case _FieldType.toolProtocol:
+          // 工具调用协议行由引擎的 command 事件表达，这里不产出可见事件
+          break;
+        case _FieldType.answer:
+          // 回答正文由引擎写进操作单结论层（OperationReport.answerBody），
+          // 不再作为思考行进入过程时间线；紧随其后的四段字段由
+          // AgentEngine.parseReportSections 单独解析，也不该混进思考。
           break;
         case null:
           break;
@@ -179,13 +199,44 @@ class ReActStreamParser {
             case '选项':
               flush();
               currentField = _FieldType.options;
-              pendingOptions = content.split('|').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+              pendingOptions = content
+                  .split('|')
+                  .map((s) => s.trim())
+                  .where((s) => s.isNotEmpty)
+                  .toList();
               break;
+            case '回答':
+              // 回答正文不是过程事件：引擎在 finish 时把它作为操作单正文展示。
+              // 这里只吞掉 buffer，避免同一段正文在时间线里再出现一次。
+              flush();
+              currentField = _FieldType.answer;
+              if (content.isNotEmpty) buffer.writeln(content);
+              break;
+            case '工具':
+            case '参数':
+              // 工具调用的协议行。引擎会为这次调用发一条带参数的 command 事件，
+              // 所以这里必须吞掉，否则 "工具: x / 参数: / k: v" 会被当成正文再显示一遍。
+              flush();
+              currentField = _FieldType.toolProtocol;
+              break;
+          }
+        } else if (currentField == _FieldType.toolProtocol) {
+          final indented = seg.isNotEmpty && (seg[0] == ' ' || seg[0] == '\t');
+          if (indented || seg.trim().isEmpty) {
+            // 缩进行是参数值，吞掉
+            buffer.writeln(seg);
+          } else {
+            // 顶格行说明协议块结束，后面按思考处理，
+            // 保证紧跟其后的 结论:/现状:/变更:/建议: 仍能进 thought 供操作单解析
+            flush();
+            currentField = _FieldType.thought;
+            buffer.writeln(seg);
           }
         } else {
           if (currentField == _FieldType.thought ||
               currentField == _FieldType.command ||
               currentField == _FieldType.text ||
+              currentField == _FieldType.answer ||
               currentField == _FieldType.plan) {
             buffer.writeln(seg);
           } else if (currentField == _FieldType.options) {
@@ -328,4 +379,4 @@ class _KeywordMatch {
   _KeywordMatch(this.position, this.keyword);
 }
 
-enum _FieldType { thought, command, options, text, plan }
+enum _FieldType { thought, command, options, text, plan, toolProtocol, answer }

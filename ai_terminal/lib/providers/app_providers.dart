@@ -3,6 +3,8 @@ import '../services/daos.dart';
 import '../core/credentials_store.dart';
 import '../models/host_config.dart';
 import '../models/ai_model_config.dart';
+import '../models/ai_endpoint.dart';
+import '../services/ai_model_selection_service.dart';
 import '../models/command_snippet.dart';
 import '../models/chat_session.dart';
 
@@ -56,94 +58,59 @@ class HostsNotifier extends StateNotifier<AsyncValue<List<HostConfig>>> {
   }
 }
 
-// ===== AI 模型 Provider =====
-final aiModelsProvider = StateNotifierProvider<AIModelsNotifier, List<AIModelConfig>>((ref) {
-  return AIModelsNotifier();
+// ===== AI 端点 / 模型 Provider =====
+final aiEndpointsProvider =
+    StateNotifierProvider<AIEndpointsNotifier, List<AIEndpoint>>((ref) {
+  return AIEndpointsNotifier();
 });
 
-class AIModelsNotifier extends StateNotifier<List<AIModelConfig>> {
-  AIModelsNotifier() : super([]) {
-    loadModels();
+class AIEndpointsNotifier extends StateNotifier<List<AIEndpoint>> {
+  AIEndpointsNotifier() : super([]) {
+    loadEndpoints();
   }
 
-  Future<void> loadModels() async {
-    final models = AIModelsDao.cached.toList();
-    // 异步从 CredentialsStore 注入 apiKey（DB 中只存空占位）
-    // 必须 await：否则 state 在 apiKey 注入完成前就被设置，导致重启后 apiKey 为空
-    await _injectApiKeys(models);
-    state = models;
-  }
-
-  /// 异步从 CredentialsStore 注入 apiKey 到内存模型
-  /// 兼容旧数据：若 DB 中 apiKey 非空（旧版本明文存储），迁移到 CredentialsStore
-  Future<void> _injectApiKeys(List<AIModelConfig> models) async {
-    var changed = false;
-    for (final m in models) {
-      final storedKey = await CredentialsStore.get(hostId: m.id, type: 'apiKey');
-      if (storedKey != null) {
-        m.apiKey = storedKey;
-      } else if (m.apiKey.isNotEmpty) {
-        // 旧数据迁移：DB 中有明文 apiKey，转移到 CredentialsStore
-        await CredentialsStore.save(hostId: m.id, type: 'apiKey', value: m.apiKey);
-        m.apiKey = ''; // 清空 DB 引用（下次 put 时会落盘空值）
-        changed = true;
-      }
+  Future<void> loadEndpoints() async {
+    // 强制让出同步栈：provider 可能在 initState/build 期间被首次创建，
+    // 空列表也必须在构建结束后再写 state，否则 Riverpod 会抛
+    // "Tried to modify a provider while the widget tree was building"。
+    await Future<void>.microtask(() {});
+    final endpoints = AIEndpointsDao.cached.toList();
+    // API Key 不落库：按端点 id 从安全存储注入到内存
+    final loaded = <AIEndpoint>[];
+    for (final e in endpoints) {
+      final storedKey =
+          await CredentialsStore.get(hostId: e.id, type: 'apiKey');
+      loaded.add(storedKey == null || storedKey.isEmpty
+          ? e
+          : e.copyWith(apiKey: storedKey));
     }
-    if (changed) {
-      for (final m in models) {
-        await AIModelsDao.upsert(m);
-      }
-    }
+    AIEndpointsDao.cacheWithRuntimeKeys(loaded);
+    state = loaded;
   }
 
-  AIModelConfig? get defaultModel {
-    return state.firstWhere(
-      (m) => m.isDefault,
-      orElse: () => state.isNotEmpty ? state.first : AIModelConfig(),
-    );
+  Future<void> saveEndpoint(AIEndpoint endpoint,
+      {bool clearApiKey = false}) async {
+    final apiKey = endpoint.apiKey;
+    await AIEndpointsDao.upsert(endpoint.copyWith(apiKey: ''));
+    if (clearApiKey) {
+      await CredentialsStore.delete(hostId: endpoint.id, type: 'apiKey');
+    } else if (apiKey.isNotEmpty) {
+      await CredentialsStore.save(
+          hostId: endpoint.id, type: 'apiKey', value: apiKey);
+    }
+    await loadEndpoints();
   }
 
-  Future<void> addModel(AIModelConfig config) async {
-    // 如果设为默认，先取消其他默认
-    if (config.isDefault) {
-      await AIModelsDao.clearDefault();
-    }
-    // apiKey 走 CredentialsStore，DB 中只存空占位
-    final apiKey = config.apiKey;
-    config.apiKey = '';
-    await AIModelsDao.upsert(config);
-    if (apiKey.isNotEmpty) {
-      await CredentialsStore.save(hostId: config.id, type: 'apiKey', value: apiKey);
-      config.apiKey = apiKey; // 内存中保留供当前会话使用
-    }
-    await loadModels();
-  }
-
-  Future<void> updateModel(AIModelConfig config) async {
-    if (config.isDefault) {
-      await AIModelsDao.clearDefault();
-    }
-    // apiKey 走 CredentialsStore
-    final apiKey = config.apiKey;
-    config.apiKey = '';
-    await AIModelsDao.upsert(config);
-    await CredentialsStore.save(hostId: config.id, type: 'apiKey', value: apiKey);
-    config.apiKey = apiKey;
-    await loadModels();
-  }
-
-  Future<void> deleteModel(String id) async {
-    // 先从当前 state 判断被删除的是否是默认模型
-    final wasDefault = state.any((m) => m.id == id && m.isDefault);
-    await AIModelsDao.delete(id);
+  Future<void> deleteEndpoint(String id) async {
+    await AIEndpointsDao.delete(id);
     await CredentialsStore.delete(hostId: id, type: 'apiKey');
-    // 如果删除的是默认模型，且还有其他模型，把第一个设为默认
-    final remaining = state.where((m) => m.id != id).toList();
-    if (wasDefault && remaining.isNotEmpty) {
-      final first = remaining.first.copyWith(isDefault: true);
-      await AIModelsDao.upsert(first);
-    }
-    await loadModels();
+    await loadEndpoints();
+  }
+
+  /// 同步构建某个模型的运行时配置（state 中的端点已注入 API Key）
+  AIModelConfig? configForModel(String modelId, {String? tierLevel}) {
+    return AIModelSelectionService.buildConfig(state, modelId,
+        tierLevel: tierLevel);
   }
 }
 

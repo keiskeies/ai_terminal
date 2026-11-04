@@ -87,16 +87,36 @@ void main() {
         expect(result!['local'], '');
       });
 
-      test('跳过无冒号的行', () {
-        final result = ToolArgsParser.parse('''
+      test('无冒号的行 → 整块判为不可解析（不静默丢内容）', () {
+        expect(
+          ToolArgsParser.parse('''
             local: /path
             这是一行没有冒号的文字
             remote: /remote
+        '''),
+          isNull,
+          reason: '逐行跳过会让模型以为整段都写进去了',
+        );
+      });
+
+      test('content 写成跨行正文 → null，而不是只剩第一行', () {
+        // 真机复现：22:09 那次 E2E 里 /tmp/ai_terminal_llm_cn.txt 只剩 12 字节
+        // （"中文测试"），后两行 emoji/结束被当无冒号行丢掉，而 file_write 仍报 success。
+        final result = ToolArgsParser.parse('''
+            path: /tmp/ai_terminal_llm_cn.txt
+            content: 中文测试
+              emoji 😀🚀
+              结束
         ''');
+        expect(result, isNull);
+      });
+
+      test('content 一行内用 \\n 转义 → 正常解析（纠错提示的形状）', () {
+        final result = ToolArgsParser.parse(
+          r'path: /tmp/x.txt' '\n' r'content: 中文测试\nemoji 😀🚀\n结束',
+        );
         expect(result, isNotNull);
-        expect(result!['local'], '/path');
-        expect(result['remote'], '/remote');
-        expect(result.length, 2);
+        expect(result!['content'], r'中文测试\nemoji 😀🚀\n结束');
       });
 
       test('空字符串返回 null', () {

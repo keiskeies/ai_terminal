@@ -26,6 +26,9 @@ class AIPromptInput extends StatefulWidget {
   final bool isOrchestratorMode;
   /// 切换编排模式回调
   final VoidCallback? onToggleOrchestrator;
+  /// 输入框底部工具行里的附加控件（模型/思考档位胶囊等）。
+  /// 放在发送按钮左侧，宽度自适应并允许省略。
+  final Widget? footer;
 
   const AIPromptInput({
     super.key,
@@ -41,6 +44,7 @@ class AIPromptInput extends StatefulWidget {
     this.onSlashCommand,
     this.isOrchestratorMode = false,
     this.onToggleOrchestrator,
+    this.footer,
   });
 
   @override
@@ -57,6 +61,12 @@ class SlashCommand {
 const List<SlashCommand> kSlashCommands = [
   SlashCommand('/new', '新建会话'),
   SlashCommand('/compact', '压缩记忆（总结早期对话）'),
+  SlashCommand('/goal', '目标模式：/goal <目标> 开始；子命令 pause / resume / edit / done / clear'),
+  SlashCommand('/plan', '只要计划不执行：/plan <目标>（临时只读，结束自动还原）'),
+  SlashCommand('/model', '切换模型：/model <名称>，不带参数则列出可选模型'),
+  SlashCommand('/permission', '切换只读（Dry-run）模式'),
+  SlashCommand('/export', '复制当前会话到剪贴板，并给出执行日志路径'),
+  SlashCommand('/help', '列出全部命令'),
 ];
 
 class _AIPromptInputState extends State<AIPromptInput> {
@@ -275,6 +285,9 @@ class _AIPromptInputState extends State<AIPromptInput> {
     final accent = widget.accentColor;
     final isOrch = widget.isOrchestratorMode;
     final effectiveAccent = isOrch ? cWarning : accent;
+    final borderColor = _isFocused
+        ? effectiveAccent
+        : (isOrch ? tc.warn : tc.border);
 
     final charCount = _controller.text.length;
     // 接近上限（80%）时变橙色提示
@@ -285,89 +298,84 @@ class _AIPromptInputState extends State<AIPromptInput> {
     return Focus(
       focusNode: _focusNode,
       onKeyEvent: _handleKeyEvent,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          TextField(
-            controller: _controller,
-            enabled: widget.enabled,
-            minLines: 1,
-            maxLines: 5,
-            maxLength: _maxLength,
-            keyboardType: TextInputType.multiline,
-            textInputAction: TextInputAction.newline,
-            // 过滤控制字符：防止小白粘贴二进制内容导致 JSON 序列化失败或数据污染
-            inputFormatters: [
-              FilteringTextInputFormatter.deny(
-                RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]'),
-              ),
-            ],
-            style: TextStyle(
-              color: tc.textMain,
-              fontSize: fBody,
-              height: 1.5,
-              fontWeight: FontWeight.w500,
-            ),
-            decoration: InputDecoration(
-              hintText: widget.hintText,
-              hintStyle: TextStyle(color: tc.textMuted, fontSize: fBody),
-              counterText: '', // 隐藏自带计数器，用自定义边框计数器
-              filled: true,
-              fillColor: tc.card,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(rSmall),
-                borderSide: BorderSide(color: effectiveAccent, width: 1),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(rSmall),
-                borderSide: BorderSide(
-                  color: isOrch ? tc.warn : tc.border,
-                  width: 1,
+      child: Container(
+        decoration: BoxDecoration(
+          color: tc.card,
+          borderRadius: BorderRadius.circular(rSmall),
+          border: Border.all(
+            color: widget.enabled
+                ? borderColor
+                : tc.border.withValues(alpha: 0.5),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _controller,
+              enabled: widget.enabled,
+              minLines: 1,
+              maxLines: 5,
+              maxLength: _maxLength,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              // 过滤控制字符：防止小白粘贴二进制内容导致 JSON 序列化失败或数据污染
+              inputFormatters: [
+                FilteringTextInputFormatter.deny(
+                  RegExp(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]'),
                 ),
+              ],
+              style: TextStyle(
+                color: tc.textMain,
+                fontSize: fBody,
+                height: 1.5,
+                fontWeight: FontWeight.w500,
               ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(rSmall),
-                borderSide: BorderSide(color: effectiveAccent, width: 1),
+              decoration: InputDecoration(
+                hintText: widget.hintText,
+                hintStyle: TextStyle(color: tc.textMuted, fontSize: fBody),
+                counterText: '',
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                contentPadding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                isDense: true,
               ),
-              disabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(rSmall),
-                borderSide: BorderSide(color: tc.border.withValues(alpha: 0.5)),
-              ),
-              contentPadding: const EdgeInsets.fromLTRB(12, 10, 46, 10),
-              isDense: true,
-              suffixIcon: Padding(
-                padding: const EdgeInsets.all(4),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (widget.onToggleOrchestrator != null)
-                      _buildOrchestratorButton(),
-                    _buildSendButton(running),
+              onSubmitted: (_) {},
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 2, 6, 6),
+              child: Row(
+                children: [
+                  Text(
+                    '$charCount / $_maxLength',
+                    style: TextStyle(
+                      color: counterColor,
+                      fontSize: fMicro,
+                      fontFamily: 'JetBrainsMono',
+                      height: 1,
+                    ),
+                  ),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: widget.footer ?? const SizedBox.shrink(),
+                    ),
+                  ),
+                  if (widget.onToggleOrchestrator != null) ...[
+                    const SizedBox(width: 4),
+                    _buildOrchestratorButton(),
                   ],
-                ),
+                  const SizedBox(width: 4),
+                  _buildSendButton(running),
+                ],
               ),
             ),
-            onSubmitted: (_) {},
-          ),
-          // 字符计数器：覆盖在底边框左侧，中线与边框对齐
-          Positioned(
-            left: 12,
-            bottom: -5.5,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              color: tc.card,
-              child: Text(
-                '$charCount / $_maxLength',
-                style: TextStyle(
-                  color: counterColor,
-                  fontSize: fMicro,
-                  fontFamily: 'JetBrainsMono',
-                  height: 1,
-                ),
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

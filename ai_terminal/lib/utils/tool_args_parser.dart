@@ -12,6 +12,8 @@
 /// 规则：
 /// - 缩进用 2 空格或 Tab 均可
 /// - 值是第一个冒号后的整行（trim 后），支持路径含空格
+/// - **含无冒号的非空行时整块判为不可解析**（模型把值写成跨行正文的形状，
+///   逐行跳过后会静默丢内容）；返回 null 让 engine 记 warn，工具因缺必填参数报错
 /// - "true"/"false" 自动转 bool
 /// - 纯数字自动转 int
 /// - hostIds/exclude 字段含逗号时转 List<String>
@@ -53,8 +55,11 @@ class ToolArgsParser {
       // 找第一个冒号（值可能含冒号，如路径 C:\path 或 time 12:00）
       final colonIdx = line.indexOf(':');
       if (colonIdx < 0) {
-        // 没有冒号 — 不是合法的 key:value 行，跳过
-        continue;
+        // 没有冒号的非空行 = 模型把值写跨了行（典型是 content 的多行正文）。
+        // 静默跳过会丢掉后半段内容却仍报成功，实测真机上写出过 12 字节的半截文件
+        // （三行中文/emoji 只剩第一行）。整个参数块判为不可解析，让工具拿到空参数、
+        // 由必填校验抛出明确错误，模型才会改写成一行的 \n 转义形式。
+        return null;
       }
 
       final key = line.substring(0, colonIdx).trim();
@@ -115,7 +120,7 @@ class ToolArgsParser {
 
   /// 取 List<String> 参数。
   /// - List 值 → map toString
-  /// - String 值 → 按逗号切分
+  /// - String 值 → 按逗号切分（并剥掉 AI 误写的 JSON 方括号）
   /// - 缺失 → [defaultValue]
   static List<String> getStringList(Map<String, dynamic> args, String key, {List<String> defaultValue = const []}) {
     final v = args[key];
@@ -124,11 +129,27 @@ class ToolArgsParser {
       return v.map((e) => e.toString()).where((s) => s.isNotEmpty).toList();
     }
     if (v is String) {
-      return v.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      return _splitListText(v);
     }
     // bool/int 等其他类型 — 不应是列表字段，回退为单元素列表
     final s = v.toString();
     return s.isEmpty ? defaultValue : [s];
+  }
+
+  /// 把 "a, b" / "[a, b]" 这类文本切成列表。
+  /// 方括号必须剥掉：AI 偶尔会把列表写成 JSON 数组字面量，早期实现直接 split(',')
+  /// 会得到 `['[web1', ' web2]']`，导致每个批量调用都打到不存在的主机名。
+  static List<String> _splitListText(String value) {
+    var text = value.trim();
+    if (text.startsWith('[') && text.endsWith(']') && text.length >= 2) {
+      text = text.substring(1, text.length - 1);
+    }
+    // 同时兼容中文逗号（AI 在中文语境下会写 "web1，web2"）
+    return text
+        .split(RegExp(r'[,，]'))
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
   }
 
   /// 取 bool 参数。
@@ -154,5 +175,88 @@ class ToolArgsParser {
     if (v is String) return int.tryParse(v) ?? defaultValue;
     if (v is num) return v.toInt();
     return defaultValue;
+  }
+}
+
+/// 工具参数缺失 — 由 [ToolArgs.requireString] 抛出，engine 捕获后转成失败观测
+class ToolArgException implements Exception {
+  final String key;
+  const ToolArgException(this.key);
+
+  @override
+  String toString() => '缺少必填参数: $key';
+}
+
+/// 工具入参的唯一访问入口。
+///
+/// 工具实现**不得**直接 `raw['key']?.toString()` 或自己做 `is List || is String` 兼容：
+/// 类型兼容规则只在 [ToolArgsParser] 里实现一份，这里提供实例语法糖。
+/// 这样新增调用方不可能"忘记转型"——裸 Map 不再是 execute 的参数类型。
+class ToolArgs {
+  final Map<String, dynamic> _raw;
+
+  const ToolArgs(this._raw);
+
+  static const ToolArgs empty = ToolArgs({});
+
+  /// 原始 Map — 只用于台账描述、审计与日志，不用于取业务参数
+  Map<String, dynamic> get asMap => Map.unmodifiable(_raw);
+
+  bool get isEmpty => _raw.isEmpty;
+
+  Iterable<String> get keys => _raw.keys;
+
+  bool has(String key) {
+    final v = _raw[key];
+    if (v == null) return false;
+    if (v is String) return v.isNotEmpty;
+    if (v is List) return v.isNotEmpty;
+    return true;
+  }
+
+  /// 键是否存在（哪怕值为空字符串）
+  ///
+  /// 与 [has] 的区别是有意保留的：file_write 需要区分"AI 没写 content"和
+  /// "AI 写了 content: 但值是空的（多行内容没转义）"，后者要给出专门的纠错提示。
+  bool containsKey(String key) => _raw.containsKey(key);
+
+  String getString(String key, {String defaultValue = ''}) =>
+      ToolArgsParser.getString(_raw, key, defaultValue: defaultValue);
+
+  /// 必填字符串：缺失或全空白时抛 [ToolArgException]
+  String requireString(String key) {
+    final v = getString(key).trim();
+    if (v.isEmpty) throw ToolArgException(key);
+    return v;
+  }
+
+  /// 按顺序取第一个非空字符串键（如 remote / remoteDir 两种写法）
+  String firstOf(List<String> keyNames, {String defaultValue = ''}) {
+    for (final k in keyNames) {
+      final v = getString(k).trim();
+      if (v.isNotEmpty) return v;
+    }
+    return defaultValue;
+  }
+
+  List<String> getStringList(String key, {List<String> defaultValue = const []}) =>
+      ToolArgsParser.getStringList(_raw, key, defaultValue: defaultValue);
+
+  bool getBool(String key, {bool defaultValue = false}) =>
+      ToolArgsParser.getBool(_raw, key, defaultValue: defaultValue);
+
+  int getInt(String key, {int defaultValue = 0}) =>
+      ToolArgsParser.getInt(_raw, key, defaultValue: defaultValue);
+
+  /// 参数摘要（日志/观测用）：值截断，避免把整个文件内容打进日志
+  String describe({int maxValueChars = 80}) {
+    if (_raw.isEmpty) return '(无参数)';
+    return _raw.entries.map((e) {
+      var v = e.value is List ? (e.value as List).join(',') : e.value.toString();
+      if (v.length > maxValueChars) {
+        v = '${v.substring(0, maxValueChars)}…(${v.length} 字符)';
+      }
+      return '${e.key}=$v';
+    }).join(', ');
   }
 }

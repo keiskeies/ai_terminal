@@ -108,12 +108,15 @@ class ConversationService {
     bool? commandSuccess,
   }) async {
     final conv = getOrCreateActiveSession(hostId);
+    final isFirstUserMessage =
+        role == 'user' && !conv.messages.any((m) => m.isUser);
     conv.addMessage(ConvMessage.create(
       role: role,
       content: content,
       command: command,
       commandSuccess: commandSuccess,
     ));
+    if (isFirstUserMessage) conv.adoptTitleFromFirstMessage(content);
     try {
       await ConversationsDao.upsert(conv);
     } catch (e) {
@@ -133,8 +136,10 @@ class ConversationService {
     required String assistantContent,
   }) async {
     final conv = getOrCreateActiveSession(hostId);
+    final isFirstUserMessage = !conv.messages.any((m) => m.isUser);
     conv.addMessage(ConvMessage.create(role: 'user', content: userContent));
     conv.addMessage(ConvMessage.create(role: 'assistant', content: assistantContent));
+    if (isFirstUserMessage) conv.adoptTitleFromFirstMessage(userContent);
     try {
       await ConversationsDao.upsert(conv);
     } catch (e) {

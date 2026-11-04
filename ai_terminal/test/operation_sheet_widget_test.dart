@@ -133,6 +133,67 @@ void main() {
       expect(find.text('EVIDENCE'), findsOneWidget);
     });
 
+    testWidgets('renders answer body in the conclusion layer, not the fold',
+        (tester) async {
+      const report = OperationReport(
+        operationId: 'op-2',
+        goal: '检查 GDM 状态',
+        hostId: 'web-01',
+        elapsedSeconds: 8,
+        stepIndex: 2,
+        commandSuccessCount: 2,
+        commandFailureCount: 0,
+        conclusion: 'GDM 运行状态正常。',
+        answerBody: '## GDM 运行状态正常\n\nsystemd-logind 与 gdm 均在运行。',
+        aiGenerated: true,
+        finishState: 'success',
+      );
+
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => OperationSheet(
+          report: report,
+          tc: ThemeColors.of(context),
+          markdownBuilder: (text, tc) => Text(text),
+          evidenceBuilder: () => const Text('EVIDENCE'),
+        ),
+      )));
+
+      expect(find.textContaining('systemd-logind 与 gdm 均在运行'), findsOneWidget,
+          reason: '回答正文必须默认可见，不能藏在"过程与证据"里');
+      expect(find.text('EVIDENCE'), findsNothing);
+
+      await tester.tap(find.text('过程与证据'));
+      await tester.pump();
+      expect(find.text('EVIDENCE'), findsOneWidget);
+    });
+
+    testWidgets('does not repeat the answer body when it equals the conclusion',
+        (tester) async {
+      const report = OperationReport(
+        operationId: 'op-3',
+        goal: '检查状态',
+        elapsedSeconds: 2,
+        stepIndex: 1,
+        commandSuccessCount: 1,
+        commandFailureCount: 0,
+        conclusion: '服务运行正常。',
+        answerBody: '## 服务运行正常。',
+        aiGenerated: true,
+        finishState: 'success',
+      );
+
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => OperationSheet(
+          report: report,
+          tc: ThemeColors.of(context),
+          markdownBuilder: (text, tc) => Text(text),
+          evidenceBuilder: () => const Text('EVIDENCE'),
+        ),
+      )));
+
+      expect(find.text('服务运行正常。'), findsOneWidget);
+    });
+
     testWidgets('failed report shows failure label and no AI badge',
         (tester) async {
       const report = OperationReport(
@@ -313,8 +374,8 @@ void main() {
       )));
 
       expect(find.text('执行清单'), findsOneWidget);
-      expect(find.textContaining('10 项 · 1 完成 · 1 进行中 · 8 待处理'),
-          findsOneWidget);
+      expect(
+          find.textContaining('10 项 · 1 完成 · 1 进行中 · 8 待处理'), findsOneWidget);
       expect(find.text('步骤 1'), findsNothing);
 
       await tester.tap(find.text('执行清单'));
@@ -322,6 +383,53 @@ void main() {
 
       expect(find.text('步骤 1'), findsOneWidget);
       expect(find.text('步骤 10'), findsOneWidget);
+    });
+
+    testWidgets('贴底限高：长计划卡内滚动，头部固定', (tester) async {
+      final steps = List.generate(20, (i) => PlanStep(title: '步骤 ${i + 1}'));
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => PlanPanel(
+          steps: steps,
+          tc: ThemeColors.of(context),
+          initiallyExpanded: true,
+          maxHeight: 168,
+        ),
+      )));
+
+      // 头部 + 分隔线之外，展开区被限高；否则长计划会把输入框顶出屏幕。
+      // 实测头部约 43.5px，留 48 的余量。
+      expect(tester.getSize(find.byType(PlanPanel)).height,
+          lessThanOrEqualTo(168 + 48));
+      // 测试外壳自己就套了一层 SingleChildScrollView，必须只数卡内那层
+      final innerScroll = find.descendant(
+          of: find.byType(PlanPanel),
+          matching: find.byType(SingleChildScrollView));
+      expect(innerScroll, findsOneWidget);
+      // 12 行可见步骤超出 168px，靠后的在视口外。SingleChildScrollView 会一次性
+      // 构建全部子节点，find.text 不管滚没滚到都能找到，所以用 hitTestable 判可见。
+      expect(find.text('步骤 12').hitTestable(), findsNothing);
+      await tester.scrollUntilVisible(find.text('步骤 12'), 60,
+          scrollable: find.descendant(
+              of: find.byType(PlanPanel), matching: find.byType(Scrollable)));
+      expect(find.text('步骤 12').hitTestable(), findsOneWidget);
+    });
+
+    testWidgets('不限高时不套滚动视图（会话流历史回看用法不变）', (tester) async {
+      final steps = List.generate(20, (i) => PlanStep(title: '步骤 ${i + 1}'));
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => PlanPanel(
+          steps: steps,
+          tc: ThemeColors.of(context),
+          initiallyExpanded: true,
+        ),
+      )));
+
+      expect(
+          find.descendant(
+              of: find.byType(PlanPanel),
+              matching: find.byType(SingleChildScrollView)),
+          findsNothing);
+      expect(find.text('步骤 12'), findsOneWidget);
     });
 
     testWidgets('shows the running command under the current step',
@@ -365,62 +473,6 @@ void main() {
       await tester.pump();
 
       expect(find.text('步骤 14'), findsOneWidget);
-    });
-  });
-
-  group('CollapsibleEventStream', () {
-    List<AgentEvent> makeEvents() {
-      final events = <AgentEvent>[];
-      for (var i = 0; i < 6; i++) {
-        final command = AgentEvent.command('echo $i', id: 'cmd-$i');
-        events.add(command);
-        events.add(AgentEvent.result(
-          commandId: command.id,
-          success: true,
-          command: 'echo $i',
-          output: 'ok',
-        ));
-      }
-      return events;
-    }
-
-    testWidgets('running stream folds older events and expands on demand',
-        (tester) async {
-      final events = makeEvents();
-      await tester.pumpWidget(_wrap(Builder(
-        builder: (context) => CollapsibleEventStream(
-          events: events,
-          tc: ThemeColors.of(context),
-          isRunning: true,
-          maxVisible: 4,
-          builder: (visible) => Text('VISIBLE:${visible.length}'),
-        ),
-      )));
-
-      expect(find.textContaining('已折叠'), findsOneWidget);
-      expect(find.text('VISIBLE:4'), findsOneWidget);
-
-      await tester.tap(find.text('完整过程'));
-      await tester.pump();
-
-      expect(find.text('VISIBLE:12'), findsOneWidget);
-      expect(find.text('收起'), findsOneWidget);
-    });
-
-    testWidgets('finished legacy stream is not folded', (tester) async {
-      final events = makeEvents();
-      await tester.pumpWidget(_wrap(Builder(
-        builder: (context) => CollapsibleEventStream(
-          events: events,
-          tc: ThemeColors.of(context),
-          isRunning: false,
-          maxVisible: 4,
-          builder: (visible) => Text('VISIBLE:${visible.length}'),
-        ),
-      )));
-
-      expect(find.text('VISIBLE:12'), findsOneWidget);
-      expect(find.textContaining('已折叠'), findsNothing);
     });
   });
 
@@ -556,7 +608,8 @@ void main() {
       await tester.pump();
 
       expect(tester.takeException(), isNull);
-      expect(find.text('已运行'), findsOneWidget);
+      // 时间线里这一行显示的是真实结果，不再是命令块的"已运行"状态
+      expect(find.text('失败'), findsWidgets);
       expect(find.textContaining('权限不足'), findsWidgets);
       expect(find.textContaining('使用 sudo 重试'), findsOneWidget);
       expect(find.textContaining('退出码 1'), findsOneWidget);
@@ -684,7 +737,9 @@ void main() {
 
       expect(find.text('部署 Nginx'), findsOneWidget);
       expect(find.textContaining('检查环境', findRichText: true), findsOneWidget);
-      expect(find.textContaining('第 3 步', findRichText: true), findsOneWidget);
+      // `第 N 步`（循环计数）已从运行条撤下：底边条的 `N 步` 是执行数，
+      // 同屏两个"步"含义不同等于让用户猜。
+      expect(find.textContaining('第 3 步', findRichText: true), findsNothing);
       expect(find.textContaining('计划 1/3', findRichText: true), findsOneWidget);
 
       await tester.tap(find.byTooltip('暂停'));
@@ -714,6 +769,345 @@ void main() {
       expect(find.textContaining('已暂停', findRichText: true), findsOneWidget);
       await tester.tap(find.byTooltip('恢复'));
       expect(resumed, isTrue);
+    });
+  });
+
+  // 指标带的规则来自设计 §3.1.2：数字必须有出处，缺出处的项整项不渲染。
+  // 指标从运行条搬到输入框之下的底边条之后，这一组改测真正承载指标的控件；
+  // 规则本身（≈ / 整项不渲染 / 分母）一条没改，只是换了渲染者。
+  group('底边指标条（运行中）', () {
+    Future<void> pump(WidgetTester tester, AgentTask task,
+        {int? contextWindow}) async {
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => AgentMetricsBar(
+          task: task,
+          tc: ThemeColors.of(context),
+          contextWindow: contextWindow,
+          running: true,
+        ),
+      )));
+    }
+
+    testWidgets('全实测时不带 ≈，并给出速率', (tester) async {
+      await pump(
+        tester,
+        AgentTask(
+          id: 'm1',
+          goal: '部署 Nginx',
+          rounds: 16,
+          tokenTotal: 1300,
+          elapsedSeconds: 10,
+        ),
+        contextWindow: 32000,
+      );
+
+      expect(find.textContaining('≈'), findsNothing);
+      expect(
+          find.textContaining('1.3k tok', findRichText: true), findsOneWidget);
+      expect(find.textContaining('16 轮', findRichText: true), findsOneWidget);
+      expect(
+          find.textContaining('130 tok/s', findRichText: true), findsOneWidget);
+    });
+
+    testWidgets('含估算时带 ≈，并且不给速率', (tester) async {
+      await pump(
+        tester,
+        AgentTask(
+          id: 'm2',
+          goal: '部署 Nginx',
+          rounds: 4,
+          tokenTotal: 1300,
+          hasEstimatedTokens: true,
+          elapsedSeconds: 10,
+        ),
+      );
+
+      expect(
+          find.textContaining('≈1.3k tok', findRichText: true), findsOneWidget);
+      // 估算 token 除以真实秒数会得到一个看着像实测的速率，所以不显示
+      expect(find.textContaining('tok/s', findRichText: true), findsNothing);
+    });
+
+    testWidgets('elapsed 为 0 时不给速率（防除零）', (tester) async {
+      await pump(
+        tester,
+        AgentTask(id: 'm3', goal: '部署 Nginx', tokenTotal: 1300),
+      );
+
+      expect(
+          find.textContaining('1.3k tok', findRichText: true), findsOneWidget);
+      expect(find.textContaining('tok/s', findRichText: true), findsNothing);
+    });
+
+    testWidgets('等确认的墙钟不进速率分母', (tester) async {
+      await pump(
+        tester,
+        AgentTask(
+          id: 'm3b',
+          goal: '部署 Nginx',
+          tokenTotal: 1300,
+          elapsedSeconds: 60,
+          confirmWaitSeconds: 45,
+        ),
+      );
+
+      // 60 秒墙钟里有 45 秒是等人按确认：速率按 1300/15=86，
+      // 按旧口径会得到 1300/60=21，那测的是人的反应速度。
+      expect(
+          find.textContaining('86 tok/s', findRichText: true), findsOneWidget);
+      expect(find.textContaining('21 tok/s', findRichText: true), findsNothing);
+    });
+
+    testWidgets('时间几乎全花在等确认上 → 整项不渲染，而不是 0 tok/s', (tester) async {
+      await pump(
+        tester,
+        AgentTask(
+          id: 'm3c',
+          goal: '部署 Nginx',
+          tokenTotal: 1300,
+          elapsedSeconds: 30,
+          confirmWaitSeconds: 30,
+        ),
+      );
+
+      expect(
+          find.textContaining('1.3k tok', findRichText: true), findsOneWidget);
+      expect(find.textContaining('tok/s', findRichText: true), findsNothing);
+    });
+
+    testWidgets('provider 没给 cached_tokens 时整项不渲染', (tester) async {
+      await pump(
+        tester,
+        AgentTask(id: 'm4', goal: '部署 Nginx', tokenTotal: 500),
+      );
+
+      expect(find.textContaining('缓存', findRichText: true), findsNothing);
+    });
+
+    testWidgets('缓存命中 0% 是真实值，必须渲染出来', (tester) async {
+      await pump(
+        tester,
+        AgentTask(id: 'm5', goal: '部署 Nginx', cacheHitPercent: 0),
+      );
+
+      // 与"没给数据"区分开：0 表示 provider 明确回答没有命中，不是未知
+      expect(
+          find.textContaining('缓存命中 0%', findRichText: true), findsOneWidget);
+    });
+
+    testWidgets('步数 = 执行过的命令/工具数，排在轮之后', (tester) async {
+      await pump(
+        tester,
+        AgentTask(
+          id: 'm5b',
+          goal: '部署 Nginx',
+          rounds: 11,
+          stepIndex: 12,
+          successCount: 400,
+          failureCount: 18,
+        ),
+      );
+
+      // stepIndex 是引擎循环计数，与"轮"几乎相等，并排显示等于同一件事说两遍；
+      // 参考界面的 `11 轮 418 步` 里那个大数是执行数。
+      expect(find.textContaining('11 轮', findRichText: true), findsOneWidget);
+      expect(find.textContaining('418 步', findRichText: true), findsOneWidget);
+      expect(find.textContaining('12 步', findRichText: true), findsNothing);
+    });
+
+    testWidgets('一条命令都没执行时不渲染 0 步', (tester) async {
+      await pump(
+        tester,
+        AgentTask(id: 'm5c', goal: '部署 Nginx', rounds: 1, stepIndex: 1),
+      );
+
+      expect(find.textContaining('轮', findRichText: true), findsOneWidget);
+      expect(find.textContaining('步', findRichText: true), findsNothing);
+    });
+
+    testWidgets('上下文分母缺失时不渲染占用环', (tester) async {
+      await pump(
+        tester,
+        AgentTask(id: 'm6', goal: '部署 Nginx', contextTokens: 14000),
+      );
+
+      expect(find.textContaining('上下文', findRichText: true), findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
+    testWidgets('有分母时渲染占用环与百分比', (tester) async {
+      await pump(
+        tester,
+        AgentTask(id: 'm7', goal: '部署 Nginx', contextTokens: 14000),
+        contextWindow: 32000,
+      );
+
+      expect(
+          find.textContaining('上下文 44%', findRichText: true), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    });
+
+    testWidgets('占用超过窗口时封顶 100%，不出现 130%', (tester) async {
+      await pump(
+        tester,
+        AgentTask(id: 'm8', goal: '部署 Nginx', contextTokens: 42000),
+        contextWindow: 32000,
+      );
+
+      expect(
+          find.textContaining('上下文 100%', findRichText: true), findsOneWidget);
+    });
+    testWidgets('窄面板下折行而不是溢出报错（§4-P3 的验收项）', (tester) async {
+      // 默认右侧布局 + 0.15 最小比例时面板可窄到 ~200px；
+      // 长目标文案 + 阶段/步/用时/计划进度 + 三个按钮挤进来，规则是折行不是溢出
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => SizedBox(
+          width: 220,
+          child: LiveOperationBar(
+            task: AgentTask(
+              id: 'n1',
+              goal: '把 nginx 日志轮转配好并验证切割生效后清理旧日志',
+              status: AgentStatus.thinking,
+              phase: '检查环境',
+              stepIndex: 12,
+              rounds: 16,
+              tokenTotal: 340000,
+              cacheHitPercent: 99,
+              contextTokens: 30000,
+              successCount: 9,
+              failureCount: 3,
+              elapsedSeconds: 45,
+            ),
+            status: AgentStatus.thinking,
+            tc: ThemeColors.of(context),
+            plan: const [
+              PlanStep(title: '检查日志目录与现有配置'),
+              PlanStep(title: '写入 logrotate 配置'),
+            ],
+          ),
+        ),
+      )));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      // 指标已经搬去底边条，运行条再显示一遍就是同一屏两个数字来源
+      expect(find.textContaining('tok', findRichText: true), findsNothing);
+    });
+
+    testWidgets('底边条在窄面板下同样折行不溢出', (tester) async {
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => SizedBox(
+          width: 220,
+          child: AgentMetricsBar(
+            task: AgentTask(
+              id: 'n2',
+              goal: '把 nginx 日志轮转配好并验证切割生效后清理旧日志',
+              rounds: 16,
+              stepIndex: 16,
+              successCount: 400,
+              failureCount: 18,
+              tokenTotal: 340000,
+              cacheHitPercent: 99,
+              contextTokens: 30000,
+              elapsedSeconds: 45,
+            ),
+            tc: ThemeColors.of(context),
+            contextWindow: 32000,
+            running: true,
+          ),
+        ),
+      )));
+      await tester.pump();
+
+      expect(tester.takeException(), isNull);
+      // 6 项指标 + 步数在 220px 下必须都还在（折行），而不是被裁掉
+      expect(find.textContaining('16 轮', findRichText: true), findsOneWidget);
+      expect(find.textContaining('418 步', findRichText: true), findsOneWidget);
+      expect(
+          find.textContaining('缓存命中 99%', findRichText: true), findsOneWidget);
+    });
+  });
+
+  // 常驻指标条：任务结束后接管运行条的位置（参照 UI 的底部模块不随任务消失）。
+  group('AgentMetricsBar', () {
+    Future<void> pumpBar(WidgetTester tester, AgentTask task,
+        {int? contextWindow}) async {
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => AgentMetricsBar(
+          task: task,
+          tc: ThemeColors.of(context),
+          contextWindow: contextWindow,
+        ),
+      )));
+    }
+
+    testWidgets('完成态仍保留轮 / token / 占用环', (tester) async {
+      await pumpBar(
+        tester,
+        AgentTask(
+          id: 'b1',
+          goal: '部署 Nginx',
+          status: AgentStatus.completed,
+          rounds: 16,
+          tokenTotal: 5600,
+          contextTokens: 14000,
+          elapsedSeconds: 28,
+        ),
+        contextWindow: 32000,
+      );
+
+      expect(find.textContaining('完成', findRichText: true), findsOneWidget);
+      expect(find.textContaining('16 轮', findRichText: true), findsOneWidget);
+      expect(
+          find.textContaining('5.6k tok', findRichText: true), findsOneWidget);
+      expect(
+          find.textContaining('上下文 44%', findRichText: true), findsOneWidget);
+    });
+
+    testWidgets('取消态显示取消而不是完成', (tester) async {
+      await pumpBar(
+        tester,
+        AgentTask(
+          id: 'b2',
+          goal: '部署 Nginx',
+          status: AgentStatus.cancelled,
+          elapsedSeconds: 74,
+        ),
+      );
+
+      expect(find.textContaining('已取消', findRichText: true), findsOneWidget);
+      expect(find.textContaining('完成', findRichText: true), findsNothing);
+    });
+
+    testWidgets('没有任何计量时不硬凑数字', (tester) async {
+      await pumpBar(
+        tester,
+        AgentTask(id: 'b3', goal: '部署 Nginx', status: AgentStatus.failed),
+        contextWindow: 32000,
+      );
+
+      expect(find.textContaining('失败', findRichText: true), findsOneWidget);
+      expect(find.textContaining('轮', findRichText: true), findsNothing);
+      expect(find.textContaining('tok', findRichText: true), findsNothing);
+      expect(find.textContaining('上下文', findRichText: true), findsNothing);
+    });
+
+    testWidgets('含估算的 token 在常驻条上同样带 ≈（与运行条同一套规则）', (tester) async {
+      await pumpBar(
+        tester,
+        AgentTask(
+          id: 'b4',
+          goal: '部署 Nginx',
+          status: AgentStatus.completed,
+          tokenTotal: 1300,
+          hasEstimatedTokens: true,
+          elapsedSeconds: 10,
+        ),
+      );
+
+      expect(
+          find.textContaining('≈1.3k tok', findRichText: true), findsOneWidget);
+      expect(find.textContaining('tok/s', findRichText: true), findsNothing);
     });
   });
 }

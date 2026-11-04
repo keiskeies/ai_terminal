@@ -4,6 +4,7 @@ import 'package:sqflite/sqflite.dart';
 import '../core/db_init.dart';
 import '../models/host_config.dart';
 import '../models/ai_model_config.dart';
+import '../models/ai_endpoint.dart';
 import '../models/chat_session.dart';
 import '../models/command_snippet.dart';
 import '../models/conversation.dart';
@@ -151,13 +152,11 @@ class AIModelsDao {
     await DbInit.db.delete('ai_models');
   }
 
-  /// 取消所有默认标记（同步更新缓存 + 异步写库）
-  static Future<void> clearDefault() async {
-    for (final m in _cache) {
-      m.isDefault = false;
-    }
-    await DbInit.db.update('ai_models', {'isDefault': 0},
-        where: 'isDefault = 1');
+  /// 旧数据的默认模型 id（仅迁移时用于初始化当前选择），新配置不再有默认模型
+  static Future<String?> getLegacyDefaultId() async {
+    final rows = await DbInit.db.query('ai_models',
+        columns: ['id'], where: 'isDefault = 1', limit: 1);
+    return rows.isEmpty ? null : rows.first['id'] as String?;
   }
 
   static Map<String, dynamic> _toRow(AIModelConfig m) => {
@@ -167,7 +166,6 @@ class AIModelsDao {
     'contextWindow': m.contextWindow,
     'fallbackModelId': m.fallbackModelId,
     'supportsFunctionCalling': m.supportsFunctionCalling ? 1 : 0,
-    'isDefault': m.isDefault ? 1 : 0,
   };
 
   static AIModelConfig _fromRow(Map<String, dynamic> r) {
@@ -182,9 +180,101 @@ class AIModelsDao {
       ..maxTokens = r['maxTokens'] as int? ?? 4096
       ..contextWindow = r['contextWindow'] as int? ?? 0
       ..fallbackModelId = r['fallbackModelId'] as String?
-      ..supportsFunctionCalling = (r['supportsFunctionCalling'] as int?) == 1
-      ..isDefault = (r['isDefault'] as int?) == 1;
+      ..supportsFunctionCalling = (r['supportsFunctionCalling'] as int?) == 1;
     return m;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// AIEndpointsDao
+// ═══════════════════════════════════════════════════════════
+
+/// 端点及其模型目录。API Key 不落此表，由 CredentialsStore 按端点 id 保存。
+class AIEndpointsDao {
+  static List<AIEndpoint> _cache = [];
+
+  static Future<void> loadCache() async {
+    _cache = await getAll();
+  }
+
+  /// 用已注入 API Key 的内存副本替换缓存（不落库）。
+  /// 供无 ref 的同步路径（如 Agent 的 fallback 解析）使用。
+  static void cacheWithRuntimeKeys(List<AIEndpoint> endpoints) {
+    _cache = endpoints;
+  }
+
+  static List<AIEndpoint> get cached => _cache;
+
+  static AIEndpoint? getCachedById(String id) {
+    for (final e in _cache) {
+      if (e.id == id) return e;
+    }
+    return null;
+  }
+
+  static Future<List<AIEndpoint>> getAll() async {
+    final rows =
+        await DbInit.db.query('ai_endpoints', orderBy: 'createdAt ASC');
+    return rows.map(_fromRow).toList();
+  }
+
+  static Future<void> upsert(AIEndpoint endpoint) async {
+    final idx = _cache.indexWhere((e) => e.id == endpoint.id);
+    if (idx >= 0) {
+      _cache[idx] = endpoint;
+    } else {
+      _cache.add(endpoint);
+    }
+    await DbInit.db.insert('ai_endpoints', _toRow(endpoint),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  static Future<void> delete(String id) async {
+    _cache.removeWhere((e) => e.id == id);
+    await DbInit.db.delete('ai_endpoints', where: 'id = ?', whereArgs: [id]);
+  }
+
+  static Future<void> clearAll() async {
+    _cache = [];
+    await DbInit.db.delete('ai_endpoints');
+  }
+
+  static Map<String, dynamic> _toRow(AIEndpoint e) => {
+        'id': e.id,
+        'providerId': e.providerId,
+        'name': e.name,
+        'baseUrl': e.baseUrl,
+        'protocol': e.protocol,
+        'models': jsonEncode(e.models.map((m) => m.toJson()).toList()),
+        'createdAt': e.createdAt,
+      };
+
+  static AIEndpoint _fromRow(Map<String, dynamic> r) {
+    List<AIEndpointModel> models = const [];
+    final raw = r['models'] as String?;
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) {
+          models = decoded
+              .whereType<Map>()
+              .map((m) =>
+                  AIEndpointModel.fromJson(Map<String, dynamic>.from(m)))
+              .toList();
+        }
+      } catch (e) {
+        debugPrint('[AIEndpointsDao] 模型目录 JSON 解析失败 (id=${r['id']}): $e');
+      }
+    }
+    return AIEndpoint(
+      id: r['id'] as String,
+      providerId: r['providerId'] as String? ?? 'custom',
+      name: r['name'] as String? ?? '',
+      baseUrl: r['baseUrl'] as String? ?? '',
+      protocol: r['protocol'] as String? ?? 'openai',
+      models: models,
+      createdAt: r['createdAt'] as int? ?? 0,
+    );
   }
 }
 
@@ -637,6 +727,8 @@ class ChangeRecordsDao {
     'type': r.type.name,
     'rollbackCommand': r.rollbackCommand,
     'rollbackDescription': r.rollbackDescription,
+    'localRestoreFrom': r.localRestoreFrom,
+    'localRestoreTo': r.localRestoreTo,
     'timestamp': r.timestamp.millisecondsSinceEpoch,
     'success': r.success ? 1 : 0,
     'username': r.username, 'conversationId': r.conversationId,
@@ -651,6 +743,8 @@ class ChangeRecordsDao {
       type: ChangeType.values.byName(r['type'] as String),
       rollbackCommand: r['rollbackCommand'] as String?,
       rollbackDescription: r['rollbackDescription'] as String?,
+      localRestoreFrom: r['localRestoreFrom'] as String?,
+      localRestoreTo: r['localRestoreTo'] as String?,
       timestamp: DateTime.fromMillisecondsSinceEpoch(r['timestamp'] as int),
       success: (r['success'] as int) == 1,
       username: r['username'] as String?,

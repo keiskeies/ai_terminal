@@ -7,12 +7,15 @@ import 'package:go_router/go_router.dart';
 import 'package:xterm/xterm.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
-import '../core/credentials_store.dart';
 import '../core/l10n_holder.dart';
+import '../core/route_observer.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/sftp_panel.dart';
 import '../widgets/logo_widget.dart';
 import '../widgets/ai_prompt_input.dart';
+import '../widgets/model_picker_panel.dart';
+import '../widgets/agent_goal_banner.dart';
+import '../models/agent_goal.dart';
 import '../widgets/session_history_dialog.dart';
 import '../widgets/agent_log_dialog.dart';
 import '../widgets/agent_command_block.dart';
@@ -23,6 +26,11 @@ import '../widgets/interrupted_turn_banner.dart';
 import '../widgets/reconnecting_banner.dart';
 import '../widgets/tab_item_widget.dart';
 import '../utils/interrupted_turn_detector.dart';
+import '../utils/slash_command.dart';
+import '../utils/conversation_export.dart';
+import '../utils/goal_continuation.dart';
+import '../services/agent_tracer.dart';
+import 'package:flutter/services.dart';
 import '../services/daos.dart';
 import '../core/prompts.dart' as prompts;
 import '../models/runbook.dart';
@@ -32,6 +40,8 @@ import '../providers/terminal_provider.dart' as tp;
 import '../providers/chat_provider.dart';
 import '../providers/agent_provider.dart';
 import '../models/ai_model_config.dart';
+import '../models/ai_endpoint.dart';
+import '../services/ai_model_selection_service.dart';
 import '../models/host_config.dart';
 import '../models/agent_event.dart';
 import '../models/agent_model.dart';
@@ -49,6 +59,47 @@ import '../widgets/terminal_view.dart' as term_widget;
 
 enum _AiPanelPosition { bottom, right }
 
+/// 面板方向与比例的存盘约定。此前两者都不落盘（每次启动都回到默认值），这里补齐。
+///
+/// 方向只在桌面显式切换时写：移动端每帧按屏幕方向覆盖，存了也会在竖屏被改回
+/// bottom，写它只会让存盘值和实际显示不一致。
+void saveAiPanelLayout({
+  required bool isMobile,
+  required bool savePosition,
+  required String position,
+  required double ratio,
+}) {
+  if (savePosition && !isMobile) {
+    SettingsDao.set('aiPanelPosition', position);
+  }
+  SettingsDao.set('aiPanelRatio', ratio);
+}
+
+/// 面板方向与比例的读盘解析，与 [saveAiPanelLayout] 成对。
+///
+/// 规则：只有显式存过且合法的才覆盖默认值；比例一律夹回合法区间。
+/// 抽成纯函数是因为"存进去"和"读出来"是两条独立的路径，只测前者会漏掉
+/// 老用户被新默认值翻转、以及脏数据把面板拉成 0 宽这两种失效。
+({String position, double ratio}) resolveAiPanelLayout({
+  required Object? storedPosition,
+  required Object? storedRatio,
+  required String defaultPosition,
+  required double defaultRatio,
+  required double minRatio,
+  required double maxRatio,
+}) {
+  final position = (storedPosition == 'bottom' || storedPosition == 'right')
+      ? storedPosition as String
+      : defaultPosition;
+  var ratio = defaultRatio;
+  if (storedRatio is num) {
+    ratio = storedRatio.toDouble();
+    if (ratio < minRatio) ratio = minRatio;
+    if (ratio > maxRatio) ratio = maxRatio;
+  }
+  return (position: position, ratio: ratio);
+}
+
 class TerminalPage extends ConsumerStatefulWidget {
   final String? hostId; // null = 本地终端
 
@@ -58,10 +109,16 @@ class TerminalPage extends ConsumerStatefulWidget {
   ConsumerState<TerminalPage> createState() => _TerminalPageState();
 }
 
-class _TerminalPageState extends ConsumerState<TerminalPage> {
+class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   Terminal? _terminal;
-  bool _isConnecting = false;
-  String? _connectionError;
+
+  /// initState 时捕获的 Agent notifier。dispose 里不能再读 ref：
+  /// 那时 element 已 disposed，ref.read 会抛 StateError 并中断后续资源回收。
+  AgentNotifier? _agentNotifier;
+
+  /// 尚无任何标签可承载时的提示（例如路由里的 hostId 已不存在）。
+  /// 连接阶段本身记在 TerminalTab.status 上，页面不再持有副本。
+  String? _placeholderError;
   // ====== Per-tab 本地状态 ======
   String? _currentTabId;
   final Map<String, String?> _tabExecutingCommand = {};
@@ -78,7 +135,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   String? _reconnectingHostLabel;
 
   // AI 面板位置和大小
-  _AiPanelPosition _aiPanelPosition = _AiPanelPosition.bottom;
+  // 桌面默认从右侧展开；移动端首帧由 _updateMobilePosition 按方向覆盖
+  _AiPanelPosition _aiPanelPosition = _AiPanelPosition.right;
   double _aiPanelRatio = 0.4;
   static const double _minPanelRatio = 0.15;
   static const double _maxPanelRatio = 0.7;
@@ -123,6 +181,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   StreamSubscription<String>? _terminalOutputSubscription;
   StreamSubscription<String>? _tabOutputSubscription; // 终端输出订阅（需随 tab 切换而取消/重建）
   AIModelConfig? _currentModelConfig;
+  final MenuController _modelMenuController = MenuController();
+  bool _agentInitInFlight = true;
+  bool _pendingModelSync = false;
+  PageRoute<dynamic>? _subscribedRoute;
 
   // 终端设置
   double _terminalFontSize = 14; // P0-3: 默认终端字号从 13 改为 14
@@ -136,6 +198,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     super.initState();
     _loadSettings(); // 先加载设置（含 maxSteps），确保 _initAgent 使用正确的 maxSteps
     _initAgent();
+    // 页面持有 notifier 引用而非在 dispose 里读 ref：TerminalPage 按路由存在，
+    // 同一时刻只有一个实例，直接占位注册，dispose 里按身份判断后释放，
+    // 避免误清掉下一个页面的注册。在 dispose 中用 ref 会抛
+    // "Cannot use ref after the widget was disposed"，中断后续资源回收。
+    _agentNotifier = ref.read(agentProvider.notifier);
+    _agentNotifier!.secretRequestHandler = _requestSecret;
     // 延迟到帧构建完成后执行连接，避免在 build 阶段修改 provider 状态
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -168,6 +236,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     }
   }
 
+  /// 存盘面板布局。方向只在桌面显式切换时写：移动端 `_updateMobilePosition`
+  /// 每帧按屏幕方向覆盖，存了也会在竖屏被改回 bottom。
+  void _savePanelLayout({required bool savePosition}) {
+    if (savePosition && _isMobile) return;
+    if (savePosition) {
+      SettingsDao.set('aiPanelPosition', _aiPanelPosition.name);
+    }
+    SettingsDao.set('aiPanelRatio', _aiPanelRatio);
+  }
+
   void _loadSettings() {
     try {
       final fontSize = SettingsDao.getCached('terminalFontSize');
@@ -187,6 +265,22 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       if (aiPanelVisible != null) {
         _isAIPanelVisible = aiPanelVisible as bool;
       }
+    } catch (_) {}
+    // 方向与比例：只有显式存过才覆盖默认值。
+    // 存过 bottom 的老用户不能被新默认 right 翻回去，所以两边都要认。
+    try {
+      final resolved = resolveAiPanelLayout(
+        storedPosition: SettingsDao.getCached('aiPanelPosition'),
+        storedRatio: SettingsDao.getCached('aiPanelRatio'),
+        defaultPosition: _aiPanelPosition.name,
+        defaultRatio: _aiPanelRatio,
+        minRatio: _minPanelRatio,
+        maxRatio: _maxPanelRatio,
+      );
+      _aiPanelPosition = resolved.position == 'bottom'
+          ? _AiPanelPosition.bottom
+          : _AiPanelPosition.right;
+      _aiPanelRatio = resolved.ratio;
     } catch (_) {}
     // 加载监控面板可见的 host 列表（per-host 独立开关）
     try {
@@ -223,26 +317,29 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   Future<void> _initAgent() async {
-    // 确保 provider 完成从 CredentialsStore 注入 apiKey（重启后 apiKey 来自安全存储）
-    await ref.read(aiModelsProvider.notifier).loadModels();
-    final models = ref.read(aiModelsProvider);
-    if (models.isNotEmpty) {
-      final defaultModel = models.firstWhere(
-        (m) => m.isDefault,
-        orElse: () => models.first,
+    try {
+      // 确保 provider 完成从 CredentialsStore 注入 apiKey（重启后 apiKey 来自安全存储）
+      await ref.read(aiEndpointsProvider.notifier).loadEndpoints();
+      final config = await AIModelSelectionService.resolveCurrent(
+        endpoints: ref.read(aiEndpointsProvider),
       );
-      _currentModelConfig = defaultModel;
-      final aiProvider = AIService.create(defaultModel);
+      if (config == null) return;
+      _currentModelConfig = config;
+      final aiProvider = AIService.create(config);
       ref.read(agentProvider.notifier).init(
-        modelConfig: defaultModel,
+        modelConfig: config,
         aiProvider: aiProvider,
       );
+      if (mounted) setState(() {});
+    } finally {
+      _agentInitInFlight = false;
     }
   }
 
-  /// 切换大模型
+  /// 切换大模型。选择会持久化，但配置里没有「默认模型」这个概念。
   void _switchModel(AIModelConfig model) {
     _currentModelConfig = model;
+    AIModelSelectionService.saveSelectedModel(model.id);
     final aiProvider = AIService.create(model);
     ref.read(agentProvider.notifier).init(
       modelConfig: model,
@@ -251,84 +348,156 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     setState(() {});
   }
 
-  Future<void> _connectToHost() async {
-    final l10n = AppLocalizations.of(context)!;
-    final host = ref.read(hostsProvider.notifier).getHostById(widget.hostId!);
-    if (host == null) {
-      setState(() => _connectionError = l10n.terminalHostNotFound);
+  /// 应用「端点 + 模型」选择：解析该模型上次的档位（或默认 medium）后重建引擎。
+  void _applyModelChoice(AIModelChoice choice, {AIReasoningTier? tier}) {
+    if (ref.read(agentProvider).isRunning) {
+      _showGoalHint(AppLocalizations.of(context)!.terminalModelLockedRunning);
       return;
     }
-
-    setState(() => _isConnecting = true);
-
-    try {
-      final password = await CredentialsStore.get(hostId: host.id, type: 'password');
-      final privateKey = await CredentialsStore.get(hostId: host.id, type: 'privateKey');
-
-      if (password == null && privateKey == null) {
-        setState(() {
-          _isConnecting = false;
-          _connectionError = l10n.noCredentials;
-        });
-        return;
-      }
-
-      await ref.read(tp.terminalProvider.notifier).openTab(
-        host,
-        password: password,
-        privateKeyContent: privateKey,
-      );
-
-      final tab = ref.read(tp.terminalProvider).activeTab;
-      if (tab == null || !tab.isConnected) {
-        throw Exception(L10n.str.connectionFailedHint);
-      }
-
-      // SSH 连接成功后设置 executor（R3：显式传 tab.hostId，避免用 activeHostId 顶替）
-      ref.read(agentProvider.notifier).setExecutor(tab.service, hostId: tab.hostId);
-
-      _switchToTab(tab);
-      setState(() => _isConnecting = false);
-    } catch (e) {
-      setState(() {
-        _isConnecting = false;
-        final errorMsg = e.toString();
-        String hint;
-        if (errorMsg.contains('Connection refused')) {
-          hint = L10n.str.connErrRefused;
-        } else if (errorMsg.contains('timeout') || errorMsg.contains('Timeout')) {
-          hint = L10n.str.connErrTimeout;
-        } else if (errorMsg.contains('authentication') || errorMsg.contains('Auth')) {
-          hint = L10n.str.connErrAuth;
-        } else if (errorMsg.contains('No route to host')) {
-          hint = L10n.str.connErrNoRoute;
-        } else {
-          hint = L10n.str.connErrGeneric;
-        }
-        _connectionError = '$errorMsg\n\n💡 $hint';
-      });
+    final resolvedTier =
+        tier ?? choice.model.resolveReasoningTier(AIModelSelectionService.tierFor(choice.modelId));
+    final config = AIModelConfig.fromEndpoint(
+      endpoint: choice.endpoint,
+      model: choice.model,
+      tier: resolvedTier,
+    );
+    if (resolvedTier != null) {
+      AIModelSelectionService.saveReasoningTier(
+          choice.modelId, resolvedTier.level);
     }
+    _switchModel(config);
+  }
+
+  /// 只切思考档位，模型不变。
+  void _applyReasoningTier(AIReasoningTier tier) {
+    if (ref.read(agentProvider).isRunning) {
+      _showGoalHint(AppLocalizations.of(context)!.terminalModelLockedRunning);
+      return;
+    }
+    final current =
+        ref.read(agentProvider.notifier).modelConfig ?? _currentModelConfig;
+    if (current == null) return;
+    final choice = AIModelSelectionService.findChoice(
+        ref.read(aiEndpointsProvider), current.id);
+    if (choice == null) return;
+    final config = AIModelConfig.fromEndpoint(
+      endpoint: choice.endpoint,
+      model: choice.model,
+      tier: tier,
+    );
+    AIModelSelectionService.saveReasoningTier(choice.modelId, tier.level);
+    _switchModel(config);
+  }
+
+  /// 设置页保存端点后同步当前 host：非运行态立即重建，运行态延后到任务结束。
+  void _scheduleModelSync() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _syncModelWithEndpoints(ref.read(aiEndpointsProvider));
+    });
+  }
+
+  void _syncModelWithEndpoints(List<AIEndpoint> endpoints) {
+    if (_agentInitInFlight || endpoints.isEmpty) return;
+    if (ref.read(agentProvider).isRunning) {
+      _pendingModelSync = true;
+      return;
+    }
+    _pendingModelSync = false;
+
+    final current =
+        ref.read(agentProvider.notifier).modelConfig ?? _currentModelConfig;
+    var choice = current == null
+        ? null
+        : AIModelSelectionService.findChoice(endpoints, current.id);
+    var tierLevel =
+        choice == null ? null : AIModelSelectionService.tierFor(choice.modelId);
+
+    if (choice == null) {
+      final selectedId = AIModelSelectionService.selectedModelId;
+      choice = selectedId == null
+          ? null
+          : AIModelSelectionService.findChoice(endpoints, selectedId);
+      final all = AIModelSelectionService.allChoices(endpoints);
+      if (choice == null && all.isNotEmpty) {
+        choice = all.first;
+        AIModelSelectionService.saveSelectedModel(choice.modelId);
+      }
+      if (choice == null) return;
+      tierLevel = AIModelSelectionService.tierFor(choice.modelId);
+    }
+
+    final tier = choice.model.resolveReasoningTier(tierLevel);
+    final endpoint = choice.endpoint;
+    final maxTokens =
+        choice.model.maxTokens <= 0 ? 4096 : choice.model.maxTokens;
+    final effort = tier != null && tier.sendsParameter ? tier.apiValue.trim() : null;
+    final unchanged = current != null &&
+        current.id == choice.model.id &&
+        current.endpointId == endpoint.id &&
+        current.baseUrl == endpoint.baseUrl &&
+        current.apiKey == endpoint.apiKey &&
+        current.modelName == choice.model.modelName &&
+        current.temperature == choice.model.temperature &&
+        current.maxTokens == maxTokens &&
+        current.contextWindow == choice.model.contextWindow &&
+        current.supportsFunctionCalling ==
+            choice.model.supportsFunctionCalling &&
+        current.fallbackModelId == choice.model.fallbackModelId &&
+        current.reasoningEffort == effort &&
+        current.reasoningLabel == tier?.label;
+    if (unchanged) return;
+
+    final config = AIModelConfig.fromEndpoint(
+      endpoint: endpoint,
+      model: choice.model,
+      tier: tier,
+    );
+    if (tier != null) {
+      AIModelSelectionService.saveReasoningTier(choice.modelId, tier.level);
+    }
+    _switchModel(config);
+  }
+
+  Future<void> _connectToHost() async {
+    final host = ref.read(hostsProvider.notifier).getHostById(widget.hostId!);
+    if (host == null) {
+      setState(() => _placeholderError = L10n.str.terminalHostNotFound);
+      return;
+    }
+    await _openHostTab(host);
+  }
+
+  /// 在新标签里连接服务器：先把界面切到新标签，再建连。
+  ///
+  /// 顺序是关键。以前等 connect 返回才切标签，期间画面还停在旧服务器上，
+  /// 顶栏和输入框却已经指向新标签——两边对不上，看起来像卡住了。
+  Future<void> _openHostTab(HostConfig host) async {
+    final notifier = ref.read(tp.terminalProvider.notifier);
+    final tab = notifier.registerTab(host);
+    _switchToTab(tab);
+
+    final connected = await notifier.connectTab(tab, host);
+    if (connected == null || !mounted) return;
+
+    // SSH 连接成功后设置 executor（R3：显式传 tab.hostId，避免用 activeHostId 顶替）
+    ref.read(agentProvider.notifier).setExecutor(connected.service, hostId: connected.hostId);
+    // 过渡视图期间终端还没参与布局，尺寸要等真正渲染后再同步一次
+    if (connected.id == _currentTabId) _scheduleSizeSync(connected);
   }
 
   /// 连接本地终端
   Future<void> _connectLocalTerminal() async {
-    final l10n = AppLocalizations.of(context)!;
-    try {
-      await ref.read(tp.terminalProvider.notifier).openLocalTab();
+    final notifier = ref.read(tp.terminalProvider.notifier);
+    final tab = notifier.registerLocalTab();
+    _switchToTab(tab);
 
-      final tab = ref.read(tp.terminalProvider).activeTab;
-      if (tab == null) {
-        setState(() => _connectionError = l10n.terminalLocalStartFailed);
-        return;
-      }
+    final connected = await notifier.connectLocalTab(tab);
+    if (connected == null || !mounted) return;
 
-      // 本地终端连接成功后立即设置 executor，使 Agent 模式可用
-      ref.read(agentProvider.notifier).setExecutor(tab.localService, hostId: tab.hostId);
-
-      _switchToTab(tab);
-    } catch (e) {
-      setState(() => _connectionError = l10n.terminalLocalStartFailedWithError('$e'));
-    }
+    // 本地终端连接成功后立即设置 executor，使 Agent 模式可用
+    ref.read(agentProvider.notifier).setExecutor(connected.localService, hostId: connected.hostId);
+    if (connected.id == _currentTabId) _scheduleSizeSync(connected);
   }
 
   StreamSubscription<String> _setupTerminalListener(tp.TerminalTab tab) {
@@ -336,7 +505,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       if (_terminal != null) _terminal!.write(data);
     });
     _terminal?.onOutput = (data) {
+      // 建连仍在飞行中时不要另起一次重连：连接池按 tabId 去重，
+      // 但两次 status 写入会互相覆盖，界面可能永远停在过渡态
       if (!tab.isConnected) {
+        if (tab.isConnecting) return;
         _reconnect();
         return;
       }
@@ -381,6 +553,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
     // 更新各 provider 的当前 tab（switchTab 已恢复该 tab 的 engine/ssh/model）
     _currentTabId = tab.id;
+    _placeholderError = null; // 已有标签可承载提示，不再需要整屏占位
     _autoScrollChat = true; // 切换 tab 时重置自动滚动
     _showScrollToBottom = false;
     ref.read(chatProvider.notifier).switchTab(tab.id, hostId: tab.hostId);
@@ -391,8 +564,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     setState(() {});
 
     // 首帧渲染后确保 PTY 尺寸与终端视图同步，修复 Tab 补全时 prompt 被覆盖的问题
-    // 使用 Timer 延迟确保 xterm 内置的 resize 已完成，避免双重 SIGWINCH
-    // R2: 保留 Timer 引用，切换 tab / dispose 时取消，避免 Timer 在 widget 销毁后仍 pending
+    _scheduleSizeSync(tab);
+  }
+
+  /// 延迟到 xterm 完成自身布局后，把终端视图尺寸推给 PTY/SSH 通道
+  /// R2: 保留 Timer 引用，切换 tab / dispose 时取消，避免 Timer 在 widget 销毁后仍 pending
+  void _scheduleSizeSync(tp.TerminalTab tab) {
     _lastResizeTab = tab;
     _resizeTimer?.cancel();
     _resizeTimer = Timer(const Duration(milliseconds: 150), () {
@@ -424,34 +601,40 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
       }
       return;
     }
+    if (tab.isConnecting) return;
 
-    setState(() => _isConnecting = true);
-    try {
-      if (tab.isLocal) {
-        final newTab = await ref.read(tp.terminalProvider.notifier).reconnectLocal(tab.id);
-        if (newTab != null && newTab.localService != null) {
-          // 重新绑定 executor（service 已更新）
-          ref.read(agentProvider.notifier).setExecutor(newTab.localService, hostId: newTab.hostId);
-          // 重新绑定终端输入监听（旧闭包持有的是旧 localService 引用）
-          _tabOutputSubscription?.cancel();
-          _tabOutputSubscription = _setupTerminalListener(newTab);
-        }
-      } else {
-        final host = ref.read(hostsProvider.notifier).getHostById(tab.hostId);
-        if (host == null) {
-          setState(() => _connectionError = L10n.str.terminalHostNotFound);
-          return;
-        }
-        final newTab = await ref.read(tp.terminalProvider.notifier).reconnect(tab.id, host);
-        if (newTab != null && newTab.service != null) {
-          ref.read(agentProvider.notifier).setExecutor(newTab.service, hostId: newTab.hostId);
-          // 重新绑定终端输入监听（旧闭包持有的是旧 service 引用）
-          _tabOutputSubscription?.cancel();
-          _tabOutputSubscription = _setupTerminalListener(newTab);
-        }
+    tp.TerminalTab? newTab;
+    if (tab.isLocal) {
+      newTab = await ref.read(tp.terminalProvider.notifier).reconnectLocal(tab.id);
+      if (!mounted) return;
+      if (newTab?.localService != null) {
+        // 重新绑定 executor（service 已更新）
+        ref.read(agentProvider.notifier).setExecutor(newTab!.localService, hostId: newTab.hostId);
+        // 重新绑定终端输入监听（旧闭包持有的是旧 localService 引用）
+        _tabOutputSubscription?.cancel();
+        _tabOutputSubscription = _setupTerminalListener(newTab);
+        if (newTab.id == _currentTabId) _scheduleSizeSync(newTab);
       }
-    } finally {
-      setState(() => _isConnecting = false);
+    } else {
+      final host = ref.read(hostsProvider.notifier).getHostById(tab.hostId);
+      if (host == null) {
+        _showOperationMessage(L10n.str.terminalHostNotFound, isError: true);
+        return;
+      }
+      newTab = await ref.read(tp.terminalProvider.notifier).reconnect(tab.id, host);
+      if (!mounted) return;
+      if (newTab?.service != null) {
+        ref.read(agentProvider.notifier).setExecutor(newTab!.service, hostId: newTab.hostId);
+        // 重新绑定终端输入监听（旧闭包持有的是旧 service 引用）
+        _tabOutputSubscription?.cancel();
+        _tabOutputSubscription = _setupTerminalListener(newTab);
+        if (newTab.id == _currentTabId) _scheduleSizeSync(newTab);
+      }
+    }
+
+    if (newTab == null) {
+      // 失败原因存在 tab.connectionError 上，主区按状态渲染；这里补一条即时反馈
+      _showOperationMessage(tab.connectionError ?? L10n.str.connectionFailedHint, isError: true);
     }
   }
 
@@ -522,9 +705,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                     title: Text(host.name, style: TextStyle(fontSize: fBody, color: tc.textMain)),
                     subtitle: Text('${host.username}@${host.host}', style: TextStyle(fontSize: fMicro, color: tc.textSub, fontFamily: 'JetBrainsMono')),
                     trailing: Icon(Icons.open_in_new, size: 14, color: tc.textMuted),
-                    onTap: () async {
+                    onTap: () {
                       Navigator.pop(context);
-                      await _connectToNewTab(host);
+                      _openHostTab(host);
                     },
                   );
                 },
@@ -536,59 +719,46 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
-  /// 在新标签中连接服务器
-  Future<void> _connectToNewTab(dynamic host) async {
-    final l10n = AppLocalizations.of(context)!;
-    final password = await CredentialsStore.get(hostId: host.id, type: 'password');
-    final privateKey = await CredentialsStore.get(hostId: host.id, type: 'privateKey');
-
-    if (password == null && privateKey == null) {
-      final ctx = context;
-      if (!ctx.mounted) return;
-      ScaffoldMessenger.of(ctx).showSnackBar(
-        SnackBar(
-          content: Text(l10n.terminalHostNoCredentials(host.name)),
-          backgroundColor: cWarning,
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route is PageRoute<dynamic> && route != _subscribedRoute) {
+      if (_subscribedRoute != null) appRouteObserver.unsubscribe(this);
+      _subscribedRoute = route;
+      appRouteObserver.subscribe(this, route);
     }
+  }
 
-    try {
-      await ref.read(tp.terminalProvider.notifier).openTab(
-        host,
-        password: password,
-        privateKeyContent: privateKey,
-      );
-      // 更新终端显示到新标签
-      final tab = ref.read(tp.terminalProvider).activeTab;
-      if (tab != null && tab.isConnected) {
-        _switchToTab(tab);
-      }
-    } catch (e) {
-      final ctx = context;
-      if (!ctx.mounted) return;
-      ScaffoldMessenger.of(ctx).showSnackBar(
-        SnackBar(
-          content: Text(l10n.terminalConnectHostFailed(host.name, '$e')),
-          backgroundColor: cDanger,
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
+  /// 从设置页等子路由返回：设置页里的端点/模型改动不会自动进入已存在的
+  /// Agent 引擎，这里强制重读端点并同步当前 host 的模型配置。
+  @override
+  void didPopNext() {
+    _refreshModelsAfterSettings();
+  }
+
+  Future<void> _refreshModelsAfterSettings() async {
+    if (!mounted) return;
+    await ref.read(aiEndpointsProvider.notifier).loadEndpoints();
+    if (!mounted) return;
+    _syncModelWithEndpoints(ref.read(aiEndpointsProvider));
+    setState(() {});
   }
 
   @override
   void dispose() {
+    appRouteObserver.unsubscribe(this);
     _resizeTimer?.cancel();
     _resizeTimer = null;
     _tabOutputSubscription?.cancel();
     _terminalOutputSubscription?.cancel();
     _scrollController.dispose();
     _chatScrollController.dispose();
+    final notifier = _agentNotifier;
+    if (notifier != null && notifier.secretRequestHandler == _requestSecret) {
+      notifier.secretRequestHandler = null;
+    }
+    _agentNotifier = null;
     super.dispose();
   }
 
@@ -616,6 +786,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         _scrollChatToBottom();
       }
     });
+    // 设置页改了端点/模型后同步当前 host；运行中延后到任务结束，
+    // 避免保存配置顺手把正在跑的任务取消掉。
+    ref.listen<List<AIEndpoint>>(aiEndpointsProvider, (_, __) {
+      _scheduleModelSync();
+    });
+    ref.listen<AgentState>(agentProvider, (prev, next) {
+      if (_pendingModelSync && prev?.isRunning == true && !next.isRunning) {
+        _scheduleModelSync();
+      }
+    });
 
     return Scaffold(
       backgroundColor: tc.bg,
@@ -627,7 +807,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
           // 终端 + AI 面板主体
           Expanded(
-            child: _buildMainBody(host, chatState, agentState, activeTab),
+            child: _buildMainBody(chatState, agentState, activeTab),
           ),
 
           // 快捷按键行（仅 Android / iOS 显示，桌面端不需要）
@@ -640,33 +820,43 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   /// 主体区域：终端 + AI 面板 + SFTP 侧面板，根据面板位置切换布局
-  Widget _buildMainBody(dynamic host, ChatState chatState, AgentState agentState, tp.TerminalTab? tab) {
+  Widget _buildMainBody(ChatState chatState, AgentState agentState, tp.TerminalTab? tab) {
 
-    // 终端视图
+    // 终端视图。主区渲染只看活动标签自己的连接阶段：页面级不再留一份
+    // "连接中"副本，否则顶栏指向新标签、画面还停在旧标签。
+    final placeholder = _buildConnectionPlaceholder(tab);
+
     final terminalView = Stack(
       children: [
-        _isConnecting
-            ? _buildConnectingView(host)
-            : _connectionError != null
-                ? _buildErrorView()
-                : term_widget.TerminalView(
-                    terminal: _terminal,
-                    fontSize: _terminalFontSize,
-                    onSend: (command) {
-                      final t = ref.read(tp.terminalProvider).activeTab;
-                      if (t == null) return;
-                      if (t.isLocal) {
-                        t.localService?.execute(command);
-                      } else {
-                        t.service?.execute(command);
-                      }
-                    },
-                  ),
-        if (tab != null && !tab.isConnected)
+        term_widget.TerminalView(
+          terminal: _terminal,
+          fontSize: _terminalFontSize,
+          onSend: (command) {
+            final t = ref.read(tp.terminalProvider).activeTab;
+            if (t == null) return;
+            if (t.isLocal) {
+              t.localService?.execute(command);
+            } else {
+              t.service?.execute(command);
+            }
+          },
+        ),
+        // AnimatedSwitcher 常驻：让它从"过渡/错误视图"切回空占位，
+        // 连接成功时才有淡出动画（整个开关被移除的话是直接消失）
+        Positioned.fill(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            child: placeholder ?? const SizedBox.shrink(),
+          ),
+        ),
+        if (tab != null &&
+            (tab.status == tp.TabStatus.reconnecting || tab.status == tp.TabStatus.lost))
           Positioned(
             top: 8,
             right: 8,
-            child: _buildDisconnectedChip(),
+            child: _buildDisconnectedChip(tab),
           ),
       ],
     );
@@ -729,6 +919,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             ? (isRight ? const SizedBox.shrink() : GestureDetector(
                 // 移动端底部布局：可拖拽调整高度的手柄
                 onPanUpdate: onDrag,
+                onPanEnd: (_) => _savePanelLayout(savePosition: false),
                 child: Container(
                   height: 20,
                   width: double.infinity,
@@ -747,6 +938,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               ))
             : GestureDetector(
               onPanUpdate: onDrag,
+              onPanEnd: (_) => _savePanelLayout(savePosition: false),
               child: MouseRegion(
                 cursor: isRight ? SystemMouseCursors.resizeColumn : SystemMouseCursors.resizeRow,
                 child: Container(
@@ -1003,24 +1195,30 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           );
           if (confirmed != true) return;
         }
-        ref.read(chatProvider.notifier).removeTab(tab.id);
-        ref.read(agentProvider.notifier).removeTab(tab.id, hostId: tab.hostId);
-        _tabAiInputText.remove(tab.id);
-        _tabExecutingCommand.remove(tab.id);
-        _tabExecutedCommands.remove(tab.id);
-        _tabPendingConfirm.remove(tab.id);
-        _tabTerminals.remove(tab.id);
-        _tabSftpVisible.remove(tab.id);
-        await ref.read(tp.terminalProvider.notifier).closeTab(tab.id);
-        final newActiveTab = ref.read(tp.terminalProvider).activeTab;
-        if (newActiveTab != null) {
-          _switchToTab(newActiveTab);
-        }
-        if (ref.read(tp.terminalProvider).tabs.isEmpty && mounted) {
-          _connectLocalTerminal();
-        }
+        await _removeTab(tab);
       },
     );
+  }
+
+  /// 关闭标签并清理页面侧的 per-tab 状态（tab 项的 x 与连接失败视图共用）
+  Future<void> _removeTab(tp.TerminalTab tab) async {
+    ref.read(chatProvider.notifier).removeTab(tab.id);
+    ref.read(agentProvider.notifier).removeTab(tab.id, hostId: tab.hostId);
+    _tabAiInputText.remove(tab.id);
+    _tabExecutingCommand.remove(tab.id);
+    _tabExecutedCommands.remove(tab.id);
+    _tabPendingConfirm.remove(tab.id);
+    _tabTerminals.remove(tab.id);
+    _tabSftpVisible.remove(tab.id);
+    await ref.read(tp.terminalProvider.notifier).closeTab(tab.id);
+    if (!mounted) return;
+    final newActiveTab = ref.read(tp.terminalProvider).activeTab;
+    if (newActiveTab != null) {
+      _switchToTab(newActiveTab);
+    }
+    if (ref.read(tp.terminalProvider).tabs.isEmpty) {
+      _connectLocalTerminal();
+    }
   }
 
   /// "+" 新标签按钮
@@ -1087,14 +1285,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   Widget _buildConnectionBadge(tp.TerminalTab? tab) {
-    final connected = tab?.isConnected == true;
+    final status = tab?.status;
+    final connected = status == tp.TabStatus.connected;
+    final connecting = status == tp.TabStatus.connecting || status == tp.TabStatus.reconnecting;
+    final dotColor = connected ? cSuccess : (connecting ? cWarning : cDanger);
     final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: (connected ? cSuccess : cDanger).withValues(alpha: 0.1),
+        color: dotColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(rFull),
-        border: Border.all(color: (connected ? cSuccess : cDanger).withValues(alpha: 0.2)),
+        border: Border.all(color: dotColor.withValues(alpha: 0.2)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1103,17 +1304,19 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
             width: 6,
             height: 6,
             decoration: BoxDecoration(
-              color: connected ? cSuccess : cDanger,
+              color: dotColor,
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(color: (connected ? cSuccess : cDanger).withValues(alpha: 0.5), blurRadius: 4),
+                BoxShadow(color: dotColor.withValues(alpha: 0.5), blurRadius: 4),
               ],
             ),
           ),
           const SizedBox(width: 5),
           Text(
-            connected ? l10n.terminalConnected : l10n.terminalOffline,
-            style: TextStyle(fontSize: fMicro, color: connected ? cSuccess : cDanger, fontWeight: FontWeight.w500),
+            connected
+                ? l10n.terminalConnected
+                : (connecting ? l10n.connecting : l10n.terminalOffline),
+            style: TextStyle(fontSize: fMicro, color: dotColor, fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -1329,65 +1532,166 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
-  // ==================== 连接中/错误 ====================
-  Widget _buildConnectingView(dynamic host) {
+  // ==================== 连接阶段视图 ====================
+
+  /// 活动标签处于"终端还不存在"的阶段时返回覆盖层，其余阶段返回 null
+  /// 重连中的标签走 null 分支，刚读到的输出不会因为重连而凭空消失
+  Widget? _buildConnectionPlaceholder(tp.TerminalTab? tab) {
+    if (tab == null) {
+      final notice = _placeholderError;
+      return notice != null ? _buildNoticeView(notice) : _buildConnectingView(null);
+    }
+    switch (tab.status) {
+      case tp.TabStatus.connecting:
+        return _buildConnectingView(tab);
+      case tp.TabStatus.failed:
+        return _buildTabErrorView(tab);
+      case tp.TabStatus.connected:
+      case tp.TabStatus.reconnecting:
+      case tp.TabStatus.lost:
+        return null;
+    }
+  }
+
+  /// 过渡视图：标签注册后、底层建连返回前占住主区
+  Widget _buildConnectingView(tp.TerminalTab? tab) {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
-    return Center(
+    final hostId = tab?.hostId ?? widget.hostId;
+    final host = (hostId == null || hostId == 'local')
+        ? null
+        : HostsDao.getCachedById(hostId);
+    final name = tab?.title ?? host?.name ?? '';
+    return Container(
+      key: const ValueKey('tab-connecting'),
+      color: tc.terminalBg,
+      alignment: Alignment.center,
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
             width: 24, height: 24,
             child: CircularProgressIndicator(strokeWidth: 2, color: tc.brand),
           ),
           const SizedBox(height: 12),
-          Text(l10n.terminalConnecting(host?.host ?? ''), style: TextStyle(color: tc.textSub, fontSize: fBody)),
+          Text(l10n.terminalConnecting(name), style: TextStyle(color: tc.textSub, fontSize: fBody)),
+          if (host != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              '${host.username}@${host.host}:${host.port}',
+              style: TextStyle(color: tc.textMuted, fontSize: fMicro, fontFamily: 'JetBrainsMono'),
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildErrorView() {
+  /// 首连失败视图：整块占据主区，说明原因并给出重试/编辑/关闭出路
+  Widget _buildTabErrorView(tp.TerminalTab tab) {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
+    return Container(
+      key: const ValueKey('tab-connect-failed'),
+      color: tc.bg,
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.wifi_tethering_error_rounded, size: 40, color: tc.error),
+              const SizedBox(height: 12),
+              Text(
+                '${l10n.connectionFailed} · ${tab.title}',
+                style: TextStyle(color: tc.textSub, fontSize: fBody),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              Flexible(
+                // 底层异常可能很长，允许滚动和复制，别把它截成看不懂的半句
+                child: SingleChildScrollView(
+                  child: SelectableText(
+                    tab.connectionError ?? l10n.connectionFailedHint,
+                    style: TextStyle(color: tc.error, fontSize: fSmall),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                alignment: WrapAlignment.center,
+                children: [
+                  ElevatedButton(
+                    onPressed: _reconnect,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: tc.brand,
+                      foregroundColor: tc.isLight ? Colors.white : cBg,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
+                    ),
+                    child: Text(l10n.retry, style: const TextStyle(fontSize: fBody)),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => context.push('/host/edit/${tab.hostId}'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: tc.textSub,
+                      side: BorderSide(color: tc.border),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
+                    ),
+                    child: Text(l10n.edit, style: const TextStyle(fontSize: fBody)),
+                  ),
+                  OutlinedButton(
+                    onPressed: () => _removeTab(tab),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: tc.textSub,
+                      side: BorderSide(color: tc.border),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
+                    ),
+                    child: Text(l10n.close, style: const TextStyle(fontSize: fBody)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 无法归属到任何标签的提示（例如路由里的 hostId 已被删除）
+  Widget _buildNoticeView(String message) {
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      key: const ValueKey('tab-notice'),
+      color: tc.bg,
+      padding: const EdgeInsets.all(32),
+      child: Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.error_outline, size: 40, color: tc.error),
             const SizedBox(height: 12),
-            Text(L10n.str.connectionFailed, style: TextStyle(color: tc.textSub, fontSize: fBody)),
-            const SizedBox(height: 6),
-            Text(_connectionError!, style: TextStyle(color: tc.error, fontSize: fSmall), textAlign: TextAlign.center),
+            Text(message, style: TextStyle(color: tc.error, fontSize: fSmall), textAlign: TextAlign.center),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                ElevatedButton(
-                  onPressed: _connectToHost,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: tc.brand,
-                    foregroundColor: tc.isLight ? Colors.white : cBg,
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
-                  ),
-                  child: Text(l10n.retry, style: const TextStyle(fontSize: fBody)),
-                ),
-                const SizedBox(width: 12),
-                OutlinedButton(
-                  onPressed: () => _connectLocalTerminal(),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: tc.textSub,
-                    side: BorderSide(color: tc.border),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
-                  ),
-                  child: Text(l10n.commonBack, style: const TextStyle(fontSize: fBody)),
-                ),
-              ],
+            OutlinedButton(
+              onPressed: () {
+                setState(() => _placeholderError = null);
+                _connectLocalTerminal();
+              },
+              style: OutlinedButton.styleFrom(
+                foregroundColor: tc.textSub,
+                side: BorderSide(color: tc.border),
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
+              ),
+              child: Text(l10n.commonBack, style: const TextStyle(fontSize: fBody)),
             ),
           ],
         ),
@@ -1395,25 +1699,91 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
-  Widget _buildDisconnectedChip() {
+  /// 曾连接的标签处于断开/重连阶段时的角标（保留终端内容，只叠加提示）
+  Widget _buildDisconnectedChip(tp.TerminalTab tab) {
     final l10n = AppLocalizations.of(context)!;
+    final retrying = tab.status == tp.TabStatus.reconnecting;
+    final color = retrying ? cWarning : cDanger;
     return GestureDetector(
-      onTap: _reconnect,
+      onTap: retrying ? null : _reconnect,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: cDanger.withValues(alpha: 0.15),
+          color: color.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(rFull),
-          border: Border.all(color: cDanger.withValues(alpha: 0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.warning_amber_rounded, color: cDanger, size: 12),
+            if (retrying)
+              SizedBox(
+                width: 11, height: 11,
+                child: CircularProgressIndicator(strokeWidth: 1.5, color: color),
+              )
+            else
+              const Icon(Icons.warning_amber_rounded, color: cDanger, size: 12),
             const SizedBox(width: 4),
-            Text(l10n.connectionInterrupted, style: const TextStyle(color: cDanger, fontSize: fMicro, fontWeight: FontWeight.w500)),
-            const SizedBox(width: 4),
-            Text(l10n.terminalReconnect, style: const TextStyle(color: cDanger, fontSize: fMicro, fontWeight: FontWeight.w600, decoration: TextDecoration.underline)),
+            Text(
+              retrying ? l10n.connecting : l10n.connectionInterrupted,
+              style: TextStyle(color: color, fontSize: fMicro, fontWeight: FontWeight.w500),
+            ),
+            if (!retrying) ...[
+              const SizedBox(width: 4),
+              Text(
+                l10n.terminalReconnect,
+                style: const TextStyle(
+                  color: cDanger, fontSize: fMicro, fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Agent 面板的等待态：首连进行中或已失败时给出一句实话。
+  /// 曾连接过的标签正在重连时返回 null —— 那会儿会话内容还在，值得留着看。
+  Widget? _buildAgentWaitingView(tp.TerminalTab? tab) {
+    final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
+    final isConnecting = tab == null || tab.status == tp.TabStatus.connecting;
+    final isFailed = tab?.status == tp.TabStatus.failed;
+    if (!isConnecting && !isFailed) return null;
+
+    final label = isFailed
+        ? '${l10n.connectionFailed} · ${tab!.title}'
+        : (tab == null ? l10n.connecting : l10n.terminalConnecting(tab.title));
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isConnecting)
+              SizedBox(
+                width: 18, height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: tc.brand),
+              )
+            else
+              Icon(Icons.wifi_tethering_error_rounded, size: 20, color: tc.error),
+            const SizedBox(height: 10),
+            Text(
+              label,
+              style: TextStyle(
+                color: isFailed ? tc.error : tc.textSub,
+                fontSize: fSmall,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              isFailed ? l10n.connectionFailedHint : l10n.terminalInputHintDisconnected,
+              style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),
@@ -1436,7 +1806,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         message: tooltip,
         waitDuration: const Duration(milliseconds: 500),
         child: GestureDetector(
-          onTap: () => setState(() => _aiPanelPosition = pos),
+          onTap: () {
+            setState(() => _aiPanelPosition = pos);
+            _savePanelLayout(savePosition: true);
+          },
           child: Container(
             width: 22,
             height: 22,
@@ -1597,6 +1970,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           // 会话压缩中横幅
           if (agentState.isCompacting)
             _buildCompactingBanner(tc),
+          // 目标横幅已下移到输入框之上（见 _buildBottomBar），与参考图顺序一致：
+          // 清单 → 目标 → 输入 → 底边指标。这里不再渲染，避免同屏两条目标行。
           // 消息列表 + 回到底部按钮
           Expanded(
             child: Stack(
@@ -1703,6 +2078,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   Widget _buildAgentChatList(AgentState agentState, tp.TerminalTab? tab) {
     final l10n = AppLocalizations.of(context)!;
     final items = agentState.chatItems;
+    // 终端还不存在的阶段（首连中/首连失败）不给上一标签的会话，也不提示"输入需求
+    // 开始自动执行"——那时输入框是灰的，提示只会让人以为能直接问
+    final waiting = _buildAgentWaitingView(tab);
+    if (waiting != null) return waiting;
     if (items.isEmpty) {
       return Center(child: Text(l10n.terminalInputHintEmpty, style: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fBody)));
     }
@@ -1729,7 +2108,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           tab: tab,
           showAutoExecute: true,
           isAgentRunning: agentState.isRunning,
-          isWaitingChoice: agentState.isWaitingChoice,
+          // 只有最后一条消息可能是"当前等待的询问"；历史消息里的旧询问不能
+          // 跟着变成可点，否则用户会误答一个早已结束的问题。
+          isWaitingChoice: agentState.isWaitingChoice && isLast,
           pendingOptions: agentState.isWaitingChoice && isLast ? agentState.pendingOptions : const [],
           enginePendingConfirm: isLast ? agentState.pendingConfirmCommand : null,
         );
@@ -1966,11 +2347,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     return const [];
   }
 
-  /// 执行一条变更的回滚：主机必须已连接，执行前二次确认，执行后写审计
+  /// 执行一条变更的回滚：远程变更需主机已连接，本机文件还原只需确认
   Future<void> _executeRollback(OperationChange change, String? hostId) async {
     if (_rollbackBusy) return;
-    final rollbackCommand = change.rollbackCommand?.trim() ?? '';
-    if (rollbackCommand.isEmpty) {
+    final cached = ChangeRecordsDao.getCachedById(change.id);
+    final rollbackCommand = change.rollbackCommand?.trim().isNotEmpty == true
+        ? change.rollbackCommand!.trim()
+        : (cached?.rollbackCommand?.trim() ?? '');
+    // 本机文件还原：把备份/回收区里的副本移回原路径，不经过 executor
+    final isLocalRestore =
+        change.localRestore || (cached?.isLocalFileRestore ?? false);
+    if (!isLocalRestore && rollbackCommand.isEmpty) {
       _showOperationMessage('该变更没有可执行的回滚命令', isError: true);
       return;
     }
@@ -1978,18 +2365,20 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     final targetHost =
         (hostId != null && hostId.trim().isNotEmpty) ? hostId.trim() : 'local';
     tp.TerminalTab? targetTab;
-    for (final tab in ref.read(tp.terminalProvider).tabs) {
-      if (tab.hostId == targetHost && tab.isConnected) {
-        targetTab = tab;
-        break;
+    if (!isLocalRestore) {
+      for (final tab in ref.read(tp.terminalProvider).tabs) {
+        if (tab.hostId == targetHost && tab.isConnected) {
+          targetTab = tab;
+          break;
+        }
       }
-    }
-    if (targetTab == null) {
-      _showOperationMessage(
-        '主机 ${targetHost == 'local' ? '本地' : targetHost} 未连接，无法执行回滚',
-        isError: true,
-      );
-      return;
+      if (targetTab == null) {
+        _showOperationMessage(
+          '主机 ${targetHost == 'local' ? '本地' : targetHost} 未连接，无法执行回滚',
+          isError: true,
+        );
+        return;
+      }
     }
 
     final tc = ThemeColors.of(context);
@@ -2007,8 +2396,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               Text('主机：$hostLabel',
                   style: TextStyle(color: tc.textMain, fontSize: fSmall)),
               const SizedBox(height: 8),
-              Text('将执行回滚命令：',
-                  style: TextStyle(color: tc.textSub, fontSize: fMicro)),
+              Text(
+                isLocalRestore ? '将把本机文件还原到：' : '将执行回滚命令：',
+                style: TextStyle(color: tc.textSub, fontSize: fMicro),
+              ),
               const SizedBox(height: 4),
               Container(
                 width: double.infinity,
@@ -2019,7 +2410,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                   border: Border.all(color: tc.border),
                 ),
                 child: SelectableText(
-                  rollbackCommand,
+                  isLocalRestore ? change.command : rollbackCommand,
                   style: TextStyle(
                     fontFamily: 'JetBrainsMono',
                     fontSize: fMono,
@@ -2029,7 +2420,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               ),
               const SizedBox(height: 8),
               Text(
-                '回滚会修改服务器状态，并写入审计记录。',
+                isLocalRestore
+                    ? '还原会把备份/回收区中的副本放回本机原路径，并写入审计记录。'
+                    : '回滚会修改服务器状态，并写入审计记录。',
                 style: TextStyle(color: tc.textMuted, fontSize: fMicro),
               ),
             ],
@@ -2051,25 +2444,30 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
     setState(() => _rollbackBusy = true);
     try {
-      final executor =
-          targetTab.isLocal ? targetTab.localService : targetTab.service;
-      if (executor == null || !executor.isConnected) {
-        _showOperationMessage('主机连接已断开，回滚未执行', isError: true);
-        return;
+      CommandExecutor? executor;
+      if (!isLocalRestore) {
+        executor = targetTab!.isLocal
+            ? targetTab.localService
+            : targetTab.service;
+        if (executor == null || !executor.isConnected) {
+          _showOperationMessage('主机连接已断开，回滚未执行', isError: true);
+          return;
+        }
       }
 
-      final cached = ChangeRecordsDao.getCachedById(change.id);
       final type =
           ChangeType.values.asNameMap()[change.type] ?? ChangeType.other;
-      final record = ChangeRecord(
-        id: change.id,
-        hostId: targetHost,
-        command: change.command,
-        type: cached?.type ?? type,
-        rollbackCommand: rollbackCommand,
-        timestamp: cached?.timestamp ?? DateTime.now(),
-        success: true,
-      );
+      // 优先用台账里的原始记录：本机还原对（localRestoreFrom/To）只存在于此
+      final record = cached ??
+          ChangeRecord(
+            id: change.id,
+            hostId: targetHost,
+            command: change.command,
+            type: type,
+            rollbackCommand: rollbackCommand,
+            timestamp: DateTime.now(),
+            success: true,
+          );
       final result =
           await ChangeRecordService.executeRollback(record, executor);
       if (!mounted) return;
@@ -2077,7 +2475,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
         _showOperationMessage('回滚未执行：主机未连接或没有回滚命令', isError: true);
       } else if (result.success) {
         setState(() => _rolledBackChangeIds.add(change.id));
-        _showOperationMessage('回滚成功：$rollbackCommand');
+        _showOperationMessage(
+            '回滚成功：${isLocalRestore ? result.stdout : rollbackCommand}');
       } else {
         final reason = result.stderr.trim().isNotEmpty
             ? result.stderr.trim()
@@ -2451,20 +2850,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 hostId: lastEventHostId(events),
               ),
             ),
-          // 执行清单常驻在事件流上方，运行中也始终可见
-          if (plan.isNotEmpty)
+          // 执行清单常驻在事件流上方，运行中也始终可见；
+          // 但贴底卡正在显示同一份计划时这里要抑制，否则同屏两份。
+          if (plan.isNotEmpty && !_planPinnedActive)
             PlanPanel(
               steps: plan,
               tc: tc,
               currentCommand: runningCommand,
             ),
-          // 运行中只展示最近事件，更早的折叠成一行；终态无 report 时保持原样
-          CollapsibleEventStream(
-            events: events,
-            tc: tc,
-            isRunning: isAgentRunning,
-            builder: buildEventContent,
-          ),
+          // 过程折叠由 AgentProcessTimeline 自己负责（一行一步 + 更早 N 步），
+          // 不再套一层 CollapsibleEventStream —— 两层折叠会互相打架。
+          buildEventContent(events),
           // 只有在还没有 AI 内容事件时（流式过程中，只有 result/info），才显示流式纯文本
           if (!hasAIContentEvents) ...[
             if (streamingContent.trim().isNotEmpty)
@@ -2620,6 +3016,83 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     }
   }
 
+  /// 掩码密码输入弹窗 —— Agent 的 provide_password 工具走这里收集特权密码。
+  ///
+  /// 返回值只在调用栈里流转到 CredentialsStore：不写 provider state、
+  /// 不进对话历史、也不落日志（AGENTS.md R7）。
+  Future<String?> _requestSecret(String title, String message) {
+    if (!mounted) return Future.value(null);
+    final tc = ThemeColors.of(context);
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        bool obscure = true;
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            backgroundColor: tc.cardElevated,
+            title: Text(title,
+                style: TextStyle(color: tc.textMain, fontSize: fBody)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(message,
+                    style:
+                        TextStyle(color: tc.textSub, fontSize: fSmall, height: 1.5)),
+                const SizedBox(height: pCompact),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  obscureText: obscure,
+                  style: TextStyle(color: tc.textMain, fontSize: fBody),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    labelText: '密码',
+                    labelStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
+                    filled: true,
+                    fillColor: tc.card,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: pCompact, vertical: pSmall),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(rInput),
+                      borderSide: BorderSide(color: tc.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(rInput),
+                      borderSide: BorderSide(color: tc.brand),
+                    ),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                          obscure ? Icons.visibility_off : Icons.visibility,
+                          size: 16,
+                          color: tc.textSub),
+                      tooltip: obscure ? '显示' : '隐藏',
+                      onPressed: () => setDialogState(() => obscure = !obscure),
+                    ),
+                  ),
+                  onSubmitted: (value) => Navigator.of(ctx).pop(value),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: Text('取消',
+                    style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(ctx).pop(controller.text),
+                child: const Text('确定', style: TextStyle(fontSize: fSmall)),
+              ),
+            ],
+          ),
+        );
+      },
+    ).whenComplete(controller.dispose);
+  }
+
   /// 直接执行命令行
   Future<void> _executeLineDirectly(String command, bool dangerous, tp.TerminalTab tab) async {
     // 危险命令：首次点击展开内联确认按钮，第二次点击确认才执行
@@ -2649,12 +3122,258 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     }
   }
 
+  /// 把文本交给 agent。`onSend` 与 `/goal` 首轮共用这段执行器绑定，避免两份实现漂移。
+  Future<void> _sendToAgent(String text, {required bool isConnected}) async {
+    if (!_checkAIModelConfigured()) {
+      _showAIModelNotConfiguredHint();
+      return;
+    }
+    _autoScrollChat = true; // 用户发送新消息时恢复自动滚动
+    if (!isConnected) return;
+    final tab = ref.read(tp.terminalProvider).activeTab;
+    // 本地终端用 localService，SSH 用 service
+    final CommandExecutor? executor =
+        tab?.isLocal == true ? tab?.localService : tab?.service;
+    final notifier = ref.read(agentProvider.notifier);
+    notifier.setExecutor(executor, hostId: tab?.hostId ?? 'local');
+    await notifier.startTask(text);
+  }
+
+  void _showGoalHint(String message) {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(SnackBar(
+      content: Text(message, style: const TextStyle(fontSize: 13)),
+      duration: const Duration(seconds: 3),
+    ));
+  }
+
+  /// `/plan`：只要计划、不执行。临时置只读，结束后**恢复原值而不是恢复 false**——
+  /// 本来就在只读模式的用户不该被这次操作顺手解锁。
+  Future<void> _runPlanOnly(String objective,
+      {required bool isConnected}) async {
+    final notifier = ref.read(agentProvider.notifier);
+    // 只读模式必须按 host 读写：计划任务可能跑几百秒，期间用户完全可能切 tab，
+    // 那时用"活跃 host"的 toggle 就会改到另一台机器上（AGENTS.md R3）
+    final planHostId = ref.read(agentProvider).hostId ?? 'local';
+    final wasReadOnly = notifier.isReadOnlyFor(planHostId);
+    if (!wasReadOnly) {
+      notifier.setReadOnlyForHost(planHostId, enabled: true);
+    }
+    try {
+      await _sendToAgent(
+        '【只要计划，不要执行】\n目标：$objective\n\n'
+        '请只输出执行计划（用 计划: 列出步骤与每步要跑的命令），不要执行任何命令；'
+        '本次已临时开启只读模式，任务结束后会恢复你原来的设置。',
+        isConnected: isConnected,
+      );
+    } finally {
+      // 重读一次：任务期间用户可能自己动过这个开关，只在他没动时还原。
+      // 页面已销毁时不还原——那种情况下留在只读是安全方向。
+      if (mounted) {
+        final nowReadOnly = notifier.isReadOnlyFor(planHostId);
+        if (shouldRestoreReadOnly(
+            wasReadOnly: wasReadOnly, nowReadOnly: nowReadOnly)) {
+          notifier.setReadOnlyForHost(planHostId, enabled: wasReadOnly);
+        }
+      }
+    }
+  }
+
+  /// `/model`：切模型。歧义时列候选让用户选，不猜——猜错等于换了一个计费不同的后端。
+  bool _handleModelCommand(String? rest) {
+    final choices =
+        AIModelSelectionService.allChoices(ref.read(aiEndpointsProvider));
+    if (choices.isEmpty) {
+      _showGoalHint('还没有配置模型，请到 设置 → AI 模型 添加');
+      return true;
+    }
+    String labelOf(AIModelChoice c) {
+      final duplicated = choices
+              .where((x) =>
+                  x.displayName.toLowerCase() == c.displayName.toLowerCase())
+              .length >
+          1;
+      return duplicated ? '${c.displayName}（${c.endpointName}）' : c.displayName;
+    }
+
+    final labels = {for (final c in choices) c.modelId: labelOf(c)};
+    final wanted = (rest ?? '').trim().toLowerCase();
+    if (wanted.isEmpty) {
+      final currentLabel =
+          labels[_currentModelConfig?.id] ?? _currentModelConfig?.name ?? '未选择';
+      final tier = _currentModelConfig?.reasoningLabel;
+      _showGoalHint('当前：$currentLabel${tier == null ? '' : ' $tier'}\n'
+          '可选：${labels.values.join('、')}\n用法：/model <名称>');
+      return true;
+    }
+    final candidates = matchModelNames(labels.values, wanted);
+    if (candidates.isEmpty) {
+      _showGoalHint('没有叫「$rest」的模型\n可选：${labels.values.join('、')}');
+      return true;
+    }
+    if (candidates.length > 1) {
+      _showGoalHint('「$rest」匹配到多个模型：${candidates.join('、')}\n请用完整名称');
+      return true;
+    }
+    final target = choices.firstWhere((c) => labels[c.modelId] == candidates.first);
+    _applyModelChoice(target);
+    _showGoalHint('已切换到模型：${labels[target.modelId]}');
+    return true;
+  }
+
+  /// `/export`：把当前会话复制到剪贴板，并指出执行日志文件的位置。
+  /// 不弹保存框、不新造格式——剪贴板是终端用户最容易接住的落点，
+  /// 日志则已经由 tracer 落成 NDJSON，指路比再造一份导出器更准。
+  bool _exportConversation() {
+    final text = formatConversationForExport(ref.read(agentProvider).chatItems);
+    if (text.isEmpty) {
+      _showGoalHint('当前会话还没有可导出的内容');
+      return true;
+    }
+    Clipboard.setData(ClipboardData(text: text));
+    final chars = text.characters.length;
+    AgentTracer.instance.tracePath().then((path) {
+      if (!mounted) return;
+      _showGoalHint(path == null
+          ? '会话已复制到剪贴板（$chars 字）'
+          : '会话已复制到剪贴板（$chars 字）\n执行日志：$path');
+    }).catchError((Object e) {
+      if (!mounted) return;
+      _showGoalHint('会话已复制到剪贴板（$chars 字）\n日志路径读取失败：$e');
+    });
+    return true;
+  }
+
+  void _showCommandHelp() {
+    final tc = ThemeColors.of(context);
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Agent 命令'),
+        content: SizedBox(
+          width: 460,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final c in kSlashCommands)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 92,
+                        child: Text(
+                          c.command,
+                          style: TextStyle(
+                            color: tc.brand,
+                            fontFamily: 'JetBrainsMono',
+                            fontSize: fSmall,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          c.description,
+                          style: TextStyle(
+                            color: tc.textSub,
+                            fontSize: fMicro,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// `/goal` 命令。子命令与目标文本的消歧见 [parseGoalCommand]。
+  bool _handleGoalCommand(String? rest, {required bool isConnected}) {
+    final notifier = ref.read(agentProvider.notifier);
+    final hostId = ref.read(agentProvider).hostId ?? 'local';
+    final cmd = parseGoalCommand(rest);
+    final existing = notifier.goalFor(hostId);
+
+    switch (cmd.sub) {
+      case null:
+        if (cmd.objective.isEmpty) {
+          _showGoalHint(existing == null
+              ? '用法：/goal <目标> 开始；/goal pause | resume | edit <新目标> | done | clear'
+              : '${existing.objective}\n状态 ${existing.status.name} · '
+                  '轮次 ${existing.roundsUsed}/${existing.maxRounds}'
+                  '${(existing.note ?? '').isEmpty ? '' : ' · ${existing.note}'}');
+          return true;
+        }
+        if (existing?.isActive == true) {
+          _showGoalHint('已有进行中的目标：${existing!.objective}\n'
+              '先 /goal done 结束，或 /goal edit <新目标> 改写');
+          return true;
+        }
+        final created = notifier.createGoal(hostId, cmd.objective);
+        if (created == null) {
+          _showGoalHint('目标文本不能为空');
+          return true;
+        }
+        // 立刻跑第一轮：`/goal xxx` 的语义是"开始"，不是"先记下来"
+        _sendToAgent(buildGoalContinuationPrompt(created),
+            isConnected: isConnected);
+        return true;
+      case 'pause':
+        _showGoalHint(notifier.pauseGoal(hostId)
+            ? '目标已暂停，不再自动续跑'
+            : '没有进行中的目标');
+        return true;
+      case 'resume':
+        // 失败原因（预算用尽 / 未连接 / 不在本会话）由 resumeGoal 写进 error
+        _showGoalHint(notifier.resumeGoal(hostId)
+            ? '目标已恢复，接着跑下一轮'
+            : '目标未能恢复，原因见上方提示');
+        return true;
+      case 'edit':
+        if (cmd.objective.isEmpty) {
+          _showGoalHint('用法：/goal edit <新目标>');
+          return true;
+        }
+        _showGoalHint(notifier.editGoal(hostId, cmd.objective)
+            ? '目标已改写（已用轮次继续累计，编辑不能重置预算）'
+            : '当前没有目标可改写；用 /goal <目标> 新建');
+        return true;
+      case 'done':
+        _showGoalHint(notifier.finishGoal(hostId) ? '目标已结束' : '没有进行中的目标');
+        return true;
+      case 'clear':
+        notifier.clearGoal(hostId);
+        _showGoalHint('目标记录已清除');
+        return true;
+      default:
+        return false;
+    }
+  }
+
   // ==================== 斜杠命令 ====================
   /// 处理斜杠命令，返回 true 表示已处理（不再发送）
   bool _handleSlashCommand(String command, {required bool isConnected}) {
     final l10n = AppLocalizations.of(context)!;
-    final cmd = command.trim().toLowerCase();
-    switch (cmd) {
+    // 命令名与参数分开取：整串 lowercase 会毁掉用户的目标原文，
+    // 而"首个 / 就当命令"会让 /etc/nginx 这类路径没法发给模型
+    final parsed = parseSlashCommand(
+      command,
+      knownNames: kSlashCommands.map((c) => c.command),
+    );
+    if (parsed == null) return false;
+    switch (parsed.name) {
       case '/new':
         _autoScrollChat = true;
         ref.read(agentProvider.notifier).newSession();
@@ -2665,7 +3384,44 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           ),
         );
         return true;
+      case '/goal':
+        return _handleGoalCommand(parsed.rest, isConnected: isConnected);
+      case '/plan':
+        final objective = (parsed.rest ?? '').trim();
+        if (objective.isEmpty) {
+          _showGoalHint('用法：/plan <要计划的目标>');
+          return true;
+        }
+        _runPlanOnly(objective, isConnected: isConnected);
+        return true;
+      case '/model':
+        return _handleModelCommand(parsed.rest);
+      case '/permission':
+        final notifier = ref.read(agentProvider.notifier);
+        final before = ref.read(agentProvider).isReadOnlyMode;
+        notifier.toggleReadOnlyMode();
+        final after = ref.read(agentProvider).isReadOnlyMode;
+        if (after == before) {
+          _showGoalHint('只读模式状态未变化，可能被运行中的任务锁定');
+        } else {
+          _showGoalHint(after
+              ? '只读模式已开启：agent 只查询，不改动任何状态'
+              : '只读模式已关闭（危险操作仍会逐个要求确认）');
+        }
+        return true;
+      case '/help':
+        _showCommandHelp();
+        return true;
+      case '/export':
+        return _exportConversation();
       case '/compact':
+        // §5-V8：压缩会并发起第二条流并重写引擎的对话历史，任务运行中做这件事
+        // 会让正在跑的 ReAct 循环看到被改写过的历史。输入框运行中本就禁用，
+        // 但目标模式会自动续跑，这个窗口被打开了，所以显式挡住。
+        if (ref.read(agentProvider).isRunning) {
+          _showGoalHint('任务进行中不能压缩记忆，请先停止任务');
+          return true;
+        }
         if (!isConnected) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -2704,12 +3460,31 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   }
 
   // ==================== 底部栏 ====================
+  /// 清单是否正贴底常驻（运行 / 暂停 / 待确认）。
+  ///
+  /// 会话流里那份 `PlanPanel` 据此抑制，避免同一份计划同屏出现两次。
+  /// 条件必须是任务状态而不是"是否存在贴底卡"这个布尔值：终态后贴底卡消失，
+  /// 会话流那份要恢复显示，否则历史回看时清单两处都看不见。
+  bool get _planPinnedActive {
+    final s = ref.read(agentProvider);
+    return s.currentTask != null &&
+        (s.isRunning ||
+            s.status == AgentStatus.paused ||
+            s.status == AgentStatus.waitingConfirm);
+  }
+
   Widget _buildBottomBar(ChatState chatState, AgentState agentState, tp.TerminalTab? tab) {
     final isConnected = tab?.isConnected == true;
-    // 从 provider 读取（已注入 apiKey），而非直接读 Hive
-    final models = ref.read(aiModelsProvider);
+    // 端点状态已注入 API Key；当前模型优先取活跃 host 实际使用的配置
+    final endpoints = ref.watch(aiEndpointsProvider);
+    final currentModel =
+        ref.read(agentProvider.notifier).modelConfig ?? _currentModelConfig;
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final List<PlanStep> pinnedPlan = agentState.chatItems.isNotEmpty &&
+            agentState.chatItems.last.role == 'assistant'
+        ? _findLatestPlan(agentState.chatItems.last.events)
+        : const [];
 
     return Container(
       padding: EdgeInsets.only(
@@ -2738,10 +3513,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               task: agentState.currentTask,
               status: agentState.status,
               tc: tc,
-              plan: agentState.chatItems.isNotEmpty &&
-                      agentState.chatItems.last.role == 'assistant'
-                  ? _findLatestPlan(agentState.chatItems.last.events)
-                  : const [],
+              plan: pinnedPlan,
               onPause: () => ref.read(agentProvider.notifier).pause(),
               onResume: () => ref.read(agentProvider.notifier).resume(),
               onStop: () => ref.read(agentProvider.notifier).cancel(),
@@ -2749,6 +3521,39 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 setState(() => _isAIPanelVisible = false);
                 SettingsDao.set('aiPanelVisible', false);
               },
+            ),
+          // 执行清单贴底常驻：运行中"我现在在哪"的锚点，跟着消息流滚走等于没有。
+          // 限高 168 卡内滚动，长计划不会把输入框顶出屏幕。
+          if (_planPinnedActive && pinnedPlan.isNotEmpty)
+            PlanPanel(
+              steps: pinnedPlan,
+              tc: tc,
+              maxHeight: 168,
+            ),
+          // 目标行：清单之下、输入框之上（参考图顺序）。运行中输入框禁用，
+          // 暂停/编辑/结束必须在这里可点，只给 /goal 命令等于没法中途停下。
+          if (agentState.goal != null)
+            AgentGoalBanner(
+              goal: agentState.goal!,
+              tc: tc,
+              onPause: () => ref
+                  .read(agentProvider.notifier)
+                  .pauseGoal(agentState.goal!.hostId),
+              onResume: () => ref
+                  .read(agentProvider.notifier)
+                  .resumeGoal(agentState.goal!.hostId),
+              onFinish: () {
+                final g = agentState.goal!;
+                final notifier = ref.read(agentProvider.notifier);
+                if (g.status == AgentGoalStatus.finished) {
+                  notifier.clearGoal(g.hostId);
+                } else {
+                  notifier.finishGoal(g.hostId);
+                }
+              },
+              onEdit: (text) => ref
+                  .read(agentProvider.notifier)
+                  .editGoal(agentState.goal!.hostId, text),
             ),
           // 工具栏
           Row(
@@ -2775,6 +3580,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 icon: Icons.history_outlined,
                 tooltip: l10n.terminalSessionHistory,
                 onTap: () => _showSessionHistoryPanel(context),
+                tc: tc,
+              ),
+              const SizedBox(width: 4),
+              // 新建会话：不用先打开历史面板
+              _buildToolbarIconButton(
+                icon: Icons.add_comment_outlined,
+                tooltip: l10n.sessionNew,
+                onTap: _startNewSession,
                 tc: tc,
               ),
               const SizedBox(width: 4),
@@ -2835,9 +3648,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
                 ),
               if (agentState.isRunning)
                 const SizedBox(width: 6),
-              // 模型选择
-              if (models.isNotEmpty)
-                _buildModelSelector(models, tc),
             ],
           ),
           const SizedBox(height: 8),
@@ -2845,7 +3655,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
           AIPromptInput(
             enabled: isConnected,
             isRunning: agentState.isRunning,
-            hintText: _getInputHint(isConnected, agentState.isRunning, agentState.isOrchestratorMode),
+            hintText: _getInputHint(isConnected, agentState.isRunning, agentState.isOrchestratorMode,
+                connecting: tab?.isConnecting == true),
             initialText: _tabAiInputText[_currentTabId ?? ''] ?? '',
             accentColor: tc.brand,
             isOrchestratorMode: agentState.isOrchestratorMode,
@@ -2860,21 +3671,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
               return _handleSlashCommand(command, isConnected: isConnected);
             },
             onStop: () => ref.read(agentProvider.notifier).cancel(),
-            onSend: (text) async {
-              if (!_checkAIModelConfigured()) {
-                _showAIModelNotConfiguredHint();
-                return;
-              }
-              _autoScrollChat = true; // 用户发送新消息时恢复自动滚动
-              if (isConnected) {
-                final tab = ref.read(tp.terminalProvider).activeTab;
-                // 本地终端用 localService，SSH 用 service
-                final CommandExecutor? executor = tab?.isLocal == true ? tab?.localService : tab?.service;
-                ref.read(agentProvider.notifier).setExecutor(executor, hostId: tab?.hostId ?? 'local');
-                await ref.read(agentProvider.notifier).startTask(text);
-              }
-            },
+            onSend: (text) => _sendToAgent(text, isConnected: isConnected),
+            footer: _buildModelCapsule(currentModel, endpoints, tc),
           ),
+          // 底边状态条：参考界面把数字放在输入框之下、贴着窗口底边，运行中与终态
+          // 共用同一条。位置不随任务结束而改变，用户不用来回找数字。
+          if (agentState.currentTask != null)
+            AgentMetricsBar(
+              task: agentState.currentTask!,
+              tc: tc,
+              contextWindow: currentModel?.effectiveContextWindow,
+              running: agentState.isRunning,
+            ),
         ],
       ),
     );
@@ -2906,73 +3714,138 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
-  /// 模型选择器 - 紧凑按钮
-  Widget _buildModelSelector(List<AIModelConfig> models, ThemeColors tc) {
+  /// 输入框底部的模型 + 思考档位胶囊。点开是按端点分组的模型选择面板。
+  Widget _buildModelCapsule(
+      AIModelConfig? currentModel, List<AIEndpoint> endpoints, ThemeColors tc) {
     final l10n = AppLocalizations.of(context)!;
-    return PopupMenuButton<String>(
-      onSelected: (modelId) {
-        final model = models.firstWhere((m) => m.id == modelId);
-        _switchModel(model);
-      },
-      offset: const Offset(0, -70),
-      color: tc.cardElevated,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
-      itemBuilder: (context) => models.map((m) {
-        final isActive = m.id == _currentModelConfig?.id;
-        return PopupMenuItem<String>(
-          value: m.id,
-          height: 32,
-          child: Row(
-            children: [
-              Container(
-                width: 6, height: 6,
-                decoration: BoxDecoration(
-                  color: isActive ? tc.brand : Colors.transparent,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                m.name,
-                style: TextStyle(
-                  fontSize: fSmall,
-                  color: isActive ? tc.brand : tc.textMain,
-                ),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                m.modelName,
-                style: TextStyle(fontSize: fMicro, color: ThemeColors.of(context).textMuted),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
-      child: Container(
-        height: 30,
-        padding: const EdgeInsets.symmetric(horizontal: 6),
-        decoration: BoxDecoration(
-          color: tc.surface,
-          borderRadius: BorderRadius.circular(rSmall),
-          border: Border.all(color: tc.border.withValues(alpha: 0.3)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.psychology_outlined, size: 12, color: tc.textMuted),
-            const SizedBox(width: 3),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 80),
-              child: Text(
-                _currentModelConfig?.name ?? l10n.terminalModel,
-                style: TextStyle(fontSize: fSmall, color: tc.textSub, height: 1.0),
-                overflow: TextOverflow.ellipsis,
-              ),
+    final choices = AIModelSelectionService.allChoices(endpoints);
+
+    if (choices.isEmpty) {
+      return Tooltip(
+        message: l10n.aiModelEmptyTitle,
+        child: InkWell(
+          onTap: () => context.push('/settings/ai'),
+          borderRadius: BorderRadius.circular(rFull),
+          child: Container(
+            height: 24,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              color: cWarning.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(rFull),
+              border: Border.all(color: cWarning.withValues(alpha: 0.4)),
             ),
-            Icon(Icons.unfold_more, size: 10, color: tc.textMuted),
-          ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.warning_amber_rounded,
+                    size: 12, color: cWarning),
+                const SizedBox(width: 4),
+                Text(
+                  l10n.terminalConfigureModel,
+                  style: const TextStyle(fontSize: fMicro, color: cWarning),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final currentChoice = currentModel == null
+        ? null
+        : AIModelSelectionService.findChoice(endpoints, currentModel.id);
+    final labelBase =
+        currentChoice?.displayName ?? currentModel?.name ?? l10n.terminalModel;
+    final effort = currentModel?.reasoningLabel;
+    final label =
+        effort == null || effort.isEmpty ? labelBase : '$labelBase $effort';
+
+    String? currentTierLevel;
+    if (currentChoice != null) {
+      currentTierLevel = currentChoice.model
+          .resolveReasoningTier(
+              AIModelSelectionService.tierFor(currentChoice.modelId))
+          ?.level;
+    }
+
+    return MenuAnchor(
+      controller: _modelMenuController,
+      alignmentOffset: const Offset(0, -8),
+      style: MenuStyle(
+        backgroundColor: WidgetStatePropertyAll(tc.cardElevated),
+        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+        elevation: const WidgetStatePropertyAll(10),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(rMedium),
+            side: BorderSide(color: tc.border),
+          ),
         ),
       ),
+      menuChildren: [
+        ModelPickerPanel(
+          endpoints: endpoints,
+          currentModelId: currentModel?.id,
+          currentTierLevel: currentTierLevel,
+          tc: tc,
+          onModelSelected: (choice, tier) =>
+              _applyModelChoice(choice, tier: tier),
+          onTierSelected: _applyReasoningTier,
+          onManage: () {
+            _modelMenuController.close();
+            context.push('/settings/ai');
+          },
+          onDone: () => _modelMenuController.close(),
+        ),
+      ],
+      builder: (context, controller, child) {
+        return Tooltip(
+          message: l10n.terminalModelAndReasoning,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(rFull),
+            onTap: () {
+              if (ref.read(agentProvider).isRunning) {
+                _showGoalHint(l10n.terminalModelLockedRunning);
+                return;
+              }
+              controller.isOpen ? controller.close() : controller.open();
+            },
+            child: Container(
+              height: 24,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                color: tc.surface,
+                borderRadius: BorderRadius.circular(rFull),
+                border: Border.all(color: tc.border.withValues(alpha: 0.5)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.psychology_outlined,
+                      size: 12, color: tc.textMuted),
+                  const SizedBox(width: 4),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 170),
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: fMicro,
+                        color: tc.textSub,
+                        height: 1.0,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 3),
+                  Icon(Icons.unfold_more, size: 11, color: tc.textMuted),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -3487,9 +4360,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
     );
   }
 
-  String _getInputHint(bool isConnected, bool isRunning, bool isOrchestrator) {
+  String _getInputHint(bool isConnected, bool isRunning, bool isOrchestrator,
+      {bool connecting = false}) {
     final l10n = AppLocalizations.of(context)!;
     if (isRunning) return l10n.terminalInputHintRunning;
+    if (connecting) return l10n.connecting;
     if (!isConnected) return l10n.terminalInputHintDisconnected;
     if (isOrchestrator) return l10n.terminalInputHintOrchestrator;
     return l10n.terminalInputHintDefault;
@@ -3497,8 +4372,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
 
   bool _checkAIModelConfigured() {
     try {
-      return AIModelsDao.cached.isNotEmpty;
-    } catch (_) { return false; }
+      return AIEndpointsDao.cached.any((e) => e.models.isNotEmpty);
+    } catch (_) {
+      return false;
+    }
   }
 
   void _showAIModelNotConfiguredHint() {
@@ -3552,6 +4429,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> {
   /// 显示会话历史面板（侧边抽屉式）
   void _showSessionHistoryPanel(BuildContext context) {
     showDialog(context: context, builder: (context) => const SessionHistoryDialog());
+  }
+
+  /// 新建会话（不经过历史面板）
+  Future<void> _startNewSession() async {
+    await ref.read(agentProvider.notifier).newSession();
+    if (!mounted) return;
+    _showOperationMessage(AppLocalizations.of(context)!.terminalSessionCreated);
   }
 
   /// 显示最大步骤数设置

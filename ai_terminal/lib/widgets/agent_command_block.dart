@@ -75,15 +75,20 @@ class AgentCommandBlock extends StatelessWidget {
         !isTool &&
         !executed;
     final safetyLevel = SafetyGuard.check(trimmed);
+    final isWaitingConfirm = !executed && pendingConfirmCommand == trimmed;
     // 只有 warn / blocked 级才视为危险命令，需要用户确认。
     // info 级（如 npm install、systemctl restart、git clone）引擎会自动执行，
     // 这里若也标黄会与实际行为不一致——显示"需确认"却直接跑，造成误导。
-    final dangerous = !isTool &&
-        (safetyLevel == SafetyLevel.warn ||
+    //
+    // 工具调用没有 SafetyLevel（它不走 shell 安全检查），但引擎会为破坏性工具
+    // （如 local_file_delete）挂起等待确认。此时必须按危险处理：
+    // 确认按钮的条件是 dangerous && isWaitingConfirm，若工具永远不 dangerous，
+    // 用户就看不到批准入口，任务只能挂到 10 分钟超时被自动拒绝。
+    final dangerous = isTool
+        ? isWaitingConfirm
+        : (safetyLevel == SafetyLevel.warn ||
             safetyLevel == SafetyLevel.blocked);
     final isBlocked = !isTool && safetyLevel == SafetyLevel.blocked;
-    final isWaitingConfirm =
-        !isTool && !executed && pendingConfirmCommand == trimmed;
 
     final cmdColor = isBlocked
         ? tc.error
@@ -179,16 +184,15 @@ class AgentCommandBlock extends StatelessWidget {
                       // 复制按钮
                       _buildCopyButton(trimmed, tc, context),
                       const SizedBox(width: 4),
-                      // 执行按钮 或 内联确认按钮（工具调用不提供执行）
-                      if (canExecute && !isLoading && !isBlocked) ...[
-                        if (dangerous && isWaitingConfirm) ...[
-                          // 危险命令待确认：显示取消 + 确认按钮
-                          _buildInlineConfirmButtons(trimmed, tc, ui),
-                        ] else ...[
-                          _buildExecuteButton(
-                              trimmed, dangerous, isBlocked, tc, tab),
-                        ],
-                      ] else if (isBlocked)
+                      // 执行按钮（工具调用与已执行过的命令不给执行入口）
+                      //
+                      // 确认按钮不放在这里：见 _buildRiskPanel —— 它必须和影响
+                      // 说明同屏，否则面板滚到底看到"删除本机文件…"时，批准
+                      // 按钮还在卡片头部上方，用户得先往上滚才能点。
+                      if (canExecute && !isLoading && !isBlocked)
+                        _buildExecuteButton(
+                            trimmed, dangerous, isBlocked, tc, tab)
+                      else if (isBlocked)
                         Container(
                           width: 26,
                           height: 26,
@@ -252,7 +256,13 @@ class AgentCommandBlock extends StatelessWidget {
     String command, {
     required bool requiresConfirm,
   }) {
-    final explanation = RiskExplainer.explain(command);
+    // 工具展示串（`local_file_delete\n  path: x`）不是 shell 命令，交给 explain
+    // 会按 shell 语义猜类型并说成"修改服务器状态"——本机工具改的是这台机器。
+    final explanation = isTool
+        ? RiskExplainer.explainTool(command.split('\n').first.trim())
+        : RiskExplainer.explain(command);
+    // 批准入口跟着影响说明走：两者必须在同一屏，用户是看着这段话按批准的
+    final isWaitingConfirm = !executed && pendingConfirmCommand == command;
     final color = isBlocked ? tc.error : tc.warn;
     return Container(
       width: double.infinity,
@@ -307,17 +317,25 @@ class AgentCommandBlock extends StatelessWidget {
           ],
           const SizedBox(height: 2),
           Text(
-            explanation.canRollback
-                ? ui.rollbackPrefix(explanation.rollbackCommand ?? '')
-                : ui.noRollbackSnapshot,
+            explanation.restoreHint ??
+                (explanation.canRollback
+                    ? ui.rollbackPrefix(explanation.rollbackCommand ?? '')
+                    : ui.noRollbackSnapshot),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: explanation.canRollback ? tc.textSub : color,
+              color:
+                  explanation.canRollback || explanation.restoreHint != null
+                      ? tc.textSub
+                      : color,
               fontSize: fMicro,
               fontWeight: FontWeight.w500,
             ),
           ),
+          if (requiresConfirm && isWaitingConfirm) ...[
+            const SizedBox(height: 7),
+            _buildInlineConfirmButtons(command, tc, ui),
+          ],
         ],
       ),
     );

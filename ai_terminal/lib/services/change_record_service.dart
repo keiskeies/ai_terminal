@@ -1,9 +1,12 @@
+import 'dart:io';
+import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 import '../core/safety_guard.dart';
 import '../models/change_record.dart';
 import 'command_executor.dart';
 import 'daos.dart';
 import '../utils/audit_logger.dart' show AuditLogger;
+import '../utils/tool_args_parser.dart';
 
 /// 变更台账服务 — 记录每次修改性命令，支持查询和回滚
 class ChangeRecordService {
@@ -20,30 +23,21 @@ class ChangeRecordService {
   static bool _hasSudo(String command) =>
       RegExp(r'^sudo\s+').hasMatch(command.trim());
 
-  static const _fileChangeTools = {
-    'file_write',
-    'file_patch',
-    'sftp_upload',
-    'sftp_download',
-    'upload_to',
-    'file_sync',
-  };
-
-  static bool isFileChangeTool(String toolName) =>
-      _fileChangeTools.contains(toolName);
-
   /// 文件工具没有 shell 命令原文，生成一条稳定的台账描述
-  static String describeFileToolChange(
-      String toolName, Map<String, dynamic> args) {
-    final path = (args['path'] ?? '').toString().trim();
-    final remote =
-        ((args['remote'] ?? args['remoteDir']) ?? '').toString().trim();
-    final local =
-        ((args['local'] ?? args['localDir']) ?? '').toString().trim();
-    final targetHost = (args['hostId'] ?? '').toString().trim();
+  ///
+  /// "哪些工具算变更"不再由这里枚举工具名 — 那会导致新增写类工具时
+  /// 忘记登记、变更静默不进台账。判断改由 [AgentToolRegistry.isChangeRecordingTool]
+  /// 从工具的 [AgentTool.kind] 派生（见 agent_tool.dart）。
+  static String describeFileToolChange(String toolName, ToolArgs args) {
+    final path = args.getString('path').trim();
+    final remote = args.firstOf(const ['remote', 'remoteDir']).trim();
+    final local = args.firstOf(const ['local', 'localDir']).trim();
+    final targetHost = args.getString('hostId').trim();
     switch (toolName) {
       case 'file_write':
       case 'file_patch':
+      case 'local_file_write':
+      case 'local_file_patch':
         return path.isEmpty ? toolName : '$toolName $path';
       case 'sftp_upload':
         return 'sftp_upload $local -> $remote';
@@ -53,6 +47,10 @@ class ChangeRecordService {
         return 'upload_to ${targetHost.isEmpty ? '' : '$targetHost:'}$remote';
       case 'file_sync':
         return 'file_sync $local -> $remote';
+      case 'local_file_delete':
+        return 'local_file_delete $path';
+      case 'local_file_move':
+        return 'local_file_move $path -> ${args.getString('dst')}';
       default:
         return toolName;
     }
@@ -141,17 +139,25 @@ class ChangeRecordService {
     String? username,
     String? conversationId,
     ChangeType? forceType,
+    String? localRestoreFrom,
+    String? localRestoreTo,
   }) async {
     final type = forceType ?? inferType(command);
     final rollbackCmd =
         forceType != null ? null : buildRollbackCommand(command, type);
+    final hasLocalRestore =
+        localRestoreFrom != null && localRestoreFrom.isNotEmpty;
     final record = ChangeRecord(
       id: _uuid.v4(),
       hostId: hostId,
       command: command,
       type: type,
       rollbackCommand: rollbackCmd,
-      rollbackDescription: rollbackCmd != null ? '可自动回滚' : null,
+      rollbackDescription: hasLocalRestore
+          ? '本机文件还原'
+          : (rollbackCmd != null ? '可自动回滚' : null),
+      localRestoreFrom: localRestoreFrom,
+      localRestoreTo: localRestoreTo,
       timestamp: DateTime.now(),
       success: success,
       username: username,
@@ -189,15 +195,21 @@ class ChangeRecordService {
   /// 3. 不再走封网期/只读模式检查（用户已显式确认回滚，回滚是修复手段）
   ///
   /// 返回回滚命令的执行结果；返回 null 表示参数错误或连接断开
+  /// [executor] 只在执行远程回滚命令时需要；本机文件还原不经过 executor，可传 null
   static Future<CommandResult?> executeRollback(
     ChangeRecord record,
-    CommandExecutor executor, {
+    CommandExecutor? executor, {
     Duration timeout = const Duration(seconds: 60),
   }) async {
+    // 本机文件还原走 Dart I/O，绝不能丢给 executor：
+    // 在 SSH 会话里执行 `mv` 会打到远端机器，而文件其实在本机。
+    if (record.isLocalFileRestore) {
+      return _restoreLocalFile(record);
+    }
     if (record.rollbackCommand == null) {
       return null;
     }
-    if (!executor.isConnected) {
+    if (executor == null || !executor.isConnected) {
       return null;
     }
     // 安全检查：回滚命令本身不能是 blocked 级（如 rm -rf /）
@@ -227,5 +239,92 @@ class ChangeRecordService {
       await markRolledBack(record.id);
     }
     return result;
+  }
+
+  /// 把本机文件从备份 / 回收区放回原位
+  ///
+  /// 语义差别是有意保留的：
+  /// - 文件用 copy —— 副本留在原地，同一条记录可以反复还原
+  /// - 目录用 rename —— 整体放回，避免复制大目录时把回收区留成半空状态
+  /// 目标已存在时先把它另存为 `.displaced.{时间戳}` 再还原：还原动作本身也不能
+  /// 悄悄覆盖用户在两次操作之间改出来的内容。
+  static Future<CommandResult> _restoreLocalFile(ChangeRecord record) async {
+    final from = record.localRestoreFrom!;
+    final to = record.localRestoreTo!;
+    const stage = '本机文件还原';
+
+    try {
+      final srcIsDir = Directory(from).existsSync();
+      final srcIsFile = !srcIsDir && File(from).existsSync();
+      if (!srcIsDir && !srcIsFile) {
+        return _restoreFailure(
+            '$stage失败：副本已不存在（$from），无法还原');
+      }
+
+      final parent = p.dirname(to);
+      if (parent.isNotEmpty && !Directory(parent).existsSync()) {
+        Directory(parent).createSync(recursive: true);
+      }
+
+      String? displaced;
+      final targetExists = srcIsDir
+          ? Directory(to).existsSync()
+          : File(to).existsSync();
+      if (targetExists) {
+        displaced = '$to.displaced.${DateTime.now().millisecondsSinceEpoch}';
+        if (srcIsDir) {
+          Directory(to).renameSync(displaced);
+        } else {
+          File(to).renameSync(displaced);
+        }
+      }
+
+      if (srcIsDir) {
+        Directory(from).renameSync(to);
+      } else {
+        File(from).copySync(to);
+      }
+
+      final message = displaced == null
+          ? '$stage完成：$from → $to'
+          : '$stage完成：$from → $to（还原前的现有文件已另存为 $displaced）';
+      await markRolledBack(record.id);
+      await _auditRestore(record, message, ok: true);
+      return CommandResult(
+        stdout: message,
+        stderr: '',
+        exitCode: 0,
+        duration: Duration.zero,
+      );
+    } catch (e) {
+      final msg = '$stage失败：$e';
+      await _auditRestore(record, msg, ok: false);
+      return _restoreFailure(msg);
+    }
+  }
+
+  static CommandResult _restoreFailure(String message) => CommandResult(
+        stdout: '',
+        stderr: message,
+        exitCode: -1,
+        duration: Duration.zero,
+        failureKind: CommandFailureKind.unknown,
+        failureReason: message,
+      );
+
+  /// 还原动作必须留痕：它改的是本机文件，远程审计里看不到
+  static Future<void> _auditRestore(
+      ChangeRecord record, String message, {required bool ok}) async {
+    try {
+      await AuditLogger.log(
+        hostId: record.hostId,
+        command: 'RESTORE LOCAL ${record.command}',
+        safetyLevel: ok ? 'info' : 'warn',
+        output: message,
+        executed: true,
+      );
+    } catch (_) {
+      // 审计写失败不该阻断已经成功的还原
+    }
   }
 }

@@ -68,6 +68,12 @@ class LocalTerminalService implements CommandExecutor {
       final ptyEnv = Map<String, String>.from(Platform.environment);
       ptyEnv['TERM'] = 'xterm-256color';
       if (!Platform.isWindows) {
+        // 关闭分页器：PTY 下的 journalctl/systemctl/git/man 会停在 (END)，
+        // 命令不退出，执行器只能干等超时。
+        ptyEnv['PAGER'] = 'cat';
+        ptyEnv['SYSTEMD_PAGER'] = 'cat';
+        ptyEnv['GIT_PAGER'] = 'cat';
+        ptyEnv['MANPAGER'] = 'cat';
         ptyEnv['CLICOLOR'] = '1';
         ptyEnv['LSCOLORS'] = 'ExFxCxDxBxegedabagacad';
         ptyEnv['LS_COLORS'] = 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32';
@@ -172,13 +178,46 @@ class LocalTerminalService implements CommandExecutor {
     }
   }
 
+  /// 按平台 + shell 生成"末尾带数字退出码标记"的包装命令（R6 分支、R8 可判定）。
+  ///
+  /// PowerShell 分支不能写成 `echo "MARKER\$LASTEXITCODE"`：**cmdlet 不设置
+  /// `$LASTEXITCODE`**，标记会渲染成 `EXITCODE_1:`（冒号后什么都没有），而完成判定
+  /// 必须按 `EXITCODE_1:\d+` 匹配（不带数字的那条 R8 规则是为了不吃命令回显），
+  /// 于是每条 cmdlet 都匹配不上、白等满超时并记成失败 —— 真机实测过。
+  ///
+  /// 改法：先把 `$LASTEXITCODE` 置空，再用 `$?` 推导数字。
+  /// - 原生命令：`$?` 与 `$LASTEXITCODE` 都被设置，取准确退出码；
+  /// - cmdlet：只有 `$?` 可靠，成功记 0、失败记 1；
+  /// - `$?` 为假但 `$LASTEXITCODE` 是 0（上一条原生命令留下的陈旧值）记 1，
+  ///   所以 `cmd /c exit 0; Get-ChildItem 不存在路径` 不会冒充成功。
+  @visibleForTesting
+  static String wrapCommandWithExitMarker(
+    String command,
+    String marker, {
+    required bool isWindows,
+    required bool isPowerShell,
+  }) {
+    if (!isWindows) return posixWrapWithExitMarker(command, marker);
+    if (!isPowerShell) return '$command & echo $marker%errorlevel%';
+    // PowerShell 分支里全是 `$var` 字面量，用 raw 字符串拼，避免 Dart 插值吃掉它们。
+    // 置空是必需的：`$LASTEXITCODE` 是会话级变量，上一条命令留下的非零值会串到
+    // 这一条（例如上一条 `cmd /c exit 7`、这一条 cmdlet 失败 → 报 7 而不是 1）。
+    return r'$LASTEXITCODE=$null; ' +
+        command +
+        r'; $__ec=if($?){0}' +
+        r'elseif($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0){$LASTEXITCODE}' +
+        r'else{1}; echo "' +
+        marker +
+        r'$__ec"';
+  }
+
   /// 执行命令并等待完成，返回结构化结果（含退出码）
   ///
   /// 改进点同 [SshService.executeAndWait]：
   /// 1. buffer 上限（R8 合规，保留尾部 256KB）
   /// 2. Shell 语法错误快速失败（bash/sh/zsh 解析错误）
   /// 3. PS2 提示符检测（引号未闭合）
-  /// 4. 交互式密码提示检测
+  /// 4. 交互式密码提示检测（sudo 提示在传入 sudoPassword 时直接应答 stdin）
   /// 5. PTY 进程退出区分正常/异常
   /// 6. marker 后停止写入 buffer
   @override
@@ -186,6 +225,7 @@ class LocalTerminalService implements CommandExecutor {
     String command, {
     Duration timeout = const Duration(seconds: 60),
     Completer<void>? cancelToken,
+    String? sudoPassword,
   }) async {
     if (_pty == null || !_isConnected) {
       return CommandResult(
@@ -201,12 +241,13 @@ class LocalTerminalService implements CommandExecutor {
     final stopwatch = Stopwatch()..start();
     _markerSeq++;
     final marker = 'EXITCODE_$_markerSeq:';
-    // 平台+shell 分支：PowerShell 用 ; 和 $LASTEXITCODE，cmd 用 & 和 %errorlevel%
-    final wrappedCommand = Platform.isWindows
-        ? (_isPowerShell
-            ? '$command; echo "$marker\$LASTEXITCODE"'
-            : '$command & echo $marker%errorlevel%')
-        : '$command\necho "$marker\$?"';
+    // 平台+shell 分支：见 [wrapCommandWithExitMarker]
+    final wrappedCommand = wrapCommandWithExitMarker(
+      command,
+      marker,
+      isWindows: Platform.isWindows,
+      isPowerShell: _isPowerShell,
+    );
     final donePattern = RegExp('${RegExp.escape(marker)}\\d+');
 
     // R8: buffer 必须有上限，保留尾部（最新输出）
@@ -217,8 +258,55 @@ class LocalTerminalService implements CommandExecutor {
     final doneCompleter = Completer<void>();
     var markerSeen = false;
     var abnormalReason = <String?>[];
+    var pagerQuitSent = false;
+    var pagerDetections = 0;
+    // sudo 提示应答器：命中提示时把密码写进 stdin，而不是让检测器中断命令
+    final sudoResponder = SudoPromptResponder();
     _pendingDoneCompleters.add(doneCompleter);
     StreamSubscription<String>? sub;
+
+    // 一次求值：marker 完成 → sudo 提示应答 → 异常状态检测。
+    // 命令停在密码提示上之后就再无输出，只靠流回调等不到第二次判定，
+    // 所以抽成函数给定时器复用（见下方 recheck）。
+    void evaluate() {
+      if (doneCompleter.isCompleted) return;
+      final snapshot = buffer.toString();
+      if (donePattern.hasMatch(snapshot)) {
+        markerSeen = true;
+        doneCompleter.complete();
+        return;
+      }
+      // 分页器等待按键：命令不会自己退出，主动按 q 让后续的 marker 执行。
+      // 400ms 门槛 + 连续两次判定，避开输出恰好以 (END) 结尾但命令仍在跑的误判。
+      // Windows 本地终端不存在 POSIX 分页器，但正则不匹配也不会触发。
+      final pagerWaiting = stopwatch.elapsedMilliseconds >= 400 &&
+          PtyOutputDetector.waitsForPager(snapshot);
+      pagerDetections = pagerWaiting ? pagerDetections + 1 : 0;
+      if (!pagerQuitSent && pagerDetections >= 2) {
+        pagerQuitSent = true;
+        try {
+          _pty?.write(utf8.encode('q\r'));
+        } catch (_) {}
+      }
+      // sudo 正在等密码：直接应答 stdin。密码只写进终端，不进 buffer/命令/日志。
+      // Windows 没有 sudo，提示正则永远不命中，这里无需平台分支。
+      if (sudoPassword != null && sudoResponder.shouldAnswer(snapshot)) {
+        try {
+          _pty?.write(utf8.encode('$sudoPassword\n'));
+        } catch (_) {}
+      }
+      final diag = PtyOutputDetector.detect(
+        buffer: snapshot,
+        marker: marker,
+        elapsedMs: stopwatch.elapsedMilliseconds,
+        isWindows: Platform.isWindows,
+        sudoPromptWillBeAnswered: sudoPassword != null,
+      );
+      if (diag != null) {
+        abnormalReason.add(diag.reason);
+        doneCompleter.complete();
+      }
+    }
 
     sub = _outputController.stream.listen(
       (data) {
@@ -230,22 +318,7 @@ class LocalTerminalService implements CommandExecutor {
             ..clear()
             ..write(truncated.substring(truncated.length - maxBufferChars));
         }
-        final snapshot = buffer.toString();
-        if (donePattern.hasMatch(snapshot)) {
-          markerSeen = true;
-          doneCompleter.complete();
-          return;
-        }
-        final diag = PtyOutputDetector.detect(
-          buffer: snapshot,
-          marker: marker,
-          elapsedMs: stopwatch.elapsedMilliseconds,
-          isWindows: Platform.isWindows,
-        );
-        if (diag != null) {
-          abnormalReason.add(diag.reason);
-          doneCompleter.complete();
-        }
+        evaluate();
       },
       onError: (e) {
         if (!doneCompleter.isCompleted) {
@@ -266,6 +339,17 @@ class LocalTerminalService implements CommandExecutor {
 
     _pty!.write(utf8.encode('$wrappedCommand\r'));
 
+    // 命令停在密码提示上时不再有任何输出，只靠流回调就永远等不到判定。
+    // 定时补一次求值，让"卡在交互提示"在秒级被识别，而不是干满超时。
+    late final Timer recheck;
+    recheck = Timer.periodic(
+      const Duration(milliseconds: 400),
+      (_) {
+        evaluate();
+        if (doneCompleter.isCompleted) recheck.cancel();
+      },
+    );
+
     try {
       await Future.any([
         doneCompleter.future,
@@ -273,9 +357,20 @@ class LocalTerminalService implements CommandExecutor {
         if (cancelToken != null) cancelToken.future,
       ]);
     } on TimeoutException {
+      // 分页器不会响应 Ctrl+C，先按 q 退出，否则它会把下一条命令当成按键吃掉
+      if (PtyOutputDetector.waitsForPager(buffer.toString())) {
+        try {
+          _pty!.write(utf8.encode('q\r'));
+        } catch (_) {}
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
       try {
         _pty!.write(utf8.encode('\x03'));
       } catch (_) {}
+      // 给被打断的程序留出退出窗口：它还活着时会把 tty 输入队列里的字节
+      // 当密码尝试吃掉，调用方紧接着发的下一条命令就被吞了
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      recheck.cancel();
       await sub.cancel();
       _pendingDoneCompleters.remove(doneCompleter);
       stopwatch.stop();
@@ -289,6 +384,7 @@ class LocalTerminalService implements CommandExecutor {
         failureReason: '命令执行超时 (${timeout.inSeconds}s)',
       );
     } catch (e) {
+      recheck.cancel();
       await sub.cancel();
       _pendingDoneCompleters.remove(doneCompleter);
       stopwatch.stop();
@@ -302,6 +398,7 @@ class LocalTerminalService implements CommandExecutor {
       );
     }
 
+    recheck.cancel();
     await sub.cancel();
     _pendingDoneCompleters.remove(doneCompleter);
     stopwatch.stop();
@@ -309,9 +406,18 @@ class LocalTerminalService implements CommandExecutor {
     var rawOutput = buffer.toString();
 
     if (!markerSeen) {
+      // 取消时如果停在分页器上，Ctrl+C 退不出 less，必须先按 q
+      if (PtyOutputDetector.waitsForPager(rawOutput)) {
+        try {
+          _pty!.write(utf8.encode('q\r'));
+        } catch (_) {}
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
       try {
         _pty!.write(utf8.encode('\x03'));
       } catch (_) {}
+      // 同超时分支：等被打断的程序真正退出再返回，避免它吃掉下一条命令的输入
+      await Future<void>.delayed(const Duration(milliseconds: 300));
       final reason = abnormalReason.isNotEmpty
           ? abnormalReason.join('; ')
           : (rawOutput.contains(marker) ? 'marker 出现但未触发完成' : '命令未完成');

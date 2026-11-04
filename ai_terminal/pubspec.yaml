@@ -28,6 +28,8 @@ dependencies:
   collection: ^1.17.0
   # HTTP 客户端
   dio: ^5.4.0
+  # MCP（Model Context Protocol）客户端：stdio / Streamable HTTP / legacy SSE
+  mcp_dart: ^2.4.3
   # 终端组件
   xterm: ^4.0.0
   # SSH 客户端

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
 import '../core/constants.dart';
+import '../core/credentials_store.dart';
 import '../services/daos.dart';
 import '../core/theme_colors.dart';
 import '../l10n/app_localizations.dart';
@@ -220,6 +221,10 @@ class _SecurityPageState extends State<SecurityPage> {
       // 清空所有数据
       await HostsDao.clearAll();
       await AIModelsDao.clearAll();
+      for (final endpoint in AIEndpointsDao.cached) {
+        await CredentialsStore.delete(hostId: endpoint.id, type: 'apiKey');
+      }
+      await AIEndpointsDao.clearAll();
       await ChatSessionsDao.clearAll();
       await SnippetsDao.clearAll();
       await SettingsDao.clear();

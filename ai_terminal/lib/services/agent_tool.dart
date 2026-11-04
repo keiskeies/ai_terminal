@@ -13,7 +13,10 @@ import 'agent_host_registry.dart';
 import '../core/l10n_holder.dart';
 import '../models/host_execution_result.dart';
 import '../utils/line_diff.dart';
+import '../utils/local_file_ops.dart';
 import '../utils/tool_args_parser.dart';
+import 'local_file_tools.dart';
+import 'project_tools.dart';
 import 'web_tools.dart';
 
 /// Agent 工具调用结果
@@ -29,6 +32,13 @@ class ToolResult {
   final int? diffAdditions;
   final int? diffDeletions;
 
+  /// 本机文件还原对：把 [restoreFrom]（备份或回收区里的副本）放回 [restoreTo]。
+  ///
+  /// 只有 `local_*` 工具会填 —— 远程文件变更的回滚走 shell 命令，
+  /// 本机变更必须走 Dart I/O，否则在 SSH 会话里点"回滚"会打到远端机器。
+  final String? restoreFrom;
+  final String? restoreTo;
+
   const ToolResult({
     required this.success,
     required this.output,
@@ -36,6 +46,8 @@ class ToolResult {
     this.hostResults,
     this.diffAdditions,
     this.diffDeletions,
+    this.restoreFrom,
+    this.restoreTo,
   });
 
   factory ToolResult.success(
@@ -43,6 +55,8 @@ class ToolResult {
     Map<String, HostExecutionResult>? hostResults,
     int? diffAdditions,
     int? diffDeletions,
+    String? restoreFrom,
+    String? restoreTo,
   }) =>
       ToolResult(
         success: true,
@@ -51,6 +65,8 @@ class ToolResult {
         hostResults: hostResults,
         diffAdditions: diffAdditions,
         diffDeletions: diffDeletions,
+        restoreFrom: restoreFrom,
+        restoreTo: restoreTo,
       );
 
   factory ToolResult.failure(
@@ -64,6 +80,55 @@ class ToolResult {
         error: error,
         hostResults: hostResults,
       );
+}
+
+/// 工具副作用类别 — 安全语义的唯一来源
+///
+/// 引擎与台账都从这里派生判断，禁止再维护第二份"哪些工具会改文件"的名单：
+/// 历史上 `ChangeRecordService._fileChangeTools` 就是硬编码枚举工具名，
+/// 新增写类工具时忘记同步就会静默丢失变更台账（AGENTS.md R5-4 黑名单反例）。
+enum ToolKind {
+  /// 只读：读文件、列目录、搜索、连通性检查
+  read,
+
+  /// 写入：创建/覆盖/补丁/移动，产生可回滚的变更
+  write,
+
+  /// 破坏性：删除等不可逆操作，必须用户确认
+  destructive,
+
+  /// 外联：访问公网（web_search / fetch_url），不触碰主机状态
+  network,
+
+  /// 编排：打到多台主机的命令执行
+  orchestration,
+}
+
+/// 工具来源 — 为后续接入 MCP server 预留的扩展点
+enum ToolSource {
+  /// Dart 内置实现
+  builtin,
+
+  /// 外部 MCP server（尚未实现，见 docs/agent-builtin-tools-timeline-design.md §6）
+  mcpServer,
+}
+
+/// 工具可见作用域 — 决定工具在什么会话里暴露给 AI
+///
+/// 提示词与 FC schema 都必须走 [AgentToolRegistry.visibleFor]，
+/// 否则会出现"提示词宣传了未注册的工具"这类必失败路径（设计稿 D1）。
+enum ToolScope {
+  /// 任何会话
+  all,
+
+  /// 仅 SSH 远程会话
+  sshSession,
+
+  /// 仅本地终端会话
+  localSession,
+
+  /// 仅多机编排模式
+  orchestrator,
 }
 
 /// Agent 工具抽象
@@ -81,12 +146,61 @@ abstract class AgentTool {
   /// 返回 JSON schema 描述字符串
   String get paramSpec;
 
+  /// 副作用类别；默认按 write 处理（未知即保守：视为会产生变更）
+  ToolKind get kind => ToolKind.write;
+
+  /// 工具来源
+  ToolSource get source => ToolSource.builtin;
+
   /// 当前任务取消令牌（由 AgentEngine 在 execute 前注入）
   ///
   /// 工具内部调用 [CommandExecutor.executeAndWait] / [CommandExecutor.writeFileViaPty]
   /// 时应透传此令牌，让 cancelTask 能立即中断正在执行的命令或文件写入。
   /// 串行 Agent 模型下保证一次只有一个 tool 在执行，因此单字段安全。
   Completer<void>? cancelToken;
+
+  /// 请用户输入 sudo 密码并落到安全存储（由 AgentEngine 在 execute 前注入）。
+  ///
+  /// 返回 true = 已收集并启用自动应答。刻意**不**返回密码本身：
+  /// 工具一旦拿到明文就可能把它拼进 ToolResult.output，而 output 会进
+  /// 对话历史并被模型读到（AGENTS.md R7）。
+  Future<bool> Function(String reason)? sudoPasswordRequest;
+
+  /// 只读工具（kind == read）
+  bool get isReadOnly => kind == ToolKind.read;
+
+  /// 会产生变更、需要进台账与回滚的工具
+  bool get recordsChanges =>
+      kind == ToolKind.write || kind == ToolKind.destructive;
+
+  /// MCP tool 描述符。
+  ///
+  /// 形状对齐 MCP 协议（name + description + inputSchema + annotations），
+  /// 将来接 stdio/SSE server 时外部工具可直接映射到 [AgentTool]，
+  /// 不需要再改注册表与引擎契约。
+  ///
+  /// 注解只发这三个：`idempotentHint` 故意**不**从 `kind` 派生 —— 同为
+  /// `ToolKind.write`，`file_write` 是幂等的而 `file_patch` 不是（第二次替换
+  /// 就找不到 old 了），按 kind 猜会对外部 client 撒谎。真要提供得加一个
+  /// 每工具可覆写的 getter，那是 MCP 客户端落地时的事。
+  Map<String, dynamic> get mcpDescriptor => {
+        'name': name,
+        'description': description,
+        // MCP 要求 inputSchema 必须是 schema 对象；[toJsonSchema] 返回 null
+        // 只表示"不参与 OpenAI FC"，不能因此吐出一个非法描述符。
+        'inputSchema': toJsonSchema() ??
+            {
+              'type': 'object',
+              'properties': const <String, dynamic>{},
+              'description': paramSpec,
+              'additionalProperties': true,
+            },
+        'annotations': {
+          'readOnlyHint': kind == ToolKind.read,
+          'destructiveHint': kind == ToolKind.destructive,
+          'openWorldHint': kind == ToolKind.network,
+        },
+      };
 
   /// P2-6: 返回 OpenAI tools API 格式的 JSON schema。
   /// 默认实现基于 paramSpec 生成一个宽松的 schema（type=object + 任意属性）。
@@ -116,7 +230,7 @@ abstract class AgentTool {
   /// writeFileViaPty。基类只提供字段，不强制要求子类使用。
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   });
 }
@@ -133,6 +247,9 @@ class SftpUploadTool extends AgentTool {
   String get name => 'sftp_upload';
 
   @override
+  ToolKind get kind => ToolKind.write;
+
+  @override
   String get description => '上传本地文件或目录到 SSH 远程服务器。用于部署项目、传输文件等场景。仅适用于已连接 SSH 远程会话。'
       '目录上传语义：把 local 目录放到 remote 目录下，自动在 remote 内创建 basename(local) 子目录。'
       '例如 local=/path/story、remote=/tmp → 实际传到 /tmp/story；若 remote 已含同名末段（如 /tmp/story）则不重复追加。';
@@ -143,14 +260,14 @@ class SftpUploadTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
     // 参数校验
-    final local = ToolArgsParser.getString(args, 'local');
-    final remote = ToolArgsParser.getString(args, 'remote');
-    final recursive = ToolArgsParser.getBool(args, 'recursive');
-    final excludeArg = ToolArgsParser.getStringList(args, 'exclude');
+    final local = args.getString('local');
+    final remote = args.getString('remote');
+    final recursive = args.getBool('recursive');
+    final excludeArg = args.getStringList('exclude');
 
     if (local.isEmpty || remote.isEmpty) {
       return ToolResult.failure('参数缺失: local 和 remote 为必填项');
@@ -275,6 +392,9 @@ class SftpDownloadTool extends AgentTool {
   String get name => 'sftp_download';
 
   @override
+  ToolKind get kind => ToolKind.write;
+
+  @override
   String get description => '从 SSH 远程服务器下载文件或目录到本地。用于取回日志、配置、备份等场景。'
       '单文件：local 是已存在目录或带结尾分隔符时，自动保存为 local/basename(remote)。'
       '目录下载语义：把 remote 目录放到 local 目录下，自动创建 basename(remote) 子目录；'
@@ -290,13 +410,13 @@ class SftpDownloadTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final remote = ToolArgsParser.getString(args, 'remote');
-    final local = ToolArgsParser.getString(args, 'local');
-    final recursive = ToolArgsParser.getBool(args, 'recursive');
-    final excludeArg = ToolArgsParser.getStringList(args, 'exclude');
+    final remote = args.getString('remote');
+    final local = args.getString('local');
+    final recursive = args.getBool('recursive');
+    final excludeArg = args.getStringList('exclude');
 
     if (remote.isEmpty || local.isEmpty) {
       return ToolResult.failure('参数缺失: remote 和 local 为必填项');
@@ -407,6 +527,9 @@ class FileSyncTool extends AgentTool {
   String get name => 'file_sync';
 
   @override
+  ToolKind get kind => ToolKind.write;
+
+  @override
   String get description => '启动或停止本地目录与远程服务器目录的自动同步。本地文件修改自动上传到远程；bidirectional 模式下还会轮询远程变化下载到本地。'
       '注意：localDir 和 remoteDir 是一一对应的完整路径，remoteDir 应包含目标子目录名（如 localDir=/path/story、remoteDir=/tmp/story），'
       '否则 story 内的文件会被平铺到 remoteDir 根下。';
@@ -417,10 +540,10 @@ class FileSyncTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final action = ToolArgsParser.getString(args, 'action');
+    final action = args.getString('action');
 
     if (action == 'status') {
       final running = _service.isRunning;
@@ -439,10 +562,10 @@ class FileSyncTool extends AgentTool {
     }
 
     if (action == 'start') {
-      final localDir = ToolArgsParser.getString(args, 'localDir');
-      final remoteDir = ToolArgsParser.getString(args, 'remoteDir');
-      final directionStr = ToolArgsParser.getString(args, 'direction', defaultValue: 'localToRemote');
-      final excludeArg = ToolArgsParser.getStringList(args, 'exclude');
+      final localDir = args.getString('localDir');
+      final remoteDir = args.getString('remoteDir');
+      final directionStr = args.getString('direction', defaultValue: 'localToRemote');
+      final excludeArg = args.getStringList('exclude');
 
       if (localDir.isEmpty || remoteDir.isEmpty) {
         return ToolResult.failure('start 需要 localDir 和 remoteDir 参数');
@@ -503,6 +626,9 @@ class ExecOnTool extends AgentTool {
   String get name => 'exec_on';
 
   @override
+  ToolKind get kind => ToolKind.orchestration;
+
+  @override
   String get description => '【多机编排】在指定主机上执行命令。用于跨主机调度操作。'
       '仅在编排模式下可用；非编排模式请用普通 execute。';
 
@@ -512,12 +638,12 @@ class ExecOnTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final hostId = ToolArgsParser.getString(args, 'hostId');
-    final command = ToolArgsParser.getString(args, 'command');
-    final timeoutSec = ToolArgsParser.getInt(args, 'timeout', defaultValue: 60);
+    final hostId = args.getString('hostId');
+    final command = args.getString('command');
+    final timeoutSec = args.getInt('timeout', defaultValue: 60);
 
     if (hostId.isEmpty || command.isEmpty) {
       return ToolResult.failure(L10n.str.orchToolParamMissing('hostId 和 command'));
@@ -590,6 +716,9 @@ class ExecBatchTool extends AgentTool {
   String get name => 'exec_batch';
 
   @override
+  ToolKind get kind => ToolKind.orchestration;
+
+  @override
   String get description => '【多机编排】批量执行同一命令到多台主机（只读命令并行执行，修改性命令串行执行）。'
       '适用于时间同步、日志清理、配置检查等批量运维场景。'
       '一台失败不影响其他主机（除非 stopOnFailure=true）。';
@@ -600,13 +729,13 @@ class ExecBatchTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final command = ToolArgsParser.getString(args, 'command');
-    final timeoutSec = ToolArgsParser.getInt(args, 'timeout', defaultValue: 60);
-    final stopOnFailure = ToolArgsParser.getBool(args, 'stopOnFailure');
-    final hostIds = ToolArgsParser.getStringList(args, 'hostIds');
+    final command = args.getString('command');
+    final timeoutSec = args.getInt('timeout', defaultValue: 60);
+    final stopOnFailure = args.getBool('stopOnFailure');
+    final hostIds = args.getStringList('hostIds');
 
     if (hostIds.isEmpty || command.isEmpty) {
       return ToolResult.failure(L10n.str.orchToolParamMissing('hostIds 和 command'));
@@ -666,6 +795,9 @@ class CheckConnectivityTool extends AgentTool {
   String get name => 'check_connectivity';
 
   @override
+  ToolKind get kind => ToolKind.read;
+
+  @override
   String get description => '【多机编排】从一台主机测试到目标主机的端口连通性。'
       '用于部署前验证网络依赖（如 web→db:3306、web→redis:6379）。'
       '源主机必须是已连接的编排参与者。';
@@ -676,13 +808,13 @@ class CheckConnectivityTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final fromHostId = ToolArgsParser.getString(args, 'fromHostId');
-    final targetHost = ToolArgsParser.getString(args, 'targetHost');
-    final port = ToolArgsParser.getInt(args, 'port');
-    final timeoutSec = ToolArgsParser.getInt(args, 'timeout', defaultValue: 5);
+    final fromHostId = args.getString('fromHostId');
+    final targetHost = args.getString('targetHost');
+    final port = args.getInt('port');
+    final timeoutSec = args.getInt('timeout', defaultValue: 5);
 
     if (fromHostId.isEmpty || targetHost.isEmpty || port <= 0) {
       return ToolResult.failure(L10n.str.orchToolConnParamMissing);
@@ -719,6 +851,9 @@ class UploadToTool extends AgentTool {
   String get name => 'upload_to';
 
   @override
+  ToolKind get kind => ToolKind.write;
+
+  @override
   String get description => '【多机编排】上传本地文件或目录到指定主机的远程目录。'
       '用于跨机部署（如把构建产物传到不同服务器）。'
       '目录上传语义同 sftp_upload：把 local 目录放到 remote 下，自动创建 basename(local) 子目录。';
@@ -729,14 +864,14 @@ class UploadToTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final hostId = ToolArgsParser.getString(args, 'hostId');
-    final local = ToolArgsParser.getString(args, 'local');
-    final remote = ToolArgsParser.getString(args, 'remote');
-    final recursive = ToolArgsParser.getBool(args, 'recursive');
-    final excludeArg = ToolArgsParser.getStringList(args, 'exclude');
+    final hostId = args.getString('hostId');
+    final local = args.getString('local');
+    final remote = args.getString('remote');
+    final recursive = args.getBool('recursive');
+    final excludeArg = args.getStringList('exclude');
 
     if (hostId.isEmpty || local.isEmpty || remote.isEmpty) {
       return ToolResult.failure(L10n.str.orchToolUploadParamMissing);
@@ -848,6 +983,9 @@ class BroadcastUploadTool extends AgentTool {
   String get name => 'broadcast_upload';
 
   @override
+  ToolKind get kind => ToolKind.write;
+
+  @override
   String get description => '【多机编排】把本地文件/目录广播分发到多台主机的相同远程目录。'
       '用于批量部署（如把配置文件/构建产物同步到一组服务器）。'
       '执行是串行的，每台主机的结果单独报告。';
@@ -858,13 +996,13 @@ class BroadcastUploadTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final hostIds = ToolArgsParser.getStringList(args, 'hostIds');
-    final local = ToolArgsParser.getString(args, 'local');
-    final remote = ToolArgsParser.getString(args, 'remote');
-    final recursive = ToolArgsParser.getBool(args, 'recursive');
+    final hostIds = args.getStringList('hostIds');
+    final local = args.getString('local');
+    final remote = args.getString('remote');
+    final recursive = args.getBool('recursive');
 
     if (local.isEmpty || remote.isEmpty) {
       return ToolResult.failure('参数缺失: local、remote 为必填项');
@@ -887,12 +1025,12 @@ class BroadcastUploadTool extends AgentTool {
       onProgress?.call('[$hid] 正在分发...');
       final r = await uploadTool.execute(
         executor: executor,
-        args: {
+        args: ToolArgs({
           'hostId': hid,
           'local': local,
           'remote': effectiveRemote,
           'recursive': recursive,
-        },
+        }),
         onProgress: onProgress,
       );
       if (r.success) {
@@ -919,6 +1057,9 @@ class CollectFileTool extends AgentTool {
   String get name => 'collect_file';
 
   @override
+  ToolKind get kind => ToolKind.read;
+
+  @override
   String get description => '【多机编排】从多台主机采集同名远程文件到本地目录，每个文件自动加 hostId 后缀。'
       '用于配置对比、日志收集等场景。';
 
@@ -928,12 +1069,12 @@ class CollectFileTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final hostIds = ToolArgsParser.getStringList(args, 'hostIds');
-    final remote = ToolArgsParser.getString(args, 'remote');
-    final localDir = ToolArgsParser.getString(args, 'localDir');
+    final hostIds = args.getStringList('hostIds');
+    final remote = args.getString('remote');
+    final localDir = args.getString('localDir');
 
     if (remote.isEmpty || localDir.isEmpty) {
       return ToolResult.failure('参数缺失: remote、localDir 为必填项');
@@ -998,6 +1139,9 @@ class MultiGrepTool extends AgentTool {
   String get name => 'multi_grep';
 
   @override
+  ToolKind get kind => ToolKind.read;
+
+  @override
   String get description => '【多机编排】在多台主机上同时 grep 搜索日志/文件，结果按主机分段聚合。'
       '用于跨机排障（如"在所有 web 机器 grep ERROR access.log 最近 100 行"）。'
       '注意：命令在远程执行，grep 语法须兼容目标 shell。';
@@ -1008,14 +1152,14 @@ class MultiGrepTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final hostIds = ToolArgsParser.getStringList(args, 'hostIds');
-    final pattern = ToolArgsParser.getString(args, 'pattern');
-    final files = ToolArgsParser.getString(args, 'files');
-    final tail = ToolArgsParser.getString(args, 'tail');
-    final ignoreCase = ToolArgsParser.getBool(args, 'ignoreCase');
+    final hostIds = args.getStringList('hostIds');
+    final pattern = args.getString('pattern');
+    final files = args.getString('files');
+    final tail = args.getString('tail');
+    final ignoreCase = args.getBool('ignoreCase');
 
     if (pattern.isEmpty || files.isEmpty) {
       return ToolResult.failure('参数缺失: pattern、files 为必填项');
@@ -1073,6 +1217,9 @@ class DiffFilesTool extends AgentTool {
   String get name => 'diff_files';
 
   @override
+  ToolKind get kind => ToolKind.read;
+
+  @override
   String get description => '【多机编排】对比多台主机上同名远程文件的内容差异。'
       '用于检查配置是否一致（如对比所有 nginx.conf）。'
       '返回每台主机文件的 md5 和两两 diff 摘要。';
@@ -1083,11 +1230,11 @@ class DiffFilesTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final hostIds = ToolArgsParser.getStringList(args, 'hostIds');
-    final remote = ToolArgsParser.getString(args, 'remote');
+    final hostIds = args.getStringList('hostIds');
+    final remote = args.getString('remote');
 
     if (remote.isEmpty) {
       return ToolResult.failure('参数缺失: remote 为必填项');
@@ -1161,6 +1308,9 @@ class CertMonitorTool extends AgentTool {
   String get name => 'cert_check';
 
   @override
+  ToolKind get kind => ToolKind.read;
+
+  @override
   String get description => '检查 HTTPS/SSL 证书到期时间或 SSH host key 指纹。'
       '用于证书到期监控、安全审计。返回证书有效期剩余天数、到期日期、颁发者等。';
 
@@ -1170,17 +1320,17 @@ class CertMonitorTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final mode = ToolArgsParser.getString(args, 'mode');
+    final mode = args.getString('mode');
     if (mode.isEmpty) {
       return ToolResult.failure('参数缺失: mode 必填（remote/local_file/ssh_hostkey）');
     }
 
     if (mode == 'remote') {
-      final host = ToolArgsParser.getString(args, 'host');
-      final port = ToolArgsParser.getInt(args, 'port', defaultValue: 443);
+      final host = args.getString('host');
+      final port = args.getInt('port', defaultValue: 443);
       if (host.isEmpty) {
         return ToolResult.failure('mode=remote 需要 host 参数');
       }
@@ -1215,7 +1365,7 @@ class CertMonitorTool extends AgentTool {
     }
 
     if (mode == 'local_file') {
-      final certPath = ToolArgsParser.getString(args, 'certPath');
+      final certPath = args.getString('certPath');
       if (certPath.isEmpty) {
         return ToolResult.failure('mode=local_file 需要 certPath 参数');
       }
@@ -1365,6 +1515,9 @@ class FileWriteTool extends AgentTool {
   String get name => 'file_write';
 
   @override
+  ToolKind get kind => ToolKind.write;
+
+  @override
   String get description => '直接写入文件内容（绕过 shell，避免转义/换行/EOF 问题）。'
       '支持 SSH 远程文件和本地文件。'
       '推荐用于：新建配置文件、整体重写文件、写入含特殊字符的脚本。'
@@ -1397,14 +1550,14 @@ class FileWriteTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final path = ToolArgsParser.getString(args, 'path');
-    final contentB64 = ToolArgsParser.getString(args, 'content_b64');
-    final contentPlain = ToolArgsParser.getString(args, 'content');
-    final mode = ToolArgsParser.getString(args, 'mode', defaultValue: 'write');
-    final backup = ToolArgsParser.getBool(args, 'backup', defaultValue: true);
+    final path = args.getString('path');
+    final contentB64 = args.getString('content_b64');
+    final contentPlain = args.getString('content');
+    final mode = args.getString('mode', defaultValue: 'write');
+    final backup = args.getBool('backup', defaultValue: true);
 
     if (path.isEmpty) {
       return ToolResult.failure('参数缺失: path 为必填项');
@@ -1434,7 +1587,7 @@ class FileWriteTool extends AgentTool {
     } else {
       // 纯文本：把单行参数里的 \n / \r / \t / \\ 还原为真实控制字符
       contentBytes =
-          Uint8List.fromList(utf8.encode(_decodeEscapedText(contentPlain)));
+          Uint8List.fromList(utf8.encode(decodeEscapedText(contentPlain)));
     }
 
     // 大小限制：避免 AI 一次输出过大 base64 出错
@@ -1450,6 +1603,16 @@ class FileWriteTool extends AgentTool {
 
     // SSH 远程会话：用 SFTP 直接写入
     if (executor is SSHService) {
+      if (looksLikeWindowsLocalPath(path)) {
+        // 设计稿 §4 就预见到这个混淆：AI 拿本机路径调远程工具时，SFTP 会把
+        // "D:\deploy\app.conf" 当成一个文件名写到服务器上并回报成功 ——
+        // 一次静默的错机器写入。宁可在这里停下。
+        return ToolResult.failure(
+          '当前是 SSH 远程会话，但 path 是本机路径格式：$path\n'
+          'file_write 会把整串当成服务器上的文件名写入，不会碰到这台电脑。\n'
+          '改本机文件请用 local_file_write；改服务器文件请给远程绝对路径（如 /etc/nginx/nginx.conf）。',
+        );
+      }
       final client = executor.client;
       if (client == null) {
         return ToolResult.failure('SSH 连接未建立，无法打开 SFTP');
@@ -1609,7 +1772,7 @@ class FileWriteTool extends AgentTool {
       if (mode == 'write' && backup && exists) {
         onProgress?.call('正在备份原文件 ...');
         try {
-          backupPath = await _backupLocalFile(path);
+          backupPath = await backupLocalFile(path);
         } on FileSystemException catch (e) {
           if (!Platform.isWindows) {
             // 文件可能属于 root，而 Dart 进程无读权限；当前 shell 可能有 sudo 权限
@@ -1759,6 +1922,9 @@ class FilePatchTool extends AgentTool {
   String get name => 'file_patch';
 
   @override
+  ToolKind get kind => ToolKind.write;
+
+  @override
   String get description => '通过字符串替换修改文件（绕过 shell，避免 sed 转义问题）。'
       '支持 SSH 远程文件和本地文件。'
       '推荐用于：改一两行配置、替换变量值、修改 server_name 等小改动。'
@@ -1784,15 +1950,15 @@ class FilePatchTool extends AgentTool {
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
-    required Map<String, dynamic> args,
+    required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final path = ToolArgsParser.getString(args, 'path');
-    final oldB64 = ToolArgsParser.getString(args, 'old_b64');
-    final newB64 = ToolArgsParser.getString(args, 'new_b64');
-    final oldPlain = ToolArgsParser.getString(args, 'old');
-    final newPlain = ToolArgsParser.getString(args, 'new');
-    final backup = ToolArgsParser.getBool(args, 'backup', defaultValue: true);
+    final path = args.getString('path');
+    final oldB64 = args.getString('old_b64');
+    final newB64 = args.getString('new_b64');
+    final oldPlain = args.getString('old');
+    final newPlain = args.getString('new');
+    final backup = args.getBool('backup', defaultValue: true);
 
     if (path.isEmpty) {
       return ToolResult.failure('参数缺失: path 为必填项');
@@ -1831,6 +1997,13 @@ class FilePatchTool extends AgentTool {
 
     // SSH 远程会话
     if (executor is SSHService) {
+      if (looksLikeWindowsLocalPath(path)) {
+        return ToolResult.failure(
+          '当前是 SSH 远程会话，但 path 是本机路径格式：$path\n'
+          'file_patch 会把整串当成服务器上的文件名去改，不会碰到这台电脑。\n'
+          '改本机文件请用 local_file_patch；改服务器文件请给远程绝对路径（如 /etc/nginx/nginx.conf）。',
+        );
+      }
       final client = executor.client;
       if (client == null) {
         return ToolResult.failure('SSH 连接未建立，无法打开 SFTP');
@@ -2004,7 +2177,7 @@ class FilePatchTool extends AgentTool {
         }
 
         if (backup) {
-          backupPath = await _backupLocalFile(path);
+          backupPath = await backupLocalFile(path);
         }
 
         await file.writeAsBytes(newFileBytes, mode: FileMode.write, flush: true);
@@ -2119,47 +2292,95 @@ class FilePatchTool extends AgentTool {
   }
 }
 
-/// 还原单行参数中的转义序列：\n \r \t \\。未知序列原样保留。
-String _decodeEscapedText(String text) {
-  final buffer = StringBuffer();
-  for (var i = 0; i < text.length; i++) {
-    final ch = text[i];
-    if (ch != '\\' || i == text.length - 1) {
-      buffer.write(ch);
-      continue;
-    }
-    final next = text[++i];
-    switch (next) {
-      case 'n':
-        buffer.write('\n');
-      case 'r':
-        buffer.write('\r');
-      case 't':
-        buffer.write('\t');
-      case '\\':
-        buffer.write('\\');
-      default:
-        buffer.write('\\');
-        buffer.write(next);
-    }
-  }
-  return buffer.toString();
+/// 注册表条目：工具 + 它的作用域
+class _RegisteredTool {
+  final AgentTool tool;
+  final ToolScope scope;
+  const _RegisteredTool(this.tool, this.scope);
 }
 
-/// 备份本地文件到同目录 .bak.{microseconds}，返回备份路径
-Future<String> _backupLocalFile(String path) async {
-  final backupPath = '$path.bak.${DateTime.now().microsecondsSinceEpoch}';
-  await File(path).copy(backupPath);
-  return backupPath;
+/// 收集特权（sudo）密码的工具
+///
+/// 场景：命令因卡在 `[sudo] … 的密码：` 而失败，且该主机还没配置 sudo 密码。
+/// 以前只能让用户绕去「主机编辑」页补填，AI 只能 ask 一句「请先配置密码」然后失败。
+/// 本工具把这条路收进 ReAct 循环：掩码弹窗 → 写入安全存储 → 立即启用自动应答，
+/// AI 直接重试原命令即可。
+///
+/// 密码**不**进 ToolResult.output：output 会作为 observation 回给模型，
+/// 明文一旦进对话历史就永久留在上下文与持久化里（AGENTS.md R7）。
+class ProvidePasswordTool extends AgentTool {
+  @override
+  String get name => 'provide_password';
+
+  @override
+  ToolKind get kind => ToolKind.write;
+
+  /// 特权密码是本机凭据，不是主机上的文件变更。进变更台账既没有回滚意义，
+  /// 又会在审计列表里多出一条敏感记录。
+  @override
+  bool get recordsChanges => false;
+
+  @override
+  String get description =>
+      '请用户输入当前主机的 sudo（特权）密码，保存到本机凭据库并立即启用密码提示自动应答。'
+      '仅在命令因「等待 sudo 密码」失败、且该主机尚未配置 sudo 密码时调用。'
+      '调用成功后重试原命令即可；本工具不会把密码内容返回给你。';
+
+  @override
+  String get paramSpec =>
+      '参数列表（多行 key:value 格式）：\n  reason: 向用户说明为什么需要这个密码（可选，会显示在输入框上方）';
+
+  @override
+  Map<String, dynamic>? toJsonSchema() => {
+        'type': 'object',
+        'properties': {
+          'reason': {
+            'type': 'string',
+            'description': '向用户说明为什么需要这个密码（可选）',
+          },
+        },
+        'additionalProperties': false,
+      };
+
+  @override
+  Future<ToolResult> execute({
+    required CommandExecutor executor,
+    required ToolArgs args,
+    void Function(String message)? onProgress,
+  }) async {
+    final request = sudoPasswordRequest;
+    if (request == null) {
+      return ToolResult.failure('当前会话未接入密码输入，请在主机设置中填写 sudo 密码');
+    }
+    onProgress?.call('等待用户输入 sudo 密码…');
+    final accepted = await request(args.getString('reason'));
+    if (!accepted) {
+      return ToolResult.failure('用户未提供密码（取消或输入为空）。'
+          '请改用 动作: ask 与用户确认，或改以非特权方式执行。');
+    }
+    return ToolResult.success('已收到 sudo 密码并保存到本机凭据库。'
+        '请重试原命令，遇到 sudo 密码提示时系统会自动应答。');
+  }
 }
 
 /// Agent 工具注册表 — 管理所有可用的工具
 class AgentToolRegistry {
-  final Map<String, AgentTool> _tools = {};
+  final Map<String, _RegisteredTool> _entries = {};
   /// 文件同步服务实例（由 registry 持有，工具共享）
   final FileSyncService fileSyncService = FileSyncService();
   /// 多机执行器实例（编排模式用）
   MultiHostExecutor? _multiHostExecutor;
+
+  /// 本地文件工具的额外授权根（由引擎注入，返回本次任务记录的项目目录）
+  List<String> Function()? _localFileRoots;
+
+  /// 设置本地文件工具的额外授权根提供者
+  ///
+  /// 用闭包而不是直接传值：项目根是在 project_analyze 执行过程中才确定的，
+  /// 工具必须读到最新值，而不是注册时的快照。
+  void setLocalFileRoots(List<String> Function()? provider) {
+    _localFileRoots = provider;
+  }
 
   AgentToolRegistry() {
     // 注册默认工具
@@ -2171,6 +2392,16 @@ class AgentToolRegistry {
     // 注册在默认层，保证任何 SSH 会话都能直接编辑文件
     register(FileWriteTool());
     register(FilePatchTool());
+    // 特权密码：sudo 提示导致命令失败时的兜底入口，SSH 与本地终端都需要。
+    register(ProvidePasswordTool());
+    // 本地项目工作流：这三个工具要求 LocalTerminalService executor，
+    // 在 SSH 会话里注册了也只会失败，所以限定 localSession 作用域。
+    register(ProjectAnalyzeTool(), scope: ToolScope.localSession);
+    register(BuildProjectTool(), scope: ToolScope.localSession);
+    register(PackageProjectTool(), scope: ToolScope.localSession);
+    // 本地文件工具：作用域不限（SSH 会话里也要能改本机的部署配置），
+    // 但每个路径都要过 LocalFilePolicy 的白名单 + 黑名单判定。
+    registerLocalFileTools(this, extraRoots: () => _localFileRoots?.call() ?? const []);
   }
 
   /// 启用编排模式：注册多机编排工具
@@ -2178,27 +2409,25 @@ class AgentToolRegistry {
   void enableOrchestrator(AgentHostRegistry registry) {
     if (_multiHostExecutor != null) return; // 已启用
     _multiHostExecutor = MultiHostExecutor(registry);
-    register(ExecOnTool(_multiHostExecutor!));
-    register(ExecBatchTool(_multiHostExecutor!));
-    register(CheckConnectivityTool(_multiHostExecutor!));
-    register(UploadToTool(_multiHostExecutor!));
-    register(BroadcastUploadTool(_multiHostExecutor!));
-    register(CollectFileTool(_multiHostExecutor!));
-    register(MultiGrepTool(_multiHostExecutor!));
-    register(DiffFilesTool(_multiHostExecutor!));
+    register(ExecOnTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
+    register(ExecBatchTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
+    register(CheckConnectivityTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
+    register(UploadToTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
+    register(BroadcastUploadTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
+    register(CollectFileTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
+    register(MultiGrepTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
+    register(DiffFilesTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
   }
 
   /// 禁用编排模式：注销多机编排工具
   void disableOrchestrator() {
     _multiHostExecutor = null;
-    _tools.remove('exec_on');
-    _tools.remove('exec_batch');
-    _tools.remove('check_connectivity');
-    _tools.remove('upload_to');
-    _tools.remove('broadcast_upload');
-    _tools.remove('collect_file');
-    _tools.remove('multi_grep');
-    _tools.remove('diff_files');
+    for (final name in const [
+      'exec_on', 'exec_batch', 'check_connectivity', 'upload_to',
+      'broadcast_upload', 'collect_file', 'multi_grep', 'diff_files',
+    ]) {
+      _entries.remove(name);
+    }
   }
 
   /// 启用联网搜索工具：注册 web_search / fetch_url
@@ -2207,48 +2436,85 @@ class AgentToolRegistry {
   /// 工具一旦注册，buildToolsPrompt / buildOpenAIToolsSchema 自动把它注入 system prompt
   /// 和 FC schema，AI 在下一轮 ReAct 中即可看到并调用。
   void enableWebTools() {
-    if (!_tools.containsKey('web_search')) {
-      register(WebSearchTool());
+    if (!has('web_search')) {
+      register(WebSearchTool(), scope: ToolScope.all);
     }
-    if (!_tools.containsKey('fetch_url')) {
-      register(FetchUrlTool());
+    if (!has('fetch_url')) {
+      register(FetchUrlTool(), scope: ToolScope.all);
     }
   }
 
   /// 禁用联网搜索工具：注销 web_search / fetch_url
   void disableWebTools() {
-    _tools.remove('web_search');
-    _tools.remove('fetch_url');
+    _entries.remove('web_search');
+    _entries.remove('fetch_url');
   }
 
   /// 当前是否已注册联网工具
-  bool get isWebToolsEnabled => _tools.containsKey('web_search');
+  bool get isWebToolsEnabled => has('web_search');
 
   bool get isOrchestratorEnabled => _multiHostExecutor != null;
 
   MultiHostExecutor? get multiHostExecutor => _multiHostExecutor;
 
-  void register(AgentTool tool) {
-    _tools[tool.name] = tool;
+  void register(AgentTool tool, {ToolScope scope = ToolScope.all}) {
+    _entries[tool.name] = _RegisteredTool(tool, scope);
   }
 
-  AgentTool? get(String name) => _tools[name];
+  /// 注销工具（供后续 MCP server 断开时清理其提供的工具）
+  void unregister(String name) => _entries.remove(name);
 
-  bool has(String name) => _tools.containsKey(name);
+  /// 按前缀批量注销（MCP 工具刷新用，避免维护第二份工具名单）
+  void unregisterPrefix(String prefix) {
+    _entries.removeWhere((name, _) => name.startsWith(prefix));
+  }
 
-  List<AgentTool> get all => _tools.values.toList();
+  AgentTool? get(String name) => _entries[name]?.tool;
+
+  bool has(String name) => _entries.containsKey(name);
+
+  /// 全部已注册工具（不做作用域过滤，仅用于诊断/日志）
+  List<AgentTool> get all => _entries.values.map((e) => e.tool).toList();
+
+  /// 当前会话可见的工具 — 提示词与 FC schema 的唯一来源
+  ///
+  /// 任何"告诉 AI 有哪些能力"的文本都必须走这里。历史上部署工作流提示词
+  /// 手写了三个未注册的工具名，AI 照着调必然失败（设计稿 D1）。
+  List<AgentTool> visibleFor({required bool isLocalSession}) {
+    return _entries.values.where((e) {
+      switch (e.scope) {
+        case ToolScope.all:
+        case ToolScope.orchestrator:
+          return true;
+        case ToolScope.localSession:
+          return isLocalSession;
+        case ToolScope.sshSession:
+          return !isLocalSession;
+      }
+    }).map((e) => e.tool).toList();
+  }
+
+  /// 是否会产生需要记入变更台账的改动
+  ///
+  /// 由 [AgentTool.kind] / [AgentTool.recordsChanges] 派生，不再维护工具名清单：
+  /// 新增写类工具自动进台账，忘记登记导致的"变更不可追溯"不会再发生。
+  bool isChangeRecordingTool(String toolName) => get(toolName)?.recordsChanges ?? false;
+
+  List<String> get changeRecordingToolNames =>
+      _entries.values.where((e) => e.tool.recordsChanges).map((e) => e.tool.name).toList();
 
   /// 构建工具说明文本，注入 system prompt
-  String buildToolsPrompt() {
-    if (_tools.isEmpty) return '';
+  String buildToolsPrompt({required bool isLocalSession}) {
+    final tools = visibleFor(isLocalSession: isLocalSession);
+    if (tools.isEmpty) return '';
     final buffer = StringBuffer();
     buffer.writeln('【可用工具】');
     buffer.writeln('当需要执行非 shell 命令的操作时（如上传文件、跨机执行），使用 "动作: tool" 调用工具。');
     buffer.writeln();
-    for (final tool in _tools.values) {
+    for (final tool in tools) {
       buffer.writeln('工具: ${tool.name}');
       buffer.writeln('  说明: ${tool.description}');
-      buffer.writeln('  $tool.paramSpec');
+      buffer.writeln('  ${tool.paramSpec}');
       buffer.writeln();
     }
     buffer.writeln('工具调用格式示例（参数必须用多行 key:value 格式，不要用 JSON）:');
@@ -2267,9 +2533,9 @@ class AgentToolRegistry {
   /// 用于在 _callAI 中传给支持 Function Calling 的模型。
   /// 返回的每个元素结构：{type:'function', function:{name, description, parameters}}
   /// toJsonSchema() 返回 null 的工具会被跳过（不参与 FC）。
-  List<Map<String, dynamic>> buildOpenAIToolsSchema() {
+  List<Map<String, dynamic>> buildOpenAIToolsSchema({required bool isLocalSession}) {
     final result = <Map<String, dynamic>>[];
-    for (final tool in _tools.values) {
+    for (final tool in visibleFor(isLocalSession: isLocalSession)) {
       final schema = tool.toJsonSchema();
       if (schema == null) continue;
       result.add({
