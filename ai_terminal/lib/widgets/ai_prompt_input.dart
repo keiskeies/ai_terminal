@@ -108,7 +108,6 @@ class _AIPromptInputState extends State<AIPromptInput> {
   void _onTextChanged() {
     widget.onChanged?.call(_controller.text);
     _detectSlashCommand();
-    setState(() {}); // 更新字符计数器
   }
 
   /// 检测输入框中的斜杠命令前缀，显示建议
@@ -295,12 +294,6 @@ class _AIPromptInputState extends State<AIPromptInput> {
         ? effectiveAccent
         : (isOrch ? tc.warn : tc.border);
 
-    final charCount = _controller.text.length;
-    // 接近上限（80%）时变橙色提示
-    final counterColor = charCount > _maxLength * 0.8
-        ? cWarning
-        : tc.textSub;
-
     return Focus(
       focusNode: _focusNode,
       onKeyEvent: _handleKeyEvent,
@@ -366,15 +359,6 @@ class _AIPromptInputState extends State<AIPromptInput> {
                     ),
                     const SizedBox(width: 6),
                   ],
-                  Text(
-                    '$charCount / $_maxLength',
-                    style: TextStyle(
-                      color: counterColor,
-                      fontSize: fMicro,
-                      fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
-                      height: 1,
-                    ),
-                  ),
                   Expanded(
                     child: Align(
                       alignment: Alignment.centerRight,
@@ -413,9 +397,10 @@ class _AIPromptInputState extends State<AIPromptInput> {
           duration: animFast,
           width: 28,
           height: 28,
+          // 圆形：这一排的其他元素（权限胶囊、模型胶囊）都是全圆角胶囊
           decoration: BoxDecoration(
             color: bgColor,
-            borderRadius: BorderRadius.circular(rXSmall),
+            borderRadius: BorderRadius.circular(rFull),
           ),
           child: running
               ? Center(

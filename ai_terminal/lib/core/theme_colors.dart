@@ -16,6 +16,7 @@ class ThemeColors {
   Color get bg => isLight ? cBgLight : cBg;
   Color get card => isLight ? cCardLight : cCard;
   Color get cardElevated => isLight ? cCardElevatedLight : cCardElevated;
+  Color get dataCard => isLight ? cCardDataLight : cCardData;
   Color get surface => isLight ? cSurfaceLight : cSurface;
 
   // 边框

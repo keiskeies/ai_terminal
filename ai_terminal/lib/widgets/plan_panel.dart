@@ -62,7 +62,7 @@ class _PlanPanelState extends State<PlanPanel> {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: tc.card,
+        color: tc.dataCard,
         borderRadius: BorderRadius.circular(rSmall),
         border: Border.all(color: tc.border),
       ),
@@ -187,7 +187,8 @@ class _PlanPanelState extends State<PlanPanel> {
       margin: const EdgeInsets.only(bottom: 2),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
-        color: isCurrent ? tc.surface : Colors.transparent,
+        // 面板底已经是 dataCard，用品牌色标"当前步"而不是再造一档灰
+        color: isCurrent ? tc.brand.withValues(alpha: 0.10) : Colors.transparent,
         borderRadius: BorderRadius.circular(rXSmall),
         border: isCurrent
             ? Border.all(color: tc.brand.withValues(alpha: 0.28))

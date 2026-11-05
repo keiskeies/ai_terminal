@@ -724,7 +724,11 @@ class AgentEventContent extends StatelessWidget {
                     code: TextStyle(
                       fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                       fontSize: fMono,
-                      backgroundColor: accent.withValues(alpha: 0.1),
+                      color: accent,
+                    ),
+                    codeblockDecoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(rXSmall),
                     ),
                     listBullet: TextStyle(color: accent),
                     strong: TextStyle(color: accent, fontWeight: FontWeight.bold),

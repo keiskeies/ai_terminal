@@ -43,10 +43,16 @@ const Color cAgentGreenLight = cLimeGreenLight;
 
 // ===== 颜色系统 (深色 · 石墨青) =====
 // 中性石墨底：层级靠 surface 阶梯 + 发丝线，不靠大面积色块。
-const Color cBg = Color(0xFF0B0D0D);
-const Color cCard = Color(0xFF111414);
-const Color cCardElevated = Color(0xFF171B1B);
-const Color cSurface = Color(0xFF1E2323);
+// 阶梯规则（G 通道）：终端/代码 7 → 窗口 12 → 内联输出 16 → 卡片 22 → 面板 32 → 控件 44，
+// 相邻至少差 4、跨层差 10；代码层永远比它的容器暗一档。
+// 卡片保持原亮度：回答正文都坐在卡片上，提亮卡片等于压低小字号的对比度。
+const Color cBg = Color(0xFF090C0C);
+const Color cCard = Color(0xFF131616);
+const Color cCardElevated = Color(0xFF1C2020);
+const Color cSurface = Color(0xFF292C2C);
+// 气泡里的数据卡片（执行清单、结论、变更行）：比所在气泡亮一档并带一点青，
+// 只靠亮度差在深色里不够看，色相偏一点才会一眼分得开。
+const Color cCardData = Color(0xFF202A28);
 // 发丝线：默认 12% 白，交互/焦点 22%，内部分隔 7%。
 const Color cBorder = Color(0x1FFFFFFF);
 const Color cBorderHover = Color(0x38FFFFFF);
@@ -56,11 +62,12 @@ const Color cHairline = Color(0x12FFFFFF);
 const Color cTextMain = Color(0xFFF1F3F1);
 const Color cTextBody = Color(0xFFB8BEBA);
 const Color cTextSub = Color(0xFF858D88);
-const Color cTextMuted = Color(0xFF6F7671);
+// 面板提亮后，最弱一档的灰字在面板上要重新够到 4:1，否则小字号先糊掉
+const Color cTextMuted = Color(0xFF7A827C);
 
 // 终端
-const Color cTerminalBg = Color(0xFF080A0A);
-const Color cTerminalOutput = Color(0xFF0E1111);
+const Color cTerminalBg = Color(0xFF040707);
+const Color cTerminalOutput = Color(0xFF0D1010);
 
 // ===== 品牌强调色（深色）=====
 // 青色只用于交互、进行中状态与链接；金色只用于第二数据色（耗时/统计）。
@@ -84,10 +91,15 @@ const Color cAgentGreen = cSuccess;
 
 // ===== 颜色系统 (浅色 · 石墨青) =====
 // 浅色底同样用中性石墨阶，青色改为深青以保证白底小字号可读。
-const Color cBgLight = Color(0xFFF3F5F3);
-const Color cCardLight = Color(0xFFFBFCFB);
+// 浅色到顶就是纯白，所以阶梯往下拉：面板最亮 → 卡片 → 代码层再暗一档；
+// 旧值 cTerminalBgLight 与 cCardElevatedLight 同为纯白，代码块只能靠边框显形。
+// 控件底只比旧值暗 4 点：再暗就会压掉胶囊里小字号的对比度。
+const Color cBgLight = Color(0xFFEEF1EE);
+const Color cCardLight = Color(0xFFFAFBFA);
 const Color cCardElevatedLight = Color(0xFFFFFFFF);
-const Color cSurfaceLight = Color(0xFFE7ECE8);
+const Color cSurfaceLight = Color(0xFFE4E9E4);
+// 浅色到不了"更白"，数据卡片反过来往下一档，靠凹陷感区分；再暗小字号就不过 4.5:1
+const Color cCardDataLight = Color(0xFFF0F4F0);
 // 浅色发丝线：默认 14% 黑，交互 23% 黑，内部分隔 7% 黑。
 const Color cBorderLightTheme = Color(0x24000000);
 const Color cBorderLightHover = Color(0x3A000000);
@@ -96,8 +108,8 @@ const Color cTextMainLight = Color(0xFF171B19);
 const Color cTextBodyLight = Color(0xFF4B534E);
 const Color cTextSubLight = Color(0xFF68716B);
 const Color cTextMutedLight = Color(0xFF8A938D);
-const Color cTerminalBgLight = Color(0xFFFFFFFF);
-const Color cTerminalOutputLight = Color(0xFFFBFCFB);
+const Color cTerminalBgLight = Color(0xFFF2F4F2);
+const Color cTerminalOutputLight = Color(0xFFE8EBE8);
 const Color cTerminalGreenLight = Color(0xFF1B7F4B);
 const Color cAgentGreenLightMode = Color(0xFF1B7F4B);
 

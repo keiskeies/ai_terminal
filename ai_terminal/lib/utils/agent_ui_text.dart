@@ -299,6 +299,7 @@ class AgentUiText {
   String get collapseProcess => zh ? '展开过程' : 'Show process';
   String get expandProcess => zh ? '展开' : 'Expand';
   String get collapse => zh ? '收起' : 'Collapse';
+  String get expandText => zh ? '展开' : 'Show more';
   String get viewFullOutput => zh ? '查看完整输出' : 'View full output';
   String toolCallsCount(int n) => zh ? '已调用工具 $n 次' : '$n tool calls';
   String commandCallsCount(int n) => zh ? '$n 条命令' : '$n commands';

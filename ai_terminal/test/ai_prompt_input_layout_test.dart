@@ -40,5 +40,8 @@ void main() {
     final field = tester.widget<TextField>(find.byType(TextField));
     expect(field.minLines, 2);
     expect(field.maxLines, 5);
+    // 左下角的字符计数已去掉
+    expect(find.textContaining('/ 50000'), findsNothing);
+    expect(find.textContaining('0 / '), findsNothing);
   });
 }

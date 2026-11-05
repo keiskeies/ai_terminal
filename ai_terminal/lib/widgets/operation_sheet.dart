@@ -161,7 +161,7 @@ class OperationSheet extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
           decoration: BoxDecoration(
-            color: tc.card,
+            color: tc.dataCard,
             borderRadius: BorderRadius.circular(rSmall),
             border: Border.all(color: tc.border),
           ),
@@ -517,7 +517,7 @@ class OperationSheet extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 5),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
       decoration: BoxDecoration(
-        color: tc.cardElevated,
+        color: tc.dataCard,
         borderRadius: BorderRadius.circular(rXSmall),
         border: Border.all(color: tc.border),
       ),
@@ -810,7 +810,7 @@ class _ExpandableEvidenceState extends State<_ExpandableEvidence> {
               margin: const EdgeInsets.only(top: 4, bottom: 6),
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: tc.card,
+                color: tc.dataCard,
                 borderRadius: BorderRadius.circular(rSmall),
                 border: Border.all(color: tc.border),
               ),

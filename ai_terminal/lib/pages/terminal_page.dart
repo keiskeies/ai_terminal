@@ -21,6 +21,7 @@ import '../widgets/session_history_dialog.dart';
 import '../widgets/agent_log_dialog.dart';
 import '../widgets/agent_command_block.dart';
 import '../widgets/agent_event_cards.dart';
+import '../widgets/collapsible_message_text.dart';
 import '../widgets/operation_sheet.dart';
 import '../widgets/plan_panel.dart';
 import '../widgets/interrupted_turn_banner.dart';
@@ -1284,7 +1285,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           ),
           const SizedBox(width: 8),
           // 右侧操作区
-          _buildTopBarActions(activeTab, tc),
+          _buildTopBarActions(),
           const SizedBox(width: 12),
         ],
       ),
@@ -1319,13 +1320,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     );
   }
 
-  /// 右侧操作区：连接状态、AI 面板开关、设置、更多
-  Widget _buildTopBarActions(tp.TerminalTab? activeTab, ThemeColors tc) {
+  /// 右侧操作区：AI 面板开关、监控、设置、更多。
+  /// 连接状态不在这里重复：每个 tab 自己带一个同色系小圆点。
+  Widget _buildTopBarActions() {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _buildConnectionBadge(activeTab),
-        const SizedBox(width: 6),
         _buildAIPanelToggleButton(),
         const SizedBox(width: 6),
         _buildMonitorToggleButton(),
@@ -1477,45 +1477,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           ),
         )),
       ],
-    );
-  }
-
-  Widget _buildConnectionBadge(tp.TerminalTab? tab) {
-    final status = tab?.status;
-    final connected = status == tp.TabStatus.connected;
-    final connecting = status == tp.TabStatus.connecting || status == tp.TabStatus.reconnecting;
-    final dotColor = connected ? cSuccess : (connecting ? cWarning : cDanger);
-    final l10n = AppLocalizations.of(context)!;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: dotColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(rFull),
-        border: Border.all(color: dotColor.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: dotColor,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(color: dotColor.withValues(alpha: 0.5), blurRadius: 4),
-              ],
-            ),
-          ),
-          const SizedBox(width: 5),
-          Text(
-            connected
-                ? l10n.terminalConnected
-                : (connecting ? l10n.connecting : l10n.terminalOffline),
-            style: TextStyle(fontSize: fMicro, color: dotColor, fontWeight: FontWeight.w500),
-          ),
-        ],
-      ),
     );
   }
 
@@ -2496,8 +2457,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             // 内容
             // 选区由列表级 SelectionArea 统一管理，这里用普通 Text 才能跨段拖动
             if (isUser)
-              Text(
-                content,
+              CollapsibleMessageText(
+                key: ValueKey('user_$content'),
+                text: content,
                 style: TextStyle(
                   color: tc.textMain,
                   fontSize: fBody,
@@ -3160,12 +3122,21 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }
 
 
-  /// 渲染一段 Markdown 文本（用于 thought/text/info 的自动追加显示）
+  /// 渲染一段 Markdown 文本（用于 thought/text/info 的自动追加显示）。
+  ///
+  /// 围栏代码块先拆出来单独渲染：flutter_markdown 的 `code` 样式同时作用于行内
+  /// 代码和整块代码的正文，想给行内代码上字色就会把整块也染上；块走独立容器，
+  /// 行内代码才敢直接用字色区分，而不是在字后面垫一块深色补丁。
   Widget _buildMarkdownText(String text, ThemeColors tc) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: MarkdownBody(
-        data: _preprocessMarkdown(text),
+    final bodies = <Widget>[];
+    for (final seg in _splitContentByCodeBlocks(text)) {
+      if (seg.isCodeBlock) {
+        bodies.add(buildPlainCodeBlock(seg.content, tc));
+        continue;
+      }
+      if (seg.content.trim().isEmpty) continue;
+      bodies.add(MarkdownBody(
+        data: _preprocessMarkdown(seg.content),
         // 交给外层 SelectionArea 统一选择：selectable=true 会让 flutter_markdown
         // 为每个段落生成独立 SelectableText，选区被限制在单段内。
         selectable: false,
@@ -3183,8 +3154,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
             fontSize: fMono,
             fontWeight: FontWeight.w500,
-            color: tc.textMain,
-            backgroundColor: tc.terminalBg,
+            color: tc.brand,
           ),
           listBullet: TextStyle(color: tc.brand, fontSize: fBody),
           blockquote: TextStyle(
@@ -3198,7 +3168,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           blockquotePadding: const EdgeInsets.only(left: 8),
         ),
         onTapLink: (text, href, title) {},
-      ),
+      ));
+    }
+    if (bodies.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: bodies.length == 1
+          ? bodies.single
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: bodies,
+            ),
     );
   }
 
