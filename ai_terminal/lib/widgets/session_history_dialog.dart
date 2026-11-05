@@ -114,7 +114,9 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
         borderRadius: BorderRadius.circular(rSmall),
         onTap: () async {
           await ref.read(agentProvider.notifier).switchSession(conv.id);
-          _loadSessions();
+          // 选完就回到会话本身：弹窗继续悬浮会挡住刚加载出来的回答
+          if (!mounted) return;
+          Navigator.of(context).pop();
         },
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),

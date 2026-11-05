@@ -2538,6 +2538,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       child: _AnswerCopyButton(
         text: text,
         label: ui.copyAnswer,
+        doneLabel: ui.copied,
         copiedLabel: ui.answerCopied,
       ),
     );
@@ -3949,6 +3950,19 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 onTap: () => _showRunbookTemplates(tc),
                 tc: tc,
               ),
+              const SizedBox(width: 4),
+              // 多机编排开关：原来挤在输入框里和发送按钮并排，挪到这一排工具按钮之后
+              _buildToolbarIconButton(
+                icon: Icons.hub_outlined,
+                tooltip: agentState.isOrchestratorMode
+                    ? l10n.orchExitMode
+                    : l10n.orchEnterMode,
+                onTap: () {
+                  ref.read(agentProvider.notifier).toggleOrchestratorMode();
+                },
+                tc: tc,
+                active: agentState.isOrchestratorMode,
+              ),
               const Spacer(),
               // 运行状态指示
               if (agentState.isRunning)
@@ -3989,9 +4003,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             isOrchestratorMode: agentState.isOrchestratorMode,
             permissionMode: agentState.permissionMode,
             onPermissionModeChanged: _applyPermissionMode,
-            onToggleOrchestrator: () {
-              ref.read(agentProvider.notifier).toggleOrchestratorMode();
-            },
             onFocusChanged: (focused) {
               setState(() => _aiInputFocused = focused);
             },
@@ -4028,6 +4039,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     return Tooltip(
       message: tooltip,
       child: GestureDetector(
+        // 只有图标本体可命中的话，28×28 按钮的边框与间隙点了没反应
+        behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: Container(
           width: 28,
@@ -5433,11 +5446,15 @@ class _AnswerCopyButton extends StatefulWidget {
   const _AnswerCopyButton({
     required this.text,
     required this.label,
+    required this.doneLabel,
     required this.copiedLabel,
   });
 
   final String text;
   final String label;
+
+  /// 复制成功后按钮自己显示的状态文案
+  final String doneLabel;
   final String copiedLabel;
 
   @override
@@ -5447,6 +5464,8 @@ class _AnswerCopyButton extends StatefulWidget {
 class _AnswerCopyButtonState extends State<_AnswerCopyButton> {
   bool _hover = false;
   bool _pressed = false;
+  bool _copied = false;
+  Timer? _doneTimer;
 
   void _copy() {
     Clipboard.setData(ClipboardData(text: widget.text));
@@ -5463,16 +5482,32 @@ class _AnswerCopyButtonState extends State<_AnswerCopyButton> {
         margin: const EdgeInsets.all(16),
       ),
     );
+    // 按下态在手势竞争下不一定出现，按钮自己变成「已复制」才是确定的回执
+    setState(() => _copied = true);
+    _doneTimer?.cancel();
+    _doneTimer = Timer(const Duration(milliseconds: 1400), () {
+      if (mounted) setState(() => _copied = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _doneTimer?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
-    final borderColor = _pressed
-        ? tc.brand
-        : _hover
-            ? tc.brand.withValues(alpha: 0.6)
-            : tc.border;
+    final accent = _copied
+        ? tc.ok
+        : _pressed
+            ? tc.brand
+            : _hover
+                ? tc.brand.withValues(alpha: 0.6)
+                : tc.border;
+    final foreground =
+        _copied ? tc.ok : (_hover || _pressed) ? tc.brand : tc.textSub;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
@@ -5490,24 +5525,28 @@ class _AnswerCopyButtonState extends State<_AnswerCopyButton> {
           duration: const Duration(milliseconds: 90),
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
           decoration: BoxDecoration(
-            color: _pressed
-                ? tc.brand.withValues(alpha: 0.18)
-                : _hover
-                    ? tc.brand.withValues(alpha: 0.07)
-                    : Colors.transparent,
+            color: _copied
+                ? tc.ok.withValues(alpha: 0.12)
+                : _pressed
+                    ? tc.brand.withValues(alpha: 0.18)
+                    : _hover
+                        ? tc.brand.withValues(alpha: 0.07)
+                        : Colors.transparent,
             borderRadius: BorderRadius.circular(rXSmall),
-            border: Border.all(color: borderColor, width: 0.5),
+            border: Border.all(color: accent, width: 0.5),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.copy_all_outlined,
-                  size: 12, color: _hover ? tc.brand : tc.textSub),
+              Icon(
+                _copied ? Icons.check_rounded : Icons.copy_all_outlined,
+                size: _copied ? 13 : 12,
+                color: foreground,
+              ),
               const SizedBox(width: 5),
               Text(
-                widget.label,
-                style: TextStyle(
-                    fontSize: fMicro, color: _hover ? tc.brand : tc.textSub),
+                _copied ? widget.doneLabel : widget.label,
+                style: TextStyle(fontSize: fMicro, color: foreground),
               ),
             ],
           ),

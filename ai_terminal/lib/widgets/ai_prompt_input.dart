@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
-import '../l10n/app_localizations.dart';
 import '../models/agent_permission_mode.dart';
 import 'permission_mode_selector.dart';
 
@@ -24,10 +23,8 @@ class AIPromptInput extends StatefulWidget {
   final Color accentColor;
   /// 斜杠命令回调：返回 true 表示命令已被处理（不再走 onSend）
   final bool Function(String command)? onSlashCommand;
-  /// 是否处于多机编排模式
+  /// 是否处于多机编排模式（只影响边框配色，开关按钮在上方工具栏）
   final bool isOrchestratorMode;
-  /// 切换编排模式回调
-  final VoidCallback? onToggleOrchestrator;
   /// 输入框底部工具行里的附加控件（模型/思考档位胶囊等）。
   /// 放在发送按钮左侧，宽度自适应并允许省略。
   final Widget? footer;
@@ -51,7 +48,6 @@ class AIPromptInput extends StatefulWidget {
     required this.accentColor,
     this.onSlashCommand,
     this.isOrchestratorMode = false,
-    this.onToggleOrchestrator,
     this.footer,
     this.permissionMode = AgentPermissionMode.ask,
     this.onPermissionModeChanged,
@@ -325,7 +321,8 @@ class _AIPromptInputState extends State<AIPromptInput> {
             TextField(
               controller: _controller,
               enabled: widget.enabled,
-              minLines: 1,
+              // 单行太矮：多行需求（命令 + 上下文 + 约束）常被压成一屏看不完
+              minLines: 2,
               maxLines: 5,
               maxLength: _maxLength,
               keyboardType: TextInputType.multiline,
@@ -384,46 +381,12 @@ class _AIPromptInputState extends State<AIPromptInput> {
                       child: widget.footer ?? const SizedBox.shrink(),
                     ),
                   ),
-                  if (widget.onToggleOrchestrator != null) ...[
-                    const SizedBox(width: 4),
-                    _buildOrchestratorButton(),
-                  ],
                   const SizedBox(width: 4),
                   _buildSendButton(running),
                 ],
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildOrchestratorButton() {
-    final tc = ThemeColors.of(context);
-    final l10n = AppLocalizations.of(context)!;
-    final isOrch = widget.isOrchestratorMode;
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: widget.onToggleOrchestrator,
-        child: AnimatedContainer(
-          duration: animFast,
-          width: 28,
-          height: 28,
-          margin: const EdgeInsets.only(right: 4),
-          decoration: BoxDecoration(
-            color: isOrch ? tc.warn : tc.surface,
-            borderRadius: BorderRadius.circular(rXSmall),
-          ),
-          child: Tooltip(
-            message: isOrch ? l10n.orchExitMode : l10n.orchEnterMode,
-            child: Icon(
-              Icons.hub_outlined,
-              color: isOrch ? (tc.isLight ? Colors.white : cBg) : tc.textMuted,
-              size: 15,
-            ),
-          ),
         ),
       ),
     );

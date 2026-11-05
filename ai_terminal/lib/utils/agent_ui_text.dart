@@ -34,6 +34,7 @@ class AgentUiText {
   String get continueTask => zh ? '继续任务' : 'Continue task';
   String get operationCopied => zh ? '操作单已复制' : 'Operation sheet copied';
   String get copyAnswer => zh ? '复制回答' : 'Copy answer';
+  String get copied => zh ? '已复制' : 'Copied';
   String get answerCopied => zh ? '回答已复制到剪贴板' : 'Answer copied';
 
   String get changesAndRollback => zh ? '变更与回滚' : 'Changes & rollback';
