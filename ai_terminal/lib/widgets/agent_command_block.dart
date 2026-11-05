@@ -256,9 +256,9 @@ class AgentCommandBlock extends StatelessWidget {
                           height: 1.4,
                         ),
                       ),
-                      // 命令文本
+                      // 命令文本（选区由 Agent 列表外层 SelectionArea 统一管理）
                       Expanded(
-                        child: SelectableText(
+                        child: Text(
                           trimmed,
                           style: TextStyle(
                             fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
@@ -540,7 +540,7 @@ Widget buildPlainCodeBlock(String codeBlock, ThemeColors tc) {
       borderRadius: BorderRadius.circular(rSmall),
       border: Border.all(color: tc.border),
     ),
-    child: SelectableText(
+    child: Text(
       codeBlock.trimRight(),
       style: TextStyle(
         fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,

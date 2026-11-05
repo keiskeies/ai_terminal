@@ -33,6 +33,8 @@ class AgentUiText {
   String get aiConclusion => zh ? 'AI 结论' : 'AI conclusion';
   String get continueTask => zh ? '继续任务' : 'Continue task';
   String get operationCopied => zh ? '操作单已复制' : 'Operation sheet copied';
+  String get copyAnswer => zh ? '复制回答' : 'Copy answer';
+  String get answerCopied => zh ? '回答已复制到剪贴板' : 'Answer copied';
 
   String get changesAndRollback => zh ? '变更与回滚' : 'Changes & rollback';
   String get auditLog => zh ? '审计记录' : 'Audit log';

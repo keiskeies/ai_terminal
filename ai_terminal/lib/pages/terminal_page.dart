@@ -2287,36 +2287,41 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     if (items.isEmpty) {
       return Center(child: Text(l10n.terminalInputHintEmpty, style: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fBody)));
     }
-    return ListView.builder(
-      controller: _chatControllerFor(tab?.id ?? _currentTabId ?? ''),
-      padding: const EdgeInsets.all(8),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        final isLast = index == items.length - 1;
-        final turnGoal = item.role == 'assistant' &&
-                index > 0 &&
-                items[index - 1].role == 'user'
-            ? items[index - 1].content
-            : null;
-        return _buildMessageBubble(
-          key: ValueKey('agent_${item.role}_$index'),
-          role: item.role,
-          content: item.content,
-          events: item.events,
-          streamingContent: item.streamingContent,
-          turnGoal: turnGoal,
-          isLoading: item.isStreaming && isLast && agentState.isRunning,
-          tab: tab,
-          showAutoExecute: true,
-          isAgentRunning: agentState.isRunning,
-          // 只有最后一条消息可能是"当前等待的询问"；历史消息里的旧询问不能
-          // 跟着变成可点，否则用户会误答一个早已结束的问题。
-          isWaitingChoice: agentState.isWaitingChoice && isLast,
-          pendingOptions: agentState.isWaitingChoice && isLast ? agentState.pendingOptions : const [],
-          enginePendingConfirm: isLast ? agentState.pendingConfirmCommand : null,
-        );
-      },
+    // 整块列表共用一个 SelectionArea：Markdown 的每段、命令卡、输出卡都是
+    // 独立 Text 组件，若各自用 SelectableText 就只能一次选中一段。
+    return SelectionArea(
+      child: ListView.builder(
+        controller: _chatControllerFor(tab?.id ?? _currentTabId ?? ''),
+        padding: const EdgeInsets.all(8),
+        itemCount: items.length,
+        itemBuilder: (context, index) {
+          final item = items[index];
+          final isLast = index == items.length - 1;
+          final turnGoal = item.role == 'assistant' &&
+                  index > 0 &&
+                  items[index - 1].role == 'user'
+              ? items[index - 1].content
+              : null;
+          return _buildMessageBubble(
+            key: ValueKey('agent_${item.role}_$index'),
+            role: item.role,
+            content: item.content,
+            events: item.events,
+            streamingContent: item.streamingContent,
+            turnGoal: turnGoal,
+            isLoading: item.isStreaming && isLast && agentState.isRunning,
+            tab: tab,
+            showAutoExecute: true,
+            isAgentRunning: agentState.isRunning,
+            // 只有最后一条消息可能是"当前等待的询问"；历史消息里的旧询问不能
+            // 跟着变成可点，否则用户会误答一个早已结束的问题。
+            isWaitingChoice: agentState.isWaitingChoice && isLast,
+            pendingOptions:
+                agentState.isWaitingChoice && isLast ? agentState.pendingOptions : const [],
+            enginePendingConfirm: isLast ? agentState.pendingConfirmCommand : null,
+          );
+        },
+      ),
     );
   }
 
@@ -2489,8 +2494,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             ),
             const SizedBox(height: 4),
             // 内容
+            // 选区由列表级 SelectionArea 统一管理，这里用普通 Text 才能跨段拖动
             if (isUser)
-              SelectableText(
+              Text(
                 content,
                 style: TextStyle(
                   color: tc.textMain,
@@ -2499,10 +2505,40 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   fontWeight: FontWeight.w500,
                 ),
               )
-            else
+            else ...[
               _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning, isWaitingChoice, pendingOptions: pendingOptions, events: events, streamingContent: streamingContent, turnGoal: turnGoal, enginePendingConfirm: enginePendingConfirm),
+              _buildAnswerCopyRow(events, content, streamingContent, isLoading),
+            ],
           ],
         ),
+      ),
+    );
+  }
+
+  /// 回答底部的整段复制。
+  ///
+  /// 拖拽选区跨不过 markdown 段落与命令卡，复制按钮是把一整轮回答捞走的出口。
+  Widget _buildAnswerCopyRow(
+    List<AgentEvent> events,
+    String content,
+    String streamingContent,
+    bool isLoading,
+  ) {
+    // 流式没收尾时正文还会变，复制半截回答不如不复制
+    if (isLoading) return const SizedBox.shrink();
+    final text = formatAnswerForCopy(
+      events: events,
+      content: content,
+      streamingContent: streamingContent,
+    );
+    if (text.isEmpty) return const SizedBox.shrink();
+    final ui = AgentUiText.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: _AnswerCopyButton(
+        text: text,
+        label: ui.copyAnswer,
+        copiedLabel: ui.answerCopied,
       ),
     );
   }
@@ -3129,9 +3165,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       padding: const EdgeInsets.only(bottom: 4),
       child: MarkdownBody(
         data: _preprocessMarkdown(text),
-        selectable: true,
-        // 规避 flutter_markdown 0.6.23 在 selectable=true 时无条件调用 onSelectionChanged!() 的 bug
-        onSelectionChanged: (_, __, ___) {},
+        // 交给外层 SelectionArea 统一选择：selectable=true 会让 flutter_markdown
+        // 为每个段落生成独立 SelectableText，选区被限制在单段内。
+        selectable: false,
         styleSheet: MarkdownStyleSheet(
           p: TextStyle(
             color: tc.textMain,
@@ -5382,6 +5418,98 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
               color: selected ? cWarning : tc.textSub,
               fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 回答底部的「复制回答」胶囊。
+///
+/// 外层列表是 SelectionArea：光标默认落在文本光标上，命中区也归选区，所以这里
+/// 自己声明手型光标、整块可点与悬停/按下态——否则它看着就只是回答下面一行正文。
+class _AnswerCopyButton extends StatefulWidget {
+  const _AnswerCopyButton({
+    required this.text,
+    required this.label,
+    required this.copiedLabel,
+  });
+
+  final String text;
+  final String label;
+  final String copiedLabel;
+
+  @override
+  State<_AnswerCopyButton> createState() => _AnswerCopyButtonState();
+}
+
+class _AnswerCopyButtonState extends State<_AnswerCopyButton> {
+  bool _hover = false;
+  bool _pressed = false;
+
+  void _copy() {
+    Clipboard.setData(ClipboardData(text: widget.text));
+    clearTopToast();
+    showTopSnackBar(
+      context,
+      SnackBar(
+        content: Text(
+          widget.copiedLabel,
+          style: const TextStyle(fontSize: fSmall),
+        ),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    final borderColor = _pressed
+        ? tc.brand
+        : _hover
+            ? tc.brand.withValues(alpha: 0.6)
+            : tc.border;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() {
+        _hover = false;
+        _pressed = false;
+      }),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _copy,
+        onTapDown: (_) => setState(() => _pressed = true),
+        onTapUp: (_) => setState(() => _pressed = false),
+        onTapCancel: () => setState(() => _pressed = false),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 90),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          decoration: BoxDecoration(
+            color: _pressed
+                ? tc.brand.withValues(alpha: 0.18)
+                : _hover
+                    ? tc.brand.withValues(alpha: 0.07)
+                    : Colors.transparent,
+            borderRadius: BorderRadius.circular(rXSmall),
+            border: Border.all(color: borderColor, width: 0.5),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.copy_all_outlined,
+                  size: 12, color: _hover ? tc.brand : tc.textSub),
+              const SizedBox(width: 5),
+              Text(
+                widget.label,
+                style: TextStyle(
+                    fontSize: fMicro, color: _hover ? tc.brand : tc.textSub),
+              ),
+            ],
           ),
         ),
       ),

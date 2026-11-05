@@ -211,7 +211,7 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
                 borderRadius: BorderRadius.circular(rXSmall),
                 border: Border.all(color: tc.border.withValues(alpha: 0.6)),
               ),
-              child: SelectableText(
+              child: Text(
                 detail,
                 style: TextStyle(
                   fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,

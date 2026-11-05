@@ -10,6 +10,7 @@ import '../models/operation_report.dart';
 import '../models/token_usage.dart';
 import '../models/plan_step.dart';
 import '../utils/agent_ui_text.dart';
+import '../utils/conversation_export.dart';
 import 'plan_panel.dart';
 import '../core/app_toast.dart';
 
@@ -385,25 +386,7 @@ class OperationSheet extends StatelessWidget {
   }
 
   void _copyConclusion(BuildContext context) {
-    final buffer = StringBuffer();
-    if (report.goal.trim().isNotEmpty) {
-      buffer.writeln('目标：${report.goal.trim()}');
-    }
-    buffer.writeln('结论：${report.conclusion.trim()}');
-    final answerBody = _visibleAnswerBody;
-    if (answerBody != null) {
-      buffer.writeln();
-      buffer.writeln(answerBody);
-    }
-    if (report.changes.isNotEmpty) {
-      buffer.writeln('变更：');
-      for (final change in report.changes) {
-        final rollback =
-            change.canRollback ? '（可回滚：${change.rollbackCommand}）' : '（无自动回滚）';
-        buffer.writeln('- ${change.command}$rollback');
-      }
-    }
-    Clipboard.setData(ClipboardData(text: buffer.toString().trimRight()));
+    Clipboard.setData(ClipboardData(text: formatOperationReportCopy(report)));
     clearTopToast();
     showTopSnackBar(context, 
       SnackBar(

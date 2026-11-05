@@ -373,7 +373,7 @@ class AgentEventContent extends StatelessWidget {
                     onRetryFailedHosts: onRetryFailedHosts,
                   )
                 else
-                  SelectableText(
+                  Text(
                     output.trimRight(),
                     style: TextStyle(
                       fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
@@ -697,9 +697,8 @@ class AgentEventContent extends StatelessWidget {
                 const SizedBox(height: 2),
                 MarkdownBody(
                   data: event.summary ?? defaultSummary,
-                  selectable: true,
-                  // 规避 flutter_markdown 0.6.23 在 selectable=true 时无条件调用 onSelectionChanged!() 的 bug
-                  onSelectionChanged: (_, __, ___) {},
+                  // 选区由 Agent 聊天列表外层的 SelectionArea 统一管理
+                  selectable: false,
                   styleSheet: MarkdownStyleSheet(
                     p: TextStyle(
                       color: accent.withValues(alpha: 0.9),
@@ -826,7 +825,7 @@ class _RawOutputTailState extends State<_RawOutputTail> {
                 constraints: const BoxConstraints(maxHeight: 220),
                 child: SingleChildScrollView(
                   primary: false,
-                  child: SelectableText(
+                  child: Text(
                     widget.tail,
                     style: TextStyle(
                       fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
