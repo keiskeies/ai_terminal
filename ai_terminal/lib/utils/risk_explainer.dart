@@ -135,6 +135,9 @@ const Map<String, _ToolImpact> _toolImpacts = {
   'check_connectivity': _ToolImpact('探测各主机的连通性，不改动主机状态', '还原：只读操作无需回滚'),
   'build_project': _ToolImpact('在本机执行构建命令，会写入项目的产物目录'),
   'package_project': _ToolImpact('在本机打包构建产物，会写出压缩包文件'),
+  'local_exec': _ToolImpact(
+      '在运行 App 的本机执行命令，可能修改本机文件、Docker 或系统服务',
+      '还原：本机 shell 无自动回滚，请以确认卡片中的命令与 cwd 为准'),
   'web_search': _ToolImpact('访问公网检索，不改动任何主机状态', '还原：不涉及改动无需回滚'),
   'fetch_url': _ToolImpact('访问公网拉取内容，不改动任何主机状态', '还原：不涉及改动无需回滚'),
   // 密码只写进本机加密凭据库，不改动服务器；但用户要知道自己正在交出特权凭据

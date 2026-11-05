@@ -106,6 +106,7 @@ The Agent can also read and write the computer this app runs on, not just your s
 - Reads need no confirmation; writes and deletions land in the change ledger and can be restored. `local_file_delete` moves files into the trash (`.ai_terminal_trash`, a reserved directory the Agent itself cannot touch); pass `hard: true` to skip the trash
 - Every delete call requires an explicit "Run" click in the UI — cancelling or letting it time out changes nothing. Read-only mode blocks all write tools as well
 - Available inside SSH sessions too: those edits touch this computer, and restoring them never goes through the remote host
+- **Local commands**: inside an SSH session, `local_exec` runs commands on this computer (PowerShell on Windows, bash on macOS/Linux by default). Its `cwd` uses the same folder authorization and prompts when the folder is not yet listed; server commands keep using normal `execute`
 
 ### Operations toolbelt
 
@@ -255,6 +256,7 @@ Real SSH and real-LLM E2E tests are enabled through environment variables and do
 - Slash-command parsing: command name separated from its argument, and subcommands disambiguated from natural language (`/etc/nginx 目录权限` still goes to the model as text)
 - Agent panel persistence: a user who explicitly chose the bottom layout is not flipped by the new right-side default, dirty values fall back, and the ratio is clamped into the legal range
 - Local file tools: folder allowlist, `..` and symlink escapes, credential blacklist, backup/trash/restore, and read-only gating
+- Local commands: PowerShell misrouting detection, exit codes across four shells, folder authorization/denial/cancellation, and read-only/full-auto gating
 - Tool contract: typed `ToolArgs` access, scope visibility, and ledger membership derived from `kind`
 - SFTP upload/download, recursive directories, binary/large-file SHA-256
 - file_write / file_patch with UTF-8, CRLF, BOM, non-UTF-8 bytes, and concurrent-change checks

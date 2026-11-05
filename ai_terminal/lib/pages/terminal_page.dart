@@ -25,6 +25,7 @@ import '../widgets/operation_sheet.dart';
 import '../widgets/plan_panel.dart';
 import '../widgets/interrupted_turn_banner.dart';
 import '../widgets/reconnecting_banner.dart';
+import '../widgets/local_dir_auth_dialog.dart';
 import '../widgets/tab_item_widget.dart';
 import '../utils/interrupted_turn_detector.dart';
 import '../utils/slash_command.dart';
@@ -54,6 +55,7 @@ import '../services/ai_service.dart';
 import '../services/command_executor.dart';
 import '../services/server_monitor_service.dart';
 import '../services/change_record_service.dart';
+import '../services/local_file_policy.dart';
 import '../models/change_record.dart';
 import '../widgets/server_monitor_panel.dart';
 import '../widgets/terminal_view.dart' as term_widget;
@@ -207,6 +209,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     // "Cannot use ref after the widget was disposed"，中断后续资源回收。
     _agentNotifier = ref.read(agentProvider.notifier);
     _agentNotifier!.secretRequestHandler = _requestSecret;
+    _agentNotifier!.localDirRequestHandler = _requestLocalDir;
     // 延迟到帧构建完成后执行连接，避免在 build 阶段修改 provider 状态
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -782,6 +785,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final notifier = _agentNotifier;
     if (notifier != null && notifier.secretRequestHandler == _requestSecret) {
       notifier.secretRequestHandler = null;
+    }
+    if (notifier != null &&
+        notifier.localDirRequestHandler == _requestLocalDir) {
+      notifier.localDirRequestHandler = null;
     }
     _agentNotifier = null;
     super.dispose();
@@ -3123,6 +3130,38 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         );
       },
     ).whenComplete(controller.dispose);
+  }
+
+  /// 本机目录授权弹窗 —— local_exec 的 cwd 不在白名单时走这里。
+  ///
+  /// 弹窗必须列出具体路径、原因和“会开启本地文件访问并授权该目录”，
+  /// 不能静默扩权；敏感路径在工具层就被拒绝，不会走到这里。
+  Future<bool> _requestLocalDir(String path, String reason) async {
+    if (!mounted) return false;
+    final ui = AgentUiText.of(context);
+    final approved = await showLocalDirAuthDialog(
+      context,
+      path: path,
+      reason: reason,
+    );
+    if (!approved || !mounted) return false;
+    // 弹窗期间任务可能已被取消：不再保存授权，也不让工具继续执行
+    if (!ref.read(agentProvider).isRunning) return false;
+
+    final policy = LocalFilePolicy.load();
+    final dirs = [...policy.allowedDirs];
+    if (!dirs.contains(path)) dirs.add(path);
+    await policy.copyWith(enabled: true, allowedDirs: dirs).save();
+    if (!mounted) return true;
+    showTopSnackBar(
+      context,
+      SnackBar(
+        content:
+            Text(ui.localExecAuthorized(path), style: const TextStyle(fontSize: fSmall)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    return true;
   }
 
   /// 直接执行命令行

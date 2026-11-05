@@ -41,6 +41,7 @@ import '../utils/rollback_advisor.dart';
 import '../utils/verification_detector.dart';
 import '../utils/command_extractor.dart';
 import '../utils/choice_request_detector.dart';
+import '../utils/local_command_detector.dart';
 import '../utils/token_estimator.dart';
 import '../utils/audit_logger.dart';
 import 'change_record_service.dart';
@@ -248,6 +249,10 @@ class AgentEngine {
   /// 只把它写进安全存储与执行器，**绝不**返回给工具或写进对话历史 ——
   /// 秘密一旦进 observation 就永久留在模型上下文里（AGENTS.md R7）。
   Future<String?> Function(String title, String message)? onSecretRequest;
+
+  /// 请求用户授权本机目录（local_exec 使用），由 AgentNotifier 注入 UI 弹窗。
+  /// 返回 true 表示用户已允许；调用方必须重新读取 LocalFilePolicy 再判定。
+  Future<bool> Function(String path, String reason)? onLocalDirRequest;
 
   int maxSteps = 0; // 0 = 无限制（运行时兜底为 _defaultMaxSteps）
 
@@ -2245,6 +2250,36 @@ class AgentEngine {
       }
     }
 
+    // 远程误发拦截：SSH 到非 Windows 主机时，明显是本机 Windows/PowerShell
+    // 的命令先给一条可读观测，避免把 PowerShell 原样发给 bash。
+    // 放在封网期之前：这是本机命令，不应被远程的变更窗口规则拦成“封网期”。
+    final remoteOs = executor is SSHService
+        ? executor.osInfo.toLowerCase()
+        : '';
+    final remoteLooksWindows = remoteOs.contains('windows') ||
+        remoteOs.contains('mingw') ||
+        remoteOs.contains('cygwin');
+    if (executor is SSHService &&
+        !remoteLooksWindows &&
+        looksLikeLocalWindowsCommand(command)) {
+      agentLogger.warn('ReAct', '疑似本机 Windows 命令发往远程 Unix: $command');
+      const reason =
+          '检测到 Windows 盘符或 PowerShell 语法，但当前 execute 运行在远程服务器。';
+      onEvent?.call(AgentEvent.info(
+          '🖥 $reason\n本机命令请改用 local_exec 工具: `$command`'));
+      final observation = ReActObservation(
+        command: command,
+        output: '$reason\n'
+            '如果目标在运行 App 的本机，请改用 local_exec 工具（参数 command/cwd）；'
+            '如果目标确实是远程服务器，请改用服务器支持的 shell 语法。',
+        success: false,
+        error: '本机命令误发到远程',
+      ).format();
+      onSuccess(false, 'local_command_on_remote', 0);
+      return _EarlyExecutionResult(
+          shouldContinue: true, observation: observation, command: command);
+    }
+
     // 变更窗口/封网期检查：非 safe 级命令在封网期被拒绝
     final (windowAllowed, windowReason) =
         ChangeWindowService.checkCommand(command);
@@ -2940,8 +2975,13 @@ class AgentEngine {
 
     agentLogger.info('ReAct', '调用工具: $toolName, 参数: ${args.describe()}');
     // R4: 工具调用必须有独立的 command 事件和 id，不能复用上一条 shell 命令的 id
-    final toolUiDisplay =
-        _formatToolCommandForDisplay(toolName, args, maxValueChars: 160);
+    // 本机 shell 的 command 是用户批准的依据，不能被 UI 的 160 字符摘要截掉；
+    // 其余工具仍按摘要截断，避免 file_write 的大内容撑爆证据层。
+    final toolUiDisplay = _formatToolCommandForDisplay(
+      toolName,
+      args,
+      maxValueChars: toolName == 'local_exec' ? 8000 : 160,
+    );
     final toolCommandEvent = AgentEvent.command(
       toolUiDisplay,
       id: 'evt_tool_${_uuid.v4().substring(0, 8)}',
@@ -3014,6 +3054,18 @@ class AgentEngine {
         if (myGeneration != _currentTaskGeneration) return false;
         return requestSudoPassword(reason: reason);
       };
+      // 本机目录授权：与密码弹窗同一套“跨 await 先查代际”的约束。
+      // 只负责把路径/原因转给 UI；策略写回由页面完成后，工具重新判定。
+      tool.localDirAuthorizationRequest = (path, reason) async {
+        if (myGeneration != _currentTaskGeneration) return false;
+        final request = onLocalDirRequest;
+        if (request == null) return false;
+        return request(path, reason);
+      };
+      // 授权弹窗可能在任务取消后才返回；工具在真正执行前用它再拦一次。
+      tool.isTaskActive = () =>
+          myGeneration == _currentTaskGeneration &&
+          _currentTask?.status != AgentStatus.cancelled;
       final result = await tool.execute(
         executor: executor,
         args: args,
@@ -3786,6 +3838,10 @@ class AgentEngine {
 
     // 注：早期对话摘要已改为逐条写入 ConvMessage.summary，不再在 system prompt 中注入
 
+    // 执行位置：远程会话里 execute 与 local_exec 的边界必须写死
+    buffer.writeln();
+    buffer.writeln(_executionLocationPrompt(executor));
+
     if (executor != null) {
       buffer.writeln('\n【系统环境】');
       if (executor is SSHService && executor.osInfo.isNotEmpty) {
@@ -3944,6 +4000,42 @@ $hostList
     _orchestratorMode = false;
     _tools.disableOrchestrator();
     _invalidateSystemPromptCache();
+  }
+
+  /// 执行位置段落：把“execute 在远程 / local_exec 在本机”说死。
+  ///
+  /// 截图故障：远程 Linux 会话里模型生成了 PowerShell，execute 原样发给 bash，
+  /// 报 `mkdir: 无效的选项 -- F` / `Select-Object: 未找到命令`。工具描述与
+  /// 远程误发拦截是第一道，这里是模型每轮都能看到的长期约束。
+  String _executionLocationPrompt(CommandExecutor? executor) {
+    final localOs = Platform.isWindows
+        ? 'Windows'
+        : Platform.isMacOS
+            ? 'macOS'
+            : Platform.isLinux
+                ? 'Linux'
+                : Platform.operatingSystem;
+    final home = Platform.environment['USERPROFILE'] ??
+        Platform.environment['HOME'] ??
+        '';
+    final buffer = StringBuffer()..writeln('【执行位置】');
+    if (executor is SSHService) {
+      final remoteFirstLine = executor.osInfo.trim().split('\n').first.trim();
+      final remote =
+          remoteFirstLine.isEmpty ? '未知系统' : remoteFirstLine;
+      buffer.writeln('- 动作: execute 运行在：远程服务器（$remote）');
+      buffer.writeln('- 运行 App 的本机：$localOs，主机名 ${Platform.localHostname}'
+          '${home.isEmpty ? '' : '，主目录 $home'}');
+      buffer.writeln(
+          '- 本机命令（Docker Desktop、盘符路径如 D:\\...、本机文件/服务）必须使用 local_exec 工具；');
+      buffer.writeln(
+          '  不要把 PowerShell/cmd 语法发给远程 shell。服务器上的普通命令继续用 execute。');
+    } else if (executor != null) {
+      buffer.writeln('- 动作: execute 运行在：本机终端（$localOs）。本机路径可直接在 execute 中使用。');
+    } else {
+      buffer.writeln('- 当前未连接执行器；运行 App 的本机为 $localOs。');
+    }
+    return buffer.toString();
   }
 
   /// 当前权限档位对应的 system prompt 段落。

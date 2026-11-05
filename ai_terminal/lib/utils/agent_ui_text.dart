@@ -229,9 +229,11 @@ class AgentUiText {
       zh ? '允许 Agent 读写本机文件' : 'Let the agent read and write local files';
   String get localFileEnableDesc => zh
       ? '开启后，Agent 可使用 local_file_read / local_file_write 等工具操作这台电脑上的文件。'
-          '未添加授权目录时，任何本机文件操作都会被拒绝。'
+          'SSH 会话里的 local_exec 也使用这份目录授权。'
+          '未添加授权目录时，任何本机文件或本机命令操作都会被拒绝。'
       : 'When enabled, the agent can use local_file_read / local_file_write and friends on this computer. '
-          'With no authorized folders, every local file operation is refused.';
+          'local_exec in SSH sessions also uses this folder authorization. '
+          'With no authorized folders, every local file or local command operation is refused.';
   String get localFileDirs => zh ? '授权目录' : 'Authorized folders';
   String get localFileAddDir => zh ? '添加目录' : 'Add folder';
   String get localFileRemoveDir => zh ? '移除该目录' : 'Remove this folder';
@@ -265,6 +267,25 @@ class AgentUiText {
   String localFileTrashClearFailed(int count) => zh
       ? '$count 项删除失败（可能被其它程序占用）'
       : '$count items could not be deleted (maybe locked by another app)';
+
+  // ── local_exec 目录授权 ──
+  String get localExecAuthTitle =>
+      zh ? '允许本机目录访问？' : 'Allow local folder access?';
+  String localExecAuthBody(String path, String reason, bool willCreate) => zh
+      ? 'Agent 需要在本机目录执行命令：\n$path\n\n'
+          '原因：$reason\n\n'
+          '${willCreate ? '该目录不存在，允许后将创建。\n' : ''}'
+          '允许后会开启本地文件访问并授权该目录。'
+      : 'The agent needs to run a command in this local folder:\n$path\n\n'
+          'Reason: $reason\n\n'
+          '${willCreate ? 'The folder does not exist and will be created.\n' : ''}'
+          'Allowing this enables local file access and authorizes the folder.';
+  String get localExecAuthNote => zh
+      ? '敏感路径（~/.ssh、.env、密钥等）仍然禁止访问。'
+      : 'Sensitive paths (~/.ssh, .env, keys) remain blocked.';
+  String get localExecAuthAllow => zh ? '允许并继续' : 'Allow and continue';
+  String localExecAuthorized(String path) =>
+      zh ? '已授权本机目录：$path' : 'Local folder authorized: $path';
 
   // ── 过程时间线 ──
   String get commandLabel => zh ? '终端命令' : 'Command';

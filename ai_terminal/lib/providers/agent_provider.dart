@@ -77,6 +77,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// （AGENTS.md R7）—— 所以这里只透传回调，Notifier 自己也不留副本。
   Future<String?> Function(String title, String message)? secretRequestHandler;
 
+  /// 本机目录授权弹窗（local_exec 使用）。由 TerminalPage 注入。
+  Future<bool> Function(String path, String reason)? localDirRequestHandler;
+
   final ConversationService _convService = ConversationService();
 
   /// 日志订阅取消函数
@@ -553,6 +556,12 @@ class AgentNotifier extends StateNotifier<AgentState> {
     // 透传而不是捕获：页面可能在引擎创建之后才注册处理器（切 tab、重建 engine）
     engine.onSecretRequest =
         (title, message) async => secretRequestHandler?.call(title, message);
+    // 透传本机目录授权：页面可能晚于 engine 注册处理器，不能在创建 engine 时捕获 null
+    engine.onLocalDirRequest = (path, reason) async {
+      final handler = localDirRequestHandler;
+      if (handler == null) return false;
+      return handler(path, reason);
+    };
     engine.onThinking = (msg) {
       // 新一轮 AI 流式开始：先把上一轮的 streamingContent 累积到 content 并保存
       _flushStreamingToContent(scopeId);

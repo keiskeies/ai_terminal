@@ -16,6 +16,7 @@ import '../utils/line_diff.dart';
 import '../utils/local_file_ops.dart';
 import '../utils/tool_args_parser.dart';
 import 'local_file_tools.dart';
+import 'local_exec_tool.dart';
 import 'project_tools.dart';
 import 'web_tools.dart';
 
@@ -165,6 +166,17 @@ abstract class AgentTool {
   /// 工具一旦拿到明文就可能把它拼进 ToolResult.output，而 output 会进
   /// 对话历史并被模型读到（AGENTS.md R7）。
   Future<bool> Function(String reason)? sudoPasswordRequest;
+
+  /// 请用户授权本机目录（local_exec 使用，由 AgentEngine 在 execute 前注入）。
+  ///
+  /// 返回 true = 用户允许访问该目录，调用方应重新读取 LocalFilePolicy 再判定一次。
+  /// 只负责“问用户”，不直接改策略；策略写回由 UI 层完成。
+  Future<bool> Function(String path, String reason)?
+      localDirAuthorizationRequest;
+
+  /// 当前任务是否仍有效（local_exec 在用户授权等待后、真正执行前检查）。
+  /// 授权弹窗可能停留很久，期间任务被取消/暂停时不能继续产生本机副作用。
+  bool Function()? isTaskActive;
 
   /// 只读工具（kind == read）
   bool get isReadOnly => kind == ToolKind.read;
@@ -2402,6 +2414,11 @@ class AgentToolRegistry {
     // 本地文件工具：作用域不限（SSH 会话里也要能改本机的部署配置），
     // 但每个路径都要过 LocalFilePolicy 的白名单 + 黑名单判定。
     registerLocalFileTools(this, extraRoots: () => _localFileRoots?.call() ?? const []);
+    // 本机 shell：只在 SSH 会话暴露。本地会话的 execute 已经在本机，
+    // 再暴露 local_exec 只会让模型在两个等价入口之间犹豫。
+    if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+      register(LocalExecTool(), scope: ToolScope.sshSession);
+    }
   }
 
   /// 启用编排模式：注册多机编排工具

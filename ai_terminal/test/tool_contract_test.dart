@@ -16,6 +16,8 @@ import 'package:ai_terminal/services/agent_host_registry.dart';
 import 'package:ai_terminal/services/agent_tool.dart';
 import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/command_executor.dart';
+import 'package:ai_terminal/services/ssh_service.dart';
+import 'package:ai_terminal/models/host_config.dart';
 import 'package:ai_terminal/utils/tool_args_parser.dart';
 
 /// 最小 mock executor：既不是 SSHService 也不是 LocalTerminalService，
@@ -332,6 +334,43 @@ void main() {
       expect(RegExp(r'参数: \{').hasMatch(prompt), isFalse,
           reason: 'parser 明确拒绝 JSON 参数，示例不能教 AI 那么写');
       expect(prompt, contains('  artifact_dir: build/web'));
+    });
+
+    test('本地会话 prompt 明确 execute 在本机，且不宣传 local_exec', () {
+      final engine = AgentEngine(
+        aiProvider: _MockAIProvider(),
+        modelConfig: _makeConfig(),
+        memory: AgentMemory(),
+        maxSteps: 5,
+        hostId: 'test-host',
+      );
+      final prompt = engine.buildSystemPromptForTesting(_MockExecutor());
+      expect(prompt, contains('【执行位置】'));
+      expect(prompt, contains('本机终端'));
+      expect(prompt, isNot(contains('local_exec')),
+          reason: '本地会话的 execute 已在本机，不应再宣传第二个等价入口');
+    });
+
+    test('SSH 会话 prompt 给出执行位置并宣传 local_exec', () {
+      final engine = AgentEngine(
+        aiProvider: _MockAIProvider(),
+        modelConfig: _makeConfig(),
+        memory: AgentMemory(),
+        maxSteps: 5,
+        hostId: 'test-host',
+      );
+      final ssh = SSHService(HostConfig.create(
+        id: 'h1',
+        name: 'h1',
+        host: '127.0.0.1',
+        username: 'tester',
+        authType: 'password',
+      ));
+      final prompt = engine.buildSystemPromptForTesting(ssh);
+      expect(prompt, contains('【执行位置】'));
+      expect(prompt, contains('远程服务器'));
+      expect(prompt, contains('local_exec'));
+      expect(prompt, contains('不要把 PowerShell/cmd 语法发给远程 shell'));
     });
   });
 
