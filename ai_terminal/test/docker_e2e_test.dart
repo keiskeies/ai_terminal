@@ -36,6 +36,7 @@ class _ScriptedAI implements AIProvider {
     Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
+    void Function(String delta)? onReasoning,
   }) async {
     if (_index >= _responses.length) {
       throw StateError('No scripted response left (call=${_index + 1})');

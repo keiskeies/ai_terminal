@@ -32,8 +32,10 @@ import '../utils/interrupted_turn_detector.dart';
 import '../utils/slash_command.dart';
 import '../utils/agent_ui_text.dart';
 import '../utils/conversation_export.dart';
+import '../utils/live_thought_text.dart';
 import '../utils/goal_continuation.dart';
 import '../services/agent_tracer.dart';
+import '../services/agent_logger.dart';
 import 'package:flutter/services.dart';
 import '../services/daos.dart';
 import '../core/prompts.dart' as prompts;
@@ -611,8 +613,23 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         tab.service?.resize(width, height);
       }
     };
+    // xterm 4.0.0 的循环缓冲在滚动回卷时可能越界（见 agent.log 里的 RangeError）。
+    // 一次写坏后 Buffer 的行数和循环缓冲会失配，之后每帧 paint 都会再崩一次，
+    // 所以这里就地恢复：清掉滚动历史让索引重新对齐，并做 5s 冷却避免刷屏。
+    var lastTermRecoveryAt = DateTime.fromMillisecondsSinceEpoch(0);
     return tab.outputController.stream.listen((data) {
-      term.write(data);
+      try {
+        term.write(data);
+      } catch (e) {
+        final now = DateTime.now();
+        if (now.difference(lastTermRecoveryAt).inSeconds >= 5) {
+          lastTermRecoveryAt = now;
+          agentLogger.warn('Terminal', '写入异常，清空滚动历史以恢复: $e');
+          try {
+            term.buffer.clearScrollback();
+          } catch (_) {}
+        }
+      }
     });
   }
 
@@ -2271,6 +2288,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             streamingContent: item.streamingContent,
             turnGoal: turnGoal,
             isLoading: item.isStreaming && isLast && agentState.isRunning,
+            // 原生推理只在跑动中展示；任务结束就收起，不占历史空间
+            liveReasoning:
+                isLast && agentState.isRunning ? agentState.liveReasoning : '',
             tab: tab,
             showAutoExecute: true,
             isAgentRunning: agentState.isRunning,
@@ -2381,6 +2401,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     List<String> pendingOptions = const [],
     List<AgentEvent> events = const [],
     String streamingContent = '',
+    String liveReasoning = '',
     String? turnGoal,
     String? enginePendingConfirm,
   }) {
@@ -2468,7 +2489,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 ),
               )
             else ...[
-              _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning, isWaitingChoice, pendingOptions: pendingOptions, events: events, streamingContent: streamingContent, turnGoal: turnGoal, enginePendingConfirm: enginePendingConfirm),
+              _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning, isWaitingChoice, pendingOptions: pendingOptions, events: events, streamingContent: streamingContent, liveReasoning: liveReasoning, turnGoal: turnGoal, enginePendingConfirm: enginePendingConfirm),
               _buildAnswerCopyRow(events, content, streamingContent, isLoading),
             ],
           ],
@@ -2933,6 +2954,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     List<String> pendingOptions = const [],
     List<AgentEvent> events = const [],
     String streamingContent = '',
+    String liveReasoning = '',
     String? turnGoal,
     String? enginePendingConfirm,
   }) {
@@ -3062,10 +3084,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               currentCommand: runningCommand,
             ),
           // 过程折叠由 AgentProcessTimeline 自己负责（一行一步 + 更早 N 步），
+          // 模型原生推理（reasoning_content）：只有部分网关返回该字段，有就实时显示
+          if (liveReasoning.trim().isNotEmpty)
+            _buildReasoningBlock(liveReasoning, tc),
           // 不再套一层 CollapsibleEventStream —— 两层折叠会互相打架。
           buildEventContent(events),
-          // 只有在还没有 AI 内容事件时（流式过程中，只有 result/info），才显示流式纯文本
-          if (!hasAIContentEvents) ...[
+          // 流式过程中的当前步思考逐字显示。原来这段只在"还没有任何 AI 事件"时
+          // 才渲染，第一步之后事件已存在，用户就再也看不到实时输出了。
+          if (isLoading && streamingContent.trim().isNotEmpty)
+            _buildLiveThought(streamingContent, tc),
+          // 没有 AI 内容事件时（流式早期或纯文本兜底）仍然按原逻辑显示
+          if (!hasAIContentEvents && !isLoading) ...[
             if (streamingContent.trim().isNotEmpty)
               _buildMarkdownText(streamingContent, tc)
             else if (content.trim().isNotEmpty)
@@ -3121,6 +3150,76 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     );
   }
 
+
+  /// 模型原生推理块：只读展示，限高避免长推理把正文挤走
+  Widget _buildReasoningBlock(String text, ThemeColors tc) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      decoration: BoxDecoration(
+        color: tc.dataCard,
+        borderRadius: BorderRadius.circular(rSmall),
+        border: Border.all(color: tc.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.psychology_outlined, size: 13, color: tc.textSub),
+              const SizedBox(width: 4),
+              Text('模型思考',
+                  style: TextStyle(fontSize: fMicro, color: tc.textSub)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: 160),
+            child: SingleChildScrollView(
+              primary: false,
+              child: Text(
+                text,
+                style: TextStyle(
+                  color: tc.textSub,
+                  fontSize: fSmall,
+                  height: 1.5,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLiveThought(String raw, ThemeColors tc) {
+    final text = extractLiveThought(raw);
+    if (text.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 2, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 9,
+                height: 9,
+                child: CircularProgressIndicator(
+                    strokeWidth: 1.4, color: tc.brand),
+              ),
+              const SizedBox(width: 5),
+              Text('思考中',
+                  style: TextStyle(fontSize: fMicro, color: tc.textSub)),
+            ],
+          ),
+          const SizedBox(height: 3),
+          _buildMarkdownText(text, tc),
+        ],
+      ),
+    );
+  }
 
   /// 渲染一段 Markdown 文本（用于 thought/text/info 的自动追加显示）。
   ///

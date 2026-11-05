@@ -38,6 +38,8 @@ abstract class AIProvider {
     Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
+    /// 模型原生推理增量（reasoning_content）；网关不给该字段时不会触发
+    void Function(String delta)? onReasoning,
   });
 }
 
@@ -148,6 +150,7 @@ class OpenAIProvider implements AIProvider {
     Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
+    void Function(String delta)? onReasoning,
   }) async {
     final effectiveSystemPrompt = systemPrompt ?? buildContextPrompt();
     final messages = buildRequestMessages(
@@ -235,6 +238,12 @@ class OpenAIProvider implements AIProvider {
             if (choices != null && choices.isNotEmpty) {
               final delta = choices[0]['delta'] as Map?;
               if (delta != null) {
+                // 原生推理增量：DeepSeek/部分网关用 reasoning_content，
+                // 也有网关用 reasoning；两处都认，没给就静默跳过。
+                final reasoning = delta['reasoning_content'] ?? delta['reasoning'];
+                if (reasoning is String && reasoning.isNotEmpty) {
+                  onReasoning?.call(reasoning);
+                }
                 // 普通文本内容
                 final content = delta['content'];
                 if (content != null && content.toString().isNotEmpty) {
@@ -362,6 +371,7 @@ class QwenProvider implements AIProvider {
     Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
+    void Function(String delta)? onReasoning,
   }) async {
     // 通义千问兼容 OpenAI API 格式
     final provider = OpenAIProvider();
@@ -374,6 +384,7 @@ class QwenProvider implements AIProvider {
       responseTimeout: responseTimeout,
       tools: tools,
       onUsage: onUsage,
+      onReasoning: onReasoning,
     );
   }
 }
@@ -395,6 +406,7 @@ class ErnieProvider implements AIProvider {
     Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
+    void Function(String delta)? onReasoning,
   }) async {
     // 百度文心 API 格式（不支持 system 角色）
     // 将 system prompt 合并到第一条 user 消息中
@@ -497,6 +509,10 @@ class ErnieProvider implements AIProvider {
                 if (choices != null && choices.isNotEmpty) {
                   final delta = choices[0]['delta'] as Map?;
                   if (delta != null) {
+                    final reasoning = delta['reasoning_content'] ?? delta['reasoning'];
+                    if (reasoning is String && reasoning.isNotEmpty) {
+                      onReasoning?.call(reasoning);
+                    }
                     final content = delta['content'];
                     if (content != null && content.toString().isNotEmpty) {
                       streamController.add(content.toString());

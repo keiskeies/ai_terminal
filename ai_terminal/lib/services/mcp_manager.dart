@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:mcp_dart/mcp_dart.dart' show LogLevel, setMcpLogHandler;
 
+import 'agent_logger.dart';
 import 'agent_tool.dart';
 import 'mcp_connection.dart';
 import 'mcp_models.dart';
@@ -49,6 +51,16 @@ class McpManager extends ChangeNotifier implements McpToolCaller {
   Future<void> init() async {
     if (_initialized || _disposed) return;
     _initialized = true;
+    // mcp_dart 默认把 SDK 日志写到 stderr；Windows GUI 版没有控制台句柄，
+    // 每次写入都抛 FileSystemException 冒到 Zone 兜底，agent.log 被 20 行栈刷屏。
+    // 只把 warn/error 收进我们自己的日志，debug/info 属于 SDK 内部流程，不进文件。
+    setMcpLogHandler((name, level, message) {
+      if (level == LogLevel.error) {
+        agentLogger.warn('MCP', '[$name] $message');
+      } else if (level == LogLevel.warn) {
+        agentLogger.debug('MCP', '[$name] $message');
+      }
+    });
     try {
       _enabled = McpStore.loadGlobalEnabled();
       final loaded = await McpStore.loadAll();

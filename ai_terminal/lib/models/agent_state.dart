@@ -41,6 +41,10 @@ class AgentState {
   /// 跨任务持续的目标（host 级状态，切 tab 不丢；null 表示没有目标）
   final AgentGoal? goal;
 
+  /// 模型原生推理（reasoning_content）的当前步增量。
+  /// 只有网关返回该字段时才有内容；任务结束即清空，不落库。
+  final String liveReasoning;
+
   AgentState({
     this.status = AgentStatus.idle,
     this.currentTask,
@@ -59,6 +63,7 @@ class AgentState {
     this.permissionMode = AgentPermissionMode.ask,
     this.isWebSearchEnabled = false,
     this.goal,
+    this.liveReasoning = '',
   })  : chatItems = chatItems ?? [],
         pendingOptions = pendingOptions ?? [];
 
@@ -94,6 +99,8 @@ class AgentState {
     bool? isWebSearchEnabled,
     AgentGoal? goal,
     bool clearGoal = false,
+    String? liveReasoning,
+    bool clearLiveReasoning = false,
   }) {
     return AgentState(
       status: status ?? this.status,
@@ -117,6 +124,8 @@ class AgentState {
       permissionMode: permissionMode ?? this.permissionMode,
       isWebSearchEnabled: isWebSearchEnabled ?? this.isWebSearchEnabled,
       goal: clearGoal ? null : (goal ?? this.goal),
+      liveReasoning:
+          clearLiveReasoning ? '' : (liveReasoning ?? this.liveReasoning),
     );
   }
 

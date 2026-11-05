@@ -21,6 +21,7 @@ class _NullProvider implements AIProvider {
     Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
+    void Function(String delta)? onReasoning,
   }) async =>
       const Stream<String>.empty();
 }

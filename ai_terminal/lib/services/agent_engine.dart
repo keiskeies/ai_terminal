@@ -230,7 +230,14 @@ class AgentEngine {
   /// _accumulatedMessage 最大字符数（防止长任务内存无界增长）
   static const int _maxAccumulatedChars = 20000;
 
+  /// 本步模型推理累积上限：推理只是过程展示，超长只保留尾部
+  static const int _maxReasoningChars = 4000;
+  final StringBuffer _reasoningBuffer = StringBuffer();
+  int _lastReasoningEmitAt = 0;
+
   void Function(String)? onThinking;
+  /// 模型原生推理增量（reasoning_content / reasoning）；网关不给该字段时不会触发
+  void Function(String text)? onReasoning;
   void Function(String)? onCommandGenerated;
   void Function(AgentResult)? onCommandExecuted;
   void Function(String)? onError;
@@ -1500,6 +1507,7 @@ class AgentEngine {
   }) async {
     agentLogger.info('ReAct', '调用 AI 模型...');
     agentLogger.debug('ReAct', '消息历史: ${_conversationHistory.length} 条');
+    _resetReasoning();
 
     String fullResponse = '';
     // 重试仅对流建立阶段有效，一旦开始接收 chunk 就不再重试
@@ -1571,6 +1579,7 @@ class AgentEngine {
           responseTimeout: aiResponseTimeout,
           tools: toolsSchema,
           onUsage: _recordUsage,
+          onReasoning: _handleReasoningDelta,
         );
         // R1: chatStream 返回时可能用户已经点过停止。尤其是 OpenAI-compatible
         // 实现不保证立刻响应 CancelToken：若这里直接订阅新流，_aiDoneCompleter
@@ -1748,6 +1757,11 @@ class AgentEngine {
 
     if (_aiStreamTimedOut && fullResponse.isEmpty) {
       throw TimeoutException('AI 响应超时（${aiResponseTimeout.inSeconds}s 无数据）');
+    }
+
+    // 流式结束：把节流掉的最后一段推理补发给 UI
+    if (_reasoningBuffer.isNotEmpty) {
+      onReasoning?.call(_reasoningBuffer.toString());
     }
 
     // 流式结束：一次性发出所有事件（e.id 此时是 stableId）
@@ -2220,6 +2234,36 @@ class AgentEngine {
     }
   }
 
+  /// 日志里只放命令首行并限长：整条命令可能是多行脚本，原样打会把日志撑爆
+  static String _logCommand(String command) {
+    final firstLine = command.split('\n').first.trim();
+    if (firstLine.isEmpty) return '(空命令)';
+    return firstLine.length <= 80 ? firstLine : '${firstLine.substring(0, 80)}…';
+  }
+
+  /// 模型推理增量：累积 + 限长 + 节流（~150ms），避免每个 token 都重建一次 UI
+  void _handleReasoningDelta(String delta) {
+    if (delta.isEmpty) return;
+    _reasoningBuffer.write(delta);
+    if (_reasoningBuffer.length > _maxReasoningChars) {
+      final text = _reasoningBuffer.toString();
+      _reasoningBuffer
+        ..clear()
+        ..write(text.substring(text.length - _maxReasoningChars));
+    }
+    final now = DateTime.now().millisecondsSinceEpoch;
+    if (now - _lastReasoningEmitAt < 150) return;
+    _lastReasoningEmitAt = now;
+    onReasoning?.call(_reasoningBuffer.toString());
+  }
+
+  /// 每一步重新开始：清空上一步的推理，并通知 UI 收起推理块
+  void _resetReasoning() {
+    _reasoningBuffer.clear();
+    _lastReasoningEmitAt = 0;
+    onReasoning?.call('');
+  }
+
   /// _runCommandWithSafety 的内部实现（不含 trace，由外层 wrapper 统一记录）
   Future<_EarlyExecutionResult> _runCommandWithSafetyInner(
     String command,
@@ -2232,7 +2276,8 @@ class AgentEngine {
   }) async {
     // 安全检查
     final safetyLevel = SafetyGuard.check(command);
-    agentLogger.info('ReAct', '安全检查: $safetyLevel');
+    agentLogger.debug('ReAct',
+        '步骤 $_currentStepCount · 安全检查 $safetyLevel · ${_logCommand(command)}');
 
     // 审计日志（执行前写入）：即使执行中崩溃，也能追溯"曾发起过这条命令"
     // 所有命令都记录（含 safe 级），因为 cat /etc/shadow 等只读命令也可能泄露敏感信息
@@ -2300,8 +2345,8 @@ class AgentEngine {
     // 权限档位：只读拒绝、询问/自动确认、全自动放行。
     // 判定逻辑抽在 permission_policy，UI 事件快照用同一份实现，避免两边漂移。
     final decision = decideCommand(safetyLevel, _permissionMode);
-    agentLogger.info(
-        'ReAct', '权限模式: ${_permissionMode.id}, 处置: ${decision.name}');
+    agentLogger.debug('ReAct',
+        '步骤 $_currentStepCount · 权限 ${_permissionMode.id} → ${decision.name}');
 
     if (decision == CommandGateDecision.reject) {
       agentLogger.warn('ReAct', '权限模式拦截命令: ${_permissionMode.id} $command');
@@ -2482,7 +2527,17 @@ class AgentEngine {
 
     final result =
         await _executeCommand(executor, command, myGeneration: myGeneration);
-    agentLogger.info('ReAct', '命令执行结果: success=${result.success}');
+    // 一条命令一行：安全/权限两条细节降到 DEBUG，正常看日志时只留这一行
+    final parts = <String>[
+      '步骤 $_currentStepCount',
+      _logCommand(command),
+      result.success ? '成功' : '失败',
+      if (result.exitCode != null) 'exit ${result.exitCode}',
+      if (result.duration != null) '${result.duration!.inMilliseconds}ms',
+      '${result.output?.length ?? 0} 字符',
+      if (!result.success && result.failureKind != null) result.failureKind!,
+    ];
+    agentLogger.info('ReAct', parts.join(' · '));
 
     // R1: 主命令执行后检查代际，避免旧任务结果污染新任务的统计/事件流
     // 若代际已变更（cancel + 立即新任务），不再更新 _currentTask 统计、不再 emit result 事件

@@ -54,8 +54,9 @@ void main() {
     FlutterError.onError = (details) {
       FlutterError.presentError(details);
       try {
-        agentLogger.error('FlutterError',
-            '框架异常: ${details.exception}\n${details.stack}');
+        // 栈只进 crash.log：agent.log 里每条异常压 20 行栈会把整份日志淹掉
+        agentLogger.error(
+            'FlutterError', '框架异常: ${details.exception}（栈见 crash.log）');
       } catch (_) {}
       // P2-8: 同步写入 crash.log（独立于 agentLogger，保证结构化字段）
       crashReporter.report(
@@ -108,7 +109,8 @@ void main() {
     // 记录到 agent 日志而非让 app 崩溃，确保用户操作不中断
     try {
       debugPrint('[ZONE] 未捕获异常: $error\n$stack');
-      agentLogger.error('Zone', '未捕获异常: $error\n$stack');
+      // 同上：栈进 crash.log，日志里只留一行，避免同一条异常刷满日志
+      agentLogger.error('Zone', '未捕获异常: $error（栈见 crash.log）');
     } catch (_) {
       // agentLogger 本身不可用时，只能 debugPrint
       debugPrint('[ZONE] agentLogger 不可用: $error');

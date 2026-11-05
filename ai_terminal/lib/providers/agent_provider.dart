@@ -574,8 +574,23 @@ class AgentNotifier extends StateNotifier<AgentState> {
             streamingContent: '',
           );
         }
-        return s.copyWith(status: AgentStatus.thinking, chatItems: items);
+        return s.copyWith(
+          status: AgentStatus.thinking,
+          chatItems: items,
+          clearLiveReasoning: true,
+        );
       });
+    };
+
+    // 模型原生推理（reasoning_content）：只有网关返回该字段时才有值。
+    // 空串表示"本步推理结束/清空"，避免上一轮的推理挂在界面上。
+    engine.onReasoning = (text) {
+      _updateScopeState(
+        scopeId,
+        (s) => text.isEmpty
+            ? s.copyWith(clearLiveReasoning: true)
+            : s.copyWith(liveReasoning: text),
+      );
     };
 
     engine.onMessage = (msg) {
