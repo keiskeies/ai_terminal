@@ -21,6 +21,7 @@ import '../widgets/session_history_dialog.dart';
 import '../widgets/agent_log_dialog.dart';
 import '../widgets/agent_command_block.dart';
 import '../widgets/agent_event_cards.dart';
+import '../widgets/agent_thinking_blocks.dart';
 import '../widgets/collapsible_message_text.dart';
 import '../widgets/operation_sheet.dart';
 import '../widgets/plan_panel.dart';
@@ -32,7 +33,6 @@ import '../utils/interrupted_turn_detector.dart';
 import '../utils/slash_command.dart';
 import '../utils/agent_ui_text.dart';
 import '../utils/conversation_export.dart';
-import '../utils/live_thought_text.dart';
 import '../utils/goal_continuation.dart';
 import '../services/agent_tracer.dart';
 import '../services/agent_logger.dart';
@@ -3086,13 +3086,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           // 过程折叠由 AgentProcessTimeline 自己负责（一行一步 + 更早 N 步），
           // 模型原生推理（reasoning_content）：只有部分网关返回该字段，有就实时显示
           if (liveReasoning.trim().isNotEmpty)
-            _buildReasoningBlock(liveReasoning, tc),
+            ModelReasoningBlock(text: liveReasoning, tc: tc),
           // 不再套一层 CollapsibleEventStream —— 两层折叠会互相打架。
           buildEventContent(events),
           // 流式过程中的当前步思考逐字显示。原来这段只在"还没有任何 AI 事件"时
           // 才渲染，第一步之后事件已存在，用户就再也看不到实时输出了。
           if (isLoading && streamingContent.trim().isNotEmpty)
-            _buildLiveThought(streamingContent, tc),
+            LiveThoughtBlock(rawText: streamingContent, tc: tc),
           // 没有 AI 内容事件时（流式早期或纯文本兜底）仍然按原逻辑显示
           if (!hasAIContentEvents && !isLoading) ...[
             if (streamingContent.trim().isNotEmpty)
@@ -3150,76 +3150,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     );
   }
 
-
-  /// 模型原生推理块：只读展示，限高避免长推理把正文挤走
-  Widget _buildReasoningBlock(String text, ThemeColors tc) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 6),
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-      decoration: BoxDecoration(
-        color: tc.dataCard,
-        borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: tc.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.psychology_outlined, size: 13, color: tc.textSub),
-              const SizedBox(width: 4),
-              Text('模型思考',
-                  style: TextStyle(fontSize: fMicro, color: tc.textSub)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 160),
-            child: SingleChildScrollView(
-              primary: false,
-              child: Text(
-                text,
-                style: TextStyle(
-                  color: tc.textSub,
-                  fontSize: fSmall,
-                  height: 1.5,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLiveThought(String raw, ThemeColors tc) {
-    final text = extractLiveThought(raw);
-    if (text.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 2, bottom: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: 9,
-                height: 9,
-                child: CircularProgressIndicator(
-                    strokeWidth: 1.4, color: tc.brand),
-              ),
-              const SizedBox(width: 5),
-              Text('思考中',
-                  style: TextStyle(fontSize: fMicro, color: tc.textSub)),
-            ],
-          ),
-          const SizedBox(height: 3),
-          _buildMarkdownText(text, tc),
-        ],
-      ),
-    );
-  }
 
   /// 渲染一段 Markdown 文本（用于 thought/text/info 的自动追加显示）。
   ///
