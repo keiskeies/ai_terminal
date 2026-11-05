@@ -325,10 +325,16 @@ class ServerMonitorService {
   /// Linux 采集：一次 runOnce 取所有指标
   Future<ServerSnapshot> _collectLinux(SSHService ssh) async {
     final script = [
+      // 强制英文输出：free/top/df/uptime 的标签会随系统 locale 翻译，
+      // 中文服务器上 free 输出的是 "内存：/交换："，按英文标签解析会全部落 0
+      'export LC_ALL=C',
       'echo @@CPU@@',
       "top -bn1 | grep 'Cpu(s)'",
       'echo @@MEM@@',
-      "free -m",
+      "free -m 2>/dev/null",
+      // /proc/meminfo 由内核生成、键名固定且不受 locale/命令缺失影响，作为首选数据源
+      'echo @@MEMINFO@@',
+      'cat /proc/meminfo',
       'echo @@DISK@@',
       "df -BG -PT",
       'echo @@NET@@',
@@ -349,10 +355,11 @@ class ServerMonitorService {
     ].join('; ');
 
     final out = await ssh.runOnce(script, timeout: const Duration(seconds: 8));
-    return _parseLinuxOutput(out);
+    return parseLinuxOutput(out);
   }
 
-  ServerSnapshot _parseLinuxOutput(String raw) {
+  @visibleForTesting
+  ServerSnapshot parseLinuxOutput(String raw) {
     final now = DateTime.now();
     if (raw.isEmpty) {
       return ServerSnapshot(timestamp: now, error: L10n.str.monitorErrorEmptyOutput);
@@ -383,40 +390,56 @@ class ServerMonitorService {
       cpuIdle = idMatch != null ? (double.tryParse(idMatch.group(1)!) ?? 0) : 0;
       cpu = (100 - cpuIdle).clamp(0, 100);
 
-      // MEM：free -m 输出
-      final memRaw = sections['MEM']?.trim() ?? '';
-      final memLines = memRaw.split('\n');
-      for (final line in memLines) {
-        if (line.startsWith('Mem:')) {
-          final parts = line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
-          if (parts.length >= 7) {
-            memTotalMB = double.tryParse(parts[1]) ?? 0;
-            memUsedMB = double.tryParse(parts[2]) ?? 0;
-            memFreeMB = double.tryParse(parts[3]) ?? 0;
-            memBuffersMB = double.tryParse(parts[5]) ?? 0;
-            memAvailableMB = double.tryParse(parts[6]) ?? 0;
-            // cached 需要单独取，free -m 在某些版本有 cached 列
-            if (parts.length >= 8) {
-              memCachedMB = double.tryParse(parts[7]) ?? 0;
+      // MEM：优先 /proc/meminfo（内核键值，不受 locale 影响，也不依赖 procps 是否安装）
+      final meminfo = _parseMeminfo(sections['MEMINFO'] ?? '');
+      if (meminfo != null) {
+        memTotalMB = meminfo.totalMB;
+        memUsedMB = meminfo.usedMB;
+        memAvailableMB = meminfo.availableMB;
+        memFreeMB = meminfo.freeMB;
+        memBuffersMB = meminfo.buffersMB;
+        memCachedMB = meminfo.cachedMB;
+        swapTotalMB = meminfo.swapTotalMB;
+        swapUsedMB = meminfo.swapUsedMB;
+        if (memTotalMB > 0) {
+          memPercent = (memUsedMB / memTotalMB * 100).clamp(0, 100);
+        }
+      } else {
+        // 回退：free -m（脚本已 export LC_ALL=C，输出为英文标签）
+        final memRaw = sections['MEM']?.trim() ?? '';
+        final memLines = memRaw.split('\n');
+        for (final line in memLines) {
+          if (line.startsWith('Mem:')) {
+            final parts = line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+            if (parts.length >= 7) {
+              memTotalMB = double.tryParse(parts[1]) ?? 0;
+              memUsedMB = double.tryParse(parts[2]) ?? 0;
+              memFreeMB = double.tryParse(parts[3]) ?? 0;
+              memBuffersMB = double.tryParse(parts[5]) ?? 0;
+              memAvailableMB = double.tryParse(parts[6]) ?? 0;
+              // cached 需要单独取，free -m 在某些版本有 cached 列
+              if (parts.length >= 8) {
+                memCachedMB = double.tryParse(parts[7]) ?? 0;
+              }
+              if (memTotalMB > 0) {
+                memPercent = (memUsedMB / memTotalMB * 100).clamp(0, 100);
+              }
             }
-            if (memTotalMB > 0) {
-              memPercent = (memUsedMB / memTotalMB * 100).clamp(0, 100);
+          } else if (line.startsWith('-/+ buffers/cache:')) {
+            final parts = line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+            if (parts.length >= 3) {
+              memUsedMB = double.tryParse(parts[1]) ?? memUsedMB;
+              memAvailableMB = double.tryParse(parts[2]) ?? memAvailableMB;
+              if (memTotalMB > 0) {
+                memPercent = (memUsedMB / memTotalMB * 100).clamp(0, 100);
+              }
             }
-          }
-        } else if (line.startsWith('-/+ buffers/cache:')) {
-          final parts = line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
-          if (parts.length >= 3) {
-            memUsedMB = double.tryParse(parts[1]) ?? memUsedMB;
-            memAvailableMB = double.tryParse(parts[2]) ?? memAvailableMB;
-            if (memTotalMB > 0) {
-              memPercent = (memUsedMB / memTotalMB * 100).clamp(0, 100);
+          } else if (line.startsWith('Swap:')) {
+            final parts = line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+            if (parts.length >= 4) {
+              swapTotalMB = double.tryParse(parts[1]) ?? 0;
+              swapUsedMB = double.tryParse(parts[2]) ?? 0;
             }
-          }
-        } else if (line.startsWith('Swap:')) {
-          final parts = line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
-          if (parts.length >= 4) {
-            swapTotalMB = double.tryParse(parts[1]) ?? 0;
-            swapUsedMB = double.tryParse(parts[2]) ?? 0;
           }
         }
       }
@@ -505,6 +528,56 @@ class ServerMonitorService {
     );
   }
 
+  /// 解析 /proc/meminfo（单位为 kB 的固定键值，不受 locale 影响）
+  ///
+  /// 返回 null 表示没有 MemTotal（文件不可读或输出为空），调用方回退到 free -m。
+  ({
+    double totalMB,
+    double usedMB,
+    double availableMB,
+    double freeMB,
+    double buffersMB,
+    double cachedMB,
+    double swapTotalMB,
+    double swapUsedMB,
+  })? _parseMeminfo(String raw) {
+    if (raw.trim().isEmpty) return null;
+    final kb = <String, double>{};
+    for (final line in raw.split('\n')) {
+      final idx = line.indexOf(':');
+      if (idx <= 0) continue;
+      final key = line.substring(0, idx).trim();
+      final value = double.tryParse(
+        line.substring(idx + 1).trim().split(RegExp(r'\s+')).first,
+      );
+      if (value != null) kb[key] = value;
+    }
+    final totalKB = kb['MemTotal'] ?? 0;
+    if (totalKB <= 0) return null;
+
+    final freeKB = kb['MemFree'] ?? 0;
+    final buffersKB = kb['Buffers'] ?? 0;
+    // 与 free 的 buff/cache 口径一致：Cached + SReclaimable - Shmem
+    final cachedKB = (kb['Cached'] ?? 0) + (kb['SReclaimable'] ?? 0) - (kb['Shmem'] ?? 0);
+    final availableKB = kb['MemAvailable'] ?? (freeKB + buffersKB + cachedKB);
+    final usedKB = totalKB > availableKB ? totalKB - availableKB : 0.0;
+    final swapTotalKB = kb['SwapTotal'] ?? 0;
+    final swapFreeKB = kb['SwapFree'] ?? 0;
+    final swapUsedKB = swapTotalKB > swapFreeKB ? swapTotalKB - swapFreeKB : 0.0;
+
+    const kbPerMB = 1024.0;
+    return (
+      totalMB: totalKB / kbPerMB,
+      usedMB: usedKB / kbPerMB,
+      availableMB: availableKB / kbPerMB,
+      freeMB: freeKB / kbPerMB,
+      buffersMB: buffersKB / kbPerMB,
+      cachedMB: cachedKB < 0 ? 0.0 : cachedKB / kbPerMB,
+      swapTotalMB: swapTotalKB / kbPerMB,
+      swapUsedMB: swapUsedKB / kbPerMB,
+    );
+  }
+
   /// 解析 Linux /proc/net/dev
   (List<NetInterface>, int totalRx, int totalTx) _parseLinuxNet(String raw, DateTime now) {
     final interfaces = <NetInterface>[];
@@ -549,6 +622,7 @@ class ServerMonitorService {
   /// macOS 采集
   Future<ServerSnapshot> _collectMacOS(SSHService ssh) async {
     final script = [
+      'export LC_ALL=C',
       'echo @@CPU@@',
       "top -l 1 -n 0 | grep 'CPU usage'",
       'echo @@MEM@@',
@@ -802,10 +876,13 @@ class ServerMonitorService {
 
   Future<ServerSnapshot> _collectLinuxLocal(LocalTerminalService local) async {
     final script = [
+      'export LC_ALL=C',
       'echo @@CPU@@',
       "top -bn1 | grep 'Cpu(s)'",
       'echo @@MEM@@',
-      "free -m",
+      "free -m 2>/dev/null",
+      'echo @@MEMINFO@@',
+      'cat /proc/meminfo',
       'echo @@DISK@@',
       "df -BG -PT",
       'echo @@NET@@',
@@ -826,11 +903,12 @@ class ServerMonitorService {
     ].join('; ');
 
     final out = await local.runOnce(script, timeout: const Duration(seconds: 8));
-    return _parseLinuxOutput(out);
+    return parseLinuxOutput(out);
   }
 
   Future<ServerSnapshot> _collectMacOSLocal(LocalTerminalService local) async {
     final script = [
+      'export LC_ALL=C',
       'echo @@CPU@@',
       "top -l 1 -n 0 | grep 'CPU usage'",
       'echo @@MEM@@',

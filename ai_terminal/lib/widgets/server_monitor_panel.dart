@@ -1021,18 +1021,21 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
           ],
         );
       case 'mem':
+        // 采集失败时 memTotalMB 为 0，显示 "-" 而不是伪造的 0 MB
+        final hasMem = s.memTotalMB > 0;
+        String memValue(double mb) => hasMem ? _formatMB(mb) : '-';
         return (
           l10n.monitorMemoryDetail,
           [
-            (l10n.monitorMemoryTotal, _formatMB(s.memTotalMB)),
-            (l10n.monitorDiskUsed, _formatMB(s.memUsedMB)),
-            (l10n.monitorDiskAvailable, _formatMB(s.memAvailableMB)),
-            (l10n.monitorMemoryFree, _formatMB(s.memFreeMB)),
-            (l10n.monitorMemoryCached, _formatMB(s.memCachedMB)),
-            (l10n.monitorMemoryBuffers, _formatMB(s.memBuffersMB)),
-            (l10n.monitorMemoryUsage, '${s.memPercent.toStringAsFixed(1)}%'),
-            (l10n.monitorSwapTotal, _formatMB(s.swapTotalMB)),
-            (l10n.monitorSwapUsed, _formatMB(s.swapUsedMB)),
+            (l10n.monitorMemoryTotal, memValue(s.memTotalMB)),
+            (l10n.monitorDiskUsed, memValue(s.memUsedMB)),
+            (l10n.monitorDiskAvailable, memValue(s.memAvailableMB)),
+            (l10n.monitorMemoryFree, memValue(s.memFreeMB)),
+            (l10n.monitorMemoryCached, memValue(s.memCachedMB)),
+            (l10n.monitorMemoryBuffers, memValue(s.memBuffersMB)),
+            (l10n.monitorMemoryUsage, hasMem ? '${s.memPercent.toStringAsFixed(1)}%' : '-'),
+            (l10n.monitorSwapTotal, memValue(s.swapTotalMB)),
+            (l10n.monitorSwapUsed, memValue(s.swapUsedMB)),
           ],
         );
       case 'disk':
