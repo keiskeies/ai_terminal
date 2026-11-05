@@ -11,11 +11,16 @@ class TerminalView extends StatefulWidget {
   final ValueChanged<String>? onSend;
   final double fontSize;
 
+  /// 是否为当前可见 tab。多个 tab 的 TerminalView 会同时挂在树上，
+  /// 只有 active 的可以抢焦点/自动聚焦，否则后台 tab 会把键盘焦点抢走。
+  final bool active;
+
   const TerminalView({
     super.key,
     this.terminal,
     this.onSend,
     this.fontSize = 13,
+    this.active = true,
   });
 
   @override
@@ -86,23 +91,28 @@ class _TerminalViewState extends State<TerminalView> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _focusNode.requestFocus();
-      }
-    });
+    if (widget.active) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _focusNode.requestFocus();
+      });
+    }
   }
 
   @override
   void didUpdateWidget(TerminalView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.terminal != null && widget.terminal != oldWidget.terminal) {
+    final terminalChanged =
+        widget.terminal != null && widget.terminal != oldWidget.terminal;
+    final becameActive = widget.active && !oldWidget.active;
+    if (terminalChanged || becameActive) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
+        if (mounted && widget.active) {
           _focusNode.unfocus();
           _focusNode.requestFocus();
         }
       });
+    } else if (!widget.active && oldWidget.active) {
+      _focusNode.unfocus();
     }
   }
 
@@ -279,7 +289,7 @@ class _TerminalViewState extends State<TerminalView> {
         widget.terminal!,
         controller: _controller,
         focusNode: _focusNode,
-        autofocus: true,
+        autofocus: widget.active,
         hardwareKeyboardOnly: isDesktop,
         onKeyEvent: _handleKeyEvent,
         textStyle: xterm.TerminalStyle(

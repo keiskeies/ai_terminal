@@ -69,9 +69,9 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
     _timer?.cancel();
     _timer = null;
     _hideOverlay();
-    // 关闭面板时清除历史数据并停止后台采集
-    // 下次打开时从 0 开始，避免显示陈旧数据；同时释放内存
-    widget.service.reset();
+    // 只停止采集，不清历史：历史归 ServerMonitorService 所有，面板在切 tab
+    // 时会被重建，但服务是 per-tab 常驻的；在这里 reset 会把用户刚看到的数据
+    // 清空，切回来从 0 开始。清空只发生在关闭 tab 或重连更换 executor 时。
     super.dispose();
   }
 

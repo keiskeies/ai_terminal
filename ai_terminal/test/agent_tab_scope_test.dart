@@ -119,6 +119,25 @@ void main() {
           reason: '切回 tabA 必须恢复它自己的状态');
     });
 
+    test('stateForScope 能读到非活跃 tab 自己的状态', () {
+      final notifier = AgentNotifier();
+      notifier.switchTab('tabA', hostId: 'host1');
+      notifier.setPermissionModeForHost(
+          'host1', AgentPermissionMode.readOnly);
+
+      notifier.switchTab('tabB', hostId: 'host1');
+
+      expect(
+        notifier.stateForScope('tabA', hostId: 'host1').permissionMode,
+        AgentPermissionMode.readOnly,
+        reason: '常驻工作区渲染非活跃 tab 时必须读它自己的状态',
+      );
+      expect(
+        notifier.stateForScope('tabB', hostId: 'host1').permissionMode,
+        AgentPermissionMode.ask,
+      );
+    });
+
     test('同 host 已有 Agent 执行时，新 tab 使用空白会话', () {
       final notifier = AgentNotifier();
       notifier.switchTab('tabA', hostId: 'host1');

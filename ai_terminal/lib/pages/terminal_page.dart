@@ -139,20 +139,82 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 正在重连的主机名称（非 null 时显示"连接恢复中"横幅）
   String? _reconnectingHostLabel;
 
-  // AI 面板位置和大小
-  // 桌面默认从右侧展开；移动端首帧由 _updateMobilePosition 按方向覆盖
-  _AiPanelPosition _aiPanelPosition = _AiPanelPosition.right;
-  double _aiPanelRatio = 0.4;
+  // AI 面板默认布局（从设置加载，新 tab 继承；每个 tab 可在会话内独立覆盖）
+  _AiPanelPosition _defaultAiPanelPosition = _AiPanelPosition.right;
+  double _defaultAiPanelRatio = 0.4;
+  bool _defaultAiPanelVisible = false;
   static const double _minPanelRatio = 0.15;
   static const double _maxPanelRatio = 0.7;
 
-  // AI 面板是否可见（P0-1：支持完全收起）
-  bool _isAIPanelVisible = false;
+  // 每个 tab 独立的 AI 面板可见性 / 方位 / 宽度比例
+  final Map<String, bool> _tabAiPanelVisible = {};
+  final Map<String, _AiPanelPosition> _tabAiPanelPosition = {};
+  final Map<String, double> _tabAiPanelRatio = {};
 
-  // 服务器监控面板可见的 hostId 集合（每个 host 开关独立）
-  final Set<String> _monitorVisibleHosts = {};
+  bool _aiPanelVisibleFor(String? tabId) => tabId == null
+      ? _defaultAiPanelVisible
+      : (_tabAiPanelVisible[tabId] ?? _defaultAiPanelVisible);
+  _AiPanelPosition _aiPanelPositionFor(String? tabId) => tabId == null
+      ? _defaultAiPanelPosition
+      : (_tabAiPanelPosition[tabId] ?? _defaultAiPanelPosition);
+  double _aiPanelRatioFor(String? tabId) => tabId == null
+      ? _defaultAiPanelRatio
+      : (_tabAiPanelRatio[tabId] ?? _defaultAiPanelRatio);
 
-  // Per-host 监控服务缓存（key = hostId 或 "local"）
+  void _setAiPanelVisible(String? tabId, bool visible) {
+    if (tabId != null) _tabAiPanelVisible[tabId] = visible;
+    _defaultAiPanelVisible = visible;
+    SettingsDao.set('aiPanelVisible', visible);
+  }
+
+  void _setAiPanelPosition(String? tabId, _AiPanelPosition position) {
+    if (tabId != null) _tabAiPanelPosition[tabId] = position;
+    _defaultAiPanelPosition = position;
+    SettingsDao.set('aiPanelPosition', position.name);
+  }
+
+  /// 新 tab 创建时把当前默认布局快照到自己的 map。
+  /// 必须快照而不是一直读默认值：否则另一个 tab 改布局时，已有的 tab 会跟着变。
+  void _initTabPanelState(tp.TerminalTab tab) {
+    _tabAiPanelVisible.putIfAbsent(tab.id, () => _defaultAiPanelVisible);
+    _tabAiPanelPosition.putIfAbsent(tab.id, () => _defaultAiPanelPosition);
+    _tabAiPanelRatio.putIfAbsent(tab.id, () => _defaultAiPanelRatio);
+    final hostKey = tab.isLocal ? 'local' : tab.hostId;
+    _tabMonitorVisible.putIfAbsent(
+        tab.id, () => _monitorDefaultVisibleHosts.contains(hostKey));
+  }
+
+  // 监控可见性的默认值仍按 host 持久化；每个 tab 在会话内有独立覆盖
+  final Set<String> _monitorDefaultVisibleHosts = {};
+  final Map<String, bool> _tabMonitorVisible = {};
+
+  bool _monitorVisibleFor(tp.TerminalTab? tab) {
+    if (tab == null) return false;
+    final hostKey = tab.isLocal ? 'local' : tab.hostId;
+    return _tabMonitorVisible[tab.id] ??
+        _monitorDefaultVisibleHosts.contains(hostKey);
+  }
+
+  /// 移动端方向变化只调整当前 tab 的方位，不覆盖其它 tab
+  void _updateMobilePositionForActive() {
+    if (!_isMobile) return;
+    final tabId = _currentTabId;
+    if (tabId == null) return;
+    final orientation = MediaQuery.of(context).orientation;
+    final target = orientation == Orientation.landscape
+        ? _AiPanelPosition.right
+        : _AiPanelPosition.bottom;
+    if (_aiPanelPositionFor(tabId) != target) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _tabAiPanelPosition[tabId] = target;
+        });
+      });
+    }
+  }
+
+  // Per-tab 监控服务缓存（key = tab.id；同服务器多 tab 各自独立历史）
   final Map<String, ServerMonitorService> _monitorServices = {};
 
   // AI 输入框焦点状态（移动端键盘避让）
@@ -180,11 +242,19 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   set _pendingConfirmCommand(String? v) { if (_currentTabId != null) _tabPendingConfirm[_currentTabId!] = v; }
 
   final _scrollController = ScrollController();
-  final _chatScrollController = ScrollController();
-  bool _showScrollToBottom = false;
-  bool _autoScrollChat = true; // 用户手动上滚时禁用自动滚动
-  StreamSubscription<String>? _terminalOutputSubscription;
-  StreamSubscription<String>? _tabOutputSubscription; // 终端输出订阅（需随 tab 切换而取消/重建）
+  /// 每个 tab 独立的聊天滚动控制器/滚动状态；切 tab 不再共用一个 offset。
+  final Map<String, ScrollController> _chatScrollControllers = {};
+  final Map<String, bool> _tabShowScrollToBottom = {};
+  final Map<String, bool> _tabAutoScroll = {};
+
+  bool get _autoScrollChat => _tabAutoScroll[_currentTabId] ?? true;
+  set _autoScrollChat(bool value) {
+    if (_currentTabId != null) _tabAutoScroll[_currentTabId!] = value;
+  }
+  /// 每个 tab 的终端输出订阅：常驻，不随 tab 切换取消。
+  /// 这样后台 tab 的 PTY 输出会继续写进它自己的 Terminal 缓冲。
+  final Map<String, StreamSubscription<String>> _tabOutputSubscriptions = {};
+  final Map<String, StreamSubscription<String>> _tabChatOutputSubscriptions = {};
   AIModelConfig? _currentModelConfig;
   final MenuController _modelMenuController = MenuController();
   bool _agentInitInFlight = true;
@@ -222,34 +292,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     });
   }
 
-  /// 手机端根据屏幕方向自动设置 AI 面板位置
-  /// 切换方向时保持 AI 面板可见状态和面板比例
-  void _updateMobilePosition(BuildContext context) {
-    if (!_isMobile) return;
-    final orientation = MediaQuery.of(context).orientation;
-    final target = orientation == Orientation.landscape
-        ? _AiPanelPosition.right
-        : _AiPanelPosition.bottom;
-    if (_aiPanelPosition != target) {
-      // 保存当前面板比例，避免切换时重置
-      final savedRatio = _aiPanelRatio;
-      final savedVisibility = _isAIPanelVisible;
-      setState(() {
-        _aiPanelPosition = target;
-        _aiPanelRatio = savedRatio;
-        _isAIPanelVisible = savedVisibility;
-      });
-    }
-  }
-
-  /// 存盘面板布局。方向只在桌面显式切换时写：移动端 `_updateMobilePosition`
+    /// 存盘面板布局。方向只在桌面显式切换时写：移动端 `_updateMobilePositionForActive`
   /// 每帧按屏幕方向覆盖，存了也会在竖屏被改回 bottom。
   void _savePanelLayout({required bool savePosition}) {
-    if (savePosition && _isMobile) return;
-    if (savePosition) {
-      SettingsDao.set('aiPanelPosition', _aiPanelPosition.name);
-    }
-    SettingsDao.set('aiPanelRatio', _aiPanelRatio);
+    final tabId = _currentTabId;
+    final ratio = _aiPanelRatioFor(tabId);
+    _defaultAiPanelRatio = ratio;
+    SettingsDao.set('aiPanelRatio', ratio);
+    if (!savePosition || _isMobile) return;
+    final position = _aiPanelPositionFor(tabId);
+    _defaultAiPanelPosition = position;
+    SettingsDao.set('aiPanelPosition', position.name);
   }
 
   void _loadSettings() {
@@ -269,7 +322,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     try {
       final aiPanelVisible = SettingsDao.getCached('aiPanelVisible');
       if (aiPanelVisible != null) {
-        _isAIPanelVisible = aiPanelVisible as bool;
+        _defaultAiPanelVisible = aiPanelVisible as bool;
       }
     } catch (_) {}
     // 方向与比例：只有显式存过才覆盖默认值。
@@ -278,21 +331,21 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       final resolved = resolveAiPanelLayout(
         storedPosition: SettingsDao.getCached('aiPanelPosition'),
         storedRatio: SettingsDao.getCached('aiPanelRatio'),
-        defaultPosition: _aiPanelPosition.name,
-        defaultRatio: _aiPanelRatio,
+        defaultPosition: _defaultAiPanelPosition.name,
+        defaultRatio: _defaultAiPanelRatio,
         minRatio: _minPanelRatio,
         maxRatio: _maxPanelRatio,
       );
-      _aiPanelPosition = resolved.position == 'bottom'
+      _defaultAiPanelPosition = resolved.position == 'bottom'
           ? _AiPanelPosition.bottom
           : _AiPanelPosition.right;
-      _aiPanelRatio = resolved.ratio;
+      _defaultAiPanelRatio = resolved.ratio;
     } catch (_) {}
-    // 加载监控面板可见的 host 列表（per-host 独立开关）
+    // 加载监控面板可见的 host 默认列表（每个 tab 可在会话内独立覆盖）
     try {
       final raw = SettingsDao.getCached('monitorVisibleHosts');
       if (raw is List) {
-        _monitorVisibleHosts.addAll(raw.cast<String>());
+        _monitorDefaultVisibleHosts.addAll(raw.cast<String>());
       }
     } catch (_) {}
     // 加载 Agent 最大步骤数（需在 initAgent 之前加载）
@@ -301,25 +354,32 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       if (!mounted) return;
       ref.read(agentProvider.notifier).loadSettings();
     });
-    // 监听聊天滚动，控制"回到底部"按钮显示 & 自动滚动锁定
-    _chatScrollController.addListener(() {
-      if (!_chatScrollController.hasClients) return;
-      final maxScroll = _chatScrollController.position.maxScrollExtent;
-      final offset = _chatScrollController.offset;
-      final distanceFromBottom = maxScroll - offset;
-      final show = distanceFromBottom > 80;
-      if (show != _showScrollToBottom) {
-        setState(() => _showScrollToBottom = show);
-      }
-      // 用户手动上滚（距底部超过 120px）时禁用自动滚动
-      if (distanceFromBottom > 120 && _autoScrollChat) {
-        _autoScrollChat = false;
-      }
-      // 用户滚到底部时恢复自动滚动
-      if (distanceFromBottom <= 40 && !_autoScrollChat) {
-        _autoScrollChat = true;
-      }
+    // 监听当前 tab 的聊天滚动，控制"回到底部"按钮显示 & 自动滚动锁定。
+    // 每个 tab 一个 controller，在 _chatControllerFor 创建时挂 listener。
+  }
+
+  /// 取某个 tab 的聊天滚动控制器；首次创建时挂上滚动监听。
+  ScrollController _chatControllerFor(String tabId) {
+    return _chatScrollControllers.putIfAbsent(tabId, () {
+      final controller = ScrollController();
+      controller.addListener(() => _onChatScroll(tabId, controller));
+      return controller;
     });
+  }
+
+  void _onChatScroll(String tabId, ScrollController controller) {
+    if (!controller.hasClients) return;
+    final distanceFromBottom =
+        controller.position.maxScrollExtent - controller.offset;
+    final show = distanceFromBottom > 80;
+    var auto = _tabAutoScroll[tabId] ?? true;
+    if (distanceFromBottom > 120) auto = false;
+    if (distanceFromBottom <= 40) auto = true;
+    _tabShowScrollToBottom[tabId] = show;
+    _tabAutoScroll[tabId] = auto;
+    if (tabId == _currentTabId && mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _initAgent() async {
@@ -526,16 +586,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     if (connected.id == _currentTabId) _scheduleSizeSync(connected);
   }
 
-  StreamSubscription<String> _setupTerminalListener(tp.TerminalTab tab) {
-    final sub = tab.outputController.stream.listen((data) {
-      if (_terminal != null) _terminal!.write(data);
-    });
-    _terminal?.onOutput = (data) {
+  /// 绑定某个 tab 自己的 Terminal：输入/尺寸写回该 tab 的 service，输出写入它的缓冲。
+  StreamSubscription<String> _setupTerminalListener(
+      tp.TerminalTab tab, Terminal term) {
+    term.onOutput = (data) {
       // 建连仍在飞行中时不要另起一次重连：连接池按 tabId 去重，
       // 但两次 status 写入会互相覆盖，界面可能永远停在过渡态
       if (!tab.isConnected) {
         if (tab.isConnecting) return;
-        _reconnect();
+        if (tab.id == _currentTabId) _reconnect();
         return;
       }
       if (tab.isLocal) {
@@ -544,44 +603,47 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         tab.service?.writeToTerminal(data);
       }
     };
-    _terminal?.onResize = (width, height, pixelWidth, pixelHeight) {
+    term.onResize = (width, height, pixelWidth, pixelHeight) {
       if (tab.isLocal) {
         tab.localService?.resize(width, height);
       } else {
         tab.service?.resize(width, height);
       }
     };
-    return sub;
+    return tab.outputController.stream.listen((data) {
+      term.write(data);
+    });
   }
 
-  /// 统一切换到指定 tab：取消旧订阅 → 复用/创建 Terminal → 绑定新监听 → 切换 provider 状态
-  void _switchToTab(tp.TerminalTab tab) {
-    // 取消旧的订阅，避免多个 tab 的输出交叉
-    _tabOutputSubscription?.cancel();
-    _tabOutputSubscription = null;
-    _terminalOutputSubscription?.cancel();
-    _terminalOutputSubscription = null;
-
-    // 复用已有的 Terminal 实例（保留终端内容），或为新 tab 创建
-    if (_tabTerminals.containsKey(tab.id)) {
-      _terminal = _tabTerminals[tab.id];
-    } else {
-      final term = Terminal(maxLines: 10000);
-      _tabTerminals[tab.id] = term;
-      _terminal = term;
+  /// 确保某个 tab 有独立的 Terminal 和常驻输出订阅。切换 tab 不再取消/重建。
+  void _ensureTabTerminal(tp.TerminalTab tab) {
+    final isCurrent = tab.id == _currentTabId;
+    final existing = _tabTerminals[tab.id];
+    if (existing != null) {
+      if (isCurrent) _terminal = existing;
+      return;
     }
-
-    // 绑定新 tab 的输出/输入监听
-    _tabOutputSubscription = _setupTerminalListener(tab);
-    _terminalOutputSubscription = tab.outputController.stream.listen((data) {
-      ref.read(chatProvider.notifier).updateLastOutput(data);
+    final term = Terminal(maxLines: 10000);
+    _tabTerminals[tab.id] = term;
+    if (isCurrent) _terminal = term;
+    _tabOutputSubscriptions[tab.id] = _setupTerminalListener(tab, term);
+    _tabChatOutputSubscriptions[tab.id] =
+        tab.outputController.stream.listen((data) {
+      if (tab.id == _currentTabId && mounted) {
+        ref.read(chatProvider.notifier).updateLastOutput(data);
+      }
     });
+  }
+
+  /// 统一切换到指定 tab：每 tab 的 Terminal/输出订阅已常驻，这里只切状态。
+  void _switchToTab(tp.TerminalTab tab) {
+    _currentTabId = tab.id;
+    _initTabPanelState(tab);
+    _ensureTabTerminal(tab);
+    _chatControllerFor(tab.id);
 
     // 更新各 provider 的当前 tab（switchTab 已恢复该 tab 的 engine/ssh/model）
-    _currentTabId = tab.id;
     _placeholderError = null; // 已有标签可承载提示，不再需要整屏占位
-    _autoScrollChat = true; // 切换 tab 时重置自动滚动
-    _showScrollToBottom = false;
     ref.read(chatProvider.notifier).switchTab(tab.id, hostId: tab.hostId);
     ref.read(agentProvider.notifier).switchTab(tab.id, hostId: tab.hostId);
     // 不再调用 setSSHService — switchTab 已恢复该 tab 的 SSH 服务，
@@ -637,9 +699,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         // 重新绑定 executor（service 已更新）
         ref.read(agentProvider.notifier).setExecutor(newTab!.localService,
             hostId: newTab.hostId, tabId: newTab.id);
-        // 重新绑定终端输入监听（旧闭包持有的是旧 localService 引用）
-        _tabOutputSubscription?.cancel();
-        _tabOutputSubscription = _setupTerminalListener(newTab);
+        // 终端的 onOutput 闭包读的是 tab 上的实时 service，重连不需要重绑订阅
+        _ensureTabTerminal(newTab);
         if (newTab.id == _currentTabId) _scheduleSizeSync(newTab);
       }
     } else {
@@ -653,9 +714,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       if (newTab?.service != null) {
         ref.read(agentProvider.notifier).setExecutor(newTab!.service,
             hostId: newTab.hostId, tabId: newTab.id);
-        // 重新绑定终端输入监听（旧闭包持有的是旧 service 引用）
-        _tabOutputSubscription?.cancel();
-        _tabOutputSubscription = _setupTerminalListener(newTab);
+        // 终端的 onOutput 闭包读的是 tab 上的实时 service，重连不需要重绑订阅
+        _ensureTabTerminal(newTab);
         if (newTab.id == _currentTabId) _scheduleSizeSync(newTab);
       }
     }
@@ -778,10 +838,19 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     appRouteObserver.unsubscribe(this);
     _resizeTimer?.cancel();
     _resizeTimer = null;
-    _tabOutputSubscription?.cancel();
-    _terminalOutputSubscription?.cancel();
+    for (final sub in _tabOutputSubscriptions.values) {
+      sub.cancel();
+    }
+    _tabOutputSubscriptions.clear();
+    for (final sub in _tabChatOutputSubscriptions.values) {
+      sub.cancel();
+    }
+    _tabChatOutputSubscriptions.clear();
     _scrollController.dispose();
-    _chatScrollController.dispose();
+    for (final controller in _chatScrollControllers.values) {
+      controller.dispose();
+    }
+    _chatScrollControllers.clear();
     final notifier = _agentNotifier;
     if (notifier != null && notifier.secretRequestHandler == _requestSecret) {
       notifier.secretRequestHandler = null;
@@ -805,7 +874,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final tc = ThemeColors.of(context);
 
     // 手机端：根据屏幕方向自动设置 AI 面板位置
-    _updateMobilePosition(context);
+    _updateMobilePositionForActive();
 
     // ref.listen 必须在 build 中无条件调用，否则面板收起时 listener 消失会触发 assertion
     ref.listen(chatProvider, (_, state) {
@@ -841,9 +910,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           // 顶部栏（标签 + 工具）
           _buildTopBar(host, terminalState, activeTab),
 
-          // 终端 + AI 面板主体
+          // 每个 tab 一棵常驻工作区；切换只改 Offstage，不销毁/重建
           Expanded(
-            child: _buildMainBody(chatState, agentState, activeTab),
+            child: _buildTabWorkspaces(
+                chatState, agentState, terminalState, activeTab),
           ),
 
           // 快捷按键行（仅 Android / iOS 显示，桌面端不需要）
@@ -855,8 +925,63 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     );
   }
 
+  /// 每个 tab 一棵常驻工作区。
+  ///
+  /// 用 Offstage 而不是只渲染 active tab：终端滚动、Agent 消息的展开状态、
+  /// 监控历史都由各自的 widget/服务持有，切 tab 不能被重建。非活跃 tab
+  /// 停止动画并排除焦点，但输出/采样继续写自己的缓冲。
+  Widget _buildTabWorkspaces(
+    ChatState chatState,
+    AgentState activeAgentState,
+    tp.TerminalState terminalState,
+    tp.TerminalTab? activeTab,
+  ) {
+    final tabs = terminalState.tabs;
+    if (tabs.isEmpty) {
+      return _wrapWithSftp(
+          _buildMainBody(chatState, activeAgentState, null, isActive: true));
+    }
+    final notifier = ref.read(agentProvider.notifier);
+    final activeId = activeTab?.id;
+    for (final tab in tabs) {
+      // 兜底：从 provider 恢复出来的历史 tab 可能还没在页面里建过 Terminal/布局快照
+      _initTabPanelState(tab);
+      _ensureTabTerminal(tab);
+    }
+    if (activeTab != null) {
+      _terminal = _tabTerminals[activeTab.id] ?? _terminal;
+    }
+    return _wrapWithSftp(Stack(
+      fit: StackFit.expand,
+      children: [
+        for (final tab in tabs)
+          Offstage(
+            offstage: tab.id != activeId,
+            child: ExcludeFocus(
+              excluding: tab.id != activeId,
+              child: TickerMode(
+                enabled: tab.id == activeId,
+                child: KeyedSubtree(
+                  key: ValueKey('tab-workspace-${tab.id}'),
+                  child: _buildMainBody(
+                    chatState,
+                    tab.id == activeId
+                        ? activeAgentState
+                        : notifier.stateForScope(tab.id, hostId: tab.hostId),
+                    tab,
+                    isActive: tab.id == activeId,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
+    ));
+  }
+
   /// 主体区域：终端 + AI 面板 + SFTP 侧面板，根据面板位置切换布局
-  Widget _buildMainBody(ChatState chatState, AgentState agentState, tp.TerminalTab? tab) {
+  Widget _buildMainBody(ChatState chatState, AgentState agentState,
+      tp.TerminalTab? tab, {required bool isActive}) {
 
     // 终端视图。主区渲染只看活动标签自己的连接阶段：页面级不再留一份
     // "连接中"副本，否则顶栏指向新标签、画面还停在旧标签。
@@ -865,15 +990,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final terminalView = Stack(
       children: [
         term_widget.TerminalView(
-          terminal: _terminal,
+          terminal: tab == null ? _terminal : (_tabTerminals[tab.id] ?? _terminal),
           fontSize: _terminalFontSize,
+          active: isActive,
           onSend: (command) {
-            final t = ref.read(tp.terminalProvider).activeTab;
-            if (t == null) return;
-            if (t.isLocal) {
-              t.localService?.execute(command);
+            if (tab == null) return;
+            if (tab.isLocal) {
+              tab.localService?.execute(command);
             } else {
-              t.service?.execute(command);
+              tab.service?.execute(command);
             }
           },
         ),
@@ -899,11 +1024,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
     // 监控面板包装：在终端下方插入监控横幅（仅在已连接且该 host 开关开启时）
     final monitorService = _getOrCreateMonitorService(tab);
-    final currentHostId = tab != null && tab.isConnected
-        ? (tab.isLocal ? 'local' : tab.hostId)
-        : null;
-    final showMonitor = currentHostId != null &&
-        _monitorVisibleHosts.contains(currentHostId) &&
+    final showMonitor = tab != null &&
+        _monitorVisibleFor(tab) &&
         monitorService != null;
     final terminalArea = showMonitor
         ? Column(
@@ -916,15 +1038,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
     // P0-1: AI 面板支持完全收起 + 移动端上滑手势展开
     Widget mainContent;
-    if (!_isAIPanelVisible) {
+    if (!_aiPanelVisibleFor(tab?.id)) {
       // AI 面板收起状态：终端占满全屏，移动端支持上滑展开 AI 面板
       mainContent = _isMobile
           ? GestureDetector(
               onVerticalDragEnd: (details) {
                 // 上滑速度超过阈值时展开 AI 面板
                 if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
-                  setState(() => _isAIPanelVisible = true);
-                  SettingsDao.set('aiPanelVisible', true);
+                  setState(() => _setAiPanelVisible(tab?.id, true));
                 }
               },
               child: terminalArea,
@@ -935,17 +1056,30 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       mainContent = LayoutBuilder(builder: (context, constraints) {
         final totalW = constraints.maxWidth;
         final totalH = constraints.maxHeight;
-        final isRight = _aiPanelPosition == _AiPanelPosition.right;
+        final isRight =
+            _aiPanelPositionFor(tab?.id) == _AiPanelPosition.right;
 
         void onDrag(DragUpdateDetails details) {
           setState(() {
-            if (isRight) {
-              final pos = details.globalPosition.dx - (context.findRenderObject() as RenderBox).localToGlobal(Offset.zero).dx;
-              _aiPanelRatio = (1 - pos / totalW).clamp(_minPanelRatio, _maxPanelRatio).toDouble();
-            } else {
-              final pos = details.globalPosition.dy - (context.findRenderObject() as RenderBox).localToGlobal(Offset.zero).dy;
-              _aiPanelRatio = (1 - pos / totalH).clamp(_minPanelRatio, _maxPanelRatio).toDouble();
-            }
+            final ratio = isRight
+                ? (1 -
+                        (details.globalPosition.dx -
+                                (context.findRenderObject() as RenderBox)
+                                    .localToGlobal(Offset.zero)
+                                    .dx) /
+                            totalW)
+                    .clamp(_minPanelRatio, _maxPanelRatio)
+                    .toDouble()
+                : (1 -
+                        (details.globalPosition.dy -
+                                (context.findRenderObject() as RenderBox)
+                                    .localToGlobal(Offset.zero)
+                                    .dy) /
+                            totalH)
+                    .clamp(_minPanelRatio, _maxPanelRatio)
+                    .toDouble();
+            if (tab != null) _tabAiPanelRatio[tab.id] = ratio;
+            _defaultAiPanelRatio = ratio;
           });
         }
 
@@ -985,8 +1119,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               ),
             );
 
-        final divider = _buildAreaDivider(agentState);
-        final aiPanelSize = isRight ? totalW * _aiPanelRatio : totalH * _aiPanelRatio;
+        final divider = _buildAreaDivider(agentState, tab?.id);
+        final aiPanelSize = isRight
+            ? totalW * _aiPanelRatioFor(tab?.id)
+            : totalH * _aiPanelRatioFor(tab?.id);
         final aiContent = Column(
           children: [
             Expanded(child: _buildAIPanel(chatState, agentState, tab)),
@@ -1010,8 +1146,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   onVerticalDragEnd: (details) {
                     // 下滑速度超过阈值时收起 AI 面板
                     if (details.primaryVelocity != null && details.primaryVelocity! > 300) {
-                      setState(() => _isAIPanelVisible = false);
-                      SettingsDao.set('aiPanelVisible', false);
+                      setState(() => _setAiPanelVisible(tab?.id, false));
                     }
                   },
                   child: SizedBox(height: aiPanelSize, child: aiContent),
@@ -1030,23 +1165,32 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       });
     }
 
-    // 桌面端：SFTP 侧面板（per-tab 独立，用 Offstage 保持存活避免重连）
+    return mainContent;
+  }
+
+  /// 桌面端 SFTP 侧面板：每个 tab 独立、Offstage 保活，切换不重连。
+  Widget _wrapWithSftp(Widget content) {
     final currentTabId = ref.read(tp.terminalProvider).activeTabId;
     final allTabs = ref.read(tp.terminalProvider).tabs;
-    final visibleSftpTabs = allTabs.where((t) => !t.isLocal && (_tabSftpVisible[t.id] ?? false)).toList();
-    final hasActiveSftp = currentTabId != null && (_tabSftpVisible[currentTabId] ?? false) && !_isMobile;
+    final visibleSftpTabs = allTabs
+        .where((t) => !t.isLocal && (_tabSftpVisible[t.id] ?? false))
+        .toList();
+    final hasActiveSftp = currentTabId != null &&
+        (_tabSftpVisible[currentTabId] ?? false) &&
+        !_isMobile;
 
     if (hasActiveSftp && visibleSftpTabs.isNotEmpty) {
       final tc = ThemeColors.of(context);
       return Row(
         children: [
-          Expanded(child: mainContent),
+          Expanded(child: content),
           // SFTP 拖拽调整宽度手柄
           GestureDetector(
             onPanUpdate: (details) {
               setState(() {
                 _sftpPanelWidth -= details.delta.dx;
-                _sftpPanelWidth = _sftpPanelWidth.clamp(_minSftpWidth, _maxSftpWidth);
+                _sftpPanelWidth =
+                    _sftpPanelWidth.clamp(_minSftpWidth, _maxSftpWidth);
               });
             },
             child: MouseRegion(
@@ -1070,7 +1214,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                       key: ValueKey('sftp-${tab.id}-${tab.hostId}'),
                       hostId: tab.hostId,
                       embedded: true,
-                      onClose: () => setState(() => _tabSftpVisible[tab.id] = false),
+                      onClose: () =>
+                          setState(() => _tabSftpVisible[tab.id] = false),
                     ),
                   ),
                 );
@@ -1084,14 +1229,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     // 如果切换到本地终端但其他 tab 的 SFTP 面板还在，需要清理
     if (!_isMobile && currentTabId != null) {
       final activeTab = ref.read(tp.terminalProvider).activeTab;
-      if (activeTab != null && activeTab.isLocal && (_tabSftpVisible[currentTabId] ?? false)) {
+      if (activeTab != null &&
+          activeTab.isLocal &&
+          (_tabSftpVisible[currentTabId] ?? false)) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) setState(() => _tabSftpVisible[currentTabId] = false);
         });
       }
     }
 
-    return mainContent;
+    return content;
   }
 
   // ==================== 顶部栏 ====================
@@ -1248,6 +1395,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     _tabExecutedCommands.remove(tab.id);
     _tabPendingConfirm.remove(tab.id);
     _tabTerminals.remove(tab.id);
+    _tabOutputSubscriptions.remove(tab.id)?.cancel();
+    _tabChatOutputSubscriptions.remove(tab.id)?.cancel();
+    _chatScrollControllers.remove(tab.id)?.dispose();
+    _tabShowScrollToBottom.remove(tab.id);
+    _tabAutoScroll.remove(tab.id);
+    _monitorServices.remove(tab.id)?.reset();
+    _tabMonitorVisible.remove(tab.id);
+    _tabAiPanelVisible.remove(tab.id);
+    _tabAiPanelPosition.remove(tab.id);
+    _tabAiPanelRatio.remove(tab.id);
     _tabSftpVisible.remove(tab.id);
     await ref.read(tp.terminalProvider.notifier).closeTab(tab.id);
     if (!mounted) return;
@@ -1362,31 +1519,29 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     );
   }
 
-  /// P0-1: AI 面板展开/收起按钮
+  /// P0-1: AI 面板展开/收起按钮（只影响当前 tab）
   Widget _buildAIPanelToggleButton() {
     final tc = ThemeColors.of(context);
     final accentColor = tc.agentGreen;
     final l10n = AppLocalizations.of(context)!;
+    final tabId = ref.read(tp.terminalProvider).activeTab?.id;
+    final visible = _aiPanelVisibleFor(tabId);
 
     return Tooltip(
-      message: _isAIPanelVisible ? l10n.terminalCollapseAIPanel : l10n.terminalExpandAIPanel,
+      message: visible ? l10n.terminalCollapseAIPanel : l10n.terminalExpandAIPanel,
       child: GestureDetector(
         onTap: () {
-          setState(() {
-            _isAIPanelVisible = !_isAIPanelVisible;
-          });
-          // 持久化状态
-          SettingsDao.set('aiPanelVisible', _isAIPanelVisible);
+          setState(() => _setAiPanelVisible(tabId, !visible));
         },
         child: AnimatedContainer(
           duration: animFast,
           height: 30,
           padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
-            color: _isAIPanelVisible ? accentColor.withValues(alpha: 0.15) : tc.surface,
+            color: visible ? accentColor.withValues(alpha: 0.15) : tc.surface,
             borderRadius: BorderRadius.circular(rSmall),
             border: Border.all(
-              color: _isAIPanelVisible ? accentColor.withValues(alpha: 0.4) : tc.border.withValues(alpha: 0.3),
+              color: visible ? accentColor.withValues(alpha: 0.4) : tc.border.withValues(alpha: 0.3),
               width: 1,
             ),
           ),
@@ -1394,17 +1549,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
-                _isAIPanelVisible ? Icons.auto_fix_high : Icons.auto_fix_high_outlined,
+                visible ? Icons.auto_fix_high : Icons.auto_fix_high_outlined,
                 size: 14,
-                color: _isAIPanelVisible ? accentColor : tc.textSub,
+                color: visible ? accentColor : tc.textSub,
               ),
               const SizedBox(width: 4),
               Text(
-                _isAIPanelVisible ? 'AI' : 'AI',
+                'AI',
                 style: TextStyle(
                   fontSize: fMicro,
-                  color: _isAIPanelVisible ? accentColor : tc.textSub,
-                  fontWeight: _isAIPanelVisible ? FontWeight.w600 : FontWeight.normal,
+                  color: visible ? accentColor : tc.textSub,
+                  fontWeight: visible ? FontWeight.w600 : FontWeight.normal,
                 ),
               ),
             ],
@@ -1415,32 +1570,34 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }
 
 
-  /// 服务器监控面板开关按钮（终端下方横幅）
+  /// 服务器监控面板开关按钮（终端下方横幅，只影响当前 tab）
   Widget _buildMonitorToggleButton() {
     final tc = ThemeColors.of(context);
     const accentColor = cKleinBlue;
     final activeTab = ref.read(tp.terminalProvider).activeTab;
     final canShow = activeTab != null && activeTab.isConnected;
-    // per-host 开关状态
-    final hostId = activeTab != null && activeTab.isConnected
-        ? (activeTab.isLocal ? 'local' : activeTab.hostId)
-        : null;
-    final isOn = hostId != null && _monitorVisibleHosts.contains(hostId);
+    final isOn = activeTab != null && _monitorVisibleFor(activeTab);
     final l10n = AppLocalizations.of(context)!;
 
     return Tooltip(
       message: isOn ? l10n.terminalCollapseMonitorPanel : l10n.terminalExpandMonitorPanel,
       child: GestureDetector(
         onTap: canShow ? () {
+          final tab = ref.read(tp.terminalProvider).activeTab;
+          if (tab == null) return;
+          final next = !_monitorVisibleFor(tab);
+          final hostKey = tab.isLocal ? 'local' : tab.hostId;
           setState(() {
-            if (isOn) {
-              _monitorVisibleHosts.remove(hostId);
+            _tabMonitorVisible[tab.id] = next;
+            // 同步 host 默认值，供之后新开的 tab 继承；已有 tab 不受影响
+            if (next) {
+              _monitorDefaultVisibleHosts.add(hostKey);
             } else {
-              _monitorVisibleHosts.add(hostId!);
+              _monitorDefaultVisibleHosts.remove(hostKey);
             }
           });
-          // 持久化为 List
-          SettingsDao.set('monitorVisibleHosts', _monitorVisibleHosts.toList());
+          SettingsDao.set(
+              'monitorVisibleHosts', _monitorDefaultVisibleHosts.toList());
         } : null,
         child: AnimatedContainer(
           duration: animFast,
@@ -1481,17 +1638,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 获取或创建当前 tab 对应的监控服务
   ServerMonitorService? _getOrCreateMonitorService(tp.TerminalTab? tab) {
     if (tab == null || !tab.isConnected) return null;
-    final hostId = tab.isLocal ? 'local' : tab.hostId;
-    var svc = _monitorServices[hostId];
+    final key = tab.id;
+    var svc = _monitorServices[key];
+    final executor = tab.isLocal ? tab.localService : tab.service;
     if (svc == null) {
-      final executor = tab.isLocal ? tab.localService : tab.service;
       svc = ServerMonitorService(executor: executor, isLocal: tab.isLocal);
-      _monitorServices[hostId] = svc;
-    } else if (svc.executor != (tab.isLocal ? tab.localService : tab.service)) {
+      _monitorServices[key] = svc;
+    } else if (svc.executor != executor) {
       // 服务实例变了（重连），重置历史
       svc.reset();
-      _monitorServices[hostId] = ServerMonitorService(executor: tab.isLocal ? tab.localService : tab.service, isLocal: tab.isLocal);
-      svc = _monitorServices[hostId]!;
+      _monitorServices[key] =
+          ServerMonitorService(executor: executor, isLocal: tab.isLocal);
+      svc = _monitorServices[key]!;
     }
     return svc;
   }
@@ -1830,23 +1988,23 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }
 
   // ==================== 区域分界线（分割条，位于终端和 AI 面板之间）====================
-  Widget _buildAreaDivider(AgentState agentState) {
+  Widget _buildAreaDivider(AgentState agentState, String? tabId) {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     final accentColor = tc.agentGreen;
-    final isRight = _aiPanelPosition == _AiPanelPosition.right;
+    final isRight = _aiPanelPositionFor(tabId) == _AiPanelPosition.right;
     // 手机端不显示位置切换按钮
     final showButtons = !_isMobile;
 
     // Chrome DevTools 风格的方形布局切换按钮
     Widget layoutButton(_AiPanelPosition pos, IconData icon, String tooltip) {
-      final isActive = _aiPanelPosition == pos;
+      final isActive = _aiPanelPositionFor(tabId) == pos;
       return Tooltip(
         message: tooltip,
         waitDuration: const Duration(milliseconds: 500),
         child: GestureDetector(
           onTap: () {
-            setState(() => _aiPanelPosition = pos);
+            setState(() => _setAiPanelPosition(tabId, pos));
             _savePanelLayout(savePosition: true);
           },
           child: Container(
@@ -1894,8 +2052,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         waitDuration: const Duration(milliseconds: 500),
         child: GestureDetector(
           onTap: () {
-            setState(() => _isAIPanelVisible = false);
-            SettingsDao.set('aiPanelVisible', false);
+            setState(() => _setAiPanelVisible(tabId, false));
           },
           child: Container(
             width: 22,
@@ -2017,7 +2174,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               children: [
                 _buildAgentChatList(agentState, tab),
                 // 回到底部按钮
-                if (_showScrollToBottom)
+                if (_tabShowScrollToBottom[tab?.id] ?? false)
                   Positioned(
                     right: 8,
                     bottom: 8,
@@ -2088,10 +2245,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   void _scrollChatToBottom() {
     if (!_autoScrollChat) return;
+    final controller =
+        _currentTabId == null ? null : _chatScrollControllers[_currentTabId];
+    if (controller == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_chatScrollController.hasClients) {
-        _chatScrollController.animateTo(
-          _chatScrollController.position.maxScrollExtent,
+      if (controller.hasClients) {
+        controller.animateTo(
+          controller.position.maxScrollExtent,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
@@ -2102,10 +2262,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 用户点击"回到底部"按钮：恢复自动滚动并滚到底部
   void _scrollChatToBottomManual() {
     _autoScrollChat = true;
+    final controller =
+        _currentTabId == null ? null : _chatScrollControllers[_currentTabId];
+    if (controller == null) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_chatScrollController.hasClients) {
-        _chatScrollController.animateTo(
-          _chatScrollController.position.maxScrollExtent,
+      if (controller.hasClients) {
+        controller.animateTo(
+          controller.position.maxScrollExtent,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
@@ -2125,7 +2288,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       return Center(child: Text(l10n.terminalInputHintEmpty, style: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fBody)));
     }
     return ListView.builder(
-      controller: _chatScrollController,
+      controller: _chatControllerFor(tab?.id ?? _currentTabId ?? ''),
       padding: const EdgeInsets.all(8),
       itemCount: items.length,
       itemBuilder: (context, index) {
@@ -2775,7 +2938,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     String? enginePendingConfirm,
   }) {
     // 合并两种待确认来源：引擎自动流程（enginePendingConfirm）和手动播放（_pendingConfirmCommand）
-    final effectivePendingConfirm = enginePendingConfirm ?? _pendingConfirmCommand;
+    final effectivePendingConfirm = enginePendingConfirm ??
+        (tab == null ? _pendingConfirmCommand : _tabPendingConfirm[tab.id]);
 
     // 判断某命令是否是引擎等待确认的命令（走 confirmCommand/rejectCommand 路径）
     bool isEngineConfirm(String command) =>
@@ -2791,7 +2955,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             isLoading: isLoading,
             isWaitingChoice: isWaitingChoice,
             pendingOptions: pendingOptions,
-            executingCommand: _executingCommand,
+            executingCommand:
+                tab == null ? _executingCommand : _tabExecutingCommand[tab.id],
             pendingConfirmCommand: effectivePendingConfirm,
             markdownBuilder: _buildMarkdownText,
             onExecuteCommand: _executeLineDirectly,
@@ -2923,7 +3088,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             if (isShell) {
               return buildCodeBlockWithExecuteButton(
                 seg.content, tc, tab, showAutoExecute, isLoading,
-                executingCommand: _executingCommand,
+                executingCommand:
+                tab == null ? _executingCommand : _tabExecutingCommand[tab.id],
                 pendingConfirmCommand: effectivePendingConfirm,
                 onExecute: _executeLineDirectly,
                 onConfirm: (command) {
@@ -3654,7 +3820,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               onResume: () => ref.read(agentProvider.notifier).resume(),
               onStop: () => ref.read(agentProvider.notifier).cancel(),
               onOpenTerminal: () {
-                setState(() => _isAIPanelVisible = false);
+                setState(() => _setAiPanelVisible(_currentTabId, false));
                 SettingsDao.set('aiPanelVisible', false);
               },
             ),
@@ -3782,7 +3948,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             isRunning: agentState.isRunning,
             hintText: _getInputHint(isConnected, agentState.isRunning, agentState.isOrchestratorMode,
                 connecting: tab?.isConnecting == true),
-            initialText: _tabAiInputText[_currentTabId ?? ''] ?? '',
+            initialText: _tabAiInputText[tab?.id ?? _currentTabId ?? ''] ?? '',
             accentColor: tc.brand,
             isOrchestratorMode: agentState.isOrchestratorMode,
             permissionMode: agentState.permissionMode,
@@ -3793,7 +3959,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             onFocusChanged: (focused) {
               setState(() => _aiInputFocused = focused);
             },
-            onChanged: (text) { _tabAiInputText[_currentTabId ?? ''] = text; },
+            onChanged: (text) { _tabAiInputText[tab?.id ?? _currentTabId ?? ''] = text; },
             onSlashCommand: (command) {
               return _handleSlashCommand(command, isConnected: isConnected);
             },

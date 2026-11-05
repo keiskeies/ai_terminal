@@ -204,10 +204,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
         _reinitEngineForScope(scopeId);
       }
     } else {
-      // 新 tab：若同 host 已有 Agent 正在执行，必须开新会话，不能把
-      // 运行中的任务和会话加载进来（否则第二个 tab 无法发新任务）。
-      final startFresh = _hasRunningAgentForHost(targetHost);
-      _restoreFromPersistence(scopeId, targetHost, startFresh: startFresh);
+      // 新 tab 一律开新会话：同一个服务器开多个 tab 时，Agent 区域必须像
+      // 独立 iframe 一样互不影响。只在“同 host 已有任务在跑”时开新会话
+      // 会让另一个 tab 意外继承正在进行的对话/消息。
+      _restoreFromPersistence(scopeId, targetHost, startFresh: true);
       _engine = null;
       _executor = null;
       // 恢复该 host 的模型配置，或保留当前全局配置
@@ -1521,6 +1521,15 @@ class AgentNotifier extends StateNotifier<AgentState> {
     );
     // 引擎可能还停在上一轮的“全自动”，必须立刻同步成新会话的默认档位
     _syncEngineFlags();
+  }
+
+  /// 读取某个 tab（scope）自己的 AgentState，供常驻的 per-tab 工作区渲染。
+  ///
+  /// 活跃 scope 直接用当前 state（最新）；非活跃 scope 读 registry 缓存。
+  /// 切换 tab 时 [switchTab] 会把旧活跃状态写回 registry，因此切回来仍是全量。
+  AgentState stateForScope(String scopeId, {String? hostId}) {
+    if (_registry.isActive(scopeId)) return state;
+    return _registry.getState(scopeId) ?? AgentState(hostId: hostId);
   }
 
   /// 切换到指定会话（侧边栏点击）
