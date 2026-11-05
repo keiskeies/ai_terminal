@@ -43,6 +43,16 @@ abstract class AIProvider {
   });
 }
 
+/// 从一条流式 delta 里取「模型原生推理」增量。
+///
+/// 不同网关字段不同：DeepSeek 系用 `reasoning_content`，少数用 `reasoning`；
+/// 也有的把推理塞成非字符串。非字符串/空串一律按"没有"处理，绝不影响正文。
+String? reasoningDeltaOf(Object? delta) {
+  if (delta is! Map) return null;
+  final value = delta['reasoning_content'] ?? delta['reasoning'];
+  return value is String && value.isNotEmpty ? value : null;
+}
+
 /// 是否该去掉 `stream_options` 再发一次请求。
 ///
 /// 规则收紧到"这次确实带了该字段"且"网关回 400"两条同时成立：
@@ -240,8 +250,8 @@ class OpenAIProvider implements AIProvider {
               if (delta != null) {
                 // 原生推理增量：DeepSeek/部分网关用 reasoning_content，
                 // 也有网关用 reasoning；两处都认，没给就静默跳过。
-                final reasoning = delta['reasoning_content'] ?? delta['reasoning'];
-                if (reasoning is String && reasoning.isNotEmpty) {
+                final reasoning = reasoningDeltaOf(delta);
+                if (reasoning != null) {
                   onReasoning?.call(reasoning);
                 }
                 // 普通文本内容
@@ -509,8 +519,8 @@ class ErnieProvider implements AIProvider {
                 if (choices != null && choices.isNotEmpty) {
                   final delta = choices[0]['delta'] as Map?;
                   if (delta != null) {
-                    final reasoning = delta['reasoning_content'] ?? delta['reasoning'];
-                    if (reasoning is String && reasoning.isNotEmpty) {
+                    final reasoning = reasoningDeltaOf(delta);
+                    if (reasoning != null) {
                       onReasoning?.call(reasoning);
                     }
                     final content = delta['content'];

@@ -1337,8 +1337,11 @@ class AgentEngine {
       // 阶段2: 解析 (Parse) — 从 AI 响应中提取结构化动作
       // ═══════════════════════════════════════════
       final step = _parseReActResponse(fullResponse);
-      agentLogger.info('ReAct',
-          '解析结果: thought="${step.thought}", action=${step.action}, command=${step.command}, options=${step.options}');
+      // 解析结果是排查用的内部细节：thought 可能上千字，默认日志里只留动作与首行摘要
+      agentLogger.debug('ReAct',
+          '步骤 $_currentStepCount 解析: action=${step.action}, '
+          'command=${step.command == null ? '-' : _logCommand(step.command!)}, '
+          'thought=${step.thought.length > 80 ? '${step.thought.substring(0, 80)}…' : step.thought}');
       // 计划是持久状态：每次模型输出完整计划时替换，不追加快照
       if (step.plan != null && step.plan!.isNotEmpty) {
         _currentPlan = List<PlanStep>.unmodifiable(step.plan!);
@@ -2177,7 +2180,8 @@ class AgentEngine {
   }) async {
     // 标记本任务已实际执行过命令（防止 AI 幻觉 finish）
     _hasExecutedAnyCommand = true;
-    agentLogger.info('ReAct', '执行命令: $command (commandId=$commandId)');
+    // 命令本身会在执行结束时随结果行一起记录，这里只留 debug 细节
+    agentLogger.debug('ReAct', '执行命令: ${_logCommand(command)} (commandId=$commandId)');
 
     // P0-2: trace 命令执行开始
     final traceTaskId = _currentTask?.id;
