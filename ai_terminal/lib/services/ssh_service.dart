@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import '../models/host_config.dart';
+import '../core/ssh_algorithms.dart';
 import 'command_executor.dart';
 
 /// SSH 连接状态
@@ -84,6 +85,7 @@ class SSHService implements CommandExecutor {
           _jumpSocket!,
           username: jumpHostConfig.username,
           onPasswordRequest: () => jumpPassword ?? '',
+          algorithms: kFastSshAlgorithms,
           identities: jumpPrivateKeyContent != null
               ? [...SSHKeyPair.fromPem(jumpPrivateKeyContent)]
               : null,
@@ -109,6 +111,7 @@ class SSHService implements CommandExecutor {
         _socket!,
         username: config.username,
         onPasswordRequest: () => password ?? '',
+        algorithms: kFastSshAlgorithms,
         identities: privateKeyContent != null
             ? [
                 ...SSHKeyPair.fromPem(privateKeyContent, passphrase),

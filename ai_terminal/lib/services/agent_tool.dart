@@ -254,6 +254,87 @@ abstract class AgentTool {
 ///   - remote: 远程目标绝对路径（必填）
 ///   - recursive: 是否递归上传目录（bool，默认 false）
 ///   - exclude: 排除的目录/文件名列表（可选，仅 recursive=true 时生效）
+/// 目录上传的取消 + 同目标串行 + 进度节流。
+///
+/// 工具层的旧上传在任务取消后不会自己知道（工具没有 cancelToken 时尤其如此），
+/// 这里用 isTaskActive 每 250ms 探测一次，并把它转成 SftpService 能识别的
+/// cancelToken；同时用 host:port:user 锁避免新旧两个上传同时跑。
+Future<ToolResult> _runDirectoryUploadWithCancel({
+  required SftpService sftp,
+  required SSHService ssh,
+  required String local,
+  required String effectiveRemote,
+  required List<String> excludeNames,
+  required void Function(String message)? onProgress,
+  required Completer<void>? cancelToken,
+  required bool Function()? isTaskActive,
+  String prefix = '',
+}) async {
+  if (isTaskActive?.call() == false || cancelToken?.isCompleted == true) {
+    return ToolResult.failure('$prefix上传已取消');
+  }
+
+  final transferCancel = Completer<void>();
+  final timer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+    if (transferCancel.isCompleted) return;
+    if (cancelToken?.isCompleted == true || isTaskActive?.call() == false) {
+      transferCancel.complete();
+    }
+  });
+
+  final lockKey = sftpUploadLockKey(
+    host: ssh.config.host,
+    port: ssh.config.port,
+    username: ssh.config.username,
+  );
+  var locked = false;
+  try {
+    if (DirectoryUploadLock.isLocked(lockKey)) {
+      onProgress?.call('$prefix等待上一轮上传退出...');
+    }
+    await DirectoryUploadLock.acquire(lockKey, cancelToken: transferCancel);
+    locked = true;
+
+    final progressWatch = Stopwatch()..start();
+    var lastProgressMs = -1000;
+    final result = await sftp.uploadDirectory(
+      local,
+      effectiveRemote,
+      excludeNames: excludeNames,
+      cancelToken: transferCancel,
+      onProgress: (uploaded, total) {
+        final now = progressWatch.elapsedMilliseconds;
+        if (uploaded >= total || now - lastProgressMs >= 1000) {
+          lastProgressMs = now;
+          onProgress?.call('$prefix上传进度: $uploaded/$total 文件');
+        }
+      },
+    );
+
+    if (result.cancelled) {
+      return ToolResult.failure(
+        '$prefix上传已取消: ${result.summary}',
+        output: '$prefix${result.summary}\n目标路径: $effectiveRemote',
+      );
+    }
+    if (result.allSuccess) {
+      return ToolResult.success(
+        '$prefix${result.summary}\n目标路径: $effectiveRemote',
+      );
+    }
+    return ToolResult(
+      success: false,
+      output: '$prefix${result.summary}\n目标路径: $effectiveRemote',
+      error: '$prefix${result.failedFiles.length} 个文件上传失败',
+    );
+  } on SftpTransferCancelled {
+    return ToolResult.failure('$prefix上传已取消');
+  } finally {
+    timer.cancel();
+    if (locked) DirectoryUploadLock.release(lockKey);
+  }
+}
+
 class SftpUploadTool extends AgentTool {
   @override
   String get name => 'sftp_upload';
@@ -355,25 +436,16 @@ class SftpUploadTool extends AgentTool {
           effectiveRemote = p.posix.join(remote, baseName);
         }
         onProgress?.call('正在递归上传目录: $local → $effectiveRemote');
-        final result = await sftp.uploadDirectory(
-          local,
-          effectiveRemote,
+        return await _runDirectoryUploadWithCancel(
+          sftp: sftp,
+          ssh: executor,
+          local: local,
+          effectiveRemote: effectiveRemote,
           excludeNames: excludeNames,
-          onProgress: (uploaded, total) {
-            onProgress?.call('上传进度: $uploaded/$total 文件');
-          },
+          onProgress: onProgress,
+          cancelToken: cancelToken,
+          isTaskActive: isTaskActive,
         );
-        if (result.allSuccess) {
-          return ToolResult.success(
-            '${result.summary}\n目标路径: $effectiveRemote',
-          );
-        } else {
-          return ToolResult(
-            success: false,
-            output: '${result.summary}\n目标路径: $effectiveRemote',
-            error: '${result.failedFiles.length} 个文件上传失败',
-          );
-        }
       }
     } catch (e) {
       debugPrint('[SftpUploadTool] 上传失败: $e');
@@ -950,25 +1022,17 @@ class UploadToTool extends AgentTool {
           effectiveRemote = p.posix.join(remote, baseName);
         }
         onProgress?.call('[$hostId] 正在递归上传目录: $local → $effectiveRemote');
-        final result = await sftp.uploadDirectory(
-          local,
-          effectiveRemote,
+        return await _runDirectoryUploadWithCancel(
+          sftp: sftp,
+          ssh: targetExecutor,
+          local: local,
+          effectiveRemote: effectiveRemote,
           excludeNames: excludeNames,
-          onProgress: (uploaded, total) {
-            onProgress?.call('[$hostId] 上传进度: $uploaded/$total 文件');
-          },
+          onProgress: onProgress,
+          cancelToken: cancelToken,
+          isTaskActive: isTaskActive,
+          prefix: '[$hostId] ',
         );
-        if (result.allSuccess) {
-          return ToolResult.success(
-            '[$hostId] ${result.summary}\n目标路径: $effectiveRemote',
-          );
-        } else {
-          return ToolResult(
-            success: false,
-            output: '[$hostId] ${result.summary}\n目标路径: $effectiveRemote',
-            error: '${result.failedFiles.length} 个文件上传失败',
-          );
-        }
       }
     } catch (e) {
       return ToolResult.failure('[$hostId] 上传失败: $e');

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -354,6 +355,40 @@ void main() {
       expect(noRecursive.error, contains('recursive'));
       expect(await sftp.statFile('$_remoteRoot/no-recursive'), isNull);
     }, timeout: const Timeout(Duration(minutes: 5)));
+
+    test('directory upload cancellation stops workers and cleans temp files',
+        () async {
+      final source = Directory(p.join(localRoot.path, 'cancel-src'))
+        ..createSync(recursive: true);
+      for (var i = 0; i < 80; i++) {
+        File(p.join(source.path, 'f$i.txt'))
+            .writeAsStringSync('x' * 2048);
+      }
+      final remoteDir = p.posix.join(_remoteRoot, 'cancel-dst');
+      final token = Completer<void>();
+      final uploadFuture = sftp.uploadDirectory(
+        source.path,
+        remoteDir,
+        cancelToken: token,
+      );
+      // 留出一点时间让 worker 真正开始，再模拟用户中断
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      token.complete();
+      final result = await uploadFuture;
+
+      expect(result.cancelled, isTrue);
+      expect(result.uploadedFiles, lessThan(80));
+      expect(result.summary, contains('已取消'));
+
+      final remoteStat = await sftp.statFile(remoteDir);
+      if (remoteStat != null && remoteStat.isDirectory) {
+        for (final entry in await sftp.listDirectory(remoteDir)) {
+          expect(entry.name, isNot(contains('.ai-upload-')),
+              reason: '取消后不能留下上传临时文件');
+        }
+      }
+      await ssh.executeAndWait('rm -rf ${_shq(remoteDir)}');
+    }, timeout: const Timeout(Duration(minutes: 2)));
 
     test('special-character names round trip without shell interpretation',
         () async {

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
@@ -6,7 +7,9 @@ import 'dart:typed_data';
 import 'package:dartssh2/dartssh2.dart';
 import 'package:path/path.dart' as p;
 import '../models/host_config.dart';
+import '../core/ssh_algorithms.dart';
 import '../core/credentials_store.dart';
+import '../utils/adaptive_concurrency.dart';
 
 /// SFTP 文件条目
 class SftpEntry {
@@ -64,11 +67,30 @@ class UploadDirectoryResult {
   List<String> failedFiles = [];
   List<String> errors = [];
 
+  /// 本次上传的初始/最终并发（自适应时可能不同）
+  int initialConcurrency = 0;
+  int finalConcurrency = 0;
+  bool concurrencyDegraded = false;
+
+  /// 是否因任务取消而提前结束
+  bool cancelled = false;
+
   bool get allSuccess => failedFiles.isEmpty;
 
   String get summary {
     final buffer = StringBuffer();
-    buffer.writeln('上传完成: $uploadedFiles/$totalFiles 个文件');
+    buffer.writeln(cancelled
+        ? '上传已取消: $uploadedFiles/$totalFiles 个文件'
+        : '上传完成: $uploadedFiles/$totalFiles 个文件');
+    if (initialConcurrency > 0) {
+      final change = initialConcurrency == finalConcurrency
+          ? '$initialConcurrency'
+          : '$initialConcurrency → $finalConcurrency';
+      final dropped = finalConcurrency > 0 &&
+          finalConcurrency < initialConcurrency;
+      buffer.writeln(
+          '并发: $change${dropped ? '（连续失败后降速）' : ''}');
+    }
     if (failedFiles.isNotEmpty) {
       buffer.writeln('失败 ${failedFiles.length} 个:');
       for (final f in failedFiles.take(5)) {
@@ -166,6 +188,7 @@ class SftpService {
           _jumpSocket!,
           username: jumpConfig.username,
           onPasswordRequest: () => jumpPassword ?? '',
+          algorithms: kFastSshAlgorithms,
           identities: jumpPrivateKey != null
               ? [...SSHKeyPair.fromPem(jumpPrivateKey)]
               : null,
@@ -180,6 +203,7 @@ class SftpService {
         _socket!,
         username: config.username,
         onPasswordRequest: () => password ?? '',
+        algorithms: kFastSshAlgorithms,
         identities: privateKeyContent != null
             ? [...SSHKeyPair.fromPem(privateKeyContent)]
             : null,
@@ -207,15 +231,21 @@ class SftpService {
   }
 
   /// 递归上传本地目录到远程
+  ///
   /// [localDir] 本地目录绝对路径
   /// [remoteDir] 远程目标目录绝对路径（不存在会自动创建）
   /// [excludeNames] 要跳过的文件/目录名（如 node_modules、.git）
   /// [onProgress] 进度回调 (uploadedFiles, totalFiles)
+  /// [concurrency] 固定并发（1–16）；传 null 使用自适应：
+  ///   小文件 16、平均 1MB 左右 8、大文件 2–4；连续失败减半，持续成功恢复。
+  /// [cancelToken] 完成时停止调度新文件并中止当前写入，保留已完成文件。
   Future<UploadDirectoryResult> uploadDirectory(
     String localDir,
     String remoteDir, {
     List<String> excludeNames = const ['node_modules', '.git', '.DS_Store'],
     void Function(int uploaded, int total)? onProgress,
+    int? concurrency,
+    Completer<void>? cancelToken,
   }) async {
     if (_sftp == null) throw Exception('SFTP 未连接');
 
@@ -242,9 +272,33 @@ class SftpService {
     }
     result.totalFiles = allFiles.length;
 
-    // 2. 确保远程根目录存在，并保留空目录结构
+    if (cancelToken?.isCompleted == true) {
+      result.cancelled = true;
+      return result;
+    }
+
+    // 2. 采样估算平均文件大小，决定初始并发。
+    //    小文件是每文件往返延迟受限，高并发；大文件受 2MB 通道窗口限制，
+    //    多开只会排队并增加服务端句柄/内存。
+    final fixedConcurrency = concurrency?.clamp(1, 16).toInt();
+    final averageBytes = await _averageFileSize(allFiles);
+    final controller = AdaptiveConcurrency(
+      initial: fixedConcurrency ??
+          chooseInitialUploadConcurrency(
+            fileCount: allFiles.length,
+            averageBytes: averageBytes,
+          ),
+      adaptive: fixedConcurrency == null,
+    );
+    result.initialConcurrency = controller.initial;
+
+    // 3. 确保远程根目录存在，并保留空目录结构
     await _ensureRemoteDir(remoteDir);
     for (final dir in allDirs) {
+      if (cancelToken?.isCompleted == true) {
+        result.cancelled = true;
+        return result;
+      }
       // dir 来自 p.relative（本机路径），必须先按本机分隔符拆分，
       // 再统一用 '/' 拼成远程路径；对 Windows 相对路径用 p.posix.split
       // 会把 "sub\a.txt" 当成单个文件名，导致平铺出带反斜杠的文件名。
@@ -252,27 +306,107 @@ class SftpService {
       await _ensureRemoteDir(remoteDirPath);
     }
 
-    // 3. 逐个上传
-    for (final file in allFiles) {
-      final relative = p.relative(file.path, from: localDir);
-      // R6: 远程路径用 posix join
-      final remotePath = p.posix.join(remoteDir, p.split(relative).join('/'));
-      final remoteParent = p.posix.dirname(remotePath);
+    // 4. 自适应并发上传。
+    // 目录结构已在上一步建好，这里不再为每个文件做一次远程 stat/mkdir；
+    // uploadFile 也跳过目标 stat（批量场景已知目标是文件路径）。
+    final progressWatch = Stopwatch()..start();
+    var lastReportMs = -1000;
 
-      // 确保远程父目录存在
-      await _ensureRemoteDir(remoteParent);
-
-      try {
-        await uploadFile(file.path, remotePath);
-        result.uploadedFiles++;
+    void reportProgress() {
+      final now = progressWatch.elapsedMilliseconds;
+      final done = result.uploadedFiles + result.failedFiles.length;
+      if (done >= result.totalFiles || now - lastReportMs >= 200) {
+        lastReportMs = now;
         onProgress?.call(result.uploadedFiles, result.totalFiles);
-      } catch (e) {
-        result.failedFiles.add(relative);
-        result.errors.add('$relative: $e');
       }
     }
 
+    final gate = _UploadGate(controller);
+    final queue = ListQueue<File>()..addAll(allFiles);
+
+    Future<void> uploadOne(File file) async {
+      final relative = p.relative(file.path, from: localDir);
+      // R6: 远程路径用 posix join
+      final remotePath =
+          p.posix.join(remoteDir, p.split(relative).join('/'));
+      try {
+        await uploadFile(
+          file.path,
+          remotePath,
+          checkExisting: false,
+          cancelToken: cancelToken,
+        );
+        result.uploadedFiles++;
+        controller.onSuccess();
+      } on SftpTransferCancelled {
+        result.cancelled = true;
+      } catch (e) {
+        result.failedFiles.add(relative);
+        result.errors.add('$relative: $e');
+        controller.onFailure();
+      }
+      // 成功后并发可能恢复，唤醒等待中的 worker
+      gate.onLimitChanged();
+      reportProgress();
+    }
+
+    Future<void> worker() async {
+      while (true) {
+        if (cancelToken?.isCompleted == true) {
+          result.cancelled = true;
+          break;
+        }
+        await gate.acquire();
+        if (cancelToken?.isCompleted == true) {
+          gate.release();
+          result.cancelled = true;
+          break;
+        }
+        if (queue.isEmpty) {
+          gate.release();
+          break;
+        }
+        final file = queue.removeFirst();
+        try {
+          await uploadOne(file);
+        } finally {
+          gate.release();
+        }
+      }
+    }
+
+    final workerCount = allFiles.length < controller.initial
+        ? allFiles.length
+        : controller.initial;
+    await Future.wait(List.generate(workerCount, (_) => worker()));
+
+    result.finalConcurrency = controller.finalConcurrency;
+    result.concurrencyDegraded =
+        controller.degraded && result.finalConcurrency < controller.initial;
+    // 最终 100% 必须发一次；取消时不伪装成完成
+    if (!result.cancelled) {
+      onProgress?.call(result.uploadedFiles, result.totalFiles);
+    }
+
     return result;
+  }
+
+  /// 采样最多 32 个文件估算平均大小；本地 stat 很便宜，但不要 2 万次全读。
+  Future<double> _averageFileSize(List<File> files) async {
+    if (files.isEmpty) return 0;
+    const sampleCount = 32;
+    final step = files.length <= sampleCount ? 1 : files.length ~/ sampleCount;
+    var total = 0;
+    var count = 0;
+    for (var i = 0; i < files.length && count < sampleCount; i += step) {
+      try {
+        total += await files[i].length();
+        count++;
+      } catch (_) {
+        // 文件在遍历后消失：跳过样本，不影响上传阶段的失败统计
+      }
+    }
+    return count == 0 ? 0 : total / count;
   }
 
   /// 递归确保远程目录存在（类似 mkdir -p）
@@ -480,17 +614,21 @@ class SftpService {
 
     final remoteFile = await _sftp!.open(remotePath);
     IOSink? sink;
+    final progress = _ProgressThrottle();
     try {
 
       sink = File(tempPath).openWrite();
       await for (final chunk in remoteFile.read(onProgress: (bytesRead) {
-        onProgress?.call(bytesRead, totalSize);
+        if (progress.shouldReport(bytesRead, totalSize)) {
+          onProgress?.call(bytesRead, totalSize);
+        }
       })) {
         sink.add(chunk);
       }
       await sink.flush();
       await sink.close();
       sink = null;
+      onProgress?.call(totalSize, totalSize);
     } catch (_) {
       try {
         await sink?.close();
@@ -515,16 +653,23 @@ class SftpService {
   ///
   /// 先写同目录远程临时文件，完整上传后再原子替换目标；中途失败只删除临时
   /// 文件，不会把服务器上的原文件截断成半成品。
+  /// [checkExisting] 为 false 时跳过目标路径的远程 stat；目录批量上传已知
+  /// 目标是文件路径，可省掉每文件一次往返。
+  /// [cancelToken] 完成时中止当前 writer，已完成的文件保留。
   Future<void> uploadFile(String localPath, String remotePath,
-      {void Function(int, int)? onProgress}) async {
+      {void Function(int, int)? onProgress,
+      bool checkExisting = true,
+      Completer<void>? cancelToken}) async {
     if (_sftp == null) throw Exception('SFTP 未连接');
 
     final localFile = File(localPath);
     final totalSize = await localFile.length();
 
-    final existing = await statFile(remotePath);
-    if (existing != null && existing.isDirectory) {
-      throw Exception('远程目标是目录，不能按文件上传: $remotePath');
+    if (checkExisting) {
+      final existing = await statFile(remotePath);
+      if (existing != null && existing.isDirectory) {
+        throw Exception('远程目标是目录，不能按文件上传: $remotePath');
+      }
     }
 
     final remoteParent = p.posix.dirname(remotePath);
@@ -544,15 +689,34 @@ class SftpService {
       try {
         final stream =
             localFile.openRead().map((chunk) => Uint8List.fromList(chunk));
+        final progress = _ProgressThrottle();
         final writer = remoteFile.write(
           stream,
           onProgress: (total) {
-            onProgress?.call(total, totalSize);
+            if (progress.shouldReport(total, totalSize)) {
+              onProgress?.call(total, totalSize);
+            }
           },
         );
+        if (cancelToken != null) {
+          unawaited(cancelToken.future.then((_) async {
+            try {
+              await writer.abort();
+            } catch (_) {}
+          }));
+        }
         await writer.done;
+        if (cancelToken?.isCompleted == true) {
+          throw const SftpTransferCancelled();
+        }
+        onProgress?.call(totalSize, totalSize);
       } finally {
-        await remoteFile.close();
+        try {
+          await remoteFile.close();
+        } catch (_) {}
+      }
+      if (cancelToken?.isCompleted == true) {
+        throw const SftpTransferCancelled();
       }
       await _renameReplace(tempPath, remotePath);
     } catch (_) {
@@ -808,3 +972,113 @@ class SftpService {
     _client = null;
   }
 }
+
+/// 传输被任务取消。
+class SftpTransferCancelled implements Exception {
+  const SftpTransferCancelled();
+
+  @override
+  String toString() => '传输已取消';
+}
+
+/// 同一 SSH 目标上的目录上传串行锁。
+///
+/// 旧任务被用户中断后，工具的 isTaskActive 检查需要最多 250ms 才能让
+/// 上传停止；如果用户立刻发起新任务，两个上传会短暂重叠。这个锁把同一
+/// host:port:user 的目录上传串起来：新任务等待旧的退出，而不是同时跑。
+class DirectoryUploadLock {
+  static final Map<String, Completer<void>> _locks = {};
+
+  static bool isLocked(String key) => _locks.containsKey(key);
+
+  static Future<void> acquire(
+    String key, {
+    Completer<void>? cancelToken,
+  }) async {
+    while (_locks.containsKey(key)) {
+      final current = _locks[key]!;
+      if (cancelToken == null) {
+        await current.future;
+      } else {
+        final acquired = await Future.any<bool>([
+          current.future.then((_) => true),
+          cancelToken.future.then((_) => false),
+        ]);
+        if (!acquired) throw const SftpTransferCancelled();
+      }
+    }
+    if (cancelToken?.isCompleted == true) {
+      throw const SftpTransferCancelled();
+    }
+    _locks[key] = Completer<void>();
+  }
+
+  static void release(String key) {
+    final current = _locks.remove(key);
+    if (current != null && !current.isCompleted) current.complete();
+  }
+}
+
+String sftpUploadLockKey({
+  required String host,
+  required int port,
+  required String username,
+}) =>
+    'sftp-upload:${host.toLowerCase()}:$port:$username';
+
+/// 上传并发闸门：worker 数量固定为初始并发，实际在途数量由控制器动态限制。
+///
+/// 直接 Future.any 起新 worker 会引入竞态/忙循环；这里用固定 worker 池 +
+/// 等待队列，减并发时多余的 worker 在 acquire 处等待，恢复时被唤醒。
+class _UploadGate {
+  final AdaptiveConcurrency _limit;
+  int _active = 0;
+  final List<Completer<void>> _waiters = [];
+
+  _UploadGate(this._limit);
+
+  Future<void> acquire() async {
+    if (_active < _limit.current) {
+      _active++;
+      return;
+    }
+    final waiter = Completer<void>();
+    _waiters.add(waiter);
+    // 槽位由 _wake 预留（_active 已加），这里只等待唤醒
+    await waiter.future;
+  }
+
+  void release() {
+    _active--;
+    _wake();
+  }
+
+  void onLimitChanged() => _wake();
+
+  void _wake() {
+    while (_waiters.isNotEmpty && _active < _limit.current) {
+      _active++;
+      _waiters.removeAt(0).complete();
+    }
+  }
+}
+
+/// 进度回调节流。
+///
+/// SFTP 每 16KB 回调一次；29MB/s 时接近 2000 次/秒。UI 层如果每次都
+/// setState 重建整个 SFTP 面板，会反过来拖慢传输。这里限制到约 10 次/秒，
+/// 完成时由调用方单独补一次 100%。
+class _ProgressThrottle {
+  final Stopwatch _watch = Stopwatch()..start();
+  int _lastMs = -1000;
+
+  bool shouldReport(int current, int total) {
+    final now = _watch.elapsedMilliseconds;
+    if (current >= total || now - _lastMs >= 100) {
+      _lastMs = now;
+      return true;
+    }
+    return false;
+  }
+}
+
