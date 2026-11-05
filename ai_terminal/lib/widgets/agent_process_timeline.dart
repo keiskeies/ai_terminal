@@ -254,6 +254,8 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
         pendingConfirmCommand: widget.pendingConfirmCommand,
         isTool: isTool,
         executed: false,
+        riskLevel: e.riskLevel,
+        permissionDecision: e.permissionDecision,
         onExecute: widget.onExecuteCommand,
         onConfirm: widget.onConfirmCommand,
         onReject: widget.onRejectCommand,

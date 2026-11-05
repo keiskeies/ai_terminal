@@ -4,6 +4,8 @@
 // 以远程路径开头（`/etc/nginx 目录权限`），若把首个 `/` 开头一律当命令，
 // 用户就没法让 agent 处理绝对路径了。
 
+import '../models/agent_permission_mode.dart';
+
 /// 解析结果
 class ParsedSlashCommand {
   /// 已小写化的命令名，如 `/goal`
@@ -57,15 +59,17 @@ List<String> matchModelNames(Iterable<String> names, String wanted) {
   return names.where((n) => n.toLowerCase().contains(needle)).toList();
 }
 
-/// `/plan` 结束后是否要把只读模式拨回去。
+/// `/plan` 结束后是否要把权限档位拨回去。
 ///
-/// 规则是"恢复原值"，不是"恢复 false"：本来就在只读模式的用户，跑一次 `/plan`
-/// 不该被顺手解锁——那等于让一次临时操作改掉他的安全边界。
-bool shouldRestoreReadOnly({
-  required bool wasReadOnly,
-  required bool nowReadOnly,
+/// 规则是"恢复原值"，不是"恢复询问"：原本是自动/全自动的用户，跑一次 `/plan`
+/// 不该被顺手改档；原本就是只读的也不用重复设置。只有用户没有手动动过
+/// （当前仍是 /plan 临时设置的只读）时才还原。
+bool shouldRestorePermissionMode({
+  required AgentPermissionMode before,
+  required AgentPermissionMode now,
 }) =>
-    nowReadOnly != wasReadOnly;
+    now == AgentPermissionMode.readOnly &&
+    before != AgentPermissionMode.readOnly;
 const Set<String> kGoalSubCommands = {
   'pause',
   'resume',

@@ -87,6 +87,11 @@ class AgentEvent {
   /// 风险等级（command 用）：safe / info / warn / blocked
   String? riskLevel;
 
+  /// 命令发出时的权限处置快照（command 用）：execute / confirm / reject。
+  /// UI 用它区分“已放行 / 需确认 / 已拦截”，不能在渲染时按当前模式重算，
+  /// 否则切换档位会让历史命令改口。
+  String? permissionDecision;
+
   /// 命令耗时（result 用）
   int? durationMs;
 
@@ -140,6 +145,7 @@ class AgentEvent {
     this.hostId,
     this.toolName,
     this.riskLevel,
+    this.permissionDecision,
   })  : id = id ?? _genId(),
         type = AgentEventType.command,
         timestamp = DateTime.now();

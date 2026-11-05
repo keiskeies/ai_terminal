@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ai_terminal/models/agent_permission_mode.dart';
 import 'package:ai_terminal/utils/slash_command.dart';
 import 'package:ai_terminal/widgets/ai_prompt_input.dart';
 
@@ -173,19 +174,48 @@ void main() {
     });
   });
 
-  group('shouldRestoreReadOnly', () {
-    test('/plan 进入前不是只读、结束时仍只读 → 要还原', () {
-      expect(shouldRestoreReadOnly(wasReadOnly: false, nowReadOnly: true), isTrue);
+  group('shouldRestorePermissionMode', () {
+    test('/plan 进入前不是只读、结束时仍只读 → 要还原原档位', () {
+      expect(
+        shouldRestorePermissionMode(
+            before: AgentPermissionMode.auto, now: AgentPermissionMode.readOnly),
+        isTrue,
+      );
+      expect(
+        shouldRestorePermissionMode(
+            before: AgentPermissionMode.fullAuto,
+            now: AgentPermissionMode.readOnly),
+        isTrue,
+      );
     });
 
-    test('进入前就是只读 → 结束后必须保持只读，不能被解锁', () {
-      // 这是"恢复原值而不是恢复 false"的核心用例：写成 false 就会把用户的边界改掉
-      expect(shouldRestoreReadOnly(wasReadOnly: true, nowReadOnly: true), isFalse);
+    test('进入前就是只读 → 结束后保持只读，不重复设置', () {
+      // 这是"恢复原值而不是恢复询问"的核心用例：写成询问就会把用户的边界改掉
+      expect(
+        shouldRestorePermissionMode(
+            before: AgentPermissionMode.readOnly,
+            now: AgentPermissionMode.readOnly),
+        isFalse,
+      );
     });
 
-    test('用户在任务期间自己改过开关 → 不覆盖他的选择', () {
-      expect(shouldRestoreReadOnly(wasReadOnly: false, nowReadOnly: false), isFalse);
-      expect(shouldRestoreReadOnly(wasReadOnly: true, nowReadOnly: false), isTrue);
+    test('用户在任务期间自己改过档位 → 不覆盖他的选择', () {
+      expect(
+        shouldRestorePermissionMode(
+            before: AgentPermissionMode.ask, now: AgentPermissionMode.auto),
+        isFalse,
+      );
+      expect(
+        shouldRestorePermissionMode(
+            before: AgentPermissionMode.ask,
+            now: AgentPermissionMode.fullAuto),
+        isFalse,
+      );
+      expect(
+        shouldRestorePermissionMode(
+            before: AgentPermissionMode.ask, now: AgentPermissionMode.ask),
+        isFalse,
+      );
     });
   });
 }

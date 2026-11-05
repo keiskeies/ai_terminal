@@ -6,6 +6,7 @@ import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/l10n/app_localizations_zh.dart';
 import 'package:ai_terminal/models/agent_event.dart';
 import 'package:ai_terminal/models/agent_model.dart';
+import 'package:ai_terminal/models/agent_permission_mode.dart';
 import 'package:ai_terminal/models/agent_memory.dart';
 import 'package:ai_terminal/models/ai_model_config.dart';
 import 'package:ai_terminal/models/token_usage.dart';
@@ -349,7 +350,7 @@ void main() {
         maxSteps: 5,
         hostId: 'test-host',
       );
-      engine.setReadOnlyMode(true);
+      engine.setPermissionMode(AgentPermissionMode.readOnly);
       final events = <AgentEvent>[];
       engine.onEvent = events.add;
 
@@ -387,7 +388,7 @@ void main() {
         maxSteps: 5,
         hostId: 'test-host',
       );
-      engine.setReadOnlyMode(true);
+      engine.setPermissionMode(AgentPermissionMode.readOnly);
       final events = <AgentEvent>[];
       engine.onEvent = events.add;
 

@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import '../models/agent_permission_mode.dart';
 
 /// Agent 操作单/计划面板的轻量文案。
 ///
@@ -279,4 +280,55 @@ class AgentUiText {
   String commandCallsCount(int n) => zh ? '$n 条命令' : '$n commands';
   String moreSteps(int n) => zh ? '更早 $n 步' : '$n earlier steps';
   String moreOutputLines(int n) => zh ? '还有 $n 行' : '$n more lines';
+
+  // ── 执行权限档位 ──
+  String get permissionModeTitle => zh ? '执行权限' : 'Execution permission';
+
+  String permissionModeLabel(AgentPermissionMode mode) {
+    switch (mode) {
+      case AgentPermissionMode.readOnly:
+        return zh ? '只读' : 'Read-only';
+      case AgentPermissionMode.ask:
+        return zh ? '询问' : 'Ask';
+      case AgentPermissionMode.auto:
+        return zh ? '自动' : 'Auto';
+      case AgentPermissionMode.fullAuto:
+        return zh ? '全自动' : 'Full auto';
+    }
+  }
+
+  String permissionModeDescription(AgentPermissionMode mode) {
+    switch (mode) {
+      case AgentPermissionMode.readOnly:
+        return zh ? '只允许只读命令，任何修改都会被拒绝' : 'Only read-only commands; changes are refused';
+      case AgentPermissionMode.ask:
+        return zh ? '修改类与高危命令都先询问你' : 'Ask before changes and high-risk commands';
+      case AgentPermissionMode.auto:
+        return zh ? '普通修改自动执行，高危命令仍会询问' : 'Run normal changes automatically; ask for high-risk ones';
+      case AgentPermissionMode.fullAuto:
+        return zh
+            ? '高危命令也自动执行；封网期与敏感文件限制仍生效'
+            : 'High-risk commands run automatically; change windows and sensitive-file guards still apply';
+    }
+  }
+
+  String get permissionAllowed => zh ? '已放行' : 'Allowed';
+  String get permissionNotExecuted => zh ? '未执行' : 'Not run';
+  String get permissionModeFullAutoWarningTitle =>
+      zh ? '启用全自动模式？' : 'Enable full-auto mode?';
+  String get permissionModeFullAutoWarningBody => zh
+      ? 'Agent 将不再逐条确认，直接执行包括删除系统配置、格式化磁盘在内的所有命令。'
+          '部分操作不可恢复；封网期与敏感文件限制仍会生效，请确认你了解影响范围。'
+      : 'The agent will stop asking and run every command, including deleting system '
+          'configuration and formatting disks. Some operations cannot be undone. '
+          'Change windows and sensitive-file guards still apply.';
+  String get permissionModeEnable => zh ? '启用' : 'Enable';
+
+  String permissionModeCurrent(String mode) =>
+      zh ? '当前权限模式：$mode' : 'Current permission mode: $mode';
+  String get permissionModeUsage =>
+      zh ? '用法：/permission <只读|询问|自动|全自动>' : 'Usage: /permission <read|ask|auto|full>';
+  String permissionModeSwitched(String mode, String desc) =>
+      zh ? '已切换到「$mode」：$desc' : 'Switched to $mode: $desc';
+
 }

@@ -16,6 +16,7 @@ import '../widgets/ai_prompt_input.dart';
 import '../widgets/model_picker_panel.dart';
 import '../widgets/agent_goal_banner.dart';
 import '../models/agent_goal.dart';
+import '../models/agent_permission_mode.dart';
 import '../widgets/session_history_dialog.dart';
 import '../widgets/agent_log_dialog.dart';
 import '../widgets/agent_command_block.dart';
@@ -27,6 +28,7 @@ import '../widgets/reconnecting_banner.dart';
 import '../widgets/tab_item_widget.dart';
 import '../utils/interrupted_turn_detector.dart';
 import '../utils/slash_command.dart';
+import '../utils/agent_ui_text.dart';
 import '../utils/conversation_export.dart';
 import '../utils/goal_continuation.dart';
 import '../services/agent_tracer.dart';
@@ -3177,17 +3179,76 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     ));
   }
 
-  /// `/plan`：只要计划、不执行。临时置只读，结束后**恢复原值而不是恢复 false**——
-  /// 本来就在只读模式的用户不该被这次操作顺手解锁。
+  /// 切换执行权限档位；全自动先弹一次范围警告。
+  Future<void> _applyPermissionMode(AgentPermissionMode mode) async {
+    if (mode == ref.read(agentProvider).permissionMode) return;
+    final ui = AgentUiText.of(context);
+    if (mode == AgentPermissionMode.fullAuto) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) {
+          final tc = ThemeColors.of(ctx);
+          return AlertDialog(
+            backgroundColor: tc.cardElevated,
+            title: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: tc.error, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    ui.permissionModeFullAutoWarningTitle,
+                    style: TextStyle(color: tc.textMain, fontSize: fBody),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              ui.permissionModeFullAutoWarningBody,
+              style: TextStyle(
+                color: tc.textSub,
+                fontSize: fSmall,
+                height: 1.5,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: Text(ui.cancel,
+                    style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: tc.error),
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(ui.permissionModeEnable,
+                    style: const TextStyle(fontSize: fSmall)),
+              ),
+            ],
+          );
+        },
+      );
+      if (ok != true || !mounted) return;
+    }
+    ref.read(agentProvider.notifier).setPermissionMode(mode);
+    if (!mounted) return;
+    _showGoalHint(ui.permissionModeSwitched(
+      ui.permissionModeLabel(mode),
+      ui.permissionModeDescription(mode),
+    ));
+  }
+
+  /// `/plan`：只要计划、不执行。临时置只读，结束后**恢复原档位而不是恢复询问**——
+  /// 本来就在自动/全自动的用户不该被这次操作顺手改档。
   Future<void> _runPlanOnly(String objective,
       {required bool isConnected}) async {
     final notifier = ref.read(agentProvider.notifier);
-    // 只读模式必须按 host 读写：计划任务可能跑几百秒，期间用户完全可能切 tab，
+    // 权限档位必须按 host 读写：计划任务可能跑几百秒，期间用户完全可能切 tab，
     // 那时用"活跃 host"的 toggle 就会改到另一台机器上（AGENTS.md R3）
     final planHostId = ref.read(agentProvider).hostId ?? 'local';
-    final wasReadOnly = notifier.isReadOnlyFor(planHostId);
-    if (!wasReadOnly) {
-      notifier.setReadOnlyForHost(planHostId, enabled: true);
+    final wasMode = notifier.permissionModeFor(planHostId);
+    final enteredReadOnly = wasMode != AgentPermissionMode.readOnly;
+    if (enteredReadOnly) {
+      notifier.setPermissionModeForHost(
+          planHostId, AgentPermissionMode.readOnly);
     }
     try {
       await _sendToAgent(
@@ -3197,13 +3258,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         isConnected: isConnected,
       );
     } finally {
-      // 重读一次：任务期间用户可能自己动过这个开关，只在他没动时还原。
+      // 重读一次：任务期间用户可能自己动过这个档位，只在他没动时还原。
       // 页面已销毁时不还原——那种情况下留在只读是安全方向。
       if (mounted) {
-        final nowReadOnly = notifier.isReadOnlyFor(planHostId);
-        if (shouldRestoreReadOnly(
-            wasReadOnly: wasReadOnly, nowReadOnly: nowReadOnly)) {
-          notifier.setReadOnlyForHost(planHostId, enabled: wasReadOnly);
+        final nowMode = notifier.permissionModeFor(planHostId);
+        if (shouldRestorePermissionMode(before: wasMode, now: nowMode)) {
+          notifier.setPermissionModeForHost(planHostId, wasMode);
         }
       }
     }
@@ -3431,17 +3491,20 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       case '/model':
         return _handleModelCommand(parsed.rest);
       case '/permission':
-        final notifier = ref.read(agentProvider.notifier);
-        final before = ref.read(agentProvider).isReadOnlyMode;
-        notifier.toggleReadOnlyMode();
-        final after = ref.read(agentProvider).isReadOnlyMode;
-        if (after == before) {
-          _showGoalHint('只读模式状态未变化，可能被运行中的任务锁定');
-        } else {
-          _showGoalHint(after
-              ? '只读模式已开启：agent 只查询，不改动任何状态'
-              : '只读模式已关闭（危险操作仍会逐个要求确认）');
+        final ui = AgentUiText.of(context);
+        final current = ref.read(agentProvider).permissionMode;
+        final wanted = parsePermissionMode(parsed.rest);
+        if ((parsed.rest ?? '').trim().isEmpty) {
+          _showGoalHint(
+              '${ui.permissionModeCurrent(ui.permissionModeLabel(current))}\n'
+              '${ui.permissionModeUsage}');
+          return true;
         }
+        if (wanted == null) {
+          _showGoalHint(ui.permissionModeUsage);
+          return true;
+        }
+        _applyPermissionMode(wanted);
         return true;
       case '/help':
         _showCommandHelp();
@@ -3625,17 +3688,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 tc: tc,
               ),
               const SizedBox(width: 4),
-              // 只读模式（Dry-run）切换
-              _buildToolbarIconButton(
-                icon: agentState.isReadOnlyMode ? Icons.lock : Icons.lock_open_outlined,
-                tooltip: agentState.isReadOnlyMode ? l10n.terminalReadOnlyOn : l10n.terminalReadOnlyOff,
-                onTap: () {
-                  ref.read(agentProvider.notifier).toggleReadOnlyMode();
-                },
-                tc: tc,
-                active: agentState.isReadOnlyMode,
-              ),
-              const SizedBox(width: 4),
               // 联网搜索切换（会话级，覆盖全局开关；下次任务生效）
               _buildToolbarIconButton(
                 icon: Icons.travel_explore_rounded,
@@ -3694,6 +3746,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             initialText: _tabAiInputText[_currentTabId ?? ''] ?? '',
             accentColor: tc.brand,
             isOrchestratorMode: agentState.isOrchestratorMode,
+            permissionMode: agentState.permissionMode,
+            onPermissionModeChanged: _applyPermissionMode,
             onToggleOrchestrator: () {
               ref.read(agentProvider.notifier).toggleOrchestratorMode();
             },

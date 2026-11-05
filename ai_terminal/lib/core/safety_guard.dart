@@ -40,7 +40,7 @@ class SafetyGuard {
     _SafetyRule(RegExp(r'chmod\s+-R\s+777\s+/'), '递归修改根目录权限为 777，将破坏所有文件权限，系统将无法正常运行'),
     _SafetyRule(RegExp(r'^init\s+0\s*$'), '立即关机，所有未保存数据将丢失'),
     _SafetyRule(RegExp(r'^shutdown\s+-h\s+now'), '立即关机，所有未保存数据将丢失'),
-    _SafetyRule(RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+/etc/'), '删除 /etc 配置目录，系统将无法启动和运行'),
+    _SafetyRule(RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+/etc/'), '删除 /etc 下的系统配置文件，相关服务可能无法运行，且不可恢复'),
     _SafetyRule(RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+/boot/'), '删除 /boot 启动目录，系统将无法启动'),
     _SafetyRule(RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+~'), '递归删除用户主目录，所有用户数据将丢失'),
     _SafetyRule(RegExp(r'^mkfs\.'), '格式化磁盘，目标分区所有数据将被擦除，不可恢复'),

@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../l10n/app_localizations.dart';
+import '../models/agent_permission_mode.dart';
+import 'permission_mode_selector.dart';
 
 /// AI 输入框，支持斜杠命令建议
 ///
@@ -30,6 +32,12 @@ class AIPromptInput extends StatefulWidget {
   /// 放在发送按钮左侧，宽度自适应并允许省略。
   final Widget? footer;
 
+  /// 当前执行权限档位（只读 / 询问 / 自动 / 全自动）
+  final AgentPermissionMode permissionMode;
+
+  /// 切换执行权限档位；null 时不显示权限胶囊
+  final ValueChanged<AgentPermissionMode>? onPermissionModeChanged;
+
   const AIPromptInput({
     super.key,
     required this.enabled,
@@ -45,6 +53,8 @@ class AIPromptInput extends StatefulWidget {
     this.isOrchestratorMode = false,
     this.onToggleOrchestrator,
     this.footer,
+    this.permissionMode = AgentPermissionMode.ask,
+    this.onPermissionModeChanged,
   });
 
   @override
@@ -64,7 +74,7 @@ const List<SlashCommand> kSlashCommands = [
   SlashCommand('/goal', '目标模式：/goal <目标> 开始；子命令 pause / resume / edit / done / clear'),
   SlashCommand('/plan', '只要计划不执行：/plan <目标>（临时只读，结束自动还原）'),
   SlashCommand('/model', '切换模型：/model <名称>，不带参数则列出可选模型'),
-  SlashCommand('/permission', '切换只读（Dry-run）模式'),
+  SlashCommand('/permission', '切换执行权限：/permission <只读|询问|自动|全自动>'),
   SlashCommand('/export', '复制当前会话到剪贴板，并给出执行日志路径'),
   SlashCommand('/help', '列出全部命令'),
 ];
@@ -341,15 +351,24 @@ class _AIPromptInputState extends State<AIPromptInput> {
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 disabledBorder: InputBorder.none,
-                contentPadding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
                 isDense: true,
               ),
               onSubmitted: (_) {},
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 2, 6, 6),
+              padding: const EdgeInsets.fromLTRB(10, 4, 6, 8),
               child: Row(
                 children: [
+                  if (widget.onPermissionModeChanged != null) ...[
+                    PermissionModeSelector(
+                      mode: widget.permissionMode,
+                      onChanged: widget.onPermissionModeChanged!,
+                      tc: tc,
+                      compact: MediaQuery.sizeOf(context).width < 520,
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   Text(
                     '$charCount / $_maxLength',
                     style: TextStyle(

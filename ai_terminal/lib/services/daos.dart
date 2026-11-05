@@ -576,6 +576,7 @@ class ConversationsDao {
     'options': e.options, 'question': e.question, 'summary': e.summary,
     'finishState': e.finishState?.name,
     'hostId': e.hostId, 'toolName': e.toolName, 'riskLevel': e.riskLevel,
+    'permissionDecision': e.permissionDecision,
     'durationMs': e.durationMs, 'exitCode': e.exitCode,
     'failureKind': e.failureKind,
     'outputTotalChars': e.outputTotalChars,
@@ -612,6 +613,7 @@ class ConversationsDao {
       ..hostId = j['hostId'] as String?
       ..toolName = j['toolName'] as String?
       ..riskLevel = j['riskLevel'] as String?
+      ..permissionDecision = j['permissionDecision'] as String?
       ..durationMs = (j['durationMs'] as num?)?.toInt()
       ..exitCode = (j['exitCode'] as num?)?.toInt()
       ..failureKind = j['failureKind'] as String?

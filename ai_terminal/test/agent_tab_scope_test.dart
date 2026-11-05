@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_terminal/models/agent_model.dart';
+import 'package:ai_terminal/models/agent_permission_mode.dart';
 import 'package:ai_terminal/providers/agent_provider.dart';
 import 'package:ai_terminal/services/agent_host_registry.dart';
 import 'package:ai_terminal/services/agent_logger.dart';
@@ -104,16 +105,17 @@ void main() {
       notifier.switchTab('tabA', hostId: 'host1');
       expect(notifier.state.hostId, 'host1');
 
-      notifier.setReadOnlyForHost('host1', enabled: true);
-      expect(notifier.state.isReadOnlyMode, isTrue);
+      notifier.setPermissionModeForHost(
+          'host1', AgentPermissionMode.readOnly);
+      expect(notifier.state.permissionMode, AgentPermissionMode.readOnly);
 
       notifier.switchTab('tabB', hostId: 'host1');
       expect(notifier.state.hostId, 'host1');
-      expect(notifier.state.isReadOnlyMode, isFalse,
+      expect(notifier.state.permissionMode, AgentPermissionMode.ask,
           reason: 'tabB 是新会话，不能继承 tabA 的状态');
 
       notifier.switchTab('tabA', hostId: 'host1');
-      expect(notifier.state.isReadOnlyMode, isTrue,
+      expect(notifier.state.permissionMode, AgentPermissionMode.readOnly,
           reason: '切回 tabA 必须恢复它自己的状态');
     });
 

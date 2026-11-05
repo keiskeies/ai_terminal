@@ -1,4 +1,5 @@
 import 'agent_model.dart';
+import 'agent_permission_mode.dart';
 import 'chat_item.dart';
 import 'agent_goal.dart';
 import 'ai_model_config.dart';
@@ -31,8 +32,8 @@ class AgentState {
   /// 是否处于多机编排模式
   final bool isOrchestratorMode;
 
-  /// 是否处于只读模式（Dry-run）
-  final bool isReadOnlyMode;
+  /// 执行权限档位（只读 / 询问 / 自动 / 全自动）
+  final AgentPermissionMode permissionMode;
 
   /// 联网搜索会话级开关（与全局开关 OR 合并；运行中切换下次任务生效）
   final bool isWebSearchEnabled;
@@ -55,7 +56,7 @@ class AgentState {
     this.summary,
     this.isCompacting = false,
     this.isOrchestratorMode = false,
-    this.isReadOnlyMode = false,
+    this.permissionMode = AgentPermissionMode.ask,
     this.isWebSearchEnabled = false,
     this.goal,
   })  : chatItems = chatItems ?? [],
@@ -89,7 +90,7 @@ class AgentState {
     bool clearSummary = false,
     bool clearError = false,
     bool? isOrchestratorMode,
-    bool? isReadOnlyMode,
+    AgentPermissionMode? permissionMode,
     bool? isWebSearchEnabled,
     AgentGoal? goal,
     bool clearGoal = false,
@@ -113,7 +114,7 @@ class AgentState {
       summary: clearSummary ? null : (summary ?? this.summary),
       isCompacting: isCompacting ?? this.isCompacting,
       isOrchestratorMode: isOrchestratorMode ?? this.isOrchestratorMode,
-      isReadOnlyMode: isReadOnlyMode ?? this.isReadOnlyMode,
+      permissionMode: permissionMode ?? this.permissionMode,
       isWebSearchEnabled: isWebSearchEnabled ?? this.isWebSearchEnabled,
       goal: clearGoal ? null : (goal ?? this.goal),
     );

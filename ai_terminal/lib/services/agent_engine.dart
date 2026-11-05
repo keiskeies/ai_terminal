@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
 import '../models/agent_model.dart';
 import '../models/agent_event.dart';
+import '../models/agent_permission_mode.dart';
 import '../models/operation_report.dart';
 import '../models/plan_step.dart';
 import '../models/change_record.dart';
@@ -23,6 +24,7 @@ import 'agent_logger.dart';
 export 'agent_logger.dart';
 import 'agent_tracer.dart';
 import '../core/safety_guard.dart';
+import '../core/permission_policy.dart';
 import '../core/credentials_store.dart';
 import '../core/l10n_holder.dart';
 import 'daos.dart';
@@ -265,8 +267,11 @@ class AgentEngine {
 
   bool get isOrchestratorMode => _orchestratorMode;
 
-  /// 只读模式（Dry-run）开关：开启后只允许 safe 级命令执行，info/warn/blocked 全部拒绝
-  bool _readOnlyMode = false;
+  /// 执行权限档位：只读 / 询问 / 自动 / 全自动。
+  /// 与命令自身的安全等级是两层概念，详见 docs/agent-permission-mode-design.md。
+  AgentPermissionMode _permissionMode = AgentPermissionMode.ask;
+
+  AgentPermissionMode get permissionMode => _permissionMode;
 
   /// 联网搜索会话级开关（与全局开关 OR 合并）
   ///
@@ -280,8 +285,6 @@ class AgentEngine {
   /// 符合 R3 精神：避免运行中修改 system prompt 导致上下文混乱）。
   /// 切换后下次 startTask 生效。
   bool _webSearchEnabled = false;
-
-  bool get isReadOnlyMode => _readOnlyMode;
 
   /// sudo 密码：执行 sudo 命令时检测到密码提示后自动注入（不写入命令本身/审计日志）
   /// 由 AgentNotifier 从 CredentialsStore 加载并设置
@@ -2259,31 +2262,22 @@ class AgentEngine {
           shouldContinue: true, observation: observation, command: command);
     }
 
-    // 只读模式（Dry-run）：非 safe 级命令直接拒绝，不执行
-    if (_readOnlyMode && safetyLevel != SafetyLevel.safe) {
-      agentLogger.warn('ReAct', '只读模式拦截非只读命令: $command');
-      final reason =
-          SafetyGuard.getReason(command) ?? SafetyGuard.getTip(safetyLevel);
-      onEvent?.call(AgentEvent.info(
-          '🔒 只读模式已开启，此命令被拒绝执行: `$command`\n等级: $safetyLevel\n说明: $reason'));
-      final observation = ReActObservation(
-        command: command,
-        output: '只读模式下禁止执行非只读命令（当前等级: $safetyLevel）',
-        success: false,
-        error: '只读模式拦截',
-      ).format();
-      onSuccess(false, 'read_only_blocked', 0);
-      return _EarlyExecutionResult(
-          shouldContinue: true, observation: observation, command: command);
-    }
+    // 权限档位：只读拒绝、询问/自动确认、全自动放行。
+    // 判定逻辑抽在 permission_policy，UI 事件快照用同一份实现，避免两边漂移。
+    final decision = decideCommand(safetyLevel, _permissionMode);
+    agentLogger.info(
+        'ReAct', '权限模式: ${_permissionMode.id}, 处置: ${decision.name}');
 
-    if (safetyLevel == SafetyLevel.blocked) {
-      agentLogger.warn('ReAct', '命令被安全系统拦截: $command');
+    if (decision == CommandGateDecision.reject) {
+      agentLogger.warn('ReAct', '权限模式拦截命令: ${_permissionMode.id} $command');
       final reason =
           SafetyGuard.getReason(command) ?? SafetyGuard.getTip(safetyLevel);
-      onEvent?.call(AgentEvent.info('🚫 命令被安全系统拦截: $command\n原因: $reason'));
-      // 审计日志：被拦截的命令追加记录（执行前已写一条 executed=false）
-      if (hostId != null) {
+      final readOnly = _permissionMode == AgentPermissionMode.readOnly;
+      onEvent?.call(AgentEvent.info(
+          '🔒 ${readOnly ? '只读模式已开启' : '当前权限模式'}，此命令被拒绝执行: `$command`\n'
+          '等级: $safetyLevel\n说明: $reason'));
+      // 审计日志：被拦截的 blocked 命令追加记录（执行前已写一条 executed=false）
+      if (hostId != null && safetyLevel == SafetyLevel.blocked) {
         try {
           await AuditLogger.log(
             hostId: hostId!,
@@ -2298,18 +2292,21 @@ class AgentEngine {
       }
       final observation = ReActObservation(
         command: command,
-        output: '命令被安全系统拦截，禁止执行',
+        output: readOnly
+            ? '只读模式下禁止执行非只读命令（当前等级: $safetyLevel）\n原因: $reason'
+            : '当前权限模式禁止执行该命令（当前等级: $safetyLevel）\n原因: $reason',
         success: false,
-        error: reason,
+        error: readOnly ? '只读模式拦截' : reason,
       ).format();
-      onSuccess(false, 'safety_blocked', 0);
+      onSuccess(false, readOnly ? 'read_only_blocked' : 'safety_blocked', 0);
       return _EarlyExecutionResult(
           shouldContinue: true, observation: observation, command: command);
     }
 
-    // warn 级别命令需要用户确认
-    if (safetyLevel == SafetyLevel.warn) {
-      agentLogger.warn('ReAct', '高风险命令需要确认: $command');
+    // 需要用户确认：warn（询问档）与 blocked（询问/自动档）
+    if (decision == CommandGateDecision.confirm) {
+      agentLogger.warn(
+          'ReAct', '命令需要确认: $command (模式: ${_permissionMode.id})');
       _pendingConfirmCommand = command;
       _confirmCompleter = Completer<bool>();
       // 每次开始等待都要清掉上一次的结论：残留的 true 会把下一次真实的
@@ -2329,7 +2326,11 @@ class AgentEngine {
       // 显示具体的风险说明，而非泛泛的"危险操作"
       final reason =
           SafetyGuard.getReason(command) ?? SafetyGuard.getTip(safetyLevel);
-      onEvent?.call(AgentEvent.info('⚠️ 高风险命令需要确认: `$command`\n风险说明: $reason'));
+      final highRisk = safetyLevel == SafetyLevel.blocked;
+      final modeLabel = _permissionMode == AgentPermissionMode.ask ? '询问' : '自动';
+      onEvent?.call(AgentEvent.info(
+          '${highRisk ? '⛔' : '⚠️'} ${highRisk ? '高危命令' : '高风险命令'}'
+          '需要确认（$modeLabel模式）: `$command`\n风险说明: $reason'));
 
       _currentTask = _currentTask!.copyWith(
         status: AgentStatus.waitingConfirm,
@@ -2372,6 +2373,24 @@ class AgentEngine {
           error: timedOut ? '确认超时' : '用户拒绝',
         ).format();
         onSuccess(false, timedOut ? 'confirm_timeout' : 'user_rejected', 0);
+        return _EarlyExecutionResult(
+            shouldContinue: true, observation: observation, command: command);
+      }
+
+      // 等待期间用户可能把档位切到只读：重新校验，不能让切换前弹出的确认框
+      // 绕过新的安全边界（全自动则本来就无需确认，重新校验仍是 execute）。
+      if (decideCommand(safetyLevel, _permissionMode) ==
+          CommandGateDecision.reject) {
+        const reason = '等待确认期间权限档位已切换为只读，命令未执行';
+        agentLogger.warn('ReAct', reason);
+        onEvent?.call(AgentEvent.info('🔒 $reason'));
+        final observation = ReActObservation(
+          command: command,
+          output: reason,
+          success: false,
+          error: '权限档位切换',
+        ).format();
+        onSuccess(false, 'permission_changed_during_confirm', 0);
         return _EarlyExecutionResult(
             shouldContinue: true, observation: observation, command: command);
       }
@@ -2621,7 +2640,10 @@ class AgentEngine {
     e.toolName ??= 'exec_command';
     final cmd = (e.command ?? '').trim();
     if (cmd.isNotEmpty) {
-      e.riskLevel ??= SafetyGuard.check(cmd).name;
+      final level = SafetyGuard.check(cmd);
+      e.riskLevel ??= level.name;
+      e.permissionDecision ??=
+          decideCommand(level, _permissionMode).name;
     }
   }
 
@@ -2643,7 +2665,11 @@ class AgentEngine {
       // R4: 为每条 fallback 命令生成独立的 commandId，并先发 command 事件
       // 否则所有 result 会关联到同一个 _lastCommandEventId，导致 UI 错误地把每个结果卡片链接到最后一条命令
       final cmdId = 'evt_fallback_${_uuid.v4().substring(0, 8)}';
-      onEvent?.call(AgentEvent.command(command, id: cmdId));
+      final cmdEvent = AgentEvent.command(command, id: cmdId);
+      // 旧格式 fallback 也要带风险/处置快照，否则 blocked 卡片会按旧逻辑
+      // 在全自动执行期间显示成“已拦截”。
+      _enrichCommandEvent(cmdEvent);
+      onEvent?.call(cmdEvent);
       final result = await _runCommandWithSafety(command, executor,
           commandId: cmdId, myGeneration: myGeneration);
       // R1: 命令执行后再次检查代际（执行期间可能被取消/新任务覆盖）
@@ -2874,9 +2900,9 @@ class AgentEngine {
       return true;
     }
 
-    // 只读模式（Dry-run）过去只拦 shell 命令，工具路径可以绕过它改文件（设计稿 D3）。
+    // 只读档过去只拦 shell 命令，工具路径可以绕过它改文件（设计稿 D3）。
     // 判据由 ToolKind 派生，新增写类工具自动受管，不需要再维护第二份名单。
-    if (_readOnlyMode && !tool.isReadOnly) {
+    if (_permissionMode == AgentPermissionMode.readOnly && !tool.isReadOnly) {
       agentLogger.info('ReAct', '只读模式拦截工具: $toolName');
       onEvent?.call(AgentEvent.info('🔒 只读模式已开启，此工具被拒绝执行: `$toolName`'));
       const observation = '观测: 当前为只读模式，禁止调用会产生变更的工具。'
@@ -2924,9 +2950,11 @@ class AgentEngine {
     );
     onEvent?.call(toolCommandEvent);
 
-    // 破坏性工具（如 local_file_delete）必须用户确认后才执行。
-    // 与危险命令共用 _confirmCompleter / 超时策略 / 取消路径，不另造一套等待机制。
-    if (tool.kind == ToolKind.destructive) {
+    // 破坏性工具（如 local_file_delete）默认必须用户确认后才执行。
+    // 全自动档跳过确认；与危险命令共用 _confirmCompleter / 超时策略 / 取消路径，
+    // 不另造一套等待机制。
+    if (tool.kind == ToolKind.destructive &&
+        destructiveToolNeedsConfirm(_permissionMode)) {
       final approved = await _confirmToolExecution(toolName, toolUiDisplay);
       // R1: await 之后先做代际检查，再决定后续状态写入
       if (myGeneration != _currentTaskGeneration) return false;
@@ -3752,17 +3780,9 @@ class AgentEngine {
       buffer.writeln(_buildOrchestratorPrompt());
     }
 
-    // 只读模式（Dry-run）注入
-    if (_readOnlyMode) {
-      buffer.writeln();
-      buffer.writeln('【只读模式 / Dry-run】');
-      buffer
-          .writeln('当前已开启只读模式，你只能执行只读命令（如 ls/cat/ps/grep/systemctl status 等）。');
-      buffer.writeln('任何可能产生副作用的命令（安装/修改/重启/删除等）都会被系统直接拒绝，不需要询问用户确认。');
-      buffer.writeln('工具调用同样受限：除只读工具（如 cert_check、multi_grep、project_analyze）外，'
-          '写入类工具（file_write/file_patch/sftp_upload 等）会被系统拒绝执行。');
-      buffer.writeln('若任务必须修改系统才能完成，请用 finish 动作告知用户"当前为只读模式，请关闭后重试"。');
-    }
+    // 执行权限档位注入
+    buffer.writeln();
+    buffer.writeln(_permissionModePrompt());
 
     // 注：早期对话摘要已改为逐条写入 ConvMessage.summary，不再在 system prompt 中注入
 
@@ -3926,11 +3946,39 @@ $hostList
     _invalidateSystemPromptCache();
   }
 
-  /// 开启/关闭只读模式（Dry-run）
-  /// 开启后 AI 只能执行只读命令（SafetyLevel.safe），任何修改性命令直接拒绝
-  void setReadOnlyMode(bool enabled) {
-    if (_readOnlyMode == enabled) return;
-    _readOnlyMode = enabled;
+  /// 当前权限档位对应的 system prompt 段落。
+  ///
+  /// 必须和 [decideCommand] 的实际行为一致：模型知道哪些命令会等待确认，
+  /// 才不会在只读档反复重试，或在全自动档仍声称"等你确认"。
+  String _permissionModePrompt() {
+    switch (_permissionMode) {
+      case AgentPermissionMode.readOnly:
+        return '''【执行权限：只读】
+当前为只读档，你只能执行只读命令（如 ls/cat/ps/grep/systemctl status 等）。
+任何可能产生副作用的命令（安装/修改/重启/删除等）都会被系统直接拒绝，不需要询问用户确认。
+工具调用同样受限：除只读工具（如 cert_check、multi_grep、project_analyze）外，
+写入类工具（file_write/file_patch/sftp_upload 等）会被系统拒绝执行。
+若任务必须修改系统才能完成，请用 finish 动作告知用户"当前为只读模式，请切换权限档位后重试"。''';
+      case AgentPermissionMode.ask:
+        return '''【执行权限：询问】
+低风险只读命令自动执行；修改类命令（删除、安装、服务重启等）与安全策略标记的高危命令
+会等待用户确认后才执行。不要声称命令已经执行，也不要在确认结果返回前继续下一步。''';
+      case AgentPermissionMode.auto:
+        return '''【执行权限：自动】
+普通修改类命令会自动执行；被安全策略标记为高危的命令（如删除系统配置、关机、
+清空防火墙、格式化磁盘等）仍会等待用户确认。执行前仍要说明影响，不要编造执行结果。''';
+      case AgentPermissionMode.fullAuto:
+        return '''【执行权限：全自动】
+所有命令（包括安全策略标记为高危的命令）与破坏性工具都会直接执行，不再询问用户。
+封网期与敏感文件访问限制仍会生效，被它们拦下的命令不要反复重试。
+执行前仍要说明预期影响；不要声称"等待用户确认"，也不要因为命令危险就跳过用户明确要求的目标。''';
+    }
+  }
+
+  /// 设置执行权限档位（只读 / 询问 / 自动 / 全自动）
+  void setPermissionMode(AgentPermissionMode mode) {
+    if (_permissionMode == mode) return;
+    _permissionMode = mode;
     _invalidateSystemPromptCache();
   }
 

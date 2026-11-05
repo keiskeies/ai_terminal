@@ -5,6 +5,7 @@ import '../models/agent_model.dart';
 import '../models/agent_event.dart';
 import '../models/agent_memory.dart';
 import '../models/agent_goal.dart';
+import '../models/agent_permission_mode.dart';
 import '../models/ai_model_config.dart';
 import '../models/chat_session.dart';
 import '../models/conversation.dart';
@@ -214,7 +215,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
     // R3: 编排模式状态同步 — 确保 engine 的编排开关与 state.isOrchestratorMode 一致
     // 防止 engine 被重新初始化后编排标志丢失，但 state 仍为 true 的不一致情况
-    _syncOrchestratorMode();
+    _syncEngineFlags();
   }
 
   /// 同 host 是否已有 Agent 在另一 tab 中执行。
@@ -282,16 +283,19 @@ class AgentNotifier extends StateNotifier<AgentState> {
     });
   }
 
-  /// 同步编排模式：让 engine 的 _orchestratorMode 与 state.isOrchestratorMode 保持一致
-  void _syncOrchestratorMode() {
+  /// 把编排 / 执行权限 / 联网搜索这些引擎级开关同步到当前 engine。
+  ///
+  /// 切会话、新建会话、创建 engine 后都要调用：`state` 是唯一真相，
+  /// engine 只是它的执行侧镜像。
+  void _syncEngineFlags() {
     if (_engine == null) return;
     if (state.isOrchestratorMode && !_engine!.isOrchestratorMode) {
       _engine!.enableOrchestrator(_registry);
     } else if (!state.isOrchestratorMode && _engine!.isOrchestratorMode) {
       _engine!.disableOrchestrator();
     }
-    // 同步只读模式
-    _engine!.setReadOnlyMode(state.isReadOnlyMode);
+    // 同步执行权限档位
+    _engine!.setPermissionMode(state.permissionMode);
     // 同步联网搜索会话级开关
     _engine!.setWebSearchEnabled(state.isWebSearchEnabled);
   }
@@ -540,7 +544,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
     _loadSudoPasswordForHost(hostId, _engine!);
 
     // 重建引擎后同步编排/只读/联网搜索开关，避免状态与引擎不一致
-    _syncOrchestratorMode();
+    _syncEngineFlags();
   }
 
   void _setupEngineCallbacks(String scopeId, AgentEngine engine) {
@@ -1061,12 +1065,12 @@ class AgentNotifier extends StateNotifier<AgentState> {
             maxSteps: (oldState ?? s).maxSteps,
             aiTimeoutSeconds: (oldState ?? s).aiTimeoutSeconds,
             isOrchestratorMode: s.isOrchestratorMode,
-            isReadOnlyMode: s.isReadOnlyMode,
+            permissionMode: s.permissionMode,
             isWebSearchEnabled: s.isWebSearchEnabled,
             goal: s.goal,
           ),
         );
-        _syncOrchestratorMode();
+        _syncEngineFlags();
       } else {
         engine.conversationId = convId;
         if (_isConversationUsedByOtherScope(scopeId, convId)) {
@@ -1428,19 +1432,18 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
   }
 
-  /// 开启/关闭只读模式（Dry-run）
-  void toggleReadOnlyMode() {
-    final newValue = !state.isReadOnlyMode;
-    _engine?.setReadOnlyMode(newValue);
-    state = state.copyWith(isReadOnlyMode: newValue);
+  /// 设置当前标签页的执行权限档位。
+  void setPermissionMode(AgentPermissionMode mode) {
+    _engine?.setPermissionMode(mode);
+    state = state.copyWith(permissionMode: mode);
   }
 
-  /// 按 host 设置只读模式。
+  /// 按 host 设置执行权限档位。
   ///
-  /// 不能用 [toggleReadOnlyMode]：它读 `state`（活跃 host）也写 `state`，
+  /// 不能用 [setPermissionMode]：它读 `state`（活跃 host）也写 `state`，
   /// 调用方若跨 await 持有意图（如 `/plan` 结束时还原），期间用户切了 tab
   /// 就会把**另一个 host** 的模式改掉（AGENTS.md R3 的那类串台）。
-  void setReadOnlyForHost(String hostId, {required bool enabled}) {
+  void setPermissionModeForHost(String hostId, AgentPermissionMode mode) {
     final scopes = _registry.scopesForHost(hostId).toList();
     // 活跃 tab 的 state 可能还没写回 registry，先确保它被包含
     final activeScope = _registry.activeScopeId;
@@ -1450,19 +1453,19 @@ class AgentNotifier extends StateNotifier<AgentState> {
       scopes.add(activeScope);
     }
     for (final scopeId in scopes) {
-      _registry.getEngine(scopeId)?.setReadOnlyMode(enabled);
-      _updateScopeState(scopeId, (s) => s.copyWith(isReadOnlyMode: enabled));
+      _registry.getEngine(scopeId)?.setPermissionMode(mode);
+      _updateScopeState(scopeId, (s) => s.copyWith(permissionMode: mode));
     }
   }
 
-  /// 该 host 当前是否只读。跨 await 的调用方必须按 host 读，不能读 `state`。
-  bool isReadOnlyFor(String hostId) {
-    if (state.hostId == hostId) return state.isReadOnlyMode;
+  /// 该 host 当前的执行权限档位。跨 await 的调用方必须按 host 读，不能读 `state`。
+  AgentPermissionMode permissionModeFor(String hostId) {
+    if (state.hostId == hostId) return state.permissionMode;
     for (final scopeId in _registry.scopesForHost(hostId)) {
       final s = _registry.getState(scopeId);
-      if (s != null) return s.isReadOnlyMode;
+      if (s != null) return s.permissionMode;
     }
-    return false;
+    return AgentPermissionMode.ask;
   }
 
   /// 开启/关闭联网搜索（会话级，覆盖全局开关）
@@ -1502,10 +1505,13 @@ class AgentNotifier extends StateNotifier<AgentState> {
       maxSteps: state.maxSteps,
       aiTimeoutSeconds: state.aiTimeoutSeconds,
       isOrchestratorMode: state.isOrchestratorMode,
-      isReadOnlyMode: state.isReadOnlyMode,
+      // 新会话回到默认“询问”，避免上一轮的“全自动”被静默继承
+      permissionMode: AgentPermissionMode.ask,
       isWebSearchEnabled: state.isWebSearchEnabled,
       goal: _goals[hostId],
     );
+    // 引擎可能还停在上一轮的“全自动”，必须立刻同步成新会话的默认档位
+    _syncEngineFlags();
   }
 
   /// 切换到指定会话（侧边栏点击）
@@ -1535,6 +1541,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
     _restoreFromPersistence(scopeId, hostId, startFresh: false);
     // 从持久化恢复引擎对话历史（不含已摘要的消息，那些已压缩为 summary）
     _restoreEngineHistory();
+    // 新会话默认“询问”，引擎不能沿用上一个会话的档位
+    _syncEngineFlags();
   }
 
   /// 重命名会话

@@ -8,6 +8,7 @@ import 'package:ai_terminal/services/command_executor.dart';
 import 'package:ai_terminal/models/agent_event.dart';
 import 'package:ai_terminal/models/agent_memory.dart';
 import 'package:ai_terminal/models/agent_model.dart';
+import 'package:ai_terminal/models/agent_permission_mode.dart';
 import 'package:ai_terminal/models/plan_step.dart';
 import 'package:ai_terminal/models/ai_model_config.dart';
 import 'package:ai_terminal/models/token_usage.dart';
@@ -628,7 +629,7 @@ void main() {
 
       engine.setTaskStatusForTesting(AgentStatus.executing);
       engine.setWebSearchEnabled(true);
-      engine.setReadOnlyMode(true);
+      engine.setPermissionMode(AgentPermissionMode.readOnly);
       expect(engine.hasSystemMessageForTesting, isTrue,
           reason: '运行中删 system 消息会让下一轮模型输出非法动作并终止任务');
 
@@ -642,4 +643,140 @@ void main() {
           reason: '任务结束后允许失效，下一次 startTask 会重建');
     });
   });
+
+  group('执行权限档位门控', () {
+    const blockedCmd = 'rm -f /etc/systemd/system/virt-edid.service';
+    const finishTurn =
+        '思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n';
+
+    test('询问档：blocked 命令挂起等待确认，确认后执行', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 清理服务文件\n动作: execute\n命令: $blockedCmd\n',
+      ]);
+      provider.enqueueStream([finishTurn]);
+
+      final engine = makeEngine(provider: provider);
+      engine.setPermissionMode(AgentPermissionMode.ask);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+
+      final running = engine.startTask('清理服务文件', _MockExecutor());
+      await _waitUntil(() => engine.hasPendingConfirm);
+
+      expect(engine.pendingConfirmCommand, blockedCmd);
+      expect(engine.currentTask?.status, AgentStatus.waitingConfirm);
+
+      engine.confirmDangerousCommand();
+      await running;
+
+      expect(
+        events.any((e) => e.isInfo && (e.text ?? '').contains('高危命令需要确认')),
+        isTrue,
+        reason: '询问档下 blocked 必须先给出确认提示，而不是直接拦截',
+      );
+      expect(
+        events.where((e) => e.isResult && e.success == true),
+        isNotEmpty,
+        reason: '用户确认后命令必须真正执行',
+      );
+      final cmdEvent =
+          events.firstWhere((e) => e.isCommand && e.command == blockedCmd);
+      expect(cmdEvent.riskLevel, 'blocked');
+      expect(cmdEvent.permissionDecision, 'confirm');
+    });
+
+    test('等待确认期间切到只读：确认后也不执行', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 清理服务文件\n动作: execute\n命令: $blockedCmd\n',
+      ]);
+      provider.enqueueStream([finishTurn]);
+
+      final engine = makeEngine(provider: provider);
+      engine.setPermissionMode(AgentPermissionMode.ask);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+
+      final running = engine.startTask('清理服务文件', _MockExecutor());
+      await _waitUntil(() => engine.hasPendingConfirm);
+
+      engine.setPermissionMode(AgentPermissionMode.readOnly);
+      engine.confirmDangerousCommand();
+      await running;
+
+      expect(
+        events.where((e) => e.isResult && e.success == true),
+        isEmpty,
+        reason: '确认框是切换档位前弹出的，但新边界必须拦住它',
+      );
+      expect(
+        events.any((e) => e.isInfo && (e.text ?? '').contains('切换为只读')),
+        isTrue,
+      );
+    });
+
+    test('全自动档：blocked 命令不挂起，直接执行', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 清理服务文件\n动作: execute\n命令: $blockedCmd\n',
+      ]);
+      provider.enqueueStream([finishTurn]);
+
+      final engine = makeEngine(provider: provider);
+      engine.setPermissionMode(AgentPermissionMode.fullAuto);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+
+      await engine.startTask('清理服务文件', _MockExecutor());
+
+      expect(engine.hasPendingConfirm, isFalse);
+      expect(
+        events.where((e) => e.isResult && e.success == true),
+        isNotEmpty,
+      );
+      final cmdEvent =
+          events.firstWhere((e) => e.isCommand && e.command == blockedCmd);
+      expect(cmdEvent.riskLevel, 'blocked');
+      expect(cmdEvent.permissionDecision, 'execute');
+    });
+
+    test('只读档：blocked 命令直接拒绝，不进入确认', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 清理服务文件\n动作: execute\n命令: $blockedCmd\n',
+      ]);
+      provider.enqueueStream([finishTurn]);
+
+      final engine = makeEngine(provider: provider);
+      engine.setPermissionMode(AgentPermissionMode.readOnly);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+
+      await engine.startTask('清理服务文件', _MockExecutor());
+
+      expect(engine.hasPendingConfirm, isFalse);
+      expect(
+        events.where((e) => e.isResult && e.success == true),
+        isEmpty,
+        reason: '只读档不能执行非 safe 命令',
+      );
+      final cmdEvent =
+          events.firstWhere((e) => e.isCommand && e.command == blockedCmd);
+      expect(cmdEvent.permissionDecision, 'reject');
+    });
+  });
+}
+
+Future<void> _waitUntil(
+  bool Function() condition, {
+  Duration timeout = const Duration(seconds: 3),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!condition()) {
+    if (DateTime.now().isAfter(deadline)) {
+      fail('等待条件超时');
+    }
+    await Future.delayed(const Duration(milliseconds: 10));
+  }
 }

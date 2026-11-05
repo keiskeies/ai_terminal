@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../core/safety_guard.dart';
+import '../core/permission_policy.dart';
 import '../providers/terminal_provider.dart' as tp;
 import '../utils/agent_ui_text.dart';
 import '../utils/risk_explainer.dart';
@@ -31,6 +32,12 @@ class AgentCommandBlock extends StatelessWidget {
   /// 是否已有执行结果：用于区分"执行前确认"和"历史变更影响"
   final bool executed;
 
+  /// 命令发出时的风险等级快照（safe/info/warn/blocked）
+  final String? riskLevel;
+
+  /// 命令发出时的权限处置快照（execute/confirm/reject）
+  final String? permissionDecision;
+
   /// 执行命令回调（点击执行按钮时触发）
   final void Function(String command, bool dangerous, tp.TerminalTab tab)?
       onExecute;
@@ -52,6 +59,8 @@ class AgentCommandBlock extends StatelessWidget {
     this.pendingConfirmCommand,
     this.isTool = false,
     this.executed = false,
+    this.riskLevel,
+    this.permissionDecision,
     this.onExecute,
     this.onConfirm,
     this.onReject,
@@ -75,23 +84,42 @@ class AgentCommandBlock extends StatelessWidget {
         showAutoExecute &&
         !isTool &&
         !executed;
-    final safetyLevel = SafetyGuard.check(trimmed);
+    // 优先使用事件里的快照：命令发出时的等级与处置，不能在渲染时按当前
+    // 权限档位重算，否则切换档位会让历史命令改口。
+    final safetyLevel = riskLevel == null
+        ? SafetyGuard.check(trimmed)
+        : SafetyLevel.values.firstWhere(
+            (level) => level.name == riskLevel,
+            orElse: () => SafetyGuard.check(trimmed),
+          );
+    final decision = permissionDecision;
     final isWaitingConfirm = !executed && pendingConfirmCommand == trimmed;
-    // 只有 warn / blocked 级才视为危险命令，需要用户确认。
-    // info 级（如 npm install、systemctl restart、git clone）引擎会自动执行，
-    // 这里若也标黄会与实际行为不一致——显示"需确认"却直接跑，造成误导。
-    //
-    // 工具调用没有 SafetyLevel（它不走 shell 安全检查），但引擎会为破坏性工具
-    // （如 local_file_delete）挂起等待确认。此时必须按危险处理：
-    // 确认按钮的条件是 dangerous && isWaitingConfirm，若工具永远不 dangerous，
-    // 用户就看不到批准入口，任务只能挂到 10 分钟超时被自动拒绝。
-    final dangerous = isTool
-        ? isWaitingConfirm
-        : (safetyLevel == SafetyLevel.warn ||
+    final levelDangerous = !isTool &&
+        (safetyLevel == SafetyLevel.warn ||
             safetyLevel == SafetyLevel.blocked);
-    final isBlocked = !isTool && safetyLevel == SafetyLevel.blocked;
+    final dangerous = isTool ? isWaitingConfirm : levelDangerous;
+    // 旧事件没有 permissionDecision：blocked 仍按硬拦截展示
+    final hardBlocked = !isTool &&
+        !executed &&
+        !isWaitingConfirm &&
+        (decision == kPermissionDecisionReject ||
+            (decision == null && safetyLevel == SafetyLevel.blocked));
+    final notExecuted = !isTool &&
+        !executed &&
+        decision == kPermissionDecisionConfirm &&
+        !isWaitingConfirm;
+    final allowed = !isTool &&
+        !executed &&
+        decision == kPermissionDecisionExecute &&
+        levelDangerous;
+    final requiresConfirm = isTool
+        ? isWaitingConfirm
+        : (decision == kPermissionDecisionConfirm ||
+            (decision == null && levelDangerous));
+    // 手动执行按钮只给非 blocked 级命令；等待确认的 blocked 命令不能绕开引擎确认
+    final blockedLevel = !isTool && safetyLevel == SafetyLevel.blocked;
 
-    final cmdColor = isBlocked
+    final cmdColor = hardBlocked
         ? tc.error
         : dangerous
             ? tc.warn
@@ -99,20 +127,36 @@ class AgentCommandBlock extends StatelessWidget {
                 ? tc.textBody
                 : tc.textMain;
 
-    final accentColor = isBlocked
+    final accentColor = hardBlocked
         ? tc.error
-        : dangerous
+        : (dangerous || notExecuted || allowed)
             ? tc.warn
             : isTool
                 ? tc.brand
                 : tc.ok;
-    final headerBg = isBlocked
+    final headerBg = hardBlocked
         ? tc.error.withValues(alpha: 0.08)
-        : dangerous
+        : (dangerous || notExecuted || allowed)
             ? tc.warn.withValues(alpha: 0.08)
             : isTool
                 ? tc.brand.withValues(alpha: 0.06)
                 : tc.ok.withValues(alpha: 0.08);
+
+    final label = isTool
+        ? ui.toolCall
+        : hardBlocked
+            ? ui.blocked
+            : isWaitingConfirm
+                ? ui.needsConfirm
+                : notExecuted
+                    ? ui.permissionNotExecuted
+                    : allowed
+                        ? ui.permissionAllowed
+                        : executed
+                            ? ui.executedLabel
+                            : dangerous
+                                ? ui.needsConfirm
+                                : ui.executable;
 
     final block = Container(
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -155,9 +199,9 @@ class AgentCommandBlock extends StatelessWidget {
                         child: Icon(
                           isTool
                               ? Icons.build
-                              : isBlocked
+                              : hardBlocked
                                   ? Icons.block
-                                  : dangerous
+                                  : (dangerous || notExecuted || allowed)
                                       ? Icons.warning_amber
                                       : Icons.check,
                           size: 9,
@@ -166,15 +210,7 @@ class AgentCommandBlock extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Text(
-                        isTool
-                            ? ui.toolCall
-                            : isBlocked
-                                ? ui.blocked
-                                : dangerous
-                                    ? ui.needsConfirm
-                                    : executed
-                                        ? ui.executedLabel
-                                        : ui.executable,
+                        label,
                         style: TextStyle(
                           fontSize: fMicro,
                           color: accentColor,
@@ -190,10 +226,10 @@ class AgentCommandBlock extends StatelessWidget {
                       // 确认按钮不放在这里：见 _buildRiskPanel —— 它必须和影响
                       // 说明同屏，否则面板滚到底看到"删除本机文件…"时，批准
                       // 按钮还在卡片头部上方，用户得先往上滚才能点。
-                      if (canExecute && !isLoading && !isBlocked)
+                      if (canExecute && !isLoading && !blockedLevel)
                         _buildExecuteButton(
-                            trimmed, dangerous, isBlocked, tc, tab)
-                      else if (isBlocked)
+                            trimmed, dangerous, blockedLevel, tc, tab)
+                      else if (hardBlocked)
                         Container(
                           width: 26,
                           height: 26,
@@ -238,8 +274,8 @@ class AgentCommandBlock extends StatelessWidget {
                 ),
                 // 变更类命令的影响说明（远程场景下比命令本身更重要）
                 if (dangerous || RiskExplainer.isMutating(trimmed))
-                  _buildRiskPanel(tc, ui, isBlocked, trimmed,
-                      requiresConfirm: dangerous),
+                  _buildRiskPanel(tc, ui, hardBlocked, trimmed,
+                      requiresConfirm: requiresConfirm),
               ],
             ),
           ),
@@ -287,7 +323,7 @@ class AgentCommandBlock extends StatelessWidget {
                     ? ui.riskBlocked
                     : executed
                         ? ui.changeImpact
-                        : requiresConfirm
+                        : isWaitingConfirm
                             ? ui.confirmImpact
                             : ui.changeImpact,
                 style: TextStyle(
