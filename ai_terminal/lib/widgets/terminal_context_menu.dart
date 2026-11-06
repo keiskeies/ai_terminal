@@ -213,13 +213,19 @@ class _TerminalContextMenuState extends State<TerminalContextMenu> {
               ),
               if (item.shortcut != null) ...[
                 const SizedBox(width: 8),
-                Text(
-                  item.shortcut!,
-                  style: TextStyle(
-                    fontSize: fMicro,
-                    color: tc.textMuted,
-                    fontFamily: 'JetBrainsMono',
-                    fontFamilyFallback: kMonoFontFallback,
+                // 长 URL/路径不能把标签挤没，最多占 120px 后省略
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 120),
+                  child: Text(
+                    item.shortcut!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: fMicro,
+                      color: tc.textMuted,
+                      fontFamily: 'JetBrainsMono',
+                      fontFamilyFallback: kMonoFontFallback,
+                    ),
                   ),
                 ),
               ],
