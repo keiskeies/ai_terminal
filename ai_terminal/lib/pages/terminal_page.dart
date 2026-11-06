@@ -62,6 +62,8 @@ import '../services/local_file_policy.dart';
 import '../models/change_record.dart';
 import '../widgets/server_monitor_panel.dart';
 import '../widgets/terminal_view.dart' as term_widget;
+import '../widgets/terminal_context_menu.dart';
+import '../utils/terminal_text_actions.dart';
 import '../core/app_toast.dart';
 
 
@@ -225,6 +227,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   // SFTP 侧面板（桌面端）- Per-tab 独立状态
   final Map<String, bool> _tabSftpVisible = {}; // 每个 tab 的 SFTP 面板是否可见
+  // 终端右键「在 SFTP 中定位」传入的初始目录（进面板后消费一次）
+  final Map<String, String> _tabSftpInitialPath = {};
   double _sftpPanelWidth = 320;
   static const double _minSftpWidth = 220;
 
@@ -1011,6 +1015,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           terminal: tab == null ? _terminal : (_tabTerminals[tab.id] ?? _terminal),
           fontSize: _terminalFontSize,
           active: isActive,
+          isLocal: tab?.isLocal ?? true,
+          onFontSizeChanged: (size) {
+            final clamped = size.clamp(10.0, 24.0);
+            setState(() => _terminalFontSize = clamped);
+            SettingsDao.set('terminalFontSize', clamped);
+          },
+          onMenuIntent: (intent, text) =>
+              _handleTerminalMenuIntent(tab, intent, text),
           onSend: (command) {
             if (tab == null) return;
             if (tab.isLocal) {
@@ -1229,11 +1241,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   child: ExcludeFocus(
                     excluding: !isActive,
                     child: SftpPanel(
-                      key: ValueKey('sftp-${tab.id}-${tab.hostId}'),
+                      // 初始目录变化时更换 key，让面板按新目录重新加载
+                      key: ValueKey(
+                          'sftp-${tab.id}-${tab.hostId}-${_tabSftpInitialPath[tab.id] ?? ''}'),
                       hostId: tab.hostId,
                       embedded: true,
-                      onClose: () =>
-                          setState(() => _tabSftpVisible[tab.id] = false),
+                      initialPath: _tabSftpInitialPath[tab.id],
+                      onClose: () => setState(() {
+                        _tabSftpVisible[tab.id] = false;
+                        // 关闭后清掉定位目标，下次从默认目录打开
+                        _tabSftpInitialPath.remove(tab.id);
+                      }),
                     ),
                   ),
                 );
@@ -3594,6 +3612,137 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       _showGoalHint('会话已复制到剪贴板（$chars 字）\n日志路径读取失败：$e');
     });
     return true;
+  }
+
+  // ==================== 终端右键菜单动作 ====================
+
+  /// 终端右键里需要页面能力的动作：Agent / 片段 / SFTP / 审计。
+  /// 纯本地动作（复制、清屏、字号、保存）在 TerminalView 内部完成。
+  Future<void> _handleTerminalMenuIntent(
+    tp.TerminalTab? tab,
+    TerminalMenuIntent intent,
+    String text,
+  ) async {
+    switch (intent) {
+      case TerminalMenuIntent.sendToAgent:
+        _putIntoAgentInput(tab, agentExplainPrompt(text));
+        break;
+      case TerminalMenuIntent.askError:
+        _putIntoAgentInput(tab, agentErrorPrompt(text));
+        break;
+      case TerminalMenuIntent.saveSnippet:
+        await _saveSelectionAsSnippet(text);
+        break;
+      case TerminalMenuIntent.openSftp:
+        if (tab == null || tab.isLocal) return;
+        setState(() {
+          _tabSftpInitialPath[tab.id] = text; // 空串表示回到默认目录
+          _tabSftpVisible[tab.id] = true;
+        });
+        break;
+      case TerminalMenuIntent.openAudit:
+        final hostId = tab?.hostId;
+        if (hostId == null || hostId.isEmpty) return;
+        context.push('/audit-log?hostId=${Uri.encodeComponent(hostId)}');
+        break;
+      case TerminalMenuIntent.viewChanges:
+        final hostId = tab?.hostId;
+        if (hostId == null || hostId.isEmpty) return;
+        context.push('/change-records?hostId=${Uri.encodeComponent(hostId)}');
+        break;
+    }
+  }
+
+  /// 只把内容放进 Agent 输入框，不自动发送：右键是"帮我看看"，不是"替我执行"
+  void _putIntoAgentInput(tp.TerminalTab? tab, String prompt) {
+    final tabId = tab?.id ?? _currentTabId ?? '';
+    setState(() {
+      _tabAiInputText[tabId] = prompt;
+      _setAiPanelVisible(tabId, true);
+    });
+    clearTopToast();
+    showTopSnackBar(context,
+      const SnackBar(
+        content: Text('已放入 Agent 输入框', style: TextStyle(fontSize: fSmall)),
+        duration: Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  Future<void> _saveSelectionAsSnippet(String command) async {
+    if (command.trim().isEmpty) return;
+    final tc = ThemeColors.of(context);
+    final controller = TextEditingController(text: '终端命令');
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: tc.cardElevated,
+        title: Text('存为命令片段',
+            style: TextStyle(color: tc.textMain, fontSize: fBody)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              controller: controller,
+              autofocus: true,
+              style: TextStyle(color: tc.textMain, fontSize: fBody),
+              decoration: InputDecoration(
+                isDense: true,
+                labelText: '片段名称',
+                labelStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
+              ),
+              onSubmitted: (value) => Navigator.of(ctx).pop(value),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              command,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: kMonoFontFallback,
+                fontSize: fMono,
+                color: tc.textSub,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text),
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    final trimmed = name?.trim() ?? '';
+    if (trimmed.isEmpty || !mounted) return;
+    await SnippetsDao.upsert(CommandSnippet.create(
+      id: 'snippet_${DateTime.now().microsecondsSinceEpoch}',
+      name: trimmed,
+      command: command,
+      description: '来自终端右键',
+    ));
+    await SnippetsDao.loadCache();
+    if (!mounted) return;
+    clearTopToast();
+    showTopSnackBar(context,
+      SnackBar(
+        content: Text('已保存到命令片段：$trimmed',
+            style: const TextStyle(fontSize: fSmall)),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   void _showCommandHelp() {

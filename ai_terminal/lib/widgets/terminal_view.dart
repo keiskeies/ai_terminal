@@ -1,15 +1,30 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart' as xterm;
+import '../core/app_toast.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../utils/terminal_text_actions.dart';
+import 'terminal_context_menu.dart';
 
 class TerminalView extends StatefulWidget {
   final xterm.Terminal? terminal;
   final ValueChanged<String>? onSend;
   final double fontSize;
+
+  /// 本机会话不提供 SFTP / 审计等远程能力
+  final bool isLocal;
+
+  /// 右键菜单里的字号调整；为空时隐藏相关项
+  final ValueChanged<double>? onFontSizeChanged;
+
+  /// 需要页面能力的菜单动作（Agent / 片段 / SFTP / 审计）
+  final Future<void> Function(TerminalMenuIntent intent, String text)? onMenuIntent;
 
   /// 是否为当前可见 tab。多个 tab 的 TerminalView 会同时挂在树上，
   /// 只有 active 的可以抢焦点/自动聚焦，否则后台 tab 会把键盘焦点抢走。
@@ -20,6 +35,9 @@ class TerminalView extends StatefulWidget {
     this.terminal,
     this.onSend,
     this.fontSize = 13,
+    this.isLocal = true,
+    this.onFontSizeChanged,
+    this.onMenuIntent,
     this.active = true,
   });
 
@@ -140,6 +158,16 @@ class _TerminalViewState extends State<TerminalView> {
       return KeyEventResult.ignored;
     }
 
+    // 粘贴统一走自己的路径：多行内容要先确认，避免一次落进多条命令。
+    // （xterm 默认把 Ctrl/Cmd+V 直接交给 terminal.paste，绕过了确认）
+    final hw = HardwareKeyboard.instance;
+    if (event is KeyDownEvent &&
+        (hw.isControlPressed || hw.isMetaPressed) &&
+        event.logicalKey == LogicalKeyboardKey.keyV) {
+      _pasteFromClipboard();
+      return KeyEventResult.handled;
+    }
+
     final terminal = widget.terminal;
     if (terminal == null) {
       return KeyEventResult.ignored;
@@ -194,43 +222,440 @@ class _TerminalViewState extends State<TerminalView> {
     return label;
   }
 
-  /// 右键弹出自定义上下文菜单（复制 / 粘贴）
+  /// 右键菜单：本地动作（复制/粘贴/清屏/字号/保存）就地完成，
+  /// 需要页面能力的动作（Agent/SFTP/片段/审计）通过 [TerminalView.onMenuIntent] 上抛。
   void _showContextMenu(Offset globalPosition) {
     final terminal = widget.terminal;
     if (terminal == null) return;
 
     final tc = ThemeColors.of(context);
     final selection = _controller.selection;
-    final hasSelection = selection != null &&
-        terminal.buffer.getText(selection).trim().isNotEmpty;
+    String? selectedText;
+    if (selection != null) {
+      final text = terminal.buffer.getText(selection);
+      if (text.trim().isNotEmpty) selectedText = text;
+    }
+    final lineText = _lineTextAt(globalPosition);
 
     final overlay = Overlay.of(context);
     late OverlayEntry entry;
+    var dismissed = false;
+    void dismiss() {
+      if (dismissed) return;
+      dismissed = true;
+      entry.remove();
+    }
+
     entry = OverlayEntry(
-      builder: (ctx) => _TerminalContextMenu(
+      builder: (ctx) => TerminalContextMenu(
         position: globalPosition,
-        hasSelection: hasSelection,
-        themeColors: tc,
-        onCopy: hasSelection
-            ? () {
-                final text = terminal.buffer.getText(selection);
-                Clipboard.setData(ClipboardData(text: text));
-                _controller.clearSelection();
-                entry.remove();
-              }
-            : null,
-        onPaste: () {
-          Clipboard.getData('text/plain').then((data) {
-            if (data?.text != null && data!.text!.isNotEmpty) {
-              terminal.paste(data.text!);
-            }
-          });
-          entry.remove();
-        },
-        onDismiss: () => entry.remove(),
+        items: _buildMenuItems(
+          terminal: terminal,
+          selectedText: selectedText,
+          lineText: lineText,
+        ),
+        onDismiss: dismiss,
+        tc: tc,
       ),
     );
     overlay.insert(entry);
+  }
+
+  /// 右键位置所在行（无选区时用于识别链接/路径/报错）。
+  ///
+  /// xterm 不暴露滚动偏移，这里按"视口贴底"换算——终端默认跟随最新输出，
+  /// 滚动查看历史时该行文本可能对不上，菜单只是多/少一条复制项，不会误执行。
+  String _lineTextAt(Offset globalPosition) {
+    final terminal = widget.terminal;
+    final box = _terminalContainerKey.currentContext?.findRenderObject();
+    if (terminal == null || box is! RenderBox) return '';
+    final local = box.globalToLocal(globalPosition);
+    final lineHeight = _measureLineHeight();
+    if (lineHeight <= 0) return '';
+    final buffer = terminal.buffer;
+    final firstVisible = buffer.height - terminal.viewHeight;
+    final index = firstVisible + (local.dy / lineHeight).floor();
+    if (index < 0 || index >= buffer.height) return '';
+    return buffer.lines[index].getText();
+  }
+
+  double _measureLineHeight() {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: 'M',
+        style: TextStyle(
+          fontFamily: 'JetBrainsMono',
+          fontFamilyFallback: kMonoFontFallback,
+          fontSize: widget.fontSize,
+          height: 1,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final height = painter.height;
+    painter.dispose();
+    return height;
+  }
+
+  List<TerminalMenuItem> _buildMenuItems({
+    required xterm.Terminal terminal,
+    required String? selectedText,
+    required String lineText,
+  }) {
+    final items = <TerminalMenuItem>[];
+    final onIntent = widget.onMenuIntent;
+    final text = selectedText?.trimRight();
+    // 右键位置的链接/路径只用于"没选中内容"时的上下文菜单
+    final url = text == null ? detectUrl(lineText) : null;
+    final path = text == null ? detectPath(lineText) : null;
+
+    // —— 编辑 ——
+    if (text != null && text.trim().isNotEmpty) {
+      items.add(TerminalMenuItem(
+        label: '复制',
+        icon: Icons.copy_rounded,
+        shortcut: 'Ctrl+Shift+C',
+        onTap: () {
+          Clipboard.setData(ClipboardData(text: text));
+          _controller.clearSelection();
+        },
+      ));
+    } else {
+      items.add(TerminalMenuItem(
+        label: '全选',
+        icon: Icons.select_all_rounded,
+        shortcut: 'Ctrl+A',
+        onTap: _selectAll,
+      ));
+    }
+    items.add(TerminalMenuItem(
+      label: '粘贴',
+      icon: Icons.paste_rounded,
+      shortcut: 'Ctrl+V',
+      onTap: _pasteFromClipboard,
+    ));
+
+    // —— 视图与导出 ——
+    items.add(TerminalMenuItem(
+      label: '清屏',
+      icon: Icons.cleaning_services_outlined,
+      separatorBefore: true,
+      onTap: terminal.buffer.clear,
+    ));
+    items.add(TerminalMenuItem(
+      label: '清空回滚缓冲',
+      icon: Icons.layers_clear_outlined,
+      danger: true,
+      onTap: terminal.buffer.clearScrollback,
+    ));
+    items.add(TerminalMenuItem(
+      label: '复制全部输出',
+      icon: Icons.copy_all_outlined,
+      onTap: _copyAllOutput,
+    ));
+    items.add(TerminalMenuItem(
+      label: '保存输出到文件…',
+      icon: Icons.save_alt_rounded,
+      onTap: _saveOutputToFile,
+    ));
+    if (widget.onFontSizeChanged != null) {
+      items.add(TerminalMenuItem(
+        label: '放大字号',
+        icon: Icons.text_increase_rounded,
+        separatorBefore: true,
+        enabled: widget.fontSize < 24,
+        onTap: () => widget.onFontSizeChanged!(widget.fontSize + 1),
+      ));
+      items.add(TerminalMenuItem(
+        label: '缩小字号',
+        icon: Icons.text_decrease_rounded,
+        enabled: widget.fontSize > 10,
+        onTap: () => widget.onFontSizeChanged!(widget.fontSize - 1),
+      ));
+      items.add(TerminalMenuItem(
+        label: '重置字号',
+        icon: Icons.text_fields_rounded,
+        onTap: () => widget.onFontSizeChanged!(14),
+      ));
+    }
+
+    // —— 选中内容（Agent / 片段 / 执行）——
+    if (text != null && text.trim().isNotEmpty && onIntent != null) {
+      items.add(TerminalMenuItem(
+        label: '发给 Agent 解释',
+        icon: Icons.auto_awesome_outlined,
+        separatorBefore: true,
+        onTap: () => onIntent(TerminalMenuIntent.sendToAgent, text),
+      ));
+      items.add(TerminalMenuItem(
+        label: '存为命令片段',
+        icon: Icons.bookmark_add_outlined,
+        onTap: () => onIntent(
+            TerminalMenuIntent.saveSnippet, stripPromptPrefix(text)),
+      ));
+      final command = stripPromptPrefix(text);
+      if (looksLikeCommand(command)) {
+        items.add(TerminalMenuItem(
+          label: '在终端执行这条命令',
+          icon: Icons.play_arrow_rounded,
+          danger: true,
+          onTap: () => _confirmRunCommand(command),
+        ));
+      }
+    }
+
+    // —— 远程会话能力 ——
+    if (!widget.isLocal && onIntent != null) {
+      items.add(TerminalMenuItem(
+        label: path != null ? '在 SFTP 中定位' : '打开 SFTP 面板',
+        icon: Icons.folder_open_outlined,
+        separatorBefore: true,
+        onTap: () => onIntent(
+          TerminalMenuIntent.openSftp,
+          path == null ? '' : directoryOfPath(path),
+        ),
+      ));
+      items.add(TerminalMenuItem(
+        label: '查看审计记录',
+        icon: Icons.receipt_long_outlined,
+        onTap: () => onIntent(TerminalMenuIntent.openAudit, ''),
+      ));
+      items.add(TerminalMenuItem(
+        label: '查看变更记录',
+        icon: Icons.history_edu_outlined,
+        onTap: () => onIntent(TerminalMenuIntent.viewChanges, ''),
+      ));
+    }
+
+    // —— 右键位置的行内对象（链接 / 路径 / 报错）——
+    if (text == null && lineText.isNotEmpty) {
+      final isError = looksLikeError(lineText) && onIntent != null;
+      if (url != null) {
+        items.add(TerminalMenuItem(
+          label: '打开链接',
+          icon: Icons.open_in_new_rounded,
+          separatorBefore: true,
+          shortcut: url.length > 30 ? '${url.substring(0, 30)}…' : url,
+          onTap: () => _openUrl(url),
+        ));
+        items.add(TerminalMenuItem(
+          label: '复制链接',
+          icon: Icons.link_rounded,
+          onTap: () => Clipboard.setData(ClipboardData(text: url)),
+        ));
+      }
+      if (path != null) {
+        items.add(TerminalMenuItem(
+          label: '复制路径',
+          icon: Icons.route_outlined,
+          separatorBefore: url == null,
+          shortcut: path.length > 30 ? '${path.substring(0, 30)}…' : path,
+          onTap: () => Clipboard.setData(ClipboardData(text: path)),
+        ));
+      }
+      if (isError) {
+        items.add(TerminalMenuItem(
+          label: '问 Agent 这个错误',
+          icon: Icons.help_outline_rounded,
+          onTap: () => onIntent(TerminalMenuIntent.askError, lineText),
+        ));
+      }
+    }
+
+    return items;
+  }
+
+  void _selectAll() {
+    final terminal = widget.terminal;
+    if (terminal == null) return;
+    final buffer = terminal.buffer;
+    if (buffer.height == 0) return;
+    final first = buffer.lines[0];
+    final last = buffer.lines[buffer.height - 1];
+    _controller.setSelection(
+      xterm.CellAnchor(0, owner: first),
+      xterm.CellAnchor(last.length, owner: last),
+    );
+  }
+
+  Future<void> _pasteFromClipboard() async {
+    final data = await Clipboard.getData('text/plain');
+    final text = data?.text;
+    if (text == null || text.isEmpty) return;
+    // 多行粘贴等于批量执行：先给用户看一眼再落进去
+    if (isMultiLine(text) && !await _confirmMultiLinePaste(text)) return;
+    if (!mounted) return;
+    widget.terminal?.paste(text);
+  }
+
+  Future<bool> _confirmMultiLinePaste(String text) async {
+    final lines = text.replaceAll('\r\n', '\n').split('\n');
+    final preview = lines.take(8).join('\n');
+    final more = lines.length - 8;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final tc = ThemeColors.of(context);
+        return AlertDialog(
+          backgroundColor: tc.cardElevated,
+          title: Text('粘贴 ${lines.length} 行内容？',
+              style: TextStyle(color: tc.textMain, fontSize: fBody)),
+          content: SizedBox(
+            width: 460,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('多行内容会被依次执行，请确认没有误粘贴：',
+                    style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: tc.terminalBg,
+                    borderRadius: BorderRadius.circular(rXSmall),
+                    border: Border.all(color: tc.border),
+                  ),
+                  child: Text(
+                    more > 0 ? '$preview\n… 还有 $more 行' : preview,
+                    style: TextStyle(
+                      fontFamily: 'JetBrainsMono',
+                      fontFamilyFallback: kMonoFontFallback,
+                      fontSize: fMono,
+                      color: tc.textBody,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('粘贴'),
+            ),
+          ],
+        );
+      },
+    );
+    return ok ?? false;
+  }
+
+  Future<void> _confirmRunCommand(String command) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final tc = ThemeColors.of(context);
+        return AlertDialog(
+          backgroundColor: tc.cardElevated,
+          title: Text('在终端执行这条命令？',
+              style: TextStyle(color: tc.textMain, fontSize: fBody)),
+          content: Container(
+            width: 460,
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: tc.terminalBg,
+              borderRadius: BorderRadius.circular(rXSmall),
+              border: Border.all(color: tc.border),
+            ),
+            child: Text(
+              command,
+              style: TextStyle(
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: kMonoFontFallback,
+                fontSize: fMono,
+                color: tc.textMain,
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: tc.error),
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('执行'),
+            ),
+          ],
+        );
+      },
+    );
+    if (ok != true) return;
+    widget.onSend?.call(command);
+  }
+
+  /// 用系统默认处理程序打开链接。argv 传参、不经 shell，避免 URL 里的字符被解释成命令
+  Future<void> _openUrl(String url) async {
+    if (!url.startsWith('http://') && !url.startsWith('https://')) return;
+    try {
+      if (Platform.isWindows) {
+        await Process.run('rundll32', ['url.dll,FileProtocolHandler', url]);
+      } else if (Platform.isMacOS) {
+        await Process.run('open', [url]);
+      } else {
+        await Process.run('xdg-open', [url]);
+      }
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: url));
+      if (!mounted) return;
+      showTopSnackBar(context,
+        const SnackBar(
+          content: Text('打开链接失败，已复制到剪贴板',
+              style: TextStyle(fontSize: fSmall)),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.all(16),
+        ),
+      );
+    }
+  }
+
+  Future<void> _copyAllOutput() async {
+    final text = widget.terminal?.buffer.getText() ?? '';
+    if (text.trim().isEmpty) return;
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!mounted) return;
+    showTopSnackBar(context,
+      SnackBar(
+        content: Text('已复制 ${text.length} 字符', style: const TextStyle(fontSize: fSmall)),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+      ),
+    );
+  }
+
+  Future<void> _saveOutputToFile() async {
+    final text = widget.terminal?.buffer.getText() ?? '';
+    if (text.trim().isEmpty) return;
+    final stamp = DateTime.now()
+        .toIso8601String()
+        .replaceAll(RegExp(r'[:.]'), '-')
+        .substring(0, 19);
+    final path = await FilePicker.platform.saveFile(
+      dialogTitle: '保存终端输出',
+      fileName: 'terminal-$stamp.log',
+      type: FileType.custom,
+      allowedExtensions: const ['log', 'txt'],
+    );
+    if (path == null) return;
+    await File(path).writeAsString(text);
+    if (!mounted) return;
+    showTopSnackBar(context,
+      SnackBar(
+        content: Text('已保存到 $path', style: const TextStyle(fontSize: fSmall)),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   @override
@@ -304,194 +729,3 @@ class _TerminalViewState extends State<TerminalView> {
   }
 }
 
-/// 终端右键上下文菜单
-/// 跟随鼠标光标位置弹出，支持明暗主题，点击外部或 ESC 关闭
-class _TerminalContextMenu extends StatefulWidget {
-  final Offset position;
-  final bool hasSelection;
-  final ThemeColors themeColors;
-  final VoidCallback? onCopy;
-  final VoidCallback? onPaste;
-  final VoidCallback onDismiss;
-
-  const _TerminalContextMenu({
-    required this.position,
-    required this.hasSelection,
-    required this.themeColors,
-    required this.onCopy,
-    required this.onPaste,
-    required this.onDismiss,
-  });
-
-  @override
-  State<_TerminalContextMenu> createState() => _TerminalContextMenuState();
-}
-
-class _TerminalContextMenuState extends State<_TerminalContextMenu> {
-  late final FocusNode _focusNode;
-
-  @override
-  void initState() {
-    super.initState();
-    _focusNode = FocusNode();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _focusNode.requestFocus();
-    });
-  }
-
-  @override
-  void dispose() {
-    _focusNode.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tc = widget.themeColors;
-    final size = MediaQuery.of(context).size;
-
-    // 菜单尺寸预估
-    const menuWidth = 168.0;
-    const menuHeight = 88.0;
-    const menuItemHeight = 36.0;
-
-    // 计算菜单位置，避免超出屏幕边界
-    double left = widget.position.dx;
-    double top = widget.position.dy;
-    if (left + menuWidth > size.width - 8) {
-      left = size.width - menuWidth - 8;
-    }
-    if (top + menuHeight > size.height - 8) {
-      top = size.height - menuHeight - 8;
-    }
-    if (left < 8) left = 8;
-    if (top < 8) top = 8;
-
-    return Stack(
-      children: [
-        // 透明遮罩，点击关闭菜单
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: widget.onDismiss,
-            onSecondaryTapDown: (_) => widget.onDismiss(),
-            child: const SizedBox.expand(),
-          ),
-        ),
-        // 菜单主体
-        Positioned(
-          left: left,
-          top: top,
-          child: Focus(
-            focusNode: _focusNode,
-            onKeyEvent: (node, event) {
-              if (event is KeyDownEvent &&
-                  event.logicalKey == LogicalKeyboardKey.escape) {
-                widget.onDismiss();
-                return KeyEventResult.handled;
-              }
-              return KeyEventResult.ignored;
-            },
-            child: Material(
-              color: Colors.transparent,
-              child: Container(
-                width: menuWidth,
-                decoration: BoxDecoration(
-                  color: tc.cardElevated,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: tc.border, width: 1),
-                  boxShadow: [
-                    BoxShadow(
-                      color: tc.isLight
-                          ? Colors.black.withValues(alpha: 0.12)
-                          : Colors.black.withValues(alpha: 0.5),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildMenuItem(
-                      icon: Icons.copy_rounded,
-                      label: '复制',
-                      shortcut: '⌘C',
-                      enabled: widget.onCopy != null,
-                      onTap: widget.onCopy,
-                      tc: tc,
-                      isFirst: true,
-                      menuItemHeight: menuItemHeight,
-                    ),
-                    Container(height: 1, color: tc.border),
-                    _buildMenuItem(
-                      icon: Icons.paste_rounded,
-                      label: '粘贴',
-                      shortcut: '⌘V',
-                      enabled: true,
-                      onTap: widget.onPaste,
-                      tc: tc,
-                      isLast: true,
-                      menuItemHeight: menuItemHeight,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildMenuItem({
-    required IconData icon,
-    required String label,
-    required String shortcut,
-    required bool enabled,
-    required VoidCallback? onTap,
-    required ThemeColors tc,
-    required double menuItemHeight,
-    bool isFirst = false,
-    bool isLast = false,
-  }) {
-    return InkWell(
-      onTap: enabled ? onTap : null,
-      borderRadius: BorderRadius.vertical(
-        top: Radius.circular(isFirst ? 8 : 0),
-        bottom: Radius.circular(isLast ? 8 : 0),
-      ),
-      child: Container(
-        height: menuItemHeight,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: enabled ? tc.textMain : tc.textMuted,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: enabled ? tc.textMain : tc.textMuted,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-            ),
-            Text(
-              shortcut,
-              style: TextStyle(
-                fontSize: 12,
-                color: enabled ? tc.textSub : tc.textMuted,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

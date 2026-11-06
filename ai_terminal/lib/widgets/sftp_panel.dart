@@ -16,11 +16,15 @@ class SftpPanel extends ConsumerStatefulWidget {
   final VoidCallback? onClose; // 嵌入模式下的关闭回调
   final bool embedded; // 是否嵌入模式（无 AppBar）
 
+  /// 打开后直接定位到的远端目录（终端右键「在 SFTP 中定位」）
+  final String? initialPath;
+
   const SftpPanel({
     super.key,
     required this.hostId,
     this.onClose,
     this.embedded = false,
+    this.initialPath,
   });
 
   @override
@@ -54,6 +58,10 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
       return;
     }
     await _controller.connectAndLoad(host);
+    final initial = widget.initialPath;
+    if (initial != null && initial.isNotEmpty && mounted) {
+      await _controller.navigateTo(initial);
+    }
   }
 
   @override

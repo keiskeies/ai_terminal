@@ -1008,7 +1008,7 @@ Write-Output '@@END@@'
     final encoded = encodePowershellCommand(_windowsCollectScript);
     final out = await local.runOnce(
       'powershell -NoProfile -NonInteractive -EncodedCommand $encoded',
-      timeout: const Duration(seconds: 12),
+      timeout: const Duration(seconds: 15),
     );
     return parseWindowsOutput(out);
   }

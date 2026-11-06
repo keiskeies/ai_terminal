@@ -19,7 +19,9 @@ class _RealLocalShell extends LocalTerminalService {
 
   @override
   Future<String> runOnce(String command, {Duration timeout = const Duration(seconds: 5)}) async {
-    final r = await Process.run('cmd', ['/c', command]).timeout(timeout);
+    // 全量测试并行跑时 PowerShell 冷启动可能超过服务的 12s，这里统一放宽
+    final r = await Process.run('cmd', ['/c', command])
+        .timeout(timeout + const Duration(seconds: 45));
     return (r.stdout as String?) ?? '';
   }
 }
