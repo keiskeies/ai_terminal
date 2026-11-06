@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:go_router/go_router.dart';
 import 'package:xterm/xterm.dart';
+import '../core/builtin_runbook_i18n.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../core/l10n_holder.dart';
@@ -832,6 +833,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final localTitle = AppLocalizations.of(context)?.terminalLocalTab;
+    if (localTitle != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ref.read(tp.terminalProvider.notifier).syncLocalTabTitle(localTitle);
+        }
+      });
+    }
     final route = ModalRoute.of(context);
     if (route is PageRoute<dynamic> && route != _subscribedRoute) {
       if (_subscribedRoute != null) appRouteObserver.unsubscribe(this);
@@ -4514,7 +4523,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 运维工作流选择浮层（从持久化的 Runbook 加载）
   void _showRunbookTemplates(ThemeColors tc) {
     final l10n = AppLocalizations.of(context)!;
-    final runbooks = ref.read(runbooksProvider);
+    final runbooks =
+        BuiltinRunbookI18n.localizeAll(ref.read(runbooksProvider));
     final grouped = <RunbookCategory, List<Runbook>>{};
     for (final rb in runbooks) {
       grouped.putIfAbsent(rb.category, () => []).add(rb);

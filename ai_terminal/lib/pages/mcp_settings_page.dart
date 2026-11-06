@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 import '../services/mcp_manager.dart';
 import '../services/mcp_models.dart';
 import '../core/app_toast.dart';
@@ -31,10 +32,10 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     final tc = ThemeColors.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('MCP 服务器'),
+        title: Text(UiText.t('MCP 服务器', 'MCP Servers')),
         actions: [
           IconButton(
-            tooltip: '添加服务器',
+            tooltip: UiText.t('添加服务器', 'Add server'),
             onPressed: _addCustom,
             icon: const Icon(Icons.add),
           ),
@@ -104,9 +105,16 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
               Expanded(
                 child: Text(
                   enabled
-                      ? '已连接 $connected/${runtimes.length} 个服务器 · '
-                          'Agent 可用 ${manager.exposedToolCount} 个工具'
-                      : 'MCP 总开关已关闭 · 已连接 0/${runtimes.length} 个服务器',
+                      ? UiText.t(
+                          '已连接 $connected/${runtimes.length} 个服务器 · '
+                              'Agent 可用 ${manager.exposedToolCount} 个工具',
+                          'Connected $connected/${runtimes.length} servers · '
+                              '${manager.exposedToolCount} tools available to the Agent',
+                        )
+                      : UiText.t(
+                          'MCP 总开关已关闭 · 已连接 0/${runtimes.length} 个服务器',
+                          'MCP master switch is off · 0/${runtimes.length} servers connected',
+                        ),
                   style: TextStyle(
                     color: tc.textMain,
                     fontSize: fBody,
@@ -118,9 +126,14 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'MCP 工具通过 Function Calling 提供给 Agent；默认只启用 readOnly 工具，'
-            'destructive 工具会走用户确认，只读模式下非只读工具会被拦截。'
-            'stdio 仅桌面端可用。',
+            UiText.t(
+              'MCP 工具通过 Function Calling 提供给 Agent；默认只启用 readOnly 工具，'
+                  'destructive 工具会走用户确认，只读模式下非只读工具会被拦截。'
+                  'stdio 仅桌面端可用。',
+              'MCP tools are exposed to the Agent through Function Calling. Only readOnly tools are enabled by default; '
+                  'destructive tools require your confirmation, and non-readonly tools are blocked in read-only mode. '
+                  'stdio is desktop-only.',
+            ),
             style: TextStyle(color: tc.textSub, fontSize: fSmall, height: 1.5),
           ),
           const SizedBox(height: 6),
@@ -139,8 +152,12 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '启用 MCP（总开关）。关闭后断开所有服务器，Agent 不再看到 MCP 工具；'
-                  '各服务器的启用配置会保留，重新打开后按配置恢复连接。',
+                  UiText.t(
+                    '启用 MCP（总开关）。关闭后断开所有服务器，Agent 不再看到 MCP 工具；'
+                        '各服务器的启用配置会保留，重新打开后按配置恢复连接。',
+                    'Enable MCP (master switch). Turning it off disconnects every server and hides MCP tools from the Agent; '
+                        'per-server settings are kept and connections are restored when you turn it back on.',
+                  ),
                   style: TextStyle(
                     color: tc.textSub,
                     fontSize: fSmall,
@@ -159,7 +176,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     try {
       await McpManager.instance.setGlobalEnabled(value);
     } catch (e) {
-      _snack('切换 MCP 总开关失败：$e', error: true);
+      _snack(UiText.t('切换 MCP 总开关失败：$e', 'Failed to toggle the MCP master switch: $e'), error: true);
     }
   }
 
@@ -169,7 +186,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Text('快速添加：', style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+        Text(UiText.t('快速添加：', 'Quick add:'), style: TextStyle(color: tc.textSub, fontSize: fSmall)),
         ActionChip(
           label: const Text('Exa MCP'),
           avatar: const Icon(Icons.add_link, size: 15),
@@ -191,7 +208,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
           onPressed: () => _addPreset(McpServerConfig.presetContext7()),
         ),
         ActionChip(
-          label: const Text('自定义'),
+          label: Text(UiText.t('自定义', 'Custom')),
           avatar: const Icon(Icons.edit_outlined, size: 15),
           onPressed: _addCustom,
         ),
@@ -212,7 +229,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
           Icon(Icons.extension_outlined, color: tc.textMuted, size: 34),
           const SizedBox(height: 10),
           Text(
-            '还没有 MCP 服务器',
+            UiText.t('还没有 MCP 服务器', 'No MCP servers yet'),
             style: TextStyle(
               color: tc.textMain,
               fontSize: fTitle,
@@ -221,8 +238,12 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
           ),
           const SizedBox(height: 6),
           Text(
-            '添加远程 Streamable HTTP / 旧版 SSE，或本地 stdio 服务器；'
-            '连接后会自动发现 tools / resources / prompts。',
+            UiText.t(
+              '添加远程 Streamable HTTP / 旧版 SSE，或本地 stdio 服务器；'
+                  '连接后会自动发现 tools / resources / prompts。',
+              'Add a remote Streamable HTTP / legacy SSE server, or a local stdio server. '
+                  'Tools / resources / prompts are discovered automatically after connecting.',
+            ),
             textAlign: TextAlign.center,
             style: TextStyle(color: tc.textSub, fontSize: fSmall, height: 1.5),
           ),
@@ -280,7 +301,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
                   inactiveTrackColor: tc.surface,
                 ),
                 PopupMenuButton<String>(
-                  tooltip: '更多',
+                  tooltip: UiText.t('更多', 'More'),
                   icon: Icon(Icons.more_horiz, size: 18, color: tc.textSub),
                   onSelected: (value) {
                     switch (value) {
@@ -295,10 +316,10 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
                         break;
                     }
                   },
-                  itemBuilder: (context) => const [
-                    PopupMenuItem(value: 'edit', child: Text('编辑')),
-                    PopupMenuItem(value: 'reconnect', child: Text('重新连接')),
-                    PopupMenuItem(value: 'delete', child: Text('删除')),
+                  itemBuilder: (context) => [
+                    PopupMenuItem(value: 'edit', child: Text(UiText.t('编辑', 'Edit'))),
+                    PopupMenuItem(value: 'reconnect', child: Text(UiText.t('重新连接', 'Reconnect'))),
+                    PopupMenuItem(value: 'delete', child: Text(UiText.t('删除', 'Delete'))),
                   ],
                 ),
               ],
@@ -310,11 +331,11 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
                 runSpacing: 4,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  _pill(config.transport.label, tc.textMuted, tc),
-                  _pill(runtime.status.label, statusColor, tc),
+                  _pill(_mcpTransportLabel(config.transport), tc.textMuted, tc),
+                  _pill(_statusLabel(runtime.status), statusColor, tc),
                   Text(
                     config.endpointLabel.isEmpty
-                        ? '（未配置端点）'
+                        ? UiText.t('（未配置端点）', '(no endpoint configured)')
                         : config.endpointLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -360,13 +381,17 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
                           : Icons.play_arrow_outlined,
                       size: 15,
                     ),
-                    label: Text(runtime.isConnected ? '断开' : '连接'),
+                    label: Text(runtime.isConnected ? UiText.t('断开', 'Disconnect') : UiText.t('连接', 'Connect')),
                   ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    '工具 ${runtime.tools.length} · 资源 ${runtime.resources.length}'
-                    ' · 提示词 ${runtime.prompts.length}',
+                    UiText.t(
+                      '工具 ${runtime.tools.length} · 资源 ${runtime.resources.length}'
+                          ' · 提示词 ${runtime.prompts.length}',
+                      'Tools ${runtime.tools.length} · Resources ${runtime.resources.length}'
+                          ' · Prompts ${runtime.prompts.length}',
+                    ),
                     style: TextStyle(color: tc.textSub, fontSize: fMicro),
                   ),
                 ),
@@ -386,7 +411,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
                     tilePadding: EdgeInsets.zero,
                     childrenPadding: const EdgeInsets.only(bottom: 8),
                     title: Text(
-                      '工具与能力',
+                      UiText.t('工具与能力', 'Tools & capabilities'),
                       style: TextStyle(color: tc.textBody, fontSize: fSmall),
                     ),
                     children: [
@@ -420,7 +445,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            runtime.error.isEmpty ? '需要 OAuth 授权' : runtime.error,
+            runtime.error.isEmpty ? UiText.t('需要 OAuth 授权', 'OAuth authorization required') : runtime.error,
             style: TextStyle(color: tc.warn, fontSize: fSmall),
           ),
           const SizedBox(height: 8),
@@ -434,13 +459,13 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
                         unawaited(McpManager.instance.login(runtime.config.id))
                     : null,
                 icon: const Icon(Icons.login, size: 15),
-                label: const Text('登录授权'),
+                label: Text(UiText.t('登录授权', 'Sign in')),
               ),
               if (runtime.pendingAuthUrl.isNotEmpty)
                 OutlinedButton.icon(
                   onPressed: () => _copy(runtime.pendingAuthUrl),
                   icon: const Icon(Icons.copy, size: 15),
-                  label: const Text('复制授权链接'),
+                  label: Text(UiText.t('复制授权链接', 'Copy authorization link')),
                 ),
             ],
           ),
@@ -452,14 +477,14 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
   Widget _buildTools(McpServerRuntime runtime, ThemeColors tc) {
     final config = runtime.config;
     final exposure = switch (config.toolExposure) {
-      McpToolExposure.readOnly => '只读工具',
-      McpToolExposure.all => '全部工具',
-      McpToolExposure.custom => '自定义',
+      McpToolExposure.readOnly => UiText.t('只读工具', 'Read-only tools'),
+      McpToolExposure.all => UiText.t('全部工具', 'All tools'),
+      McpToolExposure.custom => UiText.t('自定义', 'Custom'),
     };
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader('工具（${runtime.tools.length}）· $exposure', tc),
+        _sectionHeader(UiText.t('工具（${runtime.tools.length}）· $exposure', 'Tools (${runtime.tools.length}) · $exposure'), tc),
         for (final tool in runtime.tools) _buildToolRow(runtime, tool, tc),
       ],
     );
@@ -478,10 +503,10 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
             ? tc.error
             : tc.warn;
     final label = tool.readOnly
-        ? '只读'
+        ? UiText.t('只读', 'Read-only')
         : tool.destructive
-            ? '破坏性'
-            : '外部';
+            ? UiText.t('破坏性', 'Destructive')
+            : UiText.t('外部', 'External');
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 5),
       child: Row(
@@ -538,7 +563,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
             )
           else
             Text(
-              exposed ? 'Agent 可用' : '未开放',
+              exposed ? UiText.t('Agent 可用', 'Agent available') : UiText.t('未开放', 'Not exposed'),
               style: TextStyle(
                 color: exposed ? tc.ok : tc.textMuted,
                 fontSize: fMicro,
@@ -563,7 +588,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     try {
       await McpManager.instance.setAllowedTools(config.id, allowed);
     } catch (e) {
-      _snack('保存工具开关失败：$e', error: true);
+      _snack(UiText.t('保存工具开关失败：$e', 'Failed to save the tool switch: $e'), error: true);
     }
   }
 
@@ -571,7 +596,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader('资源（${runtime.resources.length}）', tc),
+        _sectionHeader(UiText.t('资源（${runtime.resources.length}）', 'Resources (${runtime.resources.length})'), tc),
         for (final resource in runtime.resources)
           ListTile(
             dense: true,
@@ -604,7 +629,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader('提示词（${runtime.prompts.length}）', tc),
+        _sectionHeader(UiText.t('提示词（${runtime.prompts.length}）', 'Prompts (${runtime.prompts.length})'), tc),
         for (final prompt in runtime.prompts)
           ListTile(
             dense: true,
@@ -621,8 +646,8 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
             subtitle: Text(
               prompt.description.isEmpty
                   ? (prompt.arguments.isEmpty
-                      ? '无参数'
-                      : '参数: ${prompt.arguments.map((a) => a.name).join(', ')}')
+                      ? UiText.t('无参数', 'No arguments')
+                      : UiText.t('参数: ', 'Arguments: ') + prompt.arguments.map((a) => a.name).join(', '))
                   : prompt.description,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -645,7 +670,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _sectionHeader('最近日志', tc),
+          _sectionHeader(UiText.t('最近日志', 'Recent logs'), tc),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(8),
@@ -682,6 +707,23 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     );
   }
 
+  String _statusLabel(McpServerStatus status) {
+    switch (status) {
+      case McpServerStatus.disabled:
+        return UiText.t('已停用', 'Disabled');
+      case McpServerStatus.disconnected:
+        return UiText.t('未连接', 'Disconnected');
+      case McpServerStatus.connecting:
+        return UiText.t('连接中', 'Connecting');
+      case McpServerStatus.connected:
+        return UiText.t('已连接', 'Connected');
+      case McpServerStatus.authRequired:
+        return UiText.t('需要授权', 'Authorization required');
+      case McpServerStatus.error:
+        return UiText.t('连接失败', 'Connection failed');
+    }
+  }
+
   Widget _pill(String text, Color color, ThemeColors tc) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -716,7 +758,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     _openEditor(
       McpServerConfig(
         id: _newId(),
-        name: '新 MCP 服务器',
+        name: UiText.t('新 MCP 服务器', 'New MCP server'),
         enabled: true,
         autoConnect: true,
       ),
@@ -732,10 +774,10 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     String? directory;
     try {
       directory = await FilePicker.platform.getDirectoryPath(
-        dialogTitle: '选择 filesystem MCP 允许访问的目录',
+        dialogTitle: UiText.t('选择 filesystem MCP 允许访问的目录', 'Choose the folder the filesystem MCP may access'),
       );
     } catch (e) {
-      _snack('打开目录选择器失败：$e', error: true);
+      _snack(UiText.t('打开目录选择器失败：$e', 'Failed to open the folder picker: $e'), error: true);
       return;
     }
     if (directory == null || directory.trim().isEmpty) return;
@@ -752,7 +794,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     try {
       await McpManager.instance.setEnabled(id, value);
     } catch (e) {
-      _snack('保存开关失败：$e', error: true);
+      _snack(UiText.t('保存开关失败：$e', 'Failed to save the switch: $e'), error: true);
     }
   }
 
@@ -768,7 +810,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     try {
       await McpManager.instance.saveServer(updated);
     } catch (e) {
-      _snack('保存失败：$e', error: true);
+      _snack(UiText.t('保存失败：$e', 'Failed to save: $e'), error: true);
     }
   }
 
@@ -780,16 +822,19 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('删除 MCP 服务器'),
-        content: Text('确定删除「${runtime.config.name}」？同时会清理本机保存的 headers/env/token。'),
+        title: Text(UiText.t('删除 MCP 服务器', 'Delete MCP server')),
+        content: Text(UiText.t(
+          '确定删除「${runtime.config.name}」？同时会清理本机保存的 headers/env/token。',
+          'Delete "${runtime.config.name}"? The headers/env/token saved on this machine will also be removed.',
+        )),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
+            child: Text(UiText.t('取消', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
+            child: Text(UiText.t('删除', 'Delete')),
           ),
         ],
       ),
@@ -798,7 +843,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     try {
       await McpManager.instance.deleteServer(runtime.config.id);
     } catch (e) {
-      _snack('删除失败：$e', error: true);
+      _snack(UiText.t('删除失败：$e', 'Failed to delete: $e'), error: true);
     }
   }
 
@@ -809,8 +854,8 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     var uri = resource.uri;
     if (resource.isTemplate) {
       final input = await _askText(
-        '资源 URI',
-        '按模板填写具体 URI\n${resource.uri}',
+        UiText.t('资源 URI', 'Resource URI'),
+        '${UiText.t('按模板填写具体 URI', 'Enter a concrete URI for the template')}\n${resource.uri}',
       );
       if (input == null || input.trim().isEmpty) return;
       uri = input.trim();
@@ -828,9 +873,9 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     Map<String, String> args = const {};
     if (prompt.arguments.isNotEmpty) {
       final input = await _askText(
-        '提示词参数',
-        '每行一个 key=value\n'
-        '${prompt.arguments.map((a) => '${a.name}${a.required ? '（必填）' : ''}: ${a.description}').join('\n')}',
+        UiText.t('提示词参数', 'Prompt arguments'),
+        '${UiText.t('每行一个 key=value', 'One key=value per line')}\n'
+            '${prompt.arguments.map((a) => '${a.name}${a.required ? UiText.t('（必填）', ' (required)') : ''}: ${a.description}').join('\n')}',
       );
       if (input == null) return;
       args = _parseEnvInput(input);
@@ -862,11 +907,11 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            child: Text(UiText.t('取消', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('确定'),
+            child: Text(UiText.t('确定', 'OK')),
           ),
         ],
       ),
@@ -893,13 +938,13 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
             onPressed: () {
               Clipboard.setData(ClipboardData(text: text));
               Navigator.pop(context);
-              _snack('内容已复制');
+              _snack(UiText.t('内容已复制', 'Content copied'));
             },
-            child: const Text('复制内容'),
+            child: Text(UiText.t('复制内容', 'Copy content')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('关闭'),
+            child: Text(UiText.t('关闭', 'Close')),
           ),
         ],
       ),
@@ -908,7 +953,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
 
   void _copy(String text) {
     Clipboard.setData(ClipboardData(text: text));
-    _snack('已复制');
+    _snack(UiText.t('已复制', 'Copied'));
   }
 
   Map<String, String> _parseEnvInput(String text) {
@@ -1040,7 +1085,7 @@ class _McpServerEditorDialogState extends State<_McpServerEditorDialog> {
                 children: [
                   Expanded(
                     child: Text(
-                      widget.isNew ? '添加 MCP 服务器' : '编辑 MCP 服务器',
+                      widget.isNew ? UiText.t('添加 MCP 服务器', 'Add MCP server') : UiText.t('编辑 MCP 服务器', 'Edit MCP server'),
                       style: TextStyle(
                         color: tc.textMain,
                         fontSize: fTitle,
@@ -1062,15 +1107,15 @@ class _McpServerEditorDialogState extends State<_McpServerEditorDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _field('名称', _name),
+                    _field(UiText.t('名称', 'Name'), _name),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<McpTransportKind>(
                       initialValue: _transport,
-                      decoration: const InputDecoration(labelText: '传输方式'),
+                      decoration: InputDecoration(labelText: UiText.t('传输方式', 'Transport')),
                       items: McpTransportKind.values
                           .map((t) => DropdownMenuItem(
                                 value: t,
-                                child: Text(t.label),
+                                child: Text(_mcpTransportLabel(t)),
                               ))
                           .toList(),
                       onChanged: (value) {
@@ -1079,53 +1124,61 @@ class _McpServerEditorDialogState extends State<_McpServerEditorDialog> {
                     ),
                     const SizedBox(height: 12),
                     if (_transport == McpTransportKind.stdio) ...[
-                      _field('启动命令', _command, hint: '例如 npx'),
+                      _field(UiText.t('启动命令', 'Start command'), _command, hint: UiText.t('例如 npx', 'e.g. npx')),
                       const SizedBox(height: 12),
-                      _field('参数（每行一个）', _args, maxLines: 4, hint: '-y\n@modelcontextprotocol/server-filesystem\nD:\\data'),
+                      _field(UiText.t('参数（每行一个）', 'Arguments (one per line)'), _args, maxLines: 4, hint: '-y\n@modelcontextprotocol/server-filesystem\nD:\\data'),
                       const SizedBox(height: 12),
-                      _field('工作目录（可选）', _workdir),
+                      _field(UiText.t('工作目录（可选）', 'Working directory (optional)'), _workdir),
                       const SizedBox(height: 12),
-                      _field('环境变量（每行 KEY=VALUE）', _env, maxLines: 3),
+                      _field(UiText.t('环境变量（每行 KEY=VALUE）', 'Environment variables (KEY=VALUE per line)'), _env, maxLines: 3),
                       const SizedBox(height: 6),
                       _hint(
-                        '需要本机安装 Node.js。Windows 下 npx/pnpm/yarn/uvx 会自动补 .cmd。\n'
-                        'filesystem：npx -y @modelcontextprotocol/server-filesystem <允许目录>，'
-                        '可传多个目录（每个参数一个）。\n'
-                        'context7：npx -y @upstash/context7-mcp；可无 Key 使用，'
-                        '更高额度在环境变量填 CONTEXT7_API_KEY。\n'
-                        '首次运行 npx 会联网下载包，可能较慢。',
+                        UiText.t(
+                          '需要本机安装 Node.js。Windows 下 npx/pnpm/yarn/uvx 会自动补 .cmd。\n'
+                              'filesystem：npx -y @modelcontextprotocol/server-filesystem <允许目录>，'
+                              '可传多个目录（每个参数一个）。\n'
+                              'context7：npx -y @upstash/context7-mcp；可无 Key 使用，'
+                              '更高额度在环境变量填 CONTEXT7_API_KEY。\n'
+                              '首次运行 npx 会联网下载包，可能较慢。',
+                          'Node.js must be installed locally. On Windows, npx/pnpm/yarn/uvx automatically resolve .cmd shims.\n'
+                              'filesystem: npx -y @modelcontextprotocol/server-filesystem <allowed folder>; '
+                              'pass multiple folders as separate arguments.\n'
+                              'context7: npx -y @upstash/context7-mcp; works without a key, '
+                              'set CONTEXT7_API_KEY for a higher quota.\n'
+                              'The first npx run downloads the package, so it may be slow.',
+                        ),
                       ),
                     ] else ...[
-                      _field('服务器 URL', _url, hint: 'https://example.com/mcp'),
+                      _field(UiText.t('服务器 URL', 'Server URL'), _url, hint: 'https://example.com/mcp'),
                       const SizedBox(height: 12),
-                      _field('出站代理（可选）', _proxy, hint: 'http://127.0.0.1:7890'),
+                      _field(UiText.t('出站代理（可选）', 'Outbound proxy (optional)'), _proxy, hint: 'http://127.0.0.1:7890'),
                       const SizedBox(height: 12),
-                      _field('Headers（每行 Key: Value）', _headers, maxLines: 3),
+                      _field(UiText.t('Headers（每行 Key: Value）', 'Headers (Key: Value per line)'), _headers, maxLines: 3),
                     ],
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        Expanded(child: _field('超时（ms）', _timeout)),
+                        Expanded(child: _field(UiText.t('超时（ms）', 'Timeout (ms)'), _timeout)),
                         const SizedBox(width: 12),
-                        Expanded(child: _field('工具上限', _maxTools)),
+                        Expanded(child: _field(UiText.t('工具上限', 'Tool limit'), _maxTools)),
                       ],
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<McpToolExposure>(
                       initialValue: _exposure,
-                      decoration: const InputDecoration(labelText: 'Agent 可用工具'),
-                      items: const [
+                      decoration: InputDecoration(labelText: UiText.t('Agent 可用工具', 'Tools available to the Agent')),
+                      items: [
                         DropdownMenuItem(
                           value: McpToolExposure.readOnly,
-                          child: Text('只读工具（推荐）'),
+                          child: Text(UiText.t('只读工具（推荐）', 'Read-only tools (recommended)')),
                         ),
                         DropdownMenuItem(
                           value: McpToolExposure.all,
-                          child: Text('全部工具'),
+                          child: Text(UiText.t('全部工具', 'All tools')),
                         ),
                         DropdownMenuItem(
                           value: McpToolExposure.custom,
-                          child: Text('自定义（连接后在卡片中勾选）'),
+                          child: Text(UiText.t('自定义（连接后在卡片中勾选）', 'Custom (select in the card after connecting)')),
                         ),
                       ],
                       onChanged: (value) {
@@ -1133,20 +1186,20 @@ class _McpServerEditorDialogState extends State<_McpServerEditorDialog> {
                       },
                     ),
                     const SizedBox(height: 8),
-                    _switchRow('启用服务器', _enabled, (v) => setState(() => _enabled = v)),
-                    _switchRow('应用启动时自动连接', _autoConnect, (v) => setState(() => _autoConnect = v)),
-                    _switchRow('允许 Agent 使用资源', _exposeResources, (v) => setState(() => _exposeResources = v)),
-                    _switchRow('允许 Agent 使用提示词', _exposePrompts, (v) => setState(() => _exposePrompts = v)),
+                    _switchRow(UiText.t('启用服务器', 'Enable server'), _enabled, (v) => setState(() => _enabled = v)),
+                    _switchRow(UiText.t('应用启动时自动连接', 'Auto-connect on app start'), _autoConnect, (v) => setState(() => _autoConnect = v)),
+                    _switchRow(UiText.t('允许 Agent 使用资源', 'Allow the Agent to use resources'), _exposeResources, (v) => setState(() => _exposeResources = v)),
+                    _switchRow(UiText.t('允许 Agent 使用提示词', 'Allow the Agent to use prompts'), _exposePrompts, (v) => setState(() => _exposePrompts = v)),
                     if (_transport == McpTransportKind.streamableHttp) ...[
                       Divider(color: tc.hairline, height: 24),
-                      _switchRow('使用 OAuth 授权', _oauth, (v) => setState(() => _oauth = v)),
+                      _switchRow(UiText.t('使用 OAuth 授权', 'Use OAuth authorization'), _oauth, (v) => setState(() => _oauth = v)),
                       if (_oauth) ...[
                         const SizedBox(height: 8),
-                        _field('OAuth scopes（空格/逗号分隔，可选）', _scopes),
+                        _field(UiText.t('OAuth scopes（空格/逗号分隔，可选）', 'OAuth scopes (space/comma separated, optional)'), _scopes),
                         const SizedBox(height: 12),
-                        _field('OAuth clientId（留空走 DCR）', _clientId),
+                        _field(UiText.t('OAuth clientId（留空走 DCR）', 'OAuth clientId (blank uses DCR)'), _clientId),
                         const SizedBox(height: 12),
-                        _field('OAuth clientSecret（可选）', _clientSecret, obscure: true),
+                        _field(UiText.t('OAuth clientSecret（可选）', 'OAuth clientSecret (optional)'), _clientSecret, obscure: true),
                       ],
                     ],
                     const SizedBox(height: 16),
@@ -1157,8 +1210,12 @@ class _McpServerEditorDialogState extends State<_McpServerEditorDialog> {
                         borderRadius: BorderRadius.circular(rSmall),
                       ),
                       child: Text(
-                        'MCP 服务器可以返回工具描述和外部内容，存在 prompt injection 风险。'
-                        '建议先用只读策略确认行为；headers/env/secret 保存在本机加密凭据库，编辑页会显示当前值。',
+                        UiText.t(
+                          'MCP 服务器可以返回工具描述和外部内容，存在 prompt injection 风险。'
+                              '建议先用只读策略确认行为；headers/env/secret 保存在本机加密凭据库，编辑页会显示当前值。',
+                          'MCP servers can return tool descriptions and external content, so prompt injection is a risk. '
+                              'Start with the read-only policy to confirm behavior. Headers/env/secret are stored in the local encrypted credential store; this editor shows their current values.',
+                        ),
                         style: TextStyle(color: tc.textSub, fontSize: fMicro, height: 1.5),
                       ),
                     ),
@@ -1181,7 +1238,7 @@ class _McpServerEditorDialogState extends State<_McpServerEditorDialog> {
                 children: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
-                    child: const Text('取消'),
+                    child: Text(UiText.t('取消', 'Cancel')),
                   ),
                   const SizedBox(width: 8),
                   FilledButton(
@@ -1190,7 +1247,7 @@ class _McpServerEditorDialogState extends State<_McpServerEditorDialog> {
                       backgroundColor: tc.brand,
                       foregroundColor: tc.isLight ? Colors.white : cBg,
                     ),
-                    child: Text(_enabled ? '保存并连接' : '保存'),
+                    child: Text(_enabled ? UiText.t('保存并连接', 'Save & connect') : UiText.t('保存', 'Save')),
                   ),
                 ],
               ),
@@ -1255,12 +1312,12 @@ class _McpServerEditorDialogState extends State<_McpServerEditorDialog> {
   void _save() {
     final name = _name.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = '名称不能为空');
+      setState(() => _error = UiText.t('名称不能为空', 'Name is required'));
       return;
     }
     if (_transport == McpTransportKind.stdio) {
       if (_command.text.trim().isEmpty) {
-        setState(() => _error = 'stdio 传输需要启动命令');
+        setState(() => _error = UiText.t('stdio 传输需要启动命令', 'stdio transport requires a start command'));
         return;
       }
     } else {
@@ -1269,18 +1326,18 @@ class _McpServerEditorDialogState extends State<_McpServerEditorDialog> {
           !uri.hasScheme ||
           (uri.scheme != 'http' && uri.scheme != 'https') ||
           uri.host.isEmpty) {
-        setState(() => _error = '服务器 URL 必须是 http(s) 地址');
+        setState(() => _error = UiText.t('服务器 URL 必须是 http(s) 地址', 'Server URL must be an http(s) address'));
         return;
       }
     }
     final timeout = int.tryParse(_timeout.text.trim());
     if (timeout == null || timeout < 3000 || timeout > 120000) {
-      setState(() => _error = '超时需在 3000-120000ms 之间');
+      setState(() => _error = UiText.t('超时需在 3000-120000ms 之间', 'Timeout must be between 3000 and 120000 ms'));
       return;
     }
     final maxTools = int.tryParse(_maxTools.text.trim());
     if (maxTools == null || maxTools < 1 || maxTools > 40) {
-      setState(() => _error = '工具上限需在 1-40 之间');
+      setState(() => _error = UiText.t('工具上限需在 1-40 之间', 'Tool limit must be between 1 and 40'));
       return;
     }
     final proxyRaw = _proxy.text.trim();
@@ -1365,5 +1422,16 @@ class _McpServerEditorDialogState extends State<_McpServerEditorDialog> {
       if (key.isNotEmpty) out[key] = value;
     }
     return out;
+  }
+}
+
+String _mcpTransportLabel(McpTransportKind kind) {
+  switch (kind) {
+    case McpTransportKind.streamableHttp:
+      return 'Streamable HTTP';
+    case McpTransportKind.sse:
+      return UiText.t('HTTP + SSE（旧版）', 'HTTP + SSE (legacy)');
+    case McpTransportKind.stdio:
+      return UiText.t('stdio（本地进程）', 'stdio (local process)');
   }
 }

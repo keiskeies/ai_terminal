@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../core/constants.dart';
+import '../core/ui_text.dart';
 import '../services/daos.dart';
 import '../core/theme_colors.dart';
 import '../l10n/app_localizations.dart';
@@ -117,15 +118,21 @@ class SettingsPage extends ConsumerWidget {
                   _SettingItem(
                     icon: Icons.travel_explore_rounded,
                     iconColor: cInfo,
-                    title: '联网搜索',
-                    subtitle: 'AI 知识不足时主动搜索网络（web_search / fetch_url）',
+                    title: UiText.t('联网搜索', 'Web Search'),
+                    subtitle: UiText.t(
+                      'AI 知识不足时主动搜索网络（web_search / fetch_url）',
+                      'Let AI search the web when its knowledge is not enough (web_search / fetch_url)',
+                    ),
                     onTap: () => context.push('/settings/web_search'),
                   ),
                   _SettingItem(
                     icon: Icons.hub_outlined,
                     iconColor: cInfo,
-                    title: 'MCP 服务器',
-                    subtitle: '接入外部 tools / resources / prompts（HTTP / stdio）',
+                    title: UiText.t('MCP 服务器', 'MCP Servers'),
+                    subtitle: UiText.t(
+                      '接入外部 tools / resources / prompts（HTTP / stdio）',
+                      'Connect external tools / resources / prompts (HTTP / stdio)',
+                    ),
                     onTap: () => context.push('/settings/mcp'),
                   ),
                   _SettingItem(
@@ -193,7 +200,7 @@ class SettingsPage extends ConsumerWidget {
                   _SettingItem(
                     icon: Icons.bug_report_outlined,
                     iconColor: cWarning,
-                    title: '诊断',
+                    title: UiText.t('诊断', 'Diagnostics'),
                     subtitle: _diagnosticsSubtitle(),
                     onTap: () => _showDiagnosticsDialog(context),
                   ),
@@ -368,13 +375,16 @@ class SettingsPage extends ConsumerWidget {
   String _diagnosticsSubtitle() {
     final count = crashReporter.sessionCrashCount;
     if (count > 0) {
-      return '本次会话崩溃 $count 次';
+      return UiText.t('本次会话崩溃 $count 次', '$count crash(es) this session');
     }
     final lastTime = crashReporter.lastCrashTime;
     if (lastTime != null) {
-      return '上次崩溃: ${_formatTime(lastTime)}';
+      return UiText.t(
+        '上次崩溃: ${_formatTime(lastTime)}',
+        'Last crash: ${_formatTime(lastTime)}',
+      );
     }
-    return '查看崩溃日志与健康状态';
+    return UiText.t('查看崩溃日志与健康状态', 'View crash log and health status');
   }
 
   String _formatTime(DateTime t) {
@@ -403,7 +413,7 @@ class SettingsPage extends ConsumerWidget {
           children: [
             const Icon(Icons.bug_report_outlined, color: cWarning, size: 22),
             const SizedBox(width: 8),
-            Text('诊断', style: TextStyle(color: tc.textMain, fontSize: fTitle)),
+            Text(UiText.t('诊断', 'Diagnostics'), style: TextStyle(color: tc.textMain, fontSize: fTitle)),
           ],
         ),
         content: SizedBox(
@@ -413,35 +423,35 @@ class SettingsPage extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                _diagRow(tc, '应用版本', '${info?.version ?? "unknown"}+${info?.buildNumber ?? "0"}'),
-                _diagRow(tc, '本次会话崩溃', '${crashReporter.sessionCrashCount} 次'),
-                _diagRow(tc, '上次崩溃时间',
+                _diagRow(tc, UiText.t('应用版本', 'App version'), '${info?.version ?? "unknown"}+${info?.buildNumber ?? "0"}'),
+                _diagRow(tc, UiText.t('本次会话崩溃', 'Crashes this session'), '${crashReporter.sessionCrashCount}'),
+                _diagRow(tc, UiText.t('上次崩溃时间', 'Last crash time'),
                     crashReporter.lastCrashTime != null
                         ? _formatTime(crashReporter.lastCrashTime!)
-                        : '无'),
+                        : UiText.t('无', 'None')),
                 if (crashReporter.lastCrashSummary != null)
-                  _diagRow(tc, '上次崩溃摘要', crashReporter.lastCrashSummary!),
+                  _diagRow(tc, UiText.t('上次崩溃摘要', 'Last crash summary'), crashReporter.lastCrashSummary!),
                 const Divider(height: 24),
-                Text('健康检查', style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
+                Text(UiText.t('健康检查', 'Health check'), style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
-                _diagRow(tc, 'SSH 池连接', '${snap.sshTotalConnections} 个 (ref=${snap.sshTotalRefCount})'),
-                _diagRow(tc, '已死连接', snap.sshDeadConnections > 0
-                    ? '${snap.sshDeadConnections} 个 (需关注)'
+                _diagRow(tc, UiText.t('SSH 池连接', 'SSH pool connections'), '${snap.sshTotalConnections} (ref=${snap.sshTotalRefCount})'),
+                _diagRow(tc, UiText.t('已死连接', 'Dead connections'), snap.sshDeadConnections > 0
+                    ? UiText.t('${snap.sshDeadConnections} 个 (需关注)', '${snap.sshDeadConnections} (needs attention)')
                     : '0'),
-                _diagRow(tc, '磁盘可写', snap.diskWritable ? '是' : '否 (致命问题!)'),
-                _diagRow(tc, '检查时间', _formatTime(snap.timestamp)),
+                _diagRow(tc, UiText.t('磁盘可写', 'Disk writable'), snap.diskWritable ? UiText.t('是', 'Yes') : UiText.t('否 (致命问题!)', 'No (critical!)')),
+                _diagRow(tc, UiText.t('检查时间', 'Checked at'), _formatTime(snap.timestamp)),
                 const Divider(height: 24),
                 Row(
                   children: [
                     TextButton.icon(
                       icon: const Icon(Icons.copy, size: 16),
-                      label: const Text('复制崩溃日志'),
+                      label: Text(UiText.t('复制崩溃日志', 'Copy crash log')),
                       onPressed: () async {
                         final content = await crashReporter.readLog();
                         if (!ctx.mounted) return;
                         if (content.isEmpty) {
-                          showTopSnackBar(ctx, const SnackBar(
-                            content: Text('崩溃日志为空'),
+                          showTopSnackBar(ctx, SnackBar(
+                            content: Text(UiText.t('崩溃日志为空', 'Crash log is empty')),
                             behavior: SnackBarBehavior.floating,
                           ));
                           return;
@@ -449,7 +459,10 @@ class SettingsPage extends ConsumerWidget {
                         await Clipboard.setData(ClipboardData(text: content));
                         if (!ctx.mounted) return;
                         showTopSnackBar(ctx, SnackBar(
-                          content: Text('已复制 ${content.length} 字符'),
+                          content: Text(UiText.t(
+                            '已复制 ${content.length} 字符',
+                            'Copied ${content.length} characters',
+                          )),
                           backgroundColor: cSuccess,
                           behavior: SnackBarBehavior.floating,
                         ));
@@ -457,13 +470,13 @@ class SettingsPage extends ConsumerWidget {
                     ),
                     TextButton.icon(
                       icon: const Icon(Icons.delete_outline, size: 16),
-                      label: const Text('清除'),
+                      label: Text(UiText.t('清除', 'Clear')),
                       onPressed: () async {
                         await crashReporter.clearLog();
                         if (!ctx.mounted) return;
                         Navigator.pop(ctx);
-                        showTopSnackBar(ctx, const SnackBar(
-                          content: Text('已清除崩溃日志'),
+                        showTopSnackBar(ctx, SnackBar(
+                          content: Text(UiText.t('已清除崩溃日志', 'Crash log cleared')),
                           backgroundColor: cSuccess,
                           behavior: SnackBarBehavior.floating,
                         ));
@@ -493,7 +506,7 @@ class SettingsPage extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 100,
+            width: 150,
             child: Text(label, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
           ),
           Expanded(

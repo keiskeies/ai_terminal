@@ -36,7 +36,7 @@ enum TabStatus {
 class TerminalTab {
   final String id;
   final String hostId; // 本地终端为 'local'
-  final String title;
+  String title;
   TabStatus status;
 
   /// 连接失败原因（已带分类提示），仅在 [TabStatus.failed] / [TabStatus.lost] 时有值
@@ -210,6 +210,18 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
       activeTabId: tab.id,
     );
     return tab;
+  }
+
+  /// 本地标签的标题在创建时取自当前语言；切换语言后由页面同步为新标题。
+  void syncLocalTabTitle(String title) {
+    var changed = false;
+    for (final tab in state.tabs) {
+      if (tab.isLocal && tab.title != title) {
+        tab.title = title;
+        changed = true;
+      }
+    }
+    if (changed) _publish();
   }
 
   /// 在已注册的标签上建立 SSH 连接；成功返回该标签，失败返回 null（状态已写入标签）

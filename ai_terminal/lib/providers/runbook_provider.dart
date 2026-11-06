@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../services/daos.dart';
 import '../models/runbook.dart';
+import '../core/builtin_runbook_i18n.dart';
 import '../core/l10n_holder.dart';
 
 const _uuid = Uuid();
@@ -62,8 +63,9 @@ class RunbookNotifier extends StateNotifier<List<Runbook>> {
   /// 克隆内置模板为自定义工作流
   /// 分配新 id，名字加 "(副本)"，category=custom，isBuiltin=false
   Future<Runbook?> cloneRunbook(String id) async {
-    final rb = RunbooksDao.getCachedById(id);
-    if (rb == null) return null;
+    final stored = RunbooksDao.getCachedById(id);
+    if (stored == null) return null;
+    final rb = BuiltinRunbookI18n.localize(stored);
     final cloned = rb.clone();
     cloned.id = _uuid.v4();
     await RunbooksDao.upsert(cloned);

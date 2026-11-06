@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 import '../services/web_search_config.dart';
 import '../services/web_search_service.dart';
 import '../core/app_toast.dart';
@@ -139,7 +140,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
     } catch (e) {
       if (!mounted || generation != _statusGeneration) return;
       setState(() => _statusLoading = false);
-      _showSnack('读取 Key 状态失败：$e', error: true);
+      _showSnack(UiText.t('读取 Key 状态失败：$e', 'Failed to read key status: $e'), error: true);
     }
   }
 
@@ -147,7 +148,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('联网搜索')),
+      appBar: AppBar(title: Text(UiText.t('联网搜索', 'Web Search'))),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 960),
@@ -162,8 +163,12 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
               _buildStatusCard(tc),
               const SizedBox(height: 12),
               Text(
-                '聚合网络搜索：12 个后端并发 fan-out、URL 去重合并。'
-                '开关后端、填 API Key、调参数，保存即生效。',
+                UiText.t(
+                  '聚合网络搜索：12 个后端并发 fan-out、URL 去重合并。'
+                      '开关后端、填 API Key、调参数，保存即生效。',
+                  'Aggregated web search: 12 backends fan out concurrently and merge duplicate URLs. '
+                      'Toggle backends, add API keys, tune parameters, then save.',
+                ),
                 style: TextStyle(
                   color: tc.textSub,
                   fontSize: fSmall,
@@ -171,7 +176,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
                 ),
               ),
               const SizedBox(height: 20),
-              _buildSectionTitle('免密钥（开箱即用）', tc),
+              _buildSectionTitle(UiText.t('免密钥（开箱即用）', 'No key needed (ready to use)'), tc),
               _buildPanel(
                 tc,
                 _twoColumn(
@@ -183,7 +188,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
                 ),
               ),
               const SizedBox(height: 20),
-              _buildSectionTitle('需要 API Key', tc),
+              _buildSectionTitle(UiText.t('需要 API Key', 'API key required'), tc),
               _buildPanel(
                 tc,
                 Column(
@@ -208,20 +213,23 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
                     ),
                     const SizedBox(height: 12),
                     Text(
-                      'DeepSeek 官方 API 不提供网页搜索，保留占位行且不会发起请求。',
+                      UiText.t(
+                        'DeepSeek 官方 API 不提供网页搜索，保留占位行且不会发起请求。',
+                        'The DeepSeek official API does not provide web search; this row is a placeholder and never sends a request.',
+                      ),
                       style: TextStyle(color: tc.textMuted, fontSize: fMicro),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 20),
-              _buildSectionTitle('私有实例可选 Key', tc),
+              _buildSectionTitle(UiText.t('私有实例可选 Key', 'Private instance (optional key)'), tc),
               _buildPanel(tc, _buildSearxngPanel(tc)),
               const SizedBox(height: 20),
-              _buildSectionTitle('全局参数', tc),
+              _buildSectionTitle(UiText.t('全局参数', 'Global parameters'), tc),
               _buildPanel(tc, _buildGlobalParams(tc)),
               const SizedBox(height: 20),
-              _buildSectionTitle('立即测试', tc),
+              _buildSectionTitle(UiText.t('立即测试', 'Test now'), tc),
               _buildPanel(tc, _buildTestPanel(tc)),
             ],
           ),
@@ -257,12 +265,14 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     _statText(
-                      _draft.enabled ? '已启用后端: ' : '已选后端: ',
+                      _draft.enabled
+                          ? UiText.t('已启用后端: ', 'Enabled backends: ')
+                          : UiText.t('已选后端: ', 'Selected backends: '),
                       '${_draft.enabledCount}/${WebSearchProvider.values.length}',
                       tc,
                     ),
                     _statText(
-                      '已配置密钥: ',
+                      UiText.t('已配置密钥: ', 'Configured keys: '),
                       '$configuredKeys/'
                           '${WebSearchProvider.values.where((p) => p.requiresApiKey).length}',
                       tc,
@@ -282,7 +292,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
                         ),
                       )
                     : const Icon(Icons.refresh, size: 16),
-                label: const Text('刷新状态'),
+                label: Text(UiText.t('刷新状态', 'Refresh status')),
               ),
             ],
           ),
@@ -303,8 +313,12 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '启用联网搜索（总开关）。关闭后 AI 不会调用 web_search / fetch_url；'
-                  '勾选任意后端会自动开启，会话页底部栏仍可临时覆盖。',
+                  UiText.t(
+                    '启用联网搜索（总开关）。关闭后 AI 不会调用 web_search / fetch_url；'
+                        '勾选任意后端会自动开启，会话页底部栏仍可临时覆盖。',
+                    'Enable web search (master switch). When off, the AI cannot call web_search / fetch_url. '
+                        'Selecting any backend turns it on; the session footer can still override it temporarily.',
+                  ),
                   style: TextStyle(
                     color: tc.textSub,
                     fontSize: fSmall,
@@ -393,7 +407,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
                     const SizedBox(width: 6),
                     Flexible(
                       child: Text(
-                        provider.tagline,
+                        _tagline(provider),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -406,14 +420,43 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
                 ),
               ),
               if (!available)
-                _badge('不可用', tc.textMuted)
+                _badge(UiText.t('不可用', 'Unavailable'), tc.textMuted)
               else if (enabled && needsKey)
-                _badge('需 Key', tc.warn),
+                _badge(UiText.t('需 Key', 'Key required'), tc.warn),
             ],
           ),
         ),
       ),
     );
+  }
+
+  String _tagline(WebSearchProvider provider) {
+    switch (provider) {
+      case WebSearchProvider.exa:
+        return UiText.t('语义搜索 · 需 Key', 'Semantic search · key required');
+      case WebSearchProvider.parallel:
+        return UiText.t('搜索 API · 需 Key', 'Search API · key required');
+      case WebSearchProvider.bingRss:
+        return UiText.t('RSS · 免密钥', 'RSS · no key');
+      case WebSearchProvider.duckduckgo:
+        return UiText.t('HTML · 国内需代理', 'HTML · proxy may be needed');
+      case WebSearchProvider.searxng:
+        return UiText.t('需自建实例', 'Self-hosted instance required');
+      case WebSearchProvider.brave:
+        return UiText.t('独立索引', 'Independent index');
+      case WebSearchProvider.tavily:
+        return UiText.t('AI 优化摘要', 'AI-optimized summaries');
+      case WebSearchProvider.serper:
+        return UiText.t('Google 结果', 'Google results');
+      case WebSearchProvider.mojeek:
+        return UiText.t('独立索引', 'Independent index');
+      case WebSearchProvider.deepseek:
+        return UiText.t('暂无搜索 API', 'No search API');
+      case WebSearchProvider.anthropic:
+        return UiText.t('Claude 搜索工具', 'Claude search tool');
+      case WebSearchProvider.openai:
+        return UiText.t('Responses 搜索', 'Responses search');
+    }
   }
 
   Widget _buildSquareCheck(bool checked, bool enabled, ThemeColors tc) {
@@ -489,12 +532,12 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
     final fromEnv = status?.fromEnv == true && status?.fromStore != true;
     final obscure = _obscureKeys[provider] ?? true;
     final badgeText = _statusLoading
-        ? '检查中'
+        ? UiText.t('检查中', 'Checking')
         : fromEnv
-            ? '环境变量'
+            ? UiText.t('环境变量', 'Environment')
             : configured
-                ? '已配置'
-                : '未配置';
+                ? UiText.t('已配置', 'Configured')
+                : UiText.t('未配置', 'Not configured');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -521,8 +564,8 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
                   children: [
                     Text(
                       provider == WebSearchProvider.searxng
-                          ? '部署文档'
-                          : '获取 Key',
+                          ? UiText.t('部署文档', 'Deploy guide')
+                          : UiText.t('获取 Key', 'Get key'),
                       style: TextStyle(color: tc.brand, fontSize: fMicro),
                     ),
                     const SizedBox(width: 2),
@@ -535,7 +578,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
               InkWell(
                 onTap: () => _requestClearKey(provider),
                 child: Text(
-                  '清除',
+                  UiText.t('清除', 'Clear'),
                   style: TextStyle(color: tc.warn, fontSize: fMicro),
                 ),
               ),
@@ -557,10 +600,10 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             helperText: provider == WebSearchProvider.searxng
-                ? '可选 Token：作为 Authorization: Bearer 发送'
-                : '留空表示不修改；也可使用同名环境变量',
+                ? UiText.t('可选 Token：作为 Authorization: Bearer 发送', 'Optional token, sent as Authorization: Bearer')
+                : UiText.t('留空表示不修改；也可使用同名环境变量', 'Leave blank to keep unchanged; an environment variable of the same name also works'),
             helperStyle: TextStyle(color: tc.textMuted, fontSize: fMicro),
-            helperMaxLines: 1,
+            helperMaxLines: 2,
             suffixIconConstraints:
                 const BoxConstraints(minWidth: 36, minHeight: 32),
             suffixIcon: IconButton(
@@ -580,7 +623,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              '保存后将清除已保存的 Key',
+              UiText.t('保存后将清除已保存的 Key', 'The saved key will be cleared on save'),
               style: TextStyle(color: tc.warn, fontSize: fMicro),
             ),
           ),
@@ -605,7 +648,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'SearXNG 实例地址',
+          UiText.t('SearXNG 实例地址', 'SearXNG instance URL'),
           style: TextStyle(
             color: tc.textBody,
             fontSize: fSmall,
@@ -626,9 +669,14 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
         ),
         const SizedBox(height: 8),
         Text(
-          '公共实例（含 searx.be）通常禁用 format=json，只回 HTML，必须自建：'
-          'docker run -d -p 8080:8080 searxng/searxng，并在 settings.yml 启用 '
-          'search.formats: [json]。本机实例直接填 http://127.0.0.1:8888 这类地址即可。',
+          UiText.t(
+            '公共实例（含 searx.be）通常禁用 format=json，只回 HTML，必须自建：'
+                'docker run -d -p 8080:8080 searxng/searxng，并在 settings.yml 启用 '
+                'search.formats: [json]。本机实例直接填 http://127.0.0.1:8888 这类地址即可。',
+            'Public instances (including searx.be) usually disable format=json and only return HTML, so host your own: '
+                'docker run -d -p 8080:8080 searxng/searxng, then enable search.formats: [json] in settings.yml. '
+                'For a local instance, enter an address such as http://127.0.0.1:8888.',
+          ),
           style: TextStyle(color: tc.textSub, fontSize: fMicro, height: 1.5),
         ),
         const SizedBox(height: 4),
@@ -637,7 +685,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
             'https://docs.searxng.org/admin/installation.html',
           ),
           child: Text(
-            'SearXNG 部署文档 →',
+            UiText.t('SearXNG 部署文档 →', 'SearXNG deployment guide →'),
             style: TextStyle(
               color: tc.brand,
               fontSize: fMicro,
@@ -666,7 +714,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
               errorKey: 'numResults',
               controller: _numResultsController,
               hint: '8',
-              helper: '最终返回条数（1-20）',
+              helper: UiText.t('最终返回条数（1-20）', 'Results returned (1-20)'),
               tc: tc,
             ),
             _buildNumberField(
@@ -674,7 +722,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
               errorKey: 'concurrency',
               controller: _concurrencyController,
               hint: '6',
-              helper: '同时请求的后端数（1-12）',
+              helper: UiText.t('同时请求的后端数（1-12）', 'Concurrent backends (1-12)'),
               tc: tc,
             ),
             _buildNumberField(
@@ -682,7 +730,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
               errorKey: 'backendTimeoutMs',
               controller: _timeoutController,
               hint: '30000',
-              helper: '单个后端最长等待（3000-120000ms）',
+              helper: UiText.t('单个后端最长等待（3000-120000ms）', 'Per-backend timeout (3000-120000 ms)'),
               tc: tc,
             ),
           ],
@@ -690,7 +738,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
         ),
         const SizedBox(height: 14),
         Text(
-          '出站代理',
+          UiText.t('出站代理', 'Outbound proxy'),
           style: TextStyle(
             color: tc.textBody,
             fontSize: fSmall,
@@ -711,7 +759,10 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
             isDense: true,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-            helperText: 'HTTP 代理，留空直连；HTTPS 目标自动走 CONNECT，不支持 SOCKS5',
+            helperText: UiText.t(
+              'HTTP 代理，留空直连；HTTPS 目标自动走 CONNECT，不支持 SOCKS5',
+              'HTTP proxy; leave blank for direct access. HTTPS targets use CONNECT automatically. SOCKS5 is not supported.',
+            ),
             helperStyle: TextStyle(color: tc.textMuted, fontSize: fMicro),
             helperMaxLines: 2,
             errorText: _fieldErrors['proxy'],
@@ -759,7 +810,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
             helperText: _fieldErrors.containsKey(errorKey) ? null : helper,
             helperStyle: TextStyle(color: tc.textMuted, fontSize: fMicro),
-            helperMaxLines: 1,
+            helperMaxLines: 2,
             errorText: _fieldErrors[errorKey],
             errorStyle: TextStyle(color: tc.error, fontSize: fMicro),
           ),
@@ -784,10 +835,10 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
                 controller: _testController,
                 style: TextStyle(color: tc.textMain, fontSize: fSmall),
                 onSubmitted: (_) => _runTest(),
-                decoration: const InputDecoration(
-                  hintText: '输入查询，例如 OpenAI latest news',
+                decoration: InputDecoration(
+                  hintText: UiText.t('输入查询，例如 OpenAI latest news', 'Enter a query, e.g. OpenAI latest news'),
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(
+                  contentPadding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 12,
                   ),
@@ -813,7 +864,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
                       ),
                     )
                   : const Icon(Icons.search, size: 16),
-              label: Text(_testRunning ? '搜索中' : '搜索'),
+              label: Text(_testRunning ? UiText.t('搜索中', 'Searching') : UiText.t('搜索', 'Search')),
             ),
           ],
         ),
@@ -851,7 +902,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
           const SizedBox(height: 10),
           if (response.results.isEmpty)
             Text(
-              '没有匹配结果。',
+              UiText.t('没有匹配结果。', 'No matching results.'),
               style: TextStyle(color: tc.textSub, fontSize: fSmall),
             )
           else
@@ -971,7 +1022,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
                 if (result.sources.isNotEmpty) ...[
                   const SizedBox(height: 4),
                   Text(
-                    '来源: ${result.sources.map((p) => p.displayName).join(' / ')}',
+                    UiText.t('来源: ', 'Sources: ') + result.sources.map((p) => p.displayName).join(' / '),
                     style: TextStyle(color: tc.textMuted, fontSize: fMicro),
                   ),
                 ],
@@ -1001,7 +1052,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
   Future<void> _runTest() async {
     final query = _testController.text.trim();
     if (query.isEmpty) {
-      _showSnack('请输入查询关键词');
+      _showSnack(UiText.t('请输入查询关键词', 'Please enter a search query'));
       return;
     }
     final config = _readConfigFromForm();
@@ -1047,7 +1098,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
       setState(() => _testError = e.message);
     } catch (e) {
       if (!mounted || generation != _testGeneration) return;
-      setState(() => _testError = '测试失败：$e');
+      setState(() => _testError = UiText.t('测试失败：$e', 'Test failed: $e'));
     } finally {
       if (mounted && generation == _testGeneration) {
         setState(() {
@@ -1070,7 +1121,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
       20,
       errors,
       'numResults',
-      '需在 1-20 之间',
+      UiText.t('需在 1-20 之间', 'Must be between 1 and 20'),
     );
     final concurrency = _parseInt(
       _concurrencyController.text,
@@ -1078,7 +1129,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
       12,
       errors,
       'concurrency',
-      '需在 1-12 之间',
+      UiText.t('需在 1-12 之间', 'Must be between 1 and 12'),
     );
     final backendTimeoutMs = _parseInt(
       _timeoutController.text,
@@ -1086,12 +1137,15 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
       120000,
       errors,
       'backendTimeoutMs',
-      '需在 3000-120000 之间',
+      UiText.t('需在 3000-120000 之间', 'Must be between 3000 and 120000'),
     );
     final proxyRaw = _proxyController.text.trim();
     final proxy = _normalizeProxy(proxyRaw);
     if (proxyRaw.isNotEmpty && proxy == null) {
-      errors['proxy'] = '仅支持 http://host:port，不支持 SOCKS5/代理账号密码';
+      errors['proxy'] = UiText.t(
+        '仅支持 http://host:port，不支持 SOCKS5/代理账号密码',
+        'Only http://host:port is supported; SOCKS5 and proxy credentials are not supported',
+      );
     }
     setState(() {
       _fieldErrors
@@ -1099,7 +1153,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
         ..addAll(errors);
     });
     if (errors.isNotEmpty) {
-      _showSnack('参数有误，请检查高亮字段', error: true);
+      _showSnack(UiText.t('参数有误，请检查高亮字段', 'Invalid parameters; check the highlighted fields'), error: true);
       return null;
     }
     return _draft.copyWith(
@@ -1147,7 +1201,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
     try {
       await config.save();
     } catch (e) {
-      _showSnack('配置保存失败：$e', error: true);
+      _showSnack(UiText.t('配置保存失败：$e', 'Failed to save configuration: $e'), error: true);
       return;
     }
 
@@ -1176,12 +1230,16 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
 
     if (failedProviders.isNotEmpty) {
       _showSnack(
-        '配置已保存，但这些 Key 写入失败：'
-        '${failedProviders.map((p) => p.displayName).join('、')}',
+        UiText.t(
+          '配置已保存，但这些 Key 写入失败：'
+              '${failedProviders.map((p) => p.displayName).join('、')}',
+          'Configuration saved, but these keys failed to save: '
+              '${failedProviders.map((p) => p.displayName).join(', ')}',
+        ),
         error: true,
       );
     } else {
-      _showSnack('已保存，立即生效');
+      _showSnack(UiText.t('已保存，立即生效', 'Saved and applied'));
     }
     // 状态刷新异步进行，不阻塞保存确认
     _refreshKeyStatus();
@@ -1209,7 +1267,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
       _testError = null;
     });
     _refreshKeyStatus();
-    _showSnack('已恢复上次保存的状态');
+    _showSnack(UiText.t('已恢复上次保存的状态', 'Restored the last saved state'));
   }
 
   // ─────────────────────────────────────────────────────────────
@@ -1283,7 +1341,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
             OutlinedButton.icon(
               onPressed: _reset,
               icon: const Icon(Icons.restore, size: 16),
-              label: const Text('重置状态'),
+              label: Text(UiText.t('重置状态', 'Reset')),
             ),
             const SizedBox(width: 12),
             FilledButton(
@@ -1293,7 +1351,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
                 foregroundColor: tc.isLight ? Colors.white : cBg,
                 minimumSize: const Size(88, 38),
               ),
-              child: const Text('保存'),
+              child: Text(UiText.t('保存', 'Save')),
             ),
           ],
         ),
@@ -1303,7 +1361,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
 
   void _copyUrl(String url) {
     Clipboard.setData(ClipboardData(text: url));
-    _showSnack('链接已复制: $url');
+    _showSnack(UiText.t('链接已复制: $url', 'Link copied: $url'));
   }
 
   void _showSnack(String message, {bool error = false}) {

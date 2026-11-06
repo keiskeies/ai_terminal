@@ -5,6 +5,8 @@ import 'package:uuid/uuid.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../l10n/app_localizations.dart';
+import '../core/builtin_runbook_i18n.dart';
+import '../core/ui_text.dart';
 import '../models/runbook.dart';
 import '../providers/runbook_provider.dart';
 import '../core/app_toast.dart';
@@ -85,7 +87,8 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
-    final runbooks = ref.watch(runbooksProvider);
+    final runbooks =
+        BuiltinRunbookI18n.localizeAll(ref.watch(runbooksProvider));
     final filtered = _filterRunbooks(runbooks);
     final grouped = _groupByCategory(filtered);
 
@@ -1152,16 +1155,28 @@ class _RunbookImportDialogState extends State<_RunbookImportDialog> {
                 border: Border.all(color: tc.border),
               ),
               child: SelectableText(
-                '[\n'
-                '  {\n'
-                '    "name": "磁盘巡检",\n'
-                '    "icon": "🩺",\n'
-                '    "type": "agent",\n'
-                '    "category": "inspection",\n'
-                '    "description": "检查 {{host}} 磁盘使用情况",\n'
-                '    "content": "检查 {{host}} 的磁盘使用情况并给出建议"\n'
-                '  }\n'
-                ']',
+                UiText.t(
+                  '[\n'
+                      '  {\n'
+                      '    "name": "磁盘巡检",\n'
+                      '    "icon": "🩺",\n'
+                      '    "type": "agent",\n'
+                      '    "category": "inspection",\n'
+                      '    "description": "检查 {{host}} 磁盘使用情况",\n'
+                      '    "content": "检查 {{host}} 的磁盘使用情况并给出建议"\n'
+                      '  }\n'
+                      ']',
+                  '[\n'
+                      '  {\n'
+                      '    "name": "Disk Inspection",\n'
+                      '    "icon": "🩺",\n'
+                      '    "type": "agent",\n'
+                      '    "category": "inspection",\n'
+                      '    "description": "Check disk usage on {{host}}",\n'
+                      '    "content": "Check disk usage on {{host}} and suggest improvements"\n'
+                      '  }\n'
+                      ']',
+                ),
                 style: TextStyle(
                   fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                   fontSize: fMono,
