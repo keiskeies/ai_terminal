@@ -10,7 +10,7 @@ import '../services/agent_logger.dart';
 import '../utils/ansi_stripper.dart';
 
 /// 流式更新节流间隔（毫秒）
-const int _streamThrottleMs = 80;
+const int _streamThrottleMs = 120;
 
 /// 聊天状态
 class ChatState {
@@ -87,7 +87,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
   String? _activeHostId;
 
   /// 流式输出节流：累积文本但限制 UI 更新频率
-  String _streamingBuffer = '';
   Timer? _throttleTimer;
 
   final ConversationService _convService = ConversationService();
@@ -198,18 +197,18 @@ class ChatNotifier extends StateNotifier<ChatState> {
         hostAddress: host != null ? '${host.username}@${host.host}:${host.port}' : null,
       );
 
-      String fullResponse = '';
+      final responseBuffer = StringBuffer();
 
       _streamSubscription = stream.listen(
         (chunk) {
-          fullResponse += chunk;
-          _streamingBuffer = fullResponse;
+          responseBuffer.write(chunk);
           _throttleTimer ??= Timer(
             const Duration(milliseconds: _streamThrottleMs),
             () {
               _throttleTimer = null;
-              if (_streamingBuffer.isNotEmpty) {
-                state = state.copyWith(currentAssistantMessage: _streamingBuffer);
+              final text = responseBuffer.toString();
+              if (text.isNotEmpty) {
+                state = state.copyWith(currentAssistantMessage: text);
               }
             },
           );
@@ -217,7 +216,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
         onError: (error) {
           _throttleTimer?.cancel();
           _throttleTimer = null;
-          _streamingBuffer = '';
           state = state.copyWith(
             isLoading: false,
             error: error.toString(),
@@ -226,7 +224,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
         onDone: () {
           _throttleTimer?.cancel();
           _throttleTimer = null;
-          _streamingBuffer = '';
+          final fullResponse = responseBuffer.toString();
           final aiMessage = ChatMessage.create(
             role: 'assistant',
             content: fullResponse,
@@ -276,9 +274,17 @@ class ChatNotifier extends StateNotifier<ChatState> {
     return parts.isEmpty ? null : parts.join('\n\n');
   }
 
-  /// 更新上一条命令输出（执行完命令后调用）
+  /// lastCommandOutput 只用于拼上下文（取尾部 500 字符），保留过长输出没有意义
+  static const int _maxLastOutputChars = 4096;
+
+  /// 更新上一条命令输出（调用方按批节流，避免每个终端 chunk 都清洗+通知）
   void updateLastOutput(String output) {
-    state = state.copyWith(lastCommandOutput: AnsiStripper.strip(output));
+    var stripped = AnsiStripper.strip(output);
+    if (stripped.length > _maxLastOutputChars) {
+      stripped = stripped.substring(stripped.length - _maxLastOutputChars);
+    }
+    if (stripped == state.lastCommandOutput) return;
+    state = state.copyWith(lastCommandOutput: stripped);
   }
 
   /// 清空当前 host 的会话（同时清除持久化）
@@ -303,7 +309,6 @@ class ChatNotifier extends StateNotifier<ChatState> {
     _streamSubscription?.cancel();
     _throttleTimer?.cancel();
     _throttleTimer = null;
-    _streamingBuffer = '';
     state = state.copyWith(
       isLoading: false,
       currentAssistantMessage: null,

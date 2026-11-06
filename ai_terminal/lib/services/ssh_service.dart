@@ -4,6 +4,8 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import '../models/host_config.dart';
 import '../core/ssh_algorithms.dart';
+import '../utils/exit_marker_scanner.dart';
+import '../utils/tail_text_buffer.dart';
 import 'command_executor.dart';
 
 /// SSH 连接状态
@@ -146,9 +148,14 @@ class SSHService implements CommandExecutor {
         ),
       );
 
-      _session!.stdout.listen(
+      // 流式解码：跨包的半个多字节字符会被 decoder 暂存到下一包，
+      // 逐包 utf8.decode 会把中文显示成 �。
+      _session!.stdout
+          .cast<List<int>>()
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .listen(
         (data) {
-          outputController.add(utf8.decode(data, allowMalformed: true));
+          outputController.add(data);
         },
         onError: (error) {
           outputController.add('\r\n[错误] $error\r\n');
@@ -167,9 +174,12 @@ class SSHService implements CommandExecutor {
         },
       );
 
-      _session!.stderr.listen(
+      _session!.stderr
+          .cast<List<int>>()
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .listen(
         (data) {
-          outputController.add(utf8.decode(data, allowMalformed: true));
+          outputController.add(data);
         },
       );
 
@@ -256,13 +266,19 @@ class SSHService implements CommandExecutor {
     // → "对不起，请重试"，而 marker 再也不会出现。用户实机 `sudo apt update`
     // 反复失败正是这条路径，与 locale 无关。
     final wrappedCommand = posixWrapWithExitMarker(command, marker);
-    final donePattern = RegExp('${RegExp.escape(marker)}\\d+');
+    final markerScanner = ExitMarkerScanner(marker);
+    final donePattern = markerScanner.donePattern;
 
     // R8: buffer 必须有上限，保留尾部（最新输出），避免 cat huge_file OOM
     const maxBufferChars = 256 * 1024; // 256KB
+    // 异常检测只看尾部窗口：语法错误/PS2/密码提示/分页器状态都出现在输出末尾，
+    // 没必要每个 chunk 扫完整个 256KB。
+    const detectTailChars = 8192;
+    const evaluateIntervalMs = 150;
 
     // 独立流监听：等待 marker 出现（比 prompt regex 更可靠）
-    final buffer = StringBuffer();
+    final buffer = TailTextBuffer(maxBufferChars);
+    final detectBuffer = TailTextBuffer(detectTailChars);
     final doneCompleter = Completer<void>();
     // 异常完成的原因（非 null 表示异常完成，而非 marker 出现）
     // 通过 volatile 标记区分 onDone 是正常完成（marker 已出现）还是连接断开
@@ -270,6 +286,7 @@ class SSHService implements CommandExecutor {
     var abnormalReason = <String?>[];
     var pagerQuitSent = false;
     var pagerDetections = 0;
+    var lastEvaluateAtMs = -evaluateIntervalMs;
     // sudo 提示应答器：命中提示时把密码写进 stdin，而不是让检测器中断命令
     final sudoResponder = SudoPromptResponder();
     _pendingDoneCompleters.add(doneCompleter);
@@ -279,9 +296,14 @@ class SSHService implements CommandExecutor {
     // 抽出来是因为它既要在数据到达时跑，也要在"再也没有数据到达"时跑 ——
     // 命令停在密码提示上之后就再无输出，只靠流回调会永远等不到第二次判定，
     // 于是 300ms 门槛形同虚设，只能干满超时。
-    void evaluate() {
+    void evaluate({bool force = false}) {
       if (doneCompleter.isCompleted) return;
-      final snapshot = buffer.toString();
+      final elapsed = stopwatch.elapsedMilliseconds;
+      // 数据洪流下每 150ms 最多做一次全窗口检测；marker 检测已在数据回调里
+      // 用增量 carry 实时完成，不受这里节流影响。
+      if (!force && elapsed - lastEvaluateAtMs < evaluateIntervalMs) return;
+      lastEvaluateAtMs = elapsed;
+      final snapshot = detectBuffer.tail();
       if (donePattern.hasMatch(snapshot)) {
         markerSeen = true;
         doneCompleter.complete();
@@ -289,7 +311,7 @@ class SSHService implements CommandExecutor {
       }
       // 分页器等待按键：命令不会自己退出，主动按 q 让后续的 marker 执行。
       // 400ms 门槛 + 连续两次判定，避开输出恰好以 (END) 结尾但命令仍在跑的误判。
-      final pagerWaiting = stopwatch.elapsedMilliseconds >= 400 &&
+      final pagerWaiting = elapsed >= 400 &&
           PtyOutputDetector.waitsForPager(snapshot);
       pagerDetections = pagerWaiting ? pagerDetections + 1 : 0;
       if (!pagerQuitSent && pagerDetections >= 2) {
@@ -307,9 +329,10 @@ class SSHService implements CommandExecutor {
       final diag = PtyOutputDetector.detect(
         buffer: snapshot,
         marker: marker,
-        elapsedMs: stopwatch.elapsedMilliseconds,
+        elapsedMs: elapsed,
         isWindows: false,
         sudoPromptWillBeAnswered: sudoPassword != null,
+        donePattern: donePattern,
       );
       if (diag != null) {
         abnormalReason.add(diag.reason);
@@ -321,12 +344,12 @@ class SSHService implements CommandExecutor {
       (data) {
         if (doneCompleter.isCompleted) return; // marker 已出现，停止写入避免残留污染
         buffer.write(data);
-        // R8: 截断到尾部 256KB
-        if (buffer.length > maxBufferChars) {
-          final truncated = buffer.toString();
-          buffer
-            ..clear()
-            ..write(truncated.substring(truncated.length - maxBufferChars));
+        detectBuffer.write(data);
+        // 增量 marker 检测：只拼接上一块尾部，不做全缓冲扫描
+        if (markerScanner.add(data)) {
+          markerSeen = true;
+          doneCompleter.complete();
+          return;
         }
         evaluate();
       },
@@ -357,7 +380,7 @@ class SSHService implements CommandExecutor {
     recheck = Timer.periodic(
       const Duration(milliseconds: 400),
       (_) {
-        evaluate();
+        evaluate(force: true);
         if (doneCompleter.isCompleted) recheck.cancel();
       },
     );
@@ -612,13 +635,18 @@ class SSHService implements CommandExecutor {
         '$writeCmd; __ai_terminal_ec=\$?; '
         '[ -n "\$__ai_terminal_stty" ] && stty "\$__ai_terminal_stty" 2>/dev/null; '
         'echo "$marker\$__ai_terminal_ec"';
-    final donePattern = RegExp('${RegExp.escape(marker)}\\d+');
+    final markerScanner = ExitMarkerScanner(marker);
+    final donePattern = markerScanner.donePattern;
 
     const maxBufferChars = 256 * 1024;
-    final buffer = StringBuffer();
+    const detectTailChars = 8192;
+    const evaluateIntervalMs = 150;
+    final buffer = TailTextBuffer(maxBufferChars);
+    final detectBuffer = TailTextBuffer(detectTailChars);
     final doneCompleter = Completer<void>();
     var markerSeen = false;
     var abnormalReason = <String?>[];
+    var lastEvaluateAtMs = -evaluateIntervalMs;
     _pendingDoneCompleters.add(doneCompleter);
     StreamSubscription<String>? sub;
 
@@ -626,23 +654,22 @@ class SSHService implements CommandExecutor {
       (data) {
         if (doneCompleter.isCompleted) return;
         buffer.write(data);
-        if (buffer.length > maxBufferChars) {
-          final truncated = buffer.toString();
-          buffer
-            ..clear()
-            ..write(truncated.substring(truncated.length - maxBufferChars));
-        }
-        final snapshot = buffer.toString();
-        if (donePattern.hasMatch(snapshot)) {
+        detectBuffer.write(data);
+        if (markerScanner.add(data)) {
           markerSeen = true;
           doneCompleter.complete();
           return;
         }
+        final elapsed = stopwatch.elapsedMilliseconds;
+        if (elapsed - lastEvaluateAtMs < evaluateIntervalMs) return;
+        lastEvaluateAtMs = elapsed;
+        final snapshot = detectBuffer.tail();
         final diag = PtyOutputDetector.detect(
           buffer: snapshot,
           marker: marker,
-          elapsedMs: stopwatch.elapsedMilliseconds,
+          elapsedMs: elapsed,
           isWindows: false,
+          donePattern: donePattern,
         );
         if (diag != null) {
           abnormalReason.add(diag.reason);

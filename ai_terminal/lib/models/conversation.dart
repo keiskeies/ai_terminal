@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'agent_event.dart';
 
 /// 会话消息（与具体 AI 模式无关，统一存储用户/AI 对话）
@@ -67,7 +68,46 @@ class Conversation {
 
   late List<ConvMessage> messages;
 
-  late List<ConvAgentLog> agentLogs;
+  /// Agent 日志延迟解析：启动时只保留原始 JSON，真正读取（追加/清空/写回）
+  /// 时才解码，避免所有历史会话的日志在启动阶段全部展开。
+  List<ConvAgentLog>? _agentLogs;
+  String? _agentLogsJson;
+
+  List<ConvAgentLog> get agentLogs {
+    return _agentLogs ??= _decodeAgentLogs(_agentLogsJson);
+  }
+
+  set agentLogs(List<ConvAgentLog> logs) {
+    _agentLogs = logs;
+    _agentLogsJson = null;
+  }
+
+  /// 未解码时的原始 JSON（DAO 写回可直接复用，避免无意义的编解码）
+  String? get rawAgentLogsJson => _agentLogs == null ? _agentLogsJson : null;
+
+  void setAgentLogsJson(String? json) {
+    _agentLogsJson = json;
+    _agentLogs = null;
+  }
+
+  static List<ConvAgentLog> _decodeAgentLogs(String? json) {
+    if (json == null || json.isEmpty) return [];
+    try {
+      final list = jsonDecode(json);
+      if (list is! List) return [];
+      return list
+          .whereType<Map>()
+          .map((e) => ConvAgentLog()
+            ..timestamp = DateTime.tryParse(e['timestamp'] as String? ?? '') ??
+                DateTime.fromMillisecondsSinceEpoch(0)
+            ..level = e['level'] as String? ?? 'INFO'
+            ..tag = e['tag'] as String? ?? ''
+            ..message = e['message'] as String? ?? '')
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
 
   /// 早期对话的 AI 摘要（旧机制，新压缩改为逐条写入 ConvMessage.summary）
   /// 保留字段避免反序列化失败，新逻辑不再使用
@@ -138,11 +178,12 @@ class Conversation {
     List<ConvMessage>? messages,
     List<ConvAgentLog>? agentLogs,
   })  : messages = messages ?? [],
-        agentLogs = agentLogs ?? [],
         summarizedUpToIndex = 0,
         isActive = true,
         createdAt = DateTime.now(),
-        updatedAt = DateTime.now();
+        updatedAt = DateTime.now() {
+    this.agentLogs = agentLogs ?? [];
+  }
 
   /// 添加消息并更新时间戳
   void addMessage(ConvMessage msg) {

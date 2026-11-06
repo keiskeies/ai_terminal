@@ -27,7 +27,9 @@ export '../models/agent_state.dart';
 export '../models/chat_item.dart';
 
 /// 流式更新节流间隔（毫秒）
-const int _agentStreamThrottleMs = 80;
+/// 流式更新节流间隔（毫秒）。120ms 约 8fps，肉眼仍连贯，但把
+/// 「整页重建 + Markdown 重解析」的次数从 12.5 次/秒降到 8 次/秒。
+const int _agentStreamThrottleMs = 120;
 
 /// 自动压缩阈值：超过 20 轮（40 条 user+assistant）或 30k 字符触发压缩
 const int _compactThresholdRounds = 20;
@@ -51,9 +53,18 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 每个 host 上次持久化的 assistant 内容长度，用于控制流式过程定期刷盘频率
   final Map<String, int> _lastPersistedLen = {};
 
-  /// 每个 host 的持久化写入链：串行化 save 操作，防止并发写入导致事件丢失
-  /// 解决 onEvent 中 fire-and-forget 持久化的竞态问题
-  final Map<String, Future<void>> _persistChain = {};
+  /// 每个会话待写入的最新 assistant 快照。
+  /// 流式/事件密集时只保留最后一份，避免把每个中间态都序列化落盘。
+  final Map<
+      String,
+      ({
+        String hostId,
+        String content,
+        List<AgentEvent>? events,
+      })> _pendingPersist = {};
+
+  /// 正在写盘的会话（同一会话串行，防止后写覆盖前写）
+  final Set<String> _persistingConversations = {};
 
   /// 正在启动任务的 tab：防止同一 tab 在异步落盘窗口内重复发任务
   final Set<String> _startingScopes = {};
@@ -614,7 +625,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
               // 防止 app 异常退出时丢失全部流式内容（events 由 onCompleted 时统一回写）
               final fullContent = lastItem.content + content;
               final lastLen = _lastPersistedLen[scopeId] ?? 0;
-              if (fullContent.length - lastLen > 500) {
+              // 2000 字符≈一次较长段落；配合写入合并，中间快照会被覆盖，
+              // 不再每 500 字符就整会话序列化一次。
+              if (fullContent.length - lastLen > 2000) {
                 _lastPersistedLen[scopeId] = fullContent.length;
                 _persistAssistantCompletion(scopeId, fullContent,
                     events: lastItem.events);
@@ -839,8 +852,11 @@ class AgentNotifier extends StateNotifier<AgentState> {
     });
   }
 
-  /// 持久化 assistant 完整响应（流式结束后回写）
-  /// 使用串行化链防止并发写入竞态：多个事件快速到达时，按顺序执行 save
+  /// 持久化 assistant 完整响应（流式结束后回写）。
+  ///
+  /// 同一会话只保留最新快照：流式/事件密集时多个写请求会合并成一次落盘，
+  /// 避免每个中间态都把整个会话 `jsonEncode` 一遍。写入仍按会话串行，
+  /// 防止后写覆盖前写。
   ///
   /// 必须按任务所属会话 id 写入，而不是 host 的 active 会话：同一服务器
   /// 两个 tab 并行时，另一个 tab 新建会话会改变 active 会话。
@@ -861,36 +877,40 @@ class AgentNotifier extends StateNotifier<AgentState> {
         _registry.getState(scopeId)?.hostId ??
         'local';
 
-    // 串行化：按会话 id 串起来，防止并发 save 覆盖
-    final chainKey = convId;
-    final prev = _persistChain[chainKey] ?? Future.value();
-    final next = prev.then((_) async {
-      try {
-        await _convService.updateLastAssistantContent(
-          hostId,
-          content,
-          events: events,
-          conversationId: convId,
-        );
-      } catch (e) {
-        // R8: 持久化失败不可静默吞掉，需暴露到 UI 让用户感知数据丢失风险
-        agentLogger.error('Persist',
-            '持久化 assistant 内容失败 (scope=$scopeId, conv=$convId): $e');
-        _updateScopeState(
-            scopeId,
-            (s) => s.copyWith(
-                  error: '会话保存失败，重启后此条消息可能丢失: $e',
-                ));
+    _pendingPersist[convId] = (
+      hostId: hostId,
+      content: content,
+      events: events,
+    );
+    // 已有写入在跑：更新完待写快照即可，当前 drain 循环会取到最新值
+    if (_persistingConversations.contains(convId)) return;
+
+    _persistingConversations.add(convId);
+    try {
+      while (true) {
+        final pending = _pendingPersist.remove(convId);
+        if (pending == null) break;
+        try {
+          await _convService.updateLastAssistantContent(
+            pending.hostId,
+            pending.content,
+            events: pending.events,
+            conversationId: convId,
+          );
+        } catch (e) {
+          // R8: 持久化失败不可静默吞掉，需暴露到 UI 让用户感知数据丢失风险
+          agentLogger.error('Persist',
+              '持久化 assistant 内容失败 (scope=$scopeId, conv=$convId): $e');
+          _updateScopeState(
+              scopeId,
+              (s) => s.copyWith(
+                    error: '会话保存失败，重启后此条消息可能丢失: $e',
+                  ));
+        }
       }
-    });
-    _persistChain[chainKey] = next;
-    // 链尾完成后移除，避免会话数量增长导致 map 无界增长
-    next.whenComplete(() {
-      if (identical(_persistChain[chainKey], next)) {
-        _persistChain.remove(chainKey);
-      }
-    });
-    return next;
+    } finally {
+      _persistingConversations.remove(convId);
+    }
   }
 
   /// 设置命令执行器（SSH 或本地 PTY，仅首次连接时收集系统信息）。

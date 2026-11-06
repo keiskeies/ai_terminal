@@ -116,6 +116,25 @@ bool isQueryCommand(String command) {
   return queryPrefixes.any((prefix) => cmdLower.startsWith(prefix));
 }
 
+const _taskCompleteKeywords = [
+  '任务完成', '任务已完成',
+  '已全部完成', '全部完成', '所有步骤已完成',
+  '操作完成', '安装完成', '配置完成', '部署完成',
+  '已完成',
+];
+
+// 行首允许的前缀（emoji / markdown / 中文标点）
+final RegExp _taskCompleteStartRegex = RegExp(
+  r'^[\s✅❌🎉🏁【\[*#\-•>]*(' +
+      _taskCompleteKeywords.join('|') +
+      r')[\s。！!？?】\]*·…]*$',
+);
+// 行尾模式：前文允许少量说明（≤ 30 字符），关键词后只允许标点
+final RegExp _taskCompleteEndRegex = RegExp(
+  '^.{0,30}?(' + _taskCompleteKeywords.join('|') + r')[\s。！!？?】\]*·…]*$',
+);
+final RegExp _lineBreakRegex = RegExp(r'\r?\n');
+
 bool isTaskComplete(String response) {
   // 仅在关键词作为"独立行/标题"或"短句末尾"出现时才视为任务完成。
   // 早期实现用 response.contains(k) 会在 AI 思考过程中误触发：
@@ -131,31 +150,14 @@ bool isTaskComplete(String response) {
   // 而 "我会检查任务完成情况"、"如果安装完成则继续" 不视为完成。
   if (response.trim().isEmpty) return false;
 
-  const keywords = [
-    '任务完成', '任务已完成',
-    '已全部完成', '全部完成', '所有步骤已完成',
-    '操作完成', '安装完成', '配置完成', '部署完成',
-    '已完成',
-  ];
-  // 行首允许的前缀（emoji / markdown / 中文标点）
-  final startRegex = RegExp(
-    r'^[\s✅❌🎉🏁【\[*#\-•>]*(' +
-        keywords.join('|') +
-        r')[\s。！!？?】\]*·…]*$',
-  );
-  // 行尾模式：前文允许少量说明（≤ 30 字符），关键词后只允许标点
-  final endRegex = RegExp(
-    '^.{0,30}?(' + keywords.join('|') + r')[\s。！!？?】\]*·…]*$',
-  );
-
-  final lines = response.split(RegExp(r'\r?\n'));
+  final lines = response.split(_lineBreakRegex);
   for (final line in lines) {
     final trimmed = line.trim();
     if (trimmed.isEmpty) continue;
     // 长行不考虑匹配，避免 AI 长篇思考中偶然出现关键词被误判
     if (trimmed.length > 60) continue;
-    if (startRegex.hasMatch(trimmed)) return true;
-    if (endRegex.hasMatch(trimmed)) return true;
+    if (_taskCompleteStartRegex.hasMatch(trimmed)) return true;
+    if (_taskCompleteEndRegex.hasMatch(trimmed)) return true;
   }
   return false;
 }

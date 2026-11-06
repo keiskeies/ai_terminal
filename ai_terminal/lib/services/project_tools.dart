@@ -401,7 +401,12 @@ class ProjectAnalyzeTool extends AgentTool {
       if (!await file.exists()) return null;
       final stat = await file.stat();
       if (stat.size > maxSize) {
-        return '(文件过大 ${stat.size} 字节，仅显示前 $maxSize 字节)\n${(await file.readAsString()).substring(0, maxSize)}\n...(截断)';
+        // 只读前缀，别把整个大文件先读进内存再截断
+        final prefix = await file
+            .openRead(0, maxSize)
+            .transform(const Utf8Decoder(allowMalformed: true))
+            .join();
+        return '(文件过大 ${stat.size} 字节，仅显示前 $maxSize 字节)\n$prefix\n...(截断)';
       }
       return await file.readAsString();
     } catch (e) {

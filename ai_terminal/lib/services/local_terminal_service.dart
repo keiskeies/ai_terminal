@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_pty/flutter_pty.dart';
+import '../utils/exit_marker_scanner.dart';
+import '../utils/tail_text_buffer.dart';
 import 'command_executor.dart';
 
 /// 本地终端服务 — 使用原生 PTY（伪终端）实现真正的本地 shell
@@ -92,10 +94,13 @@ class LocalTerminalService implements CommandExecutor {
 
       _isConnected = true;
 
-      _pty!.output.listen(
+      _pty!.output
+          .cast<List<int>>()
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .listen(
         (data) {
           if (!_outputController.isClosed && !_isExited) {
-            _outputController.add(utf8.decode(data, allowMalformed: true));
+            _outputController.add(data);
           }
         },
         onDone: _handleExit,
@@ -249,17 +254,23 @@ class LocalTerminalService implements CommandExecutor {
       isPowerShell: _isPowerShell,
     );
     final donePattern = RegExp('${RegExp.escape(marker)}\\d+');
+    final markerScanner = ExitMarkerScanner(marker);
 
     // R8: buffer 必须有上限，保留尾部（最新输出）
     const maxBufferChars = 256 * 1024; // 256KB
+    // 异常检测只看尾部窗口，避免每个 chunk 扫完整个 256KB
+    const detectTailChars = 8192;
+    const evaluateIntervalMs = 150;
 
     // 独立流监听：等待 marker 出现（比 prompt regex 更可靠）
-    final buffer = StringBuffer();
+    final buffer = TailTextBuffer(maxBufferChars);
+    final detectBuffer = TailTextBuffer(detectTailChars);
     final doneCompleter = Completer<void>();
     var markerSeen = false;
     var abnormalReason = <String?>[];
     var pagerQuitSent = false;
     var pagerDetections = 0;
+    var lastEvaluateAtMs = -evaluateIntervalMs;
     // sudo 提示应答器：命中提示时把密码写进 stdin，而不是让检测器中断命令
     final sudoResponder = SudoPromptResponder();
     _pendingDoneCompleters.add(doneCompleter);
@@ -268,9 +279,12 @@ class LocalTerminalService implements CommandExecutor {
     // 一次求值：marker 完成 → sudo 提示应答 → 异常状态检测。
     // 命令停在密码提示上之后就再无输出，只靠流回调等不到第二次判定，
     // 所以抽成函数给定时器复用（见下方 recheck）。
-    void evaluate() {
+    void evaluate({bool force = false}) {
       if (doneCompleter.isCompleted) return;
-      final snapshot = buffer.toString();
+      final elapsed = stopwatch.elapsedMilliseconds;
+      if (!force && elapsed - lastEvaluateAtMs < evaluateIntervalMs) return;
+      lastEvaluateAtMs = elapsed;
+      final snapshot = detectBuffer.tail();
       if (donePattern.hasMatch(snapshot)) {
         markerSeen = true;
         doneCompleter.complete();
@@ -279,7 +293,7 @@ class LocalTerminalService implements CommandExecutor {
       // 分页器等待按键：命令不会自己退出，主动按 q 让后续的 marker 执行。
       // 400ms 门槛 + 连续两次判定，避开输出恰好以 (END) 结尾但命令仍在跑的误判。
       // Windows 本地终端不存在 POSIX 分页器，但正则不匹配也不会触发。
-      final pagerWaiting = stopwatch.elapsedMilliseconds >= 400 &&
+      final pagerWaiting = elapsed >= 400 &&
           PtyOutputDetector.waitsForPager(snapshot);
       pagerDetections = pagerWaiting ? pagerDetections + 1 : 0;
       if (!pagerQuitSent && pagerDetections >= 2) {
@@ -298,9 +312,10 @@ class LocalTerminalService implements CommandExecutor {
       final diag = PtyOutputDetector.detect(
         buffer: snapshot,
         marker: marker,
-        elapsedMs: stopwatch.elapsedMilliseconds,
+        elapsedMs: elapsed,
         isWindows: Platform.isWindows,
         sudoPromptWillBeAnswered: sudoPassword != null,
+        donePattern: donePattern,
       );
       if (diag != null) {
         abnormalReason.add(diag.reason);
@@ -312,11 +327,11 @@ class LocalTerminalService implements CommandExecutor {
       (data) {
         if (doneCompleter.isCompleted) return;
         buffer.write(data);
-        if (buffer.length > maxBufferChars) {
-          final truncated = buffer.toString();
-          buffer
-            ..clear()
-            ..write(truncated.substring(truncated.length - maxBufferChars));
+        detectBuffer.write(data);
+        if (markerScanner.add(data)) {
+          markerSeen = true;
+          doneCompleter.complete();
+          return;
         }
         evaluate();
       },
@@ -345,7 +360,7 @@ class LocalTerminalService implements CommandExecutor {
     recheck = Timer.periodic(
       const Duration(milliseconds: 400),
       (_) {
-        evaluate();
+        evaluate(force: true);
         if (doneCompleter.isCompleted) recheck.cancel();
       },
     );
@@ -570,13 +585,18 @@ class LocalTerminalService implements CommandExecutor {
     _markerSeq++;
     final marker = 'EXITCODE_$_markerSeq:';
     final wrappedCommand = '$writeCmd; echo "$marker\$?"';
-    final donePattern = RegExp('${RegExp.escape(marker)}\\d+');
+    final markerScanner = ExitMarkerScanner(marker);
+    final donePattern = markerScanner.donePattern;
 
     const maxBufferChars = 256 * 1024;
-    final buffer = StringBuffer();
+    const detectTailChars = 8192;
+    const evaluateIntervalMs = 150;
+    final buffer = TailTextBuffer(maxBufferChars);
+    final detectBuffer = TailTextBuffer(detectTailChars);
     final doneCompleter = Completer<void>();
     var markerSeen = false;
     var abnormalReason = <String?>[];
+    var lastEvaluateAtMs = -evaluateIntervalMs;
     _pendingDoneCompleters.add(doneCompleter);
     StreamSubscription<String>? sub;
 
@@ -584,23 +604,22 @@ class LocalTerminalService implements CommandExecutor {
       (data) {
         if (doneCompleter.isCompleted) return;
         buffer.write(data);
-        if (buffer.length > maxBufferChars) {
-          final truncated = buffer.toString();
-          buffer
-            ..clear()
-            ..write(truncated.substring(truncated.length - maxBufferChars));
-        }
-        final snapshot = buffer.toString();
-        if (donePattern.hasMatch(snapshot)) {
+        detectBuffer.write(data);
+        if (markerScanner.add(data)) {
           markerSeen = true;
           doneCompleter.complete();
           return;
         }
+        final elapsed = stopwatch.elapsedMilliseconds;
+        if (elapsed - lastEvaluateAtMs < evaluateIntervalMs) return;
+        lastEvaluateAtMs = elapsed;
+        final snapshot = detectBuffer.tail();
         final diag = PtyOutputDetector.detect(
           buffer: snapshot,
           marker: marker,
-          elapsedMs: stopwatch.elapsedMilliseconds,
+          elapsedMs: elapsed,
           isWindows: false,
+          donePattern: donePattern,
         );
         if (diag != null) {
           abnormalReason.add(diag.reason);

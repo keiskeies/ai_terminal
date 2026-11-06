@@ -382,16 +382,15 @@ class LocalFileSearchTool extends LocalFileTool {
     for (final f in files) {
       if (hits.length >= maxMatches) break;
       scanned++;
-      final lines = await _readTextLines(f);
-      if (lines == null) continue; // 二进制/超大/无权限：跳过而不是失败
-      for (var i = 0; i < lines.length; i++) {
-        final line = ignoreCase ? lines[i].toLowerCase() : lines[i];
-        if (line.contains(needle)) {
-          final text = lines[i].length > 200 ? '${lines[i].substring(0, 200)}…' : lines[i];
-          hits.add('${_rel(f, path)}:${i + 1}: $text');
-          if (hits.length >= maxMatches) break;
-        }
-      }
+      // 流式逐行搜索：不再把每个文件整体读入并 split，命中上限时提前停止
+      await _scanFileLines(
+        file: f,
+        needle: needle,
+        ignoreCase: ignoreCase,
+        hits: hits,
+        maxMatches: maxMatches,
+        root: path,
+      );
       if (scanned % 200 == 0) onProgress?.call('已扫描 $scanned 个文件...');
     }
 
@@ -411,14 +410,31 @@ class LocalFileSearchTool extends LocalFileTool {
     return rel;
   }
 
-  Future<List<String>?> _readTextLines(String file) async {
+  Future<void> _scanFileLines({
+    required String file,
+    required String needle,
+    required bool ignoreCase,
+    required List<String> hits,
+    required int maxMatches,
+    required String root,
+  }) async {
     try {
       final stat = File(file).statSync();
-      if (stat.size > 2 * 1024 * 1024) return null;
-      final text = await File(file).readAsString();
-      return const LineSplitter().convert(text);
+      if (stat.size > 2 * 1024 * 1024) return; // 二进制/超大：跳过而不是失败
+      var lineNo = 0;
+      await for (final line in File(file)
+          .openRead()
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .transform(const LineSplitter())) {
+        lineNo++;
+        final haystack = ignoreCase ? line.toLowerCase() : line;
+        if (!haystack.contains(needle)) continue;
+        final text = line.length > 200 ? '${line.substring(0, 200)}…' : line;
+        hits.add('${_rel(file, root)}:$lineNo: $text');
+        if (hits.length >= maxMatches) break;
+      }
     } catch (_) {
-      return null;
+      // 无权限/非 UTF-8：跳过该文件
     }
   }
 }

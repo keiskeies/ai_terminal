@@ -12,16 +12,41 @@ import '../utils/tool_args_parser.dart';
 class ChangeRecordService {
   static const _uuid = Uuid();
 
+  static final RegExp _sudoPrefixRegex = RegExp(
+      r'^sudo\s+(?:-u\s+\S+\s+)?(?:-[A-Za-z]+\s+)*');
+  static final RegExp _sudoAnywhereRegex = RegExp(r'^sudo\s+');
+  static final RegExp _installRegex = RegExp(
+      r'^(apt|apt-get|yum|dnf|apk|pacman|snap|brew)\s+(install|add|-S)');
+  static final RegExp _uninstallRegex = RegExp(
+      r'^(apt|apt-get|yum|dnf|apk|pacman)\s+(remove|purge|erase|-R|autoremove)');
+  static final RegExp _systemctlStartRegex = RegExp(r'^systemctl\s+start');
+  static final RegExp _systemctlStopRegex = RegExp(r'^systemctl\s+stop');
+  static final RegExp _systemctlRestartRegex = RegExp(r'^systemctl\s+restart');
+  static final RegExp _serviceStartRegex = RegExp(r'^service\s+\w+\s+start');
+  static final RegExp _serviceStopRegex = RegExp(r'^service\s+\w+\s+stop');
+  static final RegExp _serviceRestartRegex = RegExp(r'^service\s+\w+\s+restart');
+  static final RegExp _permissionRegex = RegExp(r'chmod|chown');
+  static final RegExp _fileOpRegex =
+      RegExp(r'^(cp|mv|rm|mkdir|tee|sed|echo.*>)');
+  static final RegExp _redirectRegex = RegExp(r'(>>|>)\s*(/etc/|~/)');
+  static final RegExp _installWithPkgRegex = RegExp(
+      r'^(apt|apt-get|yum|dnf|apk|pacman|snap|brew)\s+(install|add|-S)\s+(\S+)');
+  static final RegExp _systemctlStartWithUnitRegex =
+      RegExp(r'^systemctl\s+start\s+(\S+)');
+  static final RegExp _serviceStartWithUnitRegex =
+      RegExp(r'^service\s+(\w+)\s+start');
+  static final RegExp _systemctlStopWithUnitRegex =
+      RegExp(r'^systemctl\s+stop\s+(\S+)');
+  static final RegExp _serviceStopWithUnitRegex =
+      RegExp(r'^service\s+(\w+)\s+stop');
+
   /// 去除 sudo 前缀，便于统一匹配；保留原始命令用于生成回滚命令
   static String _stripSudo(String command) {
-    return command.trim().replaceFirst(
-          RegExp(r'^sudo\s+(?:-u\s+\S+\s+)?(?:-[A-Za-z]+\s+)*'),
-          '',
-        );
+    return command.trim().replaceFirst(_sudoPrefixRegex, '');
   }
 
   static bool _hasSudo(String command) =>
-      RegExp(r'^sudo\s+').hasMatch(command.trim());
+      _sudoAnywhereRegex.hasMatch(command.trim());
 
   /// 文件工具没有 shell 命令原文，生成一条稳定的台账描述
   ///
@@ -59,21 +84,16 @@ class ChangeRecordService {
   /// 根据 SafetyGuard 规则推断变更类型
   static ChangeType inferType(String command) {
     final c = _stripSudo(command);
-    if (RegExp(r'^(apt|apt-get|yum|dnf|apk|pacman|snap|brew)\s+(install|add|-S)').hasMatch(c)) {
-      return ChangeType.install;
-    }
-    if (RegExp(r'^(apt|apt-get|yum|dnf|apk|pacman)\s+(remove|purge|erase|-R|autoremove)').hasMatch(c)) {
-      return ChangeType.uninstall;
-    }
-    if (RegExp(r'^systemctl\s+start').hasMatch(c)) return ChangeType.startService;
-    if (RegExp(r'^systemctl\s+stop').hasMatch(c)) return ChangeType.stopService;
-    if (RegExp(r'^systemctl\s+restart').hasMatch(c)) return ChangeType.restartService;
-    if (RegExp(r'^service\s+\w+\s+start').hasMatch(c)) return ChangeType.startService;
-    if (RegExp(r'^service\s+\w+\s+stop').hasMatch(c)) return ChangeType.stopService;
-    if (RegExp(r'^service\s+\w+\s+restart').hasMatch(c)) return ChangeType.restartService;
-    if (RegExp(r'chmod|chown').hasMatch(c)) return ChangeType.permission;
-    if (RegExp(r'^(cp|mv|rm|mkdir|tee|sed|echo.*>)').hasMatch(c) ||
-        RegExp(r'(>>|>)\s*(/etc/|~/)').hasMatch(c)) {
+    if (_installRegex.hasMatch(c)) return ChangeType.install;
+    if (_uninstallRegex.hasMatch(c)) return ChangeType.uninstall;
+    if (_systemctlStartRegex.hasMatch(c)) return ChangeType.startService;
+    if (_systemctlStopRegex.hasMatch(c)) return ChangeType.stopService;
+    if (_systemctlRestartRegex.hasMatch(c)) return ChangeType.restartService;
+    if (_serviceStartRegex.hasMatch(c)) return ChangeType.startService;
+    if (_serviceStopRegex.hasMatch(c)) return ChangeType.stopService;
+    if (_serviceRestartRegex.hasMatch(c)) return ChangeType.restartService;
+    if (_permissionRegex.hasMatch(c)) return ChangeType.permission;
+    if (_fileOpRegex.hasMatch(c) || _redirectRegex.hasMatch(c)) {
       return ChangeType.fileOperation;
     }
     return ChangeType.other;
@@ -86,7 +106,7 @@ class ChangeRecordService {
     switch (type) {
       case ChangeType.install:
         // apt install nginx → apt remove nginx
-        final match = RegExp(r'^(apt|apt-get|yum|dnf|apk|pacman|snap|brew)\s+(install|add|-S)\s+(\S+)').firstMatch(c);
+        final match = _installWithPkgRegex.firstMatch(c);
         if (match != null) {
           final pm = match.group(1)!;
           final pkg = match.group(3)!;
@@ -103,15 +123,15 @@ class ChangeRecordService {
         return null;
       case ChangeType.startService:
         // systemctl start nginx → systemctl stop nginx
-        final match = RegExp(r'^systemctl\s+start\s+(\S+)').firstMatch(c);
+        final match = _systemctlStartWithUnitRegex.firstMatch(c);
         if (match != null) return '${prefix}systemctl stop ${match.group(1)}';
-        final m2 = RegExp(r'^service\s+(\w+)\s+start').firstMatch(c);
+        final m2 = _serviceStartWithUnitRegex.firstMatch(c);
         if (m2 != null) return '${prefix}service ${m2.group(1)} stop';
         return null;
       case ChangeType.stopService:
-        final match = RegExp(r'^systemctl\s+stop\s+(\S+)').firstMatch(c);
+        final match = _systemctlStopWithUnitRegex.firstMatch(c);
         if (match != null) return '${prefix}systemctl start ${match.group(1)}';
-        final m2 = RegExp(r'^service\s+(\w+)\s+stop').firstMatch(c);
+        final m2 = _serviceStopWithUnitRegex.firstMatch(c);
         if (m2 != null) return '${prefix}service ${m2.group(1)} start';
         return null;
       case ChangeType.restartService:

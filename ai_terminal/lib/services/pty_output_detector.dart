@@ -147,11 +147,13 @@ class PtyOutputDetector {
     required int elapsedMs,
     required bool isWindows,
     bool sudoPromptWillBeAnswered = false,
+    RegExp? donePattern,
   }) {
     // 命令真正完成 = marker+数字出现（由调用方 donePattern 判定）
     // 检测器只在尚未完成时识别异常，故检查 buffer 是否含 marker+数字
-    final donePattern = RegExp('${RegExp.escape(marker)}\\d+');
-    if (donePattern.hasMatch(buffer)) return null;
+    final completedPattern =
+        donePattern ?? RegExp('${RegExp.escape(marker)}\\d+');
+    if (completedPattern.hasMatch(buffer)) return null;
 
     // 太早检测会误报（命令回显瞬间）—— 至少等 150ms 让回显稳定
     if (elapsedMs < 150) return null;

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -122,6 +123,11 @@ class AgentTracer {
   File? _traceFile;
   bool _disabled = false;
 
+  /// trace 按事件批量追加：避免每个事件都发起一次异步 IO，也避免并发写同一文件
+  final StringBuffer _writeBuffer = StringBuffer();
+  Timer? _flushTimer;
+  bool _writing = false;
+
   /// 当前任务的 metrics（按 taskId 索引）
   /// 一个时刻只有一个活跃任务，但保留 map 便于异步延迟事件归属
   final Map<String, TaskMetrics> _activeMetrics = {};
@@ -134,6 +140,7 @@ class AgentTracer {
   /// 当前 trace 文件路径（`/export` 用它指路）。未启用或初始化失败时为 null。
   Future<String?> tracePath() async {
     if (_disabled) return null;
+    await _flush();
     await _ensureFile();
     return _traceFile?.path;
   }
@@ -179,10 +186,41 @@ class AgentTracer {
     // 始终更新 metrics，无论是否禁用文件写入
     _updateMetrics(event);
     if (_disabled) return;
-    _ensureFile().then((_) {
-      if (_traceFile == null) return;
-      _traceFile!.writeAsString('${event.toNdjson()}\n', mode: FileMode.append);
-    });
+    _writeBuffer
+      ..write(event.toNdjson())
+      ..write('\n');
+    _scheduleFlush();
+  }
+
+  void _scheduleFlush() {
+    if (_flushTimer != null) return;
+    _flushTimer = Timer(const Duration(milliseconds: 300), _flush);
+  }
+
+  Future<void> _flush() async {
+    _flushTimer = null;
+    if (_writing) {
+      // 上一笔还没写完，稍后再试，避免并发写同一文件产生交错行
+      _scheduleFlush();
+      return;
+    }
+    if (_writeBuffer.isEmpty) return;
+    final pending = _writeBuffer.toString();
+    _writeBuffer.clear();
+    await _ensureFile();
+    final file = _traceFile;
+    if (file == null) {
+      // trace 初始化失败时不要无限缓存
+      return;
+    }
+    _writing = true;
+    try {
+      await file.writeAsString(pending, mode: FileMode.append);
+    } catch (e) {
+      agentLogger.warn('Tracer', '写入 trace 失败: $e');
+    } finally {
+      _writing = false;
+    }
   }
 
   /// 更新 metrics 状态

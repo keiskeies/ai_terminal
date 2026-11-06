@@ -264,6 +264,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 这样后台 tab 的 PTY 输出会继续写进它自己的 Terminal 缓冲。
   final Map<String, StreamSubscription<String>> _tabOutputSubscriptions = {};
   final Map<String, StreamSubscription<String>> _tabChatOutputSubscriptions = {};
+
+  /// 终端输出到聊天上下文的批量缓冲：
+  /// 高频输出（构建日志、tail -f）下不再每个 chunk 做 ANSI 清洗 + provider 通知。
+  final Map<String, StringBuffer> _tabChatOutputBuffers = {};
+  final Map<String, Timer> _tabChatOutputTimers = {};
+  static const int _chatOutputFlushMs = 200;
+  static const int _chatOutputMaxChars = 8192;
   AIModelConfig? _currentModelConfig;
   final MenuController _modelMenuController = MenuController();
   bool _agentInitInFlight = true;
@@ -654,9 +661,40 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     _tabChatOutputSubscriptions[tab.id] =
         tab.outputController.stream.listen((data) {
       if (tab.id == _currentTabId && mounted) {
-        ref.read(chatProvider.notifier).updateLastOutput(data);
+        _bufferChatOutput(tab.id, data);
       }
     });
+  }
+
+  /// 累积该 tab 的终端输出，最多每 200ms 或 8KB 触发一次上下文更新
+  void _bufferChatOutput(String tabId, String data) {
+    final buffer =
+        _tabChatOutputBuffers.putIfAbsent(tabId, StringBuffer.new)..write(data);
+    if (buffer.length >= _chatOutputMaxChars) {
+      _flushChatOutput(tabId);
+      return;
+    }
+    _tabChatOutputTimers[tabId] ??= Timer(
+      const Duration(milliseconds: _chatOutputFlushMs),
+      () => _flushChatOutput(tabId),
+    );
+  }
+
+  void _flushChatOutput(String tabId) {
+    _tabChatOutputTimers.remove(tabId)?.cancel();
+    final buffer = _tabChatOutputBuffers.remove(tabId);
+    if (buffer == null || buffer.isEmpty) return;
+    var text = buffer.toString();
+    if (text.length > _chatOutputMaxChars) {
+      text = text.substring(text.length - _chatOutputMaxChars);
+    }
+    if (!mounted) return;
+    ref.read(chatProvider.notifier).updateLastOutput(text);
+  }
+
+  void _discardChatOutput(String tabId) {
+    _tabChatOutputTimers.remove(tabId)?.cancel();
+    _tabChatOutputBuffers.remove(tabId);
   }
 
   /// 统一切换到指定 tab：每 tab 的 Terminal/输出订阅已常驻，这里只切状态。
@@ -878,6 +916,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       sub.cancel();
     }
     _tabChatOutputSubscriptions.clear();
+    for (final timer in _tabChatOutputTimers.values) {
+      timer.cancel();
+    }
+    _tabChatOutputTimers.clear();
+    _tabChatOutputBuffers.clear();
     _scrollController.dispose();
     for (final controller in _chatScrollControllers.values) {
       controller.dispose();
@@ -899,7 +942,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   Widget build(BuildContext context) {
     final host = widget.hostId != null ? ref.watch(hostsProvider.notifier).getHostById(widget.hostId!) : null;
     final terminalState = ref.watch(tp.terminalProvider);
-    final chatState = ref.watch(chatProvider);
+    // chatProvider 只在这里贡献 error；不要 watch 整个状态，否则每个终端
+    // 输出 chunk 都会让整页（终端 + 所有 tab + AI 面板）重建。
+    final chatError = ref.watch(chatProvider.select((s) => s.error));
     final agentState = ref.watch(agentProvider);
     final activeTab = terminalState.activeTab;
 
@@ -909,11 +954,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     _updateMobilePositionForActive();
 
     // ref.listen 必须在 build 中无条件调用，否则面板收起时 listener 消失会触发 assertion
-    ref.listen(chatProvider, (_, state) {
-      if (state.currentAssistantMessage != null || state.messages.isNotEmpty) {
-        _scrollChatToBottom();
-      }
-    });
+    // 只跟随聊天内容长度/流式文本变化滚动；终端输出更新 lastCommandOutput 时不再打断滚动
+    ref.listen<(String?, int)>(
+      chatProvider.select(
+          (s) => (s.currentAssistantMessage, s.messages.length)),
+      (_, __) => _scrollChatToBottom(),
+    );
     ref.listen(agentProvider, (_, state) {
       if (state.chatItems.isNotEmpty) {
         _scrollChatToBottom();
@@ -945,7 +991,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           // 每个 tab 一棵常驻工作区；切换只改 Offstage，不销毁/重建
           Expanded(
             child: _buildTabWorkspaces(
-                chatState, agentState, terminalState, activeTab),
+                chatError, agentState, terminalState, activeTab),
           ),
 
           // 快捷按键行（仅 Android / iOS 显示，桌面端不需要）
@@ -963,7 +1009,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 监控历史都由各自的 widget/服务持有，切 tab 不能被重建。非活跃 tab
   /// 停止动画并排除焦点，但输出/采样继续写自己的缓冲。
   Widget _buildTabWorkspaces(
-    ChatState chatState,
+    String? chatError,
     AgentState activeAgentState,
     tp.TerminalState terminalState,
     tp.TerminalTab? activeTab,
@@ -971,7 +1017,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final tabs = terminalState.tabs;
     if (tabs.isEmpty) {
       return _wrapWithSftp(
-          _buildMainBody(chatState, activeAgentState, null, isActive: true));
+          _buildMainBody(chatError, activeAgentState, null, isActive: true));
     }
     final notifier = ref.read(agentProvider.notifier);
     final activeId = activeTab?.id;
@@ -996,7 +1042,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 child: KeyedSubtree(
                   key: ValueKey('tab-workspace-${tab.id}'),
                   child: _buildMainBody(
-                    chatState,
+                    chatError,
                     tab.id == activeId
                         ? activeAgentState
                         : notifier.stateForScope(tab.id, hostId: tab.hostId),
@@ -1012,7 +1058,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }
 
   /// 主体区域：终端 + AI 面板 + SFTP 侧面板，根据面板位置切换布局
-  Widget _buildMainBody(ChatState chatState, AgentState agentState,
+  Widget _buildMainBody(String? chatError, AgentState agentState,
       tp.TerminalTab? tab, {required bool isActive}) {
 
     // 终端视图。主区渲染只看活动标签自己的连接阶段：页面级不再留一份
@@ -1165,8 +1211,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             : totalH * _aiPanelRatioFor(tab?.id);
         final aiContent = Column(
           children: [
-            Expanded(child: _buildAIPanel(chatState, agentState, tab)),
-            _buildBottomBar(chatState, agentState, tab),
+            Expanded(child: _buildAIPanel(chatError, agentState, tab)),
+            _buildBottomBar(agentState, tab),
           ],
         );
 
@@ -1442,6 +1488,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     _tabTerminals.remove(tab.id);
     _tabOutputSubscriptions.remove(tab.id)?.cancel();
     _tabChatOutputSubscriptions.remove(tab.id)?.cancel();
+    _discardChatOutput(tab.id);
     _chatScrollControllers.remove(tab.id)?.dispose();
     _tabShowScrollToBottom.remove(tab.id);
     _tabAutoScroll.remove(tab.id);
@@ -2157,7 +2204,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }
 
   // ==================== AI 面板 ====================
-  Widget _buildAIPanel(ChatState chatState, AgentState agentState, tp.TerminalTab? tab) {
+  Widget _buildAIPanel(String? chatError, AgentState agentState, tp.TerminalTab? tab) {
     final tc = ThemeColors.of(context);
 
     return Container(
@@ -2205,8 +2252,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             ),
           ),
           // 错误
-          if (chatState.error != null || agentState.error != null)
-            _buildErrorBanner(chatState.error ?? agentState.error),
+          if (chatError != null || agentState.error != null)
+            _buildErrorBanner(chatError ?? agentState.error),
         ],
       ),
     );
@@ -2308,28 +2355,31 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   items[index - 1].role == 'user'
               ? items[index - 1].content
               : null;
-          return _buildMessageBubble(
+          // RepaintBoundary：流式时只有最后一条消息在变，已定型消息不必跟着重绘
+          return RepaintBoundary(
             key: ValueKey('agent_${item.role}_$index'),
-            role: item.role,
-            content: item.content,
-            events: item.events,
-            streamingContent: item.streamingContent,
-            turnGoal: turnGoal,
-            isLoading: item.isStreaming && isLast && agentState.isRunning,
-            // 原生推理只在跑动中展示；任务结束就收起，不占历史空间
-            liveReasoning:
-                isLast && agentState.isRunning ? agentState.liveReasoning : '',
-            tab: tab,
-            showAutoExecute: true,
-            isAgentRunning: agentState.isRunning,
-            // 只有最后一条消息可能是"当前等待的询问"；历史消息里的旧询问不能
-            // 跟着变成可点，否则用户会误答一个早已结束的问题。
-            isWaitingChoice: agentState.isWaitingChoice && isLast,
-            pendingOptions:
-                agentState.isWaitingChoice && isLast ? agentState.pendingOptions : const [],
-            enginePendingConfirm: isLast ? agentState.pendingConfirmCommand : null,
-            // 历史回合只在"最近一轮"里保留展开态；旧回合收起过程与清单
-            isLastTurn: isLast,
+            child: _buildMessageBubble(
+              role: item.role,
+              content: item.content,
+              events: item.events,
+              streamingContent: item.streamingContent,
+              turnGoal: turnGoal,
+              isLoading: item.isStreaming && isLast && agentState.isRunning,
+              // 原生推理只在跑动中展示；任务结束就收起，不占历史空间
+              liveReasoning:
+                  isLast && agentState.isRunning ? agentState.liveReasoning : '',
+              tab: tab,
+              showAutoExecute: true,
+              isAgentRunning: agentState.isRunning,
+              // 只有最后一条消息可能是"当前等待的询问"；历史消息里的旧询问不能
+              // 跟着变成可点，否则用户会误答一个早已结束的问题。
+              isWaitingChoice: agentState.isWaitingChoice && isLast,
+              pendingOptions:
+                  agentState.isWaitingChoice && isLast ? agentState.pendingOptions : const [],
+              enginePendingConfirm: isLast ? agentState.pendingConfirmCommand : null,
+              // 历史回合只在"最近一轮"里保留展开态；旧回合收起过程与清单
+              isLastTurn: isLast,
+            ),
           );
         },
       ),
@@ -2338,7 +2388,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   // ==================== Markdown 预处理 ====================
   /// 将单个换行转为 Markdown 硬换行（带缓存）
+  /// 单段 Markdown 文本的缓存上限：流式中间态会远超这个长度，
+  /// 缓存它们既不会再命中，也会让缓存常驻一堆大字符串。
+  static const int _maxCachedMarkdownChars = 32768;
+
   String _preprocessMarkdown(String text) {
+    if (text.length > _maxCachedMarkdownChars) {
+      return _preprocessMarkdownInternal(text);
+    }
     if (_markdownCache.containsKey(text)) {
       return _markdownCache[text]!;
     }
@@ -3199,39 +3256,44 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         continue;
       }
       if (seg.content.trim().isEmpty) continue;
-      bodies.add(MarkdownBody(
-        data: _preprocessMarkdown(seg.content),
-        // 交给外层 SelectionArea 统一选择：selectable=true 会让 flutter_markdown
-        // 为每个段落生成独立 SelectableText，选区被限制在单段内。
-        selectable: false,
-        styleSheet: MarkdownStyleSheet(
-          p: TextStyle(
-            color: tc.textMain,
-            height: 1.5,
-            fontSize: fBody,
-            fontWeight: FontWeight.w500,
+      bodies.add(_CachedMarkdownText(
+        text: seg.content,
+        isLight: tc.isLight,
+        tc: tc,
+        builder: (text, theme) => MarkdownBody(
+          data: _preprocessMarkdown(text),
+          // 交给外层 SelectionArea 统一选择：selectable=true 会让 flutter_markdown
+          // 为每个段落生成独立 SelectableText，选区被限制在单段内。
+          selectable: false,
+          styleSheet: MarkdownStyleSheet(
+            p: TextStyle(
+              color: theme.textMain,
+              height: 1.5,
+              fontSize: fBody,
+              fontWeight: FontWeight.w500,
+            ),
+            h1: TextStyle(color: theme.textMain, fontSize: 16, fontWeight: FontWeight.bold),
+            h2: TextStyle(color: theme.textMain, fontSize: 14, fontWeight: FontWeight.bold),
+            h3: TextStyle(color: theme.textMain, fontSize: fBody, fontWeight: FontWeight.w600),
+            code: TextStyle(
+              fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+              fontSize: fMono,
+              fontWeight: FontWeight.w500,
+              color: theme.brand,
+            ),
+            listBullet: TextStyle(color: theme.brand, fontSize: fBody),
+            blockquote: TextStyle(
+              color: theme.textSub,
+              fontStyle: FontStyle.italic,
+              fontWeight: FontWeight.w500,
+            ),
+            blockquoteDecoration: BoxDecoration(
+              border: Border(left: BorderSide(color: theme.brand, width: 2)),
+            ),
+            blockquotePadding: const EdgeInsets.only(left: 8),
           ),
-          h1: TextStyle(color: tc.textMain, fontSize: 16, fontWeight: FontWeight.bold),
-          h2: TextStyle(color: tc.textMain, fontSize: 14, fontWeight: FontWeight.bold),
-          h3: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600),
-          code: TextStyle(
-            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
-            fontSize: fMono,
-            fontWeight: FontWeight.w500,
-            color: tc.brand,
-          ),
-          listBullet: TextStyle(color: tc.brand, fontSize: fBody),
-          blockquote: TextStyle(
-            color: tc.textSub,
-            fontStyle: FontStyle.italic,
-            fontWeight: FontWeight.w500,
-          ),
-          blockquoteDecoration: BoxDecoration(
-            border: Border(left: BorderSide(color: tc.brand, width: 2)),
-          ),
-          blockquotePadding: const EdgeInsets.only(left: 8),
+          onTapLink: (text, href, title) {},
         ),
-        onTapLink: (text, href, title) {},
       ));
     }
     if (bodies.isEmpty) return const SizedBox.shrink();
@@ -3248,6 +3310,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   /// 将内容按代码块分割（带缓存）
   List<_ContentSegment> _splitContentByCodeBlocks(String content) {
+    if (content.length > _maxCachedMarkdownChars) {
+      return _splitContentByCodeBlocksInternal(content);
+    }
     if (_splitCache.containsKey(content)) {
       return _splitCache[content]!;
     }
@@ -3987,7 +4052,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             s.status == AgentStatus.waitingConfirm);
   }
 
-  Widget _buildBottomBar(ChatState chatState, AgentState agentState, tp.TerminalTab? tab) {
+  Widget _buildBottomBar(AgentState agentState, tp.TerminalTab? tab) {
     final isConnected = tab?.isConnected == true;
     // 端点状态已注入 API Key；当前模型优先取活跃 host 实际使用的配置
     final endpoints = ref.watch(aiEndpointsProvider);
@@ -5731,5 +5796,45 @@ class _AnswerCopyButtonState extends State<_AnswerCopyButton> {
         ),
       ),
     );
+  }
+}
+
+/// 以 (text, isLight) 为 key 缓存 Markdown 子树的构建结果。
+///
+/// 流式刷新时，同一条消息里未变化的段落会反复经过父级 build；返回同一个
+/// widget 实例可让 Element.updateChild 直接跳过整棵子树，避免重复 Markdown 解析。
+class _CachedMarkdownText extends StatefulWidget {
+  final String text;
+  final bool isLight;
+  final ThemeColors tc;
+  final Widget Function(String text, ThemeColors tc) builder;
+
+  const _CachedMarkdownText({
+    required this.text,
+    required this.isLight,
+    required this.tc,
+    required this.builder,
+  });
+
+  @override
+  State<_CachedMarkdownText> createState() => _CachedMarkdownTextState();
+}
+
+class _CachedMarkdownTextState extends State<_CachedMarkdownText> {
+  String? _cachedText;
+  bool? _cachedIsLight;
+  Widget? _cached;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_cached != null &&
+        _cachedText == widget.text &&
+        _cachedIsLight == widget.isLight) {
+      return _cached!;
+    }
+    _cachedText = widget.text;
+    _cachedIsLight = widget.isLight;
+    _cached = widget.builder(widget.text, widget.tc);
+    return _cached!;
   }
 }

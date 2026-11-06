@@ -447,6 +447,14 @@ class ConversationsDao {
   // 内存缓存：key = conversationId，启动时加载
   // ConversationService 的 sync 方法（getActiveSession 等）依赖此缓存
   static final Map<String, Conversation> _cache = {};
+  /// active 会话的二级索引缓存：避免每次 tab 切换都线性扫全部会话
+  static String? _activeHostKey;
+  static Conversation? _activeConversation;
+
+  static void _invalidateActiveCache() {
+    _activeHostKey = null;
+    _activeConversation = null;
+  }
 
   static Future<void> loadCache() async {
     _cache.clear();
@@ -455,6 +463,7 @@ class ConversationsDao {
       final c = _fromRow(r);
       _cache[c.id] = c;
     }
+    _invalidateActiveCache();
   }
 
   /// 同步获取所有缓存的会话
@@ -465,9 +474,22 @@ class ConversationsDao {
 
   /// 同步获取指定 hostId 的 active 会话（从缓存）
   static Conversation? getCachedActiveByHost(String hostId) {
-    for (final c in _cache.values) {
-      if (c.hostId == hostId && c.isActive) return c;
+    final cached = _activeConversation;
+    if (_activeHostKey == hostId &&
+        cached != null &&
+        cached.isActive &&
+        identical(_cache[cached.id], cached)) {
+      return cached;
     }
+    for (final c in _cache.values) {
+      if (c.hostId == hostId && c.isActive) {
+        _activeHostKey = hostId;
+        _activeConversation = c;
+        return c;
+      }
+    }
+    _activeHostKey = hostId;
+    _activeConversation = null;
     return null;
   }
 
@@ -491,6 +513,7 @@ class ConversationsDao {
 
   static Future<void> upsert(Conversation c) async {
     _cache[c.id] = c;
+    _invalidateActiveCache();
     await DbInit.db.insert('conversations', _toRow(c),
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
@@ -503,6 +526,7 @@ class ConversationsDao {
         c.isActive = (c.id == id);
       }
     }
+    _invalidateActiveCache();
     await DbInit.db.transaction((txn) async {
       await txn.update('conversations', {'isActive': 0},
           where: 'hostId = ?', whereArgs: [hostId]);
@@ -513,13 +537,15 @@ class ConversationsDao {
 
   static Future<void> delete(String id) async {
     _cache.remove(id);
+    _invalidateActiveCache();
     await DbInit.db.delete('conversations', where: 'id = ?', whereArgs: [id]);
   }
 
   static Map<String, dynamic> _toRow(Conversation c) => {
     'id': c.id, 'hostId': c.hostId, 'title': c.title,
     'messages': jsonEncode(c.messages.map(_msgToJson).toList()),
-    'agentLogs': jsonEncode(c.agentLogs.map(_logToJson).toList()),
+    'agentLogs': c.rawAgentLogsJson ??
+        jsonEncode(c.agentLogs.map(_logToJson).toList()),
     'summary': c.summary,
     'summarizedUpToIndex': c.summarizedUpToIndex,
     'createdAt': c.createdAt.millisecondsSinceEpoch,
@@ -534,8 +560,7 @@ class ConversationsDao {
       ..title = r['title'] as String
       ..messages = (jsonDecode(r['messages'] as String) as List)
           .map((e) => _msgFromJson(e as Map<String, dynamic>)).toList()
-      ..agentLogs = (jsonDecode(r['agentLogs'] as String) as List)
-          .map((e) => _logFromJson(e as Map<String, dynamic>)).toList()
+      ..setAgentLogsJson(r['agentLogs'] as String?)
       ..summary = r['summary'] as String?
       ..summarizedUpToIndex = r['summarizedUpToIndex'] as int? ?? 0
       ..createdAt = DateTime.fromMillisecondsSinceEpoch(r['createdAt'] as int)
@@ -657,14 +682,6 @@ class ConversationsDao {
     'timestamp': l.timestamp.toIso8601String(),
     'level': l.level, 'tag': l.tag, 'message': l.message,
   };
-
-  static ConvAgentLog _logFromJson(Map<String, dynamic> j) {
-    return ConvAgentLog()
-      ..timestamp = DateTime.parse(j['timestamp'] as String)
-      ..level = j['level'] as String
-      ..tag = j['tag'] as String
-      ..message = j['message'] as String;
-  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -933,6 +950,12 @@ class AuditLogsDao {
     for (final r in rows.reversed) {
       _cache.add(_rowToMap(r));
     }
+    // 旧版本可能留下超过上限的行；启动时一次性收敛，之后按溢出量增量清理
+    await DbInit.db.rawDelete(
+      'DELETE FROM audit_logs WHERE id NOT IN '
+      '(SELECT id FROM audit_logs ORDER BY timestamp DESC LIMIT ?)',
+      [_maxEntries],
+    );
   }
 
   /// 同步获取缓存中指定 host 的审计日志（正序：最早到最新）
@@ -972,8 +995,9 @@ class AuditLogsDao {
     };
     // 同步更新缓存
     _cache.add(entry);
-    while (_cache.length > _maxEntries) {
-      _cache.removeAt(0);
+    final overflow = _cache.length - _maxEntries;
+    if (overflow > 0) {
+      _cache.removeRange(0, overflow);
     }
     // 异步写入数据库
     await DbInit.db.insert('audit_logs', {
@@ -984,13 +1008,11 @@ class AuditLogsDao {
       'output': output,
       'executed': executed ? 1 : 0,
     });
-    // 容量控制：删除超出上限的最早记录
-    final count = Sqflite.firstIntValue(
-        await DbInit.db.rawQuery('SELECT COUNT(*) FROM audit_logs'));
-    if (count != null && count > _maxEntries) {
+    // 容量控制：只按新增溢出量删除，避免每条命令都 COUNT(*) 全表
+    if (overflow > 0) {
       await DbInit.db.rawDelete(
         'DELETE FROM audit_logs WHERE id IN (SELECT id FROM audit_logs ORDER BY timestamp ASC LIMIT ?)',
-        [count - _maxEntries],
+        [overflow],
       );
     }
   }

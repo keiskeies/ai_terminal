@@ -205,7 +205,6 @@ class OpenAIProvider implements AIProvider {
       }
 
       final streamController = StreamController<String>();
-      String buffer = '';
       // P2-6: tool_calls 累积器（仅当传入 tools 时启用）
       final toolCallAcc =
           tools != null && tools.isNotEmpty ? ToolCallAccumulator() : null;
@@ -284,22 +283,17 @@ class OpenAIProvider implements AIProvider {
         }
       }
 
-      response.data!.stream.listen(
-        (chunk) {
-          String text;
-          try {
-            text = utf8.decode(chunk);
-          } catch (_) {
-            text = chunk.toString();
-          }
-          buffer += text;
-          final lines = buffer.split('\n');
-          buffer = lines.last;
-          for (int i = 0; i < lines.length - 1; i++) {
-            final line = lines[i].trim();
-            if (line.isEmpty) continue;
-            processLine(line);
-          }
+      // 用流式解码器处理跨包的多字节字符：逐 chunk utf8.decode 在分包切到
+      // 半个汉字时会抛异常并退化成 "[...]" 字节数组文本，导致 SSE 行解析失败。
+      response.data!.stream
+          .cast<List<int>>()
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .transform(const LineSplitter())
+          .listen(
+        (line) {
+          final trimmed = line.trim();
+          if (trimmed.isEmpty) return;
+          processLine(trimmed);
         },
         onError: (error) {
           if (!streamController.isClosed) {
@@ -308,13 +302,6 @@ class OpenAIProvider implements AIProvider {
           }
         },
         onDone: () {
-          // 处理剩余 buffer
-          if (buffer.isNotEmpty) {
-            final line = buffer.trim();
-            if (line.startsWith('data: ')) {
-              processLine(line);
-            }
-          }
           // P2-6: 兜底 — 若 stream 关闭时仍有未投递的 tool_calls，在此投递
           if (toolCallAcc != null &&
               toolCallAcc.hasPendingCalls &&
@@ -474,7 +461,6 @@ class ErnieProvider implements AIProvider {
       );
 
       final streamController = StreamController<String>();
-      String buffer = '';
 
       // 与 OpenAIProvider 一致：cancelToken 触发时主动关闭 streamController
       if (cancelToken != null) {
@@ -486,57 +472,52 @@ class ErnieProvider implements AIProvider {
         });
       }
 
-      response.data!.stream.listen(
-        (chunk) {
-          String text;
-          try {
-            text = utf8.decode(chunk);
-          } catch (_) {
-            text = chunk.toString();
+      response.data!.stream
+          .cast<List<int>>()
+          .transform(const Utf8Decoder(allowMalformed: true))
+          .transform(const LineSplitter())
+          .listen(
+        (line) {
+          final trimmed = line.trim();
+          if (trimmed.isEmpty) return;
+
+          if (trimmed == 'data: [DONE]') {
+            if (!streamController.isClosed) streamController.close();
+            return;
           }
 
-          buffer += text;
-          final lines = buffer.split('\n');
-          buffer = lines.last;
-
-          for (int i = 0; i < lines.length - 1; i++) {
-            final line = lines[i].trim();
-            if (line.isEmpty) continue;
-
-            if (line == 'data: [DONE]') {
-              streamController.close();
-              return;
-            }
-
-            if (line.startsWith('data: ')) {
-              final data = line.substring(6);
-              try {
-                final json = jsonDecode(data) as Map<String, dynamic>;
-                // 文心在末包给 usage（部分版本不给）；不给就不回调，UI 回落到估算值
-                final usage = TokenUsage.tryParse(json['usage']);
-                if (usage != null) onUsage?.call(usage);
-                final choices = json['choices'] as List?;
-                if (choices != null && choices.isNotEmpty) {
-                  final delta = choices[0]['delta'] as Map?;
-                  if (delta != null) {
-                    final reasoning = reasoningDeltaOf(delta);
-                    if (reasoning != null) {
-                      onReasoning?.call(reasoning);
-                    }
-                    final content = delta['content'];
-                    if (content != null && content.toString().isNotEmpty) {
+          if (trimmed.startsWith('data: ')) {
+            final data = trimmed.substring(6);
+            try {
+              final json = jsonDecode(data) as Map<String, dynamic>;
+              // 文心在末包给 usage（部分版本不给）；不给就不回调，UI 回落到估算值
+              final usage = TokenUsage.tryParse(json['usage']);
+              if (usage != null) onUsage?.call(usage);
+              final choices = json['choices'] as List?;
+              if (choices != null && choices.isNotEmpty) {
+                final delta = choices[0]['delta'] as Map?;
+                if (delta != null) {
+                  final reasoning = reasoningDeltaOf(delta);
+                  if (reasoning != null) {
+                    onReasoning?.call(reasoning);
+                  }
+                  final content = delta['content'];
+                  if (content != null && content.toString().isNotEmpty) {
+                    if (!streamController.isClosed) {
                       streamController.add(content.toString());
                     }
                   }
                 }
-              } catch (_) {}
-            }
+              }
+            } catch (_) {}
           }
         },
         onError: (error) {
           // 与 OpenAIProvider 保持一致：映射为友好消息
-          streamController.addError(mapDioError(error));
-          streamController.close();
+          if (!streamController.isClosed) {
+            streamController.addError(mapDioError(error));
+            streamController.close();
+          }
         },
         onDone: () {
           if (!streamController.isClosed) {

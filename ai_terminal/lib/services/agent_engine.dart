@@ -45,6 +45,7 @@ import '../utils/choice_request_detector.dart';
 import '../utils/local_command_detector.dart';
 import '../utils/token_estimator.dart';
 import '../utils/audit_logger.dart';
+import '../utils/tail_text_buffer.dart';
 import 'change_record_service.dart';
 import 'change_window_service.dart';
 import 'notification_service.dart';
@@ -57,7 +58,20 @@ class AgentEngine {
   final Uuid _uuid = const Uuid();
 
   AgentTask? _currentTask;
-  String _accumulatedMessage = ''; // 跟踪累积的消息
+  final TailTextBuffer _accumulatedMessageBuffer =
+      TailTextBuffer(_maxAccumulatedChars);
+
+  /// 跟踪累积的消息（只保留尾部，读写都走摊还 O(1) 的缓冲）
+  String get _accumulatedMessage => _accumulatedMessageBuffer.tail();
+
+  set _accumulatedMessage(String value) {
+    _accumulatedMessageBuffer
+      ..clear()
+      ..write(value);
+  }
+  /// 最近一次 _callAI 结束时的解析结果，供紧随其后的 _parseReActResponse 复用，
+  /// 避免同一段响应被全量解析两次。
+  List<AgentEvent>? _lastParsedResponseEvents;
   Completer<bool>? _confirmCompleter; // 等待用户确认危险命令的 Completer
   Timer? _confirmTimeoutTimer; // 确认超时定时器，cancelTask 时需 cancel
   /// 本轮确认是否因超时结束。超时和用户拒绝必须分开说：
@@ -1337,7 +1351,9 @@ class AgentEngine {
       // ═══════════════════════════════════════════
       // 阶段2: 解析 (Parse) — 从 AI 响应中提取结构化动作
       // ═══════════════════════════════════════════
-      final step = _parseReActResponse(fullResponse);
+      final step = _parseReActResponse(fullResponse,
+          parsedEvents: _lastParsedResponseEvents);
+      _lastParsedResponseEvents = null;
       // 解析结果是排查用的内部细节：thought 可能上千字，默认日志里只留动作与首行摘要
       agentLogger.debug('ReAct',
           '步骤 $_currentStepCount 解析: action=${step.action}, '
@@ -1512,8 +1528,9 @@ class AgentEngine {
     agentLogger.info('ReAct', '调用 AI 模型...');
     agentLogger.debug('ReAct', '消息历史: ${_conversationHistory.length} 条');
     _resetReasoning();
+    _lastParsedResponseEvents = null;
 
-    String fullResponse = '';
+    final fullResponseBuffer = StringBuffer();
     // 重试仅对流建立阶段有效，一旦开始接收 chunk 就不再重试
     Stream<String> stream;
     const maxRetries = 3;
@@ -1646,6 +1663,11 @@ class AgentEngine {
     final stableIdToFinalId = <String, String>{}; // 稳定 ID → 最终全局唯一 ID 的映射
     int globalEventSeq = 0; // 全局事件序号
     bool commandDetectedNotified = false; // 是否已通知过命令检测（一轮只通知一次）
+    // 流式提前检测命令：全量解析很贵，限制在 150ms 一次，且只有出现
+    // 「命令:」或围栏代码块迹象时才解析；纯推理流不再逐 chunk 重解析。
+    const earlyParseIntervalMs = 150;
+    final earlyParseStopwatch = Stopwatch()..start();
+    var lastEarlyParseAtMs = -earlyParseIntervalMs;
     // watchdog 已改为实例字段 _aiWatchdog
 
     String assignFinalId(AgentEvent e) {
@@ -1683,40 +1705,46 @@ class AgentEngine {
         if (_aiStreamTimedOut) return;
         resetWatchdog();
         chunkCount++;
-        fullResponse += chunk;
-        // B5: 限制 _accumulatedMessage 增长，超出上限只保留尾部
-        _accumulatedMessage += chunk;
-        if (_accumulatedMessage.length > _maxAccumulatedChars) {
-          _accumulatedMessage = _accumulatedMessage
-              .substring(_accumulatedMessage.length - _maxAccumulatedChars);
-        }
+        fullResponseBuffer.write(chunk);
+        // B5: 限制累积消息增长，超出上限只保留尾部
+        _accumulatedMessageBuffer.write(chunk);
         onMessage?.call(chunk);
 
         // 流式过程中检测完整命令：立即发出 command 事件 + 触发提前执行
         if (onCommandDetected != null && !commandDetectedNotified) {
-          final currentEvents = ReActStreamParser.parse(fullResponse);
-          // 找第一个已确定完成的 command 事件（不是最后一个）
-          if (currentEvents.length > 1) {
-            for (int i = 0; i < currentEvents.length - 1; i++) {
-              final e = currentEvents[i];
-              if (e.isCommand) {
-                final cmd = e.command ?? '';
-                if (cmd.isNotEmpty) {
-                  commandDetectedNotified = true;
-                  // A5 修复：先记录 stableId，再改写为 finalId
-                  final stableId = e.id;
-                  final finalId = assignFinalId(e);
-                  _lastCommandEventId = finalId;
-                  // 立即发出 command 事件，让 UI 先显示命令块
-                  if (!emittedStableIds.contains(stableId)) {
-                    emittedStableIds.add(stableId);
-                    e.id = finalId;
-                    e.isStreaming = false;
-                    _enrichCommandEvent(e);
-                    onEvent?.call(e);
+          final elapsed = earlyParseStopwatch.elapsedMilliseconds;
+          if (elapsed - lastEarlyParseAtMs >= earlyParseIntervalMs) {
+            final responseText = fullResponseBuffer.toString();
+            // 没有命令行/代码围栏时解析不可能产出 command 事件，直接跳过
+            if (responseText.contains('命令:') ||
+                responseText.contains('命令：') ||
+                responseText.contains('```')) {
+              lastEarlyParseAtMs = elapsed;
+              final currentEvents = ReActStreamParser.parse(responseText);
+              // 找第一个已确定完成的 command 事件（不是最后一个）
+              if (currentEvents.length > 1) {
+                for (int i = 0; i < currentEvents.length - 1; i++) {
+                  final e = currentEvents[i];
+                  if (e.isCommand) {
+                    final cmd = e.command ?? '';
+                    if (cmd.isNotEmpty) {
+                      commandDetectedNotified = true;
+                      // A5 修复：先记录 stableId，再改写为 finalId
+                      final stableId = e.id;
+                      final finalId = assignFinalId(e);
+                      _lastCommandEventId = finalId;
+                      // 立即发出 command 事件，让 UI 先显示命令块
+                      if (!emittedStableIds.contains(stableId)) {
+                        emittedStableIds.add(stableId);
+                        e.id = finalId;
+                        e.isStreaming = false;
+                        _enrichCommandEvent(e);
+                        onEvent?.call(e);
+                      }
+                      onCommandDetected(cmd, finalId);
+                      break;
+                    }
                   }
-                  onCommandDetected(cmd, finalId);
-                  break;
                 }
               }
             }
@@ -1759,9 +1787,11 @@ class AgentEngine {
       throw StateError('任务已取消');
     }
 
-    if (_aiStreamTimedOut && fullResponse.isEmpty) {
+    if (_aiStreamTimedOut && fullResponseBuffer.isEmpty) {
       throw TimeoutException('AI 响应超时（${aiResponseTimeout.inSeconds}s 无数据）');
     }
+
+    final fullResponse = fullResponseBuffer.toString();
 
     // 流式结束：把节流掉的最后一段推理补发给 UI
     if (_reasoningBuffer.isNotEmpty) {
@@ -1770,6 +1800,8 @@ class AgentEngine {
 
     // 流式结束：一次性发出所有事件（e.id 此时是 stableId）
     final events = ReActStreamParser.parse(fullResponse);
+    // 缓存给紧随其后的 _parseReActResponse 复用，避免同一响应全量解析两次
+    _lastParsedResponseEvents = events;
     // L10 修复：只记录第一个 command 事件的 id（主流程只执行第一个命令）
     bool firstCommandIdSet = false;
     for (final e in events) {
@@ -1847,15 +1879,17 @@ class AgentEngine {
   /// ReAct 解析器 — 从 AI 响应中提取结构化动作
   /// 命令提取复用 ReActStreamParser，正确处理多行 heredoc
   /// ═══════════════════════════════════════════════════════
-  ReActStep _parseReActResponse(String content) {
+  ReActStep _parseReActResponse(String content,
+      {List<AgentEvent>? parsedEvents}) {
     String? thought;
     ActionType? action;
     String? command;
     List<String>? options;
     List<PlanStep>? plan;
 
-    // 使用 ReActStreamParser 统一提取命令（正确处理多行 heredoc 和代码块）
-    final events = ReActStreamParser.parse(content);
+    // 使用 ReActStreamParser 统一提取命令（正确处理多行 heredoc 和代码块）。
+    // 流结束路径已经解析过一次，直接复用结果；其它调用方仍走完整解析。
+    final events = parsedEvents ?? ReActStreamParser.parse(content);
     for (final e in events) {
       if (e.isCommand && command == null) {
         command = e.command;
@@ -1987,6 +2021,15 @@ class AgentEngine {
     return '${text.substring(0, _maxAnswerChars)}\n\n…（回答过长，已截断）';
   }
 
+  /// 首个半角/全角冒号的位置（避免为一个 indexOf 编译正则）
+  static int _firstColonIndex(String text) {
+    final ascii = text.indexOf(':');
+    final fullWidth = text.indexOf('：');
+    if (ascii < 0) return fullWidth;
+    if (fullWidth < 0) return ascii;
+    return ascii < fullWidth ? ascii : fullWidth;
+  }
+
   static String? parseAnswerBlock(List<String> lines) {
     final startIdx = lines.indexWhere((l) {
       final t = l.trim();
@@ -1995,7 +2038,7 @@ class AgentEngine {
     if (startIdx < 0) return null;
 
     final first = lines[startIdx].trim();
-    final sep = first.indexOf(RegExp('[:：]'));
+    final sep = _firstColonIndex(first);
     final buffer = StringBuffer();
     final inline = first.substring(sep + 1).trim();
     if (inline.isNotEmpty) buffer.writeln(inline);
@@ -4203,8 +4246,11 @@ $hostList
   }
 
   /// 判断命令是否调用了 sudo（作为命令词，避免匹配 sudoers 等单词）
+  static final RegExp _sudoCommandPattern =
+      RegExp(r'(^|[\s;&|`(])sudo([\s]|$)');
+
   bool _isSudoCommand(String command) {
-    return RegExp(r'(^|[\s;&|`(])sudo([\s]|$)').hasMatch(command);
+    return _sudoCommandPattern.hasMatch(command);
   }
 
   /// 使 system prompt 缓存失效（下次 startTask 重建）
@@ -4287,11 +4333,14 @@ $hostList
     var totalTokens = TokenEstimator.estimateHistory(kept);
     if (totalTokens > tokenBudget) {
       final originalCount = kept.length;
-      // 从最早开始丢弃，直到总 token 数降至预算以下或仅剩 2 条
-      while (kept.length > 2 && totalTokens > tokenBudget) {
-        final removed = kept.removeAt(0);
-        totalTokens -= TokenEstimator.estimateMessage(removed);
+      // 从最早开始丢弃，直到总 token 数降至预算以下或仅剩 2 条。
+      // 先算删除下标再 sublist，避免循环 removeAt(0) 的 O(n²) 移动。
+      var drop = 0;
+      while (drop < kept.length - 2 && totalTokens > tokenBudget) {
+        totalTokens -= TokenEstimator.estimateMessage(kept[drop]);
+        drop++;
       }
+      if (drop > 0) kept = kept.sublist(drop);
       agentLogger.info(
         'TrimMsgs',
         'token-aware 裁剪: $originalCount → ${kept.length} 条, '

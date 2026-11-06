@@ -17,6 +17,18 @@ class ReActStreamParser {
     '回答:', '回答：',
   ];
 
+  static final RegExp _xmlFencedPattern = RegExp(
+      r'---\s*\n<function=(\w+)>\s*\n<parameter=command>([\s\S]*?)</parameter>\s*\n</function>\s*\n---');
+  static final RegExp _xmlBarePattern = RegExp(
+      r'<function=(\w+)>\s*\n<parameter=command>([\s\S]*?)</parameter>\s*\n</function>');
+  static final RegExp _residualSeparator = RegExp(r'^---\s*$', multiLine: true);
+  static final RegExp _codeFencePrefix = RegExp(r'^```\w*\s*\n?');
+  static final RegExp _codeFenceSuffix = RegExp(r'\n?```\s*$');
+  static final RegExp _planBullet = RegExp(r'^(?:[-*•]|\d+[.)、])\s+');
+  static final RegExp _planStatusBox =
+      RegExp(r'^[\[【(（]\s*([^\]】)）]+)\s*[\]】)）]\s*');
+  static final RegExp _planTitlePrefix = RegExp(r'^[-–—:：]\s*');
+
   static String _stableId(AgentEventType type, String content) {
     final bytes = utf8.encode('${type.name}:$content');
     // FNV-1a 64-bit hash — collision resistance far superior to h*31+b (int32)
@@ -35,8 +47,7 @@ class ReActStreamParser {
     // 预处理：将 XML tool_call 格式转换为标准 ReAct 格式
     // 匹配 ---\n<function=...>\n<parameter=command>...</parameter>\n</function>\n--- 格式
     content = content.replaceAllMapped(
-      RegExp(
-          r'---\s*\n<function=(\w+)>\s*\n<parameter=command>([\s\S]*?)</parameter>\s*\n</function>\s*\n---'),
+      _xmlFencedPattern,
       (match) {
         final funcName = match.group(1)!;
         final commandValue = match.group(2)!.trim();
@@ -49,8 +60,7 @@ class ReActStreamParser {
 
     // 处理没有 --- 分隔符的 XML tool_call 格式
     content = content.replaceAllMapped(
-      RegExp(
-          r'<function=(\w+)>\s*\n<parameter=command>([\s\S]*?)</parameter>\s*\n</function>'),
+      _xmlBarePattern,
       (match) {
         final funcName = match.group(1)!;
         final commandValue = match.group(2)!.trim();
@@ -62,7 +72,7 @@ class ReActStreamParser {
     );
 
     // 清理残留的 --- 分隔符（仅当其单独成行时）
-    content = content.replaceAll(RegExp(r'^---\s*$', multiLine: true), '');
+    content = content.replaceAll(_residualSeparator, '');
 
     _FieldType? currentField;
     final buffer = StringBuffer();
@@ -297,8 +307,8 @@ class ReActStreamParser {
 
   static String _cleanCommand(String command) {
     return command
-        .replaceAll(RegExp(r'^```\w*\s*\n?'), '')
-        .replaceAll(RegExp(r'\n?```\s*$'), '')
+        .replaceAll(_codeFencePrefix, '')
+        .replaceAll(_codeFenceSuffix, '')
         .trim();
   }
 
@@ -311,13 +321,12 @@ class ReActStreamParser {
       final line = rawLine.trim();
       if (line.isEmpty || line.startsWith('```')) continue;
 
-      final bullet = RegExp(r'^(?:[-*•]|\d+[.)、])\s+').firstMatch(line);
+      final bullet = _planBullet.firstMatch(line);
       var rest = bullet == null ? line : line.substring(bullet.end);
       PlanStepStatus status = PlanStepStatus.pending;
       String title = rest;
 
-      final box =
-          RegExp(r'^[\[【(（]\s*([^\]】)）]+)\s*[\]】)）]\s*').firstMatch(rest);
+      final box = _planStatusBox.firstMatch(rest);
       if (box != null) {
         status = _parsePlanMarker(box.group(1)!);
         title = rest.substring(box.end).trim();
@@ -326,7 +335,7 @@ class ReActStreamParser {
         continue;
       }
 
-      title = title.replaceFirst(RegExp(r'^[-–—:：]\s*'), '').trim();
+      title = title.replaceFirst(_planTitlePrefix, '').trim();
       if (title.isEmpty) continue;
       steps.add(PlanStep(title: _clip(title, 160), status: status));
       if (steps.length >= 30) break;
