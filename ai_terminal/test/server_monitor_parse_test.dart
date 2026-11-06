@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_terminal/services/server_monitor_service.dart';
 
@@ -76,6 +78,95 @@ void main() {
 
       expect(snap.memTotalMB, 0);
       expect(snap.memPercent, 0);
+    });
+  });
+
+  group('Windows 本地采集', () {
+    // 真机（Win11 22000）上 -EncodedCommand 采集到的实际输出，仅截掉多余网卡
+    const windowsRaw = '''
+@@CPU@@
+LoadPercentage=34
+@@MEM@@
+FreePhysicalMemory=80304424
+TotalVisibleMemorySize=98178380
+FreeVirtualMemory=177660308
+TotalVirtualMemorySize=198841676
+@@DISK@@
+DeviceID=C:
+DriveType=3
+FileSystem=NTFS
+FreeSpace=960695062528
+Size=1997684166656
+
+DeviceID=I:
+DriveType=2
+FileSystem=exFAT
+FreeSpace=62910627840
+Size=62911414272
+
+@@NET@@
+Name=Realtek PCIe 2.5GbE Family Controller
+BytesReceivedPersec=137711252228
+BytesSentPersec=4581280000
+PacketsReceivedErrors=2
+PacketsOutboundErrors=1
+
+Name=MediaTek Wi-Fi 7 MT7925 Wireless LAN Card
+BytesReceivedPersec=0
+BytesSentPersec=0
+PacketsReceivedErrors=0
+PacketsOutboundErrors=0
+
+@@USER@@
+8
+@@UPTIME@@
+LastBootUpTime=20261105235812
+@@LOAD@@
+N/A
+@@PROC@@
+348
+@@KERNEL@@
+Microsoft Windows 11 专业版 10.0.22000
+@@HOSTNAME@@
+CJMD
+@@END@@
+''';
+
+    test('CIM 输出解析出全部指标，不再只剩 0 和短横线', () {
+      // 空输出分支会读 L10n（需 setup），这里只锁真实采集结果的解析
+      final snap = service.parseWindowsOutput(windowsRaw);
+      expect(snap.error, isNull);
+      expect(snap.cpuPercent, 34);
+      expect(snap.memTotalMB, closeTo(98178380 / 1024, 0.001));
+      expect(snap.memPercent, greaterThan(15));
+      expect(snap.diskTotalGB, closeTo(1997684166656 / (1024 * 1024 * 1024), 0.01));
+      expect(snap.diskPercent, greaterThan(40));
+      expect(snap.diskPartitions.length, 2);
+      expect(snap.diskPartitions.first.mountPoint, 'C:');
+      expect(snap.interfaces.length, 2);
+      expect(snap.netTotalDownBytes, 137711252228);
+      expect(snap.netTotalUpBytes, 4581280000);
+      expect(snap.userCount, 8);
+      expect(snap.processCount, 348);
+      expect(snap.uptime, isNot('-'));
+      expect(snap.kernelVersion, contains('Windows 11'));
+      expect(snap.hostname, 'CJMD');
+    });
+
+    test('-EncodedCommand 的 Base64 是 UTF-16LE 且不含引号', () {
+      const script = r"Write-Output '@@CPU@@'; $x = 'a b'";
+      final encoded = ServerMonitorService.encodePowershellCommand(script);
+
+      // 不含引号：整条命令经 cmd /c 传递也不会被二次解析
+      expect(encoded.contains('"'), isFalse);
+      expect(encoded.contains("'"), isFalse);
+
+      final bytes = base64Decode(encoded);
+      expect(bytes.length, script.length * 2);
+      final decoded = String.fromCharCodes([
+        for (var i = 0; i < bytes.length; i += 2) bytes[i] | (bytes[i + 1] << 8),
+      ]);
+      expect(decoded, script);
     });
   });
 }

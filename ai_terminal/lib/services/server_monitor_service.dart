@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import '../core/l10n_holder.dart';
 import 'ssh_service.dart';
@@ -938,35 +940,80 @@ class ServerMonitorService {
     return _parseMacOSOutput(out);
   }
 
-  Future<ServerSnapshot> _collectWindowsLocal(LocalTerminalService local) async {
-    const ps = '''
-echo @@CPU@@
-wmic cpu get loadpercentage /value | findstr LoadPercentage
-echo @@MEM@@
-wmic OS get FreePhysicalMemory,TotalVisibleMemorySize,FreeVirtualMemory,TotalVirtualMemorySize /value | findstr =
-echo @@DISK@@
-wmic logicaldisk get DeviceID,DriveType,FileSystem,FreeSpace,Size /value | findstr =
-echo @@NET@@
-wmic path Win32_PerfRawData_Tcpip_NetworkInterface get Name,BytesReceivedPersec,BytesSentPersec,PacketsReceivedErrors,PacketsOutboundErrors /value
-echo @@USER@@
-query user | find /c ">"
-echo @@UPTIME@@
-wmic os get LastBootUpTime /value | findstr =
-echo @@LOAD@@
-echo N/A
-echo @@PROC@@
-tasklist /nh | find /c ">"
-echo @@KERNEL@@
-ver
-echo @@HOSTNAME@@
-hostname
-echo @@END@@
+  /// Windows 本地采集脚本：纯 CIM 实现，不使用 wmic（Win11 已弃用/移除），
+  /// 脚本内不出现双引号，避免被外层 shell 二次解析。
+  static const String _windowsCollectScript = r'''
+$ErrorActionPreference = 'SilentlyContinue'
+$ProgressPreference = 'SilentlyContinue'
+Write-Output '@@CPU@@'
+$cpu = 0
+$c = (Get-CimInstance Win32_Processor | Measure-Object -Property LoadPercentage -Average).Average
+if ($null -ne $c) { $cpu = [int][math]::Round($c) }
+Write-Output ("LoadPercentage={0}" -f $cpu)
+Write-Output '@@MEM@@'
+$os = Get-CimInstance Win32_OperatingSystem
+if ($null -ne $os) {
+  Write-Output ("FreePhysicalMemory={0}" -f $os.FreePhysicalMemory)
+  Write-Output ("TotalVisibleMemorySize={0}" -f $os.TotalVisibleMemorySize)
+  Write-Output ("FreeVirtualMemory={0}" -f $os.FreeVirtualMemory)
+  Write-Output ("TotalVirtualMemorySize={0}" -f $os.TotalVirtualMemorySize)
+}
+Write-Output '@@DISK@@'
+foreach ($d in Get-CimInstance Win32_LogicalDisk) {
+  Write-Output ("DeviceID={0}" -f $d.DeviceID)
+  Write-Output ("DriveType={0}" -f $d.DriveType)
+  Write-Output ("FileSystem={0}" -f $d.FileSystem)
+  Write-Output ("FreeSpace={0}" -f $d.FreeSpace)
+  Write-Output ("Size={0}" -f $d.Size)
+  Write-Output ''
+}
+Write-Output '@@NET@@'
+foreach ($n in Get-CimInstance Win32_PerfRawData_Tcpip_NetworkInterface) {
+  Write-Output ("Name={0}" -f $n.Name)
+  Write-Output ("BytesReceivedPersec={0}" -f $n.BytesReceivedPersec)
+  Write-Output ("BytesSentPersec={0}" -f $n.BytesSentPersec)
+  Write-Output ("PacketsReceivedErrors={0}" -f $n.PacketsReceivedErrors)
+  Write-Output ("PacketsOutboundErrors={0}" -f $n.PacketsOutboundErrors)
+  Write-Output ''
+}
+Write-Output '@@USER@@'
+$u = @(Get-CimInstance Win32_LogonSession | Where-Object { $_.LogonType -eq 2 -or $_.LogonType -eq 10 })
+Write-Output $u.Count
+Write-Output '@@UPTIME@@'
+$boot = (Get-CimInstance Win32_OperatingSystem).LastBootUpTime
+if ($null -ne $boot) { Write-Output ("LastBootUpTime={0}" -f $boot.ToString('yyyyMMddHHmmss')) }
+Write-Output '@@LOAD@@'
+Write-Output 'N/A'
+Write-Output '@@PROC@@'
+Write-Output (@(Get-Process).Count)
+Write-Output '@@KERNEL@@'
+$sys = Get-CimInstance Win32_OperatingSystem
+if ($null -ne $sys) { Write-Output ($sys.Caption + ' ' + $sys.Version) }
+Write-Output '@@HOSTNAME@@'
+Write-Output $env:COMPUTERNAME
+Write-Output '@@END@@'
 ''';
-    final out = await local.runOnce('powershell -Command "$ps"', timeout: const Duration(seconds: 12));
-    return _parseWindowsOutput(out);
+
+  /// PowerShell 的 `-EncodedCommand` 要求 UTF-16LE 的 Base64。
+  /// 这样整条命令不含引号，经 `cmd /c` 传入也不会被二次解析。
+  static String encodePowershellCommand(String script) {
+    final bytes = Uint16List.fromList(script.codeUnits);
+    return base64Encode(bytes.buffer.asUint8List());
   }
 
-  ServerSnapshot _parseWindowsOutput(String raw) {
+  Future<ServerSnapshot> _collectWindowsLocal(LocalTerminalService local) async {
+    // 旧实现把多行脚本塞进 `powershell -Command "…"`；脚本里的 `find /c ">"` 会提前
+    // 闭合外层引号 → PowerShell 报 "The string is missing the terminator"，stdout 为空，
+    // 面板上只剩 0 与「-」。改用 EncodedCommand 后不再依赖任何引号转义。
+    final encoded = encodePowershellCommand(_windowsCollectScript);
+    final out = await local.runOnce(
+      'powershell -NoProfile -NonInteractive -EncodedCommand $encoded',
+      timeout: const Duration(seconds: 12),
+    );
+    return parseWindowsOutput(out);
+  }
+
+  ServerSnapshot parseWindowsOutput(String raw) {
     final now = DateTime.now();
     if (raw.isEmpty) {
       return ServerSnapshot(timestamp: now, error: L10n.str.monitorErrorEmptyOutput);
