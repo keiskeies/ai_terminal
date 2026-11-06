@@ -712,6 +712,9 @@ class _TerminalViewState extends State<TerminalView> {
     //
     // 事件分发顺序：Listener → xterm.TerminalView 内部手势 → xterm.TerminalView
     // 所以右侧也能收到。
+    // xterm 的 RenderTerminal.paint 不做裁剪：滚动偏移不在行高整数倍时
+    // （视口高度一般不是行高整数倍，底部对齐必然如此），顶部那一行会被
+    // 画到视口上边界之外。终端上方紧挨着标签栏，多出来的行就会盖到 tab 上。
     return Listener(
       onPointerDown: (event) {
         // onPointerDown 会收到所有鼠标按钮按下+触摸。
@@ -725,22 +728,24 @@ class _TerminalViewState extends State<TerminalView> {
           }
         }
       },
-      child: Container(
-        key: _terminalContainerKey,
-        child: xterm.TerminalView(
-        widget.terminal!,
-        controller: _controller,
-        focusNode: _focusNode,
-        autofocus: widget.active,
-        hardwareKeyboardOnly: isDesktop,
-        onKeyEvent: _handleKeyEvent,
-        textStyle: xterm.TerminalStyle(
-          fontSize: widget.fontSize,
-          fontFamily: 'JetBrainsMono',
-          fontFamilyFallback: kMonoFontFallback,
+      child: ClipRect(
+        child: Container(
+          key: _terminalContainerKey,
+          child: xterm.TerminalView(
+            widget.terminal!,
+            controller: _controller,
+            focusNode: _focusNode,
+            autofocus: widget.active,
+            hardwareKeyboardOnly: isDesktop,
+            onKeyEvent: _handleKeyEvent,
+            textStyle: xterm.TerminalStyle(
+              fontSize: widget.fontSize,
+              fontFamily: 'JetBrainsMono',
+              fontFamilyFallback: kMonoFontFallback,
+            ),
+            theme: _theme,
+          ),
         ),
-        theme: _theme,
-      ),
       ),
     );
   }
