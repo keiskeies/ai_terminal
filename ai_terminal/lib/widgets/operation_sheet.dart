@@ -45,6 +45,9 @@ class OperationSheet extends StatelessWidget {
   /// 中断/失败后继续任务（基于对话上下文，不自动重跑已完成步骤）
   final VoidCallback? onContinueOperation;
 
+  /// 是否为当前进行中的这一轮；历史回合的过程层默认收起
+  final bool isLiveTurn;
+
   const OperationSheet({
     super.key,
     required this.report,
@@ -58,6 +61,7 @@ class OperationSheet extends StatelessWidget {
     this.rollbackBusy = false,
     this.onOpenAudit,
     this.onContinueOperation,
+    this.isLiveTurn = true,
   });
 
   @override
@@ -129,7 +133,13 @@ class OperationSheet extends StatelessWidget {
         ),
 
         // 执行清单（模型声明）
-        if (planSteps.isNotEmpty) PlanPanel(steps: planSteps, tc: tc),
+        if (planSteps.isNotEmpty)
+          PlanPanel(
+            steps: planSteps,
+            tc: tc,
+            // 历史回合只留进度一行，展开状态不跨回合记忆
+            initiallyExpanded: isLiveTurn ? null : false,
+          ),
         if (planSteps.isNotEmpty &&
             report.isSuccess &&
             planSteps.any((s) =>
@@ -313,45 +323,7 @@ class OperationSheet extends StatelessWidget {
         // 建议下一步
         if (report.nextActions.isNotEmpty) ...[
           const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: report.nextActions
-                .map((action) => Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: tc.cardElevated,
-                        borderRadius: BorderRadius.circular(rSmall),
-                        border: Border.all(color: tc.border),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.only(top: 2),
-                            child: Icon(Icons.arrow_forward,
-                                size: 11, color: tc.brand),
-                          ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              action,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                  color: tc.textBody,
-                                  fontSize: fSmall,
-                                  height: 1.35,
-                                  fontWeight: FontWeight.w500),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ))
-                .toList(),
-          ),
+          _NextActions(actions: report.nextActions, tc: tc),
         ],
 
         const SizedBox(height: 6),
@@ -364,6 +336,8 @@ class OperationSheet extends StatelessWidget {
           markdownBuilder: markdownBuilder,
           hasEvidence: hasEvidence,
           evidenceBuilder: evidenceBuilder,
+          failureCount: report.commandFailureCount,
+          forceCollapsed: !isLiveTurn,
         ),
       ],
     );
@@ -734,6 +708,94 @@ class OperationSheet extends StatelessWidget {
   }
 }
 
+/// 下一步建议：超过 3 条先收成一行，其余按需展开
+class _NextActions extends StatefulWidget {
+  const _NextActions({required this.actions, required this.tc});
+
+  final List<String> actions;
+  final ThemeColors tc;
+
+  @override
+  State<_NextActions> createState() => _NextActionsState();
+}
+
+class _NextActionsState extends State<_NextActions> {
+  static const _collapsedCount = 3;
+  bool _showAll = false;
+
+  Widget _chip(String action, ThemeColors tc) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: tc.cardElevated,
+        borderRadius: BorderRadius.circular(rSmall),
+        border: Border.all(color: tc.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(Icons.arrow_forward, size: 11, color: tc.brand),
+          ),
+          const SizedBox(width: 4),
+          Flexible(
+            child: Text(
+              action,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  color: tc.textBody,
+                  fontSize: fSmall,
+                  height: 1.35,
+                  fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = widget.tc;
+    final ui = AgentUiText.of(context);
+    final visible = _showAll
+        ? widget.actions
+        : widget.actions.take(_collapsedCount).toList(growable: false);
+    final hidden = widget.actions.length - visible.length;
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        for (final action in visible) _chip(action, tc),
+        if (hidden > 0)
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _showAll = true),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(ui.moreActions(hidden),
+                  style: TextStyle(color: tc.textSub, fontSize: fMicro)),
+            ),
+          ),
+        if (hidden == 0 && _showAll && widget.actions.length > _collapsedCount)
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() => _showAll = false),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(ui.collapse,
+                  style: TextStyle(color: tc.textSub, fontSize: fMicro)),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _ExpandableEvidence extends StatefulWidget {
   final ThemeColors tc;
   final String summary;
@@ -742,6 +804,12 @@ class _ExpandableEvidence extends StatefulWidget {
   final bool hasEvidence;
   final Widget Function() evidenceBuilder;
 
+  /// 失败命令数：>0 时默认展开并给警示色——把故障藏进一次点击里，用户会以为任务顺利
+  final int failureCount;
+
+  /// 非当前轮的历史回合强制收起，避免打开旧会话满屏过程
+  final bool forceCollapsed;
+
   const _ExpandableEvidence({
     required this.tc,
     required this.summary,
@@ -749,6 +817,8 @@ class _ExpandableEvidence extends StatefulWidget {
     required this.markdownBuilder,
     required this.hasEvidence,
     required this.evidenceBuilder,
+    this.failureCount = 0,
+    this.forceCollapsed = false,
   });
 
   @override
@@ -756,12 +826,22 @@ class _ExpandableEvidence extends StatefulWidget {
 }
 
 class _ExpandableEvidenceState extends State<_ExpandableEvidence> {
-  bool _expanded = false;
+  late bool _expanded = widget.failureCount > 0;
+
+  @override
+  void didUpdateWidget(covariant _ExpandableEvidence oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 新一轮开始：上一轮被用户展开过的过程自动收起
+    if (widget.forceCollapsed && !oldWidget.forceCollapsed) _expanded = false;
+    // 中途出现失败：立刻把证据层顶开，不用等用户去点
+    if (oldWidget.failureCount == 0 && widget.failureCount > 0) _expanded = true;
+  }
 
   @override
   Widget build(BuildContext context) {
     final tc = widget.tc;
     final ui = AgentUiText.of(context);
+    final warn = widget.failureCount > 0;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -775,13 +855,13 @@ class _ExpandableEvidenceState extends State<_ExpandableEvidence> {
                 Icon(
                   _expanded ? Icons.expand_more : Icons.chevron_right,
                   size: 16,
-                  color: tc.textSub,
+                  color: warn ? tc.warn : tc.textSub,
                 ),
                 const SizedBox(width: 4),
                 Text(
                   ui.processAndEvidence,
                   style: TextStyle(
-                    color: tc.textBody,
+                    color: warn ? tc.warn : tc.textBody,
                     fontSize: fSmall,
                     fontWeight: FontWeight.w500,
                   ),
@@ -799,6 +879,15 @@ class _ExpandableEvidenceState extends State<_ExpandableEvidence> {
                     ),
                   ),
                 ),
+                if (warn)
+                  Text(
+                    ui.failedCommands(widget.failureCount),
+                    style: TextStyle(
+                      color: tc.warn,
+                      fontSize: fMicro,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
               ],
             ),
           ),

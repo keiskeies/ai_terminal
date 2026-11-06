@@ -477,4 +477,81 @@ void main() {
       expect(find.text('取消'), findsOneWidget);
     });
   });
+
+  testWidgets('折叠头带上失败数：故障不能藏在"更早 N 步"里', (tester) async {
+    final events = <AgentEvent>[
+      ..._turn(steps: 6),
+      AgentEvent.command('pm2 restart api', id: 'bad'),
+      AgentEvent.result(
+        commandId: 'bad',
+        success: false,
+        error: 'boom',
+        toolName: 'exec_command',
+      ),
+    ];
+
+    await tester.pumpWidget(_wrap(_content(events)));
+    await tester.pump();
+
+    expect(find.textContaining('更早'), findsOneWidget);
+    expect(find.textContaining('1 失败'), findsOneWidget,
+        reason: '收起后的那一行必须带失败数');
+  });
+
+  testWidgets('跑完后自动收回最近 5 步', (tester) async {
+    await tester.pumpWidget(_wrap(_content(_turn(steps: 12), isLoading: true)));
+    await tester.pump();
+
+    await tester.tap(find.textContaining('更早'));
+    await tester.pump();
+    expect(find.text('local_file_read').evaluate().length, 12);
+
+    // 任务结束：运行中展开的旧步骤自动收回
+    await tester.pumpWidget(_wrap(_content(_turn(steps: 12), isLoading: false)));
+    await tester.pump();
+    expect(find.text('local_file_read').evaluate().length,
+        lessThanOrEqualTo(5));
+  });
+
+  testWidgets('成功结果只预览前 12 行，其余进查看完整输出', (tester) async {
+    final output = [for (var i = 1; i <= 30; i++) 'row-$i'].join('\n');
+    final events = [
+      AgentEvent.command('dir', id: 'c-long'),
+      AgentEvent.result(
+        commandId: 'c-long',
+        success: true,
+        output: output,
+        toolName: 'exec_command',
+      ),
+    ];
+
+    await tester.pumpWidget(_wrap(_content(events)));
+    await tester.pump();
+    await tester.tap(find.text('终端命令'));
+    await tester.pump();
+
+    expect(find.textContaining('row-1'), findsWidgets);
+    expect(find.textContaining('row-30'), findsNothing);
+    expect(find.textContaining('还有 18 行'), findsOneWidget);
+    expect(find.textContaining('查看完整输出'), findsOneWidget);
+  });
+
+  testWidgets('失败结果预览尾部 12 行，错误不被截在前面', (tester) async {
+    final output = [for (var i = 1; i <= 30; i++) 'row-$i'].join('\n');
+    final events = [
+      AgentEvent.command('dir', id: 'c-bad'),
+      AgentEvent.result(
+        commandId: 'c-bad',
+        success: false,
+        output: output,
+        toolName: 'exec_command',
+      ),
+    ];
+
+    await tester.pumpWidget(_wrap(_content(events)));
+    await tester.pump();
+
+    expect(find.textContaining('row-30'), findsWidgets);
+    expect(find.textContaining('还有 18 行'), findsOneWidget);
+  });
 }

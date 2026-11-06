@@ -47,6 +47,12 @@ class _PlanPanelState extends State<PlanPanel> {
       // 计划首次出现/增长时自动展开，但用户手动收起后不强制打断
       if (widget.steps.length <= 8) _expanded = true;
     }
+    // 全部收尾后计划只是存档：自动收起，把屏幕还给结论
+    final allDone = widget.steps.isNotEmpty &&
+        widget.steps.every((s) => s.status == PlanStepStatus.completed);
+    final wasAllDone = oldWidget.steps.isNotEmpty &&
+        oldWidget.steps.every((s) => s.status == PlanStepStatus.completed);
+    if (allDone && !wasAllDone) _expanded = false;
   }
 
   @override
@@ -58,6 +64,10 @@ class _PlanPanelState extends State<PlanPanel> {
     final counts = _counts(ui);
     final currentIndex = steps
         .indexWhere((s) => s.status == PlanStepStatus.inProgress);
+    // 收起时把"当前在做哪一步"带到标题行：只留进度数字等于把计划藏没了
+    final headerLabel = !_expanded && currentIndex >= 0
+        ? '$counts · ${ui.step(currentIndex + 1)} · ${steps[currentIndex].title}'
+        : counts;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -98,7 +108,7 @@ class _PlanPanelState extends State<PlanPanel> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      counts,
+                      headerLabel,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.right,

@@ -48,7 +48,7 @@ class AgentProcessTimeline extends StatefulWidget {
     this.onConfirmCommand,
     this.onRejectCommand,
     required this.resultBuilder,
-    this.visibleTail = 6,
+    this.visibleTail = 5,
   });
 
   @override
@@ -61,6 +61,13 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
   /// 用户手动切换过的行（key 用 command 事件 id，避免位置变化时错位）。
   /// 没记录过的行走默认策略：出问题的行默认展开。
   final Map<String, bool> _rowOpen = {};
+
+  @override
+  void didUpdateWidget(covariant AgentProcessTimeline oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 跑完后收回"最近 5 步"：运行中展开的旧步骤不该在结果页继续占屏
+    if (oldWidget.isLoading && !widget.isLoading) _expanded = false;
+  }
 
   /// 默认展开策略：
   /// - 失败的结果默认展开 —— 把错误和重试按钮藏进一次点击里，用户会以为任务顺利
@@ -199,9 +206,14 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
     final toolCalls = rows
         .where((r) => r.kind == _RowKind.call && (r.event.toolName != null))
         .length;
+    final failures = rows
+        .where((r) => r.kind == _RowKind.call && r.result?.success == false)
+        .length;
     final parts = <String>[
       if (toolCalls > 0) ui.toolCallsCount(toolCalls),
       if (calls - toolCalls > 0) ui.commandCallsCount(calls - toolCalls),
+      // 失败数字必须出现在收起后的那一行里，否则"过程已折叠"会把故障藏起来
+      if (failures > 0) ui.failureCount(failures),
     ];
     final label = _expanded
         ? ui.collapseProcess
@@ -216,15 +228,19 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
         child: Row(
           children: [
             Icon(_expanded ? Icons.expand_less : Icons.chevron_right,
-                size: 15, color: tc.textMuted),
+                size: 15, color: failures > 0 ? tc.warn : tc.textMuted),
             const SizedBox(width: 4),
             Expanded(
               child: Text(label,
-                  style: TextStyle(color: tc.textSub, fontSize: fMicro)),
+                  style: TextStyle(
+                      color: failures > 0 ? tc.warn : tc.textSub,
+                      fontSize: fMicro)),
             ),
             if (hidden.isNotEmpty)
               Text(_expanded ? ui.collapse : ui.expandProcess,
-                  style: TextStyle(color: tc.textSub, fontSize: fMicro)),
+                  style: TextStyle(
+                      color: failures > 0 ? tc.warn : tc.textSub,
+                      fontSize: fMicro)),
           ],
         ),
       ),

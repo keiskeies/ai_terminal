@@ -124,13 +124,13 @@ void main() {
       await tester.tap(find.text('审计记录'));
       expect(auditOpened, isTrue);
       expect(find.text('过程与证据'), findsOneWidget);
-      expect(find.text('EVIDENCE'), findsNothing);
+      // 有失败的命令：证据层默认展开，故障不能被折叠藏起来
+      expect(find.text('完整总结'), findsOneWidget);
+      expect(find.text('EVIDENCE'), findsOneWidget);
 
       await tester.tap(find.text('过程与证据'));
       await tester.pump();
-
-      expect(find.text('完整总结'), findsOneWidget);
-      expect(find.text('EVIDENCE'), findsOneWidget);
+      expect(find.text('EVIDENCE'), findsNothing);
     });
 
     testWidgets('renders answer body in the conclusion layer, not the fold',
@@ -1110,4 +1110,120 @@ void main() {
       expect(find.textContaining('tok/s', findRichText: true), findsNothing);
     });
   });
+
+  group('信息层级：常驻 / 折叠 / 自动收起', () {
+    OperationReport report({
+      int failures = 0,
+      List<String> nextActions = const [],
+      List<PlanStep> plan = const [],
+    }) {
+      return OperationReport(
+        operationId: 'op-h',
+        goal: '检查磁盘',
+        hostId: 'web-01',
+        elapsedSeconds: 30,
+        stepIndex: 3,
+        commandSuccessCount: 2,
+        commandFailureCount: failures,
+        conclusion: '磁盘正常。',
+        details: '结论: 磁盘正常。',
+        plan: plan,
+        nextActions: nextActions,
+        finishState: failures > 0 ? 'failed' : 'success',
+      );
+    }
+
+    Widget sheet(OperationReport r, {bool isLiveTurn = true}) {
+      return _wrap(Builder(
+        builder: (context) => OperationSheet(
+          report: r,
+          tc: ThemeColors.of(context),
+          markdownBuilder: (text, tc) => Text(text),
+          evidenceBuilder: () => const Text('EVIDENCE'),
+          isLiveTurn: isLiveTurn,
+        ),
+      ));
+    }
+
+    testWidgets('无失败时证据层默认收起，点开才可见', (tester) async {
+      await tester.pumpWidget(sheet(report()));
+      expect(find.text('EVIDENCE'), findsNothing);
+
+      await tester.tap(find.text('过程与证据'));
+      await tester.pump();
+      expect(find.text('EVIDENCE'), findsOneWidget);
+    });
+
+    testWidgets('历史回合强制收起：上一轮被展开过的过程自动收掉', (tester) async {
+      await tester.pumpWidget(sheet(report(failures: 1)));
+      expect(find.text('EVIDENCE'), findsOneWidget);
+
+      // 新一轮开始，这一轮变成历史
+      await tester.pumpWidget(sheet(report(failures: 1), isLiveTurn: false));
+      await tester.pump();
+      expect(find.text('EVIDENCE'), findsNothing);
+    });
+
+    testWidgets('下一步建议超过 3 条先收成一行，点开可全部展开', (tester) async {
+      await tester.pumpWidget(sheet(report(
+        nextActions: const ['补充监控', '配置告警', '清理日志', '更新文档', '回归验证'],
+      )));
+
+      expect(find.text('补充监控'), findsOneWidget);
+      expect(find.text('清理日志'), findsOneWidget);
+      expect(find.text('更新文档'), findsNothing);
+      expect(find.text('还有 2 条'), findsOneWidget);
+
+      await tester.tap(find.text('还有 2 条'));
+      await tester.pump();
+      expect(find.text('更新文档'), findsOneWidget);
+      expect(find.text('回归验证'), findsOneWidget);
+      expect(find.text('收起'), findsOneWidget);
+    });
+
+    testWidgets('执行清单全部完成后自动收起', (tester) async {
+      const running = [
+        PlanStep(title: '检查磁盘', status: PlanStepStatus.inProgress),
+        PlanStep(title: '清理临时文件', status: PlanStepStatus.pending),
+      ];
+      const done = [
+        PlanStep(title: '检查磁盘', status: PlanStepStatus.completed),
+        PlanStep(title: '清理临时文件', status: PlanStepStatus.completed),
+      ];
+
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => PlanPanel(steps: running, tc: ThemeColors.of(context)),
+      )));
+      expect(find.text('检查磁盘'), findsWidgets);
+
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => PlanPanel(steps: done, tc: ThemeColors.of(context)),
+      )));
+      await tester.pump();
+      // 收起后只剩标题行，步骤标题不再逐条展示
+      expect(find.text('检查磁盘'), findsNothing);
+      expect(find.text('执行清单'), findsOneWidget);
+    });
+
+    testWidgets('清单收起时标题带当前步，不只给进度数字', (tester) async {
+      final steps = [
+        for (var i = 0; i < 10; i++)
+          PlanStep(
+            title: '任务 $i',
+            status: i < 2
+                ? PlanStepStatus.completed
+                : (i == 2 ? PlanStepStatus.inProgress : PlanStepStatus.pending),
+          ),
+      ];
+
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => PlanPanel(steps: steps, tc: ThemeColors.of(context)),
+      )));
+
+      expect(find.textContaining('第 3 步'), findsOneWidget);
+      expect(find.textContaining('任务 2'), findsOneWidget); // 出现在标题行的当前步摘要里
+      expect(find.text('任务 5'), findsNothing); // 其余步骤仍收起
+    });
+  });
+
 }

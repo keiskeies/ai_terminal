@@ -2300,6 +2300,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             pendingOptions:
                 agentState.isWaitingChoice && isLast ? agentState.pendingOptions : const [],
             enginePendingConfirm: isLast ? agentState.pendingConfirmCommand : null,
+            // 历史回合只在"最近一轮"里保留展开态；旧回合收起过程与清单
+            isLastTurn: isLast,
           );
         },
       ),
@@ -2404,6 +2406,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     String liveReasoning = '',
     String? turnGoal,
     String? enginePendingConfirm,
+    bool isLastTurn = false,
   }) {
     final isUser = role == 'user';
     final tc = ThemeColors.of(context);
@@ -2489,7 +2492,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 ),
               )
             else ...[
-              _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning, isWaitingChoice, pendingOptions: pendingOptions, events: events, streamingContent: streamingContent, liveReasoning: liveReasoning, turnGoal: turnGoal, enginePendingConfirm: enginePendingConfirm),
+              _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning, isWaitingChoice, pendingOptions: pendingOptions, events: events, streamingContent: streamingContent, liveReasoning: liveReasoning, turnGoal: turnGoal, enginePendingConfirm: enginePendingConfirm, isLastTurn: isLastTurn),
               _buildAnswerCopyRow(events, content, streamingContent, isLoading),
             ],
           ],
@@ -2957,6 +2960,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     String liveReasoning = '',
     String? turnGoal,
     String? enginePendingConfirm,
+    bool isLastTurn = false,
   }) {
     // 合并两种待确认来源：引擎自动流程（enginePendingConfirm）和手动播放（_pendingConfirmCommand）
     final effectivePendingConfirm = enginePendingConfirm ??
@@ -3034,6 +3038,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           markdownBuilder: _buildMarkdownText,
           hasEvidence: evidenceEvents.isNotEmpty || hasFallbackText,
           evidenceBuilder: buildEvidence,
+          isLiveTurn: isLastTurn,
           plan: report.plan.isNotEmpty ? report.plan : _findLatestPlan(events),
           rolledBackChangeIds: _rolledBackChangeIds,
           onRollbackChange: _executeRollback,
@@ -3082,6 +3087,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               steps: plan,
               tc: tc,
               currentCommand: runningCommand,
+              // 历史回合默认收起，只留"进度 + 当前步"一行
+              initiallyExpanded: isLastTurn ? null : false,
             ),
           // 过程折叠由 AgentProcessTimeline 自己负责（一行一步 + 更早 N 步），
           // 模型原生推理（reasoning_content）：只有部分网关返回该字段，有就实时显示

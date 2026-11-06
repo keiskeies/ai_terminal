@@ -373,15 +373,10 @@ class AgentEventContent extends StatelessWidget {
                     onRetryFailedHosts: onRetryFailedHosts,
                   )
                 else
-                  Text(
-                    output.trimRight(),
-                    style: TextStyle(
-                      fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
-                      fontSize: fMono,
-                      color: tc.textBody,
-                      height: 1.45,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  _ResultOutputPreview(
+                    output: output,
+                    failed: !success,
+                    tc: tc,
                   ),
                 if (!showMatrix &&
                     event.outputTail != null &&
@@ -974,6 +969,76 @@ class _AskCustomAnswerFieldState extends State<AskCustomAnswerField> {
         suffixIconConstraints:
             const BoxConstraints(minWidth: 36, minHeight: 32),
       ),
+    );
+  }
+}
+
+/// 结果输出预览：卡片里最多 12 行，其余进"查看完整输出"弹层。
+///
+/// 一次 `Get-ChildItem -Recurse` 就能刷出几千字符，全量摊在证据层里会把
+/// 结论与失败原因一起挤出屏幕；失败时改看尾部，错误通常在最后。
+class _ResultOutputPreview extends StatelessWidget {
+  const _ResultOutputPreview({
+    required this.output,
+    required this.failed,
+    required this.tc,
+  });
+
+  static const int _previewLines = 12;
+
+  final String output;
+  final bool failed;
+  final ThemeColors tc;
+
+  @override
+  Widget build(BuildContext context) {
+    final ui = AgentUiText.of(context);
+    final lines = output.replaceAll('\r\n', '\n').split('\n');
+    final hidden = lines.length - _previewLines;
+    final shown = hidden > 0
+        ? (failed
+            ? lines.skip(lines.length - _previewLines).join('\n')
+            : lines.take(_previewLines).join('\n'))
+        : output;
+    final textStyle = TextStyle(
+      fontFamily: 'JetBrainsMono',
+      fontFamilyFallback: kMonoFontFallback,
+      fontSize: fMono,
+      color: tc.textBody,
+      height: 1.45,
+      fontWeight: FontWeight.w500,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 失败时看的是尾部，被省略的部分在前面
+        if (hidden > 0 && failed) Text('…', style: textStyle),
+        Text(shown.trimRight(), style: textStyle),
+        if (hidden > 0)
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => showOutputViewer(
+              context,
+              text: output,
+              tc: tc,
+              title: '命令输出',
+            ),
+            child: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.open_in_full, size: 11, color: tc.textSub),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${ui.moreOutputLines(hidden)} · ${ui.viewFullOutput}',
+                    style: TextStyle(color: tc.textSub, fontSize: fMicro),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
