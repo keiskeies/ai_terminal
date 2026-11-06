@@ -203,24 +203,31 @@ jobs:
 
             AI Terminal 是一款将 AI 助手与 SSH / 本地终端深度集成的跨平台应用。无论你是刚买服务器的小白、不想记命令的开发者、还是需要批量管理服务器的运维人员——打开它，用中文告诉 AI 你要干什么，它帮你连服务器、跑命令、装软件、查问题。全程安全可控。
 
-            ### 🆕 v1.3.8 新功能 · 石墨青主题 & 可读性升级
+            ### 🆕 v1.3.9 新功能 · 回答整段复制 & 终端右键菜单
 
-            v1.3.8 统一深/浅色视觉系统，提升 Agent 操作单在英文和浅色环境下的可读性，并重写项目 README。
+            v1.3.9 聚焦日常操作手感：Agent 回答可跨段选择、一键整段复制；信息按常驻/折叠/按需分级；思考真正流式输出；终端右键成为完整工作区入口；Windows 本机监控修复。
 
-            #### 🎨 石墨青主题
-            - 深色/浅色两套石墨底 + 品牌青交互 + 金色数据强调
-            - 提高正文/计划/元信息字重，发丝级边框分层更清晰
-            - Material 单选、滑杆、输入焦点统一品牌色
+            #### 📋 Agent 回答
+            - **整段选择与复制**：整条回答统一选区，可跨段落拖选；消息下方一键复制完整回答
+            - **信息分级**：结论、操作按钮、状态常驻；计划/变更/下一步在任务结束后自动收起；证据与命令输出按需展开
+            - **用户消息可收起**：默认最多两行，点开查看全文
+            - **思考流式输出**：`reasoning_content` 显示为可折叠思考块，ReAct 实时思考连续打印
 
-            #### 💬 对话与终端
-            - 用户消息改为品牌青淡染气泡，与 AI 中性气泡明确区分
-            - 新增浅色终端 ANSI 调色板，深色终端改为石墨黑
-            - Agent 操作单/执行清单文案支持英文/中文，其它语言英文兜底
+            #### 🖥️ 终端与日志
+            - **右键菜单扩展**：复制/粘贴（多行确认）/全选、导出会话到文件、清屏/清回滚、字号调整
+            - **选区动作**：发给 Agent、存为片段、确认后执行
+            - **上下文动作**：打开/复制链接、复制路径、问 Agent；远程会话直达 SFTP/变更记录/审计
+            - **结构化日志**：按级别、标签、当前任务筛选，一条事件一行
+            - **Windows 监控修复**：改用 CIM + 编码 PowerShell，非英文语言环境不再显示 0 或「-」
 
-            #### 🧹 文档与质量
-            - README 全面重写：版本、模型/供应商、语言、功能数量与真实能力对齐
-            - 移除过期截图和失效图片链接，改用英文深色界面截图
-            - 继续包含 1.3.7 的操作单、文件传输/编辑安全加固
+            #### 🎨 视觉与细节
+            - 表面阶梯 + 独立数据卡片底色，发丝线分层
+            - 圆形发送按钮、加高输入框、移除字数计数；连接状态只保留在标签页圆点
+            - 行内代码改用字色区分
+
+            #### 📁 继续包含
+            - v1.3.8 的石墨青主题与中英文操作单
+            - v1.3.7 的操作单、文件传输/编辑安全加固
 
             ### 🆕 v1.3.7 新功能 · Agent 操作单 & 文件安全加固
 
@@ -326,24 +333,31 @@ jobs:
 
             AI Terminal is a cross-platform app that deeply integrates an AI assistant with SSH and local terminals. Whether you're a beginner who just rented a VPS, a developer tired of googling commands, or a DevOps engineer managing dozens of servers — open it, tell the AI what you want in plain English (or Chinese), and it handles the rest. Safe, transparent, and under your control.
 
-            ### 🆕 What's New in v1.3.8 · Graphite Theme & Readability
+            ### 🆕 What's New in v1.3.9 · Whole-Answer Copy & Terminal Context Menu
 
-            v1.3.8 unifies the dark/light visual system, improves the Agent operation sheet in English and light mode, and rewrites the project README.
+            v1.3.9 focuses on day-to-day ergonomics: select and copy an entire Agent answer, keep information layered, stream reasoning as it happens, turn the terminal context menu into a real workspace, and fix Windows local monitoring.
 
-            #### 🎨 Graphite theme
-            - Graphite surfaces with brand-cyan interaction and gold data accents in both dark and light mode
-            - Higher text weights for body, plan and metadata text, plus hairline borders for clearer hierarchy
-            - Brand color applied to Material radios, sliders and input focus states
+            #### 📋 Agent answers
+            - **Whole-answer selection & copy**: one selection region across the answer, plus a one-click copy button under the message
+            - **Information hierarchy**: conclusion, action controls and status stay visible; plan, change ledger and next actions fold when a run ends; evidence and command output open on demand
+            - **Collapsible user messages**: two lines by default, expand for the full text
+            - **Streamed reasoning**: `reasoning_content` renders as a collapsible thinking block, and the live ReAct thought streams continuously
 
-            #### 💬 Conversations & terminal
-            - User messages now use a soft brand-cyan bubble, clearly separated from neutral AI bubbles
-            - New light terminal ANSI palette; dark terminal background changed to graphite black
-            - Agent operation sheet and plan labels support English/Chinese, with English fallback for other locales
+            #### 🖥️ Terminal & logs
+            - **Expanded context menu**: copy / paste (confirm for multi-line) / select all, export the transcript to a file, clear buffer or scrollback, and adjust the font size
+            - **Selection actions**: send to the Agent, save as a snippet, or run after confirmation
+            - **Contextual actions**: open / copy a link, copy a path, ask the Agent; remote sessions jump straight to SFTP, change records and the audit log
+            - **Structured logs**: filter by level, tag or current task, one event per line
+            - **Windows monitoring fixed**: CIM through an encoded PowerShell command, so non-English locales no longer show 0 or "-"
 
-            #### 🧹 Docs & quality
-            - README rewritten with accurate versions, provider/model/language counts and capabilities
-            - Removed outdated screenshots and broken image links; added English dark-mode screenshots
-            - Still includes the v1.3.7 operation sheet and file transfer/edit safety work
+            #### 🎨 Visual details
+            - Surface ladder with independent data-card backgrounds and hairline separation
+            - Circular send button, taller input, no character counter; connection state lives only in the tab status dot
+            - Inline code is tinted by color instead of a background patch
+
+            #### 📁 Still included
+            - The v1.3.8 graphite theme and English/Chinese operation sheet
+            - The v1.3.7 operation sheet and file transfer/edit safety work
 
             ### 🆕 What's New in v1.3.7 · Agent Operation Sheet & File Safety
 

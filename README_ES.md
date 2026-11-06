@@ -8,22 +8,22 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.3.8-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.9-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License" />
   </p>
 </p>
 
 **Language:**
-[中文](./README.md) | [English](./README_EN.md) | [日本語](./README_JA.md) | [Deutsch](./README_DE.md) | [Français](./README_FR.md) | [Español](./README_ES.md) | [한국어](./README_KO.md) | [Русский](./README_RU.md) | [Português](./README_PT.md) | [Italiano](./README_IT.md)
+[中文](./README_ZH.md) | [English](./README.md) | [日本語](./README_JA.md) | [Deutsch](./README_DE.md) | [Français](./README_FR.md) | [Español](./README_ES.md) | [한국어](./README_KO.md) | [Русский](./README_RU.md) | [Português](./README_PT.md) | [Italiano](./README_IT.md)
 
 ---
 
 > **Translation update in progress**
 >
-> Esta traducción se está actualizando para v1.3.8. Consulta el README en inglés o chino para ver el contenido actual.
+> Esta traducción se está actualizando para v1.3.9. Consulta el README en inglés o chino para ver el contenido actual.
 >
-> [README en inglés](./README_EN.md) · [README en chino](./README.md)
+> [README en inglés](./README.md) · [README en chino](./README_ZH.md)
 
 <p align="center">
   <img src="./docs/screenshots/operation-sheet-dark-en.png" width="820" alt="AI Terminal operation sheet" />

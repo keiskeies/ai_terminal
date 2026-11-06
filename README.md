@@ -2,15 +2,15 @@
   <img src="./docs/logo.png" width="112" height="112" alt="AI Terminal Logo" />
   <h1 align="center">AI Terminal</h1>
   <p align="center">
-    <strong>用自然语言操作服务器，AI 替你执行命令</strong>
+    <strong>Operate servers in natural language. AI runs the commands.</strong>
   </p>
   <p align="center">
-    <a href="https://ai-terminal.keiskei.top">官网</a> ·
-    <a href="https://github.com/keiskeies/ai_terminal/releases">下载</a> ·
+    <a href="https://ai-terminal.keiskei.top">Website</a> ·
+    <a href="https://github.com/keiskeies/ai_terminal/releases">Download</a> ·
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.3.8-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.3.9-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -18,164 +18,188 @@
   </p>
 </p>
 
-**语言：**
-**中文** | [English](./README_EN.md) | [日本語](./README_JA.md) | [Deutsch](./README_DE.md) | [Français](./README_FR.md) | [Español](./README_ES.md) | [한국어](./README_KO.md) | [Русский](./README_RU.md) | [Português](./README_PT.md) | [Italiano](./README_IT.md)
+**Language:**
+[中文](./README_ZH.md) | **English** | [日本語](./README_JA.md) | [Deutsch](./README_DE.md) | [Français](./README_FR.md) | [Español](./README_ES.md) | [한국어](./README_KO.md) | [Русский](./README_RU.md) | [Português](./README_PT.md) | [Italiano](./README_IT.md)
 
-**导航：**
-[核心能力](#核心能力) · [场景截图](#场景截图服务器管理与运维) · [下载安装](#下载安装) · [从源码运行](#从源码运行) · [安全设计](#安全设计) · [Star History](#star-history)
+**Navigate:**
+[Highlights](#highlights) · [Screenshots](#screenshots-server-management--operations) · [Download](#download) · [Run from source](#run-from-source) · [Security model](#security-model) · [Star History](#star-history)
 
 ---
 
 <p align="center">
   <img src="./docs/screenshots/agent-audit-workflow-dark-en.gif" width="960" alt="AI agent server audit workflow" />
   <br />
-  <sub>真实 Agent 巡检：计划 → 命令执行 → 结果卡片 → 结论与风险；英文界面 / 深色主题</sub>
+  <sub>A real Agent audit: plan → command execution → result cards → conclusion and risks; English UI / dark theme</sub>
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.3.8</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.3.9</strong></a>
   ·
-  <a href="https://ai-terminal.keiskei.top">访问官网</a>
+  <a href="https://ai-terminal.keiskei.top">Visit the website</a>
 </p>
 
-## 为什么是 AI Terminal
+## Why AI Terminal
 
-普通聊天助手只告诉你怎么做；AI Terminal 直接在你的服务器上完成它，并把过程留成可追溯的操作单。
+A chat assistant tells you what to run. AI Terminal runs it on your servers and leaves a traceable operation sheet behind.
 
-| 普通聊天式助手 | AI Terminal |
+| Chat-style assistant | AI Terminal |
 |---|---|
-| 给出一段可能需要修改的命令 | 在 SSH / 本地终端实际执行并校验 |
-| 对话结束就丢失上下文 | 计划、命令、退出码、证据和结论分层保留 |
-| 出错后只能重新描述 | 支持重试、重连、继续任务和失败恢复 |
-| 文件修改靠手工复制 | SFTP 上传/下载、原子写入、字节级补丁与回滚 |
-| 多台机器来回切 | 多主机编排、批量执行和按主机结果矩阵 |
+| Hands you a command you may need to edit | Executes and verifies it over SSH or a local terminal |
+| Loses context when the chat ends | Keeps plan, commands, exit codes, evidence, and conclusion layered together |
+| Makes you re-describe the problem after a failure | Retries, reconnects, resumes the task, and offers targeted recovery |
+| File changes by manual copy-paste | SFTP upload/download, atomic writes, byte-level patches, and rollback |
+| Switching between machines by hand | Multi-host orchestration, batch execution, per-host result matrix |
 
-## 一眼看懂
+## At a glance
 
-`5 个平台` · `14 种界面语言` · `22 个 AI 供应商` · `90+ 预设模型` · `26 个内置工具` · `8 个斜杠命令` · `300+ 知识库条目` · `7 种联网搜索源`
+`5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `26 built-in tools` · `8 slash commands` · `300+ knowledge entries` · `7 web search engines`
 
-## 核心能力
+## New in 1.3.9
 
-### Agent 操作单
+- **Whole-answer selection & copy** — drag across the entire answer, then copy all of it with one click under the message
+- **Information hierarchy** — conclusion, action controls and status stay visible; plan, change ledger and next actions fold once the run ends; evidence and command output open on demand
+- **Streamed reasoning** — provider `reasoning_content` renders as a collapsible model-thinking block, and the live ReAct thought streams while the task runs instead of arriving in bursts
+- **Terminal context menu** — copy/paste, transcript export, font size, send a selection to the Agent, save snippets, SFTP/audit entry points, and contextual open-link/copy-path actions
+- **Structured logs & real Windows metrics** — filter the Agent log by level, tag or current task; Windows local monitoring now reads CIM through an encoded PowerShell command, so it works under any system locale
 
-不再把思考、命令和输出堆成一条长聊天记录，而是分层展示：
+## Highlights
 
-- **结论优先**：任务结束先给结论，再展开现状、变更与建议；结论正文支持 Markdown（标题、列表、代码块、粗体）
-- **过程时间线**：思考、工具调用、终端命令各占一行，带状态与耗时；成功的步骤折成一行，失败和多机结果默认展开
-- **执行清单**：模型声明的计划、完成计数和当前步骤一目了然
-- **过程与证据**：命令、输出、耗时、退出码和失败分类按需展开
-- **变更台账**：记录文件修改与命令变更，支持回滚和审计
-- **失败恢复**：权限不足、断线、超时会给出针对性动作，可重试失败主机或继续任务
-- **多主机矩阵**：批量/广播操作按主机展示状态、耗时和输出
+### Agent Operation Sheet
 
-### 目标模式与运行计量
+Instead of stacking thinking, commands, and output into one long chat transcript, the Agent answer is layered:
 
-一条指令只做一步、跑完就停的是助手；能连着推进到目标达成、并且知道自己跑了多少，才是运维工具。
+- **Conclusion first**: the result, current state, changes, and recommended next steps — the answer body supports Markdown (headings, lists, code blocks, bold)
+- **Answer controls**: a copy button under every answer; the whole conversation is one selection region, so a cross-paragraph drag works instead of selecting one block at a time
+- **Layered by state**: plan, change ledger and next actions fold when a run ends; evidence and command output start collapsed; long user messages collapse to two lines with an explicit expand
+- **Streamed thinking**: model `reasoning_content` appears in a collapsible thinking block, and the live ReAct thought streams while the task runs
+- **Process timeline**: one row per thought, tool call, or terminal command with its status and duration; successful steps collapse to a single line while failures and multi-host results stay expanded
+- **Execution plan**: model-declared steps, progress counts, and the active step
+- **Process & evidence**: commands, output, duration, exit code, and failure category on demand
+- **Change ledger**: file and command changes are traceable, auditable, and rollback-ready
+- **Failure recovery**: targeted actions for permission, disconnect, and timeout failures
+- **Multi-host matrix**: batch/broadcast operations show per-host status, duration, and output
 
-- **`/goal <目标>`**：把目标记进当前会话，一轮任务结束后自动续跑下一轮，直到目标达成、你手动结束，或触发止损
-- **轮次预算**：默认 24 轮、上限 256 轮，用完就结束——自动续跑不会变成无限自驱
-- **该停就停**：你点了停止、任务异常、有人批准的操作超时没人确认、终端断线、切到别的会话、连续两轮一条命令都没执行——都会把目标转成暂停并写明原因，绝不自动复活
-- **运行中也停得下来**：暂停 / 编辑 / 结束三个按钮长在面板顶部的目标横幅上（那时输入框是禁用的，只给命令等于没有出口）
-- **底部运行计量**：轮数、步数、token、tok/s、上下文占用环。provider 回了 `usage` 就是实测值；只要有任何一轮是估出来的，总数就带 `≈`。缓存命中率在 provider 不提供 `cached_tokens` 时整项不显示——把"未知"显示成 0% 是个假结论
-- **8 个斜杠命令**：`/new` `/compact` `/goal` `/plan` `/model` `/permission` `/export` `/help`。`/plan` 只要计划不执行，临时置只读、结束后恢复你原来的设置（不是恢复成"关闭"）
-- **Agent 面板默认从右侧展开**，切换的方向和你拖出的比例都会被记住
+### Goal Mode & Run Metrics
 
-### 服务器与连接管理
+A one-shot command that stops when the turn ends is an assistant. Something that keeps pushing until the goal is met — and knows what it spent — is an operations tool.
 
-- SSH 远程终端 + 本地 PTY 终端，多标签共享连接池
-- 服务器分组、搜索、快速连接，一键打开终端或 SFTP
-- CPU、内存、磁盘、上传/下载实时监控条，多主机并行查看
-- 重连、断线提示、会话持久化和多标签隔离
+- **`/goal <objective>`**: the objective is stored per session, and when a round finishes the next round starts on its own — until the goal is met, you end it, or a stop condition fires
+- **Round budget**: 24 rounds by default, 256 at most. Auto-continuation cannot turn into an unbounded loop
+- **It stops when it should**: you pressed stop, the task errored, a confirmation timed out with nobody to approve it, the terminal dropped, you switched sessions, or two rounds executed no commands at all — each parks the goal with the reason shown, and it never revives itself
+- **Stoppable while it runs**: pause / edit / finish live on the goal banner at the top of the panel, because the input box is disabled during a task — a command-only exit would be no exit at all
+- **Bottom run metrics**: rounds, steps, tokens, tok/s, and a context-usage ring. Real numbers when the provider returns `usage`; the moment any round had to be estimated, the total is prefixed with `≈`. Cache-hit rate is omitted entirely when the provider doesn't report `cached_tokens` — showing 0% for unknown would be a fake conclusion
+- **8 slash commands**: `/new` `/compact` `/goal` `/plan` `/model` `/permission` `/export` `/help`. `/plan` produces a plan without executing anything: it sets read-only temporarily and restores *your* previous setting afterwards, not simply "off"
+- **The Agent panel opens on the right by default**, and remembers the side you chose plus the width you dragged it to
 
-### 文件传输与编辑
+### Servers & connections
 
-- `sftp_upload` / `sftp_download`：本地上传、服务器下载，支持单文件和目录递归
-- `file_write` / `file_patch`：绕过 shell 直接写文件或做字符串替换
-- 上传/下载使用临时文件 + rename，失败不会截断原文件
-- `file_patch` 按字节替换，保留 BOM、CRLF 和非 UTF-8 字节
-- 普通文本可直接用 `content` / `old` / `new`，不必让模型手算中文 base64
-- SFTP 编辑器会拒绝超大/非 UTF-8 文件，保存失败自动恢复
+- SSH remote terminal and local PTY terminal with a shared connection pool across tabs
+- Server groups, search, quick connect, and one-click terminal or SFTP
+- Live CPU, memory, disk, network, logon sessions, uptime, and process counts across multiple hosts
+- Local monitoring works on Windows, macOS and Linux without an SSH server; Windows reads CIM through an encoded PowerShell command, so non-English system locales no longer return zeros or dashes
+- Reconnect handling, disconnect notices, session persistence, and per-tab isolation
 
-### 本机文件工具
+### Terminal workspace
 
-Agent 也能直接读写跑着这个 App 的这台电脑，而不只是服务器：
+The terminal is not only where you watch the Agent work — it is a full workspace:
 
-- 7 个工具：`local_file_read` / `local_dir_list` / `local_file_search` 读取，`local_file_write` / `local_file_patch` / `local_file_move` / `local_file_delete` 改动
-- **默认关闭**：需在 设置 → Agent → 本地文件访问 打开开关并逐个授权目录；配置读取失败时按"关闭"处理，不会默认放开
-- **黑名单优先于白名单**：即使目录已授权，`~/.ssh`、`*.key`、`*.pem`、`.env` 等密钥与凭据文件仍被拒绝；符号链接按已存在的最近祖先解析，防 `..` 与软链逃逸
-- 读操作不需要确认；写与删会进变更台账并支持还原。`local_file_delete` 默认把文件移进回收区（`.ai_terminal_trash`，保留目录，Agent 自己碰不到），传 `hard: true` 时不进回收区
-- 任何删除调用都要用户在界面上点"确认执行"才落地，取消或超时都不会；只读模式下所有写类工具一并被拦
-- SSH 会话里同样可用——改的是本机，还原也不会绕道远程主机执行
-- **本机命令**：SSH 会话可用 `local_exec` 在这台电脑上执行命令（Windows 默认 PowerShell，macOS/Linux 默认 bash）；`cwd` 走同一份目录授权，未授权时弹窗确认；服务器上的命令仍用普通 `execute`
+- **Right-click, grouped by intent**: copy / paste (with a confirmation for multi-line text) / select all; copy the whole transcript or save it to a file; clear the buffer or scrollback; change or reset the font size
+- **Act on a selection**: send it to the Agent as context, save it as a reusable snippet, or run it after an explicit confirmation
+- **Context-aware actions**: a URL under the pointer offers open / copy link; a file path offers copy path and "ask the Agent"; remote sessions add SFTP (opening at the path's directory), change records, and the audit log
+- Row targeting uses the terminal renderer's own hit-testing, so the menu refers to the line you right-clicked — a path containing the word "error" is not mistaken for an error
 
-### 运维工具链
+### File transfer & editing
 
-- **Runbook 工作流**：内置巡检、安全、部署、维护模板，也支持自定义
-- **变更记录与审计日志**：操作人、时间、命令、结果、退出码可追溯
-- **安全时段**：限制允许修改的时间窗口
-- **通知中心**：任务完成、异常告警和安全提醒
-- **多机编排**：在单机、指定主机或一组主机上执行任务
+- `sftp_upload` / `sftp_download`: upload and download files, including recursive directories
+- `file_write` / `file_patch`: write files or apply string replacements without shell escaping
+- Atomic transfer: uploads/downloads write to a temporary file before replacing, so failures never truncate the original
+- Byte-level patches preserve BOM, CRLF, and non-UTF-8 bytes
+- Plain-text `content` / `old` / `new` parameters avoid model-generated base64 errors for Chinese text
+- The SFTP editor refuses oversized/non-UTF-8 files and restores the original on save failure
 
-### AI 与知识库
+### Local file tools
 
-- 兼容任何 OpenAI 兼容 API；内置 22 个供应商预设、90+ 个预设模型
-- 模型可配置备用模型、上下文长度、最大输出和 Function Calling
-- AI 联网搜索支持 7 种引擎：Bing HTML、DuckDuckGo、Brave、SearXNG、Tavily、Bing API、SerpAPI
-- 知识库包含 300+ 条软件安装/配置条目，按平台匹配命令
-- API Key 只保存在系统安全存储中，不写入日志或明文配置
+The Agent can also read and write the computer this app runs on, not just your servers:
 
-### 体验与安全
+- 7 tools: `local_file_read` / `local_dir_list` / `local_file_search` to read, `local_file_write` / `local_file_patch` / `local_file_move` / `local_file_delete` to change
+- **Off by default**: enable it under Settings → Agent → Local file access and authorize folders one by one; if the stored config cannot be read it falls back to disabled rather than open
+- **Blacklist beats allowlist**: even inside an authorized folder, `~/.ssh`, `*.key`, `*.pem`, `.env` and similar credential files stay off limits; symlinks resolve against the deepest existing ancestor, so `..` and symlink escapes are rejected
+- Reads need no confirmation; writes and deletions land in the change ledger and can be restored. `local_file_delete` moves files into the trash (`.ai_terminal_trash`, a reserved directory the Agent itself cannot touch); pass `hard: true` to skip the trash
+- Every delete call requires an explicit "Run" click in the UI — cancelling or letting it time out changes nothing. Read-only mode blocks all write tools as well
+- Available inside SSH sessions too: those edits touch this computer, and restoring them never goes through the remote host
+- **Local commands**: inside an SSH session, `local_exec` runs commands on this computer (PowerShell on Windows, bash on macOS/Linux by default). Its `cwd` uses the same folder authorization and prompts when the folder is not yet listed; server commands keep using normal `execute`
 
-- **石墨青主题**：深色与浅色两套配色；青色用于交互与当前状态，金色用于数据强调
-- **中英文 Agent UI**：Agent 操作单和计划面板优先支持英文/中文，其它语言回退英文
-- **14 种界面语言**：简体中文、English、日本語、한국어、Deutsch、Français、Русский、Español、Português、العربية、Italiano、हिन्दी、ไทย、Tiếng Việt
-- **5 个平台**：macOS、Linux、Windows、Android、iOS
-- 系统 Keychain / Keystore 凭据存储、SafetyGuard 命令分级和危险操作确认
+### Operations toolbelt
 
-## 场景截图：服务器管理与运维
+- **Runbooks**: built-in inspection, security, deployment, and maintenance templates, plus custom runbooks
+- **Change records & audit log**: operator, time, command, result, and exit code
+- **Safe hours**: restrict when changes are allowed
+- **Notification center**: task completion, anomalies, and security alerts
+- **Multi-host orchestration**: run on one host, selected hosts, or a group of hosts
 
-| Agent 巡检结果 | 服务器管理 |
+### AI & knowledge
+
+- Works with any OpenAI-compatible API; 22 built-in provider presets and 90+ preset models
+- Per-model fallback, context window, max output, and Function Calling settings
+- Web search with 7 engines: Bing HTML, DuckDuckGo, Brave, SearXNG, Tavily, Bing API, SerpAPI
+- Knowledge base with 300+ software installation/configuration entries, matched by platform
+- API keys stay in OS secure storage; no plaintext keys in logs or config files
+
+### Experience & security
+
+- **Graphite theme**: dark and light palettes; cyan for interaction/current state, gold for data emphasis
+- **Surface ladder**: separate surface steps for chrome, panels, cards and data cards, separated by hairlines instead of heavy borders; inline code is tinted by color rather than a background patch
+- **Cleaner controls**: circular send button, a taller Agent input, no character counter, and the tab status dot as the only connection indicator
+- **Structured Agent log**: filter by level, tag, or current task; one line per event; copy the filtered view
+- **English/Chinese Agent UI**: operation sheet and plan labels support English and Chinese first; other locales fall back to English
+- **14 UI languages**: 简体中文, English, 日本語, 한국어, Deutsch, Français, Русский, Español, Português, العربية, Italiano, हिन्दी, ไทย, Tiếng Việt
+- **5 platforms**: macOS, Linux, Windows, Android, iOS
+- OS Keychain / Keystore credential storage, SafetyGuard command classification, and confirmation for risky operations
+
+## Screenshots: server management & operations
+
+| Agent audit result | Server inventory |
 |:---:|:---:|
 | <img src="./docs/screenshots/server-audit-dark-en.png" width="440" /> | <img src="./docs/screenshots/server-list-dark-en.png" width="440" /> |
 
-| SFTP 文件管理 | 变更记录与审计 |
+| SFTP file manager | Change records & audit |
 |:---:|:---:|
 | <img src="./docs/screenshots/sftp-dark-en.png" width="440" /> | <img src="./docs/screenshots/change-records-dark-en.png" width="440" /> |
 
-| 运维工具总览 | 外观与主题 |
+| Operations toolkit | Appearance & themes |
 |:---:|:---:|
 | <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-dark-en.png" width="440" /> |
 
-- **Agent 巡检结果**：真实 Agent 生成计划、执行命令并输出风险结论；底部同时显示 CPU/内存/磁盘/网络实时监控，执行证据可展开。
-- **服务器管理**：分组、搜索、快速连接、打开终端或 SFTP。
-- **SFTP 文件管理**：浏览远端目录、上传/下载、预览与编辑。
-- **变更记录与审计**：命令、时间、结果和主机可追溯；截图中的主机 IP 已隐藏。
-- **运维工具总览**：Runbook、Activity Log、Safe Hours、Task Notifications 集中入口。
-- **外观与主题**：深色/浅色石墨青主题、终端字号调整。
+- **Agent audit result**: a real Agent builds a plan, runs commands and reports risks; live CPU/memory/disk/network metrics stay visible and evidence can be expanded.
+- **Server inventory**: groups, search, quick connect, and terminal/SFTP shortcuts.
+- **SFTP file manager**: browse remote directories, upload/download, preview and edit.
+- **Change records & audit**: command, time, result and host are traceable; host IPs in the screenshot are redacted.
+- **Operations toolkit**: runbooks, activity log, safe hours, and task notifications in one place.
+- **Appearance & themes**: graphite dark/light themes and terminal font size.
 
-## 下载安装
+## Download
 
-从 [GitHub Releases](https://github.com/keiskeies/ai_terminal/releases) 下载最新版本：
+Get the latest build from [GitHub Releases](https://github.com/keiskeies/ai_terminal/releases):
 
-| 平台 | 文件 |
+| Platform | File |
 |---|---|
-| macOS | `AI_Terminal_v1.3.8_macOS.zip` |
-| iOS | `AI_Terminal_v1.3.8_iOS.ipa`（未签名） |
-| Android | `AI_Terminal_v1.3.8_Android.apk` |
-| Windows | `AI_Terminal_v1.3.8_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.3.8_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.3.9_macOS.zip` |
+| iOS | `AI_Terminal_v1.3.9_iOS.ipa` (unsigned) |
+| Android | `AI_Terminal_v1.3.9_Android.apk` |
+| Windows | `AI_Terminal_v1.3.9_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.3.9_Linux_x64.tar.gz` |
 
-macOS 首次打开如提示“无法验证开发者”，可执行：
+If macOS reports that the developer cannot be verified:
 
 ```bash
 xattr -cr "/Applications/AI Terminal.app"
 ```
 
-iOS 包未签名，需要自行使用 Xcode/AltStore 等方式安装。
+The iOS IPA is unsigned and must be installed with your own signing method.
 
-## 从源码运行
+## Run from source
 
-要求：Flutter 3.44+（本项目在 3.47.8 / Dart 3.13 上测试），以及对应平台的构建工具。
+Requirements: Flutter 3.44+ (tested with 3.47.8 / Dart 3.13) and the platform build tools.
 
 ```bash
 git clone https://github.com/keiskeies/ai_terminal.git
@@ -186,14 +210,14 @@ dart run build_runner build --delete-conflicting-outputs
 flutter run
 ```
 
-Linux 还需要安装：
+Linux packages:
 
 ```bash
 sudo apt-get install -y libgtk-3-dev libblkid-dev liblzma-dev ninja-build \
   libgcrypt20-dev libsecret-1-dev libjsoncpp-dev
 ```
 
-构建发布包：
+Build release packages:
 
 ```bash
 flutter build macos --release
@@ -203,43 +227,43 @@ flutter build apk --release
 flutter build ios --release
 ```
 
-## 配置 AI 模型
+## Configure AI models
 
-1. 打开 **设置 → AI 模型配置**
-2. 添加端点：选择服务商或填写任意 OpenAI 兼容地址
-3. 填写 API Key、显示名称和 API 地址；一个端点下可配置多个模型
-4. 在端点里维护模型目录（上下文窗口、最大输出、推理档位），也可以「获取可用模型」
-5. 回到 Agent 输入框底部，点模型胶囊选择模型和思考档位
+1. Open **Settings → AI Model Config**
+2. Add an endpoint and choose a provider or any OpenAI-compatible URL
+3. Enter the API key, display name, and API URL; one endpoint can hold multiple models
+4. Maintain the model catalog (context window, max output, reasoning tiers) or use "Fetch available models"
+5. Back in the Agent input footer, tap the model capsule to pick a model and reasoning tier
 
-没有「默认模型」：当前使用哪个模型由底部选择器决定，选择会被记住。未填写的上下文/最大输出按 256K / 32K 处理，可逐个模型覆盖。API Key 由系统安全存储保存；应用本地数据库只保存端点与模型元数据。
+There is no "default model": the model in use is whatever the footer picker selected, and the choice is remembered. Unspecified context window / max output default to 256K / 32K and can be overridden per model. API keys are stored in OS secure storage; the local database keeps only endpoint and model metadata.
 
-## 安全设计
+## Security model
 
-- **凭据**：系统 Keychain / Keystore + AES 加密数据库，不明文落盘
-- **命令分级**：SafetyGuard 将命令分为 blocked / warn / info / safe；危险操作需要用户确认
-- **本机文件**：默认关闭，只能碰你逐个授权的目录；密钥与凭据文件的黑名单优先于白名单，`..` 与符号链接逃逸会被拒；回收区是保留目录，Agent 自己也读不到、删不掉
-- **文件安全**：写入前备份，失败回滚；上传/下载原子替换；补丁做唯一性和并发修改校验
-- **可追溯**：命令、文件变更、退出码和失败原因记录在变更台账与审计日志中
-- **边界**：AI 是执行助手，不是权限提升工具；服务器仍应遵循最小权限、防火墙和备份策略
+- **Credentials**: OS Keychain/Keystore plus an AES-encrypted database; no plaintext storage
+- **Command classification**: SafetyGuard classifies commands as blocked / warn / info / safe; risky operations require confirmation
+- **Local files**: off by default, and limited to folders you authorize one by one; the credential blacklist outranks the allowlist, `..` and symlink escapes are rejected, and the trash is a reserved directory the Agent can neither read nor delete
+- **File safety**: backups before writes, rollback on failure, atomic transfers, uniqueness and concurrent-change checks for patches
+- **Traceability**: commands, file changes, exit codes, and failure reasons are recorded in the change ledger and audit log
+- **Boundary**: the AI is an execution assistant, not a privilege-escalation tool; keep least privilege, firewalls, and backups
 
-## 架构
+## Architecture
 
 ```
 Flutter (Dart)
-├── Riverpod                 状态管理
-├── GoRouter                 路由
-├── SQLite3MultipleCiphers   加密本地数据库
-├── flutter_secure_storage   凭据存储
+├── Riverpod                 State management
+├── GoRouter                 Routing
+├── SQLite3MultipleCiphers   Encrypted local database
+├── flutter_secure_storage   Credential storage
 ├── dartssh2                 SSH / SFTP
-├── flutter_pty              本地 PTY
-├── xterm.dart               终端渲染
-├── Dio                      OpenAI 兼容 API
-└── SQLite FTS5              知识库全文搜索
+├── flutter_pty              Local PTY
+├── xterm.dart               Terminal rendering
+├── Dio                      OpenAI-compatible API
+└── SQLite FTS5              Knowledge-base full-text search
 ```
 
-仓库根目录是项目文档，Flutter 工程在 `ai_terminal/`。
+The repository root contains project docs; the Flutter app is in `ai_terminal/`.
 
-## 测试
+## Tests
 
 ```bash
 cd ai_terminal
@@ -247,31 +271,38 @@ flutter analyze
 flutter test
 ```
 
-真实 SSH / 真实 LLM 的 E2E 测试通过环境变量启用，不会在默认测试中访问外部服务。测试覆盖：
+Real SSH and real-LLM E2E tests are enabled through environment variables and do not run by default. Coverage includes:
 
-- 操作单解析与渲染、计划计数、失败恢复、回滚
-- 过程时间线的折叠窗口、失败默认展开、工具调用不重复渲染，以及 `回答:` 协议块的端到端解析
-- 目标模式的自动续跑判定：终态矩阵逐行断言（取消 / 失败 / 确认超时 / 断线 / 切走会话 / 预算耗尽 / 连续无进展 / 模型声明达成），以及排队续跑的三条守卫
-- 运行计量的显示规则：实测与估算的 `≈` 之分、缺数据整项不渲染、除零保护、上下文占用封顶 100%、窄面板下折行不溢出
-- 斜杠命令解析：命令名与参数分离、子命令与自然语言的消歧（`/etc/nginx 目录权限` 仍按普通文本发给模型）
-- Agent 面板方向与比例的存盘与读盘：显式选过 bottom 的老用户不被新默认翻转、脏值回落默认、比例夹回合法区间
-- 本机文件工具：目录白名单、`..` 与符号链接逃逸、密钥黑名单、备份/回收区/还原、只读模式拦截
-- 本机命令：PowerShell 误发远程的检测、四种 shell 的退出码、目录授权/拒绝/取消、只读与全自动门控
-- 工具契约：`ToolArgs` 取参、作用域可见性、变更台账由 `kind` 派生
-- SFTP 上传/下载、目录递归、二进制/大文件 SHA-256
-- file_write / file_patch 的 UTF-8、CRLF、BOM、非 UTF-8 字节和并发校验
-- 本地/远程文件修改、真实模型驱动的上传下载与改文件流程
+- Operation-sheet parsing/rendering, plan counts, recovery, and rollback
+- Whole-answer copy: report/thought/command formatting, duplicate-line suppression, and whole-block dedup
+- Answer controls and selection: hover/press state, copied feedback, and the real ancestor widget chain
+- Information hierarchy: plan auto-collapse, evidence expansion on failure, timeline tail and output-preview bounds, and collapsible user text
+- Reasoning: `reasoning_content` extraction, throttled live-thought display, and protocol-label stripping
+- Terminal context menu: intent mapping, multi-line paste guard, URL/path detection without error false positives, and menu sizing
+- Windows monitor: encoded PowerShell command, CIM output parsing, and the monitor strip rendering real values
+- Process timeline: the collapse window, failures expanded by default, tool calls never rendered twice, and end-to-end parsing of the `回答:` (answer) protocol block
+- Goal auto-continuation: every row of the terminal-state matrix is asserted (cancel / failure / confirmation timeout / disconnect / switched session / budget exhausted / two rounds without progress / model declares completion), plus the three guards in front of queueing the next round
+- Metric display rules: measured vs estimated `≈`, omitting an item instead of rendering missing data, divide-by-zero guard, context usage capped at 100%, and wrapping rather than overflowing in a narrow panel
+- Slash-command parsing: command name separated from its argument, and subcommands disambiguated from natural language (`/etc/nginx 目录权限` still goes to the model as text)
+- Agent panel persistence: a user who explicitly chose the bottom layout is not flipped by the new right-side default, dirty values fall back, and the ratio is clamped into the legal range
+- Local file tools: folder allowlist, `..` and symlink escapes, credential blacklist, backup/trash/restore, and read-only gating
+- Local commands: PowerShell misrouting detection, exit codes across four shells, folder authorization/denial/cancellation, and read-only/full-auto gating
+- Tool contract: typed `ToolArgs` access, scope visibility, and ledger membership derived from `kind`
+- SFTP upload/download, recursive directories, binary/large-file SHA-256
+- file_write / file_patch with UTF-8, CRLF, BOM, non-UTF-8 bytes, and concurrent-change checks
+- Local/remote file edits and real-model upload/download/edit flows
 
-## 已知边界
+## Known limits
 
-- macOS / iOS 发布包未做 Apple 公证/签名；iOS 需要自行签名安装
-- 应用不内置模型，需要自备 OpenAI 兼容 API Key
-- Agent 会执行真实命令；请在生产环境先阅读确认信息并做好备份
-- 开启本机文件访问后，Agent 改的就是这台电脑（仅限你授权的目录）；回收区副本不会自动过期，需要时在 设置 → Agent 里查看用量并手动清空
-- 14 种语言覆盖核心界面；最新 Agent 操作单文案目前以英文/中文为主，其它语言回退英文
-- token 计量优先用 provider 返回的 `usage`；不提供时回退到字符估算并在界面标 `≈`，缓存命中率则依赖 `prompt_tokens_details.cached_tokens`，没有就不显示
-- 目标模式的自动续跑只在目标所属会话处于前台时进行；切到别的会话时目标会暂停等你恢复，不会在后台机器上替你动手
-- 目录传输暂不并发，符号链接默认跳过
+- macOS/iOS builds are not notarized/signed; iOS requires your own signing
+- Token counts prefer the provider's `usage`; a call that doesn't return one falls back to a character estimate and the total is then shown with `≈`. Cache-hit rate needs `prompt_tokens_details.cached_tokens` and is simply hidden when the provider omits it
+- Goal auto-continuation only runs while the goal's own session is in the foreground — switch away and the goal parks itself rather than acting on a machine you are not looking at
+- No model is bundled; bring an OpenAI-compatible API key
+- The Agent executes real commands; review confirmations and keep backups in production
+- Once local file access is on, the Agent edits this computer (authorized folders only); trash copies never expire on their own — check the usage and empty it under Settings → Agent when you want the space back
+- 14 languages cover the core UI; the newest Agent operation-sheet labels are English/Chinese first, with English fallback for other locales
+- Directory uploads use adaptive concurrency and can be cancelled; directory downloads are still sequential, and symbolic links are skipped by default
+- The terminal context menu derives its line from the visible viewport, because xterm does not expose its scroll offset: while you are scrolled up, contextual link/path items may not match the line under the pointer. Those items only copy or open text — they never execute a command
 
 ## Star History
 
@@ -283,19 +314,19 @@ flutter test
  </picture>
 </a>
 
-## 链接
+## Links
 
-- [官网](https://ai-terminal.keiskei.top)
+- [Website](https://ai-terminal.keiskei.top)
 - [Releases](https://github.com/keiskeies/ai_terminal/releases)
-- [操作单设计文档](./docs/agent-operation-sheet-design.md)
+- [Operation Sheet design doc](./docs/agent-operation-sheet-design.md)
 - [Issue Tracker](https://github.com/keiskeies/ai_terminal/issues)
 
-## 许可证
+## License
 
 [MIT License](./LICENSE)
 
 ---
 
 <p align="center">
-  如果这个项目对你有帮助，欢迎给一个 Star。
+  If this project helps you, please consider giving it a star.
 </p>

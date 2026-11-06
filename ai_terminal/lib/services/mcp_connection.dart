@@ -122,7 +122,7 @@ class McpConnection {
     final transport = await _createTransport(oauth);
     _transport = transport;
     final client = McpClient(
-      const Implementation(name: 'AI Terminal', version: '1.4.0'),
+      const Implementation(name: 'AI Terminal', version: '1.3.9'),
       // legacy initialize profile：兼容 2025-11-25 / 2025-06-18 / 2025-03-26 /
       // 2024-11-05 等绝大多数 server，并使用全局 list_changed 通知；
       // 2026 stateless 的 subscriptions/listen 暂未接入。
