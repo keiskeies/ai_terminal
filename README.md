@@ -29,7 +29,7 @@
 <p align="center">
   <img src="./docs/screenshots/agent-audit-workflow-dark-en.gif" width="960" alt="AI agent server audit workflow" />
   <br />
-  <sub>A real Agent audit: plan → command execution → result cards → conclusion and risks; English UI / dark theme</sub>
+  <sub>A real Agent health check on a CentOS 8 server: model reasoning → 6-step plan → remote commands → evidence → conclusion; English UI / dark theme</sub>
 </p>
 
 <p align="center">
@@ -151,7 +151,7 @@ The Agent can also read and write the computer this app runs on, not just your s
 - **Surface ladder**: separate surface steps for chrome, panels, cards and data cards, separated by hairlines instead of heavy borders; inline code is tinted by color rather than a background patch
 - **Cleaner controls**: circular send button, a taller Agent input, no character counter, and the tab status dot as the only connection indicator
 - **Structured Agent log**: filter by level, tag, or current task; one line per event; copy the filtered view
-- **English/Chinese Agent UI**: operation sheet and plan labels support English and Chinese first; other locales fall back to English
+- **English UI coverage**: the Agent operation sheet, Web Search, MCP servers, Diagnostics, built-in runbooks, and the terminal context menu follow the interface language (English/Chinese first; other locales fall back to English)
 - **14 UI languages**: 简体中文, English, 日本語, 한국어, Deutsch, Français, Русский, Español, Português, العربية, Italiano, हिन्दी, ไทย, Tiếng Việt
 - **5 platforms**: macOS, Linux, Windows, Android, iOS
 - OS Keychain / Keystore credential storage, SafetyGuard command classification, and confirmation for risky operations
@@ -162,20 +162,32 @@ The Agent can also read and write the computer this app runs on, not just your s
 |:---:|:---:|
 | <img src="./docs/screenshots/server-audit-dark-en.png" width="440" /> | <img src="./docs/screenshots/server-list-dark-en.png" width="440" /> |
 
-| SFTP file manager | Change records & audit |
+| Agent operation sheet | Terminal context menu |
 |:---:|:---:|
-| <img src="./docs/screenshots/sftp-dark-en.png" width="440" /> | <img src="./docs/screenshots/change-records-dark-en.png" width="440" /> |
+| <img src="./docs/screenshots/operation-sheet-dark-en.png" width="440" /> | <img src="./docs/screenshots/terminal-context-menu-dark-en.png" width="440" /> |
 
-| Operations toolkit | Appearance & themes |
+| SFTP file manager | Activity log & audit |
 |:---:|:---:|
-| <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-dark-en.png" width="440" /> |
+| <img src="./docs/screenshots/sftp-dark-en.png" width="440" /> | <img src="./docs/screenshots/activity-log-dark-en.png" width="440" /> |
 
-- **Agent audit result**: a real Agent builds a plan, runs commands and reports risks; live CPU/memory/disk/network metrics stay visible and evidence can be expanded.
-- **Server inventory**: groups, search, quick connect, and terminal/SFTP shortcuts.
-- **SFTP file manager**: browse remote directories, upload/download, preview and edit.
-- **Change records & audit**: command, time, result and host are traceable; host IPs in the screenshot are redacted.
+| Built-in runbooks | Operations toolkit |
+|:---:|:---:|
+| <img src="./docs/screenshots/runbooks-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> |
+
+| Appearance & themes | Task notifications |
+|:---:|:---:|
+| <img src="./docs/screenshots/settings-dark-en.png" width="440" /> | <img src="./docs/screenshots/task-notifications-dark-en.png" width="440" /> |
+
+- **Agent audit result**: a real Agent health-checks a CentOS 8 container: 6-step plan, 14 remote commands, one failed package install against EOL repos, and a conclusion with risks. Live CPU/memory/disk/network metrics stay visible and evidence can be expanded.
+- **Server inventory**: groups, search, quick connect, and terminal/SFTP shortcuts; the hosts shown are a private demo environment.
+- **Agent operation sheet**: conclusion first, then plan, run metrics, and expandable evidence.
+- **Terminal context menu**: right-click groups local edit/export actions, selection actions for the Agent, font size, and remote SFTP / audit / change-record entry points.
+- **SFTP file manager**: browse remote directories, upload/download, preview and edit; remote paths use POSIX separators on every client OS.
+- **Activity log & audit**: command, time, host, result and execution state are traceable, with filters and copy.
+- **Built-in runbooks**: inspection, security, deployment, troubleshooting and maintenance templates, localized to English, run in one tap.
 - **Operations toolkit**: runbooks, activity log, safe hours, and task notifications in one place.
 - **Appearance & themes**: graphite dark/light themes and terminal font size.
+- **Task notifications**: DingTalk / Feishu / WeCom webhooks for task completion and failures.
 
 ## Download
 

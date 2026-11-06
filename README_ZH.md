@@ -29,7 +29,7 @@
 <p align="center">
   <img src="./docs/screenshots/agent-audit-workflow-dark-en.gif" width="960" alt="AI agent server audit workflow" />
   <br />
-  <sub>真实 Agent 巡检：计划 → 命令执行 → 结果卡片 → 结论与风险；英文界面 / 深色主题</sub>
+  <sub>真实 Agent 体检 CentOS 8 服务器：模型思考 → 6 步计划 → 远程命令 → 证据 → 结论；英文界面 / 深色主题</sub>
 </p>
 
 <p align="center">
@@ -151,31 +151,43 @@ Agent 也能直接读写跑着这个 App 的这台电脑，而不只是服务器
 - **表面阶梯**：外框、面板、卡片、数据卡片各用一档底色，靠发丝线分层而不是重边框；行内代码用字色区分，不再垫一块背景
 - **更干净的操作件**：圆形发送按钮、加高的 Agent 输入框、去掉字数计数；顶部只保留每个标签页的状态圆点，不再重复显示「已连接」
 - **结构化 Agent 日志**：按级别、标签或当前任务筛选，一条事件一行，筛选结果可整段复制
-- **中英文 Agent UI**：Agent 操作单和计划面板优先支持英文/中文，其它语言回退英文
+- **英文界面覆盖**：Agent 操作单、联网搜索、MCP 服务器、诊断、内置运维模板和终端右键菜单都会跟随界面语言（中英文优先，其它语言回退英文）
 - **14 种界面语言**：简体中文、English、日本語、한국어、Deutsch、Français、Русский、Español、Português、العربية、Italiano、हिन्दी、ไทย、Tiếng Việt
 - **5 个平台**：macOS、Linux、Windows、Android、iOS
 - 系统 Keychain / Keystore 凭据存储、SafetyGuard 命令分级和危险操作确认
 
 ## 场景截图：服务器管理与运维
 
-| Agent 巡检结果 | 服务器管理 |
+| Agent 体检结果 | 服务器管理 |
 |:---:|:---:|
 | <img src="./docs/screenshots/server-audit-dark-en.png" width="440" /> | <img src="./docs/screenshots/server-list-dark-en.png" width="440" /> |
 
-| SFTP 文件管理 | 变更记录与审计 |
+| Agent 操作单 | 终端右键菜单 |
 |:---:|:---:|
-| <img src="./docs/screenshots/sftp-dark-en.png" width="440" /> | <img src="./docs/screenshots/change-records-dark-en.png" width="440" /> |
+| <img src="./docs/screenshots/operation-sheet-dark-en.png" width="440" /> | <img src="./docs/screenshots/terminal-context-menu-dark-en.png" width="440" /> |
 
-| 运维工具总览 | 外观与主题 |
+| SFTP 文件管理 | 审计与活动日志 |
 |:---:|:---:|
-| <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-dark-en.png" width="440" /> |
+| <img src="./docs/screenshots/sftp-dark-en.png" width="440" /> | <img src="./docs/screenshots/activity-log-dark-en.png" width="440" /> |
 
-- **Agent 巡检结果**：真实 Agent 生成计划、执行命令并输出风险结论；底部同时显示 CPU/内存/磁盘/网络实时监控，执行证据可展开。
-- **服务器管理**：分组、搜索、快速连接、打开终端或 SFTP。
-- **SFTP 文件管理**：浏览远端目录、上传/下载、预览与编辑。
-- **变更记录与审计**：命令、时间、结果和主机可追溯；截图中的主机 IP 已隐藏。
+| 内置运维模板 | 运维工具总览 |
+|:---:|:---:|
+| <img src="./docs/screenshots/runbooks-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> |
+
+| 外观与主题 | 任务通知 |
+|:---:|:---:|
+| <img src="./docs/screenshots/settings-dark-en.png" width="440" /> | <img src="./docs/screenshots/task-notifications-dark-en.png" width="440" /> |
+
+- **Agent 体检结果**：真实 Agent 对 CentOS 8 容器做体检：6 步计划、14 条远程命令、一次针对 EOL 仓库的安装失败，以及带风险的结论；底部 CPU/内存/磁盘/网络监控保持实时，执行证据可展开。
+- **服务器管理**：分组、搜索、快速连接、打开终端或 SFTP；截图中的主机位于私有演示环境。
+- **Agent 操作单**：先给结论，再展开计划、运行指标和可展开的证据。
+- **终端右键菜单**：按用途分组——本地编辑/导出、选区发给 Agent、字号调整，以及远程 SFTP / 审计 / 变更记录入口。
+- **SFTP 文件管理**：浏览远端目录、上传/下载、预览与编辑；远程路径在任何客户端系统上都使用 POSIX 分隔符。
+- **审计与活动日志**：命令、时间、主机、结果和执行状态可追溯，支持筛选与复制。
+- **内置运维模板**：巡检、安全、部署、故障排查与日常维护模板，支持英文，一键执行。
 - **运维工具总览**：Runbook、Activity Log、Safe Hours、Task Notifications 集中入口。
 - **外观与主题**：深色/浅色石墨青主题、终端字号调整。
+- **任务通知**：钉钉 / 飞书 / 企业微信 Webhook，任务完成或失败时推送。
 
 ## 下载安装
 
