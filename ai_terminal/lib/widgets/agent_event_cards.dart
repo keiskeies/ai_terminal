@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 import '../models/agent_event.dart';
 import '../providers/terminal_provider.dart' as tp;
 import '../utils/agent_ui_text.dart';
@@ -949,7 +950,7 @@ class _AskCustomAnswerFieldState extends State<AskCustomAnswerField> {
       onSubmitted: (value) => _submit(value),
       decoration: InputDecoration(
         isDense: true,
-        hintText: '按钮都不合适？直接输入你的回答…',
+        hintText: UiText.t('按钮都不合适？直接输入你的回答…', 'None of these fit? Type your answer…'),
         hintStyle: TextStyle(color: tc.textMuted, fontSize: fSmall),
         filled: true,
         fillColor: tc.surface,

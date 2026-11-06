@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 import '../models/agent_goal.dart';
 import '../utils/agent_ui_text.dart';
 
@@ -205,7 +206,7 @@ class AgentGoalBanner extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('取消'),
+              child: Text(UiText.t('取消', 'Cancel')),
             ),
             TextButton(
               onPressed: () {
@@ -213,7 +214,7 @@ class AgentGoalBanner extends StatelessWidget {
                 Navigator.of(dialogContext).pop();
                 if (text.isNotEmpty) onEdit?.call(text);
               },
-              child: const Text('保存'),
+              child: Text(UiText.t('保存', 'Save')),
             ),
           ],
         );
@@ -236,14 +237,14 @@ class AgentGoalBanner extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('取消'),
+              child: Text(UiText.t('取消', 'Cancel')),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop();
                 onFinish?.call();
               },
-              child: const Text('结束'),
+              child: Text(UiText.t('结束', 'Finish')),
             ),
           ],
         );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 import '../utils/live_thought_text.dart';
 
 /// 模型原生推理块（reasoning_content / reasoning）。
@@ -35,7 +36,7 @@ class ModelReasoningBlock extends StatelessWidget {
             children: [
               Icon(Icons.psychology_outlined, size: 13, color: tc.textSub),
               const SizedBox(width: 4),
-              Text('模型思考',
+              Text(UiText.t('模型思考', 'Model thinking'),
                   style: TextStyle(fontSize: fMicro, color: tc.textSub)),
             ],
           ),
@@ -88,7 +89,7 @@ class LiveThoughtBlock extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 1.4, color: tc.brand),
               ),
               const SizedBox(width: 5),
-              Text('思考中', style: TextStyle(fontSize: fMicro, color: tc.textSub)),
+              Text(UiText.t('思考中', 'Thinking'), style: TextStyle(fontSize: fMicro, color: tc.textSub)),
             ],
           ),
           const SizedBox(height: 3),

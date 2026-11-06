@@ -4,6 +4,8 @@
 /// 无害的菜单项，所以宁可宽松一点也不要漏掉常见形态。
 library;
 
+import '../core/ui_text.dart';
+
 final RegExp _urlPattern = RegExp("[^\\s<>\"'`]+");
 final RegExp _urlPrefix = RegExp('https?://');
 final RegExp _windowsPathPattern = RegExp("[A-Za-z]:\\\\[^\\s\"'<>|]*");
@@ -79,11 +81,17 @@ String stripPromptPrefix(String text) =>
 
 /// 发送给 Agent 的解释请求
 String agentExplainPrompt(String selection) =>
-    '解释下面这段终端输出，指出关键信息、风险和下一步建议：\n```\n${selection.trim()}\n```';
+    UiText.t(
+      '解释下面这段终端输出，指出关键信息、风险和下一步建议：\n```\n${selection.trim()}\n```',
+      'Explain the following terminal output. Point out the key information, risks, and recommended next steps:\n```\n${selection.trim()}\n```',
+    );
 
 /// 发送给 Agent 的排错请求
 String agentErrorPrompt(String line) =>
-    '这段终端报错是什么意思？给出原因、影响和修复步骤：\n```\n${line.trim()}\n```';
+    UiText.t(
+      '这段终端报错是什么意思？给出原因、影响和修复步骤：\n```\n${line.trim()}\n```',
+      'What does this terminal error mean? Give the cause, impact, and fix steps:\n```\n${line.trim()}\n```',
+    );
 
 /// 取路径所在目录（SFTP 定位用）：`/a/b/c.log` → `/a/b`，`~/x` → `~`
 String directoryOfPath(String path) {

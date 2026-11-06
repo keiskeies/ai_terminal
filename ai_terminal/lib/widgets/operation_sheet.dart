@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 import '../models/agent_model.dart';
 import '../models/operation_report.dart';
 import '../models/token_usage.dart';
@@ -206,7 +207,9 @@ class OperationSheet extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               markdownBuilder(
-                report.conclusion.isEmpty ? '任务已结束，详见执行记录。' : report.conclusion,
+                report.conclusion.isEmpty
+                    ? UiText.t('任务已结束，详见执行记录。', 'Task finished. See the execution record for details.')
+                    : report.conclusion,
                 tc,
               ),
               // 回答正文是结论层的正文，不是证据：放在结论卡片下方直接可见，
@@ -425,7 +428,7 @@ class OperationSheet extends StatelessWidget {
 
     final host = report.hostId;
     if (host != null && host.isNotEmpty) {
-      add(host == 'local' ? '本地' : host, tc.textSub, mono: true, maxWidth: 200);
+      add(host == 'local' ? UiText.t('本地', 'Local') : host, tc.textSub, mono: true, maxWidth: 200);
     }
     add(_formatElapsed(report.elapsedSeconds, ui), tc.gold, mono: true);
     if (report.stepIndex > 0) add(ui.step(report.stepIndex), tc.textSub);
@@ -566,10 +569,10 @@ class OperationSheet extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   rolledBack
-                      ? '已执行回滚'
+                      ? UiText.t('已执行回滚', 'Rolled back')
                       : change.canRollback
-                          ? '回滚：${change.rollbackCommand}'
-                          : '无自动回滚，建议使用执行前快照',
+                          ? UiText.t('回滚：${change.rollbackCommand}', 'Rollback: ${change.rollbackCommand}')
+                          : UiText.t('无自动回滚，建议使用执行前快照', 'No automatic rollback; use a pre-change snapshot'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -587,12 +590,14 @@ class OperationSheet extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           if (rolledBack)
-            _badge('已回滚', tc.ok)
+            _badge(UiText.t('已回滚', 'Rolled back'), tc.ok)
           else if (change.canRollback && onRollbackChange != null)
             _buildRollbackButton(change)
           else
             _badge(
-              change.canRollback ? '可回滚' : '需人工',
+              change.canRollback
+                  ? UiText.t('可回滚', 'Rollback available')
+                  : UiText.t('需人工', 'Manual'),
               change.canRollback ? tc.ok : tc.textMuted,
             ),
         ],
@@ -619,7 +624,7 @@ class OperationSheet extends StatelessWidget {
             Icon(Icons.undo, size: 11, color: color),
             const SizedBox(width: 3),
             Text(
-              rollbackBusy ? '回滚中' : '回滚',
+              rollbackBusy ? UiText.t('回滚中', 'Rolling back') : UiText.t('回滚', 'Rollback'),
               style: TextStyle(
                 color: color,
                 fontSize: fMicro,
@@ -655,23 +660,23 @@ class OperationSheet extends StatelessWidget {
   String _changeTypeLabel(String type) {
     switch (type) {
       case 'install':
-        return '安装';
+        return UiText.t('安装', 'Install');
       case 'uninstall':
-        return '卸载';
+        return UiText.t('卸载', 'Uninstall');
       case 'modifyConfig':
-        return '修改配置';
+        return UiText.t('修改配置', 'Config change');
       case 'startService':
-        return '启动服务';
+        return UiText.t('启动服务', 'Start service');
       case 'stopService':
-        return '停止服务';
+        return UiText.t('停止服务', 'Stop service');
       case 'restartService':
-        return '重启服务';
+        return UiText.t('重启服务', 'Restart service');
       case 'fileOperation':
-        return '文件操作';
+        return UiText.t('文件操作', 'File operation');
       case 'permission':
-        return '权限修改';
+        return UiText.t('权限修改', 'Permission change');
       default:
-        return '变更';
+        return UiText.t('变更', 'Change');
     }
   }
 

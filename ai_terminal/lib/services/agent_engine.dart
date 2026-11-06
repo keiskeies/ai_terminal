@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:uuid/uuid.dart';
+import '../core/ui_text.dart';
 import '../models/agent_model.dart';
 import '../models/agent_event.dart';
 import '../models/agent_permission_mode.dart';
@@ -991,7 +992,7 @@ class AgentEngine {
     _confirmTimeoutTimer?.cancel();
     _confirmTimeoutTimer = null;
     // 通知 UI 暂停（info 事件，不是 finish）
-    onEvent?.call(AgentEvent.info('⏸️ 任务已暂停，可点击恢复继续'));
+    onEvent?.call(AgentEvent.info(UiText.t('⏸️ 任务已暂停，可点击恢复继续', '⏸️ Task paused. Click resume to continue.')));
   }
 
   /// P2-7: 恢复已暂停的任务
@@ -1057,7 +1058,7 @@ class AgentEngine {
     _notifyTaskUpdate();
     AgentTracer.instance
         .startTask(_currentTask!.id, '恢复: $goal', hostId: hostId);
-    onEvent?.call(AgentEvent.info('▶️ 任务已恢复，继续执行...'));
+    onEvent?.call(AgentEvent.info(UiText.t('▶️ 任务已恢复，继续执行...', '▶️ Task resumed, continuing...')));
     try {
       await _executeAutomatic(goal, executor, myGeneration);
     } catch (e, stack) {
@@ -1186,7 +1187,7 @@ class AgentEngine {
     // 仅新对话显示启动提示（只走事件通道，不混入文本流）
     if (isNewConversation) {
       _accumulatedMessage = '';
-      onEvent?.call(AgentEvent.info('🚀 开始自动执行任务...'));
+      onEvent?.call(AgentEvent.info(UiText.t('🚀 开始自动执行任务...', '🚀 Starting automatic execution...')));
     } else {
       _accumulatedMessage = '';
     }
@@ -2480,7 +2481,7 @@ class AgentEngine {
       }
 
       agentLogger.info('ReAct', '用户确认执行危险命令: $command');
-      onEvent?.call(AgentEvent.info('✅ 用户已确认，开始执行...'));
+      onEvent?.call(AgentEvent.info(UiText.t('✅ 用户已确认，开始执行...', '✅ Confirmed, executing...')));
     }
 
     // 执行命令
@@ -2848,7 +2849,7 @@ class AgentEngine {
 
     // 将用户选择反馈给 AI
     agentLogger.info('ReAct', '用户选择了: $choice');
-    onEvent?.call(AgentEvent.info('👉 你选择了: $choice'));
+    onEvent?.call(AgentEvent.info(UiText.t('👉 你选择了: $choice', '👉 You chose: $choice')));
 
     // 以 ReAct 观测格式反馈
     final observation = '观测: 用户选择了 "$choice"';
@@ -3266,7 +3267,7 @@ class AgentEngine {
           'AI 未生成命令，发送继续提示 (重试 $_noCommandRetryCount/$_maxNoCommandRetries)');
       const continuePrompt =
           '请继续执行任务。如果还有需要执行的步骤，请使用以下格式回复：\n\n思考: [你的推理]\n动作: execute\n命令: [要执行的命令]\n\n如果任务已全部完成，请回复：\n\n思考: [总结]\n动作: finish';
-      onEvent?.call(AgentEvent.info('⏳ 继续执行...'));
+      onEvent?.call(AgentEvent.info(UiText.t('⏳ 继续执行...', '⏳ Continuing...')));
       _conversationHistory
           .add(ChatMessage.create(role: 'user', content: continuePrompt));
       _trimMessages(_conversationHistory);

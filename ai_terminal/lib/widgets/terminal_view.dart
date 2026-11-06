@@ -13,6 +13,7 @@ import 'package:xterm/src/ui/render.dart' show RenderTerminal;
 import '../core/app_toast.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 import '../services/agent_logger.dart';
 import '../utils/terminal_text_actions.dart';
 import 'terminal_context_menu.dart';
@@ -320,7 +321,7 @@ class _TerminalViewState extends State<TerminalView> {
     // —— 编辑 ——
     if (text != null && text.trim().isNotEmpty) {
       items.add(TerminalMenuItem(
-        label: '复制',
+        label: UiText.t('复制', 'Copy'),
         icon: Icons.copy_rounded,
         shortcut: 'Ctrl+Shift+C',
         onTap: () {
@@ -330,14 +331,14 @@ class _TerminalViewState extends State<TerminalView> {
       ));
     } else {
       items.add(TerminalMenuItem(
-        label: '全选',
+        label: UiText.t('全选', 'Select all'),
         icon: Icons.select_all_rounded,
         shortcut: 'Ctrl+A',
         onTap: _selectAll,
       ));
     }
     items.add(TerminalMenuItem(
-      label: '粘贴',
+      label: UiText.t('粘贴', 'Paste'),
       icon: Icons.paste_rounded,
       shortcut: 'Ctrl+V',
       onTap: _pasteFromClipboard,
@@ -345,43 +346,43 @@ class _TerminalViewState extends State<TerminalView> {
 
     // —— 视图与导出 ——
     items.add(TerminalMenuItem(
-      label: '清屏',
+      label: UiText.t('清屏', 'Clear screen'),
       icon: Icons.cleaning_services_outlined,
       separatorBefore: true,
       onTap: terminal.buffer.clear,
     ));
     items.add(TerminalMenuItem(
-      label: '清空回滚缓冲',
+      label: UiText.t('清空回滚缓冲', 'Clear scrollback'),
       icon: Icons.layers_clear_outlined,
       danger: true,
       onTap: terminal.buffer.clearScrollback,
     ));
     items.add(TerminalMenuItem(
-      label: '复制全部输出',
+      label: UiText.t('复制全部输出', 'Copy all output'),
       icon: Icons.copy_all_outlined,
       onTap: _copyAllOutput,
     ));
     items.add(TerminalMenuItem(
-      label: '保存输出到文件…',
+      label: UiText.t('保存输出到文件…', 'Save output to file…'),
       icon: Icons.save_alt_rounded,
       onTap: _saveOutputToFile,
     ));
     if (widget.onFontSizeChanged != null) {
       items.add(TerminalMenuItem(
-        label: '放大字号',
+        label: UiText.t('放大字号', 'Increase font size'),
         icon: Icons.text_increase_rounded,
         separatorBefore: true,
         enabled: widget.fontSize < 24,
         onTap: () => widget.onFontSizeChanged!(widget.fontSize + 1),
       ));
       items.add(TerminalMenuItem(
-        label: '缩小字号',
+        label: UiText.t('缩小字号', 'Decrease font size'),
         icon: Icons.text_decrease_rounded,
         enabled: widget.fontSize > 10,
         onTap: () => widget.onFontSizeChanged!(widget.fontSize - 1),
       ));
       items.add(TerminalMenuItem(
-        label: '重置字号',
+        label: UiText.t('重置字号', 'Reset font size'),
         icon: Icons.text_fields_rounded,
         onTap: () => widget.onFontSizeChanged!(14),
       ));
@@ -390,13 +391,13 @@ class _TerminalViewState extends State<TerminalView> {
     // —— 选中内容（Agent / 片段 / 执行）——
     if (text != null && text.trim().isNotEmpty && onIntent != null) {
       items.add(TerminalMenuItem(
-        label: '发给 Agent 解释',
+        label: UiText.t('发给 Agent 解释', 'Send to Agent for explanation'),
         icon: Icons.auto_awesome_outlined,
         separatorBefore: true,
         onTap: () => onIntent(TerminalMenuIntent.sendToAgent, text),
       ));
       items.add(TerminalMenuItem(
-        label: '存为命令片段',
+        label: UiText.t('存为命令片段', 'Save as snippet'),
         icon: Icons.bookmark_add_outlined,
         onTap: () => onIntent(
             TerminalMenuIntent.saveSnippet, stripPromptPrefix(text)),
@@ -404,7 +405,7 @@ class _TerminalViewState extends State<TerminalView> {
       final command = stripPromptPrefix(text);
       if (looksLikeCommand(command)) {
         items.add(TerminalMenuItem(
-          label: '在终端执行这条命令',
+          label: UiText.t('在终端执行这条命令', 'Run this command in the terminal'),
           icon: Icons.play_arrow_rounded,
           danger: true,
           onTap: () => _confirmRunCommand(command),
@@ -415,7 +416,9 @@ class _TerminalViewState extends State<TerminalView> {
     // —— 远程会话能力 ——
     if (!widget.isLocal && onIntent != null) {
       items.add(TerminalMenuItem(
-        label: path != null ? '在 SFTP 中定位' : '打开 SFTP 面板',
+        label: path != null
+            ? UiText.t('在 SFTP 中定位', 'Reveal in SFTP')
+            : UiText.t('打开 SFTP 面板', 'Open SFTP panel'),
         icon: Icons.folder_open_outlined,
         separatorBefore: true,
         onTap: () => onIntent(
@@ -424,12 +427,12 @@ class _TerminalViewState extends State<TerminalView> {
         ),
       ));
       items.add(TerminalMenuItem(
-        label: '查看审计记录',
+        label: UiText.t('查看审计记录', 'View audit log'),
         icon: Icons.receipt_long_outlined,
         onTap: () => onIntent(TerminalMenuIntent.openAudit, ''),
       ));
       items.add(TerminalMenuItem(
-        label: '查看变更记录',
+        label: UiText.t('查看变更记录', 'View change records'),
         icon: Icons.history_edu_outlined,
         onTap: () => onIntent(TerminalMenuIntent.viewChanges, ''),
       ));
@@ -441,14 +444,14 @@ class _TerminalViewState extends State<TerminalView> {
       final link = url;
       if (link != null) {
         items.add(TerminalMenuItem(
-          label: '打开链接',
+          label: UiText.t('打开链接', 'Open link'),
           icon: Icons.open_in_new_rounded,
           separatorBefore: true,
           shortcut: link.length > 30 ? '${link.substring(0, 30)}…' : link,
           onTap: () => _openUrl(link),
         ));
         items.add(TerminalMenuItem(
-          label: '复制链接',
+          label: UiText.t('复制链接', 'Copy link'),
           icon: Icons.link_rounded,
           onTap: () => Clipboard.setData(ClipboardData(text: link)),
         ));
@@ -456,7 +459,7 @@ class _TerminalViewState extends State<TerminalView> {
       final pathValue = path;
       if (pathValue != null) {
         items.add(TerminalMenuItem(
-          label: '复制路径',
+          label: UiText.t('复制路径', 'Copy path'),
           icon: Icons.route_outlined,
           separatorBefore: link == null,
           shortcut: pathValue.length > 30
@@ -467,7 +470,7 @@ class _TerminalViewState extends State<TerminalView> {
       }
       if (isError) {
         items.add(TerminalMenuItem(
-          label: '问 Agent 这个错误',
+          label: UiText.t('问 Agent 这个错误', 'Ask the Agent about this error'),
           icon: Icons.help_outline_rounded,
           onTap: () => onIntent(TerminalMenuIntent.askError, errorLine!),
         ));
@@ -510,7 +513,7 @@ class _TerminalViewState extends State<TerminalView> {
         final tc = ThemeColors.of(context);
         return AlertDialog(
           backgroundColor: tc.cardElevated,
-          title: Text('粘贴 ${lines.length} 行内容？',
+          title: Text(UiText.t('粘贴 ${lines.length} 行内容？', 'Paste ${lines.length} lines?'),
               style: TextStyle(color: tc.textMain, fontSize: fBody)),
           content: SizedBox(
             width: 460,
@@ -518,7 +521,7 @@ class _TerminalViewState extends State<TerminalView> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('多行内容会被依次执行，请确认没有误粘贴：',
+                Text(UiText.t('多行内容会被依次执行，请确认没有误粘贴：', 'Multi-line content will run sequentially. Check that nothing was pasted by mistake:'),
                     style: TextStyle(color: tc.textSub, fontSize: fSmall)),
                 const SizedBox(height: 8),
                 Container(
@@ -530,7 +533,9 @@ class _TerminalViewState extends State<TerminalView> {
                     border: Border.all(color: tc.border),
                   ),
                   child: Text(
-                    more > 0 ? '$preview\n… 还有 $more 行' : preview,
+                    more > 0
+                        ? UiText.t('$preview\n… 还有 $more 行', '$preview\n… and $more more lines')
+                        : preview,
                     style: TextStyle(
                       fontFamily: 'JetBrainsMono',
                       fontFamilyFallback: kMonoFontFallback,
@@ -545,11 +550,11 @@ class _TerminalViewState extends State<TerminalView> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('取消'),
+              child: Text(UiText.t('取消', 'Cancel')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('粘贴'),
+              child: Text(UiText.t('粘贴', 'Paste')),
             ),
           ],
         );
@@ -565,7 +570,7 @@ class _TerminalViewState extends State<TerminalView> {
         final tc = ThemeColors.of(context);
         return AlertDialog(
           backgroundColor: tc.cardElevated,
-          title: Text('在终端执行这条命令？',
+          title: Text(UiText.t('在终端执行这条命令？', 'Run this command in the terminal?'),
               style: TextStyle(color: tc.textMain, fontSize: fBody)),
           content: Container(
             width: 460,
@@ -588,12 +593,12 @@ class _TerminalViewState extends State<TerminalView> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('取消'),
+              child: Text(UiText.t('取消', 'Cancel')),
             ),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: tc.error),
               onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('执行'),
+              child: Text(UiText.t('执行', 'Run')),
             ),
           ],
         );
@@ -618,12 +623,12 @@ class _TerminalViewState extends State<TerminalView> {
       await Clipboard.setData(ClipboardData(text: url));
       if (!mounted) return;
       showTopSnackBar(context,
-        const SnackBar(
-          content: Text('打开链接失败，已复制到剪贴板',
-              style: TextStyle(fontSize: fSmall)),
-          duration: Duration(seconds: 2),
+        SnackBar(
+          content: Text(UiText.t('打开链接失败，已复制到剪贴板', 'Failed to open the link; copied to clipboard'),
+              style: const TextStyle(fontSize: fSmall)),
+          duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.all(16),
+          margin: const EdgeInsets.all(16),
         ),
       );
     }
@@ -636,7 +641,7 @@ class _TerminalViewState extends State<TerminalView> {
     if (!mounted) return;
     showTopSnackBar(context,
       SnackBar(
-        content: Text('已复制 ${text.length} 字符', style: const TextStyle(fontSize: fSmall)),
+        content: Text(UiText.t('已复制 ${text.length} 字符', 'Copied ${text.length} characters'), style: const TextStyle(fontSize: fSmall)),
         duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
@@ -652,7 +657,7 @@ class _TerminalViewState extends State<TerminalView> {
         .replaceAll(RegExp(r'[:.]'), '-')
         .substring(0, 19);
     final path = await FilePicker.platform.saveFile(
-      dialogTitle: '保存终端输出',
+      dialogTitle: UiText.t('保存终端输出', 'Save terminal output'),
       fileName: 'terminal-$stamp.log',
       type: FileType.custom,
       allowedExtensions: const ['log', 'txt'],
@@ -662,7 +667,7 @@ class _TerminalViewState extends State<TerminalView> {
     if (!mounted) return;
     showTopSnackBar(context,
       SnackBar(
-        content: Text('已保存到 $path', style: const TextStyle(fontSize: fSmall)),
+        content: Text(UiText.t('已保存到 $path', 'Saved to $path'), style: const TextStyle(fontSize: fSmall)),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
@@ -677,7 +682,7 @@ class _TerminalViewState extends State<TerminalView> {
       return Container(
         color: tc.terminalBg,
         child: Center(
-          child: Text('等待连接...', style: TextStyle(color: tc.textSub)),
+          child: Text(UiText.t('等待连接...', 'Waiting for connection...'), style: TextStyle(color: tc.textSub)),
         ),
       );
     }

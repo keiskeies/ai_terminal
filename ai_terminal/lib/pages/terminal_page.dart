@@ -8,6 +8,7 @@ import 'package:xterm/xterm.dart';
 import '../core/builtin_runbook_i18n.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 import '../core/l10n_holder.dart';
 import '../core/route_observer.dart';
 import '../l10n/app_localizations.dart';
@@ -4155,7 +4156,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                       ),
                       const SizedBox(width: 5),
                       Text(
-                        agentState.status == AgentStatus.executing ? '执行中' : '思考中',
+                        agentState.status == AgentStatus.executing
+                            ? UiText.t('执行中', 'Executing')
+                            : UiText.t('思考中', 'Thinking'),
                         style: TextStyle(fontSize: fMicro, color: tc.brand, fontWeight: FontWeight.w500),
                       ),
                     ],
