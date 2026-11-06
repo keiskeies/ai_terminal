@@ -42,8 +42,18 @@ String? detectPath(String line) {
   return null;
 }
 
-/// 这一行像不像报错
-bool looksLikeError(String line) => _errorPattern.hasMatch(line);
+/// 这一行像不像报错。
+///
+/// 先剔掉 URL 与路径再匹配：`/var/log/nginx/error.log`、`.../error.html` 只是文件名，
+/// 不代表这一行是报错。
+bool looksLikeError(String line) {
+  var probe = line;
+  final url = detectUrl(line);
+  if (url != null) probe = probe.replaceAll(url, ' ');
+  final path = detectPath(line);
+  if (path != null) probe = probe.replaceAll(path, ' ');
+  return _errorPattern.hasMatch(probe);
+}
 
 /// 粘贴内容是否多行（多行等于批量执行，粘贴前必须确认）
 bool isMultiLine(String text) =>

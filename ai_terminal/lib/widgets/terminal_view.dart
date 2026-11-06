@@ -6,9 +6,14 @@ import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart' as xterm;
+// RenderTerminal.getCellOffset 是唯一能把"屏幕坐标"换算成"含滚动偏移的行号"的入口；
+// 自己按字号估算行高会差 1~2 行，右键就会读到相邻行。仅此一处用内部实现。
+// ignore: implementation_imports
+import 'package:xterm/src/ui/render.dart' show RenderTerminal;
 import '../core/app_toast.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../services/agent_logger.dart';
 import '../utils/terminal_text_actions.dart';
 import 'terminal_context_menu.dart';
 
@@ -235,7 +240,7 @@ class _TerminalViewState extends State<TerminalView> {
       final text = terminal.buffer.getText(selection);
       if (text.trim().isNotEmpty) selectedText = text;
     }
-    final lineText = _lineTextAt(globalPosition);
+    final lineTexts = _lineTextsAt(globalPosition);
 
     final overlay = Overlay.of(context);
     late OverlayEntry entry;
@@ -252,7 +257,7 @@ class _TerminalViewState extends State<TerminalView> {
         items: _buildMenuItems(
           terminal: terminal,
           selectedText: selectedText,
-          lineText: lineText,
+          lineTexts: lineTexts,
         ),
         onDismiss: dismiss,
         tc: tc,
@@ -261,53 +266,56 @@ class _TerminalViewState extends State<TerminalView> {
     overlay.insert(entry);
   }
 
-  /// 右键位置所在行（无选区时用于识别链接/路径/报错）。
-  ///
-  /// xterm 不暴露滚动偏移，这里按"视口贴底"换算——终端默认跟随最新输出，
-  /// 滚动查看历史时该行文本可能对不上，菜单只是多/少一条复制项，不会误执行。
-  String _lineTextAt(Offset globalPosition) {
+  /// 命中行 + 上下各一行：客户端坐标与截图坐标可能差半个行高，
+  /// 取并集既不会漏识别，也不会把隔了几行的内容算进来。
+  List<String> _lineTextsAt(Offset globalPosition) {
     final terminal = widget.terminal;
     final box = _terminalContainerKey.currentContext?.findRenderObject();
-    if (terminal == null || box is! RenderBox) return '';
-    final local = box.globalToLocal(globalPosition);
-    final lineHeight = _measureLineHeight();
-    if (lineHeight <= 0) return '';
+    if (terminal == null || box is! RenderBox) return const [];
+    final render = _findRenderTerminal(box);
+    if (render == null) return const [];
+    final cell = render.getCellOffset(render.globalToLocal(globalPosition));
     final buffer = terminal.buffer;
-    final firstVisible = buffer.height - terminal.viewHeight;
-    final index = firstVisible + (local.dy / lineHeight).floor();
-    if (index < 0 || index >= buffer.height) return '';
-    return buffer.lines[index].getText();
+    final texts = <String>[];
+    for (final delta in const [0, -1, 1]) {
+      final y = cell.y + delta;
+      if (y < 0 || y >= buffer.height) continue;
+      final text = buffer.lines[y].getText();
+      if (text.trim().isNotEmpty && !texts.contains(text)) texts.add(text);
+    }
+    agentLogger.debug(
+        'Terminal', '右键行: cell=(${cell.x},${cell.y}) 命中=${texts.length}');
+    return texts;
   }
 
-  double _measureLineHeight() {
-    final painter = TextPainter(
-      text: TextSpan(
-        text: 'M',
-        style: TextStyle(
-          fontFamily: 'JetBrainsMono',
-          fontFamilyFallback: kMonoFontFallback,
-          fontSize: widget.fontSize,
-          height: 1,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    final height = painter.height;
-    painter.dispose();
-    return height;
+  RenderTerminal? _findRenderTerminal(RenderObject node) {
+    if (node is RenderTerminal) return node;
+    RenderTerminal? found;
+    node.visitChildren((child) {
+      found ??= _findRenderTerminal(child);
+    });
+    return found;
   }
 
   List<TerminalMenuItem> _buildMenuItems({
     required xterm.Terminal terminal,
     required String? selectedText,
-    required String lineText,
+    required List<String> lineTexts,
   }) {
     final items = <TerminalMenuItem>[];
     final onIntent = widget.onMenuIntent;
     final text = selectedText?.trimRight();
-    // 右键位置的链接/路径只用于"没选中内容"时的上下文菜单
-    final url = text == null ? detectUrl(lineText) : null;
-    final path = text == null ? detectPath(lineText) : null;
+    // 右键位置的链接/路径/报错只用于"没选中内容"时的上下文菜单
+    String? url;
+    String? path;
+    String? errorLine;
+    if (text == null) {
+      for (final line in lineTexts) {
+        url ??= detectUrl(line);
+        path ??= detectPath(line);
+        if (errorLine == null && looksLikeError(line)) errorLine = line;
+      }
+    }
 
     // —— 编辑 ——
     if (text != null && text.trim().isNotEmpty) {
@@ -428,36 +436,40 @@ class _TerminalViewState extends State<TerminalView> {
     }
 
     // —— 右键位置的行内对象（链接 / 路径 / 报错）——
-    if (text == null && lineText.isNotEmpty) {
-      final isError = looksLikeError(lineText) && onIntent != null;
-      if (url != null) {
+    if (text == null && lineTexts.isNotEmpty) {
+      final isError = errorLine != null && onIntent != null;
+      final link = url;
+      if (link != null) {
         items.add(TerminalMenuItem(
           label: '打开链接',
           icon: Icons.open_in_new_rounded,
           separatorBefore: true,
-          shortcut: url.length > 30 ? '${url.substring(0, 30)}…' : url,
-          onTap: () => _openUrl(url),
+          shortcut: link.length > 30 ? '${link.substring(0, 30)}…' : link,
+          onTap: () => _openUrl(link),
         ));
         items.add(TerminalMenuItem(
           label: '复制链接',
           icon: Icons.link_rounded,
-          onTap: () => Clipboard.setData(ClipboardData(text: url)),
+          onTap: () => Clipboard.setData(ClipboardData(text: link)),
         ));
       }
-      if (path != null) {
+      final pathValue = path;
+      if (pathValue != null) {
         items.add(TerminalMenuItem(
           label: '复制路径',
           icon: Icons.route_outlined,
-          separatorBefore: url == null,
-          shortcut: path.length > 30 ? '${path.substring(0, 30)}…' : path,
-          onTap: () => Clipboard.setData(ClipboardData(text: path)),
+          separatorBefore: link == null,
+          shortcut: pathValue.length > 30
+              ? '${pathValue.substring(0, 30)}…'
+              : pathValue,
+          onTap: () => Clipboard.setData(ClipboardData(text: pathValue)),
         ));
       }
       if (isError) {
         items.add(TerminalMenuItem(
           label: '问 Agent 这个错误',
           icon: Icons.help_outline_rounded,
-          onTap: () => onIntent(TerminalMenuIntent.askError, lineText),
+          onTap: () => onIntent(TerminalMenuIntent.askError, errorLine!),
         ));
       }
     }
