@@ -207,6 +207,8 @@ jobs:
 
             v1.3.9 聚焦日常操作手感：Agent 回答可跨段选择、一键整段复制；信息按常驻/折叠/按需分级；思考真正流式输出；终端右键成为完整工作区入口；Windows 本机监控修复。
 
+            > **本次为重新构建**：补齐联网搜索、MCP、诊断、内置运维模板与终端右键菜单的英文界面，并更新 README 实机截图与演示 GIF。
+
             #### 📋 Agent 回答
             - **整段选择与复制**：整条回答统一选区，可跨段落拖选；消息下方一键复制完整回答
             - **信息分级**：结论、操作按钮、状态常驻；计划/变更/下一步在任务结束后自动收起；证据与命令输出按需展开
@@ -337,6 +339,8 @@ jobs:
 
             v1.3.9 focuses on day-to-day ergonomics: select and copy an entire Agent answer, keep information layered, stream reasoning as it happens, turn the terminal context menu into a real workspace, and fix Windows local monitoring.
 
+            > **Rebuilt release**: completes the English UI for Web Search, MCP, Diagnostics, built-in runbooks, and the terminal context menu, and refreshes the README screenshots and demo GIF.
+
             #### 📋 Agent answers
             - **Whole-answer selection & copy**: one selection region across the answer, plus a one-click copy button under the message
             - **Information hierarchy**: conclusion, action controls and status stay visible; plan, change ledger and next actions fold when a run ends; evidence and command output open on demand
@@ -456,5 +460,6 @@ jobs:
             - [FAQ](https://github.com/keiskeies/ai_terminal/blob/main/QUESTION.md)
           files: |
             artifacts/**/*
+          overwrite_files: true
           draft: false
           prerelease: false
