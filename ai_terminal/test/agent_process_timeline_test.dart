@@ -440,6 +440,84 @@ void main() {
       expect(picked, isEmpty);
     });
 
+    testWidgets('答完后提问步骤仍在，且答案来自事件本身（不靠事后扫描）',
+        (tester) async {
+      final ask = AgentEvent.ask('选哪个？', ['Java 8', 'Java 17'])
+        ..chosenAnswer = 'Java 17';
+      await tester.pumpWidget(_wrap(askContent(
+        ask: ask,
+        isWaitingChoice: false,
+      )));
+      await tester.pump();
+
+      // 问题与答案都必须还在（引擎回写 chosenAnswer，不依赖后面的 info 事件）
+      expect(find.text('选哪个？'), findsOneWidget);
+      expect(find.text('Java 17'), findsOneWidget);
+    });
+
+    testWidgets('两轮内容相同的提问都留档，不会因 id 相同互相顶掉',
+        (tester) async {
+      // 复现真实 bug：两轮 AI 调用里选项完全相同，若事件 id 撞车，
+      // Flutter 同层重复 key 会让整块提问步骤渲染失败（"问完就没"）。
+      final a1 = AgentEvent.ask('选哪个？', ['Java 8', 'Java 17'], id: 'evt_1_aaa')
+        ..chosenAnswer = 'Java 8';
+      final a2 = AgentEvent.ask('选哪个？', ['Java 8', 'Java 17'], id: 'evt_1_aaa')
+        ..chosenAnswer = 'Java 17';
+
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => AgentEventContent(
+          events: [a1, a2],
+          tc: ThemeColors.of(context),
+          isWaitingChoice: false,
+          markdownBuilder: (text, tc) => Text(text),
+        ),
+      )));
+      await tester.pump();
+
+      // 两个提问都要在（至少各出现一次）
+      expect(find.text('选哪个？'), findsNWidgets(2));
+      expect(tester.takeException(), isNull,
+          reason: '重复 key 会让整块提问渲染失败');
+    });
+
+    testWidgets('完整流程：提问出现 → 用户作答 → 提问仍在，可展开看选项',
+        (tester) async {
+      // 复现用户描述的场景："输出过程中出现提问，等提问结束后提问就不见了"。
+      // 这里模拟真实的状态迁移：同一批事件，先等待作答，答完后再渲染。
+      final ask = AgentEvent.ask('有多个 Java 版本可装，选哪个？',
+        ['Java 8', 'Java 17']);
+
+      // 阶段一：等待作答 —— 完整卡片 + 可点选项
+      await tester.pumpWidget(_wrap(askContent(
+        ask: ask,
+        isWaitingChoice: true,
+        onSelectChoice: (_) {},
+      )));
+      await tester.pump();
+      expect(find.text('有多个 Java 版本可装，选哪个？'), findsOneWidget);
+      expect(find.text('Java 17'), findsOneWidget);
+
+      // 阶段二：用户选了 Java 17（引擎把答案回写到事件上）
+      ask.chosenAnswer = 'Java 17';
+      await tester.pumpWidget(_wrap(askContent(
+        ask: ask,
+        isWaitingChoice: false,
+      )));
+      await tester.pump();
+
+      // 提问必须还在，且答案可见
+      expect(find.text('有多个 Java 版本可装，选哪个？'), findsOneWidget,
+          reason: '答完问题就消失 = 步骤流断档');
+      expect(find.text('Java 17'), findsOneWidget,
+          reason: '用户选了什么必须留在提问步骤里');
+
+      // 点开：完整问题与当时的选项仍可回看
+      await tester.tap(find.text('有多个 Java 版本可装，选哪个？'));
+      await tester.pump();
+      expect(find.text('Java 8'), findsOneWidget);
+      expect(find.text('你的选择：Java 17'), findsOneWidget);
+    });
+
     testWidgets('等待选择时可以输入自定义回答', (tester) async {
       final picked = <String>[];
       await tester.pumpWidget(_wrap(askContent(

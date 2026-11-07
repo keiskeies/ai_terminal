@@ -3,14 +3,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
-import '../core/ui_text.dart';
 import '../models/agent_event.dart';
 import '../providers/terminal_provider.dart' as tp;
 import '../utils/agent_ui_text.dart';
 import 'agent_process_timeline.dart';
+import 'agent_ask_card.dart';
 import 'host_result_matrix.dart';
 import 'output_viewer_sheet.dart';
 import '../core/app_toast.dart';
+
+/// 旧名保留：外部引用的是 `AskCustomAnswerField`
+typedef AskCustomAnswerField = AgentAskCustomAnswerField;
 
 /// 结构化事件列表渲染：内容自动追加，只有命令单独包装成块
 ///
@@ -173,14 +176,23 @@ class AgentEventContent extends StatelessWidget {
             ? liveReasoning
             : '',
         resultBuilder: (ctx, result) => _buildResultCard(result, tc, ctx),
+        // 询问行的渲染交给时间线：提问是流程里的一步，不是流程外的一块卡片
+        askBuilder: (ctx, ask) =>
+            _buildAskStep(ctx, ask, events, pendingAskId),
       ));
     }
 
     for (final event in events) {
       switch (event.type) {
         case AgentEventType.thought:
+          flushText();
+          segment.add(event);
+          break;
         case AgentEventType.info:
           flushText();
+          // 「👉 你选择了 X」不再单独占一行：答案已经显示在提问步骤的胶囊里，
+          // 重复一遍等于同一条信息说两次。
+          if (_isChoiceNote(event, events)) break;
           segment.add(event);
           break;
         case AgentEventType.command:
@@ -210,23 +222,10 @@ class AgentEventContent extends StatelessWidget {
           }
           break;
         case AgentEventType.ask:
-          flushSegment();
+          // 提问留在过程段里（不切段）：它和思考/命令是同一条时间线上的步骤，
+          // 切出去会变成"浮在流程之外的一块"，答完后更难看出问过什么。
           flushText();
-          if (event.id == pendingAskId) {
-            // 当前等待作答的询问：保持完整卡片 + 可点选项
-            widgets.add(_buildAskCard(event, tc, pending: true));
-          } else {
-            // 已回答的询问：像命令行一样收在步骤里（一行问题 + 答案胶囊），
-            // 点开才展开完整问题与当时的选项。答完就连"问过什么"都找不到，
-            // 步骤流就断档了。
-            widgets.add(_AskHistoryRow(
-              key: ValueKey('ask-history-${event.id}'),
-              event: event,
-              chosen: _chosenAnswerFor(events, event),
-              tc: tc,
-              expanded: _buildAskCard(event, tc, pending: false),
-            ));
-          }
+          segment.add(event);
           break;
         case AgentEventType.finish:
           flushSegment();
@@ -263,6 +262,54 @@ class AgentEventContent extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: widgets,
+    );
+  }
+
+  /// 这条 info 是不是「用户选择了 X」的回执。
+  ///
+  /// 它是提问步骤的附属信息，不是独立的一步：答案已经写在提问步骤里，
+  /// 再单独渲染一行就是把同一件事说两遍。
+  static bool _isChoiceNote(AgentEvent event, List<AgentEvent> events) {
+    if (!event.isInfo) return false;
+    final text = (event.text ?? '').trim();
+    if (!text.contains('你选择了') && !text.contains('You chose')) {
+      return false;
+    }
+    // 必须真的有对应的提问，否则这条提示本身就是唯一的信息，不能吞掉
+    return events.any((e) => e.isAsk);
+  }
+
+  /// 询问行的渲染：等待作答 → 完整卡片；已作答 → 可收起展开的步骤行。
+  ///
+  /// 提问是流程里的一步：等待作答时必须完整可见（用户要能立刻选），
+  /// 答完后收成一行（问题 + 答案胶囊），点开才看到完整问题与当时的选项。
+  /// 绝不能"答完就没"——那样时间线上就看不出这一轮问过什么。
+  Widget _buildAskStep(BuildContext context, AgentEvent ask,
+      List<AgentEvent> allEvents, String? pendingAskId) {
+    final isPending = isWaitingChoice && ask.id == pendingAskId;
+    if (isPending) {
+      return AgentAskCard(
+        event: ask,
+        tc: tc,
+        markdownBuilder: markdownBuilder,
+        onSelectChoice: onSelectChoice,
+      );
+    }
+    final chosen = ask.chosenAnswer ?? _chosenAnswerFor(allEvents, ask);
+    // key 用**位置**而不是事件 id：内容相同的两轮提问可能拿到同一个 id
+    // （引擎已改成全局递增序号，但历史数据仍可能重复），
+    // 用 id 做 key 会撞 Flutter 的重复 key，整块提问步骤直接渲染失败。
+    final index = allEvents.indexWhere((e) => identical(e, ask));
+    return AgentAskStepRow(
+      key: ValueKey('ask-step-$index-${ask.id}'),
+      event: ask,
+      chosen: chosen,
+      tc: tc,
+      expanded: AgentAskCard(
+        event: ask,
+        tc: tc,
+        markdownBuilder: markdownBuilder,
+      ),
     );
   }
 
@@ -568,112 +615,6 @@ class AgentEventContent extends StatelessWidget {
     );
   }
 
-  /// 询问卡片：问题 + 选项按钮
-  ///
-  /// [pending] 只对当前仍在等待的那一个询问为 true；历史询问保留问题文本，
-  /// 但选项不可再点，避免用户回头误答一个已经结束的问题。
-  Widget _buildAskCard(AgentEvent event, ThemeColors tc,
-      {required bool pending}) {
-    final options = event.options ?? [];
-    final question = event.question ?? '请选择';
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: tc.agentCardFill,
-        borderRadius: BorderRadius.circular(rCard),
-        border: Border.all(color: tc.brand.withValues(alpha: 0.18)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 20,
-                height: 20,
-                margin: const EdgeInsets.only(top: 1),
-                decoration: BoxDecoration(
-                  color: tc.brand.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.help_outline,
-                    size: 13, color: tc.brand),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                // 问题正文可能带 Markdown（表格/加粗/列表），
-                // 与普通正文共用同一套渲染，避免把表格原样显示成竖线文本。
-                child: markdownBuilder(question, tc),
-              ),
-            ],
-          ),
-          if (options.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: options.map((opt) {
-                return _buildOptionChip(opt, tc, selectable: pending);
-              }).toList(),
-            ),
-          ],
-          if (pending && onSelectChoice != null) ...[
-            const SizedBox(height: 10),
-            AskCustomAnswerField(
-              tc: tc,
-              onSubmit: (answer) => onSelectChoice?.call(answer),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  /// [selectable] 为 false 时选项仍在界面上展示（历史回看/任务已推进），
-  /// 只是不可点击 —— 否则用户回头只会看到一张没有选项的"请选择"卡片。
-  Widget _buildOptionChip(String label, ThemeColors tc,
-      {required bool selectable}) {
-    final accent = selectable ? tc.brand : tc.textMuted;
-    return GestureDetector(
-      onTap: selectable ? () => onSelectChoice?.call(label) : null,
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: tc.surface,
-          borderRadius: BorderRadius.circular(rMedium),
-          border: Border.all(
-              color: accent.withValues(alpha: selectable ? 0.3 : 0.18)),
-          boxShadow: [
-            BoxShadow(
-              color: tc.brand.withValues(alpha: 0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(selectable ? Icons.touch_app : Icons.radio_button_unchecked,
-                size: 12, color: accent),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: fSmall,
-                color: accent,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   /// 任务终态卡片（完成 / 取消 / 失败 / 中断）
   Widget _buildFinishCard(AgentEvent event, ThemeColors tc) {
     final state = event.finishState ?? AgentFinishState.success;
@@ -957,77 +898,6 @@ Widget buildOptionButtons(
   );
 }
 
-/// ask 选项之外的自由输入：按钮覆盖不到用户想法时，直接回一句话。
-class AskCustomAnswerField extends StatefulWidget {
-  final ThemeColors tc;
-  final void Function(String answer) onSubmit;
-
-  const AskCustomAnswerField({
-    super.key,
-    required this.tc,
-    required this.onSubmit,
-  });
-
-  @override
-  State<AskCustomAnswerField> createState() => _AskCustomAnswerFieldState();
-}
-
-class _AskCustomAnswerFieldState extends State<AskCustomAnswerField> {
-  final _controller = TextEditingController();
-  bool _submitted = false;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _submit([String? _]) {
-    final text = _controller.text.trim();
-    if (text.isEmpty || _submitted) return;
-    _submitted = true;
-    widget.onSubmit(text);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final tc = widget.tc;
-    final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(rSmall),
-      borderSide: BorderSide(color: tc.border),
-    );
-    return TextField(
-      controller: _controller,
-      style: TextStyle(color: tc.textMain, fontSize: fSmall),
-      cursorColor: tc.brand,
-      textInputAction: TextInputAction.send,
-      onSubmitted: (value) => _submit(value),
-      decoration: InputDecoration(
-        isDense: true,
-        hintText: UiText.t('按钮都不合适？直接输入你的回答…', 'None of these fit? Type your answer…'),
-        hintStyle: TextStyle(color: tc.textMuted, fontSize: fSmall),
-        filled: true,
-        fillColor: tc.surface,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
-        border: border,
-        enabledBorder: border,
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(rSmall),
-          borderSide: BorderSide(color: tc.brand.withValues(alpha: 0.5)),
-        ),
-        suffixIcon: IconButton(
-          tooltip: '发送自定义回答',
-          icon: Icon(Icons.send, size: 16, color: tc.brand),
-          onPressed: _submit,
-        ),
-        suffixIconConstraints:
-            const BoxConstraints(minWidth: 36, minHeight: 32),
-      ),
-    );
-  }
-}
-
 /// 结果输出预览：卡片里最多 12 行，其余进"查看完整输出"弹层。
 ///
 /// 一次 `Get-ChildItem -Recurse` 就能刷出几千字符，全量摊在证据层里会把
@@ -1094,106 +964,6 @@ class _ResultOutputPreview extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-/// 已回答的询问行：像命令行一样收在步骤里。
-///
-/// 一行：❓ + 问题（单行省略）+ 答案胶囊；点开展开完整问题与当时的选项
-/// （不可再选）。用户答完问题后，"问过什么、选了什么"必须留在步骤流里，
-/// 不能凭空消失。
-class _AskHistoryRow extends StatefulWidget {
-  final AgentEvent event;
-  final String? chosen;
-  final ThemeColors tc;
-
-  /// 点开后的完整内容（复用询问卡的渲染：问题 Markdown + 选项列表）
-  final Widget expanded;
-
-  const _AskHistoryRow({
-    super.key,
-    required this.event,
-    required this.chosen,
-    required this.tc,
-    required this.expanded,
-  });
-
-  @override
-  State<_AskHistoryRow> createState() => _AskHistoryRowState();
-}
-
-class _AskHistoryRowState extends State<_AskHistoryRow> {
-  bool _open = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final tc = widget.tc;
-    final question =
-        (widget.event.question ?? widget.event.text ?? '').trim();
-    final chosen = widget.chosen;
-    return InkWell(
-      borderRadius: BorderRadius.circular(rSmall),
-      onTap: () => setState(() => _open = !_open),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.help_outline, size: 13, color: tc.brand),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    question,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: tc.textBody, fontSize: fSmall),
-                  ),
-                ),
-                if (chosen != null) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: tc.ok.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(rFull),
-                        border: Border.all(
-                            color: tc.ok.withValues(alpha: 0.35), width: 0.5),
-                      ),
-                      child: Text(
-                        chosen,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            color: tc.ok,
-                            fontSize: fMicro,
-                            fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(width: 4),
-                Icon(
-                  _open ? Icons.expand_less : Icons.expand_more,
-                  size: 13,
-                  color: tc.textMuted,
-                ),
-              ],
-            ),
-            if (_open) ...[
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.only(left: 19),
-                child: widget.expanded,
-              ),
-            ],
-          ],
-        ),
-      ),
     );
   }
 }

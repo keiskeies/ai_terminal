@@ -48,6 +48,10 @@ class AgentEvent {
   /// 命令内容（command/result 用）
   String? command;
 
+  /// 命令说明（command 用）：AI 在“说明:”行写的一句话，
+  /// 用普通人能听懂的话讲这条命令做什么、有什么影响。
+  String? description;
+
   /// 命令关联 id（result 用，指向对应 command 的 id）
   String? commandId;
 
@@ -71,6 +75,12 @@ class AgentEvent {
 
   /// 询问的问题文本（ask 用）
   String? question;
+
+  /// 用户对这次询问的选择（ask 用，答完后回填）
+  ///
+  /// 「问过什么、选了什么」要留档，不能只靠事后扫描 info 事件猜——
+  /// 那个扫描跨轮就断了，提问步骤会变成一行空壳。
+  String? chosenAnswer;
 
   /// 完成摘要（finish 用）
   String? summary;
@@ -140,6 +150,7 @@ class AgentEvent {
   AgentEvent.command(
     this.command, {
     String? id,
+    this.description,
     this.dangerous,
     this.blocked,
     this.hostId,

@@ -101,6 +101,17 @@ void main() {
       expect(text, contains('- 缓存'));
     });
 
+    test('询问行带用户的选择', () {
+      final ask = AgentEvent.ask('要删除哪个？', ['日志', '缓存'])
+        ..chosenAnswer = '日志';
+
+      final text = formatAnswerForCopy(events: [ask]);
+
+      expect(text, contains('要删除哪个？'));
+      expect(text, contains('> 日志'),
+          reason: '用户选了什么必须进复制文本');
+    });
+
     test('旧 ReAct 原文不重复协议行', () {
       final events = [
         AgentEvent.text('收到新目标"验证目标行位置"，但缺少具体要验证哪一行。'),

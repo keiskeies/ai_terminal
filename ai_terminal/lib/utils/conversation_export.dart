@@ -119,16 +119,29 @@ String formatAnswerForCopy({
     emit(formatOperationReportCopy(report));
   }
 
+  // 询问行已经带上了用户的选择时，「👉 你选择了 X」那条回执不再重复输出：
+  // 同一件事说两遍，复制出去就是噪音。
+  final hasRecordedChoice =
+      events.any((e) => e.isAsk && (e.chosenAnswer ?? '').trim().isNotEmpty);
+
   for (final event in events) {
     switch (event.type) {
       case AgentEventType.thought:
       case AgentEventType.text:
+        emit(event.text);
+        break;
       case AgentEventType.info:
+        final text = (event.text ?? '').trim();
+        final isChoiceNote = text.contains('你选择了') || text.contains('You chose');
+        if (isChoiceNote && hasRecordedChoice) break;
         emit(event.text);
         break;
       case AgentEventType.command:
         final command = (event.command ?? '').trim();
         if (command.isEmpty) break;
+        // 命令说明跟着命令一起复制，否则复制出去只剩一行命令，看不出意图
+        final description = (event.description ?? '').trim();
+        if (description.isNotEmpty) emit('> $description');
         final tool = event.toolName;
         if (tool == null || tool == 'exec_command') {
           emit('\$ $command');
@@ -142,6 +155,10 @@ String formatAnswerForCopy({
         emit([
           if ((event.question ?? '').trim().isNotEmpty) event.question!.trim(),
           if (options.isNotEmpty) options.map((o) => '- $o').join('\n'),
+          // 用户选了什么必须进复制文本：界面上它显示在提问步骤的胶囊里，
+          // 复制走的是另一条路径，不带上就丢了
+          if ((event.chosenAnswer ?? '').trim().isNotEmpty)
+            '> ${event.chosenAnswer!.trim()}',
         ].join('\n'));
         break;
       case AgentEventType.finish:
@@ -162,7 +179,7 @@ String formatAnswerForCopy({
 }
 
 /// ReAct 协议控制行：命令与询问已经各自成卡，正文里再抄一遍就是重复。
-final RegExp _reactControlLine = RegExp(r'^\s*(?:动作|命令|选项|工具)\s*[:：]');
+final RegExp _reactControlLine = RegExp(r'^\s*(?:动作|说明|命令|选项|工具)\s*[:：]');
 
 /// 段落标签：去掉标签留下正文，才能和上面已输出的同一段落对上。
 final RegExp _reactLabel = RegExp(r'^\s*(?:思考|回答)\s*[:：]\s*');

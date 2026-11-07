@@ -32,6 +32,12 @@ class AgentProcessTimeline extends StatefulWidget {
   /// 时间线自己只负责"一行摘要 + 点开"，不复制渲染逻辑。
   final Widget Function(BuildContext context, AgentEvent result) resultBuilder;
 
+  /// 询问行渲染器（由调用方提供）。
+  ///
+  /// 提问和命令一样是流程里的一步，但它的"等待作答 / 已作答"两种形态
+  /// 差异很大（可点选项 vs 收起的一行），交给调用方决定。
+  final Widget Function(BuildContext context, AgentEvent ask)? askBuilder;
+
   /// 正在流式产生的模型原生推理（reasoning_content）。
   ///
   /// 它渲染成时间线**末尾**的一行思考，而不是浮在整条回答顶部的独立块：
@@ -53,6 +59,7 @@ class AgentProcessTimeline extends StatefulWidget {
     this.onConfirmCommand,
     this.onRejectCommand,
     required this.resultBuilder,
+    this.askBuilder,
     this.liveReasoning = '',
   });
 
@@ -181,7 +188,10 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
           children.add(_progressRow(r));
           break;
         case _RowKind.interactive:
-          children.add(_AskRow(event: r.event, tc: widget.tc));
+          final askBuilder = widget.askBuilder;
+          children.add(askBuilder != null
+              ? askBuilder(context, r.event)
+              : _AskRow(event: r.event, tc: widget.tc));
           break;
       }
     }
@@ -221,6 +231,7 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
     if (needsAction) {
       return AgentCommandBlock(
         command: e.command ?? '',
+        description: e.description,
         tc: tc,
         tab: widget.tab,
         showAutoExecute: widget.showAutoExecute,
@@ -354,6 +365,25 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if ((commandEvent.description ?? '').trim().isNotEmpty) ...[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 1, right: 5),
+                  child: Icon(Icons.info_outline, size: 12, color: tc.textMuted),
+                ),
+                Expanded(
+                  child: Text(
+                    commandEvent.description!.trim(),
+                    style: TextStyle(
+                        color: tc.textSub, fontSize: fMicro, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: pSmall),
+          ],
           Text(
             commandEvent.command ?? '',
             style: TextStyle(

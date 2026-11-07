@@ -15,6 +15,10 @@ import '../core/app_toast.dart';
 /// 复制按钮、执行按钮、危险命令内联确认按钮。
 class AgentCommandBlock extends StatelessWidget {
   final String command;
+
+  /// 命令说明：AI 在“说明:”行写的一句话，说明这条命令做什么、有什么影响。
+  final String? description;
+
   final ThemeColors tc;
   final tp.TerminalTab? tab;
   final bool showAutoExecute;
@@ -52,6 +56,7 @@ class AgentCommandBlock extends StatelessWidget {
     super.key,
     required this.command,
     required this.tc,
+    this.description,
     this.tab,
     this.showAutoExecute = false,
     this.isLoading = false,
@@ -272,6 +277,29 @@ class AgentCommandBlock extends StatelessWidget {
                     ],
                   ),
                 ),
+                // 命令说明：AI 在“说明:”行写的一句话，先讲清楚这条命令做什么
+                if ((description ?? '').trim().isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.info_outline, size: 12, color: tc.textMuted),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            description!.trim(),
+                            style: TextStyle(
+                              color: tc.textSub,
+                              fontSize: fMicro,
+                              height: 1.4,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 // 变更类命令的影响说明（远程场景下比命令本身更重要）
                 if (dangerous || RiskExplainer.isMutating(trimmed))
                   _buildRiskPanel(tc, ui, hardBlocked, trimmed,

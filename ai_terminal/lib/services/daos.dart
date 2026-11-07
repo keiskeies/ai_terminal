@@ -638,9 +638,11 @@ class ConversationsDao {
     'id': e.id, 'type': e.type.name,
     'timestamp': e.timestamp.toIso8601String(),
     'text': e.text, 'command': e.command, 'commandId': e.commandId,
+    'description': e.description,
     'dangerous': e.dangerous, 'blocked': e.blocked,
     'success': e.success, 'output': e.output, 'error': e.error,
     'options': e.options, 'question': e.question, 'summary': e.summary,
+    'chosenAnswer': e.chosenAnswer,
     'finishState': e.finishState?.name,
     'hostId': e.hostId, 'toolName': e.toolName, 'riskLevel': e.riskLevel,
     'permissionDecision': e.permissionDecision,
@@ -667,6 +669,7 @@ class ConversationsDao {
       ..text = j['text'] as String?
       ..command = j['command'] as String?
       ..commandId = j['commandId'] as String?
+      ..description = j['description'] as String?
       ..dangerous = j['dangerous'] as bool?
       ..blocked = j['blocked'] as bool?
       ..success = j['success'] as bool?
@@ -674,6 +677,7 @@ class ConversationsDao {
       ..error = j['error'] as String?
       ..options = (j['options'] as List?)?.map((e) => e as String).toList()
       ..question = j['question'] as String?
+      ..chosenAnswer = j['chosenAnswer'] as String?
       ..summary = j['summary'] as String?
       ..finishState =
           AgentFinishState.values.asNameMap()[j['finishState'] as String?]

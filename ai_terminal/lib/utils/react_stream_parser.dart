@@ -7,6 +7,7 @@ class ReActStreamParser {
   static const _keywords = [
     '思考:', '思考：',
     '计划:', '计划：',
+    '说明:', '说明：',
     '动作:', '动作：',
     '命令:', '命令：',
     '选项:', '选项：',
@@ -81,6 +82,9 @@ class ReActStreamParser {
     // 记住最近一次 flush 的思考内容，作为紧随其后的 ask 事件的提问；
     // 正文(text)不候选，因为它已作为 Markdown 渲染在卡片上方，重复显示反而嘈杂。
     String? lastQuestion;
+    // “说明:”是命令自带的解释，跟着下一条命令一起下发；命令消费后立即清空，
+    // 避免在没有命令的步骤后串到下一条命令上。
+    String? pendingDescription;
 
     void flush() {
       final value = buffer.toString().trim();
@@ -94,12 +98,18 @@ class ReActStreamParser {
           final id = _stableId(AgentEventType.thought, value);
           events.add(AgentEvent.thought(value, id: id));
           if (value.isNotEmpty) lastQuestion = value;
+          pendingDescription = null;
+          break;
+        case _FieldType.description:
+          if (value.isNotEmpty) pendingDescription = value;
           break;
         case _FieldType.command:
           final cleaned = _cleanCommand(value);
           if (cleaned.isNotEmpty) {
             final id = _stableId(AgentEventType.command, cleaned);
-            events.add(AgentEvent.command(cleaned, id: id));
+            events.add(AgentEvent.command(cleaned,
+                id: id, description: pendingDescription));
+            pendingDescription = null;
           }
           break;
         case _FieldType.options:
@@ -110,6 +120,7 @@ class ReActStreamParser {
           }
           pendingOptions = null;
           lastQuestion = null;
+          pendingDescription = null;
           break;
         case _FieldType.plan:
           final steps = _parsePlanSteps(value);
@@ -125,14 +136,17 @@ class ReActStreamParser {
             final id = _stableId(AgentEventType.text, value);
             events.add(AgentEvent.text(value, id: id));
           }
+          pendingDescription = null;
           break;
         case _FieldType.toolProtocol:
           // 工具调用协议行由引擎的 command 事件表达，这里不产出可见事件
+          pendingDescription = null;
           break;
         case _FieldType.answer:
           // 回答正文由引擎写进操作单结论层（OperationReport.answerBody），
           // 不再作为思考行进入过程时间线；紧随其后的四段字段由
           // AgentEngine.parseReportSections 单独解析，也不该混进思考。
+          pendingDescription = null;
           break;
         case null:
           break;
@@ -156,7 +170,9 @@ class ReActStreamParser {
           if (code.isNotEmpty) {
             flush();
             final id = _stableId(AgentEventType.command, code);
-            events.add(AgentEvent.command(code, id: id));
+            events.add(AgentEvent.command(code,
+                id: id, description: pendingDescription));
+            pendingDescription = null;
           }
         } else {
           flush();
@@ -196,6 +212,11 @@ class ReActStreamParser {
             case '计划':
               flush();
               currentField = _FieldType.plan;
+              if (content.isNotEmpty) buffer.writeln(content);
+              break;
+            case '说明':
+              flush();
+              currentField = _FieldType.description;
               if (content.isNotEmpty) buffer.writeln(content);
               break;
             case '动作':
@@ -245,6 +266,7 @@ class ReActStreamParser {
         } else {
           if (currentField == _FieldType.thought ||
               currentField == _FieldType.command ||
+              currentField == _FieldType.description ||
               currentField == _FieldType.text ||
               currentField == _FieldType.answer ||
               currentField == _FieldType.plan) {
@@ -266,7 +288,9 @@ class ReActStreamParser {
       if (code.isNotEmpty) {
         flush();
         final id = _stableId(AgentEventType.command, code);
-        events.add(AgentEvent.command(code, id: id));
+        events.add(AgentEvent.command(code,
+            id: id, description: pendingDescription));
+        pendingDescription = null;
       }
     }
 
@@ -388,4 +412,13 @@ class _KeywordMatch {
   _KeywordMatch(this.position, this.keyword);
 }
 
-enum _FieldType { thought, command, options, text, plan, toolProtocol, answer }
+enum _FieldType {
+  thought,
+  description,
+  command,
+  options,
+  text,
+  plan,
+  toolProtocol,
+  answer,
+}

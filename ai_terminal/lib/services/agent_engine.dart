@@ -149,6 +149,17 @@ class AgentEngine {
   /// 暂停/恢复时的步数偏移：恢复后步数继续累计，不归零
   int _stepOffset = 0;
 
+  /// 事件序号：整个引擎实例内单调递增。
+  ///
+  /// 必须是实例字段而不是单次 AI 调用的局部变量：事件 id 是
+  /// `evt_<序号>_<内容哈希前8位>`，序号每轮从 1 重数时，
+  /// 两轮里内容相同的 ask 事件会拿到同一个 id → Flutter 同层重复 key →
+  /// 整块提问步骤渲染失败（等待作答时正常，答完就消失）。
+  int _eventSeq = 0;
+
+  /// 当前等待用户作答的 ask 事件（用于把用户的选择回写到事件上）
+  AgentEvent? _pendingAskEvent;
+
   /// 稳定操作 id：startTask 生成，resumeTask 沿用
   String? _operationId;
 
@@ -1419,8 +1430,10 @@ class AgentEngine {
                 'finish 正文包含选择请求，转为 ask 等待用户选择: ${finishChoice.options}');
             if (step.options == null || step.options!.isEmpty) {
               // 选项: 行由流式解析器发过 ask；正文里提取的选项需要补发事件
-              onEvent?.call(
-                  AgentEvent.ask(finishChoice.question, finishChoice.options));
+              final askEvent =
+                  AgentEvent.ask(finishChoice.question, finishChoice.options);
+              _pendingAskEvent = askEvent;
+              onEvent?.call(askEvent);
             }
             final shouldContinue = await _handleAskAction(
               ReActStep(
@@ -1475,10 +1488,12 @@ class AgentEngine {
           if (!_lastResponseHadAskEvent &&
               step.options != null &&
               step.options!.isNotEmpty) {
-            onEvent?.call(AgentEvent.ask(
+            final askEvent = AgentEvent.ask(
               step.thought.trim().isEmpty ? '请选择' : step.thought.trim(),
               step.options!,
-            ));
+            );
+            _pendingAskEvent = askEvent;
+            onEvent?.call(askEvent);
             _lastResponseHadAskEvent = true;
           }
           final shouldContinue =
@@ -1715,7 +1730,6 @@ class AgentEngine {
     int chunkCount = 0;
     final emittedStableIds = <String>{}; // 已发出事件的稳定 ID（内容哈希），用于流式去重
     final stableIdToFinalId = <String, String>{}; // 稳定 ID → 最终全局唯一 ID 的映射
-    int globalEventSeq = 0; // 全局事件序号
     bool commandDetectedNotified = false; // 是否已通知过命令检测（一轮只通知一次）
     // 流式提前检测命令：全量解析很贵，限制在 150ms 一次，且只有出现
     // 「命令:」或围栏代码块迹象时才解析；纯推理流不再逐 chunk 重解析。
@@ -1735,9 +1749,9 @@ class AgentEngine {
       if (stableIdToFinalId.containsKey(stableId)) {
         return stableIdToFinalId[stableId]!;
       }
-      globalEventSeq++;
+      _eventSeq++;
       final finalId =
-          'evt_${globalEventSeq}_${stableId.substring(0, stableId.length > 8 ? 8 : stableId.length)}';
+          'evt_${_eventSeq}_${stableId.substring(0, stableId.length > 8 ? 8 : stableId.length)}';
       stableIdToFinalId[stableId] = finalId;
       e.id = finalId;
       return finalId;
@@ -1887,6 +1901,9 @@ class AgentEngine {
         assignFinalId(e); // 此处会改写 e.id 为 finalId
         e.isStreaming = false;
         _enrichCommandEvent(e);
+        // 记住本轮的提问事件：用户作答后要把选择回写上去，
+        // 让"问过什么 + 选了什么"留在同一个事件里，不靠事后扫描推断。
+        if (e.isAsk) _pendingAskEvent = e;
         onEvent?.call(e);
       } else {
         // 已发过，确保 _lastCommandEventId 用 finalId
@@ -2084,7 +2101,7 @@ class AgentEngine {
   ///   正文里的 `**结论**:` 这类带前缀的写法不受影响
   /// - ``` 围栏内的关键词行不触发停止，否则"回答里示范一段 ReAct 格式"会把正文截断
   static final RegExp _answerStopLine =
-      RegExp(r'^(动作|思考|计划|工具|参数|结论|现状|变更|建议)\s*[:：]');
+      RegExp(r'^(动作|思考|说明|计划|工具|参数|结论|现状|变更|建议)\s*[:：]');
 
   /// 操作单四段字段的行首标记（`**结论**:` 这类正文写法不算）
   static final RegExp _sectionStartLine = RegExp(r'^(结论|现状|变更|建议)\s*[:：]');
@@ -2168,6 +2185,8 @@ class AgentEngine {
           t.startsWith('动作：') ||
           t.startsWith('思考:') ||
           t.startsWith('思考：') ||
+          t.startsWith('说明:') ||
+          t.startsWith('说明：') ||
           t.startsWith('回答:') ||
           t.startsWith('回答：')) {
         break;
@@ -3044,6 +3063,9 @@ class AgentEngine {
 
     _pendingOptions = options;
     _choiceCompleter = Completer<String>();
+    // 抓住本轮这一个 ask 事件：等待期间可能又有新事件进来，
+    // 用变量固定住，回写答案时不会写到别的提问上。
+    final pendingAsk = _pendingAskEvent;
 
     _currentTask = _currentTask!.copyWith(
       status: AgentStatus.waitingConfirm,
@@ -3070,6 +3092,9 @@ class AgentEngine {
 
     // 将用户选择反馈给 AI
     agentLogger.info('ReAct', '用户选择了: $choice');
+    // 答案回写到 ask 事件本身：提问这一步要自带"问过什么 + 选了什么"，
+    // 不能只靠后面那条 info 事件反推（跨轮/跨段就断了）。
+    pendingAsk?.chosenAnswer = choice;
     onEvent?.call(AgentEvent.info(UiText.t('👉 你选择了: $choice', '👉 You chose: $choice')));
 
     // 以 ReAct 观测格式反馈
@@ -3600,7 +3625,7 @@ class AgentEngine {
       agentLogger.info('ReAct',
           'AI 未生成命令，发送继续提示 (重试 $_noCommandRetryCount/$_maxNoCommandRetries)');
       const continuePrompt =
-          '请继续执行任务。如果还有需要执行的步骤，请使用以下格式回复：\n\n思考: [你的推理]\n动作: execute\n命令: [要执行的命令]\n\n如果任务已全部完成，请回复：\n\n思考: [总结]\n动作: finish';
+          '请继续执行任务。如果还有需要执行的步骤，请使用以下格式回复：\n\n思考: [你的推理]\n说明: [一句话说明这条命令做什么、有什么影响]\n动作: execute\n命令: [要执行的命令]\n\n如果任务已全部完成，请回复：\n\n思考: [总结]\n动作: finish';
       onEvent?.call(AgentEvent.info(UiText.t('⏳ 继续执行...', '⏳ Continuing...')));
       _conversationHistory
           .add(ChatMessage.create(role: 'user', content: continuePrompt));

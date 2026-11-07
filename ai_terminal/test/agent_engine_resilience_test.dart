@@ -572,6 +572,45 @@ void main() {
       expect(provider.callCount, 3);
       expect(provider.receivedHistories[1].last.content,
           contains('用户选择了 "A. 使用官方源安装"'));
+
+      // 答案必须回写到 ask 事件本身：提问这一步要自带"问过什么 + 选了什么"，
+      // 不能只靠后面那条 info 事件反推。
+      final askEvent = events.firstWhere((e) => e.isAsk);
+      expect(askEvent.chosenAnswer, 'A. 使用官方源安装');
+    });
+
+    test('两轮内容相同的提问事件 id 不重复（引擎序号全局递增）', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 第一次询问\n选项: 继续安装 | 先不装\n',
+      ]);
+      provider.enqueueStream([
+        '思考: 用户确认继续\n动作: execute\n命令: echo install\n',
+      ]);
+      provider.enqueueStream([
+        '思考: 第二次询问\n选项: 继续安装 | 先不装\n',
+      ]);
+      provider.enqueueStream([
+        '思考: 完成\n动作: finish\n',
+      ]);
+
+      final engine = makeEngine(provider: provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+
+      final running = engine.startTask('继续安装', _MockExecutor());
+      await waitForChoice(engine);
+      engine.selectChoice('继续安装');
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await waitForChoice(engine);
+      engine.selectChoice('先不装');
+      await running;
+
+      final asks = events.where((e) => e.isAsk).toList();
+      expect(asks.length, greaterThanOrEqualTo(2));
+      final ids = asks.map((e) => e.id).toSet();
+      expect(ids.length, asks.length,
+          reason: 'id 重复会让 Flutter 同层重复 key，整块提问步骤渲染失败');
     });
 
     test('漏写 动作: ask 但有 选项: 行时按 ask 等待，不重复发事件', () async {

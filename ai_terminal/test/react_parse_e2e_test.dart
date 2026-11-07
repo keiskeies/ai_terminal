@@ -238,6 +238,67 @@ void main() {
     });
   });
 
+  group('「说明:」命令说明端到端解析', () {
+    test('E2E-16: 说明行进入命令事件，且不混进思考/命令文本', () {
+      const response = '''思考: 需要查看目录
+说明: 列出当前目录内容，只读操作，不会改动任何文件
+动作: execute
+命令: ls -la''';
+
+      final events = ReActStreamParser.parse(response);
+      final thought = events.firstWhere(
+          (e) => e.type == AgentEventType.thought);
+      final command = events.firstWhere(
+          (e) => e.type == AgentEventType.command);
+
+      expect(thought.text, '需要查看目录');
+      expect(thought.text, isNot(contains('只读操作')));
+      expect(command.command, 'ls -la');
+      expect(command.description, '列出当前目录内容，只读操作，不会改动任何文件');
+    });
+
+    test('E2E-17: 说明只跟随紧邻的下一条命令，不会串到后续命令', () {
+      const response = '''思考: 先看目录
+说明: 查看当前目录下的文件列表
+动作: execute
+命令: ls
+思考: 再确认工作目录
+动作: execute
+命令: pwd''';
+
+      final events = ReActStreamParser.parse(response);
+      final commands = events
+          .where((e) => e.type == AgentEventType.command)
+          .toList();
+
+      expect(commands.length, 2);
+      expect(commands[0].command, 'ls');
+      expect(commands[0].description, '查看当前目录下的文件列表');
+      expect(commands[1].command, 'pwd');
+      expect(commands[1].description, isNull);
+    });
+
+    test('E2E-18: 说明写在计划之后仍然绑定到命令', () {
+      const response = '''思考: 先安装 Nginx
+计划:
+- [>] 安装 Nginx
+- [ ] 验证服务
+说明: 安装 Nginx 软件包，会新增软件和系统服务
+动作: execute
+命令: sudo apt install -y nginx''';
+
+      final events = ReActStreamParser.parse(response);
+      final command = events.firstWhere(
+          (e) => e.type == AgentEventType.command);
+      final plan =
+          events.firstWhere((e) => e.type == AgentEventType.plan);
+
+      expect(plan.planSteps!.any((s) => s.title.contains('安装 Nginx')), isTrue);
+      expect(command.command, 'sudo apt install -y nginx');
+      expect(command.description, '安装 Nginx 软件包，会新增软件和系统服务');
+    });
+  });
+
   group('「回答:」块端到端解析', () {
     test('E2E-8: 回答正文含标题/列表/代码块时完整保留', () {
       const response = '''思考: 配置已生效
