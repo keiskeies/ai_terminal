@@ -218,6 +218,9 @@ const double fBody = 13.0;
 const double fSmall = 12.0;
 const double fMono = 13.0;
 const double fMicro = 11.0;
+// Agent 正文（Markdown 回答主体）专用字号：比过程证据再小一档，
+// 避免大段正文反过来压过命令/结果这些真正要读的内容。
+const double fAgentBody = 10.0;
 
 // ===== 动画 =====
 const Duration animFast = Duration(milliseconds: 120);

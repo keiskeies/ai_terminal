@@ -36,6 +36,8 @@ dependencies:
   dartssh2: ^3.3.1
   # Markdown 渲染
   flutter_markdown: ^0.6.18
+  # Markdown 解析（智能表格列宽需要读取 table/thead/tr 节点结构）
+  markdown: ^7.2.0
   # 字体
   google_fonts: ^6.1.0
   # 生物识别

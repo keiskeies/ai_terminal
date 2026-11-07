@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:go_router/go_router.dart';
@@ -9,6 +10,7 @@ import '../core/builtin_runbook_i18n.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../core/ui_text.dart';
+import '../widgets/smart_table.dart';
 import '../core/l10n_holder.dart';
 import '../core/route_observer.dart';
 import '../l10n/app_localizations.dart';
@@ -394,6 +396,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         controller.position.maxScrollExtent - controller.offset;
     final show = distanceFromBottom > 80;
     var auto = _tabAutoScroll[tabId] ?? true;
+    // 用户往上拖（finger 向下、看更早内容）立即关自动滚动：
+    // 流式期间每 150ms 就 jumpTo 回底部，若等"离底超过 120px"才关，
+    // 用户的拖动会不断被拽回去，表现为"一直自动滑到底部"。
+    // 程序化 jumpTo/animateTo 不会更新 userScrollDirection，不会误触发。
+    if (distanceFromBottom > 8 &&
+        controller.position.userScrollDirection == ScrollDirection.forward) {
+      auto = false;
+    }
     if (distanceFromBottom > 120) auto = false;
     if (distanceFromBottom <= 40) auto = true;
     _tabShowScrollToBottom[tabId] = show;
@@ -3478,47 +3488,55 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         continue;
       }
       if (seg.content.trim().isEmpty) continue;
-      bodies.add(_CachedMarkdownText(
-        text: seg.content,
-        isLight: tc.isLight,
-        tc: tc,
-        builder: (text, theme) => MarkdownBody(
-          data: _preprocessMarkdown(text),
-          // 交给外层 SelectionArea 统一选择：selectable=true 会让 flutter_markdown
-          // 为每个段落生成独立 SelectableText，选区被限制在单段内。
-          selectable: false,
-          styleSheet: MarkdownStyleSheet(
-            p: TextStyle(
-              color: theme.textMain,
-              height: 1.5,
-              // 正文与思考行同一字号（12）：回答的主体文字比过程证据大一档，
-              // 视觉上会喧宾夺主
-              fontSize: fSmall,
-              fontWeight: FontWeight.w500,
+      // 表格先切出来单独渲染：flutter_markdown 0.6.x 的 builders 对块级元素
+      // 不生效，表格始终均分列宽；这里按内容自适应宽度渲染。
+      for (final chunk in splitMarkdownTables(seg.content)) {
+        final table = chunk.table;
+        if (table != null) {
+          bodies.add(SmartMarkdownTable(data: table, tc: tc));
+        } else if (chunk.text.trim().isNotEmpty) {
+          bodies.add(_CachedMarkdownText(
+            text: chunk.text,
+            isLight: tc.isLight,
+            tc: tc,
+            builder: (text, theme) => MarkdownBody(
+              data: _preprocessMarkdown(text),
+              // 交给外层 SelectionArea 统一选择：selectable=true 会让 flutter_markdown
+              // 为每个段落生成独立 SelectableText，选区被限制在单段内。
+              selectable: false,
+              styleSheet: MarkdownStyleSheet(
+                p: TextStyle(
+                  color: theme.textMain,
+                  height: 1.5,
+                  // Agent 正文比过程证据再小一档，避免大段正文喧宾夺主
+                  fontSize: fAgentBody,
+                  fontWeight: FontWeight.w500,
+                ),
+                h1: TextStyle(color: theme.textMain, fontSize: 16, fontWeight: FontWeight.bold),
+                h2: TextStyle(color: theme.textMain, fontSize: 14, fontWeight: FontWeight.bold),
+                h3: TextStyle(color: theme.textMain, fontSize: fBody, fontWeight: FontWeight.w600),
+                code: TextStyle(
+                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                  fontSize: fMono,
+                  fontWeight: FontWeight.w500,
+                  color: theme.brand,
+                ),
+                listBullet: TextStyle(color: theme.brand, fontSize: fAgentBody),
+                blockquote: TextStyle(
+                  color: theme.textSub,
+                  fontStyle: FontStyle.italic,
+                  fontWeight: FontWeight.w500,
+                ),
+                blockquoteDecoration: BoxDecoration(
+                  border: Border(left: BorderSide(color: theme.brand, width: 2)),
+                ),
+                blockquotePadding: const EdgeInsets.only(left: 8),
+              ),
+              onTapLink: (text, href, title) {},
             ),
-            h1: TextStyle(color: theme.textMain, fontSize: 16, fontWeight: FontWeight.bold),
-            h2: TextStyle(color: theme.textMain, fontSize: 14, fontWeight: FontWeight.bold),
-            h3: TextStyle(color: theme.textMain, fontSize: fBody, fontWeight: FontWeight.w600),
-            code: TextStyle(
-              fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
-              fontSize: fMono,
-              fontWeight: FontWeight.w500,
-              color: theme.brand,
-            ),
-            listBullet: TextStyle(color: theme.brand, fontSize: fSmall),
-            blockquote: TextStyle(
-              color: theme.textSub,
-              fontStyle: FontStyle.italic,
-              fontWeight: FontWeight.w500,
-            ),
-            blockquoteDecoration: BoxDecoration(
-              border: Border(left: BorderSide(color: theme.brand, width: 2)),
-            ),
-            blockquotePadding: const EdgeInsets.only(left: 8),
-          ),
-          onTapLink: (text, href, title) {},
-        ),
-      ));
+          ));
+        }
+      }
     }
     if (bodies.isEmpty) return const SizedBox.shrink();
     return Padding(
