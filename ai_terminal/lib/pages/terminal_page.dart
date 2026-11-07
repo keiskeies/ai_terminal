@@ -4005,6 +4005,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                     ],
                   ),
                 ),
+              const SizedBox(height: 4),
+              Text(
+                '输入 / 可搜索全部命令与运维模板；↑↓ 切换、Tab 选择、Enter 执行。',
+                style: TextStyle(color: tc.textSub, fontSize: fMicro),
+              ),
             ],
           ),
         ),
@@ -4203,6 +4208,24 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         ref.read(agentProvider.notifier).modelConfig ?? _currentModelConfig;
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
+    // 斜杠建议里同时列出运维模板：内置模板在读取时才本地化，避免把首次
+    // 启动语言固化到持久化数据里。
+    final runbooks =
+        BuiltinRunbookI18n.localizeAll(ref.watch(runbooksProvider));
+    final slashExtras = <SlashCommand>[
+      for (final rb in runbooks)
+        SlashCommand(
+          '/${rb.name}',
+          rb.description ?? '',
+          isTemplate: true,
+          leading: rb.icon.isEmpty ? '📋' : rb.icon,
+          badge: rb.type == RunbookType.agent
+              ? 'AI'
+              : l10n.terminalRunbookTypeCommand,
+          searchText: '${rb.name} ${rb.description ?? ''}',
+          onSelect: () => _runRunbook(rb),
+        ),
+    ];
     final List<PlanStep> pinnedPlan = agentState.chatItems.isNotEmpty &&
             agentState.chatItems.last.role == 'assistant'
         ? _findLatestPlan(agentState.chatItems.last.events)
@@ -4395,6 +4418,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             onSlashCommand: (command) {
               return _handleSlashCommand(command, isConnected: isConnected);
             },
+            slashExtras: slashExtras,
             onStop: () => ref.read(agentProvider.notifier).cancel(),
             onSend: (text) => _sendToAgent(text, isConnected: isConnected),
             footer: _buildModelCapsule(currentModel, endpoints, tc),
@@ -4906,13 +4930,19 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       ),
       onTap: () {
         Navigator.of(sheetCtx).pop();
-        if (isAgent) {
-          _sendRunbookPrompt(rb);
-        } else {
-          _sendRunbookCommand(rb);
-        }
+        _runRunbook(rb);
       },
     );
+  }
+
+  /// 运维模板的统一执行入口：斜杠建议浮层与工具栏弹层共用，
+  /// 避免两条入口在 agent / command 分流上产生行为差异。
+  void _runRunbook(Runbook rb) {
+    if (rb.type == RunbookType.agent) {
+      _sendRunbookPrompt(rb);
+    } else {
+      _sendRunbookCommand(rb);
+    }
   }
 
   /// 发送 Runbook（agent 类型）prompt 到 Agent 执行

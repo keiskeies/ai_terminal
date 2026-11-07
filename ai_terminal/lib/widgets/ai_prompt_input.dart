@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants.dart';
@@ -5,12 +8,13 @@ import '../core/theme_colors.dart';
 import '../models/agent_permission_mode.dart';
 import 'permission_mode_selector.dart';
 
-/// AI 输入框，支持斜杠命令建议
+/// AI 输入框，支持斜杠命令建议（内置命令 + 运维模板）。
 ///
 /// 键盘约定（与主流 AI 对话平台一致）：
-/// - Enter / NumpadEnter：发送（若斜杠命令浮层打开则选中高亮命令）
-/// - Shift + Enter：换行
-/// - ↑ / ↓ / Tab / Esc：斜杠浮层导航
+/// - Enter / NumpadEnter：浮层打开时执行高亮项，否则发送
+/// - Shift + Enter：换行（优先于浮层操作）
+/// - ↑ / ↓：切换高亮项；Tab：选中高亮项（内置命令填入输入框，模板直接执行）
+/// - Esc：关闭浮层
 class AIPromptInput extends StatefulWidget {
   final bool enabled;
   final bool isRunning;
@@ -23,6 +27,9 @@ class AIPromptInput extends StatefulWidget {
   final Color accentColor;
   /// 斜杠命令回调：返回 true 表示命令已被处理（不再走 onSend）
   final bool Function(String command)? onSlashCommand;
+  /// 额外的建议项（运维模板等）。与 [kSlashCommands] 分开，避免污染
+  /// `parseSlashCommand` 的已知命令集合——模板名不是可解析的命令。
+  final List<SlashCommand> slashExtras;
   /// 是否处于多机编排模式（只影响边框配色，开关按钮在上方工具栏）
   final bool isOrchestratorMode;
   /// 输入框底部工具行里的附加控件（模型/思考档位胶囊等）。
@@ -47,6 +54,7 @@ class AIPromptInput extends StatefulWidget {
     this.onFocusChanged,
     required this.accentColor,
     this.onSlashCommand,
+    this.slashExtras = const [],
     this.isOrchestratorMode = false,
     this.footer,
     this.permissionMode = AgentPermissionMode.ask,
@@ -57,11 +65,38 @@ class AIPromptInput extends StatefulWidget {
   State<AIPromptInput> createState() => _AIPromptInputState();
 }
 
-/// 斜杠命令定义
+/// 斜杠建议项定义。
+///
+/// [isTemplate] 为 true 时表示运维模板：选中后走 [onSelect] 直接执行，
+/// 不把文本填进输入框；内置命令则只填入命令名，参数由用户继续输入。
 class SlashCommand {
   final String command;
   final String description;
-  const SlashCommand(this.command, this.description);
+
+  /// 是否为运维模板（区别于内置斜杠命令）
+  final bool isTemplate;
+
+  /// 条目前缀（模板 emoji 图标）
+  final String? leading;
+
+  /// 条目右侧类型徽标（如 AI / CMD）
+  final String? badge;
+
+  /// 模糊匹配文本；模板默认用 `name + description`，内置命令用命令名
+  final String? searchText;
+
+  /// 自定义选中行为（模板用）
+  final VoidCallback? onSelect;
+
+  const SlashCommand(
+    this.command,
+    this.description, {
+    this.isTemplate = false,
+    this.leading,
+    this.badge,
+    this.searchText,
+    this.onSelect,
+  });
 }
 
 const List<SlashCommand> kSlashCommands = [
@@ -75,17 +110,53 @@ const List<SlashCommand> kSlashCommands = [
   SlashCommand('/help', '列出全部命令'),
 ];
 
+/// 斜杠建议浮层的测试定位键。
+const Key kSlashOverlayKey = Key('slash_suggestions_overlay');
+
 class _AIPromptInputState extends State<AIPromptInput> {
+  /// 浮层条目固定高度：与键盘导航/虚拟窗口的滚动计算保持一致。
+  static const double _kItemHeight = 38.0;
+  static const double _kHintHeight = 22.0;
+  static const double _kVerticalPadding = 8.0;
+  static const double _kMaxOverlayHeight = 500.0;
+  static const double _kBorderWidth = 1.0;
+  static const double _kGap = 6.0;
+  /// 首屏至少能同时看到 8 条内置命令和几条运维模板，避免模板被完全藏住。
+  static const int _kMaxVisibleItems = 12;
+
+  /// 输入字符上限
+  static const int _maxLength = 50000;
+
   late TextEditingController _controller;
   final _focusNode = FocusNode();
   String _lastInitialText = '';
   bool _isFocused = false;
+
+  /// 父组件回写 initialText 时抑制建议检测，避免在 build 阶段操作 Overlay。
+  bool _suppressDetect = false;
+
+  /// Esc 关闭浮层时的文本：文本不变就不重新弹出。
+  String? _escDismissedText;
+
+  /// 已通过 Tab/点击填入的命令名：以其为前缀继续输入参数时不打扰用户。
+  String? _acceptedCommand;
+
   OverlayEntry? _slashOverlay;
+
+  /// 浮层所在的 Overlay 状态。定位必须用它（而不是 OverlayEntry builder 的
+  /// context）测量：builder context 首帧还没有子 RenderObject，第二次构建时
+  /// 又只会拿到浮层自身的尺寸，两者都不能代表 Overlay 坐标系。
+  OverlayState? _overlayState;
   List<SlashCommand> _filteredCommands = [];
   int _highlightedIndex = 0;
 
-  /// 输入字符上限
-  static const int _maxLength = 50000;
+  /// 虚拟窗口：只渲染 [_visibleCount] 条，键盘/滚轮移动窗口，
+  /// 避免 Overlay 反复插入时复用 ScrollController 引发的重复 attach。
+  int _windowStart = 0;
+  int _visibleCount = _kMaxVisibleItems;
+
+  /// 浮层在全局坐标系中的矩形，供 TextField.onTapOutside 判断点击落点。
+  Rect? _overlayRect;
 
   @override
   void initState() {
@@ -107,32 +178,73 @@ class _AIPromptInputState extends State<AIPromptInput> {
 
   void _onTextChanged() {
     widget.onChanged?.call(_controller.text);
-    _detectSlashCommand();
+    if (!_suppressDetect) _detectSlashCommand();
   }
 
-  /// 检测输入框中的斜杠命令前缀，显示建议
+  /// 检测输入框中的斜杠前缀，同步更新建议浮层。
+  ///
+  /// 内置命令按前缀匹配；运维模板按名称/描述做子串匹配，
+  /// 因此输入 `/巡检` 或 `/disk` 都能直接命中模板。
   void _detectSlashCommand() {
     final text = _controller.text;
-    // 仅当文本以 / 开头且不含空格时显示建议
-    if (text.startsWith('/') && !text.contains(' ')) {
-      final prefix = text.toLowerCase();
-      final filtered = kSlashCommands
-          .where((c) => c.command.toLowerCase().startsWith(prefix))
-          .toList();
-      if (filtered.isNotEmpty) {
-        _filteredCommands = filtered;
-        _highlightedIndex = _highlightedIndex.clamp(0, filtered.length - 1);
-        _showSlashOverlay();
-        return;
+    if (!text.startsWith('/') || text.contains('\n') || text.contains('\r')) {
+      _acceptedCommand = null;
+      _escDismissedText = null;
+      _hideSlashOverlay();
+      return;
+    }
+
+    // Esc 关闭后，文本未变化就保持关闭；用户继续输入则立即恢复。
+    final esc = _escDismissedText;
+    if (esc != null) {
+      if (esc == text) return;
+      _escDismissedText = null;
+    }
+    // 已选中命令后继续写参数（如 `/goal 修复磁盘`）不再弹出建议；
+    // 用户删改前缀则恢复建议。
+    final accepted = _acceptedCommand;
+    if (accepted != null) {
+      if (text.startsWith(accepted)) return;
+      _acceptedCommand = null;
+    }
+
+    final raw = text.substring(1);
+    final space = raw.indexOf(' ');
+    final token = (space < 0 ? raw : raw.substring(0, space)).trim().toLowerCase();
+    final hasArgs = space >= 0;
+
+    final builtins = <SlashCommand>[];
+    if (!hasArgs) {
+      for (final c in kSlashCommands) {
+        if (c.command.toLowerCase().startsWith('/$token')) builtins.add(c);
       }
     }
-    _hideSlashOverlay();
+    final templates = <SlashCommand>[];
+    for (final c in widget.slashExtras) {
+      final haystack = (c.searchText ?? c.command).toLowerCase();
+      if (token.isEmpty || haystack.contains(token)) templates.add(c);
+    }
+
+    final filtered = <SlashCommand>[...builtins, ...templates];
+    if (filtered.isEmpty) {
+      _hideSlashOverlay();
+      return;
+    }
+    _filteredCommands = filtered;
+    _highlightedIndex = _highlightedIndex.clamp(0, filtered.length - 1);
+    _syncWindow();
+    _showSlashOverlay();
   }
 
   void _showSlashOverlay() {
     if (_slashOverlay == null) {
-      _slashOverlay = OverlayEntry(builder: _buildSlashOverlay);
-      Overlay.of(context).insert(_slashOverlay!);
+      // 插入根 Overlay：避免被嵌套 Overlay 裁剪；用户输入回调不在 build 阶段，
+      // 可以同步插入，浮层在下一帧即可见（不再需要等第二次输入）。
+      final state = Overlay.of(context, rootOverlay: true);
+      _overlayState = state;
+      final entry = OverlayEntry(builder: _buildSlashOverlay);
+      _slashOverlay = entry;
+      state.insert(entry);
     } else {
       _slashOverlay!.markNeedsBuild();
     }
@@ -141,103 +253,251 @@ class _AIPromptInputState extends State<AIPromptInput> {
   void _hideSlashOverlay() {
     _slashOverlay?.remove();
     _slashOverlay = null;
+    _overlayState = null;
+    _overlayRect = null;
+    _filteredCommands = [];
   }
 
-  Widget _buildSlashOverlay(BuildContext context) {
-    final renderBox = context.findRenderObject() as RenderBox?;
-    if (renderBox == null) return const SizedBox.shrink();
-    final size = renderBox.size;
-    final tc = ThemeColors.of(context);
+  /// 保持高亮项落在可见窗口内。
+  void _syncWindow() {
+    final len = _filteredCommands.length;
+    if (len == 0) {
+      _windowStart = 0;
+      return;
+    }
+    final count = math.max(1, math.min(_visibleCount, len));
+    final maxStart = math.max(0, len - count);
+    var start = _windowStart.clamp(0, maxStart);
+    if (_highlightedIndex < start) start = _highlightedIndex;
+    if (_highlightedIndex >= start + count) start = _highlightedIndex - count + 1;
+    _windowStart = start.clamp(0, maxStart);
+  }
+
+  Widget _buildSlashOverlay(BuildContext overlayContext) {
+    if (_filteredCommands.isEmpty) return const SizedBox.shrink();
+    // 关键：尺寸与位置必须取「输入框自身」的 RenderBox。
+    // 原来用 OverlayEntry builder 的 context 测量，拿到的是整个 Overlay
+    // （近全屏）的尺寸，导致浮层宽度铺满屏幕、bottom 被顶到屏幕外。
+    final inputBox = context.findRenderObject() as RenderBox?;
+    final overlayBox = _overlayState?.context.findRenderObject() as RenderBox?;
+    if (inputBox == null ||
+        overlayBox == null ||
+        !inputBox.attached ||
+        !overlayBox.attached) {
+      return const SizedBox.shrink();
+    }
+
+    final globalTopLeft = inputBox.localToGlobal(Offset.zero);
+    final local = overlayBox.globalToLocal(globalTopLeft);
+    final overlaySize = overlayBox.size;
+    final width = math.min(inputBox.size.width, overlaySize.width);
+    final left = local.dx
+        .clamp(0.0, math.max(0.0, overlaySize.width - width))
+        .toDouble();
+
+    // 浮层向上展开，最高不超过输入框上方可用空间。
+    // Container 的 1px 上下边框也占高度，计入约束避免 Column 溢出。
+    const borderInset = 2 * _kBorderWidth;
+    const minOverlayHeight =
+        _kItemHeight + _kHintHeight + _kVerticalPadding + borderInset;
+    final available = local.dy - _kGap - 4;
+    final maxHeight = math.min(
+      _kMaxOverlayHeight,
+      math.max(minOverlayHeight, available),
+    );
+    final maxListHeight = math.max(
+      _kItemHeight,
+      maxHeight - _kHintHeight - _kVerticalPadding - borderInset,
+    );
+    var count = math.min(_filteredCommands.length, _kMaxVisibleItems);
+    while (count > 1 && count * _kItemHeight > maxListHeight) {
+      count--;
+    }
+    _visibleCount = math.max(1, count);
+    _syncWindow();
+    final end = math.min(_filteredCommands.length, _windowStart + _visibleCount);
+    final shown = math.max(0, end - _windowStart);
+    final contentHeight = shown * _kItemHeight + _kHintHeight + _kVerticalPadding;
+    final outerHeight = contentHeight + borderInset;
+
+    // 记录全局矩形：点击浮层时不让 TextField 失焦，否则浮层会在
+    // GestureDetector.onTap 完成前被移除，点击直接丢失。
+    _overlayRect = Rect.fromLTWH(
+      globalTopLeft.dx + (left - local.dx),
+      globalTopLeft.dy - _kGap - outerHeight,
+      width,
+      outerHeight,
+    );
+
+    final tc = ThemeColors.of(overlayContext);
     return Positioned(
-      bottom: size.height + 6,
-      left: 0,
-      width: size.width,
-      child: Container(
-        decoration: BoxDecoration(
-          color: tc.cardElevated,
-          borderRadius: BorderRadius.circular(rSmall),
-          border: Border.all(color: tc.border, width: 1),
-          boxShadow: shadowLg,
-        ),
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (int i = 0; i < _filteredCommands.length; i++)
-              _SlashCommandItem(
-                command: _filteredCommands[i],
-                isHighlighted: i == _highlightedIndex,
-                accentColor: widget.accentColor,
-                tc: tc,
-                onTap: () => _selectSlashCommand(_filteredCommands[i]),
-              ),
-          ],
+      left: left,
+      width: width,
+      bottom: overlaySize.height - local.dy + _kGap,
+      child: SizedBox(
+        height: outerHeight,
+        child: Listener(
+          onPointerSignal: (signal) {
+            if (signal is! PointerScrollEvent) return;
+            final delta = signal.scrollDelta.dy > 0 ? 1 : -1;
+            _scrollWindow(delta);
+          },
+          child: Container(
+            key: kSlashOverlayKey,
+            decoration: BoxDecoration(
+              color: tc.cardElevated,
+              borderRadius: BorderRadius.circular(rSmall),
+              border: Border.all(color: tc.border, width: 1),
+              boxShadow: shadowLg,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: SizedBox(
+                    height: _kHintHeight,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '↑↓ 切换   Tab 选择   Enter 执行   Esc 关闭',
+                            style: TextStyle(color: tc.textSub, fontSize: fMicro),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${_filteredCommands.length}',
+                          style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                for (int i = _windowStart; i < end; i++)
+                  SizedBox(
+                    height: _kItemHeight,
+                    child: _SlashCommandItem(
+                      command: _filteredCommands[i],
+                      isHighlighted: i == _highlightedIndex,
+                      accentColor: widget.accentColor,
+                      tc: tc,
+                      onHover: () => _setHighlight(i),
+                      onTap: () => _activateIndex(i, execute: false),
+                    ),
+                  ),
+                const SizedBox(height: _kVerticalPadding),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  void _selectSlashCommand(SlashCommand cmd) {
-    _controller.text = cmd.command;
-    _controller.selection = TextSelection.collapsed(offset: cmd.command.length);
-    _hideSlashOverlay();
+  void _scrollWindow(int delta) {
+    final maxStart = math.max(0, _filteredCommands.length - _visibleCount);
+    final next = (_windowStart + delta).clamp(0, maxStart);
+    if (next == _windowStart) return;
+    _windowStart = next;
+    _highlightedIndex = _highlightedIndex.clamp(next, next + _visibleCount - 1);
+    _slashOverlay?.markNeedsBuild();
   }
 
-  /// 键盘事件：Enter 发送、Shift+Enter 换行、斜杠浮层导航
-  /// 返回 KeyEventResult.handled 表示消费事件（阻止 TextField 默认行为，如换行）；
-  /// 返回 KeyEventResult.ignored 表示放行，让 TextField 走默认处理（如 Shift+Enter 换行）。
-  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    final key = event.logicalKey;
+  void _setHighlight(int index) {
+    if (_highlightedIndex == index || index >= _filteredCommands.length) return;
+    _highlightedIndex = index;
+    _syncWindow();
+    _slashOverlay?.markNeedsBuild();
+  }
 
-    // 斜杠命令浮层导航（仅浮层打开时）
+  void _moveHighlight(int delta) {
+    final len = _filteredCommands.length;
+    if (len == 0) return;
+    _highlightedIndex = (_highlightedIndex + delta + len) % len;
+    _syncWindow();
+    _slashOverlay?.markNeedsBuild();
+  }
+
+  /// 执行/填入指定项。
+  /// [execute] 为 true 时表示 Enter：内置命令直接执行、模板直接运行；
+  /// 为 false 时表示 Tab / 点击：内置命令仅填入输入框等待参数。
+  void _activateIndex(int index, {required bool execute}) {
+    if (index < 0 || index >= _filteredCommands.length) return;
+    final cmd = _filteredCommands[index];
+    _hideSlashOverlay();
+    if (cmd.isTemplate) {
+      _clearInput();
+      cmd.onSelect?.call();
+      return;
+    }
+    if (execute) {
+      _clearInput();
+      _executeSlashCommand(cmd);
+      return;
+    }
+    _acceptedCommand = cmd.command;
+    _escDismissedText = null;
+    _controller.text = cmd.command;
+    _controller.selection = TextSelection.collapsed(offset: cmd.command.length);
+  }
+
+  void _clearInput() {
+    _acceptedCommand = null;
+    _escDismissedText = null;
+    _controller.clear();
+  }
+
+  /// 键盘事件：浮层导航、Enter 发送、Shift+Enter 换行。
+  /// 返回 handled 表示消费事件（阻止 TextField 默认行为，如光标移动/换行）。
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    // 长按方向键会持续发 KeyRepeatEvent，一并处理，否则高亮会时断时续。
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    final shift = HardwareKeyboard.instance.isShiftPressed;
+    final isEnter = key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter;
+
+    // Shift+Enter 始终换行，优先于浮层的 Enter 执行语义。
+    if (isEnter && shift) return KeyEventResult.ignored;
+
     final slashActive = _slashOverlay != null && _filteredCommands.isNotEmpty;
     if (slashActive) {
       if (key == LogicalKeyboardKey.arrowDown) {
-        setState(() {
-          _highlightedIndex = (_highlightedIndex + 1) % _filteredCommands.length;
-        });
-        _slashOverlay!.markNeedsBuild();
+        _moveHighlight(1);
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.arrowUp) {
-        setState(() {
-          _highlightedIndex = (_highlightedIndex - 1 + _filteredCommands.length) % _filteredCommands.length;
-        });
-        _slashOverlay!.markNeedsBuild();
+        _moveHighlight(-1);
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.tab) {
-        _selectSlashCommand(_filteredCommands[_highlightedIndex]);
+        if (shift) {
+          _moveHighlight(-1);
+        } else {
+          _activateIndex(_highlightedIndex, execute: false);
+        }
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.escape) {
+        _escDismissedText = _controller.text;
         _hideSlashOverlay();
         return KeyEventResult.handled;
       }
-      if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter) {
-        // 浮层打开时 Enter 选中高亮命令（不发送）
-        final cmd = _filteredCommands[_highlightedIndex];
-        _controller.clear();
-        _hideSlashOverlay();
-        _executeSlashCommand(cmd);
+      if (isEnter) {
+        _activateIndex(_highlightedIndex, execute: true);
         return KeyEventResult.handled;
       }
     }
 
-    // Enter / NumpadEnter：发送（Shift+Enter 走默认换行）
-    if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.numpadEnter) {
-      final shift = HardwareKeyboard.instance.isShiftPressed;
-      if (!shift) {
-        // 无 Shift：发送。无论是否发送成功都消费事件，
-        // 避免空输入按 Enter 也产生换行。
-        _send();
-        return KeyEventResult.handled;
-      }
-      // 有 Shift：换行，放行让 TextField 走默认行为
+    if (isEnter) {
+      // 无论是否发送成功都消费事件，避免空输入按 Enter 也产生换行。
+      _send();
+      return KeyEventResult.handled;
     }
-
     return KeyEventResult.ignored;
   }
 
@@ -251,9 +511,18 @@ class _AIPromptInputState extends State<AIPromptInput> {
   @override
   void didUpdateWidget(covariant AIPromptInput oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.initialText != _lastInitialText && widget.initialText != _controller.text) {
+    if (widget.initialText != _lastInitialText &&
+        widget.initialText != _controller.text) {
+      // didUpdateWidget 处在 build 阶段，不能直接插入/移除 Overlay。
+      _suppressDetect = true;
       _controller.text = widget.initialText;
+      _suppressDetect = false;
       _lastInitialText = widget.initialText;
+      if (_slashOverlay != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _hideSlashOverlay();
+        });
+      }
     }
   }
 
@@ -275,12 +544,12 @@ class _AIPromptInputState extends State<AIPromptInput> {
     if (text.startsWith('/') && widget.onSlashCommand != null) {
       final handled = widget.onSlashCommand!(text);
       if (handled) {
-        _controller.clear();
+        _clearInput();
         return;
       }
     }
     widget.onSend(text);
-    _controller.clear();
+    _clearInput();
   }
 
   @override
@@ -320,6 +589,16 @@ class _AIPromptInputState extends State<AIPromptInput> {
               maxLength: _maxLength,
               keyboardType: TextInputType.multiline,
               textInputAction: TextInputAction.newline,
+              // 点击斜杠浮层本身时保持焦点：否则浮层会在 onTap 完成前被移除。
+              onTapOutside: (event) {
+                final rect = _overlayRect;
+                if (rect != null &&
+                    _slashOverlay != null &&
+                    rect.contains(event.position)) {
+                  return;
+                }
+                FocusManager.instance.primaryFocus?.unfocus();
+              },
               // 过滤控制字符：防止小白粘贴二进制内容导致 JSON 序列化失败或数据污染
               inputFormatters: [
                 FilteringTextInputFormatter.deny(
@@ -426,6 +705,7 @@ class _SlashCommandItem extends StatefulWidget {
   final bool isHighlighted;
   final Color accentColor;
   final ThemeColors tc;
+  final VoidCallback onHover;
   final VoidCallback onTap;
 
   const _SlashCommandItem({
@@ -433,6 +713,7 @@ class _SlashCommandItem extends StatefulWidget {
     required this.isHighlighted,
     required this.accentColor,
     required this.tc,
+    required this.onHover,
     required this.onTap,
   });
 
@@ -446,37 +727,71 @@ class _SlashCommandItemState extends State<_SlashCommandItem> {
   @override
   Widget build(BuildContext context) {
     final active = widget.isHighlighted || _isHovered;
+    final cmd = widget.command;
     return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
+      onEnter: (_) {
+        setState(() => _isHovered = true);
+        widget.onHover();
+      },
       onExit: (_) => setState(() => _isHovered = false),
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
         onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: animFast,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           color: active
               ? widget.accentColor.withValues(alpha: 0.12)
               : Colors.transparent,
           child: Row(
             children: [
-              Text(
-                widget.command.command,
-                style: TextStyle(
-                  color: active ? widget.accentColor : widget.tc.textMain,
-                  fontSize: fSmall,
-                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
-                  fontWeight: FontWeight.w600,
+              if (cmd.leading != null && cmd.leading!.isNotEmpty) ...[
+                Text(cmd.leading!, style: const TextStyle(fontSize: 14)),
+                const SizedBox(width: 6),
+              ],
+              Flexible(
+                flex: 0,
+                child: Text(
+                  cmd.command,
+                  style: TextStyle(
+                    color: active ? widget.accentColor : widget.tc.textMain,
+                    fontSize: fSmall,
+                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              if (cmd.badge != null && cmd.badge!.isNotEmpty) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: widget.accentColor.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(rXSmall),
+                    border: Border.all(
+                      color: widget.accentColor.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Text(
+                    cmd.badge!,
+                    style: TextStyle(
+                      color: widget.accentColor,
+                      fontSize: fMicro,
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  widget.command.description,
+                  cmd.description,
                   style: TextStyle(
                     color: widget.tc.textSub,
                     fontSize: fMicro,
                   ),
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
