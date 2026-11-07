@@ -82,7 +82,7 @@ void main() {
     expect(find.textContaining('输出内容0'), findsWidgets);
   });
 
-  testWidgets('失败的结果默认展开，不藏进一次点击里', (tester) async {
+  testWidgets('失败的命令默认收起：状态一行可见，点开才铺错误', (tester) async {
     final cmd = AgentEvent.command('systemctl restart nginx', id: 'c1');
     final events = [
       cmd,
@@ -96,20 +96,24 @@ void main() {
     await tester.pumpWidget(_wrap(_content(events)));
     await tester.pump();
 
+    expect(find.textContaining('systemctl restart nginx'), findsWidgets);
+    expect(find.textContaining('失败'), findsWidgets, reason: '失败状态必须一眼可见');
+    expect(find.textContaining('Job for nginx.service failed'), findsNothing,
+        reason: '十几条失败同时摊开会把真正的流程挤出屏幕');
+
+    await tester.tap(find.textContaining('systemctl restart nginx').first);
+    await tester.pump();
     expect(find.textContaining('Job for nginx.service failed'), findsWidgets,
-        reason: '失败必须一眼可见，否则用户以为任务顺利');
+        reason: '点开后错误原文必须完整可见');
   });
 
-  testWidgets('超过窗口的成功步骤被折叠，点头部展开', (tester) async {
+  testWidgets('步骤不做「更早 N 步」折叠，12 步全部留在原位', (tester) async {
     await tester.pumpWidget(_wrap(_content(_turn(steps: 12), isLoading: true)));
     await tester.pump();
 
-    expect(find.text('local_file_read').evaluate().length, lessThanOrEqualTo(6));
-    expect(find.textContaining('更早'), findsOneWidget);
-
-    await tester.tap(find.textContaining('更早'));
-    await tester.pump();
-    expect(find.text('local_file_read').evaluate().length, greaterThanOrEqualTo(7));
+    expect(find.text('local_file_read').evaluate().length, 12,
+        reason: '每个步骤都要在，不能收成一条摘要');
+    expect(find.textContaining('更早'), findsNothing);
   });
 
   testWidgets('还没结果的可执行命令不被折叠', (tester) async {
@@ -171,12 +175,12 @@ void main() {
     expect(find.textContaining('这是夹在中间的回答正文'), findsOneWidget);
   });
 
-  testWidgets('没有藏任何行时不出"更早 0 步"头部', (tester) async {
+  testWidgets('两步也全部展示，没有折叠头', (tester) async {
     await tester.pumpWidget(_wrap(_content(_turn(steps: 2))));
     await tester.pump();
 
+    expect(find.text('local_file_read').evaluate().length, 2);
     expect(find.textContaining('更早'), findsNothing);
-    expect(find.textContaining('已调用工具'), findsNothing);
   });
 
   testWidgets('询问之后的过程事件必须渲染在询问下方（按原始顺序交错）',
@@ -232,7 +236,10 @@ void main() {
     )));
     await tester.pump();
 
-    await tester.tap(find.text('旧选项'));
+    // 历史询问收成一行（问题 + 无答案胶囊），展开才见选项；点它不触发作答
+    expect(find.text('旧选项'), findsNothing,
+        reason: '已回答的询问默认收起，不占步骤流');
+    await tester.tap(find.text('旧问题'));
     await tester.pump();
     expect(picked, isEmpty, reason: '历史询问不能再被当成当前问题作答');
 
@@ -342,10 +349,11 @@ void main() {
       required AgentEvent ask,
       required bool isWaitingChoice,
       void Function(String)? onSelectChoice,
+      List<AgentEvent> extraEvents = const [],
     }) =>
         Builder(
           builder: (context) => AgentEventContent(
-            events: [ask],
+            events: [ask, ...extraEvents],
             tc: ThemeColors.of(context),
             isWaitingChoice: isWaitingChoice,
             pendingOptions: isWaitingChoice ? (ask.options ?? const []) : const [],
@@ -395,16 +403,25 @@ void main() {
       expect(picked, ['Java 17']);
     });
 
-    testWidgets('任务已推进/历史回看时选项仍然可见（此前只剩一张空卡片）',
-        (tester) async {
+    testWidgets('任务已推进/历史回看：收成一行问题+答案，点开选项仍在', (tester) async {
       await tester.pumpWidget(_wrap(askContent(
         ask: AgentEvent.ask('选哪个？', ['Java 8', 'Java 17']),
         isWaitingChoice: false,
+        extraEvents: [AgentEvent.info('👉 你选择了: Java 17')],
       )));
       await tester.pump();
 
+      // 收起态：一行问题 + 绿色答案胶囊，选项不铺开
+      expect(find.text('选哪个？'), findsOneWidget);
+      expect(find.text('Java 17'), findsOneWidget,
+          reason: '用户选了什么必须一直可见');
+      expect(find.text('Java 8'), findsNothing);
+
+      // 点开：完整问题与当时的选项仍可回看
+      await tester.tap(find.text('选哪个？'));
+      await tester.pump();
       expect(find.text('Java 8'), findsOneWidget);
-      expect(find.text('Java 17'), findsOneWidget);
+      expect(find.text('Java 17'), findsWidgets);
     });
 
     testWidgets('非等待态点选项不会回调', (tester) async {
@@ -416,6 +433,8 @@ void main() {
       )));
       await tester.pump();
 
+      await tester.tap(find.text('选哪个？')); // 先展开历史询问
+      await tester.pump();
       await tester.tap(find.text('Java 8'));
       await tester.pump();
       expect(picked, isEmpty);
@@ -478,39 +497,73 @@ void main() {
     });
   });
 
-  testWidgets('折叠头带上失败数：故障不能藏在"更早 N 步"里', (tester) async {
+  testWidgets('连续进度流合并成一行，点开才逐条铺开', (tester) async {
+    // 一次上传会产生 100 条 `上传进度: n/100 文件`；逐条铺开等于用日志把
+    // 推理和失败挤出屏幕。合并后只留一行，点开才看采样点。
     final events = <AgentEvent>[
-      ..._turn(steps: 6),
-      AgentEvent.command('pm2 restart api', id: 'bad'),
-      AgentEvent.result(
-        commandId: 'bad',
-        success: false,
-        error: 'boom',
-        toolName: 'exec_command',
-      ),
+      AgentEvent.thought('先上传文件'),
+      for (var i = 1; i <= 100; i++) AgentEvent.info('上传进度: $i/100 文件'),
     ];
-
     await tester.pumpWidget(_wrap(_content(events)));
     await tester.pump();
 
-    expect(find.textContaining('更早'), findsOneWidget);
-    expect(find.textContaining('1 失败'), findsOneWidget,
-        reason: '收起后的那一行必须带失败数');
+    expect(find.text('上传进度'), findsOneWidget);
+    expect(find.text('100/100 文件'), findsOneWidget);
+    expect(find.text('100 条'), findsOneWidget);
+    expect(find.textContaining('上传进度: 1/100'), findsNothing,
+        reason: '未展开时只占一行，不铺开 100 条采样点');
+
+    await tester.tap(find.text('上传进度'));
+    await tester.pump();
+    expect(find.textContaining('上传进度: 1/100'), findsOneWidget,
+        reason: '展开后逐条可见');
   });
 
-  testWidgets('跑完后自动收回最近 5 步', (tester) async {
-    await tester.pumpWidget(_wrap(_content(_turn(steps: 12), isLoading: true)));
+  testWidgets('不同前缀的进度不合并', (tester) async {
+    final events = <AgentEvent>[
+      AgentEvent.info('上传进度: 1/10 文件'),
+      AgentEvent.info('上传进度: 2/10 文件'),
+      AgentEvent.info('校验进度: 1/3 目录'),
+      AgentEvent.info('校验进度: 3/3 目录'),
+    ];
+    await tester.pumpWidget(_wrap(_content(events)));
     await tester.pump();
 
-    await tester.tap(find.textContaining('更早'));
+    expect(find.text('上传进度'), findsOneWidget);
+    expect(find.text('校验进度'), findsOneWidget);
+  });
+
+  testWidgets('长思考默认收成一行，点开展开全文', (tester) async {
+    final long = [
+      '第一行推理',
+      '第二行推理',
+      '第三行推理',
+      '第四行推理',
+      '第五行推理',
+      '第六行推理',
+    ].join('\n');
+    await tester.pumpWidget(_wrap(_content([AgentEvent.thought(long)])));
+    await tester.pump();
+
+    Text text() => tester.widget<Text>(find.textContaining('第六行推理'));
+    expect(text().maxLines, 1, reason: '默认收成一行，思考不挤占步骤流');
+    expect(find.byIcon(Icons.expand_more), findsOneWidget);
+
+    await tester.tap(find.textContaining('第一行推理'));
+    await tester.pump();
+    expect(text().maxLines, isNull, reason: '点开后必须能看到完整思考');
+    expect(find.byIcon(Icons.expand_less), findsOneWidget);
+  });
+
+  testWidgets('跑完后步骤仍然全部保留', (tester) async {
+    await tester.pumpWidget(_wrap(_content(_turn(steps: 12), isLoading: true)));
     await tester.pump();
     expect(find.text('local_file_read').evaluate().length, 12);
 
-    // 任务结束：运行中展开的旧步骤自动收回
     await tester.pumpWidget(_wrap(_content(_turn(steps: 12), isLoading: false)));
     await tester.pump();
-    expect(find.text('local_file_read').evaluate().length,
-        lessThanOrEqualTo(5));
+    expect(find.text('local_file_read').evaluate().length, 12,
+        reason: '结果页也要能看到完整过程');
   });
 
   testWidgets('成功结果只预览前 12 行，其余进查看完整输出', (tester) async {
@@ -549,6 +602,10 @@ void main() {
     ];
 
     await tester.pumpWidget(_wrap(_content(events)));
+    await tester.pump();
+
+    // 失败行现在默认收起，先点开再看输出预览
+    await tester.tap(find.text('终端命令'));
     await tester.pump();
 
     expect(find.textContaining('row-30'), findsWidgets);

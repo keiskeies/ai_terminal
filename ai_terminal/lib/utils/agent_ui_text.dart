@@ -304,6 +304,15 @@ class AgentUiText {
   String toolCallsCount(int n) => zh ? '已调用工具 $n 次' : '$n tool calls';
   String commandCallsCount(int n) => zh ? '$n 条命令' : '$n commands';
   String moreSteps(int n) => zh ? '更早 $n 步' : '$n earlier steps';
+
+  /// 折叠头要写清"藏了什么"：只报命令数时，用户不知道点开是 3 行还是 1 万行。
+  String thoughtCount(int n) =>
+      zh ? '$n 条推理' : (n == 1 ? '1 thought' : '$n thoughts');
+  String logCount(int n) =>
+      zh ? '$n 条系统日志' : (n == 1 ? '1 log line' : '$n log lines');
+  String progressLines(int n) => zh ? '$n 条' : '$n lines';
+  String get expandEach => zh ? '逐条' : 'Each';
+  String turnLabel(int n) => zh ? '第 $n 轮' : 'Turn $n';
   String moreActions(int n) => zh ? '还有 $n 条' : '$n more';
   String failedCommands(int n) => zh ? '$n 条命令失败' : '$n failed';
   String moreOutputLines(int n) => zh ? '还有 $n 行' : '$n more lines';

@@ -20,6 +20,10 @@ class PlanPanel extends StatefulWidget {
   /// 所以卡内自己滚动、头部固定。null = 不限高（会话流内的历史回看用法）。
   final double? maxHeight;
 
+  /// 外间距由所在布局决定：操作单里统一由模块间距控制，
+  /// 贴底/遗留流里保留默认的 8px 下边距。
+  final EdgeInsetsGeometry margin;
+
   const PlanPanel({
     super.key,
     required this.steps,
@@ -27,6 +31,7 @@ class PlanPanel extends StatefulWidget {
     this.initiallyExpanded,
     this.currentCommand,
     this.maxHeight,
+    this.margin = const EdgeInsets.only(bottom: 8),
   });
 
   @override
@@ -70,11 +75,11 @@ class _PlanPanelState extends State<PlanPanel> {
         : counts;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: widget.margin,
       decoration: BoxDecoration(
-        color: tc.dataCard,
-        borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: tc.border),
+        color: tc.agentCardFill,
+        borderRadius: BorderRadius.circular(rCard),
+        border: Border.all(color: tc.agentCardBorder, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -199,7 +204,9 @@ class _PlanPanelState extends State<PlanPanel> {
       decoration: BoxDecoration(
         // 面板底已经是 dataCard，用品牌色标"当前步"而不是再造一档灰
         color: isCurrent ? tc.brand.withValues(alpha: 0.10) : Colors.transparent,
-        borderRadius: BorderRadius.circular(rXSmall),
+        // 选中条是"胶囊"而不是表格单元：5px 在这条窄条上几乎看不出弧度，
+        // 和卡片 10px 的圆角也接不上，统一到 8px
+        borderRadius: BorderRadius.circular(rSmall),
         border: isCurrent
             ? Border.all(color: tc.brand.withValues(alpha: 0.28))
             : null,

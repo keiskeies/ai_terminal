@@ -25,7 +25,7 @@ class ModelReasoningBlock extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       decoration: BoxDecoration(
-        color: tc.dataCard,
+        color: tc.agentCardFill,
         borderRadius: BorderRadius.circular(rSmall),
         border: Border.all(color: tc.border),
       ),

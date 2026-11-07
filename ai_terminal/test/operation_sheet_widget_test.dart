@@ -124,13 +124,74 @@ void main() {
       await tester.tap(find.text('审计记录'));
       expect(auditOpened, isTrue);
       expect(find.text('过程与证据'), findsOneWidget);
-      // 有失败的命令：证据层默认展开，故障不能被折叠藏起来
+      // 失败不再自动顶开证据层：完成态优先保持干净，失败数由摘要行承担
+      expect(find.text('完整总结'), findsNothing);
+      await tester.tap(find.text('过程与证据'));
+      await tester.pump();
       expect(find.text('完整总结'), findsOneWidget);
       expect(find.text('EVIDENCE'), findsOneWidget);
 
       await tester.tap(find.text('过程与证据'));
       await tester.pump();
       expect(find.text('EVIDENCE'), findsNothing);
+    });
+
+    testWidgets('目标与用户消息相同时可省略复述，状态仍然可见', (tester) async {
+      // 会话里目标就是上一条用户消息，两段同样的大字叠着只是噪音；
+      // 省略后状态胶囊必须挪到结论行，不能连"完成/失败"一起消失。
+      const report = OperationReport(
+        operationId: 'op-echo',
+        goal: '把 www 目录上传到两台服务器',
+        elapsedSeconds: 30,
+        stepIndex: 1,
+        commandSuccessCount: 2,
+        commandFailureCount: 0,
+        conclusion: '已上传完成',
+        finishState: 'success',
+      );
+
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => OperationSheet(
+          report: report,
+          tc: ThemeColors.of(context),
+          markdownBuilder: (text, tc) => Text(text),
+          evidenceBuilder: () => const SizedBox.shrink(),
+          hasEvidence: false,
+          showGoal: false,
+        ),
+      )));
+
+      expect(find.text('把 www 目录上传到两台服务器'), findsNothing);
+      expect(find.text('已上传完成'), findsOneWidget);
+      expect(find.text('完成'), findsOneWidget);
+    });
+
+    testWidgets('证据摘要写出构成，不只报命令数', (tester) async {
+      const report = OperationReport(
+        operationId: 'op-ev',
+        goal: '同步 www 目录',
+        elapsedSeconds: 79,
+        stepIndex: 2,
+        commandSuccessCount: 36,
+        commandFailureCount: 0,
+        conclusion: '文件已同步',
+        finishState: 'success',
+      );
+
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => OperationSheet(
+          report: report,
+          tc: ThemeColors.of(context),
+          markdownBuilder: (text, tc) => Text(text),
+          evidenceBuilder: () => const Text('EVIDENCE'),
+          evidenceSummary: '36 条命令 · 2 条推理 · 12 条系统日志',
+        ),
+      )));
+
+      // 结论文本里的命令数由 meta 行渲染，摘要行只钉住新增的构成
+      expect(find.textContaining('2 条推理'), findsOneWidget);
+      expect(find.textContaining('12 条系统日志'), findsOneWidget,
+          reason: '折叠头要说清藏了什么，用户才判断得出值不值得点开');
     });
 
     testWidgets('renders answer body in the conclusion layer, not the fold',
@@ -561,6 +622,10 @@ void main() {
         ),
       )));
 
+      // 失败行默认收起，先点开这一行
+      await tester.tap(find.text('终端命令'));
+      await tester.pump();
+
       expect(find.text('重连'), findsOneWidget);
       expect(find.text('让 AI 重试'), findsOneWidget);
 
@@ -608,6 +673,10 @@ void main() {
       await tester.pump();
 
       expect(tester.takeException(), isNull);
+      // 失败行默认收起：先点开这一行再看结果详情
+      await tester.tap(find.text('终端命令'));
+      await tester.pump();
+
       // 时间线里这一行显示的是真实结果，不再是命令块的"已运行"状态
       expect(find.text('失败'), findsWidgets);
       expect(find.textContaining('权限不足'), findsWidgets);
@@ -809,6 +878,24 @@ void main() {
           find.textContaining('130 tok/s', findRichText: true), findsOneWidget);
     });
 
+    testWidgets('轮是会话轮次，步把模型请求与命令执行一起算', (tester) async {
+      await pump(
+        tester,
+        AgentTask(
+          id: 'm1b',
+          goal: '免密登录',
+          rounds: 1,
+          aiCalls: 23,
+          successCount: 3,
+          failureCount: 1,
+        ),
+      );
+
+      // 23 次模型请求 + 4 条命令（3 成功 1 失败）= 27 步；轮仍是第 1 轮
+      expect(find.textContaining('1 轮', findRichText: true), findsOneWidget);
+      expect(find.textContaining('27 步', findRichText: true), findsOneWidget);
+    });
+
     testWidgets('含估算时带 ≈，并且不给速率', (tester) async {
       await pump(
         tester,
@@ -895,7 +982,7 @@ void main() {
           find.textContaining('缓存命中 0%', findRichText: true), findsOneWidget);
     });
 
-    testWidgets('步数 = 执行过的命令/工具数，排在轮之后', (tester) async {
+    testWidgets('步 = 模型请求 + 命令执行，排在轮之后', (tester) async {
       await pump(
         tester,
         AgentTask(
@@ -908,14 +995,14 @@ void main() {
         ),
       );
 
-      // stepIndex 是引擎循环计数，与"轮"几乎相等，并排显示等于同一件事说两遍；
-      // 参考界面的 `11 轮 418 步` 里那个大数是执行数。
+      // 「步」不再只数命令：模型请求（aiCalls）+ 成功/失败/被拦截的命令 + 工具调用。
+      // 「轮」是会话轮次，所以步数只会大于等于轮数；stepIndex 不参与这两个数字。
       expect(find.textContaining('11 轮', findRichText: true), findsOneWidget);
       expect(find.textContaining('418 步', findRichText: true), findsOneWidget);
       expect(find.textContaining('12 步', findRichText: true), findsNothing);
     });
 
-    testWidgets('一条命令都没执行时不渲染 0 步', (tester) async {
+    testWidgets('没有任何活动时不渲染 0 步', (tester) async {
       await pump(
         tester,
         AgentTask(id: 'm5c', goal: '部署 Nginx', rounds: 1, stepIndex: 1),
@@ -1156,6 +1243,9 @@ void main() {
 
     testWidgets('历史回合强制收起：上一轮被展开过的过程自动收掉', (tester) async {
       await tester.pumpWidget(sheet(report(failures: 1)));
+      // 默认收起：先手动展开，才能验证"变成历史后被强制收起"
+      await tester.tap(find.text('过程与证据'));
+      await tester.pump();
       expect(find.text('EVIDENCE'), findsOneWidget);
 
       // 新一轮开始，这一轮变成历史

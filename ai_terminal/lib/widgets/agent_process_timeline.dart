@@ -32,8 +32,13 @@ class AgentProcessTimeline extends StatefulWidget {
   /// 时间线自己只负责"一行摘要 + 点开"，不复制渲染逻辑。
   final Widget Function(BuildContext context, AgentEvent result) resultBuilder;
 
-  /// 折叠后仍展示的尾部行数
-  final int visibleTail;
+  /// 正在流式产生的模型原生推理（reasoning_content）。
+  ///
+  /// 它渲染成时间线**末尾**的一行思考，而不是浮在整条回答顶部的独立块：
+  /// 思考本来就发生在命令之前、答案之后的位置上，浮在顶部会让人以为它属于
+  /// 上一轮；步骤结束时这段推理会被固化成同位置的思考事件，两者无缝衔接，
+  /// 不会出现"闪一下就没了"。
+  final String liveReasoning;
 
   const AgentProcessTimeline({
     super.key,
@@ -48,7 +53,7 @@ class AgentProcessTimeline extends StatefulWidget {
     this.onConfirmCommand,
     this.onRejectCommand,
     required this.resultBuilder,
-    this.visibleTail = 5,
+    this.liveReasoning = '',
   });
 
   @override
@@ -56,28 +61,25 @@ class AgentProcessTimeline extends StatefulWidget {
 }
 
 class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
-  bool _expanded = false;
-
-  /// 用户手动切换过的行（key 用 command 事件 id，避免位置变化时错位）。
-  /// 没记录过的行走默认策略：出问题的行默认展开。
+  /// 用户手动切换过的命令/工具行（key 用事件 id，避免位置变化时错位）
   final Map<String, bool> _rowOpen = {};
 
-  @override
-  void didUpdateWidget(covariant AgentProcessTimeline oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    // 跑完后收回"最近 5 步"：运行中展开的旧步骤不该在结果页继续占屏
-    if (oldWidget.isLoading && !widget.isLoading) _expanded = false;
-  }
+  /// 被展开的长思考（默认 3 行，点开看全文）
+  final Set<String> _openThoughts = {};
 
-  /// 默认展开策略：
-  /// - 失败的结果默认展开 —— 把错误和重试按钮藏进一次点击里，用户会以为任务顺利
-  /// - 多机结果默认展开 —— 主机矩阵是"哪台没成"的唯一答案
-  /// - 成功且已收尾的行才收成一行摘要
+  /// 展开逐条的进度组（key 用组内第一条事件 id）
+  final Set<String> _openProgress = {};
+
+  /// `上传进度: 1/100 文件` —— 前缀 + 分子/分母 + 单位
+  static final RegExp _progressPattern =
+      RegExp(r'^(.{2,}?)[：:]\s*(\d+)\s*/\s*(\d+)(.*)$');
+
+  /// 默认展开策略：**只有还没出结果的行**展开（执行/确认/看变更影响都在里面）。
+  ///
+  /// 失败行不再自动铺开 —— 一行「✗ 失败」已经说明问题，错误输出点开再看，
+  /// 十几条失败同时摊开会把真正的流程挤出屏幕。
   bool _rowOpenedByDefault(AgentEvent commandEvent, AgentEvent? result) {
-    if (result == null) return true;
-    if (result.success != true) return true;
-    if (result.hostResults != null && result.hostResults!.length > 1) return true;
-    return false;
+    return result == null;
   }
 
   bool _isOpen(AgentEvent commandEvent, AgentEvent? result) {
@@ -106,14 +108,26 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
     // 先把事件折成"行"：result 不再独立成行，而是挂到它的 command 上
     final rows = <_TimelineRow>[];
     final orphans = <AgentEvent>[];
+    // 相邻思考只留最后一条：双语模型会在 reasoning_content 里用英文推理、
+    // 又在「思考:」行里用中文写一遍，两条相邻地挤在一起就是"中英双译"。
+    // 中间没有插任何动作的连续思考是同一步的重复表述，最后的才是定稿。
+    _TimelineRow? pendingThought;
+    void flushThought() {
+      final p = pendingThought;
+      if (p != null) rows.add(p);
+      pendingThought = null;
+    }
+
     for (final e in events) {
       switch (e.type) {
         case AgentEventType.thought:
           if ((e.text ?? '').trim().isNotEmpty) {
-            rows.add(_TimelineRow.thought(e));
+            flushThought();
+            pendingThought = _TimelineRow.thought(e);
           }
           break;
         case AgentEventType.command:
+          flushThought();
           rows.add(_TimelineRow.call(e, result: resultMap[e.id]));
           break;
         case AgentEventType.result:
@@ -124,10 +138,12 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
           }
           break;
         case AgentEventType.ask:
+          flushThought();
           rows.add(_TimelineRow.interactive(e));
           break;
         case AgentEventType.info:
           if ((e.text ?? '').trim().isNotEmpty) {
+            flushThought();
             rows.add(_TimelineRow.note(e));
           }
           break;
@@ -139,42 +155,19 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
           break;
       }
     }
+    flushThought();
 
-    // 哪些行可以被折叠：已出结果、且不是当前正在跑/等确认的行
-    bool collapsible(_TimelineRow r) {
-      switch (r.kind) {
-        case _RowKind.thought:
-        case _RowKind.note:
-          return true;
-        case _RowKind.call:
-          final cmd = r.event.command ?? '';
-          if (r.result != null) return true;
-          if (widget.executingCommand == cmd) return false;
-          if (widget.pendingConfirmCommand == cmd) return false;
-          // 没有结果也没在执行：要么已跳过，要么在等确认 —— 保守起见不折
-          return false;
-        case _RowKind.interactive:
-          return false;
-      }
-    }
+    // 连续的同前缀进度（`上传进度: 1/100 文件` … `100/100`）合并成一行：
+    // 它们是一次操作的 100 个采样点，逐条铺开会把真正的推理和失败挤走。
+    final merged = _mergeProgress(rows);
+    rows
+      ..clear()
+      ..addAll(merged);
 
-    final foldableIndexes = <int>[
-      for (var i = 0; i < rows.length; i++)
-        if (collapsible(rows[i])) i
-    ];
-    final hiddenCount = _expanded
-        ? 0
-        : (foldableIndexes.length - widget.visibleTail)
-            .clamp(0, foldableIndexes.length);
-    final hidden = foldableIndexes.take(hiddenCount).toSet();
-
+    // 每个步骤都留在原位：不做「更早 N 步」折叠。
+    // 上面已经把连续进度合并成一条，剩下的都是用户要看的真实动作。
     final children = <Widget>[];
-    // 只有真的藏了行才出折叠头部，否则会出现"更早 0 步"这种没意义的控件
-    if (hidden.isNotEmpty) {
-      children.add(_header(rows, hidden));
-    }
     for (var i = 0; i < rows.length; i++) {
-      if (hidden.contains(i)) continue;
       final r = rows[i];
       switch (r.kind) {
         case _RowKind.call:
@@ -183,6 +176,9 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
         case _RowKind.thought:
         case _RowKind.note:
           children.add(_textRow(r));
+          break;
+        case _RowKind.progress:
+          children.add(_progressRow(r));
           break;
         case _RowKind.interactive:
           children.add(_AskRow(event: r.event, tc: widget.tc));
@@ -193,6 +189,15 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
       children.add(_resultFallback(o));
     }
 
+    // 实时推理：接在时间线末尾，位置就是它真实发生的地方（下一步命令之前）。
+    // 步骤结束时这段推理会被固化成同位置的思考事件，两者无缝衔接。
+    final live = widget.liveReasoning.trim();
+    if (live.isNotEmpty) {
+      children.add(_textRow(_TimelineRow.thought(
+        AgentEvent.thought(live, id: 'live_reasoning'),
+      )));
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: children,
@@ -201,54 +206,6 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
 
 
   /// 头部：一行统计 + 展开/收起（仅在确实藏了行时渲染）
-  Widget _header(List<_TimelineRow> rows, Set<int> hidden) {
-    final tc = widget.tc;
-    final ui = AgentUiText.of(context);
-    final calls = rows.where((r) => r.kind == _RowKind.call).length;
-    final toolCalls = rows
-        .where((r) => r.kind == _RowKind.call && (r.event.toolName != null))
-        .length;
-    final failures = rows
-        .where((r) => r.kind == _RowKind.call && r.result?.success == false)
-        .length;
-    final parts = <String>[
-      if (toolCalls > 0) ui.toolCallsCount(toolCalls),
-      if (calls - toolCalls > 0) ui.commandCallsCount(calls - toolCalls),
-      // 失败数字必须出现在收起后的那一行里，否则"过程已折叠"会把故障藏起来
-      if (failures > 0) ui.failureCount(failures),
-    ];
-    final label = _expanded
-        ? ui.collapseProcess
-        : '${parts.isEmpty ? ui.processFolded : parts.join(' · ')}'
-            ' · ${ui.moreSteps(hidden.length)}';
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(rXSmall),
-      onTap: () => setState(() => _expanded = !_expanded),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 5),
-        child: Row(
-          children: [
-            Icon(_expanded ? Icons.expand_less : Icons.chevron_right,
-                size: 15, color: failures > 0 ? tc.warn : tc.textMuted),
-            const SizedBox(width: 4),
-            Expanded(
-              child: Text(label,
-                  style: TextStyle(
-                      color: failures > 0 ? tc.warn : tc.textSub,
-                      fontSize: fMicro)),
-            ),
-            if (hidden.isNotEmpty)
-              Text(_expanded ? ui.collapse : ui.expandProcess,
-                  style: TextStyle(
-                      color: failures > 0 ? tc.warn : tc.textSub,
-                      fontSize: fMicro)),
-          ],
-        ),
-      ),
-    );
-  }
-
   /// 工具/命令行：一行摘要 + 尾部状态与耗时，点击展开参数与输出
   Widget _callRow(_TimelineRow row) {
     final tc = widget.tc;
@@ -289,11 +246,16 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
     final duration = result.durationMs;
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 2),
+      margin: const EdgeInsets.symmetric(vertical: 3),
       decoration: BoxDecoration(
-        color: tc.terminalOutput.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(rXSmall),
-        border: Border.all(color: tc.border.withValues(alpha: 0.6), width: 0.5),
+        // 与其它 AI 卡片一致：透明填充 + 1px 边框。命令行原先是浅色块，
+        // 在已经去掉气泡的回答里会变成一排浮起的小卡。
+        color: tc.agentCardFill,
+        // 命令行是"卡片级"容器，圆角与执行清单/结果卡统一用 10px：
+        // 5px 在 25px 高的细边框行上接近直角，看着像表格而不是卡片
+        borderRadius: BorderRadius.circular(rCard),
+        // 与其它 AI 卡片同一套边框线（正文 / 结果卡 / 执行清单）
+        border: Border.all(color: tc.agentCardBorder, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -302,7 +264,7 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
           InkWell(
             onTap: () => _toggleRow(e, result),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               child: Row(
                 children: [
                   Icon(
@@ -385,7 +347,7 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
   Widget _detail(AgentEvent commandEvent, AgentEvent result) {
     final tc = widget.tc;
     return Container(
-      padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: tc.border, width: 0.5)),
       ),
@@ -401,7 +363,7 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
               color: tc.textSub,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: pSmall),
           widget.resultBuilder(context, result),
         ],
       ),
@@ -412,41 +374,244 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
     final tc = widget.tc;
     final text = (row.event.text ?? '').trim();
     final isNote = row.kind == _RowKind.note;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 3, right: 6),
-            child: Icon(
-              isNote ? Icons.info_outline : Icons.psychology_outlined,
-              size: 12,
-              color: tc.textMuted,
+
+    // 推理和系统日志必须长得不一样：原来两者都是「小图标 + 淡色两行」，
+    // 63% 的进度/通知把模型真正的判断淹掉了。
+    // - 推理：正文色、大一号、默认三行可展开，是"为什么这么做"；
+    // - 日志：缩进一档、单行 micro 弱色，只当背景噪声。
+    if (isNote) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(23, 2, 2, 2),
+        child: Row(
+          children: [
+            Container(
+              width: 3,
+              height: 3,
+              margin: const EdgeInsets.only(right: 7),
+              decoration: BoxDecoration(
+                color: tc.textMuted.withValues(alpha: 0.7),
+                shape: BoxShape.circle,
+              ),
             ),
-          ),
-          Expanded(
-            child: Text(
-              text,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+            Expanded(
+              child: Text(
+                text,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: tc.textMuted,
+                  fontSize: fMicro,
+                  height: 1.35,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
+      );
+    }
+    // 长思考默认收成一行、点开看全文：完整内容必须能拿到，但不能默认
+    // 让几行推理把命令挤下去。短思考一行本来就装得下。
+    final opened = _openThoughts.contains(row.event.id);
+    final long = text.length > 60 || text.split('\n').length > 2;
+    return InkWell(
+      borderRadius: BorderRadius.circular(rSmall),
+      onTap: long
+          ? () => setState(() {
+                if (!_openThoughts.remove(row.event.id)) {
+                  _openThoughts.add(row.event.id);
+                }
+              })
+          : null,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(2, 4, 2, 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2, right: 6),
+              child: Icon(
+                Icons.psychology_outlined,
+                size: 12,
+                color: tc.brand.withValues(alpha: 0.85),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                text,
+                maxLines: opened ? null : 1,
+                overflow:
+                    opened ? TextOverflow.clip : TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: tc.textBody,
+                  fontSize: fSmall,
+                  height: 1.45,
+                ),
+              ),
+            ),
+            if (long)
+              Padding(
+                padding: const EdgeInsets.only(left: 4, top: 1),
+                child: Icon(
+                  opened ? Icons.expand_less : Icons.expand_more,
+                  size: 13,
+                  color: tc.textMuted,
+                ),
+              ),
+          ],
+        ),
       ),
     );
+  }
+
+  /// 连续进度合并后的一行：前缀 + 进度条 + `100/100 文件` + 条数
+  ///
+  /// 点开才逐条铺开，默认只占一行——一次上传的 100 个采样点不该等于 100 行。
+  Widget _progressRow(_TimelineRow row) {
+    final tc = widget.tc;
+    final ui = AgentUiText.of(context);
+    final group = row.events;
+    final first =
+        _progressPattern.firstMatch((group.first.text ?? '').trim());
+    final last = _progressPattern.firstMatch((group.last.text ?? '').trim());
+    final prefix = (first?.group(1) ?? '').trim();
+    final current = int.tryParse(last?.group(2) ?? '') ?? 0;
+    final total = int.tryParse(last?.group(3) ?? '') ?? 0;
+    final suffix = (last?.group(4) ?? '').trim();
+    final opened = _openProgress.contains(row.event.id);
+    final fraction =
+        total > 0 ? (current / total).clamp(0.0, 1.0).toDouble() : 0.0;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(rXSmall),
+      onTap: () => setState(() {
+        if (!_openProgress.remove(row.event.id)) {
+          _openProgress.add(row.event.id);
+        }
+      }),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(23, 3, 2, 3),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    prefix,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: tc.textSub,
+                      fontSize: fMicro,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 54,
+                  height: 3,
+                  child: Stack(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: tc.border,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      FractionallySizedBox(
+                        widthFactor: fraction,
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: tc.brand.withValues(alpha: 0.75),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '$current/$total${suffix.isEmpty ? '' : ' $suffix'}',
+                  style: TextStyle(
+                    color: tc.textSub,
+                    fontSize: fMicro,
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: kMonoFontFallback,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  ui.progressLines(group.length),
+                  style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+                ),
+                const SizedBox(width: 2),
+                Icon(
+                  opened ? Icons.expand_less : Icons.expand_more,
+                  size: 13,
+                  color: tc.textMuted,
+                ),
+              ],
+            ),
+            if (opened)
+              ...group.map((e) => Padding(
+                    padding: const EdgeInsets.only(left: 2, top: 2),
+                    child: Text(
+                      (e.text ?? '').trim(),
+                      style: TextStyle(
+                        color: tc.textMuted,
+                        fontSize: fMicro,
+                        height: 1.4,
+                      ),
+                    ),
+                  )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 把连续的同前缀进度合成一行；只有一条时保持原样
+  List<_TimelineRow> _mergeProgress(List<_TimelineRow> rows) {
+    final out = <_TimelineRow>[];
+    var i = 0;
+    while (i < rows.length) {
+      final row = rows[i];
+      final first = row.kind == _RowKind.note
+          ? _progressPattern.firstMatch((row.event.text ?? '').trim())
+          : null;
+      if (first == null) {
+        out.add(row);
+        i++;
+        continue;
+      }
+      final prefix = first.group(1)!.trim();
+      final group = <AgentEvent>[row.event];
+      var j = i + 1;
+      while (j < rows.length && rows[j].kind == _RowKind.note) {
+        final next =
+            _progressPattern.firstMatch((rows[j].event.text ?? '').trim());
+        if (next == null || next.group(1)!.trim() != prefix) break;
+        group.add(rows[j].event);
+        j++;
+      }
+      out.add(group.length > 1 ? _TimelineRow.progress(group) : row);
+      i = j;
+    }
+    return out;
   }
 
   /// 没有父命令的结果（历史数据兜底）
   Widget _resultFallback(AgentEvent result) {
     final tc = widget.tc;
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 2),
-      padding: const EdgeInsets.all(8),
+      margin: const EdgeInsets.symmetric(vertical: 3),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: tc.terminalOutput,
-        borderRadius: BorderRadius.circular(rXSmall),
+        color: tc.agentCardFill,
+        borderRadius: BorderRadius.circular(rCard),
         border: Border.all(color: tc.border, width: 0.5),
       ),
       child: Row(
@@ -476,15 +641,32 @@ class _TimelineRow {
   final AgentEvent event;
   final AgentEvent? result;
 
-  const _TimelineRow.thought(this.event) : kind = _RowKind.thought, result = null;
-  const _TimelineRow.note(this.event) : kind = _RowKind.note, result = null;
+  /// 进度组内的原始事件（仅 progress 行非空）
+  final List<AgentEvent> events;
+
+  const _TimelineRow.thought(this.event)
+      : kind = _RowKind.thought,
+        result = null,
+        events = const [];
+  const _TimelineRow.note(this.event)
+      : kind = _RowKind.note,
+        result = null,
+        events = const [];
   const _TimelineRow.interactive(this.event)
       : kind = _RowKind.interactive,
+        result = null,
+        events = const [];
+  const _TimelineRow.call(this.event, {this.result})
+      : kind = _RowKind.call,
+        events = const [];
+  _TimelineRow.progress(List<AgentEvent> group)
+      : kind = _RowKind.progress,
+        events = group,
+        event = group.first,
         result = null;
-  const _TimelineRow.call(this.event, {this.result}) : kind = _RowKind.call;
 }
 
-enum _RowKind { thought, note, call, interactive }
+enum _RowKind { thought, note, progress, call, interactive }
 
 /// 询问行：保持可点，不参与折叠
 class _AskRow extends StatelessWidget {
@@ -495,11 +677,11 @@ class _AskRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.symmetric(vertical: pSmall),
+      padding: const EdgeInsets.all(pCompact),
       decoration: BoxDecoration(
         color: tc.warn.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(rXSmall),
+        borderRadius: BorderRadius.circular(rCard),
         border: Border.all(color: tc.warn.withValues(alpha: 0.3), width: 0.5),
       ),
       child: Text(

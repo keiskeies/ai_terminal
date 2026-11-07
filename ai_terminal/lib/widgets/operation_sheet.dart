@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
@@ -11,9 +10,7 @@ import '../models/operation_report.dart';
 import '../models/token_usage.dart';
 import '../models/plan_step.dart';
 import '../utils/agent_ui_text.dart';
-import '../utils/conversation_export.dart';
 import 'plan_panel.dart';
-import '../core/app_toast.dart';
 
 /// 操作单：一轮 Agent 任务的结论 + 元数据 + 可折叠证据
 ///
@@ -49,6 +46,28 @@ class OperationSheet extends StatelessWidget {
   /// 是否为当前进行中的这一轮；历史回合的过程层默认收起
   final bool isLiveTurn;
 
+  /// 证据构成（`12 条命令 · 2 条推理 · 30 条系统日志`），由调用方按真实事件统计。
+  /// 只报"12 条命令"时用户不知道点开是 12 行还是 1 万行。
+  final String? evidenceSummary;
+
+  /// 是否在结果层复述任务目标。
+  /// 会话里目标就是上一条用户消息时，两段同样的大字叠在一起只是噪音；
+  /// 由调用方比对后决定，独立展示时仍保留目标。
+  final bool showGoal;
+
+  /// 过程已经按时间顺序铺在正文流里时，底部不再出现「过程与证据」折叠。
+  final bool showEvidence;
+
+  /// 正文由调用方在结果卡之前渲染时，这里不再重复一遍。
+  final bool showAnswerBody;
+
+  /// 正文与结论合并渲染时，结果卡不再重复一段「结论」；
+  /// 状态、指标、变更与建议下一步仍然保留。
+  final bool showConclusion;
+
+  /// 执行清单由调用方放到整条回答最底部时，这里不再插入。
+  final bool showPlan;
+
   const OperationSheet({
     super.key,
     required this.report,
@@ -63,6 +82,12 @@ class OperationSheet extends StatelessWidget {
     this.onOpenAudit,
     this.onContinueOperation,
     this.isLiveTurn = true,
+    this.evidenceSummary,
+    this.showGoal = true,
+    this.showEvidence = true,
+    this.showAnswerBody = true,
+    this.showConclusion = true,
+    this.showPlan = true,
   });
 
   @override
@@ -76,78 +101,149 @@ class OperationSheet extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 目标头
+        // 结果层：目标 + 结论 + 指标 + 状态合成一块。
+        // 原来"目标头"和"结论卡"是两套容器，下面还跟着回答正文，同一件事讲三遍；
+        // 合成一块后，第一眼看到的就是"这件事做成了什么"。
         Container(
-          padding: const EdgeInsets.fromLTRB(0, 2, 0, 10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 3,
-                height: 34,
-                margin: const EdgeInsets.only(top: 2),
-                decoration: BoxDecoration(
-                  color: statusColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      report.goal.isEmpty ? ui.taskRecord : report.goal,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: tc.textMain,
-                        fontSize: fBody,
-                        fontWeight: FontWeight.w600,
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    _buildMetaLine(ui),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: statusColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(rFull),
-                  border: Border.all(color: statusColor.withValues(alpha: 0.3)),
-                ),
-                child: Text(
-                  statusLabel,
-                  style: TextStyle(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            color: tc.agentCardFill,
+            borderRadius: BorderRadius.circular(rCard),
+            border: Border.all(color: tc.agentCardBorder, width: 1),
+          ),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(
+                  width: 3,
+                  decoration: BoxDecoration(
                     color: statusColor,
-                    fontSize: fMicro,
-                    fontWeight: FontWeight.w600,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (showGoal) ...[
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                report.goal.isEmpty
+                                    ? ui.taskRecord
+                                    : report.goal,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: tc.textMain,
+                                  fontSize: fBody,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _statusPill(statusColor, statusLabel),
+                          ],
+                        ),
+                        const SizedBox(height: pSmall),
+                      ],
+                      if (showConclusion) ...[
+                        Row(
+                          children: [
+                            Text(
+                              ui.conclusion,
+                              style: TextStyle(
+                                color: tc.textSub,
+                                fontSize: fMicro,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            if (report.verified)
+                              _badge(ui.verifiedEvidence, tc.ok)
+                            else if (report.aiGenerated)
+                              _badge(ui.aiConclusion, tc.textSub),
+                            const Spacer(),
+                            // 目标不复述时，状态要挪到这一行，否则卡片没有状态标记
+                            if (!showGoal) ...[
+                              _statusPill(statusColor, statusLabel),
+                              const SizedBox(width: 6),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: pXSmall),
+                        markdownBuilder(
+                          report.conclusion.isEmpty
+                              ? UiText.t('任务已结束，详见执行记录。',
+                                  'Task finished. See the execution record for details.')
+                              : report.conclusion,
+                          tc,
+                        ),
+                        // 结论走 Markdown，自带 4px 底距；这里再补 4，
+                        // 视觉上就是 8，和"结论标签 → 正文"的 4 拉开一档
+                        const SizedBox(height: pXSmall),
+                      ],
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // 结论整块隐藏时，状态胶囊落到这一行的最前面
+                          if (!showGoal && !showConclusion) ...[
+                            _statusPill(statusColor, statusLabel),
+                            const SizedBox(width: pSmall),
+                          ],
+                          Expanded(child: _buildMetaLine(ui)),
+                          // 继续任务贴着"失败"状态放：它原来是单独一行右对齐，
+                          // 上下各 12px，结果在清单和过程之间留出一条空带
+                          if (!report.isSuccess && onContinueOperation != null) ...[
+                            const SizedBox(width: pSmall),
+                            _buildContinueButton(ui),
+                          ],
+                        ],
+                      ),
+                      if (report.stateBadges.isNotEmpty) ...[
+                        const SizedBox(height: pSmall),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children:
+                              report.stateBadges.map(_buildStateBadge).toList(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
 
         // 执行清单（模型声明）
-        if (planSteps.isNotEmpty)
+        if (showPlan && planSteps.isNotEmpty) ...[
+          const SizedBox(height: pModule),
           PlanPanel(
             steps: planSteps,
             tc: tc,
             // 历史回合只留进度一行，展开状态不跨回合记忆
             initiallyExpanded: isLiveTurn ? null : false,
+            // 外间距由这里统一给，避免卡片自己带下边距导致节奏忽宽忽窄
+            margin: EdgeInsets.zero,
           ),
-        if (planSteps.isNotEmpty &&
+        ],
+        if (showPlan &&
+            planSteps.isNotEmpty &&
             report.isSuccess &&
             planSteps.any((s) =>
                 s.status == PlanStepStatus.inProgress ||
                 s.status == PlanStepStatus.pending))
           Padding(
-            padding: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.only(top: pSmall),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -167,110 +263,16 @@ class OperationSheet extends StatelessWidget {
             ),
           ),
 
-        // 结论
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          decoration: BoxDecoration(
-            color: tc.dataCard,
-            borderRadius: BorderRadius.circular(rSmall),
-            border: Border.all(color: tc.border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    ui.conclusion,
-                    style: TextStyle(
-                      color: tc.textSub,
-                      fontSize: fMicro,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  if (report.verified)
-                    _badge(ui.verifiedEvidence, tc.ok)
-                  else if (report.aiGenerated)
-                    _badge(ui.aiConclusion, tc.textSub),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () => _copyConclusion(context),
-                    child: Padding(
-                      padding: const EdgeInsets.all(2),
-                      child: Icon(Icons.copy, size: 12, color: tc.textSub),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              markdownBuilder(
-                report.conclusion.isEmpty
-                    ? UiText.t('任务已结束，详见执行记录。', 'Task finished. See the execution record for details.')
-                    : report.conclusion,
-                tc,
-              ),
-              // 回答正文是结论层的正文，不是证据：放在结论卡片下方直接可见，
-              // 折叠进"过程与证据"会让用户看不到 Agent 到底答了什么。
-              if (report.stateBadges.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: report.stateBadges.map(_buildStateBadge).toList(),
-                ),
-              ],
-            ],
-          ),
-        ),
-
         // 完整回答正文：与"结论 + 验证徽标"分开，避免徽标看起来像在给整篇正文背书
-        if (answerBody != null)
+        if (showAnswerBody && answerBody != null)
           Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 2),
+            padding: const EdgeInsets.only(top: pModule),
             child: markdownBuilder(answerBody, tc),
           ),
 
-        // 中断/失败后继续
-        if (!report.isSuccess && onContinueOperation != null) ...[
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: GestureDetector(
-              onTap: onContinueOperation,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: tc.brand.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(rXSmall),
-                  border: Border.all(color: tc.brand.withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.play_circle_outline, size: 13, color: tc.brand),
-                    const SizedBox(width: 4),
-                    Text(
-                      ui.continueTask,
-                      style: TextStyle(
-                        color: tc.brand,
-                        fontSize: fMicro,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-
         // 变更与回滚
         if (report.changes.isNotEmpty) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: pModule),
           Row(
             children: [
               Text(
@@ -311,7 +313,7 @@ class OperationSheet extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: pXSmall + 2),
           ...report.changes.take(5).map(_buildChangeRow),
           if (report.changes.length > 5)
             Padding(
@@ -325,23 +327,24 @@ class OperationSheet extends StatelessWidget {
 
         // 建议下一步
         if (report.nextActions.isNotEmpty) ...[
-          const SizedBox(height: 8),
+          const SizedBox(height: pModule),
           _NextActions(actions: report.nextActions, tc: tc),
         ],
 
-        const SizedBox(height: 6),
-
-        // 证据层
-        _ExpandableEvidence(
-          tc: tc,
-          summary: _evidenceSummary(ui),
-          details: report.details,
-          markdownBuilder: markdownBuilder,
-          hasEvidence: hasEvidence,
-          evidenceBuilder: evidenceBuilder,
-          failureCount: report.commandFailureCount,
-          forceCollapsed: !isLiveTurn,
-        ),
+        // 证据层：过程已经按时间顺序铺在正文里时整块省略
+        if (showEvidence) ...[
+          const SizedBox(height: pModule),
+          _ExpandableEvidence(
+            tc: tc,
+            summary: evidenceSummary ?? _evidenceSummary(ui),
+            details: report.details,
+            markdownBuilder: markdownBuilder,
+            hasEvidence: hasEvidence,
+            evidenceBuilder: evidenceBuilder,
+            failureCount: report.commandFailureCount,
+            forceCollapsed: !isLiveTurn,
+          ),
+        ],
       ],
     );
   }
@@ -360,22 +363,6 @@ class OperationSheet extends StatelessWidget {
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
     return normalize(a) == normalize(b);
-  }
-
-  void _copyConclusion(BuildContext context) {
-    Clipboard.setData(ClipboardData(text: formatOperationReportCopy(report)));
-    clearTopToast();
-    showTopSnackBar(context, 
-      SnackBar(
-        content: Text(
-          AgentUiText.of(context).operationCopied,
-          style: const TextStyle(fontSize: fSmall),
-        ),
-        duration: const Duration(seconds: 1),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-      ),
-    );
   }
 
   Color _statusColor() {
@@ -491,11 +478,11 @@ class OperationSheet extends StatelessWidget {
   Widget _buildChangeRow(OperationChange change) {
     final rolledBack = rolledBackChangeIds.contains(change.id);
     return Container(
-      margin: const EdgeInsets.only(bottom: 5),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: tc.dataCard,
-        borderRadius: BorderRadius.circular(rXSmall),
+        color: tc.agentCardFill,
+        borderRadius: BorderRadius.circular(rSmall),
         border: Border.all(color: tc.border),
       ),
       child: Row(
@@ -687,6 +674,54 @@ class OperationSheet extends StatelessWidget {
     return ui.thinkingAndExecution;
   }
 
+  Widget _buildContinueButton(AgentUiText ui) {
+    return GestureDetector(
+      onTap: onContinueOperation,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: tc.brand.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(rSmall),
+          border: Border.all(color: tc.brand.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.play_circle_outline, size: 12, color: tc.brand),
+            const SizedBox(width: 4),
+            Text(
+              ui.continueTask,
+              style: TextStyle(
+                color: tc.brand,
+                fontSize: fMicro,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _statusPill(Color color, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(rFull),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: fMicro,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
   Widget _badge(String text, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -809,7 +844,8 @@ class _ExpandableEvidence extends StatefulWidget {
   final bool hasEvidence;
   final Widget Function() evidenceBuilder;
 
-  /// 失败命令数：>0 时默认展开并给警示色——把故障藏进一次点击里，用户会以为任务顺利
+  /// 失败命令数：>0 时摘要行用警示色并显示失败数，但过程层仍保持收起，
+  /// 避免把故障细节平铺到操作单下面；用户点开摘要即可看到全部证据。
   final int failureCount;
 
   /// 非当前轮的历史回合强制收起，避免打开旧会话满屏过程
@@ -831,15 +867,18 @@ class _ExpandableEvidence extends StatefulWidget {
 }
 
 class _ExpandableEvidenceState extends State<_ExpandableEvidence> {
-  late bool _expanded = widget.failureCount > 0;
+  // 完成态与历史回合都默认收起，只留一行摘要：把 14 张命令卡平铺在操作单下面
+  // 会把结论和执行清单挤到视口之外。失败信息仍由摘要行的警示色与失败数承担，
+  // 用户需要细节时点一下即可，故障并没有被藏进"看不见"的地方。
+  late bool _expanded = false;
 
   @override
   void didUpdateWidget(covariant _ExpandableEvidence oldWidget) {
     super.didUpdateWidget(oldWidget);
     // 新一轮开始：上一轮被用户展开过的过程自动收起
     if (widget.forceCollapsed && !oldWidget.forceCollapsed) _expanded = false;
-    // 中途出现失败：立刻把证据层顶开，不用等用户去点
-    if (oldWidget.failureCount == 0 && widget.failureCount > 0) _expanded = true;
+    // 这里不再因"中途出现失败"整层顶开：失败摘要行已经是警示色并带失败数，
+    // 自动铺开全部证据与"完成态保持干净"冲突，且会把当前正在读的结论顶走。
   }
 
   @override
@@ -854,7 +893,7 @@ class _ExpandableEvidenceState extends State<_ExpandableEvidence> {
           onTap: () => setState(() => _expanded = !_expanded),
           borderRadius: BorderRadius.circular(rXSmall),
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.symmetric(vertical: 4),
             child: Row(
               children: [
                 Icon(
@@ -866,7 +905,8 @@ class _ExpandableEvidenceState extends State<_ExpandableEvidence> {
                 Text(
                   ui.processAndEvidence,
                   style: TextStyle(
-                    color: warn ? tc.warn : tc.textBody,
+                    // 只有失败计数上警示色：整行橙会让"有失败"变成"整块出事"
+                    color: tc.textBody,
                     fontSize: fSmall,
                     fontWeight: FontWeight.w500,
                   ),
@@ -901,11 +941,11 @@ class _ExpandableEvidenceState extends State<_ExpandableEvidence> {
           if (widget.details != null && widget.details!.trim().isNotEmpty) ...[
             Container(
               width: double.infinity,
-              margin: const EdgeInsets.only(top: 4, bottom: 6),
-              padding: const EdgeInsets.all(10),
+              margin: const EdgeInsets.only(top: 6, bottom: 6),
+              padding: const EdgeInsets.all(pCompact),
               decoration: BoxDecoration(
-                color: tc.dataCard,
-                borderRadius: BorderRadius.circular(rSmall),
+                color: tc.agentCardFill,
+                borderRadius: BorderRadius.circular(rCard),
                 border: Border.all(color: tc.border),
               ),
               child: Column(
@@ -986,11 +1026,10 @@ List<Widget> buildMetricItems({
   }
 
   if (task.rounds > 0) add(ui.roundsCount(task.rounds), tc.textSub);
-  // 「步」= 真正执行过的命令/工具数，不是引擎循环计数（stepIndex）。
-  // 循环计数与「轮」几乎相等（一轮一次调用），并排显示等于同一件事说两遍；
-  // 参考界面的 `11 轮 418 步` 里那个大数就是执行数。
-  final executedSteps = task.successCount + task.failureCount;
-  if (executedSteps > 0) add(ui.stepsCount(executedSteps), tc.textSub);
+  // 「步」= 请求 AI 的次数 + 命令执行次数（成功/失败/被拦截）+ 工具调用。
+  // 「轮」是会话累计的任务轮次（用户提问、目标续跑各一轮），两者量纲不同：
+  // 一轮里可能跑几十步，所以步数只会大于等于轮数。
+  if (task.stepTotal > 0) add(ui.stepsCount(task.stepTotal), tc.textSub);
   if (task.tokenTotal > 0) {
     add(
       ui.tokensCount(formatTokenCount(task.tokenTotal),
@@ -1031,10 +1070,10 @@ List<Widget> buildMetricItems({
             ),
           ),
           const SizedBox(width: 5),
-          // 窄面板里这一项必须能缩：Wrap 给子项的是"整行宽度"上限，
-          // 而 min-size Row 里的 Text 若不可缩，就会把整行顶出去（测试里以
-          // RenderFlex overflowed 暴露，真机上会是黄黑条纹）
-          Flexible(
+          // 常驻指标条改为单行横向滚动后，父级给的是无界宽度，Flexible 在这种
+          // 约束下会抛错；改用有界宽度 + ellipsis，窄面板也不会出现黄黑条纹。
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 92),
             child: Text(
               ui.contextUsed(pct),
               maxLines: 1,
@@ -1106,44 +1145,64 @@ class AgentMetricsBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final ui = AgentUiText.of(context);
     final elapsed = task.elapsedSeconds ?? 0;
-    // 贴窗口底边的细条，不做带边框的卡片：这行在输入框之下，再套一层框会在面板
-    // 底部出现"框中框"。
+    // 贴窗口底边的细条：单行横向滚动，不做带边框的卡片、也不折行。
+    // Wrap 在窄面板会把最后两项甩到第二行，指标条高度随之跳动；改成 Row +
+    // 横向滚动后高度恒定，超出部分可横向拖看，窄面板也不会 RenderFlex overflow。
     return Padding(
       padding: const EdgeInsets.only(top: 6),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 2,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          if (!running) ...[
-            Text(
-              statusLabel(task.status, ui),
-              style: TextStyle(
-                color: statusColor(tc, task.status),
-                fontSize: fMicro,
-                fontWeight: FontWeight.w600,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            if (!running) ...[
+              Text(
+                statusLabel(task.status, ui),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: statusColor(tc, task.status),
+                  fontSize: fMicro,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-            ),
-            Text(
-              _formatElapsedLabel(elapsed, ui),
-              style: TextStyle(
-                color: tc.gold,
-                fontSize: fMicro,
-                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
-                fontWeight: FontWeight.w500,
+              const SizedBox(width: 8),
+              Text(
+                _formatElapsedLabel(elapsed, ui),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: tc.gold,
+                  fontSize: fMicro,
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: kMonoFontFallback,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
-            ),
+              const SizedBox(width: 8),
+            ],
+            ..._spaced(buildMetricItems(
+              task: task,
+              contextWindow: contextWindow,
+              ui: ui,
+              tc: tc,
+              elapsedSeconds: elapsed,
+            )),
           ],
-          ...buildMetricItems(
-            task: task,
-            contextWindow: contextWindow,
-            ui: ui,
-            tc: tc,
-            elapsedSeconds: elapsed,
-          ),
-        ],
+        ),
       ),
     );
+  }
+
+  /// 给指标项之间插固定间距；Row 里不能用 Wrap 的 spacing。
+  static List<Widget> _spaced(List<Widget> items) {
+    final out = <Widget>[];
+    for (final w in items) {
+      if (out.isNotEmpty) out.add(const SizedBox(width: 8));
+      out.add(w);
+    }
+    return out;
   }
 }
 
@@ -1222,8 +1281,8 @@ class _LiveOperationBarState extends State<LiveOperationBar> {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: tc.card,
-        borderRadius: BorderRadius.circular(rSmall),
+        color: tc.agentCardFill,
+        borderRadius: BorderRadius.circular(rCard),
         border: Border.all(color: tc.border),
       ),
       child: Row(

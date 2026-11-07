@@ -13,7 +13,6 @@ import '../core/l10n_holder.dart';
 import '../core/route_observer.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/sftp_panel.dart';
-import '../widgets/logo_widget.dart';
 import '../widgets/ai_prompt_input.dart';
 import '../widgets/model_picker_panel.dart';
 import '../widgets/agent_goal_banner.dart';
@@ -23,7 +22,6 @@ import '../widgets/session_history_dialog.dart';
 import '../widgets/agent_log_dialog.dart';
 import '../widgets/agent_command_block.dart';
 import '../widgets/agent_event_cards.dart';
-import '../widgets/agent_thinking_blocks.dart';
 import '../widgets/collapsible_message_text.dart';
 import '../widgets/operation_sheet.dart';
 import '../widgets/plan_panel.dart';
@@ -1420,9 +1418,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // 左侧品牌区：LOGO + 应用名，点击返回主页
-          _buildBrandArea(tc),
-          const SizedBox(width: 8),
+          // 左侧不再放 LOGO + 应用名：终端窗口标题栏已经写着应用名，
+          // 这里再占一块只会挤走标签区。需要回主页用左侧标签或快捷键。
+          const SizedBox(width: 4),
           // 中间标签区
           Expanded(
             child: ListView.builder(
@@ -1453,34 +1451,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           _buildTopBarActions(),
           const SizedBox(width: 12),
         ],
-      ),
-    );
-  }
-
-  /// 左侧品牌区
-  Widget _buildBrandArea(ThemeColors tc) {
-    return GestureDetector(
-      onTap: () => context.go('/'),
-      child: Container(
-        height: hAppBar,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        color: Colors.transparent,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const LogoWidget(type: LogoType.mark, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              'AI Terminal',
-              style: TextStyle(
-                fontSize: fSmall,
-                fontWeight: FontWeight.w500,
-                color: tc.textMain,
-                letterSpacing: -0.3,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -2408,6 +2378,73 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     });
   }
 
+  // ==================== 轮次骨架 ====================
+
+  /// 一轮的分隔线：`● 第 3 轮  24 条命令 · 1 失败 ─────────`
+  ///
+  /// 12 轮堆叠时，用户要能一眼看出"这一段是哪一轮、有多大"，否则滚动全靠
+  /// 用户消息卡片当路标；命令数/失败数也给历史轮一个成本感。
+  Widget _buildTurnAnchor(int number, String? stats, ThemeColors tc) {
+    final ui = AgentUiText.of(context);
+    return Padding(
+      // 锚点是"下一轮的开头"，不是上一轮的结尾：上面只留一档分隔，
+      // 下面给足呼吸，避免它贴住紧随其后的用户消息。
+      padding: const EdgeInsets.only(top: 6, bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: 4,
+            margin: const EdgeInsets.only(right: 7),
+            decoration: BoxDecoration(
+              color: tc.textMuted.withValues(alpha: 0.8),
+              shape: BoxShape.circle,
+            ),
+          ),
+          Text(
+            ui.turnLabel(number),
+            style: TextStyle(
+              color: tc.textSub,
+              fontSize: fMicro,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+            ),
+          ),
+          if (stats != null) ...[
+            const SizedBox(width: 8),
+            Text(
+              stats,
+              style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+            ),
+          ],
+          const SizedBox(width: 10),
+          Expanded(
+            child: Container(
+              height: 1,
+              color: tc.border.withValues(alpha: 0.6),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 本轮回答的命令数与失败数；下一项不是 assistant（还在等模型）时返回 null
+  String? _turnStats(List<ChatItem> items, int userIndex) {
+    if (userIndex + 1 >= items.length) return null;
+    final answer = items[userIndex + 1];
+    if (answer.role != 'assistant') return null;
+    final commands = answer.events.where((e) => e.isCommand).length;
+    final failures =
+        answer.events.where((e) => e.isResult && e.success == false).length;
+    if (commands == 0 && failures == 0) return null;
+    final ui = AgentUiText.of(context);
+    return [
+      if (commands > 0) ui.commandCallsCount(commands),
+      if (failures > 0) ui.failureCount(failures),
+    ].join(' · ');
+  }
+
   // ==================== Agent 模式统一消息列表 ====================
   Widget _buildAgentChatList(AgentState agentState, tp.TerminalTab? tab) {
     final l10n = AppLocalizations.of(context)!;
@@ -2419,16 +2456,30 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     if (items.isEmpty) {
       return Center(child: Text(l10n.terminalInputHintEmpty, style: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fBody)));
     }
+    // 轮次骨架：一条 user 开启一轮，其后 assistant 的产出都属于这一轮。
+    // 12 轮的会话原来没有任何分隔，滚动时找不到"这段是哪一轮"。
+    final turnNumbers = List<int?>.filled(items.length, null);
+    var turnCount = 0;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].role == 'user') {
+        turnCount++;
+        turnNumbers[i] = turnCount;
+      }
+    }
+
     // 整块列表共用一个 SelectionArea：Markdown 的每段、命令卡、输出卡都是
     // 独立 Text 组件，若各自用 SelectableText 就只能一次选中一段。
     return SelectionArea(
       child: ListView.builder(
         controller: _chatControllerFor(tab?.id ?? _currentTabId ?? ''),
-        padding: const EdgeInsets.all(8),
+        // 两侧留白与下方底栏对齐：内容贴着面板边缘时，11px 小字 + 细边框
+        // 会显得拥挤，留出一档呼吸空间也让卡片左边缘和输入框左边缘齐平。
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
         itemCount: items.length,
         itemBuilder: (context, index) {
           final item = items[index];
           final isLast = index == items.length - 1;
+          final turnNo = turnNumbers[index];
           final turnGoal = item.role == 'assistant' &&
                   index > 0 &&
                   items[index - 1].role == 'user'
@@ -2437,7 +2488,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           // RepaintBoundary：流式时只有最后一条消息在变，已定型消息不必跟着重绘
           return RepaintBoundary(
             key: ValueKey('agent_${item.role}_$index'),
-            child: _buildMessageBubble(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // 单轮会话不加锚点：只有一个"第 1 轮"没有导航价值
+                if (turnNo != null && turnCount > 1)
+                  _buildTurnAnchor(
+                    turnNo,
+                    _turnStats(items, index),
+                    ThemeColors.of(context),
+                  ),
+                _buildMessageBubble(
               role: item.role,
               content: item.content,
               events: item.events,
@@ -2456,8 +2517,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               pendingOptions:
                   agentState.isWaitingChoice && isLast ? agentState.pendingOptions : const [],
               enginePendingConfirm: isLast ? agentState.pendingConfirmCommand : null,
-              // 历史回合只在"最近一轮"里保留展开态；旧回合收起过程与清单
-              isLastTurn: isLast,
+                  // 历史回合只在"最近一轮"里保留展开态；旧回合收起过程与清单
+                  isLastTurn: isLast,
+                ),
+              ],
             ),
           );
         },
@@ -2575,26 +2638,34 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final isUser = role == 'user';
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final ui = AgentUiText.of(context);
+    // 流式没收尾时正文还会变，复制半截回答不如不复制
+    final copyText = isUser || isLoading
+        ? ''
+        : formatAnswerForCopy(
+            events: events,
+            content: content,
+            streamingContent: streamingContent,
+          );
 
     return Align(
       key: key,
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+      alignment: Alignment.centerLeft,
       child: Container(
-        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.85),
+        // 用户提问和 AI 回答同一列宽（满宽）：原来用户消息缩在右侧 85% 宽的
+        // 气泡里，一轮对话的左边缘跟着跳，滚动时像两套不同的版式。
+        width: double.infinity,
         margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        decoration: BoxDecoration(
-          color: isUser ? tc.userBubble : tc.card,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(rMedium),
-            topRight: const Radius.circular(rMedium),
-            bottomLeft: Radius.circular(isUser ? rMedium : rXSmall),
-            bottomRight: Radius.circular(isUser ? rXSmall : rMedium),
-          ),
-          border: Border.all(
-            color: isUser ? tc.userBubbleBorder : tc.border,
-          ),
-        ),
+        padding: isUser
+            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8)
+            : EdgeInsets.zero,
+        decoration: isUser
+            ? BoxDecoration(
+                gradient: tc.userBubbleGradient,
+                borderRadius: const BorderRadius.all(Radius.circular(rMedium)),
+                border: Border.all(color: tc.userBubbleBorder, width: 0.8),
+              )
+            : null,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2605,12 +2676,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: tc.brand.withValues(
-                        alpha: isUser ? 0.14 : 0.1),
+                    color: tc.brand.withValues(alpha: isUser ? 0.14 : 0.1),
                     borderRadius: BorderRadius.circular(rXSmall),
                     border: Border.all(
-                      color: tc.brand.withValues(
-                          alpha: isUser ? 0.32 : 0.25),
+                      color: tc.brand.withValues(alpha: isUser ? 0.32 : 0.25),
                       width: 0.5,
                     ),
                   ),
@@ -2641,7 +2710,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            SizedBox(height: isUser ? pXSmall : pSmall),
             // 内容
             // 选区由列表级 SelectionArea 统一管理，这里用普通 Text 才能跨段拖动
             if (isUser)
@@ -2657,39 +2726,25 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               )
             else ...[
               _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning, isWaitingChoice, pendingOptions: pendingOptions, events: events, streamingContent: streamingContent, liveReasoning: liveReasoning, turnGoal: turnGoal, enginePendingConfirm: enginePendingConfirm, isLastTurn: isLastTurn),
-              _buildAnswerCopyRow(events, content, streamingContent, isLoading),
+              // 整段复制固定在回答左下角：Markdown 段落、命令卡、输出卡都是独立
+              // Text，拖选跨不过去，整段复制只能靠这一个按钮。放在左边缘是因为
+              // 右对齐会飘到滚动条旁边，且和结论卡的右端对齐线打架。
+              if (copyText.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: pSmall),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: _AnswerCopyButton(
+                      text: copyText,
+                      label: ui.copyAnswer,
+                      doneLabel: ui.copied,
+                      copiedLabel: ui.answerCopied,
+                    ),
+                  ),
+                ),
             ],
           ],
         ),
-      ),
-    );
-  }
-
-  /// 回答底部的整段复制。
-  ///
-  /// 拖拽选区跨不过 markdown 段落与命令卡，复制按钮是把一整轮回答捞走的出口。
-  Widget _buildAnswerCopyRow(
-    List<AgentEvent> events,
-    String content,
-    String streamingContent,
-    bool isLoading,
-  ) {
-    // 流式没收尾时正文还会变，复制半截回答不如不复制
-    if (isLoading) return const SizedBox.shrink();
-    final text = formatAnswerForCopy(
-      events: events,
-      content: content,
-      streamingContent: streamingContent,
-    );
-    if (text.isEmpty) return const SizedBox.shrink();
-    final ui = AgentUiText.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: _AnswerCopyButton(
-        text: text,
-        label: ui.copyAnswer,
-        doneLabel: ui.copied,
-        copiedLabel: ui.answerCopied,
       ),
     );
   }
@@ -3110,6 +3165,51 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }
 
   /// AI 回复内容渲染：优先用结构化事件列表渲染卡片，fallback 到旧的纯文本/ReAct 解析
+  /// 目标是否就是上一条用户消息本身。
+  ///
+  /// 会话里 report.goal 通常直接取自用户输入，结果层再复述一遍，屏幕上就是
+  /// 两段一模一样的大字。只在两者确实重合时省略，独立场景仍保留目标。
+  bool _goalEchoesPrompt(String goal, String? prompt) {
+    if (prompt == null) return false;
+    String norm(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final g = norm(goal);
+    final p = norm(prompt);
+    if (g.length < 12 || p.length < 12) return false;
+    return g == p || p.contains(g) || g.contains(p);
+  }
+
+  /// 去掉"其实是正文草稿"的思考行。
+  ///
+  /// 模型有时把最终回答整段写进推理里，于是同一段 Markdown 先以三行原始
+  /// 文本出现在思考行，再被正文渲染一遍——两边都是几百字，屏幕上就是重复。
+  /// 只在思考**包含**完整一段正文时丢弃，正常推理不受影响。
+  List<AgentEvent> _dedupeProcessEvents(List<AgentEvent> events) {
+    String norm(String s) => s.replaceAll(RegExp(r'\s+'), ' ').trim();
+    final texts = events
+        .where((e) => e.isText)
+        .map((e) => norm(e.text ?? ''))
+        .where((t) => t.length >= 120)
+        .toList(growable: false);
+    if (texts.isEmpty) return events;
+    bool isDraft(AgentEvent e) {
+      if (!e.isThought) return false;
+      final t = norm(e.text ?? '');
+      if (t.length < 120) return false;
+      return texts.any(t.contains);
+    }
+
+    return events.where((e) => !isDraft(e)).toList(growable: false);
+  }
+
+  /// 两段文字是否只是标题符号/空白差异（正文与结论重复时只留一份）
+  bool _sameAnswerText(String a, String b) {
+    String n(String s) => s
+        .replaceAll(RegExp(r'^#{1,6}\s*', multiLine: true), '')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return n(a) == n(b);
+  }
+
   Widget _buildAIContent(
     String content,
     ThemeColors tc,
@@ -3136,7 +3236,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
     // 优先使用结构化事件渲染（ReAct 格式已由 ReActStreamParser 正确解析）
     if (events.isNotEmpty) {
-      Widget buildEventContent(List<AgentEvent> source) => AgentEventContent(
+      Widget buildEventContent(List<AgentEvent> source) =>
+          AgentEventContent(
             events: source,
             tc: tc,
             tab: tab,
@@ -3144,6 +3245,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             isLoading: isLoading,
             isWaitingChoice: isWaitingChoice,
             pendingOptions: pendingOptions,
+            // 实时推理接到时间线末尾：思考发生在它真实的位置上，
+            // 而不是浮在整条回答顶部、结束后又凭空消失
+            liveReasoning: liveReasoning,
             executingCommand:
                 tab == null ? _executingCommand : _tabExecutingCommand[tab.id],
             pendingConfirmCommand: effectivePendingConfirm,
@@ -3172,49 +3276,78 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             onRetryFailedHosts: _retryFailedHosts,
           );
 
-      // 有操作单报告：结论先行 + 证据折叠；finish 卡片不再重复展示
+      // 有操作单报告：按发生顺序铺开过程，再收结论、复制、执行清单。
+      //
+      // 之前是「结论 → 计划 → 正文 → 过程折叠」：用户先看到结论，真正的
+      // 思考 / 命令 / 输出被压到最后一次点击里，顺序和实际发生顺序相反。
       final report = _findOperationReport(events);
       if (report != null) {
-        final evidenceEvents = events
-            .where((e) => !e.isReport && !e.isFinish)
-            .toList(growable: false);
-        final hasAIContentEvidence = evidenceEvents.any(
-            (e) => e.isThought || e.isCommand || e.isText || e.isAsk);
-        final hasFallbackText = streamingContent.trim().isNotEmpty ||
-            content.trim().isNotEmpty;
-        Widget buildEvidence() => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (evidenceEvents.isNotEmpty)
-                  buildEventContent(evidenceEvents),
-                // 流式结束后从历史恢复时 streamingContent 为空，使用持久化 content 兜底
-                if (!hasAIContentEvidence) ...[
-                  if (streamingContent.trim().isNotEmpty)
-                    _buildMarkdownText(streamingContent, tc, streaming: true)
-                  else if (content.trim().isNotEmpty)
-                    _buildMarkdownText(content, tc),
-                ],
-              ],
-            );
-        return OperationSheet(
-          report: report,
-          tc: tc,
-          markdownBuilder: _buildMarkdownText,
-          hasEvidence: evidenceEvents.isNotEmpty || hasFallbackText,
-          evidenceBuilder: buildEvidence,
-          isLiveTurn: isLastTurn,
-          plan: report.plan.isNotEmpty ? report.plan : _findLatestPlan(events),
-          rolledBackChangeIds: _rolledBackChangeIds,
-          onRollbackChange: _executeRollback,
-          rollbackBusy: _rollbackBusy,
-          onOpenAudit: () {
-            final host = report.hostId;
-            final query = (host != null && host.isNotEmpty)
-                ? '?hostId=${Uri.encodeComponent(host)}'
-                : '';
-            context.push('/audit-log$query');
-          },
-          onContinueOperation: () => _continueOperation(report),
+        final processEvents = _dedupeProcessEvents(events
+            .where((e) => !e.isReport && !e.isFinish && !e.isPlan)
+            .toList(growable: false));
+        final planSteps =
+            report.plan.isNotEmpty ? report.plan : _findLatestPlan(events);
+        // 回答正文只留一份：正文缺失时用"结论"兜底，正文与结论同义时也只渲染
+        // 一次。结论卡里的那一段不再单独展示——同一句话在大字标题下再讲一遍，
+        // 是整条回答最明显的重复。
+        final body = (report.answerBody ?? '').trim();
+        final conclusion = report.conclusion.trim();
+        final answerText =
+            body.isNotEmpty && !_sameAnswerText(body, conclusion)
+                ? body
+                : conclusion;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. 过程：思考 / 命令 / 输出按原始顺序交错
+            if (processEvents.isNotEmpty) buildEventContent(processEvents),
+            // 2. 回答正文：和过程里的命令行同一套框（透明填充 + 1px 边框 +
+            //    10px 圆角），左右不再内缩——原来无边框的正文比上下卡片更宽，
+            //    读起来像另一套版式。
+            if (answerText.isNotEmpty) _answerCard(answerText, tc),
+            // 3. 结果层：状态 / 主机 / 耗时 / 变更数 / 下一步
+            Padding(
+              padding: const EdgeInsets.only(top: pModule),
+              child: OperationSheet(
+                report: report,
+                tc: tc,
+                markdownBuilder: _buildMarkdownText,
+                // 目标就是上一条用户消息时不再复述
+                showGoal: !_goalEchoesPrompt(report.goal, turnGoal),
+                // 过程已经在上面按顺序铺开，这里不留「过程与证据」折叠
+                hasEvidence: false,
+                showEvidence: false,
+                evidenceBuilder: () => const SizedBox.shrink(),
+                // 正文与结论合并到上面那块，结果卡只留结果
+                showAnswerBody: false,
+                showConclusion: false,
+                // 执行清单移到整条回答的最底部
+                showPlan: false,
+                plan: const [],
+                rolledBackChangeIds: _rolledBackChangeIds,
+                onRollbackChange: _executeRollback,
+                rollbackBusy: _rollbackBusy,
+                onOpenAudit: () {
+                  final host = report.hostId;
+                  final query = (host != null && host.isNotEmpty)
+                      ? '?hostId=${Uri.encodeComponent(host)}'
+                      : '';
+                  context.push('/audit-log$query');
+                },
+                onContinueOperation: () => _continueOperation(report),
+              ),
+            ),
+            // 4. 执行清单：整条回答的最后一块（运行中由贴底清单承担）
+            if (planSteps.isNotEmpty && !_planPinnedActive) ...[
+              const SizedBox(height: pModule),
+              PlanPanel(
+                steps: planSteps,
+                tc: tc,
+                initiallyExpanded: isLastTurn ? null : false,
+                margin: EdgeInsets.zero,
+              ),
+            ],
+          ],
         );
       }
 
@@ -3244,32 +3377,32 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 hostId: lastEventHostId(events),
               ),
             ),
-          // 执行清单常驻在事件流上方，运行中也始终可见；
-          // 但贴底卡正在显示同一份计划时这里要抑制，否则同屏两份。
-          if (plan.isNotEmpty && !_planPinnedActive)
+          // 过程一条不折：用户要的是"AI 输出什么就看到什么"
+          // 实时推理（reasoning_content）已经作为时间线末尾的思考行渲染，
+          // 不再单独浮一个「模型思考」块——它停在回答顶部、每步结束又被清空，
+          // 看上去就像"思考凭空消失"。也不再有「思考中」块：它装的是流式正文
+          // （模型写的说明/答案），不是思考。
+          buildEventContent(_dedupeProcessEvents(events)),
+          // 没有 AI 内容事件时（流式早期或纯文本兜底）仍然按原逻辑显示
+          if (!hasAIContentEvents && !isLoading)
+            _answerCard(
+              streamingContent.trim().isNotEmpty
+                  ? streamingContent
+                  : content,
+              tc,
+            ),
+          // 执行清单固定在这条回答的最底部；运行中则由贴底清单承担，
+          // 这里抑制，避免同一份计划同屏出现两次。
+          if (plan.isNotEmpty && !_planPinnedActive) ...[
+            const SizedBox(height: pModule),
             PlanPanel(
               steps: plan,
               tc: tc,
               currentCommand: runningCommand,
               // 历史回合默认收起，只留"进度 + 当前步"一行
               initiallyExpanded: isLastTurn ? null : false,
+              margin: EdgeInsets.zero,
             ),
-          // 过程折叠由 AgentProcessTimeline 自己负责（一行一步 + 更早 N 步），
-          // 模型原生推理（reasoning_content）：只有部分网关返回该字段，有就实时显示
-          if (liveReasoning.trim().isNotEmpty)
-            ModelReasoningBlock(text: liveReasoning, tc: tc),
-          // 不再套一层 CollapsibleEventStream —— 两层折叠会互相打架。
-          buildEventContent(events),
-          // 流式过程中的当前步思考逐字显示。原来这段只在"还没有任何 AI 事件"时
-          // 才渲染，第一步之后事件已存在，用户就再也看不到实时输出了。
-          if (isLoading && streamingContent.trim().isNotEmpty)
-            LiveThoughtBlock(rawText: streamingContent, tc: tc),
-          // 没有 AI 内容事件时（流式早期或纯文本兜底）仍然按原逻辑显示
-          if (!hasAIContentEvents && !isLoading) ...[
-            if (streamingContent.trim().isNotEmpty)
-              _buildMarkdownText(streamingContent, tc)
-            else if (content.trim().isNotEmpty)
-              _buildMarkdownText(content, tc),
           ],
         ],
       );
@@ -3322,6 +3455,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }
 
 
+  /// 回答正文的容器：与命令行 / 结果卡同一套（见 [agentAnswerCard]）
+  Widget _answerCard(String text, ThemeColors tc) =>
+      agentAnswerCard(_buildMarkdownText(text, tc), tc);
+
   /// 渲染一段 Markdown 文本（用于 thought/text/info 的自动追加显示）。
   ///
   /// 围栏代码块先拆出来单独渲染：flutter_markdown 的 `code` 样式同时作用于行内
@@ -3354,7 +3491,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             p: TextStyle(
               color: theme.textMain,
               height: 1.5,
-              fontSize: fBody,
+              // 正文与思考行同一字号（12）：回答的主体文字比过程证据大一档，
+              // 视觉上会喧宾夺主
+              fontSize: fSmall,
               fontWeight: FontWeight.w500,
             ),
             h1: TextStyle(color: theme.textMain, fontSize: 16, fontWeight: FontWeight.bold),
@@ -3366,7 +3505,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               fontWeight: FontWeight.w500,
               color: theme.brand,
             ),
-            listBullet: TextStyle(color: theme.brand, fontSize: fBody),
+            listBullet: TextStyle(color: theme.brand, fontSize: fSmall),
             blockquote: TextStyle(
               color: theme.textSub,
               fontStyle: FontStyle.italic,
@@ -4233,7 +4372,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
     return Container(
       padding: EdgeInsets.only(
-        left: 12, right: 12, top: 8,
+        left: 14, right: 14, top: 8,
         bottom: 8 + (_isMobile ? MediaQuery.of(context).padding.bottom : 0),
       ),
       decoration: BoxDecoration(
@@ -5854,10 +5993,6 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
   }
 }
 
-/// 回答底部的「复制回答」胶囊。
-///
-/// 外层列表是 SelectionArea：光标默认落在文本光标上，命中区也归选区，所以这里
-/// 自己声明手型光标、整块可点与悬停/按下态——否则它看着就只是回答下面一行正文。
 class _AnswerCopyButton extends StatefulWidget {
   const _AnswerCopyButton({
     required this.text,
@@ -5939,7 +6074,7 @@ class _AnswerCopyButtonState extends State<_AnswerCopyButton> {
         onTapCancel: () => setState(() => _pressed = false),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 90),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: _copied
                 ? tc.ok.withValues(alpha: 0.12)
@@ -5949,7 +6084,10 @@ class _AnswerCopyButtonState extends State<_AnswerCopyButton> {
                         ? tc.brand.withValues(alpha: 0.07)
                         : Colors.transparent,
             borderRadius: BorderRadius.circular(rXSmall),
-            border: Border.all(color: accent, width: 0.5),
+            // 静止时不画边框：它是回答末尾的一个动作入口，不该再起一个方块
+            border: _copied || _hover || _pressed
+                ? Border.all(color: accent, width: 0.5)
+                : null,
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,

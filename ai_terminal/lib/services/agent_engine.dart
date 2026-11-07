@@ -72,6 +72,13 @@ class AgentEngine {
   /// 最近一次 _callAI 结束时的解析结果，供紧随其后的 _parseReActResponse 复用，
   /// 避免同一段响应被全量解析两次。
   List<AgentEvent>? _lastParsedResponseEvents;
+
+  /// 本条 AI 响应的解析结果里是否已带 ask 事件（主循环在解析后填入）
+  bool _lastResponseHadAskEvent = false;
+
+  /// 本条 AI 响应里宣布的、第一条之外的其余命令（主循环在解析后、清空事件
+  /// 缓存前填入）。由 _executeRemainingAnnouncedCommands 消费并清空。
+  List<({String eventId, String command})> _announcedFollowUps = const [];
   Completer<bool>? _confirmCompleter; // 等待用户确认危险命令的 Completer
   Timer? _confirmTimeoutTimer; // 确认超时定时器，cancelTask 时需 cancel
   /// 本轮确认是否因超时结束。超时和用户拒绝必须分开说：
@@ -106,8 +113,19 @@ class AgentEngine {
   /// 本次 AI 调用是否拿到过真实 usage；末包式 provider 在流末才给，所以要按次判定
   bool _usageThisCall = false;
 
-  /// AI 请求轮数（含重试），与 trace 的 ai_call_count 同语义
+  /// AI 请求次数（含重试与备用模型切换）。只作为「步」的一部分，
+  /// 不再直接当作「轮」显示——那会让轮看起来比步多，两个量纲被读反。
   int _aiRounds = 0;
+
+  /// 会话累计轮次：由 provider 在启动任务时按会话算好后传入。
+  /// 引擎不自行递增——续跑、用户提问都由 provider 那条统一路径计数。
+  int _roundIndex = 0;
+
+  /// 被拦截而未执行的命令数（安全策略 / 权限档位 / 用户拒绝 / 确认超时）
+  int _blockedCount = 0;
+
+  /// 工具调用次数（含未知工具与只读档拦截的调用）
+  int _toolCalls = 0;
 
   /// 等待用户确认累计秒数（危险命令 + 破坏性工具两处）。tok/s 的分母要减掉它，
   /// 但耗时本身仍按墙钟显示 —— 人的反应时间不该算进引擎吞吐率。
@@ -471,7 +489,13 @@ class AgentEngine {
   int get tokenTotalForTesting => _tokReal + _tokEstimated;
 
   @visibleForTesting
-  int get roundsForTesting => _aiRounds;
+  int get aiCallsForTesting => _aiRounds;
+
+  @visibleForTesting
+  int get blockedCountForTesting => _blockedCount;
+
+  @visibleForTesting
+  int get toolCallsForTesting => _toolCalls;
 
   /// 等确认累计秒数的测试入口。两个 await 确认点（破坏性工具 / 危险命令）共用它，
   /// 计量口径要求"人的反应时间不进 tok/s 分母"，所以必须能从真实 await 验证。
@@ -565,7 +589,10 @@ class AgentEngine {
       _currentTask = _currentTask!.copyWith(
         elapsedSeconds: elapsed,
         stepIndex: _currentStepCount,
-        rounds: _aiRounds,
+        rounds: _roundIndex,
+        aiCalls: _aiRounds,
+        blockedCount: _blockedCount,
+        toolCalls: _toolCalls,
         tokenTotal: _tokReal + _tokEstimated,
         hasEstimatedTokens: _tokEstimated > 0,
         cacheHitPercent: cacheHit,
@@ -575,7 +602,10 @@ class AgentEngine {
     } else {
       _currentTask = _currentTask!.copyWith(
         stepIndex: _currentStepCount,
-        rounds: _aiRounds,
+        rounds: _roundIndex,
+        aiCalls: _aiRounds,
+        blockedCount: _blockedCount,
+        toolCalls: _toolCalls,
         tokenTotal: _tokReal + _tokEstimated,
         hasEstimatedTokens: _tokEstimated > 0,
         cacheHitPercent: cacheHit,
@@ -696,14 +726,17 @@ class AgentEngine {
   /// 启动 Agent 任务
   /// [goal] 用户目标
   /// [executor] 命令执行器，支持 SSHService（远程）或 LocalTerminalService（本地）
-  Future<void> startTask(String goal, CommandExecutor? executor) {
+  /// [roundIndex] 会话累计轮次（用户提问 + 目标续跑），由 provider 计算并持久化
+  Future<void> startTask(String goal, CommandExecutor? executor,
+      {int roundIndex = 0}) {
     return agentLogger.runWithConversation(
       conversationId,
-      () => _startTask(goal, executor),
+      () => _startTask(goal, executor, roundIndex: roundIndex),
     );
   }
 
-  Future<void> _startTask(String goal, CommandExecutor? executor) async {
+  Future<void> _startTask(String goal, CommandExecutor? executor,
+      {int roundIndex = 0}) async {
     agentLogger.info('AgentEngine', '=== 开始任务 ===');
     agentLogger.info('AgentEngine', '目标: $goal');
     agentLogger.info('AgentEngine', '模式: Agent (ReAct)');
@@ -734,6 +767,9 @@ class AgentEngine {
     _promptRealWithCached = 0;
     _usageThisCall = false;
     _aiRounds = 0;
+    _blockedCount = 0;
+    _toolCalls = 0;
+    _roundIndex = roundIndex;
     _confirmWaitSeconds = 0;
     _contextTokens = 0;
     _lastRoundReal = 0;
@@ -748,6 +784,7 @@ class AgentEngine {
       goal: goal,
       status: AgentStatus.thinking,
       phase: '理解需求',
+      rounds: _roundIndex,
     );
     _notifyTaskUpdate();
 
@@ -1068,6 +1105,11 @@ class AgentEngine {
       stepIndex: previousStepCount,
       successCount: previousSuccessCount,
       failureCount: previousFailureCount,
+      // 暂停/恢复不重置计量：恢复后仍显示同一轮、同一批步数
+      rounds: _roundIndex,
+      aiCalls: _aiRounds,
+      blockedCount: _blockedCount,
+      toolCalls: _toolCalls,
     );
     _notifyTaskUpdate();
     AgentTracer.instance
@@ -1198,13 +1240,9 @@ class AgentEngine {
     agentLogger.info('ReAct',
         '对话历史: ${_conversationHistory.length} 条消息 (新对话: $isNewConversation)');
 
-    // 仅新对话显示启动提示（只走事件通道，不混入文本流）
-    if (isNewConversation) {
-      _accumulatedMessage = '';
-      onEvent?.call(AgentEvent.info(UiText.t('🚀 开始自动执行任务...', '🚀 Starting automatic execution...')));
-    } else {
-      _accumulatedMessage = '';
-    }
+    // 不再插入「🚀 开始自动执行任务...」这类启动提示：紧随其后的推理已经
+    // 说明了在做什么，一条纯装饰的系统日志只会占掉过程流的第一行。
+    _accumulatedMessage = '';
 
     agentLogger.info(
         'ReAct', '开始 ReAct 循环 (${isUnlimited ? "无限制" : "最多 $maxSteps 步"})');
@@ -1353,6 +1391,9 @@ class AgentEngine {
       // ═══════════════════════════════════════════
       final step = _parseReActResponse(fullResponse,
           parsedEvents: _lastParsedResponseEvents);
+      // 第一条之外、同一条响应里宣布的其余命令：解析事件缓存马上要清空，
+      // 先取出来留给 _executeRemainingAnnouncedCommands 按 id 关联结果
+      _announcedFollowUps = _remainingAnnouncedCommands(_lastParsedResponseEvents);
       _lastParsedResponseEvents = null;
       // 解析结果是排查用的内部细节：thought 可能上千字，默认日志里只留动作与首行摘要
       agentLogger.debug('ReAct',
@@ -1429,6 +1470,17 @@ class AgentEngine {
           return;
 
         case ActionType.ask:
+          // 解析没产出 ask 事件时补一条：ask 事件是"问过什么、用户选了什么"
+          // 在时间线里的唯一凭据，缺了它用户答完就什么都不剩
+          if (!_lastResponseHadAskEvent &&
+              step.options != null &&
+              step.options!.isNotEmpty) {
+            onEvent?.call(AgentEvent.ask(
+              step.thought.trim().isEmpty ? '请选择' : step.thought.trim(),
+              step.options!,
+            ));
+            _lastResponseHadAskEvent = true;
+          }
           final shouldContinue =
               await _handleAskAction(step, myGeneration: myGeneration);
           if (!shouldContinue) return;
@@ -1529,6 +1581,8 @@ class AgentEngine {
     agentLogger.debug('ReAct', '消息历史: ${_conversationHistory.length} 条');
     _resetReasoning();
     _lastParsedResponseEvents = null;
+    _announcedFollowUps = const [];
+    _lastResponseHadAskEvent = false;
 
     final fullResponseBuffer = StringBuffer();
     // 重试仅对流建立阶段有效，一旦开始接收 chunk 就不再重试
@@ -1803,15 +1857,27 @@ class AgentEngine {
 
     final fullResponse = fullResponseBuffer.toString();
 
-    // 流式结束：把节流掉的最后一段推理补发给 UI
-    if (_reasoningBuffer.isNotEmpty) {
-      onReasoning?.call(_reasoningBuffer.toString());
-    }
-
     // 流式结束：一次性发出所有事件（e.id 此时是 stableId）
     final events = ReActStreamParser.parse(fullResponse);
-    // 缓存给紧随其后的 _parseReActResponse 复用，避免同一响应全量解析两次
     _lastParsedResponseEvents = events;
+    // 本轮解析是否已产出 ask 事件：没有的话 _handleAskAction 开头要补一条，
+    // 否则用户答完问题，时间线里连"问过什么、选了什么"都找不到
+    _lastResponseHadAskEvent = events.any((e) => e.isAsk);
+
+    // 流式结束：把累积的推理固化为持久的「思考」事件。
+    // ReAct 响应本身已带「思考:」行时不再补：双语模型会在 reasoning_content 里
+    // 用英文推理、又在协议行里用中文写一遍，两条都留就是同一步思考出现两次。
+    // 流式期间顶部/时间线末尾的实时推理行已经让它被看到过，这里只留协议思考。
+    if (_reasoningBuffer.isNotEmpty) {
+      final reasoning = _reasoningBuffer.toString().trim();
+      _reasoningBuffer.clear();
+      final reactHasThought = events.any((e) => e.isThought);
+      if (reasoning.isNotEmpty && !reactHasThought) {
+        onEvent?.call(AgentEvent.thought(reasoning));
+      }
+    }
+    // 收起顶部的瞬时推理块
+    onReasoning?.call('');
     // L10 修复：只记录第一个 command 事件的 id（主流程只执行第一个命令）
     bool firstCommandIdSet = false;
     for (final e in events) {
@@ -2199,9 +2265,8 @@ class AgentEngine {
             ChatMessage.create(role: 'user', content: result.observation!));
         _trimMessages(_conversationHistory);
       }
-      // L2 修复：成功执行命令后重置无命令重试计数
-      _noCommandRetryCount = 0;
-      return true;
+      return _executeRemainingAnnouncedCommands(executor,
+          myGeneration: myGeneration);
     }
 
     final result = await _runCommandWithSafety(command, executor,
@@ -2215,14 +2280,82 @@ class AgentEngine {
           .add(ChatMessage.create(role: 'user', content: result.observation!));
       _trimMessages(_conversationHistory);
     }
+    return _executeRemainingAnnouncedCommands(executor,
+        myGeneration: myGeneration);
+  }
+
+  /// 执行本条 AI 响应里宣布的、第一条之外的其余命令。
+  ///
+  /// ReAct 协议是"一步一动作"，但模型经常一次列出多条诊断命令
+  /// （journalctl / docker ps / systemctl status …）。解析器把每条 `命令:` 都
+  /// 发成了 command 事件，而引擎只跑第一条——其余的在时间线上变成永远没有
+  /// 结果的"可执行"悬空块，用户分不清它们到底跑没跑。这里按宣布顺序把剩余
+  /// 命令也跑掉：逐条过 SafetyGuard（危险命令照常确认/拦截），结果挂到各自
+  /// 已发出的 command 事件 id 上，观测一并进对话历史。
+  Future<bool> _executeRemainingAnnouncedCommands(
+    CommandExecutor executor, {
+    required int myGeneration,
+  }) async {
+    const maxFollowUps = 10;
+    final followUps = _announcedFollowUps;
+    _announcedFollowUps = const [];
+    var ran = 0;
+    for (final c in followUps) {
+      if (ran >= maxFollowUps) break;
+      if (_currentTask?.status == AgentStatus.cancelled) break;
+      if (myGeneration != _currentTaskGeneration) return false;
+      ran++;
+      final r = await _runCommandWithSafety(c.command, executor,
+          commandId: c.eventId, myGeneration: myGeneration);
+      if (myGeneration != _currentTaskGeneration) return false;
+      if (!r.shouldContinue) return false;
+      if (r.observation != null) {
+        _conversationHistory
+            .add(ChatMessage.create(role: 'user', content: r.observation!));
+        _trimMessages(_conversationHistory);
+      }
+    }
     // L2 修复：成功执行命令后重置无命令重试计数
     _noCommandRetryCount = 0;
     return true;
   }
 
+  /// 当前响应中除第一条之外、已作为 command 事件发出的其余命令（带事件 id）。
+  /// 这些命令事件在流式/收尾阶段已发出且 id 已是 finalId，结果事件用同一 id
+  /// 关联即可；调用后由调用方清空 [_announcedFollowUps]。
+  List<({String eventId, String command})> _remainingAnnouncedCommands(
+      List<AgentEvent>? events) {
+    if (events == null) return const [];
+    var skippedFirst = false;
+    final out = <({String eventId, String command})>[];
+    for (final e in events) {
+      if (!e.isCommand) continue;
+      final cmd = (e.command ?? '').trim();
+      if (cmd.isEmpty) continue;
+      if (!skippedFirst) {
+        skippedFirst = true; // 第一条命令由 _handleExecuteAction 主流程执行
+        continue;
+      }
+      out.add((eventId: e.id, command: cmd));
+    }
+    return out;
+  }
+
   /// 提前执行的结果缓存（用 Completer 处理执行中状态）
   Completer<_EarlyExecutionResult>? _earlyExecutionCompleter;
   String? _earlyExecutionCommand;
+
+  /// 这些 reason 表示命令被策略/权限/用户拦下，从未真正执行。
+  /// 「步」的口径要求把"尝试过但没执行"也算进去，所以按 reason 统一识别，
+  /// 而不是在每个 return 分支各加一次——分支会继续增加，集合不会漏。
+  static const Set<String> _blockedCommandReasons = {
+    'window_blocked',
+    'read_only_blocked',
+    'safety_blocked',
+    'user_rejected',
+    'confirm_timeout',
+    'permission_changed_during_confirm',
+  };
 
   /// 执行命令（含安全检查、用户确认、执行、发 result 事件），返回执行结果和观测
   /// [commandId] 用于关联 result 事件与 command 事件（流式提前执行时由 _callAI 传入）
@@ -2268,6 +2401,9 @@ class AgentEngine {
           cmdSuccess = s;
           cmdReason = reason;
           outputChars = chars;
+          // 被策略拦下、从未执行的命令也计入「步」：用户视角是"AI 尝试过"。
+          // 取消/代际失效/误发远程不是拦截，计进去会让步数随取消操作膨胀。
+          if (_blockedCommandReasons.contains(reason)) _blockedCount++;
         },
       );
     } catch (e) {
@@ -2315,8 +2451,40 @@ class AgentEngine {
     onReasoning?.call(_reasoningBuffer.toString());
   }
 
-  /// 每一步重新开始：清空上一步的推理，并通知 UI 收起推理块
+  /// 原生推理是否与 ReAct 解析出的思考重复（忽略空白与大小写）。
+  ///
+  /// 有些网关把同一段推理既放在 reasoning_content、又放在「思考:」行里，
+  /// 两条都留就是屏幕上同一段话出现两遍。内容不同则不判重：原生推理往往
+  /// 比协议行更细，用户要看到的是「AI 当时到底在想什么」。
+  bool _reasoningDuplicatesReactThought(
+      String reasoning, List<AgentEvent>? events) {
+    if (events == null || events.isEmpty) return false;
+    String norm(String s) =>
+        s.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase();
+    final r = norm(reasoning);
+    if (r.isEmpty) return true;
+    final reactThoughts = events
+        .where((e) => e.isThought)
+        .map((e) => norm(e.text ?? ''))
+        .where((t) => t.isNotEmpty)
+        .toList();
+    if (reactThoughts.isEmpty) return false;
+    // 太短的推理多半是协议噪声：有协议思考时就不重复补一条
+    if (r.length < 24) return true;
+    return reactThoughts.any((t) => t.contains(r) || r.contains(t));
+  }
+
+  /// 每一步重新开始：把上一步残留的推理固化为思考事件（正常情况流式结束时已固化，
+  /// 这里只在异常退出等 flush 被跳过时兜底），再清空并通知 UI 收起瞬时推理块
   void _resetReasoning() {
+    if (_reasoningBuffer.isNotEmpty) {
+      final reasoning = _reasoningBuffer.toString().trim();
+      if (reasoning.isNotEmpty &&
+          !_reasoningDuplicatesReactThought(
+              reasoning, _lastParsedResponseEvents)) {
+        onEvent?.call(AgentEvent.thought(reasoning));
+      }
+    }
     _reasoningBuffer.clear();
     _lastReasoningEmitAt = 0;
     onReasoning?.call('');
@@ -3006,9 +3174,32 @@ class AgentEngine {
     }
   }
 
+  /// 模型幻觉出来的"思考"工具名：只带思考参数，没有命令语义
+  static const Set<String> _thinkAliasNames = {'think', 'thinking', 'reason'};
+
+  /// 模型幻觉出来的"执行"工具名：应带 command 参数，走命令执行链路
+  static const Set<String> _executeAliasNames = {
+    'execute',
+    'exec',
+    'run_command',
+    'shell',
+    'bash',
+  };
+
+  /// 通用占位工具名（OpenAI 文档示例里的 function_name 之类）：
+  /// 按参数形状路由到执行或思考
+  static const Set<String> _placeholderToolNames = {
+    'function_name',
+    'call_function',
+    'tool_call',
+  };
+
   Future<bool> _handleToolAction(ReActStep step, CommandExecutor executor,
       {required int myGeneration}) async {
     final toolName = step.toolName?.trim() ?? '';
+    // 每次工具调用都计一步，含未知工具与只读档拦截：口径是"尝试过"，
+    // 不是"成功变更过"。放在参数校验之前，失败调用同样计入。
+    _toolCalls++;
     // 裸 Map 在这里收口成 ToolArgs：此后所有取参都必须走类型化访问器
     final args = ToolArgs(step.toolArgs ?? const {});
 
@@ -3026,6 +3217,96 @@ class AgentEngine {
         _finishTask(success: false, summary: L10n.str.toolRetryExhausted);
         return false;
       }
+      return true;
+    }
+
+    // 兼容占位/幻觉工具名：部分模型受其它 agent 框架先验影响，会调用注册表
+    // 里根本不存在的 think / execute / function_name（OpenAI 文档里的占位名）。
+    // 直接报「未知工具」只会打断任务，还让同一条响应里宣布的命令全部悬空。
+    // 按名字与参数形状路由，不再报错：
+    // - 带命令类参数 → 当成执行命令
+    // - 带思考类参数 / 名字是 think → 当成记录一步思考
+    // - 都没有 → 把可用工具清单回给模型，让它自己纠正
+    final alias = toolName.toLowerCase();
+    if (_thinkAliasNames.contains(alias)) {
+      final thoughtText = args.firstOf([
+        'thought',
+        'thinking',
+        'reasoning',
+        'note',
+        'content',
+        'message',
+      ]);
+      if (thoughtText.trim().isNotEmpty) {
+        onEvent?.call(AgentEvent.thought(thoughtText.trim()));
+      }
+      _conversationHistory.add(ChatMessage.create(
+          role: 'user', content: '观测: 思考已记录，请给出下一步动作。'));
+      _trimMessages(_conversationHistory);
+      _noCommandRetryCount = 0;
+      return true;
+    }
+    if (_executeAliasNames.contains(alias) || _placeholderToolNames.contains(alias)) {
+      final command =
+          args.firstOf(['command', 'cmd', 'script', 'shell', 'shell_command']);
+      if (command.isNotEmpty) {
+        // 先补发 command 事件再执行：结果用同一 id 关联，UI 才有完整的
+        // 命令块 + 状态，而不是一条挂在旧事件上的孤儿结果
+        final cmdId = 'evt_alias_${_uuid.v4().substring(0, 8)}';
+        final cmdEvent = AgentEvent.command(command, id: cmdId);
+        _enrichCommandEvent(cmdEvent);
+        _lastCommandEventId = cmdId;
+        onEvent?.call(cmdEvent);
+        final result = await _runCommandWithSafety(command, executor,
+            commandId: cmdId, myGeneration: myGeneration);
+        if (myGeneration != _currentTaskGeneration) return false;
+        if (!result.shouldContinue) return false;
+        if (result.observation != null) {
+          _conversationHistory.add(
+              ChatMessage.create(role: 'user', content: result.observation!));
+          _trimMessages(_conversationHistory);
+        }
+        _noCommandRetryCount = 0;
+        return true;
+      }
+      // execute 别名但没给命令：告诉模型缺参数，不算致命失败
+      if (_executeAliasNames.contains(alias)) {
+        agentLogger.warn('ReAct', '$alias 别名缺少 command 参数');
+        onEvent?.call(AgentEvent.info('⚠️ AI 调用 $alias 但未提供 command 参数'));
+        _conversationHistory.add(ChatMessage.create(
+            role: 'user',
+            content: '观测: $alias 调用缺少 command 参数（要执行的命令），请重试。'));
+        _trimMessages(_conversationHistory);
+        _noCommandRetryCount++;
+        if (_noCommandRetryCount >= _maxNoCommandRetries) {
+          _finishTask(success: false, summary: L10n.str.toolRetryExhausted);
+          return false;
+        }
+        return true;
+      }
+      // 通用占位名且没有命令参数：按思考处理（模型多半是想"先想一下"）
+      final thoughtText = args.firstOf([
+        'thought',
+        'thinking',
+        'reasoning',
+        'note',
+        'content',
+        'message',
+      ]);
+      if (thoughtText.trim().isNotEmpty) {
+        onEvent?.call(AgentEvent.thought(thoughtText.trim()));
+        _conversationHistory.add(ChatMessage.create(
+            role: 'user', content: '观测: 思考已记录，请给出下一步动作。'));
+        _trimMessages(_conversationHistory);
+        _noCommandRetryCount = 0;
+        return true;
+      }
+      // 既没有命令也没有思考内容：把可用工具清单回给模型
+      final available = _tools.all.map((t) => t.name).join(', ');
+      _conversationHistory.add(ChatMessage.create(
+          role: 'user',
+          content: '观测: 工具 $toolName 不存在。可用工具: $available'));
+      _trimMessages(_conversationHistory);
       return true;
     }
 

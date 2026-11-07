@@ -1030,6 +1030,31 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
   }
 
+  /// 会话累计轮次：用户每次提问、目标每次续跑各 +1。
+  ///
+  /// 存 SettingsDao 的 KV（`agentRounds:<conversationId>`），不引新表也不改
+  /// Conversation 结构。`set()` 先写内存缓存再落库，所以即使磁盘写失败，
+  /// 本次运行内后续读数仍然正确；轮次只是展示信息，不该阻断任务启动。
+  int _bumpConversationRound(String conversationId) {
+    final key = 'agentRounds:$conversationId';
+    final cached = SettingsDao.getCached(key);
+    final int next;
+    if (cached is int) {
+      next = cached + 1;
+    } else {
+      // 升级前的老会话没有这个键：用已落盘的用户消息数回填。
+      // 此刻当前这条提问已经 append，所以"用户消息数"就是本轮序号；
+      // 不回填会让老会话的下一次提问突然从 1 开始。
+      final conv = ConversationsDao.getCachedById(conversationId);
+      final count = conv?.messages.where((m) => m.isUser).length ?? 0;
+      next = count > 0 ? count : 1;
+    }
+    SettingsDao.set(key, next).catchError((Object e) {
+      agentLogger.error('AgentNotifier', '轮次持久化失败($key): $e');
+    });
+    return next;
+  }
+
   /// 开始任务
   Future<void> startTask(String goal) async {
     final scopeId = _registry.activeScopeId;
@@ -1242,7 +1267,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
         return;
       }
 
-      final startFuture = engine.startTask(goal, executor);
+      // 会话累计轮次：用户提问与目标续跑都走 startTask，所以在这条唯一路径上 +1。
+      // 放在所有"放弃启动"的早退之后——没真正跑起来的任务不该消耗一轮。
+      final roundIndex = _bumpConversationRound(convId);
+      final startFuture = engine.startTask(goal, executor, roundIndex: roundIndex);
       // engine.startTask 同步进入 thinking 状态，之后由 isRunning 接管防重
       _startingScopes.remove(scopeId);
       await startFuture;

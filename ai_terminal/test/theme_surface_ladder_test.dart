@@ -46,13 +46,14 @@ void main() {
       expect(_contrast(cTextSub, cCardElevated), greaterThanOrEqualTo(4.5));
     });
 
-    test('数据卡片比所在气泡明显高一档，且不撞控件色', () {
-      // 执行清单 / 结论 / 变更行原来用 cCard，和气泡同色，只剩一圈边框
-      expect(_luminance(cCardData) - _luminance(cCard), greaterThanOrEqualTo(0.012));
-      expect(_luminance(cCardData) < _luminance(cSurface), isTrue);
-      // 深色里只靠亮度差不够，色相要偏一点
-      expect(cCardData.g, greaterThan(cCardData.r));
-      expect(_contrast(cTextBody, cCardData), greaterThanOrEqualTo(4.5));
+    test('AI 回答卡片改透明填充后，文字在面板底色上仍够读', () {
+      // 设计变更：执行清单 / 结论 / 证据 / 命令 / 事件卡与 demo 一致，不再填
+      // 背景色，只靠 1px 边框 + 间距分层，内容直接坐在面板 cCard 上。
+      // 原来的"数据卡片必须比气泡亮一档"契约随之作废；这里守住去掉底色之后
+      // 最容易退化的一环——11px 小字在面板底色上的对比度。
+      expect(_contrast(cTextBody, cCard), greaterThanOrEqualTo(4.5));
+      expect(_contrast(cTextSub, cCard), greaterThanOrEqualTo(4.5));
+      expect(_contrast(cTextMuted, cCard), greaterThanOrEqualTo(4.0));
     });
   });
 
@@ -72,10 +73,11 @@ void main() {
       expect(_contrast(cTextSubLight, cSurfaceLight), greaterThanOrEqualTo(4.0));
     });
 
-    test('浅色数据卡片靠凹陷区分，且小字仍够 4.5:1', () {
-      expect(_luminance(cCardLight) - _luminance(cCardDataLight),
-          greaterThanOrEqualTo(0.04));
-      expect(_contrast(cTextSubLight, cCardDataLight), greaterThanOrEqualTo(4.5));
+    test('浅色 AI 卡片透明填充后，小字在面板底色上仍够 4.5:1', () {
+      // 同深色：卡片不再用 cCardDataLight 做凹陷，内容直接坐在 cCardLight 上
+      expect(_contrast(cTextMainLight, cCardLight), greaterThanOrEqualTo(7.0));
+      expect(_contrast(cTextBodyLight, cCardLight), greaterThanOrEqualTo(4.5));
+      expect(_contrast(cTextSubLight, cCardLight), greaterThanOrEqualTo(4.5));
     });
   });
 }

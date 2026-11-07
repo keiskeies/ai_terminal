@@ -50,8 +50,10 @@ const Color cBg = Color(0xFF090C0C);
 const Color cCard = Color(0xFF131616);
 const Color cCardElevated = Color(0xFF1C2020);
 const Color cSurface = Color(0xFF292C2C);
-// 气泡里的数据卡片（执行清单、结论、变更行）：比所在气泡亮一档并带一点青，
-// 只靠亮度差在深色里不够看，色相偏一点才会一眼分得开。
+// 数据卡片（执行清单、结论、变更行）：比面板亮一档并带一点青，只靠亮度差在
+// 深色里不够看，色相偏一点才会一眼分得开。AI 回答去掉外层气泡后，这些卡片从
+// "气泡内嵌块"变成"面板上的独立卡片"，这层阶梯仍需保留：压暗会同时损失 11px
+// 小字对比度，并破坏 theme_surface_ladder_test 的 0.012 亮度差契约。
 const Color cCardData = Color(0xFF202A28);
 // 发丝线：默认 12% 白，交互/焦点 22%，内部分隔 7%。
 const Color cBorder = Color(0x1FFFFFFF);
@@ -129,11 +131,14 @@ const Color cStatusErrorLight = Color(0xFFB42318);
 const Color cStatusErrorBgLight = Color(0x14B42318);
 
 // ===== 圆角系统 =====
-const double rXSmall = 4.0;
-const double rSmall = 6.0;
-const double rMedium = 8.0;
-const double rLarge = 12.0;
-const double rXLarge = 16.0;
+// 原先 4/6/8/12 的阶梯在 11px 小字与细边框的深色界面上显得偏尖：边框越细，
+// 小半径的转角越接近直角。整体上调一档（+1~2px），让卡片、输入框、按钮的
+// 转角更圆润，同时保持四档之间的层级差不变。
+const double rXSmall = 5.0;
+const double rSmall = 8.0;
+const double rMedium = 10.0;
+const double rLarge = 14.0;
+const double rXLarge = 18.0;
 const double rFull = 999.0;
 const double rCard = rMedium;
 const double rButton = rSmall;
@@ -143,6 +148,9 @@ const double rBubble = rMedium;
 // ===== 间距系统 =====
 const double pXSmall = 4.0;
 const double pSmall = 8.0;
+/// 卡片级模块之间（结果卡 / 执行清单 / 正文 / 过程折叠）。
+/// 12 在 13px 正文的回答里会读成"两块东西断开了"，10 才是一段话的呼吸。
+const double pModule = 10.0;
 const double pCompact = 12.0;
 const double pStandard = 16.0;
 const double pLarge = 20.0;

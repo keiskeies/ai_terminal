@@ -130,6 +130,10 @@ void main() {
         ),
       )));
 
+      // 失败行默认收起：先点开这一行
+      await tester.tap(find.text('exec_batch').first);
+      await tester.pump();
+
       expect(find.text('3 台主机 · 2 成功 · 1 失败'), findsOneWidget);
       expect(find.text('web-02'), findsOneWidget);
       await tester.tap(find.text('重试失败主机'));

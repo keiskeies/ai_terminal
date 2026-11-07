@@ -110,8 +110,8 @@
 
 | 显示项 | 来源 | 无数据时 |
 |---|---|---|
-| `N 轮` | 运行中：`AgentTracer.getMetrics(taskId).aiCallCount`（F4b）；跨任务累计另存 | 显示 `0 轮`（真值，不是缺数据） |
-| `N 步` | `AgentTask.stepIndex`（F5，已有） | `0 步` |
+| `N 轮` | 会话累计轮次：用户每次提问 +1、目标每次续跑 +1，存 `SettingsDao` 的 `agentRounds:<conversationId>`（`AgentNotifier._bumpConversationRound`） | 显示 `0 轮`（真值，不是缺数据） |
+| `N 步` | `AgentTask.steps` = 模型请求次数（含重试/备用模型）+ 命令执行数（成功/失败）+ 被拦截而未执行的命令数 + 工具调用数 | `0 步` |
 | `N tok/s` | `tokenTotal / elapsedSeconds`，**elapsed 为 0 时不显示**（防除零） | 整项不渲染 |
 | `≈N tok` / `N tok` | 有 usage 用真值（不带 `≈`）；无 usage 用 `TokenEstimator` 累计（带 `≈`）——D1 | 不会缺，估算永远可得 |
 | `缓存命中 x%` | **仅当** `cached_tokens` 存在时渲染（F8、D2） | 整项不渲染 |

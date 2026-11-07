@@ -211,8 +211,31 @@ class AgentTask {
   /// 失败执行的命令数
   final int failureCount;
 
-  /// AI 请求轮数（含重试），与 trace 的 ai_call_count 同语义
+  /// 会话累计轮次：用户每次提问、目标每次续跑各 +1。
+  ///
+  /// 注意与 [aiCalls] 的区别——这里度量的是"用户可感知的第几次任务"，
+  /// 不是模型调用次数。一轮里可能包含几十次模型调用（[aiCalls]）与命令执行。
+  /// 由 provider 在启动任务时按会话累加后传入，引擎不自行递增。
   final int rounds;
+
+  /// 本任务的模型请求次数（含重试与备用模型切换）。
+  /// 只作为 [stepTotal] 的组成部分，不直接显示——显示它会让"轮"看起来比"步"多。
+  final int aiCalls;
+
+  /// 被安全策略 / 权限档位 / 用户拒绝而未执行的命令数（含确认超时）。
+  /// 这些命令从未真正执行，但用户视角是"AI 尝试过"，按产品口径要计入 [stepTotal]。
+  final int blockedCount;
+
+  /// 本任务发起的工具调用次数（含未知工具、只读档拦截的调用）。
+  final int toolCalls;
+
+  /// 「步」= 请求 AI + 执行命令（成功/失败/被拦截）+ 工具调用。
+  ///
+  /// 与 [rounds] 是两个量纲：轮是任务次数，步是一轮内的活动次数，
+  /// 所以步永远 ≥ 轮（只要一轮至少发起过一次模型请求）。
+  /// 命名避开 [steps]（模型声明的执行清单），那是另一回事。
+  int get stepTotal =>
+      aiCalls + successCount + failureCount + blockedCount + toolCalls;
 
   /// token 总量。[hasEstimatedTokens] 为 true 时其中含估算成分，界面必须显示 ≈
   final int tokenTotal;
@@ -251,6 +274,9 @@ class AgentTask {
     this.successCount = 0,
     this.failureCount = 0,
     this.rounds = 0,
+    this.aiCalls = 0,
+    this.blockedCount = 0,
+    this.toolCalls = 0,
     this.tokenTotal = 0,
     this.hasEstimatedTokens = false,
     this.cacheHitPercent,
@@ -274,6 +300,9 @@ class AgentTask {
     int? successCount,
     int? failureCount,
     int? rounds,
+    int? aiCalls,
+    int? blockedCount,
+    int? toolCalls,
     int? tokenTotal,
     bool? hasEstimatedTokens,
     int? cacheHitPercent,
@@ -298,6 +327,9 @@ class AgentTask {
       successCount: successCount ?? this.successCount,
       failureCount: failureCount ?? this.failureCount,
       rounds: rounds ?? this.rounds,
+      aiCalls: aiCalls ?? this.aiCalls,
+      blockedCount: blockedCount ?? this.blockedCount,
+      toolCalls: toolCalls ?? this.toolCalls,
       tokenTotal: tokenTotal ?? this.tokenTotal,
       hasEstimatedTokens: hasEstimatedTokens ?? this.hasEstimatedTokens,
       cacheHitPercent: clearCacheHitPercent

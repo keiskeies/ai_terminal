@@ -2,6 +2,7 @@ import 'package:dio/dio.dart' show CancelToken;
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_terminal/models/agent_memory.dart';
+import 'package:ai_terminal/models/agent_model.dart';
 import 'package:ai_terminal/models/ai_model_config.dart';
 import 'package:ai_terminal/models/chat_session.dart';
 import 'package:ai_terminal/models/token_usage.dart';
@@ -56,7 +57,7 @@ void main() {
       e.recordUsageForTesting(const TokenUsage(totalTokens: 300));
 
       expect(e.tokenTotalForTesting, 500);
-      expect(e.roundsForTesting, 2);
+      expect(e.aiCallsForTesting, 2);
     });
 
     test('没有 total_tokens 时用 prompt+completion 兜底', () {
@@ -99,6 +100,30 @@ void main() {
         const TokenUsage(promptTokens: 100, cachedTokens: 900),
       );
       expect(e.cacheHitForTesting, 100);
+    });
+  });
+
+  group('「步」的口径', () {
+    test('步 = AI 请求 + 命令（成功/失败/拦截）+ 工具调用', () {
+      final task = AgentTask(
+        id: 't1',
+        goal: '巡检',
+        aiCalls: 23,
+        successCount: 3,
+        failureCount: 1,
+        blockedCount: 2,
+        toolCalls: 5,
+      );
+
+      // 23 + 3 + 1 + 2 + 5；拦截过的命令从未执行，但用户视角是"尝试过"
+      expect(task.stepTotal, 34);
+    });
+
+    test('轮是会话累计值，与步不同源：一轮可以只有一次模型请求', () {
+      final task = AgentTask(id: 't2', goal: '巡检', rounds: 1, aiCalls: 1);
+
+      expect(task.rounds, 1);
+      expect(task.stepTotal, 1);
     });
   });
 

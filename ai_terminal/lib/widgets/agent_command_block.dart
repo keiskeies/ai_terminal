@@ -159,11 +159,11 @@ class AgentCommandBlock extends StatelessWidget {
                                 : ui.executable;
 
     final block = Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
+      margin: const EdgeInsets.symmetric(vertical: 6),
       decoration: BoxDecoration(
-        color: tc.terminalOutput,
-        borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: tc.border, width: 1),
+        color: tc.agentCardFill,
+        borderRadius: BorderRadius.circular(rCard),
+        border: Border.all(color: tc.agentCardBorder, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: Row(
@@ -303,11 +303,11 @@ class AgentCommandBlock extends StatelessWidget {
     final color = isBlocked ? tc.error : tc.warn;
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(10, 0, 10, 8),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+      margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(rXSmall),
+        borderRadius: BorderRadius.circular(rSmall),
         border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Column(
@@ -533,11 +533,11 @@ Widget buildCodeBlockWithExecuteButton(
 /// 纯代码块（非 shell）
 Widget buildPlainCodeBlock(String codeBlock, ThemeColors tc) {
   return Container(
-    margin: const EdgeInsets.symmetric(vertical: 4),
-    padding: const EdgeInsets.all(12),
+    margin: const EdgeInsets.symmetric(vertical: 6),
+    padding: const EdgeInsets.all(pCompact),
     decoration: BoxDecoration(
-      color: tc.terminalBg,
-      borderRadius: BorderRadius.circular(rSmall),
+      color: tc.agentCardFill,
+      borderRadius: BorderRadius.circular(rCard),
       border: Border.all(color: tc.border),
     ),
     child: Text(

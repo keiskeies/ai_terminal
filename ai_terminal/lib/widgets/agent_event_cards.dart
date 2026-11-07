@@ -22,6 +22,27 @@ import '../core/app_toast.dart';
 /// - finish：完成横幅
 ///
 /// 由 `_TerminalPageState._buildEventsContent` 系列方法提取而来。
+/// 回答正文的框：与命令行 / 结果卡同一套（透明填充 + 0.5px 边框 + rCard 圆角，
+/// 内边距同过程卡片的 12/10）。
+///
+/// 正文原来直接铺在面板上：上下都是带边框的卡片，只有中间这段大字没有容器，
+/// 看着像"溢出到卡片之外"的文字。给它一个同样克制的框，阅读区才立得住。
+Widget agentAnswerCard(Widget child, ThemeColors tc) {
+  return Container(
+    width: double.infinity,
+    margin: const EdgeInsets.symmetric(vertical: 3),
+    // 底 6 + Markdown 自带的 4px 底距 = 10，与上边距对称
+    padding: const EdgeInsets.fromLTRB(pCompact, pModule, pCompact, 6),
+    decoration: BoxDecoration(
+      color: tc.agentCardFill,
+      borderRadius: BorderRadius.circular(rCard),
+      // 与命令行 / 结果卡 / 执行清单同一套边框线
+      border: Border.all(color: tc.agentCardBorder, width: 1),
+    ),
+    child: child,
+  );
+}
+
 class AgentEventContent extends StatelessWidget {
   final List<AgentEvent> events;
   final ThemeColors tc;
@@ -62,6 +83,9 @@ class AgentEventContent extends StatelessWidget {
   /// 多主机矩阵重试失败主机回调
   final void Function(List<String> failedHostIds)? onRetryFailedHosts;
 
+  /// 正在流式产生的模型原生推理，交给时间线渲染成末尾的思考行
+  final String liveReasoning;
+
   const AgentEventContent({
     super.key,
     required this.events,
@@ -81,6 +105,7 @@ class AgentEventContent extends StatelessWidget {
     this.onRetryFailedCommand,
     this.onReconnectHost,
     this.onRetryFailedHosts,
+    this.liveReasoning = '',
   });
 
   @override
@@ -121,7 +146,7 @@ class AgentEventContent extends StatelessWidget {
     void flushText() {
       final text = textBuffer.toString().trim();
       if (text.isNotEmpty) {
-        widgets.add(markdownBuilder(text, tc));
+        widgets.add(agentAnswerCard(markdownBuilder(text, tc), tc));
         textBuffer.clear();
       }
     }
@@ -142,6 +167,11 @@ class AgentEventContent extends StatelessWidget {
         onExecuteCommand: onExecuteCommand,
         onConfirmCommand: onConfirmCommand,
         onRejectCommand: onRejectCommand,
+        // 只有最后一段（当前正在推进的那一段）才挂实时推理：
+        // 实时推理永远发生在时间线的末尾
+        liveReasoning: segmentEvents.last.id == events.last.id
+            ? liveReasoning
+            : '',
         resultBuilder: (ctx, result) => _buildResultCard(result, tc, ctx),
       ));
     }
@@ -182,11 +212,21 @@ class AgentEventContent extends StatelessWidget {
         case AgentEventType.ask:
           flushSegment();
           flushText();
-          widgets.add(_buildAskCard(
-            event,
-            tc,
-            pending: event.id == pendingAskId,
-          ));
+          if (event.id == pendingAskId) {
+            // 当前等待作答的询问：保持完整卡片 + 可点选项
+            widgets.add(_buildAskCard(event, tc, pending: true));
+          } else {
+            // 已回答的询问：像命令行一样收在步骤里（一行问题 + 答案胶囊），
+            // 点开才展开完整问题与当时的选项。答完就连"问过什么"都找不到，
+            // 步骤流就断档了。
+            widgets.add(_AskHistoryRow(
+              key: ValueKey('ask-history-${event.id}'),
+              event: event,
+              chosen: _chosenAnswerFor(events, event),
+              tc: tc,
+              expanded: _buildAskCard(event, tc, pending: false),
+            ));
+          }
           break;
         case AgentEventType.finish:
           flushSegment();
@@ -235,6 +275,26 @@ class AgentEventContent extends StatelessWidget {
     return null;
   }
 
+  /// 在 ask 事件之后找「用户选择了 xxx」的 info 事件，提取答案文本。
+  /// 时间线里的询问行要显示用户到底选了什么。
+  static String? _chosenAnswerFor(List<AgentEvent> events, AgentEvent ask) {
+    final idx = events.indexOf(ask);
+    if (idx < 0) return null;
+    final pattern = RegExp(r'(?:你选择了|You chose)[：:]\s*(.+)$');
+    for (var i = idx + 1; i < events.length; i++) {
+      final e = events[i];
+      if (e.isAsk) break; // 下一次询问开始还没答案
+      if (!e.isInfo) continue;
+      final m =
+          pattern.firstMatch((e.text ?? '').trim());
+      if (m != null) {
+        final answer = m.group(1)?.trim();
+        if (answer != null && answer.isNotEmpty) return answer;
+      }
+    }
+    return null;
+  }
+
   /// 结果卡片：成功/失败状态 + 输出（全部展开显示）
   /// 背景保持 terminalBg，无左侧缩进，与命令块视觉对齐
   Widget _buildResultCard(AgentEvent event, ThemeColors tc, BuildContext context) {
@@ -257,8 +317,8 @@ class AgentEventContent extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.only(bottom: 8, top: 2),
       decoration: BoxDecoration(
-        color: tc.terminalBg,
-        borderRadius: BorderRadius.circular(rSmall),
+        color: tc.agentCardFill,
+        borderRadius: BorderRadius.circular(rCard),
         border: Border.all(color: tc.border, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
@@ -520,16 +580,9 @@ class AgentEventContent extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: tc.brand.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(rSmall),
+        color: tc.agentCardFill,
+        borderRadius: BorderRadius.circular(rCard),
         border: Border.all(color: tc.brand.withValues(alpha: 0.18)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -624,7 +677,7 @@ class AgentEventContent extends StatelessWidget {
   /// 任务终态卡片（完成 / 取消 / 失败 / 中断）
   Widget _buildFinishCard(AgentEvent event, ThemeColors tc) {
     final state = event.finishState ?? AgentFinishState.success;
-    final (accent, background, title, icon, defaultSummary) = switch (state) {
+    final (accent, _, title, icon, defaultSummary) = switch (state) {
       AgentFinishState.success => (
           tc.ok,
           tc.okBg,
@@ -660,8 +713,8 @@ class AgentEventContent extends StatelessWidget {
       padding:
           const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(rSmall),
+        color: tc.agentCardFill,
+        borderRadius: BorderRadius.circular(rCard),
         border: Border.all(color: accent.withValues(alpha: 0.2)),
       ),
       child: Row(
@@ -763,10 +816,10 @@ class _RawOutputTailState extends State<_RawOutputTail> {
   Widget build(BuildContext context) {
     final tc = widget.tc;
     return Container(
-      margin: const EdgeInsets.only(top: 6),
+      margin: const EdgeInsets.only(top: pSmall),
       decoration: BoxDecoration(
-        color: tc.terminalBg.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(rXSmall),
+        color: tc.agentCardFill,
+        borderRadius: BorderRadius.circular(rSmall),
         border: Border.all(color: tc.border.withValues(alpha: 0.5)),
       ),
       child: Column(
@@ -774,9 +827,9 @@ class _RawOutputTailState extends State<_RawOutputTail> {
         children: [
           InkWell(
             onTap: () => setState(() => _expanded = !_expanded),
-            borderRadius: BorderRadius.circular(rXSmall),
+            borderRadius: BorderRadius.circular(rSmall),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               child: Row(
                 children: [
                   Icon(Icons.subject, size: 12, color: tc.textMuted),
@@ -815,11 +868,12 @@ class _RawOutputTailState extends State<_RawOutputTail> {
           if (_expanded)
             Container(
               width: double.infinity,
-              margin: const EdgeInsets.fromLTRB(7, 0, 7, 7),
-              padding: const EdgeInsets.all(7),
+              margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: tc.terminalBg,
-                borderRadius: BorderRadius.circular(rXSmall),
+                color: tc.agentCardFill,
+                borderRadius: BorderRadius.circular(rSmall),
+                border: Border.all(color: tc.border),
               ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 220),
@@ -1040,6 +1094,106 @@ class _ResultOutputPreview extends StatelessWidget {
             ),
           ),
       ],
+    );
+  }
+}
+
+/// 已回答的询问行：像命令行一样收在步骤里。
+///
+/// 一行：❓ + 问题（单行省略）+ 答案胶囊；点开展开完整问题与当时的选项
+/// （不可再选）。用户答完问题后，"问过什么、选了什么"必须留在步骤流里，
+/// 不能凭空消失。
+class _AskHistoryRow extends StatefulWidget {
+  final AgentEvent event;
+  final String? chosen;
+  final ThemeColors tc;
+
+  /// 点开后的完整内容（复用询问卡的渲染：问题 Markdown + 选项列表）
+  final Widget expanded;
+
+  const _AskHistoryRow({
+    super.key,
+    required this.event,
+    required this.chosen,
+    required this.tc,
+    required this.expanded,
+  });
+
+  @override
+  State<_AskHistoryRow> createState() => _AskHistoryRowState();
+}
+
+class _AskHistoryRowState extends State<_AskHistoryRow> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = widget.tc;
+    final question =
+        (widget.event.question ?? widget.event.text ?? '').trim();
+    final chosen = widget.chosen;
+    return InkWell(
+      borderRadius: BorderRadius.circular(rSmall),
+      onTap: () => setState(() => _open = !_open),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.help_outline, size: 13, color: tc.brand),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    question,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: tc.textBody, fontSize: fSmall),
+                  ),
+                ),
+                if (chosen != null) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: tc.ok.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(rFull),
+                        border: Border.all(
+                            color: tc.ok.withValues(alpha: 0.35), width: 0.5),
+                      ),
+                      child: Text(
+                        chosen,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            color: tc.ok,
+                            fontSize: fMicro,
+                            fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 4),
+                Icon(
+                  _open ? Icons.expand_less : Icons.expand_more,
+                  size: 13,
+                  color: tc.textMuted,
+                ),
+              ],
+            ),
+            if (_open) ...[
+              const SizedBox(height: 4),
+              Padding(
+                padding: const EdgeInsets.only(left: 19),
+                child: widget.expanded,
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
