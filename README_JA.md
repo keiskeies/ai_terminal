@@ -8,7 +8,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.3.9-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.4.0-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License" />
   </p>
@@ -21,7 +21,7 @@
 
 > **Translation update in progress**
 >
-> この翻訳は v1.3.9 向けに更新中です。最新の内容は英語版または中国語版 README を参照してください。
+> この翻訳は v1.4.0 向けに更新中です。最新の内容は英語版または中国語版 README を参照してください。
 >
 > [英語版 README](./README.md) · [中国語版 README](./README_ZH.md)
 

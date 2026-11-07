@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.3.9-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.4.0-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.3.9</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.4.0</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">Visit the website</a>
 </p>
@@ -54,13 +54,13 @@ A chat assistant tells you what to run. AI Terminal runs it on your servers and 
 
 `5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `26 built-in tools` · `8 slash commands` · `300+ knowledge entries` · `7 web search engines`
 
-## New in 1.3.9
+## New in 1.4.0
 
-- **Whole-answer selection & copy** — drag across the entire answer, then copy all of it with one click under the message
-- **Information hierarchy** — conclusion, action controls and status stay visible; plan, change ledger and next actions fold once the run ends; evidence and command output open on demand
-- **Streamed reasoning** — provider `reasoning_content` renders as a collapsible model-thinking block, and the live ReAct thought streams while the task runs instead of arriving in bursts
-- **Terminal context menu** — copy/paste, transcript export, font size, send a selection to the Agent, save snippets, SFTP/audit entry points, and contextual open-link/copy-path actions
-- **Structured logs & real Windows metrics** — filter the Agent log by level, tag or current task; Windows local monitoring now reads CIM through an encoded PowerShell command, so it works under any system locale
+- **Idle-friendly runtime performance** — no more CPU/GPU spikes while the Agent runs: the chat UI rebuilds only the streaming message instead of the whole page and every tab workspace, and auto-follow scrolling no longer restarts an animation on every token
+- **Batched terminal rendering** — PTY/SSH output is merged frame-by-frame before writing to xterm, so commands that flood the screen no longer repaint per packet
+- **Quieter system monitor** — background tabs stop polling, and the Windows CIM collection slows down while a task is running, so monitoring no longer competes with the Agent for CPU
+- **Incremental streaming markdown** — completed paragraphs are cached and only the growing tail is re-parsed, fixing the quadratic slowdown on long answers; early command detection and session persistence are likewise bounded
+- **Background-serialized persistence** — large conversations are JSON-encoded off the UI thread with per-conversation write ordering, keeping saves crash-safe and stutter-free
 
 ## Highlights
 
@@ -195,11 +195,11 @@ Get the latest build from [GitHub Releases](https://github.com/keiskeies/ai_term
 
 | Platform | File |
 |---|---|
-| macOS | `AI_Terminal_v1.3.9_macOS.zip` |
-| iOS | `AI_Terminal_v1.3.9_iOS.ipa` (unsigned) |
-| Android | `AI_Terminal_v1.3.9_Android.apk` |
-| Windows | `AI_Terminal_v1.3.9_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.3.9_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.4.0_macOS.zip` |
+| iOS | `AI_Terminal_v1.4.0_iOS.ipa` (unsigned) |
+| Android | `AI_Terminal_v1.4.0_Android.apk` |
+| Windows | `AI_Terminal_v1.4.0_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.4.0_Linux_x64.tar.gz` |
 
 If macOS reports that the developer cannot be verified:
 

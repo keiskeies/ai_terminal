@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../l10n/app_localizations.dart';
+import '../providers/agent_provider.dart';
 import '../services/server_monitor_service.dart';
 
 /// 服务器监控面板 — 单行紧凑布局（30px 高）
@@ -13,7 +15,7 @@ import '../services/server_monitor_service.dart';
 /// [icon]上传 0.01 Mb/s [图表] | [icon]下载 0.01 Mb/s [图表]
 ///
 /// 鼠标 hover 或触屏 tap 弹出详细数据浮层，浮层左右两栏布局。
-class ServerMonitorPanel extends StatefulWidget {
+class ServerMonitorPanel extends ConsumerStatefulWidget {
   final ServerMonitorService service;
   final Duration interval;
   final double height;
@@ -26,14 +28,16 @@ class ServerMonitorPanel extends StatefulWidget {
   });
 
   @override
-  State<ServerMonitorPanel> createState() => _ServerMonitorPanelState();
+  ConsumerState<ServerMonitorPanel> createState() => _ServerMonitorPanelState();
 }
 
-class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
+class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
   Timer? _timer;
   ServerSnapshot? _last;
   bool _isCollecting = false;
   int _consecutiveFailures = 0; // 连续失败次数，>=2 时显示失败状态
+  int _tick = 0;
+  DateTime _lastCollectAt = DateTime.fromMillisecondsSinceEpoch(0);
 
   // 浮层控制
   OverlayEntry? _overlayEntry;
@@ -60,8 +64,29 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
   @override
   void initState() {
     super.initState();
+    // 首帧后再采集：initState 里不能读 TickerMode；恢复多 tab 时避免
+    // 后台 tab 的面板同时触发一轮 PowerShell/WMI 采集
+    WidgetsBinding.instance.addPostFrameCallback((_) => _collectNow());
+    _timer = Timer.periodic(widget.interval, (_) => _onTick());
+  }
+
+  void _onTick() {
+    _tick++;
+    // agent 运行期间降频到 1/3（默认 15s 一次）：本地 Windows 采集要起
+    // PowerShell + 十几个 Get-CimInstance（WMI 很重），不该和正在执行的
+    // 任务抢 CPU
+    if (ref.read(agentProvider).isRunning && _tick % 3 != 0) return;
     _collectNow();
-    _timer = Timer.periodic(widget.interval, (_) => _collectNow());
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 切回本 tab（TickerMode 重新启用）时若数据已过期，立即补采一次
+    if (TickerMode.valuesOf(context).enabled &&
+        DateTime.now().difference(_lastCollectAt) > widget.interval) {
+      _collectNow();
+    }
   }
 
   @override
@@ -77,8 +102,12 @@ class _ServerMonitorPanelState extends State<ServerMonitorPanel> {
 
   Future<void> _collectNow() async {
     if (!mounted) return;
+    // 后台 tab（Offstage + TickerMode disabled）不采集：Timer.periodic 不受
+    // TickerMode 影响，必须显式跳过，否则多 tab 会叠加采集进程
+    if (!TickerMode.valuesOf(context).enabled) return;
     if (_isCollecting) return;
     _isCollecting = true;
+    _lastCollectAt = DateTime.now();
     try {
       final snap = await widget.service.collect();
       if (!mounted) return;

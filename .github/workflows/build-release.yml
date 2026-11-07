@@ -203,6 +203,30 @@ jobs:
 
             AI Terminal 是一款将 AI 助手与 SSH / 本地终端深度集成的跨平台应用。无论你是刚买服务器的小白、不想记命令的开发者、还是需要批量管理服务器的运维人员——打开它，用中文告诉 AI 你要干什么，它帮你连服务器、跑命令、装软件、查问题。全程安全可控。
 
+            ### 🆕 v1.4.0 性能专项 · Agent 运行不再打满 CPU/GPU
+
+            v1.4.0 聚焦运行时性能：任务执行期间界面渲染、终端输出、系统监控与会话持久化全面"降噪提速"，长对话不再越用越卡。
+
+            #### ⚡ 渲染与交互
+            - **整页重建 → 局部重建**：AI 流式输出只刷新正在生成的那条消息，不再带动整个页面与所有后台标签工作区
+            - **滚动跟随去动画化**：自动滚到底部改为 150ms 节流 + 瞬时跳转，消除每个数据块重启滚动动画造成的满帧率绘制
+            - **终端输出批处理**：PTY/SSH 输出按帧合并后写入 xterm，刷屏型命令不再逐包触发 VT 解析与全屏重绘
+            - **流式 Markdown 增量渲染**：已完成段落进缓存、只重新解析增长中的尾部；未闭合代码围栏按纯代码块直接渲染
+
+            #### 🧠 Agent 引擎与持久化
+            - **命令提前检测限频**：增量门槛 + 长度上限，长回答含代码块时不再对全文反复解析与哈希（原为平方级开销）；流结束全量解析兜底，命令执行不受影响
+            - **会话保存移出主线程**：大会话 JSON 序列化在后台 isolate 完成，并按会话串行落盘，写入有序、失败可回退内联编码
+            - **流式落盘双重门槛**：增量长度 + 1.5s 时间门槛，异常退出的丢失窗口保持很小
+            - **思考提取只扫尾部窗口**：窗口未命中自动回退全量扫描，语义与原版一致
+
+            #### 📊 系统监控
+            - **后台标签停止采集**：切走的标签页不再每 5s 起 PowerShell/WMI 采集，切回时自动补采
+            - **任务运行期降频**：Agent 执行期间监控采集降频至 1/3，不与任务抢 CPU
+            - **「思考中」指示器静态化**：去掉常驻转圈动画，减少持续帧调度
+
+            #### ✅ 质量验证
+            - 955 个单元/Widget 测试全部通过；新增流式 Markdown 切分一致性与思考提取长文本回归测试
+
             ### 🆕 v1.3.9 新功能 · 回答整段复制 & 终端右键菜单
 
             v1.3.9 聚焦日常操作手感：Agent 回答可跨段选择、一键整段复制；信息按常驻/折叠/按需分级；思考真正流式输出；终端右键成为完整工作区入口；Windows 本机监控修复。
@@ -228,6 +252,7 @@ jobs:
             - 行内代码改用字色区分
 
             #### 📁 继续包含
+            - v1.3.9 的回答整段复制、信息分级、思考流式输出与终端右键菜单
             - v1.3.8 的石墨青主题与中英文操作单
             - v1.3.7 的操作单、文件传输/编辑安全加固
 
@@ -335,6 +360,30 @@ jobs:
 
             AI Terminal is a cross-platform app that deeply integrates an AI assistant with SSH and local terminals. Whether you're a beginner who just rented a VPS, a developer tired of googling commands, or a DevOps engineer managing dozens of servers — open it, tell the AI what you want in plain English (or Chinese), and it handles the rest. Safe, transparent, and under your control.
 
+            ### 🆕 What's New in v1.4.0 · Runtime Performance — No More CPU/GPU Spikes
+
+            v1.4.0 is a performance release: while a task runs, UI rendering, terminal output, system monitoring and conversation persistence are all quieted down, so long conversations no longer get slower the longer they get.
+
+            #### ⚡ Rendering & interaction
+            - **Whole-page rebuilds → local rebuilds**: streaming AI output now refreshes only the message being generated, not the entire page and every background tab workspace
+            - **Animation-free scroll follow**: auto-scroll to the bottom uses a 150 ms throttle with instant jumps, ending the full-frame-rate repaints caused by restarting the scroll animation on every chunk
+            - **Batched terminal output**: PTY/SSH output is coalesced per frame before writing to xterm, so screen-filling commands no longer trigger per-packet VT parsing and full redraws
+            - **Incremental streaming Markdown**: finished paragraphs are cached and only the growing tail is re-parsed; an unclosed code fence renders as a plain code block instead of repeated parse passes
+
+            #### 🧠 Agent engine & persistence
+            - **Rate-limited early command detection**: growth threshold plus a length cap end the quadratic re-parse/hash cost of long answers with code blocks; the full parse at stream end still guarantees command execution
+            - **Persistence off the UI isolate**: large conversation JSON encoding runs on a background isolate, serialized per conversation with ordered writes and an inline fallback
+            - **Double-gated streaming saves**: length increment plus a 1.5 s time gate keeps the crash-loss window small
+            - **Thought extraction scans a tail window**: a full-scan fallback keeps the result identical to before when the marker sits outside the window
+
+            #### 📊 System monitor
+            - **Background tabs stop collecting**: switched-away tabs no longer spawn PowerShell/WMI collection every 5 s; data is re-collected automatically on return
+            - **Slowdown during tasks**: monitor collection drops to 1/3 frequency while the Agent runs so it never competes with the task for CPU
+            - **Static "thinking" indicator**: the always-spinning animation is replaced with a static icon, reducing continuous frame scheduling
+
+            #### ✅ Quality verification
+            - All 955 unit/widget tests pass; new regression tests cover streaming-Markdown split consistency and long-text thought extraction
+
             ### 🆕 What's New in v1.3.9 · Whole-Answer Copy & Terminal Context Menu
 
             v1.3.9 focuses on day-to-day ergonomics: select and copy an entire Agent answer, keep information layered, stream reasoning as it happens, turn the terminal context menu into a real workspace, and fix Windows local monitoring.
@@ -360,6 +409,7 @@ jobs:
             - Inline code is tinted by color instead of a background patch
 
             #### 📁 Still included
+            - The v1.3.9 whole-answer copy, information hierarchy, streamed reasoning and terminal context menu
             - The v1.3.8 graphite theme and English/Chinese operation sheet
             - The v1.3.7 operation sheet and file transfer/edit safety work
 

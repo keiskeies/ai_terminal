@@ -1665,9 +1665,15 @@ class AgentEngine {
     bool commandDetectedNotified = false; // 是否已通知过命令检测（一轮只通知一次）
     // 流式提前检测命令：全量解析很贵，限制在 150ms 一次，且只有出现
     // 「命令:」或围栏代码块迹象时才解析；纯推理流不再逐 chunk 重解析。
+    // 另加增长门槛（至少新增 64 字符才重解析）和长度上限：最终回答含代码
+    // 围栏但永远没有完整命令时，避免整轮对增长中的全文反复 parse+哈希（O(n²)）。
+    // 超过上限只是放弃"提前执行"优化，流结束后的全量解析仍会正常执行命令。
     const earlyParseIntervalMs = 150;
+    const earlyParseMinGrowth = 64;
+    const earlyParseMaxChars = 16384;
     final earlyParseStopwatch = Stopwatch()..start();
     var lastEarlyParseAtMs = -earlyParseIntervalMs;
+    var lastEarlyParseLen = 0;
     // watchdog 已改为实例字段 _aiWatchdog
 
     String assignFinalId(AgentEvent e) {
@@ -1713,13 +1719,17 @@ class AgentEngine {
         // 流式过程中检测完整命令：立即发出 command 事件 + 触发提前执行
         if (onCommandDetected != null && !commandDetectedNotified) {
           final elapsed = earlyParseStopwatch.elapsedMilliseconds;
-          if (elapsed - lastEarlyParseAtMs >= earlyParseIntervalMs) {
+          final bufLen = fullResponseBuffer.length;
+          if (elapsed - lastEarlyParseAtMs >= earlyParseIntervalMs &&
+              bufLen - lastEarlyParseLen >= earlyParseMinGrowth &&
+              bufLen <= earlyParseMaxChars) {
+            lastEarlyParseAtMs = elapsed;
+            lastEarlyParseLen = bufLen;
             final responseText = fullResponseBuffer.toString();
             // 没有命令行/代码围栏时解析不可能产出 command 事件，直接跳过
             if (responseText.contains('命令:') ||
                 responseText.contains('命令：') ||
                 responseText.contains('```')) {
-              lastEarlyParseAtMs = elapsed;
               final currentEvents = ReActStreamParser.parse(responseText);
               // 找第一个已确定完成的 command 事件（不是最后一个）
               if (currentEvents.length > 1) {

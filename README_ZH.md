@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.3.9-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.4.0-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.3.9</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.4.0</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">访问官网</a>
 </p>
@@ -54,13 +54,13 @@
 
 `5 个平台` · `14 种界面语言` · `22 个 AI 供应商` · `90+ 预设模型` · `26 个内置工具` · `8 个斜杠命令` · `300+ 知识库条目` · `7 种联网搜索源`
 
-## 1.3.9 新增
+## 1.4.0 新增
 
-- **整段选择与复制**：可以在整条回答上跨段落拖选，消息下方一键复制完整回答
-- **信息分级**：结论、操作按钮和状态常驻；计划、变更台账和下一步在任务结束后自动收起；证据和命令输出按需展开
-- **思考流式输出**：provider 返回的 `reasoning_content` 显示为可折叠的模型思考块，ReAct 实时思考在任务运行中连续打印，不再一段一段蹦出
-- **终端右键菜单**：复制/粘贴、导出会话、字号调整、选区发给 Agent、存为片段、SFTP/审计入口，以及按光标位置识别链接与路径
-- **结构化日志与真实 Windows 监控**：Agent 日志按级别、标签或当前任务筛选；Windows 本机监控改用 CIM + 编码 PowerShell，任何系统语言下都能取到数据
+- **运行时性能优化**：Agent 运行不再把 CPU/GPU 打满——聊天界面只重建正在流式的那条消息，不再带动整页与所有后台标签工作区；自动跟随滚动取消"每个 token 重启一次动画"的满帧率渲染
+- **终端输出批处理**：PTY/SSH 输出按帧合并后再写入 xterm，刷屏型命令不再逐包触发整屏重绘
+- **系统监控让路**：后台标签停止采集，Windows CIM 采集在任务运行期间自动降频，监控不再和 Agent 抢 CPU
+- **流式 Markdown 增量渲染**：已完成段落进缓存、只重析增长中的尾部，修复长回答越打越卡的平方级开销；命令提前检测与会话持久化同样做了增量与限频
+- **持久化移出主线程**：大会话的 JSON 序列化改在后台 isolate 完成，并按会话串行落盘，保存不再卡顿 UI，也不丢数据
 
 ## 核心能力
 
@@ -195,11 +195,11 @@ Agent 也能直接读写跑着这个 App 的这台电脑，而不只是服务器
 
 | 平台 | 文件 |
 |---|---|
-| macOS | `AI_Terminal_v1.3.9_macOS.zip` |
-| iOS | `AI_Terminal_v1.3.9_iOS.ipa`（未签名） |
-| Android | `AI_Terminal_v1.3.9_Android.apk` |
-| Windows | `AI_Terminal_v1.3.9_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.3.9_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.4.0_macOS.zip` |
+| iOS | `AI_Terminal_v1.4.0_iOS.ipa`（未签名） |
+| Android | `AI_Terminal_v1.4.0_Android.apk` |
+| Windows | `AI_Terminal_v1.4.0_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.4.0_Linux_x64.tar.gz` |
 
 macOS 首次打开如提示“无法验证开发者”，可执行：
 

@@ -32,6 +32,7 @@ import '../widgets/reconnecting_banner.dart';
 import '../widgets/local_dir_auth_dialog.dart';
 import '../widgets/tab_item_widget.dart';
 import '../utils/interrupted_turn_detector.dart';
+import '../utils/streaming_markdown.dart';
 import '../utils/slash_command.dart';
 import '../utils/agent_ui_text.dart';
 import '../utils/conversation_export.dart';
@@ -239,6 +240,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   // R2: 保留 _switchToTab 的 150ms resize Timer 引用，便于切换 tab / dispose 时取消
   // 旧实现 inline 创建 Timer 不保留引用，导致 widget_test 中 dispose 后 Timer 仍 pending
   Timer? _resizeTimer;
+  Timer? _chatScrollThrottle;
   static const double _maxSftpWidth = 600;
 
   bool get _isMobile => Platform.isAndroid || Platform.isIOS;
@@ -269,6 +271,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 高频输出（构建日志、tail -f）下不再每个 chunk 做 ANSI 清洗 + provider 通知。
   final Map<String, StringBuffer> _tabChatOutputBuffers = {};
   final Map<String, Timer> _tabChatOutputTimers = {};
+  final Map<String, StringBuffer> _tabTermWriteBuffers = {};
+  final Map<String, Timer> _tabTermWriteTimers = {};
+  DateTime _lastTermRecoveryAt = DateTime.fromMillisecondsSinceEpoch(0);
+  static const int _termWriteFlushMs = 16;
+  static const int _termWriteMaxChars = 64 * 1024;
   static const int _chatOutputFlushMs = 200;
   static const int _chatOutputMaxChars = 8192;
   AIModelConfig? _currentModelConfig;
@@ -629,21 +636,50 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     // xterm 4.0.0 的循环缓冲在滚动回卷时可能越界（见 agent.log 里的 RangeError）。
     // 一次写坏后 Buffer 的行数和循环缓冲会失配，之后每帧 paint 都会再崩一次，
     // 所以这里就地恢复：清掉滚动历史让索引重新对齐，并做 5s 冷却避免刷屏。
-    var lastTermRecoveryAt = DateTime.fromMillisecondsSinceEpoch(0);
+    // 输出先入帧级批处理缓冲：逐 chunk 直写会让每个 PTY/SSH 包都触发一次
+    // VT 解析 + markNeedsLayout + 全视口重绘，大输出时 CPU/GPU 直接打满。
     return tab.outputController.stream.listen((data) {
-      try {
-        term.write(data);
-      } catch (e) {
-        final now = DateTime.now();
-        if (now.difference(lastTermRecoveryAt).inSeconds >= 5) {
-          lastTermRecoveryAt = now;
-          agentLogger.warn('Terminal', '写入异常，清空滚动历史以恢复: $e');
-          try {
-            term.buffer.clearScrollback();
-          } catch (_) {}
-        }
-      }
+      _bufferTermWrite(tab.id, data);
     });
+  }
+
+  /// 终端显示路径批处理：最多每 16ms（约一帧）或 64KB 合并写入一次。
+  void _bufferTermWrite(String tabId, String data) {
+    final buffer =
+        _tabTermWriteBuffers.putIfAbsent(tabId, StringBuffer.new)..write(data);
+    if (buffer.length >= _termWriteMaxChars) {
+      _flushTermWrite(tabId);
+      return;
+    }
+    _tabTermWriteTimers[tabId] ??= Timer(
+      const Duration(milliseconds: _termWriteFlushMs),
+      () => _flushTermWrite(tabId),
+    );
+  }
+
+  void _flushTermWrite(String tabId) {
+    _tabTermWriteTimers.remove(tabId)?.cancel();
+    final buffer = _tabTermWriteBuffers.remove(tabId);
+    if (buffer == null || buffer.isEmpty) return;
+    final term = _tabTerminals[tabId];
+    if (term == null) return;
+    try {
+      term.write(buffer.toString());
+    } catch (e) {
+      final now = DateTime.now();
+      if (now.difference(_lastTermRecoveryAt).inSeconds >= 5) {
+        _lastTermRecoveryAt = now;
+        agentLogger.warn('Terminal', '写入异常，清空滚动历史以恢复: $e');
+        try {
+          term.buffer.clearScrollback();
+        } catch (_) {}
+      }
+    }
+  }
+
+  void _discardTermWrite(String tabId) {
+    _tabTermWriteTimers.remove(tabId)?.cancel();
+    _tabTermWriteBuffers.remove(tabId);
   }
 
   /// 确保某个 tab 有独立的 Terminal 和常驻输出订阅。切换 tab 不再取消/重建。
@@ -908,6 +944,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     appRouteObserver.unsubscribe(this);
     _resizeTimer?.cancel();
     _resizeTimer = null;
+    _chatScrollThrottle?.cancel();
+    _chatScrollThrottle = null;
     for (final sub in _tabOutputSubscriptions.values) {
       sub.cancel();
     }
@@ -921,6 +959,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     }
     _tabChatOutputTimers.clear();
     _tabChatOutputBuffers.clear();
+    for (final timer in _tabTermWriteTimers.values) {
+      timer.cancel();
+    }
+    _tabTermWriteTimers.clear();
+    _tabTermWriteBuffers.clear();
     _scrollController.dispose();
     for (final controller in _chatScrollControllers.values) {
       controller.dispose();
@@ -945,7 +988,25 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     // chatProvider 只在这里贡献 error；不要 watch 整个状态，否则每个终端
     // 输出 chunk 都会让整页（终端 + 所有 tab + AI 面板）重建。
     final chatError = ref.watch(chatProvider.select((s) => s.error));
-    final agentState = ref.watch(agentProvider);
+    // 只订阅低频字段：流式 chatItems/liveReasoning/lastMessage 每个 chunk 都在变，
+    // 若全量 watch，整页（含所有 Offstage tab 工作区）每秒重建 10~15 次。
+    // 高频部分由活动 tab 的 AI 面板 Consumer 局部订阅（见 _buildMainBody）。
+    ref.watch(agentProvider.select((s) => (
+          s.status,
+          s.error,
+          s.isCompacting,
+          s.goal,
+          s.permissionMode,
+          s.isWebSearchEnabled,
+          s.isOrchestratorMode,
+          s.pendingConfirmCommand,
+          s.pendingOptions,
+          s.hostId,
+          s.conversationId,
+          s.summary,
+          s.chatItems.length,
+        )));
+    final agentState = ref.read(agentProvider);
     final activeTab = terminalState.activeTab;
 
     final tc = ThemeColors.of(context);
@@ -1209,12 +1270,25 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         final aiPanelSize = isRight
             ? totalW * _aiPanelRatioFor(tab?.id)
             : totalH * _aiPanelRatioFor(tab?.id);
-        final aiContent = Column(
-          children: [
-            Expanded(child: _buildAIPanel(chatError, agentState, tab)),
-            _buildBottomBar(agentState, tab),
-          ],
-        );
+        // 活动 tab 的 AI 面板局部订阅完整 agent 状态：流式高频更新只重建
+        // 这棵子树，不再带动整页和其他 tab 工作区。非活动 tab 用页面传入的
+        // 快照（Offstage 不可见，切回时页面重建会刷新）。
+        final aiContent = isActive
+            ? Consumer(builder: (_, ref, __) {
+                final liveState = ref.watch(agentProvider);
+                return Column(
+                  children: [
+                    Expanded(child: _buildAIPanel(chatError, liveState, tab)),
+                    _buildBottomBar(liveState, tab),
+                  ],
+                );
+              })
+            : Column(
+                children: [
+                  Expanded(child: _buildAIPanel(chatError, agentState, tab)),
+                  _buildBottomBar(agentState, tab),
+                ],
+              );
 
         if (isRight) {
           return Row(
@@ -1489,6 +1563,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     _tabOutputSubscriptions.remove(tab.id)?.cancel();
     _tabChatOutputSubscriptions.remove(tab.id)?.cancel();
     _discardChatOutput(tab.id);
+    _discardTermWrite(tab.id);
     _chatScrollControllers.remove(tab.id)?.dispose();
     _tabShowScrollToBottom.remove(tab.id);
     _tabAutoScroll.remove(tab.id);
@@ -2298,17 +2373,21 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   void _scrollChatToBottom() {
     if (!_autoScrollChat) return;
-    final controller =
-        _currentTabId == null ? null : _chatScrollControllers[_currentTabId];
-    if (controller == null) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (controller.hasClients) {
-        controller.animateTo(
-          controller.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-        );
-      }
+    // 流式期间 agent 状态每 120~150ms 变一次；若每次都 animateTo(200ms)，
+    // 动画不断重启、永远跑不完，聊天列表会以满帧率持续 layout/paint。
+    // 改为 150ms 尾随节流 + jumpTo：最多 ~6 次/秒瞬时滚动，无动画帧开销。
+    if (_chatScrollThrottle != null) return;
+    _chatScrollThrottle = Timer(const Duration(milliseconds: 150), () {
+      _chatScrollThrottle = null;
+      if (!mounted || !_autoScrollChat) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // 延迟回调里重新查表：节流窗口内 tab 可能已关闭、controller 已
+        // dispose，捕获旧引用再访问 hasClients 会抛"use after dispose"
+        if (!mounted || !_autoScrollChat || _currentTabId == null) return;
+        final controller = _chatScrollControllers[_currentTabId!];
+        if (controller == null || !controller.hasClients) return;
+        controller.jumpTo(controller.position.maxScrollExtent);
+      });
     });
   }
 
@@ -3111,7 +3190,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 // 流式结束后从历史恢复时 streamingContent 为空，使用持久化 content 兜底
                 if (!hasAIContentEvidence) ...[
                   if (streamingContent.trim().isNotEmpty)
-                    _buildMarkdownText(streamingContent, tc)
+                    _buildMarkdownText(streamingContent, tc, streaming: true)
                   else if (content.trim().isNotEmpty)
                     _buildMarkdownText(content, tc),
                 ],
@@ -3248,7 +3327,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 围栏代码块先拆出来单独渲染：flutter_markdown 的 `code` 样式同时作用于行内
   /// 代码和整块代码的正文，想给行内代码上字色就会把整块也染上；块走独立容器，
   /// 行内代码才敢直接用字色区分，而不是在字后面垫一块深色补丁。
-  Widget _buildMarkdownText(String text, ThemeColors tc) {
+  Widget _buildMarkdownText(String text, ThemeColors tc,
+      {bool streaming = false}) {
+    // 流式增量渲染：稳定前缀走缓存块，只有正在增长的尾部重新解析
+    if (streaming && text.length > 1024) {
+      final incremental = _buildStreamingMarkdown(text, tc);
+      if (incremental != null) return incremental;
+    }
     final bodies = <Widget>[];
     for (final seg in _splitContentByCodeBlocks(text)) {
       if (seg.isCodeBlock) {
@@ -3305,6 +3390,64 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: bodies,
             ),
+    );
+  }
+
+  /// 流式 Markdown 增量分割缓存：稳定前缀只增不改，记录前缀及其分割结果，
+  /// 每次 flush 只分割新完成的段落，避免对全文反复全量分割+解析（O(n²)）。
+  String _streamMdBase = '';
+  List<_ContentSegment> _streamMdSegs = const [];
+
+  /// 流式增量渲染：在代码块外的最后一个段落边界（空行）切成
+  ///「稳定前缀 + 活跃尾部」。前缀按代码块/文本段拆成独立缓存块，文本不再
+  /// 变化、缓存必命中；只有尾部（正在增长的段落）每次 flush 重解析。
+  Widget? _buildStreamingMarkdown(String text, ThemeColors tc) {
+    final cut = stableParagraphCut(text);
+    if (cut <= 0) return null;
+    final head = text.substring(0, cut);
+    final tail = text.substring(cut);
+    List<_ContentSegment> segs;
+    if (head == _streamMdBase) {
+      segs = _streamMdSegs;
+    } else if (_streamMdBase.isNotEmpty && head.startsWith(_streamMdBase)) {
+      // 新旧前缀都结束于代码块外的段落边界，增量可以独立分割后追加
+      final delta = head.substring(_streamMdBase.length);
+      segs = [..._streamMdSegs, ..._splitContentByCodeBlocksInternal(delta)];
+      _streamMdBase = head;
+      _streamMdSegs = segs;
+    } else {
+      segs = _splitContentByCodeBlocksInternal(head);
+      _streamMdBase = head;
+      _streamMdSegs = segs;
+    }
+    final children = <Widget>[];
+    for (final seg in segs) {
+      if (seg.isCodeBlock) {
+        children.add(buildPlainCodeBlock(seg.content, tc));
+      } else if (seg.content.trim().isNotEmpty) {
+        children.add(_buildMarkdownText(seg.content, tc));
+      }
+    }
+    if (tail.trim().isNotEmpty) {
+      // 尾部含未闭合代码围栏时：围栏内容直接按纯代码块渲染，
+      // 避免增长中的代码块被当 Markdown 全文重解析
+      final fence = unclosedFenceSplit(tail);
+      if (fence != null) {
+        if (fence.$1.trim().isNotEmpty) {
+          children.add(_buildMarkdownText(fence.$1, tc));
+        }
+        children.add(buildPlainCodeBlock(fence.$2, tc));
+      } else {
+        children.add(_buildMarkdownText(tail, tc));
+      }
+    }
+    if (children.isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
     );
   }
 

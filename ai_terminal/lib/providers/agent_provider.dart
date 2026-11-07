@@ -53,6 +53,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 每个 host 上次持久化的 assistant 内容长度，用于控制流式过程定期刷盘频率
   final Map<String, int> _lastPersistedLen = {};
 
+  /// 每个 host 上次持久化时间：流式定期刷盘额外加 1.5s 时间门槛，
+  /// 快速流（每秒数千字符）不再每 2000 字符就整会话序列化一次
+  final Map<String, DateTime> _lastPersistedAt = {};
+
   /// 每个会话待写入的最新 assistant 快照。
   /// 流式/事件密集时只保留最后一份，避免把每个中间态都序列化落盘。
   final Map<
@@ -405,6 +409,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
     _reducer.cancelTimer(scopeId);
     _reducer.reset(scopeId);
     _lastPersistedLen.remove(scopeId);
+    _lastPersistedAt.remove(scopeId);
     _startingScopes.remove(scopeId);
     _startingConversations.removeWhere((_, owner) => owner == scopeId);
     // 如果移除的是当前活跃 tab，清空引用防止后续操作命中已 disposed 的引擎
@@ -625,9 +630,13 @@ class AgentNotifier extends StateNotifier<AgentState> {
               // 防止 app 异常退出时丢失全部流式内容（events 由 onCompleted 时统一回写）
               final fullContent = lastItem.content + content;
               final lastLen = _lastPersistedLen[scopeId] ?? 0;
-              // 2000 字符≈一次较长段落；配合写入合并，中间快照会被覆盖，
-              // 不再每 500 字符就整会话序列化一次。
-              if (fullContent.length - lastLen > 2000) {
+              // 2000 字符≈一次较长段落；再叠加 1.5s 时间门槛：快速流下
+              // 限制整会话序列化频率，异常退出的丢失窗口仍≤1.5s 的增量。
+              final lastAt = _lastPersistedAt[scopeId];
+              final now = DateTime.now();
+              if (fullContent.length - lastLen > 2000 &&
+                  (lastAt == null ||
+                      now.difference(lastAt).inMilliseconds >= 1500)) {
                 _lastPersistedLen[scopeId] = fullContent.length;
                 _persistAssistantCompletion(scopeId, fullContent,
                     events: lastItem.events);
@@ -877,6 +886,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
         _registry.getState(scopeId)?.hostId ??
         'local';
 
+    _lastPersistedAt[scopeId] = DateTime.now();
     _pendingPersist[convId] = (
       hostId: hostId,
       content: content,

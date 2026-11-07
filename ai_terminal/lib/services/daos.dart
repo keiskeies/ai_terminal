@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:sqflite/sqflite.dart';
@@ -511,11 +512,52 @@ class ConversationsDao {
     return rows.isEmpty ? null : _fromRow(rows.first);
   }
 
+  /// 每会话一条写入链：序列化移到后台 isolate 后，两次 upsert 的编码耗时
+  /// 不再与调用顺序一致，必须串行化保证"后调用的快照最后落盘"，
+  /// 否则旧快照可能覆盖新快照。
+  static final Map<String, Future<void>> _upsertChains = {};
+
   static Future<void> upsert(Conversation c) async {
     _cache[c.id] = c;
     _invalidateActiveCache();
-    await DbInit.db.insert('conversations', _toRow(c),
-        conflictAlgorithm: ConflictAlgorithm.replace);
+    final prev = _upsertChains[c.id] ?? Future<void>.value();
+    final completer = Completer<void>();
+    _upsertChains[c.id] = completer.future;
+    // 链本身吞掉错误继续运转；错误仍通过返回的 future 暴露给调用方（R8）
+    completer.future.catchError((Object _) {});
+    // 前一次写入失败不阻断后续写入（错误已暴露给该次调用方）
+    prev.catchError((Object _) {}).then((_) async {
+      try {
+        final row = await _encodeRow(c);
+        await DbInit.db.insert('conversations', row,
+            conflictAlgorithm: ConflictAlgorithm.replace);
+        completer.complete();
+      } catch (e, st) {
+        completer.completeError(e, st);
+      } finally {
+        if (identical(_upsertChains[c.id], completer.future)) {
+          _upsertChains.remove(c.id);
+        }
+      }
+    });
+    return completer.future;
+  }
+
+  /// 大会话的 jsonEncode（全部消息+事件+日志）可达数十 ms，放在 UI isolate
+  /// 会造成掉帧；超过阈值时移到后台 isolate 编码。isolate 消息拷贝在发送侧
+  /// 同步完成，拷贝后 UI 继续修改 conv 不影响 isolate 内的私有副本。
+  static Future<Map<String, dynamic>> _encodeRow(Conversation c) async {
+    var size = 0;
+    for (final m in c.messages) {
+      size += m.content.length;
+    }
+    if (size < 32768) return _toRow(c);
+    try {
+      return await compute(_toRow, c);
+    } catch (_) {
+      // isolate 路径失败（如对象图不可发送）时回退内联编码，保证写入不丢
+      return _toRow(c);
+    }
   }
 
   /// 设置某个 hostId 下只允许一个 active（同步更新缓存 + 异步写库）

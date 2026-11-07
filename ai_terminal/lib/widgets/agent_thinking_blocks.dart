@@ -83,11 +83,9 @@ class LiveThoughtBlock extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(
-                width: 9,
-                height: 9,
-                child: CircularProgressIndicator(strokeWidth: 1.4, color: tc.brand),
-              ),
+              // 静态图标而不是 CircularProgressIndicator：流式可能持续几十秒，
+              // 常驻 spinner 会以满帧率持续调度重绘，把整机的 GPU 占用拉高
+              Icon(Icons.psychology_outlined, size: 11, color: tc.brand),
               const SizedBox(width: 5),
               Text(UiText.t('思考中', 'Thinking'), style: TextStyle(fontSize: fMicro, color: tc.textSub)),
             ],

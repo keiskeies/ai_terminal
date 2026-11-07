@@ -97,8 +97,10 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
     if (events.isEmpty) return const SizedBox.shrink();
 
     final resultMap = <String, AgentEvent>{};
+    final commandIds = <String>{};
     for (final e in events) {
       if (e.isResult && e.commandId != null) resultMap[e.commandId!] = e;
+      if (e.isCommand) commandIds.add(e.id);
     }
 
     // 先把事件折成"行"：result 不再独立成行，而是挂到它的 command 上
@@ -115,9 +117,9 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
           rows.add(_TimelineRow.call(e, result: resultMap[e.id]));
           break;
         case AgentEventType.result:
-          // 找不到对应 command 的结果（旧数据/裁剪）仍要露出来
-          if (e.commandId == null ||
-              !events.any((c) => c.id == e.commandId && c.isCommand)) {
+          // 找不到对应 command 的结果（旧数据/裁剪）仍要露出来。
+          // 用集合查询代替 events.any：流式期间每次重建都跑，O(n²)→O(n)
+          if (e.commandId == null || !commandIds.contains(e.commandId)) {
             orphans.add(e);
           }
           break;
