@@ -14,7 +14,7 @@ export interface OpenAiStreamConfig {
   reasoningEffort?: string; // off/low/medium/high
 }
 export class OpenAiStreamClient implements LlmClient {
-  readonly name = "openai";  constructor(private readonly config: OpenAiStreamConfig) {}
+  readonly name: string = "openai";  constructor(private readonly config: OpenAiStreamConfig) {}
 
   async chatStream(opts: LlmResponseOptions): Promise<LlmResult> {
     return this.stream(opts);
