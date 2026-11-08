@@ -4,6 +4,7 @@ import '../core/theme_colors.dart';
 import '../models/agent_event.dart';
 import '../providers/terminal_provider.dart' as tp;
 import '../utils/agent_ui_text.dart';
+import '../utils/risk_explainer.dart';
 import 'agent_command_block.dart';
 
 /// Agent 过程时间线：把"做了什么"压成一行一步的可折叠流水
@@ -112,6 +113,24 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
       if (e.isCommand) commandIds.add(e.id);
     }
 
+    // 哪些命令执行前曾请用户确认：引擎在执行前紧跟着发一条「需要确认」info。
+    // 执行后靠它把确认记录留在行上，否则确认卡一执行就整块消失。
+    final confirmedIds = <String>{};
+    String? askingCommandId;
+    for (final e in events) {
+      if (e.isCommand) {
+        askingCommandId = e.id;
+      } else if (e.type == AgentEventType.info) {
+        if (askingCommandId != null &&
+            (e.text ?? '').contains('需要确认')) {
+          confirmedIds.add(askingCommandId);
+        }
+        askingCommandId = null;
+      } else if (!e.isResult) {
+        askingCommandId = null;
+      }
+    }
+
     // 先把事件折成"行"：result 不再独立成行，而是挂到它的 command 上
     final rows = <_TimelineRow>[];
     final orphans = <AgentEvent>[];
@@ -178,7 +197,7 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
       final r = rows[i];
       switch (r.kind) {
         case _RowKind.call:
-          children.add(_callRow(r));
+          children.add(_callRow(r, confirmed: confirmedIds.contains(r.event.id)));
           break;
         case _RowKind.thought:
         case _RowKind.note:
@@ -217,7 +236,7 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
 
   /// 头部：一行统计 + 展开/收起（仅在确实藏了行时渲染）
   /// 工具/命令行：一行摘要 + 尾部状态与耗时，点击展开参数与输出
-  Widget _callRow(_TimelineRow row) {
+  Widget _callRow(_TimelineRow row, {bool confirmed = false}) {
     final tc = widget.tc;
     final ui = AgentUiText.of(context);
     final e = row.event;
@@ -250,6 +269,8 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
 
     // 走到这里 result 一定非空（无结果的行已在上面退回重量级命令块）
     final ok = result.success == true;
+    // 执行前被询问过、且用户确认执行：行尾留一个「已确认」标记
+    final showConfirmed = confirmed && ok;
     final statusColor = ok ? tc.ok : tc.error;
     final statusText = ok
         ? (isTool ? ui.toolDoneLabel : ui.executedLabel)
@@ -275,28 +296,42 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
           InkWell(
             onTap: () => _toggleRow(e, result),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              // 上下留白加大，避免单行命令卡看起来又矮又挤
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
               child: Row(
                 children: [
-                  Icon(
-                    isTool ? Icons.auto_awesome : Icons.terminal,
-                    size: 13,
-                    color: isTool ? tc.brand : tc.ok,
-                  ),
-                  const SizedBox(width: 6),
-                  SizedBox(
-                    width: 92,
-                    child: Text(
-                      isTool ? (e.toolName ?? 'tool') : ui.commandLabel,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: isTool ? tc.brand : tc.ok,
-                        fontSize: fMicro,
-                        fontFamily: 'JetBrainsMono',
-                        fontFamilyFallback: kMonoFontFallback,
-                      ),
+                  // 标签整体做成浅色底胶囊：图标 + "终端命令" 包在一起
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: (isTool ? tc.brand : tc.ok)
+                          .withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isTool ? Icons.auto_awesome : Icons.terminal,
+                          size: 13,
+                          color: isTool ? tc.brand : tc.ok,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          isTool ? (e.toolName ?? 'tool') : ui.commandLabel,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: isTool ? tc.brand : tc.ok,
+                            fontSize: fMicro,
+                            fontFamily: 'JetBrainsMono',
+                            fontFamilyFallback: kMonoFontFallback,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _subject(e, isTool),
@@ -304,6 +339,22 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
                       style: TextStyle(color: tc.textBody, fontSize: fMicro),
                     ),
                   ),
+                  if (showConfirmed)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: tc.ok.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          ui.confirmedLabel,
+                          style: TextStyle(color: tc.ok, fontSize: fMicro),
+                        ),
+                      ),
+                    ),
                   if (duration != null && duration > 0)
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
@@ -324,7 +375,7 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
               ),
             ),
           ),
-          if (opened) _detail(e, result),
+          if (opened) _detail(e, result, showConfirmed),
         ],
       ),
     );
@@ -355,8 +406,20 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
     return fallback ?? raw.split('\n').first.trim();
   }
 
-  Widget _detail(AgentEvent commandEvent, AgentEvent result) {
+  /// 确认记录里的影响说明：工具按工具类型解释，shell 按命令语义解释
+  String _impact(AgentEvent e) {
+    final raw = (e.command ?? '').trim();
+    if (raw.isEmpty) return '';
+    final isTool = e.toolName != null && e.toolName != 'exec_command';
+    if (isTool) {
+      return RiskExplainer.explainTool(raw.split('\n').first.trim()).impact;
+    }
+    return RiskExplainer.explain(raw).impact;
+  }
+
+  Widget _detail(AgentEvent commandEvent, AgentEvent result, bool confirmed) {
     final tc = widget.tc;
+    final ui = AgentUiText.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
       decoration: BoxDecoration(
@@ -365,6 +428,36 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 确认记录：这条命令执行前问过用户，展开仍能看到当时的影响说明
+          if (confirmed) ...[
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: pSmall),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              decoration: BoxDecoration(
+                color: tc.warn.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(rSmall),
+                border: Border.all(color: tc.warn.withValues(alpha: 0.2)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1, right: 5),
+                    child:
+                        Icon(Icons.shield_outlined, size: 12, color: tc.warn),
+                  ),
+                  Expanded(
+                    child: Text(
+                      '${ui.confirmedRecord}：${_impact(commandEvent)}',
+                      style: TextStyle(
+                          color: tc.textSub, fontSize: fMicro, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if ((commandEvent.description ?? '').trim().isNotEmpty) ...[
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,

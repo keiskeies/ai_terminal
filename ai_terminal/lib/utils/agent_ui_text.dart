@@ -117,6 +117,8 @@ class AgentUiText {
       zh ? '回滚：无自动回滚，建议先快照' : 'Rollback: no automatic rollback; snapshot first';
   String get cancel => zh ? '取消' : 'Cancel';
   String get confirmExecute => zh ? '确认执行' : 'Run';
+  String get confirmedLabel => zh ? '已确认' : 'Confirmed';
+  String get confirmedRecord => zh ? '执行前已确认' : 'Confirmed before running';
 
   /// 引擎阶段是中文常量；英文环境映射到对应英文。
   String phase(String? raw) {

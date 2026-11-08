@@ -3531,6 +3531,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   border: Border(left: BorderSide(color: theme.brand, width: 2)),
                 ),
                 blockquotePadding: const EdgeInsets.only(left: 8),
+                // AI 常用 `---` 分隔章节，默认是 5px 粗灰线，过于抢眼；改成细线
+                horizontalRuleDecoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(color: theme.border, width: 1),
+                  ),
+                ),
               ),
               onTapLink: (text, href, title) {},
             ),

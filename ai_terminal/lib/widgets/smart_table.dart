@@ -196,11 +196,24 @@ class _SmartMarkdownTableState extends State<SmartMarkdownTable> {
       });
 
       final total = natural.fold(0.0, (a, b) => a + b);
+      // 表格最小宽度 = 满宽：内容窄于可用宽度时，把富余宽度按比例分给各列；
+      // 内容超宽时保持自然列宽、横向滚动，单元格仍不换行。
+      final available = maxWidth - 2; // 容器左右各 1px 边框
+      final widths = List<double>.from(natural);
+      final extra = available - total;
+      if (extra > 0) {
+        for (var col = 0; col < widths.length; col++) {
+          widths[col] += extra * (natural[col] / total);
+        }
+        // 浮点尾差补给最后一列，保证正好铺满
+        final sum = widths.fold(0.0, (a, b) => a + b);
+        widths[widths.length - 1] += available - sum;
+      }
 
       Widget cellBox(String text, int col,
           {bool bold = false, bool zebra = false}) {
         return Container(
-          width: natural[col],
+          width: widths[col],
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
           decoration: BoxDecoration(
             color: zebra ? tc.surface.withValues(alpha: 0.5) : null,
@@ -251,19 +264,19 @@ class _SmartMarkdownTableState extends State<SmartMarkdownTable> {
           horizontalInside: BorderSide(color: tc.agentCardBorder, width: 1),
         ),
         columnWidths: {
-          for (var col = 0; col < natural.length; col++)
-            col: FixedColumnWidth(natural[col]),
+          for (var col = 0; col < widths.length; col++)
+            col: FixedColumnWidth(widths[col]),
         },
         children: tableRows,
       );
 
-      // 容器左右各 1px 边框
-      final contentWidth = total + 2;
+      // 容器左右各 1px 边框；窄表已补到满宽，宽表横向滚动
+      final contentWidth = widths.fold(0.0, (a, b) => a + b) + 2;
       final containerWidth = math.min(maxWidth, contentWidth);
 
       Widget body;
-      if (contentWidth <= maxWidth) {
-        // 内容宽度够：直接按内容宽度显示，列宽完全自适应
+      if (contentWidth <= maxWidth + 0.5) {
+        // 内容放得下：列宽已按比例铺满整行
         body = table;
       } else {
         // 超宽：保持每列内容宽度，横向滚动查看，绝不压缩换行
