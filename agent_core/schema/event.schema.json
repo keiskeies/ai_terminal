@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-event.schema.json",
+  "title": "AgentEvent",
+  "description": "Structured agent event, mirrors Dart AgentEvent model",
+  "type": "object",
+  "required": [
+    "id",
+    "type",
+    "timestamp"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "thought",
+        "command",
+        "result",
+        "ask",
+        "finish",
+        "text",
+        "info",
+        "report",
+        "plan"
+      ],
+      "description": "AgentEventType"
+    },
+    "timestamp": {
+      "type": "number",
+      "description": "epoch ms"
+    },
+    "text": {
+      "type": "string"
+    },
+    "command": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "commandId": {
+      "type": "string"
+    },
+    "dangerous": {
+      "type": "boolean"
+    },
+    "blocked": {
+      "type": "boolean"
+    },
+    "success": {
+      "type": "boolean"
+    },
+    "output": {
+      "type": "string"
+    },
+    "error": {
+      "type": "string"
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "question": {
+      "type": "string"
+    },
+    "chosenAnswer": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "finishState": {
+      "type": "string",
+      "enum": [
+        "success",
+        "cancelled",
+        "failed",
+        "interrupted"
+      ]
+    },
+    "hostId": {
+      "type": "string"
+    },
+    "toolName": {
+      "type": "string"
+    },
+    "riskLevel": {
+      "type": "string",
+      "enum": [
+        "safe",
+        "info",
+        "warn",
+        "blocked"
+      ]
+    },
+    "permissionDecision": {
+      "type": "string",
+      "enum": [
+        "execute",
+        "confirm",
+        "reject"
+      ]
+    },
+    "durationMs": {
+      "type": "number"
+    },
+    "exitCode": {
+      "type": "number"
+    },
+    "failureKind": {
+      "type": "string"
+    },
+    "outputTotalChars": {
+      "type": "number"
+    },
+    "outputTruncated": {
+      "type": "boolean"
+    },
+    "outputTail": {
+      "type": "string",
+      "description": "tail up to 8KB"
+    },
+    "diffAdditions": {
+      "type": "number"
+    },
+    "diffDeletions": {
+      "type": "number"
+    },
+    "planSteps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "inProgress",
+              "completed",
+              "failed",
+              "skipped"
+            ]
+          },
+          "hostIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "hostResults": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "hostId",
+          "success"
+        ],
+        "properties": {
+          "hostId": {
+            "type": "string"
+          },
+          "success": {
+            "type": "boolean"
+          },
+          "output": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "exitCode": {
+            "type": "number"
+          },
+          "durationMs": {
+            "type": "number"
+          },
+          "failureKind": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "isStreaming": {
+      "type": "boolean"
+    }
+  }
+}

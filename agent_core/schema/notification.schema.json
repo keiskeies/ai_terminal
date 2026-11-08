@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "notification.schema.json",
+  "title": "Child-to-Parent Notifications",
+  "description": "JSON-RPC notifications (no id) emitted by Node child to Dart parent",
+  "type": "object",
+  "oneOf": [
+    {
+      "title": "evt:agentEvent",
+      "description": "Streamed AgentEvent (thought/command/result/...)",
+      "required": [
+        "method",
+        "params"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "method": {
+          "const": "evt:agentEvent"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "taskId",
+            "event"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string"
+            },
+            "event": {
+              "$ref": "event.schema.json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "evt:thinkingChunk",
+      "description": "Fine-grained streaming text chunk without constructing full event",
+      "properties": {
+        "method": {
+          "const": "evt:thinkingChunk"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "taskId",
+            "text"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string"
+            },
+            "text": {
+              "type": "string"
+            },
+            "isReasoning": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "evt:toolResult",
+      "description": "Large tool output, split into frames",
+      "properties": {
+        "method": {
+          "const": "evt:toolResult"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "taskId",
+            "commandId",
+            "chunk",
+            "total",
+            "data"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string"
+            },
+            "commandId": {
+              "type": "string"
+            },
+            "chunk": {
+              "type": "number"
+            },
+            "total": {
+              "type": "number"
+            },
+            "data": {
+              "type": "string"
+            },
+            "isLast": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "evt:confirmRequest",
+      "description": "Request user confirmation for dangerous operation",
+      "properties": {
+        "method": {
+          "const": "evt:confirmRequest"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "taskId",
+            "confirmId",
+            "prompt"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string"
+            },
+            "confirmId": {
+              "type": "string"
+            },
+            "prompt": {
+              "type": "string"
+            },
+            "options": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "timeoutMs": {
+              "type": "number"
+            },
+            "riskLevel": {
+              "type": "string",
+              "enum": [
+                "safe",
+                "info",
+                "warn",
+                "blocked"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "evt:taskState",
+      "description": "Terminal state notification",
+      "properties": {
+        "method": {
+          "const": "evt:taskState"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "taskId",
+            "state"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "running",
+                "thinking",
+                "executing",
+                "waiting_confirm",
+                "completed",
+                "failed",
+                "cancelled",
+                "interrupted"
+              ]
+            },
+            "summary": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "err:uncaught",
+      "description": "Unhandled exception in Node process",
+      "properties": {
+        "method": {
+          "const": "err:uncaught"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "message"
+          ],
+          "properties": {
+            "message": {
+              "type": "string"
+            },
+            "stack": {
+              "type": "string"
+            },
+            "taskId": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

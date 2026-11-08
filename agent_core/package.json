@@ -1,0 +1,26 @@
+{
+  "name": "@ai-terminal/agent-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI Terminal Agent Core - Node.js subprocess for ReAct, tools, MCP, LLM",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "esbuild src/index.ts --bundle --outfile=dist/index.js --platform=node --format=esm --external:fs --external:path --external:crypto --external:os --external:child_process --sourcemap",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test_e2e": "vitest run test/e2e/",
+    "test_regression": "vitest run test/regression/"
+  },
+  "dependencies": {
+    "zod": "^3.23.0",
+    "node-pty": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "esbuild": "^0.20.0",
+    "vitest": "^2.0.0",
+    "@types/node": "^22.0.0"
+  }
+}

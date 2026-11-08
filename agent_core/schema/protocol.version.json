@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "protocol.version.json",
+  "title": "Agent Bridge Protocol Version",
+  "type": "object",
+  "required": [
+    "major",
+    "minor"
+  ],
+  "properties": {
+    "major": {
+      "const": 1
+    },
+    "minor": {
+      "const": 0
+    }
+  }
+}

@@ -1,0 +1,248 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "request.schema.json",
+  "title": "Parent-to-Child RPC Requests",
+  "description": "All JSON-RPC request methods sent from Dart parent to Node child",
+  "type": "object",
+  "oneOf": [
+    {
+      "title": "rpc:startTask",
+      "description": "Start a new agent task",
+      "required": [
+        "method",
+        "params"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "type": "string"
+        },
+        "method": {
+          "const": "rpc:startTask"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "taskId",
+            "goal",
+            "modelConfig",
+            "hostId"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string"
+            },
+            "operationId": {
+              "type": "string"
+            },
+            "goal": {
+              "type": "string"
+            },
+            "hostId": {
+              "type": "string",
+              "description": "Frozen at task start; NEVER read activeHostId later (R3)"
+            },
+            "modelConfig": {
+              "type": "object",
+              "required": [
+                "provider",
+                "model"
+              ],
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "enum": [
+                    "openai",
+                    "anthropic",
+                    "ollama",
+                    "openai_compatible",
+                    "deepseek"
+                  ]
+                },
+                "model": {
+                  "type": "string"
+                },
+                "apiKey": {
+                  "type": "string"
+                },
+                "baseUrl": {
+                  "type": "string"
+                },
+                "temperature": {
+                  "type": "number"
+                },
+                "maxTokens": {
+                  "type": "number"
+                },
+                "systemPrompt": {
+                  "type": "string"
+                }
+              }
+            },
+            "permissionMode": {
+              "type": "string",
+              "enum": [
+                "safe",
+                "standard",
+                "dangerous",
+                "yolo"
+              ]
+            },
+            "maxSteps": {
+              "type": "number"
+            },
+            "rounds": {
+              "type": "number",
+              "description": "Session rounds carried over from provider"
+            },
+            "existingEvents": {
+              "type": "array",
+              "items": {
+                "$ref": "event.schema.json"
+              }
+            },
+            "resumeFromCheckpoint": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "rpc:cancelTask",
+      "required": [
+        "method",
+        "params"
+      ],
+      "properties": {
+        "method": {
+          "const": "rpc:cancelTask"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "taskId"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string"
+            },
+            "reason": {
+              "type": "string",
+              "enum": [
+                "user_cancel",
+                "switch_tab",
+                "remove_tab",
+                "app_exit",
+                "model_switch"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "rpc:confirm",
+      "description": "User decision on a confirmRequest",
+      "properties": {
+        "method": {
+          "const": "rpc:confirm"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "taskId",
+            "confirmId",
+            "decision"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string"
+            },
+            "confirmId": {
+              "type": "string"
+            },
+            "decision": {
+              "type": "string",
+              "enum": [
+                "ok",
+                "reject",
+                "timeout"
+              ]
+            },
+            "chosenOption": {
+              "type": "string",
+              "description": "For ask events with options"
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "rpc:getState",
+      "properties": {
+        "method": {
+          "const": "rpc:getState"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "taskId"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "rpc:ping",
+      "properties": {
+        "method": {
+          "const": "rpc:ping"
+        }
+      }
+    },
+    {
+      "title": "rpc:registerLocalTool",
+      "description": "Dart registers a tool that lives in Dart (e.g. SSH invoke); Node can call it back via reverse RPC",
+      "properties": {
+        "method": {
+          "const": "rpc:registerLocalTool"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "name",
+            "description",
+            "inputSchema"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "inputSchema": {
+              "type": "object",
+              "description": "JSON Schema for tool params"
+            },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "local",
+                "remote",
+                "all"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

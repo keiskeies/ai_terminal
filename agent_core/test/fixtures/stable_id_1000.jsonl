@@ -1,0 +1,1000 @@
+"" evt_cbf29ce484222325
+"thought:_1" evt_2357540bba93b07c
+"thought:hello_2" evt_3835a5e48c59ef6d
+"thought:世界_3" evt_f4c0aaeae0797d4
+"command:ls -la_4" evt_27c25d1f41b47dfe
+"command:echo '测试'_5" evt_38501aa0048284cb
+"result:ok_6" evt_74e7f91c546e266d
+"result:exit 1_7" evt_66b3d05de4e4241b
+"finish:_8" evt_58b1188d4b06c807
+"finish:done_9" evt_6b3a3c5e4cd19cc4
+"plan:step 1_10" evt_6b671e23e329b40f
+"info:🚀_11" evt_698e3314cce40ea9
+"ask:which?_12" evt_5c524f4a9599d3d8
+"_13" evt_3a39a01a0da48c9a
+"thought:_14" evt_211417ee08f48a58
+"thought:hello_15" evt_5d0e2b5a7cc942d3
+"thought:世界_16" evt_5d498d1b6ec7564
+"command:ls -la_17" evt_43d3051ca5c02fbe
+"command:echo '测试'_18" evt_32afb8e7a9d35a5d
+"result:ok_19" evt_143b172377175ac3
+"result:exit 1_20" evt_67b92c8befb1b1cc
+"finish:_21" evt_3ba06a167c74aa6c
+"finish:done_22" evt_5808c3c881f4635
+"plan:step 1_23" evt_6b5caf23e320a2ed
+"info:🚀_24" evt_698ac814cce12301
+"ask:which?_25" evt_5c4f464a95978eb6
+"_26" evt_3a2f0b1a0d9b3ae6
+"thought:_27" evt_211e8aee08fda246
+"thought:hello_28" evt_5d18385a7cd1ad6f
+"thought:世界_29" evt_5d197d1b6ea3dda
+"command:ls -la_30" evt_43cc7c1ca5badb45
+"command:echo '测试'_31" evt_32b63be7a9d8a4a4
+"result:ok_32" evt_1441a823771cbcd4
+"result:exit 1_33" evt_67bcaf8befb4c63c
+"finish:_34" evt_3b9ce9167c719962
+"finish:done_35" evt_57d093c881c31c5
+"plan:step 1_36" evt_6b602c23e323ad2b
+"info:🚀_37" evt_69874514ccde0e91
+"ask:which?_38" evt_5c4bcd4a95948b44
+"_39" evt_3a329a1a0d9e63ba
+"thought:_40" evt_210a09ee08ec1e09
+"thought:hello_41" evt_5d03bb5a7cc02ffe
+"thought:世界_42" evt_5ca86d1b6e40249
+"command:ls -la_43" evt_43c2091ca5b1c357
+"command:echo '测试'_44" evt_329eb6e7a9c4e3c4
+"result:ok_45" evt_144c17237725cdf6
+"result:exit 1_46" evt_67b2ba8befac8468
+"finish:_47" evt_3b8be8167c63247c
+"finish:done_48" evt_56c0e3c880dc711
+"plan:step 1_49" evt_6b562923e31b538d
+"info:🚀_50" evt_69803a14ccd7dd32
+"ask:which?_51" evt_5c44da4a958e82ad
+"_52" evt_3a2c091a0d9901a9
+"thought:_53" evt_210686ee08e90999
+"thought:hello_54" evt_5d00ba5a7cbdf874
+"thought:世界_55" evt_5c71bd1b6e116a1
+"command:ls -la_56" evt_43c5761ca5b4b265
+"command:echo '测试'_57" evt_32a239e7a9c7f834
+"result:ok_58" evt_14489e237722ca84
+"result:exit 1_59" evt_67b62d8befaf7da8
+"finish:_60" evt_3b92f3167c6955db
+"finish:done_61" evt_572913c88131158
+"plan:step 1_62" evt_6b4f1623e3151496
+"info:🚀_63" evt_697d3114ccd59810
+"ask:which?_64" evt_5c41574a958b6e3d
+"_65" evt_3a219a1a0d8ff087
+"thought:_66" evt_21111bee08f25b4d
+"thought:hello_67" evt_5d0aad5a7cc636e2
+"thought:世界_68" evt_5c390d1b6ddf499
+"command:ls -la_69" evt_43bb771ca5ac5f93
+"command:echo '测试'_70" evt_32a8a4e7a9cd19b3
+"result:ok_71" evt_144f232377281831
+"result:exit 1_72" evt_67af388befa971ab
+"finish:_73" evt_3b8f6c167c663a9f
+"finish:done_74" evt_56f883c8810cc36
+"plan:step 1_75" evt_6b529d23e3182fd2
+"info:🚀_76" evt_6979b414ccd28dd2
+"ask:which?_77" evt_5c3e544a9589334d
+"_78" evt_3a25131a0d92f3f9
+"thought:_79" evt_210d98ee08ef46dd
+"thought:hello_80" evt_5cf6445a7cb4db6d
+"thought:世界_81" evt_5bd0bd1b6d8a6ec
+"command:ls -la_82" evt_43b4701ca5a63500
+"command:echo '测试'_83" evt_32913de7a9b98bcd
+"result:ok_84" evt_142318237702ca95
+"result:exit 1_85" evt_67a52d8befa10a75
+"finish:_86" evt_3bb4e9167c862b43
+"finish:done_87" evt_594873c882fe6c0
+"plan:step 1_88" evt_6b7ea023e33d6fd6
+"info:🚀_89" evt_69acbf14ccfdfa1c
+"ask:which?_90" evt_5c37414a9582f456
+"_91" evt_3a1e0e1a0d8ccccc
+"thought:_92" evt_212f8dee090c1a92
+"thought:hello_93" evt_5cf2c15a7cb1c6fd
+"thought:世界_94" evt_5b98ad1b6d595e2
+"command:ls -la_95" evt_43b7f31ca5a94970
+"command:echo '测试'_96" evt_32943ae7a9bbbc8b
+"result:ok_97" evt_141f952376ffb625
+"result:exit 1_98" evt_67a8368befa34f97
+"finish:_99" evt_3bb172167c832b37
+"finish:done_100" evt_5dd7d2db3daddaac
+"plan:step 1_101" evt_29ec74faffdd455a
+"info:🚀_102" evt_40abdd582781b10c
+"ask:which?_103" evt_79b72ebc34686b17
+"_104" evt_14742c452e97e489
+"thought:_105" evt_29bc867937927fe3
+"thought:hello_106" evt_68609dc20a05176e
+"thought:世界_107" evt_54ae0f59d3c5588b
+"command:ls -la_108" evt_7fcbb7ada599f21d
+"command:echo '测试'_109" evt_73d695a5920bd034
+"result:ok_110" evt_77de54435cc66dd1
+"result:exit 1_111" evt_c9799c85abb15ff
+"finish:_112" evt_2b6f99356ad2ad5f
+"finish:done_113" evt_5ddb55db3db0ef1c
+"plan:step 1_114" evt_29e8ebfaffda26b8
+"info:🚀_115" evt_40af68582784d314
+"ask:which?_116" evt_79ba9bbc346b5a25
+"_117" evt_1470a9452e94d019
+"thought:_118" evt_29c017793795ac1d
+"thought:hello_119" evt_68641cc20a082512
+"thought:世界_120" evt_54a78859d3c00778
+"command:ls -la_121" evt_7fd23aada59f3c64
+"command:echo '测试'_122" evt_73cfa0a59205c437
+"result:ok_123" evt_77e1d9435cc985a7
+"result:exit 1_124" evt_ca226c85ac45a1b
+"finish:_125" evt_2b7326356ad5d2cd
+"finish:done_126" evt_5dde60db3db337a4
+"plan:step 1_127" evt_29f2defaffe26526
+"info:🚀_128" evt_40a55b58277c6878
+"ask:which?_129" evt_79b09cbc34630753
+"_130" evt_1477b6452e9b04de
+"thought:_131" evt_29c69a79379af664
+"thought:hello_132" evt_686b13c20a0e3475
+"thought:世界_133" evt_54ab0b59d3c31be8
+"command:ls -la_134" evt_7fcf39ada59d04da
+"command:echo '测试'_135" evt_73cc19a59202a8fb
+"result:ok_136" evt_77e546435ccc74b5
+"result:exit 1_137" evt_c9ea7c85ac14c77
+"finish:_138" evt_2b761f356ad7fcbf
+"finish:done_139" evt_5de1dbdb3db63e7c
+"plan:step 1_140" evt_29deddfaffd1ba69
+"info:🚀_141" evt_40b9d858278de5e9
+"ask:which?_142" evt_79c525bc34749928
+"_143" evt_1466b5452e8c8ff8
+"thought:_144" evt_29af157937873584
+"thought:hello_145" evt_68530cc209f996af
+"thought:世界_146" evt_54bc0e59d3d19434
+"command:ls -la_147" evt_7fbe38ada58e8ff4
+"command:echo '测试'_148" evt_73c88ea591ff86f3
+"result:ok_149" evt_77e84f435cceb9d7
+"result:exit 1_150" evt_c8a20c85aafbe08
+"finish:_151" evt_2b6222356ac758ce
+"finish:done_152" evt_5dcd5edb3da4c10b
+"plan:step 1_153" evt_29db5afaffcea5f9
+"info:🚀_154" evt_40bcd95827901d73
+"ask:which?_155" evt_79c828bc3476d418
+"_156" evt_146338452e8985ba
+"thought:_157" evt_29b29879378a49f4
+"thought:hello_158" evt_685695c209fcb551
+"thought:世界_159" evt_54bf0959d3d3c18c
+"command:ls -la_160" evt_7fc4a3ada593b173
+"command:echo '测试'_161" evt_73c209a591fa3946
+"result:ok_162" evt_77ef50435cd4da38
+"result:exit 1_163" evt_c9493c85ab8d5f6
+"finish:_164" evt_2b6525356ac993be
+"finish:done_165" evt_5dd0e3db3da7d8e1
+"plan:step 1_166" evt_29e56ffaffd71e2d
+"info:🚀_167" evt_40b2ea582787e5d1
+"ask:which?_168" evt_79be23bc346e7714
+"_169" evt_146dab452e929da8
+"thought:_170" evt_29b90379378f6b73
+"thought:hello_171" evt_685d18c20a01ff98
+"thought:世界_172" evt_54b88459d3ce73df
+"command:ls -la_173" evt_7fc13cada590cc97
+"command:echo '测试'_174" evt_73be88a591f7283c
+"result:ok_175" evt_77f2d3435cd7eea8
+"result:exit 1_176" evt_c9126c85ab5e6e8
+"finish:_177" evt_2b6894356acc8632
+"finish:done_178" evt_5dd454db3daacebb
+"plan:step 1_179" evt_29e1ecfaffd409bd
+"info:🚀_180" evt_40c76f58279970da
+"ask:which?_181" evt_799c20bc34518b95
+"_182" evt_14593e452e813b67
+"thought:_183" evt_29a19c79377bdd8d
+"thought:hello_184" evt_687c0bc20a1c9a10
+"thought:世界_185" evt_54930159d3ae7909
+"command:ls -la_186" evt_7fb039ada582544b
+"command:echo '测试'_187" evt_73f19ba59222a21e
+"result:ok_188" evt_77bfc6435cac7ef8
+"result:exit 1_189" evt_c8025c85aa77202
+"finish:_190" evt_2b542b356abb2abd
+"finish:done_191" evt_5dbfe7db3d996c7a
+"plan:step 1_192" evt_2a03e1fafff0dd72
+"info:🚀_193" evt_40cad658279c55b6
+"ask:which?_194" evt_799fa9bc3454aa37
+"_195" evt_1455b7452e7e202b
+"thought:_196" evt_29a49979377e0e4b
+"thought:hello_197" evt_687f0ec20a1ed500
+"thought:世界_198" evt_54968259d3b18a13
+"command:ls -la_199" evt_7fad32ada580128f
+"command:echo '测试'_200" evt_7cecc9a59750281a
+"result:ok_201" evt_10fdbe436ac28456
+"result:exit 1_202" evt_7158afc84af1729a
+"finish:_203" evt_464223357a408ec4
+"finish:done_204" evt_78addfdb4d1ed081
+"plan:step 1_205" evt_f1661faf06c4553
+"info:🚀_206" evt_3802c258229a5581
+"ask:which?_207" evt_7253f1bc30959866
+"_208" evt_7931b7451ecb1f1c
+"thought:_209" evt_4492917947037252
+"thought:hello_210" evt_1ed0ac2185e04ec
+"thought:世界_211" evt_4d47d459cff05369
+"command:ls -la_212" evt_663f42ad9740f707
+"command:echo '测试'_213" evt_7cf030a597530cf6
+"result:ok_214" evt_10fa3d436abf734c
+"result:exit 1_215" evt_715baec84af3a6be
+"finish:_216" evt_463e9e357a3d76ee
+"finish:done_217" evt_78aa5cdb4d1bbc11
+"plan:step 1_218" evt_f19f2faf06f718d
+"info:🚀_219" evt_37ff375822973379
+"ask:which?_220" evt_724d88bc30907a4d
+"_221" evt_79382c451ed05199
+"thought:_222" evt_44998879470981b5
+"thought:hello_223" evt_1f71dc2186679ba
+"thought:世界_224" evt_4d446959cfed67c1
+"command:ls -la_225" evt_6642afad9743e615
+"command:echo '测试'_226" evt_7ce5c3a59749ff3a
+"result:ok_227" evt_1104d0436ac8c19a
+"result:exit 1_228" evt_715f21c84af69ffe
+"finish:_229" evt_464919357a469c74
+"finish:done_230" evt_78b149db4d21ba76
+"plan:step 1_231" evt_f2075faf074bbd4
+"info:🚀_232" evt_37f8345822910fb2
+"ask:which?_233" evt_724a05bc308d65dd
+"_234" evt_793bad451ed362a3
+"thought:_235" evt_4496057947066d45
+"thought:hello_236" evt_1f398c2186361e4
+"thought:世界_237" evt_4d40e659cfea5351
+"command:ls -la_238" evt_664638ad974704b7
+"command:echo '测试'_239" evt_7ce93aa5974cff46
+"result:ok_240" evt_110b57436ace12ad
+"result:exit 1_241" evt_714b16c84ae5e443
+"finish:_242" evt_46348c357a3503d3
+"finish:done_243" evt_78a048db4d134590
+"plan:step 1_244" evt_f08f0faf060faf4
+"info:🚀_245" evt_37f52f58228ed15c
+"ask:which?_246" evt_724682bc308a516d
+"_247" evt_79242e451ebfabf5
+"thought:_248" evt_44850a7946f80291
+"thought:hello_249" evt_1e28fc21854df66
+"thought:世界_250" evt_4d39db59cfe421f2
+"command:ls -la_251" evt_6631abad97356c16
+"command:echo '测试'_252" evt_7cfdc9a5975e9b4d
+"result:ok_253" evt_1107d4436acafe3d
+"result:exit 1_254" evt_714e1fc84ae82965
+"finish:_255" evt_46310d357a31f62f
+"finish:done_256" evt_789ccbdb4d103b52
+"plan:step 1_257" evt_f0bf3faf06335e4
+"info:🚀_258" evt_37f1be58228bdb82
+"ask:which?_259" evt_7242ffbc30873cfd
+"_260" evt_792ab3451ec4f9a2
+"thought:_261" evt_448b8d7946fd4cd8
+"thought:hello_262" evt_1e986c2185aeec9
+"thought:世界_263" evt_4d36d259cfe1dcd0
+"command:ls -la_264" evt_66352ead97388086
+"command:echo '测试'_265" evt_7cf332a597554633
+"result:ok_266" evt_111241436ad40bf9
+"result:exit 1_267" evt_71519cc84aeb33a3
+"finish:_268" evt_463b12357a3a5333
+"finish:done_269" evt_78a6cedb4d1894f0
+"plan:step 1_270" evt_f12defaf06930e3
+"info:🚀_271" evt_37eabb582285b7bb
+"ask:which?_272" evt_723c6cbc3081d786
+"_273" evt_792e3a451ec814de
+"thought:_274" evt_4488847946fb07b6
+"thought:hello_275" evt_1e61bc218580321
+"thought:世界_276" evt_4d335559cfded292
+"command:ls -la_277" evt_6638bdad973ba95a
+"command:echo '测试'_278" evt_7cf6c3a59758726d
+"result:ok_279" evt_110ec6436ad10521
+"result:exit 1_280" evt_71739dc84b081bbc
+"finish:_281" evt_465d15357a573eb2
+"finish:done_282" evt_78c8d1db4d35806f
+"plan:step 1_283" evt_efaf7faf054c97d
+"info:🚀_284" evt_37e73058228295b3
+"ask:which?_285" evt_726f7fbc30ad5168
+"_286" evt_794cad451ee1d5d6
+"thought:_287" evt_44ad8379471a2240
+"thought:hello_288" evt_1d518c218498ad5
+"thought:世界_289" evt_4d666059d00a3edc
+"command:ls -la_290" evt_665ab4ad97588075
+"command:echo '测试'_291" evt_7cd4bea5973b8388
+"result:ok_292" evt_1115cb436ad72c4e
+"result:exit 1_293" evt_717720c84b0b302c
+"finish:_294" evt_465a0c357a54f990
+"finish:done_295" evt_78c54adb4d326533
+"plan:step 1_296" evt_efe74faf057d3bb
+"info:🚀_297" evt_37e431582280618f
+"ask:which?_298" evt_726bf6bc30aa32c6
+"_299" evt_79503c451ee4feaa
+"thought:_300" evt_3b7c5f7941bf1dd2
+"thought:hello_301" evt_78d9f6c2131c193d
+"thought:世界_302" evt_4434c059caae67ba
+"command:ls -la_303" evt_6f525aad9c82e982
+"command:echo '测试'_304" evt_44fe0a59b22ba39
+"result:ok_305" evt_854294365da597d
+"result:exit 1_306" evt_7a6ec6c850359939
+"finish:_307" evt_3d2be63574fc2793
+"finish:done_308" evt_6f97b0db47da811a
+"plan:step 1_309" evt_182c96faf5b09eec
+"info:🚀_310" evt_2eef8f581d583525
+"ask:which?_311" evt_69415ebc2b5487ea
+"_312" evt_2445245240c3d30
+"thought:_313" evt_3b7fe67941c2390e
+"thought:hello_314" evt_78dd5fc2131f017f
+"thought:世界_315" evt_44383f59cab1755e
+"command:ls -la_316" evt_6f4ed5ad9c7fd1ac
+"command:echo '测试'_317" evt_44c5da59b1fa5c9
+"result:ok_318" evt_857a24365dd5cef
+"result:exit 1_319" evt_7a6b4bc850329261
+"finish:_320" evt_3d24df3574f5fd00
+"finish:done_321" evt_6f909ddb47d44223
+"plan:step 1_322" evt_182591faf5aa77bf
+"info:🚀_323" evt_2ef314581d5b4cfb
+"ask:which?_324" evt_6944c9bc2b577392
+"_325" evt_240e945240954ee
+"thought:_326" evt_3b75597941b8f4f2
+"thought:hello_327" evt_78d370c21316c9dd
+"thought:世界_328" evt_443bb259cab46e9e
+"command:ls -la_329" evt_6f4b64ad9c7cdbd2
+"command:echo '测试'_330" evt_4536aa59b25da8e
+"result:ok_331" evt_8511d4365d80f42
+"result:exit 1_332" evt_7a6458c8502c89ca
+"finish:_333" evt_3d28623574f91170
+"finish:done_334" evt_6f9426db47d760c5
+"plan:step 1_335" evt_18228afaf5a83603
+"info:🚀_336" evt_2ef699581d5e64d1
+"ask:which?_337" evt_694848bc2b5a8136
+"_338" evt_23d60452406364c
+"thought:_339" evt_3b78e07941bc102e
+"thought:hello_340" evt_78e7edc21328474e
+"thought:世界_341" evt_44272759caa2d963
+"command:ls -la_342" evt_6f4463ad9c76bb71
+"command:echo '测试'_343" evt_44269a59b1765a8
+"result:ok_344" evt_846a84365cef3ee
+"result:exit 1_345" evt_7a6153c8502a4b74
+"finish:_346" evt_3d396535750789bc
+"finish:done_347" evt_6fa523db47e5cedf
+"plan:step 1_348" evt_181f0ffaf5a52f2b
+"info:🚀_349" evt_2ede8a581d49b973
+"ask:which?_350" evt_6933c7bc2b48fcf9
+"_351" evt_236dd452400ec05
+"thought:_352" evt_3b8d5f7941cd9105
+"thought:hello_353" evt_78eaf4c2132a890a
+"thought:世界_354" evt_442ab059caa5f805
+"command:ls -la_355" evt_6f4158ad9c7472e9
+"command:echo '测试'_356" evt_43eeca59b145b6a
+"result:ok_357" evt_84a174365d1e662
+"result:exit 1_358" evt_7a5dd2c850273a6a
+"finish:_359" evt_3d3cf035750aabc4
+"finish:done_360" evt_6f9e34db47dfcd14
+"plan:step 1_361" evt_18181afaf59f232e
+"info:🚀_362" evt_2ee59b581d4ff504
+"ask:which?_363" evt_69374cbc2b4c14cf
+"_364" evt_2335a4523fdd795
+"thought:_365" evt_3b82e87941c4724b
+"thought:hello_366" evt_78e0dfc2132210d6
+"thought:世界_367" evt_442e2d59caa90243
+"command:ls -la_368" evt_6f3dddad9c716c11
+"command:echo '测试'_369" evt_448dfa59b1c99d8
+"result:ok_370" evt_843264365cbe131
+"result:exit 1_371" evt_7a56bfc85020fb73
+"finish:_372" evt_3d35fb3575049fc7
+"finish:done_373" evt_6fa1b7db47e2e184
+"plan:step 1_374" evt_181499faf59c1224
+"info:🚀_375" evt_2ee906581d52e0ac
+"ask:which?_376" evt_693a59bc2b4e60bd
+"_377" evt_22fd74523fac325
+"thought:_378" evt_3b86697941c78355
+"thought:hello_379" evt_78e46ec2132539aa
+"thought:世界_380" evt_44502e59cac5ea5c
+"command:ls -la_381" evt_6f6d68ad9c99c904
+"command:echo '测试'_382" evt_43472a59b0b3797
+"result:ok_383" evt_839134365c36c63
+"result:exit 1_384" evt_7a89d4c8504c78bb
+"finish:_385" evt_3d46f83575130de1
+"finish:done_386" evt_6fb2b2db47f14c38
+"plan:step 1_387" evt_18118cfaf599c636
+"info:🚀_388" evt_2ed111581d3e617c
+"ask:which?_389" evt_695952bc2b690567
+"_390" evt_25f64452423237e
+"thought:_391" evt_3b9ad47941d8e230
+"thought:hello_392" evt_78c26dc213085191
+"thought:世界_393" evt_44533159cac8254c
+"command:ls -la_394" evt_6f69e7ad9c96b7fa
+"command:echo '测试'_395" evt_4316ba59b08f5db
+"result:ok_396" evt_83c984365c68439
+"result:exit 1_397" evt_7a8655c850496b17
+"finish:_398" evt_3d4a6935751603bb
+"finish:done_399" evt_6fb625db47f44578
+"plan:step 1_400" evt_7e9d0efae7554db6
+"info:🚀_401" evt_25d5ed581810ec7e
+"ask:which?_402" evt_60279cbc260d08e3
+"_403" evt_6924e845161026ab
+"thought:_404" evt_102d1c79293761a7
+"thought:hello_405" evt_4d8a91c1fa94234c
+"thought:世界_406" evt_3b1e8559c56a03ef
+"command:ls -la_407" evt_547c6bad8d1226a7
+"command:echo '测试'_408" evt_4886bfa579831a40
+"result:ok_409" evt_232a1c43754b2324
+"result:exit 1_410" evt_614f5dc842398467
+"finish:_411" evt_11d91f355c715545
+"finish:done_412" evt_4444d9db2f4f939c
+"plan:step 1_413" evt_7ea015fae7578f72
+"info:🚀_414" evt_25d2ec58180eb4f4
+"ask:which?_415" evt_60241dbc2609fb3f
+"_416" evt_69286d4516133e81
+"thought:_417" evt_10298d79293438d3
+"thought:hello_418" evt_4d8720c1fa912d72
+"thought:世界_419" evt_3b1b0659c566f64b
+"command:ls -la_420" evt_54755cad8d0bee7c
+"command:echo '测试'_421" evt_488dd4a579895c9d
+"result:ok_422" evt_2323a7437545f0a7
+"result:exit 1_423" evt_6144cec842303ce5
+"finish:_424" evt_11d59c355c6e40d5
+"finish:done_425" evt_444158db2f4c8292
+"plan:step 1_426" evt_7e9620fae74f4d9e
+"info:🚀_427" evt_25dcdf581816f362
+"ask:which?_428" evt_602ea2bc261331c3
+"_429" evt_691de645160a0497
+"thought:_430" evt_10228679292e0e40
+"thought:hello_431" evt_4d809dc1fa8be32b
+"thought:世界_432" evt_3b220759c56d16ac
+"command:ls -la_433" evt_5478dfad8d0f02ec
+"command:echo '测试'_434" evt_48913da5798c44df
+"result:ok_435" evt_232020437542d56b
+"result:exit 1_436" evt_61484bc842334723
+"finish:_437" evt_11d219355c6b2c65
+"finish:done_438" evt_443dd7db2f497188
+"plan:step 1_439" evt_7e999ffae7525b42
+"info:🚀_440" evt_25e3e658181d1df5
+"ask:which?_441" evt_603535bc2618973a
+"_442" evt_69176f451604ceb4
+"thought:_443" evt_103a91792942b2d2
+"thought:hello_444" evt_4d9822c1fa9fa40b
+"thought:世界_445" evt_3b2c1659c57584ae
+"command:ls -la_446" evt_546e6aad8d05e798
+"command:echo '测试'_447" evt_4894bea5798f55e9
+"result:ok_448" evt_231c9543753fb363
+"result:exit 1_449" evt_613e58c8422b08b5
+"finish:_450" evt_11e696355c7ca9d6
+"finish:done_451" evt_445254db2f5aeef9
+"plan:step 1_452" evt_7e929efae74c3ae1
+"info:🚀_453" evt_25e06358181a0985
+"ask:which?_454" evt_6031acbc26157898
+"_455" evt_691ada451607ba5c
+"thought:_456" evt_10370c79293f9afc
+"thought:hello_457" evt_4d9523c1fa9d6fe7
+"thought:世界_458" evt_3b288d59c572660c
+"command:ls -la_459" evt_5471ddad8d08e0d8
+"command:echo '测试'_460" evt_489b4ba57994b12e
+"result:ok_461" evt_23161043753a65b6
+"result:exit 1_462" evt_613755c84224e4ee
+"finish:_463" evt_11e32d355c79c194
+"finish:done_464" evt_444ee9db2f580351
+"plan:step 1_465" evt_7e888ffae743ccdf
+"info:🚀_466" evt_25ea705818227421
+"ask:which?_467" evt_603c1fbc261e9086
+"_468" evt_69105d4515fe9170
+"thought:_469" evt_10339b79293ca522
+"thought:hello_470" evt_4d8e14c1fa9737bc
+"thought:世界_471" evt_3b2f8259c5787209
+"command:ls -la_472" evt_546b68ad8d03ae5b
+"command:echo '测试'_473" evt_489ed2a57997cc6a
+"result:ok_474" evt_23128f43753754ac
+"result:exit 1_475" evt_613adcc84228002a
+"finish:_476" evt_11dfa8355c76a9be
+"finish:done_477" evt_444b66db2f54eee1
+"plan:step 1_478" evt_7e8c18fae746eb81
+"info:🚀_479" evt_25e6e558181f5219
+"ask:which?_480" evt_6042aebc2623ef31
+"_481" evt_6909da4515f94729
+"thought:_482" evt_10480a79294e0ac9
+"thought:hello_483" evt_4d6f9fc1fa7d735e
+"thought:世界_484" evt_3b399759c580ea3d
+"command:ls -la_485" evt_5460ddad8cfa6da5
+"command:echo '测试'_486" evt_486bbda5796c4f22
+"result:ok_487" evt_2345a2437562ce8e
+"result:exit 1_488" evt_6130cfc8421f958e
+"finish:_489" evt_11f79b355c8b2588
+"finish:done_490" evt_445febdb2f6679ea
+"plan:step 1_491" evt_7ebba3fae76f4874
+"info:🚀_492" evt_25b75a5817f6f526
+"ask:which?_493" evt_603fabbc2621b441
+"_494" evt_690cdb4515fb7eb3
+"thought:_495" evt_10449f79294b1f21
+"thought:hello_496" evt_4d6c12c1fa7a4df0
+"thought:世界_497" evt_3b369459c57eaf4d
+"command:ls -la_498" evt_546466ad8cfd8c47
+"command:echo '测试'_499" evt_486f44a5796f6a5e
+"result:ok_500" evt_1a13fa437006e9d4
+"result:exit 1_501" evt_69f571c8471e9e36
+"finish:_502" evt_8c66b3557300cb6
+"finish:done_503" evt_3b31a9db2a0d7859
+"plan:step 1_504" evt_6004dfaeb2823cd
+"info:🚀_505" evt_1cbfb85812cc92e5
+"ask:which?_506" evt_577e05bc2124daa4
+"_507" evt_71ce85451af85f1c
+"thought:_508" evt_716e57923f304a8
+"thought:hello_509" evt_46276cc1f6c17963
+"thought:世界_510" evt_32786e59c084e507
+"command:ls -la_511" evt_5d227ead91f73ec3
+"command:echo '测试'_512" evt_5199faa57ec54834
+"result:ok_513" evt_1a177d437009fe44
+"result:exit 1_514" evt_69f1f0c8471b8d2c
+"finish:_515" evt_8c9723557324e72
+"finish:done_516" evt_3b352edb2a10902f
+"plan:step 1_517" evt_5fccafaeb250f5d
+"info:🚀_518" evt_1cc3415812cfb187
+"ask:which?_519" evt_578180bc2127e17c
+"_520" evt_71d510451afdb6fb
+"thought:_521" evt_71d6a7923f85255
+"thought:hello_522" evt_462e7dc1f6c7b4f4
+"thought:世界_523" evt_326e5f59c07c7705
+"command:ls -la_524" evt_5d2c93ad91ffb6f7
+"command:echo '测试'_525" evt_519679a57ec2372a
+"result:ok_526" evt_1a1ae843700ce9ec
+"result:exit 1_527" evt_69fc03c8472401fa
+"finish:_528" evt_8ccfd355735707a
+"finish:done_529" evt_3b38bbdb2a13b59d
+"plan:step 1_530" evt_6034ffaeb2a5d0a
+"info:🚀_531" evt_1cbc4c5812c9a58a
+"ask:which?_532" evt_577afbbc212293cf
+"_533" evt_71d189451afa9bbf
+"thought:_534" evt_720f37923fb70f7
+"thought:hello_535" evt_4631e8c1f6caa09c
+"thought:世界_536" evt_3271dc59c07f8143
+"command:ls -la_537" evt_5d2904ad91fc8e23
+"command:echo '测试'_538" evt_5192e8a57ebf0af0
+"result:ok_539" evt_1a1e734370100bf4
+"result:exit 1_540" evt_6a030ac8472a2c8d
+"finish:_541" evt_8d40235573b97a7
+"finish:done_542" evt_3b3f40db2a19034a
+"plan:step 1_543" evt_60dbefaeb336e2c
+"info:🚀_544" evt_1cb2375812c12d56
+"ask:which?_545" evt_577088bc21197be1
+"_546" evt_71dc16451b03dfdb
+"thought:_547" evt_724747923fe8201
+"thought:hello_548" evt_4634f3c1f6cce924
+"thought:世界_549" evt_32676959c0766955
+"command:ls -la_550" evt_5d3015ad9202c9b4
+"command:echo '测试'_551" evt_51a775a57ed0a391
+"result:ok_552" evt_1a09e6436ffe7353
+"result:exit 1_553" evt_69ff87c84727181d
+"finish:_554" evt_8d70335573dcf31
+"finish:done_555" evt_3b42bfdb2a1c10ee
+"plan:step 1_556" evt_60a39faeb305656
+"info:🚀_557" evt_1cb5c65812c4562a
+"ask:which?_558" evt_5773f9bc211c71bb
+"_559" evt_71d88f451b00c49f
+"thought:_560" evt_72ae1792403a6e6
+"thought:hello_561" evt_463bf8c1f6d31051
+"thought:世界_562" evt_3260e659c0711f0e
+"command:ls -la_563" evt_5d3a08ad920b0822
+"command:echo '测试'_564" evt_51a3eaa57ecd8189
+"result:ok_565" evt_1a0d6b4370018b29
+"result:exit 1_566" evt_6a0974c8472f4c59
+"finish:_567" evt_8da70355740be3f
+"finish:done_568" evt_3b4632db2a1f0a2e
+"plan:step 1_569" evt_61444faeb38bd8c
+"info:🚀_570" evt_1caeb55812be1a99
+"ask:which?_571" evt_576d04bc211665be
+"_572" evt_71df80451b06c9d0
+"thought:_573" evt_72e68792406c222
+"thought:hello_574" evt_463f79c1f6d6215b
+"thought:世界_575" evt_3263ed59c07360ca
+"command:ls -la_576" evt_5d3683ad9207f04c
+"command:echo '测试'_577" evt_51a067a57eca6d19
+"result:ok_578" evt_1a106c437003c2b3
+"result:exit 1_579" evt_6a0679c8472d1f01
+"finish:_580" evt_8e179355746ec38
+"finish:done_581" evt_3b4d37db2a25315b
+"plan:step 1_582" evt_5e4b7faeb105d33
+"info:🚀_583" evt_1cdb425812e4451b
+"ask:which?_584" evt_5762f7bc210dfb22
+"_585" evt_71e997451b0f456a
+"thought:_586" evt_731f3792409e42a
+"thought:hello_587" evt_460c6ac1f6aaae45
+"thought:世界_588" evt_3259e059c06af62e
+"command:ls -la_589" evt_5d410aad92112a36
+"command:echo '测试'_590" evt_517e6ca57ead8f32
+"result:ok_591" evt_1a326f437020ae32
+"result:exit 1_592" evt_6a0cfec847326cae
+"finish:_593" evt_8e4fc35574a00a8
+"finish:done_594" evt_3b5040db2a27767d
+"plan:step 1_595" evt_5e1b8faeb0e290f
+"info:🚀_596" evt_1cde475812e68371
+"ask:which?_597" evt_576676bc211108c6
+"_598" evt_71e606451b0c1930
+"thought:_599" evt_7356a79240ce436
+"thought:hello_600" evt_5f4a64c204c0b709
+"thought:世界_601" evt_295eac59bb3d6600
+"command:ls -la_602" evt_440294ad83fa4ebe
+"command:echo '测试'_603" evt_59009ca5829afc5b
+"result:ok_604" evt_33a3e7437e62e6a9
+"result:exit 1_605" evt_4f1f86c837ade227
+"finish:_606" evt_2408fc3566fd01b7
+"finish:done_607" evt_54c1b8db3869aef4
+"plan:step 1_608" evt_6c7040fadccbf098
+"info:🚀_609" evt_155c8f580ef9e230
+"ask:which?_610" evt_4e6462bc1bdd904a
+"_611" evt_56fb98450b89d57e
+"thought:_612" evt_2255ea7933bcd5ee
+"thought:hello_613" evt_5f46e1c204bda299
+"thought:世界_614" evt_295b4359bb3a7dbe
+"command:ls -la_615" evt_44061bad83fd69fa
+"command:echo '测试'_616" evt_5903a1a5829d3ab1
+"result:ok_617" evt_33a064437e5fd239
+"result:exit 1_618" evt_4f227fc837b00c19
+"finish:_619" evt_24056d3566f9d8e3
+"finish:done_620" evt_54c823db386ed073
+"plan:step 1_621" evt_6c7745fadcd217c5
+"info:🚀_622" evt_15560a580ef49483
+"ask:which?_623" evt_4e6159bc1bdb4b28
+"_624" evt_56ff1b450b8ce9ee
+"thought:_625" evt_22605d7933c5eddc
+"thought:hello_626" evt_5f5176c204c6f44d
+"thought:世界_627" evt_29584259bb384634
+"command:ls -la_628" evt_440996ad840070d2
+"command:echo '测试'_629" evt_58f99aa58294da47
+"result:ok_630" evt_33a6f1437e652d7e
+"result:exit 1_631" evt_4f2972c837b614b0
+"finish:_632" evt_240c7e3567001474
+"finish:done_633" evt_54c4bcdb386beb97
+"plan:step 1_634" evt_6c7acefadcd53667
+"info:🚀_635" evt_15528b580ef186df
+"ask:which?_636" evt_4e5ddcbc1bd840ea
+"_637" evt_57028a450b8fdc62
+"thought:_638" evt_225cec7933c2f802
+"thought:hello_639" evt_5f4df3c204c3dfdd
+"thought:世界_640" evt_296c4559bb48f457
+"command:ls -la_641" evt_44108bad84067ccf
+"command:echo '测试'_642" evt_58f2a3a5828ecae4
+"result:ok_643" evt_3395f0437e56b898
+"result:exit 1_644" evt_4f2cf5c837b92920
+"finish:_645" evt_24166d3567084c16
+"finish:done_646" evt_54cf29db3874f953
+"plan:step 1_647" evt_6c7dcffadcd76df1
+"info:🚀_648" evt_156a18580f055557
+"ask:which?_649" evt_4e7557bc1bebf0cc
+"_650" evt_570991450b9606f5
+"thought:_651" evt_2263617933c82a7f
+"thought:hello_652" evt_5f5478c204c92d8a
+"thought:世界_653" evt_29693e59bb46b29b
+"command:ls -la_654" evt_44138cad8408b459
+"command:echo '测试'_655" evt_58f60ea58291b68c
+"result:ok_656" evt_3392f3437e5487da
+"result:exit 1_657" evt_4f3078c837bc3d90
+"finish:_658" evt_2412f435670548a4
+"finish:done_659" evt_54cbb2db3871f947
+"plan:step 1_660" evt_6c84bcfadcdd6c56
+"info:🚀_661" evt_1563a3580f0022da
+"ask:which?_662" evt_4e6ed2bc1be6a31f
+"_663" evt_570c96450b98454b
+"thought:_664" evt_226dee7933d16e9b
+"thought:hello_665" evt_5f5ee3c204d237e0
+"thought:世界_666" evt_2965b359bb439093
+"command:ls -la_667" evt_441719ad840bd9c7
+"command:echo '测试'_668" evt_58ec11a582896720
+"result:ok_669" evt_339ce6437e5cc648
+"result:exit 1_670" evt_4f370bc837c1a307
+"finish:_671" evt_2419f935670b6fd1
+"finish:done_672" evt_54d2b3db387819a8
+"plan:step 1_673" evt_6c8843fadce08792
+"info:🚀_674" evt_15601a580efd0438
+"ask:which?_675" evt_4e6b4bbc1be387e3
+"_676" evt_57101b450b9b5d21
+"thought:_677" evt_226a6f7933ce60f7
+"thought:hello_678" evt_5f5b6ac204cf346e
+"thought:世界_679" evt_29623c59bb409087
+"command:ls -la_680" evt_43e782ad83e36870
+"command:echo '测试'_681" evt_58e50ea582834359
+"result:ok_682" evt_338879437e4b6407
+"result:exit 1_683" evt_4f03f4c837962259
+"finish:_684" evt_23edee3566e62235
+"finish:done_685" evt_54a62adb3851f5f2
+"plan:step 1_686" evt_6c8bcefadce3a99a
+"info:🚀_687" evt_15780d580f118002
+"ask:which?_688" evt_4e4cd0bc1bc9b953
+"_689" evt_56dd0c450b6fea0b
+"thought:_690" evt_223ad87933a5efa0
+"thought:hello_691" evt_5f626fc204d55b9b
+"thought:世界_692" evt_29403559bb239e3c
+"command:ls -la_693" evt_43eb05ad83e67ce0
+"command:echo '测试'_694" evt_58e88fa582865463
+"result:ok_695" evt_3384f2437e4848cb
+"result:exit 1_696" evt_4f0779c837993a2f
+"finish:_697" evt_23ea6b3566e30dc5
+"finish:done_698" evt_54a329db384fbe68
+"plan:step 1_699" evt_6c8ec5fadce5d026
+"info:🚀_700" evt_c465d5809b58db0
+"ask:which?_701" evt_4704aebc180ddc3b
+"_702" evt_600eb04510cbc7f9
+"thought:_703" evt_194332792e7b8693
+"thought:hello_704" evt_56a0cdc1ffd888ca
+"thought:世界_705" evt_21fb9759b76ad747
+"command:ls -la_706" evt_4d1933ad893f5c75
+"command:echo '测试'_707" evt_61a9b9a587825b4c
+"result:ok_708" evt_2a8d4843791dd8f2
+"result:exit 1_709" evt_5835a3c83cf212f8
+"finish:_710" evt_1af6453561bbb40f
+"finish:done_711" evt_4d6181db34991c4c
+"plan:step 1_712" evt_75836bfae20e035c
+"info:🚀_713" evt_c49e05809b8a220
+"ask:which?_714" evt_470837bc1810fadd
+"_715" evt_600b454510c8dc51
+"thought:_716" evt_1946b7792e7e9e69
+"thought:hello_717" evt_56a44cc1ffdb966e
+"thought:世界_718" evt_21ff1059b76ddab9
+"command:ls -la_719" evt_4d15c0ad893c6335
+"command:echo '测试'_720" evt_61b0c4a587888cab
+"result:ok_721" evt_2a86c54379188eab
+"result:exit 1_722" evt_582eaec83cec06fb
+"finish:_723" evt_1aebd63561b2a2ed
+"finish:done_724" evt_4d578cdb3490da78
+"plan:step 1_725" evt_757feafae20af252
+"info:🚀_726" evt_c4d635809bbb690
+"ask:which?_727" evt_470bb4bc1814051b
+"_728" evt_6007ba4510c5ba49
+"thought:_729" evt_193c40792e757faf
+"thought:hello_730" evt_569dc3c1ffd641f5
+"thought:世界_731" evt_22060359b773e350
+"command:ls -la_732" evt_4d0ebdad89363f6e
+"command:echo '测试'_733" evt_61ad3da58785716f
+"result:ok_734" evt_2a8a4e43791bad4d
+"result:exit 1_735" evt_582b2fc83ce8f957
+"finish:_736" evt_1aef533561b5ad2b
+"finish:done_737" evt_4d5b0fdb3493eee8
+"plan:step 1_738" evt_757c69fae207e148
+"info:🚀_739" evt_c50665809bdf180
+"ask:which?_740" evt_471225bc181930cc
+"_741" evt_601c454510d74f84
+"thought:_742" evt_1935b9792e702e9c
+"thought:hello_743" evt_569350c1ffcd2a07
+"thought:世界_744" evt_22090659b7761e40
+"command:ls -la_745" evt_4d26c0ad894ad668
+"command:echo '测试'_746" evt_61b74aa5878ddc0b
+"result:ok_747" evt_2a9b4b43792a1b67
+"result:exit 1_748" evt_58432cc83cfd861f
+"finish:_749" evt_1ae5503561ad538d
+"finish:done_750" evt_4d540adb348dc7bb
+"plan:step 1_751" evt_7590e6fae2195eb9
+"info:🚀_752" evt_c57795809c43077
+"ask:which?_753" evt_4715a8bc181c453c
+"_754" evt_6018c44510d43e7a
+"thought:_755" evt_1938c4792e727724
+"thought:hello_756" evt_5696bdc1ffd01915
+"thought:世界_757" evt_220c8959b77932b0
+"command:ls -la_758" evt_4d2337ad8947b7c6
+"command:echo '测试'_759" evt_61b443a5878b9a4f
+"result:ok_760" evt_2a943c437923e33c
+"result:exit 1_761" evt_583c27c83cf75ef2
+"finish:_762" evt_1ade3d3561a71496
+"finish:done_763" evt_4d49fbdb348559b9
+"plan:step 1_764" evt_758d7bfae2167311
+"info:🚀_765" evt_c5ae65809c71f85
+"ask:which?_766" evt_471933bc181f6744
+"_767" evt_6015334510d11240
+"thought:_768" evt_192eb7792e6a0c88
+"thought:hello_769" evt_568cbec1ffc7c643
+"thought:世界_770" evt_22139c59b77f71a7
+"command:ls -la_771" evt_4d1c34ad894193ff
+"command:echo '测试'_772" evt_61bab4a58790c600
+"result:ok_773" evt_2a97bf437926f7ac
+"result:exit 1_774" evt_58391ec83cf519d0
+"finish:_775" evt_1ae1c43561aa2fd2
+"finish:done_776" evt_4d4d80db3488718f
+"plan:step 1_777" evt_7589f8fae2135ea1
+"info:🚀_778" evt_c5e6f5809ca3e27
+"ask:which?_779" evt_471caebc18226e1c
+"_780" evt_5ff33e4510b43e8b
+"thought:_781" evt_195e44792e926ce1
+"thought:hello_782" evt_5685b7c1ffc19bb0
+"thought:世界_783" evt_21e08559b753f0f9
+"command:ls -la_784" evt_4cfdc1ad8927d307
+"command:echo '测试'_785" evt_61c54ba5879a1b1a
+"result:ok_786" evt_2a723a437906f970
+"result:exit 1_787" evt_581a31c83cda898a
+"finish:_788" evt_1b0dc73561cf6fd6
+"finish:done_789" evt_4d7985db34adb4f9
+"plan:step 1_790" evt_759e7dfae224e9aa
+"info:🚀_791" evt_c64f25809cf886e
+"ask:which?_792" evt_46ed21bc17fa0dc3
+"_793" evt_5ff0374510b1fccf
+"thought:_794" evt_1961c5792e957deb
+"thought:hello_795" evt_56893ac1ffc4b020
+"thought:世界_796" evt_21e40a59b75708cf
+"command:ls -la_797" evt_4cfa32ad8924aa33
+"command:echo '测试'_798" evt_61c1baa58796eee0
+"result:ok_799" evt_2a75bd43790a0de0
+"result:exit 1_800" evt_3ea5abc82e960372
+"finish:_801" evt_7aa78735980c828c
+"finish:done_802" evt_2b6047db69793695
+"plan:step 1_803" evt_65b511fb217c0507
+"info:🚀_804" evt_ea14e5853a9d809
+"ask:which?_805" evt_3dee8dbc12c9a49e
+"_806" evt_467eb745026fb6c0
+"thought:_807" evt_78f7f97964cf6ce6
+"thought:hello_808" evt_2b517ac1e750b16f
+"thought:世界_809" evt_18e56e59b2269212
+"command:ls -la_810" evt_31d9c2ad7974d3ab
+"command:echo '测试'_811" evt_265120a56642aa22
+"result:ok_812" evt_3a5ba94339afe32c
+"result:exit 1_813" evt_3ea932c82e991eae
+"finish:_814" evt_7aa48635980a4b02
+"finish:done_815" evt_2b5cc4db69762225
+"plan:step 1_816" evt_65b87efb217ef415
+"info:🚀_817" evt_e9dcb5853a6c399
+"ask:which?_818" evt_3deb04bc12c685fc
+"_819" evt_46823a450272cb30
+"thought:_820" evt_78f1907964ca4ecd
+"thought:hello_821" evt_2b4af5c1e74b63c2
+"thought:世界_822" evt_18ec6559b22ca175
+"command:ls -la_823" evt_31cfb3ad796c65a9
+"command:echo '测试'_824" evt_2654aba56645cc2a
+"result:ok_825" evt_3a58284339acd222
+"result:exit 1_826" evt_3e9f25c82e90b412
+"finish:_827" evt_7aa1153598075528
+"finish:done_828" evt_2b5951db697328e5
+"plan:step 1_829" evt_65ae7ffb2176a143
+"info:🚀_830" evt_ea4d85853acf85e
+"ask:which?_831" evt_3df1f9bc12cc91f9
+"_832" evt_467bb545026d7d83
+"thought:_833" evt_78ee0d7964c73a5d
+"thought:hello_834" evt_2b476cc1e7484520
+"thought:世界_835" evt_18e8e259b2298d05
+"command:ls -la_836" evt_31d2b8ad796ea3ff
+"command:echo '测试'_837" evt_26582aa56648d9ce
+"result:ok_838" evt_3a54a74339a9c118
+"result:exit 1_839" evt_3ea2acc82e93cf4e
+"finish:_840" evt_7a9a103598012dfb
+"finish:done_841" evt_2b52ccdb696ddb38
+"plan:step 1_842" evt_65c288fb21875998
+"info:🚀_843" evt_e93d758539e8378
+"ask:which?_844" evt_3de0febc12be2745
+"_845" evt_468cba45027bf935
+"thought:_846" evt_78ea8a7964c425ed
+"thought:hello_847" evt_2b43efc1e7453ae2
+"thought:世界_848" evt_18d7e759b21b2251
+"command:ls -la_849" evt_31e3bdad797d1fb1
+"command:echo '测试'_850" evt_2643a9a566375591
+"result:ok_851" evt_3a69244339bb3e89
+"result:exit 1_852" evt_3eb6abc82ea476a5
+"finish:_853" evt_7a96893597fe12bf
+"finish:done_854" evt_2b4f43db696abc96
+"plan:step 1_855" evt_65c60bfb218a6e08
+"info:🚀_856" evt_e905a58539b793a
+"ask:which?_857" evt_3ddd7bbc12bb12d5
+"_858" evt_468fc345027e3e57
+"thought:_859" evt_78e7077964c1117d
+"thought:hello_860" evt_2b3cfec1e73f35b1
+"thought:世界_861" evt_18de6a59b2206c98
+"command:ls -la_862" evt_31dd4aad7977f09a
+"command:echo '测试'_863" evt_26472ea5663a6d67
+"result:ok_864" evt_3a65b94339b852e1
+"result:exit 1_865" evt_3eacb4c82e9c316b
+"finish:_866" evt_7a93863597fbd7cf
+"finish:done_867" evt_2b4bc2db6967ab8c
+"plan:step 1_868" evt_65bc06fb21821104
+"info:🚀_869" evt_e9acd5853a49128
+"ask:which?_870" evt_3de480bc12c13a02
+"_871" evt_46894e4502790bda
+"thought:_872" evt_78e0747964bbac06
+"thought:hello_873" evt_2b39fbc1e73cfac1
+"thought:世界_874" evt_18db6159b21e2776
+"command:ls -la_875" evt_31e049ad797a24be
+"command:echo '测试'_876" evt_264a9ba5663d5c75
+"result:ok_877" evt_3a62364339b53e71
+"result:exit 1_878" evt_3eb035c82e9f4275
+"finish:_879" evt_7a90073597f8ca2b
+"finish:done_880" evt_2b7b55db69901617
+"plan:step 1_881" evt_659a03fb21652585
+"info:🚀_882" evt_e86605853932ee7
+"ask:which?_883" evt_3e097fbc12e0548c
+"_884" evt_469a49450287768e
+"thought:_885" evt_7913877964e725e8
+"thought:hello_886" evt_2b3670c1e739d8b9
+"thought:世界_887" evt_19006059b23d4200
+"command:ls -la_888" evt_31f144ad79888f72
+"command:echo '测试'_889" evt_2632a4a56628d9df
+"result:ok_890" evt_3a76bb4339c6c97a
+"result:exit 1_891" evt_3ec4a0c82eb0a150
+"finish:_892" evt_7abf9035982123b8
+"finish:done_893" evt_2b784edb698dd45b
+"plan:step 1_894" evt_659d8cfb21684427
+"info:🚀_895" evt_e82d958539013ab
+"ask:which?_896" evt_3e067abc12de1636
+"_897" evt_469db845028a6902
+"thought:_898" evt_790ffe7964e40746
+"thought:hello_899" evt_2b32f5c1e736d1e1
+"thought:世界_900" evt_fcf3c59ace23d92
+"command:ls -la_901" evt_3aec76ad7eb61c3a
+"command:echo '测试'_902" evt_2db0d8a56a1264fd
+"result:ok_903" evt_3148f943346ea169
+"result:exit 1_904" evt_4608e2c83268cbf1
+"finish:_905" evt_71916a3592c851bb
+"finish:done_906" evt_23fd28db65a696de
+"plan:step 1_907" evt_6ecb26fb26c02840
+"info:🚀_908" evt_58b2f584e65a3d2
+"ask:which?_909" evt_34d860bc0d85589d
+"_910" evt_4ddef24506405034
+"thought:_911" evt_6fe566795f8e5c6a
+"thought:hello_912" evt_223ecbc1e20f715f
+"thought:世界_913" evt_fd2c359ace558ce
+"command:ls -la_914" evt_3ae8edad7eb2fd98
+"command:echo '测试'_915" evt_2dadd5a56a102a0d
+"result:ok_916" evt_314bfe433470dfbf
+"result:exit 1_917" evt_4605dfc832669101
+"finish:_918" evt_7194eb3592cb62c5
+"finish:done_919" evt_2400a7db65a9a482
+"plan:step 1_920" evt_6ed239fb26c66737
+"info:🚀_921" evt_5842c584e5f800b
+"ask:which?_922" evt_34d14dbc0d7f19a6
+"_923" evt_4de8e54506488ea2
+"thought:_924" evt_6fe8d1795f914812
+"thought:hello_925" evt_224258c1e21296cd
+"thought:世界_926" evt_fc83659acdc14b2
+"command:ls -la_927" evt_3af360ad7ebc1586
+"command:echo '测试'_928" evt_2daa52a56a0d159d
+"result:ok_929" evt_314f8b433474052d
+"result:exit 1_930" evt_460c4cc8326bb5e6
+"finish:_931" evt_719bde3592d16b5c
+"finish:done_932" evt_24071edb65aeda65
+"plan:step 1_933" evt_6eceb2fb26c34bfb
+"info:🚀_934" evt_587b5584e629ead
+"ask:which?_935" evt_34d4d4bc0d8234e2
+"_936" evt_4de56045064576cc
+"thought:_937" evt_6fec50795f9455b6
+"thought:hello_938" evt_224551c1e214c0bf
+"thought:世界_939" evt_fcbbd59acdf2fee
+"command:ls -la_940" evt_3adedfad7eaa9149
+"command:echo '测试'_941" evt_2da33da56a06d340
+"result:ok_942" evt_31569043347a2c5a
+"result:exit 1_943" evt_45fb4bc8325d4100
+"finish:_944" evt_7183d93592bcd0fc
+"finish:done_945" evt_23ef97db659b161f
+"plan:step 1_946" evt_6ebdb7fb26b4e147
+"info:🚀_947" evt_598b2584e710cc7
+"ask:which?_948" evt_34e5d7bc0d90ad2e
+"_949" evt_4dd4674506370f7e
+"thought:_950" evt_6fd7cf795f82d179
+"thought:hello_951" evt_223154c1e2041cce
+"thought:世界_952" evt_fe03c59acf0b0c5
+"command:ls -la_953" evt_3adb5cad7ea77cd9
+"command:echo '测试'_954" evt_2d9fd4a56a03eafe
+"result:ok_955" evt_31598f43347c607e
+"result:exit 1_956" evt_45f84ec8325b1042
+"finish:_957" evt_71875c3592bfe56c
+"finish:done_958" evt_23f320db659e34c1
+"plan:step 1_959" evt_6eba28fb26b1b873
+"info:🚀_960" evt_59223584e6bae1c
+"ask:which?_961" evt_34dee4bc0d8aa497
+"_962" evt_4ddb6e45063d3a11
+"thought:_963" evt_6fdb54795f85e94f
+"thought:hello_964" evt_223457c1e20657be
+"thought:世界_965" evt_fd5c559ace7920b
+"command:ls -la_966" evt_3ae5f1ad7eb0ce8d
+"command:echo '测试'_967" evt_2d9cd3a56a01b374
+"result:ok_968" evt_315d0243347f59be
+"result:exit 1_969" evt_460251c8326369e0
+"finish:_970" evt_718de73592c53d4b
+"finish:done_971" evt_23f9a3db65a37f08
+"plan:step 1_972" evt_6ec139fb26b7f404
+"info:🚀_973" evt_59526584e6de90c
+"ask:which?_974" evt_34e265bc0d8db5a1
+"_975" evt_4dd7e345063a1809
+"thought:_976" evt_6fde61795f88353d
+"thought:hello_977" evt_2237c6c1e2094a32
+"thought:世界_978" evt_fd94659aceaa315
+"command:ls -la_979" evt_3ae26ead7eadba1d
+"command:echo '测试'_980" evt_2d95c6a569fb7eaf
+"result:ok_981" evt_31640743348580eb
+"result:exit 1_982" evt_462454c83280555f
+"finish:_983" evt_71ace03592dfe1f5
+"finish:done_984" evt_241816db65bd4000
+"plan:step 1_985" evt_6eb038fb26a97f1e
+"info:🚀_986" evt_57021584e4ec450
+"ask:which?_987" evt_34f362bc0d9c23bb
+"_988" evt_4dfd7045065a23dd
+"thought:_989" evt_6ffd5a795fa2d9e7
+"thought:hello_990" evt_22235dc1e1f7eebd
+"thought:世界_991" evt_fedb159acfc01f0
+"command:ls -la_992" evt_3b0463ad7eca8dd2
+"command:echo '测试'_993" evt_2d923fa569f86373
+"result:ok_994" evt_3167904334889f8d
+"result:exit 1_995" evt_4620cdc8327d3a23
+"finish:_996" evt_71afdd3592e212b3
+"finish:done_997" evt_241b99db65c05470
+"plan:step 1_998" evt_6eacaffb26a6607c
+"info:🚀_999" evt_57324584e50ff40

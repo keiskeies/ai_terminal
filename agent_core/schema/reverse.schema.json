@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "reverse.schema.json",
+  "title": "Child-to-Parent Reverse RPC Requests",
+  "description": "JSON-RPC requests emitted by Node child, handled by Dart parent",
+  "type": "object",
+  "oneOf": [
+    {
+      "title": "rpc:invokeSsh",
+      "description": "Execute command on remote host via Dart SSH layer",
+      "required": [
+        "method",
+        "params"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "type": "string"
+        },
+        "method": {
+          "const": "rpc:invokeSsh"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "hostId",
+            "command"
+          ],
+          "properties": {
+            "hostId": {
+              "type": "string"
+            },
+            "command": {
+              "type": "string"
+            },
+            "timeoutMs": {
+              "type": "number"
+            },
+            "workDir": {
+              "type": "string"
+            },
+            "shell": {
+              "type": "string",
+              "enum": [
+                "bash",
+                "sh",
+                "zsh",
+                "powershell",
+                "cmd"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "rpc:invokeSftp",
+      "properties": {
+        "method": {
+          "const": "rpc:invokeSftp"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "hostId",
+            "op"
+          ],
+          "properties": {
+            "hostId": {
+              "type": "string"
+            },
+            "op": {
+              "type": "string",
+              "enum": [
+                "upload",
+                "download",
+                "list",
+                "mkdir",
+                "delete",
+                "rename"
+              ]
+            },
+            "remotePath": {
+              "type": "string"
+            },
+            "localPath": {
+              "type": "string"
+            },
+            "targetPath": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "rpc:queryKnowledge",
+      "properties": {
+        "method": {
+          "const": "rpc:queryKnowledge"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "query"
+          ],
+          "properties": {
+            "query": {
+              "type": "string"
+            },
+            "limit": {
+              "type": "number"
+            },
+            "category": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "rpc:saveSession",
+      "properties": {
+        "method": {
+          "const": "rpc:saveSession"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "taskId"
+          ],
+          "properties": {
+            "taskId": {
+              "type": "string"
+            },
+            "events": {
+              "type": "array",
+              "items": {
+                "$ref": "event.schema.json"
+              }
+            },
+            "checkpointData": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    {
+      "title": "rpc:callDartTool",
+      "description": "Invoke a Dart-registered tool (e.g. local file ops that must stay in Dart)",
+      "properties": {
+        "method": {
+          "const": "rpc:callDartTool"
+        },
+        "params": {
+          "type": "object",
+          "required": [
+            "toolName",
+            "args"
+          ],
+          "properties": {
+            "toolName": {
+              "type": "string"
+            },
+            "args": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

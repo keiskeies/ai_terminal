@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "tool.schema.json",
+  "title": "AgentTool",
+  "description": "Tool descriptor, aligned with MCP tool shape",
+  "type": "object",
+  "required": [
+    "name",
+    "description",
+    "inputSchema"
+  ],
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "inputSchema": {
+      "type": "object",
+      "description": "JSON Schema for tool input parameters"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "read",
+        "write",
+        "destructive",
+        "network",
+        "orchestration"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "builtin",
+        "mcpServer",
+        "dart"
+      ]
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "local",
+        "remote",
+        "all"
+      ]
+    },
+    "idempotent": {
+      "type": "boolean"
+    }
+  }
+}
