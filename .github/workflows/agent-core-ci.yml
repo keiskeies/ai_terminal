@@ -36,6 +36,10 @@ jobs:
         run: npm test
         working-directory: agent_core
 
+      - name: 10-case parser byte-parity e2e (R9)
+        run: npm run test_e2e
+        working-directory: agent_core
+
       - name: Build (esbuild)
         run: npm run build
         working-directory: agent_core

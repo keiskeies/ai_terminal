@@ -1,0 +1,172 @@
+[
+  {
+    "label": "E2E-thought",
+    "events": [
+      {
+        "id": "evt_4ab5285dc89fef7b",
+        "type": "thought",
+        "text": "需要查看目录"
+      }
+    ]
+  },
+  {
+    "label": "E2E-plan",
+    "events": [
+      {
+        "id": "evt_31ae7322c826490",
+        "type": "plan",
+        "planSteps": [
+          {
+            "title": "检查磁盘",
+            "status": "pending"
+          },
+          {
+            "title": "已完成备份",
+            "status": "completed"
+          },
+          {
+            "title": "进行中项",
+            "status": "inProgress"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "label": "E2E-16",
+    "events": [
+      {
+        "id": "evt_4ab5285dc89fef7b",
+        "type": "thought",
+        "text": "需要查看目录"
+      },
+      {
+        "id": "evt_123b930b450bd895",
+        "type": "command",
+        "command": "ls -la",
+        "description": "列出当前目录内容，只读操作，不会改动任何文件"
+      }
+    ]
+  },
+  {
+    "label": "E2E-17",
+    "events": [
+      {
+        "id": "evt_5db49ae2fd4df71f",
+        "type": "thought",
+        "text": "先看目录"
+      },
+      {
+        "id": "evt_42581788e3d0837d",
+        "type": "command",
+        "command": "ls",
+        "description": "查看当前目录下的文件列表"
+      },
+      {
+        "id": "evt_c7812cd142791fb",
+        "type": "thought",
+        "text": "再确认工作目录"
+      },
+      {
+        "id": "evt_26dc2a9ae2a6051b",
+        "type": "command",
+        "command": "pwd"
+      }
+    ]
+  },
+  {
+    "label": "E2E-18",
+    "events": [
+      {
+        "id": "evt_3fc36f212d739470",
+        "type": "thought",
+        "text": "先安装 Nginx"
+      },
+      {
+        "id": "evt_5c5d498f0d5f4469",
+        "type": "plan",
+        "planSteps": [
+          {
+            "title": "安装 Nginx",
+            "status": "inProgress"
+          },
+          {
+            "title": "验证服务",
+            "status": "pending"
+          }
+        ]
+      },
+      {
+        "id": "evt_2ce20c6548a587b5",
+        "type": "command",
+        "command": "sudo apt install -y nginx",
+        "description": "安装 Nginx 软件包，会新增软件和系统服务"
+      }
+    ]
+  },
+  {
+    "label": "E2E-options",
+    "events": [
+      {
+        "id": "evt_1024acc54369de64",
+        "type": "thought",
+        "text": "选哪个"
+      },
+      {
+        "id": "evt_7a6406e317c5c571",
+        "type": "ask",
+        "options": [
+          "继续",
+          "回退",
+          "取消"
+        ],
+        "question": "选哪个"
+      }
+    ]
+  },
+  {
+    "label": "E2E-codefence",
+    "events": [
+      {
+        "id": "evt_3c5384c3fb3659bc",
+        "type": "thought",
+        "text": "运行命令"
+      },
+      {
+        "id": "evt_1a983973eaa2b606",
+        "type": "command",
+        "command": "uname -a"
+      }
+    ]
+  },
+  {
+    "label": "E2E-text",
+    "events": [
+      {
+        "id": "evt_e3d57f8a36595f0",
+        "type": "text",
+        "text": "这是正文"
+      }
+    ]
+  },
+  {
+    "label": "E2E-thought-multiline",
+    "events": [
+      {
+        "id": "evt_35b42c756aa7fd4",
+        "type": "thought",
+        "text": "第一步\n第二步"
+      }
+    ]
+  },
+  {
+    "label": "E2E-orphan-desc",
+    "events": [
+      {
+        "id": "evt_1a983973eaa2b606",
+        "type": "command",
+        "command": "uname -a"
+      }
+    ]
+  }
+]

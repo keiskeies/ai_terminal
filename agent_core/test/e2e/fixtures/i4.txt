@@ -1,0 +1,7 @@
+思考: 先安装 Nginx
+计划:
+- [>] 安装 Nginx
+- [ ] 验证服务
+说明: 安装 Nginx 软件包，会新增软件和系统服务
+动作: execute
+命令: sudo apt install -y nginx
