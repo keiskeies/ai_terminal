@@ -9,9 +9,10 @@
   "scripts": {
     "build": "esbuild src/index.ts --bundle --outfile=dist/index.js --platform=node --format=esm --external:fs --external:path --external:crypto --external:os --external:child_process --sourcemap",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --no-coverage",
     "test_e2e": "vitest run test/e2e/",
-    "test_regression": "vitest run test/regression/"
+    "test_regression": "vitest run test/regression/",
+    "test:fixture": "node test/fixtures/verify.mjs"
   },
   "dependencies": {
     "zod": "^3.23.0",

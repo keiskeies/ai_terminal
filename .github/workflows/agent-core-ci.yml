@@ -1,0 +1,45 @@
+name: agent-core-ci
+
+on:
+  pull_request:
+    paths:
+      - "agent_core/**"
+      - ".github/workflows/agent-core-ci.yml"
+  push:
+    branches: [main, "feat/**"]
+    paths:
+      - "agent_core/**"
+
+jobs:
+  agent-core-build:
+    name: agent-core (typecheck + test + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: agent_core/package-lock.json
+
+      - name: Install deps
+        run: npm ci
+        working-directory: agent_core
+
+      - name: Typecheck
+        run: npm run typecheck
+        working-directory: agent_core
+
+      - name: Unit + e2e tests
+        run: npm test
+        working-directory: agent_core
+
+      - name: Build (esbuild)
+        run: npm run build
+        working-directory: agent_core
+
+      - name: Verify stableId fixture (1000 cases)
+        run: npm run test:fixture
+        working-directory: agent_core

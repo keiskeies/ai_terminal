@@ -14,6 +14,10 @@ export interface GenerationCheck {
 }
 
 export class TaskGeneration implements GenerationCheck {
+  /** Bump the current generation (used by cancel()). */
+  private _bumpCounter = 0;
+  /** Increment the current-generation counter. */
+  bump(): void { this._bumpCounter++; }
   constructor(private readonly myGen: number, private readonly currentGen: () => number, private readonly cancelled: () => boolean) {}
 
   isCurrent(): boolean {
