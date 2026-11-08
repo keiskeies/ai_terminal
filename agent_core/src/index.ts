@@ -10,6 +10,8 @@ export {TailTextBuffer} from "./utils/tail_buffer.js";
 export {TaskGeneration, StaleTaskError} from "./utils/generation.js";
 export {PendingRegistry} from "./utils/pending_registry.js";
 export {detectShell, wrapCommand} from "./utils/shell_detect.js";
+export {spawnLocalPty, resolvePtyShell, buildPtyEnv, buildPtyConfig} from "./pty/index.js";
+export type {PtySession, PtyOptions, PtyConfig, PtyShellResolution, ShellKind, ExistCheck} from "./pty/index.js";
 export {StreamAccumulator} from "./llm/stream.js";
 export {MockLlmClient, OpenAiClient} from "./llm/clients.js";
 export {OpenAiStreamClient} from "./llm/openai_stream.js";
