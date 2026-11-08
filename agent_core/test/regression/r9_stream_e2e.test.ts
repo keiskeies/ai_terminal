@@ -1,5 +1,8 @@
 import {describe, it, expect} from "vitest";
 import {OpenAiStreamClient} from "../../src/llm/openai_stream.js";
+import {StreamAccumulator} from "../../src/llm/stream.js";
+import {parse} from "../../src/react/parser.js";
+import {stableId} from "../../src/utils/stable_hash.js";
 
 function sse(lines: string[]): Response {
   const body = new ReadableStream({start(c){
@@ -29,4 +32,23 @@ describe("R9 stream pipeline e2e", () => {
     expect(out.usage?.cachedTokens).toBe(2);
     stop();
   });
-});
+    it("R9 multi-line concat: chunked stream reconstructs + parses", () => {
+      const full = "\u601d\u8003: check disk\n\u547d\u4ee4: ls -la\n";
+      const chunks = [full.slice(0, 2), full.slice(2)];
+      const acc = new StreamAccumulator();
+      for (const c of chunks) acc.pushText(c);
+      expect(acc.getResult().text).toBe(full);
+      const evts = parse(full);
+      expect(evts.map((e) => e.type)).toEqual(["thought", "command"]);
+    });
+    it("R9 stableId byte-parity: 64-bit Dart hash, no int32 collisions", () => {
+      // Reference values locked against an independent Python FNV-1a-64 oracle
+      // that replicates Dart's (hash*0x100000001b3)&0x7FFFFFFFFFFFFFFF loop.
+      expect(stableId("thought","\u9700\u8981\u67e5\u770b\u76ee\u5f55")).toBe("evt_4ab5285dc89fef7b");
+      expect(stableId("command","ls -la /tmp")).toBe("evt_4126a2a91fa730c9");
+      expect(stableId("command","uname -a")).toBe("evt_1a983973eaa2b606");
+      expect(stableId("ask","A|B|C")).toBe("evt_57e4ddc57dd32128");
+      // Deterministic: same input, same id, across calls.
+      expect(stableId("command","uname -a")).toBe(stableId("command","uname -a"));
+    });
+  });
