@@ -38,6 +38,12 @@ const int _compactThresholdChars = 30000;
 /// 压缩后保留的最近原文轮数
 const int _compactKeepRounds = 6;
 
+/// W3: 编译开关 — 灰度切到 Node Agent Core (默认 false)。
+/// 用法: flutter run --dart-define=kUseNodeAgent=true
+/// 当前 Phase 1: 仅做 guard 日志，实际走 Dart engine（Phase 2 完整接入 AgentBridge）。
+const bool kUseNodeAgent = bool.fromEnvironment("kUseNodeAgent", defaultValue: false);
+
+
 /// Agent Provider — 每个 hostId 独立 Agent 状态和记忆（持久化）
 class AgentNotifier extends StateNotifier<AgentState> {
   AgentEngine? _engine;
@@ -431,6 +437,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final aiProvider = AIService.create(_modelConfig!);
     // P1-4: 加载 fallback 模型（如有配置）
     final fallback = _loadFallbackFor(_modelConfig!);
+    if (kUseNodeAgent) {
+      agentLogger.info('AgentNotifier', 'kUseNodeAgent ON: running Dart engine (Node Agent Core pending Phase 2)');
+    }
     _engine = AgentEngine(
       aiProvider: aiProvider,
       modelConfig: _modelConfig!,
@@ -538,6 +547,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _engine!.disposeTools();
     }
 
+    if (kUseNodeAgent) {
+      agentLogger.info('AgentNotifier', 'kUseNodeAgent ON: running Dart engine (Node Agent Core pending Phase 2)');
+    }
     _engine = AgentEngine(
       aiProvider: aiProvider,
       modelConfig: modelConfig,
