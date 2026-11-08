@@ -12,6 +12,8 @@ export {PendingRegistry} from "./utils/pending_registry.js";
 export {detectShell, wrapCommand} from "./utils/shell_detect.js";
 export {StreamAccumulator} from "./llm/stream.js";
 export {MockLlmClient, OpenAiClient} from "./llm/clients.js";
+export {OpenAiStreamClient} from "./llm/openai_stream.js";
+export type {OpenAiStreamConfig} from "./llm/openai_stream.js";
 export type {LlmClient, LlmResult, ChatMsg} from "./llm/clients.js";
 export {StdioChildTransport} from "./rpc/transport.js";
 export {RpcServer} from "./rpc/server.js";
