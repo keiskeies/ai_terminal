@@ -116,14 +116,14 @@ String _cleanCell(String raw) {
   return text.replaceAll(RegExp(r'\s*\n\s*'), ' ');
 }
 
-/// 智能列宽表格：按内容自然宽度分配列宽，不再均等分。
+/// 智能列宽表格：按内容自然宽度分配列宽，单元格永不换行。
 ///
 /// 规则：
-/// - 每列取内容不换行时的最大宽度（含单元格内边距）；
+/// - 每列取内容不换行时的最大宽度（含单元格内边距与系统字号缩放）；
 /// - 总宽不超可用宽度时不强行摊满，列宽完全跟着内容走；
-/// - 总宽超限时按比例压缩（保底最小列宽），单元格内自动换行；
+/// - 总宽超限时保持内容宽度，改为横向滚动（常显滚动条），不压缩、不换行；
 /// - 表头加粗、隔行底色，边框与其它 agent 卡片统一。
-class SmartMarkdownTable extends StatelessWidget {
+class SmartMarkdownTable extends StatefulWidget {
   final MarkdownTableData data;
   final ThemeColors tc;
   final double fontSize;
@@ -136,7 +136,25 @@ class SmartMarkdownTable extends StatelessWidget {
   });
 
   @override
+  State<SmartMarkdownTable> createState() => _SmartMarkdownTableState();
+}
+
+class _SmartMarkdownTableState extends State<SmartMarkdownTable> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final data = widget.data;
+    final tc = widget.tc;
+    final fontSize = widget.fontSize;
+    final textScaler = MediaQuery.textScalerOf(context);
+
     final columnCount = math.max(
       data.header.length,
       data.rows.fold<int>(0, (max, row) => math.max(max, row.length)),
@@ -144,11 +162,10 @@ class SmartMarkdownTable extends StatelessWidget {
     if (columnCount == 0) return const SizedBox.shrink();
 
     return LayoutBuilder(builder: (context, constraints) {
-      // 容器左右各 1px 边框，先扣掉，避免固定列宽把整行顶出父级
-      final available = constraints.maxWidth.isFinite
-          ? math.max(1.0, constraints.maxWidth - 2)
-          : 600.0;
+      final maxWidth =
+          constraints.maxWidth.isFinite ? constraints.maxWidth : 600.0;
 
+      // 按内容测量自然宽度：maxLines=1，宽度即整行文字所需宽度（含 padding）。
       final natural = List<double>.generate(columnCount, (col) {
         var width = 24.0; // 空列也留一点宽度
         void measure(String text, bool bold) {
@@ -163,9 +180,11 @@ class SmartMarkdownTable extends StatelessWidget {
               ),
             ),
             maxLines: 1,
+            textScaler: textScaler,
             textDirection: TextDirection.ltr,
           )..layout();
-          width = math.max(width, painter.width + 16); // 左右 padding
+          // +2 防止浮点取整后差 1px 又触发换行
+          width = math.max(width, painter.width + 16 + 2);
           painter.dispose();
         }
 
@@ -177,24 +196,11 @@ class SmartMarkdownTable extends StatelessWidget {
       });
 
       final total = natural.fold(0.0, (a, b) => a + b);
-      final List<double> widths;
-      if (total <= available) {
-        // 内容自适应：不把剩余空间摊回各列，否则又会退化成“接近均分”
-        widths = natural;
-      } else {
-        final minCol = math.min(36.0, available / columnCount);
-        final shrinkable = math.max(0.0, available - columnCount * minCol);
-        final naturalSum = math.max(1.0, total - columnCount * minCol);
-        widths = [
-          for (final width in natural)
-            minCol + shrinkable * math.max(0.0, width - minCol) / naturalSum,
-        ];
-      }
 
       Widget cellBox(String text, int col,
           {bool bold = false, bool zebra = false}) {
         return Container(
-          width: widths[col],
+          width: natural[col],
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
           decoration: BoxDecoration(
             color: zebra ? tc.surface.withValues(alpha: 0.5) : null,
@@ -204,6 +210,8 @@ class SmartMarkdownTable extends StatelessWidget {
           ),
           child: Text(
             text,
+            maxLines: 1,
+            softWrap: false,
             style: TextStyle(
               fontSize: fontSize,
               height: 1.35,
@@ -238,11 +246,45 @@ class SmartMarkdownTable extends StatelessWidget {
         ));
       }
 
-      // 用 Align 让表格贴在左侧、宽度跟着内容走：
-      // 父级偶发 tight 约束时也不会把边框拉满整行。
+      final table = Table(
+        border: TableBorder(
+          horizontalInside: BorderSide(color: tc.agentCardBorder, width: 1),
+        ),
+        columnWidths: {
+          for (var col = 0; col < natural.length; col++)
+            col: FixedColumnWidth(natural[col]),
+        },
+        children: tableRows,
+      );
+
+      // 容器左右各 1px 边框
+      final contentWidth = total + 2;
+      final containerWidth = math.min(maxWidth, contentWidth);
+
+      Widget body;
+      if (contentWidth <= maxWidth) {
+        // 内容宽度够：直接按内容宽度显示，列宽完全自适应
+        body = table;
+      } else {
+        // 超宽：保持每列内容宽度，横向滚动查看，绝不压缩换行
+        body = Scrollbar(
+          controller: _scrollController,
+          thumbVisibility: true,
+          scrollbarOrientation: ScrollbarOrientation.bottom,
+          child: SingleChildScrollView(
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.only(bottom: 10),
+            child: table,
+          ),
+        );
+      }
+
+      // 用 Align 让表格贴在左侧；窄表宽度跟内容走，宽表占满可用宽度并滚动。
       return Align(
         alignment: Alignment.centerLeft,
         child: Container(
+          width: containerWidth,
           margin: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
             border: Border.all(color: tc.agentCardBorder, width: 1),
@@ -250,17 +292,7 @@ class SmartMarkdownTable extends StatelessWidget {
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(5),
-            child: Table(
-              border: TableBorder(
-                horizontalInside:
-                    BorderSide(color: tc.agentCardBorder, width: 1),
-              ),
-              columnWidths: {
-                for (var col = 0; col < widths.length; col++)
-                  col: FixedColumnWidth(widths[col]),
-              },
-              children: tableRows,
-            ),
+            child: body,
           ),
         ),
       );
