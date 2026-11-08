@@ -124,6 +124,9 @@ export class ToolArgs {
   get keys(): string[] { return Object.keys(this.raw); }
   /** Unmodifiable view for audit/logs; do NOT use to read business params. */
   get asMap(): Record<string, unknown> { return new Map(Object.entries(this.raw)) as any; }
+  /** Plain record of the parsed args - used by MCP tools to forward JSON (R9). */
+  asRecord(): Record<string, unknown> { return {...this.raw}; }
+
 
   has(key: string): boolean {
     const v = this.raw[key];
