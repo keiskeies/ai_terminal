@@ -632,7 +632,7 @@ class ServerMonitorService {
       'echo @@MEMSIZE@@',
       'sysctl -n hw.memsize',
       'echo @@DISK@@',
-      "df -g -PT",
+      "df -k -P",
       'echo @@NET@@',
       "netstat -ib",
       'echo @@USER@@',
@@ -651,10 +651,11 @@ class ServerMonitorService {
     ].join('; ');
 
     final out = await ssh.runOnce(script, timeout: const Duration(seconds: 10));
-    return _parseMacOSOutput(out);
+    return parseMacOSOutput(out);
   }
 
-  ServerSnapshot _parseMacOSOutput(String raw) {
+  @visibleForTesting
+  ServerSnapshot parseMacOSOutput(String raw) {
     final now = DateTime.now();
     if (raw.isEmpty) {
       return ServerSnapshot(timestamp: now, error: L10n.str.monitorErrorEmptyOutput);
@@ -722,7 +723,7 @@ class ServerMonitorService {
         memPercent = (usedBytes / totalBytes * 100).clamp(0, 100);
       }
 
-      // DISK — df -g -PT 输出（macOS 格式类似 Linux）
+      // DISK — df -k -P 输出（1024-blocks，无类型列）
       final diskRaw = sections['DISK']?.trim() ?? '';
       partitions = _parseMacOSDiskPartitions(diskRaw);
       for (final p in partitions) {
@@ -918,7 +919,7 @@ class ServerMonitorService {
       'echo @@MEMSIZE@@',
       'sysctl -n hw.memsize',
       'echo @@DISK@@',
-      "df -g -PT",
+      "df -k -P",
       'echo @@NET@@',
       "netstat -ib",
       'echo @@USER@@',
@@ -937,7 +938,7 @@ class ServerMonitorService {
     ].join('; ');
 
     final out = await local.runOnce(script, timeout: const Duration(seconds: 10));
-    return _parseMacOSOutput(out);
+    return parseMacOSOutput(out);
   }
 
   /// Windows 本地采集脚本：纯 CIM 实现，不使用 wmic（Win11 已弃用/移除），
@@ -1285,9 +1286,40 @@ Write-Output '@@END@@'
     return result;
   }
 
-  /// 解析 macOS df -g -PT 输出（格式与 Linux 类似）
+  /// 解析 macOS `df -k -P` 输出
+  ///
+  /// 不能复用 Linux 的解析：BSD df 的 `-T` 是「按类型过滤」且要带参数，
+  /// `df -g -PT` 在 macOS 上直接报 `option requires an argument -- T`，
+  /// DISK 段只剩 usage 文本 → 分区解析不出来 → 磁盘栏恒为 0。改用 `-k -P`
+  /// 后单位是 1024-blocks、且没有类型列（6 列），虚拟盘只能按设备名过滤。
   List<DiskPartition> _parseMacOSDiskPartitions(String raw) {
-    return _parseLinuxDiskPartitions(raw);
+    final result = <DiskPartition>[];
+    for (final line in raw.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty || trimmed.startsWith('Filesystem')) continue;
+      final parts = trimmed.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+      // df -k -P: Filesystem 1024-blocks Used Available Capacity Mounted on
+      if (parts.length < 6) continue;
+      final fs = parts[0];
+      // 真实盘：/dev/disk1s1（APFS 卷）、//host/share（SMB）。
+      // 其余 devfs、map auto_home、hdid 等都是虚拟盘。
+      if (!fs.startsWith('/dev/') && !fs.startsWith('//')) continue;
+      final totalGB = (double.tryParse(parts[1]) ?? 0) / (1024 * 1024);
+      final usedGB = (double.tryParse(parts[2]) ?? 0) / (1024 * 1024);
+      final freeGB = (double.tryParse(parts[3]) ?? 0) / (1024 * 1024);
+      final usePercent = double.tryParse(parts[4].replaceAll('%', '')) ?? 0;
+      if (totalGB <= 0) continue;
+      result.add(DiskPartition(
+        filesystem: fs,
+        mountPoint: parts.sublist(5).join(' '),
+        totalGB: totalGB,
+        usedGB: usedGB,
+        freeGB: freeGB,
+        usePercent: usePercent.clamp(0, 100),
+      ));
+    }
+    result.sort((a, b) => b.totalGB.compareTo(a.totalGB));
+    return result;
   }
 
   /// 解析 Windows wmic logicaldisk 输出

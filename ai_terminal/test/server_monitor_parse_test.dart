@@ -81,6 +81,41 @@ void main() {
     });
   });
 
+  group('macOS 本地磁盘采集', () {
+    // df -k -P 在 macOS 上的真实输出（截掉冗余卷）。BSD df 的 -T 是「按类型
+    // 过滤且要带参数」，旧脚本 df -g -PT 直接报错 → 磁盘栏恒为 0。
+    const dfRaw = '''
+Filesystem     1024-blocks      Used Available Capacity  Mounted on
+/dev/disk1s1s1   488245288  12272304 121022012    10%    /
+devfs                  350       350         0   100%    /dev
+/dev/disk1s3     488245288   2752584 121022012     3%    /System/Volumes/Preboot
+/dev/disk1s6     488245288   2097204 121022012     2%    /System/Volumes/VM
+/dev/disk1s2     488245288 348516996 121022012    75%    /System/Volumes/Data
+map auto_home          0         0         0   100%    /System/Volumes/Data/home
+''';
+
+    test('解析出真实分区，根分区不再是 0', () {
+      final snap = service.parseMacOSOutput(_raw([
+        ('CPU', 'CPU usage: 12.66% user, 9.81% sys, 77.51% idle'),
+        ('DISK', dfRaw),
+      ]));
+
+      expect(snap.error, isNull);
+      // devfs / map auto_home 被过滤掉，只留 /dev/ 开头的真实卷
+      expect(snap.diskPartitions.map((p) => p.mountPoint),
+          isNot(contains('/dev')));
+      expect(snap.diskPartitions, isNotEmpty);
+      expect(snap.diskTotalGB, greaterThan(0));
+      expect(snap.diskPercent, greaterThan(0));
+      // 单位换算：488245288 KB ≈ 465 GB（不是 488245288 GB）
+      expect(snap.diskTotalGB, closeTo(488245288 / (1024 * 1024), 0.01));
+      // 根分区按挂载点取，不能靠顺序（APFS 各卷容量相同，排序打平）
+      final root = snap.diskPartitions.firstWhere((p) => p.mountPoint == '/');
+      expect(root.usePercent, 10);
+      expect(snap.diskPercent, 10);
+    });
+  });
+
   group('Windows 本地采集', () {
     // 真机（Win11 22000）上 -EncodedCommand 采集到的实际输出，仅截掉多余网卡
     const windowsRaw = '''

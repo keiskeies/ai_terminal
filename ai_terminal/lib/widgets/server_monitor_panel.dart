@@ -10,9 +10,11 @@ import '../services/server_monitor_service.dart';
 
 /// 服务器监控面板 — 单行紧凑布局（30px 高）
 ///
-/// 左到右依次：[icon]用户 4 | [icon]开机 up 32 days | [icon]磁盘 12% |
-/// [icon]内存 13.5GB/32GB [图表] | [icon]CPU 38% [图表] |
-/// [icon]上传 0.01 Mb/s [图表] | [icon]下载 0.01 Mb/s [图表]
+/// 左到右依次：[icon]CPU 38% [图表] | [icon]内存 13.5GB/32GB |
+/// [icon]上传 0.01 Mb/s | [icon]下载 0.01 Mb/s | [icon]磁盘 12% |
+/// [icon]开机 up 32 days | [icon]用户 hostname
+///
+/// 只有 CPU 带 mini 折线图，其余指标只展示当前值（趋势看浮层/历史即可）。
 ///
 /// 鼠标 hover 或触屏 tap 弹出详细数据浮层，浮层左右两栏布局。
 class ServerMonitorPanel extends ConsumerStatefulWidget {
@@ -20,10 +22,14 @@ class ServerMonitorPanel extends ConsumerStatefulWidget {
   final Duration interval;
   final double height;
 
+  /// [interval] 默认 10s：一次本地采集是同步起子进程跑完全部指标，实测
+  /// macOS 单轮 real 2.2s（其中 top 占 sys 1.34s ≈ 一个核的 27%@5s），
+  /// Windows 还要冷启 powershell + 8 次 Get-CimInstance。监控条不是仪表盘，
+  /// 10s 足够，直接把采集进程开销砍半。
   const ServerMonitorPanel({
     super.key,
     required this.service,
-    this.interval = const Duration(seconds: 5),
+    this.interval = const Duration(seconds: 10),
     this.height = 30,
   });
 
@@ -45,6 +51,9 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
   Offset? _mousePosition; // 鼠标全局位置，用于浮层定位
 
   static const double _overlayMouseGap = 6;
+
+  /// hover 位移阈值（px）：小于该位移不重建浮层
+  static const double _overlayMoveEpsilon = 4;
 
   /// 按指标类型返回浮层宽度
   /// 网络/磁盘有表格 → 340；系统信息有长文本 → 320；其他两栏数字 → 280
@@ -72,7 +81,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
 
   void _onTick() {
     _tick++;
-    // agent 运行期间降频到 1/3（默认 15s 一次）：本地 Windows 采集要起
+    // agent 运行期间降频到 1/3（默认 30s 一次）：本地 Windows 采集要起
     // PowerShell + 十几个 Get-CimInstance（WMI 很重），不该和正在执行的
     // 任务抢 CPU
     if (ref.read(agentProvider).isRunning && _tick % 3 != 0) return;
@@ -156,7 +165,17 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
 
   /// 轻量级位置更新：只更新鼠标位置并重建浮层
   /// 不经过条件检查，不受 widget tree 重建影响
+  ///
+  /// 位移不足 [_overlayMoveEpsilon] 直接吞掉：onHover 是每个鼠标位移事件
+  /// 都触发，磁盘浮层带 N 行分区 + 进度条 LayoutBuilder，鼠标快速划过时
+  /// 按事件频率整层重建不值。
   void _updateOverlayPosition(Offset mousePosition) {
+    final last = _mousePosition;
+    if (last != null &&
+        (mousePosition - last).distanceSquared <
+            _overlayMoveEpsilon * _overlayMoveEpsilon) {
+      return;
+    }
     _mousePosition = mousePosition;
     _overlayEntry?.markNeedsBuild();
   }
@@ -261,7 +280,10 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 chartMax: 100,
               ),
               _divider(tc),
-              _buildMetricChipWithChart(
+              // 内存/上传/下载只展示当前值：mini 图各自要建 LineChart + 起
+              // 150ms 补间，整页重建时四个图一起重放动画，但 60px 宽的趋势
+              // 条实际没人读，只留 CPU 一个
+              _buildMetricChip(
                 metric: 'mem',
                 icon: Icons.memory,
                 label: l10n.monitorMemory,
@@ -269,28 +291,28 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                     ? '${_formatGB(snap.memUsedMB)}/${_formatGB(snap.memTotalMB)}'
                     : '-',
                 color: staleColor(_colorByPercent(snap?.memPercent ?? 0, cSuccess)),
-                chartData: history.map((s) => s.memPercent).toList(),
-                chartMax: 100,
+                valueColor: staleColor(_colorByPercent(snap?.memPercent ?? 0, cSuccess)),
+                valueMaxWidth: 110,
               ),
               _divider(tc),
-              _buildMetricChipWithChart(
+              _buildMetricChip(
                 metric: 'netUp',
                 icon: Icons.arrow_upward,
                 label: l10n.monitorUpload,
                 value: _formatRate(snap?.netUpKBps ?? 0),
                 color: staleColor(tc.brand),
-                chartData: history.map((s) => s.netUpKBps).toList(),
-                chartMax: null, // 自适应
+                valueColor: staleColor(tc.brand),
+                valueMaxWidth: 90,
               ),
               _divider(tc),
-              _buildMetricChipWithChart(
+              _buildMetricChip(
                 metric: 'netDown',
                 icon: Icons.arrow_downward,
                 label: l10n.monitorDownload,
                 value: _formatRate(snap?.netDownKBps ?? 0),
                 color: staleColor(cSuccess),
-                chartData: history.map((s) => s.netDownKBps).toList(),
-                chartMax: null,
+                valueColor: staleColor(cSuccess),
+                valueMaxWidth: 90,
               ),
               _divider(tc),
               _buildMetricChip(
@@ -334,13 +356,17 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
     );
   }
 
-  /// 不带图表的指标项（用户/开机/磁盘）
+  /// 不带图表的指标项（内存/上下行/用户/开机/磁盘）
+  ///
+  /// [color] 是图标色；[valueColor] 单独控制数值颜色（默认跟随 label 的
+  /// textSub，用于磁盘/开机这类"数值本身不需要告警色"的项）。
   Widget _buildMetricChip({
     required String metric,
     required IconData icon,
     required String label,
     required String value,
     required Color color,
+    Color? valueColor,
     double? valueMaxWidth,
   }) {
     final tc = ThemeColors.of(context);
@@ -365,8 +391,8 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 value,
                 style: TextStyle(
                   fontSize: fMicro,
-                  color: tc.textSub,
-                  fontWeight: FontWeight.w500,
+                  color: valueColor ?? tc.textSub,
+                  fontWeight: valueColor != null ? FontWeight.w600 : FontWeight.w500,
                   fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                 ),
                 overflow: TextOverflow.ellipsis,
@@ -445,6 +471,10 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
     }
     final actualMax = max ?? sampled.fold<double>(0, (a, b) => a > b ? a : b) * 1.2;
 
+    // duration: Duration.zero —— fl_chart 是 ImplicitlyAnimatedWidget，默认
+    // 150ms 补间，而 LineChartData 的相等性比较落在 FlSpot 列表上，每次
+    // build 都是全新实例 → 判定"变了" → 每来一条聊天消息（整页重建）就给
+    // 这根 60px 折线重放一轮动画。
     return LineChart(
       LineChartData(
         minY: 0,
@@ -470,6 +500,10 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
         ],
         lineTouchData: const LineTouchData(enabled: false),
       ),
+      // fl_chart 是 ImplicitlyAnimatedWidget，默认 150ms 补间；而 LineChartData
+      // 的相等性比较落在 FlSpot 列表上，每次 build 都是全新实例 → 判定"变了"
+      // → 每来一条聊天消息（整页重建）就给这根 60px 折线重放一轮动画。
+      duration: Duration.zero,
     );
   }
 
