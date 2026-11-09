@@ -49,7 +49,10 @@ export class ToolArgsParser {
     if (/^-?\d+$/.test(rawValue)) return parseInt(rawValue, 10);
     const listKeys = new Set(["hostIds", "exclude"]);
     if (listKeys.has(key) && rawValue.includes(",")) {
-      return rawValue.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+      // R9: strip surrounding brackets so "[web1, web2]" -> ["web1","web2"],
+      // NOT ["[web1","web2]"] (the historical exec_batch bracket-leak bug).
+      // Reuse _splitListText (handles brackets + Chinese comma + trim).
+      return ToolArgsParser._splitListText(rawValue);
     }
     return rawValue;
   }

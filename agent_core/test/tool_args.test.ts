@@ -99,4 +99,14 @@ describe("ToolArgs typed accessors",()=>{
    expect(a?.getString("url")).toBe("https://example.com");
    expect(ToolArgs.parse("")).toBeNull();
  });
- });
+ })  // R9 regression: parse a RAW-TEXT bracketed list (hostIds: [web1, web2]) — the
+  // _convertValue path used to leak brackets into the first/last element.
+  it("R9: parse raw bracketed hostIds list strips brackets",() => {
+    const m = ToolArgsParser.parse("hostIds: [web1, web2, db1]");
+    expect(m).not.toBeNull();
+    expect(m!.hostIds).toEqual(["web1","web2","db1"]);
+    const args = ToolArgs.wrap(m!);
+    expect(args.getStringList("hostIds")).toEqual(["web1","web2","db1"]);
+  });
+
+  ;
