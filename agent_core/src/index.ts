@@ -83,3 +83,5 @@ const isMain = process.argv[1]?.endsWith("index.js") || process.argv[1]?.endsWit
 if (isMain) {
   startServer();
 }
+export {CheckpointStore} from "./utils/checkpoint_store.js";
+export type {TaskCheckpoint} from "./utils/checkpoint_store.js";
