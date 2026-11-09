@@ -93,7 +93,7 @@ export class ReActEngine {
 
     for (let step = startStep; step < maxSteps; step++) {
       // R1: generation check at the start of each step
-      if (!myGen.isCurrent()) return "interrupted";
+      { const s = this.boundary(myGen); if (s !== null) return s; }
 
       // Build the LLM request
       const systemPrompt = this.modelConfig.systemPrompt ?? "";
@@ -115,7 +115,7 @@ export class ReActEngine {
         return "failed";
       }
       // R1: generation check after await
-      if (!myGen.isCurrent()) return "interrupted";
+      { const s = this.boundary(myGen); if (s !== null) return s; }
 
       // Parse the ReAct response into events
       const events = parse(response);
@@ -129,7 +129,7 @@ export class ReActEngine {
 
       // Append AI response to conversation history
       // R5: generation check before mutating shared history
-      if (!myGen.isCurrent()) return "interrupted";
+      { const s = this.boundary(myGen); if (s !== null) return s; }
       this.conversation.push({role: "assistant", content: response});
 
       // Check for a finish event
@@ -211,6 +211,23 @@ export class ReActEngine {
     };
     this.callbacks.onEvent(evt);
     this.callbacks.onFinished(state, summary);
+  }
+
+  /**
+   * R1/R5 boundary check: returns the terminal finish state to return when the task is
+   * no longer current, or null when still current.
+   *  - user cancel() -> "cancelled" (emit a cancelled finish; W7 deletes checkpoint)
+   *  - superseded generation (new task started) -> "interrupted" (no finish; new task owns state)
+   */
+  private boundary(myGen: TaskGeneration): AgentFinishState | null {
+    if (myGen.isCurrent()) return null;
+    if (this.cancelled) {
+      this.emitFinish("cancelled", "task cancelled by user");
+      return "cancelled";
+    }
+    // Superseded by a new task: do NOT emit a finish for the old task (the new task
+    // owns the shared state). The caller just returns silently.
+    return "interrupted";
   }
 
   /** Cancel the current task (R1 generation bump + cancelled flag). */

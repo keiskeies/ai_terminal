@@ -126,7 +126,7 @@ class GatedLlm implements LlmClient {
 }
 
 describe('W5 e2e — streaming cancel', () => {
-  it('engine.cancel() mid-stream -> interrupted, no result/finish emitted', async () => {
+  it('engine.cancel() mid-stream -> cancelled, finish(cancelled) emitted', async () => {
     const emitted: AgentEvent[] = [];
     const finished: string[] = [];
     const llm = new GatedLlm(CMD_KW + ' ls -la');
@@ -135,10 +135,33 @@ describe('W5 e2e — streaming cancel', () => {
     llm.open();      // let the in-flight stream resolve
     engine.cancel(); // bump the generation + set cancelled while the await is settling
     const state = await runP;
-    expect(state).toBe('interrupted');
-    // R1: the post-await generation check dropped the stale write -> no command/result/finish
+    expect(state).toBe('cancelled');
+    // R1: the post-await generation check dropped the stale write -> no command/result
     expect(emitted.find((e) => e.type === 'result')).toBeUndefined();
+    // R5: a user-cancel IS a terminal path -> a 'cancelled' finish is emitted (Dart cancelTask L989-994)
+    const fin = emitted.find((e) => e.type === 'finish');
+    expect(fin).toBeDefined();
+    expect(fin!.finishState).toBe('cancelled');
+    expect(finished).toEqual(['cancelled']);
+  });
+});
+
+describe('W5 e2e — task supersede (new run supersedes in-flight old run)', () => {
+  it('starting a 2nd run supersedes the 1st -> 1st returns interrupted, no finish emitted for it', async () => {
+    const emitted: AgentEvent[] = [];
+    const llm = new GatedLlm('ls -la');
+    const engine = new ReActEngine(llm, mc, {onEvent: (e) => emitted.push(e), onFinished: () => {}});
+    // Start run #1; it is in flight inside chatStream
+    const p1 = engine.run({taskId: 't1', goal: 'g', hostId: 'h1', modelConfig: mc}, 3);
+    // Start run #2 -> run() bumps currentGen, superseding run #1's generation
+    llm.open();            // let run #1's in-flight stream resolve
+    const p2 = engine.run({taskId: 't2', goal: 'g', hostId: 'h1', modelConfig: mc}, 3);
+    const s1 = await p1;
+    void p2; // run #2 is the current task; its outcome is irrelevant to the supersede check
+    // Run #1 was superseded by run #2 (not user-cancelled):
+    //   - returns "interrupted" (no finish emitted for the stale task)
+    //   - emits no finish at all (the new task owns the shared state)
+    expect(s1).toBe('interrupted');
     expect(emitted.find((e) => e.type === 'finish')).toBeUndefined();
-    expect(finished).toEqual([]);
   });
 });

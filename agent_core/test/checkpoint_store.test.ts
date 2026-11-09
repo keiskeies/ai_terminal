@@ -103,7 +103,31 @@ describe("ReActEngine W7 resume", () => {
     } finally { cleanup(); }
   });
 
-  it("terminal FAILED keeps the checkpoint (resumable)", async() => {
+  it("user cancel() -> terminal 'cancelled' + checkpoint deleted", async() => {
+    const {store, cleanup} = makeStore();
+    try {
+      store.save({
+        taskId: "t-cancel", hostId: "h", goal: "g", step: 0,
+        conversation: [], seenStableIds: [],
+        state: "inProgress", savedAt: "2025-01-01T00:00:00Z",
+      });
+      // Slow LLM: first response arrives after the caller has already cancelled.
+      const llm = new MockLlmClient(["thinking"]);
+      const engine = new ReActEngine(llm, modelConfig, {
+        onEvent: () => {},
+        onFinished: () => {},
+      }, {checkpointStore: store});
+      const p = engine.run({taskId: "t-cancel", goal: "g", hostId: "h", modelConfig} as any, 5);
+      // Cancel after the run has started (before/at the first await boundary)
+      engine.cancel();
+      const state = await p;
+      expect(state).toBe("cancelled");
+      // W7: "cancelled" is a whitelist terminal -> checkpoint is deleted
+      expect(store.load("t-cancel")).toBeNull();
+    } finally { cleanup(); }
+  });
+
+    it("terminal FAILED keeps the checkpoint (resumable)", async() => {
     const {store, cleanup} = makeStore();
     try {
       store.save({
