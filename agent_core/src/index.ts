@@ -51,6 +51,25 @@ export function startServer(opts: {verbose?: boolean} = {}): RpcServer {
     };
   });
 
+  // rpc:health - W7 rollback probe: Dart side calls before committing to Node engine
+  server.register("rpc:health", async (params: Record<string, unknown>) => {
+    const {buildDefaultToolRegistry} = await import("./tools/index.js");
+    const registry = buildDefaultToolRegistry();
+    const allTools: import("./tools/builtin.js").AgentTool[] = registry.all;
+    const requested: string[] = Array.isArray(params.tools) ? params.tools as string[] : allTools.map((t: import("./tools/builtin.js").AgentTool) => t.name);
+    const tools = requested.map(name => {
+      const t = allTools.find((x: import("./tools/builtin.js").AgentTool) => x.name === name);
+      return { name, registered: !!t, kind: t?.kind, scope: t?.scope };
+    });
+    return {
+      ok: true,
+      protocolVersion: "1.0",
+      nodeVersion: process.version,
+      tools,
+      errors: [] as string[],
+    };
+  });
+
   // rpc:getState - return current task state
   server.register("rpc:getState", async () => {
     return {
@@ -90,3 +109,4 @@ export type {ProcessHandle, SupervisorConfig} from "./utils/process_supervisor.j
 
 export {ReActEngine} from "./react/engine.js";
 export {buildDefaultToolRegistry} from "./tools/index.js";
+export type {HealthParams, HealthResult, ToolHealth, LlmHealth} from "./rpc/schema.js";

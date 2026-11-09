@@ -275,6 +275,43 @@ export interface CallDartToolResult {
   error?: string;
 }
 
+
+// ─── W7 Rollback Plan: rpc:health probe ─────────────────
+// The Dart side calls rpc:health before committing to the Node engine.
+// If the probe fails, it falls back to the Dart engine (kUseNodeAgent=false path).
+
+export interface HealthParams {
+  /** Optional: list of tool names to verify are registered. */
+  tools?: string[];
+  /** Optional: LLM provider to probe (returns 200 if reachable). */
+  llmProvider?: string;
+}
+
+export interface ToolHealth {
+  name: string;
+  registered: boolean;
+  kind?: string;
+  scope?: string;
+}
+
+export interface LlmHealth {
+  provider: string;
+  reachable: boolean;
+  latencyMs?: number;
+  error?: string;
+}
+
+export interface HealthResult {
+  ok: boolean;
+  protocolVersion: string;
+  nodeVersion: string;
+  agentCoreVersion?: string;
+  tools: ToolHealth[];
+  llm?: LlmHealth;
+  checkpointStoreDir?: string;
+  errors: string[];
+}
+
 // ─── Tool Descriptor ──────────────────────────────────
 
 export type ToolKind = "read" | "write" | "destructive" | "network" | "orchestration";

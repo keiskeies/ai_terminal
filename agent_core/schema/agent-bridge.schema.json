@@ -18,7 +18,8 @@
           "rpc:confirm",
           "rpc:getState",
           "rpc:ping",
-          "rpc:registerLocalTool"
+          "rpc:registerLocalTool",
+          "rpc:health"
         ]
       }
     },
@@ -70,7 +71,8 @@
           "evt:toolResult",
           "evt:confirmRequest",
           "evt:taskState",
-          "err:uncaught"
+          "err:uncaught",
+          "rpc:health"
         ]
       }
     },

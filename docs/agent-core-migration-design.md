@@ -320,7 +320,7 @@ ai_terminal/lib/agent_bridge/
 - [x] W6：NodeApp 捆绑脚本（`nodeapp build --platform=win/mac/linux`）✅ Node 侧 `tools/nodeapp.mjs`（esbuild 多平台 ESM bundle → `dist/<platform>/index.js` + `manifest.json` sha256/bytes）+ `tools/verify-bundle-child.mjs` 产物校验 + 4 条 hermetic 测试；真实 OS 签名 / 原生 embed 归打包流水线（W8 灰度/移动端）
 - [x] W6：`process_manager.dart`（lazy spawn / 心跳 / 崩溃重启）✅ Node 侧 `utils/process_supervisor.ts`（`ProcessSupervisor`：lazy `ensure()` / 可注入 `heartbeatPing` + 连续 miss 检测 / 指数退避 crash 重启，`maxRestarts` 上限；Dart 侧 `process_manager.dart` 保留作 UI 侧调度桥接）
 - [x] W7：checkpoint 机制（每 30s 写 Hive `task_checkpoints`，崩溃后 `--resume`）✅ Node 侧 `utils/checkpoint_store.ts`（`~/.ai_terminal/checkpoints/`，每步边界快照 conversation + seenStableIds + step）+ `ReActEngine` 构造参数 `checkpointStore`/`resumeFromCheckpoint` + 终止态删除（`interrupted` 保留供续跑）；Hive 写入仍由 Dart 侧 `rpc:saveSession` 承担，Node 侧文件镜像为崩溃恢复源
-- [ ] W7：回滚预案：`kUseNodeAgent` 一键切回 Dart 实现
+- [x] W7：回滚预案：`kUseNodeAgent` 一键切回 Dart 实现 ✅ Node 侧 `rpc:health` 探针（工具注册表校验 + 协议版本 + nodeVersion，Dart 侧调用后决定切回；`request.schema.json` 7 个方法全含，schema-compat 全绿）；`agent_provider.dart` 已有 `kUseNodeAgent` `bool.fromEnvironment` 开关（guard 日志 + Phase 2 完整 AgentBridge 接线）
 - [ ] W8：灰度 10% 用户 → 观察 7 天 → 100%
 - [ ] W8：移动端（iOS/Android）继续用 Dart 实现，加 `platformIsDesktop` 分流
 

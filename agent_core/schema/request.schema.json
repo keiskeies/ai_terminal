@@ -243,6 +243,38 @@
           }
         }
       }
+    },
+    {
+      "title": "rpc:health",
+      "description": "W7 rollback probe: verify tool registry + protocol version before committing to Node engine",
+      "required": [
+        "method"
+      ],
+      "properties": {
+        "jsonrpc": {
+          "const": "2.0"
+        },
+        "id": {
+          "type": "string"
+        },
+        "method": {
+          "const": "rpc:health"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "tools": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "llmProvider": {
+              "type": "string"
+            }
+          }
+        }
+      }
     }
   ]
 }
