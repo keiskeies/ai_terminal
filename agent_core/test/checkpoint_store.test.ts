@@ -103,6 +103,28 @@ describe("ReActEngine W7 resume", () => {
     } finally { cleanup(); }
   });
 
+  it("terminal FAILED keeps the checkpoint (resumable)", async() => {
+    const {store, cleanup} = makeStore();
+    try {
+      store.save({
+        taskId: "t-fail", hostId: "h", goal: "g", step: 0,
+        conversation: [], seenStableIds: [],
+        state: "inProgress", savedAt: "2025-01-01T00:00:00Z",
+      });
+      // No 动作: finish, no 命令: → maxNoCommandRetries exhausted → "failed"
+      const llm = new MockLlmClient(["thinking... no command emitted"]);
+      const engine = new ReActEngine(llm, modelConfig, {
+        onEvent: () => {},
+        onFinished: () => {},
+      }, {checkpointStore: store});
+      const state = await engine.run({taskId: "t-fail", goal: "g", hostId: "h", modelConfig} as any, 2);
+      expect(state).toBe("failed");
+      // FAILED is resumable → checkpoint is kept as the --resume seed point
+      expect(store.load("t-fail")).not.toBeNull();
+      expect(store.load("t-fail")!.state).toBe("inProgress");
+    } finally { cleanup(); }
+  });
+
   it("terminal success deletes the checkpoint", async() => {
     const {store, cleanup} = makeStore();
     try {
@@ -111,7 +133,7 @@ describe("ReActEngine W7 resume", () => {
         conversation: [], seenStableIds: [],
         state: "inProgress", savedAt: "2025-01-01T00:00:00Z",
       });
-      const llm = new MockLlmClient(["好的，任务完成。"]); // finish-like
+      const llm = new MockLlmClient(["思考: 完成\n动作: finish"]); // 动作: finish → success path // 动作: finish → success path
       const engine = new ReActEngine(llm, modelConfig, {
         onEvent: () => {},
         onFinished: () => {},

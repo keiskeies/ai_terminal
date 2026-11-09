@@ -156,6 +156,10 @@
         "id": "evt_35b42c756aa7fd4",
         "type": "thought",
         "text": "第一步\n第二步"
+      },
+      {
+        "id": "evt_286f64487f1d13d8",
+        "type": "finish"
       }
     ]
   },

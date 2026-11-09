@@ -190,9 +190,16 @@ export class ReActEngine {
   }
 
   private emitFinish(state: AgentFinishState, summary?: string) {
-    // W7: on a terminal state, clear the inProgress checkpoint for this task
-    // ("interrupted" = process killed — the checkpoint IS the resume point, keep it)
-    if (this.checkpointStore && state !== "interrupted" && this.lastTaskId) {
+    // W7: clear the inProgress checkpoint ONLY when the task is genuinely finished.
+    // - "success" / "cancelled": terminal, nothing to resume -> delete the checkpoint.
+    // - "failed": resumable (max-steps / no-command retry exhaustion) -> KEEP it so a
+    //   follow-up --resume can seed from the last saved step (design doc: crash-recovery).
+    // - "interrupted": process killed mid-run -> KEEP it as the crash-recovery resume point.
+    if (
+      this.checkpointStore &&
+      this.lastTaskId &&
+      (state === "success" || state === "cancelled")
+    ) {
       this.checkpointStore.delete(this.lastTaskId);
     }
     const evt: AgentEvent = {

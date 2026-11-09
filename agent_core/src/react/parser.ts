@@ -154,6 +154,7 @@ export function parse(fullResponse: string): AgentEvent[] {
   let pendingOptions: string[] | null = null;
   let lastQuestion: string | null = null;
   let pendingDescription: string | null = null;
+  let answerBody: string = "";
 
   function flush(): void {
     const value = buffer.trim();
@@ -216,6 +217,8 @@ export function parse(fullResponse: string): AgentEvent[] {
         break;
       }
       case Field.Answer: {
+        // 回答正文不进过程时间线；捕获给 动作: finish 作为 summary（Dart: answerBody → finish summary）
+        if (value) answerBody = value;
         pendingDescription = null;
         break;
       }
@@ -286,9 +289,17 @@ export function parse(fullResponse: string): AgentEvent[] {
             flush(); currentField = Field.Description;
             if (contentAfter) buffer += contentAfter + "\n";
             break;
-          case "动作": // 动作
+          case "动作": { // 动作
             flush();
+            // 动作: finish → 发一条 finish 事件（Dart: actionStr == 'finish' → ActionType.finish）
+            // finishState 缺省 → 引擎按 "success" 处理；summary 用捕获到的 回答: 正文
+            const actionWord = contentAfter ? contentAfter.trim().toLowerCase() : "";
+            if (actionWord === "finish") {
+              const id = stableId("finish", answerBody);
+              events.push({id, type: "finish", timestamp: Date.now(), summary: answerBody || undefined});
+            }
             break;
+          }
           case "命令": // 命令
             flush(); currentField = Field.Command;
             if (contentAfter) buffer += contentAfter + "\n";
