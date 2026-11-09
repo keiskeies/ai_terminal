@@ -35,10 +35,37 @@ interface TaskState {
 const taskState: TaskState = {taskId: null, status: "idle", startedAt: null};
 
 /**
+ * Doc §2.2 rpc:startTask / rpc:cancelTask live engine wiring. A single engine
+ * runs at a time; a concurrent startTask is rejected with {ok:false,error:"task_running"}
+ * so the parent cancels first (doc §2.4 supersede semantics enforced by R1
+ * generation checks in the engine).
+ */
+let activeEngine: import("./react/engine.js").ReActEngine | null = null;
+let activeRun: Promise<import("./rpc/schema.js").AgentFinishState> | null = null;
+
+/**
+ * Build a streaming LLM client from a ModelConfig (doc §2.2 W2). Exported so
+ * tests can override the client (mock / fake) without a live endpoint.
+ */
+export async function makeLlmClient(mc: import("./rpc/schema.js").ModelConfig): Promise<import("./llm/clients.js").LlmClient> {
+  if (mc.provider === "anthropic") {
+    const {AnthropicStreamClient} = await import("./llm/anthropic_stream.js");
+    return new AnthropicStreamClient({apiKey: mc.apiKey ?? "", model: mc.model, baseUrl: mc.baseUrl, maxTokens: mc.maxTokens, temperature: mc.temperature});
+  }
+  if (mc.provider === "ollama") {
+    const {OllamaStreamClient} = await import("./llm/ollama_stream.js");
+    return new OllamaStreamClient({model: mc.model, baseUrl: mc.baseUrl, maxTokens: mc.maxTokens, temperature: mc.temperature});
+  }
+  // openai | openai_compatible | deepseek
+  const {OpenAiStreamClient} = await import("./llm/openai_stream.js");
+  return new OpenAiStreamClient({apiKey: mc.apiKey ?? "", model: mc.model, baseUrl: mc.baseUrl, maxTokens: mc.maxTokens, temperature: mc.temperature});
+}
+
+/**
  * Start the agent-core RPC server on stdio.
  * Blocks forever; parent communicates via JSONL lines on stdin/stdout.
  */
-export function startServer(opts: {verbose?: boolean} = {}): RpcServer {
+export function startServer(opts: {verbose?: boolean; llmFactory?: () => import("./llm/clients.js").LlmClient} = {}): RpcServer {
   const server = new RpcServer();
 
   // rpc:ping - handshake / liveness check (parent -> child)
@@ -51,6 +78,41 @@ export function startServer(opts: {verbose?: boolean} = {}): RpcServer {
     };
   });
 
+  // rpc:startTask - doc §2.2 core task-launch method. Builds a ReActEngine
+  // (W2 streaming LLM client + W7 checkpoint store) and streams parsed events
+  // to the parent as evt:agentEvent; the terminal state is emitted as
+  // evt:taskState (doc §2.4 consistency invariant).
+  server.register("rpc:startTask", async (params: import("./rpc/schema.js").StartTaskParams) => {
+    if (taskState.status === "running") {
+      return {ok: false, error: "task_running", runningTaskId: taskState.taskId};
+    }
+    const mc = params.modelConfig;
+    const llm = opts.llmFactory !== undefined ? opts.llmFactory() : await makeLlmClient(mc);
+    const {ReActEngine} = await import("./react/engine.js");
+    const {CheckpointStore} = await import("./utils/checkpoint_store.js");
+    const engine = new ReActEngine(llm, mc, {
+      onEvent: (evt) => { server.notify("evt:agentEvent", {taskId: params.taskId, event: evt}); },
+      onFinished: (state, _summary) => {
+        server.notify("evt:taskState", {taskId: params.taskId, state: state as import("./rpc/schema.js").TaskState});
+      },
+      onError: (msg) => { server.notify("err:uncaught", {message: msg, taskId: params.taskId}); },
+    }, {
+      checkpointStore: new CheckpointStore(),
+      resumeFromCheckpoint: params.resumeFromCheckpoint === true,
+    });
+    activeEngine = engine;
+    taskState.taskId = params.taskId;
+    taskState.status = "running";
+    taskState.startedAt = Date.now();
+    const maxSteps = params.maxSteps ?? 20;
+    activeRun = engine.run(params, maxSteps).finally(() => {
+      activeEngine = null;
+      activeRun = null;
+      taskState.status = "idle";
+      taskState.startedAt = null;
+    });
+    return {ok: true, runId: params.taskId};
+  });
   // rpc:health - W7 rollback probe: Dart side calls before committing to Node engine
   // rpc:health - W7 rollback probe: Dart side calls before committing to Node engine.
   // Reports the FULL Node tool surface (W4 pure-Node + W5 orchestrator trio) so that
@@ -90,11 +152,19 @@ export function startServer(opts: {verbose?: boolean} = {}): RpcServer {
     };
   });
 
-  // rpc:cancelTask - cancel the running task (Phase 0: just clears state)
+  // rpc:cancelTask - doc §2.2: cancel the running task. The engine marks it
+  // "cancelled" (R1 generation + R5 terminal-state matrix). A pending run is
+  // awaited so the final evt:taskState notification is emitted before resolve.
   server.register("rpc:cancelTask", async () => {
+    if (activeEngine !== null && taskState.status === "running") {
+      activeEngine.cancel();
+      if (activeRun !== null) await activeRun.catch(() => {});
+    }
     taskState.taskId = null;
     taskState.status = "idle";
     taskState.startedAt = null;
+    activeEngine = null;
+    activeRun = null;
     return {ok: true};
   });
 
