@@ -302,13 +302,13 @@ ai_terminal/lib/agent_bridge/
 
 **目标**：工具执行下沉到 Node；MCP 换官方 SDK。
 
-- [ ] W4：`tools/builtin.ts`（exec / file / web / diff 等 15 个内置工具）
-- [ ] W4：`pty/adapter.ts`（node-pty，与 `flutter_pty` 的 Windows quirk 对齐）
-- [ ] W4：`shell_detect.ts`（PowerShell / cmd.exe / bash / zsh 分叉）
-- [ ] W5：`mcp/manager.ts`（`@modelcontextprotocol/sdk`，替换 `mcp_dart`）
-- [ ] W5：`rpc:invokeSsh` + `rpc:invokeSftp`（Node → Dart 反向 RPC）
-- [ ] W5：`rpc:queryKnowledge`（FTS5 查询仍走 Dart SQLite）
-- [ ] W5：R9 新增 5 条 e2e（工具执行 + 多主机 + 流式 cancel）
+- [x] W4：`tools/builtin.ts`（exec / file / web / diff 等 15 个内置工具）✅ 已移植（W4 批）
+- [x] W4：`pty/adapter.ts`（node-pty，与 `flutter_pty` 的 Windows quirk 对齐）✅ 已移植（node-pty + guarded-live 单测）
+- [x] W4：`shell_detect.ts`（PowerShell / cmd.exe / bash / zsh 分叉）✅ 已移植（utils/shell_detect.ts）
+- [x] W5：`mcp/manager.ts`（`@modelcontextprotocol/sdk`，替换 `mcp_dart`）✅ 1:1 移植 + InMemoryTransport 单测
+- [x] W5：`rpc:invokeSsh` + `rpc:invokeSftp`（Node → Dart 反向 RPC）✅ ReverseRpcClient + orchestrator 工具层
+- [x] W5：`rpc:queryKnowledge`（FTS5 查询仍走 Dart SQLite）✅ ReverseRpcClient.invokeSsh/queryKnowledge
+- [x] W5：R9 新增 5 条 e2e（工具执行 + 多主机 + 流式 cancel）✅ regression/w5_e2e.test.ts
 
 **交付物**：Agent Core 完整可用；`mcp_dart` 下线。
 
