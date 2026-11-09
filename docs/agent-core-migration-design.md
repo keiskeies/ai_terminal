@@ -289,11 +289,11 @@ ai_terminal/lib/agent_bridge/
 
 **目标**：把"用户输入 → AI 流式输出"这条最核心路径迁过去，UI 完全不动。
 
-- [ ] W2：`llm/clients.ts`（OpenAI / Anthropic / Ollama，用 `@ai-sdk/*`）
-- [ ] W2：`stream.ts`（chunk 合并 + reasoning_content，对应 `reasoningDeltaOf`）
+- [x] W2：`llm/clients.ts`（OpenAI / Anthropic / Ollama，用 `@ai-sdk/*`）✅ 已移植（streaming 三分支 + stream.ts chunk 合并）
+- [x] W2：`stream.ts`（chunk 合并 + reasoning_content，对应 `reasoningDeltaOf`）✅ 已移植（utils 无，stream.ts 独立）
 - [x] W3：`react/parser.ts`（1:1 移植 `react_stream_parser.dart`）✅ 已移植
 - [x] W3：3 条历史回归 e2e 测试（多行拼接 / 工具break / stableId 碰撞）✅ regression/r9_stream_e2e.test.ts
-- [ ] W3：Dart 侧 `agent_provider.dart` 加编译开关 `kUseNodeAgent`（默认 false，灰度）
+- [x] W3：Dart 侧 `agent_provider.dart` 加编译开关 `kUseNodeAgent`（默认 false，灰度）✅ 已加
 - [x] W3：CI 跑 10 条 e2e 用例，与 Dart 实现输出逐字节比对（stableId / event sequence 完全一致）✅ e2e/byte_comparison_10.test.ts
 
 **交付物**：Node Agent Core 能独立跑通 ReAct 循环，输出与 Dart 版一致。可独立测试。
