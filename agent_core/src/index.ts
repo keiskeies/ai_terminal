@@ -87,3 +87,6 @@ export {CheckpointStore} from "./utils/checkpoint_store.js";
 export type {TaskCheckpoint} from "./utils/checkpoint_store.js";
 export {ProcessSupervisor} from "./utils/process_supervisor.js";
 export type {ProcessHandle, SupervisorConfig} from "./utils/process_supervisor.js";
+
+export {ReActEngine} from "./react/engine.js";
+export {buildDefaultToolRegistry} from "./tools/index.js";
