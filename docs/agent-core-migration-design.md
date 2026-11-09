@@ -276,11 +276,11 @@ ai_terminal/lib/agent_bridge/
 **目标**：stdio 协议、schema、CI 全通。
 
 - [ ] D1：写 `docs/agent-bridge.schema.json`（所有 RPC method + event 的 JSON Schema）
-- [ ] D2：写 `agent_core/package.json` + `tsconfig` + `esbuild` 构建脚本
-- [ ] D3：Dart 侧 `agent_bridge/json_rpc_transport.dart`（JSONL 收发）
-- [ ] D4：Node 侧 `rpc/server.ts` + `rpc/client.ts`
-- [ ] D5：E2E 冒烟：Dart spawn Node → 发 `rpc:ping` → 收到 `{ok:true}` → 杀进程
-- [ ] D6：CI job `agent-core-build`：npm install + tsc + esbuild → dist/
+- [x] D2：写 `agent_core/package.json` + `tsconfig` + `esbuild` 构建脚本 ✅ package.json + tsconfig.json + esbuild build script in place
+- [x] D3：Dart 侧 `agent_bridge/json_rpc_transport.dart`（JSONL 收发）✅ 已移植（200 行，JSONL + 心跳 + 重连）
+- [x] D4：Node 侧 `rpc/server.ts` + `rpc/client.ts` ✅ 已移植（rpc/server.ts + rpc/client.ts + rpc/transport.ts + rpc/schema.ts）
+- [x] D5：E2E 冒烟：Dart spawn Node → 发 `rpc:ping` → 收到 `{ok:true}` → 杀进程 ✅ reverse_rpc.test.ts（spawn 冒烟 + invokeSsh/invokeSftp/queryKnowledge 全链路）
+- [x] D6：CI job `agent-core-build`：npm install + tsc + esbuild → dist/ ✅ .github/workflows/agent-core-ci.yml（typecheck + test + e2e + build + fixture 7 步）
 - [ ] D7：协议变更 checklist（任何 schema 改动要过 `npx check-schema-compat`）
 
 **交付物**：可运行的空壳 Agent Core（无 ReAct 循环），Dart ↔ Node 通信打通。
