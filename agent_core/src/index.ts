@@ -52,10 +52,22 @@ export function startServer(opts: {verbose?: boolean} = {}): RpcServer {
   });
 
   // rpc:health - W7 rollback probe: Dart side calls before committing to Node engine
+  // rpc:health - W7 rollback probe: Dart side calls before committing to Node engine.
+  // Reports the FULL Node tool surface (W4 pure-Node + W5 orchestrator trio) so that
+  // Dart's rollback decision sees exec_on/exec_batch/check_connectivity as available.
   server.register("rpc:health", async (params: Record<string, unknown>) => {
     const {buildDefaultToolRegistry} = await import("./tools/index.js");
+    const {buildOrchestratorTools} = await import("./tools/orchestrator.js");
+    // No-op executor stub for enumeration only (the probe reads .name/.kind/.scope).
+    const noopExecutor = {
+      executeOn: async () => ({stdout:"", stderr:"probe", exitCode:-1, durationMs:0, success:false}),
+      executeBatch: async () => new Map(),
+      checkConnectivity: async () => ({fromHostId:"-", targetHost:"-", port:0, reachable:false, elapsedMs:0, summary:"probe"}),
+    } as any;
     const registry = buildDefaultToolRegistry();
-    const allTools: import("./tools/builtin.js").AgentTool[] = registry.all;
+    const w4Tools: import("./tools/builtin.js").AgentTool[] = registry.all;
+    const w5Tools: import("./tools/builtin.js").AgentTool[] = buildOrchestratorTools(noopExecutor);
+    const allTools = [...w4Tools, ...w5Tools];
     const requested: string[] = Array.isArray(params.tools) ? params.tools as string[] : allTools.map((t: import("./tools/builtin.js").AgentTool) => t.name);
     const tools = requested.map(name => {
       const t = allTools.find((x: import("./tools/builtin.js").AgentTool) => x.name === name);

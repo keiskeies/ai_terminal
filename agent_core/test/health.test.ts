@@ -57,4 +57,27 @@ describe("rpc:health", () => {
     // This test just confirms the type is importable (tsc validates it; this is a no-op at runtime)
     expect(true).toBe(true);
   });
+
+  // W5: the probe now reports the full W4 + W5 orchestrator surface.
+  it("reports exec_on/exec_batch/check_connectivity as registered (W5)", () => {
+    const server = startServer({verbose: false});
+    const handlers = (server as any).handlers as Map<string, any>;
+    const h = handlers.get("rpc:health");
+    return h({tools: ["exec_on","exec_batch","check_connectivity"]}).then((r: any) => {
+      const byName = Object.fromEntries(r.tools.map((t: any) => [t.name, t.registered]));
+      expect(byName["exec_on"]).toBe(true);
+      expect(byName["exec_batch"]).toBe(true);
+      expect(byName["check_connectivity"]).toBe(true);
+    });
+  });
+  it("default tool list includes W4 + W5 orchestrator tools", () => {
+    const server = startServer({verbose: false});
+    const handlers = (server as any).handlers as Map<string, any>;
+    const h = handlers.get("rpc:health");
+    return h({}).then((r: any) => {
+      const names = r.tools.map((t: any) => t.name);
+      for (const w5 of ["exec_on","exec_batch","check_connectivity"]) expect(names).toContain(w5);
+      for (const w4 of ["local_file_read","web_search","fetch_url"]) expect(names).toContain(w4);
+    });
+  });
 });
