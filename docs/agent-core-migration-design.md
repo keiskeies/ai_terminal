@@ -291,10 +291,10 @@ ai_terminal/lib/agent_bridge/
 
 - [ ] W2：`llm/clients.ts`（OpenAI / Anthropic / Ollama，用 `@ai-sdk/*`）
 - [ ] W2：`stream.ts`（chunk 合并 + reasoning_content，对应 `reasoningDeltaOf`）
-- [ ] W3：`react/parser.ts`（1:1 移植 `react_stream_parser.dart`）
-- [ ] W3：3 条历史回归 e2e 测试（多行拼接 / 工具break / stableId 碰撞）
+- [x] W3：`react/parser.ts`（1:1 移植 `react_stream_parser.dart`）✅ 已移植
+- [x] W3：3 条历史回归 e2e 测试（多行拼接 / 工具break / stableId 碰撞）✅ regression/r9_stream_e2e.test.ts
 - [ ] W3：Dart 侧 `agent_provider.dart` 加编译开关 `kUseNodeAgent`（默认 false，灰度）
-- [ ] W3：CI 跑 10 条 e2e 用例，与 Dart 实现输出逐字节比对（stableId / event sequence 完全一致）
+- [x] W3：CI 跑 10 条 e2e 用例，与 Dart 实现输出逐字节比对（stableId / event sequence 完全一致）✅ e2e/byte_comparison_10.test.ts
 
 **交付物**：Node Agent Core 能独立跑通 ReAct 循环，输出与 Dart 版一致。可独立测试。
 
@@ -302,7 +302,7 @@ ai_terminal/lib/agent_bridge/
 
 **目标**：工具执行下沉到 Node；MCP 换官方 SDK。
 
-- [x] W4：`tools/builtin.ts`（exec / file / web / diff 等 15 个内置工具）✅ 已移植（W4 批）
+- [x] W4：`tools/builtin.ts`（exec / file / web / diff 等 9 个内置工具）✅ 已移植（W4 批）
 - [x] W4：`pty/adapter.ts`（node-pty，与 `flutter_pty` 的 Windows quirk 对齐）✅ 已移植（node-pty + guarded-live 单测）
 - [x] W4：`shell_detect.ts`（PowerShell / cmd.exe / bash / zsh 分叉）✅ 已移植（utils/shell_detect.ts）
 - [x] W5：`mcp/manager.ts`（`@modelcontextprotocol/sdk`，替换 `mcp_dart`）✅ 1:1 移植 + InMemoryTransport 单测

@@ -3,3 +3,13 @@ export {TailTextBuffer} from "./tail_buffer.js";
 export {TaskGeneration, StaleTaskError, crossBoundary} from "./generation.js";
 export {PendingRegistry, type CompleterLike} from "./pending_registry.js";
 export {detectShell, wrapCommand, detectOsInfoCommand} from "./shell_detect.js";
+
+export {LineDiff, type LineDiffResult} from "./line_diff.js";
+export {
+  decodeEscapedText, decodeContent, backupLocalFile, writeLocalFile,
+  countOccurrences, patchLocalFile, TRASH_DIR_NAME,
+  isTrashEntryDir, trashEntriesFromRestorePaths, measureTrashEntries,
+  clearTrashEntries, formatByteSize, countPathsUnderEntries,
+  looksLikeWindowsLocalPath, looksLikePosixRemotePath,
+} from "./local_file_ops.js";
+export type {LocalWriteOutcome, LocalPatchOutcome, TrashUsage, TrashClearResult, DecodedContent} from "./local_file_ops.js";

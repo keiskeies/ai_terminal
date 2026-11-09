@@ -43,8 +43,13 @@ describe("AgentToolRegistry framework",()=>{
  it("buildOpenAIToolsSchema has type/function/parameters shape",()=>{
    const r=buildDefaultToolRegistry();
    const schema=r.buildOpenAIToolsSchema({isLocalSession:true});
-   // local session hides local_exec; the other 3 tools have schemas
-   expect(schema.length).toBe(3);
+   // local session hides local_exec; all-scope tools + localSession write-class tools are visible.
+   const names=schema.map((x:any)=>x.function.name).sort();
+   expect(names).toContain("local_file_read");
+   expect(names).toContain("local_file_search");
+   expect(names).toContain("local_file_write");
+   expect(names).not.toContain("local_exec");
+   expect(schema.length).toBeGreaterThanOrEqual(7);
    const read=schema.find((x:any)=>x.function.name==="local_file_read")!;
    expect(read.type).toBe("function");
    expect(read.function.parameters).toHaveProperty("type","object");

@@ -1,9 +1,13 @@
 // tools/index.ts - facade: re-export the tool framework + a ready default registry.
 // W4 concrete pure-Node tools live in ./builtin.ts. W5 (SSH/SFTP/orchestrator/MCP)
 // will register more here once the reverse-RPC bridge + node-pty land.
+
 export {
   ToolKind, ToolSource, ToolScope,
   ToolResult, AgentTool, AgentToolRegistry,
+  LocalFileReadTool, LocalDirListTool, FetchUrlTool, LocalExecTool,
+  LocalFileSearchTool, LocalFileWriteTool, LocalFilePatchTool,
+  LocalFileMoveTool, LocalFileDeleteTool,
 } from "./builtin.js";
 export type {HostExecutionResult, ToolContext} from "./builtin.js";
 export {ToolArgs, ToolArgsParser, ToolArgException} from "./tool_args.js";
@@ -13,6 +17,8 @@ export type {OrchestratorExecutor, OrchestratorResult, OrchestratorConnectivity,
 import {
   AgentToolRegistry, ToolScope,
   LocalFileReadTool, LocalDirListTool, FetchUrlTool, LocalExecTool,
+  LocalFileSearchTool, LocalFileWriteTool, LocalFilePatchTool,
+  LocalFileMoveTool, LocalFileDeleteTool,
 } from "./builtin.js";
 
 /**
@@ -24,6 +30,11 @@ export function buildDefaultToolRegistry(): AgentToolRegistry {
   const r = new AgentToolRegistry();
   r.register(new LocalFileReadTool(), ToolScope.all);
   r.register(new LocalDirListTool(), ToolScope.all);
+  r.register(new LocalFileSearchTool(), ToolScope.all);
+  r.register(new LocalFileWriteTool(), ToolScope.localSession);
+  r.register(new LocalFilePatchTool(), ToolScope.localSession);
+  r.register(new LocalFileMoveTool(), ToolScope.localSession);
+  r.register(new LocalFileDeleteTool(), ToolScope.localSession);
   r.register(new FetchUrlTool(), ToolScope.all);
   // local_exec only makes sense when the session is NOT local (i.e. SSH);
   // in a local session the built-in terminal already executes locally.

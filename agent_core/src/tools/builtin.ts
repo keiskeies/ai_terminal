@@ -10,9 +10,12 @@
 // AGENTS.md R9: tools read args ONLY through the typed ToolArgs accessors
 // (see ./tool_args.ts); raw args[key] access in a tool body is banned.
 
-import {readFileSync, readdirSync, statSync, existsSync} from "fs";
+import {readFileSync, readdirSync, statSync, existsSync, mkdirSync, copyFileSync, cpSync, rmSync, renameSync, lstatSync} from "fs";
 import {ToolArgs} from "./tool_args.js";
 import {ShellType, wrapCommand} from "../utils/shell_detect.js";
+import {basename, dirname, relative, sep} from "path";
+import {LineDiff} from "../utils/line_diff.js";
+import {decodeEscapedText, decodeContent, writeLocalFile, patchLocalFile, TRASH_DIR_NAME} from "../utils/local_file_ops.js";
 
 // ── enums (aligned with agent_core/schema/tool.schema.json + rpc/schema.ts) ──
 export enum ToolKind {
@@ -390,3 +393,315 @@ export async function runLocalCommand(wrapped: string, cwd: string, shell: Shell
     child.on("error", (e) => { clearTimeout(timer); reject(e); });
   });
 }
+
+
+// \u2500\u2500 W4 local-file write/patch/move/delete tools (Dart local_file_tools.dart) \u2500\u2500
+// Pure Node fs; the Dart LocalFilePolicy allowlist/symlink/sensitive gating is a
+// desktop-security concern out of 1:1 scope here (host treated as trusted,
+// consistent with the already-ported local_file_read / local_dir_list).
+
+// Shared glob->RegExp helper (byte-faithful to Dart's _globToRegExp; case-
+// sensitivity mirrors "caseSensitive: !Platform.isWindows").
+function globToRegExp(glob: string): RegExp | null {
+  let re = glob
+    .replace(/[.+^$\{\}\(\)\|\[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*")
+    .replace(/\?/g, ".");
+  try { return new RegExp("^" + re + "$", process.platform === "win32" ? undefined : "i"); }
+  catch { return null; }
+}
+
+// Dart utf8Decode(List<int>): utf8.decode with a lossy fallback.
+function utf8decodeBytes(bytes: Buffer): string {
+  try { return Buffer.from(bytes).toString("utf-8"); }
+  catch { return Buffer.from(bytes).toString("latin1"); }
+}
+
+/** local_file_search - content search over a local file/dir (Dart walker, no shell). */
+export class LocalFileSearchTool extends AgentTool {
+  readonly name = "local_file_search";
+  readonly description: string = "\u5728**\u672C\u673A**\u6587\u4EF6\u6216\u76EE\u5F55\u91CC\u6309\u5185\u5BB9\u641C\u7D22\uFF0C\u8FD4\u56DE path:line: \u5185\u5BB9\u3002\u7528 Dart \u904D\u5386\u5B9E\u73B0\uFF0C\u8DE8\u5E73\u53F0\u4E14\u4E0D\u53D7 shell/locale \u5F71\u54CD\uFF08\u670D\u52A1\u5668\u4E0A\u8BF7\u4ECD\u7528\u8FDC\u7A0B grep\uFF09\u3002";
+  readonly paramSpec: string = "\u53C2\u6570\u5217\u8868\uFF08\u591A\u884C key:value \u683C\u5F0F\uFF09\uFF1A\n  path: \u672C\u673A\u6587\u4EF6\u6216\u76EE\u5F55\u7EDD\u5BF9\u8DEF\u5F84\uFF08\u5FC5\u586B\uFF09\n  query: \u8981\u641C\u7D22\u7684\u6587\u672C\uFF08\u5FC5\u586B\uFF0C\u6309\u5B57\u9762\u91CF\u5339\u914D\uFF09\n  glob: \u6587\u4EF6\u540D\u8FC7\u6EE4\uFF0C\u9017\u53F7\u5206\u9694\uFF0C\u5982 *.dart\uFF08\u53EF\u9009\uFF09\n  ignore_case: \u5FFD\u7565\u5927\u5C0F\u5199\uFF08\u53EF\u9009\uFF0C\u9ED8\u8BA4 false\uFF09\n  max_matches: \u6700\u591A\u8FD4\u56DE\u547D\u4E2D\u884C\u6570\uFF08\u53EF\u9009\uFF0C\u9ED8\u8BA4 100\uFF09";
+  get kind(): ToolKind { return ToolKind.read; }
+  get recordsChanges(): boolean { return false; }
+  static readonly SKIPPED_DIRS = new Set([".git","node_modules","build","dist",".dart_tool","__pycache__","target"]);
+  toJsonSchema(): Record<string, unknown> {
+    return {
+      type: "object",
+      properties: {
+        path: {type: "string"},
+        query: {type: "string"},
+        glob: {type: "string"},
+        ignore_case: {type: "boolean"},
+        max_matches: {type: "integer"},
+      },
+      required: ["path", "query"],
+    };
+  }
+  async execute(args: ToolArgs, ctx: ToolContext): Promise<ToolResult> {
+    const rawPath = args.getString("path");
+    const query = args.getString("query");
+    if (rawPath === "") return ToolResult.failure("missing required param: path");
+    if (query === "") return ToolResult.failure("\u53C2\u6570\u7F3A\u5931: query \u5FC5\u586B");
+    if (!existsSync(rawPath)) return ToolResult.failure("\u8DEF\u5F84\u4E0D\u5B58\u5728: " + rawPath);
+    const rootIsFile = statSync(rawPath).isFile();
+    const ignoreCase = args.getBool("ignore_case", false);
+    const maxMatches = Math.max(1, Math.min(1000, args.getInt("max_matches", 100)));
+    const needle = ignoreCase ? query.toLowerCase() : query;
+    const patterns = args.getStringList("glob", [])
+      .map(globToRegExp).filter((r): r is RegExp => r !== null);
+    const files: string[] = [];
+    let walkCapped = false;
+    if (rootIsFile) {
+      files.push(rawPath);
+    } else {
+      const collect = (dir: string): void => {
+        let ents: string[];
+        try { ents = readdirSync(dir); } catch { return; }
+        for (const en of ents) {
+          if (files.length >= 5000) { walkCapped = true; return; }
+          const full = dir + sep + en;
+          let cs;
+          try { cs = lstatSync(full); } catch { continue; }
+          if (cs.isSymbolicLink()) continue; // followLinks: false
+          if (cs.isDirectory()) {
+            if (LocalFileSearchTool.SKIPPED_DIRS.has(en)) continue;
+            collect(full);
+          } else if (cs.isFile()) {
+            const segs = full.split(/[\\/]/);
+            if (segs.some((s) => LocalFileSearchTool.SKIPPED_DIRS.has(s))) continue;
+            if (patterns.length > 0 && !patterns.some((r) => r.test(en))) continue;
+            files.push(full);
+          }
+        }
+      };
+      collect(rawPath);
+    }
+    const hits: string[] = [];
+    for (const f of files) {
+      if (hits.length >= maxMatches) break;
+      this.scanFile(f, needle, ignoreCase, rawPath, rootIsFile, hits, maxMatches);
+    }
+    const walkNote = walkCapped ? "\n\u6CE8\u610F: \u6587\u4EF6\u6570\u5DF2\u8FBE 5000 \u4E0A\u9650\uFF0C\u672A\u7EE7\u7EED\u904D\u5386\uFF0C\u8BF7\u7528 glob \u6216\u66F4\u7A84\u7684 path \u7F29\u5C0F\u8303\u56F4" : "";
+    if (hits.length === 0) {
+      return ToolResult.success("\u672A\u547D\u4E2D\u3002\u641C\u7D22 \"" + query + "\uFF0C\u626B\u63CF " + files.length + " \u4E2A\u6587\u4EF6\uFF08" + rawPath + "\uFF09" + walkNote);
+    }
+    const more = hits.length >= maxMatches ? "\n...\u5DF2\u8FBE " + maxMatches + " \u6761\u4E0A\u9650\uFF0C\u7528 glob \u7F29\u5C0F\u8303\u56F4" : "";
+    return ToolResult.success(hits.length + " \u5904\u547D\u4E2D\uFF08\u626B\u63CF " + files.length + " \u4E2A\u6587\u4EF6\uFF09\n" + hits.join("\n") + more + walkNote);
+  }
+  private scanFile(file: string, needle: string, ignoreCase: boolean, root: string, rootIsFile: boolean, hits: string[], maxMatches: number): void {
+    try {
+      const fstat = statSync(file);
+      if (fstat.size > 2 * 1024 * 1024) return; // binary/oversize: skip, don't fail
+      const text = readFileSync(file, "utf-8");
+      const lines = text.split("\n");
+      for (let i = 0; i < lines.length && hits.length < maxMatches; i++) {
+        const line = lines[i];
+        const hay = ignoreCase ? line.toLowerCase() : line;
+        if (!hay.includes(needle)) continue;
+        const shown = line.length > 200 ? line.slice(0, 200) + "\u2026" : line;
+        const rel = rootIsFile ? file : relative(root, file);
+        hits.push(rel + ":" + (i + 1) + ": " + shown);
+      }
+    } catch { /* no permission / non-utf8: skip this file */ }
+  }
+}
+
+/** local_file_write - write/append a local file (Dart direct I/O, no shell escaping). */
+export class LocalFileWriteTool extends AgentTool {
+  readonly name = "local_file_write";
+  readonly description: string = "\u5199\u5165\u6216\u8FFD\u52A0**\u672C\u673A**\u6587\u4EF6\uFF08Dart \u76F4\u63A5 I/O\uFF0C\u7ED5\u8FC7 shell \u8F6C\u4E49\uFF09\u3002\u8986\u76D6\u5DF2\u6709\u6587\u4EF6\u524D\u81EA\u52A8\u5907\u4EFD\u4E3A .bak.{\u65F6\u95F4\u623C}\uFF0C\u5199\u5931\u8D25\u81EA\u52A8\u56DE\u6EDA\u3002\u8981\u5199\u670D\u52A1\u5668\u4E0A\u7684\u6587\u4EF6\u8BF7\u7528 file_write\u3002";
+  readonly paramSpec: string = "\u53C2\u6570\u5217\u8868\uFF08\u591A\u884C key:value \u683C\u5F0F\uFF09\uFF1A\n  path: \u672C\u673A\u6587\u4EF6\u7EDD\u5BF9\u8DEF\u5F84\uFF08\u5FC5\u586B\uFF09\n  content: \u6587\u672C\u5185\u5BB9\uFF0C\u6362\u884C\u7528 \n \u8868\u793A\uFF08\u4E0E content_b64 \u4E8C\u9009\u4E00\uFF09\n  content_b64: base64 \u5185\u5BB9\uFF0C\u4E8C\u8FDB\u5236\u6216\u9700\u9010\u5B57\u8282\u4FDD\u771F\u65F6\u7528\n  mode: write | append\uFF08\u53EF\u9009\uFF0C\u9ED8\u8BA4 write\uFF09\n  backup: \u8986\u76D6\u524D\u662F\u5426\u5907\u4EFD\uFF08\u53EF\u9009\uFF0C\u9ED8\u8BA4 true\uFF09\n\u6CE8\u610F\uFF1A\u5355\u5757 content \u539F\u6587\u4E0D\u8D85\u8FC7 8KB\uFF1B\u66F4\u5927\u7684\u6587\u4EF6\u5206\u591A\u6B21 mode=append\u3002";
+  static readonly _maxChunkBytes = 8 * 1024;
+  toJsonSchema(): Record<string, unknown> {
+    return {
+      type: "object",
+      properties: {
+        path: {type: "string"},
+        content: {type: "string"},
+        content_b64: {type: "string"},
+        mode: {type: "string", enum: ["write", "append"]},
+        backup: {type: "boolean"},
+      },
+      required: ["path"],
+    };
+  }
+  async execute(args: ToolArgs, ctx: ToolContext): Promise<ToolResult> {
+    const rawPath = args.getString("path");
+    if (rawPath === "") return ToolResult.failure("missing required param: path");
+    const mode = args.getString("mode", "write");
+    if (mode !== "write" && mode !== "append") {
+      return ToolResult.failure("\u672A\u77E5 mode: " + mode + "\uFF08\u652F\u6301 write/append\uFF09");
+    }
+    const content = decodeContent(decodeEscapedText(args.getString("content")), args.getString("content_b64"));
+    if (content.error !== undefined) return ToolResult.failure(content.error);
+    if (content.bytes.length === 0 && mode === "write" && !args.containsKey("content") && !args.containsKey("content_b64")) {
+      return ToolResult.failure("\u53C2\u6570\u7F3A\u5931: content \u6216 content_b64 \u5FC5\u987B\u63D0\u4F9B\u4E00\u4E2A\u3002\u591A\u884C\u5185\u5BB9\u8BF7\u5199\u5728\u540C\u4E00\u884C\u5E76\u7528 \n \u8868\u793A\u6362\u884C\u3002");
+    }
+    if (content.bytes.length > LocalFileWriteTool._maxChunkBytes) {
+      return ToolResult.failure("\u5355\u5757\u5185\u5BB9 " + content.bytes.length + " \u5B57\u8282\uFF0C\u8D85\u8FC7 " + LocalFileWriteTool._maxChunkBytes + "B \u4E0A\u9650\u3002\n\u8BF7\u5206\u5757\uFF1A\u7B2C\u4E00\u6B21 mode=write \u5199\u524D 8KB\uFF0C\u4E4B\u540E\u7528 mode=append \u7EED\u5199\u3002");
+    }
+    const outcome = writeLocalFile({path: rawPath, bytes: content.bytes, append: mode === "append", backup: args.getBool("backup", true)});
+    if (!outcome.success) return ToolResult.failure(outcome.error ?? "\u5199\u5165\u5931\u8D25");
+    const backupLine = outcome.backupPath !== undefined ? "\n\u539F\u6587\u4EF6\u5DF2\u5907\u4EFD: " + outcome.backupPath : "";
+    return ToolResult.success("\u672C\u673A\u6587\u4EF6" + (mode === "append" ? "\u8FFD\u52A0" : "\u5199\u5165") + "\u6210\u529F: " + rawPath + "\uFF08" + outcome.bytesWritten + " \u5B57\u8282\uFF09" + backupLine, {
+      restoreFrom: outcome.backupPath,
+      restoreTo: outcome.backupPath !== undefined ? rawPath : undefined,
+    });
+  }
+}
+
+/** local_file_patch - unique string replacement in a local file. */
+export class LocalFilePatchTool extends AgentTool {
+  readonly name = "local_file_patch";
+  readonly description: string = "\u6539**\u672C\u673A**\u6587\u4EF6\u7684\u5C11\u91CF\u5185\u5BB9\uFF1A\u53EA\u63D0\u4F9B old/new\uFF0C\u5DE5\u5177\u505A\u5B57\u7B26\u4E32\u66FF\u6362\u3002old \u5FC5\u987B\u5728\u6587\u4EF6\u4E2D\u552F\u4E00\u51FA\u73B0\uFF0C\u5426\u5219\u62A5\u9519\u8981\u4F60\u7ED9\u66F4\u957F\u4E0A\u4E0B\u6587\u3002\u5199\u524D\u4F1A\u6821\u9A8C\u6587\u4EF6\u672A\u88AB\u5916\u90E8\u6539\u52A8\u3002\u8981\u6539\u670D\u52A1\u5668\u4E0A\u7684\u6587\u4EF6\u8BF7\u7528 file_patch\u3002";
+  readonly paramSpec: string = "\u53C2\u6570\u5217\u8868\uFF08\u591A\u884C key:value \u683C\u5F0F\uFF09\uFF1A\n  path: \u672C\u673A\u6587\u4EF6\u7EDD\u5BF9\u8DEF\u5F84\uFF08\u5FC5\u586B\uFF09\n  old: \u88AB\u66FF\u6362\u7684\u539F\u6587\uFF08\u4E0E old_b64 \u4E8C\u9009\u4E00\uFF09\n  new: \u66FF\u6362\u540E\u7684\u5185\u5BB9\uFF08\u4E0E new_b64 \u4E8C\u9009\u4E00\uFF1B\u5220\u9664\u5185\u5BB9\u65F6\u7559\u7A7A\uFF09\n  old_b64 / new_b64: \u591A\u884C\u6216\u542B\u7279\u6B8A\u5B57\u7B26\u65F6\u6539\u7528 base64\n  backup: \u662F\u5426\u5907\u4EFD\uFF08\u53EF\u9009\uFF0C\u9ED8\u8BA4 true\uFF09";
+  toJsonSchema(): Record<string, unknown> {
+    return {
+      type: "object",
+      properties: {
+        path: {type: "string"},
+        old: {type: "string"},
+        new: {type: "string"},
+        old_b64: {type: "string"},
+        new_b64: {type: "string"},
+        backup: {type: "boolean"},
+      },
+      required: ["path"],
+    };
+  }
+  async execute(args: ToolArgs, ctx: ToolContext): Promise<ToolResult> {
+    const rawPath = args.getString("path");
+    if (rawPath === "") return ToolResult.failure("missing required param: path");
+    const oldPlain = decodeEscapedText(args.getString("old"));
+    const newPlain = decodeEscapedText(args.getString("new"));
+    const oldB64 = args.getString("old_b64");
+    const newB64 = args.getString("new_b64");
+    const oldDecoded = decodeContent(oldPlain, oldB64);
+    const newDecoded = decodeContent(newPlain, newB64);
+    if (oldDecoded.error !== undefined) return ToolResult.failure(oldDecoded.error);
+    if (newDecoded.error !== undefined) return ToolResult.failure(newDecoded.error);
+    if (oldPlain === "" && oldB64 === "") {
+      return ToolResult.failure("\u53C2\u6570\u7F3A\u5931: old \u6216 old_b64 \u5FC5\u987B\u63D0\u4F9B");
+    }
+    const outcome = patchLocalFile({
+      path: rawPath,
+      oldText: utf8decodeBytes(oldDecoded.bytes),
+      newText: utf8decodeBytes(newDecoded.bytes),
+      backup: args.getBool("backup", true),
+    });
+    if (!outcome.success) return ToolResult.failure(outcome.error ?? "\u66FF\u6362\u5931\u8D25");
+    const diff = LineDiff.compute(outcome.oldText ?? "", outcome.newText ?? "");
+    const diffText = diff === null ? "" : "\uFF08+" + diff.additions + " -" + diff.deletions + " \u884C\uFF09";
+    const backupLine = outcome.backupPath !== undefined ? "\n\u539F\u6587\u4EF6\u5DF2\u5907\u4EFD: " + outcome.backupPath : "";
+    return ToolResult.success("\u672C\u673A\u6587\u4EF6\u5DF2\u4FEE\u6539: " + rawPath + diffText + backupLine, {
+      diffAdditions: diff === null ? undefined : diff.additions,
+      diffDeletions: diff === null ? undefined : diff.deletions,
+      restoreFrom: outcome.backupPath,
+      restoreTo: outcome.backupPath !== undefined ? rawPath : undefined,
+    });
+  }
+}
+
+/** local_file_move - move/rename a local file or dir (cross-device fallback). */
+export class LocalFileMoveTool extends AgentTool {
+  readonly name = "local_file_move";
+  readonly description: string = "\u79FB\u52A8\u6216\u91CD\u547D\u540D**\u672C\u673A**\u6587\u4EF6/\u76EE\u5F55\u3002\u6E90\u548C\u76EE\u6807\u90FD\u5FC5\u987B\u5728\u6388\u6743\u76EE\u5F55\u5185\u3002\u9ED8\u8BA4\u4E0D\u8986\u76D6\u5DF2\u5B58\u5728\u7684\u76EE\u6807\u3002";
+  readonly paramSpec: string = "\u53C2\u6570\u5217\u8868\uFF08\u591A\u884C key:value \u683C\u5F0F\uFF09\uFF1A\n  path: \u6E90\u6587\u4EF6\u7EDD\u5BF9\u8DEF\u5F84\uFF08\u5FC5\u586B\uFF09\n  dst: \u76EE\u6807\u7EDD\u5BF9\u8DEF\u5F84\uFF08\u5FC5\u586B\uFF09\n  overwrite: \u76EE\u6807\u5DF2\u5B58\u5728\u65F6\u662F\u5426\u8986\u76D6\uFF08\u53EF\u9009\uFF0C\u9ED8\u8BA4 false\uFF09";
+  toJsonSchema(): Record<string, unknown> {
+    return {
+      type: "object",
+      properties: {
+        path: {type: "string"},
+        dst: {type: "string"},
+        overwrite: {type: "boolean"},
+      },
+      required: ["path", "dst"],
+    };
+  }
+  async execute(args: ToolArgs, ctx: ToolContext): Promise<ToolResult> {
+    const srcPath = args.getString("path");
+    const dstPath = args.getString("dst");
+    if (srcPath === "" || dstPath === "") return ToolResult.failure("missing required param: path/dst");
+    if (!existsSync(srcPath)) return ToolResult.failure("\u6E90\u4E0D\u5B58\u5728: " + srcPath);
+    const isDir = statSync(srcPath).isDirectory();
+    const dstExists = existsSync(dstPath);
+    if (dstExists && !args.getBool("overwrite", false)) {
+      return ToolResult.failure("\u76EE\u6807\u5DF2\u5B58\u5728: " + dstPath + "\n\u786E\u8BA4\u8981\u8986\u76D6\u8BF7\u4F20 overwrite: true\u3002");
+    }
+    if (dstExists) {
+      try { rmSync(dstPath, {recursive: true, force: true}); }
+      catch (e: unknown) {
+        return ToolResult.failure("\u65E0\u6CD5\u6E05\u7406\u76EE\u6807: " + (e instanceof Error ? e.message : String(e)));
+      }
+    }
+    const dstParent = dirname(dstPath);
+    if (dstParent !== "" && dstParent !== ".") mkdirSync(dstParent, {recursive: true});
+    try {
+      renameSync(srcPath, dstPath);
+      return ToolResult.success("\u672C\u673A\u79FB\u52A8\u6210\u529F: " + srcPath + " -> " + dstPath, {restoreFrom: dstPath, restoreTo: srcPath});
+    } catch (e: unknown) {
+      // rename across devices fails; fall back to copy + delete
+      const m1 = e instanceof Error ? e.message : String(e);
+      try {
+        if (isDir) { cpSync(srcPath, dstPath, {recursive: true}); rmSync(srcPath, {recursive: true, force: true}); }
+        else { copyFileSync(srcPath, dstPath); rmSync(srcPath, {force: true}); }
+        return ToolResult.success("\u672C\u673A\u79FB\u52A8\u6210\u529F\uFF08\u8DE8\u76D8\uFF0C\u5DF2\u7528\u590D\u5236+\u5220\u9664\uFF09: " + srcPath + " -> " + dstPath, {restoreFrom: dstPath, restoreTo: srcPath});
+      } catch (e2: unknown) {
+        const m2 = e2 instanceof Error ? e2.message : String(e2);
+        return ToolResult.failure("\u79FB\u52A8\u5931\u8D25: " + m1 + "\n\u9000\u5316\u590D\u5236\u4E5F\u5931\u8D25: " + m2);
+      }
+    }
+  }
+}
+
+/** local_file_delete - delete a local file/dir (default: move to trash, not hard). */
+export class LocalFileDeleteTool extends AgentTool {
+  readonly name = "local_file_delete";
+  readonly description: string = "\u5220\u9664**\u672C\u673A**\u6587\u4EF6/\u76EE\u5F55\u3002\u9ED8\u8BA4\u4E0D\u771F\u5220\uFF1A\u79FB\u5165\u6388\u6743\u76EE\u5F55\u4E0B\u7684 .ai_terminal_trash/ \u56DE\u6536\u533A\uFF0C\u53EF\u4ECE\u53F0\u8D26\u8FD8\u539F\u3002\u9700\u8981\u771F\u5220\u65F6\u7528\u6237\u4F1A\u663E\u5F0F\u4F20 hard: true\u3002";
+  readonly paramSpec: string = "\u53C2\u6570\u5217\u8868\uFF08\u591A\u884C key:value \u683C\u5F0F\uFF09\uFF1A\n  path: \u8981\u5220\u9664\u7684\u672C\u673A\u8DEF\u5F84\uFF08\u5FC5\u586B\uFF09\n  recursive: \u76EE\u5F55\u662F\u5426\u9012\u5F52\u5220\u9664\uFF08\u53EF\u9009\uFF0C\u9ED8\u8BA4 false\uFF09\n  hard: true \u5219\u771F\u5220\u4E0D\u53EF\u6062\u590D\uFF08\u53EF\u9009\uFF0C\u9ED8\u8BA4 false \u2014\u2014 \u79FB\u5165\u56DE\u6536\u533A\uFF09";
+  get kind(): ToolKind { return ToolKind.destructive; }
+  toJsonSchema(): Record<string, unknown> {
+    return {
+      type: "object",
+      properties: {
+        path: {type: "string"},
+        recursive: {type: "boolean"},
+        hard: {type: "boolean"},
+      },
+      required: ["path"],
+    };
+  }
+  async execute(args: ToolArgs, ctx: ToolContext): Promise<ToolResult> {
+    const rawPath = args.getString("path");
+    if (rawPath === "") return ToolResult.failure("missing required param: path");
+    if (!existsSync(rawPath)) return ToolResult.failure("\u8DEF\u5F84\u4E0D\u5B58\u5728: " + rawPath);
+    const isDir = statSync(rawPath).isDirectory();
+    const recursive = args.getBool("recursive", false);
+    if (isDir && !recursive) {
+      return ToolResult.failure(rawPath + " \u662F\u76EE\u5F55\u3002\u786E\u8BA4\u8981\u8FDE\u5185\u5BB9\u4E00\u8D77\u5220\u9664\u8BF7\u4F20 recursive: true\u3002");
+    }
+    if (args.getBool("hard", false)) {
+      try {
+        rmSync(rawPath, {recursive: true, force: true});
+        return ToolResult.success("\u5DF2\u6C38\u4E45\u5220\u9664: " + rawPath);
+      } catch (e: unknown) {
+        return ToolResult.failure("\u5220\u9664\u5931\u8D25: " + (e instanceof Error ? e.message : String(e)));
+      }
+    }
+    // move into trash: keep relative structure so restore can put it back.
+    const parent = dirname(rawPath);
+    const base = basename(rawPath);
+    const stamp = Date.now();
+    const trashRoot = parent + sep + TRASH_DIR_NAME;
+    const target = trashRoot + sep + stamp + sep + base;
+    try {
+      mkdirSync(trashRoot + sep + stamp, {recursive: true});
+      renameSync(rawPath, target);
+    } catch (e: unknown) {
+      return ToolResult.failure("\u79FB\u5165\u56DE\u6536\u533A\u5931\u8D25: " + (e instanceof Error ? e.message : String(e)) + "\n\u786E\u8BA4\u8981\u8DF3\u8FC7\u56DE\u6536\u533A\u76F4\u63A5\u5220\u9664\u65F6\uFF0C\u8BF7\u8BA9\u7528\u6237\u540C\u610F\u540E\u7528 hard: true \u91CD\u8BD5\u3002");
+    }
+    return ToolResult.success("\u5DF2\u79FB\u5165\u56DE\u6536\u533A\uFF08\u672A\u771F\u5220\uFF0C\u53EF\u8FD8\u539F\uFF09: " + rawPath + "\n\u56DE\u6536\u4F4D\u7F6E: " + target, {restoreFrom: target, restoreTo: rawPath});
+  }
+}
+
