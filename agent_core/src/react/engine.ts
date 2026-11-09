@@ -132,11 +132,12 @@ export class ReActEngine {
       { const s = this.boundary(myGen); if (s !== null) return s; }
       this.conversation.push({role: "assistant", content: response});
 
-      // Check for a finish event
+      // Check for a finish event (the parser's finish event was already delivered to the
+      // parent via the R4-dedup loop above; do NOT re-emit it — only run the side effects).
       const finishEvt = events.find((e) => e.type === "finish");
       if (finishEvt) {
         const state = finishEvt.finishState ?? "success";
-        this.emitFinish(state, finishEvt.summary);
+        this.finishSideEffects(state, finishEvt.summary); // no 2nd finish event; Dart parity
         return state;
       }
 
@@ -189,12 +190,14 @@ export class ReActEngine {
     return "failed";
   }
 
-  private emitFinish(state: AgentFinishState, summary?: string) {
-    // W7: clear the inProgress checkpoint ONLY when the task is genuinely finished.
-    // - "success" / "cancelled": terminal, nothing to resume -> delete the checkpoint.
-    // - "failed": resumable (max-steps / no-command retry exhaustion) -> KEEP it so a
-    //   follow-up --resume can seed from the last saved step (design doc: crash-recovery).
-    // - "interrupted": process killed mid-run -> KEEP it as the crash-recovery resume point.
+  /**
+   * W7: clear the inProgress checkpoint ONLY when the task is genuinely finished.
+   * - "success" / "cancelled": terminal, nothing to resume -> delete the checkpoint.
+   * - "failed": resumable (max-steps / no-command retry / LLM error) -> KEEP it so a
+   *   follow-up --resume can seed from the last saved step (design doc: crash-recovery).
+   * - "interrupted": process killed mid-run -> KEEP it as the crash-recovery resume point.
+   */
+  private finishSideEffects(state: AgentFinishState, summary?: string): void {
     if (
       this.checkpointStore &&
       this.lastTaskId &&
@@ -202,6 +205,11 @@ export class ReActEngine {
     ) {
       this.checkpointStore.delete(this.lastTaskId);
     }
+    this.callbacks.onFinished(state, summary);
+  }
+
+  /** Emit a finish event to the parent + run the W7 side effects (checkpoint delete + onFinished). */
+  private emitFinish(state: AgentFinishState, summary?: string): void {
     const evt: AgentEvent = {
       id: stableId("finish", state + (summary ?? "")),
       type: "finish",
@@ -210,9 +218,8 @@ export class ReActEngine {
       summary: summary ?? "",
     };
     this.callbacks.onEvent(evt);
-    this.callbacks.onFinished(state, summary);
+    this.finishSideEffects(state, summary);
   }
-
   /**
    * R1/R5 boundary check: returns the terminal finish state to return when the task is
    * no longer current, or null when still current.
