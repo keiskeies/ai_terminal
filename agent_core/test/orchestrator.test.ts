@@ -1,0 +1,250 @@
+// Orchestrator tool layer unit test (Phase 2 W5: exec_on / exec_batch /
+// check_connectivity + ReverseRpcOrchestrator adapter).
+//
+// A real Dart SSH pool cannot exist in CI, so the tools are driven by a fake
+// OrchestratorExecutor that returns canned OrchestratorResult shapes, and the
+// ReverseRpcOrchestrator adapter is driven by a fake ReverseRpcClient.
+import { describe, it, expect } from 'vitest';
+import {
+  ExecOnTool,
+  ExecBatchTool,
+  CheckConnectivityTool,
+  ReverseRpcOrchestrator,
+  CommandFailureKind,
+  isReadOnlyCommand,
+  isValidHost,
+} from '../src/tools/orchestrator.js';
+import type {
+  OrchestratorExecutor,
+  OrchestratorResult,
+  OrchestratorConnectivity,
+  ExecuteBatchOptions,
+} from '../src/tools/orchestrator.js';
+import { ToolArgs } from '../src/tools/tool_args.js';
+import type { ToolContext } from '../src/tools/builtin.js';
+import type { ReverseRpcClient } from '../src/rpc/client.js';
+
+const ctx: ToolContext = { cancelled: () => false };
+
+function ok(exitCode = 0, stdout = '', stderr = ''): OrchestratorResult {
+  return { stdout, stderr, exitCode, durationMs: 12, success: exitCode === 0, failureKind: CommandFailureKind.none };
+}
+function fail(stderr = 'boom', exitCode = 1, kind?: string): OrchestratorResult {
+  return { stdout: '', stderr, exitCode, durationMs: 8, success: false, failureKind: kind ?? CommandFailureKind.unknown };
+}
+
+class FakeExecutor implements OrchestratorExecutor {
+  calls: Array<{ method: string; host?: string; command?: string }> = [];
+  onOne?: (hostId: string, command: string) => OrchestratorResult | null;
+  async executeOn(hostId: string, command: string): Promise<OrchestratorResult | null> {
+    this.calls.push({ method: 'executeOn', host: hostId, command });
+    return this.onOne ? this.onOne(hostId, command) : ok();
+  }
+  async executeBatch(hostIds: string[], command: string, opts: ExecuteBatchOptions): Promise<Map<string, OrchestratorResult>> {
+    this.calls.push({ method: 'executeBatch', command });
+    const m = new Map<string, OrchestratorResult>();
+    for (const h of hostIds) m.set(h, this.onOne ? this.onOne(h, command) ?? fail('not connected', -1) : ok());
+    return m;
+  }
+  async checkConnectivity(o: { fromHostId: string; targetHost: string; port: number }): Promise<OrchestratorConnectivity> {
+    this.calls.push({ method: 'checkConnectivity', host: o.fromHostId });
+    return {
+      fromHostId: o.fromHostId, targetHost: o.targetHost, port: o.port,
+      reachable: o.port > 0, detail: o.port > 0 ? undefined : 'unreachable',
+      elapsedMs: 3,
+      summary: (o.port > 0 ? '✓' : '✗') + ' ' + o.fromHostId + ' -> ' + o.targetHost + ':' + o.port,
+    };
+  }
+}
+
+describe('ExecOnTool (exec_on)', () => {
+  it('succeeds and folds output into a result', async () => {
+    const ex = new FakeExecutor();
+    ex.onOne = () => ok(0, 'hello world');
+    const t = new ExecOnTool(ex);
+    expect(t.name).toBe('exec_on');
+    const res = await t.execute(ToolArgs.wrap({ hostId: 'web1', command: 'echo hi' }), ctx);
+    expect(res.success).toBe(true);
+    expect(res.output).toContain('[web1]');
+    expect(res.output).toContain('hello world');
+    expect(ex.calls[0].method).toBe('executeOn');
+    expect(ex.calls[0].host).toBe('web1');
+  });
+
+  it('reports non-zero exit as a failure', async () => {
+    const ex = new FakeExecutor();
+    ex.onOne = () => fail('perm denied', 127, 'permissionDenied');
+    const t = new ExecOnTool(ex);
+    const res = await t.execute(ToolArgs.wrap({ hostId: 'db1', command: 'x' }), ctx);
+    expect(res.success).toBe(false);
+    expect(res.error).toContain('db1');
+    expect(res.error).toContain('permissionDenied');
+  });
+
+  it('surfaces not-connected when the executor returns null', async () => {
+    const ex = new FakeExecutor();
+    ex.onOne = () => null;
+    const t = new ExecOnTool(ex);
+    const res = await t.execute(ToolArgs.wrap({ hostId: 'ghost', command: 'x' }), ctx);
+    expect(res.success).toBe(false);
+    expect(res.error).toContain('未连接或不存在');
+  });
+
+  it('rejects missing required params', async () => {
+    const t = new ExecOnTool(new FakeExecutor());
+    const res = await t.execute(ToolArgs.EMPTY, ctx);
+    expect(res.success).toBe(false);
+    expect(res.error).toContain('参数缺失');
+  });
+});
+
+describe('ExecBatchTool (exec_batch)', () => {
+  it('aggregates all-success batch with per-host results', async () => {
+    const ex = new FakeExecutor();
+    ex.onOne = () => ok(0, 'ok');
+    const t = new ExecBatchTool(ex);
+    const res = await t.execute(ToolArgs.parse('hostIds: web1,web2,db1\ncommand: uptime'), ctx);
+    expect(res.success).toBe(true);
+    expect(res.output).toContain('结果: 3/3 成功');
+    expect(res.hostResults?.['web1']?.success).toBe(true);
+    expect(res.hostResults?.['db1']?.success).toBe(true);
+    expect(Object.keys(res.hostResults ?? {}).length).toBe(3);
+  });
+
+  it('reports partial failure with failure kind carried through', async () => {
+    const ex = new FakeExecutor();
+    ex.onOne = (h) => (h === 'db1' ? fail('denied', 127, 'permissionDenied') : ok(0, 'fine'));
+    const t = new ExecBatchTool(ex);
+    const res = await t.execute(ToolArgs.parse('hostIds: web1,web2,db1\ncommand: rm -f x'), ctx);
+    expect(res.success).toBe(false);
+    expect(res.error).toContain('1/3 台主机执行失败');
+    expect(res.hostResults?.['db1']?.success).toBe(false);
+    expect(res.hostResults?.['db1']?.failureKind).toBe('permissionDenied');
+    expect(res.hostResults?.['web1']?.success).toBe(true);
+  });
+
+  it('rejects empty hostIds', async () => {
+    const t = new ExecBatchTool(new FakeExecutor());
+    const res = await t.execute(ToolArgs.parse('command: uptime'), ctx);
+    expect(res.success).toBe(false);
+    expect(res.error).toContain('参数缺失');
+  });
+});
+
+describe('CheckConnectivityTool (check_connectivity)', () => {
+  it('succeeds when the probe reports reachable', async () => {
+    const ex = new FakeExecutor();
+    const t = new CheckConnectivityTool(ex);
+    const res = await t.execute(ToolArgs.wrap({ fromHostId: 'web1', targetHost: '10.0.0.5', port: 3306 }), ctx);
+    expect(res.success).toBe(true);
+  });
+
+  it('rejects non-positive port', async () => {
+    const t = new CheckConnectivityTool(new FakeExecutor());
+    const res = await t.execute(ToolArgs.wrap({ fromHostId: 'w', targetHost: 'a', port: 0 }), ctx);
+    expect(res.success).toBe(false);
+    expect(res.error).toContain('参数缺失或无效');
+  });
+
+  it('fails with detail when the probe is unreachable', async () => {
+    // a dedicated executor that reports unreachable with a detail string
+    const ex: OrchestratorExecutor = {
+      executeOn: async () => ok(),
+      executeBatch: async (hids, _cmd) => { const m = new Map<string, OrchestratorResult>(); for (const h of hids) m.set(h, ok()); return m; },
+      checkConnectivity: async (o) => ({
+        fromHostId: o.fromHostId, targetHost: o.targetHost, port: o.port,
+        reachable: false, detail: '连接超时或被拒绝', elapsedMs: 5002,
+        summary: o.fromHostId + ' -> ' + o.targetHost + ':' + o.port + ' ✗',
+      }),
+    };
+    const t = new CheckConnectivityTool(ex);
+    const res = await t.execute(ToolArgs.wrap({ fromHostId: 'web1', targetHost: 'db.local', port: 3306 }), ctx);
+    expect(res.success).toBe(false);
+    expect(res.error).toBe('连接超时或被拒绝');
+  });
+});
+
+describe('pure helpers', () => {
+  it('classifies read-only vs mutating commands', () => {
+    expect(isReadOnlyCommand('ls -la /tmp')).toBe(true);
+    expect(isReadOnlyCommand('cat /etc/hosts')).toBe(true);
+    expect(isReadOnlyCommand('rm -rf /x')).toBe(false);
+    expect(isReadOnlyCommand('apt update && apt install foo')).toBe(false);
+    expect(isReadOnlyCommand('echo hi > out')).toBe(false);
+  });
+
+  it('validates target hosts strictly (R7)', () => {
+    expect(isValidHost('10.0.0.1')).toBe(true);
+    expect(isValidHost('db.local')).toBe(true);
+    expect(isValidHost('a|rm -rf /')).toBe(false);
+    expect(isValidHost('$(evil)')).toBe(false);
+    expect(isValidHost('')).toBe(false);
+  });
+});
+
+describe('ReverseRpcOrchestrator (adapter)', () => {
+  function fakeClient(reply: { exitCode?: number; output?: string; error?: string; failureKind?: string }) {
+    const c = {
+      invokeSsh: async (_p: { hostId: string; command: string; timeoutMs?: number }) => ({
+        exitCode: reply.exitCode ?? 0,
+        output: reply.output ?? '',
+        error: reply.error,
+        durationMs: 4,
+        failureKind: reply.failureKind,
+      }),
+    };
+    return c as unknown as ReverseRpcClient;
+  }
+
+  it('maps a successful invokeSsh to a success result', async () => {
+    const ex = new ReverseRpcOrchestrator(fakeClient({ exitCode: 0, output: 'done' }));
+    const r = await ex.executeOn('web1', 'echo done');
+    expect(r).not.toBeNull();
+    expect(r!.success).toBe(true);
+    expect(r!.stdout).toBe('done');
+  });
+
+  it('maps a timeout failureKind to timedOut + non-success', async () => {
+    const ex = new ReverseRpcOrchestrator(fakeClient({ exitCode: 124, output: '', failureKind: 'timeout' }));
+    const r = await ex.executeOn('web1', 'slow');
+    expect(r!.success).toBe(false);
+    expect(r!.timedOut).toBe(true);
+    expect(r!.failureKind).toBe(CommandFailureKind.timeout);
+  });
+
+  it('treats an RPC refusal as not-connected (null)', async () => {
+    const c = {
+      invokeSsh: async () => { throw new Error('RPC error -32601: host not connected'); },
+    } as unknown as ReverseRpcClient;
+    const ex = new ReverseRpcOrchestrator(c);
+    expect(await ex.executeOn('ghost', 'x')).toBeNull();
+  });
+
+  it('skips remaining serial hosts when stopOnFailure triggers', async () => {
+    let calls = 0;
+    const c = {
+      invokeSsh: async (p: { hostId: string }) => ({
+        exitCode: p.hostId === 'a' ? 1 : 0,
+        output: '',
+        durationMs: 1,
+        failureKind: 'unknown',
+      }),
+    } as unknown as ReverseRpcClient;
+    const ex = new ReverseRpcOrchestrator(c);
+    const m = await ex.executeBatch(['a', 'b', 'c'], 'rm -rf x', { stopOnFailure: true, timeoutMs: 1000 });
+    // mutating command -> serial; host a fails -> b and c are skipped
+    expect(m.get('a')!.success).toBe(false);
+    expect(m.get('b')!.stderr).toContain('已跳过');
+    expect(m.get('c')!.stderr).toContain('已跳过');
+    void calls;
+  });
+
+  it('runs read-only commands in parallel (all hosts present)', async () => {
+    const c = {
+      invokeSsh: async (p: { hostId: string }) => ({ exitCode: 0, output: 'ok', durationMs: 1, failureKind: 'none' }),
+    } as unknown as ReverseRpcClient;
+    const ex = new ReverseRpcOrchestrator(c);
+    const m = await ex.executeBatch(['a', 'b', 'c'], 'uptime', { timeoutMs: 1000 });
+    expect([...m.values()].every((r) => r.success)).toBe(true);
+  });
+});

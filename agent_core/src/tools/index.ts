@@ -7,6 +7,8 @@ export {
 } from "./builtin.js";
 export type {HostExecutionResult, ToolContext} from "./builtin.js";
 export {ToolArgs, ToolArgsParser, ToolArgException} from "./tool_args.js";
+export {ReverseRpcOrchestrator, ExecOnTool, ExecBatchTool, CheckConnectivityTool, buildOrchestratorTools, registerOrchestratorTools, CommandFailureKind, isReadOnlyCommand, isValidHost} from "./orchestrator.js";
+export type {OrchestratorExecutor, OrchestratorResult, OrchestratorConnectivity, ExecuteBatchOptions} from "./orchestrator.js";
 
 import {
   AgentToolRegistry, ToolScope,
@@ -26,5 +28,19 @@ export function buildDefaultToolRegistry(): AgentToolRegistry {
   // local_exec only makes sense when the session is NOT local (i.e. SSH);
   // in a local session the built-in terminal already executes locally.
   r.register(new LocalExecTool(), ToolScope.sshSession);
+  return r;
+}
+
+import {ReverseRpcClient} from "../rpc/client.js";
+import {registerOrchestratorTools, ReverseRpcOrchestrator} from "./orchestrator.js";
+
+/**
+ * Build the full tool registry: all W4 pure-Node tools plus the W5 orchestrator
+ * trio (exec_on/exec_batch/check_connectivity) routed through the reverse-RPC
+ * bridge back to the Dart parent.
+ */
+export function buildFullToolRegistry(reverse: ReverseRpcClient): AgentToolRegistry {
+  const r = buildDefaultToolRegistry();
+  registerOrchestratorTools(r, new ReverseRpcOrchestrator(reverse));
   return r;
 }

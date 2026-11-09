@@ -1,0 +1,350 @@
+// orchestrator.ts - Phase 2 (W5) multi-host orchestration tools.
+//
+// 1:1 port of the Dart MultiHostExecutor-driven tools in
+// ai_terminal/lib/services/agent_tool.dart (ExecOnTool / ExecBatchTool /
+// CheckConnectivityTool). In the Node port these tools execute against the
+// Dart parent's SSH pool, so they are driven by an injected OrchestratorExecutor
+// (the default ReverseRpcOrchestrator routes each command through
+// ReverseRpcClient.invokeSsh back to Dart).
+//
+// AGENTS.md:
+//   R8  - stdout/stderr are tail-truncated (2000 / 1000 / 200 chars) before the
+//         text is folded back into conversation history.
+//   R4  - batch results keep a per-host HostExecutionResult keyed by hostId.
+//   R3  - hostId is passed explicitly to every executor call; activeHostId is
+//         never substituted.
+//   R9  - tool args are read ONLY through ToolArgs typed accessors.
+//
+// CJK literals are byte-faithful ports of the zh L10n templates
+// (ai_terminal/lib/l10n/app_zh.arb).
+
+import {AgentTool, AgentToolRegistry, ToolKind, ToolScope, ToolResult, ToolContext, HostExecutionResult} from "./builtin.js";
+import type {ToolArgs} from "./tool_args.js";
+import {ReverseRpcClient} from "../rpc/client.js";
+
+// failure kind (1:1 from pty_output_detector.dart CommandFailureKind)
+export enum CommandFailureKind {
+  none = "none",
+  timeout = "timeout",
+  syntaxError = "syntaxError",
+  interactivePrompt = "interactivePrompt",
+  disconnected = "disconnected",
+  permissionDenied = "permissionDenied",
+  cancelled = "cancelled",
+  unknown = "unknown",
+}
+
+// result shapes (mirror Dart CommandResult / ConnectivityResult)
+export interface OrchestratorResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  durationMs: number;
+  timedOut?: boolean;
+  failureKind?: CommandFailureKind | string;
+  failureReason?: string;
+  success: boolean;
+}
+
+export interface OrchestratorConnectivity {
+  fromHostId: string;
+  targetHost: string;
+  port: number;
+  reachable: boolean;
+  detail?: string;
+  elapsedMs: number;
+  summary: string;
+}
+
+export interface ExecuteBatchOptions {
+  timeoutMs?: number;
+  stopOnFailure?: boolean;
+  cancelled?: () => boolean;
+}
+
+export interface OrchestratorExecutor {
+  executeOn(hostId: string, command: string, timeoutMs?: number, cancelled?: () => boolean): Promise<OrchestratorResult | null>;
+  executeBatch(hostIds: string[], command: string, opts: ExecuteBatchOptions): Promise<Map<string, OrchestratorResult>>;
+  checkConnectivity(o: {fromHostId: string; targetHost: string; port: number; timeoutMs?: number}): Promise<OrchestratorConnectivity>;
+}
+
+// reverse-RPC adapter (the production OrchestratorExecutor)
+export class ReverseRpcOrchestrator implements OrchestratorExecutor {
+  constructor(private readonly reverse: ReverseRpcClient) {}
+
+  async executeOn(hostId: string, command: string, timeoutMs?: number, cancelled?: () => boolean): Promise<OrchestratorResult | null> {
+    if (cancelled?.()) {
+      return {stdout:"", stderr:"cancelled", exitCode:-1, durationMs:0, timedOut:false, failureKind:CommandFailureKind.cancelled, success:false};
+    }
+    try {
+      const r = await this.reverse.invokeSsh({hostId, command, timeoutMs});
+      const failureKind = (r.failureKind as CommandFailureKind | undefined) ?? CommandFailureKind.none;
+      const timedOut = r.failureKind === "timeout" || failureKind === CommandFailureKind.timeout;
+      return {
+        stdout: r.output ?? "",
+        stderr: r.error ?? "",
+        exitCode: r.exitCode ?? -1,
+        durationMs: r.durationMs ?? 0,
+        timedOut,
+        failureKind,
+        success: r.exitCode === 0 && !timedOut,
+      };
+    } catch {
+      // Host unconnected / RPC refused -> treat as "not connected" (null).
+      return null;
+    }
+  }
+
+  async executeBatch(hostIds: string[], command: string, opts: ExecuteBatchOptions): Promise<Map<string, OrchestratorResult>> {
+    const results = new Map<string, OrchestratorResult>();
+    const cancelled = opts.cancelled;
+    if (cancelled?.()) {
+      for (const h of hostIds) results.set(h, skippedResult());
+      return results;
+    }
+    if (isReadOnlyCommand(command)) {
+      // parallel: one host's failure does not affect the others
+      await Promise.all(hostIds.map(async (h) => {
+        results.set(h, await this.executeOn(h, command, opts.timeoutMs, cancelled) ?? skippedResult());
+      }));
+      return results;
+    }
+    // serial: stopOnFailure stops the remaining hosts
+    for (let i = 0; i < hostIds.length; i++) {
+      const h = hostIds[i];
+      const r = await this.executeOn(h, command, opts.timeoutMs, cancelled);
+      results.set(h, r ?? notConnectedResult(h));
+      const stopNow = opts.stopOnFailure === true && !results.get(h)!.success;
+      if (cancelled?.() || stopNow) {
+        for (let j = i + 1; j < hostIds.length; j++) results.set(hostIds[j], skippedResult());
+        break;
+      }
+    }
+    return results;
+  }
+
+  async checkConnectivity(o: {fromHostId: string; targetHost: string; port: number; timeoutMs?: number}): Promise<OrchestratorConnectivity> {
+    const t0 = Date.now();
+    if (!isValidHost(o.targetHost)) {
+      const detail = "targetHost 格式非法（仅允许 IP 或域名字符）";
+      const elapsedMs = Date.now() - t0;
+      return {fromHostId:o.fromHostId, targetHost:o.targetHost, port:o.port, reachable:false, detail, elapsedMs, summary:connectivitySummary(o.fromHostId,o.targetHost,o.port,false,elapsedMs,detail)};
+    }
+    // R6: /dev/tcp is a bash builtin -> most portable probe (no nc required).
+    const probeCmd = "timeout 3 bash -c 'cat < /dev/tcp/"+o.targetHost+"/"+o.port+"' && echo 'CONNECT_OK' || echo 'CONNECT_FAIL'";
+    const r = await this.executeOn(o.fromHostId, probeCmd, o.timeoutMs ?? 5000);
+    const elapsedMs = Date.now() - t0;
+    if (r === null) {
+      const detail = "源主机 "+o.fromHostId+" 未连接";
+      return {fromHostId:o.fromHostId, targetHost:o.targetHost, port:o.port, reachable:false, detail, elapsedMs, summary:connectivitySummary(o.fromHostId,o.targetHost,o.port,false,elapsedMs,detail)};
+    }
+    const reachable = r.stdout.includes("CONNECT_OK");
+    const detail = reachable ? undefined : (r.stderr || "连接超时或被拒绝");
+    return {fromHostId:o.fromHostId, targetHost:o.targetHost, port:o.port, reachable, detail, elapsedMs, summary:connectivitySummary(o.fromHostId,o.targetHost,o.port,reachable,elapsedMs,detail)};
+  }
+}
+
+// small L10n / formatting helpers (zh, byte-faithful)
+function notConnectedResult(hostId: string): OrchestratorResult {
+  return {stdout:"", stderr:"主机 "+hostId+" 未连接或不存在", exitCode:-1, durationMs:0, success:false};
+}
+function skippedResult(): OrchestratorResult {
+  return {stdout:"", stderr:"已跳过（前序主机失败）", exitCode:-1, durationMs:0, success:false};
+}
+function connectivitySummary(from:string,target:string,port:number,reachable:boolean,elapsedMs:number,detail?:string): string {
+  const mark = reachable ? "✓" : "✗";
+  return reachable
+    ? from+" → "+target+":"+port+" "+mark+" ("+elapsedMs+"ms)"
+    : from+" → "+target+":"+port+" "+mark+" ("+(detail ?? "不可达")+" ("+elapsedMs+"ms))";
+}
+function truncate(s: string, max: number): string {
+  if (s.length <= max) return s;
+  return s.slice(0, max)+"...("+s.length+" chars)";
+}
+function formatBatchResult(command: string, results: Map<string, OrchestratorResult>): string {
+  const total = results.size;
+  const success = [...results.values()].filter((r) => r.success).length;
+  const lines: string[] = ["结果: "+success+"/"+total+" 成功"];
+  for (const [hostId, r] of results) {
+    const mark = r.success ? "✓" : "✗";
+    const detail = r.success
+      ? (r.stdout.trim() !== "" ? truncate(r.stdout, 200) : "(无输出)")
+      : "错误: "+truncate((r.stderr.trim() !== "" ? r.stderr : "未知"), 200);
+    lines.push("["+hostId+"] "+mark+" "+detail);
+  }
+  return lines.join("\n");
+}
+
+// Conservative read-only classifier mirroring SafetyGuard.check -> safe.
+// Used only to pick the parallel vs serial batch path; a false "safe" just means
+// we run serially, which is always correct (never a correctness issue).
+const READ_ONLY_HEADS = new Set([
+  "ls","cat","df","du","ps","top","tail","head","grep","find","stat","free",
+  "uptime","which","whereis","date","whoami","hostname","echo","pwd","env",
+  "type","systemctl status","journalctl","docker ps","docker images","docker logs",
+  "kubectl get","git log","git status","docker inspect","docker port","ss -",
+  "netstat","ip addr","ip a","ifconfig","mount","uname",
+]);
+export function isReadOnlyCommand(command: string): boolean {
+  const c = command.trim();
+  if (c === "") return false;
+    if (/[;|&>$(]/.test(c)) return false; // compound / mutating pipeline
+  const first = c.split(/\s+/)[0];
+  return READ_ONLY_HEADS.has(first.toLowerCase()) || READ_ONLY_HEADS.has(first);
+}
+
+// Validate target host (IP/domain, no shell metachars) - R7.
+export function isValidHost(host: string): boolean {
+  if (host.length === 0 || host.length > 255) return false;
+  return /^[a-zA-Z0-9.\-]+$/.test(host);
+}
+
+// ExecOnTool (exec_on)
+export class ExecOnTool extends AgentTool {
+  readonly name = "exec_on";
+  readonly description = "【多机编排】在指定主机上执行命令。用于跨主机调度操作。仅在编排模式下可用；非编排模式请用普通 execute。";
+  readonly paramSpec: string = "参数列表（多行 key:value 格式）：\n  hostId: 目标主机 ID（必填）\n  command: 要执行的命令（必填）\n  timeout: 超时秒数（可选，默认 60）";
+  get kind(): ToolKind { return ToolKind.orchestration; }
+  get scope(): ToolScope { return ToolScope.orchestrator; }
+  constructor(private readonly executor: OrchestratorExecutor) { super(); }
+  toJsonSchema(): Record<string, unknown> {
+    return {
+      type: "object",
+      properties: {
+        hostId: {type: "string", description: "target host id"},
+        command: {type: "string", description: "command to run on that host"},
+        timeout: {type: "integer", description: "timeout seconds (default 60)"},
+      },
+      required: ["hostId", "command"],
+    };
+  }
+  async execute(args: ToolArgs, ctx: ToolContext): Promise<ToolResult> {
+    const hostId = args.getString("hostId");
+    const command = args.getString("command");
+    const timeoutSec = args.getInt("timeout", 60);
+    if (hostId === "" || command === "") {
+      return ToolResult.failure("参数缺失: hostId 和 command 为必填项");
+    }
+    const result = await this.executor.executeOn(hostId, command, timeoutSec * 1000, ctx.cancelled);
+    if (result === null) {
+      return ToolResult.failure("主机 "+hostId+" 未连接或不存在");
+    }
+    const mark = result.success ? "✓" : "✗";
+    const output = truncate(result.stdout, 2000);
+    const err = truncate(result.stderr, 1000);
+    const kindLabel = result.failureKind && result.failureKind !== CommandFailureKind.none
+      ? " ["+String(result.failureKind).toUpperCase()+"]"
+      : (result.timedOut ? " [TIMEOUT]" : "");
+    const summary = "["+hostId+"] "+mark+" (exit="+result.exitCode+")"+kindLabel;
+    const detail = result.success
+      ? (output.trim() !== "" ? output : "(无输出)")
+      : (output.trim() !== ""
+          ? (err.trim() !== "" ? "stdout: "+output+"\nstderr: "+err : "output: "+output)
+          : (err.trim() !== "" ? "stderr: "+err : "(无输出)"));
+    const reasonLine = result.failureReason ? "\nreason: "+result.failureReason : "";
+    if (result.success) {
+      return ToolResult.success(summary+"\n"+detail);
+    }
+    const fail = "主机 "+hostId+" 命令失败 (exit="+result.exitCode+")"+(result.failureKind && result.failureKind !== CommandFailureKind.none ? " kind="+result.failureKind : "");
+    return ToolResult.failure(fail, {output: summary+"\n"+detail+reasonLine});
+  }
+}
+
+// ExecBatchTool (exec_batch)
+export class ExecBatchTool extends AgentTool {
+  readonly name = "exec_batch";
+  readonly description = "【多机编排】批量执行同一命令到多台主机（只读命令并行执行，修改性命令串行执行）。适用于时间同步、日志清理、配置检查等批量运维场景。一台失败不影响其他主机（除非 stopOnFailure=true）。";
+  readonly paramSpec: string = "参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，逗号分隔，如 web1,web2,db1）\n  command: 要执行的命令（必填）\n  timeout: 超时秒数（可选，默认 60）\n  stopOnFailure: 某台失败是否停止后续（true/false，默认 false）";
+  get kind(): ToolKind { return ToolKind.orchestration; }
+  get scope(): ToolScope { return ToolScope.orchestrator; }
+  constructor(private readonly executor: OrchestratorExecutor) { super(); }
+  toJsonSchema(): Record<string, unknown> {
+    return {
+      type: "object",
+      properties: {
+        hostIds: {type: "string", description: "comma-separated host ids"},
+        command: {type: "string", description: "command to run on each host"},
+        timeout: {type: "integer", description: "timeout seconds (default 60)"},
+        stopOnFailure: {type: "boolean", description: "stop subsequent hosts on first failure (default false)"},
+      },
+      required: ["hostIds", "command"],
+    };
+  }
+  async execute(args: ToolArgs, ctx: ToolContext): Promise<ToolResult> {
+    const command = args.getString("command");
+    const timeoutSec = args.getInt("timeout", 60);
+    const stopOnFailure = args.getBool("stopOnFailure");
+    const hostIds = args.getStringList("hostIds");
+    if (hostIds.length === 0 || command === "") {
+      return ToolResult.failure("参数缺失: hostIds 和 command 为必填项");
+    }
+    const results = await this.executor.executeBatch(hostIds, command, {
+      timeoutMs: timeoutSec * 1000,
+      stopOnFailure,
+      cancelled: ctx.cancelled,
+    });
+    const summary = formatBatchResult(command, results);
+    const allSuccess = [...results.values()].every((r) => r.success);
+    const hostResults: Record<string, HostExecutionResult> = {};
+    for (const [hostId, r] of results) {
+      const out = r.stdout.length > 2000 ? r.stdout.slice(0, 2000)+"…" : r.stdout;
+      const err = r.stderr.length > 1000 ? r.stderr.slice(0, 1000)+"…" : r.stderr;
+      hostResults[hostId] = {
+        hostId,
+        success: r.success,
+        output: out.trim() === "" ? undefined : out,
+        error: err.trim() === "" ? undefined : err,
+        exitCode: r.exitCode,
+        durationMs: r.durationMs,
+        failureKind: r.failureKind && r.failureKind !== CommandFailureKind.none ? String(r.failureKind) : undefined,
+      };
+    }
+    if (allSuccess) return ToolResult.success(summary, {hostResults});
+    const failedCount = [...results.values()].filter((r) => !r.success).length;
+    return ToolResult.failure(failedCount+"/"+hostIds.length+" 台主机执行失败", {output: summary, hostResults});
+  }
+}
+
+// CheckConnectivityTool (check_connectivity)
+export class CheckConnectivityTool extends AgentTool {
+  readonly name = "check_connectivity";
+  readonly description = "【多机编排】从一台主机测试到目标主机的端口连通性。用于部署前验证网络依赖（如 web→db:3306、web→redis:6379）。源主机必须是已连接的编排参与者。";
+  readonly paramSpec: string = "参数列表（多行 key:value 格式）：\n  fromHostId: 源主机 ID（必填，命令从这台机执行）\n  targetHost: 目标主机 IP 或域名（必填）\n  port: 目标端口（必填）\n  timeout: 超时秒数（可选，默认 5）";
+  get kind(): ToolKind { return ToolKind.read; }
+  get scope(): ToolScope { return ToolScope.orchestrator; }
+  constructor(private readonly executor: OrchestratorExecutor) { super(); }
+  toJsonSchema(): Record<string, unknown> {
+    return {
+      type: "object",
+      properties: {
+        fromHostId: {type: "string", description: "source host id (probe runs here)"},
+        targetHost: {type: "string", description: "target IP or hostname"},
+        port: {type: "integer", description: "target port"},
+        timeout: {type: "integer", description: "timeout seconds (default 5)"},
+      },
+      required: ["fromHostId", "targetHost", "port"],
+    };
+  }
+  async execute(args: ToolArgs, _ctx: ToolContext): Promise<ToolResult> {
+    const fromHostId = args.getString("fromHostId");
+    const targetHost = args.getString("targetHost");
+    const port = args.getInt("port");
+    const timeoutSec = args.getInt("timeout", 5);
+    if (fromHostId === "" || targetHost === "" || port <= 0) {
+      return ToolResult.failure("参数缺失或无效: fromHostId、targetHost、port(正整数) 为必填项");
+    }
+    const result = await this.executor.checkConnectivity({fromHostId, targetHost, port, timeoutMs: timeoutSec * 1000});
+    if (result.reachable) {
+      return ToolResult.success(result.summary);
+    }
+    return ToolResult.failure(result.detail ?? "不可达", {output: result.summary});
+  }
+}
+
+// factory: register the orchestration trio under ToolScope.orchestrator
+export function buildOrchestratorTools(executor: OrchestratorExecutor): AgentTool[] {
+  return [new ExecOnTool(executor), new ExecBatchTool(executor), new CheckConnectivityTool(executor)];
+}
+export function registerOrchestratorTools(registry: AgentToolRegistry, executor: OrchestratorExecutor): void {
+  for (const t of buildOrchestratorTools(executor)) registry.register(t, ToolScope.orchestrator);
+}
