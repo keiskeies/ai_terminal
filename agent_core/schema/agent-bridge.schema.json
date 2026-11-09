@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "agent-bridge.schema.json",
+  "title": "Agent Bridge Protocol (umbrella schema)",
+  "description": "Umbrella JSON Schema for the Dart parent ↔ Node agent_core stdio bridge. Aggregates all RPC method names and event types; $refs to the per-domain schemas in agent_core/schema/. No circular $refs — this file is the root. Protocol version 1.0 (see protocol.version.json).",
+  "protocolVersion": {
+    "major": 1,
+    "minor": 0
+  },
+  "definitions": {
+    "parentToChildMethods": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "rpc:startTask",
+          "rpc:cancelTask",
+          "rpc:confirm",
+          "rpc:getState",
+          "rpc:ping",
+          "rpc:registerLocalTool"
+        ]
+      }
+    },
+    "childToParentMethods": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "rpc:invokeSsh",
+          "rpc:invokeSftp",
+          "rpc:queryKnowledge",
+          "rpc:saveSession",
+          "rpc:callDartTool"
+        ]
+      }
+    },
+    "notificationMethods": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "evt:agentEvent",
+          "evt:thinkingChunk",
+          "evt:toolResult",
+          "evt:confirmRequest",
+          "evt:taskState",
+          "err:uncaught"
+        ]
+      }
+    },
+    "allMethodNames": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "rpc:startTask",
+          "rpc:cancelTask",
+          "rpc:confirm",
+          "rpc:getState",
+          "rpc:ping",
+          "rpc:registerLocalTool",
+          "rpc:invokeSsh",
+          "rpc:invokeSftp",
+          "rpc:queryKnowledge",
+          "rpc:saveSession",
+          "rpc:callDartTool",
+          "evt:agentEvent",
+          "evt:thinkingChunk",
+          "evt:toolResult",
+          "evt:confirmRequest",
+          "evt:taskState",
+          "err:uncaught"
+        ]
+      }
+    },
+    "request": {
+      "$ref": "request.schema.json"
+    },
+    "reverse": {
+      "$ref": "reverse.schema.json"
+    },
+    "event": {
+      "$ref": "event.schema.json"
+    },
+    "notification": {
+      "$ref": "notification.schema.json"
+    },
+    "tool": {
+      "$ref": "tool.schema.json"
+    }
+  },
+  "type": "object",
+  "oneOf": [
+    {
+      "$ref": "#/definitions/request"
+    },
+    {
+      "$ref": "#/definitions/reverse"
+    },
+    {
+      "$ref": "#/definitions/notification"
+    },
+    {
+      "$ref": "#/definitions/tool"
+    }
+  ]
+}

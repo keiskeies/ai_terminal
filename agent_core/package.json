@@ -12,7 +12,8 @@
     "test": "vitest run --no-coverage",
     "test_e2e": "vitest run test/e2e/",
     "test_regression": "vitest run test/regression/",
-    "test:fixture": "node test/fixtures/verify.mjs"
+    "test:fixture": "node test/fixtures/verify.mjs",
+    "check:schema": "node tools/check-schema-compat.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
