@@ -1,3 +1,5 @@
+export {shouldUseNodeAgent, rolloutFraction} from "./rollout.js";
+export type {RolloutOptions} from "./rollout.js";
 export {fnv1a64DartCompat, stableId, stableHashOf} from "./stable_hash.js";
 export {TailTextBuffer} from "./tail_buffer.js";
 export {TaskGeneration, StaleTaskError, crossBoundary} from "./generation.js";

@@ -112,3 +112,5 @@ export {buildDefaultToolRegistry} from "./tools/index.js";
 export type {HealthParams, HealthResult, ToolHealth, LlmHealth} from "./rpc/schema.js";
 export type {PlatformProfile} from "./tools/platform.js";
 export {MOBILE_SAFE_TOOLS, DESKTOP_ONLY_TOOLS, toolsForPlatform} from "./tools/platform.js";
+export {shouldUseNodeAgent, rolloutFraction} from "./utils/rollout.js";
+export type {RolloutOptions} from "./utils/rollout.js";
