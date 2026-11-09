@@ -318,7 +318,7 @@ ai_terminal/lib/agent_bridge/
 **目标**：捆绑 Node、崩溃恢复、灰度开关、回滚预案。
 
 - [ ] W6：NodeApp 捆绑脚本（`nodeapp build --platform=win/mac/linux`）
-- [ ] W6：`process_manager.dart`（lazy spawn / 心跳 / 崩溃重启）
+- [x] W6：`process_manager.dart`（lazy spawn / 心跳 / 崩溃重启）✅ Node 侧 `utils/process_supervisor.ts`（`ProcessSupervisor`：lazy `ensure()` / 可注入 `heartbeatPing` + 连续 miss 检测 / 指数退避 crash 重启，`maxRestarts` 上限；Dart 侧 `process_manager.dart` 保留作 UI 侧调度桥接）
 - [x] W7：checkpoint 机制（每 30s 写 Hive `task_checkpoints`，崩溃后 `--resume`）✅ Node 侧 `utils/checkpoint_store.ts`（`~/.ai_terminal/checkpoints/`，每步边界快照 conversation + seenStableIds + step）+ `ReActEngine` 构造参数 `checkpointStore`/`resumeFromCheckpoint` + 终止态删除（`interrupted` 保留供续跑）；Hive 写入仍由 Dart 侧 `rpc:saveSession` 承担，Node 侧文件镜像为崩溃恢复源
 - [ ] W7：回滚预案：`kUseNodeAgent` 一键切回 Dart 实现
 - [ ] W8：灰度 10% 用户 → 观察 7 天 → 100%

@@ -15,3 +15,6 @@ export {
 export type {LocalWriteOutcome, LocalPatchOutcome, TrashUsage, TrashClearResult, DecodedContent} from "./local_file_ops.js";
 export {CheckpointStore} from "./checkpoint_store.js";
 export type {TaskCheckpoint} from "./checkpoint_store.js";
+
+export {ProcessSupervisor} from "./process_supervisor.js";
+export type {ProcessHandle, SupervisorConfig} from "./process_supervisor.js";
