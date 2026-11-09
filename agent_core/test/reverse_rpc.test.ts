@@ -1,4 +1,16 @@
-// Reverse-RPC bridge unit test (Phase 2 W5: rpc:invokeSsh / invokeSftp /
+it('each request gets a distinct + monotonically-increasing rev- id (R4)', async () => {
+    // The deterministic counter (rev-1, rev-2, ...) guarantees no collision
+    // AND stable ordering. This is the invariant the old Math.random() lacked.
+    const t = new FakeTransport();
+    t.register('rpc:invokeSsh', { exitCode: 0, output: '', durationMs: 0 });
+    const client = makeClient(t);
+    for (let i = 0; i < 20; i++) await client.invokeSsh({ hostId: 'h' + i, command: 'x' });
+    const ids = t.sent.map((r) => r.id);
+    for (const id of ids) expect(id).toMatch(/^rev-/);
+    expect(new Set(ids).size).toBe(20);
+    const nums = ids.map((id) => parseInt(id.slice(4), 36));
+    for (let i = 1; i < nums.length; i++) expect(nums[i]).toBe(nums[i - 1] + 1);
+  });// Reverse-RPC bridge unit test (Phase 2 W5: rpc:invokeSsh / invokeSftp /
 // queryKnowledge / saveSession / callDartTool).
 //
 // A real Dart parent cannot be spawned in CI, so we drive ReverseRpcClient

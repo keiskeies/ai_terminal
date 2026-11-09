@@ -36,9 +36,14 @@ export class ReverseRpcClient {
     );
   }
 
+  private revIdCounter = 0;
+
   private async request<T>(method: string, params: unknown): Promise<T> {
-    // Generate unique request IDs for reverse calls (prefixed to avoid collision with parent IDs)
-    const id = "rev-" + Math.random().toString(36).slice(2);
+    // R4: deterministic, monotonically-increasing reverse-RPC request IDs.
+    // The old "rev-" + Math.random().toString(36).slice(2) was non-deterministic and could
+    // collide under concurrent calls, risking a response being matched to the wrong pending
+    // request (R4 stableId/dedup invariant). A per-client counter is stable + unique.
+    const id = "rev-" + (++this.revIdCounter).toString(36);
     return this.transport.request<T>({jsonrpc: "2.0", id, method, params});
   }
 }
