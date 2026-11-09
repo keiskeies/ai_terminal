@@ -279,6 +279,8 @@ ai_terminal/lib/agent_bridge/
 - [x] D2：写 `agent_core/package.json` + `tsconfig` + `esbuild` 构建脚本 ✅ package.json + tsconfig.json + esbuild build script in place
 - [x] D3：Dart 侧 `agent_bridge/json_rpc_transport.dart`（JSONL 收发）✅ 已移植（200 行，JSONL + 心跳 + 重连）
 - [x] D4：Node 侧 `rpc/server.ts` + `rpc/client.ts` ✅ 已移植（rpc/server.ts + rpc/client.ts + rpc/transport.ts + rpc/schema.ts）
+  
+  - [x] `rpc:startTask` 已注册：`startServer` 将 `ReActEngine` 接入 RPC 面（§2.2 任务启动）；`makeLlmClient` 工厂可注入；`rpc:cancelTask` 取消 live 引擎（`6b66fd9`）。
 - [x] D5：E2E 冒烟：Dart spawn Node → 发 `rpc:ping` → 收到 `{ok:true}` → 杀进程 ✅ reverse_rpc.test.ts（spawn 冒烟 + invokeSsh/invokeSftp/queryKnowledge 全链路）
 - [x] D6：CI job `agent-core-build`：npm install + tsc + esbuild → dist/ ✅ .github/workflows/agent-core-ci.yml（typecheck + test + e2e + build + fixture 7 步）
 - [x] D7：协议变更 checklist（任何 schema 改动要过 `npx check-schema-compat`）✅ 已移植（`agent_core/tools/check-schema-compat.mjs`：校验 major.minor 未破坏 + 新增字段均为 optional + 枚举只增不减 + required 集合未扩大；npm script `check:schema` 已注册；`test/check_schema_compat.test.ts` 覆盖 6 条规则）
