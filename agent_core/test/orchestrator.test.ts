@@ -353,3 +353,129 @@ describe('ReverseRpcOrchestrator (adapter)', () => {
     expect([...m.values()].every((r) => r.success)).toBe(true);
   });
 });
+
+// ReverseRpcOrchestrator.executeBatch: parallel/serial decision paths.
+// Drives the REAL adapter through a fake ReverseRpcClient, covering branches
+// that the FakeExecutor-based w5_e2e and earlier per-shape tests do not:
+//   * read-only => parallel: a single host failure does NOT skip siblings
+//   * parallel: an RPC refusal (null) on one host falls back to a skipped marker
+//   * serial, no stopOnFailure: a mid-batch failure still runs the remaining hosts
+//   * executeOn cancelled-flag short-circuit (no RPC call issued)
+//   * checkConnectivity invalid-targetHost guard + source-not-connected
+
+describe('ReverseRpcOrchestrator.executeBatch parallel/serial decision', () => {
+
+  function clientByHost(replies: Record<string, { exitCode?: number; output?: string; error?: string; failureKind?: string }>) {
+    const c = {
+      invokeSsh: async (p: { hostId: string; command: string; timeoutMs?: number }) => {
+        const r = replies[p.hostId];
+        return {
+          exitCode: r?.exitCode ?? 0,
+          output: r?.output ?? "",
+          error: r?.error,
+          durationMs: 4,
+          failureKind: r?.failureKind,
+        };
+      },
+    } as unknown as ReverseRpcClient;
+    return c;
+  }
+
+  it('read-only batch runs in parallel: a failing host does NOT skip its siblings', async () => {
+    const ex = new ReverseRpcOrchestrator(
+      clientByHost({
+        web1: { exitCode: 0, output: "up1" },
+        web2: { exitCode: 124, output: "", failureKind: "timeout" },
+        web3: { exitCode: 0, output: "up3" },
+      }),
+    );
+    const m = await ex.executeBatch(["web1", "web2", "web3"], "uptime", { timeoutMs: 1000 });
+    expect(m.get("web1")!.success).toBe(true);
+    expect(m.get("web2")!.success).toBe(false);
+    expect(m.get("web2")!.timedOut).toBe(true);
+    expect(m.get("web3")!.success).toBe(true);
+    expect(m.get("web3")!.stderr).not.toContain("\u5DF2\u8DF3\u8FC7");
+  });
+
+  it('parallel batch: an RPC refusal (null) on one host falls back to a skipped marker', async () => {
+    let ghostCalled = false;
+    const c = {
+      invokeSsh: async (p: { hostId: string }) => {
+        if (p.hostId === "ghost") { ghostCalled = true; throw new Error("RPC refused"); }
+        return { exitCode: 0, output: "ok", durationMs: 1, failureKind: "none" };
+      },
+    } as unknown as ReverseRpcClient;
+    const ex = new ReverseRpcOrchestrator(c);
+    const m = await ex.executeBatch(["ghost", "web1"], "uptime", { timeoutMs: 1000 });
+    expect(ghostCalled).toBe(true);
+    expect(m.get("ghost")!.success).toBe(false);
+    expect(m.get("ghost")!.stderr).toContain("\u5DF2\u8DF3\u8FC7");
+    expect(m.get("web1")!.success).toBe(true);
+  });
+
+  it('serial batch WITHOUT stopOnFailure still runs remaining hosts after a failure', async () => {
+    const ex = new ReverseRpcOrchestrator(
+      clientByHost({ a: { exitCode: 1, failureKind: "unknown" }, b: { exitCode: 0, output: "b" }, c: { exitCode: 0, output: "c" } }),
+    );
+    const m = await ex.executeBatch(["a", "b", "c"], "rm -rf x", { timeoutMs: 1000 });
+    expect(m.get("a")!.success).toBe(false);
+    expect(m.get("b")!.success).toBe(true);
+    expect(m.get("c")!.success).toBe(true);
+    for (const r of m.values()) expect(r.stderr).not.toContain("\u5DF2\u8DF3\u8FC7");
+  });
+
+  it('executeOn: cancelled flag short-circuits WITHOUT issuing an RPC call', async () => {
+    let called = false;
+    const c = {
+      invokeSsh: async () => { called = true; return { exitCode: 0, output: "", durationMs: 1 }; },
+    } as unknown as ReverseRpcClient;
+    const ex = new ReverseRpcOrchestrator(c);
+    const r = await ex.executeOn("web1", "uptime", 1000, () => true);
+    expect(called).toBe(false);
+    expect(r!.success).toBe(false);
+    expect(r!.failureKind).toBe(CommandFailureKind.cancelled);
+    expect(r!.stderr).toBe("cancelled");
+  });
+});
+
+describe('ReverseRpcOrchestrator.checkConnectivity guards', () => {
+  function clientByHost(replies: Record<string, { exitCode?: number; output?: string; failureKind?: string }>) {
+    return {
+      invokeSsh: async (p: { hostId: string }) => {
+        const r = replies[p.hostId];
+        return { exitCode: r?.exitCode ?? 0, output: r?.output ?? "", durationMs: 4, failureKind: r?.failureKind ?? "none" };
+      },
+    } as unknown as ReverseRpcClient;
+  }
+
+  it('rejects an invalid targetHost before any RPC is issued', async () => {
+    let called = false;
+    const c = {
+      invokeSsh: async () => { called = true; return { exitCode: 0, output: "", durationMs: 1 }; },
+    } as unknown as ReverseRpcClient;
+    const ex = new ReverseRpcOrchestrator(c);
+    const r = await ex.checkConnectivity({ fromHostId: "w", targetHost: "bad host;rm -rf /", port: 3306, timeoutMs: 1000 });
+    expect(called).toBe(false);
+    expect(r.reachable).toBe(false);
+    expect(r.detail).toContain("\u683C\u5F0F\u975E\u6CD5");
+  });
+
+  it('reports the source host not-connected when the probe RPC is refused', async () => {
+    const c = {
+      invokeSsh: async () => { throw new Error("RPC refused"); },
+    } as unknown as ReverseRpcClient;
+    const ex = new ReverseRpcOrchestrator(c);
+    const r = await ex.checkConnectivity({ fromHostId: "w", targetHost: "10.0.0.1", port: 3306 });
+    expect(r.reachable).toBe(false);
+    expect(r.detail).toContain("\u672A\u8FDE\u63A5");
+  });
+
+  it('reports reachable when the probe stdout carries CONNECT_OK', async () => {
+    const ex = new ReverseRpcOrchestrator(
+      clientByHost({ w: { output: "CONNECT_OK", exitCode: 0 } }),
+    );
+    const r = await ex.checkConnectivity({ fromHostId: "w", targetHost: "db.internal", port: 3306 });
+    expect(r.reachable).toBe(true);
+    expect(r.summary).toContain("\u2713");
+  });
+});
