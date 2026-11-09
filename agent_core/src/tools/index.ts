@@ -30,7 +30,7 @@ import {
  * exposed only in SSH sessions (mirrors Dart: in a local session the exec
  * entry is the PTY, so local_exec would just confuse the model).
  */
-export function buildDefaultToolRegistry(): AgentToolRegistry {
+export function buildDefaultToolRegistry(platform: PlatformProfile = "desktop"): AgentToolRegistry {
   const r = new AgentToolRegistry();
   r.register(new LocalFileReadTool(), ToolScope.all);
   r.register(new LocalDirListTool(), ToolScope.all);
@@ -44,10 +44,20 @@ export function buildDefaultToolRegistry(): AgentToolRegistry {
   // local_exec only makes sense when the session is NOT local (i.e. SSH);
   // in a local session the built-in terminal already executes locally.
   r.register(new LocalExecTool(), ToolScope.sshSession);
+  // W8: mobile-safe subset (read-only + network only, no local FS writes / pty)
+  if (platform === "mobile") {
+    const keep = new Set(toolsForPlatform("mobile", r.all.map((t) => t.name)));
+    const mobile = new AgentToolRegistry();
+    for (const t of r.all) {
+      if (keep.has(t.name)) mobile.register(t, ToolScope.all);
+    }
+    return mobile;
+  }
   return r;
 }
 
 import {ReverseRpcClient} from "../rpc/client.js";
+import {PlatformProfile, toolsForPlatform} from "./platform.js";
 import {registerOrchestratorTools, ReverseRpcOrchestrator} from "./orchestrator.js";
 
 /**
@@ -60,3 +70,6 @@ export function buildFullToolRegistry(reverse: ReverseRpcClient): AgentToolRegis
   registerOrchestratorTools(r, new ReverseRpcOrchestrator(reverse));
   return r;
 }
+
+export type {PlatformProfile} from "./platform.js";
+export {MOBILE_SAFE_TOOLS, DESKTOP_ONLY_TOOLS, toolsForPlatform} from "./platform.js";

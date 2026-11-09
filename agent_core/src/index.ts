@@ -110,3 +110,5 @@ export type {ProcessHandle, SupervisorConfig} from "./utils/process_supervisor.j
 export {ReActEngine} from "./react/engine.js";
 export {buildDefaultToolRegistry} from "./tools/index.js";
 export type {HealthParams, HealthResult, ToolHealth, LlmHealth} from "./rpc/schema.js";
+export type {PlatformProfile} from "./tools/platform.js";
+export {MOBILE_SAFE_TOOLS, DESKTOP_ONLY_TOOLS, toolsForPlatform} from "./tools/platform.js";
