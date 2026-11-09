@@ -151,6 +151,7 @@ export class OpenAiStreamClient implements LlmClient {
       acc.pushReasoningDelta(reasoning);
     }
     const content = delta.content;
-    if (content != null) acc.pushText(String(content));
+    // R8 + Dart parity: gate on non-empty content (was leaking empty deltas)
+    if (content != null && String(content).length > 0) acc.pushText(String(content));
   }
 }

@@ -104,8 +104,8 @@ export class AnthropicStreamClient implements LlmClient {
     } else if (t === "content_block_delta") {
       const d = json.delta;
       if (!d) return;
-      if (d.type === "text_delta" && typeof d.text === "string") acc.pushText(d.text);
-      else if (d.type === "thinking_delta" && typeof d.thinking === "string") {
+      if (d.type === "text_delta" && typeof d.text === "string" && d.text.length > 0) acc.pushText(d.text);
+      else if (d.type === "thinking_delta" && typeof d.thinking === "string" && d.thinking.length > 0) {
         opts.onReasoningDelta?.(d.thinking); acc.pushReasoningDelta(d.thinking);
       }
     } else if (t === "message_delta") {

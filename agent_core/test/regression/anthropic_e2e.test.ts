@@ -28,6 +28,29 @@ describe("Anthropic stream e2e", () => {
     expect(out.usage?.completionTokens).toBe(10);
     stop();
   });
+  it("R8 empty text/thinking deltas are skipped (incl. onReasoningDelta callback)", async () => {
+    // Load-bearing: pre-fix code fired opts.onReasoningDelta("") for an empty
+    // thinking_delta. Dart parity = no callback for empty content.
+    const lines = [
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":""}}',
+      'data: {"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":""}}',
+      'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"ok"}}',
+      'data: {"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"deem"}}',
+    ];
+    const stop = setupFetch(() => sse(lines));
+    const c = new AnthropicStreamClient({apiKey:"k",model:"claude-3"});
+    const reasoningCalls: string[] = [];
+    const out = await c.stream({
+      modelConfig:{provider:"anthropic",model:"claude-3"},
+      messages:[{role:"user",content:"hi"}],
+      onReasoningDelta: (s) => reasoningCalls.push(s),
+    } as any);
+    expect(out.text).toBe("ok");
+    expect(out.reasoning).toBe("deem");
+    // The callback fired exactly once (only for the non-empty "deem"), NOT for "".
+    expect(reasoningCalls).toEqual(["deem"]);
+    stop();
+  });
   it("system message extracted to top-level field", async () => {
     let captured: Record<string, unknown> | null = null;
     const origFetch = globalThis.fetch;

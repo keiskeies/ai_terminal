@@ -32,7 +32,23 @@ describe("R9 stream pipeline e2e", () => {
     expect(out.usage?.cachedTokens).toBe(2);
     stop();
   });
-    it("R9 multi-line concat: chunked stream reconstructs + parses", () => {
+    it("R8 empty/null content deltas are skipped (Dart toString().isNotEmpty parity)", async () => {
+    // Dart gates on content != null && content.toString().isNotEmpty. The client now
+    // mirrors that explicitly (pushText self-guards empty pushes too, so this also
+    // pins the behavior against future accumulator changes).
+    const stop = setupFetch(() => sse([
+      'data: {"choices":[{"delta":{"content":""}}]}',
+      'data: {"choices":[{"delta":{"content":null}}]}',
+      'data: {"choices":[{"delta":{"content":"real"}}]}',
+      'data: {"choices":[{"delta":{}}]}',
+      'data: {"choices":[{"delta":{"content":""}}]}',
+    ]));
+    const client = new OpenAiStreamClient({apiKey:"k",model:"gpt-4o"});
+    const out = await client.stream({modelConfig:{provider:"openai",model:"gpt-4o"},messages:[{role:"user",content:"hi"}]});
+    expect(out.text).toBe("real");
+    stop();
+  });
+  it("R9 multi-line concat: chunked stream reconstructs + parses", () => {
       const full = "\u601d\u8003: check disk\n\u547d\u4ee4: ls -la\n";
       const chunks = [full.slice(0, 2), full.slice(2)];
       const acc = new StreamAccumulator();
