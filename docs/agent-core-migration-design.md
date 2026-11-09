@@ -302,7 +302,8 @@ ai_terminal/lib/agent_bridge/
 
 **目标**：工具执行下沉到 Node；MCP 换官方 SDK。
 
-- [x] W4：`tools/builtin.ts`（exec / file / web / diff 等 9 个内置工具）✅ 已移植（W4 批）
+- [x] W4：`tools/builtin.ts`（exec / file / web_search / fetch_url / diff 等 10 个内置工具）✅ 已移植（W4 批）
+  - `tools/web_search.ts`：`WebSearchTool`（11 后端扇出 + URL 去重合并 + 取消桥接 + 配额/瞬时错误分类）+ `WebSearchService`/`webSearchService`/`normalizeSearchUrl`/`mergeSearchResults`/`loadWebSearchConfig`，1:1 移植自 `web_tools.dart` + `web_search_{models,config,backends,merge,service,http,http_io,http_stub}.dart`（Dio→Node `fetch`+`AbortSignal`，`Platform.environment`→`process.env`，凭据层改为 `~/.ai_terminal/` 文件存储）✅ 已移植（W4 批）
 - [x] W4：`pty/adapter.ts`（node-pty，与 `flutter_pty` 的 Windows quirk 对齐）✅ 已移植（node-pty + guarded-live 单测）
 - [x] W4：`shell_detect.ts`（PowerShell / cmd.exe / bash / zsh 分叉）✅ 已移植（utils/shell_detect.ts）
 - [x] W5：`mcp/manager.ts`（`@modelcontextprotocol/sdk`，替换 `mcp_dart`）✅ 1:1 移植 + InMemoryTransport 单测

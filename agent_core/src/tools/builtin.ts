@@ -296,38 +296,109 @@ export class FetchUrlTool extends AgentTool {
   readonly paramSpec: string = "\u53C2\u6570\u5217\u8868\uFF08\u591A\u884C key:value \u683C\u5F0F\uFF09\uFF1A\n  url: \u8981\u6293\u53D6\u7684 URL\uFF08\u5FC5\u586B\uFF0C\u9700\u4EE5 http:// \u6216 https:// \u5F00\u5934\uFF09\n  max_chars: \u6B63\u6587\u6700\u5927\u5B57\u7B26\u6570\uFF08\u53EF\u9009\uFF0C\u9ED8\u8BA4 20000\uFF09";
   get kind(): ToolKind { return ToolKind.network; }
   get recordsChanges(): boolean { return false; }
+  get scope(): ToolScope { return ToolScope.all; }
   toJsonSchema(): Record<string, unknown> {
     return {
       type: "object",
       properties: {
-        url: {type: "string", description: "full URL to fetch"},
-        max_chars: {type: "integer", description: "max body chars (default 20000)"},
+        url: {type: "string", description: "\u8981\u6293\u53D6\u7684 URL"},
+        max_chars: {type: "integer", description: "\u6B63\u6587\u6700\u5927\u5B57\u7B26\u6570\uFF08\u9ED8\u8BA4 20000\uFF09"},
       },
       required: ["url"],
     };
   }
   async execute(args: ToolArgs, ctx: ToolContext): Promise<ToolResult> {
     const url = args.getString("url").trim();
-    if (url === "") return ToolResult.failure("missing required param: url");
-    const maxChars = args.getInt("max_chars", 20000);
-    if (ctx.cancelled && ctx.cancelled()) return ToolResult.failure("fetch was cancelled");
+    const maxChars = args.getInt("max_chars", 0);
+    if (url === "") return ToolResult.failure("\u53C2\u6570\u7F3A\u5931: url \u4E3A\u5FC5\u586B\u9879");
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      return ToolResult.failure("\u53C2\u6570\u9519\u8BEF: url \u5FC5\u987B\u4EE5 http:// \u6216 https:// \u5F00\u5934");
+    }
+    if (ctx.cancelled && ctx.cancelled()) return ToolResult.failure("\u6293\u53D6\u5DF2\u88AB\u53D6\u6D88", {output: ""});
+    const cap = maxChars > 0 ? maxChars : 20000;
+    // Bridge ctx.cancelled() to an AbortSignal so the in-flight fetch aborts on cancel
+    const ctrl = new AbortController();
+    const checkTimer = setInterval(() => { if (ctx.cancelled?.()) ctrl.abort(); }, 250);
     try {
-      const resp = await fetch(url, {signal: AbortSignal.timeout(30000)});
-      if (!resp.ok) {
-        if (resp.status === 404) return ToolResult.failure("URL not found (HTTP 404): " + url);
-        if (resp.status === 403) return ToolResult.failure("access denied (HTTP 403): " + url);
+      const resp = await fetch(url, {
+        signal: AbortSignal.timeout(30000),
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        },
+      });
+      const respBody = await resp.text();
+            if (resp.status === 404) {
+        return ToolResult.failure("URL \u4E0D\u5B58\u5728 (HTTP 404)\uFF1A\u8BF7\u786E\u8BA4\u94FE\u63A5\u662F\u5426\u6B63\u786E");
+      }
+      if (resp.status === 403) {
+        return ToolResult.failure("\u76EE\u6807\u7AD9\u70B9\u62D2\u7EDD\u8BBF\u95EE (HTTP 403)\uFF1A\u53EF\u80FD\u9700\u8981\u767B\u5F55\u6216\u6709\u53CD\u722C\u673A\u5236");
+      }
+      if (resp.status >= 400) {
         return ToolResult.failure("HTTP " + resp.status + " for " + url);
       }
-      const body = await resp.text();
-      const cap = Math.max(1, maxChars);
-      if (body.length <= cap) return ToolResult.success(body);
-      const truncated = body.substring(0, cap) + "\n...[truncated, total " + body.length + " chars, showing first " + cap + "]";
-      return ToolResult.success(truncated);
-    } catch (e: unknown) {
+      if (respBody === "") {
+        return ToolResult.success("\u6293\u53D6\u6210\u529F\uFF0C\u4F46\u9875\u9762\u5185\u5BB9\u4E3A\u7A7A\u3002");
+      }
+      const isHtml = /text\/html|text\/x-html/i.test(resp.headers.get("content-type") ?? "") || respBody.trimStart().startsWith("<");
+      const title = isHtml ? _extractTitle(respBody) : "";
+      const text = isHtml ? _htmlToText(respBody) : respBody;
+      const lines: string[] = [];
+      if (title !== "") { lines.push("\u6807\u9898: " + title); lines.push(""); }
+      lines.push("URL: " + url);
+      lines.push("");
+      lines.push("\u6B63\u6587:");
+      if (text.length <= cap) {
+        lines.push(text);
+      } else {
+        lines.push(text.substring(0, cap));
+        lines.push("");
+        lines.push("(\u6B63\u6587\u5DF2\u622A\u65AD\uFF0C\u5171 " + text.length + " \u5B57\u7B26\uFF0C\u4EC5\u663E\u793A\u524D " + cap + " \u5B57\u7B26)");
+      }
+      return ToolResult.success(lines.join("\n").trimEnd());
+} catch (e: unknown) {
+      if (ctrl.signal.aborted) return ToolResult.failure("\u6293\u53D6\u5DF2\u88AB\u53D6\u6D88", {output: ""});
+      if (e instanceof TypeError && /fetch failed|network|ECONN|ETIMEDOUT/i.test(e.message)) {
+        return ToolResult.failure("\u7F51\u7EDC\u9519\u8BEF\uFF1A" + e.message);
+      }
+      // resp.status check: re-fetch is not possible; use a lightweight status probe via a second request only when needed.
       const msg = e instanceof Error ? e.message : String(e);
-      return ToolResult.failure("fetch failed: " + msg);
+      return ToolResult.failure("\u6293\u53D6\u5931\u8D25: " + msg);
+    } finally {
+      clearInterval(checkTimer);
     }
   }
+}
+
+// ── HTML→text helpers (private; 1:1 from Dart web_tools.dart _extractTitle/_htmlToText/_decodeEntities) ──
+function _extractTitle(html: string): string {
+  const m = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+  if (m === null) return "";
+  return _decodeEntities(m[1] ?? "").trim();
+}
+function _htmlToText(html: string): string {
+  let s = html;
+  // 1. strip non-content blocks (script/style/nav/head/header/footer/noscript/svg/iframe)
+  s = s.replace(/<(script|style|nav|head|header|footer|noscript|svg|iframe)[^>]*>[\s\S]*?<\/\1>/gi, "");
+  // 2. block-level closing tags -> newline
+  s = s.replace(/<\/(p|div|section|article|li|h[1-6]|tr|br|blockquote|pre)>/gi, "\n");
+  // 3. <br> single tag
+  s = s.replace(/<br\s*\/?>/gi, "\n");
+  // 4. strip remaining tags
+  s = s.replace(/<[^>]+>/g, "");
+  // 5. decode entities
+  s = _decodeEntities(s);
+  // 6. compress 3+ newlines to 2, trim line edges
+  const lines = s.split("\n").map(l => l.trim());
+  s = lines.join("\n").replace(/\n{3,}/g, "\n\n");
+  return s.trim();
+}
+function _decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&apos;/g, "'").replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (m, code) => { const c = parseInt(code,10); return isNaN(c) ? m : String.fromCharCode(c); })
+    .replace(/&#x([0-9a-fA-F]+);/g, (m, hex) => { const c = parseInt(hex,16); return isNaN(c) ? m : String.fromCharCode(c); });
 }
 
 // ── local_exec (W4): run a command on the local machine via child_process. ──

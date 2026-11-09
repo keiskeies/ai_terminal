@@ -136,18 +136,29 @@ describe("LocalDirListTool",()=>{
 });
 
 describe("FetchUrlTool",()=>{
- it("data: URL returns the body",async()=>{
+ it("non-http(s) URL (data:) -> failure (参数错误: scheme)",async()=>{
    const res=await new FetchUrlTool().execute(ToolArgs.wrap({url:"data:text/plain,hi"}),{});
-   expect(res.success).toBe(true);
-   expect(res.output).toBe("hi");
+   expect(res.success).toBe(false);
+   // Dart-faithful: 参数错误: url 必须以 http:// 或 https:// 开头
+   expect(res.error).toContain("url");
  });
- it("long body is truncated with a note",async()=>{
-   const body="y".repeat(500);
-   const url="data:text/plain,"+body;
-   const res=await new FetchUrlTool().execute(ToolArgs.wrap({url,max_chars:100}),{});
-   expect(res.success).toBe(true);
-   expect(res.output).toContain("truncated");
-   expect(res.output.length).toBeLessThan(body.length);
+ it("long http body is truncated with CJK note",async()=>{
+   // Stub fetch so no real network call is made: return a 500-char html body
+   const origFetch = globalThis.fetch;
+   const body="<html><head><title>Test Page</title></head><body><p>"+("y".repeat(500))+"</p></body></html>";
+   globalThis.fetch = (async (input: any, init?: any) => {
+     return new Response(body, {status:200, headers:{"content-type":"text/html"}});
+   }) as any;
+   try {
+     const res=await new FetchUrlTool().execute(ToolArgs.wrap({url:"http://example.com/",max_chars:100}),{});
+     expect(res.success).toBe(true);
+     // CJK truncation notice: ...(正文已截断，共 N 字符，仅显示前 100 字符)
+     expect(res.output).toContain("\u6B63\u6587\u5DF2\u622A\u65AD");
+     expect(res.output).toContain("URL: http://example.com/");
+     expect(res.output).toContain("标题: Test Page");
+   } finally {
+     globalThis.fetch = origFetch;
+   }
  });
  it("connection refused -> failure",async()=>{
    const res=await new FetchUrlTool().execute(ToolArgs.wrap({url:"http://127.0.0.1:1/"}),{});

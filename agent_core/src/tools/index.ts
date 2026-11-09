@@ -9,8 +9,12 @@ export {
   LocalFileSearchTool, LocalFileWriteTool, LocalFilePatchTool,
   LocalFileMoveTool, LocalFileDeleteTool,
 } from "./builtin.js";
+import {WebSearchTool} from "./web_search.js";
 export type {HostExecutionResult, ToolContext} from "./builtin.js";
 export {ToolArgs, ToolArgsParser, ToolArgException} from "./tool_args.js";
+export {WebSearchTool, webSearchService, loadWebSearchConfig, saveWebSearchConfig, getApiKey, normalizeSearchUrl, mergeSearchResults, WebSearchQuotaError, WebSearchTransientError, WebSearchCancelledError, providerDisplayName} from "./web_search.js";
+export type {WebSearchProvider, WebSearchResult, WebSearchBatch, WebSearchBackendReport, WebSearchResponse, WebSearchConfig} from "./web_search.js";
+
 export {ReverseRpcOrchestrator, ExecOnTool, ExecBatchTool, CheckConnectivityTool, buildOrchestratorTools, registerOrchestratorTools, CommandFailureKind, isReadOnlyCommand, isValidHost} from "./orchestrator.js";
 export type {OrchestratorExecutor, OrchestratorResult, OrchestratorConnectivity, ExecuteBatchOptions} from "./orchestrator.js";
 
@@ -35,6 +39,7 @@ export function buildDefaultToolRegistry(): AgentToolRegistry {
   r.register(new LocalFilePatchTool(), ToolScope.localSession);
   r.register(new LocalFileMoveTool(), ToolScope.localSession);
   r.register(new LocalFileDeleteTool(), ToolScope.localSession);
+  r.register(new WebSearchTool(), ToolScope.all);
   r.register(new FetchUrlTool(), ToolScope.all);
   // local_exec only makes sense when the session is NOT local (i.e. SSH);
   // in a local session the built-in terminal already executes locally.

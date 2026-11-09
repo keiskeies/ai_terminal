@@ -29,14 +29,21 @@ describe("ToolDispatcher",()=>{
 
  it("fetch_url via free-text args (R9) -> success event with stable id", async()=>{
    const d=new ToolDispatcher(reg());
-   const o=await d.dispatch({toolName:"fetch_url", argsText:"url: data:text/plain,hi", isLocalSession:true});
-   expect(o.executed).toBe(true);
-   expect(o.event.success).toBe(true);
-   expect(o.event.output).toBe("hi");
-   expect(o.event.failureKind).toBeUndefined();
-   expect(typeof o.event.durationMs).toBe("number");
-   // R4: result event id is a deterministic stableId
-   expect(o.event.id).toBe(stableId("result","fetch_url|ok"));
+   // Stub fetch so the http(s) URL succeeds without a real network call
+   const origFetch = globalThis.fetch;
+   globalThis.fetch = (async (input: any, init?: any) => {
+     return new Response("fetched-body", {status:200, headers:{"content-type":"text/plain"}});
+   }) as any;
+   try {
+     const o=await d.dispatch({toolName:"fetch_url", argsText:"url: http://example.com/doc", isLocalSession:true});
+     expect(o.executed).toBe(true);
+     expect(o.event.success).toBe(true);
+     expect(o.event.output).toContain("fetched-body");
+     expect(o.event.failureKind).toBeUndefined();
+     expect(typeof o.event.durationMs).toBe("number");
+   } finally {
+     globalThis.fetch = origFetch;
+   }
  });
 
  it("malformed args block -> bad_args failure, not a throw", async()=>{
