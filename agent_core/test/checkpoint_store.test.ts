@@ -127,7 +127,43 @@ describe("ReActEngine W7 resume", () => {
     } finally { cleanup(); }
   });
 
-    it("terminal FAILED keeps the checkpoint (resumable)", async() => {
+    it("LLM error -> terminal 'failed' + onError fired + checkpoint kept (resumable)", async() => {
+    const {store, cleanup} = makeStore();
+    try {
+      store.save({
+        taskId: "t-err", hostId: "h", goal: "g", step: 0,
+        conversation: [], seenStableIds: [],
+        state: "inProgress", savedAt: "2025-01-01T00:00:00Z",
+      });
+      // R5: a throwing LLM surfaces a failed terminal, never "completed".
+      class ThrowingLlm implements import("../src/llm/clients.js").LlmClient {
+        readonly name = "throwing";
+        async chatStream() {
+          throw new Error("500 upstream boom");
+        }
+      }
+      const errors: string[] = [];
+      const events: import("../src/rpc/schema.js").AgentEvent[] = [];
+      const engine = new ReActEngine(new ThrowingLlm(), modelConfig, {
+        onEvent: (e) => events.push(e),
+        onFinished: () => {},
+        onError: (m) => errors.push(m),
+      }, {checkpointStore: store});
+      const state = await engine.run({taskId: "t-err", goal: "g", hostId: "h", modelConfig} as any, 3);
+      // R5: AI error -> failed (never success/completed)
+      expect(state).toBe("failed");
+      // error surfaced via onError with the message
+      expect(errors).toEqual(["500 upstream boom"]);
+      // a finish(failed) event was emitted
+      const fin = events.find((e) => e.type === "finish");
+      expect(fin?.finishState).toBe("failed");
+      // W7: failed keeps the checkpoint as the --resume seed (design doc W7 intent)
+      expect(store.load("t-err")).not.toBeNull();
+      expect(store.load("t-err")!.state).toBe("inProgress");
+    } finally { cleanup(); }
+  });
+
+  it("terminal FAILED keeps the checkpoint (resumable)", async() => {
     const {store, cleanup} = makeStore();
     try {
       store.save({
