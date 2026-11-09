@@ -176,21 +176,62 @@ function formatBatchResult(command: string, results: Map<string, OrchestratorRes
 }
 
 // Conservative read-only classifier mirroring SafetyGuard.check -> safe.
-// Used only to pick the parallel vs serial batch path; a false "safe" just means
-// we run serially, which is always correct (never a correctness issue).
+// Used only to pick the parallel vs serial batch path. Conservative rule:
+// a command is read-only (parallel-safe) ONLY when its head matches a known
+// read-only phrase AND no mutating subcommand/flag is present. A false-negative
+// just means we run serially, which is always correct (never a correctness issue).
+//
+// READ_ONLY_HEADS: command heads (1- or 2-word phrases) that are safe to run in
+// parallel. Matching is done on the first 1-2 tokens of the command. Multi-word
+// heads like "docker ps" / "systemctl status" / "kubectl get" are recognized as
+// read-only, while their mutating siblings ("docker rm", "systemctl stop") are
+// rejected because their head-phrase is not in this set AND their subcommand is
+// in MUTATING_SUBCOMMANDS.
 const READ_ONLY_HEADS = new Set([
+  // single-word heads
   "ls","cat","df","du","ps","top","tail","head","grep","find","stat","free",
-  "uptime","which","whereis","date","whoami","hostname","echo","pwd","env",
-  "type","systemctl status","journalctl","docker ps","docker images","docker logs",
-  "kubectl get","git log","git status","docker inspect","docker port","ss -",
-  "netstat","ip addr","ip a","ifconfig","mount","uname",
+  "uptime","which","whereis","date","whoami","hostname","echo","pwd","env","type",
+  "journalctl","netstat","ifconfig","mount","uname","ip","ss","docker","kubectl","git","systemctl",
+  // two-word read-only subcommand phrases
+  "systemctl status","systemctl show","systemctl is-active","systemctl is-enabled",
+  "docker ps","docker images","docker logs","docker inspect","docker port","docker top","docker history",
+  "kubectl get","kubectl describe","kubectl logs","kubectl top",
+  "git log","git status","git diff","git show","git branch","git tag",
+  "ip addr","ip route","ip link","ip a",
 ]);
+
+// Per-head mutating subcommands / flags. Keyed by the first token (lowercase).
+// If any token in the command (after the head) matches this denylist, the
+// command is treated as mutating and runs serially. This is the R7 security
+// fix: find -delete, mount -o remount, docker rm, kubectl delete, git push,
+// systemctl stop, etc. must NOT be run in parallel across hosts.
+const MUTATING_SUBCOMMANDS: Record<string, readonly string[]> = {
+  find:     ["-delete","-ok","-exec","-execdir","-fls","-fprint","-fprintf"],
+  mount:    ["-o","--options","-t","--type","-u","--update","--bind","--remount","-a","--all","-r","--read-only","-L","-l","--noauto"],
+  docker:   ["rm","rmi","run","create","start","stop","restart","kill","pause","unpause","prune","build","push","pull","load","save","commit","cp","exec","attach","update"],
+  kubectl:  ["apply","delete","create","patch","replace","scale","rollout","cordon","drain","uncordon","expose","label","annotate","taint","set","edit","cp","autoscale","wait","promote"],
+  systemctl:["enable","disable","start","stop","restart","reload","reload-or-restart","mask","unmask","daemon-reload","daemon-reexec","isolate","preset","set-property","kill","reset-failed"],
+  git:      ["add","commit","push","pull","fetch","merge","rebase","checkout","switch","reset","revert","stash","clean","am","cherry-pick","init","clone","remote","submodule","gc","repack","filter-branch","bisect","worktree"],
+};
+
 export function isReadOnlyCommand(command: string): boolean {
   const c = command.trim();
   if (c === "") return false;
-    if (/[;|&>$(]/.test(c)) return false; // compound / mutating pipeline
-  const first = c.split(/\s+/)[0];
-  return READ_ONLY_HEADS.has(first.toLowerCase()) || READ_ONLY_HEADS.has(first);
+  // Compound / redirect / backtick / subshell -> never read-only.
+  if (/[;|&>$(`]/.test(c)) return false;
+  const tokens = c.split(/\s+/);
+  const head1 = tokens[0].toLowerCase();
+  const head2 = tokens.length >= 2 ? head1 + " " + tokens[1].toLowerCase() : head1;
+  // Head must be a known read-only phrase (1 or 2 tokens).
+  if (!READ_ONLY_HEADS.has(head1) && !READ_ONLY_HEADS.has(head2)) return false;
+  // R7: reject if any subsequent token is a mutating subcommand/flag for this head.
+  const deny = MUTATING_SUBCOMMANDS[head1];
+  if (deny) {
+    for (let i = 1; i < tokens.length; i++) {
+      if (deny.includes(tokens[i].toLowerCase())) return false;
+    }
+  }
+  return true;
 }
 
 // Validate target host (IP/domain, no shell metachars) - R7.

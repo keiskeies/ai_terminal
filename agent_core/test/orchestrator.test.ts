@@ -166,12 +166,117 @@ describe('CheckConnectivityTool (check_connectivity)', () => {
 
 describe('pure helpers', () => {
   it('classifies read-only vs mutating commands', () => {
+    // Existing baseline cases
     expect(isReadOnlyCommand('ls -la /tmp')).toBe(true);
     expect(isReadOnlyCommand('cat /etc/hosts')).toBe(true);
     expect(isReadOnlyCommand('rm -rf /x')).toBe(false);
     expect(isReadOnlyCommand('apt update && apt install foo')).toBe(false);
     expect(isReadOnlyCommand('echo hi > out')).toBe(false);
   });
+
+  it('R7: mutating flags/subcommands on read-only heads force serial (never parallel)', () => {
+    // find with mutating flags
+    expect(isReadOnlyCommand('find / -delete')).toBe(false);
+    expect(isReadOnlyCommand('find / -exec rm {} \\;')).toBe(false);
+    expect(isReadOnlyCommand('find / -ok rm {} \\;')).toBe(false);
+    expect(isReadOnlyCommand('find / -execdir echo {}')).toBe(false);
+    // mount with mutating flags
+    expect(isReadOnlyCommand('mount -o remount /')).toBe(false);
+    expect(isReadOnlyCommand('mount -t ext4 /dev/sda1 /mnt')).toBe(false);
+    expect(isReadOnlyCommand('mount --bind /src /dst')).toBe(false);
+    expect(isReadOnlyCommand('mount -u /mnt')).toBe(false);
+    // docker mutating subcommands
+    expect(isReadOnlyCommand('docker rm c')).toBe(false);
+    expect(isReadOnlyCommand('docker stop c')).toBe(false);
+    expect(isReadOnlyCommand('docker kill c')).toBe(false);
+    expect(isReadOnlyCommand('docker exec c cmd')).toBe(false);
+    expect(isReadOnlyCommand('docker build -t img .')).toBe(false);
+    expect(isReadOnlyCommand('docker push img')).toBe(false);
+    // kubectl mutating subcommands
+    expect(isReadOnlyCommand('kubectl delete pod x')).toBe(false);
+    expect(isReadOnlyCommand('kubectl apply -f x.yaml')).toBe(false);
+    expect(isReadOnlyCommand('kubectl create ns x')).toBe(false);
+    expect(isReadOnlyCommand('kubectl scale --replicas=2 x')).toBe(false);
+    // systemctl mutating subcommands
+    expect(isReadOnlyCommand('systemctl stop ssh')).toBe(false);
+    expect(isReadOnlyCommand('systemctl enable ssh')).toBe(false);
+    expect(isReadOnlyCommand('systemctl restart ssh')).toBe(false);
+    expect(isReadOnlyCommand('systemctl mask ssh')).toBe(false);
+    // git mutating subcommands
+    expect(isReadOnlyCommand('git push origin main')).toBe(false);
+    expect(isReadOnlyCommand('git commit -m x')).toBe(false);
+    expect(isReadOnlyCommand('git checkout main')).toBe(false);
+    expect(isReadOnlyCommand('git reset --hard')).toBe(false);
+    expect(isReadOnlyCommand('git clean -f')).toBe(false);
+    expect(isReadOnlyCommand('git rebase main')).toBe(false);
+    expect(isReadOnlyCommand('git merge main')).toBe(false);
+    expect(isReadOnlyCommand('git stash')).toBe(false);
+  });
+
+  it('R7: read-only multi-subcommand heads are recognized as parallel-safe', () => {
+    // docker read-only subcommands
+    expect(isReadOnlyCommand('docker ps')).toBe(true);
+    expect(isReadOnlyCommand('docker images')).toBe(true);
+    expect(isReadOnlyCommand('docker logs c')).toBe(true);
+    expect(isReadOnlyCommand('docker inspect c')).toBe(true);
+    expect(isReadOnlyCommand('docker port c')).toBe(true);
+    expect(isReadOnlyCommand('docker top c')).toBe(true);
+    expect(isReadOnlyCommand('docker history c')).toBe(true);
+    // kubectl read-only subcommands
+    expect(isReadOnlyCommand('kubectl get pods')).toBe(true);
+    expect(isReadOnlyCommand('kubectl describe pod x')).toBe(true);
+    expect(isReadOnlyCommand('kubectl logs pod x')).toBe(true);
+    expect(isReadOnlyCommand('kubectl top pods')).toBe(true);
+    // systemctl read-only subcommands
+    expect(isReadOnlyCommand('systemctl status ssh')).toBe(true);
+    expect(isReadOnlyCommand('systemctl show ssh')).toBe(true);
+    expect(isReadOnlyCommand('systemctl is-active ssh')).toBe(true);
+    expect(isReadOnlyCommand('systemctl is-enabled ssh')).toBe(true);
+    // git read-only subcommands
+    expect(isReadOnlyCommand('git log')).toBe(true);
+    expect(isReadOnlyCommand('git status')).toBe(true);
+    expect(isReadOnlyCommand('git diff')).toBe(true);
+    expect(isReadOnlyCommand('git show')).toBe(true);
+    expect(isReadOnlyCommand('git branch')).toBe(true);
+    expect(isReadOnlyCommand('git tag')).toBe(true);
+    // ip / ss read-only
+    expect(isReadOnlyCommand('ip addr')).toBe(true);
+    expect(isReadOnlyCommand('ip route')).toBe(true);
+    expect(isReadOnlyCommand('ip link')).toBe(true);
+    expect(isReadOnlyCommand('ss -tlnp')).toBe(true);
+    // single-word read-only heads with non-mutating flags
+    expect(isReadOnlyCommand('ps -o user,cmd')).toBe(true);
+    expect(isReadOnlyCommand('top -b -n1')).toBe(true);
+    expect(isReadOnlyCommand('journalctl -u sshd --since 1h')).toBe(true);
+    expect(isReadOnlyCommand('ifconfig eth0')).toBe(true);
+    expect(isReadOnlyCommand('uname -a')).toBe(true);
+    expect(isReadOnlyCommand('df -h')).toBe(true);
+    expect(isReadOnlyCommand('du -sh /tmp')).toBe(true);
+    expect(isReadOnlyCommand('grep -r foo /etc')).toBe(true);
+    expect(isReadOnlyCommand('tail -n 20 /var/log/x')).toBe(true);
+    expect(isReadOnlyCommand('head -n 10 /var/log/x')).toBe(true);
+    expect(isReadOnlyCommand('stat /tmp')).toBe(true);
+    expect(isReadOnlyCommand('free -m')).toBe(true);
+    expect(isReadOnlyCommand('which curl')).toBe(true);
+    expect(isReadOnlyCommand('whoami')).toBe(true);
+    expect(isReadOnlyCommand('hostname')).toBe(true);
+    expect(isReadOnlyCommand('pwd')).toBe(true);
+    expect(isReadOnlyCommand('env')).toBe(true);
+    expect(isReadOnlyCommand('uptime')).toBe(true);
+    expect(isReadOnlyCommand('netstat -tlnp')).toBe(true);
+  });
+
+  it('R7: compound/redirect/backtick commands are never read-only', () => {
+    expect(isReadOnlyCommand('ls; rm -rf /')).toBe(false);
+    expect(isReadOnlyCommand('ls | rm')).toBe(false);
+    expect(isReadOnlyCommand('ls && rm -rf /')).toBe(false);
+    expect(isReadOnlyCommand('cat /etc/passwd > /tmp/x')).toBe(false);
+    expect(isReadOnlyCommand('echo $(rm -rf /)')).toBe(false);
+    expect(isReadOnlyCommand('echo `rm -rf /`')).toBe(false);
+    expect(isReadOnlyCommand('')).toBe(false);
+    expect(isReadOnlyCommand('   ')).toBe(false);
+  });
+
 
   it('validates target hosts strictly (R7)', () => {
     expect(isValidHost('10.0.0.1')).toBe(true);
