@@ -2,6 +2,8 @@
 // Phase 0: wire up stdio JSONL RPC server + rpc:ping handler.
 
 import {RpcServer} from "./rpc/server.js";
+import {runLocalCommand} from "./tools/builtin.js";
+import type {CommandExecutor} from "./react/engine.js";
 
 // ─── Re-exports for convenience ─────────────────────────────────
 export {parse} from "./react/index.js";
@@ -65,6 +67,35 @@ export async function makeLlmClient(mc: import("./rpc/schema.js").ModelConfig): 
  * Start the agent-core RPC server on stdio.
  * Blocks forever; parent communicates via JSONL lines on stdin/stdout.
  */
+/**
+ * Phase 2 live command executor: routes a raw shell command through the W4
+ * runLocalCommand runner (local_exec). Returns a CommandExecResult so the
+ * engine can emit a real result event (output/exitCode/durationMs).
+ */
+function buildLocalCommandExecutor(): CommandExecutor {
+  const defaultCwd = process.cwd();
+  const timeoutSec = 120;
+  return async (command, _ctx): Promise<import("./react/engine.js").CommandExecResult> => {
+    const {wrapCommand} = await import("./utils/shell_detect.js");
+    const marker = "EXITCODE_LOCAL";
+    const shell = process.platform === "win32" ? ("powershell" as const) : ("bash" as const);
+    const wrapped = wrapCommand(command, shell, marker);
+    const t0 = Date.now();
+    try {
+      const {stdout, stderr, exitCode} = await runLocalCommand(wrapped, defaultCwd, shell, timeoutSec);
+      const durationMs = Date.now() - t0;
+      if (exitCode === 0) {
+        return {stdout, stderr, exitCode, durationMs, success: true};
+      }
+      return {stdout, stderr, exitCode, durationMs, success: false, failureKind: "non_zero_exit"};
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      const timedOut = /timeout/i.test(msg);
+      return {stdout: "", stderr: msg, exitCode: -1, durationMs: Date.now() - t0, success: false, timedOut, failureKind: timedOut ? "timeout" : "exec_error"};
+    }
+  };
+}
+
 export function startServer(opts: {verbose?: boolean; llmFactory?: () => import("./llm/clients.js").LlmClient} = {}): RpcServer {
   const server = new RpcServer();
 
@@ -99,6 +130,11 @@ export function startServer(opts: {verbose?: boolean; llmFactory?: () => import(
     }, {
       checkpointStore: new CheckpointStore(),
       resumeFromCheckpoint: params.resumeFromCheckpoint === true,
+      // Phase 2: real command execution. The engine parses a raw shell command and
+      // dispatches it through this executor (W4 runLocalCommand, the same runner
+      // local_exec uses). Default cwd = process.cwd(); platform shell is auto-detected
+      // inside runLocalCommand via wrapCommand + the chosen shell (R6 branch).
+      commandExecutor: buildLocalCommandExecutor(),
     });
     activeEngine = engine;
     taskState.taskId = params.taskId;

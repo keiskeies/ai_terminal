@@ -26,12 +26,36 @@ export interface EngineOptions {
   checkpointStore?: CheckpointStore;
   /** W7: when true, load an existing inProgress checkpoint for the task and seed state. */
   resumeFromCheckpoint?: boolean;
+  /**
+   * Phase 2: real command executor. When present, a parsed command event is
+   * dispatched through this callback (mirroring Dart CommandExecutor.executeAndWait)
+   * and the result event carries the real output/exitCode/durationMs. When absent,
+   * the engine falls back to the Phase-0 stub result so non-wired callers keep working.
+   */
+  commandExecutor?: CommandExecutor;
 }
+
+/** Phase 2 command-executor result shape (1:1 fields the result event needs). */
+export interface CommandExecResult {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+  durationMs: number;
+  timedOut?: boolean;
+  failureKind?: string;
+  success: boolean;
+}
+/** Phase 2 command executor: run a raw shell command on the task host. */
+export type CommandExecutor = (
+  command: string,
+  ctx: {cancelled?: () => boolean; hostId?: string},
+) => Promise<CommandExecResult>
 
 export class ReActEngine {
   private readonly callbacks: EngineCallbacks;
   private readonly checkpointStore?: CheckpointStore;
   private readonly resumeFromCheckpoint?: boolean;
+  private readonly commandExecutor?: CommandExecutor;
   private currentGen = 0;
   private cancelled = false;
   private conversation: ChatMsg[] = [];
@@ -49,6 +73,7 @@ export class ReActEngine {
     this.callbacks = callbacks;
     this.checkpointStore = options?.checkpointStore;
     this.resumeFromCheckpoint = options?.resumeFromCheckpoint;
+    this.commandExecutor = options?.commandExecutor;
   }
 
   private makeGen(): TaskGeneration {
@@ -144,21 +169,34 @@ export class ReActEngine {
       // Check for a command event (tool call)
       const cmdEvt = events.find((e) => e.type === "command");
       if (cmdEvt) {
-        this.noCommandRetries = 0; // R5: reset on success
-        // Phase 2: dispatch to tool executor; Phase 0: stub
+        const cmd = cmdEvt.command ?? "";
+        // Phase 2: dispatch to the injected command executor; Phase 0: stub fallback.
+        let execRes: CommandExecResult;
+        if (this.commandExecutor) {
+          execRes = await this.commandExecutor(cmd, {cancelled: () => this.cancelled, hostId: task.hostId});
+          // R1: generation check after the await.
+          { const s = this.boundary(myGen); if (s !== null) return s; }
+        } else {
+          execRes = {stdout: "", stderr: "", exitCode: 0, durationMs: 0, success: true};
+        }
+        this.noCommandRetries = 0; // R5: reset on a real command execution
         const result: AgentEvent = {
-          id: stableId("result", cmdEvt.command ?? ""),
+          id: stableId("result", cmd),
           type: "result",
           timestamp: Date.now(),
           commandId: cmdEvt.commandId ?? cmdEvt.id,
-          success: true,
-          output: "[stub] command not yet wired (Phase 2)",
-          durationMs: 0,
+          command: cmdEvt.command,
+          success: execRes.success,
+          output: (execRes.stdout + (execRes.stderr ? "\n[stderr]\n" + execRes.stderr : "")).trimEnd() || "(no output)",
+          error: execRes.success ? undefined : ("command exited with code " + execRes.exitCode + (execRes.timedOut ? " (timed out)" : "")),
+          durationMs: execRes.durationMs,
+          exitCode: execRes.exitCode,
+          failureKind: execRes.failureKind,
         };
         this.callbacks.onEvent(result);
         this.conversation.push({
           role: "user",
-          content: "\u547d\u4ee4\u6267\u884c\u7ed3\u679c: " + (result.output ?? ""), // "命令执行结果: "
+          content: "\u547d\u4ee4\u6267\u884c\u7ed3\u679c: " + (result.output ?? "") + (result.error ? "\n[error] " + result.error : ""), // "命令执行结果: "
         });
       } else {
         // No command emitted - retry a few times
