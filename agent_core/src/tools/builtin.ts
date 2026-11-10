@@ -17,6 +17,30 @@ import {basename, dirname, relative, sep} from "path";
 import {LineDiff} from "../utils/line_diff.js";
 import {decodeEscapedText, decodeContent, writeLocalFile, patchLocalFile, TRASH_DIR_NAME} from "../utils/local_file_ops.js";
 
+// One glob->RegExp implementation, shared by local_dir_list and local_file_search.
+// Byte-faithful to Dart _globToRegExp (local_file_tools.dart:275 and :353, which are
+// identical): trim, skip blanks, escape, then star->.* and question->dot.
+//
+// Case polarity comes from Dart "caseSensitive: !Platform.isWindows": the pattern
+// matches case-INSENSITIVELY on Windows (NTFS lookups are case-insensitive) and
+// case-SENSITIVELY elsewhere. With the flag backwards, glob filters silently admit
+// names the user never asked for on Linux/macOS and refuse intended matches on
+// Windows - a filter that drops files only yields a shorter list, so nothing fails
+// loudly. Two copies used to exist: the dir-list one was case-sensitive on every OS
+// and the search one had the flag inverted, so the two tools disagreed about the
+// same glob. Keep exactly one implementation.
+function globToRegExp(glob: string): RegExp | null {
+  const trimmed = glob.trim();
+  if (trimmed === "") return null;
+  let re = trimmed
+    .replace(/[.+^$\{\}\(\)\|\[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*")
+    .replace(/\?/g, ".");
+  try { return new RegExp("^" + re + "$", process.platform === "win32" ? "i" : undefined); }
+  catch { return null; }
+}
+
+
 // ── enums (aligned with agent_core/schema/tool.schema.json + rpc/schema.ts) ──
 export enum ToolKind {
   read = "read",
@@ -248,20 +272,13 @@ export class LocalDirListTool extends AgentTool {
       required: ["path"],
     };
   }
-  private static globToRe(glob: string): RegExp | null {
-    let re = glob
-      .replace(/[.+^${}()|[\]\\]/g, "\\$&")
-      .replace(/\*/g, ".*")
-      .replace(/\?/g, ".");
-    try { return new RegExp("^" + re + "$"); } catch { return null; }
-  }
   async execute(args: ToolArgs, ctx: ToolContext): Promise<ToolResult> {
     const rawPath = args.getString("path");
     if (rawPath === "") return ToolResult.failure("missing required param: path");
     const depth = Math.min(3, args.getInt("depth", 1));
     const includeHidden = args.getBool("include_hidden", false);
     const glob = args.getStringList("glob", []);
-    const patterns = glob.map((g) => LocalDirListTool.globToRe(g)).filter((r): r is RegExp => r !== null);
+    const patterns = glob.map((g) => globToRegExp(g)).filter((r): r is RegExp => r !== null);
     if (!existsSync(rawPath)) return ToolResult.failure("directory not found: " + rawPath);
     const lines: string[] = [];
     const walk = (dir: string, d: number, indent: string) => {
@@ -487,17 +504,6 @@ export async function runLocalCommand(wrapped: string, cwd: string, shell: Shell
 // Pure Node fs; the Dart LocalFilePolicy allowlist/symlink/sensitive gating is a
 // desktop-security concern out of 1:1 scope here (host treated as trusted,
 // consistent with the already-ported local_file_read / local_dir_list).
-
-// Shared glob->RegExp helper (byte-faithful to Dart's _globToRegExp; case-
-// sensitivity mirrors "caseSensitive: !Platform.isWindows").
-function globToRegExp(glob: string): RegExp | null {
-  let re = glob
-    .replace(/[.+^$\{\}\(\)\|\[\]\\]/g, "\\$&")
-    .replace(/\*/g, ".*")
-    .replace(/\?/g, ".");
-  try { return new RegExp("^" + re + "$", process.platform === "win32" ? undefined : "i"); }
-  catch { return null; }
-}
 
 // Dart utf8Decode(List<int>): utf8.decode with a lossy fallback.
 function utf8decodeBytes(bytes: Buffer): string {
