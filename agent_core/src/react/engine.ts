@@ -9,7 +9,7 @@ import {parse} from "./parser.js";
 import {AgentEvent, AgentFinishState, ModelConfig, StartTaskParams} from "../rpc/schema.js";
 import {LlmClient, ChatMsg} from "../llm/clients.js";
 import {TaskGeneration} from "../utils/generation.js";
-import {stableId} from "../utils/stable_hash.js";
+import {genEventId} from "../utils/stable_hash.js";
 import {CheckpointStore} from "../utils/checkpoint_store.js";
 
 export interface EngineCallbacks {
@@ -107,8 +107,9 @@ export class ReActEngine {
         this.seenStableIds.clear();
         for (const id of cp.seenStableIds) this.seenStableIds.add(id);
         startStep = cp.step;
-        this.callbacks.onEvent({
-          id: stableId("info", "resumed " + task.taskId),
+        this.emit({
+          // R4: occurrence id (engine-emitted notice, not parser output)
+          id: genEventId(),
           type: "info",
           timestamp: Date.now(),
           text: "\u6062\u590d\u4efb\u52a1\u5230\u7b2c " + startStep + " \u6b65", // "恢复任务到第 N 步"
@@ -135,7 +136,7 @@ export class ReActEngine {
         response = result.text;
       } catch (e: any) {
         // R5: AI error -> failed, never completed
-        this.callbacks.onError?.(e.message ?? String(e));
+        this.reportError(e.message ?? String(e));
         this.emitFinish("failed", e.message ?? String(e));
         return "failed";
       }
@@ -149,7 +150,7 @@ export class ReActEngine {
       for (const evt of events) {
         if (this.seenStableIds.has(evt.id)) continue;
         this.seenStableIds.add(evt.id);
-        this.callbacks.onEvent(evt);
+        this.emit(evt);
       }
 
       // Append AI response to conversation history
@@ -181,7 +182,9 @@ export class ReActEngine {
         }
         this.noCommandRetries = 0; // R5: reset on a real command execution
         const result: AgentEvent = {
-          id: stableId("result", cmd),
+          // R4: occurrence id (Dart _genId), NOT a content hash — two runs of the
+          // same command are two separate results and must not share an id.
+          id: genEventId(),
           type: "result",
           timestamp: Date.now(),
           commandId: cmdEvt.commandId ?? cmdEvt.id,
@@ -193,7 +196,7 @@ export class ReActEngine {
           exitCode: execRes.exitCode,
           failureKind: execRes.failureKind,
         };
-        this.callbacks.onEvent(result);
+        this.emit(result);
         this.conversation.push({
           role: "user",
           content: "\u547d\u4ee4\u6267\u884c\u7ed3\u679c: " + (result.output ?? "") + (result.error ? "\n[error] " + result.error : ""), // "命令执行结果: "
@@ -228,6 +231,86 @@ export class ReActEngine {
     return "failed";
   }
 
+  // ---------------------------------------------------------------------------
+  // R1.3 / R5: consumer callbacks are external code and MUST NOT be able to
+  // abort the ReAct loop. onEvent / onFinished / onError are wired by the RPC
+  // layer straight onto a JSON-RPC transport (index.ts), so a single transport
+  // hiccup or a host-side bug used to propagate out of run().
+  //
+  // Two independent reasons that was a defect, not a design choice:
+  //   * R1.3 - "Every .then() on an async future MUST have an onError handler."
+  //     index.ts:144 starts the run and returns {ok:true} WITHOUT awaiting it,
+  //     so the escaping throw surfaced as an unhandled rejection. On Node >=15
+  //     the default --unhandled-rejections=strict kills the process: the child
+  //     agent dies mid-task and the parent only sees a closed pipe.
+  //   * R5 - "All terminal paths MUST behave consistently": emit() sat before
+  //     finishSideEffects(), so a throw in the event sink skipped the finish
+  //     event, skipped onFinished and left the task forever "running".
+  //
+  // Containment, not silence: R1.3 also forbids swallowing a caught error
+  // without logging it. The diagnostic therefore goes (a) to the host through
+  // the engine's own error channel and (b) to stderr, where the Dart parent
+  // already reads our stderr, each behind its own guard so a second throwing
+  // sink cannot undo the first. The stack is kept for the log line but never
+  // sent over the wire as a message.
+  private emit(evt: AgentEvent): void {
+    try {
+      this.callbacks.onEvent(evt);
+    } catch (e: unknown) {
+      this.reportCallbackFailure("onEvent", evt.type, e);
+    }
+  }
+
+  private reportFinished(state: AgentFinishState, summary?: string): void {
+    try {
+      this.callbacks.onFinished(state, summary);
+    } catch (e: unknown) {
+      this.reportCallbackFailure("onFinished", state, e);
+    }
+  }
+
+  private reportError(msg: string): void {
+    const cb = this.callbacks.onError;
+    if (!cb) return; // optional callback, unchanged behaviour when absent
+    try {
+      cb(msg);
+    } catch (e: unknown) {
+      this.reportCallbackFailure("onError", "", e);
+    }
+  }
+
+  /**
+   * Re-entrancy latch for the error channel. Without it: onError throws ->
+   * reportCallbackFailure -> reportError -> onError throws -> ... until the stack
+   * overflows (RangeError), which is exactly the crash the containment was meant
+   * to prevent. A failing error channel degrades to stderr-only reporting.
+   */
+  private reportingCallbackFailure = false;
+
+  /** Log a callback failure without ever letting the logger itself throw. */
+  private reportCallbackFailure(which: string, context: string, e: unknown): void {
+    const detail = describeThrowable(e);
+    const line =
+      "[agent-core] callback " + which + " threw for " + (context || "-") + ": " + detail;
+    // Host notification, unless the host error channel IS the thing failing -
+    // then re-notifying would recurse (see reportingCallbackFailure) and we
+    // degrade to the stderr copy below instead. The failure is still reported.
+    if (!this.reportingCallbackFailure) {
+      this.reportingCallbackFailure = true;
+      try {
+        this.reportError(line);
+      } finally {
+        this.reportingCallbackFailure = false;
+      }
+    }
+    try {
+      process.stderr.write(line + "\n");
+    } catch {
+      // stderr itself failing (closed pipe) is unrecoverable and unreportable;
+      // there is no third channel left, so drop the log rather than throw.
+    }
+  }
+
   /**
    * W7: clear the inProgress checkpoint ONLY when the task is genuinely finished.
    * - "success" / "cancelled": terminal, nothing to resume -> delete the checkpoint.
@@ -243,19 +326,21 @@ export class ReActEngine {
     ) {
       this.checkpointStore.delete(this.lastTaskId);
     }
-    this.callbacks.onFinished(state, summary);
+    this.reportFinished(state, summary);
   }
 
   /** Emit a finish event to the parent + run the W7 side effects (checkpoint delete + onFinished). */
   private emitFinish(state: AgentFinishState, summary?: string): void {
     const evt: AgentEvent = {
-      id: stableId("finish", state + (summary ?? "")),
+      // R4: occurrence id — a task can finish once per run, but the same
+      // state+summary text across runs is still a new fact (Dart _genId).
+      id: genEventId(),
       type: "finish",
       timestamp: Date.now(),
       finishState: state,
       summary: summary ?? "",
     };
-    this.callbacks.onEvent(evt);
+    this.emit(evt);
     this.finishSideEffects(state, summary);
   }
   /**
@@ -284,5 +369,22 @@ export class ReActEngine {
   /** R5: whitelist terminal states that should record side effects. */
   static isSideEffectState(s: AgentFinishState): boolean {
     return s === "success";
+  }
+}
+
+/**
+ * R1.1 - describe any throwable, including the non-Error ones a JS consumer is
+ * free to throw ("throw 'boom'", "throw undefined"), without the describer ever
+ * throwing itself (circular refs, BigInt, exotic objects). Mirrors the same fix
+ * in rpc/server.ts: a failure with no diagnostic is worse than a crash.
+ */
+function describeThrowable(e: unknown): string {
+  if (e instanceof Error) return e.stack ?? (e.name + ": " + e.message);
+  if (typeof e === "string") return "non-Error thrown (string): " + e;
+  try {
+    const j = JSON.stringify(e);
+    return "non-Error thrown: " + (j === undefined ? String(e) : j);
+  } catch {
+    return "non-Error thrown (unserializable " + typeof e + ")";
   }
 }

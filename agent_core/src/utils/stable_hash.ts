@@ -39,3 +39,29 @@ export function stableId(typeName: string, content: string): string {
 export function stableHashOf(input: string): string {
   return "evt_" + fnv1a64DartCompat(input).toString(16);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dart AgentEvent._genId() (models/agent_event.dart:218-220):
+//   static String _genId() =>
+//       'evt_${DateTime.now().millisecondsSinceEpoch}_${_counter++}';
+//   static int _counter = 0;
+//
+// R4: this is the *other* half of the id space, and confusing the two is a real
+// bug. A content hash ("evt_" + fnv1a64) is a STABLE id: it must be reproducible
+// because dedup keys on it, so it belongs to parser-produced events (thought /
+// text / command / ask / plan) whose identity IS their content. Events that
+// report an OCCURRENCE (result / finish / info) are distinct facts even when
+// their content repeats - re-running `make build` twice produces two results the
+// UI must render as two cards. Minting those from a content hash makes the second
+// one collide with the first (identical id), which downstream dedup / card keys
+// silently collapse into one. Dart therefore uses this sequence id for them.
+//
+// Byte-faithful to Dart: decimal epoch millis, then a process-wide counter that
+// starts at 0.
+// ─────────────────────────────────────────────────────────────────────────────
+let genIdCounter = 0;
+
+/** Occurrence-id for an engine-emitted event (Dart AgentEvent._genId parity). */
+export function genEventId(): string {
+  return "evt_" + Date.now().toString() + "_" + (genIdCounter++).toString();
+}

@@ -35,7 +35,11 @@ export class RpcServer {
         const result = await handler(req.params ?? {}, (n: JsonRpcNotification) => t.notify(n), t);
         t.respond(req.id, result ?? {ok: true});
       } catch (e: unknown) {
-        const err = e as Error;
+        // R1.1/R5: a caught error must still carry its diagnostic. A non-Error
+        // throwable (string / null / plain object thrown by a handler) used to hit
+        // `e as Error` and land as {ok:false, error:undefined} + an err:uncaught
+        // with message:undefined - a failure with no diagnostic at all.
+        const err = e instanceof Error ? e : new Error(toThrowableText(e));
         t.respond(req.id, {ok: false, error: err.message, stack: err.stack});
         // Also emit uncaught for crash reporting
         t.notify({jsonrpc: "2.0", method: "err:uncaught", params: {message: err.message, stack: err.stack, taskId: undefined}});
@@ -48,4 +52,17 @@ export class RpcServer {
     this.transport.notify({jsonrpc: "2.0", method, params});
   }
 
+}
+
+
+/** Describe a non-Error throwable without ever throwing from the describer itself. */
+function toThrowableText(e: unknown): string {
+  if (typeof e === "string") return "non-Error thrown (string): " + e;
+  try {
+    const j = JSON.stringify(e);
+    return "non-Error thrown: " + (j === undefined ? String(e) : j);
+  } catch {
+    // circular / BigInt / exotic -> type name only, never a second throw
+    return "non-Error thrown (unserializable " + typeof e + ")";
+  }
 }

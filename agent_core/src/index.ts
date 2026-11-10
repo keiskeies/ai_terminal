@@ -11,7 +11,7 @@ export {fnv1a64DartCompat, stableId} from "./utils/stable_hash.js";
 export {TailTextBuffer} from "./utils/tail_buffer.js";
 export {TaskGeneration, StaleTaskError} from "./utils/generation.js";
 export {PendingRegistry} from "./utils/pending_registry.js";
-export {detectShell, wrapCommand} from "./utils/shell_detect.js";
+export {detectShell, wrapCommand, extractExitMarker} from "./utils/shell_detect.js";
 export {spawnLocalPty, resolvePtyShell, buildPtyEnv, buildPtyConfig} from "./pty/index.js";
 export type {PtySession, PtyOptions, PtyConfig, PtyShellResolution, ShellKind, ExistCheck} from "./pty/index.js";
 export {StreamAccumulator} from "./llm/stream.js";

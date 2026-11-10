@@ -366,11 +366,11 @@ agent_core/test/regression/
 |---|---|---|
 | `r1_generation_check.test.ts` | 已落地 | 真 `ReActEngine` + 可门控 `chatStream`：park 中 cancel → `cancelled` 且仅一次 finish；二次 `run()` 抢占 → `interrupted` 且不发 finish |
 | `r1_stream_cancel.test.ts` | 已落地 | `PendingRegistry.resolveAll` 一次唤醒全部等待者；`close()` 拒收后续请求；`CompleterLike` 先到的 settle 生效 |
-| `r1_then_onerror.test.ts` | 待补 | R1.3：handler 抛错必须让调用方 promise 变 rejected，不得悬挂（`RpcServer` 现同时发 `err:uncaught`） |
+| `r1_then_onerror.test.ts` | 已落地 | R1.3 两段：(A) RPC handler 抛任意非 Error 值（string/undefined/null/number/boolean/对象/数组/函数/循环引用/含 BigInt）→ 响应 `error` 必须是非空字符串且与 `err:uncaught.message` 一致，描述器自身不得二次抛错（循环 + 恶意 `toJSON`）；(B) 消费方回调（`onEvent`/`onFinished`/`onError`）抛错被包住：`run()` 不 reject、终态与 finish 事件不丢、失败经 `onError` + stderr 双通道记出，且 onError 自身抛错时有再入闸门不死循环 |
 | `r2_lifecycle.test.ts` | 已落地 | 走 RPC host（`startServer` + `handlers`）：自然结束 → 通知早于状态复位；cancel 顺序 `resp:startTask → notify:taskState:cancelled → resp:cancelTask`；重复 cancel 仅一次 flush |
 | `r3_multi_host.test.ts` | 已落地 | 运行中切 tab：命令派发仍用启动时捕获的 hostId，不读 `activeHostId` |
-| `r4_stable_id.test.ts` | 待补 | R4：按 stableId 去重（现散落在 `reverse_rpc` / engine 断言中） |
-| `r5_terminal_whitelist.test.ts` | 待补 | R5：`isSideEffectState(s) === (s === "success")` 白名单（现散落在 checkpoint_store / w5_e2e / terminal_state_matrix） |
+| `r4_stable_id.test.ts` | 已落地 | R4：锁死 id 空间的两半 —— 内容哈希 `stableId(type,content)`（parser 产出的 thought/text/command/ask 与 parser 的 finish，可跨实例复现，去重闸门只认它）与 Dart `_genId` 的出现序 id `genEventId()`（result / 引擎 emitFinish / 恢复 info）；两条命令各自链接自己的 commandId（含 dispatcher 四类失败与无上下文 → undefined）；`rev-<base36>` 反向 RPC id 单调；20 万条确定性语料对照 `h*31+b`(int32) 有碰撞而 63 位摘要 0 碰撞 |
+| `r5_terminal_whitelist.test.ts` | 已落地 | R5：`isSideEffectState(s) === (s === "success")` 白名单 + `finishSideEffects` 只在 `success/cancelled` 删 checkpoint；5 种终态 × 是否发 finish / 是否调 onFinished / no-command 计数复位 全矩阵；源码级 lint 锁住白名单形状（黑名单写法直接失败） |
 | `r6_shell_fork.test.ts` | 已落地 | 三分支字节形态 + POSIX 单行/多行两形态 + 跨分支语法不串味 + marker 扫描语义（首命中 / 跨 chunk carry / 正则元字符转义） |
 | `r9_stream_e2e.test.ts` | 已落地 | 历史 3 条 bug 形态 + 新用例（迁移初期即有） |
 
@@ -391,6 +391,36 @@ agent_core/test/regression/
 - `runLocalCommand` 解析 marker 得到真实退出码并把 marker 行从 stdout 剥掉；marker 缺失（命令提前 `exit`、shell 语法错、spawn 失败）才回落到 close code。
 
 **沙箱限制（写进注释防止被当成 flaky 修掉）**：本机 PowerShell 被策略禁止执行原生 exe（`Cannot run a document in the middle of a pipeline`），`node`/`cmd`/`ipconfig` 都取不到，因此 e2e 非零码用「失败 cmdlet → 1」这个与宿主无关的 fixture；bash 经 `-c` 传参在本 CI 宿主上被改写（`false; echo "MK:$?"` 打出 `MK:0`，脚本文件退 127），故 bash 只在单元层锁字节形态，不做 bash 运行时断言。
+
+#### 6.3.2 落地过程中修掉的真实缺陷：非 Error 抛射被吞成「无诊断的失败」
+
+**症状**：`RpcServer` 的 catch 里写的是 `const err = e as Error`；`ReActEngine` 的三个消费方回调（`onEvent`/`onFinished`/`onError`）完全没有保护。
+
+**后果**：
+
+- JS 侧 `throw "boom"` / `throw undefined` 都能发生（reject、第三方工具、被截断的 promise 值）。`e as Error` 之后 `err.message === undefined`，响应体变成 `{ok:false, error:undefined}` —— 而 `JSON.stringify` 会**直接丢掉值为 undefined 的键**，父端只收到 `{ok:false}`；伴随的 `err:uncaught` 通知同样是 `message:undefined`。失败发生得彻彻底底，诊断一点都没有。Dart 里任何 throwable 都有 `toString()`，不存在这一类静默失败，属于移植时新造的缺陷。
+- 回调抛错会**逃出 `run()`**：`index.ts` 启动 run 后不 await（`activeRun` 只在关停路径上被 `.catch` 过），所以它是一次 unhandled rejection —— Node ≥15 默认 `--unhandled-rejections=strict` 直接**杀死子进程**；即使不死，抛出点排在 `finishSideEffects()` 之前，finish 事件与 `onFinished` 双双丢失，任务永远停在 running（正是 R5 禁止的「终态路径分叉」）。
+
+**修法**：
+
+- `rpc/server.ts`：`e instanceof Error ? e : new Error(toThrowableText(e))`；`toThrowableText` 自身绝不抛（string 特判 → `JSON.stringify` 兜底 → 循环 / BigInt 退化为 `non-Error thrown (unserializable <typeof>)`），保证「一次失败只报一次」。
+- `react/engine.ts`：`emit()` / `reportFinished()` / `reportError()` 三个包装包住全部回调调用；失败**必须记出**（R1.3 后半句禁止裸吞）——同时走宿主 `onError` 通道与 stderr（Dart 父端本来就读我们的 stderr），`process.stderr.write` 自己也被 try 包住（管道已关时无处可报）。
+- 再入闸门 `reportingCallbackFailure`：若失败的就是 `onError` 本身，再通知一次会 `onError → reportCallbackFailure → reportError → onError` 无限递归直至 `RangeError` —— 这个坑是修完之后写回归测试时才暴露的，属于「守卫自己变成崩溃源」。降级为只写 stderr。
+
+**为什么不是「吞掉异常」**：R1.3 同时禁止「catch 后不重抛、不记录、不转成失败终态」。这里三件都做了：任务照样落到正确终态（不改变状态机）、宿主与 stderr 各留一条含回调名 / 事件类型 / 原始 throwable 描述的记录、`error` 字段与 `err:uncaught` 一律是非空字符串。
+
+#### 6.3.3 落地过程中修掉的真实缺陷：result 事件被当成「身份」而非「一次发生」
+
+**症状**：Node 侧曾给 result 事件打 `stableId("result", toolName + "|" + status)`，finish / 恢复 info 同理按内容哈希。
+
+**后果**：键里既没有命令也没有参数，于是**同一个工具每次成功调用都得到同一个 id**（例如所有成功的 `fetch_url` 都是 `evt_60057aab507b55b7`）。任何以 `event.id` 为键的 UI 卡片、去重表或落库逻辑都会把两次执行折叠成一条 —— 这与 R4 警告的「所有 result 共用一个 `_lastCommandEventId`」是同一类错配，只是一个错在链接、一个错在身份。
+
+**依据（Dart 源）**：`models/agent_event.dart:218-220` 的 `_genId() => 'evt_${毫秒}_${_counter++}'`；`:164-183` 的 `AgentEvent.result(...)` **根本不接受 id 参数**，一律 `_genId()`。thought/command/ask/finish/text/info/report/plan 才是 `id = id ?? _genId()` —— 解析器传入稳定哈希，引擎自发的落回序 id。`agent_engine.dart` 里 8 处 `AgentEvent.finish(` 与 25 处 `AgentEvent.info(` 都不传 id，即为序 id。
+
+**修法与边界**：新增 `genEventId()`（`evt_<epochMs>_<counter>`）替换 result / 引擎 `emitFinish` / 恢复 info 三处；解析器产出（含 AI 说出 `动作: finish` 时由解析器生成的 finish，其 id 是 `stableId("finish", 回答正文)`）**继续**用内容哈希。R4 第一条「按 stableId 去重」不受影响：引擎的 `seenStableIds` 闸门只作用在解析器事件上，出现型事件从不进这个闸门（否则第二次 `make build` 的 result 会被静默吞掉）。
+
+> 副作用检查：全仓测试只用 `evt_4ab5285dc89fef7b` / `evt_e3d57f8a36595f0` / `evt_1a983973eaa2b606` 这类**解析器**事件哈希做字节比对（`e2e/byte_comparison_10`、`fixtures/stable_id_1000.jsonl`），没有任何测试钉住 result/finish/info 的 id —— 因此 §10.3 不变式 2 已按此收窄，否则那条比对永远不可能为真。
+
 
 ---
 
@@ -477,7 +507,7 @@ ai_terminal/lib/agent_bridge/
 ### 10.3 关键不变式（必须持续为真）
 
 1. **stableId 一致性**：Dart 与 Node 的 `stable_hash` 输出在 10 万样本上 100% 一致（CI 强制）
-2. **事件序列一致性**：同一任务输入，Dart 与 Node 产生的 `AgentEvent` 序列（类型 + stableId + 顺序）100% 一致
+2. **事件序列一致性**：同一任务输入，Dart 与 Node 产生的 `AgentEvent` 序列（类型 + id + 顺序）100% 一致 —— 可比对的 id 限**解析器产出的内容哈希**（thought/text/command/ask 及解析器的 finish）；result、引擎 `emitFinish`、恢复 info 是「一次发生」，Dart 走 `_genId()` 的毫秒 + 计数器，本身不可复现，只锁形状 `evt_<ms>_<n>` 与「两次发生必得两个 id」（见 §6.3.3）
 3. **终态白名单**：4 种终态 × 5 种触发路径 = 20 个测试矩阵全绿
 4. **callback 清除顺序**：flush → null callbacks → cancelTask → reset reducer，4 条路径 100% 符合
 5. **多主机隔离**：`activeHostId` 永不出现在 task 生命周期内的任何 RPC 参数里

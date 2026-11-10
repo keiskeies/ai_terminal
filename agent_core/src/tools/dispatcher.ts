@@ -2,22 +2,23 @@
 
 // A ToolDispatcher looks up a tool by name in an AgentToolRegistry, parses its
 // arguments through the R9 typed ToolArgs layer, executes the tool with a
-// ToolContext, and maps the ToolResult back onto a stableId-derived `result`
+// ToolContext, and maps the ToolResult back onto an occurrence-id `result`
 // AgentEvent. The engine / reverse-RPC bridge call this; it is transport-agnostic
 // so the same dispatch path serves both the local ReAct loop and remote tools.
 
 // Design notes (AGENTS.md):
 //   R9  args come in as ReAct free-text and are read ONLY through ToolArgs
 //       typed accessors - never raw args["key"] + ad-hoc coercion.
-//   R4  the result event id is stableId("result", ...) so downstream dedup
-//       (which keys on stableId, not the sequence finalId) stays correct.
+//   R4  a result event carries an OCCURRENCE id (genEventId) plus commandId
+//       linking it to its own command; the content-hash stableId belongs to
+//       parser-produced events only (see utils/stable_hash.ts).
 //   R1  ctx.cancelled is honoured at entry (short-circuit to a cancelled
 //       result); the caller additionally guards the await with its own generation.
 
 import {AgentTool, AgentToolRegistry, ToolContext, ToolResult} from "./builtin.js";
 import {ToolArgs} from "./tool_args.js";
 import {AgentEvent} from "../rpc/schema.js";
-import {stableId} from "../utils/stable_hash.js";
+import {genEventId} from "../utils/stable_hash.js";
 
 export interface DispatchRequest {
   /** Tool name as the model emitted it (e.g. "fetch_url"). */
@@ -28,6 +29,13 @@ export interface DispatchRequest {
   hostId?: string;
   /** Session type; drives tool scope + the local-exec default shell. */
   isLocalSession?: boolean;
+  /**
+   * R4: id of the `command` event that produced this call. Threaded onto the
+   * result event so each result links to its OWN command - the historical Dart
+   * bug used one shared `_lastCommandEventId`, which mis-linked every result
+   * card to the last command once more than one command existed.
+   */
+  commandId?: string;
   /** Opts carried to the tool (executor / cancelled / hostIds / isLocalSession). */
   ctx?: Partial<ToolContext>;
 }
@@ -55,12 +63,12 @@ export class ToolDispatcher {
 
     // R1: honour cancellation before any side effect.
     if (ctx.cancelled?.()) {
-      return {executed:false, event: this.resultEvent({toolName:req.toolName, hostId:req.hostId, success:false, error:"cancelled", failureKind:"cancelled"})};
+      return {executed:false, event: this.resultEvent({toolName:req.toolName, hostId:req.hostId, success:false, error:"cancelled", failureKind:"cancelled", commandId:req.commandId})};
     }
 
     const tool: AgentTool | undefined = this.registry.get(req.toolName);
     if (!tool) {
-      return {executed:false, event: this.resultEvent({toolName:req.toolName, hostId:req.hostId, success:false, error:"unknown tool: " + req.toolName, failureKind:"unknown_tool"})};
+      return {executed:false, event: this.resultEvent({toolName:req.toolName, hostId:req.hostId, success:false, error:"unknown tool: " + req.toolName, failureKind:"unknown_tool", commandId:req.commandId})};
     }
 
     // R9: parse free-text args once, through the typed layer. Empty input is valid
@@ -72,7 +80,7 @@ export class ToolDispatcher {
     } else {
       const parsed = ToolArgs.parse(raw);
       if (parsed === null) {
-        return {executed:false, event: this.resultEvent({toolName:req.toolName, hostId:req.hostId, success:false, error:"malformed args block", failureKind:"bad_args", output:raw})};
+        return {executed:false, event: this.resultEvent({toolName:req.toolName, hostId:req.hostId, success:false, error:"malformed args block", failureKind:"bad_args", output:raw, commandId:req.commandId})};
       }
       args = parsed;
     }
@@ -96,16 +104,25 @@ export class ToolDispatcher {
       success: res.success, output: res.output, error: res.error,
       durationMs, diffAdditions: res.diffAdditions, diffDeletions: res.diffDeletions,
       hostResults: res.hostResults, failureKind: cancelledMid ? "cancelled" : undefined,
+      commandId: req.commandId,
     });
     return {executed: true, event};
   }
 
-  private resultEvent(o: {toolName?:string; hostId?:string; success:boolean; output?:string; error?:string; failureKind?:string; durationMs?:number; diffAdditions?:number; diffDeletions?:number; hostResults?: Record<string, unknown>;}): AgentEvent {
-    const statusKey = o.success ? "ok" : (o.error ?? "fail");
-    const id = stableId("result", (o.toolName ?? "") + "|" + statusKey);
+  private resultEvent(o: {toolName?:string; hostId?:string; success:boolean; output?:string; error?:string; failureKind?:string; durationMs?:number; diffAdditions?:number; diffDeletions?:number; hostResults?: Record<string, unknown>; commandId?:string;}): AgentEvent {
+    // R4: result events are OCCURRENCES, not parser output, so their id comes from
+    // Dart's _genId sequence (see utils/stable_hash.ts). The previous
+    // stableId("result", tool + "|" + status) hashed only the tool name and the
+    // status, so every successful call of a tool produced the SAME id - a second
+    // fetch_url / a repeated command collided with the first and a dedup or card
+    // key keyed on the id collapsed two distinct results into one. The link back to
+    // the originating command is commandId, never the id.
+    const id = genEventId();
     return {
       id, type: "result", timestamp: Date.now(),
-      toolName: o.toolName, hostId: o.hostId, commandId: undefined,
+      // R4: link to the originating command event (undefined only when the caller
+      // dispatched without a command context, e.g. a direct tool call from W5 tests).
+      toolName: o.toolName, hostId: o.hostId, commandId: o.commandId,
       success: o.success, output: o.output, error: o.error,
       failureKind: o.failureKind, durationMs: o.durationMs,
       diffAdditions: o.diffAdditions, diffDeletions: o.diffDeletions, hostResults: o.hostResults as AgentEvent["hostResults"],
