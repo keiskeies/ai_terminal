@@ -42,6 +42,20 @@ export {
   PathSafetyResult,
   requireConfirm,
 } from "./utils/safety_guard.js";
+export {
+  AgentGoal,
+  AGENT_GOAL_STATUSES,
+  GoalDecision,
+  GOAL_ACTIONS,
+  GOAL_DONE_MARKER,
+  decideGoalContinuation,
+  goalMarkedDone,
+  isGoalMarkerOnlyCommand,
+  shouldScheduleGoalRound,
+  shouldKickGoalRound,
+  buildGoalContinuationPrompt,
+} from "./utils/goal_continuation.js";
+export type {AgentGoalStatus, GoalAction} from "./utils/goal_continuation.js";
 
 // ─── Task state (Phase 0 minimal) ───────────────────────────────
 interface TaskState {

@@ -55,4 +55,21 @@ export {
   type SafetyRule,
 } from "./safety_guard.js";
 
+export {
+  AgentGoal,
+  AGENT_GOAL_STATUSES,
+  GoalDecision,
+  GOAL_ACTIONS,
+  GOAL_DONE_MARKER,
+  GOAL_MARKER_STRIP_PATTERN,
+  decideGoalContinuation,
+  goalMarkedDone,
+  isGoalMarkerOnlyCommand,
+  shouldScheduleGoalRound,
+  shouldKickGoalRound,
+  buildGoalContinuationPrompt,
+  type AgentGoalStatus,
+  type GoalAction,
+} from "./goal_continuation.js";
+
 export type {ProcessHandle, SupervisorConfig} from "./process_supervisor.js";
