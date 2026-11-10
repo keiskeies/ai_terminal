@@ -5,6 +5,7 @@
 #include <shlobj.h>
 #include <string>
 #include <fstream>
+#include <filesystem>
 
 #pragma comment(lib, "Crypt32.lib")
 
@@ -83,7 +84,7 @@ std::vector<uint8_t> GetOrCreateMasterKey() {
   auto key_path = GetKeyFilePath();
 
   // 1. 尝试读取已存在的密钥文件
-  std::ifstream file(key_path, std::ios::binary);
+  std::ifstream file(std::filesystem::path(key_path), std::ios::binary);
   if (file) {
     std::vector<uint8_t> encrypted(
         (std::istreambuf_iterator<char>(file)),
@@ -105,7 +106,7 @@ std::vector<uint8_t> GetOrCreateMasterKey() {
   // 3. DPAPI 加密后写入文件
   auto protected_key = ProtectData(key.data(), key.size());
   if (!protected_key.empty()) {
-    std::ofstream out(key_path, std::ios::binary);
+    std::ofstream out(std::filesystem::path(key_path), std::ios::binary);
     if (out) {
       out.write(reinterpret_cast<const char*>(protected_key.data()),
                 protected_key.size());

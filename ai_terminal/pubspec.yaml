@@ -115,7 +115,8 @@ flutter_launcher_icons:
 # 使用 SQLite3MultipleCiphers (sqlite3mc) 替代普通 SQLite
 # sqlite3mc 兼容 SQLCipher 加密格式，支持全库加密（PRAGMA key）
 # 同时兼容明文 DB（不执行 PRAGMA key 即为普通 SQLite 操作）
-# 预编译库通过 hooks 自动从 GitHub releases 下载
+# 预编译库通过 hooks 自动从 GitHub releases 下载（Linux/macOS/Windows 都有，
+# Windows 侧拿到的是 sqlite3mc.x64.windows.dll，无需从源码编译）
 hooks:
   user_defines:
     sqlite3:

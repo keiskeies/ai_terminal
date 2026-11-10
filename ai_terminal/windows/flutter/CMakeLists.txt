@@ -89,6 +89,15 @@ add_dependencies(flutter_wrapper_app flutter_assemble)
 # flutter tool.
 set(PHONY_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/_phony_")
 set_source_files_properties("${PHONY_OUTPUT}" PROPERTIES SYMBOLIC TRUE)
+# 交叉构建（tools/windows-cross/）：Windows 模板硬编码了 tool_backend.bat，
+# 在非 Windows 主机上既没有可执行权限，批处理语法也跑不起来。Flutter 同目录
+# 提供等价的 POSIX 版 tool_backend.sh —— 两者最终都执行同一个
+# tool_backend.dart，所以按宿主平台选脚本即可，构建行为一致。
+if(CMAKE_HOST_WIN32)
+  set(FLUTTER_TOOL_BACKEND "${FLUTTER_ROOT}/packages/flutter_tools/bin/tool_backend.bat")
+else()
+  set(FLUTTER_TOOL_BACKEND "${FLUTTER_ROOT}/packages/flutter_tools/bin/tool_backend.sh")
+endif()
 add_custom_command(
   OUTPUT ${FLUTTER_LIBRARY} ${FLUTTER_LIBRARY_HEADERS}
     ${CPP_WRAPPER_SOURCES_CORE} ${CPP_WRAPPER_SOURCES_PLUGIN}
@@ -96,7 +105,7 @@ add_custom_command(
     ${PHONY_OUTPUT}
   COMMAND ${CMAKE_COMMAND} -E env
     ${FLUTTER_TOOL_ENVIRONMENT}
-    "${FLUTTER_ROOT}/packages/flutter_tools/bin/tool_backend.bat"
+    "${FLUTTER_TOOL_BACKEND}"
       ${FLUTTER_TARGET_PLATFORM} $<CONFIG>
   VERBATIM
 )

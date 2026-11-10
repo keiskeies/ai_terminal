@@ -22,6 +22,15 @@ add_executable(${BINARY_NAME} WIN32
 apply_standard_settings(${BINARY_NAME})
 
 # Add preprocessor definitions for the build version.
+# MinGW 交叉构建用 windres，它的 cpp 调用会丢一层引号 → Runner.rc 里改走
+# 数值宏拼接路径（见 Runner.rc 的 AI_TERMINAL_RC_STRINGIFY 分支）。
+if(MINGW)
+  target_compile_definitions(${BINARY_NAME} PRIVATE "AI_TERMINAL_RC_STRINGIFY=1")
+  # Flutter 的 runner 入口是 wWinMain；mingw 的 -mwindows 默认入口
+  # WinMainCRTStartup 只找 WinMain → undefined reference to `WinMain`。
+  # -municode 让它改用 wWinMainCRTStartup，与 MSVC 行为一致。
+  target_link_options(${BINARY_NAME} PRIVATE -municode)
+endif()
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION=\"${FLUTTER_VERSION}\"")
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_MAJOR=${FLUTTER_VERSION_MAJOR}")
 target_compile_definitions(${BINARY_NAME} PRIVATE "FLUTTER_VERSION_MINOR=${FLUTTER_VERSION_MINOR}")
