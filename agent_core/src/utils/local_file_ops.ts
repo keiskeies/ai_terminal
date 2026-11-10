@@ -2,10 +2,12 @@
 // Shared local-file primitives used by the local_* write/patch tools and the
 // audit/record service. Backup + escape semantics live in exactly ONE place so
 // the write path and the patch path cannot drift (AGENTS.md R8-3 "double-clean").
-//
-// Node note: the Dart LocalFilePolicy allowlist is a desktop-security concern tied
-// to the app's Settings UI; the agent_core Node port treats the host as trusted
-// (consistent with the already-ported builtin.ts local_file_read / local_dir_list)
+// Node note: policy gating lives at the TOOL layer - tools/builtin.ts calls
+// resolveLocalPath -> LocalFilePolicy.decide() before touching these helpers, which is
+// where Dart gates it too (LocalFileTool._resolve). The primitives here stay un-gated on
+// purpose: platform.ts and the restore paths feed them already-decided, post-realpath
+// paths, and a second gate in here would be a double check (AGENTS.md R8-3 "clean once,
+// at one layer"). Callers that obtain a path from the AI must gate it themselves.
 // and does NOT gate I/O on an allowlist. The I/O primitives are ported verbatim.
 
 import {

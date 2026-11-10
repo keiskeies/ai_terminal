@@ -24,7 +24,8 @@
 // blacklist half of the policy now has a real caller: the checkPath orphan is
 // closed, so a sensitive path handed to a policy object is refused before the
 // allowlist roots are ever consulted.
-import {readFileSync} from "node:fs";
+import {mkdtempSync, readFileSync, rmSync} from "node:fs";
+import {tmpdir} from "node:os";
 import {createHash} from "node:crypto";
 import {dirname, join} from "node:path";
 import {fileURLToPath} from "node:url";
@@ -67,7 +68,7 @@ const dartLines = DART.split(NL);
 const DART_POLICY_SHA = "a3057e0f61de";
 const DART_TOOLS_SHA = "4d5a9567e302";
 const DART_EXEC_SHA = "c061acd3286c";
-const POLICY_SHA = "94dc4862f4bd";
+const POLICY_SHA = "9467321e55dd";
 
 const dartLineOf = (needle: string): number => {
   const hits: number[] = [];
@@ -309,5 +310,57 @@ describe("the blacklist gate is wired, not merely defined", () => {
       expect(new LocalPathDecision(verdict, "/x").isAllowed).toBe(false);
     }
     expect(new LocalPathDecision(LocalPathVerdict.allowed, "/x").isAllowed).toBe(true);
+  });
+});
+
+
+// trustedHost is a Node-only seam (Dart has no such flag). It exists so the tool layer can
+// keep a working default posture without a Settings UI while STILL running the blacklist and
+// the reserved-trash gates first. These cases pin exactly that boundary: wide-open allowlist,
+// never a wide-open blacklist.
+describe("trustedHost widens the allowlist but never the blacklist", () => {
+  it("implies the master switch: an ordinary path is allowed with zero roots", () => {
+    const p = new LocalFilePolicy({trustedHost: true});
+    expect(p.decide("/tmp/x.txt").verdict).toBe(LocalPathVerdict.allowed);
+    expect(p.trustedHost).toBe(true);
+    expect(p.enabled).toBe(false); // the flag stands on its own; enabled stays as given
+  });
+
+  it("the blacklist still outranks it: ssh keys, .env and /etc stay sensitive", () => {
+    const p = new LocalFilePolicy({trustedHost: true});
+    const home = process.env.USERPROFILE ?? process.env.HOME ?? "/home/u";
+    const ssh = p.decide(home + "/.ssh/id_rsa");
+    expect(ssh.verdict).toBe(LocalPathVerdict.sensitive);
+    expect(ssh.reason).toContain("id_rsa");
+    expect(p.decide("/srv/app/.env").verdict).toBe(LocalPathVerdict.sensitive);
+    expect(p.decide("/etc/passwd").verdict).toBe(LocalPathVerdict.sensitive);
+  });
+
+  it("the trash directory stays reserved under trustedHost too", () => {
+    const p = new LocalFilePolicy({trustedHost: true});
+    const d = p.decide("/home/me/proj/.ai_terminal_trash/e1");
+    expect(d.verdict).toBe(LocalPathVerdict.reserved);
+  });
+
+  it("a strict policy is unaffected: trustedHost defaults to false everywhere", () => {
+    // a real temp root so the within-check compares like-for-like on every platform
+    const root = mkdtempSync(join(tmpdir(), "ac_lfp_strict_"));
+    try {
+      const strict = new LocalFilePolicy({enabled: true, allowedDirs: [root]});
+      expect(strict.trustedHost).toBe(false);
+      const inside = join(root, "a.txt");
+      expect(strict.decide(inside).verdict).toBe(LocalPathVerdict.allowed);
+      expect(strict.decide(join(root, "..", "w.txt")).verdict).toBe(LocalPathVerdict.notInAllowlist);
+      // deny-all default posture must be untouched by this feature
+      expect(new LocalFilePolicy({}).decide("/tmp/x.txt").reason).toContain("本地文件访问未开启");
+    } finally { rmSync(root, {recursive: true, force: true}); }
+  });
+
+  it("trustedHost survives toMap/fromMap and copyWith", () => {
+    const p = new LocalFilePolicy({trustedHost: true});
+    expect(LocalFilePolicy.fromMap(p.toMap()).trustedHost).toBe(true);
+    expect(p.copyWith({maxReadBytes: 10}).trustedHost).toBe(true);
+    expect(p.copyWith({trustedHost: false}).trustedHost).toBe(false);
+    expect(LocalFilePolicy.fromMap({enabled: true}).trustedHost).toBe(false);
   });
 });

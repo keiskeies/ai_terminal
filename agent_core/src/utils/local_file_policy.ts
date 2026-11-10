@@ -54,6 +54,8 @@ export interface LocalFilePolicyOptions {
   enabled?: boolean;
   allowedDirs?: string[];
   maxReadBytes?: number;
+  // Node-only: see the disclose comment on the field below.
+  trustedHost?: boolean;
 }
 
 // A settings reader stands in for Dart SettingsDao.getCached. Returning
@@ -73,11 +75,21 @@ export class LocalFilePolicy {
   readonly enabled: boolean;
   readonly allowedDirs: string[];
   readonly maxReadBytes: number;
+  // Node-only divergence, disclosed rather than silently invented. Dart has no
+  // trustedHost flag: on the desktop the allowlist is what the user turns on via the
+  // settings page, and an empty allowlist means deny-all. agent_core historically
+  // treated the host as trusted and did no path gating at all, so a Node embedder
+  // that wants that posture turns trustedHost on: the allowlist step is skipped, but
+  // the reserved-trash check and the checkPath blacklist still run FIRST, so a
+  // sensitive path (ssh key, .env, a system directory) is refused under every mode.
+  // trustedHost widens the allowlist only, never the blacklist.
+  readonly trustedHost: boolean;
 
   constructor(opts: LocalFilePolicyOptions = {}) {
     this.enabled = opts.enabled ?? false;
     this.allowedDirs = opts.allowedDirs ?? [];
     this.maxReadBytes = opts.maxReadBytes ?? DEFAULT_MAX_READ_BYTES;
+    this.trustedHost = opts.trustedHost ?? false;
   }
 
   static load(reader?: LocalFileSettingsReader): LocalFilePolicy {
@@ -99,6 +111,7 @@ export class LocalFilePolicy {
       enabled: this.enabled,
       allowedDirs: this.allowedDirs,
       maxReadBytes: this.maxReadBytes,
+      trustedHost: this.trustedHost,
     };
   }
 
@@ -110,6 +123,7 @@ export class LocalFilePolicy {
       enabled: map.enabled === true,
       allowedDirs: dirs,
       maxReadBytes: typeof map.maxReadBytes === "number" ? map.maxReadBytes : DEFAULT_MAX_READ_BYTES,
+      trustedHost: map.trustedHost === true,
     });
   }
 
@@ -118,6 +132,7 @@ export class LocalFilePolicy {
       enabled: opts.enabled ?? this.enabled,
       allowedDirs: opts.allowedDirs ?? this.allowedDirs,
       maxReadBytes: opts.maxReadBytes ?? this.maxReadBytes,
+      trustedHost: opts.trustedHost ?? this.trustedHost,
     });
   }
 
@@ -125,7 +140,10 @@ export class LocalFilePolicy {
     if (rawPath.trim().length === 0) {
       return new LocalPathDecision(LocalPathVerdict.notInAllowlist, "", "路径为空");
     }
-    if (!this.enabled) {
+    // trustedHost implies the master switch is on: an embedder that turns it on
+    // has chosen the trusted posture, so the not-enabled refusal must not fire.
+    // It only skips the allowlist roots further down, never the blacklist.
+    if (!this.enabled && !this.trustedHost) {
       return new LocalPathDecision(
         LocalPathVerdict.notInAllowlist, rawPath,
         "本地文件访问未开启。请在 设置 → Agent → 本地文件 中添加允许访问的目录。",
@@ -149,6 +167,14 @@ export class LocalFilePolicy {
     if (safety.level === "blocked") {
       return new LocalPathDecision(
         LocalPathVerdict.sensitive, lexical, safety.reason ?? "敏感路径");
+    }
+
+    // trustedHost (Node-only) skips the allowlist step but is reached only after
+    // trash-reserved and the checkPath blacklist above, so sensitive paths never
+    // arrive here. This is the honest shape of the historical "host trusted" posture:
+    // every path is authorised except the ones the blacklist refuses.
+    if (this.trustedHost) {
+      return new LocalPathDecision(LocalPathVerdict.allowed, lexical);
     }
 
     // 2. allowlist roots (Dart 153-175)

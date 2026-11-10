@@ -16,6 +16,8 @@ import {ShellType, wrapCommand, extractExitMarker} from "../utils/shell_detect.j
 import {basename, dirname, relative, sep} from "path";
 import {LineDiff} from "../utils/line_diff.js";
 import {decodeEscapedText, decodeContent, writeLocalFile, patchLocalFile, TRASH_DIR_NAME} from "../utils/local_file_ops.js";
+import {LocalFilePolicy, LocalPathDecision, LocalPathVerdict} from "../utils/local_file_policy.js";
+import {looksLikePosixRemotePath} from "../utils/local_file_ops.js";
 
 // One glob->RegExp implementation, shared by local_dir_list and local_file_search.
 // Byte-faithful to Dart _globToRegExp (local_file_tools.dart:275 and :353, which are
@@ -29,6 +31,63 @@ import {decodeEscapedText, decodeContent, writeLocalFile, patchLocalFile, TRASH_
 // loudly. Two copies used to exist: the dir-list one was case-sensitive on every OS
 // and the search one had the flag inverted, so the two tools disagreed about the
 // same glob. Keep exactly one implementation.
+// ---- LocalFilePolicy wiring (Dart LocalFileTool._resolve, 1:1) ----
+//
+// Dart gates every local_* tool through LocalFileTool._resolve (local_file_tools.dart:29-46):
+// it calls policy.decide(), and on !isAllowed returns a failure whose first line is a
+// per-verdict Chinese prefix, then the reason and a fixed hint pointing the user at the
+// settings page. The decision.resolved path (already symlink-collapsed by decide) replaces
+// the AI-supplied raw path for every later IO - itself a hardening, since it is the
+// post-realpath target rather than the string the model typed.
+
+// Node-only seam, disclosed not invented. Dart re-reads the policy from SettingsDao on each
+// call; agent_core is headless, so a provider is injectable. The default is a trustedHost
+// policy: it keeps the historical "host trusted" posture (no allowlist prompt for ordinary
+// paths) while still running the reserved-trash and checkPath blacklist gates FIRST, so a
+// sensitive path is refused regardless of embedder. A caller wanting Dart desktop semantics
+// injects a deny-all policy with an explicit allowlist.
+export type LocalFilePolicyProvider = () => LocalFilePolicy;
+const TRUSTED_HOST = (): LocalFilePolicy => new LocalFilePolicy({trustedHost: true});
+let defaultPolicyProvider: LocalFilePolicyProvider = TRUSTED_HOST;
+export function setDefaultLocalFilePolicy(provider: LocalFilePolicyProvider): void {
+  defaultPolicyProvider = provider;
+}
+export function resetDefaultLocalFilePolicy(): void { defaultPolicyProvider = TRUSTED_HOST; }
+export function defaultLocalFilePolicy(): LocalFilePolicy { return defaultPolicyProvider(); }
+
+// verdict -> refusal prefix, byte-faithful to the Dart switch at local_file_tools.dart:32-38.
+// The allowed arm is unreachable here (decide already admitted that path) but Dart spells it
+// out, so the total mapping is kept rather than a partial one.
+const REFUSE_PREFIX: Record<string, string> = {
+  [LocalPathVerdict.sensitive]: "敏感路径禁止访问",
+  [LocalPathVerdict.reserved]: "系统保留目录",
+  [LocalPathVerdict.notInAllowlist]: "路径未获授权",
+  [LocalPathVerdict.escape]: "路径跳出授权目录",
+  [LocalPathVerdict.allowed]: "路径不可用",
+};
+
+// Dart _remotePathHint (local_file_tools.dart:52-57): fires only on notInAllowlist + Windows
+// + a POSIX-looking path. For a sensitive/reserved refusal the hint is withheld on purpose -
+// there it would nudge the AI around a denial that is correct.
+function remotePathHint(rawPath: string, verdict: string): string {
+  if (verdict !== LocalPathVerdict.notInAllowlist) return "";
+  if (process.platform !== "win32" || !looksLikePosixRemotePath(rawPath)) return "";
+  return "\n注意: 这看起来是远程主机的路径，而 local_* 工具只改这台电脑。要改服务器文件请用 file_write / file_patch / sftp_upload。";
+}
+
+// Dart _resolve: a LocalPathDecision on success, or a ready-to-return failure ToolResult.
+function resolveLocalPath(rawPath: string, policy: LocalFilePolicy): LocalPathDecision | ToolResult {
+  const decision = policy.decide(rawPath);
+  if (!decision.isAllowed) {
+    const prefix = REFUSE_PREFIX[decision.verdict];
+    return ToolResult.failure(
+      prefix + ": " + rawPath + "\n原因: " + (decision.reason ?? "未通过白名单判定") + "\n" + "若确需访问，请让用户在 设置 → Agent → 本地文件 中添加该目录。"
+      + remotePathHint(rawPath, decision.verdict),
+    );
+  }
+  return decision;
+}
+
 function globToRegExp(glob: string): RegExp | null {
   const trimmed = glob.trim();
   if (trimmed === "") return null;
@@ -235,12 +294,16 @@ export class LocalFileReadTool extends AgentTool {
     if (rawPath === "") {
       return ToolResult.failure("missing required param: path");
     }
+    const policy = defaultLocalFilePolicy();
+    const resolved = resolveLocalPath(rawPath, policy);
+    if (resolved instanceof ToolResult) return resolved;
+    const fp = resolved.resolved;
     const startLine = args.getInt("start_line", 1);
     const maxLines = args.getInt("max_lines", 400);
-    if (!existsSync(rawPath)) return ToolResult.failure("file not found: " + rawPath);
-    const st = statSync(rawPath);
+    if (!existsSync(fp)) return ToolResult.failure("file not found: " + rawPath);
+    const st = statSync(fp);
     if (st.isDirectory()) return ToolResult.failure("path is a directory, use local_dir_list: " + rawPath);
-    const text = readFileSync(rawPath, "utf-8");
+    const text = readFileSync(fp, "utf-8");
     const lines = text.split("\n");
     const start = Math.max(1, startLine);
     const end = Math.min(lines.length, start + maxLines - 1);
@@ -501,9 +564,13 @@ export async function runLocalCommand(wrapped: string, cwd: string, shell: Shell
 
 
 // \u2500\u2500 W4 local-file write/patch/move/delete tools (Dart local_file_tools.dart) \u2500\u2500
-// Pure Node fs; the Dart LocalFilePolicy allowlist/symlink/sensitive gating is a
-// desktop-security concern out of 1:1 scope here (host treated as trusted,
-// consistent with the already-ported local_file_read / local_dir_list).
+// Each of the six local_* tools below routes its path through resolveLocalPath ->
+// LocalFilePolicy.decide() (the Dart LocalFileTool._resolve gate): the reserved-trash
+// and checkPath blacklist run first, and every later fs call uses decision.resolved -
+// the post-realpath target, not the string the model typed. The default provider is a
+// trustedHost policy (wide allowlist, because a headless host has no Settings page);
+// embedders that want Dart desktop semantics inject a strict allowlist via
+// setDefaultLocalFilePolicy.
 
 // Dart utf8Decode(List<int>): utf8.decode with a lossy fallback.
 function utf8decodeBytes(bytes: Buffer): string {
@@ -537,8 +604,12 @@ export class LocalFileSearchTool extends AgentTool {
     const query = args.getString("query");
     if (rawPath === "") return ToolResult.failure("missing required param: path");
     if (query === "") return ToolResult.failure("\u53C2\u6570\u7F3A\u5931: query \u5FC5\u586B");
-    if (!existsSync(rawPath)) return ToolResult.failure("\u8DEF\u5F84\u4E0D\u5B58\u5728: " + rawPath);
-    const rootIsFile = statSync(rawPath).isFile();
+    const policy = defaultLocalFilePolicy();
+    const resolved = resolveLocalPath(rawPath, policy);
+    if (resolved instanceof ToolResult) return resolved;
+    const fp = resolved.resolved;
+    if (!existsSync(fp)) return ToolResult.failure("\u8DEF\u5F84\u4E0D\u5B58\u5728: " + rawPath);
+    const rootIsFile = statSync(fp).isFile();
     const ignoreCase = args.getBool("ignore_case", false);
     const maxMatches = Math.max(1, Math.min(1000, args.getInt("max_matches", 100)));
     const needle = ignoreCase ? query.toLowerCase() : query;
@@ -547,7 +618,7 @@ export class LocalFileSearchTool extends AgentTool {
     const files: string[] = [];
     let walkCapped = false;
     if (rootIsFile) {
-      files.push(rawPath);
+      files.push(fp);
     } else {
       const collect = (dir: string): void => {
         let ents: string[];
@@ -569,7 +640,7 @@ export class LocalFileSearchTool extends AgentTool {
           }
         }
       };
-      collect(rawPath);
+      collect(fp);
     }
     const hits: string[] = [];
     for (const f of files) {
@@ -627,6 +698,10 @@ export class LocalFileWriteTool extends AgentTool {
     if (mode !== "write" && mode !== "append") {
       return ToolResult.failure("\u672A\u77E5 mode: " + mode + "\uFF08\u652F\u6301 write/append\uFF09");
     }
+    const policy = defaultLocalFilePolicy();
+    const resolved = resolveLocalPath(rawPath, policy);
+    if (resolved instanceof ToolResult) return resolved;
+    const fp = resolved.resolved;
     const content = decodeContent(decodeEscapedText(args.getString("content")), args.getString("content_b64"));
     if (content.error !== undefined) return ToolResult.failure(content.error);
     if (content.bytes.length === 0 && mode === "write" && !args.containsKey("content") && !args.containsKey("content_b64")) {
@@ -635,7 +710,7 @@ export class LocalFileWriteTool extends AgentTool {
     if (content.bytes.length > LocalFileWriteTool._maxChunkBytes) {
       return ToolResult.failure("\u5355\u5757\u5185\u5BB9 " + content.bytes.length + " \u5B57\u8282\uFF0C\u8D85\u8FC7 " + LocalFileWriteTool._maxChunkBytes + "B \u4E0A\u9650\u3002\n\u8BF7\u5206\u5757\uFF1A\u7B2C\u4E00\u6B21 mode=write \u5199\u524D 8KB\uFF0C\u4E4B\u540E\u7528 mode=append \u7EED\u5199\u3002");
     }
-    const outcome = writeLocalFile({path: rawPath, bytes: content.bytes, append: mode === "append", backup: args.getBool("backup", true)});
+    const outcome = writeLocalFile({path: fp, bytes: content.bytes, append: mode === "append", backup: args.getBool("backup", true)});
     if (!outcome.success) return ToolResult.failure(outcome.error ?? "\u5199\u5165\u5931\u8D25");
     const backupLine = outcome.backupPath !== undefined ? "\n\u539F\u6587\u4EF6\u5DF2\u5907\u4EFD: " + outcome.backupPath : "";
     return ToolResult.success("\u672C\u673A\u6587\u4EF6" + (mode === "append" ? "\u8FFD\u52A0" : "\u5199\u5165") + "\u6210\u529F: " + rawPath + "\uFF08" + outcome.bytesWritten + " \u5B57\u8282\uFF09" + backupLine, {
@@ -667,6 +742,10 @@ export class LocalFilePatchTool extends AgentTool {
   async execute(args: ToolArgs, ctx: ToolContext): Promise<ToolResult> {
     const rawPath = args.getString("path");
     if (rawPath === "") return ToolResult.failure("missing required param: path");
+    const policy = defaultLocalFilePolicy();
+    const resolved = resolveLocalPath(rawPath, policy);
+    if (resolved instanceof ToolResult) return resolved;
+    const fp = resolved.resolved;
     const oldPlain = decodeEscapedText(args.getString("old"));
     const newPlain = decodeEscapedText(args.getString("new"));
     const oldB64 = args.getString("old_b64");
@@ -679,7 +758,7 @@ export class LocalFilePatchTool extends AgentTool {
       return ToolResult.failure("\u53C2\u6570\u7F3A\u5931: old \u6216 old_b64 \u5FC5\u987B\u63D0\u4F9B");
     }
     const outcome = patchLocalFile({
-      path: rawPath,
+      path: fp,
       oldText: utf8decodeBytes(oldDecoded.bytes),
       newText: utf8decodeBytes(newDecoded.bytes),
       backup: args.getBool("backup", true),
@@ -717,29 +796,36 @@ export class LocalFileMoveTool extends AgentTool {
     const srcPath = args.getString("path");
     const dstPath = args.getString("dst");
     if (srcPath === "" || dstPath === "") return ToolResult.failure("missing required param: path/dst");
-    if (!existsSync(srcPath)) return ToolResult.failure("\u6E90\u4E0D\u5B58\u5728: " + srcPath);
-    const isDir = statSync(srcPath).isDirectory();
-    const dstExists = existsSync(dstPath);
+    const policy = defaultLocalFilePolicy();
+    const srcRes = resolveLocalPath(srcPath, policy);
+    if (srcRes instanceof ToolResult) return srcRes;
+    const srcFp = srcRes.resolved;
+    const dstRes = resolveLocalPath(dstPath, policy);
+    if (dstRes instanceof ToolResult) return dstRes;
+    const dstFp = dstRes.resolved;
+    if (!existsSync(srcFp)) return ToolResult.failure("\u6E90\u4E0D\u5B58\u5728: " + srcPath);
+    const isDir = statSync(srcFp).isDirectory();
+    const dstExists = existsSync(dstFp);
     if (dstExists && !args.getBool("overwrite", false)) {
       return ToolResult.failure("\u76EE\u6807\u5DF2\u5B58\u5728: " + dstPath + "\n\u786E\u8BA4\u8981\u8986\u76D6\u8BF7\u4F20 overwrite: true\u3002");
     }
     if (dstExists) {
-      try { rmSync(dstPath, {recursive: true, force: true}); }
+      try { rmSync(dstFp, {recursive: true, force: true}); }
       catch (e: unknown) {
         return ToolResult.failure("\u65E0\u6CD5\u6E05\u7406\u76EE\u6807: " + (e instanceof Error ? e.message : String(e)));
       }
     }
-    const dstParent = dirname(dstPath);
+    const dstParent = dirname(dstFp);
     if (dstParent !== "" && dstParent !== ".") mkdirSync(dstParent, {recursive: true});
     try {
-      renameSync(srcPath, dstPath);
+      renameSync(srcFp, dstFp);
       return ToolResult.success("\u672C\u673A\u79FB\u52A8\u6210\u529F: " + srcPath + " -> " + dstPath, {restoreFrom: dstPath, restoreTo: srcPath});
     } catch (e: unknown) {
       // rename across devices fails; fall back to copy + delete
       const m1 = e instanceof Error ? e.message : String(e);
       try {
-        if (isDir) { cpSync(srcPath, dstPath, {recursive: true}); rmSync(srcPath, {recursive: true, force: true}); }
-        else { copyFileSync(srcPath, dstPath); rmSync(srcPath, {force: true}); }
+        if (isDir) { cpSync(srcFp, dstFp, {recursive: true}); rmSync(srcFp, {recursive: true, force: true}); }
+        else { copyFileSync(srcFp, dstFp); rmSync(srcFp, {force: true}); }
         return ToolResult.success("\u672C\u673A\u79FB\u52A8\u6210\u529F\uFF08\u8DE8\u76D8\uFF0C\u5DF2\u7528\u590D\u5236+\u5220\u9664\uFF09: " + srcPath + " -> " + dstPath, {restoreFrom: dstPath, restoreTo: srcPath});
       } catch (e2: unknown) {
         const m2 = e2 instanceof Error ? e2.message : String(e2);
@@ -769,29 +855,33 @@ export class LocalFileDeleteTool extends AgentTool {
   async execute(args: ToolArgs, ctx: ToolContext): Promise<ToolResult> {
     const rawPath = args.getString("path");
     if (rawPath === "") return ToolResult.failure("missing required param: path");
-    if (!existsSync(rawPath)) return ToolResult.failure("\u8DEF\u5F84\u4E0D\u5B58\u5728: " + rawPath);
-    const isDir = statSync(rawPath).isDirectory();
+    const policy = defaultLocalFilePolicy();
+    const resolved = resolveLocalPath(rawPath, policy);
+    if (resolved instanceof ToolResult) return resolved;
+    const fp = resolved.resolved;
+    if (!existsSync(fp)) return ToolResult.failure("\u8DEF\u5F84\u4E0D\u5B58\u5728: " + rawPath);
+    const isDir = statSync(fp).isDirectory();
     const recursive = args.getBool("recursive", false);
     if (isDir && !recursive) {
       return ToolResult.failure(rawPath + " \u662F\u76EE\u5F55\u3002\u786E\u8BA4\u8981\u8FDE\u5185\u5BB9\u4E00\u8D77\u5220\u9664\u8BF7\u4F20 recursive: true\u3002");
     }
     if (args.getBool("hard", false)) {
       try {
-        rmSync(rawPath, {recursive: true, force: true});
+        rmSync(fp, {recursive: true, force: true});
         return ToolResult.success("\u5DF2\u6C38\u4E45\u5220\u9664: " + rawPath);
       } catch (e: unknown) {
         return ToolResult.failure("\u5220\u9664\u5931\u8D25: " + (e instanceof Error ? e.message : String(e)));
       }
     }
     // move into trash: keep relative structure so restore can put it back.
-    const parent = dirname(rawPath);
-    const base = basename(rawPath);
+    const parent = dirname(fp);
+    const base = basename(fp);
     const stamp = Date.now();
     const trashRoot = parent + sep + TRASH_DIR_NAME;
     const target = trashRoot + sep + stamp + sep + base;
     try {
       mkdirSync(trashRoot + sep + stamp, {recursive: true});
-      renameSync(rawPath, target);
+      renameSync(fp, target);
     } catch (e: unknown) {
       return ToolResult.failure("\u79FB\u5165\u56DE\u6536\u533A\u5931\u8D25: " + (e instanceof Error ? e.message : String(e)) + "\n\u786E\u8BA4\u8981\u8DF3\u8FC7\u56DE\u6536\u533A\u76F4\u63A5\u5220\u9664\u65F6\uFF0C\u8BF7\u8BA9\u7528\u6237\u540C\u610F\u540E\u7528 hard: true \u91CD\u8BD5\u3002");
     }
