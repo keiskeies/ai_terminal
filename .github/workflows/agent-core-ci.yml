@@ -46,6 +46,7 @@ jobs:
 
       - name: Verify stableId fixture (1000 cases)
         run: npm run test:fixture
+        working-directory: agent_core
 
       - name: Schema compatibility check (D7)
         run: npm run check:schema
