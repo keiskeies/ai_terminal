@@ -58,8 +58,23 @@ bool looksLikeError(String line) {
 }
 
 /// 粘贴内容是否多行（多行等于批量执行，粘贴前必须确认）
-bool isMultiLine(String text) =>
-    text.contains('\n') || text.contains('\r') || text.contains('\u2028');
+///
+/// 末尾的**一个**换行符不算多行：从终端复制一条命令几乎总是连回车一起
+/// 拷过来（选区天然含尾部 \n），判成多行就等于对最常见的单条命令粘贴
+/// 也弹一次确认框。真正危险的「一次落进多条命令」要求去掉尾换行之后
+/// 仍有行分隔符。
+bool isMultiLine(String text) {
+  var body = text;
+  if (body.endsWith('\r\n')) {
+    body = body.substring(0, body.length - 2);
+  } else if (body.endsWith('\n') || body.endsWith('\r') ||
+      body.endsWith('\u2028')) {
+    body = body.substring(0, body.length - 1);
+  }
+  return body.contains('\n') ||
+      body.contains('\r') ||
+      body.contains('\u2028');
+}
 
 /// 去掉提示符前缀后，是否像一条可执行命令（单行、首 token 不含空格）
 bool looksLikeCommand(String text) {

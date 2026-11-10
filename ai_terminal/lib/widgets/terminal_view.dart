@@ -174,6 +174,46 @@ class _TerminalViewState extends State<TerminalView> {
       return KeyEventResult.handled;
     }
 
+    // Windows 控制台惯例键位（Windows Terminal / cmd / PowerShell 都是这样）：
+    //   Ctrl+Insert   = 复制选中
+    //   Shift+Insert  = 粘贴（Shift 无修饰语义 → 不进多行确认；终端粘贴
+    //                    惯例是一次全发，逐行执行靠 Ctrl+V 的确认路径）
+    //   Ctrl+A        = 行首（readline/bash）
+    // 必须拦截：默认走 xterm 的 shortcutManager 时 Ctrl+A 被绑成 SelectAll
+    // （xterm shortcuts.dart），Linux 上 SSH 进 shell 就丢了这个键；Insert
+    // 两个键任何一张快捷键表里都没有，character 为空，一路掉到 keyInput。
+    if (event.logicalKey == LogicalKeyboardKey.insert) {
+      final routing =
+          resolveInsertRouting(ctrl: hw.isControlPressed, shift: hw.isShiftPressed);
+      if (routing == InsertRouting.none) {
+        // 裸 Insert：不吞键，交回 xterm（vi 插入模式等）
+        return KeyEventResult.ignored;
+      }
+      final terminal = widget.terminal;
+      if (terminal != null) {
+        if (routing == InsertRouting.copySelection) {
+          _copySelection(terminal);
+        } else {
+          _pasteFromClipboard(skipConfirm: true);
+        }
+      }
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.keyA && hw.isControlPressed) {
+      // Ctrl+A = readline 行首（bash/zsh）与 tmux 前缀，三平台都要留给 shell：
+      // 非 mac 上 xterm 把它绑成了 SelectAll（_defaultShortcuts），必须抢回来；
+      // mac 上苹果那张表只绑 ⌘A，Ctrl+A 本来就没人管，显式发 \x01 也和
+      // 系统 Terminal.app 的行为一致（全选走 ⌘A，不受影响）。
+      // 不用 keyInput(TerminalKey.keyA, ctrl: true)：xterm 的 keyInput
+      // 是纯编码，不查 OSKeyState，Ctrl 修饰的字母查不到映射会丢按键；
+      // 字节 \x01 与 keytab 里 C-a 完全等价（shell 的 readline 认的也是字节）。
+      final byte = resolveCtrlAByte(ctrl: true);
+      if (byte != null) {
+        widget.terminal?.textInput(byte);
+        return KeyEventResult.handled;
+      }
+    }
+
     final terminal = widget.terminal;
     if (terminal == null) {
       return KeyEventResult.ignored;
@@ -319,28 +359,31 @@ class _TerminalViewState extends State<TerminalView> {
     }
 
     // —— 编辑 ——
+    // 快捷键文案按平台取：mac 上 xterm 绑的是 ⌘ 系列，写 Ctrl 等于骗用户
+    final isMac = Platform.isMacOS;
     if (text != null && text.trim().isNotEmpty) {
       items.add(TerminalMenuItem(
         label: UiText.t('复制', 'Copy'),
         icon: Icons.copy_rounded,
-        shortcut: 'Ctrl+Shift+C',
+        shortcut: terminalShortcutLabel(TerminalMenuAction.copy, isMac: isMac),
         onTap: () {
-          Clipboard.setData(ClipboardData(text: text));
-          _controller.clearSelection();
+          // 走同一入口：右键菜单的 selectedText 与选区必然一致（菜单仅在有选区时显示此项）
+          _copySelection(terminal);
         },
       ));
     } else {
       items.add(TerminalMenuItem(
         label: UiText.t('全选', 'Select all'),
         icon: Icons.select_all_rounded,
-        shortcut: 'Ctrl+A',
+        shortcut:
+            terminalShortcutLabel(TerminalMenuAction.selectAll, isMac: isMac),
         onTap: _selectAll,
       ));
     }
     items.add(TerminalMenuItem(
       label: UiText.t('粘贴', 'Paste'),
       icon: Icons.paste_rounded,
-      shortcut: 'Ctrl+V',
+      shortcut: terminalShortcutLabel(TerminalMenuAction.paste, isMac: isMac),
       onTap: _pasteFromClipboard,
     ));
 
@@ -493,14 +536,48 @@ class _TerminalViewState extends State<TerminalView> {
     );
   }
 
-  Future<void> _pasteFromClipboard() async {
+  Future<void> _pasteFromClipboard({bool skipConfirm = false}) async {
     final data = await Clipboard.getData('text/plain');
-    final text = data?.text;
-    if (text == null || text.isEmpty) return;
-    // 多行粘贴等于批量执行：先给用户看一眼再落进去
-    if (isMultiLine(text) && !await _confirmMultiLinePaste(text)) return;
+    final text = data?.text ?? '';
+    // Shift+Insert / 中键（skipConfirm）例外：终端粘贴惯例是一次全发，
+    // 逐行执行的保护留给走多行确认的 Ctrl/Cmd+V 路径。
+    var route = routePaste(text, skipConfirm: skipConfirm, confirmed: false);
+    if (route.confirmNeeded) {
+      route = routePaste(text,
+          skipConfirm: skipConfirm,
+          confirmed: await _confirmMultiLinePaste(text));
+    }
+    final pasted = route.pasted;
+    if (pasted == null) return;
     if (!mounted) return;
-    widget.terminal?.paste(text);
+    widget.terminal?.paste(pasted);
+  }
+
+
+  /// 复制选区到系统剪贴板，并弹「已复制」提示。
+  /// 右键菜单的「复制」项走同一入口，避免两处各拼一遍。
+  void _copySelection(xterm.Terminal terminal) {
+    final sel = _controller.selection;
+    if (sel == null) {
+      _showToast('没有选中的内容');
+      return;
+    }
+    final text = terminal.buffer.getText(sel);
+    Clipboard.setData(ClipboardData(text: text));
+    _controller.clearSelection();
+    _showToast('已复制 ${text.length} 字符');
+  }
+
+  /// 轻提示：复用全局顶部 toast，不弹 AlertDialog、不遮挡终端
+  void _showToast(String message) {
+    showTopSnackBar(
+      context,
+      SnackBar(
+        content: Text(message, style: TextStyle(fontSize: fSmall)),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 1),
+      ),
+    );
   }
 
   Future<bool> _confirmMultiLinePaste(String text) async {
@@ -726,6 +803,12 @@ class _TerminalViewState extends State<TerminalView> {
           if (renderBox is RenderBox) {
             _showContextMenu(renderBox.localToGlobal(event.position));
           }
+        } else if (isMiddleClick(event.buttons) && !Platform.isMacOS) {
+          // 中键粘贴（X11 惯例，Windows Terminal 也支持）。与 Shift+Insert
+          // 同口径：单发全量、不做多行确认。
+          // mac 上不启用：系统 Terminal.app / iTerm2 默认都不做中键粘贴，
+          // 而它偏偏绕过确认弹窗——mac 用户用 ⌘V 走带确认的路径。
+          _pasteFromClipboard(skipConfirm: true);
         }
       },
       child: ClipRect(
@@ -751,3 +834,85 @@ class _TerminalViewState extends State<TerminalView> {
   }
 }
 
+/// 中键判定：必须**只有**中键按下。
+///
+/// 鼠标事件里的 buttons 是位掩码（1=左 2=右 4=中），而 Flutter 没有导出
+/// 对应的常量类（只有 kSecondaryButton/kTertiaryButton 这类单值常量），
+/// 所以这里自带一个最小的命名常量集，避免代码里散落 1/2/4 字面量。
+/// 组合按下（如中键+左键、拖动中同时按别的键）不算中键粘贴。
+class PointerButtons {
+  static const int none = 0;
+  static const int primary = 1;
+  static const int secondary = 2;
+  static const int middle = 4;
+
+  const PointerButtons._();
+}
+
+bool isMiddleClick(int buttons) => buttons == PointerButtons.middle;
+
+/// Insert 键的路由结果（Windows 控制台惯例）
+enum InsertRouting { none, copySelection, pasteSkipConfirm }
+
+/// Ctrl+Insert = 复制选区，Shift+Insert = 粘贴（跳过多行确认）。
+/// 两者同时按下时优先复制——与已有的 Ctrl+Shift+C 语义保持一致。
+/// 裸 Insert 返回 [InsertRouting.none]：不吞键，交回 xterm 的 keyInput
+/// （vi 的插入模式等场景需要它）。
+InsertRouting resolveInsertRouting({required bool ctrl, required bool shift}) {
+  if (ctrl) return InsertRouting.copySelection;
+  if (shift) return InsertRouting.pasteSkipConfirm;
+  return InsertRouting.none;
+}
+
+/// Ctrl+A 要发给 shell 的字节：readline 的行首。
+/// 无 Ctrl 时返回 null —— 绝不能把裸的 A 变成控制字符。
+String? resolveCtrlAByte({required bool ctrl}) => ctrl ? '\x01' : null;
+
+/// 一次粘贴的分发结果。[pasted] 为 null 表示什么都不做。
+class PasteRoute {
+  const PasteRoute._({this.pasted, required this.confirmNeeded});
+
+  final String? pasted;
+
+  /// 内容多行、且还没确认过 → 调用方需要先弹多行确认
+  final bool confirmNeeded;
+}
+
+/// 粘贴分发口径：
+/// - 空串 → 不粘贴；
+/// - skipConfirm（Shift+Insert / 中键）→ 原样粘贴，终端惯例是一次全发；
+/// - 多行且未确认 → 只标出 confirmNeeded，由调用方去问用户；
+/// - 其余（单行、或已确认）→ 原样粘贴。
+PasteRoute routePaste(String text,
+    {required bool skipConfirm, required bool confirmed}) {
+  if (text.isEmpty) {
+    return const PasteRoute._(pasted: null, confirmNeeded: false);
+  }
+  if (skipConfirm) {
+    return PasteRoute._(pasted: text, confirmNeeded: false);
+  }
+  if (isMultiLine(text) && !confirmed) {
+    return const PasteRoute._(pasted: null, confirmNeeded: true);
+  }
+  return PasteRoute._(pasted: text, confirmNeeded: false);
+}
+
+/// 右键菜单里那几个「复制/粘贴/全选」项的快捷键文案，按平台取修饰键。
+///
+/// 必须分开：xterm 在苹果平台上用的是另一张快捷键表
+/// （shortcuts.dart 的 `_defaultAppleShortcuts` → Cmd+C / Cmd+V / Cmd+A），
+/// Ctrl+Shift+C、Ctrl+V、Ctrl+A 在 mac 上**没有任何绑定**。菜单照抄
+/// Windows 的写法，就是在告诉 mac 用户去按一组按了没反应的键。
+enum TerminalMenuAction { copy, paste, selectAll }
+
+String terminalShortcutLabel(TerminalMenuAction action, {required bool isMac}) {
+  switch (action) {
+    case TerminalMenuAction.copy:
+      // mac 走系统惯例 ⌘C；非 mac 要带 Shift，否则 Ctrl+C 是发中断信号
+      return isMac ? '⌘C' : 'Ctrl+Shift+C';
+    case TerminalMenuAction.paste:
+      return isMac ? '⌘V' : 'Ctrl+V';
+    case TerminalMenuAction.selectAll:
+      return isMac ? '⌘A' : 'Ctrl+A';
+  }
+}
