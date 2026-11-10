@@ -33,6 +33,15 @@ export {
   GATE_DECISIONS,
 } from "./utils/permission_policy.js";
 export type {SafetyLevel, CommandGateDecision} from "./utils/permission_policy.js";
+export {
+  checkSafety,
+  checkPath,
+  checkReadPath,
+  getSafetyReason,
+  getSafetyTip,
+  PathSafetyResult,
+  requireConfirm,
+} from "./utils/safety_guard.js";
 
 // ─── Task state (Phase 0 minimal) ───────────────────────────────
 interface TaskState {

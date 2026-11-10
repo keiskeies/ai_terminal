@@ -35,4 +35,24 @@ export {
 } from "./permission_policy.js";
 export type {SafetyLevel, CommandGateDecision} from "./permission_policy.js";
 
+export {
+  checkSafety,
+  checkPath,
+  checkReadPath,
+  getSafetyReason,
+  getSafetyTip,
+  getHomeDir,
+  requireConfirm,
+  PathSafetyResult,
+  BLOCK_RULES,
+  WARN_RULES,
+  INFO_PATTERNS,
+  SAFETY_TIPS,
+  BLOCKED_PATH_PREFIXES,
+  BLOCKED_FILE_PATTERNS,
+  BLOCKED_DIR_NAMES,
+  HOME_BLOCKED_SUFFIXES,
+  type SafetyRule,
+} from "./safety_guard.js";
+
 export type {ProcessHandle, SupervisorConfig} from "./process_supervisor.js";

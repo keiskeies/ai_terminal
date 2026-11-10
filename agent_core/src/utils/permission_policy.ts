@@ -15,8 +15,9 @@
 // had already run.
 //
 // NOT WIRED YET, and deliberately so: computing a SafetyLevel requires the
-// SafetyGuard classifier (512 Dart lines, not ported - design doc sec. 9 item 7),
-// and acting on "confirm" requires the confirm round-trip (rpc:confirm is still a
+// SafetyGuard classifier (now ported to utils/safety_guard.ts - design doc sec. 9
+// item 7, and still uncalled), and acting on "confirm" requires the confirm
+// round-trip (rpc:confirm is still a
 // Phase 2 placeholder - sec. 9 item 6). Wiring the gate before either exists would
 // mean either blocking commands with no way to unblock them or ignoring the decision
 // outright. This module is landed first, pure and exhaustively pinned against Dart,
@@ -24,11 +25,15 @@
 
 import type {PermissionMode} from "../rpc/schema.js";
 
-// Declaration order is part of the contract on the Dart side: SafetyLevel is
-// persisted through a Hive adapter generated in declaration order, so reordering
-// silently renumbers stored values. Listed here in Dart's order.
-export const SAFETY_LEVELS = ["safe", "info", "warn", "blocked"] as const;
-export type SafetyLevel = (typeof SAFETY_LEVELS)[number];
+// SafetyLevel is owned by safety_guard.ts, because that is where Dart declares the
+// enum and the values it persists into AgentEvent.riskLevel. Re-exported so the gate
+// matrix still reads as the standalone module it is and existing imports keep
+// resolving - two declarations of one wire contract is how the two sides drift.
+import {SAFETY_LEVELS, type SafetyLevel} from "./safety_guard.js";
+
+export {SAFETY_LEVELS};
+export type {SafetyLevel};
+
 
 // Dart: enum CommandGateDecision { execute, confirm, reject }
 export const GATE_DECISIONS = ["execute", "confirm", "reject"] as const;
