@@ -54,6 +54,8 @@ export {
   HOME_BLOCKED_SUFFIXES,
   type SafetyRule,
 } from "./safety_guard.js";
+export {LocalFilePolicy, LocalPathDecision, LocalPathVerdict, LOCAL_FILE_POLICY_SETTINGS_KEY, DEFAULT_MAX_READ_BYTES} from "./local_file_policy.js";
+export type {LocalFilePolicyOptions, LocalFileSettingsReader} from "./local_file_policy.js";
 
 export {
   AgentGoal,
