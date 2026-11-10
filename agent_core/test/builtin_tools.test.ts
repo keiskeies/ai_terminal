@@ -209,7 +209,27 @@ describe("shell_detect (R6)",()=>{
 // assertion would encode the sandbox bug rather than our contract.
 // The cmd errorlevel PARSE-time caveat (Dart parity, documented in
 // shell_detect.ts) is why no cmd test asserts a NON-ZERO native code.
-describe("runLocalCommand exit marker (R6.1 + R8.1 e2e)",()=>{
+// ── Host-shell gate (CI portability) ───────────────────────────────────────
+// The CI runner is ubuntu-latest, where neither `powershell` nor `cmd` exists,
+// and runLocalCommand uses spawn(..., {shell:false}) - a missing binary emits
+// an "error" event, which runLocalCommand REJECTS on (verified: ENOENT). So an
+// ungated Windows-shell suite does not merely mismatch on Linux, it errors.
+// Resolution is probed exactly the way the code under test resolves it (no
+// shell:true), so the gate cannot be wider than the spawn.
+import {spawnSync} from "child_process";
+const resolves = (bin: string, args: string[]): boolean => {
+  try { return !spawnSync(bin, args, {encoding: "utf-8", timeout: 15000, shell: false}).error; }
+  catch { return false; }
+};
+const hasCmd = resolves("cmd", ["/c", "exit 0"]);
+const hasPowershell = resolves("powershell", ["-NoProfile", "-Command", "exit 0"]);
+const hasBash = resolves("bash", ["-c", "exit 0"]);
+const winShells = hasCmd && hasPowershell;
+// Both shells are Windows-only; gate the suite on resolution rather than on
+// process.platform, so the skip reason is provable from the same probe the
+// spawn uses.
+const describeHostShells = winShells ? describe : describe.skip;
+describeHostShells("runLocalCommand exit marker (R6.1 + R8.1 e2e)",()=>{
  const M="EXITCODE_LOCAL:";
  // The DSH sandbox blocks PowerShell from executing native exes (AppLocker-style
  // "Cannot run a document in the middle of a pipeline"), so a native-command
@@ -249,4 +269,42 @@ describe("runLocalCommand exit marker (R6.1 + R8.1 e2e)",()=>{
    const r=await runLocalCommand("exit /b 3",process.cwd(),"cmd",30);
    expect(r.exitCode).toBe(3);
  },30000);
+});
+// A POSIX counterpart for the same plumbing (R6.1 marker + R8.1 close-code
+// fallback). Deliberately avoids the bash $? derivation: on this repo CI host
+// BSS-CRU mangles argv through -c, so `false; echo "MK:$?"` prints MK:0 (shown
+// again while writing this file). Asserting it would encode the sandbox bug,
+// so the bash cases carry a LITERAL marker digit - same parsing and stripping
+// path, no shell-specific exit-code semantics. bash resolves here too, so this
+// suite is exercised on Windows as well as on the Linux runner.
+describe("runLocalCommand on bash, literal marker (host-independent plumbing)", () => {
+  const M = "EXITCODE_LOCAL:";
+  const cases = hasBash ? it : it.skip;
+  cases("marker with a literal code is parsed and stripped from stdout", async () => {
+    const r = await runLocalCommand('echo out; echo "' + M + '7"', process.cwd(), "bash", 30);
+    expect(r.exitCode).toBe(7);
+    expect(r.stdout).toContain("out");
+    expect(r.stdout).not.toContain(M);
+  }, 30000);
+  cases("no marker at all -> the close code is the exit code", async () => {
+    const r = await runLocalCommand("exit 3", process.cwd(), "bash", 30);
+    expect(r.exitCode).toBe(3);
+  }, 30000);
+});
+
+// Anti-vacuity for the gate above: a skip must only ever mean "this host has no
+// such shell", never "the gate is broken". On Windows every host-shell suite
+// must actually have run, and on Linux bash must be resolvable (the image ships
+// /bin/bash), so the Linux job still exercises runLocalCommand end-to-end.
+describe("host-shell gate is sound", () => {
+  it("windows resolves both shells and runs the windows suite", () => {
+    if (process.platform !== "win32") return;
+    expect(hasCmd, "cmd must resolve on Windows").toBe(true);
+    expect(hasPowershell, "powershell must resolve on Windows").toBe(true);
+    expect(winShells).toBe(true);
+  });
+  it("linux resolves bash so the runner is not silently shell-free", () => {
+    if (process.platform !== "linux") return;
+    expect(hasBash, "/bin/bash must resolve on the CI runner").toBe(true);
+  });
 });
