@@ -7,7 +7,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --outfile=dist/index.js --platform=node --format=esm --external:fs --external:path --external:crypto --external:os --external:child_process --sourcemap",
+    "build": "esbuild src/index.ts --bundle --outfile=dist/index.js --platform=node --format=esm --target=node18 --external:fs --external:path --external:crypto --external:os --external:child_process --external:net --external:tls --external:http --external:https --external:stream --external:buffer --external:util --external:readline --external:assert --external:string_decoder --external:url --external:zlib --external:worker_threads --external:node-pty --sourcemap",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --no-coverage",
     "test_e2e": "vitest run test/e2e/",

@@ -424,6 +424,20 @@ agent_core/test/regression/
 > 副作用检查：全仓测试只用 `evt_4ab5285dc89fef7b` / `evt_e3d57f8a36595f0` / `evt_1a983973eaa2b606` 这类**解析器**事件哈希做字节比对（`e2e/byte_comparison_10`、`fixtures/stable_id_1000.jsonl`），没有任何测试钉住 result/finish/info 的 id —— 因此 §10.3 不变式 2 已按此收窄，否则那条比对永远不可能为真。
 
 
+#### 6.3.4 落地过程中修掉的真实缺陷：CI 产物把 node-pty 打进包，本地 PTY 一调就炸
+
+**症状**：`npm run build`（CI 的 Build 步骤）与打包脚本 `tools/nodeapp.mjs` 是两套手写的 esbuild 配置，external 列表已经漂移：CLI 那边只有 `fs / path / crypto / os / child_process`，少了 `node-pty`（以及 `net / tls / http / https / ...`），于是 CI 产物 `dist/index.js` 把 node-pty 的 JS **内联**进了包，打包产物 `dist/<platform>/index.js` 才是外部引用。
+
+**后果**：node-pty 是原生插件，通过动态 import 引入；一旦被内联，esbuild 会把它的加载器改写成对内建模块的 dynamic require。实测在那个产物里调 `spawnLocalPty()` 直接抛
+
+> `Dynamic require of "events" is not supported`   （node-pty 的 CJS 加载器被内联后的典型报错）
+
+也就是说该产物的本地 PTY 路径**从落地起就是死的**，而整套测试全绿 —— 因为 vitest 跑的是 `src/*.ts`，没有任何测试碰过 `dist/*.js`。这正是 R9 第三条「格式/流水线改动必须有端到端测试」在构建产物维度的同款盲区：组件全对，装配出来的东西不能用。
+
+**修法**：`package.json` 的 `build` 脚本改为与 `tools/nodeapp.mjs` 的 `EXTERNALS` 一一对应（含 `--target=node18`，对齐 Dart 侧内嵌的 Node 版本），并把契约固化到 `test/build_externals.test.ts`：它现场用两套参数各打一个包，断言 external 列表逐字相等、产物能被 import、PTY 路径能走到插件（而不是死在 bundle 里），并要求产物文本里**不存在** `Dynamic require of`；同时反向确认「全部内联」那个对照包一定含这个字符串 —— 否则检测器本身可能是空转。
+
+> 边界：`build_externals.test.ts` 不属于 §6.2 九条规则，也不进 6.3 状态表（它守的是构建产物，不钉任何 R 规则），如同 `manifest.test.ts` 守清单、`terminal_state_matrix.test.ts` 守状态机。它刻意不断言真起了一个 shell 会话（主机限制见 `r6_shell_fork`），只断言控制流抵达插件而非死在 shim 里。
+
 ---
 
 ## 7. 回滚预案
