@@ -21,6 +21,7 @@
 import {AgentTool, AgentToolRegistry, ToolKind, ToolScope, ToolResult, ToolContext, HostExecutionResult} from "./builtin.js";
 import type {ToolArgs} from "./tool_args.js";
 import {ReverseRpcClient} from "../rpc/client.js";
+import {checkSafety} from "../utils/safety_guard.js";
 
 // failure kind (1:1 from pty_output_detector.dart CommandFailureKind)
 export enum CommandFailureKind {
@@ -60,6 +61,13 @@ export interface ExecuteBatchOptions {
   timeoutMs?: number;
   stopOnFailure?: boolean;
   cancelled?: () => boolean;
+  /**
+   * Test seam for the second parallel gate: overrides the SafetyGuard classification
+   * only, never the whitelist head check, so a test can prove the gate is live on
+   * the batch path (a whitelist head plus a predicate that refuses it has to
+   * serialise). Omitted in production, where checkSafety is used.
+   */
+  safetyCheckForTesting?: (command: string) => string;
 }
 
 export interface OrchestratorExecutor {
@@ -102,7 +110,7 @@ export class ReverseRpcOrchestrator implements OrchestratorExecutor {
       for (const h of hostIds) results.set(h, skippedResult());
       return results;
     }
-    if (isReadOnlyCommand(command)) {
+    if (isParallelSafeCommand(command, opts.safetyCheckForTesting)) {
       // parallel: one host's failure does not affect the others
       await Promise.all(hostIds.map(async (h) => {
         results.set(h, await this.executeOn(h, command, opts.timeoutMs, cancelled) ?? skippedResult());
@@ -232,6 +240,53 @@ export function isReadOnlyCommand(command: string): boolean {
     }
   }
   return true;
+}
+
+/**
+ * The batch parallel/serial gate: a command may run in parallel across hosts only
+ * when BOTH dimensions agree that it cannot write anywhere - the conservative
+ * whitelist head check AND the Dart SafetyGuard classification. Dart asks the same
+ * question at multi_host_executor.dart:121, comparing SafetyGuard.check(command)
+ * against SafetyLevel.safe, and that comparison is what this function wires up.
+ * Until it existed the Node batch path consulted only its own whitelist and never
+ * went through src/utils/safety_guard.ts at all, so the two classifiers could drift
+ * apart in silence - the same failure mode as the permission-mode values in 6.3.7.
+ *
+ * Why both and not just the Dart one: the Dart gate alone is weaker here, and that
+ * is a measured number rather than rhetoric. Of the 87 commands asserted in
+ * test/orchestrator.test.ts, 34 classify as safe under SafetyGuard while the
+ * whitelist refuses them: docker rm/stop/kill/exec/build/push, kubectl
+ * delete/apply/create/scale, systemctl enable/stop, git
+ * push/commit/checkout/reset/clean/rebase/merge/stash, find -exec and -ok, mount
+ * -o remount and --bind, plus every command chained with semicolon, pipe,
+ * ampersand, redirect, dollar-paren or backtick, and the empty command. The Dart
+ * rule tables name destructive shapes (rm -rf against the root, mkfs, fork bombs)
+ * and simply have no opinion about a git push, so swapping the whitelist out for
+ * the Dart check would run all of those in parallel across hosts. The whitelist
+ * stays the primary gate; SafetyGuard is added as a second gate, so that anything
+ * the Dart tables learn to flag also stops the parallel path here.
+ *
+ * On today rule tables the second gate happens to be implied by the first: no
+ * command the whitelist admits classifies as anything but safe. That is a property
+ * of the current tables, not an invariant, which is precisely why the conjunction
+ * lives in code rather than in a comment.
+ *
+ * test/orchestrator_safety_gate.test.ts pins both halves: the implication over the
+ * whole whitelist vocabulary plus the Dart batch gate parsed out of the Dart source,
+ * and a fake predicate that refuses a whitelist head so that the batch path has to
+ * serialise - which is the only way to show the second gate is live on the path.
+ * [safetyCheck] is injectable for exactly that; production callers pass nothing and
+ * get checkSafety.
+ */
+export function isParallelSafeCommand(
+  command: string,
+  safetyCheck: (command: string) => string = checkSafety,
+): boolean {
+  if (!isReadOnlyCommand(command)) return false;
+  // Dart compares against SafetyLevel.safe only. info is a highlight rather than a
+  // gate elsewhere (PathSafetyResult.isAllowed lets it through), but the batch path
+  // mirrors Dart and asks for the single level Dart asks for.
+  return safetyCheck(command) === "safe";
 }
 
 // Validate target host (IP/domain, no shell metachars) - R7.
