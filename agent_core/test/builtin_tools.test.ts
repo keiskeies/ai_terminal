@@ -11,7 +11,7 @@ import {
   LocalFileReadTool, LocalDirListTool, FetchUrlTool, LocalExecTool, runLocalCommand,
 } from "../src/tools/builtin.js";
 import {buildDefaultToolRegistry, ToolArgs} from "../src/tools/index.js";
-import {detectShell, wrapCommand} from "../src/utils/shell_detect.js";
+import {detectShell, wrapCommand, extractExitMarker} from "../src/utils/shell_detect.js";
 
 let T="";
 beforeAll(()=>{
@@ -176,14 +176,77 @@ describe("shell_detect (R6)",()=>{
    expect(detectShell("C:\Windows\System32\cmd.exe")).toBe("cmd");
    expect(detectShell("bash")).toBe("bash");
  });
- it("wrapCommand branches by shell",()=>{
-   expect(wrapCommand("ls","bash","MK")).toBe("ls; MK $?");
-   expect(wrapCommand("dir","powershell","MK")).toBe("dir; MK $LASTEXITCODE");
-   expect(wrapCommand("dir","cmd","MK")).toBe("dir & MK %errorlevel%");
+ // R6.1 pin (fixed): the wrapper must ECHO marker+exit-code. The previous form
+ // `cmd; MK $?` EXECUTED the bare marker (command-not-found) and destroyed the
+ // real exit status (bash 127 / cmd 9009 / PS "not recognized" 1) - verified
+ // empirically on all three shells. Byte-faithful to Dart posixWrapWithExitMarker
+ // (command_executor.dart) + wrapCommandWithExitMarker (local_terminal_service.dart).
+ it("wrapCommand branches by shell (R6.1)",()=>{
+   expect(wrapCommand("ls","bash","MK:")).toBe('ls; echo "MK:$?"');
+   expect(wrapCommand("ls","zsh","MK:")).toBe('ls; echo "MK:$?"');
+   // multi-line/heredoc: echo goes on a NEW line - "EOF; echo" is not a terminator
+   expect(wrapCommand("a\nb","sh","MK:")).toBe('a\nb\necho "MK:$?"');
+   expect(wrapCommand("dir","cmd","MK:")).toBe("dir & echo MK:%errorlevel%");
+   const ps=wrapCommand("dir","powershell","MK:");
+   expect(ps.startsWith("$LASTEXITCODE=$null; dir; ")).toBe(true); // session-leak guard
+   expect(ps).toContain("$__ec=if($?){0}");                        // cmdlet failure -> 1
+   expect(ps.endsWith('echo "MK:$__ec"')).toBe(true);
  });
- it("R8: marker pattern is marker+digits, not bare substring",()=>{
-   const wrapped=wrapCommand("echo done","bash","EXITCODE_LOCAL");
-   expect(wrapped).toContain("EXITCODE_LOCAL");
-   expect(wrapped).toContain("$?");
+ // R8.1: full pattern (marker+digits), never a bare substring - the command echo
+ // contains the literal marker and would fire completion before the command ran.
+ it("R8.1: extractExitMarker needs marker+digits",()=>{
+   expect(extractExitMarker('echo "EXITCODE_LOCAL:$?"\n',"EXITCODE_LOCAL:")).toBe(null);
+   expect(extractExitMarker("x\nEXITCODE_LOCAL:7\n","EXITCODE_LOCAL:")!.exitCode).toBe(7);
+   expect(extractExitMarker("EXITCODE_LOCAL:0rest","EXITCODE_LOCAL:")!.after).toBe("rest");
+   expect(extractExitMarker("done","EXITCODE_LOCAL:")).toBe(null);
  });
+});
+
+// R6.1/R8.1 end-to-end through the real host shells (bounded - a hang here is
+// the historical executeAndWait deadlock, not a flaky timeout). bash is pinned
+// at unit level only: BSS-CRU mangles argv through `-c` on this CI host
+// (`false; echo "MK:$?"` prints MK:0; script files exit 127), so a bash e2e
+// assertion would encode the sandbox bug rather than our contract.
+// The cmd errorlevel PARSE-time caveat (Dart parity, documented in
+// shell_detect.ts) is why no cmd test asserts a NON-ZERO native code.
+describe("runLocalCommand exit marker (R6.1 + R8.1 e2e)",()=>{
+ const M="EXITCODE_LOCAL:";
+ // The DSH sandbox blocks PowerShell from executing native exes (AppLocker-style
+ // "Cannot run a document in the middle of a pipeline"), so a native-command
+ // failure code cannot be round-tripped here. Two real, host-independent
+ // fixtures cover the same plumbing:
+ // 1) any FAILING CMDLET -> Dart derivation reports 1 (never a stale code);
+ // 2) Dart derivation order: $? is consulted FIRST, so a command that leaves a
+ //    non-zero $LASTEXITCODE but succeeds by $? reports 0. Pinned deliberately
+ //    (Dart parity, local_terminal_service.dart L210-216) - reorder at your peril.
+ it("powershell: failing cmdlet reports 1 via the marker",async()=>{
+   const r=await runLocalCommand(wrapCommand("$ErrorActionPreference=\"Stop\"; Get-ChildItem -Path Z:/nope_does_not_exist -ErrorAction Stop","powershell",M),process.cwd(),"powershell",60);
+   expect(r.exitCode).toBe(1);
+   expect(r.stdout).not.toContain(M); // marker line stripped from stdout
+ },30000);
+ it("powershell: $? precedes $LASTEXITCODE in the derivation (Dart parity)",async()=>{
+   const r=await runLocalCommand(wrapCommand("$LASTEXITCODE=5","powershell",M),process.cwd(),"powershell",60);
+   expect(r.exitCode).toBe(0); // assignment leaves $? true -> first branch wins
+ },30000);
+ it("powershell: cmdlet failure reports 1, never a stale code",async()=>{
+   const r=await runLocalCommand(wrapCommand("Get-ChildItem Z:/definitely_missing_dir_xyz","powershell",M),process.cwd(),"powershell",60);
+   expect(r.exitCode).toBe(1);
+ },30000);
+ it("powershell: success stays 0 and keeps stdout",async()=>{
+   const r=await runLocalCommand(wrapCommand("Write-Output ok","powershell",M),process.cwd(),"powershell",60);
+   expect(r.exitCode).toBe(0);
+   expect(r.stdout).toContain("ok");
+ },30000);
+ it("cmd: success reports 0 and strips the marker line",async()=>{
+   const r=await runLocalCommand(wrapCommand("echo hi","cmd",M),process.cwd(),"cmd",30);
+   expect(r.exitCode).toBe(0);
+   expect(r.stdout).toContain("hi");
+   expect(r.stdout).not.toContain(M);
+ },30000); // NOTE: a WRAPPED `exit /b 3` kills cmd before the wrapper echo runs - no
+ // marker exists and the close code is cmd's own; asserting that would pin
+ // wrapper mechanics, not the fallback, so the raw unwrapped form is used.
+ it("marker never emitted (raw command, early exit) -> close code fallback",async()=>{
+   const r=await runLocalCommand("exit /b 3",process.cwd(),"cmd",30);
+   expect(r.exitCode).toBe(3);
+ },30000);
 });

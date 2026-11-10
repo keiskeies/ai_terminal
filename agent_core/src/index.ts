@@ -77,7 +77,7 @@ function buildLocalCommandExecutor(): CommandExecutor {
   const timeoutSec = 120;
   return async (command, _ctx): Promise<import("./react/engine.js").CommandExecResult> => {
     const {wrapCommand} = await import("./utils/shell_detect.js");
-    const marker = "EXITCODE_LOCAL";
+    const marker = "EXITCODE_LOCAL:"; // Dart convention: marker ends with ':'
     const shell = process.platform === "win32" ? ("powershell" as const) : ("bash" as const);
     const wrapped = wrapCommand(command, shell, marker);
     const t0 = Date.now();

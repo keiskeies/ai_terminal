@@ -12,7 +12,7 @@
 
 import {readFileSync, readdirSync, statSync, existsSync, mkdirSync, copyFileSync, cpSync, rmSync, renameSync, lstatSync} from "fs";
 import {ToolArgs} from "./tool_args.js";
-import {ShellType, wrapCommand} from "../utils/shell_detect.js";
+import {ShellType, wrapCommand, extractExitMarker} from "../utils/shell_detect.js";
 import {basename, dirname, relative, sep} from "path";
 import {LineDiff} from "../utils/line_diff.js";
 import {decodeEscapedText, decodeContent, writeLocalFile, patchLocalFile, TRASH_DIR_NAME} from "../utils/local_file_ops.js";
@@ -431,7 +431,7 @@ export class LocalExecTool extends AgentTool {
     const timeoutSec = Math.min(600, args.getInt("timeout", 120));
     const shellArg = args.getString("shell", "").toLowerCase();
     const shell: ShellType = shellArg !== "" ? (shellArg as ShellType) : (process.platform === "win32" ? "powershell" : "bash");
-    const marker = "EXITCODE_LOCAL";
+    const marker = "EXITCODE_LOCAL:"; // Dart convention: marker ends with ':' (donePattern = marker + digits)
     const wrapped = wrapCommand(command, shell, marker);
     const t0 = Date.now();
     try {
@@ -449,7 +449,7 @@ export class LocalExecTool extends AgentTool {
 }
 
 /** Spawn a wrapped command in the chosen shell; bounded buffers, tail-retained (R8). */
-export async function runLocalCommand(wrapped: string, cwd: string, shell: ShellType, timeoutSec: number): Promise<{stdout:string;stderr:string;exitCode:number}> {
+export async function runLocalCommand(wrapped: string, cwd: string, shell: ShellType, timeoutSec: number, marker: string = "EXITCODE_LOCAL:"): Promise<{stdout:string;stderr:string;exitCode:number}> {
   const cp = await import("child_process");
   const args = shell === "powershell" ? ["-NoProfile","-Command", wrapped] : shell === "cmd" ? ["/c", wrapped] : ["-c", wrapped];
   const bin = shell === "powershell" ? "powershell" : shell === "cmd" ? "cmd" : (shell === "sh" ? "sh" : "bash");
@@ -460,7 +460,24 @@ export async function runLocalCommand(wrapped: string, cwd: string, shell: Shell
     const timer = setTimeout(() => { child.kill("SIGKILL"); reject(new Error("timeout after " + timeoutSec + "s")); }, timeoutSec * 1000);
     child.stdout.on("data", (d) => { out += d.toString(); if (out.length > MAX * 4) out = out.slice(-MAX); });
     child.stderr.on("data", (d) => { err += d.toString(); if (err.length > MAX * 4) err = err.slice(-MAX); });
-    child.on("close", (code) => { clearTimeout(timer); resolve({stdout: out.slice(-MAX), stderr: err.slice(-MAX), exitCode: code ?? -1}); });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      // Tail retained (R8.2) - the exit marker is the last line the wrapper
+      // prints, so the tail cap always preserves it. R8.1: resolve the REAL
+      // exit code from the marker pattern (marker + digits), stripping the
+      // marker line from stdout. The child close code is only a fallback for
+      // paths where the echo never ran (early `exit`, shell syntax error,
+      // spawn failure) - the pipeline tail would otherwise be the marker
+      // command's own status (0) and every failure would look successful.
+      const outFull = out.slice(-MAX);
+      const errFull = err.slice(-MAX);
+      const hit = extractExitMarker(outFull, marker);
+      if (hit !== null) {
+        resolve({stdout: outFull.slice(0, hit.before.length).replace(/\r?\n$/, ""), stderr: errFull, exitCode: hit.exitCode});
+        return;
+      }
+      resolve({stdout: outFull, stderr: errFull, exitCode: code ?? -1});
+    });
     child.on("error", (e) => { clearTimeout(timer); reject(e); });
   });
 }

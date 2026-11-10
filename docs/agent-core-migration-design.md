@@ -360,6 +360,38 @@ agent_core/test/regression/
 
 **CI 强制**：任何 PR 碰 `agent_core/src/react/` 或 `agent_core/src/tools/`，必须跑全量 e2e + 9 条回归。
 
+### 6.3 回归文件落地状态（Node 侧，随实现滚动更新）
+
+| 回归文件 | 状态 | 实际覆盖点 |
+|---|---|---|
+| `r1_generation_check.test.ts` | 已落地 | 真 `ReActEngine` + 可门控 `chatStream`：park 中 cancel → `cancelled` 且仅一次 finish；二次 `run()` 抢占 → `interrupted` 且不发 finish |
+| `r1_stream_cancel.test.ts` | 已落地 | `PendingRegistry.resolveAll` 一次唤醒全部等待者；`close()` 拒收后续请求；`CompleterLike` 先到的 settle 生效 |
+| `r1_then_onerror.test.ts` | 待补 | R1.3：handler 抛错必须让调用方 promise 变 rejected，不得悬挂（`RpcServer` 现同时发 `err:uncaught`） |
+| `r2_lifecycle.test.ts` | 已落地 | 走 RPC host（`startServer` + `handlers`）：自然结束 → 通知早于状态复位；cancel 顺序 `resp:startTask → notify:taskState:cancelled → resp:cancelTask`；重复 cancel 仅一次 flush |
+| `r3_multi_host.test.ts` | 已落地 | 运行中切 tab：命令派发仍用启动时捕获的 hostId，不读 `activeHostId` |
+| `r4_stable_id.test.ts` | 待补 | R4：按 stableId 去重（现散落在 `reverse_rpc` / engine 断言中） |
+| `r5_terminal_whitelist.test.ts` | 待补 | R5：`isSideEffectState(s) === (s === "success")` 白名单（现散落在 checkpoint_store / w5_e2e / terminal_state_matrix） |
+| `r6_shell_fork.test.ts` | 已落地 | 三分支字节形态 + POSIX 单行/多行两形态 + 跨分支语法不串味 + marker 扫描语义（首命中 / 跨 chunk carry / 正则元字符转义） |
+| `r9_stream_e2e.test.ts` | 已落地 | 历史 3 条 bug 形态 + 新用例（迁移初期即有） |
+
+> 说明：`process_supervisor.test.ts` 已覆盖 ProcessSupervisor 生命周期 7 项，故 `r2_lifecycle.test.ts` 刻意改打 RPC host 的『谁创建谁清理 + 通知/响应顺序』，不重复造轮子；各回归文件互相交叉引用而不重复实现。
+
+#### 6.3.1 落地过程中修掉的真实缺陷：本地命令退出码包装器
+
+**症状**：Node 侧 `wrapCommand` 早期形态发的是 `<cmd>; <marker> $?`（`<marker>` 为裸 token）。
+
+**后果**：shell 把 marker 当命令执行 —— 实测本机 bash 退 127（`command not found`）、cmd.exe 退 9009、PowerShell 报 `not recognized` 并退 1。管道退出码因此变成『找不到命令』的码，真实退出状态被销毁，`local_exec` 把成功命令也报成失败；同时全仓没有任何地方解析 marker，退出码只来自 child close code。
+
+**修法**（对齐 Dart 现行实现 `command_executor.dart` / `local_terminal_service.dart`，并与 `agent-goal-mode-metrics-bar-design.md` §缺陷① 的实测结论一致）：
+
+- POSIX：`cmd; echo "<marker>$?"`，单行必须留在同一行（另起一行会滞留在 tty 输入队列，被 sudo 当密码吃掉）；含换行的命令（heredoc）改用 `\n` 追加，否则 `EOF; echo` 不再识别为 heredoc 结束符而挂死。
+- cmd.exe：`cmd & echo <marker>%errorlevel%`（保持与 Dart 逐字节一致，便于 Dart↔Node 字节比对层比对；代价是 `%errorlevel%` 在解析期展开，同行前序命令的非零码可能读成 0 —— 已在注释中记为该分支的已知取舍，不做偏离性修复）。
+- PowerShell：`$LASTEXITCODE=$null; <cmd>; $__ec=if($?){0}elseif($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0){$LASTEXITCODE}else{1}; echo "<marker>$__ec"`。置空前缀必需（会话级变量，会串台）；`$__ec` 派生让 cmdlet 失败报 1 而非陈旧码。
+- marker 统一以 `:` 结尾（`EXITCODE_LOCAL:`），完成判定用 `extractExitMarker`（转义 marker + 数字，首命中），裸 substring 不再误命中命令回显（R8.1）。
+- `runLocalCommand` 解析 marker 得到真实退出码并把 marker 行从 stdout 剥掉；marker 缺失（命令提前 `exit`、shell 语法错、spawn 失败）才回落到 close code。
+
+**沙箱限制（写进注释防止被当成 flaky 修掉）**：本机 PowerShell 被策略禁止执行原生 exe（`Cannot run a document in the middle of a pipeline`），`node`/`cmd`/`ipconfig` 都取不到，因此 e2e 非零码用「失败 cmdlet → 1」这个与宿主无关的 fixture；bash 经 `-c` 传参在本 CI 宿主上被改写（`false; echo "MK:$?"` 打出 `MK:0`，脚本文件退 127），故 bash 只在单元层锁字节形态，不做 bash 运行时断言。
+
 ---
 
 ## 7. 回滚预案
