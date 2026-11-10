@@ -438,6 +438,42 @@ agent_core/test/regression/
 
 > 边界：`build_externals.test.ts` 不属于 §6.2 九条规则，也不进 6.3 状态表（它守的是构建产物，不钉任何 R 规则），如同 `manifest.test.ts` 守清单、`terminal_state_matrix.test.ts` 守状态机。它刻意不断言真起了一个 shell 会话（主机限制见 `r6_shell_fork`），只断言控制流抵达插件而非死在 shim 里。
 
+#### 6.3.5 落地过程中修掉的真实缺陷：glob 大小写极性写反，两份实现各说各话
+
+**症状**：`src/tools/builtin.ts` 里同时存在两份 glob→RegExp。`local_dir_list` 用的是 `LocalDirListTool.globToRe`，压根没有大小写分支（任何平台都大小写敏感）；`local_file_search` 用的是模块级 `globToRegExp`，flags 写成 `process.platform === "win32" ? undefined : "i"` —— 与 Dart 恰好相反，而它自己的注释还声称「mirrors caseSensitive: !Platform.isWindows」。
+
+**Dart 参照**（`ai_terminal/lib/services/local_file_tools.dart:278` 与 `:353`，两处逐字相同）：
+
+> `RegExp('^$escaped$', caseSensitive: !Platform.isWindows)`　⇒ Windows 大小写**不敏感**（NTFS 查找本身不敏感），其余平台大小写**敏感**。
+
+**后果**：这类缺陷不会抛错，只会让清单变长或变短。同一个 `*.TXT` 配 `a.txt`：Windows 上 Dart 会给出该文件，TS 的 dir-list 不给（模型看不见本该看见的文件）；Linux 上 Dart 不给，TS 的 search 给（塞给用户没要的匹配）。更糟的是**两个工具对同一个 glob 结论相反**，而 CI 发现不了 —— 既有 glob 用例的命名全是小写，正好落在两份实现唯一同意的子集里。「注释里写了规范」和「有人守着规范」是两回事。
+
+**修法**：合并成模块级唯一的 `globToRegExp`，flags 取 `process.platform === "win32" ? "i" : undefined`，并补上 Dart 的 `if (glob.trim().isEmpty) return null;`。后者不是防御性代码：`ToolArgs.getStringList` 只丢掉零长度字符串，`" "` 会活着走到 helper —— 去掉 trim，`" "` 就编译成 `/^ $/`，于是一次「空 glob」调用从「不过滤」变成「什么都过滤不掉」。
+
+**固化**：`test/glob_case.test.ts` 钉三层。
+
+1. 结构：源码里 `function globToRegExp(` 恰好一处，且 `/globToRe(?!gExp)[A-Za-z0-9_]*\s*\(/` 必须为假 —— 第二份实现无论叫什么都不放过（`globToRe(` 不是 `globToRegExp(` 的子串，所以这条判据自洽）。
+2. 极性：从源码里正则抽出 flags 表达式，用假 `process` 对象求值 —— `win32 → "i"`、`linux/darwin → undefined`、四个平台里恰好一个带 flag（挡住「顺手加个 g」这类横向漂移）。这段断言不碰真实文件系统的大小写规则，Windows / macOS / Linux 三边读法完全一致。
+3. 行为：`local_dir_list` 与 `local_file_search` 对 `*.TXT` 的实际结论必须相同，且等于 `process.platform === "win32"`；再加「`" "` 与 `" ", "*.txt"` 都不得清空结果」钉住 trim。
+
+**变异验证**：删掉 flags、把 flags 反向、两边都加 `"i"`、删 trim+空判、只删 trim、把 `globToRe` 复制回去 —— 六种漂移全部 exit 1。（头一轮里「删 trim」是漏网的，补第 3 层才咬住。同理，写第 1 层判据时差点被自己绊倒：`globToRe(` 的声明还没删就断言「不再出现 `globToRe(`」，必然自打。）
+
+#### 6.3.6 落地过程中修掉的真实缺陷：CI 步骤与测试自身的可执行性
+
+6.3.4 的教训是「CI 产物从没被测过」；这一轮补的是「CI 步骤本身没被测过，以及测试换台机器就跑不动」。
+
+**(a) `test:fixture` 少 `working-directory`。** `.github/workflows/agent-core-ci.yml` 里其余 `run` 步骤都带 `working-directory: agent_core`，唯独「Verify stableId fixture (1000 cases)」没有 —— 而**仓库根目录没有 `package.json`**。也就是说该步骤在每一次 CI run 里都只能失败，`npm run test:fixture` 会在根目录报找不到脚本。这是全流程里唯一一个本地从没手动跑过的 CI 步骤，恰好就是坏的那个。修法：补 `working-directory: agent_core`。
+
+**(b) 守卫 CI 本身。** `test/ci_workflow.test.ts` 直接解析 workflow 文本：`run` 步骤数 ≥7、每个 `run` 步骤都必须是 `working-directory: agent_core`（缺一个就是这次的 bug 复发）、`npm run X` 目标集合恰为 {build, check:schema, test:fixture, test_e2e, typecheck}、步骤目标序列固定为 `ci → typecheck → test → test_e2e → build → test:fixture → check:schema`、只允许一条 `npm ci`（禁 `npm install` 与 `npx`，CI 必须可复现）、`cache-dependency-path` 指向确实存在的 lockfile、`node-version` 主版本 ≥ `build` 里 `--target=nodeNN`、`on:` 同时存在 `push` 与 `pull_request`、二者都按 `agent_core/**` 过滤、且 workflow 把自己也纳入触发路径（改 CI 必须触发 CI 自检）、branches 同时含 `main` 与 `feat/**`（否则守 CI 的测试自己永不运行）。解析必须从 `    steps:` 起，否则 `on.push.paths` 的条目会被当成步骤。十种漂移变异全部 exit 1。
+
+**(c) 只在 Windows 有主机的测试。** exit-marker 那组用例直接 spawn `powershell` / `cmd`，在 `ubuntu-latest` 上必炸。修法不是按 `process.platform` 跳过，而是**按「能否真的把它 spawn 起来」门禁**（`spawnSync(bin, args, {shell: false})`，与 `runLocalCommand` 的 spawn 方式同构，因此门禁不可能比被测代码更宽）：按平台跳过会把「这台机器恰好没装」误当成「平台正确跳过」，按可解析性跳过则 skip 数本身可解释、可复现，也顺带覆盖 CI runner。另补一段与主机无关的 bash 用例，钉住字面量 `EXITCODE_LOCAL:7` 被解析并从 stdout 剥离、以及 `exit 3` ⇒ close code 3，保证 exit-marker 逻辑在任何 runner 上都有覆盖。注意两点：本机 `sh` **无法解析**而 `bash` 可以（正是「本地全绿、Linux runner 失败」的成因），且 bash 下 `$?` 推导不可断言，所以钉的是字面量 marker 与真实 close code，不是 `$?`。
+
+**(d) node-pty 在 Linux runner 上从源码编译。** `node-pty@1.1.0` 的 package.json 没有 `os` 字段，`scripts.install` 是 `node scripts/prebuild.js || node-gyp rebuild`，而 `prebuilds/` 里**没有 linux 目录** ⇒ `prebuild.js` 退 1，`npm ci` 在 runner 上走 `node-gyp rebuild`（需要 python3 / make / g++，`ubuntu-latest` 自带）。这不是 bug 而是构建前提，记在这里以免下次被当成 CI 抖动去「修」。
+
+**验证口径**：某些主机上 `process.execPath` 指向 GUI 子系统宿主程序，它**根本不执行脚本却返回 0**，stdout 只剩宿主自身的噪声 —— 在这种机器上「退出码 0 所以通过」是空判断。因此本轮所有 gate 一律看真实产物：`tsc` 的退出码 + 无诊断输出、`check-schema-compat: PASSED`、`fixture: 1000 ok`、`Tests 551 passed (551)` 的逐条计数，而不是只看退出码。CI 侧同理：**步骤绿不等于步骤跑了它以为的那件事** —— (a) 能活到今天就因为没人看过它的输出。
+
+> 边界：`ci_workflow.test.ts` 与 `glob_case.test.ts` 都不属于 §6.2 九条规则，也不进 6.3 状态表；前者守的是 CI 定义，后者守的是移植自身的大小写极性。同 `manifest.test.ts` / `build_externals.test.ts` 一个待遇。
+
 ---
 
 ## 7. 回滚预案
