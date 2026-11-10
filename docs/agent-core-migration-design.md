@@ -544,7 +544,7 @@ agent_core/test/regression/
 3. **多窗口 / 多 agent 实例** — Node 侧 `process` 是单例还是支持多实例？（建议：每个 TaskId 一个子进程, 上限 4 个）
 4. **checkpoint 粒度** — 每 30s 还是每个工具执行完？（建议：每个工具执行完, 增量写）
 5. **Dart 实现保留多久** — 8 周后？6 个月？（建议：移动端保留 1 年，桌面端 6 个月后删）
-6. **危险命令 confirm 流程落在哪一层** — Dart 侧是一个 `_confirmCompleter` 被 **4 条路径**唤醒（用户确认 / 拒绝 / 10 分钟超时 / `cancelTask`，后者先 generation++ 再 `complete(false)`），加 6 类拒绝原因码；`waiting_confirm` 与 `rpc:confirm` 在 Node 侧只有占位（`src/index.ts` 直接回 `confirm not yet implemented - Phase 2`）。占位不是实现：档位矩阵已落在 `utils/permission_policy.ts`，但还没有调用方，所以「等待确认」在 Node 侧仍等价于「直接执行」；要么补齐，要么灰度前显式禁掉 blocked 档。**同一个缺口里已经落地的另一半（本轮）**：goal 续跑判定整块按 1:1 落为 `utils/goal_continuation.ts`（311 行）+ `utils/agent_goal.ts`（205 行）——`decideGoalContinuation` 的 8 道守卫顺序（用户取消必须排在预算检查之前，否则「取消后预算还剩」会被当成还能继续而复活）、9 个终局分支的中文暂停文案、`shouldScheduleGoalRound` 的「同一终局任务只许续跑一次」去重（取消与异常路径会连着发两个 finish 事件）、`shouldKickGoalRound` 的假恢复守卫、`buildGoalContinuationPrompt`（只带目标与预算，不拼历史全文）、`isGoalMarkerOnlyCommand` 硬守卫（真机复拍：模型会把「目标已达成」写进 `命令:` 块，于是得到一条 CommandNotFoundException）全部到位。机器上没有 Dart 运行时，所以 `ai_terminal/test/goal_continuation_test.dart` 的 32 个 test / 73 个 expect 是被**解析后逐条重放**的——期望值来自 Dart 源码本身而不是我重抄一遍；再加结构对账：守卫条件序列、`reason:`/`action:`/`status:`/`note:` 逐条 diff、标记剥离字符类逐字节相等、提示词静态片段 10=10，改 Dart 的判定顺序或任何一条文案都会变红（`test/goal_continuation.test.ts`，36 项）。**尚未接线**：`react/engine.ts` 里还没有任何调用点，所以续跑与 confirm 现在都只是纯函数。
+6. **危险命令 confirm 流程落在哪一层** — Dart 侧是一个 `_confirmCompleter` 被 **4 条路径**唤醒（用户确认 / 拒绝 / 10 分钟超时 / `cancelTask`，后者先 generation++ 再 `complete(false)`），加 6 类拒绝原因码；`waiting_confirm` 与 `rpc:confirm` 在 Node 侧原本只有占位（`src/index.ts` 直接回 `confirm not yet implemented - Phase 2`）。占位不是实现：档位矩阵先落在 `utils/permission_policy.ts`，而「等待确认」在接线前等价于「直接执行」——本轮补齐了等待本体并把 `rpc:confirm` 接上了线（见下）。**同一个缺口里先落地的另一半**：goal 续跑判定整块按 1:1 落为 `utils/goal_continuation.ts`（311 行）+ `utils/agent_goal.ts`（205 行）——`decideGoalContinuation` 的 8 道守卫顺序（用户取消必须排在预算检查之前，否则「取消后预算还剩」会被当成还能继续而复活）、9 个终局分支的中文暂停文案、`shouldScheduleGoalRound` 的「同一终局任务只许续跑一次」去重（取消与异常路径会连着发两个 finish 事件）、`shouldKickGoalRound` 的假恢复守卫、`buildGoalContinuationPrompt`（只带目标与预算，不拼历史全文）、`isGoalMarkerOnlyCommand` 硬守卫（真机复拍：模型会把「目标已达成」写进 `命令:` 块，于是得到一条 CommandNotFoundException）全部到位。机器上没有 Dart 运行时，所以 `ai_terminal/test/goal_continuation_test.dart` 的 32 个 test / 73 个 expect 是被**解析后逐条重放**的——期望值来自 Dart 源码本身而不是我重抄一遍；再加结构对账：守卫条件序列、`reason:`/`action:`/`status:`/`note:` 逐条 diff、标记剥离字符类逐字节相等、提示词静态片段 10=10，改 Dart 的判定顺序或任何一条文案都会变红（`test/goal_continuation.test.ts`，36 项）。**本轮落地（confirm 本体 + 唯一接线者）**：确认状态机 1:1 落为 `react/confirm_flow.ts`（496 行）——一个 completer 加一个 10 分钟计时器，`arm()` 建等待并清一次粘性超时标记（对应 Dart 86/412/2639 三处复位，TS 收敛为 arm() 内 1 处），唤醒路径六条：用户确认 / 拒绝 / 超时 / `cancelTask` / 终局取消（先 generation++ 再 `complete(false)`，同 Dart 931→933 的顺序）/ 暂停；R1 的先 complete 后置 null、R2 的每条路径 cancel+null 计时器都按 Dart 原位保留。接线者是 `src/index.ts`（模块级单例 + `rpc:confirm` 五级守卫顺序 invalid_decision → confirm_flow_unavailable → task_id_mismatch → no_pending_confirm → confirm_id_mismatch；`rpc:startTask` 先唤醒上一轮残留等待再重置两个粘性标记；finally 里只 `finishCleanup()` 收计时器，因为 Dart `_finishTask` 注释（3811 行）明写不清 completer）。对账：`ai_terminal/test/tool_contract_test.dart` 的 4 个 confirm test 被解析后逐条重放，外加结构锁 —— completer 全仓只有 3 个写者（Dart 441/706/2671 vs TS 285/386/449，等量即「暂停与终局取消与 finish 都不许丢弃 awaiter」的硬证）、7 组 cancel/null 配对、6 类 blocked 原因码与 Dart 2370..2377 逐条相等且 `generation_invalid_during_confirm` 必须不在集合内（被取代的一轮不算本任务的失败步）、等待后分支顺序 generation→cancelled→超时/拒绝→重校验档位→proceed（`decideCommand` 重校验是防「切只读前弹出的确认框」绕过新边界）、三种拒绝措辞各 1 处不许合并（命令路径 `用户拒绝执行此命令` / 工具路径 `用户拒绝执行该操作`，第三个 Dart 测试散文措辞不进实现）。已披露偏差：Dart 工具内联计时器的日志文案 `工具确认超时(10min)…`（agent_engine.dart 415）在 TS 侧无对应串，因为 TS 两条等待共用 `arm()` 的同一措辞。锁在 `test/confirm_flow.test.ts`（70 项，含指纹表 + 解析完整性 + 逐条重放 + 结构同构四节）与 `test/rpc_confirm.test.ts`（14 项，线协议级：四种错误守卫、confirm/expire 的唤醒计数与 `riskLevel` 形状）。**尚未接线**：goal 续跑在 `react/engine.ts` 里还没有任何调用点，所以它仍是一个纯判定模块。
 7. **`SafetyGuard`（Dart 512 行）是否整搬** — Node 侧目前只有 `tools/orchestrator.ts` 里那个保守只读分类（注释自己写明「mirroring SafetyGuard.check -> safe」），风险分级与审计文案都还没过来；它与第 6 项是同一个缺口的两面。**已落地的那一半**：档位矩阵 `decideCommand` / `destructiveToolNeedsConfirm` 已按 Dart 1:1 落到 `utils/permission_policy.ts`，16 格全表 + Dart 侧结构对账锁在 `test/permission_policy.test.ts`（改 Dart 的守卫顺序、改 `kPermissionDecision*` 取值或改 `SafetyLevel` 顺序都会变红）。**本轮落地**：`SafetyGuard` 全量 512 行按 1:1 落为 `utils/safety_guard.ts`（659 行）——`check()` 分级（21 block + 28 warn + 13 info，含唯一一条忽略大小写的 fork 炸弹）、中文审计文案、`getReason()` 的 null 缓存、`checkPath()`/`checkReadPath()`、`getTip()`、`requireConfirm()`、`getHomeDir()` 一并到位；RE2 与 V8 的 `s` 语义差用显式 ASCII 类逐条规避，Dart 侧插值文案逐字节保真。**尚未接线**：`tools/orchestrator.ts` 的只读分类与 `local_file_ops.ts` 仍走各自旧路径，Dart 在 `local_file_policy.dart:147` 施加的 `checkPath` 闸在 Node 侧还没有调用点。对账锁在 `test/safety_guard.test.ts`（68 项）：Dart 侧 54 处 `expect` 逐条重放、七张规则表逐条 diff、路径文案模板对账、`RegExp(` 调用点计数 83=83——改 Dart 任何一条规则、文案或档位顺序都会变红。
 
 ---
@@ -561,24 +561,25 @@ agent_core/
     notification.schema.json  reverse.schema.json  tool.schema.json
     agent-bridge.schema.json
   tools/check-schema-compat.mjs               # 只做 JSON 自身一致性, 不跨语言比对 (§6.3.7)
-  src/                                       # 45 个 .ts
+  src/                                       # 46 个 .ts
     index.ts
     rpc/{server,client,schema,transport}.ts
-    react/{engine,parser,regex,index}.ts      # 待补: 危险命令 confirm (§9 第 6 项); goal 续跑落在 utils/goal_continuation.ts, 不在 react/goal.ts
+    react/{engine,parser,regex,confirm_flow,index}.ts  # confirm 状态机 (§9 第 6 项); goal 续跑落在 utils/goal_continuation.ts, 不在 react/goal.ts
     tools/{index,builtin,dispatcher,orchestrator,platform,tool_args,web_search}.ts
     pty/{index,adapter}.ts
     mcp/{index,manager,connection,models,oauth,tool_adapter}.ts
     llm/{index,clients,openai_stream,anthropic_stream,ollama_stream,stream}.ts
     utils/{index,tail_buffer,stable_hash,generation,pending_registry,line_diff,
            shell_detect,rollout,checkpoint_store,local_file_ops,process_supervisor,
-           goal_continuation,agent_goal}.ts   # goal 续跑落地新增 (§9 第 6 项)
-  test/                                      # 54 个 .test.ts + 13 份 fixture
+           goal_continuation,agent_goal,                      # goal 续跑落地新增 (§9 第 6 项)
+           safety_guard,permission_policy}.ts  # 安全分级 + 档位矩阵 (§9 第 6/7 项)
+  test/                                      # 56 个 .test.ts + 13 份 fixture
     regression/r{1,2,3,4,5,6,9}_*.test.ts     # 九条规则本体, 见 §6.2
     regression/{manifest,anthropic_e2e,w5_e2e}.test.ts
     e2e/byte_comparison_10.test.ts            # 取代草图里的 e2e/{parser,cancel,multi_host,mcp,tool}
     e2e/fixtures/{golden10.json,i0.txt..i9.txt}
     fixtures/{stable_id_1000.jsonl,verify.mjs}
-    <41 个按模块命名的 .test.ts>
+    <43 个按模块命名的 .test.ts>
 
 ai_terminal/lib/agent_bridge/                 # Dart 侧, 不在本分支范围
   agent_bridge.dart            json_rpc_transport.dart      # 已存在
@@ -590,15 +591,15 @@ ai_terminal/lib/agent_bridge/                 # Dart 侧, 不在本分支范围
 
 | 模块 | 预估行数 | 对应 Dart 原文 | 落地后实测（含文件构成） |
 |---|---|---|---|
-| Node: react/engine | 2500 | agent_engine.dart 4740 | 实际 391: 骨架 + R1/R4/R5 闸门; 危险命令 confirm 未做, goal 续跑已按 1:1 外移到 utils/goal_continuation.ts (§9 第 6 项) |
+| Node: react/engine | 2500 | agent_engine.dart 4740 | 实际 391: 骨架 + R1/R4/R5 闸门; 危险命令 confirm 已按 1:1 外移为 react/confirm_flow.ts 496 行并接线到 index.ts, goal 续跑外移到 utils/goal_continuation.ts (§9 第 6 项); engine.ts 仍无 confirm/续跑调用点 |
 | Node: react/parser | 600 | react_stream_parser.dart 425 (在 lib/utils/ 不在 lib/services/) | 实际 365 + regex.ts 12 |
 | Node: tools/* | 3000 | agent_tool.dart 2634 | 实际 2465 (7 文件; web_search 835 + builtin 802 占大头) |
 | Node: mcp/* | 500 | mcp_manager.dart 496 | 实际 2378 (connection 765 + tool_adapter 362, 草图严重低估) |
 | Node: llm/* | 400 | ai_service.dart 609 | 实际 482 (三个 *_stream.ts + clients + stream, 裸 fetch, 见 §8) |
 | Node: rpc/* | 600 | 新 | 实际 615 (schema 359 / transport 137 / server 69 / client 50) |
-| Node: utils/* | 500 | 新 | 实际 2451 (15 文件; goal_continuation.ts 311 + agent_goal.ts 205 为本轮新增, safety_guard.ts 659 系上一轮新增, permission_policy.ts 92 行更早); 另有 pty/ 236 行 (adapter 232), 草图未单列 |
+| Node: utils/* | 500 | 新 | 实际 2452 (15 文件; goal_continuation.ts 311 + agent_goal.ts 205 系上一轮新增, safety_guard.ts 659 再上一轮, permission_policy.ts 93 = 本轮只改头注释, 把 confirm 决策的归属指到 react/confirm_flow.ts); 另有 pty/ 236 行 (adapter 232), 草图未单列 |
 | Dart: agent_bridge/* | 800 | 新 | 实际 294 (agent_bridge.dart 94 + json_rpc_transport.dart 200); 另 4 个文件待补 |
-| **合计** | **~9900** | — | 实际 Node src 9669 + test 10419 = 20088 (估的 2.0 倍, 差额几乎全在 mcp 与 utils) |
+| **合计** | **~9900** | — | 实际 Node src 10358 + test 11859 = 22217 (估的 2.2 倍, 差额几乎全在 mcp 与 utils) |
 
 ### 10.3 关键不变式（必须持续为真）
 

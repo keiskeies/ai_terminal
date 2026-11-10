@@ -4,6 +4,7 @@
 import {RpcServer} from "./rpc/server.js";
 import {runLocalCommand} from "./tools/builtin.js";
 import type {CommandExecutor} from "./react/engine.js";
+import {ConfirmFlow} from "./react/confirm_flow.js";
 
 // ─── Re-exports for convenience ─────────────────────────────────
 export {parse} from "./react/index.js";
@@ -58,6 +59,20 @@ export {
 export type {AgentGoalStatus, GoalAction} from "./utils/goal_continuation.js";
 
 // ─── Task state (Phase 0 minimal) ───────────────────────────────
+// ─── Confirm flow wiring (doc §9 item 6) ────────────────────────
+// The dangerous-command / destructive-tool state machine lives in
+// react/confirm_flow.ts. The ReAct engine does not call it yet (its
+// command gate is still unwired - §9 item 6 keeps that half open), so
+// the server owns the single ConfirmFlow instance and drives it from
+// rpc:confirm. The generation / cancellation view below is the
+// server-side mirror of what the engine will eventually expose once
+// its gate calls in; until then it is fed directly from startTask /
+// cancelTask so the flow can re-validate after its await (R1).
+let serverGeneration = 0;
+let serverCancelled = false;
+let serverPermissionMode: import("./rpc/schema.js").PermissionMode = "ask";
+let confirmEventSeq = 0;
+
 interface TaskState {
   taskId: string | null;
   status: "idle" | "running";
@@ -74,6 +89,9 @@ const taskState: TaskState = {taskId: null, status: "idle", startedAt: null};
  */
 let activeEngine: import("./react/engine.js").ReActEngine | null = null;
 let activeRun: Promise<import("./rpc/schema.js").AgentFinishState> | null = null;
+// One confirm flow per server, created in startServer() so its notify
+// hooks close over the server. It stays null until startServer runs.
+let confirmFlow: ConfirmFlow | null = null;
 
 /**
  * Build a streaming LLM client from a ModelConfig (doc §2.2 W2). Exported so
@@ -129,6 +147,58 @@ function buildLocalCommandExecutor(): CommandExecutor {
 export function startServer(opts: {verbose?: boolean; llmFactory?: () => import("./llm/clients.js").LlmClient} = {}): RpcServer {
   const server = new RpcServer();
 
+  // A throwing notify sink must never abort the confirm flow (mirrors the
+  // engine callback discipline at react/engine.ts). Every hook below is
+  // fire-and-forget and guarded for exactly that reason.
+  const safeNotify = (method: string, params: Record<string, unknown>): void => {
+    try {
+      server.notify(method, params);
+    } catch (e: unknown) {
+      if (opts.verbose) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[agent-core] confirm notify failed (" + method + "): " + msg);
+      }
+    }
+  };
+  const infoEvent = (text: string): import("./rpc/schema.js").AgentEvent => {
+    return {
+      id: "confirm-info-" + ++confirmEventSeq,
+      type: "info",
+      timestamp: Date.now(),
+      text,
+    };
+  };
+  confirmFlow = new ConfirmFlow({
+    context: {
+      currentGeneration: () => serverGeneration,
+      permissionMode: () => serverPermissionMode,
+      isCancelled: () => serverCancelled,
+      bumpGeneration: () => {
+        serverGeneration++;
+      },
+    },
+    events: {
+      onInfo: (text) => {
+        safeNotify("evt:agentEvent", {taskId: taskState.taskId, event: infoEvent(text)});
+      },
+      onWaitingConfirm: () => {
+        safeNotify("evt:taskState", {taskId: taskState.taskId, state: "waiting_confirm"});
+      },
+      onConfirmRequest: (req) => {
+        safeNotify("evt:confirmRequest", {
+          taskId: taskState.taskId,
+          confirmId: req.confirmId,
+          prompt: req.prompt,
+          timeoutMs: req.timeoutMs,
+          riskLevel: req.riskLevel,
+        });
+      },
+      onLog: (level, message) => {
+        if (opts.verbose) console.error("[agent-core] confirm " + level + ": " + message);
+      },
+    },
+  });
+
   // rpc:ping - handshake / liveness check (parent -> child)
   server.register("rpc:ping", async (params: Record<string, unknown>) => {
     return {
@@ -167,6 +237,24 @@ export function startServer(opts: {verbose?: boolean; llmFactory?: () => import(
       commandExecutor: buildLocalCommandExecutor(),
     });
     activeEngine = engine;
+    // The parent's permission mode used to be dropped here; confirm_flow reads
+    // it back through ConfirmFlowContext.permissionMode(), so it must be
+    // captured (Dart default is "ask": agent_engine.dart:328).
+    serverPermissionMode = params.permissionMode ?? "ask";
+    serverCancelled = false;
+    // New task = new generation, and the per-task confirm counters restart
+    // (Dart resets them at agent_engine.dart:784 / :789).
+    serverGeneration++;
+    if (confirmFlow !== null) {
+      if (confirmFlow.hasPendingConfirm) {
+        // Cannot normally happen: a startTask while a task runs is rejected
+        // above. If a previous teardown ever left a waiter behind, WAKE it
+        // rather than drop it (R1: a dropped awaiter is a permanent hang).
+        confirmFlow.wakeForCancelTask();
+      }
+      confirmFlow.resetConfirmWaitSeconds();
+      confirmFlow.resetTaskHadConfirmTimeout();
+    }
     taskState.taskId = params.taskId;
     taskState.status = "running";
     taskState.startedAt = Date.now();
@@ -176,6 +264,10 @@ export function startServer(opts: {verbose?: boolean; llmFactory?: () => import(
       activeRun = null;
       taskState.status = "idle";
       taskState.startedAt = null;
+      // Dart _finishTask (3809-3811): finish clears the confirm timeout timer
+      // only - never the completer. The wait has already been exited by now,
+      // and completing it here would fake a user answer nobody gave.
+      confirmFlow?.finishCleanup();
     });
     return {ok: true, runId: params.taskId};
   });
@@ -222,7 +314,12 @@ export function startServer(opts: {verbose?: boolean; llmFactory?: () => import(
   // "cancelled" (R1 generation + R5 terminal-state matrix). A pending run is
   // awaited so the final evt:taskState notification is emitted before resolve.
   server.register("rpc:cancelTask", async () => {
+    confirmFlow?.wakeForCancelTask();
     if (activeEngine !== null && taskState.status === "running") {
+      // Cancellation must be visible to the confirm continuation that resumes
+      // after its await (Dart 701-707). No generation bump: cancel is not a
+      // supersede, the flow reports "cancelled_during_confirm" itself.
+      serverCancelled = true;
       activeEngine.cancel();
       if (activeRun !== null) await activeRun.catch(() => {});
     }
@@ -234,15 +331,64 @@ export function startServer(opts: {verbose?: boolean; llmFactory?: () => import(
     return {ok: true};
   });
 
-  // rpc:confirm - placeholder, Phase 2
-  server.register("rpc:confirm", async (params: Record<string, unknown>) => {
-    return {ok: false, error: "confirm not yet implemented - Phase 2", confirmId: params.confirmId ?? null};
-  });
+  // rpc:confirm - doc §2.2 / §9 item 6: deliver the parent's decision on a
+  // pending confirmation. schema/request.schema.json requires
+  // taskId + confirmId + decision, decision in ok|reject|timeout. The wire
+  // carries a confirmId that Dart's UI never needed (it calls the engine
+  // directly), so it is validated here: a stale or foreign confirmId must
+  // never resolve somebody else's wait.
+  server.register(
+    "rpc:confirm",
+    async (params: import("./rpc/schema.js").ConfirmParams): Promise<
+      | {ok: true; confirmId: string; woken: boolean}
+      | {ok: false; error: string; confirmId: string | null}
+    > => {
+      const confirmId = params.confirmId ?? null;
+      const decision = params.decision;
+      if (decision !== "ok" && decision !== "reject" && decision !== "timeout") {
+        return {ok: false, error: "invalid_decision: " + String(decision), confirmId};
+      }
+      const flow = confirmFlow;
+      if (flow === null) {
+        return {ok: false, error: "confirm_flow_unavailable", confirmId};
+      }
+      if (taskState.taskId !== null && params.taskId !== undefined && params.taskId !== taskState.taskId) {
+        return {ok: false, error: "task_id_mismatch: " + taskState.taskId, confirmId};
+      }
+      const pendingId = flow.pendingConfirmId;
+      if (pendingId === null) {
+        return {ok: false, error: "no_pending_confirm", confirmId};
+      }
+      if (confirmId !== pendingId) {
+        return {ok: false, error: "confirm_id_mismatch: " + pendingId, confirmId};
+      }
+      const wasPending = flow.hasPendingConfirm;
+      if (decision === "ok") {
+        flow.confirmDangerousCommand();
+      } else if (decision === "reject") {
+        flow.rejectDangerousCommand();
+      } else {
+        // The parent's own timeout. Dart reaches the same closing logic from
+        // its 10-minute timer; expireConfirmTimeoutForTesting() is that shared
+        // closing logic, so "timeout is not a user refusal" stays true on the
+        // wire path too (the label is only used for the log line).
+        flow.expireConfirmTimeoutForTesting(flow.pendingConfirmCommand ?? "");
+      }
+      return {ok: true, confirmId: pendingId, woken: wasPending};
+    },
+  );
 
   if (opts.verbose) {
     console.error("[agent-core] server started on stdio");
   }
   return server;
+}
+
+// Dart exposes the same seam (pendingConfirmForTesting /
+// expireConfirmTimeoutForTesting, agent_engine.dart:483 / :450): the parent
+// app drives the flow through rpc:confirm, tests reach the instance here.
+export function confirmFlowForTesting(): ConfirmFlow | null {
+  return confirmFlow;
 }
 
 // Auto-start when run as the main module
@@ -254,6 +400,29 @@ export {CheckpointStore} from "./utils/checkpoint_store.js";
 export type {TaskCheckpoint} from "./utils/checkpoint_store.js";
 export {ProcessSupervisor} from "./utils/process_supervisor.js";
 export type {ProcessHandle, SupervisorConfig} from "./utils/process_supervisor.js";
+
+export {
+  ConfirmFlow,
+  CONFIRM_TIMEOUT_MS,
+  BLOCKED_COMMAND_REASONS,
+  isBlockedCommandReason,
+  CONFIRM_REASON_GENERATION_INVALID,
+  CONFIRM_REASON_CANCELLED,
+  CONFIRM_REASON_TIMEOUT,
+  CONFIRM_REASON_USER_REJECTED,
+  CONFIRM_REASON_PERMISSION_CHANGED,
+  formatObservationFailure,
+} from "./react/confirm_flow.js";
+export type {
+  BlockedCommandReason,
+  ConfirmOutcomeKind,
+  CommandConfirmOutcome,
+  ConfirmRequestShape,
+  ConfirmFlowContext,
+  ConfirmFlowEvents,
+  ConfirmTimerHandle,
+  ConfirmFlowOptions,
+} from "./react/confirm_flow.js";
 
 export {ReActEngine} from "./react/engine.js";
 export {buildDefaultToolRegistry} from "./tools/index.js";

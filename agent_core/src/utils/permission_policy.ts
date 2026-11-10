@@ -14,14 +14,15 @@
 // separately, the UI could show "waiting for confirmation" on a command the engine
 // had already run.
 //
-// NOT WIRED YET, and deliberately so: computing a SafetyLevel requires the
-// SafetyGuard classifier (now ported to utils/safety_guard.ts - design doc sec. 9
-// item 7, and still uncalled), and acting on "confirm" requires the confirm
-// round-trip (rpc:confirm is still a
-// Phase 2 placeholder - sec. 9 item 6). Wiring the gate before either exists would
-// mean either blocking commands with no way to unblock them or ignoring the decision
-// outright. This module is landed first, pure and exhaustively pinned against Dart,
-// so the wiring commit can be a one-line call site with no policy inside it.
+// STILL NOT CALLED BY THE EXECUTION GATE, and deliberately so: the SafetyGuard
+// classifier that produces a SafetyLevel is ported (utils/safety_guard.ts) but still
+// uncalled, and react/engine.ts executes whatever the parser hands it. The confirm
+// half of the pair went live first: rpc:confirm dispatches into
+// react/confirm_flow.ts (design doc sec. 9 item 6), so a "confirm" decision now has
+// somewhere to go and a parent that can answer it. What is missing is the gate
+// itself - engine.ts must ask this module before it runs anything. Landing the
+// matrix first, pure and exhaustively pinned against Dart, keeps that wiring commit
+// a one-line call site with no policy inside it, which is what it was written for.
 
 import type {PermissionMode} from "../rpc/schema.js";
 
