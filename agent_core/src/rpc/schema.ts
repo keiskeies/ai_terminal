@@ -124,7 +124,12 @@ export interface ModelConfig {
   systemPrompt?: string;
 }
 
-export type PermissionMode = "safe" | "standard" | "dangerous" | "yolo";
+// Wire ids are Dart's AgentPermissionMode.id (ai_terminal/lib/models/
+// agent_permission_mode.dart). They are not free-form labels: the earlier
+// values ("safe"/"standard"/"dangerous"/"yolo") existed only on this side, so
+// every real startTask carrying a permission mode would have been rejected by
+// our own schema, and no Dart value would ever have type-checked here.
+export type PermissionMode = "readOnly" | "ask" | "auto" | "fullAuto";
 
 export interface StartTaskParams {
   taskId: string;

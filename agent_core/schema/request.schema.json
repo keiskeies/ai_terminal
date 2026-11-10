@@ -84,10 +84,10 @@
             "permissionMode": {
               "type": "string",
               "enum": [
-                "safe",
-                "standard",
-                "dangerous",
-                "yolo"
+                "readOnly",
+                "ask",
+                "auto",
+                "fullAuto"
               ]
             },
             "maxSteps": {
