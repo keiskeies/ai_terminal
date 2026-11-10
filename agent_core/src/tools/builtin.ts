@@ -13,7 +13,7 @@
 import {readFileSync, readdirSync, statSync, existsSync, mkdirSync, copyFileSync, cpSync, rmSync, renameSync, lstatSync} from "fs";
 import {ToolArgs} from "./tool_args.js";
 import {ShellType, wrapCommand, extractExitMarker} from "../utils/shell_detect.js";
-import {basename, dirname, relative, sep} from "path";
+import {basename, dirname, isAbsolute, join, normalize, relative, sep} from "path";
 import {LineDiff} from "../utils/line_diff.js";
 import {decodeEscapedText, decodeContent, writeLocalFile, patchLocalFile, TRASH_DIR_NAME} from "../utils/local_file_ops.js";
 import {LocalFilePolicy, LocalPathDecision, LocalPathVerdict} from "../utils/local_file_policy.js";
@@ -86,6 +86,96 @@ function resolveLocalPath(rawPath: string, policy: LocalFilePolicy): LocalPathDe
     );
   }
   return decision;
+}
+
+// ── local_exec cwd gate (Dart local_exec_tool.dart:108-151, 1:1) ──
+//
+// Dart gates the working directory, not just file paths: sensitive / reserved / escape
+// refuse outright, notInAllowlist asks the user through an injected authorization request
+// and RE-READS the policy afterwards (the settings dialog writes back), and a cancellation
+// check sits after the (possibly long) dialog so a user cancel cannot still create
+// directories or run commands. The Node port mirrors all four steps. The dialog seam is
+// injectable because agent_core is headless: with no callback wired, notInAllowlist
+// refuses with the same guidance text Dart shows when request == null. The default
+// trustedHost provider admits ordinary cwds at decide() - the historical posture - while
+// the blacklist still blocks sensitive directories before anything spawns.
+export type LocalDirAuthorizationRequest = (dir: string, reason: string) => Promise<boolean>;
+let defaultDirAuthRequest: LocalDirAuthorizationRequest | null = null;
+export function setLocalDirAuthorizationRequest(cb: LocalDirAuthorizationRequest | null): void {
+  defaultDirAuthRequest = cb;
+}
+
+// Dart _expandHome (local_exec_tool.dart:259-267): tilde + backslash-tilde on Windows.
+function expandHome(rawPath: string): string {
+  if (rawPath === "~" || rawPath.startsWith("~/") || rawPath.startsWith("~" + String.fromCharCode(92))) {
+    const home = process.env.USERPROFILE ?? process.env.HOME;
+    if (home !== undefined && home !== "") {
+      let rest = rawPath.slice(1);
+      if (rest.startsWith("/") || rest.startsWith(String.fromCharCode(92))) rest = rest.slice(1);
+      return normalize(join(home, rest));
+    }
+  }
+  return rawPath;
+}
+
+// Dart _clipForProgress (local_exec_tool.dart:288-291): collapse whitespace, 160 chars + ellipsis.
+function clipForProgress(command: string): string {
+  const oneLine = command.replace(new RegExp("\\s+", "g"), " ").trim();
+  return oneLine.length <= 160 ? oneLine : oneLine.slice(0, 160) + "…";
+}
+
+// The full Dart verdict switch over the cwd. Returns the post-decide resolved cwd (the
+// string every later mkdir/spawn must use), or a ready-to-return failure ToolResult.
+async function resolveExecCwd(cwd: string, command: string, ctx: ToolContext): Promise<string | ToolResult> {
+  let policy = defaultLocalFilePolicy();
+  const decision = policy.decide(cwd);
+  if (decision.verdict === LocalPathVerdict.sensitive || decision.verdict === LocalPathVerdict.reserved || decision.verdict === LocalPathVerdict.escape) {
+    return ToolResult.failure("本机目录被安全策略拒绝: " + decision.resolved + "\n原因: " + (decision.reason ?? "敏感路径"));
+  }
+  if (decision.verdict === LocalPathVerdict.notInAllowlist) {
+    const request = defaultDirAuthRequest;
+    if (request === null) {
+      return ToolResult.failure(
+        "本机目录未授权: " + decision.resolved + "\n"
+        + "原因: " + (decision.reason ?? "不在授权目录内") + "\n"
+        + "请让用户在 设置 → Agent → 本地文件 中添加该目录，或改用远程 execute。",
+      );
+    }
+    const willCreate = !(existsSync(decision.resolved) && statSync(decision.resolved).isDirectory());
+    const approved = await request(
+      decision.resolved,
+      "local_exec 需要在该目录执行本机命令：" + clipForProgress(command)
+      + (willCreate ? "（目录不存在，允许后将创建）" : ""),
+    );
+    if (!approved) {
+      return ToolResult.failure(
+        "用户拒绝授权本机目录: " + decision.resolved + "，命令未执行。"
+        + "请用 ask 询问用户是否授权，或改用远程 execute；不要反复重试同一目录。",
+      );
+    }
+    // Dart:136-138 - the dialog wrote the allowlist back; re-read THEN re-decide.
+    policy = defaultLocalFilePolicy();
+    const after = policy.decide(cwd);
+    if (!after.isAllowed) {
+      return ToolResult.failure(
+        "授权后仍无法访问本机目录: " + after.resolved + "\n"
+        + "原因: " + (after.reason ?? "未通过白名单判定"),
+      );
+    }
+    // fall through with the freshly decided path
+    return cancelGuard(after.resolved, ctx);
+  }
+  return cancelGuard(decision.resolved, ctx);
+}
+
+// Dart:148-151 - the approval dialog can sit open for a long time; a cancel meanwhile
+// must stop before any mkdir/spawn. ctx.cancelled mirrors Dart isTaskActive: only an
+// explicit "not active" refuses (a host that wires no callback behaves like Dart null).
+function cancelGuard(resolvedCwd: string, ctx: ToolContext): string | ToolResult {
+  if (ctx.cancelled !== undefined && ctx.cancelled()) {
+    return ToolResult.failure("任务已取消，本机命令未执行。");
+  }
+  return resolvedCwd;
 }
 
 function globToRegExp(glob: string): RegExp | null {
@@ -505,14 +595,30 @@ export class LocalExecTool extends AgentTool {
   }
   async execute(args: ToolArgs, ctx: ToolContext): Promise<ToolResult> {
     const command = args.getString("command").trim();
-    const cwd = args.getString("cwd").trim();
+    const rawCwd = args.getString("cwd").trim();
     if (command === "") return ToolResult.failure("missing required param: command");
-    if (cwd === "") return ToolResult.failure("missing required param: cwd");
+    if (rawCwd === "") return ToolResult.failure("missing required param: cwd");
+    // Dart :103-106 - home expansion happens BEFORE the absolute-path check, and the
+    // refusal still quotes the string the model sent.
+    const expandedCwd = expandHome(rawCwd);
+    if (!isAbsolute(expandedCwd)) {
+      return ToolResult.failure("cwd 必须是绝对路径（收到: " + rawCwd + "）。不要使用 . 或相对路径。");
+    }
+    const gated = await resolveExecCwd(expandedCwd, command, ctx);
+    if (gated instanceof ToolResult) return gated;
+    const cwd = gated;
     const timeoutSec = Math.min(600, args.getInt("timeout", 120));
     const shellArg = args.getString("shell", "").toLowerCase();
     const shell: ShellType = shellArg !== "" ? (shellArg as ShellType) : (process.platform === "win32" ? "powershell" : "bash");
     const marker = "EXITCODE_LOCAL:"; // Dart convention: marker ends with ':' (donePattern = marker + digits)
     const wrapped = wrapCommand(command, shell, marker);
+    // Dart:153-161 - create the approved working directory when it does not exist yet.
+    if (!existsSync(cwd)) {
+      try { mkdirSync(cwd, {recursive: true}); }
+      catch (e: unknown) {
+        return ToolResult.failure("无法创建工作目录 " + cwd + ": " + (e instanceof Error ? e.message : String(e)));
+      }
+    }
     const t0 = Date.now();
     try {
       const {stdout, stderr, exitCode} = await runLocalCommand(wrapped, cwd, shell, timeoutSec);
@@ -888,4 +994,10 @@ export class LocalFileDeleteTool extends AgentTool {
     return ToolResult.success("\u5DF2\u79FB\u5165\u56DE\u6536\u533A\uFF08\u672A\u771F\u5220\uFF0C\u53EF\u8FD8\u539F\uFF09: " + rawPath + "\n\u56DE\u6536\u4F4D\u7F6E: " + target, {restoreFrom: target, restoreTo: rawPath});
   }
 }
+
+
+
+
+
+
 
