@@ -162,7 +162,7 @@ agent_core/
       engine.ts          # 主循环 (对应 agent_engine.dart 4740 行; 实际 391 行, 是骨架不是全量)
       parser.ts          # 流式 ReAct 解析
       goal.ts            # 目标续跑 / 中断检测 —— 待补, 未实现 (§9 第 6 项)
-      safety.ts          # 危险命令 confirm 流程 —— 待补, 未实现 (§9 第 6 项)
+      safety.ts          # 危险命令 confirm 流程仍未实现 (§9 第 6 项); 它要调的档位矩阵已落地 -> utils/permission_policy.ts (§9 第 7 项)
       regex.ts           # 落地新增 (从 parser 拆出的正则)
     tools/
       registry.ts        # -> 实际是 tools/index.ts 的 buildDefaultToolRegistry(platform)
@@ -186,6 +186,7 @@ agent_core/
       generation.ts      # generation check 工具
       pending_registry.ts / line_diff.ts / shell_detect.ts / rollout.ts
       checkpoint_store.ts / local_file_ops.ts / process_supervisor.ts           # 落地新增
+      permission_policy.ts   # 落地新增: 对应 lib/core/permission_policy.dart (49 行); 草图把档位判断划给 safety.ts, 实际单独成模块, 见 §9 第 7 项
   test/
     e2e_parser.test.ts      # 对应 react_parse_e2e_test.dart —— 实际落在 e2e/byte_comparison_10.test.ts
     e2e_cancel.test.ts      # 实际落在 regression/r1_generation_check.test.ts + regression/w5_e2e.test.ts
@@ -543,8 +544,8 @@ agent_core/test/regression/
 3. **多窗口 / 多 agent 实例** — Node 侧 `process` 是单例还是支持多实例？（建议：每个 TaskId 一个子进程, 上限 4 个）
 4. **checkpoint 粒度** — 每 30s 还是每个工具执行完？（建议：每个工具执行完, 增量写）
 5. **Dart 实现保留多久** — 8 周后？6 个月？（建议：移动端保留 1 年，桌面端 6 个月后删）
-6. **危险命令 confirm 流程落在哪一层** — Dart 侧是一个 `_confirmCompleter` 被 **4 条路径**唤醒（用户确认 / 拒绝 / 10 分钟超时 / `cancelTask`，后者先 generation++ 再 `complete(false)`），加 6 类拒绝原因码；`waiting_confirm` 与 `rpc:confirm` 在 Node 侧只有占位（`src/index.ts` 直接回 `confirm not yet implemented - Phase 2`）。占位不是实现：要么补齐，要么灰度前显式禁掉
-7. **`SafetyGuard`（Dart 512 行）是否整搬** — Node 侧目前只有 `tools/orchestrator.ts` 里那个保守只读分类（注释自己写明「mirroring SafetyGuard.check -> safe」），风险分级、审计文案、`destructiveToolNeedsConfirm` 都还没过来；它与第 6 项是同一个缺口的两面。
+6. **危险命令 confirm 流程落在哪一层** — Dart 侧是一个 `_confirmCompleter` 被 **4 条路径**唤醒（用户确认 / 拒绝 / 10 分钟超时 / `cancelTask`，后者先 generation++ 再 `complete(false)`），加 6 类拒绝原因码；`waiting_confirm` 与 `rpc:confirm` 在 Node 侧只有占位（`src/index.ts` 直接回 `confirm not yet implemented - Phase 2`）。占位不是实现：档位矩阵已落在 `utils/permission_policy.ts`，但还没有调用方，所以「等待确认」在 Node 侧仍等价于「直接执行」；要么补齐，要么灰度前显式禁掉 blocked 档。
+7. **`SafetyGuard`（Dart 512 行）是否整搬** — Node 侧目前只有 `tools/orchestrator.ts` 里那个保守只读分类（注释自己写明「mirroring SafetyGuard.check -> safe」），风险分级与审计文案都还没过来；它与第 6 项是同一个缺口的两面。**已落地的那一半**：档位矩阵 `decideCommand` / `destructiveToolNeedsConfirm` 已按 Dart 1:1 落到 `utils/permission_policy.ts`，16 格全表 + Dart 侧结构对账锁在 `test/permission_policy.test.ts`（改 Dart 的守卫顺序、改 `kPermissionDecision*` 取值或改 `SafetyLevel` 顺序都会变红）。**仍未落地**：`SafetyLevel` 的分级来源本身，即 `SafetyGuard.check()` 的分类规则与中文审计文案。
 
 ---
 
@@ -560,7 +561,7 @@ agent_core/
     notification.schema.json  reverse.schema.json  tool.schema.json
     agent-bridge.schema.json
   tools/check-schema-compat.mjs               # 只做 JSON 自身一致性, 不跨语言比对 (§6.3.7)
-  src/                                       # 41 个 .ts
+  src/                                       # 42 个 .ts
     index.ts
     rpc/{server,client,schema,transport}.ts
     react/{engine,parser,regex,index}.ts      # 待补: goal.ts, safety.ts (§9 第 6 项)
@@ -569,14 +570,15 @@ agent_core/
     mcp/{index,manager,connection,models,oauth,tool_adapter}.ts
     llm/{index,clients,openai_stream,anthropic_stream,ollama_stream,stream}.ts
     utils/{index,tail_buffer,stable_hash,generation,pending_registry,line_diff,
-           shell_detect,rollout,checkpoint_store,local_file_ops,process_supervisor}.ts
-  test/                                      # 51 个 .test.ts + 13 份 fixture
+           shell_detect,rollout,checkpoint_store,local_file_ops,process_supervisor,
+           permission_policy}.ts                       # permission_policy 落地新增 (§9 第 7 项)
+  test/                                      # 52 个 .test.ts + 13 份 fixture
     regression/r{1,2,3,4,5,6,9}_*.test.ts     # 九条规则本体, 见 §6.2
     regression/{manifest,anthropic_e2e,w5_e2e}.test.ts
     e2e/byte_comparison_10.test.ts            # 取代草图里的 e2e/{parser,cancel,multi_host,mcp,tool}
     e2e/fixtures/{golden10.json,i0.txt..i9.txt}
     fixtures/{stable_id_1000.jsonl,verify.mjs}
-    <38 个按模块命名的 .test.ts, 名称与 src/ 一一对应>
+    <39 个按模块命名的 .test.ts>
 
 ai_terminal/lib/agent_bridge/                 # Dart 侧, 不在本分支范围
   agent_bridge.dart            json_rpc_transport.dart      # 已存在
@@ -594,9 +596,9 @@ ai_terminal/lib/agent_bridge/                 # Dart 侧, 不在本分支范围
 | Node: mcp/* | 500 | mcp_manager.dart 496 | 实际 2378 (connection 765 + tool_adapter 362, 草图严重低估) |
 | Node: llm/* | 400 | ai_service.dart 609 | 实际 482 (三个 *_stream.ts + clients + stream, 裸 fetch, 见 §8) |
 | Node: rpc/* | 600 | 新 | 实际 615 (schema 359 / transport 137 / server 69 / client 50) |
-| Node: utils/* | 500 | 新 | 实际 1131; 另有 pty/ 236 行 (adapter 232), 草图未单列 |
+| Node: utils/* | 500 | 新 | 实际 1222 (12 文件; permission_policy.ts 87 行为本轮新增); 另有 pty/ 236 行 (adapter 232), 草图未单列 |
 | Dart: agent_bridge/* | 800 | 新 | 实际 294 (agent_bridge.dart 94 + json_rpc_transport.dart 200); 另 4 个文件待补 |
-| **合计** | **~9900** | — | 实际 Node src 8319 + test 7538 = 15857 (估的 1.6 倍, 差额几乎全在 mcp 与 utils) |
+| **合计** | **~9900** | — | 实际 Node src 8429 + test 7809 = 16238 (估的 1.6 倍, 差额几乎全在 mcp 与 utils) |
 
 ### 10.3 关键不变式（必须持续为真）
 

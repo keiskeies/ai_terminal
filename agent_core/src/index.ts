@@ -26,6 +26,13 @@ export type {LlmClient, LlmResult, ChatMsg} from "./llm/clients.js";
 export {StdioChildTransport} from "./rpc/transport.js";
 export {RpcServer} from "./rpc/server.js";
 export {ReverseRpcClient} from "./rpc/client.js";
+export {
+  decideCommand,
+  destructiveToolNeedsConfirm,
+  SAFETY_LEVELS,
+  GATE_DECISIONS,
+} from "./utils/permission_policy.js";
+export type {SafetyLevel, CommandGateDecision} from "./utils/permission_policy.js";
 
 // ─── Task state (Phase 0 minimal) ───────────────────────────────
 interface TaskState {

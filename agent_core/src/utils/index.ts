@@ -19,4 +19,20 @@ export {CheckpointStore} from "./checkpoint_store.js";
 export type {TaskCheckpoint} from "./checkpoint_store.js";
 
 export {ProcessSupervisor} from "./process_supervisor.js";
+
+// Gate matrix ported from lib/core/permission_policy.dart (design doc §9 items 6-7).
+// Intentionally not called from anywhere yet: SafetyGuard classification and the
+// rpc:confirm round-trip are both still missing, and wiring only the decision would
+// mean computing a gate nobody acts on.
+export {
+  decideCommand,
+  destructiveToolNeedsConfirm,
+  SAFETY_LEVELS,
+  GATE_DECISIONS,
+  PERMISSION_DECISION_EXECUTE,
+  PERMISSION_DECISION_CONFIRM,
+  PERMISSION_DECISION_REJECT,
+} from "./permission_policy.js";
+export type {SafetyLevel, CommandGateDecision} from "./permission_policy.js";
+
 export type {ProcessHandle, SupervisorConfig} from "./process_supervisor.js";
