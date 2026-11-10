@@ -44,14 +44,16 @@ Node.js 子进程 (新 Agent Core) — 内嵌 Node (NodeApp 打包)
   agent_core/
     react/engine.ts        (ReAct 主循环, 替换 agent_engine)
     react/parser.ts       (替换 react_stream_parser)
-    tools/registry.ts     (替换 agent_tool + 内置 tools)
+    tools/registry.ts     (替换 agent_tool + 内置 tools)  [实际: tools/index.ts]
     mcp/manager.ts        (@modelcontextprotocol/sdk 直连)
-    llm/clients.ts        (@ai-sdk/openai|anthropic|ollama)
+    llm/clients.ts        (实际: 裸 fetch + 三个 *_stream.ts, 见 §8 决策)
     pty/adapter.ts        (node-pty, 替换 local_terminal)
-    file/ops.ts           (fs/promises, 替换 local_file_tools)
-    web/tools.ts          (fetch + 搜索后端, 替换 web_tools)
-    rpc/handlers.ts       (JSON-RPC method router)
+    file/ops.ts           (fs/promises, 替换 local_file_tools)  [实际: utils/local_file_ops.ts]
+    web/tools.ts          (fetch + 搜索后端, 替换 web_tools)  [实际: tools/web_search.ts]
+    rpc/handlers.ts       (JSON-RPC method router)  [实际: rpc/server.ts]
 ```
+
+> 本树是立项草图。落地后的真实文件清单见 §10.1；方括号里是本草图与实际的差异标注。
 
 ### 进程生命周期策略
 
@@ -141,42 +143,54 @@ enum TerminalState {
 ### 3.1 Node 侧模块（新建 `agent_core/`）
 
 ```
+# 下面是立项草图; 落地后的真实清单在 §10.1 (两处文件名不一致时以 §10.1 为准)。
+# 保留草图是为了让「计划 vs 实际」的差值本身可见 —— 已改名 / 合并 / 未做的文件在行尾标注归宿。
 agent_core/
   package.json
   tsconfig.json
   esbuild.config.js
+  schema/                    # 7 份 JSON Schema + protocol.version.json (落地新增, 草图未列)
+  tools/check-schema-compat.mjs
   src/
     index.ts               # 入口, 启动 JSON-RPC server on stdio
     rpc/
       server.ts          # 父 -> 子 handler
       client.ts          # 子 -> 父 reverse handler (Dart 实现)
       schema.ts          # 类型 + 校验
+      transport.ts       # 落地新增 (草图未列)
     react/
-      engine.ts          # 主循环 (对应 agent_engine.dart 4740 行)
+      engine.ts          # 主循环 (对应 agent_engine.dart 4740 行; 实际 391 行, 是骨架不是全量)
       parser.ts          # 流式 ReAct 解析
-      goal.ts            # 目标续跑 / 中断检测
-      safety.ts          # 危险命令 confirm 流程
+      goal.ts            # 目标续跑 / 中断检测 —— 待补, 未实现 (§9 第 6 项)
+      safety.ts          # 危险命令 confirm 流程 —— 待补, 未实现 (§9 第 6 项)
+      regex.ts           # 落地新增 (从 parser 拆出的正则)
     tools/
-      registry.ts
+      registry.ts        # -> 实际是 tools/index.ts 的 buildDefaultToolRegistry(platform)
       builtin.ts         # exec / file / web / diff 等
-      pty_adapter.ts     # node-pty 封装
+      pty_adapter.ts     # -> 实际在 pty/adapter.ts (不在 tools/ 下)
+      dispatcher.ts / orchestrator.ts / platform.ts / tool_args.ts / web_search.ts   # 落地新增
+    pty/{index,adapter}.ts                # node-pty 封装
     mcp/
       manager.ts         # @modelcontextprotocol/sdk
       oauth.ts           # 复用 mcp_oauth 逻辑
+      connection.ts / models.ts / tool_adapter.ts                              # 落地新增
     llm/
-      openai.ts          # @ai-sdk/openai
-      anthropic.ts       # @ai-sdk/anthropic
-      ollama.ts          # @ai-sdk/openai-compatible
+      openai.ts          # -> openai_stream.ts   (裸 fetch, 不是 @ai-sdk/openai, 见 §8)
+      anthropic.ts       # -> anthropic_stream.ts (裸 fetch)
+      ollama.ts          # -> ollama_stream.ts    (裸 fetch)
       stream.ts          # chunk 合并 + reasoning_content
+      clients.ts / index.ts               # 落地新增 (MockLlmClient 也在 clients.ts)
     utils/
       tail_buffer.ts     # 替换 TailTextBuffer
-      stable_hash.ts     # FNV-1a 64-bit, 与 Dart 侧实现一致
+      stable_hash.ts     # FNV-1a 64-bit 变体, 与 Dart 侧实现一致 (§10.3 第 1 条)
       generation.ts      # generation check 工具
+      pending_registry.ts / line_diff.ts / shell_detect.ts / rollout.ts
+      checkpoint_store.ts / local_file_ops.ts / process_supervisor.ts           # 落地新增
   test/
-    e2e_parser.test.ts   # 对应 react_parse_e2e_test.dart
-    e2e_cancel.test.ts
-    e2e_multi_host.test.ts
-  dist/                      # 编译产物 (tsc + esbuild bundle)
+    e2e_parser.test.ts      # 对应 react_parse_e2e_test.dart —— 实际落在 e2e/byte_comparison_10.test.ts
+    e2e_cancel.test.ts      # 实际落在 regression/r1_generation_check.test.ts + regression/w5_e2e.test.ts
+    e2e_multi_host.test.ts  # 实际落在 regression/r3_multi_host.test.ts
+  dist/                      # 编译产物 (tsc + esbuild bundle, gitignored)
 ```
 
 **关键类型（节选）**：
@@ -207,12 +221,13 @@ type AgentEvent =
 | 新增 `agent_bridge/` | 见下方目录 | 中 |
 
 ```
-ai_terminal/lib/agent_bridge/
-  agent_bridge_client.dart   # 子进程生命周期 + RPC 收发
-  json_rpc_transport.dart    # JSONL stdio 传输
-  frame_splitter.dart        # 大 payload 重组
-  agent_event_codegen.dart   # 从 schema.json 生成
-  process_manager.dart       # spawn / kill / 崩溃恢复
+ai_terminal/lib/agent_bridge/          # 现状: 目录下只有 2 个文件, 其余为规划
+  agent_bridge.dart          # 已存在
+  json_rpc_transport.dart    # 已存在
+  agent_bridge_client.dart   # 待补：子进程生命周期 + RPC 收发
+  frame_splitter.dart        # 待补：大 payload 重组
+  agent_event_codegen.dart   # 待补：从 schema.json 生成
+  process_manager.dart       # 待补：spawn / kill / 崩溃恢复
 ```
 
 ### 3.3 节点捆绑策略
@@ -243,7 +258,7 @@ ai_terminal/lib/agent_bridge/
 | R2 callback 清除顺序 | null callbacks → cancelTask → 移除注册表 | 同序，但 `EventEmitter` 的 `removeAllListeners` 时机不同 | 中 | 写 `LifecycleGuard` 统一封装；单测覆盖 4 种路径（switchTab / modelSwitch / removeTab / init） |
 | R2.4 StreamController.add 在 isClosed 后 throw | `!controller.isClosed` 检查 | `Readable` 在 `destroy` 后 `write` 返回 `false` 不 throw，行为不同 | 低 | 用 `SafeStream` 封装 |
 | R3 多主机 hostId 隔离 | 捕获 hostId，不用 activeHostId | 同逻辑，但跨进程后 hostId 通过 RPC 传递，需在 taskId 里冻结 host | 中 | `startTask` 时 `hostId` 写入 task record，后续 RPC 不再读 activeHostId |
-| R4 事件 dedup | `stableId` (FNV-1a 64-bit) | 移植 `stable_hash.ts`，单测覆盖 10 万样本与 Dart 实现一致 | 中 | 写 `stableHashDifferentialTest`，Dart 侧和 Node 侧跑同一批输入，比对 |
+| R4 事件 dedup | `stableId`（FNV-1a **变体**，见 §10.3 第 1 条） | 移植 `utils/stable_hash.ts`；跨语言字节一致由 **1000 行 Dart 生成的金标 fixture** 锁（`test/fixture_diff.test.ts` 跑源码，`test/fixtures/verify.mjs` 跑 `dist/`），另有 **20 万条**确定性语料证明摘要无碰撞而 `h*31+b`(int32) 有碰撞（`test/regression/r4_stable_id.test.ts`） | 中 | 原计划写 `stableHashDifferentialTest` 让 Dart/Node 现跑同一批输入；实际改成金标 fixture（Dart 侧离线产出十六进制），因为 CI 里没有 Dart 运行时可用（见 §10.3 第 1 条的口径修正） |
 | R5 终态白名单 | `status == completed` | `state === Completed`（TS 联合类型，编译期穷举） | 低 | TS 强类型天然优势，比 Dart 更安全 |
 | R6 shell 分叉 | PowerShell 用分号 / cmd.exe 用 & / bash 用 $? | `node-pty` 的 spawn 参数与 `flutter_pty` 不同 | 中 | 抽 `shell_detect.ts`，与 Dart 侧 `wrappedCommand` 逻辑对齐；跨平台 CI 跑 |
 | R6.6 POSIX vs 本地路径 | `p.posix.join` vs `p.join` | Node `path.posix` vs `path`，同语义 | 低 | 直接用 `path.posix` / `path` 对应 |
@@ -291,7 +306,7 @@ ai_terminal/lib/agent_bridge/
 
 **目标**：把"用户输入 → AI 流式输出"这条最核心路径迁过去，UI 完全不动。
 
-- [x] W2：`llm/clients.ts`（OpenAI / Anthropic / Ollama，用 `@ai-sdk/*`）✅ 已移植（streaming 三分支 + stream.ts chunk 合并）
+- [x] W2：LLM 三后端流式 ✅ 已移植，但**实际落地形态与本草图不同**：没有引入 `@ai-sdk/*`，而是 `llm/{openai,anthropic,ollama}_stream.ts` 直接用全局 `fetch` 打流 + `stream.ts` 做 chunk 合并（决策变更见 §8）；`llm/clients.ts` 装的是 provider 装配与 `MockLlmClient`，不是 SDK 封装
 - [x] W2：`stream.ts`（chunk 合并 + reasoning_content，对应 `reasoningDeltaOf`）✅ 已移植（utils 无，stream.ts 独立）
 - [x] W3：`react/parser.ts`（1:1 移植 `react_stream_parser.dart`）✅ 已移植
 - [x] W3：3 条历史回归 e2e 测试（多行拼接 / 工具break / stableId 碰撞）✅ regression/r9_stream_e2e.test.ts
@@ -352,7 +367,7 @@ agent_core/test/regression/
   r1_then_onerror.test.ts          # R1.3
   r2_lifecycle.test.ts             # R2 (4 种路径 × callback 清除顺序)
   r3_multi_host.test.ts            # R3 (3 host 并发切换)
-  r4_stable_id.test.ts             # R4 (10 万样本 Dart/Node 比对)
+  r4_stable_id.test.ts             # R4 (20 万语料无碰撞 + 2 万 id 空间 + 身份/发生两半各锁死)
   r5_terminal_whitelist.test.ts    # R5 (5 种终态)
   r6_shell_fork.test.ts            # R6 (bash/cmd/powershell 3 平台)
   r9_stream_e2e.test.ts            # R9 (3 条历史 bug + 7 条新用例)
@@ -376,7 +391,7 @@ agent_core/test/regression/
 
 > 说明：`process_supervisor.test.ts` 已覆盖 ProcessSupervisor 生命周期 7 项，故 `r2_lifecycle.test.ts` 刻意改打 RPC host 的『谁创建谁清理 + 通知/响应顺序』，不重复造轮子；各回归文件互相交叉引用而不重复实现。
 >
-> 另有 `manifest.test.ts`（不属于九条规则，它守的是清单本身）：直接读本文档的 6.2 列表与 6.3 状态表，断言「被点名的文件存在」、「已落地的不再标待补」、「状态列只能是已落地 / 待补两者居一」、「不允许出现 r<N>_ 开头却未被 6.2 列出的回归文件」。四种漂移（改名、删行、状态回退、新增未登记）均已用变量测试逐一验证会变红。
+> 另有 `manifest.test.ts`（不属于九条规则，它守的是清单本身）：直接读本文档的 6.2 列表与 6.3 状态表，断言「被点名的文件存在」、「已落地的不再标待补」、「状态列只能是已落地 / 待补两者居一」、「不允许出现 r<N>_ 开头却未被 6.2 列出的回归文件」。四种漂移（改名、删行、状态回退、新增未登记）均已用变异测试逐一验证会变红。
 
 #### 6.3.1 落地过程中修掉的真实缺陷：本地命令退出码包装器
 
@@ -474,6 +489,22 @@ agent_core/test/regression/
 
 > 边界：`ci_workflow.test.ts` 与 `glob_case.test.ts` 都不属于 §6.2 九条规则，也不进 6.3 状态表；前者守的是 CI 定义，后者守的是移植自身的大小写极性。同 `manifest.test.ts` / `build_externals.test.ts` 一个待遇。
 
+#### 6.3.7 落地过程中修掉的真实缺陷：权限档位的取值是两端各编一套，协议层永远不会报错
+
+**症状**：`schema/request.schema.json` 的 `rpc:startTask.params.permissionMode` 与 `src/rpc/schema.ts` 的 `PermissionMode` 一度同时写着 `safe / standard / dangerous / yolo`。
+
+**后果**：Dart 侧 `AgentPermissionMode.id` 只有 `readOnly / ask / auto / fullAuto` 四种取值（`models/agent_permission_mode.dart`）；那组拼写在 Dart 全仓 **0 命中**，连别名都不是 —— `parsePermissionMode('yolo')` 明确返回 null，别名只有中文名与 `read-only / full-auto` 这类。真实路径是 Dart 发来一个 Node 认不出的档位，而 Node 的类型系统认为它就是合法的 `"readOnly"`，运行期又不做任何校验，于是直接落进「按自动执行处理」的分支：UI 显示「只读」，Node 实际在跑 `blocked` 级命令，全程无错可报。
+
+**根因**：草图阶段按「权限模式听起来该叫什么」命名，而不是按对端已经存在的线协议取值命名。两端各自类型自洽，编译期与运行期都不会响 —— 这正是跨语言协议最典型的失效形状。
+
+**修法**：两处一起改回 Dart 的 id（JSON Schema 的 `enum` 与 TS 的 union 必须同改，取值必须全等），并新增 `test/protocol_enum_parity.test.ts`（9 条）作为跨语言取值守卫。
+
+**为什么必须新增守卫，`check-schema-compat.mjs` 挡不住**：它做的是 JSON Schema 自身一致性 —— 6 份文件可解析、`protocol.version.json` 是 1.0、每个 `oneOf` 分支的 `method.const` 唯一、umbrella 的 `$ref` 指得到、`$id` 与文件名相同。它**从不打开任何 Dart 文件**，所以「本端取值 ≠ 对端取值」这一整类缺陷对它而言不存在。新守卫直接从 Dart 源码抠取值再比对，并刻意**比顺序而不是比集合**：`AgentEvent` / `AgentEventType` / `AgentFinishState` 在 Dart 侧没有任何 JSON 序列化器，Hive 适配器按**声明顺序**落 int —— 枚举名就是线协议值，枚举顺序就是持久化契约。把成员重排一次，历史数据里那些 int 的含义就集体错位，而集合比较看不出任何变化。
+
+**顺带钉住的两个解析坑**（都做过变异验证）：Dart 枚举成员后常跟中文注释，注释里的逗号会把 `split(',')` 切碎，因此必须先剥 `//` 注释再切；剥完仍不是合法标识符的必须抛错，而不是静默产出怪值 —— 否则守卫自己就会退化成「永远通过」的那种守卫。
+
+**验证**：9 项变异全部变红 —— 6 项改 Node 侧（TS union 退回旧值、schema `enum` 退回旧值、抽取器退化成返回空数组、Dart 路径写旧、正则过度转义、按名字查枚举的逻辑坏掉），**3 项直接改 Dart 侧**（重排 `AgentFinishState` 成员、删掉 `SafetyLevel` 一个成员、把 `readOnly` 的 id 改成 `safe`），每项都恰好让对应那条断言失败（探针跑完 Dart 树 `git status` 干净、逐文件 sha256 复原）。另有 2 项探针专门验守卫**自己**的防御有承重：把某条比较两端同时喂空数组，长度闸门立刻变红；把长度闸门放宽成 `>= 0`，同一条变异就静默通过 —— 守卫自己也要被证明不是装饰。
+
 ---
 
 ## 7. 回滚预案
@@ -495,12 +526,13 @@ agent_core/test/regression/
 |---|---|---|---|
 | 通信协议 | stdio JSON-RPC | 最稳, 无端口, 生命周期对齐 | gRPC / HTTP loopback（复杂度高，不选） |
 | Node 捆绑 | NodeApp | 官方, 多平台 | pkg (停维护), nexe (跨平台差) |
-| LLM SDK | `@ai-sdk/*` | 一等公民, 流式/工具/取消都管 | 裸 fetch + 自写（重复劳动，不选） |
+| LLM SDK | **实现改为裸 `fetch` + 自写 SSE 解析**（原选 `@ai-sdk/*`） | `dependencies` 实际只有 3 个包；三个 `*_stream.ts` 直接按上游真实 chunk 形状解析（含 `reasoning_content` 差异与 `reasoningDeltaOf` 语义），才能和 Dart 侧逐字节对齐 | 保留 `@ai-sdk/*`（原计划：一等公民, 流式/工具/取消都管 —— 但它先归一化 chunk，字节比对层就没东西可比了；**已偏离原决策**） |
 | MCP | `@modelcontextprotocol/sdk` | 官方 | 保留 mcp_dart（生态差，不选） |
 | 本地 PTY | node-pty | 主流 | 保留 flutter_pty（同进程收益，不选） |
 | SSH | 保留 dartssh2 | 成熟度高于 ssh2 | 迁 ssh2（重复踩坑，不选） |
 | SQLite | 保留 sqflite | 数据层不动 | 迁 better-sqlite3（数据迁移成本高，不选） |
 | UI | 保留 Flutter + xterm.dart | 渲染质量 | xterm.js in WebView（卡顿回潮，不选） |
+| 权限档位取值 | 以 **Dart `AgentPermissionMode.id`** 为准：`readOnly / ask / auto / fullAuto` | 线协议取值由 Dart 单方面定义。Node 侧自造的 `safe / standard / dangerous / yolo` 在 Dart 全仓 0 命中（连别名都不是：`parsePermissionMode('yolo')` 返回 null），而两端类型系统各自完全自洽 —— 只会静默降级成「自动执行」，不会报错（§6.3.7） | 保留 Node 拼写 + 传输层做映射（多一处会漂移的地方，不选） |
 
 ---
 
@@ -511,6 +543,8 @@ agent_core/test/regression/
 3. **多窗口 / 多 agent 实例** — Node 侧 `process` 是单例还是支持多实例？（建议：每个 TaskId 一个子进程, 上限 4 个）
 4. **checkpoint 粒度** — 每 30s 还是每个工具执行完？（建议：每个工具执行完, 增量写）
 5. **Dart 实现保留多久** — 8 周后？6 个月？（建议：移动端保留 1 年，桌面端 6 个月后删）
+6. **危险命令 confirm 流程落在哪一层** — Dart 侧是一个 `_confirmCompleter` 被 **4 条路径**唤醒（用户确认 / 拒绝 / 10 分钟超时 / `cancelTask`，后者先 generation++ 再 `complete(false)`），加 6 类拒绝原因码；`waiting_confirm` 与 `rpc:confirm` 在 Node 侧只有占位（`src/index.ts` 直接回 `confirm not yet implemented - Phase 2`）。占位不是实现：要么补齐，要么灰度前显式禁掉
+7. **`SafetyGuard`（Dart 512 行）是否整搬** — Node 侧目前只有 `tools/orchestrator.ts` 里那个保守只读分类（注释自己写明「mirroring SafetyGuard.check -> safe」），风险分级、审计文案、`destructiveToolNeedsConfirm` 都还没过来；它与第 6 项是同一个缺口的两面。
 
 ---
 
@@ -520,45 +554,53 @@ agent_core/test/regression/
 
 ```
 agent_core/
-  package.json
-  tsconfig.json
-  esbuild.config.js
-  src/
+  package.json  tsconfig.json  esbuild.config.js   # dependencies 只有 3 个包, 见 §8
+  schema/                                    # 7 份协议契约 (§2.3)
+    protocol.version.json  request.schema.json  event.schema.json
+    notification.schema.json  reverse.schema.json  tool.schema.json
+    agent-bridge.schema.json
+  tools/check-schema-compat.mjs               # 只做 JSON 自身一致性, 不跨语言比对 (§6.3.7)
+  src/                                       # 41 个 .ts
     index.ts
-    rpc/{server,client,schema}.ts
-    react/{engine,parser,goal,safety}.ts
-    tools/{registry,builtin,pty_adapter}.ts
-    mcp/{manager,oauth}.ts
-    llm/{openai,anthropic,ollama,stream}.ts
-    utils/{tail_buffer,stable_hash,generation}.ts
-  test/e2e/{parser,cancel,multi_host,mcp,tool}.test.ts
-  test/regression/r{1,2,3,4,5,6,9}_*.test.ts
+    rpc/{server,client,schema,transport}.ts
+    react/{engine,parser,regex,index}.ts      # 待补: goal.ts, safety.ts (§9 第 6 项)
+    tools/{index,builtin,dispatcher,orchestrator,platform,tool_args,web_search}.ts
+    pty/{index,adapter}.ts
+    mcp/{index,manager,connection,models,oauth,tool_adapter}.ts
+    llm/{index,clients,openai_stream,anthropic_stream,ollama_stream,stream}.ts
+    utils/{index,tail_buffer,stable_hash,generation,pending_registry,line_diff,
+           shell_detect,rollout,checkpoint_store,local_file_ops,process_supervisor}.ts
+  test/                                      # 51 个 .test.ts + 13 份 fixture
+    regression/r{1,2,3,4,5,6,9}_*.test.ts     # 九条规则本体, 见 §6.2
+    regression/{manifest,anthropic_e2e,w5_e2e}.test.ts
+    e2e/byte_comparison_10.test.ts            # 取代草图里的 e2e/{parser,cancel,multi_host,mcp,tool}
+    e2e/fixtures/{golden10.json,i0.txt..i9.txt}
+    fixtures/{stable_id_1000.jsonl,verify.mjs}
+    <38 个按模块命名的 .test.ts, 名称与 src/ 一一对应>
 
-ai_terminal/lib/agent_bridge/
-  agent_bridge_client.dart
-  json_rpc_transport.dart
-  frame_splitter.dart
-  agent_event_codegen.dart
-  process_manager.dart
+ai_terminal/lib/agent_bridge/                 # Dart 侧, 不在本分支范围
+  agent_bridge.dart            json_rpc_transport.dart      # 已存在
+  agent_bridge_client.dart     frame_splitter.dart          # 待补
+  agent_event_codegen.dart     process_manager.dart         # 待补
 ```
 
-### 10.2 估算代码量
+### 10.2 估算代码量 vs 实际（估算是立项时的量纲，不是承诺；差值本身就是信息）
 
-| 模块 | 预估行数 | 对应 Dart 原文 |
-|---|---|---|
-| Node: react/engine | 2500 | agent_engine.dart 4740 |
-| Node: react/parser | 600 | react_stream_parser.dart 425 |
-| Node: tools/* | 3000 | agent_tool.dart 2634 |
-| Node: mcp/* | 500 | mcp_manager.dart 496 |
-| Node: llm/* | 400 | ai_service.dart 609 |
-| Node: rpc/* | 600 | 新 |
-| Node: utils/* | 500 | 新 |
-| Dart: agent_bridge/* | 800 | 新 |
-| **合计** | **~9900** | — |
+| 模块 | 预估行数 | 对应 Dart 原文 | 落地后实测（含文件构成） |
+|---|---|---|---|
+| Node: react/engine | 2500 | agent_engine.dart 4740 | 实际 391: 骨架 + R1/R4/R5 闸门; goal 续跑与危险命令 confirm 未做 (§9 第 6 项) |
+| Node: react/parser | 600 | react_stream_parser.dart 425 (在 lib/utils/ 不在 lib/services/) | 实际 365 + regex.ts 12 |
+| Node: tools/* | 3000 | agent_tool.dart 2634 | 实际 2465 (7 文件; web_search 835 + builtin 802 占大头) |
+| Node: mcp/* | 500 | mcp_manager.dart 496 | 实际 2378 (connection 765 + tool_adapter 362, 草图严重低估) |
+| Node: llm/* | 400 | ai_service.dart 609 | 实际 482 (三个 *_stream.ts + clients + stream, 裸 fetch, 见 §8) |
+| Node: rpc/* | 600 | 新 | 实际 615 (schema 359 / transport 137 / server 69 / client 50) |
+| Node: utils/* | 500 | 新 | 实际 1131; 另有 pty/ 236 行 (adapter 232), 草图未单列 |
+| Dart: agent_bridge/* | 800 | 新 | 实际 294 (agent_bridge.dart 94 + json_rpc_transport.dart 200); 另 4 个文件待补 |
+| **合计** | **~9900** | — | 实际 Node src 8319 + test 7538 = 15857 (估的 1.6 倍, 差额几乎全在 mcp 与 utils) |
 
 ### 10.3 关键不变式（必须持续为真）
 
-1. **stableId 一致性**：Dart 与 Node 的 `stable_hash` 输出在 10 万样本上 100% 一致（CI 强制）
+1. **stableId 一致性**：Node 的 `fnv1a64DartCompat()` 对 **1000 行 Dart 侧离线产出的金标输入/输出**逐行相等（`test/fixture_diff.test.ts` 对 `src/`，`test/fixtures/verify.mjs` 对 `dist/`，CI 强制）。口径要写清两件事：(a) 这是**金标比对**，CI 不现跑 Dart —— 好处是无需 Dart 运行时，代价是 Dart 侧若改了哈希不会自动变红，改 Dart 哈希必须同步重生成 fixture；(b) 它是 **FNV-1a 的变体而非标准实现**：Dart 侧每一步乘法后都 `& 0x7FFFFFFFFFFFFFFF` 清掉最高位，运行值恒 < 2^63，所以 64 位摘要实际只有 63 位有效位。照抄「标准 FNV-1a」的常数与循环会在这 1000 行里当场变红，正是这条不变式在守的东西。语料另有一条独立性质：同一 20 万条语料上 `h*31+b`(int32) 会碰撞而本摘要不碰撞（R4 要求的是后者，不是「样本够多」）。
 2. **事件序列一致性**：同一任务输入，Dart 与 Node 产生的 `AgentEvent` 序列（类型 + id + 顺序）100% 一致 —— 可比对的 id 限**解析器产出的内容哈希**（thought/text/command/ask 及解析器的 finish）；result、引擎 `emitFinish`、恢复 info 是「一次发生」，Dart 走 `_genId()` 的毫秒 + 计数器，本身不可复现，只锁形状 `evt_<ms>_<n>` 与「两次发生必得两个 id」（见 §6.3.3）
 3. **终态白名单**：4 种终态 × 5 种触发路径 = 20 个测试矩阵全绿
 4. **callback 清除顺序**：flush → null callbacks → cancelTask → reset reducer，4 条路径 100% 符合
