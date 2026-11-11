@@ -17,7 +17,7 @@ import {CheckpointStore} from "../utils/checkpoint_store.js";
 // because the UI event snapshot uses the SAME table (Dart comment 2591: "判定逻辑抽在
 // permission_policy，UI 事件快照用同一份实现，避免两边漂移").
 import {ConfirmFlow, formatObservationFailure} from "./confirm_flow.js";
-import {decideCommand, type CommandGateDecision, type SafetyLevel} from "../utils/permission_policy.js";
+import {decideCommand, destructiveToolNeedsConfirm, type CommandGateDecision, type SafetyLevel} from "../utils/permission_policy.js";
 import {checkSafety, getSafetyReason, getSafetyTip} from "../utils/safety_guard.js";
 // Dart 3861-3871: the model sometimes writes the goal-done marker into a command
 // block (real-world symptom: CommandNotFoundException), so the executor call needs a
@@ -29,6 +29,13 @@ import {isGoalMarkerOnlyCommand} from "../utils/goal_continuation.js";
 import {effectiveContextWindow, trimConversation as trimConversationList} from "../utils/context_trim.js";
 import {isQueryCommand} from "../utils/command_heuristics.js";
 import {truncateOutput, truncateQueryOutput} from "../utils/output_processor.js";
+// Round 123: the tool-action dispatch port (Dart agent_engine.dart _handleToolAction
+// 3222-3618). ToolArgs is the typed argument accessor (R9: no bare map access below
+// this line); the registry / kind enums come from the W4 tool framework; parseToolAction
+// is the 工具: / 参数: line parser committed last round.
+import {ToolArgs} from "../tools/tool_args.js";
+import {AgentToolRegistry, AgentTool, ToolKind, type ToolContext} from "../tools/builtin.js";
+import {parseToolAction} from "./tool_action.js";
 
 // Byte-faithful Dart strings (agent_engine.dart 3865 / 3868), CJK escaped.
 const GOAL_MARKER_LOG = "\u5ffd\u7565\u88ab\u5f53\u6210\u547d\u4ee4\u7684\u76ee\u6807\u8fbe\u6210\u6807\u8bb0"; // Dart log at 3865
@@ -40,6 +47,51 @@ const GOAL_MARKER_OUTPUT =
 // the literal newline pairs of the Dart source.
 const CONTINUE_PROMPT =
   "\u8BF7\u7EE7\u7EED\u6267\u884C\u4EFB\u52A1\u3002\u5982\u679C\u8FD8\u6709\u9700\u8981\u6267\u884C\u7684\u6B65\u9AA4\uFF0C\u8BF7\u4F7F\u7528\u4EE5\u4E0B\u683C\u5F0F\u56DE\u590D\uFF1A\n\n\u601D\u8003: [\u4F60\u7684\u63A8\u7406]\n\u8BF4\u660E: [\u4E00\u53E5\u8BDD\u8BF4\u660E\u8FD9\u6761\u547D\u4EE4\u505A\u4EC0\u4E48\u3001\u6709\u4EC0\u4E48\u5F71\u54CD]\n\u52A8\u4F5C: execute\n\u547D\u4EE4: [\u8981\u6267\u884C\u7684\u547D\u4EE4]\n\n\u5982\u679C\u4EFB\u52A1\u5DF2\u5168\u90E8\u5B8C\u6210\uFF0C\u8BF7\u56DE\u590D\uFF1A\n\n\u601D\u8003: [\u603B\u7ED3]\n\u52A8\u4F5C: finish";
+// -- Round 123: tool-action dispatch strings (Dart agent_engine.dart _handleToolAction
+// 3222-3618 + ReActObservation.format agent_model.dart 161-177). Byte-faithful, CJK escaped.
+const ACTION_KEY = "\u52a8\u4f5c"; // Dart action-line keyword (2007): the two colon forms get built below
+const TOOL_NO_NAME_LOG = "tool \u52a8\u4f5c\u4f46\u672a\u6307\u5b9a\u5de5\u5177\u540d"; // Dart 3231-3232 agentLogger.warn
+const INFO_EMPTY_TOOL = "\u26a0\ufe0f AI \u8c03\u7528\u5de5\u5177\u4f46\u672a\u6307\u5b9a\u5de5\u5177\u540d"; // Dart 3233-3239 info event
+const OBS_EMPTY_TOOL = "\u89c2\u6d4b: \u5de5\u5177\u8c03\u7528\u5931\u8d25 \u2014 \u672a\u6307\u5b9a\u5de5\u5177\u540d"; // Dart 3240-3245 observation
+const OBS_THINK_DONE = "\u89c2\u6d4b: \u601d\u8003\u5df2\u8bb0\u5f55\uff0c\u8bf7\u7ed9\u51fa\u4e0b\u4e00\u6b65\u52a8\u4f5c\u3002"; // Dart 3266-3272 think-alias observation
+const INFO_ALIAS_NO_CMD_A = "\u26a0\ufe0f AI \u8c03\u7528 "; // Dart 3313-3317: info prefix, alias follows
+const INFO_ALIAS_NO_CMD_B = " \u4f46\u672a\u63d0\u4f9b command \u53c2\u6570"; // Dart 3313-3317: info suffix
+const OBS_ALIAS_NO_CMD_A = "\u89c2\u6d4b: "; // Dart 3318-3322 observation around the alias
+const OBS_ALIAS_NO_CMD_B = " \u8c03\u7528\u7f3a\u5c11 command \u53c2\u6570\uff08\u8981\u6267\u884c\u7684\u547d\u4ee4\uff09\uff0c\u8bf7\u91cd\u8bd5\u3002"; // Dart 3318-3322 tail
+const OBS_TOOL_MISSING_A = "\u89c2\u6d4b: \u5de5\u5177 "; // Dart 3346-3348 / placeholder: tool name follows
+const OBS_TOOL_MISSING_B = " \u4e0d\u5b58\u5728\u3002\u53ef\u7528\u5de5\u5177: "; // Dart 3346-3348 middle, visible list follows
+const WARN_UNKNOWN_TOOL = "\u672a\u77e5\u5de5\u5177: "; // Dart 3339 agentLogger.warn
+const INFO_UNKNOWN_TOOL = "\u26a0\ufe0f \u672a\u77e5\u5de5\u5177: "; // Dart 3340-3345 info event
+const INFO_READONLY_TOOL = "\ud83d\udd12 \u53ea\u8bfb\u6a21\u5f0f\u5df2\u5f00\u542f\uff0c\u6b64\u5de5\u5177\u88ab\u62d2\u7edd\u6267\u884c: "; // Dart 3359-3366; backticks wrap the name (BT idiom)
+const OBS_READONLY_TOOL = "\u89c2\u6d4b: \u5f53\u524d\u4e3a\u53ea\u8bfb\u6a21\u5f0f\uff0c\u7981\u6b62\u8c03\u7528\u4f1a\u4ea7\u751f\u53d8\u66f4\u7684\u5de5\u5177\u3002\u8bf7\u6539\u7528\u53ea\u8bfb\u5de5\u5177/\u547d\u4ee4\u6536\u96c6\u4fe1\u606f\uff0c\u6216\u7528 finish \u544a\u77e5\u7528\u6237\u201c\u5f53\u524d\u4e3a\u53ea\u8bfb\u6a21\u5f0f\uff0c\u8bf7\u5173\u95ed\u540e\u91cd\u8bd5\u201d\u3002"; // Dart 3367-3372 const observation
+const INFO_SCOPE_HIDDEN_A = "\u26a0\ufe0f \u5de5\u5177 "; // Dart 3384-3388 info around BT+name+BT
+const INFO_SCOPE_HIDDEN_B = " \u5728\u5f53\u524d\u4f1a\u8bdd\u4e0d\u53ef\u7528"; // Dart 3384-3388 tail
+const OBS_SCOPE_HIDDEN_A = "\u89c2\u6d4b: \u5de5\u5177 "; // Dart 3389-3392 observation around name
+const OBS_SCOPE_HIDDEN_B = " \u5728\u5f53\u524d\u4f1a\u8bdd\u4e0d\u53ef\u7528\u3002\u5f53\u524d\u53ef\u7528\u5de5\u5177: "; // Dart 3389-3392 tail, visible list follows
+const INFO_TOOL_EXC_A = "\u274c \u5de5\u5177 "; // Dart 3583-3587 info around name+exc
+const INFO_TOOL_EXC_B = " \u6267\u884c\u5f02\u5e38: "; // Dart 3583-3587 middle
+const OBS_TOOL_EXC_A = "\u89c2\u6d4b: \u5de5\u5177 "; // Dart 3607-3611 observation around name+exc
+const OBS_TOOL_EXC_B = " \u6267\u884c\u5f02\u5e38 \u2014 "; // Dart 3607-3611 middle
+const NO_OUTPUT_ZH = "(\u65e0\u8f93\u51fa)"; // Dart observation placeholder for empty failed-tool output
+const TRUNC_MARK = "\n...(output truncated)".replace("output truncated", "\u8f93\u51fa\u5df2\u622a\u65ad");
+const DISPLAY_TRUNC_A = "\u2026 ("; // Dart 3130 display truncation suffix around the length
+const DISPLAY_TRUNC_B = " \u5b57\u7b26)"; // Dart 3130 tail
+const TOOL_RETRY_LOG = "\u5de5\u5177\u8c03\u7528\u91cd\u8bd5\u6b21\u6570\u8017\u5c3d\uff0c\u4efb\u52a1\u7ec8\u6b62 (failed)"; // Dart L10n toolRetryExhausted warn half
+const OBS_OK_A = "\u89c2\u6d4b: \u547d\u4ee4 "; // ReActObservation.format success branch (agent_model.dart 166)
+const OBS_OK_B = " \u6267\u884c\u6210\u529f"; // format success header tail
+const OBS_OK_C = "\u8f93\u51fa:"; // format output label
+const WARN_ALIAS_NO_CMD_B = " \u522b\u540d\u7f3a\u5c11 command \u53c2\u6570"; // Dart 3299 warn tail (alias + this tail)
+const TOOL_RETRY_SUMMARY = "\u5de5\u5177\u8c03\u7528\u91cd\u8bd5\u6b21\u6570\u8017\u5c3d\uff0c\u4efb\u52a1\u7ec8\u6b62"; // L10n.str.toolRetryExhausted finish summary; deliberately NOT the no-command summary
+// Dart 3203-3220: placeholder / hallucinated tool names routed by argument shape.
+const THINK_ALIAS_NAMES: ReadonlySet<string> = new Set(["think", "thinking", "reason"]);
+const EXECUTE_ALIAS_NAMES: ReadonlySet<string> = new Set(["execute", "exec", "run_command", "shell", "bash"]);
+const PLACEHOLDER_TOOL_NAMES: ReadonlySet<string> = new Set(["function_name", "call_function", "tool_call"]);
+const THOUGHT_ARG_KEYS: readonly string[] = ["thought", "thinking", "reasoning", "note", "content", "message"];
+const COMMAND_ARG_KEYS: readonly string[] = ["command", "cmd", "script", "shell", "shell_command"];
+// Dart 3515: a tool output reaches the wire whole up to 8000 chars. The command path caps
+// first (8 lines / 600 chars) and only then keeps an 8000-char tail - two different
+// contracts for two different events; do not merge them.
+const MAX_TOOL_EVENT_CHARS = 8000;
 
 export interface EngineCallbacks {
   /** Emit a parsed event to the parent (stdio). */
@@ -92,6 +144,21 @@ export interface EngineOptions {
    * editing the real SAFETY table.
    */
   safetyCheck?: (command: string) => SafetyLevel;
+  /**
+   * Round 123: the tool registry consulted by the tool-action dispatch (Dart owns
+   * _tools inside the engine; here the RPC server builds the registry and injects
+   * it, mirroring how confirmFlow is injected). Absent = the engine has no tool
+   * channel, and tool-action texts fall through to the no-command branch unchanged.
+   */
+  toolRegistry?: AgentToolRegistry;
+  /**
+   * Dart _isLocalSession: decides which scope-gated tools are visible (SSH sessions
+   * must not see local-only tools and vice versa). A getter so the host keeps one
+   * source of truth. The Dart-side initializer could not be re-dumped this round;
+   * the Node default is false (documented divergence) - the conservative reading of
+   * visibleFor: nothing local-only is assumed available.
+   */
+  isLocalSession?: boolean | (() => boolean);
 }
 
 /** Phase 2 command-executor result shape (1:1 fields the result event needs). */
@@ -139,6 +206,10 @@ export class ReActEngine {
   private readonly maxNoCommandRetries = 2; // R5: reset on success
   private readonly seenStableIds = new Set<string>();
   private lastTaskId?: string;
+  // Round 123: injected tool channel (see EngineOptions). No toolCalls stat field:
+  // Dart _toolCalls feeds UI progress the Node host does not have - deferred, not hidden.
+  private readonly toolRegistry?: AgentToolRegistry;
+  private readonly isLocalSessionFn: () => boolean;
 
   constructor(
     private readonly llm: LlmClient,
@@ -153,6 +224,9 @@ export class ReActEngine {
     this.confirmFlow = options?.confirmFlow;
     this.permissionModeFn = options?.permissionMode ?? ((): PermissionMode => this.ownPermissionMode);
     this.safetyCheckFn = options?.safetyCheck ?? checkSafety;
+    this.toolRegistry = options?.toolRegistry;
+    const localOpt = options?.isLocalSession;
+    this.isLocalSessionFn = typeof localOpt === "function" ? localOpt : (): boolean => localOpt === true;
     // The fallback counter is the engine field itself, so an uninjected engine keeps
     // the exact pre-gate behaviour (currentGen++ in run()/cancel()).
     this.genSource = options?.generation ?? {
@@ -301,7 +375,559 @@ export class ReActEngine {
       // Check for a command event (tool call)
       const cmdEvt = events.find((e) => e.type === "command");
       if (cmdEvt) {
-        const cmd = cmdEvt.command ?? "";
+        const gstate = await this.runGatedCommand(cmdEvt.command ?? "", cmdEvt, task, myGen, myGenNumber, step);
+        if (gstate !== null) return gstate;
+      } else {
+        // Round 123: Dart routes the tool action through _handleToolAction. The Node
+        // parser never mints a command event for a tool action, so the tool text lands
+        // in this branch: scan for an action-tool line first, and only fall through to
+        // _handleNoCommand when there is none. An engine without a registry takes
+        // hit === null ALWAYS, keeping this branch byte-identical to before (the
+        // no-command gate pins stay exact).
+        const hit = this.toolRegistry === undefined
+          ? null
+          : this.scanToolAction(response.split("\n"));
+        if (hit !== null) {
+          const tstate = await this.handleToolAction(hit[0], hit[1], task, myGen, myGenNumber, step);
+          if (tstate !== null) return tstate;
+        } else {
+          // Dart _handleNoCommand (agent_engine.dart 3622-3642): within the retry
+          // budget the model gets a progress notice + the continue prompt back in
+          // history; only after the budget is spent is the task terminal (R5: failed,
+          // never completed). The retry log lines are Dart agentLogger copies on the
+          // gate channel (stderr-only, no wire event), and the hourglass notice is a
+          // real info event like Dart 3629. Node keeps its own terminal summary
+          // string (no-command retry exhaustion) - the summary contract pinned by
+          // r5_terminal_whitelist, an already-documented divergence, unchanged here.
+          this.noCommandRetries++;
+          if (this.noCommandRetries <= this.maxNoCommandRetries) {
+            // Dart 3625-3626: AI wei sheng cheng ming ling, fa song ji xu ti shi (chong shi N/M)
+            this.logGate(
+              "info",
+              "AI \u672a\u751f\u6210\u547d\u4ee4\uff0c\u53d1\u9001\u7ee7\u7eed\u63d0\u793a (\u91cd\u8bd5 " +
+                this.noCommandRetries + "/" + this.maxNoCommandRetries + ")");
+            this.emit({
+              // R4: occurrence id - two retries show the same notice twice and each
+              // occurrence is a separate fact (Dart UiText.t hourglass, 3629).
+              id: genEventId(),
+              type: "info",
+              timestamp: Date.now(),
+              text: "\u23F3 \u7EE7\u7EED\u6267\u884C...", // hourglass + continuing
+            });
+            this.conversation.push({role: "user", content: CONTINUE_PROMPT});
+            this.trimConversation(); // Dart 3632: trim after the continue-prompt add
+          } else {
+            // Dart 3638-3639 warn: AI lian xu N ci wei sheng cheng ming ling, ren wu zhong zhi
+            this.logGate(
+              "warn",
+              "AI \u8FDE\u7EED " + this.noCommandRetries +
+                " \u6B21\u672A\u751F\u6210\u547D\u4EE4\uFF0C\u4EFB\u52A1\u7EC8\u6B62 (failed)");
+            this.emitFinish("failed", "no-command retry exhaustion");
+            return "failed";
+          }
+        }
+      }
+
+      // W7: checkpoint at every step boundary (inProgress state)
+      if (this.checkpointStore) {
+        this.checkpointStore.save({
+          taskId: task.taskId,
+          operationId: task.operationId,
+          hostId: task.hostId,
+          goal: task.goal,
+          step: step + 1,
+          conversation: this.conversation.map((m) => ({role: m.role, content: m.content})),
+          seenStableIds: [...this.seenStableIds],
+          state: "inProgress",
+          savedAt: new Date().toISOString(),
+        });
+      }
+    }
+
+    // Max steps exhausted (R5: all terminal paths emit finish + call onFinished)
+    this.emitFinish("failed", "max steps exhausted");
+    return "failed";
+  }
+
+  // ---------------------------------------------------------------------------
+  // R1.3 / R5: consumer callbacks are external code and MUST NOT be able to
+  // abort the ReAct loop. onEvent / onFinished / onError are wired by the RPC
+  // layer straight onto a JSON-RPC transport (index.ts), so a single transport
+  // hiccup or a host-side bug used to propagate out of run().
+  //
+  // Two independent reasons that was a defect, not a design choice:
+  //   * R1.3 - "Every .then() on an async future MUST have an onError handler."
+  //     index.ts:144 starts the run and returns {ok:true} WITHOUT awaiting it,
+  //     so the escaping throw surfaced as an unhandled rejection. On Node >=15
+  //     the default --unhandled-rejections=strict kills the process: the child
+  //     agent dies mid-task and the parent only sees a closed pipe.
+  //   * R5 - "All terminal paths MUST behave consistently": emit() sat before
+  //     finishSideEffects(), so a throw in the event sink skipped the finish
+  //     event, skipped onFinished and left the task forever "running".
+  //
+  // Containment, not silence: R1.3 also forbids swallowing a caught error
+  // without logging it. The diagnostic therefore goes (a) to the host through
+  // the engine's own error channel and (b) to stderr, where the Dart parent
+  // already reads our stderr, each behind its own guard so a second throwing
+  // sink cannot undo the first. The stack is kept for the log line but never
+  // sent over the wire as a message.
+  private emit(evt: AgentEvent): void {
+    try {
+      this.callbacks.onEvent(evt);
+    } catch (e: unknown) {
+      this.reportCallbackFailure("onEvent", evt.type, e);
+    }
+  }
+
+  private reportFinished(state: AgentFinishState, summary?: string): void {
+    try {
+      this.callbacks.onFinished(state, summary);
+    } catch (e: unknown) {
+      this.reportCallbackFailure("onFinished", state, e);
+    }
+  }
+
+  private reportError(msg: string): void {
+    const cb = this.callbacks.onError;
+    if (!cb) return; // optional callback, unchanged behaviour when absent
+    try {
+      cb(msg);
+    } catch (e: unknown) {
+      this.reportCallbackFailure("onError", "", e);
+    }
+  }
+
+  /**
+   * Re-entrancy latch for the error channel. Without it: onError throws ->
+   * reportCallbackFailure -> reportError -> onError throws -> ... until the stack
+   * overflows (RangeError), which is exactly the crash the containment was meant
+   * to prevent. A failing error channel degrades to stderr-only reporting.
+   */
+  private reportingCallbackFailure = false;
+
+  /** Log a callback failure without ever letting the logger itself throw. */
+  private reportCallbackFailure(which: string, context: string, e: unknown): void {
+    const detail = describeThrowable(e);
+    const line =
+      "[agent-core] callback " + which + " threw for " + (context || "-") + ": " + detail;
+    // Host notification, unless the host error channel IS the thing failing -
+    // then re-notifying would recurse (see reportingCallbackFailure) and we
+    // degrade to the stderr copy below instead. The failure is still reported.
+    if (!this.reportingCallbackFailure) {
+      this.reportingCallbackFailure = true;
+      try {
+        this.reportError(line);
+      } finally {
+        this.reportingCallbackFailure = false;
+      }
+    }
+    try {
+      process.stderr.write(line + "\n");
+    } catch {
+      // stderr itself failing (closed pipe) is unrecoverable and unreportable;
+      // there is no third channel left, so drop the log rather than throw.
+    }
+  }
+
+  /**
+   * R8 (AGENTS.md) / Dart _trimMessages (agent_engine.dart 4612-4671) applied to
+   * this.conversation. Dart calls its trim after EVERY history addition (roughly
+   * twenty call sites) so the list can never be sent oversized on the next step;
+   * Node mirrors that by invoking this right after every conversation.push below
+   * (the trim itself is idempotent and cheap while under the caps). The three
+   * layers - per-message 4000-char tail, 80-message backstop, 0.7*contextWindow
+   * token budget with a floor of 2 - live in utils/context_trim.ts with anchors.
+   *
+   * Documented structural divergence: Dart keeps system messages INSIDE the trimmed
+   * list and pins them at the head (4614-4615). This engine never stores a system
+   * message in conversation - run() rebuilds [system, ...conversation, userTask]
+   * fresh on every call - so the system-pinning branch is inert here by
+   * construction and every stored message is a non-system one. Dart logs
+   * agentLogger("TrimMsgs", ...) map onto logGate with the same TrimMsgs tag.
+   */
+  private trimConversation(): void {
+    const cw = effectiveContextWindow(this.modelConfig.contextWindow);
+    const logs = trimConversationList(this.conversation, cw);
+    for (const line of logs) this.logGate("info", "TrimMsgs: " + line);
+  }
+  /**
+   * Dart 2971-2983 (_enrichCommandEvent): stamp the host / tool / risk / decision
+   * snapshot onto a command event before the parent sees it. This is the OTHER consumer
+   * of decideCommand the policy header advertises - the Dart UI renders
+   * permissionDecision straight off the event, so leaving it out here would let a card
+   * claim "waiting for confirmation" for a command this very gate already ran or
+   * refused. Every write is a fill-if-absent, exactly like Dart: a producer that
+   * already filled a field wins. Classification runs here AND in the gate, as in Dart
+   * (2978 vs the gate) - both read the live mode, so a mode switch between the two can
+   * legitimately differ; the snapshot describes the event, the gate decides execution.
+   */
+  private enrichCommandEvent(evt: AgentEvent, hostId: string): void {
+    if (evt.type !== "command") return;
+    if (evt.hostId === undefined) evt.hostId = hostId;
+    if (evt.toolName === undefined) evt.toolName = "exec_command";
+    const cmd = (evt.command ?? "").trim();
+    if (cmd === "") return;
+    const level = this.safetyCheckFn(cmd);
+    if (evt.riskLevel === undefined) evt.riskLevel = level;
+    if (evt.permissionDecision === undefined) {
+      evt.permissionDecision = decideCommand(level, this.permissionModeFn());
+    }
+  }
+
+  /** Push one observation line back to the model, then trim (Dart 3632 / 3027). */
+  private pushObservation(content: string): void {
+    this.conversation.push({role: "user", content});
+    this.trimConversation();
+  }
+
+  /**
+   * Dart tool-retry budget sites (_handleToolAction 3238-3244 / 3305-3310 / 3348-3353
+   * / 3367-3372 / 3387-3392): count++ then >= against the SAME counter the no-command
+   * branch uses. The no-command branch keeps its own <= idiom (pinned by the gate
+   * suites); the two budgets intentionally coexist exactly as in Dart - do not merge.
+   * extraWarn marks the two sites Dart logs an extra exhaust line at (empty tool name,
+   * unknown tool); the other sites exhaust silently in Dart too.
+   */
+  private toolRetryOrContinue(extraWarn?: string): AgentFinishState | null {
+    this.noCommandRetries++;
+    if (this.noCommandRetries >= this.maxNoCommandRetries) {
+      if (extraWarn !== undefined) this.logGate("warn", extraWarn);
+      // R5: terminal path - finish event + onFinished + checkpoint policy all live
+      // inside emitFinish(). The summary is the Dart toolRetryExhausted string, NOT
+      // the no-command summary (two distinct Dart strings, two distinct pins).
+      this.emitFinish("failed", TOOL_RETRY_SUMMARY);
+      return "failed";
+    }
+    return null;
+  }
+
+  /**
+   * Dart _formatToolCommandForDisplay (3119-3136). Node reads the args through
+   * keys + asRecord: ToolArgs.asMap is a known-broken Map cast in this port, so
+   * the safe copy is the sanctioned accessor here (R9 typed-accessor rule).
+   * maxValueChars <= 0 disables truncation (the observation call site uses 0).
+   */
+  private formatToolCommandForDisplay(toolName: string, args: ToolArgs, maxValueChars = 0): string {
+    if (args.isEmpty) return toolName;
+    const NLc = String.fromCharCode(10);
+    const rec = args.asRecord();
+    let out = toolName + NLc;
+    for (const key of args.keys) {
+      const v = rec[key];
+      const raw = Array.isArray(v) ? v.join(",") : String(v);
+      const display = maxValueChars > 0 && raw.length > maxValueChars
+        ? raw.substring(0, maxValueChars) + DISPLAY_TRUNC_A + raw.length + DISPLAY_TRUNC_B
+        : raw;
+      out += "  " + key + ": " + display + NLc;
+    }
+    return out.trimEnd(); // Dart trimRight
+  }
+
+  /**
+   * Dart action-line scan (agent_engine.dart 2005-2028): the FIRST action line wins
+   * (Dart breaks right after it); only the tool value is routed here because
+   * execute/finish/ask already became events inside parse(). Returns the
+   * parseToolAction tuple when the action is tool, null for every other line shape
+   * (including other action values - those are not tool calls).
+   */
+  private scanToolAction(lines: readonly string[]): [string | null, Record<string, unknown> | null] | null {
+    for (let i = 0; i < lines.length; i++) {
+      const t = lines[i].trim();
+      if (t.startsWith(ACTION_KEY + ":") === false && t.startsWith(ACTION_KEY + "\uff1a") === false) continue;
+      const sep = t.indexOf("\uff1a") >= 0 ? "\uff1a" : ":";
+      const actionStr = t.substring(t.indexOf(sep) + 1).trim().toLowerCase();
+      if (actionStr === "tool") return parseToolAction(lines, i + 1);
+      return null; // Dart breaks after the first action line regardless of value
+    }
+    return null;
+  }
+
+  /**
+   * Dart _handleToolAction (agent_engine.dart 3222-3618) - the tool-action dispatch
+   * ladder: empty name -> think alias -> execute/placeholder alias -> registry lookup
+   * -> read-only gate -> session scope gate -> display + own command event (R4) ->
+   * destructive confirm -> execute with generation checks (R1) -> observation.
+   * Returns null to continue the ReAct loop, a terminal finish state to stop it.
+   * Deferred parity items (no Node host yet): _toolCalls stat counter, task-status
+   * phase notify, _hasExecutedAnyCommand, project-root capture, cancelToken / sudo
+   * password / localDir auth / isTaskActive / onProgress injections, and the
+   * _recordToolFileChange ledger - all documented in the commit message.
+   */
+  private async handleToolAction(
+    toolNameRaw: string | null,
+    toolArgsRaw: Record<string, unknown> | null,
+    task: StartTaskParams,
+    myGen: TaskGeneration,
+    myGenNumber: number,
+    step: number,
+  ): Promise<AgentFinishState | null> {
+    const registry = this.toolRegistry;
+    if (registry === undefined) return null; // junction guards this; defensive only
+    const toolName = (toolNameRaw ?? "").trim();
+    const args = ToolArgs.wrap(toolArgsRaw ?? {});
+    const BT = String.fromCharCode(96);
+
+    if (toolName === "") {
+      // Dart 3231-3245: warn + info + observation, then the retry budget.
+      this.logGate("warn", TOOL_NO_NAME_LOG);
+      this.emit({id: genEventId(), type: "info", timestamp: Date.now(), text: INFO_EMPTY_TOOL});
+      this.pushObservation(OBS_EMPTY_TOOL);
+      return this.toolRetryOrContinue(TOOL_RETRY_LOG);
+    }
+
+    const alias = toolName.toLowerCase();
+    // Dart 3248-3335: placeholder / hallucinated tool names are routed by argument
+    // shape instead of erroring: think aliases record a thought, execute aliases
+    // re-enter the ordinary command path, generic placeholders fall back to thought
+    // or to the available-tool list.
+    if (THINK_ALIAS_NAMES.has(alias)) {
+      const thoughtText = args.firstOf([...THOUGHT_ARG_KEYS]);
+      if (thoughtText.trim() !== "") {
+        this.emit({id: genEventId(), type: "thought", timestamp: Date.now(), text: thoughtText.trim()});
+      }
+      this.pushObservation(OBS_THINK_DONE);
+      this.noCommandRetries = 0; // R5: reset on progress
+      return null;
+    }
+    if (EXECUTE_ALIAS_NAMES.has(alias) || PLACEHOLDER_TOOL_NAMES.has(alias)) {
+      const command = args.firstOf([...COMMAND_ARG_KEYS]);
+      if (command !== "") {
+        // Dart 3277-3295: mint the command event FIRST so the result links to it (R4),
+        // then the full gate + executor path (_runCommandWithSafety parity).
+      const cmdId = genEventId(); // Dart alias/cmd event-id prefixes cannot cross the r4 id-shape gate
+        const cmdEvent: AgentEvent = {id: cmdId, type: "command", timestamp: Date.now(), command};
+        this.enrichCommandEvent(cmdEvent, task.hostId);
+        this.emit(cmdEvent);
+        const s = await this.runGatedCommand(command, cmdEvent, task, myGen, myGenNumber, step);
+        if (s !== null) return s;
+        this.noCommandRetries = 0;
+        return null;
+      }
+      if (EXECUTE_ALIAS_NAMES.has(alias)) {
+        // Dart 3298-3311: an execute alias without a command is a parameter mistake,
+        // not a fatal failure - the model gets an explicit missing-parameter line.
+        this.logGate("warn", alias + WARN_ALIAS_NO_CMD_B);
+        this.emit({id: genEventId(), type: "info", timestamp: Date.now(), text: INFO_ALIAS_NO_CMD_A + alias + INFO_ALIAS_NO_CMD_B});
+        this.pushObservation(OBS_ALIAS_NO_CMD_A + alias + OBS_ALIAS_NO_CMD_B);
+        return this.toolRetryOrContinue();
+      }
+      const thoughtText = args.firstOf([...THOUGHT_ARG_KEYS]);
+      if (thoughtText.trim() !== "") {
+        // Dart 3313-3328: a generic placeholder holding thought content acts as a thought.
+        this.emit({id: genEventId(), type: "thought", timestamp: Date.now(), text: thoughtText.trim()});
+        this.pushObservation(OBS_THINK_DONE);
+        this.noCommandRetries = 0;
+        return null;
+      }
+      // Dart 3329-3335: neither command nor thought - hand the tool list back.
+      // Deliberately NO retry++ : the model received a usable correction, not an error.
+      const available0 = registry.all.map((t) => t.name).join(", ");
+      this.pushObservation(OBS_TOOL_MISSING_A + toolName + OBS_TOOL_MISSING_B + available0);
+      return null;
+    }
+
+    const tool: AgentTool | undefined = registry.get(toolName);
+    if (tool === undefined) {
+      // Dart 3338-3354: same budget as the empty-name site, extra exhaust log.
+      this.logGate("warn", WARN_UNKNOWN_TOOL + toolName);
+      this.emit({id: genEventId(), type: "info", timestamp: Date.now(), text: INFO_UNKNOWN_TOOL + toolName});
+      const available1 = registry.all.map((t) => t.name).join(", ");
+      this.pushObservation(OBS_TOOL_MISSING_A + toolName + OBS_TOOL_MISSING_B + available1);
+      return this.toolRetryOrContinue("\u672a\u77e5\u5de5\u5177\u8c03\u7528\u91cd\u8bd5\u6b21\u6570\u8017\u5c3d");
+    }
+
+    // Dart 3357-3373: read-only mode used to gate only shell commands; the tool path
+    // must not bypass it (design doc D3). The gate derives from ToolKind.isReadOnly.
+    if (this.permissionModeFn() === "readOnly" && tool.isReadOnly === false) {
+      this.logGate("info", "\u53ea\u8bfb\u6a21\u5f0f\u62e6\u622a\u5de5\u5177: " + toolName);
+      this.emit({id: genEventId(), type: "info", timestamp: Date.now(), text: INFO_READONLY_TOOL + BT + toolName + BT});
+      this.pushObservation(OBS_READONLY_TOOL);
+      return this.toolRetryOrContinue();
+    }
+
+    // Dart 3375-3393: scope guard - registered but invisible in this session kind
+    // (the prompt filter is the first line; this catches names learned from history).
+    const isLocal = this.isLocalSessionFn();
+    const visible = registry.visibleFor({isLocalSession: isLocal});
+    if (visible.some((t) => t.name === toolName) === false) {
+      this.logGate("warn", "\u5de5\u5177\u5728\u5f53\u524d\u4f1a\u8bdd\u4e0d\u53ef\u7528: " + toolName + " (local=" + String(isLocal) + ")");
+      this.emit({id: genEventId(), type: "info", timestamp: Date.now(), text: INFO_SCOPE_HIDDEN_A + BT + toolName + BT + INFO_SCOPE_HIDDEN_B});
+      const av = visible.map((t) => t.name).join(", ");
+      this.pushObservation(OBS_SCOPE_HIDDEN_A + toolName + OBS_SCOPE_HIDDEN_B + av);
+      return this.toolRetryOrContinue();
+    }
+
+    this.logGate("info", "\u8c03\u7528\u5de5\u5177: " + toolName + ", \u53c2\u6570: " + args.describe());
+    // R4 / Dart 3396-3403: the tool call gets its OWN command event + id. local_exec
+    // keeps an 8000-char value window because its command is what the user approves;
+    // every other tool is summarised at 160 chars to keep the evidence layer small.
+    const toolUiDisplay = this.formatToolCommandForDisplay(toolName, args, toolName === "local_exec" ? 8000 : 160);
+      const toolCmdId = genEventId(); // Dart tool-cmd event-id prefix cannot cross the r4 id-shape gate
+    const toolCmd: AgentEvent = {
+      id: toolCmdId,
+      type: "command",
+      timestamp: Date.now(),
+      command: toolUiDisplay,
+      hostId: task.hostId,
+      toolName,
+    };
+    // Dart does NOT enrich this event: it is a tool card, not a shell command, so no
+    // riskLevel / permissionDecision snapshot is stamped on it.
+    this.emit(toolCmd);
+
+    // Dart 3412-3441: destructive tools confirm through the SAME completer as
+    // dangerous commands - one waiting mechanism, not two.
+    if (tool.kind === ToolKind.destructive && destructiveToolNeedsConfirm(this.permissionModeFn())) {
+      const flow = this.confirmFlow;
+      if (flow === undefined) {
+        // Same posture as the command gate when no flow is wired: the caller opted
+        // out of the confirmation channel, so executing (loudly, see the log) beats
+        // silently blocking every host that never answers rpc:confirm.
+        this.logGate("warn", "\u786e\u8ba4\u901a\u9053\u672a\u63a5\u7ebf\uff1a\u6309\u5168\u81ea\u52a8\u653e\u884c\u5de5\u5177 - " + toolName);
+      } else {
+        const approved = await flow.confirmToolExecution(toolName, toolUiDisplay);
+        // R1: the await crossed a task boundary.
+        { const s = this.boundary(myGen); if (s !== null) return s; }
+        if (approved === false) {
+          // Dart 3420-3439: read timedOut BEFORE building the refusal (the verdict is
+          // cleared when the next wait arms). Texts come from toolRefusal() so the
+          // tool/command refusal spellings cannot drift apart.
+          const timedOut = flow.confirmTimedOut;
+          const refusal = flow.toolRefusal(timedOut);
+          this.emit({id: genEventId(), type: "info", timestamp: Date.now(), text: refusal.info});
+          // A result event is mandatory: without it the UI card stays "pending".
+          this.emit({
+            id: genEventId(),
+            type: "result",
+            timestamp: Date.now(),
+            commandId: toolCmdId,
+            success: false,
+            error: refusal.reason,
+            command: toolUiDisplay,
+            hostId: task.hostId,
+            toolName,
+          });
+          this.pushObservation(refusal.observation);
+          return null; // Dart: a user refusal does NOT consume the retry budget
+        }
+      }
+    }
+
+    // Dart 3443-3463 (task status / _hasExecutedAnyCommand / project-root capture) and
+    // the 3467-3487 injections (cancelToken / sudo / dirAuth / isTaskActive) have no
+    // Node host yet - documented divergences.
+    const execStartMs = Date.now();
+    try {
+      const ctx: ToolContext = {
+        cancelled: () => this.cancelled,
+        isLocalSession: isLocal,
+      };
+      if (this.commandExecutor !== undefined) {
+        const ce = this.commandExecutor;
+        ctx.executor = async (c: string): Promise<{exitCode: number; stdout: string; stderr: string}> => {
+          const r = await ce(c, {cancelled: () => this.cancelled, hostId: task.hostId});
+          return {exitCode: r.exitCode, stdout: r.stdout, stderr: r.stderr};
+        };
+      }
+      const result = await tool.execute(args, ctx);
+      // R1: generation check after the await (Dart 3498-3502 - boundary() covers
+      // both the generation test and the cancelled-task test).
+      { const s = this.boundary(myGen); if (s !== null) return s; }
+      this.logGate("info", "\u5de5\u5177 " + toolName + " \u6267\u884c\u7ed3\u679c: success=" + String(result.success));
+      if (result.success === false) {
+        // Dart 3505-3511: surface the failure detail in the log so the model cannot
+        // invent reasons the observation never showed.
+        const detail = result.error !== undefined && result.error !== ""
+          ? result.error
+          : (result.output !== "" ? result.output : "(\u65e0\u9519\u8bef\u8be6\u60c5)");
+        this.logGate("warn", "\u5de5\u5177 " + toolName + " \u5931\u8d25\u8be6\u60c5: " + detail);
+      }
+      const durationMs = Date.now() - execStartMs;
+      // Dart 3513-3537: the wire gets the output whole up to MAX_TOOL_EVENT_CHARS.
+      // Unlike the command path there is NO 8-line cap, no [stderr] join, no tail -
+      // two different contracts, two different events; do not merge them.
+      const toolOutput = result.success ? result.output : (result.error ?? result.output);
+      const toolOutTruncated = toolOutput.length > MAX_TOOL_EVENT_CHARS;
+      const toolOutForUi = toolOutTruncated
+        ? toolOutput.substring(0, MAX_TOOL_EVENT_CHARS) + TRUNC_MARK
+        : toolOutput;
+      this.emit({
+        id: genEventId(),
+        type: "result",
+        timestamp: Date.now(),
+        commandId: toolCmdId, // R4: the tool own command id
+        success: result.success,
+        output: result.success ? toolOutForUi : undefined,
+        error: result.success ? undefined : toolOutForUi,
+        command: toolUiDisplay,
+        hostId: task.hostId,
+        toolName,
+        durationMs,
+        outputTotalChars: toolOutput.length,
+        outputTruncated: toolOutTruncated,
+        diffAdditions: result.diffAdditions,
+        diffDeletions: result.diffDeletions,
+        hostResults: result.hostResults,
+      });
+      // Dart 3555-3572 + ReActObservation.format (agent_model.dart 161-177): the
+      // observation command is a SECOND display call with cap 0 - the model sees its
+      // full arguments, the UI already got the truncated card. Multiline => bare.
+      const obsCmd = this.formatToolCommandForDisplay(toolName, args);
+      const obsOut = result.success
+        ? result.output
+        : (result.output !== "" ? result.output : NO_OUTPUT_ZH);
+      const cmdRef = obsCmd.includes("\n") ? obsCmd : BT + obsCmd + BT;
+      const observation = result.success
+        ? OBS_OK_A + cmdRef + OBS_OK_B + "\n" + (obsOut === "" ? "" : OBS_OK_C + "\n" + obsOut + "\n")
+        : formatObservationFailure(obsCmd, result.error ?? obsOut);
+      this.pushObservation(observation);
+      if (result.success) this.noCommandRetries = 0; // R5: reset the budget on progress
+      return null;
+    } catch (e: unknown) {
+      const durationMs = Date.now() - execStartMs;
+      const excText = describeThrowable(e);
+      // Dart logs at error level; logGate only knows info|warn - warn it is.
+      this.logGate("warn", "\u5de5\u5177 " + toolName + " \u6267\u884c\u5f02\u5e38: " + excText);
+      this.emit({id: genEventId(), type: "info", timestamp: Date.now(), text: INFO_TOOL_EXC_A + toolName + INFO_TOOL_EXC_B + excText});
+      // Dart 3587-3598: even a throwing tool needs a result event, or the evidence
+      // layer holds a command with no outcome. failureKind unknown mirrors Dart.
+      this.emit({
+        id: genEventId(),
+        type: "result",
+        timestamp: Date.now(),
+        commandId: toolCmdId,
+        success: false,
+        error: excText,
+        command: toolUiDisplay,
+        hostId: task.hostId,
+        toolName,
+        durationMs,
+        failureKind: "unknown",
+        outputTotalChars: excText.length,
+        outputTruncated: false,
+      });
+      { const s = this.boundary(myGen); if (s !== null) return s; }
+      this.pushObservation(OBS_TOOL_EXC_A + toolName + OBS_TOOL_EXC_B + excText);
+      return null;
+    }
+  }
+
+  /**
+   * Round 123: the gate + executor + R8 caps + result + push block lifted out of run()
+   * VERBATIM (zero semantic edits) so the execute-alias tool path can reuse it - Dart
+   * runs both paths through the same _runCommandWithSafety (agent_engine.dart 3285).
+   * Returning null means "continue the loop"; a terminal finish state means the run
+   * loop must return it. The block contained no break/continue statements, which is
+   * what made this extraction control-flow-safe.
+   */
+  private async runGatedCommand(
+    cmd: string,
+    cmdEvt: AgentEvent,
+    task: StartTaskParams,
+    myGen: TaskGeneration,
+    myGenNumber: number,
+    step: number,
+  ): Promise<AgentFinishState | null> {
         // §9 item 6: the permission gate (Dart agent_engine.dart 2590-2594).
         // Classification and decision happen BEFORE the executor is touched. This is
         // the half that utils/permission_policy.ts used to record as missing ("the
@@ -474,187 +1100,7 @@ export class ReActEngine {
           });
           this.trimConversation(); // Dart 3027: trim after the result observation
         }
-      } else {
-        // Dart _handleNoCommand (agent_engine.dart 3622-3642): within the retry
-        // budget the model gets a progress notice + the continue prompt back in
-        // history; only after the budget is spent is the task terminal (R5: failed,
-        // never completed). The retry log lines are Dart agentLogger copies on the
-        // gate channel (stderr-only, no wire event), and the hourglass notice is a
-        // real info event like Dart 3629. Node keeps its own terminal summary
-        // string (no-command retry exhaustion) - the summary contract pinned by
-        // r5_terminal_whitelist, an already-documented divergence, unchanged here.
-        this.noCommandRetries++;
-        if (this.noCommandRetries <= this.maxNoCommandRetries) {
-          // Dart 3625-3626: AI wei sheng cheng ming ling, fa song ji xu ti shi (chong shi N/M)
-          this.logGate(
-            "info",
-            "AI \u672a\u751f\u6210\u547d\u4ee4\uff0c\u53d1\u9001\u7ee7\u7eed\u63d0\u793a (\u91cd\u8bd5 " +
-              this.noCommandRetries + "/" + this.maxNoCommandRetries + ")");
-          this.emit({
-            // R4: occurrence id - two retries show the same notice twice and each
-            // occurrence is a separate fact (Dart UiText.t hourglass, 3629).
-            id: genEventId(),
-            type: "info",
-            timestamp: Date.now(),
-            text: "\u23F3 \u7EE7\u7EED\u6267\u884C...", // hourglass + continuing
-          });
-          this.conversation.push({role: "user", content: CONTINUE_PROMPT});
-          this.trimConversation(); // Dart 3632: trim after the continue-prompt add
-        } else {
-          // Dart 3638-3639 warn: AI lian xu N ci wei sheng cheng ming ling, ren wu zhong zhi
-          this.logGate(
-            "warn",
-            "AI \u8FDE\u7EED " + this.noCommandRetries +
-              " \u6B21\u672A\u751F\u6210\u547D\u4EE4\uFF0C\u4EFB\u52A1\u7EC8\u6B62 (failed)");
-          this.emitFinish("failed", "no-command retry exhaustion");
-          return "failed";
-        }
-      }
-
-      // W7: checkpoint at every step boundary (inProgress state)
-      if (this.checkpointStore) {
-        this.checkpointStore.save({
-          taskId: task.taskId,
-          operationId: task.operationId,
-          hostId: task.hostId,
-          goal: task.goal,
-          step: step + 1,
-          conversation: this.conversation.map((m) => ({role: m.role, content: m.content})),
-          seenStableIds: [...this.seenStableIds],
-          state: "inProgress",
-          savedAt: new Date().toISOString(),
-        });
-      }
-    }
-
-    // Max steps exhausted (R5: all terminal paths emit finish + call onFinished)
-    this.emitFinish("failed", "max steps exhausted");
-    return "failed";
-  }
-
-  // ---------------------------------------------------------------------------
-  // R1.3 / R5: consumer callbacks are external code and MUST NOT be able to
-  // abort the ReAct loop. onEvent / onFinished / onError are wired by the RPC
-  // layer straight onto a JSON-RPC transport (index.ts), so a single transport
-  // hiccup or a host-side bug used to propagate out of run().
-  //
-  // Two independent reasons that was a defect, not a design choice:
-  //   * R1.3 - "Every .then() on an async future MUST have an onError handler."
-  //     index.ts:144 starts the run and returns {ok:true} WITHOUT awaiting it,
-  //     so the escaping throw surfaced as an unhandled rejection. On Node >=15
-  //     the default --unhandled-rejections=strict kills the process: the child
-  //     agent dies mid-task and the parent only sees a closed pipe.
-  //   * R5 - "All terminal paths MUST behave consistently": emit() sat before
-  //     finishSideEffects(), so a throw in the event sink skipped the finish
-  //     event, skipped onFinished and left the task forever "running".
-  //
-  // Containment, not silence: R1.3 also forbids swallowing a caught error
-  // without logging it. The diagnostic therefore goes (a) to the host through
-  // the engine's own error channel and (b) to stderr, where the Dart parent
-  // already reads our stderr, each behind its own guard so a second throwing
-  // sink cannot undo the first. The stack is kept for the log line but never
-  // sent over the wire as a message.
-  private emit(evt: AgentEvent): void {
-    try {
-      this.callbacks.onEvent(evt);
-    } catch (e: unknown) {
-      this.reportCallbackFailure("onEvent", evt.type, e);
-    }
-  }
-
-  private reportFinished(state: AgentFinishState, summary?: string): void {
-    try {
-      this.callbacks.onFinished(state, summary);
-    } catch (e: unknown) {
-      this.reportCallbackFailure("onFinished", state, e);
-    }
-  }
-
-  private reportError(msg: string): void {
-    const cb = this.callbacks.onError;
-    if (!cb) return; // optional callback, unchanged behaviour when absent
-    try {
-      cb(msg);
-    } catch (e: unknown) {
-      this.reportCallbackFailure("onError", "", e);
-    }
-  }
-
-  /**
-   * Re-entrancy latch for the error channel. Without it: onError throws ->
-   * reportCallbackFailure -> reportError -> onError throws -> ... until the stack
-   * overflows (RangeError), which is exactly the crash the containment was meant
-   * to prevent. A failing error channel degrades to stderr-only reporting.
-   */
-  private reportingCallbackFailure = false;
-
-  /** Log a callback failure without ever letting the logger itself throw. */
-  private reportCallbackFailure(which: string, context: string, e: unknown): void {
-    const detail = describeThrowable(e);
-    const line =
-      "[agent-core] callback " + which + " threw for " + (context || "-") + ": " + detail;
-    // Host notification, unless the host error channel IS the thing failing -
-    // then re-notifying would recurse (see reportingCallbackFailure) and we
-    // degrade to the stderr copy below instead. The failure is still reported.
-    if (!this.reportingCallbackFailure) {
-      this.reportingCallbackFailure = true;
-      try {
-        this.reportError(line);
-      } finally {
-        this.reportingCallbackFailure = false;
-      }
-    }
-    try {
-      process.stderr.write(line + "\n");
-    } catch {
-      // stderr itself failing (closed pipe) is unrecoverable and unreportable;
-      // there is no third channel left, so drop the log rather than throw.
-    }
-  }
-
-  /**
-   * R8 (AGENTS.md) / Dart _trimMessages (agent_engine.dart 4612-4671) applied to
-   * this.conversation. Dart calls its trim after EVERY history addition (roughly
-   * twenty call sites) so the list can never be sent oversized on the next step;
-   * Node mirrors that by invoking this right after every conversation.push below
-   * (the trim itself is idempotent and cheap while under the caps). The three
-   * layers - per-message 4000-char tail, 80-message backstop, 0.7*contextWindow
-   * token budget with a floor of 2 - live in utils/context_trim.ts with anchors.
-   *
-   * Documented structural divergence: Dart keeps system messages INSIDE the trimmed
-   * list and pins them at the head (4614-4615). This engine never stores a system
-   * message in conversation - run() rebuilds [system, ...conversation, userTask]
-   * fresh on every call - so the system-pinning branch is inert here by
-   * construction and every stored message is a non-system one. Dart logs
-   * agentLogger("TrimMsgs", ...) map onto logGate with the same TrimMsgs tag.
-   */
-  private trimConversation(): void {
-    const cw = effectiveContextWindow(this.modelConfig.contextWindow);
-    const logs = trimConversationList(this.conversation, cw);
-    for (const line of logs) this.logGate("info", "TrimMsgs: " + line);
-  }
-  /**
-   * Dart 2971-2983 (_enrichCommandEvent): stamp the host / tool / risk / decision
-   * snapshot onto a command event before the parent sees it. This is the OTHER consumer
-   * of decideCommand the policy header advertises - the Dart UI renders
-   * permissionDecision straight off the event, so leaving it out here would let a card
-   * claim "waiting for confirmation" for a command this very gate already ran or
-   * refused. Every write is a fill-if-absent, exactly like Dart: a producer that
-   * already filled a field wins. Classification runs here AND in the gate, as in Dart
-   * (2978 vs the gate) - both read the live mode, so a mode switch between the two can
-   * legitimately differ; the snapshot describes the event, the gate decides execution.
-   */
-  private enrichCommandEvent(evt: AgentEvent, hostId: string): void {
-    if (evt.type !== "command") return;
-    if (evt.hostId === undefined) evt.hostId = hostId;
-    if (evt.toolName === undefined) evt.toolName = "exec_command";
-    const cmd = (evt.command ?? "").trim();
-    if (cmd === "") return;
-    const level = this.safetyCheckFn(cmd);
-    if (evt.riskLevel === undefined) evt.riskLevel = level;
-    if (evt.permissionDecision === undefined) {
-      evt.permissionDecision = decideCommand(level, this.permissionModeFn());
-    }
+    return null;
   }
 
   /**
