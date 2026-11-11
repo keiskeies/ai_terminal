@@ -19,6 +19,16 @@ import {CheckpointStore} from "../utils/checkpoint_store.js";
 import {ConfirmFlow, formatObservationFailure} from "./confirm_flow.js";
 import {decideCommand, type CommandGateDecision, type SafetyLevel} from "../utils/permission_policy.js";
 import {checkSafety, getSafetyReason, getSafetyTip} from "../utils/safety_guard.js";
+// Dart 3861-3871: the model sometimes writes the goal-done marker into a command
+// block (real-world symptom: CommandNotFoundException), so the executor call needs a
+// hard guard. Goal bookkeeping (decideGoalContinuation) lives with the Dart provider
+// on the parent side - finish events carry everything it reads (doc sec. 9).
+import {isGoalMarkerOnlyCommand} from "../utils/goal_continuation.js";
+
+// Byte-faithful Dart strings (agent_engine.dart 3865 / 3868), CJK escaped.
+const GOAL_MARKER_LOG = "\u5ffd\u7565\u88ab\u5f53\u6210\u547d\u4ee4\u7684\u76ee\u6807\u8fbe\u6210\u6807\u8bb0"; // Dart log at 3865
+const GOAL_MARKER_OUTPUT =
+  "\u8fd9\u4e00\u884c\u662f\u7ed3\u8bba\u6807\u8bb0\uff0c\u4e0d\u9700\u8981\u6267\u884c\u3002\u82e5\u76ee\u6807\u786e\u5df2\u8fbe\u6210\uff0c\u8bf7\u5728 \u56de\u7b54: \u6b63\u6587\u91cc\u8bf4\u660e\u7ed3\u679c\u3002"; // Dart output at 3868
 
 export interface EngineCallbacks {
   /** Emit a parsed event to the parent (stdio). */
@@ -363,7 +373,12 @@ export class ReActEngine {
         if (gateAllowsExecution) {
           // Phase 2: dispatch to the injected command executor; Phase 0: stub fallback.
           let execRes: CommandExecResult;
-          if (this.commandExecutor) {
+          // Dart 3861-3871: the marker is not a command. Runs AFTER the permission
+          // gate (Dart orders the same: gate 2586-2725, guard 3864), before any executor.
+          if (isGoalMarkerOnlyCommand(cmd)) {
+            this.logGate("info", GOAL_MARKER_LOG);
+            execRes = {stdout: GOAL_MARKER_OUTPUT, stderr: "", exitCode: 0, durationMs: 0, success: true};
+          } else if (this.commandExecutor) {
             execRes = await this.commandExecutor(cmd, {cancelled: () => this.cancelled, hostId: task.hostId});
             // R1: generation check after the await.
             { const s = this.boundary(myGen); if (s !== null) return s; }
