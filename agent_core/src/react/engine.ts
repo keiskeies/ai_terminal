@@ -33,6 +33,12 @@ const GOAL_MARKER_LOG = "\u5ffd\u7565\u88ab\u5f53\u6210\u547d\u4ee4\u7684\u76ee\
 const GOAL_MARKER_OUTPUT =
   "\u8fd9\u4e00\u884c\u662f\u7ed3\u8bba\u6807\u8bb0\uff0c\u4e0d\u9700\u8981\u6267\u884c\u3002\u82e5\u76ee\u6807\u786e\u5df2\u8fbe\u6210\uff0c\u8bf7\u5728 \u56de\u7b54: \u6b63\u6587\u91cc\u8bf4\u660e\u7ed3\u679c\u3002"; // Dart output at 3868
 
+// Dart agent_engine.dart 3627-3628: the continue prompt handed back to the model
+// when a turn produced no ReAct command. Byte-faithful (CJK escaped), including
+// the literal newline pairs of the Dart source.
+const CONTINUE_PROMPT =
+  "\u8BF7\u7EE7\u7EED\u6267\u884C\u4EFB\u52A1\u3002\u5982\u679C\u8FD8\u6709\u9700\u8981\u6267\u884C\u7684\u6B65\u9AA4\uFF0C\u8BF7\u4F7F\u7528\u4EE5\u4E0B\u683C\u5F0F\u56DE\u590D\uFF1A\n\n\u601D\u8003: [\u4F60\u7684\u63A8\u7406]\n\u8BF4\u660E: [\u4E00\u53E5\u8BDD\u8BF4\u660E\u8FD9\u6761\u547D\u4EE4\u505A\u4EC0\u4E48\u3001\u6709\u4EC0\u4E48\u5F71\u54CD]\n\u52A8\u4F5C: execute\n\u547D\u4EE4: [\u8981\u6267\u884C\u7684\u547D\u4EE4]\n\n\u5982\u679C\u4EFB\u52A1\u5DF2\u5168\u90E8\u5B8C\u6210\uFF0C\u8BF7\u56DE\u590D\uFF1A\n\n\u601D\u8003: [\u603B\u7ED3]\n\u52A8\u4F5C: finish";
+
 export interface EngineCallbacks {
   /** Emit a parsed event to the parent (stdio). */
   onEvent: (evt: AgentEvent) => void;
@@ -414,9 +420,37 @@ export class ReActEngine {
           this.trimConversation(); // Dart 3027: trim after the result observation
         }
       } else {
-        // No command emitted - retry a few times
+        // Dart _handleNoCommand (agent_engine.dart 3622-3642): within the retry
+        // budget the model gets a progress notice + the continue prompt back in
+        // history; only after the budget is spent is the task terminal (R5: failed,
+        // never completed). The retry log lines are Dart agentLogger copies on the
+        // gate channel (stderr-only, no wire event), and the hourglass notice is a
+        // real info event like Dart 3629. Node keeps its own terminal summary
+        // string (no-command retry exhaustion) - the summary contract pinned by
+        // r5_terminal_whitelist, an already-documented divergence, unchanged here.
         this.noCommandRetries++;
-        if (this.noCommandRetries > this.maxNoCommandRetries) {
+        if (this.noCommandRetries <= this.maxNoCommandRetries) {
+          // Dart 3625-3626: AI wei sheng cheng ming ling, fa song ji xu ti shi (chong shi N/M)
+          this.logGate(
+            "info",
+            "AI \u672a\u751f\u6210\u547d\u4ee4\uff0c\u53d1\u9001\u7ee7\u7eed\u63d0\u793a (\u91cd\u8bd5 " +
+              this.noCommandRetries + "/" + this.maxNoCommandRetries + ")");
+          this.emit({
+            // R4: occurrence id - two retries show the same notice twice and each
+            // occurrence is a separate fact (Dart UiText.t hourglass, 3629).
+            id: genEventId(),
+            type: "info",
+            timestamp: Date.now(),
+            text: "\u23F3 \u7EE7\u7EED\u6267\u884C...", // hourglass + continuing
+          });
+          this.conversation.push({role: "user", content: CONTINUE_PROMPT});
+          this.trimConversation(); // Dart 3632: trim after the continue-prompt add
+        } else {
+          // Dart 3638-3639 warn: AI lian xu N ci wei sheng cheng ming ling, ren wu zhong zhi
+          this.logGate(
+            "warn",
+            "AI \u8FDE\u7EED " + this.noCommandRetries +
+              " \u6B21\u672A\u751F\u6210\u547D\u4EE4\uFF0C\u4EFB\u52A1\u7EC8\u6B62 (failed)");
           this.emitFinish("failed", "no-command retry exhaustion");
           return "failed";
         }

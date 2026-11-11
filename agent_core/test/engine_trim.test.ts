@@ -220,9 +220,14 @@ describe("engine trims after every push (R8 wiring)", () => {
     const second = h.client.prompts[1];
     const asst = second.find((m) => m.role === "assistant");
     expect(asst).toBeDefined();
-    expect((asst as ChatMsg).content.startsWith(PFX(1000))).toBe(true);
-    // prefix 18 chars + retained tail 4000 (all ASCII -> no fence appended)
-    expect((asst as ChatMsg).content.length).toBe(4018);
+    // Dart _trimMessages scans EVERY message on every call (4617-4634), and the
+    // no-command branch now pushes a continue prompt + re-trims (3632), so the
+    // assistant reply is L1-truncated twice: 5000 -> 4018 -> 4016. The second
+    // pass drops exactly 18 chars - the whole first marker - so the second
+    // marker (cut=18, 16 chars) sits on top of the untouched 4000-char tail.
+    expect((asst as ChatMsg).content.startsWith(PFX(18))).toBe(true);
+    expect((asst as ChatMsg).content).toBe(PFX(18) + "z".repeat(MAX_MESSAGE_CHARS));
+    expect((asst as ChatMsg).content.length).toBe(PFX(18).length + MAX_MESSAGE_CHARS);
     // L1 is silent in Dart; default ctx 262144 means L2/L3 cannot fire at 1 message
     expect(h.logs.filter((s) => s.includes("TrimMsgs")).length).toBe(0);
   });
