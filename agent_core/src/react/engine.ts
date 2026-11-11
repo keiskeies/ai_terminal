@@ -385,13 +385,36 @@ export class ReActEngine {
         if (gateAllowsExecution) {
           // Phase 2: dispatch to the injected command executor; Phase 0: stub fallback.
           let execRes: CommandExecResult;
+          // Dart _executeCommand 3918-3965: executor.executeAndWait is wrapped in a
+          // try/catch that TURNS a throw into a failed AgentResult (error = e.toString(),
+          // failureKind unknown, no exit code) - the exception never escapes the ReAct
+          // loop, so the task keeps looping and only finish decides the terminal state
+          // (R5). executorError carries the Dart error string into the result event.
+          let executorError: string | undefined;
           // Dart 3861-3871: the marker is not a command. Runs AFTER the permission
           // gate (Dart orders the same: gate 2586-2725, guard 3864), before any executor.
           if (isGoalMarkerOnlyCommand(cmd)) {
             this.logGate("info", GOAL_MARKER_LOG);
             execRes = {stdout: GOAL_MARKER_OUTPUT, stderr: "", exitCode: 0, durationMs: 0, success: true};
           } else if (this.commandExecutor) {
-            execRes = await this.commandExecutor(cmd, {cancelled: () => this.cancelled, hostId: task.hostId});
+            const execStartMs = Date.now();
+            try {
+              execRes = await this.commandExecutor(cmd, {cancelled: () => this.cancelled, hostId: task.hostId});
+            } catch (e: any) {
+              // Dart 3956-3965: stopwatch.stop() + AgentResult(success: false,
+              // error: e.toString(), failureKind unknown). String(e) is the JS mirror of
+              // Dart toString() ("Error: msg"); the observation and result event below
+              // then follow the ordinary failed-result path (Dart 2776+ -> 3565-3567).
+              executorError = String(e);
+              execRes = {
+                stdout: "",
+                stderr: "",
+                exitCode: 0, // Dart: exitCode stays null; suppressed on the wire below
+                durationMs: Date.now() - execStartMs,
+                failureKind: "unknown",
+                success: false,
+              };
+            }
             // R1: generation check after the await.
             { const s = this.boundary(myGen); if (s !== null) return s; }
           } else {
@@ -407,9 +430,16 @@ export class ReActEngine {
             command: cmdEvt.command,
             success: execRes.success,
             output: (execRes.stdout + (execRes.stderr ? "\n[stderr]\n" + execRes.stderr : "")).trimEnd() || "(no output)",
-            error: execRes.success ? undefined : ("command exited with code " + execRes.exitCode + (execRes.timedOut ? " (timed out)" : "")),
+            error: execRes.success
+              ? undefined
+              : executorError !== undefined
+                // Dart exception path: error = e.toString() verbatim (3959-3961), NOT
+                // the exit-code sentence - there was no process exit.
+                ? executorError
+                : ("command exited with code " + execRes.exitCode + (execRes.timedOut ? " (timed out)" : "")),
             durationMs: execRes.durationMs,
-            exitCode: execRes.exitCode,
+            // Dart AgentResult from the throw leaves exitCode null -> wire omits it.
+            exitCode: executorError === undefined ? execRes.exitCode : undefined,
             failureKind: execRes.failureKind,
           };
           this.emit(result);
