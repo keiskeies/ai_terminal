@@ -27,6 +27,8 @@ import {isGoalMarkerOnlyCommand} from "../utils/goal_continuation.js";
 // R8 (AGENTS.md): bounded conversation history - port of Dart _trimMessages (the three
 // layers and their Dart line anchors live in utils/context_trim.ts).
 import {effectiveContextWindow, trimConversation as trimConversationList} from "../utils/context_trim.js";
+import {isQueryCommand} from "../utils/command_heuristics.js";
+import {truncateOutput, truncateQueryOutput} from "../utils/output_processor.js";
 
 // Byte-faithful Dart strings (agent_engine.dart 3865 / 3868), CJK escaped.
 const GOAL_MARKER_LOG = "\u5ffd\u7565\u88ab\u5f53\u6210\u547d\u4ee4\u7684\u76ee\u6807\u8fbe\u6210\u6807\u8bb0"; // Dart log at 3865
@@ -420,6 +422,26 @@ export class ReActEngine {
           } else {
             execRes = {stdout: "", stderr: "", exitCode: 0, durationMs: 0, success: true};
           }
+          // R8: the model-facing texts are the CAPPED ones (Dart 2809-2874):
+          // query commands get the tail-20000 cap, everything else the
+          // 8-line/600-char tail cap. The empty marker stays Node's own ASCII
+          // "(no output)" placeholder (Dart uses the zh "(无输出)" inside its
+          // truncators - a pinned, documented divergence).
+          const rawCombined = (execRes.stdout + (execRes.stderr ? "\n[stderr]\n" + execRes.stderr : "")).trimEnd();
+          const isQuery = isQueryCommand(cmdEvt.command ?? "");
+          const capText = isQuery ? truncateQueryOutput(rawCombined) : truncateOutput(rawCombined);
+          const outputText = rawCombined === "" ? "(no output)" : capText;
+          // Dart 2818-2829: evidence-layer tail for the wire only when the cap
+          // actually bit, and only for non-query commands (query output is
+          // already a tail of at most 20000).
+          let outputTail: string | undefined;
+          if (isQuery === false && rawCombined.length > outputText.length) {
+            const maxTailChars = 8000;
+            outputTail = rawCombined.length <= maxTailChars
+              ? rawCombined
+              : rawCombined.substring(rawCombined.length - maxTailChars);
+          }
+          const outputTotalChars = rawCombined.length;
           const result: AgentEvent = {
             // R4: occurrence id (Dart _genId), NOT a content hash — two runs of the
             // same command are two separate results and must not share an id.
@@ -429,7 +451,10 @@ export class ReActEngine {
             commandId: cmdEvt.commandId ?? cmdEvt.id,
             command: cmdEvt.command,
             success: execRes.success,
-            output: (execRes.stdout + (execRes.stderr ? "\n[stderr]\n" + execRes.stderr : "")).trimEnd() || "(no output)",
+            output: outputText,
+            outputTotalChars,
+            outputTruncated: rawCombined.length > outputText.length,
+            outputTail,
             error: execRes.success
               ? undefined
               : executorError !== undefined
