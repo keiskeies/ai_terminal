@@ -103,6 +103,16 @@ const USER_CHOSE_A = "\u7528\u6237\u9009\u62e9\u4e86: "; // Dart 3094 gate info 
 const CHOSEN_INFO_A = "\ud83d\udc49 \u4f60\u9009\u62e9\u4e86: "; // Dart 3098 info (zh side only; no UiText.t in Node)
 const OBS_CHOSEN_A = "\u89c2\u6d4b: \u7528\u6237\u9009\u62e9\u4e86 \""; // Dart 3101 observation head
 const OBS_CHOSEN_B = "\""; // Dart 3101 observation tail
+// Round 125: Dart anti-hallucination finish guard (agent_engine.dart 1450-1468).
+// The guard is OFF by default (EngineOptions.hallucinationGuard) - the frozen
+// r1_generation_check regression pins a bare finish with zero commands to
+// success, so the Dart contract is opt-in. Strings byte-faithful to Dart:
+// 1457-1458 warn, 1460 info, 1461-1466 user nudge.
+const GUARD_WARN_A = 'AI \u672a\u6267\u884c\u4efb\u4f55\u547d\u4ee4\u5c31 finish\uff0c\u5f3a\u5236\u7ee7\u7eed (\u91cd\u8bd5 ';
+const GUARD_WARN_B = '/';
+const GUARD_WARN_C = ')';
+const GUARD_INFO = '\u26a0\ufe0f AI \u672a\u5b9e\u9645\u6267\u884c\u547d\u4ee4\u5c31\u58f0\u79f0\u5b8c\u6210\uff0c\u8981\u6c42\u5b9e\u9645\u9a8c\u8bc1';
+const GUARD_NUDGE = '\u4f60\u5c1a\u672a\u6267\u884c\u4efb\u4f55\u547d\u4ee4\u5c31\u58f0\u660e\u4efb\u52a1\u5b8c\u6210\uff0c\u8fd9\u4e0d\u88ab\u5141\u8bb8\u3002\u8bf7\u7acb\u5373\u4f7f\u7528 \u52a8\u4f5c: execute \u5b9e\u9645\u6267\u884c\u547d\u4ee4\u9a8c\u8bc1\u4f60\u7684\u5224\u65ad\uff0c\u6240\u6709\u7ed3\u8bba\u5fc5\u987b\u6709\u547d\u4ee4\u8f93\u51fa\u4f5c\u4e3a\u4f9d\u636e\u3002\u5982\u679c\u4efb\u52a1\u786e\u5b9e\u65e0\u9700\u6267\u884c\u547d\u4ee4\uff08\u5982\u7eaf\u89e3\u91ca/\u5206\u6790\uff09\uff0c\u8bf7\u5728\u601d\u8003\u4e2d\u660e\u786e\u8bf4\u660e\u4e3a\u4ec0\u4e48\u65e0\u9700\u6267\u884c\u547d\u4ee4\u3002';
 
 export interface EngineCallbacks {
   /** Emit a parsed event to the parent (stdio). */
@@ -170,6 +180,18 @@ export interface EngineOptions {
    * visibleFor: nothing local-only is assumed available.
    */
   isLocalSession?: boolean | (() => boolean);
+  /**
+   * Round 125: Dart _hasExecutedAnyCommand anti-hallucination finish guard
+   * (agent_engine.dart 1450-1468, counters 251-252, reset 662-663, set sites
+   * 2388/3452). When true, a finish action is REFUSED up to
+   * maxFinishWithoutExecRetries (2) times unless at least one command or tool
+   * has actually executed; the model gets a nudge user message demanding real
+   * verification and the refused finish event is suppressed on the wire (Dart
+   * only ever emits finish through _finishTask). Default false: the frozen
+   * r1_generation_check regression pins a command-less finish to success, so
+   * enabling the guard is a host decision, not an engine default.
+   */
+  hallucinationGuard?: boolean;
 }
 
 /** Phase 2 command-executor result shape (1:1 fields the result event needs). */
@@ -229,6 +251,12 @@ export class ReActEngine {
   private choiceCompleter: {resolve: (v: string) => void} | null = null;
   private pendingAskEvent: AgentEvent | null = null;
   private lastResponseHadAskEvent = false;
+  // Round 125: anti-hallucination finish-guard state (Dart _hasExecutedAnyCommand
+  // 251 / _finishWithoutExecCount 252 / reset 662-663, guard 1450-1468).
+  private readonly hallucinationGuardEnabled: boolean;
+  private hasExecutedAnyCommand = false;
+  private finishWithoutExecCount = 0;
+  private readonly maxFinishWithoutExecRetries = 2; // Dart _maxFinishWithoutExecRetries
 
   constructor(
     private readonly llm: LlmClient,
@@ -246,6 +274,7 @@ export class ReActEngine {
     this.toolRegistry = options?.toolRegistry;
     const localOpt = options?.isLocalSession;
     this.isLocalSessionFn = typeof localOpt === "function" ? localOpt : (): boolean => localOpt === true;
+    this.hallucinationGuardEnabled = options?.hallucinationGuard === true;
     // The fallback counter is the engine field itself, so an uninjected engine keeps
     // the exact pre-gate behaviour (currentGen++ in run()/cancel()).
     this.genSource = options?.generation ?? {
@@ -319,6 +348,11 @@ export class ReActEngine {
     const myGenNumber = this.genSource.current();
     this.conversation = [];
     this.noCommandRetries = 0;
+    // Round 125: Dart _resetTransientState 662-663 counterpart (the flag + retry
+    // counters reset at every fresh task). Node has no pause/restore corridor, so
+    // run-entry reset is the only reset site.
+    this.hasExecutedAnyCommand = false;
+    this.finishWithoutExecCount = 0;
     this.seenStableIds.clear();
 
     // W7: resume from checkpoint if requested and one exists
@@ -381,13 +415,24 @@ export class ReActEngine {
       // gate is the only owner of.
       for (const evt of events) {
         if (this.seenStableIds.has(evt.id)) continue;
-        this.seenStableIds.add(evt.id);
         this.enrichCommandEvent(evt, task.hostId);
         // Dart 1904-1906: remember THIS turn's ask event - the user's choice is
         // written back onto the very question that was asked (handleAskAction),
         // never onto whatever arrived while the loop was parked. Only EMITTED
         // events qualify: the dedup guard above is part of the Dart shape.
         if (evt.type === "ask") this.pendingAskEvent = evt;
+        // Round 125: guard ON and this finish WOULD be refused below (no command/
+        // tool executed, retries not exhausted) -> suppress it on the wire.
+        // Dart only ever emits finish through _finishTask (agent_engine.dart
+        // 3762) - its parser never mints a finish event at all, so every refused
+        // finish simply never existed there. Here the dedup decision and the
+        // force-continue call the SAME helper in the SAME iteration (no await),
+        // so suppression and refusal always agree. A SUPPRESSED finish must not
+        // claim its stableId: the retried finish carries the same answerBody and
+        // therefore the same stableId - marking it seen would silently swallow
+        // the allowed finish on the wire (R5: every terminal path emits finish).
+        if (this.guardWillRefuseThisFinish(evt)) continue;
+        this.seenStableIds.add(evt.id);
         this.emit(evt);
       }
 
@@ -401,6 +446,25 @@ export class ReActEngine {
       // parent via the R4-dedup loop above; do NOT re-emit it — only run the side effects).
       const finishEvt = events.find((e) => e.type === "finish");
       if (finishEvt) {
+        // Round 125: Dart 1450-1468 anti-hallucination guard, first in the finish
+        // case. Refused turns force-continue WITHOUT the checkpoint save (Dart's
+        // continue skips it too) and without the finish event on the wire (the
+        // dedup loop above already suppressed it).
+        if (this.guardWillRefuseThisFinish(finishEvt)) {
+          this.finishWithoutExecCount++; // Dart 1451
+          this.logGate("warn", GUARD_WARN_A + this.finishWithoutExecCount + GUARD_WARN_B +
+            this.maxFinishWithoutExecRetries + GUARD_WARN_C);
+          this.emit({
+            id: genEventId(),
+            type: "info",
+            timestamp: Date.now(),
+            text: GUARD_INFO, // Dart 1460: onEvent(AgentEvent.info(...))
+          });
+          // Dart 1461-1467: the nudge as a user message, then _trimMessages.
+          this.conversation.push({role: "user", content: GUARD_NUDGE});
+          this.trimConversation();
+          continue; // force-continue: no checkpoint, no finish side effects
+        }
         const state = finishEvt.finishState ?? "success";
         this.finishSideEffects(state, finishEvt.summary); // no 2nd finish event; Dart parity
         return state;
@@ -1020,6 +1084,9 @@ export class ReActEngine {
           return {exitCode: r.exitCode, stdout: r.stdout, stderr: r.stderr};
         };
       }
+      // Dart 3452: the anti-hallucination flag is set UNCONDITIONALLY before
+      // running the tool - a failed tool still proves the AI acted.
+      this.hasExecutedAnyCommand = true;
       const result = await tool.execute(args, ctx);
       // R1: generation check after the await (Dart 3498-3502 - boundary() covers
       // both the generation test and the cancelled-task test).
@@ -1202,6 +1269,10 @@ export class ReActEngine {
           }
         }
         if (gateAllowsExecution) {
+          // Dart 2388: any command that clears the permission gate counts as
+          // executed (gate refusals do not); the goal marker inside this block
+          // still counts, matching Dart's body-entry placement.
+          this.hasExecutedAnyCommand = true;
           // Phase 2: dispatch to the injected command executor; Phase 0: stub fallback.
           let execRes: CommandExecResult;
           // Dart _executeCommand 3918-3965: executor.executeAndWait is wrapped in a
@@ -1292,6 +1363,22 @@ export class ReActEngine {
           this.trimConversation(); // Dart 3027: trim after the result observation
         }
     return null;
+  }
+
+  /**
+   * Round 125: single source of truth for the anti-hallucination finish-guard
+   * decision. BOTH the dedup emit loop and the finish branch call this, so the
+   * wire suppression can never drift from the force-continue decision. Returns
+   * true when this finish event would be REFUSED (forced continue) by the guard.
+   * No await between the two call sites, so the result cannot change mid-turn.
+   */
+  private guardWillRefuseThisFinish(evt: AgentEvent): boolean {
+    return (
+      evt.type === "finish" &&
+      this.hallucinationGuardEnabled &&
+      !this.hasExecutedAnyCommand &&
+      this.finishWithoutExecCount < this.maxFinishWithoutExecRetries
+    );
   }
 
   /**
