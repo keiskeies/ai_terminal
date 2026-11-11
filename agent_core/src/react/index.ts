@@ -29,3 +29,6 @@ export type {
   ConfirmTimerHandle,
   ConfirmFlowOptions,
 } from "./confirm_flow.js";
+
+export {ToolCallAccumulator, parseToolAction} from "./tool_action.js";
+export type {ToolCall, ToolActionResult} from "./tool_action.js";
