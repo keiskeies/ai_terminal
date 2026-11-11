@@ -260,6 +260,9 @@ export abstract class AgentTool {
   get source(): ToolSource { return ToolSource.builtin; }
   /** Scope; default all. */
   get scope(): ToolScope { return ToolScope.all; }
+  /** Read-only gate criterion: 1:1 Dart agent_tools.dart:182 - kind == read. */
+  get isReadOnly(): boolean { return this.kind === ToolKind.read; }
+
   /** Whether this tool records changes in the audit log. */
   get recordsChanges(): boolean { return this.kind === ToolKind.write || this.kind === ToolKind.destructive; }
   /** JSON Schema for OpenAI Function Calling. Return null to skip FC. */

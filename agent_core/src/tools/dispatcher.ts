@@ -17,7 +17,7 @@
 
 import {AgentTool, AgentToolRegistry, ToolContext, ToolResult} from "./builtin.js";
 import {ToolArgs} from "./tool_args.js";
-import {AgentEvent} from "../rpc/schema.js";
+import {AgentEvent, PermissionMode} from "../rpc/schema.js";
 import {genEventId} from "../utils/stable_hash.js";
 
 export interface DispatchRequest {
@@ -36,6 +36,14 @@ export interface DispatchRequest {
    * card to the last command once more than one command existed.
    */
   commandId?: string;
+  /**
+   * Dart agent_engine.dart 3357-3373: in read-only permission mode every tool
+   * whose kind is not read is refused BEFORE args parsing (the same order as
+   * Dart: unknown-tool check, then this gate, then argument handling). Omitted
+   * = no gate, so direct W5 dispatch callers keep their prior behaviour; the
+   * engine-side tool path passes the live mode once dispatch is wired there.
+   */
+  permissionMode?: () => PermissionMode;
   /** Opts carried to the tool (executor / cancelled / hostIds / isLocalSession). */
   ctx?: Partial<ToolContext>;
 }
@@ -69,6 +77,19 @@ export class ToolDispatcher {
     const tool: AgentTool | undefined = this.registry.get(req.toolName);
     if (!tool) {
       return {executed:false, event: this.resultEvent({toolName:req.toolName, hostId:req.hostId, success:false, error:"unknown tool: " + req.toolName, failureKind:"unknown_tool", commandId:req.commandId})};
+    }
+
+    // Dart 3357-3373: the read-only file mode used to gate shell commands only,
+    // so a tool call could edit files straight through it (design D3). The
+    // criterion derives from ToolKind, so every new write-class tool is covered
+    // automatically and no second deny-list is maintained.
+    if (req.permissionMode?.() === "readOnly" && !tool.isReadOnly) {
+      // Dart raises an info event + observation and bumps the no-command retry
+      // counter; the dispatcher has neither conversation nor counters, so the
+      // refusal surfaces as a permissionDenied result event (failureKind from
+      // CommandFailureKind.permissionDenied, orchestrator.ts) without touching
+      // the tool. The engine tool path will translate it once dispatch is wired.
+      return {executed:false, event: this.resultEvent({toolName:req.toolName, hostId:req.hostId, success:false, error:"read-only mode: tool refused: " + req.toolName, failureKind:"permissionDenied", commandId:req.commandId})};
     }
 
     // R9: parse free-text args once, through the typed layer. Empty input is valid
