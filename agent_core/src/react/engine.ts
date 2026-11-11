@@ -24,6 +24,9 @@ import {checkSafety, getSafetyReason, getSafetyTip} from "../utils/safety_guard.
 // hard guard. Goal bookkeeping (decideGoalContinuation) lives with the Dart provider
 // on the parent side - finish events carry everything it reads (doc sec. 9).
 import {isGoalMarkerOnlyCommand} from "../utils/goal_continuation.js";
+// R8 (AGENTS.md): bounded conversation history - port of Dart _trimMessages (the three
+// layers and their Dart line anchors live in utils/context_trim.ts).
+import {effectiveContextWindow, trimConversation as trimConversationList} from "../utils/context_trim.js";
 
 // Byte-faithful Dart strings (agent_engine.dart 3865 / 3868), CJK escaped.
 const GOAL_MARKER_LOG = "\u5ffd\u7565\u88ab\u5f53\u6210\u547d\u4ee4\u7684\u76ee\u6807\u8fbe\u6210\u6807\u8bb0"; // Dart log at 3865
@@ -276,6 +279,7 @@ export class ReActEngine {
       // R5: generation check before mutating shared history
       { const s = this.boundary(myGen); if (s !== null) return s; }
       this.conversation.push({role: "assistant", content: response});
+      this.trimConversation(); // Dart 3741 pattern: trim right after every add
 
       // Check for a finish event (the parser's finish event was already delivered to the
       // parent via the R4-dedup loop above; do NOT re-emit it — only run the side effects).
@@ -335,6 +339,7 @@ export class ReActEngine {
             role: "user",
             content: formatObservationFailure(cmd, readOnly ? "\u53ea\u8bfb\u6a21\u5f0f\u62e6\u622a" : blockReason),
           });
+          this.trimConversation(); // Dart 2285/2300: trim after every observation add
           gateAllowsExecution = false;
         } else if (gateDecision === "confirm") {
           // ConfirmFlow owns the entire wait: prompt, 10-minute timer, refusal texts,
@@ -364,6 +369,7 @@ export class ReActEngine {
             }
             if (outcome.observation !== null) {
               this.conversation.push({role: "user", content: outcome.observation});
+              this.trimConversation(); // Dart 2285/3027: trim after every observation add
             }
             // outcome.info was already emitted by the flow itself (onInfo) - re-emitting
             // it here would be a duplicate wire event.
@@ -405,6 +411,7 @@ export class ReActEngine {
             role: "user",
             content: "\u547d\u4ee4\u6267\u884c\u7ed3\u679c: " + (result.output ?? "") + (result.error ? "\n[error] " + result.error : ""), // "命令执行结果: "
           });
+          this.trimConversation(); // Dart 3027: trim after the result observation
         }
       } else {
         // No command emitted - retry a few times
@@ -516,6 +523,27 @@ export class ReActEngine {
     }
   }
 
+  /**
+   * R8 (AGENTS.md) / Dart _trimMessages (agent_engine.dart 4612-4671) applied to
+   * this.conversation. Dart calls its trim after EVERY history addition (roughly
+   * twenty call sites) so the list can never be sent oversized on the next step;
+   * Node mirrors that by invoking this right after every conversation.push below
+   * (the trim itself is idempotent and cheap while under the caps). The three
+   * layers - per-message 4000-char tail, 80-message backstop, 0.7*contextWindow
+   * token budget with a floor of 2 - live in utils/context_trim.ts with anchors.
+   *
+   * Documented structural divergence: Dart keeps system messages INSIDE the trimmed
+   * list and pins them at the head (4614-4615). This engine never stores a system
+   * message in conversation - run() rebuilds [system, ...conversation, userTask]
+   * fresh on every call - so the system-pinning branch is inert here by
+   * construction and every stored message is a non-system one. Dart logs
+   * agentLogger("TrimMsgs", ...) map onto logGate with the same TrimMsgs tag.
+   */
+  private trimConversation(): void {
+    const cw = effectiveContextWindow(this.modelConfig.contextWindow);
+    const logs = trimConversationList(this.conversation, cw);
+    for (const line of logs) this.logGate("info", "TrimMsgs: " + line);
+  }
   /**
    * Dart 2971-2983 (_enrichCommandEvent): stamp the host / tool / risk / decision
    * snapshot onto a command event before the parent sees it. This is the OTHER consumer

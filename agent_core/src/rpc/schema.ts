@@ -121,6 +121,11 @@ export interface ModelConfig {
   baseUrl?: string;
   temperature?: number;
   maxTokens?: number;
+  // Dart AIModelConfig carries a contextWindow that the trim machinery reads through
+  // effectiveContextWindow (ai_model_config.dart:102-103): contextWindow > 0 uses it,
+  // otherwise kDefaultContextWindow (ai_endpoint.dart:253) = 262144. Optional on the
+  // wire - a parent that never sends it gets exactly the Dart fallback behaviour.
+  contextWindow?: number;
   systemPrompt?: string;
 }
 

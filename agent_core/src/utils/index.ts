@@ -75,3 +75,21 @@ export {
 } from "./goal_continuation.js";
 
 export type {ProcessHandle, SupervisorConfig} from "./process_supervisor.js";
+export {
+  estimateText,
+  isCjk,
+  estimateHistory,
+  estimateMessage,
+  MESSAGE_OVERHEAD_TOKENS,
+  type TokenEstimateMessage,
+} from "./token_estimator.js";
+export {
+  MAX_CONVERSATION_ROUNDS,
+  MAX_MESSAGE_CHARS,
+  DEFAULT_CONTEXT_WINDOW,
+  CONTEXT_TOKEN_RATIO,
+  effectiveContextWindow,
+  truncateOneMessage,
+  trimConversation,
+  type TrimMessage,
+} from "./context_trim.js";
