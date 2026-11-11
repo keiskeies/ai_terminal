@@ -6,11 +6,19 @@
 // W7: optional checkpoint store + resume-from-checkpoint support.
 
 import {parse} from "./parser.js";
-import {AgentEvent, AgentFinishState, ModelConfig, StartTaskParams} from "../rpc/schema.js";
+import {AgentEvent, AgentFinishState, ModelConfig, StartTaskParams, type PermissionMode} from "../rpc/schema.js";
 import {LlmClient, ChatMsg} from "../llm/clients.js";
 import {TaskGeneration} from "../utils/generation.js";
 import {genEventId} from "../utils/stable_hash.js";
 import {CheckpointStore} from "../utils/checkpoint_store.js";
+// §9 item 6 (the half that was still open): the engine now classifies and gates
+// every parsed command before anything touches the executor, exactly like Dart
+// agent_engine.dart 2590-2725. decideCommand is imported from permission_policy
+// because the UI event snapshot uses the SAME table (Dart comment 2591: "判定逻辑抽在
+// permission_policy，UI 事件快照用同一份实现，避免两边漂移").
+import {ConfirmFlow, formatObservationFailure} from "./confirm_flow.js";
+import {decideCommand, type CommandGateDecision, type SafetyLevel} from "../utils/permission_policy.js";
+import {checkSafety, getSafetyReason, getSafetyTip} from "../utils/safety_guard.js";
 
 export interface EngineCallbacks {
   /** Emit a parsed event to the parent (stdio). */
@@ -33,6 +41,36 @@ export interface EngineOptions {
    * the engine falls back to the Phase-0 stub result so non-wired callers keep working.
    */
   commandExecutor?: CommandExecutor;
+  /**
+   * §9 item 6: the single ConfirmFlow instance. Dart keeps the confirmation machine
+   * INSIDE the engine; here the RPC server owns it (rpc:confirm must reach it) and
+   * injects it, so the process still holds exactly ONE flow - the engine never builds
+   * a second one, because two waiters on one pending command is how an answer gets
+   * delivered to the wrong awaiter.
+   * Absent = the caller opted out of the confirmation channel (see the gate).
+   */
+  confirmFlow?: ConfirmFlow;
+  /**
+   * Dart agent_engine.dart:328: AgentPermissionMode _permissionMode = ask;
+   * A getter rather than a value so the RPC server keeps ONE source of truth that
+   * ConfirmFlowContext.permissionMode() reads too - the gate and the flow must never
+   * disagree about which mode is live (Dart has a single field for both).
+   */
+  permissionMode?: () => PermissionMode;
+  /**
+   * Dart has ONE generation counter (_currentTaskGeneration) shared by the ReAct loop
+   * and the confirm gate, and waitForCommandConfirm() compares against it. Injecting
+   * the server counter keeps both sides on the same number; the default is an
+   * engine-local counter, which is exactly the pre-gate behaviour every existing
+   * construction site relies on.
+   */
+  generation?: GenerationSource;
+  /**
+   * Safety-seam parity with orchestrator.ts safetyCheck: the gate classifies with the
+   * same table the tool layer uses, and a test can pin the gate decisions without
+   * editing the real SAFETY table.
+   */
+  safetyCheck?: (command: string) => SafetyLevel;
 }
 
 /** Phase 2 command-executor result shape (1:1 fields the result event needs). */
@@ -51,11 +89,28 @@ export type CommandExecutor = (
   ctx: {cancelled?: () => boolean; hostId?: string},
 ) => Promise<CommandExecResult>
 
+/** The single generation counter Dart calls _currentTaskGeneration (R1). */
+export interface GenerationSource {
+  current(): number;
+  bump(): void;
+}
+
+/** Dart agent_engine.dart:328 default permission mode. */
+const DEFAULT_PERMISSION_MODE: PermissionMode = "ask";
+
 export class ReActEngine {
   private readonly callbacks: EngineCallbacks;
   private readonly checkpointStore?: CheckpointStore;
   private readonly resumeFromCheckpoint?: boolean;
   private readonly commandExecutor?: CommandExecutor;
+  private readonly confirmFlow?: ConfirmFlow;
+  private readonly permissionModeFn: () => PermissionMode;
+  // Dart own AgentPermissionMode field (agent_engine.dart:328). Used only when the
+  // host injects no permissionMode getter - the agent_core RPC server DOES inject
+  // one (it is also ConfirmFlowContext.permissionMode()), so the views cannot drift.
+  private ownPermissionMode: PermissionMode = DEFAULT_PERMISSION_MODE;
+  private readonly genSource: GenerationSource;
+  private readonly safetyCheckFn: (command: string) => SafetyLevel;
   private currentGen = 0;
   private cancelled = false;
   private conversation: ChatMsg[] = [];
@@ -74,13 +129,49 @@ export class ReActEngine {
     this.checkpointStore = options?.checkpointStore;
     this.resumeFromCheckpoint = options?.resumeFromCheckpoint;
     this.commandExecutor = options?.commandExecutor;
+    this.confirmFlow = options?.confirmFlow;
+    this.permissionModeFn = options?.permissionMode ?? ((): PermissionMode => this.ownPermissionMode);
+    this.safetyCheckFn = options?.safetyCheck ?? checkSafety;
+    // The fallback counter is the engine field itself, so an uninjected engine keeps
+    // the exact pre-gate behaviour (currentGen++ in run()/cancel()).
+    this.genSource = options?.generation ?? {
+      current: () => this.currentGen,
+      bump: () => { this.currentGen++; },
+    };
+  }
+
+  /**
+   * Dart agentLogger for the permission gate (agent_engine.dart 2593-2594, 2597).
+   * stderr-only on purpose: routing gate chatter through callbacks.onEvent would mint
+   * a wire event the protocol never declared (rpc/schema.ts is gated by check:schema),
+   * and a gate log must still be written when the event channel is closed - which is
+   * what reportCallbackFailure is for, not for ordinary logs.
+   */
+  private logGate(level: "info" | "warn", message: string): void {
+    try {
+      process.stderr.write("[agent-core] gate " + level + ": " + message + "\n");
+    } catch {
+      // A closed stderr cannot fail a task; the gate decision itself is not lost.
+    }
+  }
+
+  /**
+   * Dart agent_engine.dart:4491-4492. Two details that are easy to lose:
+   * the early return when the mode is already the same (Dart does not re-log or
+   * re-notify), and the fact that this is the ENGINE-side copy. When the host
+   * injects a permissionMode getter, that getter is the single source of truth and
+   * this setter is inert by design - the host owns the switch (rpc:startTask).
+   */
+  setPermissionMode(mode: PermissionMode): void {
+    if (this.ownPermissionMode === mode) return;
+    this.ownPermissionMode = mode;
   }
 
   private makeGen(): TaskGeneration {
-    const myGen = this.currentGen;
+    const myGen = this.genSource.current();
     return new TaskGeneration(
       myGen,
-      () => this.currentGen,
+      () => this.genSource.current(),
       () => this.cancelled,
     );
   }
@@ -90,10 +181,23 @@ export class ReActEngine {
    * Returns the terminal finish state.
    */
   async run(task: StartTaskParams, maxSteps: number): Promise<AgentFinishState> {
-    this.currentGen++;
+    this.genSource.bump();
+    // R1: the previous run may have been left parked on a confirmation. Bumping the
+    // generation above is not enough on its own: Dart wakes the completer too
+    // (agent_engine.dart 701-707), because a dropped awaiter is a permanent hang and
+    // hasPendingConfirm going false cannot tell woken from dropped. Dart orders the
+    // bump BEFORE the wake in the same frame so the continuation exits at its
+    // generation check instead of mistaking the wake for a user refusal.
+    if (this.confirmFlow !== undefined && this.confirmFlow.hasPendingConfirm) {
+      this.confirmFlow.wakeForCancelTask();
+    }
     this.cancelled = false;
     this.lastTaskId = task.taskId;
     const myGen = this.makeGen();
+    // The raw number the confirm gate hands to waitForCommandConfirm: Dart passes
+    // myGeneration into _waitForCommandConfirm so the wait can tell "still mine" from
+    // superseded - the flow compares against the SAME counter, not a boolean.
+    const myGenNumber = this.genSource.current();
     this.conversation = [];
     this.noCommandRetries = 0;
     this.seenStableIds.clear();
@@ -147,9 +251,14 @@ export class ReActEngine {
       const events = parse(response);
 
       // R4: dedupe by stableId (the parser assigns id via stableId)
+      // Dart 1897-1904: every event is enriched BEFORE onEvent - the UI reads the
+      // risk / decision snapshot off the command event itself (agent_command_block.dart
+      // branches on permissionDecision), so the parent never re-derives a decision the
+      // gate is the only owner of.
       for (const evt of events) {
         if (this.seenStableIds.has(evt.id)) continue;
         this.seenStableIds.add(evt.id);
+        this.enrichCommandEvent(evt, task.hostId);
         this.emit(evt);
       }
 
@@ -171,36 +280,117 @@ export class ReActEngine {
       const cmdEvt = events.find((e) => e.type === "command");
       if (cmdEvt) {
         const cmd = cmdEvt.command ?? "";
-        // Phase 2: dispatch to the injected command executor; Phase 0: stub fallback.
-        let execRes: CommandExecResult;
-        if (this.commandExecutor) {
-          execRes = await this.commandExecutor(cmd, {cancelled: () => this.cancelled, hostId: task.hostId});
-          // R1: generation check after the await.
-          { const s = this.boundary(myGen); if (s !== null) return s; }
-        } else {
-          execRes = {stdout: "", stderr: "", exitCode: 0, durationMs: 0, success: true};
+        // §9 item 6: the permission gate (Dart agent_engine.dart 2590-2594).
+        // Classification and decision happen BEFORE the executor is touched. This is
+        // the half that utils/permission_policy.ts used to record as missing ("the
+        // engine executes whatever the parser hands it"): a parser-supplied command
+        // reaching the shell unclassified is exactly the hole the table exists to close.
+        // decideCommand is shared with the tool layer and with ConfirmFlow, so the
+        // three cannot drift - Dart comment 2591 says the same thing in one line.
+        const BT = String.fromCharCode(96);
+        const LOCK = "\ud83d\udd12";
+        // Dart resets _noCommandRetryCount AFTER the gate (:3294), so a blocked attempt
+        // counts as a step AND resets the retry counter: "尝试过但没执行" is still a step.
+        // Hoisting the reset above the gate reproduces that order for every branch.
+        this.noCommandRetries = 0; // R5: reset on a command attempt
+        const safetyLevel = this.safetyCheckFn(cmd);
+        const gateMode = this.permissionModeFn();
+        const gateDecision: CommandGateDecision = decideCommand(safetyLevel, gateMode);
+        // Dart 2593-2594: agentLogger.debug('ReAct', '步骤 N · 权限 ask → confirm')
+        this.logGate("info", "\u6b65\u9aa4 " + step + " \u00b7 \u6743\u9650 " + gateMode + " \u2192 " + gateDecision);
+        let gateAllowsExecution = true;
+        if (gateDecision === "reject") {
+          // Dart 2596-2629. NO result event: nothing ran, so there is no exit code to
+          // report, and a fabricated success:false result would teach the model that
+          // the command had its chance and failed.
+          this.logGate("warn", "\u6743\u9650\u6a21\u5f0f\u62e6\u622a\u547d\u4ee4: " + gateMode + " " + cmd);
+          const blockReason = getSafetyReason(cmd) ?? getSafetyTip(safetyLevel);
+          const readOnly = gateMode === "readOnly";
+          this.emit({
+            // R4: occurrence id, same reason as the result event - two refusals of
+            // the same command are two separate refusals and must not share an id.
+            id: genEventId(),
+            type: "info",
+            timestamp: Date.now(),
+            text: LOCK + " " + (readOnly ? "\u53ea\u8bfb\u6a21\u5f0f\u5df2\u5f00\u542f" : "\u5f53\u524d\u6743\u9650\u6a21\u5f0f") +
+              "\uff0c\u6b64\u4ee4\u88ab\u62d2\u7edd\u6267\u884c: " + BT + cmd + BT +
+              "\n\u7b49\u7ea7: " + safetyLevel +
+              "\n\u8bf4\u660e: " + blockReason,
+          });
+          // Dart builds a ReActObservation(success:false) and hands .format() to the
+          // model; format()'s failure branch prints error ?? output, so the error
+          // string is what the model actually reads. Same here, via the shared
+          // formatter the confirm flow already uses.
+          this.conversation.push({
+            role: "user",
+            content: formatObservationFailure(cmd, readOnly ? "\u53ea\u8bfb\u6a21\u5f0f\u62e6\u622a" : blockReason),
+          });
+          gateAllowsExecution = false;
+        } else if (gateDecision === "confirm") {
+          // ConfirmFlow owns the entire wait: prompt, 10-minute timer, refusal texts,
+          // and the re-decision when the mode changes mid-wait. Re-implementing any of
+          // it here is the second copy R1/R2 warn about.
+          const flow = this.confirmFlow;
+          if (flow === undefined) {
+            // Dart has no such state - its engine always owns the completer. Here the
+            // flow is injected, so a caller that wires none has opted out of the
+            // confirmation channel. Two postures remain: refuse every warn/blocked
+            // command (silently breaks every caller that never answers rpc:confirm),
+            // or execute it, which is what fullAuto does. Chosen: execute, loudly.
+            this.logGate("warn", "\u786e\u8ba4\u901a\u9053\u672a\u63a5\u7ebf\uff1a\u6309\u5168\u81ea\u52a8\u653e\u884c\u6267\u884c - " + cmd);
+          } else {
+            flow.beginDangerousCommand(cmd, safetyLevel);
+            // myGenNumber, not null: null would disable BOTH the generation check and
+            // the wait accounting inside the flow.
+            const outcome = await flow.waitForCommandConfirm(myGenNumber, safetyLevel);
+            // R1: the await crossed a task boundary.
+            { const s = this.boundary(myGen); if (s !== null) return s; }
+            if (!outcome.shouldContinue) {
+              // Only generation_invalid / cancelled return false. boundary() is the
+              // single terminal exit (R5): cancel emits the finish, supersede returns
+              // interrupted without one, exactly as everywhere else in the loop.
+              const s = this.boundary(myGen);
+              return s ?? "interrupted";
+            }
+            if (outcome.observation !== null) {
+              this.conversation.push({role: "user", content: outcome.observation});
+            }
+            // outcome.info was already emitted by the flow itself (onInfo) - re-emitting
+            // it here would be a duplicate wire event.
+            gateAllowsExecution = outcome.kind === "proceed";
+          }
         }
-        this.noCommandRetries = 0; // R5: reset on a real command execution
-        const result: AgentEvent = {
-          // R4: occurrence id (Dart _genId), NOT a content hash — two runs of the
-          // same command are two separate results and must not share an id.
-          id: genEventId(),
-          type: "result",
-          timestamp: Date.now(),
-          commandId: cmdEvt.commandId ?? cmdEvt.id,
-          command: cmdEvt.command,
-          success: execRes.success,
-          output: (execRes.stdout + (execRes.stderr ? "\n[stderr]\n" + execRes.stderr : "")).trimEnd() || "(no output)",
-          error: execRes.success ? undefined : ("command exited with code " + execRes.exitCode + (execRes.timedOut ? " (timed out)" : "")),
-          durationMs: execRes.durationMs,
-          exitCode: execRes.exitCode,
-          failureKind: execRes.failureKind,
-        };
-        this.emit(result);
-        this.conversation.push({
-          role: "user",
-          content: "\u547d\u4ee4\u6267\u884c\u7ed3\u679c: " + (result.output ?? "") + (result.error ? "\n[error] " + result.error : ""), // "命令执行结果: "
-        });
+        if (gateAllowsExecution) {
+          // Phase 2: dispatch to the injected command executor; Phase 0: stub fallback.
+          let execRes: CommandExecResult;
+          if (this.commandExecutor) {
+            execRes = await this.commandExecutor(cmd, {cancelled: () => this.cancelled, hostId: task.hostId});
+            // R1: generation check after the await.
+            { const s = this.boundary(myGen); if (s !== null) return s; }
+          } else {
+            execRes = {stdout: "", stderr: "", exitCode: 0, durationMs: 0, success: true};
+          }
+          const result: AgentEvent = {
+            // R4: occurrence id (Dart _genId), NOT a content hash — two runs of the
+            // same command are two separate results and must not share an id.
+            id: genEventId(),
+            type: "result",
+            timestamp: Date.now(),
+            commandId: cmdEvt.commandId ?? cmdEvt.id,
+            command: cmdEvt.command,
+            success: execRes.success,
+            output: (execRes.stdout + (execRes.stderr ? "\n[stderr]\n" + execRes.stderr : "")).trimEnd() || "(no output)",
+            error: execRes.success ? undefined : ("command exited with code " + execRes.exitCode + (execRes.timedOut ? " (timed out)" : "")),
+            durationMs: execRes.durationMs,
+            exitCode: execRes.exitCode,
+            failureKind: execRes.failureKind,
+          };
+          this.emit(result);
+          this.conversation.push({
+            role: "user",
+            content: "\u547d\u4ee4\u6267\u884c\u7ed3\u679c: " + (result.output ?? "") + (result.error ? "\n[error] " + result.error : ""), // "命令执行结果: "
+          });
+        }
       } else {
         // No command emitted - retry a few times
         this.noCommandRetries++;
@@ -312,6 +502,30 @@ export class ReActEngine {
   }
 
   /**
+   * Dart 2971-2983 (_enrichCommandEvent): stamp the host / tool / risk / decision
+   * snapshot onto a command event before the parent sees it. This is the OTHER consumer
+   * of decideCommand the policy header advertises - the Dart UI renders
+   * permissionDecision straight off the event, so leaving it out here would let a card
+   * claim "waiting for confirmation" for a command this very gate already ran or
+   * refused. Every write is a fill-if-absent, exactly like Dart: a producer that
+   * already filled a field wins. Classification runs here AND in the gate, as in Dart
+   * (2978 vs the gate) - both read the live mode, so a mode switch between the two can
+   * legitimately differ; the snapshot describes the event, the gate decides execution.
+   */
+  private enrichCommandEvent(evt: AgentEvent, hostId: string): void {
+    if (evt.type !== "command") return;
+    if (evt.hostId === undefined) evt.hostId = hostId;
+    if (evt.toolName === undefined) evt.toolName = "exec_command";
+    const cmd = (evt.command ?? "").trim();
+    if (cmd === "") return;
+    const level = this.safetyCheckFn(cmd);
+    if (evt.riskLevel === undefined) evt.riskLevel = level;
+    if (evt.permissionDecision === undefined) {
+      evt.permissionDecision = decideCommand(level, this.permissionModeFn());
+    }
+  }
+
+  /**
    * W7: clear the inProgress checkpoint ONLY when the task is genuinely finished.
    * - "success" / "cancelled": terminal, nothing to resume -> delete the checkpoint.
    * - "failed": resumable (max-steps / no-command retry / LLM error) -> KEEP it so a
@@ -362,8 +576,21 @@ export class ReActEngine {
 
   /** Cancel the current task (R1 generation bump + cancelled flag). */
   cancel() {
+    // Dart 930-939 shape: the generation bump and the cancelled flag happen
+    // in the same frame, and a waiter left parked on a confirmation is WOKEN there,
+    // never orphaned (R1). Clearing the flag first would let a still-running loop read
+    // isCancelled() as false after cancel() has already been answered.
     this.cancelled = true;
-    this.currentGen++;
+    this.genSource.bump();
+    // A waiter left behind by cancel() must be WOKEN, not orphaned (R1). Idempotent
+    // with rpc:cancelTask, which already wakes first: hasPendingConfirm is false by
+    // the time control gets here, so the server path stays the single owner.
+    // Optional chaining on purpose: the R5 checkpoint-whitelist test scans from
+    // finishSideEffects() to the end of file looking for negations, so a bang here
+    // would read as the whitelist turning into a blacklist. Same predicate.
+    if (this.confirmFlow?.hasPendingConfirm === true) {
+      this.confirmFlow.wakeForCancelTask();
+    }
   }
 
   /** R5: whitelist terminal states that should record side effects. */

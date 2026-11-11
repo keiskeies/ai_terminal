@@ -21,9 +21,9 @@ export type {TaskCheckpoint} from "./checkpoint_store.js";
 export {ProcessSupervisor} from "./process_supervisor.js";
 
 // Gate matrix ported from lib/core/permission_policy.dart (design doc §9 items 6-7).
-// Intentionally not called from anywhere yet: SafetyGuard classification and the
-// rpc:confirm round-trip are both still missing, and wiring only the decision would
-// mean computing a gate nobody acts on.
+// Called from the engine command gate (react/engine.ts) and from the tool layer
+// (tools/orchestrator.ts, tools/builtin.ts) - the decision is acted on in both paths,
+// so a reject never reaches an executor.
 export {
   decideCommand,
   destructiveToolNeedsConfirm,

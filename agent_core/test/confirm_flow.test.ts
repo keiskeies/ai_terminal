@@ -238,7 +238,7 @@ type SpanPin = [string, number, number, string];
 const DART_TEST_FILE_SHA = "53bafa8f924f";
 const DART_ENGINE_FILE_SHA = "ad7e7cca87de";
 const TS_FLOW_FILE_SHA = "bc33bf7f1540";
-const TS_INDEX_FILE_SHA = "c4311d5786d1";
+const TS_INDEX_FILE_SHA = "e9f17e4945b6";   // startTask now injects the flow + counters into the engine
 
 const DART_ENGINE_SPANS: SpanPin[] = [
   ["TOOL wait",405,446,"6295febbdc34"],
@@ -987,12 +987,15 @@ describe("Dart/TS writer census for the confirmation transients", () => {
     // Dart bumps at 770 (startTask), 931 (terminal cancel) and 1096 (resumeTask).
     expect(linesWith("_currentTaskGeneration++", DART_ENGINE_LINES)).toEqual([770, 931, 1096]);
     // The flow owns only the terminal-cancel bump, and it owns it FIRST inside the wake
-    // (462, before the resolve at 464). startTask / resume bumps belong to the caller,
-    // which in the port is src/index.ts.
+    // (462, before the resolve at 464). startTask / resume bumps belong to the caller, and
+    // the port keeps exactly two write sites in src/index.ts: the flow context (181) and
+    // the GenerationSource injected into the engine (249). engine.run() bumps THAT one, so
+    // Dart’s single bump per startTask survives without the server advancing a second,
+    // parallel counter - the gate’s post-await check would then always look current (R1).
     expect(linesWith("this.ctx.bumpGeneration();", TS_FLOW_LINES)).toEqual([462]);
     const wake = span(TS_FLOW_LINES, 461, 470);
     expect(wake.indexOf("this.ctx.bumpGeneration()")).toBeLessThan(wake.indexOf("this._confirmCompleter.resolve("));
-    expect(linesWith("serverGeneration++", TS_INDEX_LINES)).toEqual([177, 247]);
+    expect(linesWith("serverGeneration++", TS_INDEX_LINES)).toEqual([181, 249]);
   });
 
   it("post-wait branch order matches Dart", () => {
@@ -1098,19 +1101,21 @@ describe("Dart/TS writer census for the confirmation transients", () => {
     }
   });
 
-  it("exactly one caller wires the flow, and the ReAct engine does not yet", () => {
-    // src/index.ts is the only consumer: the flow singleton, the rpc:confirm handler and
-    // the task-start wake/reset trio all live there.
-    expect(linesWith("confirmFlow.wakeForCancelTask()", TS_INDEX_LINES)).toEqual([253]);
-    expect(linesWith("confirmFlow.reset", TS_INDEX_LINES)).toEqual([255, 256]);
-    expect(linesWith("finishCleanup()", TS_INDEX_LINES)).toEqual([270]);
-    expect(linesWith("new ConfirmFlow", TS_INDEX_LINES)).toEqual([171]);
-    expect(linesWith("confirmFlowForTesting", TS_INDEX_LINES)).toEqual([390]);
+  it("two callers wire the flow: the RPC host owns it, the engine is injected with it", () => {
+    // src/index.ts still OWNS the instance (the flow singleton, the rpc:confirm handler
+    // and the task-start wake/reset trio live there), and it hands the SAME instance to
+    // the engine at construction time. Dart has one _confirmCompleter: two ConfirmFlow
+    // objects would let rpc:confirm answer a wait the engine is not awaiting.
+    expect(linesWith("confirmFlow.wakeForCancelTask()", TS_INDEX_LINES)).toEqual([269]);
+    expect(linesWith("confirmFlow.reset", TS_INDEX_LINES)).toEqual([271, 272]);
+    expect(linesWith("finishCleanup()", TS_INDEX_LINES)).toEqual([286]);
+    expect(linesWith("new ConfirmFlow", TS_INDEX_LINES)).toEqual([175]);
+    expect(linesWith("confirmFlowForTesting", TS_INDEX_LINES)).toEqual([406]);
     expect(count("expireConfirmTimeoutForTesting", TS_INDEX_TEXT)).toBe(3);
-    // The only TS files that name the module at all: the owner, the two barrels that
-    // re-export it, and the index that wires it. react/engine.ts names it zero times -
-    // the engine-side integration (design §9 item 7) is still open, which is why the
-    // rpc wiring above is the single ownership proof rather than a whole-tree claim.
+    // rpc:cancelTask wakes through the optional chain (confirmFlow ? .), a DIFFERENT
+    // needle that is not counted above: cancel delegates to engine.cancel(), which
+    // wakes only when a wait is outstanding (Dart guards nothing at 699-707 / 933-936).
+    // so the two wake needles below stay distinguishable.
     const files: string[] = [];
     const walk = (dir: string): void => {
       for (const entry of readdirSync(dir, {withFileTypes: true})) {
@@ -1124,10 +1129,13 @@ describe("Dart/TS writer census for the confirmation transients", () => {
       .filter((f) => readText(f).includes("confirm_flow"))
       .map((f) => f.slice(SRC_DIR.length + 1).split("\\").join("/"))
       .sort();
-    expect(namers).toEqual(["index.ts", "react/confirm_flow.ts", "react/index.ts", "utils/permission_policy.ts"]);
-    expect(count("confirm_flow", readText(ENGINE_TS))).toBe(0);
+    expect(namers).toEqual(["index.ts", "react/confirm_flow.ts", "react/engine.ts", "react/index.ts", "utils/permission_policy.ts"]);
+    // react/engine.ts now names it exactly ONCE - the import that brings ConfirmFlow
+    // and formatObservationFailure into the command gate. More than one occurrence would
+    // mean a second wiring point; zero would mean the gate lost its flow.
     // permission_policy.ts mentions the module only in a comment explaining why the gate
-    // lives there rather than in the flow.
+    // lives there rather than inside the flow.
+    expect(count("confirm_flow", readText(ENGINE_TS))).toBe(1);
     expect(count("confirm_flow", readText(POLICY))).toBe(1);
     expect(count("import", span(POLICY_LINES, 21, 21))).toBe(0);
   });

@@ -59,15 +59,19 @@ export {
 export type {AgentGoalStatus, GoalAction} from "./utils/goal_continuation.js";
 
 // ─── Task state (Phase 0 minimal) ───────────────────────────────
-// ─── Confirm flow wiring (doc §9 item 6) ────────────────────────
+// ─── Confirm flow wiring (doc §9 item 6 / 7) ──────────────────────────
 // The dangerous-command / destructive-tool state machine lives in
-// react/confirm_flow.ts. The ReAct engine does not call it yet (its
-// command gate is still unwired - §9 item 6 keeps that half open), so
-// the server owns the single ConfirmFlow instance and drives it from
-// rpc:confirm. The generation / cancellation view below is the
-// server-side mirror of what the engine will eventually expose once
-// its gate calls in; until then it is fed directly from startTask /
-// cancelTask so the flow can re-validate after its await (R1).
+// react/confirm_flow.ts. TWO callers drive it now: the ReAct engine’s
+// command gate (rpc:startTask injects the instance) and rpc:confirm, which
+// answers whatever wait is outstanding. The server still owns the single
+// instance - Dart has one _confirmCompleter, and two flows would let a
+// confirmation be answered by the wrong one.
+//
+// The generation / cancellation counters below are the SINGLE source both
+// callers read: the flow’s ConfirmFlowContext closes over them, and the
+// engine is injected with accessors onto the same variables, so the gate’s
+// "still mine?" check after its await compares against the very number the
+// flow reports (R1 - a parallel counter would always look current).
 let serverGeneration = 0;
 let serverCancelled = false;
 let serverPermissionMode: import("./rpc/schema.js").PermissionMode = "ask";
@@ -235,6 +239,14 @@ export function startServer(opts: {verbose?: boolean; llmFactory?: () => import(
       // local_exec uses). Default cwd = process.cwd(); platform shell is auto-detected
       // inside runLocalCommand via wrapCommand + the chosen shell (R6 branch).
       commandExecutor: buildLocalCommandExecutor(),
+      // §9 item 6/7: the engine-side permission gate needs the SAME flow the
+      // rpc:confirm handler answers, the SAME permission mode ConfirmFlowContext
+      // reports, and the SAME generation counter. Injecting accessors (not values)
+      // is what keeps Dart’s single-counter invariant true here - the gate must
+      // notice a supersede that lands while it awaits, and a snapshot could not.
+      confirmFlow: confirmFlow ?? undefined,
+      permissionMode: (): import("./rpc/schema.js").PermissionMode => serverPermissionMode,
+      generation: {current: () => serverGeneration, bump: () => { serverGeneration++; }},
     });
     activeEngine = engine;
     // The parent's permission mode used to be dropped here; confirm_flow reads
@@ -242,9 +254,13 @@ export function startServer(opts: {verbose?: boolean; llmFactory?: () => import(
     // captured (Dart default is "ask": agent_engine.dart:328).
     serverPermissionMode = params.permissionMode ?? "ask";
     serverCancelled = false;
-    // New task = new generation, and the per-task confirm counters restart
-    // (Dart resets them at agent_engine.dart:784 / :789).
-    serverGeneration++;
+    // Dart bumps _currentTaskGeneration exactly once per startTask (770). That single
+    // bump happens inside engine.run() on the generation source injected above, so the
+    // server and the engine cannot each advance a counter of their own: the gate’s
+    // post-await "still mine?" has to compare against the very number
+    // ConfirmFlowContext.currentGeneration() reports (R1). rpc:cancelTask’s bump is
+    // delegated to engine.cancel() for the same reason, matching Dart 931.
+    // The per-task confirm counters still restart here (Dart resets them at :784 / :789).
     if (confirmFlow !== null) {
       if (confirmFlow.hasPendingConfirm) {
         // Cannot normally happen: a startTask while a task runs is rejected

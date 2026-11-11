@@ -7,22 +7,24 @@
 //   This is the one implementation shared by the engine gate and the UI event
 //   snapshot, so the two cannot drift into two copies of the matrix.
 //
-// Keeping it in one place matters on the Node side too: react/engine.ts will call
-// decideCommand() to gate execution, and the same decision string is written to
-// AgentEvent.permissionDecision for the Dart UI to render (agent_command_block.dart
-// branches on the strings, not on an enum). If the two sides computed the matrix
-// separately, the UI could show "waiting for confirmation" on a command the engine
-// had already run.
+// Keeping it in one place matters on the Node side too: react/engine.ts asks this
+// module what to do with a parser-supplied command, and stamps that same decision
+// string onto AgentEvent.permissionDecision for the Dart UI to render
+// (agent_command_block.dart branches on the strings, not on an enum). If the two
+// sides computed the matrix separately, the UI could show "waiting for
+// confirmation" on a command the engine had already run.
 //
-// STILL NOT CALLED BY THE EXECUTION GATE, and deliberately so: the SafetyGuard
-// classifier that produces a SafetyLevel is ported (utils/safety_guard.ts) but still
-// uncalled, and react/engine.ts executes whatever the parser hands it. The confirm
-// half of the pair went live first: rpc:confirm dispatches into
-// react/confirm_flow.ts (design doc sec. 9 item 6), so a "confirm" decision now has
-// somewhere to go and a parent that can answer it. What is missing is the gate
-// itself - engine.ts must ask this module before it runs anything. Landing the
-// matrix first, pure and exhaustively pinned against Dart, keeps that wiring commit
-// a one-line call site with no policy inside it, which is what it was written for.
+// IT IS CALLED NOW, from three sites over one table. react/engine.ts
+// enrichCommandEvent() fills the snapshot on the command event, and the gate in the
+// same file classifies again before anything runs (Dart parities 2978 and 3289 -
+// a snapshot read and a decision read of the same pure table may see the same mode
+// a moment apart, which is legitimate). The tool layer asks the destructive-tool
+// row of this same matrix for the tool path (sec. 9 item 7). The "confirm" half of
+// the matrix is served by react/confirm_flow.ts, which the engine drives for a warn
+// / blocked command and rpc:confirm answers. Landing the matrix first, pure and
+// exhaustively pinned against Dart, is why those wiring commits are one call site
+// each with no policy inside them, which is what this module exists for. One
+// consequence worth stating: a reject produces NO result event - nothing ran.
 
 import type {PermissionMode} from "../rpc/schema.js";
 
