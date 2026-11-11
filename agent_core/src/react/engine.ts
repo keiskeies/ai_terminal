@@ -92,6 +92,17 @@ const COMMAND_ARG_KEYS: readonly string[] = ["command", "cmd", "script", "shell"
 // first (8 lines / 600 chars) and only then keeps an 8000-char tail - two different
 // contracts for two different events; do not merge them.
 const MAX_TOOL_EVENT_CHARS = 8000;
+// Round 124: the ask-action / user-choice strings (Dart agent_engine.dart
+// _handleAskAction 3052-3113 + wake sites 708-712 / 940-944 + selectChoice
+// 1168-1174). Byte-faithful, CJK escaped. The waitingConfirm / thinking phase
+// notify strings are NOT ported: Node has no AgentStatus task channel (commit).
+const ASK_NO_OPTIONS_WARN = "ask \u52a8\u4f5c\u4f46\u65e0\u9009\u9879\uff0c\u89c6\u4e3a finish"; // Dart 3056 warn
+const ASK_DETECTED_A = "\u68c0\u6d4b\u5230\u9009\u9879\uff0c\u6682\u505c\u7b49\u5f85\u7528\u6237\u9009\u62e9: "; // Dart 3062 info, options list follows
+const USER_CANCEL_CHOICE_LOG = "\u7528\u6237\u53d6\u6d88\u9009\u62e9"; // Dart 3089 info (user cancelled the choice)
+const USER_CHOSE_A = "\u7528\u6237\u9009\u62e9\u4e86: "; // Dart 3094 gate info prefix
+const CHOSEN_INFO_A = "\ud83d\udc49 \u4f60\u9009\u62e9\u4e86: "; // Dart 3098 info (zh side only; no UiText.t in Node)
+const OBS_CHOSEN_A = "\u89c2\u6d4b: \u7528\u6237\u9009\u62e9\u4e86 \""; // Dart 3101 observation head
+const OBS_CHOSEN_B = "\""; // Dart 3101 observation tail
 
 export interface EngineCallbacks {
   /** Emit a parsed event to the parent (stdio). */
@@ -210,6 +221,14 @@ export class ReActEngine {
   // Dart _toolCalls feeds UI progress the Node host does not have - deferred, not hidden.
   private readonly toolRegistry?: AgentToolRegistry;
   private readonly isLocalSessionFn: () => boolean;
+  // Round 124: the choice-wait state (Dart _pendingOptions 3064 / _choiceCompleter
+  // 3065 / _pendingAskEvent 1906 / _lastResponseHadAskEvent 1879). No Completer in
+  // Node: a Promise plus its captured resolve - resolve settles once by spec, so
+  // the wake sites below need no isCompleted guard.
+  private pendingOptionsList: string[] = [];
+  private choiceCompleter: {resolve: (v: string) => void} | null = null;
+  private pendingAskEvent: AgentEvent | null = null;
+  private lastResponseHadAskEvent = false;
 
   constructor(
     private readonly llm: LlmClient,
@@ -286,6 +305,11 @@ export class ReActEngine {
     if (this.confirmFlow !== undefined && this.confirmFlow.hasPendingConfirm) {
       this.confirmFlow.wakeForCancelTask();
     }
+    // R1: the same wake precedent covers a choice wait left parked by the previous
+    // run (Dart 708-712): resolve('') and clear the state, WITHOUT bumping the
+    // generation again - the bump at the top of run() already invalidates the old
+    // loop; the wake only frees its awaiter so it exits at its boundary check.
+    this.wakeChoiceCompleterForCancel();
     this.cancelled = false;
     this.lastTaskId = task.taskId;
     const myGen = this.makeGen();
@@ -344,6 +368,11 @@ export class ReActEngine {
 
       // Parse the ReAct response into events
       const events = parse(response);
+      // Dart 1879: did THIS parse produce an ask event? Dart guards its event-
+      // synthesis fallback (1488-1498) with the flag. The Node parser mints an ask
+      // event whenever options exist, so the fallback is dead code against it (not
+      // ported, see the handleAskAction docs); the flag is kept for the accessor.
+      this.lastResponseHadAskEvent = events.some((e) => e.type === "ask");
 
       // R4: dedupe by stableId (the parser assigns id via stableId)
       // Dart 1897-1904: every event is enriched BEFORE onEvent - the UI reads the
@@ -354,6 +383,11 @@ export class ReActEngine {
         if (this.seenStableIds.has(evt.id)) continue;
         this.seenStableIds.add(evt.id);
         this.enrichCommandEvent(evt, task.hostId);
+        // Dart 1904-1906: remember THIS turn's ask event - the user's choice is
+        // written back onto the very question that was asked (handleAskAction),
+        // never onto whatever arrived while the loop was parked. Only EMITTED
+        // events qualify: the dedup guard above is part of the Dart shape.
+        if (evt.type === "ask") this.pendingAskEvent = evt;
         this.emit(evt);
       }
 
@@ -372,8 +406,24 @@ export class ReActEngine {
         return state;
       }
 
-      // Check for a command event (tool call)
-      const cmdEvt = events.find((e) => e.type === "command");
+      // Round 124: Dart routes ActionType.ask through _handleAskAction, and the ask
+      // case sits BEFORE execute in the switch (1422-1537) - an ask event short-
+      // circuits the command / tool / no-command ladder for this iteration, then
+      // Dart continues to the next step (1502). The Node equivalent lets control
+      // fall through to the W7 checkpoint save below (checkpointing is Node-only).
+      // A bare ask action line with NO options never reaches here: the parser
+      // mints no event for it - scanAskAction routes it in the else ladder below.
+      const askEvt = events.find((e) => e.type === "ask");
+      if (askEvt !== undefined) {
+        const astate = await this.handleAskAction(
+          askEvt.options ?? [], askEvt.question ?? "", myGen);
+        if (astate !== null) return astate;
+      }
+      // Check for a command event (tool call). An ask turn skips the search: Dart
+      // took the ask case, never the execute case (switch-order parity).
+      const cmdEvt = askEvt !== undefined
+        ? undefined
+        : events.find((e) => e.type === "command");
       if (cmdEvt) {
         const gstate = await this.runGatedCommand(cmdEvt.command ?? "", cmdEvt, task, myGen, myGenNumber, step);
         if (gstate !== null) return gstate;
@@ -390,7 +440,14 @@ export class ReActEngine {
         if (hit !== null) {
           const tstate = await this.handleToolAction(hit[0], hit[1], task, myGen, myGenNumber, step);
           if (tstate !== null) return tstate;
-        } else {
+        } else if (askEvt === undefined && this.scanAskAction(response.split("\n"))) {
+          // Dart 2016-2017 routes a bare ask action line to the ask case even with
+          // no options; _handleAskAction turns the empty options into finish-as-ask
+          // (3055-3059) - a SUCCESS terminal, NOT the no-command budget below.
+          const thoughtEvt = events.find((e) => e.type === "thought");
+          const astate = await this.handleAskAction([], thoughtEvt?.text ?? "", myGen);
+          if (astate !== null) return astate;
+        } else if (askEvt === undefined) {
           // Dart _handleNoCommand (agent_engine.dart 3622-3642): within the retry
           // budget the model gets a progress notice + the continue prompt back in
           // history; only after the budget is spent is the task terminal (R5: failed,
@@ -640,6 +697,140 @@ export class ReActEngine {
       return null; // Dart breaks after the first action line regardless of value
     }
     return null;
+  }
+
+  /**
+   * Dart action-word scan for the ask value (agent_engine.dart 2005-2028, the
+   * value dispatch at 2016-2017). The Node parser never mints an event for a bare
+   * ask action line without options, so scan for the word here. Same first-line-
+   * wins shape as scanToolAction (Dart breaks after the first action line).
+   */
+  private scanAskAction(lines: readonly string[]): boolean {
+    for (let i = 0; i < lines.length; i++) {
+      const t = lines[i].trim();
+      if (t.startsWith(ACTION_KEY + ":") === false && t.startsWith(ACTION_KEY + "\uff1a") === false) continue;
+      const sep = t.indexOf("\uff1a") >= 0 ? "\uff1a" : ":";
+      const actionStr = t.substring(t.indexOf(sep) + 1).trim().toLowerCase();
+      return actionStr === "ask";
+    }
+    return false;
+  }
+
+  /**
+   * Dart selectChoice (agent_engine.dart 1168-1174): resolve the parked wait with
+   * the user's pick. Dart guards re-entry with !isCompleted; the JS resolve settles
+   * once by spec AND the completer reference is cleared here, so a second call is
+   * a no-op too. Dart clears _pendingOptions here and nulls the completer only
+   * when the awaiter resumes (3079-3080); Node nulls immediately so
+   * hasPendingChoice goes false the moment the answer is in - behaviourally
+   * identical (the continuation was already queued), just no stale accessor window.
+   */
+  selectChoice(choice: string): void {
+    const c = this.choiceCompleter;
+    this.pendingOptionsList = [];
+    if (c === null) return;
+    this.choiceCompleter = null;
+    c.resolve(choice);
+  }
+
+  /** Host-facing accessors for the pending question (rpc layer / tests). */
+  get hasPendingChoice(): boolean {
+    return this.choiceCompleter !== null;
+  }
+
+  get pendingOptions(): readonly string[] {
+    return this.pendingOptionsList;
+  }
+
+  /** Dart _lastResponseHadAskEvent parity accessor (see the guard note in run()). */
+  get lastAskEventSeen(): boolean {
+    return this.lastResponseHadAskEvent;
+  }
+
+  /**
+   * Dart 708-712 / 940-944: wake a parked choice wait with an empty string so the
+   * awaiter resumes and exits at its own boundary check. resolve('') on an already
+   * settled Promise is a spec-level no-op, so wake racing selectChoice is safe;
+   * nulling first makes every later wake / selectChoice a no-op as well.
+   */
+  private wakeChoiceCompleterForCancel(): void {
+    const c = this.choiceCompleter;
+    if (c === null) return;
+    this.choiceCompleter = null;
+    this.pendingOptionsList = [];
+    c.resolve("");
+  }
+
+  /**
+   * Round 124: Dart _handleAskAction (agent_engine.dart 3052-3113). The parked
+   * wait is a Promise plus its captured resolve; the answer rides back onto the
+   * captured ask event (chosenAnswer - rpc/schema.ts already carries the field,
+   * no schema change) and a ReAct observation goes back to the model. Returns
+   * null to continue the ReAct loop, a terminal finish state to stop it. Documented
+   * divergences (see the commit message):
+   *  - the waitingConfirm / thinking task-status notify pair (3070-3075 and
+   *    3106-3110) has no Node channel and is skipped;
+   *  - the cancelled-status re-check (3083-3086) is owned by boundary() in Node;
+   *  - an empty choice is terminal as "cancelled" (R5: every Node terminal path
+   *    emits finish + onFinished) where Dart returns with no finish event;
+   *  - the chosen-choice info line is the zh string only (no UiText.t in Node);
+   *  - the event-synthesis fallback (1488-1498) is dead code against the Node
+   *    parser (it mints an ask event whenever options exist) and is not ported.
+   */
+  private async handleAskAction(
+    options: readonly string[],
+    thought: string,
+    myGen: TaskGeneration,
+  ): Promise<AgentFinishState | null> {
+    if (options.length === 0) {
+      // Dart 3055-3059: ask WITHOUT options is a finish-as-ask and a SUCCESS
+      // terminal (Dart _finishTask defaults success = true at 3740) - it does
+      // NOT touch the no-command / tool retry budget.
+      this.logGate("warn", ASK_NO_OPTIONS_WARN);
+      const t = thought.trim();
+      this.emitFinish("success", t === "" ? undefined : t);
+      return "success";
+    }
+    // Dart 3062 interpolates a Dart List.toString ("[a, b]" - bare elements, no
+    // quotes); JSON.stringify would quote them, so join instead.
+    this.logGate("info", ASK_DETECTED_A + "[" + options.join(", ") + "]");
+    let resolveChoice: (v: string) => void = (): void => {};
+    const promise = new Promise<string>((res): void => { resolveChoice = res; });
+    this.choiceCompleter = {resolve: resolveChoice};
+    this.pendingOptionsList = [...options];
+    // Dart 3066-3068: pin the ask event NOW - new events may arrive while the
+    // loop is parked; the answer must not land on a different question.
+    const pendingAsk = this.pendingAskEvent;
+    const choice = await promise;
+    this.choiceCompleter = null;
+    this.pendingOptionsList = [];
+    // Dart 3082-3086 (generation / cancelled-status checks) belongs to boundary()
+    // in Node: a user cancel emits the cancelled finish, a superseded generation
+    // exits silently with "interrupted" (no finish - the new task owns the state).
+    { const s = this.boundary(myGen); if (s !== null) return s; }
+    if (choice === "") {
+      // Dart 3088-3091 logs and returns with no finish event; the Node run()
+      // contract needs a terminal state, and a wake-with-empty is cancel-shaped.
+      this.logGate("info", USER_CANCEL_CHOICE_LOG);
+      this.emitFinish("cancelled", "task cancelled by user");
+      return "cancelled";
+    }
+    this.logGate("info", USER_CHOSE_A + choice);
+    // Dart 3095-3097: chosenAnswer rides on the ask event itself - the parent
+    // holds the same object, so the question carries its answer with no re-emit.
+    if (pendingAsk !== null) pendingAsk.chosenAnswer = choice;
+    this.emit({
+      // R4: occurrence id - the choice notice is a one-shot fact (Dart 3098).
+      id: genEventId(),
+      type: "info",
+      timestamp: Date.now(),
+      text: CHOSEN_INFO_A + choice,
+    });
+    // Dart 3100-3104: ReAct observation back to the model + trim - exactly the
+    // pushObservation pair.
+    this.pushObservation(OBS_CHOSEN_A + choice + OBS_CHOSEN_B);
+    // Dart 3106-3110 thinking-phase notify: no Node task channel, skipped.
+    return null; // Dart 3112: continue the ReAct loop
   }
 
   /**
@@ -1169,6 +1360,11 @@ export class ReActEngine {
     if (this.confirmFlow?.hasPendingConfirm === true) {
       this.confirmFlow.wakeForCancelTask();
     }
+    // R1: the choice wait must be woken exactly like the confirm wait (Dart
+    // 940-944): resolve('') so the parked awaiter resumes and exits at its
+    // generation / boundary check. Same idempotence reasoning as the wake above,
+    // and the same no-bang convention for the R5 checkpoint-whitelist scan corridor.
+    this.wakeChoiceCompleterForCancel();
   }
 
   /** R5: whitelist terminal states that should record side effects. */
