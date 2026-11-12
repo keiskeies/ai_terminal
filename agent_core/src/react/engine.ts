@@ -27,7 +27,7 @@ import {isGoalMarkerOnlyCommand} from "../utils/goal_continuation.js";
 // R8 (AGENTS.md): bounded conversation history - port of Dart _trimMessages (the three
 // layers and their Dart line anchors live in utils/context_trim.ts).
 import {effectiveContextWindow, trimConversation as trimConversationList} from "../utils/context_trim.js";
-import {isQueryCommand} from "../utils/command_heuristics.js";
+import {isQueryCommand, isTaskComplete} from "../utils/command_heuristics.js";
 import {truncateOutput, truncateQueryOutput} from "../utils/output_processor.js";
 // Round 123: the tool-action dispatch port (Dart agent_engine.dart _handleToolAction
 // 3222-3618). ToolArgs is the typed argument accessor (R9: no bare map access below
@@ -124,6 +124,12 @@ const GUARD_NUDGE = '\u4f60\u5c1a\u672a\u6267\u884c\u4efb\u4f55\u547d\u4ee4\u5c3
 // with ", " inside brackets, same as ASK_DETECTED_A above.
 const FINISH_CHOICE_WARN_A =
   "finish \u6b63\u6587\u5305\u542b\u9009\u62e9\u8bf7\u6c42\uff0c\u8f6c\u4e3a ask \u7b49\u5f85\u7528\u6237\u9009\u62e9: ";
+
+// Round 127: terminal log line of the completion-sounding fallback. Dart 1470
+// writes it through agentLogger.info('ReAct', ...); the engine's only log sink
+// is logGate (stderr), so it maps to a gate info line.
+const FINISH_INFO =
+  "\u4EFB\u52A1\u5B8C\u6210 (AI \u8FD4\u56DE finish \u52A8\u4F5C)";
 
 export interface EngineCallbacks {
   /** Emit a parsed event to the parent (stdio). */
@@ -500,18 +506,7 @@ export class ReActEngine {
         // continue skips it too) and without the finish event on the wire (the
         // dedup loop above already suppressed it).
         if (this.guardWillRefuseThisFinish(finishEvt)) {
-          this.finishWithoutExecCount++; // Dart 1451
-          this.logGate("warn", GUARD_WARN_A + this.finishWithoutExecCount + GUARD_WARN_B +
-            this.maxFinishWithoutExecRetries + GUARD_WARN_C);
-          this.emit({
-            id: genEventId(),
-            type: "info",
-            timestamp: Date.now(),
-            text: GUARD_INFO, // Dart 1460: onEvent(AgentEvent.info(...))
-          });
-          // Dart 1461-1467: the nudge as a user message, then _trimMessages.
-          this.conversation.push({role: "user", content: GUARD_NUDGE});
-          this.trimConversation();
+          this.applyFinishGuard();
           continue; // force-continue: no checkpoint, no finish side effects
         }
         const state = finishEvt.finishState ?? "success";
@@ -560,6 +555,65 @@ export class ReActEngine {
           const thoughtEvt = events.find((e) => e.type === "thought");
           const astate = await this.handleAskAction([], thoughtEvt?.text ?? "", myGen);
           if (astate !== null) return astate;
+        } else if (askEvt === undefined && isTaskComplete(response)) {
+          // Round 127: Dart 2041-2055. With no action found the Dart parser
+          // asks isTaskComplete(content) and turns a completion-sounding reply
+          // into ActionType.finish BEFORE _handleNoCommand (3622-3642) spends
+          // the retry budget. The Node parser mints no finish event without an
+          // action-finish line (react/parser.ts 292-298), so this arm IS that
+          // synthesis. The local event below is never emitted and mints no
+          // stableId (R4: the engine must not hash finish text); it exists only
+          // to feed the two helpers that consume a finish event.
+          const fbThought = events.find((e) => e.type === "thought")?.text ?? "";
+          // Dart 2048 thought: thought ?? content - the parsed thought when the
+          // parser found one, else the raw response.
+          const fbSummary = fbThought !== "" ? fbThought : response;
+          const fbEvt: AgentEvent = {
+            id: genEventId(), // occurrence id, never on the wire
+            type: "finish",
+            timestamp: Date.now(),
+            summary: fbSummary,
+          };
+          // Dart routes the finish case through the choice hijack (1423-1448)
+          // BEFORE the guard (1450): a choice request in the body must become a
+          // real ask, never a green terminal. Same order, same helpers.
+          const fbHijack = this.finishChoiceHijack(fbEvt, events);
+          if (fbHijack !== null) {
+            this.logGate("warn", FINISH_CHOICE_WARN_A + "[" + Array.from(fbHijack.choice.options).join(", ") + "]");
+            if (!fbHijack.fromProtocol) {
+              const fbAsk: AgentEvent = {
+                id: genEventId(), // occurrence id like every engine-minted event
+                type: "ask",
+                timestamp: Date.now(),
+                question: fbHijack.choice.question,
+                options: Array.from(fbHijack.choice.options),
+              };
+              this.pendingAskEvent = fbAsk; // Dart 1435 - pin it, then onEvent
+              this.emit(fbAsk);
+            }
+            const fbAskState = await this.handleAskAction(
+              fbHijack.choice.options, fbHijack.choice.question, myGen);
+            if (fbAskState !== null) return fbAskState; // Dart 1447
+            continue; // Dart 1448: not terminal, next ReAct step
+          }
+          // Dart 1450-1468: the guard covers a finish the ENGINE synthesized too
+          // - claiming completion with zero commands executed is force-
+          // continued, never turned green (R5: a green terminal needs evidence).
+          if (this.guardWillRefuseThisFinish(fbEvt)) {
+            this.applyFinishGuard();
+            continue;
+          }
+          this.logGate("info", FINISH_INFO); // Dart 1470 agentLogger.info -> gate info
+          // Dart 1479-1483: _finishTask(success: true) then return. Deviations:
+          // (1) Dart 1471-1482 + _composeFinishSummary 3729-3737 split summary
+          // from answer/sections; the Node parser keeps no such split, so the
+          // fbSummary above (parsed thought else the raw response) is the
+          // closest equivalent. (2) _emitOperationReport 3755-3760 has no Node
+          // counterpart yet (D3 backlog). (3) emitFinish is the only sanctioned
+          // terminal emit and already runs the W7 side effects, so the
+          // checkpoint save below is skipped exactly like Dart's return.
+          this.emitFinish("success", fbSummary);
+          return "success";
         } else if (askEvt === undefined) {
           // Dart _handleNoCommand (agent_engine.dart 3622-3642): within the retry
           // budget the model gets a progress notice + the continue prompt back in
@@ -1428,6 +1482,29 @@ export class ReActEngine {
       !this.hasExecutedAnyCommand &&
       this.finishWithoutExecCount < this.maxFinishWithoutExecRetries
     );
+  }
+
+  /**
+   * Round 127: the force-continue half of the anti-hallucination guard (Dart
+   * 1451-1467) extracted so the parsed-finish branch and the round-127
+   * isTaskComplete fallback arm run one implementation. No await, and
+   * deliberately NO continue here: the CALLER keeps loop control, because a
+   * refused finish is not a terminal path (no finish event on the wire, no
+   * checkpoint, no side effects - R5 keeps the terminal corridor emitFinish).
+   */
+  private applyFinishGuard(): void {
+    this.finishWithoutExecCount++; // Dart 1451
+    this.logGate("warn", GUARD_WARN_A + this.finishWithoutExecCount + GUARD_WARN_B +
+      this.maxFinishWithoutExecRetries + GUARD_WARN_C);
+    this.emit({
+      id: genEventId(),
+      type: "info",
+      timestamp: Date.now(),
+      text: GUARD_INFO, // Dart 1460: onEvent(AgentEvent.info(...))
+    });
+    // Dart 1461-1467: the nudge as a user message, then _trimMessages.
+    this.conversation.push({role: "user", content: GUARD_NUDGE});
+    this.trimConversation();
   }
 
   /**

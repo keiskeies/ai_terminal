@@ -1,8 +1,11 @@
 // utils/command_heuristics.ts - port of the isQueryCommand predicate from
 // ai_terminal/lib/utils/command_heuristics.dart (lines 40-117). 1:1: same
-// prefix table, same order, same interactive exclusions. The file's other
-// helpers (isDescriptiveText / looksLikeCommand / completion keywords) have
-// no Node call site yet and are deliberately NOT ported ahead of demand.
+// prefix table, same order, same interactive exclusions. Round 127 adds the
+// completion-sounding fallback isTaskComplete (Dart 119-163): same keyword
+// table, same two anchored per-line patterns, same 60-char line cap. The
+// file's remaining helpers (isDescriptiveText / looksLikeCommand /
+// _unwrapCommand) still have no Node call site and are deliberately NOT
+// ported ahead of demand.
 
 /// 判断命令是否是查询/只读类命令（输出不应截断，agent 需要完整结果定位问题）
 ///
@@ -86,3 +89,60 @@ export function isQueryCommand(command: string): boolean {
   }
   return QUERY_PREFIXES.some((prefix) => cmdLower.startsWith(prefix));
 }
+
+// Round 127: completion-sounding finish fallback, Dart 119-163. The keyword
+// table, the alternation order and both anchored patterns are transcribed
+// from the Dart source; test/command_heuristics.test.ts locks them against
+// drift and replays the Dart isTaskComplete corpus (16 cases, 385-451).
+export const TASK_COMPLETE_KEYWORDS: string[] = [
+  '任务完成', '任务已完成',
+  '已全部完成', '全部完成', '所有步骤已完成',
+  '操作完成', '安装完成', '配置完成', '部署完成',
+  '已完成',
+];
+
+// 行首允许的前缀（emoji / markdown / 中文标点）
+// Dart 127-131 builds the pattern by concatenating raw string fragments with
+// join('|'); the JS construction below produces a .source-identical RegExp
+// (the concatenation introduces no metacharacter), locked in the drift test.
+export const TASK_COMPLETE_START: RegExp = new RegExp(
+  '^[\\s✅❌🎉🏁【\\[*#\\-•>]*(' +
+    TASK_COMPLETE_KEYWORDS.join('|') +
+    ')[\\s。！!？?】\\]*·…]*$',
+);
+
+// 行尾模式：前文允许少量说明（≤ 30 字符），关键词后只允许标点
+export const TASK_COMPLETE_END: RegExp = new RegExp(
+  '^.{0,30}?(' + TASK_COMPLETE_KEYWORDS.join('|') +
+    ')[\\s。！!？?】\\]*·…]*$',
+);
+
+// Dart 136 (_lineBreakRegex = RegExp(r'\r?\n')) is inlined at the split
+// below: the engine hands us its raw response, which may carry CRLF.
+export function isTaskComplete(response: string): boolean {
+  // 仅在关键词作为"独立行/标题"或"短句末尾"出现时才视为任务完成。
+  // 早期实现用 response.contains(k) 会在 AI 思考过程中误触发：
+  //   - "我会检查任务完成情况"（关键词后跟其他文字）
+  //   - "如果安装完成则继续"（关键词后跟条件）
+  //   - "已完成了上述步骤"（关键词后跟动词）
+  //
+  // 收紧规则（每行单独判断）：
+  // 1. 行较短（≤ 60 字符），避免长思考段落中偶然出现关键词
+  // 2. 关键词出现在行首（允许 emoji/markdown 前缀，行尾只允许标点/emoji）
+  // 3. 或关键词出现在行尾（前文允许 ≤ 30 字符说明，后跟仅标点）
+  // 这样 "任务完成"、"✅ 任务完成"、"安装已完成。" 都视为完成，
+  // 而 "我会检查任务完成情况"、"如果安装完成则继续" 不视为完成。
+  if (response.trim().length === 0) return false;
+
+  const lines = response.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) continue;
+    // 长行不考虑匹配，避免 AI 长篇思考中偶然出现关键词被误判
+    if (trimmed.length > 60) continue;
+    if (TASK_COMPLETE_START.test(trimmed)) return true;
+    if (TASK_COMPLETE_END.test(trimmed)) return true;
+  }
+  return false;
+}
+
