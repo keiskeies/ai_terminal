@@ -564,7 +564,7 @@ agent_core/
     notification.schema.json  reverse.schema.json  tool.schema.json
     agent-bridge.schema.json
   tools/check-schema-compat.mjs               # 只做 JSON 自身一致性, 不跨语言比对 (§6.3.7)
-  src/                                       # 59 个 .ts
+  src/                                       # 60 个 .ts
     index.ts
     rpc/{server,client,schema,transport}.ts
     react/{engine,parser,regex,confirm_flow,tool_action,index}.ts  # confirm 状态机 (§9 第 6 项); goal 续跑落在 utils/goal_continuation.ts, 不在 react/goal.ts
@@ -580,7 +580,7 @@ agent_core/
            token_estimator,context_trim,local_file_policy,answer_block,
            operation_report,change_window,audit_log,local_command_detector}.ts
            # 安全分级 + 档位矩阵 + 完成语义/回答块/操作单四字段/变更窗口 (§9 第 6/7 项)
-  test/                                      # 86 个 .test.ts + 13 份 fixture
+  test/                                      # 87 个 .test.ts + 13 份 fixture
     regression/r{1,2,3,4,5,6,9}_*.test.ts     # 九条规则本体, 见 §6.2
     regression/{manifest,anthropic_e2e,w5_e2e}.test.ts
     e2e/byte_comparison_10.test.ts            # 取代草图里的 e2e/{parser,cancel,multi_host,mcp,tool}
@@ -605,9 +605,9 @@ ai_terminal/lib/agent_bridge/                 # Dart 侧, 不在本分支范围
 | Node: mcp/* | 500 | mcp_manager.dart 496 | 实际 2378 (connection 765 + tool_adapter 362, 草图严重低估) |
 | Node: llm/* | 400 | ai_service.dart 609 | 实际 482 (三个 *_stream.ts + clients + stream, 裸 fetch, 见 §8) |
 | Node: rpc/* | 600 | 新 | 实际 615 (schema 359 / transport 137 / server 69 / client 50) |
-| Node: utils/* | 500 | 新 | 实际 4183 (27 文件; choice_request_detector.ts 139 系 r126 新增 (Dart choice_request_detector.dart 132 行 1:1 移植, finish 正文选择请求检测); command_heuristics.ts 88 与 output_processor.ts 40 系该轮新增 (R8 输出截断三件套), 前者 r127 扩至 148 行 (isTaskComplete + 两条完成语义正则 + 10 关键词表, Dart 119-163 1:1); token_estimator.ts 91 与 context_trim.ts 126 系前轮新增; local_file_policy.ts 271 = 本轮加 trustedHost 这一 Node-only 接缝, local_file_ops.ts 317 = 本轮只改写头注释, goal_continuation.ts 310 + agent_goal.ts 204 系上一轮新增, safety_guard.ts 658 再上一轮, permission_policy.ts 94 = 本轮再改头注释: 三个调用点 (事件快照 / 命令闸 / 工具层) 共用一张矩阵, 把 confirm 决策的归属指到 react/confirm_flow.ts); answer_block.ts 143 系 r130 新增 (Dart 2103-2124 + 2126-2153 + 2159-2198 1:1: 回答块与操作单四字段拆分 + 两条停止正则 + 12000 帽裁剪 + 全角冒号定位); tail_buffer.ts 59 行本轮接进引擎作 _accumulatedMessage 的载体; operation_report.ts 472 系 r131 新增 (models/operation_report.dart 365 + models/plan_step.dart 76 的行为半边 1:1: 三张 toJson/fromJson 容差表 + 派生 canRollback/hasDiff + 四段标签抽取器 + 四条终局结论模板 + parseStatus 九组别名; 纯叶子模块, 引擎调用点随 _emitOperationReport 一起待办, 见 §9 第 7 项末追加); change_window.ts 274 系 r132 新增 (services/change_window_service.dart 162 行 1:1: 配置模型 + 四个转型器 + 跨夜窗口判定 + 拒绝句 + 存储三件套, 七条偏差见模块头注释, 引擎臂已由 r133 接进 runGatedCommand（Dart 2573-2588, 见 §9 第 7 项末追加）; 另有 pty/ 235 行 (adapter 232), 草图未单列 |
+| Node: utils/* | 500 | 新 | 实际 4183 (28 文件; choice_request_detector.ts 139 系 r126 新增 (Dart choice_request_detector.dart 132 行 1:1 移植, finish 正文选择请求检测); command_heuristics.ts 88 与 output_processor.ts 40 系该轮新增 (R8 输出截断三件套), 前者 r127 扩至 148 行 (isTaskComplete + 两条完成语义正则 + 10 关键词表, Dart 119-163 1:1); token_estimator.ts 91 与 context_trim.ts 126 系前轮新增; local_file_policy.ts 271 = 本轮加 trustedHost 这一 Node-only 接缝, local_file_ops.ts 317 = 本轮只改写头注释, goal_continuation.ts 310 + agent_goal.ts 204 系上一轮新增, safety_guard.ts 658 再上一轮, permission_policy.ts 94 = 本轮再改头注释: 三个调用点 (事件快照 / 命令闸 / 工具层) 共用一张矩阵, 把 confirm 决策的归属指到 react/confirm_flow.ts); answer_block.ts 143 系 r130 新增 (Dart 2103-2124 + 2126-2153 + 2159-2198 1:1: 回答块与操作单四字段拆分 + 两条停止正则 + 12000 帽裁剪 + 全角冒号定位); tail_buffer.ts 59 行本轮接进引擎作 _accumulatedMessage 的载体; operation_report.ts 472 系 r131 新增 (models/operation_report.dart 365 + models/plan_step.dart 76 的行为半边 1:1: 三张 toJson/fromJson 容差表 + 派生 canRollback/hasDiff + 四段标签抽取器 + 四条终局结论模板 + parseStatus 九组别名; 纯叶子模块, 引擎调用点随 _emitOperationReport 一起待办, 见 §9 第 7 项末追加); change_window.ts 274 系 r132 新增 (services/change_window_service.dart 162 行 1:1: 配置模型 + 四个转型器 + 跨夜窗口判定 + 拒绝句 + 存储三件套, 七条偏差见模块头注释, 引擎臂已由 r133 接进 runGatedCommand（Dart 2573-2588, 见 §9 第 7 项末追加）; 另有 pty/ 235 行 (adapter 232), 草图未单列 |
 | Dart: agent_bridge/* | 800 | 新 | 实际 294 (agent_bridge.dart 94 + json_rpc_transport.dart 200); 另 4 个文件待补 |
-| **合计** | **~9900** | — | 实际 Node src 14861 + test 19520 = 34381 (估的 3.3 倍, 差额几乎全在 mcp 与 utils) |
+| **合计** | **~9900** | — | 实际 Node src 15037 + test 19593 = 34630 (估的 3.3 倍, 差额几乎全在 mcp 与 utils) |
 
 ### 10.3 关键不变式（必须持续为真）
 
