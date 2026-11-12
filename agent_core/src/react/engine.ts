@@ -36,6 +36,11 @@ import {truncateOutput, truncateQueryOutput} from "../utils/output_processor.js"
 import {ToolArgs} from "../tools/tool_args.js";
 import {AgentToolRegistry, AgentTool, ToolKind, type ToolContext} from "../tools/builtin.js";
 import {parseToolAction} from "./tool_action.js";
+// Round 126: finish-body choice hijack (Dart agent_engine.dart 1423-1448 +
+// _choiceRequestFromFinish 3034-3048). The detector is the 1:1 port of
+// utils/choice_request_detector.dart that finds "please pick A or B" text the
+// model wrote into the finish answer instead of a proper ask + options turn.
+import {ChoiceRequestDetector, ChoiceRequest} from "../utils/choice_request_detector.js";
 
 // Byte-faithful Dart strings (agent_engine.dart 3865 / 3868), CJK escaped.
 const GOAL_MARKER_LOG = "\u5ffd\u7565\u88ab\u5f53\u6210\u547d\u4ee4\u7684\u76ee\u6807\u8fbe\u6210\u6807\u8bb0"; // Dart log at 3865
@@ -113,6 +118,12 @@ const GUARD_WARN_B = '/';
 const GUARD_WARN_C = ')';
 const GUARD_INFO = '\u26a0\ufe0f AI \u672a\u5b9e\u9645\u6267\u884c\u547d\u4ee4\u5c31\u58f0\u79f0\u5b8c\u6210\uff0c\u8981\u6c42\u5b9e\u9645\u9a8c\u8bc1';
 const GUARD_NUDGE = '\u4f60\u5c1a\u672a\u6267\u884c\u4efb\u4f55\u547d\u4ee4\u5c31\u58f0\u660e\u4efb\u52a1\u5b8c\u6210\uff0c\u8fd9\u4e0d\u88ab\u5141\u8bb8\u3002\u8bf7\u7acb\u5373\u4f7f\u7528 \u52a8\u4f5c: execute \u5b9e\u9645\u6267\u884c\u547d\u4ee4\u9a8c\u8bc1\u4f60\u7684\u5224\u65ad\uff0c\u6240\u6709\u7ed3\u8bba\u5fc5\u987b\u6709\u547d\u4ee4\u8f93\u51fa\u4f5c\u4e3a\u4f9d\u636e\u3002\u5982\u679c\u4efb\u52a1\u786e\u5b9e\u65e0\u9700\u6267\u884c\u547d\u4ee4\uff08\u5982\u7eaf\u89e3\u91ca/\u5206\u6790\uff09\uff0c\u8bf7\u5728\u601d\u8003\u4e2d\u660e\u786e\u8bf4\u660e\u4e3a\u4ec0\u4e48\u65e0\u9700\u6267\u884c\u547d\u4ee4\u3002';
+
+// Dart agent_engine.dart 1429-1430 warn: finish-body choice hijack. The Dart
+// interpolation prints a List.toString ("[a, b]" - bare, comma-space), so join
+// with ", " inside brackets, same as ASK_DETECTED_A above.
+const FINISH_CHOICE_WARN_A =
+  "finish \u6b63\u6587\u5305\u542b\u9009\u62e9\u8bf7\u6c42\uff0c\u8f6c\u4e3a ask \u7b49\u5f85\u7528\u6237\u9009\u62e9: ";
 
 export interface EngineCallbacks {
   /** Emit a parsed event to the parent (stdio). */
@@ -431,6 +442,14 @@ export class ReActEngine {
         // claim its stableId: the retried finish carries the same answerBody and
         // therefore the same stableId - marking it seen would silently swallow
         // the allowed finish on the wire (R5: every terminal path emits finish).
+        // Round 126: a finish whose body asks the user to choose is NOT terminal -
+        // the finish branch below hijacks it into an ask (Dart 1427-1448). Dart's
+        // parser never mints finish events at all (finish only leaves through
+        // _finishTask), so the wire suppression is Node-only, mirroring the
+        // round-125 guard suppression exactly: SAME helper as the finish branch,
+        // no await between the two call sites, and a suppressed finish must not
+        // claim its stableId (the retried/allowed finish shares the id).
+        if (this.finishChoiceHijack(evt, events) !== null) continue;
         if (this.guardWillRefuseThisFinish(evt)) continue;
         this.seenStableIds.add(evt.id);
         this.emit(evt);
@@ -446,6 +465,36 @@ export class ReActEngine {
       // parent via the R4-dedup loop above; do NOT re-emit it — only run the side effects).
       const finishEvt = events.find((e) => e.type === "finish");
       if (finishEvt) {
+        // Round 126: Dart 1423-1448, BEFORE the anti-hallucination guard (1450).
+        // The protocol says questions go through ask + options, but some models
+        // write "please answer A or B" into the finish body: no buttons in the UI,
+        // task ends before the user decides. Convert it into a real ask and keep
+        // the loop alive after the choice. The dedup loop already suppressed this
+        // finish on the wire via the SAME helper, so no half-terminal flicker.
+        const hijack = this.finishChoiceHijack(finishEvt, events);
+        if (hijack !== null) {
+          this.logGate("warn", FINISH_CHOICE_WARN_A + "[" + Array.from(hijack.choice.options).join(", ") + "]");
+          if (!hijack.fromProtocol) {
+            // Dart 1431-1437: the options: line made the streaming parser emit the
+            // ask event already; options extracted from the BODY need a new event.
+            const askEvent: AgentEvent = {
+              id: genEventId(), // occurrence id like every engine-minted event (R4)
+              type: "ask",
+              timestamp: Date.now(),
+              question: hijack.choice.question,
+              options: Array.from(hijack.choice.options),
+            };
+            this.pendingAskEvent = askEvent; // Dart 1435 - pin it, then onEvent
+            this.emit(askEvent);
+          }
+          const hstate = await this.handleAskAction(
+            hijack.choice.options, hijack.choice.question, myGen);
+          if (hstate !== null) return hstate; // Dart 1447: !shouldContinue -> return
+          // Dart 1448: continue to the next ReAct step - NOT terminal, so no
+          // finishSideEffects and (Node-only) no checkpoint save, same shape as
+          // the round-125 forced-continue.
+          continue;
+        }
         // Round 125: Dart 1450-1468 anti-hallucination guard, first in the finish
         // case. Refused turns force-continue WITHOUT the checkpoint save (Dart's
         // continue skips it too) and without the finish event on the wire (the
@@ -1379,6 +1428,52 @@ export class ReActEngine {
       !this.hasExecutedAnyCommand &&
       this.finishWithoutExecCount < this.maxFinishWithoutExecRetries
     );
+  }
+
+  /**
+   * Round 126: single source of truth for the finish-to-ask hijack (Dart
+   * _choiceRequestFromFinish 3034-3048). BOTH the dedup emit loop (wire
+   * suppression) and the finish branch call this in the SAME iteration with no
+   * await between, mirroring the round-125 guard pattern, so suppression and
+   * conversion can never drift. Node mapping of the Dart ReActStep fields:
+   *   step.options  -> the coexisting ask event's options (the parser folds the
+   *                    options: line into an ask event, Dart stream parser did)
+   *   step.answer   -> finish event summary (parser answerBody capture)
+   *   step.thought  -> this turn's first thought event text (Dart step.thought
+   *                    is the last-parsed thought; for single-thought turns -
+   *                    the hijack corpus in practice - the two coincide)
+   *   step.rawResponse -> only reachable in Dart when thought is null, which the
+   *                    non-nullable field forbids: dead branch, not ported.
+   * fromProtocol=true means the options came from the protocol ask event itself
+   * (Dart: step.options non-empty -> the parser already put an ask on the wire);
+   * false = extracted from the body by the detector -> the finish branch must
+   * synthesize the ask event (Dart 1431-1437).
+   */
+  private finishChoiceHijack(
+    evt: AgentEvent,
+    events: readonly AgentEvent[],
+  ): {choice: ChoiceRequest; fromProtocol: boolean} | null {
+    if (evt.type !== "finish") return null;
+    const thoughtText = events.find((x) => x.type === "thought")?.text ?? "";
+    const protocolOpts = events.find((x) => x.type === "ask")?.options;
+    if (protocolOpts !== undefined && protocolOpts.length >= 2) {
+      // Dart 3035-3039: protocol options >= 2 win outright, no detector call;
+      // question = answer.trim() when non-empty else thought.trim().
+      const answerTrim = evt.summary?.trim() ?? "";
+      const question = answerTrim !== "" ? answerTrim : thoughtText.trim();
+      return {choice: new ChoiceRequest(question, protocolOpts), fromProtocol: true};
+    }
+    // Dart 3042-3047: answer ?? thought - the parser folds an empty answer to
+    // undefined (summary: answerBody || undefined), matching Dart's null answer.
+    const text = evt.summary !== undefined ? evt.summary : thoughtText;
+    const choice = ChoiceRequestDetector.detect(text);
+    if (choice === null) return null;
+    // Dart 1431 re-emits only when step.options was null/empty; a protocol ask
+    // with a single option counts as non-empty there (keep that edge byte-close).
+    return {
+      choice,
+      fromProtocol: protocolOpts !== undefined && protocolOpts.length > 0,
+    };
   }
 
   /**
