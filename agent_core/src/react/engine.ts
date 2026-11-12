@@ -72,6 +72,7 @@ import {parseToolAction} from "./tool_action.js";
 import {ChoiceRequestDetector, ChoiceRequest} from "../utils/choice_request_detector.js";
 import {RollbackAdvisor} from "../utils/rollback_advisor.js";
 import {agentLogger} from "../utils/agent_logger.js";
+import {agentTracer, TraceEvent, TraceEventType} from "../utils/agent_tracer.js";
 
 // Byte-faithful Dart strings (agent_engine.dart 3865 / 3868), CJK escaped.
 const GOAL_MARKER_LOG = "\u5ffd\u7565\u88ab\u5f53\u6210\u547d\u4ee4\u7684\u76ee\u6807\u8fbe\u6210\u6807\u8bb0"; // Dart log at 3865
@@ -476,6 +477,7 @@ this.sshOsInfo = options?.sshOsInfo;
     this.cancelled = false;
     this.lastTaskId = task.taskId;
     this.logEngine("=== \u5f00\u59cb\u4efb\u52a1 ==="); // Dart 751: === 开始任务 ===
+    agentTracer.emitSync(new TraceEvent({taskId: task.taskId, type: TraceEventType.taskStart, step: 0, payload: {goal: task.goal}}));
     const myGen = this.makeGen();
     // The raw number the confirm gate hands to waitForCommandConfirm: Dart passes
     // myGeneration into _waitForCommandConfirm so the wait can tell "still mine" from
