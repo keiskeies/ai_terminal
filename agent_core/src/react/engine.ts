@@ -187,6 +187,15 @@ export interface EngineOptions {
    */
   sshOsInfo?: string;
   /**
+   * r138: connection checker - Dart 3876-3901 (_currentExecutor.isConnected +
+   * _consecutiveConnFailures). When set, the engine checks connectivity before each
+   * raw command execution. Disconnected + >= maxRetries returns a
+   * CommandFailureKind.disconnected result without calling the executor.
+   */
+  connectionChecker?: (hostId: string) => boolean | Promise<boolean>;
+  /** r138: max consecutive connection failures (Dart _maxConnFailRetries = 3). */
+  maxConnFailRetries?: number;
+  /**
    * §9 item 6: the single ConfirmFlow instance. Dart keeps the confirmation machine
    * INSIDE the engine; here the RPC server owns it (rpc:confirm must reach it) and
    * injects it, so the process still holds exactly ONE flow - the engine never builds
@@ -301,6 +310,9 @@ export class ReActEngine {
   private readonly resumeFromCheckpoint?: boolean;
   private readonly commandExecutor?: CommandExecutor;
 private readonly sshOsInfo?: string; // r135: remote OS for local-command guard
+private readonly connectionChecker?: (hostId: string) => boolean | Promise<boolean>;
+private readonly maxConnFailRetries: number; // r138: Dart _maxConnFailRetries = 3
+private consecutiveConnFailures = 0; // r138: Dart _consecutiveConnFailures
   private readonly confirmFlow?: ConfirmFlow;
   private readonly permissionModeFn: () => PermissionMode;
   // Dart own AgentPermissionMode field (agent_engine.dart:328). Used only when the
@@ -360,6 +372,8 @@ private readonly sshOsInfo?: string; // r135: remote OS for local-command guard
     this.resumeFromCheckpoint = options?.resumeFromCheckpoint;
     this.commandExecutor = options?.commandExecutor;
 this.sshOsInfo = options?.sshOsInfo;
+    this.connectionChecker = options?.connectionChecker;
+    this.maxConnFailRetries = options?.maxConnFailRetries ?? 3; // Dart 272
     this.confirmFlow = options?.confirmFlow;
     this.permissionModeFn = options?.permissionMode ?? ((): PermissionMode => this.ownPermissionMode);
     this.safetyCheckFn = options?.safetyCheck ?? checkSafety;
@@ -1609,7 +1623,7 @@ this.sshOsInfo = options?.sshOsInfo;
           // still counts, matching Dart's body-entry placement.
           this.hasExecutedAnyCommand = true;
           // Phase 2: dispatch to the injected command executor; Phase 0: stub fallback.
-          let execRes: CommandExecResult;
+          let execRes: CommandExecResult = {stdout: "", stderr: "", exitCode: 0, durationMs: 0, success: true};
           // Dart _executeCommand 3918-3965: executor.executeAndWait is wrapped in a
           // try/catch that TURNS a throw into a failed AgentResult (error = e.toString(),
           // failureKind unknown, no exit code) - the exception never escapes the ReAct
@@ -1623,24 +1637,40 @@ this.sshOsInfo = options?.sshOsInfo;
             execRes = {stdout: GOAL_MARKER_OUTPUT, stderr: "", exitCode: 0, durationMs: 0, success: true};
           } else if (this.commandExecutor) {
             const execStartMs = Date.now();
-            try {
-              execRes = await this.commandExecutor(cmd, {cancelled: () => this.cancelled, hostId: task.hostId});
-            } catch (e: any) {
-              // Dart 3956-3965: stopwatch.stop() + AgentResult(success: false,
-              // error: e.toString(), failureKind unknown). String(e) is the JS mirror of
-              // Dart toString() ("Error: msg"); the observation and result event below
-              // then follow the ordinary failed-result path (Dart 2776+ -> 3565-3567).
-              executorError = String(e);
-              execRes = {
-                stdout: "",
-                stderr: "",
-                exitCode: 0, // Dart: exitCode stays null; suppressed on the wire below
-                durationMs: Date.now() - execStartMs,
-                failureKind: "unknown",
-                success: false,
-              };
+            // r138: connection check (Dart 3876-3901) - before the executor call.
+            let connOk = true;
+            if (this.connectionChecker !== undefined) {
+              connOk = await this.connectionChecker(task.hostId);
+              if (!connOk) {
+                this.consecutiveConnFailures++;
+                const hint = this.consecutiveConnFailures >= this.maxConnFailRetries
+                  ? "\uff08\u5df2\u8fde\u7eed\u5931\u8d25" + this.consecutiveConnFailures + "\u6b21\uff0c\u8bf7\u7acb\u5373\u4f7f\u7528 \u52a8\u4f5c: ask \u8be2\u95ee\u7528\u6237\u662f\u5426\u5df2\u91cd\u8fde\uff0c\u4e0d\u8981\u518d\u5c1d\u8bd5\u6267\u884c\u547d\u4ee4\uff09"
+                  : "\uff08\u8bf7\u4f7f\u7528 \u52a8\u4f5c: ask \u8be2\u95ee\u7528\u6237\u662f\u5426\u5df2\u91cd\u8fde\uff0c\u6216\u7b49\u5f85\u7528\u6237\u91cd\u8fde\u540e\u7ee7\u7eed\uff09";
+                execRes = {stdout: "", stderr: "\u8fde\u63a5\u5df2\u65ad\u5f00\uff0c\u8bf7\u91cd\u8fde\u540e\u91cd\u8bd5" + hint, exitCode: -1, durationMs: Date.now() - execStartMs, failureKind: "disconnected", success: false};
+              }
+            }
+            if (connOk) {
+              this.consecutiveConnFailures = 0;
+              try {
+                execRes = await this.commandExecutor(cmd, {cancelled: () => this.cancelled, hostId: task.hostId});
+              } catch (e: any) {
+                // Dart 3956-3965: stopwatch.stop() + AgentResult(success: false,
+                // error: e.toString(), failureKind unknown). String(e) is the JS mirror of
+                // Dart toString() ("Error: msg"); the observation and result event below
+                // then follow the ordinary failed-result path (Dart 2776+ -> 3565-3567).
+                executorError = String(e);
+                execRes = {
+                  stdout: "",
+                  stderr: "",
+                  exitCode: 0, // Dart: exitCode stays null; suppressed on the wire below
+                  durationMs: Date.now() - execStartMs,
+                  failureKind: "unknown",
+                  success: false,
+                };
+              }
             }
             // R1: generation check after the await.
+            { const s = this.boundary(myGen); if (s !== null) return s; }
             { const s = this.boundary(myGen); if (s !== null) return s; }
           } else {
             execRes = {stdout: "", stderr: "", exitCode: 0, durationMs: 0, success: true};
