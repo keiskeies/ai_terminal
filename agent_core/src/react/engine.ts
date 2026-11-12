@@ -57,6 +57,7 @@ import {isGoalMarkerOnlyCommand} from "../utils/goal_continuation.js";
 import {effectiveContextWindow, trimConversation as trimConversationList} from "../utils/context_trim.js";
 import {isQueryCommand, isTaskComplete} from "../utils/command_heuristics.js";
 import {truncateOutput, truncateQueryOutput} from "../utils/output_processor.js";
+import {looksLikeLocalWindowsCommand} from "../utils/local_command_detector.js";
 // Round 123: the tool-action dispatch port (Dart agent_engine.dart _handleToolAction
 // 3222-3618). ToolArgs is the typed argument accessor (R9: no bare map access below
 // this line); the registry / kind enums come from the W4 tool framework; parseToolAction
@@ -181,6 +182,11 @@ export interface EngineOptions {
    */
   commandExecutor?: CommandExecutor;
   /**
+   * r135: the remote OS string for SSH executors (Dart executor.osInfo).
+   * When set, the local-command-on-remote guard is active.
+   */
+  sshOsInfo?: string;
+  /**
    * §9 item 6: the single ConfirmFlow instance. Dart keeps the confirmation machine
    * INSIDE the engine; here the RPC server owns it (rpc:confirm must reach it) and
    * injects it, so the process still holds exactly ONE flow - the engine never builds
@@ -294,6 +300,7 @@ export class ReActEngine {
   private readonly checkpointStore?: CheckpointStore;
   private readonly resumeFromCheckpoint?: boolean;
   private readonly commandExecutor?: CommandExecutor;
+private readonly sshOsInfo?: string; // r135: remote OS for local-command guard
   private readonly confirmFlow?: ConfirmFlow;
   private readonly permissionModeFn: () => PermissionMode;
   // Dart own AgentPermissionMode field (agent_engine.dart:328). Used only when the
@@ -352,6 +359,7 @@ export class ReActEngine {
     this.checkpointStore = options?.checkpointStore;
     this.resumeFromCheckpoint = options?.resumeFromCheckpoint;
     this.commandExecutor = options?.commandExecutor;
+this.sshOsInfo = options?.sshOsInfo;
     this.confirmFlow = options?.confirmFlow;
     this.permissionModeFn = options?.permissionMode ?? ((): PermissionMode => this.ownPermissionMode);
     this.safetyCheckFn = options?.safetyCheck ?? checkSafety;
@@ -1446,6 +1454,38 @@ export class ReActEngine {
         // before the gate is consulted. Even a fullAuto session therefore refuses writes
         // during the freeze - the window is not a permission tier, it is a calendar-level
         // policy that sits above every tier: it exits the gate instead of deferring to it.
+        // r135: local-command-on-remote guard (Dart agent_engine.dart 2543-2571).
+        // Before the change-window check: a local Windows command sent to a remote
+        // Unix host should get a readable observation, not a freeze-period refusal.
+        if (
+          this.sshOsInfo !== undefined &&
+          this.sshOsInfo !== null &&
+          !this.sshOsInfo.toLowerCase().includes("windows") &&
+          !this.sshOsInfo.toLowerCase().includes("mingw") &&
+          !this.sshOsInfo.toLowerCase().includes("cygwin") &&
+          looksLikeLocalWindowsCommand(cmd)
+        ) {
+          const lcReason =
+            "\u68c7\u6d4b\u5230 Windows \u76d8\u7b26\u6216 PowerShell \u8bed\u6cd5\uff0c\u4f46\u5f53\u524d execute \u8fd0\u884c\u5728\u8fdc\u7a0b\u670d\u52a1\u5668\u3002";
+          this.emit({
+            id: genEventId(),
+            type: "info",
+            timestamp: Date.now(),
+            text: "\ud83d\udc59 " + lcReason +
+              "\n\u672c\u673a\u547d\u4ee4\u8bf7\u6539\u7528 local_exec \u5de5\u5177: `" + cmd + "`",
+          });
+          const lcObs =
+            lcReason +
+            "\n\u5982\u679c\u76ee\u6807\u5728\u8fd0\u884c App \u7684\u672c\u673a\uff0c\u8bf7\u6539\u7528 local_exec \u5de5\u5177\uff08\u53c2\u6570 command/cwd\uff09\uff1b" +
+            "\u5982\u679c\u76ee\u6807\u786e\u5b9e\u662f\u8fdc\u7a0b\u670d\u52a1\u5668\uff0c\u8bf7\u6539\u7528\u670d\u52a1\u5668\u652f\u6301\u7684 shell \u8bed\u6cd5\u3002";
+          this.conversation.push({
+            role: "user",
+            content: "\u89c2\u5bdf: " + cmd + "\n\u8f93\u51fa: " + lcObs + "\n\u72b6\u6001: \u5931\u8d25",
+          });
+          // Dart 2568: onSuccess(false, 'local_command_on_remote', 0)
+          this.emitFinish("failed", "local_command_on_remote");
+          return "failed";
+        }
         const windowCheck = this.changeWindowCheckFn(cmd);
         if (windowCheck.allowed === false) {
           // Dart 2577: agentLogger.warn(ReAct, the frozen-window line + the command).
