@@ -70,6 +70,7 @@ import {parseToolAction} from "./tool_action.js";
 // utils/choice_request_detector.dart that finds "please pick A or B" text the
 // model wrote into the finish answer instead of a proper ask + options turn.
 import {ChoiceRequestDetector, ChoiceRequest} from "../utils/choice_request_detector.js";
+import {RollbackAdvisor} from "../utils/rollback_advisor.js";
 
 // Byte-faithful Dart strings (agent_engine.dart 3865 / 3868), CJK escaped.
 const GOAL_MARKER_LOG = "\u5ffd\u7565\u88ab\u5f53\u6210\u547d\u4ee4\u7684\u76ee\u6807\u8fbe\u6210\u6807\u8bb0"; // Dart log at 3865
@@ -196,6 +197,12 @@ export interface EngineOptions {
   /** r138: max consecutive connection failures (Dart _maxConnFailRetries = 3). */
   maxConnFailRetries?: number;
   /**
+   * r141: enable pre-snapshot rollback advisor (Dart 2740-2771).
+   * When enabled, modification-type commands trigger a read-only snapshot
+   * command before execution. Default: true.
+   */
+  enableRollbackSnapshot?: boolean;
+  /**
    * §9 item 6: the single ConfirmFlow instance. Dart keeps the confirmation machine
    * INSIDE the engine; here the RPC server owns it (rpc:confirm must reach it) and
    * injects it, so the process still holds exactly ONE flow - the engine never builds
@@ -313,6 +320,7 @@ private readonly sshOsInfo?: string; // r135: remote OS for local-command guard
 private readonly connectionChecker?: (hostId: string) => boolean | Promise<boolean>;
 private readonly maxConnFailRetries: number; // r138: Dart _maxConnFailRetries = 3
 private consecutiveConnFailures = 0; // r138: Dart _consecutiveConnFailures
+  private readonly enableRollbackSnapshot: boolean; // r141: Dart 2740-2771
   private readonly confirmFlow?: ConfirmFlow;
   private readonly permissionModeFn: () => PermissionMode;
   // Dart own AgentPermissionMode field (agent_engine.dart:328). Used only when the
@@ -374,6 +382,7 @@ private consecutiveConnFailures = 0; // r138: Dart _consecutiveConnFailures
 this.sshOsInfo = options?.sshOsInfo;
     this.connectionChecker = options?.connectionChecker;
     this.maxConnFailRetries = options?.maxConnFailRetries ?? 3; // Dart 272
+    this.enableRollbackSnapshot = options?.enableRollbackSnapshot ?? true; // Dart default: enabled
     this.confirmFlow = options?.confirmFlow;
     this.permissionModeFn = options?.permissionMode ?? ((): PermissionMode => this.ownPermissionMode);
     this.safetyCheckFn = options?.safetyCheck ?? checkSafety;
@@ -1651,6 +1660,26 @@ this.sshOsInfo = options?.sshOsInfo;
             }
             if (connOk) {
               this.consecutiveConnFailures = 0;
+              // r141: pre-snapshot rollback advisor (Dart 2740-2771).
+              if (this.enableRollbackSnapshot) {
+                const modifyTarget = RollbackAdvisor.analyze(cmd);
+                if (modifyTarget !== null) {
+                  const snapshotCmd = RollbackAdvisor.buildSnapshotCommand(modifyTarget);
+                  if (snapshotCmd !== null) {
+                    this.logGate("info", "Rollback: detected modification (" + modifyTarget.type + "), running pre-snapshot");
+                    try {
+                      const snapRes = await this.commandExecutor(snapshotCmd, {cancelled: () => this.cancelled, hostId: task.hostId});
+                      // R1: generation check after snapshot (Dart 2750-2755).
+                      { const s = this.boundary(myGen); if (s !== null) return s; }
+                      if (snapRes.success && (snapRes.stdout.length > 0)) {
+                        this.logGate("info", "Rollback: snapshot recorded (" + snapRes.stdout.length + " chars)");
+                      }
+                    } catch (e: any) {
+                      this.logGate("warn", "Rollback: snapshot execution failed (ignored): " + String(e));
+                    }
+                  }
+                }
+              }
               try {
                 execRes = await this.commandExecutor(cmd, {cancelled: () => this.cancelled, hostId: task.hostId});
               } catch (e: any) {
