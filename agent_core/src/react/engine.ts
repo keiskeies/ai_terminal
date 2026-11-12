@@ -31,7 +31,21 @@ import {
   WINDOW_FALLBACK_REASON,
   type ChangeWindowCheck,
 } from "../utils/change_window.js";
-// Dart 3861-3871: the model sometimes writes the goal-done marker into a command
+// r134: the audit-log layer. utils/audit_log.ts (this round) ports Dart's
+// AuditLogger (audit_logger.dart 46-87) + the AuditLogsDao cache semantics
+// (daos 982-1087) + the engine's _logCommand / _truncateForAudit helpers
+// (agent_engine.dart 2450-2455, 2951-2955). CJK wire texts are exported
+// constants, so this file stays ASCII-only; the store is injected by the
+// host - an uninjected engine never touches persistence.
+import {
+  auditLog,
+  selectAuditOutput,
+  setAuditLogStore,
+  AUDIT_WRITE_FAIL_PRE_PREFIX,
+  AUDIT_WRITE_FAIL_BLOCKED_PREFIX,
+  AUDIT_WRITE_FAIL_POST_PREFIX,
+  type AuditLogStorePort,
+} from "../utils/audit_log.js";
 // block (real-world symptom: CommandNotFoundException), so the executor call needs a
 // hard guard. Goal bookkeeping (decideGoalContinuation) lives with the Dart provider
 // on the parent side - finish events carry everything it reads (doc sec. 9).
@@ -232,6 +246,21 @@ export interface EngineOptions {
    * r1_generation_check regression pins a command-less finish to success, so
    * enabling the guard is a host decision, not an engine default.
    */
+  /**
+   * r134: the audit-log store seam - Dart AuditLogsDao (daos 982-1087) is a
+   * static cache + SQLite DAO; the Node host injects a port that owns the
+   * persistence half. With no port the engine keeps the in-memory cache and
+   * the audit warns never fire from persistence - identical to the r133
+   * change-window posture. setAuditLogStore is the module-level setter the
+   * host calls at boot; EngineOptions.auditLogStore wires the same port
+   * into this engine instance.
+   */
+  auditLogStore?: AuditLogStorePort;
+  /**
+   * Round 125: the anti-hallucination finish guard (Dart _hasExecutedAnyCommand
+   * 1450-1468). Off by default: the frozen r1_generation_check regression pins
+   * a command-less finish to success, so enabling the guard is a host decision.
+   */
   hallucinationGuard?: boolean;
 }
 
@@ -274,10 +303,10 @@ export class ReActEngine {
   private readonly genSource: GenerationSource;
   private readonly safetyCheckFn: (command: string) => SafetyLevel;
   private readonly changeWindowCheckFn: (command: string) => ChangeWindowCheck;
-  private currentGen = 0;
   private cancelled = false;
   private conversation: ChatMsg[] = [];
   private noCommandRetries = 0;
+  private currentGen = 0; // r134: generation counter the default genSource closes over
   // Dart 275 (_maxAccumulatedChars) + 61-65: the whole-task accumulator behind
   // _accumulatedMessage, the last-resort finish text (3733). Dart appends every
   // streamed chunk (1784); Node writes each whole turn. TailTextBuffer evicts
@@ -330,6 +359,9 @@ export class ReActEngine {
     // the host store and for tests, mirroring how safetyCheck / toolRegistry arrive.
     this.changeWindowCheckFn = options?.changeWindowCheck ??
       ((command: string): ChangeWindowCheck => checkChangeWindowCommand(command));
+    // r134: the host injects the store (Dart has no seam - its DAO is static);
+    // the setter updates the module cache used by the auditLog() calls below.
+    if (options?.auditLogStore !== undefined) setAuditLogStore(options.auditLogStore);
     this.toolRegistry = options?.toolRegistry;
     const localOpt = options?.isLocalSession;
     this.isLocalSessionFn = typeof localOpt === "function" ? localOpt : (): boolean => localOpt === true;
@@ -1392,6 +1424,20 @@ export class ReActEngine {
         // Hoisting the reset above the gate reproduces that order for every branch.
         this.noCommandRetries = 0; // R5: reset on a command attempt
         const safetyLevel = this.safetyCheckFn(cmd);
+        // r134: the pre-execution audit write, Dart agent_engine.dart 2527-2541.
+        // Order is Dart order: it sits between the safety-check debug log
+        // (2524-2525, the gate info line below in Node) and the change-window
+        // arm - a command the window rejects still gets its pre-exec audit row
+        // (executed: false). Dart's hostId != null guard has no Node counterpart:
+        // StartTaskParams.hostId is required (rpc/schema.ts 143), so every task
+        // has an audit host. output is null here - nothing ran yet.
+        try {
+          await auditLog({hostId: task.hostId, command: cmd, safetyLevel, output: null, executed: false});
+        } catch (e) {
+          // Dart 2539: agentLogger.warn('Audit', '\u5ba1\u8ba1\u65e5\u5fd7\u5199\u5165\u5931\u8d25(\u6267\u884c\u524d): $e').
+          // The prefix constant carries the CJK; the error value is appended here.
+          console.warn(AUDIT_WRITE_FAIL_PRE_PREFIX + String(e));
+        }
         // r133: the change-window arm, Dart agent_engine.dart 2573-2588. Order is Dart
         // order: classify first (the level is already in hand at 2523), then the window
         // (2573-2575), then the permission gate (2592). A command the freeze rejects never
@@ -1460,6 +1506,19 @@ export class ReActEngine {
               "\n\u8bf4\u660e: " + blockReason,
           });
           // Dart builds a ReActObservation(success:false) and hands .format() to the
+          // r134: the blocked-only audit, Dart agent_engine.dart 2604-2617. Only a
+          // SAFETY-level-blocked command gets a post-refusal audit row (output = the
+          // refusal reason, executed: false); a readOnly-mode refusal of a merely-
+          // warn command does not. Dart's guard is hostId != null && blocked; Node's
+          // hostId is always present, so only the level is tested.
+          if (safetyLevel === "blocked") {
+            try {
+              await auditLog({hostId: task.hostId, command: cmd, safetyLevel, output: blockReason ?? null, executed: false});
+            } catch (e) {
+              // Dart 2615: agentLogger.warn('Audit', '\u5ba1\u8ba1\u65e5\u5fd7\u5199\u5165\u5931\u8d25(\u62e6\u622a\u5206\u652f): $e').
+              console.warn(AUDIT_WRITE_FAIL_BLOCKED_PREFIX + String(e));
+            }
+          }
           // model; format()'s failure branch prints error ?? output, so the error
           // string is what the model actually reads. Same here, via the shared
           // formatter the confirm flow already uses.
@@ -1597,6 +1656,28 @@ export class ReActEngine {
             content: "\u547d\u4ee4\u6267\u884c\u7ed3\u679c: " + (result.output ?? "") + (result.error ? "\n[error] " + result.error : ""), // "命令执行结果: "
           });
           this.trimConversation(); // Dart 3027: trim after the result observation
+          // r134: the post-execution audit write, Dart agent_engine.dart 2919-2940.
+          // Lands AFTER the result event emit and the observation push (Dart lands it
+          // after the emit and before onSuccess - both are after the wire event, so
+          // the relative order of the audit and the model observation is unchanged:
+          // the model reads its observation, then the host persistence sees the row).
+          // output is selected by selectAuditOutput (Dart 2927-2933: truncated stdout
+          // on success, truncated stderr on failure, the CJK placeholders otherwise).
+          const auditOutput = selectAuditOutput({
+            success: execRes.success,
+            output: result.output ?? "",
+            error: result.error ?? "",
+          });
+          try {
+            await auditLog({hostId: task.hostId, command: cmd, safetyLevel, output: auditOutput, executed: true});
+          } catch (e) {
+            // Dart 2937-2938: agentLogger.warn('Audit', '\u5ba1\u8ba1\u65e5\u5fd7\u5199\u5165\u5931\u8d25(\u6267\u884c\u540e):
+            // hostId=$hostId, cmd=$command, err=$e'). The hostId/cmd pieces are
+            // composed here because they are engine locals, not constants.
+            console.warn(
+              AUDIT_WRITE_FAIL_POST_PREFIX + task.hostId + ", cmd=" + cmd + ", err=" + String(e)
+            );
+          }
         }
     return null;
   }
