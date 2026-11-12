@@ -9,10 +9,10 @@
 // a hard parse error instead of a stale hand-copied literal. The file is ASCII-pure
 // for the same reason - the CJK stays in the oracle.
 //
-// One sanctioned skip: the OperationReport.extractConclusion expectation of E2E-15
-// (oracle 403-406). OperationReport is the D3 subsystem of
-// docs/agent-core-migration-design.md and is not ported yet; the skip is pinned by
-// count so a Dart-side new assertion can never slip through un-checked.
+// No sanctioned skip any more: the OperationReport.extractConclusion expectation of
+// E2E-15 (oracle 403-406) is replayed against src/utils/operation_report.ts, the D3
+// model of docs/agent-core-migration-design.md, ported in round 131. All 22
+// expectations of the six cases are asserted now.
 import {describe, it, expect} from "vitest";
 import {readFileSync} from "node:fs";
 import {fileURLToPath} from "node:url";
@@ -25,6 +25,7 @@ import {
   parseAnswerBlock,
   parseReportSections,
 } from "../src/utils/answer_block.js";
+import {extractConclusion} from "../src/utils/operation_report.js";
 import {parse as parseStream} from "../src/react/parser.js";
 
 const NL = String.fromCharCode(10);
@@ -149,19 +150,23 @@ type Needle = {target: string; kind: string; text: string};
 
 const NEEDLE_RE = /expect\(\s*(answer|sections|thoughts)\s*,\s*(isNotNull|isNull|contains\('([^']*)'\)|isNot\(contains\('([^']*)'\)\)|'([^']*)')(?:\s*,\s*reason:\s*'[^']*')?\s*\)/g;
 
-function needlesOf(tag: string): {ported: Needle[]; skipped: string[]} {
+function needlesOf(tag: string): Needle[] {
   const body = caseLines(tag).join(NL);
-  const skipped: string[] = [];
+  const ported: Needle[] = [];
+  // E2E-15 asserts the ported conclusion extractor (oracle 403-406): a live needle.
   let work = body.replace(
-    /expect\(\s*OperationReport\.extractConclusion\([^)]*\),\s*'([^']*)',\s*\);/,
-    (_m: string, lit: string): string => {
-      skipped.push(lit);
+    /expect\(\s*OperationReport\.extractConclusion\(([^)]*)\),\s*'([^']*)',\s*\);/,
+    (_m: string, args: string, lit: string): string => {
+      const subject = (args.split(",")[0] ?? "").trim();
+      if (subject !== "sections") {
+        throw new Error("E2E-15 extractConclusion subject moved in the Dart oracle: " + subject);
+      }
+      ported.push({target: "conclusion", kind: "equals", text: lit});
       return "";
     },
   );
   // E2E-12 calls the extractor INSIDE expect(); fold it onto the answer target
   work = work.replace(/expect\(\s*AgentEngine\.parseAnswerBlock\((?:[^()]|\([^()]*\))*\)\s*,/g, "expect(answer,");
-  const ported: Needle[] = [];
   NEEDLE_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
   while ((m = NEEDLE_RE.exec(work)) !== null) {
@@ -173,24 +178,28 @@ function needlesOf(tag: string): {ported: Needle[]; skipped: string[]} {
     else if (matcher.indexOf("contains(") === 0) ported.push({target, kind: "contains", text: String(m[3])});
     else ported.push({target, kind: "equals", text: String(m[5])});
   }
-  const total = (work.match(/expect\(/g) || []).length;
+  const total = (body.match(/expect\(/g) || []).length;
   if (total !== ported.length) {
-    throw new Error("E2E-" + tag + ": " + (total - ported.length) + " expectation(s) unclassified - re-read the Dart oracle");
+    throw new Error("E2E-" + tag + ": " + (total - ported.length) +
+      " expectation(s) unclassified - re-read the Dart oracle");
   }
-  return {ported, skipped};
+  return ported;
 }
 
 function replay(tag: string): void {
   const text = caseText(tag);
   const lines = text.split(NL);
+  const answer = parseAnswerBlock(lines);
+  const sections = parseReportSections(lines);
   const values: Record<string, string | null> = {
-    answer: parseAnswerBlock(lines),
-    sections: parseReportSections(lines),
-    // the E2E-15 thought expectation runs on the ported stream parser
+    answer,
+    sections,
+    // oracle 404: the conclusion is read from the four-field report, the answer body
+    // only backs it up when the report has no such field.
+    conclusion: extractConclusion(sections, {answerBody: answer}),
     thoughts: parseStream(text).filter((e) => e.type === "thought").map((e) => e.text ?? "").join(NL),
   };
-  const {ported, skipped} = needlesOf(tag);
-  expect(skipped).toHaveLength(tag === "15" ? 1 : 0);
+  const ported = needlesOf(tag);
   expect(ported.length).toBeGreaterThan(0);
   for (const n of ported) {
     const v = values[n.target];
