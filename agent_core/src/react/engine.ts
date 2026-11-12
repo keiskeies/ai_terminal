@@ -1273,6 +1273,7 @@ this.sshOsInfo = options?.sshOsInfo;
       // Dart 3338-3354: same budget as the empty-name site, extra exhaust log.
       this.logGate("warn", WARN_UNKNOWN_TOOL + toolName);
       this.emit({id: genEventId(), type: "info", timestamp: Date.now(), text: INFO_UNKNOWN_TOOL + toolName});
+    this.logReActWarn("\u672a\u77e5\u5de5\u5177: " + toolName); // Dart 3340
       const available1 = registry.all.map((t) => t.name).join(", ");
       this.pushObservation(OBS_TOOL_MISSING_A + toolName + OBS_TOOL_MISSING_B + available1);
       return this.toolRetryOrContinue("\u672a\u77e5\u5de5\u5177\u8c03\u7528\u91cd\u8bd5\u6b21\u6570\u8017\u5c3d");
@@ -1283,6 +1284,7 @@ this.sshOsInfo = options?.sshOsInfo;
     if (this.permissionModeFn() === "readOnly" && tool.isReadOnly === false) {
       this.logGate("info", "\u53ea\u8bfb\u6a21\u5f0f\u62e6\u622a\u5de5\u5177: " + toolName);
       this.emit({id: genEventId(), type: "info", timestamp: Date.now(), text: INFO_READONLY_TOOL + BT + toolName + BT});
+    this.logReAct("\u53ea\u8bfb\u6a21\u5f0f\u62e6\u622a\u5de5\u5177: " + toolName); // Dart 3360
       this.pushObservation(OBS_READONLY_TOOL);
       return this.toolRetryOrContinue();
     }
@@ -1434,6 +1436,7 @@ this.sshOsInfo = options?.sshOsInfo;
       // Dart logs at error level; logGate only knows info|warn - warn it is.
       this.logGate("warn", "\u5de5\u5177 " + toolName + " \u6267\u884c\u5f02\u5e38: " + excText);
       this.emit({id: genEventId(), type: "info", timestamp: Date.now(), text: INFO_TOOL_EXC_A + toolName + INFO_TOOL_EXC_B + excText});
+    this.logReActError("\u5de5\u5177 " + toolName + " \u6267\u884c\u5f02\u5e38: " + String(e)); // Dart 3584
       // Dart 3587-3598: even a throwing tool needs a result event, or the evidence
       // layer holds a command with no outcome. failureKind unknown mirrors Dart.
       this.emit({
