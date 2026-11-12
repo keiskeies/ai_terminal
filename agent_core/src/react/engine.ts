@@ -71,6 +71,7 @@ import {parseToolAction} from "./tool_action.js";
 // model wrote into the finish answer instead of a proper ask + options turn.
 import {ChoiceRequestDetector, ChoiceRequest} from "../utils/choice_request_detector.js";
 import {RollbackAdvisor} from "../utils/rollback_advisor.js";
+import {agentLogger} from "../utils/agent_logger.js";
 
 // Byte-faithful Dart strings (agent_engine.dart 3865 / 3868), CJK escaped.
 const GOAL_MARKER_LOG = "\u5ffd\u7565\u88ab\u5f53\u6210\u547d\u4ee4\u7684\u76ee\u6807\u8fbe\u6210\u6807\u8bb0"; // Dart log at 3865
@@ -418,7 +419,18 @@ this.sshOsInfo = options?.sshOsInfo;
     } catch {
       // A closed stderr cannot fail a task; the gate decision itself is not lost.
     }
+
   }
+  /** r143: Dart agentLogger.info('ReAct', msg) - the ReAct step logger. */
+  private logReAct(message: string): void { agentLogger.info('ReAct', message); }
+  /** r143: Dart agentLogger.info('AgentEngine', msg). */
+  private logEngine(message: string): void { agentLogger.info('AgentEngine', message); }
+  /** r143: Dart agentLogger.warn('ReAct', msg). */
+  private logReActWarn(message: string): void { agentLogger.warn('ReAct', message); }
+  /** r143: Dart agentLogger.error('ReAct', msg). */
+  private logReActError(message: string): void { agentLogger.error('ReAct', message); }
+  /** r143: Dart agentLogger.debug('ReAct', msg). */
+  private logReActDebug(message: string): void { agentLogger.debug('ReAct', message); }
 
   /**
    * Dart agent_engine.dart:4491-4492. Two details that are easy to lose:
@@ -463,6 +475,7 @@ this.sshOsInfo = options?.sshOsInfo;
     this.wakeChoiceCompleterForCancel();
     this.cancelled = false;
     this.lastTaskId = task.taskId;
+    this.logEngine("=== \u5f00\u59cb\u4efb\u52a1 ==="); // Dart 751: === 开始任务 ===
     const myGen = this.makeGen();
     // The raw number the confirm gate hands to waitForCommandConfirm: Dart passes
     // myGeneration into _waitForCommandConfirm so the wait can tell "still mine" from
@@ -500,8 +513,10 @@ this.sshOsInfo = options?.sshOsInfo;
       }
     }
 
+    this.logReAct("=== \u5f00\u59cb ReAct \u81ea\u52a8\u6267\u884c ==="); // Dart 1178
     for (let step = startStep; step < maxSteps; step++) {
       // R1: generation check at the start of each step
+    this.logReAct("--- \u6b65\u9aa4 " + (step + 1) + " ---"); // Dart 1263
       { const s = this.boundary(myGen); if (s !== null) return s; }
 
       // Build the LLM request
@@ -514,11 +529,14 @@ this.sshOsInfo = options?.sshOsInfo;
 
       // Call LLM (streaming in Phase 1)
       let response: string;
+    this.logReAct("\u8c03\u7528 AI \u6a21\u578b..."); // Dart 1595
+    this.logReActDebug("\u6d88\u606f\u5386\u53f2: " + this.conversation.length + " \u6761"); // Dart 1596
       try {
         const result = await this.llm.chatStream({modelConfig: this.modelConfig, messages: msgs});
         response = result.text;
       } catch (e: any) {
         // R5: AI error -> failed, never completed
+    this.logReActError("AI \u8c03\u7528\u5f02\u5e38: " + (e.message ?? String(e))); // Dart 1342
         this.reportError(e.message ?? String(e));
         this.emitFinish("failed", e.message ?? String(e));
         return "failed";
@@ -818,6 +836,7 @@ this.sshOsInfo = options?.sshOsInfo;
     }
 
     // Max steps exhausted (R5: all terminal paths emit finish + call onFinished)
+    this.logReActWarn("\u8fbe\u5230\u6700\u5927\u6267\u884c\u6b65\u6570 " + maxSteps + " (\u4efb\u52a1\u7ec8\u6b62)"); // Dart 1562
     this.emitFinish("failed", "max steps exhausted");
     return "failed";
   }
