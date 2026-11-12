@@ -519,6 +519,7 @@ this.sshOsInfo = options?.sshOsInfo;
     for (let step = startStep; step < maxSteps; step++) {
       // R1: generation check at the start of each step
     this.logReAct("--- \u6b65\u9aa4 " + (step + 1) + " ---"); // Dart 1263
+    agentTracer.emitSync(new TraceEvent({taskId: task.taskId, type: TraceEventType.step, step: step + 1}));
       { const s = this.boundary(myGen); if (s !== null) return s; }
 
       // Build the LLM request
@@ -531,6 +532,7 @@ this.sshOsInfo = options?.sshOsInfo;
 
       // Call LLM (streaming in Phase 1)
       let response: string;
+    agentTracer.emitSync(new TraceEvent({taskId: task.taskId, type: TraceEventType.aiCallStart, step: step + 1}));
     this.logReAct("\u8c03\u7528 AI \u6a21\u578b..."); // Dart 1595
     this.logReActDebug("\u6d88\u606f\u5386\u53f2: " + this.conversation.length + " \u6761"); // Dart 1596
       try {
@@ -540,9 +542,11 @@ this.sshOsInfo = options?.sshOsInfo;
         // R5: AI error -> failed, never completed
     this.logReActError("AI \u8c03\u7528\u5f02\u5e38: " + (e.message ?? String(e))); // Dart 1342
         this.reportError(e.message ?? String(e));
+    agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
         this.emitFinish("failed", e.message ?? String(e));
         return "failed";
       }
+    agentTracer.emitSync(new TraceEvent({taskId: task.taskId, type: TraceEventType.aiCallEnd, step: step + 1, payload: {prompt_tokens: 0, completion_tokens: 0}}));
       // R1: generation check after await
 
       // Dart 1782-1784: every streamed chunk also lands in the accumulator that
@@ -781,6 +785,7 @@ this.sshOsInfo = options?.sshOsInfo;
             turnSections !== "" ? turnSections : fbSummary,
             turnAnswer,
           );
+    agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
           this.emitFinish("success", fbFinishSummary);
           return "success";
         } else if (askEvt === undefined) {
@@ -815,6 +820,7 @@ this.sshOsInfo = options?.sshOsInfo;
               "warn",
               "AI \u8FDE\u7EED " + this.noCommandRetries +
                 " \u6B21\u672A\u751F\u6210\u547D\u4EE4\uFF0C\u4EFB\u52A1\u7EC8\u6B62 (failed)");
+    agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
             this.emitFinish("failed", "no-command retry exhaustion");
             return "failed";
           }
@@ -839,6 +845,7 @@ this.sshOsInfo = options?.sshOsInfo;
 
     // Max steps exhausted (R5: all terminal paths emit finish + call onFinished)
     this.logReActWarn("\u8fbe\u5230\u6700\u5927\u6267\u884c\u6b65\u6570 " + maxSteps + " (\u4efb\u52a1\u7ec8\u6b62)"); // Dart 1562
+    agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
     this.emitFinish("failed", "max steps exhausted");
     return "failed";
   }
@@ -989,6 +996,7 @@ this.sshOsInfo = options?.sshOsInfo;
       // R5: terminal path - finish event + onFinished + checkpoint policy all live
       // inside emitFinish(). The summary is the Dart toolRetryExhausted string, NOT
       // the no-command summary (two distinct Dart strings, two distinct pins).
+    agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
       this.emitFinish("failed", TOOL_RETRY_SUMMARY);
       return "failed";
     }
@@ -1128,6 +1136,7 @@ this.sshOsInfo = options?.sshOsInfo;
       // Dart 3052-3060 + 3751-3752: the no-options ask ends through _finishTask,
       // which ALWAYS composes - an empty thought therefore falls to the 3733
       // accumulator (this turn's text), never to an empty/undefined summary.
+    agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
       this.emitFinish("success", this.composeFinishSummary(t, ""));
       return "success";
     }
@@ -1152,6 +1161,7 @@ this.sshOsInfo = options?.sshOsInfo;
       // Dart 3088-3091 logs and returns with no finish event; the Node run()
       // contract needs a terminal state, and a wake-with-empty is cancel-shaped.
       this.logGate("info", USER_CANCEL_CHOICE_LOG);
+    agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.cancel}));
       this.emitFinish("cancelled", "task cancelled by user");
       return "cancelled";
     }
@@ -1527,6 +1537,7 @@ this.sshOsInfo = options?.sshOsInfo;
             content: "\u89c2\u5bdf: " + cmd + "\n\u8f93\u51fa: " + lcObs + "\n\u72b6\u6001: \u5931\u8d25",
           });
           // Dart 2568: onSuccess(false, 'local_command_on_remote', 0)
+    agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
           this.emitFinish("failed", "local_command_on_remote");
           return "failed";
         }
@@ -1962,6 +1973,7 @@ this.sshOsInfo = options?.sshOsInfo;
   private boundary(myGen: TaskGeneration): AgentFinishState | null {
     if (myGen.isCurrent()) return null;
     if (this.cancelled) {
+    agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.cancel}));
       this.emitFinish("cancelled", "task cancelled by user");
       return "cancelled";
     }
