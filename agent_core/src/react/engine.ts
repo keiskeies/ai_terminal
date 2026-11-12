@@ -1633,6 +1633,7 @@ this.sshOsInfo = options?.sshOsInfo;
           this.hasExecutedAnyCommand = true;
           // Phase 2: dispatch to the injected command executor; Phase 0: stub fallback.
           let execRes: CommandExecResult = {stdout: "", stderr: "", exitCode: 0, durationMs: 0, success: true};
+          let snapshotOutput: string | null = null; // r141: Dart 2832-2838
           // Dart _executeCommand 3918-3965: executor.executeAndWait is wrapped in a
           // try/catch that TURNS a throw into a failed AgentResult (error = e.toString(),
           // failureKind unknown, no exit code) - the exception never escapes the ReAct
@@ -1672,6 +1673,7 @@ this.sshOsInfo = options?.sshOsInfo;
                       // R1: generation check after snapshot (Dart 2750-2755).
                       { const s = this.boundary(myGen); if (s !== null) return s; }
                       if (snapRes.success && (snapRes.stdout.length > 0)) {
+                        snapshotOutput = snapRes.stdout;
                         this.logGate("info", "Rollback: snapshot recorded (" + snapRes.stdout.length + " chars)");
                       }
                     } catch (e: any) {
@@ -1724,6 +1726,23 @@ this.sshOsInfo = options?.sshOsInfo;
               : rawCombined.substring(rawCombined.length - maxTailChars);
           }
           const outputTotalChars = rawCombined.length;
+          // r141: Dart 2832-2847: inject rollback hint into the error text on failure
+          const rawError = executorError !== undefined
+            ? executorError
+            : ("command exited with code " + execRes.exitCode + (execRes.timedOut ? " (timed out)" : ""));
+          const errorText = !execRes.success && snapshotOutput !== null
+            ? (() => {
+                const mt = RollbackAdvisor.analyze(cmd);
+                if (mt !== null) {
+                  const hint = RollbackAdvisor.buildRollbackSuggestion(mt, snapshotOutput);
+                  if (hint !== null) {
+                    this.logGate("info", "Rollback: command failed, generated rollback suggestion");
+                    return rawError + "\n\n" + hint;
+                  }
+                }
+                return rawError;
+              })()
+            : rawError;
           const result: AgentEvent = {
             // R4: occurrence id (Dart _genId), NOT a content hash — two runs of the
             // same command are two separate results and must not share an id.
@@ -1737,13 +1756,7 @@ this.sshOsInfo = options?.sshOsInfo;
             outputTotalChars,
             outputTruncated: rawCombined.length > outputText.length,
             outputTail,
-            error: execRes.success
-              ? undefined
-              : executorError !== undefined
-                // Dart exception path: error = e.toString() verbatim (3959-3961), NOT
-                // the exit-code sentence - there was no process exit.
-                ? executorError
-                : ("command exited with code " + execRes.exitCode + (execRes.timedOut ? " (timed out)" : "")),
+            error: execRes.success ? undefined : errorText,
             durationMs: execRes.durationMs,
             // Dart AgentResult from the throw leaves exitCode null -> wire omits it.
             exitCode: executorError === undefined ? execRes.exitCode : undefined,
