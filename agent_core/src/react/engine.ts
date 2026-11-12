@@ -1206,6 +1206,7 @@ this.sshOsInfo = options?.sshOsInfo;
     if (registry === undefined) return null; // junction guards this; defensive only
     const toolName = (toolNameRaw ?? "").trim();
     const args = ToolArgs.wrap(toolArgsRaw ?? {});
+    this.logReAct("\u8c03\u7528\u5de5\u5177: " + toolName + ", \u53c2\u6570: " + JSON.stringify(toolArgsRaw ?? {})); // Dart 3395
     const BT = String.fromCharCode(96);
 
     if (toolName === "") {
