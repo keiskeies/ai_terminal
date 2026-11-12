@@ -1646,8 +1646,10 @@ this.sshOsInfo = options?.sshOsInfo;
             const outcome = await flow.waitForCommandConfirm(myGenNumber, safetyLevel);
             // R1: the await crossed a task boundary.
             { const s = this.boundary(myGen); if (s !== null) return s; }
+    this.logReAct("\u7528\u6237\u786e\u8ba4\u6267\u884c\u5371\u9669\u547d\u4ee4: " + cmd); // Dart 2723
             if (!outcome.shouldContinue) {
               // Only generation_invalid / cancelled return false. boundary() is the
+    this.logReActWarn("\u7528\u6237\u62d2\u7edd\u6267\u884c: " + cmd); // Dart 2692
               // single terminal exit (R5): cancel emits the finish, supersede returns
               // interrupted without one, exactly as everywhere else in the loop.
               const s = this.boundary(myGen);
