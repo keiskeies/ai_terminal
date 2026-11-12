@@ -19,6 +19,18 @@ import {CheckpointStore} from "../utils/checkpoint_store.js";
 import {ConfirmFlow, formatObservationFailure} from "./confirm_flow.js";
 import {decideCommand, destructiveToolNeedsConfirm, type CommandGateDecision, type SafetyLevel} from "../utils/permission_policy.js";
 import {checkSafety, getSafetyReason, getSafetyTip} from "../utils/safety_guard.js";
+// r133: the change-window (frozen-window) arm. utils/change_window.ts ported the Dart
+// service in r132 with its refusal texts exported as constants, so this file - pinned
+// ASCII-only by test/regression/r5_terminal_whitelist.test.ts - can compose the wire
+// texts without carrying a single CJK byte of its own.
+import {
+  checkChangeWindowCommand,
+  WINDOW_LOG_WARN,
+  WINDOW_INFO_HEAD,
+  WINDOW_INFO_TAIL,
+  WINDOW_FALLBACK_REASON,
+  type ChangeWindowCheck,
+} from "../utils/change_window.js";
 // Dart 3861-3871: the model sometimes writes the goal-done marker into a command
 // block (real-world symptom: CommandNotFoundException), so the executor call needs a
 // hard guard. Goal bookkeeping (decideGoalContinuation) lives with the Dart provider
@@ -185,6 +197,16 @@ export interface EngineOptions {
    */
   safetyCheck?: (command: string) => SafetyLevel;
   /**
+   * r133: the change-window / frozen-window gate - Dart ChangeWindowService.checkCommand
+   * (services/change_window_service.dart 135-153), called from agent_engine.dart 2573-2575.
+   * Dart reads its own static cache; the Node default is the module store of
+   * utils/change_window.ts, which is DISABLED until a settings port is injected
+   * (setChangeWindowStore), so wiring the arm changes nothing for a host that never
+   * configures a window. The seam also lets a test inject a window without touching the
+   * module store - the same reason safetyCheck above exists.
+   */
+  changeWindowCheck?: (command: string) => ChangeWindowCheck;
+  /**
    * Round 123: the tool registry consulted by the tool-action dispatch (Dart owns
    * _tools inside the engine; here the RPC server builds the registry and injects
    * it, mirroring how confirmFlow is injected). Absent = the engine has no tool
@@ -251,6 +273,7 @@ export class ReActEngine {
   private ownPermissionMode: PermissionMode = DEFAULT_PERMISSION_MODE;
   private readonly genSource: GenerationSource;
   private readonly safetyCheckFn: (command: string) => SafetyLevel;
+  private readonly changeWindowCheckFn: (command: string) => ChangeWindowCheck;
   private currentGen = 0;
   private cancelled = false;
   private conversation: ChatMsg[] = [];
@@ -303,6 +326,10 @@ export class ReActEngine {
     this.confirmFlow = options?.confirmFlow;
     this.permissionModeFn = options?.permissionMode ?? ((): PermissionMode => this.ownPermissionMode);
     this.safetyCheckFn = options?.safetyCheck ?? checkSafety;
+    // Dart calls ChangeWindowService.checkCommand with no seam at all; the seam here is for
+    // the host store and for tests, mirroring how safetyCheck / toolRegistry arrive.
+    this.changeWindowCheckFn = options?.changeWindowCheck ??
+      ((command: string): ChangeWindowCheck => checkChangeWindowCommand(command));
     this.toolRegistry = options?.toolRegistry;
     const localOpt = options?.isLocalSession;
     this.isLocalSessionFn = typeof localOpt === "function" ? localOpt : (): boolean => localOpt === true;
@@ -1365,6 +1392,50 @@ export class ReActEngine {
         // Hoisting the reset above the gate reproduces that order for every branch.
         this.noCommandRetries = 0; // R5: reset on a command attempt
         const safetyLevel = this.safetyCheckFn(cmd);
+        // r133: the change-window arm, Dart agent_engine.dart 2573-2588. Order is Dart
+        // order: classify first (the level is already in hand at 2523), then the window
+        // (2573-2575), then the permission gate (2592). A command the freeze rejects never
+        // reaches decideCommand, never reaches the executor, and never logs the
+        // "step N - permission" line: Dart returns its _EarlyExecutionResult (2586-2587)
+        // before the gate is consulted. Even a fullAuto session therefore refuses writes
+        // during the freeze - the window is not a permission tier, it is a calendar-level
+        // policy that sits above every tier: it exits the gate instead of deferring to it.
+        const windowCheck = this.changeWindowCheckFn(cmd);
+        if (windowCheck.allowed === false) {
+          // Dart 2577: agentLogger.warn(ReAct, the frozen-window line + the command).
+          this.logGate("warn", WINDOW_LOG_WARN + cmd);
+          // Dart 2578: onEvent?.call(AgentEvent.info(...)). One info event and NO result
+          // event - nothing ran, so there is no exit code to report, the same posture as
+          // the permission-reject arm below. Occurrence id per R4.
+          this.emit({
+            id: genEventId(),
+            type: "info",
+            timestamp: Date.now(),
+            text: WINDOW_INFO_HEAD + cmd + WINDOW_INFO_TAIL + windowCheck.reason,
+          });
+          // Dart 2579-2584: ReActObservation(output: ..., success: false,
+          // error: windowReason ?? fallback).format(). format() prints error ?? output on
+          // the failure branch, and the union guarantees reason is non-null exactly when
+          // allowed is false, so the observation output text never reaches the model here
+          // (WINDOW_OBS_OUTPUT is exported for parity and pinned against 2581 by the oracle
+          // test).
+          this.conversation.push({
+            role: "user",
+            content: formatObservationFailure(cmd, windowCheck.reason ?? WINDOW_FALLBACK_REASON),
+          });
+          this.trimConversation(); // Dart 2285/2300: trim after every observation add
+          // Dart 2585 onSuccess(false, window_blocked, 0) has NO Node counterpart: the RPC
+          // process has no metrics sink, so the block is observable only through the info
+          // event and the observation above. Disclosed divergence.
+          // Dart does not touch _hasExecutedAnyCommand on this path (2388 is inside the
+          // executed branch), so hasExecutedAnyCommand stays untouched here too.
+          // Dart 2586-2587 returns _EarlyExecutionResult(shouldContinue: true) from inside
+          // the gate helper, so nothing below it runs: no decideCommand, no mode log line,
+          // no confirm arming, no executor. A null return is this helper's "continue the
+          // loop", so the freeze cannot be talked past by an ask-mode confirmation or by
+          // fullAuto - which is exactly the point of a calendar-level policy.
+          return null;
+        }
         const gateMode = this.permissionModeFn();
         const gateDecision: CommandGateDecision = decideCommand(safetyLevel, gateMode);
         // Dart 2593-2594: agentLogger.debug('ReAct', '步骤 N · 权限 ask → confirm')

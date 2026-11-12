@@ -190,9 +190,29 @@ describe("the oracle for this service is the Dart source, not a Dart test", () =
     expect(levelLine).toBeGreaterThan(-1);
     expect(armLine).toBeGreaterThan(levelLine);
     expect(gateLine).toBeGreaterThan(armLine);
-    // The Node engine has no arm yet: round 133 wires it. This pin goes red then, on
-    // purpose, so the wiring cannot land without revisiting this file.
-    expect(ENGINE_TS).not.toContain("changeWindow");
+    // r133 landed the arm, so the absence pin flips to a presence pin: the engine must
+    // now own a changeWindow seam, must call it AFTER classification and BEFORE
+    // decideCommand (the same Dart ordering asserted above for the oracle), and must
+    // reach the wire texts only through the exported constants - never by re-typing a
+    // CJK literal, which would break the ASCII pin of r5_terminal_whitelist.
+    expect(ENGINE_TS).toContain("changeWindowCheck");
+    const tsLevel = ENGINE_TS.indexOf("const safetyLevel = this.safetyCheckFn(cmd);");
+    const tsArm = ENGINE_TS.indexOf("const windowCheck = this.changeWindowCheckFn(cmd);");
+    const tsGate = ENGINE_TS.indexOf("const gateDecision: CommandGateDecision = decideCommand(safetyLevel, gateMode);");
+    expect(tsLevel).toBeGreaterThan(-1);
+    expect(tsArm).toBeGreaterThan(tsLevel);
+    expect(tsGate).toBeGreaterThan(tsArm);
+    for (const sym of ["WINDOW_LOG_WARN", "WINDOW_INFO_HEAD", "WINDOW_INFO_TAIL", "WINDOW_FALLBACK_REASON"]) {
+      expect(ENGINE_TS).toContain(sym);
+    }
+    // The arm must refuse outright, and it must EXIT the gate: Dart 2586-2587 returns
+    // _EarlyExecutionResult(shouldContinue: true) from inside the helper, so a frozen
+    // command never reaches decideCommand and can never be rescued by an ask-mode
+    // confirmation. In this helper "continue the loop" is a null return.
+    const armBody = ENGINE_TS.substring(tsArm, tsGate);
+    expect(armBody).not.toContain("gateAllowsExecution");
+    expect(armBody).toContain("return null;");
+    expect(armBody).toContain("formatObservationFailure(cmd, windowCheck.reason");
   });
 });
 
