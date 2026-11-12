@@ -23,6 +23,8 @@ import {checkSafety, getSafetyReason, getSafetyTip} from "../utils/safety_guard.
 // block (real-world symptom: CommandNotFoundException), so the executor call needs a
 // hard guard. Goal bookkeeping (decideGoalContinuation) lives with the Dart provider
 // on the parent side - finish events carry everything it reads (doc sec. 9).
+import {parseAnswerBlock, parseReportSections} from "../utils/answer_block.js";
+import {TailTextBuffer} from "../utils/tail_buffer.js";
 import {isGoalMarkerOnlyCommand} from "../utils/goal_continuation.js";
 // R8 (AGENTS.md): bounded conversation history - port of Dart _trimMessages (the three
 // layers and their Dart line anchors live in utils/context_trim.ts).
@@ -253,6 +255,19 @@ export class ReActEngine {
   private cancelled = false;
   private conversation: ChatMsg[] = [];
   private noCommandRetries = 0;
+  // Dart 275 (_maxAccumulatedChars) + 61-65: the whole-task accumulator behind
+  // _accumulatedMessage, the last-resort finish text (3733). Dart appends every
+  // streamed chunk (1784); Node writes each whole turn. TailTextBuffer evicts
+  // the head past the cap (R8). Dart's setter (67-71, used by the error path
+  // 1354) has no Node counterpart: the error paths pass their own message.
+  private readonly maxAccumulatedChars = 20000;
+  private readonly accumulatedBuffer = new TailTextBuffer(this.maxAccumulatedChars);
+
+  // Dart 65: `_accumulatedMessage => _accumulatedMessageBuffer.tail()`.
+  private get accumulatedMessage(): string {
+    return this.accumulatedBuffer.tail();
+  }
+
   private readonly maxNoCommandRetries = 2; // R5: reset on success
   private readonly seenStableIds = new Set<string>();
   private lastTaskId?: string;
@@ -370,6 +385,10 @@ export class ReActEngine {
     // run-entry reset is the only reset site.
     this.hasExecutedAnyCommand = false;
     this.finishWithoutExecCount = 0;
+    // Dart 660 (_resetTransientState) / 1256 (startTask): the accumulator is
+    // transient state - each task starts empty, so the 3733 fallback can only
+    // ever see THIS task's text.
+    this.accumulatedBuffer.clear();
     this.seenStableIds.clear();
 
     // W7: resume from checkpoint if requested and one exists
@@ -415,10 +434,33 @@ export class ReActEngine {
         return "failed";
       }
       // R1: generation check after await
+
+      // Dart 1782-1784: every streamed chunk also lands in the accumulator that
+      // backs _accumulatedMessage. Node resolves the whole turn at once, so one
+      // write holds the same characters; TailTextBuffer keeps the TAIL past the
+      // cap (R8). After the generation check on purpose (R5: no shared-state
+      // mutation before the check) - Dart appends inside the stream listener.
+      this.accumulatedBuffer.write(response);
       { const s = this.boundary(myGen); if (s !== null) return s; }
 
       // Parse the ReAct response into events
       const events = parse(response);
+      // Dart 2002-2004: the answer block and the operation-report four-field block
+      // are cut from the RAW turn text once per turn, before the action scan.
+      // Dart stores them on the ReActStep (2091-2092); Node keeps the same three
+      // values turn-local, and the finish paths read them exactly like 1471-1482.
+      const respLines = response.split("\n");
+      const turnAnswer = parseAnswerBlock(respLines) ?? "";
+      const turnSections = parseReportSections(respLines) ?? "";
+      // Dart 2084: the NORMAL step's thought is `thought ?? ''` (only the
+      // no-action fallbacks use `thought ?? content`, 2076/2048).
+      const turnThought = events.find((e) => e.type === "thought")?.text ?? "";
+      // Dart 1476-1478 + _composeFinishSummary 3729-3737: finish text = the
+      // four-field block, else the thought, composed with the answer body.
+      const turnFinishSummary = this.composeFinishSummary(
+        turnSections !== "" ? turnSections : turnThought,
+        turnAnswer,
+      );
       // Dart 1879: did THIS parse produce an ask event? Dart guards its event-
       // synthesis fallback (1488-1498) with the flag. The Node parser mints an ask
       // event whenever options exist, so the fallback is dead code against it (not
@@ -455,8 +497,16 @@ export class ReActEngine {
         // round-125 guard suppression exactly: SAME helper as the finish branch,
         // no await between the two call sites, and a suppressed finish must not
         // claim its stableId (the retried/allowed finish shares the id).
-        if (this.finishChoiceHijack(evt, events) !== null) continue;
+        if (this.finishChoiceHijack(evt, events, turnAnswer, response) !== null) continue;
         if (this.guardWillRefuseThisFinish(evt)) continue;
+        if (evt.type === "finish" && (evt.finishState ?? "success") === "success") {
+          // Dart 3751-3765: the ONE finish event on the wire carries the composed
+          // summary (four-field block else thought, plus the answer body). Node's
+          // parser mints the event itself (Dart's never does, so Dart has nothing
+          // to rewrite), hence the in-place rewrite. The stableId was already
+          // hashed from the parser text - R4's dedup key is untouched.
+          evt.summary = turnFinishSummary;
+        }
         this.seenStableIds.add(evt.id);
         this.emit(evt);
       }
@@ -477,7 +527,7 @@ export class ReActEngine {
         // task ends before the user decides. Convert it into a real ask and keep
         // the loop alive after the choice. The dedup loop already suppressed this
         // finish on the wire via the SAME helper, so no half-terminal flicker.
-        const hijack = this.finishChoiceHijack(finishEvt, events);
+        const hijack = this.finishChoiceHijack(finishEvt, events, turnAnswer, response);
         if (hijack !== null) {
           this.logGate("warn", FINISH_CHOICE_WARN_A + "[" + Array.from(hijack.choice.options).join(", ") + "]");
           if (!hijack.fromProtocol) {
@@ -510,7 +560,11 @@ export class ReActEngine {
           continue; // force-continue: no checkpoint, no finish side effects
         }
         const state = finishEvt.finishState ?? "success";
-        this.finishSideEffects(state, finishEvt.summary); // no 2nd finish event; Dart parity
+        // Dart 3751-3765: onFinished gets the composed finish text, not the
+        // parser's answer body (a duplicate finish skipped by the dedup loop
+        // never reaches the rewrite below, so pass the composed value here).
+        const composedFinish = state === "success" ? turnFinishSummary : finishEvt.summary;
+        this.finishSideEffects(state, composedFinish); // no 2nd finish event; Dart parity
         return state;
       }
 
@@ -544,11 +598,11 @@ export class ReActEngine {
         // no-command gate pins stay exact).
         const hit = this.toolRegistry === undefined
           ? null
-          : this.scanToolAction(response.split("\n"));
+          : this.scanToolAction(respLines);
         if (hit !== null) {
           const tstate = await this.handleToolAction(hit[0], hit[1], task, myGen, myGenNumber, step);
           if (tstate !== null) return tstate;
-        } else if (askEvt === undefined && this.scanAskAction(response.split("\n"))) {
+        } else if (askEvt === undefined && this.scanAskAction(respLines)) {
           // Dart 2016-2017 routes a bare ask action line to the ask case even with
           // no options; _handleAskAction turns the empty options into finish-as-ask
           // (3055-3059) - a SUCCESS terminal, NOT the no-command budget below.
@@ -577,7 +631,7 @@ export class ReActEngine {
           // Dart routes the finish case through the choice hijack (1423-1448)
           // BEFORE the guard (1450): a choice request in the body must become a
           // real ask, never a green terminal. Same order, same helpers.
-          const fbHijack = this.finishChoiceHijack(fbEvt, events);
+          const fbHijack = this.finishChoiceHijack(fbEvt, events, turnAnswer, response);
           if (fbHijack !== null) {
             this.logGate("warn", FINISH_CHOICE_WARN_A + "[" + Array.from(fbHijack.choice.options).join(", ") + "]");
             if (!fbHijack.fromProtocol) {
@@ -605,14 +659,19 @@ export class ReActEngine {
           }
           this.logGate("info", FINISH_INFO); // Dart 1470 agentLogger.info -> gate info
           // Dart 1479-1483: _finishTask(success: true) then return. Deviations:
-          // (1) Dart 1471-1482 + _composeFinishSummary 3729-3737 split summary
-          // from answer/sections; the Node parser keeps no such split, so the
-          // fbSummary above (parsed thought else the raw response) is the
-          // closest equivalent. (2) _emitOperationReport 3755-3760 has no Node
-          // counterpart yet (D3 backlog). (3) emitFinish is the only sanctioned
-          // terminal emit and already runs the W7 side effects, so the
-          // checkpoint save below is skipped exactly like Dart's return.
-          this.emitFinish("success", fbSummary);
+          // (1) _emitOperationReport 3755-3760 has no Node counterpart yet (D3
+          // backlog). (2) emitFinish is the only sanctioned terminal emit and
+          // already runs the W7 side effects, so the checkpoint save below is
+          // skipped exactly like Dart's return. (3) The summary split IS ported
+          // now (answer_block.ts + composeFinishSummary), matching Dart 1476-1478.
+          // Dart 1476-1478 + 3751-3752 with the fallback step's thought (2048
+          // thought: thought ?? content): the four-field block wins, else the
+          // fb thought, composed with the answer body.
+          const fbFinishSummary = this.composeFinishSummary(
+            turnSections !== "" ? turnSections : fbSummary,
+            turnAnswer,
+          );
+          this.emitFinish("success", fbFinishSummary);
           return "success";
         } else if (askEvt === undefined) {
           // Dart _handleNoCommand (agent_engine.dart 3622-3642): within the retry
@@ -955,7 +1014,10 @@ export class ReActEngine {
       // NOT touch the no-command / tool retry budget.
       this.logGate("warn", ASK_NO_OPTIONS_WARN);
       const t = thought.trim();
-      this.emitFinish("success", t === "" ? undefined : t);
+      // Dart 3052-3060 + 3751-3752: the no-options ask ends through _finishTask,
+      // which ALWAYS composes - an empty thought therefore falls to the 3733
+      // accumulator (this turn's text), never to an empty/undefined summary.
+      this.emitFinish("success", this.composeFinishSummary(t, ""));
       return "success";
     }
     // Dart 3062 interpolates a Dart List.toString ("[a, b]" - bare elements, no
@@ -1515,12 +1577,12 @@ export class ReActEngine {
    * conversion can never drift. Node mapping of the Dart ReActStep fields:
    *   step.options  -> the coexisting ask event's options (the parser folds the
    *                    options: line into an ask event, Dart stream parser did)
-   *   step.answer   -> finish event summary (parser answerBody capture)
+   *   step.answer   -> parseAnswerBlock(turn text), passed in as answerText
    *   step.thought  -> this turn's first thought event text (Dart step.thought
    *                    is the last-parsed thought; for single-thought turns -
    *                    the hijack corpus in practice - the two coincide)
-   *   step.rawResponse -> only reachable in Dart when thought is null, which the
-   *                    non-nullable field forbids: dead branch, not ported.
+   *   step.rawResponse -> this turn's raw response text (live whenever answer
+   *                    and thought are both empty, Dart 3045-3046)
    * fromProtocol=true means the options came from the protocol ask event itself
    * (Dart: step.options non-empty -> the parser already put an ask on the wire);
    * false = extracted from the body by the detector -> the finish branch must
@@ -1529,20 +1591,27 @@ export class ReActEngine {
   private finishChoiceHijack(
     evt: AgentEvent,
     events: readonly AgentEvent[],
+    answerText: string,
+    turnText: string,
   ): {choice: ChoiceRequest; fromProtocol: boolean} | null {
     if (evt.type !== "finish") return null;
     const thoughtText = events.find((x) => x.type === "thought")?.text ?? "";
+    // Dart 3037: step.answer?.trim() ?? '' - ONE trimmed answer value, used by
+    // both arms (the protocol-options question and the detector text).
+    const answerTrim = answerText.trim();
     const protocolOpts = events.find((x) => x.type === "ask")?.options;
     if (protocolOpts !== undefined && protocolOpts.length >= 2) {
       // Dart 3035-3039: protocol options >= 2 win outright, no detector call;
       // question = answer.trim() when non-empty else thought.trim().
-      const answerTrim = evt.summary?.trim() ?? "";
       const question = answerTrim !== "" ? answerTrim : thoughtText.trim();
       return {choice: new ChoiceRequest(question, protocolOpts), fromProtocol: true};
     }
-    // Dart 3042-3047: answer ?? thought - the parser folds an empty answer to
-    // undefined (summary: answerBody || undefined), matching Dart's null answer.
-    const text = evt.summary !== undefined ? evt.summary : thoughtText;
+    // Dart 3041-3047: answer else thought else rawResponse. Dart reads
+    // step.answer (the parseAnswerBlock value), NOT the parser's answer body:
+    // the two differ whenever the body carries a four-field block or an inline
+    // stop word. The rawResponse arm IS live - step.thought is non-nullable, so
+    // an empty thought falls through to it (round 126 called it dead: wrong).
+    const text = answerTrim !== "" ? answerTrim : (thoughtText !== "" ? thoughtText : turnText);
     const choice = ChoiceRequestDetector.detect(text);
     if (choice === null) return null;
     // Dart 1431 re-emits only when step.options was null/empty; a protocol ask
@@ -1551,6 +1620,20 @@ export class ReActEngine {
       choice,
       fromProtocol: protocolOpts !== undefined && protocolOpts.length > 0,
     };
+  }
+
+  /**
+   * Round 128: Dart 3729-3737 (_composeFinishSummary). `report` is Dart's
+   * reportSummary (the four-field block else the thought, 1476-1478), `body` the
+   * answer block; an empty pair falls back to the whole-task accumulator (3733) -
+   * which is what accumulatedBuffer below exists for.
+   */
+  private composeFinishSummary(report: string, body: string): string {
+    const thought = report.trim();
+    const answer = body.trim();
+    if (thought === "") return answer !== "" ? answer : this.accumulatedMessage;
+    if (answer === "") return thought;
+    return thought + "\n\n" + answer;
   }
 
   /**

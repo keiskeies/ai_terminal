@@ -29,11 +29,12 @@ const CHOICE_TAIL = "\u8BF7\u56DE\u590D\u9009\u62E9 A \u8FD8\u662F B\uFF0C\u6211
 // completion-sounding THOUGHT turn: parse() -> one thought event, no action
 const THINK_DONE = THINK + ": " + KW_ALL + "\n";
 // the keyword alone: parse() -> one text event, no thought, so the summary falls
-// back to the raw response (engine.ts 567-570 ~ Dart 2048 thought ?? content)
+// back to the raw response (Dart 2048 thought: thought ?? content).
 const BARE_DONE = KW_DONE;
 // answer-labelled keyword: parse() returns NO events at all (react/parser.ts
-// 292-298 mints a finish only for an action-finish line), so the summary must be
-// the untouched response, field label included
+// 292-298 mints a finish only for an action-finish line), yet Dart still reads
+// step.answer from the raw content (2044-2052): the fallback thought (2048,
+// thought ?? content) composes WITH the answer block (3729-3737), label kept.
 const ANSWER_DONE = ANSWER + ": " + KW_DONE;
 // keyword-free prose: the very string r5_terminal_whitelist pins as NOCMD
 const PROSE = "\u53EA\u662F\u4E00\u6BB5\u666E\u901A\u6587\u5B57";
@@ -183,7 +184,9 @@ describe("isTaskComplete fallback in the action-less ladder (Dart 2041-2055)", (
     expect(await h.run()).toBe("success");
     expect(h.events.filter((e) => e.type !== "finish")).toEqual([]);
     expect(finishEvents(h)).toHaveLength(1);
-    expect(h.finished).toEqual([["success", ANSWER_DONE]]); // label included: no thought
+    expect(h.finished).toEqual([["success", ANSWER_DONE + "\n\n" + KW_DONE]]);
+    // Dart 2048 (thought ?? content, label included) + 1476-1478 + 3729-3737:
+    // the thought part composes with the answer body the block extractor found.
     expect(hourglasses(h)).toEqual([]);
   });
 

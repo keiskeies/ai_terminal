@@ -153,13 +153,17 @@ describe("ask / choice corridor (Dart _handleAskAction 3052-3113)", () => {
     expect(h.finished[0][0]).not.toBe("failed");
   });
 
-  it("bare action:ask with no thought: success with undefined summary", async () => {
+  it("bare action:ask with no thought: finish text falls back to the accumulated turn", async () => {
     const h = harness([T_ACTION_ASK]);
     expect(await h.run()).toBe("success");
     expect(h.finished.length).toBe(1);
     expect(h.finished[0][0]).toBe("success");
-    expect(h.finished[0][1]).toBeUndefined();
-    expect(h.events.filter((e) => e.type === "finish")[0].summary).toBe("");
+    // Round 128: _finishTask ALWAYS runs _composeFinishSummary (3751-3752), so an
+    // empty thought + empty answer body falls to _accumulatedMessage (3733, fed by
+    // 1784) = this turn's raw text. The old undefined / "" pair was the Node-only
+    // gap this round retires; the wire summary and onFinished now agree.
+    expect(h.finished[0][1]).toBe(T_ACTION_ASK);
+    expect(h.events.filter((e) => e.type === "finish")[0].summary).toBe(T_ACTION_ASK);
   });
 
   it("a second run() wakes the parked choice: first task interrupted, no extra finish", async () => {
