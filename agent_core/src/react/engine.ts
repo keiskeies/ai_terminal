@@ -1336,6 +1336,7 @@ this.sshOsInfo = options?.sshOsInfo;
         // out of the confirmation channel, so executing (loudly, see the log) beats
         // silently blocking every host that never answers rpc:confirm.
         this.logGate("warn", "\u786e\u8ba4\u901a\u9053\u672a\u63a5\u7ebf\uff1a\u6309\u5168\u81ea\u52a8\u653e\u884c\u5de5\u5177 - " + toolName);
+    this.logReActWarn("\u786e\u8ba4\u901a\u9053\u672a\u63a5\u7ebf\uff0c\u6309\u957f\u5b89\u5904\u7406\u4e3a\u62d2\u7edd"); // Dart 3379
       } else {
         const approved = await flow.confirmToolExecution(toolName, toolUiDisplay);
         // R1: the await crossed a task boundary.
@@ -1389,6 +1390,7 @@ this.sshOsInfo = options?.sshOsInfo;
       // both the generation test and the cancelled-task test).
       { const s = this.boundary(myGen); if (s !== null) return s; }
       this.logGate("info", "\u5de5\u5177 " + toolName + " \u6267\u884c\u7ed3\u679c: success=" + String(result.success));
+    this.logReAct("\u5de5\u5177 " + toolName + " \u6267\u884c\u7ed3\u679c: success=" + String(result.success)); // Dart 3504
       if (result.success === false) {
         // Dart 3505-3511: surface the failure detail in the log so the model cannot
         // invent reasons the observation never showed.
