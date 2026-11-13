@@ -814,6 +814,7 @@ this.sshOsInfo = options?.sshOsInfo;
               timestamp: Date.now(),
               text: "\u23F3 \u7EE7\u7EED\u6267\u884C...", // hourglass + continuing
             });
+    this.logReAct("\u91cd\u8bd5\u4e2d\u3002\u5982\u679c\u4efb\u52a1\u5df2\u5b8c\u6210\uff0c\u8bf7\u56de\u590d\u201c\u5df2\u5b8c\u6210\u201d"); // Dart 3625
             this.conversation.push({role: "user", content: CONTINUE_PROMPT});
             this.trimConversation(); // Dart 3632: trim after the continue-prompt add
           } else {
@@ -822,6 +823,7 @@ this.sshOsInfo = options?.sshOsInfo;
               "warn",
               "AI \u8FDE\u7EED " + this.noCommandRetries +
                 " \u6B21\u672A\u751F\u6210\u547D\u4EE4\uFF0C\u4EFB\u52A1\u7EC8\u6B62 (failed)");
+    this.logReActWarn("\u8fde\u7eed " + this.noCommandRetries + " \u6b21\u672a\u751f\u6210\u547d\u4ee4\uff0c\u4efb\u52a1\u7ec8\u6b62 (failed)"); // Dart 3638
     agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
             this.emitFinish("failed", "no-command retry exhaustion");
             return "failed";
