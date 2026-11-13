@@ -553,9 +553,9 @@ agent_core/test/regression/
 ---
 
 
-**agentLogger 接线状态 (r166-r182)**：引擎 32 个 logGate 站点全部有对应 agentLogger 调用（81 处：19 直接 agentLogger + 62 辅助方法）；mcp/manager.ts 6 处、mcp/connection.ts 2 处、index.ts 1 处、confirm_flow.ts 2 处、tool_action.ts 2 处 = 共 43 处应用日志站点已接线。r180 补 boundary() 取消日志 (Dart 1541)，r181 补确认期间取消日志 (Dart 2682) + 低风险提示日志 (Dart 2737)，r182 补执行后代际失效日志 (Dart 2790)。剩余 console.* 调用均在日志基础设施内部（agent_logger.ts 5 处、agent_tracer.ts 3 处）。Dart 16 个文件对账完毕：3 个有 Node 对应物（agent_engine, mcp_manager, main），13 个无对应物已记录（UI/Riverpod/Hive/崩溃/迁移/健康/命令提取/ChangeRecordService 等）。
+**agentLogger 接线状态 (r166-r182)**：引擎 32 个 logGate 站点全部有对应 agentLogger 调用（81 处：19 直接 agentLogger + 62 辅助方法）；mcp/manager.ts 6 处、mcp/connection.ts 2 处、index.ts 1 处、confirm_flow.ts 2 处、tool_action.ts 2 处 = 共 43 处应用日志站点已接线。r180 补 boundary() 取消日志 (Dart 1541)，r181 补确认期间取消日志 (Dart 2682) + 低风险提示日志 (Dart 2737)，r182 补执行后代际失效日志 (Dart 2790)。剩余 console.* 调用均在日志基础设施内部（agent_logger.ts 5 处、agent_tracer.ts 3 处）。Dart 16 个文件对账完毕：4 个有 Node 对应物（agent_engine, mcp_manager, main, command_extractor——r195 移植 `utils/command_extractor.ts` 并接线同名日志键 ExtractCmd），12 个无对应物已记录（UI/Riverpod/Hive/崩溃/迁移/健康/ChangeRecordService 等）。
 
-**迁移状态 (r187)**：agent_core/ Node 移植已完成全部代码工作：64 个 src .ts、92 个 test .test.ts（80 顶层 + 12 回归）、4 道门全绿（typecheck / schema / fixture 1000 / vitest 1208）。agentLogger 16 个 Dart 文件全部对账完毕（3 个有 Node 对应物已接线，13 个无对应物已记录）。§9 第 1-5 项为产品决策，代码侧无未完成任务。
+**迁移状态 (r195)**：agent_core/ Node 移植已完成全部代码工作：69 个 src .ts、100 个 test .test.ts（88 顶层 + 12 回归）、4 道门全绿（typecheck / schema / fixture 1000 / vitest 1257）。r188 之后补齐的 Dart 缺口：tail_buffer 测试 (r190)、ReAct 解析 E2E (r189)、InterruptedTurnDetector (r191)、AnsiStripper (r192)、AdaptiveConcurrency (r193)、ConversationExport (r194)、CommandExtractor + looksLikeCommand/isDescriptiveText (r195)。agentLogger 16 个 Dart 文件全部对账完毕（4 个有 Node 对应物已接线，12 个无对应物已记录）。§9 第 1-5 项为产品决策，代码侧无未完成任务。
 
 ## 10. 附录
 
