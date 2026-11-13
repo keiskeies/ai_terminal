@@ -1778,8 +1778,10 @@ if (safetyLevel === "info") {
               }
             }
             // R1: generation check after the await.
-            { const s = this.boundary(myGen); if (s !== null) return s; }
-            { const s = this.boundary(myGen); if (s !== null) return s; }
+{ const s = this.boundary(myGen); if (s !== null) { this.logReAct("\u547d\u4ee4\u6267\u884c\u540e\u4ee3\u9645\u5931\u6548\uff0c\u4e22\u5f03\u7ed3\u679c\u4e0d\u6c61\u67d3\u65b0\u4efb\u52a1"); // Dart 2790
+    return s;
+  } }
+{ const s = this.boundary(myGen); if (s !== null) return s; }
           } else {
             execRes = {stdout: "", stderr: "", exitCode: 0, durationMs: 0, success: true};
           }
