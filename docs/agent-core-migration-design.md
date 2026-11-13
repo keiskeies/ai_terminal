@@ -552,6 +552,9 @@ agent_core/test/regression/
 9. **本机命令误发远程 (local_command_on_remote)** — Dart `local_command_detector.dart` (37 行) + `agent_engine.dart` 2543-2571 已整搬至 `src/utils/local_command_detector.ts` + engine 远程误发拦截臂 (r135); 检测逻辑: 盘符路径 + PowerShell 强特征 (3 组 RegExp), 命中即给可读观测 + `onSuccess(false, 'local_command_on_remote', 0)` 早退
 ---
 
+
+**agentLogger 接线状态 (r166-r168)**：引擎 31 个 logGate 站点全部有对应 agentLogger 调用（~52 处）；mcp/manager.ts 6 处、mcp/connection.ts 2 处、index.ts 1 处、confirm_flow.ts 1 处 = 共 41 处应用日志站点已接线。剩余 console.* 调用均在日志基础设施内部（agent_logger / agent_tracer / audit_log / change_window），按设计使用 console。
+
 ## 10. 附录
 
 ### 10.1 文件清单（新建）
