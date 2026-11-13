@@ -2020,6 +2020,7 @@ this.logEngine("\u4efb\u52a1\u7ec8\u6b62"); // Dart 3749 failure
   private boundary(myGen: TaskGeneration): AgentFinishState | null {
     if (myGen.isCurrent()) return null;
     if (this.cancelled) {
+this.logReAct("\u4efb\u52a1\u88ab\u53d6\u6d88"); // Dart 1541
     agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.cancel}));
       this.emitFinish("cancelled", "task cancelled by user");
       return "cancelled";
