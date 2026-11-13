@@ -772,6 +772,7 @@ this.sshOsInfo = options?.sshOsInfo;
             continue;
           }
           this.logGate("info", FINISH_INFO); // Dart 1470 agentLogger.info -> gate info
+    this.logEngine("=== \u4efb\u52a1\u7ec8\u6b62 ==="); // Dart 1470
           // Dart 1479-1483: _finishTask(success: true) then return. Deviations:
           // (1) _emitOperationReport 3755-3760 has no Node counterpart yet (D3
           // backlog). (2) emitFinish is the only sanctioned terminal emit and
@@ -1169,11 +1170,13 @@ this.sshOsInfo = options?.sshOsInfo;
       // Dart 3088-3091 logs and returns with no finish event; the Node run()
       // contract needs a terminal state, and a wake-with-empty is cancel-shaped.
       this.logGate("info", USER_CANCEL_CHOICE_LOG);
+    this.logReAct("\u7528\u6237\u53d6\u6d88\u4e86\u9009\u62e9"); // Dart 3080
     agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.cancel}));
       this.emitFinish("cancelled", "task cancelled by user");
       return "cancelled";
     }
     this.logGate("info", USER_CHOSE_A + choice);
+    this.logReAct("\u7528\u6237\u9009\u62e9\u4e86: " + choice); // Dart 3085
     // Dart 3095-3097: chosenAnswer rides on the ask event itself - the parent
     // holds the same object, so the question carries its answer with no re-emit.
     if (pendingAsk !== null) pendingAsk.chosenAnswer = choice;
@@ -1304,6 +1307,7 @@ this.sshOsInfo = options?.sshOsInfo;
     const isLocal = this.isLocalSessionFn();
     const visible = registry.visibleFor({isLocalSession: isLocal});
     if (visible.some((t) => t.name === toolName) === false) {
+    this.logReActWarn("\u5de5\u5177\u5728\u5f53\u524d\u4f1a\u8bdd\u4e0d\u53ef\u7528: " + toolName); // Dart 3379
       this.logGate("warn", "\u5de5\u5177\u5728\u5f53\u524d\u4f1a\u8bdd\u4e0d\u53ef\u7528: " + toolName + " (local=" + String(isLocal) + ")");
       this.emit({id: genEventId(), type: "info", timestamp: Date.now(), text: INFO_SCOPE_HIDDEN_A + BT + toolName + BT + INFO_SCOPE_HIDDEN_B});
       const av = visible.map((t) => t.name).join(", ");
@@ -1598,6 +1602,7 @@ this.sshOsInfo = options?.sshOsInfo;
         }
         const gateMode = this.permissionModeFn();
         const gateDecision: CommandGateDecision = decideCommand(safetyLevel, gateMode);
+    this.logReAct("\u6b65\u9aa4 " + step + " \u00b7 \u6743\u9650 " + gateMode + " \u2192 confirm"); // Dart 2660
         // Dart 2593-2594: agentLogger.debug('ReAct', '步骤 N · 权限 ask → confirm')
         this.logGate("info", "\u6b65\u9aa4 " + step + " \u00b7 \u6743\u9650 " + gateMode + " \u2192 " + gateDecision);
         let gateAllowsExecution = true;
@@ -1721,6 +1726,7 @@ this.sshOsInfo = options?.sshOsInfo;
               if (this.enableRollbackSnapshot) {
                 const modifyTarget = RollbackAdvisor.analyze(cmd);
                 if (modifyTarget !== null) {
+    this.logReAct("Rollback: detected modification (" + modifyTarget.type + ")"); // Dart 3880
                   const snapshotCmd = RollbackAdvisor.buildSnapshotCommand(modifyTarget);
                   if (snapshotCmd !== null) {
                     this.logGate("info", "Rollback: detected modification (" + modifyTarget.type + "), running pre-snapshot");
@@ -1728,9 +1734,11 @@ this.sshOsInfo = options?.sshOsInfo;
                       const snapRes = await this.commandExecutor(snapshotCmd, {cancelled: () => this.cancelled, hostId: task.hostId});
                       // R1: generation check after snapshot (Dart 2750-2755).
                       { const s = this.boundary(myGen); if (s !== null) return s; }
+    this.logReAct("Rollback: snapshot recorded (" + snapRes.stdout.length + " chars)"); // Dart 3890
                       if (snapRes.success && (snapRes.stdout.length > 0)) {
                         snapshotOutput = snapRes.stdout;
                         this.logGate("info", "Rollback: snapshot recorded (" + snapRes.stdout.length + " chars)");
+    this.logReActWarn("Rollback: snapshot execution failed (ignored): " + String(snapRes)); // Dart 3895
                       }
                     } catch (e: any) {
                       this.logGate("warn", "Rollback: snapshot execution failed (ignored): " + String(e));
@@ -1790,6 +1798,7 @@ this.sshOsInfo = options?.sshOsInfo;
             ? (() => {
                 const mt = RollbackAdvisor.analyze(cmd);
                 if (mt !== null) {
+    this.logReAct("Rollback: command failed, generated rollback suggestion"); // Dart 3900
                   const hint = RollbackAdvisor.buildRollbackSuggestion(mt, snapshotOutput);
                   if (hint !== null) {
                     this.logGate("info", "Rollback: command failed, generated rollback suggestion");
@@ -1871,6 +1880,7 @@ this.sshOsInfo = options?.sshOsInfo;
    * Round 127: the force-continue half of the anti-hallucination guard (Dart
    * 1451-1467) extracted so the parsed-finish branch and the round-127
    * isTaskComplete fallback arm run one implementation. No await, and
+    this.logReActWarn("\u6a21\u578b\u63d0\u4ea4\u4e86\u65e0\u547d\u4ee4\u7684\u6b65\u9aa4\uff0c\u5df2\u91cd\u8bd5 " + this.finishWithoutExecCount + " \u6b21"); // Dart 3640
    * deliberately NO continue here: the CALLER keeps loop control, because a
    * refused finish is not a terminal path (no finish event on the wire, no
    * checkpoint, no side effects - R5 keeps the terminal corridor emitFinish).
