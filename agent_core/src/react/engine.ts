@@ -798,6 +798,7 @@ this.sshOsInfo = options?.sshOsInfo;
           // string (no-command retry exhaustion) - the summary contract pinned by
           // r5_terminal_whitelist, an already-documented divergence, unchanged here.
           this.noCommandRetries++;
+    this.logReAct("\u76ee\u6807\u8fbe\u6210\u6807\u8bb0\u4f4e\u89c2: AI \u672a\u8fd4\u56de\u6709\u6548\u52a8\u4f5c"); // Dart 1533 (approx)
           if (this.noCommandRetries <= this.maxNoCommandRetries) {
             // Dart 3625-3626: AI wei sheng cheng ming ling, fa song ji xu ti shi (chong shi N/M)
             this.logGate(
@@ -1800,6 +1801,7 @@ this.sshOsInfo = options?.sshOsInfo;
             exitCode: executorError === undefined ? execRes.exitCode : undefined,
             failureKind: execRes.failureKind,
           };
+    this.logReAct("\u6b65\u9aa4 " + step + " \u00b7 " + (execRes.success ? "\u6210\u529f" : "\u5931\u8d25") + " \u00b7 exit " + execRes.exitCode + " \u00b7 " + execRes.durationMs + "ms"); // Dart 2785
           this.emit(result);
           this.conversation.push({
             role: "user",
