@@ -538,6 +538,7 @@ this.sshOsInfo = options?.sshOsInfo;
       try {
         const result = await this.llm.chatStream({modelConfig: this.modelConfig, messages: msgs});
         response = result.text;
+this.logReAct("AI \u54cd\u5e94\u5b8c\u6210\uff0c\u5171 " + response.length + " \u5b57\u7b26"); // Dart 1935
       } catch (e: any) {
         // R5: AI error -> failed, never completed
     this.logReActError("AI \u8c03\u7528\u5f02\u5e38: " + (e.message ?? String(e))); // Dart 1342
