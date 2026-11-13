@@ -60,7 +60,7 @@ export class AgentLogger {
   // Node: set the log file path (replaces Dart's _initLogFileAsync which uses path_provider)
   setLogFile(path: string): void {
     const dir = dirname(path);
-    try { mkdirSync(dir, {recursive: true}); } catch { /* ignore */ }
+try { mkdirSync(dir, {recursive: true}); } catch (e) { console.warn("[AgentLogger] init failed: " + String(e)); }
     appendFileSync(path, "\n=== Agent Log Started " + new Date().toISOString() + " ===\n");
     this._logFile = path;
   }
