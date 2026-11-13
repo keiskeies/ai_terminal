@@ -142,7 +142,7 @@ export class AgentTracer {
   setTraceFile(path: string): void {
     if (this._disabled) return;
     const dir = dirname(path);
-    try { mkdirSync(dir, {recursive: true}); } catch { /* ignore */ }
+try { mkdirSync(dir, {recursive: true}); } catch (e) { console.warn("[agent-tracer] init failed: " + String(e)); }
     this._traceFile = path;
   }
 
