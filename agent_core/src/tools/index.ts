@@ -15,7 +15,8 @@ export {ToolArgs, ToolArgsParser, ToolArgException} from "./tool_args.js";
 export {WebSearchTool, webSearchService, loadWebSearchConfig, saveWebSearchConfig, getApiKey, normalizeSearchUrl, mergeSearchResults, WebSearchQuotaError, WebSearchTransientError, WebSearchCancelledError, providerDisplayName} from "./web_search.js";
 export type {WebSearchProvider, WebSearchResult, WebSearchBatch, WebSearchBackendReport, WebSearchResponse, WebSearchConfig} from "./web_search.js";
 
-export {ReverseRpcOrchestrator, ExecOnTool, ExecBatchTool, CheckConnectivityTool, buildOrchestratorTools, registerOrchestratorTools, CommandFailureKind, isReadOnlyCommand, isParallelSafeCommand, isValidHost} from "./orchestrator.js";
+export {ReverseRpcOrchestrator, ExecOnTool, ExecBatchTool, CheckConnectivityTool, buildOrchestratorTools, registerOrchestratorTools, isReadOnlyCommand, isParallelSafeCommand, isValidHost} from "./orchestrator.js";
+export {CommandFailureKind} from "../utils/pty_output_detector.js";
 export type {OrchestratorExecutor, OrchestratorResult, OrchestratorConnectivity, ExecuteBatchOptions} from "./orchestrator.js";
 
 import {

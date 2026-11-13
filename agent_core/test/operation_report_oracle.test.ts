@@ -32,7 +32,7 @@ import type {
   PlanStepStatus,
 } from "../src/rpc/schema.js";
 import {parse as parseStream} from "../src/react/parser.js";
-import {CommandFailureKind} from "../src/tools/orchestrator.js";
+import {CommandFailureKind} from "../src/utils/pty_output_detector.js";
 import {
   CONCLUSION_FALLBACK, MAX_CONCLUSION_CHARS, MAX_DETAILS_CHARS, SECTION_LABELS,
   badgeFromJson, badgeToJson, changeCanRollback, changeFromJson, changeHasDiff, changeToJson,

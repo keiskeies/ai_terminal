@@ -22,18 +22,10 @@ import {AgentTool, AgentToolRegistry, ToolKind, ToolScope, ToolResult, ToolConte
 import type {ToolArgs} from "./tool_args.js";
 import {ReverseRpcClient} from "../rpc/client.js";
 import {checkSafety} from "../utils/safety_guard.js";
+import {CommandFailureKind} from "../utils/pty_output_detector.js";
+export {CommandFailureKind};
 
-// failure kind (1:1 from pty_output_detector.dart CommandFailureKind)
-export enum CommandFailureKind {
-  none = "none",
-  timeout = "timeout",
-  syntaxError = "syntaxError",
-  interactivePrompt = "interactivePrompt",
-  disconnected = "disconnected",
-  permissionDenied = "permissionDenied",
-  cancelled = "cancelled",
-  unknown = "unknown",
-}
+// failure kind now lives in its canonical Dart home (utils/pty_output_detector.ts);
 
 // result shapes (mirror Dart CommandResult / ConnectivityResult)
 export interface OrchestratorResult {

@@ -71,7 +71,7 @@ const ROOT_INDEX = readText(ROOT_INDEX_TS);
 // instead of being quietly kept.
 const DART_EXEC_SHA = "5c5bfe4da555";
 const ORCH_TEST_SHA = "cca059b699cd";
-const ORCH_SHA = "5c2ef645d5b0";
+const ORCH_SHA = "af219480a76c";
 
 const dartLines = DART.split(NL);
 const dartLineOf = (needle: string): number => {
