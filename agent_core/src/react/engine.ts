@@ -1553,6 +1553,7 @@ this.sshOsInfo = options?.sshOsInfo;
         if (windowCheck.allowed === false) {
           // Dart 2577: agentLogger.warn(ReAct, the frozen-window line + the command).
           this.logGate("warn", WINDOW_LOG_WARN + cmd);
+    this.logReActWarn("\u5c01\u7f51\u671f\u62e6\u622a\u4fee\u6539\u6027\u547d\u4ee4: " + cmd); // Dart 2577
           // Dart 2578: onEvent?.call(AgentEvent.info(...)). One info event and NO result
           // event - nothing ran, so there is no exit code to report, the same posture as
           // the permission-reject arm below. Occurrence id per R4.
