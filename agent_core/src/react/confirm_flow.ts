@@ -22,6 +22,7 @@
 //   - "等确认的墙钟要单独记账：它是人的反应时间，不该进 tok/s 的分母" (430), and it
 //     is only credited while the generation is unchanged (434-438).
 
+import {agentLogger} from "../utils/agent_logger.js";
 import {CompleterLike} from "../utils/pending_registry.js";
 import {decideCommand, type CommandGateDecision, type SafetyLevel} from "../utils/permission_policy.js";
 import {getSafetyReason, getSafetyTip} from "../utils/safety_guard.js";
@@ -241,6 +242,7 @@ export class ConfirmFlow {
       if (this._confirmCompleter === target && this._confirmCompleter !== null && !this._confirmCompleter.isDone) {
         this.ev.onLog?.("warn", "确认超时(10min)，自动拒绝: " + label);
         this._confirmTimedOut = true;
+    agentLogger.warn("ConfirmFlow", "\u786e\u8ba4\u8d85\u65f6(10min)\uff0c\u81ea\u52a8\u62d2\u7edd"); // Dart 2644
         this._taskHadConfirmTimeout = true;
         this._confirmCompleter.resolve(false);
       }

@@ -237,7 +237,7 @@ type SpanPin = [string, number, number, string];
 
 const DART_TEST_FILE_SHA = "53bafa8f924f";
 const DART_ENGINE_FILE_SHA = "ad7e7cca87de";
-const TS_FLOW_FILE_SHA = "bc33bf7f1540";
+const TS_FLOW_FILE_SHA = "69dc5b337734";
 const TS_INDEX_FILE_SHA = "e9f17e4945b6";   // startTask now injects the flow + counters into the engine
 
 const DART_ENGINE_SPANS: SpanPin[] = [
@@ -257,18 +257,18 @@ const DART_ENGINE_SPANS: SpanPin[] = [
 ];
 
 const TS_FLOW_SPANS: SpanPin[] = [
-  ["arm",230,249,"4fb95d8cc17f"],
-  ["begin",252,269,"6ea92ddbca05"],
-  ["waitForCommandConfirm",277,359,"a51c955fb75e"],
-  ["confirmToolExecution",363,391,"455c45ebd74d"],
-  ["toolRefusal",396,405,"09eb268cce1a"],
-  ["confirmReject",427,440,"c92fd81f4e82"],
-  ["expire",414,424,"2fc60571d82f"],
-  ["wakeForCancelTask",443,453,"e027e703f653"],
-  ["wakeForCancelledFinish",461,470,"ccfb08457c4c"],
-  ["wakeForPause",477,484,"b429f967b78d"],
-  ["finishCleanup",491,494,"fbf1b92d5efb"],
-  ["formatObservationFailure",147,153,"7c96f8453de9"],
+["arm",231,250,"f0fc772acf82"],
+["begin",254,271,"6ea92ddbca05"],
+["waitForCommandConfirm",279,361,"a51c955fb75e"],
+["confirmToolExecution",365,393,"455c45ebd74d"],
+["toolRefusal",398,407,"09eb268cce1a"],
+["confirmReject",429,442,"c92fd81f4e82"],
+["expire",416,426,"2fc60571d82f"],
+["wakeForCancelTask",445,455,"e027e703f653"],
+["wakeForCancelledFinish",463,472,"ccfb08457c4c"],
+["wakeForPause",479,486,"b429f967b78d"],
+["finishCleanup",493,496,"fbf1b92d5efb"],
+["formatObservationFailure",148,154,"7c96f8453de9"],
 ];
 
 const DART_TEST_SPANS: SpanPin[] = [
@@ -925,14 +925,14 @@ describe("Dart/TS writer census for the confirmation transients", () => {
     // (386), wakeForCancelTask (449). Three each, and nothing else - which is the hard
     // proof that pause, terminal cancel and _finishTask never drop the awaiter.
     expect(linesWith("_confirmCompleter = null;", DART_ENGINE_LINES)).toEqual([441, 706, 2671]);
-    expect(linesWith("this._confirmCompleter = null;", TS_FLOW_LINES)).toEqual([285, 386, 449]);
+    expect(linesWith("this._confirmCompleter = null;", TS_FLOW_LINES)).toEqual([287, 388, 451]);
   });
 
   it("pause, terminal cancel and finishCleanup never null the completer", () => {
     for (const [name, from, to] of [
-      ["wakeForPause", 477, 484],
-      ["wakeForCancelledFinish", 461, 470],
-      ["finishCleanup", 491, 494],
+      ["wakeForPause", 479, 486],
+      ["wakeForCancelledFinish", 463, 472],
+      ["finishCleanup", 493, 496],
     ] as Array<[string, number, number]>) {
       expect(count("this._confirmCompleter = null;", span(TS_FLOW_LINES, from, to))).toBe(0);
       expect(count("resolve(", span(TS_FLOW_LINES, from, to))).toBe(name === "wakeForPause" || name === "wakeForCancelledFinish" ? 1 : 0);
@@ -954,8 +954,8 @@ describe("Dart/TS writer census for the confirmation transients", () => {
     // Seven cancel()/null pairs on each side, each on consecutive lines in TS.
     expect(linesWith("_confirmTimeoutTimer?.cancel();", DART_ENGINE_LINES)).toEqual([439, 456, 704, 938, 1054, 2669, 3809]);
     expect(linesWith("_confirmTimeoutTimer = null;", DART_ENGINE_LINES)).toEqual([440, 457, 705, 939, 1055, 2670, 3810]);
-    expect(linesWith("this._confirmTimeoutTimer?.cancel();", TS_FLOW_LINES)).toEqual([283, 384, 421, 447, 468, 482, 492]);
-    expect(linesWith("this._confirmTimeoutTimer = null;", TS_FLOW_LINES)).toEqual([284, 385, 422, 448, 469, 483, 493]);
+    expect(linesWith("this._confirmTimeoutTimer?.cancel();", TS_FLOW_LINES)).toEqual([285, 386, 423, 449, 470, 484, 494]);
+    expect(linesWith("this._confirmTimeoutTimer = null;", TS_FLOW_LINES)).toEqual([286, 387, 424, 450, 471, 485, 495]);
   });
 
   it("the per-wait timeout flag is cleared before every new wait", () => {
@@ -963,24 +963,24 @@ describe("Dart/TS writer census for the confirmation transients", () => {
     // declaration; TS converges both sites into one arm() line. That is a deliberate
     // collapse, not an omission: one timer, one reset, still inside the arm.
     expect(linesWith("_confirmTimedOut = false;", DART_ENGINE_LINES)).toEqual([86, 412, 2639]);
-    expect(linesWith("this._confirmTimedOut = false;", TS_FLOW_LINES)).toEqual([237]);
-    expect(offset(span(TS_FLOW_LINES, 230, 249), "this._confirmCompleter = new CompleterLike", "arm creates the awaiter")).toBeGreaterThanOrEqual(0);
-    expect(count("this._confirmTimedOut = false;", span(TS_FLOW_LINES, 230, 249))).toBe(1);
+    expect(linesWith("this._confirmTimedOut = false;", TS_FLOW_LINES)).toEqual([238]);
+    expect(offset(span(TS_FLOW_LINES, 231, 250), "this._confirmCompleter = new CompleterLike", "arm creates the awaiter")).toBeGreaterThanOrEqual(0);
+    expect(count("this._confirmTimedOut = false;", span(TS_FLOW_LINES, 231, 250))).toBe(1);
   });
 
   it("both waits await the same completer and meter the same way", () => {
     expect(linesWith("await _confirmCompleter!.future", DART_ENGINE_LINES)).toEqual([433, 2668]);
     expect(linesWith("_confirmWaitSeconds +=", DART_ENGINE_LINES)).toEqual([437, 2674]);
-    expect(linesWith("this._confirmWaitSeconds +=", TS_FLOW_LINES)).toEqual([289, 382]);
+    expect(linesWith("this._confirmWaitSeconds +=", TS_FLOW_LINES)).toEqual([291, 384]);
     // TS: the command wait accumulates before it branches (teardown-then-accumulate),
     // the tool wait accumulates before it tears down - Dart's own two orders, kept
     // distinct on purpose because the tool path also nulls the label.
-    expect(count("this._confirmWaitSeconds +=", span(TS_FLOW_LINES, 277, 359))).toBe(1);
-    expect(count("this._confirmWaitSeconds +=", span(TS_FLOW_LINES, 363, 391))).toBe(1);
-    expect(span(TS_FLOW_LINES, 363, 391).indexOf("this._confirmWaitSeconds +=") <
-      span(TS_FLOW_LINES, 363, 391).indexOf("this._confirmCompleter = null;")).toBe(true);
-    expect(span(TS_FLOW_LINES, 277, 359).indexOf("this._confirmCompleter = null;") <
-      span(TS_FLOW_LINES, 277, 359).indexOf("this._confirmWaitSeconds +=")).toBe(true);
+    expect(count("this._confirmWaitSeconds +=", span(TS_FLOW_LINES, 279, 361))).toBe(1);
+    expect(count("this._confirmWaitSeconds +=", span(TS_FLOW_LINES, 365, 393))).toBe(1);
+    expect(span(TS_FLOW_LINES, 365, 393).indexOf("this._confirmWaitSeconds +=") <
+      span(TS_FLOW_LINES, 365, 393).indexOf("this._confirmCompleter = null;")).toBe(true);
+    expect(span(TS_FLOW_LINES, 279, 361).indexOf("this._confirmCompleter = null;") <
+      span(TS_FLOW_LINES, 279, 361).indexOf("this._confirmWaitSeconds +=")).toBe(true);
   });
 
   it("generation bumps: one inside the flow, the rest with the callers", () => {
@@ -992,8 +992,8 @@ describe("Dart/TS writer census for the confirmation transients", () => {
     // the GenerationSource injected into the engine (249). engine.run() bumps THAT one, so
     // Dart’s single bump per startTask survives without the server advancing a second,
     // parallel counter - the gate’s post-await check would then always look current (R1).
-    expect(linesWith("this.ctx.bumpGeneration();", TS_FLOW_LINES)).toEqual([462]);
-    const wake = span(TS_FLOW_LINES, 461, 470);
+    expect(linesWith("this.ctx.bumpGeneration();", TS_FLOW_LINES)).toEqual([464]);
+    const wake = span(TS_FLOW_LINES, 463, 472);
     expect(wake.indexOf("this.ctx.bumpGeneration()")).toBeLessThan(wake.indexOf("this._confirmCompleter.resolve("));
     expect(linesWith("serverGeneration++", TS_INDEX_LINES)).toEqual([181, 249]);
   });
@@ -1010,7 +1010,7 @@ describe("Dart/TS writer census for the confirmation transients", () => {
     for (let i = 1; i < dartOrder.length; i++) {
       expect(dartOrder[i] as number).toBeGreaterThan(dartOrder[i - 1] as number);
     }
-    const tsCmd = span(TS_FLOW_LINES, 277, 359);
+    const tsCmd = span(TS_FLOW_LINES, 279, 361);
     const tsOrder = [
       offset(tsCmd, "CONFIRM_REASON_GENERATION_INVALID", "ts generation branch"),
       offset(tsCmd, "CONFIRM_REASON_CANCELLED", "ts cancelled branch"),
@@ -1023,7 +1023,7 @@ describe("Dart/TS writer census for the confirmation transients", () => {
     }
     // Re-validating the gate after the wait is what stops a pre-switch dialog from
     // executing under a newly read-only mode; both sides must re-decide, not reuse.
-    expect(count("decideCommand(", span(TS_FLOW_LINES, 277, 359))).toBe(1);
+    expect(count("decideCommand(", span(TS_FLOW_LINES, 279, 361))).toBe(1);
     expect(count("decideCommand(safetyLevel, _permissionMode)", span(DART_ENGINE_LINES, 2631, 2726))).toBe(1);
   });
 
@@ -1065,7 +1065,7 @@ describe("Dart/TS writer census for the confirmation transients", () => {
     expect(count("工具确认超时(10min)，自动拒绝: ", DART_ENGINE_TEXT)).toBe(1);
     expect(count("确认超时(10min)，自动拒绝: ", TS_FLOW_TEXT)).toBe(2);
     expect(count("工具确认超时(10min)，自动拒绝: ", TS_FLOW_TEXT)).toBe(0);
-    expect(linesWith("确认超时(10min)，自动拒绝: ", TS_FLOW_LINES)).toEqual([242, 418]);
+    expect(linesWith("确认超时(10min)，自动拒绝: ", TS_FLOW_LINES)).toEqual([243, 420]);
   });
 
   it("the barrel exports every runtime value confirm_flow exports", () => {
