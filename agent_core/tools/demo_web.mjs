@@ -101,7 +101,7 @@ const web = createServer((req, res) => {
         res.writeHead(200, {"content-type": "text/event-stream", "cache-control": "no-cache", connection: "keep-alive"});
         res.write("data: {\"kind\":\"hello\"}\n\n");
         sseClients.add(res);
-        req.on("close", () => sseClients.delete(res));
+        res.on("close", () => sseClients.delete(res)); // NOT req: GET body-end fires req-close early
         return;
       }
       if (req.url === "/start") {
