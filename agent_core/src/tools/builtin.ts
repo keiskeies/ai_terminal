@@ -397,7 +397,21 @@ export class LocalFileReadTool extends AgentTool {
     if (!existsSync(fp)) return ToolResult.failure("file not found: " + rawPath);
     const st = statSync(fp);
     if (st.isDirectory()) return ToolResult.failure("path is a directory, use local_dir_list: " + rawPath);
-    const text = readFileSync(fp, "utf-8");
+    // Read as a Buffer first so we can detect binary files (null bytes)
+    // before attempting a UTF-8 decode that would produce garbage lines.
+    const buf = readFileSync(fp);
+    // Heuristic: a null byte in the first 8 KiB strongly indicates binary
+    // content (PE headers, ELF, PNG, ZIP, etc). Text files virtually never
+    // contain 0x00 bytes in their first 8 KiB.
+    const sniffSize = Math.min(buf.length, 8192);
+    let hasNullByte = false;
+    for (let i = 0; i < sniffSize; i++) {
+      if (buf[i] === 0) { hasNullByte = true; break; }
+    }
+    if (hasNullByte) {
+      return ToolResult.failure("binary file: " + rawPath + " (" + buf.length + " bytes). Use local_exec with a binary-aware command (e.g. xxd, file) instead of local_file_read.");
+    }
+    const text = buf.toString("utf-8");
     const lines = text.split("\n");
     const start = Math.max(1, startLine);
     const end = Math.min(lines.length, start + maxLines - 1);

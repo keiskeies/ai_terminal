@@ -346,6 +346,19 @@ describe("LocalFileReadTool edge cases", () => {
     expect(r.output).not.toContain("two");
     expect(r.output).toContain("...more, use start_line: 2");
   });
+
+  it("binary file (null bytes) is rejected with a helpful message", async () => {
+    const target = join(T, "binary.dat");
+    // Simulate a minimal binary file: 4 null bytes + some data
+    const buf = Buffer.alloc(16);
+    buf.write("hello world\0\0\0\0", "latin1");
+    writeFileSync(target, buf);
+    const tool = new LocalFileReadTool();
+    const r = await tool.execute(ToolArgs.wrap({path: target}), ctx as any);
+    expect(r.success).toBe(false);
+    expect(r.error).toContain("binary file");
+    expect(r.error).toContain("binary.dat"); // file name in the message
+  });
 });
 
 // ── LocalDirListTool: depth=3 ──
