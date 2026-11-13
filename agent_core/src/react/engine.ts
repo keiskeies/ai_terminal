@@ -994,6 +994,7 @@ this.sshOsInfo = options?.sshOsInfo;
     this.noCommandRetries++;
     if (this.noCommandRetries >= this.maxNoCommandRetries) {
       if (extraWarn !== undefined) this.logGate("warn", extraWarn);
+      if (extraWarn !== undefined) this.logReActWarn(extraWarn); // Dart 3240
       // R5: terminal path - finish event + onFinished + checkpoint policy all live
       // inside emitFinish(). The summary is the Dart toolRetryExhausted string, NOT
       // the no-command summary (two distinct Dart strings, two distinct pins).
