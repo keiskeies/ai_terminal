@@ -1217,6 +1217,7 @@ this.sshOsInfo = options?.sshOsInfo;
       // Dart 3231-3245: warn + info + observation, then the retry budget.
       this.logGate("warn", TOOL_NO_NAME_LOG);
       this.emit({id: genEventId(), type: "info", timestamp: Date.now(), text: INFO_EMPTY_TOOL});
+    this.logReActWarn("tool \u52a8\u4f5c\u4f46\u672a\u6307\u5b9a\u5de5\u5177\u540d"); // Dart 3232
       this.pushObservation(OBS_EMPTY_TOOL);
       return this.toolRetryOrContinue(TOOL_RETRY_LOG);
     }
@@ -1254,6 +1255,7 @@ this.sshOsInfo = options?.sshOsInfo;
         // not a fatal failure - the model gets an explicit missing-parameter line.
         this.logGate("warn", alias + WARN_ALIAS_NO_CMD_B);
         this.emit({id: genEventId(), type: "info", timestamp: Date.now(), text: INFO_ALIAS_NO_CMD_A + alias + INFO_ALIAS_NO_CMD_B});
+    this.logReActWarn("\u4e2a\u522b\u540d\u7f3a\u5c11 command \u53c2\u6570"); // Dart 3299
         this.pushObservation(OBS_ALIAS_NO_CMD_A + alias + OBS_ALIAS_NO_CMD_B);
         return this.toolRetryOrContinue();
       }
