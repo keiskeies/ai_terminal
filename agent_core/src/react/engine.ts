@@ -1133,6 +1133,7 @@ this.sshOsInfo = options?.sshOsInfo;
       // terminal (Dart _finishTask defaults success = true at 3740) - it does
       // NOT touch the no-command / tool retry budget.
       this.logGate("warn", ASK_NO_OPTIONS_WARN);
+    this.logReActWarn("ask \u52a8\u4f5c\u4f46\u65e0\u9009\u9879\uff0c\u89c6\u4e3a finish"); // Dart 3056
       const t = thought.trim();
       // Dart 3052-3060 + 3751-3752: the no-options ask ends through _finishTask,
       // which ALWAYS composes - an empty thought therefore falls to the 3733
@@ -1144,6 +1145,7 @@ this.sshOsInfo = options?.sshOsInfo;
     // Dart 3062 interpolates a Dart List.toString ("[a, b]" - bare elements, no
     // quotes); JSON.stringify would quote them, so join instead.
     this.logGate("info", ASK_DETECTED_A + "[" + options.join(", ") + "]");
+    this.logReAct("\u68c0\u6d4b\u5230\u9009\u9879\uff0c\u6682\u505c\u7b49\u5f85\u7528\u6237\u9009\u62e9: " + options.join(", ")); // Dart 3062
     let resolveChoice: (v: string) => void = (): void => {};
     const promise = new Promise<string>((res): void => { resolveChoice = res; });
     this.choiceCompleter = {resolve: resolveChoice};
@@ -1152,6 +1154,7 @@ this.sshOsInfo = options?.sshOsInfo;
     // loop is parked; the answer must not land on a different question.
     const pendingAsk = this.pendingAskEvent;
     const choice = await promise;
+    this.logReAct("\u7528\u6237\u9009\u62e9\u4e86: " + (choice || "(\u53d6\u6d88)")); // Dart 3094
     this.choiceCompleter = null;
     this.pendingOptionsList = [];
     // Dart 3082-3086 (generation / cancelled-status checks) belongs to boundary()
