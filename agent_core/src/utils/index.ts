@@ -13,6 +13,10 @@ export {
   detectUrl, detectPath, looksLikeError, isMultiLine, looksLikeCommand,
   stripPromptPrefix, agentExplainPrompt, agentErrorPrompt, directoryOfPath,
 } from "./terminal_text_actions.js";
+export {CHANGE_TYPES, inferChangeType, buildRollbackCommand} from "./change_record.js";
+export type {ChangeType} from "./change_record.js";
+export {RiskExplainer} from "./risk_explainer.js";
+export type {RiskExplanation} from "./risk_explainer.js";
 export {
   parseSlashCommand, hasRest, matchModelNames, shouldRestorePermissionMode,
   kGoalSubCommands, parseGoalCommand,
