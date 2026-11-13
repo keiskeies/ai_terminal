@@ -26,6 +26,7 @@ import {
 } from './models.js';
 import { McpConnection } from './connection.js';
 import type { McpOAuthTokenStore } from './oauth.js';
+import {agentLogger} from "../utils/agent_logger.js";
 import {
   McpSideToolAdapter,
   McpSideToolKind,
@@ -195,12 +196,12 @@ export class McpManager implements McpToolCaller {
       for (const config of loaded) {
         if (config.enabled && config.autoConnect) {
           this.connect(config.id).catch((e) =>
-            console.error('[McpManager] 自动连接失败 ' + config.id + ': ' + e),
+            agentLogger.error("McpManager", "\u81ea\u52a8\u8fde\u63a5\u5931\u8d25 " + config.id + ": " + String(e)),
           );
         }
       }
     } catch (e) {
-      console.error('[McpManager] 初始化失败: ' + e);
+    agentLogger.error("McpManager", "\u521d\u59cb\u5316\u5931\u8d25: " + String(e));
     }
   }
 
@@ -223,7 +224,7 @@ export class McpManager implements McpToolCaller {
       for (const config of this._configs) {
         if (config.enabled) {
           this.connect(config.id).catch((e) =>
-            console.error('[McpManager] 连接失败 ' + config.id + ': ' + e),
+            agentLogger.error("McpManager", "\u8fde\u63a5\u5931\u8d25 " + config.id + ": " + String(e)),
           );
         } else {
           this._runtimes.set(config.id, this.blankRuntime(config, McpServerStatus.disabled));
@@ -245,7 +246,7 @@ export class McpManager implements McpToolCaller {
       try {
         await this.store.saveConfigs(this._configs);
       } catch (e) {
-        console.error('[McpManager] 保存启用状态失败: ' + e);
+    agentLogger.error("McpManager", "\u4fdd\u5b58\u542f\u7528\u72b6\u6001\u5931\u8d25: " + String(e));
       }
     }
 
@@ -312,7 +313,7 @@ export class McpManager implements McpToolCaller {
     if (!enabled) {
       await this.disconnect(id);
     } else if (this._enabled) {
-      this.connect(id).catch((e) => console.error('[McpManager] 连接失败 ' + id + ': ' + e));
+    this.connect(id).catch((e) => agentLogger.error("McpManager", "\u8fde\u63a5\u5931\u8d25 " + id + ": " + String(e)));
     } else {
       const runtime = this._runtimes.get(id);
       if (runtime != null) {
@@ -358,7 +359,7 @@ export class McpManager implements McpToolCaller {
     this.notifyListeners();
     if (config.enabled) {
       this.connect(config.id).catch((e) =>
-        console.error('[McpManager] 连接失败 ' + config.id + ': ' + e),
+        agentLogger.error("McpManager", "\u8fde\u63a5\u5931\u8d25 " + config.id + ": " + String(e)),
       );
     }
   }
