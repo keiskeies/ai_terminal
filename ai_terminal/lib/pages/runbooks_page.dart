@@ -803,55 +803,64 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
     return AlertDialog(
       title: Text(isEdit ? l10n.runbookEditTitle : l10n.runbookNewTitle),
       content: SizedBox(
-        width: 480,
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 名称
-                TextFormField(
-                  controller: _nameController,
-                  enabled: !isBuiltin,
-                  style: TextStyle(color: tc.textMain, fontSize: fBody),
-                  decoration: _inputDecoration(l10n.runbookFieldName),
-                  validator: (v) => v == null || v.trim().isEmpty ? l10n.runbookNameRequired : null,
-                ),
-                const SizedBox(height: pCompact),
-                // 图标选择
-                Text(l10n.runbookFieldIcon, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
-                const SizedBox(height: pSmall),
-                _buildEmojiPicker(),
-                const SizedBox(height: pCompact),
-                // 类型选择
-                Text(l10n.runbookFieldType, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
-                const SizedBox(height: pSmall),
-                _buildTypeSelector(),
-                const SizedBox(height: pCompact),
-                // 分类选择
-                Text(l10n.runbookFieldCategory, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
-                const SizedBox(height: pSmall),
-                _buildCategorySelector(),
-                const SizedBox(height: pCompact),
-                // 描述
-                TextFormField(
-                  controller: _descriptionController,
-                  style: TextStyle(color: tc.textMain, fontSize: fBody),
-                  decoration: _inputDecoration(l10n.runbookFieldDescription),
-                ),
-                const SizedBox(height: pCompact),
-                // 内容
-                Text(
-                  _type == RunbookType.agent ? l10n.runbookContentAgent : l10n.runbookContentCommand,
-                  style: TextStyle(color: tc.textSub, fontSize: fSmall),
-                ),
-                const SizedBox(height: pSmall),
-                TextFormField(
+        width: 560,
+        height: (MediaQuery.sizeOf(context).height * 0.75).clamp(340.0, 760.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 图标 + 名称
+              Row(
+                children: [
+                  _buildIconPicker(),
+                  const SizedBox(width: pSmall),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _nameController,
+                      enabled: !isBuiltin,
+                      style: TextStyle(color: tc.textMain, fontSize: fBody),
+                      decoration: _inputDecoration(l10n.runbookFieldName),
+                      validator: (v) => v == null || v.trim().isEmpty ? l10n.runbookNameRequired : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: pSmall),
+              // 类型 + 分类
+              Row(
+                children: [
+                  _buildTypeSelector(),
+                  const SizedBox(width: pSmall),
+                  Expanded(child: _buildCategorySelector()),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _type == RunbookType.agent ? l10n.runbookTypeAgentDesc : l10n.runbookTypeCommandDesc,
+                style: TextStyle(color: tc.textSub, fontSize: fMicro),
+              ),
+              const SizedBox(height: pSmall),
+              // 描述
+              TextFormField(
+                controller: _descriptionController,
+                style: TextStyle(color: tc.textMain, fontSize: fBody),
+                decoration: _inputDecoration(l10n.runbookFieldDescription),
+              ),
+              const SizedBox(height: pSmall),
+              // 内容（撑满剩余高度）
+              Text(
+                _type == RunbookType.agent ? l10n.runbookContentAgent : l10n.runbookContentCommand,
+                style: TextStyle(color: tc.textSub, fontSize: fSmall),
+              ),
+              const SizedBox(height: pSmall),
+              Expanded(
+                child: TextFormField(
                   controller: _contentController,
                   enabled: !isBuiltin,
-                  maxLines: 5,
+                  maxLines: null,
+                  expands: true,
+                  textAlignVertical: TextAlignVertical.top,
                   style: TextStyle(
                     fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                     fontSize: fMono,
@@ -866,16 +875,16 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
                   ),
                   validator: (v) => v == null || v.trim().isEmpty ? l10n.runbookContentRequired : null,
                 ),
-                if (isBuiltin)
-                  Padding(
-                    padding: const EdgeInsets.only(top: pSmall),
-                    child: Text(
-                      l10n.runbookBuiltinNotEditable,
-                      style: const TextStyle(color: cWarning, fontSize: fSmall),
-                    ),
+              ),
+              if (isBuiltin)
+                Padding(
+                  padding: const EdgeInsets.only(top: pSmall),
+                  child: Text(
+                    l10n.runbookBuiltinNotEditable,
+                    style: const TextStyle(color: cWarning, fontSize: fSmall),
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
         ),
       ),
@@ -924,42 +933,71 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
     );
   }
 
-  // emoji 图标选择器
-  Widget _buildEmojiPicker() {
+  // emoji 图标选择器：名称旁的按钮，弹出网格选择，避免占用表单纵向空间
+  Widget _buildIconPicker() {
     final tc = ThemeColors.of(context);
-    return Wrap(
-      spacing: pSmall,
-      runSpacing: pSmall,
-      children: _kEmojiIcons.map((e) {
-        final selected = e == _icon;
-        return GestureDetector(
-          onTap: () => setState(() => _icon = e),
-          child: Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: selected ? cPrimaryBg : tc.cardElevated,
-              borderRadius: BorderRadius.circular(rSmall),
-              border: Border.all(
-                color: selected ? cPrimary : tc.border,
-              ),
+    final l10n = AppLocalizations.of(context)!;
+    return PopupMenuButton<String>(
+      tooltip: l10n.runbookFieldIcon,
+      padding: EdgeInsets.zero,
+      itemBuilder: (context) => [
+        PopupMenuItem<String>(
+          enabled: false,
+          padding: const EdgeInsets.all(pSmall),
+          child: SizedBox(
+            width: 212,
+            child: Wrap(
+              spacing: pSmall,
+              runSpacing: pSmall,
+              children: _kEmojiIcons.map((e) {
+                final selected = e == _icon;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => _icon = e);
+                    Navigator.pop(context);
+                  },
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: selected ? cPrimaryBg : tc.cardElevated,
+                      borderRadius: BorderRadius.circular(rSmall),
+                      border: Border.all(
+                        color: selected ? cPrimary : tc.border,
+                      ),
+                    ),
+                    child: Text(e, style: const TextStyle(fontSize: 18)),
+                  ),
+                );
+              }).toList(),
             ),
-            child: Text(e, style: const TextStyle(fontSize: 18)),
           ),
-        );
-      }).toList(),
+        ),
+      ],
+      child: Container(
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: tc.cardElevated,
+          borderRadius: BorderRadius.circular(rInput),
+          border: Border.all(color: tc.border),
+        ),
+        child: Text(_icon, style: const TextStyle(fontSize: 18)),
+      ),
     );
   }
 
-  // 类型单选
+  // 类型单选（紧凑分段）
   Widget _buildTypeSelector() {
     final l10n = AppLocalizations.of(context)!;
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        _buildTypeOption(RunbookType.agent, l10n.runbookTypeAgentOption, cPrimary, l10n.runbookTypeAgentDesc),
-        const SizedBox(width: pCompact),
-        _buildTypeOption(RunbookType.command, l10n.runbookTypeCommand, cSuccess, l10n.runbookTypeCommandDesc),
+        _buildTypeOption(RunbookType.agent, l10n.runbookTypeAgentOption, cPrimary),
+        const SizedBox(width: pSmall),
+        _buildTypeOption(RunbookType.command, l10n.runbookTypeCommand, cSuccess),
       ],
     );
   }
@@ -968,48 +1006,36 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
     RunbookType type,
     String label,
     Color color,
-    String desc,
   ) {
     final tc = ThemeColors.of(context);
     final selected = _type == type;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => setState(() => _type = type),
-        child: Container(
-          padding: const EdgeInsets.all(pCompact),
-          decoration: BoxDecoration(
-            color: selected ? color.withValues(alpha: 0.12) : tc.cardElevated,
-            borderRadius: BorderRadius.circular(rSmall),
-            border: Border.all(color: selected ? color : tc.border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                    size: 16,
-                    color: selected ? color : tc.textSub,
-                  ),
-                  const SizedBox(width: pSmall),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: selected ? color : tc.textMain,
-                      fontSize: fBody,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+    return GestureDetector(
+      onTap: () => setState(() => _type = type),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: pCompact, vertical: pSmall),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.12) : tc.cardElevated,
+          borderRadius: BorderRadius.circular(rInput),
+          border: Border.all(color: selected ? color : tc.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+              size: 16,
+              color: selected ? color : tc.textSub,
+            ),
+            const SizedBox(width: pSmall),
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? color : tc.textMain,
+                fontSize: fBody,
+                fontWeight: FontWeight.w600,
               ),
-              const SizedBox(height: 4),
-              Text(
-                desc,
-                style: TextStyle(color: tc.textSub, fontSize: fMicro),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1020,7 +1046,7 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: pCompact),
+      padding: const EdgeInsets.symmetric(horizontal: pCompact, vertical: 4),
       decoration: BoxDecoration(
         color: tc.cardElevated,
         borderRadius: BorderRadius.circular(rInput),
@@ -1030,6 +1056,7 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
         child: DropdownButton<RunbookCategory>(
           value: _category,
           isExpanded: true,
+          isDense: true,
           dropdownColor: tc.surface,
           style: TextStyle(color: tc.textMain, fontSize: fBody),
           items: _kCategoryOrder
