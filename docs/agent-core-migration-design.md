@@ -553,7 +553,7 @@ agent_core/test/regression/
 ---
 
 
-**agentLogger 接线状态 (r166-r170)**：引擎 32 个 logGate 站点全部有对应 agentLogger 调用（~53 处）；mcp/manager.ts 6 处、mcp/connection.ts 2 处、index.ts 1 处、confirm_flow.ts 1 处 = 共 41 处应用日志站点已接线。剩余 console.* 调用均在日志基础设施内部（agent_logger / agent_tracer / audit_log / change_window）或审计写入失败路径（engine 3 处 Dart debugPrint 对等），按设计使用 console。Dart 侧 16 个含 agentLogger 的文件中，有 Node 对应物的 4 个（agent_engine / mcp_manager / main / command_extractor）全部已接线；其余 12 个为 Flutter 专有（UI / Riverpod / 持久化 / 崩溃上报），无 Node 对应物。
+**agentLogger 接线状态 (r166-r170)**：引擎 32 个 logGate 站点全部有对应 agentLogger 调用（~53 处）；mcp/manager.ts 6 处、mcp/connection.ts 2 处、index.ts 1 处、confirm_flow.ts 1 处 = 共 41 处应用日志站点已接线。剩余 console.* 调用均在日志基础设施内部（agent_logger / agent_tracer / audit_log / change_window）或审计写入失败路径（engine 3 处 Dart debugPrint 对等），按设计使用 console。Dart 侧 16 个含 agentLogger 的文件中，有 Node 对应物的 3 个（agent_engine / mcp_manager / main）全部已接线；command_extractor 无 Node 对应物（Node 解析器 if (cleaned) 守卫使 Dart 的空命令 fallback 不可达）；其余 12 个为 Flutter 专有（UI / Riverpod / 持久化 / 崩溃上报），无 Node 对应物。
 
 ## 10. 附录
 
