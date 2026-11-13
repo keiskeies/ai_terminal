@@ -12,14 +12,14 @@ describe("formatConversationForExport (Dart oracle)", () => {
 
   it("role-labeled alternating user/agent transcript", () => {
     const text = formatConversationForExport([
-      {role: "user", content: "\u770b\u4e0b\u78c1\u76d8"},
-      {role: "assistant", content: "\u78c1\u76d8\u5269\u4f59 40G"},
+      {role: "user", content: "看下磁盘"},
+      {role: "assistant", content: "磁盘剩余 40G"},
     ]);
-    expect(text).toContain("## \u4f60");
-    expect(text).toContain("\u770b\u4e0b\u78c1\u76d8");
+    expect(text).toContain("## 你");
+    expect(text).toContain("看下磁盘");
     expect(text).toContain("## Agent");
-    expect(text).toContain("\u78c1\u76d8\u5269\u4f59 40G");
-    expect(text.indexOf("\u770b\u4e0b\u78c1\u76d8") < text.indexOf("\u78c1\u76d8\u5269\u4f59 40G")).toBe(true);
+    expect(text).toContain("磁盘剩余 40G");
+    expect(text.indexOf("看下磁盘") < text.indexOf("磁盘剩余 40G")).toBe(true);
   });
 
   it("empty and whitespace-only items produce no paragraph", () => {
@@ -42,19 +42,19 @@ describe("formatOperationReportCopy (Dart oracle)", () => {
 
   it("goal + conclusion + changes with rollback hints", () => {
     const text = formatOperationReportCopy({
-      goal: "\u542f\u52a8 nginx",
-      conclusion: "\u6210\u529f\u542f\u52a8",
+      goal: "启动 nginx",
+      conclusion: "成功启动",
       answerBody: undefined,
       changes: [
         {command: "systemctl start nginx", canRollback: true, rollbackCommand: "systemctl stop nginx"},
         {command: "rm -rf /tmp/x", canRollback: false},
       ],
     });
-    expect(text).toContain("\u76ee\u6807\uff1a\u542f\u52a8 nginx");
-    expect(text).toContain("\u7ed3\u8bba\uff1a\u6210\u529f\u542f\u52a8");
-    expect(text).toContain("\u53d8\u66f4\uff1a");
+    expect(text).toContain("目标：启动 nginx");
+    expect(text).toContain("结论：成功启动");
+    expect(text).toContain("变更：");
     expect(text).toContain("systemctl stop nginx");
-    expect(text).toContain("\u65e0\u81ea\u52a8\u56de\u6eda");
+    expect(text).toContain("无自动回滚");
   });
 });
 

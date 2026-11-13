@@ -3,9 +3,8 @@
 // prefix table, same order, same interactive exclusions. Round 127 adds the
 // completion-sounding fallback isTaskComplete (Dart 119-163): same keyword
 // table, same two anchored per-line patterns, same 60-char line cap. The
-// file's remaining helpers (isDescriptiveText / looksLikeCommand /
-// _unwrapCommand) still have no Node call site and are deliberately NOT
-// ported ahead of demand.
+// Round 205: isDescriptiveText + looksLikeCommand (Dart 4-38) added as the
+// command_extractor.ts call site arrived. _unwrapCommand remains Dart-only.
 
 /// 判断命令是否是查询/只读类命令（输出不应截断，agent 需要完整结果定位问题）
 ///
@@ -146,3 +145,44 @@ export function isTaskComplete(response: string): boolean {
   return false;
 }
 
+
+/// 判断文本是否是描述性文字（而非命令）
+// Dart command_heuristics.dart 4-16, 1:1: same CJK-ratio gate (0.5),
+// same 22-entry descriptive-starts table, same order.
+export function isDescriptiveText(text: string): boolean {
+  // 中文字符占比过高
+  const chineseCount = (text.match(/[\u4e00-\u9fa5]/g) ?? []).length;
+  if (text.length > 0 && chineseCount / text.length > 0.5) return true;
+  // 常见的说明性开头
+  const descriptiveStarts = ["请", "可以", "需要", "应该", "将", "这个", "该", "命令", "说明", "例如", "如下", "包括", "用于", "表示", "输出", "结果", "检查", "查看", "确认", "注意", "提示", "警告", "步骤"];
+  for (const s of descriptiveStarts) {
+    if (text.startsWith(s)) return true;
+  }
+  return false;
+}
+
+// Dart command_heuristics.dart 18-38, 1:1: same length gate (3..500),
+// same CJK-ratio gate (0.3), same keyword table (Unix + Windows,
+// including the duplicate 'export' entry and the trailing-space
+// 'sc '/'reg ' entries), same lowercase-contains matching.
+export function looksLikeCommand(text: string): boolean {
+  // 检查文本是否看起来像命令
+  if (text.length < 3 || text.length > 500) return false;
+  // 不应该包含太多中文
+  const chineseCount = (text.match(/[\u4e00-\u9fa5]/g) ?? []).length;
+  if (chineseCount > text.length * 0.3) return false;
+  // 应该包含至少一个常见命令关键词
+  const cmdKeywords = [
+    // Unix
+    "sudo", "yum", "apt", "dnf", "apk", "curl", "wget", "tar",
+    "cat", "echo", "export", "cd", "mkdir", "chmod", "java",
+    "rm", "cp", "mv", "ln", "systemctl", "service", "install",
+    "download", "extract", "set", "export", "source", "update",
+    // Windows
+    "dir", "del", "copy", "move", "rmdir", "md", "cls", "chdir",
+    "setx", "tasklist", "taskkill", "ipconfig", "systeminfo",
+    "powershell", "pwsh", "winget", "choco", "scoop", "dism",
+    "netsh", "sc ", "reg ", "wmic", "where", "ftype", "assoc",
+  ];
+  return cmdKeywords.some((k) => text.toLowerCase().includes(k));
+}
