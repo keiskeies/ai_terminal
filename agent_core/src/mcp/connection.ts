@@ -38,6 +38,7 @@ import {
 import { McpOAuthProvider } from './oauth.js';
 import type { McpOAuthTokenStore } from './oauth.js';
 
+import {agentLogger} from "../utils/agent_logger.js";
 export interface McpConnectionOptions {
   config: McpServerConfig;
   onRuntime: (runtime: McpServerRuntime) => void;
@@ -688,7 +689,7 @@ export class McpConnection {
       try {
         await client.close();
       } catch (e) {
-        console.error('[McpConnection] 关闭 client 失败: ' + e);
+        agentLogger.error("McpConnection", "\u5173\u95ed client \u5931\u8d25: " + String(e));
       }
     }
     const transport = this.transport;
@@ -698,7 +699,7 @@ export class McpConnection {
       try {
         await transport.close();
       } catch (e) {
-        console.error('[McpConnection] 关闭 transport 失败: ' + e);
+        agentLogger.error("McpConnection", "\u5173\u95ed transport \u5931\u8d25: " + String(e));
       }
     }
     const oauth = this.oauthProvider;
