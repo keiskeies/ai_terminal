@@ -232,7 +232,7 @@ ai_terminal/lib/agent_bridge/          # 现状: 目录下只有 2 个文件, �
   process_manager.dart       # 待补：spawn / kill / 崩溃恢复
 ```
 
-> **r215 接线审计（对齐核验，逐方法对过线两侧）**：已存在的两个文件与 Node 子端契约完全对齐——子端 rpc 面 10 个方法（rpc:ping/health/getState/startTask/cancelTask/confirm + evt:agentEvent/taskState/confirmRequest + err:uncaught）中，AgentBridge 已封装 ping/getState/cancelTask 三个只读方法，startTask/confirm 归规划中的 agent_bridge_client.dart（宿主侧生命周期，不属 agent_core 移植范围）。**frame_splitter 判定为对称闲置契约**：transport.ts 头注称 >64KB payload 由发送方拆帧，但全仓无任何拆帧发送方（ToolResultFrame 在 schema.ts:188 声明后零构造点），Dart 传输也只是 LineSplitter 逐行读、无重组——两侧同时未实现，行为自洽（现行大 payload 靠 utils 层输出截断上限兜底，R8）。决定：保持对称闲置；拆帧与重组必须同轮成对落地才有效，届时以新增回归测试门控。agent_event_codegen/process_manager 同为宿主侧规划。此四文件的「待补」是宿主集成排期，不是 agent_core 移植缺口。
+> **r215 接线审计（对齐核验，逐方法对过线两侧）**：已存在的两个文件与 Node 子端契约完全对齐——子端 rpc 面 10 个方法（rpc:ping/health/getState/startTask/cancelTask/confirm + evt:agentEvent/taskState/confirmRequest + err:uncaught）中，AgentBridge 已封装 ping/getState/cancelTask 三个只读方法，startTask/confirm 归规划中的 agent_bridge_client.dart（宿主侧生命周期，不属 agent_core 移植范围）。**frame_splitter 判定为对称闲置契约**：transport.ts 头注称 >64KB payload 由发送方拆帧，但全仓无任何拆帧发送方（ToolResultFrame 在 schema.ts:188 声明后零构造点），Dart 传输也只是 LineSplitter 逐行读、无重组——两侧同时未实现，行为自洽（现行大 payload 靠 utils 层输出截断上限兜底，R8）。决定：保持对称闲置；拆帧与重组必须同轮成对落地才有效，届时以新增回归测试门控。agent_event_codegen/process_manager 同为宿主侧规划。此四文件的「待补」是宿主集成排期，不是 agent_core 移植缺口。 **活线复拍（r215，npm run build 后的 dist/index.js，按 json_rpc_transport.dart 的 JSONL/req-N/LineSplitter 语义逐字节收发）**：rpc:ping → result {ok:true, echo, protocolVersion, ts}（Dart 握手判据 pong['ok']==true 成立）；rpc:getState → {ok, startedAt, status, taskId}；rpc:cancelTask（空闲态）→ {ok}；三次往返全程零 malformed 行。
 
 ### 3.3 节点捆绑策略
 
