@@ -564,7 +564,7 @@ agent_core/
     notification.schema.json  reverse.schema.json  tool.schema.json
     agent-bridge.schema.json
   tools/check-schema-compat.mjs               # 只做 JSON 自身一致性, 不跨语言比对 (§6.3.7)
-  src/                                       # 62 个 .ts
+  src/                                       # 63 个 .ts
     index.ts
     rpc/{server,client,schema,transport}.ts
     react/{engine,parser,regex,confirm_flow,tool_action,index}.ts  # confirm 状态机 (§9 第 6 项); goal 续跑落在 utils/goal_continuation.ts, 不在 react/goal.ts
@@ -578,9 +578,9 @@ agent_core/
            safety_guard,permission_policy,
            choice_request_detector,command_heuristics,output_processor,
            token_estimator,context_trim,local_file_policy,answer_block,
-           operation_report,change_window,audit_log,local_command_detector}.ts
+           operation_report,change_window,audit_log,local_command_detector,compact}.ts
            # 安全分级 + 档位矩阵 + 完成语义/回答块/操作单四字段/变更窗口 (§9 第 6/7 项)
-  test/                                      # 89 个 .test.ts + 13 份 fixture
+  test/                                      # 90 个 .test.ts + 13 份 fixture
     regression/r{1,2,3,4,5,6,9}_*.test.ts     # 九条规则本体, 见 §6.2
     regression/{manifest,anthropic_e2e,w5_e2e}.test.ts
     e2e/byte_comparison_10.test.ts            # 取代草图里的 e2e/{parser,cancel,multi_host,mcp,tool}
