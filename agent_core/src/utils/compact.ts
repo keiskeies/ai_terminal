@@ -143,7 +143,8 @@ export function parseCompactJson(raw: string): CompactSummary[] | null {
       result.push({index: idx, summary: sum});
     }
     return result.length > 0 ? result : null;
-  } catch {
+  } catch (e) {
+    agentLogger.warn("Compact", "\u538b\u7f29 JSON \u89e3\u6790\u5931\u8d25: " + String(e) + ", raw: " + raw.substring(0, 200)); // Dart 4103
     return null;
   }
 }
