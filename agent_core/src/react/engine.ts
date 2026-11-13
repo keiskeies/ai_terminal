@@ -1597,6 +1597,7 @@ this.sshOsInfo = options?.sshOsInfo;
           // the command had its chance and failed.
           this.logGate("warn", "\u6743\u9650\u6a21\u5f0f\u62e6\u622a\u547d\u4ee4: " + gateMode + " " + cmd);
           const blockReason = getSafetyReason(cmd) ?? getSafetyTip(safetyLevel);
+    this.logReActWarn("\u6743\u9650\u6a21\u5f0f\u62e6\u622a\u547d\u4ee4: " + gateMode + " " + cmd); // Dart 2597
           const readOnly = gateMode === "readOnly";
           this.emit({
             // R4: occurrence id, same reason as the result event - two refusals of
