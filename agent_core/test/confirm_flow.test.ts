@@ -238,7 +238,7 @@ type SpanPin = [string, number, number, string];
 const DART_TEST_FILE_SHA = "53bafa8f924f";
 const DART_ENGINE_FILE_SHA = "ad7e7cca87de";
 const TS_FLOW_FILE_SHA = "69dc5b337734";
-const TS_INDEX_FILE_SHA = "e9f17e4945b6";   // startTask now injects the flow + counters into the engine
+const TS_INDEX_FILE_SHA = "5ba94296a80f";   // startTask now injects the flow + counters into the engine
 
 const DART_ENGINE_SPANS: SpanPin[] = [
   ["TOOL wait",405,446,"6295febbdc34"],
@@ -995,7 +995,7 @@ describe("Dart/TS writer census for the confirmation transients", () => {
     expect(linesWith("this.ctx.bumpGeneration();", TS_FLOW_LINES)).toEqual([464]);
     const wake = span(TS_FLOW_LINES, 463, 472);
     expect(wake.indexOf("this.ctx.bumpGeneration()")).toBeLessThan(wake.indexOf("this._confirmCompleter.resolve("));
-    expect(linesWith("serverGeneration++", TS_INDEX_LINES)).toEqual([181, 249]);
+    expect(linesWith("serverGeneration++", TS_INDEX_LINES)).toEqual([182, 250]);
   });
 
   it("post-wait branch order matches Dart", () => {
@@ -1106,11 +1106,11 @@ describe("Dart/TS writer census for the confirmation transients", () => {
     // and the task-start wake/reset trio live there), and it hands the SAME instance to
     // the engine at construction time. Dart has one _confirmCompleter: two ConfirmFlow
     // objects would let rpc:confirm answer a wait the engine is not awaiting.
-    expect(linesWith("confirmFlow.wakeForCancelTask()", TS_INDEX_LINES)).toEqual([269]);
-    expect(linesWith("confirmFlow.reset", TS_INDEX_LINES)).toEqual([271, 272]);
-    expect(linesWith("finishCleanup()", TS_INDEX_LINES)).toEqual([286]);
-    expect(linesWith("new ConfirmFlow", TS_INDEX_LINES)).toEqual([175]);
-    expect(linesWith("confirmFlowForTesting", TS_INDEX_LINES)).toEqual([406]);
+    expect(linesWith("confirmFlow.wakeForCancelTask()", TS_INDEX_LINES)).toEqual([270]);
+    expect(linesWith("confirmFlow.reset", TS_INDEX_LINES)).toEqual([272, 273]);
+    expect(linesWith("finishCleanup()", TS_INDEX_LINES)).toEqual([287]);
+    expect(linesWith("new ConfirmFlow", TS_INDEX_LINES)).toEqual([176]);
+    expect(linesWith("confirmFlowForTesting", TS_INDEX_LINES)).toEqual([407]);
     expect(count("expireConfirmTimeoutForTesting", TS_INDEX_TEXT)).toBe(3);
     // rpc:cancelTask wakes through the optional chain (confirmFlow ? .), a DIFFERENT
     // needle that is not counted above: cancel delegates to engine.cancel(), which

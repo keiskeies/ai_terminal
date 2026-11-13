@@ -6,6 +6,7 @@ import {runLocalCommand} from "./tools/builtin.js";
 import type {CommandExecutor} from "./react/engine.js";
 import {ConfirmFlow} from "./react/confirm_flow.js";
 
+import {agentLogger} from "./utils/agent_logger.js";
 // ─── Re-exports for convenience ─────────────────────────────────
 export {parse} from "./react/index.js";
 export {fnv1a64DartCompat, stableId} from "./utils/stable_hash.js";
@@ -160,7 +161,7 @@ export function startServer(opts: {verbose?: boolean; llmFactory?: () => import(
     } catch (e: unknown) {
       if (opts.verbose) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.error("[agent-core] confirm notify failed (" + method + "): " + msg);
+      agentLogger.error("AgentCore", "confirm notify failed (" + method + "): " + msg);
       }
     }
   };
