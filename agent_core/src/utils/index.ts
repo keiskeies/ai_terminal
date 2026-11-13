@@ -10,6 +10,10 @@ export {FormValidators, type ValidatorResult} from "./form_validators.js";
 export {extractLiveThought} from "./live_thought_text.js";
 export {stableParagraphCut, unclosedFenceSplit} from "./streaming_markdown.js";
 export {
+  detectUrl, detectPath, looksLikeError, isMultiLine, looksLikeCommand,
+  stripPromptPrefix, agentExplainPrompt, agentErrorPrompt, directoryOfPath,
+} from "./terminal_text_actions.js";
+export {
   parseSlashCommand, hasRest, matchModelNames, shouldRestorePermissionMode,
   kGoalSubCommands, parseGoalCommand,
 } from "./slash_command.js";
