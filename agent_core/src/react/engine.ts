@@ -786,6 +786,7 @@ this.sshOsInfo = options?.sshOsInfo;
             turnAnswer,
           );
     agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
+    this.logEngine("=== \u4efb\u52a1\u5b8c\u6210 ==="); // Dart 3749
           this.emitFinish("success", fbFinishSummary);
           return "success";
         } else if (askEvt === undefined) {
@@ -1695,6 +1696,7 @@ this.sshOsInfo = options?.sshOsInfo;
           // gate (Dart orders the same: gate 2586-2725, guard 3864), before any executor.
           if (isGoalMarkerOnlyCommand(cmd)) {
             this.logGate("info", GOAL_MARKER_LOG);
+    this.logReAct("\u5ffd\u7565\u88ab\u5f53\u6210\u547d\u4ee4\u7684\u76ee\u6807\u8fbe\u6210\u6807\u8bb0"); // Dart 3865
             execRes = {stdout: GOAL_MARKER_OUTPUT, stderr: "", exitCode: 0, durationMs: 0, success: true};
           } else if (this.commandExecutor) {
             const execStartMs = Date.now();
