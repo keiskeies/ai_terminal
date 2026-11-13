@@ -15,7 +15,8 @@
     "test:fixture": "node test/fixtures/verify.mjs",
     "check:schema": "node tools/check-schema-compat.mjs",
     "nodeapp": "node tools/nodeapp.mjs",
-    "nodeapp:verify": "node tools/nodeapp.mjs verify"
+    "nodeapp:verify": "node tools/nodeapp.mjs verify",
+    "demo": "node tools/demo_run.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
