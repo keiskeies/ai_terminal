@@ -13,7 +13,7 @@
 // then from the credentials file. The 12-provider registry, 11 live backends,
 // error taxonomy, merge/dedup algorithm, and cancellation semantics are
 // byte-faithful to the Dart originals.
-import {readFileSync, writeFileSync, mkdirSync, existsSync} from "fs";
+import {chmodSync, readFileSync, writeFileSync, mkdirSync, existsSync, statSync} from "fs";
 import {homedir} from "os";
 import {join} from "path";
 import {AgentTool, ToolResult, ToolContext, ToolKind, ToolScope} from "./builtin.js";
@@ -137,7 +137,12 @@ export function loadWebSearchConfig(): WebSearchConfig {
 
 export function saveWebSearchConfig(cfg: WebSearchConfig): void {
   if (!existsSync(CONFIG_DIR)) mkdirSync(CONFIG_DIR, {recursive: true});
-  writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
+  // R7: config + credential files must not be world-readable.
+  // 0600 so only the owning user can read/write.
+  writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2), {mode: 0o600});
+  if (existsSync(CRED_FILE) && (statSync(CRED_FILE).mode & 0o077) !== 0) {
+    chmodSync(CRED_FILE, 0o600);
+  }
 }
 
 export function getApiKey(p: WebSearchProvider): string | null {
@@ -145,6 +150,11 @@ export function getApiKey(p: WebSearchProvider): string | null {
   if (envName === "") return null;
   const envVal = (process.env[envName] ?? "").trim();
   if (envVal !== "") return envVal;
+  // R7: a credential file must be 0600. Only chmod when group/other bits
+  // are actually set, so the steady-state path costs no syscall.
+  if (existsSync(CRED_FILE) && (statSync(CRED_FILE).mode & 0o077) !== 0) {
+    chmodSync(CRED_FILE, 0o600);
+  }
   const cred = readJsonFile<Record<string,string>>(CRED_FILE, {});
   const stored = (cred["apiKey_" + p] ?? "").trim();
   return stored !== "" ? stored : null;
