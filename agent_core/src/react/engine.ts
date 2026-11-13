@@ -1895,6 +1895,7 @@ this.sshOsInfo = options?.sshOsInfo;
     this.finishWithoutExecCount++; // Dart 1451
     this.logGate("warn", GUARD_WARN_A + this.finishWithoutExecCount + GUARD_WARN_B +
       this.maxFinishWithoutExecRetries + GUARD_WARN_C);
+    this.logReActWarn(GUARD_WARN_A + this.finishWithoutExecCount + GUARD_WARN_B + this.maxFinishWithoutExecRetries + GUARD_WARN_C);
     this.emit({
       id: genEventId(),
       type: "info",
