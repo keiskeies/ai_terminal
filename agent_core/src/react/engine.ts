@@ -1309,6 +1309,7 @@ this.sshOsInfo = options?.sshOsInfo;
     }
 
     this.logGate("info", "\u8c03\u7528\u5de5\u5177: " + toolName + ", \u53c2\u6570: " + args.describe());
+    this.logReAct("\u8c03\u7528\u5de5\u5177: " + toolName + ", \u53c2\u6570: " + args.describe()); // Dart 3395
     // R4 / Dart 3396-3403: the tool call gets its OWN command event + id. local_exec
     // keeps an 8000-char value window because its command is what the user approves;
     // every other tool is summarised at 160 chars to keep the evidence layer small.
