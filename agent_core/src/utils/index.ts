@@ -25,6 +25,7 @@ export {
 } from "./prompts.js";
 export type {ContextPromptOptions} from "./prompts.js";
 export {CommandFailureKind, CommandFailureDiagnostic, PtyOutputDetector, detectCommandFailure, SudoPromptResponder} from "./pty_output_detector.js";
+export {MemoryEntry, AgentMemory} from "./agent_memory.js";
 export type {DetectOptions} from "./pty_output_detector.js";
 export {
   parseSlashCommand, hasRest, matchModelNames, shouldRestorePermissionMode,
