@@ -1705,6 +1705,7 @@ this.sshOsInfo = options?.sshOsInfo;
             if (this.connectionChecker !== undefined) {
               connOk = await this.connectionChecker(task.hostId);
               if (!connOk) {
+      this.logEngine("\u68c7\u6d4b\u5230\u65e7 executor \u65ad\u5f00\uff0c\u81ea\u6108\u5207\u6362\u5230\u65b0 executor"); // Dart 3879
                 this.consecutiveConnFailures++;
                 const hint = this.consecutiveConnFailures >= this.maxConnFailRetries
                   ? "\uff08\u5df2\u8fde\u7eed\u5931\u8d25" + this.consecutiveConnFailures + "\u6b21\uff0c\u8bf7\u7acb\u5373\u4f7f\u7528 \u52a8\u4f5c: ask \u8be2\u95ee\u7528\u6237\u662f\u5426\u5df2\u91cd\u8fde\uff0c\u4e0d\u8981\u518d\u5c1d\u8bd5\u6267\u884c\u547d\u4ee4\uff09"
