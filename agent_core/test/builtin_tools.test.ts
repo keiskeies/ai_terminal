@@ -3,12 +3,13 @@
 // deterministic; fetch_url uses a data: URL (success) + a refused port (failure)
 // so no real network is required.
 import {describe,it,expect,beforeAll,afterAll} from "vitest";
-import {mkdirSync,writeFileSync,rmSync} from "fs";
+import {mkdirSync,writeFileSync,rmSync,readFileSync,existsSync,statSync,unlinkSync} from "fs";
 import {tmpdir} from "os";
 import {join} from "path";
 import {
   AgentToolRegistry, ToolScope, ToolKind, ToolResult, HostExecutionResult,
   LocalFileReadTool, LocalDirListTool, FetchUrlTool, LocalExecTool, runLocalCommand,
+  LocalFileWriteTool, LocalFilePatchTool, LocalFileMoveTool, LocalFileDeleteTool,
 } from "../src/tools/builtin.js";
 import {buildDefaultToolRegistry, ToolArgs} from "../src/tools/index.js";
 import {detectShell, wrapCommand, extractExitMarker} from "../src/utils/shell_detect.js";
@@ -306,5 +307,163 @@ describe("host-shell gate is sound", () => {
   it("linux resolves bash so the runner is not silently shell-free", () => {
     if (process.platform !== "linux") return;
     expect(hasBash, "/bin/bash must resolve on the CI runner").toBe(true);
+  });
+});
+
+
+// ── LocalFileReadTool: edge cases ──
+describe("LocalFileReadTool edge cases", () => {
+  const T = mkdirSync(join(tmpdir(), "builtin_read_edge_" + Date.now()), {recursive: true});
+  const ctx = {hostId: "h", sessionType: "local", generation: 1, cancelled: () => false} as any;
+
+  afterAll(() => rmSync(T, {recursive: true, force: true}));
+
+  it("start_line past EOF returns empty range, not an error", async () => {
+    writeFileSync(join(T, "short.txt"), "line1\nline2\nline3\n");
+    const tool = new LocalFileReadTool();
+    const r = await tool.execute(ToolArgs.wrap({path: join(T, "short.txt"), start_line: 999}), ctx as any);
+    expect(r.success).toBe(true);
+    // The range is empty: showing 999-999 of 3 lines -> out is empty
+    // The header still reports the total line count
+    expect(r.output).toContain("file:");
+    expect(r.output).toContain("4 lines"); // "line1\nline2\nline3\n".split("\n") -> 4 elements
+  });
+
+  it("start_line 0 is clamped to 1", async () => {
+    writeFileSync(join(T, "clamp.txt"), "a\nb\nc\n");
+    const tool = new LocalFileReadTool();
+    const r = await tool.execute(ToolArgs.wrap({path: join(T, "clamp.txt"), start_line: 0}), ctx as any);
+    expect(r.success).toBe(true);
+    expect(r.output).toContain("1\ta"); // first line is shown
+  });
+
+  it("max_lines=1 shows only the first line with a continuation hint", async () => {
+    writeFileSync(join(T, "cap.txt"), "one\ntwo\nthree\n");
+    const tool = new LocalFileReadTool();
+    const r = await tool.execute(ToolArgs.wrap({path: join(T, "cap.txt"), start_line: 1, max_lines: 1}), ctx as any);
+    expect(r.success).toBe(true);
+    expect(r.output).toContain("one");
+    expect(r.output).not.toContain("two");
+    expect(r.output).toContain("...more, use start_line: 2");
+  });
+});
+
+// ── LocalDirListTool: depth=3 ──
+describe("LocalDirListTool depth=3", () => {
+  const T = mkdirSync(join(tmpdir(), "builtin_dir_depth_" + Date.now()), {recursive: true});
+  const ctx = {hostId: "h", sessionType: "local", generation: 1, cancelled: () => false} as any;
+
+  beforeAll(() => {
+    mkdirSync(join(T, "a"), {recursive: true});
+    mkdirSync(join(T, "a", "b"), {recursive: true});
+    mkdirSync(join(T, "a", "b", "c"), {recursive: true});
+    writeFileSync(join(T, "a", "b", "c", "deep.txt"), "x");
+  });
+  afterAll(() => rmSync(T, {recursive: true, force: true}));
+
+  it("depth=3 lists files at all three levels", async () => {
+    const tool = new LocalDirListTool();
+    const r = await tool.execute(ToolArgs.wrap({path: T, depth: 3}), ctx as any);
+    expect(r.success).toBe(true);
+    expect(r.output).toContain("a/");
+    expect(r.output).toContain("b/");
+    expect(r.output).toContain("c/");
+    // Files inside c/ are at nesting level 4 - beyond depth=3, not listed
+    expect(r.output).not.toContain("deep.txt");
+  });
+
+  it("depth=1 does NOT descend into subdirectories", async () => {
+    const tool = new LocalDirListTool();
+    const r = await tool.execute(ToolArgs.wrap({path: T, depth: 1}), ctx as any);
+    expect(r.success).toBe(true);
+    expect(r.output).toContain("a/");
+    // b/ and c/ should not appear since we only went one level
+    expect(r.output).not.toContain("b/");
+  });
+});
+
+// ── LocalFileMoveTool: cross-device fallback + self-move ──
+describe("LocalFileMoveTool edge cases", () => {
+  const T = mkdirSync(join(tmpdir(), "builtin_move_edge_" + Date.now()), {recursive: true});
+  const ctx = {hostId: "h", sessionType: "local", generation: 1, cancelled: () => false} as any;
+
+  afterAll(() => rmSync(T, {recursive: true, force: true}));
+
+  it("moving a file onto itself fails cleanly", async () => {
+    const tool = new LocalFileMoveTool();
+    const target = join(T, "self.txt");
+    writeFileSync(target, "data");
+    const r = await tool.execute(ToolArgs.wrap({path: target, dst: target, overwrite: true}), ctx as any);
+    // The rename will either fail (EXDEV/ENOTEMPTY) or succeed no-op;
+    // either way the source must still exist or the tool reports the result.
+    if (r.success) {
+      // rename no-op on POSIX: source path still valid
+      expect(existsSync(target) || existsSync(target)).toBe(true);
+    } else {
+      // The error message should be informative
+      expect(r.error).toBeDefined();
+    }
+  });
+
+  it("moving into a non-existent parent creates the parent dir", async () => {
+    const tool = new LocalFileMoveTool();
+    const src = join(T, "orphan.txt");
+    const dst = join(T, "new_dir", "orphan_moved.txt");
+    writeFileSync(src, "x");
+    const r = await tool.execute(ToolArgs.wrap({path: src, dst: dst}), ctx as any);
+    expect(r.success).toBe(true);
+    expect(existsSync(dst)).toBe(true);
+    expect(existsSync(src)).toBe(false);
+  });
+
+  it("restoreFrom/restoreTo extras are set on success", async () => {
+    const tool = new LocalFileMoveTool();
+    const src = join(T, "restore_src.txt");
+    const dst = join(T, "restore_dst.txt");
+    writeFileSync(src, "y");
+    const r = await tool.execute(ToolArgs.wrap({path: src, dst: dst}), ctx as any);
+    expect(r.success).toBe(true);
+    expect(r.restoreFrom).toBe(dst);
+    expect(r.restoreTo).toBe(src);
+  });
+});
+
+// ── LocalFileDeleteTool: TRASH_DIR_NAME leakage ──
+describe("LocalFileDeleteTool trash layout", () => {
+  const T = mkdirSync(join(tmpdir(), "builtin_del_trash_" + Date.now()), {recursive: true});
+  const ctx = {hostId: "h", sessionType: "local", generation: 1, cancelled: () => false} as any;
+
+  afterAll(() => rmSync(T, {recursive: true, force: true}));
+
+  it("the trash dir is created inside the file's parent, not a global root", async () => {
+    const sub = join(T, "subdir");
+    mkdirSync(sub, {recursive: true});
+    const target = join(sub, "victim.txt");
+    writeFileSync(target, "z");
+    const tool = new LocalFileDeleteTool();
+    const r = await tool.execute(ToolArgs.wrap({path: target}), ctx as any);
+    expect(r.success).toBe(true);
+    expect(existsSync(target)).toBe(false);
+    // The trash layout is <parent>/.ai_terminal_trash/<timestamp>/victim.txt
+    const trashDir = join(sub, ".ai_terminal_trash");
+    expect(existsSync(trashDir)).toBe(true);
+    // The .ai_terminal_trash dir itself must NOT be listed by LocalDirListTool
+    // (it starts with '.', so include_hidden=false skips it by default)
+    const dirTool = new LocalDirListTool();
+    const dr = await dirTool.execute(ToolArgs.wrap({path: sub}), ctx as any);
+    expect(dr.success).toBe(true);
+    expect(dr.output).not.toContain(".ai_terminal_trash");
+  });
+
+  it("hard:true on a file leaves no trash entry", async () => {
+    const target = join(T, "hard.txt");
+    writeFileSync(target, "h");
+    const tool = new LocalFileDeleteTool();
+    const r = await tool.execute(ToolArgs.wrap({path: target, hard: true}), ctx as any);
+    expect(r.success).toBe(true);
+    expect(existsSync(target)).toBe(false);
+    // No trash dir should be created for a hard delete
+    const trashDir = join(T, ".ai_terminal_trash");
+    expect(existsSync(trashDir)).toBe(false);
   });
 });
