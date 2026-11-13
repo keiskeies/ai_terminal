@@ -644,6 +644,7 @@ this.sshOsInfo = options?.sshOsInfo;
         const hijack = this.finishChoiceHijack(finishEvt, events, turnAnswer, response);
         if (hijack !== null) {
           this.logGate("warn", FINISH_CHOICE_WARN_A + "[" + Array.from(hijack.choice.options).join(", ") + "]");
+    this.logReActWarn("finish choice hijack: " + Array.from(hijack.choice.options).join(",")); // Dart 1460
           if (!hijack.fromProtocol) {
             // Dart 1431-1437: the options: line made the streaming parser emit the
             // ask event already; options extracted from the BODY need a new event.
@@ -748,6 +749,7 @@ this.sshOsInfo = options?.sshOsInfo;
           const fbHijack = this.finishChoiceHijack(fbEvt, events, turnAnswer, response);
           if (fbHijack !== null) {
             this.logGate("warn", FINISH_CHOICE_WARN_A + "[" + Array.from(fbHijack.choice.options).join(", ") + "]");
+    this.logReActWarn("finish choice hijack (fb): " + Array.from(fbHijack.choice.options).join(",")); // Dart 1460
             if (!fbHijack.fromProtocol) {
               const fbAsk: AgentEvent = {
                 id: genEventId(), // occurrence id like every engine-minted event
@@ -954,6 +956,7 @@ this.sshOsInfo = options?.sshOsInfo;
   private trimConversation(): void {
     const cw = effectiveContextWindow(this.modelConfig.contextWindow);
     const logs = trimConversationList(this.conversation, cw);
+    this.logReActDebug("TrimMsgs: " + logs.join(" ")); // Dart 3632
     for (const line of logs) this.logGate("info", "TrimMsgs: " + line);
   }
   /**
@@ -1405,6 +1408,7 @@ this.sshOsInfo = options?.sshOsInfo;
           ? result.error
           : (result.output !== "" ? result.output : "(\u65e0\u9519\u8bef\u8be6\u60c5)");
         this.logGate("warn", "\u5de5\u5177 " + toolName + " \u5931\u8d25\u8be6\u60c5: " + detail);
+      this.logReActWarn("\u5de5\u5177 " + toolName + " \u5931\u8d25\u8be6\u60c5: " + detail); // Dart 3510
       }
       const durationMs = Date.now() - execStartMs;
       // Dart 3513-3537: the wire gets the output whole up to MAX_TOOL_EVENT_CHARS.
@@ -1657,6 +1661,7 @@ this.sshOsInfo = options?.sshOsInfo;
             // Dart has no such state - its engine always owns the completer. Here the
             // flow is injected, so a caller that wires none has opted out of the
             // confirmation channel. Two postures remain: refuse every warn/blocked
+    this.logReActWarn("\u786e\u8ba4\u901a\u9053\u672a\u63a5\u7ebf\uff0c\u6309\u957f\u5b89\u5904\u7406\u4e3a\u62d2\u7edd"); // Dart 3379
             // command (silently breaks every caller that never answers rpc:confirm),
             // or execute it, which is what fullAuto does. Chosen: execute, loudly.
             this.logGate("warn", "\u786e\u8ba4\u901a\u9053\u672a\u63a5\u7ebf\uff1a\u6309\u5168\u81ea\u52a8\u653e\u884c\u6267\u884c - " + cmd);
@@ -1884,6 +1889,7 @@ this.sshOsInfo = options?.sshOsInfo;
    * deliberately NO continue here: the CALLER keeps loop control, because a
    * refused finish is not a terminal path (no finish event on the wire, no
    * checkpoint, no side effects - R5 keeps the terminal corridor emitFinish).
+    this.logReActWarn("\u6a21\u578b\u63d0\u4ea4\u4e86\u65e0\u547d\u4ee4\u7684\u6b65\u9aa4\uff0c\u5df2\u91cd\u8bd5 " + this.finishWithoutExecCount + " \u6b21"); // Dart 3640
    */
   private applyFinishGuard(): void {
     this.finishWithoutExecCount++; // Dart 1451
