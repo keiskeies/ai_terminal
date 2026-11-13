@@ -397,21 +397,22 @@ export class LocalFileReadTool extends AgentTool {
     if (!existsSync(fp)) return ToolResult.failure("file not found: " + rawPath);
     const st = statSync(fp);
     if (st.isDirectory()) return ToolResult.failure("path is a directory, use local_dir_list: " + rawPath);
-    // Read as a Buffer first so we can detect binary files (null bytes)
-    // before attempting a UTF-8 decode that would produce garbage lines.
-    const buf = readFileSync(fp);
-    // Heuristic: a null byte in the first 8 KiB strongly indicates binary
-    // content (PE headers, ELF, PNG, ZIP, etc). Text files virtually never
-    // contain 0x00 bytes in their first 8 KiB.
-    const sniffSize = Math.min(buf.length, 8192);
-    let hasNullByte = false;
-    for (let i = 0; i < sniffSize; i++) {
-      if (buf[i] === 0) { hasNullByte = true; break; }
+    // R8 / Dart parity (local_file_tools.dart 115-122): a file above
+    // policy.maxReadBytes is refused before any read, with the byte-faithful
+    // CJK message. Dart's readAsString failure (binary / non-UTF-8) is handled
+    // by the try/catch below - a 1:1 port, NOT an ad-hoc null-byte heuristic.
+    const size = st.size;
+    if (size > policy.maxReadBytes) {
+      const mb = (size / 1024 / 1024).toFixed(1);
+      const capMb = (policy.maxReadBytes / 1024 / 1024).toFixed(1);
+      return ToolResult.failure("文件过大（" + mb + "MB，上限 " + capMb + "MB）: " + rawPath + "\n" + "请用 start_line/max_lines 分段读，或直接用本地编辑器查看。");
     }
-    if (hasNullByte) {
-      return ToolResult.failure("binary file: " + rawPath + " (" + buf.length + " bytes). Use local_exec with a binary-aware command (e.g. xxd, file) instead of local_file_read.");
+    let text: string;
+    try {
+      text = readFileSync(fp, "utf-8");
+    } catch (e: unknown) {
+      return ToolResult.failure("读取失败（可能是二进制文件或不是 UTF-8）: " + rawPath + "\n" + (e instanceof Error ? e.message : String(e)));
     }
-    const text = buf.toString("utf-8");
     const lines = text.split("\n");
     const start = Math.max(1, startLine);
     const end = Math.min(lines.length, start + maxLines - 1);

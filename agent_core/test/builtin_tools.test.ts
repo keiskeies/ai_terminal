@@ -347,17 +347,44 @@ describe("LocalFileReadTool edge cases", () => {
     expect(r.output).toContain("...more, use start_line: 2");
   });
 
-  it("binary file (null bytes) is rejected with a helpful message", async () => {
-    const target = join(T, "binary.dat");
-    // Simulate a minimal binary file: 4 null bytes + some data
-    const buf = Buffer.alloc(16);
-    buf.write("hello world\0\0\0\0", "latin1");
-    writeFileSync(target, buf);
+  it("file above maxReadBytes is refused before any read (Dart parity)", async () => {
+    // A 3 MiB file exceeds the 2 MiB DEFAULT_MAX_READ_BYTES gate.
+    const target = join(T, "big.txt");
+    writeFileSync(target, "A".repeat(3 * 1024 * 1024));
     const tool = new LocalFileReadTool();
     const r = await tool.execute(ToolArgs.wrap({path: target}), ctx as any);
     expect(r.success).toBe(false);
-    expect(r.error).toContain("binary file");
-    expect(r.error).toContain("binary.dat"); // file name in the message
+    // Byte-faithful CJK prefix from the Dart oracle (local_file_tools.dart 117-121).
+    expect(r.error).toContain("文件过大");
+    expect(r.error).toContain("3.0MB");
+    expect(r.error).toContain("2.0MB");
+    expect(r.error).toContain("big.txt");
+  });
+
+  it("binary / non-UTF-8 files read as U+FFFD replacement, not a hard failure", async () => {
+    // Node readFileSync(encoding: "utf-8") is LENIENT: invalid bytes decode to the
+    // U+FFFD replacement char instead of throwing. So the Dart readAsString try/catch
+    // branch (local_file_tools.dart 124-129) is unreachable for byte content on Node;
+    // only OS-level errors (EACCES/EPERM) reach it. This test pins the documented
+    // divergence - a binary file reads back as replacement chars, NOT a refusal.
+    const target = join(T, "bin.dat");
+    writeFileSync(target, Buffer.from([0xff, 0xfe, 0x00, 0x41]));
+    const tool = new LocalFileReadTool();
+    const r = await tool.execute(ToolArgs.wrap({path: target}), ctx as any);
+    expect(r.success).toBe(true);
+    // The 0xff/0xfe bytes become U+FFFD; the tool degrades gracefully (Dart would
+    // have failed here, but Node's lenient decoder makes it a soft path).
+    expect(r.output).toContain("file:");
+  });
+
+  it("a small valid text file still reads fine (regression guard for the gate)", async () => {
+    const target = join(T, "ok.txt");
+    writeFileSync(target, "alpha\nbeta\n");
+    const tool = new LocalFileReadTool();
+    const r = await tool.execute(ToolArgs.wrap({path: target}), ctx as any);
+    expect(r.success).toBe(true);
+    expect(r.output).toContain("alpha");
+    expect(r.output).toContain("beta");
   });
 });
 
