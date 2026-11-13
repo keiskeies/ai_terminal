@@ -5,6 +5,7 @@ export {TailTextBuffer} from "./tail_buffer.js";
 export {TaskGeneration, StaleTaskError, crossBoundary} from "./generation.js";
 export {PendingRegistry, type CompleterLike} from "./pending_registry.js";
 export {detectShell, wrapCommand, extractExitMarker, type ExitMarkerHit, detectOsInfoCommand} from "./shell_detect.js";
+export {ExitMarkerScanner} from "./exit_marker_scanner.js";
 
 export {LineDiff, type LineDiffResult} from "./line_diff.js";
 export {
