@@ -93,7 +93,7 @@ describe("ReActEngine W7 resume", () => {
       const engine = new ReActEngine(llm, modelConfig, {
         onEvent: (e) => events.push(e),
         onFinished: () => {},
-      }, {checkpointStore: store, resumeFromCheckpoint: true});
+      }, {checkpointStore: store, resumeFromCheckpoint: true, maxLlmRetries: 0});
 
       await engine.run({taskId: "t-resume", goal: "g", hostId: "h", modelConfig} as any, 5);
 
@@ -116,7 +116,7 @@ describe("ReActEngine W7 resume", () => {
       const engine = new ReActEngine(llm, modelConfig, {
         onEvent: () => {},
         onFinished: () => {},
-      }, {checkpointStore: store});
+      }, {checkpointStore: store, maxLlmRetries: 0});
       const p = engine.run({taskId: "t-cancel", goal: "g", hostId: "h", modelConfig} as any, 5);
       // Cancel after the run has started (before/at the first await boundary)
       engine.cancel();
@@ -148,7 +148,7 @@ describe("ReActEngine W7 resume", () => {
         onEvent: (e) => events.push(e),
         onFinished: () => {},
         onError: (m) => errors.push(m),
-      }, {checkpointStore: store});
+      }, {checkpointStore: store, maxLlmRetries: 0});
       const state = await engine.run({taskId: "t-err", goal: "g", hostId: "h", modelConfig} as any, 3);
       // R5: AI error -> failed (never success/completed)
       expect(state).toBe("failed");
@@ -176,7 +176,7 @@ describe("ReActEngine W7 resume", () => {
       const engine = new ReActEngine(llm, modelConfig, {
         onEvent: () => {},
         onFinished: () => {},
-      }, {checkpointStore: store});
+      }, {checkpointStore: store, maxLlmRetries: 0});
       const state = await engine.run({taskId: "t-fail", goal: "g", hostId: "h", modelConfig} as any, 2);
       expect(state).toBe("failed");
       // FAILED is resumable → checkpoint is kept as the --resume seed point
@@ -197,7 +197,7 @@ describe("ReActEngine W7 resume", () => {
       const engine = new ReActEngine(llm, modelConfig, {
         onEvent: () => {},
         onFinished: () => {},
-      }, {checkpointStore: store});
+      }, {checkpointStore: store, maxLlmRetries: 0});
       await engine.run({taskId: "t-done", goal: "g", hostId: "h", modelConfig} as any, 3);
       // On a terminal non-interrupted finish the checkpoint file is deleted
       expect(store.load("t-done")).toBeNull();

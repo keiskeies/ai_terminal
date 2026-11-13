@@ -173,6 +173,14 @@ export interface EngineCallbacks {
 }
 
 export interface EngineOptions {
+  /** r206: fallback LLM client - Dart P1-4 (agent_engine.dart 1694-1708). When the
+   * primary model exhausts its retry budget, the engine switches to this client
+   * and retries once. Mirrors Dart _fallbackProvider. */
+  fallbackLlm?: LlmClient;
+  /** r206: fallback model config (Dart _fallbackConfig). Used with fallbackLlm. */
+  fallbackModelConfig?: ModelConfig;
+  /** r206: max LLM stream-establishment retries before fallback (Dart maxRetries = 3). */
+  maxLlmRetries?: number;
   /** W7: checkpoint store — if present, a snapshot is written at every step boundary. */
   checkpointStore?: CheckpointStore;
   /** W7: when true, load an existing inProgress checkpoint for the task and seed state. */
@@ -321,6 +329,9 @@ export class ReActEngine {
 private readonly sshOsInfo?: string; // r135: remote OS for local-command guard
 private readonly connectionChecker?: (hostId: string) => boolean | Promise<boolean>;
 private readonly maxConnFailRetries: number; // r138: Dart _maxConnFailRetries = 3
+  private maxLlmRetries: number;
+  private fallbackLlm?: LlmClient;
+  private fallbackModelConfig?: ModelConfig;
 private consecutiveConnFailures = 0; // r138: Dart _consecutiveConnFailures
   private readonly enableRollbackSnapshot: boolean; // r141: Dart 2740-2771
   private readonly confirmFlow?: ConfirmFlow;
@@ -384,6 +395,9 @@ private consecutiveConnFailures = 0; // r138: Dart _consecutiveConnFailures
 this.sshOsInfo = options?.sshOsInfo;
     this.connectionChecker = options?.connectionChecker;
     this.maxConnFailRetries = options?.maxConnFailRetries ?? 3; // Dart 272
+    this.maxLlmRetries = options?.maxLlmRetries ?? 3; // Dart P1-4 maxRetries
+    this.fallbackLlm = options?.fallbackLlm;
+    this.fallbackModelConfig = options?.fallbackModelConfig;
     this.enableRollbackSnapshot = options?.enableRollbackSnapshot ?? true; // Dart default: enabled
     this.confirmFlow = options?.confirmFlow;
     this.permissionModeFn = options?.permissionMode ?? ((): PermissionMode => this.ownPermissionMode);
@@ -532,21 +546,74 @@ this.sshOsInfo = options?.sshOsInfo;
 
       // Call LLM (streaming in Phase 1)
       let response: string;
-    agentTracer.emitSync(new TraceEvent({taskId: task.taskId, type: TraceEventType.aiCallStart, step: step + 1}));
     this.logReAct("\u8c03\u7528 AI \u6a21\u578b..."); // Dart 1595
     this.logReActDebug("\u6d88\u606f\u5386\u53f2: " + this.conversation.length + " \u6761"); // Dart 1596
-      try {
-        const result = await this.llm.chatStream({modelConfig: this.modelConfig, messages: msgs});
-        response = result.text;
-this.logReAct("AI \u54cd\u5e94\u5b8c\u6210\uff0c\u5171 " + response.length + " \u5b57\u7b26"); // Dart 1935
-      } catch (e: any) {
-        // R5: AI error -> failed, never completed
-    this.logReActError("AI \u8c03\u7528\u5f02\u5e38: " + (e.message ?? String(e))); // Dart 1342
-        this.reportError(e.message ?? String(e));
-    agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
-this.logEngine("\u4efb\u52a1\u7ec8\u6b62"); // Dart 3749 failure
-        this.emitFinish("failed", e.message ?? String(e));
-        return "failed";
+      // r206: Dart P1-4 retry/fallback loop (agent_engine.dart 1605-1715).
+      // Stream-establishment retries up to maxLlmRetries with exponential backoff
+      // [1s, 2s, 4s]. If all retries exhaust AND a fallback LLM is configured,
+      // switch to the fallback model and retry once.
+      const maxRetries = this.maxLlmRetries ?? 3;
+      const backoffMs = [1000, 2000, 4000];
+      let activeLlm = this.llm;
+      let activeConfig = this.modelConfig;
+      let fallbackAttempted = false;
+      let attempt = 0;
+      while (true) {
+        // R1: generation check at loop top (Dart 1620-1625)
+        if (!myGen.isCurrent()) {
+          throw new Error("\u4efb\u52a1\u5df2\u88ab\u65b0\u4efb\u52a1\u8986\u76d6");
+        }
+        attempt++;
+        agentTracer.emitSync(new TraceEvent({
+          taskId: task.taskId,
+          type: TraceEventType.aiCallStart,
+          step: step + 1,
+          payload: {attempt, retry: attempt > 1, fallback: fallbackAttempted, model: activeConfig.model, history_len: this.conversation.length},
+        }));
+        try {
+          const result = await activeLlm.chatStream({modelConfig: activeConfig, messages: msgs});
+          response = result.text;
+          this.logReAct("AI \u54cd\u5e94\u5b8c\u6210\uff0c\u5171 " + response.length + " \u5b57\u7b26"); // Dart 1935
+          break; // success
+        } catch (e: unknown) {
+          // R1: cancellation / generation mismatch -> do NOT retry (Dart 1688-1691)
+          if (!myGen.isCurrent()) {
+            throw new Error("\u4efb\u52a1\u5df2\u88ab\u65b0\u4efb\u52a1\u8986\u76d6");
+          }
+          const errMsg = e instanceof Error ? e.message : String(e);
+          // P1-4: retries exhausted + fallback available -> switch (Dart 1693-1708)
+          if (attempt > maxRetries || !this.isRetryableLlmError(e)) {
+            if (!fallbackAttempted && this.fallbackLlm && this.fallbackModelConfig) {
+              this.logReActWarn("\u4e3b\u6a21\u578b " + activeConfig.model + " \u91cd\u8bd5 " + attempt + " \u6b21\u4ecd\u5931\u8d25\uff0c\u5207\u6362 fallback \u6a21\u578b " + this.fallbackModelConfig.model + ": " + errMsg);
+              fallbackAttempted = true;
+              attempt = 0;
+              activeLlm = this.fallbackLlm;
+              activeConfig = this.fallbackModelConfig;
+              this.emit({id: "", type: "info", timestamp: Date.now(), text: "\u26a0\ufe0f \u4e3b\u6a21\u578b " + this.modelConfig.model + " \u4e0d\u53ef\u7528\uff0c\u5df2\u5207\u6362\u5230\u5907\u7528\u6a21\u578b " + activeConfig.model});
+              continue;
+            }
+            // No fallback or fallback already tried -> give up (Dart 1709)
+            this.logReActError("AI \u8c03\u7528\u5f02\u5e38: " + errMsg); // Dart 1342
+            this.reportError(errMsg);
+            agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
+            this.logEngine("\u4efb\u52a1\u7ec8\u6b62"); // Dart 3749 failure
+            this.emitFinish("failed", errMsg);
+            return "failed";
+          }
+          // Still within retry budget -> log + backoff (Dart 1711-1713).
+          // Dart logs the backoff seconds, so the delay is computed before the log.
+          {
+            const d = backoffMs[Math.min(attempt - 1, backoffMs.length - 1)];
+            this.logReActWarn("AI \u6d41\u5efa\u7acb\u5931\u8d25\uff08\u7b2c " + attempt + " \u6b21\uff09\uff0c" + (d / 1000) + "s \u540e\u91cd\u8bd5: " + errMsg);
+          }
+        }
+        // Backoff before next attempt (Dart 1713)
+        const delay = backoffMs[Math.min(attempt - 1, backoffMs.length - 1)];
+        await new Promise<void>((res) => setTimeout(res, delay));
+        // R1: generation check after backoff (Dart 1715)
+        if (!myGen.isCurrent()) {
+          throw new Error("\u4efb\u52a1\u5df2\u88ab\u65b0\u4efb\u52a1\u8986\u76d6");
+        }
       }
     agentTracer.emitSync(new TraceEvent({taskId: task.taskId, type: TraceEventType.aiCallEnd, step: step + 1, payload: {prompt_tokens: 0, completion_tokens: 0}}));
       // R1: generation check after await
@@ -1992,6 +2059,29 @@ if (safetyLevel === "info") {
    *   follow-up --resume can seed from the last saved step (design doc: crash-recovery).
    * - "interrupted": process killed mid-run -> KEEP it as the crash-recovery resume point.
    */
+  /**
+   * r206: Dart _isRetryableError(agent_engine.dart 1560-1577) port. Dart keys on
+   * DioException types (connectionError / *_Timeout) + HTTP 429/5xx + a lowercase
+   * message fallback ('connection' | 'timeout' | 'reset by peer'). The Node fetch
+   * stack has no DioException; the equivalent signals are Error names/codes
+   * (AbortError excluded - that is cancellation, Dart 1688 rethrows it) and the
+   * same message substrings. TimeoutException -> name "TimeoutError" / message
+   * contains 'timeout'.
+   */
+  private isRetryableLlmError(e: unknown): boolean {
+    const err = e as {name?: string; message?: string; status?: number; statusCode?: number} | null;
+    if (err === null || typeof err !== "object") {
+      return String(e).toLowerCase().includes("timeout");
+    }
+    if (err.name === "TimeoutError") return true;
+    if (err.name === "AbortError") return false; // cancellation - Dart 1688 rethrows
+    const status = err.status ?? err.statusCode;
+    if (status === 429) return true;
+    if (typeof status === "number" && status >= 500) return true;
+    const msg = String(err.message ?? e).toLowerCase();
+    return msg.includes("connection") || msg.includes("timeout") || msg.includes("reset by peer");
+  }
+
   private finishSideEffects(state: AgentFinishState, summary?: string): void {
     if (
       this.checkpointStore &&

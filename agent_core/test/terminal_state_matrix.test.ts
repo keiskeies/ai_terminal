@@ -53,7 +53,7 @@ function makeEngine(llm: LlmClient, events: AgentEvent[], store: CheckpointStore
   return new ReActEngine(llm, modelConfig, {
     onEvent: (e) => events.push(e),
     onFinished: () => {},
-  }, {checkpointStore: store});
+  }, {checkpointStore: store, maxLlmRetries: 0});
 }
 
 function runFinish(): RunResult {

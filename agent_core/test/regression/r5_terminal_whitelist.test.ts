@@ -56,7 +56,7 @@ async function drive(kind: "no-cmd" | "max-steps" | "llm-error" | "cancel", resp
     onEvent: (e) => { events.push(e); },
     onFinished: (state, summary) => { finished.push({state, summary}); },
     onError: (m) => { errors.push(m); },
-  });
+  }, {maxLlmRetries: 0});
   const p = engine.run(task("t-r5-" + kind), maxSteps);
   if (kind === "cancel") engine.cancel(); // boundary() -> emitFinish("cancelled")
   const state = await p;
@@ -173,7 +173,7 @@ describe("R5 the W7 checkpoint gate is a second, different whitelist", () => {
         const engine = new ReActEngine(s.kind === "llm-error" ? throwingLlm() : new MockLlmClient(responses), mc, {
           onEvent: () => {},
           onFinished: () => {},
-        }, {checkpointStore: store});
+        }, {checkpointStore: store, maxLlmRetries: 0});
         const p = engine.run(task(taskId), s.kind === "max-steps" ? 2 : 5);
         if (s.kind === "cancel") engine.cancel();
         if (s.kind === "supersede") engine.run(task(taskId + "2"), 1);
