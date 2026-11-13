@@ -18,6 +18,13 @@ export type {ChangeType} from "./change_record.js";
 export {RiskExplainer} from "./risk_explainer.js";
 export type {RiskExplanation} from "./risk_explainer.js";
 export {
+  commandFormatRule, agentAutoRule, behaviorBoundaryRule, knowledgeSafetyRule,
+  dangerousCommandExplainRule, buildDefaultSystemPrompt, defaultSystemPrompt,
+  systemPrompt, saveSystemPrompt, resetSystemPrompt, getSystemPrompt,
+  buildContextPrompt,
+} from "./prompts.js";
+export type {ContextPromptOptions} from "./prompts.js";
+export {
   parseSlashCommand, hasRest, matchModelNames, shouldRestorePermissionMode,
   kGoalSubCommands, parseGoalCommand,
 } from "./slash_command.js";
