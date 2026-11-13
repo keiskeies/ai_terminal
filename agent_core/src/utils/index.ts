@@ -7,6 +7,8 @@ export {PendingRegistry, type CompleterLike} from "./pending_registry.js";
 export {detectShell, wrapCommand, extractExitMarker, type ExitMarkerHit, detectOsInfoCommand} from "./shell_detect.js";
 export {ExitMarkerScanner} from "./exit_marker_scanner.js";
 export {FormValidators, type ValidatorResult} from "./form_validators.js";
+export {extractLiveThought} from "./live_thought_text.js";
+export {stableParagraphCut, unclosedFenceSplit} from "./streaming_markdown.js";
 export {
   parseSlashCommand, hasRest, matchModelNames, shouldRestorePermissionMode,
   kGoalSubCommands, parseGoalCommand,
