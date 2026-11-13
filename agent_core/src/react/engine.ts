@@ -1544,6 +1544,7 @@ this.sshOsInfo = options?.sshOsInfo;
             role: "user",
             content: "\u89c2\u5bdf: " + cmd + "\n\u8f93\u51fa: " + lcObs + "\n\u72b6\u6001: \u5931\u8d25",
           });
+    this.logReActWarn("\u7591\u4f3c\u672c\u673a Windows \u547d\u4ee4\u53d1\u5f80\u8fdc\u7a0b Unix: " + cmd); // Dart 2555
           // Dart 2568: onSuccess(false, 'local_command_on_remote', 0)
     agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
           this.emitFinish("failed", "local_command_on_remote");
