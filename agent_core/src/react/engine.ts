@@ -543,6 +543,7 @@ this.sshOsInfo = options?.sshOsInfo;
     this.logReActError("AI \u8c03\u7528\u5f02\u5e38: " + (e.message ?? String(e))); // Dart 1342
         this.reportError(e.message ?? String(e));
     agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
+this.logEngine("\u4efb\u52a1\u7ec8\u6b62"); // Dart 3749 failure
         this.emitFinish("failed", e.message ?? String(e));
         return "failed";
       }
@@ -828,6 +829,7 @@ this.sshOsInfo = options?.sshOsInfo;
                 " \u6B21\u672A\u751F\u6210\u547D\u4EE4\uFF0C\u4EFB\u52A1\u7EC8\u6B62 (failed)");
     this.logReActWarn("\u8fde\u7eed " + this.noCommandRetries + " \u6b21\u672a\u751f\u6210\u547d\u4ee4\uff0c\u4efb\u52a1\u7ec8\u6b62 (failed)"); // Dart 3638
     agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
+this.logEngine("\u4efb\u52a1\u7ec8\u6b62"); // Dart 3749 failure
             this.emitFinish("failed", "no-command retry exhaustion");
             return "failed";
           }
@@ -853,6 +855,7 @@ this.sshOsInfo = options?.sshOsInfo;
     // Max steps exhausted (R5: all terminal paths emit finish + call onFinished)
     this.logReActWarn("\u8fbe\u5230\u6700\u5927\u6267\u884c\u6b65\u6570 " + maxSteps + " (\u4efb\u52a1\u7ec8\u6b62)"); // Dart 1562
     agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
+this.logEngine("\u4efb\u52a1\u7ec8\u6b62"); // Dart 3749 failure
     this.emitFinish("failed", "max steps exhausted");
     return "failed";
   }
@@ -1006,6 +1009,7 @@ this.sshOsInfo = options?.sshOsInfo;
       // inside emitFinish(). The summary is the Dart toolRetryExhausted string, NOT
       // the no-command summary (two distinct Dart strings, two distinct pins).
     agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
+this.logEngine("\u4efb\u52a1\u7ec8\u6b62"); // Dart 3749 failure
       this.emitFinish("failed", TOOL_RETRY_SUMMARY);
       return "failed";
     }
@@ -1564,6 +1568,7 @@ this.sshOsInfo = options?.sshOsInfo;
     this.logReActWarn("\u7591\u4f3c\u672c\u673a Windows \u547d\u4ee4\u53d1\u5f80\u8fdc\u7a0b Unix: " + cmd); // Dart 2555
           // Dart 2568: onSuccess(false, 'local_command_on_remote', 0)
     agentTracer.emitSync(new TraceEvent({taskId: this.lastTaskId ?? '', type: TraceEventType.taskEnd}));
+this.logEngine("\u4efb\u52a1\u7ec8\u6b62"); // Dart 3749 failure
           this.emitFinish("failed", "local_command_on_remote");
           return "failed";
         }
