@@ -109,11 +109,12 @@ describe("LocalDirListTool",()=>{
    expect(res.output).toContain("a.txt");
    expect(res.output).toContain("b.txt");
  });
- it("skips .git / node_modules by default",async()=>{
+ it("lists .git / node_modules as skipped dirs (Dart 已跳过 marker)",async()=>{
    const res=await new LocalDirListTool().execute(ToolArgs.wrap({path:T,depth:1}),{});
    expect(res.success).toBe(true);
-   expect(res.output).not.toContain(".git");
-   expect(res.output).not.toContain("node_modules");
+   // Dart 241-243: an explicit skip-list dir is surfaced with a marker, not hidden.
+   expect(res.output).toContain(".git/  (已跳过)");
+   expect(res.output).toContain("node_modules/  (已跳过)");
  });
  it("include_hidden shows .env (hidden file not in SKIPPED_DIRS)",async()=>{
    const res=await new LocalDirListTool().execute(ToolArgs.wrap({path:T,depth:1,include_hidden:true}),{});

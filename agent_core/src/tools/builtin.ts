@@ -447,34 +447,70 @@ export class LocalDirListTool extends AgentTool {
   async execute(args: ToolArgs, ctx: ToolContext): Promise<ToolResult> {
     const rawPath = args.getString("path");
     if (rawPath === "") return ToolResult.failure("missing required param: path");
-    const depth = Math.min(3, args.getInt("depth", 1));
+    // Dart parity (local_file_tools.dart 196-272): clamp depth to 1-3,
+        // cap at 800 listed entries, count skipped dirs, sort dirs-first then
+    // name, human-readable sizes, CJK header/footer - a 1:1 port.
+    const depth = Math.max(1, Math.min(3, args.getInt("depth", 1)));
     const includeHidden = args.getBool("include_hidden", false);
     const glob = args.getStringList("glob", []);
     const patterns = glob.map((g) => globToRegExp(g)).filter((r): r is RegExp => r !== null);
-    if (!existsSync(rawPath)) return ToolResult.failure("directory not found: " + rawPath);
-    const lines: string[] = [];
-    const walk = (dir: string, d: number, indent: string) => {
-      let entries: string[];
-      try { entries = readdirSync(dir); } catch { return; }
-      for (const entry of entries) {
-        if (!includeHidden && entry.startsWith(".")) continue;
-        if (LocalDirListTool.SKIPPED_DIRS.has(entry) && d >= depth) continue;
-        if (patterns.length > 0 && !patterns.some((r) => r.test(entry))) continue;
-        const full = dir + "/" + entry;
+    if (!existsSync(rawPath)) return ToolResult.failure("目录不存在: " + rawPath);
+    if (!statSync(rawPath).isDirectory()) return ToolResult.failure("目录不存在: " + rawPath);
+
+    const out: string[] = [];
+    out.push("目录: " + rawPath + "（depth=" + depth + "）");
+    let entries = 0;
+    let skipped = 0;
+    const MAX_ENTRIES = 800;
+
+    // human-readable size, byte-faithful to Dart _humanSize (281-286):
+    // <1024 -> N B; <1MiB -> N.N K; else -> N.N M. (toFixed mirrors toStringAsFixed.)
+    const humanSize = (n: number): string => {
+      if (n < 1024) return n + "B";
+      if (n < 1024 * 1024) return (n / 1024).toFixed(1) + "K";
+      return (n / 1024 / 1024).toFixed(1) + "M";
+    };
+
+    const walkLocalDir = (dir: string, prefix: string, level: number): void => {
+      if (level > depth || entries >= MAX_ENTRIES) return;
+      let children: string[];
+      try { children = readdirSync(dir); }
+      catch (e: unknown) { out.push(prefix + "(无法读取: " + (e instanceof Error ? e.message : String(e)) + ")"); return; }
+      // Dart 225-230: dirs first, then basename compare. JS: stable sort by
+      // (isDir desc, name) mirrors the two-key comparator; readdirSync order
+      // is OS-dependent, so an explicit sort is required for determinism.
+      const meta = children.map((name) => {
         let isDir = false;
-        try { isDir = statSync(full).isDirectory(); } catch {}
-        const suffix = isDir ? "/" : "";
-        let sizeStr = "";
-        if (!isDir) {
-          try { sizeStr = "  " + statSync(full).size.toLocaleString() + " B"; } catch {}
+        try { isDir = statSync(dir + sep + name).isDirectory(); } catch {}
+        return {name, isDir};
+      });
+      meta.sort((a, m) => (a.isDir !== m.isDir ? (a.isDir ? -1 : 1) : a.name.localeCompare(m.name)));
+
+      for (const {name, isDir} of meta) {
+        if (entries >= MAX_ENTRIES) { out.push(prefix + "... 条目过多，已截断（用更深的过滤条件缩小范围）"); return; }
+        // Dart 241-245: skip-list FIRST, then hidden - the order matters
+        // (a .git dir must surface as skipped, not silently hidden).
+        if (isDir && LocalDirListTool.SKIPPED_DIRS.has(name)) {
+          skipped++;
+          out.push(prefix + name + "/  (已跳过)");
+          continue;
         }
-        lines.push(indent + entry + suffix + sizeStr);
-        if (isDir && d < depth) walk(full, d + 1, indent + "  ");
+        if (!includeHidden && name.startsWith(".")) { skipped++; continue; }
+        if (!isDir && patterns.length > 0 && !patterns.some((r) => r.test(name))) { skipped++; continue; }
+        let sizeInfo = "";
+        if (!isDir) {
+          try { sizeInfo = "  " + humanSize(statSync(dir + sep + name).size); } catch {}
+        }
+        out.push(prefix + name + (isDir ? "/" : "") + sizeInfo);
+        entries++;
+        if (isDir && level < depth) walkLocalDir(dir + sep + name, prefix + "  ", level + 1);
       }
     };
-    walk(rawPath, 1, "");
-    const header = "directory: " + rawPath + " (depth=" + depth + ")";
-    return ToolResult.success(header + "\n" + (lines.length ? lines.join("\n") : "(empty)"));
+
+    walkLocalDir(rawPath, "", 1);
+
+    if (entries === 0) return ToolResult.success(out.join("\n") + "\n" + "（该目录下没有匹配的条目，跳过 " + skipped + " 个）");
+    return ToolResult.success(out.join("\n") + "\n" + "共 " + entries + " 个条目" + (skipped > 0 ? "，跳过 " + skipped + " 个" : ""));
   }
 }
 
