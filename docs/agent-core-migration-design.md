@@ -555,14 +555,14 @@ agent_core/test/regression/
 
 **agentLogger 接线状态 (r166-r182)**：引擎 32 个 logGate 站点全部有对应 agentLogger 调用（81 处：19 直接 agentLogger + 62 辅助方法）；mcp/manager.ts 6 处、mcp/connection.ts 2 处、index.ts 1 处、confirm_flow.ts 2 处、tool_action.ts 2 处 = 共 43 处应用日志站点已接线。r180 补 boundary() 取消日志 (Dart 1541)，r181 补确认期间取消日志 (Dart 2682) + 低风险提示日志 (Dart 2737)，r182 补执行后代际失效日志 (Dart 2790)。剩余 console.* 调用均在日志基础设施内部（agent_logger.ts 5 处、agent_tracer.ts 3 处）。Dart 16 个文件对账完毕：4 个有 Node 对应物（agent_engine, mcp_manager, main, command_extractor——r195 移植 `utils/command_extractor.ts` 并接线同名日志键 ExtractCmd），12 个无对应物已记录（UI/Riverpod/Hive/崩溃/迁移/健康/ChangeRecordService 等）。
 
-**迁移状态 (r195)**：agent_core/ Node 移植已完成全部代码工作：69 个 src .ts、100 个 test .test.ts（88 顶层 + 12 回归）、4 道门全绿（typecheck / schema / fixture 1000 / vitest 1257）。r188 之后补齐的 Dart 缺口：tail_buffer 测试 (r190)、ReAct 解析 E2E (r189)、InterruptedTurnDetector (r191)、AnsiStripper (r192)、AdaptiveConcurrency (r193)、ConversationExport (r194)、CommandExtractor + looksLikeCommand/isDescriptiveText (r195)。agentLogger 16 个 Dart 文件全部对账完毕（4 个有 Node 对应物已接线，12 个无对应物已记录）。§9 第 1-5 项为产品决策，代码侧无未完成任务。
+**迁移状态 (r198)**：agent_core/ Node 移植已完成全部代码工作：70 个 src .ts、101 个 test .test.ts（89 顶层 + 12 回归）、4 道门全绿（typecheck / schema / fixture 1000 / vitest 1263）。r188 之后补齐的 Dart 缺口：tail_buffer 测试 (r190)、ReAct 解析 E2E (r189)、InterruptedTurnDetector (r191)、AnsiStripper (r192)、AdaptiveConcurrency (r193)、ConversationExport (r194)、CommandExtractor + looksLikeCommand/isDescriptiveText (r195)。agentLogger 16 个 Dart 文件全部对账完毕（4 个有 Node 对应物已接线，12 个无对应物已记录）。§9 第 1-5 项为产品决策，代码侧无未完成任务。
 
-## 10. 附录
+## 10. 附录 r198 补齐 local_shell 解析器 (parseLocalShell/resolveDefaultLocalShell, Dart :34-52/:59-67) + LocalExecTool 未知 shell 拒绝门 (Dart local_exec_tool.dart:164-178)，+6 测试 (vitest 1263→1263)。
 
 ### 10.1 文件清单（新建）
-
+ r198 补齐 local_shell 解析器 (parseLocalShell/resolveDefaultLocalShell, Dart :34-52/:59-67) + LocalExecTool 未知 shell 拒绝门 (Dart local_exec_tool.dart:164-178)，+6 测试 (vitest 1257→1263)。
 ```
-agent_core/
+## 10. 附录
   package.json  tsconfig.json  esbuild.config.js   # dependencies 只有 3 个包, 见 §8
   schema/                                    # 7 份协议契约 (§2.3)
     protocol.version.json  request.schema.json  event.schema.json
@@ -586,7 +586,7 @@ agent_core/
            operation_report,change_window,audit_log,local_command_detector,compact,
            agent_logger,agent_tracer,                         # r166-r182 日志接线
            rollback_advisor,tool_call_accumulator,verification_detector,
-           interrupted_turn_detector,ansi_stripper,           # r189-r192 Dart 缺口补齐
+           interrupted_turn_detector,ansi_stripper,local_shell,        # r189-r192 + r198 Dart 缺口补齐
            adaptive_concurrency,conversation_export,          # r193/r194
            command_extractor}.ts                              # r195
            # 安全分级 + 档位矩阵 + 完成语义/回答块/操作单四字段/变更窗口 (§9 第 6/7 项)

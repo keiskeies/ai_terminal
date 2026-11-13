@@ -13,6 +13,7 @@
 import {readFileSync, readdirSync, statSync, existsSync, mkdirSync, copyFileSync, cpSync, rmSync, renameSync, lstatSync} from "fs";
 import {ToolArgs} from "./tool_args.js";
 import {ShellType, wrapCommand, extractExitMarker} from "../utils/shell_detect.js";
+import {parseLocalShell} from "../utils/local_shell.js";
 import {basename, dirname, isAbsolute, join, normalize, relative, sep} from "path";
 import {LineDiff} from "../utils/line_diff.js";
 import {decodeEscapedText, decodeContent, writeLocalFile, patchLocalFile, TRASH_DIR_NAME} from "../utils/local_file_ops.js";
@@ -611,8 +612,21 @@ export class LocalExecTool extends AgentTool {
     if (gated instanceof ToolResult) return gated;
     const cwd = gated;
     const timeoutSec = Math.min(600, args.getInt("timeout", 120));
-    const shellArg = args.getString("shell", "").toLowerCase();
-    const shell: ShellType = shellArg !== "" ? (shellArg as ShellType) : (process.platform === "win32" ? "powershell" : "bash");
+    // Dart local_exec_tool.dart:164-173 - unknown shell values are rejected
+    // BEFORE anything is spawned; empty/"auto" falls back to the platform default.
+    const shellArgRaw = args.getString("shell", "");
+    let shell: ShellType;
+    if (shellArgRaw.trim() === "") {
+      shell = process.platform === "win32" ? "powershell" : "bash";
+    } else {
+      let parsed;
+      try {
+        parsed = parseLocalShell(shellArgRaw);
+      } catch {
+        return ToolResult.failure("unknown shell: " + shellArgRaw.trim().toLowerCase() + ". Options are powershell / cmd / bash / sh.");
+      }
+      shell = parsed !== null ? parsed.kind : (process.platform === "win32" ? "powershell" : "bash");
+    }
     const marker = "EXITCODE_LOCAL:"; // Dart convention: marker ends with ':' (donePattern = marker + digits)
     const wrapped = wrapCommand(command, shell, marker);
     // Dart:153-161 - create the approved working directory when it does not exist yet.
