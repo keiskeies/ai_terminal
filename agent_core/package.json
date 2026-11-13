@@ -16,7 +16,8 @@
     "check:schema": "node tools/check-schema-compat.mjs",
     "nodeapp": "node tools/nodeapp.mjs",
     "nodeapp:verify": "node tools/nodeapp.mjs verify",
-    "demo": "node tools/demo_run.mjs"
+    "demo": "node tools/demo_run.mjs",
+    "web": "node tools/demo_web.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",

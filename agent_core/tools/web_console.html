@@ -1,0 +1,55 @@
+<!doctype html><html><head><meta charset="utf-8"><title>ai_terminal agent-core</title>
+<style>
+body{background:#0d1117;color:#e6edf3;font:14px/1.6 Consolas,monospace;margin:0}
+#wrap{max-width:860px;margin:0 auto;padding:16px}
+h1{font-size:16px;color:#7ee787}
+#log{border:1px solid #30363d;border-radius:8px;padding:12px;height:60vh;overflow-y:auto;background:#010409}
+.ev{margin:2px 0;padding:4px 8px;border-radius:4px}
+.thought{color:#d2a8ff}.command{color:#79c0ff;background:#0d2240}.result{color:#a5d6ff;white-space:pre-wrap}
+.finish{color:#7ee787;font-weight:bold}.info{color:#d29922}.state{color:#8b949e;font-style:italic}
+.confirm{border:1px solid #d29922;background:#2d1e00;padding:8px;border-radius:6px;margin:6px 0}
+.wire{color:#484f58;font-size:12px}
+input{width:70%;background:#010409;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:8px;font:14px Consolas,monospace}
+button{background:#238636;color:#fff;border:0;border-radius:6px;padding:8px 14px;margin-left:8px;cursor:pointer}
+.deny{background:#da3633;margin-left:6px}
+</style></head><body><div id="wrap">
+<h1>ai_terminal &middot; agent-core <span id="st" class="state"></span></h1>
+<div id="log"></div><br>
+<input id="goal" placeholder="&#30446;&#26631;&#65292; &#20363;&#65306; ls / date / &#21024;&#38500;&#20020;&#26102;&#25991;&#20214;"><button onclick="go()">&#25191;&#34892;</button>
+<div id="log2"></div></div>
+<script>
+var log=document.getElementById('log'), st=document.getElementById('st');
+function put(cls, txt){ var d=document.createElement('div'); d.className='ev '+cls; d.textContent=txt; log.appendChild(d); log.scrollTop=log.scrollHeight; return d; }
+function esc(t){ return String(t==null?'':t); }
+var es=new EventSource('/events');
+es.onmessage=function(e){
+  var m; try{ m=JSON.parse(e.data); }catch(_){ return; }
+  if(m.kind==='wire'){ wire(m); }
+};
+function wire(m){
+  var p=m.params||{};
+  if(m.method==='evt:agentEvent'){
+    var e=p.event||{};
+    var txt=e.type;
+    if(e.text)txt+=' \u00b7 '+e.text;
+    if(e.command)txt+=' \u00b7 '+e.command;
+    if(e.output)txt='\n'+e.output;
+    if(e.summary)txt+=' \u00b7 '+e.summary;
+    if(e.finishState)txt+=' ['+e.finishState+']';
+    put(e.type||'ev', txt);
+  } else if(m.method==='evt:taskState'){
+    st.textContent=String(p.state); put('state','state -> '+String(p.state));
+  } else if(m.method==='evt:confirmRequest'){ confirmBox(p); }
+  else { put('wire', m.method||m.kind); }
+}
+function confirmBox(p){
+  var d=put('info','\u26a0 '+esc(p.prompt));
+  var box=document.createElement('div'); box.className='confirm';
+  var b1=document.createElement('button'); b1.textContent="&#20801;&#35768;"; b1.onclick=function(){post('/confirm',{taskId:p.taskId,confirmId:p.confirmId,decision:'ok'}); box.remove();};
+  var b2=document.createElement('button'); b2.className='deny'; b2.textContent="&#25298;&#32477;"; b2.onclick=function(){post('/confirm',{taskId:p.taskId,confirmId:p.confirmId,decision:'reject'}); box.remove();};
+  box.appendChild(b1); box.appendChild(b2); log.appendChild(box); log.scrollTop=log.scrollHeight;
+}
+function post(u,o){ fetch(u,{method:'POST',body:JSON.stringify(o)}).then(function(r){return r.json();}).then(function(j){ put('wire', u+' -> '+JSON.stringify(j)); }); }
+function go(){ var g=document.getElementById('goal').value.trim(); if(!g)return; put('state','\u25b6 goal: '+g); post('/start',{goal:g}); }
+document.getElementById('goal').addEventListener('keydown',function(e){ if(e.key==='Enter') go(); });
+</script></body></html>
