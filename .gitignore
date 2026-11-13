@@ -62,3 +62,8 @@ ai_terminal/lib/l10n/app_localizations*.dart
 # Environment
 .env
 .env.*
+# demo/launcher throwaways (agent_core)
+agent_core/.demo_window.bat
+agent_core/.live_window.bat
+agent_core/.web_window.bat
+agent_core/.web_scheduled.bat
