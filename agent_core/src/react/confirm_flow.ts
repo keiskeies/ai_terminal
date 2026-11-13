@@ -304,6 +304,7 @@ export class ConfirmFlow {
     }
     if (this.ctx.isCancelled()) {
       this.ev.onLog?.("info", "任务在等待确认期间被取消");
+agentLogger.info("ReAct", "\u4efb\u52a1\u5728\u7b49\u5f85\u786e\u8ba4\u671f\u95f4\u88ab\u53d6\u6d88"); // Dart 2682
       return {
         kind: "cancelled",
         reasonCode: CONFIRM_REASON_CANCELLED,

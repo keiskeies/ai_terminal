@@ -1610,6 +1610,9 @@ this.logEngine("\u4efb\u52a1\u7ec8\u6b62"); // Dart 3749 failure
           return null;
         }
         const gateMode = this.permissionModeFn();
+if (safetyLevel === "info") {
+    this.logReAct("\u4f4e\u98ce\u9669\u64cd\u4f5c\u63d0\u793a: " + cmd); // Dart 2737
+  }
         const gateDecision: CommandGateDecision = decideCommand(safetyLevel, gateMode);
     this.logReAct("\u6b65\u9aa4 " + step + " \u00b7 \u6743\u9650 " + gateMode + " \u2192 confirm"); // Dart 2660
         // Dart 2593-2594: agentLogger.debug('ReAct', '步骤 N · 权限 ask → confirm')
