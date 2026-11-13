@@ -93,3 +93,5 @@ export {
   trimConversation,
   type TrimMessage,
 } from "./context_trim.js";
+
+export {compactOnce, buildCompactPrompt, parseCompactJson, type CompactSummary, type CompactMessage, type CompactLlmProvider} from "./compact.js";
