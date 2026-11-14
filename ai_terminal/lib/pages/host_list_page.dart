@@ -6,11 +6,13 @@ import '../core/constants.dart';
 import '../core/credentials_store.dart';
 import '../services/daos.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 import '../l10n/app_localizations.dart';
 import '../models/host_config.dart';
 import '../providers/app_providers.dart';
 import '../widgets/host_card.dart';
 import '../widgets/logo_widget.dart';
+import '../widgets/ssh_config_import_dialog.dart';
 import '../core/app_toast.dart';
 
 class HostListPage extends ConsumerStatefulWidget {
@@ -65,6 +67,14 @@ class _HostListPageState extends ConsumerState<HostListPage> {
       appBar: AppBar(
         title: const LogoWidget(type: LogoType.wordmark, iconSize: 24),
         actions: [
+          IconButton(
+            tooltip: UiText.t('导入 SSH 配置', 'Import SSH config'),
+            icon: const Icon(Icons.file_download_outlined),
+            onPressed: () => showDialog<void>(
+              context: context,
+              builder: (_) => const SshConfigImportDialog(),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.add),
             onPressed: () => context.push('/host/edit'),

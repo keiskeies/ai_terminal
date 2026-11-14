@@ -68,4 +68,28 @@ void main() {
     expect(agentExplainPrompt('  df -h  '), contains('```\ndf -h\n```'));
     expect(agentErrorPrompt('Error: boom'), contains('```\nError: boom\n```'));
   });
+
+  test('整块提示词用四反引号围栏：块里自带三反引号也不会提前闭合', () {
+    final block = 'echo ```\n```\nsome output';
+    final prompt = agentBlockPrompt(block);
+    // 内容原样包在一对四反引号围栏里：终端里粘出来的三反引号关不掉它
+    expect(prompt, contains('````\n$block\n````'));
+    expect(prompt, contains('some output'));
+  });
+
+  group('urlAtColumn（Ctrl+点击命中）', () {
+    test('点击 URL 内部命中，去掉尾部标点', () {
+      const line = 'open https://example.com/a now';
+      expect(urlAtColumn(line, 8), 'https://example.com/a');
+      expect(urlAtColumn(line, 20), 'https://example.com/a');
+      expect(urlAtColumn('see https://a.com.', 6), 'https://a.com');
+    });
+
+    test('点击 URL 之外返回 null', () {
+      const line = 'open https://example.com now';
+      expect(urlAtColumn(line, 0), isNull);
+      expect(urlAtColumn(line, 27), isNull);
+      expect(urlAtColumn('no links here', 3), isNull);
+    });
+  });
 }

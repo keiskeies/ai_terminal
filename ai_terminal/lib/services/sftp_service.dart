@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:typed_data';
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:dartssh2/dartssh2.dart';
 import 'package:path/path.dart' as p;
 import '../models/host_config.dart';
@@ -556,6 +557,61 @@ class SftpService {
     return '${DateTime.now().microsecondsSinceEpoch}-$randomPart';
   }
 
+  static const String downloadPartInfix = '.ai-download-';
+  static const String downloadPartSuffix = '.part';
+
+  /// 断点续传的远程身份指纹：路径 + 大小 + 修改时间。
+  /// 远程文件被改动（大小或 mtime 变化）后指纹随之变化，
+  /// 旧的 .part 自动被视为陈旧文件删除并整体重下——不会拼出「半新半旧」的坏文件。
+  static String resumeToken(String remotePath, int size, int? mtime) {
+    final digest = crypto.sha1
+        .convert(utf8.encode('$remotePath|$size|${mtime ?? -1}'))
+        .toString();
+    return digest.substring(0, 16);
+  }
+
+  static String partPathFor(String localPath, String token) =>
+      '$localPath$downloadPartInfix$token$downloadPartSuffix';
+
+  /// 在同一 localPath 的历史 .part 里挑出可续传的那个。
+  /// 指纹不符的是其他远程源或已变更的旧下载，返回给调用方删除；
+  /// 大小已满（>= 远程大小）的也重下，避免把截断产物当完整文件。
+  static ({String? resume, List<String> stale}) pickResumePart(
+    List<String> existingParts,
+    String localPath,
+    String token,
+    int remoteSize,
+  ) {
+    String? matched;
+    final stale = <String>[];
+    final prefix = '$localPath$downloadPartInfix';
+    for (final part in existingParts) {
+      if (!part.startsWith(prefix) || !part.endsWith(downloadPartSuffix)) {
+        continue;
+      }
+      final tok =
+          part.substring(prefix.length, part.length - downloadPartSuffix.length);
+      if (tok != token) {
+        stale.add(part);
+        continue;
+      }
+      matched = part;
+    }
+    if (matched == null) return (resume: null, stale: stale);
+    final resume = matched;
+    // 大小达到远程大小的 .part 已无续传意义（正常路径此时应已 rename 完成）
+    try {
+      if (File(resume).lengthSync() >= remoteSize) {
+        stale.add(resume);
+        return (resume: null, stale: stale);
+      }
+    } catch (_) {
+      stale.add(resume);
+      return (resume: null, stale: stale);
+    }
+    return (resume: resume, stale: stale);
+  }
+
   /// 原子替换远程文件：优先使用 OpenSSH posix-rename；不支持覆盖语义时
   /// 先移走旧文件再落位，失败则恢复旧文件，避免目标被清空。
   Future<void> _renameReplace(String src, String dst) async {
@@ -601,7 +657,6 @@ class SftpService {
     if (localParent.isNotEmpty && localParent != '.') {
       await Directory(localParent).create(recursive: true);
     }
-    final tempPath = '$localPath.ai-download-${_tempToken()}.part';
 
     final remoteStat = await statFile(remotePath);
     if (remoteStat == null) {
@@ -612,17 +667,48 @@ class SftpService {
     }
     final totalSize = remoteStat.size ?? 0;
 
+    // 断点续传：临时文件名带远程指纹，指纹变了（远程文件被改）说明残留字节
+    // 不再可用，删掉整体重下；指纹相同则从已下载长度处续传。
+    final token = resumeToken(remotePath, totalSize, remoteStat.modifyTime);
+    final tempPath = partPathFor(localPath, token);
+    var offset = 0;
+    var hasOwnPart = false;
+    try {
+      final part = File(tempPath);
+      if (await part.exists()) {
+        hasOwnPart = true;
+        final len = await part.length();
+        if (len >= totalSize && totalSize > 0) {
+          // 字节齐了但没改名：上次在 close→rename 之间被打断，直接落位
+          await part.rename(localPath);
+          onProgress?.call(totalSize, totalSize);
+          return;
+        }
+        if (len > 0) offset = len;
+      }
+    } catch (_) {
+      // 指纹判定失败按「无残留」处理，最坏是重下一遍，不会拼坏文件
+    }
+    // 只在确实碰到残留时扫目录：批量下载的热路径不背这个开销
+    if (hasOwnPart) {
+      await _deleteStaleParts(localParent, localPath, token, totalSize);
+    }
+
     final remoteFile = await _sftp!.open(remotePath);
     IOSink? sink;
     final progress = _ProgressThrottle();
+    final base = offset;
     try {
-
-      sink = File(tempPath).openWrite();
-      await for (final chunk in remoteFile.read(onProgress: (bytesRead) {
-        if (progress.shouldReport(bytesRead, totalSize)) {
-          onProgress?.call(bytesRead, totalSize);
-        }
-      })) {
+      sink = File(tempPath).openWrite(
+          mode: offset > 0 ? FileMode.append : FileMode.write);
+      await for (final chunk in remoteFile.read(
+          offset: offset,
+          onProgress: (bytesRead) {
+            final done = base + bytesRead;
+            if (progress.shouldReport(done, totalSize)) {
+              onProgress?.call(done, totalSize);
+            }
+          })) {
         sink.add(chunk);
       }
       await sink.flush();
@@ -633,10 +719,7 @@ class SftpService {
       try {
         await sink?.close();
       } catch (_) {}
-      try {
-        final temp = File(tempPath);
-        if (await temp.exists()) await temp.delete();
-      } catch (_) {}
+      // 失败保留 .part 供下次续传；续传能力优先于「不留垃圾文件」
       rethrow;
     } finally {
       await remoteFile.close();
@@ -647,6 +730,20 @@ class SftpService {
     } catch (e) {
       throw Exception('下载已完成但保存到 $localPath 失败: $e；临时文件保留在 $tempPath');
     }
+  }
+
+  Future<void> _deleteStaleParts(
+      String localParent, String localPath, String token, int remoteSize) async {
+    try {
+      final dir = Directory(localParent.isEmpty ? '.' : localParent);
+      if (!dir.existsSync()) return;
+      final existing = dir.listSync(followLinks: false).whereType<File>().map((f) => f.path).toList();
+      for (final stale in pickResumePart(existing, localPath, token, remoteSize).stale) {
+        try {
+          await File(stale).delete();
+        } catch (_) {}
+      }
+    } catch (_) {}
   }
 
   /// 上传本地文件到远程。

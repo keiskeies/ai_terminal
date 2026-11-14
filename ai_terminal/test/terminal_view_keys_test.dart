@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart' show PointerDeviceKind, kSecondaryButton;
 import 'package:flutter/services.dart';
@@ -192,6 +194,8 @@ void main() {
       // 并等它过期的话，testWidgets 收尾会报 "Timer is still pending"。
       await gesture.up();
       await tester.pump(const Duration(seconds: 1));
-    });
+      // isMac 取自 Platform.isMacOS，无法在测试里覆写；非 mac 宿主上
+      // 菜单渲染的是 Ctrl 文案，这条断言只在 macOS 上有意义。
+    }, skip: !Platform.isMacOS);
   });
 }

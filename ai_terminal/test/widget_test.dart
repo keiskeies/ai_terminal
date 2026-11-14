@@ -1,21 +1,19 @@
-// This is a basic Flutter widget test.
+// 应用冒烟测试：验证 App 能启动并路由到首页（终端页）。
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// 注意：完整启动流程（DbInit/凭据/知识库）在 main() 里，测试环境不执行；
+// 这里只验证 Widget 树能构建、GoRouter 初始路由落在 TerminalPage。
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:ai_terminal/main.dart';
+import 'package:ai_terminal/pages/terminal_page.dart';
 
 void main() {
   testWidgets('App loads successfully', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
     await tester.pumpWidget(const ProviderScope(child: AISTerminalApp()));
+    await tester.pump();
 
-    // Verify that the app title is displayed
-    expect(find.text('AI Terminal'), findsOneWidget);
+    expect(find.byType(TerminalPage), findsOneWidget);
   });
 }

@@ -6,7 +6,9 @@ import '../models/host_config.dart';
 import '../core/ssh_algorithms.dart';
 import '../utils/exit_marker_scanner.dart';
 import '../utils/tail_text_buffer.dart';
+import '../utils/terminal_charset.dart';
 import 'command_executor.dart';
+import 'session_log_service.dart';
 
 /// SSH 连接状态
 enum SSHConnectionState {
@@ -35,6 +37,12 @@ class SSHService implements CommandExecutor {
   SSHSocket? _socket;
   bool _isConnected = false;
   String _osInfo = '';
+
+  /// 非主动断开（掉线）时回调一次，供上层标记 lost / 触发自动重连。
+  /// 主动 disconnect() 不触发。connect() 时重置去重标记。
+  VoidCallback? onDisconnected;
+  bool _intentionalDisconnect = false;
+  bool _dropNotified = false;
 
   // 跳板机相关
   SSHClient? _jumpClient;
@@ -70,6 +78,8 @@ class SSHService implements CommandExecutor {
     String? jumpPassword,
     String? jumpPrivateKeyContent,
   }) async {
+    _intentionalDisconnect = false;
+    _dropNotified = false;
     try {
       outputController.add('正在连接 ${config.host}:${config.port}...\n');
 
@@ -150,33 +160,25 @@ class SSHService implements CommandExecutor {
 
       // 流式解码：跨包的半个多字节字符会被 decoder 暂存到下一包，
       // 逐包 utf8.decode 会把中文显示成 �。
-      _session!.stdout
-          .cast<List<int>>()
-          .transform(const Utf8Decoder(allowMalformed: true))
+      // GBK/BIG5 主机按主机编码解码（terminal_charset），UTF-8 行为不变。
+      decodeTerminalOutput(_session!.stdout.cast<List<int>>(), config.encoding)
           .listen(
         (data) {
           outputController.add(data);
         },
         onError: (error) {
           outputController.add('\r\n[错误] $error\r\n');
-          _isConnected = false;
+          _handleDrop();
         },
         onDone: () {
           if (!outputController.isClosed) {
             outputController.add('\r\n[连接已关闭]\r\n');
           }
-          _isConnected = false;
-          // 连接断开时 complete 所有等待者，避免 executeAndWait 永久挂起
-          for (final p in _pendingDoneCompleters) {
-            if (!p.isCompleted) p.complete();
-          }
-          _pendingDoneCompleters.clear();
+          _handleDrop();
         },
       );
 
-      _session!.stderr
-          .cast<List<int>>()
-          .transform(const Utf8Decoder(allowMalformed: true))
+      decodeTerminalOutput(_session!.stderr.cast<List<int>>(), config.encoding)
           .listen(
         (data) {
           outputController.add(data);
@@ -242,7 +244,7 @@ class SSHService implements CommandExecutor {
     // 后台→前台假连接检测：app 从后台恢复后 SSH socket 可能已死但 _isConnected 仍为 true
     // 通过发送空命令（echo）检测连接是否真的活着
     try {
-      _session!.write(Uint8List.fromList(utf8.encode('\n')));
+      _writeTextQuietly('\n');
     } catch (e) {
       _isConnected = false;
       return CommandResult(
@@ -316,15 +318,13 @@ class SSHService implements CommandExecutor {
       pagerDetections = pagerWaiting ? pagerDetections + 1 : 0;
       if (!pagerQuitSent && pagerDetections >= 2) {
         pagerQuitSent = true;
-        try {
-          _session?.write(Uint8List.fromList(utf8.encode('q\n')));
-        } catch (_) {}
+        _writeTextQuietly('q\n');
       }
-      // sudo 正在等密码：直接应答 stdin。密码只写进终端，不进 buffer/命令/日志。
+      // sudo 正在等密码：直接应答 stdin。密码只写进终端，不进 buffer/命令/日志；
+      // 应答期间注册到 SecretMasker，会话日志里的任何回显都会被掩码。
       if (sudoPassword != null && sudoResponder.shouldAnswer(snapshot)) {
-        try {
-          _session?.write(Uint8List.fromList(utf8.encode('$sudoPassword\n')));
-        } catch (_) {}
+        SecretMasker.register(sudoPassword);
+        _writeTextQuietly('$sudoPassword\n');
       }
       final diag = PtyOutputDetector.detect(
         buffer: snapshot,
@@ -372,7 +372,22 @@ class SSHService implements CommandExecutor {
       },
     );
 
-    _session!.write(Uint8List.fromList(utf8.encode('$wrappedCommand\n')));
+    try {
+      await _writeText('$wrappedCommand\n');
+    } catch (e) {
+      // 此处 recheck 定时器尚未创建，无需 cancel
+      await sub.cancel();
+      _pendingDoneCompleters.remove(doneCompleter);
+      stopwatch.stop();
+      return CommandResult(
+        stdout: buffer.toString(),
+        stderr: '命令写入失败: $e',
+        exitCode: -1,
+        duration: stopwatch.elapsed,
+        failureKind: CommandFailureKind.disconnected,
+        failureReason: '命令写入失败: $e',
+      );
+    }
 
     // 命令停在密码提示上时不再有任何输出，只靠流回调就永远等不到判定。
     // 定时补一次求值，让"卡在交互提示"在秒级被识别，而不是干满超时。
@@ -394,21 +409,18 @@ class SSHService implements CommandExecutor {
     } on TimeoutException {
       // 分页器不会响应 Ctrl+C，先按 q 退出，否则它会把下一条命令当成按键吃掉
       if (PtyOutputDetector.waitsForPager(buffer.toString())) {
-        try {
-          _session!.write(Uint8List.fromList(utf8.encode('q\n')));
-        } catch (_) {}
+        _writeTextQuietly('q\n');
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
       // 发送 Ctrl+C 中断远程命令，防止后台进程继续输出污染下一条命令
-      try {
-        _session!.write(Uint8List.fromList(utf8.encode('\x03')));
-      } catch (_) {}
+      _writeTextQuietly('\x03');
       // 同 markerSeen==false 分支：给被打断的程序留出退出窗口，
       // 否则它会吃掉调用方下一条命令的输入
       await Future<void>.delayed(const Duration(milliseconds: 300));
       recheck.cancel();
       await sub.cancel();
       _pendingDoneCompleters.remove(doneCompleter);
+      SecretMasker.unregister(sudoPassword);
       stopwatch.stop();
       return CommandResult(
         stdout: buffer.toString(),
@@ -423,6 +435,7 @@ class SSHService implements CommandExecutor {
       recheck.cancel();
       await sub.cancel();
       _pendingDoneCompleters.remove(doneCompleter);
+      SecretMasker.unregister(sudoPassword);
       stopwatch.stop();
       return CommandResult(
         stdout: buffer.toString(),
@@ -437,6 +450,7 @@ class SSHService implements CommandExecutor {
     recheck.cancel();
     await sub.cancel();
     _pendingDoneCompleters.remove(doneCompleter);
+    SecretMasker.unregister(sudoPassword);
     stopwatch.stop();
 
     var rawOutput = buffer.toString();
@@ -445,15 +459,11 @@ class SSHService implements CommandExecutor {
     if (!markerSeen) {
       // 取消时如果停在分页器上，Ctrl+C 退不出 less，必须先按 q
       if (PtyOutputDetector.waitsForPager(rawOutput)) {
-        try {
-          _session!.write(Uint8List.fromList(utf8.encode('q\n')));
-        } catch (_) {}
+        _writeTextQuietly('q\n');
         await Future<void>.delayed(const Duration(milliseconds: 100));
       }
       // 取消时 marker 可能未出现 — 发送 Ctrl+C 停止可能仍在运行的命令
-      try {
-        _session!.write(Uint8List.fromList(utf8.encode('\x03')));
-      } catch (_) {}
+      _writeTextQuietly('\x03');
       // 等一下再返回：被 Ctrl+C 打断的 sudo 还活着，并且会把 tty 输入队列里的
       // 字节当密码尝试吃掉。调用方紧接着发的下一条命令（`sudo -k id; echo ...`）
       // 整条会被吞进密码提示，于是命令根本没跑、marker 永远不出现、只能干等超时。
@@ -516,7 +526,7 @@ class SSHService implements CommandExecutor {
     if (command.contains('\n')) {
       _writeMultiLineCommand(command);
     } else {
-      _session!.write(Uint8List.fromList(utf8.encode('$command\n')));
+      _writeUserInput('$command\n');
     }
   }
 
@@ -695,7 +705,7 @@ class SSHService implements CommandExecutor {
 
     // 1. 发送写入命令（cat > path / sudo tee path > /dev/null）
     try {
-      _session!.write(Uint8List.fromList(utf8.encode('$wrappedCommand\n')));
+      await _writeText('$wrappedCommand\n');
     } catch (e) {
       _isConnected = false;
       await sub.cancel();
@@ -727,8 +737,9 @@ class SSHService implements CommandExecutor {
       if (isLast && line.isEmpty && hasTrailingNewline) break;
       // 最后一行若原内容不以 \n 结尾，则不补 \n（保留无尾换行）
       final suffix = (isLast && !hasTrailingNewline) ? '' : '\n';
+      // 非 UTF-8 主机必须按主机编码写入，否则中文内容到 GBK 主机就是 UTF-8 字节 → 乱码文件
       try {
-        _session!.write(Uint8List.fromList(utf8.encode('$line$suffix')));
+        await _writeText('$line$suffix');
       } catch (e) {
         abnormalReason.add('写入 stdin 失败: $e');
         if (!doneCompleter.isCompleted) doneCompleter.complete();
@@ -747,11 +758,11 @@ class SSHService implements CommandExecutor {
     //   必须再发一次 Ctrl+D 才会产生 EOF（否则 cat 永久阻塞直到超时）
     if (!doneCompleter.isCompleted) {
       try {
-        _session!.write(Uint8List.fromList(utf8.encode('\x04')));
+        await _writeText('\x04');
         if (!hasTrailingNewline) {
           await Future.delayed(const Duration(milliseconds: 100));
           if (!doneCompleter.isCompleted) {
-            _session!.write(Uint8List.fromList(utf8.encode('\x04')));
+            await _writeText('\x04');
           }
         }
       } catch (e) {
@@ -768,9 +779,7 @@ class SSHService implements CommandExecutor {
         if (cancelToken != null) cancelToken.future,
       ]);
     } on TimeoutException {
-      try {
-        _session!.write(Uint8List.fromList(utf8.encode('\x03')));
-      } catch (_) {}
+      _writeTextQuietly('\x03');
       await sub.cancel();
       _pendingDoneCompleters.remove(doneCompleter);
       stopwatch.stop();
@@ -804,9 +813,7 @@ class SSHService implements CommandExecutor {
     var rawOutput = buffer.toString();
 
     if (!markerSeen) {
-      try {
-        _session!.write(Uint8List.fromList(utf8.encode('\x03')));
-      } catch (_) {}
+      _writeTextQuietly('\x03');
       final reason = abnormalReason.isNotEmpty
           ? abnormalReason.join('; ')
           : (rawOutput.contains(marker) ? 'marker 出现但未触发完成' : '文件写入未完成');
@@ -914,7 +921,7 @@ class SSHService implements CommandExecutor {
   void _writeMultiLineCommand(String command) async {
     final lines = command.split('\n');
     for (int i = 0; i < lines.length; i++) {
-      _session!.write(Uint8List.fromList(utf8.encode('${lines[i]}\n')));
+      _writeUserInput('${lines[i]}\n');
       if (i == 0 && lines.first.contains('<<')) {
         await Future.delayed(const Duration(milliseconds: 100));
       } else if (i < lines.length - 1) {
@@ -929,14 +936,56 @@ class SSHService implements CommandExecutor {
     if (_session == null || !_isConnected) {
       return;
     }
-    _session!.write(Uint8List.fromList(utf8.encode(data)));
+    _writeUserInput(data);
+  }
+
+  // 会话写入队列：非 UTF-8 主机的编码写入必须排队，否则「命令 → 文件内容 → Ctrl+D」
+  // 的字节顺序取决于谁先编码完成，文件内容会错位。用户按键与 AI 链路共用这一条队列。
+  final OrderedCharsetWriter _charsetWriter = OrderedCharsetWriter();
+
+  /// 编码感知写入：UTF-8 同步执行（零开销零回归），GBK/BIG5 排队异步编码。
+  /// ASCII（控制序列、EXITCODE marker）在 GBK/GB18030/Big5 下字节不变，走哪条分支都安全。
+  /// 无法 await 的调用点（定时/流回调里的 q、Ctrl+C、Ctrl+D、sudo 应答）用 [_writeTextQuietly]。
+  Future<void> _writeText(String text) {
+    final session = _session;
+    if (session == null) return Future.value();
+    return _charsetWriter.write(
+      text,
+      config.encoding,
+      (bytes) => session.write(bytes),
+    );
+  }
+
+  void _writeTextQuietly(String text) {
+    _writeText(text).catchError((Object e) {
+      debugPrint('[SSHService] 会话写入失败: $e');
+    });
+  }
+
+  void _writeUserInput(String data) {
+    _writeTextQuietly(data);
   }
 
   void resize(int columns, int rows) {
     _session?.resizeTerminal(columns, rows);
   }
 
+  /// 掉线统一处理：complete 所有等待者（避免 executeAndWait 永久挂起，R1），
+  /// 非主动断开时通知上层一次（去重：onError 后通常还跟一个 onDone）。
+  void _handleDrop() {
+    _isConnected = false;
+    for (final p in _pendingDoneCompleters) {
+      if (!p.isCompleted) p.complete();
+    }
+    _pendingDoneCompleters.clear();
+    if (!_intentionalDisconnect && !_dropNotified) {
+      _dropNotified = true;
+      onDisconnected?.call();
+    }
+  }
+
   Future<void> disconnect() async {
+    _intentionalDisconnect = true;
     _isConnected = false;
     // complete 所有等待者，避免 executeAndWait / writeFileViaPty 永久挂起
     for (final p in _pendingDoneCompleters) {

@@ -35,6 +35,19 @@ String? detectUrl(String line) {
   return null;
 }
 
+/// 行内覆盖 [column]（字符串下标）的 URL，Ctrl+点击打开链接用。
+/// 与 [detectUrl] 同一套识别口径，只是多了一个位置命中判断。
+String? urlAtColumn(String line, int column) {
+  for (final match in _urlPrefix.allMatches(line)) {
+    final rest = line.substring(match.start);
+    final token = _urlPattern.firstMatch(rest)?.group(0);
+    if (token == null || token.length <= match.end - match.start) continue;
+    final url = _trimTrailingPunctuation(token);
+    if (column >= match.start && column < match.start + url.length) return url;
+  }
+  return null;
+}
+
 /// 行内首个文件路径（Windows 盘符路径优先，其次 POSIX 绝对路径 / ~ / ./ ..）
 String? detectPath(String line) {
   final windows = _windowsPathPattern.firstMatch(line);
@@ -106,6 +119,18 @@ String agentErrorPrompt(String line) =>
     UiText.t(
       '这段终端报错是什么意思？给出原因、影响和修复步骤：\n```\n${line.trim()}\n```',
       'What does this terminal error mean? Give the cause, impact, and fix steps:\n```\n${line.trim()}\n```',
+    );
+
+/// 发送给 Agent 的「整条命令 + 它的输出」请求（OSC 133 命令块）。
+/// 与单行排错的差别在于：这里有完整上下文，可以让它先判断命令意图再看输出。
+String agentBlockPrompt(String block) =>
+    UiText.t(
+      '下面是一次命令及其完整输出（```` 代码块内，第一行通常是命令本身）。'
+      '先说明这条命令在做什么，再判断结果是成功还是失败；失败就给出原因和修复步骤：\n'
+      '````\n${block.trim()}\n````',
+      'Below is one command with its full output (inside the ```` fence; the first line is usually the command). '
+      'First state what the command does, then say whether it succeeded; if it failed, give the cause and the fix:\n'
+      '````\n${block.trim()}\n````',
     );
 
 /// 取路径所在目录（SFTP 定位用）：`/a/b/c.log` → `/a/b`，`~/x` → `~`

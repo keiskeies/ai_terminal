@@ -243,6 +243,32 @@ class SftpController extends ChangeNotifier {
     }
   }
 
+  /// 上传本地目录到远程目录（递归，保留结构）
+  Future<void> uploadDirectory(String localDir, String remoteDir) async {
+    final dirName = p.basename(localDir);
+    isTransferring = true;
+    transferProgress = 0;
+    transferName = dirName;
+    notifyListeners();
+
+    try {
+      await _sftpService.uploadDirectory(
+        localDir,
+        remoteDir,
+        onProgress: (uploaded, total) {
+          transferProgress = total > 0 ? uploaded / total : 0;
+          notifyListeners();
+        },
+      );
+      isTransferring = false;
+      notifyListeners();
+    } catch (e) {
+      isTransferring = false;
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   /// 读取文件内容（供编辑/预览用）
   Future<String?> readFile(String path) async {
     return _sftpService.readFileContent(path, maxSize: 1024 * 500);

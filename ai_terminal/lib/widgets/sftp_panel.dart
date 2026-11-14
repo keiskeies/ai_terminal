@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:desktop_drop/desktop_drop.dart';
 import 'package:path/path.dart' as p;
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
@@ -9,6 +10,7 @@ import '../providers/app_providers.dart';
 import '../services/sftp_controller.dart';
 import '../services/sftp_service.dart';
 import '../core/app_toast.dart';
+import '../core/route_observer.dart';
 
 /// 可复用的 SFTP 面板组件，既可用于独立页面也可嵌入终端右侧
 class SftpPanel extends ConsumerStatefulWidget {
@@ -19,19 +21,28 @@ class SftpPanel extends ConsumerStatefulWidget {
   /// 打开后直接定位到的远端目录（终端右键「在 SFTP 中定位」）
   final String? initialPath;
 
+  /// 桌面拖拽上传开关。DropTarget 监听全局事件，Offstage 保活的隐藏面板
+  /// 必须关掉，否则拖放会命中不可见的兄弟 tab 面板。
+  final bool dropEnabled;
+
   const SftpPanel({
     super.key,
     required this.hostId,
     this.onClose,
     this.embedded = false,
     this.initialPath,
+    this.dropEnabled = true,
   });
 
   @override
   ConsumerState<SftpPanel> createState() => _SftpPanelState();
 }
 
-class _SftpPanelState extends ConsumerState<SftpPanel> {
+class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
+  // desktop_drop 仅桌面平台有插件实现；移动端直接不构建 DropTarget
+  static final bool _dropSupported =
+      Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+
   late final SftpController _controller;
 
   // 路径输入模式（纯 UI 状态）
@@ -39,12 +50,50 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
   final _pathController = TextEditingController();
   final _pathFocusNode = FocusNode();
 
+  // 拖拽上传：drag 悬停高亮 + 路由覆盖判定（弹层/编辑页在上时不接拖放）
+  bool _dragging = false;
+  bool _routeCovered = false;
+  Route? _subscribedRoute;
+
   @override
   void initState() {
     super.initState();
     _controller = SftpController();
     _controller.addListener(_onChanged);
     _connect();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_dropSupported) return;
+    final route = ModalRoute.of(context);
+    if (route is PageRoute && route != _subscribedRoute) {
+      if (_subscribedRoute != null) appRouteObserver.unsubscribe(this);
+      _subscribedRoute = route;
+      appRouteObserver.subscribe(this, route);
+    }
+  }
+
+  @override
+  void didPushNext() {
+    // 弹层/新页面盖住面板时禁用 DropTarget：拖放不应打到被遮挡的面板
+    if (mounted) setState(() => _routeCovered = true);
+  }
+
+  @override
+  void didPopNext() {
+    if (mounted) setState(() => _routeCovered = false);
+  }
+
+  @override
+  void dispose() {
+    if (_subscribedRoute != null) appRouteObserver.unsubscribe(this);
+    _controller.removeListener(_onChanged);
+    _pathController.dispose();
+    _pathFocusNode.dispose();
+    _controller.dispose();
+    super.dispose();
   }
 
   void _onChanged() {
@@ -62,15 +111,6 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
     if (initial != null && initial.isNotEmpty && mounted) {
       await _controller.navigateTo(initial);
     }
-  }
-
-  @override
-  void dispose() {
-    _controller.removeListener(_onChanged);
-    _pathController.dispose();
-    _pathFocusNode.dispose();
-    _controller.dispose();
-    super.dispose();
   }
 
   void _submitPath() {
@@ -537,26 +577,114 @@ class _SftpPanelState extends ConsumerState<SftpPanel> {
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
-    return Container(
+    final panel = Container(
       decoration: BoxDecoration(
         color: tc.bg,
         border: Border(left: BorderSide(color: tc.border, width: 1)),
       ),
-      child: Column(
+      child: Stack(
         children: [
-          // 顶部工具栏
-          _buildToolbar(tc),
-          Divider(height: 1, thickness: 1, color: tc.border),
-          // 路径栏
-          _buildPathBar(tc),
-          Divider(height: 1, color: tc.border.withValues(alpha: 0.5)),
-          // 文件列表
-          Expanded(child: _buildBody()),
-          // 传输进度条
-          if (_controller.isTransferring) _buildTransferProgress(),
+          Column(
+            children: [
+              // 顶部工具栏
+              _buildToolbar(tc),
+              Divider(height: 1, thickness: 1, color: tc.border),
+              // 路径栏
+              _buildPathBar(tc),
+              Divider(height: 1, color: tc.border.withValues(alpha: 0.5)),
+              // 文件列表
+              Expanded(child: _buildBody()),
+              // 传输进度条
+              if (_controller.isTransferring) _buildTransferProgress(),
+            ],
+          ),
+          // 拖拽悬停提示
+          if (_dragging)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(
+                  color: cPrimary.withValues(alpha: 0.12),
+                  alignment: Alignment.center,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: tc.card,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: cPrimary),
+                    ),
+                    child: const Text(
+                      '松开以上传到当前目录',
+                      style: TextStyle(fontSize: fSmall, color: cPrimary),
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
+
+    if (!_dropSupported) return panel;
+    // 隐藏面板（Offstage 兄弟 tab）与被弹层遮挡时都不接拖放：
+    // desktop_drop 是全局监听，bounds 判定拦不住看不见的目标
+    return DropTarget(
+      enable: widget.dropEnabled && !_routeCovered,
+      onDragEntered: (_) => setState(() => _dragging = true),
+      onDragExited: (_) => setState(() => _dragging = false),
+      onDragDone: (details) {
+        setState(() => _dragging = false);
+        _handleDrop(details);
+      },
+      child: panel,
+    );
+  }
+
+  Future<void> _handleDrop(DropDoneDetails details) async {
+    if (_controller.isConnecting || _controller.error != null) return;
+    final base = _controller.currentPath;
+    var uploaded = 0;
+    var failed = 0;
+    for (final item in details.files) {
+      final path = item.path;
+      if (path.isEmpty) continue;
+      final name = p.basename(path);
+      if (name.isEmpty) continue;
+      final remotePath = base == '/' ? '/$name' : '$base/$name';
+      try {
+        if (await Directory(path).exists()) {
+          await _controller.uploadDirectory(path, remotePath);
+        } else {
+          await _controller.uploadFile(path, remotePath);
+        }
+        uploaded++;
+      } catch (e) {
+        failed++;
+        if (mounted) {
+          showTopSnackBar(context,
+            SnackBar(
+              content: Text('上传 $name 失败: $e'),
+              backgroundColor: cDanger,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
+    if (!mounted) return;
+    if (uploaded > 0) {
+      showTopSnackBar(context,
+        SnackBar(
+          content: Text(
+              '拖拽上传完成: $uploaded 项${failed > 0 ? '，失败 $failed 项' : ''}'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+    if (uploaded > 0 || failed > 0) {
+      await _controller.loadDirectory(_controller.currentPath);
+    }
   }
 
   Widget _buildToolbar(ThemeColors tc) {

@@ -6,12 +6,14 @@ import 'package:flutter_pty/flutter_pty.dart';
 import '../utils/exit_marker_scanner.dart';
 import '../utils/tail_text_buffer.dart';
 import 'command_executor.dart';
+import 'session_log_service.dart';
 
 /// 本地终端服务 — 使用原生 PTY（伪终端）实现真正的本地 shell
 /// 支持 macOS / Linux / Windows，提供与 macOS Terminal / Windows CMD 完全一致的体验
 class LocalTerminalService implements CommandExecutor {
   Pty? _pty;
   final StreamController<String> _outputController = StreamController<String>.broadcast();
+  final StreamController<void> _exitController = StreamController<void>.broadcast();
   bool _isConnected = false;
   bool _isExited = false;
 
@@ -29,6 +31,13 @@ class LocalTerminalService implements CommandExecutor {
   bool get isConnected => _isConnected;
   @override
   Stream<String> get output => _outputController.stream;
+
+  /// shell 进程退出这一「事件」本身。
+  ///
+  /// 不能靠 `output` 的 onDone 推断：`_handleExit` 只打一行提示、不关流（主标签
+  /// 的订阅者退出后还要读回滚区），所以下游永远等不到 onDone。分屏的额外 pane
+  /// 必须知道进程已经没了，否则界面上一屏「还活着」、敲键毫无反应。
+  Stream<void> get onExit => _exitController.stream;
 
   /// 启动本地 PTY shell
   Future<void> start({int columns = 80, int rows = 24}) async {
@@ -131,6 +140,9 @@ class LocalTerminalService implements CommandExecutor {
     _pendingDoneCompleters.clear();
     if (!_outputController.isClosed) {
       _outputController.add('\r\n\x1b[90m[进程已退出]\x1b[0m\r\n');
+    }
+    if (!_exitController.isClosed) {
+      _exitController.add(null);
     }
   }
 
@@ -302,9 +314,11 @@ class LocalTerminalService implements CommandExecutor {
           _pty?.write(utf8.encode('q\r'));
         } catch (_) {}
       }
-      // sudo 正在等密码：直接应答 stdin。密码只写进终端，不进 buffer/命令/日志。
+      // sudo 正在等密码：直接应答 stdin。密码只写进终端，不进 buffer/命令/日志；
+      // 应答期间注册到 SecretMasker，会话日志里的任何回显都会被掩码。
       // Windows 没有 sudo，提示正则永远不命中，这里无需平台分支。
       if (sudoPassword != null && sudoResponder.shouldAnswer(snapshot)) {
+        SecretMasker.register(sudoPassword);
         try {
           _pty?.write(utf8.encode('$sudoPassword\n'));
         } catch (_) {}
@@ -388,6 +402,7 @@ class LocalTerminalService implements CommandExecutor {
       recheck.cancel();
       await sub.cancel();
       _pendingDoneCompleters.remove(doneCompleter);
+      SecretMasker.unregister(sudoPassword);
       stopwatch.stop();
       return CommandResult(
         stdout: buffer.toString(),
@@ -402,6 +417,7 @@ class LocalTerminalService implements CommandExecutor {
       recheck.cancel();
       await sub.cancel();
       _pendingDoneCompleters.remove(doneCompleter);
+      SecretMasker.unregister(sudoPassword);
       stopwatch.stop();
       return CommandResult(
         stdout: buffer.toString(),
@@ -416,6 +432,7 @@ class LocalTerminalService implements CommandExecutor {
     recheck.cancel();
     await sub.cancel();
     _pendingDoneCompleters.remove(doneCompleter);
+    SecretMasker.unregister(sudoPassword);
     stopwatch.stop();
 
     var rawOutput = buffer.toString();
@@ -828,6 +845,13 @@ class LocalTerminalService implements CommandExecutor {
 
   /// 断开连接
   void disconnect() {
+    // kill 要在 `_isExited` 短路之前：进程自己退出时也走这里（pane 收到退出
+    // 事件后 close），短路会让 _pty 的主端句柄一直挂着等 GC 才回收。
+    // 对已退出的进程 kill 只是 ESRCH，无副作用。
+    try {
+      _pty?.kill();
+    } catch (_) {}
+    _pty = null;
     if (_isExited) return;
     _isExited = true;
     _isConnected = false;
@@ -836,14 +860,13 @@ class LocalTerminalService implements CommandExecutor {
       if (!p.isCompleted) p.complete();
     }
     _pendingDoneCompleters.clear();
-    _pty?.kill();
-    _pty = null;
   }
 
   /// 释放资源
   void dispose() {
     disconnect();
     _outputController.close();
+    _exitController.close();
   }
 
   /// 是否支持本地终端

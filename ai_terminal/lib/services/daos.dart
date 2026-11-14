@@ -14,6 +14,7 @@ import '../models/operation_report.dart';
 import '../models/plan_step.dart';
 import '../models/host_execution_result.dart';
 import '../models/change_record.dart';
+import '../models/command_history_entry.dart';
 import '../models/runbook.dart';
 
 // ═══════════════════════════════════════════════════════════
@@ -1084,6 +1085,124 @@ class AuditLogsDao {
     'output': r['output'],
     'executed': (r['executed'] as int) == 1,
   };
+}
+
+// ═══════════════════════════════════════════════════════════
+// CommandHistoryDao
+// ═══════════════════════════════════════════════════════════
+/// 终端命令历史（P2）。同一行命令合并成一条，只推进 usedAt / useCount。
+///
+/// 面板要「即开即有」，所以整表进内存（上限 [_maxEntries] 行，量级几百 KB）。
+class CommandHistoryDao {
+  static const int _maxEntries = 500;
+
+  /// 内存缓存：按 usedAt 倒序（最近在前），启动时加载
+  static final List<CommandHistoryEntry> _cache = [];
+
+  static bool _warnedNoDb = false;
+
+  static Future<void> loadCache() async {
+    _cache.clear();
+    final rows = await DbInit.db
+        .query('command_history', orderBy: 'usedAt DESC', limit: _maxEntries);
+    for (final r in rows) {
+      _cache.add(CommandHistoryEntry(
+        id: r['id'] as int,
+        command: r['command'] as String,
+        hostId: r['hostId'] as String?,
+        usedAt: DateTime.fromMillisecondsSinceEpoch(r['usedAt'] as int),
+        useCount: r['useCount'] as int,
+      ));
+    }
+    // 旧版本可能留下超上限的行；启动时一次性收敛
+    await DbInit.db.rawDelete(
+      'DELETE FROM command_history WHERE id NOT IN '
+      '(SELECT id FROM command_history ORDER BY usedAt DESC LIMIT ?)',
+      [_maxEntries],
+    );
+  }
+
+  /// 同步获取缓存（最近在前）
+  static List<CommandHistoryEntry> get cached => List.unmodifiable(_cache);
+
+  /// 记录一条命令。已存在则提到最前并累加次数。
+  ///
+  /// 由终端输入路径调用（每次回车），DbInit 未初始化时只写缓存 —— 与
+  /// SettingsDao 同口径，避免在 widget 测试里触碰数据库。
+  static Future<void> record(String command, {String? hostId}) async {
+    final now = DateTime.now();
+    final entryIdx = _cache.indexWhere((e) => e.command == command);
+    if (entryIdx < 0) {
+      _cache.insert(0, CommandHistoryEntry(
+        id: -(now.microsecondsSinceEpoch),
+        command: command,
+        hostId: hostId,
+        usedAt: now,
+        useCount: 1,
+      ));
+      while (_cache.length > _maxEntries) {
+        _cache.removeLast();
+      }
+    } else {
+      final old = _cache.removeAt(entryIdx);
+      _cache.insert(0, old.copyWith(usedAt: now, useCount: old.useCount + 1));
+    }
+    final entry = _cache.first;
+    if (!DbInit.isInitialized) {
+      // 每条都打会把控制台刷满；只在第一次提示
+      if (!_warnedNoDb) {
+        _warnedNoDb = true;
+        debugPrint(
+            '[CommandHistoryDao] WARN: DbInit 未初始化，record 仅写缓存，未持久化');
+      }
+      return;
+    }
+    // 缓存即真相：启动时整表加载，所以「见过」就等于行已存在，直接 UPDATE；
+    // 「没见过」才 INSERT（replace 兜住同命令并发回车的罕见竞态）。
+    final millis = now.millisecondsSinceEpoch;
+    if (entry.id > 0) {
+      await DbInit.db.update('command_history', {
+        'usedAt': millis,
+        'useCount': entry.useCount,
+        if (hostId != null) 'hostId': hostId,
+      }, where: 'id = ?', whereArgs: [entry.id]);
+    } else {
+      final id = await DbInit.db.insert('command_history', {
+        'command': command,
+        'hostId': hostId,
+        'usedAt': millis,
+        'useCount': 1,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      // 未落库的临时负 id 换成真实 id，后续 delete 才对得上
+      if (_cache.first == entry) _cache[0] = entry.copyWith(id: id);
+    }
+  }
+
+  /// 子串搜索（忽略大小写），保持最近在前的顺序。
+  static List<CommandHistoryEntry> search(String query, {int limit = 100}) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return cached.take(limit).toList();
+    final out = <CommandHistoryEntry>[];
+    for (final e in _cache) {
+      if (e.command.toLowerCase().contains(q)) {
+        out.add(e);
+        if (out.length >= limit) break;
+      }
+    }
+    return out;
+  }
+
+  static Future<void> delete(int id) async {
+    _cache.removeWhere((e) => e.id == id);
+    if (!DbInit.isInitialized) return;
+    await DbInit.db.delete('command_history', where: 'id = ?', whereArgs: [id]);
+  }
+
+  static Future<void> clearAll() async {
+    _cache.clear();
+    if (!DbInit.isInitialized) return;
+    await DbInit.db.delete('command_history');
+  }
 }
 
 // ═══════════════════════════════════════════════════════════

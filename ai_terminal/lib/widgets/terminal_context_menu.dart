@@ -9,10 +9,14 @@ import '../core/theme_colors.dart';
 enum TerminalMenuIntent {
   sendToAgent,
   askError,
+
+  /// 整块 OSC 133 命令（命令 + 输出）发给 Agent
+  askBlock,
   saveSnippet,
   openSftp,
   openAudit,
   viewChanges,
+  showHistory,
 }
 
 class TerminalMenuItem {

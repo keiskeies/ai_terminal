@@ -15,7 +15,7 @@ import 'credentials_store.dart';
 /// 升级时通过 onUpgrade 回调做增量迁移。
 class DbInit {
   static Database? _db;
-  static const int _schemaVersion = 6;
+  static const int _schemaVersion = 7;
 
   /// 数据库文件名
   static const String dbFileName = 'app_data.db';
@@ -667,6 +667,23 @@ class DbInit {
     batch.execute('CREATE INDEX idx_audit_logs_hostId ON audit_logs(hostId)');
     batch.execute('CREATE INDEX idx_audit_logs_timestamp ON audit_logs(timestamp)');
 
+    // ===== command_history =====
+    // 终端里回车执行过的命令（P2 命令历史 UI）。只存屏幕上有回显的行，
+    // 关回显的密码输入不会进来（见 utils/command_tracker.dart 的三道闸门）。
+    batch.execute('''
+      CREATE TABLE command_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        command TEXT NOT NULL,
+        hostId TEXT,
+        usedAt INTEGER NOT NULL,
+        useCount INTEGER NOT NULL DEFAULT 1
+      )
+    ''');
+    batch.execute(
+        'CREATE UNIQUE INDEX idx_command_history_command ON command_history(command)');
+    batch.execute(
+        'CREATE INDEX idx_command_history_usedAt ON command_history(usedAt)');
+
     // ===== credentials_fallback =====
     // 存 AES 加密后的密文（ivBase64:cipherBase64），与旧 Hive 兼容
     batch.execute('''
@@ -732,6 +749,22 @@ class DbInit {
         )
       ''');
     }
+    // v7: 终端命令历史（跨会话持久化，同命令合并计数）
+    if (oldVersion < 7) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS command_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          command TEXT NOT NULL,
+          hostId TEXT,
+          usedAt INTEGER NOT NULL,
+          useCount INTEGER NOT NULL DEFAULT 1
+        )
+      ''');
+      await db.execute(
+          'CREATE UNIQUE INDEX IF NOT EXISTS idx_command_history_command ON command_history(command)');
+      await db.execute(
+          'CREATE INDEX IF NOT EXISTS idx_command_history_usedAt ON command_history(usedAt)');
+    }
   }
 
   /// 关闭数据库
@@ -759,6 +792,7 @@ class DbInit {
       RunbooksDao.loadCache(),
       SettingsDao.loadCache(),
       AuditLogsDao.loadCache(),
+      CommandHistoryDao.loadCache(),
     ]);
   }
 }

@@ -289,6 +289,13 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
       }
 
       tab.service = service;
+      // 掉线（非主动断开）→ 标记 lost，UI 出重连角标；页面侧决定是否自动重连。
+      // 一个 tab 一个池条目（acquire 以 tabId 为键），回调不会被别的 tab 覆盖。
+      service.onDisconnected = () {
+        if (!_isOpen(tab.id) || tab.status != TabStatus.connected) return;
+        tab.markFailed(L10n.str.orchHostDisconnected, hadConnectedBefore: true);
+        _publish();
+      };
       tab.connectionError = null;
       tab.status = TabStatus.connected;
       _publish();
@@ -330,6 +337,7 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
       if (tab.isLocal) {
         tab.localService?.disconnect();
       } else {
+        tab.service?.onDisconnected = null; // 关 tab 是主动断开，不触发 lost
         SSHConnectionPool.release(tab.id); // 用 tabId 释放
       }
       tab.dispose();
@@ -394,7 +402,8 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
 
     // 1. 取消旧 tab 上的输出订阅（避免旧 service 流到新 service 之间产生串扰）
     existingTab.cancelOutputSubscription();
-    // 2. 强制断开旧 SSH 连接（清理连接池）
+    // 2. 强制断开旧 SSH 连接（清理连接池）。先清掉线回调：主动断开不该触发 lost
+    existingTab.service?.onDisconnected = null;
     await SSHConnectionPool.forceDisconnect(tabId);
 
     // 3. 标记为连接中

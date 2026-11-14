@@ -1,7 +1,8 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -12,9 +13,12 @@ import 'package:xterm/xterm.dart' as xterm;
 import 'package:xterm/src/ui/render.dart' show RenderTerminal;
 import '../core/app_toast.dart';
 import '../core/constants.dart';
+import '../core/terminal_keybindings.dart';
+import '../core/terminal_themes.dart';
 import '../core/theme_colors.dart';
 import '../core/ui_text.dart';
-import '../services/agent_logger.dart';
+import '../utils/terminal_blocks.dart';import '../utils/terminal_panes.dart';
+import '../utils/terminal_search.dart';
 import '../utils/terminal_text_actions.dart';
 import 'terminal_context_menu.dart';
 
@@ -36,6 +40,18 @@ class TerminalView extends StatefulWidget {
   /// 只有 active 的可以抢焦点/自动聚焦，否则后台 tab 会把键盘焦点抢走。
   final bool active;
 
+  /// 终端配色预设 id（见 core/terminal_themes.dart）；null 或未识别 → 内置配色
+  final String? paletteId;
+
+  /// 快捷键映射（见 core/terminal_keybindings.dart）；null → 默认表
+  final TerminalKeymap? keymap;
+
+  /// OSC 133 命令块（见 utils/terminal_blocks.dart）；null 或无块 → 不出块菜单
+  final TerminalBlockTracker? blockTracker;
+
+  /// 分屏动作（布局与会话都归页面持有）。null = 这个终端不参与分屏。
+  final TerminalPaneActions? panes;
+
   const TerminalView({
     super.key,
     this.terminal,
@@ -45,76 +61,64 @@ class TerminalView extends StatefulWidget {
     this.onFontSizeChanged,
     this.onMenuIntent,
     this.active = true,
+    this.paletteId,
+    this.keymap,
+    this.blockTracker,
+    this.panes,
   });
 
   @override
   State<TerminalView> createState() => _TerminalViewState();
 }
 
-class _TerminalViewState extends State<TerminalView> {
+class _TerminalViewState extends State<TerminalView> with TextInputClient {
   final FocusNode _focusNode = FocusNode();
+
+  // 桌面 IME 自建 TextInput 连接（macOS/Linux）：xterm 的 CustomTextEdit 路径
+  // 在 Windows 上收不到 IME 组字（真机实测）。Windows 不 attach（引擎会吞
+  // Ctrl+C/V 且 IME 模型损坏），组字/注入/候选窗全走 runner 原生通道。
+  TextInputConnection? _imeConnection;
+  TextEditingValue _imeState = const TextEditingValue();
+
+  // Windows runner 拦截 WM_IME_* 后把上屏串发到这个 channel（引擎 IME 模型缺陷的绕路）
+  static const MethodChannel _nativeImeChannel =
+      MethodChannel('com.keiskei.aiterminal/ime');
+  static _TerminalViewState? _nativeImeTarget;
+  bool get _isDesktop =>
+      Platform.isWindows || Platform.isMacOS || Platform.isLinux;
   // TerminalController 用于管理终端选区，右键复制时读取选中文本
   final xterm.TerminalController _controller = xterm.TerminalController();
   final GlobalKey _terminalContainerKey = GlobalKey();
 
-  static const _darkTheme = xterm.TerminalTheme(
-    cursor: cBrand,
-    selection: Color(0x4D45C8C3),
-    foreground: Color(0xFFE6ECE8),
-    background: cTerminalBg,
-    black: Color(0xFF1A1D1C),
-    red: cStatusError,
-    green: cStatusOk,
-    yellow: cStatusWarn,
-    blue: Color(0xFF6AA9FF),
-    magenta: Color(0xFFD98AD9),
-    cyan: cBrand,
-    white: Color(0xFFE6ECE8),
-    brightBlack: Color(0xFF6F7671),
-    brightRed: Color(0xFFFF9AA2),
-    brightGreen: Color(0xFF8FE7B4),
-    brightYellow: Color(0xFFF2C276),
-    brightBlue: Color(0xFF8CC0FF),
-    brightMagenta: Color(0xFFE9A8E9),
-    brightCyan: cBrandHover,
-    brightWhite: Color(0xFFFFFFFF),
-    searchHitBackground: Color(0xFF1A2423),
-    searchHitBackgroundCurrent: Color(0xFF243331),
-    searchHitForeground: Color(0xFFF1F3F1),
-  );
+  // ---- 终端搜索（默认可见 Ctrl+Shift+F / mac ⌘F，可在外观设置里改）----
+  // 高亮走 xterm 内置 controller.highlight()（渲染器原生绘制，锚点随 buffer
+  // 变动自动跟随），匹配计算遍历 buffer 文本，见 utils/terminal_search.dart。
+  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchQueryController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  bool _searchOpen = false;
+  bool _searchCaseSensitive = false;
+  List<TerminalSearchMatch> _searchMatches = [];
+  int _searchCurrent = -1;
+  final List<xterm.TerminalHighlight> _searchHighlights = [];
+  final List<xterm.CellAnchor> _searchAnchors = [];
+  // 搜索期间跳转过视图：关闭时回到底部，恢复输出跟随
+  bool _searchScrolled = false;
+  Timer? _searchDebounce;
+  static const int _searchMaxMatches = 5000;
 
-  static const _lightTheme = xterm.TerminalTheme(
-    cursor: cBrandLight,
-    selection: Color(0x330B7A75),
-    foreground: Color(0xFF1A1F1D),
-    background: cTerminalOutputLight,
-    black: Color(0xFF2A2F2C),
-    red: cStatusErrorLight,
-    green: cStatusOkLight,
-    yellow: cGoldLight,
-    blue: Color(0xFF1F5FA8),
-    magenta: Color(0xFF8A3A8A),
-    cyan: cBrandLight,
-    white: Color(0xFF6F7872),
-    brightBlack: cTextMutedLight,
-    brightRed: Color(0xFFD14343),
-    brightGreen: Color(0xFF2E9B63),
-    brightYellow: Color(0xFFA66F00),
-    brightBlue: Color(0xFF2E7BC4),
-    brightMagenta: Color(0xFFA94FA9),
-    brightCyan: Color(0xFF159792),
-    brightWhite: cTextMainLight,
-    searchHitBackground: Color(0xFFDFF3F1),
-    searchHitBackgroundCurrent: Color(0xFFC9EAE7),
-    searchHitForeground: Color(0xFF171B19),
-  );
-
-  xterm.TerminalTheme get _theme =>
-      ThemeColors.of(context).isLight ? _lightTheme : _darkTheme;
+  xterm.TerminalTheme get _theme => resolveTerminalTheme(
+      paletteId: widget.paletteId,
+      isLight: ThemeColors.of(context).isLight,
+    );
 
   @override
   void initState() {
     super.initState();
+    widget.terminal?.onBell = _onBell;
+    _focusNode.addListener(_onFocusForIme);
+    _nativeImeChannel.setMethodCallHandler(_handleNativeIme);
+    if (widget.active) _nativeImeTarget = this;
     if (widget.active) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) _focusNode.requestFocus();
@@ -125,8 +129,21 @@ class _TerminalViewState extends State<TerminalView> {
   @override
   void didUpdateWidget(TerminalView oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.active) {
+      _nativeImeTarget = this;
+    } else if (_nativeImeTarget == this) {
+      _nativeImeTarget = null;
+    }
     final terminalChanged =
         widget.terminal != null && widget.terminal != oldWidget.terminal;
+    if (terminalChanged) {
+      widget.terminal?.onBell = _onBell;
+      if (_searchOpen) {
+        oldWidget.terminal?.removeListener(_onTerminalChangedForSearch);
+        widget.terminal?.addListener(_onTerminalChangedForSearch);
+        _runSearch();
+      }
+    }
     final becameActive = widget.active && !oldWidget.active;
     if (terminalChanged || becameActive) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -142,19 +159,279 @@ class _TerminalViewState extends State<TerminalView> {
 
   @override
   void dispose() {
+    if (_nativeImeTarget == this) _nativeImeTarget = null;
+    _focusNode.removeListener(_onFocusForIme);
+    _closeIme();
     _focusNode.dispose();
+    widget.terminal?.removeListener(_onTerminalChangedForSearch);
+    _searchDebounce?.cancel();
+    _clearSearchHighlights();
+    _searchQueryController.dispose();
+    _searchFocusNode.dispose();
+    _scrollController.dispose();
     _controller.dispose();
     super.dispose();
   }
 
-  /// 键盘事件处理：
-  /// - KeyUpEvent 拦截（防止 CustomKeyboardListener 重复插入字符）
-  /// - character 为 null 时（Windows IME 问题）从 keyLabel fallback
-  /// - 其他情况返回 ignored，让 xterm keyInput + CustomKeyboardListener 处理
+  void _onFocusForIme() {
+    if (_focusNode.hasFocus && _isDesktop) {
+      _openIme();
+    } else {
+      _closeIme();
+    }
+    if (Platform.isWindows) {
+      _sendNative('focus', _focusNode.hasFocus);
+    }
+    // 分屏：键盘落到哪一屏，页面就把「活动 pane」记成这一屏（新 pane 插在哪、
+    // 焦点往哪移都以它为准）。页面在 pane 未变时不会重建，不会形成回环。
+    if (_focusNode.hasFocus) widget.panes?.onFocus();
+  }
+
+  void _openIme() {
+    if (Platform.isWindows) {
+      _updateImeCaret();
+      return;
+    }
+    if (_imeConnection != null && _imeConnection!.attached) {
+      _imeConnection!.show();
+    } else {
+      _imeConnection = TextInput.attach(
+        this,
+        TextInputConfiguration(
+          // Windows 引擎要求 setClient 携带 viewId，否则拒绝建立连接
+          viewId: View.of(context).viewId,
+          inputType: TextInputType.text,
+          inputAction: TextInputAction.newline,
+          autocorrect: false,
+          enableSuggestions: false,
+        ),
+      );
+      _imeConnection!.show();
+      _imeConnection!.setEditingState(const TextEditingValue());
+    }
+    _updateImeCaret();
+  }
+
+  void _closeIme() {
+    if (_imeConnection != null && _imeConnection!.attached) {
+      _imeConnection!.close();
+    }
+    _imeConnection = null;
+    _imeState = const TextEditingValue();
+  }
+
+  void _sendNative(String method, [Object? arguments]) {
+    _nativeImeChannel
+        .invokeMethod<dynamic>(method, arguments)
+        .catchError((Object _) {});
+  }
+
+  // 让 IME 候选窗跟着终端光标走，而不是落在窗口左上角
+  void _updateImeCaret() {
+    final box = _terminalContainerKey.currentContext?.findRenderObject();
+    final render = box == null ? null : _findRenderTerminal(box);
+    if (render == null || !render.attached) return;
+    final rect = render.localToGlobal(render.cursorOffset) & render.cellSize;
+    if (Platform.isWindows) {
+      _sendNative('setCaretRect', {'x': rect.left, 'y': rect.top});
+      return;
+    }
+    final conn = _imeConnection;
+    if (conn == null || !conn.attached) return;
+    final origin = render.localToGlobal(Offset.zero);
+    conn.setEditableSizeAndTransform(
+      render.size,
+      Matrix4.translationValues(origin.dx, origin.dy, 0),
+    );
+    conn.setCaretRect(rect);
+  }
+
+  void _scheduleCaretUpdate() {
+    if (!Platform.isWindows) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _updateImeCaret();
+    });
+  }
+
+  @override
+  TextEditingValue? get currentTextEditingValue => _imeState;
+
+  @override
+  AutofillScope? get currentAutofillScope => null;
+
+  @override
+  void updateEditingValue(TextEditingValue value) {
+    _handleImeValue(value);
+  }
+
+  void _handleImeValue(TextEditingValue value) {
+    _imeState = value;
+    // 组字中：不上屏
+    if (!value.composing.isCollapsed) {
+      return;
+    }
+    if (value.text.isNotEmpty) {
+      widget.terminal?.textInput(value.text);
+    }
+    _imeState = const TextEditingValue();
+    _imeConnection?.setEditingState(_imeState);
+  }
+
+  Future<dynamic> _handleNativeIme(MethodCall call) async {
+    if (call.method == 'commit' || call.method == 'text') {
+      final text = call.arguments as String?;
+      if (text != null && text.isNotEmpty) {
+        final target = _nativeImeTarget ?? this;
+        target.widget.terminal?.textInput(text);
+        target._scheduleCaretUpdate();
+      }
+    }
+    return null;
+  }
+
+  @override
+  void performAction(TextInputAction action) {
+    if (action == TextInputAction.done || action == TextInputAction.newline) {
+      widget.terminal?.keyInput(xterm.TerminalKey.enter);
+    }
+  }
+
+  @override
+  void connectionClosed() {
+    _imeConnection = null;
+    _imeState = const TextEditingValue();
+  }
+
+  @override
+  void updateFloatingCursor(RawFloatingCursorPoint point) {}
+
+  @override
+  void showAutocorrectionPromptRect(int start, int end) {}
+
+  @override
+  void performPrivateCommand(String action, Map<String, dynamic> data) {}
+
+  @override
+  void insertTextPlaceholder(Size size) {}
+
+  @override
+  void removeTextPlaceholder() {}
+
+  @override
+  void showToolbar() {}
+
+  DateTime? _lastBellAt;
+
+  /// BEL 响应：系统提示音。Tab 补全等场景会连发 BEL，节流防轰炸。
+  void _onBell() {
+    final now = DateTime.now();
+    final last = _lastBellAt;
+    if (last != null && now.difference(last) < const Duration(milliseconds: 500)) {
+      return;
+    }
+    _lastBellAt = now;
+    SystemSound.play(SystemSoundType.alert);
+  }
+
+  /// 生效的快捷键映射：设置里改过的动作覆盖默认，其余走默认表
+  TerminalKeymap get _keymap => widget.keymap ?? TerminalKeymap.defaults;
+
+  /// 当前这条按键组合命中了哪个可重绑动作
+  TerminalKeyAction? _matchKeyAction(int keyId) {
+    final hw = HardwareKeyboard.instance;
+    return _keymap.actionFor(
+      keyId: keyId,
+      ctrl: hw.isControlPressed,
+      shift: hw.isShiftPressed,
+      alt: hw.isAltPressed,
+      meta: hw.isMetaPressed,
+    );
+  }
+
+  /// 菜单里某个动作的快捷键文案（跟随用户的自定义，不写死）
+  String _shortcutFor(TerminalKeyAction action) {
+    final bindings = _keymap.bindingsFor(action);
+    if (bindings.isEmpty) return '';
+    final preferred = bindings.firstWhere(
+      (b) => Platform.isMacOS ? b.meta : b.ctrl,
+      orElse: () => bindings.first,
+    );
+    return preferred.label(isMac: Platform.isMacOS);
+  }
+
+  /// 执行一个可重绑的动作。返回是否消费了这个按键。
+  bool _runKeyAction(TerminalKeyAction action) {
+    switch (action) {
+      case TerminalKeyAction.paste:
+        _pasteFromClipboard();
+        return true;
+      case TerminalKeyAction.search:
+        _openSearch();
+        return true;
+      case TerminalKeyAction.commandHistory:
+        widget.onMenuIntent?.call(TerminalMenuIntent.showHistory, '');
+        return true;
+      case TerminalKeyAction.zoomIn:
+      case TerminalKeyAction.zoomOut:
+      case TerminalKeyAction.zoomReset:
+        if (widget.onFontSizeChanged == null) return false;
+        final target = action == TerminalKeyAction.zoomIn
+            ? widget.fontSize + 1
+            : action == TerminalKeyAction.zoomOut
+                ? widget.fontSize - 1
+                : 14.0;
+        // 上下限由页面 clamp，这里照旧消费按键：到了边界再放行 '=' 进 shell
+        // 会让用户以为快捷键时好时坏
+        widget.onFontSizeChanged!(target);
+        return true;
+      case TerminalKeyAction.splitVertical:
+        final panes = widget.panes;
+        if (panes == null || !panes.canSplit) return false;
+        panes.onSplit(SplitDirection.vertical);
+        return true;
+      case TerminalKeyAction.splitHorizontal:
+        final panes = widget.panes;
+        if (panes == null || !panes.canSplit) return false;
+        panes.onSplit(SplitDirection.horizontal);
+        return true;
+      case TerminalKeyAction.closePane:
+        final panes = widget.panes;
+        // 没分屏时不吞键：关标签有自己的快捷键，不能让「在单屏里按 ⌘⇧W」
+        // 变成一件悄悄发生的事
+        if (panes == null || !panes.isSplit) return false;
+        panes.onClose();
+        return true;
+      case TerminalKeyAction.focusNextPane:
+      case TerminalKeyAction.focusPrevPane:
+        final panes = widget.panes;
+        if (panes == null || !panes.isSplit) return false;
+        panes.onFocusNeighbor(action == TerminalKeyAction.focusNextPane);
+        return true;
+    }
+  }
+
+  /// Ctrl/Cmd+点击：打开光标处的 URL。cell 列号按宽字符折算成字符串下标。
+  void _handleTapUp(TapUpDetails details, xterm.CellOffset cell) {
+    final hw = HardwareKeyboard.instance;
+    if (!hw.isControlPressed && !hw.isMetaPressed) return;
+    final terminal = widget.terminal;
+    if (terminal == null) return;
+    final buffer = terminal.buffer;
+    if (cell.y < 0 || cell.y >= buffer.height) return;
+    final line = buffer.lines[cell.y];
+    var col = 0;
+    for (var i = 0; i < cell.x && i < line.length; i++) {
+      if (line.getCodePoint(i) != 0) col++;
+    }
+    final url = urlAtColumn(line.getText(), col);
+    if (url != null) _openUrl(url);
+  }
+
+  /// 键盘事件处理：拦截粘贴/缩放/Insert/Ctrl+A 等 app 级快捷键，
+  /// 其余交给 xterm keyInput（特殊键）与 CustomKeyboardListener 的
+  /// character 兜底（普通字符）；IME 组字/上屏走自建 TextInput 连接。
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
-    // KeyUpEvent 拦截：CustomKeyboardListener._onKeyEvent 对所有事件类型
-    // 都尝试 onInsert，而 xterm _handleKeyEvent 对 KeyUpEvent 返回 ignored，
-    // 导致字符被插入两次。
+    // KeyUpEvent 不参与任何插入/快捷键逻辑，直接吞掉，避免上层重复处理。
     if (event is KeyUpEvent) {
       return KeyEventResult.handled;
     }
@@ -163,17 +440,29 @@ class _TerminalViewState extends State<TerminalView> {
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
+    _scheduleCaretUpdate();
 
-    // 粘贴统一走自己的路径：多行内容要先确认，避免一次落进多条命令。
-    // （xterm 默认把 Ctrl/Cmd+V 直接交给 terminal.paste，绕过了确认）
-    final hw = HardwareKeyboard.instance;
-    if (event is KeyDownEvent &&
-        (hw.isControlPressed || hw.isMetaPressed) &&
-        event.logicalKey == LogicalKeyboardKey.keyV) {
-      _pasteFromClipboard();
+    // 可重绑的动作（粘贴/搜索/命令历史/字号缩放）统一走这张表：
+    // 设置页改了立刻生效，且默认表与旧的硬编码逐键等价。
+    //
+    // 表里没有的键一律放行到下面：Ctrl+A 是 readline 行首、Ctrl+C 是中断、
+    // Ctrl+H 是退格、Ctrl+D 是 EOF —— 那些是 shell 的键，不是我们的。
+    //
+    // 按住不放不重复触发（与旧实现一致）：连按 Ctrl+= 会一路放大，但粘贴、
+    // 搜索、历史面板重复触发会一次弹一串，索性全部只认 KeyDown。
+    if (event is KeyDownEvent) {
+      final action = _matchKeyAction(event.logicalKey.keyId);
+      if (action != null && _runKeyAction(action)) {
+        return KeyEventResult.handled;
+      }
+    }
+
+    if (_searchOpen && event.logicalKey == LogicalKeyboardKey.escape) {
+      _closeSearch();
       return KeyEventResult.handled;
     }
 
+    final hw = HardwareKeyboard.instance;
     // Windows 控制台惯例键位（Windows Terminal / cmd / PowerShell 都是这样）：
     //   Ctrl+Insert   = 复制选中
     //   Shift+Insert  = 粘贴（Shift 无修饰语义 → 不进多行确认；终端粘贴
@@ -214,58 +503,312 @@ class _TerminalViewState extends State<TerminalView> {
       }
     }
 
-    final terminal = widget.terminal;
-    if (terminal == null) {
-      return KeyEventResult.ignored;
-    }
-
-    final hardware = HardwareKeyboard.instance;
-    final hasCtrl = hardware.isControlPressed;
-    final hasAlt = hardware.isAltPressed;
-    final hasMeta = hardware.isMetaPressed;
-
-    // 只在没有 ctrl/alt/meta 修饰键且 character 为 null 时提供 fallback。
-    // 有修饰键时交给 xterm keyInput 处理（如 Ctrl+C → \x03）。
-    // character 不为 null 时交给 CustomKeyboardListener 的 character 路径处理。
-    if (!hasCtrl && !hasAlt && !hasMeta &&
-        (event.character == null || event.character!.isEmpty)) {
-      final char = _charFromKeyEvent(event, hardware.isShiftPressed);
-      if (char != null && char.isNotEmpty) {
-        terminal.textInput(char);
-        return KeyEventResult.handled;
-      }
-    }
-
-    // 返回 ignored，让 xterm 继续处理：
-    // 1. _handleKeyEvent → keyInput（处理特殊键如 Enter/Tab/方向键/Ctrl+字母）
-    // 2. CustomKeyboardListener 检查 character（如果不为 null）
+    // 其余交给 xterm：keyInput 处理特殊键（Enter/Tab/方向键/Ctrl+字母），
+    // 普通字符由 CustomKeyboardListener 的 character 兜底插入；
+    // IME 组字/上屏走本 State 自建的 TextInput 连接（见 _openIme）。
     return KeyEventResult.ignored;
   }
 
-  /// 当 KeyEvent.character 为 null 时（Windows IME 问题），
-  /// 从 LogicalKeyboardKey.keyLabel 生成字符。
-  String? _charFromKeyEvent(KeyEvent event, bool shift) {
-    final key = event.logicalKey;
+  // ---- 终端搜索 ----
 
-    // Space 键
-    if (key == LogicalKeyboardKey.space) {
-      return ' ';
+  void _openSearch() {
+    if (_searchOpen) {
+      _searchFocusNode.requestFocus();
+      return;
     }
+    setState(() => _searchOpen = true);
+    widget.terminal?.addListener(_onTerminalChangedForSearch);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _searchFocusNode.requestFocus();
+    });
+    if (_searchQueryController.text.isNotEmpty) _runSearch();
+  }
 
-    final label = key.keyLabel;
-    if (label.length != 1) {
-      return null;
+  void _closeSearch() {
+    if (!_searchOpen) return;
+    widget.terminal?.removeListener(_onTerminalChangedForSearch);
+    _searchDebounce?.cancel();
+    _clearSearchHighlights();
+    final restoreBottom = _searchScrolled;
+    setState(() {
+      _searchOpen = false;
+      _searchMatches = [];
+      _searchCurrent = -1;
+      _searchScrolled = false;
+    });
+    if (restoreBottom) _scrollToBottom();
+    _focusNode.requestFocus();
+  }
+
+  /// 输出持续到达时匹配会过期：防抖后重算。锚点本身随 buffer 变动跟随，
+  /// 这里重算只是为了把新输出里的命中也纳入。
+  void _onTerminalChangedForSearch() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 200), () {
+      if (mounted && _searchOpen) _runSearch(keepCurrent: true);
+    });
+  }
+
+  void _runSearch({bool keepCurrent = false}) {
+    final terminal = widget.terminal;
+    final query = _searchQueryController.text;
+    if (terminal == null || query.isEmpty) {
+      _clearSearchHighlights();
+      setState(() {
+        _searchMatches = [];
+        _searchCurrent = -1;
+      });
+      return;
     }
-
-    // 字母键：keyLabel 返回大写，根据 shift 决定大小写
-    if (RegExp(r'[a-zA-Z]').hasMatch(label)) {
-      return shift ? label.toUpperCase() : label.toLowerCase();
+    final matches = searchTerminalBuffer(
+      terminal.buffer,
+      query,
+      caseSensitive: _searchCaseSensitive,
+      maxMatches: _searchMaxMatches,
+    );
+    int current;
+    if (matches.isEmpty) {
+      current = -1;
+    } else if (keepCurrent && _searchCurrent >= 0) {
+      current = _searchCurrent.clamp(0, matches.length - 1);
+    } else {
+      current = 0;
     }
+    setState(() {
+      _searchMatches = matches;
+      _searchCurrent = current;
+    });
+    _applyHighlights();
+    if (!keepCurrent && current >= 0) _scrollToMatch(current);
+  }
 
-    // 数字键和符号键：keyLabel 直接是字符
-    // 注意：Shift+数字键的符号（如 Shift+1=!）无法通过 keyLabel 获取，
-    // 但这只在 character 为 null 时作为 fallback，覆盖大多数场景。
-    return label;
+  void _clearSearchHighlights() {
+    for (final h in _searchHighlights) {
+      h.dispose();
+    }
+    _searchHighlights.clear();
+    // highlight.dispose 不释放锚点，谁创建谁清理
+    for (final a in _searchAnchors) {
+      a.dispose();
+    }
+    _searchAnchors.clear();
+  }
+
+  void _applyHighlights() {
+    _clearSearchHighlights();
+    final terminal = widget.terminal;
+    if (terminal == null) return;
+    final light = ThemeColors.of(context).isLight;
+    final hitColor =
+        light ? const Color(0x59A66F00) : const Color(0x59F2C276);
+    final currentColor =
+        light ? const Color(0x80D14343) : const Color(0x99FF9AA2);
+    for (var i = 0; i < _searchMatches.length; i++) {
+      final m = _searchMatches[i];
+      // 回滚区被裁剪后行号可能越界，锚点会脱离，跳过
+      if (m.line >= terminal.buffer.height) continue;
+      final line = terminal.buffer.lines[m.line];
+      final p1 = line.createAnchor(m.start);
+      final p2 = line.createAnchor(m.end);
+      _searchAnchors.add(p1);
+      _searchAnchors.add(p2);
+      _searchHighlights.add(_controller.highlight(
+        p1: p1,
+        p2: p2,
+        color: i == _searchCurrent ? currentColor : hitColor,
+      ));
+    }
+  }
+
+  void _nextMatch() => _stepMatch(1);
+
+  void _prevMatch() => _stepMatch(-1);
+
+  void _stepMatch(int delta) {
+    if (_searchMatches.isEmpty) return;
+    final count = _searchMatches.length;
+    final base = _searchCurrent < 0 ? 0 : _searchCurrent;
+    final next = (base + delta) % count;
+    _setCurrentMatch(next < 0 ? next + count : next);
+  }
+
+  void _setCurrentMatch(int index) {
+    if (index == _searchCurrent) {
+      if (index >= 0) _scrollToMatch(index);
+      return;
+    }
+    setState(() => _searchCurrent = index);
+    _applyHighlights();
+    if (index >= 0) _scrollToMatch(index);
+  }
+
+  RenderTerminal? _renderTerminal() {
+    final box = _terminalContainerKey.currentContext?.findRenderObject();
+    return box == null ? null : _findRenderTerminal(box);
+  }
+
+  /// 滚动到命中行（尽量居中）。xterm 的滚动模型：offset 像素 = 视口顶部
+  /// 对应的 buffer 内容 y 坐标，行 i 画在 i*lineHeight - offset 处。
+  void _scrollToMatch(int index) {
+    if (_scrollToLine(_searchMatches[index].line)) _searchScrolled = true;
+  }
+
+  /// 滚动让 [line] 大致居中；渲染器还没就绪（未布局）时什么都不做。
+  bool _scrollToLine(int? line) {
+    if (line == null || line < 0) return false;
+    final render = _renderTerminal();
+    final terminal = widget.terminal;
+    if (render == null || terminal == null || !_scrollController.hasClients) {
+      return false;
+    }
+    final lineHeight = render.cellSize.height;
+    final viewportHeight = render.size.height;
+    final maxExtent =
+        math.max(0.0, terminal.buffer.height * lineHeight - viewportHeight);
+    final target =
+        (line * lineHeight - (viewportHeight - lineHeight) / 2)
+            .clamp(0.0, maxExtent);
+    _scrollController.jumpTo(target);
+    return true;
+  }
+
+  void _scrollToBottom() {
+    final render = _renderTerminal();
+    final terminal = widget.terminal;
+    if (render == null || terminal == null || !_scrollController.hasClients) {
+      return;
+    }
+    final lineHeight = render.cellSize.height;
+    final maxExtent = math.max(
+        0.0, terminal.buffer.height * lineHeight - render.size.height);
+    _scrollController.jumpTo(maxExtent);
+  }
+
+  Widget _buildSearchBar() {
+    final tc = ThemeColors.of(context);
+    final query = _searchQueryController.text;
+    final count = _searchMatches.length;
+    final String label;
+    if (query.isEmpty) {
+      label = '';
+    } else if (count == 0) {
+      label = UiText.t('无结果', 'No results');
+    } else {
+      final capped = count >= _searchMaxMatches ? '+' : '';
+      label = '${_searchCurrent + 1}/$count$capped';
+    }
+    final iconColor = tc.textSub;
+    return Focus(
+      onKeyEvent: (node, event) {
+        if (event is! KeyDownEvent) return KeyEventResult.ignored;
+        if (event.logicalKey == LogicalKeyboardKey.escape) {
+          _closeSearch();
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.enter &&
+            HardwareKeyboard.instance.isShiftPressed) {
+          _prevMatch();
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Material(
+        color: tc.surface,
+        elevation: 4,
+        shadowColor: Colors.black54,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border(bottom: BorderSide(color: tc.border)),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 260,
+                child: TextField(
+                  controller: _searchQueryController,
+                  focusNode: _searchFocusNode,
+                  style: TextStyle(fontSize: fSmall, color: tc.textMain),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 6),
+                    hintText: UiText.t('搜索终端输出', 'Search output'),
+                    hintStyle: TextStyle(fontSize: fSmall, color: tc.textMuted),
+                    filled: true,
+                    fillColor: tc.bg,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(4),
+                      borderSide: BorderSide(color: tc.border),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(4),
+                      borderSide: BorderSide(color: tc.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(4),
+                      borderSide: BorderSide(color: tc.brand),
+                    ),
+                  ),
+                  onChanged: (_) => _runSearch(),
+                  onSubmitted: (_) => _nextMatch(),
+                  // 默认 done 动作会 unfocus（EditableText._finalizeEditing），
+                  // 搜索框按 Enter 跳下一个后必须保持焦点才能继续输入/导航。
+                  onEditingComplete: () {},
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 72,
+                child: Text(
+                  label,
+                  style: TextStyle(fontSize: fSmall, color: tc.textSub),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                tooltip: UiText.t('区分大小写', 'Match case'),
+                iconSize: 16,
+                visualDensity: VisualDensity.compact,
+                onPressed: () {
+                  setState(() => _searchCaseSensitive = !_searchCaseSensitive);
+                  _runSearch();
+                },
+                icon: Text(
+                  'Aa',
+                  style: TextStyle(
+                    fontSize: fSmall,
+                    fontWeight: FontWeight.bold,
+                    color: _searchCaseSensitive ? tc.brand : iconColor,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: UiText.t('上一个 (Shift+Enter)', 'Previous (Shift+Enter)'),
+                iconSize: 16,
+                visualDensity: VisualDensity.compact,
+                onPressed: _searchMatches.isEmpty ? null : _prevMatch,
+                icon: Icon(Icons.keyboard_arrow_up, color: iconColor),
+              ),
+              IconButton(
+                tooltip: UiText.t('下一个 (Enter)', 'Next (Enter)'),
+                iconSize: 16,
+                visualDensity: VisualDensity.compact,
+                onPressed: _searchMatches.isEmpty ? null : _nextMatch,
+                icon: Icon(Icons.keyboard_arrow_down, color: iconColor),
+              ),
+              IconButton(
+                tooltip: UiText.t('关闭 (Esc)', 'Close (Esc)'),
+                iconSize: 16,
+                visualDensity: VisualDensity.compact,
+                onPressed: _closeSearch,
+                icon: Icon(Icons.close, color: iconColor),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// 右键菜单：本地动作（复制/粘贴/清屏/字号/保存）就地完成，
@@ -282,6 +825,7 @@ class _TerminalViewState extends State<TerminalView> {
       if (text.trim().isNotEmpty) selectedText = text;
     }
     final lineTexts = _lineTextsAt(globalPosition);
+    final lineY = _bufferLineAt(globalPosition);
 
     final overlay = Overlay.of(context);
     late OverlayEntry entry;
@@ -299,6 +843,7 @@ class _TerminalViewState extends State<TerminalView> {
           terminal: terminal,
           selectedText: selectedText,
           lineTexts: lineTexts,
+          lineY: lineY,
         ),
         onDismiss: dismiss,
         tc: tc,
@@ -311,22 +856,27 @@ class _TerminalViewState extends State<TerminalView> {
   /// 取并集既不会漏识别，也不会把隔了几行的内容算进来。
   List<String> _lineTextsAt(Offset globalPosition) {
     final terminal = widget.terminal;
-    final box = _terminalContainerKey.currentContext?.findRenderObject();
-    if (terminal == null || box is! RenderBox) return const [];
-    final render = _findRenderTerminal(box);
-    if (render == null) return const [];
-    final cell = render.getCellOffset(render.globalToLocal(globalPosition));
+    final y = _bufferLineAt(globalPosition);
+    if (terminal == null || y == null) return const [];
     final buffer = terminal.buffer;
     final texts = <String>[];
     for (final delta in const [0, -1, 1]) {
-      final y = cell.y + delta;
-      if (y < 0 || y >= buffer.height) continue;
-      final text = buffer.lines[y].getText();
+      final line = y + delta;
+      if (line < 0 || line >= buffer.height) continue;
+      final text = buffer.lines[line].getText();
       if (text.trim().isNotEmpty && !texts.contains(text)) texts.add(text);
     }
-    agentLogger.debug(
-        'Terminal', '右键行: cell=(${cell.x},${cell.y}) 命中=${texts.length}');
     return texts;
+  }
+
+  /// 右键位置对应的 buffer 行号（含回滚区）。拿不到渲染器时返回 null。
+  int? _bufferLineAt(Offset globalPosition) {
+    final box = _terminalContainerKey.currentContext?.findRenderObject();
+    if (box is! RenderBox) return null;
+    final render = _findRenderTerminal(box);
+    if (render == null) return null;
+    final cell = render.getCellOffset(render.globalToLocal(globalPosition));
+    return cell.y;
   }
 
   RenderTerminal? _findRenderTerminal(RenderObject node) {
@@ -342,6 +892,7 @@ class _TerminalViewState extends State<TerminalView> {
     required xterm.Terminal terminal,
     required String? selectedText,
     required List<String> lineTexts,
+    required int? lineY,
   }) {
     final items = <TerminalMenuItem>[];
     final onIntent = widget.onMenuIntent;
@@ -410,23 +961,34 @@ class _TerminalViewState extends State<TerminalView> {
       icon: Icons.save_alt_rounded,
       onTap: _saveOutputToFile,
     ));
+    if (onIntent != null) {
+      items.add(TerminalMenuItem(
+        label: UiText.t('命令历史', 'Command history'),
+        icon: Icons.history_rounded,
+        shortcut: _shortcutFor(TerminalKeyAction.commandHistory),
+        onTap: () => onIntent(TerminalMenuIntent.showHistory, ''),
+      ));
+    }
     if (widget.onFontSizeChanged != null) {
       items.add(TerminalMenuItem(
         label: UiText.t('放大字号', 'Increase font size'),
         icon: Icons.text_increase_rounded,
         separatorBefore: true,
+        shortcut: _shortcutFor(TerminalKeyAction.zoomIn),
         enabled: widget.fontSize < 24,
         onTap: () => widget.onFontSizeChanged!(widget.fontSize + 1),
       ));
       items.add(TerminalMenuItem(
         label: UiText.t('缩小字号', 'Decrease font size'),
         icon: Icons.text_decrease_rounded,
+        shortcut: _shortcutFor(TerminalKeyAction.zoomOut),
         enabled: widget.fontSize > 10,
         onTap: () => widget.onFontSizeChanged!(widget.fontSize - 1),
       ));
       items.add(TerminalMenuItem(
         label: UiText.t('重置字号', 'Reset font size'),
         icon: Icons.text_fields_rounded,
+        shortcut: _shortcutFor(TerminalKeyAction.zoomReset),
         onTap: () => widget.onFontSizeChanged!(14),
       ));
     }
@@ -455,6 +1017,43 @@ class _TerminalViewState extends State<TerminalView> {
         ));
       }
     }
+
+    // —— 分屏（首屏就是 AI 绑定的那一屏，额外屏是纯用户终端）——
+    final paneActions = widget.panes;
+    if (paneActions != null) {
+      items.add(TerminalMenuItem(
+        label: UiText.t('左右分屏', 'Split left/right'),
+        icon: Icons.view_week_outlined,
+        separatorBefore: true,
+        shortcut: _shortcutFor(TerminalKeyAction.splitVertical),
+        enabled: paneActions.canSplit,
+        onTap: () => paneActions.onSplit(SplitDirection.vertical),
+      ));
+      items.add(TerminalMenuItem(
+        label: UiText.t('上下分屏', 'Split top/bottom'),
+        icon: Icons.view_agenda_outlined,
+        shortcut: _shortcutFor(TerminalKeyAction.splitHorizontal),
+        enabled: paneActions.canSplit,
+        onTap: () => paneActions.onSplit(SplitDirection.horizontal),
+      ));
+      if (paneActions.isSplit) {
+        items.add(TerminalMenuItem(
+          label: paneActions.isPrimary
+              ? UiText.t('关掉此分屏（AI 在这屏）',
+                  'Close this pane (AI is bound here)')
+              : UiText.t('关掉此分屏', 'Close this pane'),
+          icon: Icons.close_fullscreen_outlined,
+          shortcut: _shortcutFor(TerminalKeyAction.closePane),
+          // 首屏关掉 = AI 正在用的会话没了，必须显式确认，不能一个右键误点就断任务
+          danger: paneActions.isPrimary,
+          onTap: paneActions.onClose,
+        ));
+      }
+    }
+
+    // —— 命令块（shell 打了 OSC 133 才出现）——
+    final blockItems = _buildBlockItems(lineY: lineY, onIntent: onIntent);
+    items.addAll(blockItems);
 
     // —— 远程会话能力 ——
     if (!widget.isLocal && onIntent != null) {
@@ -523,6 +1122,68 @@ class _TerminalViewState extends State<TerminalView> {
     return items;
   }
 
+  /// 命令块菜单项。shell 没装 OSC 133 集成时块列表恒为空 → 一项都不加，
+  /// 用户看不到跟自己无关的东西。
+  List<TerminalMenuItem> _buildBlockItems({
+    required int? lineY,
+    required Future<void> Function(TerminalMenuIntent, String)? onIntent,
+  }) {
+    final tracker = widget.blockTracker;
+    final terminal = widget.terminal;
+    if (tracker == null || terminal == null || onIntent == null) return const [];
+    if (lineY == null || tracker.isEmpty) return const [];
+    final height = terminal.buffer.height;
+    final lineAt = blockLineReader(terminal);
+    final index = blockIndexAtLine(tracker.blocks, lineY, height);
+    final items = <TerminalMenuItem>[];
+    if (index != null) {
+      final blocks = tracker.blocks;
+      final text = blockTextOf(blocks, index, height, lineAt);
+      final exit = blocks[index].exitCode;
+      if (text.trim().isNotEmpty) {
+        items.add(TerminalMenuItem(
+          label: UiText.t('让 Agent 解释这一整块', 'Ask Agent about this block'),
+          icon: Icons.auto_awesome_outlined,
+          shortcut: exit == null ? null : 'exit $exit',
+          separatorBefore: true,
+          onTap: () => onIntent(
+            TerminalMenuIntent.askBlock,
+            clipBlockForAgent(text),
+          ),
+        ));
+        items.add(TerminalMenuItem(
+          label: UiText.t('复制这一整块', 'Copy this block'),
+          icon: Icons.copy_all_outlined,
+          onTap: () => Clipboard.setData(ClipboardData(text: text)),
+        ));
+      }
+    }
+    final next = blockIndexNearLine(tracker.blocks, lineY,
+        forward: true, bufferHeight: height);
+    final prev = blockIndexNearLine(tracker.blocks, lineY,
+        forward: false, bufferHeight: height);
+    if (next != null || prev != null) {
+      items.add(TerminalMenuItem(
+        label: UiText.t('上一块命令', 'Previous command'),
+        icon: Icons.arrow_upward_rounded,
+        separatorBefore: items.isEmpty,
+        enabled: prev != null,
+        onTap: () {
+          if (prev != null) _scrollToLine(blockStartLine(tracker.blocks, prev));
+        },
+      ));
+      items.add(TerminalMenuItem(
+        label: UiText.t('下一块命令', 'Next command'),
+        icon: Icons.arrow_downward_rounded,
+        enabled: next != null,
+        onTap: () {
+          if (next != null) _scrollToLine(blockStartLine(tracker.blocks, next));
+        },
+      ));
+    }
+    return items;
+  }
+
   void _selectAll() {
     final terminal = widget.terminal;
     if (terminal == null) return;
@@ -533,6 +1194,7 @@ class _TerminalViewState extends State<TerminalView> {
     _controller.setSelection(
       xterm.CellAnchor(0, owner: first),
       xterm.CellAnchor(last.length, owner: last),
+      mode: xterm.SelectionMode.line,
     );
   }
 
@@ -757,31 +1419,18 @@ class _TerminalViewState extends State<TerminalView> {
     if (widget.terminal == null) {
       final tc = ThemeColors.of(context);
       return Container(
-        color: tc.terminalBg,
+        // 用配色预设的背景，否则换了配色后「等待连接」这块和终端本体两个颜色
+        color: _theme.background,
         child: Center(
           child: Text(UiText.t('等待连接...', 'Waiting for connection...'), style: TextStyle(color: tc.textSub)),
         ),
       );
     }
 
-    // 桌面平台使用 hardwareKeyboardOnly=true（CustomKeyboardListener 路径）。
-    //
-    // 为什么不用默认的 CustomTextEdit 路径：
-    // CustomTextEdit 通过 TextInput.attach 建立连接，期望通过
-    // updateEditingValue 回调获取字符。但 Windows 桌面的 TextInput
-    // 实现不通过 updateEditingValue 发送普通键盘字符（只用于 IME）。
-    // 结果：keyInput 对字母键返回 false → ignored → 传递给 TextInput →
-    // TextInput 不处理 → 字符丢失。只有 keytab 中有映射的特殊键
-    // （Enter/Tab/Backspace/方向键等）能正常工作。
-    //
-    // hardwareKeyboardOnly=true 的 CustomKeyboardListener 路径：
-    // keyInput 失败后从 KeyEvent.character 插入字符。但 Windows 上
-    // IME 激活时 character 可能为 null，所以通过 onKeyEvent 回调
-    // 提供 fallback：从 LogicalKeyboardKey.keyLabel 生成字符。
-    final isDesktop = !kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.windows ||
-            defaultTargetPlatform == TargetPlatform.macOS ||
-            defaultTargetPlatform == TargetPlatform.linux);
+    // 全平台走 CustomTextEdit（TextInput）路径。桌面中文 IME 的组字/上屏经
+    // updateEditingValue 送达：hardwareKeyboardOnly=true 不建 TextInput 连接，
+    // IME 组字永远进不来，只能靠 keyLabel 兜底出英文字母（旧实现的硬伤）。
+    // 普通字符同样经 TextInput → onInsert 插入，特殊键仍走 xterm keyInput。
 
     // 用 Listener 在外层直接监听原始指针事件，不依赖 xterm 内部的
     // 手势处理器。Listener 不参与手势竞技，不会干扰 xterm 的左键选区
@@ -792,8 +1441,18 @@ class _TerminalViewState extends State<TerminalView> {
     // xterm 的 RenderTerminal.paint 不做裁剪：滚动偏移不在行高整数倍时
     // （视口高度一般不是行高整数倍，底部对齐必然如此），顶部那一行会被
     // 画到视口上边界之外。终端上方紧挨着标签栏，多出来的行就会盖到 tab 上。
-    return Listener(
+    final terminalArea = Listener(
       onPointerDown: (event) {
+        // Alt+左键拖拽 = 块（矩形）选择，iTerm2 / Windows Terminal 惯例。
+        // 拖拽结束后不能立刻恢复 line：selection getter 按读取时的模式重建
+        // 范围，提前恢复会把块选区按行解释。下次普通左键按下才恢复。
+        if (event.buttons == PointerButtons.primary) {
+          if (HardwareKeyboard.instance.isAltPressed) {
+            _controller.setSelectionMode(xterm.SelectionMode.block);
+          } else if (_controller.selectionMode == xterm.SelectionMode.block) {
+            _controller.setSelectionMode(xterm.SelectionMode.line);
+          }
+        }
         // onPointerDown 会收到所有鼠标按钮按下+触摸。
         // kSecondaryButton = 2，对应右键（Mac 双指点击 / Windows 右键）
         if (event.buttons == kSecondaryButton) {
@@ -817,10 +1476,12 @@ class _TerminalViewState extends State<TerminalView> {
           child: xterm.TerminalView(
             widget.terminal!,
             controller: _controller,
+            scrollController: _scrollController,
             focusNode: _focusNode,
             autofocus: widget.active,
-            hardwareKeyboardOnly: isDesktop,
+            hardwareKeyboardOnly: _isDesktop,
             onKeyEvent: _handleKeyEvent,
+            onTapUp: _handleTapUp,
             textStyle: xterm.TerminalStyle(
               fontSize: widget.fontSize,
               fontFamily: 'JetBrainsMono',
@@ -830,6 +1491,14 @@ class _TerminalViewState extends State<TerminalView> {
           ),
         ),
       ),
+    );
+
+    if (!_searchOpen) return terminalArea;
+    return Stack(
+      children: [
+        terminalArea,
+        Positioned(top: 0, left: 0, right: 0, child: _buildSearchBar()),
+      ],
     );
   }
 }

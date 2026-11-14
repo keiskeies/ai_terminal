@@ -9,6 +9,8 @@ import 'package:xterm/xterm.dart';
 import '../core/builtin_runbook_i18n.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/terminal_keybindings.dart';
+import '../core/terminal_themes.dart';
 import '../core/ui_text.dart';
 import '../widgets/smart_table.dart';
 import '../core/l10n_holder.dart';
@@ -21,6 +23,7 @@ import '../widgets/agent_goal_banner.dart';
 import '../models/agent_goal.dart';
 import '../models/agent_permission_mode.dart';
 import '../widgets/session_history_dialog.dart';
+import '../widgets/command_history_panel.dart';
 import '../widgets/agent_log_dialog.dart';
 import '../widgets/agent_command_block.dart';
 import '../widgets/agent_event_cards.dart';
@@ -32,6 +35,10 @@ import '../widgets/reconnecting_banner.dart';
 import '../widgets/local_dir_auth_dialog.dart';
 import '../widgets/tab_item_widget.dart';
 import '../utils/interrupted_turn_detector.dart';
+import '../utils/command_tracker.dart';
+import '../utils/reconnect_policy.dart';
+import '../utils/terminal_blocks.dart';
+import '../utils/terminal_input_line.dart';
 import '../utils/streaming_markdown.dart';
 import '../utils/slash_command.dart';
 import '../utils/agent_ui_text.dart';
@@ -62,11 +69,16 @@ import '../services/command_executor.dart';
 import '../services/server_monitor_service.dart';
 import '../services/change_record_service.dart';
 import '../services/local_file_policy.dart';
+import '../services/session_log_service.dart';
+import '../services/port_forward_service.dart';
+import '../widgets/port_forward_dialog.dart';
 import '../models/change_record.dart';
 import '../widgets/server_monitor_panel.dart';
 import '../widgets/terminal_view.dart' as term_widget;
 import '../widgets/terminal_context_menu.dart';
 import '../utils/terminal_text_actions.dart';
+import '../utils/terminal_panes.dart';
+import '../services/pane_session_service.dart';
 import '../core/app_toast.dart';
 
 
@@ -146,6 +158,21 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   /// 正在重连的主机名称（非 null 时显示"连接恢复中"横幅）
   String? _reconnectingHostLabel;
+
+  /// 空闲断线自动重连（docs §5）：每个 tab 的已尝试次数与待执行定时器。
+  /// 任务运行中的 tab 不自动重连（isRunningFor 判定），断线即任务 failed。
+  final Map<String, int> _autoReconnectAttempts = {};
+  final Map<String, Timer> _autoReconnectTimers = {};
+  // tab 对象在 provider 里原地复用，prev/next state 拿到的是同一实例，
+  // 状态迁移必须自己记上一帧的值
+  final Map<String, tp.TabStatus> _lastTabStatus = {};
+
+  /// 会话日志（设置开启时对新开标签生效）：每 tab 一个录制器
+  bool _sessionLogEnabled = false;
+  final Map<String, SessionRecorder> _sessionRecorders = {};
+
+  /// 端口转发：每 tab 一个管理器，关标签时 dispose
+  final Map<String, PortForwardService> _portForwardServices = {};
 
   // AI 面板默认布局（从设置加载，新 tab 继承；每个 tab 可在会话内独立覆盖）
   _AiPanelPosition _defaultAiPanelPosition = _AiPanelPosition.right;
@@ -273,6 +300,35 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   final Map<String, Timer> _tabChatOutputTimers = {};
   final Map<String, StringBuffer> _tabTermWriteBuffers = {};
   final Map<String, Timer> _tabTermWriteTimers = {};
+
+  /// 每 tab 的命令捕获器：从屏幕输入行抓回车执行的命令（见 utils/command_tracker.dart）
+  final Map<String, CommandTracker> _tabCommandTrackers = {};
+
+  /// 每 tab 的 OSC 133 命令块（shell 装了集成才有；没有则恒空，菜单不出该项）
+  final Map<String, TerminalBlockTracker> _tabBlockTrackers = {};
+
+  // —— 分屏（文档 §4 方案 B）——
+  //
+  // 三个表都以 **paneId** 为键，且只装额外 pane：首屏的 id 就是 tabId，
+  // 它的 Terminal / 订阅 / 会话早就挂在 tabId 上了（`_tabTerminals` 等），
+  // 再登记一份就会有第二份真相。首屏因此天然就是 AI 绑定的那一屏。
+  final Map<String, PaneLayout> _tabPaneLayout = {};
+  final Map<String, Terminal> _paneTerminals = {};
+  final Map<String, StreamSubscription<String>> _paneOutputSubscriptions = {};
+  final Map<String, StringBuffer> _paneTermWriteBuffers = {};
+  final Map<String, Timer> _paneTermWriteTimers = {};
+  final Map<String, PaneSession> _paneSessions = {};
+  final Set<String> _paneOpening = {};
+
+  /// 焦点在哪一屏（新 pane 插在哪、焦点往哪移）。AI 绑定永远是首屏，
+  /// 不跟着这里漂移（AGENTS.md R3）。
+  String _activePaneForTab(String tabId) =>
+      _tabPaneLayout[tabId]?.activeOrPrimary ?? tabId;
+
+  PaneLayout _layoutForTab(String tabId) =>
+      _tabPaneLayout.putIfAbsent(tabId, () => PaneLayout.single(tabId));
+
+  PaneSession? _paneSessionFor(String paneId) => _paneSessions[paneId];
   DateTime _lastTermRecoveryAt = DateTime.fromMillisecondsSinceEpoch(0);
   static const int _termWriteFlushMs = 16;
   static const int _termWriteMaxChars = 64 * 1024;
@@ -286,6 +342,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   // 终端设置
   double _terminalFontSize = 14; // P0-3: 默认终端字号从 13 改为 14
+  int _terminalScrollback = 10000;
 
   // Markdown 预处理 & 内容分割缓存（避免每次 build 重复解析）
   final Map<String, String> _markdownCache = {};
@@ -341,6 +398,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     } catch (_) {
       _terminalFontSize = 14;
     }
+    try {
+      final scrollback = SettingsDao.getCached('terminalScrollback');
+      if (scrollback is num && scrollback >= 1000) {
+        _terminalScrollback = scrollback.toInt();
+      }
+    } catch (_) {}
+    try {
+      final sessionLog = SettingsDao.getCached('sessionLogEnabled');
+      if (sessionLog is bool) _sessionLogEnabled = sessionLog;
+    } catch (_) {}
     // P0-1: 加载 AI 面板可见性设置，默认收起
     try {
       final aiPanelVisible = SettingsDao.getCached('aiPanelVisible');
@@ -628,6 +695,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         if (tab.id == _currentTabId) _reconnect();
         return;
       }
+      _tabCommandTrackers[tab.id]?.onInput(data, currentInputLine: () {
+        // 刚敲的字符其回显可能还躺在批处理缓冲里（最多 16ms），不先落进
+        // buffer 就会读到半条命令。闭包只在回车时执行，不影响按键热路径。
+        _flushTermWrite(tab.id);
+        return currentInputLineOf(term);
+      });
       if (tab.isLocal) {
         tab.localService?.writeToTerminal(data);
       } else {
@@ -648,28 +721,41 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     // VT 解析 + markNeedsLayout + 全视口重绘，大输出时 CPU/GPU 直接打满。
     return tab.outputController.stream.listen((data) {
       _bufferTermWrite(tab.id, data);
+      _sessionRecorders[tab.id]?.write(data);
+      _tabCommandTrackers[tab.id]?.onOutput(data);
     });
   }
 
   /// 终端显示路径批处理：最多每 16ms（约一帧）或 64KB 合并写入一次。
-  void _bufferTermWrite(String tabId, String data) {
-    final buffer =
-        _tabTermWriteBuffers.putIfAbsent(tabId, StringBuffer.new)..write(data);
+  ///
+  /// 键既可以是 tabId（首屏）也可以是 paneId（额外屏，形如 `tab#p1`）：
+  /// 首屏 id 不含 `#p`，据此分流到两套缓冲，避免分屏输出跟主屏互相挤批。
+  void _bufferTermWrite(String id, String data) {
+    final buffers = _isPaneId(id) ? _paneTermWriteBuffers : _tabTermWriteBuffers;
+    final buffer = buffers.putIfAbsent(id, StringBuffer.new)..write(data);
     if (buffer.length >= _termWriteMaxChars) {
-      _flushTermWrite(tabId);
+      _flushTermWrite(id);
       return;
     }
-    _tabTermWriteTimers[tabId] ??= Timer(
+    final timers = _isPaneId(id) ? _paneTermWriteTimers : _tabTermWriteTimers;
+    timers[id] ??= Timer(
       const Duration(milliseconds: _termWriteFlushMs),
-      () => _flushTermWrite(tabId),
+      () => _flushTermWrite(id),
     );
   }
 
-  void _flushTermWrite(String tabId) {
-    _tabTermWriteTimers.remove(tabId)?.cancel();
-    final buffer = _tabTermWriteBuffers.remove(tabId);
+  static bool _isPaneId(String id) => id.contains('#p');
+
+  void _flushTermWrite(String id) {
+    (_isPaneId(id) ? _paneTermWriteTimers : _tabTermWriteTimers)
+        .remove(id)
+        ?.cancel();
+    final buffer =
+        (_isPaneId(id) ? _paneTermWriteBuffers : _tabTermWriteBuffers)
+            .remove(id);
     if (buffer == null || buffer.isEmpty) return;
-    final term = _tabTerminals[tabId];
+    final term =
+        _isPaneId(id) ? _paneTerminals[id] : _tabTerminals[id];
     if (term == null) return;
     try {
       term.write(buffer.toString());
@@ -685,9 +771,446 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     }
   }
 
-  void _discardTermWrite(String tabId) {
-    _tabTermWriteTimers.remove(tabId)?.cancel();
-    _tabTermWriteBuffers.remove(tabId);
+  void _discardTermWrite(String id) {
+    final isPane = _isPaneId(id);
+    (isPane ? _paneTermWriteTimers : _tabTermWriteTimers).remove(id)?.cancel();
+    (isPane ? _paneTermWriteBuffers : _tabTermWriteBuffers).remove(id);
+  }
+
+  // ==================== 分屏（文档 §4 方案 B）====================
+  //
+  // 路由规则：第一个 pane 就是标签本身 —— 它的 service、executor 绑定、AI 面板
+  // 全挂在 tabId 上，一律不动，所以 AI 的命令天然只落在这屏。额外 pane 各开自己
+  // 的会话（本地 PTY / 同一条 SSH 连接上的第二条 shell），是纯用户终端：永不注册
+  // executor，AI 绝不写入它。绑定也不随焦点漂移（AGENTS.md R3）。
+
+  tp.TerminalTab? _tabById(String tabId) => ref
+      .read(tp.terminalProvider)
+      .tabs
+      .cast<tp.TerminalTab?>()
+      .firstWhere((t) => t?.id == tabId, orElse: () => null);
+
+  /// pane id 形如 `<tabId>#p1`；首屏 id 就是 tabId（无后缀）
+  static String _tabIdOfPaneId(String paneId) {
+    final i = paneId.lastIndexOf('#p');
+    return i < 0 ? paneId : paneId.substring(0, i);
+  }
+
+  /// pane 是否还在该标签的布局里（建会话是异步的，回来时可能已被关掉）
+  bool _paneExists(String tabId, String paneId) {
+    final layout = _tabPaneLayout[tabId];
+    return layout != null && layout.indexOf(paneId) >= 0;
+  }
+
+  /// 额外 pane 自己的 Terminal（含 OSC 133 块跟踪与命令捕获）。
+  /// build 期间调用，只写页面私有的 map，不 setState。
+  Terminal _ensurePaneTerminal(String tabId, String paneId) {
+    final existing = _paneTerminals[paneId];
+    if (existing != null) return existing;
+    final term = Terminal(maxLines: _terminalScrollback);
+    _paneTerminals[paneId] = term;
+    final blockTracker = TerminalBlockTracker(terminal: term);
+    _tabBlockTrackers[paneId] = blockTracker;
+    term.onPrivateOSC = blockTracker.onPrivateOsc;
+    final hostId = _tabById(tabId)?.hostId ?? 'local';
+    _tabCommandTrackers[paneId] = CommandTracker(
+      onCommand: (command) =>
+          CommandHistoryDao.record(command, hostId: hostId),
+    );
+    return term;
+  }
+
+  /// 为额外 pane 打开（或补开）会话通道并双向绑定。
+  ///
+  /// 三条收尾路径都必须释放：建会话失败、期间 pane 被关、期间页面被销毁 ——
+  /// 谁创建谁释放（R2），否则本地会留下孤儿 PTY 进程。
+  Future<void> _ensurePaneSession(String tabId, String paneId) async {
+    final existing = _paneSessions[paneId];
+    if (existing != null) {
+      if (existing.isConnected) return;
+      // 主连接重连过：旧 shell 随 client 一起废了，补开一条，
+      // 否则这一屏看着还在、敲键却毫无反应。
+      _paneOutputSubscriptions.remove(paneId)?.cancel();
+      existing.close();
+      _paneSessions.remove(paneId);
+      _discardTermWrite(paneId);
+    }
+    if (_paneOpening.contains(paneId)) return;
+    final tab = _tabById(tabId);
+    if (tab == null) return;
+    final isLocal = tab.isLocal;
+    final client = tab.service?.client;
+    final encoding = tab.service?.config.encoding ?? 'utf-8';
+    if (!isLocal && client == null) {
+      _paneHint(paneId, 'SSH 连接未就绪，重连后点这一屏重试');
+      return;
+    }
+    _paneOpening.add(paneId);
+    PaneSession? session;
+    try {
+      session = isLocal
+          ? await LocalPaneSession.start()
+          : await SshPaneSession.open(client!, encoding: encoding);
+    } catch (e) {
+      session?.close();
+      session = null;
+      agentLogger.warn('Pane', '打开分屏会话失败: $e');
+    } finally {
+      _paneOpening.remove(paneId);
+    }
+    // await 之后重新确认：pane 可能已被关、页面可能已销毁（R1）
+    if (!mounted || !_paneExists(tabId, paneId)) {
+      session?.close();
+      return;
+    }
+    // SSH 的 client 可能在这一次 await 期间被换掉（掉线→重连）。此时拿到的
+    // shell 挂在已关闭的旧连接上：注册进去就是一屏「看着在、敲键没反应」。
+    // 掉线时 `_invalidatePaneSessions` 还看不到这条尚未登记的会话，所以只能
+    // 在这里按身份比一次。
+    if (!isLocal && !identical(client, _tabById(tabId)?.service?.client)) {
+      session?.close();
+      // 换掉 client 的那次重连可能正好也在这次 await 期间完成，于是重连回调里
+      // 的补开被 `_paneOpening` 挡掉了。这里用新 client 再跑一次，否则这一屏
+      // 只能等用户手点重开 —— 与「重连后自动补开」的约定不符。
+      unawaited(_ensurePaneSession(tabId, paneId));
+      return;
+    }
+    if (session == null) {
+      _paneHint(paneId, isLocal ? '本地终端启动失败' : '这一屏的会话打开失败');
+      return;
+    }
+    _paneSessions[paneId] = session;
+    final term = _ensurePaneTerminal(tabId, paneId);
+    term.write('\x1b[2J\x1b[H');
+    _bindPaneChannel(tabId, paneId, term, session);
+    setState(() {});
+  }
+
+  void _bindPaneChannel(
+      String tabId, String paneId, Terminal term, PaneSession session) {
+    _paneOutputSubscriptions.remove(paneId)?.cancel();
+    term.onOutput = (data) {
+      _tabCommandTrackers[paneId]?.onInput(data, currentInputLine: () {
+        _flushTermWrite(paneId);
+        return currentInputLineOf(term);
+      });
+      session.writeToTerminal(data);
+    };
+    term.onResize = (width, height, _, __) => session.resize(width, height);
+    _paneOutputSubscriptions[paneId] = session.output.listen(
+      (data) => _bufferTermWrite(paneId, data),
+      // 通道自己关了（shell 退出 / 主机侧断链 / 主连接作废）：留一行提示，
+      // 并把会话从表里摘掉 —— 底部重开条只在「表里没有会话」时出现，留着这条
+      // 死对象等于把这一屏永久锁死（点不动也重不开）。
+      onDone: () {
+        if (!_paneExists(tabId, paneId)) return;
+        if (_paneSessions[paneId] != session) return;
+        _paneSessions.remove(paneId);
+        _discardTermWrite(paneId);
+        term.write('\r\n\x1b[90m[会话已结束]\x1b[0m\r\n');
+        setState(() {});
+      },
+    );
+  }
+
+  void _paneHint(String paneId, String message) {
+    final tabId = _tabIdOfPaneId(paneId);
+    if (!_paneExists(tabId, paneId)) return;
+    _ensurePaneTerminal(tabId, paneId).write('\r\n\x1b[31m$message\x1b[0m\r\n');
+    setState(() {});
+  }
+
+  void _splitPane(String tabId, SplitDirection direction) {
+    final current = _layoutForTab(tabId);
+    final result = splitAfter(current, afterPaneId: _activePaneForTab(tabId));
+    if (result == null) {
+      _showOperationMessage(
+        '一个标签最多 ${PaneLayout.maxPanes} 屏（每屏一个真实会话）',
+        isError: true,
+      );
+      return;
+    }
+    // 同一方向连续切是 iTerm2 的习惯；换方向时整体重排，不做嵌套树
+    var layout = result.layout;
+    if (layout.isSplit && layout.direction != direction) {
+      layout = setDirection(layout, direction);
+    }
+    _tabPaneLayout[tabId] = layout;
+    _ensurePaneTerminal(tabId, result.newPaneId);
+    setState(() {});
+    unawaited(_ensurePaneSession(tabId, result.newPaneId));
+  }
+
+  /// 关掉一屏。
+  ///
+  /// 首屏在有其它屏时不许单独关：AI 绑的就是首屏那条会话，关掉它会让 AI 的
+  /// 输出「没有画面」——比取消任务更糟（文档 §4：宁可取消也不能悄悄迁移）。
+  /// 要收掉这一屏请关标签，那条路径已有 removeTab → 取消运行中任务。
+  void _closePane(String tabId, String paneId) {
+    final layout = _layoutForTab(tabId);
+    if (!layout.isSplit) return;
+    if (paneId == layout.primaryPaneId) {
+      _showOperationMessage('这一屏绑定了 AI，不能单独关掉；请直接关闭标签',
+          isError: true);
+      return;
+    }
+    _tabPaneLayout[tabId] = closePane(layout, paneId);
+    _disposePane(paneId);
+    setState(() {});
+  }
+
+  void _focusPaneNeighbor(String tabId, bool forward) {
+    final layout = _layoutForTab(tabId);
+    final next =
+        neighborPane(layout, _activePaneForTab(tabId), forward: forward);
+    if (next == null) return; // 到边界不动：绕圈会让用户以为终端吞了键
+    _tabPaneLayout[tabId] = setActive(layout, next);
+    setState(() {});
+  }
+
+  /// 键盘焦点落到某一屏。setState 是必须的：`active` 决定 Windows 原生 IME
+  /// 的唯一投递目标，不跟着真实焦点走会把中文送进另一屏。
+  void _setPaneFocus(String tabId, String paneId) {
+    final layout = _tabPaneLayout[tabId];
+    if (layout == null || !layout.isSplit) return;
+    if (layout.activeOrPrimary == paneId) return; // 未变则不重建（避免回环）
+    _tabPaneLayout[tabId] = setActive(layout, paneId);
+    setState(() {});
+  }
+
+  void _dragPaneDivider(
+      tp.TerminalTab tab, int index, double delta, double extent) {
+    if (extent <= 0) return;
+    final layout = _layoutForTab(tab.id);
+    _tabPaneLayout[tab.id] = dragDivider(layout, index, delta / extent);
+    setState(() {});
+  }
+
+  void _disposePane(String paneId) {
+    _paneOutputSubscriptions.remove(paneId)?.cancel();
+    _discardTermWrite(paneId);
+    _paneSessions.remove(paneId)?.close();
+    _paneOpening.remove(paneId);
+    _tabBlockTrackers.remove(paneId)?.dispose();
+    _tabCommandTrackers.remove(paneId);
+    _paneTerminals.remove(paneId);
+  }
+
+  /// 关掉标签：清掉它的所有额外 pane（首屏由 tab 自己的清理路径负责）
+  void _disposeTabPanes(String tabId) {
+    final layout = _tabPaneLayout.remove(tabId);
+    if (layout == null) return;
+    for (final paneId in layout.paneIds) {
+      if (paneId != tabId) _disposePane(paneId);
+    }
+  }
+
+  /// 主连接掉线：额外 pane 的 shell 挂在同一个 client 上，一起作废。
+  /// 布局保留 —— 用户重连后点那一屏会自动补开，滚动内容也不丢。
+  void _invalidatePaneSessions(String tabId) {
+    if (!mounted) return;
+    final layout = _tabPaneLayout[tabId];
+    if (layout == null || !layout.isSplit) return;
+    var changed = false;
+    for (final paneId in layout.paneIds) {
+      final session = _paneSessions.remove(paneId);
+      if (session == null) continue;
+      _paneOutputSubscriptions.remove(paneId)?.cancel();
+      session.close();
+      _discardTermWrite(paneId);
+      changed = true;
+    }
+    if (changed) setState(() {});
+  }
+
+  /// 重连成功后把额外 pane 的会话补开回来。
+  ///
+  /// 覆盖两种空洞：掉线时作废的、以及首连还没就绪所以压根没开成的。
+  /// `_ensurePaneSession` 自己会跳过「已有活会话」和「正在开」，重复调用安全。
+  void _reopenPaneSessions(tp.TerminalTab tab) {
+    final layout = _tabPaneLayout[tab.id];
+    if (layout == null || !layout.isSplit) return;
+    for (final paneId in layout.paneIds) {
+      if (paneId == tab.id) continue;
+      unawaited(_ensurePaneSession(tab.id, paneId));
+    }
+  }
+
+  /// 一屏 = 一个 TerminalView + 归属徽标 +（额外屏）会话不可用时的重开入口。
+  ///
+  /// 徽标是分屏的核心交代：用户必须一眼看出「AI 在那一屏干活」「这一屏只是我
+  /// 自己的 shell」，否则共享会话的 AI 输出会像是凭空出现在别的屏。
+  Widget _buildPaneView(tp.TerminalTab tab, String paneId,
+      {required bool isActive}) {
+    final isPrimary = paneId == tab.id;
+    final layout = _layoutForTab(tab.id);
+    final term = isPrimary
+        ? (_tabTerminals[tab.id] ?? _terminal)
+        : _ensurePaneTerminal(tab.id, paneId);
+    final session = isPrimary ? null : _paneSessions[paneId];
+    final tc = ThemeColors.of(context);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        term_widget.TerminalView(
+          terminal: term,
+          blockTracker: _tabBlockTrackers[paneId],
+          fontSize: _terminalFontSize,
+          paletteId: ref.watch(
+              settingsProvider.select((s) => s['terminalPalette'] as String?)),
+          keymap: TerminalKeymap.fromSettings(
+              ref.watch(settingsProvider.select((s) => s['terminalKeybindings']))),
+          active: isActive,
+          isLocal: tab.isLocal,
+          onFontSizeChanged: (size) {
+            final clamped = size.clamp(10.0, 24.0);
+            setState(() => _terminalFontSize = clamped);
+            SettingsDao.set('terminalFontSize', clamped);
+          },
+          onMenuIntent: (intent, text) =>
+              _handleTerminalMenuIntent(tab, intent, text, paneId: paneId),
+          onSend: (command) {
+            if (isPrimary) {
+              if (tab.isLocal) {
+                tab.localService?.execute(command);
+              } else {
+                tab.service?.execute(command);
+              }
+            } else {
+              _paneSessionFor(paneId)?.writeToTerminal('$command\r');
+            }
+          },
+          panes: TerminalPaneActions(
+            paneId: paneId,
+            isPrimary: isPrimary,
+            isSplit: layout.isSplit,
+            canSplit: layout.canSplit,
+            onSplit: (direction) => _splitPane(tab.id, direction),
+            onClose: () => _closePane(tab.id, paneId),
+            onFocusNeighbor: (forward) => _focusPaneNeighbor(tab.id, forward),
+            onFocus: () => _setPaneFocus(tab.id, paneId),
+          ),
+        ),
+        if (layout.isSplit)
+          Positioned(
+            top: 6,
+            right: 10,
+            child: _buildPaneBadge(
+              label: isPrimary
+                  ? UiText.t('AI 会话', 'AI session')
+                  : UiText.t('本地 shell', 'Local shell'),
+              color: isPrimary ? tc.agentGreen : tc.textMuted,
+            ),
+          ),
+        if (!isPrimary && session == null)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildPaneRetryBar(tab.id, paneId),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPaneBadge({required String label, required Color color}) {
+    return IgnorePointer(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(color: color.withValues(alpha: 0.5)),
+        ),
+        child: Text(label,
+            style: TextStyle(
+                fontSize: fMicro, color: color, height: 1.2)),
+      ),
+    );
+  }
+
+  Widget _buildPaneRetryBar(String tabId, String paneId) {
+    final tc = ThemeColors.of(context);
+    return Container(
+      color: tc.cardElevated.withValues(alpha: 0.92),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline, size: 14, color: tc.warn),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(UiText.t('这一屏的会话已断开', 'This pane\'s session ended'),
+                style: TextStyle(fontSize: fMicro, color: tc.textSub)),
+          ),
+          TextButton(
+            onPressed: () => _ensurePaneSession(tabId, paneId),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 22),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(UiText.t('重开这一屏', 'Reopen pane'),
+                style: const TextStyle(fontSize: fMicro)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 终端区：未分屏就是一屏；分屏按方向平铺 + 可拖分隔条。
+  ///
+  /// 用 Expanded(flex:) 而非按占比算宽度：flex 由布局引擎保证「分完且不重叠」，
+  /// 浮点比例直接换宽度会留 0.5px 缝，且 flex 最小为 1 = 任何 pane 都不会被压没。
+  Widget _buildTerminalArea(tp.TerminalTab tab, {required bool isActive}) {
+    final layout = _layoutForTab(tab.id);
+    if (!layout.isSplit) {
+      return _buildPaneView(tab, tab.id, isActive: isActive);
+    }
+    final flex = ratiosToFlex(layout.ratios);
+    return LayoutBuilder(builder: (context, constraints) {
+      final isRow = layout.direction.isSideBySide;
+      final extent = isRow ? constraints.maxWidth : constraints.maxHeight;
+      final children = <Widget>[];
+      for (var i = 0; i < layout.paneIds.length; i++) {
+        if (i > 0) {
+          children.add(_buildPaneDivider(tab, i, isRow, extent));
+        }
+        final paneId = layout.paneIds[i];
+        children.add(Expanded(
+          key: ValueKey('pane-$paneId'),
+          flex: flex[i],
+          child: _buildPaneView(
+            tab,
+            paneId,
+            isActive: isActive && layout.activeOrPrimary == paneId,
+          ),
+        ));
+      }
+      return Flex(
+        direction: isRow ? Axis.horizontal : Axis.vertical,
+        children: children,
+      );
+    });
+  }
+
+  Widget _buildPaneDivider(
+      tp.TerminalTab tab, int index, bool isRow, double extent) {
+    final tc = ThemeColors.of(context);
+    return MouseRegion(
+      cursor: isRow
+          ? SystemMouseCursors.resizeColumn
+          : SystemMouseCursors.resizeRow,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onPanUpdate: (d) => _dragPaneDivider(
+            tab, index, isRow ? d.delta.dx : d.delta.dy, extent),
+        child: Container(
+          width: isRow ? 6 : double.infinity,
+          height: isRow ? double.infinity : 6,
+          color: tc.border.withValues(alpha: 0.6),
+        ),
+      ),
+    );
   }
 
   /// 确保某个 tab 有独立的 Terminal 和常驻输出订阅。切换 tab 不再取消/重建。
@@ -698,9 +1221,23 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       if (isCurrent) _terminal = existing;
       return;
     }
-    final term = Terminal(maxLines: 10000);
+    final term = Terminal(maxLines: _terminalScrollback);
     _tabTerminals[tab.id] = term;
     if (isCurrent) _terminal = term;
+    if (_sessionLogEnabled) {
+      final recorder = SessionRecorder(label: tab.title);
+      _sessionRecorders[tab.id] = recorder;
+      recorder.start();
+    }
+    _tabCommandTrackers[tab.id] = CommandTracker(
+      onCommand: (command) =>
+          CommandHistoryDao.record(command, hostId: tab.hostId),
+    );
+    // xterm 不认识 OSC 133，但会把不认识的 OSC 转交给 onPrivateOSC：
+    // 装了 shell 集成的会话据此把「命令 + 它的输出」切成块。
+    final blockTracker = TerminalBlockTracker(terminal: term);
+    _tabBlockTrackers[tab.id] = blockTracker;
+    term.onPrivateOSC = blockTracker.onPrivateOsc;
     _tabOutputSubscriptions[tab.id] = _setupTerminalListener(tab, term);
     _tabChatOutputSubscriptions[tab.id] =
         tab.outputController.stream.listen((data) {
@@ -795,7 +1332,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       }
       return;
     }
+    await _reconnectTab(tab);
+  }
+
+  /// 重连指定 tab（手动与空闲自动重连共用）。成功后重绑 AI executor。
+  Future<void> _reconnectTab(tp.TerminalTab tab) async {
     if (tab.isConnecting) return;
+    _autoReconnectTimers.remove(tab.id)?.cancel();
 
     tp.TerminalTab? newTab;
     if (tab.isLocal) {
@@ -807,6 +1350,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             hostId: newTab.hostId, tabId: newTab.id);
         // 终端的 onOutput 闭包读的是 tab 上的实时 service，重连不需要重绑订阅
         _ensureTabTerminal(newTab);
+        // 新会话的提示符与旧连接无关，清掉残留的提示语判定
+        _tabCommandTrackers[newTab.id]?.reset();
+        // 旧连接的块与新 shell 无关（新 shell 甚至可能没装集成）
+        _tabBlockTrackers[newTab.id]?.reset();
         if (newTab.id == _currentTabId) _scheduleSizeSync(newTab);
       }
     } else {
@@ -822,6 +1369,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             hostId: newTab.hostId, tabId: newTab.id);
         // 终端的 onOutput 闭包读的是 tab 上的实时 service，重连不需要重绑订阅
         _ensureTabTerminal(newTab);
+        _tabCommandTrackers[newTab.id]?.reset();
+        _tabBlockTrackers[newTab.id]?.reset();
         if (newTab.id == _currentTabId) _scheduleSizeSync(newTab);
       }
     }
@@ -829,7 +1378,36 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     if (newTab == null) {
       // 失败原因存在 tab.connectionError 上，主区按状态渲染；这里补一条即时反馈
       _showOperationMessage(tab.connectionError ?? L10n.str.connectionFailedHint, isError: true);
+    } else {
+      // 重连成功：清零自动重连计数，下次掉线重新获得完整退避预算
+      _autoReconnectAttempts.remove(tab.id);
     }
+  }
+
+  /// 空闲断线自动重连（docs §5）：connected→lost 且该 tab 无运行中任务时，
+  /// 按 1s/2s/4s 退避最多自动重连 3 次；任务运行中不重连（断线即任务 failed，
+  /// 留给用户/引擎显式重试）。本地 PTY 退出是正常结束，不自动重启。
+  void _maybeAutoReconnect(tp.TerminalTab tab) {
+    if (tab.isLocal || tab.status != tp.TabStatus.lost) return;
+    if (ref.read(agentProvider.notifier).isRunningFor(tab.id)) return;
+    final attempts = _autoReconnectAttempts[tab.id] ?? 0;
+    if (!ReconnectPolicy.shouldRetry(attempts)) return;
+    _autoReconnectTimers.remove(tab.id)?.cancel();
+    _autoReconnectTimers[tab.id] =
+        Timer(ReconnectPolicy.delayForAttempt(attempts), () {
+      _autoReconnectTimers.remove(tab.id);
+      if (!mounted) return;
+      final current = ref
+          .read(tp.terminalProvider)
+          .tabs
+          .cast<tp.TerminalTab?>()
+          .firstWhere((t) => t?.id == tab.id, orElse: () => null);
+      // 等待期间用户可能已手动重连/关闭 tab，或任务已启动
+      if (current == null || current.status != tp.TabStatus.lost) return;
+      if (ref.read(agentProvider.notifier).isRunningFor(tab.id)) return;
+      _autoReconnectAttempts[tab.id] = attempts + 1;
+      _reconnectTab(current);
+    });
   }
 
   void _showAddHostDialog() {
@@ -972,6 +1550,37 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     }
     _tabTermWriteTimers.clear();
     _tabTermWriteBuffers.clear();
+    for (final sub in _paneOutputSubscriptions.values) {
+      sub.cancel();
+    }
+    _paneOutputSubscriptions.clear();
+    for (final timer in _paneTermWriteTimers.values) {
+      timer.cancel();
+    }
+    _paneTermWriteTimers.clear();
+    _paneTermWriteBuffers.clear();
+    // 额外 pane 是真实 PTY / SSH shell：页面销毁必须收干净，否则留下孤儿进程
+    for (final session in _paneSessions.values) {
+      session.close();
+    }
+    _paneSessions.clear();
+    _paneOpening.clear();
+    _tabPaneLayout.clear();
+    _paneTerminals.clear();
+    for (final timer in _autoReconnectTimers.values) {
+      timer.cancel();
+    }
+    _autoReconnectTimers.clear();
+    _autoReconnectAttempts.clear();
+    _lastTabStatus.clear();
+    for (final recorder in _sessionRecorders.values) {
+      recorder.close();
+    }
+    _sessionRecorders.clear();
+    for (final service in _portForwardServices.values) {
+      service.dispose();
+    }
+    _portForwardServices.clear();
     _scrollController.dispose();
     for (final controller in _chatScrollControllers.values) {
       controller.dispose();
@@ -1047,6 +1656,38 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           !_agentStateBusy(next)) {
         _scheduleModelSync();
       }
+    });
+    // tab 对象在 provider 里原地复用，prev/next state 拿到的是同一实例，
+    // 无法靠比较 prev/next 得到状态迁移，用 _lastTabStatus 自己记上一帧的值。
+    ref.listen<tp.TerminalState>(tp.terminalProvider, (prev, next) {
+      for (final tab in next.tabs) {
+        final oldStatus = _lastTabStatus[tab.id];
+        _lastTabStatus[tab.id] = tab.status;
+        if (!tab.isLocal &&
+            oldStatus != tp.TabStatus.connected &&
+            tab.status == tp.TabStatus.connected) {
+          // 重连成功：掉线时作废的额外 pane 补开回来（用户重连的意图就是
+          // 「继续用这一套终端」，不该还要他逐屏点一次）
+          _reopenPaneSessions(tab);
+        }
+        if (!tab.isLocal &&
+            oldStatus == tp.TabStatus.connected &&
+            tab.status == tp.TabStatus.lost) {
+          // 额外 pane 的 shell 挂在同一个 client 上，掉线即作废（先清后重连，
+          // 否则重连补开了新 client，旧 pane 还握着已关闭的会话）
+          _invalidatePaneSessions(tab.id);
+          _maybeAutoReconnect(tab);
+        }
+      }
+      _lastTabStatus.removeWhere((id, _) => !next.tabs.any((t) => t.id == id));
+      // 兜底：标签在别处被关掉时，额外 pane 的会话也要跟着收
+      _tabPaneLayout.removeWhere((id, layout) {
+        if (next.tabs.any((t) => t.id == id)) return false;
+        for (final paneId in layout.paneIds) {
+          if (paneId != id) _disposePane(paneId);
+        }
+        return true;
+      });
     });
 
     return Scaffold(
@@ -1136,27 +1777,20 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
     final terminalView = Stack(
       children: [
-        term_widget.TerminalView(
-          terminal: tab == null ? _terminal : (_tabTerminals[tab.id] ?? _terminal),
-          fontSize: _terminalFontSize,
-          active: isActive,
-          isLocal: tab?.isLocal ?? true,
-          onFontSizeChanged: (size) {
-            final clamped = size.clamp(10.0, 24.0);
-            setState(() => _terminalFontSize = clamped);
-            SettingsDao.set('terminalFontSize', clamped);
-          },
-          onMenuIntent: (intent, text) =>
-              _handleTerminalMenuIntent(tab, intent, text),
-          onSend: (command) {
-            if (tab == null) return;
-            if (tab.isLocal) {
-              tab.localService?.execute(command);
-            } else {
-              tab.service?.execute(command);
-            }
-          },
-        ),
+        // 分屏时这里是一整块平铺区（每屏一条会话）；未分屏就是单屏。
+        // tab == null（还没有任何标签）时保留一份裸终端，只为让过渡态有底色。
+        tab == null
+            ? term_widget.TerminalView(
+                terminal: _terminal,
+                fontSize: _terminalFontSize,
+                paletteId: ref.watch(
+                    settingsProvider.select((s) => s['terminalPalette'] as String?)),
+                keymap: TerminalKeymap.fromSettings(ref.watch(
+                    settingsProvider.select((s) => s['terminalKeybindings']))),
+                active: isActive,
+                isLocal: true,
+              )
+            : _buildTerminalArea(tab, isActive: isActive),
         // AnimatedSwitcher 常驻：让它从"过渡/错误视图"切回空占位，
         // 连接成功时才有淡出动画（整个开关被移除的话是直接消失）
         Positioned.fill(
@@ -1384,6 +2018,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                           'sftp-${tab.id}-${tab.hostId}-${_tabSftpInitialPath[tab.id] ?? ''}'),
                       hostId: tab.hostId,
                       embedded: true,
+                      dropEnabled: isActive,
                       initialPath: _tabSftpInitialPath[tab.id],
                       onClose: () => setState(() {
                         _tabSftpVisible[tab.id] = false;
@@ -1540,6 +2175,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     _tabExecutedCommands.remove(tab.id);
     _tabPendingConfirm.remove(tab.id);
     _tabTerminals.remove(tab.id);
+    _tabCommandTrackers.remove(tab.id);
+    _tabBlockTrackers.remove(tab.id)?.dispose();
+    _disposeTabPanes(tab.id);
+    _sessionRecorders.remove(tab.id)?.close();
+    _portForwardServices.remove(tab.id)?.dispose();
     _tabOutputSubscriptions.remove(tab.id)?.cancel();
     _tabChatOutputSubscriptions.remove(tab.id)?.cancel();
     _discardChatOutput(tab.id);
@@ -1793,6 +2433,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             }
             break;
           case 'prompt': _showCustomPromptDialog(); break;
+          case 'portforward': _showPortForwardDialog(); break;
+          case 'history': _showCommandHistory(); break;
           case 'builtInPrompt': _showBuiltInPromptDialog(); break;
           case 'maxsteps': _showMaxStepsDialog(); break;
           case 'settings': context.push('/settings'); break;
@@ -1802,6 +2444,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         _menuItem('reconnect', Icons.refresh_rounded, l10n.terminalReconnect),
         _menuItem('clear', Icons.cleaning_services_rounded, l10n.terminalClearScreen),
         _menuItem('sftp', Icons.folder_outlined, 'SFTP'),
+        _menuItem('portforward', Icons.swap_horiz_rounded,
+            UiText.t('端口转发', 'Port forwarding')),
+        _menuItem('history', Icons.history_rounded,
+            '${UiText.t('命令历史', 'Command history')}  (Ctrl+Shift+H)'),
         // 快捷命令
         if (snippets.isNotEmpty) ...[
           const PopupMenuDivider(height: 8),
@@ -1869,7 +2515,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final name = tab?.title ?? host?.name ?? '';
     return Container(
       key: const ValueKey('tab-connecting'),
-      color: tc.terminalBg,
+      // 与终端本体同一套配色，避免「切到 Dracula 后连接中闪一下内置底色」
+      color: resolveTerminalTheme(
+        paletteId: ref.watch(
+            settingsProvider.select((s) => s['terminalPalette'] as String?)),
+        isLight: tc.isLight,
+      ).background,
       alignment: Alignment.center,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -4002,14 +4653,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   Future<void> _handleTerminalMenuIntent(
     tp.TerminalTab? tab,
     TerminalMenuIntent intent,
-    String text,
-  ) async {
+    String text, {
+    String? paneId,
+  }) async {
     switch (intent) {
       case TerminalMenuIntent.sendToAgent:
         _putIntoAgentInput(tab, agentExplainPrompt(text));
         break;
       case TerminalMenuIntent.askError:
         _putIntoAgentInput(tab, agentErrorPrompt(text));
+        break;
+      case TerminalMenuIntent.askBlock:
+        _putIntoAgentInput(tab, agentBlockPrompt(text));
         break;
       case TerminalMenuIntent.saveSnippet:
         await _saveSelectionAsSnippet(text);
@@ -4030,6 +4685,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         final hostId = tab?.hostId;
         if (hostId == null || hostId.isEmpty) return;
         context.push('/change-records?hostId=${Uri.encodeComponent(hostId)}');
+        break;
+      case TerminalMenuIntent.showHistory:
+        _showCommandHistory(paneId: paneId);
         break;
     }
   }
@@ -5481,6 +6139,52 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             child: Text(l10n.commonExecute),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 端口转发管理（仅 SSH 标签；本地终端无 SSH 连接可复用）
+  void _showPortForwardDialog() {
+    final tab = ref.read(tp.terminalProvider).activeTab;
+    if (tab == null) return;
+    if (tab.isLocal) {
+      _showOperationMessage(
+          UiText.t('本地终端不支持端口转发', 'Port forwarding requires an SSH tab'),
+          isError: true);
+      return;
+    }
+    final service =
+        _portForwardServices.putIfAbsent(tab.id, PortForwardService.new);
+    showDialog<void>(
+      context: context,
+      builder: (_) => PortForwardDialog(
+        service: service,
+        client: () => tab.service?.client,
+      ),
+    );
+  }
+
+  /// 命令历史面板：搜历史、填进命令行或直接执行。
+  /// 写入走 `writeToTerminal`（与用户按键同一条编码队列），不是 execute，
+  /// 这样填入后仍停在命令行等用户确认，非 UTF-8 主机也不会错位。
+  /// [paneId] 非空且不是首屏时写入那一屏自己的会话。
+  void _showCommandHistory({String? paneId}) {
+    final tab = ref.read(tp.terminalProvider).activeTab;
+    if (tab == null) return;
+    final targetPane = paneId ?? tab.id;
+    showDialog<void>(
+      context: context,
+      builder: (_) => CommandHistoryPanel(
+        onInsert: (command, {required bool run}) {
+          final text = run ? '$command\r' : command;
+          if (targetPane != tab.id) {
+            _paneSessionFor(targetPane)?.writeToTerminal(text);
+          } else if (tab.isLocal) {
+            tab.localService?.writeToTerminal(text);
+          } else {
+            tab.service?.writeToTerminal(text);
+          }
+        },
       ),
     );
   }
