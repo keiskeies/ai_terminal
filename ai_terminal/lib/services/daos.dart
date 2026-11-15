@@ -16,6 +16,7 @@ import '../models/host_execution_result.dart';
 import '../models/change_record.dart';
 import '../models/command_history_entry.dart';
 import '../models/runbook.dart';
+import '../models/knowledge_rule.dart';
 
 // ═══════════════════════════════════════════════════════════
 // HostsDao
@@ -1231,5 +1232,97 @@ class CredentialsFallbackDao {
   static Future<List<String>> getAllKeys() async {
     final rows = await DbInit.db.query('credentials_fallback', columns: ['key']);
     return rows.map((r) => r['key'] as String).toList();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// KnowledgeRulesDao（用户自维护的内部运维规范）
+// ═══════════════════════════════════════════════════════════
+class KnowledgeRulesDao {
+  static List<KnowledgeRule> _cache = [];
+
+  static Future<void> loadCache() async {
+    _cache = await getAll();
+  }
+
+  /// 同步获取缓存中所有规范条目
+  static List<KnowledgeRule> get cached => _cache;
+
+  static Future<List<KnowledgeRule>> getAll() async {
+    final rows = await DbInit.db.query('knowledge_rules', orderBy: 'createdAt ASC');
+    return rows.map(_fromRow).toList();
+  }
+
+  /// 对目标主机生效的启用条目
+  ///
+  /// [hostId] 为空（本机终端、普通聊天）时只返回全局条目。
+  static List<KnowledgeRule> effectiveFor(String? hostId) {
+    String? group;
+    if (hostId != null && hostId.isNotEmpty) {
+      group = HostsDao.getCachedById(hostId)?.group;
+    }
+    return _cache
+        .where((r) => r.enabled && r.appliesTo(targetHostId: hostId, targetGroup: group))
+        .toList();
+  }
+
+  static Future<void> upsert(KnowledgeRule r) async {
+    final idx = _cache.indexWhere((e) => e.id == r.id);
+    if (idx >= 0) {
+      _cache[idx] = r;
+    } else {
+      _cache.add(r);
+    }
+    // 与 SettingsDao 同口径：DbInit 未初始化时只写缓存（单测路径），
+    // 生产环境 main.dart 已保证 DbInit 先于本 DAO 使用完成初始化
+    if (!DbInit.isInitialized) {
+      debugPrint('[KnowledgeRulesDao] WARN: DbInit 未初始化，upsert(${r.id}) 仅写缓存');
+      return;
+    }
+    await DbInit.db.insert('knowledge_rules', _toRow(r),
+        conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  static Future<void> delete(String id) async {
+    _cache.removeWhere((e) => e.id == id);
+    if (!DbInit.isInitialized) {
+      debugPrint('[KnowledgeRulesDao] WARN: DbInit 未初始化，delete($id) 仅清缓存');
+      return;
+    }
+    await DbInit.db.delete('knowledge_rules', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// 列名避开 SQL 关键字 group，故用 group_name / host_id
+  static Map<String, dynamic> _toRow(KnowledgeRule r) => {
+        'id': r.id,
+        'title': r.title,
+        'content': r.content,
+        'commands': r.commands,
+        'scope': r.scope.name,
+        'group_name': r.group,
+        'host_id': r.hostId,
+        'strict': r.strict ? 1 : 0,
+        'enabled': r.enabled ? 1 : 0,
+        'createdAt': r.createdAt.millisecondsSinceEpoch,
+        'updatedAt': r.updatedAt.millisecondsSinceEpoch,
+      };
+
+  static KnowledgeRule _fromRow(Map<String, dynamic> r) {
+    final rule = KnowledgeRule()
+      ..id = r['id'] as String
+      ..title = r['title'] as String
+      ..content = r['content'] as String
+      ..commands = (r['commands'] as String?) ?? ''
+      ..scope = KnowledgeRuleScope.values.firstWhere(
+        (s) => s.name == r['scope'],
+        orElse: () => KnowledgeRuleScope.global,
+      )
+      ..group = r['group_name'] as String?
+      ..hostId = r['host_id'] as String?
+      ..strict = (r['strict'] as int?) == 1
+      ..enabled = (r['enabled'] as int?) == 1
+      ..createdAt = DateTime.fromMillisecondsSinceEpoch(r['createdAt'] as int)
+      ..updatedAt = DateTime.fromMillisecondsSinceEpoch(r['updatedAt'] as int);
+    return rule;
   }
 }

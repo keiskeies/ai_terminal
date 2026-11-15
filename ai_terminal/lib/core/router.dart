@@ -13,6 +13,7 @@ import '../pages/security_page.dart';
 import '../pages/agent_settings_page.dart';
 import '../pages/web_search_settings_page.dart';
 import '../pages/mcp_settings_page.dart';
+import '../pages/knowledge_rules_page.dart';
 import '../pages/sftp_page.dart';
 import '../pages/audit_log_page.dart';
 import '../pages/change_records_page.dart';
@@ -96,6 +97,11 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/settings/mcp',
       builder: (context, state) => const McpSettingsPage(),
+    ),
+    // 内部规范（用户自维护、注入给 AI 的组织约定）
+    GoRoute(
+      path: '/settings/knowledge_rules',
+      builder: (context, state) => const KnowledgeRulesPage(),
     ),
     // 快捷命令
     GoRoute(

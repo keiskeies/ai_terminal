@@ -557,6 +557,7 @@ class AIService {
     String? context,
     String? hostName,
     String? hostAddress,
+    String? hostId,
     CancelToken? cancelToken,
   }) async {
     final provider = create(config);
@@ -575,7 +576,7 @@ class AIService {
       final knowledge = KnowledgeService();
       await knowledge.ensureInitialized();
       if (knowledge.isInitialized && prompt.isNotEmpty) {
-        final injection = await knowledge.buildKnowledgeInjection(prompt);
+        final injection = await knowledge.buildKnowledgeInjection(prompt, hostId: hostId);
         if (injection != null) {
           systemPrompt = '$systemPrompt\n\n$injection';
         }

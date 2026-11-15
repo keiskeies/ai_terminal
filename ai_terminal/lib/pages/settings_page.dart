@@ -10,7 +10,6 @@ import '../core/theme_colors.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/agent_provider.dart';
 import '../providers/app_providers.dart';
-import '../services/knowledge_service.dart';
 import '../services/crash_reporter.dart';
 import '../services/health_check_service.dart';
 import '../core/app_toast.dart';
@@ -137,10 +136,13 @@ class SettingsPage extends ConsumerWidget {
                   ),
                   _SettingItem(
                     icon: Icons.menu_book_rounded,
-                    iconColor: cInfo,
-                    title: l10n.settingsKnowledge,
-                    subtitle: l10n.settingsKnowledgeDesc,
-                    onTap: () => _updateKnowledgeBase(context),
+                    iconColor: cViolet,
+                    title: UiText.t('内部规范', 'Internal Rules'),
+                    subtitle: UiText.t(
+                      '写下你所在环境的约定，AI 执行时遵循',
+                      'Record your environment conventions for the AI to follow',
+                    ),
+                    onTap: () => context.push('/settings/knowledge_rules'),
                   ),
                 ],
               ),
@@ -515,60 +517,6 @@ class SettingsPage extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  Future<void> _updateKnowledgeBase(BuildContext context) async {
-    final l10n = AppLocalizations.of(context)!;
-    // 显示加载对话框
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ThemeColors.of(context).cardElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text(l10n.settingsKnowledge, style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
-        content: Row(
-          children: [
-            const SizedBox(
-              width: 20, height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            const SizedBox(width: 16),
-            Text('...', style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fBody)),
-          ],
-        ),
-      ),
-    );
-
-    try {
-      final knowledge = KnowledgeService();
-      await knowledge.ensureInitialized();
-      final result = await knowledge.forceUpdateFromRemote();
-
-      if (!context.mounted) return;
-      Navigator.pop(context); // 关闭加载对话框
-
-      final isSuccess = result.startsWith('更新成功') || result.startsWith('Update success');
-      showTopSnackBar(context, 
-        SnackBar(
-          content: Text(result),
-          duration: Duration(seconds: isSuccess ? 2 : 4),
-          backgroundColor: isSuccess ? cSuccess : cDanger,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      Navigator.pop(context); // 关闭加载对话框
-
-      showTopSnackBar(context, 
-        SnackBar(
-          content: Text('$e'),
-          backgroundColor: cDanger,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
   }
 
   /// 获取语言显示名称（"跟随系统" 需要本地化，其他语言用原名）

@@ -195,6 +195,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
         context: context,
         hostName: host?.name,
         hostAddress: host != null ? '${host.username}@${host.host}:${host.port}' : null,
+        hostId: host?.id,
       );
 
       final responseBuffer = StringBuffer();

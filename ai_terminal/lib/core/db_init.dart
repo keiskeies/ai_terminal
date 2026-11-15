@@ -15,7 +15,7 @@ import 'credentials_store.dart';
 /// 升级时通过 onUpgrade 回调做增量迁移。
 class DbInit {
   static Database? _db;
-  static const int _schemaVersion = 7;
+  static const int _schemaVersion = 8;
 
   /// 数据库文件名
   static const String dbFileName = 'app_data.db';
@@ -702,8 +702,27 @@ class DbInit {
       )
     ''');
 
+    // ===== knowledge_rules（用户自维护的内部运维规范）=====
+    batch.execute(_knowledgeRulesCreateSql);
+
     await batch.commit(noResult: true);
   }
+
+  static const String _knowledgeRulesCreateSql = '''
+    CREATE TABLE IF NOT EXISTS knowledge_rules (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      commands TEXT NOT NULL DEFAULT '',
+      scope TEXT NOT NULL DEFAULT 'global',
+      group_name TEXT,
+      host_id TEXT,
+      strict INTEGER NOT NULL DEFAULT 1,
+      enabled INTEGER NOT NULL DEFAULT 1,
+      createdAt INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL
+    )
+  ''';
 
   /// 升级数据库（未来版本在此追加迁移脚本）
   static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
@@ -765,6 +784,10 @@ class DbInit {
       await db.execute(
           'CREATE INDEX IF NOT EXISTS idx_command_history_usedAt ON command_history(usedAt)');
     }
+    // v8: 用户自维护的内部运维规范（注入给 AI 的组织约定，作用域到主机组/单主机）
+    if (oldVersion < 8) {
+      await db.execute(_knowledgeRulesCreateSql);
+    }
   }
 
   /// 关闭数据库
@@ -790,6 +813,7 @@ class DbInit {
       ConversationsDao.loadCache(),
       ChangeRecordsDao.loadCache(),
       RunbooksDao.loadCache(),
+      KnowledgeRulesDao.loadCache(),
       SettingsDao.loadCache(),
       AuditLogsDao.loadCache(),
       CommandHistoryDao.loadCache(),

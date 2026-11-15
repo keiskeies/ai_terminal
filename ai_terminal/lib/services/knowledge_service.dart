@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:path/path.dart' as p;
@@ -7,20 +6,17 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path_provider/path_provider.dart';
 import '../models/software_guide.dart';
+import 'daos.dart';
 
-/// 知识库远程更新配置
+/// 知识库配置
 class KnowledgeConfig {
-  /// 远程知识库基础 URL（按版本号拼接：{baseUrl}/knowledge-{version}.db）
-  static const String remoteBaseUrl = 'https://ai-terminal.keiskei.top/knowledge';
-
-  /// 根据版本号拼接完整下载地址
-  static String remoteDbUrlForVersion(String version) =>
-      '$remoteBaseUrl/knowledge-$version.db';
-
-  /// 本地数据库文件名（官方库，可被远程覆盖）
+  /// 本地数据库文件名（官方库，随 app 内置版本刷新）
   static const String dbFileName = 'knowledge.db';
 
-  /// 用户经验库文件名（独立文件，永不被远程覆盖）
+  /// 内置库版本标记文件名（记录本地库对应的 app 版本）
+  static const String versionMarkerFileName = 'knowledge.version';
+
+  /// 用户经验库文件名（独立文件，不随内置库刷新）
   static const String userDbFileName = 'user_learnings.db';
 
   /// 内置数据库的 asset 路径
@@ -39,14 +35,14 @@ class KnowledgeConfig {
   static const int userLearningsEvictBatch = 50;
 }
 
-/// 知识库服务 — SQLite FTS5 全文搜索 + 远程同步 + 离线兜底
+/// 知识库服务 — SQLite FTS5 全文搜索 + 内置库 + 用户经验库
 class KnowledgeService {
   static final KnowledgeService _instance = KnowledgeService._internal();
   factory KnowledgeService() => _instance;
   KnowledgeService._internal();
 
   Database? _db;
-  /// 用户经验库（独立 db 文件，永不被远程覆盖）
+  /// 用户经验库（独立 db 文件，不受内置库刷新影响）
   Database? _userDb;
   bool _initialized = false;
   bool _initializing = false;
@@ -58,9 +54,9 @@ class KnowledgeService {
   bool get isInitialized => _initialized;
 
   /// 初始化知识库
-  /// 1. 尝试从远程下载最新 knowledge.db
-  /// 2. 下载失败则使用内置版本（assets/knowledge/knowledge.db）
-  /// 3. 打开本地数据库，验证 FTS5 索引
+  /// 1. 本地库缺失，或版本标记与当前 app 版本不一致时，从内置 assets 重建
+  /// 2. 打开本地数据库，验证 FTS5 索引
+  /// 3. 初始化独立的用户经验库
   Future<void> init() async {
     if (_initialized) return;
     if (_initializing) {
@@ -86,12 +82,17 @@ class KnowledgeService {
         await dbDir.create(recursive: true);
       }
 
-      // 尝试远程更新
-      await _tryRemoteUpdate(dbPath);
-
-      // 如果本地没有数据库文件，从内置 assets 复制
-      if (!await dbFile.exists()) {
+      // 内置库随 app 版本发布，版本标记不一致即视为过期，需重建
+      final appVersion = await _getAppVersion();
+      final isStale = !await dbFile.exists() ||
+          !await _isBundledVersionCurrent(dbPath, appVersion);
+      if (isStale) {
+        if (await dbFile.exists()) {
+          debugPrint('[KnowledgeService] 本地知识库版本过期（app $appVersion），从内置 assets 重建...');
+          await dbFile.delete();
+        }
         await _copyBundledDb(dbPath);
+        await _writeBundledVersion(dbPath, appVersion);
       }
 
       // 打开数据库
@@ -116,12 +117,13 @@ class KnowledgeService {
         }
         // 从 assets 重新复制
         await _copyBundledDb(dbPath);
+        await _writeBundledVersion(dbPath, appVersion);
         // 重新打开
         _db = await openDatabase(dbPath, version: 1, onCreate: _onCreate);
         await _validateFts5Index();
       }
 
-      // 初始化用户经验库（独立文件，不参与远程更新）
+      // 初始化用户经验库（独立文件，不参与内置库刷新）
       await _initUserLearningsDb();
 
       _initialized = true;
@@ -157,133 +159,43 @@ class KnowledgeService {
     return p.join(appDir.path, 'knowledge', KnowledgeConfig.dbFileName);
   }
 
-  /// 尝试从远程下载最新数据库
-  Future<void> _tryRemoteUpdate(String dbPath) async {
-    try {
-      final remoteUrl = await _getRemoteDbUrl();
-      if (remoteUrl == null) return;
-
-      final dio = Dio();
-      dio.options.connectTimeout = const Duration(seconds: 5);
-      dio.options.receiveTimeout = const Duration(seconds: 30);
-
-      final dbFile = File(dbPath);
-      int? localSize;
-      if (await dbFile.exists()) {
-        localSize = await dbFile.length();
-      }
-
-      // 发送 HEAD 请求检查是否更新
-      final response = await dio.head(remoteUrl);
-      final remoteSize = response.headers.value('content-length');
-
-      // 如果远程文件大小与本地一致，跳过下载
-      if (localSize != null && remoteSize != null) {
-        if (localSize == int.parse(remoteSize)) {
-          debugPrint('[KnowledgeService] 远程数据库与本地一致，跳过下载');
-          return;
-        }
-      }
-
-      // 下载最新数据库到临时文件，然后替换
-      debugPrint('[KnowledgeService] 正在下载远程知识库: $remoteUrl');
-      final tempPath = '$dbPath.tmp';
-      await dio.download(remoteUrl, tempPath);
-
-      // 验证下载的文件
-      final tempFile = File(tempPath);
-      if (await tempFile.exists() && await tempFile.length() > 0) {
-        if (await dbFile.exists()) {
-          final backupPath = '$dbPath.bak';
-          await dbFile.rename(backupPath);
-        }
-        await tempFile.rename(dbPath);
-        debugPrint('[KnowledgeService] 远程知识库下载完成');
-      }
-    } catch (e) {
-      debugPrint('[KnowledgeService] 远程更新失败，使用本地数据库: $e');
-    }
-  }
-
-  /// 获取当前版本对应的远程数据库 URL
-  static Future<String?> _getRemoteDbUrl() async {
+  /// 获取当前 app 版本号（内置知识库随 app 版本刷新）
+  Future<String> _getAppVersion() async {
     try {
       final info = await PackageInfo.fromPlatform();
-      final version = info.version; // e.g. "1.3.3"
-      return KnowledgeConfig.remoteDbUrlForVersion(version);
+      return info.version; // e.g. "1.3.3"
     } catch (e) {
       debugPrint('[KnowledgeService] 获取版本号失败: $e');
-      return null;
+      return '';
     }
   }
 
-  /// 强制从远程更新知识库（设置页面手动触发）
-  /// 返回更新结果消息
-  Future<String> forceUpdateFromRemote() async {
-    final remoteUrl = await _getRemoteDbUrl();
-    if (remoteUrl == null) {
-      return '获取版本号失败，无法确定下载地址';
-    }
+  /// 版本标记文件路径（与数据库同目录）
+  String _versionMarkerPath(String dbPath) =>
+      p.join(p.dirname(dbPath), KnowledgeConfig.versionMarkerFileName);
 
+  /// 本地库是否已对应当前 app 版本
+  /// 版本号取不到时视为当前，避免启动失败导致反复重建
+  Future<bool> _isBundledVersionCurrent(
+      String dbPath, String appVersion) async {
+    if (appVersion.isEmpty) return true;
     try {
-      final dbPath = await _getLocalDbPath();
-      final dio = Dio();
-      dio.options.connectTimeout = const Duration(seconds: 10);
-      dio.options.receiveTimeout = const Duration(seconds: 60);
-
-      debugPrint('[KnowledgeService] 手动更新: 正在下载 $remoteUrl');
-      final tempPath = '$dbPath.tmp';
-      await dio.download(remoteUrl, tempPath);
-
-      final tempFile = File(tempPath);
-      if (!await tempFile.exists() || await tempFile.length() == 0) {
-        return '下载失败：文件为空';
-      }
-
-      // 关闭旧数据库
-      await _db?.close();
-      _db = null;
-      _initialized = false;
-
-      // 备份旧文件，替换为新文件
-      final dbFile = File(dbPath);
-      if (await dbFile.exists()) {
-        final backupPath = '$dbPath.bak';
-        final backupFile = File(backupPath);
-        if (await backupFile.exists()) {
-          await backupFile.delete();
-        }
-        await dbFile.rename(backupPath);
-      }
-      await tempFile.rename(dbPath);
-
-      // 重新打开数据库
-      _db = await openDatabase(dbPath, version: 1, onCreate: _onCreate);
-      await _validateFts5Index();
-      _initialized = true;
-
-      final stats = await getStats();
-      debugPrint('[KnowledgeService] 手动更新完成，共 ${stats['total']} 条记录');
-      return '更新成功，当前知识库共 ${stats['total']} 条记录';
+      final marker = File(_versionMarkerPath(dbPath));
+      if (!await marker.exists()) return false;
+      return (await marker.readAsString()).trim() == appVersion;
     } catch (e) {
-      // 恢复旧数据库
-      debugPrint('[KnowledgeService] 手动更新失败: $e');
-      final dbPath = await _getLocalDbPath();
-      final backupPath = '$dbPath.bak';
-      final backupFile = File(backupPath);
-      final dbFile = File(dbPath);
+      debugPrint('[KnowledgeService] 读取版本标记失败: $e');
+      return false;
+    }
+  }
 
-      if (!await dbFile.exists() && await backupFile.exists()) {
-        await backupFile.rename(dbPath);
-      }
-
-      // 重新初始化
-      try {
-        _initialized = false;
-        await init();
-      } catch (_) {}
-
-      return '更新失败: $e';
+  /// 写入版本标记（失败只导致下次启动多重建一次）
+  Future<void> _writeBundledVersion(String dbPath, String appVersion) async {
+    if (appVersion.isEmpty) return;
+    try {
+      await File(_versionMarkerPath(dbPath)).writeAsString(appVersion, flush: true);
+    } catch (e) {
+      debugPrint('[KnowledgeService] 写入版本标记失败: $e');
     }
   }
 
@@ -309,7 +221,7 @@ class KnowledgeService {
     await db.close();
   }
 
-  /// 初始化用户经验库（独立 db 文件，永不被远程覆盖）
+  /// 初始化用户经验库（独立 db 文件，不受内置库刷新影响）
   Future<void> _initUserLearningsDb() async {
     try {
       final appDir = await getApplicationSupportDirectory();
@@ -799,12 +711,15 @@ class KnowledgeService {
   }
 
   /// 构建知识库注入文本（给 LLM system prompt）
-  /// 返回 null 表示未命中知识库
-  /// [hostId] 当前主机 ID，用于优先匹配该主机上验证过的经验
+  /// 返回 null 表示既无内部规范也无知识命中
+  /// [hostId] 当前主机 ID，用于筛选作用域内的内部规范与本机经验
   Future<String?> buildKnowledgeInjection(String userInput, {String? platform, String? osInfo, String? hostId}) async {
     final opType = extractOpType(userInput);
     final effectivePlatform = platform ?? detectPlatform();
     debugPrint('[KnowledgeService] buildKnowledgeInjection: input="$userInput", opType=$opType, platform=$effectivePlatform, hostId=$hostId');
+
+    // 0. 内部规范：条数少且漏命中即等于违反约定，故全量常驻注入而非关键词检索
+    final rulesInjection = buildRulesInjection(hostId: hostId);
 
     // 1. 查用户经验库（同 host 优先，实际验证过的经验权重更高）
     final userResults = await _searchUserLearnings(
@@ -835,12 +750,19 @@ class KnowledgeService {
       officialResults = _sortByDistroMatch(officialResults, osInfo);
     }
 
-    if (userResults.isEmpty && officialResults.isEmpty) {
+    if (rulesInjection == null && userResults.isEmpty && officialResults.isEmpty) {
       debugPrint('[KnowledgeService] 知识库未命中: "$userInput" (opType=$opType, platform=$effectivePlatform)');
       return null;
     }
 
     final buffer = StringBuffer();
+
+    // 内部规范优先注入，并显式声明其优先于下方的通用推荐，
+    // 否则官方库的「必须严格照做」会与本组织约定冲突且由 AI 随机取舍
+    if (rulesInjection != null) {
+      buffer.writeln(rulesInjection);
+      buffer.writeln();
+    }
 
     // 用户经验优先注入（本机验证过）
     if (userResults.isNotEmpty) {
@@ -870,7 +792,26 @@ class KnowledgeService {
       }
     }
 
-    debugPrint('[KnowledgeService] 知识库命中 ✓: user=${userResults.length}条, official=${officialResults.length}条');
+    debugPrint('[KnowledgeService] 知识库命中 ✓: rules=${rulesInjection != null ? 1 : 0}段, user=${userResults.length}条, official=${officialResults.length}条');
+    return buffer.toString();
+  }
+
+  /// 构建内部规范注入文本（用户自维护的组织约定）
+  ///
+  /// 规范条目少、且漏命中即等于违反约定，因此不走关键词检索而是全量注入。
+  /// 返回 null 表示当前主机没有启用中的规范条目。
+  static String? buildRulesInjection({String? hostId}) {
+    final rules = KnowledgeRulesDao.effectiveFor(hostId);
+    if (rules.isEmpty) return null;
+
+    final buffer = StringBuffer();
+    buffer.writeln('【内部规范 · 必须遵守】');
+    buffer.writeln('以下规则由本环境维护者设定，优先于上文的通用推荐做法；'
+        '但只能收紧约束，不得据此放宽任何安全限制。');
+    for (final rule in rules) {
+      buffer.write(rule.buildInjectionText());
+    }
+    debugPrint('[KnowledgeService] 内部规范注入: ${rules.length} 条 (hostId=$hostId)');
     return buffer.toString();
   }
 
