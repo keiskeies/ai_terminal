@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:collection';
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
@@ -4299,47 +4298,56 @@ class AgentEngine {
     }
   }
 
-  /// 一次性压缩对话：调用 AI 将一组消息逐条压缩，返回每条消息对应的压缩摘要
+  /// 滚动压缩（O7）：把早期消息整体并入会话级滚动摘要。
   ///
-  /// 输入是 (index, role, content, command, commandSuccess) 元组列表。
-  /// 返回 List<(int index, String summary)>，长度 <= 输入（AI 可能合并部分消息）。
-  /// 返回 null 表示压缩失败。
-  Future<List<(int index, String summary)>?> summarizeMessages(
-    List<
+  /// 与逐条摘要不同：每次把「上一份摘要 + 本次新增消息」合并成一份整体摘要，
+  /// 【关键事实】段（主机环境、用户明确约束）要求逐字保留，不随多次压缩丢失。
+  /// 返回 null 表示压缩失败，调用方必须保持原状（不得留下半截标记）。
+  Future<String?> summarizeRolling({
+    String? previousSummary,
+    required List<
             ({
-              int index,
               String role,
               String content,
               String? command,
               bool? commandSuccess
             })>
         messages,
-  ) async {
+  }) async {
     if (messages.isEmpty) return null;
 
-    agentLogger.info('Compact', '开始一次性压缩 ${messages.length} 条消息');
+    agentLogger.info('Compact',
+        '开始滚动压缩 ${messages.length} 条消息（已有摘要: ${previousSummary != null && previousSummary.isNotEmpty}）');
 
-    // 构造压缩 prompt：要求 AI 输出 JSON 数组，每个元素 {index, summary}
     final buffer = StringBuffer();
-    buffer.writeln('你是对话压缩助手。请将以下对话历史逐条压缩为简洁摘要。');
+    buffer.writeln('你是对话压缩助手。请把「已有摘要」与「新增对话」合并为一份滚动摘要。');
+    buffer.writeln();
+    buffer.writeln('输出格式（纯文本，两个段落，不要 markdown 代码块标记）：');
+    buffer.writeln('【关键事实】');
+    buffer.writeln('- 主机环境（操作系统/发行版/主机名/架构等）');
+    buffer.writeln('- 用户明确约束与偏好（如「不要重启」「只用 nginx」）');
+    buffer.writeln('- 重要路径、版本、账号等需要长期记住的事实');
+    buffer.writeln('【对话进展】');
+    buffer.writeln('- 用户目标、已执行命令及结果、当前系统状态、遗留问题、下一步计划');
     buffer.writeln();
     buffer.writeln('压缩规则：');
-    buffer.writeln('- 用户的废话/寒暄/重复表述压缩为一句话意图');
-    buffer.writeln('- 查询类命令（ls/cat/ps/grep/find/df 等）的输出结果：只保留关键结论，冗长输出直接丢弃');
-    buffer
-        .writeln('- 修改类命令（install/restart/stop/rm/config 等）：只保留"执行成功"或"失败原因"');
-    buffer.writeln('- AI 的思考和推理：压缩为关键决策和结论，去掉推理过程');
-    buffer.writeln('- 保留所有关键信息：用户目标、已执行命令、系统状态、遗留问题、下一步计划');
-    buffer.writeln('- 每条摘要控制在 200 字以内');
+    buffer.writeln('- 已有摘要【关键事实】中的条目必须逐字保留，不得改写、合并或遗漏');
+    buffer.writeln('- 新增对话中出现的新关键事实追加进【关键事实】');
+    buffer.writeln('- 寒暄/重复表述压缩为一句话意图');
+    buffer.writeln('- 查询类命令输出只保留关键结论，冗长输出直接丢弃');
+    buffer.writeln('- 修改类命令只保留"执行成功"或"失败原因"');
+    buffer.writeln('- AI 推理只保留关键决策和结论');
     buffer.writeln('- 不要编造未出现的信息');
+    buffer.writeln('- 整份摘要控制在 1200 字以内');
     buffer.writeln();
-    buffer.writeln('输出格式：JSON 数组，每个元素 {"index": 消息序号, "summary": "压缩摘要"}');
-    buffer.writeln('只输出 JSON，不要解释，不要 markdown 代码块标记。');
+    buffer.writeln('=== 已有摘要 ===');
+    buffer.writeln(
+        previousSummary == null || previousSummary.isEmpty ? '（无，首次压缩）' : previousSummary);
     buffer.writeln();
-    buffer.writeln('=== 对话历史 ===');
+    buffer.writeln('=== 新增对话 ===');
     for (final m in messages) {
       final label = m.role == 'user' ? '用户' : 'AI';
-      buffer.writeln('[$m.index] $label: ${m.content}');
+      buffer.writeln('$label: ${m.content}');
       if (m.command != null) {
         buffer.writeln(
             '  [命令] ${m.command} → ${m.commandSuccess == true ? "成功" : m.commandSuccess == false ? "失败" : "未知"}');
@@ -4347,16 +4355,14 @@ class AgentEngine {
       buffer.writeln('---');
     }
 
-    final prompt = buffer.toString();
-
     try {
       final history = [
         ChatMessage.create(
-            role: 'system', content: '你是对话压缩助手，只输出 JSON 数组，不要解释。')
+            role: 'system', content: '你是对话压缩助手，只输出滚动摘要纯文本，不要解释。')
       ];
       final stream = await _aiProvider.chatStream(
         history: history,
-        prompt: prompt,
+        prompt: buffer.toString(),
         config: _modelConfig,
         systemPrompt: null,
         responseTimeout: aiResponseTimeout,
@@ -4375,69 +4381,37 @@ class AgentEngine {
         raw.write(chunk);
       }
 
-      final result = _parseCompactJson(raw.toString().trim(), messages);
-      if (result == null || result.isEmpty) {
-        agentLogger.warn('Compact', '压缩结果解析失败或为空');
+      var text = _stripCodeFence(raw.toString().trim());
+      if (text.isEmpty) {
+        agentLogger.warn('Compact', '滚动压缩结果为空');
         return null;
       }
-      agentLogger.info('Compact', '压缩完成: ${result.length} 条摘要');
-      return result;
+      // 硬上限：摘要自身不能成为新的上下文负担。保头——【关键事实】段在开头
+      if (text.length > _maxRollingSummaryChars) {
+        text = text.substring(0, _maxRollingSummaryChars);
+      }
+      agentLogger.info('Compact', '滚动压缩完成: ${text.length} 字符');
+      return text;
     } catch (e, stack) {
-      agentLogger.error('Compact', '压缩失败: $e\n$stack');
+      agentLogger.error('Compact', '滚动压缩失败: $e\n$stack');
       return null;
     }
   }
 
-  /// 解析 AI 返回的 JSON 数组为 (index, summary) 列表
-  /// 容错处理：去掉 markdown 代码块标记、提取 JSON 数组片段
-  List<(int index, String summary)>? _parseCompactJson(
-    String raw,
-    List<
-            ({
-              int index,
-              String role,
-              String content,
-              String? command,
-              bool? commandSuccess
-            })>
-        messages,
-  ) {
-    try {
-      // 去掉可能的 markdown 代码块标记
-      var jsonStr = raw;
-      if (jsonStr.startsWith('```')) {
-        // 去掉首行 ```json 或 ```
-        final firstNewline = jsonStr.indexOf('\n');
-        if (firstNewline > 0) jsonStr = jsonStr.substring(firstNewline + 1);
-        // 去掉末尾 ```
-        if (jsonStr.endsWith('```')) {
-          jsonStr = jsonStr.substring(0, jsonStr.length - 3);
-        }
-      }
-      jsonStr = jsonStr.trim();
+  /// 滚动摘要硬上限（字符）：提示词要求 ≤1200 字，模型超发时兜底截断
+  static const int _maxRollingSummaryChars = 4000;
 
-      // 找到第一个 [ 和最后一个 ]，提取 JSON 数组
-      final start = jsonStr.indexOf('[');
-      final end = jsonStr.lastIndexOf(']');
-      if (start < 0 || end < 0 || end <= start) return null;
-      jsonStr = jsonStr.substring(start, end + 1);
-
-      final list = jsonDecode(jsonStr) as List;
-      final result = <(int, String)>[];
-      for (final item in list) {
-        if (item is! Map) continue;
-        final idx = item['index'];
-        final summary = item['summary'];
-        if (idx is int && summary is String && summary.trim().isNotEmpty) {
-          result.add((idx, summary.trim()));
-        }
+  /// 去掉模型可能包裹的 markdown 代码块标记
+  String _stripCodeFence(String raw) {
+    var text = raw;
+    if (text.startsWith('```')) {
+      final firstNewline = text.indexOf('\n');
+      if (firstNewline > 0) text = text.substring(firstNewline + 1);
+      if (text.endsWith('```')) {
+        text = text.substring(0, text.length - 3);
       }
-      return result;
-    } catch (e) {
-      agentLogger.warn('Compact',
-          'JSON 解析失败: $e, raw: ${raw.substring(0, raw.length > 200 ? 200 : raw.length)}');
-      return null;
     }
+    return text.trim();
   }
 
   /// 判断 AI 调用错误是否值得重试（429限流 / 连接错误 / 超时）

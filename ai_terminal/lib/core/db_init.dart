@@ -15,7 +15,7 @@ import 'credentials_store.dart';
 /// 升级时通过 onUpgrade 回调做增量迁移。
 class DbInit {
   static Database? _db;
-  static const int _schemaVersion = 8;
+  static const int _schemaVersion = 9;
 
   /// 数据库文件名
   static const String dbFileName = 'app_data.db';
@@ -596,6 +596,7 @@ class DbInit {
         messages TEXT NOT NULL DEFAULT '[]',
         agentLogs TEXT NOT NULL DEFAULT '[]',
         summary TEXT,
+        rollingSummary TEXT,
         summarizedUpToIndex INTEGER NOT NULL DEFAULT 0,
         createdAt INTEGER NOT NULL,
         updatedAt INTEGER NOT NULL,
@@ -787,6 +788,13 @@ class DbInit {
     // v8: 用户自维护的内部运维规范（注入给 AI 的组织约定，作用域到主机组/单主机）
     if (oldVersion < 8) {
       await db.execute(_knowledgeRulesCreateSql);
+    }
+    // v9: Agent 滚动压缩摘要（O7：会话级整体摘要 + pinned 关键事实，
+    //     与聊天模式的 summary 列分开，互不干扰）
+    if (oldVersion < 9) {
+      await db.execute(
+        'ALTER TABLE conversations ADD COLUMN rollingSummary TEXT',
+      );
     }
   }
 

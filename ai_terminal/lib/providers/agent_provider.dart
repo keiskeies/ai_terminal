@@ -7,7 +7,6 @@ import '../models/agent_memory.dart';
 import '../models/agent_goal.dart';
 import '../models/agent_permission_mode.dart';
 import '../models/ai_model_config.dart';
-import '../models/chat_session.dart';
 import '../models/conversation.dart';
 import '../services/agent_engine.dart';
 import '../services/agent_host_registry.dart';
@@ -31,9 +30,12 @@ export '../models/chat_item.dart';
 /// 「整页重建 + Markdown 重解析」的次数从 12.5 次/秒降到 8 次/秒。
 const int _agentStreamThrottleMs = 120;
 
-/// 自动压缩阈值：超过 20 轮（40 条 user+assistant）或 30k 字符触发压缩
+/// 自动压缩阈值：超过 20 轮（40 条 user+assistant）或有效 token 超阈值触发。
+/// token 口径消除中英文密度差（旧 30k 字符阈值对中文偏松 2-3 倍）。
+/// 16000 token ≈ 64KB 英文 / 1.6 万汉字，远低于默认 256K 上下文的裁剪线
+/// （contextWindow×0.7），给 system prompt 与最近 6 轮原文留足余量。
 const int _compactThresholdRounds = 20;
-const int _compactThresholdChars = 30000;
+const int _compactThresholdTokens = 16000;
 
 /// 压缩后保留的最近原文轮数
 const int _compactKeepRounds = 6;
@@ -372,14 +374,15 @@ class AgentNotifier extends StateNotifier<AgentState> {
       hostId: hostId,
       conversationId: conv.id,
       chatItems: items,
-      summary: conv.summary,
+      summary: conv.rollingSummary ?? conv.summary,
       maxSteps: state.maxSteps,
       aiTimeoutSeconds: state.aiTimeoutSeconds,
     );
   }
 
   /// 从持久化恢复引擎对话历史（切换会话 / 新建引擎时调用）
-  /// 传 AI 时优先用 effectiveContent (summary ?? content)
+  /// 与压缩后同步共用 buildAiHistory：滚动摘要注入 + rolledUp 跳过 +
+  /// 旧逐条 summary 回退（effectiveContent）
   void _restoreEngineHistory() {
     if (_engine == null) return;
     final convId = state.conversationId;
@@ -393,13 +396,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _engine!.clearHistory();
       return;
     }
-    // 提取所有非 system 消息，传 AI 时用 effectiveContent
-    final msgs = <ChatMessage>[];
-    for (final m in conv.messages) {
-      if (m.role == 'system') continue;
-      msgs.add(ChatMessage.create(role: m.role, content: m.effectiveContent));
-    }
-    _engine!.restoreHistory(msgs);
+    _engine!.restoreHistory(conv.buildAiHistory());
   }
 
   /// 关闭 tab 时清除该 tab 自己的状态和记忆。
@@ -1476,12 +1473,13 @@ class AgentNotifier extends StateNotifier<AgentState> {
         .where((m) => m.role != 'system')
         .map((m) => ChatItem.fromConvMessage(m))
         .toList();
-    final hasSummary = conv.summary != null && conv.summary!.isNotEmpty;
+    final effectiveSummary = conv.rollingSummary ?? conv.summary;
+    final hasSummary = effectiveSummary != null && effectiveSummary.isNotEmpty;
     _updateScopeState(
         scopeId,
         (s) => s.copyWith(
               chatItems: items,
-              summary: hasSummary ? conv.summary : null,
+              summary: hasSummary ? effectiveSummary : null,
               clearSummary: !hasSummary,
             ));
   }
@@ -2099,13 +2097,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final conv = ConversationsDao.getCachedById(convId);
     if (conv == null) return;
 
-    // 统计未压缩的消息（summary 为空的非系统消息）
-    final unsummarized = conv.messages.where(
-        (m) => m.role != 'system' && (m.summary == null || m.summary!.isEmpty));
-    final rounds = unsummarized.length ~/ 2;
-    // 基于有效内容计算字符数（已压缩的用 summary 长度）
-    final needsCompact = rounds >= _compactThresholdRounds ||
-        conv.totalChars >= _compactThresholdChars;
+    final needsCompact = conv.needsCompaction(
+      tokenThreshold: _compactThresholdTokens,
+      roundThreshold: _compactThresholdRounds,
+    );
     final isCompacting = _registry.isActive(scopeId)
         ? state.isCompacting
         : (_registry.getState(scopeId)?.isCompacting ?? false);
@@ -2116,9 +2111,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
   }
 
-  /// 压缩对话：一次性调用 AI 将早期消息逐条压缩，写入 ConvMessage.summary
-  /// 保留最近 N 轮原文不压缩，确保 AI 有足够近期上下文
-  /// 压缩期间加锁（isCompacting），UI 显示"会话压缩中"横幅
+  /// 滚动压缩对话（O7）：调用 AI 把早期消息整体并入会话级 rollingSummary，
+  /// 被吸收的消息标记 rolledUp（原文留档展示，AI 历史不再携带）。
+  /// 保留最近 N 轮原文不压缩，确保 AI 有足够近期上下文。
+  /// 压缩期间加锁（isCompacting），UI 显示"会话压缩中"横幅。
   Future<void> compact([String? scopeId]) async {
     final effectiveScope = scopeId ?? _registry.activeScopeId;
     if (effectiveScope == null) return;
@@ -2137,65 +2133,71 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final conv = ConversationsDao.getCachedById(convId);
     if (conv == null) return;
 
-    // 待压缩 = 所有非系统消息中 summary 为空的，排除最近 N 轮（保留原文给 AI 近期上下文）
+    // 待压缩 = 非系统消息中排除最近 N 轮、且尚未被滚动摘要吸收的。
+    // 旧逐条 summary 的消息也参与（输入用 effectiveContent），并入后统一标记。
     final allMsgs = conv.messages.where((m) => m.role != 'system').toList();
     const keepCount = _compactKeepRounds * 2;
     if (allMsgs.length <= keepCount) return; // 太少不压缩
 
-    // 待压缩范围：除最近 keepCount 条之外，且尚未有 summary 的消息
-    final toSummarize = <ConvMessage>[];
+    final toCompact = <ConvMessage>[];
     for (int i = 0; i < allMsgs.length - keepCount; i++) {
       final m = allMsgs[i];
-      if (m.summary == null || m.summary!.isEmpty) {
-        toSummarize.add(m);
-      }
+      if (!m.rolledUp) toCompact.add(m);
     }
-    if (toSummarize.isEmpty) return;
+    if (toCompact.isEmpty) return;
 
     // 加锁 + UI 提示
     _updateScopeState(effectiveScope, (s) => s.copyWith(isCompacting: true));
 
     try {
-      // 构造压缩输入
       final tuples = <({
-        int index,
         String role,
         String content,
         String? command,
         bool? commandSuccess
       })>[];
-      for (int i = 0; i < toSummarize.length; i++) {
-        final m = toSummarize[i];
+      for (final m in toCompact) {
         tuples.add((
-          index: i,
           role: m.role,
-          content: m.content,
+          content: m.effectiveContent,
           command: m.command,
           commandSuccess: m.commandSuccess,
         ));
       }
 
-      final summaries = await engine.summarizeMessages(tuples);
-      if (summaries == null || summaries.isEmpty) {
-        agentLogger.warn('AgentNotifier', '对话压缩未产生摘要（AI 返回空或解析失败）');
+      final summary = await engine.summarizeRolling(
+        previousSummary: conv.rollingSummary,
+        messages: tuples,
+      );
+
+      // R1: await 期间会话可能被切换/删除/重载。缓存对象被替换时放弃本次
+      // 结果——toCompact 持有的是旧快照的消息引用，写进去会污染新快照。
+      final current = ConversationsDao.getCachedById(convId);
+      if (!identical(current, conv)) {
+        agentLogger.warn('AgentNotifier', '压缩期间会话已变更，放弃本次摘要');
+        _updateScopeState(
+            effectiveScope, (s) => s.copyWith(isCompacting: false));
+        return;
+      }
+      if (summary == null || summary.isEmpty) {
+        agentLogger.warn('AgentNotifier', '对话压缩未产生摘要（AI 返回空或失败）');
         _updateScopeState(
             effectiveScope, (s) => s.copyWith(isCompacting: false));
         return;
       }
 
-      // 逐条写入 ConvMessage.summary
-      for (final (idx, summary) in summaries) {
-        if (idx >= 0 && idx < toSummarize.length) {
-          toSummarize[idx].summary = summary;
-        }
+      // 整体写入滚动摘要 + 标记被吸收消息（先改内存再落库，失败时错误可见）
+      conv.rollingSummary = summary;
+      for (final m in toCompact) {
+        m.rolledUp = true;
       }
       conv.updatedAt = DateTime.now();
       await ConversationsDao.upsert(conv);
 
-      // 同步引擎内存历史：用 effectiveContent 重建，使后续 AI 调用使用压缩后的内容
+      // 同步引擎内存历史：滚动摘要 + 未吸收消息，使后续 AI 调用使用压缩后的内容
       _syncEngineHistoryAfterCompact(effectiveScope, convId);
 
-      // 更新 UI 状态
+      // 更新 UI 状态（摘要横幅让用户感知压缩结果）
       final restored = ConversationsDao.getCachedById(convId);
       if (restored != null) {
         final items = restored.messages
@@ -2207,6 +2209,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
             (s) => s.copyWith(
                   chatItems: items,
                   isCompacting: false,
+                  summary: restored.rollingSummary,
                 ));
       } else {
         _updateScopeState(
@@ -2221,19 +2224,13 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
   }
 
-  /// 压缩后同步引擎内存历史：用 effectiveContent 重建 _conversationHistory
+  /// 压缩后同步引擎内存历史：与恢复会话共用 buildAiHistory 口径
   void _syncEngineHistoryAfterCompact(String scopeId, String convId) {
     final engine = _registry.getEngine(scopeId);
     if (engine == null) return;
     final conv = ConversationsDao.getCachedById(convId);
     if (conv == null) return;
-
-    final msgs = <ChatMessage>[];
-    for (final m in conv.messages) {
-      if (m.role == 'system') continue;
-      msgs.add(ChatMessage.create(role: m.role, content: m.effectiveContent));
-    }
-    engine.restoreHistory(msgs);
+    engine.restoreHistory(conv.buildAiHistory());
   }
 
   @override

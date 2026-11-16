@@ -603,6 +603,7 @@ class ConversationsDao {
     'agentLogs': c.rawAgentLogsJson ??
         jsonEncode(c.agentLogs.map(_logToJson).toList()),
     'summary': c.summary,
+    'rollingSummary': c.rollingSummary,
     'summarizedUpToIndex': c.summarizedUpToIndex,
     'createdAt': c.createdAt.millisecondsSinceEpoch,
     'updatedAt': c.updatedAt.millisecondsSinceEpoch,
@@ -618,6 +619,7 @@ class ConversationsDao {
           .map((e) => _msgFromJson(e as Map<String, dynamic>)).toList()
       ..setAgentLogsJson(r['agentLogs'] as String?)
       ..summary = r['summary'] as String?
+      ..rollingSummary = r['rollingSummary'] as String?
       ..summarizedUpToIndex = r['summarizedUpToIndex'] as int? ?? 0
       ..createdAt = DateTime.fromMillisecondsSinceEpoch(r['createdAt'] as int)
       ..updatedAt = DateTime.fromMillisecondsSinceEpoch(r['updatedAt'] as int)
@@ -631,6 +633,7 @@ class ConversationsDao {
     'command': m.command, 'commandSuccess': m.commandSuccess,
     'events': m.events?.map(_eventToJson).toList(),
     'summary': m.summary,
+    'rolledUp': m.rolledUp,
   };
 
   static ConvMessage _msgFromJson(Map<String, dynamic> j) {
@@ -640,7 +643,8 @@ class ConversationsDao {
       ..timestamp = DateTime.parse(j['timestamp'] as String)
       ..command = j['command'] as String?
       ..commandSuccess = j['commandSuccess'] as bool?
-      ..summary = j['summary'] as String?;
+      ..summary = j['summary'] as String?
+      ..rolledUp = j['rolledUp'] as bool? ?? false;
     final evs = j['events'];
     if (evs is List) {
       m.events = evs.map((e) => _eventFromJson(e as Map<String, dynamic>)).toList();

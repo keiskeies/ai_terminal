@@ -1,5 +1,7 @@
 import 'dart:convert';
+import '../utils/token_estimator.dart';
 import 'agent_event.dart';
+import 'chat_session.dart';
 
 /// 会话消息（与具体 AI 模式无关，统一存储用户/AI 对话）
 class ConvMessage {
@@ -19,6 +21,11 @@ class ConvMessage {
   /// UI 展示始终用 content（原文），AI 读取用 summary ?? content
   String? summary;
 
+  /// 已被会话级滚动摘要（Conversation.rollingSummary）吸收：
+  /// 重建 AI 历史时整条跳过，原文仅留档展示。旧逐条 summary 机制的消息
+  /// 不带此标记，仍按 effectiveContent 参与重建（向后兼容）。
+  bool rolledUp = false;
+
   ConvMessage();
 
   ConvMessage.create({
@@ -29,6 +36,7 @@ class ConvMessage {
     this.commandSuccess,
     this.events,
     this.summary,
+    this.rolledUp = false,
   }) : timestamp = timestamp ?? DateTime.now();
 
   bool get isUser => role == 'user';
@@ -109,9 +117,13 @@ class Conversation {
     }
   }
 
-  /// 早期对话的 AI 摘要（旧机制，新压缩改为逐条写入 ConvMessage.summary）
-  /// 保留字段避免反序列化失败，新逻辑不再使用
+  /// 早期对话的 AI 摘要（普通聊天模式的压缩机制，conversation_service 维护）
+  /// Agent 模式改用下方 rollingSummary，两者互不干扰
   String? summary;
+
+  /// Agent 模式的会话级滚动摘要（含【关键事实】pinned 段）。
+  /// 每次压缩把早期消息整体并入此摘要，被吸收的消息标记 rolledUp。
+  String? rollingSummary;
 
   /// 已纳入 summary 的消息下标（旧机制，新压缩不再使用）
   int summarizedUpToIndex = 0;
@@ -203,6 +215,39 @@ class Conversation {
     }
   }
 
-  /// 估算消息总字符数（用于压缩阈值判断，基于 effectiveContent）
-  int get totalChars => messages.fold<int>(0, (sum, m) => sum + m.effectiveContent.length);
+  /// 重建传给 AI 的对话历史（压缩后与恢复会话共用同一口径）：
+  /// 滚动摘要作为首条消息注入 → 跳过已被吸收的消息 → 其余用 effectiveContent
+  /// （兼容旧逐条 summary）。system 消息不进 AI 历史（引擎另行构造 system prompt）。
+  List<ChatMessage> buildAiHistory() {
+    final msgs = <ChatMessage>[];
+    final rolling = rollingSummary;
+    if (rolling != null && rolling.isNotEmpty) {
+      msgs.add(ChatMessage.create(
+        role: 'user',
+        content: '【早期对话摘要】\n$rolling',
+      ));
+    }
+    for (final m in messages) {
+      if (m.role == 'system' || m.rolledUp) continue;
+      msgs.add(ChatMessage.create(role: m.role, content: m.effectiveContent));
+    }
+    return msgs;
+  }
+
+  /// AI 历史的有效 token 估算（压缩阈值判断用，与 buildAiHistory 同口径）
+  int get totalTokens => TokenEstimator.estimateHistory(buildAiHistory());
+
+  /// 是否需要压缩：未压缩轮次或有效 token 任一超阈值。
+  /// token 口径消除中英文密度差（旧字符阈值对中文偏松 2-3 倍）。
+  bool needsCompaction({
+    required int tokenThreshold,
+    required int roundThreshold,
+  }) {
+    final unsummarized = messages.where((m) =>
+        m.role != 'system' &&
+        !m.rolledUp &&
+        (m.summary == null || m.summary!.isEmpty));
+    final rounds = unsummarized.length ~/ 2;
+    return rounds >= roundThreshold || totalTokens >= tokenThreshold;
+  }
 }
