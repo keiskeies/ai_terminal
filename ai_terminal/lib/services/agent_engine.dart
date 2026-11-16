@@ -251,6 +251,13 @@ class AgentEngine {
   int _finishWithoutExecCount = 0;
   static const int _maxFinishWithoutExecRetries = 2;
 
+  /// O4/WP6: 计划含未完成项（[ ]/[>]）就 finish 的重试计数。
+  /// R5: 独立计数器，与 _finishWithoutExecCount / _noCommandRetryCount 互不干扰；
+  /// 达到 _maxPlanFinishRetries 后放行 finish（避免死循环），_resetTransientState 归零。
+  /// 不做命令→计划项自动映射（语义匹配不可靠），模型自报 + 引擎形式校验。
+  int _planFinishRetryCount = 0;
+  static const int _maxPlanFinishRetries = 2;
+
   /// 当前任务使用的 executor 引用（startTask 时传入，可被 setExecutor 实时刷新）。
   /// 解决场景：sudo reboot / 网络抖动导致 SSH 断开后，用户手动重连 SSH 会创建
   /// 新的 SSHService 实例，但 ReAct 循环仍持有旧引用 → 连续 success=false。
@@ -661,6 +668,7 @@ class AgentEngine {
     _noCommandRetryCount = 0;
     _hasExecutedAnyCommand = false;
     _finishWithoutExecCount = 0;
+    _planFinishRetryCount = 0; // O4/WP6: 计划 finish 门控计数新任务归零（R5）
     _consecutiveConnFailures = 0;
     _currentExecutor = null;
     _lastCommandEventId = '';
@@ -1285,6 +1293,11 @@ class AgentEngine {
             '检测到 executor 已刷新，使用新引用 (isConnected=${executor.isConnected})');
       }
 
+      // O4/WP6: 把计划进度快照幂等注入 system 消息（每轮替换整段，不累积）。
+      // 位于代际/暂停检查（与 steering 排空）之后、_callAI 之前：
+      // 同步执行无 await，旧循环不会把快照写进新会话历史（R1/R3）。
+      _syncPlanProgressToSystemMessage();
+
       // ═══════════════════════════════════════════
       // 阶段1: 思考 (Think) — 调用 AI 获取响应
       // ═══════════════════════════════════════════
@@ -1463,6 +1476,39 @@ class AgentEngine {
                   '请立即使用 动作: execute 实际执行命令验证你的判断，'
                   '所有结论必须有命令输出作为依据。如果任务确实无需执行命令（如纯解释/分析），'
                   '请在思考中明确说明为什么无需执行命令。',
+            ));
+            _trimMessages(_conversationHistory);
+            continue;
+          }
+          // O4/WP6: 计划完整性门控 — 计划仍有待处理/进行中项时不允许直接 finish。
+          // 放在 finishChoice 转换与幻觉门控之后：先保证"真的执行过"，再保证"计划对齐"。
+          // R5: 独立计数器 _planFinishRetryCount，最多提醒 2 次后放行（避免死循环）；
+          // 只作用于 finish 分支 — maxSteps 耗尽/failed/cancel/pause 路径不经过这里。
+          // 白名单判据：仅 pending/inProgress 拦截，completed/failed/skipped 均放行。
+          final unfinishedPlanSteps = _currentPlan
+              .where((s) =>
+                  s.status == PlanStepStatus.pending ||
+                  s.status == PlanStepStatus.inProgress)
+              .toList();
+          if (unfinishedPlanSteps.isNotEmpty &&
+              _planFinishRetryCount < _maxPlanFinishRetries) {
+            _planFinishRetryCount++;
+            agentLogger.warn('ReAct',
+                '计划仍有 ${unfinishedPlanSteps.length} 个未完成项，要求更新计划后再 finish '
+                '(重试 $_planFinishRetryCount/$_maxPlanFinishRetries)');
+            onEvent?.call(AgentEvent.info(
+                '⚠️ 计划还有 ${unfinishedPlanSteps.length} 个未完成项，要求逐项核对后再收尾 '
+                '($_planFinishRetryCount/$_maxPlanFinishRetries)'));
+            final unfinishedTitles =
+                unfinishedPlanSteps.map((s) => '- ${s.title}').join('\n');
+            _conversationHistory.add(ChatMessage.create(
+              role: 'user',
+              content: '计划中还有以下未完成项，不能直接 finish：\n'
+                  '$unfinishedTitles\n'
+                  '请对照计划逐项核对实际执行情况，输出完整计划块：已做的标完成 [x]，'
+                  '未做/不需要做的标跳过 [-] 并在思考中说明原因，实际失败的标失败 [!]。'
+                  '计划状态必须以命令输出为依据，不得把未执行的步骤标为完成。'
+                  '更新计划后再使用 动作: finish 收尾。',
             ));
             _trimMessages(_conversationHistory);
             continue;
@@ -4170,6 +4216,95 @@ class AgentEngine {
   /// 从 AI 响应中提取所有可执行命令（委托给 CommandExtractor）
   List<String> _extractCommands(String content) =>
       CommandExtractor.extractCommands(content);
+
+  // ── O4/WP6: 计划进度注入（每轮幂等替换 system 消息中的标记段） ──
+
+  /// 计划进度段起止标记（幂等替换靠它们定位整段）
+  static const String _planProgressStartMarker = '【当前计划进度】';
+  static const String _planProgressEndMarker = '【/当前计划进度】';
+
+  /// 把计划进度快照幂等同步进 system 消息（_conversationHistory[0]）。
+  ///
+  /// 每轮 ReAct 循环顶部（代际/暂停检查之后、_callAI 之前）调用：
+  /// - 有计划：先整段移除旧快照，再把最新快照追加到 system 消息末尾，
+  ///   保证多轮始终只有一段且内容最新（system 消息每任务重建，跨轮不累积）；
+  /// - 无计划：移除该段。
+  /// system 消息缺失时不做任何事（防御性，循环内不应出现）。
+  void _syncPlanProgressToSystemMessage() {
+    if (_conversationHistory.isEmpty ||
+        _conversationHistory[0].role != 'system') {
+      return;
+    }
+    final systemMsg = _conversationHistory[0];
+    var content = systemMsg.content;
+    final startIdx = content.indexOf(_planProgressStartMarker);
+    if (startIdx >= 0) {
+      final endIdx = content.indexOf(_planProgressEndMarker, startIdx);
+      // 连同注入时添加的 '\n\n' 分隔一起移除，还原原始 system 内容
+      var cutStart = startIdx;
+      if (cutStart >= 2 &&
+          content.substring(cutStart - 2, cutStart) == '\n\n') {
+        cutStart -= 2;
+      }
+      if (endIdx >= 0) {
+        content = content.substring(0, cutStart) +
+            content.substring(endIdx + _planProgressEndMarker.length);
+      } else {
+        // 防御：只有起标记没有止标记时，丢弃起标记之后的全部内容
+        content = content.substring(0, cutStart);
+      }
+    }
+    if (_currentPlan.isNotEmpty) {
+      content = '${content.trimRight()}\n\n${_buildPlanProgressBlock()}';
+    }
+    if (content != systemMsg.content) {
+      _conversationHistory[0] =
+          ChatMessage.create(role: 'system', content: content);
+    }
+  }
+
+  /// 生成计划进度段：计划各行 + finish 完整性指令
+  String _buildPlanProgressBlock() {
+    final buffer = StringBuffer()..writeln(_planProgressStartMarker);
+    for (final step in _currentPlan) {
+      buffer.writeln('- [${_planStatusGlyph(step.status)}] ${step.title}');
+    }
+    buffer
+      ..writeln('按实际进度更新计划块；finish 前不得遗留待处理/进行中项，不做的标跳过。')
+      ..write(_planProgressEndMarker);
+    return buffer.toString();
+  }
+
+  /// PlanStepStatus → 计划块标记（与 prompts.dart 的协议一致）
+  static String _planStatusGlyph(PlanStepStatus status) {
+    switch (status) {
+      case PlanStepStatus.completed:
+        return 'x';
+      case PlanStepStatus.inProgress:
+        return '>';
+      case PlanStepStatus.failed:
+        return '!';
+      case PlanStepStatus.skipped:
+        return '-';
+      case PlanStepStatus.pending:
+        return ' ';
+    }
+  }
+
+  // ── O4/WP6 测试入口 ──
+  @visibleForTesting
+  List<ChatMessage> get conversationHistoryForTesting => _conversationHistory;
+
+  @visibleForTesting
+  void setPlanForTesting(List<PlanStep> plan) {
+    _currentPlan = List<PlanStep>.unmodifiable(plan);
+  }
+
+  @visibleForTesting
+  void syncPlanProgressForTesting() => _syncPlanProgressToSystemMessage();
+
+  @visibleForTesting
+  int get planFinishRetryCountForTesting => _planFinishRetryCount;
 
   String _buildSystemPrompt(CommandExecutor? executor) {
     final buffer = StringBuffer();
