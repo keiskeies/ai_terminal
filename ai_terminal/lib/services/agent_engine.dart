@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -92,6 +93,18 @@ class AgentEngine {
   /// 供 provider 在任务终局时读取（不重置，随任务结束一起清零）
   bool get hadConfirmTimeout => _taskHadConfirmTimeout;
   String? _pendingConfirmCommand; // 当前等待确认的命令
+
+  /// O5: 运行中用户补充指令（steering）队列。
+  /// addUserSteering 入队，主循环顶部在代际/暂停检查之后同步排空（无 await，
+  /// 天然满足 R1）。等待确认/ask 期间循环阻塞在 await，补充自然留到下一轮。
+  final Queue<String> _steeringQueue = Queue<String>();
+
+  /// 单条补充指令长度上限（R8：保尾，最近的内容最重要）。
+  /// provider 持久化补充消息时用同一上限，保证落库内容与注入内容一致。
+  static const int maxSteeringChars = 4000;
+
+  /// 队列条数上限（R8：防止用户连续点击导致无界增长），超出丢弃最早一条
+  static const int _maxSteeringQueueLength = 20;
 
   /// 任务开始时间（用于计算 elapsedSeconds 进度）
   DateTime? _taskStartTime;
@@ -658,6 +671,7 @@ class AgentEngine {
   /// R2: 确保旧任务残留的 Completer/Subscription/Timer/CancelToken 不污染新任务
   void _resetTransientState() {
     _accumulatedMessage = '';
+    _steeringQueue.clear(); // O5: 旧任务的补充指令不能带进新任务
     _noCommandRetryCount = 0;
     _hasExecutedAnyCommand = false;
     _finishWithoutExecCount = 0;
@@ -929,6 +943,8 @@ class AgentEngine {
     }
     // 递近代际，使任何残留的旧循环立即退出
     _currentTaskGeneration++;
+    // O5: 取消即丢弃未注入的补充指令（已持久化的用户消息仍留在会话里）
+    _steeringQueue.clear();
     // 同时取消等待确认
     if (_confirmCompleter != null && !_confirmCompleter!.isCompleted) {
       _confirmCompleter!.complete(false);
@@ -1173,6 +1189,28 @@ class AgentEngine {
     _pendingOptions = [];
   }
 
+  /// O5: 任务运行中用户补充指令（steering）。
+  /// 只入队，不打断正在执行的命令，也不打断确认/ask 等待；
+  /// 下一轮 ReAct 循环边界统一注入为 user 消息并发 info 事件。
+  /// 空串/纯空白忽略；超长保尾截断（R8）。
+  void addUserSteering(String text) {
+    var t = text.trim();
+    if (t.isEmpty) return;
+    if (t.length > maxSteeringChars) {
+      t = t.substring(t.length - maxSteeringChars);
+    }
+    while (_steeringQueue.length >= _maxSteeringQueueLength) {
+      final dropped = _steeringQueue.removeFirst();
+      agentLogger.warn('ReAct',
+          '补充指令队列已满($_maxSteeringQueueLength)，丢弃最早一条(${dropped.length} 字符)');
+    }
+    _steeringQueue.add(t);
+    agentLogger.info('ReAct', '收到用户补充指令(${t.length} 字符)，下一轮循环边界注入');
+  }
+
+  /// 待注入的补充指令条数（测试与 UI 提示用）
+  int get pendingSteeringCount => _steeringQueue.length;
+
   Future<void> _executeAutomatic(
       String goal, CommandExecutor executor, int myGeneration) async {
     agentLogger.info('ReAct', '=== 开始 ReAct 自动执行 ===');
@@ -1273,6 +1311,24 @@ class AgentEngine {
       if (_currentTask?.status == AgentStatus.paused) {
         agentLogger.info('ReAct', '任务已暂停，循环退出');
         return;
+      }
+
+      // O5: 排空用户补充指令队列（steering）。
+      // 同步执行、无 await：排空期间不可能被新任务/取消打断，天然满足 R1；
+      // 且位于上方代际/暂停检查之后，旧循环不会把补充注入新会话历史。
+      // 等待确认/ask 期间循环阻塞在各自的 await，补充自然留到下一轮边界。
+      if (_steeringQueue.isNotEmpty) {
+        final injected = _steeringQueue.length;
+        while (_steeringQueue.isNotEmpty) {
+          final steering = _steeringQueue.removeFirst();
+          _conversationHistory.add(ChatMessage.create(
+            role: 'user',
+            content: '用户补充: $steering',
+          ));
+          onEvent?.call(AgentEvent.info('💬 用户补充: $steering'));
+        }
+        _trimMessages(_conversationHistory);
+        agentLogger.info('ReAct', '已注入 $injected 条用户补充指令');
       }
 
       // 刷新 executor 引用：AgentNotifier.setExecutor 可能在用户重连后

@@ -70,6 +70,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 正在写盘的会话（同一会话串行，防止后写覆盖前写）
   final Set<String> _persistingConversations = {};
 
+  /// 每个会话当前 drain 循环的 Future。steer 需要在追加补充消息前
+  /// 等待所有待写 assistant 快照落盘，否则旧快照会写到新追加的占位消息上。
+  final Map<String, Future<void>> _persistDrainFutures = {};
+
   /// 正在启动任务的 tab：防止同一 tab 在异步落盘窗口内重复发任务
   final Set<String> _startingScopes = {};
 
@@ -892,9 +896,20 @@ class AgentNotifier extends StateNotifier<AgentState> {
       content: content,
       events: events,
     );
-    // 已有写入在跑：更新完待写快照即可，当前 drain 循环会取到最新值
-    if (_persistingConversations.contains(convId)) return;
+    // 已有写入在跑：更新完待写快照即可，当前 drain 循环会取到最新值。
+    // 返回 drain 的 Future：await 本方法的调用方（如 steer）能等到
+    // 包括本次快照在内的所有待写内容真正落盘。
+    final active = _persistDrainFutures[convId];
+    if (active != null) return active;
 
+    final drain = _drainPendingPersist(scopeId, convId);
+    _persistDrainFutures[convId] = drain;
+    return drain;
+  }
+
+  /// 按会话串行落盘待写快照，直到队列排空。
+  /// 错误在循环内捕获并暴露到 UI（R8），drain 本身不会向调用方抛异常。
+  Future<void> _drainPendingPersist(String scopeId, String convId) async {
     _persistingConversations.add(convId);
     try {
       while (true) {
@@ -920,6 +935,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       }
     } finally {
       _persistingConversations.remove(convId);
+      _persistDrainFutures.remove(convId);
     }
   }
 
@@ -1285,6 +1301,124 @@ class AgentNotifier extends StateNotifier<AgentState> {
         _startingConversations.remove(claimedConversation);
       }
     }
+  }
+
+  /// O5: 任务运行中用户补充指令（steering）。
+  ///
+  /// 运行中（含等待确认/ask）：按现有 user 消息持久化路径落库
+  /// （appendMessagePair，与 startTask 同路径），成功后入队引擎，
+  /// 下一轮 ReAct 循环边界注入；不打断正在执行的命令与确认/ask 等待。
+  /// 非运行态：回退为普通发消息（startTask），其防重/拒绝逻辑照常生效。
+  /// 已暂停：提示先恢复（resumeTask 会重置瞬态并清空队列，暂停期入队会丢）。
+  Future<void> steer(String text) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    final scopeId = _registry.activeScopeId;
+    if (scopeId == null) {
+      state = state.copyWith(error: L10n.str.pleaseConfigAIModel);
+      return;
+    }
+    final engine = _registry.getEngine(scopeId) ?? _engine;
+    if (engine == null || !engine.isRunning) {
+      if (engine != null && engine.isPaused) {
+        _updateScopeState(
+            scopeId, (s) => s.copyWith(error: '任务已暂停，恢复任务后再发送补充指令'));
+        return;
+      }
+      // 非运行态（含启动窗口）：回退普通发消息，保持与现有发送行为一致
+      return startTask(trimmed);
+    }
+
+    // 与引擎 addUserSteering 同一上限：保尾截断（R8），
+    // 保证持久化内容与下一轮注入内容完全一致
+    var normalized = trimmed;
+    if (normalized.length > AgentEngine.maxSteeringChars) {
+      normalized = normalized.substring(
+          normalized.length - AgentEngine.maxSteeringChars);
+    }
+    final content = '用户补充: $normalized';
+
+    // R3: 用任务所属 scope 解析 owning host / 会话，不拿活跃 host 顶替
+    final hostId = _registry.getHostId(scopeId) ?? engine.hostId ?? 'local';
+    final convId = (_registry.isActive(scopeId)
+            ? state.conversationId
+            : _registry.getState(scopeId)?.conversationId) ??
+        engine.conversationId;
+    if (convId == null) {
+      _updateScopeState(
+          scopeId, (s) => s.copyWith(error: '${L10n.str.messageSaveFailed}: 无会话 id'));
+      return;
+    }
+
+    // 1) 固化当前流式内容与事件并等待落盘：追加补充消息前，
+    //    旧 assistant 消息必须在磁盘上完整，否则尾部内容/事件会丢。
+    _flushStreamingToContent(scopeId);
+    final itemsBefore = _registry.isActive(scopeId)
+        ? state.chatItems
+        : (_registry.getState(scopeId)?.chatItems ?? const <ChatItem>[]);
+    if (itemsBefore.isNotEmpty && itemsBefore.last.role == 'assistant') {
+      // await 会等到 drain 排空（含期间其他回调排入的最新快照），
+      // 确保不会有旧 assistant 快照写到即将追加的占位消息上
+      await _persistAssistantCompletion(scopeId, itemsBefore.last.content,
+          events: itemsBefore.last.events);
+    }
+
+    // 2) 原子追加 user 补充 + 新 assistant 占位（与 startTask 同路径）。
+    //    appendMessagePair 的同步部分在首个 await 前完成内存追加，紧接着
+    //    同步拆分 UI：落盘窗口内的流式/事件回调会落到新占位上，内存与磁盘一致。
+    //    运行中的 assistant 消息以「最后一条必须是 assistant」为不变量
+    //    （updateLastAssistantContent 依赖它），所以补充消息必须配新占位。
+    final appendFuture = _convService.appendMessagePair(
+      hostId,
+      userContent: content,
+      assistantContent: '',
+      conversationId: convId,
+    );
+    _updateScopeState(scopeId, (s) {
+      final items = [...s.chatItems];
+      if (items.isNotEmpty && items.last.role == 'assistant') {
+        items[items.length - 1] =
+            items.last.copyWith(streamingContent: '', isStreaming: false);
+      }
+      items.add(ChatItem(role: 'user', content: content));
+      items.add(ChatItem(role: 'assistant', content: '', isStreaming: true));
+      return s.copyWith(chatItems: items, clearError: true);
+    });
+    // 新 assistant 占位从 0 开始累积（与 startTask 一致）
+    _lastPersistedLen[scopeId] = 0;
+
+    try {
+      await appendFuture;
+    } catch (e) {
+      // R8: 持久化失败必须 surface；回滚 UI 拆分且不入队引擎，
+      // 避免「内存已注入、磁盘没有」的假象
+      agentLogger.error('AgentNotifier',
+          '补充指令持久化失败 (hostId=$hostId, conv=$convId): $e');
+      _updateScopeState(scopeId, (s) {
+        final items = [...s.chatItems];
+        if (items.length >= 2 &&
+            items[items.length - 2].role == 'user' &&
+            items[items.length - 2].content == content &&
+            items.last.role == 'assistant') {
+          final placeholder = items.removeLast();
+          items.removeLast();
+          if (items.isNotEmpty && items.last.role == 'assistant') {
+            final old = items.last;
+            items[items.length - 1] = old.copyWith(
+              content: old.content + placeholder.content,
+              events: [...old.events, ...placeholder.events],
+              isStreaming: true,
+            );
+          }
+        }
+        return s.copyWith(
+            chatItems: items, error: '${L10n.str.messageSaveFailed}: $e');
+      });
+      return;
+    }
+
+    // 3) 落盘成功后才入队引擎，下一轮循环边界注入
+    engine.addUserSteering(normalized);
   }
 
   /// 指定会话是否正被其他 tab 使用（无论是否在运行）。
