@@ -10,10 +10,11 @@ import '../services/server_monitor_service.dart';
 
 /// 服务器监控面板 — 单行紧凑布局（30px 高）
 ///
-/// 左到右依次：[icon]CPU 38% [图表] | [icon]内存 13.5GB/32GB |
-/// [icon]上传 0.01 Mb/s | [icon]下载 0.01 Mb/s | [icon]磁盘 12% |
+/// 左到右依次：[CPU图标] 38% [图表] | [内存条图标] 13.5GB/32GB |
+/// [上传图标] 0.01 Mb/s | [下载图标] 0.01 Mb/s | [磁盘图标] 12% |
 /// [icon]开机 up 32 days | [icon]用户 hostname
 ///
+/// CPU/内存/网络/磁盘只留图标+数值，省掉文字标签（hover/tap 浮层里有完整名称）。
 /// 只有 CPU 带 mini 折线图，其余指标只展示当前值（趋势看浮层/历史即可）。
 ///
 /// 鼠标 hover 或触屏 tap 弹出详细数据浮层，浮层左右两栏布局。
@@ -272,8 +273,10 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
               const SizedBox(width: 4),
               _buildMetricChipWithChart(
                 metric: 'cpu',
-                icon: Icons.bolt,
+                // 芯片=CPU；旧的 bolt 是闪电，表达的是电源而非处理器
+                icon: Icons.memory,
                 label: 'CPU',
+                showLabel: false,
                 value: '${(snap?.cpuPercent ?? 0).toStringAsFixed(1)}%',
                 color: staleColor(_colorByPercent(snap?.cpuPercent ?? 0, tc.brand)),
                 chartData: history.map((s) => s.cpuPercent).toList(),
@@ -286,7 +289,10 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
               _buildMetricChip(
                 metric: 'mem',
                 icon: Icons.memory,
+                // 内存条画成条形+金手指（梳齿），不是方块芯片
+                memoryStick: true,
                 label: l10n.monitorMemory,
+                showLabel: false,
                 value: snap != null && snap.memTotalMB > 0
                     ? '${_formatGB(snap.memUsedMB)}/${_formatGB(snap.memTotalMB)}'
                     : '-',
@@ -299,6 +305,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 metric: 'netUp',
                 icon: Icons.arrow_upward,
                 label: l10n.monitorUpload,
+                showLabel: false,
                 value: _formatRate(snap?.netUpKBps ?? 0),
                 color: staleColor(tc.brand),
                 valueColor: staleColor(tc.brand),
@@ -309,6 +316,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 metric: 'netDown',
                 icon: Icons.arrow_downward,
                 label: l10n.monitorDownload,
+                showLabel: false,
                 value: _formatRate(snap?.netDownKBps ?? 0),
                 color: staleColor(cSuccess),
                 valueColor: staleColor(cSuccess),
@@ -319,6 +327,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 metric: 'disk',
                 icon: Icons.storage,
                 label: l10n.monitorDisk,
+                showLabel: false,
                 value: '${(snap?.diskPercent ?? 0).toStringAsFixed(1)}%',
                 color: staleColor(_colorByPercent(snap?.diskPercent ?? 0, cWarning)),
               ),
@@ -360,12 +369,15 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
   ///
   /// [color] 是图标色；[valueColor] 单独控制数值颜色（默认跟随 label 的
   /// textSub，用于磁盘/开机这类"数值本身不需要告警色"的项）。
+  /// [showLabel] 为 false 时只留图标+数值；[memoryStick] 用自绘内存条图标。
   Widget _buildMetricChip({
     required String metric,
     required IconData icon,
     required String label,
     required String value,
     required Color color,
+    bool showLabel = true,
+    bool memoryStick = false,
     Color? valueColor,
     double? valueMaxWidth,
   }) {
@@ -382,9 +394,13 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 11, color: color),
+            if (memoryStick)
+              _RamStickIcon(color: color)
+            else
+              Icon(icon, size: 11, color: color),
             const SizedBox(width: 3),
-            Text('$label ', style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
+            if (showLabel)
+              Text('$label ', style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
             ConstrainedBox(
               constraints: BoxConstraints(maxWidth: valueMaxWidth ?? 80),
               child: Text(
@@ -404,8 +420,8 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
     );
   }
 
-  /// 带图表的指标项（内存/CPU/上传/下载）
-  /// hover 只在图表区域触发，避免在图标/文字区域频繁切换
+  /// 带图表的指标项（当前只有 CPU）
+  /// hover 只在图表区域触发，避免在图标/数值区域频繁切换
   Widget _buildMetricChipWithChart({
     required String metric,
     required IconData icon,
@@ -413,6 +429,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
     required String value,
     required Color color,
     required List<double> chartData,
+    bool showLabel = true,
     double? chartMax,
   }) {
     final tc = ThemeColors.of(context);
@@ -423,7 +440,8 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
         children: [
           Icon(icon, size: 11, color: color),
           const SizedBox(width: 3),
-          Text('$label ', style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
+          if (showLabel)
+            Text('$label ', style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
           Text(
             value,
             style: TextStyle(
@@ -1167,6 +1185,56 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
     if (mb < 1024) return '${mb.toStringAsFixed(0)}MB';
     return '${(mb / 1024).toStringAsFixed(1)}GB';
   }
+}
+
+/// 内存条图标：横向长板 + 下方金手指（梳齿），与 Icon(size: 11) 同尺寸。
+/// Material 的 Icons.memory 是方块芯片，用来表示内存会跟 CPU 混淆。
+class _RamStickIcon extends StatelessWidget {
+  final Color color;
+
+  const _RamStickIcon({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 11,
+      height: 11,
+      child: CustomPaint(painter: _RamStickPainter(color: color)),
+    );
+  }
+}
+
+class _RamStickPainter extends CustomPainter {
+  final Color color;
+
+  _RamStickPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0
+      ..strokeCap = StrokeCap.round;
+
+    // PCB 板体
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0.5, 1.0, size.width - 1, 4.0),
+        const Radius.circular(1),
+      ),
+      paint,
+    );
+    // 金手指：等距竖线，形似梳齿
+    const teeth = 5;
+    for (var i = 0; i < teeth; i++) {
+      final x = 1.5 + i * (size.width - 3) / (teeth - 1);
+      canvas.drawLine(Offset(x, 5.5), Offset(x, size.height - 0.5), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_RamStickPainter oldDelegate) => oldDelegate.color != color;
 }
 
 /// 指标项的 hover/tap 包装器
