@@ -21,6 +21,9 @@ class AIPromptInput extends StatefulWidget {
   final String hintText;
   final String initialText;
   final Function(String) onSend;
+  /// O5: 运行中补充指令（steering）回调。提供时运行态输入保持可用，
+  /// Enter/补充按钮走这里而不是 onSend；null 时保持旧行为（运行中禁发）。
+  final ValueChanged<String>? onSteer;
   final VoidCallback? onStop;
   final ValueChanged<String>? onChanged;
   final ValueChanged<bool>? onFocusChanged;
@@ -49,6 +52,7 @@ class AIPromptInput extends StatefulWidget {
     required this.hintText,
     this.initialText = '',
     required this.onSend,
+    this.onSteer,
     this.onStop,
     this.onChanged,
     this.onFocusChanged,
@@ -536,10 +540,17 @@ class _AIPromptInputState extends State<AIPromptInput> {
   }
 
   void _send() {
-    // 运行中不发送（按终止按钮才能中断）
-    if (widget.isRunning) return;
     final text = _controller.text.trim();
     if (text.isEmpty || !widget.enabled) return;
+    if (widget.isRunning) {
+      // O5: 运行中发送 = 补充指令（steering），下一轮循环边界注入。
+      // 未提供 onSteer 时保持旧行为：运行中不发送（按终止按钮才能中断）。
+      final steer = widget.onSteer;
+      if (steer == null) return;
+      steer(text);
+      _clearInput();
+      return;
+    }
     // 若是斜杠命令，优先走 onSlashCommand
     if (text.startsWith('/') && widget.onSlashCommand != null) {
       final handled = widget.onSlashCommand!(text);
@@ -656,11 +667,45 @@ class _AIPromptInputState extends State<AIPromptInput> {
                     ),
                   ),
                   const SizedBox(width: 4),
+                  // O5: 运行中保留终止按钮，旁边加一个补充指令发送按钮
+                  if (running && widget.onSteer != null && widget.enabled) ...[
+                    _buildSteerButton(),
+                    const SizedBox(width: 4),
+                  ],
                   _buildSendButton(running),
                 ],
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  /// O5: 运行中的补充指令发送按钮（终止按钮左侧，样式与发送按钮一致）
+  Widget _buildSteerButton() {
+    final tc = ThemeColors.of(context);
+    final isOrch = widget.isOrchestratorMode;
+    return Tooltip(
+      message: '补充指令（下一轮生效）',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: _send,
+          child: AnimatedContainer(
+            duration: animFast,
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: isOrch ? tc.warn : tc.brand,
+              borderRadius: BorderRadius.circular(rFull),
+            ),
+            child: Icon(
+              Icons.arrow_upward_rounded,
+              color: tc.isLight ? Colors.white : cBg,
+              size: 16,
+            ),
+          ),
         ),
       ),
     );

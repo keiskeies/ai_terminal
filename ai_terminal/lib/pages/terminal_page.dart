@@ -4832,7 +4832,23 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final notifier = ref.read(agentProvider.notifier);
     notifier.setExecutor(executor,
         hostId: tab?.hostId ?? 'local', tabId: tab?.id);
+    // O5: 等待确认/ask 期间 state.isRunning 为 false（输入框显示发送按钮），
+    // 但引擎仍在运行：此时发送应走补充指令通道，而不是被 startTask 拒绝
+    final agentState = ref.read(agentProvider);
+    if (agentState.isRunning ||
+        agentState.isWaitingConfirm ||
+        agentState.isWaitingChoice) {
+      await notifier.steer(text);
+      return;
+    }
     await notifier.startTask(text);
+  }
+
+  /// O5: 运行中补充指令（steering）：不启动新任务，下一轮循环边界注入。
+  void _steerToAgent(String text, {required bool isConnected}) {
+    if (!isConnected) return;
+    _autoScrollChat = true;
+    ref.read(agentProvider.notifier).steer(text);
   }
 
   void _showGoalHint(String message) {
@@ -5600,6 +5616,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             slashExtras: slashExtras,
             onStop: () => ref.read(agentProvider.notifier).cancel(),
             onSend: (text) => _sendToAgent(text, isConnected: isConnected),
+            onSteer: (text) => _steerToAgent(text, isConnected: isConnected),
             footer: _buildModelCapsule(currentModel, endpoints, tc),
           ),
           // 底边状态条：参考界面把数字放在输入框之下、贴着窗口底边，运行中与终态
@@ -6488,7 +6505,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   String _getInputHint(bool isConnected, bool isRunning, bool isOrchestrator,
       {bool connecting = false}) {
     final l10n = AppLocalizations.of(context)!;
-    if (isRunning) return l10n.terminalInputHintRunning;
+    // O5: 运行中输入框保持可用，发送走补充指令（steering）
+    if (isRunning) return UiText.t('补充指令…', 'Steering instructions…');
     if (connecting) return l10n.connecting;
     if (!isConnected) return l10n.terminalInputHintDisconnected;
     if (isOrchestrator) return l10n.terminalInputHintOrchestrator;
