@@ -1,29 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- 桌面启动器图标构图源（满幅版）：单层圆角底 + 撑满主体，无内层终端框。
+       由 tools/generate_app_icons.py 绘制为 assets/icons/app_icon.png 及各平台图标。
+       应用内 UI 使用的 ai_terminal/assets/icons/logo_mark.svg 保留带内层框的小尺寸版本。 -->
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#111827"/>
-      <stop offset="100%" stop-color="#0B0F19"/>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1B2742"/>
+      <stop offset="100%" stop-color="#0B101C"/>
     </linearGradient>
-    <linearGradient id="prompt" x1="0%" y1="0%" x2="100%" y2="100%">
+    <linearGradient id="prompt" x1="0%" y1="0%" x2="0%" y2="100%">
       <stop offset="0%" stop-color="#3B7DFF"/>
       <stop offset="100%" stop-color="#5A9AFF"/>
     </linearGradient>
-    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="2.5" result="blur"/>
-      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="3.75"/>
     </filter>
   </defs>
-  <!-- App icon background -->
-  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg)"/>
-  <!-- Inner terminal frame -->
-  <rect x="20" y="20" width="88" height="88" rx="18" fill="#1A1F2E" stroke="#2A2F3E" stroke-width="2"/>
-  <!-- Terminal prompt: > -->
-  <path d="M42 52 L60 68 L42 84" fill="none" stroke="url(#prompt)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-  <!-- Cursor: _ -->
-  <rect x="62" y="78" width="28" height="8" rx="4" fill="#6ECC54"/>
+
+  <!-- 单层圆角底：四角透明，交给系统裁切，避免出现第二层方框 -->
+  <rect x="0.25" y="0.25" width="127.5" height="127.5" rx="28"
+        fill="url(#bg)" stroke="#303A56" stroke-width="0.375"/>
+
   <!-- AI sparkle -->
-  <g transform="translate(92, 38)" filter="url(#glow)">
-    <circle cx="0" cy="0" r="5" fill="#6ECC54"/>
-    <path d="M0 -14 L1.8 -5.2 L10 0 L1.8 5.2 L0 14 L-1.8 5.2 L-10 0 L-1.8 -5.2 Z" fill="#6ECC54"/>
+  <g transform="translate(95.25 34.5)">
+    <path d="M0 -18.4 L2.4 -6.8 L13.1 0 L2.4 6.8 L0 18.4 L-2.4 6.8 L-13.1 0 L-2.4 -6.8 Z"
+          fill="#9BF06B" opacity="0.75" filter="url(#glow)"/>
+    <path d="M0 -18.4 L2.4 -6.8 L13.1 0 L2.4 6.8 L0 18.4 L-2.4 6.8 L-13.1 0 L-2.4 -6.8 Z"
+          fill="#9BF06B"/>
   </g>
+
+  <!-- Cursor: _ -->
+  <rect x="70.75" y="85.25" width="37.5" height="12.5" rx="6.25" fill="#7CE05A"/>
+
+  <!-- Terminal prompt: > -->
+  <path d="M31.25 33.5 L68.5 64 L31.25 94.5" fill="none"
+        stroke="url(#prompt)" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
