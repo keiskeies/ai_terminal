@@ -132,11 +132,11 @@ class SafetyGuard {
   /// 内部检查逻辑：对完整命令的所有子命令分别检查，取最高危险等级
   static SafetyLevel _checkInternal(String command) {
     // 先对完整命令做一次检查（处理 fork 炸弹等本身含 | ; 字符的单条命令，
-    // 这类命令会被 _splitCommands 拆分导致无法匹配整体模式）
+    // 这类命令会被 splitSubCommands 拆分导致无法匹配整体模式）
     final fullLevel = _checkSingle(command);
     if (fullLevel == SafetyLevel.blocked) return fullLevel;
 
-    final subCommands = _splitCommands(command);
+    final subCommands = splitSubCommands(command);
     var maxLevel = SafetyLevel.safe;
 
     for (final sub in subCommands) {
@@ -225,7 +225,7 @@ class SafetyGuard {
 
     // 如果完整命令未命中，再逐条检查拆分后的子命令
     if (reason == null) {
-      final subCommands = _splitCommands(command);
+      final subCommands = splitSubCommands(command);
       for (final sub in subCommands) {
         final cleaned = _removeComments(sub).trim();
         if (cleaned.isEmpty) continue;
@@ -255,21 +255,122 @@ class SafetyGuard {
     return reason;
   }
 
-  /// 拆分链式命令：按 && || ; | 分割，返回所有子命令
+  /// heredoc 起始标记：<<-? 空白? 引号? TAG 引号?（反向引用保证引号配对）
+  static final RegExp _heredocStartPattern =
+      RegExp(r'''<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1''');
+
+  /// 拆分链式命令：按 && || ; | 与换行分割，返回所有子命令（含空段，调用方自行过滤）。
+  /// 引号感知：单/双引号内的操作符不拆分，反斜杠转义的字符不参与匹配。
+  /// heredoc（<<EOF / <<'EOF' / <<-EOF）的内容与起始行保持整体，不按行拆开——
+  /// heredoc 是单条写文件命令，内容行不是独立子命令。
   /// 注意：不处理 $() 和反引号内的内容（保守处理，宁可误报也不漏报）
-  static List<String> _splitCommands(String command) {
-    // 先按换行符拆分（多行命令的每行可能是独立命令）
-    final lines = command.split('\n');
+  static List<String> splitSubCommands(String command) {
     final results = <String>[];
+    final buf = StringBuffer();
+    var inSingle = false;
+    var inDouble = false;
+    String? heredocTag;
+    String? pendingHeredocTag;
 
-    for (final line in lines) {
-      // 按 && || ; | 拆分
-      // 使用正则匹配这些操作符，保留操作符之间的内容
-      final parts = line.split(RegExp(r'&&|\|\||;|\|'));
-      results.addAll(parts);
+    for (final line in command.split('\n')) {
+      if (heredocTag != null) {
+        buf.write('\n');
+        buf.write(line);
+        if (line.trim() == heredocTag) {
+          heredocTag = null;
+          results.add(buf.toString());
+          buf.clear();
+        }
+        continue;
+      }
+
+      for (int i = 0; i < line.length; i++) {
+        final c = line[i];
+        if (c == "'" && !inDouble) {
+          inSingle = !inSingle;
+          buf.write(c);
+          continue;
+        }
+        if (c == '"' && !inSingle) {
+          inDouble = !inDouble;
+          buf.write(c);
+          continue;
+        }
+        if (c == '\\' && !inSingle && i + 1 < line.length) {
+          buf.write(c);
+          buf.write(line[i + 1]);
+          i++;
+          continue;
+        }
+        if (!inSingle && !inDouble) {
+          if (c == ';' || c == '|') {
+            results.add(buf.toString());
+            buf.clear();
+            if (c == '|' && i + 1 < line.length && line[i + 1] == '|') i++;
+            continue;
+          }
+          if (c == '&' && i + 1 < line.length && line[i + 1] == '&') {
+            results.add(buf.toString());
+            buf.clear();
+            i++;
+            continue;
+          }
+          if (c == '<' &&
+              i + 1 < line.length &&
+              line[i + 1] == '<' &&
+              (i == 0 || line[i - 1] != '<') &&
+              (i + 2 >= line.length || line[i + 2] != '<')) {
+            final m = _heredocStartPattern.matchAsPrefix(line, i);
+            // 起始标记后必须跟行尾/空白/分隔符，排除 $((1<<2)) 这类算术移位
+            if (m != null &&
+                (m.end == line.length ||
+                    ' \t;|&'.contains(line[m.end]))) {
+              pendingHeredocTag = m.group(2);
+              buf.write(m.group(0));
+              i = m.end - 1;
+              continue;
+            }
+          }
+        }
+        buf.write(c);
+      }
+
+      if (pendingHeredocTag != null) {
+        heredocTag = pendingHeredocTag;
+        pendingHeredocTag = null;
+      } else {
+        results.add(buf.toString());
+        buf.clear();
+      }
     }
-
+    // 未闭合的 heredoc：剩余内容整体作为一段
+    if (buf.isNotEmpty) results.add(buf.toString());
     return results;
+  }
+
+  /// 是否包含引号外、未转义的指定操作符（如 &&）。用于 shell 语法兼容提示。
+  static bool containsUnquotedOperator(String command, String operator) {
+    var inSingle = false;
+    var inDouble = false;
+    for (int i = 0; i < command.length; i++) {
+      final c = command[i];
+      if (c == "'" && !inDouble) {
+        inSingle = !inSingle;
+        continue;
+      }
+      if (c == '"' && !inSingle) {
+        inDouble = !inDouble;
+        continue;
+      }
+      if (c == '\\' && !inSingle && i + 1 < command.length) {
+        i++;
+        continue;
+      }
+      if (!inSingle && !inDouble && command.startsWith(operator, i)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// 移除行内注释（# 之后的内容，但不是 #! 且不在引号内）

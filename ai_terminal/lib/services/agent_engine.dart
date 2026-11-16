@@ -19,6 +19,7 @@ import '../services/ai_service.dart';
 import '../services/ssh_service.dart';
 import '../services/command_executor.dart';
 import '../services/knowledge_service.dart';
+import 'local_terminal_service.dart';
 import 'agent_tool.dart';
 import 'agent_host_registry.dart' as agent_host_registry;
 import 'agent_logger.dart';
@@ -2371,6 +2372,7 @@ class AgentEngine {
     'window_blocked',
     'read_only_blocked',
     'safety_blocked',
+    'chained_modification_blocked',
     'user_rejected',
     'confirm_timeout',
     'permission_changed_during_confirm',
@@ -2538,6 +2540,63 @@ class AgentEngine {
       } catch (e) {
         agentLogger.warn('Audit', '审计日志写入失败(执行前): $e');
       }
+    }
+
+    // O1 硬保证：只读管道/链式允许，但修改类命令必须每轮一条。
+    // 不依赖模型自觉：任一子命令 ≥ warn 即拦截，回传观测让模型拆分重试。
+    final subCommands = SafetyGuard.splitSubCommands(command)
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
+    if (subCommands.length > 1 &&
+        subCommands.any(
+            (s) => SafetyGuard.check(s).index >= SafetyLevel.warn.index)) {
+      agentLogger.warn('ReAct', '链式修改命令拦截: ${_logCommand(command)}');
+      const reason = '链式命令包含修改类操作，请拆分为多轮逐条执行';
+      onEvent?.call(AgentEvent.info('⛓ $reason\n命令: `$command`'));
+      // 与权限拦截分支一致：blocked 级追加一条带原因的审计记录
+      if (hostId != null && safetyLevel == SafetyLevel.blocked) {
+        try {
+          await AuditLogger.log(
+            hostId: hostId!,
+            command: command,
+            safetyLevel: safetyLevel.name,
+            output: reason,
+            executed: false,
+          );
+        } catch (e) {
+          agentLogger.warn('Audit', '审计日志写入失败(链式拦截分支): $e');
+        }
+      }
+      final observation = ReActObservation(
+        command: command,
+        output: reason,
+        success: false,
+        error: reason,
+      ).format();
+      onSuccess(false, 'chained_modification_blocked', 0);
+      return _EarlyExecutionResult(
+          shouldContinue: true, observation: observation, command: command);
+    }
+
+    // Windows 本地终端固定启动 System32 的 PowerShell 5.1，不支持 &&。
+    // 提前回传语法纠错观测，避免语法错误导致 marker 永不出现、干等超时。
+    if (executor is LocalTerminalService &&
+        Platform.isWindows &&
+        SafetyGuard.containsUnquotedOperator(command, '&&')) {
+      agentLogger.warn('ReAct', 'PowerShell 5.1 不支持 &&: ${_logCommand(command)}');
+      const reason =
+          'Windows PowerShell 5.1 不支持 && 运算符，请改用 ; 分隔只读命令（如 a ; b），或拆分为多轮逐条执行';
+      onEvent?.call(AgentEvent.info('🪟 $reason\n命令: `$command`'));
+      final observation = ReActObservation(
+        command: command,
+        output: reason,
+        success: false,
+        error: reason,
+      ).format();
+      onSuccess(false, 'ps5_and_operator_unsupported', 0);
+      return _EarlyExecutionResult(
+          shouldContinue: true, observation: observation, command: command);
     }
 
     // 远程误发拦截：SSH 到非 Windows 主机时，明显是本机 Windows/PowerShell

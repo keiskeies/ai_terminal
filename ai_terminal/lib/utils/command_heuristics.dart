@@ -1,3 +1,4 @@
+import '../core/safety_guard.dart';
 import '../services/daos.dart';
 
 /// 判断文本是否是描述性文字（而非命令）
@@ -37,12 +38,25 @@ bool looksLikeCommand(String text) {
   return cmdKeywords.any((k) => text.toLowerCase().contains(k));
 }
 
+/// 拆出非空子命令（引号/heredoc 感知，与安全层同一套拆分逻辑）
+List<String> _subCommands(String command) => SafetyGuard.splitSubCommands(command)
+    .map((s) => s.trim())
+    .where((s) => s.isNotEmpty)
+    .toList();
+
 /// 判断命令是否是查询/只读类命令（输出不应截断，agent 需要完整结果定位问题）
 ///
+/// 组合命令（管道/链式）要求所有子命令均为查询才算查询。
 /// 注意：交互式命令（top/htop/less/more/tail -f/man）不视为只读，
 /// 因为它们会阻塞 PTY 等待输入，导致 agent 卡死到超时。
 /// 这些命令应走默认 60s 超时让 watchdog 中断。
 bool isQueryCommand(String command) {
+  final subs = _subCommands(command);
+  if (subs.length > 1) return subs.every(_isSingleQueryCommand);
+  return _isSingleQueryCommand(command);
+}
+
+bool _isSingleQueryCommand(String command) {
   final queryPrefixes = [
     // 文件搜索与内容查找
     'grep', 'egrep', 'fgrep', 'find', 'locate', 'which', 'where', 'type',
@@ -196,10 +210,9 @@ String _unwrapCommand(String cmd) {
 /// - 长时间运行类（安全扫描/包管理/系统信息/大文件操作）：10 分钟
 /// - 中等耗时类（服务状态/日志/进程/编译/下载）：3 分钟
 /// - 默认：60 秒
+/// 组合命令（管道/链式）取所有子命令档位的最大值。
 /// 用户可通过设置 `commandTimeoutMultiplier` 调整超时倍数（如 2.0 = 所有超时翻倍）
 Duration getCommandTimeout(String command) {
-  final cmd = _unwrapCommand(command.trim().toLowerCase());
-
   // 读取用户配置的超时倍数（默认 1.0，clamp 到 [0.5, 10.0]）
   // 下限 0.5：低于此值时 (3 * multiplier).round() 会归零，导致 medium 命令瞬间超时
   double multiplier = 1.0;
@@ -209,6 +222,21 @@ Duration getCommandTimeout(String command) {
       multiplier = (double.tryParse(saved.toString()) ?? 1.0).clamp(0.5, 10.0);
     }
   } catch (_) {}
+
+  final subs = _subCommands(command);
+  if (subs.length > 1) {
+    var maxTimeout = Duration.zero;
+    for (final sub in subs) {
+      final t = _singleCommandTimeout(sub, multiplier);
+      if (t > maxTimeout) maxTimeout = t;
+    }
+    return maxTimeout;
+  }
+  return _singleCommandTimeout(command, multiplier);
+}
+
+Duration _singleCommandTimeout(String command, double multiplier) {
+  final cmd = _unwrapCommand(command.trim().toLowerCase());
 
   // 10 分钟：长时间运行类
   final longTimeout = Duration(minutes: (10 * multiplier).round());
