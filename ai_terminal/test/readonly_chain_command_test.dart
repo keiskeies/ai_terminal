@@ -43,6 +43,7 @@ class _RecordingExecutor implements CommandExecutor {
     Duration timeout = const Duration(seconds: 60),
     Completer<void>? cancelToken,
     String? sudoPassword,
+    Future<String?> Function(String prompt)? onInteractivePrompt,
   }) async {
     executedCommands.add(command);
     return CommandResult(
@@ -101,6 +102,7 @@ class _FakeWindowsLocalExecutor extends LocalTerminalService {
     Duration timeout = const Duration(seconds: 60),
     Completer<void>? cancelToken,
     String? sudoPassword,
+    Future<String?> Function(String prompt)? onInteractivePrompt,
   }) async {
     executedCommands.add(command);
     return CommandResult(

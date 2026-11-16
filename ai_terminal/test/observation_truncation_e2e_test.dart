@@ -181,6 +181,7 @@ class _MockExecutor implements CommandExecutor {
     Duration timeout = const Duration(seconds: 60),
     Completer<void>? cancelToken,
     String? sudoPassword,
+    Future<String?> Function(String prompt)? onInteractivePrompt,
   }) async =>
       CommandResult(
         stdout: stdout,

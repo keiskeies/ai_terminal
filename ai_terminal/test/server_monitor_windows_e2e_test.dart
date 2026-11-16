@@ -73,7 +73,8 @@ void main() {
     ));
     await tester.pump();
 
-    expect(find.textContaining('CPU'), findsOneWidget);
+    // 监控栏精简后只留图标+数值（showLabel:false），CPU 文字标签在 hover 浮层里，
+    // 这里用 CPU 数值断言渲染成功
     expect(find.textContaining('34.0%'), findsOneWidget);
     // 内存显示「已用/总量」，不再是「-」
     expect(find.textContaining('/'), findsWidgets);
