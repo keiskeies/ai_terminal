@@ -12,9 +12,9 @@ import '../services/server_monitor_service.dart';
 ///
 /// 左到右依次：[CPU图标] 38% [图表] | [内存条图标] 13.5GB/32GB |
 /// [上传图标] 0.01 Mb/s | [下载图标] 0.01 Mb/s | [磁盘图标] 12% |
-/// [icon]开机 up 32 days | [icon]用户 hostname
+/// [icon] up 32 days | [icon] hostname
 ///
-/// CPU/内存/网络/磁盘只留图标+数值，省掉文字标签（hover/tap 浮层里有完整名称）。
+/// 所有指标只留图标+数值，省掉文字标签（hover/tap 浮层里有完整名称）。
 /// 只有 CPU 带 mini 折线图，其余指标只展示当前值（趋势看浮层/历史即可）。
 ///
 /// 鼠标 hover 或触屏 tap 弹出详细数据浮层，浮层左右两栏布局。
@@ -336,6 +336,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 metric: 'uptime',
                 icon: Icons.access_time,
                 label: l10n.monitorUptime,
+                showLabel: false,
                 value: snap?.uptime ?? '-',
                 color: isStale ? tc.textMuted : tc.textSub,
                 valueMaxWidth: 100,
@@ -345,6 +346,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 metric: 'user',
                 icon: Icons.person_outline,
                 label: l10n.monitorUser,
+                showLabel: false,
                 value: (snap?.hostname.isNotEmpty ?? false) ? snap!.hostname : '-',
                 color: isStale ? tc.textMuted : tc.textSub,
                 valueMaxWidth: 120,
@@ -1229,7 +1231,8 @@ class _RamStickPainter extends CustomPainter {
     const teeth = 5;
     for (var i = 0; i < teeth; i++) {
       final x = 1.5 + i * (size.width - 3) / (teeth - 1);
-      canvas.drawLine(Offset(x, 5.5), Offset(x, size.height - 0.5), paint);
+      // 金手指只露一小截，别拖成流苏
+      canvas.drawLine(Offset(x, 5.5), Offset(x, 8.5), paint);
     }
   }
 
