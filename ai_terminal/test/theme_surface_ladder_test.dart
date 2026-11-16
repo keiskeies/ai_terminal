@@ -79,5 +79,35 @@ void main() {
       expect(_contrast(cTextBodyLight, cCardLight), greaterThanOrEqualTo(4.5));
       expect(_contrast(cTextSubLight, cCardLight), greaterThanOrEqualTo(4.5));
     });
+
+    test('浅色全表面小字号对比度：灰字与语义色在最暗控件底上仍 ≥4.5:1', () {
+      // 小字号（11-12px）是浅色模式的集中翻车点：旧 sub/muted 在控件底
+      // (cSurfaceLight) 上只有 4.1 / 2.6。契约：所有文字与语义色对全部
+      // 浅色表面（bg/卡片/浮层/控件/终端底）都不低于 4.5。
+      final surfaces = {
+        'bg': cBgLight,
+        'card': cCardLight,
+        'cardElevated': cCardElevatedLight,
+        'surface': cSurfaceLight,
+        'terminalBg': cTerminalBgLight,
+        'terminalOutput': cTerminalOutputLight,
+        'dataCard': cCardDataLight,
+      };
+      final inks = {
+        'textSub': cTextSubLight,
+        'textMuted': cTextMutedLight,
+        'brand': cBrandLight,
+        'ok': cStatusOkLight,
+        'warn': cStatusWarnLight,
+        'error': cStatusErrorLight,
+        'gold': cGoldLight,
+      };
+      for (final ink in inks.entries) {
+        for (final s in surfaces.entries) {
+          expect(_contrast(ink.value, s.value), greaterThanOrEqualTo(4.5),
+              reason: '${ink.key} on ${s.key}');
+        }
+      }
+    });
   });
 }

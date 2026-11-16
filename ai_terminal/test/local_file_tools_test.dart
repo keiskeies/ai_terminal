@@ -521,7 +521,7 @@ void main() {
       await tester.pumpWidget(wrap(const LocalFileAccessSection()));
       await tester.pump();
 
-      expect(find.text('尚未授权任何目录'), findsOneWidget);
+      expect(find.textContaining('还没有授权目录'), findsOneWidget);
       expect(find.textContaining('添加目录'), findsOneWidget);
       expect(find.textContaining('.ssh'), findsOneWidget,
           reason: '必须说明即使授权了目录，密钥类文件仍被禁止');
@@ -544,13 +544,13 @@ void main() {
       await tester.pump();
 
       expect(find.text(sandbox.path), findsOneWidget);
-      expect(find.text('尚未授权任何目录'), findsNothing);
+      expect(find.text('还没有授权目录'), findsNothing);
 
       await tester.tap(find.byIcon(Icons.close));
       await tester.pumpAndSettle();
 
       expect(LocalFilePolicy.load().allowedDirs, isEmpty);
-      expect(find.text('尚未授权任何目录'), findsOneWidget);
+      expect(find.text('还没有授权目录'), findsOneWidget);
     });
   });
 

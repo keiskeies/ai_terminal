@@ -109,7 +109,8 @@ void main() {
       expect(find.text('nginx 运行中'), findsOneWidget);
       expect(find.text('端口 443 监听'), findsOneWidget);
       expect(find.text('执行清单'), findsOneWidget);
-      expect(find.textContaining('3 项 · 3 完成'), findsOneWidget);
+      // 头部计数改成设计稿 count-chip「完成/总数」胶囊，不再拼整句统计
+      expect(find.text('3/3'), findsOneWidget);
       expect(find.textContaining('计划仍有未收尾步骤'), findsNothing);
       expect(find.text('安装 Nginx'), findsOneWidget);
       expect(find.text('变更与回滚'), findsOneWidget);
@@ -435,8 +436,9 @@ void main() {
       )));
 
       expect(find.text('执行清单'), findsOneWidget);
-      expect(
-          find.textContaining('10 项 · 1 完成 · 1 进行中 · 8 待处理'), findsOneWidget);
+      // 收起态头部：count-chip「完成/总数」+「第 N 步 · 标题」
+      expect(find.text('1/10'), findsOneWidget);
+      expect(find.textContaining('第 2 步 · 步骤 2'), findsOneWidget);
       expect(find.text('步骤 1'), findsNothing);
 
       await tester.tap(find.text('执行清单'));
@@ -766,7 +768,7 @@ void main() {
       expect(find.text('Completed'), findsOneWidget);
       expect(find.text('Execution Plan'), findsOneWidget);
       expect(find.text('AI plan'), findsOneWidget);
-      expect(find.text('2 items · 1 done · 1 in progress'), findsOneWidget);
+      expect(find.text('1/2'), findsOneWidget);
       expect(find.text('Conclusion'), findsOneWidget);
       expect(find.text('Process & evidence'), findsOneWidget);
       expect(find.text('Step 2'), findsOneWidget);
