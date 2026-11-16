@@ -2864,17 +2864,24 @@ class AgentEngine {
       success: result.success,
     );
 
-    // 格式化观测结果
+    // 格式化观测结果（分级截断，O2）
     // R8: 即使是查询命令也强制上限（20000 字符），防止 cat huge_file / journalctl 等输出撑爆 AI 上下文
+    // 失败输出保留头（报错原因）+ 尾（stack/summary），不再一刀切只留尾部
     final isQuery = isQueryCommand(command);
-    final outputText = isQuery
-        ? _truncateQueryOutput(result.output)
-        : truncateOutput(result.output, maxLines: 8, maxChars: 600);
-    final errorText = isQuery
-        ? _truncateQueryOutput(result.error)
-        : truncateOutput(result.error, maxLines: 8, maxChars: 600);
+    final String outputText;
+    final String errorText;
+    if (isQuery) {
+      outputText = truncateQueryOutput(result.output);
+      errorText = truncateQueryOutput(result.error);
+    } else if (result.success) {
+      outputText = truncateSuccessOutput(result.output);
+      errorText = truncateSuccessOutput(result.error);
+    } else {
+      outputText = truncateFailureOutput(result.output);
+      errorText = truncateFailureOutput(result.error);
+    }
 
-    // 保留原始输出尾部：事件里的 output 只有 8 行/600 字符，证据层需要更多上下文
+    // 保留原始输出尾部：事件里的 output 经过分级截断，证据层需要更多上下文
     String? outputTail;
     if (!isQuery) {
       const maxTailChars = 8000;
@@ -3011,16 +3018,6 @@ class AgentEngine {
   static String _truncateForAudit(String s) {
     if (s.length <= 500) return s;
     return '${s.substring(0, 500)}...(${s.length} chars)';
-  }
-
-  /// 查询命令输出截断：保留尾部 20000 字符（错误信息通常在末尾）
-  /// R8: 查询命令不截断会导致 cat/journalctl/find 等输出撑爆 AI 上下文
-  static const int _maxQueryOutputChars = 20000;
-  static String _truncateQueryOutput(String? output) {
-    if (output == null || output.isEmpty) return '(无输出)';
-    if (output.length <= _maxQueryOutputChars) return output;
-    return '...(输出过长，已截断前 ${output.length - _maxQueryOutputChars} 字符)\n'
-        '${output.substring(output.length - _maxQueryOutputChars)}';
   }
 
   /// 最近一次 command 事件 id（用于 result 关联）

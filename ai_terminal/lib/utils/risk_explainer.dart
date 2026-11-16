@@ -127,6 +127,7 @@ const Map<String, _ToolImpact> _toolImpacts = {
   'broadcast_upload': _ToolImpact(
       '向多台主机广播上传，各主机的同名文件都会被覆盖且不备份'),
   'sftp_download': _ToolImpact('下载远程文件到本机，同名本地文件会被覆盖且不备份'),
+  'sftp_file_read': _readOnly,
   'collect_file': _ToolImpact('从多台主机采集文件到本机目录，不改动远程状态'),
   'file_sync': _ToolImpact('开启本地与远程目录的持续同步：本地改动会自动推送到远端'),
 

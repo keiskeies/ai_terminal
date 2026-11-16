@@ -1,23 +1,53 @@
-/// 截断命令输出，保留尾部（长输出有价值的信息通常在末尾，如 "Complete!"）
-/// 最多保留 [maxLines] 行，或 [maxChars] 字符
-String truncateOutput(String? output, {int maxLines = 8, int maxChars = 600}) {
+/// 命令输出分级截断（回传给 AI 的观测）
+///
+/// 分级规则（O2）：
+/// - 查询命令：保留尾部 20000 字符（错误信息通常在末尾）
+/// - 非查询成功：保留尾部 2000 字符（长输出有价值的信息通常在末尾）
+/// - 失败（exit ≠ 0 / 执行异常）：头 2000 + 尾 6000，中间标注省略字符数；
+///   报错原因在头部、stack/summary 在尾部，两头都不能丢
+///
+/// UI outputTail（8000）与审计日志（500）不走这里，保持各自上限。
+library;
+
+/// 查询命令输出上限
+const int maxQueryOutputChars = 20000;
+
+/// 非查询成功输出上限
+const int maxSuccessOutputChars = 2000;
+
+/// 失败输出保留的头部字符数
+const int failureHeadChars = 2000;
+
+/// 失败输出保留的尾部字符数
+const int failureTailChars = 6000;
+
+/// 查询命令输出截断：保留尾部 [maxQueryOutputChars] 字符
+/// R8: 查询命令不截断会导致 cat/journalctl/find 等输出撑爆 AI 上下文
+String truncateQueryOutput(String? output) =>
+    _tailTruncate(output, maxQueryOutputChars);
+
+/// 非查询成功输出截断：保留尾部 [maxSuccessOutputChars] 字符
+String truncateSuccessOutput(String? output) =>
+    _tailTruncate(output, maxSuccessOutputChars);
+
+/// 失败输出截断：头 [failureHeadChars] + 尾 [failureTailChars]，
+/// 中间标注 `…(中间省略 N 字符)…`；总长不超过两者之和时原样返回（不截断）。
+String truncateFailureOutput(String? output) {
+  if (output == null || output.isEmpty) return '(无输出)';
+  const keep = failureHeadChars + failureTailChars;
+  // R8 边界：长度恰好等于上限时不截断，避免头尾重叠拼接出重复内容
+  if (output.length <= keep) return output;
+  final omitted = output.length - keep;
+  return '${output.substring(0, failureHeadChars)}\n'
+      '…(中间省略 $omitted 字符)…\n'
+      '${output.substring(output.length - failureTailChars)}';
+}
+
+String _tailTruncate(String? output, int maxChars) {
   if (output == null || output.isEmpty) return '(无输出)';
   if (output.length <= maxChars) return output;
-
-  // 按行分割，取尾部行
-  final lines = output.split('\n');
-  if (lines.length <= maxLines) {
-    // 行数不多但字符超限，取尾部字符
-    return '...(输出过长，已截断前 ${output.length - maxChars} 字符)\n${output.substring(output.length - maxChars)}';
-  }
-
-  // 取尾部行
-  final tailLines = lines.skip(lines.length - maxLines).toList();
-  final tailText = tailLines.join('\n');
-  if (tailText.length > maxChars) {
-    return '...(输出过长，已截断)\n${tailText.substring(tailText.length - maxChars)}';
-  }
-  return '...(输出过长，已截断前 ${lines.length - maxLines} 行)\n$tailText';
+  return '...(输出过长，已截断前 ${output.length - maxChars} 字符)\n'
+      '${output.substring(output.length - maxChars)}';
 }
 
 /// 清理 PTY 输出中的命令回显
