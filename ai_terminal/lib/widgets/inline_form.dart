@@ -200,6 +200,7 @@ class InlineSelect<T> extends StatefulWidget {
     required this.value,
     required this.items,
     required this.onChanged,
+    this.leadingBuilder,
   });
 
   final String label;
@@ -208,6 +209,9 @@ class InlineSelect<T> extends StatefulWidget {
   /// (值, 显示文字)
   final List<(T, String)> items;
   final ValueChanged<T> onChanged;
+
+  /// 可选：选项文字前的小图标（服务商 logo 之类）
+  final Widget? Function(T value)? leadingBuilder;
 
   @override
   State<InlineSelect<T>> createState() => _InlineSelectState<T>();
@@ -243,6 +247,10 @@ class _InlineSelectState<T> extends State<InlineSelect<T>> {
             ),
             child: Row(
               children: [
+                if (widget.leadingBuilder?.call(widget.value) case final leading?) ...[
+                  leading,
+                  const SizedBox(width: 7),
+                ],
                 Expanded(
                   child: Text(
                     _currentLabel,
@@ -294,14 +302,27 @@ class _InlineSelectState<T> extends State<InlineSelect<T>> {
                                   : tc.hairline),
                         ),
                       ),
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: fMicro,
-                          color: value == widget.value
-                              ? tc.brand
-                              : tc.textMain,
-                        ),
+                      child: Row(
+                        children: [
+                          if (widget.leadingBuilder?.call(value)
+                              case final leading?) ...[
+                            leading,
+                            const SizedBox(width: 7),
+                          ],
+                          Expanded(
+                            child: Text(
+                              label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: fMicro,
+                                color: value == widget.value
+                                    ? tc.brand
+                                    : tc.textMain,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

@@ -85,6 +85,7 @@ flutter:
     - assets/icons/logo_mark_light.svg
     - assets/knowledge/
     - assets/config/
+    - assets/provider_logos/
     - assets/fonts/MiSans/MiSans-License.pdf
   fonts:
     - family: MiSans

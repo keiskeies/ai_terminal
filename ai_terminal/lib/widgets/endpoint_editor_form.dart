@@ -13,6 +13,7 @@ import '../models/ai_endpoint.dart';
 import '../services/daos.dart';
 import '../services/provider_config_service.dart';
 import 'inline_form.dart';
+import 'provider_logo.dart';
 
 /// 端点编辑器（抽屉内联版）。
 ///
@@ -361,7 +362,13 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
           InlineSelect<String>(
             label: UiText.t('服务商', 'Provider'),
             value: _providerId,
-            items: [for (final p in presets) (p.id, '${p.icon} ${p.name}')],
+            items: [for (final p in presets) (p.id, p.name)],
+            leadingBuilder: (id) => ProviderLogo(
+              providerId: id,
+              fallbackIcon:
+                  ProviderConfigService.getProviderById(id)?.icon ?? '🔗',
+              size: 14,
+            ),
             onChanged: _onProviderChanged,
           ),
         const SizedBox(height: 10),

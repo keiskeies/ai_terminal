@@ -11,6 +11,7 @@ import '../models/ai_endpoint.dart';
 import '../providers/app_providers.dart';
 import '../services/daos.dart';
 import '../services/provider_config_service.dart';
+import '../widgets/provider_logo.dart';
 import '../core/app_toast.dart';
 
 /// AI 模型配置：一个端点（Base URL + API Key + 协议）下挂多个模型。
@@ -92,9 +93,9 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
                 children: [
                   CircleAvatar(
                     backgroundColor: color.withValues(alpha: 0.16),
-                    child: Text(
-                      preset?.icon ?? '🔗',
-                      style: const TextStyle(fontSize: 18),
+                    child: ProviderLogo(
+                      providerId: endpoint.providerId,
+                      fallbackIcon: preset?.icon ?? '🔗',
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -686,9 +687,10 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Text(p.icon,
-                                            style:
-                                                const TextStyle(fontSize: 16)),
+                                        ProviderLogo(
+                                            providerId: p.id,
+                                            fallbackIcon: p.icon,
+                                            size: 16),
                                         const SizedBox(width: 8),
                                         Flexible(
                                             child: Text(p.name,
