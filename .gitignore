@@ -62,3 +62,10 @@ ai_terminal/lib/l10n/app_localizations*.dart
 # Environment
 .env
 .env.*
+
+# WorkBuddy project data
+/.workbuddy/
+/ai_terminal/.workbuddy/
+
+# Runtime data
+/app_data_copy.db
