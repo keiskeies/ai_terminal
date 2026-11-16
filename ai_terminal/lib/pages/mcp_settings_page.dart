@@ -788,7 +788,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     );
   }
 
-  String _newId() => 'mcpx_${const Uuid().v4().substring(0, 8)}';
+  String _newId() => newMcpServerId();
 
   Future<void> _setEnabled(String id, bool value) async {
     try {
@@ -801,7 +801,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
   Future<void> _edit(McpServerRuntime runtime, {bool isNew = false}) async {
     final updated = await showDialog<McpServerConfig>(
       context: context,
-      builder: (context) => _McpServerEditorDialog(
+      builder: (context) => McpServerEditorDialog(
         initial: runtime.config,
         isNew: isNew,
       ),
@@ -985,17 +985,17 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
 }
 
 /// 添加/编辑服务器
-class _McpServerEditorDialog extends StatefulWidget {
-  const _McpServerEditorDialog({required this.initial, this.isNew = false});
+class McpServerEditorDialog extends StatefulWidget {
+  const McpServerEditorDialog({super.key, required this.initial, this.isNew = false});
 
   final McpServerConfig initial;
   final bool isNew;
 
   @override
-  State<_McpServerEditorDialog> createState() => _McpServerEditorDialogState();
+  State<McpServerEditorDialog> createState() => _McpServerEditorDialogState();
 }
 
-class _McpServerEditorDialogState extends State<_McpServerEditorDialog> {
+class _McpServerEditorDialogState extends State<McpServerEditorDialog> {
   late final TextEditingController _name;
   late final TextEditingController _url;
   late final TextEditingController _command;
@@ -1434,4 +1434,31 @@ String _mcpTransportLabel(McpTransportKind kind) {
     case McpTransportKind.stdio:
       return UiText.t('stdio（本地进程）', 'stdio (local process)');
   }
+}
+
+/// 新建一台 MCP 服务器时用的 id
+String newMcpServerId() => 'mcpx_${const Uuid().v4().substring(0, 8)}';
+
+/// 打开 MCP 服务器编辑器。
+///
+/// 设置页的 MCP 分组和 MCP 页面共用这一个表单 —— 否则「在设置里加」和
+/// 「在页面里加」会是两套字段，改一处忘一处。
+Future<McpServerConfig?> showMcpServerEditor(
+  BuildContext context, {
+  McpServerConfig? initial,
+  bool isNew = false,
+}) {
+  return showDialog<McpServerConfig>(
+    context: context,
+    builder: (context) => McpServerEditorDialog(
+      initial: initial ??
+          McpServerConfig(
+            id: newMcpServerId(),
+            name: UiText.t('新 MCP 服务器', 'New MCP server'),
+            enabled: true,
+            autoConnect: true,
+          ),
+      isNew: isNew,
+    ),
+  );
 }

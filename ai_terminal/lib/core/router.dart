@@ -5,20 +5,12 @@ import '../pages/host_edit_page.dart';
 import '../pages/host_list_page.dart';
 import '../pages/chat_page.dart';
 import '../pages/settings_page.dart';
-import '../pages/ai_models_page.dart';
 import '../pages/snippets_page.dart';
 import '../pages/runbooks_page.dart';
-import '../pages/appearance_page.dart';
-import '../pages/security_page.dart';
-import '../pages/agent_settings_page.dart';
-import '../pages/web_search_settings_page.dart';
-import '../pages/mcp_settings_page.dart';
-import '../pages/knowledge_rules_page.dart';
 import '../pages/sftp_page.dart';
 import '../pages/audit_log_page.dart';
 import '../pages/change_records_page.dart';
 import '../pages/change_window_page.dart';
-import '../pages/notification_settings_page.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -71,37 +63,37 @@ final GoRouter appRouter = GoRouter(
     // AI 模型配置
     GoRoute(
       path: '/settings/ai',
-      builder: (context, state) => const AIModelsPage(),
+      builder: (context, state) => SettingsPage(initialGroup: 'ai'),
     ),
     // 外观设置
     GoRoute(
       path: '/settings/appearance',
-      builder: (context, state) => const AppearancePage(),
+      builder: (context, state) => SettingsPage(initialGroup: 'appearance'),
     ),
     // 安全设置
     GoRoute(
       path: '/settings/security',
-      builder: (context, state) => const SecurityPage(),
+      builder: (context, state) => SettingsPage(initialGroup: 'security'),
     ),
     // Agent 设置
     GoRoute(
       path: '/settings/agent',
-      builder: (context, state) => const AgentSettingsPage(),
+      builder: (context, state) => SettingsPage(initialGroup: 'agent'),
     ),
     // 联网搜索设置
     GoRoute(
       path: '/settings/web_search',
-      builder: (context, state) => const WebSearchSettingsPage(),
+      builder: (context, state) => SettingsPage(initialGroup: 'web_search'),
     ),
     // MCP 服务器
     GoRoute(
       path: '/settings/mcp',
-      builder: (context, state) => const McpSettingsPage(),
+      builder: (context, state) => SettingsPage(initialGroup: 'mcp'),
     ),
     // 内部规范（用户自维护、注入给 AI 的组织约定）
     GoRoute(
       path: '/settings/knowledge_rules',
-      builder: (context, state) => const KnowledgeRulesPage(),
+      builder: (context, state) => SettingsPage(initialGroup: 'knowledge_rules'),
     ),
     // 快捷命令
     GoRoute(
@@ -145,7 +137,7 @@ final GoRouter appRouter = GoRouter(
     // 任务完成通知
     GoRoute(
       path: '/settings/notification',
-      builder: (context, state) => const NotificationSettingsPage(),
+      builder: (context, state) => SettingsPage(initialGroup: 'notification'),
     ),
   ],
 );

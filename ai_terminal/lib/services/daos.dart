@@ -408,6 +408,11 @@ class SnippetsDao {
   static Future<void> upsert(CommandSnippet s) async {
     final idx = _cache.indexWhere((e) => e.id == s.id);
     if (idx >= 0) { _cache[idx] = s; } else { _cache.add(s); }
+    // 与 SettingsDao / KnowledgeRulesDao 同口径：DbInit 未初始化时只写缓存。
+    if (!DbInit.isInitialized) {
+      debugPrint('[SnippetsDao] WARN: DbInit 未初始化，upsert(${s.id}) 仅写缓存');
+      return;
+    }
     await DbInit.db.insert('snippets', _toRow(s),
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
@@ -518,6 +523,13 @@ class ConversationsDao {
   /// 不再与调用顺序一致，必须串行化保证"后调用的快照最后落盘"，
   /// 否则旧快照可能覆盖新快照。
   static final Map<String, Future<void>> _upsertChains = {};
+
+  /// 只登记进内存缓存，不写库。
+  /// 用于空白会话：等它写出第一条内容时再由 upsert 落库。
+  static void cacheOnly(Conversation c) {
+    _cache[c.id] = c;
+    _invalidateActiveCache();
+  }
 
   static Future<void> upsert(Conversation c) async {
     _cache[c.id] = c;
@@ -1048,6 +1060,12 @@ class AuditLogsDao {
       _cache.removeRange(0, overflow);
     }
     // 异步写入数据库
+    // 与 SettingsDao / KnowledgeRulesDao 同口径：DbInit 未初始化时只写缓存
+    // （单测路径），生产环境 main.dart 已保证 DbInit 先于本 DAO 使用完成初始化。
+    if (!DbInit.isInitialized) {
+      debugPrint('[AuditLogsDao] WARN: DbInit 未初始化，add() 仅写缓存');
+      return;
+    }
     await DbInit.db.insert('audit_logs', {
       'timestamp': DateTime.now().millisecondsSinceEpoch,
       'hostId': hostId,

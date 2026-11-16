@@ -1,684 +1,126 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:package_info_plus/package_info_plus.dart';
+import 'package:go_router/go_router.dart';
+
 import '../core/constants.dart';
+import '../core/settings_catalog.dart';
 import '../core/ui_text.dart';
-import '../services/daos.dart';
-import '../core/theme_colors.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/agent_provider.dart';
 import '../providers/app_providers.dart';
-import '../services/crash_reporter.dart';
-import '../services/health_check_service.dart';
-import '../core/app_toast.dart';
+import '../providers/knowledge_rule_provider.dart';
+import '../services/mcp_manager.dart';
+import '../widgets/settings_extras.dart';
+import '../widgets/settings_inline_panel.dart';
+import '../widgets/settings_row_card.dart';
 
-/// P1-5: 设置页信息架构重组
-/// 按用户任务场景分组：连接管理、AI 与智能、外观与体验、关于
-class SettingsPage extends ConsumerWidget {
-  const SettingsPage({super.key});
+/// 设置中心（整页形态）。
+///
+/// **抽屉是设置的主载体**；这一页只是同一批组件的整页呈现（从聊天页、命令面板
+/// 这类没有抽屉的位置进来时用）。两条路径共用 [SettingsInlinePanel] 和
+/// [SettingsAboutRows]，不存在两套实现。
+///
+/// 编辑动作一律就地：加端点、改 MCP 服务器、写规范都是本组内容换一屏，
+/// 没有对话框，也没有第二个浮层。
+///
+/// 视觉全部走 [SettingsGroupCard]（设计稿第 07 节的 `.rowcard` 去掉折叠态）。
+class SettingsPage extends ConsumerStatefulWidget {
+  const SettingsPage({super.key, this.initialGroup});
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // 只监听需要的 maxSteps，避免 agent 其他状态变化触发 rebuild
-    final maxSteps = ref.watch(agentProvider.select((s) => s.maxSteps));
-    final tc = ThemeColors.of(context);
-    final l10n = AppLocalizations.of(context)!;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(l10n.settingsTitle),
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 960),
-          child: ListView(
-            padding: const EdgeInsets.all(pStandard),
-            children: [
-              // ===== 连接管理 =====
-              _buildSectionTitle(context, l10n.settingsConnection),
-              _buildGroupCard(
-                context,
-                items: [
-                  _SettingItem(
-                    icon: Icons.dns,
-                    iconColor: tc.brand,
-                    title: l10n.settingsHosts,
-                    subtitle: l10n.settingsHostsDesc,
-                    onTap: () => context.push('/hosts'),
-                  ),
-                  _SettingItem(
-                    icon: Icons.code,
-                    iconColor: tc.brand,
-                    title: l10n.settingsSnippets,
-                    subtitle: l10n.settingsSnippetsDesc,
-                    onTap: () => context.push('/snippets'),
-                  ),
-                  _SettingItem(
-                    icon: Icons.play_circle_outline,
-                    iconColor: cSuccess,
-                    title: l10n.settingsRunbooks,
-                    subtitle: l10n.settingsRunbooksDesc,
-                    onTap: () => context.push('/runbooks'),
-                  ),
-                  _SettingItem(
-                    icon: Icons.history_edu,
-                    iconColor: cViolet,
-                    title: l10n.settingsChangeRecords,
-                    subtitle: l10n.settingsChangeRecordsDesc,
-                    onTap: () => context.push('/change-records'),
-                  ),
-                  _SettingItem(
-                    icon: Icons.shield,
-                    iconColor: cWarning,
-                    title: l10n.settingsAuditLog,
-                    subtitle: l10n.settingsAuditLogDesc,
-                    onTap: () => context.push('/audit-log'),
-                  ),
-                  _SettingItem(
-                    icon: Icons.lock_clock,
-                    iconColor: cDanger,
-                    title: l10n.settingsChangeWindow,
-                    subtitle: l10n.settingsChangeWindowDesc,
-                    onTap: () => context.push('/change-window'),
-                  ),
-                  _SettingItem(
-                    icon: Icons.notifications_active,
-                    iconColor: cWarning,
-                    title: l10n.settingsNotification,
-                    subtitle: l10n.settingsNotificationDesc,
-                    onTap: () => context.push('/settings/notification'),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              // ===== AI 与智能 =====
-              _buildSectionTitle(context, l10n.settingsAI),
-              _buildGroupCard(
-                context,
-                items: [
-                  _SettingItem(
-                    icon: Icons.smart_toy,
-                    iconColor: tc.brand,
-                    title: l10n.settingsAIModel,
-                    subtitle: l10n.settingsAIModelDesc,
-                    onTap: () => context.push('/settings/ai'),
-                  ),
-                  _SettingItem(
-                    icon: Icons.auto_mode_rounded,
-                    iconColor: tc.agentGreen,
-                    title: l10n.settingsAgent,
-                    subtitle: l10n.settingsAgentDesc(maxSteps),
-                    onTap: () => context.push('/settings/agent'),
-                  ),
-                  _SettingItem(
-                    icon: Icons.travel_explore_rounded,
-                    iconColor: cInfo,
-                    title: UiText.t('联网搜索', 'Web Search'),
-                    subtitle: UiText.t(
-                      'AI 知识不足时主动搜索网络（web_search / fetch_url）',
-                      'Let AI search the web when its knowledge is not enough (web_search / fetch_url)',
-                    ),
-                    onTap: () => context.push('/settings/web_search'),
-                  ),
-                  _SettingItem(
-                    icon: Icons.hub_outlined,
-                    iconColor: cInfo,
-                    title: UiText.t('MCP 服务器', 'MCP Servers'),
-                    subtitle: UiText.t(
-                      '接入外部 tools / resources / prompts（HTTP / stdio）',
-                      'Connect external tools / resources / prompts (HTTP / stdio)',
-                    ),
-                    onTap: () => context.push('/settings/mcp'),
-                  ),
-                  _SettingItem(
-                    icon: Icons.menu_book_rounded,
-                    iconColor: cViolet,
-                    title: UiText.t('内部规范', 'Internal Rules'),
-                    subtitle: UiText.t(
-                      '写下你所在环境的约定，AI 执行时遵循',
-                      'Record your environment conventions for the AI to follow',
-                    ),
-                    onTap: () => context.push('/settings/knowledge_rules'),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              // ===== 外观与体验 =====
-              _buildSectionTitle(context, l10n.settingsAppearance),
-              _buildGroupCard(
-                context,
-                items: [
-                  _SettingItem(
-                    icon: Icons.palette,
-                    iconColor: tc.brand,
-                    title: l10n.settingsAppearanceSettings,
-                    subtitle: l10n.settingsAppearanceSettingsDesc,
-                    onTap: () => context.push('/settings/appearance'),
-                  ),
-                  _SettingItem(
-                    icon: Icons.language,
-                    iconColor: tc.brand,
-                    title: l10n.settingsLanguage,
-                    subtitle: _getLanguageName(
-                      SettingsDao.getCached('locale', defaultValue: 'system') as String,
-                      l10n,
-                    ),
-                    onTap: () => _showLanguageDialog(context, ref),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 24),
-
-              // ===== 关于 =====
-              _buildSectionTitle(context, l10n.settingsAbout),
-              _buildGroupCard(
-                context,
-                items: [
-                  _SettingItem(
-                    icon: Icons.info,
-                    iconColor: tc.brand,
-                    title: l10n.settingsAboutApp,
-                    subtitle: l10n.settingsVersion,
-                    trailing: TextButton(
-                      onPressed: () => _checkForUpdate(context),
-                      child: Text(l10n.settingsCheckUpdate),
-                    ),
-                    onTap: () => _showAboutApp(context),
-                  ),
-                  _SettingItem(
-                    icon: Icons.security,
-                    iconColor: tc.textSub,
-                    title: l10n.settingsSecurity,
-                    subtitle: l10n.settingsSecurityDesc,
-                    onTap: () => context.push('/settings/security'),
-                  ),
-                  _SettingItem(
-                    icon: Icons.bug_report_outlined,
-                    iconColor: cWarning,
-                    title: UiText.t('诊断', 'Diagnostics'),
-                    subtitle: _diagnosticsSubtitle(),
-                    onTap: () => _showDiagnosticsDialog(context),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// 分组标题
-  Widget _buildSectionTitle(BuildContext context, String title) {
-    final tc = ThemeColors.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10, left: 4),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: fTitle,
-          fontWeight: FontWeight.w600,
-          color: tc.textMain,
-        ),
-      ),
-    );
-  }
-
-  /// 分组卡片：包含多个设置项
-  /// 窄屏单列 + 分隔线；宽屏 2 列 Wrap 布局
-  Widget _buildGroupCard(BuildContext context, {required List<_SettingItem> items}) {
-    final tc = ThemeColors.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: tc.card,
-        borderRadius: BorderRadius.circular(rCard),
-        border: Border.all(color: tc.border),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth >= 720;
-          if (!isWide) {
-            // 窄屏：单列 + 分隔线
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: List.generate(items.length * 2 - 1, (index) {
-                if (index.isOdd) {
-                  return Divider(
-                    height: 1,
-                    indent: 60,
-                    color: tc.border.withValues(alpha: 0.6),
-                  );
-                }
-                return _buildSettingItem(context, items[index ~/ 2]);
-              }),
-            );
-          }
-          // 宽屏：2 列布局，每个条目独立卡片样式
-          const spacing = 12.0;
-          final itemWidth = (constraints.maxWidth - spacing * 3) / 2;
-          return Padding(
-            padding: const EdgeInsets.all(spacing),
-            child: Wrap(
-              spacing: spacing,
-              runSpacing: spacing,
-              children: items.map((item) => SizedBox(
-                width: itemWidth,
-                child: _buildSettingItem(context, item, isStandalone: true),
-              )).toList(),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildSettingItem(BuildContext context, _SettingItem item, {bool isStandalone = false}) {
-    final tc = ThemeColors.of(context);
-    return Material(
-      color: isStandalone ? tc.surface : Colors.transparent,
-      borderRadius: BorderRadius.circular(rCard),
-      clipBehavior: isStandalone ? Clip.antiAlias : Clip.none,
-      child: InkWell(
-        onTap: item.onTap,
-        borderRadius: BorderRadius.circular(rCard),
-        child: Container(
-          height: 56,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: isStandalone
-              ? BoxDecoration(
-                  borderRadius: BorderRadius.circular(rCard),
-                  border: Border.all(color: tc.border.withValues(alpha: 0.5)),
-                )
-              : null,
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: item.iconColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(rSmall),
-                ),
-                child: Icon(item.icon, color: item.iconColor, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.title,
-                      style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w500),
-                    ),
-                    if (item.subtitle != null)
-                      Text(
-                        item.subtitle!,
-                        style: TextStyle(color: tc.textSub, fontSize: fSmall),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
-                      ),
-                  ],
-                ),
-              ),
-              item.trailing ?? Icon(Icons.chevron_right, color: tc.textSub, size: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showAboutApp(BuildContext context) async {
-    final info = await PackageInfo.fromPlatform();
-    if (!context.mounted) return;
-    showAboutDialog(
-      context: context,
-      applicationName: 'AI Terminal',
-      applicationVersion: info.version,
-      applicationLegalese:
-          '本应用使用 MiSans 字体（© Xiaomi）。\nThis app uses the MiSans font (© Xiaomi).',
-    );
-  }
-
-  Future<void> _checkForUpdate(BuildContext context) async {
-    final l10n = AppLocalizations.of(context)!;
-    try {
-      final info = await PackageInfo.fromPlatform();
-      if (!context.mounted) return;
-      // 简单实现：显示当前版本信息
-      showTopSnackBar(context, 
-        SnackBar(
-          content: Text('${l10n.settingsVersion}: ${info.version}'),
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } catch (e) {
-      if (!context.mounted) return;
-      showTopSnackBar(context, 
-        SnackBar(
-          content: Text('$e'),
-          backgroundColor: cDanger,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
-  }
-
-  /// P2-8: 诊断入口副标题 — 显示崩溃次数或正常状态
-  String _diagnosticsSubtitle() {
-    final count = crashReporter.sessionCrashCount;
-    if (count > 0) {
-      return UiText.t('本次会话崩溃 $count 次', '$count crash(es) this session');
-    }
-    final lastTime = crashReporter.lastCrashTime;
-    if (lastTime != null) {
-      return UiText.t(
-        '上次崩溃: ${_formatTime(lastTime)}',
-        'Last crash: ${_formatTime(lastTime)}',
-      );
-    }
-    return UiText.t('查看崩溃日志与健康状态', 'View crash log and health status');
-  }
-
-  String _formatTime(DateTime t) {
-    String two(int n) => n.toString().padLeft(2, '0');
-    return '${t.year}-${two(t.month)}-${two(t.day)} ${two(t.hour)}:${two(t.minute)}';
-  }
-
-  /// P2-8: 诊断对话框 — 展示版本/SSH池/磁盘/崩溃日志
-  Future<void> _showDiagnosticsDialog(BuildContext context) async {
-    final tc = ThemeColors.of(context);
-    final l10n = AppLocalizations.of(context)!;
-    PackageInfo? info;
-    try {
-      info = await PackageInfo.fromPlatform();
-    } catch (_) {}
-    // 触发一次手动健康检查
-    final snap = await healthCheckService.checkNow();
-    if (!context.mounted) return;
-
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: tc.cardElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Row(
-          children: [
-            const Icon(Icons.bug_report_outlined, color: cWarning, size: 22),
-            const SizedBox(width: 8),
-            Text(UiText.t('诊断', 'Diagnostics'), style: TextStyle(color: tc.textMain, fontSize: fTitle)),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _diagRow(tc, UiText.t('应用版本', 'App version'), '${info?.version ?? "unknown"}+${info?.buildNumber ?? "0"}'),
-                _diagRow(tc, UiText.t('本次会话崩溃', 'Crashes this session'), '${crashReporter.sessionCrashCount}'),
-                _diagRow(tc, UiText.t('上次崩溃时间', 'Last crash time'),
-                    crashReporter.lastCrashTime != null
-                        ? _formatTime(crashReporter.lastCrashTime!)
-                        : UiText.t('无', 'None')),
-                if (crashReporter.lastCrashSummary != null)
-                  _diagRow(tc, UiText.t('上次崩溃摘要', 'Last crash summary'), crashReporter.lastCrashSummary!),
-                const Divider(height: 24),
-                Text(UiText.t('健康检查', 'Health check'), style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 8),
-                _diagRow(tc, UiText.t('SSH 池连接', 'SSH pool connections'), '${snap.sshTotalConnections} (ref=${snap.sshTotalRefCount})'),
-                _diagRow(tc, UiText.t('已死连接', 'Dead connections'), snap.sshDeadConnections > 0
-                    ? UiText.t('${snap.sshDeadConnections} 个 (需关注)', '${snap.sshDeadConnections} (needs attention)')
-                    : '0'),
-                _diagRow(tc, UiText.t('磁盘可写', 'Disk writable'), snap.diskWritable ? UiText.t('是', 'Yes') : UiText.t('否 (致命问题!)', 'No (critical!)')),
-                _diagRow(tc, UiText.t('检查时间', 'Checked at'), _formatTime(snap.timestamp)),
-                const Divider(height: 24),
-                Row(
-                  children: [
-                    TextButton.icon(
-                      icon: const Icon(Icons.copy, size: 16),
-                      label: Text(UiText.t('复制崩溃日志', 'Copy crash log')),
-                      onPressed: () async {
-                        final content = await crashReporter.readLog();
-                        if (!ctx.mounted) return;
-                        if (content.isEmpty) {
-                          showTopSnackBar(ctx, SnackBar(
-                            content: Text(UiText.t('崩溃日志为空', 'Crash log is empty')),
-                            behavior: SnackBarBehavior.floating,
-                          ));
-                          return;
-                        }
-                        await Clipboard.setData(ClipboardData(text: content));
-                        if (!ctx.mounted) return;
-                        showTopSnackBar(ctx, SnackBar(
-                          content: Text(UiText.t(
-                            '已复制 ${content.length} 字符',
-                            'Copied ${content.length} characters',
-                          )),
-                          backgroundColor: cSuccess,
-                          behavior: SnackBarBehavior.floating,
-                        ));
-                      },
-                    ),
-                    TextButton.icon(
-                      icon: const Icon(Icons.delete_outline, size: 16),
-                      label: Text(UiText.t('清除', 'Clear')),
-                      onPressed: () async {
-                        await crashReporter.clearLog();
-                        if (!ctx.mounted) return;
-                        Navigator.pop(ctx);
-                        showTopSnackBar(ctx, SnackBar(
-                          content: Text(UiText.t('已清除崩溃日志', 'Crash log cleared')),
-                          backgroundColor: cSuccess,
-                          behavior: SnackBarBehavior.floating,
-                        ));
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.close),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 诊断对话框内的 "字段: 值" 行
-  Widget _diagRow(ThemeColors tc, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 150,
-            child: Text(label, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
-          ),
-          Expanded(
-            child: Text(value, style: TextStyle(color: tc.textMain, fontSize: fSmall)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 获取语言显示名称（"跟随系统" 需要本地化，其他语言用原名）
-  String _getLanguageName(String code, AppLocalizations l10n) {
-    if (code == 'system') return l10n.languageFollowSystem;
-    const names = {
-      'zh': '简体中文',
-      'en': 'English',
-      'ja': '日本語',
-      'ko': '한국어',
-      'de': 'Deutsch',
-      'fr': 'Français',
-      'ru': 'Русский',
-      'es': 'Español',
-      'pt': 'Português',
-      'ar': 'العربية',
-      'it': 'Italiano',
-      'hi': 'हिन्दी',
-      'th': 'ภาษาไทย',
-      'vi': 'Tiếng Việt',
-    };
-    return names[code] ?? l10n.languageFollowSystem;
-  }
-
-  /// 语言选择对话框
-  void _showLanguageDialog(BuildContext context, WidgetRef ref) {
-    final current = SettingsDao.getCached('locale', defaultValue: 'system') as String;
-    showDialog(
-      context: context,
-      builder: (ctx) => Consumer(
-        builder: (ctx, ref, _) => _LanguageDialog(
-          current: current,
-          onConfirm: (selected) async {
-            await SettingsDao.set('locale', selected);
-            ref.read(settingsProvider.notifier).setSetting('locale', selected);
-          },
-        ),
-      ),
-    );
-  }
-}
-
-/// 语言选择对话框（StatefulWidget，确保选中状态正确更新）
-class _LanguageDialog extends StatefulWidget {
-  final String current;
-  final Future<void> Function(String selected) onConfirm;
-
-  const _LanguageDialog({required this.current, required this.onConfirm});
+  /// 从别处（网格菜单、模型胶囊的「模型设置」）跳进来时，直接把这一组滚到
+  /// 视野里。以前这些入口会打开一个独立页面，现在同一页定位，不再多一层。
+  final String? initialGroup;
 
   @override
-  State<_LanguageDialog> createState() => _LanguageDialogState();
+  ConsumerState<SettingsPage> createState() => _SettingsPageState();
 }
 
-class _LanguageDialogState extends State<_LanguageDialog> {
-  late String _selected;
-
-  // 各语言的原文名称（'system' 在 build 中用本地化文本拼接）
-  static const _languages = <(String, String)>[
-    ('zh', '简体中文'),
-    ('en', 'English'),
-    ('ja', '日本語'),
-    ('ko', '한국어'),
-    ('de', 'Deutsch'),
-    ('fr', 'Français'),
-    ('ru', 'Русский'),
-    ('es', 'Español'),
-    ('pt', 'Português'),
-    ('ar', 'العربية'),
-    ('it', 'Italiano'),
-    ('hi', 'हिन्दी'),
-    ('th', 'ภาษาไทย'),
-    ('vi', 'Tiếng Việt'),
-  ];
+class _SettingsPageState extends ConsumerState<SettingsPage> {
+  late final Map<String, GlobalKey> _groupKeys = {
+    for (final e in kSettingsEntries) e.id: GlobalKey(),
+  };
 
   @override
   void initState() {
     super.initState();
-    _selected = widget.current;
+    final target = widget.initialGroup;
+    if (target == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _groupKeys[target]?.currentContext;
+      if (ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+        alignment: 0.04,
+      );
+    });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final tc = ThemeColors.of(context);
-    final l10n = AppLocalizations.of(context)!;
-    // 组合完整列表：system（本地化）+ 各语言（原名）
-    final allOptions = <(String, String)>[
-      ('system', l10n.languageFollowSystem),
-      ..._languages,
-    ];
-    return AlertDialog(
-      backgroundColor: tc.cardElevated,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-      title: Text(l10n.languageDialogTitle, style: TextStyle(color: tc.textMain, fontSize: fTitle)),
-      content: SizedBox(
-        width: 320,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: allOptions.map((entry) {
-              final code = entry.$1;
-              final name = entry.$2;
-              final isSelected = code == _selected;
-              return InkWell(
-                onTap: () => setState(() => _selected = code),
-                borderRadius: BorderRadius.circular(rSmall),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isSelected ? tc.brand.withValues(alpha: 0.1) : Colors.transparent,
-                    borderRadius: BorderRadius.circular(rSmall),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                        color: isSelected ? tc.brand : tc.textMuted,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(name, style: TextStyle(color: isSelected ? tc.brand : tc.textMain, fontSize: fBody)),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(l10n.commonCancel, style: TextStyle(color: tc.textSub)),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            final navigator = Navigator.of(context);
-            await widget.onConfirm(_selected);
-            if (!mounted) return;
-            navigator.pop();
-          },
-          child: Text(l10n.commonConfirm),
+  /// 一组设置的卡片：标题 + 状态读数 + 就地控件。
+  Widget _groupCard(SettingsEntry entry) {
+    return SettingsGroupCard(
+      key: _groupKeys[entry.id],
+      title: entry.title,
+      subtitle: entry.subtitle,
+      children: [
+        // 改完值要立刻反映到标题行的读数上（字号、后端数、连接数……），
+        // 所以 onChanged 里重建整页。
+        SettingsInlinePanel(
+          settingsId: entry.id,
+          heavy: true,
+          onChanged: () => setState(() {}),
         ),
       ],
     );
   }
-}
 
-/// 设置项数据模型
-class _SettingItem {
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String? subtitle;
-  final Widget? trailing;
-  final VoidCallback? onTap;
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
 
-  const _SettingItem({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    this.subtitle,
-    this.trailing,
-    this.onTap,
-  });
+    // 标题行的状态读数（模型数、规则条数、步数）来自这几个 provider。
+    // 不 watch 的话，从别处改完配置再进设置页，标题还写着旧值。
+    ref.watch(aiEndpointsProvider);
+    ref.watch(knowledgeRulesProvider);
+    ref.watch(agentProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.settingsTitle)),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 720),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(pStandard, 4, pStandard, 40),
+            children: [
+              for (final entry in kSettingsEntries) ...[
+                // MCP 的配置由 manager 异步载入（启动后连服务器），不走 Riverpod，
+                // 只 listen 它才能在「还没有服务器」和「2/2 已连接」之间正确切换。
+                if (entry.id == 'mcp')
+                  ListenableBuilder(
+                    listenable: McpManager.instance,
+                    builder: (context, _) => _groupCard(entry),
+                  )
+                else
+                  _groupCard(entry),
+                const SizedBox(height: kSettingsRowGap),
+              ],
+
+              const SizedBox(height: kSettingsGroupGap - kSettingsRowGap),
+
+              SettingsSectionLabel(UiText.t('管理', 'Manage')),
+              SettingsManageRows(
+                onNavigate: (route) => context.push(route),
+              ),
+
+              const SizedBox(height: kSettingsGroupGap),
+
+              SettingsSectionLabel(UiText.t('关于', 'About')),
+              const SettingsAboutRows(),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

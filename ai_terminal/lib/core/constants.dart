@@ -1,37 +1,38 @@
 import 'package:flutter/material.dart';
 
-// ===== 主色 =====
-const Color cPrimary = Color(0xFF3B82F6);
-const Color cPrimaryHover = Color(0xFF2563EB);
-const Color cPrimaryActive = Color(0xFF1D4ED8);
-const Color cPrimaryBg = Color(0x1A3B82F6);
+// ===== 主色（旧蓝系已退场：全部别名到石墨青 token，见 cBrand 系列）=====
+const Color cPrimary = cBrand;
+const Color cPrimaryHover = cBrandHover;
+const Color cPrimaryActive = cBrandPressed;
+const Color cPrimaryBg = cBrandBg;
 
 // 兼容旧名
-const Color cPrimaryLight = Color(0xFF60A5FA);
-const Color cPrimaryDark = Color(0xFF1D4ED8);
+const Color cPrimaryLight = cBrandHover;
+const Color cPrimaryDark = cBrandPressed;
 const Color cInfo = cPrimary;
 const Color cKleinBlue = cPrimary;
 const Color cKleinBlueLight = cPrimaryLight;
 const Color cKleinBlueDark = cPrimaryDark;
 
-// ===== 语义色 =====
-const Color cSuccess = Color(0xFF10B981);
-const Color cSuccessBg = Color(0x1A10B981);
-const Color cWarning = Color(0xFFF59E0B);
-const Color cWarningBg = Color(0x1AF59E0B);
-const Color cDanger = Color(0xFFEF4444);
-const Color cDangerBg = Color(0x1AEF4444);
+// ===== 语义色（旧语义色退场，统一指向石墨青状态色）=====
+const Color cSuccess = cStatusOk;
+const Color cSuccessBg = cStatusOkBg;
+const Color cWarning = cStatusWarn;
+const Color cWarningBg = cStatusWarnBg;
+const Color cDanger = cStatusError;
+const Color cDangerBg = cStatusErrorBg;
 
 // 兼容旧名
 const Color cLimeGreen = cSuccess;
-const Color cLimeGreenLight = Color(0xFF34D399);
-const Color cLimeGreenDark = Color(0xFF059669);
+const Color cLimeGreenLight = Color(0xFF8FE7B4);
+const Color cLimeGreenDark = cStatusOk;
 const Color cChineseRed = cDanger;
-const Color cChineseRedLight = Color(0xFFF87171);
-const Color cChineseRedDark = Color(0xFFDC2626);
+const Color cChineseRedLight = Color(0xFFFF9AA2);
+const Color cChineseRedDark = cStatusError;
 const Color cHermesOrange = cWarning;
-const Color cHermesOrangeLight = Color(0xFFFBBF24);
-const Color cHermesOrangeDark = Color(0xFFD97706);
+const Color cHermesOrangeLight = Color(0xFFF2C276);
+const Color cHermesOrangeDark = cStatusWarn;
+// 紫色不再承担语义，只保留给标签分类（tagColors）。
 const Color cViolet = Color(0xFF8B5CF6);
 const Color cVioletLight = Color(0xFFA78BFA);
 const Color cVioletDark = Color(0xFF7C3AED);
@@ -108,24 +109,26 @@ const Color cBorderLightHover = Color(0x3A000000);
 const Color cHairlineLight = Color(0x12000000);
 const Color cTextMainLight = Color(0xFF171B19);
 const Color cTextBodyLight = Color(0xFF4B534E);
-const Color cTextSubLight = Color(0xFF68716B);
-const Color cTextMutedLight = Color(0xFF8A938D);
+// 小字号达标线（WCAG 4.5:1）按最暗的浅色底（控件底 #E4E9E4）反推：
+// 旧值 sub/muted 在控件底上只有 4.1 / 2.6，整档灰字压暗到刚好全表面过线。
+const Color cTextSubLight = Color(0xFF5A635D);
+const Color cTextMutedLight = Color(0xFF606963);
 const Color cTerminalBgLight = Color(0xFFF2F4F2);
 const Color cTerminalOutputLight = Color(0xFFE8EBE8);
-const Color cTerminalGreenLight = Color(0xFF1B7F4B);
-const Color cAgentGreenLightMode = Color(0xFF1B7F4B);
+const Color cTerminalGreenLight = Color(0xFF177343);
+const Color cAgentGreenLightMode = Color(0xFF177343);
 
-// 浅色品牌青：深青在白底上约 5:1，filled button 白字约 5.2:1。
-const Color cBrandLight = Color(0xFF0B7A75);
+// 浅色品牌青：深青在全部浅色表面上 ≥4.9:1，filled button 白字仍达标。
+const Color cBrandLight = Color(0xFF0A6E69);
 const Color cBrandLightHover = Color(0xFF096B67);
 const Color cBrandLightPressed = Color(0xFF075955);
 const Color cBrandLightBg = Color(0x140B7A75);
 // 浅色数据金色 / 语义状态色。
 const Color cGoldLight = Color(0xFF8A5D0A);
 const Color cGoldBgLight = Color(0x148A5D0A);
-const Color cStatusOkLight = Color(0xFF1B7F4B);
+const Color cStatusOkLight = Color(0xFF177343);
 const Color cStatusOkBgLight = Color(0x141B7F4B);
-const Color cStatusWarnLight = Color(0xFFA65B00);
+const Color cStatusWarnLight = Color(0xFF99540A);
 const Color cStatusWarnBgLight = Color(0x14A65B00);
 const Color cStatusErrorLight = Color(0xFFB42318);
 const Color cStatusErrorBgLight = Color(0x14B42318);
@@ -228,11 +231,12 @@ const Duration animNormal = Duration(milliseconds: 200);
 const Duration animSlow = Duration(milliseconds: 320);
 
 // ===== 标签颜色选项 =====
+// 紫色仅在这里作为分类色存在，不再承担语义。
 const List<Color> tagColors = [
-  cDanger,
-  cWarning,
-  Color(0xFFEAB308),
-  cSuccess,
-  cPrimary,
-  Color(0xFF8B5CF6),
+  cStatusError,
+  cStatusWarn,
+  cGold,
+  cStatusOk,
+  cBrand,
+  cViolet,
 ];

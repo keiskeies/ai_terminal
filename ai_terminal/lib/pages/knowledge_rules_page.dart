@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -116,7 +117,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
   void _showEditDialog([KnowledgeRule? rule]) {
     showDialog(
       context: context,
-      builder: (context) => _KnowledgeRuleEditDialog(
+      builder: (context) => KnowledgeRuleEditDialog(
         rule: rule,
         onSave: (saved) {
           final notifier = ref.read(knowledgeRulesProvider.notifier);
@@ -269,7 +270,9 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
                         : UiText.t('建议', 'Suggested'),
                     rule.strict ? cWarning : cInfo,
                   ),
-                  _buildBadge(_scopeText(rule), cViolet),
+                  // 作用域用 gold（第二种强调色）而不是旧紫：紫 #8B5CF6
+                  // 不在石墨青配色阶梯里，出现在设置系页面里格外突兀。
+                  _buildBadge(_scopeText(rule), tc.gold),
                 ],
               ),
             ),
@@ -355,17 +358,18 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
 }
 
 /// 规范编辑弹窗
-class _KnowledgeRuleEditDialog extends StatefulWidget {
+class KnowledgeRuleEditDialog extends StatefulWidget {
   final KnowledgeRule? rule;
   final ValueChanged<KnowledgeRule> onSave;
 
-  const _KnowledgeRuleEditDialog({this.rule, required this.onSave});
+  const KnowledgeRuleEditDialog(
+      {super.key, this.rule, required this.onSave});
 
   @override
-  State<_KnowledgeRuleEditDialog> createState() => _KnowledgeRuleEditDialogState();
+  State<KnowledgeRuleEditDialog> createState() => _KnowledgeRuleEditDialogState();
 }
 
-class _KnowledgeRuleEditDialogState extends State<_KnowledgeRuleEditDialog> {
+class _KnowledgeRuleEditDialogState extends State<KnowledgeRuleEditDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _titleController;
   late final TextEditingController _contentController;
@@ -434,7 +438,8 @@ class _KnowledgeRuleEditDialogState extends State<_KnowledgeRuleEditDialog> {
         style: TextStyle(color: tc.textMain, fontSize: fBody),
       ),
       content: SizedBox(
-        width: 560,
+        // 小屏按视口 92% 缩放，大屏保持 560 上限
+        width: math.min(560, MediaQuery.sizeOf(context).width * 0.92),
         child: SingleChildScrollView(
           child: Form(
             key: _formKey,
@@ -572,4 +577,16 @@ class _KnowledgeRuleEditDialogState extends State<_KnowledgeRuleEditDialog> {
       ],
     );
   }
+}
+
+/// 打开规范编辑器。设置页的「内部规范」分组与规范页面共用同一个表单。
+Future<void> showKnowledgeRuleEditor(
+  BuildContext context, {
+  KnowledgeRule? rule,
+  required ValueChanged<KnowledgeRule> onSave,
+}) {
+  return showDialog<void>(
+    context: context,
+    builder: (context) => KnowledgeRuleEditDialog(rule: rule, onSave: onSave),
+  );
 }

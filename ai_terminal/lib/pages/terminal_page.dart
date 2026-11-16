@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show ScrollDirection;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,7 @@ import 'package:xterm/xterm.dart';
 import '../core/builtin_runbook_i18n.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/settings_catalog.dart';
 import '../core/terminal_keybindings.dart';
 import '../core/terminal_themes.dart';
 import '../core/ui_text.dart';
@@ -17,6 +19,8 @@ import '../core/l10n_holder.dart';
 import '../core/route_observer.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/sftp_panel.dart';
+import '../widgets/command_palette.dart';
+import '../widgets/nav_drawer.dart';
 import '../widgets/ai_prompt_input.dart';
 import '../widgets/model_picker_panel.dart';
 import '../widgets/agent_goal_banner.dart';
@@ -48,7 +52,6 @@ import '../services/agent_tracer.dart';
 import '../services/agent_logger.dart';
 import 'package:flutter/services.dart';
 import '../services/daos.dart';
-import '../core/prompts.dart' as prompts;
 import '../models/runbook.dart';
 import '../providers/app_providers.dart';
 import '../providers/runbook_provider.dart';
@@ -76,13 +79,14 @@ import '../models/change_record.dart';
 import '../widgets/server_monitor_panel.dart';
 import '../widgets/terminal_view.dart' as term_widget;
 import '../widgets/terminal_context_menu.dart';
+import '../widgets/terminal_appearance_panel.dart';
 import '../utils/terminal_text_actions.dart';
 import '../utils/terminal_panes.dart';
 import '../services/pane_session_service.dart';
 import '../core/app_toast.dart';
 
 
-enum _AiPanelPosition { bottom, right }
+enum _AiPanelPosition { bottom, right, overlay }
 
 /// 面板方向与比例的存盘约定。此前两者都不落盘（每次启动都回到默认值），这里补齐。
 ///
@@ -113,7 +117,9 @@ void saveAiPanelLayout({
   required double minRatio,
   required double maxRatio,
 }) {
-  final position = (storedPosition == 'bottom' || storedPosition == 'right')
+  final position = (storedPosition == 'bottom' ||
+          storedPosition == 'right' ||
+          storedPosition == 'overlay')
       ? storedPosition as String
       : defaultPosition;
   var ratio = defaultRatio;
@@ -123,6 +129,40 @@ void saveAiPanelLayout({
     if (ratio > maxRatio) ratio = maxRatio;
   }
   return (position: position, ratio: ratio);
+}
+
+/// 80 列最小终端宽度估算：字号 × 经验字宽比 × 80，再加终端内边距与滚动条。
+///
+/// 拿不到运行时字号度量，用保守上界的字宽比 —— 宁可让面板宽一点，
+/// 也不能让 vim/htop 之类的满屏程序被挤到 80 列以下。
+double minTerminalWidthForFontSize(double fontSize) =>
+    (fontSize * 0.62 * 80 + 24).toDouble();
+
+/// 计算 AI 面板尺寸：先按 [ratio] 取值，再执行 80 列保护 ——
+/// 终端一侧剩余宽度不足 80 列时，面板必须缩到 `totalW - 80列宽`。
+/// 纯函数，便于单测覆盖「窗口太窄时面板封顶」这条不变量。
+double aiPanelSizeFor({
+  required double totalExtent,
+  required double ratio,
+  required bool enforce80Cols,
+  required double fontSize,
+  required double minRatio,
+  required double maxRatio,
+}) {
+  var size = (totalExtent * ratio).clamp(0.0, totalExtent * maxRatio).toDouble();
+  if (enforce80Cols && totalExtent > 0) {
+    final maxPanel = totalExtent - minTerminalWidthForFontSize(fontSize);
+    if (maxPanel <= 0) {
+      // 窗口本身放不下「80 列 + 最小面板」：宽度优先给终端，面板留最小可用值。
+      size = (totalExtent * minRatio).toDouble();
+    } else {
+      final minPanel = totalExtent * minRatio;
+      size = size
+          .clamp(minPanel < maxPanel ? minPanel : maxPanel, maxPanel)
+          .toDouble();
+    }
+  }
+  return size;
 }
 
 class TerminalPage extends ConsumerStatefulWidget {
@@ -136,6 +176,9 @@ class TerminalPage extends ConsumerStatefulWidget {
 
 class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   Terminal? _terminal;
+
+  /// 顶栏「外观」浮层（配色 + 字号）。配色要边切边看，所以是浮层不是页面。
+  final _appearanceMenu = MenuController();
 
   /// initState 时捕获的 Agent notifier。dispose 里不能再读 ref：
   /// 那时 element 已 disposed，ref.read 会抛 StateError 并中断后续资源回收。
@@ -176,15 +219,26 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   // AI 面板默认布局（从设置加载，新 tab 继承；每个 tab 可在会话内独立覆盖）
   _AiPanelPosition _defaultAiPanelPosition = _AiPanelPosition.right;
-  double _defaultAiPanelRatio = 0.4;
+  // 设计稿 `.shell-body{grid-template-columns:minmax(0,1fr) 320px}` 的 AI 列宽
+  // 是 **固定 320 逻辑 px**，不随窗口缩放。之前存的是比例：1280 窗口下 0.25
+  // 正好 320，但窗口一放大（或老库里存着 0.4）面板就跟着涨到 500 多，终端被
+  // 挤成一条，画面和 mockup 完全两回事。
+  // 所以默认值改成 null = 未自定义 → 按 320px 渲染；只有用户真的拖过分隔条
+  // 才写入比例（键 aiPanelRatioV2），此后按比例跟随窗口。
+  static const double _kAiPanelDefaultWidth = 320;
+  // 真正参与布局的是像素宽度（null = 用 320）。比例只在渲染时按容器换算，
+  // 不再持久化 —— 旧键 aiPanelRatioV2 里 0.4 这类历史值正是把面板撑大的原因。
+  double? _defaultAiPanelWidth;
   bool _defaultAiPanelVisible = false;
-  static const double _minPanelRatio = 0.15;
+  // 设计稿「宽度与下限」：辅助面板不低于 240px。1280px 窗口下 0.19 ≈ 243px，
+  // 比原来的 0.15（≈192px，胶囊和命令行都会换行）更贴近设计下限。
+  static const double _minPanelRatio = 0.19;
   static const double _maxPanelRatio = 0.7;
 
   // 每个 tab 独立的 AI 面板可见性 / 方位 / 宽度比例
   final Map<String, bool> _tabAiPanelVisible = {};
   final Map<String, _AiPanelPosition> _tabAiPanelPosition = {};
-  final Map<String, double> _tabAiPanelRatio = {};
+  final Map<String, double?> _tabAiPanelWidth = {};
 
   bool _aiPanelVisibleFor(String? tabId) => tabId == null
       ? _defaultAiPanelVisible
@@ -192,9 +246,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   _AiPanelPosition _aiPanelPositionFor(String? tabId) => tabId == null
       ? _defaultAiPanelPosition
       : (_tabAiPanelPosition[tabId] ?? _defaultAiPanelPosition);
-  double _aiPanelRatioFor(String? tabId) => tabId == null
-      ? _defaultAiPanelRatio
-      : (_tabAiPanelRatio[tabId] ?? _defaultAiPanelRatio);
+  double? _aiPanelWidthFor(String? tabId) => tabId == null
+      ? _defaultAiPanelWidth
+      : (_tabAiPanelWidth[tabId] ?? _defaultAiPanelWidth);
 
   void _setAiPanelVisible(String? tabId, bool visible) {
     if (tabId != null) _tabAiPanelVisible[tabId] = visible;
@@ -208,12 +262,28 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     SettingsDao.set('aiPanelPosition', position.name);
   }
 
+  // 专注模式（per-tab）：终端独占。只压制可见性，不销毁 AI/SFTP/监控的
+  // 各自状态 —— 退出专注模式后一切按原样回来。
+  final Map<String, bool> _tabFocusMode = {};
+  bool _isFocusModeFor(String? tabId) =>
+      tabId != null && (_tabFocusMode[tabId] ?? false);
+
+  void _toggleFocusMode() {
+    final tabId = _currentTabId;
+    if (tabId == null) return;
+    setState(() => _tabFocusMode[tabId] = !_isFocusModeFor(tabId));
+  }
+
+  /// AI 面板的实际可见性：专注模式压制一切浮层。
+  bool _effectiveAiVisible(String? tabId) =>
+      !_isFocusModeFor(tabId) && _aiPanelVisibleFor(tabId);
+
   /// 新 tab 创建时把当前默认布局快照到自己的 map。
   /// 必须快照而不是一直读默认值：否则另一个 tab 改布局时，已有的 tab 会跟着变。
   void _initTabPanelState(tp.TerminalTab tab) {
     _tabAiPanelVisible.putIfAbsent(tab.id, () => _defaultAiPanelVisible);
     _tabAiPanelPosition.putIfAbsent(tab.id, () => _defaultAiPanelPosition);
-    _tabAiPanelRatio.putIfAbsent(tab.id, () => _defaultAiPanelRatio);
+    _tabAiPanelWidth.putIfAbsent(tab.id, () => _defaultAiPanelWidth);
     final hostKey = tab.isLocal ? 'local' : tab.hostId;
     _tabMonitorVisible.putIfAbsent(
         tab.id, () => _monitorDefaultVisibleHosts.contains(hostKey));
@@ -260,7 +330,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   // 终端右键「在 SFTP 中定位」传入的初始目录（进面板后消费一次）
   final Map<String, String> _tabSftpInitialPath = {};
   double _sftpPanelWidth = 320;
-  static const double _minSftpWidth = 220;
+  // 设计稿「宽度与下限」：辅助面板不低于 240px，终端不低于 80 列。
+  static const double _minSftpWidth = 240;
+  /// 顶栏高度：设计稿 .topbar 42px（32px 控件 + 上下各 5px）。
+  static const double _kTopBarHeight = 42;
+
+  // SFTP 与 AI 正交摆放：AI 在右 → SFTP 落到底部条；底部条高度独立可调
+  double _sftpPanelHeight = 240;
+  static const double _minSftpHeight = 150;
+  static const double _maxSftpHeight = 420;
 
   // 延迟 resize：记录最后需要同步尺寸的 tab
   tp.TerminalTab? _lastResizeTab;
@@ -376,9 +454,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 每帧按屏幕方向覆盖，存了也会在竖屏被改回 bottom。
   void _savePanelLayout({required bool savePosition}) {
     final tabId = _currentTabId;
-    final ratio = _aiPanelRatioFor(tabId);
-    _defaultAiPanelRatio = ratio;
-    SettingsDao.set('aiPanelRatio', ratio);
+    final width = _aiPanelWidthFor(tabId);
+    // 没拖过就保持 null，下次启动仍然按设计稿的 320px 渲染。
+    if (width != null) {
+      _defaultAiPanelWidth = width;
+      SettingsDao.set('aiPanelWidthV2', width);
+    }
     if (!savePosition || _isMobile) return;
     final position = _aiPanelPositionFor(tabId);
     _defaultAiPanelPosition = position;
@@ -415,21 +496,30 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         _defaultAiPanelVisible = aiPanelVisible as bool;
       }
     } catch (_) {}
-    // 方向与比例：只有显式存过才覆盖默认值。
+    // 方向：只有显式存过才覆盖默认值。
     // 存过 bottom 的老用户不能被新默认 right 翻回去，所以两边都要认。
     try {
       final resolved = resolveAiPanelLayout(
         storedPosition: SettingsDao.getCached('aiPanelPosition'),
-        storedRatio: SettingsDao.getCached('aiPanelRatio'),
+        // 宽度已改为像素键 aiPanelWidth（见下），比例只用于方位解析，
+        // 这里传默认值占位，结果丢弃。
+        storedRatio: null,
         defaultPosition: _defaultAiPanelPosition.name,
-        defaultRatio: _defaultAiPanelRatio,
+        defaultRatio: 0.25,
         minRatio: _minPanelRatio,
         maxRatio: _maxPanelRatio,
       );
-      _defaultAiPanelPosition = resolved.position == 'bottom'
-          ? _AiPanelPosition.bottom
-          : _AiPanelPosition.right;
-      _defaultAiPanelRatio = resolved.ratio;
+      _defaultAiPanelPosition = switch (resolved.position) {
+        'bottom' => _AiPanelPosition.bottom,
+        'overlay' => _AiPanelPosition.overlay,
+        _ => _AiPanelPosition.right,
+      };
+    } catch (_) {}
+    // 宽度：只认新键 aiPanelWidth（像素）。旧键 aiPanelRatioV2 里的 0.4
+    // 是老实现的默认值，读到就会把面板撑到终端的一半，必须彻底忽略。
+    try {
+      final storedWidth = SettingsDao.getCached('aiPanelWidthV2');
+      if (storedWidth is num) _defaultAiPanelWidth = storedWidth.toDouble();
     } catch (_) {}
     // 加载监控面板可见的 host 默认列表（每个 tab 可在会话内独立覆盖）
     try {
@@ -1062,10 +1152,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               ref.watch(settingsProvider.select((s) => s['terminalKeybindings']))),
           active: isActive,
           isLocal: tab.isLocal,
+          onCommandPalette: _showCommandPalette,
           onFontSizeChanged: (size) {
             final clamped = size.clamp(10.0, 24.0);
             setState(() => _terminalFontSize = clamped);
-            SettingsDao.set('terminalFontSize', clamped);
+            // 同步给 settingsProvider：外观页/抽屉里的字号读数才不会停在旧值
+            ref
+                .read(settingsProvider.notifier)
+                .setSetting('terminalFontSize', clamped);
           },
           onMenuIntent: (intent, text) =>
               _handleTerminalMenuIntent(tab, intent, text, paneId: paneId),
@@ -1600,6 +1694,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
+    // 终端字号是终端自己的状态（Ctrl +/- 改它），但外观页/抽屉里的字号控件走的是
+    // settingsProvider：只写库不通知这边，滑块拖完终端不动，看着就像"设置没生效"。
+    // 这里把外部改动收回本地状态，两处入口操作的是同一份显示。
+    ref.listen(settingsProvider.select((s) => s['terminalFontSize']), (_, next) {
+      if (next is num && next.toDouble() != _terminalFontSize) {
+        setState(() => _terminalFontSize = next.toDouble().clamp(8.0, 24.0));
+      }
+    });
     final host = widget.hostId != null ? ref.watch(hostsProvider.notifier).getHostById(widget.hostId!) : null;
     final terminalState = ref.watch(tp.terminalProvider);
     // chatProvider 只在这里贡献 error；不要 watch 整个状态，否则每个终端
@@ -1693,22 +1795,36 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     return Scaffold(
       backgroundColor: tc.bg,
       resizeToAvoidBottomInset: true,
-      body: Column(
-        children: [
-          // 顶部栏（标签 + 工具）
-          _buildTopBar(host, terminalState, activeTab),
+      // Ctrl+K / ⌘K 命令面板：挂在页面级 Shortcuts 上，终端焦点节点未消费的
+      // 按键会冒泡到这里（keymap 默认可重绑表里没有 K，不抢 shell 的键）。
+      body: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.keyK, control: true):
+              _showCommandPalette,
+          const SingleActivator(LogicalKeyboardKey.keyK, meta: true):
+              _showCommandPalette,
+        },
+        child: Focus(
+          canRequestFocus: false,
+          skipTraversal: true,
+          child: Column(
+            children: [
+              // 顶部栏（标签 + 工具）
+              _buildTopBar(host, terminalState, activeTab),
 
-          // 每个 tab 一棵常驻工作区；切换只改 Offstage，不销毁/重建
-          Expanded(
-            child: _buildTabWorkspaces(
-                chatError, agentState, terminalState, activeTab),
+              // 每个 tab 一棵常驻工作区；切换只改 Offstage，不销毁/重建
+              Expanded(
+                child: _buildTabWorkspaces(
+                    chatError, agentState, terminalState, activeTab),
+              ),
+
+              // 快捷按键行（仅 Android / iOS 显示，桌面端不需要）
+              // 当 AI 输入框获焦（键盘弹出）时隐藏快捷按键栏，节省空间
+              if (Platform.isAndroid || Platform.isIOS && !_aiInputFocused)
+                _buildQuickKeysBar(activeTab),
+            ],
           ),
-
-          // 快捷按键行（仅 Android / iOS 显示，桌面端不需要）
-          // 当 AI 输入框获焦（键盘弹出）时隐藏快捷按键栏，节省空间
-          if (Platform.isAndroid || Platform.isIOS && !_aiInputFocused)
-            _buildQuickKeysBar(activeTab),
-        ],
+        ),
       ),
     );
   }
@@ -1726,8 +1842,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   ) {
     final tabs = terminalState.tabs;
     if (tabs.isEmpty) {
-      return _wrapWithSftp(
-          _buildMainBody(chatError, activeAgentState, null, isActive: true));
+      return _buildMainBody(
+          chatError, activeAgentState, null, isActive: true);
     }
     final notifier = ref.read(agentProvider.notifier);
     final activeId = activeTab?.id;
@@ -1739,7 +1855,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     if (activeTab != null) {
       _terminal = _tabTerminals[activeTab.id] ?? _terminal;
     }
-    return _wrapWithSftp(Stack(
+    _clearSftpOnLocalTab();
+    return Stack(
       fit: StackFit.expand,
       children: [
         for (final tab in tabs)
@@ -1764,7 +1881,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             ),
           ),
       ],
-    ));
+    );
   }
 
   /// 主体区域：终端 + AI 面板 + SFTP 侧面板，根据面板位置切换布局
@@ -1789,6 +1906,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                     settingsProvider.select((s) => s['terminalKeybindings']))),
                 active: isActive,
                 isLocal: true,
+                onCommandPalette: _showCommandPalette,
               )
             : _buildTerminalArea(tab, isActive: isActive),
         // AnimatedSwitcher 常驻：让它从"过渡/错误视图"切回空占位，
@@ -1814,6 +1932,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     // 监控面板包装：在终端下方插入监控横幅（仅在已连接且该 host 开关开启时）
     final monitorService = _getOrCreateMonitorService(tab);
     final showMonitor = tab != null &&
+        !_isFocusModeFor(tab.id) &&
         _monitorVisibleFor(tab) &&
         monitorService != null;
     final terminalArea = showMonitor
@@ -1825,11 +1944,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           )
         : terminalView;
 
+    // SFTP 与 AI 正交：AI 占右列 → SFTP 挂终端列下方；AI 在底/悬浮/收起 →
+    // SFTP 挂右侧列。挂载点必须在选择 AI 方位的分支**内侧**，否则底部态的
+    // SFTP 会横铺整屏、把 AI 一起顶上去。
+    final showSftp = _sftpVisibleFor(tab);
+
     // P0-1: AI 面板支持完全收起 + 移动端上滑手势展开
     Widget mainContent;
-    if (!_aiPanelVisibleFor(tab?.id)) {
+    if (!_effectiveAiVisible(tab?.id)) {
       // AI 面板收起状态：终端占满全屏，移动端支持上滑展开 AI 面板
-      mainContent = _isMobile
+      final bareTerminal = _isMobile
           ? GestureDetector(
               onVerticalDragEnd: (details) {
                 // 上滑速度超过阈值时展开 AI 面板
@@ -1840,35 +1964,42 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               child: terminalArea,
             )
           : terminalArea;
+      mainContent = showSftp && tab != null
+          ? _withSftpRight(bareTerminal, tab, active: isActive)
+          : bareTerminal;
     } else {
       // AI 面板展开状态：保持现有分栏布局
       mainContent = LayoutBuilder(builder: (context, constraints) {
         final totalW = constraints.maxWidth;
         final totalH = constraints.maxHeight;
+        final position = _aiPanelPositionFor(tab?.id);
+        // 设计稿「窄窗口自动上下堆叠」：窗口放不下「80 列终端 + 240px 面板」时，
+        // 右侧分栏自动退回底部，否则终端会被硬挤到 80 列以下（vim/htop 先坏）。
+        // 只影响本次渲染，不改用户存下来的方位偏好。
+        final tooNarrowForRight = totalW <
+            minTerminalWidthForFontSize(_terminalFontSize) + 240 + 20;
         final isRight =
-            _aiPanelPositionFor(tab?.id) == _AiPanelPosition.right;
+            position == _AiPanelPosition.right && !tooNarrowForRight;
+        // 非底部态的 SFTP（右列）挂在分栏结果外侧。
+        Widget sftpCol(Widget content) => showSftp && tab != null
+            ? _withSftpRight(content, tab, active: isActive)
+            : content;
 
         void onDrag(DragUpdateDetails details) {
+          final box = context.findRenderObject() as RenderBox;
+          final origin = box.localToGlobal(Offset.zero);
+          // 直接记像素宽度：拖到哪就是哪，不再折成比例 —— 比例会随窗口大小
+          // 漂移，而设计稿这一列是固定宽度。
+          final extent = isRight ? totalW : totalH;
+          final raw = isRight
+              ? totalW - (details.globalPosition.dx - origin.dx)
+              : totalH - (details.globalPosition.dy - origin.dy);
+          final px = raw
+              .clamp(240.0, extent * _maxPanelRatio)
+              .toDouble();
           setState(() {
-            final ratio = isRight
-                ? (1 -
-                        (details.globalPosition.dx -
-                                (context.findRenderObject() as RenderBox)
-                                    .localToGlobal(Offset.zero)
-                                    .dx) /
-                            totalW)
-                    .clamp(_minPanelRatio, _maxPanelRatio)
-                    .toDouble()
-                : (1 -
-                        (details.globalPosition.dy -
-                                (context.findRenderObject() as RenderBox)
-                                    .localToGlobal(Offset.zero)
-                                    .dy) /
-                            totalH)
-                    .clamp(_minPanelRatio, _maxPanelRatio)
-                    .toDouble();
-            if (tab != null) _tabAiPanelRatio[tab.id] = ratio;
-            _defaultAiPanelRatio = ratio;
+            if (tab != null) _tabAiPanelWidth[tab.id] = px;
+            _defaultAiPanelWidth = px;
           });
         }
 
@@ -1900,18 +2031,45 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               onPanEnd: (_) => _savePanelLayout(savePosition: false),
               child: MouseRegion(
                 cursor: isRight ? SystemMouseCursors.resizeColumn : SystemMouseCursors.resizeRow,
-                child: Container(
+                // 设计稿在终端与面板之间只有一条 1px 发丝线（rgba(255,255,255,.12)）。
+                // 这里把「能拖动的热区」与「看得见的线」分开：热区仍是 5px
+                // （太窄就拖不住），可见部分收成居中 1px —— 之前整块 5px 都填
+                // 了 60% 白，在两张深色面板之间像一条亮缝，是画面最脏的地方。
+                child: SizedBox(
                   width: isRight ? 5 : double.infinity,
                   height: isRight ? double.infinity : 5,
-                  color: tc.border.withValues(alpha: 0.6),
+                  child: Center(
+                    child: Container(
+                      width: isRight ? 1 : double.infinity,
+                      height: isRight ? double.infinity : 1,
+                      color: tc.border,
+                    ),
+                  ),
                 ),
               ),
             );
 
-        final divider = _buildAreaDivider(agentState, tab?.id);
-        final aiPanelSize = isRight
-            ? totalW * _aiPanelRatioFor(tab?.id)
-            : totalH * _aiPanelRatioFor(tab?.id);
+        // 80 列保护：横向分栏时终端一侧不得被面板挤到 80 列以下。
+        // 悬浮态（仅桌面）不占布局宽度，终端永远全宽，但面板取宽度比例。
+        final overlayActive =
+            position == _AiPanelPosition.overlay && !_isMobile;
+        // 像素宽度 → 本次容器的比例。默认 320（设计稿固定列宽），
+        // 拖过分隔条就用手动值；240px 下限同样换算成比例交给同一条 clamp。
+        final panelExtent = isRight || overlayActive ? totalW : totalH;
+        final wantWidth = _aiPanelWidthFor(tab?.id) ?? _kAiPanelDefaultWidth;
+        final ratio =
+            panelExtent > 0 ? (wantWidth / panelExtent).clamp(0.0, 1.0) : 0.25;
+        final minRatio = panelExtent > 0
+            ? (240.0 / panelExtent).clamp(0.0, 1.0)
+            : _minPanelRatio;
+        final aiPanelSize = aiPanelSizeFor(
+          totalExtent: panelExtent,
+          ratio: ratio,
+          enforce80Cols: isRight,
+          fontSize: _terminalFontSize,
+          minRatio: minRatio,
+          maxRatio: _maxPanelRatio,
+        );
         // 活动 tab 的 AI 面板局部订阅完整 agent 状态：流式高频更新只重建
         // 这棵子树，不再带动整页和其他 tab 工作区。非活动 tab 用页面传入的
         // 快照（Offstage 不可见，切回时页面重建会刷新）。
@@ -1932,12 +2090,55 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 ],
               );
 
+        if (position == _AiPanelPosition.overlay && !_isMobile) {
+          // 悬浮态：终端全宽，AI 浮在右上不占布局。SFTP 判定也按
+          // 「AI 没占宽度」走右侧列（见 _withSftpRight）。
+          // 设计稿 .shell.m-overlay .ai-panel：absolute top52 / right10、
+          // 宽 min(320, 88%)、12 圆角 + 四向扩散投影 —— 是一张浮起的卡片，
+          // 不是通高贴边的抽屉。之前 top/bottom/right 全 0 拉满高度，视觉上
+          // 仍像分栏，只是把分隔线盖住了而已。
+          return sftpCol(Stack(
+            fit: StackFit.expand,
+            children: [
+              terminalArea,
+              Positioned(
+                right: 10,
+                top: 4,
+                bottom: 10,
+                child: SizedBox(
+                  width: math.min(aiPanelSize, constraints.maxWidth * 0.88),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: tc.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          blurRadius: 32,
+                          offset: const Offset(0, 12),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(11),
+                      child: aiContent,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ));
+        }
+
         if (isRight) {
+          // AI 占右列 → SFTP 只能在终端列的下方（设计稿 "center ai"/"sftp ai"）。
+          final terminalColumn = showSftp && tab != null
+              ? _withSftpBottom(terminalArea, tab, active: isActive)
+              : terminalArea;
           return Row(
             children: [
-              Expanded(child: terminalArea),
+              Expanded(child: terminalColumn),
               dragHandle,
-              divider,
               SizedBox(width: aiPanelSize, child: aiContent),
             ],
           );
@@ -1955,14 +2156,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 )
               : SizedBox(height: aiPanelSize, child: aiContent);
 
-          return Column(
+          return sftpCol(Column(
             children: [
               Expanded(child: terminalArea),
               dragHandle,
-              divider,
               aiPanelWithSwipe,
             ],
-          );
+          ));
         }
       });
     }
@@ -1970,92 +2170,125 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     return mainContent;
   }
 
-  /// 桌面端 SFTP 侧面板：每个 tab 独立、Offstage 保活，切换不重连。
-  Widget _wrapWithSftp(Widget content) {
+  /// 某个 tab 的内嵌 SFTP 面板。
+  ///
+  /// 保活由各 tab 工作区外层的 Offstage 负责（切 tab 只隐藏不销毁），
+  /// 所以这里不再需要多 tab 共享一个 Stack。key 带上初始目录，
+  /// 「在 SFTP 中定位」换目录时让面板按新目录重新加载。
+  Widget _buildTabSftpPanel(tp.TerminalTab tab, {required bool active}) {
+    return SftpPanel(
+      key: ValueKey(
+          'sftp-${tab.id}-${tab.hostId}-${_tabSftpInitialPath[tab.id] ?? ''}'),
+      hostId: tab.hostId,
+      embedded: true,
+      dropEnabled: active,
+      initialPath: _tabSftpInitialPath[tab.id],
+      onClose: () => setState(() {
+        _tabSftpVisible[tab.id] = false;
+        // 关闭后清掉定位目标，下次从默认目录打开
+        _tabSftpInitialPath.remove(tab.id);
+      }),
+    );
+  }
+
+  /// SFTP 是否应该显示在该 tab 上（专注模式只压制显示，状态与高度保留）。
+  bool _sftpVisibleFor(tp.TerminalTab? tab) =>
+      tab != null &&
+      !_isMobile &&
+      !tab.isLocal &&
+      (_tabSftpVisible[tab.id] ?? false) &&
+      !_isFocusModeFor(tab.id);
+
+  /// 「终端列 + 底部 SFTP」—— 设计稿 `.shell.sftp-on.sftp-bottom` 的
+  /// `"center ai" / "sftp ai"`：SFTP 只吃终端列的下方，AI 保持通高右列。
+  /// 包在「终端+AI」外层会横铺整屏把 AI 顶上去，那是错的挂载点。
+  Widget _withSftpBottom(Widget terminalColumn, tp.TerminalTab tab,
+      {required bool active}) {
+    final tc = ThemeColors.of(context);
+    return Column(
+      children: [
+        Expanded(child: terminalColumn),
+        // SFTP 拖拽调整高度手柄
+        GestureDetector(
+          onPanUpdate: (details) {
+            setState(() {
+              _sftpPanelHeight -= details.delta.dy;
+              _sftpPanelHeight = _sftpPanelHeight
+                  .clamp(_minSftpHeight, _maxSftpHeight)
+                  .toDouble();
+            });
+          },
+          child: MouseRegion(
+            cursor: SystemMouseCursors.resizeRow,
+            child: Container(
+              height: 4,
+              color: tc.border.withValues(alpha: 0.6),
+            ),
+          ),
+        ),
+        SizedBox(
+            height: _sftpPanelHeight,
+            child: _buildTabSftpPanel(tab, active: active)),
+      ],
+    );
+  }
+
+  /// 「内容 + 右列 SFTP」—— AI 在底/悬浮/收起时 SFTP 走右侧列，
+  /// 与 AI 永远不在同一根轴上抢空间。
+  Widget _withSftpRight(Widget content, tp.TerminalTab tab,
+      {required bool active}) {
+    final tc = ThemeColors.of(context);
+    return Row(
+      children: [
+        Expanded(child: content),
+        // SFTP 拖拽调整宽度手柄
+        GestureDetector(
+          onPanUpdate: (details) {
+            setState(() {
+              _sftpPanelWidth -= details.delta.dx;
+              _sftpPanelWidth =
+                  _sftpPanelWidth.clamp(_minSftpWidth, _maxSftpWidth);
+            });
+          },
+          child: MouseRegion(
+            cursor: SystemMouseCursors.resizeColumn,
+            child: Container(
+              width: 4,
+              color: tc.border.withValues(alpha: 0.6),
+            ),
+          ),
+        ),
+        SizedBox(
+            width: _sftpPanelWidth, child: _buildTabSftpPanel(tab, active: active)),
+      ],
+    );
+  }
+
+  /// 切到本地终端时清掉该 tab 的 SFTP 面板（本地没有远端文件系统可看）。
+  void _clearSftpOnLocalTab() {
+    if (_isMobile) return;
     final currentTabId = ref.read(tp.terminalProvider).activeTabId;
-    final allTabs = ref.read(tp.terminalProvider).tabs;
-    final visibleSftpTabs = allTabs
-        .where((t) => !t.isLocal && (_tabSftpVisible[t.id] ?? false))
-        .toList();
-    final hasActiveSftp = currentTabId != null &&
-        (_tabSftpVisible[currentTabId] ?? false) &&
-        !_isMobile;
-
-    if (hasActiveSftp && visibleSftpTabs.isNotEmpty) {
-      final tc = ThemeColors.of(context);
-      return Row(
-        children: [
-          Expanded(child: content),
-          // SFTP 拖拽调整宽度手柄
-          GestureDetector(
-            onPanUpdate: (details) {
-              setState(() {
-                _sftpPanelWidth -= details.delta.dx;
-                _sftpPanelWidth =
-                    _sftpPanelWidth.clamp(_minSftpWidth, _maxSftpWidth);
-              });
-            },
-            child: MouseRegion(
-              cursor: SystemMouseCursors.resizeColumn,
-              child: Container(
-                width: 4,
-                color: tc.border.withValues(alpha: 0.6),
-              ),
-            ),
-          ),
-          SizedBox(
-            width: _sftpPanelWidth,
-            child: Stack(
-              children: visibleSftpTabs.map((tab) {
-                final isActive = tab.id == currentTabId;
-                return Offstage(
-                  offstage: !isActive,
-                  child: ExcludeFocus(
-                    excluding: !isActive,
-                    child: SftpPanel(
-                      // 初始目录变化时更换 key，让面板按新目录重新加载
-                      key: ValueKey(
-                          'sftp-${tab.id}-${tab.hostId}-${_tabSftpInitialPath[tab.id] ?? ''}'),
-                      hostId: tab.hostId,
-                      embedded: true,
-                      dropEnabled: isActive,
-                      initialPath: _tabSftpInitialPath[tab.id],
-                      onClose: () => setState(() {
-                        _tabSftpVisible[tab.id] = false;
-                        // 关闭后清掉定位目标，下次从默认目录打开
-                        _tabSftpInitialPath.remove(tab.id);
-                      }),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      );
+    if (currentTabId == null) return;
+    final activeTab = ref.read(tp.terminalProvider).activeTab;
+    if (activeTab == null ||
+        !activeTab.isLocal ||
+        !(_tabSftpVisible[currentTabId] ?? false)) {
+      return;
     }
-
-    // 如果切换到本地终端但其他 tab 的 SFTP 面板还在，需要清理
-    if (!_isMobile && currentTabId != null) {
-      final activeTab = ref.read(tp.terminalProvider).activeTab;
-      if (activeTab != null &&
-          activeTab.isLocal &&
-          (_tabSftpVisible[currentTabId] ?? false)) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) setState(() => _tabSftpVisible[currentTabId] = false);
-        });
-      }
-    }
-
-    return content;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _tabSftpVisible[currentTabId] = false);
+    });
   }
 
   // ==================== 顶部栏 ====================
-  /// 三段式结构：左侧品牌区 / 中间标签区 / 右侧操作区
+  /// 三段式结构：标签区（+ 号紧贴标签）/ 弹性空白 / 右侧操作区
   Widget _buildTopBar(dynamic host, tp.TerminalState terminalState, tp.TerminalTab? activeTab) {
     final tc = ThemeColors.of(context);
     return Container(
-      height: hAppBar,
+      // 设计稿 .topbar：42px 高、左右 8px 内边距，控件统一 32px 见方。
+      // 比原来的 48px 更贴终端类应用的密度，也让 32px 的标签/按钮上下各留 5px。
+      height: _kTopBarHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
         color: tc.bg,
         border: Border(bottom: BorderSide(color: tc.border, width: 1)),
@@ -2065,18 +2298,23 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         children: [
           // 左侧不再放 LOGO + 应用名：终端窗口标题栏已经写着应用名，
           // 这里再占一块只会挤走标签区。需要回主页用左侧标签或快捷键。
-          const SizedBox(width: 4),
-          // 中间标签区
+          // 标签区 + 末尾 "+"，整段 Expanded 吃掉左侧全部剩余宽度。
+          //
+          // 之前是 Flexible(ListView) 与 Spacer 两个弹性兄弟：RenderFlex 把
+          // 剩余宽度对半分，标签条实际只画 70px 却占掉一半且不回收，右侧动作
+          // 组因此停在窗口 70% 处（1267 宽的窗口实测停在 x=898）。窗口越宽，
+          // 动作组离右边缘越远。改成单个 Expanded 后空白全部落在标签右侧，
+          // "+" 仍是列表最后一项（紧贴最后一个标签），动作组贴住右边缘。
           Expanded(
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
-              itemCount: terminalState.tabs.length + 1, // +1 for add button
+              // 42 高顶栏里给 32px 的标签/加号留 5px 上下留白（设计稿同值）
+              padding: const EdgeInsets.symmetric(vertical: 5),
+              itemCount: terminalState.tabs.length + 1,
               itemBuilder: (context, index) {
-                // 最后一项是"+"按钮
                 if (index == terminalState.tabs.length) {
                   return Align(
-                    alignment: Alignment.center,
+                    alignment: Alignment.centerLeft,
                     heightFactor: 1.0,
                     child: _buildAddTabButton(),
                   );
@@ -2084,37 +2322,350 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 final tab = terminalState.tabs[index];
                 final isActive = tab.id == terminalState.activeTabId;
                 return Align(
-                  alignment: Alignment.center,
+                  alignment: Alignment.centerLeft,
                   heightFactor: 1.0,
                   child: _buildTabItem(tab, isActive, terminalState),
                 );
               },
             ),
           ),
-          const SizedBox(width: 8),
-          // 右侧操作区
+          // 命令面板入口（零占位导航的常驻把手）
+          _buildCommandPaletteButton(),
+          const SizedBox(width: 4),
+          // 右侧操作区：设计稿这里只有 5 个 32px 图标（菜单 / AI / SFTP / 监控），
+          // 之前还塞了专注模式与字号，8 个图标连成一排占掉顶栏 37% 的宽度，
+          // 视觉上比标签区还抢眼。专注模式在网格菜单里已有入口，字号归到
+          // 设置 · 外观，这里只留全局开关。
           _buildTopBarActions(),
-          const SizedBox(width: 12),
         ],
       ),
     );
   }
 
-  /// 右侧操作区：AI 面板开关、监控、设置、更多。
-  /// 连接状态不在这里重复：每个 tab 自己带一个同色系小圆点。
+  /// 命令面板按钮（Ctrl+K 的可视化入口）
+  Widget _buildCommandPaletteButton() {
+    final tc = ThemeColors.of(context);
+    return Tooltip(
+      message: UiText.t('命令面板 (Ctrl+K)', 'Command palette (Ctrl+K)'),
+      waitDuration: const Duration(milliseconds: 500),
+      child: GestureDetector(
+        onTap: _showCommandPalette,
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 9),
+          // 设计稿 .pal-btn：透底 + 12% 描边（不填 surface，顶栏上更轻），
+          // 键帽单独成盒：muted 字、surface 底、下沿加粗。
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(rSmall),
+            border: Border.all(color: tc.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.search_rounded, size: 13, color: tc.textSub),
+              if (MediaQuery.of(context).size.width > 720) ...[
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(5, 1, 5, 0),
+                  decoration: BoxDecoration(
+                    color: tc.surface,
+                    borderRadius: BorderRadius.circular(5),
+                    border: Border(
+                      top: BorderSide(color: tc.border),
+                      left: BorderSide(color: tc.border),
+                      right: BorderSide(color: tc.border),
+                      bottom: BorderSide(color: tc.border, width: 2),
+                    ),
+                  ),
+                  child: Text('Ctrl K',
+                      style: TextStyle(
+                          fontSize: fMicro,
+                          color: tc.textMuted,
+                          fontFamily: 'JetBrainsMono',
+                          fontFamilyFallback: kMonoFontFallback)),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 右侧常驻动作区。
+  ///
+  /// 分成三层，顺序就是「碰到的频率」：
+  /// 1. **外观**（配色 / 字号）—— 用户要挨个切过去看效果的，必须一次点击到，
+  ///    并且浮层里带一块按当前配色渲染的终端预览。以前它埋在「更多 → 终端字号
+  ///    ／配色 → 另一个页面」三层里，只给八个配色名字，没人能靠想象选色。
+  /// 2. **AI / SFTP / 监控** —— 面板开关，点一下布局就变。
+  /// 3. **菜单** —— 去处置信和会话级操作，贴最右（平台惯例：溢出项在最外侧）。
+  ///
+  /// 以前这里是两个平级菜单（四宫格「功能菜单」+ ⋯「更多」），SFTP 和监控在两个
+  /// 菜单里各有一份，设置也有两个入口 —— 用户不知道点哪个、也不知道点了会有什么
+  /// 区别。现在只剩一个菜单，而且菜单里**不再出现顶栏已有的开关**。
   Widget _buildTopBarActions() {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
+        _buildAppearanceButton(),
+        const SizedBox(width: 4),
         _buildAIPanelToggleButton(),
-        const SizedBox(width: 6),
+        const SizedBox(width: 4),
+        // SFTP 常驻开关（设计稿右侧动作组：菜单 / AI / SFTP / 监控）
+        _buildSftpToggleButton(),
+        const SizedBox(width: 4),
         _buildMonitorToggleButton(),
-        const SizedBox(width: 6),
-        _buildTerminalSettingsButton(),
-        const SizedBox(width: 6),
-        _buildToolbarMenu(),
+        const SizedBox(width: 4),
+        _buildGridMenuButton(),
       ],
     );
+  }
+
+  /// 顶栏「外观」：配色 + 字号就地改，浮层里带实时预览。
+  Widget _buildAppearanceButton() {
+    final tc = ThemeColors.of(context);
+    return MenuAnchor(
+      controller: _appearanceMenu,
+      // 按钮贴着右边缘，菜单要往左展开，否则会顶出窗口
+      style: MenuStyle(
+        alignment: AlignmentDirectional.bottomEnd,
+        backgroundColor: WidgetStatePropertyAll(tc.cardElevated),
+        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+        elevation: const WidgetStatePropertyAll(12),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(rMedium),
+            side: BorderSide(color: tc.border),
+          ),
+        ),
+      ),
+      alignmentOffset: const Offset(0, 6),
+      menuChildren: [
+        TerminalAppearancePanel(
+          onMore: () {
+            _appearanceMenu.close();
+            // 进设置抽屉的「外观」组，就地改 —— 不跳整页。
+            _showNavDrawer(NavDrawer.sectionSettings, group: 'appearance');
+          },
+        ),
+      ],
+      builder: (context, controller, child) => _buildTopAct(
+        icon: Icons.palette_outlined,
+        tooltip: UiText.t('终端配色与字号', 'Terminal colors & font size'),
+        active: controller.isOpen,
+        onTap: () => controller.isOpen ? controller.close() : controller.open(),
+      ),
+    );
+  }
+
+  /// 抽屉入口：功能板块全部覆盖在终端之上，终端尺寸一寸不让。
+  ///
+  /// [group] 是设置分区里要直接摊开的那一组 —— 配色浮层的「更多」用它，
+  /// 不再 push 一个整页设置出来。
+  void _showNavDrawer(String section, {String? group}) {
+    NavDrawer.show(
+      context,
+      section: section,
+      initialGroup: group,
+      onOpenHost: _openHostTab,
+      onRunSnippet: _executeSnippet,
+      onRunRunbook: _runRunbook,
+    );
+  }
+
+  /// 唯一的溢出菜单：**去处置信** + **本终端能做的事**。
+  ///
+  /// 顶栏已有的开关（AI / SFTP / 监控 / 配色 / 字号）绝不在这里出现第二遍 ——
+  /// 同一件事两个入口，用户只能靠记；记不住的就会点错，点错了就烦。
+  /// 这里的项都是「点一次跳走或做完」，不存在需要先展开再选的两级结构。
+  Widget _buildGridMenuButton() {
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final activeTab = ref.read(tp.terminalProvider).activeTab;
+    final snippets = SnippetsDao.cached.toList();
+    final auditToday = AuditLogsDao.getCachedRecentLogs(limit: 200)
+        .where((l) => _isToday(l['timestamp'] as String?))
+        .length;
+    // 只给「菜单里会显示计数」的三项备读数。快捷命令 / 工作流已从菜单移出
+    // （抽屉标签一键可达，且它们各自的内容已经在菜单下方有更直接的入口），
+    // 留着 key 只会变成没人读的死数据。
+    final counts = <String, String>{
+      'drawer:${NavDrawer.sectionHosts}': '${HostsDao.cached.length} 台',
+      'drawer:${NavDrawer.sectionAudit}': '今日 $auditToday 条',
+      // 组数跟着 kSettingsEntries 走：写死「8 组」的话，以后加一组就悄悄错了。
+      'drawer:${NavDrawer.sectionSettings}': '${kSettingsEntries.length} 组',
+    };
+    return PopupMenuButton<String>(
+      tooltip: UiText.t('菜单', 'Menu'),
+      color: tc.cardElevated,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      offset: const Offset(0, 36),
+      position: PopupMenuPosition.under,
+      constraints: const BoxConstraints(minWidth: 280, maxWidth: 320),
+      // 设计稿 .top-act 是 32px 见方；PopupMenuButton 走 IconButton，默认 48
+      // 的点击区会把 42px 顶栏撑开，这里压回 32。
+      style: IconButton.styleFrom(
+        minimumSize: const Size(32, 32),
+        padding: EdgeInsets.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      icon: Icon(Icons.more_horiz, color: tc.textSub, size: 20),
+      onSelected: (value) async {
+        if (value.startsWith('drawer:')) {
+          _showNavDrawer(value.substring(7));
+          return;
+        }
+        if (value.startsWith('page:')) {
+          // 台账 / 变更窗口是独立工作区（整页表格与规则编辑），不是抽屉分区。
+          context.push(value.substring(5));
+          return;
+        }
+        if (value.startsWith('snippet:')) {
+          final snippet = SnippetsDao.getCachedById(value.substring(8));
+          if (snippet != null) _executeSnippet(snippet);
+          return;
+        }
+        switch (value) {
+          case 'act:focus':
+            _toggleFocusMode();
+            break;
+          case 'act:cycle':
+            _cycleAiPanelPosition();
+            break;
+          case 'act:reconnect':
+            await _reconnect();
+            break;
+          case 'act:clear':
+            _terminal?.write('\x1b[2J\x1b[H');
+            break;
+          case 'act:history':
+            _showCommandHistory();
+            break;
+          case 'act:portforward':
+            _showPortForwardDialog();
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        // 前往组只留「菜单是唯一入口」或「带状态读数」的项。
+        // 快捷命令 / 运维工作流不在这里：抽屉顶部标签一键可达，工作流底部面板
+        // 也有自己的「管理」按钮指向同一个分区 —— 同一目的地三条路径，用户
+        // 只能靠记。菜单省下来的两条高度让「本终端」组进得了首屏。
+        _menuGroupLabel(tc, UiText.t('前往', 'Go to')),
+        _gridMenuItem('drawer:${NavDrawer.sectionHosts}', Icons.dns_outlined,
+            UiText.t('主机管理', 'Hosts'), trailing: counts['drawer:${NavDrawer.sectionHosts}']),
+        _gridMenuItem('drawer:${NavDrawer.sectionAudit}', Icons.history_rounded,
+            UiText.t('审计日志', 'Audit log'), trailing: counts['drawer:${NavDrawer.sectionAudit}']),
+        _gridMenuItem('drawer:${NavDrawer.sectionSettings}',
+            Icons.tune_rounded, UiText.t('设置', 'Settings'),
+            trailing: counts['drawer:${NavDrawer.sectionSettings}']),
+        _gridMenuItem('page:/change-records', Icons.fact_check_outlined,
+            UiText.t('变更台账', 'Change records')),
+        _gridMenuItem('page:/change-window', Icons.schedule_outlined,
+            UiText.t('变更窗口', 'Change window')),
+
+        const PopupMenuDivider(height: 8),
+        _menuGroupLabel(tc, UiText.t('本终端', 'This terminal')),
+        _gridMenuItem('act:reconnect', Icons.refresh_rounded, l10n.terminalReconnect),
+        // 本地终端既没有可转发的 SSH 通道，点了必然失败，不如不出现
+        if (activeTab != null && !activeTab.isLocal)
+          _gridMenuItem('act:portforward', Icons.swap_horiz_rounded,
+              UiText.t('端口转发', 'Port forwarding')),
+        _gridMenuItem('act:history', Icons.history_rounded,
+            '${UiText.t('命令历史', 'Command history')}  (Ctrl+Shift+H)'),
+        // 移动端没有右键菜单，清屏只能留在这里
+        if (_isMobile)
+          _gridMenuItem('act:clear', Icons.cleaning_services_rounded,
+              l10n.terminalClearScreen),
+        if (snippets.isNotEmpty) ...[
+          const PopupMenuDivider(height: 8),
+          _menuGroupLabel(tc, l10n.quickCommands),
+          ...snippets.take(5).map(
+              (s) => _gridMenuItem('snippet:${s.id}', Icons.terminal, s.name)),
+        ],
+
+        const PopupMenuDivider(height: 8),
+        _menuGroupLabel(tc, UiText.t('视图', 'View')),
+        _gridMenuItem('act:focus', Icons.fullscreen_rounded,
+            UiText.t('专注模式', 'Focus mode'),
+            trailing: UiText.t('终端全宽', 'Terminal only')),
+        if (activeTab != null)
+          _gridMenuItem('act:cycle', Icons.view_sidebar_outlined,
+              UiText.t('切换 AI 面板位置', 'Cycle AI panel position'),
+              trailing: UiText.t('右 / 底 / 悬浮', 'right / bottom / float')),
+      ],
+    );
+  }
+
+  PopupMenuItem<String> _menuGroupLabel(ThemeColors tc, String label) {
+    return PopupMenuItem<String>(
+      enabled: false,
+      height: 26,
+      child: Text(label,
+          style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
+    );
+  }
+
+  PopupMenuItem<String> _gridMenuItem(String value, IconData icon, String label,
+      {String? trailing}) {
+    final tc = ThemeColors.of(context);
+    return PopupMenuItem<String>(
+      value: value,
+      height: 38,
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: tc.textSub),
+          const SizedBox(width: 9),
+          Expanded(
+            child: Text(label,
+                style: TextStyle(fontSize: fSmall, color: tc.textMain)),
+          ),
+          if (trailing != null)
+            Text(trailing,
+                style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
+        ],
+      ),
+    );
+  }
+
+  static bool _isToday(String? rawIso) {
+    final t = rawIso == null ? null : DateTime.tryParse(rawIso);
+    if (t == null) return false;
+    final local = t.toLocal();
+    final now = DateTime.now();
+    return local.year == now.year &&
+        local.month == now.month &&
+        local.day == now.day;
+  }
+
+  /// 右栏 → 底部 → 悬浮 循环（移动端没有悬浮，跳过）
+  void _cycleAiPanelPosition() {
+    final tab = ref.read(tp.terminalProvider).activeTab;
+    final tabId = tab?.id;
+    final next = switch (_aiPanelPositionFor(tabId)) {
+      _AiPanelPosition.right => _AiPanelPosition.bottom,
+      _AiPanelPosition.bottom =>
+        _isMobile ? _AiPanelPosition.right : _AiPanelPosition.overlay,
+      _AiPanelPosition.overlay => _AiPanelPosition.right,
+    };
+    setState(() {
+      _setAiPanelPosition(tabId, next);
+      // 切到某个方位即视为想用它：悬浮/分栏都直接展开，避免「点了没反应」。
+      if (!_isFocusModeFor(tabId)) _setAiPanelVisible(tabId, true);
+    });
+  }
+
+  /// 顶栏 SFTP 开关：移动端没有桌面分栏，跳整页。
+  void _toggleSftpPanel() {
+    final tab = ref.read(tp.terminalProvider).activeTab;
+    if (tab == null || tab.isLocal) return;
+    if (_isMobile) {
+      context.push('/sftp/${tab.hostId}');
+      return;
+    }
+    setState(
+        () => _tabSftpVisible[tab.id] = !(_tabSftpVisible[tab.id] ?? false));
   }
 
   /// 单个 Tab 项（连接名称 + 关闭x）— 使用独立 widget 避免 hover 触发整页 rebuild
@@ -2191,7 +2742,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     _tabMonitorVisible.remove(tab.id);
     _tabAiPanelVisible.remove(tab.id);
     _tabAiPanelPosition.remove(tab.id);
-    _tabAiPanelRatio.remove(tab.id);
+    _tabAiPanelWidth.remove(tab.id);
     _tabSftpVisible.remove(tab.id);
     await ref.read(tp.terminalProvider.notifier).closeTab(tab.id);
     if (!mounted) return;
@@ -2212,125 +2763,123 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       message: l10n.terminalNewConnection,
       child: GestureDetector(
         onTap: _showAddHostDialog,
-        child: Container(
-          width: 32,
-          height: 32,
-          margin: const EdgeInsets.only(left: 2, right: 2),
-          decoration: BoxDecoration(
-            color: tc.surface,
-            borderRadius: BorderRadius.circular(rSmall),
-            border: Border.all(color: tc.border.withValues(alpha: 0.3)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          child: CustomPaint(
+            // 设计稿 .tab-add：透底 + 虚线描边。虚线在视觉上天然读作
+            // 「这里还缺一块」，比实线底更贴合“新建”语义。
+            foregroundPainter:
+                _DashedRoundedRectPainter(color: tc.border, radius: rSmall),
+            child: SizedBox(
+              width: 32,
+              height: 32,
+              child: Center(
+                child: Icon(Icons.add, size: 14, color: tc.textSub),
+              ),
+            ),
           ),
-          child: Icon(Icons.add, size: 14, color: tc.textSub),
         ),
       ),
-    );
-  }
-
-  /// 终端设置按钮（字号、配色）
-  Widget _buildTerminalSettingsButton() {
-    final tc = ThemeColors.of(context);
-    final l10n = AppLocalizations.of(context)!;
-    return PopupMenuButton<String>(
-      icon: Icon(Icons.text_fields, color: tc.textSub, size: 18),
-      color: tc.cardElevated,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
-      offset: const Offset(0, 40),
-      onSelected: (value) {
-        if (value.startsWith('font_')) {
-          final size = double.parse(value.substring(5));
-          setState(() => _terminalFontSize = size);
-          SettingsDao.set('terminalFontSize', size);
-        }
-      },
-      itemBuilder: (context) => [
-        PopupMenuItem<String>(
-          enabled: false,
-          height: 28,
-          child: Text(l10n.terminalFontSize(_terminalFontSize.toInt()), style: TextStyle(fontSize: fMicro, color: tc.brand, fontWeight: FontWeight.w600)),
-        ),
-        ...[8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 18.0, 20.0, 22.0, 24.0].map((size) => PopupMenuItem<String>(
-          value: 'font_$size',
-          height: 28,
-          child: Row(
-            children: [
-              if (_terminalFontSize == size)
-                Icon(Icons.check, size: 12, color: tc.brand)
-              else
-                const SizedBox(width: 12),
-              const SizedBox(width: 4),
-              Text('${size.toInt()}px', style: TextStyle(fontSize: fSmall, color: _terminalFontSize == size ? tc.brand : tc.textMain)),
-            ],
-          ),
-        )),
-      ],
     );
   }
 
   /// P0-1: AI 面板展开/收起按钮（只影响当前 tab）
-  Widget _buildAIPanelToggleButton() {
+  /// 顶栏动作按钮（设计稿 .top-act）：32px 见方、8px 圆角、纯图标。
+  ///
+  /// 为什么去掉文字标签：设计稿右侧动作组是「菜单 / AI / SFTP / 监控」四个
+  /// 同尺寸图标，标签文字会把按钮撑成 60~70px 的胶囊，一排下来比标签区还宽。
+  /// 语义交给图标 + 悬浮提示，激活态统一为「品牌青字 + 10% 青底 + 发丝边」。
+  Widget _buildTopAct({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback? onTap,
+    bool active = false,
+  }) {
     final tc = ThemeColors.of(context);
-    final accentColor = tc.agentGreen;
-    final l10n = AppLocalizations.of(context)!;
-    final tabId = ref.read(tp.terminalProvider).activeTab?.id;
-    final visible = _aiPanelVisibleFor(tabId);
-
+    final color = active
+        ? tc.brand
+        : (onTap == null ? tc.textMuted : tc.textSub);
     return Tooltip(
-      message: visible ? l10n.terminalCollapseAIPanel : l10n.terminalExpandAIPanel,
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 500),
       child: GestureDetector(
-        onTap: () {
-          setState(() => _setAiPanelVisible(tabId, !visible));
-        },
+        onTap: onTap,
         child: AnimatedContainer(
           duration: animFast,
-          height: 30,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          width: 32,
+          height: 32,
           decoration: BoxDecoration(
-            color: visible ? accentColor.withValues(alpha: 0.15) : tc.surface,
+            color: active ? tc.brandBg : Colors.transparent,
             borderRadius: BorderRadius.circular(rSmall),
+            // 开启态原来用 tc.border 描边，和 brandBg 底几乎同色，等于没有边界。
+            // 换成 brand 色能让「已开」在 42px 深色顶栏上一眼可辨；但直接用
+            // 实色 brand 会变成「亮底 + 亮边 + 亮图标」三重强调，廉价且抢标签区。
+            // 取 45% 透明度：够勾勒形状，不至于发光。
             border: Border.all(
-              color: visible ? accentColor.withValues(alpha: 0.4) : tc.border.withValues(alpha: 0.3),
+              color: active
+                  ? tc.brand.withValues(alpha: 0.45)
+                  : Colors.transparent,
               width: 1,
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                visible ? Icons.auto_fix_high : Icons.auto_fix_high_outlined,
-                size: 14,
-                color: visible ? accentColor : tc.textSub,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                'AI',
-                style: TextStyle(
-                  fontSize: fMicro,
-                  color: visible ? accentColor : tc.textSub,
-                  fontWeight: visible ? FontWeight.w600 : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
+          child: Icon(icon, size: 15, color: color),
         ),
       ),
     );
   }
 
+  Widget _buildAIPanelToggleButton() {
+    final l10n = AppLocalizations.of(context)!;
+    final tabId = ref.read(tp.terminalProvider).activeTab?.id;
+    final visible = _effectiveAiVisible(tabId);
+
+    return _buildTopAct(
+      icon: visible ? Icons.auto_awesome : Icons.auto_awesome_outlined,
+      tooltip: visible ? l10n.terminalCollapseAIPanel : l10n.terminalExpandAIPanel,
+      active: visible,
+      onTap: () => setState(() => _setAiPanelVisible(tabId, !visible)),
+    );
+  }
+
+
+  /// SFTP 面板开关按钮。
+  ///
+  /// 设计稿把 SFTP 与 AI 并列成两个常驻开关：两者永远正交（AI 在右→SFTP 在下，
+  /// AI 在下/悬浮/收起→SFTP 在右），所以入口必须一眼可见，不能只藏在网格菜单里。
+  /// 本地终端没有远端文件系统，按钮置灰。
+  Widget _buildSftpToggleButton() {
+    final tab = ref.read(tp.terminalProvider).activeTab;
+    final canShow = tab != null && !tab.isLocal;
+    final on = tab != null && (_tabSftpVisible[tab.id] ?? false);
+    return _buildTopAct(
+      icon: on ? Icons.folder_rounded : Icons.folder_outlined,
+      // 置灰了就得说清为什么 —— 一个点不动又不解释的按钮，用户只会反复点。
+      // 也不在这里写「与 AI 正交」这类布局算法说明，用户不需要知道。
+      tooltip: !canShow
+          ? UiText.t('SFTP 仅远程会话可用', 'SFTP available on remote sessions only')
+          : on
+              ? UiText.t('关闭 SFTP 面板', 'Close SFTP panel')
+              : UiText.t('SFTP 文件面板', 'SFTP file panel'),
+      onTap: canShow ? _toggleSftpPanel : null,
+      active: on,
+    );
+  }
 
   /// 服务器监控面板开关按钮（终端下方横幅，只影响当前 tab）
   Widget _buildMonitorToggleButton() {
-    final tc = ThemeColors.of(context);
-    const accentColor = cKleinBlue;
     final activeTab = ref.read(tp.terminalProvider).activeTab;
     final canShow = activeTab != null && activeTab.isConnected;
     final isOn = activeTab != null && _monitorVisibleFor(activeTab);
     final l10n = AppLocalizations.of(context)!;
 
-    return Tooltip(
-      message: isOn ? l10n.terminalCollapseMonitorPanel : l10n.terminalExpandMonitorPanel,
-      child: GestureDetector(
-        onTap: canShow ? () {
+    return _buildTopAct(
+      // 设计稿这一格是纯波形（activity），monitor_heart 带一个外框，
+      // 缩到 15px 后和「面板」类图标糊在一起，认不出是监控。
+      icon: Icons.show_chart_rounded,
+      tooltip:
+          isOn ? l10n.terminalCollapseMonitorPanel : l10n.terminalExpandMonitorPanel,
+      active: isOn,
+      onTap: canShow ? () {
           final tab = ref.read(tp.terminalProvider).activeTab;
           if (tab == null) return;
           final next = !_monitorVisibleFor(tab);
@@ -2347,39 +2896,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           SettingsDao.set(
               'monitorVisibleHosts', _monitorDefaultVisibleHosts.toList());
         } : null,
-        child: AnimatedContainer(
-          duration: animFast,
-          height: 30,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          decoration: BoxDecoration(
-            color: isOn ? accentColor.withValues(alpha: 0.15) : tc.surface,
-            borderRadius: BorderRadius.circular(rSmall),
-            border: Border.all(
-              color: isOn ? accentColor.withValues(alpha: 0.4) : tc.border.withValues(alpha: 0.3),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.monitor_heart_outlined,
-                size: 14,
-                color: isOn ? accentColor : (canShow ? tc.textSub : tc.textMuted),
-              ),
-              const SizedBox(width: 4),
-              Text(
-                l10n.terminalMonitor,
-                style: TextStyle(
-                  fontSize: fMicro,
-                  color: isOn ? accentColor : (canShow ? tc.textSub : tc.textMuted),
-                  fontWeight: isOn ? FontWeight.w600 : FontWeight.normal,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -2400,87 +2916,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       svc = _monitorServices[key]!;
     }
     return svc;
-  }
-  Widget _buildToolbarMenu() {
-    final tc = ThemeColors.of(context);
-    final l10n = AppLocalizations.of(context)!;
-    final snippets = SnippetsDao.cached.toList();
-    return PopupMenuButton<String>(
-      icon: Icon(Icons.more_horiz, color: tc.textSub, size: 20),
-      color: tc.cardElevated,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
-      offset: const Offset(0, 40),
-      onSelected: (value) async {
-        if (value.startsWith('snippet:')) {
-          final snippetId = value.substring(8);
-          final snippet = SnippetsDao.getCachedById(snippetId);
-          if (snippet != null) _executeSnippet(snippet);
-          return;
-        }
-        switch (value) {
-          case 'reconnect': await _reconnect(); break;
-          case 'clear': _terminal?.write('\x1b[2J\x1b[H'); break;
-          case 'sftp':
-            final sftpTab = ref.read(tp.terminalProvider).activeTab;
-            if (sftpTab != null && !sftpTab.isLocal) {
-              if (_isMobile) {
-                context.push('/sftp/${sftpTab.hostId}');
-              } else {
-                setState(() {
-                  _tabSftpVisible[sftpTab.id] = !(_tabSftpVisible[sftpTab.id] ?? false);
-                });
-              }
-            }
-            break;
-          case 'prompt': _showCustomPromptDialog(); break;
-          case 'portforward': _showPortForwardDialog(); break;
-          case 'history': _showCommandHistory(); break;
-          case 'builtInPrompt': _showBuiltInPromptDialog(); break;
-          case 'maxsteps': _showMaxStepsDialog(); break;
-          case 'settings': context.push('/settings'); break;
-        }
-      },
-      itemBuilder: (context) => [
-        _menuItem('reconnect', Icons.refresh_rounded, l10n.terminalReconnect),
-        _menuItem('clear', Icons.cleaning_services_rounded, l10n.terminalClearScreen),
-        _menuItem('sftp', Icons.folder_outlined, 'SFTP'),
-        _menuItem('portforward', Icons.swap_horiz_rounded,
-            UiText.t('端口转发', 'Port forwarding')),
-        _menuItem('history', Icons.history_rounded,
-            '${UiText.t('命令历史', 'Command history')}  (Ctrl+Shift+H)'),
-        // 快捷命令
-        if (snippets.isNotEmpty) ...[
-          const PopupMenuDivider(height: 8),
-          PopupMenuItem<String>(
-            enabled: false,
-            height: 24,
-            child: Text(l10n.quickCommands, style: TextStyle(fontSize: fMicro, color: tc.brand, fontWeight: FontWeight.w600)),
-          ),
-          ...snippets.take(5).map((s) => _menuItem('snippet:${s.id}', Icons.terminal, s.name)),
-        ],
-        const PopupMenuDivider(height: 8),
-        _menuItem('prompt', Icons.edit_note_rounded, L10n.str.menuItemCustomPrompt),
-        _menuItem('builtInPrompt', Icons.description_outlined, L10n.str.menuItemBuiltinPrompt),
-        _menuItem('maxsteps', Icons.auto_mode_rounded, l10n.terminalMaxSteps),
-        const PopupMenuDivider(height: 8),
-        _menuItem('settings', Icons.settings_outlined, l10n.settings),
-      ],
-    );
-  }
-
-  PopupMenuItem<String> _menuItem(String value, IconData icon, String label) {
-    final tc = ThemeColors.of(context);
-    return PopupMenuItem(
-      value: value,
-      height: 36,
-      child: Row(
-        children: [
-          Icon(icon, color: tc.textSub, size: 16),
-          const SizedBox(width: 8),
-          Text(label, style: TextStyle(fontSize: fBody, color: tc.textMain)),
-        ],
-      ),
-    );
   }
 
   // ==================== 连接阶段视图 ====================
@@ -2746,185 +3181,22 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     );
   }
 
-  // ==================== 区域分界线（分割条，位于终端和 AI 面板之间）====================
-  Widget _buildAreaDivider(AgentState agentState, String? tabId) {
-    final tc = ThemeColors.of(context);
-    final l10n = AppLocalizations.of(context)!;
-    final accentColor = tc.agentGreen;
-    final isRight = _aiPanelPositionFor(tabId) == _AiPanelPosition.right;
-    // 手机端不显示位置切换按钮
-    final showButtons = !_isMobile;
-
-    // Chrome DevTools 风格的方形布局切换按钮
-    Widget layoutButton(_AiPanelPosition pos, IconData icon, String tooltip) {
-      final isActive = _aiPanelPositionFor(tabId) == pos;
-      return Tooltip(
-        message: tooltip,
-        waitDuration: const Duration(milliseconds: 500),
-        child: GestureDetector(
-          onTap: () {
-            setState(() => _setAiPanelPosition(tabId, pos));
-            _savePanelLayout(savePosition: true);
-          },
-          child: Container(
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              color: isActive ? accentColor.withValues(alpha: 0.15) : Colors.transparent,
-              borderRadius: BorderRadius.circular(3),
-              border: isActive ? Border.all(color: accentColor.withValues(alpha: 0.5), width: 1) : null,
-            ),
-            child: Icon(icon, size: 13, color: isActive ? accentColor : tc.textMuted),
-          ),
-        ),
-      );
-    }
-
-    final label = Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 6, height: 6,
-          decoration: BoxDecoration(
-            color: cWarning,
-            shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: cWarning.withValues(alpha: 0.5), blurRadius: 4)],
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          'AGENT',
-          style: TextStyle(
-            fontSize: fMicro,
-            color: accentColor.withValues(alpha: 0.8),
-            fontWeight: FontWeight.w700,
-            letterSpacing: 1.5,
-          ),
-        ),
-      ],
-    );
-
-    // P0-1: 收起按钮
-    Widget closeButton() {
-      return Tooltip(
-        message: l10n.terminalCollapseAIPanel,
-        waitDuration: const Duration(milliseconds: 500),
-        child: GestureDetector(
-          onTap: () {
-            setState(() => _setAiPanelVisible(tabId, false));
-          },
-          child: Container(
-            width: 22,
-            height: 22,
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(3),
-              border: Border.all(color: accentColor.withValues(alpha: 0.3), width: 1),
-            ),
-            child: Icon(
-              isRight ? Icons.keyboard_arrow_right : Icons.keyboard_arrow_down,
-              size: 16,
-              color: accentColor,
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (isRight) {
-      // 竖向分割条（AI 在右侧时）
-      return Container(
-        width: showButtons ? 32 : 28,
-        decoration: BoxDecoration(
-          color: tc.card,
-          border: Border(right: BorderSide(color: tc.border.withValues(alpha: 0.4), width: 0.5)),
-        ),
-        child: Column(
-          children: [
-            if (showButtons) ...[
-              const SizedBox(height: 4),
-              closeButton(),
-              const SizedBox(height: 4),
-              RotatedBox(quarterTurns: 1, child: layoutButton(_AiPanelPosition.bottom, Icons.view_sidebar_outlined, l10n.terminalLayoutBottom)),
-              const SizedBox(height: 2),
-              layoutButton(_AiPanelPosition.right, Icons.view_sidebar_outlined, l10n.terminalLayoutRight),
-            ],
-            const Spacer(),
-            // 竖向彩色射线
-            Expanded(
-              child: Container(
-                width: 1,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [accentColor.withValues(alpha: 0.0), accentColor.withValues(alpha: 0.7), accentColor.withValues(alpha: 0.0)],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            RotatedBox(quarterTurns: 3, child: label),
-            const SizedBox(height: 8),
-          ],
-        ),
-      );
-    } else {
-      // 横向分割条（AI 在下方时）
-      return Container(
-        height: 28,
-        decoration: BoxDecoration(
-          color: tc.card,
-          border: Border(
-            bottom: BorderSide(color: tc.border.withValues(alpha: 0.4), width: 0.5),
-          ),
-        ),
-        child: Row(
-          children: [
-            const SizedBox(width: 8),
-            label,
-            const SizedBox(width: 8),
-            if (showButtons) closeButton(),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Container(
-                height: 1,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [accentColor.withValues(alpha: 0.6), accentColor.withValues(alpha: 0.0)],
-                  ),
-                ),
-              ),
-            ),
-            if (showButtons) ...[
-              const SizedBox(width: 8),
-              RotatedBox(quarterTurns: 1, child: layoutButton(_AiPanelPosition.bottom, Icons.view_sidebar_outlined, l10n.terminalLayoutBottom)),
-              const SizedBox(width: 2),
-              layoutButton(_AiPanelPosition.right, Icons.view_sidebar_outlined, l10n.terminalLayoutRight),
-            ],
-            const SizedBox(width: 6),
-          ],
-        ),
-      );
-    }
-  }
-
   // ==================== AI 面板 ====================
   Widget _buildAIPanel(String? chatError, AgentState agentState, tp.TerminalTab? tab) {
     final tc = ThemeColors.of(context);
 
     return Container(
-      decoration: BoxDecoration(
-        color: tc.cardElevated,
-        border: Border(
-          top: BorderSide(color: tc.border, width: 1),
-        ),
-      ),
+      // 设计稿 .ai-panel 只有 border-left（右侧态）/ 分割条（底部态）。
+      // 面板自己再画一条上边线会和顶栏的下边线叠成双线，这里只保留底色。
+      color: tc.cardElevated,
       child: Column(
         children: [
           // 会话压缩中横幅
           if (agentState.isCompacting)
             _buildCompactingBanner(tc),
+          // 面板头（设计稿 .ai-head）：星形 + 标题 + 模型胶囊。
+          // 位置切换钮仍留在分隔条上，这里只做身份标识。
+          _buildAiPanelHead(),
           // 目标横幅已下移到输入框之上（见 _buildBottomBar），与参考图顺序一致：
           // 清单 → 目标 → 输入 → 底边指标。这里不再渲染，避免同屏两条目标行。
           // 消息列表 + 回到底部按钮
@@ -2962,6 +3234,96 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             _buildErrorBanner(chatError ?? agentState.error),
         ],
       ),
+    );
+  }
+
+  /// 面板头（设计稿 .ai-head）：品牌星 + 「AI 助手」+ 当前模型胶囊。
+  Widget _buildAiPanelHead() {
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final modelName = _currentModelConfig?.name;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: tc.hairline)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.auto_awesome, size: 14, color: tc.brand),
+          const SizedBox(width: 7),
+          Text(
+            l10n.commonAIAssistant,
+            style: TextStyle(
+                fontSize: fSmall, color: tc.textMain, fontWeight: FontWeight.w500),
+          ),
+          if (modelName != null && MediaQuery.of(context).size.width > 560) ...[
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+              constraints: const BoxConstraints(maxWidth: 180),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(rFull),
+                border: Border.all(color: tc.border),
+              ),
+              child: Text(
+                modelName,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: fMicro, color: tc.textSub),
+              ),
+            ),
+          ],
+          if (!_isMobile) ...[
+            const Spacer(),
+            _buildAiHeadControls(
+                ref.read(tp.terminalProvider).activeTab?.id),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// AI 面板头右侧的微型控件：切换方位（右 → 下 → 悬浮）+ 收起。
+  ///
+  /// 设计稿的面板头只有「星 + 标题 + 模型胶囊」，没有一条常驻竖条放这些
+  /// 操作；把两个入口收进头部后，终端与面板之间就只剩 1px 发丝线。
+  Widget _buildAiHeadControls(String? tabId) {
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final position = _aiPanelPositionFor(tabId);
+    final icon = switch (position) {
+      _AiPanelPosition.bottom => Icons.horizontal_split_rounded,
+      _AiPanelPosition.overlay => Icons.layers_outlined,
+      _ => Icons.vertical_split_outlined,
+    };
+
+    Widget act(IconData ic, String tip, VoidCallback onTap) {
+      return Tooltip(
+        message: tip,
+        waitDuration: const Duration(milliseconds: 500),
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            width: 24,
+            height: 24,
+            margin: const EdgeInsets.only(left: 2),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(rXSmall),
+            ),
+            child: Icon(ic, size: 14, color: tc.textSub),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        act(icon, UiText.t('切换面板位置（右 / 下 / 悬浮）',
+            'Switch panel position (right / bottom / overlay)'),
+            _cycleAiPanelPosition),
+        act(Icons.close_rounded, l10n.terminalCollapseAIPanel,
+            () => setState(() => _setAiPanelVisible(tabId, false))),
+      ],
     );
   }
 
@@ -3107,15 +3469,62 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }
 
   // ==================== Agent 模式统一消息列表 ====================
+  /// 空会话的引导块。
+  ///
+  /// 之前这里只有一行居中的灰字（复用输入框 placeholder 那条文案），在一整块
+  /// 320px 宽的空面板里既没有视觉锚点、也没说清楚"这个框能干什么"。
+  /// 改成「图标 + 一句定位 + 一句边界说明」，全部克制在 11~12px，
+  /// 和设计稿面板内的小字号层级一致。
+  Widget _buildAiEmptyState() {
+    final tc = ThemeColors.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: tc.brandBg,
+                borderRadius: BorderRadius.circular(rMedium),
+                border: Border.all(color: tc.border),
+              ),
+              child: Icon(Icons.auto_awesome, size: 19, color: tc.brand),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              UiText.t('让 Agent 在这台主机上干活',
+                  'Let the agent work on this host'),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: fSmall,
+                  color: tc.textBody,
+                  fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 5),
+            Text(
+              UiText.t('描述需求，步骤自动执行；危险命令会先征求同意',
+                  'Describe the task — steps run on their own, risky commands ask first'),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: fMicro, color: tc.textMuted, height: 1.5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildAgentChatList(AgentState agentState, tp.TerminalTab? tab) {
-    final l10n = AppLocalizations.of(context)!;
     final items = agentState.chatItems;
     // 终端还不存在的阶段（首连中/首连失败）不给上一标签的会话，也不提示"输入需求
     // 开始自动执行"——那时输入框是灰的，提示只会让人以为能直接问
     final waiting = _buildAgentWaitingView(tab);
     if (waiting != null) return waiting;
     if (items.isEmpty) {
-      return Center(child: Text(l10n.terminalInputHintEmpty, style: TextStyle(color: ThemeColors.of(context).textMuted, fontSize: fBody)));
+      return _buildAiEmptyState();
     }
     // 轮次骨架：一条 user 开启一轮，其后 assistant 的产出都属于这一轮。
     // 12 轮的会话原来没有任何分隔，滚动时找不到"这段是哪一轮"。
@@ -3135,7 +3544,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         controller: _chatControllerFor(tab?.id ?? _currentTabId ?? ''),
         // 两侧留白与下方底栏对齐：内容贴着面板边缘时，11px 小字 + 细边框
         // 会显得拥挤，留出一档呼吸空间也让卡片左边缘和输入框左边缘齐平。
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
         itemCount: items.length,
         itemBuilder: (context, index) {
           final item = items[index];
@@ -3330,45 +3739,24 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 角色标签
+            // 角色标签（设计稿 .role）：纯文字 11px 品牌色，不再套胶囊底——
+            // 每条消息一个描边胶囊会把消息流切成一串标签串。
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: tc.brand.withValues(alpha: isUser ? 0.14 : 0.1),
-                    borderRadius: BorderRadius.circular(rXSmall),
-                    border: Border.all(
-                      color: tc.brand.withValues(alpha: isUser ? 0.32 : 0.25),
-                      width: 0.5,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isUser ? Icons.person_outline : Icons.auto_awesome,
-                        size: 11,
-                        color: tc.brand,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        isUser ? l10n.terminalRoleYou : l10n.commonAIAssistant,
-                        style: TextStyle(
-                          fontSize: fMicro,
-                          color: tc.brand,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                      if (isLoading) ...[
-                        const SizedBox(width: 6),
-                        SizedBox(width: 9, height: 9, child: CircularProgressIndicator(strokeWidth: 1.5, color: tc.brand)),
-                      ],
-                    ],
+                Text(
+                  // 设计稿 .role：对话里的助手署名统一叫 Agent，面板头才叫「AI 助手」。
+                  isUser ? l10n.terminalRoleYou : 'Agent',
+                  style: TextStyle(
+                    fontSize: fMicro,
+                    color: tc.brand,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
+                if (isLoading) ...[
+                  const SizedBox(width: 6),
+                  SizedBox(width: 9, height: 9, child: CircularProgressIndicator(strokeWidth: 1.5, color: tc.brand)),
+                ],
               ],
             ),
             SizedBox(height: isUser ? pXSmall : pSmall),
@@ -5053,13 +5441,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         : const [];
 
     return Container(
+      // 设计稿 .ai-footer：上下 8/10、左右 10。左右从 14 收到 12，和消息列表
+      // 的 12 对齐；上边线用发丝线（hairline），面板内部的横向分隔比外框
+      // 12% 更轻，否则底栏像被焊死在面板上。
       padding: EdgeInsets.only(
-        left: 14, right: 14, top: 8,
-        bottom: 8 + (_isMobile ? MediaQuery.of(context).padding.bottom : 0),
+        left: 12, right: 12, top: 8,
+        bottom: 10 + (_isMobile ? MediaQuery.of(context).padding.bottom : 0),
       ),
       decoration: BoxDecoration(
         color: tc.card,
-        border: Border(top: BorderSide(color: tc.border)),
+        border: Border(top: BorderSide(color: tc.hairline)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -5273,12 +5664,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: Container(
-          width: 28,
-          height: 28,
+          width: 30,
+          height: 30,
           decoration: BoxDecoration(
-            color: active ? cWarning.withValues(alpha: 0.15) : tc.surface,
+            color: active ? cWarning.withValues(alpha: 0.10) : tc.surface,
             borderRadius: BorderRadius.circular(rSmall),
-            border: active ? Border.all(color: cWarning.withValues(alpha: 0.4)) : null,
+            border: active ? Border.all(color: cWarning) : null,
           ),
           child: Icon(icon, size: 14, color: active ? cWarning : tc.textSub),
         ),
@@ -5296,11 +5687,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       return Tooltip(
         message: l10n.aiModelEmptyTitle,
         child: InkWell(
-          onTap: () => context.push('/settings/ai'),
+          // 模型管理就在抽屉设置里，不再跳整页。
+          onTap: () =>
+              _showNavDrawer(NavDrawer.sectionSettings, group: 'ai'),
           borderRadius: BorderRadius.circular(rFull),
           child: Container(
-            height: 24,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            height: 30,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
               color: cWarning.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(rFull),
@@ -5365,7 +5758,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           onTierSelected: _applyReasoningTier,
           onManage: () {
             _modelMenuController.close();
-            context.push('/settings/ai');
+            _showNavDrawer(NavDrawer.sectionSettings, group: 'ai');
           },
           onDone: () => _modelMenuController.close(),
         ),
@@ -5383,12 +5776,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               controller.isOpen ? controller.close() : controller.open();
             },
             child: Container(
-              height: 24,
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              // 与左侧权限胶囊同高（设计稿两个 cap-wrap 都是 30）、透明底 + 细描边，
+              // 一排控件的高度基线才统一。
+              height: 30,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               decoration: BoxDecoration(
-                color: tc.surface,
+                color: Colors.transparent,
                 borderRadius: BorderRadius.circular(rFull),
-                border: Border.all(color: tc.border.withValues(alpha: 0.5)),
+                border: Border.all(color: tc.border),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -5396,22 +5791,27 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   Icon(Icons.psychology_outlined,
                       size: 12, color: tc.textMuted),
                   const SizedBox(width: 4),
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 170),
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: fMicro,
-                        color: tc.textSub,
-                        height: 1.0,
-                        fontWeight: FontWeight.w500,
+                  // AI 面板按设计稿收到 320px 后，输入框里的胶囊只剩 ~130px：
+                  // 模型名必须可压缩，否则 Row 直接溢出（原来靠面板够宽蒙混过去）。
+                  Flexible(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 190),
+                      child: Text(
+                        label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: fMicro,
+                          color: tc.textSub,
+                          height: 1.0,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 3),
-                  Icon(Icons.unfold_more, size: 11, color: tc.textMuted),
+                  // 这里原本还有一个 11px 的 unfold_more：320px 面板下它和
+                  // 权限胶囊一起把模型名挤成 "...flash-n..."。胶囊整体可点，
+                  // 箭头不是必须的，省下的 14px 正好让 "…-next High" 完整露出来。
                 ],
               ),
             ),
@@ -5631,8 +6031,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                     const Spacer(),
                     TextButton.icon(
                       onPressed: () {
+                        // 「管理」和抽屉里是同一份工作流列表：先收面板，再开
+                        // 抽屉的工作流分区。跳整页 /runbooks 等于同一个功能
+                        // 有两个长相不同的页面。
                         Navigator.of(ctx).pop();
-                        context.push('/runbooks');
+                        _showNavDrawer(NavDrawer.sectionRunbooks);
                       },
                       icon: const Icon(Icons.settings_outlined, size: 14),
                       label: Text(l10n.terminalManage),
@@ -5764,6 +6167,181 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     } else {
       _sendRunbookCommand(rb);
     }
+  }
+
+  // ==================== 命令面板（Ctrl+K）====================
+  /// 零占位导航的统一入口：主机 / 快捷命令 / 工作流 / 页面 / 操作。
+  /// 数据全部来自同步缓存（Dao.cached），面板即时可用，不等异步。
+  void _showCommandPalette() {
+    CommandPalette.show(context, entries: _buildPaletteEntries());
+  }
+
+  List<CommandPaletteEntry> _buildPaletteEntries() {
+    final entries = <CommandPaletteEntry>[];
+    final activeTab = ref.read(tp.terminalProvider).activeTab;
+
+    // —— 操作 ——
+    void op(String label, IconData icon, VoidCallback run,
+            {List<String> keywords = const []}) =>
+        entries.add(CommandPaletteEntry(
+          label: label,
+          icon: icon,
+          group: UiText.t('操作', 'Actions'),
+          onRun: run,
+          keywords: keywords,
+        ));
+
+    op(UiText.t('新建连接', 'New connection'), Icons.add_circle_outline,
+        _showAddHostDialog,
+        keywords: const ['new', 'tab', 'host', '新建', '标签']);
+    if (activeTab != null) {
+      op(UiText.t('重连当前标签', 'Reconnect tab'), Icons.refresh_rounded,
+          () => _reconnectTab(activeTab),
+          keywords: const ['reconnect']);
+      op(
+        _effectiveAiVisible(activeTab.id)
+            ? UiText.t('收起 AI 面板', 'Collapse AI panel')
+            : UiText.t('展开 AI 面板', 'Expand AI panel'),
+        Icons.auto_fix_high,
+        () => setState(() =>
+            _setAiPanelVisible(activeTab.id, !_effectiveAiVisible(activeTab.id))),
+        keywords: const ['ai', 'panel'],
+      );
+      op(
+        _isFocusModeFor(activeTab.id)
+            ? UiText.t('退出专注模式', 'Exit focus mode')
+            : UiText.t('专注模式', 'Focus mode'),
+        Icons.fullscreen_rounded,
+        _toggleFocusMode,
+        keywords: const ['focus'],
+      );
+      op(
+        _monitorVisibleFor(activeTab)
+            ? UiText.t('隐藏服务器监控', 'Hide monitor')
+            : UiText.t('显示服务器监控', 'Show monitor'),
+        Icons.monitor_heart_outlined,
+        () => setState(() => _tabMonitorVisible[activeTab.id] =
+            !_monitorVisibleFor(activeTab)),
+        keywords: const ['monitor'],
+      );
+      if (!activeTab.isLocal) {
+        op(
+          (_tabSftpVisible[activeTab.id] ?? false)
+              ? UiText.t('关闭 SFTP 面板', 'Close SFTP')
+              : UiText.t('打开 SFTP 面板', 'Open SFTP'),
+          Icons.folder_outlined,
+          () {
+            if (_isMobile) {
+              context.push('/sftp/${activeTab.hostId}');
+            } else {
+              setState(() => _tabSftpVisible[activeTab.id] =
+                  !(_tabSftpVisible[activeTab.id] ?? false));
+            }
+          },
+          keywords: const ['files', '文件'],
+        );
+        op(UiText.t('端口转发', 'Port forwarding'), Icons.swap_horiz_rounded,
+            _showPortForwardDialog,
+            keywords: const ['port', 'forward', 'tunnel']);
+      }
+    }
+    op(UiText.t('命令历史', 'Command history'), Icons.history_rounded,
+        _showCommandHistory,
+        keywords: const ['history']);
+    op(UiText.t('会话历史', 'Session history'), Icons.chat_bubble_outline,
+        () => _showSessionHistoryPanel(context),
+        keywords: const ['session']);
+    op(UiText.t('新建 AI 会话', 'New AI session'), Icons.add_comment_outlined,
+        _startNewSession,
+        keywords: const ['session', 'new']);
+
+    // —— 整页 ——
+    // 只有台账留在这里：它是多列的规则编辑，塞进 600 宽的抽屉会被挤成一团。
+    // 五个功能板块一律指到抽屉，不给同一个功能第二个目的地。
+    void page(String label, String route, IconData icon,
+            {List<String> keywords = const []}) =>
+        entries.add(CommandPaletteEntry(
+          label: label,
+          icon: icon,
+          group: UiText.t('整页', 'Full page'),
+          onRun: () => context.push(route),
+          keywords: keywords,
+        ));
+
+    // 五个功能板块都在抽屉里，命令面板也把路指到同一个地方 —— 不给同一件事
+    // 第二个目的地（整页 /hosts /snippets /settings…）。
+    void section(String label, String id, IconData icon,
+            {String? group, List<String> keywords = const []}) =>
+        entries.add(CommandPaletteEntry(
+          label: label,
+          icon: icon,
+          group: UiText.t('抽屉', 'Drawer'),
+          onRun: () => _showNavDrawer(id, group: group),
+          keywords: keywords,
+        ));
+
+    section(UiText.t('主机管理', 'Hosts'), NavDrawer.sectionHosts,
+        Icons.dns_outlined,
+        keywords: const ['server', 'hosts', '服务器']);
+    section(UiText.t('快捷命令', 'Snippets'), NavDrawer.sectionSnippets,
+        Icons.bolt_outlined,
+        keywords: const ['snippet', 'commands']);
+    section(UiText.t('运维工作流', 'Runbooks'), NavDrawer.sectionRunbooks,
+        Icons.checklist_outlined,
+        keywords: const ['runbook', 'workflow']);
+    section(UiText.t('操作审计', 'Audit log'), NavDrawer.sectionAudit,
+        Icons.fact_check_outlined,
+        keywords: const ['audit']);
+    section(UiText.t('设置', 'Settings'), NavDrawer.sectionSettings,
+        Icons.settings_outlined,
+        keywords: const ['settings']);
+    section(UiText.t('AI 模型设置', 'AI model settings'),
+        NavDrawer.sectionSettings, Icons.psychology_outlined,
+        group: 'ai', keywords: const ['agent', 'model']);
+    page(UiText.t('变更记录', 'Change records'), '/change-records',
+        Icons.receipt_long_outlined,
+        keywords: const ['changes']);
+
+    // —— 主机 ——
+    const groupHosts = '主机';
+    for (final host in HostsDao.cached) {
+      entries.add(CommandPaletteEntry(
+        label: host.name,
+        subtitle: '${host.username}@${host.host}',
+        icon: Icons.dns,
+        group: groupHosts,
+        keywords: [host.host, host.username],
+        onRun: () => _openHostTab(host),
+      ));
+    }
+
+    // —— 快捷命令 ——
+    for (final s in SnippetsDao.cached) {
+      entries.add(CommandPaletteEntry(
+        label: s.name,
+        subtitle: s.command,
+        icon: Icons.bolt,
+        group: UiText.t('快捷命令', 'Snippets'),
+        keywords: [s.command],
+        onRun: () => _executeSnippet(s),
+      ));
+    }
+
+    // —— 工作流 ——
+    for (final rb in BuiltinRunbookI18n.localizeAll(RunbooksDao.cached)) {
+      entries.add(CommandPaletteEntry(
+        label: '${rb.icon} ${rb.name}',
+        subtitle: rb.description,
+        icon: rb.type == RunbookType.agent
+            ? Icons.psychology_outlined
+            : Icons.terminal,
+        group: UiText.t('工作流', 'Runbooks'),
+        keywords: [rb.content],
+        onRun: () => _runRunbook(rb),
+      ));
+    }
+
+    return entries;
   }
 
   /// 发送 Runbook（agent 类型）prompt 到 Agent 执行
@@ -5973,7 +6551,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         action: SnackBarAction(
           label: l10n.terminalConfigure,
           textColor: Colors.white,
-          onPressed: () => context.push('/settings/ai'),
+          onPressed: () =>
+              _showNavDrawer(NavDrawer.sectionSettings, group: 'ai'),
         ),
         duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
@@ -6016,65 +6595,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     await ref.read(agentProvider.notifier).newSession();
     if (!mounted) return;
     _showOperationMessage(AppLocalizations.of(context)!.terminalSessionCreated);
-  }
-
-  /// 显示最大步骤数设置
-  void _showMaxStepsDialog() {
-    final tc = ThemeColors.of(context);
-    final l10n = AppLocalizations.of(context)!;
-    final controller = TextEditingController(text: ref.read(agentProvider).maxSteps.toString());
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: tc.cardElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text(l10n.terminalMaxStepsTitle, style: TextStyle(color: tc.textMain, fontSize: fBody)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(l10n.terminalMaxStepsDesc, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              style: TextStyle(color: tc.textMain, fontSize: fBody),
-              decoration: InputDecoration(
-                labelText: l10n.terminalMaxStepsLabel,
-                labelStyle: TextStyle(color: tc.textSub),
-                enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.border)),
-                focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.brand)),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.commonCancel, style: TextStyle(color: tc.textSub)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final steps = int.tryParse(controller.text) ?? 0;
-              final clamped = steps.clamp(0, 100);
-              ref.read(agentProvider.notifier).setMaxSteps(clamped);
-              Navigator.pop(context);
-              showTopSnackBar(context, 
-                SnackBar(
-                  content: Text(l10n.terminalMaxStepsSet(clamped)),
-                  duration: const Duration(seconds: 1),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: tc.brand,
-                foregroundColor: tc.isLight ? Colors.white : cBg,
-              ),
-            child: Text(l10n.commonConfirm),
-          ),
-        ],
-      ),
-    );
   }
 
   /// 执行快捷命令片段
@@ -6188,139 +6708,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       ),
     );
   }
-
-  /// 显示自定义提示词设置
-  void _showCustomPromptDialog() {
-    String? savedPrompt;
-    try {
-      savedPrompt = SettingsDao.getCached('customSystemPrompt') as String?;
-    } catch (_) {}
-    final controller = TextEditingController(text: savedPrompt ?? '');
-    final tc = ThemeColors.of(context);
-    final l10n = AppLocalizations.of(context)!;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: tc.cardElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text(L10n.str.customPromptTitle, style: TextStyle(color: tc.textMain, fontSize: fBody)),
-        content: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.75,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(L10n.str.customPromptDesc, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
-              const SizedBox(height: 12),
-              TextField(
-                controller: controller,
-                maxLines: 5,
-                minLines: 2,
-                style: TextStyle(color: tc.textMain, fontSize: fBody),
-                decoration: InputDecoration(
-                  hintText: l10n.terminalCustomPromptHint,
-                  hintStyle: TextStyle(color: tc.textMuted, fontSize: fSmall),
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.border)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.brand)),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.commonCancel, style: TextStyle(color: tc.textSub)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              try {
-                SettingsDao.set('customSystemPrompt', controller.text.trim());
-              } catch (_) {}
-              Navigator.pop(context);
-              showTopSnackBar(context, 
-                SnackBar(
-                  content: Text(L10n.str.customPromptSaved),
-                  duration: const Duration(seconds: 1),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: tc.brand,
-                foregroundColor: tc.isLight ? Colors.white : cBg,
-              ),
-            child: Text(l10n.save),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 显示内置系统提示词编辑
-  void _showBuiltInPromptDialog() {
-    final currentPrompt = prompts.getSystemPrompt();
-    final controller = TextEditingController(text: currentPrompt);
-    final tc = ThemeColors.of(context);
-    final l10n = AppLocalizations.of(context)!;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: tc.cardElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text(L10n.str.builtinPromptTitle, style: TextStyle(color: tc.textMain, fontSize: fBody)),
-        content: SizedBox(
-          width: MediaQuery.of(ctx).size.width * 0.85,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(L10n.str.builtinPromptDesc, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
-              const SizedBox(height: 6),
-              Text(L10n.str.builtinPromptWarning, style: const TextStyle(color: cWarning, fontSize: fMicro)),
-              const SizedBox(height: 10),
-              TextField(
-                controller: controller,
-                maxLines: 10,
-                minLines: 5,
-                style: TextStyle(color: tc.textMain, fontSize: fSmall, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
-                decoration: InputDecoration(
-                  enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.border)),
-                  focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: tc.brand)),
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => controller.text = prompts.defaultSystemPrompt,
-            child: Text(l10n.commonResetDefault, style: const TextStyle(color: cWarning)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.commonCancel, style: TextStyle(color: tc.textSub)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              prompts.saveSystemPrompt(controller.text.trim());
-              Navigator.pop(ctx);
-              showTopSnackBar(context, 
-                SnackBar(
-                  content: Text(L10n.str.builtinPromptSaved),
-                  duration: const Duration(seconds: 1),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: tc.brand,
-                foregroundColor: tc.isLight ? Colors.white : cBg,
-              ),
-            child: Text(l10n.save),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 /// 内容分段：文本 or 代码块
@@ -6398,17 +6785,21 @@ class _ModeCapsuleState extends State<_ModeCapsule> with SingleTickerProviderSta
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     final isOrch = widget.isOrchestratorMode;
-    final accent = isOrch ? cWarning : tc.agentGreen;
+    // 描边/底色在 build 里按 .mode-capsule 配方走品牌青；图标与文字同色，
+    // 编排态继续用橙色保持模式可辨。
+    final accent = isOrch ? cWarning : tc.brand;
 
     return GestureDetector(
       onTap: widget.onTap,
       child: Container(
-        height: 28,
+        height: 30,
         padding: const EdgeInsets.symmetric(horizontal: 10),
+        // 设计稿 .mode-capsule：Agent 态用品牌青 10% 底 + 中性发丝边；
+        // 编排态保留橙色以示模式差异。
         decoration: BoxDecoration(
-          color: accent.withValues(alpha: 0.12),
+          color: (isOrch ? cWarning : tc.brand).withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(rFull),
-          border: Border.all(color: accent.withValues(alpha: 0.25)),
+          border: Border.all(color: isOrch ? cWarning.withValues(alpha: 0.4) : tc.border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -6876,4 +7267,38 @@ class _CachedMarkdownTextState extends State<_CachedMarkdownText> {
     _cached = widget.builder(widget.text, widget.tc);
     return _cached!;
   }
+}
+
+/// 虚线圆角描边（设计稿 .tab-add 的 CSS dashed border 等价实现）。
+class _DashedRoundedRectPainter extends CustomPainter {
+  const _DashedRoundedRectPainter({required this.color, required this.radius});
+
+  final Color color;
+  final double radius;
+
+  static const double _dash = 4.0;
+  static const double _gap = 3.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    final rect = Rect.fromLTWH(0.5, 0.5, size.width - 1, size.height - 1);
+    final path = Path()
+      ..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)));
+    for (final metric in path.computeMetrics()) {
+      double distance = 0;
+      while (distance < metric.length) {
+        final next = math.min(distance + _dash, metric.length);
+        canvas.drawPath(metric.extractPath(distance, next), paint);
+        distance = next + _gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DashedRoundedRectPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.radius != radius;
 }

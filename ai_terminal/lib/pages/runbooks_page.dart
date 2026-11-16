@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -803,7 +805,8 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
     return AlertDialog(
       title: Text(isEdit ? l10n.runbookEditTitle : l10n.runbookNewTitle),
       content: SizedBox(
-        width: 560,
+        // 小屏按视口 92% 缩放，大屏保持 560 上限
+        width: math.min(560, MediaQuery.sizeOf(context).width * 0.92),
         height: (MediaQuery.sizeOf(context).height * 0.75).clamp(340.0, 760.0),
         child: Form(
           key: _formKey,
@@ -1162,7 +1165,8 @@ class _RunbookImportDialogState extends State<_RunbookImportDialog> {
     return AlertDialog(
       title: Text(l10n.runbookImportTitle),
       content: SizedBox(
-        width: 520,
+        // 小屏按视口 92% 缩放，大屏保持 520 上限
+        width: math.min(520, MediaQuery.sizeOf(context).width * 0.92),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

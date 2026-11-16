@@ -91,10 +91,6 @@
   "auditLogSearchHint": "搜索命令、服务器、输出...",
   "auditLogTitle": "操作记录",
   "authMethod": "认证方式",
-  "builtinPromptDesc": "AI 的核心系统提示词，修改后立即生效。包含「context」的位置会被替换为服务器信息。",
-  "builtinPromptSaved": "内置提示词已保存",
-  "builtinPromptTitle": "内置系统提示词",
-  "builtinPromptWarning": "⚠️ 修改需谨慎，可随时\"重置默认\"。",
   "cancel": "取消",
   "changeRecordAllTitle": "全部改动记录",
   "changeRecordConfirmRollback": "确认撤销",
@@ -192,9 +188,6 @@
   "connectionManagement": "连接管理",
   "connectionSuccess": "连接成功",
   "copy": "复制",
-  "customPromptDesc": "追加到 AI 系统提示词末尾的自定义指令，可用于调整 AI 行为风格、输出偏好等。留空则不追加。",
-  "customPromptSaved": "自定义提示词已保存",
-  "customPromptTitle": "自定义 AI 提示词",
   "darkMode": "深色模式",
   "delete": "删除",
   "deleteConfirm": "确认删除？",
@@ -289,8 +282,6 @@
   "languageDialogTitle": "选择语言",
   "languageFollowSystem": "跟随系统",
   "lightMode": "浅色模式",
-  "menuItemBuiltinPrompt": "内置提示词",
-  "menuItemCustomPrompt": "自定义提示词",
   "messageSaveFailed": "消息保存失败，任务未启动",
   "name": "名称",
   "nickname": "昵称",
@@ -494,7 +485,6 @@
   "terminalConnected": "已连接",
   "terminalConnecting": "正在连接 {host}...",
   "terminalCreateNew": "+ 新建",
-  "terminalCustomPromptHint": "例如：回答使用英文、输出简洁格式、优先使用 Docker...",
   "terminalExitOrchestrator": "退出编排模式",
   "terminalExpandAIPanel": "展开 AI 面板",
   "terminalExpandMonitorPanel": "展开监控面板",
@@ -512,11 +502,6 @@
   "terminalLayoutRight": "右",
   "terminalLocalStartFailed": "本地终端启动失败",
   "terminalLocalStartFailedWithError": "本地终端启动失败: {error}",
-  "terminalMaxSteps": "最大步骤数",
-  "terminalMaxStepsDesc": "Agent 自动模式下的最大执行步骤数。设为 0 表示无限制，复杂任务不会被中断。",
-  "terminalMaxStepsLabel": "步骤数 (0 = 无限制)",
-  "terminalMaxStepsSet": "最大步骤数已设为 {value}",
-  "terminalMaxStepsTitle": "最大执行步骤数",
   "terminalModel": "模型",
   "terminalMonitor": "监控",
   "terminalNewConnection": "新连接",
@@ -923,13 +908,6 @@
     "placeholders": {
       "error": {
         "type": "String"
-      }
-    }
-  },
-  "@terminalMaxStepsSet": {
-    "placeholders": {
-      "value": {
-        "type": "int"
       }
     }
   },

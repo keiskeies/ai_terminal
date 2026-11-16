@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../core/constants.dart';
@@ -175,16 +176,20 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
           ),
           ElevatedButton(
             onPressed: () {
-              Navigator.pop(context);
               final resolved = snippet.resolveCommand(
                 controllers.map((k, c) => MapEntry(k, c.text)),
               );
+              // 按钮就叫「复制命令」，必须真的落到剪贴板；
+              // 原来只弹一个提示框把命令显示出来，用户还得自己选中再复制。
+              Clipboard.setData(ClipboardData(text: resolved));
+              Navigator.pop(context);
               showTopSnackBar(context, 
                 SnackBar(
                   content: SelectableText(l10n.snippetResolvedCommand(resolved)),
                   action: SnackBarAction(
                     label: l10n.copy,
-                    onPressed: () {},
+                    onPressed: () =>
+                        Clipboard.setData(ClipboardData(text: resolved)),
                   ),
                 ),
               );

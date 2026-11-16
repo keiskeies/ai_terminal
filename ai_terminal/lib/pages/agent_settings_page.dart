@@ -6,6 +6,7 @@ import '../models/ai_model_config.dart';
 import '../services/daos.dart';
 import '../core/prompts.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/agent_provider.dart';
 import '../services/local_file_policy.dart';
@@ -23,6 +24,19 @@ class AgentSettingsPage extends ConsumerStatefulWidget {
 }
 
 class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
+  /// 命令超时倍数。`getCommandTimeout` 一直在读这个键，但此前没有任何入口，
+  /// 用户永远只能拿到默认的 1.0 倍。
+  double get _commandTimeoutMultiplier {
+    final saved = SettingsDao.getCached('commandTimeoutMultiplier');
+    return (double.tryParse(saved?.toString() ?? '') ?? 1.0).clamp(0.5, 5.0);
+  }
+
+  void _setCommandTimeoutMultiplier(double value) {
+    final clamped = double.parse(value.clamp(0.5, 5.0).toStringAsFixed(1));
+    SettingsDao.set('commandTimeoutMultiplier', clamped);
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -174,6 +188,73 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                               style: TextStyle(
                                   color: tc.textMuted, fontSize: fMicro)),
                           Text('${kMaxAiResponseTimeoutSeconds}s',
+                              style: TextStyle(
+                                  color: tc.textMuted, fontSize: fMicro)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // 命令超时倍数
+              Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Padding(
+                  padding: const EdgeInsets.all(pStandard),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            UiText.t('命令超时倍数',
+                                'Command timeout multiplier'),
+                            style: TextStyle(color: tc.textMain),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: cPrimary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(rSmall),
+                            ),
+                            child: Text(
+                              '${_commandTimeoutMultiplier.toStringAsFixed(1)}x',
+                              style: const TextStyle(
+                                color: cPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        UiText.t('慢速网络调高，排查卡死调低。',
+                            'Raise on slow links, lower to surface hangs.'),
+                        style: TextStyle(color: tc.textSub, fontSize: fSmall),
+                      ),
+                      const SizedBox(height: 12),
+                      Slider(
+                        value: _commandTimeoutMultiplier,
+                        min: 0.5,
+                        max: 5.0,
+                        divisions: 9,
+                        label:
+                            '${_commandTimeoutMultiplier.toStringAsFixed(1)}x',
+                        onChanged: _setCommandTimeoutMultiplier,
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('0.5x',
+                              style: TextStyle(
+                                  color: tc.textMuted, fontSize: fMicro)),
+                          Text('5.0x',
                               style: TextStyle(
                                   color: tc.textMuted, fontSize: fMicro)),
                         ],
@@ -446,7 +527,10 @@ class _CustomPromptEditorState extends State<_CustomPromptEditor> {
 /// 白名单是"能进哪些门"，敏感路径黑名单（~/.ssh、.env 等）是"进了门也不能碰什么"，
 /// 后者优先级更高且不可被这里的配置放开。
 class LocalFileAccessSection extends StatefulWidget {
-  const LocalFileAccessSection();
+  const LocalFileAccessSection({super.key, this.flat = false});
+
+  /// 嵌在别的卡片里时传 true：不再套一层 Card，否则会变成卡中卡。
+  final bool flat;
 
   @override
   State<LocalFileAccessSection> createState() => LocalFileAccessSectionState();
@@ -570,9 +654,7 @@ class LocalFileAccessSectionState extends State<LocalFileAccessSection> {
     final ui = AgentUiText.of(context);
     if (_loading) return const SizedBox.shrink();
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
+    final content = Padding(
         padding: const EdgeInsets.all(pStandard),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -589,11 +671,7 @@ class LocalFileAccessSectionState extends State<LocalFileAccessSection> {
                 ),
               ],
             ),
-            Text(
-              ui.localFileEnableDesc,
-              style: TextStyle(color: tc.textSub, fontSize: fSmall),
-            ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 4),
             Row(
               children: [
                 Expanded(
@@ -664,7 +742,12 @@ class LocalFileAccessSectionState extends State<LocalFileAccessSection> {
             ),
           ],
         ),
-      ),
-    );
+      );
+    return widget.flat
+        ? content
+        : Card(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: content,
+          );
   }
 }

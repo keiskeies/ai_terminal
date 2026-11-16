@@ -115,7 +115,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(rSmall),
-                  borderSide: const BorderSide(color: cPrimary, width: 1),
+                  borderSide: BorderSide(color: tc.brand, width: 1.5),
                 ),
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 isDense: true,

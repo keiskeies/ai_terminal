@@ -73,7 +73,9 @@ const _appLight = xterm.TerminalTheme(
   magenta: Color(0xFF8A3A8A),
   cyan: Color(0xFF0B7A75),
   white: Color(0xFF6F7872),
-  brightBlack: Color(0xFF8A938D),
+  // 终端次要文字（ls 灰、进度提示）也走 UI 同一档灰：旧值 #8A938D 在
+  // 亮色终端底上只有 2.6:1，小字号不可读。
+  brightBlack: Color(0xFF606963),
   brightRed: Color(0xFFD14343),
   brightGreen: Color(0xFF2E9B63),
   brightYellow: Color(0xFFA66F00),
@@ -216,6 +218,84 @@ const _gruvbox = xterm.TerminalTheme(
   searchHitForeground: Color(0xFFFDF9E4),
 );
 
+const _catppuccinMocha = xterm.TerminalTheme(
+  cursor: Color(0xFFD9E0EE),
+  selection: Color(0x4D585B70),
+  foreground: Color(0xFFCDD6F4),
+  background: Color(0xFF1E1E2E),
+  black: Color(0xFF45475A),
+  red: Color(0xFFF38BA8),
+  green: Color(0xFFA6E3A1),
+  yellow: Color(0xFFF9E2AF),
+  blue: Color(0xFF89B4FA),
+  magenta: Color(0xFFF5C2E7),
+  cyan: Color(0xFF94E2D5),
+  white: Color(0xFFBAC2DE),
+  brightBlack: Color(0xFF585B70),
+  brightRed: Color(0xFFF5B4C4),
+  brightGreen: Color(0xFFC3EFC0),
+  brightYellow: Color(0xFFFBECCB),
+  brightBlue: Color(0xFFB0CCFD),
+  brightMagenta: Color(0xFFFADDF3),
+  brightCyan: Color(0xFFBAEEE4),
+  brightWhite: Color(0xFFF5E9F0),
+  searchHitBackground: Color(0xFF313244),
+  searchHitBackgroundCurrent: Color(0xFF45475A),
+  searchHitForeground: Color(0xFFCDD6F4),
+);
+
+const _tokyoNight = xterm.TerminalTheme(
+  cursor: Color(0xFFC0CAF5),
+  selection: Color(0x4D28345A),
+  foreground: Color(0xFFC0CAF5),
+  background: Color(0xFF1A1B26),
+  black: Color(0xFF15161E),
+  red: Color(0xFFF7768E),
+  green: Color(0xFF9ECE6A),
+  yellow: Color(0xFFE0AF68),
+  blue: Color(0xFF7AA2F7),
+  magenta: Color(0xFFBB9AF7),
+  cyan: Color(0xFF7DCFFF),
+  white: Color(0xFFA9B1D6),
+  brightBlack: Color(0xFF414868),
+  brightRed: Color(0xFFF98FA1),
+  brightGreen: Color(0xFFB5D98A),
+  brightYellow: Color(0xFFE8C583),
+  brightBlue: Color(0xFF96B7FA),
+  brightMagenta: Color(0xFFCEB3F9),
+  brightCyan: Color(0xFF9CD9FF),
+  brightWhite: Color(0xFFC0CAF5),
+  searchHitBackground: Color(0xFF283457),
+  searchHitBackgroundCurrent: Color(0xFF2F3D66),
+  searchHitForeground: Color(0xFFC0CAF5),
+);
+
+const _nord = xterm.TerminalTheme(
+  cursor: Color(0xFFD8DEE9),
+  selection: Color(0x4D434C5E),
+  foreground: Color(0xFFD8DEE9),
+  background: Color(0xFF2E3440),
+  black: Color(0xFF3B4252),
+  red: Color(0xFFBF616A),
+  green: Color(0xFFA3BE8C),
+  yellow: Color(0xFFEBCB8B),
+  blue: Color(0xFF81A1C1),
+  magenta: Color(0xFFB48EAD),
+  cyan: Color(0xFF88C0D0),
+  white: Color(0xFFE5E9F0),
+  brightBlack: Color(0xFF4C566A),
+  brightRed: Color(0xFFD08789),
+  brightGreen: Color(0xFFB7CBA6),
+  brightYellow: Color(0xFFF0D9A6),
+  brightBlue: Color(0xFF9CB7D3),
+  brightMagenta: Color(0xFFC9ACCB),
+  brightCyan: Color(0xFFA3D4E0),
+  brightWhite: Color(0xFFECEFF4),
+  searchHitBackground: Color(0xFF3B4252),
+  searchHitBackgroundCurrent: Color(0xFF434C5E),
+  searchHitForeground: Color(0xFFECEFF4),
+);
+
 /// 可选配色（按设置页展示顺序）。
 const List<TerminalPalette> kTerminalPalettes = [
   TerminalPalette(
@@ -249,6 +329,24 @@ const List<TerminalPalette> kTerminalPalettes = [
     labelZh: 'Gruvbox',
     labelEn: 'Gruvbox',
     dark: _gruvbox,
+  ),
+  TerminalPalette(
+    id: 'catppuccin-mocha',
+    labelZh: 'Catppuccin Mocha',
+    labelEn: 'Catppuccin Mocha',
+    dark: _catppuccinMocha,
+  ),
+  TerminalPalette(
+    id: 'tokyo-night',
+    labelZh: 'Tokyo Night',
+    labelEn: 'Tokyo Night',
+    dark: _tokyoNight,
+  ),
+  TerminalPalette(
+    id: 'nord',
+    labelZh: 'Nord',
+    labelEn: 'Nord',
+    dark: _nord,
   ),
 ];
 
