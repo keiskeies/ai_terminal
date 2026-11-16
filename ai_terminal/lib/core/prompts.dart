@@ -4,7 +4,7 @@ const String commandFormatRule = '''
 1. 所有可执行命令必须放在 ```bash 代码块中
 2. 代码块内禁止写注释、禁止写说明文字
 3. 每条命令必须是单行、可独立执行的命令
-4. 禁止使用 &&、||、;、| 等链式/管道符号
+4. 只读命令可以用管道 | 或 && / ; 链接组合（如 ps aux | grep nginx、df -h && free -m）；包含修改类操作（安装/删除/改配置/重启等）的命令禁止链接，必须每轮单独执行一条
 5. 如果需要多步操作，可以分多条命令输出，放在同一个代码块中，每行一条
 6. 解释性文字写在代码块外
 7. 对于简单安全的命令（如查看版本、检查状态），可以直接执行并在回复中说明结果
@@ -71,7 +71,7 @@ const String agentAutoRule = '''
 
 📌 核心规则：
 1. 必须先思考再行动，不可跳过"思考:"步骤
-2. 每次只执行一条命令（多步操作需要多轮完成）
+2. 修改类命令每次只执行一条；只读命令可用管道/链式一轮完成过滤统计（如 grep -n "error" app.log | tail -50）
 3. 思考过程要简洁明了，说明为什么要执行这个动作
 4. 任务完成后必须使用 finish 动作结束
 5. 不确定时使用 ask 动作询问用户
@@ -240,11 +240,17 @@ mv /etc/nginx/nginx.conf.bak.1730000000 /etc/nginx/nginx.conf && nginx -s reload
 说明：单行替换直接用 old/new 纯文本，避免自己计算 base64（中文尤其容易算错）。
 多行替换、或 old/new 首尾有空格/制表符时，改用 old_b64/new_b64（UTF-8 原文的 base64）。
 
+✅ 示例12（只读管道组合 — 一轮完成过滤统计）：
+思考: 需要确认 nginx 进程是否在运行，用管道一次完成过滤，并排除 grep 自身
+说明: 列出所有进程并过滤出 nginx 相关行，只读取信息，不会修改系统
+动作: execute
+命令: ps aux | grep nginx | grep -v grep
+
 ⚠️ 禁止事项：
 - 禁止使用 ```bash 代码块输出命令，命令只能写在"命令:"行
 - 禁止在"命令:"行写注释或说明文字
 - 禁止跳过"思考:"直接行动
-- 禁止一次执行多条命令（禁止用 &&、||、; 连接多条命令）
+- 禁止用 &&、||、; 链接多条修改类命令（只读命令的管道/链式允许）
 - 禁止说"请确认""请执行"，直接执行即可
 - **远程 SSH 会话禁止用 echo/heredoc/sed 编辑远程文件**，必须用 file_write / file_patch 工具
   （echo/heredoc 走 shell 会有转义/换行/EOF 边界问题；file_write/file_patch 走 SFTP 直传字节，绕过 shell）
@@ -340,6 +346,7 @@ $knowledgeSafetyRule
 • 优先使用包管理器 (winget/choco/scoop)
 • 修改系统配置前，必须生成备份命令
 • Windows 不支持 heredoc，写入多行文件用 Set-Content 或 here-string @'...'@
+• Windows PowerShell 5.1 不支持 && 和 ||：只读命令组合只用管道 | 或 ; 分隔（如 Get-Process | Select-String nginx）；修改类命令仍每轮单独执行一条
 • 禁止生成高危命令（如格式化磁盘、删除系统文件）
 
 【当前环境】
