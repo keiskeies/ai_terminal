@@ -35,6 +35,26 @@ class KnowledgeConfig {
   static const int userLearningsEvictBatch = 50;
 }
 
+/// 按需检索条目（[KnowledgeService.searchKnowledge] 返回，供 knowledge_search 工具使用）
+///
+/// 与注入用的 [KnowledgeSearchResult] 分开：工具输出需要区分条目来源
+/// （本机验证经验 vs 官方库），让模型知道哪些命令在当前环境实际跑通过。
+class KnowledgeSearchEntry {
+  final SoftwareGuide guide;
+
+  /// FTS5 相关性分数（已取绝对值；LIKE 回退命中为 0）
+  final double score;
+
+  /// true = 用户经验库（本机/同类环境验证过），false = 官方知识库
+  final bool isUserExperience;
+
+  const KnowledgeSearchEntry({
+    required this.guide,
+    required this.score,
+    required this.isUserExperience,
+  });
+}
+
 /// 知识库服务 — SQLite FTS5 全文搜索 + 内置库 + 用户经验库
 class KnowledgeService {
   static final KnowledgeService _instance = KnowledgeService._internal();
@@ -433,11 +453,13 @@ class KnowledgeService {
   }
 
   /// 搜索用户经验库（内部使用，结果会与官方库合并）
+  /// [limit] 最大返回条数（默认与注入路径一致）
   Future<List<KnowledgeSearchResult>> _searchUserLearnings(
     String query, {
     String? opType,
     String? platform,
     String? hostId,
+    int limit = KnowledgeConfig.maxResults,
   }) async {
     if (_userDb == null) return [];
     try {
@@ -471,7 +493,7 @@ class KnowledgeService {
         WHERE user_learnings_fts MATCH ? $where
         $orderClause
         LIMIT ?
-      ''', [...args, KnowledgeConfig.maxResults]);
+      ''', [...args, limit]);
 
       // 更新命中次数和最后使用时间（后台执行，不阻塞）
       if (results.isNotEmpty) {
@@ -521,10 +543,12 @@ class KnowledgeService {
   /// [query] 搜索关键词（原始用户输入）
   /// [opType] 可选的操作类型过滤（install/uninstall/update/configure）
   /// [platform] 可选的平台过滤
+  /// [limit] 最大返回条数（默认与注入路径一致）
   Future<List<KnowledgeSearchResult>> search(
     String query, {
     String? opType,
     String? platform,
+    int limit = KnowledgeConfig.maxResults,
   }) async {
     if (!_initialized || _db == null) {
       debugPrint('[KnowledgeService] search 跳过: initialized=$_initialized, db=${_db != null}');
@@ -571,7 +595,7 @@ class KnowledgeService {
           WHERE guides_fts MATCH ? $where
           ORDER BY ft.rank
           LIMIT ?
-        ''', [ftsQuery, ...args, KnowledgeConfig.maxResults]);
+        ''', [ftsQuery, ...args, limit]);
 
         debugPrint('[KnowledgeService] FTS5 搜索结果: ${results.length} 条');
       } catch (e) {
@@ -596,7 +620,7 @@ class KnowledgeService {
           FROM software_guides sg
           WHERE ${likeWhere.join(' AND ')}
           LIMIT ?
-        ''', [...likeArgs, KnowledgeConfig.maxResults]);
+        ''', [...likeArgs, limit]);
 
         debugPrint('[KnowledgeService] LIKE 回退搜索结果: ${results.length} 条');
       }
@@ -616,7 +640,7 @@ class KnowledgeService {
               WHERE guides_fts MATCH ?
               ORDER BY ft.rank
               LIMIT ?
-            ''', [looseFtsQuery, KnowledgeConfig.maxResults]);
+            ''', [looseFtsQuery, limit]);
           } catch (e) {
             // FTS5 不可用，LIKE 回退
             looseResults = await _db!.rawQuery('''
@@ -624,7 +648,7 @@ class KnowledgeService {
               FROM software_guides sg
               WHERE sg.software_name LIKE ? OR sg.aliases LIKE ? OR sg.summary LIKE ?
               LIMIT ?
-            ''', ['%${keywords.first}%', '%${keywords.first}%', '%${keywords.first}%', KnowledgeConfig.maxResults]);
+            ''', ['%${keywords.first}%', '%${keywords.first}%', '%${keywords.first}%', limit]);
           }
 
           if (looseResults.isNotEmpty) {
@@ -710,6 +734,105 @@ class KnowledgeService {
     return 'linux'; // SSH 场景默认 linux
   }
 
+  /// 公共检索核心 — 任务开始注入（[buildKnowledgeInjection]）与任务中途
+  /// 按需检索（[searchKnowledge] / knowledge_search 工具）共用，保证两条
+  /// 路径的命中口径一致：
+  /// 1. 用户经验库（同 host 优先，实际验证过的经验权重更高）
+  /// 2. 官方库（FTS5 前缀 AND + LIKE 回退 + 宽松搜索）
+  /// 3. 官方库阈值过滤：仅 1 条命中且分数低于阈值时视为噪声丢弃
+  Future<({List<KnowledgeSearchResult> user, List<KnowledgeSearchResult> official})>
+      _searchCore(
+    String query, {
+    String? opType,
+    String? platform,
+    String? hostId,
+    int limit = KnowledgeConfig.maxResults,
+  }) async {
+    final userResults = await _searchUserLearnings(
+      query,
+      opType: opType,
+      platform: platform,
+      hostId: hostId,
+      limit: limit,
+    );
+
+    var officialResults = await search(
+      query,
+      opType: opType,
+      platform: platform,
+      limit: limit,
+    );
+
+    // 官方库阈值过滤
+    if (officialResults.isNotEmpty) {
+      final topOfficial = officialResults.first;
+      if (topOfficial.score < KnowledgeConfig.matchThreshold &&
+          officialResults.length == 1) {
+        debugPrint('[KnowledgeService] 官方库命中但分数低于阈值，跳过官方部分');
+        officialResults = [];
+      }
+    }
+
+    return (user: userResults, official: officialResults);
+  }
+
+  /// 任务中途按需检索知识库（knowledge_search 工具入口）
+  ///
+  /// 与 [buildKnowledgeInjection] 共用 [_searchCore]，返回结构化条目列表
+  /// （用户经验在前、官方库在后），不做注入文本格式化。
+  ///
+  /// 与注入路径的两点有意差异：
+  /// - 不猜测 opType：中途查询多为排障/配置场景，[extractOpType] 兜底返回
+  ///   'install' 会把 configure/uninstall 条目错误过滤掉，故不传 opType。
+  /// - 不做发行版排序（osInfo 属于注入路径的上下文，这里按 platform 过滤即可）。
+  ///
+  /// [query] 搜索关键词；空串直接返回空列表。
+  /// [platform] 可选平台过滤（精确 + 前缀 + all，与注入一致）。
+  /// [hostId] 任务所属主机 ID，用于同 host 经验优先（R3：调用方必须传任务
+  /// 捕获的 host，而不是当前活动 tab）。
+  /// [limit] 合并后最大条目数（钳制到 1..20，R8 有界）。
+  Future<List<KnowledgeSearchEntry>> searchKnowledge(
+    String query, {
+    String? platform,
+    String? hostId,
+    int limit = 5,
+  }) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return [];
+
+    await ensureInitialized();
+    if (!_initialized) {
+      debugPrint('[KnowledgeService] searchKnowledge 跳过: 知识库未初始化 (query="$trimmed")');
+      return [];
+    }
+
+    final effectiveLimit = limit.clamp(1, 20).toInt();
+    final core = await _searchCore(
+      trimmed,
+      platform: platform,
+      hostId: hostId,
+      limit: effectiveLimit,
+    );
+
+    final entries = <KnowledgeSearchEntry>[
+      for (final r in core.user)
+        KnowledgeSearchEntry(
+          guide: r.guide,
+          score: r.score,
+          isUserExperience: true,
+        ),
+      for (final r in core.official)
+        KnowledgeSearchEntry(
+          guide: r.guide,
+          score: r.score,
+          isUserExperience: false,
+        ),
+    ];
+    debugPrint('[KnowledgeService] searchKnowledge: query="$trimmed", '
+        'platform=$platform, hostId=$hostId, 命中 ${entries.length} 条');
+    return entries.take(effectiveLimit).toList();
+  }
+
   /// 构建知识库注入文本（给 LLM system prompt）
   /// 返回 null 表示既无内部规范也无知识命中
   /// [hostId] 当前主机 ID，用于筛选作用域内的内部规范与本机经验
@@ -721,29 +844,16 @@ class KnowledgeService {
     // 0. 内部规范：条数少且漏命中即等于违反约定，故全量常驻注入而非关键词检索
     final rulesInjection = buildRulesInjection(hostId: hostId);
 
-    // 1. 查用户经验库（同 host 优先，实际验证过的经验权重更高）
-    final userResults = await _searchUserLearnings(
+    // 1+2. 用户经验库 + 官方库：与 knowledge_search 工具共用同一检索核心
+    // （FTS5 前缀 AND + LIKE 回退、同 host 经验优先、官方库阈值过滤）
+    final core = await _searchCore(
       userInput,
       opType: opType,
       platform: effectivePlatform,
       hostId: hostId,
     );
-
-    // 2. 查官方库
-    var officialResults = await search(
-      userInput,
-      opType: opType,
-      platform: effectivePlatform,
-    );
-
-    // 官方库阈值过滤（保留原逻辑）
-    if (officialResults.isNotEmpty) {
-      final topOfficial = officialResults.first;
-      if (topOfficial.score < KnowledgeConfig.matchThreshold && officialResults.length == 1) {
-        debugPrint('[KnowledgeService] 官方库命中但分数低于阈值，跳过官方部分');
-        officialResults = [];
-      }
-    }
+    final userResults = core.user;
+    var officialResults = core.official;
 
     // 官方库发行版排序（保留原逻辑）
     if (officialResults.length > 1 && osInfo != null && osInfo.isNotEmpty) {
