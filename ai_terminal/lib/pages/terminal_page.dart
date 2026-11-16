@@ -2031,21 +2031,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               onPanEnd: (_) => _savePanelLayout(savePosition: false),
               child: MouseRegion(
                 cursor: isRight ? SystemMouseCursors.resizeColumn : SystemMouseCursors.resizeRow,
-                // 设计稿在终端与面板之间只有一条 1px 发丝线（rgba(255,255,255,.12)）。
-                // 这里把「能拖动的热区」与「看得见的线」分开：热区仍是 5px
-                // （太窄就拖不住），可见部分收成居中 1px —— 之前整块 5px 都填
-                // 了 60% 白，在两张深色面板之间像一条亮缝，是画面最脏的地方。
-                child: SizedBox(
-                  width: isRight ? 5 : double.infinity,
-                  height: isRight ? double.infinity : 5,
-                  child: Center(
-                    child: Container(
-                      width: isRight ? 1 : double.infinity,
-                      height: isRight ? double.infinity : 1,
-                      color: tc.border,
-                    ),
-                  ),
-                ),
+                child: _panelDivider(vertical: isRight, tc: tc),
               ),
             );
 
@@ -2220,16 +2206,33 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           },
           child: MouseRegion(
             cursor: SystemMouseCursors.resizeRow,
-            child: Container(
-              height: 4,
-              color: tc.border.withValues(alpha: 0.6),
-            ),
+            child: _panelDivider(vertical: false, tc: tc),
           ),
         ),
         SizedBox(
             height: _sftpPanelHeight,
             child: _buildTabSftpPanel(tab, active: active)),
       ],
+    );
+  }
+
+  /// 终端与面板（AI / SFTP）之间的分隔线。
+  ///
+  /// 设计稿只有一条 1px 发丝线（tc.border）。「能拖的热区」与「看得见的线」
+  /// 必须分开：热区留 5px（太窄拖不住），可见部分收成居中 1px。以前 SFTP
+  /// 把整条 4px 都填成 60% 灰，在两块深色面板之间像一道亮缝 —— 现在 AI 与
+  /// SFTP 共用这一份，视觉真正同源，不会再一边细线一边灰条。
+  Widget _panelDivider({required bool vertical, required ThemeColors tc}) {
+    return SizedBox(
+      width: vertical ? 5 : double.infinity,
+      height: vertical ? double.infinity : 5,
+      child: Center(
+        child: Container(
+          width: vertical ? 1 : double.infinity,
+          height: vertical ? double.infinity : 1,
+          color: tc.border,
+        ),
+      ),
     );
   }
 
@@ -2252,10 +2255,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           },
           child: MouseRegion(
             cursor: SystemMouseCursors.resizeColumn,
-            child: Container(
-              width: 4,
-              color: tc.border.withValues(alpha: 0.6),
-            ),
+            child: _panelDivider(vertical: true, tc: tc),
           ),
         ),
         SizedBox(
