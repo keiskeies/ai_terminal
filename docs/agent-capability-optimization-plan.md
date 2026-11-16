@@ -151,11 +151,11 @@
 
 | 期 | 工作包 | 内容 | 规模 |
 |---|---|---|---|
-| **第一期（本轮）** | WP1 | O1 只读组合命令放开 | M |
+| **第一期（已完成，§4）** | WP1 | O1 只读组合命令放开 | M |
 | | WP2 | O2 观测分级截断 + sftp_file_read | M |
 | | WP3 | O5 steering 消息队列 | M |
 | | WP4 | O6 knowledge_search 工具 | S |
-| 第二期 | WP5 | O3 交互输入桥接 | L |
+| **第二期（已完成，§5）** | WP5 | O3 交互输入桥接 | L |
 | | WP6 | O4 计划跟踪门控 | M |
 | 第三期 | WP7 | O7 token 化压缩 | M |
 | | WP8 | O8 FC-first 协议重构 | L |
@@ -216,6 +216,27 @@
 
 **合并后补全（领队）**：WP2 发现 `_trimMessages` 的 `_maxMessageChars=4000` 会把所有历史消息尾保留裁到 4000，失败观测头部进模型前仍被砍掉。修复：观测消息（`观测:` 前缀，含命令与工具观测）专用上限 `_maxObservationMessageChars=12000`——失败观测（≤8000+包装）完整保留，查询观测尾保留从 4000 提升到 12000；token-aware 总裁剪不变。新增 2 个回归测试。
 
-**验证**：主线 `flutter analyze` 43 issue 全为基线既有（0 error，改动文件 0 新增）；`flutter test` 1502 通过 / 25 跳过 / 1 失败——失败项 `server_monitor_windows_e2e_test.dart` 已在基线 commit 91a1d5b 的 detached worktree 复现，属既有失败（疑似近期 monitor 提交引入），与本期无关。GitNexus 不可用，以 grep 调用方 + diff 复核替代。
+**验证**：主线 `flutter analyze` 43 issue 全为基线既有（0 error，改动文件 0 新增）；`flutter test` 1502 通过 / 25 跳过 / 1 失败——失败项 `server_monitor_windows_e2e_test.dart` 已在基线 commit 91a1d5b 的 detached worktree 复现，属既有失败，与本期无关（根因见 §5：63073da 监控栏图标化改版后断言过期，已修）。GitNexus 不可用，以 grep 调用方 + diff 复核替代。
 
-**待办**：monitor e2e 既有失败需单独排查；WP3 UI 需人工冒烟；第二/三期按 §2.1 启动。
+**待办**：WP3 UI 需人工冒烟；第二/三期按 §2.1 启动。
+
+## 5. 第二期完成记录（2026-11-17）
+
+WP5/WP6 由两个并行 worktree 子 agent 开发，按 WP6→WP5 顺序合并，零冲突。
+
+| WP | 提交 | 新增测试 | 备注 |
+|---|---|---|---|
+| WP6 | db9c80a | 14 | 计划进度快照每轮幂等注入 system 消息（【当前计划进度】整段替换不累积）；finish 门控只拦 pending/inProgress 项，≤2 次重试后放行，failed/skipped 不拦；叠加 `_hasExecutedAnyCommand` 幻觉门控 |
+| WP5 | 90ea236 | 30 | 检测器拆分密码类（保持中断→provide_password，R7 密码不进历史/日志）与确认类（[Y/n]/Continue?/Press ENTER，尾锚定）；`ConfirmationPromptResponder` 起始下标去重镜像 sudo 应答器；ssh/local 双执行器桥接 `onInteractivePrompt`；自动应答开关默认关（[Y/n]→Y、Press ENTER→空）；自由文本应答不落凭据库/历史 |
+
+**偏离与复核（领队）**：
+- WP5 放宽 SSH `executeAndWait` 入口守卫为 `!_isConnected`（原 `|| _session == null`）并加 `isConnectedForTesting` 测试缝。不变量复核：`_isConnected=true` 仅在 shell session 获取成功后置位；所有断开路径先置 false 再 null session——生产安全。
+- WP5 扩展 pauseTask/_finishTask 清理路径，所有出口（reset/cancel/pause/finish）均 complete `_interactiveInputCompleter`（R1，防桥接 await 永久挂起）。
+- 两个 worktree 基线为 2eaa5b9（早于主线 f513f44），三方合并只取各自增量，干净落地；WP6 注入点合并后复核位于 steering 排空之后、`_callAI` 之前（循环顶顺序：暂停检查→steering 排空→executor 刷新→计划快照注入→_callAI）。
+- **跨期合并缝隙**：WP5 改了 `executeAndWait` 签名，但一期/WP3/WP6 的 6 个测试 fake 基于旧基线未带 `onInteractivePrompt` 参数，合并后 analyze 报 6 个 invalid_override——领队补齐（8ffe2cc，R9 契约变更需 grep 全部实现方）。
+
+**monitor e2e 失败根因更正**：一期记录为"疑似负载型 flaky"有误。实为 63073da（监控面板精简标签）把所有指标 chip 改为 `showLabel:false`，"CPU" 文字移入 hover 浮层，测试 `find.textContaining('CPU')` 成为确定性过期断言。二期分支基于改版前的 2eaa5b9 故通过，造成 flaky 假象。已改用 CPU 数值断言修复（8ffe2cc）。
+
+**验证**：主线 `flutter analyze` 43 issue 全为基线既有（0 error）；`flutter test` **1547 通过 / 25 跳过 / 0 失败**。GitNexus 不可用，以 grep 调用方 + diff 复核 + 不变量检查替代 impact/detect_changes。
+
+**待办**：WP3/WP5 UI（运行中补充输入、交互应答弹窗、终端按键门控、自动应答开关）需人工冒烟；第三期（WP7 token 压缩 / WP8 FC-first）按 §2.1 启动；未推送远端。
