@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../core/safety_guard.dart';
 import 'daos.dart';
 
-/// 变更窗口（封网期）配置
+/// 安全时段配置
 ///
 /// 运维场景：在业务高峰期或封网期禁止执行修改性命令，避免误操作导致故障。
 /// 仅允许 safe 级（只读）命令执行，warn/blocked/info 级命令一律拒绝。
@@ -60,7 +60,7 @@ class ChangeWindowConfig {
   }
 }
 
-/// 变更窗口服务
+/// 安全时段服务
 class ChangeWindowService {
   static const _key = 'changeWindowConfig';
 
@@ -145,7 +145,7 @@ class ChangeWindowService {
       return (true, null);
     }
 
-    final reason = '当前处于封网期（允许变更窗口: '
+    final reason = '当前不在安全时段内（允许时段: '
         '${_fmtHour(cfg.startHour)}:00 - ${_fmtHour(cfg.endHour)}:00'
         '${cfg.allowedWeekdays.isNotEmpty ? ', 仅 ${_fmtWeekdays(cfg.allowedWeekdays)}' : ''}'
         '），修改性命令被拒绝执行。当前命令安全等级: ${level.name}';

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_terminal/l10n/app_localizations.dart';
+import 'package:ai_terminal/services/change_window_service.dart';
 import 'package:ai_terminal/widgets/nav_drawer.dart';
 import 'package:ai_terminal/widgets/settings_inline_panel.dart';
 
@@ -10,9 +11,14 @@ import 'package:ai_terminal/widgets/settings_inline_panel.dart';
 /// 这组测试盯的就是「展开之后真的有能用的控件」。
 void main() {
   Future<void> pumpPanel(WidgetTester tester, String id) async {
+    // 安全组的安全时段文案走 AppLocalizations（15 语种 ARB），
+    // 不挂 delegate 会直接抛空，和 pumpDrawer 同理。
     await tester.pumpWidget(ProviderScope(
       child: MaterialApp(
         theme: ThemeData.dark(),
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: Scaffold(
           body: SizedBox(
             width: 320,
@@ -206,5 +212,38 @@ void main() {
           scrollable: find.byType(Scrollable).first);
       expect(find.text(title), findsOneWidget, reason: '缺少分组 $title');
     }
+  });
+
+  testWidgets('安全时段在安全组内就地编辑并即时落盘', (tester) async {
+    await pumpPanel(tester, 'security');
+    expect(find.text('安全时段'), findsOneWidget);
+    expect(find.text('启用后，只能在设定时段内做改动'), findsOneWidget);
+    expect(find.byType(Slider), findsNothing);
+
+    // 应用锁 + 安全时段各一个迷你开关
+    final switches = find.byWidgetPredicate((w) =>
+        w is AnimatedContainer &&
+        w.constraints == const BoxConstraints.tightFor(width: 32, height: 18));
+    expect(switches, findsNWidgets(2));
+    await tester.tap(switches.last);
+    await tester.pump();
+
+    expect(find.text('从几点开始允许'), findsOneWidget);
+    expect(find.text('到几点结束'), findsOneWidget);
+    expect(find.byType(Slider), findsNWidgets(2));
+    expect(find.text('周一'), findsOneWidget);
+    expect(ChangeWindowService.config.enabled, isTrue);
+
+    await tester.tap(find.text('周一'));
+    await tester.pump();
+    expect(ChangeWindowService.config.allowedWeekdays, [1]);
+    expect(find.textContaining('仅 周一'), findsWidgets);
+
+    await tester.tap(switches.last);
+    await tester.pump();
+    expect(ChangeWindowService.config.enabled, isFalse);
+
+    // 复原，避免静态缓存影响同文件后续用例
+    await ChangeWindowService.save(const ChangeWindowConfig());
   });
 }

@@ -2542,7 +2542,7 @@ class AgentEngine {
 
     // 远程误发拦截：SSH 到非 Windows 主机时，明显是本机 Windows/PowerShell
     // 的命令先给一条可读观测，避免把 PowerShell 原样发给 bash。
-    // 放在封网期之前：这是本机命令，不应被远程的变更窗口规则拦成“封网期”。
+    // 放在安全时段检查之前：这是本机命令，不应被远程的安全时段规则拦成“封网期”。
     final remoteOs = executor is SSHService
         ? executor.osInfo.toLowerCase()
         : '';
@@ -2570,7 +2570,7 @@ class AgentEngine {
           shouldContinue: true, observation: observation, command: command);
     }
 
-    // 变更窗口/封网期检查：非 safe 级命令在封网期被拒绝
+    // 安全时段检查：非 safe 级命令在时段外被拒绝
     final (windowAllowed, windowReason) =
         ChangeWindowService.checkCommand(command);
     if (!windowAllowed) {

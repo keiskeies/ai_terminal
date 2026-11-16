@@ -10,7 +10,6 @@ import '../pages/runbooks_page.dart';
 import '../pages/sftp_page.dart';
 import '../pages/audit_log_page.dart';
 import '../pages/change_records_page.dart';
-import '../pages/change_window_page.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -128,11 +127,6 @@ final GoRouter appRouter = GoRouter(
         final hostId = state.uri.queryParameters['hostId'];
         return ChangeRecordsPage(hostId: hostId);
       },
-    ),
-    // 变更窗口/封网期
-    GoRoute(
-      path: '/change-window',
-      builder: (context, state) => const ChangeWindowPage(),
     ),
     // 任务完成通知
     GoRoute(

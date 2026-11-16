@@ -885,7 +885,8 @@ class _NavDrawerState extends State<NavDrawer> {
       if (!searching) ...[
         const SizedBox(height: kSettingsGroupGap - kSettingsRowGap),
         // 这里没有「管理」区：主机 / 命令 / 工作流 / 审计就在顶部标签上，
-        // 同一个入口在同一屏出现两次才是真的乱。台账和变更窗口在溢出菜单里。
+        // 同一个入口在同一屏出现两次才是真的乱。台账在溢出菜单里；
+        // 安全时段的菜单项直达设置安全组，不另设页面。
         SettingsSectionLabel(UiText.t('关于', 'About')),
         const SettingsAboutRows(),
       ],

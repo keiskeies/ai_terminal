@@ -8,6 +8,7 @@ import '../core/credentials_store.dart';
 import '../core/terminal_keybindings.dart';
 import '../core/theme_colors.dart';
 import '../core/ui_text.dart';
+import '../l10n/app_localizations.dart';
 import '../models/ai_endpoint.dart';
 import '../models/knowledge_rule.dart';
 import '../pages/agent_settings_page.dart' show LocalFileAccessSection;
@@ -15,6 +16,7 @@ import '../providers/agent_provider.dart';
 import '../providers/app_providers.dart';
 import '../providers/knowledge_rule_provider.dart';
 import '../services/ai_model_selection_service.dart';
+import '../services/change_window_service.dart';
 import '../services/daos.dart';
 import '../services/mcp_manager.dart';
 import '../services/mcp_models.dart';
@@ -71,6 +73,10 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
   List<WebSearchProvider> _webBackends = const [];
   int _webNumResults = 8;
   bool _appLockEnabled = false;
+  bool _cwEnabled = false;
+  int _cwStart = 22;
+  int _cwEnd = 6;
+  Set<int> _cwDays = {};
   bool _biometricsAvailable = false;
   String _biometricType = '';
   final LocalAuthentication _localAuth = LocalAuthentication();
@@ -124,6 +130,12 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
 
       _appLockEnabled =
           SettingsDao.getCached('appLockEnabled', defaultValue: false) == true;
+
+      final cw = ChangeWindowService.config;
+      _cwEnabled = cw.enabled;
+      _cwStart = cw.startHour;
+      _cwEnd = cw.endHour;
+      _cwDays = Set<int>.from(cw.allowedWeekdays);
     } catch (_) {}
   }
 
@@ -493,6 +505,7 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
   // ==================== 安全 ====================
 
   Widget _security(ThemeColors tc) {
+    final l10n = AppLocalizations.of(context)!;
     final biometricLabel = switch (_biometricType) {
       'face' => UiText.t('面容', 'Face'),
       'fingerprint' => UiText.t('指纹', 'Fingerprint'),
@@ -544,6 +557,106 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
             color: tc.gold),
         const SizedBox(height: 14),
         Container(height: 1, color: tc.hairline),
+        const SizedBox(height: 12),
+        // 安全时段：开关与编辑都在本组内即时落盘，没有独立页面和保存按钮。
+        Row(
+          children: [
+            Icon(
+                _cwEnabled
+                    ? Icons.lock_clock_outlined
+                    : Icons.lock_open_outlined,
+                size: 14,
+                color: _cwEnabled ? tc.gold : tc.textSub),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n.changeWindowTitle,
+                    style: TextStyle(
+                        fontSize: fMicro,
+                        color: tc.textMain,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  Text(
+                    _cwEnabled
+                        ? _cwDescribe(l10n)
+                        : l10n.changeWindowEnableHint,
+                    style: TextStyle(
+                        fontSize: fMicro, color: tc.textMuted, height: 1.35),
+                  ),
+                ],
+              ),
+            ),
+            _MiniSwitch(
+              tc: tc,
+              value: _cwEnabled,
+              onChanged: (v) {
+                setState(() => _cwEnabled = v);
+                _saveChangeWindow();
+              },
+            ),
+          ],
+        ),
+        if (_cwEnabled) ...[
+          const SizedBox(height: 12),
+          _cwHourRow(tc, l10n.changeWindowStartHour, _cwStart,
+              (v) => setState(() => _cwStart = v)),
+          const SizedBox(height: 8),
+          _cwHourRow(tc, l10n.changeWindowEndHour, _cwEnd,
+              (v) => setState(() => _cwEnd = v)),
+          const SizedBox(height: 6),
+          _note(tc, l10n.changeWindowCrossDayHint),
+          const SizedBox(height: 12),
+          Text(l10n.changeWindowWeekdaysTitle,
+              style: TextStyle(fontSize: fMicro, color: tc.textSub)),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final day in [1, 2, 3, 4, 5, 6, 7])
+                _ChipButton(
+                  tc: tc,
+                  label: _cwWeekdayName(l10n, day),
+                  selected: _cwDays.contains(day),
+                  onTap: () {
+                    setState(() {
+                      if (!_cwDays.remove(day)) _cwDays.add(day);
+                    });
+                    _saveChangeWindow();
+                  },
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: tc.goldBg,
+              borderRadius: BorderRadius.circular(rSmall),
+              border: Border.all(color: tc.gold.withValues(alpha: 0.22)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.info_outline_rounded, size: 13, color: tc.gold),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    l10n.changeWindowCurrentWindowInfo(_cwDescribe(l10n)),
+                    style: TextStyle(
+                        fontSize: fMicro, color: tc.textSub, height: 1.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 14),
+        Container(height: 1, color: tc.hairline),
         const SizedBox(height: 10),
         GestureDetector(
           onTap: () => setState(() => _confirmClear = true),
@@ -567,6 +680,107 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
               await _performClear();
             },
           ),
+      ],
+    );
+  }
+
+  String _cwFmtHour(int h) => '${h.toString().padLeft(2, '0')}:00';
+
+  String _cwWeekdayName(AppLocalizations l10n, int day) => switch (day) {
+        1 => l10n.changeWindowWeekdayMon,
+        2 => l10n.changeWindowWeekdayTue,
+        3 => l10n.changeWindowWeekdayWed,
+        4 => l10n.changeWindowWeekdayThu,
+        5 => l10n.changeWindowWeekdayFri,
+        6 => l10n.changeWindowWeekdaySat,
+        _ => l10n.changeWindowWeekdaySun,
+      };
+
+  String _cwDescribe(AppLocalizations l10n) {
+    final start = _cwFmtHour(_cwStart);
+    final end = _cwFmtHour(_cwEnd);
+    if (_cwStart == _cwEnd) return l10n.changeWindowAllDayAllowed;
+    final window = _cwStart < _cwEnd
+        ? '$start - $end'
+        : l10n.changeWindowToNextDay(start, end);
+    if (_cwDays.isEmpty) return l10n.changeWindowEveryDay(window);
+    final days = _cwDays.toList()..sort();
+    return l10n.changeWindowOnlyDays(
+        window, days.map((d) => _cwWeekdayName(l10n, d)).join('、'));
+  }
+
+  Future<void> _saveChangeWindow() async {
+    final cfg = ChangeWindowConfig(
+      enabled: _cwEnabled,
+      startHour: _cwStart,
+      endHour: _cwEnd,
+      allowedWeekdays: _cwDays.toList()..sort(),
+    );
+    try {
+      await ChangeWindowService.save(cfg);
+    } catch (e) {
+      if (!mounted) return;
+      showTopSnackBar(
+        context,
+        SnackBar(
+          content: Text(
+              AppLocalizations.of(context)!.changeWindowSaveFailed(e.toString())),
+          backgroundColor: cDanger,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+    _changed();
+  }
+
+  Widget _cwHourRow(
+      ThemeColors tc, String label, int hour, ValueChanged<int> onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(label,
+                  style: TextStyle(fontSize: fMicro, color: tc.textSub)),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: tc.goldBg,
+                borderRadius: BorderRadius.circular(rSmall),
+              ),
+              child: Text(
+                _cwFmtHour(hour),
+                style: TextStyle(
+                    fontSize: fMicro,
+                    color: tc.gold,
+                    fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 4,
+            activeTrackColor: tc.brand,
+            inactiveTrackColor: tc.surface,
+            thumbColor: tc.brand,
+            overlayColor: tc.brandBg,
+            valueIndicatorColor: tc.cardElevated,
+            valueIndicatorTextStyle:
+                TextStyle(fontSize: fMicro, color: tc.textMain),
+          ),
+          child: Slider(
+            value: hour.toDouble(),
+            min: 0,
+            max: 23,
+            divisions: 23,
+            label: _cwFmtHour(hour),
+            onChanged: (v) => onChanged(v.toInt()),
+            onChangeEnd: (_) => _saveChangeWindow(),
+          ),
+        ),
       ],
     );
   }

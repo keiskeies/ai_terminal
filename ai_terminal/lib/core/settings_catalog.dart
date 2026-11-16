@@ -1,4 +1,5 @@
 import 'ui_text.dart';
+import '../services/change_window_service.dart';
 import '../services/daos.dart';
 import '../services/mcp_manager.dart';
 import '../services/notification_service.dart';
@@ -114,11 +115,16 @@ class SettingsEntry {
   static String _securitySubtitle() {
     final appLock =
         SettingsDao.getCached('appLockEnabled', defaultValue: false) == true;
-    return appLock
-        ? UiText.t('应用锁已开启 · 高危命令二次确认',
-            'App lock on · dangerous commands confirmed')
-        : UiText.t('应用锁未开启 · 高危命令二次确认',
-            'App lock off · dangerous commands confirmed');
+    final lockLabel = appLock
+        ? UiText.t('应用锁已开启', 'App lock on')
+        : UiText.t('应用锁未开启', 'App lock off');
+    final cw = ChangeWindowService.config;
+    String pad(int h) => h.toString().padLeft(2, '0');
+    final cwLabel = cw.enabled
+        ? UiText.t('安全时段 ${pad(cw.startHour)}:00–${pad(cw.endHour)}:00',
+            'Safe window ${pad(cw.startHour)}:00–${pad(cw.endHour)}:00')
+        : UiText.t('安全时段未启用', 'Safe window off');
+    return '$lockLabel · $cwLabel';
   }
 
   static String _mcpSubtitle() {
@@ -222,12 +228,6 @@ List<SettingsShortcut> settingsShortcuts() {
       title: UiText.t('变更台账', 'Change records'),
       route: '/change-records',
       subtitle: UiText.t('谁在什么时候改了什么', 'Who changed what, when'),
-    ),
-    SettingsShortcut(
-      id: 'change-window',
-      title: UiText.t('变更窗口', 'Change window'),
-      route: '/change-window',
-      subtitle: UiText.t('限制允许执行改动的时间段', 'Restrict when changes may run'),
     ),
   ];
 }
