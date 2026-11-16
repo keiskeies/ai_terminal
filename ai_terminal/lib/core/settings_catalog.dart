@@ -1,4 +1,3 @@
-import 'terminal_themes.dart';
 import 'ui_text.dart';
 import '../services/daos.dart';
 import '../services/mcp_manager.dart';
@@ -8,12 +7,15 @@ import '../services/web_search_config.dart';
 /// 设置分组的单一数据源。
 ///
 /// 此前抽屉和整页各维护一份分组：抽屉 8 项、整页 17 项，同一个开关在两处
-/// 措辞不同（「外观」vs「外观与体验」，「AI 模型」vs「AI 与智能」）。分组
+/// 措辞不同（「终端」vs「外观与体验」，「AI 模型」vs「AI 与智能」）。分组
 /// 顺序与标题以设计稿第 07 节的 7 组为准；联网搜索是设计稿未列出、但功能
 /// 独立存在的一项，排在 Agent 之后，让三组 AI 能力连续。
 ///
 /// 副标题一律是「当前真实状态读数」，不是说明文案 —— 用户要能一眼看出自己
 /// 现在到底是什么配置，而不是读一句「管理你的主机」。
+///
+/// 主题模式 / 终端配色 / 字号这三项外观设置放在顶栏外观浮层（边切边看的
+/// 东西，一次点击到），不在这里出现。
 class SettingsEntry {
   const SettingsEntry({
     required this.id,
@@ -33,8 +35,8 @@ class SettingsEntry {
   /// 当前状态读数。数据源都在缓存里，读不到时给「还没有…」而不是空白。
   String get subtitle {
     switch (id) {
-      case 'appearance':
-        return _appearanceSubtitle();
+      case 'terminal':
+        return _terminalSubtitle();
       case 'ai':
         return _aiSubtitle();
       case 'agent':
@@ -54,29 +56,23 @@ class SettingsEntry {
     }
   }
 
-  static String _appearanceSubtitle() {
-    final mode = SettingsDao.getCached('themeMode') as String? ?? 'dark';
-    final modeLabel = switch (mode) {
-      'light' => UiText.t('浅色', 'Light'),
-      'system' => UiText.t('跟随系统', 'System'),
-      _ => UiText.t('深色', 'Dark'),
+  /// 终端的「配一次不再动」项。主题/配色/字号已移到顶栏外观浮层，
+  /// 不在设置里（也不在副标题里）。
+  static String _terminalSubtitle() {
+    final scrollback =
+        (SettingsDao.getCached('terminalScrollback') as num?)?.toInt() ?? 10000;
+    final log = SettingsDao.getCached('sessionLogEnabled') == true;
+    final logLabel = log
+        ? UiText.t('会话日志开', 'Log on')
+        : UiText.t('会话日志关', 'Log off');
+    final scrollLabel = switch (scrollback) {
+      1000 => UiText.t('1 千行', '1k'),
+      10000 => UiText.t('1 万行', '10k'),
+      50000 => UiText.t('5 万行', '50k'),
+      100000 => UiText.t('10 万行', '100k'),
+      _ => '$scrollback',
     };
-    // 没存过就用默认配色：副标题漏掉配色会让人以为「没设置过配色」。
-    final stored = SettingsDao.getCached('terminalPalette') as String?;
-    final paletteId = (stored == null || stored.isEmpty)
-        ? kDefaultTerminalPalette
-        : stored;
-    String? paletteName;
-    for (final p in kTerminalPalettes) {
-      if (p.id == paletteId) paletteName = p.label(isZh: UiText.zh);
-    }
-    final fontSize =
-        (SettingsDao.getCached('terminalFontSize') as num?)?.toInt() ?? 13;
-    return [
-      modeLabel,
-      if (paletteName != null) paletteName,
-      '${fontSize}px',
-    ].join(' · ');
+    return UiText.t('$scrollLabel · $logLabel', '$scrollLabel · $logLabel');
   }
 
   static String _aiSubtitle() {
@@ -161,7 +157,7 @@ class SettingsEntry {
 /// 第一周就会碰的，所以排在 Agent 之后；联网搜索和内部规范属于「让 AI 更懂我」
 /// 的调优项，是第二阶段的事；通知多数人永不触碰，压到最后。
 const List<SettingsEntry> kSettingsEntries = [
-  SettingsEntry(id: 'appearance', title: '外观', route: '/settings/appearance'),
+  SettingsEntry(id: 'terminal', title: '终端', route: '/settings/terminal'),
   SettingsEntry(id: 'ai', title: 'AI 模型', route: '/settings/ai'),
   SettingsEntry(id: 'agent', title: 'Agent', route: '/settings/agent'),
   SettingsEntry(id: 'security', title: '安全', route: '/settings/security'),

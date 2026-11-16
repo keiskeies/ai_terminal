@@ -84,11 +84,11 @@ void main() {
     expect(find.textContaining('打开完整'), findsNothing);
   });
 
-  testWidgets('配色浮层的「更多」能直接落到外观组', (tester) async {
-    await pumpDrawer(tester, initialGroup: 'appearance');
+  testWidgets('配色浮层的「更多」能直接落到终端组', (tester) async {
+    await pumpDrawer(tester, initialGroup: 'terminal');
 
     // 组是展开状态：展开区里的控件直接可见，不用再点一次。
-    expect(find.text('主题模式'), findsOneWidget);
-    expect(find.text('终端配色'), findsOneWidget);
+    expect(find.text('回滚缓冲行数'), findsOneWidget);
+    expect(find.text('自动会话日志'), findsOneWidget);
   });
 }

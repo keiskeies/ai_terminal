@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/core/settings_catalog.dart';
-import 'package:ai_terminal/core/terminal_themes.dart';
 import 'package:ai_terminal/l10n/app_localizations.dart';
 import 'package:ai_terminal/l10n/app_localizations_zh.dart';
 import 'package:ai_terminal/services/daos.dart';
@@ -68,7 +67,7 @@ void main() {
     await search(tester, '超时');
 
     expect(find.text('Agent'), findsOneWidget, reason: '「超时」属于 Agent 组');
-    expect(find.text('外观'), findsNothing, reason: '没命中的组要隐藏');
+    expect(find.text('终端'), findsNothing, reason: '没命中的组要隐藏');
     expect(find.text('通知'), findsNothing);
   });
 
@@ -86,8 +85,9 @@ void main() {
     await search(tester, 'mcp');
     expect(find.text('MCP 服务器'), findsOneWidget);
 
-    await search(tester, '主题');
-    expect(find.text('外观'), findsOneWidget);
+    await search(tester, '终端');
+    // 搜索框输入文字与组标题同名，两处都会命中，用 findsWidgets。
+    expect(find.text('终端'), findsWidgets);
     expect(find.text('MCP 服务器'), findsNothing);
   });
 
@@ -96,14 +96,14 @@ void main() {
     await search(tester, 'zzz不存在');
 
     expect(find.textContaining('没有叫'), findsOneWidget);
-    expect(find.text('外观'), findsNothing);
+    expect(find.text('终端'), findsNothing);
     expect(find.text('关于'), findsNothing);
   });
 
   testWidgets('清空搜索后八组恢复，关于区回归', (tester) async {
     await pumpSettings(tester);
     await search(tester, '超时');
-    expect(find.text('外观'), findsNothing);
+    expect(find.text('终端'), findsNothing);
 
     await search(tester, '');
     for (final e in kSettingsEntries) {
@@ -120,12 +120,12 @@ void main() {
     expect(find.text('关于'), findsNothing);
   });
 
-  testWidgets('组序是上手顺序：外观 → AI → Agent → 安全 → MCP → 联网 → 规范 → 通知',
+  testWidgets('组序是上手顺序：终端 → AI → Agent → 安全 → MCP → 联网 → 规范 → 通知',
       (tester) async {
     await pumpSettings(tester);
     final order = kSettingsEntries.map((e) => e.title).toList();
     expect(order, [
-      '外观',
+      '终端',
       'AI 模型',
       'Agent',
       '安全',
@@ -142,30 +142,30 @@ void main() {
         reason: '全默认时整块不渲染，不给一个永远空着的区块');
   });
 
-  testWidgets('改过字号后出现「已修改」区，点行展开外观组', (tester) async {
-    // 先改一项：字号 13 → 16。
-    await SettingsDao.set('terminalFontSize', 16);
-    addTearDown(() => SettingsDao.set('terminalFontSize', 13));
+  testWidgets('改过缓冲后出现「已修改」区，点行展开终端组', (tester) async {
+    // 先改一项：缓冲行数 10000 → 50000。
+    await SettingsDao.set('terminalScrollback', 50000);
+    addTearDown(() => SettingsDao.set('terminalScrollback', 10000));
 
     await pumpSettings(tester);
 
     expect(find.text('已修改'), findsOneWidget);
-    expect(find.text('16px'), findsOneWidget, reason: '摘要要显示当前值');
+    expect(find.text('5 万行'), findsOneWidget, reason: '摘要要显示当前值');
 
-    // 点这一行 → 外观组展开（展开后才会出现「终端配色」这类字段标签）。
-    await tester.tap(find.text('16px'));
+    // 点这一行 → 终端组展开（展开后才会出现「自动会话日志」这类字段标签）。
+    await tester.tap(find.text('5 万行'));
     await tester.pumpAndSettle();
-    expect(find.text('终端配色'), findsOneWidget);
+    expect(find.text('自动会话日志'), findsOneWidget);
   });
 
   testWidgets('改回默认后「已修改」区消失', (tester) async {
-    await SettingsDao.set('terminalFontSize', 16);
+    await SettingsDao.set('terminalScrollback', 50000);
     await pumpSettings(tester);
     expect(find.text('已修改'), findsOneWidget);
 
-    await SettingsDao.set('terminalFontSize', 13);
+    await SettingsDao.set('terminalScrollback', 10000);
     // 触发重建：搜索一次再清空。
-    await search(tester, '字号');
+    await search(tester, '缓冲');
     await search(tester, '');
     expect(find.text('已修改'), findsNothing);
   });
@@ -183,10 +183,10 @@ void main() {
   testWidgets('搜组标题必须命中（用户是照着组名念的）', (tester) async {
     await pumpSettings(tester);
 
-    // 索引表里没有「外观」「安全」这两个词，标题若不参与匹配就会给空态。
+    // 索引表里没有「终端」「安全」这两个词，标题若不参与匹配就会给空态。
     // 断言用 `findsWidgets` 而不是 `findsOneWidget`：搜索框里的输入文字
-    // 本身也是一个 Text（EditableText），搜「外观」时会出现两处。
-    for (final title in ['外观', '安全', 'AI 模型', 'MCP 服务器']) {
+    // 本身也是一个 Text（EditableText），搜「终端」时会出现两处。
+    for (final title in ['终端', '安全', 'AI 模型', 'MCP 服务器']) {
       await search(tester, title);
       expect(find.textContaining('没有叫'), findsNothing,
           reason: '搜组标题「$title」不该落空');
@@ -198,8 +198,8 @@ void main() {
     await pumpSettings(tester);
 
     for (final (query, expectTitle) in [
-      ('theme', '外观'),
-      ('font', '外观'),
+      ('terminal', '终端'),
+      ('scrollback', '终端'),
       ('timeout', 'Agent'),
       ('endpoint', 'AI 模型'),
     ]) {
@@ -253,20 +253,20 @@ void main() {
   });
 
   testWidgets('「已修改」超过 5 项时折叠并显示「还有 N 项」', (tester) async {
-    // _changedSettings() 只追踪 6 个键（主题/配色/字号/步数/超时/应用锁），
+    // _changedSettings() 只追踪 6 个键（缓冲/会话日志/步数/超时/超时倍数/应用锁），
     // 所以「超过 5 项」只可能是 6 项 —— 造满这 6 个。
-    await SettingsDao.set('themeMode', 'light');
-    await SettingsDao.set('terminalPalette', 'dracula');
-    await SettingsDao.set('terminalFontSize', 16);
+    await SettingsDao.set('terminalScrollback', 50000);
+    await SettingsDao.set('sessionLogEnabled', true);
     await SettingsDao.set('agentMaxSteps', 40);
     await SettingsDao.set('agentAiTimeoutSeconds', 300);
+    await SettingsDao.set('commandTimeoutMultiplier', 2.0);
     await SettingsDao.set('appLockEnabled', true);
     addTearDown(() async {
-      await SettingsDao.set('themeMode', 'dark');
-      await SettingsDao.set('terminalPalette', kDefaultTerminalPalette);
-      await SettingsDao.set('terminalFontSize', 13);
+      await SettingsDao.set('terminalScrollback', 10000);
+      await SettingsDao.set('sessionLogEnabled', false);
       await SettingsDao.set('agentMaxSteps', 0);
       await SettingsDao.set('agentAiTimeoutSeconds', 120);
+      await SettingsDao.set('commandTimeoutMultiplier', 1.0);
       await SettingsDao.set('appLockEnabled', false);
     });
 

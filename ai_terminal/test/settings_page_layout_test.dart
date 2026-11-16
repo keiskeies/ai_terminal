@@ -48,10 +48,10 @@ void main() {
   testWidgets('高频开关不用点开就能改', (tester) async {
     await pumpSettings(tester);
 
-    // 外观：主题/配色/字号
-    expect(find.text('主题模式'), findsOneWidget);
-    expect(find.text('终端配色'), findsOneWidget);
-    expect(find.text('字号'), findsOneWidget);
+    // 终端：缓冲/会话日志/快捷键（主题·配色·字号已移到顶栏浮层，不在设置里）
+    expect(find.text('回滚缓冲行数'), findsOneWidget);
+    expect(find.text('自动会话日志'), findsOneWidget);
+    expect(find.text('终端快捷键'), findsOneWidget);
 
     // Agent：三个步进器
     expect(find.text('最大执行步数'), findsOneWidget);

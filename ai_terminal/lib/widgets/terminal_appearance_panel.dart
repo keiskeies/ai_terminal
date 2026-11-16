@@ -9,10 +9,11 @@ import '../core/ui_text.dart';
 import '../providers/app_providers.dart';
 import '../services/daos.dart';
 
-/// 终端配色 + 字号的即时调整区（顶栏浮层和设置 · 外观共用同一份）。
+/// 终端外观的即时调整区：主题模式（深/浅/跟随系统）+ 配色 + 字号。
+/// 顶栏浮层专用，设置抽屉里不再重复出现这三项。
 ///
 /// 设计取舍（这是它存在的理由）：
-/// 配色是**即时即用**的东西 —— 用户不知道自己想要哪套，只能挨个切过去看。
+/// 外观是**即时即用**的东西 —— 用户不知道自己想要哪套，只能挨个切过去看。
 /// 所以①入口摆在终端顶栏上（一次点击，不用进设置）；②必须有一块**真的按
 /// 当前配色渲染的终端输出预览**。只列八个配色名字、旁边点几个 8px 色块，
 /// 等于让用户靠想象力做决定 —— 那是把「选配色」变成了「背名字」。
@@ -25,7 +26,7 @@ class TerminalAppearancePanel extends ConsumerWidget {
     this.width = 372,
   });
 
-  /// 打开「设置 · 外观」（主题深浅 / 回滚行数 / 会话日志 / 快捷键）。
+  /// 打开「设置 · 终端」（回滚缓冲 / 会话日志 / 快捷键）。
   /// 那些是一件事配一次、配完不再动的，不该挂在终端顶栏上。
   final VoidCallback onMore;
 
@@ -41,6 +42,10 @@ class TerminalAppearancePanel extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final tc = ThemeColors.of(context);
     final isLight = tc.isLight;
+    // 主题模式（深/浅/跟随系统）也是「边切边看」的东西，一并放浮层里。
+    // 切完整个应用即时换肤 —— 设置抽屉里那份已随三项外观项一起删掉。
+    final themeMode = ref.watch(
+        settingsProvider.select((s) => s['themeMode'] as String? ?? 'dark'));
     final paletteId = ref.watch(
         settingsProvider.select((s) => s['terminalPalette'] as String?));
     final fontSize =
@@ -73,6 +78,28 @@ class TerminalAppearancePanel extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 主题模式：整个应用即时换肤。三段都常驻，一眼看出当前态。
+            Text(UiText.t('主题模式', 'Theme'),
+                style: TextStyle(
+                    fontSize: fSmall, color: tc.textSub, height: 1.1)),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: _gap,
+              runSpacing: _gap,
+              children: [
+                for (final (id, zh, en) in const [
+                  ('dark', '深色', 'Dark'),
+                  ('light', '浅色', 'Light'),
+                  ('system', '跟随系统', 'System'),
+                ])
+                  _ThemeChip(
+                    label: UiText.t(zh, en),
+                    selected: themeMode == id,
+                    onTap: () => save('themeMode', id),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
             TerminalPalettePreview(theme: theme, fontSize: fontSize),
             const SizedBox(height: 12),
             TerminalPaletteGrid(
@@ -123,7 +150,7 @@ class TerminalAppearancePanel extends ConsumerWidget {
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 onPressed: onMore,
-                child: Text(UiText.t('外观设置', 'More appearance'),
+                child: Text(UiText.t('终端设置', 'More terminal settings'),
                     style: TextStyle(fontSize: fSmall, color: tc.brand)),
               ),
             ),
@@ -381,6 +408,48 @@ class _StepButton extends StatelessWidget {
         ),
         child:
             Icon(icon, size: 14, color: onTap == null ? tc.textMuted : tc.textSub),
+      ),
+    );
+  }
+}
+
+/// 主题模式胶囊（深色 / 浅色 / 跟随系统）。
+/// 样式与设置抽屉里的胶囊一致，避免同一类控件两种长相。
+class _ThemeChip extends StatelessWidget {
+  const _ThemeChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        // 和设置抽屉的胶囊同规则：垂直 padding 撑高度、宽度交给文本自适应，
+        // 不带 alignment —— 带了一旦落到 Wrap 宽松约束就横着撑满。
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? tc.brandBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(rFull),
+          border: Border.all(color: selected ? tc.brand : tc.border),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: fSmall,
+            height: 1.1,
+            fontWeight: selected ? FontWeight.w500 : FontWeight.normal,
+            color: selected ? tc.brand : tc.textSub,
+          ),
+        ),
       ),
     );
   }

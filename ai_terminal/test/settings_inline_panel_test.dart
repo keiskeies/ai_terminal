@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:ai_terminal/core/terminal_themes.dart';
 import 'package:ai_terminal/l10n/app_localizations.dart';
 import 'package:ai_terminal/widgets/nav_drawer.dart';
 import 'package:ai_terminal/widgets/settings_inline_panel.dart';
-import 'package:ai_terminal/widgets/terminal_appearance_panel.dart';
 
 /// 抽屉里的设置曾经展开是空的（detail 传了 const []），只有折叠箭头没有内容。
 /// 这组测试盯的就是「展开之后真的有能用的控件」。
@@ -50,47 +48,18 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('外观面板的胶囊按内容收缩，三个主题在同一行', (tester) async {
-    await pumpPanel(tester, 'appearance');
+  testWidgets('终端面板保留缓冲/日志/快捷键，不再有主题配色字号', (tester) async {
+    await pumpPanel(tester, 'terminal');
 
-    // Container 带 alignment 时会在 Wrap 的宽松约束下横向撑满，整组 chip 就变成
-    // 一列全宽按钮（抽屉里八个配色竖着占满一屏）。这条测试锁住"按内容收缩"。
-    double chipWidth(String label) => tester
-        .getSize(find
-            .ancestor(of: find.text(label), matching: find.byType(Container))
-            .first)
-        .width;
+    // 主题/配色/字号已移到顶栏外观浮层，设置里不再重复出现。
+    expect(find.text('主题模式'), findsNothing);
+    expect(find.text('终端配色'), findsNothing);
+    expect(find.text('字号'), findsNothing);
 
-    expect(chipWidth('深色'), lessThan(120));
-    expect(chipWidth('跟随系统'), lessThan(140));
-
-    // 同一行的三个 chip 垂直中线必须一致（竖排会错开一格）。
-    final yDark = tester.getCenter(find.text('深色')).dy;
-    final yLight = tester.getCenter(find.text('浅色')).dy;
-    final ySystem = tester.getCenter(find.text('跟随系统')).dy;
-    expect(yDark, yLight);
-    expect(yLight, ySystem);
-  });
-
-  testWidgets('外观面板给出主题、配色、字号的真实控件', (tester) async {
-    await pumpPanel(tester, 'appearance');
-
-    expect(find.text('主题模式'), findsOneWidget);
-    expect(find.text('深色'), findsOneWidget);
-    expect(find.text('浅色'), findsOneWidget);
-    expect(find.text('跟随系统'), findsOneWidget);
-
-    expect(find.text('终端配色'), findsOneWidget);
-    // 每个预设都要能选，缩在抽屉里也不能只给一半
-    for (final p in kTerminalPalettes) {
-      expect(find.text(p.label(isZh: true)), findsWidgets,
-          reason: '配色 ${p.id} 没有出现在抽屉里');
-    }
-
-    expect(find.text('字号'), findsOneWidget);
-    expect(find.text('13px'), findsOneWidget);
-    expect(find.byIcon(Icons.add), findsOneWidget);
-    expect(find.byIcon(Icons.remove), findsOneWidget);
+    expect(find.text('回滚缓冲行数'), findsOneWidget);
+    expect(find.text('自动会话日志'), findsOneWidget);
+    expect(find.text('终端快捷键'), findsOneWidget);
+    expect(find.text('编辑'), findsOneWidget);
   });
 
   testWidgets('通知面板能改开关、提醒时机，并直接填 Webhook', (tester) async {
@@ -174,7 +143,7 @@ void main() {
       '发不出去也',
     ];
     for (final id in [
-      'appearance',
+      'terminal',
       'ai',
       'agent',
       'security',
@@ -191,8 +160,8 @@ void main() {
     }
   });
 
-  testWidgets('外观组把原独立页里的三项也搬齐了', (tester) async {
-    await pumpPanel(tester, 'appearance');
+  testWidgets('终端组把原独立页里的三项也搬齐了', (tester) async {
+    await pumpPanel(tester, 'terminal');
 
     // 这三项原来只在「外观」独立页里。路由收掉之后如果不搬过来，
     // 用户就再也改不了回滚行数 / 会话日志 / 快捷键了。
@@ -200,34 +169,31 @@ void main() {
     expect(find.text('自动会话日志'), findsOneWidget);
     expect(find.text('终端快捷键'), findsOneWidget);
     expect(find.text('编辑'), findsOneWidget);
-    // 配色必须给预览，不能只给名字
-    expect(find.byType(TerminalPalettePreview), findsOneWidget);
   });
 
-  testWidgets('抽屉里展开「外观」能看到控件而不是空块', (tester) async {
+  testWidgets('抽屉里展开「终端」能看到控件而不是空块', (tester) async {
     await pumpDrawer(tester);
 
     // 收起态：只有副标题，没有控件
-    expect(find.text('外观'), findsOneWidget);
-    expect(find.text('主题模式'), findsNothing);
+    expect(find.text('终端'), findsOneWidget);
+    expect(find.text('自动会话日志'), findsNothing);
 
-    await tester.tap(find.text('外观'));
+    await tester.tap(find.text('终端'));
     await tester.pump();
 
     // 展开态：真的渲染出面板
-    expect(find.text('主题模式'), findsOneWidget);
-    expect(find.text('深色'), findsOneWidget);
+    expect(find.text('自动会话日志'), findsOneWidget);
     expect(find.byType(SettingsInlinePanel), findsWidgets);
   });
 
   testWidgets('抽屉设置项副标题读的是状态而不是固定文案', (tester) async {
     await pumpDrawer(tester);
-    // 外观副标题 = 主题 + 字号，至少要有 px
-    expect(find.textContaining('px'), findsWidgets);
+    // 终端副标题 = 缓冲行数 + 会话日志状态
+    expect(find.textContaining('行'), findsWidgets);
     // 每个分组都应有 rowcard（8 项）。设置分区顶部有搜索框，末组会落在
     // 视口之外（ListView 懒加载不会构建它），所以逐个滚到可见再断言。
     for (final title in const [
-      '外观',
+      '终端',
       'AI 模型',
       'Agent',
       '安全',

@@ -78,4 +78,27 @@ void main() {
     await tester.pumpAndSettle();
     expect(SettingsDao.getCached('terminalFontSize'), 13);
   });
+
+  testWidgets('主题模式三段常驻，点一下当场切肤', (tester) async {
+    SettingsDao.set('themeMode', 'dark');
+    addTearDown(() => SettingsDao.set('themeMode', 'dark'));
+    await pumpPanel(tester);
+
+    // 三段都常驻，一眼看出当前态（默认深色选中）。
+    expect(find.text('主题模式'), findsOneWidget);
+    expect(find.text('深色'), findsOneWidget);
+    expect(find.text('浅色'), findsOneWidget);
+    expect(find.text('跟随系统'), findsOneWidget);
+
+    // 点「浅色」→ 写设置，且选中态切过去。
+    await tester.tap(find.text('浅色'));
+    await tester.pumpAndSettle();
+    expect(SettingsDao.getCached('themeMode'), 'light');
+
+    await tester.tap(find.text('跟随系统'));
+    await tester.pumpAndSettle();
+    expect(SettingsDao.getCached('themeMode'), 'system');
+
+    // 当前值在设置里的持久化由 provider 转发表负责，这里只验证写入。
+  });
 }

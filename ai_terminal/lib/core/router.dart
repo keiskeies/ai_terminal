@@ -65,10 +65,10 @@ final GoRouter appRouter = GoRouter(
       path: '/settings/ai',
       builder: (context, state) => SettingsPage(initialGroup: 'ai'),
     ),
-    // 外观设置
+    // 终端设置（回滚缓冲 / 会话日志 / 快捷键；主题·配色·字号在顶栏外观浮层）
     GoRoute(
-      path: '/settings/appearance',
-      builder: (context, state) => SettingsPage(initialGroup: 'appearance'),
+      path: '/settings/terminal',
+      builder: (context, state) => SettingsPage(initialGroup: 'terminal'),
     ),
     // 安全设置
     GoRoute(

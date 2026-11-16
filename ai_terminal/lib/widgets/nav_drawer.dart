@@ -5,7 +5,6 @@ import '../core/app_toast.dart';
 import '../core/builtin_runbook_i18n.dart';
 import '../core/constants.dart';
 import '../core/settings_catalog.dart';
-import '../core/terminal_themes.dart';
 import '../core/theme_colors.dart';
 import '../core/ui_text.dart';
 import '../models/command_snippet.dart';
@@ -98,14 +97,14 @@ class NavDrawer extends StatefulWidget {
   /// 中英词都放：界面切到英文后，用户看到的是 `Theme` / `Timeout`，不会
   /// 想到去搜「主题」「超时」。组标题不在这里（由匹配函数直接拼入）。
   static const kSettingsSearchIndex = <String, List<String>>{
-    'appearance': [
-      '主题模式', '深色', '浅色', '跟随系统',
-      '终端配色', '配色', '主题', '字号', '字体', '字体大小',
+    'terminal': [
       '回滚缓冲', '缓冲', '行数', '自动会话日志', '会话日志',
       '终端快捷键', '快捷键',
-      'theme', 'dark', 'light', 'system', 'palette', 'color', 'colour',
-      'font', 'size', 'scrollback', 'buffer', 'session log', 'keybinding',
+      'scrollback', 'buffer', 'session log', 'keybinding',
       'shortcut',
+      // 主题 / 配色 / 字号已移到顶栏外观浮层，不参与设置搜索；
+      // 但旧用户可能按「外观」找，留个兜底词能落到本组而不是空态。
+      '外观', 'appearance', 'theme', 'font', 'palette',
     ],
     'ai': [
       '模型', '当前使用的模型', '端点', '接口地址', 'api key',
@@ -210,7 +209,7 @@ class _NavDrawerState extends State<NavDrawer> {
   @override
   void initState() {
     super.initState();
-    // 指定了初始组就先摊开（配色浮层的「更多」直接落到外观组）。
+    // 指定了初始组就先摊开（外观浮层的「更多」直接落到终端组）。
     final group = widget.initialGroup;
     if (group != null) _expanded.add(group);
     WidgetsBinding.instance.addPostFrameCallback((_) => _focusForLevel());
@@ -914,11 +913,11 @@ class _NavDrawerState extends State<NavDrawer> {
   /// 一组设置是否命中当前搜索词。
   ///
   /// 匹配三段：组标题、组 id、索引词。**标题必须进来** —— 用户看到的是
-  /// 「外观」「安全」这几个字，最自然的输入就是照着念；索引表里漏掉标题时，
-  /// 搜「外观」会得到空态，比没有搜索框更糟。
+  /// 「终端」「安全」这几个字，最自然的输入就是照着念；索引表里漏掉标题时，
+  /// 搜「终端」会得到空态，比没有搜索框更糟。
   ///
   /// id 参与匹配是为了英文 locale：索引词几乎都是中文，`theme` / `font`
-  /// 这类英文词只能靠 id（`appearance` 还匹配不到 theme，见下方索引）。
+  /// 这类英文词只能靠 id（`terminal` 还匹配不到 theme，见下方索引）。
   bool _settingsGroupMatches(SettingsEntry entry) {
     final hay = <String>[
       entry.title,
@@ -985,8 +984,8 @@ class _NavDrawerState extends State<NavDrawer> {
           // 快捷键，用户照着按没反应，比不给提示更糟。改成告诉他能搜什么。
           Text(
             UiText.t(
-              '可搜组名或选项名，例如：外观、模型、超时、MCP',
-              'Search a group or option, e.g. theme, model, timeout, MCP',
+              '可搜组名或选项名，例如：终端、模型、超时、MCP',
+              'Search a group or option, e.g. terminal, model, timeout, MCP',
             ),
             style: TextStyle(fontSize: fMicro, color: tc.textMuted),
           ),
@@ -1050,37 +1049,29 @@ class _NavDrawerState extends State<NavDrawer> {
   /// 开启，混进来会让「已修改」在全新安装时报一条假记录 —— 宁可少列。
   List<_ChangedRow> _changedSettings() {
     final rows = <_ChangedRow>[];
-    String? s(String key) => SettingsDao.getCached(key) as String?;
     int i(String key, int fallback) =>
         (SettingsDao.getCached(key) as num?)?.toInt() ?? fallback;
 
-    final mode = s('themeMode') ?? 'dark';
-    if (mode != 'dark') {
+    // 主题 / 配色 / 字号已移到顶栏外观浮层，不在设置里，也不在此列。
+    // （它们不在设置里出现后，这里再列会变成「摘要里有、组里没有」的错位。）
+
+    // 终端组：回滚缓冲
+    final scrollback = i('terminalScrollback', 10000);
+    if (scrollback != 10000) {
+      final scrollLabel = switch (scrollback) {
+        1000 => UiText.t('1 千行', '1k'),
+        50000 => UiText.t('5 万行', '50k'),
+        100000 => UiText.t('10 万行', '100k'),
+        _ => '$scrollback',
+      };
       rows.add(_ChangedRow(
-        'appearance',
-        UiText.t('主题模式', 'Theme'),
-        switch (mode) {
-          'light' => UiText.t('浅色', 'Light'),
-          'system' => UiText.t('跟随系统', 'System'),
-          _ => mode,
-        },
-      ));
+          'terminal', UiText.t('回滚缓冲行数', 'Scrollback'), scrollLabel));
     }
 
-    final palette = s('terminalPalette');
-    if (palette != null && palette.isNotEmpty && palette != kDefaultTerminalPalette) {
-      String label = palette;
-      for (final p in kTerminalPalettes) {
-        if (p.id == palette) label = p.label(isZh: UiText.zh);
-      }
-      rows.add(_ChangedRow(
-          'appearance', UiText.t('终端配色', 'Colors'), label));
-    }
-
-    final font = i('terminalFontSize', 13);
-    if (font != 13) {
-      rows.add(_ChangedRow(
-          'appearance', UiText.t('字号', 'Font size'), '${font}px'));
+    // 终端组：会话日志
+    if (SettingsDao.getCached('sessionLogEnabled') == true) {
+      rows.add(_ChangedRow('terminal', UiText.t('自动会话日志', 'Session log'),
+          UiText.t('已开启', 'On')));
     }
 
     final steps = i('agentMaxSteps', 0);
@@ -1093,6 +1084,13 @@ class _NavDrawerState extends State<NavDrawer> {
     if (timeout != 120) {
       rows.add(_ChangedRow(
           'agent', UiText.t('单步响应超时', 'Timeout'), '${timeout}s'));
+    }
+
+    final multiplier = (SettingsDao.getCached('commandTimeoutMultiplier') as num?)
+        ?.toDouble();
+    if (multiplier != null && multiplier != 1.0) {
+      rows.add(_ChangedRow('agent', UiText.t('命令超时倍数', 'Timeout x'),
+          '${multiplier}x'));
     }
 
     if (SettingsDao.getCached('appLockEnabled', defaultValue: false) == true) {

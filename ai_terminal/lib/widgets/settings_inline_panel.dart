@@ -6,8 +6,6 @@ import '../core/constants.dart';
 import '../core/app_toast.dart';
 import '../core/credentials_store.dart';
 import '../core/terminal_keybindings.dart';
-import '../core/terminal_themes.dart';
-import 'terminal_appearance_panel.dart';
 import '../core/theme_colors.dart';
 import '../core/ui_text.dart';
 import '../models/ai_endpoint.dart';
@@ -63,9 +61,6 @@ class SettingsInlinePanel extends ConsumerStatefulWidget {
 }
 
 class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
-  String _themeMode = 'dark';
-  double _fontSize = 13;
-  String _palette = kDefaultTerminalPalette;
   int _scrollback = 10000;
   bool _sessionLog = false;
   Map<String, List<String>> _keybindings = const {};
@@ -108,15 +103,6 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
 
   void _load() {
     try {
-      final mode = SettingsDao.getCached('themeMode');
-      if (mode is String) _themeMode = mode;
-
-      final size = SettingsDao.getCached('terminalFontSize');
-      if (size is num) _fontSize = size.toDouble();
-
-      final palette = SettingsDao.getCached('terminalPalette');
-      if (palette is String && palette.isNotEmpty) _palette = palette;
-
       final scrollback = SettingsDao.getCached('terminalScrollback');
       if (scrollback is num) _scrollback = scrollback.toInt();
 
@@ -175,8 +161,8 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
     switch (widget.settingsId) {
-      case 'appearance':
-        return _appearance(tc);
+      case 'terminal':
+        return _terminal(tc);
       case 'ai':
         return _ai(tc);
       case 'agent':
@@ -196,85 +182,14 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
     }
   }
 
-  // ==================== 外观 ====================
+  // ==================== 终端 ====================
 
-  Widget _appearance(ThemeColors tc) {
+  Widget _terminal(ThemeColors tc) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _label(tc, UiText.t('主题模式', 'Theme')),
-        const SizedBox(height: 6),
-        _chips(tc, const [
-          ('dark', '深色', 'Dark'),
-          ('light', '浅色', 'Light'),
-          ('system', '跟随系统', 'System'),
-        ], _themeMode, (v) async {
-          _themeMode = v;
-          await _set('themeMode', v);
-        }),
-        const SizedBox(height: 12),
-        _label(tc, UiText.t('终端配色', 'Terminal colors')),
-        const SizedBox(height: 6),
-        // 和顶栏「外观」浮层用的是同一份组件：一块按当前配色渲染的预览 +
-        // 每套配色画成一小块真终端。以前这里是八个文字标签，选配色等于背名字。
-        TerminalPalettePreview(
-          theme: resolveTerminalTheme(
-              paletteId: _palette, isLight: tc.isLight),
-          fontSize: _fontSize,
-        ),
-        const SizedBox(height: 8),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final chip = (constraints.maxWidth - 8 * 3) / 4;
-            return TerminalPaletteGrid(
-              paletteId: _palette,
-              isLight: tc.isLight,
-              chipWidth: chip,
-              onSelect: (id) async {
-                _palette = id;
-                await _set('terminalPalette', id);
-              },
-            );
-          },
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            _label(tc, UiText.t('字号', 'Font size')),
-            const Spacer(),
-            _StepButton(
-              tc: tc,
-              icon: Icons.remove,
-              onTap: _fontSize <= 8
-                  ? null
-                  : () async {
-                      _fontSize -= 1;
-                      await _set('terminalFontSize', _fontSize);
-                    },
-            ),
-            SizedBox(
-              width: 44,
-              child: Text(
-                '${_fontSize.toInt()}px',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: fMicro, color: tc.textMain),
-              ),
-            ),
-            _StepButton(
-              tc: tc,
-              icon: Icons.add,
-              onTap: _fontSize >= 24
-                  ? null
-                  : () async {
-                      _fontSize += 1;
-                      await _set('terminalFontSize', _fontSize);
-                    },
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        // 下面三项以前只在「外观」独立页里，那条路由已经收掉了，
-        // 不搬过来就等于用户再也改不了。
+        // 主题模式 / 终端配色 / 字号已移到顶栏「外观」浮层（边切边看的那类，
+        // 一次点击到），这里只留「配一次不再动」的三项。
         _label(tc, UiText.t('回滚缓冲行数', 'Scrollback buffer')),
         const SizedBox(height: 6),
         _chips(tc, const [

@@ -16,7 +16,7 @@ void main() {
     }
   });
 
-  test('分组顺序按上手顺序：外观 → AI → Agent → 安全 → MCP → 联网 → 规范 → 通知', () {
+  test('分组顺序按上手顺序：终端 → AI → Agent → 安全 → MCP → 联网 → 规范 → 通知', () {
     // 顺序按「用户第几周会碰它」排，不按功能分类排：
     // 安全（应用锁、高危确认）是运维用户第一周就要碰的，所以排在 Agent 之后；
     // 联网搜索和内部规范是「让 AI 更懂我」的调优项，属于第二阶段；通知压在最后。
@@ -24,7 +24,7 @@ void main() {
     expect(
       kSettingsEntries.map((e) => e.id).toList(),
       const [
-        'appearance',
+        'terminal',
         'ai',
         'agent',
         'security',

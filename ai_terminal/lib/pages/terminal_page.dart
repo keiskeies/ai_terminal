@@ -177,7 +177,7 @@ class TerminalPage extends ConsumerStatefulWidget {
 class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   Terminal? _terminal;
 
-  /// 顶栏「外观」浮层（配色 + 字号）。配色要边切边看，所以是浮层不是页面。
+  /// 顶栏「外观」浮层：主题模式 + 配色 + 字号。都要边切边看，所以是浮层不是页面。
   final _appearanceMenu = MenuController();
 
   /// initState 时捕获的 Agent notifier。dispose 里不能再读 ref：
@@ -1156,7 +1156,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           onFontSizeChanged: (size) {
             final clamped = size.clamp(10.0, 24.0);
             setState(() => _terminalFontSize = clamped);
-            // 同步给 settingsProvider：外观页/抽屉里的字号读数才不会停在旧值
+            // 同步给 settingsProvider：顶栏外观浮层的字号读数才不会停在旧值
             ref
                 .read(settingsProvider.notifier)
                 .setSetting('terminalFontSize', clamped);
@@ -1694,8 +1694,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    // 终端字号是终端自己的状态（Ctrl +/- 改它），但外观页/抽屉里的字号控件走的是
-    // settingsProvider：只写库不通知这边，滑块拖完终端不动，看着就像"设置没生效"。
+    // 终端字号是终端自己的状态（Ctrl +/- 改它），但顶栏外观浮层的字号控件走
+    // settingsProvider：只写库不通知这边，滑块拖完终端不动，看着就像「设置没生效」。
     // 这里把外部改动收回本地状态，两处入口操作的是同一份显示。
     ref.listen(settingsProvider.select((s) => s['terminalFontSize']), (_, next) {
       if (next is num && next.toDouble() != _terminalFontSize) {
@@ -2335,7 +2335,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           // 右侧操作区：设计稿这里只有 5 个 32px 图标（菜单 / AI / SFTP / 监控），
           // 之前还塞了专注模式与字号，8 个图标连成一排占掉顶栏 37% 的宽度，
           // 视觉上比标签区还抢眼。专注模式在网格菜单里已有入口，字号归到
-          // 设置 · 外观，这里只留全局开关。
+          // 顶栏外观浮层，这里只留全局开关。
           _buildTopBarActions(),
         ],
       ),
@@ -2395,7 +2395,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 右侧常驻动作区。
   ///
   /// 分成三层，顺序就是「碰到的频率」：
-  /// 1. **外观**（配色 / 字号）—— 用户要挨个切过去看效果的，必须一次点击到，
+  /// 1. **外观**（主题 / 配色 / 字号）—— 用户要挨个切过去看效果的，必须一次点击到，
   ///    并且浮层里带一块按当前配色渲染的终端预览。以前它埋在「更多 → 终端字号
   ///    ／配色 → 另一个页面」三层里，只给八个配色名字，没人能靠想象选色。
   /// 2. **AI / SFTP / 监控** —— 面板开关，点一下布局就变。
@@ -2422,7 +2422,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     );
   }
 
-  /// 顶栏「外观」：配色 + 字号就地改，浮层里带实时预览。
+  /// 顶栏「外观」：主题 + 配色 + 字号就地改，浮层里带实时预览。
   Widget _buildAppearanceButton() {
     final tc = ThemeColors.of(context);
     return MenuAnchor(
@@ -2445,8 +2445,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         TerminalAppearancePanel(
           onMore: () {
             _appearanceMenu.close();
-            // 进设置抽屉的「外观」组，就地改 —— 不跳整页。
-            _showNavDrawer(NavDrawer.sectionSettings, group: 'appearance');
+            // 进设置抽屉的「终端」组（回滚缓冲 / 会话日志 / 快捷键），
+            // 就地改 —— 不跳整页。
+            _showNavDrawer(NavDrawer.sectionSettings, group: 'terminal');
           },
         ),
       ],
