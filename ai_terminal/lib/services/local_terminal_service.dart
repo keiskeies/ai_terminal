@@ -243,6 +243,7 @@ class LocalTerminalService implements CommandExecutor {
     Duration timeout = const Duration(seconds: 60),
     Completer<void>? cancelToken,
     String? sudoPassword,
+    Future<String?> Function(String prompt)? onInteractivePrompt,
   }) async {
     if (_pty == null || !_isConnected) {
       return CommandResult(
@@ -285,6 +286,10 @@ class LocalTerminalService implements CommandExecutor {
     var lastEvaluateAtMs = -evaluateIntervalMs;
     // sudo 提示应答器：命中提示时把密码写进 stdin，而不是让检测器中断命令
     final sudoResponder = SudoPromptResponder();
+    // 确认类提示应答器：命中提示时桥接给上层（UI/自动应答），而不是中断命令
+    final confirmationResponder = ConfirmationPromptResponder();
+    // 桥接回调进行中：同一提示的增量 chunk 不再重复触发回调
+    var waitingInteractiveAnswer = false;
     _pendingDoneCompleters.add(doneCompleter);
     StreamSubscription<String>? sub;
 
@@ -323,12 +328,46 @@ class LocalTerminalService implements CommandExecutor {
           _pty?.write(utf8.encode('$sudoPassword\n'));
         } catch (_) {}
       }
+      // 确认类提示（yes/no、[Y/n]、Press ENTER 等）：调用方提供桥接回调时，
+      // 把提示尾部文本交给上层（UI 弹窗 / 自动应答），等待期间不打断命令。
+      // 答案只写进 stdin，不进 buffer/命令串；密码类提示不走此桥（R7）。
+      // 门槛：命令回显行已结束（出现换行）且超过 300ms —— 本地 PTY 逐字符
+      // 回显时，命令串里恰好含 `[Y/n]` 等字样会在回显中途短暂卡在缓冲尾部。
+      if (onInteractivePrompt != null &&
+          !waitingInteractiveAnswer &&
+          elapsed >= 300 &&
+          snapshot.contains('\n') &&
+          confirmationResponder.shouldAnswer(snapshot)) {
+        waitingInteractiveAnswer = true;
+        final promptText = PtyOutputDetector.confirmationPromptText(snapshot);
+        // 异步桥接：不阻塞 evaluate 循环，答案到达后写 stdin 继续等 marker。
+        // 回车用 \r（与 execute() 一致）：Unix ICRNL 转 \n，Windows ConPTY 认 \r。
+        () async {
+          String? answer;
+          try {
+            answer = await onInteractivePrompt(promptText);
+          } catch (_) {
+            answer = null; // 回调异常按取消处理，避免命令永远挂起（R1）
+          }
+          waitingInteractiveAnswer = false;
+          if (doneCompleter.isCompleted) return; // 已超时/取消/断开，丢弃答案
+          if (answer != null) {
+            try {
+              _pty?.write(utf8.encode('$answer\r'));
+            } catch (_) {}
+          } else {
+            abnormalReason.add('交互式确认提示被取消或超时，命令无法继续');
+            doneCompleter.complete();
+          }
+        }();
+      }
       final diag = PtyOutputDetector.detect(
         buffer: snapshot,
         marker: marker,
         elapsedMs: elapsed,
         isWindows: Platform.isWindows,
         sudoPromptWillBeAnswered: sudoPassword != null,
+        confirmationPromptWillBeBridged: onInteractivePrompt != null,
         donePattern: donePattern,
       );
       if (diag != null) {

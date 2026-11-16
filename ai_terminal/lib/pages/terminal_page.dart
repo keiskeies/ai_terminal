@@ -426,6 +426,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   final Map<String, String> _markdownCache = {};
   final Map<String, List<_ContentSegment>> _splitCache = {};
 
+  /// Agent 运行中按键门控的"已提示"标记（按 tab）：每轮运行只提示一次，
+  /// 运行结束后移除，下一轮再敲键时重新提示。
+  final Set<String> _agentKeyGateHinted = {};
+
   @override
   void initState() {
     super.initState();
@@ -438,6 +442,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     _agentNotifier = ref.read(agentProvider.notifier);
     _agentNotifier!.secretRequestHandler = _requestSecret;
     _agentNotifier!.localDirRequestHandler = _requestLocalDir;
+    _agentNotifier!.interactiveInputRequestHandler = _requestInteractiveInput;
     // 延迟到帧构建完成后执行连接，避免在 build 阶段修改 provider 状态
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -785,6 +790,25 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         if (tab.id == _currentTabId) _reconnect();
         return;
       }
+      // Agent 运行中禁止直接向 PTY 敲键：用户按键会和 Agent 的命令/确认应答
+      // 抢同一条 stdin，把答案吃掉或插进半条命令。补充指令走 AI 输入框，
+      // 确认提示走弹窗桥接 —— 桥接的 stdin 写入走 service 内部 API，
+      // 不经过 term.onOutput，不受此门控影响。
+      if (ref.read(agentProvider.notifier).isRunningFor(tab.id)) {
+        if (_agentKeyGateHinted.add(tab.id) && mounted) {
+          showTopSnackBar(
+            context,
+            SnackBar(
+              content: Text(UiText.t('Agent 执行中，补充指令请用输入框',
+                  'Agent is running. Use the chat input for extra instructions.'),
+                  style: const TextStyle(fontSize: fSmall)),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+      _agentKeyGateHinted.remove(tab.id);
       _tabCommandTrackers[tab.id]?.onInput(data, currentInputLine: () {
         // 刚敲的字符其回显可能还躺在批处理缓冲里（最多 16ms），不先落进
         // buffer 就会读到半条命令。闭包只在回车时执行，不影响按键热路径。
@@ -1687,6 +1711,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     if (notifier != null &&
         notifier.localDirRequestHandler == _requestLocalDir) {
       notifier.localDirRequestHandler = null;
+    }
+    if (notifier != null &&
+        notifier.interactiveInputRequestHandler == _requestInteractiveInput) {
+      notifier.interactiveInputRequestHandler = null;
     }
     _agentNotifier = null;
     super.dispose();
@@ -4787,6 +4815,73 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           ),
         );
       },
+    ).whenComplete(controller.dispose);
+  }
+
+  /// 确认类交互提示（yes/no、[Y/n]、Press ENTER 等）的自由文本输入弹窗。
+  ///
+  /// 与 [_requestSecret] 的区别：不掩码、不进凭据库 —— 答案是普通输入，
+  /// 只经引擎写进终端 stdin 与事件时间线，不进对话历史。
+  /// 空串 = 直接回车，是合法答案（Press ENTER 类提示）；取消返回 null，
+  /// 引擎按 interactivePrompt 中断命令。密码类提示不会到达这里（R7）。
+  Future<String?> _requestInteractiveInput(String prompt) {
+    if (!mounted) return Future.value(null);
+    final tc = ThemeColors.of(context);
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: tc.cardElevated,
+        title: Text(UiText.t('命令等待输入', 'Command awaiting input'),
+            style: TextStyle(color: tc.textMain, fontSize: fBody)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(prompt,
+                style:
+                    TextStyle(color: tc.textSub, fontSize: fSmall, height: 1.5)),
+            const SizedBox(height: pCompact),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              style: TextStyle(color: tc.textMain, fontSize: fBody),
+              decoration: InputDecoration(
+                isDense: true,
+                labelText: UiText.t('输入（留空 = 直接回车）',
+                    'Input (empty = press Enter)'),
+                labelStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
+                filled: true,
+                fillColor: tc.card,
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: pCompact, vertical: pSmall),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(rInput),
+                  borderSide: BorderSide(color: tc.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(rInput),
+                  borderSide: BorderSide(color: tc.brand),
+                ),
+              ),
+              onSubmitted: (value) => Navigator.of(dialogCtx).pop(value),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: Text(UiText.t('取消', 'Cancel'),
+                style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(controller.text),
+            child: Text(UiText.t('确定', 'OK'),
+                style: const TextStyle(fontSize: fSmall)),
+          ),
+        ],
+      ),
     ).whenComplete(controller.dispose);
   }
 

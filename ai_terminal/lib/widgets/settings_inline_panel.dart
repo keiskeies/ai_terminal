@@ -436,6 +436,17 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
               : () => _setCommandTimeoutMultiplier(
                   _commandTimeoutMultiplier + 0.5),
         ),
+        const SizedBox(height: 8),
+        // 确认类提示（[Y/n]、Press ENTER）按保守规则自动应答；默认关。
+        // 密码类提示永不自动应答（R7），无默认值的确认仍弹窗问人。
+        _toggleRow(
+          tc,
+          UiText.t('确认提示自动应答', 'Auto-answer confirmations'),
+          SettingsDao.getCached('agentAutoAnswerEnabled',
+                  defaultValue: false) ==
+              true,
+          (v) => _set('agentAutoAnswerEnabled', v),
+        ),
         const SizedBox(height: 10),
         Row(
           children: [
