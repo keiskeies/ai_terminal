@@ -594,6 +594,215 @@ class SftpDownloadTool extends AgentTool {
   }
 }
 
+/// SFTP 远程文件按行读取工具（O2）
+///
+/// 设计动机：改远程配置前模型必须看全文件 —— file_patch 要求精确匹配 old 串，
+/// 而 shell `cat` 受观测尾保留限制，大文件头部看不到。本工具走 SFTP 直读，
+/// 不经 shell（无回显/转义/分页问题），按行分段返回带行号内容。
+///
+/// 纯逻辑（大小判定 / 分行切片 / lossy 解码）抽成静态方法，脱离 SFTP 可单测。
+class SftpFileReadTool extends AgentTool {
+  /// 整体读取的文件大小上限：2MB（更大文件引导 grep 管道或 sftp_download）
+  static const int maxFileBytes = 2 * 1024 * 1024;
+
+  /// 默认读取行数
+  static const int defaultLimit = 200;
+
+  /// 单次读取行数上限
+  static const int maxLimit = 1000;
+
+  /// 单行展示上限（超长行截断，R8 缓冲有界）
+  static const int maxLineChars = 2000;
+
+  /// 单次返回内容总字符上限（R8：2MB 文件可能只有几个超长行）
+  static const int maxSliceChars = 20000;
+
+  @override
+  String get name => 'sftp_file_read';
+
+  @override
+  ToolKind get kind => ToolKind.read;
+
+  @override
+  String get description => '按行读取 SSH 远程文本文件（SFTP 直读，不经 shell，无命令回显/转义问题）。'
+      '用于修改远程文件前查看内容（file_patch 需要精确的 old 串）、分段阅读配置/日志/脚本。'
+      '返回总行数、带行号内容（L12: ...）、hasMore 与下次 offset 提示。'
+      '只读操作，无需确认。文件超过 2MB 会拒绝读取，届时请用 grep 管道定位'
+      '（如 grep -n "关键词" 文件 | head -50）或 sftp_download 取回本地。';
+
+  @override
+  String get paramSpec => '参数列表（多行 key:value 格式）：\n'
+      '  path: 远程文件绝对路径（必填）\n'
+      '  offset: 起始行号，1-based（可选，默认 1）\n'
+      '  limit: 读取行数（可选，默认 200，上限 1000）';
+
+  @override
+  Map<String, dynamic>? toJsonSchema() => {
+        'type': 'object',
+        'properties': {
+          'path': {
+            'type': 'string',
+            'description': '远程文件绝对路径',
+          },
+          'offset': {
+            'type': 'integer',
+            'description': '起始行号（1-based，默认 1）',
+          },
+          'limit': {
+            'type': 'integer',
+            'description': '读取行数（默认 200，上限 1000）',
+          },
+        },
+        'required': ['path'],
+        'additionalProperties': false,
+      };
+
+  @override
+  Future<ToolResult> execute({
+    required CommandExecutor executor,
+    required ToolArgs args,
+    void Function(String message)? onProgress,
+  }) async {
+    final String path;
+    try {
+      path = args.requireString('path');
+    } on ToolArgException {
+      return ToolResult.failure('参数缺失: path 为必填项');
+    }
+    final offset = args.getInt('offset', defaultValue: 1);
+    var limit = args.getInt('limit', defaultValue: defaultLimit);
+    if (limit < 1) limit = 1;
+    if (limit > maxLimit) limit = maxLimit;
+    if (offset < 1) {
+      return ToolResult.failure('参数错误: offset 必须 ≥ 1（1-based 行号），实际值为 $offset');
+    }
+    if (executor is! SSHService) {
+      return ToolResult.failure(
+          'sftp_file_read 仅支持 SSH 远程会话，当前为本地终端。读本机文件请用 local_file_read');
+    }
+    if (looksLikeWindowsLocalPath(path)) {
+      return ToolResult.failure(
+        '当前是 SSH 远程会话，但 path 是本机路径格式：$path\n'
+        '读本机文件请用 local_file_read；读服务器文件请给远程绝对路径（如 /etc/nginx/nginx.conf）。',
+      );
+    }
+    final client = executor.client;
+    if (client == null) {
+      return ToolResult.failure('SSH 连接未建立，无法打开 SFTP');
+    }
+
+    final sftp = SftpService();
+    try {
+      await sftp.attachToClient(client);
+    } catch (e) {
+      return ToolResult.failure('SFTP 连接失败: $e');
+    }
+
+    try {
+      final stat = await sftp.statFile(path);
+      if (stat == null) {
+        return ToolResult.failure('远程路径不存在: $path');
+      }
+      if (stat.isDirectory) {
+        return ToolResult.failure('远程路径是目录而非文件: $path');
+      }
+      final sizeError = oversizeError(stat.size);
+      if (sizeError != null) {
+        return ToolResult.failure(sizeError);
+      }
+      onProgress?.call('正在读取 $path ...');
+      // stat 拿不到大小时仍要兜底：多读 1 字节用于判定是否超限
+      final bytes = await sftp.readFileBytes(path, maxSize: maxFileBytes + 1);
+      final readSizeError = oversizeError(bytes.length);
+      if (readSizeError != null) {
+        return ToolResult.failure(readSizeError);
+      }
+      return formatSlice(decodeLossy(bytes),
+          path: path, offset: offset, limit: limit);
+    } catch (e) {
+      return ToolResult.failure('读取文件失败: $e');
+    } finally {
+      // R2: 仅关闭 SFTP 子系统通道，不关闭借用的 SSHClient
+      sftp.closeSftpOnly();
+    }
+  }
+
+  /// 文件大小判定（纯函数）：超过 2MB 返回拒绝理由，否则 null。
+  /// [sizeBytes] 为 null（stat 未给出大小）时放行，读取后再按实际字节数复核。
+  static String? oversizeError(int? sizeBytes) {
+    if (sizeBytes == null || sizeBytes <= maxFileBytes) return null;
+    return '文件过大 ($sizeBytes 字节 > $maxFileBytes 字节 / 2MB)，拒绝整体读取。'
+        '请用 grep 管道定位内容（如 grep -n "关键词" <文件> | head -50），'
+        '或用 sftp_download 下载到本地后查看。';
+  }
+
+  /// UTF-8 lossy 解码（纯函数）：非法字节替换为 U+FFFD，只读场景不损坏原文件
+  static String decodeLossy(Uint8List bytes) =>
+      utf8.decode(bytes, allowMalformed: true);
+
+  /// 按行切片并格式化（纯函数，不依赖 SFTP）。
+  /// 返回总行数、本次范围、带行号内容、hasMore 与下次 offset 提示。
+  static ToolResult formatSlice(
+    String text, {
+    required String path,
+    required int offset,
+    required int limit,
+  }) {
+    if (offset < 1) {
+      return ToolResult.failure('参数错误: offset 必须 ≥ 1，实际值为 $offset');
+    }
+    if (limit < 1) {
+      return ToolResult.failure('参数错误: limit 必须 ≥ 1，实际值为 $limit');
+    }
+    var lines = text.isEmpty ? <String>[] : text.split('\n');
+    // 末尾换行不算额外一行："a\nb\n" 是 2 行而不是 3 行
+    if (lines.isNotEmpty && lines.last.isEmpty && text.endsWith('\n')) {
+      lines = lines.sublist(0, lines.length - 1);
+    }
+    // CRLF 文件去掉行尾 \r，避免行号输出里混入不可见字符
+    lines = [
+      for (final l in lines)
+        l.endsWith('\r') ? l.substring(0, l.length - 1) : l
+    ];
+    final total = lines.length;
+    if (total == 0) {
+      return ToolResult.success('文件: $path (共 0 行，空文件)\nhasMore: false');
+    }
+    if (offset > total) {
+      return ToolResult.failure(
+          'offset 越界: 文件共 $total 行，offset=$offset 超出文件末尾。请用 1-$total 之间的 offset');
+    }
+
+    final start = offset;
+    var end = start;
+    var chars = 0;
+    final buffer = StringBuffer();
+    for (var i = start - 1; i < total && i < start - 1 + limit; i++) {
+      var line = lines[i];
+      if (line.length > maxLineChars) {
+        line =
+            '${line.substring(0, maxLineChars)}…(行过长，截断 ${line.length - maxLineChars} 字符)';
+      }
+      final entry = 'L${i + 1}: $line\n';
+      // R8 边界：恰好等于上限时仍收录；首行永远收录（单行上限 < 总上限）
+      if (chars + entry.length > maxSliceChars && buffer.isNotEmpty) break;
+      buffer.write(entry);
+      chars += entry.length;
+      end = i + 1;
+    }
+
+    final hasMore = end < total;
+    final out = StringBuffer()
+      ..writeln('文件: $path (共 $total 行)')
+      ..writeln('本次范围: L$start-L$end (${end - start + 1} 行)')
+      ..write(buffer)
+      ..write(hasMore
+          ? 'hasMore: true，继续读取请用 offset: ${end + 1}'
+          : 'hasMore: false（已到文件末尾）');
+    return ToolResult.success(out.toString());
+  }
+}
+
 /// 文件同步工具
 /// 启动/停止本地↔远端双向同步
 /// 参数：
@@ -2462,6 +2671,7 @@ class AgentToolRegistry {
     // 注册默认工具
     register(SftpUploadTool());
     register(SftpDownloadTool());
+    register(SftpFileReadTool(), scope: ToolScope.sshSession);
     register(FileSyncTool(fileSyncService));
     register(CertMonitorTool());
     // 文件编辑工具：默认模式即可用，不依赖编排模式

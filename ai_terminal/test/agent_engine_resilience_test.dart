@@ -459,7 +459,8 @@ void main() {
       provider.enqueueStream([
         '思考: 结论: 完成\n现状: ok\n变更: 无\n建议: 无\n动作: finish\n',
       ]);
-      final longOutput = List.generate(200, (i) => 'line $i').join('\n');
+      // 非查询成功输出上限为 2000 字符（O2 分级截断），构造超过上限的输出
+      final longOutput = List.generate(500, (i) => 'line $i').join('\n');
 
       final engine = makeEngine(provider: provider);
       final events = <AgentEvent>[];
@@ -470,7 +471,7 @@ void main() {
         (e) => e.isResult && e.toolName == 'exec_command',
       );
       expect(resultEvent.outputTail, isNotNull);
-      expect(resultEvent.outputTail, contains('line 199'));
+      expect(resultEvent.outputTail, contains('line 499'));
       expect(resultEvent.outputTruncated, isTrue);
     });
 
