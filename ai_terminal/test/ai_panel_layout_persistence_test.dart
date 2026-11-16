@@ -78,6 +78,10 @@ void main() {
       expect(_resolve(position: null).position, 'right');
     });
 
+    test('老用户存的 overlay 回落到 right（悬浮模式已移除）', () {
+      expect(_resolve(position: 'overlay').position, 'right');
+    });
+
     test('比例夹回合法区间', () {
       expect(_resolve(ratio: 0.02).ratio, 0.15);
       expect(_resolve(ratio: 0.95).ratio, 0.7);

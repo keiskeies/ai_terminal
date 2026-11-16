@@ -1231,8 +1231,8 @@ class _RamStickPainter extends CustomPainter {
     const teeth = 5;
     for (var i = 0; i < teeth; i++) {
       final x = 1.5 + i * (size.width - 3) / (teeth - 1);
-      // 金手指只露一小截，别拖成流苏
-      canvas.drawLine(Offset(x, 5.5), Offset(x, 8.5), paint);
+      // 金手指插进板体半截，外面只露一小截，别拖成流苏
+      canvas.drawLine(Offset(x, 2.5), Offset(x, 8.0), paint);
     }
   }
 

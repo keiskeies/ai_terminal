@@ -71,6 +71,7 @@ import '../services/ai_service.dart';
 import '../services/command_executor.dart';
 import '../services/server_monitor_service.dart';
 import '../services/change_record_service.dart';
+import '../services/change_window_service.dart';
 import '../services/local_file_policy.dart';
 import '../services/session_log_service.dart';
 import '../services/port_forward_service.dart';
@@ -86,7 +87,7 @@ import '../services/pane_session_service.dart';
 import '../core/app_toast.dart';
 
 
-enum _AiPanelPosition { bottom, right, overlay }
+enum _AiPanelPosition { bottom, right }
 
 /// 面板方向与比例的存盘约定。此前两者都不落盘（每次启动都回到默认值），这里补齐。
 ///
@@ -117,9 +118,9 @@ void saveAiPanelLayout({
   required double minRatio,
   required double maxRatio,
 }) {
-  final position = (storedPosition == 'bottom' ||
-          storedPosition == 'right' ||
-          storedPosition == 'overlay')
+  // 悬浮模式已移除。老用户存的 'overlay' 会落到这里被判为非法值，
+  // 回落到默认 right —— 正是想要的迁移结果（悬浮卡片不再存在）。
+  final position = (storedPosition == 'bottom' || storedPosition == 'right')
       ? storedPosition as String
       : defaultPosition;
   var ratio = defaultRatio;
@@ -509,11 +510,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         minRatio: _minPanelRatio,
         maxRatio: _maxPanelRatio,
       );
-      _defaultAiPanelPosition = switch (resolved.position) {
-        'bottom' => _AiPanelPosition.bottom,
-        'overlay' => _AiPanelPosition.overlay,
-        _ => _AiPanelPosition.right,
-      };
+      _defaultAiPanelPosition = resolved.position == 'bottom'
+          ? _AiPanelPosition.bottom
+          : _AiPanelPosition.right;
     } catch (_) {}
     // 宽度：只认新键 aiPanelWidth（像素）。旧键 aiPanelRatioV2 里的 0.4
     // 是老实现的默认值，读到就会把面板撑到终端的一半，必须彻底忽略。
@@ -1944,7 +1943,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           )
         : terminalView;
 
-    // SFTP 与 AI 正交：AI 占右列 → SFTP 挂终端列下方；AI 在底/悬浮/收起 →
+    // SFTP 与 AI 正交：AI 占右列 → SFTP 挂终端列下方；AI 在底/收起 →
     // SFTP 挂右侧列。挂载点必须在选择 AI 方位的分支**内侧**，否则底部态的
     // SFTP 会横铺整屏、把 AI 一起顶上去。
     final showSftp = _sftpVisibleFor(tab);
@@ -2036,12 +2035,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             );
 
         // 80 列保护：横向分栏时终端一侧不得被面板挤到 80 列以下。
-        // 悬浮态（仅桌面）不占布局宽度，终端永远全宽，但面板取宽度比例。
-        final overlayActive =
-            position == _AiPanelPosition.overlay && !_isMobile;
         // 像素宽度 → 本次容器的比例。默认 320（设计稿固定列宽），
         // 拖过分隔条就用手动值；240px 下限同样换算成比例交给同一条 clamp。
-        final panelExtent = isRight || overlayActive ? totalW : totalH;
+        final panelExtent = isRight ? totalW : totalH;
         final wantWidth = _aiPanelWidthFor(tab?.id) ?? _kAiPanelDefaultWidth;
         final ratio =
             panelExtent > 0 ? (wantWidth / panelExtent).clamp(0.0, 1.0) : 0.25;
@@ -2075,46 +2071,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   _buildBottomBar(agentState, tab),
                 ],
               );
-
-        if (position == _AiPanelPosition.overlay && !_isMobile) {
-          // 悬浮态：终端全宽，AI 浮在右上不占布局。SFTP 判定也按
-          // 「AI 没占宽度」走右侧列（见 _withSftpRight）。
-          // 设计稿 .shell.m-overlay .ai-panel：absolute top52 / right10、
-          // 宽 min(320, 88%)、12 圆角 + 四向扩散投影 —— 是一张浮起的卡片，
-          // 不是通高贴边的抽屉。之前 top/bottom/right 全 0 拉满高度，视觉上
-          // 仍像分栏，只是把分隔线盖住了而已。
-          return sftpCol(Stack(
-            fit: StackFit.expand,
-            children: [
-              terminalArea,
-              Positioned(
-                right: 10,
-                top: 4,
-                bottom: 10,
-                child: SizedBox(
-                  width: math.min(aiPanelSize, constraints.maxWidth * 0.88),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: tc.border),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.35),
-                          blurRadius: 32,
-                          offset: const Offset(0, 12),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(11),
-                      child: aiContent,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ));
-        }
 
         if (isRight) {
           // AI 占右列 → SFTP 只能在终端列的下方（设计稿 "center ai"/"sftp ai"）。
@@ -2236,7 +2192,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     );
   }
 
-  /// 「内容 + 右列 SFTP」—— AI 在底/悬浮/收起时 SFTP 走右侧列，
+  /// 「内容 + 右列 SFTP」—— AI 在底/收起时 SFTP 走右侧列，
   /// 与 AI 永远不在同一根轴上抢空间。
   Widget _withSftpRight(Widget content, tp.TerminalTab tab,
       {required bool active}) {
@@ -2514,11 +2470,19 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       icon: Icon(Icons.more_horiz, color: tc.textSub, size: 20),
       onSelected: (value) async {
         if (value.startsWith('drawer:')) {
-          _showNavDrawer(value.substring(7));
+          // drawer:<section>[:<group>] —— 带组名时直接摊开对应设置组。
+          final rest = value.substring(7);
+          final split = rest.indexOf(':');
+          if (split < 0) {
+            _showNavDrawer(rest);
+          } else {
+            _showNavDrawer(rest.substring(0, split),
+                group: rest.substring(split + 1));
+          }
           return;
         }
         if (value.startsWith('page:')) {
-          // 台账 / 变更窗口是独立工作区（整页表格与规则编辑），不是抽屉分区。
+          // 台账是独立工作区（整页表格），不是抽屉分区。
           context.push(value.substring(5));
           return;
         }
@@ -2563,8 +2527,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             trailing: counts['drawer:${NavDrawer.sectionSettings}']),
         _gridMenuItem('page:/change-records', Icons.fact_check_outlined,
             UiText.t('变更台账', 'Change records')),
-        _gridMenuItem('page:/change-window', Icons.schedule_outlined,
-            UiText.t('变更窗口', 'Change window')),
+        _gridMenuItem(
+            'drawer:${NavDrawer.sectionSettings}:security',
+            Icons.schedule_outlined,
+            UiText.t('安全时段', 'Safe window'),
+            trailing: ChangeWindowService.config.enabled
+                ? '${ChangeWindowService.config.startHour.toString().padLeft(2, '0')}:00–'
+                    '${ChangeWindowService.config.endHour.toString().padLeft(2, '0')}:00'
+                : UiText.t('未启用', 'Off')),
 
         const PopupMenuDivider(height: 8),
         _menuGroupLabel(tc, UiText.t('本终端', 'This terminal')),
@@ -2593,8 +2563,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             trailing: UiText.t('终端全宽', 'Terminal only')),
         if (activeTab != null)
           _gridMenuItem('act:cycle', Icons.view_sidebar_outlined,
-              UiText.t('切换 AI 面板位置', 'Cycle AI panel position'),
-              trailing: UiText.t('右 / 底 / 悬浮', 'right / bottom / float')),
+              UiText.t('切换 AI 面板位置', 'Move AI panel'),
+              trailing: UiText.t('右 / 底', 'right / bottom')),
       ],
     );
   }
@@ -2640,19 +2610,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         local.day == now.day;
   }
 
-  /// 右栏 → 底部 → 悬浮 循环（移动端没有悬浮，跳过）
+  /// 右栏 ↔ 底部 两态切换（悬浮模式已移除）。
   void _cycleAiPanelPosition() {
     final tab = ref.read(tp.terminalProvider).activeTab;
     final tabId = tab?.id;
-    final next = switch (_aiPanelPositionFor(tabId)) {
-      _AiPanelPosition.right => _AiPanelPosition.bottom,
-      _AiPanelPosition.bottom =>
-        _isMobile ? _AiPanelPosition.right : _AiPanelPosition.overlay,
-      _AiPanelPosition.overlay => _AiPanelPosition.right,
-    };
+    final next = _aiPanelPositionFor(tabId) == _AiPanelPosition.right
+        ? _AiPanelPosition.bottom
+        : _AiPanelPosition.right;
     setState(() {
       _setAiPanelPosition(tabId, next);
-      // 切到某个方位即视为想用它：悬浮/分栏都直接展开，避免「点了没反应」。
+      // 切到某个方位即视为想用它：直接展开，避免「点了没反应」。
       if (!_isFocusModeFor(tabId)) _setAiPanelVisible(tabId, true);
     });
   }
@@ -2846,7 +2813,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// SFTP 面板开关按钮。
   ///
   /// 设计稿把 SFTP 与 AI 并列成两个常驻开关：两者永远正交（AI 在右→SFTP 在下，
-  /// AI 在下/悬浮/收起→SFTP 在右），所以入口必须一眼可见，不能只藏在网格菜单里。
+  /// AI 在下/收起→SFTP 在右），所以入口必须一眼可见，不能只藏在网格菜单里。
   /// 本地终端没有远端文件系统，按钮置灰。
   Widget _buildSftpToggleButton() {
     final tab = ref.read(tp.terminalProvider).activeTab;
@@ -3283,7 +3250,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     );
   }
 
-  /// AI 面板头右侧的微型控件：切换方位（右 → 下 → 悬浮）+ 收起。
+  /// AI 面板头右侧的微型控件：切换方位（右 ↔ 下）+ 收起。
   ///
   /// 设计稿的面板头只有「星 + 标题 + 模型胶囊」，没有一条常驻竖条放这些
   /// 操作；把两个入口收进头部后，终端与面板之间就只剩 1px 发丝线。
@@ -3291,11 +3258,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     final position = _aiPanelPositionFor(tabId);
-    final icon = switch (position) {
-      _AiPanelPosition.bottom => Icons.horizontal_split_rounded,
-      _AiPanelPosition.overlay => Icons.layers_outlined,
-      _ => Icons.vertical_split_outlined,
-    };
+    // 图标表示「点击后切换到的目标方位」：在底 → 显示右(垂直分割)；在右 → 显示底(水平分割)。
+    final icon = position == _AiPanelPosition.bottom
+        ? Icons.vertical_split_outlined
+        : Icons.horizontal_split_rounded;
 
     Widget act(IconData ic, String tip, VoidCallback onTap) {
       return Tooltip(
@@ -3319,8 +3285,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        act(icon, UiText.t('切换面板位置（右 / 下 / 悬浮）',
-            'Switch panel position (right / bottom / overlay)'),
+        act(icon, UiText.t('切换面板位置（右 / 下）',
+            'Move panel (right / bottom)'),
             _cycleAiPanelPosition),
         act(Icons.close_rounded, l10n.terminalCollapseAIPanel,
             () => setState(() => _setAiPanelVisible(tabId, false))),
