@@ -115,6 +115,7 @@ const Map<String, _ToolImpact> _toolImpacts = {
   'cert_check': _readOnly,
   'multi_grep': _readOnly,
   'diff_files': _readOnly,
+  'knowledge_search': _readOnly,
 
   // 远程文件：file_write/file_patch 会备份，传输类不会
   'file_write':
