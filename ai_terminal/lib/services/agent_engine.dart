@@ -200,6 +200,13 @@ class AgentEngine {
   Completer<String>? _choiceCompleter;
   List<String> _pendingOptions = []; // 当前等待选择的选项
 
+  /// 等待用户应答交互式确认提示（yes/no、[Y/n]、Press ENTER 等）的 Completer。
+  /// 与 [_confirmCompleter] 同一套 10 分钟超时 / cancelTask 清理策略
+  /// （R1：外部取消时必须手动 complete(null)，否则 await 永久挂起）。
+  /// 答案是普通输入而非秘密，但同样不进对话历史/凭据库，只走事件时间线。
+  Completer<String?>? _interactiveInputCompleter;
+  Timer? _interactiveInputTimeoutTimer;
+
   /// 命令执行取消令牌：cancelTask 时 complete，_executeCommand 据此提前退出
   Completer<void>? _commandCancelToken;
 
@@ -321,6 +328,15 @@ class AgentEngine {
   /// 只把它写进安全存储与执行器，**绝不**返回给工具或写进对话历史 ——
   /// 秘密一旦进 observation 就永久留在模型上下文里（AGENTS.md R7）。
   Future<String?> Function(String title, String message)? onSecretRequest;
+
+  /// 命令卡在**确认类**交互式提示（yes/no、[Y/n]、Press ENTER 等）时索取
+  /// 自由文本输入的回调，由 AgentNotifier 注入 UI 弹窗。
+  ///
+  /// 返回答案字符串（空串 = 直接回车），或 null 表示取消/超时。
+  /// 答案只写进终端 stdin 与事件时间线，**绝不**写进对话历史或凭据库；
+  /// 密码类提示（Password:/Enter passphrase）不走此回调（AGENTS.md R7），
+  /// 仍按 interactivePrompt 中断走 provide_password 流程。
+  Future<String?> Function(String prompt)? onInteractiveInputRequest;
 
   /// 请求用户授权本机目录（local_exec 使用），由 AgentNotifier 注入 UI 弹窗。
   /// 返回 true 表示用户已允许；调用方必须重新读取 LocalFilePolicy 再判定。
@@ -481,6 +497,124 @@ class AgentEngine {
     _confirmTimeoutTimer?.cancel();
     _confirmTimeoutTimer = null;
     _confirmCompleter!.complete(false);
+  }
+
+  /// 确认类交互式提示的输入桥：自动应答规则优先，否则弹窗问用户。
+  ///
+  /// 由执行器在命令卡在 yes/no、[Y/n]、Press ENTER 等提示时回调。
+  /// 返回答案（空串 = 直接回车）；null = 取消/超时/未接 UI，执行器按
+  /// interactivePrompt 中断命令。
+  ///
+  /// 答案只作为 info 事件进事件时间线，**不进 [_conversationHistory]**
+  /// （它不是模型需要的观测，进历史会污染上下文）、**不进凭据库**。
+  /// 密码类提示不会到达这里 —— 检测器对密码永远走中断路径（R7）。
+  Future<String?> _requestInteractiveInput(String prompt) async {
+    // 自动应答（设置项 agentAutoAnswerEnabled，默认关）：
+    // 只有保守规则表命中（[Y/n]→Y、Press ENTER→回车）才自动答，其余仍弹窗。
+    final autoEnabled = SettingsDao.getCached('agentAutoAnswerEnabled',
+            defaultValue: false) ==
+        true;
+    if (autoEnabled) {
+      final auto = PtyOutputDetector.confirmationAutoAnswer(prompt);
+      if (auto != null) {
+        // 只记"规则命中"，提示文本本身已在命令输出里，无需重复进日志
+        agentLogger.info('ReAct', '确认提示命中自动应答规则');
+        onEvent?.call(AgentEvent.info(UiText.t(
+          '⌨️ 已自动应答确认提示: ${auto.isEmpty ? "(回车)" : auto}',
+          '⌨️ Auto-answered prompt: ${auto.isEmpty ? "(Enter)" : auto}',
+        )));
+        return auto;
+      }
+    }
+
+    final request = onInteractiveInputRequest;
+    if (request == null) {
+      agentLogger.warn('ReAct', 'UI 未接入交互输入回调，按交互式提示中断命令');
+      return null;
+    }
+
+    final completer = Completer<String?>();
+    _interactiveInputCompleter = completer;
+    _interactiveInputTimeoutTimer = Timer(const Duration(minutes: 10), () {
+      if (!completer.isCompleted) {
+        agentLogger.warn('ReAct', '交互输入超时(10min)，按取消处理');
+        completer.complete(null);
+      }
+    });
+
+    onEvent?.call(AgentEvent.info(UiText.t(
+      '⌨️ 命令等待输入: $prompt',
+      '⌨️ Command awaiting input: $prompt',
+    )));
+    _currentTask = _currentTask?.copyWith(
+      status: AgentStatus.waitingConfirm,
+      phase: '等待输入',
+      currentStep: '等待输入: $prompt',
+    );
+    _notifyTaskUpdate();
+
+    // UI 弹窗异步作答。cancelTask/超时会先 complete(null)，迟到的答案直接丢弃，
+    // 不会写进已经中断（或已被新任务接管）的终端。
+    request(prompt).then((answer) {
+      if (!completer.isCompleted) completer.complete(answer);
+    }).catchError((Object e) {
+      agentLogger.warn('ReAct', '交互输入弹窗异常: $e');
+      if (!completer.isCompleted) completer.complete(null);
+    });
+
+    // 等输入的墙钟单独记账：人的反应时间不进 tok/s 分母（与确认等待同口径）
+    final waitStart = DateTime.now();
+    final generationAtWait = _currentTaskGeneration;
+    final answer = await completer.future;
+    if (generationAtWait == _currentTaskGeneration) {
+      _confirmWaitSeconds += DateTime.now().difference(waitStart).inSeconds;
+    }
+    _interactiveInputTimeoutTimer?.cancel();
+    _interactiveInputTimeoutTimer = null;
+    _interactiveInputCompleter = null;
+
+    // 取消/暂停/切任务（代际失效）→ 不再恢复状态、不发答案事件，
+    // 交给取消/暂停路径收口（把 paused 盖回 executing 会让循环漏检暂停）
+    if (generationAtWait != _currentTaskGeneration ||
+        _currentTask?.status == AgentStatus.cancelled ||
+        _currentTask?.status == AgentStatus.paused) {
+      return null;
+    }
+    if (answer != null) {
+      // 答案只进事件时间线（UI 可见），不进对话历史/凭据库
+      onEvent?.call(AgentEvent.info(UiText.t(
+        '⌨️ 已输入: ${answer.isEmpty ? "(回车)" : answer}',
+        '⌨️ Input sent: ${answer.isEmpty ? "(Enter)" : answer}',
+      )));
+    } else {
+      onEvent?.call(AgentEvent.info(UiText.t(
+        '⌨️ 交互输入已取消或超时，命令将被中断',
+        '⌨️ Input cancelled or timed out; command will be interrupted',
+      )));
+    }
+    _currentTask = _currentTask?.copyWith(
+      status: AgentStatus.executing,
+      phase: '执行中',
+      currentStep: _progressStepText(),
+    );
+    _notifyTaskUpdate();
+    return answer;
+  }
+
+  /// R1 回归用：拿到"当前正在等交互输入"的 Completer 本体。
+  @visibleForTesting
+  Completer<String?>? get pendingInteractiveInputForTesting =>
+      _interactiveInputCompleter;
+
+  /// 让当前等待中的交互输入立即按"超时"收口（真定时器要等 10 分钟，测试拿不到）。
+  @visibleForTesting
+  void expireInteractiveInputTimeoutForTesting() {
+    final c = _interactiveInputCompleter;
+    if (c == null || c.isCompleted) return;
+    agentLogger.warn('ReAct', '交互输入超时(10min)，按取消处理');
+    _interactiveInputTimeoutTimer?.cancel();
+    _interactiveInputTimeoutTimer = null;
+    c.complete(null);
   }
 
   /// 设置/更新 fallback 模型（运行时切换备用模型用）
@@ -737,6 +871,13 @@ class AgentEngine {
     }
     _choiceCompleter = null;
     _pendingOptions = [];
+    if (_interactiveInputCompleter != null &&
+        !_interactiveInputCompleter!.isCompleted) {
+      _interactiveInputCompleter!.complete(null);
+    }
+    _interactiveInputTimeoutTimer?.cancel();
+    _interactiveInputTimeoutTimer = null;
+    _interactiveInputCompleter = null;
     // 注意：不递增 _currentTaskGeneration — 那是 startTask 的职责
     // 这里只清状态，不失效代际（cancelTask 已失效过的话不需要再失效）
   }
@@ -971,6 +1112,13 @@ class AgentEngine {
       _choiceCompleter!.complete('');
     }
     _pendingOptions = [];
+    // 同时取消等待交互输入（R1：先 complete(null) 唤醒 await，再清定时器）
+    if (_interactiveInputCompleter != null &&
+        !_interactiveInputCompleter!.isCompleted) {
+      _interactiveInputCompleter!.complete(null);
+    }
+    _interactiveInputTimeoutTimer?.cancel();
+    _interactiveInputTimeoutTimer = null;
     // 取消正在执行的命令
     if (_commandCancelToken != null && !_commandCancelToken!.isCompleted) {
       _commandCancelToken!.complete();
@@ -1078,6 +1226,13 @@ class AgentEngine {
     if (_choiceCompleter != null && !_choiceCompleter!.isCompleted) {
       _choiceCompleter!.complete('');
     }
+    // 取消等待交互输入（R1：同确认/选择，暂停不能让 await 挂死）
+    if (_interactiveInputCompleter != null &&
+        !_interactiveInputCompleter!.isCompleted) {
+      _interactiveInputCompleter!.complete(null);
+    }
+    _interactiveInputTimeoutTimer?.cancel();
+    _interactiveInputTimeoutTimer = null;
     // R2: 取消确认超时定时器，避免暂停后定时器仍占用资源
     // （恢复时 _resetTransientState 会再次清理，但暂停期间不该让定时器空转）
     _confirmTimeoutTimer?.cancel();
@@ -3970,7 +4125,10 @@ class AgentEngine {
     _earlyExecutionCommand = null;
     _confirmTimeoutTimer?.cancel();
     _confirmTimeoutTimer = null;
-    // 不清 _confirmCompleter / _choiceCompleter — _finishTask 调用前已退出等待状态
+    _interactiveInputTimeoutTimer?.cancel();
+    _interactiveInputTimeoutTimer = null;
+    // 不清 _confirmCompleter / _choiceCompleter / _interactiveInputCompleter —
+    // _finishTask 调用前已退出等待状态
 
     // 任务完成通知（异步，不阻塞引擎）
     _notifyTaskCompletion(success: success, startTime: startTime);
@@ -4083,7 +4241,17 @@ class AgentEngine {
         timeout: getCommandTimeout(command),
         cancelToken: _commandCancelToken,
         sudoPassword: sudoPassword,
+        // 确认类交互提示桥接：自动应答规则优先，否则 UI 弹窗（见方法注释）。
+        // 密码类提示不走此桥，检测器仍按 interactivePrompt 中断（R7）。
+        onInteractivePrompt: _requestInteractiveInput,
       );
+
+      // 命令已返回（可能被密码提示/超时/取消打断）：若还挂着交互输入等待，
+      // 立即按取消收口，不让弹窗的 await 悬到 10 分钟超时（R1）。
+      if (_interactiveInputCompleter != null &&
+          !_interactiveInputCompleter!.isCompleted) {
+        _interactiveInputCompleter!.complete(null);
+      }
 
       _commandCancelToken = null;
       stopwatch.stop();
@@ -4118,6 +4286,10 @@ class AgentEngine {
     } catch (e) {
       stopwatch.stop();
       _commandCancelToken = null;
+      if (_interactiveInputCompleter != null &&
+          !_interactiveInputCompleter!.isCompleted) {
+        _interactiveInputCompleter!.complete(null);
+      }
       return AgentResult(
         success: false,
         error: e.toString(),

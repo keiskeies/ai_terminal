@@ -65,14 +65,43 @@ class PtyOutputDetector {
     r'(?:^|\n)\s*(?:dquote|quote|cmdsubst|bquote|curly|paren|)> ',
   );
 
-  /// 交互式密码/确认提示（sudo 之外的）
+  /// 交互式**密码类**提示（sudo 之外的）
   ///
   /// sudo 提示不在这里匹配 —— 见 [SudoPromptResponder]，它按语言中立的
   /// `[sudo]` 前缀识别，覆盖中文 `[sudo] cjm 的密码：` 这类本地化提示。
-  /// 模式：ssh / scp / mysql 等的密码提示，或 yes/no 确认
-  static final _interactivePromptPattern = RegExp(
-    r'(?:Password:\s*$|Enter passphrase|Are you sure you want to continue|^\s*\(yes/no\)|^\s*\(yes/no/\[fingerprint\]\))',
+  /// 模式：ssh / scp / mysql 等的密码提示。
+  ///
+  /// 密码类提示**永远不走自由文本输入桥**（AGENTS.md R7）：无论调用方是否
+  /// 声明桥接，命中即打断，走 provide_password / sudo 密码的既有流程。
+  static final _passwordPromptPattern = RegExp(
+    r'(?:Password:\s*$|Enter passphrase)',
     multiLine: true,
+  );
+
+  /// 交互式**确认类**提示（yes/no、fingerprint 等，历史行首模式）
+  ///
+  /// 保留原有的行首/子串匹配用于"未桥接时打断"的向后兼容路径；
+  /// 桥接路径使用尾部锚定的 [_confirmationPromptAtEnd]（R8）。
+  static final _confirmationPromptPattern = RegExp(
+    r'(?:Are you sure you want to continue|^\s*\(yes/no\)|^\s*\(yes/no/\[fingerprint\]\))',
+    multiLine: true,
+  );
+
+  /// 确认类提示的**尾部锚定**模式（桥接用，AGENTS.md R8）
+  ///
+  /// 只匹配缓冲尾部：提示一定卡在输出末尾等待输入，正文里出现同样文字不算。
+  /// 覆盖：
+  /// - ssh/scp：`Are you sure you want to continue connecting (yes/no/[fingerprint])? `
+  /// - apt 等：`Do you want to continue? [Y/n] `
+  /// - 通用：`Continue?` / `Overwrite? [y/N]` / `Press ENTER to continue`
+  /// - PowerShell Read-Host 会在提示后追加 `: `，所以允许尾随冒号/问号/空白。
+  static final _confirmationPromptAtEnd = RegExp(
+    r'(?:\((?:yes/no|y/n)(?:/\[fingerprint\])?\)'
+    r'|\[(?:Y/n|y/N|yes/no)\]'
+    r'|Are you sure you want to continue[^\r\n]*'
+    r'|Continue\?'
+    r'|Press ENTER[^\r\n]*)'
+    r'[ \t]*[:：?]?[ \t\r]*$',
   );
 
   /// sudo 密码提示（语言中立）
@@ -126,6 +155,49 @@ class PtyOutputDetector {
   static RegExpMatch? sudoPromptMatch(String buffer) =>
       _sudoPromptAtEnd.firstMatch(buffer);
 
+  /// 尾部确认类提示的匹配（无提示返回 null）
+  ///
+  /// 与 [sudoPromptMatch] 同理：暴露匹配位置供 [ConfirmationPromptResponder]
+  /// 用起始下标区分"同一提示的增量"和"命令链里的下一个确认提示"。
+  static RegExpMatch? confirmationPromptMatch(String buffer) =>
+      _confirmationPromptAtEnd.firstMatch(buffer);
+
+  /// 提取确认提示所在的尾部行，供 UI 弹窗展示（不携带整个缓冲区）
+  ///
+  /// 去掉 ANSI 转义序列和首尾空白，只保留最后一行非空文本。
+  static String confirmationPromptText(String buffer) {
+    final plain = buffer.replaceAll(
+      RegExp(r'\x1B\[[\x20-\x3F]*[\x40-\x7E]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)'),
+      '',
+    );
+    final lines = plain
+        .split(RegExp(r'[\r\n]+'))
+        .where((l) => l.trim().isNotEmpty)
+        .toList();
+    return lines.isEmpty ? '' : lines.last.trim();
+  }
+
+  /// 确认类提示的保守自动应答规则（纯函数，可单测）
+  ///
+  /// 只在**默认值明确安全**时给答案：
+  /// - `[Y/n]`（默认 Yes）→ `'Y'`
+  /// - `Press ENTER`（等待回车）→ `''`（空串 = 直接回车）
+  /// 其余（`[y/N]` 默认 No、裸 `(yes/no)` 无默认值等）一律返回 null，
+  /// 交回 UI 弹窗让人决定。
+  ///
+  /// R7：密码类提示（password/passphrase/密码）绝不自动应答，返回 null。
+  static String? confirmationAutoAnswer(String prompt) {
+    if (RegExp(r'password|passphrase|密码', caseSensitive: false)
+        .hasMatch(prompt)) {
+      return null;
+    }
+    if (prompt.contains('[Y/n]')) return 'Y';
+    if (RegExp(r'press enter', caseSensitive: false).hasMatch(prompt)) {
+      return '';
+    }
+    return null;
+  }
+
   /// 检测输出并返回失败原因（null 表示未检测到异常）
   ///
   /// [buffer] 当前累积的输出
@@ -135,6 +207,9 @@ class PtyOutputDetector {
   /// [sudoPromptWillBeAnswered] 调用方会在命中 sudo 提示时写入密码。
   ///   为 true 时 sudo 提示不再算异常 —— 否则检测器抢在注入之前 complete()，
   ///   调用方随即发 Ctrl+C，把刚要接受密码的 sudo 打断（中英文 locale 都会）。
+  /// [confirmationPromptWillBeBridged] 调用方会把确认类提示桥接给上层
+  ///   （UI 弹窗 / 自动应答）。为 true 时确认提示不再算异常；密码类提示
+  ///   **不受此开关影响**，永远打断（R7：密码不走自由文本桥）。
   ///
   /// 注意：marker 字符串本身会出现在命令回显里（如 `echo "EXITCODE_1:$?"`），
   /// 这是正常的。真正的"命令完成"是 marker + 退出码数字。
@@ -147,6 +222,7 @@ class PtyOutputDetector {
     required int elapsedMs,
     required bool isWindows,
     bool sudoPromptWillBeAnswered = false,
+    bool confirmationPromptWillBeBridged = false,
     RegExp? donePattern,
   }) {
     // 命令真正完成 = marker+数字出现（由调用方 donePattern 判定）
@@ -199,11 +275,22 @@ class PtyOutputDetector {
             reason: '命令等待交互式 sudo 密码提示（未配置 sudo 密码）',
           );
         }
-      } else if (_interactivePromptPattern.hasMatch(buffer)) {
+      } else if (_passwordPromptPattern.hasMatch(buffer)) {
+        // R7：密码类提示不走自由文本桥，无论是否声明桥接都打断，
+        // 走 provide_password / sudo 密码的既有安全流程。
         return CommandFailureDiagnostic(
           kind: CommandFailureKind.interactivePrompt,
-          reason: '命令进入交互式提示（密码/确认），无法在非交互模式完成',
+          reason: '命令进入交互式密码提示，无法在非交互模式完成',
         );
+      } else if (_confirmationPromptPattern.hasMatch(buffer) ||
+          _confirmationPromptAtEnd.hasMatch(buffer)) {
+        // 确认类提示：调用方声明桥接时不打断，等 UI/自动应答写入答案
+        if (!confirmationPromptWillBeBridged) {
+          return CommandFailureDiagnostic(
+            kind: CommandFailureKind.interactivePrompt,
+            reason: '命令进入交互式提示（密码/确认），无法在非交互模式完成',
+          );
+        }
       }
     }
 
@@ -233,6 +320,27 @@ class SudoPromptResponder {
     final match = PtyOutputDetector.sudoPromptMatch(buffer);
     if (match == null) return false;
     // 缓冲按尾部 256KB 截断后下标会整体前移，此时旧游标已无意义
+    if (_lastAnsweredStart >= buffer.length) _lastAnsweredStart = -1;
+    if (match.start <= _lastAnsweredStart) return false;
+    _lastAnsweredStart = match.start;
+    return true;
+  }
+}
+
+/// 确认类提示应答状态机（每次 executeAndWait 一个实例）。
+///
+/// 与 [SudoPromptResponder] 同一套下标去重逻辑：同一个确认提示可能分多个
+/// chunk 到达（尾随空格、ANSI 重绘），下标没变 = 同一提示的增量，不再触发
+/// 桥接回调；下标变大 = 命令链里的下一个确认提示，需要再问一次。
+/// 答重了会把上一轮答案泄漏给下一条命令的 stdin。
+class ConfirmationPromptResponder {
+  int _lastAnsweredStart = -1;
+
+  /// 此刻是否应该把确认提示桥接给上层（UI 弹窗 / 自动应答）。
+  bool shouldAnswer(String buffer) {
+    final match = PtyOutputDetector.confirmationPromptMatch(buffer);
+    if (match == null) return false;
+    // 缓冲按尾部截断后下标整体前移，旧游标失效
     if (_lastAnsweredStart >= buffer.length) _lastAnsweredStart = -1;
     if (match.start <= _lastAnsweredStart) return false;
     _lastAnsweredStart = match.start;

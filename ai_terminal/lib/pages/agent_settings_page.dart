@@ -37,6 +37,17 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
     setState(() {});
   }
 
+  /// 确认提示自动应答（默认关）：只在保守规则命中时答（[Y/n]→Y、
+  /// Press ENTER→回车），密码类提示永不自动应答（AGENTS.md R7）。
+  bool get _autoAnswerEnabled =>
+      SettingsDao.getCached('agentAutoAnswerEnabled', defaultValue: false) ==
+      true;
+
+  void _setAutoAnswerEnabled(bool value) {
+    SettingsDao.set('agentAutoAnswerEnabled', value);
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -258,6 +269,44 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                               style: TextStyle(
                                   color: tc.textMuted, fontSize: fMicro)),
                         ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // 确认提示自动应答
+              Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Padding(
+                  padding: const EdgeInsets.all(pStandard),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              UiText.t('确认提示自动应答',
+                                  'Auto-answer confirmations'),
+                              style: TextStyle(color: tc.textMain),
+                            ),
+                          ),
+                          Switch(
+                            value: _autoAnswerEnabled,
+                            onChanged: _setAutoAnswerEnabled,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        UiText.t(
+                          '命令卡在确认提示时按保守规则应答（[Y/n]→Y、Press ENTER→回车）；无安全默认值的提示仍弹窗询问。密码提示永不自动应答。',
+                          'Answer confirmation prompts by conservative rules ([Y/n]→Y, Press ENTER→Enter). Prompts without a safe default still ask you. Passwords are never auto-answered.',
+                        ),
+                        style: TextStyle(color: tc.textSub, fontSize: fSmall),
                       ),
                     ],
                   ),

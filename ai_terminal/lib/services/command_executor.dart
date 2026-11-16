@@ -9,6 +9,7 @@ export 'pty_output_detector.dart'
     show
         CommandFailureDiagnostic,
         CommandFailureKind,
+        ConfirmationPromptResponder,
         PtyOutputDetector,
         SudoPromptResponder;
 
@@ -72,11 +73,18 @@ abstract class CommandExecutor {
   /// [sudoPassword] 命令卡在 sudo 密码提示时写入 PTY stdin 的应答密码。
   ///   默认 null 保持旧行为：命中交互式提示立即中断命令。
   ///   密码只进终端 stdin，不进命令串、输出缓冲与审计日志（AGENTS.md R7）。
+  /// [onInteractivePrompt] 命令卡在**确认类**交互提示（yes/no、[Y/n]、
+  ///   Press ENTER 等）时的桥接回调：返回答案字符串（空串 = 直接回车）
+  ///   写入 stdin 后继续等 marker；返回 null（用户取消/超时）则按
+  ///   interactivePrompt 中断。默认 null 保持旧行为：命中即中断。
+  ///   密码类提示（Password:/Enter passphrase）**不走此桥**（R7），
+  ///   仍按旧流程中断走 provide_password。
   Future<CommandResult> executeAndWait(
     String command, {
     Duration timeout = const Duration(seconds: 60),
     Completer<void>? cancelToken,
     String? sudoPassword,
+    Future<String?> Function(String prompt)? onInteractivePrompt,
   });
 
   /// 通过 PTY stdin 写入文件（绕过 shell 转义，继承当前 shell 权限）

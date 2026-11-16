@@ -96,6 +96,14 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// （AGENTS.md R7）—— 所以这里只透传回调，Notifier 自己也不留副本。
   Future<String?> Function(String title, String message)? secretRequestHandler;
 
+  /// 由 UI（terminal_page）注入：命令卡在确认类交互提示（yes/no、[Y/n] 等）时
+  /// 弹出自由文本输入框。返回答案（空串 = 直接回车），null 表示取消。
+  ///
+  /// 与秘密不同：答案不是凭据，不进安全存储；但同样不经过 Notifier/state/
+  /// 对话历史 —— 只透传给引擎，由引擎写进终端 stdin 与事件时间线。
+  /// 密码类提示不走此通道（AGENTS.md R7）。
+  Future<String?> Function(String prompt)? interactiveInputRequestHandler;
+
   /// 本机目录授权弹窗（local_exec 使用）。由 TerminalPage 注入。
   Future<bool> Function(String path, String reason)? localDirRequestHandler;
 
@@ -576,6 +584,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
     // 透传而不是捕获：页面可能在引擎创建之后才注册处理器（切 tab、重建 engine）
     engine.onSecretRequest =
         (title, message) async => secretRequestHandler?.call(title, message);
+    // 透传交互输入桥：同 secretRequestHandler，页面可能晚于 engine 注册处理器
+    engine.onInteractiveInputRequest =
+        (prompt) async => interactiveInputRequestHandler?.call(prompt);
     // 透传本机目录授权：页面可能晚于 engine 注册处理器，不能在创建 engine 时捕获 null
     engine.onLocalDirRequest = (path, reason) async {
       final handler = localDirRequestHandler;

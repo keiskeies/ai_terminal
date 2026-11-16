@@ -29,7 +29,8 @@ class _NullExecutor implements CommandExecutor {
   Future<CommandResult> executeAndWait(String command,
           {Duration timeout = const Duration(seconds: 1),
           Completer<void>? cancelToken,
-          String? sudoPassword}) async =>
+          String? sudoPassword,
+          Future<String?> Function(String prompt)? onInteractivePrompt}) async =>
       CommandResult(
           stdout: '', stderr: '', exitCode: 0, duration: Duration.zero);
   @override

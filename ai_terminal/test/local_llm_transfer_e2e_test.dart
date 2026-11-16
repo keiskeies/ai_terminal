@@ -77,6 +77,7 @@ class _LocalProcessExecutor extends LocalTerminalService {
     Duration timeout = const Duration(seconds: 60),
     Completer<void>? cancelToken,
     String? sudoPassword,
+    Future<String?> Function(String prompt)? onInteractivePrompt,
   }) async {
     final stopwatch = Stopwatch()..start();
     try {
