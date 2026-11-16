@@ -19,9 +19,15 @@ abstract class AIProvider {
   ///
   /// [tools] 可选：P2-6 原生 Function Calling 工具 schema（OpenAI tools API 格式）。
   /// 传入后 OpenAIProvider 会将其附加到请求 body，并解析 delta.tool_calls。
-  /// 当前实现：收到 tool_calls 时，转换为 ReAct 多行 key:value 格式
-  /// （"动作: tool / 工具: X / 参数: /   key: value"）投递到 stream，
+  /// 默认（未提供 [onToolCalls]）：收到 tool_calls 时，转换为 ReAct 多行
+  /// key:value 格式（"动作: tool / 工具: X / 参数: /   key: value"）投递到 stream，
   /// 由 AgentEngine 的现有解析路径（ToolArgsParser）处理。其他 provider 忽略此参数。
+  ///
+  /// [onToolCalls] 可选（O8 FC-first）：提供后，tool_calls 不再转成 ReAct 文本
+  /// 混入正文流，而是在累积完成时以结构化 [ToolCall] 列表直接回调，
+  /// 由调用方（AgentEngine）直接构造动作，消除「JSON→文本→再解析」的往返损耗。
+  /// 每次调用恰好回调一批（finalize 会清空累积器，[DONE]/finish_reason/onDone
+  /// 三处兜底不会重复投递）。不提供时保持旧的文本投递行为。
   ///
   /// [onUsage] 可选：provider 在流里给出真实 token 用量时回调。
   /// 可能是累计式（每个 chunk 都带递增的 usage）也可能是末包式，因此**每次都回调**，
@@ -40,6 +46,7 @@ abstract class AIProvider {
     void Function(TokenUsage usage)? onUsage,
     /// 模型原生推理增量（reasoning_content）；网关不给该字段时不会触发
     void Function(String delta)? onReasoning,
+    void Function(List<ToolCall> calls)? onToolCalls,
   });
 }
 
@@ -161,6 +168,7 @@ class OpenAIProvider implements AIProvider {
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
     void Function(String delta)? onReasoning,
+    void Function(List<ToolCall> calls)? onToolCalls,
   }) async {
     final effectiveSystemPrompt = systemPrompt ?? buildContextPrompt();
     final messages = buildRequestMessages(
@@ -209,6 +217,18 @@ class OpenAIProvider implements AIProvider {
       final toolCallAcc =
           tools != null && tools.isNotEmpty ? ToolCallAccumulator() : null;
 
+      // O8: 提供了 onToolCalls 就走结构化投递，否则维持旧的 ReAct 文本投递。
+      // 三处 finalize 兜底（[DONE]/finish_reason/onDone）共用此入口，
+      // finalize 会清空累积器，天然不会重复投递。
+      void deliverToolCalls(List<ToolCall> calls) {
+        if (calls.isEmpty || streamController.isClosed) return;
+        if (onToolCalls != null) {
+          onToolCalls(calls);
+        } else {
+          streamController.add(ToolCallAccumulator.toReActText(calls));
+        }
+      }
+
       if (cancelToken != null) {
         cancelToken.whenCancel.then((err) {
           if (!streamController.isClosed) {
@@ -220,15 +240,9 @@ class OpenAIProvider implements AIProvider {
 
       void processLine(String line) {
         if (line == 'data: [DONE]') {
-          // P2-6: 流结束前若有累积的 tool_calls，转换为 ReAct 文本投递
+          // P2-6/O8: 流结束前若有累积的 tool_calls，投递（结构化或 ReAct 文本）
           if (toolCallAcc != null && toolCallAcc.hasPendingCalls) {
-            final calls = toolCallAcc.finalize();
-            if (calls.isNotEmpty) {
-              final reactText = ToolCallAccumulator.toReActText(calls);
-              if (!streamController.isClosed) {
-                streamController.add(reactText);
-              }
-            }
+            deliverToolCalls(toolCallAcc.finalize());
           }
           if (!streamController.isClosed) {
             streamController.close();
@@ -267,13 +281,7 @@ class OpenAIProvider implements AIProvider {
                 // finish_reason='tool_calls' 时立即投递（部分 provider 不会发 [DONE]）
                 final finishReason = choices[0]['finish_reason'];
                 if (finishReason == 'tool_calls' && toolCallAcc != null) {
-                  final calls = toolCallAcc.finalize();
-                  if (calls.isNotEmpty) {
-                    final reactText = ToolCallAccumulator.toReActText(calls);
-                    if (!streamController.isClosed) {
-                      streamController.add(reactText);
-                    }
-                  }
+                  deliverToolCalls(toolCallAcc.finalize());
                 }
               }
             }
@@ -302,14 +310,11 @@ class OpenAIProvider implements AIProvider {
           }
         },
         onDone: () {
-          // P2-6: 兜底 — 若 stream 关闭时仍有未投递的 tool_calls，在此投递
+          // P2-6/O8: 兜底 — 若 stream 关闭时仍有未投递的 tool_calls，在此投递
           if (toolCallAcc != null &&
               toolCallAcc.hasPendingCalls &&
               !streamController.isClosed) {
-            final calls = toolCallAcc.finalize();
-            if (calls.isNotEmpty) {
-              streamController.add(ToolCallAccumulator.toReActText(calls));
-            }
+            deliverToolCalls(toolCallAcc.finalize());
           }
           if (!streamController.isClosed) {
             streamController.close();
@@ -369,6 +374,7 @@ class QwenProvider implements AIProvider {
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
     void Function(String delta)? onReasoning,
+    void Function(List<ToolCall> calls)? onToolCalls,
   }) async {
     // 通义千问兼容 OpenAI API 格式
     final provider = OpenAIProvider();
@@ -382,6 +388,7 @@ class QwenProvider implements AIProvider {
       tools: tools,
       onUsage: onUsage,
       onReasoning: onReasoning,
+      onToolCalls: onToolCalls,
     );
   }
 }
@@ -404,6 +411,9 @@ class ErnieProvider implements AIProvider {
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
     void Function(String delta)? onReasoning,
+    // 文心不支持原生 tool_calls，此参数仅为满足接口契约；引擎收不到回调时
+    // 自动走文本协议解析路径
+    void Function(List<ToolCall> calls)? onToolCalls,
   }) async {
     // 百度文心 API 格式（不支持 system 角色）
     // 将 system prompt 合并到第一条 user 消息中

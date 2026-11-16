@@ -19,6 +19,7 @@ import 'package:ai_terminal/services/command_executor.dart';
 import 'package:ai_terminal/services/ssh_service.dart';
 import 'package:ai_terminal/models/host_config.dart';
 import 'package:ai_terminal/utils/tool_args_parser.dart';
+import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 
 /// 最小 mock executor：既不是 SSHService 也不是 LocalTerminalService，
 /// 用于驱动引擎走到工具分发那一步（工具本身会在 mock 环境下失败，但我们只关心门禁）。
@@ -83,6 +84,7 @@ class _MockAIProvider implements AIProvider {
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
     void Function(String delta)? onReasoning,
+    void Function(List<ToolCall> calls)? onToolCalls,
   }) async {
     callCount++;
     receivedHistories.add(List.from(history));

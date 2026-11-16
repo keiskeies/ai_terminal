@@ -13,6 +13,7 @@ import 'package:ai_terminal/models/chat_session.dart';
 import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/l10n/app_localizations_zh.dart';
 import 'package:dio/dio.dart';
+import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 
 /// O5 steering（运行中用户补充指令）引擎单测。
 /// 模式参照 agent_engine_resilience_test.dart：Mock executor + Mock AI provider，
@@ -91,6 +92,7 @@ class _MockAIProvider implements AIProvider {
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
     void Function(String delta)? onReasoning,
+    void Function(List<ToolCall> calls)? onToolCalls,
   }) async {
     callCount++;
     receivedHistories.add(List.from(history));

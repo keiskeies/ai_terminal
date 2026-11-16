@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
@@ -45,6 +46,7 @@ import '../utils/command_extractor.dart';
 import '../utils/choice_request_detector.dart';
 import '../utils/local_command_detector.dart';
 import '../utils/token_estimator.dart';
+import '../utils/tool_call_accumulator.dart';
 import '../utils/audit_logger.dart';
 import '../utils/tail_text_buffer.dart';
 import 'change_record_service.dart';
@@ -73,6 +75,10 @@ class AgentEngine {
   /// 最近一次 _callAI 结束时的解析结果，供紧随其后的 _parseReActResponse 复用，
   /// 避免同一段响应被全量解析两次。
   List<AgentEvent>? _lastParsedResponseEvents;
+
+  /// O8 FC-first：最近一次 _callAI 收到的结构化 tool_calls。
+  /// 非 FC 模型或纯文本响应时为空，主循环据此走文本解析兜底。
+  List<ToolCall> _lastFcToolCalls = const [];
 
   /// 本条 AI 响应的解析结果里是否已带 ask 事件（主循环在解析后填入）
   bool _lastResponseHadAskEvent = false;
@@ -1622,14 +1628,24 @@ class AgentEngine {
       }
 
       // 将 AI 响应加入对话历史（代际和取消检查通过后）
+      // O8: FC 轮次把结构化动作按文本协议格式记进历史，保证模型（含 fallback
+      // 到非 FC 模型时）能从历史读到自己上一轮做了什么；该文本不参与本轮解析。
+      final fcCalls = _lastFcToolCalls;
+      final historyContent = fcCalls.isEmpty
+          ? fullResponse
+          : '$fullResponse${_fcCallsToHistoryText(fcCalls)}';
       _conversationHistory
-          .add(ChatMessage.create(role: 'assistant', content: fullResponse));
+          .add(ChatMessage.create(role: 'assistant', content: historyContent));
 
       // ═══════════════════════════════════════════
       // 阶段2: 解析 (Parse) — 从 AI 响应中提取结构化动作
+      // O8: 有结构化 tool_calls 时直接构造动作，不再走「JSON→文本→再解析」往返；
+      // FC 模型回纯文本（没发 tool_calls）时自动落回文本协议解析。
       // ═══════════════════════════════════════════
-      final step = _parseReActResponse(fullResponse,
-          parsedEvents: _lastParsedResponseEvents);
+      final step = fcCalls.isNotEmpty
+          ? _stepFromFcCalls(fcCalls, fullResponse)
+          : _parseReActResponse(fullResponse,
+              parsedEvents: _lastParsedResponseEvents);
       // 第一条之外、同一条响应里宣布的其余命令：解析事件缓存马上要清空，
       // 先取出来留给 _executeRemainingAnnouncedCommands 按 id 关联结果
       _announcedFollowUps = _remainingAnnouncedCommands(_lastParsedResponseEvents);
@@ -1688,7 +1704,7 @@ class AgentEngine {
             _conversationHistory.add(ChatMessage.create(
               role: 'user',
               content: '你尚未执行任何命令就声称任务完成，这不被允许。'
-                  '请立即使用 动作: execute 实际执行命令验证你的判断，'
+                  '请立即通过 execute 动作实际执行命令验证你的判断，'
                   '所有结论必须有命令输出作为依据。如果任务确实无需执行命令（如纯解释/分析），'
                   '请在思考中明确说明为什么无需执行命令。',
             ));
@@ -1723,7 +1739,7 @@ class AgentEngine {
                   '请对照计划逐项核对实际执行情况，输出完整计划块：已做的标完成 [x]，'
                   '未做/不需要做的标跳过 [-] 并在思考中说明原因，实际失败的标失败 [!]。'
                   '计划状态必须以命令输出为依据，不得把未执行的步骤标为完成。'
-                  '更新计划后再使用 动作: finish 收尾。',
+                  '更新计划后再使用 finish 动作收尾。',
             ));
             _trimMessages(_conversationHistory);
             continue;
@@ -1857,10 +1873,16 @@ class AgentEngine {
     agentLogger.debug('ReAct', '消息历史: ${_conversationHistory.length} 条');
     _resetReasoning();
     _lastParsedResponseEvents = null;
+    _lastFcToolCalls = const [];
     _announcedFollowUps = const [];
     _lastResponseHadAskEvent = false;
 
     final fullResponseBuffer = StringBuffer();
+    // O8: 本轮收到的结构化 tool_calls（onToolCalls 回调写入，流结束后消费）
+    final fcCalls = <ToolCall>[];
+    // 本轮是否按 FC 模式发送了 tools schema：是则正文里的代码围栏只是思考示例，
+    // 不能当命令提前执行（命令一律以 tool_calls 为准）。
+    var fcToolsSent = false;
     // 重试仅对流建立阶段有效，一旦开始接收 chunk 就不再重试
     Stream<String> stream;
     const maxRetries = 3;
@@ -1869,6 +1891,26 @@ class AgentEngine {
       const Duration(seconds: 2),
       const Duration(seconds: 4)
     ];
+
+    // 事件 id 状态提前到重试循环之前声明：onToolCalls 回调（在 chatStream 调用处
+    // 创建闭包）也要用 assignFinalId 做提前执行的事件去重。
+    int chunkCount = 0;
+    final emittedStableIds = <String>{}; // 已发出事件的稳定 ID（内容哈希），用于流式去重
+    final stableIdToFinalId = <String, String>{}; // 稳定 ID → 最终全局唯一 ID 的映射
+    bool commandDetectedNotified = false; // 是否已通知过命令检测（一轮只通知一次）
+
+    String assignFinalId(AgentEvent e) {
+      final stableId = e.id; // 解析器生成的稳定 ID（内容哈希）
+      if (stableIdToFinalId.containsKey(stableId)) {
+        return stableIdToFinalId[stableId]!;
+      }
+      _eventSeq++;
+      final finalId =
+          'evt_${_eventSeq}_${stableId.substring(0, stableId.length > 8 ? 8 : stableId.length)}';
+      stableIdToFinalId[stableId] = finalId;
+      e.id = finalId;
+      return finalId;
+    }
 
     // P1-4: Fallback 模型 — 主模型 maxRetries 次重试仍失败时切换备用模型重试一次
     var activeProvider = _aiProvider;
@@ -1921,6 +1963,7 @@ class AgentEngine {
               _tools.buildOpenAIToolsSchema(isLocalSession: _isLocalSession);
           if (toolsSchema.isEmpty) toolsSchema = null;
         }
+        fcToolsSent = toolsSchema != null;
         stream = await activeProvider.chatStream(
           history: _conversationHistory,
           prompt: '',
@@ -1931,6 +1974,44 @@ class AgentEngine {
           tools: toolsSchema,
           onUsage: _recordUsage,
           onReasoning: _handleReasoningDelta,
+          onToolCalls: (calls) {
+            // R1: 取消/代际失效后不再接受结构化动作（回调可能晚于 cancelTask 到达）
+            if (token.isCancelled ||
+                _currentTask?.status == AgentStatus.cancelled ||
+                (myGeneration != null &&
+                    myGeneration != _currentTaskGeneration)) {
+              return;
+            }
+            fcCalls.addAll(calls);
+            _lastFcToolCalls = List.unmodifiable(fcCalls);
+            // 提前执行：与文本流的命令检测同语义 —— 第一个 execute 定型即触发，
+            // 不等流关闭。事件走同一套 stableId 去重，流结束合并时不会重发。
+            if (onCommandDetected != null && !commandDetectedNotified) {
+              for (final c in calls) {
+                if (c.name != 'execute') continue;
+                final args = _decodeFcArgs(c.arguments);
+                final cmd = (args['command'] ?? '').toString().trim();
+                if (cmd.isEmpty) continue;
+                commandDetectedNotified = true;
+                final e = AgentEvent.command(
+                  cmd,
+                  id: ReActStreamParser.stableId(AgentEventType.command, cmd),
+                  description: args['description']?.toString(),
+                );
+                final stableId = e.id;
+                final finalId = assignFinalId(e);
+                _lastCommandEventId = finalId;
+                if (!emittedStableIds.contains(stableId)) {
+                  emittedStableIds.add(stableId);
+                  e.isStreaming = false;
+                  _enrichCommandEvent(e);
+                  onEvent?.call(e);
+                }
+                onCommandDetected(cmd, finalId);
+                break;
+              }
+            }
+          },
         );
         // R1: chatStream 返回时可能用户已经点过停止。尤其是 OpenAI-compatible
         // 实现不保证立刻响应 CancelToken：若这里直接订阅新流，_aiDoneCompleter
@@ -1988,10 +2069,6 @@ class AgentEngine {
       }
     }
 
-    int chunkCount = 0;
-    final emittedStableIds = <String>{}; // 已发出事件的稳定 ID（内容哈希），用于流式去重
-    final stableIdToFinalId = <String, String>{}; // 稳定 ID → 最终全局唯一 ID 的映射
-    bool commandDetectedNotified = false; // 是否已通知过命令检测（一轮只通知一次）
     // 流式提前检测命令：全量解析很贵，限制在 150ms 一次，且只有出现
     // 「命令:」或围栏代码块迹象时才解析；纯推理流不再逐 chunk 重解析。
     // 另加增长门槛（至少新增 64 字符才重解析）和长度上限：最终回答含代码
@@ -2004,19 +2081,6 @@ class AgentEngine {
     var lastEarlyParseAtMs = -earlyParseIntervalMs;
     var lastEarlyParseLen = 0;
     // watchdog 已改为实例字段 _aiWatchdog
-
-    String assignFinalId(AgentEvent e) {
-      final stableId = e.id; // 解析器生成的稳定 ID（内容哈希）
-      if (stableIdToFinalId.containsKey(stableId)) {
-        return stableIdToFinalId[stableId]!;
-      }
-      _eventSeq++;
-      final finalId =
-          'evt_${_eventSeq}_${stableId.substring(0, stableId.length > 8 ? 8 : stableId.length)}';
-      stableIdToFinalId[stableId] = finalId;
-      e.id = finalId;
-      return finalId;
-    }
 
     // 超时看门狗：用实例字段以便 cancelTask 取消
     _aiStreamTimedOut = false;
@@ -2045,8 +2109,11 @@ class AgentEngine {
         _accumulatedMessageBuffer.write(chunk);
         onMessage?.call(chunk);
 
-        // 流式过程中检测完整命令：立即发出 command 事件 + 触发提前执行
-        if (onCommandDetected != null && !commandDetectedNotified) {
+        // 流式过程中检测完整命令：立即发出 command 事件 + 触发提前执行。
+        // FC 模式下跳过：正文围栏是思考示例，命令只认 tool_calls（onToolCalls 回调）。
+        if (onCommandDetected != null &&
+            !commandDetectedNotified &&
+            !fcToolsSent) {
           final elapsed = earlyParseStopwatch.elapsedMilliseconds;
           final bufLen = fullResponseBuffer.length;
           if (elapsed - lastEarlyParseAtMs >= earlyParseIntervalMs &&
@@ -2134,6 +2201,60 @@ class AgentEngine {
 
     // 流式结束：一次性发出所有事件（e.id 此时是 stableId）
     final events = ReActStreamParser.parse(fullResponse);
+
+    // O8 FC-first：结构化 tool_calls 合并进事件流。
+    // FC 模式下正文是思考而非协议文本：纯文本解析出的 text 事件换成一条 thought，
+    // 计划块事件保留（WP6 的计划跟踪/finish 门控依赖文本计划块约定）。
+    if (fcCalls.isNotEmpty) {
+      final body = fullResponse.trim();
+      // 正文里的围栏/协议行只是思考示例或降级残留：命令与提问一律以
+      // 结构化调用为准，文本解析出的 command/ask/text 事件全部丢弃，
+      // 只保留计划块（WP6 约定）与思考。
+      events.removeWhere((e) =>
+          e.type == AgentEventType.text || e.isCommand || e.isAsk);
+      if (body.isNotEmpty && !events.any((e) => e.isThought)) {
+        events.insert(
+            0,
+            AgentEvent.thought(body,
+                id: ReActStreamParser.stableId(AgentEventType.thought, body)));
+      }
+      for (var i = 0; i < fcCalls.length; i++) {
+        final c = fcCalls[i];
+        final args = _decodeFcArgs(c.arguments);
+        if (c.name == 'execute') {
+          final cmd = (args['command'] ?? '').toString().trim();
+          if (cmd.isNotEmpty) {
+            // stableId 与提前执行回调里一致：已发过的在这里被去重跳过
+            events.add(AgentEvent.command(
+              cmd,
+              id: ReActStreamParser.stableId(AgentEventType.command, cmd),
+              description: args['description']?.toString(),
+            ));
+          }
+        } else if (c.name == 'ask') {
+          final question = (args['question'] ?? '').toString().trim();
+          final options = args['options'] is List
+              ? (args['options'] as List).map((e) => e.toString()).toList()
+              : <String>[];
+          if (question.isNotEmpty && options.isNotEmpty) {
+            events.add(AgentEvent.ask(
+              question,
+              options,
+              id: ReActStreamParser.stableId(
+                  AgentEventType.ask, '$question|${options.join('|')}'),
+            ));
+          }
+        }
+        // finish 事件由 _finishTask 统一发出；注册工具由 _handleToolAction
+        // 自己发命令事件 —— 都不在这里预发。
+        // 每轮只执行第一个动作：多余的 execute 走既有 _announcedFollowUps
+        // 机制逐条执行，其余多余调用忽略并提示。
+        if (i > 0 && c.name != 'execute') {
+          events.add(AgentEvent.info('⚠️ 本轮忽略多余的工具调用: ${c.name}（每轮只执行一个动作）'));
+        }
+      }
+    }
+
     _lastParsedResponseEvents = events;
     // 本轮解析是否已产出 ask 事件：没有的话 _handleAskAction 开头要补一条，
     // 否则用户答完问题，时间线里连"问过什么、选了什么"都找不到
@@ -2221,12 +2342,142 @@ class AgentEngine {
           'retry': attempt > 1,
           'fallback': fallbackAttempted,
           'model': activeConfig.modelName,
+          'fc_calls': fcCalls.length,
           'prompt_tokens': promptTokens,
           'completion_tokens': completionTokens,
         },
       ));
     }
     return fullResponse;
+  }
+
+  /// ═══════════════════════════════════════════════════════
+  /// O8 FC-first — 结构化 tool_calls → 动作
+  /// ═══════════════════════════════════════════════════════
+
+  /// 解码 FC arguments JSON。累积器已做过尾括号修复，这里仍兜底：
+  /// 解不出 Map 就返回空参数，让下游走"缺参数"提示而不是崩溃。
+  static Map<String, dynamic> _decodeFcArgs(String arguments) {
+    try {
+      final decoded = jsonDecode(arguments);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) return decoded.cast<String, dynamic>();
+    } catch (_) {}
+    return const {};
+  }
+
+  /// finish 工具的四段字段 → 操作单文本（与文本协议 parseReportSections 的输出同形）
+  static String? _fcFinishSections(Map<String, dynamic> args) {
+    final buffer = StringBuffer();
+    void add(String label, String key) {
+      final v = (args[key] ?? '').toString().trim();
+      if (v.isNotEmpty) buffer.writeln('$label: $v');
+    }
+
+    add('结论', 'conclusion');
+    add('现状', 'status');
+    add('变更', 'changes');
+    add('建议', 'suggestion');
+    final s = buffer.toString().trim();
+    return s.isEmpty ? null : s;
+  }
+
+  /// 从结构化 tool_calls 构造 ReActStep：第一个调用决定本轮动作。
+  /// thought 取正文全文；plan 取正文里解析出的计划块（保留 WP6 文本约定）。
+  ReActStep _stepFromFcCalls(List<ToolCall> calls, String text) {
+    final thought = text.trim();
+    List<PlanStep>? plan;
+    for (final e in _lastParsedResponseEvents ?? const <AgentEvent>[]) {
+      if (e.isPlan && e.planSteps != null && e.planSteps!.isNotEmpty) {
+        // 同一响应里出现多份计划时，最后一份是最新状态
+        plan = e.planSteps;
+      }
+    }
+    final first = calls.first;
+    final args = _decodeFcArgs(first.arguments);
+    switch (first.name) {
+      case 'execute':
+        final cmd = (args['command'] ?? '').toString().trim();
+        return ReActStep(
+          thought: thought,
+          action: cmd.isEmpty ? null : ActionType.execute,
+          command: cmd.isEmpty ? null : cmd,
+          plan: plan,
+          rawResponse: text,
+        );
+      case 'finish':
+        final answer = (args['answer'] ?? '').toString().trim();
+        return ReActStep(
+          thought: thought,
+          action: ActionType.finish,
+          plan: plan,
+          answer: answer.isEmpty ? null : answer,
+          sections: _fcFinishSections(args),
+          rawResponse: text,
+        );
+      case 'ask':
+        final question = (args['question'] ?? '').toString().trim();
+        final options = args['options'] is List
+            ? (args['options'] as List).map((e) => e.toString()).toList()
+            : <String>[];
+        return ReActStep(
+          thought: question.isEmpty ? thought : question,
+          action: ActionType.ask,
+          options: options,
+          plan: plan,
+          rawResponse: text,
+        );
+      default:
+        // 注册工具（含 think/execute 等别名）：交给 _handleToolAction 路由。
+        // 参数是原生 JSON 类型（bool/num/List），ToolArgs 类型化访问器统一收口（R9）。
+        return ReActStep(
+          thought: thought,
+          action: ActionType.tool,
+          toolName: first.name,
+          toolArgs: args,
+          plan: plan,
+          rawResponse: text,
+        );
+    }
+  }
+
+  /// FC 动作按文本协议格式记入历史：模型（含 fallback 非 FC 模型）能读到
+  /// 自己上一轮做了什么。这段文本只进历史，不参与本轮解析。
+  static String _fcCallsToHistoryText(List<ToolCall> calls) {
+    final buffer = StringBuffer();
+    for (final c in calls) {
+      final args = _decodeFcArgs(c.arguments);
+      switch (c.name) {
+        case 'execute':
+          {
+            buffer.writeln('\n动作: execute');
+            final desc = (args['description'] ?? '').toString().trim();
+            if (desc.isNotEmpty) buffer.writeln('说明: $desc');
+            buffer.writeln('命令: ${(args['command'] ?? '').toString().trim()}');
+          }
+        case 'finish':
+          {
+            buffer.writeln('\n动作: finish');
+            final answer = (args['answer'] ?? '').toString().trim();
+            if (answer.isNotEmpty) buffer.writeln('回答: $answer');
+            final sections = _fcFinishSections(args);
+            if (sections != null) buffer.writeln(sections);
+          }
+        case 'ask':
+          {
+            buffer.writeln('\n动作: ask');
+            final question = (args['question'] ?? '').toString().trim();
+            if (question.isNotEmpty) buffer.writeln(question);
+            final options = args['options'] is List
+                ? (args['options'] as List).map((e) => e.toString()).join(' | ')
+                : '';
+            if (options.isNotEmpty) buffer.writeln('选项: $options');
+          }
+        default:
+          buffer.write(ToolCallAccumulator.toReActText([c]));
+      }
+    }
+    return buffer.toString();
   }
 
   /// ═══════════════════════════════════════════════════════
@@ -4582,7 +4833,11 @@ class AgentEngine {
     buffer.writeln('【ReAct 自动执行模式】');
     buffer.writeln('你正在使用 ReAct（推理-行动-观测）框架。');
     buffer.writeln();
-    buffer.writeln(prompts.agentAutoRule);
+    // O8 FC-first：支持原生 Function Calling 的模型用 FC 规则（动作走 tool_calls），
+    // 其余模型维持文本协议。fallback 切换到不支持 FC 的模型时，
+    // agentFcRule 里的降级兼容条款 + 引擎的文本解析兜底保证仍能工作。
+    final fcMode = _modelConfig.supportsFunctionCalling;
+    buffer.writeln(fcMode ? prompts.agentFcRule : prompts.agentAutoRule);
 
     buffer.writeln();
     buffer.writeln(prompts.behaviorBoundaryRule);
@@ -4615,7 +4870,8 @@ class AgentEngine {
     // 必须在 buildToolsPrompt 之前调用，保证 system prompt 与 _tools 状态一致
     _syncWebToolsRegistration();
     final toolsPrompt = _tools.buildToolsPrompt(
-        isLocalSession: executor != null && executor is! SSHService);
+        isLocalSession: executor != null && executor is! SSHService,
+        fcMode: fcMode);
     if (toolsPrompt.isNotEmpty) {
       buffer.writeln();
       buffer.writeln(toolsPrompt);

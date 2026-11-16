@@ -17,6 +17,7 @@ import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/command_executor.dart';
 import 'package:ai_terminal/services/knowledge_service.dart';
 import 'package:ai_terminal/utils/tool_args_parser.dart';
+import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 
 /// knowledge_search 工具契约测试（WP4 / O6）
 ///
@@ -88,6 +89,7 @@ class _MockAIProvider implements AIProvider {
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
     void Function(String delta)? onReasoning,
+    void Function(List<ToolCall> calls)? onToolCalls,
   }) async {
     receivedHistories.add(List.from(history));
     if (_responses.isEmpty) {

@@ -9,6 +9,7 @@ import 'package:ai_terminal/models/token_usage.dart';
 import 'package:ai_terminal/services/agent_engine.dart';
 import 'package:ai_terminal/services/agent_tracer.dart';
 import 'package:ai_terminal/services/ai_service.dart';
+import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 
 /// 不产生任何输出的占位 provider：本文件只验证计量累加，不发任务。
 class _NullProvider implements AIProvider {
@@ -23,6 +24,7 @@ class _NullProvider implements AIProvider {
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
     void Function(String delta)? onReasoning,
+    void Function(List<ToolCall> calls)? onToolCalls,
   }) async =>
       const Stream<String>.empty();
 }

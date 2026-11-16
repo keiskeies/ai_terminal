@@ -30,7 +30,7 @@ class ReActStreamParser {
       RegExp(r'^[\[【(（]\s*([^\]】)）]+)\s*[\]】)）]\s*');
   static final RegExp _planTitlePrefix = RegExp(r'^[-–—:：]\s*');
 
-  static String _stableId(AgentEventType type, String content) {
+  static String stableId(AgentEventType type, String content) {
     final bytes = utf8.encode('${type.name}:$content');
     // FNV-1a 64-bit hash — collision resistance far superior to h*31+b (int32)
     int hash = 0xcbf29ce484222325;
@@ -95,7 +95,7 @@ class ReActStreamParser {
       }
       switch (currentField) {
         case _FieldType.thought:
-          final id = _stableId(AgentEventType.thought, value);
+          final id = stableId(AgentEventType.thought, value);
           events.add(AgentEvent.thought(value, id: id));
           if (value.isNotEmpty) lastQuestion = value;
           pendingDescription = null;
@@ -106,7 +106,7 @@ class ReActStreamParser {
         case _FieldType.command:
           final cleaned = _cleanCommand(value);
           if (cleaned.isNotEmpty) {
-            final id = _stableId(AgentEventType.command, cleaned);
+            final id = stableId(AgentEventType.command, cleaned);
             events.add(AgentEvent.command(cleaned,
                 id: id, description: pendingDescription));
             pendingDescription = null;
@@ -115,7 +115,7 @@ class ReActStreamParser {
         case _FieldType.options:
           if (pendingOptions != null && pendingOptions!.isNotEmpty) {
             final optsStr = pendingOptions!.join('|');
-            final id = _stableId(AgentEventType.ask, optsStr);
+            final id = stableId(AgentEventType.ask, optsStr);
             events.add(AgentEvent.ask(lastQuestion, pendingOptions, id: id));
           }
           pendingOptions = null;
@@ -127,13 +127,13 @@ class ReActStreamParser {
           if (steps.isNotEmpty) {
             final key =
                 steps.map((s) => '${s.status.name}:${s.title}').join('|');
-            final id = _stableId(AgentEventType.plan, key);
+            final id = stableId(AgentEventType.plan, key);
             events.add(AgentEvent.plan(steps, id: id));
           }
           break;
         case _FieldType.text:
           if (value.isNotEmpty) {
-            final id = _stableId(AgentEventType.text, value);
+            final id = stableId(AgentEventType.text, value);
             events.add(AgentEvent.text(value, id: id));
           }
           pendingDescription = null;
@@ -169,7 +169,7 @@ class ReActStreamParser {
           codeBlockBuffer.clear();
           if (code.isNotEmpty) {
             flush();
-            final id = _stableId(AgentEventType.command, code);
+            final id = stableId(AgentEventType.command, code);
             events.add(AgentEvent.command(code,
                 id: id, description: pendingDescription));
             pendingDescription = null;
@@ -287,7 +287,7 @@ class ReActStreamParser {
       final code = codeBlockBuffer.toString().trim();
       if (code.isNotEmpty) {
         flush();
-        final id = _stableId(AgentEventType.command, code);
+        final id = stableId(AgentEventType.command, code);
         events.add(AgentEvent.command(code,
             id: id, description: pendingDescription));
         pendingDescription = null;

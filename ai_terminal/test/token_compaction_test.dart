@@ -12,6 +12,7 @@ import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/daos.dart';
 import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/l10n/app_localizations_zh.dart';
+import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 
 /// O7 token 化压缩测试：token 阈值、滚动摘要、pinned 事实、旧数据兼容。
 ///
@@ -38,6 +39,7 @@ class _ScriptedAIProvider implements AIProvider {
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
     void Function(String delta)? onReasoning,
+    void Function(List<ToolCall> calls)? onToolCalls,
   }) async {
     prompts.add(prompt);
     final r = responses[calls < responses.length ? calls : responses.length - 1];

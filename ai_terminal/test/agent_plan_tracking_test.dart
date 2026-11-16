@@ -14,6 +14,7 @@ import 'package:ai_terminal/models/token_usage.dart';
 import 'package:ai_terminal/models/chat_session.dart';
 import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/l10n/app_localizations_zh.dart';
+import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 
 /// O4/WP6 计划跟踪与 finish 完整性门控测试。
 /// mock 模式参照 test/agent_engine_resilience_test.dart。
@@ -106,6 +107,7 @@ class _MockAIProvider implements AIProvider {
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
     void Function(String delta)? onReasoning,
+    void Function(List<ToolCall> calls)? onToolCalls,
   }) async {
     callCount++;
     receivedHistories.add(List.from(history));

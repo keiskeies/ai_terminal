@@ -19,6 +19,7 @@ import 'package:ai_terminal/utils/command_heuristics.dart';
 import 'package:ai_terminal/utils/react_stream_parser.dart';
 import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/l10n/app_localizations_zh.dart';
+import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 
 /// WP1（O1）：只读管道/链式命令放开 + 修改类链接硬拦截
 /// 覆盖：安全分级拆分、heuristics 组合判定、ReAct 解析 e2e、引擎 guard 拦截路径。
@@ -132,6 +133,7 @@ class _MockAIProvider implements AIProvider {
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
     void Function(String delta)? onReasoning,
+    void Function(List<ToolCall> calls)? onToolCalls,
   }) async {
     callCount++;
     receivedHistories.add(List.from(history));

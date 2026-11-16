@@ -19,6 +19,7 @@ import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/ssh_service.dart';
 import 'package:ai_terminal/widgets/agent_event_cards.dart';
 import 'package:ai_terminal/widgets/operation_sheet.dart';
+import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 
 class _ScriptedAI implements AIProvider {
   final List<String> _responses;
@@ -37,6 +38,7 @@ class _ScriptedAI implements AIProvider {
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
     void Function(String delta)? onReasoning,
+    void Function(List<ToolCall> calls)? onToolCalls,
   }) async {
     if (_index >= _responses.length) {
       throw StateError('No scripted response left (call=${_index + 1})');

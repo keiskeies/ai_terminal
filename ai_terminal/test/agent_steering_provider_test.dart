@@ -11,6 +11,7 @@ import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/conversation_service.dart';
 import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/l10n/app_localizations_zh.dart';
+import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 
 /// O5 steering 的 provider 路径测试。
 ///
@@ -39,6 +40,7 @@ class _NoCallAIProvider implements AIProvider {
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
     void Function(String delta)? onReasoning,
+    void Function(List<ToolCall> calls)? onToolCalls,
   }) async {
     throw StateError('测试不应触发 AI 调用');
   }

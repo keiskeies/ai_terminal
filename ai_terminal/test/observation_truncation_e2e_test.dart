@@ -12,6 +12,7 @@ import 'package:ai_terminal/models/token_usage.dart';
 import 'package:ai_terminal/services/agent_engine.dart';
 import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/command_executor.dart';
+import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 
 /// O2 观测分级截断端到端测试（R9）
 ///
@@ -231,6 +232,7 @@ class _MockAIProvider implements AIProvider {
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
     void Function(String delta)? onReasoning,
+    void Function(List<ToolCall> calls)? onToolCalls,
   }) async {
     receivedHistories.add(List.from(history));
     if (_responses.isEmpty) {

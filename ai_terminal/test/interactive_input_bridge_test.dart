@@ -17,6 +17,7 @@ import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/command_executor.dart';
 import 'package:ai_terminal/services/daos.dart';
 import 'package:ai_terminal/services/ssh_service.dart';
+import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 
 /// WP5（O3）：交互式命令输入桥接。
 ///
@@ -422,6 +423,7 @@ class _ScriptedAI implements AIProvider {
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
     void Function(String delta)? onReasoning,
+    void Function(List<ToolCall> calls)? onToolCalls,
   }) async {
     receivedHistories.add(List.from(history));
     final text = responses[_index < responses.length ? _index : responses.length - 1];

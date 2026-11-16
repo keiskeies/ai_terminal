@@ -2931,13 +2931,20 @@ class AgentToolRegistry {
   List<String> get changeRecordingToolNames =>
       _entries.values.where((e) => e.tool.recordsChanges).map((e) => e.tool.name).toList();
 
-  /// 构建工具说明文本，注入 system prompt
-  String buildToolsPrompt({required bool isLocalSession}) {
+  /// 构建工具说明文本，注入 system prompt。
+  /// [fcMode] 为 true 时（O8 FC-first），工具已通过 Function Calling schema 暴露，
+  /// 只保留清单与参数语义说明，不再注入文本协议的调用格式示例。
+  String buildToolsPrompt({required bool isLocalSession, bool fcMode = false}) {
     final tools = visibleFor(isLocalSession: isLocalSession);
     if (tools.isEmpty) return '';
     final buffer = StringBuffer();
     buffer.writeln('【可用工具】');
-    buffer.writeln('当需要执行非 shell 命令的操作时（如上传文件、跨机执行），使用 "动作: tool" 调用工具。');
+    if (fcMode) {
+      buffer.writeln('以下工具已通过 Function Calling 暴露：直接按工具名发起工具调用，'
+          '参数按各自的 JSON schema 填写。下面是每个工具的用途与参数语义说明。');
+    } else {
+      buffer.writeln('当需要执行非 shell 命令的操作时（如上传文件、跨机执行），使用 "动作: tool" 调用工具。');
+    }
     buffer.writeln();
     for (final tool in tools) {
       buffer.writeln('工具: ${tool.name}');
@@ -2945,6 +2952,7 @@ class AgentToolRegistry {
       buffer.writeln('  ${tool.paramSpec}');
       buffer.writeln();
     }
+    if (fcMode) return buffer.toString().trimRight();
     buffer.writeln('工具调用格式示例（参数必须用多行 key:value 格式，不要用 JSON）:');
     buffer.writeln('思考: 需要把本地 dist 目录上传到服务器');
     buffer.writeln('动作: tool');
@@ -2961,8 +2969,97 @@ class AgentToolRegistry {
   /// 用于在 _callAI 中传给支持 Function Calling 的模型。
   /// 返回的每个元素结构：{type:'function', function:{name, description, parameters}}
   /// toJsonSchema() 返回 null 的工具会被跳过（不参与 FC）。
+  ///
+  /// O8 FC-first：execute/finish/ask 三个核心动作也作为工具暴露，
+  /// 让 FC 模型全程走结构化 tool_calls，不再依赖文本协议行。
   List<Map<String, dynamic>> buildOpenAIToolsSchema({required bool isLocalSession}) {
-    final result = <Map<String, dynamic>>[];
+    final result = <Map<String, dynamic>>[
+      {
+        'type': 'function',
+        'function': {
+          'name': 'execute',
+          'description': '在当前主机执行一条 shell 命令并获取输出。'
+              '只读查询可用管道/&&/|| 组合；会修改系统状态的命令每轮只发一条。'
+              '需要用户确认或输入密码时不要自行猜测，改用 ask 或 provide_password。',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'command': {
+                'type': 'string',
+                'description': '要执行的完整 shell 命令',
+              },
+              'description': {
+                'type': 'string',
+                'description': '一句话说明这条命令做什么、会带来什么影响，'
+                    '用普通人能听懂的话，不要只复述命令本身',
+              },
+            },
+            'required': ['command'],
+          },
+        },
+      },
+      {
+        'type': 'function',
+        'function': {
+          'name': 'finish',
+          'description': '任务完成时调用，给出最终回答。'
+              '只有任务目标真正达成（或确认无法继续）时才能调用；'
+              '计划中仍有未完成步骤时不要调用。',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'answer': {
+                'type': 'string',
+                'description': '给用户的最终回答正文（允许 Markdown）：'
+                    '做成了什么、现在是什么状态、需要注意什么、下一步建议',
+              },
+              'conclusion': {
+                'type': 'string',
+                'description': '结论：一句话说明目标是否完成、现在是什么状态',
+              },
+              'status': {
+                'type': 'string',
+                'description': '现状：只写实际验证过的关键状态；没有验证就写"未独立验证"',
+              },
+              'changes': {
+                'type': 'string',
+                'description': '变更：实际修改了什么；没有修改写"无"',
+              },
+              'suggestion': {
+                'type': 'string',
+                'description': '建议：下一步可选项；没有写"无"',
+              },
+            },
+            'required': ['answer'],
+          },
+        },
+      },
+      {
+        'type': 'function',
+        'function': {
+          'name': 'ask',
+          'description': '需要用户做选择或补充信息时调用。'
+              '涉及危险操作确认、多个可行方案取舍、缺少必要信息时必须先问，不要擅自决定。'
+              'options 必须提供 2-4 个简洁明确的按钮选项；'
+              '开放式问题也要给出可能的回答方向作为选项。',
+          'parameters': {
+            'type': 'object',
+            'properties': {
+              'question': {
+                'type': 'string',
+                'description': '向用户提出的问题',
+              },
+              'options': {
+                'type': 'array',
+                'items': {'type': 'string'},
+                'description': '供用户选择的选项列表（用户可见的按钮文字，避免术语）',
+              },
+            },
+            'required': ['question', 'options'],
+          },
+        },
+      },
+    ];
     for (final tool in visibleFor(isLocalSession: isLocalSession)) {
       final schema = tool.toJsonSchema();
       if (schema == null) continue;
