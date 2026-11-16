@@ -392,6 +392,10 @@ class AgentEngine {
   /// 单条消息最大字符数，超出截断
   static const int _maxMessageChars = 4000;
 
+  /// 观测消息专用上限：失败观测头 2000+尾 6000 必须完整进模型，
+  /// 通用 4000 上限会把分级截断保留的报错头部再次砍掉（O2）
+  static const int _maxObservationMessageChars = 12000;
+
   AgentEngine({
     required AIProvider aiProvider,
     required AIModelConfig modelConfig,
@@ -4729,8 +4733,11 @@ $hostList
     // 第 1 层：单条消息截断（先截断再做 token 估算，避免单条消息撑爆预算）
     final truncated = <ChatMessage>[];
     for (final msg in nonSystemMsgs) {
-      if (msg.content.length > _maxMessageChars) {
-        var t = msg.content.substring(msg.content.length - _maxMessageChars);
+      final cap = msg.content.startsWith('观测:')
+          ? _maxObservationMessageChars
+          : _maxMessageChars;
+      if (msg.content.length > cap) {
+        var t = msg.content.substring(msg.content.length - cap);
         // 确保代码块完整闭合：统计 ``` 数量，奇数则补一个 ```
         final openCount = '```'.allMatches(t).length;
         if (openCount % 2 != 0) {
@@ -4738,7 +4745,7 @@ $hostList
         }
         truncated.add(ChatMessage.create(
           role: msg.role,
-          content: '...(已截断前 ${msg.content.length - _maxMessageChars} 字符)\n$t',
+          content: '...(已截断前 ${msg.content.length - cap} 字符)\n$t',
         ));
       } else {
         truncated.add(msg);

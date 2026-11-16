@@ -262,6 +262,33 @@ void main() {
       expect(messages.first.content, contains('已截断'));
     });
 
+    test('失败观测（≤12000）完整保留头部报错（O2 豁免）', () {
+      final engine = makeEngine(provider: _MockAIProvider());
+      final content = '观测: 命令 `x` 执行失败\n错误:\nHEAD-MARKER\n'
+          '${'a' * 7900}\nTAIL-MARKER';
+      final messages = <ChatMessage>[
+        ChatMessage.create(role: 'user', content: content),
+      ];
+      engine.trimMessagesForTesting(messages);
+      expect(messages.first.content, content);
+      expect(messages.first.content, contains('HEAD-MARKER'));
+      expect(messages.first.content, contains('TAIL-MARKER'));
+    });
+
+    test('超长观测按 12000 上限截断而非 4000', () {
+      final engine = makeEngine(provider: _MockAIProvider());
+      final content = '观测: 命令 `x` 执行成功\n输出:\n${'b' * 15000}';
+      final messages = <ChatMessage>[
+        ChatMessage.create(role: 'user', content: content),
+      ];
+      engine.trimMessagesForTesting(messages);
+      final trimmed = messages.first.content;
+      expect(trimmed, contains('已截断'));
+      expect(trimmed.length, greaterThan(12000));
+      expect(trimmed.length, lessThan(12100));
+      expect(trimmed.endsWith('b'), isTrue);
+    });
+
     test('system 消息保留不被裁剪', () {
       final engine = makeEngine(
         provider: _MockAIProvider(),
