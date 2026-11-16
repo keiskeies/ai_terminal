@@ -131,6 +131,9 @@ class Conversation {
 
   bool get hasAutoTitle => _autoTitlePattern.hasMatch(title.trim());
 
+  /// 还没有写过任何消息或摘要：落盘只会在历史里留下一条空对话
+  bool get isBlank => messages.isEmpty && (summary == null || summary!.isEmpty);
+
   /// 会话列表展示标题：仍是日期默认标题时，回退到首条用户消息前 20 字
   String get displayTitle {
     final stored = title.trim();

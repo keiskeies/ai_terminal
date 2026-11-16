@@ -91,10 +91,6 @@
   "auditLogSearchHint": "Search command, server, output...",
   "auditLogTitle": "Audit Log",
   "authMethod": "인증 방식",
-  "builtinPromptDesc": "AI 시스템의 핵심 프롬프트로 즉시 적용됩니다. 'context' 자리표시자는 서버 정보로 대체됩니다.",
-  "builtinPromptSaved": "기본 제공 프롬프트가 저장되었습니다",
-  "builtinPromptTitle": "기본 제공 시스템 프롬프트",
-  "builtinPromptWarning": "⚠️ 주의하여 편집하세요. 언제든지 재설정할 수 있습니다.",
   "cancel": "취소",
   "changeRecordAllTitle": "All Change Records",
   "changeRecordConfirmRollback": "Confirm Rollback",
@@ -191,9 +187,6 @@
   "connectionManagement": "연결",
   "connectionSuccess": "연결 성공",
   "copy": "복사",
-  "customPromptDesc": "AI 시스템 프롬프트에 추가되는 사용자 지정 지시사항입니다. AI 동작, 출력 스타일 등을 조정하는 데 사용됩니다. 비워두면 건너뜁니다.",
-  "customPromptSaved": "사용자 지정 프롬프트가 저장되었습니다",
-  "customPromptTitle": "사용자 지정 AI 프롬프트",
   "darkMode": "다크 모드",
   "delete": "삭제",
   "deleteConfirm": "삭제하시겠습니까?",
@@ -288,8 +281,6 @@
   "languageDialogTitle": "Select Language",
   "languageFollowSystem": "Follow System",
   "lightMode": "라이트 모드",
-  "menuItemBuiltinPrompt": "기본 제공 프롬프트",
-  "menuItemCustomPrompt": "사용자 지정 프롬프트",
   "messageSaveFailed": "메시지 저장에 실패했습니다. 작업이 시작되지 않았습니다",
   "name": "이름",
   "nickname": "별명",
@@ -493,7 +484,6 @@
   "terminalConnected": "Connected",
   "terminalConnecting": "Connecting to {host}...",
   "terminalCreateNew": "+ New",
-  "terminalCustomPromptHint": "e.g. respond in English, use concise output format, prefer Docker...",
   "terminalExitOrchestrator": "Exit orchestration mode",
   "terminalExpandAIPanel": "Expand AI panel",
   "terminalExpandMonitorPanel": "Expand monitor panel",
@@ -511,11 +501,6 @@
   "terminalLocalStartFailed": "Failed to start local terminal",
   "terminalLocalStartFailedWithError": "Failed to start local terminal: {error}",
   "terminalManage": "Manage",
-  "terminalMaxSteps": "Max steps",
-  "terminalMaxStepsDesc": "Maximum execution steps in Agent auto mode. Set to 0 for unlimited; complex tasks will not be interrupted.",
-  "terminalMaxStepsLabel": "Steps (0 = unlimited)",
-  "terminalMaxStepsSet": "Max steps set to {value}",
-  "terminalMaxStepsTitle": "Maximum execution steps",
   "terminalModel": "Model",
   "terminalMonitor": "Monitor",
   "terminalNewConnection": "New connection",
@@ -922,13 +907,6 @@
     "placeholders": {
       "error": {
         "type": "String"
-      }
-    }
-  },
-  "@terminalMaxStepsSet": {
-    "placeholders": {
-      "value": {
-        "type": "int"
       }
     }
   },

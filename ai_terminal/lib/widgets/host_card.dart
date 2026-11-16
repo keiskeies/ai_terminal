@@ -32,30 +32,34 @@ class _HostCardState extends State<HostCard> {
   bool _isHovered = false;
 
   Color get _statusColor {
+    final tc = ThemeColors.of(context);
     switch (widget.host.lastStatus) {
       case 'success':
-        return cSuccess;
+        return tc.ok;
       case 'failed':
-        return cDanger;
+        return tc.error;
       default:
-        return ThemeColors.of(context).textSub;
+        return tc.textSub;
     }
   }
 
+  /// 头像色：设计稿里只有「品牌青 / 数据金 / 弱灰」三档，不再用紫、粉、亮青
+  /// 这类装饰色板——它们会和成功/警告/错误的语义色撞在同一块卡片里。
+  /// 带标签的主机沿用标签分类色（tagColors 已是石墨青体系），
+  /// 连接成功取品牌青，失败取语义红，其余降级到弱灰。
   Color get _avatarColor {
-    final colors = [
-      cPrimary,
-      cSuccess,
-      cWarning,
-      const Color(0xFF8B5CF6),
-      const Color(0xFFEC4899),
-      const Color(0xFF06B6D4),
-    ];
-    int hash = 0;
-    for (var i = 0; i < widget.host.name.length; i++) {
-      hash = widget.host.name.codeUnitAt(i) + ((hash << 5) - hash);
+    final tc = ThemeColors.of(context);
+    if (widget.host.tagColor != null) {
+      return Color(int.parse(widget.host.tagColor!.replaceFirst('#', '0xFF')));
     }
-    return colors[hash.abs() % colors.length];
+    switch (widget.host.lastStatus) {
+      case 'success':
+        return tc.brand;
+      case 'failed':
+        return tc.error;
+      default:
+        return tc.textSub;
+    }
   }
 
   String? get _lastConnectedText {

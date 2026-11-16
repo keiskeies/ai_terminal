@@ -52,6 +52,10 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
 
   // 拖拽上传：drag 悬停高亮 + 路由覆盖判定（弹层/编辑页在上时不接拖放）
   bool _dragging = false;
+  /// 文件行 hover 下标（设计稿 .sftp-row:hover 的行块高亮）
+  int _hoveredFileIndex = -1;
+  /// 头部操作按钮 hover 标识（设计稿 .sftp-act:hover）
+  String? _hoveredHeaderAct;
   bool _routeCovered = false;
   Route? _subscribedRoute;
 
@@ -561,17 +565,9 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
   }
 
   Color _getFileIconColor(BuildContext context, SftpEntry entry) {
-    if (entry.isDirectory) return cWarning;
+    // 设计稿 .sftp-ic：目录统一金色，文件统一品牌色（不再按扩展名分色）
     final tc = ThemeColors.of(context);
-    final ext = p.extension(entry.name).toLowerCase();
-    switch (ext) {
-      case '.py': case '.js': case '.ts': case '.dart': case '.java':
-      case '.go': case '.rs': case '.c': case '.cpp': case '.sh': return cPrimary;
-      case '.json': case '.yaml': case '.yml': case '.xml': case '.toml': return tc.agentGreen;
-      case '.jpg': case '.jpeg': case '.png': case '.gif': case '.svg': return cInfo;
-      case '.zip': case '.tar': case '.gz': case '.bz2': return tc.textSub;
-      default: return tc.textSub;
-    }
+    return entry.isDirectory ? tc.gold : tc.brand;
   }
 
   @override
@@ -579,7 +575,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
     final tc = ThemeColors.of(context);
     final panel = Container(
       decoration: BoxDecoration(
-        color: tc.bg,
+        // 设计稿 .sftp-panel 与 AI 面板同底（--m-elev = cardElevated）
+        color: tc.cardElevated,
         border: Border(left: BorderSide(color: tc.border, width: 1)),
       ),
       child: Stack(
@@ -588,12 +585,12 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
             children: [
               // 顶部工具栏
               _buildToolbar(tc),
-              Divider(height: 1, thickness: 1, color: tc.border),
               // 路径栏
               _buildPathBar(tc),
-              Divider(height: 1, color: tc.border.withValues(alpha: 0.5)),
               // 文件列表
               Expanded(child: _buildBody()),
+              // 计数页脚（设计稿 .sftp-foot）
+              if (_controller.isConnected) _buildFoot(tc),
               // 传输进度条
               if (_controller.isTransferring) _buildTransferProgress(),
             ],
@@ -690,20 +687,33 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
   Widget _buildToolbar(ThemeColors tc) {
     return Container(
       height: 34,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      color: tc.card,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: tc.hairline)),
+      ),
       child: Row(
         children: [
-          const Text(
+          Text(
             'SFTP',
-            style: TextStyle(fontSize: fSmall, fontWeight: FontWeight.w600, color: cPrimary),
+            style: TextStyle(
+                fontSize: fSmall, fontWeight: FontWeight.w500, color: tc.brand),
           ),
           if (_controller.hostName != null) ...[
-            const SizedBox(width: 4),
-            Text(
-              '- ${_controller.hostName}',
-              style: TextStyle(fontSize: fMicro, color: tc.textSub),
-              overflow: TextOverflow.ellipsis,
+            const SizedBox(width: 6),
+            // 主机名做成胶囊（设计稿 .sftp-host）：面板可以开多个，标题行
+            // 要一眼分清是哪个主机的。
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              constraints: const BoxConstraints(maxWidth: 140),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(rFull),
+                border: Border.all(color: tc.border),
+              ),
+              child: Text(
+                _controller.hostName!,
+                style: TextStyle(fontSize: fMicro, color: tc.textSub),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
           const Spacer(),
@@ -712,7 +722,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
             icon: Icon(Icons.sort, size: 16, color: _controller.isConnected ? tc.textSub : tc.textMuted),
             tooltip: '排序',
             padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+            constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
             onSelected: _controller.toggleSort,
             itemBuilder: (ctx) => [
               PopupMenuItem(
@@ -756,36 +766,77 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
               ),
             ],
           ),
-          IconButton(
-            icon: Icon(Icons.upload_file, size: 16, color: _controller.isConnected ? tc.textSub : tc.textMuted),
-            tooltip: '上传',
-            onPressed: _controller.isConnected ? _uploadFiles : null,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-          ),
-          IconButton(
-            icon: Icon(Icons.create_new_folder_outlined, size: 16, color: _controller.isConnected ? tc.textSub : tc.textMuted),
-            tooltip: '新建目录',
-            onPressed: _controller.isConnected ? _showCreateDirectoryDialog : null,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-          ),
-          IconButton(
-            icon: Icon(Icons.refresh, size: 16, color: _controller.isConnected ? tc.textSub : tc.textMuted),
-            tooltip: '刷新',
-            onPressed: _controller.isConnected ? () => _controller.loadDirectory(_controller.currentPath) : null,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-          ),
-          if (widget.onClose != null)
-            IconButton(
-              icon: Icon(Icons.close, size: 16, color: tc.textSub),
-              tooltip: '关闭',
-              onPressed: widget.onClose,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-            ),
+          _headerActButton(tc,
+              id: 'upload',
+              icon: Icons.upload_file,
+              tooltip: '上传',
+              onPressed: _controller.isConnected ? _uploadFiles : null),
+          const SizedBox(width: 4),
+          _headerActButton(tc,
+              id: 'mkdir',
+              icon: Icons.create_new_folder_outlined,
+              tooltip: '新建目录',
+              onPressed: _controller.isConnected ? _showCreateDirectoryDialog : null),
+          const SizedBox(width: 4),
+          _headerActButton(tc,
+              id: 'refresh',
+              icon: Icons.refresh,
+              tooltip: '刷新',
+              onPressed: _controller.isConnected ? () => _controller.loadDirectory(_controller.currentPath) : null),
+          if (widget.onClose != null) ...[
+            const SizedBox(width: 4),
+            _headerActButton(tc,
+                id: 'close',
+                icon: Icons.close,
+                tooltip: '关闭',
+                onPressed: widget.onClose),
+          ],
         ],
+      ),
+    );
+  }
+
+  /// 头部操作按钮（设计稿 .sftp-act）：26×26 圆角块，surface 底色 + 透明边框，
+  /// hover 时边框显现、图标提亮到正文色
+  Widget _headerActButton(
+    ThemeColors tc, {
+    required String id,
+    required IconData icon,
+    required String tooltip,
+    VoidCallback? onPressed,
+  }) {
+    final enabled = onPressed != null;
+    final isHovered = enabled && _hoveredHeaderAct == id;
+    return Tooltip(
+      message: tooltip,
+      child: MouseRegion(
+        cursor: enabled ? SystemMouseCursors.click : MouseCursor.defer,
+        onEnter: enabled ? (_) => setState(() => _hoveredHeaderAct = id) : null,
+        onExit: enabled
+            ? (_) {
+                if (_hoveredHeaderAct == id) setState(() => _hoveredHeaderAct = null);
+              }
+            : null,
+        child: GestureDetector(
+          onTap: onPressed,
+          child: Container(
+            width: 26,
+            height: 26,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: tc.surface,
+              borderRadius: BorderRadius.circular(7),
+              border: Border.all(
+                color: isHovered ? tc.border : Colors.transparent,
+              ),
+            ),
+            child: Icon(icon,
+                size: 16,
+                color: !enabled
+                    ? tc.textMuted
+                    : (isHovered ? tc.textMain : tc.textSub)),
+          ),
+        ),
       ),
     );
   }
@@ -884,15 +935,18 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
   }
 
   Widget _pathSegment(String name, VoidCallback onTap) {
+    final tc = ThemeColors.of(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(3),
       child: Text(
         name,
-        style: const TextStyle(
+        style: TextStyle(
           fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
           fontSize: fMicro,
-          color: cPrimary,
+          // 设计稿 .sftp-crumb：常态灰、悬停才品牌色（hover 由父级
+          // InkWell 的 textColor 状态属性驱动）
+          color: tc.textSub,
           height: 1.2,
         ),
       ),
@@ -944,92 +998,126 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
     }
 
     if (_controller.entries.isEmpty) {
+      // 设计稿 .sftp-empty：居中、muted、11px、16 padding
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.folder_open, size: 32, color: tc.textMuted),
-            const SizedBox(height: 6),
-            Text('空目录', style: TextStyle(color: tc.textSub, fontSize: fSmall)),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.folder_open, size: 32, color: tc.textMuted),
+              const SizedBox(height: 6),
+              Text('空目录', style: TextStyle(color: tc.textMuted, fontSize: fMicro)),
+            ],
+          ),
         ),
       );
     }
 
     return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 6),
       itemCount: _controller.entries.length,
-      itemExtent: 32, // 固定行高，紧凑显示
       itemBuilder: (context, index) {
         final entry = _controller.entries[index];
-        return _buildFileItem(entry);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 2),
+          child: _buildFileItem(entry, index),
+        );
       },
     );
   }
 
-  Widget _buildFileItem(SftpEntry entry) {
+  Widget _buildFileItem(SftpEntry entry, int index) {
     final tc = ThemeColors.of(context);
-    // 右侧信息: 大小、修改时间、权限
+    // 右侧信息: 大小、修改时间（设计稿网格 1fr/58/76，无权限列）
     final sizeStr = entry.isDirectory ? '--' : entry.displaySize;
     final timeStr = entry.displayModifiedTime;
-    final permStr = entry.displayPermissions;
+    final isHovered = _hoveredFileIndex == index;
 
-    return InkWell(
-      onTap: () {
-        if (entry.isDirectory) {
-          _controller.navigateTo(entry.path);
-        } else {
-          _showEntryActions(entry);
-        }
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hoveredFileIndex = index),
+      onExit: (_) {
+        if (_hoveredFileIndex == index) setState(() => _hoveredFileIndex = -1);
       },
-      onLongPress: () => _showEntryActions(entry),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: Theme.of(context).dividerColor, width: 0.3)),
-        ),
-        child: Row(
-          children: [
-            Icon(_getFileIcon(entry), size: 15, color: _getFileIconColor(context, entry)),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                entry.name,
-                style: TextStyle(
-                  fontSize: fMicro,
-                  fontWeight: entry.isDirectory ? FontWeight.w500 : FontWeight.normal,
+      child: InkWell(
+        onTap: () {
+          if (entry.isDirectory) {
+            _controller.navigateTo(entry.path);
+          } else {
+            _showEntryActions(entry);
+          }
+        },
+        onLongPress: () => _showEntryActions(entry),
+        borderRadius: BorderRadius.circular(7),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 30),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+          // 设计稿 .sftp-row：行本身是圆角块，hover 上控件底色；
+          // 不再用 0.3px 分隔线切行。
+          decoration: BoxDecoration(
+            color: isHovered ? tc.surface : null,
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Row(
+            children: [
+              Icon(_getFileIcon(entry), size: 15, color: _getFileIconColor(context, entry)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  entry.name,
+                  style: TextStyle(
+                    fontSize: fMicro,
+                    color: tc.textBody,
+                    fontWeight: entry.isDirectory ? FontWeight.w500 : FontWeight.normal,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
-            const SizedBox(width: 4),
-            // 大小
-            SizedBox(
-              width: 52,
-              child: Text(
-                sizeStr,
-                style: TextStyle(fontSize: 9, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
-                textAlign: TextAlign.right,
-                overflow: TextOverflow.ellipsis,
+              const SizedBox(width: 4),
+              // 大小（设计稿 58px）
+              SizedBox(
+                width: 58,
+                child: Text(
+                  sizeStr,
+                  style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
+                  textAlign: TextAlign.right,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            // 修改时间
-            SizedBox(
-              width: 80,
-              child: Text(
-                timeStr,
-                style: TextStyle(fontSize: 9, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
-                overflow: TextOverflow.ellipsis,
+              const SizedBox(width: 6),
+              // 修改时间
+              SizedBox(
+                width: 76,
+                child: Text(
+                  timeStr,
+                  style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
+                  textAlign: TextAlign.right,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            // 权限
-            Text(
-              permStr,
-              style: TextStyle(fontSize: 9, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  /// 计数页脚（设计稿 .sftp-foot：已连接 <host> · <path> · N 项）
+  Widget _buildFoot(ThemeColors tc) {
+    final n = _controller.entries.length;
+    final host = _controller.hostName;
+    final label = host == null || host.isEmpty
+        ? '${_controller.currentPath} · $n 项'
+        : '已连接 $host · ${_controller.currentPath} · $n 项';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: tc.hairline)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: fMicro, color: tc.textSub),
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }

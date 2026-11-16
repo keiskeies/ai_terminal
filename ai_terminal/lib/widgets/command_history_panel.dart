@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants.dart';
@@ -88,7 +90,12 @@ class _CommandHistoryPanelState extends State<CommandHistoryPanel> {
       insetPadding: const EdgeInsets.all(32),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 520),
+        // 小屏按视口 92% 缩放，大屏保持 680 上限；高度加 85% 视口保护
+        constraints: BoxConstraints(
+          maxWidth: math.min(680, MediaQuery.sizeOf(context).width * 0.92),
+          maxHeight:
+              math.min(520, MediaQuery.sizeOf(context).height * 0.85),
+        ),
         child: Column(
           children: [
             Padding(

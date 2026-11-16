@@ -410,8 +410,10 @@ class AgentEventContent extends StatelessWidget {
                     spacing: 4,
                     runSpacing: 2,
                     children: [
-                      if (!success && event.exitCode != null)
-                        _metaChip(ui.exitCode(event.exitCode!), tc.error),
+                      // 设计稿 stchip：成功也展示退出码（exit 0 用成功色）
+                      if (event.exitCode != null)
+                        _metaChip(ui.exitCode(event.exitCode!),
+                            success ? tc.ok : tc.error),
                       if (event.durationMs != null)
                         _metaChip(
                             _formatDuration(event.durationMs!), tc.gold),
@@ -810,11 +812,12 @@ class _RawOutputTailState extends State<_RawOutputTail> {
             Container(
               width: double.infinity,
               margin: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-              padding: const EdgeInsets.all(10),
+              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
               decoration: BoxDecoration(
-                color: tc.agentCardFill,
-                borderRadius: BorderRadius.circular(rSmall),
-                border: Border.all(color: tc.border),
+                // 设计稿 mono-block：输出正文统一比卡片深一档 + 发丝边框
+                color: tc.terminalBg,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: tc.hairline, width: 1),
               ),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 220),
@@ -936,9 +939,24 @@ class _ResultOutputPreview extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 失败时看的是尾部，被省略的部分在前面
-        if (hidden > 0 && failed) Text('…', style: textStyle),
-        Text(shown.trimRight(), style: textStyle),
+        // 设计稿 mono-block：比卡片再深一档的底 + 发丝边框，输出区视觉下沉
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+          decoration: BoxDecoration(
+            color: tc.terminalBg,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: tc.hairline, width: 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 失败时看的是尾部，被省略的部分在前面
+              if (hidden > 0 && failed) Text('…', style: textStyle),
+              Text(shown.trimRight(), style: textStyle),
+            ],
+          ),
+        ),
         if (hidden > 0)
           GestureDetector(
             behavior: HitTestBehavior.opaque,

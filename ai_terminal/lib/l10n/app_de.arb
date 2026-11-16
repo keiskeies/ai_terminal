@@ -91,10 +91,6 @@
   "auditLogSearchHint": "Search command, server, output...",
   "auditLogTitle": "Audit Log",
   "authMethod": "Authentifizierungsmethode",
-  "builtinPromptDesc": "Kern-AI-Systemprompt, wird sofort wirksam. Der Platzhalter 'context' wird durch Serverinformationen ersetzt.",
-  "builtinPromptSaved": "Integrierter Prompt gespeichert",
-  "builtinPromptTitle": "Integrierter Systemprompt",
-  "builtinPromptWarning": "⚠️ Mit Vorsicht bearbeiten, jederzeit zurücksetzbar.",
   "cancel": "Abbrechen",
   "changeRecordAllTitle": "All Change Records",
   "changeRecordConfirmRollback": "Confirm Rollback",
@@ -191,9 +187,6 @@
   "connectionManagement": "Verbindungen",
   "connectionSuccess": "Verbindung erfolgreich",
   "copy": "Kopieren",
-  "customPromptDesc": "Benutzerdefinierte Anweisungen, die an den AI-Systemprompt angehängt werden. Dient zum Anpassen des AI-Verhaltens, Ausgabestils usw. Leer lassen zum Überspringen.",
-  "customPromptSaved": "Benutzerdefinierter Prompt gespeichert",
-  "customPromptTitle": "Benutzerdefinierter AI-Prompt",
   "darkMode": "Dunkel",
   "delete": "Löschen",
   "deleteConfirm": "Wirklich löschen?",
@@ -288,8 +281,6 @@
   "languageDialogTitle": "Select Language",
   "languageFollowSystem": "Follow System",
   "lightMode": "Hell",
-  "menuItemBuiltinPrompt": "Integrierter Prompt",
-  "menuItemCustomPrompt": "Benutzerdefinierter Prompt",
   "messageSaveFailed": "Nachricht konnte nicht gespeichert werden, Aufgabe nicht gestartet",
   "name": "Name",
   "nickname": "Spitzname",
@@ -493,7 +484,6 @@
   "terminalConnected": "Connected",
   "terminalConnecting": "Connecting to {host}...",
   "terminalCreateNew": "+ New",
-  "terminalCustomPromptHint": "e.g. respond in English, use concise output format, prefer Docker...",
   "terminalExitOrchestrator": "Exit orchestration mode",
   "terminalExpandAIPanel": "Expand AI panel",
   "terminalExpandMonitorPanel": "Expand monitor panel",
@@ -511,11 +501,6 @@
   "terminalLocalStartFailed": "Failed to start local terminal",
   "terminalLocalStartFailedWithError": "Failed to start local terminal: {error}",
   "terminalManage": "Manage",
-  "terminalMaxSteps": "Max steps",
-  "terminalMaxStepsDesc": "Maximum execution steps in Agent auto mode. Set to 0 for unlimited; complex tasks will not be interrupted.",
-  "terminalMaxStepsLabel": "Steps (0 = unlimited)",
-  "terminalMaxStepsSet": "Max steps set to {value}",
-  "terminalMaxStepsTitle": "Maximum execution steps",
   "terminalModel": "Model",
   "terminalMonitor": "Monitor",
   "terminalNewConnection": "New connection",
@@ -922,13 +907,6 @@
     "placeholders": {
       "error": {
         "type": "String"
-      }
-    }
-  },
-  "@terminalMaxStepsSet": {
-    "placeholders": {
-      "value": {
-        "type": "int"
       }
     }
   },

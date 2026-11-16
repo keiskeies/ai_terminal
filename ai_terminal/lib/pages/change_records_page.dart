@@ -46,23 +46,26 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
 
   Color _typeColor(ChangeType type) {
     final tc = ThemeColors.of(context);
+    // 统一走设计 token：ok / warn / error 表语义，brand（青）和 gold（金）
+    // 表中性分类。原来这套是 cKleinBlue / cChineseRed / cLimeGreen /
+    // cHermesOrange / cViolet 五个旧色，和石墨青配色阶梯完全不同一套语言。
     switch (type) {
       case ChangeType.install:
-        return cKleinBlue;
+        return tc.ok;
       case ChangeType.uninstall:
-        return cChineseRed;
+        return tc.error;
       case ChangeType.startService:
-        return cLimeGreen;
+        return tc.ok;
       case ChangeType.stopService:
-        return cHermesOrange;
+        return tc.warn;
       case ChangeType.restartService:
-        return cHermesOrange;
+        return tc.warn;
       case ChangeType.permission:
-        return cViolet;
+        return tc.gold;
       case ChangeType.fileOperation:
-        return cKleinBlueLight;
+        return tc.brand;
       case ChangeType.modifyConfig:
-        return cViolet;
+        return tc.gold;
       case ChangeType.other:
         return tc.textSub;
     }

@@ -19,7 +19,21 @@ const _uuid = Uuid();
 class HostEditPage extends ConsumerStatefulWidget {
   final String? hostId;
 
-  const HostEditPage({super.key, this.hostId});
+  /// 内嵌模式：不套 Scaffold / AppBar，由外层（抽屉子视图）提供返回与标题。
+  ///
+  /// 主机表单字段多（凭据、跳板机、sudo、编码），**只保留这一份实现** ——
+  /// 抽屉和整页路由渲染的都是它，不会出现两处各改一半。
+  final bool embedded;
+  final VoidCallback? onSaved;
+  final VoidCallback? onCancel;
+
+  const HostEditPage({
+    super.key,
+    this.hostId,
+    this.embedded = false,
+    this.onSaved,
+    this.onCancel,
+  });
 
   @override
   ConsumerState<HostEditPage> createState() => _HostEditPageState();
@@ -78,7 +92,8 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
       _portController.text = host.port.toString();
       _usernameController.text = host.username;
       _authType = host.authType;
-      _groupController.text = host.group == '默认' ? L10n.str.hostDefaultGroup : host.group;
+      _groupController.text =
+          host.group == '默认' ? L10n.str.hostDefaultGroup : host.group;
       _tagColor = host.tagColor;
       _timeout = host.timeout;
       _encoding = host.encoding;
@@ -91,23 +106,28 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
 
       // 加载凭据
       if (host.isPasswordAuth) {
-        final password = await CredentialsStore.get(hostId: host.id, type: 'password');
+        final password =
+            await CredentialsStore.get(hostId: host.id, type: 'password');
         _passwordController.text = password ?? '';
       } else {
-        final privateKey = await CredentialsStore.get(hostId: host.id, type: 'privateKey');
+        final privateKey =
+            await CredentialsStore.get(hostId: host.id, type: 'privateKey');
         _privateKeyController.text = privateKey ?? '';
       }
 
       // 加载跳板机凭据
       if (host.hasJumpHost) {
-        final jumpPassword = await CredentialsStore.get(hostId: '${host.id}_jump', type: 'password');
+        final jumpPassword = await CredentialsStore.get(
+            hostId: '${host.id}_jump', type: 'password');
         _jumpPasswordController.text = jumpPassword ?? '';
-        final jumpPrivateKey = await CredentialsStore.get(hostId: '${host.id}_jump', type: 'privateKey');
+        final jumpPrivateKey = await CredentialsStore.get(
+            hostId: '${host.id}_jump', type: 'privateKey');
         _jumpPrivateKeyController.text = jumpPrivateKey ?? '';
       }
 
       // 加载 sudo 密码（用于 AI 执行 sudo 命令时自动注入）
-      final sudoPassword = await CredentialsStore.get(hostId: host.id, type: 'sudoPassword');
+      final sudoPassword =
+          await CredentialsStore.get(hostId: host.id, type: 'sudoPassword');
       _sudoPasswordController.text = sudoPassword ?? '';
 
       setState(() {});
@@ -138,224 +158,65 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEditing ? l10n.hostEditTitleEdit : l10n.hostEditTitleNew),
-      ),
-      body: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.all(pStandard),
-                children: [
-                  // 基本信息
-                  _buildSectionTitle(l10n.hostEditSectionBasic),
-                  const SizedBox(height: 12),
+      appBar: widget.embedded
+          ? null
+          : AppBar(
+              title: Text(
+                  _isEditing ? l10n.hostEditTitleEdit : l10n.hostEditTitleNew),
+            ),
+      body: _EmbeddedDensity(
+        enabled: widget.embedded,
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: widget.embedded
+                      ? EdgeInsets.zero
+                      : const EdgeInsets.all(pStandard),
+                  children: [
+                    // 基本信息
+                    _buildSectionTitle(l10n.hostEditSectionBasic),
+                    const SizedBox(height: 12),
 
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: InputDecoration(
-                      labelText: l10n.hostEditNameLabel,
-                      hintText: l10n.hostEditNameHint,
-                    ),
-                    maxLength: 20,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) return l10n.hostEditNameRequired;
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-
-                  TextFormField(
-                    controller: _hostController,
-                    decoration: InputDecoration(
-                      labelText: l10n.hostEditHostLabel,
-                      hintText: l10n.hostEditHostHint,
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) return l10n.hostEditHostRequired;
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 12),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _portController,
-                          decoration: InputDecoration(
-                            labelText: l10n.port,
-                          ),
-                          keyboardType: TextInputType.number,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: TextFormField(
-                          controller: _usernameController,
-                          decoration: InputDecoration(
-                            labelText: l10n.hostEditUsernameLabel,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-
-                  // 认证方式
-                  _buildSectionTitle(l10n.hostEditSectionAuth),
-                  const SizedBox(height: 12),
-
-                  DropdownButtonFormField<String>(
-                    initialValue: _authType,
-                    decoration: InputDecoration(
-                      labelText: l10n.hostEditAuthTypeLabel,
-                    ),
-                    items: [
-                      DropdownMenuItem(value: 'password', child: Text(l10n.hostEditPassword)),
-                      DropdownMenuItem(value: 'privateKey', child: Text(l10n.hostEditPrivateKey)),
-                    ],
-                    onChanged: (value) => setState(() => _authType = value!),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // 密码输入
-                  if (_authType == 'password')
                     TextFormField(
-                      controller: _passwordController,
-                      obscureText: _obscurePassword,
+                      controller: _nameController,
                       decoration: InputDecoration(
-                        labelText: l10n.hostEditPassword,
-                        suffixIcon: IconButton(
-                          icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                        ),
+                        labelText: l10n.hostEditNameLabel,
+                        hintText: l10n.hostEditNameHint,
                       ),
-                    ),
-
-                  // 私钥输入
-                  if (_authType == 'privateKey') ...[
-                    SwitchListTile(
-                      title: Text(l10n.hostEditPastePrivateKey),
-                      subtitle: Text(l10n.hostEditPastePrivateKeySubtitle),
-                      value: _obscurePrivateKey,
-                      onChanged: (value) => setState(() => _obscurePrivateKey = value),
-                    ),
-                    if (_obscurePrivateKey)
-                      TextFormField(
-                        controller: _privateKeyController,
-                        maxLines: 6,
-                        decoration: InputDecoration(
-                          labelText: l10n.hostEditPrivateKeyContent,
-                          hintText: '-----BEGIN OPENSSH PRIVATE KEY-----\n...',
-                        ),
-                      )
-                    else
-                      ListTile(
-                        title: Text(l10n.hostEditSelectPrivateKeyFile),
-                        trailing: TextButton(
-                          onPressed: () async {
-                            try {
-                              final result = await FilePicker.platform.pickFiles(
-                                type: FileType.custom,
-                                allowedExtensions: ['pem', 'key', 'ppk', 'id_rsa', '*'],
-                                dialogTitle: l10n.hostEditSelectPrivateKeyFile,
-                              );
-                              if (result != null && result.files.single.path != null) {
-                                final file = File(result.files.single.path!);
-                                final content = await file.readAsString();
-                                setState(() {
-                                  _privateKeyController.text = content;
-                                });
-                                if (context.mounted) {
-                                  showTopSnackBar(context, 
-                                    SnackBar(
-                                      content: Text(l10n.hostEditPrivateKeyFileRead(result.files.single.name)),
-                                      duration: const Duration(seconds: 2),
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
-                                  );
-                                }
-                              }
-                            } catch (e) {
-                              if (context.mounted) {
-                                showTopSnackBar(context, 
-                                  SnackBar(
-                                    content: Text(l10n.hostEditReadFileFailed(e.toString())),
-                                    backgroundColor: cDanger,
-                                    behavior: SnackBarBehavior.floating,
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                          child: Text(l10n.hostEditSelect),
-                        ),
-                      ),
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _passphraseController,
-                      obscureText: _obscurePassphrase,
-                      decoration: InputDecoration(
-                        labelText: l10n.hostEditPassphraseLabel,
-                        suffixIcon: IconButton(
-                          icon: Icon(_obscurePassphrase ? Icons.visibility : Icons.visibility_off),
-                          onPressed: () => setState(() => _obscurePassphrase = !_obscurePassphrase),
-                        ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 24),
-
-                  // 分组与标签
-                  _buildSectionTitle(l10n.hostEditSectionGroupTag),
-                  const SizedBox(height: 12),
-
-                  // 分组：下拉候选 + 自由输入（新建分组）
-                  _buildGroupField(),
-                  const SizedBox(height: 12),
-
-                  Text(l10n.hostEditTagColor, style: TextStyle(color: tc.textSub)),
-                  const SizedBox(height: 8),
-                  ColorPickerRow(
-                    selectedColor: _tagColor,
-                    onColorSelected: (color) => setState(() => _tagColor = color),
-                  ),
-                  const SizedBox(height: 24),
-
-                  // 高级设置
-                  _buildSectionTitle(l10n.commonAdvancedSettings),
-                  const SizedBox(height: 12),
-
-                  // 跳板机/堡垒机配置（内联）
-                  _buildSectionTitle(l10n.hostEditSectionJumpHost),
-                  const SizedBox(height: 8),
-                  SwitchListTile(
-                    title: Text(l10n.hostEditUseJumpHost),
-                    subtitle: Text(l10n.hostEditUseJumpHostSubtitle),
-                    value: _jumpExpanded,
-                    onChanged: (value) => setState(() => _jumpExpanded = value),
-                  ),
-                  if (_jumpExpanded) ...[
-                    const SizedBox(height: 8),
-                    TextFormField(
-                      controller: _jumpHostController,
-                      decoration: InputDecoration(
-                        labelText: l10n.hostEditJumpHostLabel,
-                        hintText: l10n.hostEditHostHint,
-                        prefixIcon: const Icon(Icons.swap_horiz, size: 16),
-                      ),
+                      maxLength: 20,
+                      validator: (value) {
+                        if (value == null || value.isEmpty)
+                          return l10n.hostEditNameRequired;
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 12),
+
+                    TextFormField(
+                      controller: _hostController,
+                      decoration: InputDecoration(
+                        labelText: l10n.hostEditHostLabel,
+                        hintText: l10n.hostEditHostHint,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty)
+                          return l10n.hostEditHostRequired;
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
                     Row(
                       children: [
                         Expanded(
                           child: TextFormField(
-                            controller: _jumpPortController,
-                            decoration: InputDecoration(labelText: l10n.hostEditJumpPortLabel),
+                            controller: _portController,
+                            decoration: InputDecoration(
+                              labelText: l10n.port,
+                            ),
                             keyboardType: TextInputType.number,
                           ),
                         ),
@@ -363,178 +224,410 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                         Expanded(
                           flex: 2,
                           child: TextFormField(
-                            controller: _jumpUsernameController,
-                            decoration: InputDecoration(labelText: l10n.hostEditJumpUsernameLabel),
+                            controller: _usernameController,
+                            decoration: InputDecoration(
+                              labelText: l10n.hostEditUsernameLabel,
+                            ),
                           ),
                         ),
                       ],
                     ),
+                    const SizedBox(height: 24),
+
+                    // 认证方式
+                    _buildSectionTitle(l10n.hostEditSectionAuth),
                     const SizedBox(height: 12),
+
                     DropdownButtonFormField<String>(
-                      initialValue: _jumpAuthType,
-                      decoration: InputDecoration(labelText: l10n.hostEditJumpAuthTypeLabel),
+                      initialValue: _authType,
+                      decoration: InputDecoration(
+                        labelText: l10n.hostEditAuthTypeLabel,
+                      ),
                       items: [
-                        DropdownMenuItem(value: 'password', child: Text(l10n.hostEditPassword)),
-                        DropdownMenuItem(value: 'privateKey', child: Text(l10n.hostEditPrivateKey)),
+                        DropdownMenuItem(
+                            value: 'password',
+                            child: Text(l10n.hostEditPassword)),
+                        DropdownMenuItem(
+                            value: 'privateKey',
+                            child: Text(l10n.hostEditPrivateKey)),
                       ],
-                      onChanged: (value) => setState(() => _jumpAuthType = value),
+                      onChanged: (value) => setState(() => _authType = value!),
                     ),
                     const SizedBox(height: 12),
-                    // 跳板机密码
-                    if (_jumpAuthType == 'password')
+
+                    // 密码输入
+                    if (_authType == 'password')
                       TextFormField(
-                        controller: _jumpPasswordController,
-                        obscureText: _obscureJumpPassword,
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
                         decoration: InputDecoration(
-                          labelText: l10n.hostEditJumpPasswordLabel,
+                          labelText: l10n.hostEditPassword,
                           suffixIcon: IconButton(
-                            icon: Icon(_obscureJumpPassword ? Icons.visibility : Icons.visibility_off),
-                            onPressed: () => setState(() => _obscureJumpPassword = !_obscureJumpPassword),
+                            icon: Icon(_obscurePassword
+                                ? Icons.visibility
+                                : Icons.visibility_off),
+                            onPressed: () => setState(
+                                () => _obscurePassword = !_obscurePassword),
                           ),
                         ),
                       ),
-                    // 跳板机私钥
-                    if (_jumpAuthType == 'privateKey')
+
+                    // 私钥输入
+                    if (_authType == 'privateKey') ...[
+                      SwitchListTile(
+                        title: Text(l10n.hostEditPastePrivateKey),
+                        subtitle: Text(l10n.hostEditPastePrivateKeySubtitle),
+                        value: _obscurePrivateKey,
+                        onChanged: (value) =>
+                            setState(() => _obscurePrivateKey = value),
+                      ),
+                      if (_obscurePrivateKey)
+                        TextFormField(
+                          controller: _privateKeyController,
+                          maxLines: 6,
+                          decoration: InputDecoration(
+                            labelText: l10n.hostEditPrivateKeyContent,
+                            hintText:
+                                '-----BEGIN OPENSSH PRIVATE KEY-----\n...',
+                          ),
+                        )
+                      else
+                        ListTile(
+                          title: Text(l10n.hostEditSelectPrivateKeyFile),
+                          trailing: TextButton(
+                            onPressed: () async {
+                              try {
+                                final result =
+                                    await FilePicker.platform.pickFiles(
+                                  type: FileType.custom,
+                                  allowedExtensions: [
+                                    'pem',
+                                    'key',
+                                    'ppk',
+                                    'id_rsa',
+                                    '*'
+                                  ],
+                                  dialogTitle:
+                                      l10n.hostEditSelectPrivateKeyFile,
+                                );
+                                if (result != null &&
+                                    result.files.single.path != null) {
+                                  final file = File(result.files.single.path!);
+                                  final content = await file.readAsString();
+                                  setState(() {
+                                    _privateKeyController.text = content;
+                                  });
+                                  if (context.mounted) {
+                                    showTopSnackBar(
+                                      context,
+                                      SnackBar(
+                                        content: Text(
+                                            l10n.hostEditPrivateKeyFileRead(
+                                                result.files.single.name)),
+                                        duration: const Duration(seconds: 2),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  }
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  showTopSnackBar(
+                                    context,
+                                    SnackBar(
+                                      content: Text(l10n.hostEditReadFileFailed(
+                                          e.toString())),
+                                      backgroundColor: cDanger,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            child: Text(l10n.hostEditSelect),
+                          ),
+                        ),
+                      const SizedBox(height: 8),
                       TextFormField(
-                        controller: _jumpPrivateKeyController,
-                        obscureText: _obscureJumpPrivateKey,
-                        maxLines: 4,
+                        controller: _passphraseController,
+                        obscureText: _obscurePassphrase,
                         decoration: InputDecoration(
-                          labelText: l10n.hostEditJumpPrivateKeyContent,
-                          hintText: '-----BEGIN OPENSSH PRIVATE KEY-----\n...',
+                          labelText: l10n.hostEditPassphraseLabel,
                           suffixIcon: IconButton(
-                            icon: Icon(_obscureJumpPrivateKey ? Icons.visibility : Icons.visibility_off),
-                            onPressed: () => setState(() => _obscureJumpPrivateKey = !_obscureJumpPrivateKey),
+                            icon: Icon(_obscurePassphrase
+                                ? Icons.visibility
+                                : Icons.visibility_off),
+                            onPressed: () => setState(
+                                () => _obscurePassphrase = !_obscurePassphrase),
                           ),
                         ),
                       ),
+                    ],
+                    const SizedBox(height: 24),
+
+                    // 分组与标签
+                    _buildSectionTitle(l10n.hostEditSectionGroupTag),
+                    const SizedBox(height: 12),
+
+                    // 分组：下拉候选 + 自由输入（新建分组）
+                    _buildGroupField(),
+                    const SizedBox(height: 12),
+
+                    Text(l10n.hostEditTagColor,
+                        style: TextStyle(color: tc.textSub)),
+                    const SizedBox(height: 8),
+                    ColorPickerRow(
+                      selectedColor: _tagColor,
+                      onColorSelected: (color) =>
+                          setState(() => _tagColor = color),
+                    ),
+                    const SizedBox(height: 24),
+
+                    // 高级设置
+                    _buildSectionTitle(l10n.commonAdvancedSettings),
+                    const SizedBox(height: 12),
+
+                    // 跳板机/堡垒机配置（内联）
+                    _buildSectionTitle(l10n.hostEditSectionJumpHost),
+                    const SizedBox(height: 8),
+                    SwitchListTile(
+                      title: Text(l10n.hostEditUseJumpHost),
+                      subtitle: Text(l10n.hostEditUseJumpHostSubtitle),
+                      value: _jumpExpanded,
+                      onChanged: (value) =>
+                          setState(() => _jumpExpanded = value),
+                    ),
+                    if (_jumpExpanded) ...[
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _jumpHostController,
+                        decoration: InputDecoration(
+                          labelText: l10n.hostEditJumpHostLabel,
+                          hintText: l10n.hostEditHostHint,
+                          prefixIcon: const Icon(Icons.swap_horiz, size: 16),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              controller: _jumpPortController,
+                              decoration: InputDecoration(
+                                  labelText: l10n.hostEditJumpPortLabel),
+                              keyboardType: TextInputType.number,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: TextFormField(
+                              controller: _jumpUsernameController,
+                              decoration: InputDecoration(
+                                  labelText: l10n.hostEditJumpUsernameLabel),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: _jumpAuthType,
+                        decoration: InputDecoration(
+                            labelText: l10n.hostEditJumpAuthTypeLabel),
+                        items: [
+                          DropdownMenuItem(
+                              value: 'password',
+                              child: Text(l10n.hostEditPassword)),
+                          DropdownMenuItem(
+                              value: 'privateKey',
+                              child: Text(l10n.hostEditPrivateKey)),
+                        ],
+                        onChanged: (value) =>
+                            setState(() => _jumpAuthType = value),
+                      ),
+                      const SizedBox(height: 12),
+                      // 跳板机密码
+                      if (_jumpAuthType == 'password')
+                        TextFormField(
+                          controller: _jumpPasswordController,
+                          obscureText: _obscureJumpPassword,
+                          decoration: InputDecoration(
+                            labelText: l10n.hostEditJumpPasswordLabel,
+                            suffixIcon: IconButton(
+                              icon: Icon(_obscureJumpPassword
+                                  ? Icons.visibility
+                                  : Icons.visibility_off),
+                              onPressed: () => setState(() =>
+                                  _obscureJumpPassword = !_obscureJumpPassword),
+                            ),
+                          ),
+                        ),
+                      // 跳板机私钥
+                      if (_jumpAuthType == 'privateKey')
+                        TextFormField(
+                          controller: _jumpPrivateKeyController,
+                          obscureText: _obscureJumpPrivateKey,
+                          maxLines: 4,
+                          decoration: InputDecoration(
+                            labelText: l10n.hostEditJumpPrivateKeyContent,
+                            hintText:
+                                '-----BEGIN OPENSSH PRIVATE KEY-----\n...',
+                            suffixIcon: IconButton(
+                              icon: Icon(_obscureJumpPrivateKey
+                                  ? Icons.visibility
+                                  : Icons.visibility_off),
+                              onPressed: () => setState(() =>
+                                  _obscureJumpPrivateKey =
+                                      !_obscureJumpPrivateKey),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: cInfo.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(rSmall),
+                          border:
+                              Border.all(color: cInfo.withValues(alpha: 0.15)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline,
+                                size: 12, color: cInfo),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                l10n.hostEditJumpHostFlowHint,
+                                style: TextStyle(
+                                    fontSize: fMicro,
+                                    color: cInfo.withValues(alpha: 0.8)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 16),
+
+                    // 权限提升 (sudo) — AI 执行 sudo 命令时自动注入此密码
+                    _buildSectionTitle(l10n.hostEditSectionSudo),
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: _sudoPasswordController,
+                      obscureText: _obscureSudoPassword,
+                      decoration: InputDecoration(
+                        labelText: l10n.hostEditSudoPasswordLabel,
+                        hintText: l10n.hostEditSudoPasswordHint,
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscureSudoPassword
+                              ? Icons.visibility
+                              : Icons.visibility_off),
+                          onPressed: () => setState(() =>
+                              _obscureSudoPassword = !_obscureSudoPassword),
+                        ),
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: cInfo.withValues(alpha: 0.06),
                         borderRadius: BorderRadius.circular(rSmall),
-                        border: Border.all(color: cInfo.withValues(alpha: 0.15)),
+                        border:
+                            Border.all(color: cInfo.withValues(alpha: 0.15)),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.info_outline, size: 12, color: cInfo),
+                          const Icon(Icons.info_outline,
+                              size: 12, color: cInfo),
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              l10n.hostEditJumpHostFlowHint,
-                              style: TextStyle(fontSize: fMicro, color: cInfo.withValues(alpha: 0.8)),
+                              l10n.hostEditSudoPasswordDesc,
+                              style: TextStyle(
+                                  fontSize: fMicro,
+                                  color: cInfo.withValues(alpha: 0.8)),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 16),
 
-                  // 权限提升 (sudo) — AI 执行 sudo 命令时自动注入此密码
-                  _buildSectionTitle(l10n.hostEditSectionSudo),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _sudoPasswordController,
-                    obscureText: _obscureSudoPassword,
-                    decoration: InputDecoration(
-                      labelText: l10n.hostEditSudoPasswordLabel,
-                      hintText: l10n.hostEditSudoPasswordHint,
-                      suffixIcon: IconButton(
-                        icon: Icon(_obscureSudoPassword ? Icons.visibility : Icons.visibility_off),
-                        onPressed: () => setState(() => _obscureSudoPassword = !_obscureSudoPassword),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: cInfo.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(rSmall),
-                      border: Border.all(color: cInfo.withValues(alpha: 0.15)),
-                    ),
-                    child: Row(
+                    ExpansionTile(
+                      title: Text(l10n.hostEditMoreSettings),
                       children: [
-                        const Icon(Icons.info_outline, size: 12, color: cInfo),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            l10n.hostEditSudoPasswordDesc,
-                            style: TextStyle(fontSize: fMicro, color: cInfo.withValues(alpha: 0.8)),
+                        Padding(
+                          padding: const EdgeInsets.all(pStandard),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(l10n.hostEditConnectionTimeout(_timeout)),
+                              Slider(
+                                value: _timeout.toDouble(),
+                                min: 10,
+                                max: 120,
+                                divisions: 11,
+                                label: l10n.hostEditTimeoutSeconds(_timeout),
+                                onChanged: (value) =>
+                                    setState(() => _timeout = value.toInt()),
+                              ),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                initialValue: _encoding,
+                                decoration: InputDecoration(
+                                    labelText: l10n.hostEditEncodingLabel),
+                                items: const [
+                                  DropdownMenuItem(
+                                      value: 'utf-8', child: Text('UTF-8')),
+                                  DropdownMenuItem(
+                                      value: 'gbk', child: Text('GBK')),
+                                  DropdownMenuItem(
+                                      value: 'big5', child: Text('BIG5')),
+                                ],
+                                onChanged: (value) =>
+                                    setState(() => _encoding = value!),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  ExpansionTile(
-                    title: Text(l10n.hostEditMoreSettings),
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.all(pStandard),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(l10n.hostEditConnectionTimeout(_timeout)),
-                            Slider(
-                              value: _timeout.toDouble(),
-                              min: 10,
-                              max: 120,
-                              divisions: 11,
-                              label: l10n.hostEditTimeoutSeconds(_timeout),
-                              onChanged: (value) => setState(() => _timeout = value.toInt()),
-                            ),
-                            const SizedBox(height: 12),
-                            DropdownButtonFormField<String>(
-                              initialValue: _encoding,
-                              decoration: InputDecoration(labelText: l10n.hostEditEncodingLabel),
-                              items: const [
-                                DropdownMenuItem(value: 'utf-8', child: Text('UTF-8')),
-                                DropdownMenuItem(value: 'gbk', child: Text('GBK')),
-                                DropdownMenuItem(value: 'big5', child: Text('BIG5')),
-                              ],
-                              onChanged: (value) => setState(() => _encoding = value!),
-                            ),
-                          ],
-                        ),
+                    const SizedBox(height: 80),
+                  ],
+                ),
+              ),
+              // 底部操作栏
+              Container(
+                height: widget.embedded ? 48 : 64,
+                padding: EdgeInsets.symmetric(
+                    horizontal: widget.embedded ? 0 : pStandard, vertical: 8),
+                decoration: BoxDecoration(
+                  color: widget.embedded ? null : tc.card,
+                  border: Border(top: BorderSide(color: tc.border)),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: widget.onCancel ?? () => context.pop(),
+                        child: Text(l10n.commonCancel),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 80),
-                ],
-              ),
-            ),
-            // 底部操作栏
-            Container(
-              height: 64,
-              padding: const EdgeInsets.symmetric(horizontal: pStandard, vertical: 8),
-              decoration: BoxDecoration(
-                color: tc.card,
-                border: Border(top: BorderSide(color: tc.border)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => context.pop(),
-                      child: Text(l10n.commonCancel),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: ElevatedButton(
-                      onPressed: _saveHost,
-                      child: Text(l10n.hostEditSave),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton(
+                        onPressed: _saveHost,
+                        child: Text(l10n.hostEditSave),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -603,7 +696,8 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
       port: int.tryParse(_portController.text) ?? 22,
       username: _usernameController.text.trim(),
       authType: _authType,
-      group: _groupController.text.trim().isEmpty || _groupController.text.trim() == L10n.str.hostDefaultGroup
+      group: _groupController.text.trim().isEmpty ||
+              _groupController.text.trim() == L10n.str.hostDefaultGroup
           ? '默认'
           : _groupController.text.trim(),
       tagColor: _tagColor,
@@ -618,7 +712,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
     // 保存凭据
     bool credentialsSaved = true;
     String? credentialsError;
-    
+
     if (_authType == 'password' && _passwordController.text.isNotEmpty) {
       credentialsSaved = await CredentialsStore.save(
         hostId: hostId,
@@ -628,7 +722,8 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
       if (!credentialsSaved) {
         credentialsError = l10n.hostEditPasswordSaveFailed;
       }
-    } else if (_authType == 'privateKey' && _privateKeyController.text.isNotEmpty) {
+    } else if (_authType == 'privateKey' &&
+        _privateKeyController.text.isNotEmpty) {
       credentialsSaved = await CredentialsStore.save(
         hostId: hostId,
         type: 'privateKey',
@@ -638,24 +733,32 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
         credentialsError = l10n.hostEditPrivateKeySaveFailed;
       }
     }
-    
+
     // 如果是编辑模式，检查是否需要保留旧凭据
-    if (_isEditing && _authType == 'password' && _passwordController.text.isEmpty && _existingHost?.isPasswordAuth == true) {
+    if (_isEditing &&
+        _authType == 'password' &&
+        _passwordController.text.isEmpty &&
+        _existingHost?.isPasswordAuth == true) {
       // 用户清空了密码，保持原来的密码不变
-    } else if (_isEditing && _authType == 'privateKey' && _privateKeyController.text.isEmpty && _existingHost?.isKeyAuth == true) {
+    } else if (_isEditing &&
+        _authType == 'privateKey' &&
+        _privateKeyController.text.isEmpty &&
+        _existingHost?.isKeyAuth == true) {
       // 用户清空了私钥，保持原来的私钥不变
     }
 
     // 保存跳板机凭据
     if (_jumpExpanded) {
       final jumpCredKey = '${hostId}_jump';
-      if (_jumpAuthType == 'password' && _jumpPasswordController.text.isNotEmpty) {
+      if (_jumpAuthType == 'password' &&
+          _jumpPasswordController.text.isNotEmpty) {
         await CredentialsStore.save(
           hostId: jumpCredKey,
           type: 'password',
           value: _jumpPasswordController.text,
         );
-      } else if (_jumpAuthType == 'privateKey' && _jumpPrivateKeyController.text.isNotEmpty) {
+      } else if (_jumpAuthType == 'privateKey' &&
+          _jumpPrivateKeyController.text.isNotEmpty) {
         await CredentialsStore.save(
           hostId: jumpCredKey,
           type: 'privateKey',
@@ -685,19 +788,68 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
 
     if (mounted) {
       if (credentialsError != null) {
-        showTopSnackBar(context, 
+        showTopSnackBar(
+          context,
           SnackBar(
-            content: Text(l10n.hostEditConfigSavedButCredFailed(credentialsError)),
-            backgroundColor: Colors.orange,
+            content:
+                Text(l10n.hostEditConfigSavedButCredFailed(credentialsError)),
+            backgroundColor: cWarning,
             duration: const Duration(seconds: 4),
           ),
         );
       } else {
-        showTopSnackBar(context, 
+        showTopSnackBar(
+          context,
           SnackBar(content: Text(l10n.hostEditSaveSuccess)),
         );
       }
-      context.pop();
+      if (widget.embedded) {
+        widget.onSaved?.call();
+      } else {
+        context.pop();
+      }
     }
+  }
+}
+
+/// 抽屉内嵌时统一输入框密度：Material 默认 16px 的字段在 600 宽的抽屉里显得
+/// 又高又肿，和旁边 11–13px 的标签对不上。整页模式不受影响。
+class _EmbeddedDensity extends StatelessWidget {
+  const _EmbeddedDensity({required this.enabled, required this.child});
+
+  final bool enabled;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) return child;
+    final tc = ThemeColors.of(context);
+    final base = Theme.of(context);
+    return Theme(
+      data: base.copyWith(
+        inputDecorationTheme: InputDecorationTheme(
+          isDense: true,
+          labelStyle: TextStyle(fontSize: fSmall, color: tc.textSub),
+          hintStyle: TextStyle(fontSize: fSmall, color: tc.textMuted),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(rSmall),
+            borderSide: BorderSide(color: tc.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(rSmall),
+            borderSide: BorderSide(color: tc.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(rSmall),
+            borderSide: BorderSide(color: tc.brand),
+          ),
+        ),
+        textTheme: base.textTheme.apply(fontSizeFactor: 0.86),
+        snackBarTheme: base.snackBarTheme,
+      ),
+      child: child,
+    );
   }
 }

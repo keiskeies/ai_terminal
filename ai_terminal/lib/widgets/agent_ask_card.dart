@@ -128,13 +128,6 @@ class AgentAskOptionChip extends StatelessWidget {
           borderRadius: BorderRadius.circular(rMedium),
           border: Border.all(
               color: accent.withValues(alpha: selectable ? 0.3 : 0.18)),
-          boxShadow: [
-            BoxShadow(
-              color: tc.brand.withValues(alpha: 0.05),
-              blurRadius: 4,
-              offset: const Offset(0, 1),
-            ),
-          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,

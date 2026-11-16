@@ -8,6 +8,7 @@ import '../l10n/app_localizations.dart';
 import '../models/chat_session.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/message_bubble.dart';
+import '../widgets/nav_drawer.dart';
 import '../core/app_toast.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -144,7 +145,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
-            onPressed: () => context.push('/settings/ai'),
+            // 设置只有一个载体：抽屉。聊天页没有终端上下文（不能开标签、
+            // 不能执行命令），所以只传空的运行回调 —— 抽屉里就只剩查看和
+            // 编辑，不再 push 一个整页设置出来。
+            onPressed: () => NavDrawer.show(
+              context,
+              section: NavDrawer.sectionSettings,
+              initialGroup: 'ai',
+            ),
           ),
           PopupMenuButton<String>(
             onSelected: (value) {

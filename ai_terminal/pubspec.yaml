@@ -97,6 +97,9 @@ flutter:
         - asset: assets/fonts/JetBrainsMono-Bold.ttf
           weight: 700
 
+# 各平台图标由 tools/generate_app_icons.py 统一生成：
+# macOS/Windows/Web 用四角透明的 app_icon.png，iOS 用不透明的 app_icon_square.png，
+# Android 自适应前景用 adaptive_foreground.png。若跑过 flutter_launcher_icons，请再跑一次脚本。
 flutter_launcher_icons:
   android: true
   ios: true
@@ -110,8 +113,8 @@ flutter_launcher_icons:
     background_color: "#0A0A0F"
     theme_color: "#3B7DFF"
   image_path: "assets/icons/app_icon.png"
-  adaptive_icon_background: "#0F0F0F"
-  adaptive_icon_foreground: "assets/icons/app_icon.png"
+  adaptive_icon_background: "#141D33"
+  adaptive_icon_foreground: "assets/icons/adaptive_foreground.png"
 
 # 使用 SQLite3MultipleCiphers (sqlite3mc) 替代普通 SQLite
 # sqlite3mc 兼容 SQLCipher 加密格式，支持全库加密（PRAGMA key）

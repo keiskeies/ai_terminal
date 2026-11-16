@@ -66,13 +66,15 @@ class _PlanPanelState extends State<PlanPanel> {
     if (steps.isEmpty) return const SizedBox.shrink();
     final tc = widget.tc;
     final ui = AgentUiText.of(context);
-    final counts = _counts(ui);
     final currentIndex = steps
         .indexWhere((s) => s.status == PlanStepStatus.inProgress);
+    final doneCount = steps
+        .where((s) => s.status == PlanStepStatus.completed)
+        .length;
     // 收起时把"当前在做哪一步"带到标题行：只留进度数字等于把计划藏没了
     final headerLabel = !_expanded && currentIndex >= 0
-        ? '$counts · ${ui.step(currentIndex + 1)} · ${steps[currentIndex].title}'
-        : counts;
+        ? '${ui.step(currentIndex + 1)} · ${steps[currentIndex].title}'
+        : '';
 
     return Container(
       margin: widget.margin,
@@ -111,12 +113,16 @@ class _PlanPanelState extends State<PlanPanel> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Expanded(
+                  // 设计稿 count-chip：完成/总数以胶囊徽标呈现，其余统计留给收起行
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(rFull),
+                      border: Border.all(color: tc.border, width: 1),
+                    ),
                     child: Text(
-                      headerLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.right,
+                      '$doneCount/${steps.length}',
                       style: TextStyle(
                         color: tc.textSub,
                         fontSize: fMicro,
@@ -124,6 +130,23 @@ class _PlanPanelState extends State<PlanPanel> {
                       ),
                     ),
                   ),
+                  if (headerLabel.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        headerLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: TextStyle(
+                          color: tc.textSub,
+                          fontSize: fMicro,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ] else
+                    const Spacer(),
                   const SizedBox(width: 4),
                   Icon(
                     _expanded ? Icons.expand_more : Icons.chevron_right,
@@ -216,7 +239,10 @@ class _PlanPanelState extends State<PlanPanel> {
         children: [
           Padding(
             padding: const EdgeInsets.only(top: 1),
-            child: Icon(icon, size: 13, color: color),
+            // 设计稿 .pulse：只有进行中的步骤图标做呼吸闪烁
+            child: isCurrent
+                ? _PulsingIcon(icon: icon, size: 13, color: color)
+                : Icon(icon, size: 13, color: color),
           ),
           const SizedBox(width: 6),
           Expanded(
@@ -299,30 +325,49 @@ class _PlanPanelState extends State<PlanPanel> {
         return (Icons.radio_button_unchecked, tc.textSub);
     }
   }
+}
 
-  String _counts(AgentUiText ui) {
-    final total = widget.steps.length;
-    final completed = widget.steps
-        .where((s) => s.status == PlanStepStatus.completed)
-        .length;
-    final inProgress = widget.steps
-        .where((s) => s.status == PlanStepStatus.inProgress)
-        .length;
-    final failed =
-        widget.steps.where((s) => s.status == PlanStepStatus.failed).length;
-    final pending = widget.steps
-        .where((s) => s.status == PlanStepStatus.pending)
-        .length;
-    final skipped = widget.steps
-        .where((s) => s.status == PlanStepStatus.skipped)
-        .length;
-    return ui.planCounts(
-      total: total,
-      completed: completed,
-      inProgress: inProgress,
-      failed: failed,
-      skipped: skipped,
-      pending: pending,
+/// 进行中步骤图标的呼吸闪烁（对应设计稿 .pulse，1.2s 循环）
+class _PulsingIcon extends StatefulWidget {
+  final IconData icon;
+  final double size;
+  final Color color;
+
+  const _PulsingIcon({
+    required this.icon,
+    required this.size,
+    required this.color,
+  });
+
+  @override
+  State<_PulsingIcon> createState() => _PulsingIconState();
+}
+
+class _PulsingIconState extends State<_PulsingIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 600),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: Tween<double>(begin: 0.45, end: 1.0).animate(
+        CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+      ),
+      child: ScaleTransition(
+        scale: Tween<double>(begin: 0.85, end: 1.0).animate(
+          CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+        ),
+        child: Icon(widget.icon, size: widget.size, color: widget.color),
+      ),
     );
   }
 }

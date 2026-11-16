@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/material.dart';
 import '../core/theme_colors.dart';
@@ -76,9 +78,14 @@ class _PortForwardDialogState extends State<PortForwardDialog> {
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
+    final size = MediaQuery.sizeOf(context);
     return Dialog(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 560),
+        // 小屏按视口 92% 缩放，大屏保持 560 上限；高度加 85% 视口保护
+        constraints: BoxConstraints(
+          maxWidth: math.min(560, size.width * 0.92),
+          maxHeight: math.min(560, size.height * 0.85),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -147,7 +154,7 @@ class _PortForwardDialogState extends State<PortForwardDialog> {
                             style: TextStyle(
                                 fontSize: 11,
                                 color: rule.error != null
-                                    ? Colors.redAccent
+                                    ? tc.error
                                     : tc.textSub),
                           ),
                           trailing: IconButton(
@@ -220,8 +227,7 @@ class _PortForwardDialogState extends State<PortForwardDialog> {
               if (_formError != null) ...[
                 const SizedBox(height: 8),
                 Text(_formError!,
-                    style:
-                        const TextStyle(fontSize: 12, color: Colors.redAccent)),
+                    style: TextStyle(fontSize: 12, color: tc.error)),
               ],
               const SizedBox(height: 12),
               Align(

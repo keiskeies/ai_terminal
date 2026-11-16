@@ -123,12 +123,15 @@ class _PermissionModeSelectorState extends State<PermissionModeSelector> {
             onTap: () =>
                 controller.isOpen ? controller.close() : controller.open(),
             child: Container(
-              height: 24,
-              padding: EdgeInsets.symmetric(horizontal: widget.compact ? 6 : 8),
+              // 设计稿 .cap-wrap：30 高、10 内边距、**透明底 + 实色 1px 描边**。
+              // 之前 24 高 + 10% 同色底，和旁边 34px 的发送圆钮站在一起
+              // 像两个被压扁的小标签，底栏一排控件高低不一。
+              height: 30,
+              padding: EdgeInsets.symmetric(horizontal: widget.compact ? 6 : 10),
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.10),
+                color: Colors.transparent,
                 borderRadius: BorderRadius.circular(rFull),
-                border: Border.all(color: color.withValues(alpha: 0.45)),
+                border: Border.all(color: color.withValues(alpha: 0.75)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,

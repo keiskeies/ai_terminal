@@ -569,13 +569,24 @@ class _AIPromptInputState extends State<AIPromptInput> {
       child: Container(
         decoration: BoxDecoration(
           color: tc.card,
-          borderRadius: BorderRadius.circular(rSmall),
+          borderRadius: BorderRadius.circular(rMedium),
           border: Border.all(
             color: widget.enabled
                 ? borderColor
                 : tc.border.withValues(alpha: 0.5),
             width: 1,
           ),
+          // 设计稿 .ai-compose:focus-within 是「1px 品牌色边框 + 0 0 0 1px 光晕」，
+          // 只换边框色在深色面板上几乎看不出聚焦，外面再套一圈同色才算亮起来。
+          boxShadow: _isFocused
+              ? [
+                  BoxShadow(
+                    color: effectiveAccent.withValues(alpha: 0.55),
+                    blurRadius: 0,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -674,8 +685,8 @@ class _AIPromptInputState extends State<AIPromptInput> {
             : (canSend ? _send : null),
         child: AnimatedContainer(
           duration: animFast,
-          width: 28,
-          height: 28,
+          width: 34,
+          height: 34,
           // 圆形：这一排的其他元素（权限胶囊、模型胶囊）都是全圆角胶囊
           decoration: BoxDecoration(
             color: bgColor,
@@ -684,15 +695,15 @@ class _AIPromptInputState extends State<AIPromptInput> {
           child: running
               ? Center(
                   child: Container(
-                    width: 9,
-                    height: 9,
+                    width: 10,
+                    height: 10,
                     color: tc.isLight ? Colors.white : cBg,
                   ),
                 )
               : Icon(
                   Icons.arrow_upward_rounded,
                   color: tc.isLight ? Colors.white : cBg,
-                  size: 15,
+                  size: 16,
                 ),
         ),
       ),

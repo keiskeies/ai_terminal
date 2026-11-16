@@ -35,7 +35,8 @@ class _TabItemWidgetState extends State<TabItemWidget> {
 
     Color bgColor;
     if (isActive) {
-      bgColor = tc.cardElevated;
+      // 设计稿 .tab[aria-pressed=true]：卡片底（#131616），不是更亮的面板色。
+      bgColor = tc.card;
     } else if (_isHovered) {
       bgColor = tc.surface;
     } else {
@@ -49,24 +50,25 @@ class _TabItemWidgetState extends State<TabItemWidget> {
         onExit: (_) => setState(() => _isHovered = false),
         child: AnimatedContainer(
           duration: animFast,
-          height: 34,
+          height: 32,
           constraints: const BoxConstraints(maxWidth: 160, minWidth: 72),
           margin: const EdgeInsets.symmetric(horizontal: 2),
           padding: const EdgeInsets.only(left: 10, right: 4),
+          // 设计稿 tab：选中态用「卡片底 + 发丝描边」表达，不再叠品牌色下划线——
+          // 顶栏里下划线会和标签文字底边打架，描边与顶栏其他控件同一套语言。
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(rSmall),
+            border: Border.all(
+              color: isActive ? tc.border : Colors.transparent,
+            ),
           ),
-          child: Stack(
-            alignment: Alignment.center,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // 标签内容
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
                   Container(
-                    width: 6,
-                    height: 6,
+                    width: 7,
+                    height: 7,
                     margin: const EdgeInsets.only(right: 6),
                     decoration: BoxDecoration(
                       // 连接中给琥珀色，别让用户把"还在建连"读成"已掉线"
@@ -112,19 +114,6 @@ class _TabItemWidgetState extends State<TabItemWidget> {
                       ),
                     ),
                   ),
-                ],
-              ),
-              // 激活态底部指示线
-              if (isActive)
-                Positioned(
-                  bottom: 0,
-                  left: 8,
-                  right: 8,
-                  child: Container(
-                    height: 2,
-                    color: tc.brand,
-                  ),
-                ),
             ],
           ),
         ),

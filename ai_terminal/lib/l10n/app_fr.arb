@@ -91,10 +91,6 @@
   "auditLogSearchHint": "Search command, server, output...",
   "auditLogTitle": "Audit Log",
   "authMethod": "Méthode d'authentification",
-  "builtinPromptDesc": "Prompt système central de l'IA, prend effet immédiatement. L'espace réservé 'context' sera remplacé par les infos du serveur.",
-  "builtinPromptSaved": "Prompt intégré enregistré",
-  "builtinPromptTitle": "Prompt système intégré",
-  "builtinPromptWarning": "⚠️ Modifier avec prudence, réinitialisable à tout moment.",
   "cancel": "Annuler",
   "changeRecordAllTitle": "All Change Records",
   "changeRecordConfirmRollback": "Confirm Rollback",
@@ -191,9 +187,6 @@
   "connectionManagement": "Connexions",
   "connectionSuccess": "Connexion réussie",
   "copy": "Copier",
-  "customPromptDesc": "Instructions personnalisées ajoutées au prompt système de l'IA. Sert à ajuster le comportement de l'IA, le style de sortie, etc. Laisser vide pour ignorer.",
-  "customPromptSaved": "Prompt personnalisé enregistré",
-  "customPromptTitle": "Prompt AI personnalisé",
   "darkMode": "Sombre",
   "delete": "Supprimer",
   "deleteConfirm": "Confirmer la suppression ?",
@@ -288,8 +281,6 @@
   "languageDialogTitle": "Select Language",
   "languageFollowSystem": "Follow System",
   "lightMode": "Clair",
-  "menuItemBuiltinPrompt": "Prompt intégré",
-  "menuItemCustomPrompt": "Prompt personnalisé",
   "messageSaveFailed": "Échec de l'enregistrement du message, tâche non démarrée",
   "name": "Nom",
   "nickname": "Surnom",
@@ -493,7 +484,6 @@
   "terminalConnected": "Connected",
   "terminalConnecting": "Connecting to {host}...",
   "terminalCreateNew": "+ New",
-  "terminalCustomPromptHint": "e.g. respond in English, use concise output format, prefer Docker...",
   "terminalExitOrchestrator": "Exit orchestration mode",
   "terminalExpandAIPanel": "Expand AI panel",
   "terminalExpandMonitorPanel": "Expand monitor panel",
@@ -511,11 +501,6 @@
   "terminalLocalStartFailed": "Failed to start local terminal",
   "terminalLocalStartFailedWithError": "Failed to start local terminal: {error}",
   "terminalManage": "Manage",
-  "terminalMaxSteps": "Max steps",
-  "terminalMaxStepsDesc": "Maximum execution steps in Agent auto mode. Set to 0 for unlimited; complex tasks will not be interrupted.",
-  "terminalMaxStepsLabel": "Steps (0 = unlimited)",
-  "terminalMaxStepsSet": "Max steps set to {value}",
-  "terminalMaxStepsTitle": "Maximum execution steps",
   "terminalModel": "Model",
   "terminalMonitor": "Monitor",
   "terminalNewConnection": "New connection",
@@ -922,13 +907,6 @@
     "placeholders": {
       "error": {
         "type": "String"
-      }
-    }
-  },
-  "@terminalMaxStepsSet": {
-    "placeholders": {
-      "value": {
-        "type": "int"
       }
     }
   },

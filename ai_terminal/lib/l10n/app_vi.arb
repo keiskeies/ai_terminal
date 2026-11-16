@@ -91,10 +91,6 @@
   "auditLogSearchHint": "Search command, server, output...",
   "auditLogTitle": "Audit Log",
   "authMethod": "Phương thức xác thực",
-  "builtinPromptDesc": "Prompt hệ thống AI cốt lõi, có hiệu lực ngay. Trình giữ chỗ 'context' sẽ được thay bằng thông tin máy chủ.",
-  "builtinPromptSaved": "Đã lưu prompt tích hợp",
-  "builtinPromptTitle": "Prompt hệ thống tích hợp",
-  "builtinPromptWarning": "⚠️ Chỉnh sửa cẩn thận, có thể đặt lại bất cứ lúc nào.",
   "cancel": "Hủy",
   "changeRecordAllTitle": "All Change Records",
   "changeRecordConfirmRollback": "Confirm Rollback",
@@ -191,9 +187,6 @@
   "connectionManagement": "Kết nối",
   "connectionSuccess": "Kết nối thành công",
   "copy": "Sao chép",
-  "customPromptDesc": "Chỉ dẫn tùy chỉnh thêm vào prompt hệ thống AI. Dùng để điều chỉnh hành vi AI, phong cách đầu ra, v.v. Để trống để bỏ qua.",
-  "customPromptSaved": "Đã lưu prompt tùy chỉnh",
-  "customPromptTitle": "Prompt AI tùy chỉnh",
   "darkMode": "Tối",
   "delete": "Xóa",
   "deleteConfirm": "Xác nhận xóa?",
@@ -288,8 +281,6 @@
   "languageDialogTitle": "Select Language",
   "languageFollowSystem": "Follow System",
   "lightMode": "Sáng",
-  "menuItemBuiltinPrompt": "Prompt tích hợp",
-  "menuItemCustomPrompt": "Prompt tùy chỉnh",
   "messageSaveFailed": "Lưu tin nhắn thất bại, tác vụ chưa bắt đầu",
   "name": "Tên",
   "nickname": "Biệt danh",
@@ -493,7 +484,6 @@
   "terminalConnected": "Connected",
   "terminalConnecting": "Connecting to {host}...",
   "terminalCreateNew": "+ New",
-  "terminalCustomPromptHint": "e.g. respond in English, use concise output format, prefer Docker...",
   "terminalExitOrchestrator": "Exit orchestration mode",
   "terminalExpandAIPanel": "Expand AI panel",
   "terminalExpandMonitorPanel": "Expand monitor panel",
@@ -511,11 +501,6 @@
   "terminalLocalStartFailed": "Failed to start local terminal",
   "terminalLocalStartFailedWithError": "Failed to start local terminal: {error}",
   "terminalManage": "Manage",
-  "terminalMaxSteps": "Max steps",
-  "terminalMaxStepsDesc": "Maximum execution steps in Agent auto mode. Set to 0 for unlimited; complex tasks will not be interrupted.",
-  "terminalMaxStepsLabel": "Steps (0 = unlimited)",
-  "terminalMaxStepsSet": "Max steps set to {value}",
-  "terminalMaxStepsTitle": "Maximum execution steps",
   "terminalModel": "Model",
   "terminalMonitor": "Monitor",
   "terminalNewConnection": "New connection",
@@ -922,13 +907,6 @@
     "placeholders": {
       "error": {
         "type": "String"
-      }
-    }
-  },
-  "@terminalMaxStepsSet": {
-    "placeholders": {
-      "value": {
-        "type": "int"
       }
     }
   },

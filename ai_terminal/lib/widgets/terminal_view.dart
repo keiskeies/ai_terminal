@@ -52,6 +52,11 @@ class TerminalView extends StatefulWidget {
   /// 分屏动作（布局与会话都归页面持有）。null = 这个终端不参与分屏。
   final TerminalPaneActions? panes;
 
+  /// Ctrl+K / ⌘K 命令面板。焦点在终端里时 xterm 会先吃掉按键，
+  /// 必须在终端按键处理里抢在 keymap/keyInput 之前拦下，页面级
+  /// CallbackShortcuts 只能覆盖焦点在终端之外的场景。
+  final VoidCallback? onCommandPalette;
+
   const TerminalView({
     super.key,
     this.terminal,
@@ -65,6 +70,7 @@ class TerminalView extends StatefulWidget {
     this.keymap,
     this.blockTracker,
     this.panes,
+    this.onCommandPalette,
   });
 
   @override
@@ -441,6 +447,17 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
       return KeyEventResult.ignored;
     }
     _scheduleCaretUpdate();
+
+    // 命令面板：在 keymap 之前拦。Ctrl+K 在 readline 里是杀行尾（K），
+    // 但 app 级导航入口的优先级更高（与 paste=Ctrl+V 同一取舍）。
+    if (widget.onCommandPalette != null &&
+        event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.keyK &&
+        (HardwareKeyboard.instance.isControlPressed ||
+            HardwareKeyboard.instance.isMetaPressed)) {
+      widget.onCommandPalette!();
+      return KeyEventResult.handled;
+    }
 
     // 可重绑的动作（粘贴/搜索/命令历史/字号缩放）统一走这张表：
     // 设置页改了立刻生效，且默认表与旧的硬编码逐键等价。

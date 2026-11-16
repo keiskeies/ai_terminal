@@ -91,10 +91,6 @@
   "auditLogSearchHint": "Search command, server, output...",
   "auditLogTitle": "Audit Log",
   "authMethod": "Способ аутентификации",
-  "builtinPromptDesc": "Основной системный промпт AI, вступает в силу немедленно. Плейсхолдер 'context' будет заменён информацией о сервере.",
-  "builtinPromptSaved": "Встроенный промпт сохранён",
-  "builtinPromptTitle": "Встроенный системный промпт",
-  "builtinPromptWarning": "⚠️ Редактируйте осторожно, можно сбросить в любой момент.",
   "cancel": "Отмена",
   "changeRecordAllTitle": "All Change Records",
   "changeRecordConfirmRollback": "Confirm Rollback",
@@ -191,9 +187,6 @@
   "connectionManagement": "Подключения",
   "connectionSuccess": "Подключение успешно",
   "copy": "Копировать",
-  "customPromptDesc": "Пользовательские инструкции, добавляемые к системному промпту AI. Используются для настройки поведения AI, стиля вывода и т. д. Оставьте пустым, чтобы пропустить.",
-  "customPromptSaved": "Пользовательский промпт сохранён",
-  "customPromptTitle": "Пользовательский AI-промпт",
   "darkMode": "Тёмная",
   "delete": "Удалить",
   "deleteConfirm": "Подтвердить удаление?",
@@ -288,8 +281,6 @@
   "languageDialogTitle": "Select Language",
   "languageFollowSystem": "Follow System",
   "lightMode": "Светлая",
-  "menuItemBuiltinPrompt": "Встроенный промпт",
-  "menuItemCustomPrompt": "Пользовательский промпт",
   "messageSaveFailed": "Не удалось сохранить сообщение, задача не запущена",
   "name": "Имя",
   "nickname": "Псевдоним",
@@ -493,7 +484,6 @@
   "terminalConnected": "Connected",
   "terminalConnecting": "Connecting to {host}...",
   "terminalCreateNew": "+ New",
-  "terminalCustomPromptHint": "e.g. respond in English, use concise output format, prefer Docker...",
   "terminalExitOrchestrator": "Exit orchestration mode",
   "terminalExpandAIPanel": "Expand AI panel",
   "terminalExpandMonitorPanel": "Expand monitor panel",
@@ -511,11 +501,6 @@
   "terminalLocalStartFailed": "Failed to start local terminal",
   "terminalLocalStartFailedWithError": "Failed to start local terminal: {error}",
   "terminalManage": "Manage",
-  "terminalMaxSteps": "Max steps",
-  "terminalMaxStepsDesc": "Maximum execution steps in Agent auto mode. Set to 0 for unlimited; complex tasks will not be interrupted.",
-  "terminalMaxStepsLabel": "Steps (0 = unlimited)",
-  "terminalMaxStepsSet": "Max steps set to {value}",
-  "terminalMaxStepsTitle": "Maximum execution steps",
   "terminalModel": "Model",
   "terminalMonitor": "Monitor",
   "terminalNewConnection": "New connection",
@@ -922,13 +907,6 @@
     "placeholders": {
       "error": {
         "type": "String"
-      }
-    }
-  },
-  "@terminalMaxStepsSet": {
-    "placeholders": {
-      "value": {
-        "type": "int"
       }
     }
   },

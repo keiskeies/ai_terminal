@@ -91,10 +91,6 @@
   "auditLogSearchHint": "Search command, server, output...",
   "auditLogTitle": "Audit Log",
   "authMethod": "Método de autenticación",
-  "builtinPromptDesc": "Prompt central del sistema de IA, surte efecto inmediatamente. El marcador 'context' se reemplazará con la información del servidor.",
-  "builtinPromptSaved": "Prompt integrado guardado",
-  "builtinPromptTitle": "Prompt del sistema integrado",
-  "builtinPromptWarning": "⚠️ Edite con precaución, puede restablecerlo en cualquier momento.",
   "cancel": "Cancelar",
   "changeRecordAllTitle": "All Change Records",
   "changeRecordConfirmRollback": "Confirm Rollback",
@@ -191,9 +187,6 @@
   "connectionManagement": "Conexiones",
   "connectionSuccess": "Conexión exitosa",
   "copy": "Copiar",
-  "customPromptDesc": "Instrucciones personalizadas que se añaden al prompt del sistema de IA. Sirven para ajustar el comportamiento de la IA, el estilo de salida, etc. Déjelo vacío para omitir.",
-  "customPromptSaved": "Prompt personalizado guardado",
-  "customPromptTitle": "Prompt de IA personalizado",
   "darkMode": "Oscuro",
   "delete": "Eliminar",
   "deleteConfirm": "¿Confirmar eliminación?",
@@ -288,8 +281,6 @@
   "languageDialogTitle": "Select Language",
   "languageFollowSystem": "Follow System",
   "lightMode": "Claro",
-  "menuItemBuiltinPrompt": "Prompt integrado",
-  "menuItemCustomPrompt": "Prompt personalizado",
   "messageSaveFailed": "Error al guardar el mensaje, tarea no iniciada",
   "name": "Nombre",
   "nickname": "Apodo",
@@ -493,7 +484,6 @@
   "terminalConnected": "Connected",
   "terminalConnecting": "Connecting to {host}...",
   "terminalCreateNew": "+ New",
-  "terminalCustomPromptHint": "e.g. respond in English, use concise output format, prefer Docker...",
   "terminalExitOrchestrator": "Exit orchestration mode",
   "terminalExpandAIPanel": "Expand AI panel",
   "terminalExpandMonitorPanel": "Expand monitor panel",
@@ -511,11 +501,6 @@
   "terminalLocalStartFailed": "Failed to start local terminal",
   "terminalLocalStartFailedWithError": "Failed to start local terminal: {error}",
   "terminalManage": "Manage",
-  "terminalMaxSteps": "Max steps",
-  "terminalMaxStepsDesc": "Maximum execution steps in Agent auto mode. Set to 0 for unlimited; complex tasks will not be interrupted.",
-  "terminalMaxStepsLabel": "Steps (0 = unlimited)",
-  "terminalMaxStepsSet": "Max steps set to {value}",
-  "terminalMaxStepsTitle": "Maximum execution steps",
   "terminalModel": "Model",
   "terminalMonitor": "Monitor",
   "terminalNewConnection": "New connection",
@@ -922,13 +907,6 @@
     "placeholders": {
       "error": {
         "type": "String"
-      }
-    }
-  },
-  "@terminalMaxStepsSet": {
-    "placeholders": {
-      "value": {
-        "type": "int"
       }
     }
   },

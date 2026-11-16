@@ -91,10 +91,6 @@
   "auditLogSearchHint": "Search command, server, output...",
   "auditLogTitle": "Audit Log",
   "authMethod": "प्रमाणीकरण विधि",
-  "builtinPromptDesc": "मुख्य एआई सिस्टम प्रॉम्प्ट, तुरंत लागू होता है। प्लेसहोल्डर 'context' को सर्वर जानकारी से बदल दिया जाएगा।",
-  "builtinPromptSaved": "अंतर्निहित प्रॉम्प्ट सहेजा गया",
-  "builtinPromptTitle": "अंतर्निहित सिस्टम प्रॉम्प्ट",
-  "builtinPromptWarning": "⚠️ सावधानी से संपादित करें, कभी भी रीसेट कर सकते हैं।",
   "cancel": "रद्द करें",
   "changeRecordAllTitle": "All Change Records",
   "changeRecordConfirmRollback": "Confirm Rollback",
@@ -191,9 +187,6 @@
   "connectionManagement": "कनेक्शन",
   "connectionSuccess": "कनेक्शन सफल",
   "copy": "कॉपी",
-  "customPromptDesc": "एआई सिस्टम प्रॉम्प्ट में जोड़ी गई कस्टम निर्देश। एआई व्यवहार, आउटपुट शैली आदि समायोजित करने के लिए उपयोग की जाती हैं। छोड़ने के लिए खाली छोड़ें।",
-  "customPromptSaved": "कस्टम प्रॉम्प्ट सहेजा गया",
-  "customPromptTitle": "कस्टम एआई प्रॉम्प्ट",
   "darkMode": "डार्क",
   "delete": "हटाएं",
   "deleteConfirm": "हटाने की पुष्टि करें?",
@@ -288,8 +281,6 @@
   "languageDialogTitle": "Select Language",
   "languageFollowSystem": "Follow System",
   "lightMode": "लाइट",
-  "menuItemBuiltinPrompt": "अंतर्निहित प्रॉम्प्ट",
-  "menuItemCustomPrompt": "कस्टम प्रॉम्प्ट",
   "messageSaveFailed": "संदेश सहेजना विफल, कार्य शुरू नहीं हुआ",
   "name": "नाम",
   "nickname": "उपनाम",
@@ -493,7 +484,6 @@
   "terminalConnected": "Connected",
   "terminalConnecting": "Connecting to {host}...",
   "terminalCreateNew": "+ New",
-  "terminalCustomPromptHint": "e.g. respond in English, use concise output format, prefer Docker...",
   "terminalExitOrchestrator": "Exit orchestration mode",
   "terminalExpandAIPanel": "Expand AI panel",
   "terminalExpandMonitorPanel": "Expand monitor panel",
@@ -511,11 +501,6 @@
   "terminalLocalStartFailed": "Failed to start local terminal",
   "terminalLocalStartFailedWithError": "Failed to start local terminal: {error}",
   "terminalManage": "Manage",
-  "terminalMaxSteps": "Max steps",
-  "terminalMaxStepsDesc": "Maximum execution steps in Agent auto mode. Set to 0 for unlimited; complex tasks will not be interrupted.",
-  "terminalMaxStepsLabel": "Steps (0 = unlimited)",
-  "terminalMaxStepsSet": "Max steps set to {value}",
-  "terminalMaxStepsTitle": "Maximum execution steps",
   "terminalModel": "Model",
   "terminalMonitor": "Monitor",
   "terminalNewConnection": "New connection",
@@ -922,13 +907,6 @@
     "placeholders": {
       "error": {
         "type": "String"
-      }
-    }
-  },
-  "@terminalMaxStepsSet": {
-    "placeholders": {
-      "value": {
-        "type": "int"
       }
     }
   },

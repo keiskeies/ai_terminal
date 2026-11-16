@@ -91,10 +91,6 @@
   "auditLogSearchHint": "Search command, server, output...",
   "auditLogTitle": "Audit Log",
   "authMethod": "วิธียืนยันตัวตน",
-  "builtinPromptDesc": "พร้อมต์ระบบ AI หลัก มีผลทันที ตัวยึดตำแหน่ง 'context' จะถูกแทนที่ด้วยข้อมูลเซิร์ฟเวอร์",
-  "builtinPromptSaved": "บันทึกพร้อมต์ในตัวแล้ว",
-  "builtinPromptTitle": "พร้อมต์ระบบในตัว",
-  "builtinPromptWarning": "⚠️ แก้ไขด้วยความระมัดระวัง สามารถรีเซ็ตได้ทุกเมื่อ",
   "cancel": "ยกเลิก",
   "changeRecordAllTitle": "All Change Records",
   "changeRecordConfirmRollback": "Confirm Rollback",
@@ -191,9 +187,6 @@
   "connectionManagement": "การเชื่อมต่อ",
   "connectionSuccess": "เชื่อมต่อสำเร็จ",
   "copy": "คัดลอก",
-  "customPromptDesc": "คำสั่งแบบกำหนดเองที่เพิ่มต่อท้ายพร้อมต์ระบบ AI ใช้เพื่อปรับพฤติกรรม AI สไตล์เอาต์พุต ฯลฯ เว้นว่างไว้เพื่อข้าม",
-  "customPromptSaved": "บันทึกพร้อมต์แบบกำหนดเองแล้ว",
-  "customPromptTitle": "พร้อมต์ AI แบบกำหนดเอง",
   "darkMode": "มืด",
   "delete": "ลบ",
   "deleteConfirm": "ยืนยันการลบ?",
@@ -288,8 +281,6 @@
   "languageDialogTitle": "Select Language",
   "languageFollowSystem": "Follow System",
   "lightMode": "สว่าง",
-  "menuItemBuiltinPrompt": "พร้อมต์ในตัว",
-  "menuItemCustomPrompt": "พร้อมต์แบบกำหนดเอง",
   "messageSaveFailed": "บันทึกข้อความล้มเหลว งานยังไม่เริ่ม",
   "name": "ชื่อ",
   "nickname": "ชื่อเล่น",
@@ -493,7 +484,6 @@
   "terminalConnected": "Connected",
   "terminalConnecting": "Connecting to {host}...",
   "terminalCreateNew": "+ New",
-  "terminalCustomPromptHint": "e.g. respond in English, use concise output format, prefer Docker...",
   "terminalExitOrchestrator": "Exit orchestration mode",
   "terminalExpandAIPanel": "Expand AI panel",
   "terminalExpandMonitorPanel": "Expand monitor panel",
@@ -511,11 +501,6 @@
   "terminalLocalStartFailed": "Failed to start local terminal",
   "terminalLocalStartFailedWithError": "Failed to start local terminal: {error}",
   "terminalManage": "Manage",
-  "terminalMaxSteps": "Max steps",
-  "terminalMaxStepsDesc": "Maximum execution steps in Agent auto mode. Set to 0 for unlimited; complex tasks will not be interrupted.",
-  "terminalMaxStepsLabel": "Steps (0 = unlimited)",
-  "terminalMaxStepsSet": "Max steps set to {value}",
-  "terminalMaxStepsTitle": "Maximum execution steps",
   "terminalModel": "Model",
   "terminalMonitor": "Monitor",
   "terminalNewConnection": "New connection",
@@ -922,13 +907,6 @@
     "placeholders": {
       "error": {
         "type": "String"
-      }
-    }
-  },
-  "@terminalMaxStepsSet": {
-    "placeholders": {
-      "value": {
-        "type": "int"
       }
     }
   },

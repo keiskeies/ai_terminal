@@ -232,24 +232,16 @@ class AgentUiText {
       zh ? '本地文件访问' : 'Local file access';
   String get localFileEnable =>
       zh ? '允许 Agent 读写本机文件' : 'Let the agent read and write local files';
-  String get localFileEnableDesc => zh
-      ? '开启后，Agent 可使用 local_file_read / local_file_write 等工具操作这台电脑上的文件。'
-          'SSH 会话里的 local_exec 也使用这份目录授权。'
-          '未添加授权目录时，任何本机文件或本机命令操作都会被拒绝。'
-      : 'When enabled, the agent can use local_file_read / local_file_write and friends on this computer. '
-          'local_exec in SSH sessions also uses this folder authorization. '
-          'With no authorized folders, every local file or local command operation is refused.';
   String get localFileDirs => zh ? '授权目录' : 'Authorized folders';
   String get localFileAddDir => zh ? '添加目录' : 'Add folder';
   String get localFileRemoveDir => zh ? '移除该目录' : 'Remove this folder';
   String get localFilePickTitle =>
       zh ? '选择允许 Agent 访问的目录' : 'Choose a folder the agent may access';
   String get localFileNoDirs =>
-      zh ? '尚未授权任何目录' : 'No folders authorized yet';
+      zh ? '还没有授权目录' : 'No folder yet';
   String get localFileBlacklistHint => zh
-      ? '注意：即使目录已授权，密钥与凭据类文件（~/.ssh、*.key、*.pem、.env 等）仍被禁止访问。'
-      : 'Note: even inside an authorized folder, key and credential files '
-          '(~/.ssh, *.key, *.pem, .env, …) stay off limits.';
+      ? '密钥与凭据文件（~/.ssh、*.key、*.pem、.env）始终不可访问'
+      : 'Key and credential files (~/.ssh, *.key, *.pem, .env) stay off limits';
 
   // ── 回收区（local_file_delete 的副本）──
   String localFileTrashLabel(int count, String size) => zh
