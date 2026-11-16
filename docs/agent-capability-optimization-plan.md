@@ -1,7 +1,7 @@
 # Agent 能力优化计划
 
 - 日期：2026-11-16（第一期完成：2026-11-17）
-- 状态：第一期已合并（WP1–WP4 + 观测截断补全），第二/三期待启动
+- 状态：三期全部完成（第一期 §4，第二期 §5，第三期 §6），未推送远端
 - 范围：`ai_terminal/` 内置 AI agent（ReAct 引擎 + 工具集 + 提示词 + 执行层）
 
 ## 0. 现状架构速览
@@ -157,7 +157,7 @@
 | | WP4 | O6 knowledge_search 工具 | S |
 | **第二期（已完成，§5）** | WP5 | O3 交互输入桥接 | L |
 | | WP6 | O4 计划跟踪门控 | M |
-| 第三期 | WP7 | O7 token 化压缩 | M |
+| **第三期（已完成，§6）** | WP7 | O7 token 化压缩 | M |
 | | WP8 | O8 FC-first 协议重构 | L |
 
 ### 2.2 文件归属与冲突矩阵（第一期）
@@ -240,3 +240,23 @@ WP5/WP6 由两个并行 worktree 子 agent 开发，按 WP6→WP5 顺序合并�
 **验证**：主线 `flutter analyze` 43 issue 全为基线既有（0 error）；`flutter test` **1547 通过 / 25 跳过 / 0 失败**。GitNexus 不可用，以 grep 调用方 + diff 复核 + 不变量检查替代 impact/detect_changes。
 
 **待办**：WP3/WP5 UI（运行中补充输入、交互应答弹窗、终端按键门控、自动应答开关）需人工冒烟；第三期（WP7 token 压缩 / WP8 FC-first）按 §2.1 启动；未推送远端。
+
+## 6. 第三期完成记录（2026-11-17）
+
+按用户要求改为**主工作区直接顺序实现**（不派 worktree 子 agent）：先 WP7 后 WP8，各自独立提交。
+
+| WP | 提交 | 新增测试 | 备注 |
+|---|---|---|---|
+| WP7 | 60fc7ca | 20 | 压缩阈值 token 化（16000 token 取代 30000 字符，轮次 20 / 保留 6 轮不变）；逐条 JSON 摘要改为**滚动整体摘要**（纯文本【关键事实】+【对话进展】两段，≤1200 字、4000 字硬上限，主机环境/用户约束/路径逐字保留）；`ConvMessage.rolledUp` + `Conversation.rollingSummary`（与聊天模式 summary 分离），schema v9 迁移；`buildAiHistory()` 统一 restore/compact 两路；兼容旧逐条摘要；await 后 R1 身份校验（`identical`）；无 DB 时持久化失败按 R8 暴露到 state.error |
+| WP8 | d48f5a0 | 14 | `chatStream` 新增 `onToolCalls` 结构化回调（三处 finalize 兜底共用投递入口，不重复；Qwen 透传、Ernie 仅满足契约）；schema 增加 execute（含 description）/finish（含四段操作单字段）/ask（选项必填）动作工具；`agentFcRule` + `buildToolsPrompt(fcMode)`：正文只写思考与计划块（保留 WP6 文本计划约定），含降级兼容条款；引擎 FC 事件合并走 stableId 去重（`_stableId` 公开），第一个 execute 定型即提前执行，FC 模式禁用文本流提前命令检测、丢弃正文围栏解析出的 command/ask（思考示例不执行）；`_stepFromFcCalls` 直接构造动作，动作按文本协议记入历史；纯文本响应自动落回文本解析，非 FC 模型行为不变 |
+
+**偏离与决策**：
+- O8 原方案"分阶段删除解析兜底"**未执行删除**：文本协议解析保留为弱模型 / fallback 模型的正式降级路径（FC 模型回纯文本、主模型故障切非 FC 备用模型都依赖它），只消除了 FC 路径上的「JSON→文本→再解析」往返。
+- ask 的 options 在 schema 中设为必填：引擎 ask 流程是按钮选择制（空选项会被 `_handleAskAction` 视为 finish），开放式问题也要求给出回答方向选项，避免引入新的自由文本问答 UX。
+- finish 工具用 conclusion/status/changes/suggestion 四字段对齐文本协议操作单，而非单一 summary，保证 report 解析链路不变。
+- 门控注入文案（幻觉门控/计划门控）去掉 `动作: execute` 等协议行引用，FC/文本两种模式通用。
+- R9 契约变更同步：`AIProvider` 全部 17 个实现者（3 生产 + 14 测试 fake）签名补齐；`fc_first_e2e_test` 覆盖组装后链路——引擎层 11 例 + provider 层真实 loopback SSE 3 例（跨包 arguments 拼接、旧文本投递回归、无 [DONE] 不重复投递；测试内临时恢复真实 HttpClient 绕过 binding 的 400 mock）。
+
+**验证**：主线 `flutter analyze` 43 issue 全为基线既有（0 error）；`flutter test` **1581 通过 / 25 跳过 / 0 失败**（二期 1547 → WP7 +20 → WP8 +14）。GitNexus 不可用，以调用方全量 grep + diff 审查替代 impact/detect_changes。
+
+**待办**：WP3/WP5 UI 冒烟仍未做；WP7/WP8 无 UI 改动，但 FC 路径需真实 FC 模型联调验证（测试为脚本化 provider + 本地 SSE）；全部提交未推送远端。
