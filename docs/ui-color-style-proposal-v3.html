@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Terminal · 总体配色与功能板块样式建议 v3</title>
+<style>
+  /* 本页为会话内联可视化的独立存档：补齐原先由聊天宿主注入的主题变量。
+     mockup 自身的配色令牌定义在 #atdp .shell 内，与此处无关。 */
+  :root{
+    --seed-fg:#F1F3F1;
+    --seed-muted:#858D88;
+    --seed-primary:#45C8C3;
+    --font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    --font-code:"JetBrains Mono",Consolas,"Courier New",monospace;
+    --border-standard:rgba(255,255,255,.12);
+    --border-subtle:rgba(255,255,255,.07);
+    --fill-1:#131616;
+    --fill-2:#1C2020;
+    --fill-3:#292C2C;
+    --inset-bg:#0D1010;
+  }
+  html,body{margin:0;padding:0;background:#0B0E0E;color:var(--seed-fg);}
+  body{padding:24px 28px 48px;}
+</style>
+</head>
+<body>
+<div id="atdp">
+<style>
+  #atdp{color:var(--seed-fg);font-family:var(--font-sans);font-size:13px;line-height:1.6;}
+  #atdp *{box-sizing:border-box;}
+  #atdp h1{font-size:13px;font-weight:500;margin:0;}
+  #atdp h2{font-size:13px;font-weight:500;margin:0;}
+  #atdp p{margin:0;}
+  #atdp .atdp-sub{color:var(--seed-muted);font-size:12px;margin-top:2px;}
+  #atdp section{margin-top:26px;}
+  #atdp .atdp-h2{display:flex;align-items:baseline;gap:8px;margin-bottom:4px;}
+  #atdp .atdp-num{color:var(--seed-primary);font-weight:500;font-size:12px;}
+  #atdp .atdp-lede{color:var(--seed-muted);font-size:12px;margin-bottom:12px;max-width:78ch;}
+  #atdp .atdp-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0;}
+  #atdp .atdp-palrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0 2px;}
+  #atdp .atdp-pal-label{font-size:12px;color:var(--seed-muted);min-width:96px;}
+  #atdp .atdp-chip{display:inline-flex;flex-direction:column;justify-content:flex-end;min-width:74px;height:44px;border-radius:8px;padding:5px 7px;border:1px solid var(--border-subtle);font-size:11px;line-height:1.35;}
+  #atdp .atdp-chip b{font-weight:500;}
+  #atdp .atdp-note{font-size:12px;color:var(--seed-muted);margin-top:8px;}
+  #atdp .atdp-conflict{margin-top:12px;border-radius:10px;background:#090C0C;border:1px solid rgba(255,255,255,.12);padding:12px;display:flex;flex-direction:column;gap:10px;}
+  #atdp .atdp-conflict-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  #atdp .atdp-conflict-tag{font-size:11px;color:#858D88;min-width:44px;}
+  #atdp .atdp-fake-input{flex:1;min-width:150px;max-width:280px;height:32px;border-radius:8px;background:#292C2C;display:flex;align-items:center;padding:0 10px;font-size:12px;color:#7A827C;}
+  #atdp .atdp-fake-btn{height:32px;border-radius:8px;background:#45C8C3;color:#090C0C;display:inline-flex;align-items:center;padding:0 12px;font-size:12px;font-weight:500;}
+  #atdp .atdp-ladder{display:flex;flex-wrap:wrap;gap:4px;margin:6px 0 4px;}
+  #atdp .atdp-rung{flex:1 1 86px;min-width:86px;height:48px;border-radius:8px;border:1px solid var(--border-subtle);padding:5px 7px;font-size:11px;line-height:1.35;display:flex;flex-direction:column;justify-content:flex-end;}
+  #atdp .atdp-rung b{font-weight:500;}
+  #atdp .atdp-roles{display:flex;flex-wrap:wrap;gap:8px 16px;margin:10px 0;}
+  #atdp .atdp-role{display:inline-flex;align-items:center;gap:6px;font-size:12px;}
+  #atdp .atdp-dot{width:9px;height:9px;border-radius:50%;flex:none;}
+  #atdp table{width:100%;border-collapse:collapse;font-size:12px;}
+  #atdp th{font-weight:500;color:var(--seed-muted);text-align:left;padding:6px 8px;border-bottom:1px solid var(--border-standard);}
+  #atdp td{padding:6px 8px;border-bottom:1px solid var(--border-subtle);vertical-align:middle;}
+  #atdp .atdp-sw{display:inline-block;width:10px;height:10px;border-radius:3px;border:1px solid var(--border-subtle);vertical-align:-1px;margin-right:5px;}
+  #atdp code{font-family:var(--font-code);font-size:12px;}
+  #atdp .atdp-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+  #atdp .atdp-seg{display:inline-flex;border:1px solid var(--border-standard);border-radius:8px;overflow:hidden;}
+  #atdp .atdp-seg button{border:0;background:transparent;color:var(--seed-muted);font:inherit;font-size:12px;padding:6px 12px;min-height:32px;cursor:pointer;}
+  #atdp .atdp-seg button[aria-pressed="true"]{background:var(--fill-2);color:var(--seed-fg);font-weight:500;}
+  #atdp .atdp-focusbtn{border:1px solid var(--border-standard);background:transparent;color:var(--seed-muted);font:inherit;font-size:12px;border-radius:8px;padding:6px 12px;min-height:32px;cursor:pointer;}
+  #atdp .atdp-focusbtn[aria-pressed="true"]{background:var(--fill-2);color:var(--seed-fg);font-weight:500;}
+  #atdp .atdp-status{font-size:12px;color:var(--seed-muted);}
+  #atdp .atdp-hint{font-size:12px;color:var(--seed-muted);}
+  #atdp kbd{font-family:var(--font-code);font-size:11px;border:1px solid var(--border-standard);border-bottom-width:2px;border-radius:5px;padding:0 5px;background:var(--fill-1);}
+
+  /* 宽度账本 */
+  #atdp .ledger{margin:0 0 12px;display:flex;flex-direction:column;gap:6px;}
+  #atdp .ledger-row{display:flex;align-items:center;gap:10px;font-size:12px;}
+  #atdp .ledger-label{min-width:172px;color:var(--seed-muted);}
+  #atdp .ledger-track{flex:1;height:16px;border-radius:5px;background:var(--inset-bg);overflow:hidden;}
+  #atdp .ledger-bar{display:block;height:100%;border-radius:5px;}
+  #atdp .ledger-val{min-width:128px;text-align:right;font-family:var(--font-code);font-size:11px;}
+  #atdp .ledger-live{font-size:12px;color:var(--seed-muted);margin-top:2px;}
+  #atdp .ledger-live b{color:var(--seed-fg);font-weight:500;font-family:var(--font-code);}
+
+  /* ===== 产品 mockup：石墨青 v2（无左侧栏） ===== */
+  #atdp .shell{position:relative;--m-bg:#090C0C;--m-card:#131616;--m-elev:#1C2020;--m-surface:#292C2C;
+    --m-border:rgba(255,255,255,.12);--m-border-h:rgba(255,255,255,.22);--m-hairline:rgba(255,255,255,.07);
+    --m-text:#F1F3F1;--m-body:#B8BEBA;--m-sub:#858D88;--m-muted:#7A827C;
+    --m-brand:#45C8C3;--m-brand-h:#6ADDD8;--m-brand-bg:rgba(69,200,195,.10);--m-on-brand:#090C0C;
+    --m-gold:#E0AF63;--m-ok:#6FD39A;--m-warn:#F09A5C;--m-err:#F07C86;
+    --m-ok-bg:rgba(111,211,154,.10);--m-warn-bg:rgba(240,154,92,.10);--m-err-bg:rgba(240,124,134,.10);--m-gold-bg:rgba(224,175,99,.10);
+    --m-ub:#0E1D1A;--m-ub-border:#1E3A34;
+    --t-bg:#040707;--t-fg:#E6ECE8;--t-red:#F07C86;--t-green:#6FD39A;--t-yellow:#F09A5C;--t-blue:#6AA9FF;--t-magenta:#D98AD9;--t-cyan:#45C8C3;
+    background:var(--m-bg);color:var(--m-text);border:1px solid var(--m-border);border-radius:12px;overflow:hidden;font-size:12px;}
+  #atdp .shell :where(button){font:inherit;color:inherit;}
+  #atdp .topbar{height:42px;display:flex;align-items:center;gap:4px;padding:0 8px;border-bottom:1px solid var(--m-border);background:var(--m-bg);}
+  #atdp .tabs{display:flex;gap:4px;flex:0 1 auto;min-width:0;overflow:hidden;}
+  #atdp .tab{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 10px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--m-sub);font-size:12px;cursor:pointer;white-space:nowrap;}
+  #atdp .tab[aria-pressed="true"]{background:var(--m-card);border-color:var(--m-border);color:var(--m-text);}
+  #atdp .tab-add{width:32px;height:32px;border-radius:8px;border:1px dashed var(--m-border);background:transparent;color:var(--m-sub);cursor:pointer;flex:none;}
+  #atdp .tab-add:disabled{opacity:.35;cursor:default;}
+  #atdp .top-spacer{flex:1;min-width:4px;}
+  #atdp .top-act{height:32px;min-width:32px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--m-sub);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:5px;flex:none;padding:0 6px;}
+  #atdp .top-act[aria-pressed="true"]{color:var(--m-brand);background:var(--m-brand-bg);border-color:var(--m-border);}
+  #atdp .pal-btn{border-color:var(--m-border);color:var(--m-sub);font-size:11px;padding:0 9px;}
+  #atdp .pal-btn:hover{color:var(--m-text);border-color:var(--m-border-h);}
+  #atdp .pal-btn kbd{border-color:var(--m-border);background:var(--m-surface);color:var(--m-muted);font-size:11px;}
+  #atdp .shell-body{display:grid;grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"center ai";align-items:stretch;}
+  #atdp .center{grid-area:center;min-width:0;background:var(--m-card);display:flex;flex-direction:column;}
+  #atdp .view{display:flex;flex-direction:column;flex:1;min-height:380px;}
+  #atdp .ai-panel{grid-area:ai;}
+  #atdp .sftp-panel{grid-area:sftp;}
+  #atdp .shell.m-bottom .shell-body{grid-template-columns:minmax(0,1fr);grid-template-areas:"center" "ai";}
+  #atdp .shell.m-bottom .view{min-height:300px;}
+  #atdp .shell.m-overlay .shell-body{grid-template-columns:minmax(0,1fr);grid-template-areas:"center";}
+  #atdp .shell.m-overlay .view{min-height:470px;}
+  #atdp .shell.ai-off.m-right .shell-body{grid-template-columns:minmax(0,1fr);grid-template-areas:"center";}
+  #atdp .shell.ai-off .ai-panel{display:none;}
+  #atdp .shell:not(.sftp-on) .sftp-panel{display:none;}
+  /* SFTP 与 AI 正交：AI 右 → SFTP 下；AI 下 / 悬浮 / 关闭 → SFTP 右。 */
+  #atdp .shell.sftp-on.sftp-right .shell-body{grid-template-columns:minmax(0,1fr) 300px;grid-template-areas:"center sftp";}
+  #atdp .shell.sftp-on.sftp-right.m-bottom .shell-body{grid-template-areas:"center sftp" "ai sftp";}
+  #atdp .shell.sftp-on.sftp-bottom .shell-body{grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"center ai" "sftp ai";}
+  #atdp .shell.sftp-on.sftp-bottom .view{min-height:300px;}
+  #atdp .shell.sftp-on.sftp-bottom .sftp-panel{border-left:0;border-top:1px solid var(--m-border);}
+  #atdp .shell.focus .shell-body{grid-template-columns:minmax(0,1fr);grid-template-areas:"center";}
+  #atdp .shell.focus .ai-panel,#atdp .shell.focus .sftp-panel{display:none;}
+  #atdp .shell.focus .monitor{display:none;}
+
+  /* 终端 */
+  #atdp .term{flex:1;background:var(--t-bg);color:var(--t-fg);font-family:var(--font-code);font-size:12px;line-height:1.7;padding:10px 12px;}
+  #atdp .term .ln{white-space:pre-wrap;word-break:break-all;}
+  #atdp .t-green{color:var(--t-green);}#atdp .t-blue{color:var(--t-blue);}#atdp .t-yellow{color:var(--t-yellow);}
+  #atdp .t-red{color:var(--t-red);}#atdp .t-cyan{color:var(--t-cyan);}#atdp .t-magenta{color:var(--t-magenta);}
+  #atdp .t-dim{opacity:.55;}
+  #atdp .cursor{display:inline-block;width:7px;height:14px;background:var(--t-cyan);vertical-align:-2px;animation:atdp-blink 1.1s steps(1) infinite;}
+  @keyframes atdp-blink{50%{opacity:0;}}
+  #atdp .monitor{display:flex;gap:14px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid var(--m-border);background:var(--m-card);font-size:11px;color:var(--m-sub);}
+  #atdp .monitor[hidden]{display:none;}
+  #atdp .mon{display:flex;align-items:center;gap:6px;}
+  #atdp .mon b{color:var(--m-gold);font-weight:500;font-family:var(--font-code);}
+  #atdp .bar{width:52px;height:4px;border-radius:2px;background:var(--m-surface);overflow:hidden;}
+  #atdp .bar i{display:block;height:100%;background:var(--m-gold);border-radius:2px;}
+
+  /* AI 面板：右 / 底 / 悬浮 */
+  #atdp .ai-panel{border-left:1px solid var(--m-border);background:var(--m-elev);display:flex;flex-direction:column;min-width:0;}
+  #atdp .shell.m-bottom .ai-panel{border-left:0;border-top:1px solid var(--m-border);}
+  #atdp .shell.m-bottom .acard,#atdp .shell.m-bottom .meta{display:none;}
+  #atdp .shell.m-bottom .ai-body{gap:6px;padding:8px 12px;}
+  #atdp .shell.m-overlay .ai-panel{position:absolute;top:52px;right:10px;width:min(320px,88%);border:1px solid var(--m-border);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.35);z-index:10;}
+  #atdp .ai-head{display:flex;align-items:center;gap:7px;padding:10px 12px;border-bottom:1px solid var(--m-hairline);}
+  #atdp .ai-head .t{font-size:12px;font-weight:500;}
+  #atdp .model-chip{font-size:11px;color:var(--m-sub);border:1px solid var(--m-border);border-radius:999px;padding:1px 8px;}
+  #atdp .demo-chip{font-size:11px;color:var(--m-gold);background:var(--m-gold-bg);border-radius:999px;padding:1px 8px;margin-left:auto;}
+  #atdp .ai-body{padding:10px 12px;display:flex;flex-direction:column;gap:10px;flex:1;}
+  #atdp .ububble{background:var(--m-ub);border:1px solid var(--m-ub-border);border-radius:10px;padding:8px 10px;font-size:12px;color:var(--m-text);}
+  #atdp .role{font-size:11px;font-weight:500;color:var(--m-brand);margin-bottom:3px;}
+  #atdp .agent-text{font-size:12px;color:var(--m-body);}
+  #atdp .acard{border:1px solid var(--m-border);border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:6px;background:transparent;}
+  #atdp .acard-head{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--m-sub);}
+  #atdp .acard-head .sp{flex:1;}
+  #atdp .cmdline{font-family:var(--font-code);font-size:11px;color:var(--m-text);word-break:break-all;}
+  #atdp .exit-chip{font-size:11px;font-family:var(--font-code);color:var(--m-ok);background:var(--m-ok-bg);border-radius:6px;padding:1px 7px;}
+  #atdp .meta{font-size:11px;color:var(--m-muted);}
+  #atdp .meta b{color:var(--m-gold);font-weight:500;}
+  /* AI 底栏：保持现有功能排 + 输入框内权限 / 模型+思考胶囊（与现行 UI 一致）。 */
+  #atdp .ai-footer{border-top:1px solid var(--m-hairline);padding:8px 10px 10px;display:flex;flex-direction:column;gap:8px;}
+  #atdp .ai-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  #atdp .tool-btn{width:30px;height:30px;padding:0;justify-content:center;border-radius:8px;border:1px solid transparent;background:var(--m-surface);color:var(--m-sub);cursor:pointer;display:inline-flex;align-items:center;gap:4px;}
+  #atdp .tool-btn:hover{color:var(--m-text);border-color:var(--m-border);}
+  #atdp .tool-btn[aria-pressed="true"]{color:var(--m-warn);background:var(--m-warn-bg);border-color:var(--m-warn);}
+  #atdp .mode-capsule{height:30px;border-radius:999px;border:1px solid var(--m-border);background:var(--m-brand-bg);color:var(--m-brand);padding:0 10px;font-size:12px;font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:5px;}
+  #atdp .ai-compose{border:1px solid var(--m-border);border-radius:10px;background:var(--m-card);overflow:hidden;}
+  #atdp .ai-compose:focus-within{border-color:var(--m-brand);box-shadow:0 0 0 1px var(--m-brand);}
+  #atdp .ai-compose textarea{display:block;width:100%;min-height:52px;resize:vertical;border:0;background:transparent;color:var(--m-text);padding:10px 12px 3px;font:inherit;font-size:12px;line-height:1.5;}
+  #atdp .ai-compose textarea::placeholder{color:var(--m-muted);}
+  #atdp .ai-compose textarea:focus{outline:none;}
+  #atdp .ai-compose-bar{display:flex;align-items:center;gap:6px;padding:5px 8px 8px 10px;flex-wrap:wrap;}
+  #atdp .cap-wrap{display:inline-flex;align-items:center;gap:5px;height:30px;border:1px solid var(--m-brand);border-radius:999px;padding:0 10px;color:var(--m-brand);flex:none;}
+  #atdp .cap-wrap select{border:0;background:transparent;color:inherit;font:inherit;font-size:12px;height:22px;padding:0;max-width:170px;cursor:pointer;}
+  #atdp .cap-wrap select:focus{outline:none;}
+  #atdp .cap-wrap option{color:var(--m-text);background:var(--m-elev);}
+  #atdp .model-wrap{color:var(--m-body);border-color:var(--m-border);}
+  #atdp .compose-spacer{flex:1;min-width:2px;}
+  #atdp .send{width:34px;height:34px;border-radius:50%;border:0;background:var(--m-brand);color:var(--m-on-brand);cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;}
+  #atdp .send:hover{background:var(--m-brand-h);}
+  #atdp .shell.orch .ai-compose{border-color:var(--m-warn);}
+  #atdp .shell.orch .send{background:var(--m-warn);}
+  #atdp .sftp-panel{border-left:1px solid var(--m-border);background:var(--m-elev);display:flex;flex-direction:column;min-width:0;min-height:170px;}
+  #atdp .sftp-head{display:flex;align-items:center;gap:4px;padding:7px 8px;border-bottom:1px solid var(--m-hairline);flex-wrap:wrap;}
+  #atdp .sftp-title{font-size:12px;font-weight:500;color:var(--m-brand);}
+  #atdp .sftp-host{font-size:11px;color:var(--m-sub);border:1px solid var(--m-border);border-radius:999px;padding:0 6px;}
+  #atdp .sftp-act{height:26px;min-width:26px;border-radius:7px;border:1px solid transparent;background:var(--m-surface);color:var(--m-sub);padding:0 6px;font-size:11px;cursor:pointer;}
+  #atdp .sftp-act:hover{color:var(--m-text);border-color:var(--m-border);}
+  #atdp .sftp-path{display:flex;align-items:center;gap:4px;padding:5px 8px;background:var(--m-card);border-bottom:1px solid var(--m-hairline);}
+  #atdp .sftp-crumbs{flex:1;min-width:0;display:flex;align-items:center;overflow:hidden;font-family:var(--font-code);font-size:11px;white-space:nowrap;}
+  #atdp .sftp-crumb{border:0;background:transparent;color:var(--m-sub);padding:2px 1px;cursor:pointer;font:inherit;font-size:11px;}
+  #atdp .sftp-crumb:hover{color:var(--m-brand);}
+  #atdp .sftp-list{padding:5px 6px;display:flex;flex-direction:column;gap:2px;}
+  #atdp .sftp-row{display:grid;grid-template-columns:minmax(0,1fr) 58px 76px;align-items:center;gap:6px;width:100%;min-height:30px;padding:3px 6px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--m-body);cursor:pointer;text-align:left;font-size:11px;}
+  #atdp .sftp-row:hover{background:var(--m-surface);}
+  #atdp .sftp-row[aria-pressed="true"]{background:var(--m-brand-bg);border-color:var(--m-border);}
+  #atdp .sftp-name{display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #atdp .sftp-ic{color:var(--m-gold);width:14px;text-align:center;flex:none;}
+  #atdp .sftp-row.file .sftp-ic{color:var(--m-brand);}
+  #atdp .sftp-size,#atdp .sftp-mtime{font-family:var(--font-code);color:var(--m-muted);font-size:11px;text-align:right;}
+  #atdp .sftp-foot{margin-top:auto;padding:6px 9px;border-top:1px solid var(--m-hairline);color:var(--m-sub);font-size:11px;}
+  #atdp .sftp-empty{padding:16px;text-align:center;color:var(--m-muted);font-size:11px;}
+  #atdp .count-chip{font-size:11px;color:var(--m-sub);border:1px solid var(--m-border);border-radius:999px;padding:1px 8px;}
+  #atdp .steps{display:flex;flex-direction:column;gap:5px;}
+  #atdp .step{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--m-body);}
+  #atdp .step .ic{width:15px;text-align:center;flex:none;font-size:11px;}
+  #atdp .step.done .ic{color:var(--m-ok);}
+  #atdp .step.run{color:var(--m-text);}
+  #atdp .step.run .ic{color:var(--m-brand);}
+  #atdp .step.wait .ic{color:var(--m-warn);}
+  #atdp .step.fail .ic{color:var(--m-err);}
+  #atdp .step.todo{color:var(--m-muted);}
+  #atdp .pulse{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--m-brand);animation:atdp-pulse 1.4s ease-in-out infinite;}
+  @keyframes atdp-pulse{50%{opacity:.35;}}
+
+  /* 命令面板 / 网格菜单 / 抽屉（全部覆盖式，零布局占位） */
+  #atdp .scrim{position:absolute;inset:0;background:rgba(0,0,0,.38);z-index:30;}
+  #atdp .scrim[hidden]{display:none;}
+  #atdp .palette{position:absolute;top:56px;left:50%;transform:translateX(-50%);width:min(520px,92%);background:var(--m-elev);border:1px solid var(--m-border-h);border-radius:12px;box-shadow:0 16px 40px rgba(0,0,0,.4);z-index:31;overflow:hidden;animation:atdp-pop .16s ease-out;}
+  #atdp .palette[hidden]{display:none;}
+  @keyframes atdp-pop{from{opacity:0;transform:translateX(-50%) translateY(-6px);}to{opacity:1;transform:translateX(-50%) translateY(0);}}
+  #atdp .pal-input-row{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--m-hairline);}
+  #atdp .pal-input-row svg{color:var(--m-sub);flex:none;}
+  #atdp .pal-input-row input{flex:1;min-width:0;border:0;background:transparent;color:var(--m-text);font:inherit;font-size:13px;height:28px;}
+  #atdp .pal-input-row input:focus{outline:none;}
+  #atdp .pal-input-row input::placeholder{color:var(--m-muted);}
+  #atdp .pal-list{padding:6px;display:flex;flex-direction:column;gap:1px;}
+  #atdp .pal-item{display:flex;align-items:center;gap:9px;width:100%;padding:7px 9px;border-radius:8px;border:0;background:transparent;cursor:pointer;text-align:left;min-height:38px;}
+  #atdp .pal-item[aria-selected="true"]{background:var(--m-brand-bg);box-shadow:inset 2px 0 0 var(--m-brand);}
+  #atdp .pal-type{font-size:11px;color:var(--m-sub);border:1px solid var(--m-border);border-radius:5px;padding:0 5px;flex:none;min-width:32px;text-align:center;}
+  #atdp .pal-name{font-size:12px;color:var(--m-text);flex:none;}
+  #atdp .pal-sub{font-size:11px;color:var(--m-muted);font-family:var(--font-code);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0;}
+  #atdp .pal-empty{padding:16px;text-align:center;color:var(--m-muted);font-size:12px;}
+  #atdp .pal-empty[hidden]{display:none;}
+  #atdp .pal-foot{display:flex;gap:12px;padding:7px 12px;border-top:1px solid var(--m-hairline);font-size:11px;color:var(--m-muted);}
+  #atdp .menu{position:absolute;top:48px;right:8px;width:min(300px,90%);background:var(--m-elev);border:1px solid var(--m-border-h);border-radius:12px;box-shadow:0 16px 40px rgba(0,0,0,.4);z-index:31;padding:8px;animation:atdp-fade .15s ease-out;}
+  #atdp .menu[hidden]{display:none;}
+  @keyframes atdp-fade{from{opacity:0;transform:translateY(-4px);}to{opacity:1;transform:translateY(0);}}
+  #atdp .menu-group{font-size:11px;color:var(--m-muted);padding:5px 8px 3px;}
+  #atdp .menu button{display:flex;align-items:center;gap:9px;width:100%;padding:7px 9px;border-radius:8px;border:0;background:transparent;cursor:pointer;text-align:left;min-height:38px;color:var(--m-body);}
+  #atdp .menu button:hover{background:var(--m-surface);color:var(--m-text);}
+  #atdp .menu button svg{color:var(--m-sub);flex:none;}
+  #atdp .menu .mn{font-size:12px;color:var(--m-text);}
+  #atdp .menu .ms{font-size:11px;color:var(--m-muted);margin-left:auto;flex:none;}
+  #atdp .drawer{position:absolute;top:0;right:0;bottom:0;width:min(360px,94%);background:var(--m-elev);border-left:1px solid var(--m-border-h);box-shadow:-16px 0 40px rgba(0,0,0,.35);z-index:40;display:flex;flex-direction:column;animation:atdp-slide .18s ease-out;}
+  #atdp .drawer[hidden]{display:none;}
+  @keyframes atdp-slide{from{opacity:0;transform:translateX(24px);}to{opacity:1;transform:translateX(0);}}
+  #atdp .drawer-head{display:flex;align-items:center;gap:8px;padding:11px 12px;border-bottom:1px solid var(--m-hairline);}
+  #atdp .drawer-title{font-size:13px;font-weight:500;flex:1;}
+  #atdp .drawer-close{width:30px;height:30px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--m-sub);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  #atdp .drawer-close:hover{color:var(--m-text);border-color:var(--m-border);}
+  #atdp .drawer-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px;flex:1;min-height:0;}
+  #atdp .dcontent{display:flex;flex-direction:column;gap:8px;flex:1;}
+  #atdp .dcontent[hidden]{display:none;}
+  #atdp .group-head{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--m-sub);margin-top:4px;}
+  #atdp .search{height:32px;width:100%;border-radius:8px;border:1px solid var(--m-border);background:var(--m-surface);color:var(--m-text);padding:0 10px;font:inherit;font-size:12px;}
+  #atdp .search::placeholder{color:var(--m-muted);}
+  #atdp .search:focus{outline:none;border-color:var(--m-brand);box-shadow:0 0 0 1px var(--m-brand);}
+  #atdp .host-card{position:relative;display:flex;align-items:center;gap:10px;padding:9px 10px 9px 13px;border:1px solid var(--m-border);border-radius:10px;background:var(--m-card);cursor:pointer;text-align:left;width:100%;}
+  #atdp .host-card:hover{background:var(--m-surface);border-color:var(--m-border-h);}
+  #atdp .host-card[hidden]{display:none;}
+  #atdp .host-card::before{content:"";position:absolute;left:0;top:8px;bottom:8px;width:3px;border-radius:0 2px 2px 0;background:var(--bar,var(--m-brand));}
+  #atdp .avatar{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:500;flex:none;background:var(--m-brand-bg);color:var(--m-brand);}
+  #atdp .host-meta{min-width:0;flex:1;}
+  #atdp .host-name{font-size:12px;font-weight:500;color:var(--m-text);}
+  #atdp .host-ip{font-size:11px;color:var(--m-sub);font-family:var(--font-code);}
+  #atdp .host-status{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--m-sub);flex:none;}
+  #atdp .sd{width:7px;height:7px;border-radius:50%;flex:none;}
+  #atdp .chev{color:var(--m-muted);flex:none;}
+  #atdp .empty{padding:18px 0;text-align:center;color:var(--m-muted);font-size:12px;}
+  #atdp .empty[hidden]{display:none;}
+  #atdp .rowcard{border:1px solid var(--m-border);border-radius:10px;background:var(--m-card);overflow:hidden;}
+  #atdp .rowcard>button{display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;background:transparent;border:0;cursor:pointer;text-align:left;min-height:44px;}
+  #atdp .rowcard>button:hover{background:var(--m-surface);}
+  #atdp .rowcard .detail{border-top:1px solid var(--m-hairline);padding:9px 11px;display:flex;flex-direction:column;gap:6px;}
+  #atdp .rowcard .detail[hidden]{display:none;}
+  #atdp .row-title{font-size:12px;font-weight:500;color:var(--m-text);}
+  #atdp .row-sub{font-size:11px;color:var(--m-sub);}
+  #atdp .row-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;}
+  #atdp .tagchip{font-size:11px;border-radius:999px;padding:1px 8px;border:1px solid var(--m-border);color:var(--m-sub);flex:none;}
+  #atdp .stchip{display:inline-flex;align-items:center;gap:5px;font-size:11px;border-radius:999px;padding:2px 9px;flex:none;font-weight:500;}
+  #atdp .st-ok{color:var(--m-ok);background:var(--m-ok-bg);}
+  #atdp .st-warn{color:var(--m-warn);background:var(--m-warn-bg);}
+  #atdp .st-err{color:var(--m-err);background:var(--m-err-bg);}
+  #atdp .mono-block{font-family:var(--font-code);font-size:11px;background:var(--m-bg);border:1px solid var(--m-hairline);border-radius:8px;padding:7px 9px;color:var(--m-body);word-break:break-all;}
+  #atdp .theme-chips{display:flex;gap:6px;}
+  #atdp .theme-chips button{border:1px solid var(--m-border);background:var(--m-surface);color:var(--m-body);border-radius:999px;padding:4px 14px;font-size:11px;cursor:pointer;min-height:32px;}
+  #atdp .theme-chips button[aria-pressed="true"]{color:var(--m-brand);border-color:var(--m-brand);background:var(--m-brand-bg);font-weight:500;}
+  #atdp .audit-row{display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid var(--m-hairline);border-radius:8px;font-size:11px;}
+  #atdp .audit-time{color:var(--m-muted);font-family:var(--font-code);flex:none;}
+  #atdp .audit-cmd{color:var(--m-body);font-family:var(--font-code);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+  /* 规范说明 */
+  #atdp .specs{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:12px;}
+  #atdp .spec{border-top:1px solid var(--border-standard);padding-top:8px;}
+  #atdp .spec b{display:block;font-weight:500;margin-bottom:2px;}
+  #atdp .spec p{font-size:12px;color:var(--seed-muted);}
+
+  /* 终端预设 */
+  #atdp .presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;}
+  #atdp .preset{border:1px solid var(--border-standard);border-radius:10px;background:transparent;padding:10px 12px;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:7px;color:var(--seed-fg);min-height:44px;}
+  #atdp .preset:hover{background:var(--fill-1);}
+  #atdp .preset[aria-pressed="true"]{border-color:var(--seed-primary);box-shadow:0 0 0 1px var(--seed-primary);}
+  #atdp .preset .pn{font-size:12px;font-weight:500;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+  #atdp .preset .pd{font-size:11px;color:var(--seed-muted);}
+  #atdp .swatches{display:flex;gap:4px;}
+  #atdp .swatches i{width:14px;height:14px;border-radius:4px;border:1px solid var(--border-subtle);}
+
+  /* 落地顺序 */
+  #atdp ol.rollout{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:8px;}
+  #atdp ol.rollout b{font-weight:500;}
+  #atdp ol.rollout .d{font-size:12px;color:var(--seed-muted);}
+  #atdp .atdp-foot{margin-top:24px;padding-top:10px;border-top:1px solid var(--border-subtle);font-size:11px;color:var(--seed-muted);}
+
+  @media (max-width:760px){
+    #atdp .shell .shell-body{grid-template-columns:minmax(0,1fr)!important;grid-template-areas:"center" "sftp" "ai"!important;}
+    #atdp .shell:not(.sftp-on) .shell-body{grid-template-areas:"center" "ai"!important;}
+    #atdp .shell.m-overlay:not(.sftp-on) .shell-body{grid-template-areas:"center"!important;}
+    #atdp .shell.ai-off .shell-body{grid-template-areas:"center" "sftp"!important;}
+    #atdp .shell.ai-off:not(.sftp-on) .shell-body{grid-template-areas:"center"!important;}
+    #atdp .shell.focus .shell-body{grid-template-areas:"center"!important;}
+    #atdp .ai-panel,#atdp .sftp-panel{border-left:0;border-top:1px solid var(--m-border);}
+    #atdp .shell.m-overlay .ai-panel{top:48px;right:6px;}
+    #atdp .pal-btn kbd{display:none;}
+    #atdp .ledger-label{min-width:120px;}
+    #atdp .ledger-val{min-width:96px;}
+    #atdp .sftp-row{grid-template-columns:minmax(0,1fr) 52px;}
+    #atdp .sftp-mtime{display:none;}
+    #atdp .cap-wrap select{max-width:132px;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    #atdp .cursor,#atdp .pulse{animation:none;}
+    #atdp .palette,#atdp .menu,#atdp .drawer{animation:none;}
+  }
+</style>
+
+<header>
+  <h1>AI Terminal · 总体配色与功能板块样式建议 <span style="color:var(--seed-primary)">v3</span></h1>
+  <p class="atdp-sub">v3 变更：加号贴左紧随标签 · 补 SFTP 并与 AI 正交布局 · AI 底栏保留原功能排与权限/模型/思考选择 · 2026-11-15</p>
+</header>
+
+<!-- ============ 01 现状诊断 ============ -->
+<section aria-labelledby="atdp-s1">
+  <div class="atdp-h2"><span class="atdp-num">01</span><h2 id="atdp-s1">现状诊断：底子很好，但两套配色并存</h2></div>
+  <p class="atdp-lede">项目已有一套经过推敲的「石墨青」双主题 token 系统（表面亮度阶梯 + 发丝线 + 青/金双强调色），方向不需要推翻。真正的问题是旧蓝色系仍在大量页面里流通，同屏出现两种强调色与两套语义色。</p>
+  <div class="atdp-stats">
+    <div class="card viz-stat"><div class="viz-stat-label">强调色体系</div><div class="viz-stat-value">2 套并存</div><div class="text-small text-muted">石墨青 token × 旧蓝色系</div></div>
+    <div class="card viz-stat"><div class="viz-stat-label">旧主色引用（蓝）</div><div class="viz-stat-value">94 处</div><div class="text-small text-muted">17 个文件，不含定义</div></div>
+    <div class="card viz-stat"><div class="viz-stat-label">旧语义色引用</div><div class="viz-stat-value">170 处</div><div class="text-small text-muted">25 个文件，绿/橙/红/紫</div></div>
+    <div class="card viz-stat"><div class="viz-stat-label">终端配色预设</div><div class="viz-stat-value">5 套</div><div class="text-small text-muted">已具备，可扩充</div></div>
+  </div>
+  <div class="atdp-palrow">
+    <span class="atdp-pal-label">新 · 石墨青</span>
+    <span class="atdp-chip" style="background:#090C0C;color:#F1F3F1;border-color:rgba(255,255,255,.18)"><b>窗口</b>#090C0C</span>
+    <span class="atdp-chip" style="background:#1C2020;color:#F1F3F1;border-color:rgba(255,255,255,.18)"><b>面板</b>#1C2020</span>
+    <span class="atdp-chip" style="background:#45C8C3;color:#090C0C"><b>品牌青</b>#45C8C3</span>
+    <span class="atdp-chip" style="background:#E0AF63;color:#090C0C"><b>数据金</b>#E0AF63</span>
+    <span class="atdp-chip" style="background:#6FD39A;color:#090C0C"><b>成功</b>#6FD39A</span>
+    <span class="atdp-chip" style="background:#F09A5C;color:#090C0C"><b>警告</b>#F09A5C</span>
+    <span class="atdp-chip" style="background:#F07C86;color:#090C0C"><b>错误</b>#F07C86</span>
+  </div>
+  <div class="atdp-palrow">
+    <span class="atdp-pal-label">旧 · 蓝色系</span>
+    <span class="atdp-chip" style="background:#3B82F6;color:#fff"><b>主蓝</b>#3B82F6</span>
+    <span class="atdp-chip" style="background:#10B981;color:#fff"><b>绿</b>#10B981</span>
+    <span class="atdp-chip" style="background:#F59E0B;color:#fff"><b>橙</b>#F59E0B</span>
+    <span class="atdp-chip" style="background:#EF4444;color:#fff"><b>红</b>#EF4444</span>
+    <span class="atdp-chip" style="background:#8B5CF6;color:#fff"><b>紫</b>#8B5CF6</span>
+  </div>
+  <div class="atdp-conflict" aria-label="同屏配色冲突示例（深色）">
+    <div class="atdp-conflict-row">
+      <span class="atdp-conflict-tag">现状</span>
+      <span class="atdp-fake-input" style="border:1.5px solid #3B82F6">搜索主机…（焦点框旧蓝）</span>
+      <span class="atdp-fake-btn">新建主机（按钮新青）</span>
+    </div>
+    <div class="atdp-conflict-row">
+      <span class="atdp-conflict-tag">建议</span>
+      <span class="atdp-fake-input" style="border:1.5px solid #45C8C3">搜索主机…（焦点框品牌青）</span>
+      <span class="atdp-fake-btn">新建主机（按钮新青）</span>
+    </div>
+  </div>
+  <p class="atdp-note">冲突实例：host_list_page 搜索框焦点、host_card 头像仍用 cPrimary 旧蓝；sftp_panel（20 处）、runbooks_page、change_window_page 等大量混用旧语义色。标签色板 tagColors 也仍是旧色系。</p>
+</section>
+
+<!-- ============ 02 配色建议 ============ -->
+<section aria-labelledby="atdp-s2">
+  <div class="atdp-h2"><span class="atdp-num">02</span><h2 id="atdp-s2">配色建议：保留石墨青，收敛为一套 + 明确语义契约</h2></div>
+  <p class="atdp-lede">不换品牌色。石墨底 + 青 + 金在终端类产品里辨识度高且耐看（Warp 暗色 IDE 风、Wave 的块式面板同路线）。要做的是：旧色全部退场，每种颜色只承担一种语义。</p>
+
+  <div class="atdp-pal-label" style="margin-bottom:2px">深色表面阶梯（现有契约，保持不变）</div>
+  <div class="atdp-ladder">
+    <span class="atdp-rung" style="background:#040707;color:#E6ECE8;border-color:rgba(255,255,255,.18)"><b>终端</b>#040707</span>
+    <span class="atdp-rung" style="background:#090C0C;color:#F1F3F1;border-color:rgba(255,255,255,.18)"><b>窗口</b>#090C0C</span>
+    <span class="atdp-rung" style="background:#0D1010;color:#F1F3F1;border-color:rgba(255,255,255,.18)"><b>输出块</b>#0D1010</span>
+    <span class="atdp-rung" style="background:#131616;color:#F1F3F1;border-color:rgba(255,255,255,.18)"><b>卡片</b>#131616</span>
+    <span class="atdp-rung" style="background:#1C2020;color:#F1F3F1;border-color:rgba(255,255,255,.18)"><b>面板</b>#1C2020</span>
+    <span class="atdp-rung" style="background:#202A28;color:#F1F3F1;border-color:rgba(255,255,255,.18)"><b>数据卡</b>#202A28</span>
+    <span class="atdp-rung" style="background:#292C2C;color:#F1F3F1;border-color:rgba(255,255,255,.18)"><b>控件</b>#292C2C</span>
+  </div>
+  <div class="atdp-pal-label" style="margin:8px 0 2px">浅色表面阶梯（反向：面板最亮，代码层再暗一档）</div>
+  <div class="atdp-ladder">
+    <span class="atdp-rung" style="background:#F2F4F2;color:#171B19"><b>终端</b>#F2F4F2</span>
+    <span class="atdp-rung" style="background:#EEF1EE;color:#171B19"><b>窗口</b>#EEF1EE</span>
+    <span class="atdp-rung" style="background:#E8EBE8;color:#171B19"><b>输出块</b>#E8EBE8</span>
+    <span class="atdp-rung" style="background:#FAFBFA;color:#171B19"><b>卡片</b>#FAFBFA</span>
+    <span class="atdp-rung" style="background:#FFFFFF;color:#171B19"><b>面板</b>#FFFFFF</span>
+    <span class="atdp-rung" style="background:#F0F4F0;color:#171B19"><b>数据卡</b>#F0F4F0</span>
+    <span class="atdp-rung" style="background:#E4E9E4;color:#171B19"><b>控件</b>#E4E9E4</span>
+  </div>
+
+  <div class="atdp-roles" aria-label="色彩语义契约">
+    <span class="atdp-role"><span class="atdp-dot" style="background:#45C8C3"></span>青 = 交互 · 链接 · 运行中</span>
+    <span class="atdp-role"><span class="atdp-dot" style="background:#E0AF63"></span>金 = 数据 · 耗时 · 待确认</span>
+    <span class="atdp-role"><span class="atdp-dot" style="background:#6FD39A"></span>绿 = 成功 · 在线</span>
+    <span class="atdp-role"><span class="atdp-dot" style="background:#F09A5C"></span>橙 = 警告 · 高负载</span>
+    <span class="atdp-role"><span class="atdp-dot" style="background:#F07C86"></span>红 = 失败 · 危险 · 离线告警</span>
+  </div>
+
+  <div class="table-responsive">
+    <table>
+      <thead><tr><th>旧 token（退场）</th><th>收敛到</th><th>主要涉及</th></tr></thead>
+      <tbody>
+        <tr><td><span class="atdp-sw" style="background:#3B82F6"></span><code>cPrimary</code> #3B82F6</td><td><span class="atdp-sw" style="background:#45C8C3"></span><code>tc.brand</code></td><td>host_list / host_card / sftp_panel 等 17 文件</td></tr>
+        <tr><td><span class="atdp-sw" style="background:#10B981"></span><code>cSuccess</code> #10B981</td><td><span class="atdp-sw" style="background:#6FD39A"></span><code>tc.ok</code></td><td>状态点、监控面板、确认弹窗</td></tr>
+        <tr><td><span class="atdp-sw" style="background:#F59E0B"></span><code>cWarning</code> #F59E0B</td><td><span class="atdp-sw" style="background:#F09A5C"></span><code>tc.warn</code></td><td>警告横幅、封网期提示</td></tr>
+        <tr><td><span class="atdp-sw" style="background:#EF4444"></span><code>cDanger</code> #EF4444</td><td><span class="atdp-sw" style="background:#F07C86"></span><code>tc.error</code></td><td>危险操作、失败状态</td></tr>
+        <tr><td><span class="atdp-sw" style="background:#8B5CF6"></span><code>cViolet</code> #8B5CF6</td><td>仅保留在 <code>tagColors</code></td><td>标签分类色，不再作语义色</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="atdp-note">替换是纯 token 映射、不改布局，风险低；完成后跑 <code>flutter analyze</code> + <code>theme_surface_ladder_test</code>（表面亮度阶梯契约）。旧常量保留为别名指向新值，避免一次性大改。</p>
+</section>
+
+<!-- ============ 03 板块样式 v3 ============ -->
+<section aria-labelledby="atdp-s3">
+  <div class="atdp-h2"><span class="atdp-num">03</span><h2 id="atdp-s3">板块样式 v3：零占位导航 + AI / SFTP 正交布局（可交互 mockup）</h2></div>
+  <p class="atdp-lede">保留 v2 的零占位导航与石墨青样式，并按三点反馈修正：<b>① 服务器 + 紧贴标签左侧组</b>，一眼知道是新建连接；<b>② 补齐 SFTP 面板，且与 AI 永远正交</b>——AI 在右，SFTP 就在下；AI 在下，SFTP 就在右，避免在同一个维度上把终端压扁；<b>③ AI 底栏不改功能结构</b>，保留多机编排 / 日志 / 会话历史 / 新建会话这一排，以及权限、模型、思考档位选择。下面全部可以点：打开 SFTP 后切换 AI 位置，观察它自动换轴；实时账本同时显示终端列数与行数。</p>
+
+  <div class="ledger" aria-label="终端空间账本（1280px 窗口估算）">
+    <div class="ledger-row"><span class="ledger-label">v1 左侧栏 + 右分栏</span><span class="ledger-track"><span class="ledger-bar" style="width:70.4%;background:var(--fill-3)"></span></span><span class="ledger-val">≈900px · 125 列</span></div>
+    <div class="ledger-row"><span class="ledger-label">AI 右 + SFTP 下</span><span class="ledger-track"><span class="ledger-bar" style="width:75%;background:var(--seed-primary);opacity:.65"></span></span><span class="ledger-val">≈958px · 133 列 · 只减行数</span></div>
+    <div class="ledger-row"><span class="ledger-label">AI 下 + SFTP 右</span><span class="ledger-track"><span class="ledger-bar" style="width:76.6%;background:var(--seed-primary);opacity:.8"></span></span><span class="ledger-val">≈978px · 136 列 · 高度不减</span></div>
+    <div class="ledger-row"><span class="ledger-label">专注模式</span><span class="ledger-track"><span class="ledger-bar" style="width:100%;background:var(--seed-primary)"></span></span><span class="ledger-val">≈1278px · 177 列</span></div>
+    <p class="ledger-live">下方 mockup 实测：<b id="atdp-ledger">—</b>（12px 等宽字体估算；随 AI / SFTP 位置与窗口实时变化）</p>
+  </div>
+
+  <div class="atdp-controls">
+    <div class="atdp-seg" role="group" aria-label="AI 面板位置">
+      <button type="button" data-mode="m-right" aria-pressed="true">右侧分栏</button>
+      <button type="button" data-mode="m-bottom" aria-pressed="false">底部面板</button>
+      <button type="button" data-mode="m-overlay" aria-pressed="false">悬浮覆盖</button>
+    </div>
+    <button type="button" class="atdp-focusbtn" id="atdp-focus" aria-pressed="false">专注模式</button>
+    <button type="button" class="atdp-focusbtn" id="atdp-sftp-control" aria-pressed="false">打开 SFTP</button>
+    <div class="atdp-seg" role="group" aria-label="预览主题">
+      <button type="button" data-theme-btn="dark" aria-pressed="true">深色</button>
+      <button type="button" data-theme-btn="light" aria-pressed="false">浅色</button>
+    </div>
+    <span class="atdp-status" id="atdp-status" aria-live="polite">右侧分栏 · 深色 · 默认青</span>
+  </div>
+
+  <div class="shell m-right" id="atdp-shell">
+    <div class="topbar">
+      <div class="tabs" id="atdp-tabs">
+        <button type="button" class="tab" data-host="web-01" aria-pressed="true"><span class="sd" style="background:var(--m-ok)"></span>web-01</button>
+        <button type="button" class="tab" data-host="db-01" aria-pressed="false"><span class="sd" style="background:var(--m-ok)"></span>db-01</button>
+      </div>
+      <button type="button" class="tab-add" id="atdp-tab-add" aria-label="新建服务器标签" title="新建服务器标签">+</button>
+      <span class="top-spacer"></span>
+      <button type="button" class="top-act pal-btn" id="atdp-pal-btn" aria-label="打开命令面板（Ctrl+K）" title="命令面板 Ctrl+K">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <kbd>Ctrl K</kbd>
+      </button>
+      <button type="button" class="top-act" id="atdp-menu-btn" aria-label="打开功能菜单" aria-expanded="false">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>
+      </button>
+      <button type="button" class="top-act" id="atdp-ai-toggle" aria-pressed="true" aria-label="开关 AI 面板" title="AI 面板">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+      </button>
+      <button type="button" class="top-act" id="atdp-sftp-toggle" aria-pressed="false" aria-label="开关 SFTP 面板" title="SFTP 文件面板（与 AI 正交）">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h5l2 3h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M12 11v6M9 14l3 3 3-3"/></svg>
+      </button>
+      <button type="button" class="top-act" id="atdp-mon-toggle" aria-pressed="true" aria-label="开关监控条" title="监控">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+      </button>
+    </div>
+    <div class="shell-body">
+      <div class="center">
+        <div class="view">
+          <div class="term" id="atdp-term" aria-label="终端预览">
+            <div class="ln"><span class="t-green">keiskei@<span class="atdp-prompt-host">web-01</span></span><span class="t-dim">:</span><span class="t-blue">~</span><span class="t-dim">$</span> kubectl get pods -n production -o wide --sort-by=.status.startTime</div>
+            <div class="ln">NAME                      READY   STATUS    RESTARTS   AGE     IP            NODE</div>
+            <div class="ln">nginx-7d9f8b6c5-x2v4k     1/1     <span class="t-green">Running</span>   0          3d2h    10.244.1.17   node-02</div>
+            <div class="ln">api-6c5f9d8b7-qw8zt       1/1     <span class="t-green">Running</span>   1          5d      10.244.2.31   node-01</div>
+            <div class="ln">worker-5b8c7d6f9-k4m2n    0/1     <span class="t-yellow">Pending</span>   0          12m     &lt;none&gt;        &lt;none&gt;</div>
+            <div class="ln">&nbsp;</div>
+            <div class="ln"><span class="t-green">keiskei@<span class="atdp-prompt-host">web-01</span></span><span class="t-dim">:</span><span class="t-blue">~</span><span class="t-dim">$</span> df -h /data &amp;&amp; systemctl status nginx --no-pager | head -5</div>
+            <div class="ln">/dev/vdb1       <span class="t-yellow">200G</span>  <span class="t-yellow">132G</span>   <span class="t-yellow">68G</span>  <span class="t-yellow">66%</span> /data</div>
+            <div class="ln"><span class="t-green">●</span> nginx.service - A high performance web server</div>
+            <div class="ln">     Active: <span class="t-green">active (running)</span> since Fri 2026-11-14 22:10:03 CST</div>
+            <div class="ln">&nbsp;</div>
+            <div class="ln" id="atdp-cursor-line"><span class="t-green">keiskei@<span class="atdp-prompt-host">web-01</span></span><span class="t-dim">:</span><span class="t-blue">~</span><span class="t-dim">$</span> <span class="cursor" aria-hidden="true"></span></div>
+          </div>
+          <div class="monitor" id="atdp-monitor">
+            <span class="mon">CPU <b>23%</b><span class="bar"><i style="width:23%"></i></span></span>
+            <span class="mon">内存 <b>61%</b><span class="bar"><i style="width:61%"></i></span></span>
+            <span class="mon">负载 <b>0.42</b></span>
+            <span class="mon">网络 <b>↑1.2 ↓3.4</b> MB/s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI 面板 -->
+      <aside class="ai-panel" aria-label="AI 面板样式演示">
+        <div class="ai-head">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--m-brand)"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>
+          <span class="t">AI 助手</span>
+          <span class="model-chip">qwen3.8-flash-next</span>
+          <span class="demo-chip">样式演示</span>
+        </div>
+        <div class="ai-body" id="atdp-ai-body">
+          <div class="ububble">巡检一下 web-01：nginx 状态和 /data 磁盘占用。</div>
+          <div>
+            <div class="role">Agent</div>
+            <p class="agent-text">两项指标正常，巡检摘要生成中。执行过程如下：</p>
+          </div>
+          <div class="acard">
+            <div class="acard-head">执行清单 <span class="sp"></span><span class="count-chip">2 / 3</span></div>
+            <div class="steps">
+              <div class="step done"><span class="ic">✓</span>检查 nginx 服务状态</div>
+              <div class="step done"><span class="ic">✓</span>检查 /data 磁盘占用</div>
+              <div class="step run"><span class="ic"><span class="pulse"></span></span>生成巡检摘要</div>
+            </div>
+          </div>
+          <div class="acard">
+            <div class="acard-head"><span class="cmdline">$ systemctl status nginx</span><span class="sp"></span><span class="exit-chip">exit 0</span></div>
+            <div class="mono-block">● nginx.service — <span style="color:var(--m-ok)">active (running)</span></div>
+          </div>
+          <p class="meta">耗时 <b>1.2s</b> · 2 条命令 · 12:04</p>
+        </div>
+        <div class="ai-footer">
+          <div class="ai-tools" role="toolbar" aria-label="AI 工具栏">
+            <button type="button" class="mode-capsule" id="atdp-mode-capsule" title="Agent 模式">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>Agent
+            </button>
+            <button type="button" class="tool-btn" id="atdp-log-btn" title="执行日志" aria-label="执行日志">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="15" rx="2"/><path d="M7 9l3 3-3 3M12 15h5"/></svg>
+            </button>
+            <button type="button" class="tool-btn" id="atdp-history-btn" title="会话历史" aria-label="会话历史">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg>
+            </button>
+            <button type="button" class="tool-btn" id="atdp-newsession-btn" title="新建会话" aria-label="新建会话">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M12 8v8M8 12h8"/></svg>
+            </button>
+            <button type="button" class="tool-btn" id="atdp-web-btn" title="联网搜索（下次任务生效）" aria-label="联网搜索" aria-pressed="false">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3.5 3 14 0 18-3-4-3-14 0-18z"/></svg>
+            </button>
+            <button type="button" class="tool-btn" id="atdp-runbook-btn" title="运维模板" aria-label="运维模板">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h6l-1 8 9-12h-6z"/></svg>
+            </button>
+            <button type="button" class="tool-btn" id="atdp-orch-btn" title="多机编排" aria-label="多机编排" aria-pressed="false">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v4M12 11l-6 6M12 11l6 6"/></svg>
+            </button>
+          </div>
+          <div class="ai-compose">
+            <label for="atdp-ai-input" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">AI 输入</label>
+            <textarea id="atdp-ai-input" rows="2" placeholder="描述需求，Agent 自动执行…（Enter 发送，Shift+Enter 换行）"></textarea>
+            <div class="ai-compose-bar">
+              <span class="cap-wrap perm-wrap">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V6z"/></svg>
+                <select id="atdp-perm-select" aria-label="执行权限档位">
+                  <option value="readonly">只读</option>
+                  <option value="ask" selected>询问</option>
+                  <option value="auto">自动</option>
+                  <option value="full">全自动</option>
+                </select>
+              </span>
+              <span class="compose-spacer"></span>
+              <span class="cap-wrap model-wrap">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 01-.2 1.6l2 1.6-2 3.4-2.4-1a7 7 0 01-2.7 1.6L13.3 21h-2.6l-.4-2.4a7 7 0 01-2.7-1.6l-2.4 1-2-3.4 2-1.6A7 7 0 015 12a7 7 0 01.2-1.6l-2-1.6 2-3.4 2.4 1a7 7 0 012.7-1.6L10.7 3h2.6l.4 2.4a7 7 0 012.7 1.6l2.4-1 2 3.4-2 1.6c.1.5.2 1 .2 1.6z"/></svg>
+                <select id="atdp-model-select" aria-label="模型与思考档位">
+                  <option selected>qwen3.8-flash-next High</option>
+                  <option>qwen3.8-flash-next Low</option>
+                  <option>Sonnet 4.6 High</option>
+                  <option>Sonnet 4.6 Low</option>
+                  <option>GPT-5.2 High</option>
+                </select>
+              </span>
+              <button type="button" class="send" id="atdp-ai-send" aria-label="发送">
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- SFTP 面板：与 AI 正交（AI 右→下、AI 下→右） -->
+      <aside class="sftp-panel" id="atdp-sftp" aria-label="SFTP 文件面板">
+        <div class="sftp-head">
+          <span class="sftp-title">SFTP</span>
+          <span class="sftp-host" id="atdp-sftp-host">web-01</span>
+          <span style="flex:1;min-width:2px"></span>
+          <button type="button" class="sftp-act" data-sftp="upload" title="上传到当前目录" aria-label="上传">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 17V7M7 12l5-5 5 5"/></svg>
+          </button>
+          <button type="button" class="sftp-act" data-sftp="mkdir" title="新建目录" aria-label="新建目录">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7a2 2 0 012-2h5l2 3h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M12 11v6"/></svg>
+          </button>
+          <button type="button" class="sftp-act" data-sftp="refresh" title="刷新" aria-label="刷新">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M20 12a8 8 0 10-2.3 5.7"/><path d="M20 5v5h-5"/></svg>
+          </button>
+          <button type="button" class="sftp-act" data-sftp="close" title="关闭 SFTP" aria-label="关闭 SFTP">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+        <div class="sftp-path">
+          <button type="button" class="sftp-act" data-sftp="back" title="返回上级" style="background:transparent;border:0;height:22px;min-width:22px;padding:0">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M15 6l-6 6 6 6"/></svg>
+          </button>
+          <span class="sftp-crumbs" id="atdp-sftp-crumbs"></span>
+          <button type="button" class="sftp-act" data-sftp="home" title="根目录" style="background:transparent;border:0;height:22px;min-width:22px;padding:0">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 11l8-7 8 7"/><path d="M6 10v9h12v-9"/></svg>
+          </button>
+        </div>
+        <div class="sftp-list" id="atdp-sftp-list"></div>
+        <div class="sftp-foot" id="atdp-sftp-foot" aria-live="polite">已连接 web-01 · /var/www · 6 项</div>
+      </aside>
+    </div>
+
+    <!-- 命令面板（覆盖式） -->
+    <div class="scrim" id="atdp-scrim" hidden></div>
+    <div class="palette" id="atdp-palette" hidden role="dialog" aria-label="命令面板">
+      <div class="pal-input-row">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        <input id="atdp-pal-input" type="text" placeholder="搜索主机、命令、工作流、页面、操作…" aria-label="命令面板搜索" aria-controls="atdp-pal-list" autocomplete="off">
+        <kbd>Esc</kbd>
+      </div>
+      <div class="pal-list" id="atdp-pal-list" role="listbox" aria-label="搜索结果"></div>
+      <div class="pal-empty" id="atdp-pal-empty" hidden>没有匹配项</div>
+      <div class="pal-foot"><span>↑↓ 选择</span><span>Enter 执行</span><span>Esc 关闭</span><span>命令直接插入终端</span></div>
+    </div>
+
+    <!-- 网格菜单（覆盖式） -->
+    <div class="menu" id="atdp-menu" hidden role="menu" aria-label="功能菜单">
+      <div class="menu-group">功能板块（抽屉打开，不占布局）</div>
+      <button type="button" data-open="hosts"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="7" rx="2"/><rect x="3" y="13" width="18" height="7" rx="2"/><path d="M7 7.5h.01M7 16.5h.01"/></svg><span class="mn">主机管理</span><span class="ms">4 台</span></button>
+      <button type="button" data-open="snippets"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h6l-1 8 9-12h-6z"/></svg><span class="mn">快捷命令</span><span class="ms">4 条</span></button>
+      <button type="button" data-open="runbooks"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 5.5l1 1 2-2"/><path d="M4 11.5l1 1 2-2"/><path d="M4 17.5l1 1 2-2"/></svg><span class="mn">运维工作流</span><span class="ms">3 个</span></button>
+      <button type="button" data-open="audit"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 8v4l2.5 2.5"/><circle cx="12" cy="12" r="9"/></svg><span class="mn">审计日志</span><span class="ms">今日 12 条</span></button>
+      <button type="button" data-open="settings"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 8h10M18 8h2M4 16h2M10 16h10"/><circle cx="16" cy="8" r="2.5"/><circle cx="8" cy="16" r="2.5"/></svg><span class="mn">设置</span><span class="ms">7 组</span></button>
+      <div class="menu-group">操作</div>
+      <button type="button" data-action="focus"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H5a2 2 0 00-2 2v3M16 3h3a2 2 0 012 2v3M8 21H5a2 2 0 01-2-2v-3M16 21h3a2 2 0 002-2v-3"/></svg><span class="mn">专注模式</span><span class="ms">终端全宽</span></button>
+      <button type="button" data-action="cycle"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M15 4v14"/></svg><span class="mn">切换 AI 面板位置</span><span class="ms">右 / 底 / 悬浮</span></button>
+      <button type="button" data-action="sftp"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 012-2h5l2 3h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M12 11v6M9 14l3 3 3-3"/></svg><span class="mn">开关 SFTP 面板</span><span class="ms">与 AI 正交</span></button>
+      <button type="button" data-action="monitor"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg><span class="mn">开关监控条</span></button>
+    </div>
+
+    <!-- 模块抽屉（覆盖式） -->
+    <div class="drawer" id="atdp-drawer" hidden role="dialog" aria-label="功能抽屉">
+      <div class="drawer-head">
+        <span class="drawer-title" id="atdp-drawer-title">主机管理</span>
+        <span class="count-chip">覆盖式 · 不占布局</span>
+        <button type="button" class="drawer-close" id="atdp-drawer-close" aria-label="关闭抽屉">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <div class="drawer-body">
+        <!-- 主机 -->
+        <div class="dcontent" id="atdp-d-hosts">
+          <input class="search" id="atdp-host-search" type="search" placeholder="搜索名称 / IP / 标签" aria-label="搜索主机">
+          <div class="group-head">生产环境 <span class="count-chip" data-gcount="prod">3</span><span style="flex:1"></span><span class="count-chip" id="atdp-host-count">共 4 台</span></div>
+          <button type="button" class="host-card" data-group="prod" data-key="web-01 10.0.1.11 生产 ubuntu" style="--bar:#45C8C3">
+            <span class="avatar">W1</span>
+            <span class="host-meta"><span class="host-name">web-01</span><br><span class="host-ip">10.0.1.11 · Ubuntu 24.04</span></span>
+            <span class="host-status"><span class="sd" style="background:var(--m-ok)"></span>在线</span>
+            <svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+          <button type="button" class="host-card" data-group="prod" data-key="web-02 10.0.1.12 生产 ubuntu" style="--bar:#45C8C3">
+            <span class="avatar">W2</span>
+            <span class="host-meta"><span class="host-name">web-02</span><br><span class="host-ip">10.0.1.12 · Ubuntu 24.04</span></span>
+            <span class="host-status"><span class="sd" style="background:var(--m-ok)"></span>在线</span>
+            <svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+          <button type="button" class="host-card" data-group="prod" data-key="db-01 10.0.1.21 数据库 mysql" style="--bar:#E0AF63">
+            <span class="avatar" style="background:var(--m-gold-bg);color:var(--m-gold)">D1</span>
+            <span class="host-meta"><span class="host-name">db-01</span><br><span class="host-ip">10.0.1.21 · MySQL 8.4</span></span>
+            <span class="host-status"><span class="sd" style="background:var(--m-warn)"></span>高负载</span>
+            <svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+          <div class="group-head">测试环境 <span class="count-chip" data-gcount="test">1</span></div>
+          <button type="button" class="host-card" data-group="test" data-key="staging-01 10.0.2.31 测试 debian" style="--bar:#7A827C">
+            <span class="avatar" style="background:var(--m-surface);color:var(--m-sub)">S1</span>
+            <span class="host-meta"><span class="host-name">staging-01</span><br><span class="host-ip">10.0.2.31 · Debian 13</span></span>
+            <span class="host-status"><span class="sd" style="background:var(--m-muted)"></span>离线</span>
+            <svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+          </button>
+          <div class="empty" id="atdp-host-empty" hidden>没有匹配的主机</div>
+        </div>
+        <!-- 快捷命令 -->
+        <div class="dcontent" id="atdp-d-snippets" hidden>
+          <div class="rowcard">
+            <button type="button" data-acc aria-expanded="false"><span class="row-main"><span class="row-title">查看端口占用</span><span class="row-sub">ss -tlnp</span></span><span class="tagchip">网络</span><svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="detail" hidden><div class="mono-block">ss -tlnp</div><p class="row-sub">列出所有监听端口与对应进程。在命令面板里选它会直接插入终端。</p></div>
+          </div>
+          <div class="rowcard">
+            <button type="button" data-acc aria-expanded="false"><span class="row-main"><span class="row-title">清理 7 天前日志</span><span class="row-sub">journalctl --vacuum-time=7d</span></span><span class="tagchip">日志</span><svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="detail" hidden><div class="mono-block">sudo journalctl --vacuum-time=7d</div><p class="row-sub">按时间清理 systemd 日志，释放 /var/log 空间。</p></div>
+          </div>
+          <div class="rowcard">
+            <button type="button" data-acc aria-expanded="false"><span class="row-main"><span class="row-title">磁盘占用总览</span><span class="row-sub">df -h</span></span><span class="tagchip">磁盘</span><svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="detail" hidden><div class="mono-block">df -h --exclude-type=tmpfs</div><p class="row-sub">人类可读格式展示各挂载点用量。</p></div>
+          </div>
+          <div class="rowcard">
+            <button type="button" data-acc aria-expanded="false"><span class="row-main"><span class="row-title">内存 Top 10 进程</span><span class="row-sub">ps aux --sort=-%mem</span></span><span class="tagchip">进程</span><svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="detail" hidden><div class="mono-block">ps aux --sort=-%mem | head -11</div><p class="row-sub">按内存占用排序，快速找到大户。</p></div>
+          </div>
+        </div>
+        <!-- 工作流 -->
+        <div class="dcontent" id="atdp-d-runbooks" hidden>
+          <div class="rowcard">
+            <button type="button" data-acc aria-expanded="false"><span class="row-main"><span class="row-title">Nginx 平滑重启</span><span class="row-sub">4 步 · 上次运行 2 小时前</span></span><span class="stchip st-ok">已完成</span><svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="detail" hidden><div class="steps">
+              <div class="step done"><span class="ic">✓</span>检查配置语法 nginx -t</div>
+              <div class="step done"><span class="ic">✓</span>重载服务 systemctl reload</div>
+              <div class="step done"><span class="ic">✓</span>验证状态与响应码</div>
+              <div class="step done"><span class="ic">✓</span>写入变更台账</div>
+            </div></div>
+          </div>
+          <div class="rowcard">
+            <button type="button" data-acc aria-expanded="false"><span class="row-main"><span class="row-title">MySQL 慢查询排查</span><span class="row-sub">6 步 · 运行中 · 已耗时 48s</span></span><span class="stchip st-warn">等待确认</span><svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="detail" hidden><div class="steps">
+              <div class="step done"><span class="ic">✓</span>抓取慢日志最近 1 小时</div>
+              <div class="step done"><span class="ic">✓</span>分析 Top 5 慢 SQL</div>
+              <div class="step wait"><span class="ic">◌</span>生成索引建议 — 等待人工确认</div>
+              <div class="step todo"><span class="ic">○</span>执行变更</div>
+              <div class="step todo"><span class="ic">○</span>回归验证</div>
+              <div class="step todo"><span class="ic">○</span>写入变更台账</div>
+            </div></div>
+          </div>
+          <div class="rowcard">
+            <button type="button" data-acc aria-expanded="false"><span class="row-main"><span class="row-title">磁盘扩容检查</span><span class="row-sub">3 步 · 昨天 23:40</span></span><span class="stchip st-err">失败</span><svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="detail" hidden><div class="steps">
+              <div class="step done"><span class="ic">✓</span>检查分区表</div>
+              <div class="step fail"><span class="ic">✗</span>扩容文件系统 — resize2fs 退出码 1</div>
+              <div class="step todo"><span class="ic">○</span>验证挂载与容量</div>
+            </div></div>
+          </div>
+        </div>
+        <!-- 审计日志 -->
+        <div class="dcontent" id="atdp-d-audit" hidden>
+          <div class="audit-row"><span class="audit-time">12:04</span><span class="audit-cmd">systemctl status nginx</span><span class="stchip st-ok">exit 0</span></div>
+          <div class="audit-row"><span class="audit-time">12:03</span><span class="audit-cmd">df -h /data</span><span class="stchip st-ok">exit 0</span></div>
+          <div class="audit-row"><span class="audit-time">11:47</span><span class="audit-cmd">resize2fs /dev/vdb1</span><span class="stchip st-err">exit 1</span></div>
+          <div class="audit-row"><span class="audit-time">11:20</span><span class="audit-cmd">journalctl --vacuum-time=7d</span><span class="stchip st-ok">exit 0</span></div>
+          <p class="row-sub">审计与变更台账保持独立路由页也可，但从命令面板 / 菜单进入时以抽屉覆盖，终端上下文不丢。</p>
+        </div>
+        <!-- 设置 -->
+        <div class="dcontent" id="atdp-d-settings" hidden>
+          <div class="rowcard">
+            <button type="button" data-acc aria-expanded="false"><span class="row-main"><span class="row-title">外观</span><span class="row-sub">主题模式 · 终端配色 · 字体</span></span><svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="detail" hidden>
+              <div class="theme-chips" role="group" aria-label="主题模式">
+                <button type="button" data-theme-btn="dark" aria-pressed="true">深色</button>
+                <button type="button" data-theme-btn="light" aria-pressed="false">浅色</button>
+              </div>
+              <p class="row-sub">终端配色预设见第 04 节，点击即同步到终端预览。</p>
+            </div>
+          </div>
+          <div class="rowcard">
+            <button type="button" data-acc aria-expanded="false"><span class="row-main"><span class="row-title">AI 模型</span><span class="row-sub">3 个已配置</span></span><svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="detail" hidden><p class="row-sub">Claude Sonnet 4.6（默认）· GPT-5.2 · 本地 Qwen3。默认模型以胶囊常驻 AI 面板头。</p></div>
+          </div>
+          <div class="rowcard">
+            <button type="button" data-acc aria-expanded="false"><span class="row-main"><span class="row-title">Agent</span><span class="row-sub">步数上限 · 超时 · 自动压缩</span></span><svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="detail" hidden><p class="row-sub">最大 30 步 · 单命令 60s · 历史超 80% 自动压缩。</p></div>
+          </div>
+          <div class="rowcard">
+            <button type="button" data-acc aria-expanded="false"><span class="row-main"><span class="row-title">安全</span><span class="row-sub">凭据加密 · 危险命令确认</span></span><svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="detail" hidden><p class="row-sub">凭据走 secure storage + AES 回落；rm / dd / mkfs 类命令二次确认。</p></div>
+          </div>
+          <div class="rowcard">
+            <button type="button" data-acc aria-expanded="false"><span class="row-main"><span class="row-title">MCP 服务器</span><span class="row-sub">2 个已连接</span></span><svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="detail" hidden><p class="row-sub">knowledge-center · browser。状态点用语义绿/红。</p></div>
+          </div>
+          <div class="rowcard">
+            <button type="button" data-acc aria-expanded="false"><span class="row-main"><span class="row-title">内部规范</span><span class="row-sub">12 条 · 注入 AI 上下文</span></span><svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="detail" hidden><p class="row-sub">组织约定由用户自维护，命令手册远程更新已下线。</p></div>
+          </div>
+          <div class="rowcard">
+            <button type="button" data-acc aria-expanded="false"><span class="row-main"><span class="row-title">通知</span><span class="row-sub">任务完成提醒</span></span><svg class="chev" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg></button>
+            <div class="detail" hidden><p class="row-sub">长任务完成 / 失败时系统通知，失败用红色语义。</p></div>
+          </div>
+        </div>
+        <!-- 会话历史（AI 底栏按钮打开） -->
+        <div class="dcontent" id="atdp-d-history" hidden>
+          <div class="rowcard">
+            <button type="button" data-session="巡检 web-01（当前会话）"><span class="row-main"><span class="row-title">巡检 web-01</span><span class="row-sub">今天 12:04 · 4 条消息 · 运行中</span></span><span class="stchip st-ok">进行中</span></button>
+          </div>
+          <div class="rowcard">
+            <button type="button" data-session="MySQL 慢查询"><span class="row-main"><span class="row-title">MySQL 慢查询</span><span class="row-sub">今天 11:20 · 18 条消息</span></span><span class="tagchip">失败</span></button>
+          </div>
+          <div class="rowcard">
+            <button type="button" data-session="nginx 平滑重启"><span class="row-main"><span class="row-title">Nginx 平滑重启</span><span class="row-sub">昨天 22:10 · 9 条消息</span></span><span class="tagchip">已完成</span></button>
+          </div>
+          <p class="row-sub">点击历史会话即恢复对话与上下文；「新建会话」按钮同排，不用先进这里。</p>
+        </div>
+        <!-- Agent 执行日志 -->
+        <div class="dcontent" id="atdp-d-log" hidden>
+          <div class="mono-block" style="display:flex;flex-direction:column;gap:3px;background:var(--m-bg)">
+            <span><span class="audit-time">12:04:11</span> plan 拆解任务 → 3 步</span>
+            <span><span class="audit-time">12:04:12</span> exec systemctl status nginx → exit 0（1.2s）</span>
+            <span><span class="audit-time">12:04:13</span> exec df -h /data → exit 0（0.4s）</span>
+            <span><span class="audit-time">12:04:14</span> write 会话持久化 conv-0f3a</span>
+            <span><span class="audit-time">12:04:15</span> <span style="color:var(--m-brand)">stream</span> 生成巡检摘要…</span>
+          </div>
+          <p class="row-sub">完整日志落在本地文件，抽屉只是快速预览；与审计日志（命令台账）分开。</p>
+        </div>
+        <!-- 多机编排 -->
+        <div class="dcontent" id="atdp-d-orch" hidden>
+          <p class="row-sub">勾选目标主机，任务会并行下发并汇总每台的执行结果。</p>
+          <label class="row-sub" style="display:flex;align-items:center;gap:7px;padding:4px 2px"><input type="checkbox" data-orch="web-01" checked> web-01 · 10.0.1.11</label>
+          <label class="row-sub" style="display:flex;align-items:center;gap:7px;padding:4px 2px"><input type="checkbox" data-orch="web-02" checked> web-02 · 10.0.1.12</label>
+          <label class="row-sub" style="display:flex;align-items:center;gap:7px;padding:4px 2px"><input type="checkbox" data-orch="staging-01"> staging-01 · 10.0.2.31（离线）</label>
+          <div class="audit-row"><span class="audit-time">上次批量</span><span class="audit-cmd">uptime 更新检查</span><span class="stchip st-ok">3/3 成功</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="specs">
+    <div class="spec"><b>标签加号贴左</b><p>顶栏左组 = [标签…][+]，加号紧随最后一个标签，语义一目了然；右侧只放全局动作（搜索/菜单/AI/SFTP/监控）。</p></div>
+    <div class="spec"><b>AI / SFTP 正交</b><p>AI 右 → SFTP 下，AI 下 → SFTP 右，永远不同轴。任何组合下终端至少保住「整宽或整高」其中一维；窄窗口自动上下堆叠。</p></div>
+    <div class="spec"><b>AI 底栏原样</b><p>功能排（编排/日志/历史/新建/联网/模板）+ 输入框内权限档位、模型、思考胶囊照现有结构，只统一到石墨青 token，不动交互。</p></div>
+    <div class="spec"><b>导航零占位</b><p>Ctrl+K 命令面板 + 顶栏网格菜单 + 覆盖式抽屉。常驻像素占用 = 0，页面浮在工作区上，不打断终端上下文。</p></div>
+    <div class="spec"><b>宽度与下限</b><p>AI 右 / 底 / 悬浮三态 + 专注模式；分栏拖拽设下限：终端不低于 80 列、辅助面板不低于 240px。窄窗口默认底部堆叠。</p></div>
+    <div class="spec"><b>容器与状态</b><p>1px 边框 + 10px 圆角 + 无阴影；3px 语义色条 + 状态胶囊：运行=青、待确认=金、成功=绿、失败=红，SFTP 目录=金、文件=青，全 App 一套词汇。</p></div>
+  </div>
+</section>
+
+<!-- ============ 04 终端预设 ============ -->
+<section aria-labelledby="atdp-s4">
+  <div class="atdp-h2"><span class="atdp-num">04</span><h2 id="atdp-s4">终端配色：在现有 5 套上补 3 套主流预设</h2></div>
+  <p class="atdp-lede">沿用「只做整套预设、不做逐色取色」的现有策略。点击下面任意预设，上方终端预览即时换色；浅色模式下没有亮色变体的预设会回落到默认亮青——与现有 resolveTerminalTheme 的行为一致。</p>
+  <div class="presets" role="group" aria-label="终端配色预设">
+    <button type="button" class="preset" data-pal="default" aria-pressed="true">
+      <span class="pn">默认青 <span class="pd">现有 · 深/浅双变体</span></span>
+      <span class="swatches"><i style="background:#1A1D1C"></i><i style="background:#F07C86"></i><i style="background:#6FD39A"></i><i style="background:#F09A5C"></i><i style="background:#6AA9FF"></i><i style="background:#D98AD9"></i><i style="background:#45C8C3"></i><i style="background:#E6ECE8"></i></span>
+    </button>
+    <button type="button" class="preset" data-pal="mocha" aria-pressed="false">
+      <span class="pn">Catppuccin Mocha <span class="pd">新增 · 仅暗色</span></span>
+      <span class="swatches"><i style="background:#45475A"></i><i style="background:#F38BA8"></i><i style="background:#A6E3A1"></i><i style="background:#F9E2AF"></i><i style="background:#89B4FA"></i><i style="background:#F5C2E7"></i><i style="background:#94E2D5"></i><i style="background:#BAC2DE"></i></span>
+    </button>
+    <button type="button" class="preset" data-pal="tokyo" aria-pressed="false">
+      <span class="pn">Tokyo Night <span class="pd">新增 · 仅暗色</span></span>
+      <span class="swatches"><i style="background:#15161E"></i><i style="background:#F7768E"></i><i style="background:#9ECE6A"></i><i style="background:#E0AF68"></i><i style="background:#7AA2F7"></i><i style="background:#BB9AF7"></i><i style="background:#7DCFFF"></i><i style="background:#A9B1D6"></i></span>
+    </button>
+    <button type="button" class="preset" data-pal="nord" aria-pressed="false">
+      <span class="pn">Nord <span class="pd">新增 · 仅暗色</span></span>
+      <span class="swatches"><i style="background:#3B4252"></i><i style="background:#BF616A"></i><i style="background:#A3BE8C"></i><i style="background:#EBCB8B"></i><i style="background:#81A1C1"></i><i style="background:#B48EAD"></i><i style="background:#88C0D0"></i><i style="background:#E5E9F0"></i></span>
+    </button>
+  </div>
+</section>
+
+<!-- ============ 05 落地顺序 ============ -->
+<section aria-labelledby="atdp-s5">
+  <div class="atdp-h2"><span class="atdp-num">05</span><h2 id="atdp-s5">建议落地顺序</h2></div>
+  <ol class="rollout">
+    <li><b>P0 · 色彩收敛</b><span class="d"> — 旧蓝/旧语义色 → tc.* token（约 30 个文件、纯映射替换，低风险）；tagColors 同步换新色系；跑 analyze + 表面阶梯契约测试。收益最大，先做。</span></li>
+    <li><b>P1 · 零占位导航 + 正交双面板</b><span class="d"> — 顶栏标签加号贴左；Ctrl+K 命令面板、网格菜单、覆盖抽屉；AI 面板右/底/悬浮三态 + 专注模式；SFTP 面板与 AI 正交摆放（右↔下互换），终端最小 80 列保护。AI 底栏功能排与权限/模型/思考胶囊保持现状不动。</span></li>
+    <li><b>P2 · 终端预设扩充 + 浅色复查</b><span class="d"> — 增加 Catppuccin Mocha / Tokyo Night / Nord（仅暗色，亮色回落默认）；浅色主题逐页复查小字号对比度（≥4.5:1）。</span></li>
+  </ol>
+</section>
+
+<p class="atdp-foot">调研文件：core/constants.dart · core/theme.dart · core/theme_colors.dart · core/terminal_themes.dart · pages/host_list_page.dart · widgets/host_card.dart · widgets/sftp_panel.dart · widgets/ai_prompt_input.dart · pages/terminal_page.dart（AI 工具排 L5136–5233 / 模型胶囊 L5300+）· test/theme_surface_ladder_test.dart。引用计数为 grep 实测（不含 constants.dart 定义处）。v3 已按三点反馈修正：加号贴左、SFTP 正交补齐、AI 底栏保留原功能结构。</p>
+
+<script>
+(function(){
+  var root = document.getElementById('atdp');
+  var shell = document.getElementById('atdp-shell');
+  var status = document.getElementById('atdp-status');
+  var ledger = document.getElementById('atdp-ledger');
+  var term = document.getElementById('atdp-term');
+  if(!root || !shell || !status || !ledger || !term) return;
+
+  var SURF = {
+    dark: {'--m-bg':'#090C0C','--m-card':'#131616','--m-elev':'#1C2020','--m-surface':'#292C2C',
+      '--m-border':'rgba(255,255,255,0.12)','--m-border-h':'rgba(255,255,255,0.22)','--m-hairline':'rgba(255,255,255,0.07)',
+      '--m-text':'#F1F3F1','--m-body':'#B8BEBA','--m-sub':'#858D88','--m-muted':'#7A827C',
+      '--m-brand':'#45C8C3','--m-brand-h':'#6ADDD8','--m-brand-bg':'rgba(69,200,195,0.10)','--m-on-brand':'#090C0C',
+      '--m-gold':'#E0AF63','--m-ok':'#6FD39A','--m-warn':'#F09A5C','--m-err':'#F07C86',
+      '--m-ok-bg':'rgba(111,211,154,0.10)','--m-warn-bg':'rgba(240,154,92,0.10)','--m-err-bg':'rgba(240,124,134,0.10)','--m-gold-bg':'rgba(224,175,99,0.10)',
+      '--m-ub':'#0E1D1A','--m-ub-border':'#1E3A34'},
+    light: {'--m-bg':'#EEF1EE','--m-card':'#FAFBFA','--m-elev':'#FFFFFF','--m-surface':'#E4E9E4',
+      '--m-border':'rgba(0,0,0,0.14)','--m-border-h':'rgba(0,0,0,0.23)','--m-hairline':'rgba(0,0,0,0.07)',
+      '--m-text':'#171B19','--m-body':'#4B534E','--m-sub':'#68716B','--m-muted':'#8A938D',
+      '--m-brand':'#0B7A75','--m-brand-h':'#096B67','--m-brand-bg':'rgba(11,122,117,0.08)','--m-on-brand':'#FFFFFF',
+      '--m-gold':'#8A5D0A','--m-ok':'#1B7F4B','--m-warn':'#A65B00','--m-err':'#B42318',
+      '--m-ok-bg':'rgba(27,127,75,0.08)','--m-warn-bg':'rgba(166,91,0,0.08)','--m-err-bg':'rgba(180,35,24,0.08)','--m-gold-bg':'rgba(138,93,10,0.08)',
+      '--m-ub':'#F1F8F6','--m-ub-border':'#C9DFD9'}
+  };
+  var PAL = {
+    'default': {name:'默认青', dark:{bg:'#040707',fg:'#E6ECE8',red:'#F07C86',green:'#6FD39A',yellow:'#F09A5C',blue:'#6AA9FF',magenta:'#D98AD9',cyan:'#45C8C3'},
+      light:{bg:'#E8EBE8',fg:'#1A1F1D',red:'#B42318',green:'#1B7F4B',yellow:'#8A5D0A',blue:'#1F5FA8',magenta:'#8A3A8A',cyan:'#0B7A75'}},
+    'mocha': {name:'Catppuccin Mocha', dark:{bg:'#1E1E2E',fg:'#CDD6F4',red:'#F38BA8',green:'#A6E3A1',yellow:'#F9E2AF',blue:'#89B4FA',magenta:'#F5C2E7',cyan:'#94E2D5'}},
+    'tokyo': {name:'Tokyo Night', dark:{bg:'#1A1B26',fg:'#C0CAF5',red:'#F7768E',green:'#9ECE6A',yellow:'#E0AF68',blue:'#7AA2F7',magenta:'#BB9AF7',cyan:'#7DCFFF'}},
+    'nord': {name:'Nord', dark:{bg:'#2E3440',fg:'#D8DEE9',red:'#BF616A',green:'#A3BE8C',yellow:'#EBCB8B',blue:'#81A1C1',magenta:'#B48EAD',cyan:'#88C0D0'}}
+  };
+  var MODE_NAMES = {'m-right':'右侧分栏','m-bottom':'底部面板','m-overlay':'悬浮覆盖'};
+  var MODE_ORDER = ['m-right','m-bottom','m-overlay'];
+  var state = {theme:'dark', pal:'default', mode:'m-right', focus:false, sftp:false};
+
+  /* ---------- 空间实测：列 + 行 ---------- */
+  var charW = 7.2, lineH = 20.4;
+  try{
+    var ctx = document.createElement('canvas').getContext('2d');
+    ctx.font = '12px ' + getComputedStyle(term).fontFamily;
+    var w = ctx.measureText('MMMMMMMMMM').width / 10;
+    if(w > 3 && w < 20){ charW = w; }
+    var lh = parseFloat(getComputedStyle(term).lineHeight);
+    if(lh > 12 && lh < 40){ lineH = lh; }
+  }catch(e){}
+  function updateLedger(){
+    var px = Math.max(0, term.clientWidth - 24);
+    var cols = Math.floor(px / charW);
+    var py = Math.max(0, term.clientHeight - 20);
+    var rows = Math.floor(py / lineH);
+    ledger.textContent = '终端净宽 ' + px + 'px ≈ ' + cols + ' 列 · 净高 ' + py + 'px ≈ ' + rows + ' 行';
+  }
+  if(typeof ResizeObserver !== 'undefined'){
+    new ResizeObserver(updateLedger).observe(term);
+  }
+
+  function announce(){
+    var p = PAL[state.pal];
+    var fallback = (state.theme==='light' && !p.light) ? '（亮色回落默认亮青）' : '';
+    var sftpTxt = '';
+    if(state.sftp && !state.focus){
+      sftpTxt = ' · SFTP ' + (sftpPos()==='bottom' ? '下' : '右');
+    }
+    status.textContent = (state.focus ? '专注模式' : MODE_NAMES[state.mode]) + sftpTxt + ' · ' + (state.theme==='dark'?'深色':'浅色') + ' · ' + p.name + fallback;
+  }
+  function applyTheme(){
+    var s = SURF[state.theme];
+    for(var k in s){ shell.style.setProperty(k, s[k]); }
+    var btns = root.querySelectorAll('[data-theme-btn]');
+    for(var i=0;i<btns.length;i++){ btns[i].setAttribute('aria-pressed', btns[i].getAttribute('data-theme-btn')===state.theme ? 'true':'false'); }
+    applyPalette();
+  }
+  function applyPalette(){
+    var p = PAL[state.pal];
+    var t = (state.theme==='light') ? (p.light || PAL['default'].light) : p.dark;
+    shell.style.setProperty('--t-bg', t.bg);
+    shell.style.setProperty('--t-fg', t.fg);
+    shell.style.setProperty('--t-red', t.red);
+    shell.style.setProperty('--t-green', t.green);
+    shell.style.setProperty('--t-yellow', t.yellow);
+    shell.style.setProperty('--t-blue', t.blue);
+    shell.style.setProperty('--t-magenta', t.magenta);
+    shell.style.setProperty('--t-cyan', t.cyan);
+    var btns = root.querySelectorAll('[data-pal]');
+    for(var i=0;i<btns.length;i++){ btns[i].setAttribute('aria-pressed', btns[i].getAttribute('data-pal')===state.pal ? 'true':'false'); }
+    announce();
+  }
+  function setMode(m){
+    state.mode = m;
+    for(var i=0;i<MODE_ORDER.length;i++){ shell.classList.toggle(MODE_ORDER[i], MODE_ORDER[i]===m); }
+    var btns = root.querySelectorAll('[data-mode]');
+    for(var j=0;j<btns.length;j++){ btns[j].setAttribute('aria-pressed', btns[j].getAttribute('data-mode')===m ? 'true':'false'); }
+    applyLayout();
+  }
+  function cycleMode(){
+    var idx = MODE_ORDER.indexOf(state.mode);
+    setMode(MODE_ORDER[(idx+1)%MODE_ORDER.length]);
+  }
+  var focusBtn = document.getElementById('atdp-focus');
+  function setFocus(on){
+    state.focus = on;
+    shell.classList.toggle('focus', on);
+    focusBtn.setAttribute('aria-pressed', on?'true':'false');
+    focusBtn.textContent = on ? '退出专注' : '专注模式';
+    applyLayout();
+  }
+  focusBtn.addEventListener('click', function(){ setFocus(!state.focus); });
+
+  /* ---------- SFTP 正交布局：AI 右→SFTP 下；其余→右 ---------- */
+  function sftpPos(){
+    var aiRight = state.mode==='m-right' && !shell.classList.contains('ai-off') && !state.focus;
+    return aiRight ? 'bottom' : 'right';
+  }
+  var sftpControl = document.getElementById('atdp-sftp-control');
+  var sftpToggle = document.getElementById('atdp-sftp-toggle');
+  function applyLayout(){
+    shell.classList.toggle('sftp-on', state.sftp);
+    var pos = sftpPos();
+    shell.classList.toggle('sftp-bottom', state.sftp && pos==='bottom');
+    shell.classList.toggle('sftp-right', state.sftp && pos==='right');
+    var pressed = state.sftp ? 'true' : 'false';
+    if(sftpToggle){ sftpToggle.setAttribute('aria-pressed', pressed); }
+    if(sftpControl){
+      sftpControl.setAttribute('aria-pressed', pressed);
+      sftpControl.textContent = state.sftp ? '关闭 SFTP' : '打开 SFTP';
+    }
+    announce(); updateLedger();
+  }
+  function setSftp(on){
+    state.sftp = on;
+    applyLayout();
+  }
+  if(sftpControl){ sftpControl.addEventListener('click', function(){ setSftp(!state.sftp); }); }
+  if(sftpToggle){ sftpToggle.addEventListener('click', function(){ setSftp(!state.sftp); }); }
+
+  var themeBtns = root.querySelectorAll('[data-theme-btn]');
+  for(var i=0;i<themeBtns.length;i++){
+    themeBtns[i].addEventListener('click', function(){ state.theme = this.getAttribute('data-theme-btn'); applyTheme(); });
+  }
+  var palBtns = root.querySelectorAll('[data-pal]');
+  for(var j=0;j<palBtns.length;j++){
+    palBtns[j].addEventListener('click', function(){ state.pal = this.getAttribute('data-pal'); applyPalette(); });
+  }
+  var modeBtns = root.querySelectorAll('[data-mode]');
+  for(var m=0;m<modeBtns.length;m++){
+    modeBtns[m].addEventListener('click', function(){ setMode(this.getAttribute('data-mode')); });
+  }
+
+  /* ---------- 顶栏：标签 / AI / 监控 ---------- */
+  var tabsBox = document.getElementById('atdp-tabs');
+  var tabAdd = document.getElementById('atdp-tab-add');
+  var tabCount = 2;
+  function activateTab(btn){
+    var all = tabsBox.querySelectorAll('.tab');
+    for(var i=0;i<all.length;i++){ all[i].setAttribute('aria-pressed', all[i]===btn?'true':'false'); }
+    var host = btn.getAttribute('data-host');
+    var spans = root.querySelectorAll('.atdp-prompt-host');
+    for(var s=0;s<spans.length;s++){ spans[s].textContent = host; }
+    var sHost = document.getElementById('atdp-sftp-host');
+    if(sHost){
+      sHost.textContent = host;
+      sftpPath = '/var/www'; sftpStack = []; sftpSel = null;
+      sftpRender();
+    }
+  }
+  tabsBox.addEventListener('click', function(e){
+    var btn = e.target.closest ? e.target.closest('.tab') : null;
+    if(btn){ activateTab(btn); }
+  });
+  tabAdd.addEventListener('click', function(){
+    if(tabCount>=5){ return; }
+    tabCount++;
+    var name = 'web-0'+tabCount;
+    var btn = document.createElement('button');
+    btn.type='button'; btn.className='tab'; btn.setAttribute('data-host',name); btn.setAttribute('aria-pressed','false');
+    var dot = document.createElement('span'); dot.className='sd'; dot.style.background='var(--m-ok)';
+    btn.appendChild(dot); btn.appendChild(document.createTextNode(name));
+    tabsBox.appendChild(btn);
+    activateTab(btn);
+    if(tabCount>=5){ tabAdd.disabled = true; }
+  });
+  var aiToggle = document.getElementById('atdp-ai-toggle');
+  aiToggle.addEventListener('click', function(){
+    var on = this.getAttribute('aria-pressed')==='true';
+    this.setAttribute('aria-pressed', on?'false':'true');
+    shell.classList.toggle('ai-off', on);
+    applyLayout();
+  });
+  var monToggle = document.getElementById('atdp-mon-toggle');
+  var monitor = document.getElementById('atdp-monitor');
+  function toggleMonitor(){
+    var on = monToggle.getAttribute('aria-pressed')==='true';
+    monToggle.setAttribute('aria-pressed', on?'false':'true');
+    monitor.hidden = on;
+  }
+  monToggle.addEventListener('click', toggleMonitor);
+
+  /* ---------- 抽屉 ---------- */
+  var drawer = document.getElementById('atdp-drawer');
+  var drawerTitle = document.getElementById('atdp-drawer-title');
+  var drawerClose = document.getElementById('atdp-drawer-close');
+  var DRAWER_NAMES = {hosts:'主机管理',snippets:'快捷命令',runbooks:'运维工作流',audit:'审计日志',settings:'设置',history:'会话历史',log:'Agent 执行日志',orch:'多机编排'};
+  function openDrawer(name){
+    closeMenu();
+    drawerTitle.textContent = DRAWER_NAMES[name] || '功能';
+    for(var key in DRAWER_NAMES){
+      var el = document.getElementById('atdp-d-'+key);
+      if(el){ el.hidden = (key!==name); }
+    }
+    drawer.hidden = false;
+    var search = document.getElementById('atdp-host-search');
+    if(name==='hosts' && search){ search.focus(); } else { drawerClose.focus(); }
+  }
+  function closeDrawer(){ drawer.hidden = true; }
+  drawerClose.addEventListener('click', closeDrawer);
+
+  /* ---------- 网格菜单 ---------- */
+  var menu = document.getElementById('atdp-menu');
+  var menuBtn = document.getElementById('atdp-menu-btn');
+  function openMenu(){ closePalette(); menu.hidden = false; menuBtn.setAttribute('aria-expanded','true'); }
+  function closeMenu(){ menu.hidden = true; menuBtn.setAttribute('aria-expanded','false'); }
+  menuBtn.addEventListener('click', function(){ if(menu.hidden){ openMenu(); } else { closeMenu(); } });
+  menu.addEventListener('click', function(e){
+    var btn = e.target.closest ? e.target.closest('button') : null;
+    if(!btn) return;
+    var open = btn.getAttribute('data-open');
+    var action = btn.getAttribute('data-action');
+    if(open){ openDrawer(open); }
+    else if(action==='focus'){ closeMenu(); setFocus(!state.focus); }
+    else if(action==='cycle'){ closeMenu(); cycleMode(); }
+    else if(action==='monitor'){ closeMenu(); toggleMonitor(); }
+    else if(action==='sftp'){ closeMenu(); setSftp(!state.sftp); }
+  });
+  document.addEventListener('click', function(e){
+    if(!menu.hidden && !menu.contains(e.target) && e.target!==menuBtn && !menuBtn.contains(e.target)){ closeMenu(); }
+  });
+
+  /* ---------- 命令面板 ---------- */
+  var scrim = document.getElementById('atdp-scrim');
+  var palette = document.getElementById('atdp-palette');
+  var palBtn = document.getElementById('atdp-pal-btn');
+  var palInput = document.getElementById('atdp-pal-input');
+  var palList = document.getElementById('atdp-pal-list');
+  var palEmpty = document.getElementById('atdp-pal-empty');
+  var ITEMS = [
+    {type:'主机', name:'web-01', sub:'10.0.1.11 · 生产 · 在线', kind:'drawer', target:'hosts'},
+    {type:'主机', name:'web-02', sub:'10.0.1.12 · 生产 · 在线', kind:'drawer', target:'hosts'},
+    {type:'主机', name:'db-01', sub:'10.0.1.21 · 数据库 · 高负载', kind:'drawer', target:'hosts'},
+    {type:'主机', name:'staging-01', sub:'10.0.2.31 · 测试 · 离线', kind:'drawer', target:'hosts'},
+    {type:'命令', name:'查看端口占用', sub:'ss -tlnp', kind:'cmd', cmd:'ss -tlnp'},
+    {type:'命令', name:'磁盘占用总览', sub:'df -h --exclude-type=tmpfs', kind:'cmd', cmd:'df -h --exclude-type=tmpfs'},
+    {type:'命令', name:'清理 7 天前日志', sub:'sudo journalctl --vacuum-time=7d', kind:'cmd', cmd:'sudo journalctl --vacuum-time=7d'},
+    {type:'命令', name:'内存 Top 10 进程', sub:'ps aux --sort=-%mem | head -11', kind:'cmd', cmd:'ps aux --sort=-%mem | head -11'},
+    {type:'流程', name:'Nginx 平滑重启', sub:'4 步 · 已完成', kind:'drawer', target:'runbooks'},
+    {type:'流程', name:'MySQL 慢查询排查', sub:'6 步 · 等待确认', kind:'drawer', target:'runbooks'},
+    {type:'流程', name:'磁盘扩容检查', sub:'3 步 · 失败', kind:'drawer', target:'runbooks'},
+    {type:'页面', name:'主机管理', sub:'4 台主机', kind:'drawer', target:'hosts'},
+    {type:'页面', name:'快捷命令', sub:'4 条', kind:'drawer', target:'snippets'},
+    {type:'页面', name:'运维工作流', sub:'3 个', kind:'drawer', target:'runbooks'},
+    {type:'页面', name:'审计日志', sub:'今日 12 条', kind:'drawer', target:'audit'},
+    {type:'页面', name:'设置', sub:'外观 / 模型 / 安全…', kind:'drawer', target:'settings'},
+    {type:'操作', name:'开关 SFTP 面板', sub:'与 AI 面板正交：AI 右→下，AI 下→右', kind:'action', action:'sftp'},
+    {type:'操作', name:'专注模式', sub:'隐藏 AI / SFTP / 监控，终端全宽', kind:'action', action:'focus'},
+    {type:'操作', name:'切换 AI 面板位置', sub:'右侧 → 底部 → 悬浮', kind:'action', action:'cycle'},
+    {type:'操作', name:'开关监控条', sub:'CPU / 内存 / 负载 / 网络', kind:'action', action:'monitor'}
+  ];
+  var filtered = ITEMS.slice();
+  var active = 0;
+  function renderPal(q){
+    q = (q||'').trim().toLowerCase();
+    filtered = ITEMS.filter(function(it){
+      return !q || (it.type+' '+it.name+' '+it.sub).toLowerCase().indexOf(q)>=0;
+    });
+    active = 0;
+    palList.textContent = '';
+    for(var i=0;i<filtered.length;i++){
+      var it = filtered[i];
+      var b = document.createElement('button');
+      b.type='button'; b.className='pal-item'; b.setAttribute('role','option');
+      b.setAttribute('data-idx', String(i));
+      b.setAttribute('aria-selected', i===0?'true':'false');
+      var t = document.createElement('span'); t.className='pal-type'; t.textContent = it.type;
+      var n = document.createElement('span'); n.className='pal-name'; n.textContent = it.name;
+      var s = document.createElement('span'); s.className='pal-sub'; s.textContent = it.sub;
+      b.appendChild(t); b.appendChild(n); b.appendChild(s);
+      palList.appendChild(b);
+    }
+    palEmpty.hidden = filtered.length>0;
+  }
+  function setActive(idx){
+    if(!filtered.length) return;
+    active = Math.max(0, Math.min(filtered.length-1, idx));
+    var opts = palList.querySelectorAll('.pal-item');
+    for(var i=0;i<opts.length;i++){ opts[i].setAttribute('aria-selected', i===active?'true':'false'); }
+  }
+  function openPalette(){
+    closeMenu(); closeDrawer();
+    palette.hidden = false; scrim.hidden = false;
+    palInput.value=''; renderPal('');
+    palInput.focus();
+  }
+  function closePalette(){
+    if(palette.hidden) return;
+    palette.hidden = true; scrim.hidden = true;
+    palBtn.focus();
+  }
+  function insertCommand(cmd){
+    var cursorLine = document.getElementById('atdp-cursor-line');
+    var host = 'web-01';
+    var act = tabsBox.querySelector('.tab[aria-pressed="true"]');
+    if(act){ host = act.getAttribute('data-host'); }
+    var ln = document.createElement('div'); ln.className='ln';
+    var prompt = document.createElement('span'); prompt.className='t-green'; prompt.textContent='keiskei@'+host;
+    var colon = document.createElement('span'); colon.className='t-dim'; colon.textContent=':';
+    var path = document.createElement('span'); path.className='t-blue'; path.textContent='~';
+    var dollar = document.createElement('span'); dollar.className='t-dim'; dollar.textContent='$ ';
+    var c = document.createElement('span'); c.textContent = cmd;
+    ln.appendChild(prompt); ln.appendChild(colon); ln.appendChild(path); ln.appendChild(dollar); ln.appendChild(c);
+    term.insertBefore(ln, cursorLine);
+    while(term.children.length>16){ term.removeChild(term.firstChild); }
+    status.textContent = '已插入命令：' + cmd;
+  }
+  function execute(item){
+    closePalette();
+    if(item.kind==='drawer'){ openDrawer(item.target); }
+    else if(item.kind==='cmd'){ insertCommand(item.cmd); }
+    else if(item.kind==='action'){
+      if(item.action==='focus'){ setFocus(!state.focus); }
+      else if(item.action==='cycle'){ cycleMode(); }
+      else if(item.action==='monitor'){ toggleMonitor(); }
+      else if(item.action==='sftp'){ setSftp(!state.sftp); }
+    }
+  }
+  palBtn.addEventListener('click', openPalette);
+  scrim.addEventListener('click', closePalette);
+  palInput.addEventListener('input', function(){ renderPal(this.value); });
+  palInput.addEventListener('keydown', function(e){
+    if(e.key==='ArrowDown'){ e.preventDefault(); setActive(active+1); }
+    else if(e.key==='ArrowUp'){ e.preventDefault(); setActive(active-1); }
+    else if(e.key==='Enter'){ e.preventDefault(); if(filtered[active]){ execute(filtered[active]); } }
+    else if(e.key==='Escape'){ e.preventDefault(); closePalette(); }
+  });
+  palList.addEventListener('click', function(e){
+    var btn = e.target.closest ? e.target.closest('.pal-item') : null;
+    if(btn){ execute(filtered[Number(btn.getAttribute('data-idx'))]); }
+  });
+  palList.addEventListener('mouseover', function(e){
+    var btn = e.target.closest ? e.target.closest('.pal-item') : null;
+    if(btn){ setActive(Number(btn.getAttribute('data-idx'))); }
+  });
+  document.addEventListener('keydown', function(e){
+    if((e.ctrlKey||e.metaKey) && (e.key==='k'||e.key==='K')){
+      e.preventDefault();
+      if(palette.hidden){ openPalette(); } else { closePalette(); }
+    } else if(e.key==='Escape'){
+      if(!palette.hidden){ closePalette(); }
+      else if(!menu.hidden){ closeMenu(); }
+      else if(!drawer.hidden){ closeDrawer(); }
+    }
+  });
+
+  /* ---------- 手风琴 / 主机搜索 / 演示聊天 ---------- */
+  var accs = root.querySelectorAll('[data-acc]');
+  for(var a=0;a<accs.length;a++){
+    accs[a].addEventListener('click', function(){
+      var detail = this.parentElement.querySelector('.detail');
+      if(!detail) return;
+      var open = this.getAttribute('aria-expanded')==='true';
+      this.setAttribute('aria-expanded', open?'false':'true');
+      detail.hidden = open;
+    });
+  }
+  var search = document.getElementById('atdp-host-search');
+  var hostCards = root.querySelectorAll('.host-card');
+  var hostCount = document.getElementById('atdp-host-count');
+  var hostEmpty = document.getElementById('atdp-host-empty');
+  search.addEventListener('input', function(){
+    var q = this.value.trim().toLowerCase();
+    var shown = 0, prod = 0, test = 0;
+    for(var i=0;i<hostCards.length;i++){
+      var c = hostCards[i];
+      var hit = !q || c.getAttribute('data-key').toLowerCase().indexOf(q)>=0;
+      c.hidden = !hit;
+      if(hit){ shown++; if(c.getAttribute('data-group')==='prod'){prod++;} else {test++;} }
+    }
+    hostCount.textContent = '共 ' + shown + ' 台';
+    hostEmpty.hidden = shown>0;
+    var gc = root.querySelectorAll('[data-gcount]');
+    for(var g=0;g<gc.length;g++){
+      gc[g].textContent = gc[g].getAttribute('data-gcount')==='prod' ? prod : test;
+    }
+  });
+  var aiInput = document.getElementById('atdp-ai-input');
+  var aiSend = document.getElementById('atdp-ai-send');
+  var aiBody = document.getElementById('atdp-ai-body');
+  var modelChip = root.querySelector('.model-chip');
+  function sendDemo(){
+    var text = aiInput.value.trim();
+    if(!text){ return; }
+    var ub = document.createElement('div'); ub.className='ububble'; ub.textContent = text;
+    var wrap = document.createElement('div');
+    var role = document.createElement('div'); role.className='role'; role.textContent='Agent';
+    var p = document.createElement('p'); p.className='agent-text';
+    p.textContent = '这是样式演示面板，不会真正调用模型。实际对话由 Agent 引擎驱动，卡片与状态样式与此处一致。';
+    wrap.appendChild(role); wrap.appendChild(p);
+    aiBody.appendChild(ub); aiBody.appendChild(wrap);
+    while(aiBody.children.length>14){ aiBody.removeChild(aiBody.firstChild); }
+    aiInput.value='';
+  }
+  aiSend.addEventListener('click', sendDemo);
+  aiInput.addEventListener('keydown', function(e){
+    if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendDemo(); }
+  });
+
+  /* ---------- AI 底栏：功能排与胶囊 ---------- */
+  var toolBtns = {
+    log: document.getElementById('atdp-log-btn'),
+    history: document.getElementById('atdp-history-btn'),
+    newsession: document.getElementById('atdp-newsession-btn'),
+    web: document.getElementById('atdp-web-btn'),
+    runbook: document.getElementById('atdp-runbook-btn'),
+    orch: document.getElementById('atdp-orch-btn'),
+    mode: document.getElementById('atdp-mode-capsule')
+  };
+  toolBtns.log.addEventListener('click', function(){ openDrawer('log'); });
+  toolBtns.history.addEventListener('click', function(){ openDrawer('history'); });
+  toolBtns.runbook.addEventListener('click', function(){ openDrawer('runbooks'); });
+  toolBtns.mode.addEventListener('click', function(){ openDrawer('orch'); });
+  toolBtns.newsession.addEventListener('click', function(){
+    aiBody.textContent = '';
+    status.textContent = '已新建会话（演示：清空对话流）';
+  });
+  toolBtns.web.addEventListener('click', function(){
+    var on = this.getAttribute('aria-pressed')==='true';
+    this.setAttribute('aria-pressed', on?'false':'true');
+    status.textContent = '联网搜索：' + (on?'未启用':'已启用（下次任务生效）');
+  });
+  toolBtns.orch.addEventListener('click', function(){
+    var on = this.getAttribute('aria-pressed')==='true';
+    this.setAttribute('aria-pressed', on?'false':'true');
+    shell.classList.toggle('orch', !on);
+    status.textContent = on ? '已退出多机编排' : '多机编排：已选 2 台主机（点击「Agent 模式」胶囊查看清单）';
+    if(!on){ openDrawer('orch'); }
+  });
+  var permSelect = document.getElementById('atdp-perm-select');
+  permSelect.addEventListener('change', function(){
+    status.textContent = '执行权限：' + this.options[this.selectedIndex].text;
+  });
+  var modelSelect = document.getElementById('atdp-model-select');
+  modelSelect.addEventListener('change', function(){
+    if(modelChip){ modelChip.textContent = this.value.replace(/ (High|Low)$/,''); }
+    status.textContent = '模型 / 思考档位：' + this.value;
+  });
+  var sessionBtns = root.querySelectorAll('[data-session]');
+  for(var sb=0;sb<sessionBtns.length;sb++){
+    sessionBtns[sb].addEventListener('click', function(){
+      closeDrawer();
+      status.textContent = '已载入会话：' + this.getAttribute('data-session');
+    });
+  }
+
+  /* ---------- SFTP 文件面板 ---------- */
+  var FS = {
+    '/':[{n:'home',d:1},{n:'var',d:1},{n:'etc',d:1},{n:'backup-20261114.tar.gz',s:'2.4 GB',m:'11-14 22:10'}],
+    '/var':[{n:'www',d:1},{n:'log',d:1},{n:'lib',d:1}],
+    '/var/www':[{n:'html',d:1},{n:'releases',d:1},{n:'nginx.conf',s:'1.8 KB',m:'11-14 22:10'},{n:'app.conf',s:'640 B',m:'11-12 09:31'},{n:'cert.pem',s:'3.1 KB',m:'10-02 03:00'}],
+    '/var/www/html':[{n:'index.html',s:'4.2 KB',m:'11-14 21:58'},{n:'favicon.ico',s:'15 KB',m:'09-18 12:04'}],
+    '/var/www/releases':[{n:'20261113',d:1},{n:'20261101',d:1},{n:'rollback.sh',s:'1.1 KB',m:'11-13 23:40'}],
+    '/var/log':[{n:'syslog',s:'18 MB',m:'11-15 12:02'},{n:'nginx-access.log',s:'64 MB',m:'11-15 11:59'}]
+  };
+  var sftpHost = document.getElementById('atdp-sftp-host');
+  var sftpCrumbs = document.getElementById('atdp-sftp-crumbs');
+  var sftpList = document.getElementById('atdp-sftp-list');
+  var sftpFoot = document.getElementById('atdp-sftp-foot');
+  var sftpPath = '/var/www';
+  var sftpStack = [];
+  var sftpSel = null;
+  function entries(path){ return FS[path] || []; }
+  function sftpRender(){
+    var parts = sftpPath==='/' ? [] : sftpPath.split('/').filter(Boolean);
+    sftpCrumbs.textContent = '';
+    var mk = function(label, path){
+      var b = document.createElement('button'); b.type='button'; b.className='sftp-crumb';
+      b.textContent = label; b.setAttribute('data-path', path);
+      sftpCrumbs.appendChild(b);
+    };
+    mk('/', '/');
+    var acc = '';
+    for(var i=0;i<parts.length;i++){
+      acc += '/' + parts[i];
+      mk('/' + parts[i], acc);
+    }
+    sftpList.textContent = '';
+    var list = entries(sftpPath);
+    for(var j=0;j<list.length;j++){
+      (function(entry){
+        var row = document.createElement('button'); row.type='button';
+        row.className = 'sftp-row' + (entry.d ? '' : ' file');
+        if(sftpSel && sftpSel.p===sftpPath && sftpSel.n===entry.n){ row.setAttribute('aria-pressed','true'); }
+        var name = document.createElement('span'); name.className='sftp-name';
+        var ic = document.createElement('span'); ic.className='sftp-ic'; ic.textContent = entry.d ? '▤' : '▪';
+        var nm = document.createElement('span'); nm.textContent = entry.n;
+        name.appendChild(ic); name.appendChild(nm);
+        var size = document.createElement('span'); size.className='sftp-size'; size.textContent = entry.d ? '—' : (entry.s || '');
+        var mt = document.createElement('span'); mt.className='sftp-mtime'; mt.textContent = entry.m || '11-15 10:00';
+        row.appendChild(name); row.appendChild(size); row.appendChild(mt);
+        row.addEventListener('click', function(){
+          if(entry.d){ sftpNavigate((sftpPath==='/'?'':sftpPath) + '/' + entry.n); }
+          else{
+            sftpSel = (sftpSel && sftpSel.n===entry.n && sftpSel.p===sftpPath) ? null : {p:sftpPath, n:entry.n};
+            sftpFoot.textContent = sftpSel ? ('已选中 ' + entry.n + ' · 上传/下载走真实 SFTP 通道') : ('已连接 ' + sftpHost.textContent + ' · ' + sftpPath + ' · ' + list.length + ' 项');
+            sftpRender();
+          }
+        });
+        sftpList.appendChild(row);
+      })(list[j]);
+    }
+    if(!list.length){
+      var empty = document.createElement('div'); empty.className='sftp-empty'; empty.textContent='空目录';
+      sftpList.appendChild(empty);
+    }
+    if(!sftpSel){
+      sftpFoot.textContent = '已连接 ' + sftpHost.textContent + ' · ' + sftpPath + ' · ' + list.length + ' 项';
+    }
+  }
+  function sftpNavigate(path){
+    if(path===sftpPath){ return; }
+    sftpStack.push(sftpPath);
+    sftpPath = path; sftpSel = null;
+    sftpRender();
+    status.textContent = 'SFTP：' + path;
+  }
+  sftpCrumbs.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('.sftp-crumb') : null;
+    if(b){ sftpNavigate(b.getAttribute('data-path')); }
+  });
+  var sftpPanel = document.getElementById('atdp-sftp');
+  sftpPanel.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('[data-sftp]') : null;
+    if(!b){ return; }
+    var act = b.getAttribute('data-sftp');
+    if(act==='close'){ setSftp(false); }
+    else if(act==='back'){ if(sftpStack.length){ sftpPath = sftpStack.pop(); sftpSel=null; sftpRender(); } }
+    else if(act==='home'){ sftpNavigate('/'); }
+    else if(act==='refresh'){ sftpSel=null; sftpRender(); status.textContent='SFTP：已刷新 ' + sftpPath; }
+    else if(act==='upload'){
+      FS[sftpPath] = entries(sftpPath).concat([{n:'deploy-notes.log', s:'0.4 MB', m:'刚刚'}]);
+      sftpSel=null; sftpRender(); status.textContent='SFTP：已上传 deploy-notes.log 到 ' + sftpPath;
+    }
+    else if(act==='mkdir'){
+      var base='新建目录', name=base, k=2;
+      while(entries(sftpPath).some(function(x){return x.n===name;})){ name = base + ' ' + (k++); }
+      FS[sftpPath] = entries(sftpPath).concat([{n:name, d:1}]);
+      sftpSel=null; sftpRender(); status.textContent='SFTP：已创建 ' + name;
+    }
+  });
+
+  applyTheme();
+  setMode('m-right');
+  sftpRender();
+  applyLayout();
+})();
+</script>
+</div></body>
+</html>
