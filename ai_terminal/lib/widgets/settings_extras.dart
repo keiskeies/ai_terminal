@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +15,7 @@ import '../providers/app_providers.dart';
 import '../services/crash_reporter.dart';
 import '../services/daos.dart';
 import '../services/health_check_service.dart';
+import '../services/update_check_service.dart';
 import 'settings_row_card.dart';
 
 /// 设置页「管理」区的入口行（**只在整页设置用**）。
@@ -146,20 +149,7 @@ class _SettingsAboutRowsState extends ConsumerState<SettingsAboutRows> {
           detail: [_languageList(code)],
         ),
         const SizedBox(height: kSettingsRowGap),
-        _VersionCard(
-          dense: widget.dense,
-          onCopy: (text) {
-            Clipboard.setData(ClipboardData(text: text));
-            showTopSnackBar(
-              context,
-              SnackBar(
-                content: Text(UiText.t('已复制版本信息', 'Version info copied')),
-                duration: const Duration(seconds: 1),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          },
-        ),
+        _VersionCard(dense: widget.dense),
         const SizedBox(height: kSettingsRowGap),
         SettingsRowCard(
           dense: widget.dense,
@@ -381,14 +371,15 @@ class _SettingsAboutRowsState extends ConsumerState<SettingsAboutRows> {
   }
 }
 
-/// 版本卡片：显示版本 + 构建号，点按复制。
+/// 版本卡片：显示版本号，点按检查更新（GitHub Releases）。
 ///
-/// 以前这里挂了个「检查更新」按钮，但项目里没有更新服务端，点下去只是把版本号
-/// 再弹一遍。与其留个假按钮，不如老实给出版本，并提供「复制版本信息」。
+/// 中间态回退过一次：先是有个假的「检查更新」按钮（点了只弹版本号），
+/// 后来砍成「点按复制」。现在仓库在 GitHub 上有 CI 自动发布的 Release，
+/// 检查更新有了真实数据源，就恢复成检查更新 —— 发现新版时整行变成动作，
+/// 再点一下打开浏览器到 Release 页。复制版本信息降级为长按（排障时偶尔用）。
 class _VersionCard extends StatefulWidget {
-  const _VersionCard({required this.onCopy, this.dense = false});
+  const _VersionCard({this.dense = false});
 
-  final void Function(String text) onCopy;
   final bool dense;
 
   @override
@@ -398,33 +389,143 @@ class _VersionCard extends StatefulWidget {
 class _VersionCardState extends State<_VersionCard> {
   bool _hovering = false;
   String _version = '';
-  String _build = '';
+
+  /// 检查更新的状态机：idle → checking → upToDate / available / failed。
+  _UpdateState _state = _UpdateState.idle;
+  UpdateInfo? _latest;
+  String _error = '';
 
   @override
   void initState() {
     super.initState();
+    // 副标题只显示版本主体：+构建号是打包元数据，普通用户不关心，
+    // 要排查问题时「诊断」区里有完整读数。
     PackageInfo.fromPlatform().then((info) {
       if (!mounted) return;
-      setState(() {
-        _version = info.version;
-        _build = info.buildNumber;
-      });
+      setState(() => _version = normalizeVersion(info.version));
     }).catchError((_) {});
+  }
+
+  Future<void> _check() async {
+    if (_state == _UpdateState.checking) return;
+    setState(() {
+      _state = _UpdateState.checking;
+      _error = '';
+    });
+    try {
+      final latest = await UpdateCheckService.instance.fetchLatest();
+      if (!mounted) return;
+      final newer = _version.isEmpty ||
+          compareVersions(latest.version, _version) > 0;
+      setState(() {
+        _latest = latest;
+        _state =
+            newer ? _UpdateState.available : _UpdateState.upToDate;
+      });
+    } on UpdateCheckException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _state = _UpdateState.failed;
+        _error = e.message;
+      });
+    }
+  }
+
+  Future<void> _openRelease() async {
+    final url = _latest?.url;
+    if (url == null) return;
+    try {
+      if (Platform.isWindows) {
+        await Process.run('rundll32', ['url.dll,FileProtocolHandler', url]);
+      } else if (Platform.isMacOS) {
+        await Process.run('open', [url]);
+      } else {
+        await Process.run('xdg-open', [url]);
+      }
+    } catch (_) {
+      await Clipboard.setData(ClipboardData(text: url));
+      if (!mounted) return;
+      showTopSnackBar(
+        context,
+        SnackBar(
+          content: Text(UiText.t('打开链接失败，已复制到剪贴板',
+              'Failed to open the link; copied to clipboard')),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  void _onTap() {
+    // 发现新版之后，这一行就是「去下载」；其余状态点了都是重新检查。
+    if (_state == _UpdateState.available) {
+      _openRelease();
+    } else {
+      _check();
+    }
+  }
+
+  Future<void> _copyVersion() async {
+    await Clipboard.setData(
+        ClipboardData(text: 'AI Terminal $_version'));
+    if (!mounted) return;
+    showTopSnackBar(
+      context,
+      SnackBar(
+        content: Text(UiText.t('已复制版本信息', 'Version info copied')),
+        duration: const Duration(seconds: 1),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
-    final versionText =
-        _version.isEmpty ? UiText.t('读取中…', 'Loading…') : '$_version+$_build';
+    final (String sub, Color subColor, IconData icon) = switch (_state) {
+      _ when _version.isEmpty => (
+          'AI Terminal · ${UiText.t('读取中…', 'Loading…')}',
+          tc.textSub,
+          Icons.downloading_rounded,
+        ),
+      _UpdateState.checking => (
+          UiText.t('正在检查更新…', 'Checking for updates…'),
+          tc.textSub,
+          Icons.downloading_rounded,
+        ),
+      _UpdateState.available => (
+          UiText.t('发现新版本 ${_latest?.version ?? ''}，点击查看',
+              'Version ${_latest?.version ?? ''} available — tap to open'),
+          tc.brand,
+          Icons.system_update_alt_rounded,
+        ),
+      _UpdateState.upToDate => (
+          UiText.t('已是最新版本', 'You are on the latest version'),
+          tc.ok,
+          Icons.check_circle_outline_rounded,
+        ),
+      _UpdateState.failed => (
+          _error,
+          tc.error,
+          Icons.wifi_tethering_error_rounded,
+        ),
+      _UpdateState.idle => (
+          'AI Terminal · $_version',
+          tc.textSub,
+          Icons.system_update_alt_rounded,
+        ),
+    };
     return MouseRegion(
       onEnter: (_) => setState(() => _hovering = true),
       onExit: (_) => setState(() => _hovering = false),
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
-        onTap: () => widget.onCopy('AI Terminal $versionText'),
-        child: Container(
+        onTap: _onTap,
+        onLongPress: _version.isEmpty ? null : _copyVersion,
+        child: AnimatedContainer(
+          duration: animFast,
           constraints: const BoxConstraints(minHeight: 44),
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
           decoration: BoxDecoration(
@@ -451,19 +552,17 @@ class _VersionCardState extends State<_VersionCard> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'AI Terminal · $versionText',
+                      sub,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: widget.dense ? fMicro : fSmall,
-                        color: tc.textSub,
-                      ),
+                      style:
+                          TextStyle(fontSize: widget.dense ? fMicro : fSmall, color: subColor),
                     ),
                   ],
                 ),
               ),
               const SizedBox(width: 8),
-              Icon(Icons.copy_rounded, size: 14, color: tc.textMuted),
+              Icon(icon, size: 14, color: subColor),
             ],
           ),
         ),
@@ -471,3 +570,6 @@ class _VersionCardState extends State<_VersionCard> {
     );
   }
 }
+
+enum _UpdateState { idle, checking, upToDate, available, failed }
+
