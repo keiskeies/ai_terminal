@@ -141,6 +141,14 @@ class AgentEngine {
   /// 引擎不自行递增——续跑、用户提问都由 provider 那条统一路径计数。
   int _roundIndex = 0;
 
+  /// 当前任务是否目标模式的续跑轮（含 /goal 首轮）。
+  /// provider 的目标终局判定只认目标轮：用户提问轮收尾不触发自动续跑，
+  /// 也不计入"无进展"，否则答完问题又咔咔续跑旧目标（反刍残留链路）。
+  bool _currentTaskIsGoalRound = false;
+
+  /// 当前任务是否目标续跑轮（供 provider 终局判定读取）
+  bool get currentTaskIsGoalRound => _currentTaskIsGoalRound;
+
   /// 被拦截而未执行的命令数（安全策略 / 权限档位 / 用户拒绝 / 确认超时）
   int _blockedCount = 0;
 
@@ -283,6 +291,12 @@ class AgentEngine {
   /// 达到 _maxFinishWithoutExecRetries 后放行 finish（避免死循环）
   int _finishWithoutExecCount = 0;
   static const int _maxFinishWithoutExecRetries = 2;
+
+  /// 纯问答显式声明标记：模型在 finish 的思考/正文里写明这句话，
+  /// 表示本轮是基于已有上下文的问答，幻觉门控让路。
+  /// 与 [_userForbadeCommands]（只由用户原文置位）不同，这是模型自声明，
+  /// 提示词已把它限定在纯提问任务；操作类任务不带声明的幻觉 finish 仍被拦。
+  static const String _pureQaDeclaration = '纯问答，无需执行命令';
 
   /// 用户是否显式要求本次任务不要执行命令（"严禁执行任何命令，只根据会话回答"）
   ///
@@ -849,6 +863,7 @@ class AgentEngine {
   void _resetTransientState() {
     _accumulatedMessage = '';
     _steeringQueue.clear(); // O5: 旧任务的补充指令不能带进新任务
+    _currentTaskIsGoalRound = false;
     _noCommandRetryCount = 0;
     _hasExecutedAnyCommand = false;
     _finishWithoutExecCount = 0;
@@ -938,16 +953,19 @@ class AgentEngine {
   /// [goal] 用户目标
   /// [executor] 命令执行器，支持 SSHService（远程）或 LocalTerminalService（本地）
   /// [roundIndex] 会话累计轮次（用户提问 + 目标续跑），由 provider 计算并持久化
+  /// [isGoalRound] 是否目标模式的续跑轮（含 /goal 首轮）。用户提问/普通指令
+  /// 不是目标轮：终局时不参与目标续跑判定，否则纯问答答完又自动续跑旧目标。
   Future<void> startTask(String goal, CommandExecutor? executor,
-      {int roundIndex = 0}) {
+      {int roundIndex = 0, bool isGoalRound = false}) {
     return agentLogger.runWithConversation(
       conversationId,
-      () => _startTask(goal, executor, roundIndex: roundIndex),
+      () => _startTask(goal, executor,
+          roundIndex: roundIndex, isGoalRound: isGoalRound),
     );
   }
 
   Future<void> _startTask(String goal, CommandExecutor? executor,
-      {int roundIndex = 0}) async {
+      {int roundIndex = 0, bool isGoalRound = false}) async {
     agentLogger.info('AgentEngine', '=== 开始任务 ===');
     agentLogger.info('AgentEngine', '目标: $goal');
     agentLogger.info('AgentEngine', '模式: Agent (ReAct)');
@@ -982,6 +1000,7 @@ class AgentEngine {
     _blockedCount = 0;
     _toolCalls = 0;
     _roundIndex = roundIndex;
+    _currentTaskIsGoalRound = isGoalRound;
     _confirmWaitSeconds = 0;
     _contextTokens = 0;
     _lastRoundReal = 0;
@@ -1304,6 +1323,7 @@ class AgentEngine {
     final previousStartedAt = _taskStartTime ?? _currentTask!.createdAt;
     final hadExecutedAnyCommand = _hasExecutedAnyCommand;
     final hadForbiddenCommands = _userForbadeCommands;
+    final wasGoalRound = _currentTaskIsGoalRound;
     final previousChangeIds = List<String>.of(_operationChangeIds);
     final previousChanges = List<OperationChange>.of(_operationChanges);
     final previousBadges = List<OperationBadge>.of(_operationBadges);
@@ -1319,6 +1339,7 @@ class AgentEngine {
     _stepOffset = previousStepCount;
     _hasExecutedAnyCommand = hadExecutedAnyCommand;
     _userForbadeCommands = hadForbiddenCommands;
+    _currentTaskIsGoalRound = wasGoalRound;
     _operationChangeIds.addAll(previousChangeIds);
     _operationChanges.addAll(previousChanges);
     _operationBadges.addAll(previousBadges);
@@ -1483,10 +1504,26 @@ class AgentEngine {
           0, ChatMessage.create(role: 'system', content: systemPrompt));
     }
 
-    // 添加用户消息
+    // 添加用户消息。包装保持意图中性：纯提问（问原因/原理）不是操作任务，
+    // 旧文案"请分析任务并开始执行"会把模型框进执行模式，见提示词【纯提问直接回答】。
+    // 旧历史里追加的新问题必须标记为独立请求，否则模型把它当上一任务的续跑，
+    // 重新执行命令并"反刍"上一任务的总结。
+    // 目标续跑轮例外：它本来就是上一目标的继续，标成"独立新请求"会自相矛盾。
+    final String userContent;
+    if (isNewConversation) {
+      userContent = '用户消息: $goal\n\n请先判断意图：操作请求→规划并执行；'
+          '纯提问→直接基于上下文回答并 finish，无需执行命令。';
+    } else if (goal.startsWith(kGoalContinuationPrefix)) {
+      userContent = '$goal\n\n这是目标模式的自动续跑轮，请继续朝该目标推进，'
+          '不要把它当成新的独立请求。';
+    } else {
+      userContent = '用户的新消息（独立的新请求，不是上一任务的继续）: $goal\n'
+          '如果这是对上一任务的提问，直接基于已有上下文回答，'
+          '不要重新执行命令，也不要重复之前的总结。';
+    }
     _conversationHistory.add(ChatMessage.create(
       role: 'user',
-      content: isNewConversation ? '任务: $goal\n\n请分析任务并开始执行。' : goal,
+      content: userContent,
     ));
 
     agentLogger.info('ReAct',
@@ -1531,6 +1568,13 @@ class AgentEngine {
           ));
           onEvent?.call(AgentEvent.info('💬 用户补充: $steering'));
         }
+        // 补充可能是提问而不是指令（"刚才为何用压缩"这类）。不引导的话
+        // 模型会把它当任务指令，继续执行甚至反刍上一任务的总结。
+        _conversationHistory.add(ChatMessage.create(
+          role: 'user',
+          content: '（以上为用户补充：若是提问而非指令，直接基于已有上下文简要回答，'
+              '不要为回答它执行新命令，也不要重复之前的任务总结；若是指令则按补充调整任务。）',
+        ));
         _trimMessages(_conversationHistory);
         agentLogger.info('ReAct', '已注入 $injected 条用户补充指令');
       }
@@ -1727,8 +1771,13 @@ class AgentEngine {
           // R5: 用独立计数器 _finishWithoutExecCount 限制重试次数，避免与
           // _noCommandRetryCount（无动作重试）互相干扰导致提前放行
           // 用户明确禁止执行命令时让路：纯问答任务的交付物就是文本答案
+          // 模型显式声明"纯问答，无需执行命令"时同样让路：纯提问的回答
+          // 依据是已有上下文，门控逼它执行命令只会答非所问（提示词规则 13/11）
+          final declaresPureQa = step.thought.contains(_pureQaDeclaration) ||
+              (step.answer?.contains(_pureQaDeclaration) ?? false);
           if (!_hasExecutedAnyCommand &&
               !_userForbadeCommands &&
+              !declaresPureQa &&
               _finishWithoutExecCount < _maxFinishWithoutExecRetries) {
             _finishWithoutExecCount++;
             agentLogger.warn('ReAct',
@@ -1737,12 +1786,17 @@ class AgentEngine {
             _conversationHistory.add(ChatMessage.create(
               role: 'user',
               content: '你尚未执行任何命令就声称任务完成，这不被允许。'
-                  '请立即通过 execute 动作实际执行命令验证你的判断，'
-                  '所有结论必须有命令输出作为依据。如果任务确实无需执行命令（如纯解释/分析），'
-                  '请在思考中明确说明为什么无需执行命令。',
+                  '如果任务需要实际操作/检查，请立即通过 execute 动作实际执行命令验证你的判断，'
+                  '所有结论必须有命令输出作为依据。'
+                  '如果用户的消息只是提问（问原因/原理/差异），本任务确属纯问答、无需执行命令，'
+                  '请在思考开头写明"$_pureQaDeclaration"，'
+                  '直接基于已有上下文回答用户的问题，然后再次 finish。',
             ));
             _trimMessages(_conversationHistory);
             continue;
+          }
+          if (!_hasExecutedAnyCommand && declaresPureQa) {
+            agentLogger.info('ReAct', '模型声明纯问答（无需执行命令），finish 幻觉门控让路');
           }
           // O4/WP6: 计划完整性门控 — 计划仍有待处理/进行中项时不允许直接 finish。
           // 放在 finishChoice 转换与幻觉门控之后：先保证"真的执行过"，再保证"计划对齐"。

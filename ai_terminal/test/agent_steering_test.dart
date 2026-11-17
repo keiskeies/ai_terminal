@@ -215,8 +215,9 @@ void main() {
 
       // startTask 会重置瞬态（清空队列），故在 ask 等待期间入队验证注入内容
       final history = await steerDuringAsk(engine, provider, [long]);
-      // drain 后应出现在第二轮历史末尾
-      final last = history.last;
+      // drain 后应出现在第二轮历史末尾（提问引导消息紧随其后）
+      final last = history[history.length - 2];
+      expect(history.last.content, contains('若是提问而非指令'));
       expect(last.role, 'user');
       expect(last.content.endsWith('TAIL'), isTrue, reason: '截断必须保留尾部');
       // 注：_trimMessages 对 >4000 字符的单条消息还有一层既有保尾截断（带标记前缀），
@@ -286,8 +287,10 @@ void main() {
       expect(ib, ia + 1, reason: '注入顺序必须与入队顺序一致');
       expect(history[ia].role, 'user');
       expect(history[ib].role, 'user');
-      expect(history.last.content, '用户补充: 再看内存',
-          reason: '补充必须在 _callAI 之前注入，成为第二轮历史的末尾');
+      expect(history[history.length - 2].content, '用户补充: 再看内存',
+          reason: '补充必须在 _callAI 之前注入，成为第二轮历史的末尾（引导消息紧随其后）');
+      expect(history.last.content, contains('若是提问而非指令'),
+          reason: '补充批次后附提问引导，防止把提问当指令继续执行');
 
       final infos = events
           .where((e) => e.isInfo && (e.text ?? '').startsWith('💬 用户补充:'))

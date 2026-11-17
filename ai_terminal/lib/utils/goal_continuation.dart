@@ -36,6 +36,21 @@ class GoalDecision {
 /// 模型在回答里声明目标达成的标记（出现在行首即算）
 const String kGoalDoneMarker = '目标已达成';
 
+/// 自动续跑提示词的固定前缀。引擎据此识别续跑轮：
+/// 消息包装不能把续跑轮标成"独立新请求"（与"继续推进目标"自相矛盾）。
+const String kGoalContinuationPrefix = '【目标模式 · 自动续跑】';
+
+/// 任务终局时要不要走目标续跑判定。
+///
+/// 用户发起的任务（提问/普通指令）不是目标轮：拿它做判定会把纯问答的
+/// 零命令收尾算成"无进展"，答完问题又自动续跑旧目标——用户看到的就是
+/// "无视我的问题、咔咔继续执行"。目标预算与进展只由真正的目标轮推进。
+bool shouldHandleGoalFinish({
+  required AgentGoal? goal,
+  required bool taskIsGoalRound,
+}) =>
+    goal != null && goal.isActive && taskIsGoalRound;
+
 /// 整条"命令"其实只是达成标记。
 ///
 /// 真机复拍发现：模型会把「目标已达成」写进 `命令:` 块，于是被丢进 shell，
@@ -245,7 +260,7 @@ bool shouldKickGoalRound({
 /// 上下文由引擎自己维护，重复拼进去会白白撑爆窗口。
 String buildGoalContinuationPrompt(AgentGoal goal) {
   final done = goal.roundsUsed + 1;
-  return '【目标模式 · 自动续跑】第 $done/${goal.maxRounds} 轮\n'
+  return '$kGoalContinuationPrefix第 $done/${goal.maxRounds} 轮\n'
       '目标：${goal.objective}\n\n'
       '请继续朝该目标推进。若你确认目标已经完全达成，'
       '只在「回答:」正文里单独一行写 $kGoalDoneMarker 并说明结果；'

@@ -1080,7 +1080,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
   }
 
   /// 开始任务
-  Future<void> startTask(String goal) async {
+  /// [isGoalRound] 目标模式续跑轮（含 /goal 首轮）才置 true；
+  /// 用户提问/普通指令保持 false，终局时不触发目标自动续跑。
+  Future<void> startTask(String goal, {bool isGoalRound = false}) async {
     final scopeId = _registry.activeScopeId;
     if (scopeId == null) {
       state = state.copyWith(error: L10n.str.pleaseConfigAIModel);
@@ -1294,7 +1296,12 @@ class AgentNotifier extends StateNotifier<AgentState> {
       // 会话累计轮次：用户提问与目标续跑都走 startTask，所以在这条唯一路径上 +1。
       // 放在所有"放弃启动"的早退之后——没真正跑起来的任务不该消耗一轮。
       final roundIndex = _bumpConversationRound(convId);
-      final startFuture = engine.startTask(goal, executor, roundIndex: roundIndex);
+      // /goal 首轮经 _sendToAgent 普通发送进来，没带 isGoalRound 参数：
+      // 按续跑提示词前缀兜底识别，否则首轮收尾后不会自动续跑。
+      final goalRound =
+          isGoalRound || goal.startsWith(kGoalContinuationPrefix);
+      final startFuture = engine.startTask(goal, executor,
+          roundIndex: roundIndex, isGoalRound: goalRound);
       // engine.startTask 同步进入 thinking 状态，之后由 isRunning 接管防重
       _startingScopes.remove(scopeId);
       await startFuture;
@@ -1980,7 +1987,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       if (_goals[hostId]?.isActive != true) return;
       if (_registry.activeScopeId != resumeScope) return;
       if (_engine != null && _engine!.isRunning) return;
-      startTask(prompt);
+      startTask(prompt, isGoalRound: true);
     });
     return true;
   }
@@ -2028,7 +2035,13 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final hostId =
         _registry.getHostId(scopeId) ?? engine.hostId ?? 'local';
     final goal = _goals[hostId];
-    if (goal == null || !goal.isActive) return;
+    // 只处理目标轮：用户提问/普通指令的收尾不参与续跑判定，
+    // 否则纯问答零命令收尾会被算成"无进展"，答完又自动续跑旧目标。
+    if (!shouldHandleGoalFinish(
+        goal: goal, taskIsGoalRound: engine.currentTaskIsGoalRound)) {
+      return;
+    }
+    if (goal == null || !goal.isActive) return; // 类型提升：下方按非空使用
 
     // 任务对象必须按 tab 取对来源：活跃 tab 的 currentTask 写在 `state` 里
     // （startTask / onTaskUpdated 都是直接 `state =`），注册表里那份不随这些写更新。
@@ -2084,7 +2097,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       if (_goals[hostId]?.isActive != true) return;
       if (_registry.activeScopeId != scopeId) return;
       if (_engine != engine || engine.isRunning) return;
-      startTask(prompt);
+      startTask(prompt, isGoalRound: true);
     });
   }
 

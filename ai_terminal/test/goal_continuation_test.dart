@@ -333,6 +333,40 @@ void main() {
       expect(prompt, contains('把 nginx 日志轮转配好'));
       expect(prompt, contains(kGoalDoneMarker));
     });
+
+    test('以固定前缀开头：引擎/provider 据此识别续跑轮', () {
+      final prompt = buildGoalContinuationPrompt(goal());
+      expect(prompt, startsWith(kGoalContinuationPrefix));
+    });
+  });
+
+  group('终局判定只认目标轮（反刍残留链路）', () {
+    test('用户提问轮收尾不触发目标续跑判定', () {
+      expect(
+        shouldHandleGoalFinish(goal: goal(), taskIsGoalRound: false),
+        isFalse,
+        reason: '纯问答零命令收尾若参与判定，会被算成无进展并自动续跑旧目标',
+      );
+    });
+
+    test('目标轮收尾照常判定', () {
+      expect(
+        shouldHandleGoalFinish(goal: goal(), taskIsGoalRound: true),
+        isTrue,
+      );
+    });
+
+    test('无目标或目标非活跃一律不判定', () {
+      expect(
+        shouldHandleGoalFinish(goal: null, taskIsGoalRound: true),
+        isFalse,
+      );
+      expect(
+        shouldHandleGoalFinish(
+            goal: goal(status: AgentGoalStatus.paused), taskIsGoalRound: true),
+        isFalse,
+      );
+    });
   });
 
   group('AgentGoal 自身约束', () {

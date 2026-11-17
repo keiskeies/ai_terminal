@@ -8,6 +8,7 @@ import 'package:ai_terminal/services/agent_engine.dart';
 import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/command_executor.dart';
 import 'package:ai_terminal/models/agent_event.dart';
+import 'package:ai_terminal/models/agent_goal.dart';
 import 'package:ai_terminal/models/agent_memory.dart';
 import 'package:ai_terminal/models/agent_model.dart';
 import 'package:ai_terminal/models/ai_model_config.dart';
@@ -16,6 +17,7 @@ import 'package:ai_terminal/models/chat_session.dart';
 import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/l10n/app_localizations_zh.dart';
 import 'package:ai_terminal/utils/tool_call_accumulator.dart';
+import 'package:ai_terminal/utils/goal_continuation.dart';
 
 /// O8 FC-first 端到端测试（R9：流式/协议改动必须覆盖组装后的完整链路）。
 ///
@@ -553,6 +555,12 @@ void main() {
             .any((m) => m.role == 'user' && m.content.contains('实际执行命令验证')),
         isTrue,
       );
+      // 驳回文案必须给出纯问答合法出口，否则模型只能被迫去执行命令
+      expect(
+        provider.receivedHistories.last
+            .any((m) => m.role == 'user' && m.content.contains('纯问答，无需执行命令')),
+        isTrue,
+      );
     });
 
     test('运行中补充禁止命令：后续 finish 不再被强制继续', () async {
@@ -603,6 +611,172 @@ void main() {
       expect(prompts, isNotEmpty);
       expect(prompts.last.content, contains('不要执行任何命令'));
       expect(prompts.last.content, isNot(contains('命令: [要执行的命令]')));
+    });
+  });
+
+  group('纯问答端到端（提问不被逼去执行命令）', () {
+    test('FC：提问 + 声明纯问答 → 零命令一次收尾', () async {
+      final provider = _FcMockProvider();
+      provider.enqueueFc(
+        ['纯问答，无需执行命令。用户在问上一任务的方案取舍，直接基于上下文解释。'],
+        [_finishCall(answer: '压缩是为了保证备份一致性……')],
+      );
+      final engine = makeEngine(provider: provider);
+      final executor = _MockExecutor();
+
+      await engine.startTask('你刚数据库复制为何不直接复制文件非要用压缩', executor);
+
+      expect(engine.currentTask?.status, AgentStatus.completed);
+      expect(executor.executed, isEmpty);
+      expect(provider.callCount, 1);
+      expect(engine.finishWithoutExecCountForTesting, 0);
+    });
+
+    test('FC：首次 finish 无声明被驳回，按提示声明后放行', () async {
+      final provider = _FcMockProvider();
+      provider.enqueueFc(['直接解释一下'], [_finishCall(answer: '因为……')]);
+      provider.enqueueFc(
+        ['纯问答，无需执行命令。这是对上一任务的提问。'],
+        [_finishCall(answer: '因为……')],
+      );
+      final engine = makeEngine(provider: provider);
+      final executor = _MockExecutor();
+
+      await engine.startTask('为何不直接复制文件', executor);
+
+      expect(engine.currentTask?.status, AgentStatus.completed);
+      expect(executor.executed, isEmpty);
+      expect(provider.callCount, 2);
+      expect(engine.finishWithoutExecCountForTesting, 1);
+    });
+
+    test('FC：answer 里声明纯问答同样放行', () async {
+      final provider = _FcMockProvider();
+      provider.enqueueFc(
+        ['用户只是提问'],
+        [_finishCall(answer: '纯问答，无需执行命令。\n\n原因是……')],
+      );
+      final engine = makeEngine(provider: provider);
+      final executor = _MockExecutor();
+
+      await engine.startTask('压缩和直接复制有什么区别', executor);
+
+      expect(engine.currentTask?.status, AgentStatus.completed);
+      expect(executor.executed, isEmpty);
+      expect(provider.callCount, 1);
+    });
+
+    test('文本协议：思考行声明纯问答 → 零命令收尾', () async {
+      final provider = _FcMockProvider();
+      provider.enqueueText([
+        '思考: 纯问答，无需执行命令。直接解释原因。\n'
+            '动作: finish\n'
+            '回答: 因为压缩能节省带宽……\n',
+      ]);
+      final engine = makeEngine(provider: provider, fc: false);
+      final executor = _MockExecutor();
+
+      await engine.startTask('为何要用压缩', executor);
+
+      expect(engine.currentTask?.status, AgentStatus.completed);
+      expect(executor.executed, isEmpty);
+      expect(provider.callCount, 1);
+      expect(engine.finishWithoutExecCountForTesting, 0);
+    });
+
+    test('操作任务不带声明的幻觉 finish 仍被拦（反幻觉不回归）', () async {
+      final provider = _FcMockProvider();
+      provider.enqueueFc(['服务应该正常'], [_finishCall(conclusion: '服务正常')]);
+      provider.enqueueFc(['我确定正常'], [_finishCall(conclusion: '服务正常')]);
+      provider.enqueueFc(['好吧完成'], [_finishCall(conclusion: '服务正常')]);
+      final engine = makeEngine(provider: provider);
+
+      await engine.startTask('检查 nginx 服务状态', _MockExecutor());
+
+      expect(engine.finishWithoutExecCountForTesting, 2);
+      expect(provider.callCount, 3);
+    });
+
+    test('消息包装：新对话意图中性；旧历史新问题标记为独立请求', () async {
+      final provider = _FcMockProvider();
+      provider.enqueueFc(['纯问答，无需执行命令。'], [_finishCall(answer: '好的')]);
+      provider.enqueueFc(['纯问答，无需执行命令。'], [_finishCall(answer: '解释如下')]);
+      final engine = makeEngine(provider: provider);
+      final executor = _MockExecutor();
+
+      await engine.startTask('帮我备份数据库', executor);
+      await engine.startTask('为何不直接复制文件非要用压缩', executor);
+
+      // 首条消息不再强制"开始执行"
+      final firstUser = provider.receivedHistories.first
+          .firstWhere((m) => m.role == 'user');
+      expect(firstUser.content, contains('请先判断意图'));
+      expect(firstUser.content, isNot(contains('请分析任务并开始执行')));
+      // 第二轮的新问题带独立请求框架，防止被当成上一任务续跑
+      final secondUsers = provider.receivedHistories.last
+          .where((m) => m.role == 'user')
+          .toList();
+      expect(secondUsers.last.content, contains('独立的新请求'));
+      expect(secondUsers.last.content, contains('为何不直接复制文件非要用压缩'));
+    });
+
+    test('system prompt 两套规则都含纯提问分支', () {
+      final fcPrompt = makeEngine(provider: _FcMockProvider(), fc: true)
+          .buildSystemPromptForTesting(_MockExecutor());
+      expect(fcPrompt, contains('纯提问直接回答'));
+      final textPrompt = makeEngine(provider: _FcMockProvider(), fc: false)
+          .buildSystemPromptForTesting(_MockExecutor());
+      expect(textPrompt, contains('纯提问直接回答'));
+    });
+
+    test('目标续跑轮：包装不标"独立新请求"，任务带目标轮标记', () async {
+      final provider = _FcMockProvider();
+      provider.enqueueFc(['执行目标第一步'], [_executeCall('uptime')]);
+      provider.enqueueFc(['完成'], [_finishCall()]);
+      provider.enqueueFc(['纯问答，无需执行命令。'], [_finishCall(answer: '解释')]);
+      final engine = makeEngine(provider: provider);
+      final executor = _MockExecutor();
+
+      await engine.startTask('配置日志轮转', executor);
+      expect(engine.currentTaskIsGoalRound, isFalse);
+
+      final prompt = buildGoalContinuationPrompt(AgentGoal(
+        id: 'g1',
+        hostId: 'test-host',
+        objective: '配置日志轮转',
+        maxRounds: 24,
+        createdAt: DateTime(2026, 11, 1),
+        updatedAt: DateTime(2026, 11, 1),
+      ));
+      await engine.startTask(prompt, executor, isGoalRound: true);
+
+      expect(engine.currentTaskIsGoalRound, isTrue);
+      final lastUser = provider.receivedHistories.last
+          .lastWhere((m) => m.role == 'user');
+      expect(lastUser.content, contains('自动续跑轮'));
+      expect(lastUser.content, isNot(contains('独立的新请求')));
+    });
+
+    test('运行中补充是提问：注入提问引导，不让模型当指令继续执行', () async {
+      final provider = _FcMockProvider();
+      provider.enqueueFc(['先看磁盘'], [_executeCall('df -h')]);
+      provider.enqueueFc(['完成'], [_finishCall()]);
+      final engine = makeEngine(provider: provider);
+
+      final future = engine.startTask('检查磁盘', _MockExecutor());
+      engine.addUserSteering('刚才为何用压缩不直接复制');
+      await future;
+
+      expect(engine.currentTask?.status, AgentStatus.completed);
+      final history = provider.receivedHistories.last;
+      expect(
+        history.any((m) => m.role == 'user' && m.content == '用户补充: 刚才为何用压缩不直接复制'),
+        isTrue,
+      );
+      expect(
+        history.any((m) => m.role == 'user' && m.content.contains('若是提问而非指令')),
+        isTrue,
+      );
     });
   });
 
