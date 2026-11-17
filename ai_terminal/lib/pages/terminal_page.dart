@@ -5813,8 +5813,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final labelBase =
         currentChoice?.displayName ?? currentModel?.name ?? l10n.terminalModel;
     final effort = currentModel?.reasoningLabel;
-    final label =
-        effort == null || effort.isEmpty ? labelBase : '$labelBase $effort';
+    // 模型与思考程度之间用中点分隔（英文名中间那种点 ·），不再用普通空格。
+    final label = effort == null || effort.isEmpty
+        ? labelBase
+        : '$labelBase · $effort';
 
     String? currentTierLevel;
     if (currentChoice != null) {
@@ -5879,9 +5881,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.psychology_outlined,
-                      size: 12, color: tc.textMuted),
-                  const SizedBox(width: 4),
                   // AI 面板按设计稿收到 320px 后，输入框里的胶囊只剩 ~130px：
                   // 模型名必须可压缩，否则 Row 直接溢出（原来靠面板够宽蒙混过去）。
                   Flexible(
