@@ -142,7 +142,7 @@ class _FoxPainter extends CustomPainter {
       ..color = _furEdge
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.6
-      ..strokeLinejoin = StrokeJoin.round;
+      ..strokeJoin = StrokeJoin.round;
     final inkPaint = Paint()..color = _ink;
 
     // 左耳、右耳（圆润 Q 曲线三角）。
@@ -162,12 +162,12 @@ class _FoxPainter extends CustomPainter {
     }
 
     // 脸。
-    final face = Rect.fromLTWH(-25, -24, 50, 48);
+    const face = Rect.fromLTWH(-25, -24, 50, 48);
     canvas.drawOval(face, furPaint);
     canvas.drawOval(face, edgePaint);
 
     // 浅色口鼻，压在脸下方。
-    canvas.drawOval(Rect.fromLTWH(-12, 3, 24, 16), Paint()..color = _muzzle);
+    canvas.drawOval(const Rect.fromLTWH(-12, 3, 24, 16), Paint()..color = _muzzle);
 
     // 眼睛：Y 轴随 eyeOpen 压缩，X 轴保持不变 —— 眨眼而非眯眼。
     final eyeRy = 3.4 * eyeOpen;
@@ -207,7 +207,7 @@ class _FoxPainter extends CustomPainter {
           ..color = _scarfEdge
           ..style = PaintingStyle.stroke
           ..strokeWidth = 1.2
-          ..strokeLinejoin = StrokeJoin.round,
+          ..strokeJoin = StrokeJoin.round,
       );
     }
 
