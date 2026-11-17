@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.4.1-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.4.2-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.4.1</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.4.2</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">Visit the website</a>
 </p>
@@ -54,20 +54,20 @@ A chat assistant tells you what to run. AI Terminal runs it on your servers and 
 
 `5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `28 built-in tools` · `8 slash commands` · `300+ knowledge entries` · `7 web search engines`
 
-## New in 1.4.1
+## New in 1.4.2
 
-This release completes a three-phase agent capability program: the Agent works with longer output without drowning its own context, keeps you in control mid-task, and now drives actions through native Function Calling.
+v1.4.1 shipped the agent capability program; 1.4.2 is the field-report release. Every change below came out of running that agent end-to-end against real servers, and each one is covered by a regression test.
 
-- **Function Calling first** — on FC-capable models, commands and the finish/ask actions are structured `tool_calls` instead of JSON embedded in prose: no more text round-trip parsing, and the early-execution path still fires the moment a command appears. The text protocol stays as a first-class fallback for non-FC models
-- **Run-aware context compaction** — thresholds are measured in tokens instead of raw characters, and a rolling whole-conversation summary replaces piecemeal trimming, so long tasks no longer blow past the context window or lose early decisions
-- **Interject while a task runs** — send a supplemental instruction mid-task (steering); it is injected into the next round instead of waiting for the task to end
-- **Interactive prompts bridged** — `[Y/n]`, `Continue?` and `Press ENTER` prompts (and password prompts, kept out of history and logs) surface a real input dialog; an opt-in auto-responder handles confirmations you trust
-- **Plan tracking & finish gate** — plan progress is re-injected every round, and a conclusion cannot end the task while plan items are still pending
-- **Observation-grade truncation** — long output is capped per event class, failures keep their head and tail, and a new `sftp_file_read` tool reads remote files without cat-ing them into the transcript
-- **`knowledge_search` tool** — the 300+ entry knowledge base is now queryable mid-task, not just pre-matched at task start
-- **Read-only pipelines allowed** — `grep … | sort | head` style combinations run freely; chaining that could mutate state stays hard-blocked
-- **Terminal capability gap closed** — split panes with AI routing per pane, full Windows/macOS keyboard shortcuts, and per-line right-click actions
-- **Settings & UI rebuilt** — settings drawer with section navigation and in-place editing, redesigned host edit form, slimmer monitor strip, official SVG provider logos, unified app icons, and GitHub Releases update check
+- **Code samples stay samples** — a fenced block inside a finish/ask answer used to be parsed as a command and typed into the PTY (a pasted `sshd_config` ran as `-bash: L1: command not found`, line after line). Command extraction is now scoped to the text after a declared execute action, and the early-execution path obeys the same scope
+- **No zombie "running" state** — a late early-execution callback could flip a finished task back to executing, leaving the UI spinning forever and swallowing interjected instructions; terminal states are now final
+- **Your answers to prompts stop echoing back as commands** — after you reply `y` to a `Continue?` prompt, the PTY echoes the whole line into stdout, and the model read `Continue? y` in its observation and tried to run it. The echo line is now matched and removed verbatim, so your reply still never enters the conversation history
+- **"Don't run anything" is respected** — tell the agent to answer from context alone and the finish gate no longer burns retries demanding a command first; the constraint is read from your own words only, so the model cannot talk its way out of verifying
+- **Knowledge search handles command-shaped queries** — searching for `read -p 'Continue? ' ans` used to break the FTS5 match (`-` parsed as NOT) and silently downgrade both knowledge lookups; keywords are now quoted literals
+- **Tool calls in either argument shape work** — flattened parameters and the older nested `{"args": {…}}` both dispatch, which removes the spurious "missing required parameter: path" failures on file writes; the interactive input dialog also no longer red-screens while closing
+
+## Earlier releases
+
+The v1.4.1 agent capability program: native Function Calling for commands and finish/ask, token-measured context compaction with a rolling whole-conversation summary, mid-task interjection, bridged interactive prompts with an opt-in auto-responder, plan tracking with a finish gate, observation-grade output truncation plus `sftp_file_read`, a `knowledge_search` tool, read-only pipelines, split panes with per-pane AI routing, and the rebuilt settings drawer.
 
 Also includes the v1.4.0 runtime performance program: local message rebuilds instead of whole-page, batched terminal output, monitor slowdown during tasks, incremental streaming markdown, and background-serialized persistence.
 
@@ -204,11 +204,11 @@ Get the latest build from [GitHub Releases](https://github.com/keiskeies/ai_term
 
 | Platform | File |
 |---|---|
-| macOS | `AI_Terminal_v1.4.1_macOS.zip` |
-| iOS | `AI_Terminal_v1.4.1_iOS.ipa` (unsigned) |
-| Android | `AI_Terminal_v1.4.1_Android.apk` |
-| Windows | `AI_Terminal_v1.4.1_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.4.1_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.4.2_macOS.zip` |
+| iOS | `AI_Terminal_v1.4.2_iOS.ipa` (unsigned) |
+| Android | `AI_Terminal_v1.4.2_Android.apk` |
+| Windows | `AI_Terminal_v1.4.2_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.4.2_Linux_x64.tar.gz` |
 
 If macOS reports that the developer cannot be verified:
 

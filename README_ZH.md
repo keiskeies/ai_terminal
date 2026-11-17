@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.4.1-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.4.2-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.4.1</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.4.2</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">访问官网</a>
 </p>
@@ -54,20 +54,20 @@
 
 `5 个平台` · `14 种界面语言` · `22 个 AI 供应商` · `90+ 预设模型` · `28 个内置工具` · `8 个斜杠命令` · `300+ 知识库条目` · `7 种联网搜索源`
 
-## 1.4.1 新增
+## 1.4.2 新增
 
-本次版本完成了为期三期的 Agent 能力优化：长输出不再淹没自身上下文、任务运行中你可以随时干预，动作改走原生 Function Calling。
+1.4.1 交付了 Agent 能力专项，1.4.2 是它的实测修复版：下面每一条都是在真实服务器上把 Agent 跑完整流程时暴露出来的问题，且每条都配了回归测试。
 
-- **Function Calling 优先**：支持 FC 的模型上，命令与 finish/ask 动作以结构化 `tool_calls` 传递，不再把 JSON 埋进正文反复解析；命令出现即提前执行的链路保持不变。文本协议保留为一等降级路径，非 FC 模型行为不变
-- **Token 化上下文压缩**：压缩阈值按 token 计量，滚动整体摘要替代零散裁剪，长任务不再撑爆上下文窗口、也不丢早期决策
-- **运行中插话**：任务执行中可补充指令（steering），下一轮直接注入，不必等任务结束
-- **交互提示桥接**：`[Y/n]`、`Continue?`、`Press ENTER`（以及密码提示，密码不进历史与日志）会弹出真实输入框；可信场景可开启自动应答
-- **计划跟踪与完成门控**：每轮重新注入计划进度；仍有未完成任务项时，结论不允许提前结束
-- **观测分级截断**：长输出按事件类型分级限长，失败输出保留头尾；新增 `sftp_file_read` 直接读取远端文件，不再用 cat 灌满对话
-- **`knowledge_search` 工具**：300+ 条知识库支持任务中途按需检索，不再只在任务开始时预匹配
-- **只读管道放开**：`grep … | sort | head` 这类只读组合命令可直接执行；可能修改状态的链接仍然硬拦截
-- **终端能力补齐**：分屏 + 按分屏路由 AI、Windows/macOS 快捷键补全、按行右键操作
-- **设置与界面重做**：设置抽屉分区导航 + 就地编辑、主机编辑表单重设计、监控面板精简、服务商官方 SVG logo、全平台图标统一、GitHub Releases 检查更新
+- **代码示例不再被当成命令执行**：finish/ask 正文里的代码围栏曾被解析成命令逐行送进 PTY（贴上的 `sshd_config` 跑出满屏 `-bash: L1: command not found`）。命令解析范围收紧到已声明 execute 动作之后的正文，提前执行链路同样遵守
+- **不再有卡死的"运行中"**：任务收尾后残留的提前执行回调会把状态改回执行中，界面永远转圈、补充指令也无人消费；现在终态就是终态
+- **你的回答不再回显成命令**：回答 `Continue?` 提示后，PTY 会把「提示 + 输入」整行回显进 stdout，模型在观测里读到 `Continue? y` 就真去执行它。现在按整行逐字匹配删除该回显，你的答案本身依旧不进对话历史
+- **"不许执行命令"被尊重**：让 Agent 只根据会话内容作答时，finish 门控不再白烧重试步数逼它先跑命令；该约束只从用户原文判定，模型自己说"无需命令"不能拿来脱身
+- **命令样子的检索词不再炸库**：搜 `read -p 'Continue? ' ans` 会让 FTS5 把 `-` 当 NOT 解析报错、两路检索双双降级；关键词改为引号字面量
+- **两种工具参数形状都能通**：平铺参数与旧的 `{"args": {…}}` 嵌套都能正确分发，消除写文件时反复报「参数缺失: path 为必填项」；交互输入弹窗关闭时也不再红屏
+
+## 1.4.1 及更早
+
+1.4.1 的 Agent 能力专项：命令与 finish/ask 动作改走原生 Function Calling、Token 化上下文压缩与滚动整体摘要、运行中插话、交互提示桥接与可信场景自动应答、计划跟踪与完成门控、观测分级截断与 `sftp_file_read`、`knowledge_search` 工具、只读管道放开、分屏按屏路由 AI，以及设置抽屉重做。
 
 同时包含 v1.4.0 的运行时性能专项：消息级局部重建、终端输出批处理、任务期监控降频、流式 Markdown 增量渲染与后台序列化持久化。
 
@@ -204,11 +204,11 @@ Agent 也能直接读写跑着这个 App 的这台电脑，而不只是服务器
 
 | 平台 | 文件 |
 |---|---|
-| macOS | `AI_Terminal_v1.4.1_macOS.zip` |
-| iOS | `AI_Terminal_v1.4.1_iOS.ipa`（未签名） |
-| Android | `AI_Terminal_v1.4.1_Android.apk` |
-| Windows | `AI_Terminal_v1.4.1_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.4.1_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.4.2_macOS.zip` |
+| iOS | `AI_Terminal_v1.4.2_iOS.ipa`（未签名） |
+| Android | `AI_Terminal_v1.4.2_Android.apk` |
+| Windows | `AI_Terminal_v1.4.2_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.4.2_Linux_x64.tar.gz` |
 
 macOS 首次打开如提示“无法验证开发者”，可执行：
 

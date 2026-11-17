@@ -203,24 +203,16 @@ jobs:
 
             AI Terminal 是一款将 AI 助手与 SSH / 本地终端深度集成的跨平台应用。无论你是刚买服务器的小白、不想记命令的开发者、还是需要批量管理服务器的运维人员——打开它，用中文告诉 AI 你要干什么，它帮你连服务器、跑命令、装软件、查问题。全程安全可控。
 
-            ### 🆕 v1.4.1 Agent 能力专项 · 动作改走原生 Function Calling
+            ### 🆕 v1.4.2 实测修复 · Agent 在真机上跑出来的六个问题
 
-            v1.4.1 完成了为期三期的 Agent 能力优化（O1–O8）：长输出不再淹没上下文、任务运行中可随时干预、动作以结构化 tool_calls 传递。
+            v1.4.1 交付了 Agent 能力专项，1.4.2 把它拿到真实服务器上跑完整流程，逐条修掉暴露出来的问题。每一条都有回归测试兜底。
 
-            #### 🤖 Agent 引擎
-            - **FC 优先协议**：支持 Function Calling 的模型上，命令与 finish/ask 走结构化 `tool_calls`，不再把 JSON 埋进正文反复解析；命令出现即提前执行的链路保持不变，文本协议保留为一等降级路径
-            - **Token 化上下文压缩**：压缩阈值按 token 计量，滚动整体摘要替代零散裁剪，长任务不再撑爆上下文窗口
-            - **运行中插话**：任务执行中可补充指令，下一轮直接注入，不必等任务结束
-            - **交互提示桥接**：`[Y/n]`、`Continue?`、密码提示弹出真实输入框（密码不进历史与日志）；可信场景可开启自动应答
-            - **计划跟踪与完成门控**：每轮重注计划进度；仍有未完成任务项时结论不允许提前结束
-            - **观测分级截断**：长输出按事件类型限长、失败保留头尾；新增 `sftp_file_read` 直接读取远端文件
-            - **`knowledge_search` 工具**：300+ 条知识库支持任务中途按需检索
-            - **只读管道放开**：`grep … | sort | head` 组合直接执行；可能修改状态的链接仍硬拦截
-
-            #### 🖥️ 终端与界面
-            - **终端能力补齐**：分屏 + 按分屏路由 AI、Windows/macOS 快捷键补全、按行右键操作
-            - **设置与界面重做**：设置抽屉分区导航 + 就地编辑、主机编辑表单重设计、监控面板精简
-            - **其他**：服务商官方 SVG logo、全平台图标统一、GitHub Releases 检查更新
+            - **代码示例不再被当命令执行**：finish/ask 正文里的代码围栏曾被解析成命令逐行送进终端（贴上的配置文件跑出满屏 `command not found`）；命令解析范围收紧到已声明执行动作之后的正文
+            - **不再有卡死的「运行中」**：任务收尾后残留的提前执行回调会把状态改回执行中，界面永远转圈、补充指令无人消费；现在终态就是终态
+            - **你的回答不再回显成命令**：回答 `Continue?` 后终端把「提示 + 输入」整行回显，模型在观测里读到就真去执行它；现在按整行逐字匹配删除，你的答案依旧不进对话历史
+            - **「不许执行命令」被尊重**：要求只根据会话内容作答时，完成门控不再白烧重试步数逼它先跑命令；该约束只从用户原文判定，模型自己说「无需命令」不能拿来脱身
+            - **命令样子的检索词不再炸库**：搜索含 `-` 与引号的命令会让全文检索报错降级；关键词改为引号字面量
+            - **两种工具参数形状都能通**：平铺与旧的嵌套参数均正确分发，消除写文件反复报「参数缺失」；交互输入弹窗关闭时也不再红屏
 
             ### 🆕 v1.3.9 新功能 · 回答整段复制 & 终端右键菜单
 
@@ -247,6 +239,7 @@ jobs:
             - 行内代码改用字色区分
 
             #### 📁 继续包含
+            - v1.4.1 的 Agent 能力专项：FC 优先协议、Token 化上下文压缩与滚动摘要、运行中插话、交互提示桥接、计划跟踪与完成门控、观测分级截断与 `sftp_file_read`、`knowledge_search` 工具、只读管道放开、分屏按屏路由 AI、设置抽屉重做
             - v1.4.0 的运行时性能专项：局部重建、终端输出批处理、监控降频、流式 Markdown 增量渲染、持久化移出主线程
             - v1.3.9 的回答整段复制、信息分级、思考流式输出与终端右键菜单
             - v1.3.8 的石墨青主题与中英文操作单
@@ -324,24 +317,16 @@ jobs:
 
             AI Terminal is a cross-platform app that deeply integrates an AI assistant with SSH and local terminals. Whether you're a beginner who just rented a VPS, a developer tired of googling commands, or a DevOps engineer managing dozens of servers — open it, tell the AI what you want in plain English (or Chinese), and it handles the rest. Safe, transparent, and under your control.
 
-            ### 🆕 What's New in v1.4.1 · Agent Capability Program — Actions Now Run on Native Function Calling
+            ### 🆕 What's New in v1.4.2 · Six Agent Bugs Found on Real Servers
 
-            v1.4.1 closes a three-phase agent capability program (O1–O8): long output no longer drowns the context, you can steer a task while it runs, and actions are delivered as structured tool_calls.
+            v1.4.1 shipped the agent capability program; 1.4.2 is what running it end-to-end against real servers turned up. Every item below has a regression test.
 
-            #### 🤖 Agent engine
-            - **Function Calling first**: on FC-capable models, commands and the finish/ask actions arrive as structured `tool_calls` instead of JSON embedded in prose; early command execution still fires the moment a command appears, and the text protocol stays a first-class fallback
-            - **Token-based compaction**: compaction thresholds are measured in tokens and a rolling whole-conversation summary replaces piecemeal trimming, so long tasks stay inside the context window
-            - **Interject mid-task**: supplemental instructions are injected into the next round while the task keeps running
-            - **Interactive prompts bridged**: `[Y/n]`, `Continue?` and password prompts open a real input dialog (passwords never enter history or logs); an opt-in auto-responder covers confirmations you trust
-            - **Plan tracking & finish gate**: plan progress is re-injected every round, and a conclusion cannot end the task while plan items are still pending
-            - **Observation-grade truncation**: long output is capped per event class with failures keeping head and tail; new `sftp_file_read` reads remote files directly
-            - **`knowledge_search` tool**: the 300+ entry knowledge base is queryable mid-task
-            - **Read-only pipelines allowed**: `grep … | sort | head` combinations run freely; chaining that could mutate state stays hard-blocked
-
-            #### 🖥️ Terminal & UI
-            - **Terminal gaps closed**: split panes with per-pane AI routing, full Windows/macOS keyboard shortcuts, per-line right-click actions
-            - **Settings & UI rebuilt**: settings drawer with section navigation and in-place editing, redesigned host edit form, slimmer monitor strip
-            - **Also**: official SVG provider logos, unified app icons, GitHub Releases update check
+            - **Code samples stay samples**: a fenced block inside a finish/ask answer used to be parsed as a command and typed into the terminal line by line; command extraction is now scoped to the text after a declared execute action
+            - **No zombie "running" state**: a late early-execution callback could flip a finished task back to executing, leaving the UI spinning forever and swallowing interjected instructions; terminal states are now final
+            - **Your answers stop echoing back as commands**: after you reply to a `Continue?` prompt the terminal echoes the whole line, and the model tried to run it; the echo line is now matched and removed, and your reply still never enters the conversation history
+            - **"Don't run anything" is respected**: when you ask for an answer from context alone, the finish gate no longer burns retries demanding a command first; the constraint is read from your own words only
+            - **Command-shaped searches no longer break the knowledge base**: queries containing `-` and quotes crashed the full-text match and silently downgraded retrieval; keywords are now quoted literals
+            - **Both tool argument shapes work**: flattened and legacy nested parameters both dispatch, ending the repeated "missing required parameter" failures on file writes; the interactive input dialog no longer red-screens while closing
 
             ### 🆕 What's New in v1.3.9 · Whole-Answer Copy & Terminal Context Menu
 
