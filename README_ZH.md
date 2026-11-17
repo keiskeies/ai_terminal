@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.4.2-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.4.3-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.4.2</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.4.3</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">访问官网</a>
 </p>
@@ -54,18 +54,19 @@
 
 `5 个平台` · `14 种界面语言` · `22 个 AI 供应商` · `90+ 预设模型` · `28 个内置工具` · `8 个斜杠命令` · `300+ 知识库条目` · `7 种联网搜索源`
 
-## 1.4.2 新增
+## 1.4.3 新增
 
-1.4.1 交付了 Agent 能力专项，1.4.2 是它的实测修复版：下面每一条都是在真实服务器上把 Agent 跑完整流程时暴露出来的问题，且每条都配了回归测试。
+1.4.2 修的是 Agent 本身，1.4.3 修的是它外面那一圈：界面语言、拖窄就崩的面板，以及你只是问一句、它却跑去执行命令。
 
-- **代码示例不再被当成命令执行**：finish/ask 正文里的代码围栏曾被解析成命令逐行送进 PTY（贴上的 `sshd_config` 跑出满屏 `-bash: L1: command not found`）。命令解析范围收紧到已声明 execute 动作之后的正文，提前执行链路同样遵守
-- **不再有卡死的"运行中"**：任务收尾后残留的提前执行回调会把状态改回执行中，界面永远转圈、补充指令也无人消费；现在终态就是终态
-- **你的回答不再回显成命令**：回答 `Continue?` 提示后，PTY 会把「提示 + 输入」整行回显进 stdout，模型在观测里读到 `Continue? y` 就真去执行它。现在按整行逐字匹配删除该回显，你的答案本身依旧不进对话历史
-- **"不许执行命令"被尊重**：让 Agent 只根据会话内容作答时，finish 门控不再白烧重试步数逼它先跑命令；该约束只从用户原文判定，模型自己说"无需命令"不能拿来脱身
-- **命令样子的检索词不再炸库**：搜 `read -p 'Continue? ' ans` 会让 FTS5 把 `-` 当 NOT 解析报错、两路检索双双降级；关键词改为引号字面量
-- **两种工具参数形状都能通**：平铺参数与旧的 `{"args": {…}}` 嵌套都能正确分发，消除写文件时反复报「参数缺失: path 为必填项」；交互输入弹窗关闭时也不再红屏
+- **提问就是提问**：问"为何不直接复制文件非要用压缩"，过去会被逼着执行一串命令——ReAct 提示词的纯执行世界观假定每一轮都要落到动作上，finish 门控又硬性要求先跑命令。现在两套规则与门控都增加了纯问答分支，门控接受"本轮纯问答、无需命令"的显式声明并让路。新增 15 个回归用例，覆盖 Function Calling 与文本协议、目标模式续跑、运行中插话
+- **回答不再被反复反刍**：旧会话里追加一个新提问，过去会被当成上一个任务的一部分，模型先把上一轮答案复述一遍才干活。现在新提问标记为独立请求
+- **英文界面真的全英文**：484 处文案、56 个文件接入双语层——SFTP 与工具进度、MCP 连接状态、联网搜索、项目与本地文件工具、SSH 配置导入、审计日志、确认对话框、设置目录、安全规则与风险说明。仍是中文的只剩模型和远端 shell 说的话：AI 提示词、远端命令输出，以及写进数据库的持久值（`默认` 是存储值，只在渲染时映射）
+- **AI 面板拖窄不再崩**：长模型名加思考档位会把面板头部顶出可视区、收起按钮点不到；一条长 Ask 选项在真机上把卡片顶宽 414 px；上下分屏时空状态块底部溢出 26 px。三处分别改成可收缩或可滚动，并各配布局回归测试
+- **助手有了自己的狐狸**：头像用 `CustomPainter` 纯绘制，14–64 px 无损、跟随主题，3.2 秒周期随机相位眨眼；模型胶囊去掉前置图标，模型名与思考档位改用中点分隔
 
-## 1.4.1 及更早
+## 1.4.2 及更早
+
+1.4.2 是 Agent 能力专项的实测修复版：正文里的代码围栏不再被逐行送进 PTY，任务收尾后残留的提前执行回调不再把状态改回"运行中"，`Continue? y` 的终端回显不再变成命令，"不许执行命令"不再白烧 finish 门控重试步数，命令样子的检索词不再炸 FTS5，平铺与 `{"args": {…}}` 嵌套两种工具参数形状都能正确分发。
 
 1.4.1 的 Agent 能力专项：命令与 finish/ask 动作改走原生 Function Calling、Token 化上下文压缩与滚动整体摘要、运行中插话、交互提示桥接与可信场景自动应答、计划跟踪与完成门控、观测分级截断与 `sftp_file_read`、`knowledge_search` 工具、只读管道放开、分屏按屏路由 AI，以及设置抽屉重做。
 
@@ -179,7 +180,7 @@ Agent 也能直接读写跑着这个 App 的这台电脑，而不只是服务器
 |:---:|:---:|
 | <img src="./docs/screenshots/sftp-dark-en.png" width="440" /> | <img src="./docs/screenshots/activity-log-dark-en.png" width="440" /> |
 
-| 内置运维模板 | 运维工具总览 |
+| 内置运维模板 | 设置抽屉 |
 |:---:|:---:|
 | <img src="./docs/screenshots/runbooks-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> |
 
@@ -190,13 +191,13 @@ Agent 也能直接读写跑着这个 App 的这台电脑，而不只是服务器
 - **Agent 体检结果**：真实 Agent 对 CentOS 8 容器做体检：6 步计划、14 条远程命令、一次针对 EOL 仓库的安装失败，以及带风险的结论；底部 CPU/内存/磁盘/网络监控保持实时，执行证据可展开。
 - **服务器管理**：分组、搜索、快速连接、打开终端或 SFTP；截图中的主机位于私有演示环境。
 - **Agent 操作单**：先给结论，再展开计划、运行指标和可展开的证据。
-- **终端右键菜单**：按用途分组——本地编辑/导出、选区发给 Agent、字号调整，以及远程 SFTP / 审计 / 变更记录入口。
-- **SFTP 文件管理**：浏览远端目录、上传/下载、预览与编辑；远程路径在任何客户端系统上都使用 POSIX 分隔符。
-- **审计与活动日志**：命令、时间、主机、结果和执行状态可追溯，支持筛选与复制。
+- **终端右键菜单**：按用途分组——本地编辑/导出、选区发给 Agent、字号调整、左右/上下分屏、命令历史，以及远程 SFTP / 审计入口。
+- **SFTP 文件管理**：与终端并排的侧栏，浏览远端目录、上传/下载、预览与编辑；远程路径在任何客户端系统上都使用 POSIX 分隔符。
+- **审计与活动日志**：每行记录命令、时间、主机、结果与安全判定，支持搜索与带输出复制。
 - **内置运维模板**：巡检、安全、部署、故障排查与日常维护模板，支持英文，一键执行。
-- **运维工具总览**：Runbook、Activity Log、Safe Hours、Task Notifications 集中入口。
-- **外观与主题**：深色/浅色石墨青主题、终端字号调整。
-- **任务通知**：钉钉 / 飞书 / 企业微信 Webhook，任务完成或失败时推送。
+- **设置抽屉**：终端、AI 模型、Agent、安全、MCP 服务器、联网搜索、House Rules、通知与语言在一列里滚动完成，改动过的设置置顶。
+- **外观与主题**：深色/浅色/跟随系统、8 套终端配色带真实提示符预览、终端字号调整。
+- **任务通知**：钉钉 / 飞书 / 企业微信 Webhook，可选每次运行推送或仅失败推送。
 
 ## 下载安装
 
@@ -204,11 +205,11 @@ Agent 也能直接读写跑着这个 App 的这台电脑，而不只是服务器
 
 | 平台 | 文件 |
 |---|---|
-| macOS | `AI_Terminal_v1.4.2_macOS.zip` |
-| iOS | `AI_Terminal_v1.4.2_iOS.ipa`（未签名） |
-| Android | `AI_Terminal_v1.4.2_Android.apk` |
-| Windows | `AI_Terminal_v1.4.2_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.4.2_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.4.3_macOS.zip` |
+| iOS | `AI_Terminal_v1.4.3_iOS.ipa`（未签名） |
+| Android | `AI_Terminal_v1.4.3_Android.apk` |
+| Windows | `AI_Terminal_v1.4.3_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.4.3_Linux_x64.tar.gz` |
 
 macOS 首次打开如提示“无法验证开发者”，可执行：
 

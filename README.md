@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.4.2-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.4.3-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.4.2</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.4.3</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">Visit the website</a>
 </p>
@@ -54,18 +54,19 @@ A chat assistant tells you what to run. AI Terminal runs it on your servers and 
 
 `5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `28 built-in tools` · `8 slash commands` · `300+ knowledge entries` · `7 web search engines`
 
-## New in 1.4.2
+## New in 1.4.3
 
-v1.4.1 shipped the agent capability program; 1.4.2 is the field-report release. Every change below came out of running that agent end-to-end against real servers, and each one is covered by a regression test.
+1.4.2 fixed the agent; 1.4.3 fixes everything around it — the interface language, the panels that broke when you resized them, and the assistant that ran commands when you only asked a question.
 
-- **Code samples stay samples** — a fenced block inside a finish/ask answer used to be parsed as a command and typed into the PTY (a pasted `sshd_config` ran as `-bash: L1: command not found`, line after line). Command extraction is now scoped to the text after a declared execute action, and the early-execution path obeys the same scope
-- **No zombie "running" state** — a late early-execution callback could flip a finished task back to executing, leaving the UI spinning forever and swallowing interjected instructions; terminal states are now final
-- **Your answers to prompts stop echoing back as commands** — after you reply `y` to a `Continue?` prompt, the PTY echoes the whole line into stdout, and the model read `Continue? y` in its observation and tried to run it. The echo line is now matched and removed verbatim, so your reply still never enters the conversation history
-- **"Don't run anything" is respected** — tell the agent to answer from context alone and the finish gate no longer burns retries demanding a command first; the constraint is read from your own words only, so the model cannot talk its way out of verifying
-- **Knowledge search handles command-shaped queries** — searching for `read -p 'Continue? ' ans` used to break the FTS5 match (`-` parsed as NOT) and silently downgrade both knowledge lookups; keywords are now quoted literals
-- **Tool calls in either argument shape work** — flattened parameters and the older nested `{"args": {…}}` both dispatch, which removes the spurious "missing required parameter: path" failures on file writes; the interactive input dialog also no longer red-screens while closing
+- **Questions get answered, not executed** — asking "why copy the file instead of compressing it" used to push the agent into running a handful of commands, because the ReAct prompt assumed every turn lands on an action and the finish gate demanded a command first. Both prompt rule sets and the gate now have an explicit answer-only branch, and the gate accepts a declared "pure Q&A, no command needed" and backs off. 15 new regression cases cover Function Calling and the text protocol, goal-mode continuation, and mid-task steering
+- **Answers stop being chewed over** — a follow-up question appended to an older conversation was treated as part of the previous task, so the model re-narrated the last answer before doing any work. A new question is now marked as a standalone request
+- **English UI is actually English** — 484 strings across 56 files moved behind the bilingual layer: SFTP and tool progress lines, MCP connection status, web search, project and local-file tools, SSH config import, audit rows, confirm dialogs, the settings catalog, safety rules, and risk explanations. What stays Chinese is what the model and the remote shell say, not what the app says — AI prompts, remote command output, and values persisted in your database (`默认` is a stored value, so it is mapped at render time only)
+- **The AI panel survives being narrowed** — a long model name plus the thinking pill overflowed the panel header and put the collapse button out of reach; one long Ask option overflowed a card by 414 px on a real device; the empty-state block overflowed by 26 px in a short top/bottom split. All three now shrink or scroll, each with a layout regression test
+- **The assistant got a fox** — the avatar is drawn with a `CustomPainter`, so it stays crisp from 14 px to 64 px and follows the theme, blinking on a 3.2 s cycle with randomised phase; the model pill drops its leading icon and separates model from thinking level with a middle dot
 
 ## Earlier releases
+
+The v1.4.2 field-report release for the agent capability program: fenced code samples stopped being typed into the PTY line by line, a late early-execution callback could no longer flip a finished task back to "running", `Continue? y` PTY echoes stopped coming back as commands, "don't run anything" stopped burning finish-gate retries, command-shaped knowledge queries stopped breaking the FTS5 match, and flattened and nested `{"args": {…}}` tool parameters both dispatch.
 
 The v1.4.1 agent capability program: native Function Calling for commands and finish/ask, token-measured context compaction with a rolling whole-conversation summary, mid-task interjection, bridged interactive prompts with an opt-in auto-responder, plan tracking with a finish gate, observation-grade output truncation plus `sftp_file_read`, a `knowledge_search` tool, read-only pipelines, split panes with per-pane AI routing, and the rebuilt settings drawer.
 
@@ -179,7 +180,7 @@ The Agent can also read and write the computer this app runs on, not just your s
 |:---:|:---:|
 | <img src="./docs/screenshots/sftp-dark-en.png" width="440" /> | <img src="./docs/screenshots/activity-log-dark-en.png" width="440" /> |
 
-| Built-in runbooks | Operations toolkit |
+| Built-in runbooks | Settings drawer |
 |:---:|:---:|
 | <img src="./docs/screenshots/runbooks-dark-en.png" width="440" /> | <img src="./docs/screenshots/settings-overview-dark-en.png" width="440" /> |
 
@@ -190,13 +191,13 @@ The Agent can also read and write the computer this app runs on, not just your s
 - **Agent audit result**: a real Agent health-checks a CentOS 8 container: 6-step plan, 14 remote commands, one failed package install against EOL repos, and a conclusion with risks. Live CPU/memory/disk/network metrics stay visible and evidence can be expanded.
 - **Server inventory**: groups, search, quick connect, and terminal/SFTP shortcuts; the hosts shown are a private demo environment.
 - **Agent operation sheet**: conclusion first, then plan, run metrics, and expandable evidence.
-- **Terminal context menu**: right-click groups local edit/export actions, selection actions for the Agent, font size, and remote SFTP / audit / change-record entry points.
-- **SFTP file manager**: browse remote directories, upload/download, preview and edit; remote paths use POSIX separators on every client OS.
-- **Activity log & audit**: command, time, host, result and execution state are traceable, with filters and copy.
+- **Terminal context menu**: right-click groups local edit/export actions, selection actions for the Agent, font size, split panes, command history, and remote SFTP / audit entry points.
+- **SFTP file manager**: a side panel next to the terminal — browse remote directories, upload/download, preview and edit; remote paths use POSIX separators on every client OS.
+- **Activity log & audit**: command, time, host, result and safety verdict are traceable per row, with search and copy-with-output.
 - **Built-in runbooks**: inspection, security, deployment, troubleshooting and maintenance templates, localized to English, run in one tap.
-- **Operations toolkit**: runbooks, activity log, safe hours, and task notifications in one place.
-- **Appearance & themes**: graphite dark/light themes and terminal font size.
-- **Task notifications**: DingTalk / Feishu / WeCom webhooks for task completion and failures.
+- **Settings drawer**: terminal, AI model, Agent, security, MCP servers, web search, house rules, notifications and language in one scrollable list, with the settings you changed pinned on top.
+- **Appearance & themes**: dark/light/system, eight terminal palettes with a live preview of your own prompt, and font size.
+- **Task notifications**: DingTalk / Feishu / WeCom webhooks, with a choice of every run or failures only.
 
 ## Download
 
@@ -204,11 +205,11 @@ Get the latest build from [GitHub Releases](https://github.com/keiskeies/ai_term
 
 | Platform | File |
 |---|---|
-| macOS | `AI_Terminal_v1.4.2_macOS.zip` |
-| iOS | `AI_Terminal_v1.4.2_iOS.ipa` (unsigned) |
-| Android | `AI_Terminal_v1.4.2_Android.apk` |
-| Windows | `AI_Terminal_v1.4.2_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.4.2_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.4.3_macOS.zip` |
+| iOS | `AI_Terminal_v1.4.3_iOS.ipa` (unsigned) |
+| Android | `AI_Terminal_v1.4.3_Android.apk` |
+| Windows | `AI_Terminal_v1.4.3_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.4.3_Linux_x64.tar.gz` |
 
 If macOS reports that the developer cannot be verified:
 
