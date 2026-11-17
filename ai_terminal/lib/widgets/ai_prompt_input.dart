@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 import '../models/agent_permission_mode.dart';
 import 'permission_mode_selector.dart';
 
@@ -92,9 +93,21 @@ class SlashCommand {
   /// 自定义选中行为（模板用）
   final VoidCallback? onSelect;
 
+  /// 英文文案；只给内置命令用。
+  ///
+  /// [description] 是 `const` 表里的字面量，编译期就钉成中文了，所以英文界面
+  /// 必须在这里带一份对照，渲染时用 [displayDescription] 取。运维模板的文案在
+  /// 读取时才本地化，不需要这一份。
+  final String? descriptionEn;
+
+  /// 渲染用文案：有英文对照且当前不是中文界面时用英文。
+  String get displayDescription =>
+      descriptionEn != null && !UiText.zh ? descriptionEn! : description;
+
   const SlashCommand(
     this.command,
     this.description, {
+    this.descriptionEn,
     this.isTemplate = false,
     this.leading,
     this.badge,
@@ -104,14 +117,23 @@ class SlashCommand {
 }
 
 const List<SlashCommand> kSlashCommands = [
-  SlashCommand('/new', '新建会话'),
-  SlashCommand('/compact', '压缩记忆（总结早期对话）'),
-  SlashCommand('/goal', '目标模式：/goal <目标> 开始；子命令 pause / resume / edit / done / clear'),
-  SlashCommand('/plan', '只要计划不执行：/plan <目标>（临时只读，结束自动还原）'),
-  SlashCommand('/model', '切换模型：/model <名称>，不带参数则列出可选模型'),
-  SlashCommand('/permission', '切换执行权限：/permission <只读|询问|自动|全自动>'),
-  SlashCommand('/export', '复制当前会话到剪贴板，并给出执行日志路径'),
-  SlashCommand('/help', '列出全部命令'),
+  SlashCommand('/new', '新建会话', descriptionEn: 'New session'),
+  SlashCommand('/compact', '压缩记忆（总结早期对话）',
+      descriptionEn: 'Compact memory (summarise earlier turns)'),
+  SlashCommand('/goal', '目标模式：/goal <目标> 开始；子命令 pause / resume / edit / done / clear',
+      descriptionEn:
+          'Goal mode: /goal <objective>; subcommands pause / resume / edit / done / clear'),
+  SlashCommand('/plan', '只要计划不执行：/plan <目标>（临时只读，结束自动还原）',
+      descriptionEn:
+          'Plan only, no execution: /plan <objective> (read-only, restored on exit)'),
+  SlashCommand('/model', '切换模型：/model <名称>，不带参数则列出可选模型',
+      descriptionEn: 'Switch model: /model <name>; no argument lists models'),
+  SlashCommand('/permission', '切换执行权限：/permission <只读|询问|自动|全自动>',
+      descriptionEn:
+          'Change permission: /permission <read-only|ask|auto|full-auto>'),
+  SlashCommand('/export', '复制当前会话到剪贴板，并给出执行日志路径',
+      descriptionEn: 'Copy the session to the clipboard with its log path'),
+  SlashCommand('/help', '列出全部命令', descriptionEn: 'List all commands'),
 ];
 
 /// 斜杠建议浮层的测试定位键。
@@ -365,7 +387,8 @@ class _AIPromptInputState extends State<AIPromptInput> {
                       children: [
                         Expanded(
                           child: Text(
-                            '↑↓ 切换   Tab 选择   Enter 执行   Esc 关闭',
+                            UiText.t('↑↓ 切换   Tab 选择   Enter 执行   Esc 关闭',
+                                '↑↓ navigate   Tab select   Enter run   Esc close'),
                             style: TextStyle(color: tc.textSub, fontSize: fMicro),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -687,7 +710,7 @@ class _AIPromptInputState extends State<AIPromptInput> {
     final tc = ThemeColors.of(context);
     final isOrch = widget.isOrchestratorMode;
     return Tooltip(
-      message: '补充指令（下一轮生效）',
+      message: UiText.t('补充指令（下一轮生效）', 'Steering instruction (applies next turn)'),
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: GestureDetector(
@@ -842,7 +865,7 @@ class _SlashCommandItemState extends State<_SlashCommandItem> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  cmd.description,
+                  cmd.displayDescription,
                   style: TextStyle(
                     color: widget.tc.textSub,
                     fontSize: fMicro,

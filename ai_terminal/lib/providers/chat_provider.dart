@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../core/ui_text.dart';
 import '../models/chat_session.dart';
 import '../models/ai_model_config.dart';
 import '../services/ai_service.dart';
@@ -252,7 +253,8 @@ class ChatNotifier extends StateNotifier<ChatState> {
     _convService.appendMessage(hostId, role: 'assistant', content: content).then((_) {}).catchError((e) {
       // R8: 持久化失败不可静默吞掉
       agentLogger.error('ChatNotifier', '持久化 assistant 响应失败 (hostId=$hostId): $e');
-      state = state.copyWith(error: 'AI 响应保存失败: $e');
+      state = state.copyWith(
+          error: UiText.t('AI 响应保存失败: $e', 'Failed to save AI response: $e'));
     });
   }
 

@@ -408,16 +408,17 @@ class AgentCommandBlock extends StatelessWidget {
 
   /// 复制按钮
   Widget _buildCopyButton(String text, ThemeColors tc, BuildContext context) {
+    final ui = AgentUiText.of(context);
     return GestureDetector(
       onTap: () {
         Clipboard.setData(ClipboardData(text: text));
         clearTopToast();
         showTopSnackBar(context, 
-          const SnackBar(
-            content: Text('已复制', style: TextStyle(fontSize: fSmall)),
-            duration: Duration(seconds: 1),
+          SnackBar(
+            content: Text(ui.copied, style: const TextStyle(fontSize: fSmall)),
+            duration: const Duration(seconds: 1),
             behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.all(16),
+            margin: const EdgeInsets.all(16),
           ),
         );
       },

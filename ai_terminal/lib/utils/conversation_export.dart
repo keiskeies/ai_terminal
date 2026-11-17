@@ -1,3 +1,4 @@
+import '../core/ui_text.dart';
 import '../models/agent_event.dart';
 import '../models/chat_item.dart';
 import '../models/operation_report.dart';
@@ -27,9 +28,11 @@ String formatConversationForExport(List<ChatItem> items) {
 String formatOperationReportCopy(OperationReport report) {
   final buffer = StringBuffer();
   if (report.goal.trim().isNotEmpty) {
-    buffer.writeln('目标：${report.goal.trim()}');
+    buffer.writeln(UiText.t(
+        '目标：${report.goal.trim()}', 'Goal: ${report.goal.trim()}'));
   }
-  buffer.writeln('结论：${report.conclusion.trim()}');
+  buffer.writeln(UiText.t(
+      '结论：${report.conclusion.trim()}', 'Conclusion: ${report.conclusion.trim()}'));
   final answerBody = report.answerBody?.trim();
   if (answerBody != null && answerBody.isNotEmpty && !_sameText(answerBody, report.conclusion)) {
     buffer

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 
 /// 命令面板条目。
 ///
@@ -205,7 +206,8 @@ class _CommandPaletteState extends State<CommandPalette> {
                                     isDense: true,
                                     border: InputBorder.none,
                                     hintText: widget.placeholder ??
-                                        '搜索主机 / 命令 / 页面 / 操作…',
+                                        UiText.t('搜索主机 / 命令 / 页面 / 操作…',
+                                            'Search hosts / commands / pages / actions…'),
                                     hintStyle: TextStyle(
                                         color: tc.textMuted, fontSize: fBody),
                                   ),
@@ -221,7 +223,7 @@ class _CommandPaletteState extends State<CommandPalette> {
                           Padding(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             child: Center(
-                              child: Text('没有匹配项',
+                              child: Text(UiText.t('没有匹配项', 'No matches'),
                                   style: TextStyle(
                                       fontSize: fSmall, color: tc.textMuted)),
                             ),
@@ -259,11 +261,14 @@ class _CommandPaletteState extends State<CommandPalette> {
                           ),
                           child: Row(
                             children: [
-                              _footHint(tc, '↑↓', '选择'),
+                              _footHint(tc, '↑↓',
+                                  UiText.t('选择', 'select')),
                               const SizedBox(width: 12),
-                              _footHint(tc, 'Enter', '执行'),
+                              _footHint(tc, 'Enter',
+                                  UiText.t('执行', 'run')),
                               const SizedBox(width: 12),
-                              _footHint(tc, 'Esc', '关闭'),
+                              _footHint(tc, 'Esc',
+                                  UiText.t('关闭', 'close')),
                             ],
                           ),
                         ),

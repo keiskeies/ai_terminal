@@ -1,3 +1,4 @@
+import '../core/ui_text.dart';
 import '../models/operation_report.dart';
 
 /// 确定性验证检测器
@@ -16,26 +17,34 @@ class VerificationDetector {
 
     final isActive = RegExp(r'systemctl\s+is-active\s+(\S+)').firstMatch(cmd);
     if (isActive != null) {
-      final service = isActive.group(1) ?? '服务';
+      final service = isActive.group(1) ?? UiText.t('服务', 'service');
       final state = _firstLine(out).toLowerCase();
       if (state == 'active') {
-        return OperationBadge(text: '$service 运行中', level: 'success');
+        return OperationBadge(
+            text: UiText.t('$service 运行中', '$service running'),
+            level: 'success');
       }
       if (state == 'inactive' || state == 'failed' || state == 'unknown') {
-        return OperationBadge(text: '$service 未运行', level: 'warning');
+        return OperationBadge(
+            text: UiText.t('$service 未运行', '$service not running'),
+            level: 'warning');
       }
       return null;
     }
 
     final isEnabled = RegExp(r'systemctl\s+is-enabled\s+(\S+)').firstMatch(cmd);
     if (isEnabled != null) {
-      final service = isEnabled.group(1) ?? '服务';
+      final service = isEnabled.group(1) ?? UiText.t('服务', 'service');
       final state = _firstLine(out).toLowerCase();
       if (state == 'enabled') {
-        return OperationBadge(text: '$service 开机自启', level: 'success');
+        return OperationBadge(
+            text: UiText.t('$service 开机自启', '$service autostart on'),
+            level: 'success');
       }
       if (state == 'disabled') {
-        return OperationBadge(text: '$service 未设置自启', level: 'info');
+        return OperationBadge(
+            text: UiText.t('$service 未设置自启', '$service autostart off'),
+            level: 'info');
       }
       return null;
     }
@@ -54,14 +63,22 @@ class VerificationDetector {
       if (ports.isEmpty) return null;
       final sorted = ports.map(int.parse).toList()..sort();
       final shown = sorted.take(4).join('/');
-      final suffix = sorted.length > 4 ? ' 等 ${sorted.length} 个端口' : '';
-      return OperationBadge(text: '端口 $shown$suffix 监听', level: 'success');
+      final suffix = sorted.length > 4
+          ? UiText.t(' 等 ${sorted.length} 个端口', ' (+${sorted.length} more)')
+          : '';
+      return OperationBadge(
+          text: UiText.t('端口 $shown$suffix 监听', 'Ports $shown$suffix listening'),
+          level: 'success');
     }
 
     if (cmd.contains('nginx -t')) {
       return success
-          ? const OperationBadge(text: 'Nginx 配置检查通过', level: 'success')
-          : const OperationBadge(text: 'Nginx 配置检查失败', level: 'warning');
+          ? OperationBadge(
+              text: UiText.t('Nginx 配置检查通过', 'Nginx config check passed'),
+              level: 'success')
+          : OperationBadge(
+              text: UiText.t('Nginx 配置检查失败', 'Nginx config check failed'),
+              level: 'warning');
     }
 
     if (cmd.contains('curl ')) {

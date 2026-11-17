@@ -7,6 +7,7 @@ import 'agent_tool.dart';
 import 'command_executor.dart';
 import 'local_terminal_service.dart';
 import '../core/safety_guard.dart';
+import '../core/ui_text.dart';
 import '../utils/command_heuristics.dart';
 import '../utils/tool_args_parser.dart';
 
@@ -93,7 +94,8 @@ class ProjectAnalyzeTool extends AgentTool {
   }) async {
     final path = args.getString('path');
     if (path.isEmpty) {
-      return ToolResult.failure('参数缺失: path 为必填项');
+      return ToolResult.failure(
+          UiText.t('参数缺失: path 为必填项', 'Missing parameter: path is required'));
     }
 
     // 路径安全检查
@@ -104,14 +106,17 @@ class ProjectAnalyzeTool extends AgentTool {
 
     final dir = Directory(path);
     if (!await dir.exists()) {
-      return ToolResult.failure('项目目录不存在: $path');
+      return ToolResult.failure(UiText.t(
+          '项目目录不存在: $path', 'Project directory does not exist: $path'));
     }
 
-    onProgress?.call('正在分析项目结构...');
+    onProgress?.call(
+        UiText.t('正在分析项目结构...', 'Analyzing project structure...'));
 
     final result = StringBuffer();
-    result.writeln('=== 项目分析报告 ===');
-    result.writeln('项目路径: ${dir.absolute.path}');
+    result.writeln(UiText.t('=== 项目分析报告 ===', '=== Project analysis report ==='));
+    result.writeln(
+        UiText.t('项目路径: ${dir.absolute.path}', 'Project path: ${dir.absolute.path}'));
     result.writeln();
 
     // 收集项目根目录下的文件
@@ -471,7 +476,8 @@ class BuildProjectTool extends AgentTool {
     final command = args.getString('command');
 
     if (path.isEmpty) {
-      return ToolResult.failure('参数缺失: path 为必填项');
+      return ToolResult.failure(
+          UiText.t('参数缺失: path 为必填项', 'Missing parameter: path is required'));
     }
 
     // 路径安全检查
@@ -502,25 +508,30 @@ class BuildProjectTool extends AgentTool {
       if (buildCmd.isEmpty) {
         return ToolResult.failure('未提供构建命令，且无法自动识别项目类型。请提供 command 参数（如 npm run build）');
       }
-      onProgress?.call('自动识别构建命令: $buildCmd');
+      onProgress?.call(UiText.t(
+          '自动识别构建命令: $buildCmd', 'Auto-detected build command: $buildCmd'));
     }
 
     // 安全检查构建命令
     final cmdSafety = SafetyGuard.check(buildCmd);
     if (cmdSafety == SafetyLevel.blocked) {
-      return ToolResult.failure('构建命令被安全策略拦截: ${SafetyGuard.getReason(buildCmd)}');
+      return ToolResult.failure(UiText.t(
+          '构建命令被安全策略拦截: ${SafetyGuard.getReason(buildCmd)}',
+          'Build command blocked by safety policy: ${SafetyGuard.getReason(buildCmd)}'));
     }
 
     // 获取构建锁（串行化）
-    onProgress?.call('等待构建锁...');
+    onProgress?.call(UiText.t('等待构建锁...', 'Waiting for build lock...'));
     try {
       await BuildLock.instance.acquire();
     } on CancellationException {
-      return ToolResult.failure('等待构建锁时被取消');
+      return ToolResult.failure(UiText.t(
+          '等待构建锁时被取消', 'Cancelled while waiting for the build lock'));
     }
 
     try {
-      onProgress?.call('开始构建: $buildCmd');
+      onProgress?.call(
+          UiText.t('开始构建: $buildCmd', 'Starting build: $buildCmd'));
       debugPrint('[BuildProject] 在 $path 执行: $buildCmd');
 
       // 拼接完整命令：cd 到项目目录 + 执行构建
@@ -537,12 +548,15 @@ class BuildProjectTool extends AgentTool {
       final stderr = result.stderr;
 
       if (result.success) {
-        final summary = '✓ 构建成功 (${result.duration.inSeconds}s)\n\n输出:\n$output';
-        onProgress?.call('构建成功');
+        final summary = UiText.t('✓ 构建成功 (${result.duration.inSeconds}s)\n\n输出:\n$output',
+            '✓ Build succeeded (${result.duration.inSeconds}s)\n\nOutput:\n$output');
+        onProgress?.call(UiText.t('构建成功', 'Build succeeded'));
         return ToolResult.success(summary);
       } else {
         final errorDetail = StringBuffer();
-        errorDetail.writeln('✗ 构建失败 (退出码: ${result.exitCode}, 耗时: ${result.duration.inSeconds}s)');
+        errorDetail.writeln(UiText.t(
+            '✗ 构建失败 (退出码: ${result.exitCode}, 耗时: ${result.duration.inSeconds}s)',
+            '✗ Build failed (exit code: ${result.exitCode}, took ${result.duration.inSeconds}s)'));
         if (result.timedOut) {
           errorDetail.writeln('⏱ 构建超时');
         }
@@ -733,10 +747,14 @@ class PackageProjectTool extends AgentTool {
     // 安全检查打包命令
     final cmdSafety = SafetyGuard.check(packageCmd);
     if (cmdSafety == SafetyLevel.blocked) {
-      return ToolResult.failure('打包命令被安全策略拦截: ${SafetyGuard.getReason(packageCmd)}');
+      return ToolResult.failure(UiText.t(
+          '打包命令被安全策略拦截: ${SafetyGuard.getReason(packageCmd)}',
+          'Package command blocked by safety policy: ${SafetyGuard.getReason(packageCmd)}'));
     }
 
-    onProgress?.call('开始打包: $artifactDir → $outputFile');
+    onProgress?.call(UiText.t(
+        '开始打包: $artifactDir → $outputFile',
+        'Starting packaging: $artifactDir → $outputFile'));
     debugPrint('[PackageProject] 执行: $packageCmd');
 
     try {
@@ -753,12 +771,17 @@ class PackageProjectTool extends AgentTool {
         }
         final fileSize = await outputFileObj.length();
         final sizeStr = _formatFileSize(fileSize);
-        final summary = '✓ 打包成功\n输出文件: $outputFile\n大小: $sizeStr\n\n可用 sftp_upload 工具上传此文件到服务器。';
-        onProgress?.call('打包成功: $sizeStr');
+        final summary = UiText.t(
+            '✓ 打包成功\n输出文件: $outputFile\n大小: $sizeStr\n\n可用 sftp_upload 工具上传此文件到服务器。',
+            '✓ Packaging succeeded\nOutput file: $outputFile\nSize: $sizeStr\n\nUse the sftp_upload tool to upload this file to the server.');
+        onProgress?.call(
+            UiText.t('打包成功: $sizeStr', 'Packaging succeeded: $sizeStr'));
         return ToolResult.success(summary);
       } else {
         return ToolResult.failure(
-          '✗ 打包失败 (退出码: ${result.exitCode})\n--- stdout ---\n${result.stdout}\n--- stderr ---\n${result.stderr}',
+          UiText.t(
+              '✗ 打包失败 (退出码: ${result.exitCode})\n--- stdout ---\n${result.stdout}\n--- stderr ---\n${result.stderr}',
+              '✗ Packaging failed (exit code: ${result.exitCode})\n--- stdout ---\n${result.stdout}\n--- stderr ---\n${result.stderr}'),
           output: result.stdout,
         );
       }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 
 /// 设置行卡片。设计稿第 07 节的 `.rowcard` 唯一实现。
 ///
@@ -23,7 +24,7 @@ class SettingsRowCard extends StatefulWidget {
     this.expanded = false,
     this.onToggle,
     this.onNavigate,
-    this.actionLabel = '打开完整设置',
+    this.actionLabel,
     this.dense = false,
   });
 
@@ -39,8 +40,11 @@ class SettingsRowCard extends StatefulWidget {
   /// 跳转式卡片的点击回调（通常是 context.push）
   final VoidCallback? onNavigate;
 
-  /// 展开区底部那行「打开完整设置」的文案
-  final String actionLabel;
+  /// 展开区底部那行「打开完整设置」的文案。
+  ///
+  /// 留空给渲染期兜底：默认值写成 `'打开完整设置'` 会在编译期把中文钉死，
+  /// 英文界面下 const 构造不会重新求值。
+  final String? actionLabel;
 
   /// 抽屉里字号更小一档
   final bool dense;
@@ -168,7 +172,8 @@ class _SettingsRowCardState extends State<SettingsRowCard> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                widget.actionLabel,
+                widget.actionLabel ??
+                    UiText.t('打开完整设置', 'Open full settings'),
                 style: TextStyle(fontSize: fMicro, color: tc.brand),
               ),
               const SizedBox(width: 2),

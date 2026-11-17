@@ -6,6 +6,7 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:path/path.dart' as p;
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 import '../providers/app_providers.dart';
 import '../services/sftp_controller.dart';
 import '../services/sftp_service.dart';
@@ -107,7 +108,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
   Future<void> _connect() async {
     final host = ref.read(hostsProvider.notifier).getHostById(widget.hostId);
     if (host == null) {
-      _controller.setError('主机不存在');
+      _controller.setError(UiText.t('主机不存在', 'Host not found'));
       return;
     }
     await _controller.connectAndLoad(host);
@@ -166,33 +167,43 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
             ),
             const Divider(height: 1),
             if (entry.isDirectory)
-              _actionTile(context, Icons.folder_open, '打开', () {
-                Navigator.pop(ctx);
-                _controller.navigateTo(entry.path);
-              }),
+              _actionTile(
+                  context,
+                  Icons.folder_open,
+                  UiText.t('打开', 'Open'),
+                  () {
+                    Navigator.pop(ctx);
+                    _controller.navigateTo(entry.path);
+                  }),
             if (!entry.isDirectory)
-              _actionTile(context, Icons.download, '下载到本地', () {
+              _actionTile(context, Icons.download,
+                  UiText.t('下载到本地', 'Download'), () {
                 Navigator.pop(ctx);
                 _downloadFile(entry);
               }),
             if (!entry.isDirectory)
-              _actionTile(context, Icons.visibility, '预览内容', () {
+              _actionTile(context, Icons.visibility,
+                  UiText.t('预览内容', 'Preview'), () {
                 Navigator.pop(ctx);
                 _editOrPreviewFile(entry, readOnly: true);
               }),
             if (!entry.isDirectory)
-              _actionTile(context, Icons.edit_outlined, '编辑', () {
+              _actionTile(context, Icons.edit_outlined,
+                  UiText.t('编辑', 'Edit'), () {
                 Navigator.pop(ctx);
                 _editOrPreviewFile(entry, readOnly: false);
               }),
-            _actionTile(context, Icons.drive_file_rename_outline, '重命名', () {
+            _actionTile(context, Icons.drive_file_rename_outline,
+                UiText.t('重命名', 'Rename'), () {
               Navigator.pop(ctx);
               _renameEntry(entry);
             }),
             _actionTile(
               context,
               Icons.delete,
-              entry.isDirectory ? '删除目录' : '删除文件',
+              entry.isDirectory
+                  ? UiText.t('删除目录', 'Delete folder')
+                  : UiText.t('删除文件', 'Delete file'),
               () {
                 Navigator.pop(ctx);
                 _deleteEntry(entry);
@@ -223,7 +234,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         final localPath = '${Directory.systemTemp.path}/${entry.name}';
         showTopSnackBar(context, 
           SnackBar(
-            content: Text('已下载到: $localPath'),
+            content: Text(UiText.t('已下载到: $localPath', 'Downloaded to: $localPath')),
             duration: const Duration(seconds: 3),
             behavior: SnackBarBehavior.floating,
           ),
@@ -233,7 +244,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       if (mounted) {
         showTopSnackBar(context, 
           SnackBar(
-            content: Text('下载失败: $e'),
+            content: Text(UiText.t('下载失败: $e', 'Download failed: $e')),
             backgroundColor: cDanger,
             behavior: SnackBarBehavior.floating,
           ),
@@ -251,7 +262,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
     } catch (e) {
       if (mounted) {
         showTopSnackBar(context, 
-          SnackBar(content: Text('读取失败: $e'), backgroundColor: cDanger),
+          SnackBar(content: Text(UiText.t('读取失败: $e', 'Read failed: $e')), backgroundColor: cDanger),
         );
       }
       return;
@@ -292,7 +303,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                         color: tc.textMuted.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text('只读', style: TextStyle(fontSize: 9, color: tc.textMuted)),
+                      child: Text(UiText.t('只读', 'Read-only'), style: TextStyle(fontSize: 9, color: tc.textMuted)),
                     ),
                   if (!readOnly && hasModified)
                     Container(
@@ -301,7 +312,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                         color: cWarning.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Text('已修改', style: TextStyle(fontSize: 9, color: cWarning)),
+                      child: Text(UiText.t('已修改', 'Modified'), style: TextStyle(fontSize: 9, color: cWarning)),
                     ),
                 ],
               ),
@@ -337,7 +348,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text('关闭'),
+                  child: Text(UiText.t('关闭', 'Close')),
                 ),
                 if (!readOnly)
                   ElevatedButton(
@@ -347,9 +358,9 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                         if (ctx.mounted) {
                           Navigator.pop(ctx);
                           showTopSnackBar(ctx, 
-                            const SnackBar(
-                              content: Text('已保存'),
-                              duration: Duration(seconds: 2),
+                            SnackBar(
+                              content: Text(UiText.t('已保存', 'Saved')),
+                              duration: const Duration(seconds: 2),
                               behavior: SnackBarBehavior.floating,
                             ),
                           );
@@ -357,12 +368,12 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                       } catch (e) {
                         if (ctx.mounted) {
                           showTopSnackBar(ctx, 
-                            SnackBar(content: Text('保存失败: $e'), backgroundColor: cDanger),
+                            SnackBar(content: Text(UiText.t('保存失败: $e', 'Save failed: $e')), backgroundColor: cDanger),
                           );
                         }
                       }
                     } : null,
-                    child: const Text('保存'),
+                    child: Text(UiText.t('保存', 'Save')),
                   ),
               ],
             );
@@ -380,21 +391,21 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       builder: (ctx) => AlertDialog(
         backgroundColor: DialogTheme.of(context).backgroundColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: const Text('重命名', style: TextStyle(fontSize: fSmall)),
+        title: Text(UiText.t('重命名', 'Rename'), style: const TextStyle(fontSize: fSmall)),
         content: TextField(
           controller: controller,
           autofocus: true,
           style: const TextStyle(fontSize: fSmall),
-          decoration: const InputDecoration(labelText: '新名称', isDense: true),
+          decoration: InputDecoration(labelText: UiText.t('新名称', 'New name'), isDense: true),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
+            child: Text(UiText.t('取消', 'Cancel')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('确定'),
+            child: Text(UiText.t('确定', 'OK')),
           ),
         ],
       ),
@@ -406,7 +417,9 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       } catch (e) {
         if (mounted) {
           showTopSnackBar(context, 
-            SnackBar(content: Text('重命名失败: $e'), backgroundColor: cDanger),
+            SnackBar(
+                content: Text(UiText.t('重命名失败: $e', 'Rename failed: $e')),
+                backgroundColor: cDanger),
           );
         }
       }
@@ -419,17 +432,17 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       builder: (ctx) => AlertDialog(
         backgroundColor: DialogTheme.of(context).backgroundColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: const Text('确认删除', style: TextStyle(color: cDanger, fontSize: fSmall)),
-        content: Text('确定删除 "${entry.name}" 吗？此操作不可恢复。', style: const TextStyle(fontSize: fSmall)),
+        title: Text(UiText.t('确认删除', 'Confirm delete'), style: const TextStyle(color: cDanger, fontSize: fSmall)),
+        content: Text(UiText.t('确定删除 "${entry.name}" 吗？此操作不可恢复。', 'Delete "${entry.name}"? This cannot be undone.'), style: const TextStyle(fontSize: fSmall)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
+            child: Text(UiText.t('取消', 'Cancel')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(backgroundColor: cDanger),
-            child: const Text('删除'),
+            child: Text(UiText.t('删除', 'Delete')),
           ),
         ],
       ),
@@ -441,7 +454,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       } catch (e) {
         if (mounted) {
           showTopSnackBar(context, 
-            SnackBar(content: Text('删除失败: $e'), backgroundColor: cDanger),
+            SnackBar(content: Text(UiText.t('删除失败: $e', 'Delete failed: $e')), backgroundColor: cDanger),
           );
         }
       }
@@ -456,7 +469,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       if (mounted) {
         showTopSnackBar(context, 
           SnackBar(
-            content: Text('打开文件选择器失败: $e'),
+            content: Text(UiText.t('打开文件选择器失败: $e', 'Failed to open file picker: $e')),
             backgroundColor: cDanger,
             behavior: SnackBarBehavior.floating,
           ),
@@ -482,7 +495,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         if (mounted) {
           showTopSnackBar(context, 
             SnackBar(
-              content: Text('已上传: $fileName'),
+              content: Text(UiText.t('已上传: $fileName', 'Uploaded: $fileName')),
               duration: const Duration(seconds: 2),
               behavior: SnackBarBehavior.floating,
             ),
@@ -492,7 +505,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         if (mounted) {
           showTopSnackBar(context, 
             SnackBar(
-              content: Text('上传 $fileName 失败: $e'),
+              content: Text(UiText.t('上传 $fileName 失败: $e', 'Failed to upload $fileName: $e')),
               backgroundColor: cDanger,
               behavior: SnackBarBehavior.floating,
             ),
@@ -513,17 +526,17 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       builder: (ctx) => AlertDialog(
         backgroundColor: DialogTheme.of(context).backgroundColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: const Text('新建目录', style: TextStyle(fontSize: fSmall)),
+        title: Text(UiText.t('新建目录', 'New folder'), style: const TextStyle(fontSize: fSmall)),
         content: TextField(
           controller: controller,
           autofocus: true,
           style: const TextStyle(fontSize: fSmall),
-          decoration: const InputDecoration(labelText: '目录名称', isDense: true),
+          decoration: InputDecoration(labelText: UiText.t('目录名称', 'Folder name'), isDense: true),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('取消'),
+            child: Text(UiText.t('取消', 'Cancel')),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -534,12 +547,12 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
               } catch (e) {
                 if (mounted) {
                   showTopSnackBar(context, 
-                    SnackBar(content: Text('创建目录失败: $e'), backgroundColor: cDanger),
+                    SnackBar(content: Text(UiText.t('创建目录失败: $e', 'Failed to create folder: $e')), backgroundColor: cDanger),
                   );
                 }
               }
             },
-            child: const Text('创建'),
+            child: Text(UiText.t('创建', 'Create')),
           ),
         ],
       ),
@@ -610,9 +623,9 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: cPrimary),
                     ),
-                    child: const Text(
-                      '松开以上传到当前目录',
-                      style: TextStyle(fontSize: fSmall, color: cPrimary),
+                    child: Text(
+                      UiText.t('松开以上传到当前目录', 'Drop to upload to the current folder'),
+                      style: const TextStyle(fontSize: fSmall, color: cPrimary),
                     ),
                   ),
                 ),
@@ -660,7 +673,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         if (mounted) {
           showTopSnackBar(context,
             SnackBar(
-              content: Text('上传 $name 失败: $e'),
+              content: Text(UiText.t('上传 $name 失败: $e', 'Failed to upload $name: $e')),
               backgroundColor: cDanger,
               behavior: SnackBarBehavior.floating,
             ),
@@ -673,7 +686,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       showTopSnackBar(context,
         SnackBar(
           content: Text(
-              '拖拽上传完成: $uploaded 项${failed > 0 ? '，失败 $failed 项' : ''}'),
+              UiText.t('拖拽上传完成: $uploaded 项${failed > 0 ? '，失败 $failed 项' : ''}',
+                  'Drop upload complete: $uploaded item(s)${failed > 0 ? ', $failed failed' : ''}')),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
         ),
@@ -720,7 +734,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
           // 排序按钮
           PopupMenuButton<String>(
             icon: Icon(Icons.sort, size: 16, color: _controller.isConnected ? tc.textSub : tc.textMuted),
-            tooltip: '排序',
+            tooltip: UiText.t('排序', 'Sort'),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
             onSelected: _controller.toggleSort,
@@ -730,7 +744,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('名称', style: TextStyle(fontSize: fSmall)),
+                    Text(UiText.t('名称', 'Name'), style: const TextStyle(fontSize: fSmall)),
                     if (_controller.sortBy == SftpSortFields.name) ...[
                       const SizedBox(width: 4),
                       Icon(_controller.sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: cPrimary),
@@ -743,7 +757,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('大小', style: TextStyle(fontSize: fSmall)),
+                    Text(UiText.t('大小', 'Size'), style: const TextStyle(fontSize: fSmall)),
                     if (_controller.sortBy == SftpSortFields.size) ...[
                       const SizedBox(width: 4),
                       Icon(_controller.sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: cPrimary),
@@ -756,7 +770,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text('修改时间', style: TextStyle(fontSize: fSmall)),
+                    Text(UiText.t('修改时间', 'Modified'), style: const TextStyle(fontSize: fSmall)),
                     if (_controller.sortBy == SftpSortFields.modified) ...[
                       const SizedBox(width: 4),
                       Icon(_controller.sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: cPrimary),
@@ -769,26 +783,26 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
           _headerActButton(tc,
               id: 'upload',
               icon: Icons.upload_file,
-              tooltip: '上传',
+              tooltip: UiText.t('上传', 'Upload'),
               onPressed: _controller.isConnected ? _uploadFiles : null),
           const SizedBox(width: 4),
           _headerActButton(tc,
               id: 'mkdir',
               icon: Icons.create_new_folder_outlined,
-              tooltip: '新建目录',
+              tooltip: UiText.t('新建目录', 'New folder'),
               onPressed: _controller.isConnected ? _showCreateDirectoryDialog : null),
           const SizedBox(width: 4),
           _headerActButton(tc,
               id: 'refresh',
               icon: Icons.refresh,
-              tooltip: '刷新',
+              tooltip: UiText.t('刷新', 'Refresh'),
               onPressed: _controller.isConnected ? () => _controller.loadDirectory(_controller.currentPath) : null),
           if (widget.onClose != null) ...[
             const SizedBox(width: 4),
             _headerActButton(tc,
                 id: 'close',
                 icon: Icons.close,
-                tooltip: '关闭',
+                tooltip: UiText.t('关闭', 'Close'),
                 onPressed: widget.onClose),
           ],
         ],
@@ -868,7 +882,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
               onPressed: _startPathEditing,
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
-              tooltip: '输入路径',
+              tooltip: UiText.t('输入路径', 'Enter path'),
             ),
           // 根目录按钮（右侧）
           IconButton(
@@ -876,7 +890,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
             onPressed: () => _controller.navigateTo('/'),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
-            tooltip: '根目录',
+            tooltip: UiText.t('根目录', 'Root folder'),
           ),
         ],
       ),
@@ -965,7 +979,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
               child: CircularProgressIndicator(strokeWidth: 2, color: cPrimary),
             ),
             const SizedBox(height: 8),
-            Text('正在连接...', style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+            Text(UiText.t('正在连接...', 'Connecting...'), style: TextStyle(color: tc.textSub, fontSize: fSmall)),
           ],
         ),
       );
@@ -985,7 +999,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
               ElevatedButton(
                 onPressed: _connect,
                 style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4)),
-                child: const Text('重试', style: TextStyle(fontSize: fSmall)),
+                child: Text(UiText.t('重试', 'Retry'), style: const TextStyle(fontSize: fSmall)),
               ),
             ],
           ),
@@ -1007,7 +1021,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
             children: [
               Icon(Icons.folder_open, size: 32, color: tc.textMuted),
               const SizedBox(height: 6),
-              Text('空目录', style: TextStyle(color: tc.textMuted, fontSize: fMicro)),
+              Text(UiText.t('空目录', 'Empty folder'), style: TextStyle(color: tc.textMuted, fontSize: fMicro)),
             ],
           ),
         ),
@@ -1107,8 +1121,10 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
     final n = _controller.entries.length;
     final host = _controller.hostName;
     final label = host == null || host.isEmpty
-        ? '${_controller.currentPath} · $n 项'
-        : '已连接 $host · ${_controller.currentPath} · $n 项';
+        ? '${_controller.currentPath} · ${UiText.count(n, '项', 'items')}'
+        : '${UiText.t('已连接', 'Connected')} $host'
+            ' · ${_controller.currentPath}'
+            ' · ${UiText.count(n, '项', 'items')}';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
       decoration: BoxDecoration(

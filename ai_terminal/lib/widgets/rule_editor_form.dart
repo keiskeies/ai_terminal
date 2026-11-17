@@ -145,7 +145,9 @@ class _RuleEditorFormState extends State<RuleEditorForm> {
           InlineSelect<String>(
             label: UiText.t('主机组', 'Host group'),
             value: groups.contains(_group) ? _group : groups.first,
-            items: [for (final g in groups) (g, g)],
+            items: [
+              for (final g in groups) (g, UiText.hostGroup(g)),
+            ],
             onChanged: (v) => setState(() => _group = v),
           ),
         ],

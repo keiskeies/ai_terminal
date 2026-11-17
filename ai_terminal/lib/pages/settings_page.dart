@@ -61,7 +61,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget _groupCard(SettingsEntry entry) {
     return SettingsGroupCard(
       key: _groupKeys[entry.id],
-      title: entry.title,
+      title: entry.label,
       subtitle: entry.subtitle,
       children: [
         // 改完值要立刻反映到标题行的读数上（字号、后端数、连接数……），

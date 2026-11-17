@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 
 /// 历史回合未完成时的横幅：明确标记中断，并提供继续入口
 class InterruptedTurnBanner extends StatelessWidget {
@@ -36,7 +37,7 @@ class InterruptedTurnBanner extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '任务已中断',
+                  UiText.t('任务已中断', 'Task interrupted'),
                   style: TextStyle(
                     color: tc.warn,
                     fontSize: fSmall,
@@ -45,7 +46,10 @@ class InterruptedTurnBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 1),
                 Text(
-                  goalText.isEmpty ? '执行记录已保留，可以继续完成' : goalText,
+                  goalText.isEmpty
+                      ? UiText.t('执行记录已保留，可以继续完成',
+                          'Execution records were kept — you can pick this up')
+                      : goalText,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: tc.textSub, fontSize: fMicro),
@@ -72,7 +76,7 @@ class InterruptedTurnBanner extends StatelessWidget {
                         size: 12, color: tc.brand),
                     const SizedBox(width: 4),
                     Text(
-                      '继续任务',
+                      UiText.t('继续任务', 'Continue task'),
                       style: TextStyle(
                         color: tc.brand,
                         fontSize: fMicro,

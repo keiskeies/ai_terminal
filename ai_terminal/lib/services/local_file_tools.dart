@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:path/path.dart' as p;
+import '../core/ui_text.dart';
 import '../utils/line_diff.dart';
 import '../utils/local_file_ops.dart';
 import '../utils/tool_args_parser.dart';
@@ -337,7 +338,10 @@ class LocalFileSearchTool extends LocalFileTool {
   }) async {
     final rawPath = args.getString('path');
     final query = args.getString('query');
-    if (query.isEmpty) return ToolResult.failure('参数缺失: query 必填');
+    if (query.isEmpty) {
+      return ToolResult.failure(
+          UiText.t('参数缺失: query 必填', 'Missing parameter: query is required'));
+    }
 
     final resolved = await _resolve(rawPath, _policy);
     if (resolved is ToolResult) return resolved;
@@ -391,10 +395,17 @@ class LocalFileSearchTool extends LocalFileTool {
         maxMatches: maxMatches,
         root: path,
       );
-      if (scanned % 200 == 0) onProgress?.call('已扫描 $scanned 个文件...');
+      if (scanned % 200 == 0) {
+        onProgress?.call(UiText.t(
+            '已扫描 $scanned 个文件...', 'Scanned $scanned files...'));
+      }
     }
 
-    final walkNote = walkCapped ? '\n注意: 文件数已达 5000 上限，未继续遍历，请用 glob 或更窄的 path 缩小范围' : '';
+    final walkNote = walkCapped
+        ? UiText.t(
+            '\n注意: 文件数已达 5000 上限，未继续遍历，请用 glob 或更窄的 path 缩小范围',
+            '\nNote: reached the 5000-file cap and stopped walking; narrow the scope with glob or a tighter path')
+        : '';
     if (hits.isEmpty) {
       return ToolResult.success(
           '未命中。搜索 "$query"，扫描 ${files.length} 个文件（$path）$walkNote');
@@ -493,7 +504,9 @@ class LocalFileWriteTool extends LocalFileTool {
     final rawPath = args.getString('path');
     final mode = args.getString('mode', defaultValue: 'write');
     if (mode != 'write' && mode != 'append') {
-      return ToolResult.failure('未知 mode: $mode（支持 write/append）');
+      return ToolResult.failure(UiText.t(
+          '未知 mode: $mode（支持 write/append）',
+          'Unknown mode: $mode (supported: write/append)'));
     }
     final resolved = await _resolve(rawPath, _policy);
     if (resolved is ToolResult) return resolved;
@@ -505,8 +518,11 @@ class LocalFileWriteTool extends LocalFileTool {
     );
     if (content.isFailed) return ToolResult.failure(content.error!);
     if (content.bytes.isEmpty && mode == 'write' && !args.containsKey('content') && !args.containsKey('content_b64')) {
-      return ToolResult.failure('参数缺失: content 或 content_b64 必须提供一个。'
-          '多行内容请写在同一行并用 \\n 表示换行。');
+      return ToolResult.failure(UiText.t(
+          '参数缺失: content 或 content_b64 必须提供一个。'
+          '多行内容请写在同一行并用 \\n 表示换行。',
+          'Missing parameter: provide either content or content_b64. '
+          'Write multi-line content on a single line using \\n for newlines.'));
     }
     if (content.bytes.length > _maxChunkBytes) {
       return ToolResult.failure(

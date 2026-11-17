@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../core/app_toast.dart';
+import '../core/ui_text.dart';
 
 /// 打开原始输出查看器（底部面板，支持搜索与复制）
 Future<void> showOutputViewer(
@@ -19,7 +20,7 @@ Future<void> showOutputViewer(
     builder: (_) => OutputViewerSheet(
       text: text,
       tc: tc,
-      title: title ?? '原始输出',
+      title: title,
     ),
   );
 }
@@ -27,13 +28,18 @@ Future<void> showOutputViewer(
 class OutputViewerSheet extends StatefulWidget {
   final String text;
   final ThemeColors tc;
-  final String title;
+
+  /// 标题为 null 时在 build 里取当前语言文案。
+  ///
+  /// 不写成 `this.title = '原始输出'`：默认参数是编译期常量，切到英文后仍会
+  /// 显示中文——`const` 表同理，凡是跟着语言走的文案都不能待在 const 默认值里。
+  final String? title;
 
   const OutputViewerSheet({
     super.key,
     required this.text,
     required this.tc,
-    this.title = '原始输出',
+    this.title,
   });
 
   @override
@@ -59,7 +65,10 @@ class _OutputViewerSheetState extends State<OutputViewerSheet> {
         : lines
             .where((line) => line.toLowerCase().contains(_query.toLowerCase()))
             .join('\n');
-    final display = filtered.trim().isEmpty ? '没有匹配内容' : filtered;
+    final display = filtered.trim().isEmpty
+        ? UiText.t('没有匹配内容', 'No matching line')
+        : filtered;
+    final title = widget.title ?? UiText.t('原始输出', 'Raw output');
 
     return SafeArea(
       child: Padding(
@@ -79,7 +88,7 @@ class _OutputViewerSheetState extends State<OutputViewerSheet> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        widget.title,
+                        title,
                         style: TextStyle(
                           color: tc.textMain,
                           fontSize: fSmall,
@@ -88,31 +97,31 @@ class _OutputViewerSheetState extends State<OutputViewerSheet> {
                       ),
                     ),
                     Text(
-                      '${widget.text.length} 字符',
+                      UiText.count(widget.text.length, '字符', 'chars'),
                       style: TextStyle(color: tc.textMuted, fontSize: fMicro),
                     ),
                     const SizedBox(width: 4),
                     _iconButton(
                       icon: Icons.copy,
-                      tooltip: '复制全部',
+                      tooltip: UiText.t('复制全部', 'Copy all'),
                       color: tc.textSub,
                       onTap: () {
                         Clipboard.setData(ClipboardData(text: widget.text));
                         clearTopToast();
                         showTopSnackBar(context, 
-                          const SnackBar(
-                            content: Text('已复制',
-                                style: TextStyle(fontSize: fSmall)),
-                            duration: Duration(seconds: 1),
+                          SnackBar(
+                            content: Text(UiText.t('已复制', 'Copied'),
+                                style: const TextStyle(fontSize: fSmall)),
+                            duration: const Duration(seconds: 1),
                             behavior: SnackBarBehavior.floating,
-                            margin: EdgeInsets.all(16),
+                            margin: const EdgeInsets.all(16),
                           ),
                         );
                       },
                     ),
                     _iconButton(
                       icon: Icons.close,
-                      tooltip: '关闭',
+                      tooltip: UiText.t('关闭', 'Close'),
                       color: tc.textSub,
                       onTap: () => Navigator.of(context).pop(),
                     ),
@@ -127,7 +136,7 @@ class _OutputViewerSheetState extends State<OutputViewerSheet> {
                   style: TextStyle(color: tc.textMain, fontSize: fSmall),
                   decoration: InputDecoration(
                     isDense: true,
-                    hintText: '搜索输出…',
+                    hintText: UiText.t('搜索输出…', 'Search output…'),
                     hintStyle: TextStyle(color: tc.textMuted, fontSize: fSmall),
                     prefixIcon:
                         Icon(Icons.search, size: 16, color: tc.textMuted),

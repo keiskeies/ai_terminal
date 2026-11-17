@@ -525,8 +525,11 @@ class _KnowledgeRuleEditDialogState extends State<KnowledgeRuleEditDialog> {
                     decoration: InputDecoration(
                       labelText: UiText.t('主机组', 'Host group'),
                     ),
+                    // value 保持持久化的原始组名（'默认' 写进 Hive 不能改），
+                    // 只有 child 走本地化展示。
                     items: groups
-                        .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+                        .map((g) => DropdownMenuItem(
+                            value: g, child: Text(UiText.hostGroup(g))))
                         .toList(),
                     onChanged: (v) => setState(() => _group = v ?? _group),
                   ),

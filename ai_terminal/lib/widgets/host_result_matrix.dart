@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 import '../models/host_execution_result.dart';
 
 /// 多主机批量结果矩阵：按主机展示成功/失败、耗时、退出码与输出摘要
@@ -44,8 +45,11 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
             const SizedBox(width: 5),
             Expanded(
               child: Text(
-                '${widget.results.length} 台主机 · $success 成功'
-                '${failed > 0 ? " · $failed 失败" : ""}',
+                UiText.t(
+                    '${widget.results.length} 台主机 · $success 成功'
+                    '${failed > 0 ? " · $failed 失败" : ""}',
+                    '${widget.results.length} hosts · $success succeeded'
+                    '${failed > 0 ? " · $failed failed" : ""}'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -74,7 +78,7 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
                       Icon(Icons.refresh, size: 11, color: tc.brand),
                       const SizedBox(width: 3),
                       Text(
-                        '重试失败主机',
+                        UiText.t('重试失败主机', 'Retry failed hosts'),
                         style: TextStyle(
                           color: tc.brand,
                           fontSize: fMicro,
@@ -102,7 +106,8 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
     final preview = _firstLine(detail);
     final meta = <String>[
       if (result.durationMs != null) _formatDuration(result.durationMs!),
-      if (result.exitCode != null) '退出码 ${result.exitCode}',
+      if (result.exitCode != null)
+        UiText.t('退出码 ${result.exitCode}', 'exit ${result.exitCode}'),
       if (!result.success) _failureLabel(result.failureKind),
     ];
 
@@ -162,7 +167,9 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              result.success ? '成功' : '失败',
+                              result.success
+                                  ? UiText.t('成功', 'OK')
+                                  : UiText.t('失败', 'Failed'),
                               style: TextStyle(
                                 color: color,
                                 fontSize: fMicro,
@@ -236,19 +243,19 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
   String _failureLabel(String? failureKind) {
     switch (failureKind) {
       case 'disconnected':
-        return '连接断开';
+        return UiText.t('连接断开', 'Disconnected');
       case 'timeout':
-        return '超时';
+        return UiText.t('超时', 'Timed out');
       case 'permissionDenied':
-        return '权限不足';
+        return UiText.t('权限不足', 'Permission denied');
       case 'interactivePrompt':
-        return '等待输入';
+        return UiText.t('等待输入', 'Waiting for input');
       case 'syntaxError':
-        return '语法错误';
+        return UiText.t('语法错误', 'Syntax error');
       case 'cancelled':
-        return '已取消';
+        return UiText.t('已取消', 'Cancelled');
       default:
-        return '执行失败';
+        return UiText.t('执行失败', 'Failed');
     }
   }
 

@@ -365,7 +365,8 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
                   style: TextStyle(fontSize: fMicro, color: tc.textMain),
                 ),
                 Text(
-                  '${e.models.length} 个模型 · ${e.baseUrl}',
+                  UiText.t('${e.models.length} 个模型 · ${e.baseUrl}',
+                      '${e.models.length} models · ${e.baseUrl}'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: fMicro, color: tc.textMuted),

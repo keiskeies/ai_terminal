@@ -1238,13 +1238,14 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
   void _copySelection(xterm.Terminal terminal) {
     final sel = _controller.selection;
     if (sel == null) {
-      _showToast('没有选中的内容');
+      _showToast(UiText.t('没有选中的内容', 'Nothing selected'));
       return;
     }
     final text = terminal.buffer.getText(sel);
     Clipboard.setData(ClipboardData(text: text));
     _controller.clearSelection();
-    _showToast('已复制 ${text.length} 字符');
+    _showToast(UiText.t('已复制 ${text.length} 字符',
+        'Copied ${text.length} characters'));
   }
 
   /// 轻提示：复用全局顶部 toast，不弹 AlertDialog、不遮挡终端

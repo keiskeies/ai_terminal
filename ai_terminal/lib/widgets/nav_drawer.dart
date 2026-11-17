@@ -76,6 +76,15 @@ class NavDrawer extends StatefulWidget {
     sectionSettings: '设置',
   };
 
+  /// [titles] 的英文对照；其它语言回退英文。
+  static const titlesEn = <String, String>{
+    sectionHosts: 'Server inventory',
+    sectionSnippets: 'Snippets',
+    sectionRunbooks: 'Runbooks',
+    sectionAudit: 'Audit log',
+    sectionSettings: 'Settings',
+  };
+
   /// 顶部分区标签的文字（比标题短，五个标签要挤在一行）。
   static const shortTitles = <String, String>{
     sectionHosts: '主机',
@@ -84,6 +93,26 @@ class NavDrawer extends StatefulWidget {
     sectionAudit: '审计',
     sectionSettings: '设置',
   };
+
+  /// [shortTitles] 的英文对照。
+  static const shortTitlesEn = <String, String>{
+    sectionHosts: 'Hosts',
+    sectionSnippets: 'Commands',
+    sectionRunbooks: 'Runbooks',
+    sectionAudit: 'Audit',
+    sectionSettings: 'Settings',
+  };
+
+  /// 跟随界面语言的分区标题。
+  ///
+  /// 用访问器而不是直接读 [titles]：两个表都是 `const`，在表里写
+  /// `UiText.t(...)` 会把文案冻在编译时语言上（切语言不刷新）。
+  static String titleOf(String section) => UiText.t(
+      titles[section] ?? '功能', titlesEn[section] ?? 'Features');
+
+  /// 跟随界面语言的分区短标签。
+  static String shortTitleOf(String section) =>
+      UiText.t(shortTitles[section] ?? section, shortTitlesEn[section] ?? section);
 
   /// 设置搜索索引：组 id → 该组可被搜到的词。
   ///
@@ -152,7 +181,7 @@ class NavDrawer extends StatefulWidget {
     return showGeneralDialog(
       context: context,
       barrierDismissible: true,
-      barrierLabel: '关闭抽屉',
+      barrierLabel: UiText.t('关闭抽屉', 'Close drawer'),
       barrierColor: Colors.black.withValues(alpha: 0.38),
       transitionDuration: const Duration(milliseconds: 180),
       pageBuilder: (_, __, ___) => NavDrawer(
@@ -283,7 +312,7 @@ class _NavDrawerState extends State<NavDrawer> {
 
   String get _title {
     final form = _level.form;
-    if (form == null) return NavDrawer.titles[_level.section] ?? '功能';
+    if (form == null) return NavDrawer.titleOf(_level.section);
     final editing = _level.itemId != null;
     return switch (form) {
       _FormKind.host =>
@@ -444,7 +473,7 @@ class _NavDrawerState extends State<NavDrawer> {
           border: Border.all(color: selected ? tc.brand : tc.border),
         ),
         child: Text(
-          NavDrawer.shortTitles[section] ?? section,
+          NavDrawer.shortTitleOf(section),
           style: TextStyle(
             fontSize: fSmall,
             color: selected ? tc.brand : tc.textSub,
@@ -515,7 +544,7 @@ class _NavDrawerState extends State<NavDrawer> {
       grouped.putIfAbsent(h.group, () => []).add(h);
     }
     return _list([
-      _searchField(tc, '搜索名称 / IP / 分组'),
+      _searchField(tc, UiText.t('搜索名称 / IP / 分组', 'Search name / IP / group')),
       const SizedBox(height: 10),
       _addRow(tc, UiText.t('新增主机', 'New host'),
           () => _openForm(_FormKind.host)),
@@ -524,7 +553,7 @@ class _NavDrawerState extends State<NavDrawer> {
         _groupHead(tc, e.key, e.value.length, all.length),
         for (final h in e.value) _hostCard(tc, h),
       ],
-      if (matched.isEmpty) _empty(tc, '没有匹配的主机'),
+      if (matched.isEmpty) _empty(tc, UiText.t('没有匹配的主机', 'No matching host')),
     ]);
   }
 
@@ -537,7 +566,7 @@ class _NavDrawerState extends State<NavDrawer> {
             _close();
             widget.onOpenHost?.call(h);
           },
-          tooltip: '打开 ${h.name}',
+          tooltip: UiText.t('打开 ${h.name}', 'Open ${h.name}'),
           child: Container(
             padding: const EdgeInsets.fromLTRB(13, 10, 8, 10),
             decoration: BoxDecoration(
@@ -630,7 +659,7 @@ class _NavDrawerState extends State<NavDrawer> {
     final matched =
         _filter(SnippetsDao.cached, (s) => '${s.name} ${s.command}');
     return _list([
-      _searchField(tc, '搜索名称 / 命令'),
+      _searchField(tc, UiText.t('搜索名称 / 命令', 'Search name / command')),
       const SizedBox(height: 10),
       _addRow(tc, UiText.t('新建快捷命令', 'New snippet'),
           () => _openForm(_FormKind.snippet)),
@@ -664,7 +693,8 @@ class _NavDrawerState extends State<NavDrawer> {
             ],
           ),
         ),
-      if (matched.isEmpty) _empty(tc, '没有匹配的快捷命令'),
+      if (matched.isEmpty)
+        _empty(tc, UiText.t('没有匹配的快捷命令', 'No matching snippet')),
     ]);
   }
 
@@ -674,7 +704,8 @@ class _NavDrawerState extends State<NavDrawer> {
     final matched = _filter(BuiltinRunbookI18n.localizeAll(RunbooksDao.cached),
         (r) => '${r.name} ${r.description ?? ''}');
     return _list([
-      _searchField(tc, '搜索名称 / 说明'),
+      _searchField(
+          tc, UiText.t('搜索名称 / 说明', 'Search name / description')),
       const SizedBox(height: 10),
       _addRow(tc, UiText.t('新建工作流', 'New runbook'),
           () => _openForm(_FormKind.runbook)),
@@ -686,13 +717,17 @@ class _NavDrawerState extends State<NavDrawer> {
             tc: tc,
             title: '${rb.icon} ${rb.name}',
             subtitle: rb.description ??
-                (rb.type == RunbookType.agent ? 'AI 执行' : '直接执行'),
+                (rb.type == RunbookType.agent
+                    ? UiText.t('AI 执行', 'AI run')
+                    : UiText.t('直接执行', 'Run directly')),
             expanded: _expanded.contains(rb.id),
             onToggle: () => _toggle(rb.id),
             detail: [
               _monoBlock(tc, rb.content),
-              _rowSub(tc, '执行 ${rb.runCount} 次'
-                  '${rb.lastRunAt != null ? ' · 最近 ${_fmtLocal(rb.lastRunAt!)}' : ''}'),
+              _rowSub(
+                  tc,
+                  '${UiText.t('执行 ${rb.runCount} 次', '${rb.runCount} runs')}'
+                  '${rb.lastRunAt != null ? ' · ${UiText.t('最近', 'last')} ${_fmtLocal(rb.lastRunAt!)}' : ''}'),
               _cardActions(tc, [
                 if (widget.onRunRunbook != null)
                   (
@@ -708,7 +743,8 @@ class _NavDrawerState extends State<NavDrawer> {
             ],
           ),
         ),
-      if (matched.isEmpty) _empty(tc, '没有匹配的工作流'),
+      if (matched.isEmpty)
+        _empty(tc, UiText.t('没有匹配的工作流', 'No matching runbook')),
     ]);
   }
 
@@ -721,7 +757,7 @@ class _NavDrawerState extends State<NavDrawer> {
             (l['command'] as String? ?? '').toLowerCase().contains(_query))
         .toList();
     return _list([
-      _searchField(tc, '搜索命令'),
+      _searchField(tc, UiText.t('搜索命令', 'Search commands')),
       const SizedBox(height: 10),
       _addRow(
         tc,
@@ -731,7 +767,7 @@ class _NavDrawerState extends State<NavDrawer> {
       ),
       const SizedBox(height: 12),
       for (final l in logs) _auditRow(tc, l),
-      if (logs.isEmpty) _empty(tc, '还没有审计记录'),
+      if (logs.isEmpty) _empty(tc, UiText.t('还没有审计记录', 'No audit records yet')),
     ]);
   }
 
@@ -774,14 +810,19 @@ class _NavDrawerState extends State<NavDrawer> {
     final id = 'audit:$ts:${log['command']}';
     final out = log['output'] as String? ?? '';
     final host = log['hostId'] as String? ?? '';
+    // 审计表存的是 hostId（uuid），直接铺出来没人读得懂；按 id 换成主机名，
+    // 查不到（主机已删）再退回原始 id。
+    final hostLabel = host.isEmpty
+        ? UiText.t('本机', 'This machine')
+        : (HostsDao.getCachedById(host)?.name ?? host);
     return _RowCard(
       tc: tc,
       title: '${_hhmm(ts)}  ${log['command'] as String? ?? ''}',
-      subtitle: '${host.isEmpty ? '本机' : host}'
-          '${out.isEmpty ? ' · 无输出' : ' · ${out.split('\n').first}'}',
+      subtitle: '$hostLabel'
+          '${out.isEmpty ? ' · ${UiText.t('无输出', 'no output')}' : ' · ${out.split('\n').first}'}',
       titleMono: true,
       trailing: _statusChip(tc,
-          text: blocked ? '拦截' : '放行',
+          text: blocked ? UiText.t('拦截', 'Blocked') : UiText.t('放行', 'Allowed'),
           fg: blocked ? tc.error : tc.ok,
           bg: blocked ? tc.errorBg : tc.okBg),
       expanded: _expanded.contains(id),
@@ -791,7 +832,9 @@ class _NavDrawerState extends State<NavDrawer> {
             tc,
             '$host · $ts'
             '\n${log['safetyLevel'] ?? ''} · '
-            '${(log['executed'] as bool? ?? false) ? '已执行' : '未执行'}'),
+            '${(log['executed'] as bool? ?? false)
+                ? UiText.t('已执行', 'executed')
+                : UiText.t('未执行', 'not run')}'),
         if (out.isNotEmpty) _monoBlock(tc, out),
         _cardActions(tc, [
           (
@@ -855,7 +898,7 @@ class _NavDrawerState extends State<NavDrawer> {
       for (final entry in matched) ...[
         SettingsRowCard(
           key: _cardKey(entry.id),
-          title: entry.title,
+          title: entry.label,
           subtitle: entry.subtitle,
           // 展开态 = 手动展开 ∪ 本次搜索命中。两者分开是为了让搜索不污染手动
           // 状态（详见 _onSettingsQuery）；点击只翻手动那一半，于是搜索态下
@@ -922,6 +965,7 @@ class _NavDrawerState extends State<NavDrawer> {
   bool _settingsGroupMatches(SettingsEntry entry) {
     final hay = <String>[
       entry.title,
+      entry.titleEn,
       entry.id,
       ...?NavDrawer.kSettingsSearchIndex[entry.id],
     ].join(' ').toLowerCase();
@@ -1221,16 +1265,20 @@ class _NavDrawerState extends State<NavDrawer> {
     );
   }
 
+  /// 分组名的展示文案（'默认' → 当前语言的 Default）。
+  String groupLabel(String group) => UiText.hostGroup(group);
+
   Widget _groupHead(ThemeColors tc, String label, int count, int total) {
     return Padding(
       padding: const EdgeInsets.only(top: 6, bottom: 8),
       child: Row(
         children: [
-          Text(label, style: TextStyle(fontSize: fSmall, color: tc.textSub)),
+          Text(groupLabel(label),
+              style: TextStyle(fontSize: fSmall, color: tc.textSub)),
           const SizedBox(width: 6),
           _countChip(tc, '$count'),
           const Spacer(),
-          _countChip(tc, '共 $total 台'),
+          _countChip(tc, UiText.t('共 $total 台', '$total hosts')),
         ],
       ),
     );
@@ -1552,5 +1600,7 @@ String _fmtLocal(DateTime t) {
       local.day == now.day;
   final hm = '${local.hour.toString().padLeft(2, '0')}:'
       '${local.minute.toString().padLeft(2, '0')}';
-  return sameDay ? '今天 $hm' : '${local.month}/${local.day} $hm';
+  return sameDay
+      ? '${UiText.t('今天', 'Today')} $hm'
+      : '${local.month}/${local.day} $hm';
 }

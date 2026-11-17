@@ -5,6 +5,7 @@ import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../services/agent_engine.dart';
 import '../core/app_toast.dart';
+import '../core/ui_text.dart';
 
 /// Agent 日志查看器对话框
 ///
@@ -191,17 +192,18 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
               children: [
                 const Icon(Icons.terminal, color: cPrimary, size: 18),
                 const SizedBox(width: 8),
-                Text('Agent 日志',
+                Text(UiText.t('Agent 日志', 'Agent logs'),
                     style: TextStyle(
                         color: tc.textMain,
                         fontSize: fBody,
                         fontWeight: FontWeight.w600)),
                 const SizedBox(width: 8),
-                Text('共 ${_all.length} 条 · 显示 ${visible.length} 条',
+                Text(UiText.t('共 ${_all.length} 条 · 显示 ${visible.length} 条',
+                        '${_all.length} entries · showing ${visible.length}'),
                     style: TextStyle(color: tc.textMuted, fontSize: fMicro)),
                 const Spacer(),
                 IconButton(
-                  tooltip: '复制当前筛选结果',
+                  tooltip: UiText.t('复制当前筛选结果', 'Copy filtered view'),
                   icon: Icon(Icons.copy_all, color: tc.textSub, size: 16),
                   onPressed: () async {
                     final ctx = context;
@@ -210,7 +212,8 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                     if (!ctx.mounted) return;
                     showTopSnackBar(ctx,
                       SnackBar(
-                        content: Text('已复制 ${visible.length} 条日志',
+                        content: Text(UiText.t('已复制 ${visible.length} 条日志',
+                                'Copied ${visible.length} log entries'),
                             style: const TextStyle(fontSize: 13)),
                         duration: const Duration(seconds: 1),
                       ),
@@ -252,11 +255,12 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                       dropdownColor: tc.cardElevated,
                       icon: Icon(Icons.arrow_drop_down, size: 16, color: tc.textSub),
                       style: TextStyle(fontSize: fMicro, color: tc.textSub),
-                      hint: Text('全部 tag',
+                      hint: Text(UiText.t('全部 tag', 'All tags'),
                           style: TextStyle(fontSize: fMicro, color: tc.textSub)),
                       items: [
-                        const DropdownMenuItem<String?>(
-                            value: null, child: Text('全部 tag')),
+                        DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text(UiText.t('全部 tag', 'All tags'))),
                         for (final tag in _tags)
                           DropdownMenuItem<String?>(
                               value: tag,
@@ -296,7 +300,7 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                           color: _currentTaskOnly ? tc.brand : tc.textSub,
                         ),
                         const SizedBox(width: 4),
-                        Text('只看本次任务',
+                        Text(UiText.t('只看本次任务', 'This task only'),
                             style: TextStyle(
                                 fontSize: fMicro,
                                 color: _currentTaskOnly ? tc.brand : tc.textSub)),

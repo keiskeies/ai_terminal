@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:mcp_dart/mcp_dart.dart';
 
+import '../core/ui_text.dart';
 import 'mcp_models.dart';
 import 'mcp_oauth.dart';
 
@@ -122,7 +123,7 @@ class McpConnection {
     final transport = await _createTransport(oauth);
     _transport = transport;
     final client = McpClient(
-      const Implementation(name: 'AI Terminal', version: '1.4.2'),
+      const Implementation(name: 'AI Terminal', version: '1.4.3'),
       // legacy initialize profile：兼容 2025-11-25 / 2025-06-18 / 2025-03-26 /
       // 2024-11-05 等绝大多数 server，并使用全局 list_changed 通知；
       // 2026 stateless 的 subscriptions/listen 暂未接入。
@@ -500,7 +501,7 @@ class McpConnection {
       );
     } on UnauthorizedError {
       _status = McpServerStatus.authRequired;
-      _error = 'OAuth 授权已过期，请重新登录';
+      _error = UiText.t('OAuth 授权已过期，请重新登录', 'OAuth authorization has expired; sign in again');
       _emit();
       throw const McpAuthRequiredException('OAuth 授权已过期，请重新登录');
     } catch (e) {
@@ -522,14 +523,16 @@ class McpConnection {
     if (buffer.isEmpty && result.hasStructuredContent) {
       buffer.write(encodeMcpJson(result.structuredContentJson?.toJson()));
     }
-    if (buffer.isEmpty) return '（MCP 工具返回空结果）';
+    if (buffer.isEmpty) return UiText.t('（MCP 工具返回空结果）', '(MCP tool returned an empty result)');
     return _cap(buffer.toString(), 20000);
   }
 
   String _contentText(Content content) {
     if (content is TextContent) return content.text;
     if (content is ImageContent) {
-      return '[图片 ${content.mimeType}，${content.data.length} base64 字符]';
+      return UiText.t(
+          '[图片 ${content.mimeType}，${content.data.length} base64 字符]',
+          '[Image ${content.mimeType}, ${content.data.length} base64 chars]');
     }
     if (content is AudioContent) {
       return '[音频 ${content.mimeType}，${content.data.length} base64 字符]';

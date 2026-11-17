@@ -4,6 +4,7 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:watcher/watcher.dart';
+import '../core/ui_text.dart';
 import 'sftp_service.dart';
 
 /// 同步方向
@@ -410,7 +411,9 @@ class FileSyncService {
         config.remoteDir,
         excludeNames: config.excludeNames,
         onProgress: (uploaded, total) {
-          _emit(SyncEventType.uploadProgress, '全量上传进度: $uploaded/$total',
+          _emit(SyncEventType.uploadProgress,
+              UiText.t('全量上传进度: $uploaded/$total',
+                  'Full upload progress: $uploaded/$total'),
               uploaded: uploaded, total: total);
         },
       );

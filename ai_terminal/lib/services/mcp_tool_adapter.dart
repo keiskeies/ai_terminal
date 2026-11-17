@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../core/ui_text.dart';
 import '../utils/tool_args_parser.dart';
 import 'agent_tool.dart';
 import 'command_executor.dart';
@@ -98,16 +99,20 @@ class McpToolAdapter extends AgentTool {
     void Function(String message)? onProgress,
   }) async {
     if (cancelToken?.isCompleted == true) {
-      return ToolResult.failure('MCP 调用已被取消');
+      return ToolResult.failure(UiText.t('MCP 调用已被取消', 'MCP call cancelled'));
     }
     final arguments = _readArguments(args);
     if (arguments == null) {
       return ToolResult.failure(
-        '参数格式错误：请把 MCP 工具参数写成单行 JSON，例如 '
-        '`json: {"query":"flutter"}`',
+        UiText.t(
+          '参数格式错误：请把 MCP 工具参数写成单行 JSON，例如 '
+          '`json: {"query":"flutter"}`',
+          'Invalid argument format: pass MCP tool arguments as a single-line JSON object, e.g. '
+          '`json: {"query":"flutter"}`',
+        ),
       );
     }
-    onProgress?.call('调用 MCP 工具 $serverName/${descriptor.name}');
+    onProgress?.call(UiText.t('调用 MCP 工具 $serverName/${descriptor.name}', 'Calling MCP tool $serverName/${descriptor.name}'));
     try {
       final result =
           await caller.callMcpTool(serverId, descriptor.name, arguments);
@@ -264,7 +269,7 @@ class McpSideToolAdapter extends AgentTool {
   }) async {
     final runtime = caller.mcpRuntime(serverId);
     if (runtime == null || !runtime.isConnected) {
-      return ToolResult.failure('MCP 服务器「$serverName」未连接');
+      return ToolResult.failure(UiText.t('MCP 服务器「$serverName」未连接', 'MCP server "$serverName" is not connected'));
     }
     try {
       switch (sideKind) {
@@ -286,12 +291,12 @@ class McpSideToolAdapter extends AgentTool {
           return ToolResult.success(buffer.toString().trimRight());
         case McpSideToolKind.readResource:
           final uri = args.requireString('uri');
-          onProgress?.call('读取 MCP 资源 $uri');
+          onProgress?.call(UiText.t('读取 MCP 资源 $uri', 'Reading MCP resource $uri'));
           final text = await caller.readMcpResource(serverId, uri);
           return ToolResult.success(text);
         case McpSideToolKind.listPrompts:
           if (runtime.prompts.isEmpty) {
-            return ToolResult.success('该 MCP 服务器没有提供提示词。');
+            return ToolResult.success(UiText.t('该 MCP 服务器没有提供提示词。', 'This MCP server provides no prompts.'));
           }
           final buffer = StringBuffer('提示词列表：\n');
           for (final prompt in runtime.prompts) {
@@ -317,7 +322,7 @@ class McpSideToolAdapter extends AgentTool {
               (key, value) => MapEntry(key.toString(), value.toString()),
             );
           }
-          onProgress?.call('获取 MCP 提示词 $name');
+          onProgress?.call(UiText.t('获取 MCP 提示词 $name', 'Fetching MCP prompt $name'));
           final text =
               await caller.getMcpPrompt(serverId, name, arguments: promptArgs);
           return ToolResult.success(text);

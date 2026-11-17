@@ -6,6 +6,7 @@ library;
 
 import 'dart:io';
 
+import '../core/ui_text.dart';
 import '../models/host_config.dart';
 import '../utils/ssh_config_parser.dart';
 
@@ -50,7 +51,10 @@ class SshConfigImportService {
       );
     } on FileSystemException catch (e) {
       return SshConfigImportSource(
-          path: path, exists: true, readError: '读取失败: ${e.message}');
+          path: path,
+          exists: true,
+          readError:
+              UiText.t('读取失败: ${e.message}', 'Read failed: ${e.message}'));
     }
   }
 

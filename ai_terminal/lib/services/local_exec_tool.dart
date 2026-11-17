@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import '../core/safety_guard.dart';
+import '../core/ui_text.dart';
 import '../utils/audit_logger.dart';
 import '../utils/local_shell.dart';
 import '../utils/tool_args_parser.dart';
@@ -87,8 +88,9 @@ class LocalExecTool extends AgentTool {
     void Function(String message)? onProgress,
   }) async {
     if (!isLocalExecPlatformSupported()) {
-      return ToolResult.failure(
-          '当前平台不支持本机命令执行（仅支持 Windows / macOS / Linux 桌面端）。');
+      return ToolResult.failure(UiText.t(
+          '当前平台不支持本机命令执行（仅支持 Windows / macOS / Linux 桌面端）。',
+          'Local command execution is not supported on this platform (desktop Windows / macOS / Linux only).'));
     }
 
     final command = args.getString('command').trim();
@@ -154,9 +156,12 @@ class LocalExecTool extends AgentTool {
     if (!await dir.exists()) {
       try {
         await dir.create(recursive: true);
-        onProgress?.call('已创建本机工作目录: $resolvedCwd');
+        onProgress?.call(UiText.t('已创建本机工作目录: $resolvedCwd',
+            'Created local working directory: $resolvedCwd'));
       } catch (e) {
-        return ToolResult.failure('无法创建工作目录 $resolvedCwd: $e');
+        return ToolResult.failure(UiText.t(
+            '无法创建工作目录 $resolvedCwd: $e',
+            'Cannot create working directory $resolvedCwd: $e'));
       }
     }
 
@@ -188,8 +193,9 @@ class LocalExecTool extends AgentTool {
       executed: false,
     );
 
-    onProgress?.call(
-        '本机执行 (${localShellLabel(shell)}): ${_clipForProgress(command)}');
+    onProgress?.call(UiText.t(
+        '本机执行 (${localShellLabel(shell)}): ${_clipForProgress(command)}',
+        'Local run (${localShellLabel(shell)}): ${_clipForProgress(command)}'));
 
     // ── 4. 执行 ───────────────────────────────────────────────
     LocalCommandResult result;

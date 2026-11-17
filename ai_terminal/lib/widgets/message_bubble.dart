@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 import '../models/chat_session.dart';
 import 'logo_widget.dart';
 
@@ -46,7 +47,7 @@ class MessageBubble extends StatelessWidget {
                     const LogoWidget(type: LogoType.mark, size: 16),
                     const SizedBox(width: 6),
                     Text(
-                      'AI 助手',
+                      UiText.t('AI 助手', 'AI Assistant'),
                       style: TextStyle(fontSize: fSmall, color: tc.textSub, fontWeight: FontWeight.w500),
                     ),
                   ],

@@ -73,6 +73,7 @@ class AgentEngine {
       ..clear()
       ..write(value);
   }
+
   /// 最近一次 _callAI 结束时的解析结果，供紧随其后的 _parseReActResponse 复用，
   /// 避免同一段响应被全量解析两次。
   List<AgentEvent>? _lastParsedResponseEvents;
@@ -311,8 +312,10 @@ class AgentEngine {
     if (_userForbadeCommands) return;
     if (!NoCommandIntentDetector.detects(userText)) return;
     _userForbadeCommands = true;
-    agentLogger.info('ReAct', '检测到用户禁止执行命令（来源: $source），'
-        'finish 幻觉门控让路');
+    agentLogger.info(
+        'ReAct',
+        '检测到用户禁止执行命令（来源: $source），'
+            'finish 幻觉门控让路');
   }
 
   /// O4/WP6: 计划含未完成项（[ ]/[>]）就 finish 的重试计数。
@@ -351,6 +354,7 @@ class AgentEngine {
   int _lastReasoningEmitAt = 0;
 
   void Function(String)? onThinking;
+
   /// 模型原生推理增量（reasoning_content / reasoning）；网关不给该字段时不会触发
   void Function(String text)? onReasoning;
   void Function(String)? onCommandGenerated;
@@ -503,11 +507,13 @@ class AgentEngine {
       }
     });
 
-    onEvent?.call(AgentEvent.info('⚠️ 该操作会改动本机文件，需要确认:\n$display'));
+    onEvent?.call(AgentEvent.info(UiText.t('⚠️ 该操作会改动本机文件，需要确认:\n$display',
+        '⚠️ This operation will modify local files and needs confirmation:\n$display')));
     _currentTask = _currentTask?.copyWith(
       status: AgentStatus.waitingConfirm,
-      phase: '等待确认',
-      currentStep: '等待确认: $toolName',
+      phase: UiText.t('等待确认', 'Waiting for confirmation'),
+      currentStep:
+          UiText.t('等待确认: $toolName', 'Waiting for confirmation: $toolName'),
     );
     _notifyTaskUpdate();
 
@@ -554,9 +560,9 @@ class AgentEngine {
   Future<String?> _requestInteractiveInput(String prompt) async {
     // 自动应答（设置项 agentAutoAnswerEnabled，默认关）：
     // 只有保守规则表命中（[Y/n]→Y、Press ENTER→回车）才自动答，其余仍弹窗。
-    final autoEnabled = SettingsDao.getCached('agentAutoAnswerEnabled',
-            defaultValue: false) ==
-        true;
+    final autoEnabled =
+        SettingsDao.getCached('agentAutoAnswerEnabled', defaultValue: false) ==
+            true;
     if (autoEnabled) {
       final auto = PtyOutputDetector.confirmationAutoAnswer(prompt);
       if (auto != null) {
@@ -639,7 +645,7 @@ class AgentEngine {
     }
     _currentTask = _currentTask?.copyWith(
       status: AgentStatus.executing,
-      phase: '执行中',
+      phase: UiText.t('执行中', 'Running'),
       currentStep: _progressStepText(),
     );
     _notifyTaskUpdate();
@@ -1246,7 +1252,7 @@ class AgentEngine {
     }
     _currentTask = _currentTask!.copyWith(
       status: AgentStatus.paused,
-      phase: '已暂停',
+      phase: UiText.t('已暂停', 'Paused'),
     );
     _notifyTaskUpdate();
     agentLogger.info('AgentEngine', '任务已暂停 (暂停前状态: $s)');
@@ -1290,7 +1296,8 @@ class AgentEngine {
     _confirmTimeoutTimer?.cancel();
     _confirmTimeoutTimer = null;
     // 通知 UI 暂停（info 事件，不是 finish）
-    onEvent?.call(AgentEvent.info(UiText.t('⏸️ 任务已暂停，可点击恢复继续', '⏸️ Task paused. Click resume to continue.')));
+    onEvent?.call(AgentEvent.info(UiText.t(
+        '⏸️ 任务已暂停，可点击恢复继续', '⏸️ Task paused. Click resume to continue.')));
   }
 
   /// P2-7: 恢复已暂停的任务
@@ -1365,7 +1372,8 @@ class AgentEngine {
     _notifyTaskUpdate();
     AgentTracer.instance
         .startTask(_currentTask!.id, '恢复: $goal', hostId: hostId);
-    onEvent?.call(AgentEvent.info(UiText.t('▶️ 任务已恢复，继续执行...', '▶️ Task resumed, continuing...')));
+    onEvent?.call(AgentEvent.info(
+        UiText.t('▶️ 任务已恢复，继续执行...', '▶️ Task resumed, continuing...')));
     try {
       await _executeAutomatic(goal, executor, myGeneration);
     } catch (e, stack) {
@@ -1566,7 +1574,8 @@ class AgentEngine {
             role: 'user',
             content: '用户补充: $steering',
           ));
-          onEvent?.call(AgentEvent.info('💬 用户补充: $steering'));
+          onEvent?.call(AgentEvent.info(
+              UiText.t('💬 用户补充: $steering', '💬 User steering: $steering')));
         }
         // 补充可能是提问而不是指令（"刚才为何用压缩"这类）。不引导的话
         // 模型会把它当任务指令，继续执行甚至反刍上一任务的总结。
@@ -1600,7 +1609,7 @@ class AgentEngine {
       _currentStepCount = stepCount;
       _currentTask = _currentTask!.copyWith(
         status: AgentStatus.thinking,
-        phase: '思考中',
+        phase: UiText.t('思考中', 'Thinking'),
         currentStep: _progressStepText(),
       );
       _notifyTaskUpdate();
@@ -1723,13 +1732,15 @@ class AgentEngine {
               parsedEvents: _lastParsedResponseEvents);
       // 第一条之外、同一条响应里宣布的其余命令：解析事件缓存马上要清空，
       // 先取出来留给 _executeRemainingAnnouncedCommands 按 id 关联结果
-      _announcedFollowUps = _remainingAnnouncedCommands(_lastParsedResponseEvents);
+      _announcedFollowUps =
+          _remainingAnnouncedCommands(_lastParsedResponseEvents);
       _lastParsedResponseEvents = null;
       // 解析结果是排查用的内部细节：thought 可能上千字，默认日志里只留动作与首行摘要
-      agentLogger.debug('ReAct',
+      agentLogger.debug(
+          'ReAct',
           '步骤 $_currentStepCount 解析: action=${step.action}, '
-          'command=${step.command == null ? '-' : _logCommand(step.command!)}, '
-          'thought=${step.thought.length > 80 ? '${step.thought.substring(0, 80)}…' : step.thought}');
+              'command=${step.command == null ? '-' : _logCommand(step.command!)}, '
+              'thought=${step.thought.length > 80 ? '${step.thought.substring(0, 80)}…' : step.thought}');
       // 计划是持久状态：每次模型输出完整计划时替换，不追加快照
       if (step.plan != null && step.plan!.isNotEmpty) {
         _currentPlan = List<PlanStep>.unmodifiable(step.plan!);
@@ -1782,7 +1793,8 @@ class AgentEngine {
             _finishWithoutExecCount++;
             agentLogger.warn('ReAct',
                 'AI 未执行任何命令就 finish，强制继续 (重试 $_finishWithoutExecCount/$_maxFinishWithoutExecRetries)');
-            onEvent?.call(AgentEvent.info('⚠️ AI 未实际执行命令就声称完成，要求实际验证'));
+            onEvent?.call(AgentEvent.info(UiText.t('⚠️ AI 未实际执行命令就声称完成，要求实际验证',
+                '⚠️ Model claimed completion without running any command; asking it to verify first')));
             _conversationHistory.add(ChatMessage.create(
               role: 'user',
               content: '你尚未执行任何命令就声称任务完成，这不被允许。'
@@ -1811,12 +1823,16 @@ class AgentEngine {
           if (unfinishedPlanSteps.isNotEmpty &&
               _planFinishRetryCount < _maxPlanFinishRetries) {
             _planFinishRetryCount++;
-            agentLogger.warn('ReAct',
+            agentLogger.warn(
+                'ReAct',
                 '计划仍有 ${unfinishedPlanSteps.length} 个未完成项，要求更新计划后再 finish '
-                '(重试 $_planFinishRetryCount/$_maxPlanFinishRetries)');
-            onEvent?.call(AgentEvent.info(
+                    '(重试 $_planFinishRetryCount/$_maxPlanFinishRetries)');
+            onEvent?.call(AgentEvent.info(UiText.t(
                 '⚠️ 计划还有 ${unfinishedPlanSteps.length} 个未完成项，要求逐项核对后再收尾 '
-                '($_planFinishRetryCount/$_maxPlanFinishRetries)'));
+                    '($_planFinishRetryCount/$_maxPlanFinishRetries)',
+                '⚠️ Plan still has ${unfinishedPlanSteps.length} unfinished item(s); '
+                    'asking to review each one before finishing '
+                    '($_planFinishRetryCount/$_maxPlanFinishRetries)')));
             final unfinishedTitles =
                 unfinishedPlanSteps.map((s) => '- ${s.title}').join('\n');
             _conversationHistory.add(ChatMessage.create(
@@ -1853,7 +1869,9 @@ class AgentEngine {
               step.options != null &&
               step.options!.isNotEmpty) {
             final askEvent = AgentEvent.ask(
-              step.thought.trim().isEmpty ? '请选择' : step.thought.trim(),
+              step.thought.trim().isEmpty
+                  ? UiText.t('请选择', 'Choose one')
+                  : step.thought.trim(),
               step.options!,
             );
             _pendingAskEvent = askEvent;
@@ -1924,10 +1942,11 @@ class AgentEngine {
 
     if (hitMaxSteps) {
       agentLogger.warn('ReAct', '达到最大执行步数 $maxSteps');
-      onEvent?.call(AgentEvent.info('⚠️ 达到最大执行步数 ($maxSteps)，任务被中断'));
+      onEvent?.call(AgentEvent.info(UiText.t('⚠️ 达到最大执行步数 ($maxSteps)，任务被中断',
+          '⚠️ Max execution steps reached ($maxSteps); task interrupted')));
       _emitOperationReport(finishState: AgentFinishState.interrupted);
       onEvent?.call(AgentEvent.finish(
-        summary: '达到最大执行步数，任务被中断',
+        summary: L10n.str.taskMaxSteps,
         finishState: AgentFinishState.interrupted,
       ));
       // L15 修复：maxSteps 路径也调 onCompleted，确保流式内容 flush 到 content
@@ -2131,8 +2150,9 @@ class AgentEngine {
             activeProvider = _fallbackProvider!;
             activeConfig = _fallbackConfig!;
             // 通知 UI：模型已切换
-            onEvent?.call(AgentEvent.info(
-                '⚠️ 主模型 ${_modelConfig.modelName} 不可用，已切换到备用模型 ${activeConfig.modelName}'));
+            onEvent?.call(AgentEvent.info(UiText.t(
+                '⚠️ 主模型 ${_modelConfig.modelName} 不可用，已切换到备用模型 ${activeConfig.modelName}',
+                '⚠️ Primary model ${_modelConfig.modelName} unavailable; switched to fallback model ${activeConfig.modelName}')));
             continue;
           }
           rethrow;
@@ -2324,8 +2344,8 @@ class AgentEngine {
       // 正文里的围栏/协议行只是思考示例或降级残留：命令与提问一律以
       // 结构化调用为准，文本解析出的 command/ask/text 事件全部丢弃，
       // 只保留计划块（WP6 约定）与思考。
-      events.removeWhere((e) =>
-          e.type == AgentEventType.text || e.isCommand || e.isAsk);
+      events.removeWhere(
+          (e) => e.type == AgentEventType.text || e.isCommand || e.isAsk);
       if (body.isNotEmpty && !events.any((e) => e.isThought)) {
         events.insert(
             0,
@@ -2364,7 +2384,9 @@ class AgentEngine {
         // 每轮只执行第一个动作：多余的 execute 走既有 _announcedFollowUps
         // 机制逐条执行，其余多余调用忽略并提示。
         if (i > 0 && c.name != 'execute') {
-          events.add(AgentEvent.info('⚠️ 本轮忽略多余的工具调用: ${c.name}（每轮只执行一个动作）'));
+          events.add(AgentEvent.info(UiText.t(
+              '⚠️ 本轮忽略多余的工具调用: ${c.name}（每轮只执行一个动作）',
+              '⚠️ Ignored extra tool call this round: ${c.name} (only one action runs per round)')));
         }
       }
     }
@@ -2415,9 +2437,7 @@ class AgentEngine {
     // O8: FC 模式下命令只认 tool_calls —— 正文围栏/引用块只是思考示例或
     // 文件内容摘录，绝不能当命令执行（真机验证曾把 sshd_config 的围栏内容
     // 直接写进远端 PTY）。
-    if (!commandDetectedNotified &&
-        onCommandDetected != null &&
-        !fcToolsSent) {
+    if (!commandDetectedNotified && onCommandDetected != null && !fcToolsSent) {
       for (final e in events) {
         if (e.isCommand) {
           final cmd = e.command ?? '';
@@ -2636,8 +2656,7 @@ class AgentEngine {
     final lines = content.split('\n');
     for (var i = 0; i < lines.length; i++) {
       final trimmedLine = lines[i].trim();
-      if (!trimmedLine.startsWith('动作:') &&
-          !trimmedLine.startsWith('动作：')) {
+      if (!trimmedLine.startsWith('动作:') && !trimmedLine.startsWith('动作：')) {
         continue;
       }
       final sepIdx = trimmedLine.indexOf(trimmedLine.contains('：') ? '：' : ':');
@@ -2776,7 +2795,7 @@ class AgentEngine {
 
   static String _clipAnswerText(String text) {
     if (text.length <= _maxAnswerChars) return text;
-    return '${text.substring(0, _maxAnswerChars)}\n\n…（回答过长，已截断）';
+    return '${text.substring(0, _maxAnswerChars)}\n\n${UiText.t('…（回答过长，已截断）', '…(answer truncated because it was too long)')}';
   }
 
   /// 首个半角/全角冒号的位置（避免为一个 indexOf 编译正则）
@@ -3053,7 +3072,8 @@ class AgentEngine {
     // 标记本任务已实际执行过命令（防止 AI 幻觉 finish）
     _hasExecutedAnyCommand = true;
     // 命令本身会在执行结束时随结果行一起记录，这里只留 debug 细节
-    agentLogger.debug('ReAct', '执行命令: ${_logCommand(command)} (commandId=$commandId)');
+    agentLogger.debug(
+        'ReAct', '执行命令: ${_logCommand(command)} (commandId=$commandId)');
 
     // P0-2: trace 命令执行开始
     final traceTaskId = _currentTask?.id;
@@ -3117,7 +3137,9 @@ class AgentEngine {
   static String _logCommand(String command) {
     final firstLine = command.split('\n').first.trim();
     if (firstLine.isEmpty) return '(空命令)';
-    return firstLine.length <= 80 ? firstLine : '${firstLine.substring(0, 80)}…';
+    return firstLine.length <= 80
+        ? firstLine
+        : '${firstLine.substring(0, 80)}…';
   }
 
   /// 模型推理增量：累积 + 限长 + 节流（~150ms），避免每个 token 都重建一次 UI
@@ -3222,11 +3244,12 @@ class AgentEngine {
         .where((s) => s.isNotEmpty)
         .toList();
     if (subCommands.length > 1 &&
-        subCommands.any(
-            (s) => SafetyGuard.check(s).index >= SafetyLevel.warn.index)) {
+        subCommands
+            .any((s) => SafetyGuard.check(s).index >= SafetyLevel.warn.index)) {
       agentLogger.warn('ReAct', '链式修改命令拦截: ${_logCommand(command)}');
       const reason = '链式命令包含修改类操作，请拆分为多轮逐条执行';
-      onEvent?.call(AgentEvent.info('⛓ $reason\n命令: `$command`'));
+      onEvent?.call(AgentEvent.info(
+          '⛓ ${UiText.t(reason, 'Chained commands contain modifying operations; split them into separate single commands across rounds')}\n${UiText.t('命令', 'Command')}: `$command`'));
       // 与权限拦截分支一致：blocked 级追加一条带原因的审计记录
       if (hostId != null && safetyLevel == SafetyLevel.blocked) {
         try {
@@ -3257,10 +3280,12 @@ class AgentEngine {
     if (executor is LocalTerminalService &&
         Platform.isWindows &&
         SafetyGuard.containsUnquotedOperator(command, '&&')) {
-      agentLogger.warn('ReAct', 'PowerShell 5.1 不支持 &&: ${_logCommand(command)}');
+      agentLogger.warn(
+          'ReAct', 'PowerShell 5.1 不支持 &&: ${_logCommand(command)}');
       const reason =
           'Windows PowerShell 5.1 不支持 && 运算符，请改用 ; 分隔只读命令（如 a ; b），或拆分为多轮逐条执行';
-      onEvent?.call(AgentEvent.info('🪟 $reason\n命令: `$command`'));
+      onEvent?.call(AgentEvent.info(
+          '🪟 ${UiText.t(reason, 'Windows PowerShell 5.1 does not support the && operator; separate read-only commands with ; (e.g. a ; b), or split them into separate single commands across rounds')}\n${UiText.t('命令', 'Command')}: `$command`'));
       final observation = ReActObservation(
         command: command,
         output: reason,
@@ -3275,9 +3300,8 @@ class AgentEngine {
     // 远程误发拦截：SSH 到非 Windows 主机时，明显是本机 Windows/PowerShell
     // 的命令先给一条可读观测，避免把 PowerShell 原样发给 bash。
     // 放在安全时段检查之前：这是本机命令，不应被远程的安全时段规则拦成“封网期”。
-    final remoteOs = executor is SSHService
-        ? executor.osInfo.toLowerCase()
-        : '';
+    final remoteOs =
+        executor is SSHService ? executor.osInfo.toLowerCase() : '';
     final remoteLooksWindows = remoteOs.contains('windows') ||
         remoteOs.contains('mingw') ||
         remoteOs.contains('cygwin');
@@ -3285,10 +3309,9 @@ class AgentEngine {
         !remoteLooksWindows &&
         looksLikeLocalWindowsCommand(command)) {
       agentLogger.warn('ReAct', '疑似本机 Windows 命令发往远程 Unix: $command');
-      const reason =
-          '检测到 Windows 盘符或 PowerShell 语法，但当前 execute 运行在远程服务器。';
+      const reason = '检测到 Windows 盘符或 PowerShell 语法，但当前 execute 运行在远程服务器。';
       onEvent?.call(AgentEvent.info(
-          '🖥 $reason\n本机命令请改用 local_exec 工具: `$command`'));
+          '🖥 ${UiText.t(reason, 'Windows drive letters or PowerShell syntax detected, but this execute runs on the remote server.')}\n${UiText.t('本机命令请改用 local_exec 工具', 'For local commands use the local_exec tool')}: `$command`'));
       final observation = ReActObservation(
         command: command,
         output: '$reason\n'
@@ -3307,7 +3330,8 @@ class AgentEngine {
         ChangeWindowService.checkCommand(command);
     if (!windowAllowed) {
       agentLogger.warn('ReAct', '封网期拦截修改性命令: $command');
-      onEvent?.call(AgentEvent.info('🚫 封网期拦截\n命令: `$command`\n$windowReason'));
+      onEvent?.call(AgentEvent.info(
+          '🚫 ${UiText.t('封网期拦截', 'Blocked during change window')}\n${UiText.t('命令', 'Command')}: `$command`\n$windowReason'));
       final observation = ReActObservation(
         command: command,
         output: '封网期内禁止执行修改性命令（仅允许只读命令）',
@@ -3327,12 +3351,16 @@ class AgentEngine {
 
     if (decision == CommandGateDecision.reject) {
       agentLogger.warn('ReAct', '权限模式拦截命令: ${_permissionMode.id} $command');
+      // UI 事件按当前语言；observation/审计走规范中文串——reason 会原样
+      // 喂回模型，模型上下文里的规范串不随 UI 语言漂移
       final reason =
           SafetyGuard.getReason(command) ?? SafetyGuard.getTip(safetyLevel);
+      final reasonZh =
+          SafetyGuard.getReasonZh(command) ?? SafetyGuard.getTipZh(safetyLevel);
       final readOnly = _permissionMode == AgentPermissionMode.readOnly;
       onEvent?.call(AgentEvent.info(
-          '🔒 ${readOnly ? '只读模式已开启' : '当前权限模式'}，此命令被拒绝执行: `$command`\n'
-          '等级: $safetyLevel\n说明: $reason'));
+          '🔒 ${readOnly ? UiText.t('只读模式已开启，此命令被拒绝执行', 'Read-only mode is on; this command was not allowed to run') : UiText.t('当前权限模式，此命令被拒绝执行', 'Blocked by the current permission mode; this command was not allowed to run')}: `$command`\n'
+          '${UiText.t('等级: $safetyLevel', 'Level: $safetyLevel')}\n${UiText.t('说明: $reason', 'Reason: $reason')}'));
       // 审计日志：被拦截的 blocked 命令追加记录（执行前已写一条 executed=false）
       if (hostId != null && safetyLevel == SafetyLevel.blocked) {
         try {
@@ -3340,7 +3368,7 @@ class AgentEngine {
             hostId: hostId!,
             command: command,
             safetyLevel: safetyLevel.name,
-            output: reason,
+            output: reasonZh,
             executed: false,
           );
         } catch (e) {
@@ -3350,10 +3378,10 @@ class AgentEngine {
       final observation = ReActObservation(
         command: command,
         output: readOnly
-            ? '只读模式下禁止执行非只读命令（当前等级: $safetyLevel）\n原因: $reason'
-            : '当前权限模式禁止执行该命令（当前等级: $safetyLevel）\n原因: $reason',
+            ? '只读模式下禁止执行非只读命令（当前等级: $safetyLevel）\n原因: $reasonZh'
+            : '当前权限模式禁止执行该命令（当前等级: $safetyLevel）\n原因: $reasonZh',
         success: false,
-        error: readOnly ? '只读模式拦截' : reason,
+        error: readOnly ? '只读模式拦截' : reasonZh,
       ).format();
       onSuccess(false, readOnly ? 'read_only_blocked' : 'safety_blocked', 0);
       return _EarlyExecutionResult(
@@ -3362,8 +3390,7 @@ class AgentEngine {
 
     // 需要用户确认：warn（询问档）与 blocked（询问/自动档）
     if (decision == CommandGateDecision.confirm) {
-      agentLogger.warn(
-          'ReAct', '命令需要确认: $command (模式: ${_permissionMode.id})');
+      agentLogger.warn('ReAct', '命令需要确认: $command (模式: ${_permissionMode.id})');
       _pendingConfirmCommand = command;
       _confirmCompleter = Completer<bool>();
       // 每次开始等待都要清掉上一次的结论：残留的 true 会把下一次真实的
@@ -3384,10 +3411,14 @@ class AgentEngine {
       final reason =
           SafetyGuard.getReason(command) ?? SafetyGuard.getTip(safetyLevel);
       final highRisk = safetyLevel == SafetyLevel.blocked;
-      final modeLabel = _permissionMode == AgentPermissionMode.ask ? '询问' : '自动';
-      onEvent?.call(AgentEvent.info(
+      final modeLabel = _permissionMode == AgentPermissionMode.ask
+          ? UiText.t('询问', 'Ask')
+          : UiText.t('自动', 'Auto');
+      onEvent?.call(AgentEvent.info(UiText.t(
           '${highRisk ? '⛔' : '⚠️'} ${highRisk ? '高危命令' : '高风险命令'}'
-          '需要确认（$modeLabel模式）: `$command`\n风险说明: $reason'));
+              '需要确认（$modeLabel模式）: `$command`\n风险说明: $reason',
+          '${highRisk ? '⛔' : '⚠️'} ${highRisk ? 'High-risk command' : 'Risky command'}'
+              ' needs confirmation ($modeLabel mode): `$command`\nRisk: $reason')));
 
       _currentTask = _currentTask!.copyWith(
         status: AgentStatus.waitingConfirm,
@@ -3422,7 +3453,9 @@ class AgentEngine {
         final timedOut = _confirmTimedOut;
         final reason = timedOut ? '确认超时（10 分钟无响应），已自动拒绝' : '用户拒绝执行此命令';
         agentLogger.info('ReAct', '$reason: $command');
-        onEvent?.call(AgentEvent.info(timedOut ? '⏱ $reason' : '❌ $reason'));
+        onEvent?.call(AgentEvent.info(timedOut
+            ? '⏱ ${UiText.t(reason, 'Confirmation timed out (no response for 10 minutes); auto-rejected')}'
+            : '❌ ${UiText.t(reason, 'User declined to run this command')}'));
         final observation = ReActObservation(
           command: command,
           output: reason,
@@ -3440,7 +3473,8 @@ class AgentEngine {
           CommandGateDecision.reject) {
         const reason = '等待确认期间权限档位已切换为只读，命令未执行';
         agentLogger.warn('ReAct', reason);
-        onEvent?.call(AgentEvent.info('🔒 $reason'));
+        onEvent?.call(AgentEvent.info(
+            '🔒 ${UiText.t(reason, 'Permission mode switched to read-only while awaiting confirmation; command was not run')}'));
         final observation = ReActObservation(
           command: command,
           output: reason,
@@ -3453,7 +3487,8 @@ class AgentEngine {
       }
 
       agentLogger.info('ReAct', '用户确认执行危险命令: $command');
-      onEvent?.call(AgentEvent.info(UiText.t('✅ 用户已确认，开始执行...', '✅ Confirmed, executing...')));
+      onEvent?.call(AgentEvent.info(
+          UiText.t('✅ 用户已确认，开始执行...', '✅ Confirmed, executing...')));
     }
 
     // 执行命令
@@ -3706,8 +3741,7 @@ class AgentEngine {
     if (cmd.isNotEmpty) {
       final level = SafetyGuard.check(cmd);
       e.riskLevel ??= level.name;
-      e.permissionDecision ??=
-          decideCommand(level, _permissionMode).name;
+      e.permissionDecision ??= decideCommand(level, _permissionMode).name;
     }
   }
 
@@ -3825,7 +3859,8 @@ class AgentEngine {
     // 答案回写到 ask 事件本身：提问这一步要自带"问过什么 + 选了什么"，
     // 不能只靠后面那条 info 事件反推（跨轮/跨段就断了）。
     pendingAsk?.chosenAnswer = choice;
-    onEvent?.call(AgentEvent.info(UiText.t('👉 你选择了: $choice', '👉 You chose: $choice')));
+    onEvent?.call(
+        AgentEvent.info(UiText.t('👉 你选择了: $choice', '👉 You chose: $choice')));
 
     // 以 ReAct 观测格式反馈
     final observation = '观测: 用户选择了 "$choice"';
@@ -3967,7 +4002,8 @@ class AgentEngine {
 
     if (toolName.isEmpty) {
       agentLogger.warn('ReAct', 'tool 动作但未指定工具名');
-      onEvent?.call(AgentEvent.info('⚠️ AI 调用工具但未指定工具名'));
+      onEvent?.call(AgentEvent.info(UiText.t('⚠️ AI 调用工具但未指定工具名',
+          '⚠️ Model called a tool without specifying a tool name')));
       const observation = '观测: 工具调用失败 — 未指定工具名';
       _conversationHistory
           .add(ChatMessage.create(role: 'user', content: observation));
@@ -4002,13 +4038,14 @@ class AgentEngine {
       if (thoughtText.trim().isNotEmpty) {
         onEvent?.call(AgentEvent.thought(thoughtText.trim()));
       }
-      _conversationHistory.add(ChatMessage.create(
-          role: 'user', content: '观测: 思考已记录，请给出下一步动作。'));
+      _conversationHistory.add(
+          ChatMessage.create(role: 'user', content: '观测: 思考已记录，请给出下一步动作。'));
       _trimMessages(_conversationHistory);
       _noCommandRetryCount = 0;
       return true;
     }
-    if (_executeAliasNames.contains(alias) || _placeholderToolNames.contains(alias)) {
+    if (_executeAliasNames.contains(alias) ||
+        _placeholderToolNames.contains(alias)) {
       final command =
           args.firstOf(['command', 'cmd', 'script', 'shell', 'shell_command']);
       if (command.isNotEmpty) {
@@ -4034,10 +4071,11 @@ class AgentEngine {
       // execute 别名但没给命令：告诉模型缺参数，不算致命失败
       if (_executeAliasNames.contains(alias)) {
         agentLogger.warn('ReAct', '$alias 别名缺少 command 参数');
-        onEvent?.call(AgentEvent.info('⚠️ AI 调用 $alias 但未提供 command 参数'));
+        onEvent?.call(AgentEvent.info(UiText.t(
+            '⚠️ AI 调用 $alias 但未提供 command 参数',
+            '⚠️ Model called $alias but did not provide the command parameter')));
         _conversationHistory.add(ChatMessage.create(
-            role: 'user',
-            content: '观测: $alias 调用缺少 command 参数（要执行的命令），请重试。'));
+            role: 'user', content: '观测: $alias 调用缺少 command 参数（要执行的命令），请重试。'));
         _trimMessages(_conversationHistory);
         _noCommandRetryCount++;
         if (_noCommandRetryCount >= _maxNoCommandRetries) {
@@ -4057,8 +4095,8 @@ class AgentEngine {
       ]);
       if (thoughtText.trim().isNotEmpty) {
         onEvent?.call(AgentEvent.thought(thoughtText.trim()));
-        _conversationHistory.add(ChatMessage.create(
-            role: 'user', content: '观测: 思考已记录，请给出下一步动作。'));
+        _conversationHistory.add(
+            ChatMessage.create(role: 'user', content: '观测: 思考已记录，请给出下一步动作。'));
         _trimMessages(_conversationHistory);
         _noCommandRetryCount = 0;
         return true;
@@ -4066,8 +4104,7 @@ class AgentEngine {
       // 既没有命令也没有思考内容：把可用工具清单回给模型
       final available = _tools.all.map((t) => t.name).join(', ');
       _conversationHistory.add(ChatMessage.create(
-          role: 'user',
-          content: '观测: 工具 $toolName 不存在。可用工具: $available'));
+          role: 'user', content: '观测: 工具 $toolName 不存在。可用工具: $available'));
       _trimMessages(_conversationHistory);
       return true;
     }
@@ -4075,7 +4112,8 @@ class AgentEngine {
     final tool = _tools.get(toolName);
     if (tool == null) {
       agentLogger.warn('ReAct', '未知工具: $toolName');
-      onEvent?.call(AgentEvent.info('⚠️ 未知工具: $toolName'));
+      onEvent?.call(AgentEvent.info(
+          UiText.t('⚠️ 未知工具: $toolName', '⚠️ Unknown tool: $toolName')));
       final available = _tools.all.map((t) => t.name).join(', ');
       final observation = '观测: 工具 $toolName 不存在。可用工具: $available';
       _conversationHistory
@@ -4095,7 +4133,8 @@ class AgentEngine {
     // 判据由 ToolKind 派生，新增写类工具自动受管，不需要再维护第二份名单。
     if (_permissionMode == AgentPermissionMode.readOnly && !tool.isReadOnly) {
       agentLogger.info('ReAct', '只读模式拦截工具: $toolName');
-      onEvent?.call(AgentEvent.info('🔒 只读模式已开启，此工具被拒绝执行: `$toolName`'));
+      onEvent?.call(AgentEvent.info(UiText.t('🔒 只读模式已开启，此工具被拒绝执行: `$toolName`',
+          '🔒 Read-only mode is on; this tool was not allowed to run: `$toolName`')));
       const observation = '观测: 当前为只读模式，禁止调用会产生变更的工具。'
           '请改用只读工具/命令收集信息，或用 finish 告知用户"当前为只读模式，请关闭后重试"。';
       _conversationHistory
@@ -4115,7 +4154,8 @@ class AgentEngine {
     if (!visible.any((t) => t.name == toolName)) {
       agentLogger.warn(
           'ReAct', '工具在当前会话不可用: $toolName (local=$_isLocalSession)');
-      onEvent?.call(AgentEvent.info('⚠️ 工具 `$toolName` 在当前会话不可用'));
+      onEvent?.call(AgentEvent.info(UiText.t('⚠️ 工具 `$toolName` 在当前会话不可用',
+          '⚠️ Tool `$toolName` is not available in this session')));
       final available = visible.map((t) => t.name).join(', ');
       final observation = '观测: 工具 $toolName 在当前会话不可用。当前可用工具: $available';
       _conversationHistory
@@ -4158,7 +4198,9 @@ class AgentEngine {
         // 同上：10 分钟没人点，不等于用户说了"不"
         final timedOut = _confirmTimedOut;
         final reason = timedOut ? '确认超时（10 分钟无响应），已自动拒绝' : '用户拒绝执行该操作';
-        onEvent?.call(AgentEvent.info(timedOut ? '⏱ $reason' : '❌ $reason'));
+        onEvent?.call(AgentEvent.info(timedOut
+            ? '⏱ ${UiText.t(reason, 'Confirmation timed out (no response for 10 minutes); auto-rejected')}'
+            : '❌ ${UiText.t(reason, 'User declined to run this operation')}'));
         // 必须补一条 result：否则 UI 里这条命令卡片永远停在"待执行"
         onEvent?.call(AgentEvent.result(
           commandId: toolCommandEvent.id,
@@ -4319,7 +4361,8 @@ class AgentEngine {
     } catch (e) {
       toolStopwatch.stop();
       agentLogger.error('ReAct', '工具 $toolName 执行异常: $e');
-      onEvent?.call(AgentEvent.info('❌ 工具 $toolName 执行异常: $e'));
+      onEvent?.call(AgentEvent.info(UiText.t('❌ 工具 $toolName 执行异常: $e',
+          '❌ Tool $toolName threw an exception: $e')));
       // 工具异常也要有 result 事件，避免证据层只有命令没有结果
       onEvent?.call(AgentEvent.result(
         commandId: toolCommandEvent.id,
@@ -4364,8 +4407,7 @@ class AgentEngine {
       // 用户禁止执行命令时不能再催"去执行命令"，否则提示词和用户约束对着干。
       const continuePrompt =
           '请继续执行任务。如果还有需要执行的步骤，请使用以下格式回复：\n\n思考: [你的推理]\n说明: [一句话说明这条命令做什么、有什么影响]\n动作: execute\n命令: [要执行的命令]\n\n如果任务已全部完成，请回复：\n\n思考: [总结]\n动作: finish';
-      const noCommandPrompt =
-          '请继续完成任务。用户已明确要求本次任务不要执行任何命令，'
+      const noCommandPrompt = '请继续完成任务。用户已明确要求本次任务不要执行任何命令，'
           '请直接给出面向用户的文字回答，然后回复：\n\n'
           '思考: [总结]\n动作: finish\n回答: [给用户的完整回答]';
       onEvent?.call(AgentEvent.info(UiText.t('⏳ 继续执行...', '⏳ Continuing...')));
@@ -4486,7 +4528,9 @@ class AgentEngine {
     final startTime = _currentTask?.createdAt;
     _currentTask = _currentTask!.copyWith(
       status: success ? AgentStatus.completed : AgentStatus.failed,
-      phase: success ? '整理结论' : '执行失败',
+      phase: success
+          ? UiText.t('整理结论', 'Summarizing')
+          : UiText.t('执行失败', 'Failed'),
       completedAt: DateTime.now(),
     );
     _notifyTaskUpdate();
@@ -4774,8 +4818,9 @@ class AgentEngine {
     buffer.writeln('- 整份摘要控制在 1200 字以内');
     buffer.writeln();
     buffer.writeln('=== 已有摘要 ===');
-    buffer.writeln(
-        previousSummary == null || previousSummary.isEmpty ? '（无，首次压缩）' : previousSummary);
+    buffer.writeln(previousSummary == null || previousSummary.isEmpty
+        ? '（无，首次压缩）'
+        : previousSummary);
     buffer.writeln();
     buffer.writeln('=== 新增对话 ===');
     for (final m in messages) {
@@ -4790,8 +4835,7 @@ class AgentEngine {
 
     try {
       final history = [
-        ChatMessage.create(
-            role: 'system', content: '你是对话压缩助手，只输出滚动摘要纯文本，不要解释。')
+        ChatMessage.create(role: 'system', content: '你是对话压缩助手，只输出滚动摘要纯文本，不要解释。')
       ];
       final stream = await _aiProvider.chatStream(
         history: history,
@@ -5281,15 +5325,13 @@ $hostList
     final buffer = StringBuffer()..writeln('【执行位置】');
     if (executor is SSHService) {
       final remoteFirstLine = executor.osInfo.trim().split('\n').first.trim();
-      final remote =
-          remoteFirstLine.isEmpty ? '未知系统' : remoteFirstLine;
+      final remote = remoteFirstLine.isEmpty ? '未知系统' : remoteFirstLine;
       buffer.writeln('- 动作: execute 运行在：远程服务器（$remote）');
       buffer.writeln('- 运行 App 的本机：$localOs，主机名 ${Platform.localHostname}'
           '${home.isEmpty ? '' : '，主目录 $home'}');
       buffer.writeln(
           '- 本机命令（Docker Desktop、盘符路径如 D:\\...、本机文件/服务）必须使用 local_exec 工具；');
-      buffer.writeln(
-          '  不要把 PowerShell/cmd 语法发给远程 shell。服务器上的普通命令继续用 execute。');
+      buffer.writeln('  不要把 PowerShell/cmd 语法发给远程 shell。服务器上的普通命令继续用 execute。');
     } else if (executor != null) {
       buffer.writeln('- 动作: execute 运行在：本机终端（$localOs）。本机路径可直接在 execute 中使用。');
     } else {

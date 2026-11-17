@@ -6,6 +6,7 @@ import '../core/theme_colors.dart';
 import '../models/agent_event.dart';
 import '../providers/terminal_provider.dart' as tp;
 import '../utils/agent_ui_text.dart';
+import '../core/ui_text.dart';
 import 'agent_process_timeline.dart';
 import 'agent_ask_card.dart';
 import 'host_result_matrix.dart';
@@ -347,7 +348,8 @@ class AgentEventContent extends StatelessWidget {
   Widget _buildResultCard(AgentEvent event, ThemeColors tc, BuildContext context) {
     final ui = AgentUiText.of(context);
     final success = event.success ?? false;
-    final output = event.output ?? event.error ?? '(无输出)';
+    final output = event.output ?? event.error ??
+        UiText.t('(无输出)', '(no output)');
     final lines = output.split('\n');
     final hostResults = event.hostResults;
     final showMatrix = hostResults != null && hostResults.length > 1;
@@ -454,7 +456,7 @@ class AgentEventContent extends StatelessWidget {
                         onReconnectHost != null)
                       _failureActionButton(
                         icon: Icons.wifi_tethering,
-                        label: '重连',
+                        label: UiText.t('重连', 'Reconnect'),
                         color: tc.warn,
                         onTap: () => onReconnectHost!(event),
                       ),
@@ -462,7 +464,7 @@ class AgentEventContent extends StatelessWidget {
                         (event.command ?? '').trim().isNotEmpty)
                       _failureActionButton(
                         icon: Icons.refresh,
-                        label: '让 AI 重试',
+                        label: UiText.t('让 AI 重试', 'Ask AI to retry'),
                         color: tc.brand,
                         onTap: () => onRetryFailedCommand!(event),
                       ),
@@ -595,16 +597,17 @@ class AgentEventContent extends StatelessWidget {
 
   /// 复制按钮（与 AgentCommandBlock._buildCopyButton 行为一致）
   Widget _buildCopyButton(String text, ThemeColors tc, BuildContext context) {
+    final ui = AgentUiText.of(context);
     return GestureDetector(
       onTap: () {
         Clipboard.setData(ClipboardData(text: text));
         clearTopToast();
         showTopSnackBar(context, 
-          const SnackBar(
-            content: Text('已复制', style: TextStyle(fontSize: fSmall)),
-            duration: Duration(seconds: 1),
+          SnackBar(
+            content: Text(ui.copied, style: const TextStyle(fontSize: fSmall)),
+            duration: const Duration(seconds: 1),
             behavior: SnackBarBehavior.floating,
-            margin: EdgeInsets.all(16),
+            margin: const EdgeInsets.all(16),
           ),
         );
       },
@@ -624,30 +627,30 @@ class AgentEventContent extends StatelessWidget {
       AgentFinishState.success => (
           tc.ok,
           tc.okBg,
-          '任务完成',
+          UiText.t('任务完成', 'Task complete'),
           Icons.celebration,
-          '已完成所有步骤',
+          UiText.t('已完成所有步骤', 'All steps finished'),
         ),
       AgentFinishState.cancelled => (
           tc.warn,
           tc.warnBg,
-          '任务已取消',
+          UiText.t('任务已取消', 'Task cancelled'),
           Icons.cancel_outlined,
-          '任务已取消',
+          UiText.t('任务已取消', 'Task cancelled'),
         ),
       AgentFinishState.failed => (
           tc.error,
           tc.errorBg,
-          '任务失败',
+          UiText.t('任务失败', 'Task failed'),
           Icons.error_outline,
-          '任务执行失败',
+          UiText.t('任务执行失败', 'Task execution failed'),
         ),
       AgentFinishState.interrupted => (
           tc.warn,
           tc.warnBg,
-          '任务已中断',
+          UiText.t('任务已中断', 'Task interrupted'),
           Icons.pause_circle_outline,
-          '任务被中断',
+          UiText.t('任务被中断', 'Task was interrupted'),
         ),
     };
 
@@ -780,8 +783,9 @@ class _RawOutputTailState extends State<_RawOutputTail> {
                   Expanded(
                     child: Text(
                       widget.totalChars != null
-                          ? '原始输出尾部 · 共 ${widget.totalChars} 字符'
-                          : '原始输出尾部',
+                          ? UiText.t('原始输出尾部 · 共 ${widget.totalChars} 字符',
+                              'Raw output tail · ${widget.totalChars} chars total')
+                          : UiText.t('原始输出尾部', 'Raw output tail'),
                       style: TextStyle(color: tc.textSub, fontSize: fMicro),
                     ),
                   ),
@@ -790,7 +794,7 @@ class _RawOutputTailState extends State<_RawOutputTail> {
                       context,
                       text: widget.tail,
                       tc: tc,
-                      title: '原始输出尾部',
+                      title: UiText.t('原始输出尾部', 'Raw output tail'),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.all(2),
@@ -964,7 +968,7 @@ class _ResultOutputPreview extends StatelessWidget {
               context,
               text: output,
               tc: tc,
-              title: '命令输出',
+              title: UiText.t('命令输出', 'Command output'),
             ),
             child: Padding(
               padding: const EdgeInsets.only(top: 6),

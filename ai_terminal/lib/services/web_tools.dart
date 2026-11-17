@@ -5,6 +5,7 @@ import 'command_executor.dart';
 import 'web_search_config.dart';
 import 'web_search_http.dart';
 import 'web_search_service.dart';
+import '../core/ui_text.dart';
 import '../utils/tool_args_parser.dart';
 
 /// 联网搜索工具
@@ -64,10 +65,10 @@ class WebSearchTool extends AgentTool {
     final maxResults = args.getInt('max_results', defaultValue: 0);
 
     if (query.isEmpty) {
-      return ToolResult.failure('参数缺失: query 为必填项');
+      return ToolResult.failure(UiText.t('参数缺失: query 为必填项', 'Missing parameter: query is required'));
     }
 
-    onProgress?.call('正在搜索: $query');
+    onProgress?.call(UiText.t('正在搜索: $query', 'Searching: $query'));
 
     // 桥接 AgentTool.cancelToken (Completer<void>) → Dio.CancelToken
     // 设计意图：cancelTask 完成 Completer 时，立即取消进行中的网络请求，
@@ -211,7 +212,7 @@ class FetchUrlTool extends AgentTool {
 
     final cap = maxChars > 0 ? maxChars : _defaultMaxChars;
 
-    onProgress?.call('正在抓取: $url');
+    onProgress?.call(UiText.t('正在抓取: $url', 'Fetching: $url'));
 
     final dioCancel = CancelToken();
     StreamSubscription<void>? sub;
@@ -250,17 +251,17 @@ class FetchUrlTool extends AgentTool {
       );
       final html = resp.data ?? '';
       if (html.isEmpty) {
-        return ToolResult.success('抓取成功，但页面内容为空。');
+        return ToolResult.success(UiText.t('抓取成功，但页面内容为空。', 'Fetched successfully, but the page content is empty.'));
       }
 
-      onProgress?.call('解析正文...');
+      onProgress?.call(UiText.t('解析正文...', 'Parsing article text...'));
 
       final title = _extractTitle(html);
       final text = _htmlToText(html);
 
       final buffer = StringBuffer();
       if (title.isNotEmpty) {
-        buffer.writeln('标题: $title');
+        buffer.writeln(UiText.t('标题: $title', 'Title: $title'));
         buffer.writeln();
       }
       buffer.writeln('URL: $url');

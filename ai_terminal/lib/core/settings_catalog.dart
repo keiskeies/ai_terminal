@@ -21,13 +21,24 @@ class SettingsEntry {
   const SettingsEntry({
     required this.id,
     required this.title,
+    required this.titleEn,
     required this.route,
   });
 
   /// 与 [SettingsInlinePanel] 的 settingsId、`/settings/<id>` 路由保持一致
   final String id;
 
+  /// 中文标题；渲染请用 [label]。
+  ///
+  /// 这里保留字段而不是直接写 `UiText.t(...)`，是因为 `kSettingsEntries` 是
+  /// `const` 列表 —— 构造期求值会把文案冻在编译时的语言上。
   final String title;
+
+  /// 英文标题（其它语言回退英文）。
+  final String titleEn;
+
+  /// 跟随界面语言的标题。
+  String get label => UiText.t(title, titleEn);
 
   /// 定位用的路由（`/settings/<id>`）。这条路由现在渲染的还是同一次 [SettingsPage]，
   /// 只是进来时把对应的组滚到视野里 —— 不再有独立的二级设置页面。
@@ -163,19 +174,46 @@ class SettingsEntry {
 /// 第一周就会碰的，所以排在 Agent 之后；联网搜索和内部规范属于「让 AI 更懂我」
 /// 的调优项，是第二阶段的事；通知多数人永不触碰，压到最后。
 const List<SettingsEntry> kSettingsEntries = [
-  SettingsEntry(id: 'terminal', title: '终端', route: '/settings/terminal'),
-  SettingsEntry(id: 'ai', title: 'AI 模型', route: '/settings/ai'),
-  SettingsEntry(id: 'agent', title: 'Agent', route: '/settings/agent'),
-  SettingsEntry(id: 'security', title: '安全', route: '/settings/security'),
-  SettingsEntry(id: 'mcp', title: 'MCP 服务器', route: '/settings/mcp'),
   SettingsEntry(
-      id: 'web_search', title: '联网搜索', route: '/settings/web_search'),
+      id: 'terminal',
+      title: '终端',
+      titleEn: 'Terminal',
+      route: '/settings/terminal'),
+  SettingsEntry(
+      id: 'ai',
+      title: 'AI 模型',
+      titleEn: 'AI model',
+      route: '/settings/ai'),
+  SettingsEntry(
+      id: 'agent',
+      title: 'Agent',
+      titleEn: 'Agent',
+      route: '/settings/agent'),
+  SettingsEntry(
+      id: 'security',
+      title: '安全',
+      titleEn: 'Security',
+      route: '/settings/security'),
+  SettingsEntry(
+      id: 'mcp',
+      title: 'MCP 服务器',
+      titleEn: 'MCP servers',
+      route: '/settings/mcp'),
+  SettingsEntry(
+      id: 'web_search',
+      title: '联网搜索',
+      titleEn: 'Web search',
+      route: '/settings/web_search'),
   SettingsEntry(
       id: 'knowledge_rules',
       title: '内部规范',
+      titleEn: 'House rules',
       route: '/settings/knowledge_rules'),
   SettingsEntry(
-      id: 'notification', title: '通知', route: '/settings/notification'),
+      id: 'notification',
+      title: '通知',
+      titleEn: 'Notifications',
+      route: '/settings/notification'),
 ];
 
 /// 设置页里的「管理类」入口：不是开关，点进去是独立的 CRUD 页面。

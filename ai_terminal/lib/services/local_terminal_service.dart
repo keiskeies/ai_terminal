@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_pty/flutter_pty.dart';
+import '../core/ui_text.dart';
 import '../utils/exit_marker_scanner.dart';
 import '../utils/tail_text_buffer.dart';
 import 'command_executor.dart';
@@ -12,8 +13,10 @@ import 'session_log_service.dart';
 /// 支持 macOS / Linux / Windows，提供与 macOS Terminal / Windows CMD 完全一致的体验
 class LocalTerminalService implements CommandExecutor {
   Pty? _pty;
-  final StreamController<String> _outputController = StreamController<String>.broadcast();
-  final StreamController<void> _exitController = StreamController<void>.broadcast();
+  final StreamController<String> _outputController =
+      StreamController<String>.broadcast();
+  final StreamController<void> _exitController =
+      StreamController<void>.broadcast();
   bool _isConnected = false;
   bool _isExited = false;
 
@@ -49,7 +52,9 @@ class LocalTerminalService implements CommandExecutor {
 
       if (Platform.isWindows) {
         // Windows 优先 PowerShell（支持 ANSI/更丰富命令），回退 cmd.exe
-        if (File('C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe').existsSync()) {
+        if (File(
+                'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe')
+            .existsSync()) {
           // flutter_pty 的 ConPTY 下直接启动 powershell.exe 会立即静默退出（无法获得
           // 有效控制台句柄），由 cmd.exe 托管后 PowerShell 才能正常交互
           shell = 'cmd.exe';
@@ -87,7 +92,8 @@ class LocalTerminalService implements CommandExecutor {
         ptyEnv['MANPAGER'] = 'cat';
         ptyEnv['CLICOLOR'] = '1';
         ptyEnv['LSCOLORS'] = 'ExFxCxDxBxegedabagacad';
-        ptyEnv['LS_COLORS'] = 'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32';
+        ptyEnv['LS_COLORS'] =
+            'rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32';
       }
 
       _pty = Pty.start(
@@ -107,24 +113,27 @@ class LocalTerminalService implements CommandExecutor {
           .cast<List<int>>()
           .transform(const Utf8Decoder(allowMalformed: true))
           .listen(
-        (data) {
-          if (!_outputController.isClosed && !_isExited) {
-            _outputController.add(data);
-          }
-        },
-        onDone: _handleExit,
-        onError: (e) {
-          debugPrint('[LocalTerminal] 输出错误: $e');
-          _handleExit();
-        },
-      );
+            (data) {
+              if (!_outputController.isClosed && !_isExited) {
+                _outputController.add(data);
+              }
+            },
+            onDone: _handleExit,
+            onError: (e) {
+              debugPrint('[LocalTerminal] 输出错误: $e');
+              _handleExit();
+            },
+          );
 
       _pty!.exitCode.then((code) {
         debugPrint('[LocalTerminal] 进程退出, code=$code shell=$shell');
         _handleExit();
       });
     } catch (e) {
-      _outputController.add('\r\n\x1b[31m✗ 本地终端启动失败: $e\x1b[0m\r\n');
+      // 这行直接打进终端输出流，用户看得见，必须过 UiText。
+      _outputController.add('\r\n\x1b[31m✗ '
+          '${UiText.t('本地终端启动失败: $e', 'Failed to start local terminal: $e')}'
+          '\x1b[0m\r\n');
       _isConnected = false;
     }
   }
@@ -139,7 +148,9 @@ class LocalTerminalService implements CommandExecutor {
     }
     _pendingDoneCompleters.clear();
     if (!_outputController.isClosed) {
-      _outputController.add('\r\n\x1b[90m[进程已退出]\x1b[0m\r\n');
+      _outputController.add('\r\n\x1b[90m'
+          '${UiText.t('[进程已退出]', '[process exited]')}'
+          '\x1b[0m\r\n');
     }
     if (!_exitController.isClosed) {
       _exitController.add(null);
@@ -168,13 +179,16 @@ class LocalTerminalService implements CommandExecutor {
   /// 用于监控面板等需要轻量、不污染交互式 shell 的场景。
   /// 失败返回空字符串。超时默认 5 秒。
   @override
-  Future<String> runOnce(String command, {Duration timeout = const Duration(seconds: 5)}) async {
+  Future<String> runOnce(String command,
+      {Duration timeout = const Duration(seconds: 5)}) async {
     try {
       if (Platform.isWindows) {
-        final result = await Process.run('cmd', ['/c', command]).timeout(timeout);
+        final result =
+            await Process.run('cmd', ['/c', command]).timeout(timeout);
         return (result.stdout as String?) ?? '';
       } else {
-        final result = await Process.run('/bin/sh', ['-c', command]).timeout(timeout);
+        final result =
+            await Process.run('/bin/sh', ['-c', command]).timeout(timeout);
         return (result.stdout as String?) ?? '';
       }
     } catch (e) {
@@ -310,8 +324,8 @@ class LocalTerminalService implements CommandExecutor {
       // 分页器等待按键：命令不会自己退出，主动按 q 让后续的 marker 执行。
       // 400ms 门槛 + 连续两次判定，避开输出恰好以 (END) 结尾但命令仍在跑的误判。
       // Windows 本地终端不存在 POSIX 分页器，但正则不匹配也不会触发。
-      final pagerWaiting = elapsed >= 400 &&
-          PtyOutputDetector.waitsForPager(snapshot);
+      final pagerWaiting =
+          elapsed >= 400 && PtyOutputDetector.waitsForPager(snapshot);
       pagerDetections = pagerWaiting ? pagerDetections + 1 : 0;
       if (!pagerQuitSent && pagerDetections >= 2) {
         pagerQuitSent = true;
@@ -802,7 +816,8 @@ class LocalTerminalService implements CommandExecutor {
         kind = CommandFailureKind.interactivePrompt;
       } else if (reason.contains('进程已退出')) {
         kind = CommandFailureKind.disconnected;
-      } else if (reason.contains('Permission denied') || reason.contains('权限')) {
+      } else if (reason.contains('Permission denied') ||
+          reason.contains('权限')) {
         kind = CommandFailureKind.permissionDenied;
       }
       return CommandResult(
@@ -909,5 +924,6 @@ class LocalTerminalService implements CommandExecutor {
   }
 
   /// 是否支持本地终端
-  static bool get isSupported => Platform.isMacOS || Platform.isLinux || Platform.isWindows;
+  static bool get isSupported =>
+      Platform.isMacOS || Platform.isLinux || Platform.isWindows;
 }

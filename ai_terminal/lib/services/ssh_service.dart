@@ -4,6 +4,7 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import '../models/host_config.dart';
 import '../core/ssh_algorithms.dart';
+import '../core/ui_text.dart';
 import '../utils/exit_marker_scanner.dart';
 import '../utils/tail_text_buffer.dart';
 import '../utils/terminal_charset.dart';
@@ -30,7 +31,8 @@ class SSHConnectionError implements Exception {
 /// SSH 服务
 class SSHService implements CommandExecutor {
   final HostConfig config;
-  final StreamController<String> outputController = StreamController<String>.broadcast();
+  final StreamController<String> outputController =
+      StreamController<String>.broadcast();
 
   SSHSession? _session;
   SSHClient? _client;
@@ -71,11 +73,13 @@ class SSHService implements CommandExecutor {
   String get osInfo => _osInfo;
   @override
   Stream<String> get output => outputController.stream;
+
   /// 暴露内部 SSHClient（只读），供 SFTP 等子工具复用连接
   /// 调用方不得 close 此 client，生命周期由 SSHService 管理
   SSHClient? get client => _client;
-  SSHConnectionState get state =>
-      _isConnected ? SSHConnectionState.connected : SSHConnectionState.disconnected;
+  SSHConnectionState get state => _isConnected
+      ? SSHConnectionState.connected
+      : SSHConnectionState.disconnected;
 
   Future<void> connect({
     String? password,
@@ -88,11 +92,16 @@ class SSHService implements CommandExecutor {
     _intentionalDisconnect = false;
     _dropNotified = false;
     try {
-      outputController.add('正在连接 ${config.host}:${config.port}...\n');
+      // 连接过程的提示直接进终端输出流，是用户能看到的文案，必须过 UiText。
+      outputController.add(UiText.t('正在连接 ${config.host}:${config.port}...',
+              'Connecting to ${config.host}:${config.port}...') +
+          '\n');
 
       // 如果配置了跳板机
       if (jumpHostConfig != null) {
-        outputController.add('通过跳板机 ${jumpHostConfig.host} 中转连接...\n');
+        outputController.add(UiText.t('通过跳板机 ${jumpHostConfig.host} 中转连接...',
+                'Relaying through jump host ${jumpHostConfig.host}...') +
+            '\n');
 
         // 1. 先连接跳板机（加超时）
         _jumpSocket = await SSHSocket.connect(
@@ -141,16 +150,24 @@ class SSHService implements CommandExecutor {
       // 验证连通性
       try {
         final echoResult = await _client!.execute("echo 'OK'");
-        await echoResult.stdout.cast<List<int>>().transform(utf8.decoder).join();
-        outputController.add('连接验证通过\n');
+        await echoResult.stdout
+            .cast<List<int>>()
+            .transform(utf8.decoder)
+            .join();
+        outputController.add(UiText.t('连接验证通过\n', 'Connection verified\n'));
       } catch (e) {
-        outputController.add('连接验证跳过: $e\n');
+        outputController
+            .add(UiText.t('连接验证跳过: $e\n', 'Connection check skipped: $e\n'));
       }
 
       // 获取系统信息
       try {
         final sysInfo = await _client!.execute('uname -s -m');
-        _osInfo = (await sysInfo.stdout.cast<List<int>>().transform(utf8.decoder).join()).trim();
+        _osInfo = (await sysInfo.stdout
+                .cast<List<int>>()
+                .transform(utf8.decoder)
+                .join())
+            .trim();
       } catch (e) {
         debugPrint('[SSHService] 获取系统信息失败: $e');
         _osInfo = 'Unknown';
@@ -174,12 +191,13 @@ class SSHService implements CommandExecutor {
           outputController.add(data);
         },
         onError: (error) {
-          outputController.add('\r\n[错误] $error\r\n');
+          outputController.add('\r\n${UiText.t('[错误]', '[error]')} $error\r\n');
           _handleDrop();
         },
         onDone: () {
           if (!outputController.isClosed) {
-            outputController.add('\r\n[连接已关闭]\r\n');
+            outputController
+                .add('\r\n${UiText.t('[连接已关闭]', '[connection closed]')}\r\n');
           }
           _handleDrop();
         },
@@ -198,23 +216,22 @@ class SSHService implements CommandExecutor {
       // 关闭分页器：PTY 下的 journalctl/systemctl/git/man 默认调 less，
       // 命令停在 (END) 等按键，退出码 marker 永远不会执行。
       _session!.write(Uint8List.fromList(utf8.encode(
-        'export PAGER=cat SYSTEMD_PAGER=cat GIT_PAGER=cat MANPAGER=cat;'
-        'export LS_COLORS="rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32";'
-        'alias ls="ls --color=auto" 2>/dev/null;'
-        'alias ll="ls -la --color=auto" 2>/dev/null;'
-        'alias grep="grep --color=auto" 2>/dev/null;'
-        // 用 ANSI 清屏，避免最小化容器没有 clear 命令时打印
-        // "clear: command not found" 并把初始化命令留在屏幕上
-        'printf \'\\033[2J\\033[H\'\n'
-      )));
+          'export PAGER=cat SYSTEMD_PAGER=cat GIT_PAGER=cat MANPAGER=cat;'
+          'export LS_COLORS="rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32";'
+          'alias ls="ls --color=auto" 2>/dev/null;'
+          'alias ll="ls -la --color=auto" 2>/dev/null;'
+          'alias grep="grep --color=auto" 2>/dev/null;'
+          // 用 ANSI 清屏，避免最小化容器没有 clear 命令时打印
+          // "clear: command not found" 并把初始化命令留在屏幕上
+          'printf \'\\033[2J\\033[H\'\n')));
 
-      outputController.add('\r\n✅ 连接成功\r\n');
+      outputController.add('\r\n✅ ${UiText.t('连接成功', 'Connected')}\r\n');
       outputController.add('OS: $_osInfo\r\n');
       outputController.add('\$ ');
-
     } catch (e) {
       _isConnected = false;
-      outputController.add('\r\n❌ 连接失败: $e\r\n');
+      outputController
+          .add('\r\n❌ ${UiText.t('连接失败: ', 'Connection failed: ')}$e\r\n');
       rethrow;
     }
   }
@@ -328,8 +345,8 @@ class SSHService implements CommandExecutor {
       }
       // 分页器等待按键：命令不会自己退出，主动按 q 让后续的 marker 执行。
       // 400ms 门槛 + 连续两次判定，避开输出恰好以 (END) 结尾但命令仍在跑的误判。
-      final pagerWaiting = elapsed >= 400 &&
-          PtyOutputDetector.waitsForPager(snapshot);
+      final pagerWaiting =
+          elapsed >= 400 && PtyOutputDetector.waitsForPager(snapshot);
       pagerDetections = pagerWaiting ? pagerDetections + 1 : 0;
       if (!pagerQuitSent && pagerDetections >= 2) {
         pagerQuitSent = true;
@@ -566,7 +583,8 @@ class SSHService implements CommandExecutor {
   @override
   void execute(String command) {
     if (_session == null || !_isConnected) {
-      outputController.add('[错误] 未连接\r\n');
+      outputController
+          .add('${UiText.t('[错误] 未连接', '[error] Not connected')}\r\n');
       return;
     }
 
@@ -686,8 +704,7 @@ class SSHService implements CommandExecutor {
     final marker = 'EXITCODE_$_markerSeq:';
     // 关闭终端输入的行尾转换，否则 PTY 的 ICRNL 会把 CRLF 中的 \r 变成 \n，
     // 导致通过 PTY fallback 写入的文件与原文不一致。写入完成后恢复原 stty。
-    final wrappedCommand =
-        '__ai_terminal_stty=\$(stty -g 2>/dev/null); '
+    final wrappedCommand = '__ai_terminal_stty=\$(stty -g 2>/dev/null); '
         'stty -icrnl -inlcr -igncr 2>/dev/null; '
         '$writeCmd; __ai_terminal_ec=\$?; '
         '[ -n "\$__ai_terminal_stty" ] && stty "\$__ai_terminal_stty" 2>/dev/null; '
@@ -788,7 +805,8 @@ class SSHService implements CommandExecutor {
       try {
         await _writeText('$line$suffix');
       } catch (e) {
-        abnormalReason.add('写入 stdin 失败: $e');
+        abnormalReason
+            .add(UiText.t('写入 stdin 失败: $e', 'Failed to write to stdin: $e'));
         if (!doneCompleter.isCompleted) doneCompleter.complete();
         break;
       }
@@ -813,7 +831,7 @@ class SSHService implements CommandExecutor {
           }
         }
       } catch (e) {
-        abnormalReason.add('发送 EOF 失败: $e');
+        abnormalReason.add(UiText.t('发送 EOF 失败: $e', 'Failed to send EOF: $e'));
         if (!doneCompleter.isCompleted) doneCompleter.complete();
       }
     }
@@ -871,7 +889,8 @@ class SSHService implements CommandExecutor {
         kind = CommandFailureKind.interactivePrompt;
       } else if (reason.contains('channel 已关闭') || reason.contains('断开')) {
         kind = CommandFailureKind.disconnected;
-      } else if (reason.contains('Permission denied') || reason.contains('权限')) {
+      } else if (reason.contains('Permission denied') ||
+          reason.contains('权限')) {
         kind = CommandFailureKind.permissionDenied;
       }
       return CommandResult(
@@ -954,11 +973,15 @@ class SSHService implements CommandExecutor {
   /// 用于监控面板等需要轻量、不污染交互式 shell 的场景。
   /// 失败返回空字符串。超时默认 5 秒。
   @override
-  Future<String> runOnce(String command, {Duration timeout = const Duration(seconds: 5)}) async {
+  Future<String> runOnce(String command,
+      {Duration timeout = const Duration(seconds: 5)}) async {
     if (_client == null || !_isConnected) return '';
     try {
       final result = await _client!.execute(command).timeout(timeout);
-      return await result.stdout.cast<List<int>>().transform(utf8.decoder).join();
+      return await result.stdout
+          .cast<List<int>>()
+          .transform(utf8.decoder)
+          .join();
     } catch (e) {
       debugPrint('[SSHService] runOnce 失败 ($command): $e');
       return '';
@@ -1049,7 +1072,7 @@ class SSHService implements CommandExecutor {
     _socket = null;
     _jumpClient = null;
     _jumpSocket = null;
-    outputController.add('\r\n[已断开连接]\r\n');
+    outputController.add('\r\n${UiText.t('[已断开连接]', '[disconnected]')}\r\n');
   }
 
   void dispose() {

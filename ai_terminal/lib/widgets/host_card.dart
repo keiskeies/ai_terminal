@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 import '../models/host_config.dart';
 
 /// P1-4: 服务器卡片重设计
@@ -65,10 +66,13 @@ class _HostCardState extends State<HostCard> {
   String? get _lastConnectedText {
     if (widget.host.lastConnectedAt == null) return null;
     final diff = DateTime.now().difference(widget.host.lastConnectedAt!);
-    if (diff.inMinutes < 1) return '刚刚';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
-    if (diff.inHours < 24) return '${diff.inHours}小时前';
-    if (diff.inDays < 30) return '${diff.inDays}天前';
+    if (diff.inMinutes < 1) return UiText.t('刚刚', 'just now');
+    if (diff.inMinutes < 60)
+      return UiText.count(diff.inMinutes, '分钟前', 'min ago');
+    if (diff.inHours < 24)
+      return UiText.count(diff.inHours, '小时前', 'h ago');
+    if (diff.inDays < 30)
+      return UiText.count(diff.inDays, '天前', 'd ago');
     return null;
   }
 
@@ -174,7 +178,8 @@ class _HostCardState extends State<HostCard> {
                             if (lastConnected != null) ...[
                               const SizedBox(height: 2),
                               Text(
-                                '最后连接: $lastConnected',
+                                UiText.t('最后连接: $lastConnected',
+                                    'Last connected: $lastConnected'),
                                 style: TextStyle(
                                   fontSize: fMicro,
                                   color: tc.textMuted,
@@ -189,7 +194,7 @@ class _HostCardState extends State<HostCard> {
                         children: [
                           _ActionButton(
                             icon: Icons.terminal,
-                            tooltip: '连接终端',
+                            tooltip: UiText.t('连接终端', 'Open terminal'),
                             onTap: () => context.push('/terminal/${widget.host.id}'),
                           ),
                           const SizedBox(width: 2),
@@ -212,23 +217,23 @@ class _HostCardState extends State<HostCard> {
                               }
                             },
                             itemBuilder: (context) => [
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'edit',
                                 child: Row(
                                   children: [
-                                    Icon(Icons.edit, size: 20),
-                                    SizedBox(width: 12),
-                                    Text('编辑'),
+                                    const Icon(Icons.edit, size: 20),
+                                    const SizedBox(width: 12),
+                                    Text(UiText.t('编辑', 'Edit')),
                                   ],
                                 ),
                               ),
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'delete',
                                 child: Row(
                                   children: [
-                                    Icon(Icons.delete, size: 20, color: cDanger),
-                                    SizedBox(width: 12),
-                                    Text('删除', style: TextStyle(color: cDanger)),
+                                    const Icon(Icons.delete, size: 20, color: cDanger),
+                                    const SizedBox(width: 12),
+                                    Text(UiText.t('删除', 'Delete'), style: const TextStyle(color: cDanger)),
                                   ],
                                 ),
                               ),

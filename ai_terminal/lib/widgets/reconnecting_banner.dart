@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/constants.dart';
 import '../core/theme_colors.dart';
+import '../core/ui_text.dart';
 
 /// 重连期间的常驻状态横幅
 class ReconnectingBanner extends StatelessWidget {
@@ -37,7 +38,8 @@ class ReconnectingBanner extends StatelessWidget {
           const SizedBox(width: 7),
           Expanded(
             child: Text(
-              '正在重连 $hostLabel · 连接恢复中',
+              UiText.t('正在重连 $hostLabel · 连接恢复中',
+                  'Reconnecting to $hostLabel · recovering connection'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
