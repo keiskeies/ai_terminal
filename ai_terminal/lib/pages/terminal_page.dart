@@ -3362,7 +3362,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           // 按钮照旧贴右边缘；面板拖窄时整组被压缩，组内标题再走省略号。原来
           // 这一行没有任何可收缩的一层，长模型名会把「切换方位 / 收起」两个按钮
           // 直接挤出可视区 —— RenderFlex overflow，收起按钮点不到。
-          // 三种写法已用 test/flex_zero_overflow_probe_test.dart 实测比较过。
+          // 三种写法已用 test/ai_panel_head_overflow_test.dart 实测比较过。
           Flexible(
             child: Row(
               mainAxisSize: MainAxisSize.min,
