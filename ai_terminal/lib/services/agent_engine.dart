@@ -43,6 +43,7 @@ import '../utils/react_stream_parser.dart';
 import '../utils/rollback_advisor.dart';
 import '../utils/verification_detector.dart';
 import '../utils/command_extractor.dart';
+import '../utils/no_command_intent_detector.dart';
 import '../utils/choice_request_detector.dart';
 import '../utils/local_command_detector.dart';
 import '../utils/token_estimator.dart';
@@ -282,6 +283,23 @@ class AgentEngine {
   /// 达到 _maxFinishWithoutExecRetries 后放行 finish（避免死循环）
   int _finishWithoutExecCount = 0;
   static const int _maxFinishWithoutExecRetries = 2;
+
+  /// 用户是否显式要求本次任务不要执行命令（"严禁执行任何命令，只根据会话回答"）
+  ///
+  /// 命中时 [_finishWithoutExecCount] 门控让路：用户意图优先于反幻觉默认值，
+  /// 否则纯问答任务要白烧完重试步数才能收尾。只由用户原文置位
+  /// （goal / steering / ask 选项），模型自己的说法不算数。
+  bool _userForbadeCommands = false;
+
+  /// 只从用户原文吸收"禁止执行命令"约束；单向置位，同一任务内不撤销。
+  /// ask 选项虽是模型写的文案，但点选动作出自用户，视为用户表态。
+  void _absorbNoCommandConstraint(String userText, String source) {
+    if (_userForbadeCommands) return;
+    if (!NoCommandIntentDetector.detects(userText)) return;
+    _userForbadeCommands = true;
+    agentLogger.info('ReAct', '检测到用户禁止执行命令（来源: $source），'
+        'finish 幻觉门控让路');
+  }
 
   /// O4/WP6: 计划含未完成项（[ ]/[>]）就 finish 的重试计数。
   /// R5: 独立计数器，与 _finishWithoutExecCount / _noCommandRetryCount 互不干扰；
@@ -834,6 +852,7 @@ class AgentEngine {
     _noCommandRetryCount = 0;
     _hasExecutedAnyCommand = false;
     _finishWithoutExecCount = 0;
+    _userForbadeCommands = false;
     _planFinishRetryCount = 0; // O4/WP6: 计划 finish 门控计数新任务归零（R5）
     _consecutiveConnFailures = 0;
     _currentExecutor = null;
@@ -946,6 +965,7 @@ class AgentEngine {
     // 保证新任务起点干净：无残留 Completer/Subscription/Timer/CancelToken
     _resetTransientState();
     _currentExecutor = executor; // 保存 executor 引用，支持运行时刷新
+    _absorbNoCommandConstraint(goal, '任务目标');
 
     // 新任务代际，使任何残留的旧循环退出
     _currentTaskGeneration++;
@@ -1283,6 +1303,7 @@ class AgentEngine {
     final previousElapsed = _currentTask!.elapsedSeconds ?? 0;
     final previousStartedAt = _taskStartTime ?? _currentTask!.createdAt;
     final hadExecutedAnyCommand = _hasExecutedAnyCommand;
+    final hadForbiddenCommands = _userForbadeCommands;
     final previousChangeIds = List<String>.of(_operationChangeIds);
     final previousChanges = List<OperationChange>.of(_operationChanges);
     final previousBadges = List<OperationBadge>.of(_operationBadges);
@@ -1297,6 +1318,7 @@ class AgentEngine {
     _currentStepCount = previousStepCount;
     _stepOffset = previousStepCount;
     _hasExecutedAnyCommand = hadExecutedAnyCommand;
+    _userForbadeCommands = hadForbiddenCommands;
     _operationChangeIds.addAll(previousChangeIds);
     _operationChanges.addAll(previousChanges);
     _operationBadges.addAll(previousBadges);
@@ -1502,6 +1524,7 @@ class AgentEngine {
         final injected = _steeringQueue.length;
         while (_steeringQueue.isNotEmpty) {
           final steering = _steeringQueue.removeFirst();
+          _absorbNoCommandConstraint(steering, '用户补充');
           _conversationHistory.add(ChatMessage.create(
             role: 'user',
             content: '用户补充: $steering',
@@ -1703,7 +1726,9 @@ class AgentEngine {
           // 典型场景：AI 在 ask 后声称"已检查...无问题"但实际未运行任何命令
           // R5: 用独立计数器 _finishWithoutExecCount 限制重试次数，避免与
           // _noCommandRetryCount（无动作重试）互相干扰导致提前放行
+          // 用户明确禁止执行命令时让路：纯问答任务的交付物就是文本答案
           if (!_hasExecutedAnyCommand &&
+              !_userForbadeCommands &&
               _finishWithoutExecCount < _maxFinishWithoutExecRetries) {
             _finishWithoutExecCount++;
             agentLogger.warn('ReAct',
@@ -3742,6 +3767,7 @@ class AgentEngine {
 
     // 将用户选择反馈给 AI
     agentLogger.info('ReAct', '用户选择了: $choice');
+    _absorbNoCommandConstraint(choice, 'ask 选项');
     // 答案回写到 ask 事件本身：提问这一步要自带"问过什么 + 选了什么"，
     // 不能只靠后面那条 info 事件反推（跨轮/跨段就断了）。
     pendingAsk?.chosenAnswer = choice;
@@ -4281,11 +4307,18 @@ class AgentEngine {
     if (_noCommandRetryCount <= _maxNoCommandRetries) {
       agentLogger.info('ReAct',
           'AI 未生成命令，发送继续提示 (重试 $_noCommandRetryCount/$_maxNoCommandRetries)');
+      // 用户禁止执行命令时不能再催"去执行命令"，否则提示词和用户约束对着干。
       const continuePrompt =
           '请继续执行任务。如果还有需要执行的步骤，请使用以下格式回复：\n\n思考: [你的推理]\n说明: [一句话说明这条命令做什么、有什么影响]\n动作: execute\n命令: [要执行的命令]\n\n如果任务已全部完成，请回复：\n\n思考: [总结]\n动作: finish';
+      const noCommandPrompt =
+          '请继续完成任务。用户已明确要求本次任务不要执行任何命令，'
+          '请直接给出面向用户的文字回答，然后回复：\n\n'
+          '思考: [总结]\n动作: finish\n回答: [给用户的完整回答]';
       onEvent?.call(AgentEvent.info(UiText.t('⏳ 继续执行...', '⏳ Continuing...')));
-      _conversationHistory
-          .add(ChatMessage.create(role: 'user', content: continuePrompt));
+      _conversationHistory.add(ChatMessage.create(
+        role: 'user',
+        content: _userForbadeCommands ? noCommandPrompt : continuePrompt,
+      ));
       _trimMessages(_conversationHistory);
       return true;
     }
@@ -4913,6 +4946,12 @@ class AgentEngine {
 
   @visibleForTesting
   int get planFinishRetryCountForTesting => _planFinishRetryCount;
+
+  @visibleForTesting
+  int get finishWithoutExecCountForTesting => _finishWithoutExecCount;
+
+  @visibleForTesting
+  bool get userForbadeCommandsForTesting => _userForbadeCommands;
 
   String _buildSystemPrompt(CommandExecutor? executor) {
     final buffer = StringBuffer();

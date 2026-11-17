@@ -500,6 +500,110 @@ void main() {
       expect(textPrompt, contains('严格格式要求'));
       expect(textPrompt, isNot(contains('Function Calling 模式')));
     });
+
+    test('用户禁止执行命令：未执行任何命令也能直接 finish', () async {
+      final provider = _FcMockProvider();
+      provider.enqueueFc(['用户要求不执行命令，直接基于会话内容作答'], [
+        _finishCall(
+          answer: '根据本会话内容，结论如下……',
+          conclusion: '未执行命令，依据为会话内容',
+        )
+      ]);
+      final engine = makeEngine(provider: provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+      final executor = _MockExecutor();
+
+      await engine.startTask('严禁执行任何命令，只根据本会话内容总结进展', executor);
+
+      expect(engine.currentTask?.status, AgentStatus.completed);
+      expect(executor.executed, isEmpty);
+      // 幻觉门控让路：一次 AI 调用即收尾，没有被强制继续
+      expect(provider.callCount, 1);
+      expect(engine.finishWithoutExecCountForTesting, 0);
+      expect(engine.userForbadeCommandsForTesting, isTrue);
+      expect(
+        events.where((e) => e.text != null && e.text!.contains('未实际执行命令')),
+        isEmpty,
+      );
+    });
+
+    test('用户未禁止：未执行命令就 finish 仍被门控拦下（回归）', () async {
+      final provider = _FcMockProvider();
+      provider.enqueueFc(['我判断服务正常'], [_finishCall(conclusion: '服务正常')]);
+      provider.enqueueFc(['再确认一次'], [_finishCall(conclusion: '服务正常')]);
+      provider.enqueueFc(['完成'], [_finishCall(conclusion: '服务正常')]);
+      final engine = makeEngine(provider: provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+
+      await engine.startTask('检查 nginx 服务状态', _MockExecutor());
+
+      expect(engine.currentTask?.status, AgentStatus.completed);
+      expect(engine.finishWithoutExecCountForTesting, 2);
+      expect(engine.userForbadeCommandsForTesting, isFalse);
+      expect(provider.callCount, 3);
+      expect(
+        events.where((e) => e.text != null && e.text!.contains('未实际执行命令')),
+        isNotEmpty,
+      );
+      // 强制继续的指令要求模型实际执行命令
+      expect(
+        provider.receivedHistories.last
+            .any((m) => m.role == 'user' && m.content.contains('实际执行命令验证')),
+        isTrue,
+      );
+    });
+
+    test('运行中补充禁止命令：后续 finish 不再被强制继续', () async {
+      final provider = _FcMockProvider();
+      provider.enqueueFc(
+        ['需要确认是否允许执行命令'],
+        [
+          ToolCall(
+            id: 'call_ask',
+            name: 'ask',
+            arguments: jsonEncode({
+              'question': '可以执行只读命令吗？',
+              'options': ['可以', '不要执行'],
+            }),
+          ),
+        ],
+      );
+      provider.enqueueFc(['按用户要求直接作答'], [_finishCall(answer: '基于会话内容的总结')]);
+      final engine = makeEngine(provider: provider);
+
+      final future = engine.startTask('总结本次会话做了什么', _MockExecutor());
+      for (var i = 0; i < 200 && !engine.hasPendingChoice; i++) {
+        await Future.delayed(const Duration(milliseconds: 10));
+      }
+      expect(engine.hasPendingChoice, isTrue);
+      engine.addUserSteering('禁止执行任何命令，直接用文字回答');
+      engine.selectChoice('不要执行');
+      await future;
+
+      expect(engine.currentTask?.status, AgentStatus.completed);
+      expect(provider.callCount, 2);
+      expect(engine.finishWithoutExecCountForTesting, 0);
+      expect(engine.userForbadeCommandsForTesting, isTrue);
+    });
+
+    test('禁止命令时空动作的继续提示不再催促执行', () async {
+      final provider = _FcMockProvider();
+      provider.enqueueFc(['我想执行一下看看'], [_executeCall('')]);
+      provider.enqueueFc(['直接给结论'], [_finishCall(answer: '无需命令即可回答')]);
+      final engine = makeEngine(provider: provider);
+
+      await engine.startTask('不要执行命令，直接说明原因', _MockExecutor());
+
+      expect(engine.currentTask?.status, AgentStatus.completed);
+      final prompts = provider.receivedHistories.last
+          .where((m) => m.role == 'user' && m.content.contains('请继续'))
+          .toList();
+      expect(prompts, isNotEmpty);
+      expect(prompts.last.content, contains('不要执行任何命令'));
+      expect(prompts.last.content, isNot(contains('命令: [要执行的命令]')));
+    });
   });
 
   group('OpenAIProvider SSE 结构化投递（真实字节流）', () {
