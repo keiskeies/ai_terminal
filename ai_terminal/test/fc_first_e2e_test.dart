@@ -362,6 +362,35 @@ void main() {
       expect(engine.currentTask?.status, AgentStatus.completed);
     });
 
+    test('老模型把参数套进 {"args": {...}} 时引擎解包，工具正常执行', () async {
+      // 真机缺陷：默认 schema 曾把参数包成 args 对象，模型照做后 file_write
+      // 读不到 path，连续两轮报「参数缺失」。schema 已改平铺，但线上模型仍可能
+      // 按旧习惯发嵌套形状，引擎必须在分发前解包。
+      final provider = _FcMockProvider();
+      provider.enqueueFc([], [
+        ToolCall(
+          id: 'call_nested',
+          name: 'knowledge_search',
+          arguments: jsonEncode({
+            'args': {'query': 'docker'},
+          }),
+        ),
+      ]);
+      provider.enqueueFc(['完成'], [_finishCall()]);
+      final engine = makeEngine(provider: provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+
+      await engine.startTask('查 docker 指引', _MockExecutor());
+
+      final result = events.firstWhere(
+        (e) => e.isResult && e.toolName == 'knowledge_search',
+      );
+      expect(result.success, isTrue,
+          reason: '嵌套参数必须被解包，否则 query 读不到（${result.error}）');
+      expect(result.error ?? '', isNot(contains('缺少必填参数')));
+    });
+
     test('FC 正文里的代码围栏只是思考示例，不会被当命令执行', () async {
       final provider = _FcMockProvider();
       provider.enqueueFc(

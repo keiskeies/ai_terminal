@@ -3875,8 +3875,15 @@ class AgentEngine {
     // 每次工具调用都计一步，含未知工具与只读档拦截：口径是"尝试过"，
     // 不是"成功变更过"。放在参数校验之前，失败调用同样计入。
     _toolCalls++;
+    // 老模型的兼容：早期 schema 把参数包成 {"args": {...}}，照做的模型仍会这样发。
+    // 只在「唯一键且是 Map」时解包，正常平铺参数不会被误伤。
+    var rawArgs = step.toolArgs ?? const <String, dynamic>{};
+    final nested = rawArgs['args'];
+    if (nested is Map && rawArgs.keys.length == 1) {
+      rawArgs = nested.map((k, v) => MapEntry(k.toString(), v));
+    }
     // 裸 Map 在这里收口成 ToolArgs：此后所有取参都必须走类型化访问器
-    final args = ToolArgs(step.toolArgs ?? const {});
+    final args = ToolArgs(rawArgs);
 
     if (toolName.isEmpty) {
       agentLogger.warn('ReAct', 'tool 动作但未指定工具名');

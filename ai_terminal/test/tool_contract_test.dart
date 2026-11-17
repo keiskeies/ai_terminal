@@ -283,6 +283,19 @@ void main() {
       }
     });
 
+    test('默认 FC schema 的参数是顶层键，不再嵌套 args 对象（真机 file_write 缺陷回归）',
+        () {
+      // 真机上模型按旧 schema 发出 {"args": {path, content}}，file_write 读不到
+      // path 直接报「参数缺失: path 为必填项」。schema 必须让参数平铺。
+      final schema = FileWriteTool().toJsonSchema()!;
+      expect(schema['type'], 'object');
+      expect((schema['properties'] as Map).containsKey('args'), isFalse,
+          reason: '嵌套 args 会让所有走默认 schema 的工具读不到参数');
+      expect(schema['additionalProperties'], isTrue,
+          reason: '参数说明仍是模型唯一的填写依据，必须允许任意顶层键');
+      expect(schema['description'], contains('path'));
+    });
+
     test('不参与 FC 的工具（toJsonSchema 返回 null）仍给出合法描述符', () async {
       final d = _NullSchemaTool().mcpDescriptor;
       final schema = d['inputSchema'];

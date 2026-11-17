@@ -220,16 +220,14 @@ abstract class AgentTool {
   /// 子类可重写以提供精确的参数类型。
   /// 返回 null 表示该工具不参与 FC（仅文本协议可用）。
   Map<String, dynamic>? toJsonSchema() {
-    // 默认实现：宽松 schema，让 AI 自由填参数，由 execute 内部校验
+    // 默认实现：宽松 schema，让 AI 自由填参数，由 execute 内部校验。
+    // 参数必须是**顶层**键：早先这里把参数包成 `args` 对象，模型照做后
+    // file_write 拿到 {"args": {path, content}}，必填校验读不到 path 直接失败
+    // （真机验证：写文件工具连续两轮报「参数缺失: path 为必填项」）。
     return {
       'type': 'object',
-      'properties': {
-        'args': {
-          'type': 'object',
-          'description': paramSpec,
-          'additionalProperties': true,
-        },
-      },
+      'description': paramSpec,
+      'properties': const <String, dynamic>{},
       'additionalProperties': true,
     };
   }
