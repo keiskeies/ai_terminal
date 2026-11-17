@@ -4715,6 +4715,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     if (!mounted) return Future.value(null);
     final tc = ThemeColors.of(context);
     final controller = TextEditingController();
+    // 同 _requestInteractiveInput：关闭动画期间 TextField 仍会 build，
+    // 立即 dispose 会命中「controller used after being disposed」断言。
+    void disposeController() {
+      WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
+    }
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
@@ -4781,7 +4786,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           ),
         );
       },
-    ).whenComplete(controller.dispose);
+    ).whenComplete(disposeController);
   }
 
   /// 确认类交互提示（yes/no、[Y/n]、Press ENTER 等）的自由文本输入弹窗。
@@ -4794,6 +4799,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     if (!mounted) return Future.value(null);
     final tc = ThemeColors.of(context);
     final controller = TextEditingController();
+    // 弹窗关闭动画期间 TextField 仍在 build：立即 dispose 会让
+    // AnimatedWidget 在 didUpdateWidget 里 addListener 到已销毁的 controller
+    // 并抛出 "A TextEditingController was used after being disposed"。
+    // 延后到下一帧之后再释放。
+    void disposeController() {
+      WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
+    }
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
@@ -4848,7 +4860,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           ),
         ],
       ),
-    ).whenComplete(controller.dispose);
+    ).whenComplete(disposeController);
   }
 
   /// 本机目录授权弹窗 —— local_exec 的 cwd 不在白名单时走这里。

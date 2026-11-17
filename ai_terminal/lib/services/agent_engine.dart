@@ -2122,11 +2122,17 @@ class AgentEngine {
             lastEarlyParseAtMs = elapsed;
             lastEarlyParseLen = bufLen;
             final responseText = fullResponseBuffer.toString();
+            // 只解析 `动作:` 行之后的正文：解析器把任意围栏当成 command，
+            // 思考里的示例围栏（或 ask/finish 轮的文件摘录）会抢在真正的
+            // `命令:` 之前被送进执行器（真机验证：ask 轮把端口配置片段执行了）。
+            // 未声明 execute 的流不提前执行，交给流结束后的全量解析。
+            final tail = _textFromDeclaredAction(responseText);
             // 没有命令行/代码围栏时解析不可能产出 command 事件，直接跳过
-            if (responseText.contains('命令:') ||
-                responseText.contains('命令：') ||
-                responseText.contains('```')) {
-              final currentEvents = ReActStreamParser.parse(responseText);
+            if (tail != null &&
+                (tail.contains('命令:') ||
+                    tail.contains('命令：') ||
+                    tail.contains('```'))) {
+              final currentEvents = ReActStreamParser.parse(tail);
               // 找第一个已确定完成的 command 事件（不是最后一个）
               if (currentEvents.length > 1) {
                 for (int i = 0; i < currentEvents.length - 1; i++) {
@@ -2201,6 +2207,27 @@ class AgentEngine {
 
     // 流式结束：一次性发出所有事件（e.id 此时是 stableId）
     final events = ReActStreamParser.parse(fullResponse);
+
+    // 解析器把任意围栏都产出为 command 事件，但只有 `动作: execute` 之后的
+    // 内容才是本轮真正要执行的命令：
+    // - 动作行之前的围栏是思考示例
+    // - finish/ask 轮正文里的围栏是文件摘录（真机验证曾把 sshd_config 的
+    //   15 行内容逐行执行成 `-bash: L1: command not found`）
+    final declaredAction = _declaredTextAction(fullResponse);
+    final commandScope = _textFromDeclaredAction(fullResponse);
+    if (declaredAction == ActionType.execute && commandScope != null) {
+      final scopedCommands = ReActStreamParser.parse(commandScope)
+          .where((e) => e.isCommand)
+          .toList();
+      final firstCmdIdx = events.indexWhere((e) => e.isCommand);
+      events.removeWhere((e) => e.isCommand);
+      if (scopedCommands.isNotEmpty) {
+        events.insertAll(
+            firstCmdIdx < 0 ? events.length : firstCmdIdx, scopedCommands);
+      }
+    } else if (declaredAction != null) {
+      events.removeWhere((e) => e.isCommand);
+    }
 
     // O8 FC-first：结构化 tool_calls 合并进事件流。
     // FC 模式下正文是思考而非协议文本：纯文本解析出的 text 事件换成一条 thought，
@@ -2297,8 +2324,13 @@ class AgentEngine {
       }
     }
 
-    // 如果流式过程中没检测到命令（命令在最后），现在也通知一下
-    if (!commandDetectedNotified && onCommandDetected != null) {
+    // 如果流式过程中没检测到命令（命令在最后），现在也通知一下。
+    // O8: FC 模式下命令只认 tool_calls —— 正文围栏/引用块只是思考示例或
+    // 文件内容摘录，绝不能当命令执行（真机验证曾把 sshd_config 的围栏内容
+    // 直接写进远端 PTY）。
+    if (!commandDetectedNotified &&
+        onCommandDetected != null &&
+        !fcToolsSent) {
       for (final e in events) {
         if (e.isCommand) {
           final cmd = e.command ?? '';
@@ -2484,6 +2516,51 @@ class AgentEngine {
   /// ReAct 解析器 — 从 AI 响应中提取结构化动作
   /// 命令提取复用 ReActStreamParser，正确处理多行 heredoc
   /// ═══════════════════════════════════════════════════════
+  /// 正文里声明的动作类型（`动作: xxx` 行首次出现即定型）。
+  /// 供流结束路径判断「本轮是不是 finish/ask」以剔除围栏误解析出的命令。
+  static ActionType? _declaredTextAction(String content) {
+    for (final line in content.split('\n')) {
+      final trimmedLine = line.trim();
+      if (!trimmedLine.startsWith('动作:') && !trimmedLine.startsWith('动作：')) {
+        continue;
+      }
+      final sepIdx = trimmedLine.indexOf(trimmedLine.contains('：') ? '：' : ':');
+      switch (trimmedLine.substring(sepIdx + 1).trim().toLowerCase()) {
+        case 'execute':
+          return ActionType.execute;
+        case 'finish':
+          return ActionType.finish;
+        case 'ask':
+          return ActionType.ask;
+        case 'tool':
+          return ActionType.tool;
+      }
+      return null;
+    }
+    return null;
+  }
+
+  /// `动作: execute` 行之后的正文（含动作行）。
+  ///
+  /// 只有这一段里出现的围栏/`命令:` 才可能是本轮真正要执行的命令；
+  /// 动作行之前的思考里贴的示例围栏、finish/ask 轮的文件摘录都要排除。
+  /// 返回 null 表示正文里没有声明 execute 的动作行。
+  static String? _textFromDeclaredAction(String content) {
+    final lines = content.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      final trimmedLine = lines[i].trim();
+      if (!trimmedLine.startsWith('动作:') &&
+          !trimmedLine.startsWith('动作：')) {
+        continue;
+      }
+      final sepIdx = trimmedLine.indexOf(trimmedLine.contains('：') ? '：' : ':');
+      final actionStr = trimmedLine.substring(sepIdx + 1).trim().toLowerCase();
+      if (actionStr != 'execute') return null;
+      return lines.sublist(i).join('\n');
+    }
+    return null;
+  }
+
   ReActStep _parseReActResponse(String content,
       {List<AgentEvent>? parsedEvents}) {
     String? thought;
@@ -2514,28 +2591,17 @@ class AgentEngine {
     final lines = content.split('\n');
     final answer = parseAnswerBlock(lines);
     final sections = parseReportSections(lines);
-    for (var i = 0; i < lines.length; i++) {
-      final trimmedLine = lines[i].trim();
-      if (trimmedLine.startsWith('动作:') || trimmedLine.startsWith('动作：')) {
-        final sepIdx =
-            trimmedLine.indexOf(trimmedLine.contains('：') ? '：' : ':');
-        final actionStr =
-            trimmedLine.substring(sepIdx + 1).trim().toLowerCase();
-        if (actionStr == 'execute') {
-          action = ActionType.execute;
-        } else if (actionStr == 'finish') {
-          action = ActionType.finish;
-        } else if (actionStr == 'ask') {
-          action = ActionType.ask;
-        } else if (actionStr == 'tool') {
-          action = ActionType.tool;
-          // 解析后续的 工具: 和 参数: 行（多行 key:value 格式）
-          // 抽成静态方法以便单元测试覆盖端到端解析链路
+    action = _declaredTextAction(content);
+    // 工具动作需要顺序扫描后续 `工具:` / `参数:` 行（遇到首个动作行即停）
+    if (action == ActionType.tool) {
+      for (var i = 0; i < lines.length; i++) {
+        final trimmedLine = lines[i].trim();
+        if (trimmedLine.startsWith('动作:') || trimmedLine.startsWith('动作：')) {
           final toolResult = parseToolAction(lines, i + 1);
           toolName = toolResult.$1;
           toolArgs = toolResult.$2;
+          break;
         }
-        break;
       }
     }
 
@@ -3032,6 +3098,15 @@ class AgentEngine {
     required void Function(bool success, String reason, int outputChars)
         onSuccess,
   }) async {
+    // R5: 任务已终结（完成/失败/取消）后，流式提前执行的残余回调不能再把
+    // 状态改回 executing —— 否则 UI 会永久停在「运行中」，且补充指令
+    // 永远等不到下一轮循环边界（真机验证：finish 后提前执行复活任务）。
+    final task = _currentTask;
+    if (task != null && isTerminalStatus(task.status)) {
+      onSuccess(false, 'task_already_terminal', 0);
+      return _EarlyExecutionResult(shouldContinue: false, command: command);
+    }
+
     // 安全检查
     final safetyLevel = SafetyGuard.check(command);
     agentLogger.debug('ReAct',
