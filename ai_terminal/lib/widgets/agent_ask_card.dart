@@ -38,7 +38,7 @@ class AgentAskCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final options = event.options ?? const [];
     final question = (event.question ?? event.text ?? '').trim();
-    final title = question.isEmpty ? '请选择' : question;
+    final title = question.isEmpty ? UiText.t('请选择', 'Choose one') : question;
     final pending = onSelectChoice != null;
 
     return Container(
@@ -75,17 +75,27 @@ class AgentAskCard extends StatelessWidget {
           ),
           if (options.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: options
-                  .map((opt) => AgentAskOptionChip(
-                        label: opt,
-                        tc: tc,
-                        selectable: pending,
-                        onTap: onSelectChoice,
-                      ))
-                  .toList(),
+            // Wrap 的子项拿到的是无限宽约束，所以胶囊必须自己设上限，否则
+            // 一条长选项会把整行顶穿（1.4.2 真机上就溢出过 414px）。
+            LayoutBuilder(
+              builder: (context, c) {
+                final cap = (c.maxWidth.isFinite ? c.maxWidth : 320.0) * 0.92;
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: options
+                      .map((opt) => ConstrainedBox(
+                            constraints: BoxConstraints(maxWidth: cap),
+                            child: AgentAskOptionChip(
+                              label: opt,
+                              tc: tc,
+                              selectable: pending,
+                              onTap: onSelectChoice,
+                            ),
+                          ))
+                      .toList(),
+                );
+              },
             ),
           ],
           if (pending) ...[
@@ -135,12 +145,18 @@ class AgentAskOptionChip extends StatelessWidget {
             Icon(selectable ? Icons.touch_app : Icons.radio_button_unchecked,
                 size: 12, color: accent),
             const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: fSmall,
-                color: accent,
-                fontWeight: FontWeight.w600,
+            // 选项文案是模型给的，长度没有上限（真机上出现过把三个候选塞进
+            // 同一行的情况）。不包 Flexible 时 Row 会按文本固有宽度排，直接
+            // 顶穿 Wrap 的可用宽度并报 RenderFlex overflow。
+            Flexible(
+              child: Text(
+                label,
+                softWrap: true,
+                style: TextStyle(
+                  fontSize: fSmall,
+                  color: accent,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],
@@ -183,9 +199,8 @@ class _AgentAskStepRowState extends State<AgentAskStepRow> {
   @override
   Widget build(BuildContext context) {
     final tc = widget.tc;
-    final question =
-        (widget.event.question ?? widget.event.text ?? '').trim();
-    final title = question.isEmpty ? '请选择' : question;
+    final question = (widget.event.question ?? widget.event.text ?? '').trim();
+    final title = question.isEmpty ? UiText.t('请选择', 'Choose one') : question;
     final chosen = widget.chosen;
 
     return Container(
@@ -264,11 +279,10 @@ class _AgentAskStepRowState extends State<AgentAskStepRow> {
                     const SizedBox(height: pSmall),
                     Row(
                       children: [
-                        Icon(Icons.check_circle,
-                            size: 13, color: tc.ok),
+                        Icon(Icons.check_circle, size: 13, color: tc.ok),
                         const SizedBox(width: 6),
                         Text(
-                          '你的选择：$chosen',
+                          UiText.t('你的选择：$chosen', 'Your choice: $chosen'),
                           style: TextStyle(
                               color: tc.ok, fontSize: fMicro, height: 1.4),
                         ),
@@ -333,13 +347,12 @@ class _AgentAskCustomAnswerFieldState extends State<AgentAskCustomAnswerField> {
       onSubmitted: (value) => _submit(value),
       decoration: InputDecoration(
         isDense: true,
-        hintText: UiText.t('按钮都不合适？直接输入你的回答…',
-            'None of these fit? Type your answer…'),
+        hintText: UiText.t(
+            '按钮都不合适？直接输入你的回答…', 'None of these fit? Type your answer…'),
         hintStyle: TextStyle(color: tc.textMuted, fontSize: fSmall),
         filled: true,
         fillColor: tc.surface,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
         border: border,
         enabledBorder: border,
         focusedBorder: OutlineInputBorder(
@@ -347,7 +360,7 @@ class _AgentAskCustomAnswerFieldState extends State<AgentAskCustomAnswerField> {
           borderSide: BorderSide(color: tc.brand.withValues(alpha: 0.5)),
         ),
         suffixIcon: IconButton(
-          tooltip: '发送自定义回答',
+          tooltip: UiText.t('发送自定义回答', 'Send custom answer'),
           icon: Icon(Icons.send, size: 16, color: tc.brand),
           onPressed: _submit,
         ),

@@ -85,7 +85,7 @@ import '../utils/terminal_text_actions.dart';
 import '../utils/terminal_panes.dart';
 import '../services/pane_session_service.dart';
 import '../core/app_toast.dart';
-
+import '../widgets/ai_fox_avatar.dart';
 
 enum _AiPanelPosition { bottom, right }
 
@@ -150,7 +150,8 @@ double aiPanelSizeFor({
   required double minRatio,
   required double maxRatio,
 }) {
-  var size = (totalExtent * ratio).clamp(0.0, totalExtent * maxRatio).toDouble();
+  var size =
+      (totalExtent * ratio).clamp(0.0, totalExtent * maxRatio).toDouble();
   if (enforce80Cols && totalExtent > 0) {
     final maxPanel = totalExtent - minTerminalWidthForFontSize(fontSize);
     if (maxPanel <= 0) {
@@ -333,6 +334,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   double _sftpPanelWidth = 320;
   // 设计稿「宽度与下限」：辅助面板不低于 240px，终端不低于 80 列。
   static const double _minSftpWidth = 240;
+
   /// 顶栏高度：设计稿 .topbar 42px（32px 控件 + 上下各 5px）。
   static const double _kTopBarHeight = 42;
 
@@ -352,13 +354,23 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   bool get _isMobile => Platform.isAndroid || Platform.isIOS;
 
   // Per-tab 状态便捷访问器（自动根据 _currentTabId 读写对应 tab 的状态）
-  String? get _executingCommand => _currentTabId != null ? _tabExecutingCommand[_currentTabId!] : null;
-  set _executingCommand(String? v) { if (_currentTabId != null) _tabExecutingCommand[_currentTabId!] = v; }
-  Set<String> get _executedCommands => _currentTabId != null ? (_tabExecutedCommands[_currentTabId!] ??= {}) : {};
-  String? get _pendingConfirmCommand => _currentTabId != null ? _tabPendingConfirm[_currentTabId!] : null;
-  set _pendingConfirmCommand(String? v) { if (_currentTabId != null) _tabPendingConfirm[_currentTabId!] = v; }
+  String? get _executingCommand =>
+      _currentTabId != null ? _tabExecutingCommand[_currentTabId!] : null;
+  set _executingCommand(String? v) {
+    if (_currentTabId != null) _tabExecutingCommand[_currentTabId!] = v;
+  }
+
+  Set<String> get _executedCommands => _currentTabId != null
+      ? (_tabExecutedCommands[_currentTabId!] ??= {})
+      : {};
+  String? get _pendingConfirmCommand =>
+      _currentTabId != null ? _tabPendingConfirm[_currentTabId!] : null;
+  set _pendingConfirmCommand(String? v) {
+    if (_currentTabId != null) _tabPendingConfirm[_currentTabId!] = v;
+  }
 
   final _scrollController = ScrollController();
+
   /// 每个 tab 独立的聊天滚动控制器/滚动状态；切 tab 不再共用一个 offset。
   final Map<String, ScrollController> _chatScrollControllers = {};
   final Map<String, bool> _tabShowScrollToBottom = {};
@@ -368,10 +380,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   set _autoScrollChat(bool value) {
     if (_currentTabId != null) _tabAutoScroll[_currentTabId!] = value;
   }
+
   /// 每个 tab 的终端输出订阅：常驻，不随 tab 切换取消。
   /// 这样后台 tab 的 PTY 输出会继续写进它自己的 Terminal 缓冲。
   final Map<String, StreamSubscription<String>> _tabOutputSubscriptions = {};
-  final Map<String, StreamSubscription<String>> _tabChatOutputSubscriptions = {};
+  final Map<String, StreamSubscription<String>> _tabChatOutputSubscriptions =
+      {};
 
   /// 终端输出到聊天上下文的批量缓冲：
   /// 高频输出（构建日志、tail -f）下不再每个 chunk 做 ANSI 清洗 + provider 通知。
@@ -456,7 +470,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     });
   }
 
-    /// 存盘面板布局。方向只在桌面显式切换时写：移动端 `_updateMobilePositionForActive`
+  /// 存盘面板布局。方向只在桌面显式切换时写：移动端 `_updateMobilePositionForActive`
   /// 每帧按屏幕方向覆盖，存了也会在竖屏被改回 bottom。
   void _savePanelLayout({required bool savePosition}) {
     final tabId = _currentTabId;
@@ -585,9 +599,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       _currentModelConfig = config;
       final aiProvider = AIService.create(config);
       ref.read(agentProvider.notifier).init(
-        modelConfig: config,
-        aiProvider: aiProvider,
-      );
+            modelConfig: config,
+            aiProvider: aiProvider,
+          );
       if (mounted) setState(() {});
     } finally {
       _agentInitInFlight = false;
@@ -618,9 +632,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     AIModelSelectionService.saveSelectedModel(model.id);
     final aiProvider = AIService.create(model);
     ref.read(agentProvider.notifier).init(
-      modelConfig: model,
-      aiProvider: aiProvider,
-    );
+          modelConfig: model,
+          aiProvider: aiProvider,
+        );
     setState(() {});
   }
 
@@ -630,8 +644,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       _showGoalHint(AppLocalizations.of(context)!.terminalModelLockedRunning);
       return;
     }
-    final resolvedTier =
-        tier ?? choice.model.resolveReasoningTier(AIModelSelectionService.tierFor(choice.modelId));
+    final resolvedTier = tier ??
+        choice.model.resolveReasoningTier(
+            AIModelSelectionService.tierFor(choice.modelId));
     final config = AIModelConfig.fromEndpoint(
       endpoint: choice.endpoint,
       model: choice.model,
@@ -707,7 +722,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final endpoint = choice.endpoint;
     final maxTokens =
         choice.model.maxTokens <= 0 ? 4096 : choice.model.maxTokens;
-    final effort = tier != null && tier.sendsParameter ? tier.apiValue.trim() : null;
+    final effort =
+        tier != null && tier.sendsParameter ? tier.apiValue.trim() : null;
     final unchanged = current != null &&
         current.id == choice.model.id &&
         current.endpointId == endpoint.id &&
@@ -798,8 +814,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           showTopSnackBar(
             context,
             SnackBar(
-              content: Text(UiText.t('Agent 执行中，补充指令请用输入框',
-                  'Agent is running. Use the chat input for extra instructions.'),
+              content: Text(
+                  UiText.t('Agent 执行中，补充指令请用输入框',
+                      'Agent is running. Use the chat input for extra instructions.'),
                   style: const TextStyle(fontSize: fSmall)),
               duration: const Duration(seconds: 2),
             ),
@@ -844,7 +861,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 键既可以是 tabId（首屏）也可以是 paneId（额外屏，形如 `tab#p1`）：
   /// 首屏 id 不含 `#p`，据此分流到两套缓冲，避免分屏输出跟主屏互相挤批。
   void _bufferTermWrite(String id, String data) {
-    final buffers = _isPaneId(id) ? _paneTermWriteBuffers : _tabTermWriteBuffers;
+    final buffers =
+        _isPaneId(id) ? _paneTermWriteBuffers : _tabTermWriteBuffers;
     final buffer = buffers.putIfAbsent(id, StringBuffer.new)..write(data);
     if (buffer.length >= _termWriteMaxChars) {
       _flushTermWrite(id);
@@ -867,8 +885,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         (_isPaneId(id) ? _paneTermWriteBuffers : _tabTermWriteBuffers)
             .remove(id);
     if (buffer == null || buffer.isEmpty) return;
-    final term =
-        _isPaneId(id) ? _paneTerminals[id] : _tabTerminals[id];
+    final term = _isPaneId(id) ? _paneTerminals[id] : _tabTerminals[id];
     if (term == null) return;
     try {
       term.write(buffer.toString());
@@ -927,8 +944,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     term.onPrivateOSC = blockTracker.onPrivateOsc;
     final hostId = _tabById(tabId)?.hostId ?? 'local';
     _tabCommandTrackers[paneId] = CommandTracker(
-      onCommand: (command) =>
-          CommandHistoryDao.record(command, hostId: hostId),
+      onCommand: (command) => CommandHistoryDao.record(command, hostId: hostId),
     );
     return term;
   }
@@ -955,7 +971,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final client = tab.service?.client;
     final encoding = tab.service?.config.encoding ?? 'utf-8';
     if (!isLocal && client == null) {
-      _paneHint(paneId, 'SSH 连接未就绪，重连后点这一屏重试');
+      _paneHint(
+          paneId,
+          UiText.t('SSH 连接未就绪，重连后点这一屏重试',
+              'SSH is not ready — reconnect, then retry this pane'));
       return;
     }
     _paneOpening.add(paneId);
@@ -989,7 +1008,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       return;
     }
     if (session == null) {
-      _paneHint(paneId, isLocal ? '本地终端启动失败' : '这一屏的会话打开失败');
+      _paneHint(
+          paneId,
+          isLocal
+              ? UiText.t('本地终端启动失败', 'Local terminal failed to start')
+              : UiText.t('这一屏的会话打开失败', 'This pane failed to open a session'));
       return;
     }
     _paneSessions[paneId] = session;
@@ -1020,7 +1043,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         if (_paneSessions[paneId] != session) return;
         _paneSessions.remove(paneId);
         _discardTermWrite(paneId);
-        term.write('\r\n\x1b[90m[会话已结束]\x1b[0m\r\n');
+        term.write('\r\n\x1b[90m'
+            '${UiText.t('[会话已结束]', '[session ended]')}'
+            '\x1b[0m\r\n');
         setState(() {});
       },
     );
@@ -1038,7 +1063,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final result = splitAfter(current, afterPaneId: _activePaneForTab(tabId));
     if (result == null) {
       _showOperationMessage(
-        '一个标签最多 ${PaneLayout.maxPanes} 屏（每屏一个真实会话）',
+        UiText.t('一个标签最多 ${PaneLayout.maxPanes} 屏（每屏一个真实会话）',
+            'A tab holds at most ${PaneLayout.maxPanes} panes (one live session each)'),
         isError: true,
       );
       return;
@@ -1063,7 +1089,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final layout = _layoutForTab(tabId);
     if (!layout.isSplit) return;
     if (paneId == layout.primaryPaneId) {
-      _showOperationMessage('这一屏绑定了 AI，不能单独关掉；请直接关闭标签',
+      _showOperationMessage(
+          UiText.t('这一屏绑定了 AI，不能单独关掉；请直接关闭标签',
+              'This pane is bound to the AI and cannot be closed alone; close the tab instead'),
           isError: true);
       return;
     }
@@ -1171,8 +1199,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           fontSize: _terminalFontSize,
           paletteId: ref.watch(
               settingsProvider.select((s) => s['terminalPalette'] as String?)),
-          keymap: TerminalKeymap.fromSettings(
-              ref.watch(settingsProvider.select((s) => s['terminalKeybindings']))),
+          keymap: TerminalKeymap.fromSettings(ref
+              .watch(settingsProvider.select((s) => s['terminalKeybindings']))),
           active: isActive,
           isLocal: tab.isLocal,
           onCommandPalette: _showCommandPalette,
@@ -1240,8 +1268,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           border: Border.all(color: color.withValues(alpha: 0.5)),
         ),
         child: Text(label,
-            style: TextStyle(
-                fontSize: fMicro, color: color, height: 1.2)),
+            style: TextStyle(fontSize: fMicro, color: color, height: 1.2)),
       ),
     );
   }
@@ -1366,8 +1393,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   /// 累积该 tab 的终端输出，最多每 200ms 或 8KB 触发一次上下文更新
   void _bufferChatOutput(String tabId, String data) {
-    final buffer =
-        _tabChatOutputBuffers.putIfAbsent(tabId, StringBuffer.new)..write(data);
+    final buffer = _tabChatOutputBuffers.putIfAbsent(tabId, StringBuffer.new)
+      ..write(data);
     if (buffer.length >= _chatOutputMaxChars) {
       _flushChatOutput(tabId);
       return;
@@ -1459,7 +1486,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
     tp.TerminalTab? newTab;
     if (tab.isLocal) {
-      newTab = await ref.read(tp.terminalProvider.notifier).reconnectLocal(tab.id);
+      newTab =
+          await ref.read(tp.terminalProvider.notifier).reconnectLocal(tab.id);
       if (!mounted) return;
       if (newTab?.localService != null) {
         // 重新绑定 executor（service 已更新）
@@ -1479,7 +1507,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         _showOperationMessage(L10n.str.terminalHostNotFound, isError: true);
         return;
       }
-      newTab = await ref.read(tp.terminalProvider.notifier).reconnect(tab.id, host);
+      newTab =
+          await ref.read(tp.terminalProvider.notifier).reconnect(tab.id, host);
       if (!mounted) return;
       if (newTab?.service != null) {
         ref.read(agentProvider.notifier).setExecutor(newTab!.service,
@@ -1494,7 +1523,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
     if (newTab == null) {
       // 失败原因存在 tab.connectionError 上，主区按状态渲染；这里补一条即时反馈
-      _showOperationMessage(tab.connectionError ?? L10n.str.connectionFailedHint, isError: true);
+      _showOperationMessage(
+          tab.connectionError ?? L10n.str.connectionFailedHint,
+          isError: true);
     } else {
       // 重连成功：清零自动重连计数，下次掉线重新获得完整退避预算
       _autoReconnectAttempts.remove(tab.id);
@@ -1540,9 +1571,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     showModalBottomSheet(
       context: context,
       backgroundColor: tc.cardElevated,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(rLarge))),
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(rLarge))),
       builder: (context) => Container(
-        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.4),
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -1552,7 +1585,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 children: [
                   Icon(Icons.add_circle_outline, size: 16, color: tc.brand),
                   const SizedBox(width: 8),
-                  Text(l10n.terminalSelectServerForNewTab, style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
+                  Text(l10n.terminalSelectServerForNewTab,
+                      style: TextStyle(
+                          color: tc.textMain,
+                          fontSize: fBody,
+                          fontWeight: FontWeight.w600)),
                   const Spacer(),
                   GestureDetector(
                     onTap: () {
@@ -1560,13 +1597,19 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                       this.context.push('/host/edit');
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
                         color: tc.brand.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(rSmall),
-                        border: Border.all(color: tc.brand.withValues(alpha: 0.25)),
+                        border:
+                            Border.all(color: tc.brand.withValues(alpha: 0.25)),
                       ),
-                      child: Text(l10n.terminalCreateNew, style: TextStyle(fontSize: fMicro, color: tc.brand, fontWeight: FontWeight.w500)),
+                      child: Text(l10n.terminalCreateNew,
+                          style: TextStyle(
+                              fontSize: fMicro,
+                              color: tc.brand,
+                              fontWeight: FontWeight.w500)),
                     ),
                   ),
                 ],
@@ -1583,17 +1626,27 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   return ListTile(
                     dense: true,
                     leading: Container(
-                      width: 8, height: 8,
+                      width: 8,
+                      height: 8,
                       decoration: BoxDecoration(
                         color: host.tagColor != null
-                            ? tagColors.firstWhere((c) => c.toARGB32().toString() == host.tagColor, orElse: () => cPrimary)
+                            ? tagColors.firstWhere(
+                                (c) => c.toARGB32().toString() == host.tagColor,
+                                orElse: () => cPrimary)
                             : cPrimary,
                         shape: BoxShape.circle,
                       ),
                     ),
-                    title: Text(host.name, style: TextStyle(fontSize: fBody, color: tc.textMain)),
-                    subtitle: Text('${host.username}@${host.host}', style: TextStyle(fontSize: fMicro, color: tc.textSub, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback)),
-                    trailing: Icon(Icons.open_in_new, size: 14, color: tc.textMuted),
+                    title: Text(host.name,
+                        style: TextStyle(fontSize: fBody, color: tc.textMain)),
+                    subtitle: Text('${host.username}@${host.host}',
+                        style: TextStyle(
+                            fontSize: fMicro,
+                            color: tc.textSub,
+                            fontFamily: 'JetBrainsMono',
+                            fontFamilyFallback: kMonoFontFallback)),
+                    trailing:
+                        Icon(Icons.open_in_new, size: 14, color: tc.textMuted),
                     onTap: () {
                       Navigator.pop(context);
                       _openHostTab(host);
@@ -1724,12 +1777,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     // 终端字号是终端自己的状态（Ctrl +/- 改它），但顶栏外观浮层的字号控件走
     // settingsProvider：只写库不通知这边，滑块拖完终端不动，看着就像「设置没生效」。
     // 这里把外部改动收回本地状态，两处入口操作的是同一份显示。
-    ref.listen(settingsProvider.select((s) => s['terminalFontSize']), (_, next) {
+    ref.listen(settingsProvider.select((s) => s['terminalFontSize']),
+        (_, next) {
       if (next is num && next.toDouble() != _terminalFontSize) {
         setState(() => _terminalFontSize = next.toDouble().clamp(8.0, 24.0));
       }
     });
-    final host = widget.hostId != null ? ref.watch(hostsProvider.notifier).getHostById(widget.hostId!) : null;
+    final host = widget.hostId != null
+        ? ref.watch(hostsProvider.notifier).getHostById(widget.hostId!)
+        : null;
     final terminalState = ref.watch(tp.terminalProvider);
     // chatProvider 只在这里贡献 error；不要 watch 整个状态，否则每个终端
     // 输出 chunk 都会让整页（终端 + 所有 tab + AI 面板）重建。
@@ -1763,8 +1819,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     // ref.listen 必须在 build 中无条件调用，否则面板收起时 listener 消失会触发 assertion
     // 只跟随聊天内容长度/流式文本变化滚动；终端输出更新 lastCommandOutput 时不再打断滚动
     ref.listen<(String?, int)>(
-      chatProvider.select(
-          (s) => (s.currentAssistantMessage, s.messages.length)),
+      chatProvider
+          .select((s) => (s.currentAssistantMessage, s.messages.length)),
       (_, __) => _scrollChatToBottom(),
     );
     ref.listen(agentProvider, (_, state) {
@@ -1869,8 +1925,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   ) {
     final tabs = terminalState.tabs;
     if (tabs.isEmpty) {
-      return _buildMainBody(
-          chatError, activeAgentState, null, isActive: true);
+      return _buildMainBody(chatError, activeAgentState, null, isActive: true);
     }
     final notifier = ref.read(agentProvider.notifier);
     final activeId = activeTab?.id;
@@ -1912,9 +1967,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }
 
   /// 主体区域：终端 + AI 面板 + SFTP 侧面板，根据面板位置切换布局
-  Widget _buildMainBody(String? chatError, AgentState agentState,
-      tp.TerminalTab? tab, {required bool isActive}) {
-
+  Widget _buildMainBody(
+      String? chatError, AgentState agentState, tp.TerminalTab? tab,
+      {required bool isActive}) {
     // 终端视图。主区渲染只看活动标签自己的连接阶段：页面级不再留一份
     // "连接中"副本，否则顶栏指向新标签、画面还停在旧标签。
     final placeholder = _buildConnectionPlaceholder(tab);
@@ -1927,8 +1982,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             ? term_widget.TerminalView(
                 terminal: _terminal,
                 fontSize: _terminalFontSize,
-                paletteId: ref.watch(
-                    settingsProvider.select((s) => s['terminalPalette'] as String?)),
+                paletteId: ref.watch(settingsProvider
+                    .select((s) => s['terminalPalette'] as String?)),
                 keymap: TerminalKeymap.fromSettings(ref.watch(
                     settingsProvider.select((s) => s['terminalKeybindings']))),
                 active: isActive,
@@ -1947,7 +2002,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           ),
         ),
         if (tab != null &&
-            (tab.status == tp.TabStatus.reconnecting || tab.status == tp.TabStatus.lost))
+            (tab.status == tp.TabStatus.reconnecting ||
+                tab.status == tp.TabStatus.lost))
           Positioned(
             top: 8,
             right: 8,
@@ -1984,7 +2040,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           ? GestureDetector(
               onVerticalDragEnd: (details) {
                 // 上滑速度超过阈值时展开 AI 面板
-                if (details.primaryVelocity != null && details.primaryVelocity! < -300) {
+                if (details.primaryVelocity != null &&
+                    details.primaryVelocity! < -300) {
                   setState(() => _setAiPanelVisible(tab?.id, true));
                 }
               },
@@ -2003,8 +2060,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         // 设计稿「窄窗口自动上下堆叠」：窗口放不下「80 列终端 + 240px 面板」时，
         // 右侧分栏自动退回底部，否则终端会被硬挤到 80 列以下（vim/htop 先坏）。
         // 只影响本次渲染，不改用户存下来的方位偏好。
-        final tooNarrowForRight = totalW <
-            minTerminalWidthForFontSize(_terminalFontSize) + 240 + 20;
+        final tooNarrowForRight =
+            totalW < minTerminalWidthForFontSize(_terminalFontSize) + 240 + 20;
         final isRight =
             position == _AiPanelPosition.right && !tooNarrowForRight;
         // 非底部态的 SFTP（右列）挂在分栏结果外侧。
@@ -2021,9 +2078,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           final raw = isRight
               ? totalW - (details.globalPosition.dx - origin.dx)
               : totalH - (details.globalPosition.dy - origin.dy);
-          final px = raw
-              .clamp(240.0, extent * _maxPanelRatio)
-              .toDouble();
+          final px = raw.clamp(240.0, extent * _maxPanelRatio).toDouble();
           setState(() {
             if (tab != null) _tabAiPanelWidth[tab.id] = px;
             _defaultAiPanelWidth = px;
@@ -2033,34 +2088,38 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         final tc = ThemeColors.of(context);
         // 手机端不显示拖拽手柄
         final dragHandle = _isMobile
-            ? (isRight ? const SizedBox.shrink() : GestureDetector(
-                // 移动端底部布局：可拖拽调整高度的手柄
-                onPanUpdate: onDrag,
-                onPanEnd: (_) => _savePanelLayout(savePosition: false),
-                child: Container(
-                  height: 20,
-                  width: double.infinity,
-                  color: Colors.transparent,
-                  child: Center(
+            ? (isRight
+                ? const SizedBox.shrink()
+                : GestureDetector(
+                    // 移动端底部布局：可拖拽调整高度的手柄
+                    onPanUpdate: onDrag,
+                    onPanEnd: (_) => _savePanelLayout(savePosition: false),
                     child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: tc.textMuted.withValues(alpha: 0.6),
-                        borderRadius: BorderRadius.circular(2),
+                      height: 20,
+                      width: double.infinity,
+                      color: Colors.transparent,
+                      child: Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: tc.textMuted.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ))
+                  ))
             : GestureDetector(
-              onPanUpdate: onDrag,
-              onPanEnd: (_) => _savePanelLayout(savePosition: false),
-              child: MouseRegion(
-                cursor: isRight ? SystemMouseCursors.resizeColumn : SystemMouseCursors.resizeRow,
-                child: _panelDivider(vertical: isRight, tc: tc),
-              ),
-            );
+                onPanUpdate: onDrag,
+                onPanEnd: (_) => _savePanelLayout(savePosition: false),
+                child: MouseRegion(
+                  cursor: isRight
+                      ? SystemMouseCursors.resizeColumn
+                      : SystemMouseCursors.resizeRow,
+                  child: _panelDivider(vertical: isRight, tc: tc),
+                ),
+              );
 
         // 80 列保护：横向分栏时终端一侧不得被面板挤到 80 列以下。
         // 像素宽度 → 本次容器的比例。默认 320（设计稿固定列宽），
@@ -2118,7 +2177,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               ? GestureDetector(
                   onVerticalDragEnd: (details) {
                     // 下滑速度超过阈值时收起 AI 面板
-                    if (details.primaryVelocity != null && details.primaryVelocity! > 300) {
+                    if (details.primaryVelocity != null &&
+                        details.primaryVelocity! > 300) {
                       setState(() => _setAiPanelVisible(tab?.id, false));
                     }
                   },
@@ -2243,7 +2303,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           ),
         ),
         SizedBox(
-            width: _sftpPanelWidth, child: _buildTabSftpPanel(tab, active: active)),
+            width: _sftpPanelWidth,
+            child: _buildTabSftpPanel(tab, active: active)),
       ],
     );
   }
@@ -2266,7 +2327,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   // ==================== 顶部栏 ====================
   /// 三段式结构：标签区（+ 号紧贴标签）/ 弹性空白 / 右侧操作区
-  Widget _buildTopBar(dynamic host, tp.TerminalState terminalState, tp.TerminalTab? activeTab) {
+  Widget _buildTopBar(
+      dynamic host, tp.TerminalState terminalState, tp.TerminalTab? activeTab) {
     final tc = ThemeColors.of(context);
     return Container(
       // 设计稿 .topbar：42px 高、左右 8px 内边距，控件统一 32px 见方。
@@ -2476,10 +2538,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     // （抽屉标签一键可达，且它们各自的内容已经在菜单下方有更直接的入口），
     // 留着 key 只会变成没人读的死数据。
     final counts = <String, String>{
-      'drawer:${NavDrawer.sectionHosts}': '${HostsDao.cached.length} 台',
-      'drawer:${NavDrawer.sectionAudit}': '今日 $auditToday 条',
+      'drawer:${NavDrawer.sectionHosts}':
+          UiText.count(HostsDao.cached.length, '台', 'hosts'),
+      'drawer:${NavDrawer.sectionAudit}':
+          UiText.t('今日 $auditToday 条', '$auditToday today'),
       // 组数跟着 kSettingsEntries 走：写死「8 组」的话，以后加一组就悄悄错了。
-      'drawer:${NavDrawer.sectionSettings}': '${kSettingsEntries.length} 组',
+      'drawer:${NavDrawer.sectionSettings}':
+          UiText.count(kSettingsEntries.length, '组', 'groups'),
     };
     return PopupMenuButton<String>(
       tooltip: UiText.t('菜单', 'Menu'),
@@ -2547,18 +2612,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         // 只能靠记。菜单省下来的两条高度让「本终端」组进得了首屏。
         _menuGroupLabel(tc, UiText.t('前往', 'Go to')),
         _gridMenuItem('drawer:${NavDrawer.sectionHosts}', Icons.dns_outlined,
-            UiText.t('主机管理', 'Hosts'), trailing: counts['drawer:${NavDrawer.sectionHosts}']),
+            UiText.t('主机管理', 'Hosts'),
+            trailing: counts['drawer:${NavDrawer.sectionHosts}']),
         _gridMenuItem('drawer:${NavDrawer.sectionAudit}', Icons.history_rounded,
-            UiText.t('审计日志', 'Audit log'), trailing: counts['drawer:${NavDrawer.sectionAudit}']),
-        _gridMenuItem('drawer:${NavDrawer.sectionSettings}',
-            Icons.tune_rounded, UiText.t('设置', 'Settings'),
+            UiText.t('审计日志', 'Audit log'),
+            trailing: counts['drawer:${NavDrawer.sectionAudit}']),
+        _gridMenuItem('drawer:${NavDrawer.sectionSettings}', Icons.tune_rounded,
+            UiText.t('设置', 'Settings'),
             trailing: counts['drawer:${NavDrawer.sectionSettings}']),
         _gridMenuItem('page:/change-records', Icons.fact_check_outlined,
             UiText.t('变更台账', 'Change records')),
-        _gridMenuItem(
-            'drawer:${NavDrawer.sectionSettings}:security',
-            Icons.schedule_outlined,
-            UiText.t('安全时段', 'Safe window'),
+        _gridMenuItem('drawer:${NavDrawer.sectionSettings}:security',
+            Icons.schedule_outlined, UiText.t('安全时段', 'Safe window'),
             trailing: ChangeWindowService.config.enabled
                 ? '${ChangeWindowService.config.startHour.toString().padLeft(2, '0')}:00–'
                     '${ChangeWindowService.config.endHour.toString().padLeft(2, '0')}:00'
@@ -2566,7 +2631,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
         const PopupMenuDivider(height: 8),
         _menuGroupLabel(tc, UiText.t('本终端', 'This terminal')),
-        _gridMenuItem('act:reconnect', Icons.refresh_rounded, l10n.terminalReconnect),
+        _gridMenuItem(
+            'act:reconnect', Icons.refresh_rounded, l10n.terminalReconnect),
         // 本地终端既没有可转发的 SSH 通道，点了必然失败，不如不出现
         if (activeTab != null && !activeTab.isLocal)
           _gridMenuItem('act:portforward', Icons.swap_horiz_rounded,
@@ -2601,8 +2667,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     return PopupMenuItem<String>(
       enabled: false,
       height: 26,
-      child: Text(label,
-          style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
+      child:
+          Text(label, style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
     );
   }
 
@@ -2665,7 +2731,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }
 
   /// 单个 Tab 项（连接名称 + 关闭x）— 使用独立 widget 避免 hover 触发整页 rebuild
-  Widget _buildTabItem(tp.TerminalTab tab, bool isActive, tp.TerminalState terminalState) {
+  Widget _buildTabItem(
+      tp.TerminalTab tab, bool isActive, tp.TerminalState terminalState) {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     return TabItemWidget(
@@ -2683,7 +2750,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         // 让该 host 的 executor 变成陈旧引用，导致编排误报"未连接"。
         // 直接拦截，要求用户先等编排完成或取消编排。
         if (agentState.isOrchestratorMode && agentState.isRunning) {
-          showTopSnackBar(context, 
+          showTopSnackBar(
+            context,
             SnackBar(
               content: Text(l10n.orchAgentRunning),
               behavior: SnackBarBehavior.floating,
@@ -2701,8 +2769,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               title: Text(l10n.terminalTaskRunning),
               content: Text(l10n.terminalCloseTabConfirm),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.commonCancel)),
-                TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.close)),
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: Text(l10n.commonCancel)),
+                TextButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: Text(l10n.close)),
               ],
             ),
           );
@@ -2792,9 +2864,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     bool active = false,
   }) {
     final tc = ThemeColors.of(context);
-    final color = active
-        ? tc.brand
-        : (onTap == null ? tc.textMuted : tc.textSub);
+    final color =
+        active ? tc.brand : (onTap == null ? tc.textMuted : tc.textSub);
     return Tooltip(
       message: tooltip,
       waitDuration: const Duration(milliseconds: 500),
@@ -2831,12 +2902,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
     return _buildTopAct(
       icon: visible ? Icons.auto_awesome : Icons.auto_awesome_outlined,
-      tooltip: visible ? l10n.terminalCollapseAIPanel : l10n.terminalExpandAIPanel,
+      tooltip:
+          visible ? l10n.terminalCollapseAIPanel : l10n.terminalExpandAIPanel,
       active: visible,
       onTap: () => setState(() => _setAiPanelVisible(tabId, !visible)),
     );
   }
-
 
   /// SFTP 面板开关按钮。
   ///
@@ -2872,26 +2943,29 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       // 设计稿这一格是纯波形（activity），monitor_heart 带一个外框，
       // 缩到 15px 后和「面板」类图标糊在一起，认不出是监控。
       icon: Icons.show_chart_rounded,
-      tooltip:
-          isOn ? l10n.terminalCollapseMonitorPanel : l10n.terminalExpandMonitorPanel,
+      tooltip: isOn
+          ? l10n.terminalCollapseMonitorPanel
+          : l10n.terminalExpandMonitorPanel,
       active: isOn,
-      onTap: canShow ? () {
-          final tab = ref.read(tp.terminalProvider).activeTab;
-          if (tab == null) return;
-          final next = !_monitorVisibleFor(tab);
-          final hostKey = tab.isLocal ? 'local' : tab.hostId;
-          setState(() {
-            _tabMonitorVisible[tab.id] = next;
-            // 同步 host 默认值，供之后新开的 tab 继承；已有 tab 不受影响
-            if (next) {
-              _monitorDefaultVisibleHosts.add(hostKey);
-            } else {
-              _monitorDefaultVisibleHosts.remove(hostKey);
+      onTap: canShow
+          ? () {
+              final tab = ref.read(tp.terminalProvider).activeTab;
+              if (tab == null) return;
+              final next = !_monitorVisibleFor(tab);
+              final hostKey = tab.isLocal ? 'local' : tab.hostId;
+              setState(() {
+                _tabMonitorVisible[tab.id] = next;
+                // 同步 host 默认值，供之后新开的 tab 继承；已有 tab 不受影响
+                if (next) {
+                  _monitorDefaultVisibleHosts.add(hostKey);
+                } else {
+                  _monitorDefaultVisibleHosts.remove(hostKey);
+                }
+              });
+              SettingsDao.set(
+                  'monitorVisibleHosts', _monitorDefaultVisibleHosts.toList());
             }
-          });
-          SettingsDao.set(
-              'monitorVisibleHosts', _monitorDefaultVisibleHosts.toList());
-        } : null,
+          : null,
     );
   }
 
@@ -2921,7 +2995,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   Widget? _buildConnectionPlaceholder(tp.TerminalTab? tab) {
     if (tab == null) {
       final notice = _placeholderError;
-      return notice != null ? _buildNoticeView(notice) : _buildConnectingView(null);
+      return notice != null
+          ? _buildNoticeView(notice)
+          : _buildConnectingView(null);
     }
     switch (tab.status) {
       case tp.TabStatus.connecting:
@@ -2957,16 +3033,22 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         mainAxisSize: MainAxisSize.min,
         children: [
           SizedBox(
-            width: 24, height: 24,
+            width: 24,
+            height: 24,
             child: CircularProgressIndicator(strokeWidth: 2, color: tc.brand),
           ),
           const SizedBox(height: 12),
-          Text(l10n.terminalConnecting(name), style: TextStyle(color: tc.textSub, fontSize: fBody)),
+          Text(l10n.terminalConnecting(name),
+              style: TextStyle(color: tc.textSub, fontSize: fBody)),
           if (host != null) ...[
             const SizedBox(height: 4),
             Text(
               '${host.username}@${host.host}:${host.port}',
-              style: TextStyle(color: tc.textMuted, fontSize: fMicro, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
+              style: TextStyle(
+                  color: tc.textMuted,
+                  fontSize: fMicro,
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: kMonoFontFallback),
             ),
           ],
         ],
@@ -2988,7 +3070,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.wifi_tethering_error_rounded, size: 40, color: tc.error),
+              Icon(Icons.wifi_tethering_error_rounded,
+                  size: 40, color: tc.error),
               const SizedBox(height: 12),
               Text(
                 '${l10n.connectionFailed} · ${tab.title}',
@@ -3017,30 +3100,39 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: tc.brand,
                       foregroundColor: tc.isLight ? Colors.white : cBg,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(rMedium)),
                     ),
-                    child: Text(l10n.retry, style: const TextStyle(fontSize: fBody)),
+                    child: Text(l10n.retry,
+                        style: const TextStyle(fontSize: fBody)),
                   ),
                   OutlinedButton(
                     onPressed: () => context.push('/host/edit/${tab.hostId}'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: tc.textSub,
                       side: BorderSide(color: tc.border),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(rMedium)),
                     ),
-                    child: Text(l10n.edit, style: const TextStyle(fontSize: fBody)),
+                    child: Text(l10n.edit,
+                        style: const TextStyle(fontSize: fBody)),
                   ),
                   OutlinedButton(
                     onPressed: () => _removeTab(tab),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: tc.textSub,
                       side: BorderSide(color: tc.border),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 10),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(rMedium)),
                     ),
-                    child: Text(l10n.close, style: const TextStyle(fontSize: fBody)),
+                    child: Text(l10n.close,
+                        style: const TextStyle(fontSize: fBody)),
                   ),
                 ],
               ),
@@ -3065,7 +3157,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           children: [
             Icon(Icons.error_outline, size: 40, color: tc.error),
             const SizedBox(height: 12),
-            Text(message, style: TextStyle(color: tc.error, fontSize: fSmall), textAlign: TextAlign.center),
+            Text(message,
+                style: TextStyle(color: tc.error, fontSize: fSmall),
+                textAlign: TextAlign.center),
             const SizedBox(height: 16),
             OutlinedButton(
               onPressed: () {
@@ -3075,10 +3169,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               style: OutlinedButton.styleFrom(
                 foregroundColor: tc.textSub,
                 side: BorderSide(color: tc.border),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(rMedium)),
               ),
-              child: Text(l10n.commonBack, style: const TextStyle(fontSize: fBody)),
+              child: Text(l10n.commonBack,
+                  style: const TextStyle(fontSize: fBody)),
             ),
           ],
         ),
@@ -3105,22 +3202,27 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           children: [
             if (retrying)
               SizedBox(
-                width: 11, height: 11,
-                child: CircularProgressIndicator(strokeWidth: 1.5, color: color),
+                width: 11,
+                height: 11,
+                child:
+                    CircularProgressIndicator(strokeWidth: 1.5, color: color),
               )
             else
               const Icon(Icons.warning_amber_rounded, color: cDanger, size: 12),
             const SizedBox(width: 4),
             Text(
               retrying ? l10n.connecting : l10n.connectionInterrupted,
-              style: TextStyle(color: color, fontSize: fMicro, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                  color: color, fontSize: fMicro, fontWeight: FontWeight.w500),
             ),
             if (!retrying) ...[
               const SizedBox(width: 4),
               Text(
                 l10n.terminalReconnect,
                 style: const TextStyle(
-                  color: cDanger, fontSize: fMicro, fontWeight: FontWeight.w600,
+                  color: cDanger,
+                  fontSize: fMicro,
+                  fontWeight: FontWeight.w600,
                   decoration: TextDecoration.underline,
                 ),
               ),
@@ -3151,11 +3253,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           children: [
             if (isConnecting)
               SizedBox(
-                width: 18, height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2, color: tc.brand),
+                width: 18,
+                height: 18,
+                child:
+                    CircularProgressIndicator(strokeWidth: 2, color: tc.brand),
               )
             else
-              Icon(Icons.wifi_tethering_error_rounded, size: 20, color: tc.error),
+              Icon(Icons.wifi_tethering_error_rounded,
+                  size: 20, color: tc.error),
             const SizedBox(height: 10),
             Text(
               label,
@@ -3167,7 +3272,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             ),
             const SizedBox(height: 4),
             Text(
-              isFailed ? l10n.connectionFailedHint : l10n.terminalInputHintDisconnected,
+              isFailed
+                  ? l10n.connectionFailedHint
+                  : l10n.terminalInputHintDisconnected,
               style: TextStyle(color: tc.textMuted, fontSize: fMicro),
               textAlign: TextAlign.center,
             ),
@@ -3178,7 +3285,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }
 
   // ==================== AI 面板 ====================
-  Widget _buildAIPanel(String? chatError, AgentState agentState, tp.TerminalTab? tab) {
+  Widget _buildAIPanel(
+      String? chatError, AgentState agentState, tp.TerminalTab? tab) {
     final tc = ThemeColors.of(context);
 
     return Container(
@@ -3188,8 +3296,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       child: Column(
         children: [
           // 会话压缩中横幅
-          if (agentState.isCompacting)
-            _buildCompactingBanner(tc),
+          if (agentState.isCompacting) _buildCompactingBanner(tc),
           // 面板头（设计稿 .ai-head）：星形 + 标题 + 模型胶囊。
           // 位置切换钮仍留在分隔条上，这里只做身份标识。
           _buildAiPanelHead(),
@@ -3215,10 +3322,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                           borderRadius: BorderRadius.circular(rFull),
                           border: Border.all(color: tc.border),
                           boxShadow: [
-                            BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 6),
+                            BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.3),
+                                blurRadius: 6),
                           ],
                         ),
-                        child: Icon(Icons.keyboard_arrow_down, size: 18, color: tc.textSub),
+                        child: Icon(Icons.keyboard_arrow_down,
+                            size: 18, color: tc.textSub),
                       ),
                     ),
                   ),
@@ -3233,7 +3343,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     );
   }
 
-  /// 面板头（设计稿 .ai-head）：品牌星 + 「AI 助手」+ 当前模型胶囊。
+  /// 面板头（设计稿 .ai-head）：狐狸头像 + 「AI 助手」+ 当前模型胶囊。
   Widget _buildAiPanelHead() {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
@@ -3244,35 +3354,58 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         border: Border(bottom: BorderSide(color: tc.hairline)),
       ),
       child: Row(
+        // 用 spaceBetween 而不是 Spacer()：Spacer 是 flex 1 的占位，会和下面
+        // 那个 Flexible 平分剩余空间，宽面板里按钮就只能停在四分之三处。
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(Icons.auto_awesome, size: 14, color: tc.brand),
-          const SizedBox(width: 7),
-          Text(
-            l10n.commonAIAssistant,
-            style: TextStyle(
-                fontSize: fSmall, color: tc.textMain, fontWeight: FontWeight.w500),
-          ),
-          if (modelName != null && MediaQuery.of(context).size.width > 560) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-              constraints: const BoxConstraints(maxWidth: 180),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(rFull),
-                border: Border.all(color: tc.border),
-              ),
-              child: Text(
-                modelName,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: fMicro, color: tc.textSub),
-              ),
+          // 标题 + 模型胶囊整组包一层 Flexible：宽面板里它按自然宽度排布，
+          // 按钮照旧贴右边缘；面板拖窄时整组被压缩，组内标题再走省略号。原来
+          // 这一行没有任何可收缩的一层，长模型名会把「切换方位 / 收起」两个按钮
+          // 直接挤出可视区 —— RenderFlex overflow，收起按钮点不到。
+          // 三种写法已用 test/flex_zero_overflow_probe_test.dart 实测比较过。
+          Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const AiFoxAvatar(size: 16, showScarf: false),
+                const SizedBox(width: 7),
+                Flexible(
+                  child: Text(
+                    l10n.commonAIAssistant,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: TextStyle(
+                        fontSize: fSmall,
+                        color: tc.textMain,
+                        fontWeight: FontWeight.w500),
+                  ),
+                ),
+                if (modelName != null &&
+                    MediaQuery.of(context).size.width > 560) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 1),
+                      constraints: const BoxConstraints(maxWidth: 180),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(rFull),
+                        border: Border.all(color: tc.border),
+                      ),
+                      child: Text(
+                        modelName,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        style: TextStyle(fontSize: fMicro, color: tc.textSub),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ],
-          if (!_isMobile) ...[
-            const Spacer(),
-            _buildAiHeadControls(
-                ref.read(tp.terminalProvider).activeTab?.id),
-          ],
+          ),
+          if (!_isMobile)
+            _buildAiHeadControls(ref.read(tp.terminalProvider).activeTab?.id),
         ],
       ),
     );
@@ -3313,8 +3446,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        act(icon, UiText.t('切换面板位置（右 / 下）',
-            'Move panel (right / bottom)'),
+        act(icon, UiText.t('切换面板位置（右 / 下）', 'Move panel (right / bottom)'),
             _cycleAiPanelPosition),
         act(Icons.close_rounded, l10n.terminalCollapseAIPanel,
             () => setState(() => _setAiPanelVisible(tabId, false))),
@@ -3472,43 +3604,54 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 和设计稿面板内的小字号层级一致。
   Widget _buildAiEmptyState() {
     final tc = ThemeColors.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: tc.brandBg,
-                borderRadius: BorderRadius.circular(rMedium),
-                border: Border.all(color: tc.border),
-              ),
-              child: Icon(Icons.auto_awesome, size: 19, color: tc.brand),
+    Widget content = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: tc.brandBg,
+              borderRadius: BorderRadius.circular(rMedium),
+              border: Border.all(color: tc.border),
             ),
-            const SizedBox(height: 12),
-            Text(
-              UiText.t('让 Agent 在这台主机上干活',
-                  'Let the agent work on this host'),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: fSmall,
-                  color: tc.textBody,
-                  fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 5),
-            Text(
-              UiText.t('描述需求，步骤自动执行；危险命令会先征求同意',
-                  'Describe the task — steps run on their own, risky commands ask first'),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                  fontSize: fMicro, color: tc.textMuted, height: 1.5),
-            ),
-          ],
-        ),
+            child: const AiFoxAvatar(size: 22),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            UiText.t('让 Agent 在这台主机上干活', 'Let the agent work on this host'),
+            textAlign: TextAlign.center,
+            style: TextStyle(
+                fontSize: fSmall,
+                color: tc.textBody,
+                fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            UiText.t('描述需求，步骤自动执行；危险命令会先征求同意',
+                'Describe the task — steps run on their own, risky commands ask first'),
+            textAlign: TextAlign.center,
+            style:
+                TextStyle(fontSize: fMicro, color: tc.textMuted, height: 1.5),
+          ),
+        ],
       ),
+    );
+    // 上下分屏时这一屏能只有 80 多像素高：Center + 固定高度内容会直接顶出
+    // 「BOTTOM OVERFLOWED BY 26 PIXELS」。改成高度够就居中、不够就滚动。
+    return LayoutBuilder(
+      builder: (context, c) {
+        final max = c.maxHeight;
+        if (!max.isFinite) return Center(child: content);
+        return SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: max),
+            child: Center(child: content),
+          ),
+        );
+      },
     );
   }
 
@@ -3564,24 +3707,27 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                     ThemeColors.of(context),
                   ),
                 _buildMessageBubble(
-              role: item.role,
-              content: item.content,
-              events: item.events,
-              streamingContent: item.streamingContent,
-              turnGoal: turnGoal,
-              isLoading: item.isStreaming && isLast && agentState.isRunning,
-              // 原生推理只在跑动中展示；任务结束就收起，不占历史空间
-              liveReasoning:
-                  isLast && agentState.isRunning ? agentState.liveReasoning : '',
-              tab: tab,
-              showAutoExecute: true,
-              isAgentRunning: agentState.isRunning,
-              // 只有最后一条消息可能是"当前等待的询问"；历史消息里的旧询问不能
-              // 跟着变成可点，否则用户会误答一个早已结束的问题。
-              isWaitingChoice: agentState.isWaitingChoice && isLast,
-              pendingOptions:
-                  agentState.isWaitingChoice && isLast ? agentState.pendingOptions : const [],
-              enginePendingConfirm: isLast ? agentState.pendingConfirmCommand : null,
+                  role: item.role,
+                  content: item.content,
+                  events: item.events,
+                  streamingContent: item.streamingContent,
+                  turnGoal: turnGoal,
+                  isLoading: item.isStreaming && isLast && agentState.isRunning,
+                  // 原生推理只在跑动中展示；任务结束就收起，不占历史空间
+                  liveReasoning: isLast && agentState.isRunning
+                      ? agentState.liveReasoning
+                      : '',
+                  tab: tab,
+                  showAutoExecute: true,
+                  isAgentRunning: agentState.isRunning,
+                  // 只有最后一条消息可能是"当前等待的询问"；历史消息里的旧询问不能
+                  // 跟着变成可点，否则用户会误答一个早已结束的问题。
+                  isWaitingChoice: agentState.isWaitingChoice && isLast,
+                  pendingOptions: agentState.isWaitingChoice && isLast
+                      ? agentState.pendingOptions
+                      : const [],
+                  enginePendingConfirm:
+                      isLast ? agentState.pendingConfirmCommand : null,
                   // 历史回合只在"最近一轮"里保留展开态；旧回合收起过程与清单
                   isLastTurn: isLast,
                 ),
@@ -3750,7 +3896,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 ),
                 if (isLoading) ...[
                   const SizedBox(width: 6),
-                  SizedBox(width: 9, height: 9, child: CircularProgressIndicator(strokeWidth: 1.5, color: tc.brand)),
+                  SizedBox(
+                      width: 9,
+                      height: 9,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 1.5, color: tc.brand)),
                 ],
               ],
             ),
@@ -3769,7 +3919,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 ),
               )
             else ...[
-              _buildAIContent(content, tc, tab, showAutoExecute, isLoading, isAgentRunning, isWaitingChoice, pendingOptions: pendingOptions, events: events, streamingContent: streamingContent, liveReasoning: liveReasoning, turnGoal: turnGoal, enginePendingConfirm: enginePendingConfirm, isLastTurn: isLastTurn),
+              _buildAIContent(content, tc, tab, showAutoExecute, isLoading,
+                  isAgentRunning, isWaitingChoice,
+                  pendingOptions: pendingOptions,
+                  events: events,
+                  streamingContent: streamingContent,
+                  liveReasoning: liveReasoning,
+                  turnGoal: turnGoal,
+                  enginePendingConfirm: enginePendingConfirm,
+                  isLastTurn: isLastTurn),
               // 整段复制固定在回答左下角：Markdown 段落、命令卡、输出卡都是独立
               // Text，拖选跨不过去，整段复制只能靠这一个按钮。放在左边缘是因为
               // 右对齐会飘到滚动条旁边，且和结论卡的右端对齐线打架。
@@ -3846,7 +4004,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final isLocalRestore =
         change.localRestore || (cached?.isLocalFileRestore ?? false);
     if (!isLocalRestore && rollbackCommand.isEmpty) {
-      _showOperationMessage('该变更没有可执行的回滚命令', isError: true);
+      _showOperationMessage(
+          UiText.t(
+              '该变更没有可执行的回滚命令', 'This change has no rollback command to run'),
+          isError: true);
       return;
     }
 
@@ -3862,7 +4023,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       }
       if (targetTab == null) {
         _showOperationMessage(
-          '主机 ${targetHost == 'local' ? '本地' : targetHost} 未连接，无法执行回滚',
+          UiText.t('主机 ${targetHost == 'local' ? '本地' : targetHost} 未连接，无法执行回滚',
+              'Host ${targetHost == 'local' ? 'local' : targetHost} is not connected; rollback cannot run'),
           isError: true,
         );
         return;
@@ -3870,22 +4032,27 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     }
 
     final tc = ThemeColors.of(context);
-    final hostLabel = targetHost == 'local' ? '本地' : targetHost;
+    // targetHost 是 hostId，只有 'local' 这个哨兵值需要翻译；直接翻整串会把
+    // IP 也吞进译文。
+    final hostLabel =
+        targetHost == 'local' ? UiText.t('本地', 'Local') : targetHost;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: tc.cardElevated,
-        title: const Text('确认回滚'),
+        title: Text(UiText.t('确认回滚', 'Confirm rollback')),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('主机：$hostLabel',
+              Text(UiText.t('主机：$hostLabel', 'Host: $hostLabel'),
                   style: TextStyle(color: tc.textMain, fontSize: fSmall)),
               const SizedBox(height: 8),
               Text(
-                isLocalRestore ? '将把本机文件还原到：' : '将执行回滚命令：',
+                isLocalRestore
+                    ? UiText.t('将把本机文件还原到：', 'Will restore the local file to:')
+                    : UiText.t('将执行回滚命令：', 'Will run the rollback command:'),
                 style: TextStyle(color: tc.textSub, fontSize: fMicro),
               ),
               const SizedBox(height: 4),
@@ -3900,7 +4067,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 child: SelectableText(
                   isLocalRestore ? change.command : rollbackCommand,
                   style: TextStyle(
-                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: kMonoFontFallback,
                     fontSize: fMono,
                     color: tc.warn,
                   ),
@@ -3909,8 +4077,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               const SizedBox(height: 8),
               Text(
                 isLocalRestore
-                    ? '还原会把备份/回收区中的副本放回本机原路径，并写入审计记录。'
-                    : '回滚会修改服务器状态，并写入审计记录。',
+                    ? UiText.t('还原会把备份/回收区中的副本放回本机原路径，并写入审计记录。',
+                        'Restore puts the backup/trash copy back at its original local path and writes an audit record.')
+                    : UiText.t('回滚会修改服务器状态，并写入审计记录。',
+                        'Rollback changes server state and writes an audit record.'),
                 style: TextStyle(color: tc.textMuted, fontSize: fMicro),
               ),
             ],
@@ -3919,11 +4089,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
+            child: Text(UiText.t('取消', 'Cancel')),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text('确认回滚', style: TextStyle(color: tc.ok)),
+            child: Text(UiText.t('确认回滚', 'Confirm rollback'),
+                style: TextStyle(color: tc.ok)),
           ),
         ],
       ),
@@ -3934,11 +4105,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     try {
       CommandExecutor? executor;
       if (!isLocalRestore) {
-        executor = targetTab!.isLocal
-            ? targetTab.localService
-            : targetTab.service;
+        executor =
+            targetTab!.isLocal ? targetTab.localService : targetTab.service;
         if (executor == null || !executor.isConnected) {
-          _showOperationMessage('主机连接已断开，回滚未执行', isError: true);
+          _showOperationMessage(
+              UiText.t('主机连接已断开，回滚未执行', 'Host disconnected, rollback not run'),
+              isError: true);
           return;
         }
       }
@@ -3960,19 +4132,28 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           await ChangeRecordService.executeRollback(record, executor);
       if (!mounted) return;
       if (result == null) {
-        _showOperationMessage('回滚未执行：主机未连接或没有回滚命令', isError: true);
+        _showOperationMessage(
+            UiText.t('回滚未执行：主机未连接或没有回滚命令',
+                'Rollback not run: host not connected or no rollback command'),
+            isError: true);
       } else if (result.success) {
         setState(() => _rolledBackChangeIds.add(change.id));
-        _showOperationMessage(
-            '回滚成功：${isLocalRestore ? result.stdout : rollbackCommand}');
+        _showOperationMessage(UiText.t(
+            '回滚成功：${isLocalRestore ? result.stdout : rollbackCommand}',
+            'Rollback succeeded: ${isLocalRestore ? result.stdout : rollbackCommand}'));
       } else {
         final reason = result.stderr.trim().isNotEmpty
             ? result.stderr.trim()
-            : '退出码 ${result.exitCode}';
-        _showOperationMessage('回滚失败：$reason', isError: true);
+            : UiText.t(
+                '退出码 ${result.exitCode}', 'exit code ${result.exitCode}');
+        _showOperationMessage(
+            UiText.t('回滚失败：$reason', 'Rollback failed: $reason'),
+            isError: true);
       }
     } catch (e) {
-      if (mounted) _showOperationMessage('回滚异常：$e', isError: true);
+      if (mounted)
+        _showOperationMessage(UiText.t('回滚异常：$e', 'Rollback error: $e'),
+            isError: true);
     } finally {
       if (mounted) setState(() => _rollbackBusy = false);
     }
@@ -3980,26 +4161,33 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   /// 断线失败一键重连当前主机
   Future<void> _reconnectHost(AgentEvent event) async {
-    final targetHost =
-        (event.hostId != null && event.hostId!.trim().isNotEmpty)
-            ? event.hostId!.trim()
-            : 'local';
+    final targetHost = (event.hostId != null && event.hostId!.trim().isNotEmpty)
+        ? event.hostId!.trim()
+        : 'local';
     final activeTab = ref.read(tp.terminalProvider).activeTab;
     if (activeTab == null || activeTab.hostId != targetHost) {
-      _showOperationMessage('请先切换到该主机再重连', isError: true);
+      _showOperationMessage(
+          UiText.t('请先切换到该主机再重连', 'Switch to that host before reconnecting'),
+          isError: true);
       return;
     }
     if (activeTab.isLocal) {
-      _showOperationMessage('本地终端不需要重连，请检查终端进程', isError: true);
+      _showOperationMessage(
+          UiText.t('本地终端不需要重连，请检查终端进程',
+              'The local terminal does not reconnect; check the terminal process'),
+          isError: true);
       return;
     }
     final config = HostsDao.getCachedById(targetHost);
     if (config == null) {
-      _showOperationMessage('找不到主机配置，无法重连', isError: true);
+      _showOperationMessage(
+          UiText.t('找不到主机配置，无法重连', 'Host config missing, cannot reconnect'),
+          isError: true);
       return;
     }
 
-    _showOperationMessage('正在重连 ${activeTab.title} ...');
+    _showOperationMessage(UiText.t(
+        '正在重连 ${activeTab.title} ...', 'Reconnecting ${activeTab.title} ...'));
     if (mounted) {
       setState(() => _reconnectingHostLabel = activeTab.title);
     }
@@ -4009,16 +4197,21 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           .reconnect(activeTab.id, config);
       if (!mounted) return;
       if (tab == null || !tab.isConnected) {
-        _showOperationMessage('重连失败，请检查网络或密码', isError: true);
+        _showOperationMessage(
+            UiText.t('重连失败，请检查网络或密码',
+                'Reconnect failed — check the network or password'),
+            isError: true);
         return;
       }
       final executor = tab.isLocal ? tab.localService : tab.service;
       ref
           .read(agentProvider.notifier)
           .setExecutor(executor, hostId: tab.hostId, tabId: tab.id);
-      _showOperationMessage('重连成功');
+      _showOperationMessage(UiText.t('重连成功', 'Reconnected'));
     } catch (e) {
-      if (mounted) _showOperationMessage('重连异常：$e', isError: true);
+      if (mounted)
+        _showOperationMessage(UiText.t('重连异常：$e', 'Reconnect error: $e'),
+            isError: true);
     } finally {
       if (mounted) {
         setState(() => _reconnectingHostLabel = null);
@@ -4061,7 +4254,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     String? hostId,
   }) async {
     if (ref.read(agentProvider).isRunning) {
-      _showOperationMessage('Agent 正在执行，请稍后再试', isError: true);
+      _showOperationMessage(
+          UiText.t(
+              'Agent 正在执行，请稍后再试', 'The agent is running — try again shortly'),
+          isError: true);
       return;
     }
     if (!_checkAIModelConfigured()) {
@@ -4070,19 +4266,26 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     }
     final activeTab = ref.read(tp.terminalProvider).activeTab;
     if (activeTab == null) {
-      _showOperationMessage('请先连接主机再继续任务', isError: true);
+      _showOperationMessage(
+          UiText.t('请先连接主机再继续任务', 'Connect to the host before continuing'),
+          isError: true);
       return;
     }
-    final targetHost =
-        (hostId != null && hostId.trim().isNotEmpty) ? hostId.trim() : activeTab.hostId;
+    final targetHost = (hostId != null && hostId.trim().isNotEmpty)
+        ? hostId.trim()
+        : activeTab.hostId;
     if (activeTab.hostId != targetHost) {
-      _showOperationMessage('请先切换到该主机再继续任务', isError: true);
+      _showOperationMessage(
+          UiText.t('请先切换到该主机再继续任务', 'Switch to that host before continuing'),
+          isError: true);
       return;
     }
     final executor =
         activeTab.isLocal ? activeTab.localService : activeTab.service;
     if (!activeTab.isConnected || executor == null || !executor.isConnected) {
-      _showOperationMessage('请先连接主机再继续任务', isError: true);
+      _showOperationMessage(
+          UiText.t('请先连接主机再继续任务', 'Connect to the host before continuing'),
+          isError: true);
       return;
     }
 
@@ -4124,7 +4327,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         .toList();
     if (hosts.isEmpty) return;
     if (ref.read(agentProvider).isRunning) {
-      _showOperationMessage('Agent 正在执行，请稍后再试', isError: true);
+      _showOperationMessage(
+          UiText.t(
+              'Agent 正在执行，请稍后再试', 'The agent is running — try again shortly'),
+          isError: true);
       return;
     }
     if (!_checkAIModelConfigured()) {
@@ -4133,8 +4339,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     }
 
     final activeTab = ref.read(tp.terminalProvider).activeTab;
-    final executor =
-        activeTab?.isLocal == true ? activeTab?.localService : activeTab?.service;
+    final executor = activeTab?.isLocal == true
+        ? activeTab?.localService
+        : activeTab?.service;
     if (activeTab == null ||
         !activeTab.isConnected ||
         executor == null ||
@@ -4158,7 +4365,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final command = (event.command ?? '').trim();
     if (command.isEmpty) return;
     if (ref.read(agentProvider).isRunning) {
-      _showOperationMessage('Agent 正在执行，请稍后再试', isError: true);
+      _showOperationMessage(
+          UiText.t(
+              'Agent 正在执行，请稍后再试', 'The agent is running — try again shortly'),
+          isError: true);
       return;
     }
     if (!_checkAIModelConfigured()) {
@@ -4166,22 +4376,25 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       return;
     }
 
-    final targetHost =
-        (event.hostId != null && event.hostId!.trim().isNotEmpty)
-            ? event.hostId!.trim()
-            : 'local';
+    final targetHost = (event.hostId != null && event.hostId!.trim().isNotEmpty)
+        ? event.hostId!.trim()
+        : 'local';
     final activeTab = ref.read(tp.terminalProvider).activeTab;
     if (activeTab == null ||
         activeTab.hostId != targetHost ||
         !activeTab.isConnected) {
-      _showOperationMessage('请先切换/重连到该主机再重试', isError: true);
+      _showOperationMessage(
+          UiText.t(
+              '请先切换/重连到该主机再重试', 'Switch to or reconnect that host, then retry'),
+          isError: true);
       return;
     }
-    final executor = activeTab.isLocal
-        ? activeTab.localService
-        : activeTab.service;
+    final executor =
+        activeTab.isLocal ? activeTab.localService : activeTab.service;
     if (executor == null || !executor.isConnected) {
-      _showOperationMessage('主机连接已断开，请先重连', isError: true);
+      _showOperationMessage(
+          UiText.t('主机连接已断开，请先重连', 'Host disconnected — reconnect first'),
+          isError: true);
       return;
     }
 
@@ -4199,13 +4412,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   void _showOperationMessage(String message, {bool isError = false}) {
     if (!mounted) return;
     clearTopToast();
-    showTopSnackBar(context, SnackBar(
-      content: Text(message, style: const TextStyle(fontSize: fSmall)),
-      duration: Duration(seconds: isError ? 4 : 2),
-      behavior: SnackBarBehavior.floating,
-      margin: const EdgeInsets.all(16),
-      backgroundColor: isError ? cDanger.withValues(alpha: 0.95) : null,
-    ));
+    showTopSnackBar(
+        context,
+        SnackBar(
+          content: Text(message, style: const TextStyle(fontSize: fSmall)),
+          duration: Duration(seconds: isError ? 4 : 2),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          backgroundColor: isError ? cDanger.withValues(alpha: 0.95) : null,
+        ));
   }
 
   /// AI 回复内容渲染：优先用结构化事件列表渲染卡片，fallback 到旧的纯文本/ReAct 解析
@@ -4280,8 +4495,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
     // 优先使用结构化事件渲染（ReAct 格式已由 ReActStreamParser 正确解析）
     if (events.isNotEmpty) {
-      Widget buildEventContent(List<AgentEvent> source) =>
-          AgentEventContent(
+      Widget buildEventContent(List<AgentEvent> source) => AgentEventContent(
             events: source,
             tc: tc,
             tab: tab,
@@ -4304,7 +4518,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               } else {
                 // 手动播放流程：直接在终端执行
                 final activeTab = ref.read(tp.terminalProvider).activeTab;
-                if (activeTab != null) _executeLineDirectly(command, true, activeTab);
+                if (activeTab != null)
+                  _executeLineDirectly(command, true, activeTab);
               }
             },
             onRejectCommand: () {
@@ -4336,10 +4551,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         // 是整条回答最明显的重复。
         final body = (report.answerBody ?? '').trim();
         final conclusion = report.conclusion.trim();
-        final answerText =
-            body.isNotEmpty && !_sameAnswerText(body, conclusion)
-                ? body
-                : conclusion;
+        final answerText = body.isNotEmpty && !_sameAnswerText(body, conclusion)
+            ? body
+            : conclusion;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -4430,9 +4644,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           // 没有 AI 内容事件时（流式早期或纯文本兜底）仍然按原逻辑显示
           if (!hasAIContentEvents && !isLoading)
             _answerCard(
-              streamingContent.trim().isNotEmpty
-                  ? streamingContent
-                  : content,
+              streamingContent.trim().isNotEmpty ? streamingContent : content,
               tc,
             ),
           // 执行清单固定在这条回答的最底部；运行中则由贴底清单承担，
@@ -4460,12 +4672,20 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         ...segments.map((seg) {
           if (seg.isCodeBlock) {
             final lang = seg.language;
-            final isShell = lang == 'bash' || lang == 'sh' || lang == 'shell' || lang == 'zsh';
+            final isShell = lang == 'bash' ||
+                lang == 'sh' ||
+                lang == 'shell' ||
+                lang == 'zsh';
             if (isShell) {
               return buildCodeBlockWithExecuteButton(
-                seg.content, tc, tab, showAutoExecute, isLoading,
-                executingCommand:
-                tab == null ? _executingCommand : _tabExecutingCommand[tab.id],
+                seg.content,
+                tc,
+                tab,
+                showAutoExecute,
+                isLoading,
+                executingCommand: tab == null
+                    ? _executingCommand
+                    : _tabExecutingCommand[tab.id],
                 pendingConfirmCommand: effectivePendingConfirm,
                 onExecute: _executeLineDirectly,
                 onConfirm: (command) {
@@ -4473,7 +4693,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                     ref.read(agentProvider.notifier).confirmCommand();
                   } else {
                     final activeTab = ref.read(tp.terminalProvider).activeTab;
-                    if (activeTab != null) _executeLineDirectly(command, true, activeTab);
+                    if (activeTab != null)
+                      _executeLineDirectly(command, true, activeTab);
                   }
                 },
                 onReject: () {
@@ -4493,11 +4714,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           }
         }),
         if (isWaitingChoice && pendingOptions.isNotEmpty)
-          buildOptionButtons(pendingOptions, tc, false, onSelectChoice: _onOptionSelected),
+          buildOptionButtons(pendingOptions, tc, false,
+              onSelectChoice: _onOptionSelected),
       ],
     );
   }
-
 
   /// 回答正文的容器：与命令行 / 结果卡同一套（见 [agentAnswerCard]）
   Widget _answerCard(String text, ThemeColors tc) =>
@@ -4546,11 +4767,21 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   fontSize: fAgentBody,
                   fontWeight: FontWeight.w500,
                 ),
-                h1: TextStyle(color: theme.textMain, fontSize: 16, fontWeight: FontWeight.bold),
-                h2: TextStyle(color: theme.textMain, fontSize: 14, fontWeight: FontWeight.bold),
-                h3: TextStyle(color: theme.textMain, fontSize: fBody, fontWeight: FontWeight.w600),
+                h1: TextStyle(
+                    color: theme.textMain,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold),
+                h2: TextStyle(
+                    color: theme.textMain,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold),
+                h3: TextStyle(
+                    color: theme.textMain,
+                    fontSize: fBody,
+                    fontWeight: FontWeight.w600),
                 code: TextStyle(
-                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: kMonoFontFallback,
                   fontSize: fMono,
                   fontWeight: FontWeight.w500,
                   color: theme.brand,
@@ -4562,7 +4793,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   fontWeight: FontWeight.w500,
                 ),
                 blockquoteDecoration: BoxDecoration(
-                  border: Border(left: BorderSide(color: theme.brand, width: 2)),
+                  border:
+                      Border(left: BorderSide(color: theme.brand, width: 2)),
                 ),
                 blockquotePadding: const EdgeInsets.only(left: 8),
                 // AI 常用 `---` 分隔章节，默认是 5px 粗灰线，过于抢眼；改成细线
@@ -4681,7 +4913,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       // 代码块内容和语言标识
       final lang = match.group(1) ?? '';
       final code = match.group(2) ?? '';
-      segments.add(_ContentSegment(code, true, language: lang.isEmpty ? null : lang.toLowerCase()));
+      segments.add(_ContentSegment(code, true,
+          language: lang.isEmpty ? null : lang.toLowerCase()));
       lastEnd = match.end;
     }
     // 剩余文本
@@ -4720,6 +4953,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     void disposeController() {
       WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
     }
+
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
@@ -4735,8 +4969,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(message,
-                    style:
-                        TextStyle(color: tc.textSub, fontSize: fSmall, height: 1.5)),
+                    style: TextStyle(
+                        color: tc.textSub, fontSize: fSmall, height: 1.5)),
                 const SizedBox(height: pCompact),
                 TextField(
                   controller: controller,
@@ -4745,7 +4979,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   style: TextStyle(color: tc.textMain, fontSize: fBody),
                   decoration: InputDecoration(
                     isDense: true,
-                    labelText: '密码',
+                    labelText: UiText.t('密码', 'Password'),
                     labelStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
                     filled: true,
                     fillColor: tc.card,
@@ -4764,7 +4998,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                           obscure ? Icons.visibility_off : Icons.visibility,
                           size: 16,
                           color: tc.textSub),
-                      tooltip: obscure ? '显示' : '隐藏',
+                      tooltip: obscure
+                          ? UiText.t('显示', 'Show')
+                          : UiText.t('隐藏', 'Hide'),
                       onPressed: () => setDialogState(() => obscure = !obscure),
                     ),
                   ),
@@ -4775,12 +5011,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(),
-                child: Text('取消',
+                child: Text(UiText.t('取消', 'Cancel'),
                     style: TextStyle(color: tc.textSub, fontSize: fSmall)),
               ),
               FilledButton(
                 onPressed: () => Navigator.of(ctx).pop(controller.text),
-                child: const Text('确定', style: TextStyle(fontSize: fSmall)),
+                child: Text(UiText.t('确定', 'OK'),
+                    style: const TextStyle(fontSize: fSmall)),
               ),
             ],
           ),
@@ -4806,6 +5043,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     void disposeController() {
       WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
     }
+
     return showDialog<String>(
       context: context,
       barrierDismissible: false,
@@ -4818,8 +5056,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(prompt,
-                style:
-                    TextStyle(color: tc.textSub, fontSize: fSmall, height: 1.5)),
+                style: TextStyle(
+                    color: tc.textSub, fontSize: fSmall, height: 1.5)),
             const SizedBox(height: pCompact),
             TextField(
               controller: controller,
@@ -4827,8 +5065,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               style: TextStyle(color: tc.textMain, fontSize: fBody),
               decoration: InputDecoration(
                 isDense: true,
-                labelText: UiText.t('输入（留空 = 直接回车）',
-                    'Input (empty = press Enter)'),
+                labelText:
+                    UiText.t('输入（留空 = 直接回车）', 'Input (empty = press Enter)'),
                 labelStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
                 filled: true,
                 fillColor: tc.card,
@@ -4887,8 +5125,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     showTopSnackBar(
       context,
       SnackBar(
-        content:
-            Text(ui.localExecAuthorized(path), style: const TextStyle(fontSize: fSmall)),
+        content: Text(ui.localExecAuthorized(path),
+            style: const TextStyle(fontSize: fSmall)),
         duration: const Duration(seconds: 2),
       ),
     );
@@ -4896,7 +5134,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }
 
   /// 直接执行命令行
-  Future<void> _executeLineDirectly(String command, bool dangerous, tp.TerminalTab tab) async {
+  Future<void> _executeLineDirectly(
+      String command, bool dangerous, tp.TerminalTab tab) async {
     // 危险命令：首次点击展开内联确认按钮，第二次点击确认才执行
     if (dangerous && _pendingConfirmCommand != command) {
       setState(() => _pendingConfirmCommand = command);
@@ -4959,10 +5198,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }
 
   void _showGoalHint(String message) {
-    showTopSnackBar(context, SnackBar(
-      content: Text(message, style: const TextStyle(fontSize: 13)),
-      duration: const Duration(seconds: 3),
-    ));
+    showTopSnackBar(
+        context,
+        SnackBar(
+          content: Text(message, style: const TextStyle(fontSize: 13)),
+          duration: const Duration(seconds: 3),
+        ));
   }
 
   /// 切换执行权限档位；全自动先弹一次范围警告。
@@ -5064,7 +5305,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final choices =
         AIModelSelectionService.allChoices(ref.read(aiEndpointsProvider));
     if (choices.isEmpty) {
-      _showGoalHint('还没有配置模型，请到 设置 → AI 模型 添加');
+      _showGoalHint(UiText.t('还没有配置模型，请到 设置 → AI 模型 添加',
+          'No model configured yet — add one in Settings → AI models'));
       return true;
     }
     String labelOf(AIModelChoice c) {
@@ -5079,8 +5321,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final labels = {for (final c in choices) c.modelId: labelOf(c)};
     final wanted = (rest ?? '').trim().toLowerCase();
     if (wanted.isEmpty) {
-      final currentLabel =
-          labels[_currentModelConfig?.id] ?? _currentModelConfig?.name ?? '未选择';
+      final currentLabel = labels[_currentModelConfig?.id] ??
+          _currentModelConfig?.name ??
+          UiText.t('未选择', 'none');
       final tier = _currentModelConfig?.reasoningLabel;
       _showGoalHint('当前：$currentLabel${tier == null ? '' : ' $tier'}\n'
           '可选：${labels.values.join('、')}\n用法：/model <名称>');
@@ -5092,12 +5335,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       return true;
     }
     if (candidates.length > 1) {
-      _showGoalHint('「$rest」匹配到多个模型：${candidates.join('、')}\n请用完整名称');
+      _showGoalHint(UiText.t('「$rest」匹配到多个模型：${candidates.join('、')}\n请用完整名称',
+          '"$rest" matched several models: ${candidates.join(", ")}\nUse the full name'));
       return true;
     }
-    final target = choices.firstWhere((c) => labels[c.modelId] == candidates.first);
+    final target =
+        choices.firstWhere((c) => labels[c.modelId] == candidates.first);
     _applyModelChoice(target);
-    _showGoalHint('已切换到模型：${labels[target.modelId]}');
+    _showGoalHint(UiText.t('已切换到模型：${labels[target.modelId]}',
+        'Model switched to ${labels[target.modelId]}'));
     return true;
   }
 
@@ -5107,7 +5353,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   bool _exportConversation() {
     final text = formatConversationForExport(ref.read(agentProvider).chatItems);
     if (text.isEmpty) {
-      _showGoalHint('当前会话还没有可导出的内容');
+      _showGoalHint(
+          UiText.t('当前会话还没有可导出的内容', 'Nothing to export from this session'));
       return true;
     }
     Clipboard.setData(ClipboardData(text: text));
@@ -5115,11 +5362,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     AgentTracer.instance.tracePath().then((path) {
       if (!mounted) return;
       _showGoalHint(path == null
-          ? '会话已复制到剪贴板（$chars 字）'
-          : '会话已复制到剪贴板（$chars 字）\n执行日志：$path');
+          ? UiText.t('会话已复制到剪贴板（$chars 字）',
+              'Session copied to clipboard ($chars chars)')
+          : UiText.t('会话已复制到剪贴板（$chars 字）\n执行日志：$path',
+              'Session copied to clipboard ($chars chars)\nLog: $path'));
     }).catchError((Object e) {
       if (!mounted) return;
-      _showGoalHint('会话已复制到剪贴板（$chars 字）\n日志路径读取失败：$e');
+      _showGoalHint(UiText.t('会话已复制到剪贴板（$chars 字）\n日志路径读取失败：$e',
+          'Session copied to clipboard ($chars chars)\nLog path unavailable: $e'));
     });
     return true;
   }
@@ -5178,12 +5428,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       _setAiPanelVisible(tabId, true);
     });
     clearTopToast();
-    showTopSnackBar(context,
-      const SnackBar(
-        content: Text('已放入 Agent 输入框', style: TextStyle(fontSize: fSmall)),
-        duration: Duration(seconds: 1),
+    showTopSnackBar(
+      context,
+      SnackBar(
+        content: Text(UiText.t('已放入 Agent 输入框', 'Moved into the Agent input'),
+            style: const TextStyle(fontSize: fSmall)),
+        duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.all(16),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
@@ -5191,12 +5443,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   Future<void> _saveSelectionAsSnippet(String command) async {
     if (command.trim().isEmpty) return;
     final tc = ThemeColors.of(context);
-    final controller = TextEditingController(text: '终端命令');
+    final controller =
+        TextEditingController(text: UiText.t('终端命令', 'Terminal command'));
     final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: tc.cardElevated,
-        title: Text('存为命令片段',
+        title: Text(UiText.t('存为命令片段', 'Save as command snippet'),
             style: TextStyle(color: tc.textMain, fontSize: fBody)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -5208,7 +5461,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               style: TextStyle(color: tc.textMain, fontSize: fBody),
               decoration: InputDecoration(
                 isDense: true,
-                labelText: '片段名称',
+                labelText: UiText.t('片段名称', 'Snippet name'),
                 labelStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
               ),
               onSubmitted: (value) => Navigator.of(ctx).pop(value),
@@ -5230,11 +5483,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('取消'),
+            child: Text(UiText.t('取消', 'Cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(controller.text),
-            child: const Text('保存'),
+            child: Text(UiText.t('保存', 'Save')),
           ),
         ],
       ),
@@ -5246,14 +5499,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       id: 'snippet_${DateTime.now().microsecondsSinceEpoch}',
       name: trimmed,
       command: command,
-      description: '来自终端右键',
+      description: UiText.t('来自终端右键', 'From the terminal context menu'),
     ));
     await SnippetsDao.loadCache();
     if (!mounted) return;
     clearTopToast();
-    showTopSnackBar(context,
+    showTopSnackBar(
+      context,
       SnackBar(
-        content: Text('已保存到命令片段：$trimmed',
+        content: Text(
+            UiText.t(
+                '已保存到命令片段：$trimmed', 'Saved to command snippets: $trimmed'),
             style: const TextStyle(fontSize: fSmall)),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
@@ -5267,7 +5523,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Agent 命令'),
+        title: Text(UiText.t('Agent 命令', 'Agent commands')),
         content: SizedBox(
           width: 460,
           child: Column(
@@ -5286,14 +5542,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                           c.command,
                           style: TextStyle(
                             color: tc.brand,
-                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                            fontFamily: 'JetBrainsMono',
+                            fontFamilyFallback: kMonoFontFallback,
                             fontSize: fSmall,
                           ),
                         ),
                       ),
                       Expanded(
                         child: Text(
-                          c.description,
+                          c.displayDescription,
                           style: TextStyle(
                             color: tc.textSub,
                             fontSize: fMicro,
@@ -5306,7 +5563,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 ),
               const SizedBox(height: 4),
               Text(
-                '输入 / 可搜索全部命令与运维模板；↑↓ 切换、Tab 选择、Enter 执行。',
+                UiText.t('输入 / 可搜索全部命令与运维模板；↑↓ 切换、Tab 选择、Enter 执行。',
+                    'Type / to search all commands and runbooks; ↑↓ to move, Tab to select, Enter to run.'),
                 style: TextStyle(color: tc.textSub, fontSize: fMicro),
               ),
             ],
@@ -5315,7 +5573,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('关闭'),
+            child: Text(UiText.t('关闭', 'Close')),
           ),
         ],
       ),
@@ -5354,15 +5612,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             isConnected: isConnected);
         return true;
       case 'pause':
-        _showGoalHint(notifier.pauseGoal(hostId)
-            ? '目标已暂停，不再自动续跑'
-            : '没有进行中的目标');
+        _showGoalHint(notifier.pauseGoal(hostId) ? '目标已暂停，不再自动续跑' : '没有进行中的目标');
         return true;
       case 'resume':
         // 失败原因（预算用尽 / 未连接 / 不在本会话）由 resumeGoal 写进 error
-        _showGoalHint(notifier.resumeGoal(hostId)
-            ? '目标已恢复，接着跑下一轮'
-            : '目标未能恢复，原因见上方提示');
+        _showGoalHint(
+            notifier.resumeGoal(hostId) ? '目标已恢复，接着跑下一轮' : '目标未能恢复，原因见上方提示');
         return true;
       case 'edit':
         if (cmd.objective.isEmpty) {
@@ -5400,9 +5655,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       case '/new':
         _autoScrollChat = true;
         ref.read(agentProvider.notifier).newSession();
-        showTopSnackBar(context, 
+        showTopSnackBar(
+          context,
           SnackBar(
-            content: Text(l10n.terminalSessionCreated, style: const TextStyle(fontSize: 13)),
+            content: Text(l10n.terminalSessionCreated,
+                style: const TextStyle(fontSize: 13)),
             duration: const Duration(seconds: 1),
           ),
         );
@@ -5445,13 +5702,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         // 会让正在跑的 ReAct 循环看到被改写过的历史。输入框运行中本就禁用，
         // 但目标模式会自动续跑，这个窗口被打开了，所以显式挡住。
         if (ref.read(agentProvider).isRunning) {
-          _showGoalHint('任务进行中不能压缩记忆，请先停止任务');
+          _showGoalHint(UiText.t('任务进行中不能压缩记忆，请先停止任务',
+              'Cannot compact memory while a task is running — stop it first'));
           return true;
         }
         if (!isConnected) {
-          showTopSnackBar(context, 
+          showTopSnackBar(
+            context,
             SnackBar(
-              content: Text(l10n.terminalConnectTerminalFirst, style: const TextStyle(fontSize: 13)),
+              content: Text(l10n.terminalConnectTerminalFirst,
+                  style: const TextStyle(fontSize: 13)),
               duration: const Duration(seconds: 1),
             ),
           );
@@ -5463,17 +5723,21 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         }
         ref.read(agentProvider.notifier).compact().then((_) {
           if (!mounted) return;
-          showTopSnackBar(context, 
+          showTopSnackBar(
+            context,
             SnackBar(
-              content: Text(l10n.terminalCompactionDone, style: const TextStyle(fontSize: 13)),
+              content: Text(l10n.terminalCompactionDone,
+                  style: const TextStyle(fontSize: 13)),
               duration: const Duration(seconds: 1),
             ),
           );
         }).catchError((e) {
           if (!mounted) return;
-          showTopSnackBar(context, 
+          showTopSnackBar(
+            context,
             SnackBar(
-              content: Text(l10n.terminalCompactionFailed('$e'), style: const TextStyle(fontSize: 13)),
+              content: Text(l10n.terminalCompactionFailed('$e'),
+                  style: const TextStyle(fontSize: 13)),
               duration: const Duration(seconds: 2),
             ),
           );
@@ -5535,7 +5799,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       // 的 12 对齐；上边线用发丝线（hairline），面板内部的横向分隔比外框
       // 12% 更轻，否则底栏像被焊死在面板上。
       padding: EdgeInsets.only(
-        left: 12, right: 12, top: 8,
+        left: 12,
+        right: 12,
+        top: 8,
         bottom: 10 + (_isMobile ? MediaQuery.of(context).padding.bottom : 0),
       ),
       decoration: BoxDecoration(
@@ -5603,79 +5869,106 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   .editGoal(agentState.goal!.hostId, text),
             ),
           // 工具栏
+          //
+          // 左侧是模式胶囊 + 6 个 30px 图标按钮（固定约 360px），右侧是运行状态。
+          // AI 面板拖到 370px 以下时 Spacer 被挤成负值，整行 RenderFlex overflow，
+          // 最右边的按钮直接出了可视区、点不到。改成「左侧整组可横向滚动 +
+          // spaceBetween」：宽度够时和原来一模一样（贴左排布、状态贴右），不够时
+          // 按钮能滚出来，而不是消失。
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Agent / 编排模式胶囊
-              _ModeCapsule(
-                isOrchestratorMode: agentState.isOrchestratorMode,
-                connectedCount: ref.read(tp.terminalProvider).tabs.where((t) => t.isConnected && !t.isLocal).length,
-                totalHosts: HostsDao.cached.length,
-                onTap: agentState.isOrchestratorMode ? () => _showOrchestratorHosts(tc) : null,
+              Flexible(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Agent / 编排模式胶囊
+                      _ModeCapsule(
+                        isOrchestratorMode: agentState.isOrchestratorMode,
+                        connectedCount: ref
+                            .read(tp.terminalProvider)
+                            .tabs
+                            .where((t) => t.isConnected && !t.isLocal)
+                            .length,
+                        totalHosts: HostsDao.cached.length,
+                        onTap: agentState.isOrchestratorMode
+                            ? () => _showOrchestratorHosts(tc)
+                            : null,
+                      ),
+                      const SizedBox(width: 6),
+                      // 日志按钮
+                      _buildToolbarIconButton(
+                        icon: Icons.terminal_outlined,
+                        tooltip: l10n.terminalAgentLog,
+                        onTap: () => _showAgentLogDialog(context),
+                        tc: tc,
+                      ),
+                      const SizedBox(width: 4),
+                      // 历史按钮
+                      _buildToolbarIconButton(
+                        icon: Icons.history_outlined,
+                        tooltip: l10n.terminalSessionHistory,
+                        onTap: () => _showSessionHistoryPanel(context),
+                        tc: tc,
+                      ),
+                      const SizedBox(width: 4),
+                      // 新建会话：不用先打开历史面板
+                      _buildToolbarIconButton(
+                        icon: Icons.add_comment_outlined,
+                        tooltip: l10n.sessionNew,
+                        onTap: _startNewSession,
+                        tc: tc,
+                      ),
+                      const SizedBox(width: 4),
+                      // 联网搜索切换（会话级，覆盖全局开关；下次任务生效）
+                      _buildToolbarIconButton(
+                        icon: Icons.travel_explore_rounded,
+                        tooltip: agentState.isWebSearchEnabled
+                            ? UiText.t('联网搜索：已启用（下次任务生效）',
+                                'Web search: on (applies to the next task)')
+                            : UiText.t('联网搜索：未启用（点击启用，下次任务生效）',
+                                'Web search: off (click to enable, applies to the next task)'),
+                        onTap: () {
+                          ref.read(agentProvider.notifier).toggleWebSearch();
+                        },
+                        tc: tc,
+                        active: agentState.isWebSearchEnabled,
+                      ),
+                      const SizedBox(width: 4),
+                      // 运维模板（Runbook）
+                      _buildToolbarIconButton(
+                        icon: Icons.bolt_outlined,
+                        tooltip: l10n.terminalRunbookTemplates,
+                        onTap: () => _showRunbookTemplates(tc),
+                        tc: tc,
+                      ),
+                      const SizedBox(width: 4),
+                      // 多机编排开关：原来挤在输入框里和发送按钮并排，挪到这一排工具按钮之后
+                      _buildToolbarIconButton(
+                        icon: Icons.hub_outlined,
+                        tooltip: agentState.isOrchestratorMode
+                            ? l10n.orchExitMode
+                            : l10n.orchEnterMode,
+                        onTap: () {
+                          ref
+                              .read(agentProvider.notifier)
+                              .toggleOrchestratorMode();
+                        },
+                        tc: tc,
+                        active: agentState.isOrchestratorMode,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(width: 6),
-              // 日志按钮
-              _buildToolbarIconButton(
-                icon: Icons.terminal_outlined,
-                tooltip: l10n.terminalAgentLog,
-                onTap: () => _showAgentLogDialog(context),
-                tc: tc,
-              ),
-              const SizedBox(width: 4),
-              // 历史按钮
-              _buildToolbarIconButton(
-                icon: Icons.history_outlined,
-                tooltip: l10n.terminalSessionHistory,
-                onTap: () => _showSessionHistoryPanel(context),
-                tc: tc,
-              ),
-              const SizedBox(width: 4),
-              // 新建会话：不用先打开历史面板
-              _buildToolbarIconButton(
-                icon: Icons.add_comment_outlined,
-                tooltip: l10n.sessionNew,
-                onTap: _startNewSession,
-                tc: tc,
-              ),
-              const SizedBox(width: 4),
-              // 联网搜索切换（会话级，覆盖全局开关；下次任务生效）
-              _buildToolbarIconButton(
-                icon: Icons.travel_explore_rounded,
-                tooltip: agentState.isWebSearchEnabled
-                    ? '联网搜索：已启用（下次任务生效）'
-                    : '联网搜索：未启用（点击启用，下次任务生效）',
-                onTap: () {
-                  ref.read(agentProvider.notifier).toggleWebSearch();
-                },
-                tc: tc,
-                active: agentState.isWebSearchEnabled,
-              ),
-              const SizedBox(width: 4),
-              // 运维模板（Runbook）
-              _buildToolbarIconButton(
-                icon: Icons.bolt_outlined,
-                tooltip: l10n.terminalRunbookTemplates,
-                onTap: () => _showRunbookTemplates(tc),
-                tc: tc,
-              ),
-              const SizedBox(width: 4),
-              // 多机编排开关：原来挤在输入框里和发送按钮并排，挪到这一排工具按钮之后
-              _buildToolbarIconButton(
-                icon: Icons.hub_outlined,
-                tooltip: agentState.isOrchestratorMode
-                    ? l10n.orchExitMode
-                    : l10n.orchEnterMode,
-                onTap: () {
-                  ref.read(agentProvider.notifier).toggleOrchestratorMode();
-                },
-                tc: tc,
-                active: agentState.isOrchestratorMode,
-              ),
-              const Spacer(),
               // 运行状态指示
               if (agentState.isRunning)
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
                     color: tc.brand.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rFull),
@@ -5684,21 +5977,24 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       SizedBox(
-                        width: 10, height: 10,
-                        child: CircularProgressIndicator(strokeWidth: 1.5, color: tc.brand),
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 1.5, color: tc.brand),
                       ),
                       const SizedBox(width: 5),
                       Text(
                         agentState.status == AgentStatus.executing
                             ? UiText.t('执行中', 'Executing')
                             : UiText.t('思考中', 'Thinking'),
-                        style: TextStyle(fontSize: fMicro, color: tc.brand, fontWeight: FontWeight.w500),
+                        style: TextStyle(
+                            fontSize: fMicro,
+                            color: tc.brand,
+                            fontWeight: FontWeight.w500),
                       ),
                     ],
                   ),
                 ),
-              if (agentState.isRunning)
-                const SizedBox(width: 6),
             ],
           ),
           const SizedBox(height: 8),
@@ -5706,7 +6002,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           AIPromptInput(
             enabled: isConnected,
             isRunning: agentState.isRunning,
-            hintText: _getInputHint(isConnected, agentState.isRunning, agentState.isOrchestratorMode,
+            hintText: _getInputHint(isConnected, agentState.isRunning,
+                agentState.isOrchestratorMode,
                 connecting: tab?.isConnecting == true),
             initialText: _tabAiInputText[tab?.id ?? _currentTabId ?? ''] ?? '',
             accentColor: tc.brand,
@@ -5716,7 +6013,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             onFocusChanged: (focused) {
               setState(() => _aiInputFocused = focused);
             },
-            onChanged: (text) { _tabAiInputText[tab?.id ?? _currentTabId ?? ''] = text; },
+            onChanged: (text) {
+              _tabAiInputText[tab?.id ?? _currentTabId ?? ''] = text;
+            },
             onSlashCommand: (command) {
               return _handleSlashCommand(command, isConnected: isConnected);
             },
@@ -5779,8 +6078,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         message: l10n.aiModelEmptyTitle,
         child: InkWell(
           // 模型管理就在抽屉设置里，不再跳整页。
-          onTap: () =>
-              _showNavDrawer(NavDrawer.sectionSettings, group: 'ai'),
+          onTap: () => _showNavDrawer(NavDrawer.sectionSettings, group: 'ai'),
           borderRadius: BorderRadius.circular(rFull),
           child: Container(
             height: 30,
@@ -5814,9 +6112,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         currentChoice?.displayName ?? currentModel?.name ?? l10n.terminalModel;
     final effort = currentModel?.reasoningLabel;
     // 模型与思考程度之间用中点分隔（英文名中间那种点 ·），不再用普通空格。
-    final label = effort == null || effort.isEmpty
-        ? labelBase
-        : '$labelBase · $effort';
+    final label =
+        effort == null || effort.isEmpty ? labelBase : '$labelBase · $effort';
 
     String? currentTierLevel;
     if (currentChoice != null) {
@@ -5929,10 +6226,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final readlineKeys = [
       const _QuickKey('⌃A', '\x01'),
       const _QuickKey('⌃E', '\x05'),
-      const _QuickKey('⌃U', '\x15'),  // 删除行首到光标
-      const _QuickKey('⌃K', '\x0b'),  // 删除光标到行尾
-      const _QuickKey('⌃W', '\x17'),  // 删除前一个单词
-      const _QuickKey('⌃R', '\x12'),  // 搜索历史命令
+      const _QuickKey('⌃U', '\x15'), // 删除行首到光标
+      const _QuickKey('⌃K', '\x0b'), // 删除光标到行尾
+      const _QuickKey('⌃W', '\x17'), // 删除前一个单词
+      const _QuickKey('⌃R', '\x12'), // 搜索历史命令
     ];
     // 方向 + 导航键
     final navKeys = [
@@ -5953,7 +6250,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       height: 36,
       decoration: BoxDecoration(
         color: tc.card,
-        border: Border(top: BorderSide(color: tc.border.withValues(alpha: 0.3))),
+        border:
+            Border(top: BorderSide(color: tc.border.withValues(alpha: 0.3))),
       ),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
@@ -5961,7 +6259,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         itemCount: keys.length,
         separatorBuilder: (_, index) {
           // 在高频键和其他键之间加分隔线
-          if (index == coreCount - 1 || index == coreCount + readlineKeys.length - 1) {
+          if (index == coreCount - 1 ||
+              index == coreCount + readlineKeys.length - 1) {
             return Container(
               width: 1,
               margin: const EdgeInsets.symmetric(vertical: 4),
@@ -6003,7 +6302,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                         : isNav
                             ? (isConnected ? tc.ok : tc.textMuted)
                             : (isConnected ? tc.textSub : tc.textMuted),
-                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: kMonoFontFallback,
                     fontWeight: isCore ? FontWeight.w600 : FontWeight.w500,
                     height: 1.0,
                   ),
@@ -6069,8 +6369,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 运维工作流选择浮层（从持久化的 Runbook 加载）
   void _showRunbookTemplates(ThemeColors tc) {
     final l10n = AppLocalizations.of(context)!;
-    final runbooks =
-        BuiltinRunbookI18n.localizeAll(ref.read(runbooksProvider));
+    final runbooks = BuiltinRunbookI18n.localizeAll(ref.read(runbooksProvider));
     final grouped = <RunbookCategory, List<Runbook>>{};
     for (final rb in runbooks) {
       grouped.putIfAbsent(rb.category, () => []).add(rb);
@@ -6142,14 +6441,20 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               Divider(height: 1, color: tc.border.withValues(alpha: 0.5)),
               if (runbooks.isEmpty)
                 Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
                   child: Column(
                     children: [
-                      Icon(Icons.auto_awesome_motion, size: 40, color: tc.textSub),
+                      Icon(Icons.auto_awesome_motion,
+                          size: 40, color: tc.textSub),
                       const SizedBox(height: 8),
-                      Text(l10n.terminalNoRunbooks, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+                      Text(l10n.terminalNoRunbooks,
+                          style:
+                              TextStyle(color: tc.textSub, fontSize: fSmall)),
                       const SizedBox(height: 4),
-                      Text(l10n.terminalNoRunbooksHint, style: TextStyle(color: tc.textSub, fontSize: fMicro)),
+                      Text(l10n.terminalNoRunbooksHint,
+                          style:
+                              TextStyle(color: tc.textSub, fontSize: fMicro)),
                     ],
                   ),
                 )
@@ -6160,8 +6465,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                     padding: const EdgeInsets.symmetric(vertical: 4),
                     children: [
                       for (final cat in order)
-                        if (grouped[cat] != null && grouped[cat]!.isNotEmpty) ...[
-                          _buildRunbookSectionHeader(tc, categoryLabels[cat]!, grouped[cat]!.length),
+                        if (grouped[cat] != null &&
+                            grouped[cat]!.isNotEmpty) ...[
+                          _buildRunbookSectionHeader(
+                              tc, categoryLabels[cat]!, grouped[cat]!.length),
                           for (final rb in grouped[cat]!)
                             _buildRunbookTile(tc, ctx, rb),
                         ],
@@ -6293,8 +6600,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             ? UiText.t('收起 AI 面板', 'Collapse AI panel')
             : UiText.t('展开 AI 面板', 'Expand AI panel'),
         Icons.auto_fix_high,
-        () => setState(() =>
-            _setAiPanelVisible(activeTab.id, !_effectiveAiVisible(activeTab.id))),
+        () => setState(() => _setAiPanelVisible(
+            activeTab.id, !_effectiveAiVisible(activeTab.id))),
         keywords: const ['ai', 'panel'],
       );
       op(
@@ -6310,8 +6617,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             ? UiText.t('隐藏服务器监控', 'Hide monitor')
             : UiText.t('显示服务器监控', 'Show monitor'),
         Icons.monitor_heart_outlined,
-        () => setState(() => _tabMonitorVisible[activeTab.id] =
-            !_monitorVisibleFor(activeTab)),
+        () => setState(() =>
+            _tabMonitorVisible[activeTab.id] = !_monitorVisibleFor(activeTab)),
         keywords: const ['monitor'],
       );
       if (!activeTab.isLocal) {
@@ -6370,8 +6677,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           keywords: keywords,
         ));
 
-    section(UiText.t('主机管理', 'Hosts'), NavDrawer.sectionHosts,
-        Icons.dns_outlined,
+    section(
+        UiText.t('主机管理', 'Hosts'), NavDrawer.sectionHosts, Icons.dns_outlined,
         keywords: const ['server', 'hosts', '服务器']);
     section(UiText.t('快捷命令', 'Snippets'), NavDrawer.sectionSnippets,
         Icons.bolt_outlined,
@@ -6385,15 +6692,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     section(UiText.t('设置', 'Settings'), NavDrawer.sectionSettings,
         Icons.settings_outlined,
         keywords: const ['settings']);
-    section(UiText.t('AI 模型设置', 'AI model settings'),
-        NavDrawer.sectionSettings, Icons.psychology_outlined,
+    section(UiText.t('AI 模型设置', 'AI model settings'), NavDrawer.sectionSettings,
+        Icons.psychology_outlined,
         group: 'ai', keywords: const ['agent', 'model']);
     page(UiText.t('变更记录', 'Change records'), '/change-records',
         Icons.receipt_long_outlined,
         keywords: const ['changes']);
 
     // —— 主机 ——
-    const groupHosts = '主机';
+    final groupHosts = UiText.t('主机', 'Hosts');
     for (final host in HostsDao.cached) {
       entries.add(CommandPaletteEntry(
         label: host.name,
@@ -6444,7 +6751,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final tab = ref.read(tp.terminalProvider).activeTab;
     if (tab == null || !tab.isConnected) {
       final l10n = AppLocalizations.of(context)!;
-      showTopSnackBar(context, 
+      showTopSnackBar(
+        context,
         SnackBar(
           content: Text(l10n.terminalConnectTerminalForRunbook),
           behavior: SnackBarBehavior.floating,
@@ -6454,9 +6762,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     }
     _autoScrollChat = true;
     // 本地终端用 localService，SSH 用 service
-    final CommandExecutor? executor = tab.isLocal == true ? tab.localService : tab.service;
-    ref.read(agentProvider.notifier).setExecutor(executor,
-        hostId: tab.hostId, tabId: tab.id);
+    final CommandExecutor? executor =
+        tab.isLocal == true ? tab.localService : tab.service;
+    ref
+        .read(agentProvider.notifier)
+        .setExecutor(executor, hostId: tab.hostId, tabId: tab.id);
     await ref.read(runbooksProvider.notifier).incrementRunCount(rb.id);
     await ref.read(agentProvider.notifier).startTask(rb.content);
   }
@@ -6466,7 +6776,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final tab = ref.read(tp.terminalProvider).activeTab;
     if (tab == null || !tab.isConnected) {
       final l10n = AppLocalizations.of(context)!;
-      showTopSnackBar(context, 
+      showTopSnackBar(
+        context,
         SnackBar(
           content: Text(l10n.terminalConnectTerminalForCommand),
           behavior: SnackBarBehavior.floating,
@@ -6484,7 +6795,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       if (rb.hasUnfilledVariables(values)) {
         if (!mounted) return;
         final l10n = AppLocalizations.of(context)!;
-        showTopSnackBar(context, 
+        showTopSnackBar(
+          context,
           SnackBar(
             content: Text(l10n.terminalUnfilledVariables),
             behavior: SnackBarBehavior.floating,
@@ -6517,7 +6829,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       context: context,
       builder: (dialogCtx) => AlertDialog(
         backgroundColor: tc.cardElevated,
-        title: Text(l10n.terminalFillVariables(rb.name), style: TextStyle(color: tc.textMain, fontSize: fBody)),
+        title: Text(l10n.terminalFillVariables(rb.name),
+            style: TextStyle(color: tc.textMain, fontSize: fBody)),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -6530,7 +6843,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 ),
                 const SizedBox(height: pCompact),
               ],
-              Text(l10n.terminalCommandTemplate, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+              Text(l10n.terminalCommandTemplate,
+                  style: TextStyle(color: tc.textSub, fontSize: fSmall)),
               const SizedBox(height: 4),
               Container(
                 width: double.infinity,
@@ -6543,7 +6857,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 child: SelectableText(
                   rb.content,
                   style: TextStyle(
-                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: kMonoFontFallback,
                     fontSize: fMono,
                     color: tc.terminalGreen,
                   ),
@@ -6562,7 +6877,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                       labelStyle: TextStyle(
                         color: tc.textSub,
                         fontSize: fSmall,
-                        fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                        fontFamily: 'JetBrainsMono',
+                        fontFamilyFallback: kMonoFontFallback,
                       ),
                       filled: true,
                       fillColor: tc.card,
@@ -6629,13 +6945,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   void _showAIModelNotConfiguredHint() {
     final l10n = AppLocalizations.of(context)!;
-    showTopSnackBar(context, 
+    showTopSnackBar(
+      context,
       SnackBar(
         content: Row(
           children: [
             const Icon(Icons.warning_amber, color: Colors.white, size: 18),
             const SizedBox(width: 8),
-            Text(l10n.pleaseConfigAIModel, style: const TextStyle(fontSize: fBody)),
+            Text(l10n.pleaseConfigAIModel,
+                style: const TextStyle(fontSize: fBody)),
           ],
         ),
         backgroundColor: cWarning,
@@ -6647,7 +6965,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         ),
         duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rMedium)),
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(rMedium)),
       ),
     );
   }
@@ -6666,7 +6985,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         children: [
           const Icon(Icons.error_outline, color: cDanger, size: 14),
           const SizedBox(width: 6),
-          Expanded(child: Text(error, style: const TextStyle(color: cDanger, fontSize: fSmall), maxLines: 2, overflow: TextOverflow.ellipsis)),
+          Expanded(
+              child: Text(error,
+                  style: const TextStyle(color: cDanger, fontSize: fSmall),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis)),
         ],
       ),
     );
@@ -6678,7 +7001,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   /// 显示会话历史面板（侧边抽屉式）
   void _showSessionHistoryPanel(BuildContext context) {
-    showDialog(context: context, builder: (context) => const SessionHistoryDialog());
+    showDialog(
+        context: context, builder: (context) => const SessionHistoryDialog());
   }
 
   /// 新建会话（不经过历史面板）
@@ -6715,38 +7039,47 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(l10n.snippetResolvedCommand(snippet.command), style: TextStyle(color: tc.textSub, fontSize: fSmall, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback)),
+            Text(l10n.snippetResolvedCommand(snippet.command),
+                style: TextStyle(
+                    color: tc.textSub,
+                    fontSize: fSmall,
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: kMonoFontFallback)),
             const SizedBox(height: 12),
             ...variables.map((v) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: TextField(
-                controller: controllers[v],
-                style: TextStyle(color: tc.textMain, fontSize: fBody),
-                decoration: InputDecoration(
-                  labelText: '{{$v}}',
-                  labelStyle: TextStyle(color: tc.textSub),
-                  filled: true,
-                  fillColor: tc.surface,
-                ),
-              ),
-            )),
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: TextField(
+                    controller: controllers[v],
+                    style: TextStyle(color: tc.textMain, fontSize: fBody),
+                    decoration: InputDecoration(
+                      labelText: '{{$v}}',
+                      labelStyle: TextStyle(color: tc.textSub),
+                      filled: true,
+                      fillColor: tc.surface,
+                    ),
+                  ),
+                )),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l10n.commonCancel, style: TextStyle(color: tc.textSub))),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child:
+                  Text(l10n.commonCancel, style: TextStyle(color: tc.textSub))),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              final resolved = snippet.resolveCommand(controllers.map((k, c) => MapEntry(k, c.text)));
+              final resolved = snippet.resolveCommand(
+                  controllers.map((k, c) => MapEntry(k, c.text)));
               final tab = ref.read(tp.terminalProvider).activeTab;
               if (tab?.service != null) {
                 tab!.service!.execute(resolved);
               }
             },
             style: ElevatedButton.styleFrom(
-                backgroundColor: tc.brand,
-                foregroundColor: tc.isLight ? Colors.white : cBg,
-              ),
+              backgroundColor: tc.brand,
+              foregroundColor: tc.isLight ? Colors.white : cBg,
+            ),
             child: Text(l10n.commonExecute),
           ),
         ],
@@ -6805,6 +7138,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 class _ContentSegment {
   final String content;
   final bool isCodeBlock;
+
   /// 代码块语言标识（如 bash、text、python 等），非代码块时为 null
   final String? language;
   _ContentSegment(this.content, this.isCodeBlock, {this.language});
@@ -6837,7 +7171,8 @@ class _ModeCapsule extends StatefulWidget {
   State<_ModeCapsule> createState() => _ModeCapsuleState();
 }
 
-class _ModeCapsuleState extends State<_ModeCapsule> with SingleTickerProviderStateMixin {
+class _ModeCapsuleState extends State<_ModeCapsule>
+    with SingleTickerProviderStateMixin {
   late AnimationController _radarController;
 
   @override
@@ -6890,7 +7225,8 @@ class _ModeCapsuleState extends State<_ModeCapsule> with SingleTickerProviderSta
         decoration: BoxDecoration(
           color: (isOrch ? cWarning : tc.brand).withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(rFull),
-          border: Border.all(color: isOrch ? cWarning.withValues(alpha: 0.4) : tc.border),
+          border: Border.all(
+              color: isOrch ? cWarning.withValues(alpha: 0.4) : tc.border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -6921,7 +7257,10 @@ class _ModeCapsuleState extends State<_ModeCapsule> with SingleTickerProviderSta
             ),
             const SizedBox(width: 5),
             Text(
-              isOrch ? l10n.terminalOrchestratorMode(widget.connectedCount, widget.totalHosts) : 'Agent',
+              isOrch
+                  ? l10n.terminalOrchestratorMode(
+                      widget.connectedCount, widget.totalHosts)
+                  : 'Agent',
               style: TextStyle(
                 fontSize: fSmall,
                 color: accent,
@@ -6931,7 +7270,8 @@ class _ModeCapsuleState extends State<_ModeCapsule> with SingleTickerProviderSta
             ),
             if (isOrch) ...[
               const SizedBox(width: 3),
-              Icon(Icons.arrow_drop_down, size: 14, color: accent.withValues(alpha: 0.7)),
+              Icon(Icons.arrow_drop_down,
+                  size: 14, color: accent.withValues(alpha: 0.7)),
             ],
           ],
         ),
@@ -6968,9 +7308,8 @@ class _RadarRipplePainter extends CustomPainter {
       final phase = (baseProgress + i / rings) % 1.0;
       final radius = startRadius + (maxRadius - startRadius) * phase;
       // 淡出曲线：前 20% 淡入，后 80% 淡出
-      final alpha = phase < 0.2
-          ? (phase / 0.2) * 0.5
-          : (1 - (phase - 0.2) / 0.8) * 0.5;
+      final alpha =
+          phase < 0.2 ? (phase / 0.2) * 0.5 : (1 - (phase - 0.2) / 0.8) * 0.5;
       paint.color = color.withValues(alpha: alpha.clamp(0.0, 0.5));
       canvas.drawCircle(center, radius, paint);
     }
@@ -7000,7 +7339,8 @@ class _OrchestratorHostsSheet extends StatefulWidget {
   });
 
   @override
-  State<_OrchestratorHostsSheet> createState() => _OrchestratorHostsSheetState();
+  State<_OrchestratorHostsSheet> createState() =>
+      _OrchestratorHostsSheetState();
 }
 
 class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
@@ -7036,7 +7376,8 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
                 ),
                 const Spacer(),
                 Text(
-                  l10n.terminalOrchestratorConnected(widget.connectedHostIds.length, widget.allHosts.length),
+                  l10n.terminalOrchestratorConnected(
+                      widget.connectedHostIds.length, widget.allHosts.length),
                   style: TextStyle(fontSize: fSmall, color: tc.textSub),
                 ),
               ],
@@ -7049,7 +7390,8 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
               height: 44,
               child: ListView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 children: [
                   _buildGroupChip(tc, l10n.commonAll, _selectedGroup == null),
                   for (final g in widget.groupNames)
@@ -7079,14 +7421,18 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
                       final host = _filteredHosts[i];
                       final isConn = widget.connectedHostIds.contains(host.id);
                       return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 2),
                         child: Row(
                           children: [
                             Container(
-                              width: 8, height: 8,
+                              width: 8,
+                              height: 8,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: isConn ? tc.agentGreen : tc.textMuted.withValues(alpha: 0.4),
+                                color: isConn
+                                    ? tc.agentGreen
+                                    : tc.textMuted.withValues(alpha: 0.4),
                               ),
                             ),
                             const SizedBox(width: 10),
@@ -7107,27 +7453,35 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
                                       ),
                                       const SizedBox(width: 6),
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 1),
                                         decoration: BoxDecoration(
-                                          color: tc.textMuted.withValues(alpha: 0.12),
-                                          borderRadius: BorderRadius.circular(rSmall),
+                                          color: tc.textMuted
+                                              .withValues(alpha: 0.12),
+                                          borderRadius:
+                                              BorderRadius.circular(rSmall),
                                         ),
                                         child: Text(
                                           host.group,
-                                          style: TextStyle(fontSize: fMicro, color: tc.textSub),
+                                          style: TextStyle(
+                                              fontSize: fMicro,
+                                              color: tc.textSub),
                                         ),
                                       ),
                                     ],
                                   ),
                                   Text(
                                     '${host.host}:${host.port} · ${host.username}',
-                                    style: TextStyle(fontSize: fMicro, color: tc.textSub),
+                                    style: TextStyle(
+                                        fontSize: fMicro, color: tc.textSub),
                                   ),
                                 ],
                               ),
                             ),
                             Text(
-                              isConn ? l10n.terminalConnected : l10n.terminalStatusNotConnected,
+                              isConn
+                                  ? l10n.terminalConnected
+                                  : l10n.terminalStatusNotConnected,
                               style: TextStyle(
                                 fontSize: fSmall,
                                 color: isConn ? tc.agentGreen : tc.textMuted,
@@ -7154,7 +7508,8 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
                       decoration: BoxDecoration(
                         color: cWarning.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(rSmall),
-                        border: Border.all(color: cWarning.withValues(alpha: 0.3)),
+                        border:
+                            Border.all(color: cWarning.withValues(alpha: 0.3)),
                       ),
                       child: Text(
                         l10n.terminalExitOrchestrator,
@@ -7183,10 +7538,14 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: selected ? cWarning.withValues(alpha: 0.15) : tc.textMuted.withValues(alpha: 0.08),
+            color: selected
+                ? cWarning.withValues(alpha: 0.15)
+                : tc.textMuted.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(rSmall),
             border: Border.all(
-              color: selected ? cWarning.withValues(alpha: 0.4) : tc.border.withValues(alpha: 0.3),
+              color: selected
+                  ? cWarning.withValues(alpha: 0.4)
+                  : tc.border.withValues(alpha: 0.3),
             ),
           ),
           child: Text(
@@ -7267,8 +7626,11 @@ class _AnswerCopyButtonState extends State<_AnswerCopyButton> {
             : _hover
                 ? tc.brand.withValues(alpha: 0.6)
                 : tc.border;
-    final foreground =
-        _copied ? tc.ok : (_hover || _pressed) ? tc.brand : tc.textSub;
+    final foreground = _copied
+        ? tc.ok
+        : (_hover || _pressed)
+            ? tc.brand
+            : tc.textSub;
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hover = true),
