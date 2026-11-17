@@ -259,4 +259,8 @@ WP5/WP6 由两个并行 worktree 子 agent 开发，按 WP6→WP5 顺序合并�
 
 **验证**：主线 `flutter analyze` 43 issue 全为基线既有（0 error）；`flutter test` **1581 通过 / 25 跳过 / 0 失败**（二期 1547 → WP7 +20 → WP8 +14）。GitNexus 不可用，以调用方全量 grep + diff 审查替代 impact/detect_changes。
 
-**待办**：WP3/WP5 UI 冒烟仍未做；WP7/WP8 无 UI 改动，但 FC 路径需真实 FC 模型联调验证（测试为脚本化 provider + 本地 SSE）；全部提交未推送远端。
+**待办**：WP3/WP5 UI 冒烟仍未做。
+
+**真机联调**：WP1–WP8 在本地 Windows dev 包 + Demo Server（FC 模型）逐项验收通过。WP7 走 `/compact` 手动压缩：滚动摘要两轮 604→974 字符（第二轮 `已有摘要: true` 为滚动合并），引擎历史 38→15 条，首轮原文仍在聊天列表，跨两次压缩后 pinned 事实（中文回复约束 / 主机环境 / 容器 IP / 会话 id / 文件内容）逐条可复述且能诚实说明"保留的是摘要非原文"；11 轮 / 9% 上下文未误触发自动压缩。WP8 在 trace 中确认 execute / ask / finish 三类动作均 `fc_calls=1`，正文围栏里的示例命令未被执行（直接 shell 校验 `RC=2`、文件不存在），finish 四段操作单落在 `taskEnd.summary`，ask 按钮可点且能续跑，纯文本轮次自动 `fc_calls=0` 落回文本协议，提前执行的 execute 事件无重复命令卡片。
+
+**真机发现并修复**：finish 幻觉门控（`_hasExecutedAnyCommand`）不认识"严禁执行任何命令，只根据会话内容回答"这类用户约束，纯问答任务要白烧完 2 次重试、最后靠 ask 才能收尾。新增 `NoCommandIntentDetector`（只喂用户原文：goal / steering / ask 选项，模型自述不算豁免依据），命中后 `_userForbadeCommands` 单向置位、在 `_resetTransientState` 归零并跨 pause/resume 保留，幻觉门控让路，`_handleNoCommand` 的继续提示也改成"直接给文字回答"而不再催促执行命令。判据要求否定词直接修饰无限定的"命令/指令"，"禁止执行安装命令"这类只禁一类的说法不豁免。
