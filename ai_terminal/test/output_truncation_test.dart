@@ -121,4 +121,45 @@ void main() {
       expect(stripCommandEcho('total 0\nfile1', 'ls -la'), 'total 0\nfile1');
     });
   });
+
+  group('stripInteractiveEcho（O3：提示+答案回显不污染观测）', () {
+    test('整行回显被删除，真实输出保留', () {
+      final out = stripInteractiveEcho(
+        'Continue? y\ngot-y',
+        [(prompt: 'Continue? ', answer: 'y')],
+      );
+      expect(out, 'got-y');
+    });
+
+    test('空答案（回车）匹配裸提示行', () {
+      final out = stripInteractiveEcho(
+        'Press ENTER to continue\nstarted',
+        [(prompt: 'Press ENTER to continue', answer: '')],
+      );
+      expect(out, 'started');
+    });
+
+    test('R8：正文里包含同样文字但不是整行相等的行不被删除', () {
+      const output = 'Continue? y is the prompt echo we expect to see\n'
+          'got-y';
+      final out = stripInteractiveEcho(
+        output,
+        [(prompt: 'Continue? ', answer: 'y')],
+      );
+      expect(out, output, reason: '只删整行逐字相等的回显');
+    });
+
+    test('空白折叠后仍匹配（PTY 补空格/制表符）', () {
+      final out = stripInteractiveEcho(
+        'Continue?   y\ndone',
+        [(prompt: 'Continue? ', answer: 'y')],
+      );
+      expect(out, 'done');
+    });
+
+    test('没有记录交互时原样返回', () {
+      const output = 'Continue? y\nok';
+      expect(stripInteractiveEcho(output, const []), output);
+    });
+  });
 }

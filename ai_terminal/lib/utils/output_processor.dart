@@ -50,6 +50,36 @@ String _tailTruncate(String? output, int maxChars) {
       '${output.substring(output.length - maxChars)}';
 }
 
+/// 清理交互确认提示 + 用户答案的终端回显行（O3）
+///
+/// PTY 先原样回显提示（`Continue? ` 不带换行），答案写进 stdin 后又被回显到
+/// 同一行（`Continue? y`）。这段不是命令输出：留在观测里模型会把它当成下一条
+/// 命令（真机验证里确实执行了 `Continue? y`，报 `command not found`）。
+///
+/// R8：只删除与「记录的提示 + 记录的答案」逐字相等的整行（空白折叠后比较），
+/// 不做裸子串删除 —— 正文里恰好出现同样文字的行不能被误删。
+String stripInteractiveEcho(
+  String output,
+  List<({String prompt, String answer})> interactions,
+) {
+  if (output.isEmpty || interactions.isEmpty) return output;
+  final expected = <String>{};
+  for (final item in interactions) {
+    final prompt = _collapseSpaces(item.prompt);
+    if (prompt.isEmpty) continue;
+    final answer = _collapseSpaces(item.answer);
+    expected.add(answer.isEmpty ? prompt : '$prompt $answer');
+  }
+  if (expected.isEmpty) return output;
+  final lines = output.split('\n');
+  final kept =
+      lines.where((line) => !expected.contains(_collapseSpaces(line))).toList();
+  return kept.length == lines.length ? output : kept.join('\n');
+}
+
+String _collapseSpaces(String s) =>
+    s.replaceAll(RegExp(r'[ \t]+'), ' ').trim();
+
 /// 清理 PTY 输出中的命令回显
 /// 终端在执行命令时会先把输入的命令回显到 stdout，导致结果里包含命令本身
 String stripCommandEcho(String output, String command) {

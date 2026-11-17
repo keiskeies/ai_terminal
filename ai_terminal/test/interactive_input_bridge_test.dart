@@ -270,6 +270,36 @@ void main() {
       }
     });
 
+    test('提示+答案的回显不进观测，模型不会把它当命令执行（O3 真机缺陷）',
+        () async {
+      const answer = 'y';
+      final provider = _ScriptedAI([executeResponse, finishResponse]);
+      final engine = makeEngine(provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+      engine.onInteractiveInputRequest = (prompt) async => answer;
+      // 真机形状：PTY 把提示行和用户输入回显进 stdout
+      final exec = _BridgeExecutor(
+        prompt: 'Continue? ',
+        stdout: 'Continue? y\ngot-y',
+      );
+
+      await engine.startTask('测试目标', exec);
+
+      // 第二次调用（finish 轮）的上下文里不得出现回显行：
+      // 真机上模型正是看到它才发出了 `命令: Continue? y`
+      final secondHistory = provider.receivedHistories.last
+          .map((m) => m.content)
+          .join('\n');
+      expect(secondHistory, contains('got-y'), reason: '真实输出必须保留');
+      expect(secondHistory, isNot(contains('Continue? y')),
+          reason: '提示+答案的回显不得进入观测');
+
+      // 结果事件里的 output 同样要干净（UI 与证据层都基于它）
+      final resultEvent = events.lastWhere((e) => e.isResult);
+      expect(resultEvent.output ?? '', isNot(contains('Continue? y')));
+    });
+
     test('cancelTask 立即 complete(null)，await 不挂死（R1）', () async {
       final provider = _ScriptedAI([executeResponse, finishResponse]);
       final engine = makeEngine(provider);
@@ -438,11 +468,14 @@ class _ScriptedAI implements AIProvider {
 /// 答案非 null → 成功结果；null → interactivePrompt 失败（模拟执行器中断）。
 class _BridgeExecutor implements CommandExecutor {
   final String prompt;
+
+  /// 应答后的 stdout；真机上 PTY 会把「提示 + 用户输入」回显进这段输出
+  final String stdout;
   String? lastAnswer;
   CommandFailureKind lastFailureKind = CommandFailureKind.none;
   int bridgeCalls = 0;
 
-  _BridgeExecutor({required this.prompt});
+  _BridgeExecutor({required this.prompt, this.stdout = 'ok'});
 
   @override
   bool get isConnected => true;
@@ -484,7 +517,7 @@ class _BridgeExecutor implements CommandExecutor {
       );
     }
     return CommandResult(
-      stdout: 'ok',
+      stdout: stdout,
       stderr: '',
       exitCode: 0,
       duration: Duration.zero,

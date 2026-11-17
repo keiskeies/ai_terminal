@@ -212,6 +212,12 @@ class AgentEngine {
   Completer<String?>? _interactiveInputCompleter;
   Timer? _interactiveInputTimeoutTimer;
 
+  /// 本轮命令里已应答的交互提示（提示文本 + 答案）。
+  /// 终端会把 "提示行 + 用户输入" 回显到输出里，若不清掉，模型会把它当成
+  /// 下一条命令执行（O3 真机验证：`Continue? y` 被当命令跑掉）。
+  /// 只对本次命令有效：每次执行前清空，执行后用于清洗观测。
+  final List<({String prompt, String answer})> _interactiveEchoes = [];
+
   /// 命令执行取消令牌：cancelTask 时 complete，_executeCommand 据此提前退出
   Completer<void>? _commandCancelToken;
 
@@ -528,6 +534,7 @@ class AgentEngine {
           '⌨️ 已自动应答确认提示: ${auto.isEmpty ? "(回车)" : auto}',
           '⌨️ Auto-answered prompt: ${auto.isEmpty ? "(Enter)" : auto}',
         )));
+        _interactiveEchoes.add((prompt: prompt, answer: auto));
         return auto;
       }
     }
@@ -587,6 +594,7 @@ class AgentEngine {
     }
     if (answer != null) {
       // 答案只进事件时间线（UI 可见），不进对话历史/凭据库
+      _interactiveEchoes.add((prompt: prompt, answer: answer));
       onEvent?.call(AgentEvent.info(UiText.t(
         '⌨️ 已输入: ${answer.isEmpty ? "(回车)" : answer}',
         '⌨️ Input sent: ${answer.isEmpty ? "(Enter)" : answer}',
@@ -4547,6 +4555,8 @@ class AgentEngine {
 
     // 创建取消令牌，cancelTask 时 complete 触发提前退出
     _commandCancelToken = Completer<void>();
+    // 每条命令单独记账交互回显：上一条命令的提示文本不该清洗本条的正文
+    _interactiveEchoes.clear();
 
     // sudo 密码交给执行器应答：执行器在输出流上识别提示并写入 PTY stdin。
     // 密码不进命令串、不进审计日志、也不回传给模型（AGENTS.md R7）。
@@ -4597,6 +4607,9 @@ class AgentEngine {
       var cleanOutput = AnsiStripper.strip(result.stdout);
       // 清理 PTY 回显的命令本身
       cleanOutput = stripCommandEcho(cleanOutput, command);
+      // 清理交互提示 + 用户答案的回显行（O3）：它不是命令输出，
+      // 留在观测里模型会当成下一条命令执行
+      cleanOutput = stripInteractiveEcho(cleanOutput, _interactiveEchoes);
 
       return AgentResult.fromCommand(
         command: command,
