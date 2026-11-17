@@ -465,7 +465,7 @@ class KnowledgeService {
     try {
       final keywords = _extractKeywords(query);
       if (keywords.isEmpty) return [];
-      final ftsQuery = keywords.map((k) => '$k*').join(' AND ');
+      final ftsQuery = _ftsPrefixQuery(keywords);
 
       var where = '';
       final args = <dynamic>[ftsQuery];
@@ -528,6 +528,16 @@ class KnowledgeService {
     }
   }
 
+  /// FTS5 前缀查询串：每个关键词包成引号字面量，再做前缀匹配。
+  ///
+  /// 裸拼 `'$k*'` 会把关键词当成 FTS5 查询语法解析：`-p` 是 NOT 运算符、
+  /// `'continue?` 是字符串字面量起点，整条 MATCH 直接报
+  /// `SQL logic error: no such column: p`（真机验证：命令里带 `-p` 的请求
+  /// 让用户经验库与软件库检索全部降级到 LIKE）。引号内的内容只按字面处理。
+  static String _ftsPrefixQuery(List<String> keywords) => keywords
+      .map((k) => '"${k.replaceAll('"', '""')}"*')
+      .join(' AND ');
+
   /// 获取用户经验库统计
   Future<int> getUserLearningsCount() async {
     if (_userDb == null) return 0;
@@ -564,8 +574,8 @@ class KnowledgeService {
       }
 
       // 构建 FTS5 查询：关键词之间 AND 连接，使用前缀搜索
-      // FTS5 语法: term* 表示前缀匹配
-      final ftsQuery = keywords.map((k) => '$k*').join(' AND ');
+      // FTS5 语法: "term"* 表示字面量前缀匹配
+      final ftsQuery = _ftsPrefixQuery(keywords);
 
       debugPrint('[KnowledgeService] 搜索: keywords=$keywords, ftsQuery="$ftsQuery", opType=$opType, platform=$platform');
 
@@ -629,7 +639,7 @@ class KnowledgeService {
         // 尝试宽松搜索：只用第一个关键词，不过滤 opType
         if (keywords.length > 1 || opType != null) {
           debugPrint('[KnowledgeService] 尝试宽松搜索...');
-          final looseFtsQuery = '${keywords.first}*';
+          final looseFtsQuery = _ftsPrefixQuery([keywords.first]);
 
           List<Map<String, Object?>> looseResults;
           try {

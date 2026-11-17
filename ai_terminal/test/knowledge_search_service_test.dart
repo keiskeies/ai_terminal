@@ -97,6 +97,29 @@ void main() {
       expect(await service.searchKnowledge('   '), isEmpty);
       expect(await service.searchKnowledge('zzzqqqxxxnotexist'), isEmpty);
     });
+
+    test('FTS 特殊字符不炸查询：-p / 引号 / 问号（真机缺陷回归）', () async {
+      // 真机输入 `read -p 'Continue? ' ans` 时，裸拼 `-p*` 让 FTS5 把 `-`
+      // 解析成 NOT、`'` 解析成字面量起点，整条 MATCH 报
+      // `no such column: p`，用户经验库与官方库检索双双降级。
+      // 关键词包成引号字面量后，这类请求必须正常返回（不抛异常、有结果或空）。
+      final entries = await service.searchKnowledge(
+        r"read -p 'Continue? ' ans; echo got-$ans",
+        platform: 'linux',
+      );
+      expect(entries, isNotNull);
+      // 中括号/花括号/OR/NEAR 等同样是 FTS5 语法字符
+      expect(await service.searchKnowledge('docker OR nginx [test] {x}'),
+          isNotNull);
+      expect(await service.searchKnowledge('"unbalanced quote'), isNotNull);
+      expect(await service.searchKnowledge('a AND', ), isNotNull);
+    });
+
+    test('引号字面量前缀仍能命中（quote 化不破坏正常检索）', () async {
+      final entries = await service.searchKnowledge('dock', platform: 'linux');
+      expect(entries.where((e) => e.guide.softwareName == 'docker'), isNotEmpty,
+          reason: '"dock"* 前缀匹配必须继续工作');
+    });
   });
 
   group('用户经验库与多 host 隔离（R3）', () {
