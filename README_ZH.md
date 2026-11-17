@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.4.0-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.4.1-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.4.0</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.4.1</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">访问官网</a>
 </p>
@@ -52,15 +52,24 @@
 
 ## 一眼看懂
 
-`5 个平台` · `14 种界面语言` · `22 个 AI 供应商` · `90+ 预设模型` · `26 个内置工具` · `8 个斜杠命令` · `300+ 知识库条目` · `7 种联网搜索源`
+`5 个平台` · `14 种界面语言` · `22 个 AI 供应商` · `90+ 预设模型` · `28 个内置工具` · `8 个斜杠命令` · `300+ 知识库条目` · `7 种联网搜索源`
 
-## 1.4.0 新增
+## 1.4.1 新增
 
-- **运行时性能优化**：Agent 运行不再把 CPU/GPU 打满——聊天界面只重建正在流式的那条消息，不再带动整页与所有后台标签工作区；自动跟随滚动取消"每个 token 重启一次动画"的满帧率渲染
-- **终端输出批处理**：PTY/SSH 输出按帧合并后再写入 xterm，刷屏型命令不再逐包触发整屏重绘
-- **系统监控让路**：后台标签停止采集，Windows CIM 采集在任务运行期间自动降频，监控不再和 Agent 抢 CPU
-- **流式 Markdown 增量渲染**：已完成段落进缓存、只重析增长中的尾部，修复长回答越打越卡的平方级开销；命令提前检测与会话持久化同样做了增量与限频
-- **持久化移出主线程**：大会话的 JSON 序列化改在后台 isolate 完成，并按会话串行落盘，保存不再卡顿 UI，也不丢数据
+本次版本完成了为期三期的 Agent 能力优化：长输出不再淹没自身上下文、任务运行中你可以随时干预，动作改走原生 Function Calling。
+
+- **Function Calling 优先**：支持 FC 的模型上，命令与 finish/ask 动作以结构化 `tool_calls` 传递，不再把 JSON 埋进正文反复解析；命令出现即提前执行的链路保持不变。文本协议保留为一等降级路径，非 FC 模型行为不变
+- **Token 化上下文压缩**：压缩阈值按 token 计量，滚动整体摘要替代零散裁剪，长任务不再撑爆上下文窗口、也不丢早期决策
+- **运行中插话**：任务执行中可补充指令（steering），下一轮直接注入，不必等任务结束
+- **交互提示桥接**：`[Y/n]`、`Continue?`、`Press ENTER`（以及密码提示，密码不进历史与日志）会弹出真实输入框；可信场景可开启自动应答
+- **计划跟踪与完成门控**：每轮重新注入计划进度；仍有未完成任务项时，结论不允许提前结束
+- **观测分级截断**：长输出按事件类型分级限长，失败输出保留头尾；新增 `sftp_file_read` 直接读取远端文件，不再用 cat 灌满对话
+- **`knowledge_search` 工具**：300+ 条知识库支持任务中途按需检索，不再只在任务开始时预匹配
+- **只读管道放开**：`grep … | sort | head` 这类只读组合命令可直接执行；可能修改状态的链接仍然硬拦截
+- **终端能力补齐**：分屏 + 按分屏路由 AI、Windows/macOS 快捷键补全、按行右键操作
+- **设置与界面重做**：设置抽屉分区导航 + 就地编辑、主机编辑表单重设计、监控面板精简、服务商官方 SVG logo、全平台图标统一、GitHub Releases 检查更新
+
+同时包含 v1.4.0 的运行时性能专项：消息级局部重建、终端输出批处理、任务期监控降频、流式 Markdown 增量渲染与后台序列化持久化。
 
 ## 核心能力
 
@@ -195,11 +204,11 @@ Agent 也能直接读写跑着这个 App 的这台电脑，而不只是服务器
 
 | 平台 | 文件 |
 |---|---|
-| macOS | `AI_Terminal_v1.4.0_macOS.zip` |
-| iOS | `AI_Terminal_v1.4.0_iOS.ipa`（未签名） |
-| Android | `AI_Terminal_v1.4.0_Android.apk` |
-| Windows | `AI_Terminal_v1.4.0_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.4.0_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.4.1_macOS.zip` |
+| iOS | `AI_Terminal_v1.4.1_iOS.ipa`（未签名） |
+| Android | `AI_Terminal_v1.4.1_Android.apk` |
+| Windows | `AI_Terminal_v1.4.1_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.4.1_Linux_x64.tar.gz` |
 
 macOS 首次打开如提示“无法验证开发者”，可执行：
 

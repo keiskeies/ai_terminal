@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.4.0-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.4.1-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.4.0</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.4.1</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">Visit the website</a>
 </p>
@@ -52,15 +52,24 @@ A chat assistant tells you what to run. AI Terminal runs it on your servers and 
 
 ## At a glance
 
-`5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `26 built-in tools` · `8 slash commands` · `300+ knowledge entries` · `7 web search engines`
+`5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `28 built-in tools` · `8 slash commands` · `300+ knowledge entries` · `7 web search engines`
 
-## New in 1.4.0
+## New in 1.4.1
 
-- **Idle-friendly runtime performance** — no more CPU/GPU spikes while the Agent runs: the chat UI rebuilds only the streaming message instead of the whole page and every tab workspace, and auto-follow scrolling no longer restarts an animation on every token
-- **Batched terminal rendering** — PTY/SSH output is merged frame-by-frame before writing to xterm, so commands that flood the screen no longer repaint per packet
-- **Quieter system monitor** — background tabs stop polling, and the Windows CIM collection slows down while a task is running, so monitoring no longer competes with the Agent for CPU
-- **Incremental streaming markdown** — completed paragraphs are cached and only the growing tail is re-parsed, fixing the quadratic slowdown on long answers; early command detection and session persistence are likewise bounded
-- **Background-serialized persistence** — large conversations are JSON-encoded off the UI thread with per-conversation write ordering, keeping saves crash-safe and stutter-free
+This release completes a three-phase agent capability program: the Agent works with longer output without drowning its own context, keeps you in control mid-task, and now drives actions through native Function Calling.
+
+- **Function Calling first** — on FC-capable models, commands and the finish/ask actions are structured `tool_calls` instead of JSON embedded in prose: no more text round-trip parsing, and the early-execution path still fires the moment a command appears. The text protocol stays as a first-class fallback for non-FC models
+- **Run-aware context compaction** — thresholds are measured in tokens instead of raw characters, and a rolling whole-conversation summary replaces piecemeal trimming, so long tasks no longer blow past the context window or lose early decisions
+- **Interject while a task runs** — send a supplemental instruction mid-task (steering); it is injected into the next round instead of waiting for the task to end
+- **Interactive prompts bridged** — `[Y/n]`, `Continue?` and `Press ENTER` prompts (and password prompts, kept out of history and logs) surface a real input dialog; an opt-in auto-responder handles confirmations you trust
+- **Plan tracking & finish gate** — plan progress is re-injected every round, and a conclusion cannot end the task while plan items are still pending
+- **Observation-grade truncation** — long output is capped per event class, failures keep their head and tail, and a new `sftp_file_read` tool reads remote files without cat-ing them into the transcript
+- **`knowledge_search` tool** — the 300+ entry knowledge base is now queryable mid-task, not just pre-matched at task start
+- **Read-only pipelines allowed** — `grep … | sort | head` style combinations run freely; chaining that could mutate state stays hard-blocked
+- **Terminal capability gap closed** — split panes with AI routing per pane, full Windows/macOS keyboard shortcuts, and per-line right-click actions
+- **Settings & UI rebuilt** — settings drawer with section navigation and in-place editing, redesigned host edit form, slimmer monitor strip, official SVG provider logos, unified app icons, and GitHub Releases update check
+
+Also includes the v1.4.0 runtime performance program: local message rebuilds instead of whole-page, batched terminal output, monitor slowdown during tasks, incremental streaming markdown, and background-serialized persistence.
 
 ## Highlights
 
@@ -195,11 +204,11 @@ Get the latest build from [GitHub Releases](https://github.com/keiskeies/ai_term
 
 | Platform | File |
 |---|---|
-| macOS | `AI_Terminal_v1.4.0_macOS.zip` |
-| iOS | `AI_Terminal_v1.4.0_iOS.ipa` (unsigned) |
-| Android | `AI_Terminal_v1.4.0_Android.apk` |
-| Windows | `AI_Terminal_v1.4.0_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.4.0_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.4.1_macOS.zip` |
+| iOS | `AI_Terminal_v1.4.1_iOS.ipa` (unsigned) |
+| Android | `AI_Terminal_v1.4.1_Android.apk` |
+| Windows | `AI_Terminal_v1.4.1_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.4.1_Linux_x64.tar.gz` |
 
 If macOS reports that the developer cannot be verified:
 
