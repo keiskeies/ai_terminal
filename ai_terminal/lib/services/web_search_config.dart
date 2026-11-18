@@ -122,6 +122,10 @@ enum WebSearchProvider {
   /// SearXNG 实例地址是必填项
   bool get requiresInstanceUrl => this == WebSearchProvider.searxng;
 
+  /// 该后端是否还缺实例地址
+  bool missingInstanceUrl(String instanceUrl) =>
+      requiresInstanceUrl && instanceUrl.trim().isEmpty;
+
   String get displayName {
     switch (this) {
       case WebSearchProvider.exa:
@@ -277,6 +281,46 @@ class WebSearchConfig {
       enabledBackends.any((p) => p.isAvailable);
 
   int get enabledCount => enabledBackends.where((p) => p.isAvailable).length;
+
+  /// 已启用但还缺实例地址的后端
+  ///
+  /// Key 是否已配要读凭据库（异步），判不了；地址是同步可得的，先把这一类
+  /// 「每次搜索必定被跳过」的缺口摆到界面上。
+  List<WebSearchProvider> backendsMissingInstanceUrl() {
+    return enabledBackends
+        .where((p) => p.missingInstanceUrl(searxngInstanceUrl))
+        .toList(growable: false);
+  }
+
+  /// 代理归一化：无 scheme 补 `http://`，只接受 `http://host:port`
+  ///
+  /// 拒绝带 `userInfo` 的写法，避免把 `user:pass@host` 当合法代理落库；
+  /// SOCKS5 与代理账号密码都不支持（Dio 的 proxy 只吃 http 通道）。
+  /// 返回 null 表示非法，空串表示「不设代理」。
+  static String? normalizeProxy(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return '';
+    final withScheme =
+        trimmed.contains('://') ? trimmed : 'http://$trimmed';
+    final uri = Uri.tryParse(withScheme);
+    if (uri == null || uri.host.isEmpty) return null;
+    if (uri.scheme != 'http') return null;
+    if (uri.userInfo.isNotEmpty) return null;
+    return withScheme;
+  }
+
+  /// SearXNG 实例地址归一化：必须 http(s) 且带 host，去尾斜杠
+  static String? normalizeInstanceUrl(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+    final withScheme = trimmed.contains('://') ? trimmed : 'http://$trimmed';
+    final uri = Uri.tryParse(withScheme);
+    if (uri == null || uri.host.isEmpty) return null;
+    if (uri.scheme != 'http' && uri.scheme != 'https') return null;
+    return withScheme.endsWith('/')
+        ? withScheme.substring(0, withScheme.length - 1)
+        : withScheme;
+  }
 
   WebSearchConfig copyWith({
     bool? enabled,

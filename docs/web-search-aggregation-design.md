@@ -28,7 +28,7 @@
 | 2 | Parallel | 需 Key | `PARALLEL_API_KEY` | `POST https://api.parallel.ai/v1/search` | 是 | `search_queries` + `results[].excerpts` |
 | 3 | Bing RSS | 免密钥 | 无 | `GET https://www.bing.com/search?format=rss` | 是 | 自动跟随 `cn.bing.com` 跳转 |
 | 4 | DuckDuckGo | 免密钥 | 无 | `GET https://lite.duckduckgo.com/lite/` | 是 | 国内直连常超时，需代理 |
-| 5 | SearXNG | 免密钥 | 可选 Token | `GET {instance}/search?format=json` | 是 | 需自建并开启 `search.formats: [json]` |
+| 5 | SearXNG | 免密钥 | 可选 Token | `GET {instance}/search?format=json` | 是 | 需自建并开启 `search.formats: [html, json]`（保留 html，否则实例自带网页端失效） |
 | 6 | Brave | 需 Key | `BRAVE_API_KEY` | `GET https://api.search.brave.com/res/v1/web/search` | 是 | 独立索引 |
 | 7 | Tavily | 需 Key | `TAVILY_API_KEY` | `POST https://api.tavily.com/search` | 是 | AI 优化摘要 |
 | 8 | Serper.dev | 需 Key | `SERPER_API_KEY` | `POST https://google.serper.dev/search` | 是 | Google 结果 |

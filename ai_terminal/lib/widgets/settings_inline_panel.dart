@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart' show CancelToken;
 import 'package:local_auth/local_auth.dart';
 
 import '../core/constants.dart';
@@ -22,6 +24,7 @@ import '../services/mcp_manager.dart';
 import '../services/mcp_models.dart';
 import '../services/notification_service.dart';
 import '../services/web_search_config.dart';
+import '../services/web_search_service.dart';
 import 'endpoint_editor_form.dart';
 import 'inline_form.dart';
 import 'keybinding_editor.dart';
@@ -73,6 +76,11 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
   int _webBackendCount = 0;
   List<WebSearchProvider> _webBackends = const [];
   int _webNumResults = 8;
+  int _webConcurrency = 6;
+  int _webTimeoutMs = 30000;
+  String _webProxy = '';
+  String? _webProxyError;
+  String _webSearxngUrl = '';
   bool _appLockEnabled = false;
   bool _cwEnabled = false;
   int _cwStart = 22;
@@ -96,6 +104,9 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
   bool _showPrompt = false;
   bool _showWebPicker = false;
   WebSearchProvider? _webKeyFor;
+  WebSearchProvider? _webSearxngFor;
+  bool _showWebAdvanced = false;
+  bool _showWebTest = false;
   bool _confirmClear = false;
 
   /// 等待二次确认的条目 id（端点 / MCP / 规范共用），该行就地换成确认条。
@@ -128,6 +139,10 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
       _webBackendCount = web.enabledCount;
       _webBackends = web.enabledBackends;
       _webNumResults = web.numResults;
+      _webConcurrency = web.concurrency;
+      _webTimeoutMs = web.backendTimeoutMs;
+      _webProxy = web.proxy;
+      _webSearxngUrl = web.searxngInstanceUrl;
 
       _appLockEnabled =
           SettingsDao.getCached('appLockEnabled', defaultValue: false) == true;
@@ -973,6 +988,9 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
   // ==================== 联网搜索 ====================
 
   Widget _webSearch(ThemeColors tc) {
+    final searxngPending = WebSearchConfig.load()
+        .backendsMissingInstanceUrl()
+        .isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -998,12 +1016,15 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
               _WebBackendChip(
                 tc: tc,
                 provider: p,
-                onTap: () async {
-                  final cfg = WebSearchConfig.load();
-                  final next = cfg.enabledBackends.where((e) => e != p).toList();
-                  await cfg.copyWith(enabledBackends: next).save();
-                  _load();
-                  _changed();
+                needsKey: p.requiresApiKey,
+                pendingUrl: p.missingInstanceUrl(_webSearxngUrl),
+                // 缺实例地址的后端，第一动作是点开补地址，不是删掉它
+                onTap: () {
+                  if (p.requiresInstanceUrl) {
+                    _openWebSetup(p);
+                  } else {
+                    _removeWebBackend(p);
+                  }
                 },
               ),
             _ChipButton(
@@ -1012,19 +1033,45 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
                   ? UiText.t('收起', 'Hide')
                   : '+ ${UiText.t('添加', 'Add')}',
               selected: _showWebPicker,
-              onTap: () =>
-                  setState(() => _showWebPicker = !_showWebPicker),
+              onTap: () => setState(() {
+                _showWebPicker = !_showWebPicker;
+                _webKeyFor = null;
+                _webSearxngFor = null;
+              }),
             ),
           ],
         ),
-        if (_webKeyFor != null) ...[
+        if (_webSearxngFor case final provider?) ...[
+          const SizedBox(height: 8),
+          _WebSearxngForm(
+            provider: provider,
+            initialUrl: _webSearxngUrl,
+            onCancel: () => setState(() => _webSearxngFor = null),
+            onSave: (url, token, tokenCleared) async {
+              if (token.isNotEmpty) {
+                await WebSearchConfig.saveApiKey(provider, token);
+              } else if (tokenCleared) {
+                await WebSearchConfig.deleteApiKey(provider);
+              }
+              await WebSearchConfig.load()
+                  .copyWith(searxngInstanceUrl: url)
+                  .save();
+              if (!mounted) return;
+              setState(() => _webSearxngFor = null);
+              if (!WebSearchConfig.load().enabledBackends.contains(provider)) {
+                await _enableWebBackend(provider);
+              }
+            },
+            onRemove: () => _removeWebBackend(provider),
+          ),
+        ] else if (_webKeyFor case final provider?) ...[
           const SizedBox(height: 8),
           _WebKeyForm(
-            provider: _webKeyFor!,
+            provider: provider,
             onCancel: () => setState(() => _webKeyFor = null),
             onSave: (key) async {
-              await WebSearchConfig.saveApiKey(_webKeyFor!, key);
-              final provider = _webKeyFor!;
+              await WebSearchConfig.saveApiKey(provider, key);
+              if (!mounted) return;
               setState(() => _webKeyFor = null);
               await _enableWebBackend(provider);
             },
@@ -1045,19 +1092,152 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
               tc,
               UiText.t('一个后端都没启用，等于没开。',
                   'No backend enabled — search will not run.')),
+        ] else if (searxngPending && _webSearxngFor == null) ...[
+          const SizedBox(height: 6),
+          _note(
+              tc,
+              UiText.t(
+                  'SearXNG 还差实例地址：点它的胶囊补上，否则每次搜索都会跳过它。',
+                  'SearXNG still needs an instance URL — tap its chip, or every search skips it.')),
         ],
         const SizedBox(height: 10),
-        _kv(
-          tc,
-          UiText.t('返回条数', 'Results'),
-          '$_webNumResults',
+        _ChipButton(
+          tc: tc,
+          label: _showWebAdvanced
+              ? UiText.t('收起高级', 'Hide advanced')
+              : UiText.t('高级 · 代理 / 条数 / 并发 / 超时',
+                  'Advanced · proxy / results / concurrency / timeout'),
+          selected: _showWebAdvanced,
+          onTap: () => setState(() => _showWebAdvanced = !_showWebAdvanced),
         ),
+        if (_showWebAdvanced) ...[
+          const SizedBox(height: 8),
+          _stepperRow(
+            tc,
+            UiText.t('返回条数', 'Results'),
+            '$_webNumResults',
+            onMinus: _webNumResults > 1
+                ? () => _saveWebNumResults(_webNumResults - 1)
+                : null,
+            onPlus: _webNumResults < 20
+                ? () => _saveWebNumResults(_webNumResults + 1)
+                : null,
+          ),
+          _stepperRow(
+            tc,
+            UiText.t('并发后端数', 'Concurrent backends'),
+            '$_webConcurrency',
+            onMinus: _webConcurrency > 1
+                ? () => _saveWebConcurrency(_webConcurrency - 1)
+                : null,
+            onPlus: _webConcurrency < 12
+                ? () => _saveWebConcurrency(_webConcurrency + 1)
+                : null,
+          ),
+          _stepperRow(
+            tc,
+            UiText.t('单后端超时', 'Per-backend timeout'),
+            '$_webTimeoutMs ms',
+            onMinus: _webTimeoutMs > 3000
+                ? () => _saveWebTimeout(_webTimeoutMs - 5000)
+                : null,
+            onPlus: _webTimeoutMs < 120000
+                ? () => _saveWebTimeout(_webTimeoutMs + 5000)
+                : null,
+          ),
+          const SizedBox(height: 6),
+          _label(tc, UiText.t('出站代理（可选）', 'Outbound proxy (optional)')),
+          const SizedBox(height: 4),
+          _WebhookField(
+            key: ValueKey('web-proxy-$_webProxy'),
+            tc: tc,
+            initial: _webProxy,
+            hint: 'http://127.0.0.1:7890',
+            onSave: _saveWebProxy,
+          ),
+          if (_webProxyError != null) ...[
+            const SizedBox(height: 4),
+            Text(_webProxyError!,
+                style: TextStyle(fontSize: fMicro, color: tc.error, height: 1.35)),
+          ] else ...[
+            const SizedBox(height: 4),
+            _note(tc, UiText.t('代理仅支持 http://host:port',
+                'Proxy only supports http://host:port')),
+          ],
+          const SizedBox(height: 10),
+          // 与「高级」同款折叠：收起时只剩一颗按钮，展开才占这半屏。
+          // 曾经它常驻且「返回」只清结果——点了没反应，和别处「返回=退上一屏」相悖。
+          if (_showWebTest)
+            _WebTestPanel(
+              enabled: _webSearchEnabled && _webBackendCount > 0,
+              onBack: () => setState(() => _showWebTest = false),
+            )
+          else
+            _ChipButton(
+              tc: tc,
+              label: UiText.t('立即测试', 'Test now'),
+              selected: false,
+              onTap: () => setState(() => _showWebTest = true),
+            ),
+        ],
       ],
     );
   }
 
-  /// 选一个后端：需要 Key 而没配的，就地换成 Key 输入；否则直接启用。
+  /// 打开某个后端的补配置表单；同一时刻只允许存在一张表单
+  void _openWebSetup(WebSearchProvider p) {
+    setState(() {
+      _webSearxngFor = p;
+      _webKeyFor = null;
+      _showWebPicker = false;
+    });
+  }
+
+  Future<void> _removeWebBackend(WebSearchProvider p) async {
+    final cfg = WebSearchConfig.load();
+    final next = cfg.enabledBackends.where((e) => e != p).toList();
+    await cfg.copyWith(enabledBackends: next).save();
+    if (!mounted) return;
+    setState(() => _webSearxngFor = null);
+    _load();
+    _changed();
+  }
+
+  /// 步进器一次一跳：就地写 SettingsDao 并同步内存读数
+  Future<void> _patchWeb(
+      WebSearchConfig Function(WebSearchConfig cfg) patch) async {
+    await patch(WebSearchConfig.load()).save();
+    _load();
+    _changed();
+  }
+
+  Future<void> _saveWebNumResults(int v) =>
+      _patchWeb((c) => c.copyWith(numResults: v.clamp(1, 20)));
+
+  Future<void> _saveWebConcurrency(int v) =>
+      _patchWeb((c) => c.copyWith(concurrency: v.clamp(1, 12)));
+
+  Future<void> _saveWebTimeout(int v) => _patchWeb(
+      (c) => c.copyWith(backendTimeoutMs: v.clamp(3000, 120000)));
+
+  Future<void> _saveWebProxy(String raw) async {
+    final normalized = WebSearchConfig.normalizeProxy(raw);
+    if (normalized == null) {
+      setState(() => _webProxyError = UiText.t(
+          '仅支持 http://host:port，不支持 SOCKS5/代理账号密码',
+          'Only http://host:port is supported; SOCKS5 and proxy credentials are not'));
+      return;
+    }
+    setState(() => _webProxyError = null);
+    await _patchWeb((c) => c.copyWith(proxy: normalized));
+  }
+
+  /// 选一个后端：还缺前置配置的，就地换成对应表单；齐了就启用。
   Future<void> _pickWebBackend(WebSearchProvider p) async {
+    if (p.missingInstanceUrl(WebSearchConfig.load().searxngInstanceUrl)) {
+      setState(() => _webSearxngFor = p);
+      return;
+    }
     if (p.requiresApiKey) {
       final status = await WebSearchConfig.apiKeyStatus(p);
       if (!status.configured) {
@@ -1380,14 +1560,17 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
 /// Webhook 输入框：自己管 controller，避免父级 setState 重建时丢焦点。
 class _WebhookField extends StatefulWidget {
   const _WebhookField({
+    super.key,
     required this.tc,
     required this.initial,
     required this.onSave,
+    this.hint = 'https://…',
   });
 
   final ThemeColors tc;
   final String initial;
   final ValueChanged<String> onSave;
+  final String hint;
 
   @override
   State<_WebhookField> createState() => _WebhookFieldState();
@@ -1416,7 +1599,7 @@ class _WebhookFieldState extends State<_WebhookField> {
               style: TextStyle(fontSize: fMicro, color: tc.textMain),
               decoration: InputDecoration(
                 isDense: true,
-                hintText: 'https://…',
+                hintText: widget.hint,
                 hintStyle: TextStyle(fontSize: fMicro, color: tc.textMuted),
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 9, vertical: 8),
@@ -1453,24 +1636,41 @@ class _WebhookFieldState extends State<_WebhookField> {
   }
 }
 
-/// 已启用的联网后端胶囊：需要 Key 且没配的，前面挂一把小金锁。
+/// 已启用的联网后端胶囊：缺 Key 挂金锁，缺实例地址挂橙色警示。
 class _WebBackendChip extends StatelessWidget {
   const _WebBackendChip({
     required this.tc,
     required this.provider,
+    required this.needsKey,
+    required this.pendingUrl,
     required this.onTap,
   });
 
   final ThemeColors tc;
   final WebSearchProvider provider;
+
+  /// 该后端要 Key（是否已配判不了，Key 在凭据库里）
+  final bool needsKey;
+
+  /// 自建实例地址还没填 —— 每次搜索都会跳过它
+  final bool pendingUrl;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    // 地址型后端的点击动作是「打开表单」，画个 × 会让人以为一点就删、不敢点
+    final trailing = provider.requiresInstanceUrl
+        ? Icons.edit_outlined
+        : Icons.close_rounded;
     final label = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (provider.requiresApiKey)
+        if (pendingUrl)
+          Padding(
+            padding: const EdgeInsets.only(right: 3),
+            child: Icon(Icons.error_outline_rounded, size: 11, color: tc.warn),
+          )
+        else if (needsKey)
           Padding(
             padding: const EdgeInsets.only(right: 3),
             child: Icon(Icons.key_rounded, size: 11, color: tc.gold),
@@ -1485,7 +1685,7 @@ class _WebBackendChip extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 4),
-        Icon(Icons.close_rounded, size: 11, color: tc.textMuted),
+        Icon(trailing, size: 11, color: tc.textMuted),
       ],
     );
     return GestureDetector(
@@ -1874,6 +2074,7 @@ class _WebKeyForm extends StatefulWidget {
 
 class _WebKeyFormState extends State<_WebKeyForm> {
   final _controller = TextEditingController();
+  bool _obscure = true;
 
   @override
   void dispose() {
@@ -1883,6 +2084,7 @@ class _WebKeyFormState extends State<_WebKeyForm> {
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     final key = _controller.text.trim();
     return InlineSheet(
       title: L10n.str.ut_fddba05801(widget.provider.displayName),
@@ -1900,11 +2102,340 @@ class _WebKeyFormState extends State<_WebKeyForm> {
         InlineField(
           label: UiText.t('API Key', 'API Key'),
           controller: _controller,
-          obscure: true,
+          obscure: _obscure,
           mono: true,
           onChanged: (_) => setState(() {}),
           hint: widget.provider.envKeyName,
+          trailing: IconButton(
+            iconSize: 14,
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            onPressed: () => setState(() => _obscure = !_obscure),
+            icon: Icon(
+              _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+              color: tc.textSub,
+            ),
+          ),
         ),
+        if (widget.provider.signupUrl.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          InkWell(
+            onTap: () {
+              Clipboard.setData(
+                  ClipboardData(text: widget.provider.signupUrl));
+              showTopSnackBar(
+                context,
+                SnackBar(
+                  content: Text(L10n.str.ut_8de5894b72(
+                      widget.provider.signupUrl)),
+                  duration: const Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            child: Text(
+              UiText.t('复制获取 Key 的地址 →', 'Copy the URL to get a key →'),
+              style: TextStyle(
+                  color: tc.brand,
+                  fontSize: fMicro,
+                  decoration: TextDecoration.underline),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// SearXNG 自建实例：地址必填、Token 可选，保存即启用该后端。
+///
+/// 加了后端却因为没地址被搜索静默跳过，是这块最早的功能性 bug：地址必须
+/// 在启用前拿到，不能等用户跑一次搜索才发现。
+class _WebSearxngForm extends StatefulWidget {
+  const _WebSearxngForm({
+    required this.provider,
+    required this.initialUrl,
+    required this.onCancel,
+    required this.onSave,
+    required this.onRemove,
+  });
+
+  final WebSearchProvider provider;
+  final String initialUrl;
+  final VoidCallback onCancel;
+
+  /// (地址, Token, 用户是否主动清空过 Token)
+  final void Function(String url, String token, bool tokenCleared) onSave;
+  final VoidCallback onRemove;
+
+  @override
+  State<_WebSearxngForm> createState() => _WebSearxngFormState();
+}
+
+class _WebSearxngFormState extends State<_WebSearxngForm> {
+  late final TextEditingController _url =
+      TextEditingController(text: widget.initialUrl);
+  final TextEditingController _token = TextEditingController();
+  bool _obscure = true;
+  bool _tokenTouched = false;
+  bool _confirmRemove = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _url.dispose();
+    _token.dispose();
+    super.dispose();
+  }
+
+  /// 掩码框分不清「没改」和「清空」，只在用户真的动过时才写/删 Token
+  bool get _tokenCleared => _tokenTouched && _token.text.trim().isEmpty;
+
+  void _save() {
+    final url = WebSearchConfig.normalizeInstanceUrl(_url.text);
+    if (url == null) {
+      setState(() => _error = UiText.t(
+          '地址需是 http(s)://host:port，例如 http://127.0.0.1:8888',
+          'Enter an address such as http(s)://host:port, e.g. http://127.0.0.1:8888'));
+      return;
+    }
+    setState(() => _error = null);
+    widget.onSave(url, _token.text.trim(), _tokenCleared);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    final signupUrl = WebSearchProvider.searxng.signupUrl;
+    return InlineSheet(
+      title: UiText.t('${widget.provider.displayName} 实例',
+          '${widget.provider.displayName} instance'),
+      onBack: widget.onCancel,
+      error: _error,
+      actions: [
+        InlineButton(
+            label: UiText.t('取消', 'Cancel'), onTap: widget.onCancel),
+        InlineButton(
+          label: UiText.t('保存并启用', 'Save & enable'),
+          primary: true,
+          onTap: _save,
+        ),
+      ],
+      children: [
+        InlineField(
+          label: UiText.t('SearXNG 实例地址', 'SearXNG instance URL'),
+          controller: _url,
+          mono: true,
+          hint: 'http://127.0.0.1:8888',
+          onChanged: (_) {
+            if (_error != null) setState(() => _error = null);
+          },
+        ),
+        const SizedBox(height: 6),
+        _searxngNote(tc),
+        const SizedBox(height: 6),
+        InkWell(
+          onTap: () {
+            Clipboard.setData(ClipboardData(text: signupUrl));
+            showTopSnackBar(
+              context,
+              SnackBar(
+                content: Text(L10n.str.ut_8de5894b72(signupUrl)),
+                duration: const Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          },
+          child: Text(
+            UiText.t('复制部署文档地址 →', 'Copy the deployment guide URL →'),
+            style: TextStyle(
+                color: tc.brand,
+                fontSize: fMicro,
+                decoration: TextDecoration.underline),
+          ),
+        ),
+        const SizedBox(height: 8),
+        InlineField(
+          label: UiText.t('Token（可选）', 'Token (optional)'),
+          controller: _token,
+          obscure: _obscure,
+          mono: true,
+          hint: WebSearchProvider.searxng.envKeyName,
+          onChanged: (_) => _tokenTouched = true,
+          trailing: IconButton(
+            iconSize: 14,
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            onPressed: () => setState(() => _obscure = !_obscure),
+            icon: Icon(
+              _obscure
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              color: tc.textSub,
+            ),
+          ),
+        ),
+        if (widget.initialUrl.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          if (_confirmRemove)
+            InlineConfirm(
+              message: UiText.t('移除 SearXNG 后端？地址与 Token 会保留。',
+                  'Remove the SearXNG backend? URL and token stay saved.'),
+              onCancel: () => setState(() => _confirmRemove = false),
+              onConfirm: () {
+                setState(() => _confirmRemove = false);
+                widget.onRemove();
+              },
+            )
+          else
+            InkWell(
+              onTap: () => setState(() => _confirmRemove = true),
+              child: Text(
+                UiText.t('移除该后端', 'Remove this backend'),
+                style: TextStyle(color: tc.warn, fontSize: fMicro),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+
+  Widget _searxngNote(ThemeColors tc) => Text(
+        UiText.t(
+          '公共实例（含 searx.be）通常禁用 format=json，只回 HTML，必须自建：'
+          'docker run -d -p 8080:8080 searxng/searxng，并在 settings.yml 启用 '
+          'search.formats: [html, json]。',
+          'Public instances (including searx.be) usually disable format=json and only '
+          'return HTML, so host your own: docker run -d -p 8080:8080 searxng/searxng, '
+          'then enable search.formats: [html, json] in settings.yml.',
+        ),
+        style: TextStyle(fontSize: fMicro, color: tc.textMuted, height: 1.35),
+      );
+}
+
+/// 立即测试：跑一次真实聚合搜索，把每个后端的结果数/耗时/错误摊开。
+///
+/// 用已保存的配置，不搞旧页那套「草稿 override」——抽屉里其余设置即时生效。
+class _WebTestPanel extends StatefulWidget {
+  const _WebTestPanel({required this.enabled, required this.onBack});
+
+  final bool enabled;
+
+  /// 收起本面板（连同在途请求一起 dispose 掉），不是只清结果
+  final VoidCallback onBack;
+
+  @override
+  State<_WebTestPanel> createState() => _WebTestPanelState();
+}
+
+class _WebTestPanelState extends State<_WebTestPanel> {
+  final TextEditingController _query = TextEditingController(text: 'flutter');
+  CancelToken? _cancel;
+  int _generation = 0;
+  bool _running = false;
+  WebSearchResponse? _response;
+  String? _error;
+
+  @override
+  void dispose() {
+    // R2：先作废回写，再取消在途请求，最后释放 controller
+    _generation++;
+    _cancel?.cancel('panel disposed');
+    _cancel = null;
+    _query.dispose();
+    super.dispose();
+  }
+
+  Future<void> _run() async {
+    final query = _query.text.trim();
+    if (query.isEmpty || _running) return;
+    final myGeneration = ++_generation;
+    _cancel?.cancel('superseded');
+    final token = CancelToken();
+    _cancel = token;
+    setState(() {
+      _running = true;
+      _response = null;
+      _error = null;
+    });
+    try {
+      final response =
+          await WebSearchService.instance.search(query, dioCancelToken: token);
+      if (!mounted || myGeneration != _generation) return;
+      setState(() {
+        _running = false;
+        _cancel = null;
+        _response = response;
+      });
+    } catch (e) {
+      if (!mounted || myGeneration != _generation) return;
+      setState(() {
+        _running = false;
+        _cancel = null;
+        _error = e.toString();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
+    final response = _response;
+    return InlineSheet(
+      title: UiText.t('立即测试', 'Test now'),
+      onBack: widget.onBack,
+      error: _error ??
+          (widget.enabled
+              ? null
+              : UiText.t('先打开总开关并启用至少一个后端。',
+                  'Turn the master switch on and enable at least one backend.')),
+      actions: [
+        InlineButton(
+          label: UiText.t('测试', 'Test'),
+          primary: true,
+          busy: _running,
+          onTap: widget.enabled && !_running ? _run : null,
+        ),
+      ],
+      children: [
+        InlineField(label: UiText.t('测试关键词', 'Test query'), controller: _query),
+        if (response != null) ...[
+          const SizedBox(height: 8),
+          Text(
+              UiText.t(
+                '共 ${response.results.length} 条结果 · '
+                '${response.successCount} 个后端成功 · ${response.failureCount} 个失败',
+                '${response.results.length} results · '
+                '${response.successCount} ok · ${response.failureCount} failed',
+              ),
+              style: TextStyle(fontSize: fMicro, color: tc.textMuted, height: 1.35),
+            ),
+          const SizedBox(height: 4),
+          for (final report in response.reports)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    report.ok ? Icons.check_circle_outline : Icons.error_outline,
+                    size: 12,
+                    color: report.ok ? tc.ok : tc.error,
+                  ),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      '${report.provider.displayName} · ${report.summary}',
+                      style: TextStyle(
+                          fontSize: fMicro,
+                          color: report.ok ? tc.textSub : tc.textMain,
+                          height: 1.35),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ],
     );
   }

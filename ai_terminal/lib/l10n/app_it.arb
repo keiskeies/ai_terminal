@@ -4411,5 +4411,21 @@
         "type": "int"
       }
     }
-  }
+  },
+  "ut_fdb87a921f": "SearXNG still needs an instance URL — tap its chip, or every search skips it.",
+  "ut_ce0b4d5dcc": "Token (facoltativo)",
+  "ut_341402f7e9": "Only http://host:port is supported; SOCKS5 and proxy credentials are not",
+  "ut_dd676a16c3": "Turn the master switch on and enable at least one backend.",
+  "ut_adb6e13bd8": "Public instances (including searx.be) usually disable format=json and only return HTML, so host your own: docker run -d -p 8080:8080 searxng/searxng, then enable search.formats: [html, json] in settings.yml.",
+  "ut_9efbbcb09d": "Timeout per backend",
+  "ut_efaae1eeee": "Enter an address such as http(s)://host:port, e.g. http://127.0.0.1:8888",
+  "ut_73d855601e": "Copy the URL to get a key →",
+  "ut_c73975e022": "Copy the deployment guide URL →",
+  "ut_a698fef8df": "Backend concorrenti",
+  "ut_4a24bb1f5c": "Nascondi avanzate",
+  "ut_26b5af11a5": "Prova",
+  "ut_e4ecd4b6a5": "Query di prova",
+  "ut_e0355c78e9": "Remove the SearXNG backend? URL and token stay saved.",
+  "ut_53648e3fea": "Rimuovi questo backend",
+  "ut_b8b2d87880": "Avanzate · proxy / risultati / concorrenza / timeout"
 }

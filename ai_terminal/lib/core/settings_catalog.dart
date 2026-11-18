@@ -118,9 +118,15 @@ class SettingsEntry {
 
   static String _webSearchSubtitle() {
     final web = WebSearchConfig.load();
-    return web.enabled
-        ? L10n.str.ut_9947165032(web.enabledCount)
-        : UiText.t('已关闭 · AI 只靠本地上下文', 'Off · AI uses local context only');
+    if (!web.enabled) {
+      return UiText.t('已关闭 · AI 只靠本地上下文',
+          'Off · AI uses local context only');
+    }
+    final base = L10n.str.ut_9947165032(web.enabledCount);
+    // 地址没填的后端每次搜索都会被跳过，不展开抽屉也得看出来
+    final pending = web.backendsMissingInstanceUrl().length;
+    if (pending == 0) return base;
+    return '$base · ${UiText.t('$pending 个待配置', '$pending need setup')}';
   }
 
   static String _securitySubtitle() {

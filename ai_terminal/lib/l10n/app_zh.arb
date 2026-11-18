@@ -4449,5 +4449,21 @@
         "type": "int"
       }
     }
-  }
+  },
+  "ut_fdb87a921f": "SearXNG 还差实例地址：点它的胶囊补上，否则每次搜索都会跳过它。",
+  "ut_ce0b4d5dcc": "Token（可选）",
+  "ut_341402f7e9": "仅支持 http://host:port，不支持 SOCKS5/代理账号密码",
+  "ut_dd676a16c3": "先打开总开关并启用至少一个后端。",
+  "ut_adb6e13bd8": "公共实例（含 searx.be）通常禁用 format=json，只回 HTML，必须自建：docker run -d -p 8080:8080 searxng/searxng，并在 settings.yml 启用 search.formats: [html, json]。",
+  "ut_9efbbcb09d": "单后端超时",
+  "ut_efaae1eeee": "地址需是 http(s)://host:port，例如 http://127.0.0.1:8888",
+  "ut_73d855601e": "复制获取 Key 的地址 →",
+  "ut_c73975e022": "复制部署文档地址 →",
+  "ut_a698fef8df": "并发后端数",
+  "ut_4a24bb1f5c": "收起高级",
+  "ut_26b5af11a5": "测试",
+  "ut_e4ecd4b6a5": "测试关键词",
+  "ut_e0355c78e9": "移除 SearXNG 后端？地址与 Token 会保留。",
+  "ut_53648e3fea": "移除该后端",
+  "ut_b8b2d87880": "高级 · 代理 / 条数 / 并发 / 超时"
 }
