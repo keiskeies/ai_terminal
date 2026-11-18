@@ -3882,5 +3882,534 @@
         "type": "Object"
       }
     }
+  },
+  "agentUiTaskRecord": "작업 기록",
+  "agentUiCompleted": "완료",
+  "agentUiFailed": "실패",
+  "agentUiCancelled": "취소됨",
+  "agentUiInterrupted": "중단됨",
+  "agentUiPlanTitle": "실행 목록",
+  "agentUiPlanByAi": "AI 계획",
+  "agentUiPlanWarning": "계획에 아직 완료되지 않은 단계가 있습니다. 모두 완료되었는지 확인하십시오.",
+  "agentUiConclusion": "결론",
+  "agentUiVerifiedEvidence": "검증 증거 있음",
+  "agentUiAiConclusion": "AI 결론",
+  "agentUiContinueTask": "작업 계속",
+  "agentUiOperationCopied": "작업 순서가 복사되었습니다.",
+  "agentUiCopyAnswer": "답변 복사",
+  "agentUiCopied": "복사됨",
+  "agentUiAnswerCopied": "답변이 클립보드에 복사되었습니다.",
+  "agentUiChangesAndRollback": "변경 사항 및 롤백",
+  "agentUiAuditLog": "감사 기록",
+  "agentUiProcessAndEvidence": "프로세스 및 증거",
+  "agentUiFullSummary": "전체 요약",
+  "agentUiNoEvidence": "확장 가능한 실행 기록 없음",
+  "agentUiContextHint": "컨텍스트가 사용되었습니다. 70% 이상 그러면 엔진이 가장 오래된 메시지를 삭제하기 시작합니다.",
+  "agentUiGoalRunning": "목표 진행 중",
+  "agentUiGoalPaused": "목표 일시 중지됨",
+  "agentUiGoalFinished": "목표 종료됨",
+  "agentUiGoalEditAction": "목표 편집",
+  "agentUiGoalFinishAction": "목표 종료",
+  "agentUiGoalClearAction": "기록 지우기",
+  "agentUiGoalEditTitle": "목표 편집",
+  "agentUiGoalFinishTitle": "이 목표를 종료하시겠습니까?",
+  "agentUiGoalFinishBody": "대상은 완료로 표시되며 실행 중인 작업에는 영향을 미치지 않습니다.",
+  "agentUiGoalBudgetExhausted": "라운드 소진",
+  "agentUiThinkingAndExecution": "생각 및 실행 기록",
+  "agentUiLessThanOneSecond": "1초 미만",
+  "agentUiAgentTask": "에이전트 작업",
+  "agentUiOpenInTerminal": "터미널 보기",
+  "agentUiResume": "재개",
+  "agentUiPause": "일시 중지",
+  "agentUiStop": "중지",
+  "agentUiThinking": "생각 중",
+  "agentUiExecuting": "실행 중",
+  "agentUiWaitingConfirm": "확인 대기 중",
+  "agentUiPaused": "일시 중지됨",
+  "agentUiIdle": "준비",
+  "agentUiToolCall": "도구 호출",
+  "agentUiBlocked": "가로채기됨",
+  "agentUiNeedsConfirm": "확인 필요",
+  "agentUiExecutedLabel": "실행 중",
+  "agentUiExecutable": "실행 가능",
+  "agentUiRiskBlocked": "명령이 보호되었습니다. 정책 차단",
+  "agentUiChangeImpact": "변경 영향",
+  "agentUiConfirmImpact": "실행 전 영향을 확인하세요",
+  "agentUiNoRollbackSnapshot": "롤백: 자동 롤백이 없습니다. 먼저 스냅샷을 찍는 것이 좋습니다",
+  "agentUiCancel": "취소",
+  "agentUiConfirmExecute": "실행 확인",
+  "agentUiConfirmedLabel": "확인",
+  "agentUiConfirmedRecord": "실행 전 확인",
+  "agentUiResultSuccess": "실행 성공",
+  "agentUiLocalFileSection": "로컬 파일 액세스",
+  "agentUiLocalFileEnable": "허용된 에이전트는 로컬 파일을 읽고 씁니다",
+  "agentUiLocalFileDirs": "디렉터리 승인",
+  "agentUiLocalFileAddDir": "디렉터리 추가",
+  "agentUiLocalFileRemoveDir": "디렉터리 제거",
+  "agentUiLocalFilePickTitle": "에이전트가 액세스할 수 있는 디렉터리 선택",
+  "agentUiLocalFileNoDirs": "아직 인증된 디렉터리가 없습니다.",
+  "agentUiLocalFileBlacklistHint": "키 및 자격 증명 파일(~/.ssh, *.key, *.pem, .env)은 항상 접근할 수 없습니다.",
+  "agentUiLocalFileTrashEmpty": "재활용 영역이 비어 있습니다.",
+  "agentUiLocalFileTrashClear": "재활용 영역을 비우세요.",
+  "agentUiLocalFileTrashClearRefused": "재활용 영역에 포함되지 않고 건너뛰거나 삭제되지 않은 경로가 있습니다.",
+  "agentUiLocalExecAuthTitle": "로컬 디렉터리 액세스를 허용하시겠습니까?",
+  "agentUiLocalExecAuthNote": "민감한 경로(~/.ssh, .env, 키 등)는 계속 금지되어 있습니다.",
+  "agentUiLocalExecAuthAllow": "허용 및 계속",
+  "agentUiCommandLabel": "터미널 명령",
+  "agentUiPendingLabel": "보류 중",
+  "agentUiToolDoneLabel": "호출됨",
+  "agentUiFailedLabel": "실패",
+  "agentUiProcessFolded": "프로세스 축소됨",
+  "agentUiCollapseProcess": "프로세스 확장",
+  "agentUiExpandProcess": "확장",
+  "agentUiCollapse": "축소",
+  "agentUiExpandText": "확장",
+  "agentUiViewFullOutput": "전체 출력 보기",
+  "agentUiExpandEach": "항목별 항목",
+  "agentUiPermissionModeTitle": "실행 권한",
+  "agentUiPermissionAllowed": "해제됨",
+  "agentUiPermissionNotExecuted": "실행되지 않음",
+  "agentUiPermFullAutoWarningTitle": "완전 자동 모드가 활성화되었습니까?",
+  "agentUiPermFullAutoWarningBody": "에이전트는 더 이상 시스템 구성 삭제, 디스크 포맷 등 모든 명령을 일일이 확인하지 않고 직접 실행합니다. 일부 작업은 복구할 수 없습니다. 네트워크 정전 기간과 민감한 파일 제한은 여전히 ​​유효합니다. 영향의 범위를 이해했는지 확인하십시오.",
+  "agentUiPermissionEnable": "활성화",
+  "agentUiPermissionModeUsage": "사용법: /permission <읽기 전용|질문|자동|완전 자동>",
+  "agentUiCacheHit": "cache hit {percent}%",
+  "@agentUiCacheHit": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiChangesCount": "{n} 변경",
+  "@agentUiChangesCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCallsCount": "{n} 명령",
+  "@agentUiCommandCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCount": "{n} 명령",
+  "@agentUiCommandCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCountOne": "1 명령",
+  "agentUiContextUsed": "context {percent}%",
+  "@agentUiContextUsed": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExitCode": "종료 코드 {n}",
+  "@agentUiExitCode": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExpandAll": "모든 {n} 항목 확장",
+  "@agentUiExpandAll": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailedCommands": "{n} 명령 실패",
+  "@agentUiFailedCommands": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureCount": "{n} 실패",
+  "@agentUiFailureCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureHintCancelled": "실행이 취소되었습니다. 이 단계를 다시 시작할 수 있습니다.",
+  "agentUiFailureHintDisconnected": "연결 끊김. 먼저 서버에 다시 연결한 후 이 단계를 다시 시도하는 것이 좋습니다.",
+  "agentUiFailureHintInteractivePrompt": "명령어가 입력을 기다리는 중입니다. 비대화형 매개변수(예: -y / --batch)를 사용하고 다시 시도하는 것이 좋습니다.",
+  "agentUiFailureHintPermissionDenied": "권한이 부족합니다. sudo를 사용하여 다시 시도하거나 권한이 있는 사용자를 변경하는 것이 좋습니다.",
+  "agentUiFailureHintSyntaxError": "명령 구문 오류로 인해 실행되지 않습니다. 명령을 수정하고 다시 시도하는 것이 좋습니다.",
+  "agentUiFailureHintTimeout": "실행 시간 초과. 시간 초과를 연장하거나 명령을 더 작은 조각으로 분할하고 다시 시도하는 것이 좋습니다.",
+  "agentUiFailureHintUnknown": "실행에 실패했습니다. 출력을 확인하고 수정한 후 다시 시도하는 것이 좋습니다.",
+  "agentUiFailureLabelCancelled": "Canceled",
+  "agentUiFailureLabelDisconnected": "연결 끊김",
+  "agentUiFailureLabelInteractivePrompt": "입력을 기다리는 중",
+  "agentUiFailureLabelPermissionDenied": "권한이 부족합니다",
+  "agentUiFailureLabelSyntaxError": "명령 구문 오류",
+  "agentUiFailureLabelTimeout": "실행 시간 초과",
+  "agentUiGoalRounds": "round {used}/{max}",
+  "@agentUiGoalRounds": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiGoalRoundsLeft": "{n} 라운드",
+  "@agentUiGoalRoundsLeft": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiItemsCount": "{n} 항목",
+  "@agentUiItemsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalExecAuthCreateLine": "디렉토리가 존재하지 않습니다. 허가를 받아 제작됩니다.\n",
+  "agentUiLocalExecAuthGrant": "허용하면 로컬 파일 액세스가 활성화되고 해당 디렉터리가 승인됩니다.",
+  "agentUiLocalExecAuthHead": "에이전트는 로컬 디렉터리에서 명령을 실행해야 합니다.\n{path}\n\n",
+  "@agentUiLocalExecAuthHead": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthReason": "이유: {reason}\n\n",
+  "@agentUiLocalExecAuthReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthorized": "승인된 로컬 디렉터리: {path}",
+  "@agentUiLocalExecAuthorized": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearBody": "지우면 해당 사본이 영구적으로 삭제됩니다. {count} 항목(약 {size}). 그 이후에는 {records} 변경 기록이 더 이상 복원되지 않습니다(기록 자체는 유지되지만 파일은 검색할 수 없습니다).",
+  "@agentUiLocalFileTrashClearBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      },
+      "records": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearFailed": "{n} 항목 삭제 실패(다른 프로그램이 사용 중일 수 있음)",
+  "@agentUiLocalFileTrashClearFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashCleared": "재활용 영역이 비워졌습니다. {count} 항목을 삭제하고 {size}에 대해 해제합니다.",
+  "@agentUiLocalFileTrashCleared": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashLabel": "재활용 영역: {count} 항목 · 약 {size}",
+  "@agentUiLocalFileTrashLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLogCount": "{n} 시스템 로그",
+  "@agentUiLogCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLogCountOne": "1 시스템 로그",
+  "agentUiMoreActions": "및 {n}",
+  "@agentUiMoreActions": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreChanges": "및 {n} 변경, 자세한 내용은 감사 기록",
+  "@agentUiMoreChanges": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreOutputLines": "및 {n} 행",
+  "@agentUiMoreOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreSteps": "이전 {n} 단계",
+  "@agentUiMoreSteps": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiOutputLines": "{n} 줄",
+  "@agentUiOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPermDescAsk": "수정 및 고위험 명령이 먼저 묻습니다.",
+  "agentUiPermDescAuto": "일반적인 수정은 자동으로 실행되지만 고위험 명령은 계속 묻습니다.",
+  "agentUiPermDescFullAuto": "고위험 명령도 자동으로 실행됩니다. 네트워크 블랙아웃 기간 및 민감한 파일 제한이 여전히 유효함",
+  "agentUiPermDescReadOnly": "읽기 전용 명령만 허용되며 수정 사항은 거부됩니다.",
+  "agentUiPermLabelAsk": "묻기",
+  "agentUiPermLabelAuto": "자동",
+  "agentUiPermLabelFullAuto": "완전 자동",
+  "agentUiPermLabelReadOnly": "읽기 전용",
+  "agentUiPermissionModeCurrent": "현재 권한 모드: {mode}",
+  "@agentUiPermissionModeCurrent": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPermissionModeSwitched": "\"{mode}\"로 전환됨: {desc}",
+  "@agentUiPermissionModeSwitched": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "desc": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPhaseCancel": "취소됨",
+  "agentUiPhaseExec": "명령 실행",
+  "agentUiPhaseFail": "실행 실패",
+  "agentUiPhasePause": "일시 중지됨",
+  "agentUiPhaseResume": "실행 계속",
+  "agentUiPhaseSummarize": "결론 정리",
+  "agentUiPhaseThink": "생각 중",
+  "agentUiPhaseTool": "도구 실행",
+  "agentUiPhaseUnderstand": "요구 사항 이해",
+  "agentUiPhaseVerify": "확인 결과",
+  "agentUiPhaseWaitChoice": "선택 대기 중",
+  "agentUiPhaseWaitConfirm": "확인 대기 중",
+  "agentUiPlanDone": "{n} 완료",
+  "@agentUiPlanDone": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanFailed": "{n} 실패",
+  "@agentUiPlanFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanInProgress": "{n} 진행 중",
+  "@agentUiPlanInProgress": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanItems": "{n} 항목",
+  "@agentUiPlanItems": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanPending": "{n} 보류 중",
+  "@agentUiPlanPending": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanProgress": "계획 {done}/{total}",
+  "@agentUiPlanProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanSkipped": "{n} 건너뛰기",
+  "@agentUiPlanSkipped": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiProgressLines": "{n} 항목",
+  "@agentUiProgressLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiRiskPrefix": "위험: {reason}",
+  "@agentUiRiskPrefix": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRollbackPrefix": "롤백: {command}",
+  "@agentUiRollbackPrefix": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRoundsCount": "{n} 라운드",
+  "@agentUiRoundsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStep": "를 참조하세요. {n} 단계",
+  "@agentUiStep": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStepsCount": "{n} 단계",
+  "@agentUiStepsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiSuccessCount": "{n} 성공",
+  "@agentUiSuccessCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCount": "{n} 추론",
+  "@agentUiThoughtCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCountOne": "1 추론",
+  "agentUiTokPerSec": "{n} tok/s",
+  "@agentUiTokPerSec": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTokensCount": "{estimated}{value} tok",
+  "@agentUiTokensCount": {
+    "placeholders": {
+      "estimated": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiToolCallsCount": "도구가 {n}번 호출되었습니다.",
+  "@agentUiToolCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTruncated": "잘림",
+  "agentUiTruncatedChars": "잘림 {n} 문자",
+  "@agentUiTruncatedChars": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTurnLabel": "번째 {n} 라운드",
+  "@agentUiTurnLabel": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
   }
 }

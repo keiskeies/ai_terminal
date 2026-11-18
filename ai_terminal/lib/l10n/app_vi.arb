@@ -3882,5 +3882,534 @@
         "type": "Object"
       }
     }
+  },
+  "agentUiTaskRecord": "Bản ghi nhiệm vụ",
+  "agentUiCompleted": "Đã hoàn thành",
+  "agentUiFailed": "Thất bại",
+  "agentUiCancelled": "Đã hủy",
+  "agentUiInterrupted": "Bị gián đoạn",
+  "agentUiPlanTitle": "Danh sách thực hiện",
+  "agentUiPlanByAi": "Kế hoạch AI",
+  "agentUiPlanWarning": "Kế hoạch vẫn còn các bước chưa hoàn thành, vui lòng kiểm tra xem chúng đã hoàn thành chưa",
+  "agentUiConclusion": "Kết luận",
+  "agentUiVerifiedEvidence": "Có bằng chứng xác minh",
+  "agentUiAiConclusion": "Kết luận AI",
+  "agentUiContinueTask": "Tiếp tục nhiệm vụ",
+  "agentUiOperationCopied": "Lệnh vận hành đã được sao chép",
+  "agentUiCopyAnswer": "Sao chép câu trả lời",
+  "agentUiCopied": "Đã sao chép",
+  "agentUiAnswerCopied": "Câu trả lời đã được sao chép vào bảng tạm",
+  "agentUiChangesAndRollback": "Thay đổi và khôi phục",
+  "agentUiAuditLog": "Hồ sơ kiểm tra",
+  "agentUiProcessAndEvidence": "Quy trình và bằng chứng",
+  "agentUiFullSummary": "Tóm tắt đầy đủ",
+  "agentUiNoEvidence": "Không có hồ sơ thực thi có thể mở rộng",
+  "agentUiContextHint": "Bối cảnh bị chiếm dụng; hơn 70% Khi đó, công cụ sẽ bắt đầu loại bỏ các tin nhắn cũ nhất",
+  "agentUiGoalRunning": "Mục tiêu đang tiến hành",
+  "agentUiGoalPaused": "Mục tiêu bị tạm dừng",
+  "agentUiGoalFinished": "Mục tiêu đã kết thúc",
+  "agentUiGoalEditAction": "Chỉnh sửa mục tiêu",
+  "agentUiGoalFinishAction": "Mục tiêu kết thúc",
+  "agentUiGoalClearAction": "Xóa bản ghi",
+  "agentUiGoalEditTitle": "Chỉnh sửa mục tiêu",
+  "agentUiGoalFinishTitle": "Kết thúc mục tiêu này?",
+  "agentUiGoalFinishBody": "Mục tiêu sẽ được đánh dấu là đã hoàn thành và các tác vụ đang chạy sẽ không bị ảnh hưởng.",
+  "agentUiGoalBudgetExhausted": "Kết thúc vòng đấu",
+  "agentUiThinkingAndExecution": "Bản ghi suy nghĩ và thực hiện",
+  "agentUiLessThanOneSecond": "Dưới 1 giây",
+  "agentUiAgentTask": "Nhiệm vụ tác nhân",
+  "agentUiOpenInTerminal": "Xem trong thiết bị đầu cuối",
+  "agentUiResume": "Tiếp tục",
+  "agentUiPause": "Tạm dừng",
+  "agentUiStop": "Dừng",
+  "agentUiThinking": "Suy nghĩ",
+  "agentUiExecuting": "Thực thi",
+  "agentUiWaitingConfirm": "Đang chờ xác nhận",
+  "agentUiPaused": "Tạm dừng",
+  "agentUiIdle": "Sẵn sàng",
+  "agentUiToolCall": "Gọi công cụ",
+  "agentUiBlocked": "Bị chặn",
+  "agentUiNeedsConfirm": "Yêu cầu xác nhận",
+  "agentUiExecutedLabel": "Đang chạy",
+  "agentUiExecutable": "Có thể thực thi",
+  "agentUiRiskBlocked": "Lệnh đã được bảo mật Chặn chính sách",
+  "agentUiChangeImpact": "Thay đổi tác động",
+  "agentUiConfirmImpact": "Vui lòng xác nhận tác động trước khi thực thi",
+  "agentUiNoRollbackSnapshot": "Khôi phục: Không có khôi phục tự động, nên chụp nhanh trước",
+  "agentUiCancel": "Hủy",
+  "agentUiConfirmExecute": "Xác nhận thực hiện",
+  "agentUiConfirmedLabel": "Xác nhận",
+  "agentUiConfirmedRecord": "Xác nhận trước khi thực thi",
+  "agentUiResultSuccess": "Thực thi thành công",
+  "agentUiLocalFileSection": "Truy cập tệp cục bộ",
+  "agentUiLocalFileEnable": "Tác nhân được phép đọc và ghi tệp cục bộ",
+  "agentUiLocalFileDirs": "Ủy quyền thư mục",
+  "agentUiLocalFileAddDir": "Thêm thư mục",
+  "agentUiLocalFileRemoveDir": "Xóa thư mục",
+  "agentUiLocalFilePickTitle": "Chọn thư mục mà Tác nhân được phép truy cập",
+  "agentUiLocalFileNoDirs": "Không có thư mục được ủy quyền chưa",
+  "agentUiLocalFileBlacklistHint": "Các tệp khóa và thông tin xác thực (~/.ssh, *.key, *.pem, .env) luôn không thể truy cập được",
+  "agentUiLocalFileTrashEmpty": "Vùng tái chế trống",
+  "agentUiLocalFileTrashClear": "Làm trống vùng tái chế",
+  "agentUiLocalFileTrashClearRefused": "Có các đường dẫn không nằm trong vùng tái chế và đã bị bỏ qua và không bị xóa",
+  "agentUiLocalExecAuthTitle": "Cho phép truy cập thư mục cục bộ?",
+  "agentUiLocalExecAuthNote": "Các đường dẫn nhạy cảm (~/.ssh, .env, key, v.v.) vẫn nằm ngoài giới hạn.",
+  "agentUiLocalExecAuthAllow": "Cho phép và tiếp tục",
+  "agentUiCommandLabel": "Lệnh đầu cuối",
+  "agentUiPendingLabel": "đang chờ xử lý",
+  "agentUiToolDoneLabel": "Được gọi",
+  "agentUiFailedLabel": "Không thành công",
+  "agentUiProcessFolded": "Quy trình bị thu gọn",
+  "agentUiCollapseProcess": "Mở rộng quy trình",
+  "agentUiExpandProcess": "Mở rộng",
+  "agentUiCollapse": "Thu gọn",
+  "agentUiExpandText": "Mở rộng",
+  "agentUiViewFullOutput": "Xem đầu ra đầy đủ",
+  "agentUiExpandEach": "Mục theo mục",
+  "agentUiPermissionModeTitle": "Quyền thực thi",
+  "agentUiPermissionAllowed": "Đã phát hành",
+  "agentUiPermissionNotExecuted": "Chưa thực thi",
+  "agentUiPermFullAutoWarningTitle": "Đã bật chế độ hoàn toàn tự động?",
+  "agentUiPermFullAutoWarningBody": "Agent sẽ không còn xác nhận từng cái một và trực tiếp thực hiện tất cả các lệnh bao gồm xóa cấu hình hệ thống và định dạng đĩa. Một số thao tác không thể phục hồi được; thời gian mất mạng và các hạn chế về tệp nhạy cảm sẽ vẫn có hiệu lực. Hãy chắc chắn rằng bạn hiểu phạm vi tác động.",
+  "agentUiPermissionEnable": "Bật",
+  "agentUiPermissionModeUsage": "Cách sử dụng: /permission <read-only|ask|auto|full-automatic>",
+  "agentUiCacheHit": "cache đạt {percent}%",
+  "@agentUiCacheHit": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiChangesCount": "{n} thay đổi",
+  "@agentUiChangesCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCallsCount": "{n} lệnh",
+  "@agentUiCommandCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCount": "{n} lệnh",
+  "@agentUiCommandCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCountOne": "1 lệnh",
+  "agentUiContextUsed": "bối cảnh {percent}%",
+  "@agentUiContextUsed": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExitCode": "Mã thoát {n}",
+  "@agentUiExitCode": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExpandAll": "mở rộng tất cả {n} mục",
+  "@agentUiExpandAll": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailedCommands": "{n} lệnh không thành công",
+  "@agentUiFailedCommands": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureCount": "{n} Không thành công",
+  "@agentUiFailureCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureHintCancelled": "Việc thực thi đã bị hủy. Bạn có thể khởi động lại bước này.",
+  "agentUiFailureHintDisconnected": "Đã ngắt kết nối. Bạn nên kết nối lại với máy chủ trước rồi thử lại bước này.",
+  "agentUiFailureHintInteractivePrompt": "Lệnh đang chờ đầu vào. Bạn nên sử dụng các tham số không tương tác (chẳng hạn như -y/ --batch) và thử lại.",
+  "agentUiFailureHintPermissionDenied": "Không đủ quyền. Bạn nên sử dụng sudo để thử lại hoặc thay đổi người dùng có quyền.",
+  "agentUiFailureHintSyntaxError": "Lỗi cú pháp lệnh, không được thực thi. Nên sửa lệnh và thử lại.",
+  "agentUiFailureHintTimeout": "Hết thời gian thực hiện. Bạn nên kéo dài thời gian chờ hoặc chia lệnh thành các phần nhỏ hơn và thử lại.",
+  "agentUiFailureHintUnknown": "Thực thi không thành công. Bạn nên kiểm tra đầu ra, sửa nó và thử lại.",
+  "agentUiFailureLabelCancelled": "Đã hủy",
+  "agentUiFailureLabelDisconnected": "Đã ngắt kết nối",
+  "agentUiFailureLabelInteractivePrompt": "Đang chờ đầu vào",
+  "agentUiFailureLabelPermissionDenied": "Không đủ quyền",
+  "agentUiFailureLabelSyntaxError": "Lỗi cú pháp lệnh",
+  "agentUiFailureLabelTimeout": "Hết thời gian thực hiện",
+  "agentUiGoalRounds": "vòng {used}/{max}",
+  "@agentUiGoalRounds": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiGoalRoundsLeft": "{n} Vòng",
+  "@agentUiGoalRoundsLeft": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiItemsCount": "{n} mục",
+  "@agentUiItemsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalExecAuthCreateLine": "Thư mục không tồn tại. Nó sẽ được tạo ra với sự cho phép.\n",
+  "agentUiLocalExecAuthGrant": "Sau khi cho phép, quyền truy cập tệp cục bộ sẽ được bật và thư mục sẽ được cấp phép.",
+  "agentUiLocalExecAuthHead": "Tác nhân cần thực thi lệnh trong thư mục cục bộ:\n{path}\n\n",
+  "@agentUiLocalExecAuthHead": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthReason": "Lý do: {reason}\n\n",
+  "@agentUiLocalExecAuthReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthorized": "Thư mục cục bộ được ủy quyền: {path}",
+  "@agentUiLocalExecAuthorized": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearBody": "Việc xóa sẽ xóa vĩnh viễn bản sao của các mục {count} này (khoảng {size}). Sau đó, các bản ghi thay đổi {records} sẽ không được khôi phục nữa (bản thân các bản ghi được giữ lại nhưng không thể truy xuất các tệp).",
+  "@agentUiLocalFileTrashClearBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      },
+      "records": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearFailed": "{n} việc xóa mục không thành công (có thể bị chiếm bởi các chương trình khác)",
+  "@agentUiLocalFileTrashClearFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashCleared": "Khu vực tái chế đã bị dọn sạch: xóa mục {count} và phát hành khoảng {size}",
+  "@agentUiLocalFileTrashCleared": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashLabel": "khu vực tái chế: {count} mục · Khoảng {size}",
+  "@agentUiLocalFileTrashLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLogCount": "{n} nhật ký hệ thống",
+  "@agentUiLogCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLogCountOne": "1 nhật ký hệ thống",
+  "agentUiMoreActions": "và {n}",
+  "@agentUiMoreActions": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreChanges": "và {n} thay đổi, xem bản ghi kiểm tra",
+  "@agentUiMoreChanges": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreOutputLines": "và {n} Hàng",
+  "@agentUiMoreOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreSteps": "trước {n} bước",
+  "@agentUiMoreSteps": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiOutputLines": "{n} Dòng",
+  "@agentUiOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPermDescAsk": "Các sửa đổi và lệnh có rủi ro cao sẽ hỏi bạn trước",
+  "agentUiPermDescAuto": "Các sửa đổi thông thường sẽ được thực thi tự động, các lệnh có rủi ro cao vẫn sẽ hỏi",
+  "agentUiPermDescFullAuto": "Các lệnh có rủi ro cao cũng sẽ được thực thi tự động; thời gian mất điện mạng và các hạn chế tệp nhạy cảm vẫn có hiệu lực",
+  "agentUiPermDescReadOnly": "Chỉ cho phép các lệnh chỉ đọc, mọi sửa đổi sẽ bị từ chối",
+  "agentUiPermLabelAsk": "Hỏi",
+  "agentUiPermLabelAuto": "Tự động",
+  "agentUiPermLabelFullAuto": "Hoàn toàn tự động",
+  "agentUiPermLabelReadOnly": "Chỉ đọc",
+  "agentUiPermissionModeCurrent": "Chế độ cấp phép hiện tại: {mode}",
+  "@agentUiPermissionModeCurrent": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPermissionModeSwitched": "Chuyển sang \"{mode}\": {desc}",
+  "@agentUiPermissionModeSwitched": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "desc": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPhaseCancel": "Đã hủy",
+  "agentUiPhaseExec": "Thực thi lệnh",
+  "agentUiPhaseFail": "Thực thi không thành công",
+  "agentUiPhasePause": "Tạm dừng",
+  "agentUiPhaseResume": "Tiếp tục thực hiện",
+  "agentUiPhaseSummarize": "Sắp xếp kết luận",
+  "agentUiPhaseThink": "Suy nghĩ",
+  "agentUiPhaseTool": "Công cụ thực thi",
+  "agentUiPhaseUnderstand": "Tìm hiểu yêu cầu",
+  "agentUiPhaseVerify": "Kết quả xác minh",
+  "agentUiPhaseWaitChoice": "Đang chờ lựa chọn",
+  "agentUiPhaseWaitConfirm": "Đang chờ xác nhận",
+  "agentUiPlanDone": "{n} đã hoàn thành",
+  "@agentUiPlanDone": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanFailed": "{n} không thành công",
+  "@agentUiPlanFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanInProgress": "{n} đang tiến hành",
+  "@agentUiPlanInProgress": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanItems": "{n} mục",
+  "@agentUiPlanItems": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanPending": "{n} đang chờ xử lý",
+  "@agentUiPlanPending": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanProgress": "Kế hoạch {done}/{total}",
+  "@agentUiPlanProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanSkipped": "{n} đã bỏ qua",
+  "@agentUiPlanSkipped": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiProgressLines": "{n} mục",
+  "@agentUiProgressLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiRiskPrefix": "Rủi ro: {reason}",
+  "@agentUiRiskPrefix": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRollbackPrefix": "Quay lại: {command}",
+  "@agentUiRollbackPrefix": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRoundsCount": "{n} vòng",
+  "@agentUiRoundsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStep": "để biết chi tiết {n} bước",
+  "@agentUiStep": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStepsCount": "{n} bước",
+  "@agentUiStepsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiSuccessCount": "{n} Thành công",
+  "@agentUiSuccessCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCount": "{n} suy luận",
+  "@agentUiThoughtCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCountOne": "1 suy luận",
+  "agentUiTokPerSec": "{n} tok/s",
+  "@agentUiTokPerSec": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTokensCount": "{estimated}_{value} từ khóa",
+  "@agentUiTokensCount": {
+    "placeholders": {
+      "estimated": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiToolCallsCount": "Tool đã được gọi {n} lần",
+  "@agentUiToolCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTruncated": "Bị cắt ngắn",
+  "agentUiTruncatedChars": "Bị cắt bớt {n} Ký tự",
+  "@agentUiTruncatedChars": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTurnLabel": "vòng {n} thứ",
+  "@agentUiTurnLabel": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
   }
 }

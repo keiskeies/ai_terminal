@@ -3882,5 +3882,534 @@
         "type": "Object"
       }
     }
+  },
+  "agentUiTaskRecord": "Registro attività",
+  "agentUiCompleted": "Completato",
+  "agentUiFailed": "Non riuscito",
+  "agentUiCancelled": "Annullato",
+  "agentUiInterrupted": "Interrotto",
+  "agentUiPlanTitle": "Elenco esecuzioni",
+  "agentUiPlanByAi": "Piano AI",
+  "agentUiPlanWarning": "Il piano presenta ancora passaggi non completati, verificare se sono stati tutti completati",
+  "agentUiConclusion": "Conclusione",
+  "agentUiVerifiedEvidence": "Avere prove di verifica",
+  "agentUiAiConclusion": "Conclusione AI",
+  "agentUiContinueTask": "Continuare l'attività",
+  "agentUiOperationCopied": "L'ordine dell'operazione è stato copiato",
+  "agentUiCopyAnswer": "Copia risposta",
+  "agentUiCopied": "Copiato",
+  "agentUiAnswerCopied": "La risposta è stata copiata negli appunti",
+  "agentUiChangesAndRollback": "Modifiche e rollback",
+  "agentUiAuditLog": "Record di audit",
+  "agentUiProcessAndEvidence": "Processo e prove",
+  "agentUiFullSummary": "Riepilogo completo",
+  "agentUiNoEvidence": "Nessun record di esecuzione espandibile",
+  "agentUiContextHint": "Contesto occupato; più del 70% Il motore inizierà quindi a scartare i messaggi più vecchi",
+  "agentUiGoalRunning": "Obiettivo in corso",
+  "agentUiGoalPaused": "Obiettivo in pausa",
+  "agentUiGoalFinished": "Obiettivo terminato",
+  "agentUiGoalEditAction": "Modifica obiettivo",
+  "agentUiGoalFinishAction": "Termina obiettivo",
+  "agentUiGoalClearAction": "Cancella record",
+  "agentUiGoalEditTitle": "Modifica obiettivo",
+  "agentUiGoalFinishTitle": "Terminare questo obiettivo?",
+  "agentUiGoalFinishBody": "L'obiettivo verrà contrassegnato come completato e le attività in esecuzione non verranno influenzate.",
+  "agentUiGoalBudgetExhausted": "Round esauriti",
+  "agentUiThinkingAndExecution": "Record di pensiero ed esecuzione",
+  "agentUiLessThanOneSecond": "Meno di 1 secondo",
+  "agentUiAgentTask": "Attività agente",
+  "agentUiOpenInTerminal": "Visualizza nel terminale",
+  "agentUiResume": "Riprendi",
+  "agentUiPause": "Pausa",
+  "agentUiStop": "Interrompi",
+  "agentUiThinking": "Pensando",
+  "agentUiExecuting": "Eseguendo",
+  "agentUiWaitingConfirm": "In attesa di conferma",
+  "agentUiPaused": "In pausa",
+  "agentUiIdle": "Pronto",
+  "agentUiToolCall": "Chiamata strumento",
+  "agentUiBlocked": "Intercettato",
+  "agentUiNeedsConfirm": "Richiede conferma",
+  "agentUiExecutedLabel": "In esecuzione",
+  "agentUiExecutable": "Eseguibile",
+  "agentUiRiskBlocked": "Il comando è stato protetto Intercettazione policy",
+  "agentUiChangeImpact": "Modifica impatto",
+  "agentUiConfirmImpact": "Conferma l'impatto prima dell'esecuzione",
+  "agentUiNoRollbackSnapshot": "Rollback: nessun rollback automatico, si consiglia di acquisire prima uno snapshot",
+  "agentUiCancel": "Annulla",
+  "agentUiConfirmExecute": "Conferma esecuzione",
+  "agentUiConfirmedLabel": "Confermato",
+  "agentUiConfirmedRecord": "Confermato prima dell'esecuzione",
+  "agentUiResultSuccess": "Esecuzione riuscita",
+  "agentUiLocalFileSection": "Accesso file locale",
+  "agentUiLocalFileEnable": "Consentito L'agente legge e scrive file locali",
+  "agentUiLocalFileDirs": "Autorizza directory",
+  "agentUiLocalFileAddDir": "Aggiungi directory",
+  "agentUiLocalFileRemoveDir": "Rimuovi directory",
+  "agentUiLocalFilePickTitle": "Seleziona la directory a cui è consentito l'agente a cui accedere",
+  "agentUiLocalFileNoDirs": "Non esiste ancora una directory autorizzata",
+  "agentUiLocalFileBlacklistHint": "I file delle chiavi e delle credenziali (~/.ssh, *.key, *.pem, .env) sono sempre inaccessibili",
+  "agentUiLocalFileTrashEmpty": "L'area di riciclo è vuota",
+  "agentUiLocalFileTrashClear": "Svuota l'area di riciclo",
+  "agentUiLocalFileTrashClearRefused": "Ci sono percorsi che non si trovano nell'area di riciclo e sono stati saltati e non eliminati",
+  "agentUiLocalExecAuthTitle": "Consentire l'accesso alla directory locale?",
+  "agentUiLocalExecAuthNote": "I percorsi sensibili (~/.ssh, .env, chiavi, ecc.) rimangono vietati.",
+  "agentUiLocalExecAuthAllow": "Consenti e continua",
+  "agentUiCommandLabel": "Comando terminale",
+  "agentUiPendingLabel": "in sospeso",
+  "agentUiToolDoneLabel": "Chiamato",
+  "agentUiFailedLabel": "Non riuscito",
+  "agentUiProcessFolded": "Processo compresso",
+  "agentUiCollapseProcess": "Espandi processo",
+  "agentUiExpandProcess": "Espandi",
+  "agentUiCollapse": "Comprimi",
+  "agentUiExpandText": "Espandi",
+  "agentUiViewFullOutput": "Visualizza output completo",
+  "agentUiExpandEach": "Elemento per elemento",
+  "agentUiPermissionModeTitle": "Autorizzazioni di esecuzione",
+  "agentUiPermissionAllowed": "Rilasciato",
+  "agentUiPermissionNotExecuted": "Non eseguito",
+  "agentUiPermFullAutoWarningTitle": "Modalità completamente automatica attivata?",
+  "agentUiPermFullAutoWarningBody": "L'agente non confermerà più uno per uno ed eseguirà direttamente tutti i comandi, inclusa l'eliminazione della configurazione del sistema e la formattazione del disco. Alcune operazioni non possono essere recuperate; il periodo di blackout della rete e le restrizioni sui file sensibili rimarranno in vigore. Assicurati di comprendere la portata dell'impatto.",
+  "agentUiPermissionEnable": "Abilita",
+  "agentUiPermissionModeUsage": "Utilizzo: /permission <sola lettura|ask|auto|completamente automatico>",
+  "agentUiCacheHit": "cache hit {percent}%",
+  "@agentUiCacheHit": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiChangesCount": "{n} modifiche",
+  "@agentUiChangesCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCallsCount": "{n} comandi",
+  "@agentUiCommandCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCount": "{n} comandi",
+  "@agentUiCommandCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCountOne": "1 comando",
+  "agentUiContextUsed": "contesto {percent}%",
+  "@agentUiContextUsed": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExitCode": "Codice di uscita {n}",
+  "@agentUiExitCode": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExpandAll": "espandi tutti gli {n} elementi",
+  "@agentUiExpandAll": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailedCommands": "{n} comandi non riusciti",
+  "@agentUiFailedCommands": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureCount": "{n} fallito",
+  "@agentUiFailureCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureHintCancelled": "Esecuzione annullata. Puoi riavviare questo passaggio.",
+  "agentUiFailureHintDisconnected": "Connessione disconnessa. Si consiglia di riconnettersi prima al server e poi riprovare questo passaggio.",
+  "agentUiFailureHintInteractivePrompt": "Il comando è in attesa di input. Si consiglia di utilizzare parametri non interattivi (come -y / --batch) e riprovare.",
+  "agentUiFailureHintPermissionDenied": "Autorizzazioni insufficienti. Si consiglia di utilizzare sudo per riprovare o modificare l'utente con le autorizzazioni.",
+  "agentUiFailureHintSyntaxError": "Errore di sintassi del comando, non eseguito. Si consiglia di correggere il comando e riprovare.",
+  "agentUiFailureHintTimeout": "Timeout di esecuzione. Si consiglia di estendere il timeout o dividere il comando in parti più piccole e riprovare.",
+  "agentUiFailureHintUnknown": "Esecuzione fallita. Si consiglia di controllare l'output, correggerlo e riprovare.",
+  "agentUiFailureLabelCancelled": "Annullato",
+  "agentUiFailureLabelDisconnected": "Connessione disconnessa",
+  "agentUiFailureLabelInteractivePrompt": "In attesa di input",
+  "agentUiFailureLabelPermissionDenied": "Autorizzazioni insufficienti",
+  "agentUiFailureLabelSyntaxError": "Errore di sintassi del comando",
+  "agentUiFailureLabelTimeout": "Timeout di esecuzione",
+  "agentUiGoalRounds": "round {used}/{max}",
+  "@agentUiGoalRounds": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiGoalRoundsLeft": "{n} Round",
+  "@agentUiGoalRoundsLeft": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiItemsCount": "{n} elementi",
+  "@agentUiItemsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalExecAuthCreateLine": "La directory non esiste. Verrà creato con il permesso.\n",
+  "agentUiLocalExecAuthGrant": "Dopo aver consentito, l'accesso al file locale sarà abilitato e la directory sarà autorizzata.",
+  "agentUiLocalExecAuthHead": "L'agente deve eseguire il comando nella directory locale:\n{path}\n\n",
+  "@agentUiLocalExecAuthHead": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthReason": "Motivo: {reason}\n\n",
+  "@agentUiLocalExecAuthReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthorized": "Directory locale autorizzata: {path}",
+  "@agentUiLocalExecAuthorized": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearBody": "La cancellazione eliminerà definitivamente le copie di questi {count} elementi (circa {size}). Successivamente, i record di modifica {records} non verranno più ripristinati (i record stessi verranno conservati, ma i file non potranno essere recuperati).",
+  "@agentUiLocalFileTrashClearBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      },
+      "records": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearFailed": "{n} eliminazione dell'elemento non riuscita (potrebbe essere occupata da altri programmi)",
+  "@agentUiLocalFileTrashClearFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashCleared": "L'area di riciclaggio è stata svuotata: elimina l'elemento {count} e rilascia circa {size}",
+  "@agentUiLocalFileTrashCleared": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashLabel": "area di riciclaggio: {count} elementi · Circa {size}",
+  "@agentUiLocalFileTrashLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLogCount": "{n} registri di sistema",
+  "@agentUiLogCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLogCountOne": "1 registri di sistema",
+  "agentUiMoreActions": "e {n}",
+  "@agentUiMoreActions": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreChanges": "e {n} modifiche, vedere il record di controllo",
+  "@agentUiMoreChanges": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreOutputLines": "e {n} Riga",
+  "@agentUiMoreOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreSteps": "precedenti {n} passaggi",
+  "@agentUiMoreSteps": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiOutputLines": "{n} Linea",
+  "@agentUiOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPermDescAsk": "Le modifiche e i comandi ad alto rischio verranno richiesti per primi",
+  "agentUiPermDescAuto": "Le modifiche ordinarie verranno eseguite automaticamente, i comandi ad alto rischio verranno comunque richiesti",
+  "agentUiPermDescFullAuto": "Anche i comandi ad alto rischio verranno eseguiti automaticamente; il periodo di blackout della rete e le restrizioni sui file sensibili sono ancora in vigore",
+  "agentUiPermDescReadOnly": "Sono consentiti solo comandi di sola lettura, qualsiasi modifica verrà rifiutata",
+  "agentUiPermLabelAsk": "Chiedi",
+  "agentUiPermLabelAuto": "Automaticamente",
+  "agentUiPermLabelFullAuto": "Completamente automatico",
+  "agentUiPermLabelReadOnly": "Sola lettura",
+  "agentUiPermissionModeCurrent": "Modalità di autorizzazione corrente: {mode}",
+  "@agentUiPermissionModeCurrent": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPermissionModeSwitched": "Passato a \"{mode}\": {desc}",
+  "@agentUiPermissionModeSwitched": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "desc": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPhaseCancel": "Annullato",
+  "agentUiPhaseExec": "Esegui comando",
+  "agentUiPhaseFail": "Esecuzione fallita",
+  "agentUiPhasePause": "In pausa",
+  "agentUiPhaseResume": "Continua l'esecuzione",
+  "agentUiPhaseSummarize": "Organizza conclusione",
+  "agentUiPhaseThink": "Pensare",
+  "agentUiPhaseTool": "Esegui strumento",
+  "agentUiPhaseUnderstand": "Comprendere i requisiti",
+  "agentUiPhaseVerify": "Risultato della verifica",
+  "agentUiPhaseWaitChoice": "In attesa di selezione",
+  "agentUiPhaseWaitConfirm": "In attesa di conferma",
+  "agentUiPlanDone": "{n} completato",
+  "@agentUiPlanDone": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanFailed": "{n} fallito",
+  "@agentUiPlanFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanInProgress": "{n} in corso",
+  "@agentUiPlanInProgress": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanItems": "{n} elementi",
+  "@agentUiPlanItems": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanPending": "{n} in sospeso",
+  "@agentUiPlanPending": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanProgress": "Piano {done}/{total}",
+  "@agentUiPlanProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanSkipped": "{n} saltato",
+  "@agentUiPlanSkipped": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiProgressLines": "{n} elementi",
+  "@agentUiProgressLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiRiskPrefix": "Rischio: {reason}",
+  "@agentUiRiskPrefix": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRollbackPrefix": "Rollback: {command}",
+  "@agentUiRollbackPrefix": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRoundsCount": "{n} round",
+  "@agentUiRoundsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStep": "per i dettagli {n} passaggio",
+  "@agentUiStep": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStepsCount": "{n} passaggio",
+  "@agentUiStepsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiSuccessCount": "{n} Riuscito",
+  "@agentUiSuccessCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCount": "{n} inferenze",
+  "@agentUiThoughtCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCountOne": "1 inferenze",
+  "agentUiTokPerSec": "{n} tok/s",
+  "@agentUiTokPerSec": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTokensCount": "{estimated}{value} tok",
+  "@agentUiTokensCount": {
+    "placeholders": {
+      "estimated": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiToolCallsCount": "Lo strumento è stato chiamato {n} volte",
+  "@agentUiToolCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTruncated": "Troncato",
+  "agentUiTruncatedChars": "Troncato {n} Caratteri",
+  "@agentUiTruncatedChars": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTurnLabel": "esimo {n} round",
+  "@agentUiTurnLabel": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
   }
 }

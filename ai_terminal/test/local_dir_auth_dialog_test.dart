@@ -4,9 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 
+import 'package:ai_terminal/core/l10n_holder.dart';
+import 'package:ai_terminal/l10n/app_localizations_en.dart';
 import 'package:ai_terminal/widgets/local_dir_auth_dialog.dart';
 
 void main() {
+  setUpAll(() => L10n.setup(AppLocalizationsEn()));
+
   final missingPath =
       p.join(Directory.systemTemp.path, 'ai_terminal_auth_test_missing_dir');
 

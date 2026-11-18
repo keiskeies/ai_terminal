@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/core/theme_colors.dart';
+import 'package:ai_terminal/l10n/app_localizations_en.dart';
 import 'package:ai_terminal/widgets/agent_command_block.dart';
 
 const _blockedCmd = 'rm -f /etc/systemd/system/virt-edid.service';
@@ -29,6 +31,8 @@ Widget _host({
 }
 
 void main() {
+  setUpAll(() => L10n.setup(AppLocalizationsEn()));
+
   testWidgets('blocked 等待确认时显示需确认和批准入口，不再显示已拦截', (tester) async {
     await tester.pumpWidget(_host(
       permissionDecision: 'confirm',

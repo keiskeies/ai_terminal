@@ -3882,5 +3882,534 @@
         "type": "Object"
       }
     }
+  },
+  "agentUiTaskRecord": "タスク記録",
+  "agentUiCompleted": "完了",
+  "agentUiFailed": "失敗",
+  "agentUiCancelled": "キャンセル",
+  "agentUiInterrupted": "中断",
+  "agentUiPlanTitle": "実行リスト",
+  "agentUiPlanByAi": "AI 計画",
+  "agentUiPlanWarning": "計画には未完了のステップがまだあります。すべて完了したかどうかを確認してください",
+  "agentUiConclusion": "結論",
+  "agentUiVerifiedEvidence": "検証証拠があります",
+  "agentUiAiConclusion": "AI の結論",
+  "agentUiContinueTask": "タスクを続行",
+  "agentUiOperationCopied": "操作命令がコピーされました",
+  "agentUiCopyAnswer": "回答をコピーしました",
+  "agentUiCopied": "コピーされました",
+  "agentUiAnswerCopied": "回答はクリップボードにコピーされました",
+  "agentUiChangesAndRollback": "変更とロールバック",
+  "agentUiAuditLog": "監査記録",
+  "agentUiProcessAndEvidence": "プロセスと証拠",
+  "agentUiFullSummary": "完全な概要",
+  "agentUiNoEvidence": "展開可能な実行記録はありません",
+  "agentUiContextHint": "コンテキストが占有されています。 70% を超えると、エンジンは最も古いメッセージの破棄を開始します。",
+  "agentUiGoalRunning": "進行中の目標",
+  "agentUiGoalPaused": "目標が一時停止されました",
+  "agentUiGoalFinished": "目標が終了しました",
+  "agentUiGoalEditAction": "目標を編集します",
+  "agentUiGoalFinishAction": "目標を終了します",
+  "agentUiGoalClearAction": "記録をクリアします",
+  "agentUiGoalEditTitle": "目標を編集します",
+  "agentUiGoalFinishTitle": "この目標を終了しますか?",
+  "agentUiGoalFinishBody": "ターゲットは完了としてマークされ、実行中のタスクは影響を受けません。",
+  "agentUiGoalBudgetExhausted": "ラウンド数は消耗",
+  "agentUiThinkingAndExecution": "思考と実行の記録",
+  "agentUiLessThanOneSecond": "1秒未満",
+  "agentUiAgentTask": "エージェントタスク",
+  "agentUiOpenInTerminal": "端末で表示",
+  "agentUiResume": "再開",
+  "agentUiPause": "一時停止",
+  "agentUiStop": "停止",
+  "agentUiThinking": "考え中",
+  "agentUiExecuting": "実行中",
+  "agentUiWaitingConfirm": "確認待ち",
+  "agentUiPaused": "一時停止",
+  "agentUiIdle": "準備完了",
+  "agentUiToolCall": "ツール呼び出し",
+  "agentUiBlocked": "インターセプト",
+  "agentUiNeedsConfirm": "確認が必要",
+  "agentUiExecutedLabel": "実行中",
+  "agentUiExecutable": "実行可能",
+  "agentUiRiskBlocked": "コマンドは保護されている ポリシーインターセプト",
+  "agentUiChangeImpact": "変更の影響",
+  "agentUiConfirmImpact": "実行前に影響を確認してください",
+  "agentUiNoRollbackSnapshot": "ロールバック: 自動ロールバックはありません。最初にスナップショットを作成することをお勧めします",
+  "agentUiCancel": "キャンセル",
+  "agentUiConfirmExecute": "実行を確認します",
+  "agentUiConfirmedLabel": "確認済み",
+  "agentUiConfirmedRecord": "実行前に確認されました",
+  "agentUiResultSuccess": "実行が成功しました",
+  "agentUiLocalFileSection": "ローカル ファイル アクセス",
+  "agentUiLocalFileEnable": "エージェントによるローカル ファイルの読み取りと書き込みが許可されました",
+  "agentUiLocalFileDirs": "ディレクトリの承認",
+  "agentUiLocalFileAddDir": "ディレクトリの追加",
+  "agentUiLocalFileRemoveDir": "ディレクトリの削除",
+  "agentUiLocalFilePickTitle": "エージェントが保存するディレクトリを選択へのアクセスが許可されています",
+  "agentUiLocalFileNoDirs": "許可されたディレクトリがまだありません",
+  "agentUiLocalFileBlacklistHint": "キーおよび認証情報ファイル (~/.ssh、*.key、*.pem、.env) は常にアクセスできません",
+  "agentUiLocalFileTrashEmpty": "リサイクル領域が空です",
+  "agentUiLocalFileTrashClear": "リサイクル領域を空にします",
+  "agentUiLocalFileTrashClearRefused": "リサイクル領域に存在せず、スキップされ、削除されていないパスがあります",
+  "agentUiLocalExecAuthTitle": "ローカル ディレクトリへのアクセスを許可しますか?",
+  "agentUiLocalExecAuthNote": "機密性の高いパス (~/.ssh、.env、キーなど) は立ち入り禁止のままです。",
+  "agentUiLocalExecAuthAllow": "許可して続行",
+  "agentUiCommandLabel": "ターミナルコマンド",
+  "agentUiPendingLabel": "保留中",
+  "agentUiToolDoneLabel": "呼び出されました",
+  "agentUiFailedLabel": "失敗しました",
+  "agentUiProcessFolded": "プロセスが折りたたまれました",
+  "agentUiCollapseProcess": "プロセスを展開しました",
+  "agentUiExpandProcess": "展開しました",
+  "agentUiCollapse": "折りたたまれました",
+  "agentUiExpandText": "展開しました",
+  "agentUiViewFullOutput": "完全な出力を表示",
+  "agentUiExpandEach": "項目ごとに表示",
+  "agentUiPermissionModeTitle": "実行権限",
+  "agentUiPermissionAllowed": "解放されました",
+  "agentUiPermissionNotExecuted": "実行されません",
+  "agentUiPermFullAutoWarningTitle": "全自動モードは有効ですか?",
+  "agentUiPermFullAutoWarningBody": "エージェントは、システム構成の削除やディスクのフォーマットを含むすべてのコマンドを 1 つずつ確認して直接実行することはなくなります。一部の操作は回復できません。ネットワークのブラックアウト期間と機密ファイルの制限は引き続き有効です。影響範囲をご理解の上ご利用ください。",
+  "agentUiPermissionEnable": "有効にする",
+  "agentUiPermissionModeUsage": "使用法: /permission <読み取り専用|ask|自動|全自動>",
+  "agentUiCacheHit": "キャッシュ・ヒット {percent}%",
+  "@agentUiCacheHit": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiChangesCount": "{n} 変更",
+  "@agentUiChangesCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCallsCount": "{n} コマンド",
+  "@agentUiCommandCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCount": "{n} コマンド",
+  "@agentUiCommandCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCountOne": "1 コマンド",
+  "agentUiContextUsed": "コンテキスト {percent}%",
+  "@agentUiContextUsed": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExitCode": "終了コード {n}",
+  "@agentUiExitCode": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExpandAll": "すべての {n} アイテム展開",
+  "@agentUiExpandAll": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailedCommands": "{n} コマンドが失敗しました",
+  "@agentUiFailedCommands": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureCount": "{n} 失敗",
+  "@agentUiFailureCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureHintCancelled": "実行がキャンセルされました。このステップを再開できます。",
+  "agentUiFailureHintDisconnected": "接続が切断されました。まずサーバーに再接続してから、この手順を再試行することをお勧めします。",
+  "agentUiFailureHintInteractivePrompt": "コマンドは入力を待っています。非対話型パラメーター (-y / --batch など) を使用して再試行することをお勧めします。",
+  "agentUiFailureHintPermissionDenied": "権限が不十分です。 sudo を使用して再試行するか、権限のあるユーザーを変更することをお勧めします。",
+  "agentUiFailureHintSyntaxError": "コマンド構文エラーのため実行されません。コマンドを修正して再試行することをお勧めします。",
+  "agentUiFailureHintTimeout": "実行タイムアウト。タイムアウトを延長するか、コマンドをより小さな部分に分割して再試行することをお勧めします。",
+  "agentUiFailureHintUnknown": "実行に失敗しました。出力を確認し、修正して再試行することをお勧めします。",
+  "agentUiFailureLabelCancelled": "キャンセル",
+  "agentUiFailureLabelDisconnected": "接続切断",
+  "agentUiFailureLabelInteractivePrompt": "入力待ち",
+  "agentUiFailureLabelPermissionDenied": "権限が不十分です",
+  "agentUiFailureLabelSyntaxError": "コマンド構文エラー",
+  "agentUiFailureLabelTimeout": "実行タイムアウト",
+  "agentUiGoalRounds": "round {used}/{max}",
+  "@agentUiGoalRounds": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiGoalRoundsLeft": "{n} ラウンド",
+  "@agentUiGoalRoundsLeft": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiItemsCount": "{n} 項目",
+  "@agentUiItemsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalExecAuthCreateLine": "ディレクトリが存在しません。許可を得て作成させていただきます。\n",
+  "agentUiLocalExecAuthGrant": "許可すると、ローカル ファイル アクセスが有効になり、ディレクトリが承認されます。",
+  "agentUiLocalExecAuthHead": "エージェントはローカル ディレクトリでコマンドを実行する必要があります:\n{path}\n\n",
+  "@agentUiLocalExecAuthHead": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthReason": "理由: {reason}\n\n",
+  "@agentUiLocalExecAuthReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthorized": "承認されたローカル ディレクトリ: {path}",
+  "@agentUiLocalExecAuthorized": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearBody": "クリアすると、これらの {count} アイテム (約 {size}) のコピーが完全に削除されます。その後、{records} 変更レコードは復元されなくなります (レコード自体は保持されますが、ファイルは取得できません)。",
+  "@agentUiLocalFileTrashClearBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      },
+      "records": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearFailed": "{n} アイテムの削除に失敗しました (他のプログラムによって占有されている可能性があります)",
+  "@agentUiLocalFileTrashClearFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashCleared": "リサイクル領域が空になりました: {count} アイテムを削除し、{size} について解放してください",
+  "@agentUiLocalFileTrashCleared": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashLabel": "リサイクルエリア: {count} アイテム · 約 {size}",
+  "@agentUiLocalFileTrashLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLogCount": "{n} システム ログ",
+  "@agentUiLogCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLogCountOne": "1 システム ログ",
+  "agentUiMoreActions": "および {n}",
+  "@agentUiMoreActions": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreChanges": "および {n} 変更、詳細は監査記録",
+  "@agentUiMoreChanges": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreOutputLines": "および {n} 行",
+  "@agentUiMoreOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreSteps": "以前の {n} ステップ",
+  "@agentUiMoreSteps": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiOutputLines": "{n} 行",
+  "@agentUiOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPermDescAsk": "変更と高リスクのコマンドが最初に質問します",
+  "agentUiPermDescAuto": "通常の変更は自動的に実行され、高リスクのコマンドは引き続き質問します",
+  "agentUiPermDescFullAuto": "高リスクのコマンドも自動的に実行されます。ネットワーク停電期間と機密ファイルの制限はまだ有効です",
+  "agentUiPermDescReadOnly": "読み取り専用コマンドのみが許可され、変更は拒否されます。",
+  "agentUiPermLabelAsk": "質問する",
+  "agentUiPermLabelAuto": "自動的に",
+  "agentUiPermLabelFullAuto": "完全に自動",
+  "agentUiPermLabelReadOnly": "読み取り専用",
+  "agentUiPermissionModeCurrent": "現在の権限モード: {mode}",
+  "@agentUiPermissionModeCurrent": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPermissionModeSwitched": "\"{mode}\" に切り替え: {desc}",
+  "@agentUiPermissionModeSwitched": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "desc": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPhaseCancel": "キャンセル",
+  "agentUiPhaseExec": "コマンド実行",
+  "agentUiPhaseFail": "実行失敗",
+  "agentUiPhasePause": "一時停止",
+  "agentUiPhaseResume": "実行継続",
+  "agentUiPhaseSummarize": "結論の整理",
+  "agentUiPhaseThink": "思考",
+  "agentUiPhaseTool": "ツール実行",
+  "agentUiPhaseUnderstand": "要件の理解",
+  "agentUiPhaseVerify": "検証結果",
+  "agentUiPhaseWaitChoice": "選択待ち",
+  "agentUiPhaseWaitConfirm": "確認待ち",
+  "agentUiPlanDone": "{n} 完了",
+  "@agentUiPlanDone": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanFailed": "{n} 失敗",
+  "@agentUiPlanFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanInProgress": "{n} 進行中",
+  "@agentUiPlanInProgress": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanItems": "{n} アイテム",
+  "@agentUiPlanItems": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanPending": "{n} 保留中",
+  "@agentUiPlanPending": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanProgress": "計画 {done}/{total}",
+  "@agentUiPlanProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanSkipped": "{n} スキップ",
+  "@agentUiPlanSkipped": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiProgressLines": "{n} 項目",
+  "@agentUiProgressLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiRiskPrefix": "リスク: {reason}",
+  "@agentUiRiskPrefix": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRollbackPrefix": "ロールバック: {command}",
+  "@agentUiRollbackPrefix": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRoundsCount": "{n} ラウンド",
+  "@agentUiRoundsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStep": "を参照 {n} ステップ",
+  "@agentUiStep": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStepsCount": "{n} ステップ",
+  "@agentUiStepsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiSuccessCount": "{n} 成功",
+  "@agentUiSuccessCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCount": "{n} 推論",
+  "@agentUiThoughtCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCountOne": "1 推論",
+  "agentUiTokPerSec": "{n} tok/s",
+  "@agentUiTokPerSec": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTokensCount": "{estimated}{value} tok",
+  "@agentUiTokensCount": {
+    "placeholders": {
+      "estimated": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiToolCallsCount": "ツールが {n} 回呼び出されました",
+  "@agentUiToolCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTruncated": "切り捨て",
+  "agentUiTruncatedChars": "{n} 文字の切り詰め",
+  "@agentUiTruncatedChars": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTurnLabel": "番目の {n} ラウンド",
+  "@agentUiTurnLabel": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
   }
 }

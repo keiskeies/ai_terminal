@@ -3882,5 +3882,534 @@
         "type": "Object"
       }
     }
+  },
+  "agentUiTaskRecord": "Task record",
+  "agentUiCompleted": "Completed",
+  "agentUiFailed": "Failed",
+  "agentUiCancelled": "Cancelled",
+  "agentUiInterrupted": "Interrupted",
+  "agentUiPlanTitle": "Execution Plan",
+  "agentUiPlanByAi": "AI plan",
+  "agentUiPlanWarning": "Some plan steps are still open. Please verify the task is complete.",
+  "agentUiConclusion": "Conclusion",
+  "agentUiVerifiedEvidence": "Verified evidence",
+  "agentUiAiConclusion": "AI conclusion",
+  "agentUiContinueTask": "Continue task",
+  "agentUiOperationCopied": "Operation sheet copied",
+  "agentUiCopyAnswer": "Copy answer",
+  "agentUiCopied": "Copied",
+  "agentUiAnswerCopied": "Answer copied",
+  "agentUiChangesAndRollback": "Changes & rollback",
+  "agentUiAuditLog": "Audit log",
+  "agentUiProcessAndEvidence": "Process & evidence",
+  "agentUiFullSummary": "Full summary",
+  "agentUiNoEvidence": "No execution records to expand",
+  "agentUiContextHint": "Context usage. Above 70% the engine starts dropping the earliest messages.",
+  "agentUiGoalRunning": "Active goal",
+  "agentUiGoalPaused": "Paused goal",
+  "agentUiGoalFinished": "Finished goal",
+  "agentUiGoalEditAction": "Edit goal",
+  "agentUiGoalFinishAction": "Finish goal",
+  "agentUiGoalClearAction": "Clear record",
+  "agentUiGoalEditTitle": "Edit goal",
+  "agentUiGoalFinishTitle": "Finish this goal?",
+  "agentUiGoalFinishBody": "The goal is marked finished. A running task is not affected.",
+  "agentUiGoalBudgetExhausted": "Round budget used up",
+  "agentUiThinkingAndExecution": "Thinking & execution log",
+  "agentUiLessThanOneSecond": "<1s",
+  "agentUiAgentTask": "Agent task",
+  "agentUiOpenInTerminal": "Open in terminal",
+  "agentUiResume": "Resume",
+  "agentUiPause": "Pause",
+  "agentUiStop": "Stop",
+  "agentUiThinking": "Thinking",
+  "agentUiExecuting": "Executing",
+  "agentUiWaitingConfirm": "Waiting for confirmation",
+  "agentUiPaused": "Paused",
+  "agentUiIdle": "Idle",
+  "agentUiToolCall": "Tool call",
+  "agentUiBlocked": "Blocked",
+  "agentUiNeedsConfirm": "Needs confirmation",
+  "agentUiExecutedLabel": "Executed",
+  "agentUiExecutable": "Ready",
+  "agentUiRiskBlocked": "Blocked by the safety policy",
+  "agentUiChangeImpact": "Change impact",
+  "agentUiConfirmImpact": "Review impact before running",
+  "agentUiNoRollbackSnapshot": "Rollback: no automatic rollback; snapshot first",
+  "agentUiCancel": "Cancel",
+  "agentUiConfirmExecute": "Run",
+  "agentUiConfirmedLabel": "Confirmed",
+  "agentUiConfirmedRecord": "Confirmed before running",
+  "agentUiResultSuccess": "Succeeded",
+  "agentUiLocalFileSection": "Local file access",
+  "agentUiLocalFileEnable": "Let the agent read and write local files",
+  "agentUiLocalFileDirs": "Authorized folders",
+  "agentUiLocalFileAddDir": "Add folder",
+  "agentUiLocalFileRemoveDir": "Remove this folder",
+  "agentUiLocalFilePickTitle": "Choose a folder the agent may access",
+  "agentUiLocalFileNoDirs": "No folder yet",
+  "agentUiLocalFileBlacklistHint": "Key and credential files (~/.ssh, *.key, *.pem, .env) stay off limits",
+  "agentUiLocalFileTrashEmpty": "Trash is empty",
+  "agentUiLocalFileTrashClear": "Empty trash",
+  "agentUiLocalFileTrashClearRefused": "Some paths are outside the trash and were skipped",
+  "agentUiLocalExecAuthTitle": "Allow local folder access?",
+  "agentUiLocalExecAuthNote": "Sensitive paths (~/.ssh, .env, keys) remain blocked.",
+  "agentUiLocalExecAuthAllow": "Allow and continue",
+  "agentUiCommandLabel": "Command",
+  "agentUiPendingLabel": "Pending",
+  "agentUiToolDoneLabel": "Called",
+  "agentUiFailedLabel": "Failed",
+  "agentUiProcessFolded": "Process folded",
+  "agentUiCollapseProcess": "Show process",
+  "agentUiExpandProcess": "Expand",
+  "agentUiCollapse": "Collapse",
+  "agentUiExpandText": "Show more",
+  "agentUiViewFullOutput": "View full output",
+  "agentUiExpandEach": "Each",
+  "agentUiPermissionModeTitle": "Execution permission",
+  "agentUiPermissionAllowed": "Allowed",
+  "agentUiPermissionNotExecuted": "Not run",
+  "agentUiPermFullAutoWarningTitle": "Enable full-auto mode?",
+  "agentUiPermFullAutoWarningBody": "The agent will stop asking and run every command, including deleting system configuration and formatting disks. Some operations cannot be undone. Change windows and sensitive-file guards still apply.",
+  "agentUiPermissionEnable": "Enable",
+  "agentUiPermissionModeUsage": "Usage: /permission <read|ask|auto|full>",
+  "agentUiCacheHit": "cache hit {percent}%",
+  "@agentUiCacheHit": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiChangesCount": "{n} changes",
+  "@agentUiChangesCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCallsCount": "{n} commands",
+  "@agentUiCommandCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCount": "{n} commands",
+  "@agentUiCommandCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCountOne": "1 command",
+  "agentUiContextUsed": "ctx {percent}%",
+  "@agentUiContextUsed": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExitCode": "Exit {n}",
+  "@agentUiExitCode": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExpandAll": "Show all {n}",
+  "@agentUiExpandAll": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailedCommands": "{n} failed",
+  "@agentUiFailedCommands": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureCount": "{n} failed",
+  "@agentUiFailureCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureHintCancelled": "Execution was cancelled. You can start this step again.",
+  "agentUiFailureHintDisconnected": "Connection lost. Reconnect the server, then retry this step.",
+  "agentUiFailureHintInteractivePrompt": "The command is waiting for input. Use non-interactive flags such as -y or --batch.",
+  "agentUiFailureHintPermissionDenied": "Permission denied. Retry with sudo or use an account with the required access.",
+  "agentUiFailureHintSyntaxError": "The command was not executed due to a syntax error. Fix it and retry.",
+  "agentUiFailureHintTimeout": "Command timed out. Increase the timeout or split it into smaller steps.",
+  "agentUiFailureHintUnknown": "Execution failed. Review the output, fix the command and retry.",
+  "agentUiFailureLabelCancelled": "Cancelled",
+  "agentUiFailureLabelDisconnected": "Disconnected",
+  "agentUiFailureLabelInteractivePrompt": "Waiting for input",
+  "agentUiFailureLabelPermissionDenied": "Permission denied",
+  "agentUiFailureLabelSyntaxError": "Syntax error",
+  "agentUiFailureLabelTimeout": "Timed out",
+  "agentUiGoalRounds": "rounds {used}/{max}",
+  "@agentUiGoalRounds": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiGoalRoundsLeft": "{n} left",
+  "@agentUiGoalRoundsLeft": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiItemsCount": "{n} items",
+  "@agentUiItemsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalExecAuthCreateLine": "The folder does not exist and will be created.\n",
+  "agentUiLocalExecAuthGrant": "Allowing this enables local file access and authorizes the folder.",
+  "agentUiLocalExecAuthHead": "The agent needs to run a command in this local folder:\n{path}\n\n",
+  "@agentUiLocalExecAuthHead": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthReason": "Reason: {reason}\n\n",
+  "@agentUiLocalExecAuthReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthorized": "Local folder authorized: {path}",
+  "@agentUiLocalExecAuthorized": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearBody": "This permanently deletes {count} saved copies (~{size}). {records} change records will no longer be restorable (the records stay, the files do not).",
+  "@agentUiLocalFileTrashClearBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      },
+      "records": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearFailed": "{n} items could not be deleted (maybe locked by another app)",
+  "@agentUiLocalFileTrashClearFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashCleared": "Trash emptied: {count} items removed, ~{size} freed",
+  "@agentUiLocalFileTrashCleared": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashLabel": "Trash: {count} items · ~{size}",
+  "@agentUiLocalFileTrashLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLogCount": "{n} log lines",
+  "@agentUiLogCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLogCountOne": "1 log line",
+  "agentUiMoreActions": "{n} more",
+  "@agentUiMoreActions": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreChanges": "{n} more changes — see audit log",
+  "@agentUiMoreChanges": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreOutputLines": "{n} more lines",
+  "@agentUiMoreOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreSteps": "{n} earlier steps",
+  "@agentUiMoreSteps": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiOutputLines": "{n} lines",
+  "@agentUiOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPermDescAsk": "Ask before changes and high-risk commands",
+  "agentUiPermDescAuto": "Run normal changes automatically; ask for high-risk ones",
+  "agentUiPermDescFullAuto": "High-risk commands run automatically; change windows and sensitive-file guards still apply",
+  "agentUiPermDescReadOnly": "Only read-only commands; changes are refused",
+  "agentUiPermLabelAsk": "Ask",
+  "agentUiPermLabelAuto": "Auto",
+  "agentUiPermLabelFullAuto": "Full auto",
+  "agentUiPermLabelReadOnly": "Read-only",
+  "agentUiPermissionModeCurrent": "Current permission mode: {mode}",
+  "@agentUiPermissionModeCurrent": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPermissionModeSwitched": "Switched to {mode}: {desc}",
+  "@agentUiPermissionModeSwitched": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "desc": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPhaseCancel": "Cancelled",
+  "agentUiPhaseExec": "Executing command",
+  "agentUiPhaseFail": "Failed",
+  "agentUiPhasePause": "Paused",
+  "agentUiPhaseResume": "Resuming",
+  "agentUiPhaseSummarize": "Summarizing",
+  "agentUiPhaseThink": "Thinking",
+  "agentUiPhaseTool": "Running tool",
+  "agentUiPhaseUnderstand": "Understanding request",
+  "agentUiPhaseVerify": "Verifying result",
+  "agentUiPhaseWaitChoice": "Waiting for choice",
+  "agentUiPhaseWaitConfirm": "Waiting for confirmation",
+  "agentUiPlanDone": "{n} done",
+  "@agentUiPlanDone": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanFailed": "{n} failed",
+  "@agentUiPlanFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanInProgress": "{n} in progress",
+  "@agentUiPlanInProgress": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanItems": "{n} items",
+  "@agentUiPlanItems": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanPending": "{n} pending",
+  "@agentUiPlanPending": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanProgress": "Plan {done}/{total}",
+  "@agentUiPlanProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanSkipped": "{n} skipped",
+  "@agentUiPlanSkipped": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiProgressLines": "{n} lines",
+  "@agentUiProgressLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiRiskPrefix": "Risk: {reason}",
+  "@agentUiRiskPrefix": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRollbackPrefix": "Rollback: {command}",
+  "@agentUiRollbackPrefix": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRoundsCount": "{n} rounds",
+  "@agentUiRoundsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStep": "Step {n}",
+  "@agentUiStep": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStepsCount": "{n} steps",
+  "@agentUiStepsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiSuccessCount": "{n} succeeded",
+  "@agentUiSuccessCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCount": "{n} thoughts",
+  "@agentUiThoughtCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCountOne": "1 thought",
+  "agentUiTokPerSec": "{n} tok/s",
+  "@agentUiTokPerSec": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTokensCount": "{estimated}{value} tok",
+  "@agentUiTokensCount": {
+    "placeholders": {
+      "estimated": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiToolCallsCount": "{n} tool calls",
+  "@agentUiToolCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTruncated": "Truncated",
+  "agentUiTruncatedChars": "Truncated · {n} chars",
+  "@agentUiTruncatedChars": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTurnLabel": "Turn {n}",
+  "@agentUiTurnLabel": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
   }
 }

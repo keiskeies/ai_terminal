@@ -3882,5 +3882,534 @@
         "type": "Object"
       }
     }
+  },
+  "agentUiTaskRecord": "บันทึกงาน",
+  "agentUiCompleted": "เสร็จสมบูรณ์",
+  "agentUiFailed": "ล้มเหลว",
+  "agentUiCancelled": "ยกเลิก",
+  "agentUiInterrupted": "ถูกขัดจังหวะ",
+  "agentUiPlanTitle": "รายการการดำเนินการ",
+  "agentUiPlanByAi": "แผน AI",
+  "agentUiPlanWarning": "แผนยังมีขั้นตอนที่ยังไม่เสร็จ โปรดตรวจสอบว่าขั้นตอนทั้งหมดเสร็จสมบูรณ์หรือไม่",
+  "agentUiConclusion": "บทสรุป",
+  "agentUiVerifiedEvidence": "มีหลักฐานการตรวจสอบ",
+  "agentUiAiConclusion": "ข้อสรุปของ AI",
+  "agentUiContinueTask": "ดำเนินงานต่อ",
+  "agentUiOperationCopied": "คัดลอกคำสั่งการดำเนินการแล้ว",
+  "agentUiCopyAnswer": "คัดลอกคำตอบ",
+  "agentUiCopied": "คัดลอกแล้ว",
+  "agentUiAnswerCopied": "คัดลอกคำตอบไปยังคลิปบอร์ดแล้ว",
+  "agentUiChangesAndRollback": "การเปลี่ยนแปลงและการย้อนกลับ",
+  "agentUiAuditLog": "บันทึกการตรวจสอบ",
+  "agentUiProcessAndEvidence": "กระบวนการและหลักฐาน",
+  "agentUiFullSummary": "สรุปโดยสมบูรณ์",
+  "agentUiNoEvidence": "ไม่มีบันทึกการดำเนินการที่ขยายได้",
+  "agentUiContextHint": "บริบทครอบครอง; มากกว่า 70% กลไกจะเริ่มทิ้งข้อความที่เก่าที่สุด",
+  "agentUiGoalRunning": "เป้าหมายอยู่ระหว่างดำเนินการ",
+  "agentUiGoalPaused": "เป้าหมายหยุดชั่วคราว",
+  "agentUiGoalFinished": "เป้าหมายสิ้นสุด",
+  "agentUiGoalEditAction": "แก้ไขเป้าหมาย",
+  "agentUiGoalFinishAction": "เป้าหมายสิ้นสุด",
+  "agentUiGoalClearAction": "ล้างบันทึก",
+  "agentUiGoalEditTitle": "แก้ไขเป้าหมาย",
+  "agentUiGoalFinishTitle": "สิ้นสุดเป้าหมายนี้หรือไม่",
+  "agentUiGoalFinishBody": "เป้าหมายจะถูกทำเครื่องหมายว่าเสร็จสมบูรณ์ และภารกิจที่กำลังดำเนินอยู่จะไม่ได้รับผลกระทบ",
+  "agentUiGoalBudgetExhausted": "หมดรอบ",
+  "agentUiThinkingAndExecution": "บันทึกการคิดและการปฏิบัติ",
+  "agentUiLessThanOneSecond": "น้อยกว่า 1 วินาที",
+  "agentUiAgentTask": "งานของตัวแทน",
+  "agentUiOpenInTerminal": "ดูในเทอร์มินัล",
+  "agentUiResume": "ทำต่อ",
+  "agentUiPause": "หยุดชั่วคราว",
+  "agentUiStop": "หยุด",
+  "agentUiThinking": "กำลังคิด",
+  "agentUiExecuting": "กำลังดำเนินการ",
+  "agentUiWaitingConfirm": "กำลังรอการยืนยัน",
+  "agentUiPaused": "หยุดชั่วคราว",
+  "agentUiIdle": "พร้อม",
+  "agentUiToolCall": "การเรียกเครื่องมือ",
+  "agentUiBlocked": "ถูกสกัดกั้น",
+  "agentUiNeedsConfirm": "ต้องมีการยืนยัน",
+  "agentUiExecutedLabel": "กำลังทำงาน",
+  "agentUiExecutable": "ดำเนินการได้",
+  "agentUiRiskBlocked": "คำสั่งได้รับการรักษาความปลอดภัย การสกัดกั้นนโยบาย",
+  "agentUiChangeImpact": "เปลี่ยนผลกระทบ",
+  "agentUiConfirmImpact": "โปรดยืนยันผลกระทบก่อนดำเนินการ",
+  "agentUiNoRollbackSnapshot": "ย้อนกลับ: ไม่มีการย้อนกลับอัตโนมัติ แนะนำให้ถ่ายภาพสแนปชอตก่อน",
+  "agentUiCancel": "ยกเลิก",
+  "agentUiConfirmExecute": "ยืนยันการดำเนินการ",
+  "agentUiConfirmedLabel": "ยืนยันแล้ว",
+  "agentUiConfirmedRecord": "ยืนยันก่อนดำเนินการ",
+  "agentUiResultSuccess": "ดำเนินการสำเร็จ",
+  "agentUiLocalFileSection": "การเข้าถึงไฟล์ในเครื่อง",
+  "agentUiLocalFileEnable": "ตัวแทนที่ได้รับอนุญาตอ่านและเขียนไฟล์ในเครื่อง",
+  "agentUiLocalFileDirs": "อนุญาตไดเร็กทอรี",
+  "agentUiLocalFileAddDir": "เพิ่มไดเร็กทอรี",
+  "agentUiLocalFileRemoveDir": "ลบไดเร็กทอรี",
+  "agentUiLocalFilePickTitle": "เลือกไดเร็กทอรีที่ Agent ได้รับอนุญาตให้เข้าถึง",
+  "agentUiLocalFileNoDirs": "ยังไม่มีไดเร็กทอรีที่ได้รับอนุญาต",
+  "agentUiLocalFileBlacklistHint": "ไฟล์คีย์และข้อมูลรับรอง (~/.ssh, *.key, *.pem, .env) ไม่สามารถเข้าถึงได้เสมอ",
+  "agentUiLocalFileTrashEmpty": "พื้นที่รีไซเคิลว่างเปล่า",
+  "agentUiLocalFileTrashClear": "ล้างพื้นที่รีไซเคิล",
+  "agentUiLocalFileTrashClearRefused": "มีพาธที่ไม่ได้อยู่ในพื้นที่รีไซเคิลและถูกข้ามและไม่ถูกลบ",
+  "agentUiLocalExecAuthTitle": "อนุญาตการเข้าถึงไดเรกทอรีท้องถิ่นหรือไม่",
+  "agentUiLocalExecAuthNote": "เส้นทางที่ละเอียดอ่อน (~/.ssh, .env, คีย์ ฯลฯ) ยังคงไม่ถูกจำกัด",
+  "agentUiLocalExecAuthAllow": "อนุญาตและดำเนินการต่อ",
+  "agentUiCommandLabel": "คำสั่งเทอร์มินัล",
+  "agentUiPendingLabel": "รอดำเนินการ",
+  "agentUiToolDoneLabel": "เรียกว่า",
+  "agentUiFailedLabel": "ล้มเหลว",
+  "agentUiProcessFolded": "กระบวนการยุบ",
+  "agentUiCollapseProcess": "ขยายกระบวนการ",
+  "agentUiExpandProcess": "ขยาย",
+  "agentUiCollapse": "ยุบ",
+  "agentUiExpandText": "ขยาย",
+  "agentUiViewFullOutput": "ดูเอาต์พุตทั้งหมด",
+  "agentUiExpandEach": "รายการทีละรายการ",
+  "agentUiPermissionModeTitle": "ดำเนินการอนุญาต",
+  "agentUiPermissionAllowed": "ปล่อยแล้ว",
+  "agentUiPermissionNotExecuted": "ไม่ถูกดำเนินการ",
+  "agentUiPermFullAutoWarningTitle": "เปิดใช้งานโหมดอัตโนมัติเต็มรูปแบบหรือไม่",
+  "agentUiPermFullAutoWarningBody": "ตัวแทนจะไม่ยืนยันทีละรายการอีกต่อไป และดำเนินการคำสั่งทั้งหมดโดยตรง รวมถึงการลบการกำหนดค่าระบบและการฟอร์แมตดิสก์ การดำเนินการบางอย่างไม่สามารถกู้คืนได้ ช่วงเวลาไฟดับของเครือข่ายและข้อจำกัดของไฟล์ที่ละเอียดอ่อนจะยังคงมีผลอยู่ โปรดตรวจสอบให้แน่ใจว่าคุณเข้าใจขอบเขตของผลกระทบ",
+  "agentUiPermissionEnable": "เปิดใช้งาน",
+  "agentUiPermissionModeUsage": "การใช้งาน: /permission <อ่านอย่างเดียว|ถาม|อัตโนมัติ|อัตโนมัติทั้งหมด>",
+  "agentUiCacheHit": "cache hit {percent}%",
+  "@agentUiCacheHit": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiChangesCount": "{n} การเปลี่ยนแปลง",
+  "@agentUiChangesCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCallsCount": "คำสั่ง {n}",
+  "@agentUiCommandCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCount": "{n} คำสั่ง",
+  "@agentUiCommandCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCountOne": "1 คำสั่ง",
+  "agentUiContextUsed": "context {percent}%",
+  "@agentUiContextUsed": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExitCode": "รหัสออก {n}",
+  "@agentUiExitCode": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExpandAll": "ขยายรายการ {n} ทั้งหมด",
+  "@agentUiExpandAll": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailedCommands": "{n} คำสั่งล้มเหลว",
+  "@agentUiFailedCommands": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureCount": "{n} ล้มเหลว",
+  "@agentUiFailureCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureHintCancelled": "การดำเนินการถูกยกเลิก คุณสามารถเริ่มขั้นตอนนี้ใหม่ได้",
+  "agentUiFailureHintDisconnected": "การเชื่อมต่อถูกตัดการเชื่อมต่อ ขอแนะนำให้เชื่อมต่อกับเซิร์ฟเวอร์อีกครั้งก่อน จากนั้นลองขั้นตอนนี้อีกครั้ง",
+  "agentUiFailureHintInteractivePrompt": "คำสั่งกำลังรออินพุต ขอแนะนำให้ใช้พารามิเตอร์ที่ไม่โต้ตอบ (เช่น -y / --batch) แล้วลองอีกครั้ง",
+  "agentUiFailureHintPermissionDenied": "สิทธิ์ไม่เพียงพอ ขอแนะนำให้ใช้ sudo เพื่อลองอีกครั้ง หรือเปลี่ยนผู้ใช้ที่มีสิทธิ์",
+  "agentUiFailureHintSyntaxError": "ข้อผิดพลาดทางไวยากรณ์คำสั่ง ไม่ได้ดำเนินการ ขอแนะนำให้แก้ไขคำสั่งแล้วลองอีกครั้ง",
+  "agentUiFailureHintTimeout": "การหมดเวลาของการดำเนินการ ขอแนะนำให้ขยายการหมดเวลาหรือแยกคำสั่งออกเป็นส่วนเล็กๆ แล้วลองอีกครั้ง",
+  "agentUiFailureHintUnknown": "การดำเนินการล้มเหลว ขอแนะนำให้ตรวจสอบเอาต์พุต แก้ไขแล้วลองอีกครั้ง",
+  "agentUiFailureLabelCancelled": "ยกเลิกแล้ว",
+  "agentUiFailureLabelDisconnected": "การเชื่อมต่อถูกตัดการเชื่อมต่อ",
+  "agentUiFailureLabelInteractivePrompt": "กำลังรออินพุต",
+  "agentUiFailureLabelPermissionDenied": "สิทธิ์ไม่เพียงพอ",
+  "agentUiFailureLabelSyntaxError": "ข้อผิดพลาดทางไวยากรณ์คำสั่ง",
+  "agentUiFailureLabelTimeout": "การหมดเวลาของการดำเนินการ",
+  "agentUiGoalRounds": "round {used}/{max}",
+  "@agentUiGoalRounds": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiGoalRoundsLeft": "{n} รอบ",
+  "@agentUiGoalRoundsLeft": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiItemsCount": "{n} รายการ",
+  "@agentUiItemsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalExecAuthCreateLine": "ไม่มีไดเร็กทอรีนี้ มันจะถูกสร้างขึ้นโดยได้รับอนุญาต\n",
+  "agentUiLocalExecAuthGrant": "หลังจากอนุญาตแล้ว การเข้าถึงไฟล์ในเครื่องจะถูกเปิดใช้งานและไดเร็กทอรีจะได้รับอนุญาต",
+  "agentUiLocalExecAuthHead": "Agent จำเป็นต้องดำเนินการคำสั่งในไดเร็กทอรีภายในเครื่อง:\n{path}\n\n",
+  "@agentUiLocalExecAuthHead": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthReason": "เหตุผล: {reason}\n\n",
+  "@agentUiLocalExecAuthReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthorized": "ไดเรกทอรีท้องถิ่นที่ได้รับอนุญาต: {path}",
+  "@agentUiLocalExecAuthorized": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearBody": "กำลังเคลียร์ จะลบสำเนาของรายการ {count} เหล่านี้อย่างถาวร (ประมาณ {size}) หลังจากนั้น บันทึกการเปลี่ยนแปลง {records} จะไม่ถูกกู้คืนอีกต่อไป (ตัวบันทึกเองจะยังคงอยู่ แต่ไม่สามารถเรียกคืนไฟล์ได้)",
+  "@agentUiLocalFileTrashClearBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      },
+      "records": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearFailed": "{n} การลบรายการล้มเหลว (อาจถูกครอบครองโดยโปรแกรมอื่น)",
+  "@agentUiLocalFileTrashClearFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashCleared": "พื้นที่รีไซเคิลว่างเปล่า: ลบรายการ {count} และปล่อยประมาณ {size}",
+  "@agentUiLocalFileTrashCleared": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashLabel": "พื้นที่รีไซเคิล: {count} รายการ · ประมาณ {size}",
+  "@agentUiLocalFileTrashLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLogCount": "{n} บันทึกของระบบ",
+  "@agentUiLogCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLogCountOne": "1 บันทึกของระบบ",
+  "agentUiMoreActions": "และ {n}",
+  "@agentUiMoreActions": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreChanges": "และ {n} การเปลี่ยนแปลง โปรดดูบันทึกการตรวจสอบ",
+  "@agentUiMoreChanges": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreOutputLines": "และ {n} แถว",
+  "@agentUiMoreOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreSteps": "ก่อนหน้า {n} ขั้นตอน",
+  "@agentUiMoreSteps": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiOutputLines": "{n} Line",
+  "@agentUiOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPermDescAsk": "การแก้ไขและคำสั่งที่มีความเสี่ยงสูงจะถามคุณก่อน",
+  "agentUiPermDescAuto": "การแก้ไขทั่วไปจะดำเนินการโดยอัตโนมัติ คำสั่งที่มีความเสี่ยงสูงจะยังคงถาม",
+  "agentUiPermDescFullAuto": "คำสั่งที่มีความเสี่ยงสูงจะถูกดำเนินการโดยอัตโนมัติเช่นกัน ระยะเวลาที่ไฟดับของเครือข่ายและข้อจำกัดของไฟล์ที่ละเอียดอ่อนยังคงมีผลอยู่",
+  "agentUiPermDescReadOnly": "อนุญาตให้ใช้คำสั่งแบบอ่านอย่างเดียวเท่านั้น การแก้ไขใดๆ จะถูกปฏิเสธ",
+  "agentUiPermLabelAsk": "ถาม",
+  "agentUiPermLabelAuto": "โดยอัตโนมัติ",
+  "agentUiPermLabelFullAuto": "อัตโนมัติเต็มรูปแบบ",
+  "agentUiPermLabelReadOnly": "อ่านอย่างเดียว",
+  "agentUiPermissionModeCurrent": "โหมดการอนุญาตปัจจุบัน: {mode}",
+  "@agentUiPermissionModeCurrent": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPermissionModeSwitched": "เปลี่ยนเป็น \"{mode}\": {desc}",
+  "@agentUiPermissionModeSwitched": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "desc": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPhaseCancel": "ยกเลิก",
+  "agentUiPhaseExec": "ดำเนินการคำสั่ง",
+  "agentUiPhaseFail": "การดำเนินการล้มเหลว",
+  "agentUiPhasePause": "หยุดชั่วคราว",
+  "agentUiPhaseResume": "ดำเนินการต่อไป",
+  "agentUiPhaseSummarize": "จัดระเบียบข้อสรุป",
+  "agentUiPhaseThink": "กำลังคิด",
+  "agentUiPhaseTool": "ดำเนินการเครื่องมือ",
+  "agentUiPhaseUnderstand": "ทำความเข้าใจข้อกำหนด",
+  "agentUiPhaseVerify": "ผลการตรวจสอบ",
+  "agentUiPhaseWaitChoice": "กำลังรอการเลือก",
+  "agentUiPhaseWaitConfirm": "รอการยืนยัน",
+  "agentUiPlanDone": "{n} เสร็จสมบูรณ์",
+  "@agentUiPlanDone": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanFailed": "{n} ล้มเหลว",
+  "@agentUiPlanFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanInProgress": "{n} อยู่ระหว่างดำเนินการ",
+  "@agentUiPlanInProgress": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanItems": "{n} รายการ",
+  "@agentUiPlanItems": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanPending": "{n} รอดำเนินการ",
+  "@agentUiPlanPending": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanProgress": "แผน {done}/{total}",
+  "@agentUiPlanProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanSkipped": "{n} ข้าม",
+  "@agentUiPlanSkipped": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiProgressLines": "{n} รายการ",
+  "@agentUiProgressLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiRiskPrefix": "ความเสี่ยง: {reason}",
+  "@agentUiRiskPrefix": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRollbackPrefix": "ย้อนกลับ: {command}",
+  "@agentUiRollbackPrefix": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRoundsCount": "{n} รอบ",
+  "@agentUiRoundsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStep": "สำหรับรายละเอียด {n} ขั้นตอน",
+  "@agentUiStep": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStepsCount": "{n} ขั้นตอน",
+  "@agentUiStepsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiSuccessCount": "{n} สำเร็จ",
+  "@agentUiSuccessCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCount": "{n} การอนุมาน",
+  "@agentUiThoughtCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCountOne": "1 การอนุมาน",
+  "agentUiTokPerSec": "{n} tok/s",
+  "@agentUiTokPerSec": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTokensCount": "{estimated}{value} ท็อด",
+  "@agentUiTokensCount": {
+    "placeholders": {
+      "estimated": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiToolCallsCount": "เครื่องมือถูกเรียก {n} ครั้ง",
+  "@agentUiToolCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTruncated": "ตัดทอน",
+  "agentUiTruncatedChars": "{n} ที่ถูกตัดทอน อักขระ",
+  "@agentUiTruncatedChars": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTurnLabel": "th {n} รอบ",
+  "@agentUiTurnLabel": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
   }
 }

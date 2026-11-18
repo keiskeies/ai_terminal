@@ -3882,5 +3882,534 @@
         "type": "Object"
       }
     }
+  },
+  "agentUiTaskRecord": "Запись задачи",
+  "agentUiCompleted": "Завершено",
+  "agentUiFailed": "Не удалось",
+  "agentUiCancelled": "Отменено",
+  "agentUiInterrupted": "Прервано",
+  "agentUiPlanTitle": "Список выполнения",
+  "agentUiPlanByAi": "План AI",
+  "agentUiPlanWarning": "В плане все еще есть незавершенные шаги, проверьте, все ли они выполнены",
+  "agentUiConclusion": "Заключение",
+  "agentUiVerifiedEvidence": "Имеются проверочные доказательства",
+  "agentUiAiConclusion": "Заключение AI",
+  "agentUiContinueTask": "Продолжить задачу",
+  "agentUiOperationCopied": "Порядок операций скопирован",
+  "agentUiCopyAnswer": "Скопировать ответ",
+  "agentUiCopied": "Скопировано",
+  "agentUiAnswerCopied": "Ответ скопирован в буфер обмена",
+  "agentUiChangesAndRollback": "Изменения и откаты",
+  "agentUiAuditLog": "Записи аудита",
+  "agentUiProcessAndEvidence": "Процесс и доказательства",
+  "agentUiFullSummary": "Полное резюме",
+  "agentUiNoEvidence": "Нет расширяемых записей выполнения",
+  "agentUiContextHint": "Контекст занят; более 70% После этого система начнет удалять самые старые сообщения",
+  "agentUiGoalRunning": "Цель выполняется",
+  "agentUiGoalPaused": "Цель приостановлена ​​",
+  "agentUiGoalFinished": "Цель завершена",
+  "agentUiGoalEditAction": "Изменить цель",
+  "agentUiGoalFinishAction": "Завершить цель",
+  "agentUiGoalClearAction": "Очистить запись",
+  "agentUiGoalEditTitle": "Изменить цель",
+  "agentUiGoalFinishTitle": "Завершить эту цель?",
+  "agentUiGoalFinishBody": "Цель будет помечена как выполненная, и запущенные задачи не будут затронуты.",
+  "agentUiGoalBudgetExhausted": "Раунды исчерпаны",
+  "agentUiThinkingAndExecution": "Запись обдумывания и выполнения",
+  "agentUiLessThanOneSecond": "Меньше 1 секунды",
+  "agentUiAgentTask": "Задача агента",
+  "agentUiOpenInTerminal": "Просмотр в терминале",
+  "agentUiResume": "Возобновление",
+  "agentUiPause": "Пауза",
+  "agentUiStop": "Стоп",
+  "agentUiThinking": "Обдумывание",
+  "agentUiExecuting": "Выполнение",
+  "agentUiWaitingConfirm": "Ожидание подтверждения",
+  "agentUiPaused": "Приостановлено",
+  "agentUiIdle": "Готово",
+  "agentUiToolCall": "Вызов инструмента",
+  "agentUiBlocked": "Перехвачено",
+  "agentUiNeedsConfirm": "Требуется подтверждение",
+  "agentUiExecutedLabel": "Выполняется",
+  "agentUiExecutable": "Исполняемый файл",
+  "agentUiRiskBlocked": "Команда защищена Перехват политики",
+  "agentUiChangeImpact": "Влияние изменения",
+  "agentUiConfirmImpact": "Подтвердите влияние перед выполнением",
+  "agentUiNoRollbackSnapshot": "Откат: автоматический откат не предусмотрен, рекомендуется сначала сделать снимок",
+  "agentUiCancel": "Отмена",
+  "agentUiConfirmExecute": "Подтвердить выполнение",
+  "agentUiConfirmedLabel": "Подтверждено",
+  "agentUiConfirmedRecord": "Подтверждено перед выполнением",
+  "agentUiResultSuccess": "Выполнение успешно",
+  "agentUiLocalFileSection": "Доступ к локальному файлу",
+  "agentUiLocalFileEnable": "Разрешено Агент читает и записывает локальные файлы",
+  "agentUiLocalFileDirs": "Авторизовать каталог",
+  "agentUiLocalFileAddDir": "Добавить каталог",
+  "agentUiLocalFileRemoveDir": "Удалить каталог",
+  "agentUiLocalFilePickTitle": "Выберите каталог, к которому агенту разрешен доступ",
+  "agentUiLocalFileNoDirs": "Авторизованного каталога пока нет",
+  "agentUiLocalFileBlacklistHint": "Файлы ключей и учетных данных (~/.ssh, *.key, *.pem, .env) всегда недоступны",
+  "agentUiLocalFileTrashEmpty": "Область корзины пуста",
+  "agentUiLocalFileTrashClear": "Очистите область корзины",
+  "agentUiLocalFileTrashClearRefused": "Существуют пути, которые не входят в область корзины, которые были пропущены и не удалены",
+  "agentUiLocalExecAuthTitle": "Разрешить доступ к локальному каталогу?",
+  "agentUiLocalExecAuthNote": "Конфиденциальные пути (~/.ssh, .env, ключи и т. д.) остаются закрытыми.",
+  "agentUiLocalExecAuthAllow": "Разрешить и продолжить",
+  "agentUiCommandLabel": "Команда терминала",
+  "agentUiPendingLabel": "ожидается",
+  "agentUiToolDoneLabel": "Вызвано",
+  "agentUiFailedLabel": "Сбой",
+  "agentUiProcessFolded": "Процесс свернут",
+  "agentUiCollapseProcess": "Развернуть процесс",
+  "agentUiExpandProcess": "Развернуть",
+  "agentUiCollapse": "Свернуть",
+  "agentUiExpandText": "Развернуть",
+  "agentUiViewFullOutput": "Просмотр полного вывода",
+  "agentUiExpandEach": "Поэлементно",
+  "agentUiPermissionModeTitle": "Разрешения на выполнение",
+  "agentUiPermissionAllowed": "Выпущено",
+  "agentUiPermissionNotExecuted": "Не выполнено",
+  "agentUiPermFullAutoWarningTitle": "Полностью автоматический режим включен?",
+  "agentUiPermFullAutoWarningBody": "Агент больше не будет подтверждать одну за другой и напрямую выполнять все команды, включая удаление конфигурации системы и форматирование диска. Некоторые операции невозможно восстановить; период отключения сети и ограничения на конфиденциальные файлы останутся в силе. Пожалуйста, убедитесь, что вы понимаете масштабы воздействия.",
+  "agentUiPermissionEnable": "Включить",
+  "agentUiPermissionModeUsage": "Использование: /permission <только для чтения|спрашивать|авто|полностью автоматический>",
+  "agentUiCacheHit": "попадание в кэш {percent}%",
+  "@agentUiCacheHit": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiChangesCount": "{n} изменения",
+  "@agentUiChangesCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCallsCount": "Команды {n}",
+  "@agentUiCommandCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCount": "{n} команды",
+  "@agentUiCommandCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCountOne": "1 команда",
+  "agentUiContextUsed": "контекст {percent}%",
+  "@agentUiContextUsed": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExitCode": "Код выхода {n}",
+  "@agentUiExitCode": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExpandAll": "развернуть все элементы {n}",
+  "@agentUiExpandAll": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailedCommands": "{n} не удалось выполнить команды",
+  "@agentUiFailedCommands": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureCount": "{n} не удалось",
+  "@agentUiFailureCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureHintCancelled": "Выполнение отменено. Вы можете перезапустить этот шаг.",
+  "agentUiFailureHintDisconnected": "Соединение прервано. Рекомендуется сначала повторно подключиться к серверу, а затем повторить этот шаг еще раз.",
+  "agentUiFailureHintInteractivePrompt": "Команда ожидает ввода. Рекомендуется использовать неинтерактивные параметры (например, -y/--batch) и повторить попытку.",
+  "agentUiFailureHintPermissionDenied": "Недостаточно разрешений. Рекомендуется использовать sudo, чтобы повторить попытку, или сменить пользователя с разрешениями.",
+  "agentUiFailureHintSyntaxError": "Ошибка синтаксиса команды, она не выполнена. Рекомендуется исправить команду и повторить попытку.",
+  "agentUiFailureHintTimeout": "Тайм-аут выполнения. Рекомендуется продлить тайм-аут или разделить команду на более мелкие части и повторить попытку.",
+  "agentUiFailureHintUnknown": "Выполнение не удалось. Рекомендуется проверить вывод, исправить его и повторить попытку.",
+  "agentUiFailureLabelCancelled": "Отменено",
+  "agentUiFailureLabelDisconnected": "Соединение разорвано",
+  "agentUiFailureLabelInteractivePrompt": "Ожидание ввода",
+  "agentUiFailureLabelPermissionDenied": "Недостаточно разрешений",
+  "agentUiFailureLabelSyntaxError": "Ошибка синтаксиса команды.",
+  "agentUiFailureLabelTimeout": "Тайм-аут выполнения.",
+  "agentUiGoalRounds": "round {used}/{max}",
+  "@agentUiGoalRounds": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiGoalRoundsLeft": "{n} Раунд",
+  "@agentUiGoalRoundsLeft": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiItemsCount": "{n} элементы",
+  "@agentUiItemsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalExecAuthCreateLine": "Каталог не существует. Он будет создан с разрешения.\n",
+  "agentUiLocalExecAuthGrant": "После разрешения будет включен доступ к локальному файлу и каталог будет авторизован.",
+  "agentUiLocalExecAuthHead": "Агенту необходимо выполнить команду в локальном каталоге:\n{path}\n\n",
+  "@agentUiLocalExecAuthHead": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthReason": "Причина: {reason}\n\n",
+  "@agentUiLocalExecAuthReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthorized": "Авторизованный локальный каталог: {path}",
+  "@agentUiLocalExecAuthorized": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearBody": "При очистке копии этих элементов {count} будут удалены без возможности восстановления (прибл. {size}). После этого записи изменений {records} больше не будут восстановлены (сами записи сохраняются, но файлы получить невозможно).",
+  "@agentUiLocalFileTrashClearBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      },
+      "records": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearFailed": "{n} удаление элемента не удалось (может быть занято другими программами)",
+  "@agentUiLocalFileTrashClearFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashCleared": "Область переработки очищена: удалите элемент {count} и отпустите около {size}",
+  "@agentUiLocalFileTrashCleared": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashLabel": "область переработки: {count} элементов · Приблизительно {size}",
+  "@agentUiLocalFileTrashLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLogCount": "{n} системные журналы",
+  "@agentUiLogCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLogCountOne": "1 системные журналы",
+  "agentUiMoreActions": "и {n}",
+  "@agentUiMoreActions": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreChanges": "и {n} изменения, подробности см. в записи аудита",
+  "@agentUiMoreChanges": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreOutputLines": "и {n} Строка",
+  "@agentUiMoreOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreSteps": "предыдущие шаги {n}",
+  "@agentUiMoreSteps": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiOutputLines": "{n} Строка",
+  "@agentUiOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPermDescAsk": "Изменения и команды высокого риска будут запрашиваться в первую очередь",
+  "agentUiPermDescAuto": "Обычные модификации будут выполняться автоматически, команды высокого риска по-прежнему будут запрашиваться",
+  "agentUiPermDescFullAuto": "Команды высокого риска также будут выполняться автоматически; период отключения сети и ограничения на конфиденциальные файлы все еще действуют",
+  "agentUiPermDescReadOnly": "Разрешены только команды только для чтения, любые изменения будут отклонены.",
+  "agentUiPermLabelAsk": "Спрашивать",
+  "agentUiPermLabelAuto": "Автоматически",
+  "agentUiPermLabelFullAuto": "Полностью автоматически",
+  "agentUiPermLabelReadOnly": "Только чтение",
+  "agentUiPermissionModeCurrent": "Текущий режим разрешений: {mode}",
+  "@agentUiPermissionModeCurrent": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPermissionModeSwitched": "Переключился на «{mode}»: {desc}",
+  "@agentUiPermissionModeSwitched": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "desc": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPhaseCancel": "Отменено",
+  "agentUiPhaseExec": "Выполнить команду",
+  "agentUiPhaseFail": "Выполнение не удалось",
+  "agentUiPhasePause": "Приостановлено",
+  "agentUiPhaseResume": "Продолжить выполнение",
+  "agentUiPhaseSummarize": "Организовать вывод",
+  "agentUiPhaseThink": "Обдумать",
+  "agentUiPhaseTool": "Выполнить инструмент",
+  "agentUiPhaseUnderstand": "Понять требования",
+  "agentUiPhaseVerify": "Результат проверки",
+  "agentUiPhaseWaitChoice": "Ожидать выбора",
+  "agentUiPhaseWaitConfirm": "Ожидать подтверждения",
+  "agentUiPlanDone": "{n} завершено",
+  "@agentUiPlanDone": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanFailed": "{n} не удалось",
+  "@agentUiPlanFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanInProgress": "{n} в процессе",
+  "@agentUiPlanInProgress": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanItems": "{n} элементы",
+  "@agentUiPlanItems": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanPending": "{n} в ожидании",
+  "@agentUiPlanPending": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanProgress": "План {done}/{total}",
+  "@agentUiPlanProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanSkipped": "{n} пропущено",
+  "@agentUiPlanSkipped": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiProgressLines": "{n} элементы",
+  "@agentUiProgressLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiRiskPrefix": "Риск: {reason}",
+  "@agentUiRiskPrefix": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRollbackPrefix": "Откат: {command}",
+  "@agentUiRollbackPrefix": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRoundsCount": "{n} раунд",
+  "@agentUiRoundsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStep": "{n} шаг",
+  "@agentUiStep": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStepsCount": "{n} шаг",
+  "@agentUiStepsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiSuccessCount": "{n} Успешно",
+  "@agentUiSuccessCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCount": "{n} выводы",
+  "@agentUiThoughtCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCountOne": "1 выводы",
+  "agentUiTokPerSec": "{n} ток/с",
+  "@agentUiTokPerSec": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTokensCount": "{estimated}{value} tok",
+  "@agentUiTokensCount": {
+    "placeholders": {
+      "estimated": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiToolCallsCount": "Инструмент вызывался {n} раз.",
+  "@agentUiToolCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTruncated": "Усечена",
+  "agentUiTruncatedChars": "Усеченные символы {n}",
+  "@agentUiTruncatedChars": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTurnLabel": "-й раунд {n}",
+  "@agentUiTurnLabel": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
   }
 }

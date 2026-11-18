@@ -3882,5 +3882,534 @@
         "type": "Object"
       }
     }
+  },
+  "agentUiTaskRecord": "سجل المهمة",
+  "agentUiCompleted": "مكتمل",
+  "agentUiFailed": "فاشل",
+  "agentUiCancelled": "ملغى",
+  "agentUiInterrupted": "تمت مقاطعته",
+  "agentUiPlanTitle": "قائمة التنفيذ",
+  "agentUiPlanByAi": "خطة الذكاء الاصطناعي",
+  "agentUiPlanWarning": "لا تزال الخطة بها خطوات غير مكتملة، يرجى التحقق مما إذا كانت جميعها مكتملة",
+  "agentUiConclusion": "الاستنتاج",
+  "agentUiVerifiedEvidence": "الحصول على أدلة التحقق",
+  "agentUiAiConclusion": "استنتاج الذكاء الاصطناعي",
+  "agentUiContinueTask": "مواصلة المهمة",
+  "agentUiOperationCopied": "تم نسخ أمر التشغيل",
+  "agentUiCopyAnswer": "انسخ الإجابة",
+  "agentUiCopied": "منسوخ",
+  "agentUiAnswerCopied": "تم نسخ الإجابة إلى الحافظة",
+  "agentUiChangesAndRollback": "التغييرات والتراجعات",
+  "agentUiAuditLog": "سجلات التدقيق",
+  "agentUiProcessAndEvidence": "العملية والأدلة",
+  "agentUiFullSummary": "ملخص كامل",
+  "agentUiNoEvidence": "لا توجد سجلات تنفيذ قابلة للتوسيع",
+  "agentUiContextHint": "السياق مشغول ؛ أكثر من 70% سيبدأ المحرك بعد ذلك في تجاهل أقدم الرسائل",
+  "agentUiGoalRunning": "الهدف قيد التقدم",
+  "agentUiGoalPaused": "الهدف متوقف مؤقتًا",
+  "agentUiGoalFinished": "انتهى الهدف",
+  "agentUiGoalEditAction": "تعديل الهدف",
+  "agentUiGoalFinishAction": "نهاية الهدف",
+  "agentUiGoalClearAction": "مسح السجل",
+  "agentUiGoalEditTitle": "تعديل الهدف",
+  "agentUiGoalFinishTitle": "إنهاء هذا الهدف؟",
+  "agentUiGoalFinishBody": "سيتم وضع علامة على الهدف كمكتمل، ولن تتأثر المهام الجارية.",
+  "agentUiGoalBudgetExhausted": "استنفدت الجولات",
+  "agentUiThinkingAndExecution": "سجل التفكير والتنفيذ",
+  "agentUiLessThanOneSecond": "أقل من 1 ثانية",
+  "agentUiAgentTask": "مهمة الوكيل",
+  "agentUiOpenInTerminal": "عرض في المحطة",
+  "agentUiResume": "استئناف",
+  "agentUiPause": "إيقاف مؤقت",
+  "agentUiStop": "إيقاف",
+  "agentUiThinking": "تفكير",
+  "agentUiExecuting": "تنفيذ",
+  "agentUiWaitingConfirm": "انتظار التأكيد",
+  "agentUiPaused": "متوقف مؤقتًا",
+  "agentUiIdle": "جاهز",
+  "agentUiToolCall": "استدعاء الأداة",
+  "agentUiBlocked": "تم اعتراضه",
+  "agentUiNeedsConfirm": "يتطلب تأكيدًا",
+  "agentUiExecutedLabel": "تشغيل",
+  "agentUiExecutable": "قابل للتنفيذ",
+  "agentUiRiskBlocked": "تم تأمين الأمر اعتراض السياسة",
+  "agentUiChangeImpact": "تغيير التأثير",
+  "agentUiConfirmImpact": "يرجى تأكيد التأثير قبل التنفيذ",
+  "agentUiNoRollbackSnapshot": "التراجع: لا يوجد تراجع تلقائي، يوصى بأخذ لقطة أولاً",
+  "agentUiCancel": "إلغاء",
+  "agentUiConfirmExecute": "تأكيد التنفيذ",
+  "agentUiConfirmedLabel": "تأكيد",
+  "agentUiConfirmedRecord": "التأكيد قبل التنفيذ",
+  "agentUiResultSuccess": "التنفيذ ناجح",
+  "agentUiLocalFileSection": "الوصول إلى الملفات المحلية",
+  "agentUiLocalFileEnable": "الوكيل المسموح له بقراءة الملفات المحلية وكتابتها",
+  "agentUiLocalFileDirs": "تفويض الدليل",
+  "agentUiLocalFileAddDir": "إضافة دليل",
+  "agentUiLocalFileRemoveDir": "إزالة الدليل",
+  "agentUiLocalFilePickTitle": "حدد الدليل الذي يُسمح للوكيل بالوصول",
+  "agentUiLocalFileNoDirs": "لا يوجد دليل معتمد حتى الآن",
+  "agentUiLocalFileBlacklistHint": "لا يمكن دائمًا الوصول إلى ملفات المفاتيح وبيانات الاعتماد (~/.ssh، *.key، *.pem، .env)",
+  "agentUiLocalFileTrashEmpty": "منطقة إعادة التدوير فارغة",
+  "agentUiLocalFileTrashClear": "أفرغ منطقة إعادة التدوير",
+  "agentUiLocalFileTrashClearRefused": "هناك مسارات ليست موجودة في منطقة إعادة التدوير وتم تخطيها ولم يتم حذفها",
+  "agentUiLocalExecAuthTitle": "السماح بالوصول إلى الدليل المحلي؟",
+  "agentUiLocalExecAuthNote": "تظل المسارات الحساسة (~/.ssh، و.env، والمفاتيح، وما إلى ذلك) محظورة.",
+  "agentUiLocalExecAuthAllow": "السماح والمتابعة",
+  "agentUiCommandLabel": "الأمر الطرفي",
+  "agentUiPendingLabel": "معلق",
+  "agentUiToolDoneLabel": "تم الاتصال به",
+  "agentUiFailedLabel": "فشل",
+  "agentUiProcessFolded": "انهارت العملية",
+  "agentUiCollapseProcess": "قم بتوسيع العملية",
+  "agentUiExpandProcess": "قم بتوسيع",
+  "agentUiCollapse": "طي",
+  "agentUiExpandText": "قم بتوسيع",
+  "agentUiViewFullOutput": "عرض الإخراج الكامل",
+  "agentUiExpandEach": "عنصر حسب العنصر",
+  "agentUiPermissionModeTitle": "تنفيذ الأذونات",
+  "agentUiPermissionAllowed": "تم إصداره",
+  "agentUiPermissionNotExecuted": "لم يتم التنفيذ",
+  "agentUiPermFullAutoWarningTitle": "هل تم تمكين الوضع التلقائي بالكامل؟",
+  "agentUiPermFullAutoWarningBody": "لن يقوم الوكيل بعد الآن بالتأكيد واحدًا تلو الآخر وتنفيذ جميع الأوامر مباشرة بما في ذلك حذف تكوين النظام وتهيئة القرص. لا يمكن استرداد بعض العمليات؛ ستظل فترة حجب الشبكة وقيود الملفات الحساسة سارية. يرجى التأكد من أنك تفهم نطاق التأثير.",
+  "agentUiPermissionEnable": "تمكين",
+  "agentUiPermissionModeUsage": "الاستخدام: / إذن <للقراءة فقط|اسأل|تلقائي|تلقائي بالكامل>",
+  "agentUiCacheHit": "cache hit {percent}%",
+  "@agentUiCacheHit": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiChangesCount": "{n} التغييرات",
+  "@agentUiChangesCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCallsCount": "أوامر {n}",
+  "@agentUiCommandCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCount": "{n} مستديرة",
+  "@agentUiCommandCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCountOne": "أمر واحد",
+  "agentUiContextUsed": "context {percent}%",
+  "@agentUiContextUsed": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExitCode": "رمز الخروج {n}",
+  "@agentUiExitCode": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExpandAll": "قم بتوسيع جميع عناصر {n}",
+  "@agentUiExpandAll": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailedCommands": "{n} الأوامر الفاشلة",
+  "@agentUiFailedCommands": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureCount": "{n} فاشلة",
+  "@agentUiFailureCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureHintCancelled": "تم إلغاء التنفيذ. يمكنك إعادة تشغيل هذه الخطوة.",
+  "agentUiFailureHintDisconnected": "تم قطع الاتصال. يوصى بإعادة الاتصال بالخادم أولاً ثم تجربة هذه الخطوة مرة أخرى.",
+  "agentUiFailureHintInteractivePrompt": "الأمر في انتظار الإدخال. يوصى باستخدام معلمات غير تفاعلية (مثل -y / --batch) والمحاولة مرة أخرى.",
+  "agentUiFailureHintPermissionDenied": "أذونات غير كافية. يوصى باستخدام Sudo للمحاولة مرة أخرى، أو تغيير المستخدم الذي لديه الأذونات.",
+  "agentUiFailureHintSyntaxError": "خطأ في بناء جملة الأمر، لم يتم تنفيذه. يوصى بتصحيح الأمر والمحاولة مرة أخرى.",
+  "agentUiFailureHintTimeout": "مهلة التنفيذ. يوصى بتمديد المهلة أو تقسيم الأمر إلى أجزاء أصغر والمحاولة مرة أخرى.",
+  "agentUiFailureHintUnknown": "فشل التنفيذ. يوصى بالتحقق من الإخراج وتصحيحه والمحاولة مرة أخرى.",
+  "agentUiFailureLabelCancelled": "تم الإلغاء",
+  "agentUiFailureLabelDisconnected": "تم قطع الاتصال",
+  "agentUiFailureLabelInteractivePrompt": "في انتظار الإدخال",
+  "agentUiFailureLabelPermissionDenied": "أذونات غير كافية",
+  "agentUiFailureLabelSyntaxError": "خطأ في بناء جملة الأمر",
+  "agentUiFailureLabelTimeout": "مهلة التنفيذ",
+  "agentUiGoalRounds": "round {used}/{max}",
+  "@agentUiGoalRounds": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiGoalRoundsLeft": "{n} أوامر",
+  "@agentUiGoalRoundsLeft": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiItemsCount": "{n} العناصر",
+  "@agentUiItemsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalExecAuthCreateLine": "الدليل غير موجود. سيتم إنشاؤه بإذن.\n",
+  "agentUiLocalExecAuthGrant": "بعد السماح، سيتم تمكين الوصول إلى الملفات المحلية وسيتم ترخيص الدليل.",
+  "agentUiLocalExecAuthHead": "يحتاج الوكيل إلى تنفيذ الأمر في الدليل المحلي:\n{path}\n\n",
+  "@agentUiLocalExecAuthHead": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthReason": "السبب: {reason}\n\n",
+  "@agentUiLocalExecAuthReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthorized": "الدليل المحلي المعتمد: {path}",
+  "@agentUiLocalExecAuthorized": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearBody": "سيؤدي المسح إلى حذف نسخ هذه العناصر {count} نهائيًا (حوالي {size}). بعد ذلك، لن تتم استعادة سجلات التغيير {records} (يتم الاحتفاظ بالسجلات نفسها، ولكن لا يمكن استرداد الملفات).",
+  "@agentUiLocalFileTrashClearBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      },
+      "records": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearFailed": "{n} فشل حذف العنصر (قد تشغله برامج أخرى)",
+  "@agentUiLocalFileTrashClearFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashCleared": "تم إفراغ منطقة إعادة التدوير: احذف العنصر {count} وحرر حوالي {size}",
+  "@agentUiLocalFileTrashCleared": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashLabel": "منطقة إعادة التدوير: {count} عناصر · حوالي {size}",
+  "@agentUiLocalFileTrashLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLogCount": "{n} سجلات النظام",
+  "@agentUiLogCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLogCountOne": "سجلات النظام",
+  "agentUiMoreActions": "و{n}",
+  "@agentUiMoreActions": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreChanges": "و{n} التغييرات، راجع سجل التدقيق",
+  "@agentUiMoreChanges": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreOutputLines": "و{n} الصف",
+  "@agentUiMoreOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreSteps": "خطوات {n} السابقة",
+  "@agentUiMoreSteps": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiOutputLines": "{n} السطر",
+  "@agentUiOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPermDescAsk": "ستسألك التعديلات والأوامر عالية الخطورة أولاً",
+  "agentUiPermDescAuto": "سيتم تنفيذ التعديلات العادية تلقائيًا، وستظل الأوامر عالية الخطورة تسأل",
+  "agentUiPermDescFullAuto": "سيتم أيضًا تنفيذ الأوامر عالية الخطورة تلقائيًا؛ لا تزال فترة تعتيم الشبكة وقيود الملفات الحساسة سارية",
+  "agentUiPermDescReadOnly": "يُسمح بأوامر القراءة فقط فقط، وسيتم رفض أي تعديلات",
+  "agentUiPermLabelAsk": "اسأل",
+  "agentUiPermLabelAuto": "تلقائيًا",
+  "agentUiPermLabelFullAuto": "تلقائي بالكامل",
+  "agentUiPermLabelReadOnly": "للقراءة فقط",
+  "agentUiPermissionModeCurrent": "وضع الأذونات الحالي: {mode}",
+  "@agentUiPermissionModeCurrent": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPermissionModeSwitched": "تم التبديل إلى \"{mode}\": {desc}",
+  "@agentUiPermissionModeSwitched": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "desc": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPhaseCancel": "تم الإلغاء",
+  "agentUiPhaseExec": "تنفيذ الأمر",
+  "agentUiPhaseFail": "فشل التنفيذ",
+  "agentUiPhasePause": "متوقف مؤقتًا",
+  "agentUiPhaseResume": "متابعة التنفيذ",
+  "agentUiPhaseSummarize": "تنظيم الاستنتاج",
+  "agentUiPhaseThink": "التفكير",
+  "agentUiPhaseTool": "تنفيذ الأداة",
+  "agentUiPhaseUnderstand": "فهم المتطلبات",
+  "agentUiPhaseVerify": "نتيجة التحقق",
+  "agentUiPhaseWaitChoice": "انتظار التحديد",
+  "agentUiPhaseWaitConfirm": "انتظار التأكيد",
+  "agentUiPlanDone": "{n} مكتملة",
+  "@agentUiPlanDone": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanFailed": "{n} فاشلة",
+  "@agentUiPlanFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanInProgress": "{n} قيد التقدم",
+  "@agentUiPlanInProgress": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanItems": "{n} العناصر",
+  "@agentUiPlanItems": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanPending": "{n} معلقة",
+  "@agentUiPlanPending": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanProgress": "خطة {done}/{total}",
+  "@agentUiPlanProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanSkipped": "{n} تم تخطي",
+  "@agentUiPlanSkipped": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiProgressLines": "{n} العناصر",
+  "@agentUiProgressLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiRiskPrefix": "المخاطرة: {reason}",
+  "@agentUiRiskPrefix": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRollbackPrefix": "التراجع: {command}",
+  "@agentUiRollbackPrefix": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRoundsCount": "{n} الجولة",
+  "@agentUiRoundsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStep": "للحصول على التفاصيل {n} الخطوة",
+  "@agentUiStep": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStepsCount": "{n} الخطوة",
+  "@agentUiStepsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiSuccessCount": "{n} ناجحة",
+  "@agentUiSuccessCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCount": "{n} الاستدلالات",
+  "@agentUiThoughtCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCountOne": "1 الاستدلالات",
+  "agentUiTokPerSec": "{n} tok/s",
+  "@agentUiTokPerSec": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTokensCount": "{estimated}{value} tok",
+  "@agentUiTokensCount": {
+    "placeholders": {
+      "estimated": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiToolCallsCount": "تم استدعاء الأداة {n} مرات",
+  "@agentUiToolCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTruncated": "مقطوع",
+  "agentUiTruncatedChars": "تم اقتطاع {n} أحرف",
+  "@agentUiTruncatedChars": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTurnLabel": "{n} الجولة",
+  "@agentUiTurnLabel": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
   }
 }

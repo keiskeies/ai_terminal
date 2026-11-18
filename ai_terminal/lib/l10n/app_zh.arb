@@ -3920,5 +3920,534 @@
         "type": "Object"
       }
     }
+  },
+  "agentUiTaskRecord": "任务记录",
+  "agentUiCompleted": "完成",
+  "agentUiFailed": "失败",
+  "agentUiCancelled": "已取消",
+  "agentUiInterrupted": "已中断",
+  "agentUiPlanTitle": "执行清单",
+  "agentUiPlanByAi": "AI 计划",
+  "agentUiPlanWarning": "计划仍有未收尾步骤，请核对是否全部完成",
+  "agentUiConclusion": "结论",
+  "agentUiVerifiedEvidence": "有验证证据",
+  "agentUiAiConclusion": "AI 结论",
+  "agentUiContinueTask": "继续任务",
+  "agentUiOperationCopied": "操作单已复制",
+  "agentUiCopyAnswer": "复制回答",
+  "agentUiCopied": "已复制",
+  "agentUiAnswerCopied": "回答已复制到剪贴板",
+  "agentUiChangesAndRollback": "变更与回滚",
+  "agentUiAuditLog": "审计记录",
+  "agentUiProcessAndEvidence": "过程与证据",
+  "agentUiFullSummary": "完整总结",
+  "agentUiNoEvidence": "没有可展开的执行记录",
+  "agentUiContextHint": "上下文占用；超过 70% 后引擎会开始丢弃最早的消息",
+  "agentUiGoalRunning": "进行中的目标",
+  "agentUiGoalPaused": "已暂停的目标",
+  "agentUiGoalFinished": "已结束的目标",
+  "agentUiGoalEditAction": "编辑目标",
+  "agentUiGoalFinishAction": "结束目标",
+  "agentUiGoalClearAction": "清除记录",
+  "agentUiGoalEditTitle": "编辑目标",
+  "agentUiGoalFinishTitle": "结束这个目标？",
+  "agentUiGoalFinishBody": "目标会被标记为结束，正在运行的任务不受影响。",
+  "agentUiGoalBudgetExhausted": "轮次已用尽",
+  "agentUiThinkingAndExecution": "思考与执行记录",
+  "agentUiLessThanOneSecond": "不足 1s",
+  "agentUiAgentTask": "Agent 任务",
+  "agentUiOpenInTerminal": "在终端查看",
+  "agentUiResume": "恢复",
+  "agentUiPause": "暂停",
+  "agentUiStop": "停止",
+  "agentUiThinking": "思考中",
+  "agentUiExecuting": "执行中",
+  "agentUiWaitingConfirm": "等待确认",
+  "agentUiPaused": "已暂停",
+  "agentUiIdle": "就绪",
+  "agentUiToolCall": "工具调用",
+  "agentUiBlocked": "已拦截",
+  "agentUiNeedsConfirm": "需确认",
+  "agentUiExecutedLabel": "已运行",
+  "agentUiExecutable": "可执行",
+  "agentUiRiskBlocked": "该命令已被安全策略拦截",
+  "agentUiChangeImpact": "变更影响",
+  "agentUiConfirmImpact": "执行前请确认影响",
+  "agentUiNoRollbackSnapshot": "回滚：无自动回滚，建议先快照",
+  "agentUiCancel": "取消",
+  "agentUiConfirmExecute": "确认执行",
+  "agentUiConfirmedLabel": "已确认",
+  "agentUiConfirmedRecord": "执行前已确认",
+  "agentUiResultSuccess": "执行成功",
+  "agentUiLocalFileSection": "本地文件访问",
+  "agentUiLocalFileEnable": "允许 Agent 读写本机文件",
+  "agentUiLocalFileDirs": "授权目录",
+  "agentUiLocalFileAddDir": "添加目录",
+  "agentUiLocalFileRemoveDir": "移除该目录",
+  "agentUiLocalFilePickTitle": "选择允许 Agent 访问的目录",
+  "agentUiLocalFileNoDirs": "还没有授权目录",
+  "agentUiLocalFileBlacklistHint": "密钥与凭据文件（~/.ssh、*.key、*.pem、.env）始终不可访问",
+  "agentUiLocalFileTrashEmpty": "回收区为空",
+  "agentUiLocalFileTrashClear": "清空回收区",
+  "agentUiLocalFileTrashClearRefused": "有路径不在回收区内，已跳过未删除",
+  "agentUiLocalExecAuthTitle": "允许本机目录访问？",
+  "agentUiLocalExecAuthNote": "敏感路径（~/.ssh、.env、密钥等）仍然禁止访问。",
+  "agentUiLocalExecAuthAllow": "允许并继续",
+  "agentUiCommandLabel": "终端命令",
+  "agentUiPendingLabel": "待执行",
+  "agentUiToolDoneLabel": "已调用",
+  "agentUiFailedLabel": "失败",
+  "agentUiProcessFolded": "过程已折叠",
+  "agentUiCollapseProcess": "展开过程",
+  "agentUiExpandProcess": "展开",
+  "agentUiCollapse": "收起",
+  "agentUiExpandText": "展开",
+  "agentUiViewFullOutput": "查看完整输出",
+  "agentUiExpandEach": "逐条",
+  "agentUiPermissionModeTitle": "执行权限",
+  "agentUiPermissionAllowed": "已放行",
+  "agentUiPermissionNotExecuted": "未执行",
+  "agentUiPermFullAutoWarningTitle": "启用全自动模式？",
+  "agentUiPermFullAutoWarningBody": "Agent 将不再逐条确认，直接执行包括删除系统配置、格式化磁盘在内的所有命令。部分操作不可恢复；封网期与敏感文件限制仍会生效，请确认你了解影响范围。",
+  "agentUiPermissionEnable": "启用",
+  "agentUiPermissionModeUsage": "用法：/permission <只读|询问|自动|全自动>",
+  "agentUiCacheHit": "缓存命中 {percent}%",
+  "@agentUiCacheHit": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiChangesCount": "{n} 项变更",
+  "@agentUiChangesCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCallsCount": "{n} 条命令",
+  "@agentUiCommandCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCount": "{n} 条命令",
+  "@agentUiCommandCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCountOne": "1 条命令",
+  "agentUiContextUsed": "上下文 {percent}%",
+  "@agentUiContextUsed": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExitCode": "退出码 {n}",
+  "@agentUiExitCode": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExpandAll": "展开全部 {n} 项",
+  "@agentUiExpandAll": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailedCommands": "{n} 条命令失败",
+  "@agentUiFailedCommands": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureCount": "{n} 失败",
+  "@agentUiFailureCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureHintCancelled": "执行已取消。可以重新发起本步。",
+  "agentUiFailureHintDisconnected": "连接已断开。建议先重连服务器，再重试本步。",
+  "agentUiFailureHintInteractivePrompt": "命令在等待输入。建议改用非交互参数（如 -y / --batch）后重试。",
+  "agentUiFailureHintPermissionDenied": "权限不足。建议使用 sudo 重试，或更换有权限的用户。",
+  "agentUiFailureHintSyntaxError": "命令语法错误，未执行。建议修正命令后重试。",
+  "agentUiFailureHintTimeout": "执行超时。建议延长超时，或把命令拆小后重试。",
+  "agentUiFailureHintUnknown": "执行失败。建议查看输出后修正并重试。",
+  "agentUiFailureLabelCancelled": "已取消",
+  "agentUiFailureLabelDisconnected": "连接已断开",
+  "agentUiFailureLabelInteractivePrompt": "等待输入",
+  "agentUiFailureLabelPermissionDenied": "权限不足",
+  "agentUiFailureLabelSyntaxError": "命令语法错误",
+  "agentUiFailureLabelTimeout": "执行超时",
+  "agentUiGoalRounds": "轮次 {used}/{max}",
+  "@agentUiGoalRounds": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiGoalRoundsLeft": "剩 {n} 轮",
+  "@agentUiGoalRoundsLeft": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiItemsCount": "{n} 项",
+  "@agentUiItemsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalExecAuthCreateLine": "该目录不存在，允许后将创建。\n",
+  "agentUiLocalExecAuthGrant": "允许后会开启本地文件访问并授权该目录。",
+  "agentUiLocalExecAuthHead": "Agent 需要在本机目录执行命令：\n{path}\n\n",
+  "@agentUiLocalExecAuthHead": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthReason": "原因：{reason}\n\n",
+  "@agentUiLocalExecAuthReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthorized": "已授权本机目录：{path}",
+  "@agentUiLocalExecAuthorized": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearBody": "清空会永久删除这 {count} 项副本（约 {size}）。之后 {records} 条改动记录将无法再还原（记录本身保留，只是捞不回文件）。",
+  "@agentUiLocalFileTrashClearBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      },
+      "records": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearFailed": "{n} 项删除失败（可能被其它程序占用）",
+  "@agentUiLocalFileTrashClearFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashCleared": "已清空回收区：删除 {count} 项，释放约 {size}",
+  "@agentUiLocalFileTrashCleared": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashLabel": "回收区：{count} 项 · 约 {size}",
+  "@agentUiLocalFileTrashLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLogCount": "{n} 条系统日志",
+  "@agentUiLogCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLogCountOne": "1 条系统日志",
+  "agentUiMoreActions": "还有 {n} 条",
+  "@agentUiMoreActions": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreChanges": "还有 {n} 项变更，详见审计记录",
+  "@agentUiMoreChanges": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreOutputLines": "还有 {n} 行",
+  "@agentUiMoreOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreSteps": "更早 {n} 步",
+  "@agentUiMoreSteps": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiOutputLines": "{n} 行",
+  "@agentUiOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPermDescAsk": "修改类与高危命令都先询问你",
+  "agentUiPermDescAuto": "普通修改自动执行，高危命令仍会询问",
+  "agentUiPermDescFullAuto": "高危命令也自动执行；封网期与敏感文件限制仍生效",
+  "agentUiPermDescReadOnly": "只允许只读命令，任何修改都会被拒绝",
+  "agentUiPermLabelAsk": "询问",
+  "agentUiPermLabelAuto": "自动",
+  "agentUiPermLabelFullAuto": "全自动",
+  "agentUiPermLabelReadOnly": "只读",
+  "agentUiPermissionModeCurrent": "当前权限模式：{mode}",
+  "@agentUiPermissionModeCurrent": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPermissionModeSwitched": "已切换到「{mode}」：{desc}",
+  "@agentUiPermissionModeSwitched": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "desc": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPhaseCancel": "已取消",
+  "agentUiPhaseExec": "执行命令",
+  "agentUiPhaseFail": "执行失败",
+  "agentUiPhasePause": "已暂停",
+  "agentUiPhaseResume": "继续执行",
+  "agentUiPhaseSummarize": "整理结论",
+  "agentUiPhaseThink": "思考中",
+  "agentUiPhaseTool": "执行工具",
+  "agentUiPhaseUnderstand": "理解需求",
+  "agentUiPhaseVerify": "验证结果",
+  "agentUiPhaseWaitChoice": "等待选择",
+  "agentUiPhaseWaitConfirm": "等待确认",
+  "agentUiPlanDone": "{n} 完成",
+  "@agentUiPlanDone": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanFailed": "{n} 失败",
+  "@agentUiPlanFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanInProgress": "{n} 进行中",
+  "@agentUiPlanInProgress": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanItems": "{n} 项",
+  "@agentUiPlanItems": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanPending": "{n} 待处理",
+  "@agentUiPlanPending": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanProgress": "计划 {done}/{total}",
+  "@agentUiPlanProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanSkipped": "{n} 跳过",
+  "@agentUiPlanSkipped": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiProgressLines": "{n} 条",
+  "@agentUiProgressLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiRiskPrefix": "风险：{reason}",
+  "@agentUiRiskPrefix": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRollbackPrefix": "回滚：{command}",
+  "@agentUiRollbackPrefix": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRoundsCount": "{n} 轮",
+  "@agentUiRoundsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStep": "第 {n} 步",
+  "@agentUiStep": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStepsCount": "{n} 步",
+  "@agentUiStepsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiSuccessCount": "{n} 成功",
+  "@agentUiSuccessCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCount": "{n} 条推理",
+  "@agentUiThoughtCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCountOne": "1 条推理",
+  "agentUiTokPerSec": "{n} tok/s",
+  "@agentUiTokPerSec": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTokensCount": "{estimated}{value} tok",
+  "@agentUiTokensCount": {
+    "placeholders": {
+      "estimated": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiToolCallsCount": "已调用工具 {n} 次",
+  "@agentUiToolCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTruncated": "已截断",
+  "agentUiTruncatedChars": "已截断 {n} 字符",
+  "@agentUiTruncatedChars": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTurnLabel": "第 {n} 轮",
+  "@agentUiTurnLabel": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
   }
 }

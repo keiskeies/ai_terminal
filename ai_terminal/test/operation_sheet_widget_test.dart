@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/core/theme.dart';
 import 'package:ai_terminal/core/theme_colors.dart';
 import 'package:ai_terminal/l10n/app_localizations.dart';
+import 'package:ai_terminal/l10n/app_localizations_en.dart';
+import 'package:ai_terminal/l10n/app_localizations_zh.dart';
 import 'package:ai_terminal/models/agent_event.dart';
 import 'package:ai_terminal/models/agent_model.dart';
 import 'package:ai_terminal/models/operation_report.dart';
@@ -17,6 +20,10 @@ Widget _wrapWithTheme(
   ThemeData theme, {
   Locale locale = const Locale('zh'),
 }) {
+  // AgentUiText 走全局 L10n；与 MaterialApp locale 保持同步。
+  L10n.setup(locale.languageCode == 'en'
+      ? AppLocalizationsEn()
+      : AppLocalizationsZh());
   return MaterialApp(
     theme: theme,
     locale: locale,

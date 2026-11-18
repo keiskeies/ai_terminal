@@ -3882,5 +3882,534 @@
         "type": "Object"
       }
     }
+  },
+  "agentUiTaskRecord": "कार्य रिकॉर्ड",
+  "agentUiCompleted": "पूर्ण",
+  "agentUiFailed": "विफल",
+  "agentUiCancelled": "रद्द",
+  "agentUiInterrupted": "बाधित",
+  "agentUiPlanTitle": "निष्पादन सूची",
+  "agentUiPlanByAi": "एआई योजना",
+  "agentUiPlanWarning": "योजना में अभी भी अधूरे चरण हैं, कृपया जांचें कि क्या वे सभी पूरे हो गए हैं",
+  "agentUiConclusion": "निष्कर्ष",
+  "agentUiVerifiedEvidence": "सत्यापन साक्ष्य है",
+  "agentUiAiConclusion": "एआई निष्कर्ष",
+  "agentUiContinueTask": "कार्य जारी रखें",
+  "agentUiOperationCopied": "संचालन आदेश दिया गया है कॉपी किया गया",
+  "agentUiCopyAnswer": "कॉपी किया गया उत्तर",
+  "agentUiCopied": "कॉपी किया गया",
+  "agentUiAnswerCopied": "उत्तर क्लिपबोर्ड पर कॉपी किया गया है",
+  "agentUiChangesAndRollback": "परिवर्तन और रोलबैक",
+  "agentUiAuditLog": "ऑडिट रिकॉर्ड",
+  "agentUiProcessAndEvidence": "प्रक्रिया और साक्ष्य",
+  "agentUiFullSummary": "पूर्ण सारांश",
+  "agentUiNoEvidence": "कोई विस्तार योग्य निष्पादन रिकॉर्ड नहीं",
+  "agentUiContextHint": "संदर्भ व्याप्त; 70% से अधिक इंजन फिर सबसे पुराने संदेशों को हटाना शुरू कर देगा",
+  "agentUiGoalRunning": "लक्ष्य प्रगति पर है",
+  "agentUiGoalPaused": "लक्ष्य रुका हुआ है",
+  "agentUiGoalFinished": "लक्ष्य समाप्त हो गया है",
+  "agentUiGoalEditAction": "लक्ष्य संपादित करें",
+  "agentUiGoalFinishAction": "अंतिम लक्ष्य",
+  "agentUiGoalClearAction": "रिकॉर्ड साफ़ करें",
+  "agentUiGoalEditTitle": "लक्ष्य संपादित करें",
+  "agentUiGoalFinishTitle": "इस लक्ष्य को समाप्त करें?",
+  "agentUiGoalFinishBody": "लक्ष्य को पूर्ण के रूप में चिह्नित किया जाएगा, और चल रहे कार्य प्रभावित नहीं होंगे।",
+  "agentUiGoalBudgetExhausted": "राउंड ख़त्म हो गए",
+  "agentUiThinkingAndExecution": "सोचने और क्रियान्वयन का रिकॉर्ड",
+  "agentUiLessThanOneSecond": "1s से कम",
+  "agentUiAgentTask": "एजेंट कार्य",
+  "agentUiOpenInTerminal": "टर्मिनल में देखें",
+  "agentUiResume": "फिर से शुरू करें",
+  "agentUiPause": "रोकें",
+  "agentUiStop": "बंद करें",
+  "agentUiThinking": "सोचें",
+  "agentUiExecuting": "निष्पादन करें",
+  "agentUiWaitingConfirm": "पुष्टि की प्रतीक्षा करें",
+  "agentUiPaused": "रोका गया",
+  "agentUiIdle": "तैयार",
+  "agentUiToolCall": "टूल कॉल",
+  "agentUiBlocked": "अवरुद्ध",
+  "agentUiNeedsConfirm": "पुष्टि की आवश्यकता है",
+  "agentUiExecutedLabel": "चलाना",
+  "agentUiExecutable": "निष्पादन योग्य",
+  "agentUiRiskBlocked": "कमांड को सुरक्षित कर दिया गया है नीति अवरोधन",
+  "agentUiChangeImpact": "प्रभाव बदलें",
+  "agentUiConfirmImpact": "कृपया निष्पादन से पहले प्रभाव की पुष्टि करें",
+  "agentUiNoRollbackSnapshot": "रोलबैक: कोई स्वचालित रोलबैक नहीं, पहले स्नैपशॉट लेने की अनुशंसा की जाती है",
+  "agentUiCancel": "रद्द करें",
+  "agentUiConfirmExecute": "निष्पादन की पुष्टि करें",
+  "agentUiConfirmedLabel": "पुष्टि की गई",
+  "agentUiConfirmedRecord": "निष्पादन से पहले पुष्टि की गई",
+  "agentUiResultSuccess": "निष्पादन सफल",
+  "agentUiLocalFileSection": "स्थानीय फ़ाइल पहुंच",
+  "agentUiLocalFileEnable": "अनुमति प्राप्त एजेंट स्थानीय फ़ाइलों को पढ़ता और लिखता है",
+  "agentUiLocalFileDirs": "निर्देशिका को अधिकृत करें",
+  "agentUiLocalFileAddDir": "निर्देशिका जोड़ें",
+  "agentUiLocalFileRemoveDir": "निर्देशिका को हटाएं",
+  "agentUiLocalFilePickTitle": "उस निर्देशिका का चयन करें जिसे एजेंट को एक्सेस करने की अनुमति है",
+  "agentUiLocalFileNoDirs": "अभी तक कोई अधिकृत निर्देशिका नहीं है",
+  "agentUiLocalFileBlacklistHint": "कुंजी और क्रेडेंशियल फ़ाइलें (~/.ssh, *.key, *.pem, .env) हमेशा पहुंच योग्य नहीं हैं",
+  "agentUiLocalFileTrashEmpty": "रीसायकल क्षेत्र खाली है",
+  "agentUiLocalFileTrashClear": "रीसायकल क्षेत्र खाली करें",
+  "agentUiLocalFileTrashClearRefused": "ऐसे पथ हैं जो रीसायकल क्षेत्र में नहीं हैं और छोड़ दिए गए हैं और हटाए नहीं गए हैं",
+  "agentUiLocalExecAuthTitle": "स्थानीय निर्देशिका पहुंच की अनुमति दें?",
+  "agentUiLocalExecAuthNote": "संवेदनशील पथ (~/.ssh, .env, कुंजियाँ, आदि) सीमा से बाहर रहते हैं।",
+  "agentUiLocalExecAuthAllow": "अनुमति दें और जारी रखें",
+  "agentUiCommandLabel": "टर्मिनल कमांड",
+  "agentUiPendingLabel": "लंबित",
+  "agentUiToolDoneLabel": "कॉल किया गया",
+  "agentUiFailedLabel": "विफल",
+  "agentUiProcessFolded": "प्रक्रिया ध्वस्त",
+  "agentUiCollapseProcess": "प्रक्रिया का विस्तार",
+  "agentUiExpandProcess": "विस्तार",
+  "agentUiCollapse": "संक्षिप्त",
+  "agentUiExpandText": "विस्तृत",
+  "agentUiViewFullOutput": "पूर्ण आउटपुट देखें",
+  "agentUiExpandEach": "आइटम द्वारा आइटम",
+  "agentUiPermissionModeTitle": "अनुमतियाँ निष्पादित करें",
+  "agentUiPermissionAllowed": "जारी",
+  "agentUiPermissionNotExecuted": "निष्पादित नहीं",
+  "agentUiPermFullAutoWarningTitle": "पूरी तरह से स्वचालित मोड सक्षम?",
+  "agentUiPermFullAutoWarningBody": "एजेंट अब एक-एक करके पुष्टि नहीं करेगा और सिस्टम कॉन्फ़िगरेशन को हटाने और डिस्क को फ़ॉर्मेट करने सहित सभी कमांड को सीधे निष्पादित करेगा। कुछ ऑपरेशन पुनर्प्राप्त नहीं किए जा सकते; नेटवर्क ब्लैकआउट अवधि और संवेदनशील फ़ाइल प्रतिबंध अभी भी प्रभावी रहेंगे। कृपया सुनिश्चित करें कि आप प्रभाव के दायरे को समझते हैं।",
+  "agentUiPermissionEnable": "सक्षम करें",
+  "agentUiPermissionModeUsage": "उपयोग: /अनुमति <केवल पढ़ने के लिए|पूछें|ऑटो|पूरी तरह से स्वचालित>",
+  "agentUiCacheHit": "cache हिट {percent}%",
+  "@agentUiCacheHit": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiChangesCount": "{n} परिवर्तन",
+  "@agentUiChangesCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCallsCount": "{n} कमांड",
+  "@agentUiCommandCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCount": "{n} कमांड",
+  "@agentUiCommandCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiCommandCountOne": "1 कमांड",
+  "agentUiContextUsed": "संदर्भ {percent}%",
+  "@agentUiContextUsed": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExitCode": "एग्जिट कोड {n}",
+  "@agentUiExitCode": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiExpandAll": "सभी {n} आइटम का विस्तार करें",
+  "@agentUiExpandAll": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailedCommands": "{n} कमांड विफल",
+  "@agentUiFailedCommands": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureCount": "{n} विफल",
+  "@agentUiFailureCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiFailureHintCancelled": "निष्पादन रद्द। आप इस चरण को पुनः आरंभ कर सकते हैं.",
+  "agentUiFailureHintDisconnected": "कनेक्शन काट दिया गया। यह अनुशंसा की जाती है कि पहले सर्वर से पुनः कनेक्ट करें और फिर इस चरण को दोबारा आज़माएँ।",
+  "agentUiFailureHintInteractivePrompt": "कमांड इनपुट की प्रतीक्षा कर रहा है। गैर-इंटरैक्टिव पैरामीटर (जैसे -y / --बैच) का उपयोग करने और पुनः प्रयास करने की अनुशंसा की जाती है।",
+  "agentUiFailureHintPermissionDenied": "अपर्याप्त अनुमतियाँ। पुनः प्रयास करने के लिए sudo का उपयोग करने, या अनुमतियों के साथ उपयोगकर्ता को बदलने की अनुशंसा की जाती है।",
+  "agentUiFailureHintSyntaxError": "कमांड सिंटैक्स त्रुटि, निष्पादित नहीं। कमांड को सही करने और पुनः प्रयास करने की अनुशंसा की जाती है।",
+  "agentUiFailureHintTimeout": "निष्पादन समयबाह्य। टाइमआउट बढ़ाने या कमांड को छोटे टुकड़ों में विभाजित करने और पुनः प्रयास करने की अनुशंसा की जाती है।",
+  "agentUiFailureHintUnknown": "निष्पादन विफल रहा। आउटपुट की जांच करने, उसे ठीक करने और पुनः प्रयास करने की अनुशंसा की जाती है।",
+  "agentUiFailureLabelCancelled": "रद्द",
+  "agentUiFailureLabelDisconnected": "कनेक्शन काट दिया गया",
+  "agentUiFailureLabelInteractivePrompt": "इनपुट की प्रतीक्षा में",
+  "agentUiFailureLabelPermissionDenied": "अपर्याप्त अनुमतियाँ",
+  "agentUiFailureLabelSyntaxError": "कमांड सिंटैक्स त्रुटि",
+  "agentUiFailureLabelTimeout": "निष्पादन समयबाह्य",
+  "agentUiGoalRounds": "round {used}/{max}",
+  "@agentUiGoalRounds": {
+    "placeholders": {
+      "used": {
+        "type": "int"
+      },
+      "max": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiGoalRoundsLeft": "{n} राउंड",
+  "@agentUiGoalRoundsLeft": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiItemsCount": "{n} आइटम",
+  "@agentUiItemsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalExecAuthCreateLine": "निर्देशिका मौजूद नहीं है. इसे अनुमति से बनाया जाएगा.\n",
+  "agentUiLocalExecAuthGrant": "अनुमति देने के बाद, स्थानीय फ़ाइल पहुंच सक्षम हो जाएगी और निर्देशिका अधिकृत हो जाएगी।",
+  "agentUiLocalExecAuthHead": "एजेंट को स्थानीय निर्देशिका में कमांड निष्पादित करने की आवश्यकता है:\n{path}\n\n",
+  "@agentUiLocalExecAuthHead": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthReason": "कारण: {reason}\n\n",
+  "@agentUiLocalExecAuthReason": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalExecAuthorized": "अधिकृत स्थानीय निर्देशिका: {path}",
+  "@agentUiLocalExecAuthorized": {
+    "placeholders": {
+      "path": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearBody": "साफ़ करने से इन {count} आइटम (लगभग {size}) की प्रतियां स्थायी रूप से हटा दी जाएंगी। उसके बाद, {records} परिवर्तन रिकॉर्ड अब पुनर्स्थापित नहीं किए जाएंगे (रिकॉर्ड स्वयं बनाए रखे जाते हैं, लेकिन फ़ाइलें पुनर्प्राप्त नहीं की जा सकतीं)।",
+  "@agentUiLocalFileTrashClearBody": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      },
+      "records": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashClearFailed": "{n} आइटम हटाना विफल (अन्य कार्यक्रमों द्वारा कब्जा किया जा सकता है)",
+  "@agentUiLocalFileTrashClearFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLocalFileTrashCleared": "पुनर्चक्रण क्षेत्र खाली कर दिया गया है: {count} आइटम को हटाएं और {size} के बारे में जारी करें",
+  "@agentUiLocalFileTrashCleared": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLocalFileTrashLabel": "रीसाइक्लिंग क्षेत्र: {count} आइटम · लगभग {size}",
+  "@agentUiLocalFileTrashLabel": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      },
+      "size": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiLogCount": "{n} सिस्टम लॉग",
+  "@agentUiLogCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiLogCountOne": "1 सिस्टम लॉग",
+  "agentUiMoreActions": "और {n}",
+  "@agentUiMoreActions": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreChanges": "और {n} परिवर्तन, विवरण के लिए ऑडिट रिकॉर्ड",
+  "@agentUiMoreChanges": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreOutputLines": "और {n} पंक्ति",
+  "@agentUiMoreOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiMoreSteps": "पहले {n} चरण",
+  "@agentUiMoreSteps": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiOutputLines": "{n} लाइन",
+  "@agentUiOutputLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPermDescAsk": "संशोधन और उच्च-जोखिम वाले आदेश आपसे पहले पूछेंगे",
+  "agentUiPermDescAuto": "सामान्य संशोधन स्वचालित रूप से निष्पादित किए जाएंगे, उच्च-जोखिम वाले आदेश अभी भी पूछेंगे",
+  "agentUiPermDescFullAuto": "उच्च-जोखिम वाले आदेश भी स्वचालित रूप से निष्पादित किए जाएंगे; नेटवर्क ब्लैकआउट अवधि और संवेदनशील फ़ाइल प्रतिबंध अभी भी प्रभावी हैं",
+  "agentUiPermDescReadOnly": "केवल पढ़ने योग्य आदेशों की अनुमति है, कोई भी संशोधन अस्वीकार कर दिया जाएगा",
+  "agentUiPermLabelAsk": "पूछें",
+  "agentUiPermLabelAuto": "स्वचालित रूप से",
+  "agentUiPermLabelFullAuto": "पूरी तरह से स्वचालित",
+  "agentUiPermLabelReadOnly": "केवल पढ़ने के लिए",
+  "agentUiPermissionModeCurrent": "वर्तमान अनुमति मोड: {mode}",
+  "@agentUiPermissionModeCurrent": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPermissionModeSwitched": "\"{mode}\" पर स्विच किया गया: {desc}",
+  "@agentUiPermissionModeSwitched": {
+    "placeholders": {
+      "mode": {
+        "type": "String"
+      },
+      "desc": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiPhaseCancel": "रद्द",
+  "agentUiPhaseExec": "कमांड निष्पादित करें",
+  "agentUiPhaseFail": "निष्पादन विफल",
+  "agentUiPhasePause": "रोका गया",
+  "agentUiPhaseResume": "निष्पादन जारी रखें",
+  "agentUiPhaseSummarize": "निष्कर्ष व्यवस्थित करें",
+  "agentUiPhaseThink": "सोच",
+  "agentUiPhaseTool": "टूल निष्पादित करें",
+  "agentUiPhaseUnderstand": "आवश्यकताओं को समझें",
+  "agentUiPhaseVerify": "सत्यापन परिणाम",
+  "agentUiPhaseWaitChoice": "चयन की प्रतीक्षा करें",
+  "agentUiPhaseWaitConfirm": "पुष्टि की प्रतीक्षा करें",
+  "agentUiPlanDone": "{n} पूर्ण",
+  "@agentUiPlanDone": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanFailed": "{n} विफल",
+  "@agentUiPlanFailed": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanInProgress": "{n} प्रगति पर",
+  "@agentUiPlanInProgress": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanItems": "{n} आइटम",
+  "@agentUiPlanItems": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanPending": "{n} लंबित",
+  "@agentUiPlanPending": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanProgress": "प्लान {done}/{total}",
+  "@agentUiPlanProgress": {
+    "placeholders": {
+      "done": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiPlanSkipped": "{n} छोड़ दिया गया",
+  "@agentUiPlanSkipped": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiProgressLines": "{n} आइटम",
+  "@agentUiProgressLines": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiRiskPrefix": "जोखिम: {reason}",
+  "@agentUiRiskPrefix": {
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRollbackPrefix": "रोलबैक: {command}",
+  "@agentUiRollbackPrefix": {
+    "placeholders": {
+      "command": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiRoundsCount": "{n} राउंड",
+  "@agentUiRoundsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStep": "देखें {n} चरण",
+  "@agentUiStep": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiStepsCount": "{n} चरण",
+  "@agentUiStepsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiSuccessCount": "{n} सफल",
+  "@agentUiSuccessCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCount": "{n} अनुमान",
+  "@agentUiThoughtCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiThoughtCountOne": "1 अनुमान",
+  "agentUiTokPerSec": "{n} tok/s",
+  "@agentUiTokPerSec": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTokensCount": "{estimated}{value} tok",
+  "@agentUiTokensCount": {
+    "placeholders": {
+      "estimated": {
+        "type": "String"
+      },
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "agentUiToolCallsCount": "टूल को {n} बार कॉल किया गया है",
+  "@agentUiToolCallsCount": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTruncated": "छोटा",
+  "agentUiTruncatedChars": "काटे गए {n} वर्ण",
+  "@agentUiTruncatedChars": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
+  },
+  "agentUiTurnLabel": "वां {n} राउंड",
+  "@agentUiTurnLabel": {
+    "placeholders": {
+      "n": {
+        "type": "int"
+      }
+    }
   }
 }

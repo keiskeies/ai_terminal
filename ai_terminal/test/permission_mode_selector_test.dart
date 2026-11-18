@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:ai_terminal/core/constants.dart';
+import 'package:ai_terminal/core/l10n_holder.dart';
+import 'package:ai_terminal/l10n/app_localizations_en.dart';
 import 'package:ai_terminal/models/agent_permission_mode.dart';
 import 'package:ai_terminal/widgets/ai_prompt_input.dart';
 import 'package:ai_terminal/widgets/permission_mode_selector.dart';
 
 void main() {
+  setUpAll(() => L10n.setup(AppLocalizationsEn()));
+
   testWidgets('360px 窄屏底部工具行不溢出，权限胶囊仍可见', (tester) async {
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1.0;
