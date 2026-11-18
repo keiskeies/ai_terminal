@@ -39,9 +39,21 @@ endif()
 # Be cautious about adding new options here, as plugins use this function by
 # default. In most cases, you should add new options to specific targets instead
 # of modifying this function.
+# Ubuntu 26（runner 镜像 2026-10 起迁移）的新版编译器把 json.hpp
+# ——flutter_secure_storage_linux 自带——里 `operator "" _json` 的空格写法
+# 判为 -Wdeprecated-literal-operator，在本模板的 -Werror 下直接编译失败。
+# 该写法只是过时而非错误，压掉这一个警告即可，其余 -Werror 保持原样。
+# 探测用肯定式：旧 clang 对不认识的 -Wno-X 会延迟报错，测 -Wno-X 不可靠。
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag("-Wdeprecated-literal-operator"
+  CXX_SUPPORTS_WARN_DEPRECATED_LITERAL_OPERATOR)
+
 function(APPLY_STANDARD_SETTINGS TARGET)
   target_compile_features(${TARGET} PUBLIC cxx_std_14)
   target_compile_options(${TARGET} PRIVATE -Wall -Werror)
+  if(CXX_SUPPORTS_WARN_DEPRECATED_LITERAL_OPERATOR)
+    target_compile_options(${TARGET} PRIVATE -Wno-deprecated-literal-operator)
+  endif()
   target_compile_options(${TARGET} PRIVATE "$<$<NOT:$<CONFIG:Debug>>:-O3>")
   target_compile_definitions(${TARGET} PRIVATE "$<$<NOT:$<CONFIG:Debug>>:NDEBUG>")
 endfunction()

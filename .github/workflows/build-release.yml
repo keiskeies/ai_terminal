@@ -80,6 +80,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # ubuntu-latest 自 2026-10 的镜像迁移后默认 JDK 已到 25，而本项目
+      # Gradle 8.14 最高只支持 24，flutter build apk 会以
+      # "Java/Gradle incompatibility" 失败。显式钉 17（模板与 Gradle 都支持）。
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
