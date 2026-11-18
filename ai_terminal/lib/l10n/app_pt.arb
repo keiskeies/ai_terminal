@@ -442,7 +442,7 @@
   "settingsSnippets": "Comandos de atalho",
   "settingsSnippetsDesc": "Salve comandos usados com frequência e execute-os com um clique na próxima vez",
   "settingsTitle": "configurações",
-  "settingsVersion": "Versão 1.4.3",
+  "settingsVersion": "Versão 1.5.0",
   "simplifiedChinese": "简体中文",
   "snippetCommandHint": "Por exemplo: docker exec -it '{container}' /bin/bash",
   "snippetCommandLabel": "Comando:",

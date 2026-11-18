@@ -442,7 +442,7 @@
   "settingsSnippets": "바로가기 명령",
   "settingsSnippetsDesc": "자주 사용하는 명령을 저장하고 다음 번에 한 번의 클릭으로 실행",
   "settingsTitle": "설정",
-  "settingsVersion": "버전 1.4.3",
+  "settingsVersion": "버전 1.5.0",
   "simplifiedChinese": "简体中文",
   "snippetCommandHint": "예: docker exec -it '{container}' /bin/bash",
   "snippetCommandLabel": "명령:",
