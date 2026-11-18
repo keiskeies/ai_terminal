@@ -8,170 +8,170 @@
   "agentRunning": "เอเจนต์กำลังทำงาน กรุณารอ",
   "agentSettingAiTimeoutDesc": "ถือว่าหมดเวลาหากไม่มีเอาต์พุตจากโมเดลตามระยะนี้ เพิ่มค่าเมื่อใช้โมเดลโลคอลที่ช้า",
   "agentSettingAiTimeoutLabel": "หมดเวลาตอบสนอง AI",
-  "agentSettingAutoExecSection": "AI Auto Execution",
-  "agentSettingBuiltInPrompt": "AI Built-in Instructions",
-  "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",
-  "agentSettingBuiltInPromptSubtitle": "Modify AI's basic instructions",
-  "agentSettingBuiltInSaved": "AI built-in instructions saved",
-  "agentSettingCustomPromptHint": "e.g., Respond in English, use concise format, prefer Docker...",
-  "agentSettingExtraPrompt": "Additional Instructions",
-  "agentSettingExtraPromptDesc": "Additional requirements appended to built-in instructions to adjust AI's response style. Leave empty to skip.",
-  "agentSettingExtraPromptSaved": "Additional instructions saved",
-  "agentSettingExtraPromptSubtitle": "Additional requirements appended to built-in instructions",
-  "agentSettingHundredSteps": "100 steps",
-  "agentSettingMaxStepsDesc": "Maximum number of steps AI takes when executing commands automatically. Set to 0 for unlimited steps; complex tasks will not be interrupted.",
-  "agentSettingMaxStepsLabel": "Max steps AI can execute automatically",
-  "agentSettingPromptSection": "AI Prompts",
-  "agentSettingPromptWarning": "⚠️ Modify with caution. Inappropriate prompts may cause abnormal AI behavior. Click \"Reset\" to restore defaults at any time.",
-  "agentSettingTitle": "Agent Settings",
+  "agentSettingAutoExecSection": "การดำเนินการอัตโนมัติของ AI",
+  "agentSettingBuiltInPrompt": "คำแนะนำในตัว AI",
+  "agentSettingBuiltInPromptDesc": "นี่เป็นคำสั่งพื้นฐานของ AI และจะมีผลทันทีหลังการแก้ไข \"บริบท\" ภายในจะถูกแทนที่ด้วยข้อมูลเซิร์ฟเวอร์",
+  "agentSettingBuiltInPromptSubtitle": "ปรับเปลี่ยนคำสั่งพื้นฐานสำหรับ AI",
+  "agentSettingBuiltInSaved": "บันทึกคำแนะนำในตัว AI แล้ว",
+  "agentSettingCustomPromptHint": "เช่น ตอบเป็นภาษาอังกฤษ ออกในรูปแบบกระชับ ใช้ Docker ก่อน...",
+  "agentSettingExtraPrompt": "คำแนะนำเพิ่มเติม",
+  "agentSettingExtraPromptDesc": "ข้อกำหนดเพิ่มเติมที่เพิ่มเข้าไปในคำแนะนำในตัวสามารถปรับรูปแบบการตอบรับของ AI ได้ เว้นว่างไว้เพื่อไม่ให้ต่อท้าย",
+  "agentSettingExtraPromptSaved": "บันทึกคำแนะนำเพิ่มเติมแล้ว",
+  "agentSettingExtraPromptSubtitle": "ข้อกำหนดเพิ่มเติมหลังจากคำสั่งในตัว",
+  "agentSettingHundredSteps": "100 ขั้นตอน",
+  "agentSettingMaxStepsDesc": "เมื่อ AI ดำเนินการคำสั่งโดยอัตโนมัติ จะใช้เวลาเพียงไม่กี่ขั้นตอน การตั้งค่าเป็น 0 หมายความว่าไม่มีการจำกัดจำนวนขั้นตอน และงานที่ซับซ้อนจะไม่ถูกรบกวนกลางทาง",
+  "agentSettingMaxStepsLabel": "AI สามารถดำเนินการได้มากที่สุดโดยอัตโนมัติเพียงไม่กี่ขั้นตอน",
+  "agentSettingPromptSection": "คำแจ้ง AI",
+  "agentSettingPromptWarning": "⚠️ โปรดใช้ความระมัดระวังในการแก้ไข คำที่ไม่เหมาะสมอาจทำให้เกิดพฤติกรรม AI ที่ผิดปกติได้ คุณสามารถคลิก \"รีเซ็ต\" ได้ตลอดเวลาเพื่อคืนค่าเริ่มต้น",
+  "agentSettingTitle": "การตั้งค่าตัวแทน",
   "agentSettings": "เอเจนต์",
   "agentSettingsDesc": "จำนวนขั้นตอนสูงสุดที่ AI รันอัตโนมัติ (0 = ไม่จำกัด)",
-  "aiAndIntelligence": "AI",
-  "aiModelAdd": "Add Model",
-  "aiModelApiKeyInvalid": "Invalid API Key",
-  "aiModelApiKeyRequired": "Please enter an API Key",
-  "aiModelBaseUrlRequired": "Please enter a Base URL",
-  "aiModelCannotConnect": "Unable to connect",
+  "aiAndIntelligence": "AI และความฉลาด",
+  "aiModelAdd": "เพิ่มรุ่น",
+  "aiModelApiKeyInvalid": "คีย์ API ไม่ถูกต้อง",
+  "aiModelApiKeyRequired": "กรุณากรอกคีย์ API",
+  "aiModelBaseUrlRequired": "กรุณากรอก URL ฐาน",
+  "aiModelCannotConnect": "ไม่สามารถเชื่อมต่อได้",
   "aiModelConfig": "โมเดล AI",
   "aiModelConfigDesc": "ตั้งค่า API key และพารามิเตอร์โมเดล",
-  "aiModelConnectionTimeout": "Connection timeout",
-  "aiModelDeleteConfirm": "Are you sure you want to delete \"{name}\"?",
-  "aiModelDeleteTitle": "Delete Model",
-  "aiModelEditTitle": "Edit Model",
-  "aiModelEmptySubtitle": "Add an endpoint to group multiple models under one API key",
-  "aiModelEmptyTitle": "No AI models yet",
-  "aiModelMaxTokens": "Max Response Tokens",
-  "aiModelModelName": "Model Name",
-  "aiModelModelNameRequired": "Please enter a model name",
-  "aiModelNameError": "Incorrect model name",
-  "aiModelNameRequired": "Please enter a name",
-  "aiModelProvider": "AI Provider",
-  "aiModelProvidersUpdated": "Provider list updated ({count} providers)",
-  "aiModelRefreshProviders": "Refresh provider list",
-  "aiModelRemoteConfigEmpty": "Remote configuration is empty",
-  "aiModelRequestFailed": "Request failed ({code})",
-  "aiModelServerError": "Server error ({code})",
-  "aiModelSetAsDefault": "Set as default model",
-  "aiModelSetDefault": "Set as Default",
-  "aiModelTemperature": "Randomness",
-  "aiModelTest": "Test",
-  "aiModelTestFailed": "Test failed",
-  "aiModelTitle": "AI Model Configuration",
-  "aiModelTooManyRequests": "Too many requests",
-  "aiModelUpdateFailed": "Update failed: {error}",
+  "aiModelConnectionTimeout": "หมดเวลาการเชื่อมต่อ",
+  "aiModelDeleteConfirm": "คุณแน่ใจหรือไม่ว่าต้องการลบ \"{name}\"?",
+  "aiModelDeleteTitle": "ลบโมเดล",
+  "aiModelEditTitle": "แก้ไขโมเดล",
+  "aiModelEmptySubtitle": "เพิ่มจุดสิ้นสุด สามารถกำหนดค่าได้หลายรุ่นภายใต้จุดสิ้นสุดเดียว",
+  "aiModelEmptyTitle": "ยังไม่มีโมเดล AI",
+  "aiModelMaxTokens": "จำนวนอักขระสูงสุดในการตอบกลับ",
+  "aiModelModelName": "ชื่อรุ่น",
+  "aiModelModelNameRequired": "กรุณากรอกชื่อรุ่น",
+  "aiModelNameError": "ชื่อรุ่นผิด",
+  "aiModelNameRequired": "กรุณากรอกชื่อ",
+  "aiModelProvider": "ผู้ให้บริการเอไอ",
+  "aiModelProvidersUpdated": "อัปเดตรายชื่อผู้ให้บริการแล้ว (ผู้ให้บริการ {count})",
+  "aiModelRefreshProviders": "อัปเดตรายชื่อผู้ให้บริการ",
+  "aiModelRemoteConfigEmpty": "การกำหนดค่าระยะไกลว่างเปล่า",
+  "aiModelRequestFailed": "คำขอล้มเหลว ({code})",
+  "aiModelServerError": "ข้อผิดพลาดของเซิร์ฟเวอร์ ({code})",
+  "aiModelSetAsDefault": "ตั้งเป็นรุ่นเริ่มต้น",
+  "aiModelSetDefault": "ตั้งเป็นค่าเริ่มต้น",
+  "aiModelTemperature": "ความบังเอิญ",
+  "aiModelTest": "ทดสอบ",
+  "aiModelTestFailed": "การทดสอบล้มเหลว",
+  "aiModelTitle": "การกำหนดค่าโมเดล AI",
+  "aiModelTooManyRequests": "คำขอบ่อยเกินไป",
+  "aiModelUpdateFailed": "การอัปเดตล้มเหลว: {error}",
   "aiPanel": "แผง AI",
   "appTitle": "AI Terminal",
   "appearance": "รูปลักษณ์",
   "appearanceDesc": "โหมดมืด/สว่าง ขนาดตัวอักษร ชุดสี",
-  "appearanceDisplayMode": "Display Mode",
-  "appearanceDisplayModeDesc": "Choose dark or light interface",
-  "appearanceFontSizeDesc": "Drag the slider to adjust terminal text size",
-  "appearanceTitle": "Appearance Settings",
+  "appearanceDisplayMode": "โหมดการแสดงผล",
+  "appearanceDisplayModeDesc": "เลือกอินเทอร์เฟซที่มืดหรือสว่าง",
+  "appearanceFontSizeDesc": "ลากแถบเลื่อนเพื่อปรับขนาดข้อความเทอร์มินัล",
+  "appearanceTitle": "การตั้งค่าลักษณะที่ปรากฏ",
   "auditLog": "บันทึกกิจกรรม",
-  "auditLogAllTitle": "All Audit Logs",
-  "auditLogCopied": "Copied {count} logs to clipboard",
-  "auditLogCopyTooltip": "Copy Records",
+  "auditLogAllTitle": "บันทึกการดำเนินงานทั้งหมด",
+  "auditLogCopied": "คัดลอกบันทึก {count} ไปยังคลิปบอร์ดแล้ว",
+  "auditLogCopyTooltip": "คัดลอกบันทึก",
   "auditLogDesc": "ดูว่าใครรันคำสั่งอะไรและเมื่อใด",
-  "auditLogEmpty": "No audit logs",
-  "auditLogExecuted": "Executed",
-  "auditLogExportHeader": "# Audit Log Export",
-  "auditLogExportTime": "# Export time: {time}",
-  "auditLogExportTotal": "# Total: {count}",
-  "auditLogFilterAll": "All Records",
-  "auditLogFilterBlocked": "Only Blocked",
-  "auditLogFilterThisHost": "Only Current Host",
-  "auditLogNoMatch": "No matching records",
-  "auditLogNoRecordsToCopy": "No records to copy",
-  "auditLogNotExecuted": "Not Executed",
-  "auditLogOutput": "Output",
-  "auditLogSafetyBlocked": "Blocked",
-  "auditLogSafetyDanger": "Danger",
-  "auditLogSafetySafe": "Safe",
-  "auditLogSafetyWarning": "Warning",
-  "auditLogSearchHint": "Search command, server, output...",
-  "auditLogTitle": "Audit Log",
+  "auditLogEmpty": "ยังไม่มีบันทึกการดำเนินงาน",
+  "auditLogExecuted": "ดำเนินการแล้ว",
+  "auditLogExportHeader": "# บันทึกการดำเนินการส่งออก",
+  "auditLogExportTime": "# เวลาส่งออก: {time}",
+  "auditLogExportTotal": "# จำนวนสินค้าทั้งหมด : {count}",
+  "auditLogFilterAll": "บันทึกทั้งหมด",
+  "auditLogFilterBlocked": "ถูกบล็อกเท่านั้น",
+  "auditLogFilterThisHost": "โฮสต์ปัจจุบันเท่านั้น",
+  "auditLogNoMatch": "ไม่มีบันทึกที่ตรงกัน",
+  "auditLogNoRecordsToCopy": "ไม่มีบันทึกที่จะคัดลอก",
+  "auditLogNotExecuted": "ไม่ได้ดำเนินการ",
+  "auditLogOutput": "เอาท์พุท",
+  "auditLogSafetyBlocked": "ถูกบล็อก",
+  "auditLogSafetyDanger": "อันตราย",
+  "auditLogSafetySafe": "ปลอดภัย",
+  "auditLogSafetyWarning": "คำเตือน",
+  "auditLogSearchHint": "ค้นหาคำสั่ง เซิร์ฟเวอร์ เอาท์พุต...",
+  "auditLogTitle": "บันทึกการดำเนินงาน",
   "authMethod": "วิธียืนยันตัวตน",
   "cancel": "ยกเลิก",
-  "changeRecordAllTitle": "All Change Records",
-  "changeRecordConfirmRollback": "Confirm Rollback",
-  "changeRecordEmpty": "No change records",
-  "changeRecordEmptyHint": "Changes (such as installing, starting/stopping services) will be recorded automatically",
-  "changeRecordFailed": "Failed",
-  "changeRecordFilterAll": "All Records",
-  "changeRecordFilterRollbackable": "Only Rollbackable",
-  "changeRecordFilterThisHost": "Only Current Host",
-  "changeRecordHostNotConnected": "Server {hostId} is not connected, cannot roll back. Please connect to the server first.",
-  "changeRecordNotRollbackable": "This record does not support automatic rollback",
-  "changeRecordOriginalCommand": "Original command: {command}",
-  "changeRecordRollbackButton": "Rollback",
-  "changeRecordRollbackError": "Rollback error: {error}",
-  "changeRecordRollbackFailed": "Rollback failed: {stderr}",
-  "changeRecordRollbackFailedNoExec": "Rollback failed: cannot execute",
-  "changeRecordRollbackOnHost": "The following rollback command will be executed on server {hostName}:",
-  "changeRecordRollbackSuccess": "Rollback succeeded: {command}",
-  "changeRecordRolledBack": "Rolled Back",
-  "changeRecordRollingBack": "Rolling back: {command}",
-  "changeRecordSuccess": "Success",
-  "changeRecordTitle": "Change Records",
-  "changeRecordTypeFileOperation": "File Operation",
-  "changeRecordTypeInstall": "Install",
-  "changeRecordTypeModifyConfig": "Config Change",
-  "changeRecordTypeOther": "Other",
-  "changeRecordTypePermission": "Permission Change",
-  "changeRecordTypeRestartService": "Restart Service",
-  "changeRecordTypeStartService": "Start Service",
-  "changeRecordTypeStopService": "Stop Service",
-  "changeRecordTypeUninstall": "Uninstall",
+  "changeRecordAllTitle": "ประวัติการเปลี่ยนแปลงทั้งหมด",
+  "changeRecordConfirmRollback": "ยืนยันการเพิกถอน",
+  "changeRecordEmpty": "ยังไม่มีบันทึกการเปลี่ยนแปลง",
+  "changeRecordEmptyHint": "หลังจากทำการเปลี่ยนแปลง (เช่น การติดตั้ง การเริ่มและการหยุดบริการ) จะถูกบันทึกโดยอัตโนมัติ",
+  "changeRecordFailed": "ล้มเหลว",
+  "changeRecordFilterAll": "บันทึกทั้งหมด",
+  "changeRecordFilterRollbackable": "สามารถเพิกถอนได้เท่านั้น",
+  "changeRecordFilterThisHost": "โฮสต์ปัจจุบันเท่านั้น",
+  "changeRecordHostNotConnected": "เซิร์ฟเวอร์ {hostId} ไม่ได้เชื่อมต่อและไม่สามารถเพิกถอนได้ กรุณาเชื่อมต่อกับเซิร์ฟเวอร์นี้ก่อน",
+  "changeRecordNotRollbackable": "บันทึกนี้ไม่รองรับการเพิกถอนอัตโนมัติ",
+  "changeRecordOriginalCommand": "คำสั่งเดิม: {command}",
+  "changeRecordRollbackButton": "ยกเลิก",
+  "changeRecordRollbackError": "เลิกทำข้อผิดพลาด: {error}",
+  "changeRecordRollbackFailed": "การเลิกทำล้มเหลว: {stderr}",
+  "changeRecordRollbackFailedNoExec": "การเลิกทำล้มเหลว: ไม่สามารถดำเนินการได้",
+  "changeRecordRollbackOnHost": "คำสั่งเลิกทำจะถูกดำเนินการบนเซิร์ฟเวอร์ {hostName}:",
+  "changeRecordRollbackSuccess": "การยกเลิกสำเร็จ: {command}",
+  "changeRecordRolledBack": "เพิกถอนแล้ว",
+  "changeRecordRollingBack": "กำลังยกเลิก: {command}",
+  "changeRecordSuccess": "ความสำเร็จ",
+  "changeRecordTitle": "ประวัติการเปลี่ยนแปลง",
+  "changeRecordTypeFileOperation": "การดำเนินงานไฟล์",
+  "changeRecordTypeInstall": "การติดตั้ง",
+  "changeRecordTypeModifyConfig": "ปรับเปลี่ยนการกำหนดค่า",
+  "changeRecordTypeOther": "อื่นๆ",
+  "changeRecordTypePermission": "การปรับเปลี่ยนการอนุญาต",
+  "changeRecordTypeRestartService": "เริ่มบริการใหม่",
+  "changeRecordTypeStartService": "เริ่มให้บริการ",
+  "changeRecordTypeStopService": "หยุดให้บริการ",
+  "changeRecordTypeUninstall": "ถอนการติดตั้ง",
   "changeRecords": "ประวัติการเปลี่ยนแปลง",
   "changeRecordsDesc": "ติดตามการเปลี่ยนแปลงทั้งหมดและย้อนกลับได้หากมีปัญหา",
   "changeWindow": "ช่วงเวลาปลอดภัย",
-  "changeWindowAllDayAllowed": "Allowed all day",
-  "changeWindowAllowedWindow": "Allowed Window",
-  "changeWindowCrossDayHint": "Tip: A start time later than the end time means overnight (e.g., 22:00 to next day 06:00)",
-  "changeWindowCurrentWindowInfo": "Current allowed window: {window}\nCommands that make changes will be rejected at other times (read-only commands are not affected).",
+  "changeWindowAllDayAllowed": "อนุญาตตลอดทั้งวัน",
+  "changeWindowAllowedWindow": "ระยะเวลาที่อนุญาต",
+  "changeWindowCrossDayHint": "เคล็ดลับ: เวลาเริ่มต้นช้ากว่าเวลาสิ้นสุด ซึ่งหมายความว่าข้ามคืน (เช่น 22.00 ถึง 06.00 น. ของวันถัดไป)",
+  "changeWindowCurrentWindowInfo": "ระยะเวลาที่อนุญาตในปัจจุบัน: {window}\nคำสั่งที่ทำการเปลี่ยนแปลงในเวลาอื่นจะถูกปฏิเสธ (คำสั่งดูจะไม่ได้รับผลกระทบ)",
   "changeWindowDesc": "จำกัดการเปลี่ยนแปลงเฉพาะช่วงเวลาที่กำหนด",
-  "changeWindowEnable": "Enable Safe Window",
-  "changeWindowEnableHint": "When enabled, changes can only be made during the set window",
-  "changeWindowEndHour": "End hour",
-  "changeWindowEveryDay": "{window}, every day",
-  "changeWindowOnlyDays": "{window}, only {days}",
-  "changeWindowSaveConfig": "Save Config",
-  "changeWindowSaveFailed": "Save failed: {error}",
-  "changeWindowSaved": "Safe window settings saved",
-  "changeWindowStartHour": "Start hour",
-  "changeWindowTitle": "Safe Window",
-  "changeWindowToNextDay": "{start} to next day {end}",
-  "changeWindowWeekdayFri": "Fri",
-  "changeWindowWeekdayMon": "Mon",
-  "changeWindowWeekdaySat": "Sat",
-  "changeWindowWeekdaySun": "Sun",
-  "changeWindowWeekdayThu": "Thu",
-  "changeWindowWeekdayTue": "Tue",
-  "changeWindowWeekdayWed": "Wed",
-  "changeWindowWeekdaysTitle": "Which days are allowed (none = every day)",
-  "chatBackToServerList": "Back to server list",
-  "chatClearSession": "Clear session",
-  "chatConnectServerHint": "Please connect to a server first, then tap the AI button in the bottom right on the terminal page",
-  "chatEmptyHint": "e.g. install Docker, check memory usage",
-  "chatEmptyTitle": "How can I help you?",
-  "chatInputHint": "Type a command or question...",
-  "chatNeedTerminal": "AI assistant needs to be used in a terminal",
+  "changeWindowEnable": "เปิดใช้งานชั่วโมงที่ปลอดภัย",
+  "changeWindowEnableHint": "เมื่อเปิดใช้งานแล้ว การเปลี่ยนแปลงจะทำได้ภายในระยะเวลาที่กำหนดเท่านั้น",
+  "changeWindowEndHour": "มันจะจบตอนไหน?",
+  "changeWindowEveryDay": "{window} ทุกวัน",
+  "changeWindowOnlyDays": "{window} เท่านั้น {days}",
+  "changeWindowSaveConfig": "บันทึกการกำหนดค่า",
+  "changeWindowSaveFailed": "ไม่สามารถบันทึก: {error}",
+  "changeWindowSaved": "บันทึกการตั้งค่าชั่วโมงปลอดภัยแล้ว",
+  "changeWindowStartHour": "อนุญาตตั้งแต่กี่โมงคะ?",
+  "changeWindowTitle": "ระยะเวลาที่ปลอดภัย",
+  "changeWindowToNextDay": "{start} ไปจนถึงวันถัดไป {end}",
+  "changeWindowWeekdayFri": "วันศุกร์",
+  "changeWindowWeekdayMon": "วันจันทร์",
+  "changeWindowWeekdaySat": "วันเสาร์",
+  "changeWindowWeekdaySun": "วันอาทิตย์",
+  "changeWindowWeekdayThu": "วันพฤหัสบดี",
+  "changeWindowWeekdayTue": "วันอังคาร",
+  "changeWindowWeekdayWed": "วันพุธ",
+  "changeWindowWeekdaysTitle": "วันไหนที่อนุญาต (ไม่มีทางเลือก = ทุกวัน)",
+  "chatBackToServerList": "กลับสู่รายการเซิร์ฟเวอร์",
+  "chatClearSession": "เซสชันที่ชัดเจน",
+  "chatConnectServerHint": "โปรดเชื่อมต่อกับเซิร์ฟเวอร์ก่อน เข้าสู่หน้าเทอร์มินัลแล้วคลิกปุ่ม AI ที่มุมขวาล่าง",
+  "chatEmptyHint": "ตัวอย่างเช่น: ติดตั้ง Docker ตรวจสอบการใช้หน่วยความจำ",
+  "chatEmptyTitle": "ฉันจะช่วยคุณได้อย่างไร?",
+  "chatInputHint": "ป้อนคำสั่งหรือคำถาม...",
+  "chatNeedTerminal": "ต้องใช้ผู้ช่วย AI ในเทอร์มินัล",
   "clearMessagesFailed": "ล้างข้อความล้มเหลว",
   "close": "ปิด",
-  "commonAIAssistant": "AI Assistant",
-  "commonAdvancedSettings": "Advanced Settings",
-  "commonAll": "All",
-  "commonBack": "Back",
-  "commonCancel": "Cancel",
-  "commonCommand": "Command",
-  "commonConfirm": "OK",
-  "commonCopiedToClipboard": "Copied to clipboard",
-  "commonDescription": "Description",
-  "commonExecute": "Execute",
-  "commonGotIt": "Got it",
-  "commonName": "Name",
-  "commonResetDefault": "Reset to Default",
-  "commonUnlimited": "Unlimited",
+  "commonAIAssistant": "ผู้ช่วยเอไอ",
+  "commonAdvancedSettings": "การตั้งค่าขั้นสูง",
+  "commonAll": "ทั้งหมด",
+  "commonBack": "กลับ",
+  "commonCancel": "ยกเลิก",
+  "commonCommand": "คำสั่ง",
+  "commonConfirm": "ตกลง",
+  "commonCopiedToClipboard": "คัดลอกไปยังคลิปบอร์ดแล้ว",
+  "commonDescription": "คำอธิบาย",
+  "commonExecute": "ดำเนินการ",
+  "commonGotIt": "เข้าใจแล้ว",
+  "commonName": "ชื่อ",
+  "commonResetDefault": "รีเซ็ตค่าเริ่มต้น",
+  "commonUnlimited": "ไม่จำกัด",
   "compactFailed": "การบีบอัดบทสนทนาล้มเหลว",
   "compacting": "กำลังบีบอัดบทสนทนา...",
   "confirm": "ยืนยัน",
@@ -206,107 +206,107 @@
   "fieldRequired": "จำเป็นต้องกรอกฟิลด์นี้",
   "followSystem": "ตามระบบ",
   "group": "กลุ่ม",
-  "hostEditAuthTypeLabel": "Authentication Method *",
-  "hostEditConfigSavedButCredFailed": "⚠️ Configuration saved, but {error}. Please retry.",
-  "hostEditConnectionTimeout": "Connection timeout: {timeout}s",
-  "hostEditDefaultGroup": "Default",
-  "hostEditEncodingLabel": "Character Encoding",
-  "hostEditGroupHint": "Enter or select a group",
-  "hostEditGroupLabel": "Group",
-  "hostEditHostHint": "IP address or domain",
-  "hostEditHostLabel": "Host Address *",
-  "hostEditHostRequired": "Please enter the host address",
-  "hostEditJumpAuthTypeLabel": "Jump Host Authentication",
-  "hostEditJumpHostFlowHint": "Will first connect to the jump host, then forward to the target server through it",
-  "hostEditJumpHostLabel": "Jump Host Address *",
-  "hostEditJumpPasswordLabel": "Jump Host Password",
-  "hostEditJumpPortLabel": "Jump Host Port",
-  "hostEditJumpPrivateKeyContent": "Jump Host Private Key Content",
-  "hostEditJumpUsernameLabel": "Jump Host Username",
-  "hostEditMoreSettings": "More Settings",
-  "hostEditNameHint": "e.g., Production Server",
-  "hostEditNameLabel": "Name *",
-  "hostEditNameRequired": "Please enter a name",
-  "hostEditPassphraseLabel": "Passphrase (optional)",
-  "hostEditPassword": "Password",
-  "hostEditPasswordSaveFailed": "Failed to save password",
-  "hostEditPastePrivateKey": "Paste Private Key",
-  "hostEditPastePrivateKeySubtitle": "Turn off to select from file",
-  "hostEditPortLabel": "Port",
-  "hostEditPrivateKey": "Private Key",
-  "hostEditPrivateKeyContent": "Private Key Content",
-  "hostEditPrivateKeyFileRead": "Private key file loaded: {name}",
-  "hostEditPrivateKeySaveFailed": "Failed to save private key",
-  "hostEditReadFileFailed": "Failed to read file: {error}",
-  "hostEditSave": "💾 Save",
-  "hostEditSaveSuccess": "✅ Saved successfully",
-  "hostEditSectionAuth": "Authentication",
-  "hostEditSectionBasic": "Basic Information",
-  "hostEditSectionGroupTag": "Group & Tag",
-  "hostEditSectionJumpHost": "Jump Host / Bastion",
-  "hostEditSectionSudo": "Privilege Escalation (sudo)",
-  "hostEditSelect": "Select",
-  "hostEditSelectGroupTooltip": "Select an existing group",
-  "hostEditSelectPrivateKeyFile": "Select Private Key File",
-  "hostEditSudoPasswordDesc": "Once configured, this password will be auto-filled when AI encounters a sudo password prompt. It is saved via system secure storage and never appears in commands or logs.",
-  "hostEditSudoPasswordHint": "Auto-injected when AI runs sudo commands",
-  "hostEditSudoPasswordLabel": "Sudo Password (optional)",
-  "hostEditTagColor": "Tag Color",
-  "hostEditTimeoutSeconds": "{timeout}s",
-  "hostEditTitleEdit": "Edit Server",
-  "hostEditTitleNew": "New Server",
-  "hostEditUseJumpHost": "Use Jump Host",
-  "hostEditUseJumpHostSubtitle": "Connect via jump host / bastion",
-  "hostEditUsernameLabel": "Username",
-  "hostListAITipIntro": "AI assistant is available after connecting to a server:",
-  "hostListAITipNote": "💡 AI can help you generate commands, explain output, and troubleshoot issues",
-  "hostListAITipStep1": "1️⃣  Tap a server card to open the terminal",
-  "hostListAITipStep2": "2️⃣  After connecting, the AI button appears in the bottom right",
-  "hostListAITipStep3": "3️⃣  Tap the AI button to start the smart command assistant",
-  "hostListAITipTitle": "AI assistant usage tips",
-  "hostListAddFirstServer": "Add your first server to start AI-assisted remote management",
-  "hostListClearSearch": "Clear search",
-  "hostListConnectTerminal": "Connect terminal",
-  "hostListDeleteConfirm": "Are you sure you want to delete \"{hostName}\"?\n\nSaved credentials will also be deleted.",
-  "hostListDeleteServer": "Delete server",
-  "hostListDeleteSuccess": "Deleted successfully",
-  "hostListEditConfig": "Edit configuration",
-  "hostListLoadFailed": "Failed to load: {error}",
-  "hostListNoSearchResults": "No matching servers found",
-  "hostListNoSearchResultsHint": "Try different keywords or check spelling",
-  "hostListNoServers": "No servers yet",
-  "hostListSearchHint": "Search servers...",
+  "hostEditAuthTypeLabel": "วิธีการยืนยันตัวตน *",
+  "hostEditConfigSavedButCredFailed": "⚠️ บันทึกการกำหนดค่าสำเร็จแล้ว แต่ {error} โปรดลองอีกครั้ง",
+  "hostEditConnectionTimeout": "หมดเวลาการเชื่อมต่อ: {timeout} วินาที",
+  "hostEditDefaultGroup": "ค่าเริ่มต้น",
+  "hostEditEncodingLabel": "การเข้ารหัสอักขระ",
+  "hostEditGroupHint": "ป้อนหรือเลือกกลุ่ม",
+  "hostEditGroupLabel": "กลุ่ม",
+  "hostEditHostHint": "ที่อยู่ IP หรือชื่อโดเมน",
+  "hostEditHostLabel": "ที่อยู่โฮสต์ *",
+  "hostEditHostRequired": "กรุณากรอกที่อยู่โฮสต์",
+  "hostEditJumpAuthTypeLabel": "วิธีการตรวจสอบความถูกต้องของ Spring Board",
+  "hostEditJumpHostFlowHint": "เครื่องสปริงบอร์ดจะเชื่อมต่อก่อนแล้วจึงส่งต่อไปยังเซิร์ฟเวอร์เป้าหมายผ่านเครื่องสปริงบอร์ด",
+  "hostEditJumpHostLabel": "ที่อยู่เครื่องสปริงบอร์ด *",
+  "hostEditJumpPasswordLabel": "รหัสผ่านสปริงบอร์ด",
+  "hostEditJumpPortLabel": "พอร์ตสปริงบอร์ด",
+  "hostEditJumpPrivateKeyContent": "เนื้อหาคีย์ส่วนตัวของเครื่อง Springboard",
+  "hostEditJumpUsernameLabel": "ชื่อผู้ใช้สปริงบอร์ด",
+  "hostEditMoreSettings": "การตั้งค่าเพิ่มเติม",
+  "hostEditNameHint": "ตัวอย่างเช่น: เซิร์ฟเวอร์ที่ใช้งานจริง",
+  "hostEditNameLabel": "ชื่อ *",
+  "hostEditNameRequired": "กรุณากรอกชื่อ",
+  "hostEditPassphraseLabel": "รหัสผ่านคีย์ส่วนตัว (ไม่จำเป็น)",
+  "hostEditPassword": "รหัสผ่าน",
+  "hostEditPasswordSaveFailed": "การบันทึกรหัสผ่านล้มเหลว",
+  "hostEditPastePrivateKey": "วางรหัสส่วนตัว",
+  "hostEditPastePrivateKeySubtitle": "ปิดแล้วเลือกจากไฟล์",
+  "hostEditPortLabel": "พอร์ต",
+  "hostEditPrivateKey": "รหัสส่วนตัว",
+  "hostEditPrivateKeyContent": "เนื้อหาคีย์ส่วนตัว",
+  "hostEditPrivateKeyFileRead": "ไฟล์คีย์ส่วนตัวที่อ่าน: {name}",
+  "hostEditPrivateKeySaveFailed": "การบันทึกคีย์ส่วนตัวล้มเหลว",
+  "hostEditReadFileFailed": "ไม่สามารถอ่านไฟล์: {error}",
+  "hostEditSave": "💾 บันทึก",
+  "hostEditSaveSuccess": "✅บันทึกสำเร็จ",
+  "hostEditSectionAuth": "วิธีการรับรองความถูกต้อง",
+  "hostEditSectionBasic": "ข้อมูลพื้นฐาน",
+  "hostEditSectionGroupTag": "การจัดกลุ่มและการติดฉลาก",
+  "hostEditSectionJumpHost": "เครื่องสปริงบอร์ด/ป้อมปราการ",
+  "hostEditSectionSudo": "การเพิ่มสิทธิ์ (sudo)",
+  "hostEditSelect": "เลือก",
+  "hostEditSelectGroupTooltip": "เลือกกลุ่มที่มีอยู่",
+  "hostEditSelectPrivateKeyFile": "เลือกไฟล์คีย์ส่วนตัว",
+  "hostEditSudoPasswordDesc": "หลังจากกำหนดค่า AI จะกรอกรหัสผ่านนี้โดยอัตโนมัติเมื่อพบรหัสผ่านเมื่อดำเนินการคำสั่ง sudo รหัสผ่านจะถูกบันทึกไว้ในที่จัดเก็บข้อมูลที่ปลอดภัยของระบบ และไม่ปรากฏในคำสั่งหรือบันทึก",
+  "hostEditSudoPasswordHint": "AI จะถูกฉีดโดยอัตโนมัติเมื่อดำเนินการคำสั่ง sudo",
+  "hostEditSudoPasswordLabel": "รหัสผ่าน sudo (ไม่จำเป็น)",
+  "hostEditTagColor": "สีฉลาก",
+  "hostEditTimeoutSeconds": "{timeout} วินาที",
+  "hostEditTitleEdit": "แก้ไขเซิร์ฟเวอร์",
+  "hostEditTitleNew": "สร้างเซิร์ฟเวอร์ใหม่",
+  "hostEditUseJumpHost": "ใช้เครื่องสปริง",
+  "hostEditUseJumpHostSubtitle": "เชื่อมต่อผ่านโฮสต์สปริงบอร์ด/ป้อมปราการ",
+  "hostEditUsernameLabel": "ชื่อผู้ใช้",
+  "hostListAITipIntro": "จำเป็นต้องใช้ผู้ช่วย AI หลังจากเชื่อมต่อกับเซิร์ฟเวอร์:",
+  "hostListAITipNote": "💡 AI สามารถช่วยคุณสร้างคำสั่ง ตีความเอาต์พุต และแก้ไขปัญหาได้",
+  "hostListAITipStep1": "1️⃣คลิกที่การ์ดเซิร์ฟเวอร์เพื่อเข้าสู่เทอร์มินัล",
+  "hostListAITipStep2": "2️⃣ หลังจากเชื่อมต่อสำเร็จ ปุ่ม AI จะปรากฏขึ้นที่มุมขวาล่าง",
+  "hostListAITipStep3": "3️⃣คลิกปุ่ม AI เพื่อเริ่มระบบช่วยสั่งการอัจฉริยะ",
+  "hostListAITipTitle": "เคล็ดลับการใช้ผู้ช่วย AI",
+  "hostListAddFirstServer": "เพิ่มเซิร์ฟเวอร์เครื่องแรกของคุณและเริ่มการจัดการระยะไกลที่ได้รับความช่วยเหลือจาก AI",
+  "hostListClearSearch": "ล้างการค้นหา",
+  "hostListConnectTerminal": "เชื่อมต่อเทอร์มินัล",
+  "hostListDeleteConfirm": "คุณแน่ใจหรือไม่ว่าต้องการลบ \"{hostName}\"?\n\nข้อมูลรับรองที่บันทึกไว้จะถูกลบด้วย",
+  "hostListDeleteServer": "ลบเซิร์ฟเวอร์",
+  "hostListDeleteSuccess": "ลบสำเร็จ",
+  "hostListEditConfig": "แก้ไขการกำหนดค่า",
+  "hostListLoadFailed": "การโหลดล้มเหลว: {error}",
+  "hostListNoSearchResults": "ไม่พบเซิร์ฟเวอร์ที่ตรงกัน",
+  "hostListNoSearchResultsHint": "ลองใช้คำหลักอื่นหรือตรวจสอบการสะกด",
+  "hostListNoServers": "ยังไม่มีเซิร์ฟเวอร์",
+  "hostListSearchHint": "ค้นหาเซิร์ฟเวอร์...",
   "language": "ภาษา",
   "languageDesc": "เลือกภาษาของอินเทอร์เฟซ",
-  "languageDialogTitle": "Select Language",
-  "languageFollowSystem": "Follow System",
+  "languageDialogTitle": "เลือกภาษา",
+  "languageFollowSystem": "ทำตามระบบ",
   "lightMode": "สว่าง",
   "messageSaveFailed": "บันทึกข้อความล้มเหลว งานยังไม่เริ่ม",
   "name": "ชื่อ",
   "nickname": "ชื่อเล่น",
   "noCredentials": "❌ ไม่พบข้อมูลประจำตัว\n\nกรุณาแก้ไขเซิร์ฟเวอร์แล้วป้อนรหัสผ่านหรือคีย์ส่วนตัว",
-  "notificationAlways": "Every time",
-  "notificationAlwaysSubtitle": "Send a notification when a task finishes or fails",
-  "notificationEnable": "Enable task completion notifications",
-  "notificationEnableHint": "Automatically send a message when a task finishes or fails",
-  "notificationEnterUrlFirst": "Please fill in the notification URL first",
-  "notificationFailedOnly": "Only on failure",
-  "notificationFailedOnlySubtitle": "Only send a notification when a task fails",
-  "notificationInstructionsBody": "1. Add a \"bot\" in your DingTalk/Feishu/WeCom group to get the webhook URL\n2. Paste the URL into the input box above\n3. Click \"Send test notification\" to check if you can receive it\n4. From now on, a message will be sent to the group automatically when a task finishes or fails",
-  "notificationInstructionsTitle": "Instructions",
-  "notificationInvalidUrl": "Invalid URL format: {error}",
-  "notificationSaveConfig": "Save Config",
-  "notificationSaveFailed": "Save failed: {error}",
-  "notificationSaved": "Notification settings saved",
-  "notificationSendTest": "Send test notification",
-  "notificationSending": "Sending...",
-  "notificationTestFailed": "Test failed: {error}",
-  "notificationTestSendFailed": "Send failed, please check the notification URL",
-  "notificationTestSent": "Test notification sent, please check your group",
-  "notificationTitle": "Task Completion Notifications",
-  "notificationTriggerTitle": "When to send notifications",
-  "notificationWebhookSupport": "Supports: DingTalk, Feishu, WeCom group, Slack, etc.",
-  "notificationWebhookUrl": "Webhook URL",
+  "notificationAlways": "แจ้งให้ทราบทุกครั้ง",
+  "notificationAlwaysSubtitle": "ส่งการแจ้งเตือนเมื่องานเสร็จสิ้นหรือล้มเหลว",
+  "notificationEnable": "เปิดใช้งานการแจ้งเตือนงานเสร็จสิ้น",
+  "notificationEnableHint": "ส่งข้อความโดยอัตโนมัติเมื่องานเสร็จสิ้นหรือล้มเหลว",
+  "notificationEnterUrlFirst": "กรุณากรอกที่อยู่ในการแจ้งเตือนก่อน",
+  "notificationFailedOnly": "แจ้งเตือนเมื่อเกิดความล้มเหลวเท่านั้น",
+  "notificationFailedOnlySubtitle": "ส่งการแจ้งเตือนเมื่องานล้มเหลวเท่านั้น",
+  "notificationInstructionsBody": "1. เพิ่ม \"หุ่นยนต์\" ในกลุ่ม DingTalk/Feishu/Enterprise WeChat และรับที่อยู่การแจ้งเตือน\n2. วางที่อยู่ลงในช่องป้อนข้อมูลด้านบน\n3. คลิก \"ส่งการแจ้งเตือนการทดสอบ\" เพื่อดูว่าคุณสามารถรับได้หรือไม่\n4. เมื่องานเสร็จสิ้นหรือล้มเหลวในอนาคต ข้อความจะถูกส่งไปยังกลุ่มโดยอัตโนมัติ",
+  "notificationInstructionsTitle": "คำแนะนำสำหรับการใช้งาน",
+  "notificationInvalidUrl": "รูปแบบที่อยู่ไม่ถูกต้อง: {error}",
+  "notificationSaveConfig": "บันทึกการกำหนดค่า",
+  "notificationSaveFailed": "ไม่สามารถบันทึก: {error}",
+  "notificationSaved": "บันทึกการกำหนดค่าการแจ้งเตือนแล้ว",
+  "notificationSendTest": "ส่งการแจ้งเตือนการทดสอบ",
+  "notificationSending": "กำลังส่ง...",
+  "notificationTestFailed": "การทดสอบล้มเหลว: {error}",
+  "notificationTestSendFailed": "ไม่สามารถส่งได้ โปรดตรวจสอบที่อยู่การแจ้งเตือน",
+  "notificationTestSent": "ส่งการแจ้งเตือนการทดสอบแล้ว โปรดไปที่กลุ่มเพื่อตรวจสอบ",
+  "notificationTitle": "การแจ้งเตือนงานเสร็จสิ้น",
+  "notificationTriggerTitle": "จะส่งการแจ้งเตือนเมื่อใด",
+  "notificationWebhookSupport": "การสนับสนุน: DingTalk, Feishu, กลุ่ม WeChat ขององค์กร, Slack ฯลฯ",
+  "notificationWebhookUrl": "ที่อยู่รับแจ้ง",
   "notifications": "การแจ้งเตือน",
   "notificationsDesc": "รับข้อความเมื่องานเสร็จสิ้น",
   "ok": "ตกลง",
@@ -319,146 +319,146 @@
   "quickCommands": "สนิปเป็ต",
   "quickCommandsDesc": "บันทึกคำสั่งที่ใช้บ่อยเพื่อเรียกใช้ด้วยคลิกเดียว",
   "retry": "ลองอีกครั้ง",
-  "runbookBuiltinCannotDelete": "Built-in templates cannot be deleted",
-  "runbookBuiltinNotEditable": "Built-in templates are not editable. Use \"Clone\" to create a copy and modify it.",
-  "runbookBuiltinTag": "Built-in",
-  "runbookCategoryCustom": "Custom",
-  "runbookCategoryDeployment": "Deployment",
-  "runbookCategoryInspection": "Inspection",
-  "runbookCategoryMaintenance": "Maintenance",
-  "runbookCategorySecurity": "Security",
-  "runbookCategoryTroubleshooting": "Troubleshooting",
-  "runbookClipboardEmpty": "Clipboard is empty",
-  "runbookCloneTooltip": "Clone",
-  "runbookClonedToast": "Cloned as custom runbook: {name}",
-  "runbookContentAgent": "Prompt Content",
-  "runbookContentAgentHint": "e.g., Check disk usage of '{host}' and provide suggestions",
-  "runbookContentCommand": "Command Content",
-  "runbookContentCommandHint": "e.g., ssh '{user}'@'{host}' df -h",
-  "runbookContentRequired": "Please enter the content",
-  "runbookCreate": "Create",
-  "runbookDeleteConfirm": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
-  "runbookDeleteTitle": "Delete Runbook",
-  "runbookDeleteTooltip": "Delete",
-  "runbookDeletedToast": "Deleted",
-  "runbookEditTitle": "Edit Runbook",
-  "runbookEditTooltip": "Edit",
-  "runbookEmptyFiltered": "No matching runbooks. Try adjusting the filters.",
-  "runbookEmptyHint": "Tap the bottom-right button to create a runbook",
-  "runbookEmptyTitle": "No runbooks yet",
-  "runbookFieldCategory": "Category",
-  "runbookFieldDescription": "Description (optional)",
-  "runbookFieldIcon": "Icon",
-  "runbookFieldName": "Name",
-  "runbookFieldType": "Type",
-  "runbookFilterAll": "All",
-  "runbookImportButton": "Import",
-  "runbookImportHint": "Copy JSON from the official open platform and paste it here",
-  "runbookImportPasteHint": "Paste JSON content here…",
-  "runbookImportSuccess": "Successfully imported {count} runbooks",
-  "runbookImportTitle": "Import Runbooks",
-  "runbookImportTooltip": "Import Runbook",
-  "runbookJsonParseFailed": "JSON parse failed: {error}",
-  "runbookNameRequired": "Please enter a name",
-  "runbookNewTitle": "New Runbook",
-  "runbookPasteFromClipboard": "Paste from Clipboard",
-  "runbookPasteJsonFirst": "Please paste JSON content first",
-  "runbookRunCount": "Run {count} times",
-  "runbookSearchHint": "Search runbook name or description",
-  "runbookTitle": "Runbooks",
-  "runbookTypeAgentDesc": "Natural language prompt, executed by AI via ReAct framework",
-  "runbookTypeAgentOption": "AI Execute",
-  "runbookTypeAgentTag": "AI Execute",
-  "runbookTypeCommand": "Direct Execute",
-  "runbookTypeCommandDesc": "Execute commands directly in terminal after variable substitution",
-  "runbookUseInTerminal": "Please use this in the terminal page",
+  "runbookBuiltinCannotDelete": "เทมเพลตในตัวไม่สามารถลบได้",
+  "runbookBuiltinNotEditable": "ไม่สามารถแก้ไขเทมเพลตในตัวได้ โปรดใช้ \"โคลน\" เพื่อสร้างสำเนาแล้วแก้ไข",
+  "runbookBuiltinTag": "บิวท์อิน",
+  "runbookCategoryCustom": "ปรับแต่ง",
+  "runbookCategoryDeployment": "ปรับใช้",
+  "runbookCategoryInspection": "การตรวจสอบ",
+  "runbookCategoryMaintenance": "การบำรุงรักษาตามปกติ",
+  "runbookCategorySecurity": "ปลอดภัย",
+  "runbookCategoryTroubleshooting": "การแก้ไขปัญหา",
+  "runbookClipboardEmpty": "คลิปบอร์ดว่างเปล่า",
+  "runbookCloneTooltip": "โคลน",
+  "runbookClonedToast": "โคลนเป็นเวิร์กโฟลว์แบบกำหนดเอง: {name}",
+  "runbookContentAgent": "เนื้อหาพร้อมท์",
+  "runbookContentAgentHint": "ตัวอย่าง: ตรวจสอบการใช้งานดิสก์ของ '{host}' และให้คำแนะนำ",
+  "runbookContentCommand": "เนื้อหาคำสั่ง",
+  "runbookContentCommandHint": "ตัวอย่างเช่น: ssh '{user}'@'{host}' df -h",
+  "runbookContentRequired": "กรุณากรอกเนื้อหา",
+  "runbookCreate": "สร้าง",
+  "runbookDeleteConfirm": "คุณแน่ใจหรือไม่ว่าต้องการลบ \"{name}\"? การดำเนินการนี้ไม่สามารถยกเลิกได้",
+  "runbookDeleteTitle": "ลบเวิร์กโฟลว์",
+  "runbookDeleteTooltip": "ลบ",
+  "runbookDeletedToast": "ลบแล้ว",
+  "runbookEditTitle": "แก้ไขขั้นตอนการทำงาน",
+  "runbookEditTooltip": "แก้ไข",
+  "runbookEmptyFiltered": "ไม่มีขั้นตอนการทำงานที่ตรงกัน ลองปรับเงื่อนไขตัวกรอง",
+  "runbookEmptyHint": "คลิกปุ่มที่มุมขวาล่างเพื่อสร้างเวิร์กโฟลว์ใหม่",
+  "runbookEmptyTitle": "ยังไม่มีขั้นตอนการดำเนินงานและการบำรุงรักษา",
+  "runbookFieldCategory": "การจำแนกประเภท",
+  "runbookFieldDescription": "คำอธิบาย (ไม่บังคับ)",
+  "runbookFieldIcon": "ไอคอน",
+  "runbookFieldName": "ชื่อ",
+  "runbookFieldType": "ประเภท",
+  "runbookFilterAll": "ทั้งหมด",
+  "runbookImportButton": "นำเข้า",
+  "runbookImportHint": "คัดลอก JSON จากแพลตฟอร์มเปิดของเว็บไซต์อย่างเป็นทางการแล้ววางที่นี่",
+  "runbookImportPasteHint": "วางเนื้อหา JSON ที่นี่...",
+  "runbookImportSuccess": "นำเข้าเวิร์กโฟลว์ {count} สำเร็จแล้ว",
+  "runbookImportTitle": "นำเข้าขั้นตอนการดำเนินงานและการบำรุงรักษา",
+  "runbookImportTooltip": "นำเข้าขั้นตอนการทำงาน",
+  "runbookJsonParseFailed": "การแยกวิเคราะห์ JSON ล้มเหลว: {error}",
+  "runbookNameRequired": "กรุณากรอกชื่อ",
+  "runbookNewTitle": "ขั้นตอนการทำงานใหม่",
+  "runbookPasteFromClipboard": "วางจากคลิปบอร์ด",
+  "runbookPasteJsonFirst": "โปรดวางเนื้อหา JSON ก่อน",
+  "runbookRunCount": "ดำเนินการ {count} ครั้ง",
+  "runbookSearchHint": "ค้นหาชื่อเวิร์กโฟลว์หรือคำอธิบาย",
+  "runbookTitle": "ขั้นตอนการดำเนินงานและการบำรุงรักษา",
+  "runbookTypeAgentDesc": "พร้อมท์ภาษาธรรมชาติ AI จะดำเนินการตามกรอบ ReAct",
+  "runbookTypeAgentOption": "การดำเนินการของ AI",
+  "runbookTypeAgentTag": "การดำเนินการของ AI",
+  "runbookTypeCommand": "การดำเนินการโดยตรง",
+  "runbookTypeCommandDesc": "หลังจากการทดแทนตัวแปร ให้ดำเนินการคำสั่งโดยตรงในเทอร์มินัล",
+  "runbookUseInTerminal": "กรุณาใช้มันในหน้าเทอร์มินัล",
   "runbooks": "รันบุ๊ก",
   "runbooksDesc": "เปลี่ยนงานประจำให้เป็นเทมเพลตที่ใช้ซ้ำได้",
   "save": "บันทึก",
   "scrollToBottom": "เลื่อนลงล่าง",
   "search": "ค้นหา",
-  "securityAllDataCleared": "All data has been cleared",
-  "securityAppLockSubtitleOff": "When disabled, no verification is needed to open the app",
-  "securityAppLockSubtitleOn": "Opening the app requires {biometricType} or password",
-  "securityAuditLogSubtitle": "View the execution record of each command",
-  "securityAuditLogTitle": "Audit Log",
-  "securityAuthenticateReason": "Verify your identity to enable app lock",
-  "securityBiometricFaceId": "Face ID",
-  "securityBiometricFingerprint": "Fingerprint",
-  "securityBiometricGeneric": "Biometrics",
-  "securityBiometricNotSupported": "⚠️ Device does not support fingerprint or face ID",
-  "securityBiometricStatusTitle": "Fingerprint / Face ID Status",
-  "securityBiometricSupported": "✅ Supports {biometricType}",
-  "securityClearAllData": "Clear All Data",
-  "securityClearAllDataSubtitle": "Delete all servers, chat history, and passwords (irreversible)",
-  "securityClearConfirmPrompt": "Please type DELETE to confirm:",
-  "securityClearFailed": "Clear failed: {error}",
-  "securityClearIrreversible": "This action cannot be undone!",
-  "securityClearItemAiModels": "• AI model settings",
-  "securityClearItemChats": "• Chat history",
-  "securityClearItemPasswords": "• All passwords",
-  "securityClearItemServers": "• Server list",
-  "securityClearItemSnippets": "• Quick commands",
-  "securityClearWarning": "This action will delete all data, including:",
-  "securityConfirmDelete": "Confirm Delete",
-  "securityDangerAction": "⚠️ Dangerous Action",
-  "securityEnableAppLock": "Enable App Lock",
+  "securityAllDataCleared": "ล้างข้อมูลทั้งหมดแล้ว",
+  "securityAppLockSubtitleOff": "การเปิดแอปหลังปิดไม่จำเป็นต้องมีการตรวจสอบ",
+  "securityAppLockSubtitleOn": "{biometricType} หรือรหัสผ่านจำเป็นต้องเปิดแอป",
+  "securityAuditLogSubtitle": "ดูบันทึกการดำเนินการของแต่ละคำสั่ง",
+  "securityAuditLogTitle": "บันทึกการดำเนินงาน",
+  "securityAuthenticateReason": "ตรวจสอบสิทธิ์เพื่อเปิดใช้งาน App Lock",
+  "securityBiometricFaceId": "รหัสใบหน้า",
+  "securityBiometricFingerprint": "ลายนิ้วมือ",
+  "securityBiometricGeneric": "ไบโอเมตริกซ์",
+  "securityBiometricNotSupported": "⚠️เครื่องไม่รองรับลายนิ้วมือหรือใบหน้า",
+  "securityBiometricStatusTitle": "สถานะลายนิ้วมือ/ใบหน้า",
+  "securityBiometricSupported": "✅ รองรับ {biometricType}",
+  "securityClearAllData": "ล้างข้อมูลทั้งหมด",
+  "securityClearAllDataSubtitle": "ลบเซิร์ฟเวอร์ ประวัติการแชท รหัสผ่านทั้งหมด (ไม่สามารถกู้คืนได้)",
+  "securityClearConfirmPrompt": "กรุณากรอก DELETE เพื่อยืนยัน:",
+  "securityClearFailed": "ล้างข้อมูลล้มเหลว: {error}",
+  "securityClearIrreversible": "การดำเนินการนี้ไม่สามารถยกเลิกได้!",
+  "securityClearItemAiModels": "• การตั้งค่าโมเดล AI",
+  "securityClearItemChats": "• ประวัติการแชท",
+  "securityClearItemPasswords": "• รหัสผ่านทั้งหมด",
+  "securityClearItemServers": "• รายการเซิร์ฟเวอร์",
+  "securityClearItemSnippets": "• คำสั่งด่วน",
+  "securityClearWarning": "การดำเนินการนี้จะลบข้อมูลทั้งหมด รวมถึง:",
+  "securityConfirmDelete": "ยืนยันการลบ",
+  "securityDangerAction": "⚠️การดำเนินการที่เป็นอันตราย",
+  "securityEnableAppLock": "เปิดใช้งานการล็อคแอป",
   "securitySettings": "ความปลอดภัย",
   "securitySettingsDesc": "ปลดล็อกแอปด้วยลายนิ้วมือหรือ Face ID",
-  "securityTitle": "Security Settings",
+  "securityTitle": "การตั้งค่าความปลอดภัย",
   "selectFile": "เลือกไฟล์",
   "send": "ส่ง",
   "serverList": "เซิร์ฟเวอร์",
   "serverListDesc": "เพิ่มและจัดการเซิร์ฟเวอร์ระยะไกลที่จะเชื่อมต่อ",
   "settings": "การตั้งค่า",
-  "settingsAI": "AI & Intelligence",
-  "settingsAIModel": "AI Model Config",
-  "settingsAIModelDesc": "Configure AI API key and model",
-  "settingsAbout": "About",
-  "settingsAboutApp": "About AI Terminal",
-  "settingsAgent": "Agent Settings",
-  "settingsAgentDesc": "Max auto-execute steps (0 = unlimited: {steps})",
-  "settingsAppearance": "Appearance",
-  "settingsAppearanceSettings": "Appearance",
-  "settingsAppearanceSettingsDesc": "Switch dark/light mode, adjust font size",
-  "settingsAuditLog": "Activity Log",
-  "settingsAuditLogDesc": "Records who ran each command and when",
-  "settingsChangeRecords": "Change Records",
-  "settingsChangeRecordsDesc": "Track all changes, undo if something goes wrong",
-  "settingsChangeWindow": "Safe Hours",
-  "settingsChangeWindowDesc": "Set safe time windows; changes blocked outside them",
-  "settingsCheckUpdate": "Check for Updates",
-  "settingsConnection": "Connections",
-  "settingsHosts": "Servers",
-  "settingsHostsDesc": "Add and edit remote servers to connect to",
-  "settingsLanguage": "Language",
-  "settingsLanguageDesc": "Choose interface language",
-  "settingsNotification": "Task Notifications",
-  "settingsNotificationDesc": "Get notified when a task finishes",
-  "settingsRunbooks": "Runbooks",
-  "settingsRunbooksDesc": "Turn common ops tasks into templates, run in one tap",
-  "settingsSecurity": "Security",
-  "settingsSecurityDesc": "Unlock the app with fingerprint or Face ID",
-  "settingsSnippets": "Snippets",
-  "settingsSnippetsDesc": "Save frequently used commands for one-tap execution",
-  "settingsTitle": "Settings",
-  "settingsVersion": "Version 1.4.3",
+  "settingsAI": "AI และความฉลาด",
+  "settingsAIModel": "การกำหนดค่าโมเดล AI",
+  "settingsAIModelDesc": "การกำหนดค่าคีย์และโมเดลสำหรับ AI",
+  "settingsAbout": "เกี่ยวกับ",
+  "settingsAboutApp": "เกี่ยวกับ เอไอ เทอร์มินัล",
+  "settingsAgent": "การตั้งค่าตัวแทน",
+  "settingsAgentDesc": "จำนวนขั้นตอนสูงสุดที่ AI สามารถดำเนินการได้โดยอัตโนมัติ (0=ไม่มีขีดจำกัด: {steps})",
+  "settingsAppearance": "รูปลักษณ์ภายนอกและประสบการณ์",
+  "settingsAppearanceSettings": "การตั้งค่าลักษณะที่ปรากฏ",
+  "settingsAppearanceSettingsDesc": "สลับโหมดมืด/สว่าง ปรับขนาดตัวอักษร",
+  "settingsAuditLog": "บันทึกการดำเนินงาน",
+  "settingsAuditLogDesc": "บันทึกว่าใครเป็นผู้ดำเนินการแต่ละคำสั่งและเมื่อใด",
+  "settingsChangeRecords": "ประวัติการเปลี่ยนแปลง",
+  "settingsChangeRecordsDesc": "การเปลี่ยนแปลงทั้งหมดจะถูกบันทึกไว้และสามารถยกเลิกได้หากมีข้อผิดพลาดเกิดขึ้น",
+  "settingsChangeWindow": "ระยะเวลาที่ปลอดภัย",
+  "settingsChangeWindowDesc": "กำหนดระยะเวลาที่ปลอดภัยและห้ามเปลี่ยนแปลงในเวลาอื่น",
+  "settingsCheckUpdate": "ตรวจสอบการอัปเดต",
+  "settingsConnection": "การจัดการการเชื่อมต่อ",
+  "settingsHosts": "รายการเซิร์ฟเวอร์",
+  "settingsHostsDesc": "เพิ่มและแก้ไขเซิร์ฟเวอร์ที่คุณต้องการเชื่อมต่อจากระยะไกล",
+  "settingsLanguage": "ภาษา",
+  "settingsLanguageDesc": "เลือกภาษาอินเทอร์เฟซ",
+  "settingsNotification": "การแจ้งเตือนงานเสร็จสิ้น",
+  "settingsNotificationDesc": "ส่งข้อความแจ้งเตือนคุณโดยอัตโนมัติหลังจากงานเสร็จสิ้น",
+  "settingsRunbooks": "ขั้นตอนการดำเนินงานและการบำรุงรักษา",
+  "settingsRunbooksDesc": "บันทึกการดำเนินการทั่วไปและการดำเนินการบำรุงรักษาเป็นเทมเพลตและเรียกใช้ได้ด้วยคลิกเดียว",
+  "settingsSecurity": "การตั้งค่าความปลอดภัย",
+  "settingsSecurityDesc": "ปลดล็อคแอพด้วยลายนิ้วมือหรือใบหน้า",
+  "settingsSnippets": "คำสั่งลัด",
+  "settingsSnippetsDesc": "บันทึกคำสั่งที่ใช้บ่อยและดำเนินการด้วยคลิกเดียวในครั้งถัดไป",
+  "settingsTitle": "การตั้งค่า",
+  "settingsVersion": "เวอร์ชัน 1.4.3",
   "simplifiedChinese": "简体中文",
-  "snippetCommandHint": "e.g., docker exec -it '{container}' /bin/bash",
-  "snippetCommandLabel": "Command:",
-  "snippetCommandRequired": "Please enter the command",
-  "snippetCopyCommand": "Copy Command",
-  "snippetDeleteConfirm": "Are you sure you want to delete \"{name}\"?",
-  "snippetDeleteTitle": "Delete Snippet",
-  "snippetEditTitle": "Edit Snippet",
-  "snippetEmptyHint": "Tap the button below to add one",
-  "snippetEmptyTitle": "No snippets yet",
-  "snippetFieldCommand": "Command",
-  "snippetFieldDescription": "Description (optional)",
-  "snippetNameRequired": "Please enter a name",
-  "snippetNewTitle": "New Snippet",
-  "snippetResolvedCommand": "Command: {command}",
-  "snippetTitle": "Snippets",
+  "snippetCommandHint": "ตัวอย่างเช่น: docker exec -it '{container}' /bin/bash",
+  "snippetCommandLabel": "คำสั่ง:",
+  "snippetCommandRequired": "กรุณากรอกคำสั่ง",
+  "snippetCopyCommand": "คำสั่งคัดลอก",
+  "snippetDeleteConfirm": "คุณแน่ใจหรือไม่ว่าต้องการลบ \"{name}\"?",
+  "snippetDeleteTitle": "คำสั่งลบ",
+  "snippetEditTitle": "แก้ไขคำสั่ง",
+  "snippetEmptyHint": "คลิกปุ่มด้านล่างเพื่อเพิ่ม",
+  "snippetEmptyTitle": "ยังไม่มีคำสั่งลัด",
+  "snippetFieldCommand": "คำสั่ง",
+  "snippetFieldDescription": "คำอธิบาย (ไม่บังคับ)",
+  "snippetNameRequired": "กรุณากรอกชื่อ",
+  "snippetNewTitle": "คำสั่งใหม่",
+  "snippetResolvedCommand": "คำสั่ง: {command}",
+  "snippetTitle": "คำสั่งลัด",
   "taskAborted": "⚠️ ยกเลิกงาน",
   "taskCancelled": "⚠️ งานถูกยกเลิก",
   "taskCompleted": "งานเสร็จสิ้น",
@@ -466,65 +466,65 @@
   "taskFailed": "งานล้มเหลว",
   "taskMaxSteps": "ถึงขั้นตอนสูงสุดแล้ว งานถูกหยุด",
   "taskTerminated": "งานถูกสิ้นสุด",
-  "terminalAgentLog": "Agent log",
-  "terminalClearScreen": "Clear screen",
-  "terminalCloseTabConfirm": "Closing this tab will cancel the running task. Are you sure?",
-  "terminalCollapseAIPanel": "Collapse AI panel",
-  "terminalCollapseMonitorPanel": "Collapse monitor panel",
-  "terminalCommandLabel": "Command: {command}",
-  "terminalCommandTemplate": "Command template:",
-  "terminalCompactingHistory": "AI is compressing conversation history",
-  "terminalCompactionDone": "Memory compression completed",
-  "terminalCompactionFailed": "Compression failed: {error}",
-  "terminalConfigure": "Configure",
-  "terminalConnectHostFailed": "Failed to connect to {hostName}: {error}",
-  "terminalConnectTerminalFirst": "Please connect to a terminal first",
-  "terminalConnectTerminalForCommand": "Please connect to a terminal before executing commands",
-  "terminalConnectTerminalForRunbook": "Please connect to a terminal (SSH or local) before using runbooks",
-  "terminalConnected": "Connected",
-  "terminalConnecting": "Connecting to {host}...",
-  "terminalCreateNew": "+ New",
-  "terminalExitOrchestrator": "Exit orchestration mode",
-  "terminalExpandAIPanel": "Expand AI panel",
-  "terminalExpandMonitorPanel": "Expand monitor panel",
-  "terminalFillVariables": "Fill variables - {name}",
+  "terminalAgentLog": "บันทึกตัวแทน",
+  "terminalClearScreen": "หน้าจอที่ชัดเจน",
+  "terminalCloseTabConfirm": "การปิดแท็บนี้จะยกเลิกงานที่กำลังทำงานอยู่ คุณแน่ใจหรือไม่ว่าต้องการปิด?",
+  "terminalCollapseAIPanel": "ยุบแผง AI",
+  "terminalCollapseMonitorPanel": "ปิดแผงการตรวจสอบ",
+  "terminalCommandLabel": "คำสั่ง: {command}",
+  "terminalCommandTemplate": "แม่แบบคำสั่ง:",
+  "terminalCompactingHistory": "AI กำลังบีบอัดการสนทนาในอดีต",
+  "terminalCompactionDone": "การบีบอัดหน่วยความจำเสร็จสมบูรณ์",
+  "terminalCompactionFailed": "การบีบอัดล้มเหลว: {error}",
+  "terminalConfigure": "การกำหนดค่า",
+  "terminalConnectHostFailed": "ไม่สามารถเชื่อมต่อกับ {hostName}: {error}",
+  "terminalConnectTerminalFirst": "กรุณาเชื่อมต่อเทอร์มินัลก่อน",
+  "terminalConnectTerminalForCommand": "โปรดเชื่อมต่อกับเทอร์มินัลก่อนแล้วจึงดำเนินการคำสั่ง",
+  "terminalConnectTerminalForRunbook": "โปรดเชื่อมต่อกับเทอร์มินัล (SSH หรือเทอร์มินัลท้องถิ่น) ก่อนที่จะใช้เวิร์กโฟลว์การดำเนินการและการบำรุงรักษา",
+  "terminalConnected": "เชื่อมต่อแล้ว",
+  "terminalConnecting": "กำลังเชื่อมต่อ {host}...",
+  "terminalCreateNew": "+ ใหม่",
+  "terminalExitOrchestrator": "ออกจากโหมดออร์เคสตรา",
+  "terminalExpandAIPanel": "ขยายแผง AI",
+  "terminalExpandMonitorPanel": "ขยายแผงการตรวจสอบ",
+  "terminalFillVariables": "กรอกตัวแปร - {name}",
   "terminalFontSize": "ขนาดตัวอักษรเทอร์มินัล: {size}px",
-  "terminalHostNoCredentials": "{hostName} has no credentials configured. Please edit the server first.",
-  "terminalHostNotFound": "Host not found",
-  "terminalInputHintDefault": "Describe your request, Agent will execute automatically...",
-  "terminalInputHintDisconnected": "Available after connecting to a terminal",
-  "terminalInputHintEmpty": "Type a request to start auto-execution...",
-  "terminalInputHintOrchestrator": "Multi-host orchestration mode: describe cross-host tasks, e.g. \"sync time on all servers\"",
-  "terminalInputHintRunning": "Agent is running...",
-  "terminalLayoutBottom": "Bottom",
-  "terminalLayoutRight": "Right",
-  "terminalLocalStartFailed": "Failed to start local terminal",
-  "terminalLocalStartFailedWithError": "Failed to start local terminal: {error}",
-  "terminalManage": "Manage",
-  "terminalModel": "Model",
-  "terminalMonitor": "Monitor",
-  "terminalNewConnection": "New connection",
-  "terminalNoHostsSaved": "No saved hosts\nPlease add a server on the home page first",
-  "terminalNoRunbooks": "No runbooks available",
-  "terminalNoRunbooksHint": "Click \"Manage\" to create a runbook",
+  "terminalHostNoCredentials": "{hostName} ไม่ได้กำหนดค่าข้อมูลรับรอง โปรดแก้ไขเซิร์ฟเวอร์ก่อน",
+  "terminalHostNotFound": "ไม่มีโฮสต์อยู่",
+  "terminalInputHintDefault": "อธิบายข้อกำหนดและตัวแทนจะดำเนินการ...",
+  "terminalInputHintDisconnected": "ใช้งานได้หลังจากเชื่อมต่อกับเทอร์มินัล",
+  "terminalInputHintEmpty": "ป้อนข้อกำหนดเพื่อเริ่มการดำเนินการอัตโนมัติ...",
+  "terminalInputHintOrchestrator": "โหมดการจัดการหลายเครื่อง: อธิบายงานข้ามโฮสต์ เช่น \"การซิงโครไนซ์เวลาเซิร์ฟเวอร์ทั้งหมด\"",
+  "terminalInputHintRunning": "ตัวแทนกำลังดำเนินการ...",
+  "terminalLayoutBottom": "ลง",
+  "terminalLayoutRight": "ถูกต้อง",
+  "terminalLocalStartFailed": "เทอร์มินัลท้องถิ่นไม่สามารถเริ่มต้นได้",
+  "terminalLocalStartFailedWithError": "โลคัลเทอร์มินัลไม่สามารถเริ่มทำงาน: {error}",
+  "terminalManage": "การจัดการ",
+  "terminalModel": "รุ่น",
+  "terminalMonitor": "จอภาพ",
+  "terminalNewConnection": "การเชื่อมต่อใหม่",
+  "terminalNoHostsSaved": "ยังไม่มีโฮสต์ที่บันทึกไว้\nโปรดเพิ่มเซิร์ฟเวอร์ในหน้าแรกก่อน",
+  "terminalNoRunbooks": "ยังไม่มีขั้นตอนการดำเนินงานและการบำรุงรักษา",
+  "terminalNoRunbooksHint": "คลิก \"จัดการ\" เพื่อสร้างเวิร์กโฟลว์ใหม่",
   "terminalNotConnected": "เชื่อมต่อเทอร์มินัลก่อนเพื่อใช้โหมดอัตโนมัติ",
   "terminalNotReady": "เทอร์มินัลยังไม่เชื่อมต่อ กรุณาเชื่อมต่อก่อน",
-  "terminalOffline": "Offline",
-  "terminalOrchestratorConnected": "{connected}/{total} connected",
-  "terminalOrchestratorHostList": "Multi-host orchestration · Host list",
-  "terminalOrchestratorMode": "Orchestrate · {connected}/{total}",
-  "terminalReadOnlyOff": "Read-only mode (Dry-run)",
-  "terminalReadOnlyOn": "Read-only mode is on (click to turn off)",
-  "terminalReconnect": "Reconnect",
-  "terminalRoleYou": "You",
-  "terminalRunbookTemplates": "Runbook templates",
-  "terminalRunbookTypeCommand": "Command",
-  "terminalSelectServerForNewTab": "Select a server to connect in a new tab",
-  "terminalSessionCreated": "New session created",
-  "terminalSessionHistory": "Session history",
-  "terminalStatusNotConnected": "Not connected",
-  "terminalTaskRunning": "Task is running",
-  "terminalUnfilledVariables": "Some variables are unfilled. Execution cancelled.",
+  "terminalOffline": "ออฟไลน์",
+  "terminalOrchestratorConnected": "{connected}/{total} เชื่อมต่อแล้ว",
+  "terminalOrchestratorHostList": "การจัดระบบหลายเครื่อง · รายการโฮสต์",
+  "terminalOrchestratorMode": "การจัดเตรียม · {connected}/{total}",
+  "terminalReadOnlyOff": "โหมดอ่านอย่างเดียว (ทดลองรัน)",
+  "terminalReadOnlyOn": "เปิดโหมดอ่านอย่างเดียวอยู่ (คลิกเพื่อปิด)",
+  "terminalReconnect": "เชื่อมต่อใหม่",
+  "terminalRoleYou": "คุณ",
+  "terminalRunbookTemplates": "เทมเพลตการทำงานและการบำรุงรักษา",
+  "terminalRunbookTypeCommand": "คำสั่ง",
+  "terminalSelectServerForNewTab": "เลือกการเชื่อมต่อเซิร์ฟเวอร์แท็บใหม่",
+  "terminalSessionCreated": "สร้างเซสชันใหม่แล้ว",
+  "terminalSessionHistory": "ประวัติเซสชัน",
+  "terminalStatusNotConnected": "ไม่ได้เชื่อมต่อ",
+  "terminalTaskRunning": "งานกำลังทำงานอยู่",
+  "terminalUnfilledVariables": "มีตัวแปรที่ไม่สำเร็จและการดำเนินการถูกยกเลิก",
   "testConnection": "ทดสอบการเชื่อมต่อ",
   "themeMode": "โหมดธีม",
   "thinkingNextStep": "🤔 กำลังคิดขั้นตอนถัดไป...",
@@ -1227,59 +1227,2660 @@
       }
     }
   },
-  "aiEndpointAdd": "Add endpoint",
-  "aiEndpointEditTitle": "Edit endpoint",
-  "aiEndpointDeleteTitle": "Delete endpoint",
-  "aiEndpointDeleteConfirm": "Delete \"{name}\" and its {count} model(s)?",
-  "aiEndpointApiKey": "API key",
-  "aiEndpointApiKeyHint": "Leave blank to keep the saved key",
-  "aiEndpointBaseUrl": "API URL",
-  "aiEndpointProtocol": "API protocol",
+  "aiEndpointAdd": "เพิ่มจุดสิ้นสุด",
+  "aiEndpointEditTitle": "แก้ไขจุดสิ้นสุด",
+  "aiEndpointDeleteTitle": "ลบปลายทาง",
+  "aiEndpointDeleteConfirm": "คุณแน่ใจหรือไม่ว่าต้องการลบตำแหน่งข้อมูล \"{name}\" และรุ่น {count}",
+  "aiEndpointApiKey": "คีย์เอพีไอ",
+  "aiEndpointApiKeyHint": "เว้นว่างไว้เพื่อใช้ข้อมูลรับรองที่บันทึกไว้",
+  "aiEndpointBaseUrl": "ที่อยู่ API",
+  "aiEndpointProtocol": "โปรโตคอล API",
   "aiEndpointProtocolOpenai": "OpenAI Chat Completions",
-  "aiEndpointProtocolErnie": "Baidu ERNIE",
-  "aiEndpointCustomSettings": "Custom settings",
-  "aiEndpointModels": "Model catalog",
-  "aiEndpointModelsCount": "{count} models",
-  "aiEndpointRestoreDefaults": "Restore defaults",
-  "aiEndpointFetchModels": "Fetch available models",
-  "aiEndpointAddModel": "Add model",
-  "aiEndpointNoModels": "No models yet. Add one or fetch available models.",
-  "aiEndpointRestoreConfirm": "Replace the current catalog with default models for \"{provider}\"?",
-  "aiEndpointRestoreUnavailable": "This provider has no built-in default models",
-  "aiEndpointFetchSuccess": "Added {count} models",
-  "aiEndpointFetchNone": "No models available to add",
-  "aiEndpointFetchFailed": "Failed to fetch models: {error}",
-  "aiEndpointSelectModels": "Select models to add",
-  "aiEndpointNoProvider": "Custom",
-  "aiEndpointAddModelTitle": "Add model",
-  "aiEndpointEditModelTitle": "Edit model",
-  "aiModelDisplayName": "Display name",
-  "aiModelId": "Model ID",
-  "aiModelContextWindow": "Context window",
-  "aiModelContextWindowHint": "0 = unknown; runtime falls back to 262144 (256K)",
-  "aiModelMaxOutput": "Max output tokens",
-  "aiModelReasoning": "Reasoning levels",
-  "aiModelReasoningHint": "Enable to configure reasoning tiers for this model",
-  "aiModelTier": "Tier",
-  "aiModelApiValue": "API value",
-  "aiModelApiValueHint": "Leave blank to omit this parameter",
-  "aiModelAddTier": "Add tier",
-  "aiModelFallback": "Fallback model",
-  "aiModelNoFallback": "No fallback",
+  "aiEndpointProtocolErnie": "ไป่ตู้ เหวินซิน เออร์นี่",
+  "aiEndpointCustomSettings": "การตั้งค่าแบบกำหนดเอง",
+  "aiEndpointModels": "แคตตาล็อกรุ่น",
+  "aiEndpointModelsCount": "รุ่น {count}",
+  "aiEndpointRestoreDefaults": "คืนค่าโมเดลเริ่มต้น",
+  "aiEndpointFetchModels": "รับรุ่นที่มีจำหน่าย",
+  "aiEndpointAddModel": "เพิ่มรุ่น",
+  "aiEndpointNoModels": "ยังไม่มีรุ่น คลิก \"เพิ่มรุ่น\" หรือ \"รับรุ่นที่มี\"",
+  "aiEndpointRestoreConfirm": "ไดเร็กทอรีโมเดลเริ่มต้นของ \"{provider}\" จะถูกกู้คืน และโมเดลที่กำหนดเองปัจจุบันจะถูกแทนที่",
+  "aiEndpointRestoreUnavailable": "ผู้ให้บริการรายนี้ไม่มีโมเดลเริ่มต้นในตัว",
+  "aiEndpointFetchSuccess": "เพิ่มรุ่น {count} แล้ว",
+  "aiEndpointFetchNone": "ไม่มีรุ่นที่จะเพิ่ม",
+  "aiEndpointFetchFailed": "ไม่สามารถรับโมเดล: {error}",
+  "aiEndpointSelectModels": "เลือกรุ่นที่จะเพิ่ม",
+  "aiEndpointNoProvider": "ปรับแต่ง",
+  "aiEndpointAddModelTitle": "เพิ่มรุ่น",
+  "aiEndpointEditModelTitle": "แก้ไขโมเดล",
+  "aiModelDisplayName": "ชื่อที่แสดง",
+  "aiModelId": "รหัสรุ่น",
+  "aiModelContextWindow": "หน้าต่างบริบท",
+  "aiModelContextWindowHint": "0 หมายถึงไม่ทราบ ประมวลผลเป็น 262144 (256K) ระหว่างรันไทม์",
+  "aiModelMaxOutput": "จำนวนโทเค็นเอาต์พุตสูงสุด",
+  "aiModelReasoning": "ระดับการใช้เหตุผล",
+  "aiModelReasoningHint": "หลังจากเปิดแล้ว คุณสามารถกำหนดค่าอุปกรณ์การคิดของโมเดลได้",
+  "aiModelTier": "เกียร์",
+  "aiModelApiValue": "ค่าพารามิเตอร์ API",
+  "aiModelApiValueHint": "เว้นว่างไว้หากไม่ส่งพารามิเตอร์นี้",
+  "aiModelAddTier": "ใส่เกียร์",
+  "aiModelFallback": "รุ่นสำรอง",
+  "aiModelNoFallback": "ไม่มีรุ่นสำรอง",
   "aiModelFunctionCalling": "Function Calling",
-  "aiModelTierRequired": "Keep at least one tier",
-  "aiModelTierLevelRequired": "Tier name is required",
-  "aiModelTierDuplicate": "Tier names must be unique",
-  "aiModelValidationName": "Display name is required",
-  "aiModelValidationModelId": "Model ID is required",
-  "aiModelValidationBaseUrl": "API URL is required",
-  "aiModelValidationModels": "Add at least one model",
-  "terminalConfigureModel": "Configure model",
-  "terminalModelAndReasoning": "Model & reasoning",
-  "terminalReasoning": "Reasoning",
-  "terminalReasoningNotEnabled": "This model has no reasoning tiers enabled; enable them in settings",
-  "terminalReasoningOff": "Off",
-  "terminalManageModels": "Manage models…",
-  "aiModelFunctionCallingHint": "Native tool calling (OpenAI tools API); enable only for models that support it",
-  "terminalModelLockedRunning": "Agent is running; change the model or reasoning after it finishes"
+  "aiModelTierRequired": "เก็บไว้อย่างน้อยหนึ่งเกียร์",
+  "aiModelTierLevelRequired": "ชื่อเกียร์ต้องไม่เว้นว่าง",
+  "aiModelTierDuplicate": "เกียร์ไม่สามารถทำซ้ำได้",
+  "aiModelValidationName": "กรุณากรอกชื่อที่แสดง",
+  "aiModelValidationModelId": "กรุณากรอกรหัสรุ่น",
+  "aiModelValidationBaseUrl": "กรุณากรอกที่อยู่ API",
+  "aiModelValidationModels": "เพิ่มอย่างน้อยหนึ่งรุ่น",
+  "terminalConfigureModel": "กำหนดค่าโมเดล",
+  "terminalModelAndReasoning": "แบบจำลองและการคิด",
+  "terminalReasoning": "ระดับของการคิด",
+  "terminalReasoningNotEnabled": "รุ่นนี้ไม่ได้เปิดใช้งานอุปกรณ์การคิด แต่สามารถเปิดได้ในการตั้งค่า",
+  "terminalReasoningOff": "ปิดความคิด",
+  "terminalManageModels": "รูปแบบการบริหารจัดการ...",
+  "aiModelFunctionCallingHint": "การเรียกใช้เครื่องมือเนทิฟ (OpenAI tools API) เปิดใช้งานเฉพาะรุ่นที่รองรับโปรโตคอลนี้เท่านั้น",
+  "terminalModelLockedRunning": "เจ้าหน้าที่กำลังทำงานอยู่ เปลี่ยนโมเดลหรืออุปกรณ์คิดหลังจากเสร็จสิ้น",
+  "changeRecordRestoreLocalFile": "ไฟล์ต่อไปนี้จะถูกกู้คืนในเครื่อง โดยไม่ต้องผ่านเซิร์ฟเวอร์ใดๆ:",
+  "ut_9dd16b4310": "ยกเลิก",
+  "ut_929f88c953": "บันทึก",
+  "ut_375761b903": "แก้ไข",
+  "ut_12b4ff78f0": "ลบ",
+  "ut_2439c9088c": "ปิด",
+  "ut_8d8a263df0": "ชื่อ",
+  "ut_dd3bec10ce": "ตกลง",
+  "ut_2bbaf6e153": "คัดลอกแล้ว",
+  "ut_7713abebb3": "ประวัติคำสั่ง",
+  "ut_c96baaaa38": "คำสั่ง",
+  "ut_bed1bc3d9f": "คำสั่งลัด",
+  "ut_4064dc0579": "สถานการณ์โดยรวม",
+  "ut_8b97bab772": "กลุ่มเจ้าภาพ",
+  "ut_c53688e21a": "โฮสต์",
+  "ut_b996bd3d08": "ปรับแต่ง",
+  "ut_400ef8d1c1": "เครื่องมือทั้งหมด",
+  "ut_5ea95f868c": "เซิร์ฟเวอร์ MCP ใหม่",
+  "ut_fb999767e8": "การส่งต่อพอร์ต",
+  "ut_ee627300a6": "ตัวแทนกำลังดำเนินการ โปรดลองอีกครั้งในภายหลัง",
+  "ut_8fa7ec1798": "กำลังคิด",
+  "ut_19a5b5ad85": "ชัดเจน",
+  "ut_5dc39ef856": "กรุณาเลือก",
+  "ut_c4b7d3a09f": "ปิด (Esc)",
+  "ut_fda3f94089": "ดำเนินการ",
+  "ut_6e269868a4": "1พันเส้น",
+  "ut_60a303a337": "50,000 เส้น",
+  "ut_386ffb419a": "100,000 เส้น",
+  "ut_53f8d85ab6": "โฮสต์",
+  "ut_cf99c7c571": "ขั้นตอนการดำเนินงานและการบำรุงรักษา",
+  "ut_422db29f9c": "บันทึกการตรวจสอบ",
+  "ut_b671baec90": "เปลี่ยนบัญชีแยกประเภท",
+  "ut_abcdfedd3e": "การยืนยันพร้อมรับคำอัตโนมัติ",
+  "ut_760a393290": "นำเข้าการกำหนดค่า SSH",
+  "ut_cce7c556ba": "แนวทางบรรณาธิการ",
+  "ut_1982929432": "ข้อมูลจำเพาะใหม่",
+  "ut_f996de5ff9": "ชื่อเรื่อง",
+  "ut_1bc8da322f": "กรุณากรอกชื่อเรื่อง",
+  "ut_2d4881db12": "เนื้อหาเชิงบรรทัดฐาน",
+  "ut_483b58204b": "กรุณากรอกเนื้อหาข้อกำหนด",
+  "ut_29f14d8cf9": "คำสั่งอ้างอิง (ไม่บังคับ)",
+  "ut_fcfbe3558f": "ขอบเขต",
+  "ut_0cac2580f1": "โฮสต์เดียว",
+  "ut_479fdc582d": "กลุ่มเจ้าภาพ",
+  "ut_56c43b3c1f": "ปฏิบัติตามอย่างเคร่งครัด",
+  "ut_223ebc733a": "AI จะต้องดำเนินการตามที่เป็นอยู่และไม่สามารถปรับเปลี่ยนตัวเองได้",
+  "ut_4ba4d0c89f": "อนุญาตให้ AI ปรับพารามิเตอร์โดยไม่ละเมิดสัญญา",
+  "ut_4c7c042a46": "เพิ่มเซิร์ฟเวอร์",
+  "ut_aa56ccc31c": "อ่านอย่างเดียว",
+  "ut_2c94b3027b": "เชื่อมต่อแล้ว",
+  "ut_e5e228e9d3": "เพิ่มเซิร์ฟเวอร์ MCP",
+  "ut_e7c0c60a9b": "แก้ไขเซิร์ฟเวอร์ MCP",
+  "ut_e539334ba2": "วิธีการส่งสัญญาณ",
+  "ut_3062040662": "เริ่มคำสั่ง",
+  "ut_635c6ac2e8": "พารามิเตอร์ (หนึ่งรายการต่อบรรทัด)",
+  "ut_86e6b6dae2": "URL ของเซิร์ฟเวอร์",
+  "ut_7c1909ae8d": "หมดเวลา (มิลลิวินาที)",
+  "ut_f3f63f65a0": "ฝาปิดเครื่องมือ",
+  "ut_78a04cd0e0": "เครื่องมือตัวแทนที่มีอยู่",
+  "ut_b50e4d2f14": "เครื่องมือแบบอ่านอย่างเดียว (แนะนำ)",
+  "ut_f7f0786cb6": "เปิดใช้งานเซิร์ฟเวอร์",
+  "ut_e234091c8a": "เชื่อมต่ออัตโนมัติเมื่อแอปพลิเคชันเริ่มทำงาน",
+  "ut_e1d7cd83a8": "อนุญาตให้ตัวแทนใช้ทรัพยากร",
+  "ut_2a8817d718": "อนุญาตให้ตัวแทนใช้คำพร้อมท์",
+  "ut_bbe5aed47c": "อนุญาตโดยใช้ OAuth",
+  "ut_9f237e2f4c": "บันทึกและเชื่อมต่อ",
+  "ut_c3255fdff5": "ชื่อไม่สามารถเว้นว่างได้",
+  "ut_18b03910f5": "การถ่ายโอน stdio ต้องใช้คำสั่งเริ่มต้น",
+  "ut_78ed27f966": "URL ของเซิร์ฟเวอร์ต้องเป็นที่อยู่ http",
+  "ut_6462e5fd3f": "ระยะหมดเวลาจะต้องอยู่ระหว่าง 3,000-120,000ms",
+  "ut_765400571f": "ฝาปิดเครื่องมือต้องอยู่ระหว่าง 1-40",
+  "ut_e43ff18e6b": "HTTP + SSE (ดั้งเดิม)",
+  "ut_6c1dbbd423": "stdio (กระบวนการท้องถิ่น)",
+  "ut_1ce1d6c086": "เกี่ยวกับ",
+  "ut_451a175be9": "การจัดการโฮสต์",
+  "ut_42d62d0f0e": "การตั้งค่า",
+  "ut_85c1206607": "โหมดโฟกัส",
+  "ut_20d2782c72": "ท้องถิ่น",
+  "ut_6ea2ce2fe7": "ยืนยันการย้อนกลับ",
+  "ut_78d92a1509": "โปรดเชื่อมต่อกับโฮสต์ก่อนที่จะทำงานต่อ",
+  "ut_9f7bc31ffe": "ดัชนีอิสระ",
+  "ut_ac8a126fc3": "การดำเนินการล้มเหลว",
+  "ut_e56e69b4b9": "ยกเลิกแล้ว",
+  "ut_278fcd681d": "เขียนเสร็จแล้ว",
+  "ut_ae9a95fec3": "ผู้ใช้ยกเลิกงาน การเขียน PTY ถูกยกเลิก",
+  "ut_0bb0be16b3": "การเปลี่ยนเสร็จสมบูรณ์",
+  "ut_1aa59da0cf": "เขียนล้มเหลว กำลังย้อนกลับ...",
+  "ut_47e5e5365c": "การค้นหาฐานความรู้ถูกยกเลิก",
+  "ut_b79b73a254": "พารามิเตอร์หายไป: จำเป็นต้องมีเส้นทาง",
+  "ut_b48a9bcd4c": "ยืนยัน",
+  "ut_fa7ae42a25": "บริการ",
+  "ut_f71cf695fe": "งานถูกยกเลิก",
+  "ut_dec92d98dd": "งานถูกขัดจังหวะ",
+  "ut_a8046742ba": "หางเอาต์พุตดิบ",
+  "ut_fc6ff4c8fb": "แท็กทั้งหมด",
+  "ut_c31fd08687": "คัดลอก",
+  "ut_68caa1b369": "แค่ตอนนี้",
+  "ut_de0e9433a3": "คำอธิบาย",
+  "ut_a53a6efe91": "ชื่อที่แสดงต้องไม่เว้นว่าง",
+  "ut_5d608a562e": "เพิ่มจุดสิ้นสุด",
+  "ut_d4387b2009": "ผู้ให้บริการ",
+  "ut_7a9886373c": "คีย์ API",
+  "ut_1bd24257e4": "เพิ่ม",
+  "ut_5f7dd28505": "แก้ไขโฮสต์",
+  "ut_cad33d6032": "เพิ่มโฮสต์",
+  "ut_4b91f1393e": "สร้างคำสั่งทางลัดใหม่",
+  "ut_bc90bc1b81": "ขั้นตอนการทำงานใหม่",
+  "ut_35448c521f": "เปิดอยู่แล้ว",
+  "ut_dbddf26277": "จำนวนขั้นตอนการดำเนินการสูงสุด",
+  "ut_a18400490f": "ล็อคแอป",
+  "ut_f9aea8cf2e": "ลองอีกครั้ง",
+  "ut_ec5739654b": "ไม่สามารถเปิดลิงก์ได้ คัดลอกไปยังคลิปบอร์ดแล้ว",
+  "ut_72cb33e8c2": "ปุ่มลัดเทอร์มินัล",
+  "ut_dc29b2f27f": "ปิด",
+  "ut_9a7f4df03a": "คำแจ้งที่กำหนดเอง",
+  "ut_df02f06fa2": "เปลี่ยนชื่อ",
+  "ut_035134b18f": "สร้างไดเรกทอรีใหม่",
+  "ut_7025e8166d": "วาง",
+  "ut_e45556d8c1": "คำสั่งรักษาความปลอดภัย",
+  "ut_7a4c7fc5d7": "การดำเนินการนี้เกี่ยวข้องกับการกำหนดค่าระบบหรือการดาวน์โหลดเครือข่าย โปรดยืนยันการดำเนินการ",
+  "ut_a88f921ea4": "การดำเนินการที่เป็นอันตราย โปรดยืนยันอย่างรอบคอบก่อนดำเนินการ",
+  "ut_bf6e849886": "การดำเนินการที่มีความเสี่ยงสูงถูกบล็อกโดยนโยบายความปลอดภัย",
+  "ut_873cf0baa9": "เส้นทางว่างเปล่า",
+  "ut_4370f90a2c": "เส้นทางว่างเปล่าหลังจากการทำให้เป็นมาตรฐาน",
+  "ut_0abbb47931": "เข้าสู่ระบบเซสชั่น",
+  "ut_79ab7ea24e": "ออกจากระบบเซสชัน",
+  "ut_dc687b5190": "10,000 เส้น",
+  "ut_b80d4fdf1b": "ยังไม่มีการกำหนดค่าโมเดล",
+  "ut_62197ba790": "ปิด · AI อาศัยบริบทในท้องถิ่นเท่านั้น",
+  "ut_88b11effff": "การล็อคแอปเปิดอยู่",
+  "ut_aae6a1b7f8": "ไม่ได้เปิดใช้งานการล็อคแอป",
+  "ut_7355cf069a": "ไม่ได้เปิดใช้งานชั่วโมงปลอดภัย",
+  "ut_22b7a960c1": "ยังไม่มีเซิร์ฟเวอร์",
+  "ut_bf73a41ef9": "ยังไม่มีกฎเกณฑ์",
+  "ut_a86e6d7ade": "ไม่ได้เปิด",
+  "ut_c61e7e68e8": "เปิดใช้งานแล้ว · ที่อยู่ Webhook หายไปและไม่สามารถส่งได้",
+  "ut_6839af3e8f": "เปิดใช้งานแล้ว · การแจ้งเตือนสำหรับแต่ละงาน",
+  "ut_f9ab3c28bf": "เปิดใช้งาน · แจ้งเตือนเมื่อเกิดความล้มเหลวเท่านั้น",
+  "ut_f500e9fc9a": "เทมเพลตคำสั่งพร้อมตัวแปร",
+  "ut_2d8f504c07": "รายการตรวจสอบหลายขั้นตอน",
+  "ut_f53531d72c": "แหล่งที่มาและผลลัพธ์ของแต่ละคำสั่ง",
+  "ut_5aa2535411": "ใครเปลี่ยนอะไรเมื่อไหร่?",
+  "ut_49efe264bb": "คำสั่งหมดเวลาหลายครั้ง",
+  "ut_b1eedc7da7": "เพิ่มความเร็วสำหรับเครือข่ายที่ช้าและลดความเร็วลงเพื่อแก้ไขปัญหาการเชื่อมต่อที่ค้าง",
+  "ut_0ef39843c1": "วางเนื้อหา",
+  "ut_cfae7855b2": "เลือกจากไฟล์",
+  "ut_f77e687e7f": "เปิดใช้งาน · ที่อยู่ที่ต้องการกรอก",
+  "ut_bb68aeb526": "กำหนดค่าแล้ว · การฉีดอัตโนมัติ AI",
+  "ut_1f46b82540": "หมดเวลาการเชื่อมต่อ",
+  "ut_beac562f56": "โหลดคีย์ส่วนตัวที่บันทึกไว้แล้ว",
+  "ut_8b9d8a0293": "ไม่มีรายการ Canonical ที่จะส่งออก",
+  "ut_9e0a441f63": "ส่งออกข้อกำหนดภายใน",
+  "ut_393f76846d": "นำเข้าข้อกำหนดภายใน",
+  "ut_c1358ed65a": "ลบข้อกำหนด",
+  "ut_2d0ac889f0": "กฎระเบียบภายใน",
+  "ut_b8ff31b60e": "นำเข้า JSON",
+  "ut_70148cd17d": "ส่งออก JSON",
+  "ut_a25e5f2908": "ยังไม่มีข้อกำหนดภายใน",
+  "ut_0a354147d1": "เข้มงวด",
+  "ut_e35e26caf1": "ข้อเสนอแนะ",
+  "ut_321c7d5cbd": "ตัวอย่างเช่น: nginx เปลี่ยนเฉพาะ conf.d",
+  "ut_c841026fad": "เขียนข้อจำกัดให้ชัดเจนในภาษาธรรมชาติ แล้ว AI จะติดตามข้อจำกัดเหล่านั้นอย่างแน่นอน\nตัวอย่างเช่น: เครือข่ายภายในใช้ mirrors.corp.internal และอย่าใช้แหล่งที่มาของเครือข่ายสาธารณะ",
+  "ut_cbf092e19a": "เซิร์ฟเวอร์เอ็มซีพี",
+  "ut_3ee244446d": "นอกจากนี้อย่างรวดเร็ว:",
+  "ut_76aba21781": "ยังไม่มีเซิร์ฟเวอร์ MCP",
+  "ut_23784ffbb8": "เพิ่มเติม",
+  "ut_bf9a7280ff": "เชื่อมต่อใหม่",
+  "ut_b3ea1460b7": "(ไม่ได้กำหนดค่าปลายทาง)",
+  "ut_c6f94e5dc4": "ตัดการเชื่อมต่อ",
+  "ut_a037d357eb": "เชื่อมต่อ",
+  "ut_d58e58c337": "เครื่องมือและความสามารถ",
+  "ut_ac3cdbdaa3": "ต้องมีการอนุญาต OAuth",
+  "ut_6d628c3737": "การอนุญาตเข้าสู่ระบบ",
+  "ut_55b9a7e0c0": "คัดลอกลิงก์การอนุญาต",
+  "ut_8173ace3f3": "เครื่องมือแบบอ่านอย่างเดียว",
+  "ut_936b003fe8": "ทำลายล้าง",
+  "ut_bc386dcd56": "ภายนอก",
+  "ut_eb15558933": "ตัวแทนสามารถใช้ได้",
+  "ut_4fc8541fe1": "ไม่เปิด",
+  "ut_fcabd36585": "ไม่มีพารามิเตอร์",
+  "ut_7889ed8608": "พารามิเตอร์:",
+  "ut_69440da7fa": "บันทึกล่าสุด",
+  "ut_0dbb5c7bd4": "ปิดการใช้งาน",
+  "ut_f50cfe7b3a": "ไม่ได้เชื่อมต่อ",
+  "ut_439759c292": "กำลังเชื่อมต่อ",
+  "ut_28c0833d52": "จำเป็นต้องได้รับอนุญาต",
+  "ut_fcc790f11c": "การเชื่อมต่อล้มเหลว",
+  "ut_6b02c4539d": "เลือกไดเร็กทอรีที่ระบบไฟล์ MCP อนุญาตให้เข้าถึงได้",
+  "ut_446d04518f": "ลบเซิร์ฟเวอร์ MCP",
+  "ut_3121de47a1": "URI ทรัพยากร",
+  "ut_5e1e108436": "กรอก URI เฉพาะตามเทมเพลต",
+  "ut_250aaaa8b9": "พารามิเตอร์คำพร้อมท์",
+  "ut_3dedee49e4": "หนึ่งคีย์=ค่าต่อบรรทัด",
+  "ut_1cc391dd56": "(จำเป็น)",
+  "ut_4a407548bf": "คัดลอกเนื้อหาแล้ว",
+  "ut_7c50d4b883": "คัดลอกเนื้อหา",
+  "ut_8e8300886d": "เช่น npx",
+  "ut_9e643633f7": "ไดเร็กทอรีการทำงาน (ไม่บังคับ)",
+  "ut_4c8483a194": "ตัวแปรสภาพแวดล้อม (KEY=VALUE ต่อบรรทัด)",
+  "ut_4ad1ca4105": "พร็อกซีขาออก (ไม่บังคับ)",
+  "ut_c9270e6a1d": "ส่วนหัว (คีย์: ค่าต่อแถว)",
+  "ut_e249b99577": "ปรับแต่งเอง (ทำเครื่องหมายในช่องในการ์ดหลังจากเชื่อมต่อ)",
+  "ut_3665baf413": "ขอบเขต OAuth (คั่นด้วยช่องว่าง/จุลภาค ไม่บังคับ)",
+  "ut_92dbcbd641": "OAuth clientId (เว้นว่างไว้เพื่อใช้ DCR)",
+  "ut_87fceccd93": "OAuth clientSecret (ไม่บังคับ)",
+  "ut_9c3dece052": "การจัดการ",
+  "ut_37ac3bf8ce": "เจ้าหน้าที่กำลังดำเนินการ โปรดใช้ช่องป้อนข้อมูลเพื่อดูคำแนะนำเพิ่มเติม",
+  "ut_dcdd97ac06": "การเชื่อมต่อ SSH ยังไม่พร้อม คลิกที่หน้าจอนี้เพื่อลองอีกครั้งหลังจากเชื่อมต่อใหม่",
+  "ut_4fc495b331": "เทอร์มินัลท้องถิ่นไม่สามารถเริ่มต้นได้",
+  "ut_4bab1ab6c2": "การเปิดเซสชันบนหน้าจอนี้ล้มเหลว",
+  "ut_129733266f": "[เซสชันสิ้นสุด]",
+  "ut_b6c84bb8f3": "หน้าจอนี้เชื่อมโยงกับ AI และไม่สามารถปิดได้โดยลำพัง กรุณาปิดแท็บโดยตรง",
+  "ut_def20d7537": "การสนทนาของเอไอ",
+  "ut_cafa2f7cad": "เปลือกท้องถิ่น",
+  "ut_e1fac83b32": "เซสชันสำหรับหน้าจอนี้ถูกตัดการเชื่อมต่อ",
+  "ut_13304be1df": "เปิดหน้าจอนี้อีกครั้ง",
+  "ut_6582d682ca": "แผงคำสั่ง (Ctrl+K)",
+  "ut_422f8e1f4e": "สีเทอร์มินัลและขนาดตัวอักษร",
+  "ut_19d7987a04": "เมนู",
+  "ut_c985d380db": "ไปที่",
+  "ut_d4c339f3c6": "ระยะเวลาที่ปลอดภัย",
+  "ut_7df2507796": "ไม่ได้เปิดใช้งาน",
+  "ut_86dfbbb589": "เทอร์มินัลนี้",
+  "ut_7a89819950": "ดู",
+  "ut_9175d8cccb": "เทอร์มินัลเต็มความกว้าง",
+  "ut_1029dcb6e3": "สลับตำแหน่งแผง AI",
+  "ut_d170a458d4": "ขวา/ล่าง",
+  "ut_23820b0802": "SFTP ใช้ได้กับเซสชันระยะไกลเท่านั้น",
+  "ut_ed8ab87e0e": "ปิดแผง SFTP",
+  "ut_02fc9755f6": "แผงไฟล์ SFTP",
+  "ut_3d81bbe4b1": "ตำแหน่งแผงสวิตช์ (ขวา/ล่าง)",
+  "ut_49aa3e0155": "ให้ตัวแทนทำงานกับโฮสต์นี้",
+  "ut_80f39c254f": "อธิบายข้อกำหนดและขั้นตอนต่างๆ จะดำเนินการโดยอัตโนมัติ คำสั่งที่เป็นอันตรายจะขออนุญาตก่อน",
+  "ut_dbe7312942": "ไม่มีคำสั่งย้อนกลับที่สามารถปฏิบัติการได้สำหรับการเปลี่ยนแปลงนี้",
+  "ut_98ddb3e569": "จะกู้คืนไฟล์ในเครื่องเป็น:",
+  "ut_12db03a03c": "คำสั่งย้อนกลับจะถูกดำเนินการ:",
+  "ut_d9c1f090b6": "การคืนค่าจะวางสำเนาไว้ในพื้นที่สำรอง/รีไซเคิลกลับไปยังเส้นทางเดิมของเครื่องภายในเครื่อง และเขียนบันทึกการตรวจสอบ",
+  "ut_ba66b6920c": "Rollback แก้ไขสถานะเซิร์ฟเวอร์และเขียนบันทึกการตรวจสอบ",
+  "ut_ae7f0253b5": "การเชื่อมต่อโฮสต์ถูกตัดการเชื่อมต่อ และไม่ได้ทำการย้อนกลับ",
+  "ut_e79e7730e4": "ไม่ได้ดำเนินการย้อนกลับ: โฮสต์ไม่ได้เชื่อมต่อหรือไม่มีคำสั่งย้อนกลับ",
+  "ut_36ae6b14be": "โปรดเปลี่ยนไปใช้โฮสต์นี้ก่อนแล้วจึงเชื่อมต่อใหม่",
+  "ut_f89df440af": "ไม่จำเป็นต้องเชื่อมต่อเทอร์มินัลท้องถิ่นอีกครั้ง โปรดตรวจสอบกระบวนการของเทอร์มินัล",
+  "ut_31edece655": "ไม่พบการกำหนดค่าโฮสต์ ไม่สามารถเชื่อมต่อใหม่ได้",
+  "ut_470431de01": "การเชื่อมต่อใหม่ล้มเหลว โปรดตรวจสอบเครือข่ายหรือรหัสผ่าน",
+  "ut_42e52ee488": "เชื่อมต่อใหม่สำเร็จ",
+  "ut_3a602327a9": "โปรดเปลี่ยนไปใช้โฮสต์นี้ก่อนที่จะทำงานต่อ",
+  "ut_46e4b5a120": "โปรดสลับ/เชื่อมต่อกับโฮสต์นี้อีกครั้งแล้วลองอีกครั้ง",
+  "ut_c4388ff04e": "การเชื่อมต่อโฮสต์ถูกตัดการเชื่อมต่อ โปรดเชื่อมต่อใหม่ก่อน",
+  "ut_3993de2fb8": "รหัสผ่าน",
+  "ut_694738320d": "แสดง",
+  "ut_6870753dcd": "ซ่อน",
+  "ut_b765c3fd60": "คำสั่งรอการป้อนข้อมูล",
+  "ut_107ca67793": "Enter (เว้นว่างไว้ = กด Enter)",
+  "ut_793f2a8599": "โมเดลยังไม่ได้รับการกำหนดค่า โปรดไปที่การตั้งค่า → โมเดล AI เพื่อเพิ่ม",
+  "ut_4ed5ea2e0b": "ไม่ได้เลือก",
+  "ut_6aba627378": "ไม่มีเนื้อหาที่สามารถส่งออกได้สำหรับเซสชันปัจจุบัน",
+  "ut_13465ff9b3": "วางไว้ในกล่องป้อนข้อมูลของตัวแทนแล้ว",
+  "ut_d45aa5cd92": "คำสั่งเทอร์มินัล",
+  "ut_aec5a6dc3d": "บันทึกเป็นส่วนคำสั่ง",
+  "ut_2f4c7a6c8c": "ชื่อแฟรกเมนต์",
+  "ut_06c357f14d": "จากเทอร์มินัลคลิกขวา",
+  "ut_f58a1a9197": "คำสั่งตัวแทน",
+  "ut_bb76c4ff57": "ป้อน / เพื่อค้นหาคำสั่งทั้งหมดและเทมเพลตการดำเนินการและการบำรุงรักษา ↑↓ เพื่อสลับ กด Tab เพื่อเลือก และ Enter เพื่อดำเนินการ",
+  "ut_5d888b8a22": "หน่วยความจำไม่สามารถบีบอัดได้ในขณะที่งานกำลังดำเนินอยู่ กรุณาหยุดภารกิจก่อน",
+  "ut_5f55be5f65": "ค้นหาทางอินเทอร์เน็ต: เปิดใช้งาน (มีผลสำหรับภารกิจถัดไป)",
+  "ut_921c3a3d3c": "การค้นหาทางอินเทอร์เน็ต: ไม่ได้เปิดใช้งาน (คลิกเพื่อเปิดใช้งาน งานถัดไปจะมีผล)",
+  "ut_b5e4297324": "กำลังดำเนินการ",
+  "ut_d68f77a907": "การดำเนินงาน",
+  "ut_5085464dd9": "การเชื่อมต่อใหม่",
+  "ut_cbd048e6e6": "เชื่อมต่อป้ายกำกับปัจจุบันอีกครั้ง",
+  "ut_f30d7344c7": "ยุบแผง AI",
+  "ut_c7b60ecb72": "ขยายแผง AI",
+  "ut_36a1bca19d": "ออกจากโหมดโฟกัส",
+  "ut_c56382e3ee": "ซ่อนการตรวจสอบเซิร์ฟเวอร์",
+  "ut_55b60aaf25": "แสดงการตรวจสอบเซิร์ฟเวอร์",
+  "ut_1e838ce89c": "ปิดแผง SFTP",
+  "ut_a752de5a42": "เปิดแผง SFTP",
+  "ut_f934cd40d1": "ประวัติเซสชัน",
+  "ut_f8ead6b402": "สร้างเซสชัน AI ใหม่",
+  "ut_76462daeb1": "เต็มหน้า",
+  "ut_e17ad38728": "ลิ้นชัก",
+  "ut_9b85525187": "การตรวจสอบการปฏิบัติงาน",
+  "ut_1bc161aa98": "การตั้งค่าโมเดล AI",
+  "ut_1d6ad9a57d": "ประวัติการเปลี่ยนแปลง",
+  "ut_8659bce8a2": "ขั้นตอนการทำงาน",
+  "ut_7781e2e2a1": "คำแนะนำเพิ่มเติม...",
+  "ut_c8e527419a": "เทอร์มินัลท้องถิ่นไม่รองรับการส่งต่อพอร์ต",
+  "ut_fc1fc05fcd": "ค้นหาทางอินเทอร์เน็ต",
+  "ut_1a5ebea669": "Keyless (ใช้งานได้นอกกรอบ)",
+  "ut_d007a268a0": "ต้องใช้คีย์ API",
+  "ut_06aab0767d": "คีย์ตัวเลือกอินสแตนซ์ส่วนตัว",
+  "ut_d17f6d0537": "พารามิเตอร์ระดับโลก",
+  "ut_28bd2b7489": "ทดสอบเลย",
+  "ut_fd44505c78": "เปิดใช้งานแบ็กเอนด์:",
+  "ut_35fef8a980": "แบ็กเอนด์ที่เลือก:",
+  "ut_a7179dbf9b": "คีย์ที่กำหนดค่า:",
+  "ut_435e2b9a3e": "รีเฟรชสถานะ",
+  "ut_3b3bcc7a34": "ไม่สามารถใช้ได้",
+  "ut_aff6cc24ed": "จำเป็นต้องใช้กุญแจ",
+  "ut_140b926331": "การค้นหาความหมาย · ต้องใช้รหัส",
+  "ut_c8f4f082c1": "Search API · ต้องใช้คีย์",
+  "ut_060d69c2ef": "RSS · ไม่ใช้กุญแจ",
+  "ut_82fe5ca073": "HTML · หน่วยงานในประเทศที่จำเป็น",
+  "ut_cde0d7f255": "จำเป็นต้องสร้างอินสแตนซ์ของคุณเอง",
+  "ut_fdb03fa75f": "สรุปการเพิ่มประสิทธิภาพ AI",
+  "ut_2846d31002": "ผลการค้นหาของ Google",
+  "ut_50265d0478": "ยังไม่มี API การค้นหา",
+  "ut_aa998837ed": "เครื่องมือค้นหาของโคลด",
+  "ut_72f0d7877f": "ค้นหาคำตอบ",
+  "ut_ebda0aff48": "อยู่ระหว่างการตรวจสอบ",
+  "ut_7875a79d06": "ตัวแปรสภาพแวดล้อม",
+  "ut_464ca43586": "กำหนดค่าแล้ว",
+  "ut_cdc3132e4c": "ไม่ได้กำหนดค่า",
+  "ut_dd2e9a0289": "เอกสารการติดตั้งใช้งาน",
+  "ut_050792529a": "รับกุญแจ",
+  "ut_836f91fea2": "โทเค็นเสริม: ส่งเป็นการอนุญาต: ผู้ถือ",
+  "ut_37cabfd93e": "เว้นว่างไว้เพื่อระบุว่าไม่มีการแก้ไข คุณยังสามารถใช้ตัวแปรสภาพแวดล้อมด้วยชื่อเดียวกันได้",
+  "ut_60f1ed814f": "คีย์ที่บันทึกไว้จะถูกล้างหลังจากบันทึก",
+  "ut_246737f23c": "ที่อยู่อินสแตนซ์ SearXNG",
+  "ut_dceef0fd66": "เอกสารการปรับใช้ SearXNG →",
+  "ut_05981b84e9": "จำนวนสินค้าสุดท้ายที่ส่งคืน (1-20)",
+  "ut_875f752532": "จำนวนแบ็กเอนด์ที่ร้องขอพร้อมกัน (1-12)",
+  "ut_113e34528c": "การรอแบ็กเอนด์เดียวที่นานที่สุด (3000-120000ms)",
+  "ut_d012b127eb": "พร็อกซีขาออก",
+  "ut_6a13f67dc3": "ป้อนคำค้นหา เช่น ข่าวล่าสุดของ OpenAI",
+  "ut_eeda5a24be": "กำลังค้นหา",
+  "ut_7c5d801935": "ค้นหา",
+  "ut_3d01e59d2e": "ไม่มีผลลัพธ์ที่ตรงกัน",
+  "ut_aef246a460": "ที่มา:",
+  "ut_a7de20e32a": "กรุณากรอกคำค้นหา",
+  "ut_8334c9cd68": "ต้องอยู่ระหว่าง 1-20",
+  "ut_c1fe9fa3f2": "ต้องอยู่ระหว่าง 1-12",
+  "ut_299e9d34bb": "ต้องอยู่ระหว่าง 3000-120000",
+  "ut_3d127654a9": "พารามิเตอร์ไม่ถูกต้อง โปรดตรวจสอบช่องที่ไฮไลต์",
+  "ut_0531ef0aec": "บันทึกแล้วมีผลทันที",
+  "ut_c259d39a21": "กู้คืนสถานะที่บันทึกไว้ล่าสุด",
+  "ut_1595af9c76": "รีเซ็ตสถานะ",
+  "ut_5046a76cef": "รอการยืนยัน",
+  "ut_3a760ee340": "กำลังดำเนินการ",
+  "ut_9b47257520": "ถูกระงับ",
+  "ut_6bafadcb9f": "⏸️ งานถูกระงับแล้ว คุณสามารถคลิกเพื่อดำเนินการต่อเพื่อดำเนินการต่อได้",
+  "ut_5384a63ffb": "▶️ ภารกิจถูกดำเนินการต่อแล้ว ดำเนินการต่อไป...",
+  "ut_48eb86eca2": "⚠️ AI อ้างว่าเสร็จสิ้นโดยไม่ต้องดำเนินการคำสั่งจริง ซึ่งต้องมีการตรวจสอบจริง",
+  "ut_c975d9cfca": "…(คำตอบยาวเกินไปและถูกตัดทอนแล้ว)",
+  "ut_c0bd0404a4": "สำหรับคำสั่งดั้งเดิม โปรดใช้เครื่องมือ local_exec แทน",
+  "ut_a3621ea638": "การสกัดกั้นระหว่างการปิดล้อมเครือข่าย",
+  "ut_6c86646cba": "เปิดใช้งานโหมดอ่านอย่างเดียวและการดำเนินการของคำสั่งนี้ถูกปฏิเสธ",
+  "ut_6140f3dac8": "โหมดการอนุญาตปัจจุบัน คำสั่งนี้ถูกปฏิเสธการดำเนินการ",
+  "ut_b14923e57e": "ถาม",
+  "ut_287a6d5c24": "อัตโนมัติ",
+  "ut_64b5e22817": "✅ ผู้ใช้ยืนยันแล้ว เริ่มดำเนินการ...",
+  "ut_748164be56": "⚠️ AI เรียกเครื่องมือแต่ไม่ได้ระบุชื่อเครื่องมือ",
+  "ut_ee157cb455": "⏳ ดำเนินการต่อ...",
+  "ut_7d89802fc1": "จัดระเบียบข้อสรุป",
+  "ut_42d195aa5d": "กำลังเปิดระบบย่อย SFTP...",
+  "ut_a70224cf55": "การอัปโหลดเสร็จสมบูรณ์",
+  "ut_3ce3c27270": "ดาวน์โหลดเสร็จสมบูรณ์",
+  "ut_90b80824a2": "การซิงค์ไฟล์หยุดลง",
+  "ut_948df560e2": "การซิงค์ไฟล์หยุดแล้ว",
+  "ut_c6a06709f5": "กำลังเริ่มการซิงค์ไฟล์...",
+  "ut_88dfa9a69c": "พารามิเตอร์หายไป: ต้องใช้โหมด (remote/local_file/ssh_hostkey)",
+  "ut_c767a0bfa3": "ช่วงพอร์ตไม่ถูกต้อง (1-65535)",
+  "ut_7400d2fd8c": "certPath มีอักขระที่ไม่ถูกต้อง (เครื่องหมายคำพูด/อัฒภาค/ไปป์/backticks ฯลฯ)",
+  "ut_272d2f4a52": "กำลังอ่านลายนิ้วมือคีย์โฮสต์ SSH...",
+  "ut_049487ff40": "พารามิเตอร์ขาดหายไป: ต้องระบุเนื้อหาหรือ content_b64",
+  "ut_7515f1e67e": "การเขียน SFTP ล้มเหลว กำลังย้อนกลับการสำรองข้อมูล...",
+  "ut_ee8e576b01": "ไฟล์ต้นฉบับถูกกู้คืนจากข้อมูลสำรอง",
+  "ut_a3714eed7b": "การเขียน SFTP ล้มเหลว กำลังลองใช้โหมด PTY stdin (cat > ไฟล์)...",
+  "ut_ca59f0145f": "กำลังสำรองไฟล์ต้นฉบับ...",
+  "ut_ed571dc1ef": "ไฟล์ในเครื่อง",
+  "ut_aeff3a9157": "การเขียนในเครื่องโดยตรงล้มเหลว กำลังพยายามเขียนผ่านเชลล์ปัจจุบัน...",
+  "ut_751b0202ff": "PTY stdin ท้องถิ่น",
+  "ut_ddd5f79db8": "PTY stdin ท้องถิ่น + sudo tee",
+  "ut_e67f272887": "  หมายเหตุ: กระบวนการปัจจุบันไม่มีสิทธิ์ในการอ่านไฟล์ต้นฉบับและไม่สามารถสร้างการสำรองข้อมูลได้",
+  "ut_d1dd8a4a86": "เซสชันปัจจุบันไม่สามารถเข้าถึงการป้อนรหัสผ่าน กรุณากรอกรหัสผ่าน sudo ในการตั้งค่าโฮสต์",
+  "ut_cdfaed0dc5": "รอให้ผู้ใช้ป้อนรหัสผ่าน sudo...",
+  "ut_6d06b21d26": "ผู้ใช้ไม่ได้ระบุรหัสผ่าน (ยกเลิกหรือเว้นว่างไว้) โปรดใช้การดำเนินการ: ขอให้ยืนยันกับผู้ใช้แทน หรือดำเนินการในโหมดที่ไม่มีสิทธิ์แทน",
+  "ut_de63930b16": "ประสบการณ์การตรวจสอบดั้งเดิม",
+  "ut_11e4b8176f": "ฐานความรู้อย่างเป็นทางการ",
+  "ut_587234aed7": "บทความนี้ถูกตัดทอน",
+  "ut_fb8896831d": "จำนวนเงินรวมเกินขีดจำกัด และรายการต่อๆ ไปถูกตัดทอน",
+  "ut_89d6d1508a": "แพลตฟอร์มปัจจุบันไม่รองรับการดำเนินการคำสั่งดั้งเดิม (เฉพาะเดสก์ท็อป Windows / macOS / Linux)",
+  "ut_4d2a25adb6": "พารามิเตอร์หายไป: จำเป็นต้องค้นหา",
+  "ut_039e6df512": "\nหมายเหตุ: จำนวนไฟล์ถึงขีดจำกัดสูงสุดที่ 5,000 แล้ว การข้ามผ่านจะไม่ดำเนินต่อไป โปรดใช้ glob หรือเส้นทางที่แคบกว่าเพื่อทำให้ช่วงแคบลง",
+  "ut_4d2db00134": "อาร์กิวเมนต์หายไป: ต้องระบุเนื้อหาหรือ content_b64 โปรดเขียนเนื้อหาหลายบรรทัดในบรรทัดเดียวกัน และใช้ \\n เพื่อระบุการขึ้นบรรทัดใหม่",
+  "ut_1d0e0057ce": "[กระบวนการออกแล้ว]",
+  "ut_80fbd0db5a": "การอนุญาต OAuth หมดอายุแล้ว โปรดเข้าสู่ระบบอีกครั้ง",
+  "ut_3212b67b4f": "(เครื่องมือ MCP ส่งคืนผลลัพธ์ที่ว่างเปล่า)",
+  "ut_3043a371fb": "ยกเลิกการเรียก MCP",
+  "ut_4b697ab9d4": "เซิร์ฟเวอร์ MCP นี้ไม่ได้ระบุคำแจ้ง",
+  "ut_e6a3f8cacd": "กำลังวิเคราะห์โครงสร้างโครงการ...",
+  "ut_18ecc05e1c": "=== รายงานการวิเคราะห์โครงการ ===",
+  "ut_b814db8dc9": "กำลังรอการล็อคการสร้าง...",
+  "ut_b703554a31": "ยกเลิกในขณะที่รอการล็อคบิลด์",
+  "ut_76fa7f5bc2": "สร้างสำเร็จ",
+  "ut_957091cf2f": "ผ่านการตรวจสอบการเชื่อมต่อแล้ว\n",
+  "ut_892c3e0946": "[ข้อผิดพลาด]",
+  "ut_d9a78ca9ae": "[การเชื่อมต่อปิด]",
+  "ut_4db21d650d": "การเชื่อมต่อสำเร็จ",
+  "ut_7038dfdb24": "การเชื่อมต่อล้มเหลว:",
+  "ut_3902f53eb2": "[ข้อผิดพลาด] ไม่ได้เชื่อมต่อ",
+  "ut_8d0408fbbe": "[ตัดการเชื่อมต่อ]",
+  "ut_87f4917a26": "พารามิเตอร์หายไป: จำเป็นต้องมีการค้นหา",
+  "ut_3561d2bc19": "การรวบรวมข้อมูลสำเร็จ แต่เนื้อหาของหน้าว่างเปล่า",
+  "ut_558bbf2918": "แยกข้อความ...",
+  "ut_d74776ae2e": "คำสั่งนี้ถูกบล็อกโดยนโยบายความปลอดภัย",
+  "ut_1ebeb12158": "ยืนยันการดำเนินการคำสั่ง",
+  "ut_dfde5a0464": "การยืนยันการปฏิบัติงานที่เป็นอันตราย",
+  "ut_517880c5b3": "กำลังจะถูกดำเนินการ:",
+  "ut_dd66d942fb": "การดำเนินการนี้อาจทำให้ระบบไม่พร้อมใช้งาน โปรดดำเนินการด้วยความระมัดระวัง!",
+  "ut_c5955eb9de": "กรุณากรอก CONFIRM เพื่อดำเนินการต่อ:",
+  "ut_68772a88f7": "กรอกยืนยัน",
+  "ut_fccd2f755c": "ยืนยันการดำเนินการ",
+  "ut_6863351895": "ดำเนินการเรียกเครื่องมือที่อาจเปลี่ยนสถานะนอกเซสชันปัจจุบัน",
+  "ut_e6f77c3aa9": "การติดตั้งหรืออัปเกรดแพ็คเกจซอฟต์แวร์อาจเปลี่ยนแปลงการพึ่งพาระบบและส่งผลต่อบริการที่มีอยู่",
+  "ut_03303bd6da": "ถอนการติดตั้งซอฟต์แวร์ บริการที่ต้องใช้ซอฟต์แวร์ดังกล่าวอาจไม่พร้อมใช้งาน",
+  "ut_c8e25a26d1": "การเริ่มบริการจะเปลี่ยนสถานะการทำงานปัจจุบัน",
+  "ut_cd5d5a98a0": "หยุดบริการและเว็บไซต์/อินเทอร์เฟซที่ใช้บริการจะถูกขัดจังหวะ",
+  "ut_88ec88c7b3": "เริ่มบริการใหม่ เว็บไซต์/อินเทอร์เฟซอาจถูกขัดจังหวะชั่วคราว",
+  "ut_7ba837a04e": "แก้ไข ย้าย หรือลบไฟล์ที่อาจส่งผลต่อการกำหนดค่าหรือข้อมูล",
+  "ut_a1e726721a": "การแก้ไขการอนุญาตหรือเจ้าของไฟล์อาจส่งผลต่อการเข้าถึงบริการ",
+  "ut_1210181241": "แก้ไขไฟล์การกำหนดค่าซึ่งอาจเปลี่ยนลักษณะการทำงานของบริการ",
+  "ut_a0e4d573e8": "แก้ไขสถานะเซิร์ฟเวอร์ โปรดยืนยันขอบเขตของผลกระทบ",
+  "ut_ab356c88ee": "ผ่านการตรวจสอบการกำหนดค่า Nginx",
+  "ut_8e89715728": "การตรวจสอบการกำหนดค่า Nginx ล้มเหลว",
+  "ut_3e37edb32c": "ไม่มีปุ่มใดพอดี? เพียงกรอกคำตอบของคุณ...",
+  "ut_1cb11a152d": "ส่งคำตอบที่กำหนดเอง",
+  "ut_b31e90861f": "(ไม่มีเอาต์พุต)",
+  "ut_c06a19b387": "เชื่อมต่อใหม่",
+  "ut_e3d0732b84": "ให้ AI ลองอีกครั้ง",
+  "ut_73c881e205": "ภารกิจสำเร็จแล้ว",
+  "ut_22aee52bc1": "ครบทุกขั้นตอนแล้ว",
+  "ut_704c12f2eb": "งานล้มเหลว",
+  "ut_da68e2844f": "การดำเนินการงานล้มเหลว",
+  "ut_ede5822e49": "งานถูกขัดจังหวะ",
+  "ut_9566f7b70f": "เอาต์พุตคำสั่ง",
+  "ut_51bfee4aca": "สิ้นสุด",
+  "ut_e46194bcb9": "บันทึกตัวแทน",
+  "ut_ecc8f6c40b": "คัดลอกผลลัพธ์ตัวกรองปัจจุบัน",
+  "ut_f988024855": "ดูงานนี้เท่านั้น",
+  "ut_7b8553ecdf": "การคิดแบบอย่าง",
+  "ut_46d28ef143": "↑↓ สลับแท็บ เลือก Enter ดำเนินการ Esc ปิด",
+  "ut_9e9ac63dcb": "คำแนะนำเพิ่มเติม (มีผลใช้บังคับในรอบถัดไป)",
+  "ut_f12263d7ea": "ไม่มีสี",
+  "ut_b35da5e4e9": "ล้างประวัติคำสั่งทั้งหมดหรือไม่",
+  "ut_0f29d5bb1a": "ชัดเจน",
+  "ut_9687dea3ac": "ล้างประวัติ",
+  "ut_8a6ca36e98": "คำสั่งประวัติการค้นหา",
+  "ut_3a23e3acdd": "ยังไม่มีคำสั่งทางประวัติศาสตร์",
+  "ut_f22110ada9": "ป้อนเพื่อดำเนินการผลลัพธ์แรก · ป้อนเพื่อกรอก · คลิกเพื่อคัดลอก",
+  "ut_956e4930dd": "ค้นหาโฮสต์/คำสั่ง/หน้า/การกระทำ...",
+  "ut_e69a25b65d": "ไม่มีการแข่งขัน",
+  "ut_f160c18c0c": "เลือก",
+  "ut_981720593b": "ดำเนินการ",
+  "ut_a3e557dfb9": "ปิด",
+  "ut_493d7ff67f": "การตรวจสอบ",
+  "ut_b8c3200c7b": "ปลอดภัย",
+  "ut_2aa836e6e9": "ปรับใช้",
+  "ut_bda0db72a1": "การแก้ไขปัญหา",
+  "ut_6f9c60bc15": "การบำรุงรักษาตามปกติ",
+  "ut_338073cc53": "เทมเพลตในตัวเป็นแบบอ่านอย่างเดียว",
+  "ut_5865795364": "ไอคอน",
+  "ut_5dfdb946bf": "ประเภท",
+  "ut_52129c776f": "การดำเนินการ AI (ขั้นตอนภาษาธรรมชาติ)",
+  "ut_e87bf3a87f": "การดำเนินการโดยตรง (คำสั่งเชลล์)",
+  "ut_c1af116483": "การจำแนกประเภท",
+  "ut_e91627ff38": "ขั้นตอน (เขียนถึง AI)",
+  "ut_25cc0f420e": "คำสั่ง",
+  "ut_cdeeaa7450": "ไม่มีโมเดลที่สามารถกู้คืนได้สำหรับพรีเซ็ตนี้",
+  "ut_ab0793064d": "กรอก URL ฐานก่อน",
+  "ut_dd05d9a6b8": "ไม่มีรุ่นใหม่ที่จะเพิ่ม",
+  "ut_5fe10ec0d8": "หมดเวลาการเชื่อมต่อ",
+  "ut_bc3f91069f": "ไม่สามารถเชื่อมต่อได้",
+  "ut_6367b9ea6c": "คำขอล้มเหลว",
+  "ut_7794ac4d33": "URL ฐานต้องไม่เว้นว่าง",
+  "ut_ae851c66db": "เก็บไว้อย่างน้อยหนึ่งรุ่น",
+  "ut_82d4f67dc5": "แก้ไขจุดสิ้นสุด",
+  "ut_742161ce45": "เว้นว่างไว้เพื่อใช้คีย์ที่บันทึกไว้",
+  "ut_41678037ea": "ชื่อที่แสดง",
+  "ut_03570451ac": "ข้อตกลง",
+  "ut_0de12236b8": "เหวินซินยี่หยาน",
+  "ut_7abc46ce6d": "คืนค่าเริ่มต้น",
+  "ut_28c32fe34f": "กำลังเรียกข้อมูล...",
+  "ut_f2a08ffc71": "ดึงจากผู้ให้บริการ",
+  "ut_a52f4bbfda": "ปก",
+  "ut_3ed4ca7624": "ยังไม่มีรุ่น เพิ่มหนึ่งก่อน.",
+  "ut_7e4f0e1070": "รหัสรุ่นต้องไม่เว้นว่าง",
+  "ut_2ea671ff59": "ชื่อเกียร์ซ้ำกัน",
+  "ut_d2cf18b1f8": "ต้องมีอย่างน้อยหนึ่งเกียร์เพื่อให้สามารถอนุมานได้",
+  "ut_df2b9cacae": "ตกลง",
+  "ut_02259f1272": "ไม่ได้ตั้งค่า",
+  "ut_ea6cf493d2": "เชื่อมต่อเทอร์มินัล",
+  "ut_57d80443c9": "ลองโฮสต์ที่ล้มเหลวอีกครั้ง",
+  "ut_9e541c6382": "ความสำเร็จ",
+  "ut_e35dddb0b4": "ล้มเหลว",
+  "ut_ec4c29ca9a": "ขาดการเชื่อมต่อ",
+  "ut_a1e91f6981": "หมดเวลา",
+  "ut_7d4af9fef1": "สิทธิ์ไม่เพียงพอ",
+  "ut_9927a13579": "รอการป้อนข้อมูล",
+  "ut_b3d243fdfd": "ข้อผิดพลาดทางไวยากรณ์",
+  "ut_66197bd48d": "กลับ",
+  "ut_58851eb751": "บันทึกการดำเนินการได้รับการเก็บรักษาไว้และสามารถดำเนินการให้เสร็จสิ้นได้",
+  "ut_e6b33fe91a": "ทำงานต่อไป",
+  "ut_5e6e54121d": "คืนค่าเริ่มต้น",
+  "ut_9aa0cecb52": "คลิกเพื่อเข้าใหม่",
+  "ut_1f0be4879d": "กรุณากดคีย์ผสม...",
+  "ut_5a1aea8730": "ตกลง",
+  "ut_a1490afb10": "พร็อกซีรองรับเฉพาะ http://host:port",
+  "ut_ffad1d8b04": "ไดเร็กทอรีการทำงาน (ไม่บังคับ)",
+  "ut_205492caf2": "ตัวแปรสภาพแวดล้อม (KEY=VALUE ต่อบรรทัด)",
+  "ut_acce8b3510": "พร็อกซีขาออก (ไม่บังคับ)",
+  "ut_cd76953b04": "ส่วนหัว (คีย์: ค่าต่อแถว)",
+  "ut_12f53f2717": "ปรับแต่ง (ตรวจสอบหลังจากเชื่อมต่อ)",
+  "ut_a8481de1d6": "ขอบเขต OAuth (คั่นด้วยช่องว่าง/จุลภาค)",
+  "ut_4181f5ee36": "OAuth clientId (เว้นว่างไว้เพื่อใช้ DCR)",
+  "ut_a6f501ed31": "OAuth clientSecret (ไม่บังคับ)",
+  "ut_810e89c23f": "ผู้ช่วยเอไอ",
+  "ut_1a81fac6b4": "ปิดลิ้นชัก",
+  "ut_df39e46c77": "แก้ไขคำสั่งทางลัด",
+  "ut_5b6a456972": "แก้ไขขั้นตอนการทำงาน",
+  "ut_9d49b2c71b": "กลับสู่ระดับก่อนหน้า",
+  "ut_de5dd6102e": "ค้นหาชื่อ/IP/กลุ่ม",
+  "ut_1c95f57481": "ไม่มีโฮสต์ที่ตรงกัน",
+  "ut_29b3f192d8": "ค้นหาชื่อ/คำสั่ง",
+  "ut_d112e18b97": "ไม่มีคำสั่งทางลัดที่ตรงกัน",
+  "ut_dd209aad9b": "ค้นหาชื่อ/คำอธิบาย",
+  "ut_3d46c0f619": "การดำเนินการของ AI",
+  "ut_6ba17bef52": "การดำเนินการโดยตรง",
+  "ut_45a37578cb": "เมื่อเร็วๆ นี้",
+  "ut_ab4373452b": "วิ่ง",
+  "ut_6cb13cd9c4": "ไม่มีขั้นตอนการทำงานที่ตรงกัน",
+  "ut_00636e0752": "คำสั่งค้นหา",
+  "ut_f83f96b238": "ยังไม่มีบันทึกการตรวจสอบ",
+  "ut_cacce52f6d": "ไม่มีบันทึกที่จะคัดลอก",
+  "ut_a50d8711f5": "บันทึกการตรวจสอบเทอร์มินัล AI",
+  "ut_6200fddf68": "เครื่องท้องถิ่น",
+  "ut_2f5e0aff16": "ไม่มีเอาท์พุต",
+  "ut_f943d2ce6c": "สกัดกั้น",
+  "ut_740618ad3b": "ปล่อย",
+  "ut_311d08fee0": "ดำเนินการแล้ว",
+  "ut_7e1cc53dfe": "ไม่ได้ดำเนินการ",
+  "ut_d6834ac586": "คัดลอกสิ่งนี้",
+  "ut_4a647e404a": "การตั้งค่าการค้นหา",
+  "ut_8ad11edf4e": "ดัดแปลง",
+  "ut_57d5e9c054": "ปิด",
+  "ut_10f71987c9": "จำนวนบรรทัดบัฟเฟอร์การย้อนกลับ",
+  "ut_d7b02e9cf7": "การบันทึกเซสชันอัตโนมัติ",
+  "ut_2543cfa7f8": "หมดเวลาตอบสนองขั้นตอนเดียว",
+  "ut_fac7fadb45": "คำสั่งหมดเวลาหลายครั้ง",
+  "ut_48274233a0": "วันนี้",
+  "ut_98427f593c": "งานสิ้นสุดลงแล้ว โปรดดูบันทึกการดำเนินการเพื่อดูรายละเอียด",
+  "ut_9caaf88e9c": "ดำเนินการย้อนกลับแล้ว",
+  "ut_aee33bbe51": "ไม่มีการย้อนกลับอัตโนมัติ ขอแนะนำให้ใช้สแน็ปช็อตก่อนดำเนินการ",
+  "ut_4e9cdbd7a8": "รีดกลับแล้ว",
+  "ut_730ed00d8e": "สามารถม้วนกลับได้",
+  "ut_4f069ae310": "ต้องใช้แรงงาน",
+  "ut_209a3ee99a": "กลิ้งกลับ",
+  "ut_8bcebbb092": "ย้อนกลับ",
+  "ut_3459fead8a": "การติดตั้ง",
+  "ut_ad620f1593": "ถอนการติดตั้ง",
+  "ut_0e0e2a9a73": "ปรับเปลี่ยนการกำหนดค่า",
+  "ut_7393410b1a": "เริ่มให้บริการ",
+  "ut_64a71bf56a": "หยุดให้บริการ",
+  "ut_c5ea3f5be9": "เริ่มบริการใหม่",
+  "ut_7a42975bda": "การดำเนินงานไฟล์",
+  "ut_98ae0d0e95": "การปรับเปลี่ยนการอนุญาต",
+  "ut_d3636b0082": "เปลี่ยนแปลง",
+  "ut_3954d67b32": "ไม่มีการแข่งขัน",
+  "ut_ce6351e3cc": "ผลผลิตดิบ",
+  "ut_f5876a2bf8": "คัดลอกทั้งหมด",
+  "ut_f7d3ee00a1": "ค้นหาผลลัพธ์...",
+  "ut_ef2170f4b4": "ไม่ได้เชื่อมต่อป้ายกำกับปัจจุบัน และไม่สามารถสร้างการส่งต่อได้",
+  "ut_0df8de01ab": "กรุณากรอกพอร์ตที่ถูกต้อง (1-65535) และโฮสต์เป้าหมาย",
+  "ut_be0c081010": "ยังไม่มีกฎการส่งต่อ",
+  "ut_d0df2ad5ea": "หยุดและลบ",
+  "ut_f704784855": "ท้องถิ่น → ระยะไกล",
+  "ut_1b67fdda4b": "ระยะไกล → ท้องถิ่น",
+  "ut_50901ca37c": "พอร์ตการฟัง",
+  "ut_864e1c6380": "โฮสต์เป้าหมาย",
+  "ut_ec3f615847": "พอร์ตเป้าหมาย",
+  "ut_c1fbfd5065": "เพิ่มไปข้างหน้า",
+  "ut_4a8eab4b12": "ตัวอย่างเช่น: nginx เปลี่ยนเฉพาะ conf.d",
+  "ut_ee90ce584e": "เขียนข้อจำกัดให้ชัดเจนในภาษาธรรมชาติ แล้ว AI จะติดตามข้อจำกัดเหล่านั้นอย่างแน่นอน",
+  "ut_468c99d256": "ยังไม่มีโฮสต์ ดังนั้นจึงไม่สามารถจำกัดอยู่เพียงโฮสต์เดียวได้",
+  "ut_d83a565087": "การวินิจฉัย",
+  "ut_92cd36cefb": "กำลังตรวจสอบ...",
+  "ut_0ddb8a1f0d": "ไม่ได้รับผลการทดสอบ",
+  "ut_b1ab09352f": "เวอร์ชันแอปพลิเคชัน",
+  "ut_0942c2789b": "เซสชันนี้ขัดข้อง",
+  "ut_9f028e8160": "เวลาเกิดอุบัติเหตุครั้งสุดท้าย",
+  "ut_87c363d0c9": "ไม่มี",
+  "ut_065917e680": "การเชื่อมต่อพูล SSH",
+  "ut_4927752a48": "การเชื่อมต่อที่ตายแล้ว",
+  "ut_46d9b304c4": "ดิสก์เขียนได้",
+  "ut_3779abda15": "ใช่",
+  "ut_e812fd5dbb": "ไม่",
+  "ut_2e81ddc87a": "ตรวจสอบเวลา",
+  "ut_234f4f27c8": "บันทึกข้อขัดข้องว่างเปล่า",
+  "ut_d10e283a81": "คัดลอกบันทึกข้อขัดข้อง",
+  "ut_ced38012da": "ล้างบันทึกข้อขัดข้องแล้ว",
+  "ut_ead023bd7e": "ตรวจสอบอีกครั้ง",
+  "ut_2e28b0df81": "บันทึกข้อขัดข้องและสถานะสุขภาพ",
+  "ut_3f96027e32": "คัดลอกข้อมูลเวอร์ชันแล้ว",
+  "ut_1f0a3070de": "กำลังอ่าน...",
+  "ut_b6541b6328": "กำลังตรวจสอบการอัปเดต...",
+  "ut_32142192ac": "เป็นเวอร์ชั่นล่าสุดแล้ว",
+  "ut_7dc8c0869d": "รุ่น",
+  "ut_610ddf67b9": "จำนวนบรรทัดบัฟเฟอร์การย้อนกลับ",
+  "ut_8a70b91e29": "การบันทึกเซสชันอัตโนมัติ",
+  "ut_050de7d897": "รุ่นที่ใช้อยู่ในปัจจุบัน",
+  "ut_626fb86214": "ยังไม่มีรุ่น. ขั้นแรกให้เพิ่มจุดสิ้นสุด จากนั้นจึงเพิ่มโมเดล",
+  "ut_387e6f82d0": "จุดสิ้นสุด",
+  "ut_76fb9c463a": "ยังไม่มีจุดสิ้นสุด",
+  "ut_38966aa565": "ไม่มีขีดจำกัด",
+  "ut_f28f99867b": "หมดเวลาตอบสนองขั้นตอนเดียว",
+  "ut_ded8ed2d66": "คำสั่งหมดเวลาหลายครั้ง",
+  "ut_a2ce59889b": "ไม่ได้ตั้งค่า",
+  "ut_6aad5ea609": "แก้ไขคำ",
+  "ut_b95d0f872a": "ใบหน้า",
+  "ut_2318f73d10": "ลายนิ้วมือ",
+  "ut_8ec132c8b8": "ไบโอเมตริกซ์",
+  "ut_cea6052a7e": "ปิดแล้ว",
+  "ut_00f43cd923": "ไม่มีข้อมูลไบโอเมตริกบนอุปกรณ์นี้ และไม่สามารถเปิดการล็อคแอปได้",
+  "ut_91f4c00293": "การจัดเก็บข้อมูลรับรอง",
+  "ut_021001ca72": "พื้นที่เก็บข้อมูลที่ปลอดภัยของระบบ + AES ทางเลือก",
+  "ut_b25f81d2b6": "คำสั่งที่มีความเสี่ยงสูง",
+  "ut_ffaeb5818f": "การยืนยันครั้งที่สองก่อนดำเนินการ",
+  "ut_98c6d8c630": "ล้างข้อมูลในเครื่อง",
+  "ut_a74aec2b15": "ข้อมูลในเครื่องถูกล้างแล้ว",
+  "ut_5474c635a4": "ยืนยันตัวตนเพื่อเปิดใช้งาน App Lock",
+  "ut_00b1b1f0c5": "เปิดใช้งาน MCP",
+  "ut_a48007473a": "ยังไม่มีเซิร์ฟเวอร์",
+  "ut_c9189bb086": "ไม่ได้เชื่อมต่อ",
+  "ut_a4b4f07ab5": "อนุญาตการค้นหาทางอินเทอร์เน็ตของ AI",
+  "ut_704bcb4a34": "แบ็กเอนด์",
+  "ut_2acaddf4df": "หากไม่มีการเปิดใช้งานแบ็กเอนด์ใดเลย แสดงว่าไม่ได้เปิดใช้งานแบ็กเอนด์เหล่านั้น",
+  "ut_d40fdc917f": "ส่งกลับจำนวนรายการ",
+  "ut_b00662826d": "ยังไม่มีกฎเกณฑ์",
+  "ut_078781c029": "เพิ่มกฎ",
+  "ut_19b85efbe5": "เจ้าภาพทั้งหมด",
+  "ut_c9e6373a79": "การแจ้งเตือนให้เสร็จสิ้นงาน",
+  "ut_4b93fcd514": "เมื่อไหร่จะเตือน",
+  "ut_6e277f398f": "ที่อยู่เว็บฮุค",
+  "ut_559d9de7a7": "ฉันยังไม่ได้กรอกที่อยู่เว็บฮุค จึงไม่สามารถส่งได้",
+  "ut_e52ad942fc": "ต่อท้ายคำแจ้งของระบบ",
+  "ut_62951d47df": "ข้อกำหนดเพิ่มเติมที่เขียนลงในเครื่องนี้",
+  "ut_968538bf30": "ป้อน DELETE เพื่อยืนยัน",
+  "ut_3da0e76468": "เพิ่มแบ็กเอนด์การค้นหา",
+  "ut_402165c066": "เพิ่มแบ็กเอนด์ที่มีอยู่ทั้งหมดแล้ว",
+  "ut_fd7c3540b7": "บันทึกและเปิดใช้งาน",
+  "ut_ed57742e6a": "เปิดการตั้งค่าแบบเต็ม",
+  "ut_5208f9bddf": "ไม่มีโฮสต์อยู่",
+  "ut_bc683a74fa": "เปิด",
+  "ut_731d9e386f": "ดาวน์โหลดไปยังท้องถิ่น",
+  "ut_21512fa475": "ดูตัวอย่างเนื้อหา",
+  "ut_64da167c8c": "ลบไดเรกทอรี",
+  "ut_f405fa4a70": "ลบไฟล์",
+  "ut_8b9071fa7d": "ดัดแปลง",
+  "ut_46ebf5b01b": "บันทึกแล้ว",
+  "ut_01ff3a92b3": "ชื่อใหม่",
+  "ut_c28161cd4b": "ยืนยันการลบ",
+  "ut_32d93b8221": "ชื่อไดเรกทอรี",
+  "ut_87fc3f64f6": "สร้าง",
+  "ut_40cd9573ff": "ปล่อยเพื่ออัปโหลดไปยังไดเร็กทอรีปัจจุบัน",
+  "ut_ebab5a91e2": "เรียงลำดับ",
+  "ut_436d7985a6": "ขนาด",
+  "ut_cac0b492e4": "เวลาปรับเปลี่ยน",
+  "ut_125f95f8d1": "อัปโหลด",
+  "ut_fe22bfe107": "รีเฟรช",
+  "ut_2b1e2ceb1b": "เข้าสู่เส้นทาง",
+  "ut_cfd5be4925": "ไดเรกทอรีราก",
+  "ut_9dc11a1d64": "กำลังเชื่อมต่อ...",
+  "ut_98d1c295e4": "ไดเร็กทอรีว่างเปล่า",
+  "ut_a64c884da9": "ไม่สามารถอ่านไฟล์การกำหนดค่าได้",
+  "ut_91d4c887bb": "ไม่พบไฟล์การกำหนดค่า",
+  "ut_8411943202": "การนำเข้าล้มเหลว",
+  "ut_c4bdcb7bb4": "ไม่มีโฮสต์ที่สามารถนำเข้าในการกำหนดค่าได้",
+  "ut_ee82429005": "เคล็ดลับการแยกวิเคราะห์",
+  "ut_ffb911cc34": "นำเข้า",
+  "ut_4e39421eaf": "กระดานกระโดดน้ำ",
+  "ut_35660d6755": "ต้องใช้รหัสส่วนตัว",
+  "ut_94376a7210": "สินค้าไม่ได้นำเข้า",
+  "ut_793cb65e3d": "มีอยู่แล้ว",
+  "ut_61181b84f1": "โหมดธีม",
+  "ut_33bd0353d6": "ขนาดตัวอักษร",
+  "ut_5fb0f8f4a5": "การตั้งค่าเทอร์มินัล",
+  "ut_ce50810b95": "สีเข้มเท่านั้น",
+  "ut_39c65ad937": "ไม่มีผลลัพธ์",
+  "ut_ef282263a5": "เอาต์พุตเทอร์มินัลการค้นหา",
+  "ut_d24c2e83f7": "คำนึงถึงขนาดตัวพิมพ์",
+  "ut_3525464ef3": "ก่อนหน้า (Shift+Enter)",
+  "ut_01e46e4cac": "ถัดไป (ป้อน)",
+  "ut_3dd4f86972": "เลือกทั้งหมด",
+  "ut_93db49204e": "หน้าจอที่ชัดเจน",
+  "ut_6b1ae00645": "ล้างบัฟเฟอร์ scrollback",
+  "ut_49db0eb3e7": "คัดลอกเอาต์พุตทั้งหมด",
+  "ut_8f5a44f9a8": "บันทึกเอาต์พุตลงไฟล์...",
+  "ut_7e205da9b6": "ขยายขนาดตัวอักษร",
+  "ut_aa2e753d46": "ลดขนาดตัวอักษร",
+  "ut_1c98824fa9": "รีเซ็ตขนาดตัวอักษร",
+  "ut_e9304231ed": "ส่งคำอธิบายไปยังตัวแทน",
+  "ut_c48f8080f6": "บันทึกเป็นส่วนคำสั่ง",
+  "ut_ab94a86f01": "ดำเนินการคำสั่งนี้ในเทอร์มินัล",
+  "ut_e865710760": "แยกหน้าจอซ้ายและขวา",
+  "ut_9833a4decf": "แยกหน้าจอขึ้นและลง",
+  "ut_3e9c805d7f": "ปิดหน้าจอแยกนี้ (AI อยู่บนหน้าจอนี้)",
+  "ut_16863c6e3a": "ปิดหน้าจอแยกนี้",
+  "ut_6f9e7de9f4": "ค้นหาใน SFTP",
+  "ut_fa0ed53542": "เปิดแผง SFTP",
+  "ut_6dc8f53907": "ดูบันทึกการตรวจสอบ",
+  "ut_078958b894": "ดูประวัติการเปลี่ยนแปลง",
+  "ut_76a60a446c": "เปิดลิงก์",
+  "ut_b99781d2e8": "คัดลอกลิงก์",
+  "ut_9641c0bb12": "คัดลอกเส้นทาง",
+  "ut_b736a87497": "สอบถามตัวแทนเกี่ยวกับข้อผิดพลาดนี้",
+  "ut_6fcc795a39": "ให้ตัวแทนอธิบายส่วนทั้งหมดนี้",
+  "ut_dc52ca948e": "คัดลอกทั้งบล็อกนี้",
+  "ut_4d77c0da07": "คำสั่งก่อนหน้า",
+  "ut_083f59cfec": "คำสั่งบล็อกถัดไป",
+  "ut_c49dbc7b41": "ไม่มีเนื้อหาที่เลือก",
+  "ut_90074297f5": "เนื้อหาหลายบรรทัดจะถูกดำเนินการตามลำดับ โปรดตรวจสอบให้แน่ใจว่าไม่มีข้อผิดพลาดในการวาง:",
+  "ut_3a1c210c39": "ดำเนินการคำสั่งนี้ในเทอร์มินัลหรือไม่?",
+  "ut_a28740df5a": "บันทึกเอาต์พุตเทอร์มินัล",
+  "ut_8a039d57ca": "กำลังรอการเชื่อมต่อ...",
+  "ut_364a8e7d72": "เทอร์มินัล",
+  "ut_6b4426c1f7": "โมเดลเอไอ",
+  "ut_47436bc8ab": "ตัวแทน",
+  "ut_ed3461341d": "เซิร์ฟเวอร์เอ็มซีพี",
+  "ut_a6db458718": "ค้นหาทางอินเทอร์เน็ต",
+  "ut_83d66464a0": "กฎระเบียบภายใน",
+  "ut_dc4a75d976": "การแจ้งเตือน",
+  "ut_6dbcd29d76": "การตรวจสอบ",
+  "ut_2e90894c9a": "ล้มเหลวเท่านั้น",
+  "ut_ec50bedaa8": "เตือนทุกครั้ง",
+  "ut_e39887dfed": "ไม่สามารถสำรองไฟล์ต้นฉบับ: {e} การเขียนถูกยกเลิกและไฟล์ต้นฉบับไม่ได้รับการแก้ไข",
+  "@ut_e39887dfed": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fcda8e6588": "  ไฟล์ต้นฉบับได้รับการสำรองไว้แล้ว: {backupPath}",
+  "@ut_fcda8e6588": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4452077d81": "{summary}\nเส้นทางเป้าหมาย: {effectiveLocal}",
+  "@ut_4452077d81": {
+    "placeholders": {
+      "summary": {
+        "type": "Object"
+      },
+      "effectiveLocal": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f4856090f2": "กำลังอ่าน {path} ...",
+  "@ut_f4856090f2": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1e823bfa18": "การดำเนินการ openssl ล้มเหลว: {stderr}",
+  "@ut_1e823bfa18": {
+    "placeholders": {
+      "stderr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a2a80977d9": "กำลังสำรองไฟล์ต้นฉบับไปที่ {backupPath}...",
+  "@ut_a2a80977d9": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b9beeabb91": "  วิธีย้อนกลับ: mv {backupPath} {path}",
+  "@ut_b9beeabb91": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c4acfd10f3": "  หากคุณต้องการย้อนกลับ: เขียนทับ {path} ด้วยข้อมูลสำรองนี้",
+  "@ut_c4acfd10f3": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_af40dec29f": "ไฟล์ที่ถูกแก้ไข: {path}",
+  "@ut_af40dec29f": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fb892c6b10": "  การแทนที่: ไบต์ {length} → ไบต์ {length}",
+  "@ut_fb892c6b10": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_59e5f6620a": "  ขนาดไฟล์: {length} → {length} ไบต์",
+  "@ut_59e5f6620a": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5fe0b81932": "ไม่สามารถบันทึก: {e}",
+  "@ut_5fe0b81932": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1dd514c792": "คัดลอกอักขระ {length} แล้ว",
+  "@ut_1dd514c792": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e275b00675": "ไฟล์ที่ละเอียดอ่อน: {fileName} (ห้ามเข้าถึงแม้ภายในโปรเจ็กต์)",
+  "@ut_e275b00675": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3ae63b10aa": "ไดเรกทอรีที่ละเอียดอ่อน: {segment} (ห้ามเข้าถึง)",
+  "@ut_3ae63b10aa": {
+    "placeholders": {
+      "segment": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5b6668af25": "ไดเร็กทอรีระบบ {prefix} ถูกห้าม",
+  "@ut_5b6668af25": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_337b92f903": "ไดเร็กทอรีที่ละเอียดอ่อน ~/{suffix} ไม่ได้รับอนุญาตให้เข้าถึง",
+  "@ut_337b92f903": {
+    "placeholders": {
+      "suffix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0c25c4bff1": "ไฟล์ที่มีความละเอียดอ่อน: {fileName}",
+  "@ut_0c25c4bff1": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fffc2d39d8": "ไดเรกทอรีที่ละเอียดอ่อน: ห้ามการเข้าถึง {segment}",
+  "@ut_fffc2d39d8": {
+    "placeholders": {
+      "segment": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_61f32e7e81": "เส้นทางไม่อยู่ในไดเร็กทอรีโปรเจ็กต์ที่ได้รับอนุญาต: {normalized}",
+  "@ut_61f32e7e81": {
+    "placeholders": {
+      "normalized": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7695e08c1e": "{scrollLabel} · {logLabel}",
+  "@ut_7695e08c1e": {
+    "placeholders": {
+      "scrollLabel": {
+        "type": "Object"
+      },
+      "logLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b003c911bd": "{count} · ปัจจุบัน {selectedName}",
+  "@ut_b003c911bd": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      },
+      "selectedName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3f574ada1a": "{count} กำหนดค่าแล้ว",
+  "@ut_3f574ada1a": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_664f79491a": "ไม่จำกัดจำนวนก้าว · หมดเวลา {timeout}s",
+  "@ut_664f79491a": {
+    "placeholders": {
+      "timeout": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a303a7b799": "ขั้นตอน {steps} สูงสุด · หมดเวลา {timeout}s",
+  "@ut_a303a7b799": {
+    "placeholders": {
+      "steps": {
+        "type": "Object"
+      },
+      "timeout": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9947165032": "เปิดใช้งานแล้ว · มีแบ็กเอนด์ {enabledCount}",
+  "@ut_9947165032": {
+    "placeholders": {
+      "enabledCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_94c3718c07": "ระยะเวลาปลอดภัย {startHour}:00–{endHour}:00",
+  "@ut_94c3718c07": {
+    "placeholders": {
+      "startHour": {
+        "type": "Object"
+      },
+      "endHour": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cbd8c9bc33": "ส่งออกแถบ {length} ไปที่ {path}",
+  "@ut_cbd8c9bc33": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b078e9e8b1": "การส่งออกล้มเหลว: {e}",
+  "@ut_b078e9e8b1": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_81d685bdc0": "โดยข้ามกฎของโฮสต์ที่ไม่รู้จัก {skippedUnknownHost}",
+  "@ut_81d685bdc0": {
+    "placeholders": {
+      "skippedUnknownHost": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f59978a9af": "ข้อมูลจำเพาะ {imported} {skippedHint} ได้รับการนำเข้าแล้ว",
+  "@ut_f59978a9af": {
+    "placeholders": {
+      "imported": {
+        "type": "Object"
+      },
+      "skippedHint": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4bda191f7f": "การนำเข้าล้มเหลว: {e}",
+  "@ut_4bda191f7f": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ec13b5dac5": "ไม่สามารถสลับสวิตช์หลัก MCP: {e}",
+  "@ut_ec13b5dac5": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1e9e2bf1a0": "เครื่องมือ ({length}) · {exposure}",
+  "@ut_1e9e2bf1a0": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "exposure": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fb221962b1": "ไม่สามารถบันทึกสวิตช์เครื่องมือ: {e}",
+  "@ut_fb221962b1": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_62adaafe0d": "ทรัพยากร ({length})",
+  "@ut_62adaafe0d": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_70da821187": "คำแจ้ง ({length})",
+  "@ut_70da821187": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_169bc8e674": "ไม่สามารถเปิดตัวเลือกไดเรกทอรี: {e}",
+  "@ut_169bc8e674": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_02f4d31e55": "ไม่สามารถบันทึกสวิตช์: {e}",
+  "@ut_02f4d31e55": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c87274304e": "บันทึกล้มเหลว: {e}",
+  "@ut_c87274304e": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1c9cc2edb3": "การลบล้มเหลว: {e}",
+  "@ut_1c9cc2edb3": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ab07d88b41": "สูงสุด {maxPanes} หน้าจอต่อแท็บ (หนึ่งเซสชันจริงต่อหน้าจอ)",
+  "@ut_ab07d88b41": {
+    "placeholders": {
+      "maxPanes": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2596a43876": "กระทู้ {auditToday} ของวันนี้",
+  "@ut_2596a43876": {
+    "placeholders": {
+      "auditToday": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_acb620e2fa": "โฮสต์ {targetHost} ไม่ได้เชื่อมต่อและไม่สามารถทำการย้อนกลับได้",
+  "@ut_acb620e2fa": {
+    "placeholders": {
+      "targetHost": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2f00778de2": "พิธีกร: {hostLabel}",
+  "@ut_2f00778de2": {
+    "placeholders": {
+      "hostLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_35b3e86940": "ย้อนกลับสำเร็จ: {rollbackCommand}",
+  "@ut_35b3e86940": {
+    "placeholders": {
+      "rollbackCommand": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_21823fef80": "รหัสออก {exitCode}",
+  "@ut_21823fef80": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_34ec0a3e03": "การย้อนกลับล้มเหลว: {reason}",
+  "@ut_34ec0a3e03": {
+    "placeholders": {
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_be42c8efee": "ข้อยกเว้นการย้อนกลับ: {e}",
+  "@ut_be42c8efee": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_99956a3c17": "กำลังเชื่อมต่อ {title} อีกครั้ง...",
+  "@ut_99956a3c17": {
+    "placeholders": {
+      "title": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c1dbbf6a2c": "ข้อยกเว้นการเชื่อมต่อใหม่: {e}",
+  "@ut_c1dbbf6a2c": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5b97d3e6a4": "เปลี่ยนเป็นรุ่น : {modelId}",
+  "@ut_5b97d3e6a4": {
+    "placeholders": {
+      "modelId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7fb66c7378": "คัดลอกการสนทนาไปยังคลิปบอร์ดแล้ว (คำ {chars})",
+  "@ut_7fb66c7378": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a1c44d88d9": "คัดลอกการสนทนาไปยังคลิปบอร์ดแล้ว (คำ {chars})\nบันทึกการดำเนินการ: {path}",
+  "@ut_a1c44d88d9": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5cf729e87e": "คัดลอกการสนทนาไปยังคลิปบอร์ดแล้ว (คำ {chars})\nไม่สามารถอ่านเส้นทางบันทึก: {e}",
+  "@ut_5cf729e87e": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e77b2cd18c": "บันทึกไปยังตัวอย่างคำสั่ง: {trimmed}",
+  "@ut_e77b2cd18c": {
+    "placeholders": {
+      "trimmed": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_32148ad774": "ไม่สามารถอ่านสถานะคีย์: {e}",
+  "@ut_32148ad774": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9979b52038": "การทดสอบล้มเหลว: {e}",
+  "@ut_9979b52038": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6934446d27": "บันทึกการกำหนดค่าล้มเหลว: {e}",
+  "@ut_6934446d27": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8de5894b72": "คัดลอกลิงก์แล้ว: {url}",
+  "@ut_8de5894b72": {
+    "placeholders": {
+      "url": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_61476f7ee8": "การตอบสนองของ AI ไม่สามารถบันทึกได้: {e}",
+  "@ut_61476f7ee8": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_07c39ce9ce": "⚠️ การดำเนินการนี้จะเปลี่ยนไฟล์ในเครื่องและต้องมีการยืนยัน:\n{display}",
+  "@ut_07c39ce9ce": {
+    "placeholders": {
+      "display": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b306912acf": "กำลังรอการยืนยัน: {toolName}",
+  "@ut_b306912acf": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0968807bf1": "💌 เพิ่มผู้ใช้: {steering}",
+  "@ut_0968807bf1": {
+    "placeholders": {
+      "steering": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c547224534": "⚠️ ยังมีรายการที่ยังทำไม่เสร็จ {length} ในแผน และจะต้องตรวจสอบทีละรายการก่อนจะเสร็จสิ้น ({planFinishRetryCount}/{maxPlanFinishRetries})",
+  "@ut_c547224534": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "planFinishRetryCount": {
+        "type": "Object"
+      },
+      "maxPlanFinishRetries": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_478eec6181": "⚠️ ถึงจำนวนขั้นตอนการดำเนินการสูงสุด ({maxSteps}) แล้ว และงานถูกขัดจังหวะ",
+  "@ut_478eec6181": {
+    "placeholders": {
+      "maxSteps": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fa2224f3f9": "⚠️ รุ่นหลัก {modelName} ไม่พร้อมใช้งาน และได้เปลี่ยนเป็นรุ่นสำรองแล้ว {modelName}",
+  "@ut_fa2224f3f9": {
+    "placeholders": {
+      "modelName": {
+        "type": "Object"
+      },
+      "modelName2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_971883a7fe": "⚠️ ละเว้นการเรียกใช้เครื่องมือซ้ำซ้อนในรอบนี้: {name} (ดำเนินการเพียงครั้งเดียวในแต่ละรอบ)",
+  "@ut_971883a7fe": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cb255683ce": "เกรด: {safetyLevel}",
+  "@ut_cb255683ce": {
+    "placeholders": {
+      "safetyLevel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ee0b938b2c": "คำอธิบาย: {reason}",
+  "@ut_ee0b938b2c": {
+    "placeholders": {
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f46987bf0d": "{highRisk} {highRisk} ต้องมีการยืนยัน (โหมด {modeLabel}): `{command}`\nคำชี้แจงความเสี่ยง: {reason}",
+  "@ut_f46987bf0d": {
+    "placeholders": {
+      "highRisk": {
+        "type": "Object"
+      },
+      "highRisk2": {
+        "type": "Object"
+      },
+      "modeLabel": {
+        "type": "Object"
+      },
+      "command": {
+        "type": "Object"
+      },
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a61b05ce9b": "👉 คุณเลือก: {choice}",
+  "@ut_a61b05ce9b": {
+    "placeholders": {
+      "choice": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_386b3634c1": "⚠️ AI เรียก {alias} แต่ไม่มีพารามิเตอร์คำสั่งมาให้",
+  "@ut_386b3634c1": {
+    "placeholders": {
+      "alias": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0eed0d18c7": "⚠️เครื่องมือที่ไม่รู้จัก: {toolName}",
+  "@ut_0eed0d18c7": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_21239ba62c": "🔒 เปิดใช้งานโหมดอ่านอย่างเดียว เครื่องมือนี้ถูกปฏิเสธการดำเนินการ: `{toolName}`",
+  "@ut_21239ba62c": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_339abc33a7": "⚠️ เครื่องมือ `{toolName}` ไม่พร้อมใช้งานในเซสชันปัจจุบัน",
+  "@ut_339abc33a7": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2bd0b4985d": "❌ ข้อยกเว้นการดำเนินการของเครื่องมือ {toolName}: {e}",
+  "@ut_2bd0b4985d": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e36f09192f": "{prefix} กำลังรอการอัปโหลดรอบสุดท้ายเพื่อออก...",
+  "@ut_e36f09192f": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dc39c308a2": "ความคืบหน้าการอัปโหลด {prefix}: ไฟล์ {uploaded}/{total}",
+  "@ut_dc39c308a2": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      },
+      "uploaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_91700996f4": "กำลังอัพโหลดไฟล์: {local}",
+  "@ut_91700996f4": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ded2242c8f": "อัพโหลดไฟล์สำเร็จ: {local} → {remote} ({size})",
+  "@ut_ded2242c8f": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_d72746d0d0": "กำลังอัพโหลดไดเร็กทอรีซ้ำ: {local} → {effectiveRemote}",
+  "@ut_d72746d0d0": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      },
+      "effectiveRemote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0e800a8406": "กำลังดาวน์โหลดไฟล์: {remote} → {target}",
+  "@ut_0e800a8406": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "target": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c8b91122b": "ดาวน์โหลดไฟล์สำเร็จ: {remote} → {target} ({size})",
+  "@ut_5c8b91122b": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "target": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2bc26619aa": "ดาวน์โหลดไดเรกทอรีซ้ำ: {remote} → {effectiveLocal}",
+  "@ut_2bc26619aa": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "effectiveLocal": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_52a01019d8": "ความคืบหน้าการดาวน์โหลด: ไฟล์ {downloaded}/{total}",
+  "@ut_52a01019d8": {
+    "placeholders": {
+      "downloaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6b85bbaf16": "[{hostId}] การเชื่อมต่อ SFTP ล้มเหลว: {e}",
+  "@ut_6b85bbaf16": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2d44fe0c64": "[{hostId}] กำลังอัพโหลดไฟล์: {local}",
+  "@ut_2d44fe0c64": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7ef1cd9389": "[Z{hostId}] การอัปโหลดเสร็จสมบูรณ์",
+  "@ut_7ef1cd9389": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a465e8a3ee": "[{hostId}] อัพโหลดไฟล์สำเร็จ: {local} → {remote} ({size})",
+  "@ut_a465e8a3ee": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_699c3fa8dc": "[{hostId}] กำลังอัพโหลดไดเร็กทอรีซ้ำ: {local} → {effectiveRemote}",
+  "@ut_699c3fa8dc": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      },
+      "effectiveRemote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2996de9000": "[Z{hid}] จัดจำหน่าย...",
+  "@ut_2996de9000": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0f735fba75": "[{hid}] ✗ ยกเลิก, ข้าม",
+  "@ut_0f735fba75": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c021ae6b9": "[{hid}] กำลังสะสม {remote}...",
+  "@ut_5c021ae6b9": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e31edc9171": "[{hid}] ✗ โฮสต์ไม่ได้เชื่อมต่อหรือเซสชันที่ไม่ใช่ SSH",
+  "@ut_e31edc9171": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2e01615eec": "=== [{hid}] ยกเลิก, ข้ามแล้ว ===",
+  "@ut_2e01615eec": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ffebfc53a6": "[Z{hid}] กำลังค้นหา...",
+  "@ut_ffebfc53a6": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_38bc3dac85": "=== [{hid}] โฮสต์ไม่ได้เชื่อมต่อ ===",
+  "@ut_38bc3dac85": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8dc55e0134": "[{hid}] กำลังอ่าน {remote} ...",
+  "@ut_8dc55e0134": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_475dcf3309": "กำลังตรวจสอบใบรับรอง HTTPS สำหรับ {host}:{port}...",
+  "@ut_475dcf3309": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      },
+      "port": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bde384cf72": "กำลังแก้ไขใบรับรองท้องถิ่น: {certPath}",
+  "@ut_bde384cf72": {
+    "placeholders": {
+      "certPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b733c697fb": "{write} {path} ({length} ไบต์)...",
+  "@ut_b733c697fb": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_24853c3f76": "ไฟล์ {write} สำเร็จ: {path} ({length} ไบต์)",
+  "@ut_24853c3f76": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a7bd551b52": "การย้อนกลับการสำรองข้อมูลล้มเหลว: {rollbackErr} จะพยายามเขียน PTY",
+  "@ut_a7bd551b52": {
+    "placeholders": {
+      "rollbackErr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f8d0ae7c3c": "\n  หมายเหตุ: กระบวนการ SFTP ได้สำรองไฟล์ต้นฉบับไว้ที่ {backupPath} สามารถลบข้อมูลสำรองได้ด้วยตนเองหลังจากเขียน PTY สำเร็จแล้ว",
+  "@ut_f8d0ae7c3c": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6820e10527": "การเขียนไฟล์สำเร็จ (โหมด PTY stdin cat): {path} ({length} ไบต์) {backupInfo}",
+  "@ut_6820e10527": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      },
+      "backupInfo": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_caa84ab310": "การเขียน cat ล้มเหลว: {failureReason} ลอง sudo tee ...",
+  "@ut_caa84ab310": {
+    "placeholders": {
+      "failureReason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b0ea4177b4": "การเขียนไฟล์สำเร็จ (PTY stdin + sudo tee): {path} ({length} bytes) {backupInfo}",
+  "@ut_b0ea4177b4": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      },
+      "backupInfo": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_aad3625b0a": "ไฟล์ {write} สำเร็จ ({method}): {path} ({byteCount} ไบต์)",
+  "@ut_aad3625b0a": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "method": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "byteCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_00cd1c4300": "การค้นหาฐานความรู้: {query}",
+  "@ut_00cd1c4300": {
+    "placeholders": {
+      "query": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c0b2e0370": "\n…({label} ข้อความต้นฉบับมีอักขระ {length})",
+  "@ut_5c0b2e0370": {
+    "placeholders": {
+      "label": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6f51e792f4": "ความคืบหน้าการอัปโหลดแบบเต็ม: {uploaded}/{total}",
+  "@ut_6f51e792f4": {
+    "placeholders": {
+      "uploaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf4b2fdeb1": "สร้างไดเร็กทอรีการทำงานในเครื่องแล้ว: {resolvedCwd}",
+  "@ut_cf4b2fdeb1": {
+    "placeholders": {
+      "resolvedCwd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_93ba05fcda": "ไม่สามารถสร้างไดเร็กทอรีการทำงาน {resolvedCwd}: {e}",
+  "@ut_93ba05fcda": {
+    "placeholders": {
+      "resolvedCwd": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bb63c6672a": "การดำเนินการเฉพาะที่ ({shell}): {command}",
+  "@ut_bb63c6672a": {
+    "placeholders": {
+      "shell": {
+        "type": "Object"
+      },
+      "command": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b5e97db76b": "สแกนไฟล์ {scanned} แล้ว...",
+  "@ut_b5e97db76b": {
+    "placeholders": {
+      "scanned": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_132456dcfb": "โหมดที่ไม่รู้จัก: {mode} (รองรับการเขียน/ผนวก)",
+  "@ut_132456dcfb": {
+    "placeholders": {
+      "mode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3b4b10f1b2": "โลคัลเทอร์มินัลไม่สามารถเริ่มทำงาน: {e}",
+  "@ut_3b4b10f1b2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bbafda1855": "[รูปภาพ {mimeType}, {length} ฐาน 64 ตัวอักษร]",
+  "@ut_bbafda1855": {
+    "placeholders": {
+      "mimeType": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3901620d02": "เรียกเครื่องมือ MCP {serverName}/{name}",
+  "@ut_3901620d02": {
+    "placeholders": {
+      "serverName": {
+        "type": "Object"
+      },
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_405448830f": "อ่านทรัพยากร MCP {uri}",
+  "@ut_405448830f": {
+    "placeholders": {
+      "uri": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_090d7978c2": "รับคำแจ้ง MCP {name}",
+  "@ut_090d7978c2": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b01822a097": "ไม่มีไดเรกทอรีโครงการ: {path}",
+  "@ut_b01822a097": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f1acec8e02": "เส้นทางโครงการ : {path}",
+  "@ut_f1acec8e02": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8a884e053e": "จดจำคำสั่ง build โดยอัตโนมัติ: {buildCmd}",
+  "@ut_8a884e053e": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5ab7922da3": "คำสั่ง build ถูกบล็อกโดยนโยบายความปลอดภัย: {buildCmd}",
+  "@ut_5ab7922da3": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_323ecc4b40": "เริ่มสร้าง: {buildCmd}",
+  "@ut_323ecc4b40": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dd547aa71c": "✓ สร้างสำเร็จ ({inSeconds}s)\n\nเอาท์พุท:\n{output}",
+  "@ut_dd547aa71c": {
+    "placeholders": {
+      "inSeconds": {
+        "type": "Object"
+      },
+      "output": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fe98a458a9": "✗ การสร้างล้มเหลว (รหัสออก: {exitCode} เวลาที่ใช้: {inSeconds}s)",
+  "@ut_fe98a458a9": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      },
+      "inSeconds": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2192f982a0": "คำสั่งการทำแพ็กเกจถูกบล็อกโดยนโยบายความปลอดภัย: {packageCmd}",
+  "@ut_2192f982a0": {
+    "placeholders": {
+      "packageCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5e9fa40ae2": "เริ่มบรรจุภัณฑ์: {artifactDir} → {outputFile}",
+  "@ut_5e9fa40ae2": {
+    "placeholders": {
+      "artifactDir": {
+        "type": "Object"
+      },
+      "outputFile": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c3df15635": "✓ บรรจุภัณฑ์สำเร็จ\nไฟล์เอาท์พุต: {outputFile}\nขนาด: {sizeStr}\n\nไฟล์นี้สามารถอัปโหลดไปยังเซิร์ฟเวอร์โดยใช้เครื่องมือ sftp_upload",
+  "@ut_9c3df15635": {
+    "placeholders": {
+      "outputFile": {
+        "type": "Object"
+      },
+      "sizeStr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7884351654": "บรรจุภัณฑ์สำเร็จ: {sizeStr}",
+  "@ut_7884351654": {
+    "placeholders": {
+      "sizeStr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0a71fe6a29": "✗ บรรจุภัณฑ์ล้มเหลว (รหัสออก: {exitCode})\n--- stdout ---\n{stdout}\n--- stderr ---\n{stderr}",
+  "@ut_0a71fe6a29": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      },
+      "stdout": {
+        "type": "Object"
+      },
+      "stderr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_62e6c24a03": "อ่านล้มเหลว: {message}",
+  "@ut_62e6c24a03": {
+    "placeholders": {
+      "message": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ed6128ba80": "กำลังเชื่อมต่อ {host}:{port}...",
+  "@ut_ed6128ba80": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      },
+      "port": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2574cd27d5": "เชื่อมต่อผ่านรีเลย์สปริงบอร์ด {host}...",
+  "@ut_2574cd27d5": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_939fbbbde2": "การตรวจสอบการเชื่อมต่อถูกข้าม: {e}\n",
+  "@ut_939fbbbde2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c09d2ebc3": "ไม่สามารถเขียนไปยัง stdin: {e}",
+  "@ut_5c09d2ebc3": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_160a20b4b9": "ไม่สามารถส่ง EOF: {e}",
+  "@ut_160a20b4b9": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e230a6d105": "กำลังค้นหา {query}",
+  "@ut_e230a6d105": {
+    "placeholders": {
+      "query": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8bc3df095a": "กำลังดึงข้อมูล: {url}",
+  "@ut_8bc3df095a": {
+    "placeholders": {
+      "url": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_571ec497a6": "ชื่อเรื่อง: {title}",
+  "@ut_571ec497a6": {
+    "placeholders": {
+      "title": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_eb988194e9": "เป้าหมาย: {trim}",
+  "@ut_eb988194e9": {
+    "placeholders": {
+      "trim": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_304b011a8a": "สรุป: {trim}",
+  "@ut_304b011a8a": {
+    "placeholders": {
+      "trim": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_080de8536f": "{service} กำลังทำงานอยู่",
+  "@ut_080de8536f": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8f24f3ec45": "{service} ไม่ทำงาน",
+  "@ut_8f24f3ec45": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_622000e27f": "{service} เริ่มทำงานโดยอัตโนมัติเมื่อบู๊ต",
+  "@ut_622000e27f": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_371d1b3d69": "{service} ไม่ได้ตั้งค่าการเริ่มต้นอัตโนมัติ",
+  "@ut_371d1b3d69": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e7e9d06df9": " รอพอร์ต {length}",
+  "@ut_e7e9d06df9": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9def515d87": "พอร์ต {shown}{suffix} กำลังฟังอยู่",
+  "@ut_9def515d87": {
+    "placeholders": {
+      "shown": {
+        "type": "Object"
+      },
+      "suffix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ea6610697b": "ตัวเลือกของคุณ: {chosen}",
+  "@ut_ea6610697b": {
+    "placeholders": {
+      "chosen": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e7d26cf57d": "ส่วนท้ายเอาต์พุตดั้งเดิม · รวมอักขระ {totalChars}",
+  "@ut_e7d26cf57d": {
+    "placeholders": {
+      "totalChars": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7234d250c6": "รวม {length} รายการ · แสดงรายการ {length}",
+  "@ut_7234d250c6": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0b13faa29b": "คัดลอกบันทึก {length} แล้ว",
+  "@ut_0b13faa29b": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2a21b678a8": "{inMinutes} นาทีที่แล้ว",
+  "@ut_2a21b678a8": {
+    "placeholders": {
+      "inMinutes": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_05ac4fcf03": "{inHours}Z ชั่วโมงที่ผ่านมา",
+  "@ut_05ac4fcf03": {
+    "placeholders": {
+      "inHours": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_11bfebfb31": "{inDays} วันที่ผ่านมา",
+  "@ut_11bfebfb31": {
+    "placeholders": {
+      "inDays": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5eda668d7a": "รุ่น · {length}",
+  "@ut_5eda668d7a": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dc4c3efe70": "เขียนทับโมเดล {length} ปัจจุบันด้วยโมเดลเริ่มต้นเป็น \"{name}\" หรือไม่",
+  "@ut_dc4c3efe70": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c153205f28": "ดึงมารุ่น {length}",
+  "@ut_c153205f28": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c3ca30909": "เพิ่ม {length}",
+  "@ut_9c3ca30909": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0408a4e88d": "การเชื่อมต่อล่าสุด: {lastConnected}",
+  "@ut_0408a4e88d": {
+    "placeholders": {
+      "lastConnected": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_508cac93a2": "{length} โฮสต์ · {success} สำเร็จ'\n                    '{failed}",
+  "@ut_508cac93a2": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "success": {
+        "type": "Object"
+      },
+      "failed": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_00fefb12c8": "รหัสออก {exitCode}",
+  "@ut_00fefb12c8": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7c37c17c72": "เปิด {name}",
+  "@ut_7c37c17c72": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_393e236ec2": "ดำเนินการ {runCount} ครั้ง",
+  "@ut_393e236ec2": {
+    "placeholders": {
+      "runCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4dbb782799": "คัดลอกแถบ {length} นี้ (พร้อมเอาต์พุต)",
+  "@ut_4dbb782799": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_afa890cf1c": "คัดลอกรายการ {length} แล้ว",
+  "@ut_afa890cf1c": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_63f8cd8765": "ยังมีรายการ {rest} อีกด้วย",
+  "@ut_63f8cd8765": {
+    "placeholders": {
+      "rest": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2565b39f32": "รวม {total} หน่วย",
+  "@ut_2565b39f32": {
+    "placeholders": {
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e36a5ac905": "ย้อนกลับ: {rollbackCommand}",
+  "@ut_e36a5ac905": {
+    "placeholders": {
+      "rollbackCommand": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_261ec8093d": "กำลังเชื่อมต่อ {hostLabel} อีกครั้ง · กำลังกู้คืนการเชื่อมต่อ",
+  "@ut_261ec8093d": {
+    "placeholders": {
+      "hostLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1568d540be": "คัดลอกอักขระ {length} แล้ว",
+  "@ut_1568d540be": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c14c3f2424": "เซสชันนี้ขัดข้อง {count} ครั้ง",
+  "@ut_c14c3f2424": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1f5bbded76": "พบเวอร์ชั่นใหม่ {version} คลิกเพื่อดู",
+  "@ut_1f5bbded76": {
+    "placeholders": {
+      "version": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5eb52c419e": "รุ่น {length} · {baseUrl}",
+  "@ut_5eb52c419e": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "baseUrl": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_01f2ee338e": "คำศัพท์ {length}",
+  "@ut_01f2ee338e": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_92bbd40515": "เปิดใช้งาน · ตรวจสอบ {biometricLabel} เมื่อเริ่มต้นระบบ",
+  "@ut_92bbd40515": {
+    "placeholders": {
+      "biometricLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8ecd2c14b5": "เชื่อมต่อแล้ว · เครื่องมือ {value}",
+  "@ut_8ecd2c14b5": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7c5becde1e": "{value} เครื่องมือ",
+  "@ut_7c5becde1e": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3d787403e1": "กลุ่มเจ้าบ้าน · {group}",
+  "@ut_3d787403e1": {
+    "placeholders": {
+      "group": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_def0dd4b20": "พิธีกร · {hostId}",
+  "@ut_def0dd4b20": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fddba05801": "คีย์ API {displayName}",
+  "@ut_fddba05801": {
+    "placeholders": {
+      "displayName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e42173cc90": "ดาวน์โหลดไปที่: {localPath}",
+  "@ut_e42173cc90": {
+    "placeholders": {
+      "localPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7a77df19f2": "การดาวน์โหลดล้มเหลว: {e}",
+  "@ut_7a77df19f2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c9db79438": "อ่านล้มเหลว: {e}",
+  "@ut_9c9db79438": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6f2c34a667": "การเปลี่ยนชื่อล้มเหลว: {e}",
+  "@ut_6f2c34a667": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf4419589b": "ลบล้มเหลว: {e}",
+  "@ut_cf4419589b": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c3b890cd74": "ไม่สามารถเปิดตัวเลือกไฟล์: {e}",
+  "@ut_c3b890cd74": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3f446bd9fe": "อัพโหลดแล้ว: {fileName}",
+  "@ut_3f446bd9fe": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9e12df0a1f": "การอัปโหลด {fileName} ล้มเหลว: {e}",
+  "@ut_9e12df0a1f": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e89a046c8b": "ไม่สามารถสร้างไดเร็กทอรี: {e}",
+  "@ut_e89a046c8b": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6c61736431": "การอัปโหลด {name} ล้มเหลว: {e}",
+  "@ut_6c61736431": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3cc564d9ac": "นำเข้าโฮสต์ {ok} แล้ว (ต้องกรอกข้อมูลรับรองในหน้าแก้ไขโฮสต์)",
+  "@ut_3cc564d9ac": {
+    "placeholders": {
+      "ok": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_218046bbfd": "วางบรรทัด {length} หรือไม่",
+  "@ut_218046bbfd": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c40c983842": "{preview}\n…และเส้น {more}",
+  "@ut_c40c983842": {
+    "placeholders": {
+      "preview": {
+        "type": "Object"
+      },
+      "more": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3482231651": "บันทึกไว้ใน {path}",
+  "@ut_3482231651": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_aa865c9773": "รายการ",
+  "ut_75282877a3": "บทความ · การแทรกบริบท AI",
+  "ut_35f3bcac7a": "บันทึกสถานีแล้ว",
+  "ut_c32994dbf5": "ไต้หวัน",
+  "ut_2cdff50b37": "กลุ่ม",
+  "ut_f7826628c0": "นาทีที่แล้ว",
+  "ut_bfa2c2000f": "ชั่วโมงที่ผ่านมา",
+  "ut_15e2558649": "วันที่ผ่านมา",
+  "ut_e7b73487d7": "ตัวละคร",
+  "ut_babe4e8237": "เซิร์ฟเวอร์ {connected}/{total}",
+  "@ut_babe4e8237": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_95860656bf": "สวิตช์หลัก MCP ปิดอยู่ · เซิร์ฟเวอร์ {connected}/{total} เชื่อมต่อแล้ว",
+  "@ut_95860656bf": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e12efa5ddb": "เซิร์ฟเวอร์ {connected}/{total} · เครื่องมือ {tools} รายการสำหรับเอเจนต์",
+  "@ut_e12efa5ddb": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      },
+      "tools": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3330b55acf": "{value} ทรัพยากร",
+  "@ut_3330b55acf": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf674ef0f8": "{value} พรอมต์",
+  "@ut_cf674ef0f8": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  }
 }

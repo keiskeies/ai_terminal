@@ -6,9 +6,9 @@ library;
 
 import 'dart:io';
 
-import '../core/ui_text.dart';
 import '../models/host_config.dart';
 import '../utils/ssh_config_parser.dart';
+import '../core/l10n_holder.dart';
 
 /// 默认配置文件路径（不含内容）；不存在时 [SshConfigImportSource.exists] 为 false。
 class SshConfigImportSource {
@@ -54,7 +54,7 @@ class SshConfigImportService {
           path: path,
           exists: true,
           readError:
-              UiText.t('读取失败: ${e.message}', 'Read failed: ${e.message}'));
+              L10n.str.ut_62e6c24a03(e.message));
     }
   }
 

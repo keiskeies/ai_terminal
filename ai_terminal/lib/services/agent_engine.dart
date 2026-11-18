@@ -507,13 +507,12 @@ class AgentEngine {
       }
     });
 
-    onEvent?.call(AgentEvent.info(UiText.t('⚠️ 该操作会改动本机文件，需要确认:\n$display',
-        '⚠️ This operation will modify local files and needs confirmation:\n$display')));
+    onEvent?.call(AgentEvent.info(L10n.str.ut_07c39ce9ce(display)));
     _currentTask = _currentTask?.copyWith(
       status: AgentStatus.waitingConfirm,
       phase: UiText.t('等待确认', 'Waiting for confirmation'),
       currentStep:
-          UiText.t('等待确认: $toolName', 'Waiting for confirmation: $toolName'),
+          L10n.str.ut_b306912acf(toolName),
     );
     _notifyTaskUpdate();
 
@@ -1575,7 +1574,7 @@ class AgentEngine {
             content: '用户补充: $steering',
           ));
           onEvent?.call(AgentEvent.info(
-              UiText.t('💬 用户补充: $steering', '💬 User steering: $steering')));
+              L10n.str.ut_0968807bf1(steering)));
         }
         // 补充可能是提问而不是指令（"刚才为何用压缩"这类）。不引导的话
         // 模型会把它当任务指令，继续执行甚至反刍上一任务的总结。
@@ -1942,8 +1941,7 @@ class AgentEngine {
 
     if (hitMaxSteps) {
       agentLogger.warn('ReAct', '达到最大执行步数 $maxSteps');
-      onEvent?.call(AgentEvent.info(UiText.t('⚠️ 达到最大执行步数 ($maxSteps)，任务被中断',
-          '⚠️ Max execution steps reached ($maxSteps); task interrupted')));
+      onEvent?.call(AgentEvent.info(L10n.str.ut_478eec6181(maxSteps)));
       _emitOperationReport(finishState: AgentFinishState.interrupted);
       onEvent?.call(AgentEvent.finish(
         summary: L10n.str.taskMaxSteps,
@@ -2150,9 +2148,7 @@ class AgentEngine {
             activeProvider = _fallbackProvider!;
             activeConfig = _fallbackConfig!;
             // 通知 UI：模型已切换
-            onEvent?.call(AgentEvent.info(UiText.t(
-                '⚠️ 主模型 ${_modelConfig.modelName} 不可用，已切换到备用模型 ${activeConfig.modelName}',
-                '⚠️ Primary model ${_modelConfig.modelName} unavailable; switched to fallback model ${activeConfig.modelName}')));
+            onEvent?.call(AgentEvent.info(L10n.str.ut_fa2224f3f9(_modelConfig.modelName, activeConfig.modelName)));
             continue;
           }
           rethrow;
@@ -2384,9 +2380,7 @@ class AgentEngine {
         // 每轮只执行第一个动作：多余的 execute 走既有 _announcedFollowUps
         // 机制逐条执行，其余多余调用忽略并提示。
         if (i > 0 && c.name != 'execute') {
-          events.add(AgentEvent.info(UiText.t(
-              '⚠️ 本轮忽略多余的工具调用: ${c.name}（每轮只执行一个动作）',
-              '⚠️ Ignored extra tool call this round: ${c.name} (only one action runs per round)')));
+          events.add(AgentEvent.info(L10n.str.ut_971883a7fe(c.name)));
         }
       }
     }
@@ -3360,7 +3354,7 @@ class AgentEngine {
       final readOnly = _permissionMode == AgentPermissionMode.readOnly;
       onEvent?.call(AgentEvent.info(
           '🔒 ${readOnly ? UiText.t('只读模式已开启，此命令被拒绝执行', 'Read-only mode is on; this command was not allowed to run') : UiText.t('当前权限模式，此命令被拒绝执行', 'Blocked by the current permission mode; this command was not allowed to run')}: `$command`\n'
-          '${UiText.t('等级: $safetyLevel', 'Level: $safetyLevel')}\n${UiText.t('说明: $reason', 'Reason: $reason')}'));
+          '${L10n.str.ut_cb255683ce(safetyLevel)}\n${L10n.str.ut_ee0b938b2c(reason)}'));
       // 审计日志：被拦截的 blocked 命令追加记录（执行前已写一条 executed=false）
       if (hostId != null && safetyLevel == SafetyLevel.blocked) {
         try {
@@ -3860,7 +3854,7 @@ class AgentEngine {
     // 不能只靠后面那条 info 事件反推（跨轮/跨段就断了）。
     pendingAsk?.chosenAnswer = choice;
     onEvent?.call(
-        AgentEvent.info(UiText.t('👉 你选择了: $choice', '👉 You chose: $choice')));
+        AgentEvent.info(L10n.str.ut_a61b05ce9b(choice)));
 
     // 以 ReAct 观测格式反馈
     final observation = '观测: 用户选择了 "$choice"';
@@ -4071,9 +4065,7 @@ class AgentEngine {
       // execute 别名但没给命令：告诉模型缺参数，不算致命失败
       if (_executeAliasNames.contains(alias)) {
         agentLogger.warn('ReAct', '$alias 别名缺少 command 参数');
-        onEvent?.call(AgentEvent.info(UiText.t(
-            '⚠️ AI 调用 $alias 但未提供 command 参数',
-            '⚠️ Model called $alias but did not provide the command parameter')));
+        onEvent?.call(AgentEvent.info(L10n.str.ut_386b3634c1(alias)));
         _conversationHistory.add(ChatMessage.create(
             role: 'user', content: '观测: $alias 调用缺少 command 参数（要执行的命令），请重试。'));
         _trimMessages(_conversationHistory);
@@ -4113,7 +4105,7 @@ class AgentEngine {
     if (tool == null) {
       agentLogger.warn('ReAct', '未知工具: $toolName');
       onEvent?.call(AgentEvent.info(
-          UiText.t('⚠️ 未知工具: $toolName', '⚠️ Unknown tool: $toolName')));
+          L10n.str.ut_0eed0d18c7(toolName)));
       final available = _tools.all.map((t) => t.name).join(', ');
       final observation = '观测: 工具 $toolName 不存在。可用工具: $available';
       _conversationHistory
@@ -4133,8 +4125,7 @@ class AgentEngine {
     // 判据由 ToolKind 派生，新增写类工具自动受管，不需要再维护第二份名单。
     if (_permissionMode == AgentPermissionMode.readOnly && !tool.isReadOnly) {
       agentLogger.info('ReAct', '只读模式拦截工具: $toolName');
-      onEvent?.call(AgentEvent.info(UiText.t('🔒 只读模式已开启，此工具被拒绝执行: `$toolName`',
-          '🔒 Read-only mode is on; this tool was not allowed to run: `$toolName`')));
+      onEvent?.call(AgentEvent.info(L10n.str.ut_21239ba62c(toolName)));
       const observation = '观测: 当前为只读模式，禁止调用会产生变更的工具。'
           '请改用只读工具/命令收集信息，或用 finish 告知用户"当前为只读模式，请关闭后重试"。';
       _conversationHistory
@@ -4154,8 +4145,7 @@ class AgentEngine {
     if (!visible.any((t) => t.name == toolName)) {
       agentLogger.warn(
           'ReAct', '工具在当前会话不可用: $toolName (local=$_isLocalSession)');
-      onEvent?.call(AgentEvent.info(UiText.t('⚠️ 工具 `$toolName` 在当前会话不可用',
-          '⚠️ Tool `$toolName` is not available in this session')));
+      onEvent?.call(AgentEvent.info(L10n.str.ut_339abc33a7(toolName)));
       final available = visible.map((t) => t.name).join(', ');
       final observation = '观测: 工具 $toolName 在当前会话不可用。当前可用工具: $available';
       _conversationHistory
@@ -4361,8 +4351,7 @@ class AgentEngine {
     } catch (e) {
       toolStopwatch.stop();
       agentLogger.error('ReAct', '工具 $toolName 执行异常: $e');
-      onEvent?.call(AgentEvent.info(UiText.t('❌ 工具 $toolName 执行异常: $e',
-          '❌ Tool $toolName threw an exception: $e')));
+      onEvent?.call(AgentEvent.info(L10n.str.ut_2bd0b4985d(toolName, e)));
       // 工具异常也要有 result 事件，避免证据层只有命令没有结果
       onEvent?.call(AgentEvent.result(
         commandId: toolCommandEvent.id,

@@ -12,6 +12,7 @@ import '../l10n/app_localizations.dart';
 import '../models/knowledge_rule.dart';
 import '../providers/knowledge_rule_provider.dart';
 import '../services/daos.dart';
+import '../core/l10n_holder.dart';
 
 const _uuid = Uuid();
 
@@ -54,8 +55,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
       if (!mounted) return;
       showTopSnackBar(context,
         SnackBar(
-          content: Text(UiText.t('已导出 ${rules.length} 条到 $path',
-              'Exported ${rules.length} rules to $path')),
+          content: Text(L10n.str.ut_cbd8c9bc33(rules.length, path)),
           backgroundColor: cSuccess,
           behavior: SnackBarBehavior.floating,
         ),
@@ -64,7 +64,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
       if (!mounted) return;
       showTopSnackBar(context,
         SnackBar(
-          content: Text(UiText.t('导出失败: $e', 'Export failed: $e')),
+          content: Text(L10n.str.ut_b078e9e8b1(e)),
           backgroundColor: cDanger,
           behavior: SnackBarBehavior.floating,
         ),
@@ -90,14 +90,11 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
           .importFromJson(source, knownHostIds: knownHostIds);
       if (!mounted) return;
       final skippedHint = result.skippedUnknownHost > 0
-          ? UiText.t('，跳过 ${result.skippedUnknownHost} 条未知主机规则',
-              ', skipped ${result.skippedUnknownHost} rules for unknown hosts')
+          ? L10n.str.ut_81d685bdc0(result.skippedUnknownHost)
           : '';
       showTopSnackBar(context,
         SnackBar(
-          content: Text(UiText.t(
-              '已导入 ${result.imported} 条规范$skippedHint',
-              'Imported ${result.imported} rules$skippedHint')),
+          content: Text(L10n.str.ut_f59978a9af(result.imported, skippedHint)),
           backgroundColor: cSuccess,
           behavior: SnackBarBehavior.floating,
         ),
@@ -106,7 +103,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
       if (!mounted) return;
       showTopSnackBar(context,
         SnackBar(
-          content: Text(UiText.t('导入失败: $e', 'Import failed: $e')),
+          content: Text(L10n.str.ut_4bda191f7f(e)),
           backgroundColor: cDanger,
           behavior: SnackBarBehavior.floating,
         ),

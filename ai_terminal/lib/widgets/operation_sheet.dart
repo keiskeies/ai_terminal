@@ -11,6 +11,7 @@ import '../models/token_usage.dart';
 import '../models/plan_step.dart';
 import '../utils/agent_ui_text.dart';
 import 'plan_panel.dart';
+import '../core/l10n_holder.dart';
 
 /// 操作单：一轮 Agent 任务的结论 + 元数据 + 可折叠证据
 ///
@@ -558,7 +559,7 @@ class OperationSheet extends StatelessWidget {
                   rolledBack
                       ? UiText.t('已执行回滚', 'Rolled back')
                       : change.canRollback
-                          ? UiText.t('回滚：${change.rollbackCommand}', 'Rollback: ${change.rollbackCommand}')
+                          ? L10n.str.ut_e36a5ac905(change.rollbackCommand ?? '')
                           : UiText.t('无自动回滚，建议使用执行前快照', 'No automatic rollback; use a pre-change snapshot'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

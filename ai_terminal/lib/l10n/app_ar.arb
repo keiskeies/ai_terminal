@@ -8,170 +8,170 @@
   "agentRunning": "الوكيل ينفذ مهمة، يرجى الانتظار",
   "agentSettingAiTimeoutDesc": "تُعد المهلة منتهية إذا لم يصل أي ناتج من النموذج خلال هذه المدة. زد القيمة عند استخدام نماذج محلية بطيئة.",
   "agentSettingAiTimeoutLabel": "مهلة استجابة الذكاء الاصطناعي",
-  "agentSettingAutoExecSection": "AI Auto Execution",
-  "agentSettingBuiltInPrompt": "AI Built-in Instructions",
-  "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",
-  "agentSettingBuiltInPromptSubtitle": "Modify AI's basic instructions",
-  "agentSettingBuiltInSaved": "AI built-in instructions saved",
-  "agentSettingCustomPromptHint": "e.g., Respond in English, use concise format, prefer Docker...",
-  "agentSettingExtraPrompt": "Additional Instructions",
-  "agentSettingExtraPromptDesc": "Additional requirements appended to built-in instructions to adjust AI's response style. Leave empty to skip.",
-  "agentSettingExtraPromptSaved": "Additional instructions saved",
-  "agentSettingExtraPromptSubtitle": "Additional requirements appended to built-in instructions",
-  "agentSettingHundredSteps": "100 steps",
-  "agentSettingMaxStepsDesc": "Maximum number of steps AI takes when executing commands automatically. Set to 0 for unlimited steps; complex tasks will not be interrupted.",
-  "agentSettingMaxStepsLabel": "Max steps AI can execute automatically",
-  "agentSettingPromptSection": "AI Prompts",
-  "agentSettingPromptWarning": "⚠️ Modify with caution. Inappropriate prompts may cause abnormal AI behavior. Click \"Reset\" to restore defaults at any time.",
-  "agentSettingTitle": "Agent Settings",
+  "agentSettingAutoExecSection": "التنفيذ الآلي بالذكاء الاصطناعي",
+  "agentSettingBuiltInPrompt": "تعليمات الذكاء الاصطناعي المضمنة",
+  "agentSettingBuiltInPromptDesc": "هذه هي التعليمات الأساسية للذكاء الاصطناعي وستدخل حيز التنفيذ فورًا بعد التعديل. سيتم استبدال \"السياق\" الموجود بالداخل بمعلومات الخادم.",
+  "agentSettingBuiltInPromptSubtitle": "تعديل التعليمات الأساسية للذكاء الاصطناعي",
+  "agentSettingBuiltInSaved": "تم حفظ تعليمات الذكاء الاصطناعي المضمنة",
+  "agentSettingCustomPromptHint": "على سبيل المثال: الإجابة باللغة الإنجليزية، والإخراج بتنسيق موجز، واستخدام Docker أولاً...",
+  "agentSettingExtraPrompt": "تعليمات إضافية",
+  "agentSettingExtraPromptDesc": "يمكن للمتطلبات الإضافية المضافة إلى التعليمات المضمنة ضبط أسلوب الرد الخاص بالذكاء الاصطناعي. اتركه فارغًا لعدم الإلحاق.",
+  "agentSettingExtraPromptSaved": "تم حفظ التعليمات الإضافية",
+  "agentSettingExtraPromptSubtitle": "متطلبات إضافية بعد التوجيهات المضمنة",
+  "agentSettingHundredSteps": "100 خطوة",
+  "agentSettingMaxStepsDesc": "عندما ينفذ الذكاء الاصطناعي أمرًا تلقائيًا، فإن الأمر يستغرق بضع خطوات على الأكثر. ويعني ضبطه على 0 أنه لا يوجد حد لعدد الخطوات، ولن تتم مقاطعة المهام المعقدة في منتصف الطريق.",
+  "agentSettingMaxStepsLabel": "يمكن للذكاء الاصطناعي تنفيذ بضع خطوات تلقائيًا على الأكثر",
+  "agentSettingPromptSection": "كلمات سريعة لمنظمة العفو الدولية",
+  "agentSettingPromptWarning": "⚠️ كن حذرًا عند التعديل، فقد تؤدي الكلمات السريعة غير المناسبة إلى سلوك غير طبيعي للذكاء الاصطناعي. يمكنك النقر فوق \"إعادة تعيين\" في أي وقت لاستعادة الإعداد الافتراضي.",
+  "agentSettingTitle": "إعدادات الوكيل",
   "agentSettings": "الوكيل",
   "agentSettingsDesc": "الحد الأقصى للخطوات التي ينفذها الذكاء الاصطناعي تلقائيًا (0 = غير محدود)",
   "aiAndIntelligence": "الذكاء الاصطناعي",
-  "aiModelAdd": "Add Model",
-  "aiModelApiKeyInvalid": "Invalid API Key",
-  "aiModelApiKeyRequired": "Please enter an API Key",
-  "aiModelBaseUrlRequired": "Please enter a Base URL",
-  "aiModelCannotConnect": "Unable to connect",
+  "aiModelAdd": "إضافة نموذج",
+  "aiModelApiKeyInvalid": "مفتاح API غير صالح",
+  "aiModelApiKeyRequired": "الرجاء إدخال مفتاح API",
+  "aiModelBaseUrlRequired": "الرجاء إدخال عنوان URL الأساسي",
+  "aiModelCannotConnect": "غير قادر على الاتصال",
   "aiModelConfig": "نماذج الذكاء الاصطناعي",
   "aiModelConfigDesc": "إعداد مفاتيح API ومعلمات النموذج",
-  "aiModelConnectionTimeout": "Connection timeout",
-  "aiModelDeleteConfirm": "Are you sure you want to delete \"{name}\"?",
-  "aiModelDeleteTitle": "Delete Model",
-  "aiModelEditTitle": "Edit Model",
-  "aiModelEmptySubtitle": "Add an endpoint to group multiple models under one API key",
-  "aiModelEmptyTitle": "No AI models yet",
-  "aiModelMaxTokens": "Max Response Tokens",
-  "aiModelModelName": "Model Name",
-  "aiModelModelNameRequired": "Please enter a model name",
-  "aiModelNameError": "Incorrect model name",
-  "aiModelNameRequired": "Please enter a name",
-  "aiModelProvider": "AI Provider",
-  "aiModelProvidersUpdated": "Provider list updated ({count} providers)",
-  "aiModelRefreshProviders": "Refresh provider list",
-  "aiModelRemoteConfigEmpty": "Remote configuration is empty",
-  "aiModelRequestFailed": "Request failed ({code})",
-  "aiModelServerError": "Server error ({code})",
-  "aiModelSetAsDefault": "Set as default model",
-  "aiModelSetDefault": "Set as Default",
-  "aiModelTemperature": "Randomness",
-  "aiModelTest": "Test",
-  "aiModelTestFailed": "Test failed",
-  "aiModelTitle": "AI Model Configuration",
-  "aiModelTooManyRequests": "Too many requests",
-  "aiModelUpdateFailed": "Update failed: {error}",
+  "aiModelConnectionTimeout": "مهلة الاتصال",
+  "aiModelDeleteConfirm": "هل أنت متأكد أنك تريد حذف \"{name}\"؟",
+  "aiModelDeleteTitle": "حذف النموذج",
+  "aiModelEditTitle": "تحرير النموذج",
+  "aiModelEmptySubtitle": "أضف نقطة نهاية. يمكن تكوين نماذج متعددة تحت نقطة نهاية واحدة.",
+  "aiModelEmptyTitle": "لا يوجد نموذج للذكاء الاصطناعي حتى الآن",
+  "aiModelMaxTokens": "الحد الأقصى لعدد الأحرف في الرد",
+  "aiModelModelName": "اسم النموذج",
+  "aiModelModelNameRequired": "الرجاء إدخال اسم النموذج",
+  "aiModelNameError": "اسم الموديل خاطئ",
+  "aiModelNameRequired": "الرجاء إدخال الاسم",
+  "aiModelProvider": "مزود خدمة الذكاء الاصطناعي",
+  "aiModelProvidersUpdated": "تم تحديث قائمة الموفرين (موفري {count})",
+  "aiModelRefreshProviders": "تحديث قائمة مزودي الخدمة",
+  "aiModelRemoteConfigEmpty": "التكوين عن بعد فارغ",
+  "aiModelRequestFailed": "فشل الطلب ({code})",
+  "aiModelServerError": "خطأ في الخادم ({code})",
+  "aiModelSetAsDefault": "تعيين كنموذج افتراضي",
+  "aiModelSetDefault": "تعيين كافتراضي",
+  "aiModelTemperature": "العشوائية",
+  "aiModelTest": "اختبار",
+  "aiModelTestFailed": "فشل الاختبار",
+  "aiModelTitle": "تكوين نموذج الذكاء الاصطناعي",
+  "aiModelTooManyRequests": "الطلبات متكررة جدًا",
+  "aiModelUpdateFailed": "فشل التحديث: {error}",
   "aiPanel": "لوحة الذكاء الاصطناعي",
   "appTitle": "AI Terminal",
   "appearance": "المظهر",
   "appearanceDesc": "الوضع الداكن/الفاتح، حجم الخط، نظام الألوان",
-  "appearanceDisplayMode": "Display Mode",
-  "appearanceDisplayModeDesc": "Choose dark or light interface",
-  "appearanceFontSizeDesc": "Drag the slider to adjust terminal text size",
-  "appearanceTitle": "Appearance Settings",
+  "appearanceDisplayMode": "وضع العرض",
+  "appearanceDisplayModeDesc": "اختر واجهة داكنة أو فاتحة",
+  "appearanceFontSizeDesc": "اسحب شريط التمرير لضبط حجم النص الطرفي",
+  "appearanceTitle": "إعدادات المظهر",
   "auditLog": "سجل النشاط",
-  "auditLogAllTitle": "All Audit Logs",
-  "auditLogCopied": "Copied {count} logs to clipboard",
-  "auditLogCopyTooltip": "Copy Records",
+  "auditLogAllTitle": "جميع سجلات العمليات",
+  "auditLogCopied": "تم نسخ سجلات {count} إلى الحافظة",
+  "auditLogCopyTooltip": "سجل النسخ",
   "auditLogDesc": "شاهد من نفّذ أي أمر ومتى",
-  "auditLogEmpty": "No audit logs",
-  "auditLogExecuted": "Executed",
-  "auditLogExportHeader": "# Audit Log Export",
-  "auditLogExportTime": "# Export time: {time}",
-  "auditLogExportTotal": "# Total: {count}",
-  "auditLogFilterAll": "All Records",
-  "auditLogFilterBlocked": "Only Blocked",
-  "auditLogFilterThisHost": "Only Current Host",
-  "auditLogNoMatch": "No matching records",
-  "auditLogNoRecordsToCopy": "No records to copy",
-  "auditLogNotExecuted": "Not Executed",
-  "auditLogOutput": "Output",
-  "auditLogSafetyBlocked": "Blocked",
-  "auditLogSafetyDanger": "Danger",
-  "auditLogSafetySafe": "Safe",
-  "auditLogSafetyWarning": "Warning",
-  "auditLogSearchHint": "Search command, server, output...",
-  "auditLogTitle": "Audit Log",
+  "auditLogEmpty": "لا يوجد سجل العملية حتى الآن",
+  "auditLogExecuted": "تم تنفيذه",
+  "auditLogExportHeader": "# تصدير سجلات العمليات",
+  "auditLogExportTime": "# وقت التصدير: {time}",
+  "auditLogExportTotal": "# إجمالي عدد العناصر: {count}",
+  "auditLogFilterAll": "جميع السجلات",
+  "auditLogFilterBlocked": "منعت فقط",
+  "auditLogFilterThisHost": "المضيف الحالي فقط",
+  "auditLogNoMatch": "لا توجد سجلات متطابقة",
+  "auditLogNoRecordsToCopy": "لا توجد سجلات لنسخها",
+  "auditLogNotExecuted": "لم يتم تنفيذه",
+  "auditLogOutput": "الإخراج",
+  "auditLogSafetyBlocked": "محظور",
+  "auditLogSafetyDanger": "خطر",
+  "auditLogSafetySafe": "آمنة",
+  "auditLogSafetyWarning": "تحذير",
+  "auditLogSearchHint": "أوامر البحث والخوادم والمخرجات ...",
+  "auditLogTitle": "سجل العملية",
   "authMethod": "طريقة المصادقة",
   "cancel": "إلغاء",
-  "changeRecordAllTitle": "All Change Records",
-  "changeRecordConfirmRollback": "Confirm Rollback",
-  "changeRecordEmpty": "No change records",
-  "changeRecordEmptyHint": "Changes (such as installing, starting/stopping services) will be recorded automatically",
-  "changeRecordFailed": "Failed",
-  "changeRecordFilterAll": "All Records",
-  "changeRecordFilterRollbackable": "Only Rollbackable",
-  "changeRecordFilterThisHost": "Only Current Host",
-  "changeRecordHostNotConnected": "Server {hostId} is not connected, cannot roll back. Please connect to the server first.",
-  "changeRecordNotRollbackable": "This record does not support automatic rollback",
-  "changeRecordOriginalCommand": "Original command: {command}",
-  "changeRecordRollbackButton": "Rollback",
-  "changeRecordRollbackError": "Rollback error: {error}",
-  "changeRecordRollbackFailed": "Rollback failed: {stderr}",
-  "changeRecordRollbackFailedNoExec": "Rollback failed: cannot execute",
-  "changeRecordRollbackOnHost": "The following rollback command will be executed on server {hostName}:",
-  "changeRecordRollbackSuccess": "Rollback succeeded: {command}",
-  "changeRecordRolledBack": "Rolled Back",
-  "changeRecordRollingBack": "Rolling back: {command}",
-  "changeRecordSuccess": "Success",
-  "changeRecordTitle": "Change Records",
-  "changeRecordTypeFileOperation": "File Operation",
-  "changeRecordTypeInstall": "Install",
-  "changeRecordTypeModifyConfig": "Config Change",
-  "changeRecordTypeOther": "Other",
-  "changeRecordTypePermission": "Permission Change",
-  "changeRecordTypeRestartService": "Restart Service",
-  "changeRecordTypeStartService": "Start Service",
-  "changeRecordTypeStopService": "Stop Service",
-  "changeRecordTypeUninstall": "Uninstall",
+  "changeRecordAllTitle": "كل تغيير التاريخ",
+  "changeRecordConfirmRollback": "تأكيد الإلغاء",
+  "changeRecordEmpty": "لا يوجد سجل التغيير حتى الآن",
+  "changeRecordEmptyHint": "بعد إجراء التغييرات (مثل تثبيت الخدمات وبدءها وإيقافها)، سيتم تسجيلها تلقائيًا.",
+  "changeRecordFailed": "فشل",
+  "changeRecordFilterAll": "جميع السجلات",
+  "changeRecordFilterRollbackable": "لا يمكن إلا أن يتم إبطالها",
+  "changeRecordFilterThisHost": "المضيف الحالي فقط",
+  "changeRecordHostNotConnected": "الخادم {hostId} غير متصل ولا يمكن إبطاله. الرجاء الاتصال بهذا الخادم أولاً.",
+  "changeRecordNotRollbackable": "لا يدعم هذا السجل الإلغاء التلقائي",
+  "changeRecordOriginalCommand": "الأمر الأصلي: {command}",
+  "changeRecordRollbackButton": "إلغاء",
+  "changeRecordRollbackError": "التراجع عن الخطأ: {error}",
+  "changeRecordRollbackFailed": "فشل التراجع: {stderr}",
+  "changeRecordRollbackFailedNoExec": "فشل التراجع: غير قادر على التنفيذ",
+  "changeRecordRollbackOnHost": "سيتم تنفيذ أمر التراجع على الخادم {hostName}:",
+  "changeRecordRollbackSuccess": "تم الإلغاء بنجاح: {command}",
+  "changeRecordRolledBack": "تم إبطاله",
+  "changeRecordRollingBack": "الإلغاء: {command}",
+  "changeRecordSuccess": "النجاح",
+  "changeRecordTitle": "تغيير التاريخ",
+  "changeRecordTypeFileOperation": "عمليات الملف",
+  "changeRecordTypeInstall": "التثبيت",
+  "changeRecordTypeModifyConfig": "تعديل التكوين",
+  "changeRecordTypeOther": "الآخرين",
+  "changeRecordTypePermission": "تعديل الإذن",
+  "changeRecordTypeRestartService": "إعادة تشغيل الخدمة",
+  "changeRecordTypeStartService": "ابدأ الخدمة",
+  "changeRecordTypeStopService": "إيقاف الخدمة",
+  "changeRecordTypeUninstall": "إلغاء التثبيت",
   "changeRecords": "سجل التغييرات",
   "changeRecordsDesc": "تتبع جميع التغييرات والتراجع إذا تعطل شيء ما",
   "changeWindow": "ساعات آمنة",
-  "changeWindowAllDayAllowed": "Allowed all day",
-  "changeWindowAllowedWindow": "Allowed Window",
-  "changeWindowCrossDayHint": "Tip: A start time later than the end time means overnight (e.g., 22:00 to next day 06:00)",
-  "changeWindowCurrentWindowInfo": "Current allowed window: {window}\nCommands that make changes will be rejected at other times (read-only commands are not affected).",
+  "changeWindowAllDayAllowed": "مسموح به طوال اليوم",
+  "changeWindowAllowedWindow": "الفترة المسموح بها",
+  "changeWindowCrossDayHint": "نصيحة: وقت البدء متأخر عن وقت الانتهاء، مما يعني أنه يعبر الليل (مثل الساعة 22:00 إلى الساعة 06:00 من اليوم التالي)",
+  "changeWindowCurrentWindowInfo": "الفترة المسموح بها الحالية: {window}\nسيتم رفض الأوامر التي تجري تغييرات في أوقات أخرى (لا تتأثر أوامر العرض).",
   "changeWindowDesc": "تقييد التغييرات على نوافذ زمنية آمنة محددة",
-  "changeWindowEnable": "Enable Safe Window",
-  "changeWindowEnableHint": "When enabled, changes can only be made during the set window",
-  "changeWindowEndHour": "End hour",
-  "changeWindowEveryDay": "{window}, every day",
-  "changeWindowOnlyDays": "{window}, only {days}",
-  "changeWindowSaveConfig": "Save Config",
-  "changeWindowSaveFailed": "Save failed: {error}",
-  "changeWindowSaved": "Safe window settings saved",
-  "changeWindowStartHour": "Start hour",
-  "changeWindowTitle": "Safe Window",
-  "changeWindowToNextDay": "{start} to next day {end}",
-  "changeWindowWeekdayFri": "Fri",
-  "changeWindowWeekdayMon": "Mon",
-  "changeWindowWeekdaySat": "Sat",
-  "changeWindowWeekdaySun": "Sun",
-  "changeWindowWeekdayThu": "Thu",
-  "changeWindowWeekdayTue": "Tue",
-  "changeWindowWeekdayWed": "Wed",
-  "changeWindowWeekdaysTitle": "Which days are allowed (none = every day)",
-  "chatBackToServerList": "Back to server list",
-  "chatClearSession": "Clear session",
-  "chatConnectServerHint": "Please connect to a server first, then tap the AI button in the bottom right on the terminal page",
-  "chatEmptyHint": "e.g. install Docker, check memory usage",
-  "chatEmptyTitle": "How can I help you?",
-  "chatInputHint": "Type a command or question...",
-  "chatNeedTerminal": "AI assistant needs to be used in a terminal",
+  "changeWindowEnable": "تمكين ساعات آمنة",
+  "changeWindowEnableHint": "بمجرد تمكينه، لا يمكن إجراء التغييرات إلا خلال الفترة الزمنية المحددة.",
+  "changeWindowEndHour": "في أي وقت سوف تنتهي؟",
+  "changeWindowEveryDay": "{window}، كل يوم",
+  "changeWindowOnlyDays": "{window}، فقط {days}",
+  "changeWindowSaveConfig": "حفظ التكوين",
+  "changeWindowSaveFailed": "فشل الحفظ: {error}",
+  "changeWindowSaved": "تم حفظ إعدادات الساعات الآمنة",
+  "changeWindowStartHour": "من أي وقت مسموح؟",
+  "changeWindowTitle": "فترة آمنة",
+  "changeWindowToNextDay": "{start} إلى اليوم التالي {end}",
+  "changeWindowWeekdayFri": "الجمعة",
+  "changeWindowWeekdayMon": "الاثنين",
+  "changeWindowWeekdaySat": "السبت",
+  "changeWindowWeekdaySun": "الأحد",
+  "changeWindowWeekdayThu": "الخميس",
+  "changeWindowWeekdayTue": "الثلاثاء",
+  "changeWindowWeekdayWed": "الأربعاء",
+  "changeWindowWeekdaysTitle": "ما هي الأيام المسموح بها (لا يوجد خيار = كل يوم)",
+  "chatBackToServerList": "العودة إلى قائمة الخادم",
+  "chatClearSession": "جلسة واضحة",
+  "chatConnectServerHint": "يرجى الاتصال بالخادم أولاً، ثم أدخل الصفحة الطرفية وانقر على زر AI في الزاوية اليمنى السفلية",
+  "chatEmptyHint": "على سبيل المثال: تثبيت Docker، والتحقق من استخدام الذاكرة",
+  "chatEmptyTitle": "كيف يمكنني مساعدتك؟",
+  "chatInputHint": "أدخل أمراً أو سؤالاً...",
+  "chatNeedTerminal": "يجب استخدام مساعد الذكاء الاصطناعي في المحطة",
   "clearMessagesFailed": "فشل مسح الرسائل",
   "close": "إغلاق",
-  "commonAIAssistant": "AI Assistant",
-  "commonAdvancedSettings": "Advanced Settings",
-  "commonAll": "All",
-  "commonBack": "Back",
-  "commonCancel": "Cancel",
-  "commonCommand": "Command",
-  "commonConfirm": "OK",
-  "commonCopiedToClipboard": "Copied to clipboard",
-  "commonDescription": "Description",
-  "commonExecute": "Execute",
-  "commonGotIt": "Got it",
-  "commonName": "Name",
-  "commonResetDefault": "Reset to Default",
-  "commonUnlimited": "Unlimited",
+  "commonAIAssistant": "مساعد الذكاء الاصطناعي",
+  "commonAdvancedSettings": "الإعدادات المتقدمة",
+  "commonAll": "الكل",
+  "commonBack": "العودة",
+  "commonCancel": "إلغاء",
+  "commonCommand": "الأمر",
+  "commonConfirm": "حسنًا",
+  "commonCopiedToClipboard": "تم النسخ إلى الحافظة",
+  "commonDescription": "الوصف",
+  "commonExecute": "تنفيذ",
+  "commonGotIt": "حصلت عليه",
+  "commonName": "الاسم",
+  "commonResetDefault": "إعادة تعيين الافتراضي",
+  "commonUnlimited": "غير محدود",
   "compactFailed": "فشل ضغط المحادثة",
   "compacting": "يجري ضغط المحادثة...",
   "confirm": "تأكيد",
@@ -206,107 +206,107 @@
   "fieldRequired": "هذا الحقل مطلوب",
   "followSystem": "النظام",
   "group": "المجموعة",
-  "hostEditAuthTypeLabel": "Authentication Method *",
-  "hostEditConfigSavedButCredFailed": "⚠️ Configuration saved, but {error}. Please retry.",
-  "hostEditConnectionTimeout": "Connection timeout: {timeout}s",
-  "hostEditDefaultGroup": "Default",
-  "hostEditEncodingLabel": "Character Encoding",
-  "hostEditGroupHint": "Enter or select a group",
-  "hostEditGroupLabel": "Group",
-  "hostEditHostHint": "IP address or domain",
-  "hostEditHostLabel": "Host Address *",
-  "hostEditHostRequired": "Please enter the host address",
-  "hostEditJumpAuthTypeLabel": "Jump Host Authentication",
-  "hostEditJumpHostFlowHint": "Will first connect to the jump host, then forward to the target server through it",
-  "hostEditJumpHostLabel": "Jump Host Address *",
-  "hostEditJumpPasswordLabel": "Jump Host Password",
-  "hostEditJumpPortLabel": "Jump Host Port",
-  "hostEditJumpPrivateKeyContent": "Jump Host Private Key Content",
-  "hostEditJumpUsernameLabel": "Jump Host Username",
-  "hostEditMoreSettings": "More Settings",
-  "hostEditNameHint": "e.g., Production Server",
-  "hostEditNameLabel": "Name *",
-  "hostEditNameRequired": "Please enter a name",
-  "hostEditPassphraseLabel": "Passphrase (optional)",
-  "hostEditPassword": "Password",
-  "hostEditPasswordSaveFailed": "Failed to save password",
-  "hostEditPastePrivateKey": "Paste Private Key",
-  "hostEditPastePrivateKeySubtitle": "Turn off to select from file",
-  "hostEditPortLabel": "Port",
-  "hostEditPrivateKey": "Private Key",
-  "hostEditPrivateKeyContent": "Private Key Content",
-  "hostEditPrivateKeyFileRead": "Private key file loaded: {name}",
-  "hostEditPrivateKeySaveFailed": "Failed to save private key",
-  "hostEditReadFileFailed": "Failed to read file: {error}",
-  "hostEditSave": "💾 Save",
-  "hostEditSaveSuccess": "✅ Saved successfully",
-  "hostEditSectionAuth": "Authentication",
-  "hostEditSectionBasic": "Basic Information",
-  "hostEditSectionGroupTag": "Group & Tag",
-  "hostEditSectionJumpHost": "Jump Host / Bastion",
-  "hostEditSectionSudo": "Privilege Escalation (sudo)",
-  "hostEditSelect": "Select",
-  "hostEditSelectGroupTooltip": "Select an existing group",
-  "hostEditSelectPrivateKeyFile": "Select Private Key File",
-  "hostEditSudoPasswordDesc": "Once configured, this password will be auto-filled when AI encounters a sudo password prompt. It is saved via system secure storage and never appears in commands or logs.",
-  "hostEditSudoPasswordHint": "Auto-injected when AI runs sudo commands",
-  "hostEditSudoPasswordLabel": "Sudo Password (optional)",
-  "hostEditTagColor": "Tag Color",
-  "hostEditTimeoutSeconds": "{timeout}s",
-  "hostEditTitleEdit": "Edit Server",
-  "hostEditTitleNew": "New Server",
-  "hostEditUseJumpHost": "Use Jump Host",
-  "hostEditUseJumpHostSubtitle": "Connect via jump host / bastion",
-  "hostEditUsernameLabel": "Username",
-  "hostListAITipIntro": "AI assistant is available after connecting to a server:",
-  "hostListAITipNote": "💡 AI can help you generate commands, explain output, and troubleshoot issues",
-  "hostListAITipStep1": "1️⃣  Tap a server card to open the terminal",
-  "hostListAITipStep2": "2️⃣  After connecting, the AI button appears in the bottom right",
-  "hostListAITipStep3": "3️⃣  Tap the AI button to start the smart command assistant",
-  "hostListAITipTitle": "AI assistant usage tips",
-  "hostListAddFirstServer": "Add your first server to start AI-assisted remote management",
-  "hostListClearSearch": "Clear search",
-  "hostListConnectTerminal": "Connect terminal",
-  "hostListDeleteConfirm": "Are you sure you want to delete \"{hostName}\"?\n\nSaved credentials will also be deleted.",
-  "hostListDeleteServer": "Delete server",
-  "hostListDeleteSuccess": "Deleted successfully",
-  "hostListEditConfig": "Edit configuration",
-  "hostListLoadFailed": "Failed to load: {error}",
-  "hostListNoSearchResults": "No matching servers found",
-  "hostListNoSearchResultsHint": "Try different keywords or check spelling",
-  "hostListNoServers": "No servers yet",
-  "hostListSearchHint": "Search servers...",
+  "hostEditAuthTypeLabel": "طريقة المصادقة *",
+  "hostEditConfigSavedButCredFailed": "⚠️ تم حفظ التكوين بنجاح، ولكن {error}، يرجى المحاولة مرة أخرى",
+  "hostEditConnectionTimeout": "مهلة الاتصال: {timeout} ثانية",
+  "hostEditDefaultGroup": "الافتراضي",
+  "hostEditEncodingLabel": "ترميز الأحرف",
+  "hostEditGroupHint": "أدخل أو حدد مجموعة",
+  "hostEditGroupLabel": "المجموعة",
+  "hostEditHostHint": "عنوان IP أو اسم المجال",
+  "hostEditHostLabel": "عنوان المضيف *",
+  "hostEditHostRequired": "الرجاء إدخال عنوان المضيف",
+  "hostEditJumpAuthTypeLabel": "طريقة مصادقة لوحة الربيع",
+  "hostEditJumpHostFlowHint": "سيتم توصيل جهاز Springboard أولاً ثم إعادة توجيهه إلى الخادم الهدف من خلال جهاز Springboard.",
+  "hostEditJumpHostLabel": "عنوان جهاز سبرينج بورد *",
+  "hostEditJumpPasswordLabel": "كلمة مرور نقطة انطلاق",
+  "hostEditJumpPortLabel": "ميناء نقطة انطلاق",
+  "hostEditJumpPrivateKeyContent": "محتوى المفتاح الخاص لجهاز Springboard",
+  "hostEditJumpUsernameLabel": "اسم مستخدم سبرينج بورد",
+  "hostEditMoreSettings": "المزيد من الإعدادات",
+  "hostEditNameHint": "على سبيل المثال: خادم الإنتاج",
+  "hostEditNameLabel": "الاسم *",
+  "hostEditNameRequired": "الرجاء إدخال الاسم",
+  "hostEditPassphraseLabel": "كلمة مرور المفتاح الخاص (اختياري)",
+  "hostEditPassword": "كلمة المرور",
+  "hostEditPasswordSaveFailed": "فشل حفظ كلمة المرور",
+  "hostEditPastePrivateKey": "الصق المفتاح الخاص",
+  "hostEditPastePrivateKeySubtitle": "أغلق ثم اختر من الملف",
+  "hostEditPortLabel": "ميناء",
+  "hostEditPrivateKey": "مفتاح خاص",
+  "hostEditPrivateKeyContent": "محتوى المفتاح الخاص",
+  "hostEditPrivateKeyFileRead": "قراءة ملف المفتاح الخاص: {name}",
+  "hostEditPrivateKeySaveFailed": "فشل حفظ المفتاح الخاص",
+  "hostEditReadFileFailed": "فشل في قراءة الملف: {error}",
+  "hostEditSave": "💾 حفظ",
+  "hostEditSaveSuccess": "✅ تم الحفظ بنجاح",
+  "hostEditSectionAuth": "طريقة المصادقة",
+  "hostEditSectionBasic": "المعلومات الأساسية",
+  "hostEditSectionGroupTag": "التجميع ووضع العلامات",
+  "hostEditSectionJumpHost": "آلة القفز/القلعة",
+  "hostEditSectionSudo": "تصعيد الامتياز (سودو)",
+  "hostEditSelect": "اختر",
+  "hostEditSelectGroupTooltip": "حدد مجموعة موجودة",
+  "hostEditSelectPrivateKeyFile": "حدد ملف المفتاح الخاص",
+  "hostEditSudoPasswordDesc": "بعد التكوين، سيقوم الذكاء الاصطناعي بملء كلمة المرور هذه تلقائيًا عند مواجهة مطالبة بكلمة المرور عند تنفيذ أمر sudo. يتم حفظ كلمات المرور في وحدة تخزين آمنة للنظام ولا تظهر في الأوامر أو السجلات.",
+  "hostEditSudoPasswordHint": "يتم حقن الذكاء الاصطناعي تلقائيًا عند تنفيذ أمر sudo",
+  "hostEditSudoPasswordLabel": "كلمة مرور سودو (اختياري)",
+  "hostEditTagColor": "لون التسمية",
+  "hostEditTimeoutSeconds": "{timeout} ثانية",
+  "hostEditTitleEdit": "تحرير الخادم",
+  "hostEditTitleNew": "إنشاء خادم جديد",
+  "hostEditUseJumpHost": "استخدم آلة الربيع",
+  "hostEditUseJumpHostSubtitle": "الاتصال عبر نقطة انطلاق/مضيف المعقل",
+  "hostEditUsernameLabel": "اسم المستخدم",
+  "hostListAITipIntro": "يجب استخدام مساعد الذكاء الاصطناعي بعد الاتصال بالخادم:",
+  "hostListAITipNote": "💡 يمكن أن يساعدك الذكاء الاصطناعي في إنشاء الأوامر وتفسير المخرجات واستكشاف المشكلات وإصلاحها",
+  "hostListAITipStep1": "1️⃣ انقر على بطاقة الخادم للدخول إلى المحطة",
+  "hostListAITipStep2": "2️⃣ بعد نجاح الاتصال، سيظهر زر الذكاء الاصطناعي في الزاوية اليمنى السفلية",
+  "hostListAITipStep3": "3️⃣ انقر فوق زر AI لبدء تشغيل مساعد الأوامر الذكي",
+  "hostListAITipTitle": "نصائح لاستخدام مساعد الذكاء الاصطناعي",
+  "hostListAddFirstServer": "أضف خادمك الأول وابدأ الإدارة عن بعد بمساعدة الذكاء الاصطناعي",
+  "hostListClearSearch": "مسح البحث",
+  "hostListConnectTerminal": "ربط المحطة",
+  "hostListDeleteConfirm": "هل أنت متأكد أنك تريد حذف \"{hostName}\"؟\n\nسيتم أيضًا حذف بيانات الاعتماد المحفوظة.",
+  "hostListDeleteServer": "حذف الخادم",
+  "hostListDeleteSuccess": "تم الحذف بنجاح",
+  "hostListEditConfig": "تحرير التكوين",
+  "hostListLoadFailed": "فشل التحميل: {error}",
+  "hostListNoSearchResults": "لم يتم العثور على خادم مطابق",
+  "hostListNoSearchResultsHint": "جرب كلمات رئيسية أخرى أو قم بالتدقيق الإملائي",
+  "hostListNoServers": "لا يوجد خادم حتى الآن",
+  "hostListSearchHint": "خادم البحث...",
   "language": "اللغة",
   "languageDesc": "اختر لغة الواجهة",
-  "languageDialogTitle": "Select Language",
-  "languageFollowSystem": "Follow System",
+  "languageDialogTitle": "اختر اللغة",
+  "languageFollowSystem": "اتبع النظام",
   "lightMode": "فاتح",
   "messageSaveFailed": "فشل حفظ الرسالة، لم تبدأ المهمة",
   "name": "الاسم",
   "nickname": "الكنية",
   "noCredentials": "❌ لم يتم العثور على بيانات اعتماد\n\nيرجى تحرير الخادم وإدخال كلمة المرور أو المفتاح الخاص.",
-  "notificationAlways": "Every time",
-  "notificationAlwaysSubtitle": "Send a notification when a task finishes or fails",
-  "notificationEnable": "Enable task completion notifications",
-  "notificationEnableHint": "Automatically send a message when a task finishes or fails",
-  "notificationEnterUrlFirst": "Please fill in the notification URL first",
-  "notificationFailedOnly": "Only on failure",
-  "notificationFailedOnlySubtitle": "Only send a notification when a task fails",
-  "notificationInstructionsBody": "1. Add a \"bot\" in your DingTalk/Feishu/WeCom group to get the webhook URL\n2. Paste the URL into the input box above\n3. Click \"Send test notification\" to check if you can receive it\n4. From now on, a message will be sent to the group automatically when a task finishes or fails",
-  "notificationInstructionsTitle": "Instructions",
-  "notificationInvalidUrl": "Invalid URL format: {error}",
-  "notificationSaveConfig": "Save Config",
-  "notificationSaveFailed": "Save failed: {error}",
-  "notificationSaved": "Notification settings saved",
-  "notificationSendTest": "Send test notification",
-  "notificationSending": "Sending...",
-  "notificationTestFailed": "Test failed: {error}",
-  "notificationTestSendFailed": "Send failed, please check the notification URL",
-  "notificationTestSent": "Test notification sent, please check your group",
-  "notificationTitle": "Task Completion Notifications",
-  "notificationTriggerTitle": "When to send notifications",
-  "notificationWebhookSupport": "Supports: DingTalk, Feishu, WeCom group, Slack, etc.",
-  "notificationWebhookUrl": "Webhook URL",
+  "notificationAlways": "إخطار في كل مرة",
+  "notificationAlwaysSubtitle": "إرسال إشعارات عند اكتمال المهام أو فشلها",
+  "notificationEnable": "تمكين إشعارات إكمال المهام",
+  "notificationEnableHint": "إرسال الرسائل تلقائيًا عند اكتمال المهام أو فشلها",
+  "notificationEnterUrlFirst": "يرجى ملء عنوان الإخطار أولا",
+  "notificationFailedOnly": "الإخطار فقط عند الفشل",
+  "notificationFailedOnlySubtitle": "إرسال إشعار فقط عند فشل المهمة",
+  "notificationInstructionsBody": "1. أضف \"روبوت\" إلى مجموعة DingTalk/Feishu/Enterprise WeChat واحصل على عنوان الإشعار\n2. الصق العنوان في مربع الإدخال أعلاه\n3. انقر فوق \"إرسال إشعار الاختبار\" لمعرفة ما إذا كان بإمكانك استلامه\n4. عند اكتمال مهمة ما أو فشلها في المستقبل، سيتم إرسال رسالة تلقائيًا إلى المجموعة",
+  "notificationInstructionsTitle": "تعليمات الاستخدام",
+  "notificationInvalidUrl": "تنسيق عنوان خاطئ: {error}",
+  "notificationSaveConfig": "حفظ التكوين",
+  "notificationSaveFailed": "فشل الحفظ: {error}",
+  "notificationSaved": "تم حفظ تكوين الإخطار",
+  "notificationSendTest": "إرسال إشعار الاختبار",
+  "notificationSending": "جارٍ الإرسال...",
+  "notificationTestFailed": "فشل الاختبار: {error}",
+  "notificationTestSendFailed": "فشل الإرسال، يرجى التحقق من عنوان الإخطار",
+  "notificationTestSent": "تم إرسال إشعار الاختبار، يرجى الذهاب إلى المجموعة لإلقاء نظرة",
+  "notificationTitle": "إشعار إكمال المهمة",
+  "notificationTriggerTitle": "متى ترسل الإخطار",
+  "notificationWebhookSupport": "الدعم: DingTalk، Feishu، مجموعة WeChat للمؤسسات، Slack، إلخ.",
+  "notificationWebhookUrl": "عنوان الإخطار",
   "notifications": "الإشعارات",
   "notificationsDesc": "احصل على رسالة عند انتهاء المهام",
   "ok": "موافق",
@@ -319,146 +319,146 @@
   "quickCommands": "مقتطفات",
   "quickCommandsDesc": "احفظ الأوامر المتكررة للتنفيذ بلمسة واحدة",
   "retry": "إعادة المحاولة",
-  "runbookBuiltinCannotDelete": "Built-in templates cannot be deleted",
-  "runbookBuiltinNotEditable": "Built-in templates are not editable. Use \"Clone\" to create a copy and modify it.",
-  "runbookBuiltinTag": "Built-in",
-  "runbookCategoryCustom": "Custom",
-  "runbookCategoryDeployment": "Deployment",
-  "runbookCategoryInspection": "Inspection",
-  "runbookCategoryMaintenance": "Maintenance",
-  "runbookCategorySecurity": "Security",
-  "runbookCategoryTroubleshooting": "Troubleshooting",
-  "runbookClipboardEmpty": "Clipboard is empty",
-  "runbookCloneTooltip": "Clone",
-  "runbookClonedToast": "Cloned as custom runbook: {name}",
-  "runbookContentAgent": "Prompt Content",
-  "runbookContentAgentHint": "e.g., Check disk usage of '{host}' and provide suggestions",
-  "runbookContentCommand": "Command Content",
-  "runbookContentCommandHint": "e.g., ssh '{user}'@'{host}' df -h",
-  "runbookContentRequired": "Please enter the content",
-  "runbookCreate": "Create",
-  "runbookDeleteConfirm": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
-  "runbookDeleteTitle": "Delete Runbook",
-  "runbookDeleteTooltip": "Delete",
-  "runbookDeletedToast": "Deleted",
-  "runbookEditTitle": "Edit Runbook",
-  "runbookEditTooltip": "Edit",
-  "runbookEmptyFiltered": "No matching runbooks. Try adjusting the filters.",
-  "runbookEmptyHint": "Tap the bottom-right button to create a runbook",
-  "runbookEmptyTitle": "No runbooks yet",
-  "runbookFieldCategory": "Category",
-  "runbookFieldDescription": "Description (optional)",
-  "runbookFieldIcon": "Icon",
-  "runbookFieldName": "Name",
-  "runbookFieldType": "Type",
-  "runbookFilterAll": "All",
-  "runbookImportButton": "Import",
-  "runbookImportHint": "Copy JSON from the official open platform and paste it here",
-  "runbookImportPasteHint": "Paste JSON content here…",
-  "runbookImportSuccess": "Successfully imported {count} runbooks",
-  "runbookImportTitle": "Import Runbooks",
-  "runbookImportTooltip": "Import Runbook",
-  "runbookJsonParseFailed": "JSON parse failed: {error}",
-  "runbookNameRequired": "Please enter a name",
-  "runbookNewTitle": "New Runbook",
-  "runbookPasteFromClipboard": "Paste from Clipboard",
-  "runbookPasteJsonFirst": "Please paste JSON content first",
-  "runbookRunCount": "Run {count} times",
-  "runbookSearchHint": "Search runbook name or description",
-  "runbookTitle": "Runbooks",
-  "runbookTypeAgentDesc": "Natural language prompt, executed by AI via ReAct framework",
-  "runbookTypeAgentOption": "AI Execute",
-  "runbookTypeAgentTag": "AI Execute",
-  "runbookTypeCommand": "Direct Execute",
-  "runbookTypeCommandDesc": "Execute commands directly in terminal after variable substitution",
-  "runbookUseInTerminal": "Please use this in the terminal page",
+  "runbookBuiltinCannotDelete": "لا يمكن حذف القوالب المضمنة",
+  "runbookBuiltinNotEditable": "لا يمكن تحرير القالب المدمج، يرجى استخدام \"استنساخ\" لإنشاء نسخة ثم تعديلها.",
+  "runbookBuiltinTag": "مدمج",
+  "runbookCategoryCustom": "تخصيص",
+  "runbookCategoryDeployment": "نشر",
+  "runbookCategoryInspection": "التفتيش",
+  "runbookCategoryMaintenance": "الصيانة الروتينية",
+  "runbookCategorySecurity": "آمنة",
+  "runbookCategoryTroubleshooting": "استكشاف الأخطاء وإصلاحها",
+  "runbookClipboardEmpty": "الحافظة فارغة",
+  "runbookCloneTooltip": "استنساخ",
+  "runbookClonedToast": "استنساخ كسير عمل مخصص: {name}",
+  "runbookContentAgent": "محتوى سريع",
+  "runbookContentAgentHint": "على سبيل المثال: تحقق من استخدام القرص لـ \"{host}\" وقدم اقتراحات",
+  "runbookContentCommand": "محتوى الأمر",
+  "runbookContentCommandHint": "على سبيل المثال: ssh '{user}'@'{host}' df -h",
+  "runbookContentRequired": "الرجاء إدخال المحتوى",
+  "runbookCreate": "إنشاء",
+  "runbookDeleteConfirm": "هل أنت متأكد أنك تريد حذف \"{name}\"؟ لا يمكن التراجع عن هذا الإجراء.",
+  "runbookDeleteTitle": "حذف سير العمل",
+  "runbookDeleteTooltip": "حذف",
+  "runbookDeletedToast": "تم الحذف",
+  "runbookEditTitle": "تحرير سير العمل",
+  "runbookEditTooltip": "تحرير",
+  "runbookEmptyFiltered": "لا يوجد سير عمل مطابق، حاول ضبط شروط التصفية",
+  "runbookEmptyHint": "انقر فوق الزر الموجود في الزاوية اليمنى السفلية لإنشاء سير عمل جديد",
+  "runbookEmptyTitle": "لا يوجد سير عمل للتشغيل والصيانة حتى الآن",
+  "runbookFieldCategory": "التصنيف",
+  "runbookFieldDescription": "الوصف (اختياري)",
+  "runbookFieldIcon": "أيقونة",
+  "runbookFieldName": "الاسم",
+  "runbookFieldType": "اكتب",
+  "runbookFilterAll": "الكل",
+  "runbookImportButton": "import",
+  "runbookImportHint": "انسخ JSON من النظام الأساسي المفتوح للموقع الرسمي والصقه هنا",
+  "runbookImportPasteHint": "الصق محتوى JSON هنا...",
+  "runbookImportSuccess": "تم بنجاح استيراد سير عمل {count}",
+  "runbookImportTitle": "استيراد عملية وصيانة سير العمل",
+  "runbookImportTooltip": "استيراد سير العمل",
+  "runbookJsonParseFailed": "فشل تحليل JSON: {error}",
+  "runbookNameRequired": "الرجاء إدخال الاسم",
+  "runbookNewTitle": "سير العمل الجديد",
+  "runbookPasteFromClipboard": "لصق من الحافظة",
+  "runbookPasteJsonFirst": "يرجى لصق محتوى JSON أولاً",
+  "runbookRunCount": "تم تنفيذه مرات {count}",
+  "runbookSearchHint": "ابحث عن اسم سير العمل أو الوصف",
+  "runbookTitle": "سير عمل التشغيل والصيانة",
+  "runbookTypeAgentDesc": "موجه اللغة الطبيعية، يتم تنفيذ الذكاء الاصطناعي وفقًا لإطار عمل ReAct",
+  "runbookTypeAgentOption": "تنفيذ الذكاء الاصطناعي",
+  "runbookTypeAgentTag": "تنفيذ الذكاء الاصطناعي",
+  "runbookTypeCommand": "التنفيذ المباشر",
+  "runbookTypeCommandDesc": "بعد استبدال المتغير، قم بتنفيذ الأمر مباشرة في الوحدة الطرفية",
+  "runbookUseInTerminal": "يرجى استخدامه على الصفحة الطرفية",
   "runbooks": "كتب التشغيل",
   "runbooksDesc": "حوّل العمليات الروتينية إلى قوالب قابلة لإعادة الاستخدام",
   "save": "حفظ",
   "scrollToBottom": "التمرير إلى الأسفل",
   "search": "بحث",
-  "securityAllDataCleared": "All data has been cleared",
-  "securityAppLockSubtitleOff": "When disabled, no verification is needed to open the app",
-  "securityAppLockSubtitleOn": "Opening the app requires {biometricType} or password",
-  "securityAuditLogSubtitle": "View the execution record of each command",
-  "securityAuditLogTitle": "Audit Log",
-  "securityAuthenticateReason": "Verify your identity to enable app lock",
-  "securityBiometricFaceId": "Face ID",
-  "securityBiometricFingerprint": "Fingerprint",
-  "securityBiometricGeneric": "Biometrics",
-  "securityBiometricNotSupported": "⚠️ Device does not support fingerprint or face ID",
-  "securityBiometricStatusTitle": "Fingerprint / Face ID Status",
-  "securityBiometricSupported": "✅ Supports {biometricType}",
-  "securityClearAllData": "Clear All Data",
-  "securityClearAllDataSubtitle": "Delete all servers, chat history, and passwords (irreversible)",
-  "securityClearConfirmPrompt": "Please type DELETE to confirm:",
-  "securityClearFailed": "Clear failed: {error}",
-  "securityClearIrreversible": "This action cannot be undone!",
-  "securityClearItemAiModels": "• AI model settings",
-  "securityClearItemChats": "• Chat history",
-  "securityClearItemPasswords": "• All passwords",
-  "securityClearItemServers": "• Server list",
-  "securityClearItemSnippets": "• Quick commands",
-  "securityClearWarning": "This action will delete all data, including:",
-  "securityConfirmDelete": "Confirm Delete",
-  "securityDangerAction": "⚠️ Dangerous Action",
-  "securityEnableAppLock": "Enable App Lock",
+  "securityAllDataCleared": "تم مسح كافة البيانات",
+  "securityAppLockSubtitleOff": "فتح التطبيق بعد الإغلاق لا يتطلب التحقق",
+  "securityAppLockSubtitleOn": "مطلوب {biometricType} أو كلمة المرور لفتح التطبيق",
+  "securityAuditLogSubtitle": "عرض سجل التنفيذ لكل أمر",
+  "securityAuditLogTitle": "سجل العملية",
+  "securityAuthenticateReason": "قم بالمصادقة لتمكين قفل التطبيق",
+  "securityBiometricFaceId": "معرف الوجه",
+  "securityBiometricFingerprint": "بصمة",
+  "securityBiometricGeneric": "القياسات الحيوية",
+  "securityBiometricNotSupported": "⚠️ الجهاز لا يدعم بصمة الإصبع أو الوجه",
+  "securityBiometricStatusTitle": "بصمة الإصبع/حالة الوجه",
+  "securityBiometricSupported": "✅ دعم {biometricType}",
+  "securityClearAllData": "مسح كافة البيانات",
+  "securityClearAllDataSubtitle": "حذف جميع الخوادم وسجل الدردشة وكلمات المرور (لا يمكن استعادتها)",
+  "securityClearConfirmPrompt": "الرجاء إدخال \"حذف\" للتأكيد:",
+  "securityClearFailed": "فشل المسح: {error}",
+  "securityClearIrreversible": "لا يمكن التراجع عن هذا الإجراء!",
+  "securityClearItemAiModels": "• إعدادات نموذج الذكاء الاصطناعي",
+  "securityClearItemChats": "• تاريخ الدردشة",
+  "securityClearItemPasswords": "• جميع كلمات المرور",
+  "securityClearItemServers": "• قائمة الخادم",
+  "securityClearItemSnippets": "• أوامر سريعة",
+  "securityClearWarning": "ستؤدي هذه العملية إلى حذف جميع البيانات، بما في ذلك:",
+  "securityConfirmDelete": "تأكيد الحذف",
+  "securityDangerAction": "⚠️عملية خطيرة",
+  "securityEnableAppLock": "تمكين قفل التطبيق",
   "securitySettings": "الأمان",
   "securitySettingsDesc": "افتح التطبيق ببصمة الإصبع أو Face ID",
-  "securityTitle": "Security Settings",
+  "securityTitle": "إعدادات الأمان",
   "selectFile": "تحديد ملف",
   "send": "إرسال",
   "serverList": "الخوادم",
   "serverListDesc": "إضافة وإدارة الخوادم البعيدة للاتصال بها",
   "settings": "الإعدادات",
-  "settingsAI": "AI & Intelligence",
-  "settingsAIModel": "AI Model Config",
-  "settingsAIModelDesc": "Configure AI API key and model",
-  "settingsAbout": "About",
-  "settingsAboutApp": "About AI Terminal",
-  "settingsAgent": "Agent Settings",
-  "settingsAgentDesc": "Max auto-execute steps (0 = unlimited: {steps})",
-  "settingsAppearance": "Appearance",
-  "settingsAppearanceSettings": "Appearance",
-  "settingsAppearanceSettingsDesc": "Switch dark/light mode, adjust font size",
-  "settingsAuditLog": "Activity Log",
-  "settingsAuditLogDesc": "Records who ran each command and when",
-  "settingsChangeRecords": "Change Records",
-  "settingsChangeRecordsDesc": "Track all changes, undo if something goes wrong",
-  "settingsChangeWindow": "Safe Hours",
-  "settingsChangeWindowDesc": "Set safe time windows; changes blocked outside them",
-  "settingsCheckUpdate": "Check for Updates",
-  "settingsConnection": "Connections",
-  "settingsHosts": "Servers",
-  "settingsHostsDesc": "Add and edit remote servers to connect to",
-  "settingsLanguage": "Language",
-  "settingsLanguageDesc": "Choose interface language",
-  "settingsNotification": "Task Notifications",
-  "settingsNotificationDesc": "Get notified when a task finishes",
-  "settingsRunbooks": "Runbooks",
-  "settingsRunbooksDesc": "Turn common ops tasks into templates, run in one tap",
-  "settingsSecurity": "Security",
-  "settingsSecurityDesc": "Unlock the app with fingerprint or Face ID",
-  "settingsSnippets": "Snippets",
-  "settingsSnippetsDesc": "Save frequently used commands for one-tap execution",
-  "settingsTitle": "Settings",
-  "settingsVersion": "Version 1.4.3",
+  "settingsAI": "الذكاء الاصطناعي والذكاء",
+  "settingsAIModel": "تكوين نموذج الذكاء الاصطناعي",
+  "settingsAIModelDesc": "تكوين المفاتيح والنماذج للذكاء الاصطناعي",
+  "settingsAbout": "حول",
+  "settingsAboutApp": "حول محطة الذكاء الاصطناعي",
+  "settingsAgent": "إعدادات الوكيل",
+  "settingsAgentDesc": "الحد الأقصى لعدد الخطوات التي يمكن للذكاء الاصطناعي تنفيذها تلقائيًا (0=لا يوجد حد: {steps})",
+  "settingsAppearance": "المظهر والخبرة",
+  "settingsAppearanceSettings": "إعدادات المظهر",
+  "settingsAppearanceSettingsDesc": "تبديل الوضع الداكن / الفاتح، وضبط حجم الخط",
+  "settingsAuditLog": "سجل العملية",
+  "settingsAuditLogDesc": "سجل من قام بتنفيذ كل أمر ومتى",
+  "settingsChangeRecords": "تغيير التاريخ",
+  "settingsChangeRecordsDesc": "يتم تسجيل جميع التغييرات ويمكن التراجع عنها إذا حدث خطأ ما.",
+  "settingsChangeWindow": "فترة آمنة",
+  "settingsChangeWindowDesc": "حدد فترة آمنة واحظر التغييرات في أوقات أخرى",
+  "settingsCheckUpdate": "التحقق من وجود تحديثات",
+  "settingsConnection": "إدارة الاتصال",
+  "settingsHosts": "قائمة الخادم",
+  "settingsHostsDesc": "قم بإضافة وتحرير الخادم الذي تريد الاتصال به عن بعد",
+  "settingsLanguage": "اللغة",
+  "settingsLanguageDesc": "اختر لغة الواجهة",
+  "settingsNotification": "إشعار إكمال المهمة",
+  "settingsNotificationDesc": "إرسال رسالة تلقائيًا لإعلامك بعد اكتمال المهمة",
+  "settingsRunbooks": "سير عمل التشغيل والصيانة",
+  "settingsRunbooksDesc": "احفظ عمليات التشغيل والصيانة الشائعة كقوالب وقم بتشغيلها بنقرة واحدة",
+  "settingsSecurity": "إعدادات الأمان",
+  "settingsSecurityDesc": "فتح التطبيقات ببصمة الإصبع أو الوجه",
+  "settingsSnippets": "أوامر الاختصار",
+  "settingsSnippetsDesc": "احفظ الأوامر المستخدمة بشكل متكرر وقم بتنفيذها بنقرة واحدة في المرة القادمة",
+  "settingsTitle": "الإعدادات",
+  "settingsVersion": "الإصدار 1.4.3",
   "simplifiedChinese": "简体中文",
-  "snippetCommandHint": "e.g., docker exec -it '{container}' /bin/bash",
-  "snippetCommandLabel": "Command:",
-  "snippetCommandRequired": "Please enter the command",
-  "snippetCopyCommand": "Copy Command",
-  "snippetDeleteConfirm": "Are you sure you want to delete \"{name}\"?",
-  "snippetDeleteTitle": "Delete Snippet",
-  "snippetEditTitle": "Edit Snippet",
-  "snippetEmptyHint": "Tap the button below to add one",
-  "snippetEmptyTitle": "No snippets yet",
-  "snippetFieldCommand": "Command",
-  "snippetFieldDescription": "Description (optional)",
-  "snippetNameRequired": "Please enter a name",
-  "snippetNewTitle": "New Snippet",
-  "snippetResolvedCommand": "Command: {command}",
-  "snippetTitle": "Snippets",
+  "snippetCommandHint": "على سبيل المثال: docker exec -it '{container}' /bin/bash",
+  "snippetCommandLabel": "الأمر:",
+  "snippetCommandRequired": "الرجاء إدخال الأمر",
+  "snippetCopyCommand": "أمر النسخ",
+  "snippetDeleteConfirm": "هل أنت متأكد أنك تريد حذف \"{name}\"؟",
+  "snippetDeleteTitle": "أمر الحذف",
+  "snippetEditTitle": "تحرير الأمر",
+  "snippetEmptyHint": "انقر فوق الزر أدناه للإضافة",
+  "snippetEmptyTitle": "لا يوجد أمر اختصار حتى الآن",
+  "snippetFieldCommand": "الأمر",
+  "snippetFieldDescription": "الوصف (اختياري)",
+  "snippetNameRequired": "الرجاء إدخال الاسم",
+  "snippetNewTitle": "أمر جديد",
+  "snippetResolvedCommand": "الأمر: {command}",
+  "snippetTitle": "أوامر الاختصار",
   "taskAborted": "⚠️ تم إحباط المهمة",
   "taskCancelled": "⚠️ تم إلغاء المهمة",
   "taskCompleted": "اكتملت المهمة",
@@ -466,65 +466,65 @@
   "taskFailed": "فشلت المهمة",
   "taskMaxSteps": "تم الوصول إلى الحد الأقصى للخطوات، تمت مقاطعة المهمة",
   "taskTerminated": "تم إنهاء المهمة",
-  "terminalAgentLog": "Agent log",
-  "terminalClearScreen": "Clear screen",
-  "terminalCloseTabConfirm": "Closing this tab will cancel the running task. Are you sure?",
-  "terminalCollapseAIPanel": "Collapse AI panel",
-  "terminalCollapseMonitorPanel": "Collapse monitor panel",
-  "terminalCommandLabel": "Command: {command}",
-  "terminalCommandTemplate": "Command template:",
-  "terminalCompactingHistory": "AI is compressing conversation history",
-  "terminalCompactionDone": "Memory compression completed",
-  "terminalCompactionFailed": "Compression failed: {error}",
-  "terminalConfigure": "Configure",
-  "terminalConnectHostFailed": "Failed to connect to {hostName}: {error}",
-  "terminalConnectTerminalFirst": "Please connect to a terminal first",
-  "terminalConnectTerminalForCommand": "Please connect to a terminal before executing commands",
-  "terminalConnectTerminalForRunbook": "Please connect to a terminal (SSH or local) before using runbooks",
-  "terminalConnected": "Connected",
-  "terminalConnecting": "Connecting to {host}...",
-  "terminalCreateNew": "+ New",
-  "terminalExitOrchestrator": "Exit orchestration mode",
-  "terminalExpandAIPanel": "Expand AI panel",
-  "terminalExpandMonitorPanel": "Expand monitor panel",
-  "terminalFillVariables": "Fill variables - {name}",
+  "terminalAgentLog": "سجل الوكيل",
+  "terminalClearScreen": "شاشة واضحة",
+  "terminalCloseTabConfirm": "سيؤدي إغلاق علامة التبويب هذه إلى إلغاء المهام قيد التشغيل. هل أنت متأكد أنك تريد إغلاقه؟",
+  "terminalCollapseAIPanel": "طي لوحة الذكاء الاصطناعي",
+  "terminalCollapseMonitorPanel": "إغلاق لوحة المراقبة",
+  "terminalCommandLabel": "الأمر: {command}",
+  "terminalCommandTemplate": "قالب الأمر:",
+  "terminalCompactingHistory": "يقوم الذكاء الاصطناعي بضغط المحادثات التاريخية",
+  "terminalCompactionDone": "اكتمل ضغط الذاكرة",
+  "terminalCompactionFailed": "فشل الضغط: {error}",
+  "terminalConfigure": "التكوين",
+  "terminalConnectHostFailed": "فشل الاتصال بـ {hostName}: {error}",
+  "terminalConnectTerminalFirst": "يرجى توصيل المحطة أولاً",
+  "terminalConnectTerminalForCommand": "يرجى الاتصال بالمحطة أولاً ثم تنفيذ الأمر",
+  "terminalConnectTerminalForRunbook": "يرجى الاتصال بالمحطة (SSH أو المحطة المحلية) قبل استخدام سير عمل التشغيل والصيانة",
+  "terminalConnected": "متصل",
+  "terminalConnecting": "جارٍ الاتصال {host}...",
+  "terminalCreateNew": "+ جديد",
+  "terminalExitOrchestrator": "الخروج من وضع التنسيق",
+  "terminalExpandAIPanel": "قم بتوسيع لوحة الذكاء الاصطناعي",
+  "terminalExpandMonitorPanel": "قم بتوسيع لوحة المراقبة",
+  "terminalFillVariables": "املأ المتغيرات - {name}",
   "terminalFontSize": "حجم خط الطرفية: {size}px",
-  "terminalHostNoCredentials": "{hostName} has no credentials configured. Please edit the server first.",
-  "terminalHostNotFound": "Host not found",
-  "terminalInputHintDefault": "Describe your request, Agent will execute automatically...",
-  "terminalInputHintDisconnected": "Available after connecting to a terminal",
-  "terminalInputHintEmpty": "Type a request to start auto-execution...",
-  "terminalInputHintOrchestrator": "Multi-host orchestration mode: describe cross-host tasks, e.g. \"sync time on all servers\"",
-  "terminalInputHintRunning": "Agent is running...",
-  "terminalLayoutBottom": "Bottom",
-  "terminalLayoutRight": "Right",
-  "terminalLocalStartFailed": "Failed to start local terminal",
-  "terminalLocalStartFailedWithError": "Failed to start local terminal: {error}",
-  "terminalManage": "Manage",
-  "terminalModel": "Model",
-  "terminalMonitor": "Monitor",
-  "terminalNewConnection": "New connection",
-  "terminalNoHostsSaved": "No saved hosts\nPlease add a server on the home page first",
-  "terminalNoRunbooks": "No runbooks available",
-  "terminalNoRunbooksHint": "Click \"Manage\" to create a runbook",
+  "terminalHostNoCredentials": "{hostName} لم يتم تكوين بيانات الاعتماد، يرجى تحرير الخادم أولاً",
+  "terminalHostNotFound": "المضيف غير موجود",
+  "terminalInputHintDefault": "قم بوصف المتطلبات وسينفذ الوكيل تلقائيًا...",
+  "terminalInputHintDisconnected": "متاح بعد الاتصال بالمحطة",
+  "terminalInputHintEmpty": "أدخل المتطلبات لبدء التنفيذ التلقائي...",
+  "terminalInputHintOrchestrator": "وضع التزامن متعدد الأجهزة: يصف المهام المشتركة بين المضيفين، مثل \"مزامنة جميع أوقات الخادم\"",
+  "terminalInputHintRunning": "جاري تنفيذ الوكيل...",
+  "terminalLayoutBottom": "أسفل",
+  "terminalLayoutRight": "صحيح",
+  "terminalLocalStartFailed": "فشلت المحطة المحلية في البدء",
+  "terminalLocalStartFailedWithError": "فشل تشغيل المحطة المحلية: {error}",
+  "terminalManage": "الإدارة",
+  "terminalModel": "نموذج",
+  "terminalMonitor": "مراقب",
+  "terminalNewConnection": "اتصال جديد",
+  "terminalNoHostsSaved": "لا يوجد مضيفين محفوظين حتى الآن\nالرجاء إضافة خادم إلى الصفحة الرئيسية أولاً",
+  "terminalNoRunbooks": "لا يوجد سير عمل للتشغيل والصيانة حتى الآن",
+  "terminalNoRunbooksHint": "انقر فوق \"إدارة\" لإنشاء سير عمل جديد",
   "terminalNotConnected": "اتصل بالطرفية أولاً لاستخدام الوضع التلقائي",
   "terminalNotReady": "الطرفية غير متصلة، يرجى الاتصال أولاً",
-  "terminalOffline": "Offline",
-  "terminalOrchestratorConnected": "{connected}/{total} connected",
-  "terminalOrchestratorHostList": "Multi-host orchestration · Host list",
-  "terminalOrchestratorMode": "Orchestrate · {connected}/{total}",
-  "terminalReadOnlyOff": "Read-only mode (Dry-run)",
-  "terminalReadOnlyOn": "Read-only mode is on (click to turn off)",
-  "terminalReconnect": "Reconnect",
-  "terminalRoleYou": "You",
-  "terminalRunbookTemplates": "Runbook templates",
-  "terminalRunbookTypeCommand": "Command",
-  "terminalSelectServerForNewTab": "Select a server to connect in a new tab",
-  "terminalSessionCreated": "New session created",
-  "terminalSessionHistory": "Session history",
-  "terminalStatusNotConnected": "Not connected",
-  "terminalTaskRunning": "Task is running",
-  "terminalUnfilledVariables": "Some variables are unfilled. Execution cancelled.",
+  "terminalOffline": "غير متصل",
+  "terminalOrchestratorConnected": "تم توصيل {connected}/{total}",
+  "terminalOrchestratorHostList": "تنسيق متعدد الآلات · قائمة المضيفين",
+  "terminalOrchestratorMode": "الترتيب · {connected}/{total}",
+  "terminalReadOnlyOff": "وضع القراءة فقط (التشغيل الجاف)",
+  "terminalReadOnlyOn": "وضع القراءة فقط قيد التشغيل (انقر للإغلاق)",
+  "terminalReconnect": "أعد الاتصال",
+  "terminalRoleYou": "أنت",
+  "terminalRunbookTemplates": "نموذج التشغيل والصيانة",
+  "terminalRunbookTypeCommand": "الأمر",
+  "terminalSelectServerForNewTab": "حدد اتصال علامة التبويب الجديدة للخادم",
+  "terminalSessionCreated": "تم إنشاء جلسة جديدة",
+  "terminalSessionHistory": "تاريخ الجلسة",
+  "terminalStatusNotConnected": "غير متصل",
+  "terminalTaskRunning": "المهمة قيد التشغيل",
+  "terminalUnfilledVariables": "هناك متغيرات غير مملوءة وتم إلغاء التنفيذ.",
   "testConnection": "اختبار الاتصال",
   "themeMode": "وضع السمة",
   "thinkingNextStep": "🤔 أفكر في الخطوة التالية...",
@@ -1227,59 +1227,2660 @@
       }
     }
   },
-  "aiEndpointAdd": "Add endpoint",
-  "aiEndpointEditTitle": "Edit endpoint",
-  "aiEndpointDeleteTitle": "Delete endpoint",
-  "aiEndpointDeleteConfirm": "Delete \"{name}\" and its {count} model(s)?",
-  "aiEndpointApiKey": "API key",
-  "aiEndpointApiKeyHint": "Leave blank to keep the saved key",
-  "aiEndpointBaseUrl": "API URL",
-  "aiEndpointProtocol": "API protocol",
+  "aiEndpointAdd": "أضف نقطة النهاية",
+  "aiEndpointEditTitle": "تحرير نقطة النهاية",
+  "aiEndpointDeleteTitle": "حذف نقطة النهاية",
+  "aiEndpointDeleteConfirm": "هل أنت متأكد أنك تريد حذف نقطة النهاية \"{name}\" ونماذج {count} الخاصة بها؟",
+  "aiEndpointApiKey": "مفتاح واجهة برمجة التطبيقات",
+  "aiEndpointApiKeyHint": "اتركه فارغًا لاستخدام بيانات الاعتماد المحفوظة",
+  "aiEndpointBaseUrl": "عنوان واجهة برمجة التطبيقات",
+  "aiEndpointProtocol": "بروتوكول API",
   "aiEndpointProtocolOpenai": "OpenAI Chat Completions",
-  "aiEndpointProtocolErnie": "Baidu ERNIE",
-  "aiEndpointCustomSettings": "Custom settings",
-  "aiEndpointModels": "Model catalog",
-  "aiEndpointModelsCount": "{count} models",
-  "aiEndpointRestoreDefaults": "Restore defaults",
-  "aiEndpointFetchModels": "Fetch available models",
-  "aiEndpointAddModel": "Add model",
-  "aiEndpointNoModels": "No models yet. Add one or fetch available models.",
-  "aiEndpointRestoreConfirm": "Replace the current catalog with default models for \"{provider}\"?",
-  "aiEndpointRestoreUnavailable": "This provider has no built-in default models",
-  "aiEndpointFetchSuccess": "Added {count} models",
-  "aiEndpointFetchNone": "No models available to add",
-  "aiEndpointFetchFailed": "Failed to fetch models: {error}",
-  "aiEndpointSelectModels": "Select models to add",
-  "aiEndpointNoProvider": "Custom",
-  "aiEndpointAddModelTitle": "Add model",
-  "aiEndpointEditModelTitle": "Edit model",
-  "aiModelDisplayName": "Display name",
-  "aiModelId": "Model ID",
-  "aiModelContextWindow": "Context window",
-  "aiModelContextWindowHint": "0 = unknown; runtime falls back to 262144 (256K)",
-  "aiModelMaxOutput": "Max output tokens",
-  "aiModelReasoning": "Reasoning levels",
-  "aiModelReasoningHint": "Enable to configure reasoning tiers for this model",
-  "aiModelTier": "Tier",
-  "aiModelApiValue": "API value",
-  "aiModelApiValueHint": "Leave blank to omit this parameter",
-  "aiModelAddTier": "Add tier",
-  "aiModelFallback": "Fallback model",
-  "aiModelNoFallback": "No fallback",
+  "aiEndpointProtocolErnie": "بايدو ونشين إيرني",
+  "aiEndpointCustomSettings": "الإعدادات المخصصة",
+  "aiEndpointModels": "كتالوج النموذج",
+  "aiEndpointModelsCount": "نماذج {count}",
+  "aiEndpointRestoreDefaults": "استعادة النموذج الافتراضي",
+  "aiEndpointFetchModels": "الحصول على النماذج المتاحة",
+  "aiEndpointAddModel": "إضافة نموذج",
+  "aiEndpointNoModels": "لا يوجد نموذج بعد، انقر على \"إضافة نموذج\" أو \"الحصول على النماذج المتوفرة\"",
+  "aiEndpointRestoreConfirm": "ستتم استعادة دليل النموذج الافتراضي \"{provider}\"، وسيتم استبدال النموذج المخصص الحالي.",
+  "aiEndpointRestoreUnavailable": "لا يحتوي مزود الخدمة هذا على نموذج افتراضي مضمن",
+  "aiEndpointFetchSuccess": "تمت إضافة نماذج {count}",
+  "aiEndpointFetchNone": "لا توجد نماذج لإضافتها",
+  "aiEndpointFetchFailed": "فشل الحصول على النموذج: {error}",
+  "aiEndpointSelectModels": "حدد النموذج المراد إضافته",
+  "aiEndpointNoProvider": "تخصيص",
+  "aiEndpointAddModelTitle": "إضافة نموذج",
+  "aiEndpointEditModelTitle": "تحرير النموذج",
+  "aiModelDisplayName": "اسم العرض",
+  "aiModelId": "معرف النموذج",
+  "aiModelContextWindow": "نافذة السياق",
+  "aiModelContextWindowHint": "0 يعني غير معروف، تمت معالجته كـ 262144 (256 كيلو بايت) أثناء وقت التشغيل",
+  "aiModelMaxOutput": "الحد الأقصى لعدد الرموز الإخراج",
+  "aiModelReasoning": "مستوى المنطق",
+  "aiModelReasoningHint": "بعد الفتح، يمكنك تكوين أداة التفكير الخاصة بالنموذج.",
+  "aiModelTier": "والعتاد",
+  "aiModelApiValue": "قيمة معلمة API",
+  "aiModelApiValueHint": "اتركه فارغًا لعدم إرسال هذه المعلمة",
+  "aiModelAddTier": "أضف العتاد",
+  "aiModelFallback": "نموذج بديل",
+  "aiModelNoFallback": "لا يوجد نموذج احتياطي",
   "aiModelFunctionCalling": "Function Calling",
-  "aiModelTierRequired": "Keep at least one tier",
-  "aiModelTierLevelRequired": "Tier name is required",
-  "aiModelTierDuplicate": "Tier names must be unique",
-  "aiModelValidationName": "Display name is required",
-  "aiModelValidationModelId": "Model ID is required",
-  "aiModelValidationBaseUrl": "API URL is required",
-  "aiModelValidationModels": "Add at least one model",
-  "terminalConfigureModel": "Configure model",
-  "terminalModelAndReasoning": "Model & reasoning",
-  "terminalReasoning": "Reasoning",
-  "terminalReasoningNotEnabled": "This model has no reasoning tiers enabled; enable them in settings",
-  "terminalReasoningOff": "Off",
-  "terminalManageModels": "Manage models…",
-  "aiModelFunctionCallingHint": "Native tool calling (OpenAI tools API); enable only for models that support it",
-  "terminalModelLockedRunning": "Agent is running; change the model or reasoning after it finishes"
+  "aiModelTierRequired": "احتفظ بعتاد واحد على الأقل",
+  "aiModelTierLevelRequired": "لا يمكن أن يكون اسم الترس فارغًا",
+  "aiModelTierDuplicate": "لا يمكن تكرار التروس",
+  "aiModelValidationName": "يرجى ملء اسم العرض",
+  "aiModelValidationModelId": "يرجى ملء معرف النموذج",
+  "aiModelValidationBaseUrl": "يرجى ملء عنوان API",
+  "aiModelValidationModels": "أضف نموذجًا واحدًا على الأقل",
+  "terminalConfigureModel": "تكوين النموذج",
+  "terminalModelAndReasoning": "النماذج والتفكير",
+  "terminalReasoning": "درجة التفكير",
+  "terminalReasoningNotEnabled": "لم يتم تمكين أداة التفكير في هذا الطراز، ويمكن تشغيلها في الإعدادات.",
+  "terminalReasoningOff": "تفكير وثيق",
+  "terminalManageModels": "نموذج الإدارة...",
+  "aiModelFunctionCallingHint": "استدعاء الأداة الأصلية (واجهة برمجة تطبيقات أدوات OpenAI)، يتم تمكين النماذج التي تدعم هذا البروتوكول فقط",
+  "terminalModelLockedRunning": "الوكيل قيد التشغيل، قم بتبديل النموذج أو جهاز التفكير بعد الانتهاء.",
+  "changeRecordRestoreLocalFile": "سيتم استعادة الملفات التالية محليًا، دون المرور عبر أي خادم:",
+  "ut_9dd16b4310": "إلغاء",
+  "ut_929f88c953": "حفظ",
+  "ut_375761b903": "تحرير",
+  "ut_12b4ff78f0": "حذف",
+  "ut_2439c9088c": "قريب",
+  "ut_8d8a263df0": "الاسم",
+  "ut_dd3bec10ce": "حسنًا",
+  "ut_2bbaf6e153": "منقول",
+  "ut_7713abebb3": "تاريخ الأوامر",
+  "ut_c96baaaa38": "الأمر",
+  "ut_bed1bc3d9f": "أوامر الاختصار",
+  "ut_4064dc0579": "الوضع العام",
+  "ut_8b97bab772": "المجموعة المضيفة",
+  "ut_c53688e21a": "المضيف",
+  "ut_b996bd3d08": "تخصيص",
+  "ut_400ef8d1c1": "جميع الأدوات",
+  "ut_5ea95f868c": "خادم MCP جديد",
+  "ut_fb999767e8": "إعادة توجيه المنفذ",
+  "ut_ee627300a6": "الوكيل قيد التنفيذ، يرجى المحاولة مرة أخرى لاحقًا",
+  "ut_8fa7ec1798": "التفكير",
+  "ut_19a5b5ad85": "واضح",
+  "ut_5dc39ef856": "الرجاء التحديد",
+  "ut_c4b7d3a09f": "إغلاق (خروج)",
+  "ut_fda3f94089": "تنفيذ",
+  "ut_6e269868a4": "1 ألف سطر",
+  "ut_60a303a337": "50.000 سطر",
+  "ut_386ffb419a": "100.000 سطر",
+  "ut_53f8d85ab6": "المضيف",
+  "ut_cf99c7c571": "سير عمل التشغيل والصيانة",
+  "ut_422db29f9c": "سجل التدقيق",
+  "ut_b671baec90": "تغيير دفتر الأستاذ",
+  "ut_abcdfedd3e": "تأكيد الرد التلقائي السريع",
+  "ut_760a393290": "استيراد تكوين SSH",
+  "ut_cce7c556ba": "المبادئ التوجيهية التحريرية",
+  "ut_1982929432": "مواصفات جديدة",
+  "ut_f996de5ff9": "العنوان",
+  "ut_1bc8da322f": "يرجى ملء العنوان",
+  "ut_2d4881db12": "المحتوى المعياري",
+  "ut_483b58204b": "يرجى ملء محتوى المواصفات",
+  "ut_29f14d8cf9": "الأمر المرجعي (اختياري)",
+  "ut_fcfbe3558f": "النطاق",
+  "ut_0cac2580f1": "مضيف واحد",
+  "ut_479fdc582d": "المجموعة المضيفة",
+  "ut_56c43b3c1f": "اتبع بدقة",
+  "ut_223ebc733a": "يجب تنفيذ الذكاء الاصطناعي كما هو، ولا يجوز له تعديل نفسه",
+  "ut_4ba4d0c89f": "السماح للذكاء الاصطناعي بضبط المعلمات دون انتهاك العقد",
+  "ut_4c7c042a46": "أضف الخادم",
+  "ut_aa56ccc31c": "قراءة فقط",
+  "ut_2c94b3027b": "متصل",
+  "ut_e5e228e9d3": "إضافة خادم MCP",
+  "ut_e7c0c60a9b": "تحرير خادم MCP",
+  "ut_e539334ba2": "طريقة الإرسال",
+  "ut_3062040662": "أمر البدء",
+  "ut_635c6ac2e8": "المعلمات (واحدة لكل سطر)",
+  "ut_86e6b6dae2": "عنوان URL للخادم",
+  "ut_7c1909ae8d": "المهلة (مللي ثانية)",
+  "ut_f3f63f65a0": "غطاء الأداة",
+  "ut_78a04cd0e0": "الأدوات المتاحة للوكيل",
+  "ut_b50e4d2f14": "أدوات للقراءة فقط (مستحسن)",
+  "ut_f7f0786cb6": "تمكين الخادم",
+  "ut_e234091c8a": "الاتصال تلقائيا عند بدء التطبيق",
+  "ut_e1d7cd83a8": "السماح للوكيل باستخدام الموارد",
+  "ut_2a8817d718": "السماح للوكيل باستخدام الكلمات السريعة",
+  "ut_bbe5aed47c": "التفويض باستخدام OAuth",
+  "ut_9f237e2f4c": "حفظ والاتصال",
+  "ut_c3255fdff5": "لا يمكن أن يكون الاسم فارغًا",
+  "ut_18b03910f5": "يتطلب نقل stdio أمر بدء التشغيل",
+  "ut_78ed27f966": "يجب أن يكون عنوان URL للخادم عبارة عن عنوان http(s).",
+  "ut_6462e5fd3f": "يجب أن تكون المهلة بين 3000-120000 مللي ثانية",
+  "ut_765400571f": "يجب أن يكون غطاء الأداة بين 1-40",
+  "ut_e43ff18e6b": "HTTP + SSE (قديم)",
+  "ut_6c1dbbd423": "stdio (عملية محلية)",
+  "ut_1ce1d6c086": "حول",
+  "ut_451a175be9": "إدارة المضيف",
+  "ut_42d62d0f0e": "الإعدادات",
+  "ut_85c1206607": "وضع التركيز",
+  "ut_20d2782c72": "محلي",
+  "ut_6ea2ce2fe7": "تأكيد التراجع",
+  "ut_78d92a1509": "يرجى الاتصال بالمضيف أولاً قبل متابعة المهمة",
+  "ut_9f7bc31ffe": "مؤشر مستقل",
+  "ut_ac8a126fc3": "فشل التنفيذ",
+  "ut_e56e69b4b9": "تم الإلغاء",
+  "ut_278fcd681d": "اكتملت الكتابة",
+  "ut_ae9a95fec3": "يقوم المستخدم بإلغاء المهمة، وتم إحباط كتابة PTY",
+  "ut_0bb0be16b3": "اكتمل الاستبدال",
+  "ut_1aa59da0cf": "فشلت الكتابة، التراجع...",
+  "ut_47e5e5365c": "تم إلغاء البحث في قاعدة المعرفة",
+  "ut_b79b73a254": "المعلمة المفقودة: المسار مطلوب",
+  "ut_b48a9bcd4c": "تأكيد",
+  "ut_fa7ae42a25": "الخدمة",
+  "ut_f71cf695fe": "تم إلغاء المهمة",
+  "ut_dec92d98dd": "تمت مقاطعة المهمة",
+  "ut_a8046742ba": "ذيل الإخراج الخام",
+  "ut_fc6ff4c8fb": "جميع العلامات",
+  "ut_c31fd08687": "نسخ",
+  "ut_68caa1b369": "الآن فقط",
+  "ut_de0e9433a3": "الوصف",
+  "ut_a53a6efe91": "لا يمكن أن يكون اسم العرض فارغًا",
+  "ut_5d608a562e": "أضف نقطة النهاية",
+  "ut_d4387b2009": "مزود الخدمة",
+  "ut_7a9886373c": "مفتاح واجهة برمجة التطبيقات",
+  "ut_1bd24257e4": "إضافة",
+  "ut_5f7dd28505": "تحرير المضيف",
+  "ut_cad33d6032": "أضف مضيفًا",
+  "ut_4b91f1393e": "إنشاء أمر اختصار جديد",
+  "ut_bc90bc1b81": "سير العمل الجديد",
+  "ut_35448c521f": "تم تشغيله بالفعل",
+  "ut_dbddf26277": "الحد الأقصى لعدد خطوات التنفيذ",
+  "ut_a18400490f": "قفل التطبيق",
+  "ut_f9aea8cf2e": "حاول مرة أخرى",
+  "ut_ec5739654b": "فشل فتح الرابط، وتم نسخه إلى الحافظة",
+  "ut_72cb33e8c2": "مفاتيح الاختصار الطرفية",
+  "ut_dc29b2f27f": "قريب",
+  "ut_9a7f4df03a": "كلمات موجهة مخصصة",
+  "ut_df02f06fa2": "إعادة تسمية",
+  "ut_035134b18f": "إنشاء دليل جديد",
+  "ut_7025e8166d": "لصق",
+  "ut_e45556d8c1": "أمر أمني",
+  "ut_7a4c7fc5d7": "تتضمن هذه العملية تكوين النظام أو تنزيل الشبكة، يرجى تأكيد العملية",
+  "ut_a88f921ea4": "عملية خطيرة، يرجى التأكد بعناية قبل تنفيذها.",
+  "ut_bf6e849886": "تم حظر العمليات عالية المخاطر من خلال السياسات الأمنية",
+  "ut_873cf0baa9": "المسار فارغ",
+  "ut_4370f90a2c": "المسار فارغ بعد التطبيع",
+  "ut_0abbb47931": "تسجيل الدخول للجلسة",
+  "ut_79ab7ea24e": "تسجيل الخروج من الجلسة",
+  "ut_dc687b5190": "10.000 سطر",
+  "ut_b80d4fdf1b": "لم يتم تكوين أي نموذج حتى الآن",
+  "ut_62197ba790": "مغلق · يعتمد الذكاء الاصطناعي فقط على السياق المحلي",
+  "ut_88b11effff": "قفل التطبيق قيد التشغيل",
+  "ut_aae6a1b7f8": "لم يتم تمكين قفل التطبيق",
+  "ut_7355cf069a": "الساعات الآمنة غير ممكّنة",
+  "ut_22b7a960c1": "لا يوجد خادم حتى الآن",
+  "ut_bf73a41ef9": "لا توجد قواعد حتى الآن",
+  "ut_a86e6d7ade": "لم يتم تشغيله",
+  "ut_c61e7e68e8": "ممكّن · عنوان Webhook مفقود ولا يمكن إرساله.",
+  "ut_6839af3e8f": "ممكّن · تذكير لكل مهمة",
+  "ut_f9ab3c28bf": "ممكّن · تنبيه فقط عند الفشل",
+  "ut_f500e9fc9a": "قالب الأوامر مع المتغيرات",
+  "ut_2d8f504c07": "قائمة مرجعية متعددة الخطوات",
+  "ut_f53531d72c": "مصدر ونتيجة كل أمر",
+  "ut_5aa2535411": "من تغير ماذا ومتى؟",
+  "ut_49efe264bb": "مهلة الأمر متعددة",
+  "ut_b1eedc7da7": "قم بزيادة السرعة للشبكات البطيئة وخفضها لاستكشاف أخطاء الاتصالات المتوقفة وإصلاحها.",
+  "ut_0ef39843c1": "لصق المحتوى",
+  "ut_cfae7855b2": "اختر من الملف",
+  "ut_f77e687e7f": "ممكّن · العنوان المراد ملؤه",
+  "ut_bb68aeb526": "تكوين · الحقن التلقائي لمنظمة العفو الدولية",
+  "ut_1f46b82540": "مهلة الاتصال",
+  "ut_beac562f56": "تم تحميل المفتاح الخاص المحفوظ",
+  "ut_8b9d8a0293": "لا توجد إدخالات أساسية للتصدير",
+  "ut_9e0a441f63": "تصدير المواصفات الداخلية",
+  "ut_393f76846d": "استيراد المواصفات الداخلية",
+  "ut_c1358ed65a": "حذف المواصفات",
+  "ut_2d0ac889f0": "اللوائح الداخلية",
+  "ut_b8ff31b60e": "استيراد جسون",
+  "ut_70148cd17d": "تصدير JSON",
+  "ut_a25e5f2908": "لا توجد مواصفات داخلية حتى الآن",
+  "ut_0a354147d1": "صارم",
+  "ut_e35e26caf1": "اقتراحات",
+  "ut_321c7d5cbd": "على سبيل المثال: يقوم nginx بتغيير conf.d فقط",
+  "ut_c841026fad": "اكتب القيود بوضوح باللغة الطبيعية، وسيتبعها الذكاء الاصطناعي تمامًا.",
+  "ut_cbf092e19a": "خادم MCP",
+  "ut_3ee244446d": "خادم MCP",
+  "ut_76aba21781": "إضافة سريعة:",
+  "ut_23784ffbb8": "لا يوجد خادم MCP حتى الآن",
+  "ut_bf9a7280ff": "المزيد",
+  "ut_b3ea1460b7": "أعد الاتصال",
+  "ut_c6f94e5dc4": "(لم يتم تكوين نقطة النهاية)",
+  "ut_a037d357eb": "قطع الاتصال",
+  "ut_d58e58c337": "اتصال",
+  "ut_ac3cdbdaa3": "الأدوات والقدرات",
+  "ut_6d628c3737": "مطلوب إذن OAuth",
+  "ut_55b9a7e0c0": "إذن تسجيل الدخول",
+  "ut_8173ace3f3": "انسخ رابط التفويض",
+  "ut_936b003fe8": "أدوات للقراءة فقط",
+  "ut_bc386dcd56": "مدمر",
+  "ut_eb15558933": "خارجي",
+  "ut_4fc8541fe1": "الوكيل متاح",
+  "ut_fcabd36585": "غير مفتوح",
+  "ut_7889ed8608": "لا توجد معلمات",
+  "ut_69440da7fa": "السجلات الأخيرة",
+  "ut_0dbb5c7bd4": "معطل",
+  "ut_f50cfe7b3a": "غير متصل",
+  "ut_439759c292": "الاتصال",
+  "ut_28c0833d52": "الترخيص مطلوب",
+  "ut_fcc790f11c": "فشل الاتصال",
+  "ut_6b02c4539d": "حدد الدلائل التي يسمح نظام الملفات MCP بالوصول إليها",
+  "ut_446d04518f": "حذف خادم MCP",
+  "ut_3121de47a1": "معرف الموارد المنتظم (URI) للمورد",
+  "ut_5e1e108436": "املأ عنوان URI المحدد وفقًا للنموذج",
+  "ut_250aaaa8b9": "معلمات كلمة سريعة",
+  "ut_3dedee49e4": "مفتاح واحد = القيمة لكل سطر",
+  "ut_1cc391dd56": "(مطلوب)",
+  "ut_4a407548bf": "تم نسخ المحتوى",
+  "ut_7c50d4b883": "نسخ المحتوى",
+  "ut_8e8300886d": "على سبيل المثال نبكس",
+  "ut_9e643633f7": "دليل العمل (اختياري)",
+  "ut_4c8483a194": "متغيرات البيئة (KEY=VALUE لكل سطر)",
+  "ut_4ad1ca4105": "الوكيل الصادر (اختياري)",
+  "ut_c9270e6a1d": "الرؤوس (المفتاح: القيمة لكل صف)",
+  "ut_e249b99577": "مخصص (ضع علامة في المربع الموجود في البطاقة بعد الاتصال)",
+  "ut_3665baf413": "نطاقات OAuth (مفصولة بمسافة/فاصلة، اختيارية)",
+  "ut_92dbcbd641": "معرف عميل OAuth (اتركه فارغًا لاستخدام DCR)",
+  "ut_87fceccd93": "OAuth ClientSecret (اختياري)",
+  "ut_9c3dece052": "الإدارة",
+  "ut_37ac3bf8ce": "الوكيل قيد التنفيذ، يرجى استخدام مربع الإدخال للحصول على تعليمات إضافية.",
+  "ut_dcdd97ac06": "اتصال SSH غير جاهز. انقر فوق هذه الشاشة للمحاولة مرة أخرى بعد إعادة الاتصال.",
+  "ut_4fc495b331": "فشلت المحطة المحلية في البدء",
+  "ut_4bab1ab6c2": "فشل افتتاح الجلسة على هذه الشاشة",
+  "ut_129733266f": "[انتهت الجلسة]",
+  "ut_b6c84bb8f3": "ترتبط هذه الشاشة بالذكاء الاصطناعي ولا يمكن إيقاف تشغيلها بمفردها؛ يرجى إغلاق علامة التبويب مباشرة",
+  "ut_def20d7537": "محادثة الذكاء الاصطناعي",
+  "ut_cafa2f7cad": "قذيفة محلية",
+  "ut_e1fac83b32": "تم قطع اتصال جلسة هذه الشاشة",
+  "ut_13304be1df": "أعد فتح هذه الشاشة",
+  "ut_6582d682ca": "لوحة الأوامر (Ctrl+K)",
+  "ut_422f8e1f4e": "لون المحطة وحجم الخط",
+  "ut_19d7987a04": "القائمة",
+  "ut_c985d380db": "اذهب الى",
+  "ut_d4c339f3c6": "فترة آمنة",
+  "ut_7df2507796": "غير ممكّن",
+  "ut_86dfbbb589": "هذه المحطة",
+  "ut_7a89819950": "عرض",
+  "ut_9175d8cccb": "العرض الكامل للمحطة",
+  "ut_1029dcb6e3": "تبديل موضع لوحة AI",
+  "ut_d170a458d4": "اليمين / الأسفل",
+  "ut_23820b0802": "SFTP متاح فقط للجلسات البعيدة",
+  "ut_ed8ab87e0e": "أغلق لوحة SFTP",
+  "ut_02fc9755f6": "لوحة ملف SFTP",
+  "ut_3d81bbe4b1": "موضع لوحة التبديل (يمين/أسفل)",
+  "ut_49aa3e0155": "دع الوكيل يعمل على هذا المضيف",
+  "ut_80f39c254f": "قم بوصف المتطلبات وسيتم تنفيذ الخطوات تلقائيًا؛ سوف تطلب الأوامر الخطيرة الإذن أولاً",
+  "ut_dbe7312942": "لا يوجد أمر التراجع القابل للتنفيذ لهذا التغيير",
+  "ut_98ddb3e569": "سيتم استعادة الملفات المحلية إلى:",
+  "ut_12db03a03c": "سيتم تنفيذ أمر الاستعادة:",
+  "ut_d9c1f090b6": "ستؤدي عملية الاستعادة إلى وضع النسخة في منطقة النسخ الاحتياطي/إعادة التدوير مرة أخرى إلى المسار الأصلي للجهاز المحلي وكتابة سجلات التدقيق.",
+  "ut_ba66b6920c": "يقوم التراجع بتعديل حالة الخادم وكتابة سجلات التدقيق.",
+  "ut_ae7f0253b5": "تم قطع اتصال المضيف ولم يتم إجراء الاستعادة.",
+  "ut_e79e7730e4": "لم يتم تنفيذ التراجع: المضيف غير متصل أو لا يوجد أمر التراجع",
+  "ut_36ae6b14be": "الرجاء التبديل إلى هذا المضيف أولاً ثم إعادة الاتصال.",
+  "ut_f89df440af": "لا تحتاج المحطة المحلية إلى إعادة الاتصال، يرجى التحقق من عملية المحطة",
+  "ut_31edece655": "لم يتم العثور على تكوين المضيف، غير قادر على إعادة الاتصال",
+  "ut_470431de01": "فشلت عملية إعادة الاتصال، يرجى التحقق من الشبكة أو كلمة المرور",
+  "ut_42e52ee488": "تم إعادة الاتصال بنجاح",
+  "ut_3a602327a9": "الرجاء التبديل إلى هذا المضيف أولاً قبل متابعة المهمة",
+  "ut_46e4b5a120": "يرجى التبديل/إعادة الاتصال بهذا المضيف والمحاولة مرة أخرى",
+  "ut_c4388ff04e": "لقد تم قطع اتصال المضيف، يرجى إعادة الاتصال أولاً",
+  "ut_3993de2fb8": "كلمة المرور",
+  "ut_694738320d": "عرض",
+  "ut_6870753dcd": "إخفاء",
+  "ut_b765c3fd60": "الأمر ينتظر الإدخال",
+  "ut_107ca67793": "أدخل (اتركه فارغًا = اضغط على Enter)",
+  "ut_793f2a8599": "لم يتم تكوين النموذج بعد، يرجى الانتقال إلى الإعدادات → AI Model للإضافة",
+  "ut_4ed5ea2e0b": "لم يتم التحديد",
+  "ut_6aba627378": "لا يوجد محتوى قابل للتصدير للجلسة الحالية",
+  "ut_13465ff9b3": "تم وضعها بالفعل في مربع إدخال الوكيل",
+  "ut_d45aa5cd92": "الأوامر الطرفية",
+  "ut_aec5a6dc3d": "حفظ كجزء من الأمر",
+  "ut_2f4c7a6c8c": "اسم القطعة",
+  "ut_06c357f14d": "من المحطة انقر بزر الماوس الأيمن",
+  "ut_f58a1a9197": "أمر الوكيل",
+  "ut_bb76c4ff57": "أدخل / للبحث عن كافة الأوامر وقوالب التشغيل والصيانة؛ ↑↓ للتبديل، وTab للتحديد، وEnter للتنفيذ.",
+  "ut_5d888b8a22": "لا يمكن ضغط الذاكرة أثناء تقدم المهمة. يرجى إيقاف المهمة أولاً.",
+  "ut_5f55be5f65": "البحث على الإنترنت: ممكّن (فعال للمهمة التالية)",
+  "ut_921c3a3d3c": "البحث على الإنترنت: غير ممكّن (انقر للتمكين، ستصبح المهمة التالية سارية المفعول)",
+  "ut_b5e4297324": "تنفيذ",
+  "ut_d68f77a907": "العملية",
+  "ut_5085464dd9": "اتصال جديد",
+  "ut_cbd048e6e6": "أعد توصيل التسمية الحالية",
+  "ut_f30d7344c7": "طي لوحة الذكاء الاصطناعي",
+  "ut_c7b60ecb72": "قم بتوسيع لوحة الذكاء الاصطناعي",
+  "ut_36a1bca19d": "الخروج من وضع التركيز",
+  "ut_c56382e3ee": "إخفاء مراقبة الخادم",
+  "ut_55b60aaf25": "عرض مراقبة الخادم",
+  "ut_1e838ce89c": "أغلق لوحة SFTP",
+  "ut_a752de5a42": "افتح لوحة SFTP",
+  "ut_f934cd40d1": "تاريخ الجلسة",
+  "ut_f8ead6b402": "قم بإنشاء جلسة AI جديدة",
+  "ut_76462daeb1": "صفحة كاملة",
+  "ut_e17ad38728": "درج",
+  "ut_9b85525187": "التدقيق التشغيلي",
+  "ut_1bc161aa98": "إعدادات نموذج الذكاء الاصطناعي",
+  "ut_1d6ad9a57d": "تغيير التاريخ",
+  "ut_8659bce8a2": "سير العمل",
+  "ut_7781e2e2a1": "تعليمات إضافية…",
+  "ut_c8e527419a": "لا تدعم المحطة المحلية إعادة توجيه المنفذ",
+  "ut_fc1fc05fcd": "البحث على الإنترنت",
+  "ut_1a5ebea669": "بدون مفتاح (يعمل خارج الصندوق)",
+  "ut_d007a268a0": "مفتاح API مطلوب",
+  "ut_06aab0767d": "مثيل خاص مفتاح اختياري",
+  "ut_d17f6d0537": "المعلمات العالمية",
+  "ut_28bd2b7489": "اختبر الآن",
+  "ut_fd44505c78": "تمكين الخلفية:",
+  "ut_35fef8a980": "الواجهات الخلفية المختارة:",
+  "ut_a7179dbf9b": "المفتاح الذي تم تكوينه:",
+  "ut_435e2b9a3e": "حالة التحديث",
+  "ut_3b3bcc7a34": "غير متوفر",
+  "ut_aff6cc24ed": "المفتاح مطلوب",
+  "ut_140b926331": "البحث الدلالي · المفتاح مطلوب",
+  "ut_c8f4f082c1": "واجهة برمجة تطبيقات البحث · المفتاح مطلوب",
+  "ut_060d69c2ef": "آر إس إس · بدون مفتاح",
+  "ut_82fe5ca073": "HTML · مطلوب وكالة محلية",
+  "ut_cde0d7f255": "تحتاج إلى بناء المثيل الخاص بك",
+  "ut_fdb03fa75f": "ملخص تحسين الذكاء الاصطناعي",
+  "ut_2846d31002": "نتائج جوجل",
+  "ut_50265d0478": "لا توجد واجهة برمجة تطبيقات للبحث حتى الآن",
+  "ut_aa998837ed": "أداة بحث كلود",
+  "ut_72f0d7877f": "بحث الردود",
+  "ut_ebda0aff48": "تحت التفتيش",
+  "ut_7875a79d06": "متغيرات البيئة",
+  "ut_464ca43586": "تم تكوينه",
+  "ut_cdc3132e4c": "لم يتم تكوينه",
+  "ut_dd2e9a0289": "وثائق النشر",
+  "ut_050792529a": "احصل على المفتاح",
+  "ut_836f91fea2": "رمز اختياري: تم إرساله كتفويض: حامله",
+  "ut_37cabfd93e": "اتركه فارغًا للإشارة إلى عدم وجود تعديل؛ يمكنك أيضًا استخدام متغيرات البيئة بنفس الاسم.",
+  "ut_60f1ed814f": "سيتم مسح المفتاح المحفوظ بعد الحفظ",
+  "ut_246737f23c": "عنوان مثيل SearXNG",
+  "ut_dceef0fd66": "وثائق نشر SearXNG →",
+  "ut_05981b84e9": "العدد النهائي للعناصر التي تم إرجاعها (1-20)",
+  "ut_875f752532": "عدد الواجهات الخلفية المطلوبة في وقت واحد (1-12)",
+  "ut_113e34528c": "أطول فترة انتظار لواجهة خلفية واحدة (3000-120000 مللي ثانية)",
+  "ut_d012b127eb": "الوكيل الصادر",
+  "ut_6a13f67dc3": "أدخل استعلامًا مثل آخر أخبار OpenAI",
+  "ut_eeda5a24be": "البحث",
+  "ut_7c5d801935": "بحث",
+  "ut_3d01e59d2e": "لا توجد نتائج مطابقة.",
+  "ut_aef246a460": "المصدر:",
+  "ut_a7de20e32a": "الرجاء إدخال الكلمة الأساسية للاستعلام",
+  "ut_8334c9cd68": "يجب أن يكون بين 1-20",
+  "ut_c1fe9fa3f2": "يجب أن يكون بين 1-12",
+  "ut_299e9d34bb": "يجب أن يكون بين 3000-120000",
+  "ut_3d127654a9": "المعلمة خاطئة، يرجى التحقق من الحقل المميز",
+  "ut_0531ef0aec": "تم الحفظ، وأصبح فعالاً على الفور",
+  "ut_c259d39a21": "تمت استعادة آخر حالة محفوظة",
+  "ut_1595af9c76": "إعادة ضبط الحالة",
+  "ut_5046a76cef": "في انتظار التأكيد",
+  "ut_3a760ee340": "تنفيذ",
+  "ut_9b47257520": "مع وقف التنفيذ",
+  "ut_6bafadcb9f": "⏸️ تم تعليق المهمة، يمكنك النقر للاستئناف للمتابعة",
+  "ut_5384a63ffb": "◀️ تم استئناف المهمة، تابع التنفيذ...",
+  "ut_48eb86eca2": "⚠️ يدعي الذكاء الاصطناعي الإكمال دون تنفيذ الأمر فعليًا، مما يتطلب التحقق الفعلي",
+  "ut_c975d9cfca": "…(الإجابة طويلة جدًا وتم اقتطاعها)",
+  "ut_c0bd0404a4": "بالنسبة للأوامر الأصلية، يرجى استخدام الأداة local_exec بدلاً من ذلك.",
+  "ut_a3621ea638": "اعتراض أثناء حصار الشبكة",
+  "ut_6c86646cba": "تم تمكين وضع القراءة فقط وتم رفض تنفيذ هذا الأمر.",
+  "ut_6140f3dac8": "وضع الإذن الحالي، تم رفض تنفيذ هذا الأمر",
+  "ut_b14923e57e": "اسأل",
+  "ut_287a6d5c24": "تلقائي",
+  "ut_64b5e22817": "✅ أكد المستخدم، بدء التنفيذ...",
+  "ut_748164be56": "⚠️ يستدعي الذكاء الاصطناعي الأداة لكنه لا يحدد اسم الأداة",
+  "ut_ee157cb455": "⏳ متابعة...",
+  "ut_7d89802fc1": "تنظيم الاستنتاجات",
+  "ut_42d195aa5d": "جارٍ فتح النظام الفرعي لـ SFTP...",
+  "ut_a70224cf55": "اكتمل التحميل",
+  "ut_3ce3c27270": "اكتمل التنزيل",
+  "ut_90b80824a2": "توقفت مزامنة الملفات",
+  "ut_948df560e2": "توقفت مزامنة الملفات",
+  "ut_c6a06709f5": "جارٍ بدء مزامنة الملفات...",
+  "ut_88dfa9a69c": "المعلمة المفقودة: الوضع مطلوب (remote/local_file/ssh_hostkey)",
+  "ut_c767a0bfa3": "نطاق المنفذ غير قانوني (1-65535)",
+  "ut_7400d2fd8c": "يحتوي certPath على أحرف غير قانونية (علامات الاقتباس/الفواصل المنقوطة/أنابيب/علامات الظهر، وما إلى ذلك)",
+  "ut_272d2f4a52": "قراءة بصمة مفتاح مضيف SSH...",
+  "ut_049487ff40": "المعلمة مفقودة: يجب أن يوفر المحتوى أو content_b64 واحدًا",
+  "ut_7515f1e67e": "فشلت الكتابة في SFTP، جارٍ التراجع عن النسخة الاحتياطية...",
+  "ut_ee8e576b01": "تمت استعادة الملف الأصلي من النسخة الاحتياطية",
+  "ut_a3714eed7b": "فشلت الكتابة في SFTP، أثناء محاولة وضع PTY stdin (ملف > cat)...",
+  "ut_ca59f0145f": "جارٍ النسخ الاحتياطي للملفات الأصلية...",
+  "ut_ed571dc1ef": "الملف المحلي",
+  "ut_aeff3a9157": "فشلت الكتابة المحلية المباشرة، محاولة الكتابة من خلال الصدفة الحالية...",
+  "ut_751b0202ff": "معيار PTY المحلي",
+  "ut_ddd5f79db8": "PTY المحلي stdin + سودو تي",
+  "ut_e67f272887": "  ملاحظة: العملية الحالية ليس لديها إذن لقراءة الملف الأصلي ولا يمكنها إنشاء نسخة احتياطية.",
+  "ut_d1dd8a4a86": "الجلسة الحالية ليس لديها حق الوصول إلى إدخال كلمة المرور. يرجى ملء كلمة مرور sudo في إعدادات المضيف.",
+  "ut_cdfaed0dc5": "انتظر حتى يقوم المستخدم بإدخال كلمة مرور Sudo ...",
+  "ut_6d06b21d26": "لم يقدم المستخدم كلمة مرور (إلغاء أو أدخل فارغًا). يرجى استخدام الإجراء: اطلب التأكيد مع المستخدم بدلاً من ذلك، أو قم بالتنفيذ في الوضع غير المميز بدلاً من ذلك.",
+  "ut_de63930b16": "تجربة التحقق الأصلية",
+  "ut_11e4b8176f": "قاعدة المعرفة الرسمية",
+  "ut_587234aed7": "لقد تم اقتطاع هذه المقالة",
+  "ut_fb8896831d": "يتجاوز المبلغ الإجمالي الحد، وتم اقتطاع الإدخالات اللاحقة.",
+  "ut_89d6d1508a": "لا يدعم النظام الأساسي الحالي تنفيذ الأوامر الأصلية (فقط لسطح مكتب Windows / macOS / Linux).",
+  "ut_4d2a25adb6": "المعلمة المفقودة: الاستعلام مطلوب",
+  "ut_039e6df512": "\nملاحظة: وصل عدد الملفات إلى الحد الأعلى وهو 5000 ملف. ولن يستمر الاجتياز. الرجاء استخدام المسار الشامل أو الأضيق لتضييق النطاق.",
+  "ut_4d2db00134": "ملاحظة: وصل عدد الملفات إلى الحد الأعلى وهو 5000 ملف. ولن يستمر الاجتياز. الرجاء استخدام المسار الشامل أو الأضيق لتضييق النطاق.",
+  "ut_1d0e0057ce": "الوسيطة المفقودة: المحتوى أو content_b64 يجب توفير أحدهما. الرجاء كتابة عدة أسطر من المحتوى في نفس السطر واستخدام \\n للإشارة إلى فاصل الأسطر.",
+  "ut_80fbd0db5a": "[لقد انتهت العملية]",
+  "ut_3212b67b4f": "لقد انتهت صلاحية ترخيص OAuth، يرجى تسجيل الدخول مرة أخرى",
+  "ut_3043a371fb": "(تقوم أداة MCP بإرجاع نتائج فارغة)",
+  "ut_4b697ab9d4": "تم إلغاء مكالمة MCP",
+  "ut_e6a3f8cacd": "لم يقدم خادم MCP هذا كلمة سريعة.",
+  "ut_18ecc05e1c": "تحليل هيكل المشروع...",
+  "ut_b814db8dc9": "=== تقرير تحليل المشروع ===",
+  "ut_b703554a31": "في انتظار قفل البناء...",
+  "ut_76fa7f5bc2": "تم الإلغاء أثناء انتظار قفل البناء",
+  "ut_957091cf2f": "بناء ناجح",
+  "ut_892c3e0946": "تم التحقق من الاتصال",
+  "ut_d9a78ca9ae": "[الاتصال مغلق]",
+  "ut_4db21d650d": "[خطأ]",
+  "ut_7038dfdb24": "[الاتصال مغلق]",
+  "ut_3902f53eb2": "تم الاتصال بنجاح",
+  "ut_8d0408fbbe": "فشل الاتصال:",
+  "ut_87f4917a26": "[خطأ] غير متصل",
+  "ut_3561d2bc19": "[منقطع]",
+  "ut_558bbf2918": "المعلمات المفقودة: الاستعلام مطلوب",
+  "ut_d74776ae2e": "تمت عملية الزحف بنجاح، ولكن محتوى الصفحة فارغ.",
+  "ut_1ebeb12158": "تحليل النص...",
+  "ut_dfde5a0464": "تم حظر هذا الأمر بواسطة سياسة الأمان",
+  "ut_517880c5b3": "تأكيد تنفيذ الأمر",
+  "ut_dd66d942fb": "تأكيد العمليات الخطرة",
+  "ut_c5955eb9de": "على وشك التنفيذ:",
+  "ut_68772a88f7": "قد تؤدي هذه العملية إلى عدم توفر النظام، يرجى إجراؤها بحذر!",
+  "ut_fccd2f755c": "الرجاء إدخال تأكيد للمتابعة:",
+  "ut_6863351895": "أدخل تأكيد",
+  "ut_e6f77c3aa9": "تأكيد التنفيذ",
+  "ut_03303bd6da": "تنفيذ استدعاءات الأدوات التي قد تغير الحالة خارج الجلسة الحالية",
+  "ut_c8e25a26d1": "قد يؤدي تثبيت حزم البرامج أو ترقيتها إلى تغيير تبعيات النظام والتأثير على الخدمات الحالية.",
+  "ut_cd5d5a98a0": "قم بإلغاء تثبيت البرامج، فقد تكون الخدمات التي تعتمد عليها غير متوفرة",
+  "ut_88ec88c7b3": "سيؤدي بدء الخدمة إلى تغيير حالة التشغيل الحالية",
+  "ut_7ba837a04e": "قم بإيقاف الخدمة وسيتم مقاطعة مواقع الويب/الواجهات التي تعتمد عليها",
+  "ut_a1e726721a": "أعد تشغيل الخدمة. قد يتم مقاطعة موقع الويب/الواجهة مؤقتًا.",
+  "ut_1210181241": "تعديل ملفات التكوين، والتي قد تغير سلوك الخدمة",
+  "ut_a0e4d573e8": "تعديل حالة الخادم، يرجى تأكيد نطاق التأثير",
+  "ut_ab356c88ee": "تم اجتياز فحص تكوين Nginx",
+  "ut_8e89715728": "فشل التحقق من تكوين Nginx",
+  "ut_3e37edb32c": "أي من الأزرار تناسب؟ فقط أدخل إجابتك...",
+  "ut_1cb11a152d": "إرسال إجابة مخصصة",
+  "ut_b31e90861f": "(لا يوجد إخراج)",
+  "ut_c06a19b387": "أعد الاتصال",
+  "ut_e3d0732b84": "دع الذكاء الاصطناعي يحاول مرة أخرى",
+  "ut_73c881e205": "أنجزت المهمة",
+  "ut_22aee52bc1": "تم الانتهاء من جميع الخطوات",
+  "ut_704c12f2eb": "فشلت المهمة",
+  "ut_da68e2844f": "فشل تنفيذ المهمة",
+  "ut_ede5822e49": "تمت مقاطعة المهمة",
+  "ut_9566f7b70f": "إخراج الأمر",
+  "ut_51bfee4aca": "نهاية",
+  "ut_e46194bcb9": "سجل الوكيل",
+  "ut_ecc8f6c40b": "انسخ نتائج التصفية الحالية",
+  "ut_f988024855": "عرض هذه المهمة فقط",
+  "ut_7b8553ecdf": "التفكير النموذجي",
+  "ut_46d28ef143": "↑↓ تبديل علامة التبويب، حدد إدخال، تنفيذ خروج، إغلاق",
+  "ut_9e9ac63dcb": "تعليمات تكميلية (تسري في الجولة القادمة)",
+  "ut_f12263d7ea": "لا لون",
+  "ut_b35da5e4e9": "هل تريد مسح سجل الأوامر بالكامل؟",
+  "ut_0f29d5bb1a": "واضح",
+  "ut_9687dea3ac": "مسح التاريخ",
+  "ut_8a6ca36e98": "أوامر سجل البحث",
+  "ut_3a23e3acdd": "لا توجد أوامر تاريخية حتى الآن",
+  "ut_f22110ada9": "أدخل لتنفيذ النتيجة الأولى · أدخل لملء الفراغ · انقر للنسخ",
+  "ut_956e4930dd": "ابحث عن المضيف/الأمر/الصفحة/الإجراء...",
+  "ut_e69a25b65d": "لا يوجد تطابق",
+  "ut_f160c18c0c": "اختر",
+  "ut_981720593b": "تنفيذ",
+  "ut_a3e557dfb9": "قريب",
+  "ut_493d7ff67f": "التفتيش",
+  "ut_b8c3200c7b": "آمنة",
+  "ut_2aa836e6e9": "نشر",
+  "ut_bda0db72a1": "استكشاف الأخطاء وإصلاحها",
+  "ut_6f9c60bc15": "الصيانة الروتينية",
+  "ut_338073cc53": "القوالب المضمنة للقراءة فقط",
+  "ut_5865795364": "أيقونة",
+  "ut_5dfdb946bf": "اكتب",
+  "ut_52129c776f": "تنفيذ الذكاء الاصطناعي (خطوة اللغة الطبيعية)",
+  "ut_e87bf3a87f": "التنفيذ المباشر (أمر shell)",
+  "ut_c1af116483": "التصنيف",
+  "ut_e91627ff38": "الخطوات (مكتوبة إلى AI)",
+  "ut_25cc0f420e": "الأمر",
+  "ut_cdeeaa7450": "لا توجد نماذج قابلة للاستعادة لهذا الإعداد المسبق",
+  "ut_ab0793064d": "املأ عنوان URL الأساسي أولاً",
+  "ut_dd05d9a6b8": "لا توجد نماذج جديدة لإضافتها",
+  "ut_5fe10ec0d8": "مهلة الاتصال",
+  "ut_bc3f91069f": "غير قادر على الاتصال",
+  "ut_6367b9ea6c": "فشل الطلب",
+  "ut_7794ac4d33": "لا يمكن أن يكون عنوان URL الأساسي فارغًا",
+  "ut_ae851c66db": "احتفظ بنموذج واحد على الأقل",
+  "ut_82d4f67dc5": "تحرير نقطة النهاية",
+  "ut_742161ce45": "اتركه فارغًا لاستخدام المفتاح المحفوظ",
+  "ut_41678037ea": "اسم العرض",
+  "ut_03570451ac": "اتفاق",
+  "ut_0de12236b8": "ونكسينييان",
+  "ut_7abc46ce6d": "استعادة الافتراضي",
+  "ut_28c32fe34f": "جارٍ الاسترداد...",
+  "ut_f2a08ffc71": "سحب من مزود الخدمة",
+  "ut_a52f4bbfda": "الغلاف",
+  "ut_3ed4ca7624": "لا يوجد نموذج حتى الآن، أضف واحدًا أولاً.",
+  "ut_7e4f0e1070": "لا يمكن أن يكون معرف النموذج فارغًا",
+  "ut_2ea671ff59": "اسم العتاد مكرر",
+  "ut_d2cf18b1f8": "مطلوب ترس واحد على الأقل لتمكين الاستدلال",
+  "ut_df2b9cacae": "حسنًا",
+  "ut_02259f1272": "لم يتم ضبطه",
+  "ut_ea6cf493d2": "ربط المحطة",
+  "ut_57d80443c9": "أعد محاولة المضيف الفاشل",
+  "ut_9e541c6382": "النجاح",
+  "ut_e35dddb0b4": "فشل",
+  "ut_ec4c29ca9a": "تم فقد الاتصال",
+  "ut_a1e91f6981": "مهلة",
+  "ut_7d4af9fef1": "أذونات غير كافية",
+  "ut_9927a13579": "في انتظار الإدخال",
+  "ut_b3d243fdfd": "خطأ في بناء الجملة",
+  "ut_66197bd48d": "العودة",
+  "ut_58851eb751": "تم الاحتفاظ بسجل التنفيذ ويمكن استكماله.",
+  "ut_e6b33fe91a": "مواصلة المهمة",
+  "ut_5e6e54121d": "استعادة الافتراضي",
+  "ut_9aa0cecb52": "انقر لإعادة الدخول",
+  "ut_1f0be4879d": "الرجاء الضغط على مجموعة المفاتيح ...",
+  "ut_5a1aea8730": "حسنًا",
+  "ut_a1490afb10": "الوكيل يدعم فقط http://host:port",
+  "ut_ffad1d8b04": "دليل العمل (اختياري)",
+  "ut_205492caf2": "متغيرات البيئة (KEY=VALUE لكل سطر)",
+  "ut_acce8b3510": "الوكيل الصادر (اختياري)",
+  "ut_cd76953b04": "الرؤوس (المفتاح: القيمة لكل صف)",
+  "ut_12f53f2717": "التخصيص (تحقق بعد الاتصال)",
+  "ut_a8481de1d6": "نطاقات OAuth (مفصولة بمسافة/فاصلة)",
+  "ut_4181f5ee36": "معرف عميل OAuth (اتركه فارغًا لاستخدام DCR)",
+  "ut_a6f501ed31": "OAuth ClientSecret (اختياري)",
+  "ut_810e89c23f": "مساعد الذكاء الاصطناعي",
+  "ut_1a81fac6b4": "درج قريب",
+  "ut_df39e46c77": "تحرير أوامر الاختصار",
+  "ut_5b6a456972": "تحرير سير العمل",
+  "ut_9d49b2c71b": "العودة إلى المستوى السابق",
+  "ut_de5dd6102e": "البحث عن الاسم/IP/المجموعة",
+  "ut_1c95f57481": "لا يوجد مضيف مطابق",
+  "ut_29b3f192d8": "البحث عن الاسم/الأمر",
+  "ut_d112e18b97": "لا يوجد أمر اختصار مطابق",
+  "ut_dd209aad9b": "البحث عن الاسم/الوصف",
+  "ut_3d46c0f619": "تنفيذ الذكاء الاصطناعي",
+  "ut_6ba17bef52": "التنفيذ المباشر",
+  "ut_45a37578cb": "مؤخرا",
+  "ut_ab4373452b": "تشغيل",
+  "ut_6cb13cd9c4": "لا يوجد سير عمل مطابق",
+  "ut_00636e0752": "أمر البحث",
+  "ut_f83f96b238": "لا توجد سجلات التدقيق حتى الآن",
+  "ut_cacce52f6d": "لا توجد سجلات لنسخها",
+  "ut_a50d8711f5": "سجل تدقيق محطة الذكاء الاصطناعي",
+  "ut_6200fddf68": "آلة محلية",
+  "ut_2f5e0aff16": "لا يوجد إخراج",
+  "ut_f943d2ce6c": "اعتراض",
+  "ut_740618ad3b": "الافراج",
+  "ut_311d08fee0": "تم تنفيذه",
+  "ut_7e1cc53dfe": "لم يتم تنفيذه",
+  "ut_d6834ac586": "انسخ هذا",
+  "ut_4a647e404a": "إعدادات البحث",
+  "ut_8ad11edf4e": "معدلة",
+  "ut_57d5e9c054": "قريب",
+  "ut_10f71987c9": "عدد خطوط المخزن المؤقت للتراجع",
+  "ut_d7b02e9cf7": "التسجيل التلقائي للجلسة",
+  "ut_2543cfa7f8": "مهلة الاستجابة بخطوة واحدة",
+  "ut_fac7fadb45": "مهلة الأمر متعددة",
+  "ut_48274233a0": "اليوم",
+  "ut_98427f593c": "انتهت المهمة، يرجى الاطلاع على سجل التنفيذ للحصول على التفاصيل.",
+  "ut_9caaf88e9c": "تم تنفيذ التراجع",
+  "ut_aee33bbe51": "لا يوجد تراجع تلقائي، يوصى باستخدام لقطة ما قبل التنفيذ",
+  "ut_4e9cdbd7a8": "تراجعت",
+  "ut_730ed00d8e": "يمكن التراجع",
+  "ut_4f069ae310": "يتطلب العمالة",
+  "ut_209a3ee99a": "التراجع",
+  "ut_8bcebbb092": "التراجع",
+  "ut_3459fead8a": "التثبيت",
+  "ut_ad620f1593": "إلغاء التثبيت",
+  "ut_0e0e2a9a73": "تعديل التكوين",
+  "ut_7393410b1a": "ابدأ الخدمة",
+  "ut_64a71bf56a": "إيقاف الخدمة",
+  "ut_c5ea3f5be9": "إعادة تشغيل الخدمة",
+  "ut_7a42975bda": "عمليات الملف",
+  "ut_98ae0d0e95": "تعديل الإذن",
+  "ut_d3636b0082": "التغيير",
+  "ut_3954d67b32": "لا توجد مباريات",
+  "ut_ce6351e3cc": "الناتج الخام",
+  "ut_f5876a2bf8": "نسخ الكل",
+  "ut_f7d3ee00a1": "مخرجات البحث...",
+  "ut_ef2170f4b4": "التسمية الحالية غير متصلة ولا يمكن إنشاء إعادة التوجيه.",
+  "ut_0df8de01ab": "يرجى ملء منفذ صالح (1-65535) والمضيف المستهدف",
+  "ut_be0c081010": "لا توجد قواعد إعادة التوجيه حتى الآن",
+  "ut_d0df2ad5ea": "توقف وحذف",
+  "ut_f704784855": "محلي → بعيد",
+  "ut_1b67fdda4b": "بعيد → محلي",
+  "ut_50901ca37c": "منفذ الاستماع",
+  "ut_864e1c6380": "المضيف المستهدف",
+  "ut_ec3f615847": "المنفذ المستهدف",
+  "ut_c1fbfd5065": "إضافة إلى الأمام",
+  "ut_4a8eab4b12": "على سبيل المثال: يقوم nginx بتغيير conf.d فقط",
+  "ut_ee90ce584e": "اكتب القيود بوضوح باللغة الطبيعية، وسيتبعها الذكاء الاصطناعي تمامًا.",
+  "ut_468c99d256": "لا يوجد مضيف حتى الآن، لذلك لا يمكن أن يقتصر على مضيف واحد.",
+  "ut_d83a565087": "التشخيص",
+  "ut_92cd36cefb": "جارٍ التحقق…",
+  "ut_0ddb8a1f0d": "لم تحصل على نتائج الاختبار.",
+  "ut_b1ab09352f": "نسخة التطبيق",
+  "ut_0942c2789b": "تعطلت هذه الجلسة",
+  "ut_9f028e8160": "وقت الانهيار الأخير",
+  "ut_87c363d0c9": "لا شيء",
+  "ut_065917e680": "اتصال تجمع SSH",
+  "ut_4927752a48": "اتصال ميت",
+  "ut_46d9b304c4": "قرص قابل للكتابة",
+  "ut_3779abda15": "نعم",
+  "ut_e812fd5dbb": "لا",
+  "ut_2e81ddc87a": "تحقق من الوقت",
+  "ut_234f4f27c8": "سجل الأعطال فارغ",
+  "ut_d10e283a81": "نسخ سجل الأعطال",
+  "ut_ced38012da": "تم مسح سجل الأعطال",
+  "ut_ead023bd7e": "إعادة الفحص",
+  "ut_2e28b0df81": "سجلات الأعطال والحالة الصحية",
+  "ut_3f96027e32": "تم نسخ معلومات الإصدار",
+  "ut_1f0a3070de": "القراءة…",
+  "ut_b6541b6328": "جارٍ التحقق من وجود تحديثات...",
+  "ut_32142192ac": "بالفعل أحدث إصدار",
+  "ut_7dc8c0869d": "النسخة",
+  "ut_610ddf67b9": "عدد خطوط المخزن المؤقت للتراجع",
+  "ut_8a70b91e29": "التسجيل التلقائي للجلسة",
+  "ut_050de7d897": "النموذج المستخدم حاليا",
+  "ut_626fb86214": "لا يوجد نموذج بعد. قم أولاً بإضافة نقطة نهاية، ثم قم بإضافة النموذج.",
+  "ut_387e6f82d0": "نقطة النهاية",
+  "ut_76fb9c463a": "لا توجد نقاط النهاية بعد.",
+  "ut_38966aa565": "لا يوجد حد",
+  "ut_f28f99867b": "مهلة الاستجابة بخطوة واحدة",
+  "ut_ded8ed2d66": "مهلة الأمر متعددة",
+  "ut_a2ce59889b": "لم يتم ضبطه",
+  "ut_6aad5ea609": "تحرير الكلمة",
+  "ut_b95d0f872a": "وجه",
+  "ut_2318f73d10": "بصمة",
+  "ut_8ec132c8b8": "القياسات الحيوية",
+  "ut_cea6052a7e": "مغلق",
+  "ut_00f43cd923": "لا توجد مقاييس حيوية متاحة على هذا الجهاز ولا يمكن تشغيل قفل التطبيقات.",
+  "ut_91f4c00293": "تخزين بيانات الاعتماد",
+  "ut_021001ca72": "التخزين الآمن للنظام + AES الاحتياطي",
+  "ut_b25f81d2b6": "أوامر عالية المخاطر",
+  "ut_ffaeb5818f": "التأكيد الثاني قبل التنفيذ",
+  "ut_98c6d8c630": "مسح البيانات المحلية",
+  "ut_a74aec2b15": "تم مسح البيانات المحلية",
+  "ut_5474c635a4": "التحقق من الهوية لتمكين قفل التطبيق",
+  "ut_00b1b1f0c5": "تمكين MCP",
+  "ut_a48007473a": "لا يوجد خادم حتى الآن.",
+  "ut_c9189bb086": "غير متصل",
+  "ut_a4b4f07ab5": "السماح بالبحث عبر الإنترنت باستخدام الذكاء الاصطناعي",
+  "ut_704bcb4a34": "الخلفية",
+  "ut_2acaddf4df": "إذا لم يتم تمكين أي من الواجهات الخلفية، فهذا يعني أنها لم يتم تشغيلها.",
+  "ut_d40fdc917f": "إرجاع عدد العناصر",
+  "ut_b00662826d": "لا توجد قواعد حتى الآن.",
+  "ut_078781c029": "أضف القواعد",
+  "ut_19b85efbe5": "جميع المضيفين",
+  "ut_c9e6373a79": "تذكير بإكمال المهمة",
+  "ut_4b93fcd514": "متى يجب التذكير",
+  "ut_6e277f398f": "عنوان الويب هوك",
+  "ut_559d9de7a7": "لم أقم بملء عنوان الرد التلقائي على الويب حتى الآن، لذلك لا يمكن إرساله.",
+  "ut_e52ad942fc": "إلحاق بعد كلمة موجه النظام",
+  "ut_62951d47df": "اتفاقيات إضافية مكتوبة على هذا الجهاز.",
+  "ut_968538bf30": "أدخل حذف للتأكيد",
+  "ut_3da0e76468": "أضف الواجهة الخلفية للبحث",
+  "ut_402165c066": "تمت إضافة جميع الواجهات الخلفية المتاحة.",
+  "ut_fd7c3540b7": "حفظ وتمكين",
+  "ut_ed57742e6a": "افتح الإعدادات الكاملة",
+  "ut_5208f9bddf": "المضيف غير موجود",
+  "ut_bc683a74fa": "مفتوح",
+  "ut_731d9e386f": "تحميل إلى المحلية",
+  "ut_21512fa475": "معاينة المحتوى",
+  "ut_64da167c8c": "حذف الدليل",
+  "ut_f405fa4a70": "حذف الملفات",
+  "ut_8b9071fa7d": "معدلة",
+  "ut_46ebf5b01b": "تم الحفظ",
+  "ut_01ff3a92b3": "اسم جديد",
+  "ut_c28161cd4b": "تأكيد الحذف",
+  "ut_32d93b8221": "اسم الدليل",
+  "ut_87fc3f64f6": "إنشاء",
+  "ut_40cd9573ff": "حرر للتحميل إلى الدليل الحالي",
+  "ut_ebab5a91e2": "فرز",
+  "ut_436d7985a6": "الحجم",
+  "ut_cac0b492e4": "وقت التعديل",
+  "ut_125f95f8d1": "تحميل",
+  "ut_fe22bfe107": "تحديث",
+  "ut_2b1e2ceb1b": "أدخل المسار",
+  "ut_cfd5be4925": "الدليل الجذر",
+  "ut_9dc11a1d64": "جارٍ الاتصال...",
+  "ut_98d1c295e4": "دليل فارغ",
+  "ut_a64c884da9": "غير قادر على قراءة ملف التكوين",
+  "ut_91d4c887bb": "لم يتم العثور على ملف التكوين",
+  "ut_8411943202": "فشل الاستيراد",
+  "ut_c4bdcb7bb4": "لا يوجد مضيف يمكن استيراده في التكوين",
+  "ut_ee82429005": "نصائح التحليل",
+  "ut_ffb911cc34": "import",
+  "ut_4e39421eaf": "نقطة انطلاق",
+  "ut_35660d6755": "مطلوب مفتاح خاص",
+  "ut_94376a7210": "لم يتم استيراد العنصر",
+  "ut_793cb65e3d": "موجود بالفعل",
+  "ut_61181b84f1": "وضع الموضوع",
+  "ut_33bd0353d6": "حجم الخط",
+  "ut_5fb0f8f4a5": "إعدادات المحطة",
+  "ut_ce50810b95": "اللون الداكن فقط",
+  "ut_39c65ad937": "لا توجد نتائج",
+  "ut_ef282263a5": "البحث عن مخرجات المحطة",
+  "ut_d24c2e83f7": "حساس لحالة الأحرف",
+  "ut_3525464ef3": "السابق (إزاحة+إدخال)",
+  "ut_01e46e4cac": "التالي (أدخل)",
+  "ut_3dd4f86972": "حدد الكل",
+  "ut_93db49204e": "شاشة واضحة",
+  "ut_6b1ae00645": "قم بمسح المخزن المؤقت للتمرير إلى الخلف",
+  "ut_49db0eb3e7": "نسخ كافة المخرجات",
+  "ut_8f5a44f9a8": "حفظ الإخراج إلى ملف...",
+  "ut_7e205da9b6": "تكبير حجم الخط",
+  "ut_aa2e753d46": "تقليل حجم الخط",
+  "ut_1c98824fa9": "إعادة ضبط حجم الخط",
+  "ut_e9304231ed": "إرسال شرح إلى الوكيل",
+  "ut_c48f8080f6": "حفظ كجزء من الأمر",
+  "ut_ab94a86f01": "قم بتنفيذ هذا الأمر في المحطة",
+  "ut_e865710760": "تقسيم الشاشة إلى اليسار واليمين",
+  "ut_9833a4decf": "تقسيم الشاشة لأعلى ولأسفل",
+  "ut_3e9c805d7f": "قم بإيقاف تشغيل هذه الشاشة المقسمة (الذكاء الاصطناعي موجود على هذه الشاشة)",
+  "ut_16863c6e3a": "قم بإيقاف تشغيل هذه الشاشة المنقسمة",
+  "ut_6f9e7de9f4": "تحديد موقع في SFTP",
+  "ut_fa0ed53542": "افتح لوحة SFTP",
+  "ut_6dc8f53907": "عرض سجلات التدقيق",
+  "ut_078958b894": "عرض سجل التغيير",
+  "ut_76a60a446c": "رابط مفتوح",
+  "ut_b99781d2e8": "انسخ الرابط",
+  "ut_9641c0bb12": "مسار النسخ",
+  "ut_b736a87497": "اسأل الوكيل عن هذا الخطأ",
+  "ut_6fcc795a39": "دع الوكيل يشرح هذا الجزء بأكمله",
+  "ut_dc52ca948e": "انسخ هذه الكتلة بأكملها",
+  "ut_4d77c0da07": "الأمر السابق",
+  "ut_083f59cfec": "أمر الكتلة التالي",
+  "ut_c49dbc7b41": "لا يوجد محتوى محدد",
+  "ut_90074297f5": "سيتم تنفيذ أسطر متعددة من المحتوى بشكل تسلسلي، يرجى التأكد من عدم وجود خطأ في اللصق:",
+  "ut_3a1c210c39": "تنفيذ هذا الأمر في المحطة؟",
+  "ut_a28740df5a": "حفظ الإخراج الطرفي",
+  "ut_8a039d57ca": "في انتظار الاتصال...",
+  "ut_364a8e7d72": "المحطة الطرفية",
+  "ut_6b4426c1f7": "نموذج الذكاء الاصطناعي",
+  "ut_47436bc8ab": "عامل",
+  "ut_ed3461341d": "خادم MCP",
+  "ut_a6db458718": "البحث على الإنترنت",
+  "ut_83d66464a0": "اللوائح الداخلية",
+  "ut_dc4a75d976": "الإشعارات",
+  "ut_6dbcd29d76": "مراجعة",
+  "ut_2e90894c9a": "فشل فقط",
+  "ut_ec50bedaa8": "أذكر في كل مرة",
+  "ut_e39887dfed": "فشل في عمل نسخة احتياطية للملف الأصلي: {e}. تم إحباط الكتابة ولم يتم تعديل الملف الأصلي.",
+  "@ut_e39887dfed": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fcda8e6588": "  تم عمل نسخة احتياطية للملف الأصلي: {backupPath}",
+  "@ut_fcda8e6588": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4452077d81": "{summary}\nالمسار المستهدف: {effectiveLocal}",
+  "@ut_4452077d81": {
+    "placeholders": {
+      "summary": {
+        "type": "Object"
+      },
+      "effectiveLocal": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f4856090f2": "قراءة {path} ...",
+  "@ut_f4856090f2": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1e823bfa18": "قراءة {stderr}...",
+  "@ut_1e823bfa18": {
+    "placeholders": {
+      "stderr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a2a80977d9": "فشل تنفيذ opensl: {backupPath}",
+  "@ut_a2a80977d9": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b9beeabb91": "  للتراجع: mv {backupPath} {path}",
+  "@ut_b9beeabb91": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c4acfd10f3": "  إذا كنت بحاجة إلى التراجع: فاستبدل {path} بهذه النسخة الاحتياطية",
+  "@ut_c4acfd10f3": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_af40dec29f": "  إذا كنت بحاجة إلى التراجع: فاستبدل {path} بهذه النسخة الاحتياطية",
+  "@ut_af40dec29f": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fb892c6b10": "تم تعديل الملف: {length}",
+  "@ut_fb892c6b10": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_59e5f6620a": "  الاستبدال: {length} بايت → {length} بايت",
+  "@ut_59e5f6620a": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5fe0b81932": "فشل الحفظ: {e}",
+  "@ut_5fe0b81932": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1dd514c792": "فشل الحفظ: {length}",
+  "@ut_1dd514c792": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e275b00675": "تم نسخ أحرف {fileName}",
+  "@ut_e275b00675": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3ae63b10aa": "الملفات الحساسة: {segment} (الوصول إليها محظور حتى داخل المشروع)",
+  "@ut_3ae63b10aa": {
+    "placeholders": {
+      "segment": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5b6668af25": "الدليل الحساس: {prefix} (الوصول محظور)",
+  "@ut_5b6668af25": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_337b92f903": "يحظر الوصول إلى دليل النظام {suffix}",
+  "@ut_337b92f903": {
+    "placeholders": {
+      "suffix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0c25c4bff1": "الدليل الحساس ~/{fileName} محظور الوصول إليه",
+  "@ut_0c25c4bff1": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fffc2d39d8": "الملفات الحساسة: {segment}",
+  "@ut_fffc2d39d8": {
+    "placeholders": {
+      "segment": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_61f32e7e81": "دليل حساس: الوصول إلى {normalized} محظور",
+  "@ut_61f32e7e81": {
+    "placeholders": {
+      "normalized": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7695e08c1e": "{scrollLabel} · {logLabel}",
+  "@ut_7695e08c1e": {
+    "placeholders": {
+      "scrollLabel": {
+        "type": "Object"
+      },
+      "logLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b003c911bd": "{count} · {selectedName}",
+  "@ut_b003c911bd": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      },
+      "selectedName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3f574ada1a": "تم تكوين {count}",
+  "@ut_3f574ada1a": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_664f79491a": "تم تكوين {timeout}",
+  "@ut_664f79491a": {
+    "placeholders": {
+      "timeout": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a303a7b799": "الحد الأقصى {steps} الخطوات · المهلة {timeout}s",
+  "@ut_a303a7b799": {
+    "placeholders": {
+      "steps": {
+        "type": "Object"
+      },
+      "timeout": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9947165032": "ممكّن · {enabledCount} الواجهات الخلفية متاحة",
+  "@ut_9947165032": {
+    "placeholders": {
+      "enabledCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_94c3718c07": "الفترة الآمنة {startHour}:00–{endHour}:00",
+  "@ut_94c3718c07": {
+    "placeholders": {
+      "startHour": {
+        "type": "Object"
+      },
+      "endHour": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cbd8c9bc33": "فترة الأمان {length}:00–{path}:00",
+  "@ut_cbd8c9bc33": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b078e9e8b1": "فشل التصدير: {e}",
+  "@ut_b078e9e8b1": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_81d685bdc0": "فشل التصدير: {skippedUnknownHost}",
+  "@ut_81d685bdc0": {
+    "placeholders": {
+      "skippedUnknownHost": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f59978a9af": "مواصفات {imported} المستوردة{skippedHint}",
+  "@ut_f59978a9af": {
+    "placeholders": {
+      "imported": {
+        "type": "Object"
+      },
+      "skippedHint": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4bda191f7f": "فشل الاستيراد: {e}",
+  "@ut_4bda191f7f": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ec13b5dac5": "فشل الاستيراد: {e}",
+  "@ut_ec13b5dac5": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1e9e2bf1a0": "الأدوات ({length}) · {exposure}",
+  "@ut_1e9e2bf1a0": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "exposure": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fb221962b1": "فشل حفظ مفتاح الأداة: {e}",
+  "@ut_fb221962b1": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_62adaafe0d": "فشل حفظ مفتاح الأداة: {length}",
+  "@ut_62adaafe0d": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_70da821187": "الموارد ({length})",
+  "@ut_70da821187": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_169bc8e674": "كلمة سريعة ({e})",
+  "@ut_169bc8e674": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_02f4d31e55": "فشل فتح محدد الدليل: {e}",
+  "@ut_02f4d31e55": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c87274304e": "فشل حفظ المفتاح: {e}",
+  "@ut_c87274304e": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1c9cc2edb3": "فشل الحفظ: {e}",
+  "@ut_1c9cc2edb3": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ab07d88b41": "فشل الحذف: {maxPanes}",
+  "@ut_ab07d88b41": {
+    "placeholders": {
+      "maxPanes": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2596a43876": "الحد الأقصى لشاشات {auditToday} لكل علامة تبويب (جلسة حقيقية واحدة لكل شاشة)",
+  "@ut_2596a43876": {
+    "placeholders": {
+      "auditToday": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_acb620e2fa": "مشاركات {targetHost} اليوم",
+  "@ut_acb620e2fa": {
+    "placeholders": {
+      "targetHost": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2f00778de2": "المضيف {hostLabel} غير متصل ولا يمكنه إجراء التراجع",
+  "@ut_2f00778de2": {
+    "placeholders": {
+      "hostLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_35b3e86940": "المضيف: {rollbackCommand}",
+  "@ut_35b3e86940": {
+    "placeholders": {
+      "rollbackCommand": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_21823fef80": "تم الاستعادة بنجاح: {exitCode}",
+  "@ut_21823fef80": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_34ec0a3e03": "رمز الخروج {reason}",
+  "@ut_34ec0a3e03": {
+    "placeholders": {
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_be42c8efee": "فشل الاستعادة: {e}",
+  "@ut_be42c8efee": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_99956a3c17": "استثناء التراجع: {title}",
+  "@ut_99956a3c17": {
+    "placeholders": {
+      "title": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c1dbbf6a2c": "جارٍ إعادة الاتصال {e}...",
+  "@ut_c1dbbf6a2c": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5b97d3e6a4": "استثناء إعادة الاتصال: {modelId}",
+  "@ut_5b97d3e6a4": {
+    "placeholders": {
+      "modelId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7fb66c7378": "تم التحويل إلى الموديل: {chars}",
+  "@ut_7fb66c7378": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a1c44d88d9": "تم نسخ المحادثة إلى الحافظة ({chars} كلمة)\nسجل التنفيذ: {path}",
+  "@ut_a1c44d88d9": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5cf729e87e": "تم نسخ المحادثة إلى الحافظة ({chars} كلمة)\nفشل في قراءة مسار السجل: {e}",
+  "@ut_5cf729e87e": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e77b2cd18c": "تم الحفظ في مقتطف الأمر: {trimmed}",
+  "@ut_e77b2cd18c": {
+    "placeholders": {
+      "trimmed": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_32148ad774": "فشل في قراءة حالة المفتاح: {e}",
+  "@ut_32148ad774": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9979b52038": "فشل الاختبار: {e}",
+  "@ut_9979b52038": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6934446d27": "فشل حفظ التكوين: {e}",
+  "@ut_6934446d27": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8de5894b72": "تم نسخ الرابط: {url}",
+  "@ut_8de5894b72": {
+    "placeholders": {
+      "url": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_61476f7ee8": "فشل حفظ استجابة الذكاء الاصطناعي: {e}",
+  "@ut_61476f7ee8": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_07c39ce9ce": "⚠️ ستؤدي هذه العملية إلى تغيير الملفات المحلية وتتطلب تأكيدًا:\n{display}",
+  "@ut_07c39ce9ce": {
+    "placeholders": {
+      "display": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b306912acf": "{toolName}",
+  "@ut_b306912acf": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0968807bf1": "في انتظار التأكيد: {steering}",
+  "@ut_0968807bf1": {
+    "placeholders": {
+      "steering": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c547224534": "⚠️ لا يزال هناك {length} عناصر غير مكتملة في الخطة، والتي يجب فحصها واحدًا تلو الآخر قبل الانتهاء ({planFinishRetryCount}/{maxPlanFinishRetries})",
+  "@ut_c547224534": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "planFinishRetryCount": {
+        "type": "Object"
+      },
+      "maxPlanFinishRetries": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_478eec6181": "⚠️ تم الوصول إلى الحد الأقصى لعدد خطوات التنفيذ ({maxSteps}) ومقاطعة المهمة",
+  "@ut_478eec6181": {
+    "placeholders": {
+      "maxSteps": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fa2224f3f9": "⚠️ تم الوصول إلى الحد الأقصى لعدد خطوات التنفيذ ({modelName}) ومقاطعة المهمة",
+  "@ut_fa2224f3f9": {
+    "placeholders": {
+      "modelName": {
+        "type": "Object"
+      },
+      "modelName2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_971883a7fe": "⚠️ تجاهل استدعاءات الأداة المتكررة في هذه الجولة: {name} (نفذ إجراءً واحدًا فقط في كل جولة)",
+  "@ut_971883a7fe": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cb255683ce": "⚠️ تجاهل استدعاءات الأداة الزائدة في هذه الجولة: {safetyLevel} (نفذ إجراءً واحدًا فقط في كل جولة)",
+  "@ut_cb255683ce": {
+    "placeholders": {
+      "safetyLevel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ee0b938b2c": "الصف: {reason}",
+  "@ut_ee0b938b2c": {
+    "placeholders": {
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f46987bf0d": "{highRisk} {highRisk} يتطلب تأكيدًا (وضع {modeLabel}): `{command}`\nبيان المخاطر: {reason}",
+  "@ut_f46987bf0d": {
+    "placeholders": {
+      "highRisk": {
+        "type": "Object"
+      },
+      "highRisk2": {
+        "type": "Object"
+      },
+      "modeLabel": {
+        "type": "Object"
+      },
+      "command": {
+        "type": "Object"
+      },
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a61b05ce9b": "👉 اخترت: {choice}",
+  "@ut_a61b05ce9b": {
+    "placeholders": {
+      "choice": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_386b3634c1": "⚠️ يستدعي الذكاء الاصطناعي {alias} ولكن لا يتم توفير معلمة أمر",
+  "@ut_386b3634c1": {
+    "placeholders": {
+      "alias": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0eed0d18c7": "👉 لقد اخترت: {toolName}",
+  "@ut_0eed0d18c7": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_21239ba62c": "⚠️ يستدعي الذكاء الاصطناعي {toolName} ولكن لا يتم توفير معلمة الأمر",
+  "@ut_21239ba62c": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_339abc33a7": "⚠️أداة غير معروفة: {toolName}",
+  "@ut_339abc33a7": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2bd0b4985d": "❌ استثناء تنفيذ الأداة {toolName}: {e}",
+  "@ut_2bd0b4985d": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e36f09192f": "⚠️ الأداة `{prefix}` غير متوفرة في الجلسة الحالية",
+  "@ut_e36f09192f": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dc39c308a2": "{prefix} تقدم التحميل: {uploaded}/{total} الملفات",
+  "@ut_dc39c308a2": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      },
+      "uploaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_91700996f4": "{local} في انتظار انتهاء الجولة الأخيرة من التحميل...",
+  "@ut_91700996f4": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ded2242c8f": "تقدم تحميل {local}: ملفات {remote}/{size}",
+  "@ut_ded2242c8f": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_d72746d0d0": "تحميل الدليل بشكل متكرر: {local} → {effectiveRemote}",
+  "@ut_d72746d0d0": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      },
+      "effectiveRemote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0e800a8406": "تنزيل الملفات: {remote} → {target}",
+  "@ut_0e800a8406": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "target": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c8b91122b": "تم تنزيل الملف بنجاح: {remote} → {target} ({size})",
+  "@ut_5c8b91122b": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "target": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2bc26619aa": "تنزيل الملف: {remote} → {effectiveLocal}",
+  "@ut_2bc26619aa": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "effectiveLocal": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_52a01019d8": "تقدم التنزيل: {downloaded}/{total} الملفات",
+  "@ut_52a01019d8": {
+    "placeholders": {
+      "downloaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6b85bbaf16": "دليل التنزيل بشكل متكرر: {hostId} → {e}",
+  "@ut_6b85bbaf16": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2d44fe0c64": "تقدم التنزيل: ملفات {hostId}/{local}",
+  "@ut_2d44fe0c64": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7ef1cd9389": "[{hostId}] اكتمل التحميل",
+  "@ut_7ef1cd9389": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a465e8a3ee": "[{hostId}] تم تحميل الملف بنجاح: {local} → {remote} ({size})",
+  "@ut_a465e8a3ee": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_699c3fa8dc": "[{hostId}] دليل التحميل المتكرر: {local} → {effectiveRemote}",
+  "@ut_699c3fa8dc": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      },
+      "effectiveRemote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2996de9000": "[{hid}] التوزيع...",
+  "@ut_2996de9000": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0f735fba75": "[{hid}] ✗ تم الإلغاء والتخطي",
+  "@ut_0f735fba75": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c021ae6b9": "[{hid}] جمع {remote} ...",
+  "@ut_5c021ae6b9": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e31edc9171": "[{hid}] ✗ تم الإلغاء والتخطي",
+  "@ut_e31edc9171": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2e01615eec": "=== [{hid}] تم الإلغاء والتخطي ===",
+  "@ut_2e01615eec": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ffebfc53a6": "[{hid}] ✗ المضيف غير متصل أو غير متصل بجلسة SSH",
+  "@ut_ffebfc53a6": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_38bc3dac85": "=== [{hid}] تم الإلغاء والتخطي ===",
+  "@ut_38bc3dac85": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8dc55e0134": "[{hid}] قراءة {remote} ...",
+  "@ut_8dc55e0134": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_475dcf3309": "جارٍ التحقق من شهادة HTTPS لـ {host}:{port}...",
+  "@ut_475dcf3309": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      },
+      "port": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bde384cf72": "حل الشهادة المحلية: {certPath}",
+  "@ut_bde384cf72": {
+    "placeholders": {
+      "certPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b733c697fb": "تشغيل {write} {path} ({length} بايت)...",
+  "@ut_b733c697fb": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_24853c3f76": "نجح الملف {write}: {path} ({length} بايت)",
+  "@ut_24853c3f76": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a7bd551b52": "فشل التراجع عن النسخة الاحتياطية: {rollbackErr}، ستتم محاولة كتابة PTY",
+  "@ut_a7bd551b52": {
+    "placeholders": {
+      "rollbackErr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f8d0ae7c3c": "\n  ملاحظة: قامت عملية SFTP بعمل نسخة احتياطية للملف الأصلي إلى {backupPath}. يمكن حذف النسخة الاحتياطية يدويًا بعد كتابة PTY بنجاح.",
+  "@ut_f8d0ae7c3c": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6820e10527": "نجحت كتابة الملف (قطة وضع PTY stdin): {path} ({length} بايت){backupInfo}",
+  "@ut_6820e10527": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      },
+      "backupInfo": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_caa84ab310": "فشلت كتابة القطة: {failureReason}، حاول Sudo Tee ...",
+  "@ut_caa84ab310": {
+    "placeholders": {
+      "failureReason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b0ea4177b4": "نجحت كتابة الملف (PTY stdin + Sudo Tee): {path} ({length} بايت){backupInfo}",
+  "@ut_b0ea4177b4": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      },
+      "backupInfo": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_aad3625b0a": "نجح الملف {write} ({method}): {path} ({byteCount} بايت)",
+  "@ut_aad3625b0a": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "method": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "byteCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_00cd1c4300": "فشلت كتابة القطة: {query}، حاول Sudo Tee ...",
+  "@ut_00cd1c4300": {
+    "placeholders": {
+      "query": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c0b2e0370": "\n…({label}، إجمالي {length} أحرف في النص الأصلي)",
+  "@ut_5c0b2e0370": {
+    "placeholders": {
+      "label": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6f51e792f4": "تقدم التحميل الكامل: {uploaded}/{total}",
+  "@ut_6f51e792f4": {
+    "placeholders": {
+      "uploaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf4b2fdeb1": "البحث في قاعدة المعرفة: {resolvedCwd}",
+  "@ut_cf4b2fdeb1": {
+    "placeholders": {
+      "resolvedCwd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_93ba05fcda": "غير قادر على إنشاء دليل العمل {resolvedCwd}: {e}",
+  "@ut_93ba05fcda": {
+    "placeholders": {
+      "resolvedCwd": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bb63c6672a": "…({shell}، النص الأصلي يحتوي على أحرف {command})",
+  "@ut_bb63c6672a": {
+    "placeholders": {
+      "shell": {
+        "type": "Object"
+      },
+      "command": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b5e97db76b": "ملفات {scanned} التي تم فحصها...",
+  "@ut_b5e97db76b": {
+    "placeholders": {
+      "scanned": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_132456dcfb": "وضع غير معروف: {mode} (يدعم الكتابة/الإلحاق)",
+  "@ut_132456dcfb": {
+    "placeholders": {
+      "mode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3b4b10f1b2": "فشل تشغيل المحطة المحلية: {e}",
+  "@ut_3b4b10f1b2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bbafda1855": "[الصورة {mimeType}، {length} base64 حرفًا]",
+  "@ut_bbafda1855": {
+    "placeholders": {
+      "mimeType": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3901620d02": "استدعاء أداة MCP {serverName}/{name}",
+  "@ut_3901620d02": {
+    "placeholders": {
+      "serverName": {
+        "type": "Object"
+      },
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_405448830f": "اقرأ مورد MCP {uri}",
+  "@ut_405448830f": {
+    "placeholders": {
+      "uri": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_090d7978c2": "احصل على كلمة موجهة لـ MCP {name}",
+  "@ut_090d7978c2": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b01822a097": "دليل المشروع غير موجود: {path}",
+  "@ut_b01822a097": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f1acec8e02": "مسار المشروع: {path}",
+  "@ut_f1acec8e02": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8a884e053e": "التعرف تلقائيًا على أمر الإنشاء: {buildCmd}",
+  "@ut_8a884e053e": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5ab7922da3": "تم حظر أمر الإنشاء بواسطة سياسة الأمان: {buildCmd}",
+  "@ut_5ab7922da3": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_323ecc4b40": "بدء البناء: {buildCmd}",
+  "@ut_323ecc4b40": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dd547aa71c": "✓ البناء ناجح ({inSeconds}s)\n\nالإخراج:\n{output}",
+  "@ut_dd547aa71c": {
+    "placeholders": {
+      "inSeconds": {
+        "type": "Object"
+      },
+      "output": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fe98a458a9": "✗ فشل البناء (رمز الخروج: {exitCode}، الوقت المستغرق: {inSeconds}s)",
+  "@ut_fe98a458a9": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      },
+      "inSeconds": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2192f982a0": "أمر التغليف المحظور بواسطة سياسة الأمان: {packageCmd}",
+  "@ut_2192f982a0": {
+    "placeholders": {
+      "packageCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5e9fa40ae2": "ابدأ التعبئة: {artifactDir} → {outputFile}",
+  "@ut_5e9fa40ae2": {
+    "placeholders": {
+      "artifactDir": {
+        "type": "Object"
+      },
+      "outputFile": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c3df15635": "✗ فشل البناء (رمز الخروج: {outputFile}، الوقت المستغرق: {sizeStr})",
+  "@ut_9c3df15635": {
+    "placeholders": {
+      "outputFile": {
+        "type": "Object"
+      },
+      "sizeStr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7884351654": "أمر التغليف المحظور بواسطة سياسة الأمان: {sizeStr}",
+  "@ut_7884351654": {
+    "placeholders": {
+      "sizeStr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0a71fe6a29": "✗ فشل التغليف (رمز الخروج: {exitCode})\n--- ستدوت ---\n{stdout}\n--- ستدير ---\n{stderr}",
+  "@ut_0a71fe6a29": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      },
+      "stdout": {
+        "type": "Object"
+      },
+      "stderr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_62e6c24a03": "فشلت القراءة: {message}",
+  "@ut_62e6c24a03": {
+    "placeholders": {
+      "message": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ed6128ba80": "جارٍ الاتصال {host}:{port}...",
+  "@ut_ed6128ba80": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      },
+      "port": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2574cd27d5": "الاتصال عبر نقطة انطلاق {host} التتابع...",
+  "@ut_2574cd27d5": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_939fbbbde2": "تم تخطي التحقق من الاتصال: {e}",
+  "@ut_939fbbbde2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c09d2ebc3": "فشلت الكتابة إلى stdin: {e}",
+  "@ut_5c09d2ebc3": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_160a20b4b9": "التغليف ناجح: {e}",
+  "@ut_160a20b4b9": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e230a6d105": "✗ فشل التغليف (رمز الخروج: {query})",
+  "@ut_e230a6d105": {
+    "placeholders": {
+      "query": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8bc3df095a": "جلب: {url}",
+  "@ut_8bc3df095a": {
+    "placeholders": {
+      "url": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_571ec497a6": "العنوان: {title}",
+  "@ut_571ec497a6": {
+    "placeholders": {
+      "title": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_eb988194e9": "الهدف: {trim}",
+  "@ut_eb988194e9": {
+    "placeholders": {
+      "trim": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_304b011a8a": "الخلاصة: {trim}",
+  "@ut_304b011a8a": {
+    "placeholders": {
+      "trim": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_080de8536f": "فشلت القراءة: {service}",
+  "@ut_080de8536f": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8f24f3ec45": "{service} لا يعمل",
+  "@ut_8f24f3ec45": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_622000e27f": "الاتصال من خلال تتابع نقطة انطلاق {service}...",
+  "@ut_622000e27f": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_371d1b3d69": "تم تخطي التحقق من الاتصال: {service}",
+  "@ut_371d1b3d69": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e7e9d06df9": " انتظر منافذ {length}",
+  "@ut_e7e9d06df9": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9def515d87": "منفذ {shown}{suffix} الاستماع",
+  "@ut_9def515d87": {
+    "placeholders": {
+      "shown": {
+        "type": "Object"
+      },
+      "suffix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ea6610697b": "فشل إرسال EOF: {chosen}",
+  "@ut_ea6610697b": {
+    "placeholders": {
+      "chosen": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e7d26cf57d": "البحث عن: {totalChars}",
+  "@ut_e7d26cf57d": {
+    "placeholders": {
+      "totalChars": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7234d250c6": "جلب: {length}",
+  "@ut_7234d250c6": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0b13faa29b": "العنوان: {length}",
+  "@ut_0b13faa29b": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2a21b678a8": "الهدف: {inMinutes}",
+  "@ut_2a21b678a8": {
+    "placeholders": {
+      "inMinutes": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_05ac4fcf03": "الخلاصة: {inHours}",
+  "@ut_05ac4fcf03": {
+    "placeholders": {
+      "inHours": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_11bfebfb31": "{inDays} قيد التشغيل",
+  "@ut_11bfebfb31": {
+    "placeholders": {
+      "inDays": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5eda668d7a": "{length} لا يعمل",
+  "@ut_5eda668d7a": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dc4c3efe70": "هل تريد استبدال نماذج {length} الحالية بالنموذج الافتراضي \"{name}\"؟",
+  "@ut_dc4c3efe70": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c153205f28": "لم يتم ضبط التشغيل التلقائي {length}",
+  "@ut_c153205f28": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c3ca30909": " انتظر منافذ {length}",
+  "@ut_9c3ca30909": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0408a4e88d": "منفذ الاستماع {lastConnected}",
+  "@ut_0408a4e88d": {
+    "placeholders": {
+      "lastConnected": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_508cac93a2": "مضيف {length} · {success} ناجح'\n                    '{failed}",
+  "@ut_508cac93a2": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "success": {
+        "type": "Object"
+      },
+      "failed": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_00fefb12c8": "ذيل الإخراج الأصلي · أحرف {exitCode} في المجموع",
+  "@ut_00fefb12c8": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7c37c17c72": "فتح {name}",
+  "@ut_7c37c17c72": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_393e236ec2": "تم نسخ سجلات {runCount}",
+  "@ut_393e236ec2": {
+    "placeholders": {
+      "runCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4dbb782799": "منذ دقائق {length}",
+  "@ut_4dbb782799": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_afa890cf1c": "{length} منذ ساعات",
+  "@ut_afa890cf1c": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_63f8cd8765": "منذ أيام {rest}",
+  "@ut_63f8cd8765": {
+    "placeholders": {
+      "rest": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2565b39f32": "النماذج · {total}",
+  "@ut_2565b39f32": {
+    "placeholders": {
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e36a5ac905": "التراجع: {rollbackCommand}",
+  "@ut_e36a5ac905": {
+    "placeholders": {
+      "rollbackCommand": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_261ec8093d": "انسحبت إلى نماذج {hostLabel}",
+  "@ut_261ec8093d": {
+    "placeholders": {
+      "hostLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1568d540be": "إضافة {length}",
+  "@ut_1568d540be": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c14c3f2424": "آخر اتصال: {count}",
+  "@ut_c14c3f2424": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1f5bbded76": "تم العثور على نسخة جديدة {version}، انقر للعرض",
+  "@ut_1f5bbded76": {
+    "placeholders": {
+      "version": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5eb52c419e": "نماذج {length} · {baseUrl}",
+  "@ut_5eb52c419e": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "baseUrl": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_01f2ee338e": "كلمات {length}",
+  "@ut_01f2ee338e": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_92bbd40515": "ممكّن · التحقق من {biometricLabel} عند بدء التشغيل",
+  "@ut_92bbd40515": {
+    "placeholders": {
+      "biometricLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8ecd2c14b5": "متصل · أدوات {value}",
+  "@ut_8ecd2c14b5": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7c5becde1e": "{value} أدوات",
+  "@ut_7c5becde1e": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3d787403e1": "المجموعة المضيفة · {group}",
+  "@ut_3d787403e1": {
+    "placeholders": {
+      "group": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_def0dd4b20": "المضيف · {hostId}",
+  "@ut_def0dd4b20": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fddba05801": "مفتاح {displayName} API",
+  "@ut_fddba05801": {
+    "placeholders": {
+      "displayName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e42173cc90": "تم التنزيل على: {localPath}",
+  "@ut_e42173cc90": {
+    "placeholders": {
+      "localPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7a77df19f2": "فشل التنزيل: {e}",
+  "@ut_7a77df19f2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c9db79438": "فشلت القراءة: {e}",
+  "@ut_9c9db79438": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6f2c34a667": "فشلت إعادة التسمية: {e}",
+  "@ut_6f2c34a667": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf4419589b": "فشل الحذف: {e}",
+  "@ut_cf4419589b": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c3b890cd74": "فشل فتح منتقي الملفات: {e}",
+  "@ut_c3b890cd74": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3f446bd9fe": "تم الرفع: {fileName}",
+  "@ut_3f446bd9fe": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9e12df0a1f": "فشل تحميل {fileName}: {e}",
+  "@ut_9e12df0a1f": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e89a046c8b": "فشل إنشاء الدليل: {e}",
+  "@ut_e89a046c8b": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6c61736431": "فشل تحميل {name}: {e}",
+  "@ut_6c61736431": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3cc564d9ac": "تم استيراد مضيفي {ok} (يجب ملء بيانات الاعتماد في صفحة تحرير المضيف)",
+  "@ut_3cc564d9ac": {
+    "placeholders": {
+      "ok": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_218046bbfd": "لصق السطر {length}؟",
+  "@ut_218046bbfd": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c40c983842": "{preview}\n…والخط {more}",
+  "@ut_c40c983842": {
+    "placeholders": {
+      "preview": {
+        "type": "Object"
+      },
+      "more": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3482231651": "تم الحفظ في {path}",
+  "@ut_3482231651": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_aa865c9773": "البند",
+  "ut_75282877a3": "البند",
+  "ut_35f3bcac7a": "المادة · حقن سياق الذكاء الاصطناعي",
+  "ut_c32994dbf5": "تم حفظ المحطة",
+  "ut_2cdff50b37": "تايوان",
+  "ut_f7826628c0": "مجموعة",
+  "ut_bfa2c2000f": "قبل دقائق",
+  "ut_15e2558649": "منذ ساعات",
+  "ut_e7b73487d7": "منذ أيام",
+  "ut_babe4e8237": "{connected}/{total} خوادم",
+  "@ut_babe4e8237": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_95860656bf": "مفتاح MCP الرئيسي مغلق · تم توصيل {connected}/{total} خوادم",
+  "@ut_95860656bf": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e12efa5ddb": "{connected}/{total} خوادم · {tools} أدوات متاحة للوكيل",
+  "@ut_e12efa5ddb": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      },
+      "tools": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3330b55acf": "{value} مورد",
+  "@ut_3330b55acf": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf674ef0f8": "{value} مطالبات",
+  "@ut_cf674ef0f8": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  }
 }

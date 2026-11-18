@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 
 import 'ui_text.dart';
+import '../core/l10n_holder.dart';
 
 /// 命令安全等级
 enum SafetyLevel {
@@ -591,16 +592,14 @@ class SafetyGuard {
         for (final pattern in _blockedFilePatterns) {
           if (pattern.hasMatch(fileName)) {
             return PathSafetyResult(SafetyLevel.blocked,
-                UiText.t('敏感文件: $fileName（即使项目内也禁止访问）',
-                    'Sensitive file: $fileName (blocked even inside the project)'));
+                L10n.str.ut_e275b00675(fileName));
           }
         }
         // 检查路径分段是否含敏感目录名
         for (final segment in normalized.split('/')) {
           if (_blockedDirNames.contains(segment)) {
             return PathSafetyResult(SafetyLevel.blocked,
-                UiText.t('敏感目录: $segment（禁止访问）',
-                    'Sensitive directory: $segment (access blocked)'));
+                L10n.str.ut_3ae63b10aa(segment));
           }
         }
         return const PathSafetyResult(SafetyLevel.safe, null);
@@ -611,7 +610,7 @@ class SafetyGuard {
     for (final prefix in _blockedPathPrefixes) {
       if (normalized == prefix || normalized.startsWith('$prefix/')) {
         return PathSafetyResult(SafetyLevel.blocked,
-            UiText.t('系统目录 $prefix 禁止访问', 'System directory $prefix is off-limits'));
+            L10n.str.ut_5b6668af25(prefix));
       }
     }
 
@@ -622,7 +621,7 @@ class SafetyGuard {
         final sensitivePath = '$home/$suffix';
         if (normalized == sensitivePath || normalized.startsWith('$sensitivePath/')) {
           return PathSafetyResult(SafetyLevel.blocked,
-              UiText.t('敏感目录 ~/$suffix 禁止访问', 'Sensitive directory ~/$suffix is off-limits'));
+              L10n.str.ut_337b92f903(suffix));
         }
       }
       // 直接读 ~/.ssh/id_rsa 这种情况已被上面覆盖
@@ -633,7 +632,7 @@ class SafetyGuard {
     for (final pattern in _blockedFilePatterns) {
       if (pattern.hasMatch(fileName)) {
         return PathSafetyResult(SafetyLevel.blocked,
-            UiText.t('敏感文件: $fileName', 'Sensitive file: $fileName'));
+            L10n.str.ut_0c25c4bff1(fileName));
       }
     }
 
@@ -641,15 +640,14 @@ class SafetyGuard {
     for (final segment in normalized.split('/')) {
       if (_blockedDirNames.contains(segment)) {
         return PathSafetyResult(SafetyLevel.blocked,
-            UiText.t('敏感目录: $segment 禁止访问', 'Sensitive directory: $segment is off-limits'));
+            L10n.str.ut_fffc2d39d8(segment));
       }
     }
 
     // 6. 项目外的路径需确认（防止 AI 乱跑）
     return PathSafetyResult(
       SafetyLevel.warn,
-      UiText.t('路径不在授权的项目目录内: $normalized',
-          'Path is outside the authorized project directory: $normalized'),
+      L10n.str.ut_61f32e7e81(normalized),
     );
   }
 

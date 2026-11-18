@@ -11,6 +11,7 @@ import '../core/ui_text.dart';
 import '../services/mcp_manager.dart';
 import '../services/mcp_models.dart';
 import '../core/app_toast.dart';
+import '../core/l10n_holder.dart';
 
 /// MCP 服务器设置页
 class McpSettingsPage extends StatefulWidget {
@@ -104,17 +105,12 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
+                  // 数字插值串不能用 UiText.t 字面配对（索引里没有 \$connected 那类
+                  // 动态条目，12 种非 zh/en 语言会回退英文），统一走 ARB 模板键。
                   enabled
-                      ? UiText.t(
-                          '已连接 $connected/${runtimes.length} 个服务器 · '
-                              'Agent 可用 ${manager.exposedToolCount} 个工具',
-                          'Connected $connected/${runtimes.length} servers · '
-                              '${manager.exposedToolCount} tools available to the Agent',
-                        )
-                      : UiText.t(
-                          'MCP 总开关已关闭 · 已连接 0/${runtimes.length} 个服务器',
-                          'MCP master switch is off · 0/${runtimes.length} servers connected',
-                        ),
+                      ? L10n.str.ut_e12efa5ddb(
+                          connected, runtimes.length, manager.exposedToolCount)
+                      : L10n.str.ut_95860656bf(0, runtimes.length),
                   style: TextStyle(
                     color: tc.textMain,
                     fontSize: fBody,
@@ -176,7 +172,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     try {
       await McpManager.instance.setGlobalEnabled(value);
     } catch (e) {
-      _snack(UiText.t('切换 MCP 总开关失败：$e', 'Failed to toggle the MCP master switch: $e'), error: true);
+      _snack(L10n.str.ut_ec13b5dac5(e), error: true);
     }
   }
 
@@ -386,12 +382,10 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    UiText.t(
-                      '工具 ${runtime.tools.length} · 资源 ${runtime.resources.length}'
-                          ' · 提示词 ${runtime.prompts.length}',
-                      'Tools ${runtime.tools.length} · Resources ${runtime.resources.length}'
-                          ' · Prompts ${runtime.prompts.length}',
-                    ),
+                    // 数量串统一用 ARB 模板键（L10n.str.*），不走 UiText.t 字面配对。
+                    '${L10n.str.ut_7c5becde1e(runtime.tools.length)} · '
+                    '${L10n.str.ut_3330b55acf(runtime.resources.length)} · '
+                    '${L10n.str.ut_cf674ef0f8(runtime.prompts.length)}',
                     style: TextStyle(color: tc.textSub, fontSize: fMicro),
                   ),
                 ),
@@ -484,7 +478,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader(UiText.t('工具（${runtime.tools.length}）· $exposure', 'Tools (${runtime.tools.length}) · $exposure'), tc),
+        _sectionHeader(L10n.str.ut_1e9e2bf1a0(runtime.tools.length, exposure), tc),
         for (final tool in runtime.tools) _buildToolRow(runtime, tool, tc),
       ],
     );
@@ -588,7 +582,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     try {
       await McpManager.instance.setAllowedTools(config.id, allowed);
     } catch (e) {
-      _snack(UiText.t('保存工具开关失败：$e', 'Failed to save the tool switch: $e'), error: true);
+      _snack(L10n.str.ut_fb221962b1(e), error: true);
     }
   }
 
@@ -596,7 +590,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader(UiText.t('资源（${runtime.resources.length}）', 'Resources (${runtime.resources.length})'), tc),
+        _sectionHeader(L10n.str.ut_62adaafe0d(runtime.resources.length), tc),
         for (final resource in runtime.resources)
           ListTile(
             dense: true,
@@ -629,7 +623,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader(UiText.t('提示词（${runtime.prompts.length}）', 'Prompts (${runtime.prompts.length})'), tc),
+        _sectionHeader(L10n.str.ut_70da821187(runtime.prompts.length), tc),
         for (final prompt in runtime.prompts)
           ListTile(
             dense: true,
@@ -777,7 +771,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
         dialogTitle: UiText.t('选择 filesystem MCP 允许访问的目录', 'Choose the folder the filesystem MCP may access'),
       );
     } catch (e) {
-      _snack(UiText.t('打开目录选择器失败：$e', 'Failed to open the folder picker: $e'), error: true);
+      _snack(L10n.str.ut_169bc8e674(e), error: true);
       return;
     }
     if (directory == null || directory.trim().isEmpty) return;
@@ -794,7 +788,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     try {
       await McpManager.instance.setEnabled(id, value);
     } catch (e) {
-      _snack(UiText.t('保存开关失败：$e', 'Failed to save the switch: $e'), error: true);
+      _snack(L10n.str.ut_02f4d31e55(e), error: true);
     }
   }
 
@@ -810,7 +804,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     try {
       await McpManager.instance.saveServer(updated);
     } catch (e) {
-      _snack(UiText.t('保存失败：$e', 'Failed to save: $e'), error: true);
+      _snack(L10n.str.ut_c87274304e(e), error: true);
     }
   }
 
@@ -843,7 +837,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     try {
       await McpManager.instance.deleteServer(runtime.config.id);
     } catch (e) {
-      _snack(UiText.t('删除失败：$e', 'Failed to delete: $e'), error: true);
+      _snack(L10n.str.ut_1c9cc2edb3(e), error: true);
     }
   }
 

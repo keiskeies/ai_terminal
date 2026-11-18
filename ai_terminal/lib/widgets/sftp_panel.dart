@@ -12,6 +12,7 @@ import '../services/sftp_controller.dart';
 import '../services/sftp_service.dart';
 import '../core/app_toast.dart';
 import '../core/route_observer.dart';
+import '../core/l10n_holder.dart';
 
 /// 可复用的 SFTP 面板组件，既可用于独立页面也可嵌入终端右侧
 class SftpPanel extends ConsumerStatefulWidget {
@@ -234,7 +235,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         final localPath = '${Directory.systemTemp.path}/${entry.name}';
         showTopSnackBar(context, 
           SnackBar(
-            content: Text(UiText.t('已下载到: $localPath', 'Downloaded to: $localPath')),
+            content: Text(L10n.str.ut_e42173cc90(localPath)),
             duration: const Duration(seconds: 3),
             behavior: SnackBarBehavior.floating,
           ),
@@ -244,7 +245,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       if (mounted) {
         showTopSnackBar(context, 
           SnackBar(
-            content: Text(UiText.t('下载失败: $e', 'Download failed: $e')),
+            content: Text(L10n.str.ut_7a77df19f2(e)),
             backgroundColor: cDanger,
             behavior: SnackBarBehavior.floating,
           ),
@@ -262,7 +263,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
     } catch (e) {
       if (mounted) {
         showTopSnackBar(context, 
-          SnackBar(content: Text(UiText.t('读取失败: $e', 'Read failed: $e')), backgroundColor: cDanger),
+          SnackBar(content: Text(L10n.str.ut_9c9db79438(e)), backgroundColor: cDanger),
         );
       }
       return;
@@ -368,7 +369,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                       } catch (e) {
                         if (ctx.mounted) {
                           showTopSnackBar(ctx, 
-                            SnackBar(content: Text(UiText.t('保存失败: $e', 'Save failed: $e')), backgroundColor: cDanger),
+                            SnackBar(content: Text(L10n.str.ut_5fe0b81932(e)), backgroundColor: cDanger),
                           );
                         }
                       }
@@ -418,7 +419,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         if (mounted) {
           showTopSnackBar(context, 
             SnackBar(
-                content: Text(UiText.t('重命名失败: $e', 'Rename failed: $e')),
+                content: Text(L10n.str.ut_6f2c34a667(e)),
                 backgroundColor: cDanger),
           );
         }
@@ -454,7 +455,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       } catch (e) {
         if (mounted) {
           showTopSnackBar(context, 
-            SnackBar(content: Text(UiText.t('删除失败: $e', 'Delete failed: $e')), backgroundColor: cDanger),
+            SnackBar(content: Text(L10n.str.ut_cf4419589b(e)), backgroundColor: cDanger),
           );
         }
       }
@@ -469,7 +470,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       if (mounted) {
         showTopSnackBar(context, 
           SnackBar(
-            content: Text(UiText.t('打开文件选择器失败: $e', 'Failed to open file picker: $e')),
+            content: Text(L10n.str.ut_c3b890cd74(e)),
             backgroundColor: cDanger,
             behavior: SnackBarBehavior.floating,
           ),
@@ -495,7 +496,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         if (mounted) {
           showTopSnackBar(context, 
             SnackBar(
-              content: Text(UiText.t('已上传: $fileName', 'Uploaded: $fileName')),
+              content: Text(L10n.str.ut_3f446bd9fe(fileName)),
               duration: const Duration(seconds: 2),
               behavior: SnackBarBehavior.floating,
             ),
@@ -505,7 +506,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         if (mounted) {
           showTopSnackBar(context, 
             SnackBar(
-              content: Text(UiText.t('上传 $fileName 失败: $e', 'Failed to upload $fileName: $e')),
+              content: Text(L10n.str.ut_9e12df0a1f(fileName, e)),
               backgroundColor: cDanger,
               behavior: SnackBarBehavior.floating,
             ),
@@ -547,7 +548,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
               } catch (e) {
                 if (mounted) {
                   showTopSnackBar(context, 
-                    SnackBar(content: Text(UiText.t('创建目录失败: $e', 'Failed to create folder: $e')), backgroundColor: cDanger),
+                    SnackBar(content: Text(L10n.str.ut_e89a046c8b(e)), backgroundColor: cDanger),
                   );
                 }
               }
@@ -673,7 +674,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         if (mounted) {
           showTopSnackBar(context,
             SnackBar(
-              content: Text(UiText.t('上传 $name 失败: $e', 'Failed to upload $name: $e')),
+              content: Text(L10n.str.ut_6c61736431(name, e)),
               backgroundColor: cDanger,
               behavior: SnackBarBehavior.floating,
             ),

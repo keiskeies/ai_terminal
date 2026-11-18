@@ -10,6 +10,7 @@ import '../core/ui_text.dart';
 import '../services/web_search_config.dart';
 import '../services/web_search_service.dart';
 import '../core/app_toast.dart';
+import '../core/l10n_holder.dart';
 
 /// 联网搜索设置页（多后端聚合）
 ///
@@ -140,7 +141,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
     } catch (e) {
       if (!mounted || generation != _statusGeneration) return;
       setState(() => _statusLoading = false);
-      _showSnack(UiText.t('读取 Key 状态失败：$e', 'Failed to read key status: $e'), error: true);
+      _showSnack(L10n.str.ut_32148ad774(e), error: true);
     }
   }
 
@@ -1098,7 +1099,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
       setState(() => _testError = e.message);
     } catch (e) {
       if (!mounted || generation != _testGeneration) return;
-      setState(() => _testError = UiText.t('测试失败：$e', 'Test failed: $e'));
+      setState(() => _testError = L10n.str.ut_9979b52038(e));
     } finally {
       if (mounted && generation == _testGeneration) {
         setState(() {
@@ -1201,7 +1202,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
     try {
       await config.save();
     } catch (e) {
-      _showSnack(UiText.t('配置保存失败：$e', 'Failed to save configuration: $e'), error: true);
+      _showSnack(L10n.str.ut_6934446d27(e), error: true);
       return;
     }
 
@@ -1361,7 +1362,7 @@ class _WebSearchSettingsPageState extends State<WebSearchSettingsPage> {
 
   void _copyUrl(String url) {
     Clipboard.setData(ClipboardData(text: url));
-    _showSnack(UiText.t('链接已复制: $url', 'Link copied: $url'));
+    _showSnack(L10n.str.ut_8de5894b72(url));
   }
 
   void _showSnack(String message, {bool error = false}) {

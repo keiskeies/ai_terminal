@@ -16,6 +16,7 @@ import 'drawer_editors.dart';
 import 'settings_extras.dart';
 import 'settings_inline_panel.dart';
 import 'settings_row_card.dart';
+import '../core/l10n_holder.dart';
 
 /// 应用唯一的功能抽屉。
 ///
@@ -78,7 +79,9 @@ class NavDrawer extends StatefulWidget {
 
   /// [titles] 的英文对照；其它语言回退英文。
   static const titlesEn = <String, String>{
-    sectionHosts: 'Server inventory',
+    // en 必须与 ARB 中 (zh,en) 对的 en 完全一致，否则 UiText.t 查不到索引、
+    // 非中文界面回退成英文（历史 bug：'Server inventory' 应写 'Hosts'）。
+    sectionHosts: 'Hosts',
     sectionSnippets: 'Snippets',
     sectionRunbooks: 'Runbooks',
     sectionAudit: 'Audit log',
@@ -566,7 +569,7 @@ class _NavDrawerState extends State<NavDrawer> {
             _close();
             widget.onOpenHost?.call(h);
           },
-          tooltip: UiText.t('打开 ${h.name}', 'Open ${h.name}'),
+          tooltip: L10n.str.ut_7c37c17c72(h.name),
           child: Container(
             padding: const EdgeInsets.fromLTRB(13, 10, 8, 10),
             decoration: BoxDecoration(
@@ -726,7 +729,7 @@ class _NavDrawerState extends State<NavDrawer> {
               _monoBlock(tc, rb.content),
               _rowSub(
                   tc,
-                  '${UiText.t('执行 ${rb.runCount} 次', '${rb.runCount} runs')}'
+                  '${L10n.str.ut_393e236ec2(rb.runCount)}'
                   '${rb.lastRunAt != null ? ' · ${UiText.t('最近', 'last')} ${_fmtLocal(rb.lastRunAt!)}' : ''}'),
               _cardActions(tc, [
                 if (widget.onRunRunbook != null)
@@ -761,7 +764,7 @@ class _NavDrawerState extends State<NavDrawer> {
       const SizedBox(height: 10),
       _addRow(
         tc,
-        UiText.t('复制这 ${logs.length} 条（含输出）', 'Copy these ${logs.length} rows (with output)'),
+        L10n.str.ut_4dbb782799(logs.length),
         () => _exportAudit(logs),
         icon: Icons.copy_all_rounded,
       ),
@@ -798,7 +801,7 @@ class _NavDrawerState extends State<NavDrawer> {
       context,
       SnackBar(
         content:
-            Text(UiText.t('已复制 ${logs.length} 条', 'Copied ${logs.length} rows')),
+            Text(L10n.str.ut_afa890cf1c(logs.length)),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -1006,7 +1009,7 @@ class _NavDrawerState extends State<NavDrawer> {
           child: Text(
             _changedAll
                 ? UiText.t('收起', 'Show less')
-                : UiText.t('还有 $rest 项', '$rest more'),
+                : L10n.str.ut_63f8cd8765(rest),
             style: TextStyle(fontSize: fMicro, color: tc.brand),
           ),
         ),
@@ -1278,7 +1281,7 @@ class _NavDrawerState extends State<NavDrawer> {
           const SizedBox(width: 6),
           _countChip(tc, '$count'),
           const Spacer(),
-          _countChip(tc, UiText.t('共 $total 台', '$total hosts')),
+          _countChip(tc, L10n.str.ut_2565b39f32(total)),
         ],
       ),
     );

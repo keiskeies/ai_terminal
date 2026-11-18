@@ -21,6 +21,7 @@ import '../utils/terminal_blocks.dart';import '../utils/terminal_panes.dart';
 import '../utils/terminal_search.dart';
 import '../utils/terminal_text_actions.dart';
 import 'terminal_context_menu.dart';
+import '../core/l10n_holder.dart';
 
 class TerminalView extends StatefulWidget {
   final xterm.Terminal? terminal;
@@ -1244,8 +1245,7 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     final text = terminal.buffer.getText(sel);
     Clipboard.setData(ClipboardData(text: text));
     _controller.clearSelection();
-    _showToast(UiText.t('已复制 ${text.length} 字符',
-        'Copied ${text.length} characters'));
+    _showToast(L10n.str.ut_1dd514c792(text.length));
   }
 
   /// 轻提示：复用全局顶部 toast，不弹 AlertDialog、不遮挡终端
@@ -1270,7 +1270,7 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
         final tc = ThemeColors.of(context);
         return AlertDialog(
           backgroundColor: tc.cardElevated,
-          title: Text(UiText.t('粘贴 ${lines.length} 行内容？', 'Paste ${lines.length} lines?'),
+          title: Text(L10n.str.ut_218046bbfd(lines.length),
               style: TextStyle(color: tc.textMain, fontSize: fBody)),
           content: SizedBox(
             width: 460,
@@ -1291,7 +1291,7 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
                   ),
                   child: Text(
                     more > 0
-                        ? UiText.t('$preview\n… 还有 $more 行', '$preview\n… and $more more lines')
+                        ? L10n.str.ut_c40c983842(preview, more)
                         : preview,
                     style: TextStyle(
                       fontFamily: 'JetBrainsMono',
@@ -1398,7 +1398,7 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     if (!mounted) return;
     showTopSnackBar(context,
       SnackBar(
-        content: Text(UiText.t('已复制 ${text.length} 字符', 'Copied ${text.length} characters'), style: const TextStyle(fontSize: fSmall)),
+        content: Text(L10n.str.ut_1dd514c792(text.length), style: const TextStyle(fontSize: fSmall)),
         duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
@@ -1424,7 +1424,7 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     if (!mounted) return;
     showTopSnackBar(context,
       SnackBar(
-        content: Text(UiText.t('已保存到 $path', 'Saved to $path'), style: const TextStyle(fontSize: fSmall)),
+        content: Text(L10n.str.ut_3482231651(path), style: const TextStyle(fontSize: fSmall)),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),

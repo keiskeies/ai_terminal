@@ -290,7 +290,7 @@ Future<ToolResult> _runDirectoryUploadWithCancel({
   var locked = false;
   try {
     if (DirectoryUploadLock.isLocked(lockKey)) {
-      onProgress?.call(UiText.t('$prefix等待上一轮上传退出...', '${prefix}Waiting for the previous upload to finish...'));
+      onProgress?.call(L10n.str.ut_e36f09192f(prefix));
     }
     await DirectoryUploadLock.acquire(lockKey, cancelToken: transferCancel);
     locked = true;
@@ -306,7 +306,7 @@ Future<ToolResult> _runDirectoryUploadWithCancel({
         final now = progressWatch.elapsedMilliseconds;
         if (uploaded >= total || now - lastProgressMs >= 1000) {
           lastProgressMs = now;
-          onProgress?.call(UiText.t('$prefix上传进度: $uploaded/$total 文件', '${prefix}Upload progress: $uploaded/$total files'));
+          onProgress?.call(L10n.str.ut_dc39c308a2(prefix, uploaded, total));
         }
       },
     );
@@ -414,7 +414,7 @@ class SftpUploadTool extends AgentTool {
     try {
       if (!isDir) {
         // 单文件上传
-        onProgress?.call(UiText.t('正在上传文件: ${p.basename(local)}', 'Uploading: ${p.basename(local)}'));
+        onProgress?.call(L10n.str.ut_91700996f4(p.basename(local)));
         // R6: 远程路径用 posix
         final remoteParent = p.posix.dirname(remote);
         if (remoteParent.isNotEmpty && remoteParent != '.') {
@@ -424,7 +424,7 @@ class SftpUploadTool extends AgentTool {
         final size = await file.length();
         onProgress?.call(UiText.t('上传完成', 'Upload complete'));
         return ToolResult.success(
-          UiText.t('文件上传成功: $local → $remote (${_formatSize(size)})', 'File uploaded: $local → $remote (${_formatSize(size)})'),
+          L10n.str.ut_ded2242c8f(local, remote, _formatSize(size)),
         );
       } else {
         // 目录递归上传
@@ -435,7 +435,7 @@ class SftpUploadTool extends AgentTool {
         if (p.posix.basename(remote) != baseName) {
           effectiveRemote = p.posix.join(remote, baseName);
         }
-        onProgress?.call(UiText.t('正在递归上传目录: $local → $effectiveRemote', 'Uploading directory recursively: $local → $effectiveRemote'));
+        onProgress?.call(L10n.str.ut_d72746d0d0(local, effectiveRemote));
         return await _runDirectoryUploadWithCancel(
           sftp: sftp,
           ssh: executor,
@@ -532,12 +532,12 @@ class SftpDownloadTool extends AgentTool {
         if (localIsDir || local.endsWith('/') || local.endsWith('\\')) {
           target = p.join(local, p.posix.basename(remote));
         }
-        onProgress?.call(UiText.t('正在下载文件: ${p.posix.basename(remote)} → $target', 'Downloading: ${p.posix.basename(remote)} → $target'));
+        onProgress?.call(L10n.str.ut_0e800a8406(p.posix.basename(remote), target));
         await sftp.downloadFile(remote, target);
         final size = stat.size ?? 0;
         onProgress?.call(UiText.t('下载完成', 'Download complete'));
         return ToolResult.success(
-          UiText.t('文件下载成功: $remote → $target (${_formatSize(size)})', 'File downloaded: $remote → $target (${_formatSize(size)})'),
+          L10n.str.ut_5c8b91122b(remote, target, _formatSize(size)),
         );
       }
 
@@ -557,23 +557,23 @@ class SftpDownloadTool extends AgentTool {
           ? ['node_modules', '.git', '.DS_Store']
           : excludeArg;
 
-      onProgress?.call(UiText.t('正在递归下载目录: $remote → $effectiveLocal', 'Downloading directory recursively: $remote → $effectiveLocal'));
+      onProgress?.call(L10n.str.ut_2bc26619aa(remote, effectiveLocal));
       final result = await sftp.downloadDirectory(
         remote,
         effectiveLocal,
         excludeNames: excludeNames,
         onProgress: (downloaded, total) {
-          onProgress?.call(UiText.t('下载进度: $downloaded/$total 文件', 'Download progress: $downloaded/$total files'));
+          onProgress?.call(L10n.str.ut_52a01019d8(downloaded, total));
         },
       );
       if (result.allSuccess) {
         return ToolResult.success(
-          UiText.t('${result.summary}\n目标路径: $effectiveLocal', '${result.summary}\nDestination: $effectiveLocal'),
+          L10n.str.ut_4452077d81(result.summary, effectiveLocal),
         );
       }
       return ToolResult(
         success: false,
-        output: UiText.t('${result.summary}\n目标路径: $effectiveLocal', '${result.summary}\nDestination: $effectiveLocal'),
+        output: L10n.str.ut_4452077d81(result.summary, effectiveLocal),
         error: '${result.failedFiles.length} 个文件下载失败',
       );
     } catch (e) {
@@ -710,7 +710,7 @@ class SftpFileReadTool extends AgentTool {
       if (sizeError != null) {
         return ToolResult.failure(sizeError);
       }
-      onProgress?.call(UiText.t('正在读取 $path ...', 'Reading $path ...'));
+      onProgress?.call(L10n.str.ut_f4856090f2(path));
       // stat 拿不到大小时仍要兜底：多读 1 字节用于判定是否超限
       final bytes = await sftp.readFileBytes(path, maxSize: maxFileBytes + 1);
       final readSizeError = oversizeError(bytes.length);
@@ -1208,21 +1208,21 @@ class UploadToTool extends AgentTool {
     try {
       await sftp.attachToClient(client);
     } catch (e) {
-      return ToolResult.failure(UiText.t('[$hostId] SFTP 连接失败: $e', '[$hostId] SFTP connection failed: $e'));
+      return ToolResult.failure(L10n.str.ut_6b85bbaf16(hostId, e));
     }
 
     try {
       if (!isDir) {
-        onProgress?.call(UiText.t('[$hostId] 正在上传文件: ${p.basename(local)}', '[$hostId] Uploading: ${p.basename(local)}'));
+        onProgress?.call(L10n.str.ut_2d44fe0c64(hostId, p.basename(local)));
         final remoteParent = p.posix.dirname(remote);
         if (remoteParent.isNotEmpty && remoteParent != '.') {
           await sftp.ensureDirectory(remoteParent);
         }
         await sftp.uploadFile(local, remote);
         final size = await file.length();
-        onProgress?.call(UiText.t('[$hostId] 上传完成', '[$hostId] Upload complete'));
+        onProgress?.call(L10n.str.ut_7ef1cd9389(hostId));
         return ToolResult.success(
-          UiText.t('[$hostId] 文件上传成功: $local → $remote (${_formatSize(size)})', '[$hostId] File uploaded: $local → $remote (${_formatSize(size)})'),
+          L10n.str.ut_a465e8a3ee(hostId, local, remote, _formatSize(size)),
         );
       } else {
         final baseName = p.basename(local);
@@ -1230,7 +1230,7 @@ class UploadToTool extends AgentTool {
         if (p.posix.basename(remote) != baseName) {
           effectiveRemote = p.posix.join(remote, baseName);
         }
-        onProgress?.call(UiText.t('[$hostId] 正在递归上传目录: $local → $effectiveRemote', '[$hostId] Uploading directory recursively: $local → $effectiveRemote'));
+        onProgress?.call(L10n.str.ut_699c3fa8dc(hostId, local, effectiveRemote));
         return await _runDirectoryUploadWithCancel(
           sftp: sftp,
           ssh: targetExecutor,
@@ -1307,7 +1307,7 @@ class BroadcastUploadTool extends AgentTool {
     final results = <String>[];
     int successCount = 0;
     for (final hid in hostIds) {
-      onProgress?.call(UiText.t('[$hid] 正在分发...', '[$hid] Distributing...'));
+      onProgress?.call(L10n.str.ut_2996de9000(hid));
       final r = await uploadTool.execute(
         executor: executor,
         args: ToolArgs({
@@ -1381,13 +1381,13 @@ class CollectFileTool extends AgentTool {
 
     for (final hid in hostIds) {
       if (_executor.isCancelled) {
-        results.add(UiText.t('[$hid] ✗ 已取消，跳过', '[$hid] ✗ Cancelled, skipped'));
+        results.add(L10n.str.ut_0f735fba75(hid));
         continue;
       }
-      onProgress?.call(UiText.t('[$hid] 正在采集 $remote ...', '[$hid] Collecting $remote ...'));
+      onProgress?.call(L10n.str.ut_5c021ae6b9(hid, remote));
       final targetExecutor = _executor.executorFor(hid);
       if (targetExecutor == null || targetExecutor is! SSHService) {
-        results.add(UiText.t('[$hid] ✗ 主机未连接或非 SSH 会话', '[$hid] ✗ Host not connected or not an SSH session'));
+        results.add(L10n.str.ut_e31edc9171(hid));
         continue;
       }
       final client = targetExecutor.client;
@@ -1469,13 +1469,13 @@ class MultiGrepTool extends AgentTool {
     int hitCount = 0;
     for (final hid in hostIds) {
       if (_executor.isCancelled) {
-        results.add(UiText.t('=== [$hid] 已取消，跳过 ===', '=== [$hid] Cancelled, skipped ==='));
+        results.add(L10n.str.ut_2e01615eec(hid));
         continue;
       }
-      onProgress?.call(UiText.t('[$hid] 正在搜索...', '[$hid] Searching...'));
+      onProgress?.call(L10n.str.ut_ffebfc53a6(hid));
       final r = await _executor.executeOn(hid, cmd, timeout: const Duration(seconds: 30));
       if (r == null) {
-        results.add(UiText.t('=== [$hid] 主机未连接 ===', '=== [$hid] Host not connected ==='));
+        results.add(L10n.str.ut_38bc3dac85(hid));
         continue;
       }
       final out = r.stdout.trim();
@@ -1537,7 +1537,7 @@ class DiffFilesTool extends AgentTool {
         contentResults[hid] = '';
         continue;
       }
-      onProgress?.call(UiText.t('[$hid] 正在读取 $remote ...', '[$hid] Reading $remote ...'));
+      onProgress?.call(L10n.str.ut_8dc55e0134(hid, remote));
       final r = await _executor.executeOn(
         hid,
         "md5sum '$remote' 2>/dev/null; echo '---CONTENT---'; cat '$remote' 2>/dev/null | head -200",
@@ -1627,7 +1627,7 @@ class CertMonitorTool extends AgentTool {
         return ToolResult.failure(UiText.t('port 范围非法（1-65535）', 'Invalid port range (1-65535)'));
       }
 
-      onProgress?.call(UiText.t('正在检查 $host:$port 的 HTTPS 证书...', 'Checking HTTPS certificate for $host:$port...'));
+      onProgress?.call(L10n.str.ut_475dcf3309(host, port));
       // 通过 executor 在已连接主机上执行 openssl 命令
       // 用 -servername 启用 SNI；用 2>/dev/null 屏蔽 s_client 的握手交互输出
       final cmd = "echo | openssl s_client -connect $host:$port -servername $host 2>/dev/null "
@@ -1635,7 +1635,7 @@ class CertMonitorTool extends AgentTool {
       try {
         final result = await executor.executeAndWait(cmd, timeout: const Duration(seconds: 15));
         if (!result.success) {
-          return ToolResult.failure(UiText.t('openssl 执行失败: ${result.stderr}', 'openssl failed: ${result.stderr}'), output: result.stdout);
+          return ToolResult.failure(L10n.str.ut_1e823bfa18(result.stderr), output: result.stdout);
         }
         final output = result.stdout.trim();
         if (output.isEmpty) {
@@ -1658,12 +1658,12 @@ class CertMonitorTool extends AgentTool {
       if (RegExp(r"[';`$\\|&><\n\r]").hasMatch(certPath)) {
         return ToolResult.failure(UiText.t('certPath 含非法字符（禁止引号/分号/管道/反引号等）', 'certPath contains illegal characters (quotes, semicolons, pipes, backticks, etc. are not allowed)'));
       }
-      onProgress?.call(UiText.t('正在解析本地证书: $certPath', 'Parsing local certificate: $certPath'));
+      onProgress?.call(L10n.str.ut_bde384cf72(certPath));
       final cmd = "openssl x509 -in '$certPath' -noout -dates -issuer -subject 2>&1";
       try {
         final result = await executor.executeAndWait(cmd, timeout: const Duration(seconds: 10));
         if (!result.success) {
-          return ToolResult.failure(UiText.t('openssl 执行失败: ${result.stderr}', 'openssl failed: ${result.stderr}'), output: result.stdout);
+          return ToolResult.failure(L10n.str.ut_1e823bfa18(result.stderr), output: result.stdout);
         }
         final output = result.stdout.trim();
         if (output.isEmpty || output.contains('unable to load certificate')) {
@@ -1954,11 +1954,11 @@ class FileWriteTool extends AgentTool {
               );
             }
             backupPath = '$path.bak.${DateTime.now().millisecondsSinceEpoch}';
-            onProgress?.call(UiText.t('正在备份原文件到 $backupPath ...', 'Backing up original file to $backupPath ...'));
+            onProgress?.call(L10n.str.ut_a2a80977d9(backupPath));
             try {
               await sftp.copyFile(path, backupPath);
             } catch (e) {
-              return ToolResult.failure(UiText.t('备份原文件失败: $e。已中止写入，原文件未被修改。', 'Failed to back up the original file: $e. Write aborted; the original file was not modified.'));
+              return ToolResult.failure(L10n.str.ut_e39887dfed(e));
             }
           }
         }
@@ -1974,8 +1974,8 @@ class FileWriteTool extends AgentTool {
         final msg = StringBuffer()
           ..writeln(UiText.t('文件${mode == 'write' ? '写入' : '追加'}成功: $path (${contentBytes.length} 字节)', '${mode == 'write' ? 'File written' : 'Content appended'}: $path (${contentBytes.length} bytes)'));
         if (backupPath != null) {
-          msg.writeln(UiText.t('  原文件已备份: $backupPath', '  Original backed up: $backupPath'));
-          msg.writeln(UiText.t('  如需回滚: mv $backupPath $path', '  To roll back: mv $backupPath $path'));
+          msg.writeln(L10n.str.ut_fcda8e6588(backupPath));
+          msg.writeln(L10n.str.ut_b9beeabb91(backupPath, path));
         }
         return ToolResult.success(msg.toString().trimRight());
       } catch (e) {
@@ -1988,7 +1988,7 @@ class FileWriteTool extends AgentTool {
             onProgress?.call(UiText.t('原文件已从备份恢复', 'Original file restored from backup'));
           } catch (rollbackErr) {
             // 回滚失败也继续走 PTY fallback（PTY 会覆盖原文件）
-            onProgress?.call(UiText.t('备份回滚失败: $rollbackErr，将尝试 PTY 写入', 'Backup rollback failed: $rollbackErr, trying PTY write'));
+            onProgress?.call(L10n.str.ut_a7bd551b52(rollbackErr));
           }
         }
       } finally {
@@ -2001,7 +2001,7 @@ class FileWriteTool extends AgentTool {
       if (mode == 'write') {
         onProgress?.call(UiText.t('SFTP 写入失败，尝试 PTY stdin 模式 (cat > file)...', 'SFTP write failed, trying PTY stdin mode (cat > file)...'));
         final backupInfo = backupPath != null
-            ? UiText.t('\n  注意：SFTP 流程已备份原文件到 $backupPath，PTY 写入成功后可手动删除该备份', '\n  Note: the SFTP flow backed up the original file to $backupPath; delete that backup manually once the PTY write succeeds')
+            ? L10n.str.ut_f8d0ae7c3c(backupPath)
             : '';
 
         // 第一次：cat > /path（适用于 root shell 或用户有权限）
@@ -2014,14 +2014,14 @@ class FileWriteTool extends AgentTool {
         );
         if (ptyResult.success) {
           return ToolResult.success(
-            UiText.t('文件写入成功（PTY stdin 模式 cat）: $path (${contentBytes.length} 字节)$backupInfo', 'File written via PTY stdin (cat): $path (${contentBytes.length} bytes)$backupInfo'),
+            L10n.str.ut_6820e10527(path, contentBytes.length, backupInfo),
           );
         }
         // cancelToken 触发时不再尝试 sudo tee，直接返回
         if (cancelToken != null && cancelToken!.isCompleted) {
           return ToolResult.failure(UiText.t('用户取消任务，PTY 写入中止', 'Task cancelled by user, PTY write aborted'));
         }
-        onProgress?.call(UiText.t('cat 写入失败: ${ptyResult.failureReason}，尝试 sudo tee ...', 'cat write failed: ${ptyResult.failureReason}, trying sudo tee ...'));
+        onProgress?.call(L10n.str.ut_caa84ab310(ptyResult.failureReason ?? ''));
 
         // 第二次：sudo tee /path > /dev/null（适用于非 root + sudo 可用）
         final ptyResult2 = await executor.writeFileViaPty(
@@ -2033,7 +2033,7 @@ class FileWriteTool extends AgentTool {
         );
         if (ptyResult2.success) {
           return ToolResult.success(
-            UiText.t('文件写入成功（PTY stdin + sudo tee）: $path (${contentBytes.length} 字节)$backupInfo', 'File written via PTY stdin + sudo tee: $path (${contentBytes.length} bytes)$backupInfo'),
+            L10n.str.ut_b0ea4177b4(path, contentBytes.length, backupInfo),
           );
         }
 
@@ -2077,11 +2077,11 @@ class FileWriteTool extends AgentTool {
             backupUnavailable = true;
           } else {
             return ToolResult.failure(
-              UiText.t('备份原文件失败: $e。已中止写入，原文件未被修改。', 'Failed to back up the original file: $e. Write aborted; the original file was not modified.'),
+              L10n.str.ut_e39887dfed(e),
             );
           }
         } catch (e) {
-          return ToolResult.failure(UiText.t('备份原文件失败: $e。已中止写入，原文件未被修改。', 'Failed to back up the original file: $e. Write aborted; the original file was not modified.'));
+          return ToolResult.failure(L10n.str.ut_e39887dfed(e));
         }
       }
 
@@ -2188,8 +2188,8 @@ class FileWriteTool extends AgentTool {
       ..writeln(
           UiText.t('文件${mode == 'write' ? '写入' : '追加'}成功（$method）: $path ($byteCount 字节)', '${mode == 'write' ? 'File written' : 'Content appended'} ($method): $path ($byteCount bytes)'));
     if (backupPath != null) {
-      msg.writeln(UiText.t('  原文件已备份: $backupPath', '  Original backed up: $backupPath'));
-      msg.writeln(UiText.t('  如需回滚: 用该备份覆盖 $path', '  To roll back: overwrite $path with that backup'));
+      msg.writeln(L10n.str.ut_fcda8e6588(backupPath));
+      msg.writeln(L10n.str.ut_c4acfd10f3(path));
     } else if (backupUnavailable) {
       msg.writeln(UiText.t('  注意：当前进程无权限读取原文件，未能生成备份。', '  Note: this process cannot read the original file, so no backup was created.'));
     }
@@ -2291,7 +2291,7 @@ class FilePatchTool extends AgentTool {
     final oldStr = utf8.decode(oldBytes, allowMalformed: true);
     final newStr = utf8.decode(newBytes, allowMalformed: true);
 
-    onProgress?.call(UiText.t('正在读取 $path ...', 'Reading $path ...'));
+    onProgress?.call(L10n.str.ut_f4856090f2(path));
 
     // SSH 远程会话
     if (executor is SSHService) {
@@ -2372,11 +2372,11 @@ class FilePatchTool extends AgentTool {
         // 自动备份
         if (backup) {
           backupPath = '$path.bak.${DateTime.now().millisecondsSinceEpoch}';
-          onProgress?.call(UiText.t('正在备份原文件到 $backupPath ...', 'Backing up original file to $backupPath ...'));
+          onProgress?.call(L10n.str.ut_a2a80977d9(backupPath));
           try {
             await sftp.copyFile(path, backupPath);
           } catch (e) {
-            return ToolResult.failure(UiText.t('备份原文件失败: $e。已中止写入，原文件未被修改。', 'Failed to back up the original file: $e. Write aborted; the original file was not modified.'));
+            return ToolResult.failure(L10n.str.ut_e39887dfed(e));
           }
         }
 
@@ -2385,12 +2385,12 @@ class FilePatchTool extends AgentTool {
 
         onProgress?.call(UiText.t('替换完成', 'Replacement complete'));
         final msg = StringBuffer()
-          ..writeln(UiText.t('文件已修改: $path', 'File modified: $path'))
-          ..writeln(UiText.t('  替换: ${oldBytes.length} 字节 → ${newBytes.length} 字节', '  Replaced: ${oldBytes.length} bytes → ${newBytes.length} bytes'))
-          ..writeln(UiText.t('  文件大小: ${bytes.length} → ${newFileBytes.length} 字节', '  File size: ${bytes.length} → ${newFileBytes.length} bytes'));
+          ..writeln(L10n.str.ut_af40dec29f(path))
+          ..writeln(L10n.str.ut_fb892c6b10(oldBytes.length, newBytes.length))
+          ..writeln(L10n.str.ut_59e5f6620a(bytes.length, newFileBytes.length));
         if (backupPath != null) {
-          msg.writeln(UiText.t('  原文件已备份: $backupPath', '  Original backed up: $backupPath'));
-          msg.writeln(UiText.t('  如需回滚: mv $backupPath $path', '  To roll back: mv $backupPath $path'));
+          msg.writeln(L10n.str.ut_fcda8e6588(backupPath));
+          msg.writeln(L10n.str.ut_b9beeabb91(backupPath, path));
         }
         final diff = LineDiff.compute(oldStr, newStr);
         return ToolResult.success(
@@ -2485,12 +2485,12 @@ class FilePatchTool extends AgentTool {
 
         onProgress?.call(UiText.t('替换完成', 'Replacement complete'));
         final msg = StringBuffer()
-          ..writeln(UiText.t('文件已修改: $path', 'File modified: $path'))
-          ..writeln(UiText.t('  替换: ${oldBytes.length} 字节 → ${newBytes.length} 字节', '  Replaced: ${oldBytes.length} bytes → ${newBytes.length} bytes'))
-          ..writeln(UiText.t('  文件大小: ${bytes.length} → ${newFileBytes.length} 字节', '  File size: ${bytes.length} → ${newFileBytes.length} bytes'));
+          ..writeln(L10n.str.ut_af40dec29f(path))
+          ..writeln(L10n.str.ut_fb892c6b10(oldBytes.length, newBytes.length))
+          ..writeln(L10n.str.ut_59e5f6620a(bytes.length, newFileBytes.length));
         if (backupPath != null) {
-          msg.writeln(UiText.t('  原文件已备份: $backupPath', '  Original backed up: $backupPath'));
-          msg.writeln(UiText.t('  如需回滚: 用该备份覆盖 $path', '  To roll back: overwrite $path with that backup'));
+          msg.writeln(L10n.str.ut_fcda8e6588(backupPath));
+          msg.writeln(L10n.str.ut_c4acfd10f3(path));
         }
         final diff = LineDiff.compute(oldStr, newStr);
         return ToolResult.success(
@@ -2752,7 +2752,7 @@ class KnowledgeSearchTool extends AgentTool {
       return ToolResult.failure(UiText.t('知识库检索已取消', 'Knowledge search cancelled'));
     }
 
-    onProgress?.call(UiText.t('正在检索知识库: $query', 'Searching knowledge base: $query'));
+    onProgress?.call(L10n.str.ut_00cd1c4300(query));
     final entries = await KnowledgeService().searchKnowledge(
       query,
       platform: platform,
@@ -2799,7 +2799,7 @@ class KnowledgeSearchTool extends AgentTool {
   /// 字符上限截断：恰好等于上限时不截断（R8 边界）；超限时保留头部并标注原长度
   static String _capText(String text, int cap, String label) {
     if (text.length <= cap) return text;
-    final note = UiText.t('\n…($label，原文共 ${text.length} 字符)', '\n…($label, ${text.length} chars total)');
+    final note = L10n.str.ut_5c0b2e0370(label, text.length);
     final keep = (cap - note.length).clamp(0, text.length);
     return '${text.substring(0, keep)}$note';
   }

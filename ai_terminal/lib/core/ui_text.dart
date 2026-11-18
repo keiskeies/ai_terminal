@@ -1,23 +1,69 @@
 import 'l10n_holder.dart';
+import 'ui_text_index.dart';
 
-/// zh/en copy for screens that have not been moved into the ARB set yet.
+/// Runtime localization helper for strings that live outside the
+/// widget/ARB layer.
 ///
-/// Matches the [AgentUiText] convention: Chinese and English first, every
-/// other locale falls back to English instead of leaking Chinese.
+/// Design:
+/// - Full localization now goes through the 14-locale ARB set. [t] looks up
+///   the (zh, en) pair in [kUiTextPairToKey] and returns the current locale's
+///   translation from [kUiTextIndex].
+/// - When the pair is not indexed (dynamic/interpolated strings) it delegates
+///   to [L10n.str] keys where available, or falls back to the zh/en pair.
+/// - Locale is taken from [L10n] when initialized; before setup, falls back
+///   to zh, matching the old behavior.
 class UiText {
   static bool get zh =>
       !L10n.isReady || L10n.str.localeName.toLowerCase().startsWith('zh');
 
-  static String t(String zhText, String enText) => zh ? zhText : enText;
+  /// The current locale code (zh/en/ar/de/es/fr/hi/it/ja/ko/pt/ru/th/vi),
+  /// or 'zh' when L10n is not ready yet.
+  static String get _locale {
+    if (!L10n.isReady) return 'zh';
+    final name = L10n.str.localeName.toLowerCase();
+    if (name == 'zh' || name == 'zh_cn' || name == 'zh_hans') return 'zh';
+    if (name == 'en' || name == 'en_us') return 'en';
+    for (final l in const [
+      'ar', 'de', 'es', 'fr', 'hi', 'it', 'ja', 'ko', 'pt', 'ru', 'th', 'vi',
+    ]) {
+      if (name.startsWith(l)) return l;
+    }
+    return 'en';
+  }
 
-  static String count(int n, String zhUnit, String enUnit) =>
-      zh ? '$n $zhUnit' : '$n $enUnit';
+  static String t(String zhText, String enText) {
+    final key = kUiTextPairToKey['$zhText\x1f$enText'];
+    if (key != null) {
+      final rec = kUiTextIndex[key];
+      if (rec != null) {
+        final v = rec[_locale];
+        if (v != null && v.isNotEmpty) return v;
+        // fall back: en, then zh
+        final en = rec['en'];
+        if (en != null && en.isNotEmpty) return en;
+        final zh = rec['zh'];
+        if (zh != null && zh.isNotEmpty) return zh;
+      }
+    }
+    return zh ? zhText : enText;
+  }
 
-  /// 主机组名的展示文案。
-  ///
-  /// `'默认'` 是写进 Hive 的持久值，不能改（改了老数据全落进一个新组），也不
-  /// 能在这里返回别的值给写回路径用 —— 只用于渲染。比较、筛选、持久化一律比
-  /// 较 `'默认'` 原值，和主机编辑页 `host.group == '默认'` 的处理保持一致。
+  static String count(int n, String zhUnit, String enUnit) {
+    final key = kUiTextPairToKey['$zhUnit\x1f$enUnit'];
+    if (key != null) {
+      final rec = kUiTextIndex[key];
+      if (rec != null) {
+        final v = rec[_locale];
+        if (v != null && v.isNotEmpty) return '$n $v';
+        final en = rec['en'];
+        if (en != null && en.isNotEmpty) return '$n $en';
+        final zh2 = rec['zh'];
+        if (zh2 != null && zh2.isNotEmpty) return '$n $zh2';
+      }
+    }
+    return zh ? '$n $zhUnit' : '$n $enUnit';
+  }
+
   static String hostGroup(String group) =>
       group == '默认' && L10n.isReady ? L10n.str.hostDefaultGroup : group;
 }

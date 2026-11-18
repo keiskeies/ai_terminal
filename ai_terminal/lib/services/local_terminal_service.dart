@@ -8,6 +8,7 @@ import '../utils/exit_marker_scanner.dart';
 import '../utils/tail_text_buffer.dart';
 import 'command_executor.dart';
 import 'session_log_service.dart';
+import '../core/l10n_holder.dart';
 
 /// 本地终端服务 — 使用原生 PTY（伪终端）实现真正的本地 shell
 /// 支持 macOS / Linux / Windows，提供与 macOS Terminal / Windows CMD 完全一致的体验
@@ -132,7 +133,7 @@ class LocalTerminalService implements CommandExecutor {
     } catch (e) {
       // 这行直接打进终端输出流，用户看得见，必须过 UiText。
       _outputController.add('\r\n\x1b[31m✗ '
-          '${UiText.t('本地终端启动失败: $e', 'Failed to start local terminal: $e')}'
+          '${L10n.str.ut_3b4b10f1b2(e)}'
           '\x1b[0m\r\n');
       _isConnected = false;
     }

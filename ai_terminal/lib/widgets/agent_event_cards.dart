@@ -12,6 +12,7 @@ import 'agent_ask_card.dart';
 import 'host_result_matrix.dart';
 import 'output_viewer_sheet.dart';
 import '../core/app_toast.dart';
+import '../core/l10n_holder.dart';
 
 /// 旧名保留：外部引用的是 `AskCustomAnswerField`
 typedef AskCustomAnswerField = AgentAskCustomAnswerField;
@@ -783,8 +784,7 @@ class _RawOutputTailState extends State<_RawOutputTail> {
                   Expanded(
                     child: Text(
                       widget.totalChars != null
-                          ? UiText.t('原始输出尾部 · 共 ${widget.totalChars} 字符',
-                              'Raw output tail · ${widget.totalChars} chars total')
+                          ? L10n.str.ut_e7d26cf57d(widget.totalChars ?? 0)
                           : UiText.t('原始输出尾部', 'Raw output tail'),
                       style: TextStyle(color: tc.textSub, fontSize: fMicro),
                     ),

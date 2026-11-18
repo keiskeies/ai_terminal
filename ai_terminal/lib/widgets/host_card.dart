@@ -4,6 +4,7 @@ import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../core/ui_text.dart';
 import '../models/host_config.dart';
+import '../core/l10n_holder.dart';
 
 /// P1-4: 服务器卡片重设计
 /// - 高度从 72px 增加到 88px
@@ -178,8 +179,7 @@ class _HostCardState extends State<HostCard> {
                             if (lastConnected != null) ...[
                               const SizedBox(height: 2),
                               Text(
-                                UiText.t('最后连接: $lastConnected',
-                                    'Last connected: $lastConnected'),
+                                L10n.str.ut_0408a4e88d(lastConnected),
                                 style: TextStyle(
                                   fontSize: fMicro,
                                   color: tc.textMuted,

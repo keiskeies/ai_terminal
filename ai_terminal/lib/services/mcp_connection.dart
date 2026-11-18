@@ -8,6 +8,7 @@ import 'package:mcp_dart/mcp_dart.dart';
 import '../core/ui_text.dart';
 import 'mcp_models.dart';
 import 'mcp_oauth.dart';
+import '../core/l10n_holder.dart';
 
 /// 一个 MCP 服务器的连接
 ///
@@ -530,9 +531,7 @@ class McpConnection {
   String _contentText(Content content) {
     if (content is TextContent) return content.text;
     if (content is ImageContent) {
-      return UiText.t(
-          '[图片 ${content.mimeType}，${content.data.length} base64 字符]',
-          '[Image ${content.mimeType}, ${content.data.length} base64 chars]');
+      return L10n.str.ut_bbafda1855(content.mimeType, content.data.length);
     }
     if (content is AudioContent) {
       return '[音频 ${content.mimeType}，${content.data.length} base64 字符]';

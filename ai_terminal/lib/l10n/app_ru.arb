@@ -8,170 +8,170 @@
   "agentRunning": "Агент выполняет задачу, подождите",
   "agentSettingAiTimeoutDesc": "Считается превышенным, если за это время не пришло ни одного ответа модели. Увеличьте для медленных локальных моделей.",
   "agentSettingAiTimeoutLabel": "Тайм-аут ответа ИИ",
-  "agentSettingAutoExecSection": "AI Auto Execution",
-  "agentSettingBuiltInPrompt": "AI Built-in Instructions",
-  "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",
-  "agentSettingBuiltInPromptSubtitle": "Modify AI's basic instructions",
-  "agentSettingBuiltInSaved": "AI built-in instructions saved",
-  "agentSettingCustomPromptHint": "e.g., Respond in English, use concise format, prefer Docker...",
-  "agentSettingExtraPrompt": "Additional Instructions",
-  "agentSettingExtraPromptDesc": "Additional requirements appended to built-in instructions to adjust AI's response style. Leave empty to skip.",
-  "agentSettingExtraPromptSaved": "Additional instructions saved",
-  "agentSettingExtraPromptSubtitle": "Additional requirements appended to built-in instructions",
-  "agentSettingHundredSteps": "100 steps",
-  "agentSettingMaxStepsDesc": "Maximum number of steps AI takes when executing commands automatically. Set to 0 for unlimited steps; complex tasks will not be interrupted.",
-  "agentSettingMaxStepsLabel": "Max steps AI can execute automatically",
-  "agentSettingPromptSection": "AI Prompts",
-  "agentSettingPromptWarning": "⚠️ Modify with caution. Inappropriate prompts may cause abnormal AI behavior. Click \"Reset\" to restore defaults at any time.",
-  "agentSettingTitle": "Agent Settings",
+  "agentSettingAutoExecSection": "Автоматизированное выполнение с помощью ИИ",
+  "agentSettingBuiltInPrompt": "Встроенные инструкции AI",
+  "agentSettingBuiltInPromptDesc": "Это базовая инструкция ИИ, которая вступит в силу сразу после внесения изменений. «Контекст» внутри будет заменен информацией о сервере.",
+  "agentSettingBuiltInPromptSubtitle": "Изменить базовые инструкции для ИИ",
+  "agentSettingBuiltInSaved": "Встроенные инструкции AI сохранены.",
+  "agentSettingCustomPromptHint": "Например: ответьте на английском языке, выведите в кратком формате, сначала используйте Docker...",
+  "agentSettingExtraPrompt": "дополнительные инструкции",
+  "agentSettingExtraPromptDesc": "Дополнительные требования, добавленные к встроенным инструкциям, могут изменить стиль ответа ИИ. Оставьте пустым, чтобы не добавлять.",
+  "agentSettingExtraPromptSaved": "Дополнительные инструкции сохранены.",
+  "agentSettingExtraPromptSubtitle": "Дополнительные требования после встроенных директив",
+  "agentSettingHundredSteps": "100 шагов",
+  "agentSettingMaxStepsDesc": "Когда ИИ автоматически выполняет команду, это занимает максимум несколько шагов. Установка значения 0 означает, что количество шагов не ограничено, и сложные задачи не будут прерываться на полпути.",
+  "agentSettingMaxStepsLabel": "ИИ может автоматически выполнить максимум несколько шагов",
+  "agentSettingPromptSection": "ИИ подсказывает слова",
+  "agentSettingPromptWarning": "⚠️ Будьте осторожны при изменении: неподходящие слова-подсказки могут привести к ненормальному поведению ИИ. Вы можете в любой момент нажать «Сбросить», чтобы восстановить настройки по умолчанию.",
+  "agentSettingTitle": "Настройки агента",
   "agentSettings": "Агент",
   "agentSettingsDesc": "Максимум шагов автозапуска AI (0 = без ограничений)",
-  "aiAndIntelligence": "AI",
-  "aiModelAdd": "Add Model",
-  "aiModelApiKeyInvalid": "Invalid API Key",
-  "aiModelApiKeyRequired": "Please enter an API Key",
-  "aiModelBaseUrlRequired": "Please enter a Base URL",
-  "aiModelCannotConnect": "Unable to connect",
+  "aiAndIntelligence": "ИИ и интеллект",
+  "aiModelAdd": "Добавить модель",
+  "aiModelApiKeyInvalid": "Ключ API недействителен.",
+  "aiModelApiKeyRequired": "Пожалуйста, введите ключ API",
+  "aiModelBaseUrlRequired": "Пожалуйста, введите базовый URL",
+  "aiModelCannotConnect": "Не удалось подключиться",
   "aiModelConfig": "AI-модели",
   "aiModelConfigDesc": "Настройка API-ключей и параметров модели",
-  "aiModelConnectionTimeout": "Connection timeout",
-  "aiModelDeleteConfirm": "Are you sure you want to delete \"{name}\"?",
-  "aiModelDeleteTitle": "Delete Model",
-  "aiModelEditTitle": "Edit Model",
-  "aiModelEmptySubtitle": "Add an endpoint to group multiple models under one API key",
-  "aiModelEmptyTitle": "No AI models yet",
-  "aiModelMaxTokens": "Max Response Tokens",
-  "aiModelModelName": "Model Name",
-  "aiModelModelNameRequired": "Please enter a model name",
-  "aiModelNameError": "Incorrect model name",
-  "aiModelNameRequired": "Please enter a name",
-  "aiModelProvider": "AI Provider",
-  "aiModelProvidersUpdated": "Provider list updated ({count} providers)",
-  "aiModelRefreshProviders": "Refresh provider list",
-  "aiModelRemoteConfigEmpty": "Remote configuration is empty",
-  "aiModelRequestFailed": "Request failed ({code})",
-  "aiModelServerError": "Server error ({code})",
-  "aiModelSetAsDefault": "Set as default model",
-  "aiModelSetDefault": "Set as Default",
-  "aiModelTemperature": "Randomness",
-  "aiModelTest": "Test",
-  "aiModelTestFailed": "Test failed",
-  "aiModelTitle": "AI Model Configuration",
-  "aiModelTooManyRequests": "Too many requests",
-  "aiModelUpdateFailed": "Update failed: {error}",
+  "aiModelConnectionTimeout": "Тайм-аут соединения",
+  "aiModelDeleteConfirm": "Вы уверены, что хотите удалить \"{name}\"?",
+  "aiModelDeleteTitle": "Удалить модель",
+  "aiModelEditTitle": "Редактировать модель",
+  "aiModelEmptySubtitle": "Добавьте конечную точку. Под одной конечной точкой можно настроить несколько моделей.",
+  "aiModelEmptyTitle": "Модели искусственного интеллекта пока нет.",
+  "aiModelMaxTokens": "Максимальное количество символов в ответе",
+  "aiModelModelName": "Название модели",
+  "aiModelModelNameRequired": "Пожалуйста, введите название модели",
+  "aiModelNameError": "Неправильное название модели",
+  "aiModelNameRequired": "Пожалуйста, введите имя",
+  "aiModelProvider": "Поставщик услуг ИИ",
+  "aiModelProvidersUpdated": "Список поставщиков обновлен (поставщики {count})",
+  "aiModelRefreshProviders": "Обновить список поставщиков услуг",
+  "aiModelRemoteConfigEmpty": "Удаленная конфигурация пуста",
+  "aiModelRequestFailed": "Запрос не выполнен ({code})",
+  "aiModelServerError": "Ошибка сервера ({code})",
+  "aiModelSetAsDefault": "Установить как модель по умолчанию",
+  "aiModelSetDefault": "Установить по умолчанию",
+  "aiModelTemperature": "Случайность",
+  "aiModelTest": "тест",
+  "aiModelTestFailed": "тест не пройден",
+  "aiModelTitle": "Конфигурация модели ИИ",
+  "aiModelTooManyRequests": "Запросы слишком частые",
+  "aiModelUpdateFailed": "Обновление не выполнено: {error}.",
   "aiPanel": "Панель AI",
   "appTitle": "AI Терминал",
   "appearance": "Оформление",
   "appearanceDesc": "Тёмная/светлая тема, размер шрифта, цветовая схема",
-  "appearanceDisplayMode": "Display Mode",
-  "appearanceDisplayModeDesc": "Choose dark or light interface",
-  "appearanceFontSizeDesc": "Drag the slider to adjust terminal text size",
-  "appearanceTitle": "Appearance Settings",
+  "appearanceDisplayMode": "режим отображения",
+  "appearanceDisplayModeDesc": "Выберите темный или светлый интерфейс",
+  "appearanceFontSizeDesc": "Перетащите ползунок, чтобы настроить размер текста терминала.",
+  "appearanceTitle": "Настройки внешнего вида",
   "auditLog": "Журнал активности",
-  "auditLogAllTitle": "All Audit Logs",
-  "auditLogCopied": "Copied {count} logs to clipboard",
-  "auditLogCopyTooltip": "Copy Records",
+  "auditLogAllTitle": "Все записи операций",
+  "auditLogCopied": "Журналы {count} скопированы в буфер обмена.",
+  "auditLogCopyTooltip": "копировать запись",
   "auditLogDesc": "Смотрите, кто, когда и какую команду выполнял",
-  "auditLogEmpty": "No audit logs",
-  "auditLogExecuted": "Executed",
-  "auditLogExportHeader": "# Audit Log Export",
-  "auditLogExportTime": "# Export time: {time}",
-  "auditLogExportTotal": "# Total: {count}",
-  "auditLogFilterAll": "All Records",
-  "auditLogFilterBlocked": "Only Blocked",
-  "auditLogFilterThisHost": "Only Current Host",
-  "auditLogNoMatch": "No matching records",
-  "auditLogNoRecordsToCopy": "No records to copy",
-  "auditLogNotExecuted": "Not Executed",
-  "auditLogOutput": "Output",
-  "auditLogSafetyBlocked": "Blocked",
-  "auditLogSafetyDanger": "Danger",
-  "auditLogSafetySafe": "Safe",
-  "auditLogSafetyWarning": "Warning",
-  "auditLogSearchHint": "Search command, server, output...",
-  "auditLogTitle": "Audit Log",
+  "auditLogEmpty": "Записей об операциях пока нет",
+  "auditLogExecuted": "Выполнено",
+  "auditLogExportHeader": "# Экспорт записей операций",
+  "auditLogExportTime": "# Время экспорта: {time}",
+  "auditLogExportTotal": "# Общее количество элементов: {count}",
+  "auditLogFilterAll": "Все записи",
+  "auditLogFilterBlocked": "только заблокирован",
+  "auditLogFilterThisHost": "Только текущий хост",
+  "auditLogNoMatch": "Нет соответствующих записей",
+  "auditLogNoRecordsToCopy": "Нет записей для копирования",
+  "auditLogNotExecuted": "Не выполнено",
+  "auditLogOutput": "вывод",
+  "auditLogSafetyBlocked": "заблокирован",
+  "auditLogSafetyDanger": "опасность",
+  "auditLogSafetySafe": "безопасный",
+  "auditLogSafetyWarning": "предупреждение",
+  "auditLogSearchHint": "Команды поиска, серверы, выходные данные...",
+  "auditLogTitle": "Запись операции",
   "authMethod": "Способ аутентификации",
   "cancel": "Отмена",
-  "changeRecordAllTitle": "All Change Records",
-  "changeRecordConfirmRollback": "Confirm Rollback",
-  "changeRecordEmpty": "No change records",
-  "changeRecordEmptyHint": "Changes (such as installing, starting/stopping services) will be recorded automatically",
-  "changeRecordFailed": "Failed",
-  "changeRecordFilterAll": "All Records",
-  "changeRecordFilterRollbackable": "Only Rollbackable",
-  "changeRecordFilterThisHost": "Only Current Host",
-  "changeRecordHostNotConnected": "Server {hostId} is not connected, cannot roll back. Please connect to the server first.",
-  "changeRecordNotRollbackable": "This record does not support automatic rollback",
-  "changeRecordOriginalCommand": "Original command: {command}",
-  "changeRecordRollbackButton": "Rollback",
-  "changeRecordRollbackError": "Rollback error: {error}",
-  "changeRecordRollbackFailed": "Rollback failed: {stderr}",
-  "changeRecordRollbackFailedNoExec": "Rollback failed: cannot execute",
-  "changeRecordRollbackOnHost": "The following rollback command will be executed on server {hostName}:",
-  "changeRecordRollbackSuccess": "Rollback succeeded: {command}",
-  "changeRecordRolledBack": "Rolled Back",
-  "changeRecordRollingBack": "Rolling back: {command}",
-  "changeRecordSuccess": "Success",
-  "changeRecordTitle": "Change Records",
-  "changeRecordTypeFileOperation": "File Operation",
-  "changeRecordTypeInstall": "Install",
-  "changeRecordTypeModifyConfig": "Config Change",
-  "changeRecordTypeOther": "Other",
-  "changeRecordTypePermission": "Permission Change",
-  "changeRecordTypeRestartService": "Restart Service",
-  "changeRecordTypeStartService": "Start Service",
-  "changeRecordTypeStopService": "Stop Service",
-  "changeRecordTypeUninstall": "Uninstall",
+  "changeRecordAllTitle": "Вся история изменений",
+  "changeRecordConfirmRollback": "Подтвердить отзыв",
+  "changeRecordEmpty": "Записей об изменениях пока нет",
+  "changeRecordEmptyHint": "После внесения изменений (таких как установка, запуск и остановка служб) они будут автоматически записаны.",
+  "changeRecordFailed": "не удалось",
+  "changeRecordFilterAll": "Все записи",
+  "changeRecordFilterRollbackable": "Можно только отозвать",
+  "changeRecordFilterThisHost": "Только текущий хост",
+  "changeRecordHostNotConnected": "Сервер {hostId} не подключен и не может быть отозван. Пожалуйста, сначала подключитесь к этому серверу.",
+  "changeRecordNotRollbackable": "Эта запись не поддерживает автоматический отзыв",
+  "changeRecordOriginalCommand": "Исходная команда: {command}.",
+  "changeRecordRollbackButton": "Отмена",
+  "changeRecordRollbackError": "Ошибка отмены: {error}.",
+  "changeRecordRollbackFailed": "Не удалось отменить: {stderr}.",
+  "changeRecordRollbackFailedNoExec": "Не удалось отменить: невозможно выполнить.",
+  "changeRecordRollbackOnHost": "Команда отмены будет выполнена на сервере {hostName}:",
+  "changeRecordRollbackSuccess": "Отмена прошла успешно: {command}",
+  "changeRecordRolledBack": "Отозван",
+  "changeRecordRollingBack": "Отмена: {command}",
+  "changeRecordSuccess": "успех",
+  "changeRecordTitle": "История изменений",
+  "changeRecordTypeFileOperation": "Операции с файлами",
+  "changeRecordTypeInstall": "Установка",
+  "changeRecordTypeModifyConfig": "Изменить конфигурацию",
+  "changeRecordTypeOther": "Другие",
+  "changeRecordTypePermission": "Изменение разрешения",
+  "changeRecordTypeRestartService": "Перезапустить службу",
+  "changeRecordTypeStartService": "Запустить службу",
+  "changeRecordTypeStopService": "Остановить службу",
+  "changeRecordTypeUninstall": "Удалить",
   "changeRecords": "История изменений",
   "changeRecordsDesc": "Отслеживайте все изменения и откатывайте при сбоях",
   "changeWindow": "Безопасные часы",
-  "changeWindowAllDayAllowed": "Allowed all day",
-  "changeWindowAllowedWindow": "Allowed Window",
-  "changeWindowCrossDayHint": "Tip: A start time later than the end time means overnight (e.g., 22:00 to next day 06:00)",
-  "changeWindowCurrentWindowInfo": "Current allowed window: {window}\nCommands that make changes will be rejected at other times (read-only commands are not affected).",
+  "changeWindowAllDayAllowed": "разрешено весь день",
+  "changeWindowAllowedWindow": "Разрешенный период",
+  "changeWindowCrossDayHint": "Совет: время начала позже времени окончания, что означает, что оно пересекает ночь (например, с 22:00 до 06:00 следующего дня).",
+  "changeWindowCurrentWindowInfo": "Текущий разрешенный период: {window}.\nКоманды, вносящие изменения в другое время, будут отклонены (команды просмотра не затрагиваются).",
   "changeWindowDesc": "Ограничьте изменения заданными безопасными временными окнами",
-  "changeWindowEnable": "Enable Safe Window",
-  "changeWindowEnableHint": "When enabled, changes can only be made during the set window",
-  "changeWindowEndHour": "End hour",
-  "changeWindowEveryDay": "{window}, every day",
-  "changeWindowOnlyDays": "{window}, only {days}",
-  "changeWindowSaveConfig": "Save Config",
-  "changeWindowSaveFailed": "Save failed: {error}",
-  "changeWindowSaved": "Safe window settings saved",
-  "changeWindowStartHour": "Start hour",
-  "changeWindowTitle": "Safe Window",
-  "changeWindowToNextDay": "{start} to next day {end}",
-  "changeWindowWeekdayFri": "Fri",
-  "changeWindowWeekdayMon": "Mon",
-  "changeWindowWeekdaySat": "Sat",
-  "changeWindowWeekdaySun": "Sun",
-  "changeWindowWeekdayThu": "Thu",
-  "changeWindowWeekdayTue": "Tue",
-  "changeWindowWeekdayWed": "Wed",
-  "changeWindowWeekdaysTitle": "Which days are allowed (none = every day)",
-  "chatBackToServerList": "Back to server list",
-  "chatClearSession": "Clear session",
-  "chatConnectServerHint": "Please connect to a server first, then tap the AI button in the bottom right on the terminal page",
-  "chatEmptyHint": "e.g. install Docker, check memory usage",
-  "chatEmptyTitle": "How can I help you?",
-  "chatInputHint": "Type a command or question...",
-  "chatNeedTerminal": "AI assistant needs to be used in a terminal",
+  "changeWindowEnable": "Включить безопасные часы",
+  "changeWindowEnableHint": "После включения изменения можно будет вносить только в течение установленного периода времени.",
+  "changeWindowEndHour": "В какое время оно закончится?",
+  "changeWindowEveryDay": "{window}, каждый день",
+  "changeWindowOnlyDays": "{window}, только {days}",
+  "changeWindowSaveConfig": "Сохранить конфигурацию",
+  "changeWindowSaveFailed": "Не удалось сохранить: {error}.",
+  "changeWindowSaved": "Настройки безопасного времени сохранены.",
+  "changeWindowStartHour": "С какого времени это разрешено?",
+  "changeWindowTitle": "безопасный период",
+  "changeWindowToNextDay": "{start} на следующий день {end}",
+  "changeWindowWeekdayFri": "Пятница",
+  "changeWindowWeekdayMon": "понедельник",
+  "changeWindowWeekdaySat": "суббота",
+  "changeWindowWeekdaySun": "воскресенье",
+  "changeWindowWeekdayThu": "Четверг",
+  "changeWindowWeekdayTue": "вторник",
+  "changeWindowWeekdayWed": "среда",
+  "changeWindowWeekdaysTitle": "В какие дни разрешено (без выбора = каждый день)",
+  "chatBackToServerList": "Вернуться к списку серверов",
+  "chatClearSession": "очистить сеанс",
+  "chatConnectServerHint": "Сначала подключитесь к серверу, войдите на страницу терминала и нажмите кнопку AI в правом нижнем углу.",
+  "chatEmptyHint": "Например: установите Docker, проверьте использование памяти.",
+  "chatEmptyTitle": "Как я могу вам помочь?",
+  "chatInputHint": "Введите команду или вопрос...",
+  "chatNeedTerminal": "В терминале необходимо использовать AI Assistant.",
   "clearMessagesFailed": "Не удалось очистить сообщения",
   "close": "Закрыть",
-  "commonAIAssistant": "AI Assistant",
-  "commonAdvancedSettings": "Advanced Settings",
-  "commonAll": "All",
-  "commonBack": "Back",
-  "commonCancel": "Cancel",
-  "commonCommand": "Command",
-  "commonConfirm": "OK",
-  "commonCopiedToClipboard": "Copied to clipboard",
-  "commonDescription": "Description",
-  "commonExecute": "Execute",
-  "commonGotIt": "Got it",
-  "commonName": "Name",
-  "commonResetDefault": "Reset to Default",
-  "commonUnlimited": "Unlimited",
+  "commonAIAssistant": "ИИ-помощник",
+  "commonAdvancedSettings": "Расширенные настройки",
+  "commonAll": "Все",
+  "commonBack": "Возврат",
+  "commonCancel": "Отмена",
+  "commonCommand": "команда",
+  "commonConfirm": "ОК",
+  "commonCopiedToClipboard": "Скопировано в буфер обмена",
+  "commonDescription": "Описание",
+  "commonExecute": "выполнять",
+  "commonGotIt": "понял",
+  "commonName": "Имя",
+  "commonResetDefault": "сбросить настройки по умолчанию",
+  "commonUnlimited": "Безлимитный",
   "compactFailed": "Не удалось сжать диалог",
   "compacting": "Сжатие диалога...",
   "confirm": "Подтвердить",
@@ -206,107 +206,107 @@
   "fieldRequired": "Это поле обязательно",
   "followSystem": "Системная",
   "group": "Группа",
-  "hostEditAuthTypeLabel": "Authentication Method *",
-  "hostEditConfigSavedButCredFailed": "⚠️ Configuration saved, but {error}. Please retry.",
-  "hostEditConnectionTimeout": "Connection timeout: {timeout}s",
-  "hostEditDefaultGroup": "Default",
-  "hostEditEncodingLabel": "Character Encoding",
-  "hostEditGroupHint": "Enter or select a group",
-  "hostEditGroupLabel": "Group",
-  "hostEditHostHint": "IP address or domain",
-  "hostEditHostLabel": "Host Address *",
-  "hostEditHostRequired": "Please enter the host address",
-  "hostEditJumpAuthTypeLabel": "Jump Host Authentication",
-  "hostEditJumpHostFlowHint": "Will first connect to the jump host, then forward to the target server through it",
-  "hostEditJumpHostLabel": "Jump Host Address *",
-  "hostEditJumpPasswordLabel": "Jump Host Password",
-  "hostEditJumpPortLabel": "Jump Host Port",
-  "hostEditJumpPrivateKeyContent": "Jump Host Private Key Content",
-  "hostEditJumpUsernameLabel": "Jump Host Username",
-  "hostEditMoreSettings": "More Settings",
-  "hostEditNameHint": "e.g., Production Server",
-  "hostEditNameLabel": "Name *",
-  "hostEditNameRequired": "Please enter a name",
-  "hostEditPassphraseLabel": "Passphrase (optional)",
-  "hostEditPassword": "Password",
-  "hostEditPasswordSaveFailed": "Failed to save password",
-  "hostEditPastePrivateKey": "Paste Private Key",
-  "hostEditPastePrivateKeySubtitle": "Turn off to select from file",
-  "hostEditPortLabel": "Port",
-  "hostEditPrivateKey": "Private Key",
-  "hostEditPrivateKeyContent": "Private Key Content",
-  "hostEditPrivateKeyFileRead": "Private key file loaded: {name}",
-  "hostEditPrivateKeySaveFailed": "Failed to save private key",
-  "hostEditReadFileFailed": "Failed to read file: {error}",
-  "hostEditSave": "💾 Save",
-  "hostEditSaveSuccess": "✅ Saved successfully",
-  "hostEditSectionAuth": "Authentication",
-  "hostEditSectionBasic": "Basic Information",
-  "hostEditSectionGroupTag": "Group & Tag",
-  "hostEditSectionJumpHost": "Jump Host / Bastion",
-  "hostEditSectionSudo": "Privilege Escalation (sudo)",
-  "hostEditSelect": "Select",
-  "hostEditSelectGroupTooltip": "Select an existing group",
-  "hostEditSelectPrivateKeyFile": "Select Private Key File",
-  "hostEditSudoPasswordDesc": "Once configured, this password will be auto-filled when AI encounters a sudo password prompt. It is saved via system secure storage and never appears in commands or logs.",
-  "hostEditSudoPasswordHint": "Auto-injected when AI runs sudo commands",
-  "hostEditSudoPasswordLabel": "Sudo Password (optional)",
-  "hostEditTagColor": "Tag Color",
-  "hostEditTimeoutSeconds": "{timeout}s",
-  "hostEditTitleEdit": "Edit Server",
-  "hostEditTitleNew": "New Server",
-  "hostEditUseJumpHost": "Use Jump Host",
-  "hostEditUseJumpHostSubtitle": "Connect via jump host / bastion",
-  "hostEditUsernameLabel": "Username",
-  "hostListAITipIntro": "AI assistant is available after connecting to a server:",
-  "hostListAITipNote": "💡 AI can help you generate commands, explain output, and troubleshoot issues",
-  "hostListAITipStep1": "1️⃣  Tap a server card to open the terminal",
-  "hostListAITipStep2": "2️⃣  After connecting, the AI button appears in the bottom right",
-  "hostListAITipStep3": "3️⃣  Tap the AI button to start the smart command assistant",
-  "hostListAITipTitle": "AI assistant usage tips",
-  "hostListAddFirstServer": "Add your first server to start AI-assisted remote management",
-  "hostListClearSearch": "Clear search",
-  "hostListConnectTerminal": "Connect terminal",
-  "hostListDeleteConfirm": "Are you sure you want to delete \"{hostName}\"?\n\nSaved credentials will also be deleted.",
-  "hostListDeleteServer": "Delete server",
-  "hostListDeleteSuccess": "Deleted successfully",
-  "hostListEditConfig": "Edit configuration",
-  "hostListLoadFailed": "Failed to load: {error}",
-  "hostListNoSearchResults": "No matching servers found",
-  "hostListNoSearchResultsHint": "Try different keywords or check spelling",
-  "hostListNoServers": "No servers yet",
-  "hostListSearchHint": "Search servers...",
+  "hostEditAuthTypeLabel": "Метод аутентификации *",
+  "hostEditConfigSavedButCredFailed": "⚠️ Конфигурация успешно сохранена, но {error}, попробуйте еще раз.",
+  "hostEditConnectionTimeout": "Таймаут соединения: {timeout} секунд.",
+  "hostEditDefaultGroup": "По умолчанию",
+  "hostEditEncodingLabel": "кодировка символов",
+  "hostEditGroupHint": "Введите или выберите группу",
+  "hostEditGroupLabel": "Группа",
+  "hostEditHostHint": "IP-адрес или доменное имя",
+  "hostEditHostLabel": "Адрес хоста *",
+  "hostEditHostRequired": "Пожалуйста, введите адрес хоста",
+  "hostEditJumpAuthTypeLabel": "Метод аутентификации Spring Board",
+  "hostEditJumpHostFlowHint": "Сначала будет подключен трамплин-машина, а затем перенаправлен на целевой сервер через трамплин-машину.",
+  "hostEditJumpHostLabel": "Адрес машины трамплина *",
+  "hostEditJumpPasswordLabel": "Пароль трамплина",
+  "hostEditJumpPortLabel": "трамплин порт",
+  "hostEditJumpPrivateKeyContent": "Содержимое закрытого ключа машины Springboard",
+  "hostEditJumpUsernameLabel": "Имя пользователя трамплина",
+  "hostEditMoreSettings": "Дополнительные настройки",
+  "hostEditNameHint": "Например: производственный сервер",
+  "hostEditNameLabel": "Имя *",
+  "hostEditNameRequired": "Пожалуйста, введите имя",
+  "hostEditPassphraseLabel": "Пароль закрытого ключа (необязательно)",
+  "hostEditPassword": "Пароль",
+  "hostEditPasswordSaveFailed": "Не удалось сохранить пароль",
+  "hostEditPastePrivateKey": "Вставьте закрытый ключ",
+  "hostEditPastePrivateKeySubtitle": "Закрыть, затем выбрать из файла",
+  "hostEditPortLabel": "порт",
+  "hostEditPrivateKey": "закрытый ключ",
+  "hostEditPrivateKeyContent": "Содержимое закрытого ключа",
+  "hostEditPrivateKeyFileRead": "Чтение файла закрытого ключа: {name}.",
+  "hostEditPrivateKeySaveFailed": "Не удалось сохранить закрытый ключ.",
+  "hostEditReadFileFailed": "Не удалось прочитать файл: {error}.",
+  "hostEditSave": "💾 Сохранить",
+  "hostEditSaveSuccess": "✅ Сохранено успешно",
+  "hostEditSectionAuth": "Метод аутентификации",
+  "hostEditSectionBasic": "Основная информация",
+  "hostEditSectionGroupTag": "Группировка и маркировка",
+  "hostEditSectionJumpHost": "Трамплин/крепостная машина",
+  "hostEditSectionSudo": "Повышение привилегий (sudo)",
+  "hostEditSelect": "Выбрать",
+  "hostEditSelectGroupTooltip": "Выберите существующую группу",
+  "hostEditSelectPrivateKeyFile": "Выберите файл закрытого ключа",
+  "hostEditSudoPasswordDesc": "После настройки ИИ автоматически введет этот пароль при появлении запроса на ввод пароля при выполнении команды sudo. Пароли сохраняются в безопасном хранилище системы и не отображаются в командах или журналах.",
+  "hostEditSudoPasswordHint": "ИИ автоматически внедряется при выполнении команды sudo",
+  "hostEditSudoPasswordLabel": "пароль sudo (необязательно)",
+  "hostEditTagColor": "Цвет этикетки",
+  "hostEditTimeoutSeconds": "{timeout} секунд",
+  "hostEditTitleEdit": "Редактировать сервер",
+  "hostEditTitleNew": "Создать новый сервер",
+  "hostEditUseJumpHost": "Используйте пружинную машину",
+  "hostEditUseJumpHostSubtitle": "Подключение через хост-трамплин/бастион",
+  "hostEditUsernameLabel": "Имя пользователя",
+  "hostListAITipIntro": "AI-помощник необходимо использовать после подключения к серверу:",
+  "hostListAITipNote": "💡 ИИ может помочь вам генерировать команды, интерпретировать выходные данные и устранять проблемы.",
+  "hostListAITipStep1": "1️⃣ Нажмите на карточку сервера, чтобы войти в терминал",
+  "hostListAITipStep2": "2️⃣ После успешного подключения в правом нижнем углу появится кнопка AI.",
+  "hostListAITipStep3": "3️⃣ Нажмите кнопку AI, чтобы запустить интеллектуального командного помощника.",
+  "hostListAITipTitle": "Советы по использованию AI-помощника",
+  "hostListAddFirstServer": "Добавьте свой первый сервер и начните удаленное управление с помощью искусственного интеллекта.",
+  "hostListClearSearch": "Очистить поиск",
+  "hostListConnectTerminal": "Подключить терминал",
+  "hostListDeleteConfirm": "Вы уверены, что хотите удалить \"{hostName}\"?\n\nСохраненные учетные данные также будут удалены.",
+  "hostListDeleteServer": "Удалить сервер",
+  "hostListDeleteSuccess": "Удалить успешно",
+  "hostListEditConfig": "Изменить конфигурацию",
+  "hostListLoadFailed": "Не удалось загрузить: {error}.",
+  "hostListNoSearchResults": "Подходящий сервер не найден",
+  "hostListNoSearchResultsHint": "Попробуйте другие ключевые слова или проверьте правописание.",
+  "hostListNoServers": "Сервера пока нет",
+  "hostListSearchHint": "Поисковый сервер...",
   "language": "Язык",
   "languageDesc": "Выбор языка интерфейса",
-  "languageDialogTitle": "Select Language",
-  "languageFollowSystem": "Follow System",
+  "languageDialogTitle": "Выберите язык",
+  "languageFollowSystem": "Следуйте системе",
   "lightMode": "Светлая",
   "messageSaveFailed": "Не удалось сохранить сообщение, задача не запущена",
   "name": "Имя",
   "nickname": "Псевдоним",
   "noCredentials": "❌ Учётные данные не найдены\n\nОтредактируйте сервер и введите пароль или приватный ключ.",
-  "notificationAlways": "Every time",
-  "notificationAlwaysSubtitle": "Send a notification when a task finishes or fails",
-  "notificationEnable": "Enable task completion notifications",
-  "notificationEnableHint": "Automatically send a message when a task finishes or fails",
-  "notificationEnterUrlFirst": "Please fill in the notification URL first",
-  "notificationFailedOnly": "Only on failure",
-  "notificationFailedOnlySubtitle": "Only send a notification when a task fails",
-  "notificationInstructionsBody": "1. Add a \"bot\" in your DingTalk/Feishu/WeCom group to get the webhook URL\n2. Paste the URL into the input box above\n3. Click \"Send test notification\" to check if you can receive it\n4. From now on, a message will be sent to the group automatically when a task finishes or fails",
-  "notificationInstructionsTitle": "Instructions",
-  "notificationInvalidUrl": "Invalid URL format: {error}",
-  "notificationSaveConfig": "Save Config",
-  "notificationSaveFailed": "Save failed: {error}",
-  "notificationSaved": "Notification settings saved",
-  "notificationSendTest": "Send test notification",
-  "notificationSending": "Sending...",
-  "notificationTestFailed": "Test failed: {error}",
-  "notificationTestSendFailed": "Send failed, please check the notification URL",
-  "notificationTestSent": "Test notification sent, please check your group",
-  "notificationTitle": "Task Completion Notifications",
-  "notificationTriggerTitle": "When to send notifications",
-  "notificationWebhookSupport": "Supports: DingTalk, Feishu, WeCom group, Slack, etc.",
-  "notificationWebhookUrl": "Webhook URL",
+  "notificationAlways": "Уведомлять каждый раз",
+  "notificationAlwaysSubtitle": "Отправляйте уведомления, когда задачи выполнены или не выполнены",
+  "notificationEnable": "Включить уведомления о завершении задач",
+  "notificationEnableHint": "Автоматически отправлять сообщения, когда задачи выполнены или не выполнены",
+  "notificationEnterUrlFirst": "Пожалуйста, сначала заполните адрес для уведомления",
+  "notificationFailedOnly": "Уведомлять только о сбоях",
+  "notificationFailedOnlySubtitle": "Отправлять уведомление только в случае сбоя задачи",
+  "notificationInstructionsBody": "1. Добавьте «робота» в группу DingTalk/Feishu/Enterprise WeChat и получите адрес уведомления.\n2. Вставьте адрес в поле ввода выше.\n3. Нажмите «Отправить тестовое уведомление», чтобы узнать, сможете ли вы его получить.\n4. Когда задача будет выполнена или не выполнена в будущем, в группу будет автоматически отправлено сообщение.",
+  "notificationInstructionsTitle": "Инструкция по применению",
+  "notificationInvalidUrl": "Неправильный формат адреса: {error}.",
+  "notificationSaveConfig": "Сохранить конфигурацию",
+  "notificationSaveFailed": "Не удалось сохранить: {error}.",
+  "notificationSaved": "Конфигурация уведомлений сохранена.",
+  "notificationSendTest": "Отправить тестовое уведомление",
+  "notificationSending": "Отправка...",
+  "notificationTestFailed": "Тест не пройден: {error}",
+  "notificationTestSendFailed": "Не удалось отправить, проверьте адрес уведомления.",
+  "notificationTestSent": "Уведомление о тестировании отправлено. Чтобы просмотреть его, зайдите в группу.",
+  "notificationTitle": "Уведомление о завершении задачи",
+  "notificationTriggerTitle": "когда отправлять уведомление",
+  "notificationWebhookSupport": "Поддержка: DingTalk, Feishu, корпоративная группа WeChat, Slack и т. д.",
+  "notificationWebhookUrl": "Адрес уведомления",
   "notifications": "Уведомления",
   "notificationsDesc": "Получайте сообщение по завершении задач",
   "ok": "ОК",
@@ -319,146 +319,146 @@
   "quickCommands": "Сниппеты",
   "quickCommandsDesc": "Сохраняйте частые команды для выполнения в один тап",
   "retry": "Повторить",
-  "runbookBuiltinCannotDelete": "Built-in templates cannot be deleted",
-  "runbookBuiltinNotEditable": "Built-in templates are not editable. Use \"Clone\" to create a copy and modify it.",
-  "runbookBuiltinTag": "Built-in",
-  "runbookCategoryCustom": "Custom",
-  "runbookCategoryDeployment": "Deployment",
-  "runbookCategoryInspection": "Inspection",
-  "runbookCategoryMaintenance": "Maintenance",
-  "runbookCategorySecurity": "Security",
-  "runbookCategoryTroubleshooting": "Troubleshooting",
-  "runbookClipboardEmpty": "Clipboard is empty",
-  "runbookCloneTooltip": "Clone",
-  "runbookClonedToast": "Cloned as custom runbook: {name}",
-  "runbookContentAgent": "Prompt Content",
-  "runbookContentAgentHint": "e.g., Check disk usage of '{host}' and provide suggestions",
-  "runbookContentCommand": "Command Content",
-  "runbookContentCommandHint": "e.g., ssh '{user}'@'{host}' df -h",
-  "runbookContentRequired": "Please enter the content",
-  "runbookCreate": "Create",
-  "runbookDeleteConfirm": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
-  "runbookDeleteTitle": "Delete Runbook",
-  "runbookDeleteTooltip": "Delete",
-  "runbookDeletedToast": "Deleted",
-  "runbookEditTitle": "Edit Runbook",
-  "runbookEditTooltip": "Edit",
-  "runbookEmptyFiltered": "No matching runbooks. Try adjusting the filters.",
-  "runbookEmptyHint": "Tap the bottom-right button to create a runbook",
-  "runbookEmptyTitle": "No runbooks yet",
-  "runbookFieldCategory": "Category",
-  "runbookFieldDescription": "Description (optional)",
-  "runbookFieldIcon": "Icon",
-  "runbookFieldName": "Name",
-  "runbookFieldType": "Type",
-  "runbookFilterAll": "All",
-  "runbookImportButton": "Import",
-  "runbookImportHint": "Copy JSON from the official open platform and paste it here",
-  "runbookImportPasteHint": "Paste JSON content here…",
-  "runbookImportSuccess": "Successfully imported {count} runbooks",
-  "runbookImportTitle": "Import Runbooks",
-  "runbookImportTooltip": "Import Runbook",
-  "runbookJsonParseFailed": "JSON parse failed: {error}",
-  "runbookNameRequired": "Please enter a name",
-  "runbookNewTitle": "New Runbook",
-  "runbookPasteFromClipboard": "Paste from Clipboard",
-  "runbookPasteJsonFirst": "Please paste JSON content first",
-  "runbookRunCount": "Run {count} times",
-  "runbookSearchHint": "Search runbook name or description",
-  "runbookTitle": "Runbooks",
-  "runbookTypeAgentDesc": "Natural language prompt, executed by AI via ReAct framework",
-  "runbookTypeAgentOption": "AI Execute",
-  "runbookTypeAgentTag": "AI Execute",
-  "runbookTypeCommand": "Direct Execute",
-  "runbookTypeCommandDesc": "Execute commands directly in terminal after variable substitution",
-  "runbookUseInTerminal": "Please use this in the terminal page",
+  "runbookBuiltinCannotDelete": "Встроенные шаблоны невозможно удалить.",
+  "runbookBuiltinNotEditable": "Встроенный шаблон нельзя редактировать. Используйте «клон», чтобы создать копию, а затем измените ее.",
+  "runbookBuiltinTag": "Встроенный",
+  "runbookCategoryCustom": "Настроить",
+  "runbookCategoryDeployment": "развернуть",
+  "runbookCategoryInspection": "Инспекция",
+  "runbookCategoryMaintenance": "Текущее техническое обслуживание",
+  "runbookCategorySecurity": "безопасный",
+  "runbookCategoryTroubleshooting": "Устранение неполадок",
+  "runbookClipboardEmpty": "Буфер обмена пуст",
+  "runbookCloneTooltip": "клонировать",
+  "runbookClonedToast": "Клонировать как пользовательский рабочий процесс: {name}",
+  "runbookContentAgent": "Подскажите контент",
+  "runbookContentAgentHint": "Пример: проверьте использование диска «{host}» и дайте предложения.",
+  "runbookContentCommand": "Содержимое команды",
+  "runbookContentCommandHint": "Например: ssh '{user}'@'{host}' df -h",
+  "runbookContentRequired": "Пожалуйста, введите содержание",
+  "runbookCreate": "создавать",
+  "runbookDeleteConfirm": "Вы уверены, что хотите удалить \"{name}\"? Это действие невозможно отменить.",
+  "runbookDeleteTitle": "Удалить рабочий процесс",
+  "runbookDeleteTooltip": "Удалить",
+  "runbookDeletedToast": "Удалено",
+  "runbookEditTitle": "Редактировать рабочий процесс",
+  "runbookEditTooltip": "Редактировать",
+  "runbookEmptyFiltered": "Нет подходящего рабочего процесса, попробуйте настроить условия фильтра.",
+  "runbookEmptyHint": "Нажмите кнопку в правом нижнем углу, чтобы создать новый рабочий процесс.",
+  "runbookEmptyTitle": "Пока нет рабочего процесса по эксплуатации и техническому обслуживанию",
+  "runbookFieldCategory": "Классификация",
+  "runbookFieldDescription": "Описание (необязательно)",
+  "runbookFieldIcon": "значок",
+  "runbookFieldName": "Имя",
+  "runbookFieldType": "Тип",
+  "runbookFilterAll": "Все",
+  "runbookImportButton": "импортировать",
+  "runbookImportHint": "Скопируйте JSON с официального сайта открытой платформы и вставьте сюда.",
+  "runbookImportPasteHint": "Вставьте сюда содержимое JSON…",
+  "runbookImportSuccess": "Успешно импортированы рабочие процессы {count}.",
+  "runbookImportTitle": "Рабочий процесс импорта и обслуживания",
+  "runbookImportTooltip": "Импорт рабочего процесса",
+  "runbookJsonParseFailed": "Не удалось выполнить синтаксический анализ JSON: {error}.",
+  "runbookNameRequired": "Пожалуйста, введите имя",
+  "runbookNewTitle": "Новый рабочий процесс",
+  "runbookPasteFromClipboard": "Вставить из буфера обмена",
+  "runbookPasteJsonFirst": "Пожалуйста, сначала вставьте содержимое JSON",
+  "runbookRunCount": "Выполнено {count} раз.",
+  "runbookSearchHint": "Поиск имени или описания рабочего процесса",
+  "runbookTitle": "Рабочий процесс эксплуатации и технического обслуживания",
+  "runbookTypeAgentDesc": "Подсказка на естественном языке, AI выполняется в соответствии с фреймворком ReAct.",
+  "runbookTypeAgentOption": "Исполнение ИИ",
+  "runbookTypeAgentTag": "Исполнение ИИ",
+  "runbookTypeCommand": "Прямое исполнение",
+  "runbookTypeCommandDesc": "После подстановки переменных выполните команду прямо в терминале",
+  "runbookUseInTerminal": "Пожалуйста, используйте его на странице терминала",
   "runbooks": "Ранбуки",
   "runbooksDesc": "Превратите рутинные операции в переиспользуемые шаблоны",
   "save": "Сохранить",
   "scrollToBottom": "Прокрутить вниз",
   "search": "Поиск",
-  "securityAllDataCleared": "All data has been cleared",
-  "securityAppLockSubtitleOff": "When disabled, no verification is needed to open the app",
-  "securityAppLockSubtitleOn": "Opening the app requires {biometricType} or password",
-  "securityAuditLogSubtitle": "View the execution record of each command",
-  "securityAuditLogTitle": "Audit Log",
-  "securityAuthenticateReason": "Verify your identity to enable app lock",
-  "securityBiometricFaceId": "Face ID",
-  "securityBiometricFingerprint": "Fingerprint",
-  "securityBiometricGeneric": "Biometrics",
-  "securityBiometricNotSupported": "⚠️ Device does not support fingerprint or face ID",
-  "securityBiometricStatusTitle": "Fingerprint / Face ID Status",
-  "securityBiometricSupported": "✅ Supports {biometricType}",
-  "securityClearAllData": "Clear All Data",
-  "securityClearAllDataSubtitle": "Delete all servers, chat history, and passwords (irreversible)",
-  "securityClearConfirmPrompt": "Please type DELETE to confirm:",
-  "securityClearFailed": "Clear failed: {error}",
-  "securityClearIrreversible": "This action cannot be undone!",
-  "securityClearItemAiModels": "• AI model settings",
-  "securityClearItemChats": "• Chat history",
-  "securityClearItemPasswords": "• All passwords",
-  "securityClearItemServers": "• Server list",
-  "securityClearItemSnippets": "• Quick commands",
-  "securityClearWarning": "This action will delete all data, including:",
-  "securityConfirmDelete": "Confirm Delete",
-  "securityDangerAction": "⚠️ Dangerous Action",
-  "securityEnableAppLock": "Enable App Lock",
+  "securityAllDataCleared": "Все данные удалены",
+  "securityAppLockSubtitleOff": "Открытие приложения после закрытия не требует проверки",
+  "securityAppLockSubtitleOn": "Для открытия приложения требуется {biometricType} или пароль.",
+  "securityAuditLogSubtitle": "Просмотр записи выполнения каждой команды",
+  "securityAuditLogTitle": "Запись операции",
+  "securityAuthenticateReason": "Пройдите аутентификацию, чтобы включить блокировку приложений.",
+  "securityBiometricFaceId": "Идентификатор лица",
+  "securityBiometricFingerprint": "отпечаток пальца",
+  "securityBiometricGeneric": "Биометрия",
+  "securityBiometricNotSupported": "⚠️ Устройство не поддерживает отпечаток пальца или лицо.",
+  "securityBiometricStatusTitle": "Статус отпечатка пальца/лица",
+  "securityBiometricSupported": "✅ Поддержка {biometricType}",
+  "securityClearAllData": "Очистить все данные",
+  "securityClearAllDataSubtitle": "Удалить все серверы, историю чатов, пароли (не подлежат восстановлению)",
+  "securityClearConfirmPrompt": "Пожалуйста, введите DELETE для подтверждения:",
+  "securityClearFailed": "Очистить не удалось: {error}",
+  "securityClearIrreversible": "Это действие невозможно отменить!",
+  "securityClearItemAiModels": "• Настройки модели ИИ",
+  "securityClearItemChats": "• История чата",
+  "securityClearItemPasswords": "• Все пароли",
+  "securityClearItemServers": "• Список серверов",
+  "securityClearItemSnippets": "• Быстрые команды",
+  "securityClearWarning": "Эта операция удалит все данные, включая:",
+  "securityConfirmDelete": "Подтвердить удаление",
+  "securityDangerAction": "⚠️Опасная операция",
+  "securityEnableAppLock": "Включить блокировку приложения",
   "securitySettings": "Безопасность",
   "securitySettingsDesc": "Разблокировка приложения по отпечатку или Face ID",
-  "securityTitle": "Security Settings",
+  "securityTitle": "Настройки безопасности",
   "selectFile": "Выбрать файл",
   "send": "Отправить",
   "serverList": "Серверы",
   "serverListDesc": "Добавление и управление удалёнными серверами",
   "settings": "Настройки",
-  "settingsAI": "AI & Intelligence",
-  "settingsAIModel": "AI Model Config",
-  "settingsAIModelDesc": "Configure AI API key and model",
-  "settingsAbout": "About",
-  "settingsAboutApp": "About AI Terminal",
-  "settingsAgent": "Agent Settings",
-  "settingsAgentDesc": "Max auto-execute steps (0 = unlimited: {steps})",
-  "settingsAppearance": "Appearance",
-  "settingsAppearanceSettings": "Appearance",
-  "settingsAppearanceSettingsDesc": "Switch dark/light mode, adjust font size",
-  "settingsAuditLog": "Activity Log",
-  "settingsAuditLogDesc": "Records who ran each command and when",
-  "settingsChangeRecords": "Change Records",
-  "settingsChangeRecordsDesc": "Track all changes, undo if something goes wrong",
-  "settingsChangeWindow": "Safe Hours",
-  "settingsChangeWindowDesc": "Set safe time windows; changes blocked outside them",
-  "settingsCheckUpdate": "Check for Updates",
-  "settingsConnection": "Connections",
-  "settingsHosts": "Servers",
-  "settingsHostsDesc": "Add and edit remote servers to connect to",
-  "settingsLanguage": "Language",
-  "settingsLanguageDesc": "Choose interface language",
-  "settingsNotification": "Task Notifications",
-  "settingsNotificationDesc": "Get notified when a task finishes",
-  "settingsRunbooks": "Runbooks",
-  "settingsRunbooksDesc": "Turn common ops tasks into templates, run in one tap",
-  "settingsSecurity": "Security",
-  "settingsSecurityDesc": "Unlock the app with fingerprint or Face ID",
-  "settingsSnippets": "Snippets",
-  "settingsSnippetsDesc": "Save frequently used commands for one-tap execution",
-  "settingsTitle": "Settings",
-  "settingsVersion": "Version 1.4.3",
+  "settingsAI": "ИИ и интеллект",
+  "settingsAIModel": "Конфигурация модели ИИ",
+  "settingsAIModelDesc": "Настройка ключей и моделей для ИИ",
+  "settingsAbout": "О",
+  "settingsAboutApp": "Об AI-терминале",
+  "settingsAgent": "Настройки агента",
+  "settingsAgentDesc": "Максимальное количество шагов, которые ИИ может выполнить автоматически (0 = нет ограничений: {steps})",
+  "settingsAppearance": "Внешний вид и опыт",
+  "settingsAppearanceSettings": "Настройки внешнего вида",
+  "settingsAppearanceSettingsDesc": "Переключение темного/светлого режима, настройка размера шрифта",
+  "settingsAuditLog": "Запись операции",
+  "settingsAuditLogDesc": "Запишите, кто и когда выполнил каждую команду.",
+  "settingsChangeRecords": "История изменений",
+  "settingsChangeRecordsDesc": "Все изменения записываются и могут быть отменены, если что-то пойдет не так.",
+  "settingsChangeWindow": "безопасный период",
+  "settingsChangeWindowDesc": "Установите безопасный период и запретите изменения в другое время.",
+  "settingsCheckUpdate": "Проверьте наличие обновлений",
+  "settingsConnection": "Управление соединениями",
+  "settingsHosts": "Список серверов",
+  "settingsHostsDesc": "Добавьте и отредактируйте сервер, к которому вы хотите подключиться удаленно.",
+  "settingsLanguage": "Язык",
+  "settingsLanguageDesc": "Выберите язык интерфейса",
+  "settingsNotification": "Уведомление о завершении задачи",
+  "settingsNotificationDesc": "Автоматически отправлять сообщение, уведомляющее вас после завершения задачи.",
+  "settingsRunbooks": "Рабочий процесс эксплуатации и технического обслуживания",
+  "settingsRunbooksDesc": "Сохраняйте общие операции по эксплуатации и техническому обслуживанию в виде шаблонов и запускайте их одним щелчком мыши.",
+  "settingsSecurity": "Настройки безопасности",
+  "settingsSecurityDesc": "Разблокировка приложений с помощью отпечатка пальца или лица",
+  "settingsSnippets": "Ярлыки команд",
+  "settingsSnippetsDesc": "Сохраняйте часто используемые команды и в следующий раз выполняйте их одним щелчком мыши.",
+  "settingsTitle": "настройки",
+  "settingsVersion": "Версия 1.4.3",
   "simplifiedChinese": "简体中文",
-  "snippetCommandHint": "e.g., docker exec -it '{container}' /bin/bash",
-  "snippetCommandLabel": "Command:",
-  "snippetCommandRequired": "Please enter the command",
-  "snippetCopyCommand": "Copy Command",
-  "snippetDeleteConfirm": "Are you sure you want to delete \"{name}\"?",
-  "snippetDeleteTitle": "Delete Snippet",
-  "snippetEditTitle": "Edit Snippet",
-  "snippetEmptyHint": "Tap the button below to add one",
-  "snippetEmptyTitle": "No snippets yet",
-  "snippetFieldCommand": "Command",
-  "snippetFieldDescription": "Description (optional)",
-  "snippetNameRequired": "Please enter a name",
-  "snippetNewTitle": "New Snippet",
-  "snippetResolvedCommand": "Command: {command}",
-  "snippetTitle": "Snippets",
+  "snippetCommandHint": "Например: docker exec -it '{container}' /bin/bash",
+  "snippetCommandLabel": "Команда:",
+  "snippetCommandRequired": "Пожалуйста, введите команду",
+  "snippetCopyCommand": "команда копирования",
+  "snippetDeleteConfirm": "Вы уверены, что хотите удалить \"{name}\"?",
+  "snippetDeleteTitle": "Удалить команду",
+  "snippetEditTitle": "Команда редактирования",
+  "snippetEmptyHint": "Нажмите кнопку ниже, чтобы добавить",
+  "snippetEmptyTitle": "Ярлыка команды пока нет",
+  "snippetFieldCommand": "команда",
+  "snippetFieldDescription": "Описание (необязательно)",
+  "snippetNameRequired": "Пожалуйста, введите имя",
+  "snippetNewTitle": "Новая команда",
+  "snippetResolvedCommand": "Команда: {command}",
+  "snippetTitle": "Ярлыки команд",
   "taskAborted": "⚠️ Задача прервана",
   "taskCancelled": "⚠️ Задача отменена",
   "taskCompleted": "Задача завершена",
@@ -466,65 +466,65 @@
   "taskFailed": "Задача не удалась",
   "taskMaxSteps": "Достигнут максимум шагов, задача прервана",
   "taskTerminated": "Задача прекращена",
-  "terminalAgentLog": "Agent log",
-  "terminalClearScreen": "Clear screen",
-  "terminalCloseTabConfirm": "Closing this tab will cancel the running task. Are you sure?",
-  "terminalCollapseAIPanel": "Collapse AI panel",
-  "terminalCollapseMonitorPanel": "Collapse monitor panel",
-  "terminalCommandLabel": "Command: {command}",
-  "terminalCommandTemplate": "Command template:",
-  "terminalCompactingHistory": "AI is compressing conversation history",
-  "terminalCompactionDone": "Memory compression completed",
-  "terminalCompactionFailed": "Compression failed: {error}",
-  "terminalConfigure": "Configure",
-  "terminalConnectHostFailed": "Failed to connect to {hostName}: {error}",
-  "terminalConnectTerminalFirst": "Please connect to a terminal first",
-  "terminalConnectTerminalForCommand": "Please connect to a terminal before executing commands",
-  "terminalConnectTerminalForRunbook": "Please connect to a terminal (SSH or local) before using runbooks",
-  "terminalConnected": "Connected",
-  "terminalConnecting": "Connecting to {host}...",
-  "terminalCreateNew": "+ New",
-  "terminalExitOrchestrator": "Exit orchestration mode",
-  "terminalExpandAIPanel": "Expand AI panel",
-  "terminalExpandMonitorPanel": "Expand monitor panel",
-  "terminalFillVariables": "Fill variables - {name}",
+  "terminalAgentLog": "Журнал агента",
+  "terminalClearScreen": "очистить экран",
+  "terminalCloseTabConfirm": "Закрытие этой вкладки приведет к отмене запущенных задач. Вы уверены, что хотите закрыть его?",
+  "terminalCollapseAIPanel": "Свернуть панель ИИ",
+  "terminalCollapseMonitorPanel": "Закрыть панель мониторинга",
+  "terminalCommandLabel": "Команда: {command}",
+  "terminalCommandTemplate": "Шаблон команды:",
+  "terminalCompactingHistory": "ИИ сжимает исторические разговоры",
+  "terminalCompactionDone": "Сжатие памяти завершено",
+  "terminalCompactionFailed": "Ошибка сжатия: {error}.",
+  "terminalConfigure": "Конфигурация",
+  "terminalConnectHostFailed": "Не удалось подключиться к {hostName}: {error}.",
+  "terminalConnectTerminalFirst": "Пожалуйста, сначала подключите терминал",
+  "terminalConnectTerminalForCommand": "Сначала подключитесь к терминалу, а затем выполните команду",
+  "terminalConnectTerminalForRunbook": "Пожалуйста, подключитесь к терминалу (SSH или локальному терминалу) перед использованием рабочего процесса эксплуатации и обслуживания.",
+  "terminalConnected": "Подключено",
+  "terminalConnecting": "Подключение {host}...",
+  "terminalCreateNew": "+ Новый",
+  "terminalExitOrchestrator": "Выйти из режима оркестрации",
+  "terminalExpandAIPanel": "Развернуть панель ИИ",
+  "terminalExpandMonitorPanel": "Развернуть панель мониторинга",
+  "terminalFillVariables": "Заполняем переменные - {name}",
   "terminalFontSize": "Размер шрифта терминала: {size}px",
-  "terminalHostNoCredentials": "{hostName} has no credentials configured. Please edit the server first.",
-  "terminalHostNotFound": "Host not found",
-  "terminalInputHintDefault": "Describe your request, Agent will execute automatically...",
-  "terminalInputHintDisconnected": "Available after connecting to a terminal",
-  "terminalInputHintEmpty": "Type a request to start auto-execution...",
-  "terminalInputHintOrchestrator": "Multi-host orchestration mode: describe cross-host tasks, e.g. \"sync time on all servers\"",
-  "terminalInputHintRunning": "Agent is running...",
-  "terminalLayoutBottom": "Bottom",
-  "terminalLayoutRight": "Right",
-  "terminalLocalStartFailed": "Failed to start local terminal",
-  "terminalLocalStartFailedWithError": "Failed to start local terminal: {error}",
-  "terminalManage": "Manage",
-  "terminalModel": "Model",
-  "terminalMonitor": "Monitor",
-  "terminalNewConnection": "New connection",
-  "terminalNoHostsSaved": "No saved hosts\nPlease add a server on the home page first",
-  "terminalNoRunbooks": "No runbooks available",
-  "terminalNoRunbooksHint": "Click \"Manage\" to create a runbook",
+  "terminalHostNoCredentials": "{hostName} Учетные данные не настроены, сначала отредактируйте сервер.",
+  "terminalHostNotFound": "Хост не существует",
+  "terminalInputHintDefault": "Опишите требования, и Агент автоматически выполнит...",
+  "terminalInputHintDisconnected": "Доступно после подключения к терминалу",
+  "terminalInputHintEmpty": "Введите требования, чтобы начать автоматическое выполнение...",
+  "terminalInputHintOrchestrator": "Режим оркестрации нескольких компьютеров: описывает задачи между хостами, такие как «синхронизация времени всего сервера».",
+  "terminalInputHintRunning": "Агент выполняет...",
+  "terminalLayoutBottom": "вниз",
+  "terminalLayoutRight": "правильно",
+  "terminalLocalStartFailed": "Локальный терминал не удалось запустить",
+  "terminalLocalStartFailedWithError": "Не удалось запустить локальный терминал: {error}.",
+  "terminalManage": "управление",
+  "terminalModel": "модель",
+  "terminalMonitor": "Монитор",
+  "terminalNewConnection": "новое соединение",
+  "terminalNoHostsSaved": "Еще нет сохраненных хостов\nПожалуйста, сначала добавьте сервер на главную страницу",
+  "terminalNoRunbooks": "Пока нет рабочего процесса по эксплуатации и техническому обслуживанию",
+  "terminalNoRunbooksHint": "Нажмите «Управление», чтобы создать новый рабочий процесс.",
   "terminalNotConnected": "Сначала подключите терминал для использования автоматического режима",
   "terminalNotReady": "Терминал не подключён, сначала подключитесь",
-  "terminalOffline": "Offline",
-  "terminalOrchestratorConnected": "{connected}/{total} connected",
-  "terminalOrchestratorHostList": "Multi-host orchestration · Host list",
-  "terminalOrchestratorMode": "Orchestrate · {connected}/{total}",
-  "terminalReadOnlyOff": "Read-only mode (Dry-run)",
-  "terminalReadOnlyOn": "Read-only mode is on (click to turn off)",
-  "terminalReconnect": "Reconnect",
-  "terminalRoleYou": "You",
-  "terminalRunbookTemplates": "Runbook templates",
-  "terminalRunbookTypeCommand": "Command",
-  "terminalSelectServerForNewTab": "Select a server to connect in a new tab",
-  "terminalSessionCreated": "New session created",
-  "terminalSessionHistory": "Session history",
-  "terminalStatusNotConnected": "Not connected",
-  "terminalTaskRunning": "Task is running",
-  "terminalUnfilledVariables": "Some variables are unfilled. Execution cancelled.",
+  "terminalOffline": "Оффлайн",
+  "terminalOrchestratorConnected": "{connected}/{total} подключено",
+  "terminalOrchestratorHostList": "Многомашинная оркестровка · Список хостов",
+  "terminalOrchestratorMode": "Аранжировка · {connected}/{total}",
+  "terminalReadOnlyOff": "Режим только для чтения (пробный прогон)",
+  "terminalReadOnlyOn": "Режим только для чтения включен (нажмите, чтобы закрыть)",
+  "terminalReconnect": "Восстановить соединение",
+  "terminalRoleYou": "ты",
+  "terminalRunbookTemplates": "Шаблон эксплуатации и технического обслуживания",
+  "terminalRunbookTypeCommand": "команда",
+  "terminalSelectServerForNewTab": "Выберите подключение к новой вкладке сервера",
+  "terminalSessionCreated": "Новый сеанс создан",
+  "terminalSessionHistory": "история сеансов",
+  "terminalStatusNotConnected": "Не подключено",
+  "terminalTaskRunning": "Задача выполняется",
+  "terminalUnfilledVariables": "Имеются незаполненные переменные, и выполнение отменено.",
   "testConnection": "Проверить подключение",
   "themeMode": "Режим темы",
   "thinkingNextStep": "🤔 Обдумываю следующий шаг...",
@@ -1227,59 +1227,2660 @@
       }
     }
   },
-  "aiEndpointAdd": "Add endpoint",
-  "aiEndpointEditTitle": "Edit endpoint",
-  "aiEndpointDeleteTitle": "Delete endpoint",
-  "aiEndpointDeleteConfirm": "Delete \"{name}\" and its {count} model(s)?",
-  "aiEndpointApiKey": "API key",
-  "aiEndpointApiKeyHint": "Leave blank to keep the saved key",
-  "aiEndpointBaseUrl": "API URL",
-  "aiEndpointProtocol": "API protocol",
+  "aiEndpointAdd": "Добавить конечную точку",
+  "aiEndpointEditTitle": "Изменить конечную точку",
+  "aiEndpointDeleteTitle": "Удалить конечную точку",
+  "aiEndpointDeleteConfirm": "Вы уверены, что хотите удалить конечную точку «{name}» и ее модели {count}?",
+  "aiEndpointApiKey": "API-ключ",
+  "aiEndpointApiKeyHint": "Оставьте поле пустым, чтобы использовать сохраненные учетные данные.",
+  "aiEndpointBaseUrl": "API-адрес",
+  "aiEndpointProtocol": "API-протокол",
   "aiEndpointProtocolOpenai": "OpenAI Chat Completions",
-  "aiEndpointProtocolErnie": "Baidu ERNIE",
-  "aiEndpointCustomSettings": "Custom settings",
-  "aiEndpointModels": "Model catalog",
-  "aiEndpointModelsCount": "{count} models",
-  "aiEndpointRestoreDefaults": "Restore defaults",
-  "aiEndpointFetchModels": "Fetch available models",
-  "aiEndpointAddModel": "Add model",
-  "aiEndpointNoModels": "No models yet. Add one or fetch available models.",
-  "aiEndpointRestoreConfirm": "Replace the current catalog with default models for \"{provider}\"?",
-  "aiEndpointRestoreUnavailable": "This provider has no built-in default models",
-  "aiEndpointFetchSuccess": "Added {count} models",
-  "aiEndpointFetchNone": "No models available to add",
-  "aiEndpointFetchFailed": "Failed to fetch models: {error}",
-  "aiEndpointSelectModels": "Select models to add",
-  "aiEndpointNoProvider": "Custom",
-  "aiEndpointAddModelTitle": "Add model",
-  "aiEndpointEditModelTitle": "Edit model",
-  "aiModelDisplayName": "Display name",
-  "aiModelId": "Model ID",
-  "aiModelContextWindow": "Context window",
-  "aiModelContextWindowHint": "0 = unknown; runtime falls back to 262144 (256K)",
-  "aiModelMaxOutput": "Max output tokens",
-  "aiModelReasoning": "Reasoning levels",
-  "aiModelReasoningHint": "Enable to configure reasoning tiers for this model",
-  "aiModelTier": "Tier",
-  "aiModelApiValue": "API value",
-  "aiModelApiValueHint": "Leave blank to omit this parameter",
-  "aiModelAddTier": "Add tier",
-  "aiModelFallback": "Fallback model",
-  "aiModelNoFallback": "No fallback",
+  "aiEndpointProtocolErnie": "Байду Вэньсинь ЭРНИ",
+  "aiEndpointCustomSettings": "Пользовательские настройки",
+  "aiEndpointModels": "Каталог моделей",
+  "aiEndpointModelsCount": "{count} модели",
+  "aiEndpointRestoreDefaults": "Восстановить модель по умолчанию",
+  "aiEndpointFetchModels": "Получить доступные модели",
+  "aiEndpointAddModel": "Добавить модель",
+  "aiEndpointNoModels": "Модели пока нет, нажмите «Добавить модель» или «Получить доступные модели».",
+  "aiEndpointRestoreConfirm": "Каталог модели по умолчанию «{provider}» будет восстановлен, а текущая пользовательская модель будет заменена.",
+  "aiEndpointRestoreUnavailable": "У этого поставщика услуг нет встроенной модели по умолчанию.",
+  "aiEndpointFetchSuccess": "Добавлены модели {count}",
+  "aiEndpointFetchNone": "Нет моделей для добавления",
+  "aiEndpointFetchFailed": "Не удалось получить модель: {error}.",
+  "aiEndpointSelectModels": "Выберите модель для добавления",
+  "aiEndpointNoProvider": "Настроить",
+  "aiEndpointAddModelTitle": "Добавить модель",
+  "aiEndpointEditModelTitle": "Редактировать модель",
+  "aiModelDisplayName": "отображаемое имя",
+  "aiModelId": "Идентификатор модели",
+  "aiModelContextWindow": "контекстное окно",
+  "aiModelContextWindowHint": "0 означает неизвестно, во время выполнения обрабатывается как 262144 (256 КБ).",
+  "aiModelMaxOutput": "Максимальное количество выходных токенов",
+  "aiModelReasoning": "уровень рассуждения",
+  "aiModelReasoningHint": "После открытия вы можете настроить мыслительный механизм модели.",
+  "aiModelTier": "шестерня",
+  "aiModelApiValue": "Значение параметра API",
+  "aiModelApiValueHint": "Оставьте пустым, чтобы не отправлять этот параметр",
+  "aiModelAddTier": "Добавить снаряжение",
+  "aiModelFallback": "Альтернативная модель",
+  "aiModelNoFallback": "Нет резервной модели",
   "aiModelFunctionCalling": "Function Calling",
-  "aiModelTierRequired": "Keep at least one tier",
-  "aiModelTierLevelRequired": "Tier name is required",
-  "aiModelTierDuplicate": "Tier names must be unique",
-  "aiModelValidationName": "Display name is required",
-  "aiModelValidationModelId": "Model ID is required",
-  "aiModelValidationBaseUrl": "API URL is required",
-  "aiModelValidationModels": "Add at least one model",
-  "terminalConfigureModel": "Configure model",
-  "terminalModelAndReasoning": "Model & reasoning",
-  "terminalReasoning": "Reasoning",
-  "terminalReasoningNotEnabled": "This model has no reasoning tiers enabled; enable them in settings",
-  "terminalReasoningOff": "Off",
-  "terminalManageModels": "Manage models…",
-  "aiModelFunctionCallingHint": "Native tool calling (OpenAI tools API); enable only for models that support it",
-  "terminalModelLockedRunning": "Agent is running; change the model or reasoning after it finishes"
+  "aiModelTierRequired": "Держите хотя бы одну шестерню",
+  "aiModelTierLevelRequired": "Название механизма не может быть пустым.",
+  "aiModelTierDuplicate": "Шестерни не могут повторяться",
+  "aiModelValidationName": "Пожалуйста, заполните отображаемое имя",
+  "aiModelValidationModelId": "Пожалуйста, заполните идентификатор модели",
+  "aiModelValidationBaseUrl": "Пожалуйста, заполните адрес API",
+  "aiModelValidationModels": "Добавьте хотя бы одну модель",
+  "terminalConfigureModel": "Настроить модель",
+  "terminalModelAndReasoning": "Модели и мышление",
+  "terminalReasoning": "степень мышления",
+  "terminalReasoningNotEnabled": "В этой модели не включен механизм мышления, его можно включить в настройках.",
+  "terminalReasoningOff": "Пристальное мышление",
+  "terminalManageModels": "Модель управления…",
+  "aiModelFunctionCallingHint": "Собственный вызов инструментов (API инструментов OpenAI), включены только модели, поддерживающие этот протокол.",
+  "terminalModelLockedRunning": "Агент работает, переключите модель или механизм мышления после его завершения.",
+  "changeRecordRestoreLocalFile": "Следующие файлы будут восстановлены локально, минуя какой-либо сервер:",
+  "ut_9dd16b4310": "Отмена",
+  "ut_929f88c953": "сохранить",
+  "ut_375761b903": "Редактировать",
+  "ut_12b4ff78f0": "Удалить",
+  "ut_2439c9088c": "закрыть",
+  "ut_8d8a263df0": "Имя",
+  "ut_dd3bec10ce": "ОК",
+  "ut_2bbaf6e153": "Скопировано",
+  "ut_7713abebb3": "история команд",
+  "ut_c96baaaa38": "команда",
+  "ut_bed1bc3d9f": "Ярлыки команд",
+  "ut_4064dc0579": "общая ситуация",
+  "ut_8b97bab772": "группа хостов",
+  "ut_c53688e21a": "Хост",
+  "ut_b996bd3d08": "Настроить",
+  "ut_400ef8d1c1": "Все инструменты",
+  "ut_5ea95f868c": "Новый MCP-сервер",
+  "ut_fb999767e8": "переадресация портов",
+  "ut_ee627300a6": "Агент выполняется, повторите попытку позже.",
+  "ut_8fa7ec1798": "мышление",
+  "ut_19a5b5ad85": "Очистить",
+  "ut_5dc39ef856": "Пожалуйста, выберите",
+  "ut_c4b7d3a09f": "Закрыть (Esc)",
+  "ut_fda3f94089": "выполнять",
+  "ut_6e269868a4": "1 тысяча строк",
+  "ut_60a303a337": "50 000 строк",
+  "ut_386ffb419a": "100 000 строк",
+  "ut_53f8d85ab6": "Хост",
+  "ut_cf99c7c571": "Рабочий процесс эксплуатации и технического обслуживания",
+  "ut_422db29f9c": "Журнал аудита",
+  "ut_b671baec90": "Изменить регистр",
+  "ut_abcdfedd3e": "Автоматический ответ на запрос подтверждения",
+  "ut_760a393290": "Импортировать конфигурацию SSH",
+  "ut_cce7c556ba": "Редакционные правила",
+  "ut_1982929432": "Новые характеристики",
+  "ut_f996de5ff9": "Название",
+  "ut_1bc8da322f": "Пожалуйста, заполните заголовок",
+  "ut_2d4881db12": "Нормативное содержание",
+  "ut_483b58204b": "Пожалуйста, заполните содержание спецификации",
+  "ut_29f14d8cf9": "Эталонная команда (необязательно)",
+  "ut_fcfbe3558f": "Область применения",
+  "ut_0cac2580f1": "Один хост",
+  "ut_479fdc582d": "группа хостов",
+  "ut_56c43b3c1f": "строго следовать",
+  "ut_223ebc733a": "ИИ должен работать как есть и не может настраиваться самостоятельно.",
+  "ut_4ba4d0c89f": "Разрешить ИИ корректировать параметры, не нарушая контракт",
+  "ut_4c7c042a46": "Добавить сервер",
+  "ut_aa56ccc31c": "только чтение",
+  "ut_2c94b3027b": "Подключено",
+  "ut_e5e228e9d3": "Добавить MCP-сервер",
+  "ut_e7c0c60a9b": "Редактировать MCP-сервер",
+  "ut_e539334ba2": "Метод передачи",
+  "ut_3062040662": "Команда запуска",
+  "ut_635c6ac2e8": "Параметры (по одному в строке)",
+  "ut_86e6b6dae2": "URL-адрес сервера",
+  "ut_7c1909ae8d": "тайм-аут (мс)",
+  "ut_f3f63f65a0": "Крышка инструмента",
+  "ut_78a04cd0e0": "Доступные инструменты агента",
+  "ut_b50e4d2f14": "Инструменты только для чтения (рекомендуется)",
+  "ut_f7f0786cb6": "Включить сервер",
+  "ut_e234091c8a": "Автоматическое подключение при запуске приложения",
+  "ut_e1d7cd83a8": "Разрешить агенту использовать ресурсы",
+  "ut_2a8817d718": "Разрешить агенту использовать слова-подсказки",
+  "ut_bbe5aed47c": "Авторизуйтесь с помощью OAuth",
+  "ut_9f237e2f4c": "Сохранить и подключить",
+  "ut_c3255fdff5": "Имя не может быть пустым",
+  "ut_18b03910f5": "для передачи stdio требуется команда запуска",
+  "ut_78ed27f966": "URL-адрес сервера должен быть http(s)-адресом.",
+  "ut_6462e5fd3f": "Тайм-аут должен быть в пределах 3000-120000 мс.",
+  "ut_765400571f": "Ограничение инструмента должно быть в пределах 1-40.",
+  "ut_e43ff18e6b": "HTTP + SSE (устаревший)",
+  "ut_6c1dbbd423": "stdio (локальный процесс)",
+  "ut_1ce1d6c086": "О",
+  "ut_451a175be9": "Управление хостом",
+  "ut_42d62d0f0e": "настройки",
+  "ut_85c1206607": "режим фокусировки",
+  "ut_20d2782c72": "местный",
+  "ut_6ea2ce2fe7": "Подтвердить откат",
+  "ut_78d92a1509": "Пожалуйста, сначала подключитесь к хосту, прежде чем продолжить задачу.",
+  "ut_9f7bc31ffe": "независимый индекс",
+  "ut_ac8a126fc3": "Выполнение не удалось",
+  "ut_e56e69b4b9": "Отменено",
+  "ut_278fcd681d": "Написание завершено",
+  "ut_ae9a95fec3": "Пользователь отменяет задачу, запись PTY прервана",
+  "ut_0bb0be16b3": "Замена завершена",
+  "ut_1aa59da0cf": "Запись не удалась, откат...",
+  "ut_47e5e5365c": "Поиск в базе знаний отменен",
+  "ut_b79b73a254": "Отсутствует параметр: требуется путь.",
+  "ut_b48a9bcd4c": "Подтвердить",
+  "ut_fa7ae42a25": "услуга",
+  "ut_f71cf695fe": "Задача отменена",
+  "ut_dec92d98dd": "Задача прервана",
+  "ut_a8046742ba": "необработанный выходной хвост",
+  "ut_fc6ff4c8fb": "Все теги",
+  "ut_c31fd08687": "Копировать",
+  "ut_68caa1b369": "только что",
+  "ut_de0e9433a3": "Описание",
+  "ut_a53a6efe91": "Отображаемое имя не может быть пустым.",
+  "ut_5d608a562e": "Добавить конечную точку",
+  "ut_d4387b2009": "поставщик услуг",
+  "ut_7a9886373c": "API-ключ",
+  "ut_1bd24257e4": "добавить",
+  "ut_5f7dd28505": "Изменить хост",
+  "ut_cad33d6032": "Добавить хост",
+  "ut_4b91f1393e": "Создайте новую команду быстрого доступа",
+  "ut_bc90bc1b81": "Новый рабочий процесс",
+  "ut_35448c521f": "Уже включено",
+  "ut_dbddf26277": "Максимальное количество шагов выполнения",
+  "ut_a18400490f": "блокировка приложения",
+  "ut_f9aea8cf2e": "Попробуйте еще раз",
+  "ut_ec5739654b": "Не удалось открыть ссылку, скопировано в буфер обмена.",
+  "ut_72cb33e8c2": "Сочетания клавиш терминала",
+  "ut_dc29b2f27f": "закрыть",
+  "ut_9a7f4df03a": "Пользовательские слова-подсказки",
+  "ut_df02f06fa2": "Переименовать",
+  "ut_035134b18f": "Создать новый каталог",
+  "ut_7025e8166d": "Вставить",
+  "ut_e45556d8c1": "команда безопасности",
+  "ut_7a4c7fc5d7": "Эта операция включает в себя настройку системы или загрузку по сети. Подтвердите операцию.",
+  "ut_a88f921ea4": "Опасная операция, пожалуйста, внимательно подтвердите ее перед выполнением.",
+  "ut_bf6e849886": "Операции высокого риска заблокированы политиками безопасности",
+  "ut_873cf0baa9": "Путь пуст",
+  "ut_4370f90a2c": "Путь пуст после нормализации",
+  "ut_0abbb47931": "Вход в сеанс",
+  "ut_79ab7ea24e": "Выход из сеанса",
+  "ut_dc687b5190": "10 000 строк",
+  "ut_b80d4fdf1b": "Модель еще не настроена",
+  "ut_62197ba790": "Закрыто · ИИ полагается исключительно на местный контекст",
+  "ut_88b11effff": "Блокировка приложения включена",
+  "ut_aae6a1b7f8": "Блокировка приложения не включена",
+  "ut_7355cf069a": "Безопасные часы не включены",
+  "ut_22b7a960c1": "Сервера пока нет",
+  "ut_bf73a41ef9": "правил пока нет",
+  "ut_a86e6d7ade": "Не включено",
+  "ut_c61e7e68e8": "Включено · Адрес веб-перехватчика отсутствует и не может быть отправлен.",
+  "ut_6839af3e8f": "Включено · Напоминание о каждой задаче",
+  "ut_f9ab3c28bf": "Включено · Оповещение только при сбое",
+  "ut_f500e9fc9a": "Шаблон команды с переменными",
+  "ut_2d8f504c07": "Многоэтапный контрольный список",
+  "ut_f53531d72c": "Источник и результат каждой команды",
+  "ut_5aa2535411": "Кто и что когда изменил?",
+  "ut_49efe264bb": "Таймаут команды кратный",
+  "ut_b1eedc7da7": "Увеличьте скорость для медленных сетей и уменьшите ее для устранения застрявших соединений.",
+  "ut_0ef39843c1": "Вставить контент",
+  "ut_cfae7855b2": "Выбрать из файла",
+  "ut_f77e687e7f": "Включено · Адрес для заполнения",
+  "ut_bb68aeb526": "Настроено · Автоматическое внедрение искусственного интеллекта",
+  "ut_1f46b82540": "Тайм-аут соединения",
+  "ut_beac562f56": "Сохраненный закрытый ключ загружен.",
+  "ut_8b9d8a0293": "Нет канонических записей для экспорта.",
+  "ut_9e0a441f63": "Экспорт внутренних спецификаций",
+  "ut_393f76846d": "Импортировать внутренние спецификации",
+  "ut_c1358ed65a": "Удалить спецификацию",
+  "ut_2d0ac889f0": "внутренние правила",
+  "ut_b8ff31b60e": "Импортировать JSON",
+  "ut_70148cd17d": "Экспорт JSON",
+  "ut_a25e5f2908": "Внутренних спецификаций пока нет.",
+  "ut_0a354147d1": "строгий",
+  "ut_e35e26caf1": "Предложения",
+  "ut_321c7d5cbd": "Например: nginx меняет только conf.d",
+  "ut_c841026fad": "Четко напишите ограничения на естественном языке, и ИИ будет точно им следовать.\nНапример: внутренняя сеть использует Mirrors.corp.internal и не использует источник apt общедоступной сети.",
+  "ut_cbf092e19a": "MCP-сервер",
+  "ut_3ee244446d": "Быстрое дополнение:",
+  "ut_76aba21781": "Сервера MCP пока нет",
+  "ut_23784ffbb8": "Подробнее",
+  "ut_bf9a7280ff": "Восстановить соединение",
+  "ut_b3ea1460b7": "(конечная точка не настроена)",
+  "ut_c6f94e5dc4": "Отключить",
+  "ut_a037d357eb": "подключить",
+  "ut_d58e58c337": "Инструменты и способности",
+  "ut_ac3cdbdaa3": "Требуется авторизация OAuth",
+  "ut_6d628c3737": "Авторизация входа",
+  "ut_55b9a7e0c0": "Скопировать ссылку авторизации",
+  "ut_8173ace3f3": "инструменты только для чтения",
+  "ut_936b003fe8": "разрушительный",
+  "ut_bc386dcd56": "внешний",
+  "ut_eb15558933": "Агент доступен",
+  "ut_4fc8541fe1": "Не открыто",
+  "ut_fcabd36585": "нет параметров",
+  "ut_7889ed8608": "Параметры:",
+  "ut_69440da7fa": "Последние журналы",
+  "ut_0dbb5c7bd4": "Деактивирован",
+  "ut_f50cfe7b3a": "Не подключено",
+  "ut_439759c292": "Подключение",
+  "ut_28c0833d52": "Требуется авторизация",
+  "ut_fcc790f11c": "Соединение не удалось",
+  "ut_6b02c4539d": "Выберите каталоги, к которым файловая система MCP разрешает доступ.",
+  "ut_446d04518f": "Удалить MCP-сервер",
+  "ut_3121de47a1": "URI ресурса",
+  "ut_5e1e108436": "Заполните конкретный URI согласно шаблону",
+  "ut_250aaaa8b9": "Параметры слова подсказки",
+  "ut_3dedee49e4": "Один ключ = значение в строке",
+  "ut_1cc391dd56": "(обязательно)",
+  "ut_4a407548bf": "Содержимое скопировано",
+  "ut_7c50d4b883": "Копировать контент",
+  "ut_8e8300886d": "Например нпх",
+  "ut_9e643633f7": "Рабочий каталог (необязательно)",
+  "ut_4c8483a194": "Переменные среды (KEY=VALUE в каждой строке)",
+  "ut_4ad1ca4105": "Исходящий прокси (необязательно)",
+  "ut_c9270e6a1d": "Заголовки (ключ: значение в строке)",
+  "ut_e249b99577": "Индивидуально (поставьте галочку в карточке после подключения)",
+  "ut_3665baf413": "Области действия OAuth (разделенные пробелом/запятой, необязательно)",
+  "ut_92dbcbd641": "OAuth clientId (оставьте пустым, чтобы использовать DCR)",
+  "ut_87fceccd93": "OAuth clientSecret (необязательно)",
+  "ut_9c3dece052": "управление",
+  "ut_37ac3bf8ce": "Агент выполняется. Используйте поле ввода для получения дополнительных инструкций.",
+  "ut_dcdd97ac06": "SSH-соединение не готово. Нажмите на этот экран, чтобы повторить попытку после повторного подключения.",
+  "ut_4fc495b331": "Локальный терминал не удалось запустить",
+  "ut_4bab1ab6c2": "Не удалось открыть сеанс на этом экране.",
+  "ut_129733266f": "[Сессия окончена]",
+  "ut_b6c84bb8f3": "Этот экран привязан к AI и не может быть отключен самостоятельно; пожалуйста, закройте вкладку напрямую",
+  "ut_def20d7537": "разговор с ИИ",
+  "ut_cafa2f7cad": "локальная оболочка",
+  "ut_e1fac83b32": "Сеанс для этого экрана отключен",
+  "ut_13304be1df": "Открыть снова этот экран",
+  "ut_6582d682ca": "Палитра команд (Ctrl+K)",
+  "ut_422f8e1f4e": "Цвет терминала и размер шрифта",
+  "ut_19d7987a04": "меню",
+  "ut_c985d380db": "Перейти к",
+  "ut_d4c339f3c6": "безопасный период",
+  "ut_7df2507796": "Не включено",
+  "ut_86dfbbb589": "Этот терминал",
+  "ut_7a89819950": "просмотр",
+  "ut_9175d8cccb": "Полная ширина терминала",
+  "ut_1029dcb6e3": "Переключить положение панели AI",
+  "ut_d170a458d4": "справа/внизу",
+  "ut_23820b0802": "SFTP доступен только для удаленных сеансов.",
+  "ut_ed8ab87e0e": "Закройте панель SFTP",
+  "ut_02fc9755f6": "Панель файлов SFTP",
+  "ut_3d81bbe4b1": "Переключение положения панели (справа/снизу)",
+  "ut_49aa3e0155": "Разрешить агенту работать на этом хосте",
+  "ut_80f39c254f": "Опишите требования и шаги будут выполнены автоматически; опасные команды сначала запрашивают разрешение",
+  "ut_dbe7312942": "Для этого изменения не существует исполняемой команды отката.",
+  "ut_98ddb3e569": "Восстановит локальные файлы в:",
+  "ut_12db03a03c": "Команда отката будет выполнена:",
+  "ut_d9c1f090b6": "Восстановление поместит копию в область резервного копирования/переработки обратно на исходный путь локального компьютера и запишет записи аудита.",
+  "ut_ba66b6920c": "Откат изменяет состояние сервера и записывает записи аудита.",
+  "ut_ae7f0253b5": "Соединение с хостом было разорвано и откат не был выполнен.",
+  "ut_e79e7730e4": "Откат не выполнен: хост не подключен или нет команды отката.",
+  "ut_36ae6b14be": "Пожалуйста, сначала переключитесь на этот хост, а затем снова подключитесь.",
+  "ut_f89df440af": "Локальный терминал не требует повторного подключения, проверьте процесс терминала",
+  "ut_31edece655": "Конфигурация хоста не найдена, невозможно повторно подключиться",
+  "ut_470431de01": "Не удалось переподключиться, проверьте сеть или пароль.",
+  "ut_42e52ee488": "Повторное подключение успешно",
+  "ut_3a602327a9": "Пожалуйста, сначала переключитесь на этот хост, прежде чем продолжить задачу.",
+  "ut_46e4b5a120": "Пожалуйста, переключитесь/переподключитесь к этому хосту и повторите попытку.",
+  "ut_c4388ff04e": "Соединение с хостом прервано, сначала подключитесь заново",
+  "ut_3993de2fb8": "Пароль",
+  "ut_694738320d": "показать",
+  "ut_6870753dcd": "спрятать",
+  "ut_b765c3fd60": "Команда ожидает ввода",
+  "ut_107ca67793": "Введите (оставьте пустым = нажмите Enter)",
+  "ut_793f2a8599": "Модель еще не настроена. Чтобы добавить ее, перейдите в «Настройки» → «Модель AI».",
+  "ut_4ed5ea2e0b": "Не выбрано",
+  "ut_6aba627378": "Для текущего сеанса нет экспортируемого контента.",
+  "ut_13465ff9b3": "Уже помещено в поле ввода агента.",
+  "ut_d45aa5cd92": "Команды терминала",
+  "ut_aec5a6dc3d": "Сохранить как фрагмент команды",
+  "ut_2f4c7a6c8c": "Имя фрагмента",
+  "ut_06c357f14d": "Из терминала щелкните правой кнопкой мыши",
+  "ut_f58a1a9197": "Команда агента",
+  "ut_bb76c4ff57": "Введите / для поиска всех команд и шаблонов эксплуатации и обслуживания; ↑↓ для переключения, Tab для выбора и Enter для выполнения.",
+  "ut_5d888b8a22": "Память не может быть сжата во время выполнения задачи. Пожалуйста, сначала остановите задачу.",
+  "ut_5f55be5f65": "Поиск в Интернете: включен (действителен для следующей миссии)",
+  "ut_921c3a3d3c": "Поиск в Интернете: не включен (нажмите, чтобы включить, вступит в силу следующая задача)",
+  "ut_b5e4297324": "Выполнение",
+  "ut_d68f77a907": "Операция",
+  "ut_5085464dd9": "Новое соединение",
+  "ut_cbd048e6e6": "Повторно подключить текущую метку",
+  "ut_f30d7344c7": "Свернуть панель ИИ",
+  "ut_c7b60ecb72": "Развернуть панель ИИ",
+  "ut_36a1bca19d": "Выйти из режима фокусировки",
+  "ut_c56382e3ee": "Скрыть мониторинг сервера",
+  "ut_55b60aaf25": "Показать мониторинг сервера",
+  "ut_1e838ce89c": "Закройте панель SFTP",
+  "ut_a752de5a42": "Откройте панель SFTP",
+  "ut_f934cd40d1": "история сеансов",
+  "ut_f8ead6b402": "Создать новый сеанс AI",
+  "ut_76462daeb1": "полная страница",
+  "ut_e17ad38728": "ящик",
+  "ut_9b85525187": "Операционный аудит",
+  "ut_1bc161aa98": "Настройки модели ИИ",
+  "ut_1d6ad9a57d": "История изменений",
+  "ut_8659bce8a2": "Рабочий процесс",
+  "ut_7781e2e2a1": "Дополнительные инструкции…",
+  "ut_c8e527419a": "Локальный терминал не поддерживает переадресацию портов",
+  "ut_fc1fc05fcd": "Интернет-поиск",
+  "ut_1a5ebea669": "Бесключевой доступ (работает из коробки)",
+  "ut_d007a268a0": "Требуется ключ API",
+  "ut_06aab0767d": "Дополнительный ключ частного экземпляра",
+  "ut_d17f6d0537": "глобальные параметры",
+  "ut_28bd2b7489": "Протестируйте сейчас",
+  "ut_fd44505c78": "Бэкэнд включен:",
+  "ut_35fef8a980": "Выбранные бэкэнды:",
+  "ut_a7179dbf9b": "Настроенный ключ:",
+  "ut_435e2b9a3e": "обновить статус",
+  "ut_3b3bcc7a34": "Недоступно",
+  "ut_aff6cc24ed": "Требуется ключ",
+  "ut_140b926331": "Семантический поиск · Требуется ключ",
+  "ut_c8f4f082c1": "API поиска · Требуется ключ",
+  "ut_060d69c2ef": "RSS · Бесключевой доступ",
+  "ut_82fe5ca073": "HTML · Требуется местное агентство",
+  "ut_cde0d7f255": "Нужно создать свой собственный экземпляр",
+  "ut_fdb03fa75f": "Сводка по оптимизации ИИ",
+  "ut_2846d31002": "Результаты Google",
+  "ut_50265d0478": "API поиска пока нет",
+  "ut_aa998837ed": "Инструмент поиска Клода",
+  "ut_72f0d7877f": "Поиск ответов",
+  "ut_ebda0aff48": "Под проверкой",
+  "ut_7875a79d06": "переменные среды",
+  "ut_464ca43586": "настроен",
+  "ut_cdc3132e4c": "Не настроено",
+  "ut_dd2e9a0289": "Документация по развертыванию",
+  "ut_050792529a": "Получить ключ",
+  "ut_836f91fea2": "Дополнительный токен: отправляется как авторизация: носитель",
+  "ut_37cabfd93e": "Оставьте пустым, чтобы указать отсутствие изменений; вы также можете использовать переменные среды с тем же именем.",
+  "ut_60f1ed814f": "Сохраненный ключ будет удален после сохранения.",
+  "ut_246737f23c": "Адрес экземпляра SearXNG",
+  "ut_dceef0fd66": "Документация по развертыванию SearXNG →",
+  "ut_05981b84e9": "Окончательное количество возвращенных товаров (1-20)",
+  "ut_875f752532": "Количество бэкэндов, запрошенных одновременно (1–12)",
+  "ut_113e34528c": "Самое долгое ожидание одного бэкенда (3000-120000мс)",
+  "ut_d012b127eb": "исходящий прокси",
+  "ut_6a13f67dc3": "Введите запрос, например последние новости OpenAI.",
+  "ut_eeda5a24be": "Поиск",
+  "ut_7c5d801935": "Поиск",
+  "ut_3d01e59d2e": "Нет соответствующих результатов.",
+  "ut_aef246a460": "Источник:",
+  "ut_a7de20e32a": "Пожалуйста, введите ключевое слово запроса",
+  "ut_8334c9cd68": "Должно быть от 1 до 20",
+  "ut_c1fe9fa3f2": "Должно быть от 1 до 12",
+  "ut_299e9d34bb": "Должно быть от 3000 до 120000.",
+  "ut_3d127654a9": "Параметр неправильный, проверьте выделенное поле.",
+  "ut_0531ef0aec": "Сохранено, вступает в силу немедленно.",
+  "ut_c259d39a21": "Восстановлено последнее сохраненное состояние",
+  "ut_1595af9c76": "состояние сброса",
+  "ut_5046a76cef": "Ожидание подтверждения",
+  "ut_3a760ee340": "Выполнение",
+  "ut_9b47257520": "Приостановлено",
+  "ut_6bafadcb9f": "⏸️ Задача приостановлена. Чтобы продолжить, нажмите «Возобновить».",
+  "ut_5384a63ffb": "▶️ Задача возобновлена, продолжайте выполнение...",
+  "ut_48eb86eca2": "⚠️ ИИ заявляет о завершении без фактического выполнения команды, требуя фактической проверки.",
+  "ut_c975d9cfca": "…(Ответ слишком длинный и был сокращен)",
+  "ut_c0bd0404a4": "Для собственных команд используйте вместо этого инструмент local_exec.",
+  "ut_a3621ea638": "Перехват во время блокады сети",
+  "ut_6c86646cba": "Режим только для чтения включен, и выполнение этой команды запрещено.",
+  "ut_6140f3dac8": "Текущий режим разрешений, выполнение этой команды запрещено",
+  "ut_b14923e57e": "Спросить",
+  "ut_287a6d5c24": "автоматический",
+  "ut_64b5e22817": "✅ Пользователь подтвердил, начните выполнение...",
+  "ut_748164be56": "⚠️ ИИ вызывает инструмент, но не указывает имя инструмента",
+  "ut_ee157cb455": "⏳Продолжить...",
+  "ut_7d89802fc1": "Организуйте выводы",
+  "ut_42d195aa5d": "Открытие подсистемы SFTP...",
+  "ut_a70224cf55": "Загрузка завершена",
+  "ut_3ce3c27270": "Загрузка завершена",
+  "ut_90b80824a2": "Синхронизация файлов остановлена",
+  "ut_948df560e2": "Синхронизация файлов остановлена",
+  "ut_c6a06709f5": "Запуск синхронизации файлов...",
+  "ut_88dfa9a69c": "Отсутствует параметр: требуется режим (удаленный/локальный_файл/ssh_hostkey)",
+  "ut_c767a0bfa3": "Недопустимый диапазон портов (1-65535).",
+  "ut_7400d2fd8c": "certPath содержит недопустимые символы (кавычки/точки с запятой/вертикальные кавычки/обратные кавычки и т. д.).",
+  "ut_272d2f4a52": "Чтение отпечатка ключа хоста SSH...",
+  "ut_049487ff40": "Параметр отсутствует: content или content_b64 должен его предоставить.",
+  "ut_7515f1e67e": "Ошибка записи SFTP, откат резервной копии...",
+  "ut_ee8e576b01": "Исходный файл восстановлен из резервной копии",
+  "ut_a3714eed7b": "Ошибка записи SFTP, попытка режима стандартного ввода PTY (cat > file)...",
+  "ut_ca59f0145f": "Резервное копирование исходных файлов...",
+  "ut_ed571dc1ef": "локальный файл",
+  "ut_aeff3a9157": "Не удалось выполнить прямую локальную запись, попытка записи через текущую оболочку...",
+  "ut_751b0202ff": "локальный стандартный ввод PTY",
+  "ut_ddd5f79db8": "Локальный стандартный ввод PTY + тройник sudo",
+  "ut_e67f272887": "  Примечание. Текущий процесс не имеет разрешения на чтение исходного файла и не может создать резервную копию.",
+  "ut_d1dd8a4a86": "Текущая сессия не имеет доступа к вводу пароля. Пожалуйста, введите пароль sudo в настройках хоста.",
+  "ut_cdfaed0dc5": "Подождите, пока пользователь введет пароль sudo…",
+  "ut_6d06b21d26": "Пользователь не указал пароль (отмените или введите пустой). Пожалуйста, используйте Действие: вместо этого попросите пользователя подтвердить или выполните вместо этого в непривилегированном режиме.",
+  "ut_de63930b16": "Собственный опыт проверки",
+  "ut_11e4b8176f": "Официальная база знаний",
+  "ut_587234aed7": "Эта статья была сокращена",
+  "ut_fb8896831d": "Общая сумма превышает лимит, и последующие записи были усечены.",
+  "ut_89d6d1508a": "Текущая платформа не поддерживает собственное выполнение команд (только рабочий стол Windows/macOS/Linux).",
+  "ut_4d2a25adb6": "Отсутствует параметр: требуется запрос.",
+  "ut_039e6df512": "\nПримечание. Количество файлов достигло верхнего предела в 5000. Обход продолжаться не будет. Пожалуйста, используйте glob или более узкий путь, чтобы сузить диапазон.",
+  "ut_4d2db00134": "Отсутствует аргумент: content или content_b64. Необходимо указать его. Пожалуйста, напишите несколько строк содержимого в одной строке и используйте \\n для обозначения разрыва строки.",
+  "ut_1d0e0057ce": "[Процесс завершился]",
+  "ut_80fbd0db5a": "Срок действия авторизации OAuth истек. Пожалуйста, войдите снова.",
+  "ut_3212b67b4f": "(Инструмент MCP возвращает пустые результаты)",
+  "ut_3043a371fb": "Вызов MCP отменен",
+  "ut_4b697ab9d4": "Этот сервер MCP не предоставил слово-подсказку.",
+  "ut_e6a3f8cacd": "Анализ структуры проекта...",
+  "ut_18ecc05e1c": "=== Отчет об анализе проекта ===",
+  "ut_b814db8dc9": "Ожидание блокировки сборки...",
+  "ut_b703554a31": "Отменено во время ожидания блокировки сборки.",
+  "ut_76fa7f5bc2": "Создайте успешный",
+  "ut_957091cf2f": "Проверка соединения пройдена\n",
+  "ut_892c3e0946": "[ошибка]",
+  "ut_d9a78ca9ae": "[Соединение закрыто]",
+  "ut_4db21d650d": "Соединение успешно",
+  "ut_7038dfdb24": "Соединение не удалось:",
+  "ut_3902f53eb2": "[Ошибка] Не подключено",
+  "ut_8d0408fbbe": "[Отключено]",
+  "ut_87f4917a26": "Отсутствуют параметры: требуется запрос.",
+  "ut_3561d2bc19": "Сканирование прошло успешно, но содержимое страницы пусто.",
+  "ut_558bbf2918": "Разобрать текст...",
+  "ut_d74776ae2e": "Эта команда заблокирована политикой безопасности",
+  "ut_1ebeb12158": "Подтвердить выполнение команды",
+  "ut_dfde5a0464": "Подтверждение опасных операций",
+  "ut_517880c5b3": "Скоро будет исполнено:",
+  "ut_dd66d942fb": "Эта операция может привести к недоступности системы, выполняйте ее осторожно!",
+  "ut_c5955eb9de": "Пожалуйста, введите ПОДТВЕРДИТЬ, чтобы продолжить:",
+  "ut_68772a88f7": "Введите ПОДТВЕРДИТЬ",
+  "ut_fccd2f755c": "Подтвердить выполнение",
+  "ut_6863351895": "Выполнять вызовы инструментов, которые могут изменить состояние за пределами текущего сеанса.",
+  "ut_e6f77c3aa9": "Установка или обновление пакетов программного обеспечения может изменить зависимости системы и повлиять на существующие службы.",
+  "ut_03303bd6da": "Удалите программное обеспечение, службы, которые полагаются на него, могут быть недоступны.",
+  "ut_c8e25a26d1": "Запуск службы изменит текущий статус работы.",
+  "ut_cd5d5a98a0": "Остановите службу, и веб-сайты/интерфейсы, которые полагаются на нее, будут прерваны.",
+  "ut_88ec88c7b3": "Перезапустите службу. Работа веб-сайта/интерфейса может быть временно прекращена.",
+  "ut_7ba837a04e": "Изменяйте, перемещайте или удаляйте файлы, которые могут повлиять на конфигурацию или данные.",
+  "ut_a1e726721a": "Изменение прав доступа к файлам или владельцев может повлиять на доступ к службе.",
+  "ut_1210181241": "Измените файлы конфигурации, которые могут изменить поведение службы.",
+  "ut_a0e4d573e8": "Измените статус сервера. Подтвердите масштаб воздействия.",
+  "ut_ab356c88ee": "Проверка конфигурации Nginx пройдена",
+  "ut_8e89715728": "Проверка конфигурации Nginx не удалась",
+  "ut_3e37edb32c": "Ни одна кнопка не подошла? Просто введите свой ответ…",
+  "ut_1cb11a152d": "Отправить индивидуальный ответ",
+  "ut_b31e90861f": "(нет вывода)",
+  "ut_c06a19b387": "Восстановить соединение",
+  "ut_e3d0732b84": "Пусть ИИ попробует еще раз",
+  "ut_73c881e205": "Миссия выполнена",
+  "ut_22aee52bc1": "Все шаги выполнены",
+  "ut_704c12f2eb": "Задача не выполнена",
+  "ut_da68e2844f": "Выполнение задачи не удалось",
+  "ut_ede5822e49": "Задача была прервана",
+  "ut_9566f7b70f": "вывод команды",
+  "ut_51bfee4aca": "конец",
+  "ut_e46194bcb9": "Журнал агента",
+  "ut_ecc8f6c40b": "Копировать текущие результаты фильтра",
+  "ut_f988024855": "Только просмотреть эту задачу",
+  "ut_7b8553ecdf": "модель мышления",
+  "ut_46d28ef143": "↑↓ Переключить вкладку. Выбрать Enter. Выполнить Esc. Закрыть.",
+  "ut_9e9ac63dcb": "Дополнительные инструкции (вступают в силу в следующем раунде)",
+  "ut_f12263d7ea": "нет цвета",
+  "ut_b35da5e4e9": "Очистить всю историю команд?",
+  "ut_0f29d5bb1a": "Очистить",
+  "ut_9687dea3ac": "Очистить историю",
+  "ut_8a6ca36e98": "Команды истории поиска",
+  "ut_3a23e3acdd": "Исторических команд пока нет",
+  "ut_f22110ada9": "Введите, чтобы выполнить первый результат · Введите, чтобы заполнить · Нажмите, чтобы скопировать",
+  "ut_956e4930dd": "Поиск хоста/команды/страницы/действия…",
+  "ut_e69a25b65d": "нет совпадений",
+  "ut_f160c18c0c": "Выбрать",
+  "ut_981720593b": "выполнять",
+  "ut_a3e557dfb9": "закрыть",
+  "ut_493d7ff67f": "Инспекция",
+  "ut_b8c3200c7b": "безопасный",
+  "ut_2aa836e6e9": "развернуть",
+  "ut_bda0db72a1": "Устранение неполадок",
+  "ut_6f9c60bc15": "Текущее техническое обслуживание",
+  "ut_338073cc53": "Встроенные шаблоны доступны только для чтения.",
+  "ut_5865795364": "значок",
+  "ut_5dfdb946bf": "Тип",
+  "ut_52129c776f": "Выполнение искусственного интеллекта (этап естественного языка)",
+  "ut_e87bf3a87f": "Прямое выполнение (команда оболочки)",
+  "ut_c1af116483": "Классификация",
+  "ut_e91627ff38": "Шаги (записано в AI)",
+  "ut_25cc0f420e": "команда",
+  "ut_cdeeaa7450": "Для этого пресета нет восстанавливаемых моделей.",
+  "ut_ab0793064d": "Сначала заполните базовый URL-адрес",
+  "ut_dd05d9a6b8": "Нет новых моделей для добавления",
+  "ut_5fe10ec0d8": "Тайм-аут соединения",
+  "ut_bc3f91069f": "Не удалось подключиться",
+  "ut_6367b9ea6c": "Запрос не выполнен",
+  "ut_7794ac4d33": "Базовый URL не может быть пустым.",
+  "ut_ae851c66db": "Оставьте хотя бы одну модель",
+  "ut_82d4f67dc5": "Изменить конечную точку",
+  "ut_742161ce45": "Оставьте поле пустым, чтобы использовать сохраненный ключ.",
+  "ut_41678037ea": "отображаемое имя",
+  "ut_03570451ac": "соглашение",
+  "ut_0de12236b8": "Вэньсинийян",
+  "ut_7abc46ce6d": "Восстановить настройки по умолчанию",
+  "ut_28c32fe34f": "Получение…",
+  "ut_f2a08ffc71": "Получить от поставщика услуг",
+  "ut_a52f4bbfda": "Обложка",
+  "ut_3ed4ca7624": "Модели пока нет, сначала добавьте ее.",
+  "ut_7e4f0e1070": "Идентификатор модели не может быть пустым.",
+  "ut_2ea671ff59": "Повторяющееся название механизма",
+  "ut_d2cf18b1f8": "Для включения вывода требуется хотя бы одна передача.",
+  "ut_df2b9cacae": "ОК",
+  "ut_02259f1272": "Не установлено",
+  "ut_ea6cf493d2": "Подключить терминал",
+  "ut_57d80443c9": "Повторить неудачную попытку хоста",
+  "ut_9e541c6382": "успех",
+  "ut_e35dddb0b4": "не удалось",
+  "ut_ec4c29ca9a": "Потеряно соединение",
+  "ut_a1e91f6981": "тайм-аут",
+  "ut_7d4af9fef1": "Недостаточно разрешений",
+  "ut_9927a13579": "ожидание ввода",
+  "ut_b3d243fdfd": "синтаксическая ошибка",
+  "ut_66197bd48d": "Возврат",
+  "ut_58851eb751": "Запись выполнения сохранена и может быть завершена.",
+  "ut_e6b33fe91a": "продолжить задачу",
+  "ut_5e6e54121d": "Восстановить настройки по умолчанию",
+  "ut_9aa0cecb52": "Нажмите, чтобы войти повторно",
+  "ut_1f0be4879d": "Пожалуйста, нажмите комбинацию клавиш…",
+  "ut_5a1aea8730": "ОК",
+  "ut_a1490afb10": "Прокси поддерживает только http://host:port.",
+  "ut_ffad1d8b04": "Рабочий каталог (необязательно)",
+  "ut_205492caf2": "Переменные среды (KEY=VALUE в каждой строке)",
+  "ut_acce8b3510": "Исходящий прокси (необязательно)",
+  "ut_cd76953b04": "Заголовки (ключ: значение в строке)",
+  "ut_12f53f2717": "Настроить (проверить после подключения)",
+  "ut_a8481de1d6": "Области действия OAuth (разделенные пробелом/запятой)",
+  "ut_4181f5ee36": "OAuth clientId (оставьте пустым, чтобы использовать DCR)",
+  "ut_a6f501ed31": "OAuth clientSecret (необязательно)",
+  "ut_810e89c23f": "ИИ-помощник",
+  "ut_1a81fac6b4": "закрыть ящик",
+  "ut_df39e46c77": "Редактировать команды быстрого доступа",
+  "ut_5b6a456972": "Редактировать рабочий процесс",
+  "ut_9d49b2c71b": "Вернуться на предыдущий уровень",
+  "ut_de5dd6102e": "Поиск имени/IP/группы",
+  "ut_1c95f57481": "Нет подходящего хоста",
+  "ut_29b3f192d8": "Поиск имени/команды",
+  "ut_d112e18b97": "Нет подходящей команды быстрого доступа",
+  "ut_dd209aad9b": "Поиск по имени/описанию",
+  "ut_3d46c0f619": "Исполнение ИИ",
+  "ut_6ba17bef52": "Прямое исполнение",
+  "ut_45a37578cb": "Недавно",
+  "ut_ab4373452b": "бежать",
+  "ut_6cb13cd9c4": "Нет подходящего рабочего процесса",
+  "ut_00636e0752": "команда поиска",
+  "ut_f83f96b238": "Записей аудита пока нет",
+  "ut_cacce52f6d": "Нет записей для копирования",
+  "ut_a50d8711f5": "Журнал аудита терминала AI",
+  "ut_6200fddf68": "локальная машина",
+  "ut_2f5e0aff16": "Нет вывода",
+  "ut_f943d2ce6c": "перехватывать",
+  "ut_740618ad3b": "выпуск",
+  "ut_311d08fee0": "Выполнено",
+  "ut_7e1cc53dfe": "Не выполнено",
+  "ut_d6834ac586": "Скопируйте это",
+  "ut_4a647e404a": "Настройки поиска",
+  "ut_8ad11edf4e": "Модифицированный",
+  "ut_57d5e9c054": "закрыть",
+  "ut_10f71987c9": "Количество строк буфера отката",
+  "ut_d7b02e9cf7": "Автоматическая регистрация сеансов",
+  "ut_2543cfa7f8": "Тайм-аут одношагового ответа",
+  "ut_fac7fadb45": "Таймаут команды кратный",
+  "ut_48274233a0": "сегодня",
+  "ut_98427f593c": "Задача завершена, подробности смотрите в протоколе выполнения.",
+  "ut_9caaf88e9c": "Откат выполнен",
+  "ut_aee33bbe51": "Нет автоматического отката, рекомендуется использовать снимок перед выполнением.",
+  "ut_4e9cdbd7a8": "Откатился назад",
+  "ut_730ed00d8e": "Можно откатить назад",
+  "ut_4f069ae310": "Требуется рабочая сила",
+  "ut_209a3ee99a": "Откат назад",
+  "ut_8bcebbb092": "откат",
+  "ut_3459fead8a": "Установка",
+  "ut_ad620f1593": "Удалить",
+  "ut_0e0e2a9a73": "Изменить конфигурацию",
+  "ut_7393410b1a": "Запустить службу",
+  "ut_64a71bf56a": "Остановить службу",
+  "ut_c5ea3f5be9": "Перезапустить службу",
+  "ut_7a42975bda": "Операции с файлами",
+  "ut_98ae0d0e95": "Изменение разрешения",
+  "ut_d3636b0082": "изменить",
+  "ut_3954d67b32": "Нет совпадений",
+  "ut_ce6351e3cc": "необработанный результат",
+  "ut_f5876a2bf8": "скопировать все",
+  "ut_f7d3ee00a1": "Результаты поиска…",
+  "ut_ef2170f4b4": "Текущая метка не подключена и переадресацию установить невозможно.",
+  "ut_0df8de01ab": "Пожалуйста, укажите действительный порт (1-65535) и целевой хост.",
+  "ut_be0c081010": "Правил переадресации пока нет.",
+  "ut_d0df2ad5ea": "остановить и удалить",
+  "ut_f704784855": "местный → удаленный",
+  "ut_1b67fdda4b": "удаленный → локальный",
+  "ut_50901ca37c": "порт прослушивания",
+  "ut_864e1c6380": "целевой хост",
+  "ut_ec3f615847": "целевой порт",
+  "ut_c1fbfd5065": "Добавить вперед",
+  "ut_4a8eab4b12": "Например: nginx меняет только conf.d",
+  "ut_ee90ce584e": "Четко напишите ограничения на естественном языке, и ИИ будет точно им следовать.",
+  "ut_468c99d256": "Хоста пока нет, поэтому ограничиться одним нельзя.",
+  "ut_d83a565087": "Диагностика",
+  "ut_92cd36cefb": "Проверка…",
+  "ut_0ddb8a1f0d": "Не получила результатов анализов.",
+  "ut_b1ab09352f": "Версия приложения",
+  "ut_0942c2789b": "Этот сеанс прервался",
+  "ut_9f028e8160": "время последнего сбоя",
+  "ut_87c363d0c9": "Нет",
+  "ut_065917e680": "SSH-соединение с пулом",
+  "ut_4927752a48": "мертвое соединение",
+  "ut_46d9b304c4": "Диск доступен для записи",
+  "ut_3779abda15": "Да",
+  "ut_e812fd5dbb": "Нет",
+  "ut_2e81ddc87a": "Проверить время",
+  "ut_234f4f27c8": "Журнал сбоев пуст",
+  "ut_d10e283a81": "Копировать журнал сбоев",
+  "ut_ced38012da": "Журнал сбоев очищен.",
+  "ut_ead023bd7e": "перепроверить",
+  "ut_2e28b0df81": "Журналы сбоев и состояние работоспособности",
+  "ut_3f96027e32": "Информация о версии скопирована.",
+  "ut_1f0a3070de": "Чтение…",
+  "ut_b6541b6328": "Проверка обновлений…",
+  "ut_32142192ac": "Уже последняя версия",
+  "ut_7dc8c0869d": "версия",
+  "ut_610ddf67b9": "Количество строк буфера отката",
+  "ut_8a70b91e29": "Автоматическая регистрация сеансов",
+  "ut_050de7d897": "Используемая модель",
+  "ut_626fb86214": "Модели пока нет. Сначала добавьте конечную точку, затем добавьте модель.",
+  "ut_387e6f82d0": "конечная точка",
+  "ut_76fb9c463a": "Конечных точек пока нет.",
+  "ut_38966aa565": "Без ограничений",
+  "ut_f28f99867b": "Тайм-аут одношагового ответа",
+  "ut_ded8ed2d66": "Таймаут команды кратный",
+  "ut_a2ce59889b": "не установлено",
+  "ut_6aad5ea609": "Изменить слово",
+  "ut_b95d0f872a": "лицо",
+  "ut_2318f73d10": "отпечаток пальца",
+  "ut_8ec132c8b8": "Биометрия",
+  "ut_cea6052a7e": "Закрыто",
+  "ut_00f43cd923": "На этом устройстве нет биометрических данных, и блокировку приложений невозможно включить.",
+  "ut_91f4c00293": "Хранение учетных данных",
+  "ut_021001ca72": "Безопасное хранилище системы + резервный вариант AES",
+  "ut_b25f81d2b6": "Ордера с высоким риском",
+  "ut_ffaeb5818f": "Второе подтверждение перед выполнением",
+  "ut_98c6d8c630": "Очистить локальные данные",
+  "ut_a74aec2b15": "Локальные данные удалены.",
+  "ut_5474c635a4": "Подтвердите личность, чтобы включить блокировку приложений",
+  "ut_00b1b1f0c5": "Включить MCP",
+  "ut_a48007473a": "Сервера пока нет.",
+  "ut_c9189bb086": "Не подключено",
+  "ut_a4b4f07ab5": "Разрешить ИИ-поиск в Интернете",
+  "ut_704bcb4a34": "серверная часть",
+  "ut_2acaddf4df": "Если ни один из бэкэндов не включен, это означает, что они не включены.",
+  "ut_d40fdc917f": "Вернуть количество элементов",
+  "ut_b00662826d": "Правил пока нет.",
+  "ut_078781c029": "Добавить правила",
+  "ut_19b85efbe5": "Все хосты",
+  "ut_c9e6373a79": "Напоминание о завершении задачи",
+  "ut_4b93fcd514": "когда напомнить",
+  "ut_6e277f398f": "Адрес вебхука",
+  "ut_559d9de7a7": "Я еще не заполнил адрес веб-перехватчика, поэтому его невозможно отправить.",
+  "ut_e52ad942fc": "Добавляется после слова системной подсказки",
+  "ut_62951d47df": "Дополнительные соглашения, записанные на этой машине.",
+  "ut_968538bf30": "Введите DELETE для подтверждения.",
+  "ut_3da0e76468": "Добавить серверную часть поиска",
+  "ut_402165c066": "Добавлены все доступные бэкэнды.",
+  "ut_fd7c3540b7": "Сохранить и включить",
+  "ut_ed57742e6a": "Открыть полные настройки",
+  "ut_5208f9bddf": "Хост не существует",
+  "ut_bc683a74fa": "открыть",
+  "ut_731d9e386f": "Скачать на локальный",
+  "ut_21512fa475": "Предварительный просмотр контента",
+  "ut_64da167c8c": "удалить каталог",
+  "ut_f405fa4a70": "Удалить файлы",
+  "ut_8b9071fa7d": "Модифицированный",
+  "ut_46ebf5b01b": "сохранено",
+  "ut_01ff3a92b3": "новое имя",
+  "ut_c28161cd4b": "Подтвердить удаление",
+  "ut_32d93b8221": "имя каталога",
+  "ut_87fc3f64f6": "создавать",
+  "ut_40cd9573ff": "Отпустите для загрузки в текущий каталог",
+  "ut_ebab5a91e2": "сортировать",
+  "ut_436d7985a6": "размер",
+  "ut_cac0b492e4": "время модификации",
+  "ut_125f95f8d1": "загрузить",
+  "ut_fe22bfe107": "Обновить",
+  "ut_2b1e2ceb1b": "Введите путь",
+  "ut_cfd5be4925": "корневой каталог",
+  "ut_9dc11a1d64": "Подключение...",
+  "ut_98d1c295e4": "Пустой каталог",
+  "ut_a64c884da9": "Невозможно прочитать файл конфигурации",
+  "ut_91d4c887bb": "Файл конфигурации не найден",
+  "ut_8411943202": "Импорт не удался",
+  "ut_c4bdcb7bb4": "В конфигурации нет хоста, который можно импортировать.",
+  "ut_ee82429005": "Советы по парсингу",
+  "ut_ffb911cc34": "импортировать",
+  "ut_4e39421eaf": "трамплин",
+  "ut_35660d6755": "Требуется закрытый ключ",
+  "ut_94376a7210": "Товар не импортирован",
+  "ut_793cb65e3d": "Уже существует",
+  "ut_61181b84f1": "режим темы",
+  "ut_33bd0353d6": "Размер шрифта",
+  "ut_5fb0f8f4a5": "Настройки терминала",
+  "ut_ce50810b95": "только темный цвет",
+  "ut_39c65ad937": "Нет результатов",
+  "ut_ef282263a5": "Выход терминала поиска",
+  "ut_d24c2e83f7": "чувствителен к регистру",
+  "ut_3525464ef3": "Предыдущий (Shift+Enter)",
+  "ut_01e46e4cac": "Далее (Ввод)",
+  "ut_3dd4f86972": "Выбрать все",
+  "ut_93db49204e": "очистить экран",
+  "ut_6b1ae00645": "Очистить буфер обратной прокрутки",
+  "ut_49db0eb3e7": "Скопировать весь вывод",
+  "ut_8f5a44f9a8": "Сохранить вывод в файл…",
+  "ut_7e205da9b6": "Увеличить размер шрифта",
+  "ut_aa2e753d46": "Уменьшить размер шрифта",
+  "ut_1c98824fa9": "Сбросить размер шрифта",
+  "ut_e9304231ed": "Отправить объяснение агенту",
+  "ut_c48f8080f6": "Сохранить как фрагмент команды",
+  "ut_ab94a86f01": "Выполните эту команду в терминале",
+  "ut_e865710760": "Разделение экрана слева и справа",
+  "ut_9833a4decf": "Разделение экрана вверх и вниз",
+  "ut_3e9c805d7f": "Отключите этот разделенный экран (на этом экране присутствует AI)",
+  "ut_16863c6e3a": "Выключите этот разделенный экран",
+  "ut_6f9e7de9f4": "Найти в SFTP",
+  "ut_fa0ed53542": "Откройте панель SFTP",
+  "ut_6dc8f53907": "Просмотр записей аудита",
+  "ut_078958b894": "Посмотреть историю изменений",
+  "ut_76a60a446c": "открыть ссылку",
+  "ut_b99781d2e8": "Скопировать ссылку",
+  "ut_9641c0bb12": "копировать путь",
+  "ut_b736a87497": "Спросите агента об этой ошибке",
+  "ut_6fcc795a39": "Пусть агент объяснит весь этот кусок",
+  "ut_dc52ca948e": "Скопируйте весь этот блок",
+  "ut_4d77c0da07": "Предыдущая команда",
+  "ut_083f59cfec": "команда следующего блока",
+  "ut_c49dbc7b41": "Нет выбранного контента",
+  "ut_90074297f5": "Несколько строк контента будут выполняться последовательно, убедитесь, что при вставке нет ошибок:",
+  "ut_3a1c210c39": "Выполнить эту команду в терминале?",
+  "ut_a28740df5a": "Сохранить вывод терминала",
+  "ut_8a039d57ca": "Ожидание соединения...",
+  "ut_364a8e7d72": "Терминал",
+  "ut_6b4426c1f7": "Модель искусственного интеллекта",
+  "ut_47436bc8ab": "Агент",
+  "ut_ed3461341d": "MCP-сервер",
+  "ut_a6db458718": "Интернет-поиск",
+  "ut_83d66464a0": "внутренние правила",
+  "ut_dc4a75d976": "Уведомления",
+  "ut_6dbcd29d76": "аудит",
+  "ut_2e90894c9a": "только не удалось",
+  "ut_ec50bedaa8": "напоминай каждый раз",
+  "ut_e39887dfed": "Не удалось создать резервную копию исходного файла: {e}. Запись была прервана, а исходный файл не был изменен.",
+  "@ut_e39887dfed": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fcda8e6588": "  Резервная копия исходного файла: {backupPath}.",
+  "@ut_fcda8e6588": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4452077d81": "{summary}\nЦелевой путь: {effectiveLocal}",
+  "@ut_4452077d81": {
+    "placeholders": {
+      "summary": {
+        "type": "Object"
+      },
+      "effectiveLocal": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f4856090f2": "Читаю {path}...",
+  "@ut_f4856090f2": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1e823bfa18": "Ошибка выполнения openssl: {stderr}",
+  "@ut_1e823bfa18": {
+    "placeholders": {
+      "stderr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a2a80977d9": "Резервное копирование исходных файлов в {backupPath}...",
+  "@ut_a2a80977d9": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b9beeabb91": "  Для отката: mv {backupPath} {path}",
+  "@ut_b9beeabb91": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c4acfd10f3": "  Если нужно откатиться: перезапишите {path} этой резервной копией",
+  "@ut_c4acfd10f3": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_af40dec29f": "Файл изменен: {path}",
+  "@ut_af40dec29f": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fb892c6b10": "  Замена: {length} байт → {length} байт.",
+  "@ut_fb892c6b10": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_59e5f6620a": "  Размер файла: {length} → {length} байт.",
+  "@ut_59e5f6620a": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5fe0b81932": "Не удалось сохранить: {e}.",
+  "@ut_5fe0b81932": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1dd514c792": "{length} символы скопированы.",
+  "@ut_1dd514c792": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e275b00675": "Конфиденциальные файлы: {fileName} (доступ запрещен даже внутри проекта)",
+  "@ut_e275b00675": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3ae63b10aa": "Конфиденциальный каталог: {segment} (доступ запрещен)",
+  "@ut_3ae63b10aa": {
+    "placeholders": {
+      "segment": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5b6668af25": "Доступ к системному каталогу {prefix} запрещен.",
+  "@ut_5b6668af25": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_337b92f903": "Доступ к конфиденциальному каталогу ~/{suffix} запрещен.",
+  "@ut_337b92f903": {
+    "placeholders": {
+      "suffix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0c25c4bff1": "Конфиденциальные файлы: {fileName}.",
+  "@ut_0c25c4bff1": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fffc2d39d8": "Конфиденциальный каталог: доступ {segment} запрещен.",
+  "@ut_fffc2d39d8": {
+    "placeholders": {
+      "segment": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_61f32e7e81": "Путь находится за пределами авторизованного каталога проекта: {normalized}.",
+  "@ut_61f32e7e81": {
+    "placeholders": {
+      "normalized": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7695e08c1e": "{scrollLabel} · {logLabel}",
+  "@ut_7695e08c1e": {
+    "placeholders": {
+      "scrollLabel": {
+        "type": "Object"
+      },
+      "logLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b003c911bd": "{count} · Текущий {selectedName}",
+  "@ut_b003c911bd": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      },
+      "selectedName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3f574ada1a": "{count} настроено",
+  "@ut_3f574ada1a": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_664f79491a": "Неограниченное количество шагов · Тайм-аут {timeout}s",
+  "@ut_664f79491a": {
+    "placeholders": {
+      "timeout": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a303a7b799": "Максимальное количество шагов {steps} · Тайм-аут {timeout}s",
+  "@ut_a303a7b799": {
+    "placeholders": {
+      "steps": {
+        "type": "Object"
+      },
+      "timeout": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9947165032": "Включено · Доступны серверные части {enabledCount}",
+  "@ut_9947165032": {
+    "placeholders": {
+      "enabledCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_94c3718c07": "Период безопасности {startHour}:00–{endHour}:00",
+  "@ut_94c3718c07": {
+    "placeholders": {
+      "startHour": {
+        "type": "Object"
+      },
+      "endHour": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cbd8c9bc33": "Экспорт полос {length} в {path}.",
+  "@ut_cbd8c9bc33": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b078e9e8b1": "Не удалось экспортировать: {e}.",
+  "@ut_b078e9e8b1": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_81d685bdc0": ", пропуская {skippedUnknownHost} правила неизвестного хоста",
+  "@ut_81d685bdc0": {
+    "placeholders": {
+      "skippedUnknownHost": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f59978a9af": "Спецификация {imported} {skippedHint} импортирована.",
+  "@ut_f59978a9af": {
+    "placeholders": {
+      "imported": {
+        "type": "Object"
+      },
+      "skippedHint": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4bda191f7f": "Не удалось импортировать: {e}.",
+  "@ut_4bda191f7f": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ec13b5dac5": "Не удалось переключить главный переключатель MCP: {e}.",
+  "@ut_ec13b5dac5": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1e9e2bf1a0": "Инструменты ({length}) · {exposure}",
+  "@ut_1e9e2bf1a0": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "exposure": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fb221962b1": "Не удалось сохранить переключатель инструмента: {e}.",
+  "@ut_fb221962b1": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_62adaafe0d": "Ресурсы ({length})",
+  "@ut_62adaafe0d": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_70da821187": "Слово подсказки ({length})",
+  "@ut_70da821187": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_169bc8e674": "Не удалось открыть селектор каталогов: {e}.",
+  "@ut_169bc8e674": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_02f4d31e55": "Не удалось сохранить переключатель: {e}.",
+  "@ut_02f4d31e55": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c87274304e": "Не удалось сохранить: {e}.",
+  "@ut_c87274304e": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1c9cc2edb3": "Не удалось удалить: {e}.",
+  "@ut_1c9cc2edb3": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ab07d88b41": "Максимум {maxPanes} экранов на вкладке (один реальный сеанс на экран)",
+  "@ut_ab07d88b41": {
+    "placeholders": {
+      "maxPanes": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2596a43876": "Сегодняшние публикации {auditToday}",
+  "@ut_2596a43876": {
+    "placeholders": {
+      "auditToday": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_acb620e2fa": "Хост {targetHost} не подключен и не может выполнить откат",
+  "@ut_acb620e2fa": {
+    "placeholders": {
+      "targetHost": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2f00778de2": "Хост: {hostLabel}",
+  "@ut_2f00778de2": {
+    "placeholders": {
+      "hostLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_35b3e86940": "Откат выполнен успешно: {rollbackCommand}",
+  "@ut_35b3e86940": {
+    "placeholders": {
+      "rollbackCommand": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_21823fef80": "Код выхода {exitCode}",
+  "@ut_21823fef80": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_34ec0a3e03": "Откат не удался: {reason}.",
+  "@ut_34ec0a3e03": {
+    "placeholders": {
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_be42c8efee": "Исключение отката: {e}.",
+  "@ut_be42c8efee": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_99956a3c17": "Повторное подключение {title}...",
+  "@ut_99956a3c17": {
+    "placeholders": {
+      "title": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c1dbbf6a2c": "Исключение повторного подключения: {e}",
+  "@ut_c1dbbf6a2c": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5b97d3e6a4": "Переключился на модель: {modelId}",
+  "@ut_5b97d3e6a4": {
+    "placeholders": {
+      "modelId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7fb66c7378": "Разговор скопирован в буфер обмена (слова {chars})",
+  "@ut_7fb66c7378": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a1c44d88d9": "Разговор скопирован в буфер обмена (слова {chars})\nЖурнал выполнения: {path}",
+  "@ut_a1c44d88d9": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5cf729e87e": "Разговор скопирован в буфер обмена (слова {chars})\nНе удалось прочитать путь журнала: {e}.",
+  "@ut_5cf729e87e": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e77b2cd18c": "Сохранено во фрагменте команды: {trimmed}.",
+  "@ut_e77b2cd18c": {
+    "placeholders": {
+      "trimmed": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_32148ad774": "Не удалось прочитать статус ключа: {e}.",
+  "@ut_32148ad774": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9979b52038": "Тест не пройден: {e}",
+  "@ut_9979b52038": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6934446d27": "Не удалось сохранить конфигурацию: {e}.",
+  "@ut_6934446d27": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8de5894b72": "Ссылка скопирована: {url}",
+  "@ut_8de5894b72": {
+    "placeholders": {
+      "url": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_61476f7ee8": "Не удалось сохранить ответ AI: {e}.",
+  "@ut_61476f7ee8": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_07c39ce9ce": "⚠️ Эта операция изменит локальные файлы и требует подтверждения:\n{display}",
+  "@ut_07c39ce9ce": {
+    "placeholders": {
+      "display": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b306912acf": "Ожидание подтверждения: {toolName}",
+  "@ut_b306912acf": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0968807bf1": "💬 Добавлен пользователь: {steering}",
+  "@ut_0968807bf1": {
+    "placeholders": {
+      "steering": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c547224534": "⚠️ В плане еще остались незавершенные пункты {length}, и их необходимо проверить один за другим перед завершением ({planFinishRetryCount}/{maxPlanFinishRetries})",
+  "@ut_c547224534": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "planFinishRetryCount": {
+        "type": "Object"
+      },
+      "maxPlanFinishRetries": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_478eec6181": "⚠️ Достигнуто максимальное количество шагов выполнения ({maxSteps}) и задача прерывается.",
+  "@ut_478eec6181": {
+    "placeholders": {
+      "maxSteps": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fa2224f3f9": "⚠️ Основная модель {modelName} недоступна и заменена на резервную модель {modelName}.",
+  "@ut_fa2224f3f9": {
+    "placeholders": {
+      "modelName": {
+        "type": "Object"
+      },
+      "modelName2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_971883a7fe": "⚠️ Игнорируйте лишние вызовы инструментов в этом раунде: {name} (выполняйте только одно действие в каждом раунде)",
+  "@ut_971883a7fe": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cb255683ce": "Оценка: {safetyLevel}",
+  "@ut_cb255683ce": {
+    "placeholders": {
+      "safetyLevel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ee0b938b2c": "Описание: {reason}",
+  "@ut_ee0b938b2c": {
+    "placeholders": {
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f46987bf0d": "{highRisk} {highRisk} требует подтверждения (режим {modeLabel}): `{command}`\nЗаявление о рисках: {reason}",
+  "@ut_f46987bf0d": {
+    "placeholders": {
+      "highRisk": {
+        "type": "Object"
+      },
+      "highRisk2": {
+        "type": "Object"
+      },
+      "modeLabel": {
+        "type": "Object"
+      },
+      "command": {
+        "type": "Object"
+      },
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a61b05ce9b": "👉 Вы выбрали: {choice}",
+  "@ut_a61b05ce9b": {
+    "placeholders": {
+      "choice": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_386b3634c1": "⚠️ ИИ вызывает {alias}, но параметр команды не указан.",
+  "@ut_386b3634c1": {
+    "placeholders": {
+      "alias": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0eed0d18c7": "⚠️Неизвестный инструмент: {toolName}.",
+  "@ut_0eed0d18c7": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_21239ba62c": "🔒 Режим только для чтения включен, этому инструменту отказано в выполнении: `{toolName}`",
+  "@ut_21239ba62c": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_339abc33a7": "⚠️ Инструмент «{toolName}» недоступен в текущем сеансе.",
+  "@ut_339abc33a7": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2bd0b4985d": "❌ Исключение выполнения инструмента {toolName}: {e}.",
+  "@ut_2bd0b4985d": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e36f09192f": "{prefix} Ожидание завершения последнего раунда загрузки...",
+  "@ut_e36f09192f": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dc39c308a2": "{prefix} ход загрузки: файлы {uploaded}/{total}",
+  "@ut_dc39c308a2": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      },
+      "uploaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_91700996f4": "Загрузка файла: {local}",
+  "@ut_91700996f4": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ded2242c8f": "Файл успешно загружен: {local} → {remote} ({size})",
+  "@ut_ded2242c8f": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_d72746d0d0": "Рекурсивная загрузка каталога: {local} → {effectiveRemote}.",
+  "@ut_d72746d0d0": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      },
+      "effectiveRemote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0e800a8406": "Скачивание файла: {remote} → {target}",
+  "@ut_0e800a8406": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "target": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c8b91122b": "Загрузка файла прошла успешно: {remote} → {target} ({size})",
+  "@ut_5c8b91122b": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "target": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2bc26619aa": "Рекурсивная загрузка каталога: {remote} → {effectiveLocal}.",
+  "@ut_2bc26619aa": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "effectiveLocal": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_52a01019d8": "Ход загрузки: файлы {downloaded}/{total}",
+  "@ut_52a01019d8": {
+    "placeholders": {
+      "downloaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6b85bbaf16": "[{hostId}] Не удалось подключиться к SFTP: {e}",
+  "@ut_6b85bbaf16": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2d44fe0c64": "[{hostId}] Загрузка файла: {local}",
+  "@ut_2d44fe0c64": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7ef1cd9389": "[{hostId}] Загрузка завершена",
+  "@ut_7ef1cd9389": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a465e8a3ee": "[{hostId}] Файл успешно загружен: {local} → {remote} ({size})",
+  "@ut_a465e8a3ee": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_699c3fa8dc": "[{hostId}] Рекурсивная загрузка каталога: {local} → {effectiveRemote}.",
+  "@ut_699c3fa8dc": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      },
+      "effectiveRemote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2996de9000": "[{hid}] Распространение...",
+  "@ut_2996de9000": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0f735fba75": "[{hid}] ✗ Отменено, пропущено",
+  "@ut_0f735fba75": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c021ae6b9": "[{hid}] Собираем {remote}...",
+  "@ut_5c021ae6b9": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e31edc9171": "[{hid}] ✗ Хост не подключен или сеанс не SSH.",
+  "@ut_e31edc9171": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2e01615eec": "=== [{hid}] Отменено, пропущено ===",
+  "@ut_2e01615eec": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ffebfc53a6": "[{hid}] Ищу...",
+  "@ut_ffebfc53a6": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_38bc3dac85": "=== [{hid}] Хост не подключен ===",
+  "@ut_38bc3dac85": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8dc55e0134": "[{hid}] Читаю {remote}...",
+  "@ut_8dc55e0134": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_475dcf3309": "Проверка сертификата HTTPS для {host}:{port}...",
+  "@ut_475dcf3309": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      },
+      "port": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bde384cf72": "Разрешение локального сертификата: {certPath}",
+  "@ut_bde384cf72": {
+    "placeholders": {
+      "certPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b733c697fb": "{write} {path} ({length} байт)...",
+  "@ut_b733c697fb": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_24853c3f76": "Файл {write} выполнен успешно: {path} ({length} байт).",
+  "@ut_24853c3f76": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a7bd551b52": "Не удалось выполнить откат резервной копии: {rollbackErr}, будет предпринята попытка записи PTY.",
+  "@ut_a7bd551b52": {
+    "placeholders": {
+      "rollbackErr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f8d0ae7c3c": "\n  Примечание. Процесс SFTP создал резервную копию исходного файла в {backupPath}. Резервную копию можно удалить вручную после успешной записи PTY.",
+  "@ut_f8d0ae7c3c": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6820e10527": "Запись файла успешна (кот режима стандартного ввода PTY): {path} ({length} байт) {backupInfo}",
+  "@ut_6820e10527": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      },
+      "backupInfo": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_caa84ab310": "Ошибка записи кота: {failureReason}, попробуй sudo tee...",
+  "@ut_caa84ab310": {
+    "placeholders": {
+      "failureReason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b0ea4177b4": "Запись файла прошла успешно (стандартный ввод PTY + тройник sudo): {path} ({length} байт) {backupInfo}",
+  "@ut_b0ea4177b4": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      },
+      "backupInfo": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_aad3625b0a": "Файл {write} выполнен успешно ({method}): {path} ({byteCount} байт)",
+  "@ut_aad3625b0a": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "method": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "byteCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_00cd1c4300": "Поиск в базе знаний: {query}",
+  "@ut_00cd1c4300": {
+    "placeholders": {
+      "query": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c0b2e0370": "\n…({label}, исходный текст содержит символы {length})",
+  "@ut_5c0b2e0370": {
+    "placeholders": {
+      "label": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6f51e792f4": "Полный ход загрузки: {uploaded}/{total}.",
+  "@ut_6f51e792f4": {
+    "placeholders": {
+      "uploaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf4b2fdeb1": "Локальный рабочий каталог создан: {resolvedCwd}.",
+  "@ut_cf4b2fdeb1": {
+    "placeholders": {
+      "resolvedCwd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_93ba05fcda": "Невозможно создать рабочий каталог {resolvedCwd}: {e}.",
+  "@ut_93ba05fcda": {
+    "placeholders": {
+      "resolvedCwd": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bb63c6672a": "Локальное исполнение ({shell}): {command}",
+  "@ut_bb63c6672a": {
+    "placeholders": {
+      "shell": {
+        "type": "Object"
+      },
+      "command": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b5e97db76b": "{scanned} файлы отсканированы...",
+  "@ut_b5e97db76b": {
+    "placeholders": {
+      "scanned": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_132456dcfb": "Неизвестный режим: {mode} (поддерживает запись/добавление)",
+  "@ut_132456dcfb": {
+    "placeholders": {
+      "mode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3b4b10f1b2": "Не удалось запустить локальный терминал: {e}.",
+  "@ut_3b4b10f1b2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bbafda1855": "[Изображение {mimeType}, {length} символов base64]",
+  "@ut_bbafda1855": {
+    "placeholders": {
+      "mimeType": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3901620d02": "Вызов инструмента MCP {serverName}/{name}",
+  "@ut_3901620d02": {
+    "placeholders": {
+      "serverName": {
+        "type": "Object"
+      },
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_405448830f": "Прочтите ресурс MCP {uri}",
+  "@ut_405448830f": {
+    "placeholders": {
+      "uri": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_090d7978c2": "Получите подсказку MCP {name}",
+  "@ut_090d7978c2": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b01822a097": "Каталог проекта не существует: {path}.",
+  "@ut_b01822a097": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f1acec8e02": "Путь проекта: {path}",
+  "@ut_f1acec8e02": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8a884e053e": "Автоматически распознавать команду сборки: {buildCmd}.",
+  "@ut_8a884e053e": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5ab7922da3": "Команда сборки заблокирована политикой безопасности: {buildCmd}.",
+  "@ut_5ab7922da3": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_323ecc4b40": "Начать строительство: {buildCmd}",
+  "@ut_323ecc4b40": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dd547aa71c": "✓ Постройте успешные ({inSeconds})\n\nВыход:\n{output}",
+  "@ut_dd547aa71c": {
+    "placeholders": {
+      "inSeconds": {
+        "type": "Object"
+      },
+      "output": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fe98a458a9": "✗ Сборка не удалась (код выхода: {exitCode}, затраченное время: {inSeconds}s)",
+  "@ut_fe98a458a9": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      },
+      "inSeconds": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2192f982a0": "Команда упаковки заблокирована политикой безопасности: {packageCmd}",
+  "@ut_2192f982a0": {
+    "placeholders": {
+      "packageCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5e9fa40ae2": "Начать упаковку: {artifactDir} → {outputFile}",
+  "@ut_5e9fa40ae2": {
+    "placeholders": {
+      "artifactDir": {
+        "type": "Object"
+      },
+      "outputFile": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c3df15635": "✓ Упаковка удачная\nВыходной файл: {outputFile}.\nРазмер: {sizeStr}\n\nЭтот файл можно загрузить на сервер с помощью инструмента sftp_upload.",
+  "@ut_9c3df15635": {
+    "placeholders": {
+      "outputFile": {
+        "type": "Object"
+      },
+      "sizeStr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7884351654": "Упаковка успешна: {sizeStr}",
+  "@ut_7884351654": {
+    "placeholders": {
+      "sizeStr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0a71fe6a29": "✗ Ошибка упаковки (код выхода: {exitCode}).\n--- стандартный вывод ---\n{stdout}\n--- стандартное сообщение ---\n{stderr}",
+  "@ut_0a71fe6a29": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      },
+      "stdout": {
+        "type": "Object"
+      },
+      "stderr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_62e6c24a03": "Не удалось прочитать: {message}.",
+  "@ut_62e6c24a03": {
+    "placeholders": {
+      "message": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ed6128ba80": "Подключение {host}:{port}...",
+  "@ut_ed6128ba80": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      },
+      "port": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2574cd27d5": "Подключаем через трамплинное реле {host}...",
+  "@ut_2574cd27d5": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_939fbbbde2": "Проверка соединения пропущена: {e}\n",
+  "@ut_939fbbbde2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c09d2ebc3": "Не удалось записать на стандартный ввод: {e}.",
+  "@ut_5c09d2ebc3": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_160a20b4b9": "Не удалось отправить EOF: {e}.",
+  "@ut_160a20b4b9": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e230a6d105": "Ищу: {query}",
+  "@ut_e230a6d105": {
+    "placeholders": {
+      "query": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8bc3df095a": "Получение: {url}.",
+  "@ut_8bc3df095a": {
+    "placeholders": {
+      "url": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_571ec497a6": "Название: {title}",
+  "@ut_571ec497a6": {
+    "placeholders": {
+      "title": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_eb988194e9": "Цель: {trim}",
+  "@ut_eb988194e9": {
+    "placeholders": {
+      "trim": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_304b011a8a": "Вывод: {trim}",
+  "@ut_304b011a8a": {
+    "placeholders": {
+      "trim": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_080de8536f": "{service} работает",
+  "@ut_080de8536f": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8f24f3ec45": "{service} не работает",
+  "@ut_8f24f3ec45": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_622000e27f": "{service} запускается автоматически при загрузке",
+  "@ut_622000e27f": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_371d1b3d69": "{service} Автозапуск не установлен",
+  "@ut_371d1b3d69": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e7e9d06df9": " Подождите портов {length}.",
+  "@ut_e7e9d06df9": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9def515d87": "Прослушивание порта {shown}{suffix}",
+  "@ut_9def515d87": {
+    "placeholders": {
+      "shown": {
+        "type": "Object"
+      },
+      "suffix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ea6610697b": "Ваш выбор: {chosen}",
+  "@ut_ea6610697b": {
+    "placeholders": {
+      "chosen": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e7d26cf57d": "Конец исходного вывода · Всего символов {totalChars}",
+  "@ut_e7d26cf57d": {
+    "placeholders": {
+      "totalChars": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7234d250c6": "Всего элементов {length} · Показаны элементы {length}",
+  "@ut_7234d250c6": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0b13faa29b": "{length} журналы скопированы.",
+  "@ut_0b13faa29b": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2a21b678a8": "{inMinutes} минут назад",
+  "@ut_2a21b678a8": {
+    "placeholders": {
+      "inMinutes": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_05ac4fcf03": "{inHours} часов назад",
+  "@ut_05ac4fcf03": {
+    "placeholders": {
+      "inHours": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_11bfebfb31": "{inDays} дней назад",
+  "@ut_11bfebfb31": {
+    "placeholders": {
+      "inDays": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5eda668d7a": "Модели · {length}",
+  "@ut_5eda668d7a": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dc4c3efe70": "Заменить текущие модели {length} моделью по умолчанию «{name}»?",
+  "@ut_dc4c3efe70": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c153205f28": "Притянуто к моделям {length}.",
+  "@ut_c153205f28": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c3ca30909": "Добавить {length}",
+  "@ut_9c3ca30909": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0408a4e88d": "Последнее подключение: {lastConnected}",
+  "@ut_0408a4e88d": {
+    "placeholders": {
+      "lastConnected": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_508cac93a2": "{length} хосты · {success} успешно'\n                    '{failed}",
+  "@ut_508cac93a2": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "success": {
+        "type": "Object"
+      },
+      "failed": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_00fefb12c8": "Код выхода {exitCode}",
+  "@ut_00fefb12c8": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7c37c17c72": "Открыть {name}",
+  "@ut_7c37c17c72": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_393e236ec2": "Выполнено {runCount} раз.",
+  "@ut_393e236ec2": {
+    "placeholders": {
+      "runCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4dbb782799": "Скопируйте этот бар {length} (с выводом)",
+  "@ut_4dbb782799": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_afa890cf1c": "{length} элементы скопированы",
+  "@ut_afa890cf1c": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_63f8cd8765": "Также есть предметы {rest}.",
+  "@ut_63f8cd8765": {
+    "placeholders": {
+      "rest": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2565b39f32": "Всего единиц {total}",
+  "@ut_2565b39f32": {
+    "placeholders": {
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e36a5ac905": "Откат: {rollbackCommand}",
+  "@ut_e36a5ac905": {
+    "placeholders": {
+      "rollbackCommand": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_261ec8093d": "Переподключение {hostLabel} · Соединение восстанавливается",
+  "@ut_261ec8093d": {
+    "placeholders": {
+      "hostLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1568d540be": "{length} символы скопированы.",
+  "@ut_1568d540be": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c14c3f2424": "Этот сеанс аварийно завершился {count} раз.",
+  "@ut_c14c3f2424": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1f5bbded76": "Найдена новая версия {version}, нажмите, чтобы посмотреть",
+  "@ut_1f5bbded76": {
+    "placeholders": {
+      "version": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5eb52c419e": "Модели {length} · {baseUrl}",
+  "@ut_5eb52c419e": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "baseUrl": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_01f2ee338e": "{length} слова",
+  "@ut_01f2ee338e": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_92bbd40515": "Включено · Проверка {biometricLabel} при запуске.",
+  "@ut_92bbd40515": {
+    "placeholders": {
+      "biometricLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8ecd2c14b5": "Подключено · {value} инструменты",
+  "@ut_8ecd2c14b5": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7c5becde1e": "{value} инструментов",
+  "@ut_7c5becde1e": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3d787403e1": "Группа хостов · {group}",
+  "@ut_3d787403e1": {
+    "placeholders": {
+      "group": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_def0dd4b20": "Хозяин · {hostId}",
+  "@ut_def0dd4b20": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fddba05801": "{displayName} API-ключ",
+  "@ut_fddba05801": {
+    "placeholders": {
+      "displayName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e42173cc90": "Загружено в: {localPath}",
+  "@ut_e42173cc90": {
+    "placeholders": {
+      "localPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7a77df19f2": "Не удалось загрузить: {e}.",
+  "@ut_7a77df19f2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c9db79438": "Не удалось прочитать: {e}.",
+  "@ut_9c9db79438": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6f2c34a667": "Не удалось переименовать: {e}.",
+  "@ut_6f2c34a667": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf4419589b": "Не удалось удалить: {e}.",
+  "@ut_cf4419589b": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c3b890cd74": "Не удалось открыть средство выбора файлов: {e}.",
+  "@ut_c3b890cd74": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3f446bd9fe": "Загружено: {fileName}",
+  "@ut_3f446bd9fe": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9e12df0a1f": "Не удалось загрузить {fileName}: {e}.",
+  "@ut_9e12df0a1f": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e89a046c8b": "Не удалось создать каталог: {e}.",
+  "@ut_e89a046c8b": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6c61736431": "Не удалось загрузить {name}: {e}.",
+  "@ut_6c61736431": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3cc564d9ac": "Хосты {ok} были импортированы (учетные данные необходимо ввести на странице редактирования хоста)",
+  "@ut_3cc564d9ac": {
+    "placeholders": {
+      "ok": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_218046bbfd": "Вставить строку {length}?",
+  "@ut_218046bbfd": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c40c983842": "{preview}\n… и строки {more}",
+  "@ut_c40c983842": {
+    "placeholders": {
+      "preview": {
+        "type": "Object"
+      },
+      "more": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3482231651": "Сохранено в {path}.",
+  "@ut_3482231651": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_aa865c9773": "предмет",
+  "ut_75282877a3": "Статья · Внедрение контекста ИИ",
+  "ut_35f3bcac7a": "Станция сохранена",
+  "ut_c32994dbf5": "Тайвань",
+  "ut_2cdff50b37": "группа",
+  "ut_f7826628c0": "минут назад",
+  "ut_bfa2c2000f": "часов назад",
+  "ut_15e2558649": "дней назад",
+  "ut_e7b73487d7": "персонаж",
+  "ut_babe4e8237": "{connected}/{total} серверов",
+  "@ut_babe4e8237": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_95860656bf": "Главный переключатель MCP выключен · подключено серверов: {connected}/{total}",
+  "@ut_95860656bf": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e12efa5ddb": "{connected}/{total} серверов · {tools} инструментов доступно агенту",
+  "@ut_e12efa5ddb": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      },
+      "tools": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3330b55acf": "{value} ресурсов",
+  "@ut_3330b55acf": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf674ef0f8": "{value} подсказок",
+  "@ut_cf674ef0f8": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  }
 }

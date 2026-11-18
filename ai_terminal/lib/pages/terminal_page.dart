@@ -1063,8 +1063,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final result = splitAfter(current, afterPaneId: _activePaneForTab(tabId));
     if (result == null) {
       _showOperationMessage(
-        UiText.t('一个标签最多 ${PaneLayout.maxPanes} 屏（每屏一个真实会话）',
-            'A tab holds at most ${PaneLayout.maxPanes} panes (one live session each)'),
+        L10n.str.ut_ab07d88b41(PaneLayout.maxPanes),
         isError: true,
       );
       return;
@@ -2541,7 +2540,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       'drawer:${NavDrawer.sectionHosts}':
           UiText.count(HostsDao.cached.length, '台', 'hosts'),
       'drawer:${NavDrawer.sectionAudit}':
-          UiText.t('今日 $auditToday 条', '$auditToday today'),
+          L10n.str.ut_2596a43876(auditToday),
       // 组数跟着 kSettingsEntries 走：写死「8 组」的话，以后加一组就悄悄错了。
       'drawer:${NavDrawer.sectionSettings}':
           UiText.count(kSettingsEntries.length, '组', 'groups'),
@@ -4046,7 +4045,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(UiText.t('主机：$hostLabel', 'Host: $hostLabel'),
+              Text(L10n.str.ut_2f00778de2(hostLabel),
                   style: TextStyle(color: tc.textMain, fontSize: fSmall)),
               const SizedBox(height: 8),
               Text(
@@ -4138,21 +4137,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             isError: true);
       } else if (result.success) {
         setState(() => _rolledBackChangeIds.add(change.id));
-        _showOperationMessage(UiText.t(
-            '回滚成功：${isLocalRestore ? result.stdout : rollbackCommand}',
-            'Rollback succeeded: ${isLocalRestore ? result.stdout : rollbackCommand}'));
+        _showOperationMessage(L10n.str.ut_35b3e86940(isLocalRestore ? result.stdout : rollbackCommand));
       } else {
         final reason = result.stderr.trim().isNotEmpty
             ? result.stderr.trim()
-            : UiText.t(
-                '退出码 ${result.exitCode}', 'exit code ${result.exitCode}');
+            : L10n.str.ut_21823fef80(result.exitCode);
         _showOperationMessage(
-            UiText.t('回滚失败：$reason', 'Rollback failed: $reason'),
+            L10n.str.ut_34ec0a3e03(reason),
             isError: true);
       }
     } catch (e) {
       if (mounted)
-        _showOperationMessage(UiText.t('回滚异常：$e', 'Rollback error: $e'),
+        _showOperationMessage(L10n.str.ut_be42c8efee(e),
             isError: true);
     } finally {
       if (mounted) setState(() => _rollbackBusy = false);
@@ -4186,8 +4182,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       return;
     }
 
-    _showOperationMessage(UiText.t(
-        '正在重连 ${activeTab.title} ...', 'Reconnecting ${activeTab.title} ...'));
+    _showOperationMessage(L10n.str.ut_99956a3c17(activeTab.title));
     if (mounted) {
       setState(() => _reconnectingHostLabel = activeTab.title);
     }
@@ -4210,7 +4205,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       _showOperationMessage(UiText.t('重连成功', 'Reconnected'));
     } catch (e) {
       if (mounted)
-        _showOperationMessage(UiText.t('重连异常：$e', 'Reconnect error: $e'),
+        _showOperationMessage(L10n.str.ut_c1dbbf6a2c(e),
             isError: true);
     } finally {
       if (mounted) {
@@ -5342,8 +5337,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final target =
         choices.firstWhere((c) => labels[c.modelId] == candidates.first);
     _applyModelChoice(target);
-    _showGoalHint(UiText.t('已切换到模型：${labels[target.modelId]}',
-        'Model switched to ${labels[target.modelId]}'));
+    _showGoalHint(L10n.str.ut_5b97d3e6a4(labels[target.modelId] ?? ''));
     return true;
   }
 
@@ -5362,14 +5356,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     AgentTracer.instance.tracePath().then((path) {
       if (!mounted) return;
       _showGoalHint(path == null
-          ? UiText.t('会话已复制到剪贴板（$chars 字）',
-              'Session copied to clipboard ($chars chars)')
-          : UiText.t('会话已复制到剪贴板（$chars 字）\n执行日志：$path',
-              'Session copied to clipboard ($chars chars)\nLog: $path'));
+          ? L10n.str.ut_7fb66c7378(chars)
+          : L10n.str.ut_a1c44d88d9(chars, path));
     }).catchError((Object e) {
       if (!mounted) return;
-      _showGoalHint(UiText.t('会话已复制到剪贴板（$chars 字）\n日志路径读取失败：$e',
-          'Session copied to clipboard ($chars chars)\nLog path unavailable: $e'));
+      _showGoalHint(L10n.str.ut_5cf729e87e(chars, e));
     });
     return true;
   }
@@ -5508,8 +5499,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       context,
       SnackBar(
         content: Text(
-            UiText.t(
-                '已保存到命令片段：$trimmed', 'Saved to command snippets: $trimmed'),
+            L10n.str.ut_e77b2cd18c(trimmed),
             style: const TextStyle(fontSize: fSmall)),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,

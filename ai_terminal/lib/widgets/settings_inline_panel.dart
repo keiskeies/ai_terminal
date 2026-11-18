@@ -27,6 +27,7 @@ import 'inline_form.dart';
 import 'keybinding_editor.dart';
 import 'mcp_server_editor_form.dart';
 import 'rule_editor_form.dart';
+import '../core/l10n_holder.dart';
 
 /// 设置页里每一组的就地编辑区。
 ///
@@ -365,8 +366,7 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
                   style: TextStyle(fontSize: fMicro, color: tc.textMain),
                 ),
                 Text(
-                  UiText.t('${e.models.length} 个模型 · ${e.baseUrl}',
-                      '${e.models.length} models · ${e.baseUrl}'),
+                  L10n.str.ut_5eb52c419e(e.models.length, e.baseUrl),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: fMicro, color: tc.textMuted),
@@ -469,7 +469,7 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
             Text(
               customPrompt.trim().isEmpty
                   ? UiText.t('未设置', 'Not set')
-                  : UiText.t('${customPrompt.trim().length} 字', '${customPrompt.trim().length} chars'),
+                  : L10n.str.ut_01f2ee338e(customPrompt.trim().length),
               style: TextStyle(fontSize: fMicro, color: tc.textMuted),
             ),
             const SizedBox(width: 8),
@@ -538,8 +538,7 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
                   ),
                   Text(
                     _appLockEnabled
-                        ? UiText.t('已开启 · 启动时验证$biometricLabel',
-                            'On · requires $biometricLabel at launch')
+                        ? L10n.str.ut_92bbd40515(biometricLabel)
                         : UiText.t('已关闭', 'Off'),
                     style: TextStyle(fontSize: fMicro, color: tc.textMuted),
                   ),
@@ -940,8 +939,7 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
                 ),
                 Text(
                   connected
-                      ? UiText.t('已连接 · ${runtime?.tools.length ?? 0} 个工具',
-                          'Connected · ${runtime?.tools.length ?? 0} tools')
+                      ? L10n.str.ut_8ecd2c14b5(runtime?.tools.length ?? 0)
                       : UiText.t('未连接', 'Offline'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1887,8 +1885,7 @@ class _WebKeyFormState extends State<_WebKeyForm> {
   Widget build(BuildContext context) {
     final key = _controller.text.trim();
     return InlineSheet(
-      title: UiText.t('${widget.provider.displayName} API Key',
-          '${widget.provider.displayName} API key'),
+      title: L10n.str.ut_fddba05801(widget.provider.displayName),
       onBack: widget.onCancel,
       actions: [
         InlineButton(

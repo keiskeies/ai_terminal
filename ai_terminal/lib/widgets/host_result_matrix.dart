@@ -4,6 +4,7 @@ import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../core/ui_text.dart';
 import '../models/host_execution_result.dart';
+import '../core/l10n_holder.dart';
 
 /// 多主机批量结果矩阵：按主机展示成功/失败、耗时、退出码与输出摘要
 class HostResultMatrix extends StatefulWidget {
@@ -107,7 +108,7 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
     final meta = <String>[
       if (result.durationMs != null) _formatDuration(result.durationMs!),
       if (result.exitCode != null)
-        UiText.t('退出码 ${result.exitCode}', 'exit ${result.exitCode}'),
+        L10n.str.ut_00fefb12c8(result.exitCode ?? 0),
       if (!result.success) _failureLabel(result.failureKind),
     ];
 

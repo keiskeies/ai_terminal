@@ -5,6 +5,7 @@ import '../utils/tool_args_parser.dart';
 import 'agent_tool.dart';
 import 'command_executor.dart';
 import 'mcp_models.dart';
+import '../core/l10n_holder.dart';
 
 /// Adapter 依赖的最小调用面（由 McpManager 实现，便于测试）
 abstract class McpToolCaller {
@@ -112,7 +113,7 @@ class McpToolAdapter extends AgentTool {
         ),
       );
     }
-    onProgress?.call(UiText.t('调用 MCP 工具 $serverName/${descriptor.name}', 'Calling MCP tool $serverName/${descriptor.name}'));
+    onProgress?.call(L10n.str.ut_3901620d02(serverName, descriptor.name));
     try {
       final result =
           await caller.callMcpTool(serverId, descriptor.name, arguments);
@@ -291,7 +292,7 @@ class McpSideToolAdapter extends AgentTool {
           return ToolResult.success(buffer.toString().trimRight());
         case McpSideToolKind.readResource:
           final uri = args.requireString('uri');
-          onProgress?.call(UiText.t('读取 MCP 资源 $uri', 'Reading MCP resource $uri'));
+          onProgress?.call(L10n.str.ut_405448830f(uri));
           final text = await caller.readMcpResource(serverId, uri);
           return ToolResult.success(text);
         case McpSideToolKind.listPrompts:
@@ -322,7 +323,7 @@ class McpSideToolAdapter extends AgentTool {
               (key, value) => MapEntry(key.toString(), value.toString()),
             );
           }
-          onProgress?.call(UiText.t('获取 MCP 提示词 $name', 'Fetching MCP prompt $name'));
+          onProgress?.call(L10n.str.ut_090d7978c2(name));
           final text =
               await caller.getMcpPrompt(serverId, name, arguments: promptArgs);
           return ToolResult.success(text);

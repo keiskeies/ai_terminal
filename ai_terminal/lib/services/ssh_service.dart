@@ -10,6 +10,7 @@ import '../utils/tail_text_buffer.dart';
 import '../utils/terminal_charset.dart';
 import 'command_executor.dart';
 import 'session_log_service.dart';
+import '../core/l10n_holder.dart';
 
 /// SSH 连接状态
 enum SSHConnectionState {
@@ -93,14 +94,12 @@ class SSHService implements CommandExecutor {
     _dropNotified = false;
     try {
       // 连接过程的提示直接进终端输出流，是用户能看到的文案，必须过 UiText。
-      outputController.add(UiText.t('正在连接 ${config.host}:${config.port}...',
-              'Connecting to ${config.host}:${config.port}...') +
+      outputController.add(L10n.str.ut_ed6128ba80(config.host, config.port) +
           '\n');
 
       // 如果配置了跳板机
       if (jumpHostConfig != null) {
-        outputController.add(UiText.t('通过跳板机 ${jumpHostConfig.host} 中转连接...',
-                'Relaying through jump host ${jumpHostConfig.host}...') +
+        outputController.add(L10n.str.ut_2574cd27d5(jumpHostConfig.host) +
             '\n');
 
         // 1. 先连接跳板机（加超时）
@@ -157,7 +156,7 @@ class SSHService implements CommandExecutor {
         outputController.add(UiText.t('连接验证通过\n', 'Connection verified\n'));
       } catch (e) {
         outputController
-            .add(UiText.t('连接验证跳过: $e\n', 'Connection check skipped: $e\n'));
+            .add(L10n.str.ut_939fbbbde2(e));
       }
 
       // 获取系统信息
@@ -806,7 +805,7 @@ class SSHService implements CommandExecutor {
         await _writeText('$line$suffix');
       } catch (e) {
         abnormalReason
-            .add(UiText.t('写入 stdin 失败: $e', 'Failed to write to stdin: $e'));
+            .add(L10n.str.ut_5c09d2ebc3(e));
         if (!doneCompleter.isCompleted) doneCompleter.complete();
         break;
       }
@@ -831,7 +830,7 @@ class SSHService implements CommandExecutor {
           }
         }
       } catch (e) {
-        abnormalReason.add(UiText.t('发送 EOF 失败: $e', 'Failed to send EOF: $e'));
+        abnormalReason.add(L10n.str.ut_160a20b4b9(e));
         if (!doneCompleter.isCompleted) doneCompleter.complete();
       }
     }

@@ -8,6 +8,7 @@ import '../utils/tool_args_parser.dart';
 import 'agent_tool.dart';
 import 'command_executor.dart';
 import 'local_file_policy.dart';
+import '../core/l10n_holder.dart';
 
 /// 本地文件工具集 — 读写**运行本 App 的这台机器**上的文件
 ///
@@ -396,8 +397,7 @@ class LocalFileSearchTool extends LocalFileTool {
         root: path,
       );
       if (scanned % 200 == 0) {
-        onProgress?.call(UiText.t(
-            '已扫描 $scanned 个文件...', 'Scanned $scanned files...'));
+        onProgress?.call(L10n.str.ut_b5e97db76b(scanned));
       }
     }
 
@@ -504,9 +504,7 @@ class LocalFileWriteTool extends LocalFileTool {
     final rawPath = args.getString('path');
     final mode = args.getString('mode', defaultValue: 'write');
     if (mode != 'write' && mode != 'append') {
-      return ToolResult.failure(UiText.t(
-          '未知 mode: $mode（支持 write/append）',
-          'Unknown mode: $mode (supported: write/append)'));
+      return ToolResult.failure(L10n.str.ut_132456dcfb(mode));
     }
     final resolved = await _resolve(rawPath, _policy);
     if (resolved is ToolResult) return resolved;

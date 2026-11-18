@@ -9,6 +9,7 @@ import '../models/host_config.dart';
 import '../providers/app_providers.dart';
 import '../services/ssh_config_import_service.dart';
 import '../utils/ssh_config_parser.dart';
+import '../core/l10n_holder.dart';
 
 /// 从 `~/.ssh/config` 导入主机。
 ///
@@ -107,8 +108,7 @@ class _SshConfigImportDialogState extends ConsumerState<SshConfigImportDialog> {
     if (!mounted) return;
     Navigator.of(context).pop();
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(UiText.t('已导入 $ok 台主机（凭据需在主机编辑页补填）',
-          'Imported $ok host(s); add credentials in host edit')),
+      content: Text(L10n.str.ut_3cc564d9ac(ok)),
     ));
   }
 

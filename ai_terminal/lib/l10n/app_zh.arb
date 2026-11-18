@@ -1320,5 +1320,2605 @@
     }
   },
   "aiModelFunctionCallingHint": "原生工具调用（OpenAI tools API），仅支持该协议的模型开启",
-  "terminalModelLockedRunning": "Agent 运行中，结束后再切换模型或思考档位"
+  "terminalModelLockedRunning": "Agent 运行中，结束后再切换模型或思考档位",
+  "ut_9dd16b4310": "取消",
+  "ut_929f88c953": "保存",
+  "ut_375761b903": "编辑",
+  "ut_12b4ff78f0": "删除",
+  "ut_2439c9088c": "关闭",
+  "ut_8d8a263df0": "名称",
+  "ut_dd3bec10ce": "确定",
+  "ut_2bbaf6e153": "已复制",
+  "ut_7713abebb3": "命令历史",
+  "ut_c96baaaa38": "命令",
+  "ut_bed1bc3d9f": "快捷命令",
+  "ut_4064dc0579": "全局",
+  "ut_8b97bab772": "主机组",
+  "ut_c53688e21a": "主机",
+  "ut_b996bd3d08": "自定义",
+  "ut_400ef8d1c1": "全部工具",
+  "ut_5ea95f868c": "新 MCP 服务器",
+  "ut_fb999767e8": "端口转发",
+  "ut_ee627300a6": "Agent 正在执行，请稍后再试",
+  "ut_8fa7ec1798": "思考中",
+  "ut_19a5b5ad85": "清除",
+  "ut_5dc39ef856": "请选择",
+  "ut_c4b7d3a09f": "关闭 (Esc)",
+  "ut_fda3f94089": "执行",
+  "ut_6e269868a4": "1 千行",
+  "ut_60a303a337": "5 万行",
+  "ut_386ffb419a": "10 万行",
+  "ut_53f8d85ab6": "主机",
+  "ut_cf99c7c571": "运维工作流",
+  "ut_422db29f9c": "审计日志",
+  "ut_b671baec90": "变更台账",
+  "ut_abcdfedd3e": "确认提示自动应答",
+  "ut_760a393290": "导入 SSH 配置",
+  "ut_cce7c556ba": "编辑规范",
+  "ut_1982929432": "新增规范",
+  "ut_f996de5ff9": "标题",
+  "ut_1bc8da322f": "请填写标题",
+  "ut_2d4881db12": "规范内容",
+  "ut_483b58204b": "请填写规范内容",
+  "ut_29f14d8cf9": "参考命令（可选）",
+  "ut_fcfbe3558f": "作用域",
+  "ut_0cac2580f1": "单台主机",
+  "ut_479fdc582d": "主机组",
+  "ut_56c43b3c1f": "严格遵循",
+  "ut_223ebc733a": "AI 必须原样执行，不得自行调整",
+  "ut_4ba4d0c89f": "允许 AI 在不违背约定前提下调整参数",
+  "ut_4c7c042a46": "添加服务器",
+  "ut_aa56ccc31c": "只读",
+  "ut_2c94b3027b": "已连接",
+  "ut_e5e228e9d3": "添加 MCP 服务器",
+  "ut_e7c0c60a9b": "编辑 MCP 服务器",
+  "ut_e539334ba2": "传输方式",
+  "ut_3062040662": "启动命令",
+  "ut_635c6ac2e8": "参数（每行一个）",
+  "ut_86e6b6dae2": "服务器 URL",
+  "ut_7c1909ae8d": "超时（ms）",
+  "ut_f3f63f65a0": "工具上限",
+  "ut_78a04cd0e0": "Agent 可用工具",
+  "ut_b50e4d2f14": "只读工具（推荐）",
+  "ut_f7f0786cb6": "启用服务器",
+  "ut_e234091c8a": "应用启动时自动连接",
+  "ut_e1d7cd83a8": "允许 Agent 使用资源",
+  "ut_2a8817d718": "允许 Agent 使用提示词",
+  "ut_bbe5aed47c": "使用 OAuth 授权",
+  "ut_9f237e2f4c": "保存并连接",
+  "ut_c3255fdff5": "名称不能为空",
+  "ut_18b03910f5": "stdio 传输需要启动命令",
+  "ut_78ed27f966": "服务器 URL 必须是 http(s) 地址",
+  "ut_6462e5fd3f": "超时需在 3000-120000ms 之间",
+  "ut_765400571f": "工具上限需在 1-40 之间",
+  "ut_e43ff18e6b": "HTTP + SSE（旧版）",
+  "ut_6c1dbbd423": "stdio（本地进程）",
+  "ut_1ce1d6c086": "关于",
+  "ut_451a175be9": "主机管理",
+  "ut_42d62d0f0e": "设置",
+  "ut_85c1206607": "专注模式",
+  "ut_20d2782c72": "本地",
+  "ut_6ea2ce2fe7": "确认回滚",
+  "ut_78d92a1509": "请先连接主机再继续任务",
+  "ut_9f7bc31ffe": "独立索引",
+  "ut_ac8a126fc3": "执行失败",
+  "ut_e56e69b4b9": "已取消",
+  "ut_278fcd681d": "写入完成",
+  "ut_ae9a95fec3": "用户取消任务，PTY 写入中止",
+  "ut_0bb0be16b3": "替换完成",
+  "ut_1aa59da0cf": "写入失败，正在回滚 ...",
+  "ut_47e5e5365c": "知识库检索已取消",
+  "ut_b79b73a254": "参数缺失: path 为必填项",
+  "ut_b48a9bcd4c": "确认",
+  "ut_fa7ae42a25": "服务",
+  "ut_f71cf695fe": "任务已取消",
+  "ut_dec92d98dd": "任务已中断",
+  "ut_a8046742ba": "原始输出尾部",
+  "ut_fc6ff4c8fb": "全部 tag",
+  "ut_c31fd08687": "复制",
+  "ut_68caa1b369": "刚刚",
+  "ut_de0e9433a3": "说明",
+  "ut_a53a6efe91": "显示名称不能为空",
+  "ut_5d608a562e": "添加端点",
+  "ut_d4387b2009": "服务商",
+  "ut_7a9886373c": "API Key",
+  "ut_1bd24257e4": "添加",
+  "ut_5f7dd28505": "编辑主机",
+  "ut_cad33d6032": "新增主机",
+  "ut_4b91f1393e": "新建快捷命令",
+  "ut_bc90bc1b81": "新建工作流",
+  "ut_35448c521f": "已开启",
+  "ut_dbddf26277": "最大执行步数",
+  "ut_a18400490f": "应用锁",
+  "ut_f9aea8cf2e": "重试",
+  "ut_ec5739654b": "打开链接失败，已复制到剪贴板",
+  "ut_72cb33e8c2": "终端快捷键",
+  "ut_dc29b2f27f": "收起",
+  "ut_9a7f4df03a": "自定义提示词",
+  "ut_df02f06fa2": "重命名",
+  "ut_035134b18f": "新建目录",
+  "ut_7025e8166d": "粘贴",
+  "ut_e45556d8c1": "安全命令",
+  "ut_7a4c7fc5d7": "此操作涉及系统配置或网络下载，请确认操作",
+  "ut_a88f921ea4": "危险操作，请仔细确认后再执行",
+  "ut_bf6e849886": "高危操作，已被安全策略拦截",
+  "ut_873cf0baa9": "路径为空",
+  "ut_4370f90a2c": "路径规范化后为空",
+  "ut_0abbb47931": "会话日志开",
+  "ut_79ab7ea24e": "会话日志关",
+  "ut_dc687b5190": "1 万行",
+  "ut_b80d4fdf1b": "还没有配置模型",
+  "ut_62197ba790": "已关闭 · AI 只靠本地上下文",
+  "ut_88b11effff": "应用锁已开启",
+  "ut_aae6a1b7f8": "应用锁未开启",
+  "ut_7355cf069a": "安全时段未启用",
+  "ut_22b7a960c1": "还没有服务器",
+  "ut_bf73a41ef9": "还没有规则",
+  "ut_a86e6d7ade": "未开启",
+  "ut_c61e7e68e8": "已开启 · 缺 Webhook 地址，发不出去",
+  "ut_6839af3e8f": "已开启 · 每次任务都提醒",
+  "ut_f9ab3c28bf": "已开启 · 仅失败时提醒",
+  "ut_f500e9fc9a": "带变量的命令模板",
+  "ut_2d8f504c07": "多步骤操作清单",
+  "ut_f53531d72c": "每条命令的来源与结果",
+  "ut_5aa2535411": "谁在什么时候改了什么",
+  "ut_49efe264bb": "命令超时倍数",
+  "ut_b1eedc7da7": "慢速网络调高，排查卡死调低。",
+  "ut_0ef39843c1": "粘贴内容",
+  "ut_cfae7855b2": "从文件选择",
+  "ut_f77e687e7f": "已启用 · 待填写地址",
+  "ut_bb68aeb526": "已配置 · AI 自动注入",
+  "ut_1f46b82540": "连接超时",
+  "ut_beac562f56": "已载入保存的私钥",
+  "ut_8b9d8a0293": "没有可导出的规范条目",
+  "ut_9e0a441f63": "导出内部规范",
+  "ut_393f76846d": "导入内部规范",
+  "ut_c1358ed65a": "删除规范",
+  "ut_2d0ac889f0": "内部规范",
+  "ut_b8ff31b60e": "导入 JSON",
+  "ut_70148cd17d": "导出 JSON",
+  "ut_a25e5f2908": "还没有内部规范",
+  "ut_0a354147d1": "严格",
+  "ut_e35e26caf1": "建议",
+  "ut_321c7d5cbd": "例如：nginx 只改 conf.d",
+  "ut_c841026fad": "用自然语言写清楚约束，AI 会原样遵循。\n例如：内网统一走 mirrors.corp.internal，不要使用公网 apt 源。",
+  "ut_cbf092e19a": "MCP 服务器",
+  "ut_3ee244446d": "快速添加：",
+  "ut_76aba21781": "还没有 MCP 服务器",
+  "ut_23784ffbb8": "更多",
+  "ut_bf9a7280ff": "重新连接",
+  "ut_b3ea1460b7": "（未配置端点）",
+  "ut_c6f94e5dc4": "断开",
+  "ut_a037d357eb": "连接",
+  "ut_d58e58c337": "工具与能力",
+  "ut_ac3cdbdaa3": "需要 OAuth 授权",
+  "ut_6d628c3737": "登录授权",
+  "ut_55b9a7e0c0": "复制授权链接",
+  "ut_8173ace3f3": "只读工具",
+  "ut_936b003fe8": "破坏性",
+  "ut_bc386dcd56": "外部",
+  "ut_eb15558933": "Agent 可用",
+  "ut_4fc8541fe1": "未开放",
+  "ut_fcabd36585": "无参数",
+  "ut_7889ed8608": "参数: ",
+  "ut_69440da7fa": "最近日志",
+  "ut_0dbb5c7bd4": "已停用",
+  "ut_f50cfe7b3a": "未连接",
+  "ut_439759c292": "连接中",
+  "ut_28c0833d52": "需要授权",
+  "ut_fcc790f11c": "连接失败",
+  "ut_6b02c4539d": "选择 filesystem MCP 允许访问的目录",
+  "ut_446d04518f": "删除 MCP 服务器",
+  "ut_3121de47a1": "资源 URI",
+  "ut_5e1e108436": "按模板填写具体 URI",
+  "ut_250aaaa8b9": "提示词参数",
+  "ut_3dedee49e4": "每行一个 key=value",
+  "ut_1cc391dd56": "（必填）",
+  "ut_4a407548bf": "内容已复制",
+  "ut_7c50d4b883": "复制内容",
+  "ut_8e8300886d": "例如 npx",
+  "ut_9e643633f7": "工作目录（可选）",
+  "ut_4c8483a194": "环境变量（每行 KEY=VALUE）",
+  "ut_4ad1ca4105": "出站代理（可选）",
+  "ut_c9270e6a1d": "Headers（每行 Key: Value）",
+  "ut_e249b99577": "自定义（连接后在卡片中勾选）",
+  "ut_3665baf413": "OAuth scopes（空格/逗号分隔，可选）",
+  "ut_92dbcbd641": "OAuth clientId（留空走 DCR）",
+  "ut_87fceccd93": "OAuth clientSecret（可选）",
+  "ut_9c3dece052": "管理",
+  "ut_37ac3bf8ce": "Agent 执行中，补充指令请用输入框",
+  "ut_dcdd97ac06": "SSH 连接未就绪，重连后点这一屏重试",
+  "ut_4fc495b331": "本地终端启动失败",
+  "ut_4bab1ab6c2": "这一屏的会话打开失败",
+  "ut_129733266f": "[会话已结束]",
+  "ut_b6c84bb8f3": "这一屏绑定了 AI，不能单独关掉；请直接关闭标签",
+  "ut_def20d7537": "AI 会话",
+  "ut_cafa2f7cad": "本地 shell",
+  "ut_e1fac83b32": "这一屏的会话已断开",
+  "ut_13304be1df": "重开这一屏",
+  "ut_6582d682ca": "命令面板 (Ctrl+K)",
+  "ut_422f8e1f4e": "终端配色与字号",
+  "ut_19d7987a04": "菜单",
+  "ut_c985d380db": "前往",
+  "ut_d4c339f3c6": "安全时段",
+  "ut_7df2507796": "未启用",
+  "ut_86dfbbb589": "本终端",
+  "ut_7a89819950": "视图",
+  "ut_9175d8cccb": "终端全宽",
+  "ut_1029dcb6e3": "切换 AI 面板位置",
+  "ut_d170a458d4": "右 / 底",
+  "ut_23820b0802": "SFTP 仅远程会话可用",
+  "ut_ed8ab87e0e": "关闭 SFTP 面板",
+  "ut_02fc9755f6": "SFTP 文件面板",
+  "ut_3d81bbe4b1": "切换面板位置（右 / 下）",
+  "ut_49aa3e0155": "让 Agent 在这台主机上干活",
+  "ut_80f39c254f": "描述需求，步骤自动执行；危险命令会先征求同意",
+  "ut_dbe7312942": "该变更没有可执行的回滚命令",
+  "ut_98ddb3e569": "将把本机文件还原到：",
+  "ut_12db03a03c": "将执行回滚命令：",
+  "ut_d9c1f090b6": "还原会把备份/回收区中的副本放回本机原路径，并写入审计记录。",
+  "ut_ba66b6920c": "回滚会修改服务器状态，并写入审计记录。",
+  "ut_ae7f0253b5": "主机连接已断开，回滚未执行",
+  "ut_e79e7730e4": "回滚未执行：主机未连接或没有回滚命令",
+  "ut_36ae6b14be": "请先切换到该主机再重连",
+  "ut_f89df440af": "本地终端不需要重连，请检查终端进程",
+  "ut_31edece655": "找不到主机配置，无法重连",
+  "ut_470431de01": "重连失败，请检查网络或密码",
+  "ut_42e52ee488": "重连成功",
+  "ut_3a602327a9": "请先切换到该主机再继续任务",
+  "ut_46e4b5a120": "请先切换/重连到该主机再重试",
+  "ut_c4388ff04e": "主机连接已断开，请先重连",
+  "ut_3993de2fb8": "密码",
+  "ut_694738320d": "显示",
+  "ut_6870753dcd": "隐藏",
+  "ut_b765c3fd60": "命令等待输入",
+  "ut_107ca67793": "输入（留空 = 直接回车）",
+  "ut_793f2a8599": "还没有配置模型，请到 设置 → AI 模型 添加",
+  "ut_4ed5ea2e0b": "未选择",
+  "ut_6aba627378": "当前会话还没有可导出的内容",
+  "ut_13465ff9b3": "已放入 Agent 输入框",
+  "ut_d45aa5cd92": "终端命令",
+  "ut_aec5a6dc3d": "存为命令片段",
+  "ut_2f4c7a6c8c": "片段名称",
+  "ut_06c357f14d": "来自终端右键",
+  "ut_f58a1a9197": "Agent 命令",
+  "ut_bb76c4ff57": "输入 / 可搜索全部命令与运维模板；↑↓ 切换、Tab 选择、Enter 执行。",
+  "ut_5d888b8a22": "任务进行中不能压缩记忆，请先停止任务",
+  "ut_5f55be5f65": "联网搜索：已启用（下次任务生效）",
+  "ut_921c3a3d3c": "联网搜索：未启用（点击启用，下次任务生效）",
+  "ut_b5e4297324": "执行中",
+  "ut_d68f77a907": "操作",
+  "ut_5085464dd9": "新建连接",
+  "ut_cbd048e6e6": "重连当前标签",
+  "ut_f30d7344c7": "收起 AI 面板",
+  "ut_c7b60ecb72": "展开 AI 面板",
+  "ut_36a1bca19d": "退出专注模式",
+  "ut_c56382e3ee": "隐藏服务器监控",
+  "ut_55b60aaf25": "显示服务器监控",
+  "ut_1e838ce89c": "关闭 SFTP 面板",
+  "ut_a752de5a42": "打开 SFTP 面板",
+  "ut_f934cd40d1": "会话历史",
+  "ut_f8ead6b402": "新建 AI 会话",
+  "ut_76462daeb1": "整页",
+  "ut_e17ad38728": "抽屉",
+  "ut_9b85525187": "操作审计",
+  "ut_1bc161aa98": "AI 模型设置",
+  "ut_1d6ad9a57d": "变更记录",
+  "ut_8659bce8a2": "工作流",
+  "ut_7781e2e2a1": "补充指令…",
+  "ut_c8e527419a": "本地终端不支持端口转发",
+  "ut_fc1fc05fcd": "联网搜索",
+  "ut_1a5ebea669": "免密钥（开箱即用）",
+  "ut_d007a268a0": "需要 API Key",
+  "ut_06aab0767d": "私有实例可选 Key",
+  "ut_d17f6d0537": "全局参数",
+  "ut_28bd2b7489": "立即测试",
+  "ut_fd44505c78": "已启用后端: ",
+  "ut_35fef8a980": "已选后端: ",
+  "ut_a7179dbf9b": "已配置密钥: ",
+  "ut_435e2b9a3e": "刷新状态",
+  "ut_3b3bcc7a34": "不可用",
+  "ut_aff6cc24ed": "需 Key",
+  "ut_140b926331": "语义搜索 · 需 Key",
+  "ut_c8f4f082c1": "搜索 API · 需 Key",
+  "ut_060d69c2ef": "RSS · 免密钥",
+  "ut_82fe5ca073": "HTML · 国内需代理",
+  "ut_cde0d7f255": "需自建实例",
+  "ut_fdb03fa75f": "AI 优化摘要",
+  "ut_2846d31002": "Google 结果",
+  "ut_50265d0478": "暂无搜索 API",
+  "ut_aa998837ed": "Claude 搜索工具",
+  "ut_72f0d7877f": "Responses 搜索",
+  "ut_ebda0aff48": "检查中",
+  "ut_7875a79d06": "环境变量",
+  "ut_464ca43586": "已配置",
+  "ut_cdc3132e4c": "未配置",
+  "ut_dd2e9a0289": "部署文档",
+  "ut_050792529a": "获取 Key",
+  "ut_836f91fea2": "可选 Token：作为 Authorization: Bearer 发送",
+  "ut_37cabfd93e": "留空表示不修改；也可使用同名环境变量",
+  "ut_60f1ed814f": "保存后将清除已保存的 Key",
+  "ut_246737f23c": "SearXNG 实例地址",
+  "ut_dceef0fd66": "SearXNG 部署文档 →",
+  "ut_05981b84e9": "最终返回条数（1-20）",
+  "ut_875f752532": "同时请求的后端数（1-12）",
+  "ut_113e34528c": "单个后端最长等待（3000-120000ms）",
+  "ut_d012b127eb": "出站代理",
+  "ut_6a13f67dc3": "输入查询，例如 OpenAI latest news",
+  "ut_eeda5a24be": "搜索中",
+  "ut_7c5d801935": "搜索",
+  "ut_3d01e59d2e": "没有匹配结果。",
+  "ut_aef246a460": "来源: ",
+  "ut_a7de20e32a": "请输入查询关键词",
+  "ut_8334c9cd68": "需在 1-20 之间",
+  "ut_c1fe9fa3f2": "需在 1-12 之间",
+  "ut_299e9d34bb": "需在 3000-120000 之间",
+  "ut_3d127654a9": "参数有误，请检查高亮字段",
+  "ut_0531ef0aec": "已保存，立即生效",
+  "ut_c259d39a21": "已恢复上次保存的状态",
+  "ut_1595af9c76": "重置状态",
+  "ut_5046a76cef": "等待确认",
+  "ut_3a760ee340": "执行中",
+  "ut_9b47257520": "已暂停",
+  "ut_6bafadcb9f": "⏸️ 任务已暂停，可点击恢复继续",
+  "ut_5384a63ffb": "▶️ 任务已恢复，继续执行...",
+  "ut_48eb86eca2": "⚠️ AI 未实际执行命令就声称完成，要求实际验证",
+  "ut_c975d9cfca": "…（回答过长，已截断）",
+  "ut_c0bd0404a4": "本机命令请改用 local_exec 工具",
+  "ut_a3621ea638": "封网期拦截",
+  "ut_6c86646cba": "只读模式已开启，此命令被拒绝执行",
+  "ut_6140f3dac8": "当前权限模式，此命令被拒绝执行",
+  "ut_b14923e57e": "询问",
+  "ut_287a6d5c24": "自动",
+  "ut_64b5e22817": "✅ 用户已确认，开始执行...",
+  "ut_748164be56": "⚠️ AI 调用工具但未指定工具名",
+  "ut_ee157cb455": "⏳ 继续执行...",
+  "ut_7d89802fc1": "整理结论",
+  "ut_42d195aa5d": "正在打开 SFTP 子系统...",
+  "ut_a70224cf55": "上传完成",
+  "ut_3ce3c27270": "下载完成",
+  "ut_90b80824a2": "已停止文件同步",
+  "ut_948df560e2": "文件同步已停止",
+  "ut_c6a06709f5": "正在启动文件同步...",
+  "ut_88dfa9a69c": "参数缺失: mode 必填（remote/local_file/ssh_hostkey）",
+  "ut_c767a0bfa3": "port 范围非法（1-65535）",
+  "ut_7400d2fd8c": "certPath 含非法字符（禁止引号/分号/管道/反引号等）",
+  "ut_272d2f4a52": "正在读取 SSH host key 指纹...",
+  "ut_049487ff40": "参数缺失: content 或 content_b64 必须提供一个",
+  "ut_7515f1e67e": "SFTP 写入失败，正在回滚备份 ...",
+  "ut_ee8e576b01": "原文件已从备份恢复",
+  "ut_a3714eed7b": "SFTP 写入失败，尝试 PTY stdin 模式 (cat > file)...",
+  "ut_ca59f0145f": "正在备份原文件 ...",
+  "ut_ed571dc1ef": "本地文件",
+  "ut_aeff3a9157": "本地直接写入失败，尝试通过当前 shell 写入 ...",
+  "ut_751b0202ff": "本地 PTY stdin",
+  "ut_ddd5f79db8": "本地 PTY stdin + sudo tee",
+  "ut_e67f272887": "  注意：当前进程无权限读取原文件，未能生成备份。",
+  "ut_d1dd8a4a86": "当前会话未接入密码输入，请在主机设置中填写 sudo 密码",
+  "ut_cdfaed0dc5": "等待用户输入 sudo 密码…",
+  "ut_6d06b21d26": "用户未提供密码（取消或输入为空）。请改用 动作: ask 与用户确认，或改以非特权方式执行。",
+  "ut_de63930b16": "本机验证经验",
+  "ut_11e4b8176f": "官方知识库",
+  "ut_587234aed7": "本条已截断",
+  "ut_fb8896831d": "总量超限，后续条目已截断",
+  "ut_89d6d1508a": "当前平台不支持本机命令执行（仅支持 Windows / macOS / Linux 桌面端）。",
+  "ut_4d2a25adb6": "参数缺失: query 必填",
+  "ut_039e6df512": "\n注意: 文件数已达 5000 上限，未继续遍历，请用 glob 或更窄的 path 缩小范围",
+  "ut_4d2db00134": "参数缺失: content 或 content_b64 必须提供一个。多行内容请写在同一行并用 \\n 表示换行。",
+  "ut_1d0e0057ce": "[进程已退出]",
+  "ut_80fbd0db5a": "OAuth 授权已过期，请重新登录",
+  "ut_3212b67b4f": "（MCP 工具返回空结果）",
+  "ut_3043a371fb": "MCP 调用已被取消",
+  "ut_4b697ab9d4": "该 MCP 服务器没有提供提示词。",
+  "ut_e6a3f8cacd": "正在分析项目结构...",
+  "ut_18ecc05e1c": "=== 项目分析报告 ===",
+  "ut_b814db8dc9": "等待构建锁...",
+  "ut_b703554a31": "等待构建锁时被取消",
+  "ut_76fa7f5bc2": "构建成功",
+  "ut_957091cf2f": "连接验证通过\n",
+  "ut_892c3e0946": "[错误]",
+  "ut_d9a78ca9ae": "[连接已关闭]",
+  "ut_4db21d650d": "连接成功",
+  "ut_7038dfdb24": "连接失败: ",
+  "ut_3902f53eb2": "[错误] 未连接",
+  "ut_8d0408fbbe": "[已断开连接]",
+  "ut_87f4917a26": "参数缺失: query 为必填项",
+  "ut_3561d2bc19": "抓取成功，但页面内容为空。",
+  "ut_558bbf2918": "解析正文...",
+  "ut_d74776ae2e": "此命令被安全策略拦截",
+  "ut_1ebeb12158": "确认执行命令",
+  "ut_dfde5a0464": "危险操作确认",
+  "ut_517880c5b3": "即将执行:",
+  "ut_dd66d942fb": "此操作可能造成系统不可用，请谨慎执行！",
+  "ut_c5955eb9de": "请输入 CONFIRM 继续:",
+  "ut_68772a88f7": "输入 CONFIRM",
+  "ut_fccd2f755c": "确认执行",
+  "ut_6863351895": "执行工具调用，可能改动当前会话之外的状态",
+  "ut_e6f77c3aa9": "安装或升级软件包，可能改变系统依赖，影响已有服务",
+  "ut_03303bd6da": "卸载软件，依赖它的服务可能不可用",
+  "ut_c8e25a26d1": "启动服务，会改变当前运行状态",
+  "ut_cd5d5a98a0": "停止服务，依赖它的网站/接口会中断",
+  "ut_88ec88c7b3": "重启服务，网站/接口可能短暂中断",
+  "ut_7ba837a04e": "修改、移动或删除文件，可能影响配置或数据",
+  "ut_a1e726721a": "修改文件权限或属主，可能影响服务访问",
+  "ut_1210181241": "修改配置文件，可能改变服务行为",
+  "ut_a0e4d573e8": "修改服务器状态，请确认影响范围",
+  "ut_ab356c88ee": "Nginx 配置检查通过",
+  "ut_8e89715728": "Nginx 配置检查失败",
+  "ut_3e37edb32c": "按钮都不合适？直接输入你的回答…",
+  "ut_1cb11a152d": "发送自定义回答",
+  "ut_b31e90861f": "(无输出)",
+  "ut_c06a19b387": "重连",
+  "ut_e3d0732b84": "让 AI 重试",
+  "ut_73c881e205": "任务完成",
+  "ut_22aee52bc1": "已完成所有步骤",
+  "ut_704c12f2eb": "任务失败",
+  "ut_da68e2844f": "任务执行失败",
+  "ut_ede5822e49": "任务被中断",
+  "ut_9566f7b70f": "命令输出",
+  "ut_51bfee4aca": "结束",
+  "ut_e46194bcb9": "Agent 日志",
+  "ut_ecc8f6c40b": "复制当前筛选结果",
+  "ut_f988024855": "只看本次任务",
+  "ut_7b8553ecdf": "模型思考",
+  "ut_46d28ef143": "↑↓ 切换   Tab 选择   Enter 执行   Esc 关闭",
+  "ut_9e9ac63dcb": "补充指令（下一轮生效）",
+  "ut_f12263d7ea": "无颜色",
+  "ut_b35da5e4e9": "清空全部命令历史？",
+  "ut_0f29d5bb1a": "清空",
+  "ut_9687dea3ac": "清空历史",
+  "ut_8a6ca36e98": "搜索历史命令",
+  "ut_3a23e3acdd": "暂无历史命令",
+  "ut_f22110ada9": "回车执行首条结果 · Enter 填入 · 单击复制",
+  "ut_956e4930dd": "搜索主机 / 命令 / 页面 / 操作…",
+  "ut_e69a25b65d": "没有匹配项",
+  "ut_f160c18c0c": "选择",
+  "ut_981720593b": "执行",
+  "ut_a3e557dfb9": "关闭",
+  "ut_493d7ff67f": "巡检",
+  "ut_b8c3200c7b": "安全",
+  "ut_2aa836e6e9": "部署",
+  "ut_bda0db72a1": "故障排查",
+  "ut_6f9c60bc15": "日常维护",
+  "ut_338073cc53": "内置模板只读",
+  "ut_5865795364": "图标",
+  "ut_5dfdb946bf": "类型",
+  "ut_52129c776f": "AI 执行（自然语言步骤）",
+  "ut_e87bf3a87f": "直接执行（shell 命令）",
+  "ut_c1af116483": "分类",
+  "ut_e91627ff38": "步骤（写给 AI）",
+  "ut_25cc0f420e": "命令",
+  "ut_cdeeaa7450": "这套预设没有可恢复的模型",
+  "ut_ab0793064d": "先填 Base URL",
+  "ut_dd05d9a6b8": "没有新模型可加",
+  "ut_5fe10ec0d8": "连接超时",
+  "ut_bc3f91069f": "无法连接",
+  "ut_6367b9ea6c": "请求失败",
+  "ut_7794ac4d33": "Base URL 不能为空",
+  "ut_ae851c66db": "至少保留一个模型",
+  "ut_82d4f67dc5": "编辑端点",
+  "ut_742161ce45": "留空则沿用已保存的 Key",
+  "ut_41678037ea": "显示名称",
+  "ut_03570451ac": "协议",
+  "ut_0de12236b8": "文心一言",
+  "ut_7abc46ce6d": "恢复默认",
+  "ut_28c32fe34f": "拉取中…",
+  "ut_f2a08ffc71": "从服务商拉取",
+  "ut_a52f4bbfda": "覆盖",
+  "ut_3ed4ca7624": "还没有模型，先添加一个。",
+  "ut_7e4f0e1070": "模型 ID 不能为空",
+  "ut_2ea671ff59": "档位名重复",
+  "ut_d2cf18b1f8": "开启推理至少需要一个档位",
+  "ut_df2b9cacae": "确定",
+  "ut_02259f1272": "不设置",
+  "ut_ea6cf493d2": "连接终端",
+  "ut_57d80443c9": "重试失败主机",
+  "ut_9e541c6382": "成功",
+  "ut_e35dddb0b4": "失败",
+  "ut_ec4c29ca9a": "连接断开",
+  "ut_a1e91f6981": "超时",
+  "ut_7d4af9fef1": "权限不足",
+  "ut_9927a13579": "等待输入",
+  "ut_b3d243fdfd": "语法错误",
+  "ut_66197bd48d": "返回",
+  "ut_58851eb751": "执行记录已保留，可以继续完成",
+  "ut_e6b33fe91a": "继续任务",
+  "ut_5e6e54121d": "恢复默认",
+  "ut_9aa0cecb52": "点击重新录入",
+  "ut_1f0be4879d": "请按下组合键…",
+  "ut_5a1aea8730": "确定",
+  "ut_a1490afb10": "代理仅支持 http://host:port",
+  "ut_ffad1d8b04": "工作目录（可选）",
+  "ut_205492caf2": "环境变量（每行 KEY=VALUE）",
+  "ut_acce8b3510": "出站代理（可选）",
+  "ut_cd76953b04": "Headers（每行 Key: Value）",
+  "ut_12f53f2717": "自定义（连接后勾选）",
+  "ut_a8481de1d6": "OAuth scopes（空格/逗号分隔）",
+  "ut_4181f5ee36": "OAuth clientId（留空走 DCR）",
+  "ut_a6f501ed31": "OAuth clientSecret（可选）",
+  "ut_810e89c23f": "AI 助手",
+  "ut_1a81fac6b4": "关闭抽屉",
+  "ut_df39e46c77": "编辑快捷命令",
+  "ut_5b6a456972": "编辑工作流",
+  "ut_9d49b2c71b": "返回上一层",
+  "ut_de5dd6102e": "搜索名称 / IP / 分组",
+  "ut_1c95f57481": "没有匹配的主机",
+  "ut_29b3f192d8": "搜索名称 / 命令",
+  "ut_d112e18b97": "没有匹配的快捷命令",
+  "ut_dd209aad9b": "搜索名称 / 说明",
+  "ut_3d46c0f619": "AI 执行",
+  "ut_6ba17bef52": "直接执行",
+  "ut_45a37578cb": "最近",
+  "ut_ab4373452b": "运行",
+  "ut_6cb13cd9c4": "没有匹配的工作流",
+  "ut_00636e0752": "搜索命令",
+  "ut_f83f96b238": "还没有审计记录",
+  "ut_cacce52f6d": "没有可复制的记录",
+  "ut_a50d8711f5": "AI Terminal 审计日志",
+  "ut_6200fddf68": "本机",
+  "ut_2f5e0aff16": "无输出",
+  "ut_f943d2ce6c": "拦截",
+  "ut_740618ad3b": "放行",
+  "ut_311d08fee0": "已执行",
+  "ut_7e1cc53dfe": "未执行",
+  "ut_d6834ac586": "复制这条",
+  "ut_4a647e404a": "搜索设置项",
+  "ut_8ad11edf4e": "已修改",
+  "ut_57d5e9c054": "收起",
+  "ut_10f71987c9": "回滚缓冲行数",
+  "ut_d7b02e9cf7": "自动会话日志",
+  "ut_2543cfa7f8": "单步响应超时",
+  "ut_fac7fadb45": "命令超时倍数",
+  "ut_48274233a0": "今天",
+  "ut_98427f593c": "任务已结束，详见执行记录。",
+  "ut_9caaf88e9c": "已执行回滚",
+  "ut_aee33bbe51": "无自动回滚，建议使用执行前快照",
+  "ut_4e9cdbd7a8": "已回滚",
+  "ut_730ed00d8e": "可回滚",
+  "ut_4f069ae310": "需人工",
+  "ut_209a3ee99a": "回滚中",
+  "ut_8bcebbb092": "回滚",
+  "ut_3459fead8a": "安装",
+  "ut_ad620f1593": "卸载",
+  "ut_0e0e2a9a73": "修改配置",
+  "ut_7393410b1a": "启动服务",
+  "ut_64a71bf56a": "停止服务",
+  "ut_c5ea3f5be9": "重启服务",
+  "ut_7a42975bda": "文件操作",
+  "ut_98ae0d0e95": "权限修改",
+  "ut_d3636b0082": "变更",
+  "ut_3954d67b32": "没有匹配内容",
+  "ut_ce6351e3cc": "原始输出",
+  "ut_f5876a2bf8": "复制全部",
+  "ut_f7d3ee00a1": "搜索输出…",
+  "ut_ef2170f4b4": "当前标签未连接，无法建立转发",
+  "ut_0df8de01ab": "请填写有效的端口（1-65535）和目标主机",
+  "ut_be0c081010": "暂无转发规则",
+  "ut_d0df2ad5ea": "停止并删除",
+  "ut_f704784855": "本地 → 远端",
+  "ut_1b67fdda4b": "远端 → 本地",
+  "ut_50901ca37c": "监听端口",
+  "ut_864e1c6380": "目标主机",
+  "ut_ec3f615847": "目标端口",
+  "ut_c1fbfd5065": "添加转发",
+  "ut_4a8eab4b12": "例如：nginx 只改 conf.d",
+  "ut_ee90ce584e": "用自然语言写清楚约束，AI 会原样遵循。",
+  "ut_468c99d256": "还没有主机，无法限定到单台。",
+  "ut_d83a565087": "诊断",
+  "ut_92cd36cefb": "检查中…",
+  "ut_0ddb8a1f0d": "没有拿到检查结果。",
+  "ut_b1ab09352f": "应用版本",
+  "ut_0942c2789b": "本次会话崩溃",
+  "ut_9f028e8160": "上次崩溃时间",
+  "ut_87c363d0c9": "无",
+  "ut_065917e680": "SSH 池连接",
+  "ut_4927752a48": "已死连接",
+  "ut_46d9b304c4": "磁盘可写",
+  "ut_3779abda15": "是",
+  "ut_e812fd5dbb": "否",
+  "ut_2e81ddc87a": "检查时间",
+  "ut_234f4f27c8": "崩溃日志为空",
+  "ut_d10e283a81": "复制崩溃日志",
+  "ut_ced38012da": "已清除崩溃日志",
+  "ut_ead023bd7e": "重新检查",
+  "ut_2e28b0df81": "崩溃日志与健康状态",
+  "ut_3f96027e32": "已复制版本信息",
+  "ut_1f0a3070de": "读取中…",
+  "ut_b6541b6328": "正在检查更新…",
+  "ut_32142192ac": "已是最新版本",
+  "ut_7dc8c0869d": "版本",
+  "ut_610ddf67b9": "回滚缓冲行数",
+  "ut_8a70b91e29": "自动会话日志",
+  "ut_050de7d897": "当前使用的模型",
+  "ut_626fb86214": "还没有模型。先加一个端点，再往里加模型。",
+  "ut_387e6f82d0": "端点",
+  "ut_76fb9c463a": "还没有端点。",
+  "ut_38966aa565": "不限",
+  "ut_f28f99867b": "单步响应超时",
+  "ut_ded8ed2d66": "命令超时倍数",
+  "ut_a2ce59889b": "未设置",
+  "ut_6aad5ea609": "编辑提示词",
+  "ut_b95d0f872a": "面容",
+  "ut_2318f73d10": "指纹",
+  "ut_8ec132c8b8": "生物识别",
+  "ut_cea6052a7e": "已关闭",
+  "ut_00f43cd923": "本机没有可用的生物识别，应用锁无法开启。",
+  "ut_91f4c00293": "凭据存储",
+  "ut_021001ca72": "系统安全存储 + AES 回落",
+  "ut_b25f81d2b6": "高危命令",
+  "ut_ffaeb5818f": "执行前二次确认",
+  "ut_98c6d8c630": "清除本机数据",
+  "ut_a74aec2b15": "本机数据已清除",
+  "ut_5474c635a4": "验证身份以开启应用锁",
+  "ut_00b1b1f0c5": "启用 MCP",
+  "ut_a48007473a": "还没有服务器。",
+  "ut_c9189bb086": "未连接",
+  "ut_a4b4f07ab5": "允许 AI 联网搜索",
+  "ut_704bcb4a34": "后端",
+  "ut_2acaddf4df": "一个后端都没启用，等于没开。",
+  "ut_d40fdc917f": "返回条数",
+  "ut_b00662826d": "还没有规则。",
+  "ut_078781c029": "添加规则",
+  "ut_19b85efbe5": "所有主机",
+  "ut_c9e6373a79": "任务完成提醒",
+  "ut_4b93fcd514": "什么时候提醒",
+  "ut_6e277f398f": "Webhook 地址",
+  "ut_559d9de7a7": "还没填 Webhook 地址，发不出去。",
+  "ut_e52ad942fc": "追加到系统提示词之后",
+  "ut_62951d47df": "写给这台机器的额外约定。",
+  "ut_968538bf30": "输入 DELETE 以确认",
+  "ut_3da0e76468": "添加搜索后端",
+  "ut_402165c066": "可用的后端都已经加上了。",
+  "ut_fd7c3540b7": "保存并启用",
+  "ut_ed57742e6a": "打开完整设置",
+  "ut_5208f9bddf": "主机不存在",
+  "ut_bc683a74fa": "打开",
+  "ut_731d9e386f": "下载到本地",
+  "ut_21512fa475": "预览内容",
+  "ut_64da167c8c": "删除目录",
+  "ut_f405fa4a70": "删除文件",
+  "ut_8b9071fa7d": "已修改",
+  "ut_46ebf5b01b": "已保存",
+  "ut_01ff3a92b3": "新名称",
+  "ut_c28161cd4b": "确认删除",
+  "ut_32d93b8221": "目录名称",
+  "ut_87fc3f64f6": "创建",
+  "ut_40cd9573ff": "松开以上传到当前目录",
+  "ut_ebab5a91e2": "排序",
+  "ut_436d7985a6": "大小",
+  "ut_cac0b492e4": "修改时间",
+  "ut_125f95f8d1": "上传",
+  "ut_fe22bfe107": "刷新",
+  "ut_2b1e2ceb1b": "输入路径",
+  "ut_cfd5be4925": "根目录",
+  "ut_9dc11a1d64": "正在连接...",
+  "ut_98d1c295e4": "空目录",
+  "ut_a64c884da9": "无法读取配置文件",
+  "ut_91d4c887bb": "未找到配置文件",
+  "ut_8411943202": "导入失败",
+  "ut_c4bdcb7bb4": "配置里没有可导入的主机",
+  "ut_ee82429005": "解析提示",
+  "ut_ffb911cc34": "导入",
+  "ut_4e39421eaf": "跳板",
+  "ut_35660d6755": "需补私钥",
+  "ut_94376a7210": "项未导入",
+  "ut_793cb65e3d": "已存在",
+  "ut_61181b84f1": "主题模式",
+  "ut_33bd0353d6": "字号",
+  "ut_5fb0f8f4a5": "终端设置",
+  "ut_ce50810b95": "仅暗色",
+  "ut_39c65ad937": "无结果",
+  "ut_ef282263a5": "搜索终端输出",
+  "ut_d24c2e83f7": "区分大小写",
+  "ut_3525464ef3": "上一个 (Shift+Enter)",
+  "ut_01e46e4cac": "下一个 (Enter)",
+  "ut_3dd4f86972": "全选",
+  "ut_93db49204e": "清屏",
+  "ut_6b1ae00645": "清空回滚缓冲",
+  "ut_49db0eb3e7": "复制全部输出",
+  "ut_8f5a44f9a8": "保存输出到文件…",
+  "ut_7e205da9b6": "放大字号",
+  "ut_aa2e753d46": "缩小字号",
+  "ut_1c98824fa9": "重置字号",
+  "ut_e9304231ed": "发给 Agent 解释",
+  "ut_c48f8080f6": "存为命令片段",
+  "ut_ab94a86f01": "在终端执行这条命令",
+  "ut_e865710760": "左右分屏",
+  "ut_9833a4decf": "上下分屏",
+  "ut_3e9c805d7f": "关掉此分屏（AI 在这屏）",
+  "ut_16863c6e3a": "关掉此分屏",
+  "ut_6f9e7de9f4": "在 SFTP 中定位",
+  "ut_fa0ed53542": "打开 SFTP 面板",
+  "ut_6dc8f53907": "查看审计记录",
+  "ut_078958b894": "查看变更记录",
+  "ut_76a60a446c": "打开链接",
+  "ut_b99781d2e8": "复制链接",
+  "ut_9641c0bb12": "复制路径",
+  "ut_b736a87497": "问 Agent 这个错误",
+  "ut_6fcc795a39": "让 Agent 解释这一整块",
+  "ut_dc52ca948e": "复制这一整块",
+  "ut_4d77c0da07": "上一块命令",
+  "ut_083f59cfec": "下一块命令",
+  "ut_c49dbc7b41": "没有选中的内容",
+  "ut_90074297f5": "多行内容会被依次执行，请确认没有误粘贴：",
+  "ut_3a1c210c39": "在终端执行这条命令？",
+  "ut_a28740df5a": "保存终端输出",
+  "ut_8a039d57ca": "等待连接...",
+  "ut_364a8e7d72": "终端",
+  "ut_6b4426c1f7": "AI 模型",
+  "ut_47436bc8ab": "Agent",
+  "ut_ed3461341d": "MCP 服务器",
+  "ut_a6db458718": "联网搜索",
+  "ut_83d66464a0": "内部规范",
+  "ut_dc4a75d976": "通知",
+  "ut_6dbcd29d76": "审计",
+  "ut_2e90894c9a": "仅失败",
+  "ut_ec50bedaa8": "每次都提醒",
+  "ut_e39887dfed": "备份原文件失败: {e}。已中止写入，原文件未被修改。",
+  "@ut_e39887dfed": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fcda8e6588": "  原文件已备份: {backupPath}",
+  "@ut_fcda8e6588": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4452077d81": "{summary}\n目标路径: {effectiveLocal}",
+  "@ut_4452077d81": {
+    "placeholders": {
+      "summary": {
+        "type": "Object"
+      },
+      "effectiveLocal": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f4856090f2": "正在读取 {path} ...",
+  "@ut_f4856090f2": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1e823bfa18": "openssl 执行失败: {stderr}",
+  "@ut_1e823bfa18": {
+    "placeholders": {
+      "stderr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a2a80977d9": "正在备份原文件到 {backupPath} ...",
+  "@ut_a2a80977d9": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b9beeabb91": "  如需回滚: mv {backupPath} {path}",
+  "@ut_b9beeabb91": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c4acfd10f3": "  如需回滚: 用该备份覆盖 {path}",
+  "@ut_c4acfd10f3": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_af40dec29f": "文件已修改: {path}",
+  "@ut_af40dec29f": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fb892c6b10": "  替换: {length} 字节 → {length} 字节",
+  "@ut_fb892c6b10": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_59e5f6620a": "  文件大小: {length} → {length} 字节",
+  "@ut_59e5f6620a": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5fe0b81932": "保存失败: {e}",
+  "@ut_5fe0b81932": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1dd514c792": "已复制 {length} 字符",
+  "@ut_1dd514c792": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e275b00675": "敏感文件: {fileName}（即使项目内也禁止访问）",
+  "@ut_e275b00675": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3ae63b10aa": "敏感目录: {segment}（禁止访问）",
+  "@ut_3ae63b10aa": {
+    "placeholders": {
+      "segment": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5b6668af25": "系统目录 {prefix} 禁止访问",
+  "@ut_5b6668af25": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_337b92f903": "敏感目录 ~/{suffix} 禁止访问",
+  "@ut_337b92f903": {
+    "placeholders": {
+      "suffix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0c25c4bff1": "敏感文件: {fileName}",
+  "@ut_0c25c4bff1": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fffc2d39d8": "敏感目录: {segment} 禁止访问",
+  "@ut_fffc2d39d8": {
+    "placeholders": {
+      "segment": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_61f32e7e81": "路径不在授权的项目目录内: {normalized}",
+  "@ut_61f32e7e81": {
+    "placeholders": {
+      "normalized": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7695e08c1e": "{scrollLabel} · {logLabel}",
+  "@ut_7695e08c1e": {
+    "placeholders": {
+      "scrollLabel": {
+        "type": "Object"
+      },
+      "logLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b003c911bd": "{count} 个 · 当前 {selectedName}",
+  "@ut_b003c911bd": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      },
+      "selectedName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3f574ada1a": "{count} 个已配置",
+  "@ut_3f574ada1a": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_664f79491a": "步数不限 · 超时 {timeout}s",
+  "@ut_664f79491a": {
+    "placeholders": {
+      "timeout": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a303a7b799": "最大 {steps} 步 · 超时 {timeout}s",
+  "@ut_a303a7b799": {
+    "placeholders": {
+      "steps": {
+        "type": "Object"
+      },
+      "timeout": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9947165032": "已开启 · {enabledCount} 个后端可用",
+  "@ut_9947165032": {
+    "placeholders": {
+      "enabledCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_94c3718c07": "安全时段 {startHour}:00–{endHour}:00",
+  "@ut_94c3718c07": {
+    "placeholders": {
+      "startHour": {
+        "type": "Object"
+      },
+      "endHour": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cbd8c9bc33": "已导出 {length} 条到 {path}",
+  "@ut_cbd8c9bc33": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b078e9e8b1": "导出失败: {e}",
+  "@ut_b078e9e8b1": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_81d685bdc0": "，跳过 {skippedUnknownHost} 条未知主机规则",
+  "@ut_81d685bdc0": {
+    "placeholders": {
+      "skippedUnknownHost": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f59978a9af": "已导入 {imported} 条规范{skippedHint}",
+  "@ut_f59978a9af": {
+    "placeholders": {
+      "imported": {
+        "type": "Object"
+      },
+      "skippedHint": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4bda191f7f": "导入失败: {e}",
+  "@ut_4bda191f7f": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ec13b5dac5": "切换 MCP 总开关失败：{e}",
+  "@ut_ec13b5dac5": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1e9e2bf1a0": "工具（{length}）· {exposure}",
+  "@ut_1e9e2bf1a0": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "exposure": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fb221962b1": "保存工具开关失败：{e}",
+  "@ut_fb221962b1": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_62adaafe0d": "资源（{length}）",
+  "@ut_62adaafe0d": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_70da821187": "提示词（{length}）",
+  "@ut_70da821187": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_169bc8e674": "打开目录选择器失败：{e}",
+  "@ut_169bc8e674": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_02f4d31e55": "保存开关失败：{e}",
+  "@ut_02f4d31e55": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c87274304e": "保存失败：{e}",
+  "@ut_c87274304e": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1c9cc2edb3": "删除失败：{e}",
+  "@ut_1c9cc2edb3": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ab07d88b41": "一个标签最多 {maxPanes} 屏（每屏一个真实会话）",
+  "@ut_ab07d88b41": {
+    "placeholders": {
+      "maxPanes": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2596a43876": "今日 {auditToday} 条",
+  "@ut_2596a43876": {
+    "placeholders": {
+      "auditToday": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_acb620e2fa": "主机 {targetHost} 未连接，无法执行回滚",
+  "@ut_acb620e2fa": {
+    "placeholders": {
+      "targetHost": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2f00778de2": "主机：{hostLabel}",
+  "@ut_2f00778de2": {
+    "placeholders": {
+      "hostLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_35b3e86940": "回滚成功：{rollbackCommand}",
+  "@ut_35b3e86940": {
+    "placeholders": {
+      "rollbackCommand": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_21823fef80": "退出码 {exitCode}",
+  "@ut_21823fef80": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_34ec0a3e03": "回滚失败：{reason}",
+  "@ut_34ec0a3e03": {
+    "placeholders": {
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_be42c8efee": "回滚异常：{e}",
+  "@ut_be42c8efee": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_99956a3c17": "正在重连 {title} ...",
+  "@ut_99956a3c17": {
+    "placeholders": {
+      "title": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c1dbbf6a2c": "重连异常：{e}",
+  "@ut_c1dbbf6a2c": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5b97d3e6a4": "已切换到模型：{modelId}",
+  "@ut_5b97d3e6a4": {
+    "placeholders": {
+      "modelId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7fb66c7378": "会话已复制到剪贴板（{chars} 字）",
+  "@ut_7fb66c7378": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a1c44d88d9": "会话已复制到剪贴板（{chars} 字）\n执行日志：{path}",
+  "@ut_a1c44d88d9": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5cf729e87e": "会话已复制到剪贴板（{chars} 字）\n日志路径读取失败：{e}",
+  "@ut_5cf729e87e": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e77b2cd18c": "已保存到命令片段：{trimmed}",
+  "@ut_e77b2cd18c": {
+    "placeholders": {
+      "trimmed": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_32148ad774": "读取 Key 状态失败：{e}",
+  "@ut_32148ad774": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9979b52038": "测试失败：{e}",
+  "@ut_9979b52038": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6934446d27": "配置保存失败：{e}",
+  "@ut_6934446d27": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8de5894b72": "链接已复制: {url}",
+  "@ut_8de5894b72": {
+    "placeholders": {
+      "url": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_61476f7ee8": "AI 响应保存失败: {e}",
+  "@ut_61476f7ee8": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_07c39ce9ce": "⚠️ 该操作会改动本机文件，需要确认:\n{display}",
+  "@ut_07c39ce9ce": {
+    "placeholders": {
+      "display": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b306912acf": "等待确认: {toolName}",
+  "@ut_b306912acf": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0968807bf1": "💬 用户补充: {steering}",
+  "@ut_0968807bf1": {
+    "placeholders": {
+      "steering": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c547224534": "⚠️ 计划还有 {length} 个未完成项，要求逐项核对后再收尾 ({planFinishRetryCount}/{maxPlanFinishRetries})",
+  "@ut_c547224534": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "planFinishRetryCount": {
+        "type": "Object"
+      },
+      "maxPlanFinishRetries": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_478eec6181": "⚠️ 达到最大执行步数 ({maxSteps})，任务被中断",
+  "@ut_478eec6181": {
+    "placeholders": {
+      "maxSteps": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fa2224f3f9": "⚠️ 主模型 {modelName} 不可用，已切换到备用模型 {modelName}",
+  "@ut_fa2224f3f9": {
+    "placeholders": {
+      "modelName": {
+        "type": "Object"
+      },
+      "modelName2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_971883a7fe": "⚠️ 本轮忽略多余的工具调用: {name}（每轮只执行一个动作）",
+  "@ut_971883a7fe": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cb255683ce": "等级: {safetyLevel}",
+  "@ut_cb255683ce": {
+    "placeholders": {
+      "safetyLevel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ee0b938b2c": "说明: {reason}",
+  "@ut_ee0b938b2c": {
+    "placeholders": {
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f46987bf0d": "{highRisk} {highRisk}需要确认（{modeLabel}模式）: `{command}`\n风险说明: {reason}",
+  "@ut_f46987bf0d": {
+    "placeholders": {
+      "highRisk": {
+        "type": "Object"
+      },
+      "highRisk2": {
+        "type": "Object"
+      },
+      "modeLabel": {
+        "type": "Object"
+      },
+      "command": {
+        "type": "Object"
+      },
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a61b05ce9b": "👉 你选择了: {choice}",
+  "@ut_a61b05ce9b": {
+    "placeholders": {
+      "choice": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_386b3634c1": "⚠️ AI 调用 {alias} 但未提供 command 参数",
+  "@ut_386b3634c1": {
+    "placeholders": {
+      "alias": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0eed0d18c7": "⚠️ 未知工具: {toolName}",
+  "@ut_0eed0d18c7": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_21239ba62c": "🔒 只读模式已开启，此工具被拒绝执行: `{toolName}`",
+  "@ut_21239ba62c": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_339abc33a7": "⚠️ 工具 `{toolName}` 在当前会话不可用",
+  "@ut_339abc33a7": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2bd0b4985d": "❌ 工具 {toolName} 执行异常: {e}",
+  "@ut_2bd0b4985d": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e36f09192f": "{prefix}等待上一轮上传退出...",
+  "@ut_e36f09192f": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dc39c308a2": "{prefix}上传进度: {uploaded}/{total} 文件",
+  "@ut_dc39c308a2": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      },
+      "uploaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_91700996f4": "正在上传文件: {local}",
+  "@ut_91700996f4": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ded2242c8f": "文件上传成功: {local} → {remote} ({size})",
+  "@ut_ded2242c8f": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_d72746d0d0": "正在递归上传目录: {local} → {effectiveRemote}",
+  "@ut_d72746d0d0": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      },
+      "effectiveRemote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0e800a8406": "正在下载文件: {remote} → {target}",
+  "@ut_0e800a8406": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "target": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c8b91122b": "文件下载成功: {remote} → {target} ({size})",
+  "@ut_5c8b91122b": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "target": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2bc26619aa": "正在递归下载目录: {remote} → {effectiveLocal}",
+  "@ut_2bc26619aa": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "effectiveLocal": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_52a01019d8": "下载进度: {downloaded}/{total} 文件",
+  "@ut_52a01019d8": {
+    "placeholders": {
+      "downloaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6b85bbaf16": "[{hostId}] SFTP 连接失败: {e}",
+  "@ut_6b85bbaf16": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2d44fe0c64": "[{hostId}] 正在上传文件: {local}",
+  "@ut_2d44fe0c64": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7ef1cd9389": "[{hostId}] 上传完成",
+  "@ut_7ef1cd9389": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a465e8a3ee": "[{hostId}] 文件上传成功: {local} → {remote} ({size})",
+  "@ut_a465e8a3ee": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_699c3fa8dc": "[{hostId}] 正在递归上传目录: {local} → {effectiveRemote}",
+  "@ut_699c3fa8dc": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      },
+      "effectiveRemote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2996de9000": "[{hid}] 正在分发...",
+  "@ut_2996de9000": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0f735fba75": "[{hid}] ✗ 已取消，跳过",
+  "@ut_0f735fba75": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c021ae6b9": "[{hid}] 正在采集 {remote} ...",
+  "@ut_5c021ae6b9": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e31edc9171": "[{hid}] ✗ 主机未连接或非 SSH 会话",
+  "@ut_e31edc9171": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2e01615eec": "=== [{hid}] 已取消，跳过 ===",
+  "@ut_2e01615eec": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ffebfc53a6": "[{hid}] 正在搜索...",
+  "@ut_ffebfc53a6": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_38bc3dac85": "=== [{hid}] 主机未连接 ===",
+  "@ut_38bc3dac85": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8dc55e0134": "[{hid}] 正在读取 {remote} ...",
+  "@ut_8dc55e0134": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_475dcf3309": "正在检查 {host}:{port} 的 HTTPS 证书...",
+  "@ut_475dcf3309": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      },
+      "port": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bde384cf72": "正在解析本地证书: {certPath}",
+  "@ut_bde384cf72": {
+    "placeholders": {
+      "certPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b733c697fb": "正在{write} {path} ({length} 字节)...",
+  "@ut_b733c697fb": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_24853c3f76": "文件{write}成功: {path} ({length} 字节)",
+  "@ut_24853c3f76": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a7bd551b52": "备份回滚失败: {rollbackErr}，将尝试 PTY 写入",
+  "@ut_a7bd551b52": {
+    "placeholders": {
+      "rollbackErr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f8d0ae7c3c": "\n  注意：SFTP 流程已备份原文件到 {backupPath}，PTY 写入成功后可手动删除该备份",
+  "@ut_f8d0ae7c3c": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6820e10527": "文件写入成功（PTY stdin 模式 cat）: {path} ({length} 字节){backupInfo}",
+  "@ut_6820e10527": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      },
+      "backupInfo": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_caa84ab310": "cat 写入失败: {failureReason}，尝试 sudo tee ...",
+  "@ut_caa84ab310": {
+    "placeholders": {
+      "failureReason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b0ea4177b4": "文件写入成功（PTY stdin + sudo tee）: {path} ({length} 字节){backupInfo}",
+  "@ut_b0ea4177b4": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      },
+      "backupInfo": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_aad3625b0a": "文件{write}成功（{method}）: {path} ({byteCount} 字节)",
+  "@ut_aad3625b0a": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "method": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "byteCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_00cd1c4300": "正在检索知识库: {query}",
+  "@ut_00cd1c4300": {
+    "placeholders": {
+      "query": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c0b2e0370": "\n…({label}，原文共 {length} 字符)",
+  "@ut_5c0b2e0370": {
+    "placeholders": {
+      "label": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6f51e792f4": "全量上传进度: {uploaded}/{total}",
+  "@ut_6f51e792f4": {
+    "placeholders": {
+      "uploaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf4b2fdeb1": "已创建本机工作目录: {resolvedCwd}",
+  "@ut_cf4b2fdeb1": {
+    "placeholders": {
+      "resolvedCwd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_93ba05fcda": "无法创建工作目录 {resolvedCwd}: {e}",
+  "@ut_93ba05fcda": {
+    "placeholders": {
+      "resolvedCwd": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bb63c6672a": "本机执行 ({shell}): {command}",
+  "@ut_bb63c6672a": {
+    "placeholders": {
+      "shell": {
+        "type": "Object"
+      },
+      "command": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b5e97db76b": "已扫描 {scanned} 个文件...",
+  "@ut_b5e97db76b": {
+    "placeholders": {
+      "scanned": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_132456dcfb": "未知 mode: {mode}（支持 write/append）",
+  "@ut_132456dcfb": {
+    "placeholders": {
+      "mode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3b4b10f1b2": "本地终端启动失败: {e}",
+  "@ut_3b4b10f1b2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bbafda1855": "[图片 {mimeType}，{length} base64 字符]",
+  "@ut_bbafda1855": {
+    "placeholders": {
+      "mimeType": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3901620d02": "调用 MCP 工具 {serverName}/{name}",
+  "@ut_3901620d02": {
+    "placeholders": {
+      "serverName": {
+        "type": "Object"
+      },
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_405448830f": "读取 MCP 资源 {uri}",
+  "@ut_405448830f": {
+    "placeholders": {
+      "uri": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_090d7978c2": "获取 MCP 提示词 {name}",
+  "@ut_090d7978c2": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b01822a097": "项目目录不存在: {path}",
+  "@ut_b01822a097": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f1acec8e02": "项目路径: {path}",
+  "@ut_f1acec8e02": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8a884e053e": "自动识别构建命令: {buildCmd}",
+  "@ut_8a884e053e": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5ab7922da3": "构建命令被安全策略拦截: {buildCmd}",
+  "@ut_5ab7922da3": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_323ecc4b40": "开始构建: {buildCmd}",
+  "@ut_323ecc4b40": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dd547aa71c": "✓ 构建成功 ({inSeconds}s)\n\n输出:\n{output}",
+  "@ut_dd547aa71c": {
+    "placeholders": {
+      "inSeconds": {
+        "type": "Object"
+      },
+      "output": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fe98a458a9": "✗ 构建失败 (退出码: {exitCode}, 耗时: {inSeconds}s)",
+  "@ut_fe98a458a9": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      },
+      "inSeconds": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2192f982a0": "打包命令被安全策略拦截: {packageCmd}",
+  "@ut_2192f982a0": {
+    "placeholders": {
+      "packageCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5e9fa40ae2": "开始打包: {artifactDir} → {outputFile}",
+  "@ut_5e9fa40ae2": {
+    "placeholders": {
+      "artifactDir": {
+        "type": "Object"
+      },
+      "outputFile": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c3df15635": "✓ 打包成功\n输出文件: {outputFile}\n大小: {sizeStr}\n\n可用 sftp_upload 工具上传此文件到服务器。",
+  "@ut_9c3df15635": {
+    "placeholders": {
+      "outputFile": {
+        "type": "Object"
+      },
+      "sizeStr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7884351654": "打包成功: {sizeStr}",
+  "@ut_7884351654": {
+    "placeholders": {
+      "sizeStr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0a71fe6a29": "✗ 打包失败 (退出码: {exitCode})\n--- stdout ---\n{stdout}\n--- stderr ---\n{stderr}",
+  "@ut_0a71fe6a29": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      },
+      "stdout": {
+        "type": "Object"
+      },
+      "stderr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_62e6c24a03": "读取失败: {message}",
+  "@ut_62e6c24a03": {
+    "placeholders": {
+      "message": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ed6128ba80": "正在连接 {host}:{port}...",
+  "@ut_ed6128ba80": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      },
+      "port": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2574cd27d5": "通过跳板机 {host} 中转连接...",
+  "@ut_2574cd27d5": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_939fbbbde2": "连接验证跳过: {e}\n",
+  "@ut_939fbbbde2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c09d2ebc3": "写入 stdin 失败: {e}",
+  "@ut_5c09d2ebc3": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_160a20b4b9": "发送 EOF 失败: {e}",
+  "@ut_160a20b4b9": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e230a6d105": "正在搜索: {query}",
+  "@ut_e230a6d105": {
+    "placeholders": {
+      "query": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8bc3df095a": "正在抓取: {url}",
+  "@ut_8bc3df095a": {
+    "placeholders": {
+      "url": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_571ec497a6": "标题: {title}",
+  "@ut_571ec497a6": {
+    "placeholders": {
+      "title": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_eb988194e9": "目标：{trim}",
+  "@ut_eb988194e9": {
+    "placeholders": {
+      "trim": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_304b011a8a": "结论：{trim}",
+  "@ut_304b011a8a": {
+    "placeholders": {
+      "trim": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_080de8536f": "{service} 运行中",
+  "@ut_080de8536f": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8f24f3ec45": "{service} 未运行",
+  "@ut_8f24f3ec45": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_622000e27f": "{service} 开机自启",
+  "@ut_622000e27f": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_371d1b3d69": "{service} 未设置自启",
+  "@ut_371d1b3d69": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e7e9d06df9": " 等 {length} 个端口",
+  "@ut_e7e9d06df9": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9def515d87": "端口 {shown}{suffix} 监听",
+  "@ut_9def515d87": {
+    "placeholders": {
+      "shown": {
+        "type": "Object"
+      },
+      "suffix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ea6610697b": "你的选择：{chosen}",
+  "@ut_ea6610697b": {
+    "placeholders": {
+      "chosen": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e7d26cf57d": "原始输出尾部 · 共 {totalChars} 字符",
+  "@ut_e7d26cf57d": {
+    "placeholders": {
+      "totalChars": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7234d250c6": "共 {length} 条 · 显示 {length} 条",
+  "@ut_7234d250c6": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0b13faa29b": "已复制 {length} 条日志",
+  "@ut_0b13faa29b": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2a21b678a8": "{inMinutes} 分钟前",
+  "@ut_2a21b678a8": {
+    "placeholders": {
+      "inMinutes": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_05ac4fcf03": "{inHours} 小时前",
+  "@ut_05ac4fcf03": {
+    "placeholders": {
+      "inHours": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_11bfebfb31": "{inDays} 天前",
+  "@ut_11bfebfb31": {
+    "placeholders": {
+      "inDays": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5eda668d7a": "模型 · {length} 个",
+  "@ut_5eda668d7a": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dc4c3efe70": "用「{name}」的默认模型覆盖当前 {length} 个模型？",
+  "@ut_dc4c3efe70": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c153205f28": "拉取到 {length} 个模型",
+  "@ut_c153205f28": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c3ca30909": "加入 {length} 个",
+  "@ut_9c3ca30909": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0408a4e88d": "最后连接: {lastConnected}",
+  "@ut_0408a4e88d": {
+    "placeholders": {
+      "lastConnected": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_508cac93a2": "{length} 台主机 · {success} 成功'\n                    '{failed}",
+  "@ut_508cac93a2": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "success": {
+        "type": "Object"
+      },
+      "failed": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_00fefb12c8": "退出码 {exitCode}",
+  "@ut_00fefb12c8": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7c37c17c72": "打开 {name}",
+  "@ut_7c37c17c72": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_393e236ec2": "执行 {runCount} 次",
+  "@ut_393e236ec2": {
+    "placeholders": {
+      "runCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4dbb782799": "复制这 {length} 条（含输出）",
+  "@ut_4dbb782799": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_afa890cf1c": "已复制 {length} 条",
+  "@ut_afa890cf1c": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_63f8cd8765": "还有 {rest} 项",
+  "@ut_63f8cd8765": {
+    "placeholders": {
+      "rest": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2565b39f32": "共 {total} 台",
+  "@ut_2565b39f32": {
+    "placeholders": {
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e36a5ac905": "回滚：{rollbackCommand}",
+  "@ut_e36a5ac905": {
+    "placeholders": {
+      "rollbackCommand": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_261ec8093d": "正在重连 {hostLabel} · 连接恢复中",
+  "@ut_261ec8093d": {
+    "placeholders": {
+      "hostLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1568d540be": "已复制 {length} 字符",
+  "@ut_1568d540be": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c14c3f2424": "本次会话崩溃 {count} 次",
+  "@ut_c14c3f2424": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1f5bbded76": "发现新版本 {version}，点击查看",
+  "@ut_1f5bbded76": {
+    "placeholders": {
+      "version": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5eb52c419e": "{length} 个模型 · {baseUrl}",
+  "@ut_5eb52c419e": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "baseUrl": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_01f2ee338e": "{length} 字",
+  "@ut_01f2ee338e": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_92bbd40515": "已开启 · 启动时验证{biometricLabel}",
+  "@ut_92bbd40515": {
+    "placeholders": {
+      "biometricLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8ecd2c14b5": "已连接 · {value} 个工具",
+  "@ut_8ecd2c14b5": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7c5becde1e": "{value} 个工具",
+  "@ut_7c5becde1e": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3d787403e1": "主机组 · {group}",
+  "@ut_3d787403e1": {
+    "placeholders": {
+      "group": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_def0dd4b20": "主机 · {hostId}",
+  "@ut_def0dd4b20": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fddba05801": "{displayName} API Key",
+  "@ut_fddba05801": {
+    "placeholders": {
+      "displayName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e42173cc90": "已下载到: {localPath}",
+  "@ut_e42173cc90": {
+    "placeholders": {
+      "localPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7a77df19f2": "下载失败: {e}",
+  "@ut_7a77df19f2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c9db79438": "读取失败: {e}",
+  "@ut_9c9db79438": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6f2c34a667": "重命名失败: {e}",
+  "@ut_6f2c34a667": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf4419589b": "删除失败: {e}",
+  "@ut_cf4419589b": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c3b890cd74": "打开文件选择器失败: {e}",
+  "@ut_c3b890cd74": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3f446bd9fe": "已上传: {fileName}",
+  "@ut_3f446bd9fe": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9e12df0a1f": "上传 {fileName} 失败: {e}",
+  "@ut_9e12df0a1f": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e89a046c8b": "创建目录失败: {e}",
+  "@ut_e89a046c8b": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6c61736431": "上传 {name} 失败: {e}",
+  "@ut_6c61736431": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3cc564d9ac": "已导入 {ok} 台主机（凭据需在主机编辑页补填）",
+  "@ut_3cc564d9ac": {
+    "placeholders": {
+      "ok": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_218046bbfd": "粘贴 {length} 行内容？",
+  "@ut_218046bbfd": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c40c983842": "{preview}\n… 还有 {more} 行",
+  "@ut_c40c983842": {
+    "placeholders": {
+      "preview": {
+        "type": "Object"
+      },
+      "more": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3482231651": "已保存到 {path}",
+  "@ut_3482231651": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_aa865c9773": "项",
+  "ut_75282877a3": "条 · 注入 AI 上下文",
+  "ut_35f3bcac7a": "台已保存",
+  "ut_c32994dbf5": "台",
+  "ut_2cdff50b37": "组",
+  "ut_f7826628c0": "分钟前",
+  "ut_bfa2c2000f": "小时前",
+  "ut_15e2558649": "天前",
+  "ut_e7b73487d7": "字符",
+  "ut_babe4e8237": "{connected}/{total} 个服务器",
+  "@ut_babe4e8237": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_95860656bf": "MCP 总开关已关闭 · 已连接 {connected}/{total} 个服务器",
+  "@ut_95860656bf": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e12efa5ddb": "{connected}/{total} 个服务器 · Agent 可用 {tools} 个工具",
+  "@ut_e12efa5ddb": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      },
+      "tools": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3330b55acf": "{value} 个资源",
+  "@ut_3330b55acf": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf674ef0f8": "{value} 个提示词",
+  "@ut_cf674ef0f8": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  }
 }

@@ -7,6 +7,7 @@ import '../core/theme_colors.dart';
 import '../core/ui_text.dart';
 import '../models/command_history_entry.dart';
 import '../services/daos.dart';
+import '../core/l10n_holder.dart';
 
 /// 终端命令历史面板（P2）。
 ///
@@ -256,8 +257,8 @@ class _CommandHistoryPanelState extends State<CommandHistoryPanel> {
   String _ago(DateTime t) {
     final d = DateTime.now().difference(t);
     if (d.inMinutes < 1) return UiText.t('刚刚', 'just now');
-    if (d.inHours < 1) return UiText.t('${d.inMinutes} 分钟前', '${d.inMinutes}m ago');
-    if (d.inDays < 1) return UiText.t('${d.inHours} 小时前', '${d.inHours}h ago');
-    return UiText.t('${d.inDays} 天前', '${d.inDays}d ago');
+    if (d.inHours < 1) return L10n.str.ut_2a21b678a8(d.inMinutes);
+    if (d.inDays < 1) return L10n.str.ut_05ac4fcf03(d.inHours);
+    return L10n.str.ut_11bfebfb31(d.inDays);
   }
 }

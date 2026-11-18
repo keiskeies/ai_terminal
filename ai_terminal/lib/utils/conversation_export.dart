@@ -1,7 +1,7 @@
-import '../core/ui_text.dart';
 import '../models/agent_event.dart';
 import '../models/chat_item.dart';
 import '../models/operation_report.dart';
+import '../core/l10n_holder.dart';
 
 /// 把会话拼成纯文本，供 `/export` 复制到剪贴板。
 ///
@@ -28,11 +28,9 @@ String formatConversationForExport(List<ChatItem> items) {
 String formatOperationReportCopy(OperationReport report) {
   final buffer = StringBuffer();
   if (report.goal.trim().isNotEmpty) {
-    buffer.writeln(UiText.t(
-        '目标：${report.goal.trim()}', 'Goal: ${report.goal.trim()}'));
+    buffer.writeln(L10n.str.ut_eb988194e9(report.goal.trim()));
   }
-  buffer.writeln(UiText.t(
-      '结论：${report.conclusion.trim()}', 'Conclusion: ${report.conclusion.trim()}'));
+  buffer.writeln(L10n.str.ut_304b011a8a(report.conclusion.trim()));
   final answerBody = report.answerBody?.trim();
   if (answerBody != null && answerBody.isNotEmpty && !_sameText(answerBody, report.conclusion)) {
     buffer

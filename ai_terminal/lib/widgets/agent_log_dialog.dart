@@ -6,6 +6,7 @@ import '../core/theme_colors.dart';
 import '../services/agent_engine.dart';
 import '../core/app_toast.dart';
 import '../core/ui_text.dart';
+import '../core/l10n_holder.dart';
 
 /// Agent 日志查看器对话框
 ///
@@ -198,8 +199,7 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                         fontSize: fBody,
                         fontWeight: FontWeight.w600)),
                 const SizedBox(width: 8),
-                Text(UiText.t('共 ${_all.length} 条 · 显示 ${visible.length} 条',
-                        '${_all.length} entries · showing ${visible.length}'),
+                Text(L10n.str.ut_7234d250c6(_all.length, visible.length),
                     style: TextStyle(color: tc.textMuted, fontSize: fMicro)),
                 const Spacer(),
                 IconButton(
@@ -212,8 +212,7 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                     if (!ctx.mounted) return;
                     showTopSnackBar(ctx,
                       SnackBar(
-                        content: Text(UiText.t('已复制 ${visible.length} 条日志',
-                                'Copied ${visible.length} log entries'),
+                        content: Text(L10n.str.ut_0b13faa29b(visible.length),
                             style: const TextStyle(fontSize: 13)),
                         duration: const Duration(seconds: 1),
                       ),

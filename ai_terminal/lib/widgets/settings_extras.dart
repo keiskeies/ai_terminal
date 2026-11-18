@@ -17,6 +17,7 @@ import '../services/daos.dart';
 import '../services/health_check_service.dart';
 import '../services/update_check_service.dart';
 import 'settings_row_card.dart';
+import '../core/l10n_holder.dart';
 
 /// 设置页「管理」区的入口行（**只在整页设置用**）。
 ///
@@ -281,9 +282,7 @@ class _SettingsAboutRowsState extends ConsumerState<SettingsAboutRows> {
                 showTopSnackBar(
                     context,
                     SnackBar(
-                      content: Text(UiText.t(
-                          '已复制 ${content.length} 字符',
-                          'Copied ${content.length} characters')),
+                      content: Text(L10n.str.ut_1568d540be(content.length)),
                       behavior: SnackBarBehavior.floating,
                     ));
               },
@@ -332,7 +331,7 @@ class _SettingsAboutRowsState extends ConsumerState<SettingsAboutRows> {
   static String _diagnosticsSubtitle() {
     final count = crashReporter.sessionCrashCount;
     if (count > 0) {
-      return UiText.t('本次会话崩溃 $count 次', '$count crash(es) this session');
+      return L10n.str.ut_c14c3f2424(count);
     }
     final lastTime = crashReporter.lastCrashTime;
     if (lastTime != null) {

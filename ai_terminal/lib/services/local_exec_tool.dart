@@ -10,6 +10,7 @@ import '../utils/tool_args_parser.dart';
 import 'agent_tool.dart';
 import 'command_executor.dart';
 import 'local_file_policy.dart';
+import '../core/l10n_holder.dart';
 
 /// 在运行 App 的本机执行命令 — 只对 SSH 会话暴露。
 ///
@@ -156,12 +157,9 @@ class LocalExecTool extends AgentTool {
     if (!await dir.exists()) {
       try {
         await dir.create(recursive: true);
-        onProgress?.call(UiText.t('已创建本机工作目录: $resolvedCwd',
-            'Created local working directory: $resolvedCwd'));
+        onProgress?.call(L10n.str.ut_cf4b2fdeb1(resolvedCwd));
       } catch (e) {
-        return ToolResult.failure(UiText.t(
-            '无法创建工作目录 $resolvedCwd: $e',
-            'Cannot create working directory $resolvedCwd: $e'));
+        return ToolResult.failure(L10n.str.ut_93ba05fcda(resolvedCwd, e));
       }
     }
 
@@ -193,9 +191,7 @@ class LocalExecTool extends AgentTool {
       executed: false,
     );
 
-    onProgress?.call(UiText.t(
-        '本机执行 (${localShellLabel(shell)}): ${_clipForProgress(command)}',
-        'Local run (${localShellLabel(shell)}): ${_clipForProgress(command)}'));
+    onProgress?.call(L10n.str.ut_bb63c6672a(localShellLabel(shell), _clipForProgress(command)));
 
     // ── 4. 执行 ───────────────────────────────────────────────
     LocalCommandResult result;

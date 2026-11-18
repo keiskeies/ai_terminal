@@ -7,6 +7,7 @@ import 'web_search_http.dart';
 import 'web_search_service.dart';
 import '../core/ui_text.dart';
 import '../utils/tool_args_parser.dart';
+import '../core/l10n_holder.dart';
 
 /// 联网搜索工具
 ///
@@ -68,7 +69,7 @@ class WebSearchTool extends AgentTool {
       return ToolResult.failure(UiText.t('参数缺失: query 为必填项', 'Missing parameter: query is required'));
     }
 
-    onProgress?.call(UiText.t('正在搜索: $query', 'Searching: $query'));
+    onProgress?.call(L10n.str.ut_e230a6d105(query));
 
     // 桥接 AgentTool.cancelToken (Completer<void>) → Dio.CancelToken
     // 设计意图：cancelTask 完成 Completer 时，立即取消进行中的网络请求，
@@ -212,7 +213,7 @@ class FetchUrlTool extends AgentTool {
 
     final cap = maxChars > 0 ? maxChars : _defaultMaxChars;
 
-    onProgress?.call(UiText.t('正在抓取: $url', 'Fetching: $url'));
+    onProgress?.call(L10n.str.ut_8bc3df095a(url));
 
     final dioCancel = CancelToken();
     StreamSubscription<void>? sub;
@@ -261,7 +262,7 @@ class FetchUrlTool extends AgentTool {
 
       final buffer = StringBuffer();
       if (title.isNotEmpty) {
-        buffer.writeln(UiText.t('标题: $title', 'Title: $title'));
+        buffer.writeln(L10n.str.ut_571ec497a6(title));
         buffer.writeln();
       }
       buffer.writeln('URL: $url');

@@ -14,6 +14,7 @@ import '../services/daos.dart';
 import '../services/provider_config_service.dart';
 import 'inline_form.dart';
 import 'provider_logo.dart';
+import '../core/l10n_holder.dart';
 
 /// 端点编辑器（抽屉内联版）。
 ///
@@ -320,7 +321,7 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
       if (mounted) {
         setState(() {
           _saving = false;
-          _error = UiText.t('保存失败: $e', 'Save failed: $e');
+          _error = L10n.str.ut_5fe0b81932(e);
         });
       }
     }
@@ -422,8 +423,7 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
           children: [
             Expanded(
               child: Text(
-                UiText.t('模型 · ${_models.length} 个',
-                    '${_models.length} model(s)'),
+                L10n.str.ut_5eda668d7a(_models.length),
                 style: TextStyle(fontSize: fMicro, color: tc.textSub),
               ),
             ),
@@ -537,8 +537,7 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
   Widget _fetchPicker(ThemeColors tc) {
     final candidates = _fetchCandidates!;
     return InlineSheet(
-      title: UiText.t('拉取到 ${candidates.length} 个模型',
-          '${candidates.length} models found'),
+      title: L10n.str.ut_c153205f28(candidates.length),
       onBack: () => setState(() => _fetchCandidates = null),
       actions: [
         InlineButton(
@@ -546,8 +545,7 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
           onTap: () => setState(() => _fetchCandidates = null),
         ),
         InlineButton(
-          label: UiText.t('加入 ${_fetchPicked.length} 个',
-              'Add ${_fetchPicked.length}'),
+          label: L10n.str.ut_9c3ca30909(_fetchPicked.length),
           primary: true,
           onTap: _fetchPicked.isEmpty
               ? null

@@ -1,5 +1,6 @@
 import '../core/ui_text.dart';
 import '../models/operation_report.dart';
+import '../core/l10n_holder.dart';
 
 /// 确定性验证检测器
 ///
@@ -21,12 +22,12 @@ class VerificationDetector {
       final state = _firstLine(out).toLowerCase();
       if (state == 'active') {
         return OperationBadge(
-            text: UiText.t('$service 运行中', '$service running'),
+            text: L10n.str.ut_080de8536f(service),
             level: 'success');
       }
       if (state == 'inactive' || state == 'failed' || state == 'unknown') {
         return OperationBadge(
-            text: UiText.t('$service 未运行', '$service not running'),
+            text: L10n.str.ut_8f24f3ec45(service),
             level: 'warning');
       }
       return null;
@@ -38,12 +39,12 @@ class VerificationDetector {
       final state = _firstLine(out).toLowerCase();
       if (state == 'enabled') {
         return OperationBadge(
-            text: UiText.t('$service 开机自启', '$service autostart on'),
+            text: L10n.str.ut_622000e27f(service),
             level: 'success');
       }
       if (state == 'disabled') {
         return OperationBadge(
-            text: UiText.t('$service 未设置自启', '$service autostart off'),
+            text: L10n.str.ut_371d1b3d69(service),
             level: 'info');
       }
       return null;
@@ -64,10 +65,10 @@ class VerificationDetector {
       final sorted = ports.map(int.parse).toList()..sort();
       final shown = sorted.take(4).join('/');
       final suffix = sorted.length > 4
-          ? UiText.t(' 等 ${sorted.length} 个端口', ' (+${sorted.length} more)')
+          ? L10n.str.ut_e7e9d06df9(sorted.length)
           : '';
       return OperationBadge(
-          text: UiText.t('端口 $shown$suffix 监听', 'Ports $shown$suffix listening'),
+          text: L10n.str.ut_9def515d87(shown, suffix),
           level: 'success');
     }
 

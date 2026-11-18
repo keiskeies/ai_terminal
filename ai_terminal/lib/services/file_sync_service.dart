@@ -4,8 +4,8 @@ import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:watcher/watcher.dart';
-import '../core/ui_text.dart';
 import 'sftp_service.dart';
+import '../core/l10n_holder.dart';
 
 /// 同步方向
 enum SyncDirection {
@@ -412,8 +412,7 @@ class FileSyncService {
         excludeNames: config.excludeNames,
         onProgress: (uploaded, total) {
           _emit(SyncEventType.uploadProgress,
-              UiText.t('全量上传进度: $uploaded/$total',
-                  'Full upload progress: $uploaded/$total'),
+              L10n.str.ut_6f51e792f4(uploaded, total),
               uploaded: uploaded, total: total);
         },
       );

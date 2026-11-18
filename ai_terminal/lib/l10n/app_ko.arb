@@ -8,170 +8,170 @@
   "agentRunning": "에이전트가 작업을 실행 중입니다. 완료될 때까지 기다려주세요",
   "agentSettingAiTimeoutDesc": "이 시간 동안 모델 출력이 없으면 시간 초과로 판단합니다. 느린 로컬 모델은 값을 늘리세요.",
   "agentSettingAiTimeoutLabel": "AI 응답 시간 초과",
-  "agentSettingAutoExecSection": "AI Auto Execution",
-  "agentSettingBuiltInPrompt": "AI Built-in Instructions",
-  "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",
-  "agentSettingBuiltInPromptSubtitle": "Modify AI's basic instructions",
-  "agentSettingBuiltInSaved": "AI built-in instructions saved",
-  "agentSettingCustomPromptHint": "e.g., Respond in English, use concise format, prefer Docker...",
-  "agentSettingExtraPrompt": "Additional Instructions",
-  "agentSettingExtraPromptDesc": "Additional requirements appended to built-in instructions to adjust AI's response style. Leave empty to skip.",
-  "agentSettingExtraPromptSaved": "Additional instructions saved",
-  "agentSettingExtraPromptSubtitle": "Additional requirements appended to built-in instructions",
-  "agentSettingHundredSteps": "100 steps",
-  "agentSettingMaxStepsDesc": "Maximum number of steps AI takes when executing commands automatically. Set to 0 for unlimited steps; complex tasks will not be interrupted.",
-  "agentSettingMaxStepsLabel": "Max steps AI can execute automatically",
-  "agentSettingPromptSection": "AI Prompts",
-  "agentSettingPromptWarning": "⚠️ Modify with caution. Inappropriate prompts may cause abnormal AI behavior. Click \"Reset\" to restore defaults at any time.",
-  "agentSettingTitle": "Agent Settings",
+  "agentSettingAutoExecSection": "AI 자동화 실행",
+  "agentSettingBuiltInPrompt": "AI 내장 지침",
+  "agentSettingBuiltInPromptDesc": "이는 AI의 기본 명령어로, 수정 후 즉시 적용됩니다. 내부의 \"컨텍스트\"는 서버 정보로 대체됩니다.",
+  "agentSettingBuiltInPromptSubtitle": "AI에 대한 기본 지침 수정",
+  "agentSettingBuiltInSaved": "AI 내장 지침이 저장되었습니다.",
+  "agentSettingCustomPromptHint": "예를 들어 영어로 답변하고, 간결한 형식으로 출력하고, Docker를 먼저 사용하세요...",
+  "agentSettingExtraPrompt": "추가 지침",
+  "agentSettingExtraPromptDesc": "내장 지침에 추가된 추가 요구 사항은 AI의 응답 스타일을 조정할 수 있습니다. 추가하지 않으려면 비워 두세요.",
+  "agentSettingExtraPromptSaved": "추가 지침이 저장되었습니다.",
+  "agentSettingExtraPromptSubtitle": "내장 지시문 이후의 추가 요구 사항",
+  "agentSettingHundredSteps": "100걸음",
+  "agentSettingMaxStepsDesc": "AI가 자동으로 명령을 실행하는 경우 최대 몇 단계만 거치면 됩니다. 0으로 설정하면 단계 수에 제한이 없으며 복잡한 작업이 중간에 중단되지 않습니다.",
+  "agentSettingMaxStepsLabel": "AI는 최대 몇 단계만 자동으로 실행할 수 있습니다.",
+  "agentSettingPromptSection": "AI 프롬프트 단어",
+  "agentSettingPromptWarning": "⚠️ 수정 시 주의하세요. 부적절한 프롬프트 단어는 AI의 비정상적인 동작을 유발할 수 있습니다. 언제든지 \"재설정\"을 클릭하여 기본값을 복원할 수 있습니다.",
+  "agentSettingTitle": "에이전트 설정",
   "agentSettings": "에이전트",
   "agentSettingsDesc": "AI가 자동 실행하는 최대 단계 수 (0 = 무제한)",
-  "aiAndIntelligence": "AI",
-  "aiModelAdd": "Add Model",
-  "aiModelApiKeyInvalid": "Invalid API Key",
-  "aiModelApiKeyRequired": "Please enter an API Key",
-  "aiModelBaseUrlRequired": "Please enter a Base URL",
-  "aiModelCannotConnect": "Unable to connect",
+  "aiAndIntelligence": "AI와 지능",
+  "aiModelAdd": "모델 추가",
+  "aiModelApiKeyInvalid": "API 키가 잘못되었습니다.",
+  "aiModelApiKeyRequired": "API 키를 입력하세요",
+  "aiModelBaseUrlRequired": "기본 URL을 입력하세요.",
+  "aiModelCannotConnect": "연결할 수 없습니다",
   "aiModelConfig": "AI 모델",
   "aiModelConfigDesc": "API 키와 모델 매개변수 설정",
-  "aiModelConnectionTimeout": "Connection timeout",
-  "aiModelDeleteConfirm": "Are you sure you want to delete \"{name}\"?",
-  "aiModelDeleteTitle": "Delete Model",
-  "aiModelEditTitle": "Edit Model",
-  "aiModelEmptySubtitle": "Add an endpoint to group multiple models under one API key",
-  "aiModelEmptyTitle": "No AI models yet",
-  "aiModelMaxTokens": "Max Response Tokens",
-  "aiModelModelName": "Model Name",
-  "aiModelModelNameRequired": "Please enter a model name",
-  "aiModelNameError": "Incorrect model name",
-  "aiModelNameRequired": "Please enter a name",
-  "aiModelProvider": "AI Provider",
-  "aiModelProvidersUpdated": "Provider list updated ({count} providers)",
-  "aiModelRefreshProviders": "Refresh provider list",
-  "aiModelRemoteConfigEmpty": "Remote configuration is empty",
-  "aiModelRequestFailed": "Request failed ({code})",
-  "aiModelServerError": "Server error ({code})",
-  "aiModelSetAsDefault": "Set as default model",
-  "aiModelSetDefault": "Set as Default",
-  "aiModelTemperature": "Randomness",
-  "aiModelTest": "Test",
-  "aiModelTestFailed": "Test failed",
-  "aiModelTitle": "AI Model Configuration",
-  "aiModelTooManyRequests": "Too many requests",
-  "aiModelUpdateFailed": "Update failed: {error}",
+  "aiModelConnectionTimeout": "연결 시간 초과",
+  "aiModelDeleteConfirm": "정말로 \"{name}\"을 삭제하시겠습니까?",
+  "aiModelDeleteTitle": "모델 삭제",
+  "aiModelEditTitle": "모델 편집",
+  "aiModelEmptySubtitle": "엔드포인트를 추가합니다. 하나의 엔드포인트 아래에 여러 모델을 구성할 수 있습니다.",
+  "aiModelEmptyTitle": "아직 AI 모델이 없음",
+  "aiModelMaxTokens": "답글의 최대 문자 수",
+  "aiModelModelName": "모델명",
+  "aiModelModelNameRequired": "모델명을 입력해주세요",
+  "aiModelNameError": "잘못된 모델 이름",
+  "aiModelNameRequired": "이름을 입력하세요",
+  "aiModelProvider": "AI 서비스 제공자",
+  "aiModelProvidersUpdated": "제공업체 목록 업데이트됨({count} 제공업체)",
+  "aiModelRefreshProviders": "서비스 제공업체 목록 업데이트",
+  "aiModelRemoteConfigEmpty": "원격 구성이 비어 있습니다.",
+  "aiModelRequestFailed": "요청 실패({code})",
+  "aiModelServerError": "서버 오류({code})",
+  "aiModelSetAsDefault": "기본 모델로 설정",
+  "aiModelSetDefault": "기본값으로 설정",
+  "aiModelTemperature": "무작위성",
+  "aiModelTest": "테스트",
+  "aiModelTestFailed": "테스트 실패",
+  "aiModelTitle": "AI 모델 구성",
+  "aiModelTooManyRequests": "요청이 너무 자주 발생합니다.",
+  "aiModelUpdateFailed": "업데이트 실패: {error}",
   "aiPanel": "AI 패널",
   "appTitle": "AI 터미널",
   "appearance": "외관",
   "appearanceDesc": "다크/라이트 모드, 글꼴 크기, 색상 테마",
-  "appearanceDisplayMode": "Display Mode",
-  "appearanceDisplayModeDesc": "Choose dark or light interface",
-  "appearanceFontSizeDesc": "Drag the slider to adjust terminal text size",
-  "appearanceTitle": "Appearance Settings",
+  "appearanceDisplayMode": "디스플레이 모드",
+  "appearanceDisplayModeDesc": "어둡거나 밝은 인터페이스를 선택하세요",
+  "appearanceFontSizeDesc": "슬라이더를 드래그하여 터미널 텍스트 크기를 조정하세요",
+  "appearanceTitle": "모양 설정",
   "auditLog": "활동 로그",
-  "auditLogAllTitle": "All Audit Logs",
-  "auditLogCopied": "Copied {count} logs to clipboard",
-  "auditLogCopyTooltip": "Copy Records",
+  "auditLogAllTitle": "모든 작업 기록",
+  "auditLogCopied": "{count} 로그를 클립보드에 복사했습니다.",
+  "auditLogCopyTooltip": "기록 복사",
   "auditLogDesc": "누가 언제 어떤 명령을 실행했는지 확인",
-  "auditLogEmpty": "No audit logs",
-  "auditLogExecuted": "Executed",
-  "auditLogExportHeader": "# Audit Log Export",
-  "auditLogExportTime": "# Export time: {time}",
-  "auditLogExportTotal": "# Total: {count}",
-  "auditLogFilterAll": "All Records",
-  "auditLogFilterBlocked": "Only Blocked",
-  "auditLogFilterThisHost": "Only Current Host",
-  "auditLogNoMatch": "No matching records",
-  "auditLogNoRecordsToCopy": "No records to copy",
-  "auditLogNotExecuted": "Not Executed",
-  "auditLogOutput": "Output",
-  "auditLogSafetyBlocked": "Blocked",
-  "auditLogSafetyDanger": "Danger",
-  "auditLogSafetySafe": "Safe",
-  "auditLogSafetyWarning": "Warning",
-  "auditLogSearchHint": "Search command, server, output...",
-  "auditLogTitle": "Audit Log",
+  "auditLogEmpty": "아직 작업 기록이 없습니다",
+  "auditLogExecuted": "실행됨",
+  "auditLogExportHeader": "# 작업 기록 내보내기",
+  "auditLogExportTime": "# 내보내기 시간: {time}",
+  "auditLogExportTotal": "# 총 항목 수: {count}",
+  "auditLogFilterAll": "모든 기록",
+  "auditLogFilterBlocked": "차단된 것만",
+  "auditLogFilterThisHost": "현재 호스트만",
+  "auditLogNoMatch": "일치하는 레코드가 없습니다.",
+  "auditLogNoRecordsToCopy": "복사할 기록이 없습니다.",
+  "auditLogNotExecuted": "실행되지 않음",
+  "auditLogOutput": "출력",
+  "auditLogSafetyBlocked": "차단됨",
+  "auditLogSafetyDanger": "위험",
+  "auditLogSafetySafe": "안전하다",
+  "auditLogSafetyWarning": "경고",
+  "auditLogSearchHint": "명령, 서버, 출력 검색...",
+  "auditLogTitle": "운영기록",
   "authMethod": "인증 방식",
   "cancel": "취소",
-  "changeRecordAllTitle": "All Change Records",
-  "changeRecordConfirmRollback": "Confirm Rollback",
-  "changeRecordEmpty": "No change records",
-  "changeRecordEmptyHint": "Changes (such as installing, starting/stopping services) will be recorded automatically",
-  "changeRecordFailed": "Failed",
-  "changeRecordFilterAll": "All Records",
-  "changeRecordFilterRollbackable": "Only Rollbackable",
-  "changeRecordFilterThisHost": "Only Current Host",
-  "changeRecordHostNotConnected": "Server {hostId} is not connected, cannot roll back. Please connect to the server first.",
-  "changeRecordNotRollbackable": "This record does not support automatic rollback",
-  "changeRecordOriginalCommand": "Original command: {command}",
-  "changeRecordRollbackButton": "Rollback",
-  "changeRecordRollbackError": "Rollback error: {error}",
-  "changeRecordRollbackFailed": "Rollback failed: {stderr}",
-  "changeRecordRollbackFailedNoExec": "Rollback failed: cannot execute",
-  "changeRecordRollbackOnHost": "The following rollback command will be executed on server {hostName}:",
-  "changeRecordRollbackSuccess": "Rollback succeeded: {command}",
-  "changeRecordRolledBack": "Rolled Back",
-  "changeRecordRollingBack": "Rolling back: {command}",
-  "changeRecordSuccess": "Success",
-  "changeRecordTitle": "Change Records",
-  "changeRecordTypeFileOperation": "File Operation",
-  "changeRecordTypeInstall": "Install",
-  "changeRecordTypeModifyConfig": "Config Change",
-  "changeRecordTypeOther": "Other",
-  "changeRecordTypePermission": "Permission Change",
-  "changeRecordTypeRestartService": "Restart Service",
-  "changeRecordTypeStartService": "Start Service",
-  "changeRecordTypeStopService": "Stop Service",
-  "changeRecordTypeUninstall": "Uninstall",
+  "changeRecordAllTitle": "모든 변경 내역",
+  "changeRecordConfirmRollback": "해지 확인",
+  "changeRecordEmpty": "아직 변경 기록이 없습니다.",
+  "changeRecordEmptyHint": "변경(예: 설치, 서비스 시작 및 중지)을 수행한 후에는 자동으로 기록됩니다.",
+  "changeRecordFailed": "실패했다",
+  "changeRecordFilterAll": "모든 기록",
+  "changeRecordFilterRollbackable": "취소만 가능",
+  "changeRecordFilterThisHost": "현재 호스트만",
+  "changeRecordHostNotConnected": "서버 {hostId}가 연결되어 있지 않아 취소할 수 없습니다. 먼저 이 서버에 연결하세요.",
+  "changeRecordNotRollbackable": "이 레코드는 자동 취소를 지원하지 않습니다.",
+  "changeRecordOriginalCommand": "원래 명령: {command}",
+  "changeRecordRollbackButton": "취소",
+  "changeRecordRollbackError": "실행취소 오류: {error}",
+  "changeRecordRollbackFailed": "실행취소 실패: {stderr}",
+  "changeRecordRollbackFailedNoExec": "실행 취소 실패: 실행할 수 없습니다.",
+  "changeRecordRollbackOnHost": "실행 취소 명령은 서버 {hostName}에서 실행됩니다.",
+  "changeRecordRollbackSuccess": "취소 성공: {command}",
+  "changeRecordRolledBack": "취소됨",
+  "changeRecordRollingBack": "취소 중: {command}",
+  "changeRecordSuccess": "성공",
+  "changeRecordTitle": "변경 내역",
+  "changeRecordTypeFileOperation": "파일 작업",
+  "changeRecordTypeInstall": "설치",
+  "changeRecordTypeModifyConfig": "구성 수정",
+  "changeRecordTypeOther": "기타",
+  "changeRecordTypePermission": "권한 수정",
+  "changeRecordTypeRestartService": "서비스 다시 시작",
+  "changeRecordTypeStartService": "서비스 시작",
+  "changeRecordTypeStopService": "서비스 중지",
+  "changeRecordTypeUninstall": "제거",
   "changeRecords": "변경 이력",
   "changeRecordsDesc": "모든 변경 사항을 추적하고 문제 발생 시 되돌리기",
   "changeWindow": "안전 시간대",
-  "changeWindowAllDayAllowed": "Allowed all day",
-  "changeWindowAllowedWindow": "Allowed Window",
-  "changeWindowCrossDayHint": "Tip: A start time later than the end time means overnight (e.g., 22:00 to next day 06:00)",
-  "changeWindowCurrentWindowInfo": "Current allowed window: {window}\nCommands that make changes will be rejected at other times (read-only commands are not affected).",
+  "changeWindowAllDayAllowed": "하루 종일 허용",
+  "changeWindowAllowedWindow": "허용기간",
+  "changeWindowCrossDayHint": "Tip: 시작 시간이 종료 시간보다 늦습니다. 즉 밤을 지났다는 의미입니다(예: 22:00부터 다음날 06:00까지).",
+  "changeWindowCurrentWindowInfo": "현재 허용기간 : {window}\n다른 시간에 변경하는 명령은 거부됩니다(보기 명령은 영향을 받지 않음).",
   "changeWindowDesc": "변경을 지정된 안전한 시간대로 제한",
-  "changeWindowEnable": "Enable Safe Window",
-  "changeWindowEnableHint": "When enabled, changes can only be made during the set window",
-  "changeWindowEndHour": "End hour",
-  "changeWindowEveryDay": "{window}, every day",
-  "changeWindowOnlyDays": "{window}, only {days}",
-  "changeWindowSaveConfig": "Save Config",
-  "changeWindowSaveFailed": "Save failed: {error}",
-  "changeWindowSaved": "Safe window settings saved",
-  "changeWindowStartHour": "Start hour",
-  "changeWindowTitle": "Safe Window",
-  "changeWindowToNextDay": "{start} to next day {end}",
-  "changeWindowWeekdayFri": "Fri",
-  "changeWindowWeekdayMon": "Mon",
-  "changeWindowWeekdaySat": "Sat",
-  "changeWindowWeekdaySun": "Sun",
-  "changeWindowWeekdayThu": "Thu",
-  "changeWindowWeekdayTue": "Tue",
-  "changeWindowWeekdayWed": "Wed",
-  "changeWindowWeekdaysTitle": "Which days are allowed (none = every day)",
-  "chatBackToServerList": "Back to server list",
-  "chatClearSession": "Clear session",
-  "chatConnectServerHint": "Please connect to a server first, then tap the AI button in the bottom right on the terminal page",
-  "chatEmptyHint": "e.g. install Docker, check memory usage",
-  "chatEmptyTitle": "How can I help you?",
-  "chatInputHint": "Type a command or question...",
-  "chatNeedTerminal": "AI assistant needs to be used in a terminal",
+  "changeWindowEnable": "안전한 시간 활성화",
+  "changeWindowEnableHint": "활성화되면 설정된 기간 내에만 변경이 가능합니다.",
+  "changeWindowEndHour": "언제 끝나나요?",
+  "changeWindowEveryDay": "{window}, 매일",
+  "changeWindowOnlyDays": "{window}, {days}만 해당",
+  "changeWindowSaveConfig": "구성 저장",
+  "changeWindowSaveFailed": "저장 실패: {error}",
+  "changeWindowSaved": "안전 시간 설정이 저장되었습니다.",
+  "changeWindowStartHour": "몇시부터 허용되나요?",
+  "changeWindowTitle": "안전한 기간",
+  "changeWindowToNextDay": "{start} 다음날까지 {end}",
+  "changeWindowWeekdayFri": "금요일",
+  "changeWindowWeekdayMon": "월요일",
+  "changeWindowWeekdaySat": "토요일",
+  "changeWindowWeekdaySun": "일요일",
+  "changeWindowWeekdayThu": "목요일",
+  "changeWindowWeekdayTue": "화요일",
+  "changeWindowWeekdayWed": "수요일",
+  "changeWindowWeekdaysTitle": "허용되는 요일(선택 없음 = 매일)",
+  "chatBackToServerList": "서버 목록으로 돌아가기",
+  "chatClearSession": "세션 지우기",
+  "chatConnectServerHint": "먼저 서버에 접속하신 후, 터미널 페이지에 들어가 오른쪽 하단의 AI 버튼을 클릭해주세요.",
+  "chatEmptyHint": "예: Docker 설치, 메모리 사용량 확인",
+  "chatEmptyTitle": "어떻게 도와드릴까요?",
+  "chatInputHint": "명령이나 질문을 입력하세요...",
+  "chatNeedTerminal": "터미널에서 AI 도우미를 사용해야 합니다.",
   "clearMessagesFailed": "메시지 삭제에 실패했습니다",
   "close": "닫기",
-  "commonAIAssistant": "AI Assistant",
-  "commonAdvancedSettings": "Advanced Settings",
-  "commonAll": "All",
-  "commonBack": "Back",
-  "commonCancel": "Cancel",
-  "commonCommand": "Command",
-  "commonConfirm": "OK",
-  "commonCopiedToClipboard": "Copied to clipboard",
-  "commonDescription": "Description",
-  "commonExecute": "Execute",
-  "commonGotIt": "Got it",
-  "commonName": "Name",
-  "commonResetDefault": "Reset to Default",
-  "commonUnlimited": "Unlimited",
+  "commonAIAssistant": "AI 비서",
+  "commonAdvancedSettings": "고급 설정",
+  "commonAll": "모두",
+  "commonBack": "반환",
+  "commonCancel": "취소",
+  "commonCommand": "명령",
+  "commonConfirm": "알았어",
+  "commonCopiedToClipboard": "클립보드에 복사됨",
+  "commonDescription": "설명",
+  "commonExecute": "실행하다",
+  "commonGotIt": "알았어요",
+  "commonName": "이름",
+  "commonResetDefault": "기본값 재설정",
+  "commonUnlimited": "무제한",
   "compactFailed": "대화 압축에 실패했습니다",
   "compacting": "대화를 압축하는 중...",
   "confirm": "확인",
@@ -206,107 +206,107 @@
   "fieldRequired": "이 항목은 필수입니다",
   "followSystem": "시스템 설정 따르기",
   "group": "그룹",
-  "hostEditAuthTypeLabel": "Authentication Method *",
-  "hostEditConfigSavedButCredFailed": "⚠️ Configuration saved, but {error}. Please retry.",
-  "hostEditConnectionTimeout": "Connection timeout: {timeout}s",
-  "hostEditDefaultGroup": "Default",
-  "hostEditEncodingLabel": "Character Encoding",
-  "hostEditGroupHint": "Enter or select a group",
-  "hostEditGroupLabel": "Group",
-  "hostEditHostHint": "IP address or domain",
-  "hostEditHostLabel": "Host Address *",
-  "hostEditHostRequired": "Please enter the host address",
-  "hostEditJumpAuthTypeLabel": "Jump Host Authentication",
-  "hostEditJumpHostFlowHint": "Will first connect to the jump host, then forward to the target server through it",
-  "hostEditJumpHostLabel": "Jump Host Address *",
-  "hostEditJumpPasswordLabel": "Jump Host Password",
-  "hostEditJumpPortLabel": "Jump Host Port",
-  "hostEditJumpPrivateKeyContent": "Jump Host Private Key Content",
-  "hostEditJumpUsernameLabel": "Jump Host Username",
-  "hostEditMoreSettings": "More Settings",
-  "hostEditNameHint": "e.g., Production Server",
-  "hostEditNameLabel": "Name *",
-  "hostEditNameRequired": "Please enter a name",
-  "hostEditPassphraseLabel": "Passphrase (optional)",
-  "hostEditPassword": "Password",
-  "hostEditPasswordSaveFailed": "Failed to save password",
-  "hostEditPastePrivateKey": "Paste Private Key",
-  "hostEditPastePrivateKeySubtitle": "Turn off to select from file",
-  "hostEditPortLabel": "Port",
-  "hostEditPrivateKey": "Private Key",
-  "hostEditPrivateKeyContent": "Private Key Content",
-  "hostEditPrivateKeyFileRead": "Private key file loaded: {name}",
-  "hostEditPrivateKeySaveFailed": "Failed to save private key",
-  "hostEditReadFileFailed": "Failed to read file: {error}",
-  "hostEditSave": "💾 Save",
-  "hostEditSaveSuccess": "✅ Saved successfully",
-  "hostEditSectionAuth": "Authentication",
-  "hostEditSectionBasic": "Basic Information",
-  "hostEditSectionGroupTag": "Group & Tag",
-  "hostEditSectionJumpHost": "Jump Host / Bastion",
-  "hostEditSectionSudo": "Privilege Escalation (sudo)",
-  "hostEditSelect": "Select",
-  "hostEditSelectGroupTooltip": "Select an existing group",
-  "hostEditSelectPrivateKeyFile": "Select Private Key File",
-  "hostEditSudoPasswordDesc": "Once configured, this password will be auto-filled when AI encounters a sudo password prompt. It is saved via system secure storage and never appears in commands or logs.",
-  "hostEditSudoPasswordHint": "Auto-injected when AI runs sudo commands",
-  "hostEditSudoPasswordLabel": "Sudo Password (optional)",
-  "hostEditTagColor": "Tag Color",
-  "hostEditTimeoutSeconds": "{timeout}s",
-  "hostEditTitleEdit": "Edit Server",
-  "hostEditTitleNew": "New Server",
-  "hostEditUseJumpHost": "Use Jump Host",
-  "hostEditUseJumpHostSubtitle": "Connect via jump host / bastion",
-  "hostEditUsernameLabel": "Username",
-  "hostListAITipIntro": "AI assistant is available after connecting to a server:",
-  "hostListAITipNote": "💡 AI can help you generate commands, explain output, and troubleshoot issues",
-  "hostListAITipStep1": "1️⃣  Tap a server card to open the terminal",
-  "hostListAITipStep2": "2️⃣  After connecting, the AI button appears in the bottom right",
-  "hostListAITipStep3": "3️⃣  Tap the AI button to start the smart command assistant",
-  "hostListAITipTitle": "AI assistant usage tips",
-  "hostListAddFirstServer": "Add your first server to start AI-assisted remote management",
-  "hostListClearSearch": "Clear search",
-  "hostListConnectTerminal": "Connect terminal",
-  "hostListDeleteConfirm": "Are you sure you want to delete \"{hostName}\"?\n\nSaved credentials will also be deleted.",
-  "hostListDeleteServer": "Delete server",
-  "hostListDeleteSuccess": "Deleted successfully",
-  "hostListEditConfig": "Edit configuration",
-  "hostListLoadFailed": "Failed to load: {error}",
-  "hostListNoSearchResults": "No matching servers found",
-  "hostListNoSearchResultsHint": "Try different keywords or check spelling",
-  "hostListNoServers": "No servers yet",
-  "hostListSearchHint": "Search servers...",
+  "hostEditAuthTypeLabel": "인증방법 *",
+  "hostEditConfigSavedButCredFailed": "⚠️ 구성이 성공적으로 저장되었지만 {error}, 다시 시도해 주세요.",
+  "hostEditConnectionTimeout": "연결 시간 초과: {timeout}초",
+  "hostEditDefaultGroup": "기본값",
+  "hostEditEncodingLabel": "문자 인코딩",
+  "hostEditGroupHint": "그룹 입력 또는 선택",
+  "hostEditGroupLabel": "그룹",
+  "hostEditHostHint": "IP 주소 또는 도메인 이름",
+  "hostEditHostLabel": "호스트 주소 *",
+  "hostEditHostRequired": "호스트 주소를 입력해주세요",
+  "hostEditJumpAuthTypeLabel": "스프링보드 인증방법",
+  "hostEditJumpHostFlowHint": "스프링보드 머신이 먼저 연결된 후 스프링보드 머신을 통해 대상 서버로 전달됩니다.",
+  "hostEditJumpHostLabel": "스프링보드 기계 주소 *",
+  "hostEditJumpPasswordLabel": "스프링보드 비밀번호",
+  "hostEditJumpPortLabel": "스프링보드 포트",
+  "hostEditJumpPrivateKeyContent": "스프링보드 머신 개인 키 콘텐츠",
+  "hostEditJumpUsernameLabel": "스프링보드 사용자 이름",
+  "hostEditMoreSettings": "추가 설정",
+  "hostEditNameHint": "예: 프로덕션 서버",
+  "hostEditNameLabel": "이름 *",
+  "hostEditNameRequired": "이름을 입력하세요",
+  "hostEditPassphraseLabel": "개인 키 비밀번호(선택 사항)",
+  "hostEditPassword": "비밀번호",
+  "hostEditPasswordSaveFailed": "비밀번호 저장 실패",
+  "hostEditPastePrivateKey": "개인 키 붙여넣기",
+  "hostEditPastePrivateKeySubtitle": "닫은 후 파일에서 선택",
+  "hostEditPortLabel": "항구",
+  "hostEditPrivateKey": "개인 키",
+  "hostEditPrivateKeyContent": "개인 키 내용",
+  "hostEditPrivateKeyFileRead": "개인 키 파일 읽기: {name}",
+  "hostEditPrivateKeySaveFailed": "개인키 저장 실패",
+  "hostEditReadFileFailed": "파일을 읽지 못했습니다: {error}",
+  "hostEditSave": "💾 저장",
+  "hostEditSaveSuccess": "✅ 성공적으로 저장되었습니다",
+  "hostEditSectionAuth": "인증방법",
+  "hostEditSectionBasic": "기본정보",
+  "hostEditSectionGroupTag": "그룹화 및 라벨링",
+  "hostEditSectionJumpHost": "스프링보드/포트레스 머신",
+  "hostEditSectionSudo": "권한 에스컬레이션(sudo)",
+  "hostEditSelect": "선택",
+  "hostEditSelectGroupTooltip": "기존 그룹 선택",
+  "hostEditSelectPrivateKeyFile": "개인 키 파일 선택",
+  "hostEditSudoPasswordDesc": "구성 후 AI는 sudo 명령을 실행할 때 비밀번호 프롬프트가 나타나면 자동으로 이 비밀번호를 입력합니다. 비밀번호는 시스템 보안 저장소에 저장되며 명령이나 로그에 표시되지 않습니다.",
+  "hostEditSudoPasswordHint": "sudo 명령을 실행하면 AI가 자동으로 주입됩니다.",
+  "hostEditSudoPasswordLabel": "sudo 비밀번호(선택사항)",
+  "hostEditTagColor": "라벨 색상",
+  "hostEditTimeoutSeconds": "{timeout}초",
+  "hostEditTitleEdit": "서버 편집",
+  "hostEditTitleNew": "새 서버 만들기",
+  "hostEditUseJumpHost": "스프링 머신을 사용하세요",
+  "hostEditUseJumpHostSubtitle": "스프링보드/배스천 호스트를 통해 연결",
+  "hostEditUsernameLabel": "사용자 이름",
+  "hostListAITipIntro": "AI 도우미는 서버에 연결한 후 사용해야 합니다.",
+  "hostListAITipNote": "💡 AI는 명령을 생성하고, 출력을 해석하고, 문제를 해결하는 데 도움을 줄 수 있습니다.",
+  "hostListAITipStep1": "1️⃣ 서버 카드를 클릭해 단말기에 입장하세요",
+  "hostListAITipStep2": "2️⃣ 연결이 성공하면 오른쪽 하단에 AI 버튼이 나타납니다",
+  "hostListAITipStep3": "3️⃣ AI 버튼을 클릭하여 지능형 명령 도우미를 시작하세요",
+  "hostListAITipTitle": "AI 비서 활용 팁",
+  "hostListAddFirstServer": "첫 번째 서버를 추가하고 AI 지원 원격 관리를 시작하세요",
+  "hostListClearSearch": "검색 지우기",
+  "hostListConnectTerminal": "터미널 연결",
+  "hostListDeleteConfirm": "정말로 \"{hostName}\"을 삭제하시겠습니까?\n\n저장된 자격 증명도 삭제됩니다.",
+  "hostListDeleteServer": "서버 삭제",
+  "hostListDeleteSuccess": "성공적으로 삭제되었습니다",
+  "hostListEditConfig": "구성 수정",
+  "hostListLoadFailed": "로드 실패: {error}",
+  "hostListNoSearchResults": "일치하는 서버를 찾을 수 없습니다",
+  "hostListNoSearchResultsHint": "다른 키워드를 사용해 보거나 맞춤법을 확인하세요.",
+  "hostListNoServers": "아직 서버가 없습니다",
+  "hostListSearchHint": "서버 검색...",
   "language": "언어",
   "languageDesc": "인터페이스 언어 선택",
-  "languageDialogTitle": "Select Language",
-  "languageFollowSystem": "Follow System",
+  "languageDialogTitle": "언어 선택",
+  "languageFollowSystem": "시스템을 따르세요",
   "lightMode": "라이트 모드",
   "messageSaveFailed": "메시지 저장에 실패했습니다. 작업이 시작되지 않았습니다",
   "name": "이름",
   "nickname": "별명",
   "noCredentials": "❌ 자격 증명을 찾을 수 없습니다\n\n서버를 편집하여 비밀번호 또는 개인 키를 입력하세요.",
-  "notificationAlways": "Every time",
-  "notificationAlwaysSubtitle": "Send a notification when a task finishes or fails",
-  "notificationEnable": "Enable task completion notifications",
-  "notificationEnableHint": "Automatically send a message when a task finishes or fails",
-  "notificationEnterUrlFirst": "Please fill in the notification URL first",
-  "notificationFailedOnly": "Only on failure",
-  "notificationFailedOnlySubtitle": "Only send a notification when a task fails",
-  "notificationInstructionsBody": "1. Add a \"bot\" in your DingTalk/Feishu/WeCom group to get the webhook URL\n2. Paste the URL into the input box above\n3. Click \"Send test notification\" to check if you can receive it\n4. From now on, a message will be sent to the group automatically when a task finishes or fails",
-  "notificationInstructionsTitle": "Instructions",
-  "notificationInvalidUrl": "Invalid URL format: {error}",
-  "notificationSaveConfig": "Save Config",
-  "notificationSaveFailed": "Save failed: {error}",
-  "notificationSaved": "Notification settings saved",
-  "notificationSendTest": "Send test notification",
-  "notificationSending": "Sending...",
-  "notificationTestFailed": "Test failed: {error}",
-  "notificationTestSendFailed": "Send failed, please check the notification URL",
-  "notificationTestSent": "Test notification sent, please check your group",
-  "notificationTitle": "Task Completion Notifications",
-  "notificationTriggerTitle": "When to send notifications",
-  "notificationWebhookSupport": "Supports: DingTalk, Feishu, WeCom group, Slack, etc.",
-  "notificationWebhookUrl": "Webhook URL",
+  "notificationAlways": "매번 알림",
+  "notificationAlwaysSubtitle": "작업이 완료되거나 실패하면 알림 보내기",
+  "notificationEnable": "작업 완료 알림 활성화",
+  "notificationEnableHint": "작업이 완료되거나 실패하면 자동으로 메시지 보내기",
+  "notificationEnterUrlFirst": "먼저 알림 주소를 입력해주세요.",
+  "notificationFailedOnly": "실패 시에만 알림",
+  "notificationFailedOnlySubtitle": "작업이 실패할 때만 알림 보내기",
+  "notificationInstructionsBody": "1. DingTalk/Feishu/Enterprise WeChat 그룹에 \"로봇\"을 추가하고 알림 주소를 받습니다.\n2. 위의 입력창에 주소를 붙여넣으세요\n3. \"테스트 알림 보내기\"를 클릭하여 알림을 받을 수 있는지 확인하세요.\n4. 향후 작업이 완료되거나 실패하면 자동으로 그룹에 메시지가 전송됩니다.",
+  "notificationInstructionsTitle": "사용 지침",
+  "notificationInvalidUrl": "잘못된 주소 형식: {error}",
+  "notificationSaveConfig": "구성 저장",
+  "notificationSaveFailed": "저장 실패: {error}",
+  "notificationSaved": "알림 구성이 저장되었습니다.",
+  "notificationSendTest": "테스트 알림 보내기",
+  "notificationSending": "보내는 중...",
+  "notificationTestFailed": "테스트 실패: {error}",
+  "notificationTestSendFailed": "전송에 실패했습니다. 알림 주소를 확인하세요.",
+  "notificationTestSent": "테스트 알림이 전송되었습니다. 그룹으로 이동하여 살펴보세요.",
+  "notificationTitle": "작업 완료 알림",
+  "notificationTriggerTitle": "알림을 보낼 때",
+  "notificationWebhookSupport": "지원: DingTalk, Feishu, 기업 WeChat 그룹, Slack 등",
+  "notificationWebhookUrl": "알림 주소",
   "notifications": "알림",
   "notificationsDesc": "작업 완료 시 메시지 받기",
   "ok": "확인",
@@ -319,146 +319,146 @@
   "quickCommands": "스니펫",
   "quickCommandsDesc": "자주 쓰는 명령어를 저장해 한 번에 실행",
   "retry": "재시도",
-  "runbookBuiltinCannotDelete": "Built-in templates cannot be deleted",
-  "runbookBuiltinNotEditable": "Built-in templates are not editable. Use \"Clone\" to create a copy and modify it.",
-  "runbookBuiltinTag": "Built-in",
-  "runbookCategoryCustom": "Custom",
-  "runbookCategoryDeployment": "Deployment",
-  "runbookCategoryInspection": "Inspection",
-  "runbookCategoryMaintenance": "Maintenance",
-  "runbookCategorySecurity": "Security",
-  "runbookCategoryTroubleshooting": "Troubleshooting",
-  "runbookClipboardEmpty": "Clipboard is empty",
-  "runbookCloneTooltip": "Clone",
-  "runbookClonedToast": "Cloned as custom runbook: {name}",
-  "runbookContentAgent": "Prompt Content",
-  "runbookContentAgentHint": "e.g., Check disk usage of '{host}' and provide suggestions",
-  "runbookContentCommand": "Command Content",
-  "runbookContentCommandHint": "e.g., ssh '{user}'@'{host}' df -h",
-  "runbookContentRequired": "Please enter the content",
-  "runbookCreate": "Create",
-  "runbookDeleteConfirm": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
-  "runbookDeleteTitle": "Delete Runbook",
-  "runbookDeleteTooltip": "Delete",
-  "runbookDeletedToast": "Deleted",
-  "runbookEditTitle": "Edit Runbook",
-  "runbookEditTooltip": "Edit",
-  "runbookEmptyFiltered": "No matching runbooks. Try adjusting the filters.",
-  "runbookEmptyHint": "Tap the bottom-right button to create a runbook",
-  "runbookEmptyTitle": "No runbooks yet",
-  "runbookFieldCategory": "Category",
-  "runbookFieldDescription": "Description (optional)",
-  "runbookFieldIcon": "Icon",
-  "runbookFieldName": "Name",
-  "runbookFieldType": "Type",
-  "runbookFilterAll": "All",
-  "runbookImportButton": "Import",
-  "runbookImportHint": "Copy JSON from the official open platform and paste it here",
-  "runbookImportPasteHint": "Paste JSON content here…",
-  "runbookImportSuccess": "Successfully imported {count} runbooks",
-  "runbookImportTitle": "Import Runbooks",
-  "runbookImportTooltip": "Import Runbook",
-  "runbookJsonParseFailed": "JSON parse failed: {error}",
-  "runbookNameRequired": "Please enter a name",
-  "runbookNewTitle": "New Runbook",
-  "runbookPasteFromClipboard": "Paste from Clipboard",
-  "runbookPasteJsonFirst": "Please paste JSON content first",
-  "runbookRunCount": "Run {count} times",
-  "runbookSearchHint": "Search runbook name or description",
-  "runbookTitle": "Runbooks",
-  "runbookTypeAgentDesc": "Natural language prompt, executed by AI via ReAct framework",
-  "runbookTypeAgentOption": "AI Execute",
-  "runbookTypeAgentTag": "AI Execute",
-  "runbookTypeCommand": "Direct Execute",
-  "runbookTypeCommandDesc": "Execute commands directly in terminal after variable substitution",
-  "runbookUseInTerminal": "Please use this in the terminal page",
+  "runbookBuiltinCannotDelete": "내장 템플릿은 삭제할 수 없습니다.",
+  "runbookBuiltinNotEditable": "내장된 템플릿은 편집할 수 없습니다. \"복제\"를 사용하여 복사본을 만든 다음 수정하세요.",
+  "runbookBuiltinTag": "내장",
+  "runbookCategoryCustom": "사용자 정의",
+  "runbookCategoryDeployment": "배포",
+  "runbookCategoryInspection": "검사",
+  "runbookCategoryMaintenance": "정기 유지 관리",
+  "runbookCategorySecurity": "안전하다",
+  "runbookCategoryTroubleshooting": "문제 해결",
+  "runbookClipboardEmpty": "클립보드가 비어 있습니다.",
+  "runbookCloneTooltip": "클론",
+  "runbookClonedToast": "커스텀 워크플로로 복제: {name}",
+  "runbookContentAgent": "프롬프트 내용",
+  "runbookContentAgentHint": "예: '{host}'의 디스크 사용량을 확인하고 제안하기",
+  "runbookContentCommand": "명령 내용",
+  "runbookContentCommandHint": "예: ssh '{user}'@'{host}' df -h",
+  "runbookContentRequired": "내용을 입력해주세요",
+  "runbookCreate": "창조하다",
+  "runbookDeleteConfirm": "정말로 \"{name}\"을 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.",
+  "runbookDeleteTitle": "워크플로 삭제",
+  "runbookDeleteTooltip": "삭제",
+  "runbookDeletedToast": "삭제됨",
+  "runbookEditTitle": "작업 흐름 편집",
+  "runbookEditTooltip": "편집",
+  "runbookEmptyFiltered": "일치하는 워크플로가 없습니다. 필터 조건을 조정해 보세요.",
+  "runbookEmptyHint": "새 워크플로를 생성하려면 오른쪽 하단에 있는 버튼을 클릭하세요.",
+  "runbookEmptyTitle": "아직 운영 및 유지 관리 워크플로가 없습니다.",
+  "runbookFieldCategory": "분류",
+  "runbookFieldDescription": "설명(선택사항)",
+  "runbookFieldIcon": "아이콘",
+  "runbookFieldName": "이름",
+  "runbookFieldType": "유형",
+  "runbookFilterAll": "모두",
+  "runbookImportButton": "수입",
+  "runbookImportHint": "공식 웹사이트 오픈 플랫폼에서 JSON을 복사하여 여기에 붙여넣으세요.",
+  "runbookImportPasteHint": "여기에 JSON 콘텐츠를 붙여넣으세요…",
+  "runbookImportSuccess": "{count} 워크플로를 성공적으로 가져왔습니다.",
+  "runbookImportTitle": "가져오기 작업 및 유지 관리 워크플로",
+  "runbookImportTooltip": "워크플로 가져오기",
+  "runbookJsonParseFailed": "JSON 구문 분석 실패: {error}",
+  "runbookNameRequired": "이름을 입력하세요",
+  "runbookNewTitle": "새로운 작업흐름",
+  "runbookPasteFromClipboard": "클립보드에서 붙여넣기",
+  "runbookPasteJsonFirst": "먼저 JSON 콘텐츠를 붙여넣으세요.",
+  "runbookRunCount": "{count}번 실행됨",
+  "runbookSearchHint": "워크플로 이름 또는 설명 검색",
+  "runbookTitle": "운영 및 유지보수 워크플로",
+  "runbookTypeAgentDesc": "자연어 프롬프트, AI는 ReAct 프레임워크에 따라 실행됩니다.",
+  "runbookTypeAgentOption": "AI 실행",
+  "runbookTypeAgentTag": "AI 실행",
+  "runbookTypeCommand": "직접 실행",
+  "runbookTypeCommandDesc": "변수 대체 후 터미널에서 직접 명령을 실행하십시오.",
+  "runbookUseInTerminal": "터미널 페이지에서 이용해주세요",
   "runbooks": "런북",
   "runbooksDesc": "반복 업무를 재사용 가능한 템플릿으로",
   "save": "저장",
   "scrollToBottom": "맨 아래로 스크롤",
   "search": "검색",
-  "securityAllDataCleared": "All data has been cleared",
-  "securityAppLockSubtitleOff": "When disabled, no verification is needed to open the app",
-  "securityAppLockSubtitleOn": "Opening the app requires {biometricType} or password",
-  "securityAuditLogSubtitle": "View the execution record of each command",
-  "securityAuditLogTitle": "Audit Log",
-  "securityAuthenticateReason": "Verify your identity to enable app lock",
-  "securityBiometricFaceId": "Face ID",
-  "securityBiometricFingerprint": "Fingerprint",
-  "securityBiometricGeneric": "Biometrics",
-  "securityBiometricNotSupported": "⚠️ Device does not support fingerprint or face ID",
-  "securityBiometricStatusTitle": "Fingerprint / Face ID Status",
-  "securityBiometricSupported": "✅ Supports {biometricType}",
-  "securityClearAllData": "Clear All Data",
-  "securityClearAllDataSubtitle": "Delete all servers, chat history, and passwords (irreversible)",
-  "securityClearConfirmPrompt": "Please type DELETE to confirm:",
-  "securityClearFailed": "Clear failed: {error}",
-  "securityClearIrreversible": "This action cannot be undone!",
-  "securityClearItemAiModels": "• AI model settings",
-  "securityClearItemChats": "• Chat history",
-  "securityClearItemPasswords": "• All passwords",
-  "securityClearItemServers": "• Server list",
-  "securityClearItemSnippets": "• Quick commands",
-  "securityClearWarning": "This action will delete all data, including:",
-  "securityConfirmDelete": "Confirm Delete",
-  "securityDangerAction": "⚠️ Dangerous Action",
-  "securityEnableAppLock": "Enable App Lock",
+  "securityAllDataCleared": "모든 데이터가 삭제되었습니다.",
+  "securityAppLockSubtitleOff": "앱을 닫은 후 여는 경우에는 인증이 필요하지 않습니다.",
+  "securityAppLockSubtitleOn": "앱을 열려면 {biometricType} 또는 비밀번호가 필요합니다",
+  "securityAuditLogSubtitle": "각 명령의 실행 기록 보기",
+  "securityAuditLogTitle": "운영기록",
+  "securityAuthenticateReason": "앱 잠금을 활성화하려면 인증하세요",
+  "securityBiometricFaceId": "페이스ID",
+  "securityBiometricFingerprint": "지문",
+  "securityBiometricGeneric": "생체 인식",
+  "securityBiometricNotSupported": "⚠️ 해당 기기는 지문이나 얼굴 인식을 지원하지 않습니다.",
+  "securityBiometricStatusTitle": "지문/얼굴 상태",
+  "securityBiometricSupported": "✅ {biometricType} 지원",
+  "securityClearAllData": "모든 데이터 지우기",
+  "securityClearAllDataSubtitle": "서버, 채팅기록, 비밀번호 모두 삭제 (복구불가)",
+  "securityClearConfirmPrompt": "확인하려면 DELETE를 입력하세요.",
+  "securityClearFailed": "지우기 실패: {error}",
+  "securityClearIrreversible": "이 작업은 취소할 수 없습니다!",
+  "securityClearItemAiModels": "• AI 모델 설정",
+  "securityClearItemChats": "• 채팅 기록",
+  "securityClearItemPasswords": "• 모든 비밀번호",
+  "securityClearItemServers": "• 서버 목록",
+  "securityClearItemSnippets": "• 빠른 명령",
+  "securityClearWarning": "이 작업을 수행하면 다음을 포함한 모든 데이터가 삭제됩니다.",
+  "securityConfirmDelete": "삭제 확인",
+  "securityDangerAction": "⚠️위험한 작업",
+  "securityEnableAppLock": "앱 잠금 활성화",
   "securitySettings": "보안",
   "securitySettingsDesc": "지문 또는 Face ID로 앱 잠금 해제",
-  "securityTitle": "Security Settings",
+  "securityTitle": "보안 설정",
   "selectFile": "파일 선택",
   "send": "전송",
   "serverList": "서버",
   "serverListDesc": "원격 서버를 추가하고 관리",
   "settings": "설정",
-  "settingsAI": "AI & Intelligence",
-  "settingsAIModel": "AI Model Config",
-  "settingsAIModelDesc": "Configure AI API key and model",
-  "settingsAbout": "About",
-  "settingsAboutApp": "About AI Terminal",
-  "settingsAgent": "Agent Settings",
-  "settingsAgentDesc": "Max auto-execute steps (0 = unlimited: {steps})",
-  "settingsAppearance": "Appearance",
-  "settingsAppearanceSettings": "Appearance",
-  "settingsAppearanceSettingsDesc": "Switch dark/light mode, adjust font size",
-  "settingsAuditLog": "Activity Log",
-  "settingsAuditLogDesc": "Records who ran each command and when",
-  "settingsChangeRecords": "Change Records",
-  "settingsChangeRecordsDesc": "Track all changes, undo if something goes wrong",
-  "settingsChangeWindow": "Safe Hours",
-  "settingsChangeWindowDesc": "Set safe time windows; changes blocked outside them",
-  "settingsCheckUpdate": "Check for Updates",
-  "settingsConnection": "Connections",
-  "settingsHosts": "Servers",
-  "settingsHostsDesc": "Add and edit remote servers to connect to",
-  "settingsLanguage": "Language",
-  "settingsLanguageDesc": "Choose interface language",
-  "settingsNotification": "Task Notifications",
-  "settingsNotificationDesc": "Get notified when a task finishes",
-  "settingsRunbooks": "Runbooks",
-  "settingsRunbooksDesc": "Turn common ops tasks into templates, run in one tap",
-  "settingsSecurity": "Security",
-  "settingsSecurityDesc": "Unlock the app with fingerprint or Face ID",
-  "settingsSnippets": "Snippets",
-  "settingsSnippetsDesc": "Save frequently used commands for one-tap execution",
-  "settingsTitle": "Settings",
-  "settingsVersion": "Version 1.4.3",
+  "settingsAI": "AI와 지능",
+  "settingsAIModel": "AI 모델 구성",
+  "settingsAIModelDesc": "AI용 키 및 모델 구성",
+  "settingsAbout": "소개",
+  "settingsAboutApp": "AI 터미널 소개",
+  "settingsAgent": "에이전트 설정",
+  "settingsAgentDesc": "AI가 자동으로 실행할 수 있는 최대 단계 수(0=제한 없음: {steps})",
+  "settingsAppearance": "외모와 경험",
+  "settingsAppearanceSettings": "모양 설정",
+  "settingsAppearanceSettingsDesc": "어둡게/밝게 모드 전환, 글꼴 크기 조정",
+  "settingsAuditLog": "운영기록",
+  "settingsAuditLogDesc": "각 명령을 실행한 사람과 시기를 기록합니다.",
+  "settingsChangeRecords": "변경 내역",
+  "settingsChangeRecordsDesc": "모든 변경 사항은 기록되며 문제가 발생하면 취소할 수 있습니다.",
+  "settingsChangeWindow": "안전한 기간",
+  "settingsChangeWindowDesc": "안전기간을 설정하고 그 외 시간에는 변경금지",
+  "settingsCheckUpdate": "업데이트 확인",
+  "settingsConnection": "연결 관리",
+  "settingsHosts": "서버 목록",
+  "settingsHostsDesc": "원격으로 연결하려는 서버를 추가하고 편집하세요.",
+  "settingsLanguage": "언어",
+  "settingsLanguageDesc": "인터페이스 언어 선택",
+  "settingsNotification": "작업 완료 알림",
+  "settingsNotificationDesc": "작업이 완료된 후 알려주는 메시지를 자동으로 보냅니다.",
+  "settingsRunbooks": "운영 및 유지보수 워크플로",
+  "settingsRunbooksDesc": "일반적인 운영 및 유지보수 작업을 템플릿으로 저장하고 한 번의 클릭으로 실행",
+  "settingsSecurity": "보안 설정",
+  "settingsSecurityDesc": "지문이나 얼굴로 앱 잠금 해제",
+  "settingsSnippets": "바로가기 명령",
+  "settingsSnippetsDesc": "자주 사용하는 명령을 저장하고 다음 번에 한 번의 클릭으로 실행",
+  "settingsTitle": "설정",
+  "settingsVersion": "버전 1.4.3",
   "simplifiedChinese": "简体中文",
-  "snippetCommandHint": "e.g., docker exec -it '{container}' /bin/bash",
-  "snippetCommandLabel": "Command:",
-  "snippetCommandRequired": "Please enter the command",
-  "snippetCopyCommand": "Copy Command",
-  "snippetDeleteConfirm": "Are you sure you want to delete \"{name}\"?",
-  "snippetDeleteTitle": "Delete Snippet",
-  "snippetEditTitle": "Edit Snippet",
-  "snippetEmptyHint": "Tap the button below to add one",
-  "snippetEmptyTitle": "No snippets yet",
-  "snippetFieldCommand": "Command",
-  "snippetFieldDescription": "Description (optional)",
-  "snippetNameRequired": "Please enter a name",
-  "snippetNewTitle": "New Snippet",
-  "snippetResolvedCommand": "Command: {command}",
-  "snippetTitle": "Snippets",
+  "snippetCommandHint": "예: docker exec -it '{container}' /bin/bash",
+  "snippetCommandLabel": "명령:",
+  "snippetCommandRequired": "명령어를 입력해주세요",
+  "snippetCopyCommand": "복사 명령",
+  "snippetDeleteConfirm": "정말로 \"{name}\"을 삭제하시겠습니까?",
+  "snippetDeleteTitle": "삭제 명령",
+  "snippetEditTitle": "편집 명령",
+  "snippetEmptyHint": "추가하려면 아래 버튼을 클릭하세요.",
+  "snippetEmptyTitle": "아직 단축키 명령이 없습니다.",
+  "snippetFieldCommand": "명령",
+  "snippetFieldDescription": "설명(선택사항)",
+  "snippetNameRequired": "이름을 입력하세요",
+  "snippetNewTitle": "새로운 명령",
+  "snippetResolvedCommand": "명령: {command}",
+  "snippetTitle": "바로가기 명령",
   "taskAborted": "⚠️ 작업이 중단되었습니다",
   "taskCancelled": "⚠️ 작업이 취소되었습니다",
   "taskCompleted": "작업이 완료되었습니다",
@@ -466,65 +466,65 @@
   "taskFailed": "작업이 실패했습니다",
   "taskMaxSteps": "최대 단계에 도달하여 작업이 중단되었습니다",
   "taskTerminated": "작업이 종료되었습니다",
-  "terminalAgentLog": "Agent log",
-  "terminalClearScreen": "Clear screen",
-  "terminalCloseTabConfirm": "Closing this tab will cancel the running task. Are you sure?",
-  "terminalCollapseAIPanel": "Collapse AI panel",
-  "terminalCollapseMonitorPanel": "Collapse monitor panel",
-  "terminalCommandLabel": "Command: {command}",
-  "terminalCommandTemplate": "Command template:",
-  "terminalCompactingHistory": "AI is compressing conversation history",
-  "terminalCompactionDone": "Memory compression completed",
-  "terminalCompactionFailed": "Compression failed: {error}",
-  "terminalConfigure": "Configure",
-  "terminalConnectHostFailed": "Failed to connect to {hostName}: {error}",
-  "terminalConnectTerminalFirst": "Please connect to a terminal first",
-  "terminalConnectTerminalForCommand": "Please connect to a terminal before executing commands",
-  "terminalConnectTerminalForRunbook": "Please connect to a terminal (SSH or local) before using runbooks",
-  "terminalConnected": "Connected",
-  "terminalConnecting": "Connecting to {host}...",
-  "terminalCreateNew": "+ New",
-  "terminalExitOrchestrator": "Exit orchestration mode",
-  "terminalExpandAIPanel": "Expand AI panel",
-  "terminalExpandMonitorPanel": "Expand monitor panel",
-  "terminalFillVariables": "Fill variables - {name}",
+  "terminalAgentLog": "에이전트 로그",
+  "terminalClearScreen": "화면 지우기",
+  "terminalCloseTabConfirm": "이 탭을 닫으면 실행 중인 작업이 취소됩니다. 정말로 닫으시겠어요?",
+  "terminalCollapseAIPanel": "AI 패널 축소",
+  "terminalCollapseMonitorPanel": "모니터링 패널 닫기",
+  "terminalCommandLabel": "명령: {command}",
+  "terminalCommandTemplate": "명령 템플릿:",
+  "terminalCompactingHistory": "AI가 과거 대화를 압축하고 있다",
+  "terminalCompactionDone": "메모리 압축 완료",
+  "terminalCompactionFailed": "압축 실패: {error}",
+  "terminalConfigure": "구성",
+  "terminalConnectHostFailed": "{hostName}에 연결하지 못했습니다: {error}",
+  "terminalConnectTerminalFirst": "먼저 단말기를 연결해주세요",
+  "terminalConnectTerminalForCommand": "먼저 터미널에 접속하신 후 명령어를 실행해주세요",
+  "terminalConnectTerminalForRunbook": "운영 및 유지 관리 워크플로를 사용하기 전에 터미널(SSH 또는 로컬 터미널)에 연결하세요.",
+  "terminalConnected": "연결됨",
+  "terminalConnecting": "{host} 연결 중...",
+  "terminalCreateNew": "+ 신규",
+  "terminalExitOrchestrator": "오케스트레이션 모드 종료",
+  "terminalExpandAIPanel": "AI 패널 확장",
+  "terminalExpandMonitorPanel": "모니터링 패널 확장",
+  "terminalFillVariables": "변수를 입력하세요 - {name}",
   "terminalFontSize": "터미널 글꼴 크기: {size}px",
-  "terminalHostNoCredentials": "{hostName} has no credentials configured. Please edit the server first.",
-  "terminalHostNotFound": "Host not found",
-  "terminalInputHintDefault": "Describe your request, Agent will execute automatically...",
-  "terminalInputHintDisconnected": "Available after connecting to a terminal",
-  "terminalInputHintEmpty": "Type a request to start auto-execution...",
-  "terminalInputHintOrchestrator": "Multi-host orchestration mode: describe cross-host tasks, e.g. \"sync time on all servers\"",
-  "terminalInputHintRunning": "Agent is running...",
-  "terminalLayoutBottom": "Bottom",
-  "terminalLayoutRight": "Right",
-  "terminalLocalStartFailed": "Failed to start local terminal",
-  "terminalLocalStartFailedWithError": "Failed to start local terminal: {error}",
-  "terminalManage": "Manage",
-  "terminalModel": "Model",
-  "terminalMonitor": "Monitor",
-  "terminalNewConnection": "New connection",
-  "terminalNoHostsSaved": "No saved hosts\nPlease add a server on the home page first",
-  "terminalNoRunbooks": "No runbooks available",
-  "terminalNoRunbooksHint": "Click \"Manage\" to create a runbook",
+  "terminalHostNoCredentials": "{hostName} 자격 증명이 구성되지 않았습니다. 먼저 서버를 편집하십시오.",
+  "terminalHostNotFound": "호스트가 존재하지 않습니다",
+  "terminalInputHintDefault": "요구 사항을 설명하면 에이전트가 자동으로 실행됩니다.",
+  "terminalInputHintDisconnected": "단말기 접속 후 이용 가능",
+  "terminalInputHintEmpty": "자동 실행을 시작하기 위한 요구 사항을 입력하세요...",
+  "terminalInputHintOrchestrator": "다중 시스템 오케스트레이션 모드: \"모든 서버 시간 동기화\"와 같은 호스트 간 작업을 설명합니다.",
+  "terminalInputHintRunning": "에이전트가 실행 중입니다...",
+  "terminalLayoutBottom": "아래로",
+  "terminalLayoutRight": "맞아",
+  "terminalLocalStartFailed": "로컬 터미널을 시작하지 못했습니다.",
+  "terminalLocalStartFailedWithError": "로컬 터미널을 시작하지 못했습니다: {error}",
+  "terminalManage": "관리",
+  "terminalModel": "모델",
+  "terminalMonitor": "모니터",
+  "terminalNewConnection": "새로운 연결",
+  "terminalNoHostsSaved": "아직 저장된 호스트가 없습니다.\n먼저 홈페이지에 서버를 추가해주세요",
+  "terminalNoRunbooks": "아직 운영 및 유지 관리 워크플로가 없습니다.",
+  "terminalNoRunbooksHint": "새 워크플로를 만들려면 \"관리\"를 클릭하세요.",
   "terminalNotConnected": "자동 모드를 사용하려면 먼저 터미널에 연결하세요",
   "terminalNotReady": "터미널이 연결되지 않았습니다. 먼저 연결하세요",
-  "terminalOffline": "Offline",
-  "terminalOrchestratorConnected": "{connected}/{total} connected",
-  "terminalOrchestratorHostList": "Multi-host orchestration · Host list",
-  "terminalOrchestratorMode": "Orchestrate · {connected}/{total}",
-  "terminalReadOnlyOff": "Read-only mode (Dry-run)",
-  "terminalReadOnlyOn": "Read-only mode is on (click to turn off)",
-  "terminalReconnect": "Reconnect",
-  "terminalRoleYou": "You",
-  "terminalRunbookTemplates": "Runbook templates",
-  "terminalRunbookTypeCommand": "Command",
-  "terminalSelectServerForNewTab": "Select a server to connect in a new tab",
-  "terminalSessionCreated": "New session created",
-  "terminalSessionHistory": "Session history",
-  "terminalStatusNotConnected": "Not connected",
-  "terminalTaskRunning": "Task is running",
-  "terminalUnfilledVariables": "Some variables are unfilled. Execution cancelled.",
+  "terminalOffline": "오프라인",
+  "terminalOrchestratorConnected": "{connected}/{total} 연결됨",
+  "terminalOrchestratorHostList": "다중 시스템 오케스트레이션 · 호스트 목록",
+  "terminalOrchestratorMode": "편곡 · {connected}/{total}",
+  "terminalReadOnlyOff": "읽기 전용 모드(시험 실행)",
+  "terminalReadOnlyOn": "읽기 전용 모드가 켜져 있습니다(닫으려면 클릭하세요).",
+  "terminalReconnect": "다시 연결",
+  "terminalRoleYou": "당신",
+  "terminalRunbookTemplates": "운영 및 유지보수 템플릿",
+  "terminalRunbookTypeCommand": "명령",
+  "terminalSelectServerForNewTab": "서버 새 탭 연결 선택",
+  "terminalSessionCreated": "새 세션이 생성되었습니다.",
+  "terminalSessionHistory": "세션 기록",
+  "terminalStatusNotConnected": "연결되지 않음",
+  "terminalTaskRunning": "작업이 실행 중입니다.",
+  "terminalUnfilledVariables": "채워지지 않은 변수가 있어 실행이 취소되었습니다.",
   "testConnection": "연결 테스트",
   "themeMode": "테마 모드",
   "thinkingNextStep": "🤔 다음 단계를 생각하는 중...",
@@ -1227,59 +1227,2660 @@
       }
     }
   },
-  "aiEndpointAdd": "Add endpoint",
-  "aiEndpointEditTitle": "Edit endpoint",
-  "aiEndpointDeleteTitle": "Delete endpoint",
-  "aiEndpointDeleteConfirm": "Delete \"{name}\" and its {count} model(s)?",
-  "aiEndpointApiKey": "API key",
-  "aiEndpointApiKeyHint": "Leave blank to keep the saved key",
-  "aiEndpointBaseUrl": "API URL",
-  "aiEndpointProtocol": "API protocol",
+  "aiEndpointAdd": "엔드포인트 추가",
+  "aiEndpointEditTitle": "엔드포인트 편집",
+  "aiEndpointDeleteTitle": "엔드포인트 삭제",
+  "aiEndpointDeleteConfirm": "\"{name}\" 엔드포인트와 해당 {count} 모델을 삭제하시겠습니까?",
+  "aiEndpointApiKey": "API 키",
+  "aiEndpointApiKeyHint": "저장된 자격 증명을 사용하려면 비워 두세요.",
+  "aiEndpointBaseUrl": "API 주소",
+  "aiEndpointProtocol": "API 프로토콜",
   "aiEndpointProtocolOpenai": "OpenAI Chat Completions",
-  "aiEndpointProtocolErnie": "Baidu ERNIE",
-  "aiEndpointCustomSettings": "Custom settings",
-  "aiEndpointModels": "Model catalog",
-  "aiEndpointModelsCount": "{count} models",
-  "aiEndpointRestoreDefaults": "Restore defaults",
-  "aiEndpointFetchModels": "Fetch available models",
-  "aiEndpointAddModel": "Add model",
-  "aiEndpointNoModels": "No models yet. Add one or fetch available models.",
-  "aiEndpointRestoreConfirm": "Replace the current catalog with default models for \"{provider}\"?",
-  "aiEndpointRestoreUnavailable": "This provider has no built-in default models",
-  "aiEndpointFetchSuccess": "Added {count} models",
-  "aiEndpointFetchNone": "No models available to add",
-  "aiEndpointFetchFailed": "Failed to fetch models: {error}",
-  "aiEndpointSelectModels": "Select models to add",
-  "aiEndpointNoProvider": "Custom",
-  "aiEndpointAddModelTitle": "Add model",
-  "aiEndpointEditModelTitle": "Edit model",
-  "aiModelDisplayName": "Display name",
-  "aiModelId": "Model ID",
-  "aiModelContextWindow": "Context window",
-  "aiModelContextWindowHint": "0 = unknown; runtime falls back to 262144 (256K)",
-  "aiModelMaxOutput": "Max output tokens",
-  "aiModelReasoning": "Reasoning levels",
-  "aiModelReasoningHint": "Enable to configure reasoning tiers for this model",
-  "aiModelTier": "Tier",
-  "aiModelApiValue": "API value",
-  "aiModelApiValueHint": "Leave blank to omit this parameter",
-  "aiModelAddTier": "Add tier",
-  "aiModelFallback": "Fallback model",
-  "aiModelNoFallback": "No fallback",
+  "aiEndpointProtocolErnie": "바이두 원신 ERNIE",
+  "aiEndpointCustomSettings": "맞춤 설정",
+  "aiEndpointModels": "모델 카탈로그",
+  "aiEndpointModelsCount": "{count} 모델",
+  "aiEndpointRestoreDefaults": "기본 모델 복원",
+  "aiEndpointFetchModels": "사용 가능한 모델 가져오기",
+  "aiEndpointAddModel": "모델 추가",
+  "aiEndpointNoModels": "아직 모델이 없습니다. \"모델 추가\" 또는 \"사용 가능한 모델 가져오기\"를 클릭하세요.",
+  "aiEndpointRestoreConfirm": "\"{provider}\"의 기본 모델 디렉토리가 복원되고 현재 사용자 정의 모델이 대체됩니다.",
+  "aiEndpointRestoreUnavailable": "이 서비스 제공업체에는 내장된 기본 모델이 없습니다.",
+  "aiEndpointFetchSuccess": "{count} 모델이 추가되었습니다.",
+  "aiEndpointFetchNone": "추가할 모델이 없습니다.",
+  "aiEndpointFetchFailed": "모델 획득 실패: {error}",
+  "aiEndpointSelectModels": "추가할 모델을 선택하세요.",
+  "aiEndpointNoProvider": "사용자 정의",
+  "aiEndpointAddModelTitle": "모델 추가",
+  "aiEndpointEditModelTitle": "모델 편집",
+  "aiModelDisplayName": "표시 이름",
+  "aiModelId": "모델 ID",
+  "aiModelContextWindow": "컨텍스트 창",
+  "aiModelContextWindowHint": "0은 알 수 없음을 의미하며 런타임 동안 262144(256K)로 처리됩니다.",
+  "aiModelMaxOutput": "최대 출력 토큰 수",
+  "aiModelReasoning": "추론 수준",
+  "aiModelReasoningHint": "연 후 모델의 사고 장비를 구성할 수 있습니다.",
+  "aiModelTier": "기어",
+  "aiModelApiValue": "API 매개변수 값",
+  "aiModelApiValueHint": "이 매개변수를 보내지 않으려면 비워 두세요.",
+  "aiModelAddTier": "장비 추가",
+  "aiModelFallback": "대체 모델",
+  "aiModelNoFallback": "백업 모델 없음",
   "aiModelFunctionCalling": "Function Calling",
-  "aiModelTierRequired": "Keep at least one tier",
-  "aiModelTierLevelRequired": "Tier name is required",
-  "aiModelTierDuplicate": "Tier names must be unique",
-  "aiModelValidationName": "Display name is required",
-  "aiModelValidationModelId": "Model ID is required",
-  "aiModelValidationBaseUrl": "API URL is required",
-  "aiModelValidationModels": "Add at least one model",
-  "terminalConfigureModel": "Configure model",
-  "terminalModelAndReasoning": "Model & reasoning",
-  "terminalReasoning": "Reasoning",
-  "terminalReasoningNotEnabled": "This model has no reasoning tiers enabled; enable them in settings",
-  "terminalReasoningOff": "Off",
-  "terminalManageModels": "Manage models…",
-  "aiModelFunctionCallingHint": "Native tool calling (OpenAI tools API); enable only for models that support it",
-  "terminalModelLockedRunning": "Agent is running; change the model or reasoning after it finishes"
+  "aiModelTierRequired": "최소한 하나의 장비를 유지하십시오",
+  "aiModelTierLevelRequired": "기어 이름은 비워둘 수 없습니다.",
+  "aiModelTierDuplicate": "기어는 반복될 수 없습니다.",
+  "aiModelValidationName": "표시 이름을 입력하세요.",
+  "aiModelValidationModelId": "모델 ID를 입력하세요.",
+  "aiModelValidationBaseUrl": "API 주소를 입력해주세요",
+  "aiModelValidationModels": "모델을 하나 이상 추가하세요.",
+  "terminalConfigureModel": "모델 구성",
+  "terminalModelAndReasoning": "모델과 사고",
+  "terminalReasoning": "사고의 정도",
+  "terminalReasoningNotEnabled": "이 모델에는 사고 기어가 활성화되어 있지 않으며 설정에서 켤 수 있습니다.",
+  "terminalReasoningOff": "긴밀한 사고",
+  "terminalManageModels": "관리 모델…",
+  "aiModelFunctionCallingHint": "기본 도구 호출(OpenAI 도구 API), 이 프로토콜을 지원하는 모델만 활성화됩니다.",
+  "terminalModelLockedRunning": "에이전트가 실행 중입니다. 완료되면 모델이나 사고 장비를 전환하세요.",
+  "changeRecordRestoreLocalFile": "다음 파일은 서버를 거치지 않고 로컬로 복원됩니다.",
+  "ut_9dd16b4310": "취소",
+  "ut_929f88c953": "저장",
+  "ut_375761b903": "편집",
+  "ut_12b4ff78f0": "삭제",
+  "ut_2439c9088c": "닫기",
+  "ut_8d8a263df0": "이름",
+  "ut_dd3bec10ce": "알았어",
+  "ut_2bbaf6e153": "복사됨",
+  "ut_7713abebb3": "명령 기록",
+  "ut_c96baaaa38": "명령",
+  "ut_bed1bc3d9f": "바로가기 명령",
+  "ut_4064dc0579": "전반적인 상황",
+  "ut_8b97bab772": "호스트 그룹",
+  "ut_c53688e21a": "호스트",
+  "ut_b996bd3d08": "사용자 정의",
+  "ut_400ef8d1c1": "모든 도구",
+  "ut_5ea95f868c": "새로운 MCP 서버",
+  "ut_fb999767e8": "포트 포워딩",
+  "ut_ee627300a6": "에이전트가 실행 중입니다. 나중에 다시 시도해 주세요.",
+  "ut_8fa7ec1798": "생각",
+  "ut_19a5b5ad85": "지우기",
+  "ut_5dc39ef856": "선택해주세요",
+  "ut_c4b7d3a09f": "닫기(Esc)",
+  "ut_fda3f94089": "실행하다",
+  "ut_6e269868a4": "1,000줄",
+  "ut_60a303a337": "50,000줄",
+  "ut_386ffb419a": "100,000줄",
+  "ut_53f8d85ab6": "호스트",
+  "ut_cf99c7c571": "운영 및 유지보수 워크플로",
+  "ut_422db29f9c": "감사 로그",
+  "ut_b671baec90": "원장 변경",
+  "ut_abcdfedd3e": "확인 프롬프트 자동 응답",
+  "ut_760a393290": "SSH 구성 가져오기",
+  "ut_cce7c556ba": "편집 지침",
+  "ut_1982929432": "새로운 사양",
+  "ut_f996de5ff9": "제목",
+  "ut_1bc8da322f": "제목을 입력해주세요",
+  "ut_2d4881db12": "규범적인 내용",
+  "ut_483b58204b": "사양 내용을 입력해 주세요.",
+  "ut_29f14d8cf9": "참조 명령(선택 사항)",
+  "ut_fcfbe3558f": "범위",
+  "ut_0cac2580f1": "단일 호스트",
+  "ut_479fdc582d": "호스트 그룹",
+  "ut_56c43b3c1f": "엄격히 따르다",
+  "ut_223ebc733a": "AI는 있는 그대로 실행되어야 하며 자체 조정이 불가능할 수 있습니다.",
+  "ut_4ba4d0c89f": "AI가 계약을 위반하지 않고 매개변수를 조정할 수 있도록 허용",
+  "ut_4c7c042a46": "서버 추가",
+  "ut_aa56ccc31c": "읽기 전용",
+  "ut_2c94b3027b": "연결됨",
+  "ut_e5e228e9d3": "MCP 서버 추가",
+  "ut_e7c0c60a9b": "MCP 서버 편집",
+  "ut_e539334ba2": "전송방식",
+  "ut_3062040662": "시작 명령",
+  "ut_635c6ac2e8": "매개변수(한 줄에 하나씩)",
+  "ut_86e6b6dae2": "서버 URL",
+  "ut_7c1909ae8d": "시간 초과(밀리초)",
+  "ut_f3f63f65a0": "도구 캡",
+  "ut_78a04cd0e0": "상담원이 사용할 수 있는 도구",
+  "ut_b50e4d2f14": "읽기 전용 도구(권장)",
+  "ut_f7f0786cb6": "서버 활성화",
+  "ut_e234091c8a": "애플리케이션이 시작되면 자동으로 연결",
+  "ut_e1d7cd83a8": "에이전트가 리소스를 사용하도록 허용",
+  "ut_2a8817d718": "상담원이 프롬프트 단어를 사용하도록 허용",
+  "ut_bbe5aed47c": "OAuth를 사용하여 승인",
+  "ut_9f237e2f4c": "저장하고 연결하세요",
+  "ut_c3255fdff5": "이름은 비워둘 수 없습니다.",
+  "ut_18b03910f5": "stdio 전송에는 시작 명령이 필요합니다",
+  "ut_78ed27f966": "서버 URL은 http(s) 주소여야 합니다.",
+  "ut_6462e5fd3f": "시간 초과는 3000~120000ms 사이여야 합니다.",
+  "ut_765400571f": "도구 한도는 1-40 사이여야 합니다.",
+  "ut_e43ff18e6b": "HTTP + SSE(레거시)",
+  "ut_6c1dbbd423": "stdio(로컬 프로세스)",
+  "ut_1ce1d6c086": "소개",
+  "ut_451a175be9": "호스트 관리",
+  "ut_42d62d0f0e": "설정",
+  "ut_85c1206607": "집중 모드",
+  "ut_20d2782c72": "지역",
+  "ut_6ea2ce2fe7": "롤백 확인",
+  "ut_78d92a1509": "작업을 계속하기 전에 먼저 호스트에 연결하십시오.",
+  "ut_9f7bc31ffe": "독립지수",
+  "ut_ac8a126fc3": "실행 실패",
+  "ut_e56e69b4b9": "취소됨",
+  "ut_278fcd681d": "작성 완료",
+  "ut_ae9a95fec3": "사용자가 작업을 취소하고 PTY 쓰기가 중단되었습니다.",
+  "ut_0bb0be16b3": "교체 완료",
+  "ut_1aa59da0cf": "쓰기 실패, 롤백 중...",
+  "ut_47e5e5365c": "기술 자료 검색이 취소되었습니다.",
+  "ut_b79b73a254": "누락된 매개변수: 경로가 필요합니다.",
+  "ut_b48a9bcd4c": "확인",
+  "ut_fa7ae42a25": "서비스",
+  "ut_f71cf695fe": "작업이 취소되었습니다.",
+  "ut_dec92d98dd": "작업이 중단되었습니다.",
+  "ut_a8046742ba": "원시 출력 꼬리",
+  "ut_fc6ff4c8fb": "모든 태그",
+  "ut_c31fd08687": "복사",
+  "ut_68caa1b369": "지금 막",
+  "ut_de0e9433a3": "설명",
+  "ut_a53a6efe91": "표시 이름은 비워둘 수 없습니다.",
+  "ut_5d608a562e": "엔드포인트 추가",
+  "ut_d4387b2009": "서비스 제공자",
+  "ut_7a9886373c": "API 키",
+  "ut_1bd24257e4": "추가하다",
+  "ut_5f7dd28505": "호스트 수정",
+  "ut_cad33d6032": "호스트 추가",
+  "ut_4b91f1393e": "새 바로가기 명령 만들기",
+  "ut_bc90bc1b81": "새로운 작업흐름",
+  "ut_35448c521f": "이미 켜져 있음",
+  "ut_dbddf26277": "최대 실행 단계 수",
+  "ut_a18400490f": "앱 잠금",
+  "ut_f9aea8cf2e": "다시 시도하세요",
+  "ut_ec5739654b": "링크를 열지 못했습니다. 클립보드에 복사되었습니다.",
+  "ut_72cb33e8c2": "터미널 단축키",
+  "ut_dc29b2f27f": "닫기",
+  "ut_9a7f4df03a": "맞춤 프롬프트 단어",
+  "ut_df02f06fa2": "이름 바꾸기",
+  "ut_035134b18f": "새 디렉터리 만들기",
+  "ut_7025e8166d": "붙여넣기",
+  "ut_e45556d8c1": "보안 명령",
+  "ut_7a4c7fc5d7": "이 작업에는 시스템 구성 또는 네트워크 다운로드가 포함됩니다. 작업을 확인하십시오.",
+  "ut_a88f921ea4": "위험한 작업이므로 실행하기 전에 주의 깊게 확인하시기 바랍니다.",
+  "ut_bf6e849886": "고위험 작업은 보안 정책에 의해 차단되었습니다.",
+  "ut_873cf0baa9": "경로가 비어 있습니다.",
+  "ut_4370f90a2c": "정규화 후 경로가 비어 있습니다.",
+  "ut_0abbb47931": "세션 로그온",
+  "ut_79ab7ea24e": "세션 로그오프",
+  "ut_dc687b5190": "10,000줄",
+  "ut_b80d4fdf1b": "아직 구성된 모델이 없습니다.",
+  "ut_62197ba790": "폐쇄형 · AI는 지역 상황에만 의존합니다.",
+  "ut_88b11effff": "앱 잠금이 켜져 있습니다.",
+  "ut_aae6a1b7f8": "앱 잠금이 활성화되지 않았습니다",
+  "ut_7355cf069a": "안전 시간이 활성화되지 않았습니다.",
+  "ut_22b7a960c1": "아직 서버가 없습니다",
+  "ut_bf73a41ef9": "아직 규칙이 없습니다",
+  "ut_a86e6d7ade": "켜지지 않음",
+  "ut_c61e7e68e8": "활성화됨 · 웹훅 주소가 누락되어 전송할 수 없습니다.",
+  "ut_6839af3e8f": "활성화됨 · 각 작업에 대한 알림",
+  "ut_f9ab3c28bf": "활성화됨 · 실패 시에만 경고",
+  "ut_f500e9fc9a": "변수가 포함된 명령 템플릿",
+  "ut_2d8f504c07": "다단계 체크리스트",
+  "ut_f53531d72c": "각 명령의 소스와 결과",
+  "ut_5aa2535411": "누가 언제 무엇을 바꿨나요?",
+  "ut_49efe264bb": "명령 시간 초과 배수",
+  "ut_b1eedc7da7": "느린 네트워크의 경우 속도를 높이고 연결 중단 문제를 해결하려면 속도를 낮추세요.",
+  "ut_0ef39843c1": "내용 붙여넣기",
+  "ut_cfae7855b2": "파일에서 선택",
+  "ut_f77e687e7f": "활성화됨 · 입력할 주소",
+  "ut_bb68aeb526": "구성·AI 자동 주입",
+  "ut_1f46b82540": "연결 시간 초과",
+  "ut_beac562f56": "저장된 개인 키가 로드되었습니다.",
+  "ut_8b9d8a0293": "내보낼 표준 항목이 없습니다.",
+  "ut_9e0a441f63": "내부 사양 내보내기",
+  "ut_393f76846d": "내부 사양 가져오기",
+  "ut_c1358ed65a": "사양 삭제",
+  "ut_2d0ac889f0": "내부 규정",
+  "ut_b8ff31b60e": "JSON 가져오기",
+  "ut_70148cd17d": "JSON 내보내기",
+  "ut_a25e5f2908": "아직 내부 사양은 없습니다.",
+  "ut_0a354147d1": "엄격한",
+  "ut_e35e26caf1": "제안",
+  "ut_321c7d5cbd": "예: nginx는 conf.d만 변경합니다.",
+  "ut_c841026fad": "제약 조건을 자연어로 명확하게 작성하면 AI가 이를 정확하게 따릅니다.\n예를 들어 내부 네트워크는 mirrors.corp.internal을 사용하고 공용 네트워크 적절한 소스를 사용하지 않습니다.",
+  "ut_cbf092e19a": "MCP 서버",
+  "ut_3ee244446d": "빠른 추가:",
+  "ut_76aba21781": "아직 MCP 서버가 없습니다",
+  "ut_23784ffbb8": "더보기",
+  "ut_bf9a7280ff": "다시 연결",
+  "ut_b3ea1460b7": "(엔드포인트가 구성되지 않음)",
+  "ut_c6f94e5dc4": "연결 끊기",
+  "ut_a037d357eb": "연결하다",
+  "ut_d58e58c337": "도구와 능력",
+  "ut_ac3cdbdaa3": "OAuth 승인이 필요합니다",
+  "ut_6d628c3737": "로그인 인증",
+  "ut_55b9a7e0c0": "승인 링크 복사",
+  "ut_8173ace3f3": "읽기 전용 도구",
+  "ut_936b003fe8": "파괴적인",
+  "ut_bc386dcd56": "외부",
+  "ut_eb15558933": "에이전트를 사용할 수 있습니다",
+  "ut_4fc8541fe1": "열리지 않음",
+  "ut_fcabd36585": "매개변수 없음",
+  "ut_7889ed8608": "매개변수:",
+  "ut_69440da7fa": "최근 로그",
+  "ut_0dbb5c7bd4": "비활성화됨",
+  "ut_f50cfe7b3a": "연결되지 않음",
+  "ut_439759c292": "연결 중",
+  "ut_28c0833d52": "승인이 필요합니다",
+  "ut_fcc790f11c": "연결 실패",
+  "ut_6b02c4539d": "파일 시스템 MCP가 액세스를 허용하는 디렉토리를 선택하십시오.",
+  "ut_446d04518f": "MCP 서버 삭제",
+  "ut_3121de47a1": "리소스 URI",
+  "ut_5e1e108436": "템플릿에 따라 특정 URI를 입력하세요.",
+  "ut_250aaaa8b9": "프롬프트 단어 매개변수",
+  "ut_3dedee49e4": "하나의 키=한 줄에 값",
+  "ut_1cc391dd56": "(필수)",
+  "ut_4a407548bf": "콘텐츠가 복사되었습니다.",
+  "ut_7c50d4b883": "콘텐츠 복사",
+  "ut_8e8300886d": "예를 들어 npx",
+  "ut_9e643633f7": "작업 디렉터리(선택 사항)",
+  "ut_4c8483a194": "환경 변수(한 줄당 KEY=VALUE)",
+  "ut_4ad1ca4105": "아웃바운드 프록시(선택 사항)",
+  "ut_c9270e6a1d": "헤더(키: 행당 값)",
+  "ut_e249b99577": "맞춤형 (접속 후 카드 내 체크박스 체크)",
+  "ut_3665baf413": "OAuth 범위(공백/쉼표로 구분, 선택사항)",
+  "ut_92dbcbd641": "OAuth 클라이언트 ID(DCR을 사용하려면 비워두세요)",
+  "ut_87fceccd93": "OAuth clientSecret(선택사항)",
+  "ut_9c3dece052": "관리",
+  "ut_37ac3bf8ce": "에이전트가 실행 중입니다. 추가 지침을 보려면 입력 상자를 사용하세요.",
+  "ut_dcdd97ac06": "SSH 연결이 준비되지 않았습니다. 재접속 후 다시 시도하려면 이 화면을 클릭하세요.",
+  "ut_4fc495b331": "로컬 터미널을 시작하지 못했습니다.",
+  "ut_4bab1ab6c2": "이 화면에서 세션을 열지 못했습니다.",
+  "ut_129733266f": "[세션 종료]",
+  "ut_b6c84bb8f3": "이 화면은 AI에 바인딩되어 있어 혼자서 끌 수 없습니다. 탭을 직접 닫아주세요",
+  "ut_def20d7537": "AI 대화",
+  "ut_cafa2f7cad": "로컬 쉘",
+  "ut_e1fac83b32": "이 화면의 세션 연결이 끊어졌습니다.",
+  "ut_13304be1df": "이 화면을 다시 엽니다",
+  "ut_6582d682ca": "명령 팔레트(Ctrl+K)",
+  "ut_422f8e1f4e": "터미널 색상 및 글꼴 크기",
+  "ut_19d7987a04": "메뉴",
+  "ut_c985d380db": "이동",
+  "ut_d4c339f3c6": "안전한 기간",
+  "ut_7df2507796": "활성화되지 않음",
+  "ut_86dfbbb589": "이 터미널",
+  "ut_7a89819950": "보기",
+  "ut_9175d8cccb": "터미널 전폭",
+  "ut_1029dcb6e3": "AI 패널 위치 전환",
+  "ut_d170a458d4": "오른쪽/아래",
+  "ut_23820b0802": "SFTP는 원격 세션에만 사용할 수 있습니다.",
+  "ut_ed8ab87e0e": "SFTP 패널 닫기",
+  "ut_02fc9755f6": "SFTP 파일 패널",
+  "ut_3d81bbe4b1": "패널 위치 전환(오른쪽/아래)",
+  "ut_49aa3e0155": "에이전트가 이 호스트에서 작업하도록 허용",
+  "ut_80f39c254f": "요구 사항을 설명하면 단계가 자동으로 실행됩니다. 위험한 명령은 먼저 허가를 요청합니다",
+  "ut_dbe7312942": "이 변경사항에 대해 실행 가능한 롤백 명령이 없습니다.",
+  "ut_98ddb3e569": "로컬 파일을 다음 위치로 복원합니다.",
+  "ut_12db03a03c": "롤백 명령이 실행됩니다:",
+  "ut_d9c1f090b6": "복원은 복사본을 백업/재활용 영역에 다시 로컬 머신의 원래 경로에 넣고 감사 기록을 작성합니다.",
+  "ut_ba66b6920c": "롤백은 서버 상태를 수정하고 감사 레코드를 작성합니다.",
+  "ut_ae7f0253b5": "호스트 연결이 끊어져 롤백이 수행되지 않았습니다.",
+  "ut_e79e7730e4": "롤백이 수행되지 않음: 호스트가 연결되지 않았거나 롤백 명령이 없습니다.",
+  "ut_36ae6b14be": "먼저 이 호스트로 전환한 후 다시 연결하세요.",
+  "ut_f89df440af": "로컬 터미널은 다시 연결할 필요가 없습니다. 터미널 프로세스를 확인하세요.",
+  "ut_31edece655": "호스트 구성을 찾을 수 없어 다시 연결할 수 없습니다.",
+  "ut_470431de01": "다시 연결하지 못했습니다. 네트워크나 비밀번호를 확인하세요.",
+  "ut_42e52ee488": "재연결 성공",
+  "ut_3a602327a9": "작업을 계속하기 전에 먼저 이 호스트로 전환하십시오.",
+  "ut_46e4b5a120": "이 호스트로 전환/다시 연결하고 다시 시도하십시오.",
+  "ut_c4388ff04e": "호스트 연결이 끊어졌습니다. 먼저 다시 연결해 주세요.",
+  "ut_3993de2fb8": "비밀번호",
+  "ut_694738320d": "쇼",
+  "ut_6870753dcd": "숨기다",
+  "ut_b765c3fd60": "명령은 입력을 기다립니다.",
+  "ut_107ca67793": "Enter(공백으로 놔두기 = Enter 누르기)",
+  "ut_793f2a8599": "모델이 아직 구성되지 않았습니다. 설정 → AI 모델로 이동하여 추가하세요.",
+  "ut_4ed5ea2e0b": "선택되지 않음",
+  "ut_6aba627378": "현재 세션에 내보낼 수 있는 콘텐츠가 없습니다.",
+  "ut_13465ff9b3": "에이전트 입력 상자에 이미 배치되어 있습니다.",
+  "ut_d45aa5cd92": "터미널 명령",
+  "ut_aec5a6dc3d": "명령 조각으로 저장",
+  "ut_2f4c7a6c8c": "조각 이름",
+  "ut_06c357f14d": "터미널에서 마우스 오른쪽 버튼을 클릭하세요.",
+  "ut_f58a1a9197": "에이전트 명령",
+  "ut_bb76c4ff57": "모든 명령과 작동 및 유지 관리 템플릿을 검색하려면 /를 입력합니다. ↑↓는 ​​전환, Tab은 선택, Enter는 실행입니다.",
+  "ut_5d888b8a22": "작업이 진행되는 동안에는 메모리를 압축할 수 없습니다. 먼저 작업을 중지하십시오.",
+  "ut_5f55be5f65": "인터넷 검색 : 활성화 (다음 미션부터 유효)",
+  "ut_921c3a3d3c": "인터넷 검색: 활성화되지 않음(활성화하려면 클릭하세요. 다음 작업이 적용됩니다)",
+  "ut_b5e4297324": "실행 중",
+  "ut_d68f77a907": "작동",
+  "ut_5085464dd9": "새로운 연결",
+  "ut_cbd048e6e6": "현재 라벨 다시 연결",
+  "ut_f30d7344c7": "AI 패널 축소",
+  "ut_c7b60ecb72": "AI 패널 확장",
+  "ut_36a1bca19d": "집중 모드 종료",
+  "ut_c56382e3ee": "서버 모니터링 숨기기",
+  "ut_55b60aaf25": "서버 모니터링 표시",
+  "ut_1e838ce89c": "SFTP 패널 닫기",
+  "ut_a752de5a42": "SFTP 패널 열기",
+  "ut_f934cd40d1": "세션 기록",
+  "ut_f8ead6b402": "새 AI 세션 생성",
+  "ut_76462daeb1": "전체 페이지",
+  "ut_e17ad38728": "서랍",
+  "ut_9b85525187": "운영 감사",
+  "ut_1bc161aa98": "AI 모델 설정",
+  "ut_1d6ad9a57d": "변경 내역",
+  "ut_8659bce8a2": "작업흐름",
+  "ut_7781e2e2a1": "추가 지침…",
+  "ut_c8e527419a": "로컬 터미널은 포트 전달을 지원하지 않습니다.",
+  "ut_fc1fc05fcd": "인터넷 검색",
+  "ut_1a5ebea669": "열쇠 없음(즉시 사용 가능)",
+  "ut_d007a268a0": "API 키가 필요합니다",
+  "ut_06aab0767d": "프라이빗 인스턴스 선택적 키",
+  "ut_d17f6d0537": "전역 매개변수",
+  "ut_28bd2b7489": "지금 테스트",
+  "ut_fd44505c78": "백엔드 활성화됨:",
+  "ut_35fef8a980": "선택한 백엔드:",
+  "ut_a7179dbf9b": "구성된 키:",
+  "ut_435e2b9a3e": "새로 고침 상태",
+  "ut_3b3bcc7a34": "사용할 수 없음",
+  "ut_aff6cc24ed": "열쇠 필요",
+  "ut_140b926331": "의미 검색 · 키 필요",
+  "ut_c8f4f082c1": "검색 API · 키 필요",
+  "ut_060d69c2ef": "RSS · 키리스",
+  "ut_82fe5ca073": "HTML · 국내대리점 필수",
+  "ut_cde0d7f255": "자신만의 인스턴스를 구축해야 함",
+  "ut_fdb03fa75f": "AI 최적화 요약",
+  "ut_2846d31002": "구글 검색결과",
+  "ut_50265d0478": "아직 검색 API가 없습니다.",
+  "ut_aa998837ed": "클로드 검색 도구",
+  "ut_72f0d7877f": "응답 검색",
+  "ut_ebda0aff48": "검사중",
+  "ut_7875a79d06": "환경 변수",
+  "ut_464ca43586": "구성된",
+  "ut_cdc3132e4c": "구성되지 않음",
+  "ut_dd2e9a0289": "배포 문서",
+  "ut_050792529a": "키 받기",
+  "ut_836f91fea2": "선택적 토큰: 승인으로 전송됨: 전달자",
+  "ut_37cabfd93e": "수정이 없음을 나타내려면 비워 두십시오. 동일한 이름의 환경 변수를 사용할 수도 있습니다.",
+  "ut_60f1ed814f": "저장된 키는 저장 후 삭제됩니다.",
+  "ut_246737f23c": "SearXNG 인스턴스 주소",
+  "ut_dceef0fd66": "SearXNG 배포 문서 →",
+  "ut_05981b84e9": "반환된 최종 항목 수(1-20)",
+  "ut_875f752532": "동시에 요청된 백엔드 수(1-12)",
+  "ut_113e34528c": "단일 백엔드에 대한 가장 긴 대기 시간(3000-120000ms)",
+  "ut_d012b127eb": "아웃바운드 프록시",
+  "ut_6a13f67dc3": "OpenAI 최신 뉴스 등의 쿼리를 입력하세요.",
+  "ut_eeda5a24be": "검색 중",
+  "ut_7c5d801935": "검색",
+  "ut_3d01e59d2e": "일치하는 결과가 없습니다.",
+  "ut_aef246a460": "출처:",
+  "ut_a7de20e32a": "검색어 키워드를 입력해주세요",
+  "ut_8334c9cd68": "1~20 사이여야 합니다.",
+  "ut_c1fe9fa3f2": "1~12 사이여야 합니다.",
+  "ut_299e9d34bb": "3000-120000 사이여야 합니다.",
+  "ut_3d127654a9": "매개변수가 잘못되었습니다. 강조 표시된 필드를 확인하세요.",
+  "ut_0531ef0aec": "저장되었습니다. 즉시 적용됩니다.",
+  "ut_c259d39a21": "마지막으로 저장된 상태를 복원했습니다.",
+  "ut_1595af9c76": "상태 재설정",
+  "ut_5046a76cef": "확인을 기다리는 중",
+  "ut_3a760ee340": "실행 중",
+  "ut_9b47257520": "정지됨",
+  "ut_6bafadcb9f": "⏸️ 작업이 일시 중지되었습니다. 계속하려면 클릭하여 재개할 수 있습니다.",
+  "ut_5384a63ffb": "▶️ 작업이 재개되었습니다. 계속 실행하세요...",
+  "ut_48eb86eca2": "⚠️ AI는 실제로 명령을 실행하지 않고 완료를 주장하므로 실제 확인이 필요합니다.",
+  "ut_c975d9cfca": "…(답변이 너무 길어서 잘렸습니다.)",
+  "ut_c0bd0404a4": "기본 명령의 경우 대신 local_exec 도구를 사용하세요.",
+  "ut_a3621ea638": "네트워크 차단 중 차단",
+  "ut_6c86646cba": "읽기 전용 모드가 활성화되어 있으며 이 명령의 실행이 거부되었습니다.",
+  "ut_6140f3dac8": "현재 권한 모드입니다. 이 명령은 실행이 거부되었습니다.",
+  "ut_b14923e57e": "물어보세요",
+  "ut_287a6d5c24": "자동",
+  "ut_64b5e22817": "✅ 사용자가 확인하고 실행을 시작했습니다...",
+  "ut_748164be56": "⚠️ AI가 도구를 호출하지만 도구 이름을 지정하지 않습니다.",
+  "ut_ee157cb455": "⏳ 계속...",
+  "ut_7d89802fc1": "결론 정리",
+  "ut_42d195aa5d": "SFTP 하위 시스템을 여는 중...",
+  "ut_a70224cf55": "업로드 완료",
+  "ut_3ce3c27270": "다운로드 완료",
+  "ut_90b80824a2": "파일 동기화가 중지되었습니다.",
+  "ut_948df560e2": "파일 동기화가 중지되었습니다",
+  "ut_c6a06709f5": "파일 동기화 시작 중...",
+  "ut_88dfa9a69c": "매개변수 누락: 모드 필요(remote/local_file/ssh_hostkey)",
+  "ut_c767a0bfa3": "포트 범위가 잘못되었습니다(1-65535).",
+  "ut_7400d2fd8c": "certPath에 잘못된 문자(따옴표/세미콜론/파이프/백틱 등)가 포함되어 있습니다.",
+  "ut_272d2f4a52": "SSH 호스트 키 지문을 읽는 중...",
+  "ut_049487ff40": "매개변수 누락: content 또는 content_b64가 하나를 제공해야 합니다.",
+  "ut_7515f1e67e": "SFTP 쓰기 실패, 백업 롤백...",
+  "ut_ee8e576b01": "백업에서 원본 파일이 복원되었습니다.",
+  "ut_a3714eed7b": "SFTP 쓰기에 실패했습니다. PTY 표준 입력 모드(cat > file)를 시도하고 있습니다...",
+  "ut_ca59f0145f": "원본 파일 백업 중...",
+  "ut_ed571dc1ef": "로컬 파일",
+  "ut_aeff3a9157": "직접 로컬 쓰기에 실패했습니다. 현재 셸을 통해 쓰려고 합니다...",
+  "ut_751b0202ff": "로컬 PTY 표준 입력",
+  "ut_ddd5f79db8": "로컬 PTY 표준 입력 + sudo 티",
+  "ut_e67f272887": "  참고: 현재 프로세스에는 원본 파일을 읽을 수 있는 권한이 없으며 백업을 생성할 수 없습니다.",
+  "ut_d1dd8a4a86": "현재 세션은 비밀번호 입력에 접근할 수 없습니다. 호스트 설정에서 sudo 비밀번호를 입력해주세요.",
+  "ut_cdfaed0dc5": "사용자가 sudo 비밀번호를 입력할 때까지 기다립니다...",
+  "ut_6d06b21d26": "사용자가 비밀번호를 제공하지 않았습니다(취소하거나 공백으로 입력). 작업을 사용하십시오: 대신 사용자에게 확인을 요청하거나 대신 비권한 모드에서 실행하십시오.",
+  "ut_de63930b16": "네이티브 검증 경험",
+  "ut_11e4b8176f": "공식 지식 베이스",
+  "ut_587234aed7": "이 기사는 잘렸습니다.",
+  "ut_fb8896831d": "총액이 한도를 초과하여 이후 항목이 잘렸습니다.",
+  "ut_89d6d1508a": "현재 플랫폼은 기본 명령 실행을 지원하지 않습니다(Windows/macOS/Linux 데스크톱만 해당).",
+  "ut_4d2a25adb6": "매개변수 누락: 쿼리 필요",
+  "ut_039e6df512": "\n참고: 파일 수가 상한인 5000에 도달했습니다. 순회가 계속되지 않습니다. 범위를 좁히려면 glob이나 더 좁은 경로를 사용하세요.",
+  "ut_4d2db00134": "인수 누락: content 또는 content_b64 인수 중 하나를 제공해야 합니다. 같은 줄에 여러 줄의 내용을 작성하고 \\n을 사용하여 줄바꿈을 표시하세요.",
+  "ut_1d0e0057ce": "[프로세스가 종료되었습니다.]",
+  "ut_80fbd0db5a": "OAuth 인증이 만료되었습니다. 다시 로그인하세요.",
+  "ut_3212b67b4f": "(MCP 도구는 빈 결과를 반환합니다)",
+  "ut_3043a371fb": "MCP 통화가 취소되었습니다.",
+  "ut_4b697ab9d4": "이 MCP 서버는 프롬프트 단어를 제공하지 않았습니다.",
+  "ut_e6a3f8cacd": "프로젝트 구조 분석 중...",
+  "ut_18ecc05e1c": "=== 프로젝트 분석 보고서 ===",
+  "ut_b814db8dc9": "빌드 잠금을 기다리는 중...",
+  "ut_b703554a31": "빌드 잠금을 기다리는 동안 취소되었습니다.",
+  "ut_76fa7f5bc2": "빌드 성공",
+  "ut_957091cf2f": "연결 확인이 통과되었습니다.\n",
+  "ut_892c3e0946": "[오류]",
+  "ut_d9a78ca9ae": "[연결이 종료되었습니다]",
+  "ut_4db21d650d": "연결 성공",
+  "ut_7038dfdb24": "연결 실패:",
+  "ut_3902f53eb2": "[오류] 연결되지 않음",
+  "ut_8d0408fbbe": "[연결 끊김]",
+  "ut_87f4917a26": "누락된 매개변수: 쿼리가 필요합니다.",
+  "ut_3561d2bc19": "크롤링에 성공했지만 페이지 콘텐츠가 비어 있습니다.",
+  "ut_558bbf2918": "텍스트를 분석해 보세요...",
+  "ut_d74776ae2e": "이 명령은 보안 정책에 의해 차단되었습니다.",
+  "ut_1ebeb12158": "명령 실행 확인",
+  "ut_dfde5a0464": "위험한 작업 확인",
+  "ut_517880c5b3": "곧 실행될 예정:",
+  "ut_dd66d942fb": "이 작업으로 인해 시스템을 사용할 수 없게 될 수 있으므로 주의해서 수행하십시오!",
+  "ut_c5955eb9de": "계속하려면 CONFIRM을 입력하세요.",
+  "ut_68772a88f7": "확인을 입력하세요",
+  "ut_fccd2f755c": "실행 확인",
+  "ut_6863351895": "현재 세션 외부에서 상태를 변경할 수 있는 도구 호출을 실행합니다.",
+  "ut_e6f77c3aa9": "소프트웨어 패키지를 설치하거나 업그레이드하면 시스템 종속성이 변경되고 기존 서비스에 영향을 미칠 수 있습니다.",
+  "ut_03303bd6da": "소프트웨어를 제거하면 이에 의존하는 서비스를 사용하지 못할 수 있습니다.",
+  "ut_c8e25a26d1": "서비스를 시작하면 현재 실행 상태가 변경됩니다.",
+  "ut_cd5d5a98a0": "서비스를 중지하면 해당 서비스에 의존하는 웹사이트/인터페이스가 중단됩니다.",
+  "ut_88ec88c7b3": "서비스를 다시 시작하십시오. 웹사이트/인터페이스가 일시적으로 중단될 수 있습니다.",
+  "ut_7ba837a04e": "구성이나 데이터에 영향을 줄 수 있는 파일 수정, 이동 또는 삭제",
+  "ut_a1e726721a": "파일 권한이나 소유자를 수정하면 서비스 액세스에 영향을 미칠 수 있습니다.",
+  "ut_1210181241": "서비스 동작을 변경할 수 있는 구성 파일 수정",
+  "ut_a0e4d573e8": "서버 상태를 수정하세요. 영향 범위를 확인해 주세요.",
+  "ut_ab356c88ee": "Nginx 구성 확인을 통과했습니다.",
+  "ut_8e89715728": "Nginx 구성 확인에 실패했습니다.",
+  "ut_3e37edb32c": "단추가 하나도 안 맞나요? 답을 입력하세요…",
+  "ut_1cb11a152d": "맞춤 답변 보내기",
+  "ut_b31e90861f": "(출력 없음)",
+  "ut_c06a19b387": "다시 연결",
+  "ut_e3d0732b84": "AI가 다시 시도하게 하세요",
+  "ut_73c881e205": "임무 완수",
+  "ut_22aee52bc1": "모든 단계가 완료되었습니다.",
+  "ut_704c12f2eb": "작업 실패",
+  "ut_da68e2844f": "작업 실행 실패",
+  "ut_ede5822e49": "작업이 중단되었습니다",
+  "ut_9566f7b70f": "명령 출력",
+  "ut_51bfee4aca": "끝",
+  "ut_e46194bcb9": "에이전트 로그",
+  "ut_ecc8f6c40b": "현재 필터 결과 복사",
+  "ut_f988024855": "이 작업 보기만 가능",
+  "ut_7b8553ecdf": "모델적 사고",
+  "ut_46d28ef143": "↑↓ 스위치 탭 선택 Enter 실행 Esc 닫기",
+  "ut_9e9ac63dcb": "보충 지침(다음 라운드부터 유효)",
+  "ut_f12263d7ea": "색깔 없음",
+  "ut_b35da5e4e9": "모든 명령 기록을 삭제하시겠습니까?",
+  "ut_0f29d5bb1a": "지우기",
+  "ut_9687dea3ac": "기록 지우기",
+  "ut_8a6ca36e98": "검색 기록 명령",
+  "ut_3a23e3acdd": "아직 기록 명령이 없습니다.",
+  "ut_f22110ada9": "첫 번째 결과를 실행하려면 Enter를 누르십시오. · 입력하려면 Enter를 누르십시오. · 복사하려면 클릭하십시오.",
+  "ut_956e4930dd": "호스트/명령/페이지/작업 검색...",
+  "ut_e69a25b65d": "일치하지 않음",
+  "ut_f160c18c0c": "선택",
+  "ut_981720593b": "실행하다",
+  "ut_a3e557dfb9": "닫기",
+  "ut_493d7ff67f": "검사",
+  "ut_b8c3200c7b": "안전하다",
+  "ut_2aa836e6e9": "배포",
+  "ut_bda0db72a1": "문제 해결",
+  "ut_6f9c60bc15": "정기 유지 관리",
+  "ut_338073cc53": "내장 템플릿은 읽기 전용입니다.",
+  "ut_5865795364": "아이콘",
+  "ut_5dfdb946bf": "유형",
+  "ut_52129c776f": "AI 실행(자연어 단계)",
+  "ut_e87bf3a87f": "직접 실행(셸 명령)",
+  "ut_c1af116483": "분류",
+  "ut_e91627ff38": "단계(AI에 기록됨)",
+  "ut_25cc0f420e": "명령",
+  "ut_cdeeaa7450": "이 사전 설정에 대해 복원 가능한 모델이 없습니다.",
+  "ut_ab0793064d": "먼저 기본 URL을 입력하세요.",
+  "ut_dd05d9a6b8": "추가할 새 모델이 없습니다.",
+  "ut_5fe10ec0d8": "연결 시간 초과",
+  "ut_bc3f91069f": "연결할 수 없습니다",
+  "ut_6367b9ea6c": "요청 실패",
+  "ut_7794ac4d33": "기본 URL은 비워둘 수 없습니다.",
+  "ut_ae851c66db": "하나 이상의 모델 유지",
+  "ut_82d4f67dc5": "엔드포인트 편집",
+  "ut_742161ce45": "저장된 키를 사용하려면 비워두세요.",
+  "ut_41678037ea": "표시 이름",
+  "ut_03570451ac": "합의",
+  "ut_0de12236b8": "원신이얀",
+  "ut_7abc46ce6d": "기본값 복원",
+  "ut_28c32fe34f": "검색 중…",
+  "ut_f2a08ffc71": "서비스 제공업체에서 가져오기",
+  "ut_a52f4bbfda": "표지",
+  "ut_3ed4ca7624": "아직 모델이 없습니다. 먼저 모델을 추가하세요.",
+  "ut_7e4f0e1070": "모델 ID는 비워둘 수 없습니다.",
+  "ut_2ea671ff59": "중복된 장비 이름",
+  "ut_d2cf18b1f8": "추론을 활성화하려면 하나 이상의 기어가 필요합니다.",
+  "ut_df2b9cacae": "알았어",
+  "ut_02259f1272": "설정되지 않음",
+  "ut_ea6cf493d2": "터미널 연결",
+  "ut_57d80443c9": "실패한 호스트 재시도",
+  "ut_9e541c6382": "성공",
+  "ut_e35dddb0b4": "실패했다",
+  "ut_ec4c29ca9a": "연결 끊김",
+  "ut_a1e91f6981": "시간 초과",
+  "ut_7d4af9fef1": "권한이 부족합니다.",
+  "ut_9927a13579": "입력을 기다리는 중",
+  "ut_b3d243fdfd": "구문 오류",
+  "ut_66197bd48d": "반환",
+  "ut_58851eb751": "실행기록이 유지되어 완료가 가능합니다.",
+  "ut_e6b33fe91a": "작업 계속",
+  "ut_5e6e54121d": "기본값 복원",
+  "ut_9aa0cecb52": "다시 입력하려면 클릭하세요.",
+  "ut_1f0be4879d": "키 조합을 눌러주세요…",
+  "ut_5a1aea8730": "알았어",
+  "ut_a1490afb10": "프록시는 http://host:port만 지원합니다.",
+  "ut_ffad1d8b04": "작업 디렉터리(선택 사항)",
+  "ut_205492caf2": "환경 변수(한 줄당 KEY=VALUE)",
+  "ut_acce8b3510": "아웃바운드 프록시(선택 사항)",
+  "ut_cd76953b04": "헤더(키: 행당 값)",
+  "ut_12f53f2717": "Customize(연결 후 확인)",
+  "ut_a8481de1d6": "OAuth 범위(공백/쉼표로 구분)",
+  "ut_4181f5ee36": "OAuth 클라이언트 ID(DCR을 사용하려면 비워두세요)",
+  "ut_a6f501ed31": "OAuth clientSecret(선택사항)",
+  "ut_810e89c23f": "AI 비서",
+  "ut_1a81fac6b4": "서랍 닫기",
+  "ut_df39e46c77": "바로가기 명령 편집",
+  "ut_5b6a456972": "작업 흐름 편집",
+  "ut_9d49b2c71b": "이전 레벨로 돌아가기",
+  "ut_de5dd6102e": "이름/IP/그룹 검색",
+  "ut_1c95f57481": "일치하는 호스트가 없습니다.",
+  "ut_29b3f192d8": "이름/명령어 검색",
+  "ut_d112e18b97": "일치하는 바로가기 명령이 없습니다.",
+  "ut_dd209aad9b": "이름/설명 검색",
+  "ut_3d46c0f619": "AI 실행",
+  "ut_6ba17bef52": "직접 실행",
+  "ut_45a37578cb": "최근",
+  "ut_ab4373452b": "달리다",
+  "ut_6cb13cd9c4": "일치하는 워크플로가 없습니다.",
+  "ut_00636e0752": "검색 명령",
+  "ut_f83f96b238": "아직 감사 기록이 없습니다.",
+  "ut_cacce52f6d": "복사할 기록이 없습니다.",
+  "ut_a50d8711f5": "AI 단말기 감사 로그",
+  "ut_6200fddf68": "로컬 머신",
+  "ut_2f5e0aff16": "출력 없음",
+  "ut_f943d2ce6c": "가로채기",
+  "ut_740618ad3b": "릴리스",
+  "ut_311d08fee0": "실행됨",
+  "ut_7e1cc53dfe": "실행되지 않음",
+  "ut_d6834ac586": "이것을 복사하세요",
+  "ut_4a647e404a": "검색 설정",
+  "ut_8ad11edf4e": "수정됨",
+  "ut_57d5e9c054": "닫기",
+  "ut_10f71987c9": "롤백 버퍼 라인 수",
+  "ut_d7b02e9cf7": "자동 세션 로깅",
+  "ut_2543cfa7f8": "단일 단계 응답 시간 초과",
+  "ut_fac7fadb45": "명령 시간 초과 배수",
+  "ut_48274233a0": "오늘",
+  "ut_98427f593c": "작업이 종료되었습니다. 자세한 내용은 실행기록을 확인해주세요.",
+  "ut_9caaf88e9c": "롤백 수행됨",
+  "ut_aee33bbe51": "자동 롤백이 없으므로 실행 전 스냅샷을 사용하는 것이 좋습니다.",
+  "ut_4e9cdbd7a8": "롤백됨",
+  "ut_730ed00d8e": "롤백 가능",
+  "ut_4f069ae310": "노동력이 필요함",
+  "ut_209a3ee99a": "롤백 중",
+  "ut_8bcebbb092": "롤백",
+  "ut_3459fead8a": "설치",
+  "ut_ad620f1593": "제거",
+  "ut_0e0e2a9a73": "구성 수정",
+  "ut_7393410b1a": "서비스 시작",
+  "ut_64a71bf56a": "서비스 중지",
+  "ut_c5ea3f5be9": "서비스 다시 시작",
+  "ut_7a42975bda": "파일 작업",
+  "ut_98ae0d0e95": "권한 수정",
+  "ut_d3636b0082": "변화",
+  "ut_3954d67b32": "일치하는 항목 없음",
+  "ut_ce6351e3cc": "원시 출력",
+  "ut_f5876a2bf8": "모두 복사",
+  "ut_f7d3ee00a1": "검색 결과…",
+  "ut_ef2170f4b4": "현재 라벨이 연결되지 않아 전달을 설정할 수 없습니다.",
+  "ut_0df8de01ab": "유효한 포트(1-65535)와 대상 호스트를 입력하세요.",
+  "ut_be0c081010": "아직 전달 규칙이 없습니다.",
+  "ut_d0df2ad5ea": "중지하고 삭제하세요",
+  "ut_f704784855": "로컬 → 원격",
+  "ut_1b67fdda4b": "원격 → 로컬",
+  "ut_50901ca37c": "청취 포트",
+  "ut_864e1c6380": "대상 호스트",
+  "ut_ec3f615847": "대상 포트",
+  "ut_c1fbfd5065": "앞으로 추가",
+  "ut_4a8eab4b12": "예: nginx는 conf.d만 변경합니다.",
+  "ut_ee90ce584e": "제약 조건을 자연어로 명확하게 작성하면 AI가 이를 정확하게 따릅니다.",
+  "ut_468c99d256": "아직 호스트가 없으므로 단일 호스트로 제한할 수 없습니다.",
+  "ut_d83a565087": "진단",
+  "ut_92cd36cefb": "확인 중…",
+  "ut_0ddb8a1f0d": "테스트 결과를 얻지 못했습니다.",
+  "ut_b1ab09352f": "애플리케이션 버전",
+  "ut_0942c2789b": "이 세션이 중단되었습니다",
+  "ut_9f028e8160": "마지막 충돌 시간",
+  "ut_87c363d0c9": "없음",
+  "ut_065917e680": "SSH 풀 연결",
+  "ut_4927752a48": "끊어진 연결",
+  "ut_46d9b304c4": "디스크 쓰기 가능",
+  "ut_3779abda15": "예",
+  "ut_e812fd5dbb": "아니요",
+  "ut_2e81ddc87a": "시간 확인",
+  "ut_234f4f27c8": "충돌 로그가 비어 있습니다.",
+  "ut_d10e283a81": "충돌 로그 복사",
+  "ut_ced38012da": "충돌 로그가 삭제되었습니다.",
+  "ut_ead023bd7e": "다시 확인하다",
+  "ut_2e28b0df81": "충돌 로그 및 상태",
+  "ut_3f96027e32": "버전 정보가 복사되었습니다.",
+  "ut_1f0a3070de": "읽는 중…",
+  "ut_b6541b6328": "업데이트 확인 중…",
+  "ut_32142192ac": "이미 최신 버전임",
+  "ut_7dc8c0869d": "버전",
+  "ut_610ddf67b9": "롤백 버퍼 라인 수",
+  "ut_8a70b91e29": "자동 세션 로깅",
+  "ut_050de7d897": "현재 사용중인 모델",
+  "ut_626fb86214": "아직 모델이 없습니다. 먼저 엔드포인트를 추가한 다음 모델을 추가하세요.",
+  "ut_387e6f82d0": "끝점",
+  "ut_76fb9c463a": "아직 엔드포인트가 없습니다.",
+  "ut_38966aa565": "제한 없음",
+  "ut_f28f99867b": "단일 단계 응답 시간 초과",
+  "ut_ded8ed2d66": "명령 시간 초과 배수",
+  "ut_a2ce59889b": "설정되지 않음",
+  "ut_6aad5ea609": "단어 수정",
+  "ut_b95d0f872a": "얼굴",
+  "ut_2318f73d10": "지문",
+  "ut_8ec132c8b8": "생체 인식",
+  "ut_cea6052a7e": "휴무",
+  "ut_00f43cd923": "이 기기에서는 생체 인식 기능을 사용할 수 없으며 앱 잠금을 설정할 수 없습니다.",
+  "ut_91f4c00293": "자격증명 저장",
+  "ut_021001ca72": "시스템 보안 스토리지 + AES 폴백",
+  "ut_b25f81d2b6": "고위험 주문",
+  "ut_ffaeb5818f": "실행 전 2차 확인",
+  "ut_98c6d8c630": "로컬 데이터 지우기",
+  "ut_a74aec2b15": "로컬 데이터가 삭제되었습니다.",
+  "ut_5474c635a4": "앱 잠금을 활성화하려면 신원을 확인하세요.",
+  "ut_00b1b1f0c5": "MCP 활성화",
+  "ut_a48007473a": "아직 서버가 없습니다.",
+  "ut_c9189bb086": "연결되지 않음",
+  "ut_a4b4f07ab5": "AI 인터넷 검색 허용",
+  "ut_704bcb4a34": "백엔드",
+  "ut_2acaddf4df": "활성화된 백엔드가 없다면 백엔드가 활성화되지 않은 것입니다.",
+  "ut_d40fdc917f": "항목 수를 반환합니다.",
+  "ut_b00662826d": "아직 규칙이 없습니다.",
+  "ut_078781c029": "규칙 추가",
+  "ut_19b85efbe5": "모든 호스트",
+  "ut_c9e6373a79": "작업 완료 알림",
+  "ut_4b93fcd514": "언제 상기시켜줄까",
+  "ut_6e277f398f": "웹훅 주소",
+  "ut_559d9de7a7": "아직 웹훅 주소를 입력하지 않아서 보낼 수 없습니다.",
+  "ut_e52ad942fc": "시스템 프롬프트 단어 뒤에 추가됨",
+  "ut_62951d47df": "이 시스템에 추가 규칙이 기록되었습니다.",
+  "ut_968538bf30": "확인하려면 DELETE를 입력하세요.",
+  "ut_3da0e76468": "검색 백엔드 추가",
+  "ut_402165c066": "사용 가능한 모든 백엔드가 추가되었습니다.",
+  "ut_fd7c3540b7": "저장 및 활성화",
+  "ut_ed57742e6a": "전체 설정 열기",
+  "ut_5208f9bddf": "호스트가 존재하지 않습니다",
+  "ut_bc683a74fa": "열다",
+  "ut_731d9e386f": "로컬로 다운로드",
+  "ut_21512fa475": "콘텐츠 미리보기",
+  "ut_64da167c8c": "디렉토리 삭제",
+  "ut_f405fa4a70": "파일 삭제",
+  "ut_8b9071fa7d": "수정됨",
+  "ut_46ebf5b01b": "저장됨",
+  "ut_01ff3a92b3": "새 이름",
+  "ut_c28161cd4b": "삭제 확인",
+  "ut_32d93b8221": "디렉토리 이름",
+  "ut_87fc3f64f6": "창조하다",
+  "ut_40cd9573ff": "현재 디렉토리에 업로드하려면 릴리즈하세요.",
+  "ut_ebab5a91e2": "정렬",
+  "ut_436d7985a6": "크기",
+  "ut_cac0b492e4": "수정 시간",
+  "ut_125f95f8d1": "업로드",
+  "ut_fe22bfe107": "새로고침",
+  "ut_2b1e2ceb1b": "경로 입력",
+  "ut_cfd5be4925": "루트 디렉터리",
+  "ut_9dc11a1d64": "연결 중...",
+  "ut_98d1c295e4": "빈 디렉토리",
+  "ut_a64c884da9": "구성 파일을 읽을 수 없습니다.",
+  "ut_91d4c887bb": "구성 파일을 찾을 수 없습니다.",
+  "ut_8411943202": "가져오기 실패",
+  "ut_c4bdcb7bb4": "구성에 가져올 수 있는 호스트가 없습니다.",
+  "ut_ee82429005": "구문 분석 팁",
+  "ut_ffb911cc34": "수입",
+  "ut_4e39421eaf": "발판",
+  "ut_35660d6755": "개인 키가 필요합니다",
+  "ut_94376a7210": "가져오지 않은 항목",
+  "ut_793cb65e3d": "이미 존재합니다",
+  "ut_61181b84f1": "테마 모드",
+  "ut_33bd0353d6": "글꼴 크기",
+  "ut_5fb0f8f4a5": "터미널 설정",
+  "ut_ce50810b95": "어두운 색만",
+  "ut_39c65ad937": "결과 없음",
+  "ut_ef282263a5": "검색단말 출력",
+  "ut_d24c2e83f7": "대소문자 구분",
+  "ut_3525464ef3": "이전(Shift+Enter)",
+  "ut_01e46e4cac": "다음(Enter)",
+  "ut_3dd4f86972": "모두 선택",
+  "ut_93db49204e": "화면 지우기",
+  "ut_6b1ae00645": "스크롤백 버퍼 지우기",
+  "ut_49db0eb3e7": "모든 출력 복사",
+  "ut_8f5a44f9a8": "출력을 파일로 저장…",
+  "ut_7e205da9b6": "글꼴 크기 확대",
+  "ut_aa2e753d46": "글꼴 크기 줄이기",
+  "ut_1c98824fa9": "글꼴 크기 재설정",
+  "ut_e9304231ed": "상담원에게 설명 보내기",
+  "ut_c48f8080f6": "명령 조각으로 저장",
+  "ut_ab94a86f01": "터미널에서 이 명령을 실행하세요.",
+  "ut_e865710760": "화면을 좌우로 분할",
+  "ut_9833a4decf": "화면을 위아래로 분할",
+  "ut_3e9c805d7f": "이 분할 화면을 꺼주세요 (AI는 이 화면에 있습니다)",
+  "ut_16863c6e3a": "이 분할 화면 끄기",
+  "ut_6f9e7de9f4": "SFTP에서 찾기",
+  "ut_fa0ed53542": "SFTP 패널 열기",
+  "ut_6dc8f53907": "감사 기록 보기",
+  "ut_078958b894": "변경 내역 보기",
+  "ut_76a60a446c": "링크 열기",
+  "ut_b99781d2e8": "링크 복사",
+  "ut_9641c0bb12": "경로 복사",
+  "ut_b736a87497": "이 오류에 대해 상담원에게 문의하세요.",
+  "ut_6fcc795a39": "에이전트가 이 전체 부분을 설명하도록 하세요.",
+  "ut_dc52ca948e": "이 전체 블록을 복사하세요",
+  "ut_4d77c0da07": "이전 명령",
+  "ut_083f59cfec": "다음 블록 명령",
+  "ut_c49dbc7b41": "선택한 콘텐츠가 없습니다.",
+  "ut_90074297f5": "여러 줄의 내용이 순차적으로 실행됩니다. 붙여넣기에 실수가 없는지 확인하십시오.",
+  "ut_3a1c210c39": "이 명령을 터미널에서 실행하시겠습니까?",
+  "ut_a28740df5a": "터미널 출력 저장",
+  "ut_8a039d57ca": "연결을 기다리는 중...",
+  "ut_364a8e7d72": "터미널",
+  "ut_6b4426c1f7": "AI 모델",
+  "ut_47436bc8ab": "대리인",
+  "ut_ed3461341d": "MCP 서버",
+  "ut_a6db458718": "인터넷 검색",
+  "ut_83d66464a0": "내부 규정",
+  "ut_dc4a75d976": "알림",
+  "ut_6dbcd29d76": "심사",
+  "ut_2e90894c9a": "단지 실패했을 뿐이다",
+  "ut_ec50bedaa8": "매번 상기시켜줘",
+  "ut_e39887dfed": "원본 파일 백업 실패: {e}. 쓰기가 중단되었으며 원본 파일은 수정되지 않았습니다.",
+  "@ut_e39887dfed": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fcda8e6588": "  원본 파일이 백업되었습니다: {backupPath}",
+  "@ut_fcda8e6588": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4452077d81": "{summary}\n대상 경로: {effectiveLocal}",
+  "@ut_4452077d81": {
+    "placeholders": {
+      "summary": {
+        "type": "Object"
+      },
+      "effectiveLocal": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f4856090f2": "{path} 읽는 중...",
+  "@ut_f4856090f2": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1e823bfa18": "openssl 실행 실패: {stderr}",
+  "@ut_1e823bfa18": {
+    "placeholders": {
+      "stderr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a2a80977d9": "원본 파일을 {backupPath}에 백업하는 중...",
+  "@ut_a2a80977d9": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b9beeabb91": "  롤백하려면: mv {backupPath} {path}",
+  "@ut_b9beeabb91": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c4acfd10f3": "  롤백해야 하는 경우: 이 백업으로 {path}를 덮어씁니다.",
+  "@ut_c4acfd10f3": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_af40dec29f": "수정된 파일: {path}",
+  "@ut_af40dec29f": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fb892c6b10": "  대체: {length}바이트 → {length}바이트",
+  "@ut_fb892c6b10": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_59e5f6620a": "  파일 크기: {length} → {length}바이트",
+  "@ut_59e5f6620a": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5fe0b81932": "저장 실패: {e}",
+  "@ut_5fe0b81932": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1dd514c792": "{length}자 복사됨",
+  "@ut_1dd514c792": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e275b00675": "민감한 파일 : {fileName} (프로젝트 내에서도 접근 금지)",
+  "@ut_e275b00675": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3ae63b10aa": "민감한 디렉터리: {segment}(액세스 금지)",
+  "@ut_3ae63b10aa": {
+    "placeholders": {
+      "segment": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5b6668af25": "시스템 디렉터리 {prefix} 액세스가 금지되었습니다.",
+  "@ut_5b6668af25": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_337b92f903": "민감한 디렉터리 ~/{suffix}에는 액세스가 금지되어 있습니다.",
+  "@ut_337b92f903": {
+    "placeholders": {
+      "suffix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0c25c4bff1": "민감한 파일: {fileName}",
+  "@ut_0c25c4bff1": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fffc2d39d8": "민감한 디렉터리: {segment} 액세스가 금지되었습니다.",
+  "@ut_fffc2d39d8": {
+    "placeholders": {
+      "segment": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_61f32e7e81": "경로가 승인된 프로젝트 디렉터리 내에 없습니다: {normalized}",
+  "@ut_61f32e7e81": {
+    "placeholders": {
+      "normalized": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7695e08c1e": "{scrollLabel} · {logLabel}",
+  "@ut_7695e08c1e": {
+    "placeholders": {
+      "scrollLabel": {
+        "type": "Object"
+      },
+      "logLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b003c911bd": "{count} · 현재 {selectedName}",
+  "@ut_b003c911bd": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      },
+      "selectedName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3f574ada1a": "{count}가 구성됨",
+  "@ut_3f574ada1a": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_664f79491a": "단계 수 무제한 · 시간 초과 {timeout}s",
+  "@ut_664f79491a": {
+    "placeholders": {
+      "timeout": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a303a7b799": "최대 {steps} 단계 · 시간 초과 {timeout}s",
+  "@ut_a303a7b799": {
+    "placeholders": {
+      "steps": {
+        "type": "Object"
+      },
+      "timeout": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9947165032": "활성화됨 · {enabledCount} 백엔드 사용 가능",
+  "@ut_9947165032": {
+    "placeholders": {
+      "enabledCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_94c3718c07": "안전기간 {startHour}:00~{endHour}:00",
+  "@ut_94c3718c07": {
+    "placeholders": {
+      "startHour": {
+        "type": "Object"
+      },
+      "endHour": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cbd8c9bc33": "{length} 스트립을 {path}로 내보냈습니다.",
+  "@ut_cbd8c9bc33": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b078e9e8b1": "내보내기 실패: {e}",
+  "@ut_b078e9e8b1": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_81d685bdc0": ", {skippedUnknownHost} 알 수 없는 호스트 규칙 건너뛰기",
+  "@ut_81d685bdc0": {
+    "placeholders": {
+      "skippedUnknownHost": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f59978a9af": "{imported} 사양 {skippedHint}를 가져왔습니다.",
+  "@ut_f59978a9af": {
+    "placeholders": {
+      "imported": {
+        "type": "Object"
+      },
+      "skippedHint": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4bda191f7f": "가져오기 실패: {e}",
+  "@ut_4bda191f7f": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ec13b5dac5": "MCP 마스터 스위치를 전환하지 못했습니다: {e}",
+  "@ut_ec13b5dac5": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1e9e2bf1a0": "도구 ({length}) · {exposure}",
+  "@ut_1e9e2bf1a0": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "exposure": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fb221962b1": "도구 스위치 저장 실패: {e}",
+  "@ut_fb221962b1": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_62adaafe0d": "리소스({length})",
+  "@ut_62adaafe0d": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_70da821187": "프롬프트 단어({length})",
+  "@ut_70da821187": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_169bc8e674": "디렉터리 선택기를 열지 못했습니다: {e}",
+  "@ut_169bc8e674": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_02f4d31e55": "스위치 저장 실패: {e}",
+  "@ut_02f4d31e55": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c87274304e": "저장 실패: {e}",
+  "@ut_c87274304e": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1c9cc2edb3": "삭제 실패: {e}",
+  "@ut_1c9cc2edb3": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ab07d88b41": "탭당 최대 {maxPanes} 화면(화면당 실제 세션 1개)",
+  "@ut_ab07d88b41": {
+    "placeholders": {
+      "maxPanes": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2596a43876": "오늘의 {auditToday} 게시물",
+  "@ut_2596a43876": {
+    "placeholders": {
+      "auditToday": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_acb620e2fa": "호스트 {targetHost}가 연결되지 않아 롤백을 수행할 수 없습니다.",
+  "@ut_acb620e2fa": {
+    "placeholders": {
+      "targetHost": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2f00778de2": "호스트: {hostLabel}",
+  "@ut_2f00778de2": {
+    "placeholders": {
+      "hostLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_35b3e86940": "롤백 성공: {rollbackCommand}",
+  "@ut_35b3e86940": {
+    "placeholders": {
+      "rollbackCommand": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_21823fef80": "종료 코드 {exitCode}",
+  "@ut_21823fef80": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_34ec0a3e03": "롤백 실패: {reason}",
+  "@ut_34ec0a3e03": {
+    "placeholders": {
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_be42c8efee": "롤백 예외: {e}",
+  "@ut_be42c8efee": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_99956a3c17": "{title}를 다시 연결하는 중...",
+  "@ut_99956a3c17": {
+    "placeholders": {
+      "title": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c1dbbf6a2c": "재연결 예외: {e}",
+  "@ut_c1dbbf6a2c": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5b97d3e6a4": "모델로 전환: {modelId}",
+  "@ut_5b97d3e6a4": {
+    "placeholders": {
+      "modelId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7fb66c7378": "대화가 클립보드에 복사되었습니다({chars} 단어).",
+  "@ut_7fb66c7378": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a1c44d88d9": "대화가 클립보드에 복사되었습니다({chars} 단어).\n실행 로그: {path}",
+  "@ut_a1c44d88d9": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5cf729e87e": "대화가 클립보드에 복사되었습니다({chars} 단어).\n로그 경로를 읽지 못했습니다: {e}",
+  "@ut_5cf729e87e": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e77b2cd18c": "명령 조각에 저장됨: {trimmed}",
+  "@ut_e77b2cd18c": {
+    "placeholders": {
+      "trimmed": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_32148ad774": "키 상태를 읽지 못했습니다: {e}",
+  "@ut_32148ad774": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9979b52038": "테스트 실패: {e}",
+  "@ut_9979b52038": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6934446d27": "구성 저장 실패: {e}",
+  "@ut_6934446d27": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8de5894b72": "링크 복사됨: {url}",
+  "@ut_8de5894b72": {
+    "placeholders": {
+      "url": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_61476f7ee8": "AI 응답 저장 실패: {e}",
+  "@ut_61476f7ee8": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_07c39ce9ce": "⚠️ 이 작업을 수행하면 로컬 파일이 변경되며 확인이 필요합니다.\n{display}",
+  "@ut_07c39ce9ce": {
+    "placeholders": {
+      "display": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b306912acf": "확인 대기 중: {toolName}",
+  "@ut_b306912acf": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0968807bf1": "💬 사용자 추가: {steering}",
+  "@ut_0968807bf1": {
+    "placeholders": {
+      "steering": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c547224534": "⚠️ 계획에는 아직 {length} 미완성 항목이 있으며, 마무리하기 전에 하나씩 확인해야 합니다({planFinishRetryCount}/{maxPlanFinishRetries})",
+  "@ut_c547224534": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "planFinishRetryCount": {
+        "type": "Object"
+      },
+      "maxPlanFinishRetries": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_478eec6181": "⚠️ 최대 실행 단계 수({maxSteps})에 도달하여 작업이 중단됩니다.",
+  "@ut_478eec6181": {
+    "placeholders": {
+      "maxSteps": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fa2224f3f9": "⚠️ 메인모델 {modelName}는 생산이 중단되어 백업모델 {modelName}로 변경되었습니다.",
+  "@ut_fa2224f3f9": {
+    "placeholders": {
+      "modelName": {
+        "type": "Object"
+      },
+      "modelName2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_971883a7fe": "⚠️ 이번 라운드에서 중복 도구 호출 무시: {name}(각 라운드에서 하나의 작업만 수행)",
+  "@ut_971883a7fe": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cb255683ce": "등급: {safetyLevel}",
+  "@ut_cb255683ce": {
+    "placeholders": {
+      "safetyLevel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ee0b938b2c": "설명: {reason}",
+  "@ut_ee0b938b2c": {
+    "placeholders": {
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f46987bf0d": "{highRisk} {highRisk}에서는 확인이 필요합니다({modeLabel} 모드): `{command}`\n위험 설명: {reason}",
+  "@ut_f46987bf0d": {
+    "placeholders": {
+      "highRisk": {
+        "type": "Object"
+      },
+      "highRisk2": {
+        "type": "Object"
+      },
+      "modeLabel": {
+        "type": "Object"
+      },
+      "command": {
+        "type": "Object"
+      },
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a61b05ce9b": "👉 당신은 다음을 선택했습니다: {choice}",
+  "@ut_a61b05ce9b": {
+    "placeholders": {
+      "choice": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_386b3634c1": "⚠️ AI가 {alias}를 호출하지만 명령 매개변수가 제공되지 않습니다.",
+  "@ut_386b3634c1": {
+    "placeholders": {
+      "alias": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0eed0d18c7": "⚠️알 수 없는 도구: {toolName}",
+  "@ut_0eed0d18c7": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_21239ba62c": "🔒 읽기 전용 모드가 활성화되어 있으면 이 도구의 실행이 거부됩니다: `{toolName}`",
+  "@ut_21239ba62c": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_339abc33a7": "⚠️ 현재 세션에서는 '{toolName}' 도구를 사용할 수 없습니다.",
+  "@ut_339abc33a7": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2bd0b4985d": "❌ 공구 {toolName} 실행 예외: {e}",
+  "@ut_2bd0b4985d": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e36f09192f": "{prefix} 마지막 업로드 라운드가 종료되기를 기다리는 중...",
+  "@ut_e36f09192f": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dc39c308a2": "{prefix} 업로드 진행률: {uploaded}/{total} 파일",
+  "@ut_dc39c308a2": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      },
+      "uploaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_91700996f4": "파일 업로드 중: {local}",
+  "@ut_91700996f4": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ded2242c8f": "파일 업로드 성공: {local} → {remote} ({size})",
+  "@ut_ded2242c8f": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_d72746d0d0": "재귀적으로 업로드하는 디렉터리: {local} → {effectiveRemote}",
+  "@ut_d72746d0d0": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      },
+      "effectiveRemote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0e800a8406": "파일 다운로드 중: {remote} → {target}",
+  "@ut_0e800a8406": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "target": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c8b91122b": "파일 다운로드 성공: {remote} → {target} ({size})",
+  "@ut_5c8b91122b": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "target": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2bc26619aa": "재귀적으로 다운로드하는 디렉터리: {remote} → {effectiveLocal}",
+  "@ut_2bc26619aa": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "effectiveLocal": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_52a01019d8": "다운로드 진행률: {downloaded}/{total} 파일",
+  "@ut_52a01019d8": {
+    "placeholders": {
+      "downloaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6b85bbaf16": "[{hostId}] SFTP 연결 실패: {e}",
+  "@ut_6b85bbaf16": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2d44fe0c64": "[{hostId}] 파일 업로드 중: {local}",
+  "@ut_2d44fe0c64": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7ef1cd9389": "[{hostId}] 업로드 완료",
+  "@ut_7ef1cd9389": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a465e8a3ee": "[{hostId}] 파일 업로드 성공: {local} → {remote} ({size})",
+  "@ut_a465e8a3ee": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_699c3fa8dc": "[{hostId}] 재귀적으로 업로드하는 디렉터리: {local} → {effectiveRemote}",
+  "@ut_699c3fa8dc": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      },
+      "effectiveRemote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2996de9000": "[{hid}] 배포 중...",
+  "@ut_2996de9000": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0f735fba75": "[{hid}] ✗ 취소, 건너뛰기",
+  "@ut_0f735fba75": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c021ae6b9": "[{hid}] {remote} 수집 중...",
+  "@ut_5c021ae6b9": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e31edc9171": "[{hid}] ✗ 호스트가 연결되지 않았거나 SSH 세션이 아님",
+  "@ut_e31edc9171": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2e01615eec": "=== [{hid}] 취소됨, 건너뛰음 ===",
+  "@ut_2e01615eec": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ffebfc53a6": "[{hid}] 검색 중...",
+  "@ut_ffebfc53a6": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_38bc3dac85": "=== [{hid}] 호스트가 연결되지 않았습니다 ===",
+  "@ut_38bc3dac85": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8dc55e0134": "[{hid}] {remote} 읽는 중...",
+  "@ut_8dc55e0134": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_475dcf3309": "{host}:{port}에 대한 HTTPS 인증서를 확인하는 중...",
+  "@ut_475dcf3309": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      },
+      "port": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bde384cf72": "로컬 인증서 확인 중: {certPath}",
+  "@ut_bde384cf72": {
+    "placeholders": {
+      "certPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b733c697fb": "{write} {path}({length}바이트)...",
+  "@ut_b733c697fb": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_24853c3f76": "파일 {write} 성공: {path}({length}바이트)",
+  "@ut_24853c3f76": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a7bd551b52": "백업 롤백 실패: {rollbackErr}, PTY 쓰기가 시도됩니다.",
+  "@ut_a7bd551b52": {
+    "placeholders": {
+      "rollbackErr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f8d0ae7c3c": "\n  참고: SFTP 프로세스는 원본 파일을 {backupPath}에 백업했습니다. PTY가 성공적으로 작성된 후 백업을 수동으로 삭제할 수 있습니다.",
+  "@ut_f8d0ae7c3c": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6820e10527": "파일 쓰기 성공(PTY stdin 모드 cat): {path} ({length} 바이트){backupInfo}",
+  "@ut_6820e10527": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      },
+      "backupInfo": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_caa84ab310": "고양이 쓰기 실패: {failureReason}, sudo tee를 시도해 보세요...",
+  "@ut_caa84ab310": {
+    "placeholders": {
+      "failureReason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b0ea4177b4": "파일 쓰기 성공(PTY stdin + sudo tee): {path}({length} 바이트){backupInfo}",
+  "@ut_b0ea4177b4": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      },
+      "backupInfo": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_aad3625b0a": "파일 {write} 성공({method}): {path}({byteCount} 바이트)",
+  "@ut_aad3625b0a": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "method": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "byteCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_00cd1c4300": "지식 베이스 검색 중: {query}",
+  "@ut_00cd1c4300": {
+    "placeholders": {
+      "query": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c0b2e0370": "\n…({label}, 원본 텍스트에는 {length} 문자가 포함되어 있습니다)",
+  "@ut_5c0b2e0370": {
+    "placeholders": {
+      "label": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6f51e792f4": "전체 업로드 진행 상황: {uploaded}/{total}",
+  "@ut_6f51e792f4": {
+    "placeholders": {
+      "uploaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf4b2fdeb1": "로컬 작업 디렉터리가 생성되었습니다: {resolvedCwd}",
+  "@ut_cf4b2fdeb1": {
+    "placeholders": {
+      "resolvedCwd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_93ba05fcda": "작업 디렉터리 {resolvedCwd}를 생성할 수 없습니다: {e}",
+  "@ut_93ba05fcda": {
+    "placeholders": {
+      "resolvedCwd": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bb63c6672a": "로컬 실행({shell}): {command}",
+  "@ut_bb63c6672a": {
+    "placeholders": {
+      "shell": {
+        "type": "Object"
+      },
+      "command": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b5e97db76b": "{scanned} 파일을 검사했습니다...",
+  "@ut_b5e97db76b": {
+    "placeholders": {
+      "scanned": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_132456dcfb": "알 수 없는 모드: {mode}(쓰기/추가 지원)",
+  "@ut_132456dcfb": {
+    "placeholders": {
+      "mode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3b4b10f1b2": "로컬 터미널을 시작하지 못했습니다: {e}",
+  "@ut_3b4b10f1b2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bbafda1855": "[이미지 {mimeType}, {length} base64 문자]",
+  "@ut_bbafda1855": {
+    "placeholders": {
+      "mimeType": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3901620d02": "MCP 도구 호출 {serverName}/{name}",
+  "@ut_3901620d02": {
+    "placeholders": {
+      "serverName": {
+        "type": "Object"
+      },
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_405448830f": "MCP 리소스 읽기 {uri}",
+  "@ut_405448830f": {
+    "placeholders": {
+      "uri": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_090d7978c2": "MCP 프롬프트 단어 {name} 가져오기",
+  "@ut_090d7978c2": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b01822a097": "프로젝트 디렉터리가 존재하지 않습니다: {path}",
+  "@ut_b01822a097": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f1acec8e02": "프로젝트 경로: {path}",
+  "@ut_f1acec8e02": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8a884e053e": "빌드 명령 자동 인식: {buildCmd}",
+  "@ut_8a884e053e": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5ab7922da3": "빌드 명령이 보안 정책에 의해 차단되었습니다: {buildCmd}",
+  "@ut_5ab7922da3": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_323ecc4b40": "건물 시작: {buildCmd}",
+  "@ut_323ecc4b40": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dd547aa71c": "✓ 빌드 성공({inSeconds}s)\n\n출력:\n{output}",
+  "@ut_dd547aa71c": {
+    "placeholders": {
+      "inSeconds": {
+        "type": "Object"
+      },
+      "output": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fe98a458a9": "✗ 빌드 실패(종료 코드: {exitCode}, 소요 시간: {inSeconds}s)",
+  "@ut_fe98a458a9": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      },
+      "inSeconds": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2192f982a0": "보안 정책에 의해 차단된 패키징 명령: {packageCmd}",
+  "@ut_2192f982a0": {
+    "placeholders": {
+      "packageCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5e9fa40ae2": "포장 시작 : {artifactDir} → {outputFile}",
+  "@ut_5e9fa40ae2": {
+    "placeholders": {
+      "artifactDir": {
+        "type": "Object"
+      },
+      "outputFile": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c3df15635": "✓ 포장 성공\n출력 파일: {outputFile}\n크기: {sizeStr}\n\n이 파일은 sftp_upload 도구를 사용하여 서버에 업로드할 수 있습니다.",
+  "@ut_9c3df15635": {
+    "placeholders": {
+      "outputFile": {
+        "type": "Object"
+      },
+      "sizeStr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7884351654": "포장 성공: {sizeStr}",
+  "@ut_7884351654": {
+    "placeholders": {
+      "sizeStr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0a71fe6a29": "✗ 패키징 실패(종료 코드: {exitCode})\n--- 표준 출력 ---\n{stdout}\n--- 표준 오류 ---\n{stderr}",
+  "@ut_0a71fe6a29": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      },
+      "stdout": {
+        "type": "Object"
+      },
+      "stderr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_62e6c24a03": "읽기 실패: {message}",
+  "@ut_62e6c24a03": {
+    "placeholders": {
+      "message": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ed6128ba80": "{host}:{port} 연결 중...",
+  "@ut_ed6128ba80": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      },
+      "port": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2574cd27d5": "스프링보드 {host} 릴레이를 통해 연결...",
+  "@ut_2574cd27d5": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_939fbbbde2": "연결 확인 건너뛰기: {e}\n",
+  "@ut_939fbbbde2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c09d2ebc3": "stdin에 쓰지 못했습니다: {e}",
+  "@ut_5c09d2ebc3": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_160a20b4b9": "EOF 전송 실패: {e}",
+  "@ut_160a20b4b9": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e230a6d105": "검색어: {query}",
+  "@ut_e230a6d105": {
+    "placeholders": {
+      "query": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8bc3df095a": "가져오는 중: {url}",
+  "@ut_8bc3df095a": {
+    "placeholders": {
+      "url": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_571ec497a6": "제목: {title}",
+  "@ut_571ec497a6": {
+    "placeholders": {
+      "title": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_eb988194e9": "대상: {trim}",
+  "@ut_eb988194e9": {
+    "placeholders": {
+      "trim": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_304b011a8a": "결론: {trim}",
+  "@ut_304b011a8a": {
+    "placeholders": {
+      "trim": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_080de8536f": "{service}가 실행 중입니다.",
+  "@ut_080de8536f": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8f24f3ec45": "{service}가 실행되고 있지 않습니다.",
+  "@ut_8f24f3ec45": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_622000e27f": "{service}는 부팅 시 자동으로 시작됩니다.",
+  "@ut_622000e27f": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_371d1b3d69": "{service} 자동 시작이 설정되지 않았습니다.",
+  "@ut_371d1b3d69": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e7e9d06df9": " {length} 포트를 기다립니다.",
+  "@ut_e7e9d06df9": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9def515d87": "포트 {shown}{suffix} 수신 대기",
+  "@ut_9def515d87": {
+    "placeholders": {
+      "shown": {
+        "type": "Object"
+      },
+      "suffix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ea6610697b": "당신의 선택: {chosen}",
+  "@ut_ea6610697b": {
+    "placeholders": {
+      "chosen": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e7d26cf57d": "원본 출력 꼬리 · 총 {totalChars} 문자",
+  "@ut_e7d26cf57d": {
+    "placeholders": {
+      "totalChars": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7234d250c6": "총 {length}개 항목 · {length}개 항목 표시",
+  "@ut_7234d250c6": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0b13faa29b": "{length} 로그가 복사되었습니다.",
+  "@ut_0b13faa29b": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2a21b678a8": "{inMinutes}분 전",
+  "@ut_2a21b678a8": {
+    "placeholders": {
+      "inMinutes": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_05ac4fcf03": "{inHours}시간 전",
+  "@ut_05ac4fcf03": {
+    "placeholders": {
+      "inHours": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_11bfebfb31": "{inDays}일 전",
+  "@ut_11bfebfb31": {
+    "placeholders": {
+      "inDays": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5eda668d7a": "모델 · {length}",
+  "@ut_5eda668d7a": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dc4c3efe70": "현재 {length} 모델을 \"{name}\"의 기본 모델로 덮어쓰시겠습니까?",
+  "@ut_dc4c3efe70": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c153205f28": "{length} 모델로 당겨짐",
+  "@ut_c153205f28": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c3ca30909": "{length} 추가",
+  "@ut_9c3ca30909": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0408a4e88d": "마지막 연결: {lastConnected}",
+  "@ut_0408a4e88d": {
+    "placeholders": {
+      "lastConnected": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_508cac93a2": "{length} 호스트 · {success} 성공'\n                    '{failed}",
+  "@ut_508cac93a2": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "success": {
+        "type": "Object"
+      },
+      "failed": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_00fefb12c8": "종료 코드 {exitCode}",
+  "@ut_00fefb12c8": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7c37c17c72": "{name} 열기",
+  "@ut_7c37c17c72": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_393e236ec2": "{runCount}번 실행됨",
+  "@ut_393e236ec2": {
+    "placeholders": {
+      "runCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4dbb782799": "이 {length} 막대를 복사하세요(출력 포함).",
+  "@ut_4dbb782799": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_afa890cf1c": "{length} 항목이 복사되었습니다.",
+  "@ut_afa890cf1c": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_63f8cd8765": "{rest} 항목도 있습니다",
+  "@ut_63f8cd8765": {
+    "placeholders": {
+      "rest": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2565b39f32": "총 {total} 단위",
+  "@ut_2565b39f32": {
+    "placeholders": {
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e36a5ac905": "롤백: {rollbackCommand}",
+  "@ut_e36a5ac905": {
+    "placeholders": {
+      "rollbackCommand": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_261ec8093d": "{hostLabel} 다시 연결 중 · 연결을 복원하는 중",
+  "@ut_261ec8093d": {
+    "placeholders": {
+      "hostLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1568d540be": "{length}자 복사됨",
+  "@ut_1568d540be": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c14c3f2424": "이 세션이 {count}회 충돌했습니다.",
+  "@ut_c14c3f2424": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1f5bbded76": "새 버전 {version}를 찾았습니다. 보려면 클릭하세요.",
+  "@ut_1f5bbded76": {
+    "placeholders": {
+      "version": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5eb52c419e": "{length} 모델 · {baseUrl}",
+  "@ut_5eb52c419e": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "baseUrl": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_01f2ee338e": "{length} 단어",
+  "@ut_01f2ee338e": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_92bbd40515": "활성화됨 · 시작 시 {biometricLabel} 확인",
+  "@ut_92bbd40515": {
+    "placeholders": {
+      "biometricLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8ecd2c14b5": "연결됨 · {value} 도구",
+  "@ut_8ecd2c14b5": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7c5becde1e": "{value} 도구",
+  "@ut_7c5becde1e": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3d787403e1": "호스트 그룹 · {group}",
+  "@ut_3d787403e1": {
+    "placeholders": {
+      "group": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_def0dd4b20": "호스트 · {hostId}",
+  "@ut_def0dd4b20": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fddba05801": "{displayName} API 키",
+  "@ut_fddba05801": {
+    "placeholders": {
+      "displayName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e42173cc90": "다운로드 대상: {localPath}",
+  "@ut_e42173cc90": {
+    "placeholders": {
+      "localPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7a77df19f2": "다운로드 실패: {e}",
+  "@ut_7a77df19f2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c9db79438": "읽기 실패: {e}",
+  "@ut_9c9db79438": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6f2c34a667": "이름 바꾸기 실패: {e}",
+  "@ut_6f2c34a667": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf4419589b": "삭제 실패: {e}",
+  "@ut_cf4419589b": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c3b890cd74": "파일 선택기를 열지 못했습니다: {e}",
+  "@ut_c3b890cd74": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3f446bd9fe": "업로드됨: {fileName}",
+  "@ut_3f446bd9fe": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9e12df0a1f": "{fileName} 업로드 실패: {e}",
+  "@ut_9e12df0a1f": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e89a046c8b": "디렉터리 생성 실패: {e}",
+  "@ut_e89a046c8b": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6c61736431": "{name} 업로드 실패: {e}",
+  "@ut_6c61736431": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3cc564d9ac": "{ok} 호스트를 가져왔습니다(호스트 편집 페이지에서 자격 증명을 입력해야 함).",
+  "@ut_3cc564d9ac": {
+    "placeholders": {
+      "ok": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_218046bbfd": "{length} 줄을 붙여넣으시겠어요?",
+  "@ut_218046bbfd": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c40c983842": "{preview}\n… 그리고 {more} 라인",
+  "@ut_c40c983842": {
+    "placeholders": {
+      "preview": {
+        "type": "Object"
+      },
+      "more": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3482231651": "{path}에 저장되었습니다.",
+  "@ut_3482231651": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_aa865c9773": "아이템",
+  "ut_75282877a3": "기사 · AI 컨텍스트 주입",
+  "ut_35f3bcac7a": "스테이션이 저장되었습니다",
+  "ut_c32994dbf5": "대만",
+  "ut_2cdff50b37": "그룹",
+  "ut_f7826628c0": "몇 분 전",
+  "ut_bfa2c2000f": "몇 시간 전",
+  "ut_15e2558649": "며칠 전",
+  "ut_e7b73487d7": "성격",
+  "ut_babe4e8237": "서버 {connected}/{total}개",
+  "@ut_babe4e8237": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_95860656bf": "MCP 마스터 스위치 꺼짐 · 서버 {connected}/{total}개 연결됨",
+  "@ut_95860656bf": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e12efa5ddb": "서버 {connected}/{total}개 · 에이전트 사용 가능 도구 {tools}개",
+  "@ut_e12efa5ddb": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      },
+      "tools": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3330b55acf": "{value} 리소스",
+  "@ut_3330b55acf": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf674ef0f8": "{value} 프롬프트",
+  "@ut_cf674ef0f8": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  }
 }

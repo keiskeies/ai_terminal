@@ -8,170 +8,170 @@
   "agentRunning": "El agente está ejecutando una tarea, espere",
   "agentSettingAiTimeoutDesc": "Se considera agotado si no llega ninguna salida del modelo durante este tiempo. Auméntalo para modelos locales lentos.",
   "agentSettingAiTimeoutLabel": "Tiempo de espera de respuesta de IA",
-  "agentSettingAutoExecSection": "AI Auto Execution",
-  "agentSettingBuiltInPrompt": "AI Built-in Instructions",
-  "agentSettingBuiltInPromptDesc": "These are the basic instructions for AI, effective immediately after modification. The 'context' inside will be replaced with server information.",
-  "agentSettingBuiltInPromptSubtitle": "Modify AI's basic instructions",
-  "agentSettingBuiltInSaved": "AI built-in instructions saved",
-  "agentSettingCustomPromptHint": "e.g., Respond in English, use concise format, prefer Docker...",
-  "agentSettingExtraPrompt": "Additional Instructions",
-  "agentSettingExtraPromptDesc": "Additional requirements appended to built-in instructions to adjust AI's response style. Leave empty to skip.",
-  "agentSettingExtraPromptSaved": "Additional instructions saved",
-  "agentSettingExtraPromptSubtitle": "Additional requirements appended to built-in instructions",
-  "agentSettingHundredSteps": "100 steps",
-  "agentSettingMaxStepsDesc": "Maximum number of steps AI takes when executing commands automatically. Set to 0 for unlimited steps; complex tasks will not be interrupted.",
-  "agentSettingMaxStepsLabel": "Max steps AI can execute automatically",
-  "agentSettingPromptSection": "AI Prompts",
-  "agentSettingPromptWarning": "⚠️ Modify with caution. Inappropriate prompts may cause abnormal AI behavior. Click \"Reset\" to restore defaults at any time.",
-  "agentSettingTitle": "Agent Settings",
+  "agentSettingAutoExecSection": "Ejecución automatizada de IA",
+  "agentSettingBuiltInPrompt": "Instrucciones integradas de IA",
+  "agentSettingBuiltInPromptDesc": "Esta es la instrucción básica de la IA y entrará en vigor inmediatamente después de la modificación. El \"contexto\" interior será reemplazado con información del servidor.",
+  "agentSettingBuiltInPromptSubtitle": "Modificar instrucciones básicas para IA",
+  "agentSettingBuiltInSaved": "Instrucciones integradas de IA guardadas",
+  "agentSettingCustomPromptHint": "Por ejemplo: responda en inglés, genere en formato conciso, use Docker primero ...",
+  "agentSettingExtraPrompt": "instrucciones adicionales",
+  "agentSettingExtraPromptDesc": "Los requisitos adicionales agregados a las instrucciones integradas pueden ajustar el estilo de respuesta de la IA. Déjelo en blanco para no agregarlo.",
+  "agentSettingExtraPromptSaved": "Instrucciones adicionales guardadas",
+  "agentSettingExtraPromptSubtitle": "Requisitos adicionales después de las directivas integradas",
+  "agentSettingHundredSteps": "100 pasos",
+  "agentSettingMaxStepsDesc": "Cuando la IA ejecuta automáticamente un comando, requiere como máximo unos pocos pasos. Establecerlo en 0 significa que no hay límite para la cantidad de pasos y las tareas complejas no se interrumpirán a la mitad.",
+  "agentSettingMaxStepsLabel": "La IA puede ejecutar automáticamente algunos pasos como máximo",
+  "agentSettingPromptSection": "Palabras solicitadas por IA",
+  "agentSettingPromptWarning": "⚠️ Tenga cuidado al modificar, las palabras inapropiadas pueden causar un comportamiento anormal de la IA. Puede hacer clic en \"Restablecer\" en cualquier momento para restaurar el valor predeterminado.",
+  "agentSettingTitle": "Configuración del agente",
   "agentSettings": "Agente",
   "agentSettingsDesc": "Máximo de pasos que la IA ejecuta automáticamente (0 = ilimitado)",
   "aiAndIntelligence": "IA",
-  "aiModelAdd": "Add Model",
-  "aiModelApiKeyInvalid": "Invalid API Key",
-  "aiModelApiKeyRequired": "Please enter an API Key",
-  "aiModelBaseUrlRequired": "Please enter a Base URL",
-  "aiModelCannotConnect": "Unable to connect",
+  "aiModelAdd": "Agregar modelo",
+  "aiModelApiKeyInvalid": "La clave API no es válida",
+  "aiModelApiKeyRequired": "Por favor ingrese la clave API",
+  "aiModelBaseUrlRequired": "Por favor ingrese la URL base",
+  "aiModelCannotConnect": "No se puede conectar",
   "aiModelConfig": "Modelos de IA",
   "aiModelConfigDesc": "Configura claves API y parámetros del modelo",
-  "aiModelConnectionTimeout": "Connection timeout",
-  "aiModelDeleteConfirm": "Are you sure you want to delete \"{name}\"?",
-  "aiModelDeleteTitle": "Delete Model",
-  "aiModelEditTitle": "Edit Model",
-  "aiModelEmptySubtitle": "Add an endpoint to group multiple models under one API key",
-  "aiModelEmptyTitle": "No AI models yet",
-  "aiModelMaxTokens": "Max Response Tokens",
-  "aiModelModelName": "Model Name",
-  "aiModelModelNameRequired": "Please enter a model name",
-  "aiModelNameError": "Incorrect model name",
-  "aiModelNameRequired": "Please enter a name",
-  "aiModelProvider": "AI Provider",
-  "aiModelProvidersUpdated": "Provider list updated ({count} providers)",
-  "aiModelRefreshProviders": "Refresh provider list",
-  "aiModelRemoteConfigEmpty": "Remote configuration is empty",
-  "aiModelRequestFailed": "Request failed ({code})",
-  "aiModelServerError": "Server error ({code})",
-  "aiModelSetAsDefault": "Set as default model",
-  "aiModelSetDefault": "Set as Default",
-  "aiModelTemperature": "Randomness",
-  "aiModelTest": "Test",
-  "aiModelTestFailed": "Test failed",
-  "aiModelTitle": "AI Model Configuration",
-  "aiModelTooManyRequests": "Too many requests",
-  "aiModelUpdateFailed": "Update failed: {error}",
+  "aiModelConnectionTimeout": "Tiempo de espera de conexión",
+  "aiModelDeleteConfirm": "¿Está seguro de que desea eliminar \"{name}\"?",
+  "aiModelDeleteTitle": "Eliminar modelo",
+  "aiModelEditTitle": "Editar modelo",
+  "aiModelEmptySubtitle": "Agregue un punto final. Se pueden configurar varios modelos en un punto final.",
+  "aiModelEmptyTitle": "Aún no hay modelo de IA",
+  "aiModelMaxTokens": "Número máximo de caracteres en respuesta",
+  "aiModelModelName": "Nombre del modelo",
+  "aiModelModelNameRequired": "Por favor ingrese el nombre del modelo",
+  "aiModelNameError": "Nombre de modelo incorrecto",
+  "aiModelNameRequired": "Por favor ingrese el nombre",
+  "aiModelProvider": "Proveedor de servicios de IA",
+  "aiModelProvidersUpdated": "Lista de proveedores actualizada (proveedores {count})",
+  "aiModelRefreshProviders": "Actualizar lista de proveedores de servicios",
+  "aiModelRemoteConfigEmpty": "La configuración remota está vacía",
+  "aiModelRequestFailed": "Solicitud fallida ({code})",
+  "aiModelServerError": "Error del servidor ({code})",
+  "aiModelSetAsDefault": "Establecer como modelo predeterminado",
+  "aiModelSetDefault": "Establecer como predeterminado",
+  "aiModelTemperature": "Aleatoriedad",
+  "aiModelTest": "prueba",
+  "aiModelTestFailed": "prueba fallida",
+  "aiModelTitle": "Configuración del modelo de IA",
+  "aiModelTooManyRequests": "Las solicitudes son demasiado frecuentes",
+  "aiModelUpdateFailed": "Error en la actualización: {error}",
   "aiPanel": "Panel de IA",
   "appTitle": "AI Terminal",
   "appearance": "Apariencia",
   "appearanceDesc": "Modo oscuro/claro, tamaño de fuente, esquema de color",
-  "appearanceDisplayMode": "Display Mode",
-  "appearanceDisplayModeDesc": "Choose dark or light interface",
-  "appearanceFontSizeDesc": "Drag the slider to adjust terminal text size",
-  "appearanceTitle": "Appearance Settings",
+  "appearanceDisplayMode": "modo de visualización",
+  "appearanceDisplayModeDesc": "Elija una interfaz oscura o clara",
+  "appearanceFontSizeDesc": "Arrastre el control deslizante para ajustar el tamaño del texto del terminal",
+  "appearanceTitle": "Configuración de apariencia",
   "auditLog": "Registro de actividad",
-  "auditLogAllTitle": "All Audit Logs",
-  "auditLogCopied": "Copied {count} logs to clipboard",
-  "auditLogCopyTooltip": "Copy Records",
+  "auditLogAllTitle": "Todos los registros de operación",
+  "auditLogCopied": "Copiado registros {count} al portapapeles",
+  "auditLogCopyTooltip": "copiar registro",
   "auditLogDesc": "Ver quién ejecutó qué comando y cuándo",
-  "auditLogEmpty": "No audit logs",
-  "auditLogExecuted": "Executed",
-  "auditLogExportHeader": "# Audit Log Export",
-  "auditLogExportTime": "# Export time: {time}",
-  "auditLogExportTotal": "# Total: {count}",
-  "auditLogFilterAll": "All Records",
-  "auditLogFilterBlocked": "Only Blocked",
-  "auditLogFilterThisHost": "Only Current Host",
-  "auditLogNoMatch": "No matching records",
-  "auditLogNoRecordsToCopy": "No records to copy",
-  "auditLogNotExecuted": "Not Executed",
-  "auditLogOutput": "Output",
-  "auditLogSafetyBlocked": "Blocked",
-  "auditLogSafetyDanger": "Danger",
-  "auditLogSafetySafe": "Safe",
-  "auditLogSafetyWarning": "Warning",
-  "auditLogSearchHint": "Search command, server, output...",
-  "auditLogTitle": "Audit Log",
+  "auditLogEmpty": "Aún no hay registro de operación",
+  "auditLogExecuted": "ejecutado",
+  "auditLogExportHeader": "# Exportar registros de operaciones",
+  "auditLogExportTime": "# Hora de exportación: {time}",
+  "auditLogExportTotal": "# Número total de artículos: {count}",
+  "auditLogFilterAll": "Todos los registros",
+  "auditLogFilterBlocked": "solo bloqueado",
+  "auditLogFilterThisHost": "Solo anfitrión actual",
+  "auditLogNoMatch": "No hay registros coincidentes",
+  "auditLogNoRecordsToCopy": "No hay registros para copiar",
+  "auditLogNotExecuted": "No ejecutado",
+  "auditLogOutput": "salida",
+  "auditLogSafetyBlocked": "bloqueado",
+  "auditLogSafetyDanger": "peligro",
+  "auditLogSafetySafe": "seguro",
+  "auditLogSafetyWarning": "advertencia",
+  "auditLogSearchHint": "Buscar comandos, servidores, salidas...",
+  "auditLogTitle": "Registro de operación",
   "authMethod": "Método de autenticación",
   "cancel": "Cancelar",
-  "changeRecordAllTitle": "All Change Records",
-  "changeRecordConfirmRollback": "Confirm Rollback",
-  "changeRecordEmpty": "No change records",
-  "changeRecordEmptyHint": "Changes (such as installing, starting/stopping services) will be recorded automatically",
-  "changeRecordFailed": "Failed",
-  "changeRecordFilterAll": "All Records",
-  "changeRecordFilterRollbackable": "Only Rollbackable",
-  "changeRecordFilterThisHost": "Only Current Host",
-  "changeRecordHostNotConnected": "Server {hostId} is not connected, cannot roll back. Please connect to the server first.",
-  "changeRecordNotRollbackable": "This record does not support automatic rollback",
-  "changeRecordOriginalCommand": "Original command: {command}",
-  "changeRecordRollbackButton": "Rollback",
-  "changeRecordRollbackError": "Rollback error: {error}",
-  "changeRecordRollbackFailed": "Rollback failed: {stderr}",
-  "changeRecordRollbackFailedNoExec": "Rollback failed: cannot execute",
-  "changeRecordRollbackOnHost": "The following rollback command will be executed on server {hostName}:",
-  "changeRecordRollbackSuccess": "Rollback succeeded: {command}",
-  "changeRecordRolledBack": "Rolled Back",
-  "changeRecordRollingBack": "Rolling back: {command}",
-  "changeRecordSuccess": "Success",
-  "changeRecordTitle": "Change Records",
-  "changeRecordTypeFileOperation": "File Operation",
-  "changeRecordTypeInstall": "Install",
-  "changeRecordTypeModifyConfig": "Config Change",
-  "changeRecordTypeOther": "Other",
-  "changeRecordTypePermission": "Permission Change",
-  "changeRecordTypeRestartService": "Restart Service",
-  "changeRecordTypeStartService": "Start Service",
-  "changeRecordTypeStopService": "Stop Service",
-  "changeRecordTypeUninstall": "Uninstall",
+  "changeRecordAllTitle": "Todo el historial de cambios.",
+  "changeRecordConfirmRollback": "Confirmar revocación",
+  "changeRecordEmpty": "Aún no hay registros de cambios",
+  "changeRecordEmptyHint": "Después de realizar cambios (como instalación, inicio y parada de servicios), se registrará automáticamente.",
+  "changeRecordFailed": "falló",
+  "changeRecordFilterAll": "Todos los registros",
+  "changeRecordFilterRollbackable": "Sólo se puede revocar",
+  "changeRecordFilterThisHost": "Solo anfitrión actual",
+  "changeRecordHostNotConnected": "El servidor {hostId} no está conectado y no se puede revocar. Conéctese primero a este servidor.",
+  "changeRecordNotRollbackable": "Este registro no admite la revocación automática.",
+  "changeRecordOriginalCommand": "Comando original: {command}",
+  "changeRecordRollbackButton": "Cancelar",
+  "changeRecordRollbackError": "Deshacer error: {error}",
+  "changeRecordRollbackFailed": "Error al deshacer: {stderr}",
+  "changeRecordRollbackFailedNoExec": "Error al deshacer: no se puede ejecutar",
+  "changeRecordRollbackOnHost": "El comando deshacer se ejecutará en el servidor {hostName}:",
+  "changeRecordRollbackSuccess": "Cancelación exitosa: {command}",
+  "changeRecordRolledBack": "Revocado",
+  "changeRecordRollingBack": "Cancelando: {command}",
+  "changeRecordSuccess": "éxito",
+  "changeRecordTitle": "Historial de cambios",
+  "changeRecordTypeFileOperation": "Operaciones de archivos",
+  "changeRecordTypeInstall": "Instalación",
+  "changeRecordTypeModifyConfig": "Modificar configuración",
+  "changeRecordTypeOther": "Otros",
+  "changeRecordTypePermission": "Modificación de permiso",
+  "changeRecordTypeRestartService": "Reiniciar servicio",
+  "changeRecordTypeStartService": "Iniciar servicio",
+  "changeRecordTypeStopService": "detener el servicio",
+  "changeRecordTypeUninstall": "Desinstalar",
   "changeRecords": "Historial de cambios",
   "changeRecordsDesc": "Rastrea todos los cambios y deshace si algo falla",
   "changeWindow": "Horas seguras",
-  "changeWindowAllDayAllowed": "Allowed all day",
-  "changeWindowAllowedWindow": "Allowed Window",
-  "changeWindowCrossDayHint": "Tip: A start time later than the end time means overnight (e.g., 22:00 to next day 06:00)",
-  "changeWindowCurrentWindowInfo": "Current allowed window: {window}\nCommands that make changes will be rejected at other times (read-only commands are not affected).",
+  "changeWindowAllDayAllowed": "permitido todo el dia",
+  "changeWindowAllowedWindow": "Periodo permitido",
+  "changeWindowCrossDayHint": "Consejo: la hora de inicio es posterior a la hora de finalización, lo que significa que cruza la noche (por ejemplo, de 22:00 a 06:00 del día siguiente)",
+  "changeWindowCurrentWindowInfo": "Período permitido actual: {window}\nLos comandos que realicen cambios en otros momentos serán rechazados (los comandos de visualización no se ven afectados).",
   "changeWindowDesc": "Restringe los cambios a ventanas de tiempo seguras designadas",
-  "changeWindowEnable": "Enable Safe Window",
-  "changeWindowEnableHint": "When enabled, changes can only be made during the set window",
-  "changeWindowEndHour": "End hour",
-  "changeWindowEveryDay": "{window}, every day",
-  "changeWindowOnlyDays": "{window}, only {days}",
-  "changeWindowSaveConfig": "Save Config",
-  "changeWindowSaveFailed": "Save failed: {error}",
-  "changeWindowSaved": "Safe window settings saved",
-  "changeWindowStartHour": "Start hour",
-  "changeWindowTitle": "Safe Window",
-  "changeWindowToNextDay": "{start} to next day {end}",
-  "changeWindowWeekdayFri": "Fri",
-  "changeWindowWeekdayMon": "Mon",
-  "changeWindowWeekdaySat": "Sat",
-  "changeWindowWeekdaySun": "Sun",
-  "changeWindowWeekdayThu": "Thu",
-  "changeWindowWeekdayTue": "Tue",
-  "changeWindowWeekdayWed": "Wed",
-  "changeWindowWeekdaysTitle": "Which days are allowed (none = every day)",
-  "chatBackToServerList": "Back to server list",
-  "chatClearSession": "Clear session",
-  "chatConnectServerHint": "Please connect to a server first, then tap the AI button in the bottom right on the terminal page",
-  "chatEmptyHint": "e.g. install Docker, check memory usage",
-  "chatEmptyTitle": "How can I help you?",
-  "chatInputHint": "Type a command or question...",
-  "chatNeedTerminal": "AI assistant needs to be used in a terminal",
+  "changeWindowEnable": "Habilitar horarios seguros",
+  "changeWindowEnableHint": "Una vez habilitado, los cambios solo se podrán realizar dentro del período de tiempo establecido.",
+  "changeWindowEndHour": "¿A qué hora terminará?",
+  "changeWindowEveryDay": "{window}, todos los días",
+  "changeWindowOnlyDays": "{window}, solo {days}",
+  "changeWindowSaveConfig": "Guardar configuración",
+  "changeWindowSaveFailed": "No se pudo guardar: {error}",
+  "changeWindowSaved": "Configuración de horas seguras guardada",
+  "changeWindowStartHour": "¿A partir de qué hora está permitido?",
+  "changeWindowTitle": "periodo seguro",
+  "changeWindowToNextDay": "{start} al día siguiente {end}",
+  "changeWindowWeekdayFri": "viernes",
+  "changeWindowWeekdayMon": "lunes",
+  "changeWindowWeekdaySat": "sábado",
+  "changeWindowWeekdaySun": "domingo",
+  "changeWindowWeekdayThu": "jueves",
+  "changeWindowWeekdayTue": "martes",
+  "changeWindowWeekdayWed": "miércoles",
+  "changeWindowWeekdaysTitle": "Qué días están permitidos (sin opción = todos los días)",
+  "chatBackToServerList": "Volver a la lista de servidores",
+  "chatClearSession": "sesión clara",
+  "chatConnectServerHint": "Primero conéctese al servidor, ingrese a la página de la terminal y haga clic en el botón AI en la esquina inferior derecha",
+  "chatEmptyHint": "Por ejemplo: instale Docker, verifique el uso de memoria",
+  "chatEmptyTitle": "¿Cómo puedo ayudarte?",
+  "chatInputHint": "Introduzca un comando o pregunta...",
+  "chatNeedTerminal": "Es necesario utilizar un asistente de IA en la terminal",
   "clearMessagesFailed": "Error al borrar los mensajes",
   "close": "Cerrar",
-  "commonAIAssistant": "AI Assistant",
-  "commonAdvancedSettings": "Advanced Settings",
-  "commonAll": "All",
-  "commonBack": "Back",
-  "commonCancel": "Cancel",
-  "commonCommand": "Command",
-  "commonConfirm": "OK",
-  "commonCopiedToClipboard": "Copied to clipboard",
-  "commonDescription": "Description",
-  "commonExecute": "Execute",
-  "commonGotIt": "Got it",
-  "commonName": "Name",
-  "commonResetDefault": "Reset to Default",
-  "commonUnlimited": "Unlimited",
+  "commonAIAssistant": "asistente de IA",
+  "commonAdvancedSettings": "Configuraciones avanzadas",
+  "commonAll": "Todos",
+  "commonBack": "Regresar",
+  "commonCancel": "Cancelar",
+  "commonCommand": "comando",
+  "commonConfirm": "bien",
+  "commonCopiedToClipboard": "Copiado al portapapeles",
+  "commonDescription": "Descripción",
+  "commonExecute": "ejecutar",
+  "commonGotIt": "Lo tengo",
+  "commonName": "Nombre",
+  "commonResetDefault": "restablecer valor predeterminado",
+  "commonUnlimited": "Ilimitado",
   "compactFailed": "Error al compactar la conversación",
   "compacting": "Compactando conversación...",
   "confirm": "Confirmar",
@@ -206,110 +206,110 @@
   "fieldRequired": "Este campo es obligatorio",
   "followSystem": "Sistema",
   "group": "Grupo",
-  "hostEditAuthTypeLabel": "Authentication Method *",
-  "hostEditConfigSavedButCredFailed": "⚠️ Configuration saved, but {error}. Please retry.",
-  "hostEditConnectionTimeout": "Connection timeout: {timeout}s",
-  "hostEditDefaultGroup": "Default",
-  "hostEditEncodingLabel": "Character Encoding",
-  "hostEditGroupHint": "Enter or select a group",
-  "hostEditGroupLabel": "Group",
-  "hostEditHostHint": "IP address or domain",
-  "hostEditHostLabel": "Host Address *",
-  "hostEditHostRequired": "Please enter the host address",
-  "hostEditJumpAuthTypeLabel": "Jump Host Authentication",
-  "hostEditJumpHostFlowHint": "Will first connect to the jump host, then forward to the target server through it",
-  "hostEditJumpHostLabel": "Jump Host Address *",
-  "hostEditJumpPasswordLabel": "Jump Host Password",
-  "hostEditJumpPortLabel": "Jump Host Port",
-  "hostEditJumpPrivateKeyContent": "Jump Host Private Key Content",
-  "hostEditJumpUsernameLabel": "Jump Host Username",
-  "hostEditMoreSettings": "More Settings",
-  "hostEditNameHint": "e.g., Production Server",
-  "hostEditNameLabel": "Name *",
-  "hostEditNameRequired": "Please enter a name",
-  "hostEditPassphraseLabel": "Passphrase (optional)",
-  "hostEditPassword": "Password",
-  "hostEditPasswordSaveFailed": "Failed to save password",
-  "hostEditPastePrivateKey": "Paste Private Key",
-  "hostEditPastePrivateKeySubtitle": "Turn off to select from file",
-  "hostEditPortLabel": "Port",
-  "hostEditPrivateKey": "Private Key",
-  "hostEditPrivateKeyContent": "Private Key Content",
-  "hostEditPrivateKeyFileRead": "Private key file loaded: {name}",
-  "hostEditPrivateKeySaveFailed": "Failed to save private key",
-  "hostEditReadFileFailed": "Failed to read file: {error}",
-  "hostEditSave": "💾 Save",
-  "hostEditSaveSuccess": "✅ Saved successfully",
-  "hostEditSectionAuth": "Authentication",
-  "hostEditSectionBasic": "Basic Information",
-  "hostEditSectionGroupTag": "Group & Tag",
-  "hostEditSectionJumpHost": "Jump Host / Bastion",
-  "hostEditSectionSudo": "Privilege Escalation (sudo)",
-  "hostEditSelect": "Select",
-  "hostEditSelectGroupTooltip": "Select an existing group",
-  "hostEditSelectPrivateKeyFile": "Select Private Key File",
-  "hostEditSudoPasswordDesc": "Once configured, this password will be auto-filled when AI encounters a sudo password prompt. It is saved via system secure storage and never appears in commands or logs.",
-  "hostEditSudoPasswordHint": "Auto-injected when AI runs sudo commands",
-  "hostEditSudoPasswordLabel": "Sudo Password (optional)",
-  "hostEditTagColor": "Tag Color",
-  "hostEditTimeoutSeconds": "{timeout}s",
-  "hostEditTitleEdit": "Edit Server",
-  "hostEditTitleNew": "New Server",
-  "hostEditUseJumpHost": "Use Jump Host",
-  "hostEditUseJumpHostSubtitle": "Connect via jump host / bastion",
-  "hostEditUsernameLabel": "Username",
-  "hostListAITipIntro": "AI assistant is available after connecting to a server:",
-  "hostListAITipNote": "💡 AI can help you generate commands, explain output, and troubleshoot issues",
-  "hostListAITipStep1": "1️⃣  Tap a server card to open the terminal",
-  "hostListAITipStep2": "2️⃣  After connecting, the AI button appears in the bottom right",
-  "hostListAITipStep3": "3️⃣  Tap the AI button to start the smart command assistant",
-  "hostListAITipTitle": "AI assistant usage tips",
-  "hostListAddFirstServer": "Add your first server to start AI-assisted remote management",
-  "hostListClearSearch": "Clear search",
-  "hostListConnectTerminal": "Connect terminal",
-  "hostListDeleteConfirm": "Are you sure you want to delete \"{hostName}\"?\n\nSaved credentials will also be deleted.",
-  "hostListDeleteServer": "Delete server",
-  "hostListDeleteSuccess": "Deleted successfully",
-  "hostListEditConfig": "Edit configuration",
-  "hostListLoadFailed": "Failed to load: {error}",
-  "hostListNoSearchResults": "No matching servers found",
-  "hostListNoSearchResultsHint": "Try different keywords or check spelling",
-  "hostListNoServers": "No servers yet",
-  "hostListSearchHint": "Search servers...",
+  "hostEditAuthTypeLabel": "Método de autenticación *",
+  "hostEditConfigSavedButCredFailed": "⚠️ La configuración se guardó correctamente, pero {error}, inténtelo de nuevo",
+  "hostEditConnectionTimeout": "Tiempo de espera de conexión: {timeout} segundos",
+  "hostEditDefaultGroup": "Predeterminado",
+  "hostEditEncodingLabel": "codificación de caracteres",
+  "hostEditGroupHint": "Ingresa o selecciona un grupo",
+  "hostEditGroupLabel": "grupo",
+  "hostEditHostHint": "Dirección IP o nombre de dominio",
+  "hostEditHostLabel": "Dirección del anfitrión *",
+  "hostEditHostRequired": "Por favor ingrese la dirección del anfitrión",
+  "hostEditJumpAuthTypeLabel": "Método de autenticación de Spring Board",
+  "hostEditJumpHostFlowHint": "La máquina trampolín se conectará primero y luego se reenviará al servidor de destino a través de la máquina trampolín.",
+  "hostEditJumpHostLabel": "Dirección de la máquina trampolín *",
+  "hostEditJumpPasswordLabel": "Contraseña de trampolín",
+  "hostEditJumpPortLabel": "puerto de trampolín",
+  "hostEditJumpPrivateKeyContent": "Contenido de la clave privada de la máquina Springboard",
+  "hostEditJumpUsernameLabel": "nombre de usuario de trampolín",
+  "hostEditMoreSettings": "Más configuraciones",
+  "hostEditNameHint": "Por ejemplo: servidor de producción",
+  "hostEditNameLabel": "Nombre *",
+  "hostEditNameRequired": "Por favor ingrese el nombre",
+  "hostEditPassphraseLabel": "Contraseña de clave privada (opcional)",
+  "hostEditPassword": "Contraseña",
+  "hostEditPasswordSaveFailed": "Error al guardar la contraseña",
+  "hostEditPastePrivateKey": "Pega la clave privada",
+  "hostEditPastePrivateKeySubtitle": "Cerrar y seleccionar del archivo",
+  "hostEditPortLabel": "puerto",
+  "hostEditPrivateKey": "clave privada",
+  "hostEditPrivateKeyContent": "Contenido de clave privada",
+  "hostEditPrivateKeyFileRead": "Archivo de clave privada leído: {name}",
+  "hostEditPrivateKeySaveFailed": "Error al guardar la clave privada",
+  "hostEditReadFileFailed": "No se pudo leer el archivo: {error}",
+  "hostEditSave": "💾 Guardar",
+  "hostEditSaveSuccess": "✅ Guardado exitosamente",
+  "hostEditSectionAuth": "Método de autenticación",
+  "hostEditSectionBasic": "Información básica",
+  "hostEditSectionGroupTag": "Agrupación y etiquetado",
+  "hostEditSectionJumpHost": "Máquina de trampolín/fortaleza",
+  "hostEditSectionSudo": "Escalada de privilegios (sudo)",
+  "hostEditSelect": "Seleccionar",
+  "hostEditSelectGroupTooltip": "Seleccione un grupo existente",
+  "hostEditSelectPrivateKeyFile": "Seleccionar archivo de clave privada",
+  "hostEditSudoPasswordDesc": "Después de la configuración, AI completará automáticamente esta contraseña cuando encuentre una solicitud de contraseña al ejecutar el comando sudo. Las contraseñas se guardan en el almacenamiento seguro del sistema y no aparecen en comandos ni registros.",
+  "hostEditSudoPasswordHint": "La IA se inyecta automáticamente al ejecutar el comando sudo",
+  "hostEditSudoPasswordLabel": "contraseña sudo (opcional)",
+  "hostEditTagColor": "Color de etiqueta",
+  "hostEditTimeoutSeconds": "{timeout} segundos",
+  "hostEditTitleEdit": "Editar servidor",
+  "hostEditTitleNew": "Crear un nuevo servidor",
+  "hostEditUseJumpHost": "Utilice una máquina de resorte",
+  "hostEditUseJumpHostSubtitle": "Conéctese a través del host trampolín/bastión",
+  "hostEditUsernameLabel": "Nombre de usuario",
+  "hostListAITipIntro": "El asistente de IA debe usarse después de conectarse al servidor:",
+  "hostListAITipNote": "💡 La IA puede ayudarle a generar comandos, interpretar resultados y solucionar problemas",
+  "hostListAITipStep1": "1️⃣ Haga clic en la tarjeta del servidor para ingresar a la terminal",
+  "hostListAITipStep2": "2️⃣ Después de que la conexión sea exitosa, el botón AI aparecerá en la esquina inferior derecha",
+  "hostListAITipStep3": "3️⃣ Haga clic en el botón AI para iniciar el asistente de comando inteligente",
+  "hostListAITipTitle": "Consejos para usar el asistente de IA",
+  "hostListAddFirstServer": "Agregue su primer servidor e inicie la administración remota asistida por IA",
+  "hostListClearSearch": "Borrar búsqueda",
+  "hostListConnectTerminal": "terminal de conexión",
+  "hostListDeleteConfirm": "¿Está seguro de que desea eliminar \"{hostName}\"?\n\nLas credenciales guardadas también se eliminarán.",
+  "hostListDeleteServer": "Eliminar servidor",
+  "hostListDeleteSuccess": "Eliminar exitosamente",
+  "hostListEditConfig": "Editar configuración",
+  "hostListLoadFailed": "Error al cargar: {error}",
+  "hostListNoSearchResults": "No se encontró ningún servidor coincidente",
+  "hostListNoSearchResultsHint": "Pruebe con otras palabras clave o revise la ortografía",
+  "hostListNoServers": "Aún no hay servidor",
+  "hostListSearchHint": "Servidor de búsqueda...",
   "language": "Idioma",
   "languageDesc": "Elige el idioma de la interfaz",
-  "languageDialogTitle": "Select Language",
-  "languageFollowSystem": "Follow System",
+  "languageDialogTitle": "Seleccionar idioma",
+  "languageFollowSystem": "Sigue el sistema",
   "lightMode": "Claro",
   "messageSaveFailed": "Error al guardar el mensaje, tarea no iniciada",
   "name": "Nombre",
   "nickname": "Apodo",
   "noCredentials": "❌ No se encontraron credenciales\n\nEdite el servidor e introduzca la contraseña o la clave privada.",
-  "notificationAlways": "Every time",
-  "notificationAlwaysSubtitle": "Send a notification when a task finishes or fails",
-  "notificationEnable": "Enable task completion notifications",
-  "notificationEnableHint": "Automatically send a message when a task finishes or fails",
-  "notificationEnterUrlFirst": "Please fill in the notification URL first",
-  "notificationFailedOnly": "Only on failure",
-  "notificationFailedOnlySubtitle": "Only send a notification when a task fails",
-  "notificationInstructionsBody": "1. Add a \"bot\" in your DingTalk/Feishu/WeCom group to get the webhook URL\n2. Paste the URL into the input box above\n3. Click \"Send test notification\" to check if you can receive it\n4. From now on, a message will be sent to the group automatically when a task finishes or fails",
-  "notificationInstructionsTitle": "Instructions",
-  "notificationInvalidUrl": "Invalid URL format: {error}",
-  "notificationSaveConfig": "Save Config",
-  "notificationSaveFailed": "Save failed: {error}",
-  "notificationSaved": "Notification settings saved",
-  "notificationSendTest": "Send test notification",
-  "notificationSending": "Sending...",
-  "notificationTestFailed": "Test failed: {error}",
-  "notificationTestSendFailed": "Send failed, please check the notification URL",
-  "notificationTestSent": "Test notification sent, please check your group",
-  "notificationTitle": "Task Completion Notifications",
-  "notificationTriggerTitle": "When to send notifications",
-  "notificationWebhookSupport": "Supports: DingTalk, Feishu, WeCom group, Slack, etc.",
-  "notificationWebhookUrl": "Webhook URL",
+  "notificationAlways": "Notificar cada vez",
+  "notificationAlwaysSubtitle": "Enviar notificaciones cuando las tareas se completen o fallen",
+  "notificationEnable": "Habilitar notificaciones de finalización de tareas",
+  "notificationEnableHint": "Enviar mensajes automáticamente cuando las tareas se completen o fallen",
+  "notificationEnterUrlFirst": "Por favor complete primero la dirección de notificación",
+  "notificationFailedOnly": "Notificar solo en caso de falla",
+  "notificationFailedOnlySubtitle": "Enviar notificación solo cuando la tarea falla",
+  "notificationInstructionsBody": "1. Agregue un \"robot\" al grupo DingTalk/Feishu/Enterprise WeChat y obtenga la dirección de notificación\n2. Pegue la dirección en el cuadro de entrada de arriba\n3. Haga clic en \"Enviar notificación de prueba\" para ver si puede recibirla.\n4. Cuando una tarea se completa o falla en el futuro, se enviará automáticamente un mensaje al grupo.",
+  "notificationInstructionsTitle": "Instrucciones de uso",
+  "notificationInvalidUrl": "Formato de dirección incorrecto: {error}",
+  "notificationSaveConfig": "Guardar configuración",
+  "notificationSaveFailed": "No se pudo guardar: {error}",
+  "notificationSaved": "Configuración de notificaciones guardada",
+  "notificationSendTest": "Enviar notificación de prueba",
+  "notificationSending": "Enviando...",
+  "notificationTestFailed": "Prueba fallida: {error}",
+  "notificationTestSendFailed": "No se pudo enviar, verifique la dirección de notificación",
+  "notificationTestSent": "La notificación de prueba ha sido enviada, vaya al grupo para verla.",
+  "notificationTitle": "Notificación de finalización de tarea",
+  "notificationTriggerTitle": "cuando enviar notificación",
+  "notificationWebhookSupport": "Soporte: DingTalk, Feishu, grupo empresarial WeChat, Slack, etc.",
+  "notificationWebhookUrl": "Dirección de notificación",
   "notifications": "Notificaciones",
   "notificationsDesc": "Recibe un mensaje cuando terminen las tareas",
-  "ok": "OK",
+  "ok": "bien",
   "password": "Contraseña",
   "passwordAuth": "Contraseña",
   "pleaseConfigAIModel": "Configure primero un modelo de IA",
@@ -319,146 +319,146 @@
   "quickCommands": "Fragmentos",
   "quickCommandsDesc": "Guarda comandos frecuentes para ejecución con un toque",
   "retry": "Reintentar",
-  "runbookBuiltinCannotDelete": "Built-in templates cannot be deleted",
-  "runbookBuiltinNotEditable": "Built-in templates are not editable. Use \"Clone\" to create a copy and modify it.",
-  "runbookBuiltinTag": "Built-in",
-  "runbookCategoryCustom": "Custom",
-  "runbookCategoryDeployment": "Deployment",
-  "runbookCategoryInspection": "Inspection",
-  "runbookCategoryMaintenance": "Maintenance",
-  "runbookCategorySecurity": "Security",
-  "runbookCategoryTroubleshooting": "Troubleshooting",
-  "runbookClipboardEmpty": "Clipboard is empty",
-  "runbookCloneTooltip": "Clone",
-  "runbookClonedToast": "Cloned as custom runbook: {name}",
-  "runbookContentAgent": "Prompt Content",
-  "runbookContentAgentHint": "e.g., Check disk usage of '{host}' and provide suggestions",
-  "runbookContentCommand": "Command Content",
-  "runbookContentCommandHint": "e.g., ssh '{user}'@'{host}' df -h",
-  "runbookContentRequired": "Please enter the content",
-  "runbookCreate": "Create",
-  "runbookDeleteConfirm": "Are you sure you want to delete \"{name}\"? This action cannot be undone.",
-  "runbookDeleteTitle": "Delete Runbook",
-  "runbookDeleteTooltip": "Delete",
-  "runbookDeletedToast": "Deleted",
-  "runbookEditTitle": "Edit Runbook",
-  "runbookEditTooltip": "Edit",
-  "runbookEmptyFiltered": "No matching runbooks. Try adjusting the filters.",
-  "runbookEmptyHint": "Tap the bottom-right button to create a runbook",
-  "runbookEmptyTitle": "No runbooks yet",
-  "runbookFieldCategory": "Category",
-  "runbookFieldDescription": "Description (optional)",
-  "runbookFieldIcon": "Icon",
-  "runbookFieldName": "Name",
-  "runbookFieldType": "Type",
-  "runbookFilterAll": "All",
-  "runbookImportButton": "Import",
-  "runbookImportHint": "Copy JSON from the official open platform and paste it here",
-  "runbookImportPasteHint": "Paste JSON content here…",
-  "runbookImportSuccess": "Successfully imported {count} runbooks",
-  "runbookImportTitle": "Import Runbooks",
-  "runbookImportTooltip": "Import Runbook",
-  "runbookJsonParseFailed": "JSON parse failed: {error}",
-  "runbookNameRequired": "Please enter a name",
-  "runbookNewTitle": "New Runbook",
-  "runbookPasteFromClipboard": "Paste from Clipboard",
-  "runbookPasteJsonFirst": "Please paste JSON content first",
-  "runbookRunCount": "Run {count} times",
-  "runbookSearchHint": "Search runbook name or description",
-  "runbookTitle": "Runbooks",
-  "runbookTypeAgentDesc": "Natural language prompt, executed by AI via ReAct framework",
-  "runbookTypeAgentOption": "AI Execute",
-  "runbookTypeAgentTag": "AI Execute",
-  "runbookTypeCommand": "Direct Execute",
-  "runbookTypeCommandDesc": "Execute commands directly in terminal after variable substitution",
-  "runbookUseInTerminal": "Please use this in the terminal page",
-  "runbooks": "Runbooks",
+  "runbookBuiltinCannotDelete": "Las plantillas integradas no se pueden eliminar",
+  "runbookBuiltinNotEditable": "La plantilla incorporada no se puede editar. Utilice \"clonar\" para crear una copia y luego modifíquela.",
+  "runbookBuiltinTag": "Incorporado",
+  "runbookCategoryCustom": "Personalizar",
+  "runbookCategoryDeployment": "implementar",
+  "runbookCategoryInspection": "Inspección",
+  "runbookCategoryMaintenance": "Mantenimiento de rutina",
+  "runbookCategorySecurity": "seguro",
+  "runbookCategoryTroubleshooting": "Solución de problemas",
+  "runbookClipboardEmpty": "El portapapeles está vacío.",
+  "runbookCloneTooltip": "clonar",
+  "runbookClonedToast": "Clonar como flujo de trabajo personalizado: {name}",
+  "runbookContentAgent": "Contenido rápido",
+  "runbookContentAgentHint": "Por ejemplo: verifique el uso del disco de '{host}' y brinde sugerencias",
+  "runbookContentCommand": "Contenido del comando",
+  "runbookContentCommandHint": "Por ejemplo: ssh '{user}'@'{host}' df -h",
+  "runbookContentRequired": "Por favor ingresa el contenido",
+  "runbookCreate": "crear",
+  "runbookDeleteConfirm": "¿Está seguro de que desea eliminar \"{name}\"? Esta acción no se puede deshacer.",
+  "runbookDeleteTitle": "Eliminar flujo de trabajo",
+  "runbookDeleteTooltip": "Eliminar",
+  "runbookDeletedToast": "Eliminado",
+  "runbookEditTitle": "Editar flujo de trabajo",
+  "runbookEditTooltip": "Editar",
+  "runbookEmptyFiltered": "No hay flujo de trabajo coincidente; intente ajustar las condiciones del filtro",
+  "runbookEmptyHint": "Haga clic en el botón en la esquina inferior derecha para crear un nuevo flujo de trabajo",
+  "runbookEmptyTitle": "Aún no hay flujo de trabajo de operación y mantenimiento",
+  "runbookFieldCategory": "Clasificación",
+  "runbookFieldDescription": "Descripción (opcional)",
+  "runbookFieldIcon": "icono",
+  "runbookFieldName": "Nombre",
+  "runbookFieldType": "Tipo",
+  "runbookFilterAll": "Todos",
+  "runbookImportButton": "importar",
+  "runbookImportHint": "Copie JSON de la plataforma abierta del sitio web oficial y péguelo aquí",
+  "runbookImportPasteHint": "Pegue el contenido JSON aquí...",
+  "runbookImportSuccess": "Flujos de trabajo {count} importados correctamente",
+  "runbookImportTitle": "Importar flujo de trabajo de operación y mantenimiento",
+  "runbookImportTooltip": "Importar flujo de trabajo",
+  "runbookJsonParseFailed": "Error al analizar JSON: {error}",
+  "runbookNameRequired": "Por favor ingrese el nombre",
+  "runbookNewTitle": "Nuevo flujo de trabajo",
+  "runbookPasteFromClipboard": "Pegar desde el portapapeles",
+  "runbookPasteJsonFirst": "Primero pegue el contenido JSON.",
+  "runbookRunCount": "Ejecutado {count} veces",
+  "runbookSearchHint": "Buscar nombre o descripción del flujo de trabajo",
+  "runbookTitle": "Flujo de trabajo de operación y mantenimiento.",
+  "runbookTypeAgentDesc": "Aviso en lenguaje natural, la IA se ejecuta de acuerdo con el marco ReAct",
+  "runbookTypeAgentOption": "Ejecución de IA",
+  "runbookTypeAgentTag": "Ejecución de IA",
+  "runbookTypeCommand": "Ejecución directa",
+  "runbookTypeCommandDesc": "Después de la sustitución de variables, ejecute el comando directamente en la terminal",
+  "runbookUseInTerminal": "Úselo en la página de la terminal.",
+  "runbooks": "Flujo de trabajo de operación y mantenimiento.",
   "runbooksDesc": "Convierte operaciones rutinarias en plantillas reutilizables",
   "save": "Guardar",
   "scrollToBottom": "Desplazar al final",
   "search": "Buscar",
-  "securityAllDataCleared": "All data has been cleared",
-  "securityAppLockSubtitleOff": "When disabled, no verification is needed to open the app",
-  "securityAppLockSubtitleOn": "Opening the app requires {biometricType} or password",
-  "securityAuditLogSubtitle": "View the execution record of each command",
-  "securityAuditLogTitle": "Audit Log",
-  "securityAuthenticateReason": "Verify your identity to enable app lock",
-  "securityBiometricFaceId": "Face ID",
-  "securityBiometricFingerprint": "Fingerprint",
-  "securityBiometricGeneric": "Biometrics",
-  "securityBiometricNotSupported": "⚠️ Device does not support fingerprint or face ID",
-  "securityBiometricStatusTitle": "Fingerprint / Face ID Status",
-  "securityBiometricSupported": "✅ Supports {biometricType}",
-  "securityClearAllData": "Clear All Data",
-  "securityClearAllDataSubtitle": "Delete all servers, chat history, and passwords (irreversible)",
-  "securityClearConfirmPrompt": "Please type DELETE to confirm:",
-  "securityClearFailed": "Clear failed: {error}",
-  "securityClearIrreversible": "This action cannot be undone!",
-  "securityClearItemAiModels": "• AI model settings",
-  "securityClearItemChats": "• Chat history",
-  "securityClearItemPasswords": "• All passwords",
-  "securityClearItemServers": "• Server list",
-  "securityClearItemSnippets": "• Quick commands",
-  "securityClearWarning": "This action will delete all data, including:",
-  "securityConfirmDelete": "Confirm Delete",
-  "securityDangerAction": "⚠️ Dangerous Action",
-  "securityEnableAppLock": "Enable App Lock",
+  "securityAllDataCleared": "Todos los datos borrados",
+  "securityAppLockSubtitleOff": "Abrir la aplicación después de cerrarla no requiere verificación",
+  "securityAppLockSubtitleOn": "Se requiere {biometricType} o contraseña para abrir la aplicación.",
+  "securityAuditLogSubtitle": "Ver el registro de ejecución de cada comando",
+  "securityAuditLogTitle": "Registro de operación",
+  "securityAuthenticateReason": "Autenticarse para habilitar el bloqueo de aplicaciones",
+  "securityBiometricFaceId": "identificación facial",
+  "securityBiometricFingerprint": "huella digital",
+  "securityBiometricGeneric": "Biometría",
+  "securityBiometricNotSupported": "⚠️ El dispositivo no admite huellas dactilares ni rostro.",
+  "securityBiometricStatusTitle": "Estado de huella digital/rostro",
+  "securityBiometricSupported": "✅ Soporte {biometricType}",
+  "securityClearAllData": "Borrar todos los datos",
+  "securityClearAllDataSubtitle": "Eliminar todos los servidores, historial de chat y contraseñas (no se pueden recuperar)",
+  "securityClearConfirmPrompt": "Por favor ingrese BORRAR para confirmar:",
+  "securityClearFailed": "Error al borrar: {error}",
+  "securityClearIrreversible": "¡Esta acción no se puede deshacer!",
+  "securityClearItemAiModels": "• Configuración del modelo de IA",
+  "securityClearItemChats": "• Historial de chat",
+  "securityClearItemPasswords": "• Todas las contraseñas",
+  "securityClearItemServers": "• Lista de servidores",
+  "securityClearItemSnippets": "• Comandos rápidos",
+  "securityClearWarning": "Esta operación eliminará todos los datos, incluidos:",
+  "securityConfirmDelete": "Confirmar eliminación",
+  "securityDangerAction": "⚠️Operación peligrosa",
+  "securityEnableAppLock": "Habilitar bloqueo de aplicaciones",
   "securitySettings": "Seguridad",
   "securitySettingsDesc": "Desbloquea la app con huella o Face ID",
-  "securityTitle": "Security Settings",
+  "securityTitle": "Configuraciones de seguridad",
   "selectFile": "Seleccionar archivo",
   "send": "Enviar",
   "serverList": "Servidores",
   "serverListDesc": "Añadir y gestionar servidores remotos para conectarse",
   "settings": "Configuración",
-  "settingsAI": "AI & Intelligence",
-  "settingsAIModel": "AI Model Config",
-  "settingsAIModelDesc": "Configure AI API key and model",
-  "settingsAbout": "About",
-  "settingsAboutApp": "About AI Terminal",
-  "settingsAgent": "Agent Settings",
-  "settingsAgentDesc": "Max auto-execute steps (0 = unlimited: {steps})",
-  "settingsAppearance": "Appearance",
-  "settingsAppearanceSettings": "Appearance",
-  "settingsAppearanceSettingsDesc": "Switch dark/light mode, adjust font size",
-  "settingsAuditLog": "Activity Log",
-  "settingsAuditLogDesc": "Records who ran each command and when",
-  "settingsChangeRecords": "Change Records",
-  "settingsChangeRecordsDesc": "Track all changes, undo if something goes wrong",
-  "settingsChangeWindow": "Safe Hours",
-  "settingsChangeWindowDesc": "Set safe time windows; changes blocked outside them",
-  "settingsCheckUpdate": "Check for Updates",
-  "settingsConnection": "Connections",
-  "settingsHosts": "Servers",
-  "settingsHostsDesc": "Add and edit remote servers to connect to",
-  "settingsLanguage": "Language",
-  "settingsLanguageDesc": "Choose interface language",
-  "settingsNotification": "Task Notifications",
-  "settingsNotificationDesc": "Get notified when a task finishes",
-  "settingsRunbooks": "Runbooks",
-  "settingsRunbooksDesc": "Turn common ops tasks into templates, run in one tap",
-  "settingsSecurity": "Security",
-  "settingsSecurityDesc": "Unlock the app with fingerprint or Face ID",
-  "settingsSnippets": "Snippets",
-  "settingsSnippetsDesc": "Save frequently used commands for one-tap execution",
-  "settingsTitle": "Settings",
-  "settingsVersion": "Version 1.4.3",
+  "settingsAI": "IA e inteligencia",
+  "settingsAIModel": "Configuración del modelo de IA",
+  "settingsAIModelDesc": "Configuración de claves y modelos para IA",
+  "settingsAbout": "Acerca de",
+  "settingsAboutApp": "Acerca de la terminal AI",
+  "settingsAgent": "Configuración del agente",
+  "settingsAgentDesc": "El número máximo de pasos que la IA puede ejecutar automáticamente (0=sin límite: {steps})",
+  "settingsAppearance": "Apariencia y experiencia",
+  "settingsAppearanceSettings": "Configuración de apariencia",
+  "settingsAppearanceSettingsDesc": "Cambiar el modo oscuro/claro, ajustar el tamaño de fuente",
+  "settingsAuditLog": "Registro de operación",
+  "settingsAuditLogDesc": "Registre quién ejecutó cada comando y cuándo",
+  "settingsChangeRecords": "Historial de cambios",
+  "settingsChangeRecordsDesc": "Todos los cambios se registran y se pueden deshacer si algo sale mal.",
+  "settingsChangeWindow": "periodo seguro",
+  "settingsChangeWindowDesc": "Establecer un período seguro y prohibir cambios en otros momentos.",
+  "settingsCheckUpdate": "Buscar actualizaciones",
+  "settingsConnection": "Gestión de conexión",
+  "settingsHosts": "Lista de servidores",
+  "settingsHostsDesc": "Agregue y edite el servidor al que desea conectarse de forma remota",
+  "settingsLanguage": "Idioma",
+  "settingsLanguageDesc": "Seleccionar idioma de interfaz",
+  "settingsNotification": "Notificación de finalización de tarea",
+  "settingsNotificationDesc": "Enviar automáticamente un mensaje para notificarle una vez completada la tarea.",
+  "settingsRunbooks": "Flujo de trabajo de operación y mantenimiento.",
+  "settingsRunbooksDesc": "Guarde operaciones comunes de operación y mantenimiento como plantillas y ejecútelas con un solo clic",
+  "settingsSecurity": "Configuraciones de seguridad",
+  "settingsSecurityDesc": "Desbloquear aplicaciones con huella digital o rostro",
+  "settingsSnippets": "Comandos de acceso directo",
+  "settingsSnippetsDesc": "Guarde los comandos utilizados con frecuencia y ejecútelos con un clic la próxima vez",
+  "settingsTitle": "ajustes",
+  "settingsVersion": "Versión 1.4.3",
   "simplifiedChinese": "简体中文",
-  "snippetCommandHint": "e.g., docker exec -it '{container}' /bin/bash",
-  "snippetCommandLabel": "Command:",
-  "snippetCommandRequired": "Please enter the command",
-  "snippetCopyCommand": "Copy Command",
-  "snippetDeleteConfirm": "Are you sure you want to delete \"{name}\"?",
-  "snippetDeleteTitle": "Delete Snippet",
-  "snippetEditTitle": "Edit Snippet",
-  "snippetEmptyHint": "Tap the button below to add one",
-  "snippetEmptyTitle": "No snippets yet",
-  "snippetFieldCommand": "Command",
-  "snippetFieldDescription": "Description (optional)",
-  "snippetNameRequired": "Please enter a name",
-  "snippetNewTitle": "New Snippet",
-  "snippetResolvedCommand": "Command: {command}",
-  "snippetTitle": "Snippets",
+  "snippetCommandHint": "Por ejemplo: docker exec -it '{container}' /bin/bash",
+  "snippetCommandLabel": "Comando:",
+  "snippetCommandRequired": "Por favor ingrese el comando",
+  "snippetCopyCommand": "comando de copia",
+  "snippetDeleteConfirm": "¿Está seguro de que desea eliminar \"{name}\"?",
+  "snippetDeleteTitle": "Eliminar comando",
+  "snippetEditTitle": "Editar comando",
+  "snippetEmptyHint": "Haga clic en el botón de abajo para agregar",
+  "snippetEmptyTitle": "Aún no hay ningún comando de acceso directo",
+  "snippetFieldCommand": "comando",
+  "snippetFieldDescription": "Descripción (opcional)",
+  "snippetNameRequired": "Por favor ingrese el nombre",
+  "snippetNewTitle": "Nuevo comando",
+  "snippetResolvedCommand": "Comando: {command}",
+  "snippetTitle": "Comandos de acceso directo",
   "taskAborted": "⚠️ Tarea abortada",
   "taskCancelled": "⚠️ Tarea cancelada",
   "taskCompleted": "Tarea completada",
@@ -466,65 +466,65 @@
   "taskFailed": "Tarea fallida",
   "taskMaxSteps": "Máximo de pasos alcanzado, tarea interrumpida",
   "taskTerminated": "Tarea terminada",
-  "terminalAgentLog": "Agent log",
-  "terminalClearScreen": "Clear screen",
-  "terminalCloseTabConfirm": "Closing this tab will cancel the running task. Are you sure?",
-  "terminalCollapseAIPanel": "Collapse AI panel",
-  "terminalCollapseMonitorPanel": "Collapse monitor panel",
-  "terminalCommandLabel": "Command: {command}",
-  "terminalCommandTemplate": "Command template:",
-  "terminalCompactingHistory": "AI is compressing conversation history",
-  "terminalCompactionDone": "Memory compression completed",
-  "terminalCompactionFailed": "Compression failed: {error}",
-  "terminalConfigure": "Configure",
-  "terminalConnectHostFailed": "Failed to connect to {hostName}: {error}",
-  "terminalConnectTerminalFirst": "Please connect to a terminal first",
-  "terminalConnectTerminalForCommand": "Please connect to a terminal before executing commands",
-  "terminalConnectTerminalForRunbook": "Please connect to a terminal (SSH or local) before using runbooks",
-  "terminalConnected": "Connected",
-  "terminalConnecting": "Connecting to {host}...",
-  "terminalCreateNew": "+ New",
-  "terminalExitOrchestrator": "Exit orchestration mode",
-  "terminalExpandAIPanel": "Expand AI panel",
-  "terminalExpandMonitorPanel": "Expand monitor panel",
-  "terminalFillVariables": "Fill variables - {name}",
+  "terminalAgentLog": "Registro del agente",
+  "terminalClearScreen": "pantalla clara",
+  "terminalCloseTabConfirm": "Al cerrar esta pestaña se cancelarán las tareas en ejecución. ¿Estás seguro de que quieres cerrarlo?",
+  "terminalCollapseAIPanel": "Contraer panel de IA",
+  "terminalCollapseMonitorPanel": "Cerrar panel de seguimiento",
+  "terminalCommandLabel": "Comando: {command}",
+  "terminalCommandTemplate": "Plantilla de comando:",
+  "terminalCompactingHistory": "La IA está comprimiendo conversaciones históricas",
+  "terminalCompactionDone": "Compresión de memoria completada",
+  "terminalCompactionFailed": "Error de compresión: {error}",
+  "terminalConfigure": "Configuración",
+  "terminalConnectHostFailed": "No se pudo conectar a {hostName}: {error}",
+  "terminalConnectTerminalFirst": "Por favor conecte el terminal primero",
+  "terminalConnectTerminalForCommand": "Conéctese primero a la terminal y luego ejecute el comando",
+  "terminalConnectTerminalForRunbook": "Conéctese al terminal (SSH o terminal local) antes de utilizar el flujo de trabajo de operación y mantenimiento.",
+  "terminalConnected": "Conectado",
+  "terminalConnecting": "Conectando {host}...",
+  "terminalCreateNew": "+ Nuevo",
+  "terminalExitOrchestrator": "Salir del modo de orquestación",
+  "terminalExpandAIPanel": "Expandir el panel de IA",
+  "terminalExpandMonitorPanel": "Ampliar panel de seguimiento",
+  "terminalFillVariables": "Complete las variables - {name}",
   "terminalFontSize": "Tamaño de fuente del terminal: {size}px",
-  "terminalHostNoCredentials": "{hostName} has no credentials configured. Please edit the server first.",
-  "terminalHostNotFound": "Host not found",
-  "terminalInputHintDefault": "Describe your request, Agent will execute automatically...",
-  "terminalInputHintDisconnected": "Available after connecting to a terminal",
-  "terminalInputHintEmpty": "Type a request to start auto-execution...",
-  "terminalInputHintOrchestrator": "Multi-host orchestration mode: describe cross-host tasks, e.g. \"sync time on all servers\"",
-  "terminalInputHintRunning": "Agent is running...",
-  "terminalLayoutBottom": "Bottom",
-  "terminalLayoutRight": "Right",
-  "terminalLocalStartFailed": "Failed to start local terminal",
-  "terminalLocalStartFailedWithError": "Failed to start local terminal: {error}",
-  "terminalManage": "Manage",
-  "terminalModel": "Model",
-  "terminalMonitor": "Monitor",
-  "terminalNewConnection": "New connection",
-  "terminalNoHostsSaved": "No saved hosts\nPlease add a server on the home page first",
-  "terminalNoRunbooks": "No runbooks available",
-  "terminalNoRunbooksHint": "Click \"Manage\" to create a runbook",
+  "terminalHostNoCredentials": "{hostName} No hay credenciales configuradas, primero edite el servidor",
+  "terminalHostNotFound": "El anfitrión no existe",
+  "terminalInputHintDefault": "Describe los requisitos y el Agente ejecuta automáticamente...",
+  "terminalInputHintDisconnected": "Disponible después de conectar al terminal",
+  "terminalInputHintEmpty": "Ingrese los requisitos para iniciar la ejecución automática...",
+  "terminalInputHintOrchestrator": "Modo de orquestación de múltiples máquinas: describe tareas entre hosts, como \"sincronizar todos los tiempos del servidor\"",
+  "terminalInputHintRunning": "El agente está ejecutando...",
+  "terminalLayoutBottom": "abajo",
+  "terminalLayoutRight": "correcto",
+  "terminalLocalStartFailed": "La terminal local no pudo iniciarse",
+  "terminalLocalStartFailedWithError": "El terminal local no pudo iniciarse: {error}",
+  "terminalManage": "gestión",
+  "terminalModel": "modelo",
+  "terminalMonitor": "Monitorear",
+  "terminalNewConnection": "nueva conexión",
+  "terminalNoHostsSaved": "Aún no hay hosts guardados\nPrimero agregue un servidor a la página de inicio.",
+  "terminalNoRunbooks": "Aún no hay flujo de trabajo de operación y mantenimiento",
+  "terminalNoRunbooksHint": "Haga clic en \"Administrar\" para crear un nuevo flujo de trabajo.",
   "terminalNotConnected": "Conecte primero una terminal para usar el modo automático",
   "terminalNotReady": "Terminal no conectada, conecte primero",
-  "terminalOffline": "Offline",
-  "terminalOrchestratorConnected": "{connected}/{total} connected",
-  "terminalOrchestratorHostList": "Multi-host orchestration · Host list",
-  "terminalOrchestratorMode": "Orchestrate · {connected}/{total}",
-  "terminalReadOnlyOff": "Read-only mode (Dry-run)",
-  "terminalReadOnlyOn": "Read-only mode is on (click to turn off)",
-  "terminalReconnect": "Reconnect",
-  "terminalRoleYou": "You",
-  "terminalRunbookTemplates": "Runbook templates",
-  "terminalRunbookTypeCommand": "Command",
-  "terminalSelectServerForNewTab": "Select a server to connect in a new tab",
-  "terminalSessionCreated": "New session created",
-  "terminalSessionHistory": "Session history",
-  "terminalStatusNotConnected": "Not connected",
-  "terminalTaskRunning": "Task is running",
-  "terminalUnfilledVariables": "Some variables are unfilled. Execution cancelled.",
+  "terminalOffline": "Sin conexión",
+  "terminalOrchestratorConnected": "{connected}/{total} conectado",
+  "terminalOrchestratorHostList": "Orquestación multimáquina · Lista de hosts",
+  "terminalOrchestratorMode": "Arreglo · {connected}/{total}",
+  "terminalReadOnlyOff": "Modo de sólo lectura (ejecución en seco)",
+  "terminalReadOnlyOn": "El modo de solo lectura está activado (haga clic para cerrar)",
+  "terminalReconnect": "Reconectar",
+  "terminalRoleYou": "tu",
+  "terminalRunbookTemplates": "Plantilla de operación y mantenimiento.",
+  "terminalRunbookTypeCommand": "comando",
+  "terminalSelectServerForNewTab": "Seleccione la conexión de nueva pestaña del servidor",
+  "terminalSessionCreated": "Nueva sesión creada",
+  "terminalSessionHistory": "historial de sesiones",
+  "terminalStatusNotConnected": "No conectado",
+  "terminalTaskRunning": "La tarea se está ejecutando",
+  "terminalUnfilledVariables": "Hay variables sin completar y la ejecución ha sido cancelada.",
   "testConnection": "Probar conexión",
   "themeMode": "Modo de tema",
   "thinkingNextStep": "🤔 Pensando en el siguiente paso...",
@@ -948,7 +948,7 @@
   "monitorNetColTraffic": "Tráfico total ↓/↑",
   "monitorNetColRate": "Tasa ↓/↑",
   "monitorNetColIssues": "Err/Pérd",
-  "monitorDiskTotal": "Total",
+  "monitorDiskTotal": "capacidad total",
   "monitorDiskUsed": "Usado",
   "monitorDiskAvailable": "Disponible",
   "monitorDiskOverallUsage": "Uso general",
@@ -967,7 +967,7 @@
   "monitorLoad15": "Carga 15min",
   "monitorProcessCount": "Nº de procesos",
   "monitorMemoryDetail": "Detalles de memoria",
-  "monitorMemoryTotal": "Total",
+  "monitorMemoryTotal": "memoria total",
   "monitorMemoryFree": "Libre",
   "monitorMemoryCached": "Caché",
   "monitorMemoryBuffers": "Búferes",
@@ -975,7 +975,7 @@
   "monitorSwapTotal": "Swap total",
   "monitorSwapUsed": "Swap usado",
   "monitorDiskDetail": "Detalles de disco",
-  "monitorDiskTotal2": "Total",
+  "monitorDiskTotal2": "cantidad total",
   "monitorDiskUsage": "Uso",
   "monitorNetDetail": "Detalles de red",
   "monitorUserSession": "Usuarios y sesiones",
@@ -986,7 +986,7 @@
   "monitorErrorCollecting": "Recopilando",
   "monitorErrorNotConnected": "No conectado",
   "monitorErrorEmptyOutput": "Salida de recopilación vacía",
-  "terminalLocalTab": "Local",
+  "terminalLocalTab": "locales",
   "sessionNew": "Nuevo",
   "sessionNoSessions": "Sin sesiones",
   "sessionCompressed": "Comprimido",
@@ -1227,59 +1227,2660 @@
       }
     }
   },
-  "aiEndpointAdd": "Add endpoint",
-  "aiEndpointEditTitle": "Edit endpoint",
-  "aiEndpointDeleteTitle": "Delete endpoint",
-  "aiEndpointDeleteConfirm": "Delete \"{name}\" and its {count} model(s)?",
-  "aiEndpointApiKey": "API key",
-  "aiEndpointApiKeyHint": "Leave blank to keep the saved key",
-  "aiEndpointBaseUrl": "API URL",
-  "aiEndpointProtocol": "API protocol",
+  "aiEndpointAdd": "Agregar punto final",
+  "aiEndpointEditTitle": "Editar punto final",
+  "aiEndpointDeleteTitle": "Eliminar punto final",
+  "aiEndpointDeleteConfirm": "¿Está seguro de que desea eliminar el punto final \"{name}\" y sus modelos {count}?",
+  "aiEndpointApiKey": "clave API",
+  "aiEndpointApiKeyHint": "Déjelo en blanco para usar las credenciales guardadas",
+  "aiEndpointBaseUrl": "dirección API",
+  "aiEndpointProtocol": "protocolo API",
   "aiEndpointProtocolOpenai": "OpenAI Chat Completions",
-  "aiEndpointProtocolErnie": "Baidu ERNIE",
-  "aiEndpointCustomSettings": "Custom settings",
-  "aiEndpointModels": "Model catalog",
-  "aiEndpointModelsCount": "{count} models",
-  "aiEndpointRestoreDefaults": "Restore defaults",
-  "aiEndpointFetchModels": "Fetch available models",
-  "aiEndpointAddModel": "Add model",
-  "aiEndpointNoModels": "No models yet. Add one or fetch available models.",
-  "aiEndpointRestoreConfirm": "Replace the current catalog with default models for \"{provider}\"?",
-  "aiEndpointRestoreUnavailable": "This provider has no built-in default models",
-  "aiEndpointFetchSuccess": "Added {count} models",
-  "aiEndpointFetchNone": "No models available to add",
-  "aiEndpointFetchFailed": "Failed to fetch models: {error}",
-  "aiEndpointSelectModels": "Select models to add",
-  "aiEndpointNoProvider": "Custom",
-  "aiEndpointAddModelTitle": "Add model",
-  "aiEndpointEditModelTitle": "Edit model",
-  "aiModelDisplayName": "Display name",
-  "aiModelId": "Model ID",
-  "aiModelContextWindow": "Context window",
-  "aiModelContextWindowHint": "0 = unknown; runtime falls back to 262144 (256K)",
-  "aiModelMaxOutput": "Max output tokens",
-  "aiModelReasoning": "Reasoning levels",
-  "aiModelReasoningHint": "Enable to configure reasoning tiers for this model",
-  "aiModelTier": "Tier",
-  "aiModelApiValue": "API value",
-  "aiModelApiValueHint": "Leave blank to omit this parameter",
-  "aiModelAddTier": "Add tier",
-  "aiModelFallback": "Fallback model",
-  "aiModelNoFallback": "No fallback",
+  "aiEndpointProtocolErnie": "Baidu Wenxin ERNIE",
+  "aiEndpointCustomSettings": "Configuraciones personalizadas",
+  "aiEndpointModels": "Catálogo de modelos",
+  "aiEndpointModelsCount": "Modelos {count}",
+  "aiEndpointRestoreDefaults": "Restaurar modelo predeterminado",
+  "aiEndpointFetchModels": "Obtener modelos disponibles",
+  "aiEndpointAddModel": "Agregar modelo",
+  "aiEndpointNoModels": "Aún no hay ningún modelo, haga clic en \"Agregar modelo\" u \"Obtener modelos disponibles\"",
+  "aiEndpointRestoreConfirm": "Se restaurará el directorio de modelo predeterminado de \"{provider}\" y se reemplazará el modelo personalizado actual.",
+  "aiEndpointRestoreUnavailable": "Este proveedor de servicios no tiene un modelo predeterminado integrado",
+  "aiEndpointFetchSuccess": "Modelos {count} añadidos.",
+  "aiEndpointFetchNone": "No hay modelos para agregar",
+  "aiEndpointFetchFailed": "No se pudo obtener el modelo: {error}",
+  "aiEndpointSelectModels": "Seleccione el modelo a agregar",
+  "aiEndpointNoProvider": "Personalizar",
+  "aiEndpointAddModelTitle": "Agregar modelo",
+  "aiEndpointEditModelTitle": "Editar modelo",
+  "aiModelDisplayName": "nombre para mostrar",
+  "aiModelId": "ID del modelo",
+  "aiModelContextWindow": "ventana contextual",
+  "aiModelContextWindowHint": "0 significa desconocido, procesado como 262144 (256K) durante el tiempo de ejecución",
+  "aiModelMaxOutput": "Número máximo de tokens de salida",
+  "aiModelReasoning": "nivel de razonamiento",
+  "aiModelReasoningHint": "Después de abrir, puede configurar el engranaje de pensamiento del modelo.",
+  "aiModelTier": "engranaje",
+  "aiModelApiValue": "Valor del parámetro API",
+  "aiModelApiValueHint": "Dejar en blanco para no enviar este parámetro",
+  "aiModelAddTier": "Agregar equipo",
+  "aiModelFallback": "Modelo alternativo",
+  "aiModelNoFallback": "Sin modelo de respaldo",
   "aiModelFunctionCalling": "Function Calling",
-  "aiModelTierRequired": "Keep at least one tier",
-  "aiModelTierLevelRequired": "Tier name is required",
-  "aiModelTierDuplicate": "Tier names must be unique",
-  "aiModelValidationName": "Display name is required",
-  "aiModelValidationModelId": "Model ID is required",
-  "aiModelValidationBaseUrl": "API URL is required",
-  "aiModelValidationModels": "Add at least one model",
-  "terminalConfigureModel": "Configure model",
-  "terminalModelAndReasoning": "Model & reasoning",
-  "terminalReasoning": "Reasoning",
-  "terminalReasoningNotEnabled": "This model has no reasoning tiers enabled; enable them in settings",
-  "terminalReasoningOff": "Off",
-  "terminalManageModels": "Manage models…",
-  "aiModelFunctionCallingHint": "Native tool calling (OpenAI tools API); enable only for models that support it",
-  "terminalModelLockedRunning": "Agent is running; change the model or reasoning after it finishes"
+  "aiModelTierRequired": "Mantenga al menos una marcha",
+  "aiModelTierLevelRequired": "El nombre del equipo no puede estar vacío",
+  "aiModelTierDuplicate": "Los engranajes no se pueden repetir",
+  "aiModelValidationName": "Por favor complete el nombre para mostrar",
+  "aiModelValidationModelId": "Por favor complete el ID del modelo",
+  "aiModelValidationBaseUrl": "Por favor complete la dirección API",
+  "aiModelValidationModels": "Añade al menos un modelo",
+  "terminalConfigureModel": "Configurar modelo",
+  "terminalModelAndReasoning": "Modelos y pensamiento",
+  "terminalReasoning": "grado de pensamiento",
+  "terminalReasoningNotEnabled": "Este modelo no tiene habilitado el engranaje de pensamiento, se puede activar en la configuración.",
+  "terminalReasoningOff": "Pensamiento cercano",
+  "terminalManageModels": "Modelo de gestión…",
+  "aiModelFunctionCallingHint": "Llamada de herramienta nativa (API de herramientas OpenAI), solo están habilitados los modelos que admiten este protocolo",
+  "terminalModelLockedRunning": "El agente se está ejecutando, cambia el modelo o el equipo de pensamiento una vez que haya terminado.",
+  "changeRecordRestoreLocalFile": "Los siguientes archivos se restaurarán localmente, sin pasar por ningún servidor:",
+  "ut_9dd16b4310": "Cancelar",
+  "ut_929f88c953": "guardar",
+  "ut_375761b903": "Editar",
+  "ut_12b4ff78f0": "Eliminar",
+  "ut_2439c9088c": "cerrar",
+  "ut_8d8a263df0": "Nombre",
+  "ut_dd3bec10ce": "bien",
+  "ut_2bbaf6e153": "copiado",
+  "ut_7713abebb3": "historial de mando",
+  "ut_c96baaaa38": "comando",
+  "ut_bed1bc3d9f": "Comandos de acceso directo",
+  "ut_4064dc0579": "situación general",
+  "ut_8b97bab772": "grupo anfitrión",
+  "ut_c53688e21a": "Anfitrión",
+  "ut_b996bd3d08": "Personalizar",
+  "ut_400ef8d1c1": "Todas las herramientas",
+  "ut_5ea95f868c": "Nuevo servidor MCP",
+  "ut_fb999767e8": "reenvío de puertos",
+  "ut_ee627300a6": "El agente se está ejecutando. Vuelva a intentarlo más tarde.",
+  "ut_8fa7ec1798": "Pensando",
+  "ut_19a5b5ad85": "Borrar",
+  "ut_5dc39ef856": "Por favor seleccione",
+  "ut_c4b7d3a09f": "Cerrar (Esc)",
+  "ut_fda3f94089": "ejecutar",
+  "ut_6e269868a4": "1 mil lineas",
+  "ut_60a303a337": "50.000 líneas",
+  "ut_386ffb419a": "100.000 líneas",
+  "ut_53f8d85ab6": "Anfitrión",
+  "ut_cf99c7c571": "Flujo de trabajo de operación y mantenimiento.",
+  "ut_422db29f9c": "Registro de auditoría",
+  "ut_b671baec90": "Cambiar libro mayor",
+  "ut_abcdfedd3e": "Respuesta automática al mensaje de confirmación",
+  "ut_760a393290": "Importar configuración SSH",
+  "ut_cce7c556ba": "Pautas editoriales",
+  "ut_1982929432": "Nuevas especificaciones",
+  "ut_f996de5ff9": "Título",
+  "ut_1bc8da322f": "Por favor completa el título",
+  "ut_2d4881db12": "Contenido normativo",
+  "ut_483b58204b": "Por favor complete el contenido de la especificación",
+  "ut_29f14d8cf9": "Comando de referencia (opcional)",
+  "ut_fcfbe3558f": "Alcance",
+  "ut_0cac2580f1": "anfitrión único",
+  "ut_479fdc582d": "grupo anfitrión",
+  "ut_56c43b3c1f": "seguir estrictamente",
+  "ut_223ebc733a": "La IA debe ejecutarse tal cual y no puede ajustarse sola",
+  "ut_4ba4d0c89f": "Permitir que la IA ajuste los parámetros sin violar el contrato",
+  "ut_4c7c042a46": "Agregar servidor",
+  "ut_aa56ccc31c": "solo lectura",
+  "ut_2c94b3027b": "Conectado",
+  "ut_e5e228e9d3": "Agregar servidor MCP",
+  "ut_e7c0c60a9b": "Editar servidor MCP",
+  "ut_e539334ba2": "Método de transmisión",
+  "ut_3062040662": "Comando de inicio",
+  "ut_635c6ac2e8": "Parámetros (uno por línea)",
+  "ut_86e6b6dae2": "URL del servidor",
+  "ut_7c1909ae8d": "tiempo de espera (ms)",
+  "ut_f3f63f65a0": "Tapa de herramienta",
+  "ut_78a04cd0e0": "Herramientas disponibles para el agente",
+  "ut_b50e4d2f14": "Herramientas de solo lectura (recomendado)",
+  "ut_f7f0786cb6": "Habilitar servidor",
+  "ut_e234091c8a": "Conectarse automáticamente cuando se inicia la aplicación",
+  "ut_e1d7cd83a8": "Permitir que el agente use recursos",
+  "ut_2a8817d718": "Permitir que el agente use palabras de aviso",
+  "ut_bbe5aed47c": "Autorizar usando OAuth",
+  "ut_9f237e2f4c": "Guardar y conectar",
+  "ut_c3255fdff5": "El nombre no puede estar vacío",
+  "ut_18b03910f5": "La transferencia stdio requiere un comando de inicio",
+  "ut_78ed27f966": "La URL del servidor debe ser una dirección http(s)",
+  "ut_6462e5fd3f": "El tiempo de espera debe estar entre 3000 y 120 000 ms",
+  "ut_765400571f": "La tapa de la herramienta debe estar entre 1 y 40",
+  "ut_e43ff18e6b": "HTTP + SSE (heredado)",
+  "ut_6c1dbbd423": "stdio (proceso local)",
+  "ut_1ce1d6c086": "Acerca de",
+  "ut_451a175be9": "Gestión de host",
+  "ut_42d62d0f0e": "ajustes",
+  "ut_85c1206607": "modo de enfoque",
+  "ut_20d2782c72": "locales",
+  "ut_6ea2ce2fe7": "Confirmar reversión",
+  "ut_78d92a1509": "Conéctese primero al host antes de continuar con la tarea.",
+  "ut_9f7bc31ffe": "índice independiente",
+  "ut_ac8a126fc3": "La ejecución falló",
+  "ut_e56e69b4b9": "Cancelado",
+  "ut_278fcd681d": "Escritura completada",
+  "ut_ae9a95fec3": "El usuario cancela la tarea, se cancela la escritura de PTY",
+  "ut_0bb0be16b3": "Reemplazo completado",
+  "ut_1aa59da0cf": "Error al escribir, retrocediendo...",
+  "ut_47e5e5365c": "Búsqueda en la base de conocimientos cancelada",
+  "ut_b79b73a254": "Parámetro faltante: la ruta es obligatoria",
+  "ut_b48a9bcd4c": "Confirmar",
+  "ut_fa7ae42a25": "servicio",
+  "ut_f71cf695fe": "Tarea cancelada",
+  "ut_dec92d98dd": "Tarea interrumpida",
+  "ut_a8046742ba": "cola de salida cruda",
+  "ut_fc6ff4c8fb": "Todas las etiquetas",
+  "ut_c31fd08687": "Copiar",
+  "ut_68caa1b369": "justo ahora",
+  "ut_de0e9433a3": "Descripción",
+  "ut_a53a6efe91": "El nombre para mostrar no puede estar vacío",
+  "ut_5d608a562e": "Agregar punto final",
+  "ut_d4387b2009": "proveedor de servicios",
+  "ut_7a9886373c": "Clave API",
+  "ut_1bd24257e4": "agregar",
+  "ut_5f7dd28505": "Editar anfitrión",
+  "ut_cad33d6032": "Agregar anfitrión",
+  "ut_4b91f1393e": "Crear un nuevo comando de acceso directo",
+  "ut_bc90bc1b81": "Nuevo flujo de trabajo",
+  "ut_35448c521f": "Ya encendido",
+  "ut_dbddf26277": "Número máximo de pasos de ejecución",
+  "ut_a18400490f": "bloqueo de aplicaciones",
+  "ut_f9aea8cf2e": "Inténtalo de nuevo",
+  "ut_ec5739654b": "No se pudo abrir el enlace, se copió en el portapapeles",
+  "ut_72cb33e8c2": "Teclas de acceso directo de terminal",
+  "ut_dc29b2f27f": "cerrar",
+  "ut_9a7f4df03a": "Palabras de aviso personalizadas",
+  "ut_df02f06fa2": "Cambiar nombre",
+  "ut_035134b18f": "Crear nuevo directorio",
+  "ut_7025e8166d": "Pegar",
+  "ut_e45556d8c1": "comando de seguridad",
+  "ut_7a4c7fc5d7": "Esta operación implica la configuración del sistema o la descarga de red. Confirme la operación.",
+  "ut_a88f921ea4": "Operación peligrosa, por favor confirme cuidadosamente antes de ejecutarla.",
+  "ut_bf6e849886": "Las operaciones de alto riesgo han sido bloqueadas por políticas de seguridad.",
+  "ut_873cf0baa9": "El camino está vacío",
+  "ut_4370f90a2c": "La ruta está vacía después de la normalización.",
+  "ut_0abbb47931": "Iniciar sesión",
+  "ut_79ab7ea24e": "Cerrar sesión",
+  "ut_dc687b5190": "10.000 líneas",
+  "ut_b80d4fdf1b": "Ningún modelo configurado todavía",
+  "ut_62197ba790": "Cerrado · La IA se basa únicamente en el contexto local",
+  "ut_88b11effff": "El bloqueo de aplicaciones está activado",
+  "ut_aae6a1b7f8": "El bloqueo de aplicaciones no está habilitado",
+  "ut_7355cf069a": "Horario seguro no habilitado",
+  "ut_22b7a960c1": "Aún no hay servidor",
+  "ut_bf73a41ef9": "aún no hay reglas",
+  "ut_a86e6d7ade": "No encendido",
+  "ut_c61e7e68e8": "Habilitado · Falta la dirección del webhook y no se puede enviar.",
+  "ut_6839af3e8f": "Habilitado · Recordatorio para cada tarea",
+  "ut_f9ab3c28bf": "Habilitado · Alerta solo en caso de falla",
+  "ut_f500e9fc9a": "Plantilla de comando con variables",
+  "ut_2d8f504c07": "Lista de verificación de varios pasos",
+  "ut_f53531d72c": "La fuente y el resultado de cada comando.",
+  "ut_5aa2535411": "¿Quién cambió qué y cuándo?",
+  "ut_49efe264bb": "Tiempo de espera de comando múltiple",
+  "ut_b1eedc7da7": "Aumente la velocidad para redes lentas y bájela para solucionar problemas de conexiones atascadas.",
+  "ut_0ef39843c1": "Pegar contenido",
+  "ut_cfae7855b2": "Seleccionar del archivo",
+  "ut_f77e687e7f": "Habilitado · Dirección a completar",
+  "ut_bb68aeb526": "Configurado · Inyección automática de IA",
+  "ut_1f46b82540": "Tiempo de espera de conexión",
+  "ut_beac562f56": "Clave privada guardada cargada",
+  "ut_8b9d8a0293": "No hay entradas canónicas para exportar.",
+  "ut_9e0a441f63": "Exportar especificaciones internas",
+  "ut_393f76846d": "Importar especificaciones internas",
+  "ut_c1358ed65a": "Eliminar especificación",
+  "ut_2d0ac889f0": "reglamento interno",
+  "ut_b8ff31b60e": "Importar JSON",
+  "ut_70148cd17d": "Exportar JSON",
+  "ut_a25e5f2908": "Aún no hay especificaciones internas",
+  "ut_0a354147d1": "estricto",
+  "ut_e35e26caf1": "Sugerencias",
+  "ut_321c7d5cbd": "Por ejemplo: nginx solo cambia conf.d",
+  "ut_c841026fad": "Escriba las restricciones claramente en lenguaje natural y la IA las seguirá exactamente.",
+  "ut_cbf092e19a": "servidor MCP",
+  "ut_3ee244446d": "servidor MCP",
+  "ut_76aba21781": "Adición rápida:",
+  "ut_23784ffbb8": "Aún no hay servidor MCP",
+  "ut_bf9a7280ff": "Más",
+  "ut_b3ea1460b7": "Reconectar",
+  "ut_c6f94e5dc4": "(punto final no configurado)",
+  "ut_a037d357eb": "Desconectar",
+  "ut_d58e58c337": "conectar",
+  "ut_ac3cdbdaa3": "Herramientas y habilidades",
+  "ut_6d628c3737": "Se requiere autorización de OAuth",
+  "ut_55b9a7e0c0": "Autorización de inicio de sesión",
+  "ut_8173ace3f3": "Copiar enlace de autorización",
+  "ut_936b003fe8": "herramientas de solo lectura",
+  "ut_bc386dcd56": "destructivo",
+  "ut_eb15558933": "externo",
+  "ut_4fc8541fe1": "El agente está disponible",
+  "ut_fcabd36585": "No abierto",
+  "ut_7889ed8608": "sin parámetros",
+  "ut_69440da7fa": "Registros recientes",
+  "ut_0dbb5c7bd4": "Desactivado",
+  "ut_f50cfe7b3a": "No conectado",
+  "ut_439759c292": "Conectando",
+  "ut_28c0833d52": "Se requiere autorización",
+  "ut_fcc790f11c": "La conexión falló",
+  "ut_6b02c4539d": "Seleccione los directorios a los que el sistema de archivos MCP permite el acceso",
+  "ut_446d04518f": "Eliminar servidor MCP",
+  "ut_3121de47a1": "URI de recurso",
+  "ut_5e1e108436": "Complete el URI específico según la plantilla",
+  "ut_250aaaa8b9": "Parámetros de palabra rápida",
+  "ut_3dedee49e4": "Una clave = valor por línea",
+  "ut_1cc391dd56": "(obligatorio)",
+  "ut_4a407548bf": "Contenido copiado",
+  "ut_7c50d4b883": "Copiar contenido",
+  "ut_8e8300886d": "Por ejemplo npx",
+  "ut_9e643633f7": "Directorio de trabajo (opcional)",
+  "ut_4c8483a194": "Variables de entorno (CLAVE=VALOR por línea)",
+  "ut_4ad1ca4105": "Proxy saliente (opcional)",
+  "ut_c9270e6a1d": "Encabezados (Clave: Valor por fila)",
+  "ut_e249b99577": "Personalizado (marque la casilla en la tarjeta después de conectarse)",
+  "ut_3665baf413": "Ámbitos de OAuth (separados por espacios/comas, opcionales)",
+  "ut_92dbcbd641": "ID de cliente de OAuth (déjelo en blanco para usar DCR)",
+  "ut_87fceccd93": "Cliente OAuthSecret (opcional)",
+  "ut_9c3dece052": "gestión",
+  "ut_37ac3bf8ce": "El Agente se está ejecutando; utilice el cuadro de entrada para obtener instrucciones adicionales.",
+  "ut_dcdd97ac06": "La conexión SSH no está lista. Haga clic en esta pantalla para intentarlo nuevamente después de volver a conectarse.",
+  "ut_4fc495b331": "La terminal local no pudo iniciarse",
+  "ut_4bab1ab6c2": "La sesión al abrirse en esta pantalla falló.",
+  "ut_129733266f": "[Sesión finalizada]",
+  "ut_b6c84bb8f3": "Esta pantalla está vinculada a la IA y no se puede apagar sola; por favor cierra la pestaña directamente",
+  "ut_def20d7537": "Conversación de IA",
+  "ut_cafa2f7cad": "caparazón local",
+  "ut_e1fac83b32": "La sesión para esta pantalla ha sido desconectada.",
+  "ut_13304be1df": "Reabrir esta pantalla",
+  "ut_6582d682ca": "Paleta de comandos (Ctrl+K)",
+  "ut_422f8e1f4e": "Color de terminal y tamaño de fuente",
+  "ut_19d7987a04": "menú",
+  "ut_c985d380db": "Ir a",
+  "ut_d4c339f3c6": "periodo seguro",
+  "ut_7df2507796": "No habilitado",
+  "ut_86dfbbb589": "Esta terminal",
+  "ut_7a89819950": "ver",
+  "ut_9175d8cccb": "Terminal de ancho completo",
+  "ut_1029dcb6e3": "Cambiar la posición del panel AI",
+  "ut_d170a458d4": "derecha/abajo",
+  "ut_23820b0802": "SFTP solo está disponible para sesiones remotas",
+  "ut_ed8ab87e0e": "Cerrar el panel SFTP",
+  "ut_02fc9755f6": "Panel de archivos SFTP",
+  "ut_3d81bbe4b1": "Posición del panel de interruptores (derecha/inferior)",
+  "ut_49aa3e0155": "Permitir que el Agente trabaje en este host",
+  "ut_80f39c254f": "Describa los requisitos y los pasos se ejecutarán automáticamente; Los comandos peligrosos pedirán permiso primero.",
+  "ut_dbe7312942": "No hay ningún comando de reversión ejecutable para este cambio.",
+  "ut_98ddb3e569": "Restaurará archivos locales a:",
+  "ut_12db03a03c": "Se ejecutará el comando de reversión:",
+  "ut_d9c1f090b6": "Restaurar colocará la copia en el área de copia de seguridad/reciclaje en la ruta original de la máquina local y escribirá registros de auditoría.",
+  "ut_ba66b6920c": "La reversión modifica el estado del servidor y escribe registros de auditoría.",
+  "ut_ae7f0253b5": "La conexión del host se desconectó y no se realizó la reversión.",
+  "ut_e79e7730e4": "Reversión no realizada: el host no está conectado o no hay ningún comando de reversión",
+  "ut_36ae6b14be": "Primero cambie a este host y luego vuelva a conectarse.",
+  "ut_f89df440af": "No es necesario volver a conectar el terminal local, verifique el proceso del terminal",
+  "ut_31edece655": "Configuración del host no encontrada, no se puede volver a conectar",
+  "ut_470431de01": "La reconexión falló, verifique la red o la contraseña",
+  "ut_42e52ee488": "Reconexión exitosa",
+  "ut_3a602327a9": "Primero cambie a este host antes de continuar con la tarea.",
+  "ut_46e4b5a120": "Cambie o vuelva a conectarse a este host e inténtelo de nuevo.",
+  "ut_c4388ff04e": "La conexión del host se ha desconectado; vuelva a conectarse primero",
+  "ut_3993de2fb8": "Contraseña",
+  "ut_694738320d": "mostrar",
+  "ut_6870753dcd": "ocultar",
+  "ut_b765c3fd60": "El comando espera entrada",
+  "ut_107ca67793": "Ingresar (dejar en blanco = presionar Intro)",
+  "ut_793f2a8599": "El modelo aún no se ha configurado, vaya a Configuración → Modelo AI para agregar",
+  "ut_4ed5ea2e0b": "No seleccionado",
+  "ut_6aba627378": "No hay contenido exportable para la sesión actual.",
+  "ut_13465ff9b3": "Ya colocado en el cuadro de entrada del Agente",
+  "ut_d45aa5cd92": "Comandos de terminal",
+  "ut_aec5a6dc3d": "Guardar como fragmento de comando",
+  "ut_2f4c7a6c8c": "Nombre del fragmento",
+  "ut_06c357f14d": "Desde la terminal haga clic derecho",
+  "ut_f58a1a9197": "Comando del agente",
+  "ut_bb76c4ff57": "Ingrese / para buscar todos los comandos y plantillas de operación y mantenimiento; ↑↓ para cambiar, Tab para seleccionar y Enter para ejecutar.",
+  "ut_5d888b8a22": "La memoria no se puede comprimir mientras la tarea está en progreso. Primero detenga la tarea.",
+  "ut_5f55be5f65": "Búsqueda en Internet: habilitada (efectiva para la próxima misión)",
+  "ut_921c3a3d3c": "Búsqueda en Internet: no habilitada (haga clic para habilitar, la siguiente tarea tendrá efecto)",
+  "ut_b5e4297324": "ejecutando",
+  "ut_d68f77a907": "Operación",
+  "ut_5085464dd9": "Nueva conexión",
+  "ut_cbd048e6e6": "Reconectar la etiqueta actual",
+  "ut_f30d7344c7": "Contraer panel de IA",
+  "ut_c7b60ecb72": "Expandir el panel de IA",
+  "ut_36a1bca19d": "Salir del modo de enfoque",
+  "ut_c56382e3ee": "Ocultar monitoreo del servidor",
+  "ut_55b60aaf25": "Mostrar monitoreo del servidor",
+  "ut_1e838ce89c": "Cerrar el panel SFTP",
+  "ut_a752de5a42": "Abra el panel SFTP",
+  "ut_f934cd40d1": "historial de sesiones",
+  "ut_f8ead6b402": "Crea una nueva sesión de IA",
+  "ut_76462daeb1": "página completa",
+  "ut_e17ad38728": "cajón",
+  "ut_9b85525187": "Auditoría operativa",
+  "ut_1bc161aa98": "Configuración del modelo de IA",
+  "ut_1d6ad9a57d": "Historial de cambios",
+  "ut_8659bce8a2": "Flujo de trabajo",
+  "ut_7781e2e2a1": "Instrucciones adicionales…",
+  "ut_c8e527419a": "La terminal local no admite el reenvío de puertos.",
+  "ut_fc1fc05fcd": "búsqueda en internet",
+  "ut_1a5ebea669": "Sin llave (funciona de inmediato)",
+  "ut_d007a268a0": "Se requiere clave API",
+  "ut_06aab0767d": "Clave opcional de instancia privada",
+  "ut_d17f6d0537": "parámetros globales",
+  "ut_28bd2b7489": "Prueba ahora",
+  "ut_fd44505c78": "Servidor habilitado:",
+  "ut_35fef8a980": "Servidores seleccionados:",
+  "ut_a7179dbf9b": "Clave configurada:",
+  "ut_435e2b9a3e": "estado de actualización",
+  "ut_3b3bcc7a34": "No disponible",
+  "ut_aff6cc24ed": "Se requiere clave",
+  "ut_140b926331": "Búsqueda semántica · Clave requerida",
+  "ut_c8f4f082c1": "API de búsqueda · Clave requerida",
+  "ut_060d69c2ef": "RSS · Sin llave",
+  "ut_82fe5ca073": "HTML · Se requiere agencia nacional",
+  "ut_cde0d7f255": "Necesitas construir tu propia instancia",
+  "ut_fdb03fa75f": "Resumen de optimización de IA",
+  "ut_2846d31002": "resultados de google",
+  "ut_50265d0478": "Aún no hay API de búsqueda",
+  "ut_aa998837ed": "herramienta de búsqueda de Claude",
+  "ut_72f0d7877f": "Búsqueda de respuestas",
+  "ut_ebda0aff48": "Bajo inspección",
+  "ut_7875a79d06": "variables de entorno",
+  "ut_464ca43586": "configurado",
+  "ut_cdc3132e4c": "No configurado",
+  "ut_dd2e9a0289": "Documentación de implementación",
+  "ut_050792529a": "Obtener clave",
+  "ut_836f91fea2": "Token opcional: enviado como autorización: portador",
+  "ut_37cabfd93e": "Déjelo en blanco para indicar que no hay modificaciones; También puede utilizar variables de entorno con el mismo nombre.",
+  "ut_60f1ed814f": "La clave guardada se borrará después de guardarla.",
+  "ut_246737f23c": "Dirección de instancia de SearXNG",
+  "ut_dceef0fd66": "Documentación de implementación de SearXNG →",
+  "ut_05981b84e9": "El número final de artículos devueltos (1-20)",
+  "ut_875f752532": "Número de backends solicitados simultáneamente (1-12)",
+  "ut_113e34528c": "La espera más larga para un único backend (3000-120000 ms)",
+  "ut_d012b127eb": "proxy saliente",
+  "ut_6a13f67dc3": "Ingrese una consulta como las últimas noticias de OpenAI",
+  "ut_eeda5a24be": "Buscando",
+  "ut_7c5d801935": "Buscar",
+  "ut_3d01e59d2e": "No hay resultados coincidentes.",
+  "ut_aef246a460": "Fuente:",
+  "ut_a7de20e32a": "Por favor ingrese la palabra clave de consulta",
+  "ut_8334c9cd68": "Debe estar entre 1 y 20",
+  "ut_c1fe9fa3f2": "Debe estar entre 1 y 12",
+  "ut_299e9d34bb": "Debe estar entre 3000-120000",
+  "ut_3d127654a9": "El parámetro es incorrecto, verifique el campo resaltado",
+  "ut_0531ef0aec": "Guardado, con efecto inmediato",
+  "ut_c259d39a21": "Restaurado último estado guardado",
+  "ut_1595af9c76": "restablecer estado",
+  "ut_5046a76cef": "Esperando confirmación",
+  "ut_3a760ee340": "ejecutando",
+  "ut_9b47257520": "suspendido",
+  "ut_6bafadcb9f": "⏸️ La tarea ha sido suspendida, puedes hacer clic en reanudar para continuar",
+  "ut_5384a63ffb": "▶️ La tarea ha sido retomada, continúa la ejecución...",
+  "ut_48eb86eca2": "⚠️ La IA afirma que se completó sin ejecutar realmente el comando, lo que requiere una verificación real",
+  "ut_c975d9cfca": "…(La respuesta es demasiado larga y ha sido truncada)",
+  "ut_c0bd0404a4": "Para comandos nativos, utilice la herramienta local_exec en su lugar.",
+  "ut_a3621ea638": "Intercepción durante el bloqueo de la red.",
+  "ut_6c86646cba": "El modo de solo lectura está habilitado y se deniega la ejecución de este comando.",
+  "ut_6140f3dac8": "Modo de permiso actual, se niega la ejecución de este comando",
+  "ut_b14923e57e": "preguntar",
+  "ut_287a6d5c24": "automático",
+  "ut_64b5e22817": "✅ El usuario ha confirmado, inicia la ejecución...",
+  "ut_748164be56": "⚠️ AI llama a la herramienta pero no especifica el nombre de la herramienta",
+  "ut_ee157cb455": "⏳ Continuar...",
+  "ut_7d89802fc1": "Organizar conclusiones",
+  "ut_42d195aa5d": "Abriendo el subsistema SFTP...",
+  "ut_a70224cf55": "Carga completada",
+  "ut_3ce3c27270": "Descarga completada",
+  "ut_90b80824a2": "Sincronización de archivos detenida",
+  "ut_948df560e2": "La sincronización de archivos se ha detenido",
+  "ut_c6a06709f5": "Iniciando sincronización de archivos...",
+  "ut_88dfa9a69c": "Parámetro faltante: modo requerido (remoto/local_file/ssh_hostkey)",
+  "ut_c767a0bfa3": "El rango de puertos es ilegal (1-65535)",
+  "ut_7400d2fd8c": "certPath contiene caracteres ilegales (comillas/punto y coma/tuberías/comillas invertidas, etc.)",
+  "ut_272d2f4a52": "Leyendo la huella digital de la clave del host SSH...",
+  "ut_049487ff40": "Falta parámetro: content o content_b64 debe proporcionar uno",
+  "ut_7515f1e67e": "Error de escritura SFTP, revertir la copia de seguridad...",
+  "ut_ee8e576b01": "Archivo original restaurado desde la copia de seguridad",
+  "ut_a3714eed7b": "Error de escritura SFTP, intentando el modo PTY stdin (cat > archivo)...",
+  "ut_ca59f0145f": "Copia de seguridad de archivos originales...",
+  "ut_ed571dc1ef": "archivo local",
+  "ut_aeff3a9157": "Falló la escritura local directa al intentar escribir a través del shell actual...",
+  "ut_751b0202ff": "entrada estándar PTY local",
+  "ut_ddd5f79db8": "PTY local stdin + camiseta sudo",
+  "ut_e67f272887": "  Nota: El proceso actual no tiene permiso para leer el archivo original y no puede generar una copia de seguridad.",
+  "ut_d1dd8a4a86": "La sesión actual no tiene acceso a la entrada de contraseña. Complete la contraseña de sudo en la configuración del host.",
+  "ut_cdfaed0dc5": "Espere a que el usuario ingrese la contraseña sudo...",
+  "ut_6d06b21d26": "El usuario no proporcionó una contraseña (cancelar o ingresar en blanco). Utilice Acción: solicite confirmación con el usuario o ejecútelo en modo sin privilegios.",
+  "ut_de63930b16": "Experiencia de verificación nativa",
+  "ut_11e4b8176f": "Base de conocimientos oficial",
+  "ut_587234aed7": "Este artículo ha sido truncado.",
+  "ut_fb8896831d": "El importe total supera el límite y las entradas posteriores se han truncado.",
+  "ut_89d6d1508a": "La plataforma actual no admite la ejecución de comandos nativos (solo escritorio Windows/macOS/Linux).",
+  "ut_4d2a25adb6": "Parámetro faltante: consulta requerida",
+  "ut_039e6df512": "\nNota: La cantidad de archivos ha alcanzado el límite superior de 5000. El recorrido no continuará. Utilice glob o una ruta más estrecha para reducir el rango.",
+  "ut_4d2db00134": "Nota: La cantidad de archivos ha alcanzado el límite superior de 5000. El recorrido no continuará. Utilice glob o una ruta más estrecha para reducir el rango.",
+  "ut_1d0e0057ce": "Argumento faltante: content o content_b64 Se debe proporcionar uno. Escriba varias líneas de contenido en la misma línea y utilice \\n para indicar un salto de línea.",
+  "ut_80fbd0db5a": "[El proceso ha salido]",
+  "ut_3212b67b4f": "La autorización de OAuth ha caducado, inicie sesión nuevamente",
+  "ut_3043a371fb": "(La herramienta MCP devuelve resultados vacíos)",
+  "ut_4b697ab9d4": "Llamada MCP cancelada",
+  "ut_e6a3f8cacd": "Este servidor MCP no proporcionó una palabra de aviso.",
+  "ut_18ecc05e1c": "Analizando la estructura del proyecto...",
+  "ut_b814db8dc9": "=== Informe de análisis del proyecto ===",
+  "ut_b703554a31": "Esperando el bloqueo de construcción...",
+  "ut_76fa7f5bc2": "Cancelado mientras esperaba el bloqueo de compilación",
+  "ut_957091cf2f": "Construir con éxito",
+  "ut_892c3e0946": "Verificación de conexión aprobada",
+  "ut_d9a78ca9ae": "[Conexión cerrada]",
+  "ut_4db21d650d": "[error]",
+  "ut_7038dfdb24": "[Conexión cerrada]",
+  "ut_3902f53eb2": "Conexión exitosa",
+  "ut_8d0408fbbe": "La conexión falló:",
+  "ut_87f4917a26": "[Error] No conectado",
+  "ut_3561d2bc19": "[Desconectado]",
+  "ut_558bbf2918": "Parámetros faltantes: se requiere consulta",
+  "ut_d74776ae2e": "El rastreo se realizó correctamente, pero el contenido de la página está vacío.",
+  "ut_1ebeb12158": "Analiza el texto...",
+  "ut_dfde5a0464": "Este comando está bloqueado por la política de seguridad.",
+  "ut_517880c5b3": "Confirmar la ejecución del comando",
+  "ut_dd66d942fb": "Confirmación de operaciones peligrosas.",
+  "ut_c5955eb9de": "A punto de ser ejecutado:",
+  "ut_68772a88f7": "Esta operación puede hacer que el sistema deje de estar disponible. ¡Realícela con precaución!",
+  "ut_fccd2f755c": "Por favor ingrese CONFIRMAR para continuar:",
+  "ut_6863351895": "Ingrese CONFIRMAR",
+  "ut_e6f77c3aa9": "Confirmar ejecución",
+  "ut_03303bd6da": "Ejecutar llamadas a herramientas que pueden cambiar de estado fuera de la sesión actual",
+  "ut_c8e25a26d1": "La instalación o actualización de paquetes de software puede cambiar las dependencias del sistema y afectar los servicios existentes.",
+  "ut_cd5d5a98a0": "Desinstale el software; es posible que los servicios que dependen de él no estén disponibles",
+  "ut_88ec88c7b3": "Iniciar el servicio cambiará el estado de ejecución actual",
+  "ut_7ba837a04e": "Detenga el servicio y los sitios web/interfaces que dependen de él se interrumpirán",
+  "ut_a1e726721a": "Reinicie el servicio. El sitio web/la interfaz puede verse interrumpido temporalmente.",
+  "ut_1210181241": "Modificar archivos de configuración, lo que puede cambiar el comportamiento del servicio.",
+  "ut_a0e4d573e8": "Modifique el estado del servidor, confirme el alcance del impacto",
+  "ut_ab356c88ee": "Se pasó la verificación de configuración de Nginx",
+  "ut_8e89715728": "La verificación de configuración de Nginx falló",
+  "ut_3e37edb32c": "¿Ninguno de los botones encaja? Simplemente ingresa tu respuesta...",
+  "ut_1cb11a152d": "Enviar respuesta personalizada",
+  "ut_b31e90861f": "(sin salida)",
+  "ut_c06a19b387": "Reconectar",
+  "ut_e3d0732b84": "Deja que la IA vuelva a intentarlo",
+  "ut_73c881e205": "Misión cumplida",
+  "ut_22aee52bc1": "Todos los pasos completados",
+  "ut_704c12f2eb": "Tarea fallida",
+  "ut_da68e2844f": "La ejecución de la tarea falló",
+  "ut_ede5822e49": "La tarea fue interrumpida",
+  "ut_9566f7b70f": "salida del comando",
+  "ut_51bfee4aca": "fin",
+  "ut_e46194bcb9": "Registro del agente",
+  "ut_ecc8f6c40b": "Copiar los resultados del filtro actual",
+  "ut_f988024855": "Ver solo esta tarea",
+  "ut_7b8553ecdf": "pensamiento modelo",
+  "ut_46d28ef143": "↑↓ Cambiar pestaña Seleccionar Entrar Ejecutar Esc Cerrar",
+  "ut_9e9ac63dcb": "Instrucciones complementarias (vigentes en la siguiente ronda)",
+  "ut_f12263d7ea": "sin color",
+  "ut_b35da5e4e9": "¿Borrar todo el historial de comandos?",
+  "ut_0f29d5bb1a": "Borrar",
+  "ut_9687dea3ac": "Borrar historial",
+  "ut_8a6ca36e98": "Comandos del historial de búsqueda",
+  "ut_3a23e3acdd": "Aún no hay comandos históricos",
+  "ut_f22110ada9": "Ingrese para ejecutar el primer resultado · Ingrese para completar · Haga clic para copiar",
+  "ut_956e4930dd": "Buscar host/comando/página/acción…",
+  "ut_e69a25b65d": "no hay coincidencia",
+  "ut_f160c18c0c": "Seleccionar",
+  "ut_981720593b": "ejecutar",
+  "ut_a3e557dfb9": "cerrar",
+  "ut_493d7ff67f": "Inspección",
+  "ut_b8c3200c7b": "seguro",
+  "ut_2aa836e6e9": "implementar",
+  "ut_bda0db72a1": "Solución de problemas",
+  "ut_6f9c60bc15": "Mantenimiento de rutina",
+  "ut_338073cc53": "Las plantillas integradas son de solo lectura",
+  "ut_5865795364": "icono",
+  "ut_5dfdb946bf": "Tipo",
+  "ut_52129c776f": "Ejecución de IA (paso de lenguaje natural)",
+  "ut_e87bf3a87f": "Ejecución directa (comando shell)",
+  "ut_c1af116483": "Clasificación",
+  "ut_e91627ff38": "Pasos (escritos en IA)",
+  "ut_25cc0f420e": "comando",
+  "ut_cdeeaa7450": "No hay modelos restaurables para este ajuste preestablecido",
+  "ut_ab0793064d": "Complete primero la URL base",
+  "ut_dd05d9a6b8": "No hay nuevos modelos para agregar",
+  "ut_5fe10ec0d8": "Tiempo de espera de conexión",
+  "ut_bc3f91069f": "No se puede conectar",
+  "ut_6367b9ea6c": "Solicitud fallida",
+  "ut_7794ac4d33": "La URL base no puede estar vacía",
+  "ut_ae851c66db": "Mantenga al menos un modelo",
+  "ut_82d4f67dc5": "Editar punto final",
+  "ut_742161ce45": "Déjelo en blanco para usar la clave guardada",
+  "ut_41678037ea": "nombre para mostrar",
+  "ut_03570451ac": "acuerdo",
+  "ut_0de12236b8": "Wenxinyiyan",
+  "ut_7abc46ce6d": "Restaurar valor predeterminado",
+  "ut_28c32fe34f": "Recuperando…",
+  "ut_f2a08ffc71": "Extraer del proveedor de servicios",
+  "ut_a52f4bbfda": "Portada",
+  "ut_3ed4ca7624": "Aún no hay modelo, agrega uno primero.",
+  "ut_7e4f0e1070": "El ID del modelo no puede estar vacío",
+  "ut_2ea671ff59": "Nombre de equipo duplicado",
+  "ut_d2cf18b1f8": "Se requiere al menos un engranaje para permitir la inferencia.",
+  "ut_df2b9cacae": "bien",
+  "ut_02259f1272": "No establecido",
+  "ut_ea6cf493d2": "terminal de conexión",
+  "ut_57d80443c9": "Reintentar el host fallido",
+  "ut_9e541c6382": "éxito",
+  "ut_e35dddb0b4": "falló",
+  "ut_ec4c29ca9a": "Conexión perdida",
+  "ut_a1e91f6981": "tiempo de espera",
+  "ut_7d4af9fef1": "Permisos insuficientes",
+  "ut_9927a13579": "esperando entrada",
+  "ut_b3d243fdfd": "error de sintaxis",
+  "ut_66197bd48d": "Regresar",
+  "ut_58851eb751": "El registro de ejecución se ha conservado y se puede completar.",
+  "ut_e6b33fe91a": "continuar tarea",
+  "ut_5e6e54121d": "Restaurar valor predeterminado",
+  "ut_9aa0cecb52": "Haga clic para volver a ingresar",
+  "ut_1f0be4879d": "Por favor presione la combinación de teclas...",
+  "ut_5a1aea8730": "bien",
+  "ut_a1490afb10": "El proxy solo admite http://host:puerto",
+  "ut_ffad1d8b04": "Directorio de trabajo (opcional)",
+  "ut_205492caf2": "Variables de entorno (CLAVE=VALOR por línea)",
+  "ut_acce8b3510": "Proxy saliente (opcional)",
+  "ut_cd76953b04": "Encabezados (Clave: Valor por fila)",
+  "ut_12f53f2717": "Personalizar (verificar después de conectarse)",
+  "ut_a8481de1d6": "Ámbitos de OAuth (separados por espacios/comas)",
+  "ut_4181f5ee36": "ID de cliente de OAuth (déjelo en blanco para usar DCR)",
+  "ut_a6f501ed31": "Cliente OAuthSecret (opcional)",
+  "ut_810e89c23f": "asistente de IA",
+  "ut_1a81fac6b4": "cerrar cajón",
+  "ut_df39e46c77": "Editar comandos de acceso directo",
+  "ut_5b6a456972": "Editar flujo de trabajo",
+  "ut_9d49b2c71b": "Volver al nivel anterior",
+  "ut_de5dd6102e": "Buscar nombre/IP/grupo",
+  "ut_1c95f57481": "No hay ningún anfitrión coincidente",
+  "ut_29b3f192d8": "Buscar nombre/comando",
+  "ut_d112e18b97": "No hay ningún comando de acceso directo coincidente",
+  "ut_dd209aad9b": "Buscar nombre/descripción",
+  "ut_3d46c0f619": "Ejecución de IA",
+  "ut_6ba17bef52": "Ejecución directa",
+  "ut_45a37578cb": "Recientemente",
+  "ut_ab4373452b": "correr",
+  "ut_6cb13cd9c4": "No hay flujo de trabajo coincidente",
+  "ut_00636e0752": "comando de búsqueda",
+  "ut_f83f96b238": "Aún no hay registros de auditoría",
+  "ut_cacce52f6d": "No hay registros para copiar",
+  "ut_a50d8711f5": "Registro de auditoría de terminal de IA",
+  "ut_6200fddf68": "máquina local",
+  "ut_2f5e0aff16": "Sin salida",
+  "ut_f943d2ce6c": "interceptar",
+  "ut_740618ad3b": "liberar",
+  "ut_311d08fee0": "ejecutado",
+  "ut_7e1cc53dfe": "No ejecutado",
+  "ut_d6834ac586": "Copia esto",
+  "ut_4a647e404a": "Configuración de búsqueda",
+  "ut_8ad11edf4e": "Modificado",
+  "ut_57d5e9c054": "cerrar",
+  "ut_10f71987c9": "Número de líneas del buffer de reversión",
+  "ut_d7b02e9cf7": "Registro automático de sesiones",
+  "ut_2543cfa7f8": "Tiempo de espera de respuesta de un solo paso",
+  "ut_fac7fadb45": "Tiempo de espera de comando múltiple",
+  "ut_48274233a0": "hoy",
+  "ut_98427f593c": "La tarea ha finalizado; consulte el registro de ejecución para obtener más detalles.",
+  "ut_9caaf88e9c": "Reversión realizada",
+  "ut_aee33bbe51": "Sin reversión automática, se recomienda utilizar una instantánea previa a la ejecución",
+  "ut_4e9cdbd7a8": "revertido",
+  "ut_730ed00d8e": "Se puede revertir",
+  "ut_4f069ae310": "Requiere mano de obra",
+  "ut_209a3ee99a": "Retroceder",
+  "ut_8bcebbb092": "revertir",
+  "ut_3459fead8a": "Instalación",
+  "ut_ad620f1593": "Desinstalar",
+  "ut_0e0e2a9a73": "Modificar configuración",
+  "ut_7393410b1a": "Iniciar servicio",
+  "ut_64a71bf56a": "detener el servicio",
+  "ut_c5ea3f5be9": "Reiniciar servicio",
+  "ut_7a42975bda": "Operaciones de archivos",
+  "ut_98ae0d0e95": "Modificación de permiso",
+  "ut_d3636b0082": "cambiar",
+  "ut_3954d67b32": "No hay coincidencias",
+  "ut_ce6351e3cc": "salida bruta",
+  "ut_f5876a2bf8": "copiar todo",
+  "ut_f7d3ee00a1": "Resultado de la búsqueda…",
+  "ut_ef2170f4b4": "La etiqueta actual no está conectada y no se puede establecer el reenvío.",
+  "ut_0df8de01ab": "Complete un puerto válido (1-65535) y un host de destino",
+  "ut_be0c081010": "Aún no hay reglas de reenvío",
+  "ut_d0df2ad5ea": "detener y eliminar",
+  "ut_f704784855": "local → remoto",
+  "ut_1b67fdda4b": "remoto → local",
+  "ut_50901ca37c": "puerto de escucha",
+  "ut_864e1c6380": "anfitrión objetivo",
+  "ut_ec3f615847": "puerto de destino",
+  "ut_c1fbfd5065": "Agregar adelante",
+  "ut_4a8eab4b12": "Por ejemplo: nginx solo cambia conf.d",
+  "ut_ee90ce584e": "Escriba las restricciones claramente en lenguaje natural y la IA las seguirá exactamente.",
+  "ut_468c99d256": "Aún no hay un anfitrión, por lo que no se puede limitar a uno solo.",
+  "ut_d83a565087": "Diagnóstico",
+  "ut_92cd36cefb": "Comprobando…",
+  "ut_0ddb8a1f0d": "No obtuve los resultados de la prueba.",
+  "ut_b1ab09352f": "Versión de la aplicación",
+  "ut_0942c2789b": "Esta sesión falló",
+  "ut_9f028e8160": "última hora del accidente",
+  "ut_87c363d0c9": "Ninguno",
+  "ut_065917e680": "Conexión de grupo SSH",
+  "ut_4927752a48": "conexión muerta",
+  "ut_46d9b304c4": "Disco grabable",
+  "ut_3779abda15": "si",
+  "ut_e812fd5dbb": "No",
+  "ut_2e81ddc87a": "comprobar la hora",
+  "ut_234f4f27c8": "El registro de fallos está vacío",
+  "ut_d10e283a81": "Copiar registro de fallos",
+  "ut_ced38012da": "Registro de fallos borrado",
+  "ut_ead023bd7e": "volver a comprobar",
+  "ut_2e28b0df81": "Registros de fallos y estado de salud",
+  "ut_3f96027e32": "Información de versión copiada",
+  "ut_1f0a3070de": "Leyendo…",
+  "ut_b6541b6328": "Buscando actualizaciones...",
+  "ut_32142192ac": "Ya la ultima version",
+  "ut_7dc8c0869d": "versión",
+  "ut_610ddf67b9": "Número de líneas del buffer de reversión",
+  "ut_8a70b91e29": "Registro automático de sesiones",
+  "ut_050de7d897": "Modelo utilizado actualmente",
+  "ut_626fb86214": "Ningún modelo todavía. Primero agregue un punto final, luego agregue el modelo.",
+  "ut_387e6f82d0": "punto final",
+  "ut_76fb9c463a": "Aún no hay puntos finales.",
+  "ut_38966aa565": "Sin límite",
+  "ut_f28f99867b": "Tiempo de espera de respuesta de un solo paso",
+  "ut_ded8ed2d66": "Tiempo de espera de comando múltiple",
+  "ut_a2ce59889b": "no establecido",
+  "ut_6aad5ea609": "Editar palabra",
+  "ut_b95d0f872a": "cara",
+  "ut_2318f73d10": "huella digital",
+  "ut_8ec132c8b8": "Biometría",
+  "ut_cea6052a7e": "Cerrado",
+  "ut_00f43cd923": "No hay datos biométricos disponibles en este dispositivo y App Lock no se puede activar.",
+  "ut_91f4c00293": "Almacenamiento de credenciales",
+  "ut_021001ca72": "Almacenamiento seguro del sistema + respaldo AES",
+  "ut_b25f81d2b6": "Órdenes de alto riesgo",
+  "ut_ffaeb5818f": "Segunda confirmación antes de la ejecución.",
+  "ut_98c6d8c630": "Borrar datos locales",
+  "ut_a74aec2b15": "Los datos locales han sido borrados.",
+  "ut_5474c635a4": "Verifique la identidad para habilitar el bloqueo de aplicaciones",
+  "ut_00b1b1f0c5": "Habilitar MCP",
+  "ut_a48007473a": "Aún no hay servidor.",
+  "ut_c9189bb086": "No conectado",
+  "ut_a4b4f07ab5": "Permitir la búsqueda en Internet con IA",
+  "ut_704bcb4a34": "backend",
+  "ut_2acaddf4df": "Si ninguno de los backends está habilitado, significa que no están activados.",
+  "ut_d40fdc917f": "Devolver el número de artículos",
+  "ut_b00662826d": "Aún no hay reglas.",
+  "ut_078781c029": "Agregar reglas",
+  "ut_19b85efbe5": "Todos los anfitriones",
+  "ut_c9e6373a79": "Recordatorio de finalización de tarea",
+  "ut_4b93fcd514": "cuando recordar",
+  "ut_6e277f398f": "dirección de webhook",
+  "ut_559d9de7a7": "Aún no he completado la dirección del webhook, por lo que no se puede enviar.",
+  "ut_e52ad942fc": "Se añade después de la palabra de aviso del sistema.",
+  "ut_62951d47df": "Convenciones adicionales escritas en esta máquina.",
+  "ut_968538bf30": "Ingrese BORRAR para confirmar",
+  "ut_3da0e76468": "Agregar backend de búsqueda",
+  "ut_402165c066": "Se han agregado todos los backends disponibles.",
+  "ut_fd7c3540b7": "Guardar y habilitar",
+  "ut_ed57742e6a": "Abrir configuración completa",
+  "ut_5208f9bddf": "El anfitrión no existe",
+  "ut_bc683a74fa": "abierto",
+  "ut_731d9e386f": "Descargar a local",
+  "ut_21512fa475": "Vista previa del contenido",
+  "ut_64da167c8c": "eliminar directorio",
+  "ut_f405fa4a70": "Eliminar archivos",
+  "ut_8b9071fa7d": "Modificado",
+  "ut_46ebf5b01b": "salvado",
+  "ut_01ff3a92b3": "nuevo nombre",
+  "ut_c28161cd4b": "Confirmar eliminación",
+  "ut_32d93b8221": "nombre del directorio",
+  "ut_87fc3f64f6": "crear",
+  "ut_40cd9573ff": "Liberar para cargar en el directorio actual",
+  "ut_ebab5a91e2": "ordenar",
+  "ut_436d7985a6": "tamaño",
+  "ut_cac0b492e4": "hora de modificación",
+  "ut_125f95f8d1": "subir",
+  "ut_fe22bfe107": "Actualizar",
+  "ut_2b1e2ceb1b": "Introducir ruta",
+  "ut_cfd5be4925": "directorio raíz",
+  "ut_9dc11a1d64": "Conectando...",
+  "ut_98d1c295e4": "directorio vacio",
+  "ut_a64c884da9": "No se puede leer el archivo de configuración",
+  "ut_91d4c887bb": "Archivo de configuración no encontrado",
+  "ut_8411943202": "Importación fallida",
+  "ut_c4bdcb7bb4": "No hay ningún host que se pueda importar en la configuración.",
+  "ut_ee82429005": "Consejos de análisis",
+  "ut_ffb911cc34": "importar",
+  "ut_4e39421eaf": "trampolín",
+  "ut_35660d6755": "Se requiere clave privada",
+  "ut_94376a7210": "Artículo no importado",
+  "ut_793cb65e3d": "Ya existe",
+  "ut_61181b84f1": "modo tema",
+  "ut_33bd0353d6": "Tamaño de fuente",
+  "ut_5fb0f8f4a5": "Configuración de terminales",
+  "ut_ce50810b95": "solo color oscuro",
+  "ut_39c65ad937": "Sin resultados",
+  "ut_ef282263a5": "Salida del terminal de búsqueda",
+  "ut_d24c2e83f7": "distingue entre mayúsculas y minúsculas",
+  "ut_3525464ef3": "Anterior (Mayús+Entrar)",
+  "ut_01e46e4cac": "Siguiente (Entrar)",
+  "ut_3dd4f86972": "Seleccionar todo",
+  "ut_93db49204e": "pantalla clara",
+  "ut_6b1ae00645": "Borrar el búfer de desplazamiento hacia atrás",
+  "ut_49db0eb3e7": "Copiar toda la salida",
+  "ut_8f5a44f9a8": "Guardar la salida en un archivo...",
+  "ut_7e205da9b6": "Ampliar tamaño de fuente",
+  "ut_aa2e753d46": "Reducir el tamaño de fuente",
+  "ut_1c98824fa9": "Restablecer tamaño de fuente",
+  "ut_e9304231ed": "Enviar explicación al Agente",
+  "ut_c48f8080f6": "Guardar como fragmento de comando",
+  "ut_ab94a86f01": "Ejecute este comando en la terminal.",
+  "ut_e865710760": "Pantalla dividida a izquierda y derecha",
+  "ut_9833a4decf": "Dividir pantalla arriba y abajo",
+  "ut_3e9c805d7f": "Desactiva esta pantalla dividida (la IA está en esta pantalla)",
+  "ut_16863c6e3a": "Desactiva esta pantalla dividida",
+  "ut_6f9e7de9f4": "Ubicar en SFTP",
+  "ut_fa0ed53542": "Abra el panel SFTP",
+  "ut_6dc8f53907": "Ver registros de auditoría",
+  "ut_078958b894": "Ver historial de cambios",
+  "ut_76a60a446c": "enlace abierto",
+  "ut_b99781d2e8": "Copiar enlace",
+  "ut_9641c0bb12": "copiar ruta",
+  "ut_b736a87497": "Pregúntele al agente sobre este error",
+  "ut_6fcc795a39": "Deja que el agente explique todo este fragmento.",
+  "ut_dc52ca948e": "Copia este bloque completo",
+  "ut_4d77c0da07": "Comando anterior",
+  "ut_083f59cfec": "comando de siguiente bloque",
+  "ut_c49dbc7b41": "Ningún contenido seleccionado",
+  "ut_90074297f5": "Se ejecutarán varias líneas de contenido de forma secuencial; asegúrese de que no haya ningún error al pegar:",
+  "ut_3a1c210c39": "¿Ejecutar este comando en la terminal?",
+  "ut_a28740df5a": "Guardar salida del terminal",
+  "ut_8a039d57ca": "Esperando conexión...",
+  "ut_364a8e7d72": "Terminal",
+  "ut_6b4426c1f7": "modelo de IA",
+  "ut_47436bc8ab": "Agente",
+  "ut_ed3461341d": "servidor MCP",
+  "ut_a6db458718": "búsqueda en internet",
+  "ut_83d66464a0": "reglamento interno",
+  "ut_dc4a75d976": "Notificaciones",
+  "ut_6dbcd29d76": "auditoría",
+  "ut_2e90894c9a": "solo falló",
+  "ut_ec50bedaa8": "recordar cada vez",
+  "ut_e39887dfed": "No se pudo realizar la copia de seguridad del archivo original: {e}. La escritura ha sido cancelada y el archivo original no ha sido modificado.",
+  "@ut_e39887dfed": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fcda8e6588": "  Se ha realizado una copia de seguridad del archivo original: {backupPath}",
+  "@ut_fcda8e6588": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4452077d81": "{summary}\nRuta de destino: {effectiveLocal}",
+  "@ut_4452077d81": {
+    "placeholders": {
+      "summary": {
+        "type": "Object"
+      },
+      "effectiveLocal": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f4856090f2": "Leyendo {path}...",
+  "@ut_f4856090f2": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1e823bfa18": "Leyendo {stderr}...",
+  "@ut_1e823bfa18": {
+    "placeholders": {
+      "stderr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a2a80977d9": "La ejecución de openssl falló: {backupPath}",
+  "@ut_a2a80977d9": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b9beeabb91": "  Para retroceder: mv {backupPath} {path}",
+  "@ut_b9beeabb91": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c4acfd10f3": "  Si necesita revertir: sobrescriba {path} con esta copia de seguridad",
+  "@ut_c4acfd10f3": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_af40dec29f": "  Si necesita revertir: sobrescriba {path} con esta copia de seguridad",
+  "@ut_af40dec29f": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fb892c6b10": "Archivo modificado: {length}",
+  "@ut_fb892c6b10": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_59e5f6620a": "  Reemplazo: {length} bytes → {length} bytes",
+  "@ut_59e5f6620a": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5fe0b81932": "No se pudo guardar: {e}",
+  "@ut_5fe0b81932": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1dd514c792": "No se pudo guardar: {length}",
+  "@ut_1dd514c792": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e275b00675": "{fileName} caracteres copiados",
+  "@ut_e275b00675": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3ae63b10aa": "Archivos sensibles: {segment} (el acceso está prohibido incluso dentro del proyecto)",
+  "@ut_3ae63b10aa": {
+    "placeholders": {
+      "segment": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5b6668af25": "Directorio sensible: {prefix} (acceso prohibido)",
+  "@ut_5b6668af25": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_337b92f903": "Acceso prohibido al directorio del sistema {suffix}",
+  "@ut_337b92f903": {
+    "placeholders": {
+      "suffix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0c25c4bff1": "Se prohíbe el acceso al directorio confidencial ~/{fileName}",
+  "@ut_0c25c4bff1": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fffc2d39d8": "Archivos sensibles: {segment}",
+  "@ut_fffc2d39d8": {
+    "placeholders": {
+      "segment": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_61f32e7e81": "Directorio sensible: {normalized} acceso prohibido",
+  "@ut_61f32e7e81": {
+    "placeholders": {
+      "normalized": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7695e08c1e": "{scrollLabel} · {logLabel}",
+  "@ut_7695e08c1e": {
+    "placeholders": {
+      "scrollLabel": {
+        "type": "Object"
+      },
+      "logLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b003c911bd": "{count} · {selectedName}",
+  "@ut_b003c911bd": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      },
+      "selectedName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3f574ada1a": "{count} configurado",
+  "@ut_3f574ada1a": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_664f79491a": "{timeout} configurado",
+  "@ut_664f79491a": {
+    "placeholders": {
+      "timeout": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a303a7b799": "Máximo {steps} pasos · tiempo de espera {timeout}s",
+  "@ut_a303a7b799": {
+    "placeholders": {
+      "steps": {
+        "type": "Object"
+      },
+      "timeout": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9947165032": "Habilitado · {enabledCount} backends disponibles",
+  "@ut_9947165032": {
+    "placeholders": {
+      "enabledCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_94c3718c07": "Período seguro {startHour}:00–{endHour}:00",
+  "@ut_94c3718c07": {
+    "placeholders": {
+      "startHour": {
+        "type": "Object"
+      },
+      "endHour": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cbd8c9bc33": "Periodo de seguridad {length}:00–{path}:00",
+  "@ut_cbd8c9bc33": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b078e9e8b1": "Exportación fallida: {e}",
+  "@ut_b078e9e8b1": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_81d685bdc0": "Error al exportar: {skippedUnknownHost}",
+  "@ut_81d685bdc0": {
+    "placeholders": {
+      "skippedUnknownHost": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f59978a9af": "Importado {imported} especificaciones{skippedHint}",
+  "@ut_f59978a9af": {
+    "placeholders": {
+      "imported": {
+        "type": "Object"
+      },
+      "skippedHint": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4bda191f7f": "Error de importación: {e}",
+  "@ut_4bda191f7f": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ec13b5dac5": "Error de importación: {e}",
+  "@ut_ec13b5dac5": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1e9e2bf1a0": "Herramientas ({length}) · {exposure}",
+  "@ut_1e9e2bf1a0": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "exposure": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fb221962b1": "No se pudo guardar el cambio de herramienta: {e}",
+  "@ut_fb221962b1": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_62adaafe0d": "No se pudo guardar el cambio de herramienta: {length}",
+  "@ut_62adaafe0d": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_70da821187": "Recursos ({length})",
+  "@ut_70da821187": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_169bc8e674": "Palabra de aviso ({e})",
+  "@ut_169bc8e674": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_02f4d31e55": "No se pudo abrir el selector de directorio: {e}",
+  "@ut_02f4d31e55": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c87274304e": "No se pudo guardar el interruptor: {e}",
+  "@ut_c87274304e": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1c9cc2edb3": "Error al guardar: {e}",
+  "@ut_1c9cc2edb3": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ab07d88b41": "Error al eliminar: {maxPanes}",
+  "@ut_ab07d88b41": {
+    "placeholders": {
+      "maxPanes": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2596a43876": "Máximo de pantallas {auditToday} por pestaña (una sesión real por pantalla)",
+  "@ut_2596a43876": {
+    "placeholders": {
+      "auditToday": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_acb620e2fa": "Publicaciones de {targetHost} de hoy",
+  "@ut_acb620e2fa": {
+    "placeholders": {
+      "targetHost": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2f00778de2": "El host {hostLabel} no está conectado y no puede realizar la reversión",
+  "@ut_2f00778de2": {
+    "placeholders": {
+      "hostLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_35b3e86940": "Anfitrión: {rollbackCommand}",
+  "@ut_35b3e86940": {
+    "placeholders": {
+      "rollbackCommand": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_21823fef80": "Reversión exitosa: {exitCode}",
+  "@ut_21823fef80": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_34ec0a3e03": "Código de salida {reason}",
+  "@ut_34ec0a3e03": {
+    "placeholders": {
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_be42c8efee": "Error al revertir: {e}",
+  "@ut_be42c8efee": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_99956a3c17": "Excepción de reversión: {title}",
+  "@ut_99956a3c17": {
+    "placeholders": {
+      "title": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c1dbbf6a2c": "Reconectando {e}...",
+  "@ut_c1dbbf6a2c": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5b97d3e6a4": "Excepción de reconexión: {modelId}",
+  "@ut_5b97d3e6a4": {
+    "placeholders": {
+      "modelId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7fb66c7378": "Cambiado al modelo: {chars}",
+  "@ut_7fb66c7378": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a1c44d88d9": "Conversación copiada al portapapeles ({chars} palabras)\nRegistro de ejecución: {path}",
+  "@ut_a1c44d88d9": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5cf729e87e": "Conversación copiada al portapapeles ({chars} palabras)\nNo se pudo leer la ruta del registro: {e}",
+  "@ut_5cf729e87e": {
+    "placeholders": {
+      "chars": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e77b2cd18c": "Guardado en fragmento de comando: {trimmed}",
+  "@ut_e77b2cd18c": {
+    "placeholders": {
+      "trimmed": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_32148ad774": "No se pudo leer el estado de la clave: {e}",
+  "@ut_32148ad774": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9979b52038": "Prueba fallida: {e}",
+  "@ut_9979b52038": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6934446d27": "Error al guardar la configuración: {e}",
+  "@ut_6934446d27": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8de5894b72": "Enlace copiado: {url}",
+  "@ut_8de5894b72": {
+    "placeholders": {
+      "url": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_61476f7ee8": "La respuesta de IA no se pudo guardar: {e}",
+  "@ut_61476f7ee8": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_07c39ce9ce": "⚠️ Esta operación cambiará los archivos locales y requiere confirmación:\n{display}",
+  "@ut_07c39ce9ce": {
+    "placeholders": {
+      "display": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b306912acf": "{toolName}",
+  "@ut_b306912acf": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0968807bf1": "Esperando confirmación: {steering}",
+  "@ut_0968807bf1": {
+    "placeholders": {
+      "steering": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c547224534": "⚠️ Todavía quedan {length} elementos sin terminar en el plan, que deben verificarse uno por uno antes de terminar ({planFinishRetryCount}/{maxPlanFinishRetries})",
+  "@ut_c547224534": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "planFinishRetryCount": {
+        "type": "Object"
+      },
+      "maxPlanFinishRetries": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_478eec6181": "⚠️ Se alcanza el número máximo de pasos de ejecución ({maxSteps}) y se interrumpe la tarea",
+  "@ut_478eec6181": {
+    "placeholders": {
+      "maxSteps": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fa2224f3f9": "⚠️ Se alcanza el número máximo de pasos de ejecución ({modelName}) y se interrumpe la tarea",
+  "@ut_fa2224f3f9": {
+    "placeholders": {
+      "modelName": {
+        "type": "Object"
+      },
+      "modelName2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_971883a7fe": "⚠️ Ignora llamadas de herramientas redundantes en esta ronda: {name} (solo realiza una acción por ronda)",
+  "@ut_971883a7fe": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cb255683ce": "⚠️ Ignora llamadas de herramientas redundantes en esta ronda: {safetyLevel} (solo realiza una acción en cada ronda)",
+  "@ut_cb255683ce": {
+    "placeholders": {
+      "safetyLevel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ee0b938b2c": "Grado: {reason}",
+  "@ut_ee0b938b2c": {
+    "placeholders": {
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f46987bf0d": "{highRisk} {highRisk} requiere confirmación (modo {modeLabel}): `{command}`\nDeclaración de riesgo: {reason}",
+  "@ut_f46987bf0d": {
+    "placeholders": {
+      "highRisk": {
+        "type": "Object"
+      },
+      "highRisk2": {
+        "type": "Object"
+      },
+      "modeLabel": {
+        "type": "Object"
+      },
+      "command": {
+        "type": "Object"
+      },
+      "reason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a61b05ce9b": "👉 Tú elegiste: {choice}",
+  "@ut_a61b05ce9b": {
+    "placeholders": {
+      "choice": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_386b3634c1": "⚠️ AI llama a {alias} pero no se proporciona ningún parámetro de comando",
+  "@ut_386b3634c1": {
+    "placeholders": {
+      "alias": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0eed0d18c7": "👉 Tu elegiste: {toolName}",
+  "@ut_0eed0d18c7": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_21239ba62c": "⚠️ AI llama a {toolName} pero no se proporciona ningún parámetro de comando",
+  "@ut_21239ba62c": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_339abc33a7": "⚠️Herramienta desconocida: {toolName}",
+  "@ut_339abc33a7": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2bd0b4985d": "❌ Excepción de ejecución de la herramienta {toolName}: {e}",
+  "@ut_2bd0b4985d": {
+    "placeholders": {
+      "toolName": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e36f09192f": "⚠️ La herramienta `{prefix}` no está disponible en la sesión actual",
+  "@ut_e36f09192f": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dc39c308a2": "{prefix} progreso de carga: archivos {uploaded}/{total}",
+  "@ut_dc39c308a2": {
+    "placeholders": {
+      "prefix": {
+        "type": "Object"
+      },
+      "uploaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_91700996f4": "{local} Esperando a que salga la última ronda de carga...",
+  "@ut_91700996f4": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ded2242c8f": "Progreso de carga de {local}: archivos {remote}/{size}",
+  "@ut_ded2242c8f": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_d72746d0d0": "Directorio de carga recursiva: {local} → {effectiveRemote}",
+  "@ut_d72746d0d0": {
+    "placeholders": {
+      "local": {
+        "type": "Object"
+      },
+      "effectiveRemote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0e800a8406": "Descargando archivos: {remote} → {target}",
+  "@ut_0e800a8406": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "target": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c8b91122b": "Descarga exitosa del archivo: {remote} → {target} ({size})",
+  "@ut_5c8b91122b": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "target": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2bc26619aa": "Descargando archivo: {remote} → {effectiveLocal}",
+  "@ut_2bc26619aa": {
+    "placeholders": {
+      "remote": {
+        "type": "Object"
+      },
+      "effectiveLocal": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_52a01019d8": "Progreso de la descarga: archivos {downloaded}/{total}",
+  "@ut_52a01019d8": {
+    "placeholders": {
+      "downloaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6b85bbaf16": "Directorio de descarga recursiva: {hostId} → {e}",
+  "@ut_6b85bbaf16": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2d44fe0c64": "Progreso de la descarga: archivos {hostId}/{local}",
+  "@ut_2d44fe0c64": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7ef1cd9389": "[{hostId}] Carga completada",
+  "@ut_7ef1cd9389": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a465e8a3ee": "[{hostId}] Archivo cargado exitosamente: {local} → {remote} ({size})",
+  "@ut_a465e8a3ee": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      },
+      "size": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_699c3fa8dc": "[{hostId}] Directorio de carga recursiva: {local} → {effectiveRemote}",
+  "@ut_699c3fa8dc": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      },
+      "local": {
+        "type": "Object"
+      },
+      "effectiveRemote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2996de9000": "[{hid}] Distribuyendo...",
+  "@ut_2996de9000": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0f735fba75": "[{hid}] ✗ Cancelado, omitido",
+  "@ut_0f735fba75": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c021ae6b9": "[{hid}] Recolectando {remote}...",
+  "@ut_5c021ae6b9": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e31edc9171": "[{hid}] ✗ Cancelado, omitido",
+  "@ut_e31edc9171": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2e01615eec": "=== [{hid}] Cancelado, omitido ===",
+  "@ut_2e01615eec": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ffebfc53a6": "[{hid}] ✗ Host no conectado o sesión no SSH",
+  "@ut_ffebfc53a6": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_38bc3dac85": "=== [{hid}] Cancelado, omitido ===",
+  "@ut_38bc3dac85": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8dc55e0134": "[{hid}] Leyendo {remote}...",
+  "@ut_8dc55e0134": {
+    "placeholders": {
+      "hid": {
+        "type": "Object"
+      },
+      "remote": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_475dcf3309": "Comprobando el certificado HTTPS para {host}:{port}...",
+  "@ut_475dcf3309": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      },
+      "port": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bde384cf72": "Resolviendo certificado local: {certPath}",
+  "@ut_bde384cf72": {
+    "placeholders": {
+      "certPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b733c697fb": "Ejecutando {write} {path} ({length} bytes)...",
+  "@ut_b733c697fb": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_24853c3f76": "Archivo {write} exitoso: {path} ({length} bytes)",
+  "@ut_24853c3f76": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_a7bd551b52": "Error en la reversión de la copia de seguridad: {rollbackErr}, se intentará escribir PTY",
+  "@ut_a7bd551b52": {
+    "placeholders": {
+      "rollbackErr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f8d0ae7c3c": "\n  Nota: El proceso SFTP ha realizado una copia de seguridad del archivo original en {backupPath}. La copia de seguridad se puede eliminar manualmente después de que el PTY se haya escrito correctamente.",
+  "@ut_f8d0ae7c3c": {
+    "placeholders": {
+      "backupPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6820e10527": "Escritura de archivo exitosa (categoría en modo estándar PTY): {path} ({length} bytes){backupInfo}",
+  "@ut_6820e10527": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      },
+      "backupInfo": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_caa84ab310": "Error de escritura del gato: {failureReason}, prueba con Sudo tee...",
+  "@ut_caa84ab310": {
+    "placeholders": {
+      "failureReason": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b0ea4177b4": "Escritura de archivo exitosa (PTY stdin + sudo tee): {path} ({length} bytes){backupInfo}",
+  "@ut_b0ea4177b4": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      },
+      "backupInfo": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_aad3625b0a": "Archivo {write} exitoso ({method}): {path} ({byteCount} bytes)",
+  "@ut_aad3625b0a": {
+    "placeholders": {
+      "write": {
+        "type": "Object"
+      },
+      "method": {
+        "type": "Object"
+      },
+      "path": {
+        "type": "Object"
+      },
+      "byteCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_00cd1c4300": "Error de escritura del gato: {query}, prueba con Sudo tee...",
+  "@ut_00cd1c4300": {
+    "placeholders": {
+      "query": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c0b2e0370": "\n…({label}, total {length} caracteres en el texto original)",
+  "@ut_5c0b2e0370": {
+    "placeholders": {
+      "label": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6f51e792f4": "Progreso de carga completo: {uploaded}/{total}",
+  "@ut_6f51e792f4": {
+    "placeholders": {
+      "uploaded": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf4b2fdeb1": "Buscando en la base de conocimientos: {resolvedCwd}",
+  "@ut_cf4b2fdeb1": {
+    "placeholders": {
+      "resolvedCwd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_93ba05fcda": "No se puede crear el directorio de trabajo {resolvedCwd}: {e}",
+  "@ut_93ba05fcda": {
+    "placeholders": {
+      "resolvedCwd": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bb63c6672a": "…({shell}, el texto original contiene caracteres {command})",
+  "@ut_bb63c6672a": {
+    "placeholders": {
+      "shell": {
+        "type": "Object"
+      },
+      "command": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b5e97db76b": "Archivos {scanned} escaneados...",
+  "@ut_b5e97db76b": {
+    "placeholders": {
+      "scanned": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_132456dcfb": "Modo desconocido: {mode} (admite escritura/añadir)",
+  "@ut_132456dcfb": {
+    "placeholders": {
+      "mode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3b4b10f1b2": "El terminal local no pudo iniciarse: {e}",
+  "@ut_3b4b10f1b2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_bbafda1855": "[Imagen {mimeType}, {length} caracteres base64]",
+  "@ut_bbafda1855": {
+    "placeholders": {
+      "mimeType": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3901620d02": "Llame a la herramienta MCP {serverName}/{name}",
+  "@ut_3901620d02": {
+    "placeholders": {
+      "serverName": {
+        "type": "Object"
+      },
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_405448830f": "Leer recurso MCP {uri}",
+  "@ut_405448830f": {
+    "placeholders": {
+      "uri": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_090d7978c2": "Obtener la palabra de aviso de MCP {name}",
+  "@ut_090d7978c2": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_b01822a097": "El directorio del proyecto no existe: {path}",
+  "@ut_b01822a097": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_f1acec8e02": "Ruta del proyecto: {path}",
+  "@ut_f1acec8e02": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8a884e053e": "Reconocer automáticamente el comando de compilación: {buildCmd}",
+  "@ut_8a884e053e": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5ab7922da3": "El comando de compilación fue bloqueado por la política de seguridad: {buildCmd}",
+  "@ut_5ab7922da3": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_323ecc4b40": "Comience a construir: {buildCmd}",
+  "@ut_323ecc4b40": {
+    "placeholders": {
+      "buildCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dd547aa71c": "✓ Construir con éxito ({inSeconds}s)\n\nSalida:\n{output}",
+  "@ut_dd547aa71c": {
+    "placeholders": {
+      "inSeconds": {
+        "type": "Object"
+      },
+      "output": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fe98a458a9": "✗ Error de compilación (código de salida: {exitCode}, tiempo necesario: {inSeconds}s)",
+  "@ut_fe98a458a9": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      },
+      "inSeconds": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2192f982a0": "Comando de empaquetado bloqueado por política de seguridad: {packageCmd}",
+  "@ut_2192f982a0": {
+    "placeholders": {
+      "packageCmd": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5e9fa40ae2": "Iniciar embalaje: {artifactDir} → {outputFile}",
+  "@ut_5e9fa40ae2": {
+    "placeholders": {
+      "artifactDir": {
+        "type": "Object"
+      },
+      "outputFile": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c3df15635": "✗ Error de compilación (código de salida: {outputFile}, tiempo necesario: {sizeStr})",
+  "@ut_9c3df15635": {
+    "placeholders": {
+      "outputFile": {
+        "type": "Object"
+      },
+      "sizeStr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7884351654": "Comando de empaquetado bloqueado por política de seguridad: {sizeStr}",
+  "@ut_7884351654": {
+    "placeholders": {
+      "sizeStr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0a71fe6a29": "✗ Error de embalaje (código de salida: {exitCode})\n--- salida estándar ---\n{stdout}\n--- estándar ---\n{stderr}",
+  "@ut_0a71fe6a29": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      },
+      "stdout": {
+        "type": "Object"
+      },
+      "stderr": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_62e6c24a03": "Error de lectura: {message}",
+  "@ut_62e6c24a03": {
+    "placeholders": {
+      "message": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ed6128ba80": "Conectando {host}:{port}...",
+  "@ut_ed6128ba80": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      },
+      "port": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2574cd27d5": "Conexión a través del relé trampolín {host}...",
+  "@ut_2574cd27d5": {
+    "placeholders": {
+      "host": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_939fbbbde2": "Verificación de conexión omitida: {e}",
+  "@ut_939fbbbde2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5c09d2ebc3": "No se pudo escribir en la entrada estándar: {e}",
+  "@ut_5c09d2ebc3": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_160a20b4b9": "Embalaje exitoso: {e}",
+  "@ut_160a20b4b9": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e230a6d105": "✗ Error de embalaje (código de salida: {query})",
+  "@ut_e230a6d105": {
+    "placeholders": {
+      "query": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8bc3df095a": "Recuperando: {url}",
+  "@ut_8bc3df095a": {
+    "placeholders": {
+      "url": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_571ec497a6": "Título: {title}",
+  "@ut_571ec497a6": {
+    "placeholders": {
+      "title": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_eb988194e9": "Objetivo: {trim}",
+  "@ut_eb988194e9": {
+    "placeholders": {
+      "trim": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_304b011a8a": "Conclusión: {trim}",
+  "@ut_304b011a8a": {
+    "placeholders": {
+      "trim": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_080de8536f": "Error de lectura: {service}",
+  "@ut_080de8536f": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8f24f3ec45": "{service} no se está ejecutando",
+  "@ut_8f24f3ec45": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_622000e27f": "Conectar a través del relé trampolín {service}...",
+  "@ut_622000e27f": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_371d1b3d69": "Verificación de conexión omitida: {service}",
+  "@ut_371d1b3d69": {
+    "placeholders": {
+      "service": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e7e9d06df9": " Espere los puertos {length}",
+  "@ut_e7e9d06df9": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9def515d87": "Puerto {shown}{suffix} escuchando",
+  "@ut_9def515d87": {
+    "placeholders": {
+      "shown": {
+        "type": "Object"
+      },
+      "suffix": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_ea6610697b": "No se pudo enviar EOF: {chosen}",
+  "@ut_ea6610697b": {
+    "placeholders": {
+      "chosen": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e7d26cf57d": "Buscando: {totalChars}",
+  "@ut_e7d26cf57d": {
+    "placeholders": {
+      "totalChars": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7234d250c6": "Obteniendo: {length}",
+  "@ut_7234d250c6": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "length2": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0b13faa29b": "Título: {length}",
+  "@ut_0b13faa29b": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2a21b678a8": "Objetivo: {inMinutes}",
+  "@ut_2a21b678a8": {
+    "placeholders": {
+      "inMinutes": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_05ac4fcf03": "Conclusión: {inHours}",
+  "@ut_05ac4fcf03": {
+    "placeholders": {
+      "inHours": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_11bfebfb31": "{inDays} se está ejecutando",
+  "@ut_11bfebfb31": {
+    "placeholders": {
+      "inDays": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5eda668d7a": "{length} no se está ejecutando",
+  "@ut_5eda668d7a": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_dc4c3efe70": "¿Sobrescribir los modelos {length} actuales con el modelo predeterminado de \"{name}\"?",
+  "@ut_dc4c3efe70": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      },
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c153205f28": "{length} Inicio automático no configurado",
+  "@ut_c153205f28": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c3ca30909": " Espere los puertos {length}",
+  "@ut_9c3ca30909": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_0408a4e88d": "Puerto {lastConnected} escuchando",
+  "@ut_0408a4e88d": {
+    "placeholders": {
+      "lastConnected": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_508cac93a2": "{length} anfitrión · {success} exitoso'\n                    '{failed}",
+  "@ut_508cac93a2": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "success": {
+        "type": "Object"
+      },
+      "failed": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_00fefb12c8": "Cola de salida original · {exitCode} caracteres en total",
+  "@ut_00fefb12c8": {
+    "placeholders": {
+      "exitCode": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7c37c17c72": "Abierto {name}",
+  "@ut_7c37c17c72": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_393e236ec2": "{runCount} registros copiados",
+  "@ut_393e236ec2": {
+    "placeholders": {
+      "runCount": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_4dbb782799": "{length} hace minutos",
+  "@ut_4dbb782799": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_afa890cf1c": "{length} hace horas",
+  "@ut_afa890cf1c": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_63f8cd8765": "{rest} hace días",
+  "@ut_63f8cd8765": {
+    "placeholders": {
+      "rest": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_2565b39f32": "Modelos · {total}",
+  "@ut_2565b39f32": {
+    "placeholders": {
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e36a5ac905": "Revertir: {rollbackCommand}",
+  "@ut_e36a5ac905": {
+    "placeholders": {
+      "rollbackCommand": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_261ec8093d": "Tirado a los modelos {hostLabel}",
+  "@ut_261ec8093d": {
+    "placeholders": {
+      "hostLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1568d540be": "Añadir {length}",
+  "@ut_1568d540be": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c14c3f2424": "Última conexión: {count}",
+  "@ut_c14c3f2424": {
+    "placeholders": {
+      "count": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_1f5bbded76": "Nueva versión encontrada {version}, haga clic para ver",
+  "@ut_1f5bbded76": {
+    "placeholders": {
+      "version": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_5eb52c419e": "{length} modelos · {baseUrl}",
+  "@ut_5eb52c419e": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      },
+      "baseUrl": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_01f2ee338e": "{length} palabras",
+  "@ut_01f2ee338e": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_92bbd40515": "Habilitado · Verificar {biometricLabel} al iniciar",
+  "@ut_92bbd40515": {
+    "placeholders": {
+      "biometricLabel": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_8ecd2c14b5": "Conectado · Herramientas {value}",
+  "@ut_8ecd2c14b5": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7c5becde1e": "{value} herramientas",
+  "@ut_7c5becde1e": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3d787403e1": "Grupo anfitrión · {group}",
+  "@ut_3d787403e1": {
+    "placeholders": {
+      "group": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_def0dd4b20": "Anfitrión · {hostId}",
+  "@ut_def0dd4b20": {
+    "placeholders": {
+      "hostId": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_fddba05801": "Clave API {displayName}",
+  "@ut_fddba05801": {
+    "placeholders": {
+      "displayName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e42173cc90": "Descargado a: {localPath}",
+  "@ut_e42173cc90": {
+    "placeholders": {
+      "localPath": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_7a77df19f2": "Descarga fallida: {e}",
+  "@ut_7a77df19f2": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9c9db79438": "Error de lectura: {e}",
+  "@ut_9c9db79438": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6f2c34a667": "Error al cambiar el nombre: {e}",
+  "@ut_6f2c34a667": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf4419589b": "Error al eliminar: {e}",
+  "@ut_cf4419589b": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c3b890cd74": "No se pudo abrir el selector de archivos: {e}",
+  "@ut_c3b890cd74": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3f446bd9fe": "Subido: {fileName}",
+  "@ut_3f446bd9fe": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_9e12df0a1f": "Error al cargar {fileName}: {e}",
+  "@ut_9e12df0a1f": {
+    "placeholders": {
+      "fileName": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e89a046c8b": "No se pudo crear el directorio: {e}",
+  "@ut_e89a046c8b": {
+    "placeholders": {
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_6c61736431": "Error al cargar {name}: {e}",
+  "@ut_6c61736431": {
+    "placeholders": {
+      "name": {
+        "type": "Object"
+      },
+      "e": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3cc564d9ac": "Se han importado los hosts {ok} (las credenciales deben completarse en la página de edición del host)",
+  "@ut_3cc564d9ac": {
+    "placeholders": {
+      "ok": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_218046bbfd": "¿Pegar la línea {length}?",
+  "@ut_218046bbfd": {
+    "placeholders": {
+      "length": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_c40c983842": "{preview}\n…y la línea {more}",
+  "@ut_c40c983842": {
+    "placeholders": {
+      "preview": {
+        "type": "Object"
+      },
+      "more": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3482231651": "Guardado en {path}",
+  "@ut_3482231651": {
+    "placeholders": {
+      "path": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_aa865c9773": "artículo",
+  "ut_75282877a3": "artículo",
+  "ut_35f3bcac7a": "Artículo · Inyectar contexto de IA",
+  "ut_c32994dbf5": "La emisora ha sido guardada",
+  "ut_2cdff50b37": "Taiwán",
+  "ut_f7826628c0": "grupo",
+  "ut_bfa2c2000f": "hace minutos",
+  "ut_15e2558649": "hace horas",
+  "ut_e7b73487d7": "hace dias",
+  "ut_babe4e8237": "{connected}/{total} servidores",
+  "@ut_babe4e8237": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_95860656bf": "Interruptor principal de MCP apagado · {connected}/{total} servidores conectados",
+  "@ut_95860656bf": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_e12efa5ddb": "{connected}/{total} servidores · {tools} herramientas disponibles para el agente",
+  "@ut_e12efa5ddb": {
+    "placeholders": {
+      "connected": {
+        "type": "Object"
+      },
+      "total": {
+        "type": "Object"
+      },
+      "tools": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_3330b55acf": "{value} recursos",
+  "@ut_3330b55acf": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  },
+  "ut_cf674ef0f8": "{value} prompts",
+  "@ut_cf674ef0f8": {
+    "placeholders": {
+      "value": {
+        "type": "Object"
+      }
+    }
+  }
 }

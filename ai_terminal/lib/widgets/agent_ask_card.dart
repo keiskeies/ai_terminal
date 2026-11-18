@@ -3,6 +3,7 @@ import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../core/ui_text.dart';
 import '../models/agent_event.dart';
+import '../core/l10n_holder.dart';
 
 /// 询问的两态渲染
 ///
@@ -282,7 +283,7 @@ class _AgentAskStepRowState extends State<AgentAskStepRow> {
                         Icon(Icons.check_circle, size: 13, color: tc.ok),
                         const SizedBox(width: 6),
                         Text(
-                          UiText.t('你的选择：$chosen', 'Your choice: $chosen'),
+                          L10n.str.ut_ea6610697b(chosen),
                           style: TextStyle(
                               color: tc.ok, fontSize: fMicro, height: 1.4),
                         ),

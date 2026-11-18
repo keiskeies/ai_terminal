@@ -4,6 +4,7 @@ import '../services/daos.dart';
 import '../services/mcp_manager.dart';
 import '../services/notification_service.dart';
 import '../services/web_search_config.dart';
+import '../core/l10n_holder.dart';
 
 /// 设置分组的单一数据源。
 ///
@@ -84,7 +85,7 @@ class SettingsEntry {
       100000 => UiText.t('10 万行', '100k'),
       _ => '$scrollback',
     };
-    return UiText.t('$scrollLabel · $logLabel', '$scrollLabel · $logLabel');
+    return L10n.str.ut_7695e08c1e(scrollLabel, logLabel);
   }
 
   static String _aiSubtitle() {
@@ -100,8 +101,8 @@ class SettingsEntry {
       }
     }
     return selectedName.isNotEmpty
-        ? UiText.t('$count 个 · 当前 $selectedName', '$count · using $selectedName')
-        : UiText.t('$count 个已配置', '$count configured');
+        ? L10n.str.ut_b003c911bd(count, selectedName)
+        : L10n.str.ut_3f574ada1a(count);
   }
 
   static String _agentSubtitle() {
@@ -111,15 +112,14 @@ class SettingsEntry {
     final timeout = timeoutRaw is num ? timeoutRaw.toInt() : 120;
     // maxSteps = 0 在引擎里的含义是「不限」，写成「最大 0 步」像没初始化。
     return steps == 0
-        ? UiText.t('步数不限 · 超时 ${timeout}s', 'Unlimited steps · ${timeout}s timeout')
-        : UiText.t('最大 $steps 步 · 超时 ${timeout}s', '$steps steps · ${timeout}s timeout');
+        ? L10n.str.ut_664f79491a(timeout)
+        : L10n.str.ut_a303a7b799(steps, timeout);
   }
 
   static String _webSearchSubtitle() {
     final web = WebSearchConfig.load();
     return web.enabled
-        ? UiText.t('已开启 · ${web.enabledCount} 个后端可用',
-            'On · ${web.enabledCount} backends')
+        ? L10n.str.ut_9947165032(web.enabledCount)
         : UiText.t('已关闭 · AI 只靠本地上下文', 'Off · AI uses local context only');
   }
 
@@ -132,8 +132,7 @@ class SettingsEntry {
     final cw = ChangeWindowService.config;
     String pad(int h) => h.toString().padLeft(2, '0');
     final cwLabel = cw.enabled
-        ? UiText.t('安全时段 ${pad(cw.startHour)}:00–${pad(cw.endHour)}:00',
-            'Safe window ${pad(cw.startHour)}:00–${pad(cw.endHour)}:00')
+        ? L10n.str.ut_94c3718c07(pad(cw.startHour), pad(cw.endHour))
         : UiText.t('安全时段未启用', 'Safe window off');
     return '$lockLabel · $cwLabel';
   }
@@ -141,10 +140,17 @@ class SettingsEntry {
   static String _mcpSubtitle() {
     final mcp = McpManager.instance;
     if (mcp.configs.isEmpty) return UiText.t('还没有服务器', 'No server yet');
-    return UiText.t(
-      '${mcp.connectedCount}/${mcp.configs.length} 已连接 · ${mcp.exposedToolCount} 个工具',
-      '${mcp.connectedCount}/${mcp.configs.length} connected · ${mcp.exposedToolCount} tools',
-    );
+    // 数字插值串必须用 ARB 模板键（L10n.str.*），不能走 UiText.t 的字面配对：
+    // 「2/2 connected · 8 tools」这类带上数字的串在索引里没有对应条目，
+    // ko/ja 等 12 种语言会回退英文。两块碎片（连接分数 + 工具数）分别
+    // 用各自的 ARB 键组装。
+    final connected = L10n.str.terminalOrchestratorConnected(
+        mcp.connectedCount, mcp.configs.length);
+    // 工具数用纯数量的模板键「{value} 个工具」；不能用 ut_8ecd2c14b5
+    // （「已连接 · {value} 个工具」），否则和前面的分数拼接出
+    // 「2/2 已连接 · 已连接 · 8 个工具」双份「已连接」。
+    final tools = L10n.str.ut_7c5becde1e(mcp.exposedToolCount);
+    return '$connected · $tools';
   }
 
   static String _rulesSubtitle() {
