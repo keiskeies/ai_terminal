@@ -376,46 +376,51 @@ class _AIPromptInputState extends State<AIPromptInput> {
               border: Border.all(color: tc.border, width: 1),
               boxShadow: shadowLg,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: SizedBox(
-                    height: _kHintHeight,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            UiText.t('↑↓ 切换   Tab 选择   Enter 执行   Esc 关闭',
-                                '↑↓ navigate   Tab select   Enter run   Esc close'),
-                            style: TextStyle(color: tc.textSub, fontSize: fMicro),
-                            overflow: TextOverflow.ellipsis,
+            // root Overlay 之上没有 DefaultTextStyle 祖先，缺 Material 时
+            // 文字会落到 fallback 样式（黄色双下划线）。
+            child: Material(
+              type: MaterialType.transparency,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: SizedBox(
+                      height: _kHintHeight,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              UiText.t('↑↓ 切换   Tab 选择   Enter 执行   Esc 关闭',
+                                  '↑↓ navigate   Tab select   Enter run   Esc close'),
+                              style: TextStyle(color: tc.textSub, fontSize: fMicro),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${_filteredCommands.length}',
-                          style: TextStyle(color: tc.textMuted, fontSize: fMicro),
-                        ),
-                      ],
+                          const SizedBox(width: 6),
+                          Text(
+                            '${_filteredCommands.length}',
+                            style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                for (int i = _windowStart; i < end; i++)
-                  SizedBox(
-                    height: _kItemHeight,
-                    child: _SlashCommandItem(
-                      command: _filteredCommands[i],
-                      isHighlighted: i == _highlightedIndex,
-                      accentColor: widget.accentColor,
-                      tc: tc,
-                      onHover: () => _setHighlight(i),
-                      onTap: () => _activateIndex(i, execute: false),
+                  for (int i = _windowStart; i < end; i++)
+                    SizedBox(
+                      height: _kItemHeight,
+                      child: _SlashCommandItem(
+                        command: _filteredCommands[i],
+                        isHighlighted: i == _highlightedIndex,
+                        accentColor: widget.accentColor,
+                        tc: tc,
+                        onHover: () => _setHighlight(i),
+                        onTap: () => _activateIndex(i, execute: false),
+                      ),
                     ),
-                  ),
-                const SizedBox(height: _kVerticalPadding),
-              ],
+                  const SizedBox(height: _kVerticalPadding),
+                ],
+              ),
             ),
           ),
         ),

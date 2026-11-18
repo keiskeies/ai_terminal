@@ -127,6 +127,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('浮层文字不带 fallback 黄色双下划线', (tester) async {
+    await pumpInput(tester);
+    await focusAndEnter(tester, '/');
+
+    // 回归：浮层插在 root Overlay，缺 Material/DefaultTextStyle 祖先时
+    // 文字落到 fallback 样式（黄色双下划线）。
+    final texts = find.descendant(
+      of: find.byKey(kSlashOverlayKey),
+      matching: find.byType(Text),
+    );
+    expect(texts, findsWidgets);
+    for (final el in texts.evaluate()) {
+      final style = DefaultTextStyle.of(el)
+          .style
+          .merge((el.widget as Text).style);
+      expect(style.decoration, anyOf(isNull, TextDecoration.none));
+      expect(style.decorationStyle, isNot(TextDecorationStyle.double));
+    }
+  });
+
   testWidgets('运维模板进入斜杠建议，Tab 选中后直接执行', (tester) async {
     var selected = false;
     await pumpInput(tester, extras: [
