@@ -203,17 +203,17 @@ jobs:
 
             AI Terminal 是一款将 AI 助手与 SSH / 本地终端深度集成的跨平台应用。无论你是刚买服务器的小白、不想记命令的开发者、还是需要批量管理服务器的运维人员——打开它，用中文告诉 AI 你要干什么，它帮你连服务器、跑命令、装软件、查问题。全程安全可控。
 
-            ### 🆕 v1.4.3 界面语言、面板稳定性与纯提问
+            ### 🆕 v1.5.0 操作单全面接入 14 种语言
 
-            1.4.2 修的是 Agent 本身，1.4.3 修的是它外面那一圈：界面语言、拖窄就崩的面板，以及你只是问一句、它却跑去执行命令。
+            1.4.3 把界面文案搬进了国际化层，但 Agent 自己的声音漏在外面：操作单仍是一堆硬编码的中英配对，其余十二种语言打开它看到的还是英文。1.5.0 把这段收尾。
 
-            - **提问就是提问**：问「为何不直接复制文件非要用压缩」过去会被逼着执行一串命令——提示词假定每一轮都要落到动作上，完成门控又硬性要求先跑命令。现在两套规则与门控都有纯问答分支，并接受「本轮纯问答、无需命令」的显式声明；新增 15 个回归用例
-            - **回答不再被反复反刍**：旧会话里追加新提问会被当成上一个任务的一部分，模型先复述上一轮答案才干活；现在新提问标记为独立请求
-            - **英文界面真的全英文**：484 处文案、56 个文件接入双语层——SFTP 与工具进度、MCP 连接状态、联网搜索、项目与本地文件工具、SSH 配置导入、审计日志、确认对话框、设置目录、安全规则与风险说明；仍是中文的只剩模型与远端 shell 的输出，以及写进数据库的持久值
-            - **AI 面板拖窄不再崩**：长模型名 + 思考档位会把面板头部顶出可视区、收起按钮点不到；一条长 Ask 选项在真机上把卡片顶宽 414 px；上下分屏时空状态块底部溢出 26 px。三处分别改成可收缩或可滚动，各配布局回归测试
-            - **助手有了自己的狐狸**：头像纯绘制，14–64 px 无损、跟随主题、3.2 秒周期随机相位眨眼；模型胶囊去掉前置图标，模型名与思考档位改用中点分隔
+            - **操作单说你的语言**：`AgentUiText` 全部 188 个成员改走 ARB 键、14 种语言全覆盖——步骤计数、阶段标签、失败分类与提示、权限模式、token 统计、本地执行授权正文
+            - **单复数不再糊在一起**："1 command" 与 "3 commands" 拆成独立键按 n == 1 选择，每个开关的每条分支各配一键；重构前后对 188 个成员做 golden dump 对比，中英文逐字节一致
+            - **数字不再破坏语言**：MCP 设置页带数字插值的字符串在索引里没有条目，「新建服务器」摘要与能力行在十二种语言里恒回退英文；改用带配套单位键的 ARB 模板键，已用韩语实测
+            - **截图终于对上软件**：README 最后两张图还挂着 1.3.9 的窗口外壳，英文报告里混着一枚中文徽章；这次从实机运行重新截取
 
             #### 📁 继续包含
+            - v1.4.3 的稳定性修复：纯提问不再被逼去执行命令、追问不再复述上一轮答案、484 处文案接入双语层、AI 面板拖窄不再溢出、手绘狐狸头像
             - v1.4.2 的 Agent 实测修复：代码示例不再被当命令逐行执行、卡死的「运行中」、`Continue? y` 终端回显回灌成命令、「不许执行命令」被门控无视、命令样检索词炸全文检索、平铺与嵌套两种工具参数形状
             - v1.4.1 的 Agent 能力专项：FC 优先协议、Token 化上下文压缩与滚动摘要、运行中插话、交互提示桥接、计划跟踪与完成门控、观测分级截断与 `sftp_file_read`、`knowledge_search` 工具、只读管道放开、分屏按屏路由 AI、设置抽屉重做
             - v1.4.0 的运行时性能专项：局部重建、终端输出批处理、监控降频、流式 Markdown 增量渲染、持久化移出主线程
@@ -293,17 +293,17 @@ jobs:
 
             AI Terminal is a cross-platform app that deeply integrates an AI assistant with SSH and local terminals. Whether you're a beginner who just rented a VPS, a developer tired of googling commands, or a DevOps engineer managing dozens of servers — open it, tell the AI what you want in plain English (or Chinese), and it handles the rest. Safe, transparent, and under your control.
 
-            ### 🆕 What's New in v1.4.3 · Interface Language, Panel Stability and Plain Questions
+            ### 🆕 What's New in v1.5.0 · The Operation Sheet Speaks Your Language
 
-            1.4.2 fixed the agent; 1.4.3 fixes everything around it — the interface language, the panels that broke when you resized them, and the assistant that ran commands when you only asked a question.
+            1.4.3 moved the interface into the localization layer but left the agent's own voice behind: the operation sheet was still a list of hard-coded Chinese/English pairs, so the other twelve languages read it in English. 1.5.0 finishes that migration.
 
-            - **Questions get answered, not executed**: asking "why copy the file instead of compressing it" used to push the agent into running a handful of commands, because the prompt assumed every turn lands on an action and the finish gate demanded a command first. Both rule sets and the gate now have an answer-only branch and accept a declared "pure Q&A, no command needed"; 15 new regression cases
-            - **Answers stop being chewed over**: a follow-up question appended to an older conversation was treated as part of the previous task, so the model re-narrated the last answer before doing any work; a new question is now a standalone request
-            - **English UI is actually English**: 484 strings across 56 files moved behind the bilingual layer — SFTP and tool progress, MCP status, web search, project and local-file tools, SSH config import, audit rows, confirm dialogs, the settings catalog, safety rules and risk explanations. What stays Chinese is only what the model and the remote shell say, plus values persisted in your database
-            - **The AI panel survives being narrowed**: a long model name plus the thinking pill pushed the collapse button off screen; one long Ask option overflowed a card by 414 px on a real device; the empty state overflowed by 26 px in a short top/bottom split. All three now shrink or scroll, each with a layout regression test
-            - **The assistant got a fox**: the avatar is drawn, not rasterised, so it stays crisp from 14 px to 64 px and follows the theme, blinking on a 3.2 s cycle; the model pill drops its leading icon and separates model from thinking level with a middle dot
+            - **The operation sheet speaks your language**: all 188 `AgentUiText` members now resolve through ARB keys in all 14 languages — step counters, phase labels, failure categories and their hints, permission modes, token totals, and the local-execution authorization body
+            - **Singulars stop being an afterthought**: "1 command" and "3 commands" became separate keys selected on n == 1, and every branch of each switch got its own key. A golden dump of all 188 members before and after the refactor is byte-identical for Chinese and English
+            - **Numbers stop breaking the language**: MCP settings strings that interpolate a count had no index entry, so twelve languages fell back to English on the "New server" summary and capability rows; five ARB template keys with matching unit keys replace them, verified in Korean
+            - **The screenshots finally match the app**: the last two README images still showed the 1.3.9 window chrome, including a Chinese badge in an otherwise English report; both were recaptured from a live run
 
             #### 📁 Still included
+            - The v1.4.3 stability fixes: pure questions no longer forced into command execution, follow-ups no longer re-narrating the previous answer, 484 strings behind the bilingual layer, the AI panel surviving being narrowed, and the hand-drawn fox avatar
             - The v1.4.2 agent field fixes: fenced code samples typed into the terminal line by line, the zombie "running" state, `Continue? y` terminal echoes coming back as commands, the finish gate ignoring "don't run anything", command-shaped searches crashing full-text retrieval, and flattened vs nested tool parameters
             - The v1.4.1 agent capability program: Function-Calling-first protocol, token-measured context compaction with a rolling summary, mid-task interjection, bridged interactive prompts, plan tracking with a finish gate, observation-grade truncation plus `sftp_file_read`, the `knowledge_search` tool, read-only pipelines, per-pane AI routing in split views, and the rebuilt settings drawer
             - The v1.4.0 runtime performance program: local rebuilds, batched terminal output, monitor slowdown, incremental streaming Markdown, and off-thread persistence
