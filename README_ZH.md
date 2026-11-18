@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.4.3-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.5.0-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.4.3</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.5.0</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">访问官网</a>
 </p>
@@ -54,17 +54,17 @@
 
 `5 个平台` · `14 种界面语言` · `22 个 AI 供应商` · `90+ 预设模型` · `28 个内置工具` · `8 个斜杠命令` · `300+ 知识库条目` · `7 种联网搜索源`
 
-## 1.4.3 新增
+## 1.5.0 新增
 
-1.4.2 修的是 Agent 本身，1.4.3 修的是它外面那一圈：界面语言、拖窄就崩的面板，以及你只是问一句、它却跑去执行命令。
+1.4.3 把界面文案搬进了国际化层，但 Agent 自己的声音漏在外面：操作单仍是一堆硬编码的中英配对，其余十二种语言打开它看到的还是英文。1.5.0 把这段收尾。
 
-- **提问就是提问**：问"为何不直接复制文件非要用压缩"，过去会被逼着执行一串命令——ReAct 提示词的纯执行世界观假定每一轮都要落到动作上，finish 门控又硬性要求先跑命令。现在两套规则与门控都增加了纯问答分支，门控接受"本轮纯问答、无需命令"的显式声明并让路。新增 15 个回归用例，覆盖 Function Calling 与文本协议、目标模式续跑、运行中插话
-- **回答不再被反复反刍**：旧会话里追加一个新提问，过去会被当成上一个任务的一部分，模型先把上一轮答案复述一遍才干活。现在新提问标记为独立请求
-- **英文界面真的全英文**：484 处文案、56 个文件接入双语层——SFTP 与工具进度、MCP 连接状态、联网搜索、项目与本地文件工具、SSH 配置导入、审计日志、确认对话框、设置目录、安全规则与风险说明。仍是中文的只剩模型和远端 shell 说的话：AI 提示词、远端命令输出，以及写进数据库的持久值（`默认` 是存储值，只在渲染时映射）
-- **AI 面板拖窄不再崩**：长模型名加思考档位会把面板头部顶出可视区、收起按钮点不到；一条长 Ask 选项在真机上把卡片顶宽 414 px；上下分屏时空状态块底部溢出 26 px。三处分别改成可收缩或可滚动，并各配布局回归测试
-- **助手有了自己的狐狸**：头像用 `CustomPainter` 纯绘制，14–64 px 无损、跟随主题，3.2 秒周期随机相位眨眼；模型胶囊去掉前置图标，模型名与思考档位改用中点分隔
+- **操作单说你的语言**：`AgentUiText` 全部 188 个成员改走 ARB 键、14 种语言全覆盖——步骤计数、阶段标签、失败分类与提示、权限模式、token 统计、本地执行授权正文。单数变体（"1 command" / "3 commands"）拆成独立键按 `n == 1` 选择，每个 `switch` 的每条分支各配一键。重构前后对 188 个成员做 golden dump 对比，中英文逐字节一致，原本正常的展示没有移动
+- **数字不再破坏语言**：MCP 设置页带数字插值的字符串在索引里没有条目，"新建服务器"摘要与能力行在十二种语言里恒回退英文。改用五个带配套单位键的 ARB 模板键，并已用韩语实测验证
+- **截图终于对上软件**：README 最后两张图还挂着 1.3.9 的窗口外壳，英文报告里混着一枚中文徽章；这次从 1.5.0 实机运行重新截取
 
-## 1.4.2 及更早
+## 1.4.3 及更早
+
+1.4.3 稳定性版本：纯提问不再被逼去执行命令，追问不再复述上一轮答案，484 处文案、56 个文件接入双语层，AI 面板拖窄不再溢出，助手换上手绘狐狸头像。
 
 1.4.2 是 Agent 能力专项的实测修复版：正文里的代码围栏不再被逐行送进 PTY，任务收尾后残留的提前执行回调不再把状态改回"运行中"，`Continue? y` 的终端回显不再变成命令，"不许执行命令"不再白烧 finish 门控重试步数，命令样子的检索词不再炸 FTS5，平铺与 `{"args": {…}}` 嵌套两种工具参数形状都能正确分发。
 
@@ -205,11 +205,11 @@ Agent 也能直接读写跑着这个 App 的这台电脑，而不只是服务器
 
 | 平台 | 文件 |
 |---|---|
-| macOS | `AI_Terminal_v1.4.3_macOS.zip` |
-| iOS | `AI_Terminal_v1.4.3_iOS.ipa`（未签名） |
-| Android | `AI_Terminal_v1.4.3_Android.apk` |
-| Windows | `AI_Terminal_v1.4.3_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.4.3_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.5.0_macOS.zip` |
+| iOS | `AI_Terminal_v1.5.0_iOS.ipa`（未签名） |
+| Android | `AI_Terminal_v1.5.0_Android.apk` |
+| Windows | `AI_Terminal_v1.5.0_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.5.0_Linux_x64.tar.gz` |
 
 macOS 首次打开如提示“无法验证开发者”，可执行：
 

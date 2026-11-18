@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.4.3-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.5.0-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.4.3</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.5.0</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">Visit the website</a>
 </p>
@@ -54,17 +54,17 @@ A chat assistant tells you what to run. AI Terminal runs it on your servers and 
 
 `5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `28 built-in tools` · `8 slash commands` · `300+ knowledge entries` · `7 web search engines`
 
-## New in 1.4.3
+## New in 1.5.0
 
-1.4.2 fixed the agent; 1.4.3 fixes everything around it — the interface language, the panels that broke when you resized them, and the assistant that ran commands when you only asked a question.
+1.4.3 moved the interface into the localization layer but left the agent's own voice behind: the operation sheet was still a list of hard-coded Chinese/English pairs, so the other twelve languages read it in English. 1.5.0 finishes that migration.
 
-- **Questions get answered, not executed** — asking "why copy the file instead of compressing it" used to push the agent into running a handful of commands, because the ReAct prompt assumed every turn lands on an action and the finish gate demanded a command first. Both prompt rule sets and the gate now have an explicit answer-only branch, and the gate accepts a declared "pure Q&A, no command needed" and backs off. 15 new regression cases cover Function Calling and the text protocol, goal-mode continuation, and mid-task steering
-- **Answers stop being chewed over** — a follow-up question appended to an older conversation was treated as part of the previous task, so the model re-narrated the last answer before doing any work. A new question is now marked as a standalone request
-- **English UI is actually English** — 484 strings across 56 files moved behind the bilingual layer: SFTP and tool progress lines, MCP connection status, web search, project and local-file tools, SSH config import, audit rows, confirm dialogs, the settings catalog, safety rules, and risk explanations. What stays Chinese is what the model and the remote shell say, not what the app says — AI prompts, remote command output, and values persisted in your database (`默认` is a stored value, so it is mapped at render time only)
-- **The AI panel survives being narrowed** — a long model name plus the thinking pill overflowed the panel header and put the collapse button out of reach; one long Ask option overflowed a card by 414 px on a real device; the empty-state block overflowed by 26 px in a short top/bottom split. All three now shrink or scroll, each with a layout regression test
-- **The assistant got a fox** — the avatar is drawn with a `CustomPainter`, so it stays crisp from 14 px to 64 px and follows the theme, blinking on a 3.2 s cycle with randomised phase; the model pill drops its leading icon and separates model from thinking level with a middle dot
+- **The operation sheet speaks your language** — all 188 `AgentUiText` members now resolve through ARB keys in all 14 languages: step counters, phase labels, failure categories and their hints, permission modes, token totals, and the local-execution authorization body. Singular variants ("1 command" vs "3 commands") became separate keys selected on `n == 1`, and every branch of each `switch` got its own key. A golden dump comparing all 188 members before and after the refactor is byte-identical for Chinese and English, so nothing that already worked moved
+- **Numbers stop breaking the language** — MCP settings strings that interpolate a count had no index entry, so twelve languages fell back to English on the "New server" summary and the capability rows. Five ARB template keys with matching unit keys replace them, verified in Korean
+- **The screenshots finally match the app** — the last two README images still showed the 1.3.9 window chrome, including a Chinese badge in an otherwise English report; both were recaptured from a live run on 1.5.0
 
 ## Earlier releases
+
+The v1.4.3 stability release: pure questions stopped being forced into command execution, follow-up questions stopped re-narrating the previous answer, 484 strings across 56 files moved behind the bilingual layer, the AI panel stopped overflowing when narrowed, and the assistant got a hand-drawn fox avatar.
 
 The v1.4.2 field-report release for the agent capability program: fenced code samples stopped being typed into the PTY line by line, a late early-execution callback could no longer flip a finished task back to "running", `Continue? y` PTY echoes stopped coming back as commands, "don't run anything" stopped burning finish-gate retries, command-shaped knowledge queries stopped breaking the FTS5 match, and flattened and nested `{"args": {…}}` tool parameters both dispatch.
 
@@ -205,11 +205,11 @@ Get the latest build from [GitHub Releases](https://github.com/keiskeies/ai_term
 
 | Platform | File |
 |---|---|
-| macOS | `AI_Terminal_v1.4.3_macOS.zip` |
-| iOS | `AI_Terminal_v1.4.3_iOS.ipa` (unsigned) |
-| Android | `AI_Terminal_v1.4.3_Android.apk` |
-| Windows | `AI_Terminal_v1.4.3_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.4.3_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.5.0_macOS.zip` |
+| iOS | `AI_Terminal_v1.5.0_iOS.ipa` (unsigned) |
+| Android | `AI_Terminal_v1.5.0_Android.apk` |
+| Windows | `AI_Terminal_v1.5.0_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.5.0_Linux_x64.tar.gz` |
 
 If macOS reports that the developer cannot be verified:
 
