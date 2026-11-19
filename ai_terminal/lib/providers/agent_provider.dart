@@ -15,7 +15,6 @@ import '../services/ai_service.dart';
 import '../services/ai_model_selection_service.dart';
 import '../services/command_executor.dart';
 import '../services/conversation_service.dart';
-import '../services/knowledge_service.dart';
 import '../core/credentials_store.dart';
 import '../services/daos.dart';
 import '../utils/goal_continuation.dart';
@@ -765,14 +764,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
               ));
     };
 
-    engine.onCompleted = (fullMessage) {
+    engine.onCompleted = (_) {
       // 任务完成：累积最后一轮内容并保存
       _flushStreamingToContent(scopeId);
-      // 仅成功完成的任务记录经验到用户经验库
-      // cancelTask / _finishTask(success:false) / maxSteps 耗尽都会调 onCompleted 以 flush 流式内容，
-      // 但这些路径的任务不完整（cancelled / failed），不应记录到知识库（避免污染学习经验）
-      final taskStatus = engine.currentTask?.status;
-      final shouldRecordLearning = taskStatus == AgentStatus.completed;
       _updateScopeState(scopeId, (s) {
         final items = [...s.chatItems];
         if (items.isNotEmpty && items.last.role == 'assistant') {
@@ -786,10 +780,6 @@ class AgentNotifier extends StateNotifier<AgentState> {
           // 最后再保存一次（确保 finish 等事件也被持久化）
           _persistAssistantCompletion(scopeId, lastItem.content,
               events: lastItem.events);
-          // 仅成功完成的任务记录经验到用户经验库（cancelled/failed 不记录）
-          if (shouldRecordLearning) {
-            _recordLearningFromTask(scopeId, items, fullMessage);
-          }
         }
         return s.copyWith(chatItems: items);
       });
@@ -821,70 +811,6 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
     _reducer.cancelTimer(scopeId);
     _reducer.reset(scopeId);
-  }
-
-  /// 任务成功完成后，将经验记录到用户经验库（异步，不阻塞 UI）
-  /// 使用捕获的 scopeId 解析真实 hostId（R3：不读当前活跃 tab，避免写错库）
-  void _recordLearningFromTask(
-      String scopeId, List<ChatItem> items, String aiSummary) {
-    final hostId = _registry.getHostId(scopeId) ??
-        _registry.getState(scopeId)?.hostId ??
-        'local';
-    Future.microtask(() async {
-      try {
-        // 取最后一条用户消息作为原始请求
-        String? userRequest;
-        for (var i = items.length - 1; i >= 0; i--) {
-          if (items[i].role == 'user') {
-            userRequest = items[i].content;
-            break;
-          }
-        }
-        if (userRequest == null || userRequest.trim().isEmpty) return;
-
-        // 从最后一条 assistant 消息的 events 提取执行过的命令
-        ChatItem? lastAssistant;
-        for (var i = items.length - 1; i >= 0; i--) {
-          if (items[i].role == 'assistant') {
-            lastAssistant = items[i];
-            break;
-          }
-        }
-        if (lastAssistant == null) return;
-
-        final commands = <String>[];
-        for (final event in lastAssistant.events) {
-          if (event.isCommand &&
-              event.command != null &&
-              event.command!.isNotEmpty) {
-            commands.add(event.command!);
-          }
-        }
-        if (commands.isEmpty) return;
-
-        // R8：截断过长内容，防止无界增长
-        final truncatedRequest = userRequest.length > 500
-            ? userRequest.substring(0, 500)
-            : userRequest;
-        final truncatedSummary =
-            aiSummary.length > 1000 ? aiSummary.substring(0, 1000) : aiSummary;
-        final executedCommands = commands.join('\n');
-        final truncatedCommands = executedCommands.length > 2000
-            ? executedCommands.substring(0, 2000)
-            : executedCommands;
-
-        final knowledge = KnowledgeService();
-        await knowledge.ensureInitialized();
-        await knowledge.recordLearning(
-          hostId: hostId,
-          userRequest: truncatedRequest,
-          executedCommands: truncatedCommands,
-          aiSummary: truncatedSummary,
-        );
-      } catch (e) {
-        debugPrint('[AgentNotifier] _recordLearningFromTask 失败: $e');
-      }
-    });
   }
 
   /// 持久化 assistant 完整响应（流式结束后回写）。

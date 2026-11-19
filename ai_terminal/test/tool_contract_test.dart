@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
 import 'package:ai_terminal/core/l10n_holder.dart';
+import 'package:ai_terminal/core/prompts.dart' as prompts;
 import 'package:ai_terminal/l10n/app_localizations_zh.dart';
 import 'package:ai_terminal/models/agent_event.dart';
 import 'package:ai_terminal/models/agent_model.dart';
@@ -18,6 +19,8 @@ import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/command_executor.dart';
 import 'package:ai_terminal/services/ssh_service.dart';
 import 'package:ai_terminal/models/host_config.dart';
+import 'package:ai_terminal/models/knowledge_rule.dart';
+import 'package:ai_terminal/services/daos.dart';
 import 'package:ai_terminal/utils/tool_args_parser.dart';
 import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 
@@ -353,6 +356,62 @@ void main() {
       expect(prompt, contains('  artifact_dir: build/web'));
     });
 
+    // 知识库剔除时内部规范注入从 knowledge_service 迁到 rules_injection。
+    // 设置页仍宣称「N 条 · 注入 AI 上下文」，所以必须守住组装后的提示词真的带上规范，
+    // 而不是只 grep 到调用点就算数（R9：单元绿不代表组装链路通）。
+    test('内部规范真的进 system prompt，无规范时不留空抬头', () async {
+      AgentEngine makeEngine() => AgentEngine(
+            aiProvider: _MockAIProvider(),
+            modelConfig: _makeConfig(),
+            memory: AgentMemory(),
+            maxSteps: 5,
+            hostId: 'test-host',
+          );
+
+      expect(
+        makeEngine().buildSystemPromptForTesting(_MockExecutor()),
+        isNot(contains('【内部规范 · 必须遵守】')),
+      );
+
+      final r = KnowledgeRule()
+        ..id = 'prompt-guard-rule'
+        ..title = '走内网镜像源'
+        ..content = '禁止使用公网 apt 源'
+        ..scope = KnowledgeRuleScope.global
+        ..strict = true
+        ..enabled = true;
+      await KnowledgeRulesDao.upsert(r);
+      addTearDown(() => KnowledgeRulesDao.delete(r.id));
+
+      final prompt = makeEngine().buildSystemPromptForTesting(_MockExecutor());
+      expect(prompt, contains('【内部规范 · 必须遵守】'));
+      expect(prompt, contains('- [严格] 走内网镜像源'));
+      expect(prompt, contains('  禁止使用公网 apt 源'));
+    });
+
+    // 知识库剔除曾把寄居其中的「安装失败不进入自救循环」一起带走。
+    // 该约束与知识库无关，现独立为 installSafetyRule；引擎与两个平台模板都必须带上。
+    test('安装安全规则在引擎与两个平台模板里都在', () {
+      const antiLoop = '不进入自救循环';
+      const refuse = '该软件暂无已知安装方式';
+      final engine = AgentEngine(
+        aiProvider: _MockAIProvider(),
+        modelConfig: _makeConfig(),
+        memory: AgentMemory(),
+        maxSteps: 5,
+        hostId: 'test-host',
+      );
+      final prompt = engine.buildSystemPromptForTesting(_MockExecutor());
+      expect(prompt, contains('【安装安全规则'));
+      expect(prompt, contains(antiLoop));
+      expect(prompt, contains(refuse));
+      for (final isWindows in [true, false]) {
+        final tpl = prompts.buildDefaultSystemPrompt(isWindows: isWindows);
+        expect(tpl, contains(antiLoop), reason: 'isWindows=$isWindows 模板漏接');
+        expect(tpl, contains(refuse));
+      }
+    });
+
     test('本地会话 prompt 明确 execute 在本机，且不宣传 local_exec', () {
       final engine = AgentEngine(
         aiProvider: _MockAIProvider(),
@@ -457,6 +516,45 @@ void main() {
       );
       expect(
           events.any((e) => e.isCommand && e.toolName == 'cert_check'), isTrue);
+    });
+  });
+
+  group('工具抛异常 → 失败观测进历史（引擎通用 catch）', () {
+    // 原覆盖挂在 knowledge_search 上（该工具已随知识库剔除）。内置工具现在都
+    // 自行 catch ToolArgException（SftpFileReadTool / MCP adapter）或走
+    // getString + 策略判定返回 ToolResult.failure，没有一个会把异常抛到引擎，
+    // 故用测试内工具保住 agent_engine 通用 catch → result 事件 → 观测入历史这条链。
+    test('必填参数缺失抛 ToolArgException 时，引擎转成失败观测并回传给 AI', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 探测一下\n动作: tool\n工具: throwing_probe\n',
+      ]);
+      provider.enqueueStream([_finishTurn]);
+
+      final engine = AgentEngine(
+        aiProvider: provider,
+        modelConfig: _makeConfig(),
+        memory: AgentMemory(),
+        maxSteps: 5,
+        hostId: 'test-host',
+      );
+      engine.toolsForTesting.register(_ThrowingProbeTool());
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+
+      await engine.startTask('探测', _MockExecutor());
+
+      final result = events.firstWhere(
+        (e) => e.isResult && e.toolName == 'throwing_probe',
+      );
+      expect(result.success, isFalse);
+      expect(result.error, contains('缺少必填参数'));
+      // 第二轮请求必须带上异常观测，AI 才知道要改动作而不是重复调用
+      expect(
+        provider.receivedHistories.last.any(
+            (m) => m.content.contains('观测: 工具 throwing_probe 执行异常')),
+        isTrue,
+      );
     });
   });
 
@@ -725,4 +823,29 @@ class _NullSchemaTool extends AgentTool {
     void Function(String message)? onProgress,
   }) async =>
       ToolResult.success('ok');
+}
+
+/// 故意把 ToolArgException 抛给引擎（不自行 catch），用来覆盖引擎通用异常分支
+class _ThrowingProbeTool extends AgentTool {
+  @override
+  String get name => 'throwing_probe';
+
+  @override
+  ToolKind get kind => ToolKind.read;
+
+  @override
+  String get description => '仅测试用工具：缺必填参数时抛异常';
+
+  @override
+  String get paramSpec => '  path: 文件路径（必填）';
+
+  @override
+  Future<ToolResult> execute({
+    required CommandExecutor executor,
+    required ToolArgs args,
+    void Function(String message)? onProgress,
+  }) async {
+    args.requireString('path');
+    return ToolResult.success('ok');
+  }
 }

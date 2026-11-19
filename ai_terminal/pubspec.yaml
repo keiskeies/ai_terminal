@@ -83,7 +83,6 @@ flutter:
     - assets/icons/logo_mark.svg
     - assets/icons/logo_wordmark.svg
     - assets/icons/logo_mark_light.svg
-    - assets/knowledge/
     - assets/config/
     - assets/provider_logos/
     - assets/fonts/MiSans/MiSans-License.pdf

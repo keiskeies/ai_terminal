@@ -18,8 +18,8 @@ const _uuid = Uuid();
 
 /// 内部规范：用户自维护、注入给 AI 的组织约定
 ///
-/// 与官方知识库的区别是这里以自然语言规则为主体 —— 公司习惯（走内网源、
-/// 不改主配置、端口非默认）无法用结构化命令卡表达。
+/// 以自然语言规则为主体 —— 公司习惯（走内网源、不改主配置、端口非默认）
+/// 无法用结构化命令卡表达。
 class KnowledgeRulesPage extends ConsumerStatefulWidget {
   const KnowledgeRulesPage({super.key});
 

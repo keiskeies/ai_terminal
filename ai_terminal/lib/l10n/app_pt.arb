@@ -1380,7 +1380,6 @@
   "ut_ae9a95fec3": "O usuário cancela a tarefa, a gravação do PTY foi abortada",
   "ut_0bb0be16b3": "Substituição concluída",
   "ut_1aa59da0cf": "Falha na gravação, revertendo...",
-  "ut_47e5e5365c": "Pesquisa na base de conhecimento cancelada",
   "ut_b79b73a254": "Parâmetro ausente: o caminho é obrigatório",
   "ut_b48a9bcd4c": "Confirmar",
   "ut_fa7ae42a25": "serviço",
@@ -1671,7 +1670,6 @@
   "ut_cdfaed0dc5": "Aguarde o usuário inserir a senha do sudo…",
   "ut_6d06b21d26": "O usuário não forneceu uma senha (cancelar ou inserir em branco). Use Action: peça para confirmar com o usuário ou execute em modo não privilegiado.",
   "ut_de63930b16": "Experiência de verificação nativa",
-  "ut_11e4b8176f": "Base de conhecimento oficial",
   "ut_587234aed7": "Este artigo foi truncado",
   "ut_fb8896831d": "O valor total excede o limite e as entradas subsequentes foram truncadas.",
   "ut_89d6d1508a": "A plataforma atual não oferece suporte à execução de comandos nativos (apenas desktop Windows/macOS/Linux).",
@@ -3051,14 +3049,6 @@
         "type": "Object"
       },
       "byteCount": {
-        "type": "Object"
-      }
-    }
-  },
-  "ut_00cd1c4300": "Pesquisando na base de conhecimento: {query}",
-  "@ut_00cd1c4300": {
-    "placeholders": {
-      "query": {
         "type": "Object"
       }
     }

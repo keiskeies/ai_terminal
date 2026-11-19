@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_terminal/models/knowledge_rule.dart';
 import 'package:ai_terminal/providers/knowledge_rule_provider.dart';
 import 'package:ai_terminal/services/daos.dart';
+import 'package:ai_terminal/services/rules_injection.dart';
 
 /// 覆盖内部规范的作用域匹配与注入文本构建。
 ///
@@ -104,6 +105,35 @@ void main() {
       final r = rule(id: 'a', title: 't', content: '第一行\n\n第三行');
       final lines = r.buildInjectionText().trimRight().split('\n');
       expect(lines.length, 3);
+    });
+  });
+
+  // 知识库剔除时本函数从 knowledge_service.dart 迁到 rules_injection.dart。
+  // 迁移的失败模式是「设置页仍显示 N 条·注入 AI 上下文，实际不注入」，
+  // 故这里守住函数本身的输出契约，接线由 tool_contract_test 的提示词守卫覆盖。
+  group('buildRulesInjection', () {
+    test('无启用条目时返回 null，不往提示词塞空壳', () async {
+      expect(buildRulesInjection(), isNull);
+      await KnowledgeRulesDao.upsert(rule(id: 'off', title: '停用', enabled: false));
+      expect(buildRulesInjection(), isNull);
+    });
+
+    test('有启用条目时输出规范抬头与正文', () async {
+      await KnowledgeRulesDao.upsert(
+          rule(id: 'g1', title: '走内网源', content: '不要用公网 apt 源'));
+      final text = buildRulesInjection();
+      expect(text, isNotNull);
+      expect(text, contains('【内部规范 · 必须遵守】'));
+      expect(text, contains('- [严格] 走内网源'));
+      expect(text, contains('  不要用公网 apt 源'));
+    });
+
+    test('主机作用域条目只对匹配 hostId 注入', () async {
+      await KnowledgeRulesDao.upsert(rule(
+          id: 'h1', title: '生产约定', scope: KnowledgeRuleScope.host, hostId: 'prod-1'));
+      expect(buildRulesInjection(hostId: 'prod-1'), contains('生产约定'));
+      expect(buildRulesInjection(hostId: 'other'), isNull);
+      expect(buildRulesInjection(), isNull);
     });
   });
 

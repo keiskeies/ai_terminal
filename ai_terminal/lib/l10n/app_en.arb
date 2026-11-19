@@ -1380,7 +1380,6 @@
   "ut_ae9a95fec3": "Task cancelled by user, PTY write aborted",
   "ut_0bb0be16b3": "Replacement complete",
   "ut_1aa59da0cf": "Write failed, rolling back ...",
-  "ut_47e5e5365c": "Knowledge search cancelled",
   "ut_b79b73a254": "Missing parameter: path is required",
   "ut_b48a9bcd4c": "Confirm",
   "ut_fa7ae42a25": "service",
@@ -1671,7 +1670,6 @@
   "ut_cdfaed0dc5": "Waiting for user to enter sudo password…",
   "ut_6d06b21d26": "No password provided by the user (cancelled or empty). Use 动作: ask to confirm with the user, or run without privileges.",
   "ut_de63930b16": "Verified local experience",
-  "ut_11e4b8176f": "Official knowledge base",
   "ut_587234aed7": "entry truncated",
   "ut_fb8896831d": "total limit exceeded, later entries truncated",
   "ut_89d6d1508a": "Local command execution is not supported on this platform (desktop Windows / macOS / Linux only).",
@@ -3051,14 +3049,6 @@
         "type": "Object"
       },
       "byteCount": {
-        "type": "Object"
-      }
-    }
-  },
-  "ut_00cd1c4300": "Searching knowledge base: {query}",
-  "@ut_00cd1c4300": {
-    "placeholders": {
-      "query": {
         "type": "Object"
       }
     }

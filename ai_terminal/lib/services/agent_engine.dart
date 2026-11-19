@@ -19,7 +19,7 @@ import '../models/token_usage.dart';
 import '../services/ai_service.dart';
 import '../services/ssh_service.dart';
 import '../services/command_executor.dart';
-import '../services/knowledge_service.dart';
+import '../services/rules_injection.dart';
 import 'local_terminal_service.dart';
 import 'agent_tool.dart';
 import 'agent_host_registry.dart' as agent_host_registry;
@@ -280,9 +280,6 @@ class AgentEngine {
   AIProvider? _fallbackProvider;
   AIModelConfig? _fallbackConfig;
 
-  /// 缓存的知识库注入文本（在 startTask 时查询，在 _buildSystemPrompt 时使用）
-  String? _cachedKnowledgeInjection;
-
   /// 持久化对话历史，跨 startTask() 调用保留上下文
   final List<ChatMessage> _conversationHistory = [];
 
@@ -399,7 +396,7 @@ class AgentEngine {
 
   int maxSteps = 0; // 0 = 无限制（运行时兜底为 _defaultMaxSteps）
 
-  /// 当前引擎所属的 hostId（用于知识库经验匹配和多 host 隔离）
+  /// 当前引擎所属的 hostId（用于内部规范作用域匹配和多 host 隔离）
   String? hostId;
 
   /// 当前任务所属的会话 id（由 AgentNotifier 在任务开始/切换会话时设置）。
@@ -1036,45 +1033,6 @@ class AgentEngine {
     // P0-2: trace 任务开始
     AgentTracer.instance.startTask(_currentTask!.id, goal, hostId: hostId);
 
-    // 查询知识库，缓存注入文本
-    try {
-      final knowledge = KnowledgeService();
-      // 确保知识库已初始化（懒初始化兜底）
-      await knowledge.ensureInitialized();
-      // R1: await 后检查代际，避免旧任务的知识库结果覆盖新任务的 _cachedKnowledgeInjection
-      if (myGeneration != _currentTaskGeneration) {
-        agentLogger.info('AgentEngine', '知识库初始化期间代际失效，放弃任务');
-        return;
-      }
-      // 检测远程平台：SSH 连接时从 osInfo 推断，否则用本地平台
-      String? knowledgePlatform;
-      if (executor is SSHService) {
-        knowledgePlatform =
-            KnowledgeService.detectPlatformFromOsInfo(executor.osInfo);
-      }
-      _cachedKnowledgeInjection = await knowledge.buildKnowledgeInjection(
-        goal,
-        platform: knowledgePlatform,
-        osInfo: executor is SSHService ? executor.osInfo : null,
-        hostId: hostId,
-      );
-      // R1: 第二次 await 后再次检查代际
-      if (myGeneration != _currentTaskGeneration) {
-        agentLogger.info('AgentEngine', '知识库查询期间代际失效，放弃任务');
-        return;
-      }
-      if (_cachedKnowledgeInjection != null) {
-        agentLogger.info('AgentEngine',
-            '知识库命中 ✓ (platform=${knowledgePlatform ?? "local"})');
-      } else {
-        agentLogger.info(
-            'AgentEngine', '知识库未命中 (platform=${knowledgePlatform ?? "local"})');
-      }
-    } catch (e) {
-      agentLogger.warn('AgentEngine', '知识库查询失败: $e');
-      _cachedKnowledgeInjection = null;
-    }
-
     try {
       agentLogger.info('AgentEngine', '执行 Agent 模式');
       // _executeAutomatic 要求非空 executor，此处显式检查避免调用方误传 null
@@ -1121,7 +1079,7 @@ class AgentEngine {
           ));
         }
         // R5: 所有终态路径必须 emit finish 事件 + flush 流式内容到持久化
-        // 但失败路径不调用 onCompleted（它会触发 _recordLearningFromTask 污染知识库）
+        // 但失败路径不调用 onCompleted（保持既有终态语义：失败不走完成回调）
         // 只 emit finish 事件让 UI 停止流式状态，流式内容由 onError 回调中的 error 状态替代
         _emitOperationReport(
           finishState: AgentFinishState.failed,
@@ -4662,7 +4620,7 @@ class AgentEngine {
       summary: finishSummary,
       finishState: success ? AgentFinishState.success : AgentFinishState.failed,
     ));
-    // onCompleted 仍传完整累积文本：知识库学习需要完整上下文，
+    // onCompleted 仍传完整累积文本：持久化需要完整上下文，
     // 操作单结论只使用 step.thought 生成的 finishSummary。
     final completionMessage =
         _accumulatedMessage.isNotEmpty ? _accumulatedMessage : finishSummary;
@@ -5186,7 +5144,7 @@ class AgentEngine {
     buffer.writeln();
     buffer.writeln(prompts.behaviorBoundaryRule);
     buffer.writeln();
-    buffer.writeln(prompts.knowledgeSafetyRule);
+    buffer.writeln(prompts.installSafetyRule);
     buffer.writeln();
     buffer.writeln(prompts.dangerousCommandExplainRule);
 
@@ -5203,10 +5161,12 @@ class AgentEngine {
       buffer.writeln(customPrompt);
     }
 
-    // 知识库注入（异步获取，使用缓存结果）
-    if (_cachedKnowledgeInjection != null) {
+    // 内部规范注入：同步读 DAO 缓存，无 await 故无需代际检查；
+    // 每轮重建意味着用户中途改规范即时生效
+    final rulesInjection = buildRulesInjection(hostId: hostId);
+    if (rulesInjection != null) {
       buffer.writeln();
-      buffer.writeln(_cachedKnowledgeInjection);
+      buffer.writeln(rulesInjection);
     }
 
     // 工具能力注入（告诉 AI 有哪些非 shell 工具可用）
@@ -5230,7 +5190,7 @@ class AgentEngine {
       buffer.writeln('- 你的训练数据可能过时（如最新版本号、近期新闻、新发布的软件包）');
       buffer.writeln('- 遇到不熟悉的错误信息、概念、API');
       buffer.writeln('- 用户明确要求"查一下"或"搜索"');
-      buffer.writeln('何时不使用：你已有把握的知识不要盲目搜索，避免浪费配额。优先用已有知识 + 知识库 + 命令执行解决任务。');
+      buffer.writeln('何时不使用：你已有把握的知识不要盲目搜索，避免浪费配额。优先用已有知识 + 命令执行解决任务。');
     }
 
     // 本地项目部署工作流提示（仅在本地终端会话时注入）

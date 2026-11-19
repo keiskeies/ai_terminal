@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
 import 'package:ai_terminal/services/agent_engine.dart';
+import 'package:ai_terminal/services/agent_tool.dart';
 import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/command_executor.dart';
 import 'package:ai_terminal/models/agent_event.dart';
@@ -17,6 +18,7 @@ import 'package:ai_terminal/models/chat_session.dart';
 import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/l10n/app_localizations_zh.dart';
 import 'package:ai_terminal/utils/tool_call_accumulator.dart';
+import 'package:ai_terminal/utils/tool_args_parser.dart';
 import 'package:ai_terminal/utils/goal_continuation.dart';
 
 /// O8 FC-first 端到端测试（R9：流式/协议改动必须覆盖组装后的完整链路）。
@@ -372,7 +374,7 @@ void main() {
       provider.enqueueFc([], [
         ToolCall(
           id: 'call_nested',
-          name: 'knowledge_search',
+          name: 'nested_args_probe',
           arguments: jsonEncode({
             'args': {'query': 'docker'},
           }),
@@ -380,17 +382,20 @@ void main() {
       ]);
       provider.enqueueFc(['完成'], [_finishCall()]);
       final engine = makeEngine(provider: provider);
+      engine.toolsForTesting.register(_NestedArgsProbeTool());
       final events = <AgentEvent>[];
       engine.onEvent = events.add;
 
       await engine.startTask('查 docker 指引', _MockExecutor());
 
       final result = events.firstWhere(
-        (e) => e.isResult && e.toolName == 'knowledge_search',
+        (e) => e.isResult && e.toolName == 'nested_args_probe',
       );
       expect(result.success, isTrue,
           reason: '嵌套参数必须被解包，否则 query 读不到（${result.error}）');
       expect(result.error ?? '', isNot(contains('缺少必填参数')));
+      // 不止"没报错"：解包后的值必须真的传到工具手里
+      expect(result.output, contains('docker'));
     });
 
     test('FC 正文里的代码围栏只是思考示例，不会被当命令执行', () async {
@@ -455,7 +460,7 @@ void main() {
           .toList();
       expect(names, containsAll(['execute', 'finish', 'ask']));
       // 注册工具仍然在列
-      expect(names, contains('knowledge_search'));
+      expect(names, contains('cert_check'));
       final execSchema = tools.firstWhere(
           (t) => (t['function'] as Map)['name'] == 'execute')['function'] as Map;
       final params = execSchema['parameters'] as Map;
@@ -910,4 +915,30 @@ void main() {
           {'command': 'java -version'});
     });
   });
+}
+
+/// 仅测试用：把收到的 query 原样回显，用来证明嵌套参数解包后值真的到了工具手里。
+/// 不用真实工具是因为存活工具要么打真实文件系统/网络，要么自行 catch 参数缺失，
+/// 断言会随环境漂移。
+class _NestedArgsProbeTool extends AgentTool {
+  @override
+  String get name => 'nested_args_probe';
+
+  @override
+  ToolKind get kind => ToolKind.read;
+
+  @override
+  String get description => '仅测试用工具：回显 query 参数';
+
+  @override
+  String get paramSpec => '  query: 查询词（必填）';
+
+  @override
+  Future<ToolResult> execute({
+    required CommandExecutor executor,
+    required ToolArgs args,
+    void Function(String message)? onProgress,
+  }) async {
+    return ToolResult.success('query=${args.requireString('query')}');
+  }
 }

@@ -1380,7 +1380,6 @@
   "ut_ae9a95fec3": "Benutzer bricht Aufgabe ab, PTY-Schreiben abgebrochen",
   "ut_0bb0be16b3": "Austausch abgeschlossen",
   "ut_1aa59da0cf": "Schreiben fehlgeschlagen, Rollback ...",
-  "ut_47e5e5365c": "Suche in der Wissensdatenbank abgebrochen",
   "ut_b79b73a254": "Fehlender Parameter: Pfad ist erforderlich",
   "ut_b48a9bcd4c": "Bestätigen",
   "ut_fa7ae42a25": "Dienst",
@@ -1671,7 +1670,6 @@
   "ut_cdfaed0dc5": "Warten Sie, bis der Benutzer das Sudo-Passwort eingibt.",
   "ut_6d06b21d26": "Der Benutzer hat kein Passwort angegeben (abbrechen oder leer eingeben). Bitte verwenden Sie stattdessen Aktion: Bitte um Bestätigung mit dem Benutzer oder führen Sie stattdessen im nichtprivilegierten Modus aus.",
   "ut_de63930b16": "Native Verifizierungserfahrung",
-  "ut_11e4b8176f": "Offizielle Wissensdatenbank",
   "ut_587234aed7": "Dieser Artikel wurde gekürzt",
   "ut_fb8896831d": "Der Gesamtbetrag überschreitet das Limit und nachfolgende Eingaben wurden abgeschnitten.",
   "ut_89d6d1508a": "Die aktuelle Plattform unterstützt keine native Befehlsausführung (nur Windows-/MacOS-/Linux-Desktop).",
@@ -3055,14 +3053,6 @@
       }
     }
   },
-  "ut_00cd1c4300": "cat write failed: {query}, versuchen Sie es mit sudo tee ...",
-  "@ut_00cd1c4300": {
-    "placeholders": {
-      "query": {
-        "type": "Object"
-      }
-    }
-  },
   "ut_5c0b2e0370": "\n…({label}, insgesamt {length} Zeichen im Originaltext)",
   "@ut_5c0b2e0370": {
     "placeholders": {
@@ -3085,7 +3075,7 @@
       }
     }
   },
-  "ut_cf4b2fdeb1": "Durchsuchen der Wissensdatenbank: {resolvedCwd}",
+  "ut_cf4b2fdeb1": "Lokales Arbeitsverzeichnis erstellt: {resolvedCwd}",
   "@ut_cf4b2fdeb1": {
     "placeholders": {
       "resolvedCwd": {

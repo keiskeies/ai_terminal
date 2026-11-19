@@ -1380,7 +1380,6 @@
   "ut_ae9a95fec3": "Người dùng hủy tác vụ, ghi PTY bị hủy",
   "ut_0bb0be16b3": "Thay thế hoàn tất",
   "ut_1aa59da0cf": "Viết không thành công, quay lại...",
-  "ut_47e5e5365c": "Tìm kiếm cơ sở kiến thức đã bị hủy",
   "ut_b79b73a254": "Thiếu tham số: bắt buộc phải có đường dẫn",
   "ut_b48a9bcd4c": "Xác nhận",
   "ut_fa7ae42a25": "dịch vụ",
@@ -1671,7 +1670,6 @@
   "ut_cdfaed0dc5": "Đợi người dùng nhập mật khẩu sudo…",
   "ut_6d06b21d26": "Người dùng không cung cấp mật khẩu (hủy hoặc nhập trống). Vui lòng sử dụng Hành động: thay vào đó hãy yêu cầu xác nhận với người dùng hoặc thực thi ở chế độ không có đặc quyền.",
   "ut_de63930b16": "Trải nghiệm xác minh gốc",
-  "ut_11e4b8176f": "Cơ sở kiến thức chính thức",
   "ut_587234aed7": "Bài viết này đã bị cắt ngắn",
   "ut_fb8896831d": "Tổng số tiền vượt quá giới hạn và các mục nhập tiếp theo đã bị cắt bớt.",
   "ut_89d6d1508a": "Nền tảng hiện tại không hỗ trợ thực thi lệnh gốc (chỉ máy tính để bàn Windows / macOS / Linux).",
@@ -3051,14 +3049,6 @@
         "type": "Object"
       },
       "byteCount": {
-        "type": "Object"
-      }
-    }
-  },
-  "ut_00cd1c4300": "Tìm kiếm kho kiến thức: {query}",
-  "@ut_00cd1c4300": {
-    "placeholders": {
-      "query": {
         "type": "Object"
       }
     }

@@ -10,7 +10,6 @@ import 'core/credentials_store.dart';
 import 'core/l10n_holder.dart';
 import 'l10n/app_localizations.dart';
 import 'providers/app_providers.dart';
-import 'services/knowledge_service.dart';
 import 'services/provider_config_service.dart';
 import 'services/ai_endpoint_migration.dart';
 import 'services/change_window_service.dart';
@@ -83,10 +82,6 @@ void main() {
     await AIEndpointsMigration.migrateIfNeeded();
     await ChangeWindowService.load();
     await NotificationService.load();
-
-    KnowledgeService().init().catchError((e) {
-      debugPrint('[main] 知识库初始化失败: $e');
-    });
 
     // 启动 SSH 连接池空闲清理：每 5 分钟扫描，回收空闲超过 10 分钟的连接
     // 防止用户打开多个 tab 后连接泄漏导致文件描述符耗尽

@@ -7,7 +7,7 @@ import '../models/token_usage.dart';
 import '../core/prompts.dart';
 import '../utils/tool_call_accumulator.dart';
 import 'daos.dart';
-import 'knowledge_service.dart';
+import 'rules_injection.dart';
 
 abstract class AIProvider {
   /// 调用 AI 模型返回流式响应。
@@ -578,20 +578,11 @@ class AIService {
       hostAddress: hostAddress,
     );
 
-    // 追加知识库安全规则
-    systemPrompt = '$systemPrompt\n\n$knowledgeSafetyRule';
-
-    // 查询知识库并注入
-    try {
-      final knowledge = KnowledgeService();
-      await knowledge.ensureInitialized();
-      if (knowledge.isInitialized && prompt.isNotEmpty) {
-        final injection = await knowledge.buildKnowledgeInjection(prompt, hostId: hostId);
-        if (injection != null) {
-          systemPrompt = '$systemPrompt\n\n$injection';
-        }
-      }
-    } catch (_) {}
+    // 内部规范注入（用户自维护的组织约定，全量常驻）
+    final rulesInjection = buildRulesInjection(hostId: hostId);
+    if (rulesInjection != null) {
+      systemPrompt = '$systemPrompt\n\n$rulesInjection';
+    }
 
     // 追加用户自定义提示词
     try {

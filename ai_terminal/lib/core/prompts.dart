@@ -278,7 +278,7 @@ const String agentFcRule = '''
    - execute(command, description)：执行一条 shell 命令；description 写一句话说明这条命令做什么、有什么影响
    - finish(answer, conclusion, status, changes, suggestion)：任务完成，给出最终回答
    - ask(question, options)：需要用户选择或补充信息；options 必须提供 2-4 个用户可见的按钮文字，简洁明确、避免术语
-   - 【可用工具】清单里的其他工具（如 sftp_upload、file_write、knowledge_search）：按工具名直接调用，参数按各自的 JSON schema 填写
+   - 【可用工具】清单里的其他工具（如 sftp_upload、file_write、local_file_read）：按工具名直接调用，参数按各自的 JSON schema 填写
 
 📌 多步任务计划（3 步以上或涉及修改操作时，在正文中输出"计划:"块）：
 计划:
@@ -336,14 +336,11 @@ const String behaviorBoundaryRule = '''
 10. 【错误理解】宁可保守不操作，也不要过度执行。不确定时只报告信息，不执行修改
 ''';
 
-/// 知识库安全规则 — 固定在 System Prompt 中，不可违背
-const String knowledgeSafetyRule = '''
-【知识库安全规则 - 不可违背】
-1. 当系统提供本地知识库命令时，必须原样使用，不得替换包管理器或更改命令核心逻辑
-2. 当本地知识库未提供而你认识该软件时，正常使用正确的包管理器直接安装，**禁止使用任何搜索类命令**（如 apt search、yum search、dnf search）
-3. 当你无法确定正确安装方式时，必须拒绝执行，并回复："该软件暂无已知安装方式，请提供官方安装指引。"
-4. 知识库条目标记为 strict 模式时，你必须严格照做，不得修改命令；标记为 suggest 模式时，可优化参数但不可更换包管理器
-5. 命令执行失败时，捕获错误返回给用户，不进入自救循环（不要自动尝试其他安装方式）
+/// 安装安全规则 — 安装失败路径的防自救循环约束（原寄居知识库规则，剔除时独立保留）
+const String installSafetyRule = '''
+【安装安全规则 - 不可违背】
+1. 当你无法确定正确安装方式时，必须拒绝执行，并回复："该软件暂无已知安装方式，请提供官方安装指引。"
+2. 安装/升级命令执行失败时，捕获错误返回给用户，不进入自救循环（不要自动尝试其他安装方式）
 ''';
 
 /// 危险命令解释规则 — 要求 AI 在执行高风险命令前用自然语言解释命令作用和风险
@@ -405,7 +402,7 @@ $commandFormatRule
 
 $behaviorBoundaryRule
 
-$knowledgeSafetyRule
+$installSafetyRule
 
 【安全约束】
 • 优先使用包管理器 (winget/choco/scoop)
@@ -431,7 +428,7 @@ $commandFormatRule
 
 $behaviorBoundaryRule
 
-$knowledgeSafetyRule
+$installSafetyRule
 
 【安全约束】
 • 优先使用包管理器 (apt/yum/dnf)，避免源码编译

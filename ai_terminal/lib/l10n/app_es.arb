@@ -1380,7 +1380,6 @@
   "ut_ae9a95fec3": "El usuario cancela la tarea, se cancela la escritura de PTY",
   "ut_0bb0be16b3": "Reemplazo completado",
   "ut_1aa59da0cf": "Error al escribir, retrocediendo...",
-  "ut_47e5e5365c": "Búsqueda en la base de conocimientos cancelada",
   "ut_b79b73a254": "Parámetro faltante: la ruta es obligatoria",
   "ut_b48a9bcd4c": "Confirmar",
   "ut_fa7ae42a25": "servicio",
@@ -1671,7 +1670,6 @@
   "ut_cdfaed0dc5": "Espere a que el usuario ingrese la contraseña sudo...",
   "ut_6d06b21d26": "El usuario no proporcionó una contraseña (cancelar o ingresar en blanco). Utilice Acción: solicite confirmación con el usuario o ejecútelo en modo sin privilegios.",
   "ut_de63930b16": "Experiencia de verificación nativa",
-  "ut_11e4b8176f": "Base de conocimientos oficial",
   "ut_587234aed7": "Este artículo ha sido truncado.",
   "ut_fb8896831d": "El importe total supera el límite y las entradas posteriores se han truncado.",
   "ut_89d6d1508a": "La plataforma actual no admite la ejecución de comandos nativos (solo escritorio Windows/macOS/Linux).",
@@ -3055,14 +3053,6 @@
       }
     }
   },
-  "ut_00cd1c4300": "Error de escritura del gato: {query}, prueba con Sudo tee...",
-  "@ut_00cd1c4300": {
-    "placeholders": {
-      "query": {
-        "type": "Object"
-      }
-    }
-  },
   "ut_5c0b2e0370": "\n…({label}, total {length} caracteres en el texto original)",
   "@ut_5c0b2e0370": {
     "placeholders": {
@@ -3085,7 +3075,7 @@
       }
     }
   },
-  "ut_cf4b2fdeb1": "Buscando en la base de conocimientos: {resolvedCwd}",
+  "ut_cf4b2fdeb1": "Directorio de trabajo local creado: {resolvedCwd}",
   "@ut_cf4b2fdeb1": {
     "placeholders": {
       "resolvedCwd": {

@@ -18,7 +18,6 @@ import '../utils/local_file_ops.dart';
 import '../utils/tool_args_parser.dart';
 import 'local_file_tools.dart';
 import 'local_exec_tool.dart';
-import 'knowledge_service.dart';
 import 'project_tools.dart';
 import 'web_tools.dart';
 
@@ -2670,141 +2669,6 @@ class ProvidePasswordTool extends AgentTool {
   }
 }
 
-/// 知识库按需检索工具（O6）
-///
-/// 知识库原本只在任务开始一次性检索注入 system prompt
-/// （KnowledgeService.buildKnowledgeInjection），任务中途才明确的知识需求
-/// （安装/配置/排障指引）无法再查。本工具把与注入同一套检索核心
-/// （searchKnowledge：FTS5 前缀 AND + LIKE 回退、用户经验 + 官方库、平台过滤）
-/// 暴露进 ReAct 循环。只读免确认，本地 + SSH 会话都可用。
-///
-/// hostId 取当前任务绑定的 executor（SSHService.config.id / 本地 'local'），
-/// 而不是活动 tab 的 activeHostId —— 长任务可能跨 tab 切换，经验匹配必须
-/// 落在任务所属主机上（AGENTS.md R3）。
-class KnowledgeSearchTool extends AgentTool {
-  /// 单条条目字符硬上限（R8：超限截断并标注）
-  static const int maxEntryChars = 1500;
-
-  /// 输出总字符硬上限（R8：超限截断并标注）
-  static const int maxTotalChars = 8000;
-
-  /// 返回条目数上限
-  static const int resultLimit = 5;
-
-  @override
-  String get name => 'knowledge_search';
-
-  @override
-  ToolKind get kind => ToolKind.read;
-
-  @override
-  String get description =>
-      '检索本地知识库（官方运维知识 + 本机验证过的用户经验）。'
-      '任务中途需要软件安装/配置/排障指引，或不确定某个软件的正确命令、参数、包管理器时调用；'
-      '返回最多 5 条条目（软件/平台/模式/命令/备注），模式为"强制执行"的条目必须严格照做。'
-      '只读、无副作用。公网最新信息请改用 web_search，本工具只查本地库。';
-
-  @override
-  String get paramSpec => '参数列表（多行 key:value 格式）：\n'
-      '  query: 搜索关键词（必填，软件名 + 操作，如 nginx 反向代理）\n'
-      '  platform: 平台过滤（可选，linux/macos/windows；缺省按当前会话自动判断）';
-
-  @override
-  Map<String, dynamic>? toJsonSchema() => {
-        'type': 'object',
-        'properties': {
-          'query': {
-            'type': 'string',
-            'description': '搜索关键词（软件名 + 操作，如 nginx 反向代理）',
-          },
-          'platform': {
-            'type': 'string',
-            'description': '平台过滤（linux/macos/windows，可选，缺省自动判断）',
-          },
-        },
-        'required': ['query'],
-      };
-
-  @override
-  Future<ToolResult> execute({
-    required CommandExecutor executor,
-    required ToolArgs args,
-    void Function(String message)? onProgress,
-  }) async {
-    // 必填校验：缺失/全空白抛 ToolArgException，engine 捕获后转成失败观测
-    final query = args.requireString('query');
-    final platformArg = args.getString('platform').trim().toLowerCase();
-
-    // 平台与 hostId 都从任务绑定的 executor 推导（R3），显式 platform 参数优先
-    String? platform = platformArg.isNotEmpty ? platformArg : null;
-    String hostId;
-    if (executor is SSHService) {
-      hostId = executor.config.id;
-      platform ??=
-          KnowledgeService.detectPlatformFromOsInfo(executor.osInfo) ?? 'linux';
-    } else {
-      hostId = 'local';
-      platform ??= KnowledgeService.detectPlatform();
-    }
-
-    final ct = cancelToken;
-    if (ct != null && ct.isCompleted) {
-      return ToolResult.failure(UiText.t('知识库检索已取消', 'Knowledge search cancelled'));
-    }
-
-    onProgress?.call(L10n.str.ut_00cd1c4300(query));
-    final entries = await KnowledgeService().searchKnowledge(
-      query,
-      platform: platform,
-      hostId: hostId,
-      limit: resultLimit,
-    );
-
-    // R1: await 期间任务可能已被取消，不再把结果写回观测
-    if (ct != null && ct.isCompleted) {
-      return ToolResult.failure(UiText.t('知识库检索已取消', 'Knowledge search cancelled'));
-    }
-
-    if (entries.isEmpty) {
-      return ToolResult.success(
-        '知识库未命中：没有与 "$query" 相关的条目（platform=$platform）。'
-        '可调整关键词（软件名/操作类型）重试一次；仍无结果时改用 web_search 查询公网信息，'
-        '或基于已有知识继续任务。',
-      );
-    }
-    return ToolResult.success(formatEntries(query, entries));
-  }
-
-  /// 把检索条目格式化为观测文本。
-  ///
-  /// 公开静态方法：契约测试直接用它验证截断边界（单条 [maxEntryChars]、
-  /// 总量 [maxTotalChars]），不需要真实数据库。
-  /// 两层截断都保留头部并标注——知识条目的标题/命令在头部，
-  /// 与 fetch_url 同理，是 R8"保尾"惯例的边界例外。
-  static String formatEntries(String query, List<KnowledgeSearchEntry> entries) {
-    final buffer = StringBuffer();
-    buffer.writeln('知识库检索 "$query"：命中 ${entries.length} 条');
-    for (var i = 0; i < entries.length; i++) {
-      final e = entries[i];
-      final source = e.isUserExperience
-          ? UiText.t('本机验证经验', 'Verified local experience')
-          : UiText.t('官方知识库', 'Official knowledge base');
-      final entry =
-          '[${i + 1}] ${e.guide.softwareName}（$source）\n${e.guide.buildInjectionText().trimRight()}';
-      buffer.writeln(_capText(entry, maxEntryChars, UiText.t('本条已截断', 'entry truncated')));
-    }
-    return _capText(buffer.toString().trimRight(), maxTotalChars, UiText.t('总量超限，后续条目已截断', 'total limit exceeded, later entries truncated'));
-  }
-
-  /// 字符上限截断：恰好等于上限时不截断（R8 边界）；超限时保留头部并标注原长度
-  static String _capText(String text, int cap, String label) {
-    if (text.length <= cap) return text;
-    final note = L10n.str.ut_5c0b2e0370(label, text.length);
-    final keep = (cap - note.length).clamp(0, text.length);
-    return '${text.substring(0, keep)}$note';
-  }
-}
-
 /// Agent 工具注册表 — 管理所有可用的工具
 class AgentToolRegistry {
   final Map<String, _RegisteredTool> _entries = {};
@@ -2837,9 +2701,6 @@ class AgentToolRegistry {
     register(FilePatchTool());
     // 特权密码：sudo 提示导致命令失败时的兜底入口，SSH 与本地终端都需要。
     register(ProvidePasswordTool());
-    // 知识库按需检索（O6）：任务中途才明确的安装/配置/排障知识需求可再查，
-    // 只读免确认，本地 + SSH 会话都可用。
-    register(KnowledgeSearchTool());
     // 本地项目工作流：这三个工具要求 LocalTerminalService executor，
     // 在 SSH 会话里注册了也只会失败，所以限定 localSession 作用域。
     register(ProjectAnalyzeTool(), scope: ToolScope.localSession);

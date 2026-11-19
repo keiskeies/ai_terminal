@@ -1380,7 +1380,6 @@
   "ut_ae9a95fec3": "L'utilisateur annule la tâche, l'écriture PTY est interrompue",
   "ut_0bb0be16b3": "Remplacement terminé",
   "ut_1aa59da0cf": "Échec de l'écriture, restauration...",
-  "ut_47e5e5365c": "Recherche dans la base de connaissances annulée",
   "ut_b79b73a254": "Paramètre manquant : le chemin est requis",
   "ut_b48a9bcd4c": "Confirmer",
   "ut_fa7ae42a25": "services",
@@ -1671,7 +1670,6 @@
   "ut_cdfaed0dc5": "Attendez que l'utilisateur saisisse le mot de passe sudo…",
   "ut_6d06b21d26": "L'utilisateur n'a pas fourni de mot de passe (annuler ou saisir un espace vide). Veuillez plutôt utiliser Action : demander à confirmer auprès de l'utilisateur, ou exécuter plutôt en mode non privilégié.",
   "ut_de63930b16": "Expérience de vérification native",
-  "ut_11e4b8176f": "Base de connaissances officielle",
   "ut_587234aed7": "Cet article a été tronqué",
   "ut_fb8896831d": "Le montant total dépasse la limite et les entrées suivantes ont été tronquées.",
   "ut_89d6d1508a": "La plateforme actuelle ne prend pas en charge l'exécution de commandes natives (uniquement sur le bureau Windows/MacOS/Linux).",
@@ -3055,14 +3053,6 @@
       }
     }
   },
-  "ut_00cd1c4300": "échec de l'écriture du chat : {query}, essayez sudo tee...",
-  "@ut_00cd1c4300": {
-    "placeholders": {
-      "query": {
-        "type": "Object"
-      }
-    }
-  },
   "ut_5c0b2e0370": "\n…({label}, total de {length} caractères dans le texte original)",
   "@ut_5c0b2e0370": {
     "placeholders": {
@@ -3085,7 +3075,7 @@
       }
     }
   },
-  "ut_cf4b2fdeb1": "Recherche dans la base de connaissances : {resolvedCwd}",
+  "ut_cf4b2fdeb1": "Répertoire de travail local créé : {resolvedCwd}",
   "@ut_cf4b2fdeb1": {
     "placeholders": {
       "resolvedCwd": {

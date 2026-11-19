@@ -1380,7 +1380,6 @@
   "ut_ae9a95fec3": "L'utente annulla l'attività, scrittura PTY interrotta",
   "ut_0bb0be16b3": "Sostituzione completata",
   "ut_1aa59da0cf": "Scrittura non riuscita, rollback in corso...",
-  "ut_47e5e5365c": "Ricerca nella knowledge base annullata",
   "ut_b79b73a254": "Parametro mancante: il percorso è obbligatorio",
   "ut_b48a9bcd4c": "Conferma",
   "ut_fa7ae42a25": "servizio",
@@ -1671,7 +1670,6 @@
   "ut_cdfaed0dc5": "Attendi che l'utente inserisca la password sudo…",
   "ut_6d06b21d26": "L'utente non ha fornito una password (annulla o inserisci vuoto). Utilizza invece l'azione: chiedi conferma all'utente oppure esegui in modalità non privilegiata.",
   "ut_de63930b16": "Esperienza di verifica nativa",
-  "ut_11e4b8176f": "Base di conoscenza ufficiale",
   "ut_587234aed7": "Questo articolo è stato troncato",
   "ut_fb8896831d": "L'importo totale supera il limite e le voci successive sono state troncate.",
   "ut_89d6d1508a": "La piattaforma attuale non supporta l'esecuzione nativa dei comandi (solo desktop Windows/macOS/Linux).",
@@ -3055,14 +3053,6 @@
       }
     }
   },
-  "ut_00cd1c4300": "scrittura cat non riuscita: {query}, prova sudo tee ...",
-  "@ut_00cd1c4300": {
-    "placeholders": {
-      "query": {
-        "type": "Object"
-      }
-    }
-  },
   "ut_5c0b2e0370": "\n…({label}, totale {length} caratteri nel testo originale)",
   "@ut_5c0b2e0370": {
     "placeholders": {
@@ -3085,7 +3075,7 @@
       }
     }
   },
-  "ut_cf4b2fdeb1": "Ricerca nella knowledge base: {resolvedCwd}",
+  "ut_cf4b2fdeb1": "Directory di lavoro locale creata: {resolvedCwd}",
   "@ut_cf4b2fdeb1": {
     "placeholders": {
       "resolvedCwd": {

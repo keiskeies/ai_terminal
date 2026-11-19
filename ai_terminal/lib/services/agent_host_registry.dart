@@ -9,8 +9,8 @@ import 'command_executor.dart';
 /// 一个服务器（hostId）可以同时打开多个 tab。过去这里按 hostId 存储，导致
 /// 同一服务器的第二个 tab 会直接加载第一个 tab 正在执行的 Agent 状态，且共享
 /// 引擎的 `isRunning` 会拒绝第二个 tab 的任务。现在每个 tab 拥有独立的
-/// state / engine / executor / memory，同时记录 scope → hostId，供知识库、
-/// 审计、多机编排等仍以“服务器”为单位的逻辑使用。
+/// state / engine / executor / memory，同时记录 scope → hostId，供审计、
+/// 多机编排等仍以“服务器”为单位的逻辑使用。
 class AgentHostRegistry {
   /// scopeId(tabId) → hostId
   final Map<String, String> _scopeHosts = {};
