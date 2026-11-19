@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.5.0-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.5.1-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.5.0</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.5.1</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">Visit the website</a>
 </p>
@@ -54,15 +54,21 @@ A chat assistant tells you what to run. AI Terminal runs it on your servers and 
 
 `5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `28 built-in tools` · `8 slash commands` · `300+ knowledge entries` · `7 web search engines`
 
-## New in 1.5.0
+## New in 1.5.1
 
-1.4.3 moved the interface into the localization layer but left the agent's own voice behind: the operation sheet was still a list of hard-coded Chinese/English pairs, so the other twelve languages read it in English. 1.5.0 finishes that migration.
+When a command failed, the observation handed back to the model was always "(no output)" — the real error sat in the executor's stdout while the observation read the always-empty stderr, so the AI could only guess and retry. 1.5.1 rebuilds that observation path and closes the execution, parsing and rendering boundary defects confirmed by the audit (F1-F3, H1-H2, M1-M5, P1-P2, D1, N1-N3).
 
-- **The operation sheet speaks your language** — all 188 `AgentUiText` members now resolve through ARB keys in all 14 languages: step counters, phase labels, failure categories and their hints, permission modes, token totals, and the local-execution authorization body. Singular variants ("1 command" vs "3 commands") became separate keys selected on `n == 1`, and every branch of each `switch` got its own key. A golden dump comparing all 188 members before and after the refactor is byte-identical for Chinese and English, so nothing that already worked moved
-- **Numbers stop breaking the language** — MCP settings strings that interpolate a count had no index entry, so twelve languages fell back to English on the "New server" summary and the capability rows. Five ARB template keys with matching unit keys replace them, verified in Korean
-- **The screenshots finally match the app** — the last two README images still showed the 1.3.9 window chrome, including a Chinese badge in an otherwise English report; both were recaptured from a live run on 1.5.0
+- **Failure observations are real** — a failed command's observation now carries its actual output, exit code and failure category all the way to the model. Field-verified: running `foo --version` on a remote host produces an answer quoting `-bash: foo: command not found` with exit code 127, and the agent declines to guess an install
+- **Sanitizing stops eating content** — residual escape sequences are only stripped when a real ESC byte is present and the pattern is tightened to ECMA-48 parameter form, so `[INFO]`, JSON arrays and timestamps survive; the trailing prompt now needs an exact full-line match, so the last content line is no longer shaved off. Colored output was re-checked with `cat -v` and `od -c` for intact escape bytes
+- **Exit codes stop bleeding across commands** — the cmd wrapper reads a fresh `%errorlevel%` (the old form returned the previous command's stale 0), marker detection requires a numeric boundary so 137 is no longer truncated into 1, and SSH probes whether the remote is Windows and picks the matching wrapper
+- **Half a response never executes** — an AI stream that stalls mid-flight is discarded and retried (at most twice per task), so a half-written heredoc never reaches the terminal. Analysis prose with no action declaration is likewise never extracted as commands, and file writes skip interactive-prompt detection so content containing `Password:` or `[Y/n]` lands verbatim
+- **Old sessions become readable** — protocol text in event-less history now renders and exports structurally, while ordinary Markdown is no longer parsed into command cards with an execute button
+- **Web search settings rebuilt** — the standalone page becomes an inline drawer; SearXNG accepts a self-hosted instance URL plus optional token, and result count, concurrency, timeout and HTTP proxy are configured per backend capability
+- **Server monitor detail window** — network and disk metrics open a dedicated detail window with a table layout and virtual interfaces collapsed to one line; the hover overlay stays a quick glance and the panel pauses its polling while the window is open
 
 ## Earlier releases
+
+The v1.5.0 internationalization release: all 188 `AgentUiText` members moved behind ARB keys in 14 languages, singular variants ("1 command" vs "3 commands") became separate keys selected on `n == 1`, MCP count interpolation moved to template keys, and the last two stale README screenshots were recaptured from a live run.
 
 The v1.4.3 stability release: pure questions stopped being forced into command execution, follow-up questions stopped re-narrating the previous answer, 484 strings across 56 files moved behind the bilingual layer, the AI panel stopped overflowing when narrowed, and the assistant got a hand-drawn fox avatar.
 
@@ -205,11 +211,11 @@ Get the latest build from [GitHub Releases](https://github.com/keiskeies/ai_term
 
 | Platform | File |
 |---|---|
-| macOS | `AI_Terminal_v1.5.0_macOS.zip` |
-| iOS | `AI_Terminal_v1.5.0_iOS.ipa` (unsigned) |
-| Android | `AI_Terminal_v1.5.0_Android.apk` |
-| Windows | `AI_Terminal_v1.5.0_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.5.0_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.5.1_macOS.zip` |
+| iOS | `AI_Terminal_v1.5.1_iOS.ipa` (unsigned) |
+| Android | `AI_Terminal_v1.5.1_Android.apk` |
+| Windows | `AI_Terminal_v1.5.1_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.5.1_Linux_x64.tar.gz` |
 
 If macOS reports that the developer cannot be verified:
 
@@ -322,7 +328,7 @@ Real SSH and real-LLM E2E tests are enabled through environment variables and do
 - No model is bundled; bring an OpenAI-compatible API key
 - The Agent executes real commands; review confirmations and keep backups in production
 - Once local file access is on, the Agent edits this computer (authorized folders only); trash copies never expire on their own — check the usage and empty it under Settings → Agent when you want the space back
-- 14 languages cover the core UI; the newest Agent operation-sheet labels are English/Chinese first, with English fallback for other locales
+- 14 languages cover the full UI including the agent's own operation sheet; a handful of strings stay in English by design (product and protocol names)
 - Directory uploads use adaptive concurrency and can be cancelled; directory downloads are still sequential, and symbolic links are skipped by default
 - The terminal context menu derives its line from the visible viewport, because xterm does not expose its scroll offset: while you are scrolled up, contextual link/path items may not match the line under the pointer. Those items only copy or open text — they never execute a command
 

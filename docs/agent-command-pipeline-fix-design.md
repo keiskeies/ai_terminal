@@ -1,6 +1,6 @@
 # Agent 命令管线缺陷修复设计（提示词 → 生成 → 执行 → 观测 → 展示）
 
-状态：**已实施（2026-11-19）**。F1-F3/H1-H2/M1-M5/P1-P2/D1/N1-N3 全部落地；全量 `flutter test --no-pub` **1703 passed / 25 skipped 全绿**，`flutter analyze` 无 error（仅 2 条 HEAD 基线自带 warning，与本次无关）。逐项结果见 §7，偏差与设计澄清见 §10。真机验收（Docker SSH / 本地 cmd+PS 双 shell）未在本环境执行，状态见 §7 末。
+状态：**已实施（2026-11-19）**。F1-F3/H1-H2/M1-M5/P1-P2/D1/N1-N3 全部落地；全量 `flutter test --no-pub` **1703 passed / 25 skipped 全绿**，`flutter analyze` 无 error（仅 2 条 HEAD 基线自带 warning，与本次无关）。逐项结果见 §7，偏差与设计澄清见 §10。真机验收已在 Windows 发布构建 + 应用内 Demo Server（SSH）复拍，逐项证据见 §7「真机验收」表；仅 P2 流超时重试与 D1 raw 解析分支为单元测试级证据。
 审计日期：2026-11-19（main 分支快照）。行号以本次快照为准，会随代码漂移——**定位请以符号名为准**。
 适用范围：`ai_terminal/lib/services/agent_engine.dart`、`ssh_service.dart`、`local_terminal_service.dart`、`command_executor.dart`、`lib/models/agent_model.dart`、`lib/utils/ansi_stripper.dart`、`exit_marker_scanner.dart`、`output_processor.dart`、`react_stream_parser.dart`、`lib/core/prompts.dart`、`lib/pages/terminal_page.dart`、`lib/utils/conversation_export.dart`
 关联：AGENTS.md R5/R6/R8/R9（终态一致、shell 分支、单次清洗、契约扇出）、`docs/terminal-capability-gap-design.md`（执行通道架构事实 A/B/C）
@@ -266,9 +266,25 @@ if (!isPowerShell) return '$command & call echo $marker%^errorlevel^%';
 | P2 | 新增 _declaredTextAction 单测 | 混用冒号/注解值 | ✅ `test/declared_action_test.dart` 10 例绿（经 `declaredActionForTest` 测试入口） |
 | P2 | 新增 raw fallback 渲染测试（D1） | 协议正文不再露出「动作:」行、导出分节 | ✅ `test/raw_fallback_render_test.dart` 9 例绿（纯函数 4 + 导出 4 + widget 1） |
 
-**真机验收**（green tests ≠ proof，按设备验证规则复拍）：
-- 本地 cmd + PowerShell：失败→成功命令序列退出码正确（M1）；`type data.json` 尾 `]` 保留（H2/F2）。**状态：未执行（blocked，本轮无设备复拍条件），实施时 M1 包装串已在本机交互 cmd 与 `cmd /c` 双上下文实测（事实 F），但 app 内端到端序列未拍。**
-- Docker SSH（见本地 E2E 资源）：`foo --version` 失败 → 观测/回答引用真实报错（F1）；写含 `Password:` 的文件完整（M3）；`cat` 彩色+JSON 混合输出无损（F2）。**状态：未执行（blocked）。**
+**真机验收（2026-11-19 已复拍）**：对象为仓库发布构建 `build/windows/x64/runner/Release/ai_terminal.exe`（改动后重新 `flutter build windows --release --no-pub`，以 `app.so` 时间戳确认新代码在盘），模型用应用内已配置的 DeepSeek-V4.1-Flash-1017，SSH 侧用应用内已配置的 Demo Server（Linux，root）。每次重启前先读 `trace_YYYYMMDD.ndjson` 末事件确认无运行中任务。
+
+| 项 | 环境 | 复拍证据 | 结论 |
+|---|---|---|---|
+| M1 退出码新鲜值 | 本地 tab（包装分支为 PowerShell） | 失败→成功序列得 `EXITCODE_1:7` / `EXITCODE_2:0`，`RESULT_FIRST=7` `RESULT_SECOND=0`；卡片汇总「3 条命令 1 失败」 | ✅ |
+| M1 cmd 分支 | 交互 cmd（stdin 上下文离线探针） | `MARK%^errorlevel^%` 取到新鲜 1、旧式 `& echo %errorlevel%` 取到陈旧 0（事实 F 矩阵） | ✅ 包装串本身；⚠️ app 内 cmd 会话端到端未拍（本机本地 shell 是 PS） |
+| F1 失败观测 | 本地 + Demo Server | 本地回答原样引用 `CommandNotFoundException`、`CMD_EXIT_B=9009`、`EXITCODE_4:1`；远端引用 `-bash: foo: command not found` 与退出码 127，并主动声明不猜包装安装 | ✅ |
+| F2/H2 输出无损 | 本地 + Demo Server | 本地多行输入 5 行齐全，回答引用逐行长度 `LEN=22/7/21/12/28`（尾行 28 字符完整）；远端彩色 `ls --color=always` 经 `cat -v`/`sed 's/\x1b/<ESC>/g'`/`od -c` 三种独立回显均为 `^[[01;34m` / `<ESC>[01;34m` / `033 [ 0 1 ; 3 4 m`，转义字节未被清洗吃掉 | ✅ |
+| M3 交互门控 | Demo Server | `printf 'Password:\n[Y/n] continue?\nplain\n' > /tmp/m3_test.txt` 后 `cat` 三行原样、末尾换行保留、退出码 0，46 ms 返回无交互式提示误判挂起 | ✅ |
+| H1 marker 数字边界 | Demo Server | `false`/`true` 同批得 `false_exit=1`、`true_exit=0`（修复前 `$?` 串值只会得 0） | ✅ |
+| D1 raw fallback | 应用内历史会话 | 11/17、11/18 老会话加载后均为结构化事件卡，界面无裸「动作:/命令:」协议行；**「无事件 + 原始协议正文」的旧记录本机已无留存，raw 解析分支未复现**，该分支仅 `raw_fallback_render_test.dart` 9 例单元覆盖 | 🟡 部分（渲染层已拍，raw 分支仅单测） |
+| P2 流超时重试 | — | 自然条件下难以诱发流停滞；仅 `ai_stream_timeout_test.dart`（含 `calls > 1` 硬断言，修复前探针实测 `calls=1` 直接 `failed`）证明 | 🟡 仅单测 |
+
+**顺带复拍到的一项确认门行为（非本次验收项，属旧缺陷 V3 的对照）**：清理 `/tmp/m3_test.txt` 时 `rm -f` 触发风险确认卡，我的点击未送达应用（见下），门在 `commandStart` 后整 600 s 自动拒绝（trace `17:09:17 commandStart` → `17:19:17 commandEnd success:false`）。回答把它归因为「approval prompt timed out and was auto-rejected，文件仍在（32 bytes，root，Nov 19 09:06 未变）」并转成带自由输入框的选择卡征询下一步，**没有**把系统超时写成用户拒绝，也没有擅自重试——旧 V3「系统行为记成用户意图」的症状未复现。
+
+**复拍中断点（诚实记录）**：约 17:11 起 Computer Use 对该窗口的输入注入整体不再送达（剪贴板哨兵法验证：点「复制回答」后剪贴板仍是哨兵值；`Ctrl+K` 不弹搜索；`activate_window` 返回成功亦无效），因此确认卡的「确认执行」按钮**未在真机点击成功**，风险确认卡的按钮可点性本轮只由 11/17 前的历史复拍与单元/widget 测试覆盖。截图与只读通道全程正常。
+**遗留状态**：Demo Server 上 `/tmp/m3_test.txt`（32 bytes，root）未删除（清理动作正是那枚未点到的确认卡）；本机应用保持运行，Demo Server 标签页与会话保留。
+
+对照证据（非本次验收项）：11/17 老会话里可见修复前症状「Empty output again — the harness seems to swallow stderr/output when the command exits non-zero」，与 §2 契约事实 A 一致。
 - 每次真机验证前按 trace 末事件确认无运行中任务再重启 app。
 
 **基线**：实施前重跑 `flutter analyze` / `flutter test --no-pub` 记录当前基线（2026-11-06 快照为 33 issues / 938 passed，已过期仅作量级参考），收尾对比。
@@ -308,7 +324,7 @@ if (!isPowerShell) return '$command & call echo $marker%^errorlevel^%';
 8. **H1 使用点为 4 处 + 2 处兜底**：donePattern 边界形态在 scanner 单点改；`matchesAtEnd` 兜底在 ssh executeAndWait / ssh writeFileViaPty / local executeAndWait / local writeFileViaPty 的 onDone 与异常前路径全部接入；退出码提取统一为 `marker(\d+)(?:[^\d]|$)` 边界形态并以 `replaceRange` 就地移除 marker。
 9. **D1 两处防误伤门控**：`hasVisibleReactEvents`（思考/命令/正文/询问/完成任一）——plan-only 事件流不产出正文，解析结果无可见事件时必须继续原文兜底，否则正文变空白；`terminal_page` 的解析结果按正文字符串在 State 上缓存（build 期每帧重 parse 是白费）。`events.isEmpty` 的消息维持基线行为（raw fallback 历来只在有事件段内生效），与事实 G 一致。
 10. **`AgentResult.fromCommand.success` 显式对齐**：`exitCode == 0 && failureKind == null`（事实 C 的约定固化），消除对「异常必返 -1」的隐式依赖。
-11. **真机验收未执行**：见 §7 末两项 blocked；本机 cmd 双上下文的 M1 包装串实测（事实 F）不能替代 app 内端到端复拍。
+11. **真机验收补充（2026-11-19 已执行）**：本地 tab 与 Demo Server SSH 均已复拍（见 §7 真机验收表）。两处仍未闭环：① 本地 cmd 会话的 M1 端到端序列——本机 app 的本地 shell 是 PowerShell，cmd 分支只有交互 stdin 离线探针证据（事实 F）；② D1 的「无事件 + 原始协议正文」旧记录在本机已无留存，raw 解析分支只有单测。
 
 ### 10b. 回归自审（实施后复审发现并已修复的 3 个实施缺陷）
 

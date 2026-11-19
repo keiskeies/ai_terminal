@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.5.0-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.5.1-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.5.0</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.5.1</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">访问官网</a>
 </p>
@@ -54,15 +54,21 @@
 
 `5 个平台` · `14 种界面语言` · `22 个 AI 供应商` · `90+ 预设模型` · `28 个内置工具` · `8 个斜杠命令` · `300+ 知识库条目` · `7 种联网搜索源`
 
-## 1.5.0 新增
+## 1.5.1 新增
 
-1.4.3 把界面文案搬进了国际化层，但 Agent 自己的声音漏在外面：操作单仍是一堆硬编码的中英配对，其余十二种语言打开它看到的还是英文。1.5.0 把这段收尾。
+命令失败时，回给模型的观测恒为「(无输出)」——真实报错在执行器的 stdout 里，观测却只读恒为空的 stderr，AI 只能瞎猜着重试。1.5.1 重建了这条观测链路，并收掉审计确认的执行 / 解析 / 展示边界缺陷（F1-F3、H1-H2、M1-M5、P1-P2、D1、N1-N3）。
 
-- **操作单说你的语言**：`AgentUiText` 全部 188 个成员改走 ARB 键、14 种语言全覆盖——步骤计数、阶段标签、失败分类与提示、权限模式、token 统计、本地执行授权正文。单数变体（"1 command" / "3 commands"）拆成独立键按 `n == 1` 选择，每个 `switch` 的每条分支各配一键。重构前后对 188 个成员做 golden dump 对比，中英文逐字节一致，原本正常的展示没有移动
-- **数字不再破坏语言**：MCP 设置页带数字插值的字符串在索引里没有条目，"新建服务器"摘要与能力行在十二种语言里恒回退英文。改用五个带配套单位键的 ARB 模板键，并已用韩语实测验证
-- **截图终于对上软件**：README 最后两张图还挂着 1.3.9 的窗口外壳，英文报告里混着一枚中文徽章；这次从 1.5.0 实机运行重新截取
+- **失败观测是真的了**：失败命令的观测现在携带真实输出、退出码与失败分类并全链透传给模型。实机验收：远端跑 `foo --version`，回答原样引用 `-bash: foo: command not found` 与退出码 127，并明确拒绝猜测安装
+- **清洗不再吃掉正文**：残留转义序列仅在真含 ESC 字节时清理，且正则收紧到 ECMA-48 参数形态，`[INFO]`、JSON 数组、时间戳不再被误当控制序列删掉；尾部提示符改整行精确匹配，正文最后一行不再被削掉。彩色输出用 `cat -v` 与 `od -c` 双重复核转义字节完整
+- **退出码不再串值**：cmd 包装取新鲜的 `%errorlevel%`（旧写法会拿到上一条命令的陈旧 0），marker 判定要求数字边界使 137 不再被截半读成 1，SSH 连接后探测远端是否 Windows 并按平台选包装分支
+- **半截响应绝不执行**：AI 流中途超时改为丢弃半截正文并重试（任务级 ≤2 次），写了一半的 heredoc 不会送进终端；没有动作声明的分析正文同样不会被提取成命令，写文件期间跳过交互提示检测，含 `Password:` / `[Y/n]` 的内容原样落盘
+- **老会话读得懂了**：无事件的历史会话里的协议正文改为结构化渲染与导出；普通 Markdown 不再被解析成带执行按钮的命令卡
+- **联网搜索设置重做**：独立页改为行内抽屉，SearXNG 支持自建实例地址与可选 Token，返回条数、并发、超时与 HTTP 代理按后端能力配置
+- **服务器监控明细窗**：网络与磁盘指标可展开独立详情窗（表格布局、虚拟接口折叠成一行），hover 浮层只留速览，开窗期间面板停轮询以免本地采集频率翻倍
 
-## 1.4.3 及更早
+## 1.5.0 及更早
+
+1.5.0 国际化收尾：`AgentUiText` 全部 188 个成员改走 ARB 键、14 种语言全覆盖，单数变体（"1 command" / "3 commands"）拆成独立键按 `n == 1` 选择，MCP 的数字插值改走模板键，README 最后两张过期截图从实机运行重新截取。
 
 1.4.3 稳定性版本：纯提问不再被逼去执行命令，追问不再复述上一轮答案，484 处文案、56 个文件接入双语层，AI 面板拖窄不再溢出，助手换上手绘狐狸头像。
 
@@ -205,11 +211,11 @@ Agent 也能直接读写跑着这个 App 的这台电脑，而不只是服务器
 
 | 平台 | 文件 |
 |---|---|
-| macOS | `AI_Terminal_v1.5.0_macOS.zip` |
-| iOS | `AI_Terminal_v1.5.0_iOS.ipa`（未签名） |
-| Android | `AI_Terminal_v1.5.0_Android.apk` |
-| Windows | `AI_Terminal_v1.5.0_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.5.0_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.5.1_macOS.zip` |
+| iOS | `AI_Terminal_v1.5.1_iOS.ipa`（未签名） |
+| Android | `AI_Terminal_v1.5.1_Android.apk` |
+| Windows | `AI_Terminal_v1.5.1_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.5.1_Linux_x64.tar.gz` |
 
 macOS 首次打开如提示“无法验证开发者”，可执行：
 
@@ -320,7 +326,7 @@ flutter test
 - 应用不内置模型，需要自备 OpenAI 兼容 API Key
 - Agent 会执行真实命令；请在生产环境先阅读确认信息并做好备份
 - 开启本机文件访问后，Agent 改的就是这台电脑（仅限你授权的目录）；回收区副本不会自动过期，需要时在 设置 → Agent 里查看用量并手动清空
-- 14 种语言覆盖核心界面；最新 Agent 操作单文案目前以英文/中文为主，其它语言回退英文
+- 14 种语言覆盖全部界面，含 Agent 自己的操作单；仅少量文案按设计保持英文（产品名与协议名）
 - token 计量优先用 provider 返回的 `usage`；不提供时回退到字符估算并在界面标 `≈`，缓存命中率则依赖 `prompt_tokens_details.cached_tokens`，没有就不显示
 - 目标模式的自动续跑只在目标所属会话处于前台时进行；切到别的会话时目标会暂停等你恢复，不会在后台机器上替你动手
 - 目录上传使用自适应并发并支持取消；目录下载仍是串行，符号链接默认跳过
