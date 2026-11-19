@@ -52,7 +52,7 @@ A chat assistant tells you what to run. AI Terminal runs it on your servers and 
 
 ## At a glance
 
-`5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `28 built-in tools` · `8 slash commands` · `300+ knowledge entries` · `7 web search engines`
+`5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `28 built-in tools` · `8 slash commands` · `300+ knowledge entries` · `11 web search backends`
 
 ## New in 1.5.1
 
@@ -157,7 +157,7 @@ The Agent can also read and write the computer this app runs on, not just your s
 
 - Works with any OpenAI-compatible API; 22 built-in provider presets and 90+ preset models
 - Per-model fallback, context window, max output, and Function Calling settings
-- Web search with 7 engines: Bing HTML, DuckDuckGo, Brave, SearXNG, Tavily, Bing API, SerpAPI
+- Web search with 11 selectable backends: Bing RSS, DuckDuckGo, SearXNG, Brave, Tavily, Serper.dev, Mojeek, Exa and Parallel, plus OpenAI and Anthropic grounded search; Bing RSS, DuckDuckGo and SearXNG need no key (SearXNG takes an optional token and a self-hosted URL)
 - Knowledge base with 300+ software installation/configuration entries, matched by platform
 - API keys stay in OS secure storage; no plaintext keys in logs or config files
 
@@ -167,7 +167,7 @@ The Agent can also read and write the computer this app runs on, not just your s
 - **Surface ladder**: separate surface steps for chrome, panels, cards and data cards, separated by hairlines instead of heavy borders; inline code is tinted by color rather than a background patch
 - **Cleaner controls**: circular send button, a taller Agent input, no character counter, and the tab status dot as the only connection indicator
 - **Structured Agent log**: filter by level, tag, or current task; one line per event; copy the filtered view
-- **English UI coverage**: the Agent operation sheet, Web Search, MCP servers, Diagnostics, built-in runbooks, and the terminal context menu follow the interface language (English/Chinese first; other locales fall back to English)
+- **Interface language coverage**: the Agent operation sheet, Web Search, MCP servers, Diagnostics, built-in runbooks, and the terminal context menu follow the interface language in all 14 locales
 - **14 UI languages**: 简体中文, English, 日本語, 한국어, Deutsch, Français, Русский, Español, Português, العربية, Italiano, हिन्दी, ไทย, Tiếng Việt
 - **5 platforms**: macOS, Linux, Windows, Android, iOS
 - OS Keychain / Keystore credential storage, SafetyGuard command classification, and confirmation for risky operations
@@ -328,7 +328,7 @@ Real SSH and real-LLM E2E tests are enabled through environment variables and do
 - No model is bundled; bring an OpenAI-compatible API key
 - The Agent executes real commands; review confirmations and keep backups in production
 - Once local file access is on, the Agent edits this computer (authorized folders only); trash copies never expire on their own — check the usage and empty it under Settings → Agent when you want the space back
-- 14 languages cover the full UI including the agent's own operation sheet; a handful of strings stay in English by design (product and protocol names)
+- 14 languages carry the full string set, including the agent's own operation sheet; roughly a dozen strings per locale remain in English (product and protocol names, plus some of the newest web-search help text)
 - Directory uploads use adaptive concurrency and can be cancelled; directory downloads are still sequential, and symbolic links are skipped by default
 - The terminal context menu derives its line from the visible viewport, because xterm does not expose its scroll offset: while you are scrolled up, contextual link/path items may not match the line under the pointer. Those items only copy or open text — they never execute a command
 
