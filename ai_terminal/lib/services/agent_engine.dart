@@ -1884,6 +1884,16 @@ class AgentEngine {
 
         case ActionType.execute:
           if (step.command == null || step.command!.trim().isEmpty) {
+            // R10: fallback 提取需要模型显式声明了「动作: execute」。
+            // 未声明的轮次（纯分析/答复正文）绝不从正文里猜命令 ——
+            // 历史上曾把「binlog 位置: … → appvg-applv (57%)」这类带
+            // 低中文占比+ASCII 关键词的分析行捞出来当命令执行（真机 -bash 报错）。
+            if (!_declaresExecuteAction(fullResponse)) {
+              agentLogger.info('ReAct', '未声明动作: execute，跳过 fallback 命令提取');
+              final shouldContinue = await _handleNoCommand();
+              if (!shouldContinue) return;
+              continue;
+            }
             // ReAct 解析出了 execute 但无命令 → fallback 到旧方式提取
             final fallbackCommands = _extractCommands(fullResponse);
             if (fallbackCommands.isNotEmpty) {
@@ -2330,6 +2340,18 @@ class AgentEngine {
       }
     } else if (declaredAction != null) {
       events.removeWhere((e) => e.isCommand);
+    } else {
+      // R10: 正文里没有任何 `动作:` 行 → 本轮没有执行意图，一律不执行命令。
+      // 此前无动作行时围栏命令原样保留并被默认当成 execute，真机上把
+      // 「binlog 位置: … → appvg-applv (/app, 57%)」这类贴回正文的分析
+      // 文本逐行敲进了终端（-bash: command not found / syntax error）。
+      // 模型想执行必须声明 动作: execute；缺失时交给 _handleNoCommand
+      // 的格式提示重试，弱模型一轮即可回到协议。
+      final dropped = events.where((e) => e.isCommand).length;
+      if (dropped > 0) {
+        agentLogger.info('ReAct', '未声明动作行，丢弃 $dropped 条围栏/命令事件不执行');
+        events.removeWhere((e) => e.isCommand);
+      }
     }
 
     // O8 FC-first：结构化 tool_calls 合并进事件流。
@@ -2639,6 +2661,27 @@ class AgentEngine {
       return null;
     }
     return null;
+  }
+
+  /// 正文里是否显式声明了「动作: execute」。
+  ///
+  /// 只在显式声明时允许 fallback 命令提取（见 execute 分支的 R10 注释）。
+  /// 与 _textFromDeclaredAction 共用同一套动作行识别，避免两处口径漂移。
+  static bool _declaresExecuteAction(String content) {
+    if (content.isEmpty) return false;
+    final lines = content.split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      final trimmedLine = lines[i].trim();
+      if (!trimmedLine.startsWith('动作:') && !trimmedLine.startsWith('动作：')) {
+        continue;
+      }
+      final sepIdx =
+          trimmedLine.indexOf(trimmedLine.contains('：') ? '：' : ':');
+      if (sepIdx < 0) continue;
+      return trimmedLine.substring(sepIdx + 1).trim().toLowerCase() ==
+          'execute';
+    }
+    return false;
   }
 
   /// `动作: execute` 行之后的正文（含动作行）。

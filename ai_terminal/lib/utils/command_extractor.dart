@@ -88,6 +88,11 @@ class CommandExtractor {
       if (isDescriptiveText(trimmed)) continue;
       var cleaned = trimmed.replaceFirst(RegExp(r'^\d+[\.\)]\s*'), '');
       cleaned = cleaned.replaceFirst(RegExp(r'^[-*]\s*'), '');
+      // 含中文的行不参与宽松提取：分析文本常以 ASCII 路径/关键字开头
+      //（如 "binlog 位置: /app/... → appvg-applv (57%)"），中文字符占比
+      // 低于 looksLikeCommand 的 30% 阈值会被误判成命令执行 — 宽松模式
+      // 只服务纯命令块，中文混排的行应被当作描述跳过。
+      if (RegExp(r'[\u4e00-\u9fa5]').hasMatch(cleaned)) continue;
       if (looksLikeCommand(cleaned) && cleaned.length >= 3) {
         agentLogger.info('ExtractCmd', '模式4匹配成功(宽松): $cleaned');
         return cleaned;
@@ -182,7 +187,11 @@ class CommandExtractor {
         continue;
       }
       // 过滤描述性文字：代码块中的 prose 行不应被当作命令执行
-      if (line.length >= 3 && !isDescriptiveText(line) && looksLikeCommand(line)) {
+      // （含中文的行直接跳过，避免 "binlog 位置: ..." 这类被误执行）
+      if (line.length >= 3 &&
+          !isDescriptiveText(line) &&
+          !RegExp(r'[\u4e00-\u9fa5]').hasMatch(line) &&
+          looksLikeCommand(line)) {
         commands.add(line);
       }
       i++;
