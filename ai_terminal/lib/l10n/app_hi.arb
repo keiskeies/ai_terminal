@@ -986,6 +986,11 @@
   "monitorErrorCollecting": "संग्रह कर रहा है",
   "monitorErrorNotConnected": "कनेक्ट नहीं है",
   "monitorErrorEmptyOutput": "संग्रह आउटपुट खाली है",
+  "monitorNetVirtualGroup": "{count} वर्चुअल इंटरफ़ेस",
+  "monitorShowVirtual": "दिखाएँ",
+  "monitorHideVirtual": "छिपाएँ",
+  "monitorOpenDetail": "विवरण",
+  "monitorLiveUpdating": "हर {seconds} सेकंड में अपडेट",
   "terminalLocalTab": "स्थानीय",
   "sessionNew": "नया",
   "sessionNoSessions": "कोई सत्र नहीं",
@@ -1015,7 +1020,6 @@
   "orchInputTruncated": "...(इनपुट बहुत लंबा है, कटा हुआ)",
   "orchSkippedPreviousFailed": "छोड़ा गया (पिछला होस्ट विफल)",
   "monitorCollectingFailed": "संग्रह विफल ({count} बार लगातार)",
-  "monitorNetMoreInterfaces": "{count} और इंटरफ़ेस नहीं दिखाए गए",
   "sessionMessageCount": "{count} संदेश",
   "sessionDeleteConfirm": "सत्र \"{title}\" के सभी संदेश और लॉग स्थायी रूप से हटा दिए जाएंगे और पुनर्प्राप्त नहीं किए जा सकते।",
   "runbookCopy": "{name} (प्रति)",
@@ -1038,14 +1042,21 @@
   "orchToolSftpOpening": "[{hostId}] SFTP सबसिस्टम खो रहा है...",
   "orchToolExecProgress": "[{hostId}] निष्पादन: {command}",
   "orchTaskAbnormal": "⚠️ कार्य असामान्य रूप से समाप्त: {error}",
-  "@monitorCollectingFailed": {
+  "@monitorLiveUpdating": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "@monitorNetVirtualGroup": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
   },
-  "@monitorNetMoreInterfaces": {
+  "@monitorCollectingFailed": {
     "placeholders": {
       "count": {
         "type": "int"

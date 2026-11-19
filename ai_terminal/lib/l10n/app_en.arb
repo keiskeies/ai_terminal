@@ -987,6 +987,11 @@
   "monitorErrorCollecting": "Collecting",
   "monitorErrorNotConnected": "Not Connected",
   "monitorErrorEmptyOutput": "Collection output is empty",
+  "monitorNetVirtualGroup": "{count} virtual interfaces",
+  "monitorShowVirtual": "Show",
+  "monitorHideVirtual": "Hide",
+  "monitorOpenDetail": "Details",
+  "monitorLiveUpdating": "Auto-updates every {seconds}s",
   "terminalLocalTab": "Local",
   "sessionNew": "New",
   "sessionNoSessions": "No sessions",
@@ -1016,7 +1021,6 @@
   "orchInputTruncated": "...(input too long, truncated)",
   "orchSkippedPreviousFailed": "Skipped (previous host failed)",
   "monitorCollectingFailed": "Collection failed ({count} consecutive times)",
-  "monitorNetMoreInterfaces": "{count} more interfaces not shown",
   "sessionMessageCount": "{count} messages",
   "sessionDeleteConfirm": "All messages and logs of session \"{title}\" will be permanently deleted and cannot be recovered.",
   "runbookCopy": "{name} (Copy)",
@@ -1039,14 +1043,21 @@
   "orchToolSftpOpening": "[{hostId}] Opening SFTP subsystem...",
   "orchToolExecProgress": "[{hostId}] Execute: {command}",
   "orchTaskAbnormal": "⚠️ Task terminated abnormally: {error}",
-  "@monitorCollectingFailed": {
+  "@monitorLiveUpdating": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "@monitorNetVirtualGroup": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
   },
-  "@monitorNetMoreInterfaces": {
+  "@monitorCollectingFailed": {
     "placeholders": {
       "count": {
         "type": "int"

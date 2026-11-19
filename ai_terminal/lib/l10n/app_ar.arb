@@ -986,6 +986,11 @@
   "monitorErrorCollecting": "جارٍ الجمع",
   "monitorErrorNotConnected": "غير متصل",
   "monitorErrorEmptyOutput": "مخرجات الجمع فارغة",
+  "monitorNetVirtualGroup": "{count} واجهات افتراضية",
+  "monitorShowVirtual": "عرض",
+  "monitorHideVirtual": "إخفاء",
+  "monitorOpenDetail": "التفاصيل",
+  "monitorLiveUpdating": "تحديث كل {seconds} ثانية",
   "terminalLocalTab": "محلي",
   "sessionNew": "جديد",
   "sessionNoSessions": "لا توجد جلسات",
@@ -1015,7 +1020,6 @@
   "orchInputTruncated": "...(الإدخال طويل جدًا، مقطوع)",
   "orchSkippedPreviousFailed": "تم التخطي (فشل المضيف السابق)",
   "monitorCollectingFailed": "فشل الجمع ({count} مرات متتالية)",
-  "monitorNetMoreInterfaces": "{count} واجهات إضافية غير معروضة",
   "sessionMessageCount": "{count} رسائل",
   "sessionDeleteConfirm": "سيتم حذف جميع الرسائل والسجلات الخاصة بالجلسة \"{title}\" بشكل دائم ولا يمكن استعادتها.",
   "runbookCopy": "{name} (نسخة)",
@@ -1038,14 +1042,21 @@
   "orchToolSftpOpening": "[{hostId}] جارٍ فتح نظام SFTP الفرعي...",
   "orchToolExecProgress": "[{hostId}] تنفيذ: {command}",
   "orchTaskAbnormal": "⚠️ انتهت المهمة بشكل غير طبيعي: {error}",
-  "@monitorCollectingFailed": {
+  "@monitorLiveUpdating": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "@monitorNetVirtualGroup": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
   },
-  "@monitorNetMoreInterfaces": {
+  "@monitorCollectingFailed": {
     "placeholders": {
       "count": {
         "type": "int"

@@ -986,6 +986,11 @@
   "monitorErrorCollecting": "Coletando",
   "monitorErrorNotConnected": "Não conectado",
   "monitorErrorEmptyOutput": "Saída da coleta vazia",
+  "monitorNetVirtualGroup": "{count} interfaces virtuais",
+  "monitorShowVirtual": "Mostrar",
+  "monitorHideVirtual": "Ocultar",
+  "monitorOpenDetail": "Detalhes",
+  "monitorLiveUpdating": "Atualiza a cada {seconds} s",
   "terminalLocalTab": "locais",
   "sessionNew": "Novo",
   "sessionNoSessions": "Sem sessões",
@@ -1015,7 +1020,6 @@
   "orchInputTruncated": "...(entrada muito longa, truncada)",
   "orchSkippedPreviousFailed": "Ignorado (host anterior falhou)",
   "monitorCollectingFailed": "Coleta falhou ({count} vezes consecutivas)",
-  "monitorNetMoreInterfaces": "Mais {count} interfaces não exibidas",
   "sessionMessageCount": "{count} mensagens",
   "sessionDeleteConfirm": "Todas as mensagens e logs da sessão \"{title}\" serão excluídos permanentemente e não poderão ser recuperados.",
   "runbookCopy": "{name} (Cópia)",
@@ -1038,14 +1042,21 @@
   "orchToolSftpOpening": "[{hostId}] Abrindo subsistema SFTP...",
   "orchToolExecProgress": "[{hostId}] Executar: {command}",
   "orchTaskAbnormal": "⚠️ Tarefa encerrada anormalmente: {error}",
-  "@monitorCollectingFailed": {
+  "@monitorLiveUpdating": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "@monitorNetVirtualGroup": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
   },
-  "@monitorNetMoreInterfaces": {
+  "@monitorCollectingFailed": {
     "placeholders": {
       "count": {
         "type": "int"

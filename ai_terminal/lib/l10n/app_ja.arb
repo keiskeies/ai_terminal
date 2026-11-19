@@ -986,6 +986,11 @@
   "monitorErrorCollecting": "収集中",
   "monitorErrorNotConnected": "未接続",
   "monitorErrorEmptyOutput": "収集出力が空です",
+  "monitorNetVirtualGroup": "仮想インターフェース {count} 件",
+  "monitorShowVirtual": "表示",
+  "monitorHideVirtual": "隠す",
+  "monitorOpenDetail": "詳細",
+  "monitorLiveUpdating": "{seconds} 秒ごとに更新",
   "terminalLocalTab": "ローカル",
   "sessionNew": "新規",
   "sessionNoSessions": "セッションなし",
@@ -1015,7 +1020,6 @@
   "orchInputTruncated": "...(入力が長すぎます、切り詰めました)",
   "orchSkippedPreviousFailed": "スキップ（前のホストが失敗）",
   "monitorCollectingFailed": "収集失敗（連続 {count} 回）",
-  "monitorNetMoreInterfaces": "あと {count} 個のインターフェースが非表示",
   "sessionMessageCount": "{count} 件のメッセージ",
   "sessionDeleteConfirm": "セッション「{title}」のすべてのメッセージとログは完全に削除され、復元できません。",
   "runbookCopy": "{name} (コピー)",
@@ -1038,14 +1042,21 @@
   "orchToolSftpOpening": "[{hostId}] SFTP サブシステムを開いています...",
   "orchToolExecProgress": "[{hostId}] 実行: {command}",
   "orchTaskAbnormal": "⚠️ タスクが異常終了しました: {error}",
-  "@monitorCollectingFailed": {
+  "@monitorLiveUpdating": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "@monitorNetVirtualGroup": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
   },
-  "@monitorNetMoreInterfaces": {
+  "@monitorCollectingFailed": {
     "placeholders": {
       "count": {
         "type": "int"

@@ -986,6 +986,11 @@
   "monitorErrorCollecting": "Идёт сбор",
   "monitorErrorNotConnected": "Не подключено",
   "monitorErrorEmptyOutput": "Вывод сбора пуст",
+  "monitorNetVirtualGroup": "{count} виртуальных интерфейсов",
+  "monitorShowVirtual": "Показать",
+  "monitorHideVirtual": "Скрыть",
+  "monitorOpenDetail": "Подробно",
+  "monitorLiveUpdating": "Обновляется каждые {seconds} с",
   "terminalLocalTab": "Локально",
   "sessionNew": "Новый",
   "sessionNoSessions": "Нет сессий",
@@ -1015,7 +1020,6 @@
   "orchInputTruncated": "...(ввод слишком длинный, обрезан)",
   "orchSkippedPreviousFailed": "Пропущено (предыдущий хост не удался)",
   "monitorCollectingFailed": "Сбор не удался ({count} раз подряд)",
-  "monitorNetMoreInterfaces": "Ещё {count} интерфейсов не отображается",
   "sessionMessageCount": "{count} сообщ.",
   "sessionDeleteConfirm": "Все сообщения и логи сессии \"{title}\" будут удалены без возможности восстановления.",
   "runbookCopy": "{name} (копия)",
@@ -1038,14 +1042,21 @@
   "orchToolSftpOpening": "[{hostId}] Открытие подсистемы SFTP...",
   "orchToolExecProgress": "[{hostId}] Выполнение: {command}",
   "orchTaskAbnormal": "⚠️ Задача завершена аварийно: {error}",
-  "@monitorCollectingFailed": {
+  "@monitorLiveUpdating": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "@monitorNetVirtualGroup": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
   },
-  "@monitorNetMoreInterfaces": {
+  "@monitorCollectingFailed": {
     "placeholders": {
       "count": {
         "type": "int"

@@ -986,6 +986,11 @@
   "monitorErrorCollecting": "กำลังรวบรวม",
   "monitorErrorNotConnected": "ไม่ได้เชื่อมต่อ",
   "monitorErrorEmptyOutput": "ผลลัพธ์การรวบรวมว่าง",
+  "monitorNetVirtualGroup": "{count} อินเทอร์เฟซเสมือน",
+  "monitorShowVirtual": "แสดง",
+  "monitorHideVirtual": "ซ่อน",
+  "monitorOpenDetail": "รายละเอียด",
+  "monitorLiveUpdating": "อัปเดตทุก {seconds} วินาที",
   "terminalLocalTab": "ภายในเครื่อง",
   "sessionNew": "ใหม่",
   "sessionNoSessions": "ยังไม่มีเซสชัน",
@@ -1015,7 +1020,6 @@
   "orchInputTruncated": "...(อินพุตยาวเกินไป ถูกตัดทอน)",
   "orchSkippedPreviousFailed": "ข้ามไป (โฮสต์ก่อนหน้าล้มเหลว)",
   "monitorCollectingFailed": "การรวบรวมล้มเหลว ({count} ครั้งติดต่อกัน)",
-  "monitorNetMoreInterfaces": "ยังมีอินเทอร์เฟซอีก {count} รายการที่ไม่แสดง",
   "sessionMessageCount": "{count} ข้อความ",
   "sessionDeleteConfirm": "ข้อความและบันทึกทั้งหมดของเซสชัน \"{title}\" จะถูกลบถาวรและไม่สามารถกู้คืนได้",
   "runbookCopy": "{name} (สำเนา)",
@@ -1038,14 +1042,21 @@
   "orchToolSftpOpening": "[{hostId}] กำลังเปิดระบบย่อย SFTP...",
   "orchToolExecProgress": "[{hostId}] ดำเนินการ: {command}",
   "orchTaskAbnormal": "⚠️ งานสิ้นสุดผิดปกติ: {error}",
-  "@monitorCollectingFailed": {
+  "@monitorLiveUpdating": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "@monitorNetVirtualGroup": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
   },
-  "@monitorNetMoreInterfaces": {
+  "@monitorCollectingFailed": {
     "placeholders": {
       "count": {
         "type": "int"

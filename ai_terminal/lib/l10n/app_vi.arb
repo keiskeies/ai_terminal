@@ -986,6 +986,11 @@
   "monitorErrorCollecting": "Đang thu thập",
   "monitorErrorNotConnected": "Chưa kết nối",
   "monitorErrorEmptyOutput": "Đầu ra thu thập trống",
+  "monitorNetVirtualGroup": "{count} giao diện ảo",
+  "monitorShowVirtual": "Hiển thị",
+  "monitorHideVirtual": "Ẩn",
+  "monitorOpenDetail": "Chi tiết",
+  "monitorLiveUpdating": "Tự động cập nhật mỗi {seconds} giây",
   "terminalLocalTab": "Cục bộ",
   "sessionNew": "Mới",
   "sessionNoSessions": "Chưa có phiên",
@@ -1015,7 +1020,6 @@
   "orchInputTruncated": "...(đầu vào quá dài, đã cắt ngắn)",
   "orchSkippedPreviousFailed": "Đã bỏ qua (máy trước thất bại)",
   "monitorCollectingFailed": "Thu thập thất bại ({count} lần liên tiếp)",
-  "monitorNetMoreInterfaces": "Còn {count} giao diện chưa hiển thị",
   "sessionMessageCount": "{count} tin nhắn",
   "sessionDeleteConfirm": "Tất cả tin nhắn và nhật ký của phiên \"{title}\" sẽ bị xóa vĩnh viễn và không thể khôi phục.",
   "runbookCopy": "{name} (Bản sao)",
@@ -1038,14 +1042,21 @@
   "orchToolSftpOpening": "[{hostId}] Đang mở hệ thống con SFTP...",
   "orchToolExecProgress": "[{hostId}] Thực thi: {command}",
   "orchTaskAbnormal": "⚠️ Tác vụ kết thúc bất thường: {error}",
-  "@monitorCollectingFailed": {
+  "@monitorLiveUpdating": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "@monitorNetVirtualGroup": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
   },
-  "@monitorNetMoreInterfaces": {
+  "@monitorCollectingFailed": {
     "placeholders": {
       "count": {
         "type": "int"

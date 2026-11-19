@@ -987,6 +987,11 @@
   "monitorErrorCollecting": "采集进行中",
   "monitorErrorNotConnected": "未连接",
   "monitorErrorEmptyOutput": "采集输出为空",
+  "monitorNetVirtualGroup": "虚拟接口 {count} 个",
+  "monitorShowVirtual": "显示",
+  "monitorHideVirtual": "收起",
+  "monitorOpenDetail": "展开详情",
+  "monitorLiveUpdating": "每 {seconds} 秒自动更新",
   "terminalLocalTab": "本地",
   "sessionNew": "新建",
   "sessionNoSessions": "暂无会话",
@@ -1016,7 +1021,6 @@
   "orchInputTruncated": "...(输入过长，已截断)",
   "orchSkippedPreviousFailed": "已跳过（前序主机失败）",
   "monitorCollectingFailed": "采集失败（连续 {count} 次）",
-  "monitorNetMoreInterfaces": "还有 {count} 个接口未显示",
   "sessionMessageCount": "{count} 条消息",
   "sessionDeleteConfirm": "会话「{title}」的所有消息和日志将被永久删除，无法恢复。",
   "runbookCopy": "{name} (副本)",
@@ -1039,14 +1043,21 @@
   "orchToolSftpOpening": "[{hostId}] 正在打开 SFTP 子系统...",
   "orchToolExecProgress": "[{hostId}] 执行: {command}",
   "orchTaskAbnormal": "⚠️ 任务异常终止: {error}",
-  "@monitorCollectingFailed": {
+  "@monitorLiveUpdating": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "@monitorNetVirtualGroup": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
   },
-  "@monitorNetMoreInterfaces": {
+  "@monitorCollectingFailed": {
     "placeholders": {
       "count": {
         "type": "int"

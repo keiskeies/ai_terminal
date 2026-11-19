@@ -7,6 +7,7 @@ import '../core/theme_colors.dart';
 import '../l10n/app_localizations.dart';
 import '../providers/agent_provider.dart';
 import '../services/server_monitor_service.dart';
+import 'monitor_detail_view.dart';
 
 /// 服务器监控面板 — 单行紧凑布局（30px 高）
 ///
@@ -52,6 +53,9 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
   Offset? _mousePosition; // 鼠标全局位置，用于浮层定位
 
   static const double _overlayMouseGap = 6;
+
+  /// 详情窗是否打开：打开期间面板不轮询，采集交给详情窗（见 _onTick）
+  bool _detailDialogOpen = false;
 
   /// hover 位移阈值（px）：小于该位移不重建浮层
   static const double _overlayMoveEpsilon = 4;
@@ -112,6 +116,10 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
 
   Future<void> _collectNow() async {
     if (!mounted) return;
+    // 详情窗打开期间由详情窗自己按 interval 轮询，面板再采等于把本地采集
+    // （PowerShell + 一堆 Get-CimInstance/WMI）频率翻倍。闸门放这里而不是
+    // _onTick：didChangeDependencies 的补采路径同样要挡
+    if (_detailDialogOpen) return;
     // 后台 tab（Offstage + TickerMode disabled）不采集：Timer.periodic 不受
     // TickerMode 影响，必须显式跳过，否则多 tab 会叠加采集进程
     if (!TickerMode.valuesOf(context).enabled) return;
@@ -137,15 +145,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
     }
   }
 
-  // ==================== 工具函数 ====================
-
-  /// 根据使用率百分比返回对应颜色
-  /// < 80%: 正常色, 80~95%: 警告橙, >= 95%: 危险红
-  Color _colorByPercent(double percent, Color normal) {
-    if (percent >= 95) return cDanger;
-    if (percent >= 80) return cWarning;
-    return normal;
-  }
+  // ==================== 浮层控制 ====================
 
   void _showOverlay(String metric, Offset mousePosition) {
     _mousePosition = mousePosition;
@@ -162,6 +162,31 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
       builder: (ctx) => _buildOverlay(metric),
     );
     Overlay.of(context, rootOverlay: true).insert(_overlayEntry!);
+  }
+
+  /// 点击指标 = 打开详情窗（网络/磁盘），其余指标沿用浮层
+  ///
+  /// 浮层是纯 hover 产物：鼠标一离开芯片 onExit 就销毁它，浮层里的按钮根本
+  /// 点不到。所以「看全部」必须挂在芯片的 tap 上，而不是浮层内部。
+  void _onMetricTap(String metric, Offset position) async {
+    final snap = _last;
+    final detailKind = monitorDetailKind(metric);
+    if (snap != null && snap.error == null && detailKind != null) {
+      _hideOverlay();
+      _detailDialogOpen = true;
+      await showMonitorDetailDialog(
+        context,
+        service: widget.service,
+        metric: metric,
+        interval: widget.interval,
+      );
+      if (!mounted) return;
+      _detailDialogOpen = false;
+      // 面板停轮询期间数据可能已过期，开窗期间看到的最新值先同步回快照
+      _collectNow();
+      return;
+    }
+    _showOverlay(metric, position);
   }
 
   /// 轻量级位置更新：只更新鼠标位置并重建浮层
@@ -278,7 +303,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 label: 'CPU',
                 showLabel: false,
                 value: '${(snap?.cpuPercent ?? 0).toStringAsFixed(1)}%',
-                color: staleColor(_colorByPercent(snap?.cpuPercent ?? 0, tc.brand)),
+                color: staleColor(monitorColorByPercent(snap?.cpuPercent ?? 0, tc.brand)),
                 chartData: history.map((s) => s.cpuPercent).toList(),
                 chartMax: 100,
               ),
@@ -294,10 +319,10 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 label: l10n.monitorMemory,
                 showLabel: false,
                 value: snap != null && snap.memTotalMB > 0
-                    ? '${_formatGB(snap.memUsedMB)}/${_formatGB(snap.memTotalMB)}'
+                    ? '${fmtFromMB(snap.memUsedMB)}/${fmtFromMB(snap.memTotalMB)}'
                     : '-',
-                color: staleColor(_colorByPercent(snap?.memPercent ?? 0, cSuccess)),
-                valueColor: staleColor(_colorByPercent(snap?.memPercent ?? 0, cSuccess)),
+                color: staleColor(monitorColorByPercent(snap?.memPercent ?? 0, cSuccess)),
+                valueColor: staleColor(monitorColorByPercent(snap?.memPercent ?? 0, cSuccess)),
                 valueMaxWidth: 110,
               ),
               _divider(tc),
@@ -306,7 +331,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 icon: Icons.arrow_upward,
                 label: l10n.monitorUpload,
                 showLabel: false,
-                value: _formatRate(snap?.netUpKBps ?? 0),
+                value: fmtRate(snap?.netUpKBps ?? 0),
                 color: staleColor(tc.brand),
                 valueColor: staleColor(tc.brand),
                 valueMaxWidth: 90,
@@ -317,7 +342,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 icon: Icons.arrow_downward,
                 label: l10n.monitorDownload,
                 showLabel: false,
-                value: _formatRate(snap?.netDownKBps ?? 0),
+                value: fmtRate(snap?.netDownKBps ?? 0),
                 color: staleColor(cSuccess),
                 valueColor: staleColor(cSuccess),
                 valueMaxWidth: 90,
@@ -329,7 +354,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 label: l10n.monitorDisk,
                 showLabel: false,
                 value: '${(snap?.diskPercent ?? 0).toStringAsFixed(1)}%',
-                color: staleColor(_colorByPercent(snap?.diskPercent ?? 0, cWarning)),
+                color: staleColor(monitorColorByPercent(snap?.diskPercent ?? 0, cWarning)),
               ),
               _divider(tc),
               _buildMetricChip(
@@ -391,6 +416,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
       onShow: _showOverlay,
       onHide: _hideOverlay,
       onHoverMove: _updateOverlayPosition,
+      onTap: _onMetricTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4),
         child: Row(
@@ -461,6 +487,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
             onShow: _showOverlay,
             onHide: _hideOverlay,
             onHoverMove: _updateOverlayPosition,
+            onTap: _onMetricTap,
             child: SizedBox(
               width: 60,
               height: widget.height - 4,
@@ -654,15 +681,19 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                   ],
                 ),
                 Divider(height: 6, color: tc.border.withValues(alpha: 0.3)),
-                // 网络/磁盘 → 表格布局；系统信息 → 单栏（长文本）；其他 → 两栏
-                if (metric == 'netUp' || metric == 'netDown')
-                  _buildNetOverlayContent(tc, snap)
-                else if (metric == 'disk')
-                  _buildDiskOverlayContent(tc, snap)
-                else if (metric == 'uptime')
-                  _buildSingleColumnRows(tc, rows)
-                else
-                  _buildTwoColumnRows(tc, rows),
+                // 明细区用 Flexible 吃剩余高度：固定块（标题/汇总/表头）先占位，
+                // 若不收缩明细，弹层高度不足时表格会被 RenderFlex 裁掉
+                // （磁盘分区"挤到下面"就是这么来的）
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: _buildOverlayBody(metric, tc, snap, rows),
+                  ),
+                ),
+                // 提示固定在滚动区之外：浮层是纯 hover 产物（鼠标离开芯片即销毁，
+                // onExit 抢在任何点击进入之前），滚出可视区的东西等于不存在，
+                // 入口提示绝不能放进可滚内容里。且只给真有详情窗的指标（网络/磁盘），
+                // CPU/内存等点击不会开窗，挂提示就是死指引
+                if (monitorDetailKind(metric) != null) _overlayDetailHint(tc),
               ],
             ),
           ),
@@ -671,36 +702,60 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
     );
   }
 
-  /// 网络浮层专用内容：汇总 + 接口明细表格
+  Widget _buildOverlayBody(
+    String metric,
+    ThemeColors tc,
+    ServerSnapshot snap,
+    List<(String, String)> rows,
+  ) {
+    // 网络/磁盘 → 表格布局；系统信息 → 单栏（长文本）；其他 → 两栏
+    if (metric == 'netUp' || metric == 'netDown') return _buildNetOverlayContent(tc, snap);
+    if (metric == 'disk') return _buildDiskOverlayContent(tc, snap);
+    if (metric == 'uptime') return _buildSingleColumnRows(tc, rows);
+    return twoColumnRows(tc, rows);
+  }
+
+  /// 浮层是纯 hover 产物（鼠标离开芯片即销毁），里面的滚动和按钮都点不到，
+  /// 所以浮层只做速览：真实设备优先、虚拟设备折叠成一行，完整列表走详情窗。
   Widget _buildNetOverlayContent(ThemeColors tc, ServerSnapshot s) {
     final l10n = AppLocalizations.of(context)!;
-    // 汇总信息
     final summary = [
-      (l10n.monitorNetTotalDown, _formatRate(s.netDownKBps)),
-      (l10n.monitorNetTotalUp, _formatRate(s.netUpKBps)),
-      (l10n.monitorNetTotalDownloaded, _formatBytes(s.netTotalDownBytes)),
-      (l10n.monitorNetTotalUploaded, _formatBytes(s.netTotalUpBytes)),
+      (l10n.monitorNetTotalDown, fmtRate(s.netDownKBps)),
+      (l10n.monitorNetTotalUp, fmtRate(s.netUpKBps)),
+      (l10n.monitorNetTotalDownloaded, fmtBytes(s.netTotalDownBytes)),
+      (l10n.monitorNetTotalUploaded, fmtBytes(s.netTotalUpBytes)),
       (l10n.monitorNetInterfaceCount, '${s.interfaces.length}'),
     ];
 
-    // 接口按总流量排序，活跃接口在前
-    final sorted = List<NetInterface>.from(s.interfaces)
-      ..sort((a, b) => (b.rxBytes + b.txBytes).compareTo(a.rxBytes + a.txBytes));
+    final sorted = sortInterfacesByTraffic(s.interfaces);
+    final real = sorted.where((i) => !isVirtualNetInterface(i.name)).toList();
+    final virtualCount = sorted.length - real.length;
+
+    Widget row(NetInterface iface) {
+      final errs = iface.rxErrors + iface.txErrors;
+      final drops = iface.rxDropped + iface.txDropped;
+      final hasIssue = errs > 0 || drops > 0;
+      return netTableRow(
+        tc,
+        name: iface.name,
+        traffic: '${fmtBytes(iface.rxBytes)} / ${fmtBytes(iface.txBytes)}',
+        rate: '${fmtRate(iface.downKBps)} / ${fmtRate(iface.upKBps)}',
+        issues: hasIssue ? '$errs/$drops' : '-',
+        issuesColor: hasIssue ? (errs > 0 ? cDanger : cWarning) : tc.textMuted,
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 汇总行（左右两栏）
-        _buildTwoColumnRows(tc, summary),
+        twoColumnRows(tc, summary),
         const SizedBox(height: 8),
-        // 接口明细表
         Text(
           l10n.monitorNetInterfaceDetail,
           style: TextStyle(fontSize: fMicro, color: tc.textSub, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 4),
-        // 表头
-        _buildNetTableRow(
+        netTableRow(
           tc,
           name: l10n.monitorNetColInterface,
           traffic: l10n.monitorNetColTraffic,
@@ -708,35 +763,15 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
           issues: l10n.monitorNetColIssues,
           isHeader: true,
         ),
-        // 表体（最多展示 8 个接口，避免浮层过高）
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 170),
-          child: SingleChildScrollView(
-            child: Column(
-              children: sorted.take(8).map((iface) {
-                final totalErr = iface.rxErrors + iface.txErrors;
-                final totalDrop = iface.rxDropped + iface.txDropped;
-                final hasIssue = totalErr > 0 || totalDrop > 0;
-                final issueColor = hasIssue
-                    ? (totalErr > 0 ? cDanger : cWarning)
-                    : tc.textMuted;
-                return _buildNetTableRow(
-                  tc,
-                  name: iface.name,
-                  traffic: '${_formatBytes(iface.rxBytes)} / ${_formatBytes(iface.txBytes)}',
-                  rate: '${_formatRate(iface.downKBps)} / ${_formatRate(iface.upKBps)}',
-                  issues: hasIssue ? '$totalErr/$totalDrop' : '-',
-                  issuesColor: issueColor,
-                );
-              }).toList(),
-            ),
-          ),
-        ),
-        if (sorted.length > 8)
+        ...real.take(_overlayMaxRows).map(row),
+        if (real.length > _overlayMaxRows || virtualCount > 0)
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              l10n.monitorNetMoreInterfaces(sorted.length - 8),
+              [
+                if (virtualCount > 0) l10n.monitorNetVirtualGroup(virtualCount),
+                if (real.length > _overlayMaxRows) '+${real.length - _overlayMaxRows}',
+              ].join(' · '),
               style: TextStyle(fontSize: fMicro, color: tc.textMuted),
             ),
           ),
@@ -744,7 +779,23 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
     );
   }
 
-  /// 磁盘浮层专用内容：根分区汇总 + 分区明细表格
+  /// 浮层底部提示：浮层本身 hover 即散，鼠标进不去，所以「看全部」的入口是
+  /// 芯片的点击 —— 这里只做指路，不能画成按钮（画成按钮就等于画了个点不到的东西）
+  Widget _overlayDetailHint(ThemeColors tc) {
+    final l10n = AppLocalizations.of(context)!;
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        children: [
+          Icon(Icons.touch_app_outlined, size: 11, color: tc.textMuted),
+          const SizedBox(width: 4),
+          Text(l10n.monitorOpenDetail,
+              style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDiskOverlayContent(ThemeColors tc, ServerSnapshot s) {
     final l10n = AppLocalizations.of(context)!;
     final partitions = s.diskPartitions;
@@ -763,256 +814,45 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildTwoColumnRows(tc, summary),
+        twoColumnRows(tc, summary),
         const SizedBox(height: 8),
-        // 总使用率进度条
-        Container(
-          height: 6,
-          decoration: BoxDecoration(
-            color: tc.border.withValues(alpha: 0.3),
-            borderRadius: BorderRadius.circular(3),
-          ),
-          child: LayoutBuilder(
-            builder: (ctx, constraints) {
-              final w = constraints.maxWidth * (overallPercent / 100).clamp(0.0, 1.0);
-              return Align(
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  width: w,
-                  decoration: BoxDecoration(
-                    color: _colorByPercent(overallPercent, cSuccess),
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
+        usageBar(tc, overallPercent, monitorColorByPercent(overallPercent, cSuccess)),
         const SizedBox(height: 10),
         Text(
           l10n.monitorDiskPartitionDetail,
           style: TextStyle(fontSize: fMicro, color: tc.textSub, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 4),
-        _buildDiskTableRow(
+        diskTableRow(
           tc,
           mount: l10n.monitorDiskColMount,
           used: l10n.monitorDiskColUsage,
           percent: l10n.monitorDiskColPercent,
           isHeader: true,
         ),
-        ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 180),
-          child: SingleChildScrollView(
-            child: Column(
-              children: partitions.map((p) {
-                return _buildDiskTableRow(
-                  tc,
-                  mount: p.mountPoint,
-                  used: '${_formatGB(p.usedGB * 1024)} / ${_formatGB(p.totalGB * 1024)}',
-                  percent: '${p.usePercent.toStringAsFixed(1)}%',
-                  usePercent: p.usePercent,
-                );
-              }).toList(),
+        ...partitions.take(_overlayMaxRows).map(
+              (p) => diskTableRow(
+                tc,
+                mount: p.mountPoint,
+                used: '${fmtFromMB(p.usedGB * 1024)} / ${fmtFromMB(p.totalGB * 1024)}',
+                percent: '${p.usePercent.toStringAsFixed(1)}%',
+                usePercent: p.usePercent,
+              ),
+            ),
+        if (partitions.length > _overlayMaxRows)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              '+${partitions.length - _overlayMaxRows}',
+              style: TextStyle(fontSize: fMicro, color: tc.textMuted),
             ),
           ),
-        ),
       ],
     );
   }
 
-  /// 磁盘分区表格行
-  Widget _buildDiskTableRow(
-    ThemeColors tc, {
-    required String mount,
-    required String used,
-    required String percent,
-    bool isHeader = false,
-    double usePercent = 0,
-  }) {
-    final textColor = isHeader ? tc.textMuted : tc.textSub;
-    final fontWeight = isHeader ? FontWeight.w500 : FontWeight.w500;
-    final barColor = isHeader
-        ? tc.textMuted
-        : _colorByPercent(usePercent, cSuccess);
-
-    if (isHeader) {
-      return Container(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: tc.border.withValues(alpha: 0.3), width: 0.5)),
-        ),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 70,
-              child: Text(
-                mount,
-                style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
-                textAlign: TextAlign.left,
-              ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                used,
-                style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
-                textAlign: TextAlign.left,
-              ),
-            ),
-            const SizedBox(width: 6),
-            SizedBox(
-              width: 50,
-              child: Text(
-                percent,
-                style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
-                textAlign: TextAlign.right,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              SizedBox(
-                width: 70,
-                child: Text(
-                  mount,
-                  style: TextStyle(fontSize: fMicro, color: textColor, fontWeight: fontWeight, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.left,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  used,
-                  style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
-                  textAlign: TextAlign.left,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 6),
-              SizedBox(
-                width: 50,
-                child: Text(
-                  percent,
-                  style: TextStyle(fontSize: fMicro, color: barColor, fontWeight: FontWeight.w600, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
-                  textAlign: TextAlign.right,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          // 进度条
-          Container(
-            height: 4,
-            decoration: BoxDecoration(
-              color: tc.border.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(2),
-            ),
-            child: LayoutBuilder(
-              builder: (ctx, constraints) {
-                final w = constraints.maxWidth * (usePercent / 100).clamp(0.0, 1.0);
-                return Align(
-                  alignment: Alignment.centerLeft,
-                  child: Container(
-                    width: w,
-                    decoration: BoxDecoration(
-                      color: barColor,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 网络接口表格行（4 列布局，适配 340px 宽度）
-  Widget _buildNetTableRow(
-    ThemeColors tc, {
-    required String name,
-    required String traffic,
-    required String rate,
-    required String issues,
-    bool isHeader = false,
-    Color? issuesColor,
-  }) {
-    final style = TextStyle(
-      fontSize: fMicro,
-      color: isHeader ? tc.textMuted : tc.textSub,
-      fontWeight: isHeader ? FontWeight.w500 : FontWeight.normal,
-      fontFamily: isHeader ? null : 'JetBrainsMono',
-      fontFamilyFallback: isHeader ? null : kMonoFontFallback,
-    );
-    final issuesStyle = style.copyWith(
-      color: issuesColor ?? style.color,
-      fontWeight: issuesColor != null ? FontWeight.w600 : style.fontWeight,
-    );
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 1.5),
-      child: Row(
-        children: [
-          // 接口名 70px
-          SizedBox(
-            width: 70,
-            child: Text(name, style: style, overflow: TextOverflow.ellipsis),
-          ),
-          // 总流量
-          Expanded(
-            flex: 3,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Text(traffic, style: style, overflow: TextOverflow.ellipsis),
-            ),
-          ),
-          // 速率
-          Expanded(
-            flex: 3,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Text(rate, style: style, overflow: TextOverflow.ellipsis),
-            ),
-          ),
-          // 错/丢 36px
-          SizedBox(
-            width: 36,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Text(issues, style: issuesStyle),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 构建左右两栏的数据行（适用于短数字/短文本 value）
-  Widget _buildTwoColumnRows(ThemeColors tc, List<(String, String)> rows) {
-    final mid = (rows.length / 2).ceil();
-    final left = rows.sublist(0, mid);
-    final right = rows.sublist(mid);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(child: _buildColumn(tc, left)),
-        const SizedBox(width: 12),
-        Expanded(child: _buildColumn(tc, right)),
-      ],
-    );
-  }
+  /// 浮层速览的最大行数
+  static const int _overlayMaxRows = 6;
 
   /// 构建单栏数据行（适用于可能有长文本 value 的场景，如系统信息）
   Widget _buildSingleColumnRows(ThemeColors tc, List<(String, String)> rows) {
@@ -1033,40 +873,6 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(
-                  r.$2,
-                  style: TextStyle(
-                    fontSize: fMicro,
-                    color: tc.textSub,
-                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  textAlign: TextAlign.right,
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildColumn(ThemeColors tc, List<(String, String)> rows) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: rows.map((r) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 1),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                r.$1,
-                style: TextStyle(fontSize: fMicro, color: tc.textMuted),
-              ),
-              const Spacer(),
-              Expanded(
-                flex: 2,
                 child: Text(
                   r.$2,
                   style: TextStyle(
@@ -1106,7 +912,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
       case 'mem':
         // 采集失败时 memTotalMB 为 0，显示 "-" 而不是伪造的 0 MB
         final hasMem = s.memTotalMB > 0;
-        String memValue(double mb) => hasMem ? _formatMB(mb) : '-';
+        String memValue(double mb) => hasMem ? fmtMB(mb) : '-';
         return (
           l10n.monitorMemoryDetail,
           [
@@ -1161,31 +967,6 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
       default:
         return ('-', const []);
     }
-  }
-
-  // ==================== 格式化工具 ====================
-
-  String _formatRate(double kb) {
-    if (kb < 1) return '${(kb * 1024).toStringAsFixed(0)} B/s';
-    if (kb < 1024) return '${kb.toStringAsFixed(1)} KB/s';
-    return '${(kb / 1024).toStringAsFixed(2)} MB/s';
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-  }
-
-  String _formatMB(double mb) {
-    if (mb < 1024) return '${mb.toStringAsFixed(0)} MB';
-    return '${(mb / 1024).toStringAsFixed(2)} GB';
-  }
-
-  String _formatGB(double mb) {
-    if (mb < 1024) return '${mb.toStringAsFixed(0)}MB';
-    return '${(mb / 1024).toStringAsFixed(1)}GB';
   }
 }
 
@@ -1251,6 +1032,7 @@ class _MetricHoverWrapper extends StatefulWidget {
   final void Function(String metric, Offset mousePosition) onShow;
   final void Function(String metric) onHide;
   final void Function(Offset mousePosition) onHoverMove;
+  final void Function(String metric, Offset position) onTap;
   final Widget child;
 
   const _MetricHoverWrapper({
@@ -1260,6 +1042,7 @@ class _MetricHoverWrapper extends StatefulWidget {
     required this.onShow,
     required this.onHide,
     required this.onHoverMove,
+    required this.onTap,
     required this.child,
   });
 
@@ -1291,13 +1074,9 @@ class _MetricHoverWrapperState extends State<_MetricHoverWrapper> {
         widget.onHide(widget.metric);
       },
       child: GestureDetector(
-        onTapDown: (details) {
-          if (isActive) {
-            widget.onHide(widget.metric);
-          } else {
-            widget.onShow(widget.metric, details.globalPosition);
-          }
-        },
+        // onTapUp 而不是 onTapDown：按下后拖出再松手（按住拖动横向滚动监控栏）
+        // 不应触发开窗/切浮层
+        onTapUp: (details) => widget.onTap(widget.metric, details.globalPosition),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
           decoration: BoxDecoration(

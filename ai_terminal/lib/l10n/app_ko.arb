@@ -986,6 +986,11 @@
   "monitorErrorCollecting": "수집 중",
   "monitorErrorNotConnected": "연결 안 됨",
   "monitorErrorEmptyOutput": "수집 출력이 비어 있음",
+  "monitorNetVirtualGroup": "가상 인터페이스 {count}개",
+  "monitorShowVirtual": "표시",
+  "monitorHideVirtual": "숨기기",
+  "monitorOpenDetail": "상세",
+  "monitorLiveUpdating": "{seconds}초마다 자동 업데이트",
   "terminalLocalTab": "로컬",
   "sessionNew": "새로 만들기",
   "sessionNoSessions": "세션 없음",
@@ -1015,7 +1020,6 @@
   "orchInputTruncated": "...(입력이 너무 김, 잘림)",
   "orchSkippedPreviousFailed": "건너뜀 (이전 호스트 실패)",
   "monitorCollectingFailed": "수집 실패 (연속 {count}회)",
-  "monitorNetMoreInterfaces": "{count}개 인터페이스 미표시",
   "sessionMessageCount": "메시지 {count}개",
   "sessionDeleteConfirm": "세션 \"{title}\"의 모든 메시지와 로그가 영구적으로 삭제되며 복구할 수 없습니다.",
   "runbookCopy": "{name} (사본)",
@@ -1038,14 +1042,21 @@
   "orchToolSftpOpening": "[{hostId}] SFTP 하위 시스템 여는 중...",
   "orchToolExecProgress": "[{hostId}] 실행: {command}",
   "orchTaskAbnormal": "⚠️ 작업 비정상 종료: {error}",
-  "@monitorCollectingFailed": {
+  "@monitorLiveUpdating": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "@monitorNetVirtualGroup": {
     "placeholders": {
       "count": {
         "type": "int"
       }
     }
   },
-  "@monitorNetMoreInterfaces": {
+  "@monitorCollectingFailed": {
     "placeholders": {
       "count": {
         "type": "int"
