@@ -1136,7 +1136,6 @@
     .feature-icon.runbook { background: var(--accent-glow-purple); color: var(--accent-purple-light); }
     .feature-icon.notify { background: rgba(236, 72, 153, 0.1); color: var(--accent-pink); }
     .feature-icon.orchestrate { background: var(--accent-glow-purple); color: var(--accent-purple-light); }
-    .feature-icon.knowledge { background: var(--green-dim); color: var(--accent-green); }
     .feature-icon.files { background: var(--accent-glow-cyan); color: var(--accent-cyan-light); }
     .feature-icon.theme { background: var(--accent-glow-purple); color: var(--accent-purple-light); }
     .feature-icon.search { background: var(--accent-glow-cyan); color: var(--accent-cyan-light); }
@@ -1341,73 +1340,6 @@
       0%, 100% { box-shadow: 0 0 8px var(--accent-glow-green); }
       50% { box-shadow: 0 0 16px var(--accent-glow-cyan); }
     }
-
-    /* ========== VERSION LIST ========== */
-    .version-list {
-      display: flex; flex-direction: column; gap: 0.6rem;
-      max-width: 560px; margin: 0 auto;
-    }
-
-    .version-item {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 14px 20px; background: var(--bg-card);
-      border: 1px solid var(--border); border-radius: 8px;
-      text-decoration: none; color: inherit; transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      position: relative;
-      overflow: hidden;
-    }
-    .version-item::before {
-      content: '';
-      position: absolute;
-      left: 0; top: 0; bottom: 0;
-      width: 3px;
-      background: linear-gradient(180deg, var(--accent-purple), var(--accent-cyan));
-      transform: scaleY(0);
-      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .version-item:hover {
-      border-color: var(--border-bright);
-      transform: translateX(4px);
-      box-shadow: 0 6px 20px var(--shadow);
-      background: var(--bg-secondary);
-    }
-    .version-item:hover::before { transform: scaleY(1); }
-
-    .version-info {
-      display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
-    }
-    .version-name {
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 600; font-size: 0.92rem; color: var(--text-primary);
-      display: flex; align-items: center; gap: 8px;
-    }
-    .version-name .latest-badge {
-      font-size: 0.62rem;
-      padding: 2px 6px;
-      background: var(--accent-glow-green);
-      color: var(--accent-green);
-      border-radius: 4px;
-      font-weight: 700;
-      border: 1px solid rgba(16, 185, 129, 0.2);
-    }
-    .version-date {
-      font-size: 0.75rem; color: var(--text-dim);
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    .version-meta {
-      display: flex; align-items: center; gap: 10px;
-      color: var(--text-secondary);
-    }
-    .version-size {
-      font-size: 0.82rem; font-weight: 500;
-      font-family: 'JetBrains Mono', monospace;
-      color: var(--accent-cyan-light);
-    }
-    .version-item svg {
-      color: var(--accent-purple-light); transition: transform 0.3s;
-    }
-    .version-item:hover svg { transform: translateX(2px); }
 
     /* ========== CTA ========== */
     .cta { padding: 100px 1.5rem; text-align: center; position: relative; }
@@ -2046,30 +1978,24 @@
       </div>
       <div class="feature-card">
         <span class="code-num">11</span>
-        <div class="feature-icon knowledge">📚</div>
-        <h3 data-i18n="f11_title">Knowledge Base Driven</h3>
-        <p data-i18n="f11_desc">An offline knowledge base gives the AI 300+ software install and config entries, matched by platform and updatable.</p>
-      </div>
-      <div class="feature-card">
-        <span class="code-num">12</span>
         <div class="feature-icon cross">🌐</div>
         <h3 data-i18n="f12_title">Cross-Platform</h3>
         <p data-i18n="f12_desc">One codebase, all platforms. macOS, Windows, Linux, iOS &amp; Android — built with Flutter.</p>
       </div>
       <div class="feature-card">
-        <span class="code-num">13</span>
+        <span class="code-num">12</span>
         <div class="feature-icon files">📦</div>
         <h3 data-i18n="f13_title">SFTP &amp; Safe File Edits</h3>
         <p data-i18n="f13_desc">Recursive upload/download with atomic replace; file_write / file_patch preserve encoding and skip shell escaping.</p>
       </div>
       <div class="feature-card">
-        <span class="code-num">14</span>
+        <span class="code-num">13</span>
         <div class="feature-icon theme">🎨</div>
         <h3 data-i18n="f14_title">Graphite Theme</h3>
         <p data-i18n="f14_desc">Dark and light graphite palettes with cyan interaction states, gold data emphasis, and adjustable terminal font size.</p>
       </div>
       <div class="feature-card">
-        <span class="code-num">15</span>
+        <span class="code-num">14</span>
         <div class="feature-icon search">🔎</div>
         <h3 data-i18n="f15_title">AI Web Search</h3>
         <p data-i18n="f15_desc">7 search engines with smart fallback; Bing HTML and DuckDuckGo options need no API key, and the Agent fetches pages on demand.</p>
@@ -2172,16 +2098,6 @@
         <span class="badge">arm64-v8a</span>
       </a>
     </div>
-    
-    <!-- Knowledge Data Versions -->
-    <div class="reveal" style="max-width: 900px; margin: 3rem auto 0; text-align: center;">
-      <h3 style="font-size: 1.25rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-primary);" data-i18n="knowledge_title">Knowledge Database Versions</h3>
-      <p style="color: var(--text-secondary); margin-bottom: 1.75rem; font-size: 0.9rem;" data-i18n="knowledge_desc">Download the knowledge database for offline AI assistance. Choose the version that matches your app.</p>
-      
-      <div class="version-list" id="knowledgeVersions">
-        <!-- Versions will be dynamically loaded by JavaScript -->
-      </div>
-    </div>
   </section>
 
   <!-- CTA -->
@@ -2231,70 +2147,6 @@
   </div>
 
   <script>
-    // ========== KNOWLEDGE VERSIONS DATA ==========
-    const knowledgeVersions = [
-      {
-        version: '1.3.8',
-        date: '2026-10-25',
-        size: '160 KB',
-        isLatest: true
-      },
-      {
-        version: '1.3.5',
-        date: '2025-07-05',
-        size: '124 KB',
-        isLatest: false
-      },
-      {
-        version: '1.3.4',
-        date: '2025-06-28',
-        size: '124 KB',
-        isLatest: false
-      },
-      {
-        version: '1.3.3',
-        date: '2025-06-15',
-        size: '124 KB',
-        isLatest: false
-      },
-      {
-        version: '1.3.1',
-        date: '2025-05-20',
-        size: '124 KB',
-        isLatest: false
-      },
-      {
-        version: '1.3.0',
-        date: '2025-05-11',
-        size: '124 KB',
-        isLatest: false
-      },
-      {
-        version: '1.2.1',
-        date: '2025-04-28',
-        size: '80 KB',
-        isLatest: false
-      }
-    ];
-
-    function renderKnowledgeVersions() {
-      const container = document.getElementById('knowledgeVersions');
-      if (!container) return;
-      
-      container.innerHTML = knowledgeVersions.map(v => `
-        <a href="knowledge/knowledge-${v.version}.db" download class="version-item">
-          <div class="version-info">
-            <span class="version-name">v${v.version} ${v.isLatest ? '<span class="latest-badge">' + (i18n[currentLang]?.knowledge_latest || 'Latest') + '</span>' : ''}</span>
-            <span class="version-date">${v.date}</span>
-          </div>
-          <div class="version-meta">
-            <span class="version-size">${v.size}</span>
-            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          </div>
-        </a>
-      `).join('');
-    }
-
     // ========== I18N ==========
     const i18n = {
       en: {
@@ -2340,10 +2192,6 @@
         ss_settings: 'Settings Page (Chinese)',
         ss_settings_en: 'Settings Page (English)',
         ss_lang: 'Multi-language Settings',
-        ss_kb1: 'Knowledge Base Demo 1',
-        ss_kb2: 'Knowledge Base Demo 2',
-        ss_kb3: 'Knowledge Base Demo 3',
-        ss_kb4: 'Knowledge Base Demo 4',
         showcase1_title: 'All-in-One Ops Console',
         showcase1_subtitle: 'AI Agent + Terminal + Server Monitoring',
         showcase1_p1: 'AI Agent smart execution: describe needs in natural language, AI auto-generates and runs commands',
@@ -2414,8 +2262,6 @@
         f9_desc: 'Credentials encrypted at the system level. Optional biometric unlock with Face ID / Touch ID / Fingerprint.',
         f10_title: 'Multi-Server Orchestration',
         f10_desc: 'Execute commands across multiple servers simultaneously. Batch operations and coordinated deployments made easy.',
-        f11_title: 'Knowledge Base Driven',
-        f11_desc: 'Offline knowledge base powers the AI with domain-specific expertise. Downloadable and always improving.',
         f12_title: 'Cross-Platform',
         f12_desc: 'One codebase, all platforms. macOS, Windows, Linux, iOS & Android — built with Flutter.',
         how_label: 'How it works',
@@ -2435,9 +2281,6 @@
         download_label: 'Download',
         download_title: 'Get AI Terminal',
         download_desc: 'Free and open source. Download v1.3.6 for your platform.',
-        knowledge_title: 'Knowledge Database Versions',
-        knowledge_desc: 'Download the knowledge database for offline AI assistance. Choose the version that matches your app.',
-        knowledge_latest: 'Latest',
         cta_title: 'Ready to transform<br>your terminal?',
         cta_desc: 'Open source, free forever. Start using AI Terminal v1.3.6 today.',
         cta_btn: 'View on GitHub',
@@ -2487,10 +2330,6 @@
         ss_settings: '设置页面（中文版）',
         ss_settings_en: '设置页面（英文版）',
         ss_lang: '多语言设置',
-        ss_kb1: '知识库演示 1',
-        ss_kb2: '知识库演示 2',
-        ss_kb3: '知识库演示 3',
-        ss_kb4: '知识库演示 4',
         showcase1_title: '主界面 · 一站式运维控制台',
         showcase1_subtitle: 'AI Agent + 终端 + 服务器监控',
         showcase1_p1: 'AI Agent 智能执行：自然语言描述需求，AI 自动生成并执行命令',
@@ -2561,8 +2400,6 @@
         f9_desc: '凭证在系统级加密存储。支持 Face ID / Touch ID / 指纹生物识别解锁。',
         f10_title: '多机编排',
         f10_desc: '同时在多台服务器上执行命令。批量操作和协调部署变得轻而易举。',
-        f11_title: '知识库驱动',
-        f11_desc: '离线知识库为 AI 提供领域专业知识。可下载，持续更新。',
         f12_title: '跨平台',
         f12_desc: '一套代码，全平台运行。macOS、Windows、Linux、iOS 和 Android — 基于 Flutter 构建。',
         how_label: '工作原理',
@@ -2582,9 +2419,6 @@
         download_label: '下载',
         download_title: '获取 AI Terminal',
         download_desc: '开源免费，下载 v1.3.6 版本到你的平台。',
-        knowledge_title: '知识库数据库版本',
-        knowledge_desc: '下载知识库数据库以支持离线 AI 助手功能。请选择与您的应用版本匹配的数据库。',
-        knowledge_latest: '最新版本',
         cta_title: '准备好升级<br>你的终端了吗？',
         cta_desc: '开源、永久免费。立即开始使用 AI Terminal v1.3.6。',
         cta_btn: '在 GitHub 上查看',
@@ -2620,10 +2454,6 @@
         ss_settings: '設定ページ（中国語）',
         ss_settings_en: '設定ページ（英語）',
         ss_lang: '多言語設定',
-        ss_kb1: 'ナレッジベースデモ 1',
-        ss_kb2: 'ナレッジベースデモ 2',
-        ss_kb3: 'ナレッジベースデモ 3',
-        ss_kb4: 'ナレッジベースデモ 4',
         showcase1_title: 'オールインワン運用コンソール',
         showcase1_subtitle: 'AI Agent + ターミナル + サーバー監視',
         showcase1_p1: 'AI Agent スマート実行：自然言語でニーズを記述すると、AIがコマンドを自動生成して実行',
@@ -2694,8 +2524,6 @@
         f9_desc: '資格情報はシステムレベルで暗号化。Face ID / Touch ID / 指紋による生体認証ロック解除もオプションでサポート。',
         f10_title: 'マルチサーバーオーケストレーション',
         f10_desc: '複数のサーバーで同時にコマンドを実行。バッチ操作と調整されたデプロイが簡単に。',
-        f11_title: 'ナレッジベース駆動',
-        f11_desc: 'オフラインナレッジベースがAIにドメイン固有の専門知識を提供。ダウンロード可能で常に改善中。',
         f12_title: 'クロスプラットフォーム',
         f12_desc: '1つのコードベースで全プラットフォームに対応。macOS、Windows、Linux、iOS、Android — Flutterで構築。',
         how_label: '仕組み',
@@ -2715,9 +2543,6 @@
         download_label: 'ダウンロード',
         download_title: 'AI Terminalを入手',
         download_desc: '無料でオープンソース。お使いのプラットフォームにv1.3.6をダウンロードしてください。',
-        knowledge_title: 'ナレッジベースデータベースバージョン',
-        knowledge_desc: 'オフラインAIアシスタントのためのナレッジベースデータベースをダウンロードしてください。アプリのバージョンに一致するバージョンを選択してください。',
-        knowledge_latest: '最新',
         cta_title: 'ターミナルを<br>変える準備はできましたか？',
         cta_desc: 'オープンソース、永久無料。今すぐAI Terminal v1.3.6の使用を開始してください。',
         cta_btn: 'GitHubで見る',
@@ -2753,10 +2578,6 @@
         ss_settings: 'Einstellungsseite (Chinesisch)',
         ss_settings_en: 'Einstellungsseite (Englisch)',
         ss_lang: 'Mehrsprachige Einstellungen',
-        ss_kb1: 'Wissensdatenbank-Demo 1',
-        ss_kb2: 'Wissensdatenbank-Demo 2',
-        ss_kb3: 'Wissensdatenbank-Demo 3',
-        ss_kb4: 'Wissensdatenbank-Demo 4',
         showcase1_title: 'All-in-One Ops-Konsole',
         showcase1_subtitle: 'KI-Agent + Terminal + Server-Überwachung',
         showcase1_p1: 'KI-Agent intelligente Ausführung: Beschreiben Sie Bedürfnisse in natürlicher Sprache, KI generiert und führt Befehle automatisch aus',
@@ -2827,8 +2648,6 @@
         f9_desc: 'Anmeldeinformationen auf Systemebene verschlüsselt. Optionale biometrische Entsperrung mit Face ID / Touch ID / Fingerabdruck.',
         f10_title: 'Multi-Server-Orchestrierung',
         f10_desc: 'Gleichzeitige Befehlsausführung auf mehreren Servern. Batch-Operationen und koordinierte Bereitstellungen leicht gemacht.',
-        f11_title: 'Wissensdatenbank-gesteuert',
-        f11_desc: 'Offline-Wissensdatenbank versorgt die KI mit domänenspezifischem Fachwissen. Herunterladbar und ständig verbessernd.',
         f12_title: 'Plattformübergreifend',
         f12_desc: 'Eine Codebasis, alle Plattformen. macOS, Windows, Linux, iOS & Android — mit Flutter gebaut.',
         how_label: 'So funktioniert es',
@@ -2848,9 +2667,6 @@
         download_label: 'Download',
         download_title: 'AI Terminal holen',
         download_desc: 'Kostenlos und Open Source. Laden Sie v1.3.6 für Ihre Plattform herunter.',
-        knowledge_title: 'Wissensdatenbank-Versionen',
-        knowledge_desc: 'Laden Sie die Wissensdatenbank für Offline-KI-Unterstützung herunter. Wählen Sie die Version, die zu Ihrer App passt.',
-        knowledge_latest: 'Neueste',
         cta_title: 'Bereit, Ihr Terminal<br>zu transformieren?',
         cta_desc: 'Open Source, für immer kostenlos. Starten Sie noch heute mit AI Terminal v1.3.6.',
         cta_btn: 'Auf GitHub ansehen',
@@ -2886,10 +2702,6 @@
         ss_settings: 'Page des paramètres (Chinois)',
         ss_settings_en: 'Page des paramètres (Anglais)',
         ss_lang: 'Paramètres multilingues',
-        ss_kb1: 'Démo Base de connaissances 1',
-        ss_kb2: 'Démo Base de connaissances 2',
-        ss_kb3: 'Démo Base de connaissances 3',
-        ss_kb4: 'Démo Base de connaissances 4',
         showcase1_title: 'Console Ops tout-en-un',
         showcase1_subtitle: 'Agent IA + Terminal + Surveillance serveur',
         showcase1_p1: 'Exécution intelligente par l\'agent IA : décrivez vos besoins en langage naturel, l\'IA génère et exécute les commandes automatiquement',
@@ -2960,8 +2772,6 @@
         f9_desc: 'Identifiants chiffrés au niveau système. Déverrouillage biométrique optionnel avec Face ID / Touch ID / Empreinte digitale.',
         f10_title: 'Orchestration multi-serveurs',
         f10_desc: 'Exécutez des commandes sur plusieurs serveurs simultanément. Opérations par lots et déploiements coordonnés facilités.',
-        f11_title: 'Piloté par base de connaissances',
-        f11_desc: 'La base de connaissances hors ligne alimente l\'IA avec une expertise spécifique au domaine. Téléchargeable et en constante amélioration.',
         f12_title: 'Multiplateforme',
         f12_desc: 'Une base de code, toutes les plateformes. macOS, Windows, Linux, iOS & Android — construit avec Flutter.',
         how_label: 'Fonctionnement',
@@ -2981,9 +2791,6 @@
         download_label: 'Téléchargement',
         download_title: 'Obtenir AI Terminal',
         download_desc: 'Gratuit et open source. Téléchargez v1.3.6 pour votre plateforme.',
-        knowledge_title: 'Versions de la base de connaissances',
-        knowledge_desc: 'Téléchargez la base de connaissances pour l\'assistance IA hors ligne. Choisissez la version correspondant à votre application.',
-        knowledge_latest: 'Dernier',
         cta_title: 'Prêt à transformer<br>votre terminal ?',
         cta_desc: 'Open source, gratuit pour toujours. Commencez dès aujourd\'hui avec AI Terminal v1.3.6.',
         cta_btn: 'Voir sur GitHub',
@@ -3019,10 +2826,6 @@
         ss_settings: 'Страница настроек (китайский)',
         ss_settings_en: 'Страница настроек (английский)',
         ss_lang: 'Многоязычные настройки',
-        ss_kb1: 'Демо базы знаний 1',
-        ss_kb2: 'Демо базы знаний 2',
-        ss_kb3: 'Демо базы знаний 3',
-        ss_kb4: 'Демо базы знаний 4',
         showcase1_title: 'Унифицированная консоль эксплуатации',
         showcase1_subtitle: 'ИИ-агент + Терминал + Мониторинг серверов',
         showcase1_p1: 'Умное выполнение ИИ-агентом: опишите потребности на естественном языке, ИИ автоматически генерирует и выполняет команды',
@@ -3093,8 +2896,6 @@
         f9_desc: 'Учетные данные зашифрованы на системном уровне. Опциональная биометрическая разблокировка с Face ID / Touch ID / отпечатком пальца.',
         f10_title: 'Мультисерверная оркестрация',
         f10_desc: 'Выполняйте команды на нескольких серверах одновременно. Пакетные операции и скоординированные развертывания стали проще.',
-        f11_title: 'На основе базы знаний',
-        f11_desc: 'Оффлайн-база знаний снабжает ИИ предметно-специфической экспертизой. Загружается и постоянно улучшается.',
         f12_title: 'Кроссплатформенность',
         f12_desc: 'Одна кодовая база, все платформы. macOS, Windows, Linux, iOS и Android — создано с Flutter.',
         how_label: 'Как работает',
@@ -3114,9 +2915,6 @@
         download_label: 'Скачать',
         download_title: 'Получить AI Terminal',
         download_desc: 'Бесплатно и с открытым исходным кодом. Скачайте v1.3.6 для вашей платформы.',
-        knowledge_title: 'Версии базы знаний',
-        knowledge_desc: 'Скачайте базу знаний для оффлайн-поддержки ИИ. Выберите версию, соответствующую вашему приложению.',
-        knowledge_latest: 'Последняя',
         cta_title: 'Готовы трансформировать<br>ваш терминал?',
         cta_desc: 'Открытый исходный код, бесплатно навсегда. Начните сегодня с AI Terminal v1.3.6.',
         cta_btn: 'Посмотреть на GitHub',
@@ -3152,10 +2950,6 @@
         ss_settings: 'Página de configuración (Chino)',
         ss_settings_en: 'Página de configuración (Inglés)',
         ss_lang: 'Configuraciones multilingües',
-        ss_kb1: 'Demo Base de conocimientos 1',
-        ss_kb2: 'Demo Base de conocimientos 2',
-        ss_kb3: 'Demo Base de conocimientos 3',
-        ss_kb4: 'Demo Base de conocimientos 4',
         showcase1_title: 'Consola de Ops Todo en Uno',
         showcase1_subtitle: 'Agente IA + Terminal + Monitoreo de Servidores',
         showcase1_p1: 'Ejecución inteligente por agente IA: describe necesidades en lenguaje natural, la IA genera y ejecuta comandos automáticamente',
@@ -3226,8 +3020,6 @@
         f9_desc: 'Credenciales cifradas a nivel del sistema. Desbloqueo biométrico opcional con Face ID / Touch ID / Huella digital.',
         f10_title: 'Orquestación multi-servidor',
         f10_desc: 'Ejecuta comandos en múltiples servidores simultáneamente. Operaciones por lotes y despliegues coordinados simplificados.',
-        f11_title: 'Impulsado por base de conocimientos',
-        f11_desc: 'La base de conocimientos offline alimenta la IA con experiencia específica del dominio. Descargable y en constante mejora.',
         f12_title: 'Multiplataforma',
         f12_desc: 'Una base de código, todas las plataformas. macOS, Windows, Linux, iOS y Android — construido con Flutter.',
         how_label: 'Cómo funciona',
@@ -3247,9 +3039,6 @@
         download_label: 'Descargar',
         download_title: 'Obtener AI Terminal',
         download_desc: 'Gratis y de código abierto. Descarga v1.3.6 para tu plataforma.',
-        knowledge_title: 'Versiones de la base de conocimientos',
-        knowledge_desc: 'Descarga la base de conocimientos para soporte de IA offline. Elige la versión que coincida con tu aplicación.',
-        knowledge_latest: 'Última',
         cta_title: '¿Listo para transformar<br>tu terminal?',
         cta_desc: 'Código abierto, gratis para siempre. Comienza hoy con AI Terminal v1.3.6.',
         cta_btn: 'Ver en GitHub',
@@ -3285,10 +3074,6 @@
         ss_settings: '설정 페이지 (중국어)',
         ss_settings_en: '설정 페이지 (영어)',
         ss_lang: '다국어 설정',
-        ss_kb1: '지식 베이스 데모 1',
-        ss_kb2: '지식 베이스 데모 2',
-        ss_kb3: '지식 베이스 데모 3',
-        ss_kb4: '지식 베이스 데모 4',
         showcase1_title: '올인원 운영 콘솔',
         showcase1_subtitle: 'AI 에이전트 + 터미널 + 서버 모니터링',
         showcase1_p1: 'AI 에이전트 스마트 실행: 자연어로 요구사항을 설명하면 AI가 자동으로 명령을 생성하고 실행',
@@ -3359,8 +3144,6 @@
         f9_desc: '시스템 수준에서 암호화된 자격 증명. Face ID / Touch ID / 지문으로 선택적 생체 인식 잠금 해제.',
         f10_title: '멀티 서버 오케스트레이션',
         f10_desc: '여러 서버에서 동시에 명령을 실행하세요. 일괄 작업 및 조정된 배포가 간단해집니다.',
-        f11_title: '지식 베이스 기반',
-        f11_desc: '오프라인 지식 베이스가 도메인별 전문 지식을 AI에 제공합니다. 다운로드 가능하며 지속적으로 개선됩니다.',
         f12_title: '크로스 플랫폼',
         f12_desc: '하나의 코드베이스, 모든 플랫폼. macOS, Windows, Linux, iOS 및 Android — Flutter로 제작.',
         how_label: '작동 방식',
@@ -3380,9 +3163,6 @@
         download_label: '다운로드',
         download_title: 'AI Terminal 받기',
         download_desc: '무료 오픈 소스. 당신의 플랫폼에 v1.3.6를 다운로드하세요.',
-        knowledge_title: '지식 베이스 버전',
-        knowledge_desc: '오프라인 AI 지원을 위한 지식 베이스를 다운로드하세요. 앱과 일치하는 버전을 선택하세요.',
-        knowledge_latest: '최신',
         cta_title: '당신의 터미널을<br>바꿀 준비가 되셨나요?',
         cta_desc: '오픈 소스, 영원히 무료. 지금 AI Terminal v1.3.6를 시작하세요.',
         cta_btn: 'GitHub에서 보기',
@@ -3418,10 +3198,6 @@
         ss_settings: 'Página de configurações (Chinês)',
         ss_settings_en: 'Página de configurações (Inglês)',
         ss_lang: 'Configurações multilíngues',
-        ss_kb1: 'Demo Base de conhecimento 1',
-        ss_kb2: 'Demo Base de conhecimento 2',
-        ss_kb3: 'Demo Base de conhecimento 3',
-        ss_kb4: 'Demo Base de conhecimento 4',
         showcase1_title: 'Console de Ops Tudo-em-Um',
         showcase1_subtitle: 'Agente IA + Terminal + Monitoramento de Servidores',
         showcase1_p1: 'Execução inteligente do agente IA: descreva necessidades em linguagem natural, a IA gera e executa comandos automaticamente',
@@ -3492,8 +3268,6 @@
         f9_desc: 'Credenciais criptografadas em nível de sistema. Desbloqueio biométrico opcional com Face ID / Touch ID / Impressão digital.',
         f10_title: 'Orquestração multi-servidor',
         f10_desc: 'Execute comandos em vários servidores simultaneamente. Operações em lote e implantações coordenadas simplificadas.',
-        f11_title: 'Baseado em base de conhecimento',
-        f11_desc: 'A base de conhecimento offline alimenta a IA com expertise específica do domínio. Baixável e em constante melhoria.',
         f12_title: 'Multiplataforma',
         f12_desc: 'Uma base de código, todas as plataformas. macOS, Windows, Linux, iOS e Android — construído com Flutter.',
         how_label: 'Como funciona',
@@ -3513,9 +3287,6 @@
         download_label: 'Baixar',
         download_title: 'Obter AI Terminal',
         download_desc: 'Gratuito e de código aberto. Baixe v1.3.6 para sua plataforma.',
-        knowledge_title: 'Versões da base de conhecimento',
-        knowledge_desc: 'Baixe a base de conhecimento para suporte de IA offline. Escolha a versão que corresponde ao seu app.',
-        knowledge_latest: 'Mais recente',
         cta_title: 'Pronto para transformar<br>seu terminal?',
         cta_desc: 'Código aberto, grátis para sempre. Comece hoje com AI Terminal v1.3.6.',
         cta_btn: 'Ver no GitHub',
@@ -3551,10 +3322,6 @@
         ss_settings: 'Pagina impostazioni (Cinese)',
         ss_settings_en: 'Pagina impostazioni (Inglese)',
         ss_lang: 'Impostazioni multilingua',
-        ss_kb1: 'Demo Base di conoscenza 1',
-        ss_kb2: 'Demo Base di conoscenza 2',
-        ss_kb3: 'Demo Base di conoscenza 3',
-        ss_kb4: 'Demo Base di conoscenza 4',
         showcase1_title: 'Console Ops All-in-One',
         showcase1_subtitle: 'Agente IA + Terminale + Monitoraggio Server',
         showcase1_p1: 'Esecuzione intelligente agente IA: descrivi le esigenze in linguaggio naturale, l\'IA genera ed esegue automaticamente i comandi',
@@ -3625,8 +3392,6 @@
         f9_desc: 'Credenziali crittografate a livello di sistema. Sblocco biometrico opzionale con Face ID / Touch ID / Impronta digitale.',
         f10_title: 'Orchestrazione multi-server',
         f10_desc: 'Esegui comandi su più server simultaneamente. Operazioni batch e distribuzioni coordinate semplificate.',
-        f11_title: 'Basato su base di conoscenza',
-        f11_desc: 'La base di conoscenza offline alimenta l\'IA con competenze specifiche del dominio. Scaricabile e in costante miglioramento.',
         f12_title: 'Multipiattaforma',
         f12_desc: 'Un\'unica base di codice, tutte le piattaforme. macOS, Windows, Linux, iOS e Android — costruito con Flutter.',
         how_label: 'Come funziona',
@@ -3646,9 +3411,6 @@
         download_label: 'Scarica',
         download_title: 'Ottieni AI Terminal',
         download_desc: 'Gratuito e open source. Scarica v1.3.6 per la tua piattaforma.',
-        knowledge_title: 'Versioni della base di conoscenza',
-        knowledge_desc: 'Scarica la base di conoscenza per il supporto IA offline. Scegli la versione corrispondente alla tua app.',
-        knowledge_latest: 'Ultima',
         cta_title: 'Pronto a trasformare<br>il tuo terminale?',
         cta_desc: 'Open source, gratis per sempre. Inizia oggi con AI Terminal v1.3.6.',
         cta_btn: 'Vedi su GitHub',
@@ -3715,7 +3477,6 @@
         f3_desc: '四级安全分类 — safe / info / warn / blocked。每条 AI 生成的命令执行前都会检查。',
         f13_title: 'SFTP 与安全文件编辑',
         f13_desc: '目录递归上传下载、原子替换；file_write / file_patch 保留编码并绕过 shell 转义。',
-        f11_desc: '离线知识库为 AI 提供 300+ 条软件安装与配置经验，按平台匹配命令，可下载更新。',
         f14_title: '石墨青主题',
         f14_desc: '深色与浅色两套石墨青配色，青色标记交互，金色强调数据，终端字号可调。',
         f15_title: 'AI 联网搜索',
@@ -3784,7 +3545,6 @@
         f3_desc: '4-level safety classification — safe / info / warn / blocked. Every AI-generated command is checked before execution.',
         f13_title: 'SFTP & Safe File Edits',
         f13_desc: 'Recursive upload/download with atomic replace; file_write / file_patch preserve encoding and skip shell escaping.',
-        f11_desc: 'An offline knowledge base gives the AI 300+ software install and config entries, matched by platform and updatable.',
         f14_title: 'Graphite Theme',
         f14_desc: 'Dark and light graphite palettes with cyan interaction states, gold data emphasis, and adjustable terminal font size.',
         f15_title: 'AI Web Search',
@@ -3873,8 +3633,6 @@
       if (langDropdown) {
         langDropdown.classList.remove('open');
       }
-
-      renderKnowledgeVersions();
     }
 
     function toggleTheme() {

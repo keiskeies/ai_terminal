@@ -52,7 +52,7 @@
 
 ## 一眼看懂
 
-`5 个平台` · `14 种界面语言` · `22 个 AI 供应商` · `90+ 预设模型` · `28 个内置工具` · `8 个斜杠命令` · `300+ 知识库条目` · `11 种联网搜索后端`
+`5 个平台` · `14 种界面语言` · `22 个 AI 供应商` · `90+ 预设模型` · `27 个内置工具` · `8 个斜杠命令` · `11 种联网搜索后端`
 
 ## 1.5.1 新增
 
@@ -153,12 +153,11 @@ Agent 也能直接读写跑着这个 App 的这台电脑，而不只是服务器
 - **通知中心**：任务完成、异常告警和安全提醒
 - **多机编排**：在单机、指定主机或一组主机上执行任务
 
-### AI 与知识库
+### AI
 
 - 兼容任何 OpenAI 兼容 API；内置 22 个供应商预设、90+ 个预设模型
 - 模型可配置备用模型、上下文长度、最大输出和 Function Calling
 - AI 联网搜索支持 11 种可选后端：Bing RSS、DuckDuckGo、SearXNG、Brave、Tavily、Serper.dev、Mojeek、Exa、Parallel，以及 OpenAI 与 Anthropic 的接地搜索；Bing RSS、DuckDuckGo、SearXNG 免密钥（SearXNG 可选填 Token 与自建实例地址）
-- 知识库包含 300+ 条软件安装/配置条目，按平台匹配命令
 - API Key 只保存在系统安全存储中，不写入日志或明文配置
 
 ### 体验与安全
@@ -285,8 +284,7 @@ Flutter (Dart)
 ├── dartssh2                 SSH / SFTP
 ├── flutter_pty              本地 PTY
 ├── xterm.dart               终端渲染
-├── Dio                      OpenAI 兼容 API
-└── SQLite FTS5              知识库全文搜索
+└── Dio                      OpenAI 兼容 API
 ```
 
 仓库根目录是项目文档，Flutter 工程在 `ai_terminal/`。

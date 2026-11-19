@@ -52,7 +52,7 @@ A chat assistant tells you what to run. AI Terminal runs it on your servers and 
 
 ## At a glance
 
-`5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `28 built-in tools` · `8 slash commands` · `300+ knowledge entries` · `11 web search backends`
+`5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `27 built-in tools` · `8 slash commands` · `11 web search backends`
 
 ## New in 1.5.1
 
@@ -153,12 +153,11 @@ The Agent can also read and write the computer this app runs on, not just your s
 - **Notification center**: task completion, anomalies, and security alerts
 - **Multi-host orchestration**: run on one host, selected hosts, or a group of hosts
 
-### AI & knowledge
+### AI
 
 - Works with any OpenAI-compatible API; 22 built-in provider presets and 90+ preset models
 - Per-model fallback, context window, max output, and Function Calling settings
 - Web search with 11 selectable backends: Bing RSS, DuckDuckGo, SearXNG, Brave, Tavily, Serper.dev, Mojeek, Exa and Parallel, plus OpenAI and Anthropic grounded search; Bing RSS, DuckDuckGo and SearXNG need no key (SearXNG takes an optional token and a self-hosted URL)
-- Knowledge base with 300+ software installation/configuration entries, matched by platform
 - API keys stay in OS secure storage; no plaintext keys in logs or config files
 
 ### Experience & security
@@ -285,8 +284,7 @@ Flutter (Dart)
 ├── dartssh2                 SSH / SFTP
 ├── flutter_pty              Local PTY
 ├── xterm.dart               Terminal rendering
-├── Dio                      OpenAI-compatible API
-└── SQLite FTS5              Knowledge-base full-text search
+└── Dio                      OpenAI-compatible API
 ```
 
 The repository root contains project docs; the Flutter app is in `ai_terminal/`.

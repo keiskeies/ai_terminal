@@ -29,7 +29,6 @@ Generated files (`*.g.dart`, `*.freezed.dart`) are gitignored. After cloning, al
 | Build (current platform) | `./build_all.sh current` |
 | Build (all platforms) | `./build_all.sh all` |
 | Regenerate Hive adapters | `dart run build_runner build --delete-conflicting-outputs` |
-| Rebuild knowledge DB | `python3 tools/csv_to_knowledge.py ai_terminal/assets/knowledge/knowledge.csv ai_terminal/assets/knowledge/knowledge.db` (from repo root) |
 
 ## Architecture
 
@@ -40,7 +39,6 @@ Generated files (`*.g.dart`, `*.freezed.dart`) are gitignored. After cloning, al
 - **Local terminal**: flutter_pty
 - **Terminal UI**: xterm.dart
 - **AI**: OpenAI-compatible API via Dio
-- **Knowledge base**: SQLite FTS5 full-text search (`knowledge_service.dart`)
 
 Entry point: `ai_terminal/lib/main.dart`
 
@@ -49,12 +47,6 @@ Entry point: `ai_terminal/lib/main.dart`
 - **Linux**: requires system packages: `libgtk-3-dev libblkid-dev liblzma-dev ninja-build libgcrypt20-dev libsecret-1-dev libjsoncpp-dev`
 - **Android**: CI patches Flutter's `settings.gradle.kts` to add `gradlePluginPortal()` — local builds may need this manually
 - **iOS**: requires macOS + valid developer certificate for release builds
-
-## Knowledge base workflow
-
-1. Edit CSV: `ai_terminal/assets/knowledge/knowledge.csv`
-2. Convert to SQLite: `python3 tools/csv_to_knowledge.py <csv> <db>`
-3. The `.db` file is bundled as a Flutter asset
 
 ## CI
 
@@ -102,8 +94,8 @@ The following rules are distilled from real bugs found in code review. Each rule
 - **All terminal paths MUST behave consistently.** Whether the task ends by AI `finish`, max-steps exhaustion, no-command retry exhaustion, or error — every path must: (1) set a terminal status, (2) emit a `finish` event, (3) call `onCompleted` to flush streaming content. Divergent paths cause UI to get stuck in "running" or lose the last streaming chunk.
 - **Retry/step counters MUST reset on success.** A "no-command retry count" that only increments and never resets will eventually trigger false termination on long tasks where intermittent no-command responses are normal. Reset to 0 after every successful command execution.
 - **Do not mutate shared history before the generation check.** Adding an AI response to `_conversationHistory` before checking `myGeneration` pollutes the new session's history with the old task's response. Always: generation check → cancel check → then mutate history.
-- **Whitelist over blacklist for terminal-state gating.** `!isCancelled` is a blacklist — it silently admits `failed` and any future terminal state. Use `status == completed` (whitelist) when gating "should record/side-effect" (e.g. recording a learning entry to the knowledge base). `cancelTask`, `_finishTask(success:false)`, and `maxSteps` exhaustion ALL invoke `onCompleted` to flush streaming content; a blacklist gate like `if (!isCancelled) recordLearning()` lets `failed` paths pollute the knowledge base with incomplete tasks. When a new terminal state is added later, whitelist gates automatically skip it; blacklist gates silently admit it.
-- **When fixing a side-effect on one path, enumerate ALL paths that invoke the same callback.** `onCompleted` is called from `cancelTask`, `_finishTask(success:true)`, `_finishTask(success:false)`, and `maxSteps` exhaustion. A side-effect fix that only considers `cancelTask` (e.g. adding `if (!isCancelled)` to block knowledge-base pollution) leaves `failed` paths still polluting. Before merging any side-effect fix, grep every caller of the callback/method and verify each terminal path's behavior against the fix. Side-effects to check: knowledge-base writes, persistence, notifications, audit logs, telemetry.
+- **Whitelist over blacklist for terminal-state gating.** `!isCancelled` is a blacklist — it silently admits `failed` and any future terminal state. Use `status == completed` (whitelist) when gating "should record/side-effect" (e.g. persisting the assistant reply as a completed turn). `cancelTask`, `_finishTask(success:false)`, and `maxSteps` exhaustion ALL invoke `onCompleted` to flush streaming content; a blacklist gate like `if (!isCancelled) { /* write side-effect */ }` lets `failed` paths write incomplete turns into the conversation store. When a new terminal state is added later, whitelist gates automatically skip it; blacklist gates silently admit it.
+- **When fixing a side-effect on one path, enumerate ALL paths that invoke the same callback.** `onCompleted` is called from `cancelTask`, `_finishTask(success:true)`, `_finishTask(success:false)`, and `maxSteps` exhaustion. A side-effect fix that only considers `cancelTask` (e.g. adding `if (!isCancelled)` to block a bad persistence write) leaves `failed` paths still writing. Before merging any side-effect fix, grep every caller of the callback/method and verify each terminal path's behavior against the fix. Side-effects to check: persistence, notifications, audit logs, telemetry.
 
 ### R6. Cross-platform compatibility
 

@@ -223,6 +223,7 @@ jobs:
             - **联网搜索设置重做**：独立页改为行内抽屉，SearXNG 支持自建实例地址与可选 Token，返回条数 / 并发 / 超时 / HTTP 代理按后端能力配置，缺地址的后端在副标题上直接可见
             - **服务器监控明细窗**：网络与磁盘指标可展开独立详情窗（表格布局、虚拟接口折叠成一行、开窗期间面板停轮询以免本地采集频率翻倍），hover 浮层只留速览
             - **斜杠命令弹窗**：补 Material 包裹，缺默认文字样式时不再落到黄色双下划线的 fallback 样式
+            - **官方命令知识库整体下线**：300+ 条内置命令卡、FTS5 检索与经验回写全部移除，安装包不再携带知识库文件；设置页「内部规范」保留，注入链独立成模块并补提示词级守卫；安装失败防自救循环约束独立保留，六语言「检索知识库」误译修正
 
             #### 📁 继续包含
             - v1.5.0 的操作单国际化：188 个成员改走 ARB 键、14 种语言全覆盖、单复数拆成独立键、MCP 数字插值改模板键
@@ -248,7 +249,6 @@ jobs:
             - 🎯 **多机编排**：单 Agent 调度多台主机，命令按 host 路由执行，状态实时回显
             - 🛡️ **三重安全防护**：行为边界提示词 → SafetyGuard 命令分级 → 危险操作需 CONFIRM 确认
             - 🔐 **零明文凭据**：密码/私钥存储在系统 Keychain / Keystore，永不明文落盘
-            - 🧠 **知识库驱动**：内置 300+ 软件安装/配置条目，按平台匹配命令
             - 🛠️ **AI 工具调用**：SFTP 跨机上传、文件同步、经验记忆等非 shell 工具
             - 🖥️ **5 平台原生**：macOS / Linux / Windows / Android / iOS 全平台支持
             - 🌍 **14 种语言**：中文/英文/日语/韩语/法语/德语/西班牙语/俄语/葡萄牙语等
@@ -316,6 +316,7 @@ jobs:
             - **Web search settings rebuilt**: the standalone page becomes an inline drawer, SearXNG accepts a self-hosted instance URL plus optional token, result count / concurrency / timeout / HTTP proxy are configurable per backend capability, and backends missing a URL say so in their subtitle
             - **Server monitor detail window**: the network and disk metrics open a dedicated detail window (table layout, virtual interfaces collapsed to one line, panel polling paused while it is open so local collection does not double in frequency), leaving the hover overlay as a quick glance
             - **Slash-command popup**: gains a Material wrapper, so it no longer falls back to the yellow double-underline text style when no default text style is in scope
+            - **Official command knowledge base retired**: the 300+ bundled command cards, FTS5 search and experience write-back are removed and installers no longer ship knowledge files; the settings-page House Rules stay, with their injection chain split into its own module and guarded at prompt level; the install-failure anti-self-rescue constraint is kept independently, and a six-locale "searching knowledge base" mistranslation is fixed
 
             #### 📁 Still included
             - The v1.5.0 operation sheet localization: all 188 members resolved through ARB keys in 14 languages, singulars split into separate keys, and MCP count interpolation moved to template keys
@@ -341,7 +342,6 @@ jobs:
             - 🎯 **Multi-Host Orchestration**: Single Agent dispatches commands across multiple hosts, routed by hostId, with live status feedback
             - 🛡️ **Triple Security**: Behavior boundary prompts → SafetyGuard command classification → Dangerous ops require CONFIRM
             - 🔐 **Zero Plaintext Credentials**: Passwords/keys in system Keychain / Keystore, never on disk
-            - 🧠 **Knowledge-Driven**: 300+ software install/config entries, matched by platform
             - 🛠️ **AI Tool Calling**: SFTP cross-host upload, file sync, experience memory and other non-shell tools
             - 🖥️ **5 Native Platforms**: macOS / Linux / Windows / Android / iOS
             - 🌍 **14 Languages**: Chinese / English / Japanese / Korean / French / German / Spanish / Russian / Portuguese & more
