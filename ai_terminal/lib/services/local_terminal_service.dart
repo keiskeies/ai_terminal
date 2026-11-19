@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_pty/flutter_pty.dart';
 import '../core/ui_text.dart';
 import '../utils/exit_marker_scanner.dart';
+import '../utils/output_processor.dart';
 import '../utils/tail_text_buffer.dart';
 import 'command_executor.dart';
 import 'session_log_service.dart';
@@ -175,24 +176,36 @@ class LocalTerminalService implements CommandExecutor {
     }
   }
 
-  /// 一次性执行命令并返回 stdout（不走 PTY，使用 Process.run）
+  /// 一次性执行命令并返回 stdout（不走 PTY，独立进程）
   ///
   /// 用于监控面板等需要轻量、不污染交互式 shell 的场景。
   /// 失败返回空字符串。超时默认 5 秒。
+  /// M5：用 Process.start 而非 Process.run(...).timeout() —— 后者超时只让
+  /// await 抛出，子进程继续跑（R2 泄漏）。这里超时主动 kill。
   @override
   Future<String> runOnce(String command,
       {Duration timeout = const Duration(seconds: 5)}) async {
+    Process? process;
     try {
-      if (Platform.isWindows) {
-        final result =
-            await Process.run('cmd', ['/c', command]).timeout(timeout);
-        return (result.stdout as String?) ?? '';
-      } else {
-        final result =
-            await Process.run('/bin/sh', ['-c', command]).timeout(timeout);
-        return (result.stdout as String?) ?? '';
+      process = Platform.isWindows
+          ? await Process.start('cmd', ['/c', command])
+          : await Process.start('/bin/sh', ['-c', command]);
+      final stdoutFuture = process.stdout.transform(utf8.decoder).join();
+      // 排空 stderr：管道写满会让子进程阻塞在写上，永远等不到 exitCode
+      final stderrFuture = process.stderr.drain<void>().catchError((_) {});
+      try {
+        await process.exitCode.timeout(timeout);
+      } on TimeoutException {
+        process.kill(ProcessSignal.sigkill);
+        debugPrint('[LocalTerminalService] runOnce 超时已终止 ($command)');
+        return '';
       }
+      final out =
+          await stdoutFuture.timeout(const Duration(seconds: 2), onTimeout: () => '');
+      await stderrFuture;
+      return out;
     } catch (e) {
+      process?.kill(ProcessSignal.sigkill);
       debugPrint('[LocalTerminalService] runOnce 失败 ($command): $e');
       return '';
     }
@@ -222,6 +235,15 @@ class LocalTerminalService implements CommandExecutor {
   /// - cmdlet：只有 `$?` 可靠，成功记 0、失败记 1；
   /// - `$?` 为假但 `$LASTEXITCODE` 是 0（上一条原生命令留下的陈旧值）记 1，
   ///   所以 `cmd /c exit 0; Get-ChildItem 不存在路径` 不会冒充成功。
+  ///
+  /// cmd 分支不能写成 `echo MARKER%errorlevel%`：**cmd 在同一遍解析里就把
+  /// `%errorlevel%` 展开**，取值早于 `&` 后面的命令执行 —— 拿到的是上一条命令的
+  /// 陈旧退出码（实机：`cmd /c exit 9 & echo %errorlevel%` 输出 0）。
+  /// 采用 `call echo MARKER%^errorlevel^%`：第一遍 `%` 展开时变量名含 `^`
+  /// 属未定义变量，cmd 原样保留该引用；随后去掉转义符 `^` 得到 `%errorlevel%`；
+  /// `call` 触发第二遍展开，此时命令已执行完，取到新鲜退出码。
+  /// 实机验证两种上下文都成立（交互 cmd 与 `cmd /c`）；`%%errorlevel%%` 形态
+  /// 在 `cmd /c` 下内层先被展开成 `%9%`（输出 `MARKER%0%`），故弃用。
   @visibleForTesting
   static String wrapCommandWithExitMarker(
     String command,
@@ -230,17 +252,8 @@ class LocalTerminalService implements CommandExecutor {
     required bool isPowerShell,
   }) {
     if (!isWindows) return posixWrapWithExitMarker(command, marker);
-    if (!isPowerShell) return '$command & echo $marker%errorlevel%';
-    // PowerShell 分支里全是 `$var` 字面量，用 raw 字符串拼，避免 Dart 插值吃掉它们。
-    // 置空是必需的：`$LASTEXITCODE` 是会话级变量，上一条命令留下的非零值会串到
-    // 这一条（例如上一条 `cmd /c exit 7`、这一条 cmdlet 失败 → 报 7 而不是 1）。
-    return r'$LASTEXITCODE=$null; ' +
-        command +
-        r'; $__ec=if($?){0}' +
-        r'elseif($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0){$LASTEXITCODE}' +
-        r'else{1}; echo "' +
-        marker +
-        r'$__ec"';
+    return windowsWrapWithExitMarker(command, marker,
+        isPowerShell: isPowerShell);
   }
 
   /// 执行命令并等待完成，返回结构化结果（含退出码）
@@ -281,8 +294,12 @@ class LocalTerminalService implements CommandExecutor {
       isWindows: Platform.isWindows,
       isPowerShell: _isPowerShell,
     );
-    final donePattern = RegExp('${RegExp.escape(marker)}\\d+');
     final markerScanner = ExitMarkerScanner(marker);
+    final donePattern = markerScanner.donePattern;
+    // H1：退出码提取与 scanner 完成判定同一口径——数字后必须是边界
+    // （非数字字符或流尾，后者对应 matchesAtEnd 兜底），避免 137 被截半时提取到前缀 1。
+    final exitCodeRegex =
+        RegExp('${RegExp.escape(marker)}(\\d+)(?:[^\\d]|\$)');
 
     // R8: buffer 必须有上限，保留尾部（最新输出）
     const maxBufferChars = 256 * 1024; // 256KB
@@ -411,7 +428,13 @@ class LocalTerminalService implements CommandExecutor {
       },
       onDone: () {
         if (!doneCompleter.isCompleted) {
-          if (!markerSeen) {
+          // H1 兜底：marker 刚输出完流就关闭时，donePattern 等不到数字后的
+          // 边界字符。缓冲尾部正好停在 marker+数字上 → 按完成处理，
+          // 不把正常结束的命令误判成进程退出。
+          if (!markerSeen &&
+              ExitMarkerScanner.matchesAtEnd(buffer.tail(), marker)) {
+            markerSeen = true;
+          } else if (!markerSeen) {
             abnormalReason.add('本地 PTY 进程已退出');
             _isConnected = false;
           }
@@ -491,6 +514,12 @@ class LocalTerminalService implements CommandExecutor {
 
     var rawOutput = buffer.toString();
 
+    // H1 兜底：完成由取消/异常检测触发，但缓冲尾部实际停在 marker+数字上
+    // （边界字符始终没来）→ 按完成处理，正常提取退出码。
+    if (!markerSeen && ExitMarkerScanner.matchesAtEnd(rawOutput, marker)) {
+      markerSeen = true;
+    }
+
     if (!markerSeen) {
       // 取消时如果停在分页器上，Ctrl+C 退不出 less，必须先按 q
       if (PtyOutputDetector.waitsForPager(rawOutput)) {
@@ -525,8 +554,7 @@ class LocalTerminalService implements CommandExecutor {
       );
     }
 
-    // 从输出中提取退出码
-    final exitCodeRegex = RegExp('$marker(\\d+)');
+    // 从输出中提取退出码（exitCodeRegex 与 scanner 同一边界口径，见上方声明处）
     final match = exitCodeRegex.firstMatch(rawOutput);
     int exitCode = 0;
     if (match != null) {
@@ -534,13 +562,11 @@ class LocalTerminalService implements CommandExecutor {
       rawOutput = rawOutput.replaceAll('$marker$exitCode', '');
     }
 
-    // 清理输出
-    var cleanOutput = rawOutput;
-    final cmdEchoIdx = cleanOutput.indexOf(wrappedCommand);
-    if (cmdEchoIdx >= 0) {
-      cleanOutput = cleanOutput.substring(cmdEchoIdx + wrappedCommand.length);
-    }
-    cleanOutput = cleanOutput.replaceAll(RegExp(r'[\]\$#>]\s*$'), '').trim();
+    // 清理输出：剔 marker（上）→ 去回显（绕排容忍，F3）→ 清尾行提示符（H2）。
+    // 旧的尾部单字符清洗 [\]\$#>] 会吃掉 JSON 末 ]、口令 $ 等合法尾字符，
+    // 换 stripTrailingPromptLine 整行精确匹配。
+    var cleanOutput = stripWrappedEcho(rawOutput, wrappedCommand);
+    cleanOutput = stripTrailingPromptLine(cleanOutput).trim();
 
     return CommandResult(
       stdout: cleanOutput,
@@ -658,6 +684,9 @@ class LocalTerminalService implements CommandExecutor {
     final wrappedCommand = '$writeCmd; echo "$marker\$?"';
     final markerScanner = ExitMarkerScanner(marker);
     final donePattern = markerScanner.donePattern;
+    // M3 阶段门控（与 SSH 同口径）：内容期回显的就是文件本身，
+    // detect 会把内容里的 Password:/[Y/n] 误判成交互提示而中断写入。
+    var contentSending = false;
 
     const maxBufferChars = 256 * 1024;
     const detectTailChars = 8192;
@@ -684,6 +713,7 @@ class LocalTerminalService implements CommandExecutor {
         final elapsed = stopwatch.elapsedMilliseconds;
         if (elapsed - lastEvaluateAtMs < evaluateIntervalMs) return;
         lastEvaluateAtMs = elapsed;
+        if (contentSending) return;
         final snapshot = detectBuffer.tail();
         final diag = PtyOutputDetector.detect(
           buffer: snapshot,
@@ -720,7 +750,8 @@ class LocalTerminalService implements CommandExecutor {
     // 2. 等待 shell 进入 stdin 等待状态
     await Future.delayed(const Duration(milliseconds: 100));
 
-    // 3. 逐行发送文件内容
+    // 3. 逐行发送文件内容（进入内容期：交互式提示检测停止）
+    contentSending = true;
     final hasTrailingNewline = content.isNotEmpty && content.last == 0x0a;
     final contentStr = utf8.decode(content, allowMalformed: true);
     final lines = contentStr.split('\n');
@@ -803,6 +834,11 @@ class LocalTerminalService implements CommandExecutor {
 
     var rawOutput = buffer.toString();
 
+    // H1 兜底：marker 数字恰压缓冲尾（scanner 等不到数字边界）时按完成补判
+    if (!markerSeen && ExitMarkerScanner.matchesAtEnd(buffer.tail(), marker)) {
+      markerSeen = true;
+    }
+
     if (!markerSeen) {
       try {
         _pty!.write(utf8.encode('\x03'));
@@ -831,21 +867,19 @@ class LocalTerminalService implements CommandExecutor {
       );
     }
 
-    final exitCodeRegex = RegExp('$marker(\\d+)');
+    final exitCodeRegex =
+        RegExp('${RegExp.escape(marker)}(\\d+)(?:[^\\d]|\$)');
     final match = exitCodeRegex.firstMatch(rawOutput);
     int exitCode = 0;
     if (match != null) {
       exitCode = int.tryParse(match.group(1) ?? '0') ?? 0;
-      rawOutput = rawOutput.replaceAll('$marker$exitCode', '');
+      rawOutput = rawOutput.replaceRange(match.start, match.end, '');
     }
 
-    // 清理输出：移除命令回显，保留 cat/tee 的错误输出
-    var cleanOutput = rawOutput;
-    final cmdEchoIdx = cleanOutput.indexOf(wrappedCommand);
-    if (cmdEchoIdx >= 0) {
-      cleanOutput = cleanOutput.substring(cmdEchoIdx + wrappedCommand.length);
-    }
-    cleanOutput = cleanOutput.replaceAll(RegExp(r'[\]\$#>]\s*$'), '').trim();
+    // 清理输出：回显去除（绕排容忍）+ 精确提示符尾行（H2），
+    // 保留 cat/tee 的错误输出
+    var cleanOutput = stripWrappedEcho(rawOutput, wrappedCommand);
+    cleanOutput = stripTrailingPromptLine(cleanOutput).trim();
 
     // exitCode != 0：cat/tee 写入失败（如磁盘满、SELinux 拒绝）
     if (exitCode != 0) {

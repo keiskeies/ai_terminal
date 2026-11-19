@@ -4432,6 +4432,19 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     return g == p || p.contains(g) || g.contains(p);
   }
 
+  /// raw fallback 的事件缓存：_buildAIContent 在 build 期跑，每帧重新 parse
+  /// 整段正文是白费；老会话消息渲染后正文不变，按内容字符串缓存上次解析结果。
+  String? _rawFallbackCacheKey;
+  List<AgentEvent> _rawFallbackCacheEvents = const [];
+
+  List<AgentEvent> _rawFallbackEventsFor(String text) {
+    if (text == _rawFallbackCacheKey) return _rawFallbackCacheEvents;
+    final events = parseRawReactFallbackEvents(text);
+    _rawFallbackCacheKey = text;
+    _rawFallbackCacheEvents = events;
+    return events;
+  }
+
   /// 去掉"其实是正文草稿"的思考行。
   ///
   /// 模型有时把最终回答整段写进推理里，于是同一段 Markdown 先以三行原始
@@ -4489,52 +4502,68 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         enginePendingConfirm != null && enginePendingConfirm == command.trim();
 
     // 优先使用结构化事件渲染（ReAct 格式已由 ReActStreamParser 正确解析）
-    if (events.isNotEmpty) {
-      Widget buildEventContent(List<AgentEvent> source) => AgentEventContent(
-            events: source,
-            tc: tc,
-            tab: tab,
-            showAutoExecute: showAutoExecute,
-            isLoading: isLoading,
-            isWaitingChoice: isWaitingChoice,
-            pendingOptions: pendingOptions,
-            // 实时推理接到时间线末尾：思考发生在它真实的位置上，
-            // 而不是浮在整条回答顶部、结束后又凭空消失
-            liveReasoning: liveReasoning,
-            executingCommand:
-                tab == null ? _executingCommand : _tabExecutingCommand[tab.id],
-            pendingConfirmCommand: effectivePendingConfirm,
-            markdownBuilder: _buildMarkdownText,
-            onExecuteCommand: _executeLineDirectly,
-            onConfirmCommand: (command) {
-              if (isEngineConfirm(command)) {
-                // 引擎自动流程：走 confirmCommand 解析 completer
-                ref.read(agentProvider.notifier).confirmCommand();
-              } else {
-                // 手动播放流程：直接在终端执行
-                final activeTab = ref.read(tp.terminalProvider).activeTab;
-                if (activeTab != null)
-                  _executeLineDirectly(command, true, activeTab);
-              }
-            },
-            onRejectCommand: () {
-              if (enginePendingConfirm != null) {
-                ref.read(agentProvider.notifier).rejectCommand();
-              } else {
-                setState(() => _pendingConfirmCommand = null);
-              }
-            },
-            onSelectChoice: _onOptionSelected,
-            onRetryFailedCommand: _retryFailedCommand,
-            onReconnectHost: _reconnectHost,
-            onRetryFailedHosts: _retryFailedHosts,
-          );
+    Widget buildEventContent(List<AgentEvent> source) => AgentEventContent(
+          events: source,
+          tc: tc,
+          tab: tab,
+          showAutoExecute: showAutoExecute,
+          isLoading: isLoading,
+          isWaitingChoice: isWaitingChoice,
+          pendingOptions: pendingOptions,
+          // 实时推理接到时间线末尾：思考发生在它真实的位置上，
+          // 而不是浮在整条回答顶部、结束后又凭空消失
+          liveReasoning: liveReasoning,
+          executingCommand:
+              tab == null ? _executingCommand : _tabExecutingCommand[tab.id],
+          pendingConfirmCommand: effectivePendingConfirm,
+          markdownBuilder: _buildMarkdownText,
+          onExecuteCommand: _executeLineDirectly,
+          onConfirmCommand: (command) {
+            if (isEngineConfirm(command)) {
+              // 引擎自动流程：走 confirmCommand 解析 completer
+              ref.read(agentProvider.notifier).confirmCommand();
+            } else {
+              // 手动播放流程：直接在终端执行
+              final activeTab = ref.read(tp.terminalProvider).activeTab;
+              if (activeTab != null)
+                _executeLineDirectly(command, true, activeTab);
+            }
+          },
+          onRejectCommand: () {
+            if (enginePendingConfirm != null) {
+              ref.read(agentProvider.notifier).rejectCommand();
+            } else {
+              setState(() => _pendingConfirmCommand = null);
+            }
+          },
+          onSelectChoice: _onOptionSelected,
+          onRetryFailedCommand: _retryFailedCommand,
+          onReconnectHost: _reconnectHost,
+          onRetryFailedHosts: _retryFailedHosts,
+        );
 
-      // 有操作单报告：按发生顺序铺开过程，再收结论、复制、执行清单。
-      //
-      // 之前是「结论 → 计划 → 正文 → 过程折叠」：用户先看到结论，真正的
-      // 思考 / 命令 / 输出被压到最后一次点击里，顺序和实际发生顺序相反。
-      final report = _findOperationReport(events);
+    // 有操作单报告：按发生顺序铺开过程，再收结论、复制、执行清单。
+    //
+    // 之前是「结论 → 计划 → 正文 → 过程折叠」：用户先看到结论，真正的
+    // 思考 / 命令 / 输出被压到最后一次点击里，顺序和实际发生顺序相反。
+    final report = _findOperationReport(events);
+    if (events.isNotEmpty) {
+      // D1 raw fallback（events 非空但无正文事件、非加载中）：正文是原始 ReAct
+      // 协议文本时解析成事件复用同一条渲染路径，协议行不再当正文显示。
+      final hasAIContentEvents = events.any((e) =>
+          e.isThought || e.isCommand || e.isText || e.isAsk || e.isFinish);
+      final rawFallbackText = (!hasAIContentEvents && !isLoading)
+          ? (streamingContent.trim().isNotEmpty ? streamingContent : content)
+          : null;
+      List<AgentEvent> rawFallbackEvents = const [];
+      if (rawFallbackText != null) {
+        final parsed = _rawFallbackEventsFor(rawFallbackText);
+        // 只认正文可见事件（思考/命令/正文/询问/完成）；plan-only 在
+        // 事件流渲染里不产出内容，必须继续走原文兜底，否则正文变空。
+        if (hasVisibleReactEvents(parsed)) {
+          rawFallbackEvents = _dedupeProcessEvents(parsed);
+        }
+      }
       if (report != null) {
         final processEvents = _dedupeProcessEvents(events
             .where((e) => !e.isReport && !e.isFinish && !e.isPlan)
@@ -4605,10 +4634,6 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       }
 
       // 旧会话/进行中：保持原有事件流渲染
-      // 判断 events 中是否有 AI 输出的内容事件（thought/command/text/ask/finish）
-      // 如果只有 result/info，说明还在流式过程中，需要同时显示 streamingContent
-      final hasAIContentEvents = events.any((e) =>
-          e.isThought || e.isCommand || e.isText || e.isAsk || e.isFinish);
       final plan = _findLatestPlan(events);
       final interrupted = !isAgentRunning &&
           !isLoading &&
@@ -4636,12 +4661,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           // 看上去就像"思考凭空消失"。也不再有「思考中」块：它装的是流式正文
           // （模型写的说明/答案），不是思考。
           buildEventContent(_dedupeProcessEvents(events)),
-          // 没有 AI 内容事件时（流式早期或纯文本兜底）仍然按原逻辑显示
-          if (!hasAIContentEvents && !isLoading)
-            _answerCard(
-              streamingContent.trim().isNotEmpty ? streamingContent : content,
-              tc,
-            ),
+          // 没有 AI 内容事件时（流式早期或纯文本兜底）显示正文：
+          // 正文是原始 ReAct 协议文本（老会话）时走结构化渲染，协议行不当正文；
+          // 非协议正文（普通 Markdown，含代码示例）不解析、原样渲染 ——
+          // 解析器会把任意围栏变成带执行按钮的命令卡，不能对普通回答动刀。
+          if (rawFallbackEvents.isNotEmpty)
+            buildEventContent(rawFallbackEvents)
+          else if (rawFallbackText != null)
+            _answerCard(rawFallbackText, tc),
           // 执行清单固定在这条回答的最底部；运行中则由贴底清单承担，
           // 这里抑制，避免同一份计划同屏出现两次。
           if (plan.isNotEmpty && !_planPinnedActive) ...[

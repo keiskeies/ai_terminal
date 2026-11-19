@@ -26,6 +26,31 @@ String posixWrapWithExitMarker(String command, String marker) =>
         ? '$command\necho "$marker\$?"'
         : '$command; echo "$marker\$?"';
 
+/// Windows shell 的退出码标记包装（R6 分支逻辑单点维护，本地 PTY 与
+/// 远端 Windows SSH 共用）。
+///
+/// cmd 分支必须用 `call echo MARKER%^errorlevel^%`：直接
+/// `& echo MARKER%errorlevel%` 在整行解析期就展开，取到**上一条**命令的陈旧值。
+/// `%^errorlevel^%` 第一遍因变量名含 `^` 属未定义而原样保留，`call` 触发
+/// 第二遍展开时命令已执行完，取到新鲜值（交互 cmd 与 cmd /c 双上下文实测）。
+String windowsWrapWithExitMarker(
+  String command,
+  String marker, {
+  required bool isPowerShell,
+}) {
+  if (!isPowerShell) return '$command & call echo $marker%^errorlevel^%';
+  // PowerShell 分支里全是 `$var` 字面量，用 raw 字符串拼，避免 Dart 插值吃掉它们。
+  // 置空是必需的：`$LASTEXITCODE` 是会话级变量，上一条命令留下的非零值会串到
+  // 这一条（例如上一条 `cmd /c exit 7`、这一条 cmdlet 失败 → 报 7 而不是 1）。
+  return r'$LASTEXITCODE=$null; ' +
+      command +
+      r'; $__ec=if($?){0}' +
+      r'elseif($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0){$LASTEXITCODE}' +
+      r'else{1}; echo "' +
+      marker +
+      r'$__ec"';
+}
+
 /// 命令执行结果（包含退出码）
 class CommandResult {
   final String stdout;

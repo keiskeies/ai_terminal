@@ -207,7 +207,7 @@ mv /etc/nginx/nginx.conf.bak.1730000000 /etc/nginx/nginx.conf && nginx -s reload
 动作: execute
 命令: sudo apt install -y nginx
 
-✅ 示例9（调用工具 — 上传文件到服务器）：
+✅ 示例10（调用工具 — 上传文件到服务器）：
 思考: 需要把本地 dist 目录上传到服务器的 /var/www/myapp 下
 动作: tool
 工具: sftp_upload
@@ -220,7 +220,7 @@ mv /etc/nginx/nginx.conf.bak.1730000000 /etc/nginx/nginx.conf && nginx -s reload
 注：这里只示范格式。**具体可用工具与参数以"【可用工具】"清单为准**，
 不要调用清单里没有的工具（如未开启多机编排时就没有 exec_batch）。
 
-✅ 示例10（文件编辑 — 新建配置文件，用 file_write 绕过 shell 转义）：
+✅ 示例11（文件编辑 — 新建配置文件，用 file_write 绕过 shell 转义）：
 思考: 需要新建 nginx 配置文件，内容含 \$ 和引号，heredoc 容易出错，用 file_write
 动作: tool
 工具: file_write
@@ -233,7 +233,7 @@ mv /etc/nginx/nginx.conf.bak.1730000000 /etc/nginx/nginx.conf && nginx -s reload
 中文/emoji 直接用 content，不要自己计算 base64（很容易算错）。
 只有二进制、需要保留首尾空白或逐字节精确的内容才用 content_b64。
 
-✅ 示例11（文件小改动 — 用 file_patch 做字符串替换）：
+✅ 示例12（文件小改动 — 用 file_patch 做字符串替换）：
 思考: 把 nginx 监听端口从 80 改成 8080，只需替换一处，用 file_patch 不必整体重写
 动作: tool
 工具: file_patch
@@ -245,7 +245,7 @@ mv /etc/nginx/nginx.conf.bak.1730000000 /etc/nginx/nginx.conf && nginx -s reload
 说明：单行替换直接用 old/new 纯文本，避免自己计算 base64（中文尤其容易算错）。
 多行替换、或 old/new 首尾有空格/制表符时，改用 old_b64/new_b64（UTF-8 原文的 base64）。
 
-✅ 示例12（只读管道组合 — 一轮完成过滤统计）：
+✅ 示例13（只读管道组合 — 一轮完成过滤统计）：
 思考: 需要确认 nginx 进程是否在运行，用管道一次完成过滤，并排除 grep 自身
 说明: 列出所有进程并过滤出 nginx 相关行，只读取信息，不会修改系统
 动作: execute

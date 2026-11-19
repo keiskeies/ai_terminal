@@ -29,6 +29,11 @@ class ReActStreamParser {
   static final RegExp _planStatusBox =
       RegExp(r'^[\[【(（]\s*([^\]】)）]+)\s*[\]】)）]\s*');
   static final RegExp _planTitlePrefix = RegExp(r'^[-–—:：]\s*');
+  // heredoc 起始：<< / <<- / <<~ 后可跟一层可选引号再跟定界符词。
+  // 前断言排除 <<<（here-string，不是 heredoc）。用三引号 raw 串承载——
+  // 双引号 raw 串内 \" 不会转义，单引号 raw 串内 ' 会截断字面量。
+  static final RegExp _heredocStart =
+      RegExp(r"""(^|[^<])<<(?!<)[-~]?['"]?(\w+)['"]?""");
 
   static String stableId(AgentEventType type, String content) {
     final bytes = utf8.encode('${type.name}:$content');
@@ -157,10 +162,23 @@ class ReActStreamParser {
     final lines = content.split('\n');
     bool inCodeBlock = false;
     final codeBlockBuffer = StringBuffer();
+    // heredoc 保护（设计 §6.1）：命令字段行含 <<定界符 后，直到某行 trim
+    // 等于定界符为止，所有行不做关键词切分、整行并入命令 buffer——
+    // 防止 heredoc 正文里的 命令:/说明: 行被当协议行切走、截断命令。
+    String? heredocDelim;
 
     for (int i = 0; i < lines.length; i++) {
       final line = lines[i];
       final trimmed = line.trim();
+
+      if (heredocDelim != null) {
+        // heredoc 内容期：整行（含定界符行本身）原样并入命令 buffer
+        buffer.writeln(line);
+        if (trimmed == heredocDelim) {
+          heredocDelim = null;
+        }
+        continue;
+      }
 
       if (trimmed.startsWith('```')) {
         if (inCodeBlock) {
@@ -281,6 +299,12 @@ class ReActStreamParser {
           }
         }
       }
+
+      // 处于命令字段且本行含 heredoc 起始 → 记录定界符，进入内容保护期
+      if (heredocDelim == null && currentField == _FieldType.command) {
+        final hs = _heredocStart.firstMatch(line);
+        if (hs != null) heredocDelim = hs.group(2);
+      }
     }
 
     if (inCodeBlock) {
@@ -308,7 +332,12 @@ class ReActStreamParser {
       while (true) {
         final pos = line.indexOf(kw, idx);
         if (pos < 0) break;
-        matches.add(_KeywordMatch(pos, kw));
+        // 行内（position>0）命中仅当前一字符为空格/Tab 才是字段边界：
+        // echo "命令: x" 的引号前缀不是边界，思考: a 动作: execute 的空格前缀才是。
+        // 行首命中不受限。
+        if (pos == 0 || line[pos - 1] == ' ' || line[pos - 1] == '\t') {
+          matches.add(_KeywordMatch(pos, kw));
+        }
         idx = pos + kw.length;
       }
     }

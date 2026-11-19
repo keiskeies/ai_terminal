@@ -610,6 +610,20 @@ class AgentNotifier extends StateNotifier<AgentState> {
       });
     };
 
+    // AI 流中途超时被丢弃重试：与 onThinking 相反，绝不能 flush —— 半截正文
+    // （可能含写了一半的 heredoc）一旦并入 content 就永久留在回答里。直接丢弃。
+    engine.onStreamDiscarded = () {
+      _reducer.cancelTimer(scopeId);
+      _reducer.reset(scopeId);
+      _updateScopeState(scopeId, (s) {
+        final items = [...s.chatItems];
+        if (items.isNotEmpty && items.last.role == 'assistant') {
+          items[items.length - 1] = items.last.copyWith(streamingContent: '');
+        }
+        return s.copyWith(chatItems: items);
+      });
+    };
+
     // 模型原生推理（reasoning_content）：只有网关返回该字段时才有值。
     // 空串表示"本步推理结束/清空"，避免上一轮的推理挂在界面上。
     engine.onReasoning = (text) {

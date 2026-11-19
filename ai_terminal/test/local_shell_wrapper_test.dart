@@ -46,14 +46,17 @@ void main() {
       expect(w, endsWith('\necho "EXITCODE_1:\$?"'));
     });
 
-    test('cmd 分支用 & 与 %errorlevel%', () {
+    test('cmd 分支用 call echo 取新鲜 %errorlevel%（M1）', () {
       final w = LocalTerminalService.wrapCommandWithExitMarker(
         'dir',
         'EXITCODE_3:',
         isWindows: true,
         isPowerShell: false,
       );
-      expect(w, 'dir & echo EXITCODE_3:%errorlevel%');
+      // 旧形状 `& echo MARKER%errorlevel%` 在解析期展开，取上一条命令的陈旧值。
+      // `call echo MARKER%^errorlevel^%` 经 call 第三遍展开取新鲜值，
+      // 交互 cmd 与 cmd /c 两种上下文实测均正确（设计文档事实 F）。
+      expect(w, 'dir & call echo EXITCODE_3:%^errorlevel^%');
     });
 
     test('PowerShell 分支不再把 \$LASTEXITCODE 直接当值', () {

@@ -111,14 +111,46 @@ void main() {
     });
   });
 
-  group('stripCommandEcho 不受分级截断改动影响', () {
-    test('首行回显被剥离', () {
-      expect(stripCommandEcho('ls -la\nfile1\nfile2', 'ls -la'),
+  group('stripTrailingPromptLine（H2：替代尾部单字符清洗）', () {
+    test('bash 提示符尾行被删', () {
+      expect(stripTrailingPromptLine('file1\nfile2\nuser@host:~\$ '),
           'file1\nfile2');
+      expect(stripTrailingPromptLine('out\n[root@host ~]#'), 'out');
     });
 
-    test('真实输出不被误删', () {
-      expect(stripCommandEcho('total 0\nfile1', 'ls -la'), 'total 0\nfile1');
+    test('cmd / PS 提示符尾行被删', () {
+      expect(stripTrailingPromptLine('out\nC:\\Users\\test>'), 'out');
+      expect(stripTrailingPromptLine('out\nPS D:\\item>'), 'out');
+    });
+
+    test('合法末字符不再被吃（旧单字符清洗的回归）', () {
+      expect(stripTrailingPromptLine('[1,2,3]'), '[1,2,3]');
+      expect(stripTrailingPromptLine('pass\$'), 'pass\$');
+      expect(stripTrailingPromptLine('{"a": 1}'), '{"a": 1}');
+    });
+
+    test('空输出与无提示符输出原样返回', () {
+      expect(stripTrailingPromptLine(''), '');
+      expect(stripTrailingPromptLine('total 0\nfile1'), 'total 0\nfile1');
+    });
+  });
+
+  group('stripWrappedEcho（执行器层唯一回显清洗点，R8）', () {
+    test('精确回显被剥离', () {
+      expect(stripWrappedEcho('ls -la; echo "EXITCODE_1:\$?"\nfile1\n',
+          'ls -la; echo "EXITCODE_1:\$?"'), '\nfile1\n');
+    });
+
+    test('折行回显被容忍剥离', () {
+      final cmd = 'echo ${'x' * 100} ; echo "EXITCODE_1:\$?"';
+      final wrapped = cmd.substring(0, 80) + '\r\n' + cmd.substring(80);
+      final out = stripWrappedEcho('$wrapped\r\nreal-output\r\n', cmd);
+      expect(out, '\r\nreal-output\r\n');
+    });
+
+    test('找不到回显时原样返回（不误删真实输出）', () {
+      final wrapped = 'pwd; echo "EXITCODE_1:\$?"';
+      expect(stripWrappedEcho('/home/user/pwd\nx', wrapped), '/home/user/pwd\nx');
     });
   });
 

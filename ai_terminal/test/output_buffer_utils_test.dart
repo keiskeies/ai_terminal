@@ -28,19 +28,36 @@ void main() {
     test('detects a marker split across chunks', () {
       final scanner = ExitMarkerScanner('EXITCODE_7:');
       expect(scanner.add('EXITCODE_7'), isFalse);
-      expect(scanner.add(':123'), isTrue);
+      expect(scanner.add(':123\n'), isTrue);
+    });
+
+    // H1：数字后必须出现非数字边界才算完成——137 拆成 1/37 两片时，
+    // 第一片不得按 1 完成（否则后续 chunk 被丢弃，退出码截半）
+    test('waits for a non-digit boundary after the exit code', () {
+      final scanner = ExitMarkerScanner('EXITCODE_1:');
+      expect(scanner.add('out\nEXITCODE_1:1'), isFalse);
+      expect(scanner.add('37\n'), isTrue);
+    });
+
+    test('digits at buffer end are complete only via matchesAtEnd', () {
+      final scanner = ExitMarkerScanner('EXITCODE_9:');
+      expect(scanner.add('EXITCODE_9:2'), isFalse);
+      expect(ExitMarkerScanner.matchesAtEnd('out\nEXITCODE_9:2', 'EXITCODE_9:'),
+          isTrue);
+      expect(ExitMarkerScanner.matchesAtEnd('EXITCODE_9:\$?', 'EXITCODE_9:'),
+          isFalse);
     });
 
     test('does not match the command echo without an exit code', () {
       final scanner = ExitMarkerScanner('EXITCODE_2:');
       expect(scanner.add('echo "EXITCODE_2:\$?"'), isFalse);
-      expect(scanner.add('\nEXITCODE_2:1'), isTrue);
+      expect(scanner.add('\nEXITCODE_2:1\n'), isTrue);
     });
 
     test('keeps enough carry for a marker split near the boundary', () {
       final scanner = ExitMarkerScanner('EXITCODE_12:');
       expect(scanner.add('x' * 100 + 'EXITCODE_12'), isFalse);
-      expect(scanner.add(':0'), isTrue);
+      expect(scanner.add(':0\n'), isTrue);
     });
   });
 }

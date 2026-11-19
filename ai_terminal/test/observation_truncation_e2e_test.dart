@@ -53,12 +53,13 @@ void main() {
     ]);
     provider.enqueueStream([finishTurn]);
 
+    // 真实执行器契约（事实 A）：stderr 恒空，报错全在 stdout
     final stderr = 'HEAD_ERR_MARKER: recipe failed at step 1\n'
         '${'m' * 20000}\n'
         'TAIL_ERR_MARKER: make aborted';
     final executor = _MockExecutor()
       ..exitCode = 1
-      ..stderr = stderr;
+      ..stdout = stderr;
 
     final engine = makeEngine(provider);
     final events = <AgentEvent>[];
@@ -145,7 +146,7 @@ void main() {
     const stderr = 'permission denied\nplease use sudo';
     final executor = _MockExecutor()
       ..exitCode = 1
-      ..stderr = stderr;
+      ..stdout = stderr;
 
     final engine = makeEngine(provider);
     final events = <AgentEvent>[];

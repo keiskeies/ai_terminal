@@ -14,11 +14,19 @@ class AnsiStripper {
 
   /// 清理残留的半截序列（ESC 字符丢失后的残留）
   /// 例如：]0;root@host:~  (OSC 标题设置的残留)
-  static final RegExp _residualOsc = RegExp(r'\][0-9]*;[^\n\r]*');
+  ///
+  /// 必须要求至少一位数字：`\][0-9]*;` 会命中 `arr[0]; done` 的 `];`
+  /// （零位数字），把合法文本整行吃掉。
+  static final RegExp _residualOsc = RegExp(r'\][0-9]+;[^\n\r]*');
 
   /// 清理残留的 CSI 参数片段
-  /// 例如：[K (清除行)、[?2004h/[?2004l (括号粘贴模式)、[>0;10;1c 等
-  static final RegExp _residualCsi = RegExp(r'\[[\x20-\x3F]*[\x40-\x7E]');
+  /// 例如：[0m、[?2004h/[?2004l（括号粘贴模式）、[>0;10;1c 等
+  ///
+  /// 参数段限定 ECMA-48 参数字节 0x30-0x3F（数字与 :;<=>?），终止字节限定
+  /// 字母/@。放宽到 0x20-0x3F 会把 `,`/`-` 当参数，`[1,2,3]`、`[2026-11-19]`
+  /// 这类合法输出会被整段删掉（探针实证）。裸 `[K` 无参数不再清——代价是
+  /// 极端 ESC 丢失场景留噪声，不损坏文本。
+  static final RegExp _residualCsi = RegExp(r'\[[\x30-\x3F]+[A-Za-z@]');
 
   /// 清理控制字符（除 \n \t 外）和行尾空格，一遍完成
   static final RegExp _controlCharsAndTrailingSpaces = RegExp(
@@ -47,9 +55,13 @@ class AnsiStripper {
     //    先删 prompt 才能整行删掉。
     result = result.replaceAll(_promptPrefix, '');
 
-    // 3. 清理残留的半截 OSC / CSI 片段
-    result = result.replaceAll(_residualOsc, '');
-    result = result.replaceAll(_residualCsi, '');
+    // 3. 清理残留的半截 OSC / CSI 片段——仅当原始输入确实含转义字节。
+    //    残留的前提是 ESC 丢失；没有 ESC 的输入不存在残留，无条件清洗只会
+    //    毁掉 `[INFO]`、JSON 数组、`[2026-11-19]` 时间戳等合法文本（探针实证）。
+    if (input.contains('\x1B') || input.contains('\x07')) {
+      result = result.replaceAll(_residualOsc, '');
+      result = result.replaceAll(_residualCsi, '');
+    }
 
     // 4. 控制字符 + 行尾空格（合并为一遍）
     result = result.replaceAll(_controlCharsAndTrailingSpaces, '');

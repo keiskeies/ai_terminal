@@ -80,30 +80,52 @@ String stripInteractiveEcho(
 String _collapseSpaces(String s) =>
     s.replaceAll(RegExp(r'[ \t]+'), ' ').trim();
 
-/// 清理 PTY 输出中的命令回显
-/// 终端在执行命令时会先把输入的命令回显到 stdout，导致结果里包含命令本身
-String stripCommandEcho(String output, String command) {
-  if (output.isEmpty || command.isEmpty) return output;
+/// 清理 PTY 输出中的命令回显（执行器层是唯一的回显清洗点，R8 只清一次）
+///
+/// 长命令会被 PTY 按列宽折行回显（每 80 列插入 \r\n），精确
+/// `indexOf(wrappedCommand)` 会 miss，于是回显留在观测里。这里用逐字符
+/// 允许 `\r?\n?` 的正则容忍折行；为控制匹配成本只在头部窗口内查找
+/// （回显必然出现在输出流头部，命令 ≤500 字符）。找不到就原样返回——
+/// 留回显是噪声，误删真实输出是损坏（stripCommandEcho 的前车之鉴）。
+String stripWrappedEcho(String output, String wrappedCommand) {
+  if (output.isEmpty || wrappedCommand.isEmpty) return output;
+  // 快路径：未折行的精确匹配
+  final exact = output.indexOf(wrappedCommand);
+  if (exact >= 0) return output.substring(exact + wrappedCommand.length);
+  // 折行容忍路径：只在头部窗口内试
+  final window = output.substring(
+      0, output.length < 4096 + wrappedCommand.length
+          ? output.length
+          : 4096 + wrappedCommand.length);
+  final pattern = RegExp(
+    wrappedCommand.split('').map(RegExp.escape).join(r'\r?\n?'),
+  );
+  final m = pattern.firstMatch(window);
+  if (m == null) return output;
+  return output.substring(m.end);
+}
 
-  final trimmedOutput = output.trimLeft();
-  final trimmedCommand = command.trim();
+final RegExp _promptLineBash = RegExp(r'^[\w.\-]+@[\w.\-]+:[^\n]*[#$]\s*$');
+final RegExp _promptLineBashRoot = RegExp(r'^\[[\w.\-]+@[\w.\-]+[^\]\n]*\][#$]\s*$');
+final RegExp _promptLineCmd = RegExp(r'^[A-Za-z]:\\[^\n]*>\s*$');
+final RegExp _promptLinePs = RegExp(r'^PS [^\n]*>\s*$');
 
-  // 情况 1：输出第一行就是命令本身（最常见）
-  final firstNewline = trimmedOutput.indexOf('\n');
-  final firstLine = firstNewline == -1 ? trimmedOutput : trimmedOutput.substring(0, firstNewline);
-  if (firstLine.trim() == trimmedCommand || firstLine.trim().endsWith(trimmedCommand)) {
-    return firstNewline == -1 ? '' : trimmedOutput.substring(firstNewline + 1).trimLeft();
+/// 删除输出末尾整体匹配 shell 提示符形态的最后一行。
+///
+/// 替代旧的尾部单字符清洗 `replaceAll(RegExp(r'[\]\$#]\s*$'))`——那个会吃掉
+/// JSON 数组的 `]`、口令里的 `$` 等合法末字符，而真提示符反而只删掉一个字符。
+/// 只认三种整行形态（bash user@host:path$ / cmd `C:\path>` / PS `PS path>`），
+/// 不做单字符删除。
+String stripTrailingPromptLine(String output) {
+  if (output.isEmpty) return output;
+  final idx = output.lastIndexOf('\n');
+  final lastLine = (idx == -1 ? output : output.substring(idx + 1)).trimRight();
+  if (lastLine.isEmpty) return output;
+  if (_promptLineBash.hasMatch(lastLine) ||
+      _promptLineBashRoot.hasMatch(lastLine) ||
+      _promptLineCmd.hasMatch(lastLine) ||
+      _promptLinePs.hasMatch(lastLine)) {
+    return idx == -1 ? '' : output.substring(0, idx);
   }
-
-  // 情况 2：命令出现在开头，但前面可能有 prompt 残留字符
-  final commandIndex = trimmedOutput.indexOf(trimmedCommand);
-  if (commandIndex >= 0 && commandIndex < 20) {
-    final afterCommand = trimmedOutput.substring(commandIndex + trimmedCommand.length);
-    // 如果命令后紧跟换行，则把这整段视为回显
-    if (afterCommand.startsWith('\n') || afterCommand.startsWith('\r')) {
-      return afterCommand.replaceFirst(RegExp(r'^[\r\n]+'), '').trimLeft();
-    }
-  }
-
   return output;
 }

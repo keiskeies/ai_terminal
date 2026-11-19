@@ -260,6 +260,14 @@ class AgentEngine {
   Timer? _aiWatchdog;
   bool _aiStreamTimedOut = false;
 
+  /// 本轮任务内「AI 流中途超时」已重试次数（上限 2，任务启动时清零）。
+  /// 上限存在防抖：网络持续抖动时不能无限重试烧配额。
+  int _aiStreamTimeoutRetries = 0;
+
+  /// 丢弃半截流式响应的 UI 桥：ReAct 循环重试前调用，宿主须丢弃当前轮
+  /// streamingContent（不并入 content），否则重试轮正文会接在半截 heredoc 后面。
+  void Function()? onStreamDiscarded;
+
   /// AI 流式完成 Completer（cancelTask 可 complete 以解除 _callAI 挂起）
   Completer<void>? _aiDoneCompleter;
 
@@ -891,6 +899,7 @@ class AgentEngine {
     _aiWatchdog?.cancel();
     _aiWatchdog = null;
     _aiStreamTimedOut = false;
+    _aiStreamTimeoutRetries = 0;
     _aiStreamSub?.cancel();
     _aiStreamSub = null;
     _aiDoneCompleter = null;
@@ -1986,6 +1995,8 @@ class AgentEngine {
     agentLogger.info('ReAct', '调用 AI 模型...');
     agentLogger.debug('ReAct', '消息历史: ${_conversationHistory.length} 条');
     _resetReasoning();
+    // 不沿用上一轮的流超时标志：流建立阶段的异常不得被循环层误判为「流中途超时」
+    _aiStreamTimedOut = false;
     _lastParsedResponseEvents = null;
     _lastFcToolCalls = const [];
     _announcedFollowUps = const [];
@@ -2312,8 +2323,39 @@ class AgentEngine {
       throw StateError('任务已取消');
     }
 
-    if (_aiStreamTimedOut && fullResponseBuffer.isEmpty) {
-      throw TimeoutException('AI 响应超时（${aiResponseTimeout.inSeconds}s 无数据）');
+    // 流中途超时：一律丢弃半截响应重试，即使缓冲非空（§5.3）。
+    // 半截响应当完整响应用会出事：流尾解析会把写了一半的 heredoc 命令 flush 成
+    // command 事件发给执行器，远端 shell 干等 EOF 到命令超时。
+    // 重试用尾递归（新栈帧=全新局部状态，半截 buffer/去重集不流入下一轮），
+    // 上限 2 次防网络抖动烧配额；提前执行已触发时不可重试——命令已经发出去了，
+    // 重试会二次执行，退回抛错走 failed 路径（与历史行为一致）。
+    if (_aiStreamTimedOut) {
+      final canRetry = !commandDetectedNotified && _aiStreamTimeoutRetries < 2;
+      agentLogger.warn(
+          'AI',
+          'AI 流超时，丢弃已收 ${fullResponseBuffer.length} 字符'
+          '（${canRetry ? '重试第 ${_aiStreamTimeoutRetries + 1}/2 次' : '不再重试'}）');
+      if (!canRetry) {
+        throw TimeoutException('AI 响应超时（${aiResponseTimeout.inSeconds}s 无数据）');
+      }
+      _aiStreamTimeoutRetries++;
+      // 实例级残留清理：被丢弃的半截不得进入重试轮的观测/历史
+      _accumulatedMessageBuffer.clear();
+      _lastFcToolCalls = const [];
+      // UI 桥：丢弃当前轮 streamingContent（不并入 content），重试正文从零开始
+      onStreamDiscarded?.call();
+      await Future.delayed(const Duration(seconds: 1));
+      // R1: 退避期间取消/代际变更则放弃重试
+      if (myGeneration != null && myGeneration != _currentTaskGeneration) {
+        throw StateError('任务已被新任务覆盖');
+      }
+      if (_currentTask?.status == AgentStatus.cancelled) {
+        throw StateError('任务已取消');
+      }
+      return _callAI(
+        onCommandDetected: onCommandDetected,
+        myGeneration: myGeneration,
+      );
     }
 
     final fullResponse = fullResponseBuffer.toString();
@@ -2639,6 +2681,19 @@ class AgentEngine {
   /// ReAct 解析器 — 从 AI 响应中提取结构化动作
   /// 命令提取复用 ReActStreamParser，正确处理多行 heredoc
   /// ═══════════════════════════════════════════════════════
+  /// 协议行的字段值：分隔符取 ASCII ':' 与全角 '：' 中**先出现**者（混用行
+  /// 「动作: finish（原因：磁盘满）」按全角优先会切到括号里的冒号），值取首个
+  /// 空白/括号前的词以容忍尾随注解。动作/工具/参数的取值共用此口径，
+  /// 避免多处漂移。需要完整值（参数多行缓冲）时用 includeRestOfLine。
+  /// 无分隔符返回 null。
+  static String? _protocolValue(String line, {bool includeRestOfLine = false}) {
+    final sep = _firstColonIndex(line);
+    if (sep < 0) return null;
+    final rest = line.substring(sep + 1).trim();
+    if (includeRestOfLine) return rest;
+    return RegExp(r'^[^\s（(【\[]+').firstMatch(rest)?.group(0) ?? '';
+  }
+
   /// 正文里声明的动作类型（`动作: xxx` 行首次出现即定型）。
   /// 供流结束路径判断「本轮是不是 finish/ask」以剔除围栏误解析出的命令。
   static ActionType? _declaredTextAction(String content) {
@@ -2647,8 +2702,9 @@ class AgentEngine {
       if (!trimmedLine.startsWith('动作:') && !trimmedLine.startsWith('动作：')) {
         continue;
       }
-      final sepIdx = trimmedLine.indexOf(trimmedLine.contains('：') ? '：' : ':');
-      switch (trimmedLine.substring(sepIdx + 1).trim().toLowerCase()) {
+      final actionValue = _protocolValue(trimmedLine);
+      if (actionValue == null) continue;
+      switch (actionValue.toLowerCase()) {
         case 'execute':
           return ActionType.execute;
         case 'finish':
@@ -2675,11 +2731,9 @@ class AgentEngine {
       if (!trimmedLine.startsWith('动作:') && !trimmedLine.startsWith('动作：')) {
         continue;
       }
-      final sepIdx =
-          trimmedLine.indexOf(trimmedLine.contains('：') ? '：' : ':');
-      if (sepIdx < 0) continue;
-      return trimmedLine.substring(sepIdx + 1).trim().toLowerCase() ==
-          'execute';
+      final actionValue = _protocolValue(trimmedLine);
+      if (actionValue == null) continue;
+      return actionValue.toLowerCase() == 'execute';
     }
     return false;
   }
@@ -2696,9 +2750,9 @@ class AgentEngine {
       if (!trimmedLine.startsWith('动作:') && !trimmedLine.startsWith('动作：')) {
         continue;
       }
-      final sepIdx = trimmedLine.indexOf(trimmedLine.contains('：') ? '：' : ':');
-      final actionStr = trimmedLine.substring(sepIdx + 1).trim().toLowerCase();
-      if (actionStr != 'execute') return null;
+      final actionValue = _protocolValue(trimmedLine);
+      if (actionValue == null) return null;
+      if (actionValue.toLowerCase() != 'execute') return null;
       return lines.sublist(i).join('\n');
     }
     return null;
@@ -2900,16 +2954,24 @@ class AgentEngine {
     if (start < 0) return null;
 
     final buffer = StringBuffer();
+    // inFence 在 start 处必为 false（段起点要求 !inFence），这里继续跟踪：
+    // 与 parseAnswerBlock 同口径，报告段内 ``` 围栏里的协议词行不触发段边界。
     for (var i = start; i < lines.length; i++) {
       final t = lines[i].trim();
-      if (t.startsWith('动作:') ||
-          t.startsWith('动作：') ||
-          t.startsWith('思考:') ||
-          t.startsWith('思考：') ||
-          t.startsWith('说明:') ||
-          t.startsWith('说明：') ||
-          t.startsWith('回答:') ||
-          t.startsWith('回答：')) {
+      if (t.startsWith('```')) {
+        inFence = !inFence;
+        buffer.writeln(lines[i]);
+        continue;
+      }
+      if (!inFence &&
+          (t.startsWith('动作:') ||
+              t.startsWith('动作：') ||
+              t.startsWith('思考:') ||
+              t.startsWith('思考：') ||
+              t.startsWith('说明:') ||
+              t.startsWith('说明：') ||
+              t.startsWith('回答:') ||
+              t.startsWith('回答：'))) {
         break;
       }
       buffer.writeln(lines[i]);
@@ -2917,6 +2979,15 @@ class AgentEngine {
     final text = buffer.toString().trim();
     return text.isEmpty ? null : text;
   }
+
+  /// 动作行识别三件套的测试入口（N1：混用冒号/带注解值的回归覆盖）。
+  @visibleForTesting
+  static ({ActionType? declared, bool executes, String? scopeText})
+      declaredActionForTest(String content) => (
+            declared: _declaredTextAction(content),
+            executes: _declaresExecuteAction(content),
+            scopeText: _textFromDeclaredAction(content),
+          );
 
   /// 解析 "动作: tool" 行之后的 工具: 和 参数: 行。
   /// 返回 (toolName, toolArgs)，未找到时对应字段为 null。
@@ -2947,12 +3018,11 @@ class AgentEngine {
         break;
       }
       if (tlTrim.startsWith('工具:') || tlTrim.startsWith('工具：')) {
-        final sep = tlTrim.indexOf(tlTrim.contains('：') ? '：' : ':');
-        toolName = tlTrim.substring(sep + 1).trim();
+        toolName = _protocolValue(tlTrim);
       } else if (tlTrim.startsWith('参数:') || tlTrim.startsWith('参数：')) {
         // 收集参数：参数: 行本身 + 后续所有缩进行（多行 key:value 格式）
-        final sep = tlTrim.indexOf(tlTrim.contains('：') ? '：' : ':');
-        final argsBuffer = StringBuffer()..writeln(tlTrim.substring(sep + 1));
+        final argsBuffer =
+            StringBuffer()..writeln(_protocolValue(tlTrim, includeRestOfLine: true) ?? '');
         // 收集后续缩进行（2 空格或 Tab 开头）
         for (var k = j + 1; k < lines.length; k++) {
           final pl = lines[k];
@@ -3627,11 +3697,16 @@ class AgentEngine {
     }
 
     // 保留原始输出尾部：事件里的 output 经过分级截断，证据层需要更多上下文
+    // 失败时真实输出在 output（执行器恒 stderr=''，见设计文档事实 A），
+    // 读 error 会让证据层永远缺失报错正文
     String? outputTail;
     if (!isQuery) {
       const maxTailChars = 8000;
-      final raw = result.success ? result.output : result.error;
-      final shown = result.success ? outputText : errorText;
+      final raw = result.output;
+      // 卡片正文（output 与失败 error 段）都是 outputText：只有它真被截断时
+      // 尾部证据才有增量价值。按 errorText（失败时恒 '(无输出)' 的 stderr）比长度
+      // 会让几乎每个失败卡都附带一份与正文重复的 outputTail + 失真徽标。
+      final shown = outputText;
       if (raw != null && raw.isNotEmpty && raw.length > shown.length) {
         outputTail = raw.length <= maxTailChars
             ? raw
@@ -3649,23 +3724,27 @@ class AgentEngine {
       }
     }
 
+    // F1：失败的真实内容在 stdout（执行器恒 stderr=''），观测正文用 outputText；
+    // errorText 只在执行器真的给了 stderr 时才非 '(无输出)'，此时作为独立「错误:」段
+    final hasRealError = (result.error ?? '').trim().isNotEmpty;
+    final failureBody = rollbackHint != null
+        ? '$outputText\n\n【失败回滚提示】修改前已快照:\n${snapshot?.snapshotOutput ?? "(无快照)"}\n$rollbackHint'
+        : outputText;
+
     final observation = ReActObservation(
       command: command,
-      output: result.success
-          ? outputText
-          : (rollbackHint != null
-              ? '$errorText\n\n【失败回滚提示】修改前已快照:\n${snapshot?.snapshotOutput ?? "(无快照)"}\n$rollbackHint'
-              : errorText),
+      output: result.success ? outputText : failureBody,
       success: result.success,
-      error: result.success ? null : errorText,
+      error: result.success ? null : (hasRealError ? errorText : null),
+      exitCode: result.exitCode,
+      failureKind: result.failureKind,
+      failureReason: result.failureReason,
     );
 
     // 先发出结构化结果事件，再通知执行完成
-    final rawOutputLength = result.success
-        ? (result.output?.length ?? 0)
-        : (result.error?.length ?? 0);
-    final shownOutputLength =
-        result.success ? outputText.length : errorText.length;
+    // 失败时长度按 outputText 计：真实输出在 output，按恒空的 error 计会让截断徽标失真
+    final rawOutputLength = result.output?.length ?? 0;
+    final shownOutputLength = outputText.length;
     onEvent?.call(AgentEvent.result(
       commandId: commandId ?? _lastCommandEventId,
       command: command,
@@ -3673,7 +3752,7 @@ class AgentEngine {
       output: outputText,
       error: result.success
           ? null
-          : (rollbackHint != null ? '$errorText\n\n$rollbackHint' : errorText),
+          : (rollbackHint != null ? '$outputText\n\n$rollbackHint' : outputText),
       hostId: hostId,
       toolName: 'exec_command',
       durationMs: result.duration?.inMilliseconds,
@@ -4775,8 +4854,8 @@ class AgentEngine {
 
       // 清理 ANSI 转义序列
       var cleanOutput = AnsiStripper.strip(result.stdout);
-      // 清理 PTY 回显的命令本身
-      cleanOutput = stripCommandEcho(cleanOutput, command);
+      // 命令回显已由执行器层去除（stripWrappedEcho），这里不再二次清洗——
+      // 第二遍 stripCommandEcho 会把首行恰含命令词的真实输出删掉（R8 单点清洗）
       // 清理交互提示 + 用户答案的回显行（O3）：它不是命令输出，
       // 留在观测里模型会当成下一条命令执行
       cleanOutput = stripInteractiveEcho(cleanOutput, _interactiveEchoes);
@@ -4790,6 +4869,7 @@ class AgentEngine {
         failureKind: result.failureKind == CommandFailureKind.none
             ? null
             : result.failureKind.name,
+        failureReason: result.failureReason,
       );
     } catch (e) {
       stopwatch.stop();

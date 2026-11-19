@@ -29,6 +29,10 @@ class AgentResult {
   /// 失败类型（CommandFailureKind.name），成功时为 null
   final String? failureKind;
 
+  /// 失败诊断（CommandResult.failureReason 透传：超时时长/语法错误/交互提示原文）。
+  /// 失败观测把它回传给 AI 用于决策（重试/修语法/重连/给密码）
+  final String? failureReason;
+
   AgentResult({
     required this.success,
     this.output,
@@ -36,6 +40,7 @@ class AgentResult {
     this.exitCode,
     this.duration,
     this.failureKind,
+    this.failureReason,
   });
 
   factory AgentResult.fromCommand({
@@ -45,14 +50,18 @@ class AgentResult {
     required int exitCode,
     required Duration duration,
     String? failureKind,
+    String? failureReason,
   }) {
     return AgentResult(
-      success: exitCode == 0,
+      // 与 CommandResult.success 同口径：异常路径（超时/语法/断线/交互中断）
+      // 即使 shell 报了 0 退出码也不算成功，消除对「异常必返 -1」的隐式依赖
+      success: exitCode == 0 && failureKind == null,
       output: stdout.isNotEmpty ? stdout : null,
       error: stderr.isNotEmpty ? stderr : null,
       exitCode: exitCode,
       duration: duration,
       failureKind: failureKind,
+      failureReason: failureReason,
     );
   }
 
@@ -146,14 +155,26 @@ class ReActObservation {
   /// 是否执行成功
   final bool success;
 
-  /// 错误信息
+  /// 错误信息（仅当 stderr 真有内容时非 null）
   final String? error;
+
+  /// 退出码（失败观测标题里带给 AI）
+  final int? exitCode;
+
+  /// 失败类型（CommandFailureKind.name）
+  final String? failureKind;
+
+  /// 失败诊断原文（超时时长/语法错误/交互提示文本，AI 据此决策）
+  final String? failureReason;
 
   const ReActObservation({
     required this.command,
     required this.output,
     this.success = true,
     this.error,
+    this.exitCode,
+    this.failureKind,
+    this.failureReason,
   });
 
   /// 格式化为 AI 可理解的观测文本
@@ -169,9 +190,35 @@ class ReActObservation {
         buffer.writeln(output);
       }
     } else {
-      buffer.writeln('观测: 命令 $cmdRef 执行失败');
-      buffer.writeln('错误:');
-      buffer.writeln(error ?? output);
+      final codePart = exitCode != null ? ' (退出码: $exitCode)' : '';
+      buffer.writeln('观测: 命令 $cmdRef 执行失败$codePart');
+      final kind = failureKind ?? '';
+      final reason = failureReason ?? '';
+      if (kind.isNotEmpty || reason.isNotEmpty) {
+        buffer.writeln([
+          if (kind.isNotEmpty) '失败类型: $kind',
+          if (reason.isNotEmpty) '诊断: $reason',
+        ].join(' · '));
+      }
+      // 失败时真实报错几乎总在 output（执行器把远端 stderr 并入了 stdout，
+      // error 恒空的契约）——旧实现只回显 error，AI 永远看到 "(无输出)"。
+      final hasOutput = output.isNotEmpty && output != '(无输出)';
+      if (hasOutput) {
+        buffer.writeln('输出:');
+        buffer.writeln(output);
+      }
+      // 拦截类观测把同一原因同时放进 output 和 error（历史契约）——
+      // 不再重复输出第二遍；真实 stderr（执行器契约下与 output 不同源）仍单独成段。
+      final err = error;
+      final hasError =
+          err != null && err.isNotEmpty && !(hasOutput && output.contains(err));
+      if (hasError) {
+        buffer.writeln('错误:');
+        buffer.writeln(err);
+      }
+      if (!hasOutput && !hasError) {
+        buffer.writeln('(无输出)');
+      }
     }
     return buffer.toString();
   }
