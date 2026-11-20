@@ -182,7 +182,12 @@ AgentEngine facade (循环 + 生命周期 + 7 Completer)
   - Step 4 `HistoryPolicy`（`720d6fd`）：三层裁剪 + 3 个上限常量 → `lib/services/history_policy.dart`，唯一实例依赖 `effectiveContextWindow` 改显式入参；22 处调用点经 `_trimMessages` 转发零改动。新增 8 例特征化测试。
   - 每次拆分均通过 `flutter analyze`（81 issues / 0 error 基线）与全量测试（现 1725 passed / 25 skipped）。
 - **Step 5–6（判定：推迟）**：`CommandRunner`（旧 3016–3110/3275–3806/4713–4855 → 当前 2668–2851/2927–3535/4389–4531）**不在本阶段提取**。复核结论：①「顺手修 §3.4」前提已不成立（R1 缺口修完，见 §3.4）；② `_runCommandWithSafetyInner`(2927–3464，538 行) 不是可提取的执行器，而是引擎状态机本身——5 次 `_currentTask.copyWith`、6/7 个 Completer、终态门、台账/badges/memory、3 回调、10+ `onEvent` 全部交织；③ 代际检查 18+ 处与 cancel/pause/resume 的 Completer 顺序强耦合。推迟到 **Step 7 TerminationGuard 之后**：Guard 落地后可在入口统一收口 generation，`_executeCommand`(4389–4531) 才能真正变成接收显式 generation/executor 的纯执行器。`ToolOrchestrator` 同理待 Guard 后再评估。
-- **Step 7 最后做**：引入 `TerminationGuard.terminate({status, finishState, flush})`，固定顺序执行 status→report→finish→flush→tracer→清理，包 try/finally；替换全部 11 条终态路径。**必须每引擎一个实例，严禁 static**；guard 接收 `generation/hostId/operationId`，进入时统一代际检查。
+- **Step 7 已落地（阶段 A/B/C，2026-11-20）**：新建 `lib/services/termination_guard.dart`，每引擎一个实例（严禁 static），`terminate({status, finishState, writeStatus, emitReport, emitFinish, flush, endTracer, cleanup, expectedGeneration})` 固定顺序 status→report→finish→flush→tracer，cleanup 放 try/finally，入口代际检查 + 同代际幂等。分三阶段零回归落地：
+  - **阶段 A**（`352ab83`）：`_finishTask` 委托 Guard，9 个调用点零改动；新增 7 例 Guard 测试。
+  - **阶段 B**（`3a73139`）：engine 7 条裸写终态路径（executor 空 / 启动 catch / resume catch / 执行器断连 / AI catch / 步数耗尽 / cancel）全部收口，棘轮 10→2。cancel 特殊处理：Guard 在代际++前调用。
+  - **阶段 C**（`a9b74e5`）：provider 2 处 UI 终态经 `resolveUiStatus` 收口；`check_terminal_writes.py` 基线归零、切换**硬禁令**。新增 2 例 UI 态测试。
+  - 「11 条」口径说明：实测 10 个物理赋值点（含 `_finishTask` 内部 1 个），1915 单行二态算两条逻辑路径 ≈ 11；以磁盘 10 点为事实基准，已全部收口。
+  - 缺口说明：报告原列「失败终态 finish+flush 断言 / 旧命令 record 回归 / 两 scope guard 不串台 / _aiDoneCompleter 置 null / ask 取消终态」等测试，因深度耦合引擎私有状态需大量 `ForTesting` 后门，本轮未补；Guard 自身的顺序/finally/代际/幂等已有 9 例独立测试覆盖。
 - **暂时别动**：`_callAI`（stream + watchdog + doneCompleter 六件事咬合）、`cancelTask/pauseTask/resumeTask`（与 7 Completer 和回调清空顺序强耦合）。
 
 ---
@@ -331,11 +336,12 @@ AgentEngine facade (循环 + 生命周期 + 7 Completer)
 
 ## 7. 测试安全网
 
-- 现有全量基线：`flutter test` = **1704 passed / 25 skipped**，`flutter analyze` = 81 issues / 0 error。
+- 现有全量基线：`flutter test` = **1734 passed / 25 skipped**，`flutter analyze` = 81 issues / 0 error。
 - `test/agent_*` 约 145 例，其中 `agent_engine_resilience_test.dart` 25 例、`agent_tab_scope_test.dart` 9 例是直接安全网。
 - **已补（2026-11-20）**：`test/react_parser_test.dart` 新增 15 例，直接覆盖刚抽出的 `ReActParser.parseReActResponse` 动作分流（execute/finish/ask/tool/空响应/无动作回退/isTaskComplete/复用 parsedEvents）与 `parseAnswerBlock`（围栏防误切、有界截断、无回答返回 null）、`parseReportSections`。这是 ReActParser 拆分的行为锁定安全网。
 - **仍存缺口（待 TerminationGuard 落地后补）**：失败终态 finish+flush 的独立断言；"旧命令 record 在 cancel+新任务后返回"回归；"两 scope 同时终态 guard 不串台"用例；`_aiDoneCompleter` 置 null 断言；ask 取消选择终态断言。这些路径深度耦合引擎私有状态，补单测需大量 `ForTesting` 后门，风险超收益，留到 TerminationGuard 收口时一并补。
-- **CI 静态检查（已落地）**：`.github/workflows/quality.yml` 在 push/PR main 时跑 analyze + 全量 test；`tools/check_terminal_writes.py` 对终态写入点做**棘轮式**检查（当前基线 10 处合法写入，只增不减）。最终目标「除 TerminationGuard 外禁止直接赋终态」待 TerminationGuard 实现后把基线降到 0 切换为硬禁令——现在直接上硬禁令会误伤 10 处合法路径。
+- **CI 静态检查（已落地）**：`.github/workflows/quality.yml` 在 push/PR main 时跑 analyze + 全量 test + `tools/check_terminal_writes.py`。终态写入检查已由棘轮切换为**硬禁令**（基线 0）：TerminationGuard 阶段 A/B/C 落地后，engine 7 条裸写 + provider 2 处 UI 终态全部经 Guard 收口，任何绕过 Guard 的 `AgentStatus.completed/failed/cancelled` 直接赋值都会令 CI 失败。合法入口仅 `_terminationGuard.terminate(...)` 与 `_uiTerminationGuard.resolveUiStatus(...)`。
+- **Guard 自身测试**：`test/termination_guard_test.dart` 9 例，覆盖固定顺序、回调抛异常时 cleanup 仍执行（finally）、代际不符跳过、同代际幂等、代际变化后重开、可选步骤、UI 态决策有界。
 
 ---
 
