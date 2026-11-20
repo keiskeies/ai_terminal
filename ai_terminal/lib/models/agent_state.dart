@@ -8,7 +8,6 @@ import 'ai_model_config.dart';
 class AgentState {
   final AgentStatus status;
   final AgentTask? currentTask;
-  final String? lastMessage;
   final List<ChatItem> chatItems; // 统一的消息列表，包含用户和AI消息
   final String? error;
   final int maxSteps;
@@ -48,7 +47,6 @@ class AgentState {
   AgentState({
     this.status = AgentStatus.idle,
     this.currentTask,
-    this.lastMessage,
     List<ChatItem>? chatItems,
     this.error,
     this.maxSteps = 0,
@@ -77,7 +75,6 @@ class AgentState {
   AgentState copyWith({
     AgentStatus? status,
     AgentTask? currentTask,
-    String? lastMessage,
     List<ChatItem>? chatItems,
     String? error,
     int? maxSteps,
@@ -105,7 +102,6 @@ class AgentState {
     return AgentState(
       status: status ?? this.status,
       currentTask: currentTask ?? this.currentTask,
-      lastMessage: lastMessage ?? this.lastMessage,
       chatItems: chatItems ?? this.chatItems,
       error: clearError ? null : (error ?? this.error),
       maxSteps: maxSteps ?? this.maxSteps,

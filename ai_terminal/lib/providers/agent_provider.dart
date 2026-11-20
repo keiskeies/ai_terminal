@@ -272,15 +272,25 @@ class AgentNotifier extends StateNotifier<AgentState> {
           state.status == AgentStatus.paused);
 
   /// R2/R3: 统一清空引擎回调，供切 tab / 移除 tab / dispose 使用
+  ///
+  /// 必须覆盖 [_setupEngineCallbacks] 注册的全部回调。遗漏任何一项都会让
+  /// 被废弃的引擎继续持有指向页面/scope 的闭包，轻则内存泄漏，重则在切 tab
+  /// 后仍有回调写回旧 scope（R3 串台）。
   void _clearEngineCallbacks(AgentEngine engine) {
     engine.onMessage = null;
     engine.onThinking = null;
+    engine.onReasoning = null;
+    engine.onStreamDiscarded = null;
     engine.onEvent = null;
     engine.onCommandGenerated = null;
     engine.onCommandExecuted = null;
     engine.onError = null;
     engine.onTaskUpdated = null;
     engine.onCompleted = null;
+    // 三个交互透传回调：清空后废弃引擎不再持有页面处理器闭包
+    engine.onSecretRequest = null;
+    engine.onInteractiveInputRequest = null;
+    engine.onLocalDirRequest = null;
   }
 
   /// 回调已清空后再 cancel 的兜底收尾：不依赖 engine 回调，直接把该 tab
@@ -675,7 +685,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
                     events: lastItem.events);
               }
             }
-            return s.copyWith(lastMessage: content, chatItems: items);
+            return s.copyWith(chatItems: items);
           });
         },
       );
@@ -949,9 +959,15 @@ class AgentNotifier extends StateNotifier<AgentState> {
         _isStateBusy(_registry.getState(tabId));
   }
 
-  /// 设置最大步骤数
+  /// 设置最大步骤数（对所有 host 的引擎立即生效，与超时设置语义一致）
   void setMaxSteps(int steps) {
     state = state.copyWith(maxSteps: steps);
+    for (final engine in _registry.engines) {
+      engine.maxSteps = steps;
+    }
+    for (final scopeId in _registry.scopeIds) {
+      _registry.updateState(scopeId, (s) => s.copyWith(maxSteps: steps));
+    }
     _engine?.maxSteps = steps;
     SettingsDao.set('agentMaxSteps', steps).catchError((e) {
       debugPrint('[AgentNotifier] 保存 maxSteps 失败: $e');
@@ -984,6 +1000,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
       if (saved != null) {
         final steps = (saved is int) ? saved : (saved as num).toInt();
         state = state.copyWith(maxSteps: steps);
+        for (final engine in _registry.engines) {
+          engine.maxSteps = steps;
+        }
         _engine?.maxSteps = steps;
       }
       final savedTimeout = SettingsDao.getCached('agentAiTimeoutSeconds');
@@ -1057,7 +1076,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
 
     final engine = _engine!;
-    final executor = _executor;
+    // R3: executor 必须按 scopeId 解析（与 resume 一致），不能用活跃缓存
+    // _executor —— 快速切 tab 时它可能仍指向上一个 tab 的连接。
+    final executor = _registry.getScopeExecutor(scopeId) ?? _executor;
     // 检查终端连接：小白可能不知道 SSH 已断开，继续发任务会失败
     if (executor != null && !executor.isConnected) {
       state = state.copyWith(error: '终端未连接，请先连接终端');
@@ -1204,7 +1225,6 @@ class AgentNotifier extends StateNotifier<AgentState> {
             ChatItem(role: 'user', content: goal),
             ChatItem(role: 'assistant', content: '', isStreaming: true),
           ],
-          lastMessage: '',
           currentTask: null,
           clearError: true,
         ),
@@ -1582,7 +1602,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
     _engine?.clearHistory();
     final convId = state.conversationId;
-    state = state.copyWith(chatItems: [], lastMessage: '', clearSummary: true);
+    state = state.copyWith(chatItems: [], clearSummary: true);
     if (convId != null) {
       try {
         await _convService.clearMessages(convId);

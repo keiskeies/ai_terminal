@@ -1759,7 +1759,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     // chatProvider 只在这里贡献 error；不要 watch 整个状态，否则每个终端
     // 输出 chunk 都会让整页（终端 + 所有 tab + AI 面板）重建。
     final chatError = ref.watch(chatProvider.select((s) => s.error));
-    // 只订阅低频字段：流式 chatItems/liveReasoning/lastMessage 每个 chunk 都在变，
+    // 只订阅低频字段：流式 chatItems/liveReasoning 每个 chunk 都在变，
     // 若全量 watch，整页（含所有 Offstage tab 工作区）每秒重建 10~15 次。
     // 高频部分由活动 tab 的 AI 面板 Consumer 局部订阅（见 _buildMainBody）。
     ref.watch(agentProvider.select((s) => (
