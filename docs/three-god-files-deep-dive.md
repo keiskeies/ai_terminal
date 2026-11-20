@@ -322,10 +322,11 @@ AgentEngine facade (循环 + 生命周期 + 7 Completer)
 
 ## 7. 测试安全网
 
-- 现有全量基线：`flutter test` = **1689 passed / 25 skipped**，`flutter analyze` = 81 issues / 0 error。
+- 现有全量基线：`flutter test` = **1704 passed / 25 skipped**，`flutter analyze` = 81 issues / 0 error。
 - `test/agent_*` 约 145 例，其中 `agent_engine_resilience_test.dart` 25 例、`agent_tab_scope_test.dart` 9 例是直接安全网。
-- **缺口**：5 条失败终态无 finish+flush 断言；无"旧命令 record 在 cancel+新任务后返回"回归；无"两 scope 同时终态 guard 不串台"用例；`_aiDoneCompleter` 置 null 无断言；ask 取消选择无终态断言。
-- 拆分前必须补齐上述特征化测试，并在 CI 加静态检查：除 `TerminationGuard` 外禁止直接给 `AgentStatus.completed|failed|cancelled` 赋值。
+- **已补（2026-11-20）**：`test/react_parser_test.dart` 新增 15 例，直接覆盖刚抽出的 `ReActParser.parseReActResponse` 动作分流（execute/finish/ask/tool/空响应/无动作回退/isTaskComplete/复用 parsedEvents）与 `parseAnswerBlock`（围栏防误切、有界截断、无回答返回 null）、`parseReportSections`。这是 ReActParser 拆分的行为锁定安全网。
+- **仍存缺口（待 TerminationGuard 落地后补）**：失败终态 finish+flush 的独立断言；"旧命令 record 在 cancel+新任务后返回"回归；"两 scope 同时终态 guard 不串台"用例；`_aiDoneCompleter` 置 null 断言；ask 取消选择终态断言。这些路径深度耦合引擎私有状态，补单测需大量 `ForTesting` 后门，风险超收益，留到 TerminationGuard 收口时一并补。
+- **CI 静态检查（已落地）**：`.github/workflows/quality.yml` 在 push/PR main 时跑 analyze + 全量 test；`tools/check_terminal_writes.py` 对终态写入点做**棘轮式**检查（当前基线 10 处合法写入，只增不减）。最终目标「除 TerminationGuard 外禁止直接赋终态」待 TerminationGuard 实现后把基线降到 0 切换为硬禁令——现在直接上硬禁令会误伤 10 处合法路径。
 
 ---
 
