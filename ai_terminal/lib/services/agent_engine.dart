@@ -24,6 +24,7 @@ import 'local_terminal_service.dart';
 import 'agent_tool.dart';
 import 'agent_host_registry.dart' as agent_host_registry;
 import 'react_parser.dart';
+import 'event_store.dart';
 import 'agent_logger.dart';
 export 'agent_logger.dart';
 import 'agent_tracer.dart';
@@ -179,13 +180,12 @@ class AgentEngine {
   /// 暂停/恢复时的步数偏移：恢复后步数继续累计，不归零
   int _stepOffset = 0;
 
-  /// 事件序号：整个引擎实例内单调递增。
+  /// 事件 id 分配与去重（R4：每引擎独立实例）。
   ///
-  /// 必须是实例字段而不是单次 AI 调用的局部变量：事件 id 是
-  /// `evt_<序号>_<内容哈希前8位>`，序号每轮从 1 重数时，
-  /// 两轮里内容相同的 ask 事件会拿到同一个 id → Flutter 同层重复 key →
-  /// 整块提问步骤渲染失败（等待作答时正常，答完就消失）。
-  int _eventSeq = 0;
+  /// 序号跨 AI 轮次单调递增；轮内去重状态由 [EventScope] 隔离。
+  /// 详见 event_store.dart 的注释（重复 id 会导致 Flutter 同层重复 key，
+  /// 让整块提问步骤渲染失败）。
+  final EventStore _eventStore = EventStore();
 
   /// 当前等待用户作答的 ask 事件（用于把用户的选择回写到事件上）
   AgentEvent? _pendingAskEvent;
@@ -1988,23 +1988,10 @@ class AgentEngine {
 
     // 事件 id 状态提前到重试循环之前声明：onToolCalls 回调（在 chatStream 调用处
     // 创建闭包）也要用 assignFinalId 做提前执行的事件去重。
+    // R4: 去重状态按调用作用域隔离，序号由 _eventStore 跨轮共享。
     int chunkCount = 0;
-    final emittedStableIds = <String>{}; // 已发出事件的稳定 ID（内容哈希），用于流式去重
-    final stableIdToFinalId = <String, String>{}; // 稳定 ID → 最终全局唯一 ID 的映射
+    final eventScope = _eventStore.newScope();
     bool commandDetectedNotified = false; // 是否已通知过命令检测（一轮只通知一次）
-
-    String assignFinalId(AgentEvent e) {
-      final stableId = e.id; // 解析器生成的稳定 ID（内容哈希）
-      if (stableIdToFinalId.containsKey(stableId)) {
-        return stableIdToFinalId[stableId]!;
-      }
-      _eventSeq++;
-      final finalId =
-          'evt_${_eventSeq}_${stableId.substring(0, stableId.length > 8 ? 8 : stableId.length)}';
-      stableIdToFinalId[stableId] = finalId;
-      e.id = finalId;
-      return finalId;
-    }
 
     // P1-4: Fallback 模型 — 主模型 maxRetries 次重试仍失败时切换备用模型重试一次
     var activeProvider = _aiProvider;
@@ -2093,10 +2080,10 @@ class AgentEngine {
                   description: args['description']?.toString(),
                 );
                 final stableId = e.id;
-                final finalId = assignFinalId(e);
+                final finalId = eventScope.assignFinalId(e);
                 _lastCommandEventId = finalId;
-                if (!emittedStableIds.contains(stableId)) {
-                  emittedStableIds.add(stableId);
+                if (eventScope.isNew(stableId)) {
+                  eventScope.markEmitted(stableId);
                   e.isStreaming = false;
                   _enrichCommandEvent(e);
                   onEvent?.call(e);
@@ -2236,11 +2223,11 @@ class AgentEngine {
                       commandDetectedNotified = true;
                       // A5 修复：先记录 stableId，再改写为 finalId
                       final stableId = e.id;
-                      final finalId = assignFinalId(e);
+                      final finalId = eventScope.assignFinalId(e);
                       _lastCommandEventId = finalId;
                       // 立即发出 command 事件，让 UI 先显示命令块
-                      if (!emittedStableIds.contains(stableId)) {
-                        emittedStableIds.add(stableId);
+                      if (eventScope.isNew(stableId)) {
+                        eventScope.markEmitted(stableId);
                         e.id = finalId;
                         e.isStreaming = false;
                         _enrichCommandEvent(e);
@@ -2441,9 +2428,9 @@ class AgentEngine {
     bool firstCommandIdSet = false;
     for (final e in events) {
       final stableId = e.id;
-      if (!emittedStableIds.contains(stableId)) {
-        emittedStableIds.add(stableId);
-        assignFinalId(e); // 此处会改写 e.id 为 finalId
+      if (eventScope.isNew(stableId)) {
+        eventScope.markEmitted(stableId);
+        eventScope.assignFinalId(e); // 此处会改写 e.id 为 finalId
         e.isStreaming = false;
         _enrichCommandEvent(e);
         // 记住本轮的提问事件：用户作答后要把选择回写上去，
@@ -2452,10 +2439,10 @@ class AgentEngine {
         onEvent?.call(e);
       } else {
         // 已发过，确保 _lastCommandEventId 用 finalId
-        e.id = stableIdToFinalId[stableId] ?? e.id;
+        e.id = eventScope.finalIdFor(stableId);
       }
       if (e.isCommand && !firstCommandIdSet) {
-        _lastCommandEventId = stableIdToFinalId[stableId] ?? e.id;
+        _lastCommandEventId = eventScope.finalIdFor(stableId);
         firstCommandIdSet = true;
       }
     }
@@ -2470,7 +2457,7 @@ class AgentEngine {
           final cmd = e.command ?? '';
           if (cmd.isNotEmpty) {
             commandDetectedNotified = true;
-            final finalId = stableIdToFinalId[e.id] ?? e.id;
+            final finalId = eventScope.finalIdFor(e.id);
             _lastCommandEventId = finalId;
             onCommandDetected(cmd, finalId);
             break;
