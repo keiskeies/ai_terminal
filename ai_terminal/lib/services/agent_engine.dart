@@ -27,6 +27,7 @@ import 'event_store.dart';
 import 'history_policy.dart';
 import 'prompt_builder.dart';
 import 'command_runner.dart';
+import 'tool_orchestrator.dart';
 import 'termination_guard.dart';
 import 'agent_logger.dart';
 export 'agent_logger.dart';
@@ -3531,24 +3532,19 @@ class AgentEngine {
   /// 把工具参数格式化为展示用文本（多行 key:value 格式，与 ReAct 调用格式一致）
   /// 用于 AgentEvent.result.command 和 ReActObservation.command
   /// 避免 AI 从观测/事件里看到 JSON 格式而被"带偏"
+  ///
+  /// Step 6 已迁至 `ToolDisplayFormatter.describe`，这里保留薄转发壳
+  /// （调用点零改动，测试仍可按原入口断言）。
   static String _formatToolCommandForDisplay(
     String toolName,
     ToolArgs args, {
     int maxValueChars = 0,
-  }) {
-    if (args.isEmpty) return toolName;
-    final buffer = StringBuffer()..writeln(toolName);
-    for (final entry in args.asMap.entries) {
-      final v = entry.value;
-      final raw = v is List ? v.join(',') : '$v';
-      // UI 展示时截断大参数（如 file_write 的 base64 内容），避免证据层被塞爆
-      final display = maxValueChars > 0 && raw.length > maxValueChars
-          ? '${raw.substring(0, maxValueChars)}… (${raw.length} 字符)'
-          : raw;
-      buffer.writeln('  ${entry.key}: $display');
-    }
-    return buffer.toString().trimRight();
-  }
+  }) =>
+      ToolDisplayFormatter.describe(
+        toolName,
+        args,
+        maxValueChars: maxValueChars,
+      );
 
   /// 处理 tool 动作 — 调用非 shell 工具（如 SFTP 上传）
   /// ═══════════════════════════════════════════════════════
@@ -3619,26 +3615,6 @@ class AgentEngine {
     }
   }
 
-  /// 模型幻觉出来的"思考"工具名：只带思考参数，没有命令语义
-  static const Set<String> _thinkAliasNames = {'think', 'thinking', 'reason'};
-
-  /// 模型幻觉出来的"执行"工具名：应带 command 参数，走命令执行链路
-  static const Set<String> _executeAliasNames = {
-    'execute',
-    'exec',
-    'run_command',
-    'shell',
-    'bash',
-  };
-
-  /// 通用占位工具名（OpenAI 文档示例里的 function_name 之类）：
-  /// 按参数形状路由到执行或思考
-  static const Set<String> _placeholderToolNames = {
-    'function_name',
-    'call_function',
-    'tool_call',
-  };
-
   Future<bool> _handleToolAction(ReActStep step, CommandExecutor executor,
       {required int myGeneration}) async {
     final toolName = step.toolName?.trim() ?? '';
@@ -3648,10 +3624,7 @@ class AgentEngine {
     // 老模型的兼容：早期 schema 把参数包成 {"args": {...}}，照做的模型仍会这样发。
     // 只在「唯一键且是 Map」时解包，正常平铺参数不会被误伤。
     var rawArgs = step.toolArgs ?? const <String, dynamic>{};
-    final nested = rawArgs['args'];
-    if (nested is Map && rawArgs.keys.length == 1) {
-      rawArgs = nested.map((k, v) => MapEntry(k.toString(), v));
-    }
+    rawArgs = ToolArgNormalizer.unwrapNestedArgs(rawArgs);
     // 裸 Map 在这里收口成 ToolArgs：此后所有取参都必须走类型化访问器
     final args = ToolArgs(rawArgs);
 
@@ -3676,22 +3649,14 @@ class AgentEngine {
     // 兼容占位/幻觉工具名：部分模型受其它 agent 框架先验影响，会调用注册表
     // 里根本不存在的 think / execute / function_name（OpenAI 文档里的占位名）。
     // 直接报「未知工具」只会打断任务，还让同一条响应里宣布的命令全部悬空。
-    // 按名字与参数形状路由，不再报错：
+    // 按名字与参数形状路由，不再报错（分类逻辑见 ToolAliasRouter）：
     // - 带命令类参数 → 当成执行命令
     // - 带思考类参数 / 名字是 think → 当成记录一步思考
     // - 都没有 → 把可用工具清单回给模型，让它自己纠正
-    final alias = toolName.toLowerCase();
-    if (_thinkAliasNames.contains(alias)) {
-      final thoughtText = args.firstOf([
-        'thought',
-        'thinking',
-        'reasoning',
-        'note',
-        'content',
-        'message',
-      ]);
-      if (thoughtText.trim().isNotEmpty) {
-        onEvent?.call(AgentEvent.thought(thoughtText.trim()));
+    final aliasRoute = ToolAliasRouter.resolve(toolName, args);
+    if (aliasRoute.kind == ToolAliasKind.think) {
+      if (aliasRoute.hasThought) {
+        onEvent?.call(AgentEvent.thought(aliasRoute.thought.trim()));
       }
       _conversationHistory.add(
           ChatMessage.create(role: 'user', content: '观测: 思考已记录，请给出下一步动作。'));
@@ -3699,11 +3664,10 @@ class AgentEngine {
       _noCommandRetryCount = 0;
       return true;
     }
-    if (_executeAliasNames.contains(alias) ||
-        _placeholderToolNames.contains(alias)) {
-      final command =
-          args.firstOf(['command', 'cmd', 'script', 'shell', 'shell_command']);
-      if (command.isNotEmpty) {
+    if (aliasRoute.kind == ToolAliasKind.execute ||
+        aliasRoute.kind == ToolAliasKind.placeholder) {
+      if (aliasRoute.hasCommand) {
+        final command = aliasRoute.command;
         // 先补发 command 事件再执行：结果用同一 id 关联，UI 才有完整的
         // 命令块 + 状态，而不是一条挂在旧事件上的孤儿结果
         final cmdId = 'evt_alias_${_uuid.v4().substring(0, 8)}';
@@ -3724,7 +3688,8 @@ class AgentEngine {
         return true;
       }
       // execute 别名但没给命令：告诉模型缺参数，不算致命失败
-      if (_executeAliasNames.contains(alias)) {
+      if (aliasRoute.kind == ToolAliasKind.execute) {
+        final alias = toolName.toLowerCase();
         agentLogger.warn('ReAct', '$alias 别名缺少 command 参数');
         onEvent?.call(AgentEvent.info(L10n.str.ut_386b3634c1(alias)));
         _conversationHistory.add(ChatMessage.create(
@@ -3738,16 +3703,8 @@ class AgentEngine {
         return true;
       }
       // 通用占位名且没有命令参数：按思考处理（模型多半是想"先想一下"）
-      final thoughtText = args.firstOf([
-        'thought',
-        'thinking',
-        'reasoning',
-        'note',
-        'content',
-        'message',
-      ]);
-      if (thoughtText.trim().isNotEmpty) {
-        onEvent?.call(AgentEvent.thought(thoughtText.trim()));
+      if (aliasRoute.hasThought) {
+        onEvent?.call(AgentEvent.thought(aliasRoute.thought.trim()));
         _conversationHistory.add(
             ChatMessage.create(role: 'user', content: '观测: 思考已记录，请给出下一步动作。'));
         _trimMessages(_conversationHistory);
@@ -3763,62 +3720,42 @@ class AgentEngine {
     }
 
     final tool = _tools.get(toolName);
-    if (tool == null) {
-      agentLogger.warn('ReAct', '未知工具: $toolName');
-      onEvent?.call(AgentEvent.info(
-          L10n.str.ut_0eed0d18c7(toolName)));
-      final available = _tools.all.map((t) => t.name).join(', ');
-      final observation = '观测: 工具 $toolName 不存在。可用工具: $available';
+    // 执行前三道门禁（未知 → 只读档 → 作用域）的判定与文案见 ToolGate；
+    // 日志、重试计数与终态收口仍归引擎（要读写实例状态）。
+    final block = ToolGate.evaluate(
+      toolName: toolName,
+      tool: tool,
+      permissionMode: _permissionMode,
+      allToolNames: () => _tools.all.map((t) => t.name).toList(),
+      visibleToolNames: () => _tools
+          .visibleFor(isLocalSession: _isLocalSession)
+          .map((t) => t.name)
+          .toList(),
+      isLocalSession: _isLocalSession,
+    );
+    if (block != null) {
+      if (block.isWarning) {
+        agentLogger.warn('ReAct', block.logMessage);
+      } else {
+        agentLogger.info('ReAct', block.logMessage);
+      }
+      onEvent?.call(block.notice);
       _conversationHistory
-          .add(ChatMessage.create(role: 'user', content: observation));
+          .add(ChatMessage.create(role: 'user', content: block.observation));
       _trimMessages(_conversationHistory);
       // 与 toolName.isEmpty 路径一致：累计重试次数，防止 AI 反复调用不存在的工具造成死循环
       _noCommandRetryCount++;
       if (_noCommandRetryCount >= _maxNoCommandRetries) {
-        agentLogger.warn('ReAct', '未知工具调用重试次数耗尽');
+        if (block.reason == ToolGateReason.unknownTool) {
+          agentLogger.warn('ReAct', '未知工具调用重试次数耗尽');
+        }
         _finishTask(success: false, summary: L10n.str.toolRetryExhausted);
         return false;
       }
       return true;
     }
-
-    // 只读档过去只拦 shell 命令，工具路径可以绕过它改文件（设计稿 D3）。
-    // 判据由 ToolKind 派生，新增写类工具自动受管，不需要再维护第二份名单。
-    if (_permissionMode == AgentPermissionMode.readOnly && !tool.isReadOnly) {
-      agentLogger.info('ReAct', '只读模式拦截工具: $toolName');
-      onEvent?.call(AgentEvent.info(L10n.str.ut_21239ba62c(toolName)));
-      const observation = '观测: 当前为只读模式，禁止调用会产生变更的工具。'
-          '请改用只读工具/命令收集信息，或用 finish 告知用户"当前为只读模式，请关闭后重试"。';
-      _conversationHistory
-          .add(ChatMessage.create(role: 'user', content: observation));
-      _trimMessages(_conversationHistory);
-      _noCommandRetryCount++;
-      if (_noCommandRetryCount >= _maxNoCommandRetries) {
-        _finishTask(success: false, summary: L10n.str.toolRetryExhausted);
-        return false;
-      }
-      return true;
-    }
-
-    // 作用域守卫：工具已注册但当前会话不该看到它（如 SSH 会话里调 project_analyze）。
-    // 提示词已按作用域过滤，这里是兜底 —— AI 可能从历史对话里学到上一会话的工具名。
-    final visible = _tools.visibleFor(isLocalSession: _isLocalSession);
-    if (!visible.any((t) => t.name == toolName)) {
-      agentLogger.warn(
-          'ReAct', '工具在当前会话不可用: $toolName (local=$_isLocalSession)');
-      onEvent?.call(AgentEvent.info(L10n.str.ut_339abc33a7(toolName)));
-      final available = visible.map((t) => t.name).join(', ');
-      final observation = '观测: 工具 $toolName 在当前会话不可用。当前可用工具: $available';
-      _conversationHistory
-          .add(ChatMessage.create(role: 'user', content: observation));
-      _trimMessages(_conversationHistory);
-      _noCommandRetryCount++;
-      if (_noCommandRetryCount >= _maxNoCommandRetries) {
-        _finishTask(success: false, summary: L10n.str.toolRetryExhausted);
-        return false;
-      }
-      return true;
-    }
+    // 走到这里 ToolGate 已保证 tool 非空；显式判空只为满足流分析。
+    if (tool == null) return false;
 
     agentLogger.info('ReAct', '调用工具: $toolName, 参数: ${args.describe()}');
     // R4: 工具调用必须有独立的 command 事件和 id，不能复用上一条 shell 命令的 id
@@ -3848,10 +3785,8 @@ class AgentEngine {
       if (!approved) {
         // 同上：10 分钟没人点，不等于用户说了"不"
         final timedOut = _confirmTimedOut;
-        final reason = timedOut ? '确认超时（10 分钟无响应），已自动拒绝' : '用户拒绝执行该操作';
-        onEvent?.call(AgentEvent.info(timedOut
-            ? '⏱ ${UiText.t(reason, 'Confirmation timed out (no response for 10 minutes); auto-rejected')}'
-            : '❌ ${UiText.t(reason, 'User declined to run this operation')}'));
+        final reason = ToolConfirmation.reason(timedOut);
+        onEvent?.call(ToolConfirmation.notice(timedOut));
         // 必须补一条 result：否则 UI 里这条命令卡片永远停在"待执行"
         onEvent?.call(AgentEvent.result(
           commandId: toolCommandEvent.id,
@@ -3861,8 +3796,7 @@ class AgentEngine {
           hostId: hostId,
           toolName: toolName,
         ));
-        final observation = '观测: $reason。'
-            '${timedOut ? '用户可能只是暂时离开，可以重申一次或改用更保守的方案。' : '请用 ask 询问用户希望如何进行，或用 finish 结束任务，不要重复尝试。'}';
+        final observation = ToolConfirmation.observation(timedOut);
         _conversationHistory
             .add(ChatMessage.create(role: 'user', content: observation));
         _trimMessages(_conversationHistory);
@@ -3942,25 +3876,20 @@ class AgentEngine {
 
       // 发 result 事件：关联本次工具自己的 command id，并带上耗时/主机/工具名
       toolStopwatch.stop();
-      const maxToolEventChars = 8000;
-      final toolOutput =
-          result.success ? result.output : (result.error ?? result.output);
-      final toolOutputTruncated = toolOutput.length > maxToolEventChars;
-      final toolOutputForUi = toolOutputTruncated
-          ? '${toolOutput.substring(0, maxToolEventChars)}\n...(输出已截断)'
-          : toolOutput;
+      // 截断阈值与字段派生见 ToolResultPresenter（8000 字符）
+      final view = ToolResultPresenter.fromResult(result);
       onEvent?.call(AgentEvent.result(
         commandId: toolCommandEvent.id,
         success: result.success,
-        output: result.success ? toolOutputForUi : null,
-        error: result.success ? null : toolOutputForUi,
+        output: result.success ? view.displayed : null,
+        error: result.success ? null : view.displayed,
         // UI 展示用：工具名 + 多行参数（大参数已截断，避免证据层膨胀）
         command: toolUiDisplay,
         hostId: hostId,
         toolName: toolName,
         durationMs: toolStopwatch.elapsedMilliseconds,
-        outputTotalChars: toolOutput.length,
-        outputTruncated: toolOutputTruncated,
+        outputTotalChars: view.totalChars,
+        outputTruncated: view.truncated,
         diffAdditions: result.diffAdditions,
         diffDeletions: result.diffDeletions,
         hostResults: result.hostResults,
@@ -4014,17 +3943,18 @@ class AgentEngine {
       agentLogger.error('ReAct', '工具 $toolName 执行异常: $e');
       onEvent?.call(AgentEvent.info(L10n.str.ut_2bd0b4985d(toolName, e)));
       // 工具异常也要有 result 事件，避免证据层只有命令没有结果
+      final errorView = ToolResultPresenter.fromError(e);
       onEvent?.call(AgentEvent.result(
         commandId: toolCommandEvent.id,
         success: false,
-        error: e.toString(),
+        error: errorView.displayed,
         command: toolUiDisplay,
         hostId: hostId,
         toolName: toolName,
         durationMs: toolStopwatch.elapsedMilliseconds,
         failureKind: CommandFailureKind.unknown.name,
-        outputTotalChars: e.toString().length,
-        outputTruncated: false,
+        outputTotalChars: errorView.totalChars,
+        outputTruncated: errorView.truncated,
       ));
 
       if (myGeneration != _currentTaskGeneration) return false;
