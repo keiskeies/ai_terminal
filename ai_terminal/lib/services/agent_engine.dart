@@ -20,13 +20,13 @@ import '../services/ai_service.dart';
 import '../services/ssh_service.dart';
 import '../services/command_executor.dart';
 import '../services/rules_injection.dart';
-import 'local_terminal_service.dart';
 import 'agent_tool.dart';
 import 'agent_host_registry.dart' as agent_host_registry;
 import 'react_parser.dart';
 import 'event_store.dart';
 import 'history_policy.dart';
 import 'prompt_builder.dart';
+import 'command_runner.dart';
 import 'termination_guard.dart';
 import 'agent_logger.dart';
 export 'agent_logger.dart';
@@ -50,13 +50,11 @@ import '../utils/verification_detector.dart';
 import '../utils/command_extractor.dart';
 import '../utils/no_command_intent_detector.dart';
 import '../utils/choice_request_detector.dart';
-import '../utils/local_command_detector.dart';
 import '../utils/token_estimator.dart';
 import '../utils/tool_call_accumulator.dart';
 import '../utils/audit_logger.dart';
 import '../utils/tail_text_buffer.dart';
 import 'change_record_service.dart';
-import 'change_window_service.dart';
 import 'notification_service.dart';
 
 /// Agent 执行引擎 - 核心自动执行系统
@@ -762,14 +760,9 @@ class AgentEngine {
     return '第 $_currentStepCount 步 | ✅$s ❌$f | ${elapsed}s';
   }
 
-  /// 按命令类型派生展示阶段（不参与状态机）
-  String _phaseForCommand(String command, SafetyLevel level) {
-    if (isQueryCommand(command)) return '检查环境';
-    if (level == SafetyLevel.warn || level == SafetyLevel.blocked) {
-      return '执行变更';
-    }
-    return '执行命令';
-  }
+  /// 按命令类型派生展示阶段（委托 CommandRunner，不参与状态机）
+  String _phaseForCommand(String command, SafetyLevel level) =>
+      CommandRunner.phaseForCommand(command, level);
 
   /// 记录 provider 给出的真实 token 用量。
   ///
@@ -2800,43 +2793,18 @@ class AgentEngine {
     return true;
   }
 
-  /// 当前响应中除第一条之外、已作为 command 事件发出的其余命令（带事件 id）。
-  /// 这些命令事件在流式/收尾阶段已发出且 id 已是 finalId，结果事件用同一 id
-  /// 关联即可；调用后由调用方清空 [_announcedFollowUps]。
+  /// 当前响应中除第一条之外、已作为 command 事件发出的其余命令（委托 CommandRunner）
   List<({String eventId, String command})> _remainingAnnouncedCommands(
-      List<AgentEvent>? events) {
-    if (events == null) return const [];
-    var skippedFirst = false;
-    final out = <({String eventId, String command})>[];
-    for (final e in events) {
-      if (!e.isCommand) continue;
-      final cmd = (e.command ?? '').trim();
-      if (cmd.isEmpty) continue;
-      if (!skippedFirst) {
-        skippedFirst = true; // 第一条命令由 _handleExecuteAction 主流程执行
-        continue;
-      }
-      out.add((eventId: e.id, command: cmd));
-    }
-    return out;
-  }
+          List<AgentEvent>? events) =>
+      CommandRunner.remainingAnnouncedCommands(events);
 
   /// 提前执行的结果缓存（用 Completer 处理执行中状态）
   Completer<_EarlyExecutionResult>? _earlyExecutionCompleter;
   String? _earlyExecutionCommand;
 
-  /// 这些 reason 表示命令被策略/权限/用户拦下，从未真正执行。
-  /// 「步」的口径要求把"尝试过但没执行"也算进去，所以按 reason 统一识别，
-  /// 而不是在每个 return 分支各加一次——分支会继续增加，集合不会漏。
-  static const Set<String> _blockedCommandReasons = {
-    'window_blocked',
-    'read_only_blocked',
-    'safety_blocked',
-    'chained_modification_blocked',
-    'user_rejected',
-    'confirm_timeout',
-    'permission_changed_during_confirm',
-  };
+  /// 这些 reason 表示命令被策略/权限/用户拦下，从未真正执行（口径见 CommandRunner）
+  static const Set<String> _blockedCommandReasons =
+      CommandRunner.blockedCommandReasons;
 
   /// 执行命令（含安全检查、用户确认、执行、发 result 事件），返回执行结果和观测
   /// [commandId] 用于关联 result 事件与 command 事件（流式提前执行时由 _callAI 传入）
@@ -2910,14 +2878,9 @@ class AgentEngine {
     }
   }
 
-  /// 日志里只放命令首行并限长：整条命令可能是多行脚本，原样打会把日志撑爆
-  static String _logCommand(String command) {
-    final firstLine = command.split('\n').first.trim();
-    if (firstLine.isEmpty) return '(空命令)';
-    return firstLine.length <= 80
-        ? firstLine
-        : '${firstLine.substring(0, 80)}…';
-  }
+  /// 日志里只放命令首行并限长（委托 CommandRunner）
+  static String _logCommand(String command) =>
+      CommandRunner.logCommand(command);
 
   /// 模型推理增量：累积 + 限长 + 节流（~150ms），避免每个 token 都重建一次 UI
   void _handleReasoningDelta(String delta) {
@@ -3023,155 +2986,41 @@ class AgentEngine {
       }
     }
 
-    // O1 硬保证：只读管道/链式允许，但修改类命令必须每轮一条。
-    // 不依赖模型自觉：任一子命令 ≥ warn 即拦截，回传观测让模型拆分重试。
-    final subCommands = SafetyGuard.splitSubCommands(command)
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-    if (subCommands.length > 1 &&
-        subCommands
-            .any((s) => SafetyGuard.check(s).index >= SafetyLevel.warn.index)) {
-      agentLogger.warn('ReAct', '链式修改命令拦截: ${_logCommand(command)}');
-      const reason = '链式命令包含修改类操作，请拆分为多轮逐条执行';
-      onEvent?.call(AgentEvent.info(
-          '⛓ ${UiText.t(reason, 'Chained commands contain modifying operations; split them into separate single commands across rounds')}\n${UiText.t('命令', 'Command')}: `$command`'));
-      // 与权限拦截分支一致：blocked 级追加一条带原因的审计记录
-      if (hostId != null && safetyLevel == SafetyLevel.blocked) {
-        try {
-          await AuditLogger.log(
-            hostId: hostId!,
-            command: command,
-            safetyLevel: safetyLevel.name,
-            output: reason,
-            executed: false,
-          );
-        } catch (e) {
-          agentLogger.warn('Audit', '审计日志写入失败(链式拦截分支): $e');
-        }
-      }
-      final observation = ReActObservation(
-        command: command,
-        output: reason,
-        success: false,
-        error: reason,
-      ).format();
-      onSuccess(false, 'chained_modification_blocked', 0);
-      return _EarlyExecutionResult(
-          shouldContinue: true, observation: observation, command: command);
-    }
-
-    // Windows 本地终端固定启动 System32 的 PowerShell 5.1，不支持 &&。
-    // 提前回传语法纠错观测，避免语法错误导致 marker 永不出现、干等超时。
-    if (executor is LocalTerminalService &&
-        Platform.isWindows &&
-        SafetyGuard.containsUnquotedOperator(command, '&&')) {
-      agentLogger.warn(
-          'ReAct', 'PowerShell 5.1 不支持 &&: ${_logCommand(command)}');
-      const reason =
-          'Windows PowerShell 5.1 不支持 && 运算符，请改用 ; 分隔只读命令（如 a ; b），或拆分为多轮逐条执行';
-      onEvent?.call(AgentEvent.info(
-          '🪟 ${UiText.t(reason, 'Windows PowerShell 5.1 does not support the && operator; separate read-only commands with ; (e.g. a ; b), or split them into separate single commands across rounds')}\n${UiText.t('命令', 'Command')}: `$command`'));
-      final observation = ReActObservation(
-        command: command,
-        output: reason,
-        success: false,
-        error: reason,
-      ).format();
-      onSuccess(false, 'ps5_and_operator_unsupported', 0);
-      return _EarlyExecutionResult(
-          shouldContinue: true, observation: observation, command: command);
-    }
-
-    // 远程误发拦截：SSH 到非 Windows 主机时，明显是本机 Windows/PowerShell
-    // 的命令先给一条可读观测，避免把 PowerShell 原样发给 bash。
-    // 放在安全时段检查之前：这是本机命令，不应被远程的安全时段规则拦成“封网期”。
-    final remoteOs =
-        executor is SSHService ? executor.osInfo.toLowerCase() : '';
-    final remoteLooksWindows = remoteOs.contains('windows') ||
-        remoteOs.contains('mingw') ||
-        remoteOs.contains('cygwin');
-    if (executor is SSHService &&
-        !remoteLooksWindows &&
-        looksLikeLocalWindowsCommand(command)) {
-      agentLogger.warn('ReAct', '疑似本机 Windows 命令发往远程 Unix: $command');
-      const reason = '检测到 Windows 盘符或 PowerShell 语法，但当前 execute 运行在远程服务器。';
-      onEvent?.call(AgentEvent.info(
-          '🖥 ${UiText.t(reason, 'Windows drive letters or PowerShell syntax detected, but this execute runs on the remote server.')}\n${UiText.t('本机命令请改用 local_exec 工具', 'For local commands use the local_exec tool')}: `$command`'));
-      final observation = ReActObservation(
-        command: command,
-        output: '$reason\n'
-            '如果目标在运行 App 的本机，请改用 local_exec 工具（参数 command/cwd）；'
-            '如果目标确实是远程服务器，请改用服务器支持的 shell 语法。',
-        success: false,
-        error: '本机命令误发到远程',
-      ).format();
-      onSuccess(false, 'local_command_on_remote', 0);
-      return _EarlyExecutionResult(
-          shouldContinue: true, observation: observation, command: command);
-    }
-
-    // 安全时段检查：非 safe 级命令在时段外被拒绝
-    final (windowAllowed, windowReason) =
-        ChangeWindowService.checkCommand(command);
-    if (!windowAllowed) {
-      agentLogger.warn('ReAct', '封网期拦截修改性命令: $command');
-      onEvent?.call(AgentEvent.info(
-          '🚫 ${UiText.t('封网期拦截', 'Blocked during change window')}\n${UiText.t('命令', 'Command')}: `$command`\n$windowReason'));
-      final observation = ReActObservation(
-        command: command,
-        output: '封网期内禁止执行修改性命令（仅允许只读命令）',
-        success: false,
-        error: windowReason ?? '封网期拦截',
-      ).format();
-      onSuccess(false, 'window_blocked', 0);
-      return _EarlyExecutionResult(
-          shouldContinue: true, observation: observation, command: command);
-    }
-
-    // 权限档位：只读拒绝、询问/自动确认、全自动放行。
-    // 判定逻辑抽在 permission_policy，UI 事件快照用同一份实现，避免两边漂移。
+    // 执行前五道守卫（顺序敏感，语义见 CommandPreflight）。
+    // 判定本身无状态；审计写入留在引擎侧——它要 hostId 且会 await。
     final decision = decideCommand(safetyLevel, _permissionMode);
     agentLogger.debug('ReAct',
         '步骤 $_currentStepCount · 权限 ${_permissionMode.id} → ${decision.name}');
-
-    if (decision == CommandGateDecision.reject) {
-      agentLogger.warn('ReAct', '权限模式拦截命令: ${_permissionMode.id} $command');
-      // UI 事件按当前语言；observation/审计走规范中文串——reason 会原样
-      // 喂回模型，模型上下文里的规范串不随 UI 语言漂移
-      final reason =
-          SafetyGuard.getReason(command) ?? SafetyGuard.getTip(safetyLevel);
-      final reasonZh =
-          SafetyGuard.getReasonZh(command) ?? SafetyGuard.getTipZh(safetyLevel);
-      final readOnly = _permissionMode == AgentPermissionMode.readOnly;
-      onEvent?.call(AgentEvent.info(
-          '🔒 ${readOnly ? UiText.t('只读模式已开启，此命令被拒绝执行', 'Read-only mode is on; this command was not allowed to run') : UiText.t('当前权限模式，此命令被拒绝执行', 'Blocked by the current permission mode; this command was not allowed to run')}: `$command`\n'
-          '${L10n.str.ut_cb255683ce(safetyLevel)}\n${L10n.str.ut_ee0b938b2c(reason)}'));
-      // 审计日志：被拦截的 blocked 命令追加记录（执行前已写一条 executed=false）
-      if (hostId != null && safetyLevel == SafetyLevel.blocked) {
+    final block = CommandPreflight.evaluate(
+      command: command,
+      safetyLevel: safetyLevel,
+      executor: executor,
+      permissionMode: _permissionMode,
+      decision: decision,
+      emitInfo: (e) => onEvent?.call(e),
+    );
+    if (block != null) {
+      agentLogger.warn(
+          'ReAct', '预检拦截(${block.reasonCode}): ${_logCommand(command)}');
+      if (block.auditOutput != null && hostId != null) {
         try {
           await AuditLogger.log(
             hostId: hostId!,
             command: command,
             safetyLevel: safetyLevel.name,
-            output: reasonZh,
+            output: block.auditOutput!,
             executed: false,
           );
         } catch (e) {
-          agentLogger.warn('Audit', '审计日志写入失败(拦截分支): $e');
+          agentLogger.warn(
+              'Audit', '审计日志写入失败(${block.auditTag ?? '拦截分支'}): $e');
         }
       }
-      final observation = ReActObservation(
-        command: command,
-        output: readOnly
-            ? '只读模式下禁止执行非只读命令（当前等级: $safetyLevel）\n原因: $reasonZh'
-            : '当前权限模式禁止执行该命令（当前等级: $safetyLevel）\n原因: $reasonZh',
-        success: false,
-        error: readOnly ? '只读模式拦截' : reasonZh,
-      ).format();
-      onSuccess(false, readOnly ? 'read_only_blocked' : 'safety_blocked', 0);
+      onSuccess(false, block.reasonCode, 0);
       return _EarlyExecutionResult(
-          shouldContinue: true, observation: observation, command: command);
+          shouldContinue: true,
+          observation: block.observation,
+          command: command);
     }
 
     // 需要用户确认：warn（询问档）与 blocked（询问/自动档）
@@ -3523,28 +3372,20 @@ class AgentEngine {
     );
   }
 
-  /// 审计日志输出截断（避免 MB 级日志膨胀审计 box）
-  static String _truncateForAudit(String s) {
-    if (s.length <= 500) return s;
-    return '${s.substring(0, 500)}...(${s.length} chars)';
-  }
+  /// 审计日志输出截断（委托 CommandRunner）
+  static String _truncateForAudit(String s) =>
+      CommandRunner.truncateForAudit(s);
 
   /// 最近一次 command 事件 id（用于 result 关联）
   /// 由 _callAI 流式解析时更新，_handleExecuteAction 执行命令后用它关联 result
   String _lastCommandEventId = '';
 
-  /// 为 shell command 事件补主机/工具/风险元数据（供操作单证据层使用）
-  void _enrichCommandEvent(AgentEvent e) {
-    if (!e.isCommand) return;
-    e.hostId ??= hostId;
-    e.toolName ??= 'exec_command';
-    final cmd = (e.command ?? '').trim();
-    if (cmd.isNotEmpty) {
-      final level = SafetyGuard.check(cmd);
-      e.riskLevel ??= level.name;
-      e.permissionDecision ??= decideCommand(level, _permissionMode).name;
-    }
-  }
+  /// 为 shell command 事件补主机/工具/风险元数据（委托 CommandRunner）
+  void _enrichCommandEvent(AgentEvent e) => CommandRunner.enrichCommandEvent(
+        e,
+        hostId: hostId,
+        permissionMode: _permissionMode,
+      );
 
   /// 处理多条命令执行（旧格式 fallback）
   Future<bool> _handleExecuteCommands(
