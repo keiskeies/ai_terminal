@@ -3223,6 +3223,13 @@ class AgentEngine {
     onReasoning?.call(_reasoningBuffer.toString());
   }
 
+  /// 推理规范化用的空白折叠正则：提为 static final，避免每次调用/每行
+  /// 重新编译（该方法在流式推理结束、每步 reset 时都会走到）。
+  static final RegExp _reasoningWsRegExp = RegExp(r'\s+');
+
+  static String _normalizeReasoning(String s) =>
+      s.replaceAll(_reasoningWsRegExp, ' ').trim().toLowerCase();
+
   /// 原生推理是否与 ReAct 解析出的思考重复（忽略空白与大小写）。
   ///
   /// 有些网关把同一段推理既放在 reasoning_content、又放在「思考:」行里，
@@ -3231,19 +3238,21 @@ class AgentEngine {
   bool _reasoningDuplicatesReactThought(
       String reasoning, List<AgentEvent>? events) {
     if (events == null || events.isEmpty) return false;
-    String norm(String s) =>
-        s.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase();
-    final r = norm(reasoning);
+    final r = _normalizeReasoning(reasoning);
     if (r.isEmpty) return true;
-    final reactThoughts = events
-        .where((e) => e.isThought)
-        .map((e) => norm(e.text ?? ''))
-        .where((t) => t.isNotEmpty)
-        .toList();
-    if (reactThoughts.isEmpty) return false;
+    final thoughts = <String>[];
+    for (final e in events) {
+      if (!e.isThought) continue;
+      final t = _normalizeReasoning(e.text ?? '');
+      if (t.isNotEmpty) thoughts.add(t);
+    }
+    if (thoughts.isEmpty) return false;
     // 太短的推理多半是协议噪声：有协议思考时就不重复补一条
     if (r.length < 24) return true;
-    return reactThoughts.any((t) => t.contains(r) || r.contains(t));
+    for (final t in thoughts) {
+      if (t.contains(r) || r.contains(t)) return true;
+    }
+    return false;
   }
 
   /// 每一步重新开始：把上一步残留的推理固化为思考事件（正常情况流式结束时已固化，

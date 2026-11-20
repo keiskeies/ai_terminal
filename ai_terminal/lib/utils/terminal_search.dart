@@ -30,6 +30,7 @@ List<TextMatch> findTextMatches(
   List<String> lines,
   String query, {
   bool caseSensitive = false,
+  int maxMatches = 0,
 }) {
   if (query.isEmpty) return const [];
   final pattern = RegExp(RegExp.escape(query), caseSensitive: caseSensitive);
@@ -37,6 +38,9 @@ List<TextMatch> findTextMatches(
   for (var i = 0; i < lines.length; i++) {
     for (final m in pattern.allMatches(lines[i])) {
       results.add(TextMatch(line: i, start: m.start, end: m.end));
+      // 命中数达标立即双层跳出：短 query 在数万行回滚区可产生十万级
+      // 匹配，而调用方最多只用 maxMatches 个，收集其余纯属浪费。
+      if (maxMatches > 0 && results.length >= maxMatches) return results;
     }
   }
   return results;
@@ -66,25 +70,24 @@ List<TerminalSearchMatch> searchTerminalBuffer(
   int maxMatches = 5000,
 }) {
   if (query.isEmpty) return const [];
-  final lines = <String>[];
-  final columnMaps = <List<int>>[];
-  for (var i = 0; i < buffer.height; i++) {
-    final extracted = lineTextWithColumns(buffer.lines[i]);
-    lines.add(extracted.text);
-    columnMaps.add(extracted.columns);
-  }
-  final matches = findTextMatches(lines, query, caseSensitive: caseSensitive);
+  final pattern = RegExp(RegExp.escape(query), caseSensitive: caseSensitive);
   final results = <TerminalSearchMatch>[];
-  for (final m in matches) {
-    if (results.length >= maxMatches) break;
-    final columns = columnMaps[m.line];
-    final line = buffer.lines[m.line];
-    final lastCell = columns[m.end - 1];
-    results.add(TerminalSearchMatch(
-      line: m.line,
-      start: columns[m.start],
-      end: lastCell + line.getWidth(lastCell),
-    ));
+  // 逐行提取 + 匹配，凑够 maxMatches 立即停止：回滚区可达数万行，
+  // 不必先为全部行构建 text/columns 再收集无界中间列表。
+  for (var i = 0; i < buffer.height && results.length < maxMatches; i++) {
+    final line = buffer.lines[i];
+    final extracted = lineTextWithColumns(line);
+    final text = extracted.text;
+    final columns = extracted.columns;
+    for (final m in pattern.allMatches(text)) {
+      final lastCell = columns[m.end - 1];
+      results.add(TerminalSearchMatch(
+        line: i,
+        start: columns[m.start],
+        end: lastCell + line.getWidth(lastCell),
+      ));
+      if (results.length >= maxMatches) break;
+    }
   }
   return results;
 }

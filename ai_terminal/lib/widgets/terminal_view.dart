@@ -107,8 +107,14 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
   bool _searchCaseSensitive = false;
   List<TerminalSearchMatch> _searchMatches = [];
   int _searchCurrent = -1;
-  final List<xterm.TerminalHighlight> _searchHighlights = [];
-  final List<xterm.CellAnchor> _searchAnchors = [];
+  // 与 _searchMatches 按下标一一对应；行越界/无锚点的项为 null。
+  // TerminalHighlight.color 是 final，切换命中时不重建全部，只 dispose +
+  // 复用同一对锚点重建旧/新两处高亮（见 _recolorHighlight）。
+  final List<xterm.TerminalHighlight?> _searchHighlights = [];
+  final List<({xterm.CellAnchor p1, xterm.CellAnchor p2})?> _searchAnchorPairs =
+      [];
+  Color? _searchHitColor;
+  Color? _searchCurrentColor;
   // 搜索期间跳转过视图：关闭时回到底部，恢复输出跟随
   bool _searchScrolled = false;
   Timer? _searchDebounce;
@@ -602,14 +608,17 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
 
   void _clearSearchHighlights() {
     for (final h in _searchHighlights) {
-      h.dispose();
+      h?.dispose();
     }
     _searchHighlights.clear();
     // highlight.dispose 不释放锚点，谁创建谁清理
-    for (final a in _searchAnchors) {
-      a.dispose();
+    for (final a in _searchAnchorPairs) {
+      a?.p1.dispose();
+      a?.p2.dispose();
     }
-    _searchAnchors.clear();
+    _searchAnchorPairs.clear();
+    _searchHitColor = null;
+    _searchCurrentColor = null;
   }
 
   void _applyHighlights() {
@@ -621,21 +630,43 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
         light ? const Color(0x59A66F00) : const Color(0x59F2C276);
     final currentColor =
         light ? const Color(0x80D14343) : const Color(0x99FF9AA2);
+    _searchHitColor = hitColor;
+    _searchCurrentColor = currentColor;
     for (var i = 0; i < _searchMatches.length; i++) {
       final m = _searchMatches[i];
       // 回滚区被裁剪后行号可能越界，锚点会脱离，跳过
-      if (m.line >= terminal.buffer.height) continue;
+      if (m.line >= terminal.buffer.height) {
+        _searchHighlights.add(null);
+        _searchAnchorPairs.add(null);
+        continue;
+      }
       final line = terminal.buffer.lines[m.line];
       final p1 = line.createAnchor(m.start);
       final p2 = line.createAnchor(m.end);
-      _searchAnchors.add(p1);
-      _searchAnchors.add(p2);
+      _searchAnchorPairs.add((p1: p1, p2: p2));
       _searchHighlights.add(_controller.highlight(
         p1: p1,
         p2: p2,
         color: i == _searchCurrent ? currentColor : hitColor,
       ));
     }
+  }
+
+  /// 只重建单个高亮的颜色（切换当前命中时使用）。
+  ///
+  /// xterm 的 TerminalHighlight.color 是 final，无法原地改色，必须 dispose
+  /// 旧 highlight 后用同一对锚点重建。锚点不随 highlight 释放，故可复用。
+  /// 命中数可达 5000，切换时只动旧/新两处，从 O(5000) 降为 O(1)。
+  void _recolorHighlight(int index, Color color) {
+    if (index < 0 || index >= _searchHighlights.length) return;
+    final anchors = _searchAnchorPairs[index];
+    if (anchors == null) return;
+    _searchHighlights[index]?.dispose();
+    _searchHighlights[index] = _controller.highlight(
+      p1: anchors.p1,
+      p2: anchors.p2,
+      color: color,
+    );
   }
 
   void _nextMatch() => _stepMatch(1);
@@ -655,8 +686,14 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
       if (index >= 0) _scrollToMatch(index);
       return;
     }
+    final previous = _searchCurrent;
     setState(() => _searchCurrent = index);
-    _applyHighlights();
+    final hit = _searchHitColor;
+    final current = _searchCurrentColor;
+    if (hit != null && current != null) {
+      if (previous >= 0) _recolorHighlight(previous, hit);
+      if (index >= 0) _recolorHighlight(index, current);
+    }
     if (index >= 0) _scrollToMatch(index);
   }
 

@@ -9,6 +9,8 @@
 /// UI outputTail（8000）与审计日志（500）不走这里，保持各自上限。
 library;
 
+import 'dart:collection';
+
 /// 查询命令输出上限
 const int maxQueryOutputChars = 20000;
 
@@ -80,6 +82,32 @@ String stripInteractiveEcho(
 String _collapseSpaces(String s) =>
     s.replaceAll(RegExp(r'[ \t]+'), ' ').trim();
 
+/// stripWrappedEcho 的折行正则缓存：同一命令重复执行时避免反复编译正则。
+/// 有界 LRU（64 条）：命中移到末尾，满时淘汰最久未用。命令种类有限，
+/// 64 条足以覆盖绝大多数场景，常驻内存可忽略。
+final LinkedHashMap<String, RegExp> _wrappedEchoPatternCache =
+    LinkedHashMap<String, RegExp>();
+
+const int _maxWrappedEchoCache = 64;
+
+RegExp _wrappedEchoPattern(String wrappedCommand) {
+  final cached = _wrappedEchoPatternCache[wrappedCommand];
+  if (cached != null) {
+    // LinkedHashMap 插入顺序：移除再插入把命中项移到最末（最近使用）。
+    _wrappedEchoPatternCache.remove(wrappedCommand);
+    _wrappedEchoPatternCache[wrappedCommand] = cached;
+    return cached;
+  }
+  final pattern = RegExp(
+    wrappedCommand.split('').map(RegExp.escape).join(r'\r?\n?'),
+  );
+  if (_wrappedEchoPatternCache.length >= _maxWrappedEchoCache) {
+    _wrappedEchoPatternCache.remove(_wrappedEchoPatternCache.keys.first);
+  }
+  _wrappedEchoPatternCache[wrappedCommand] = pattern;
+  return pattern;
+}
+
 /// 清理 PTY 输出中的命令回显（执行器层是唯一的回显清洗点，R8 只清一次）
 ///
 /// 长命令会被 PTY 按列宽折行回显（每 80 列插入 \r\n），精确
@@ -97,10 +125,7 @@ String stripWrappedEcho(String output, String wrappedCommand) {
       0, output.length < 4096 + wrappedCommand.length
           ? output.length
           : 4096 + wrappedCommand.length);
-  final pattern = RegExp(
-    wrappedCommand.split('').map(RegExp.escape).join(r'\r?\n?'),
-  );
-  final m = pattern.firstMatch(window);
+  final m = _wrappedEchoPattern(wrappedCommand).firstMatch(window);
   if (m == null) return output;
   return output.substring(m.end);
 }

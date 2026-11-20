@@ -1863,10 +1863,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           _maybeAutoReconnect(tab);
         }
       }
-      _lastTabStatus.removeWhere((id, _) => !next.tabs.any((t) => t.id == id));
+      // 先建 id Set，避免对每个 map entry 线性扫描 tabs（O(n²)→O(n)）
+      final tabIds = next.tabs.map((t) => t.id).toSet();
+      _lastTabStatus.removeWhere((id, _) => !tabIds.contains(id));
       // 兜底：标签在别处被关掉时，额外 pane 的会话也要跟着收
       _tabPaneLayout.removeWhere((id, layout) {
-        if (next.tabs.any((t) => t.id == id)) return false;
+        if (tabIds.contains(id)) return false;
         for (final paneId in layout.paneIds) {
           if (paneId != id) _disposePane(paneId);
         }
@@ -3583,9 +3585,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     if (userIndex + 1 >= items.length) return null;
     final answer = items[userIndex + 1];
     if (answer.role != 'assistant') return null;
-    final commands = answer.events.where((e) => e.isCommand).length;
-    final failures =
-        answer.events.where((e) => e.isResult && e.success == false).length;
+    // 单次遍历同时统计命令数与失败数（原来两次 where().length 各遍历一遍）
+    var commands = 0;
+    var failures = 0;
+    for (final e in answer.events) {
+      if (e.isCommand) commands++;
+      if (e.isResult && e.success == false) failures++;
+    }
     if (commands == 0 && failures == 0) return null;
     final ui = AgentUiText.of(context);
     return [

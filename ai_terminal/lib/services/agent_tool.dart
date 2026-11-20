@@ -2524,12 +2524,15 @@ class FilePatchTool extends AgentTool {
     );
   }
 
+  /// 统计 needle 在 haystack 中（不重叠）的出现次数。
+  /// 前缀表只构建一次并在每次搜索间复用，避免重复 O(m) 预处理。
   static int _countOccurrencesBytes(Uint8List haystack, Uint8List needle) {
     if (needle.isEmpty) return 0;
+    final prefix = _kmpPrefix(needle);
     var count = 0;
     var idx = 0;
     while (idx <= haystack.length - needle.length) {
-      final found = _indexOfBytes(haystack, needle, idx);
+      final found = _indexOfBytesKmp(haystack, needle, idx, prefix);
       if (found < 0) break;
       count++;
       idx = found + needle.length;
@@ -2537,19 +2540,44 @@ class FilePatchTool extends AgentTool {
     return count;
   }
 
+  /// KMP 前缀表（最长相等前后缀长度）。O(m)。
+  static List<int> _kmpPrefix(Uint8List needle) {
+    final prefix = List<int>.filled(needle.length, 0);
+    for (var i = 1, len = 0; i < needle.length; i++) {
+      while (len > 0 && needle[i] != needle[len]) {
+        len = prefix[len - 1];
+      }
+      if (needle[i] == needle[len]) len++;
+      prefix[i] = len;
+    }
+    return prefix;
+  }
+
+  /// 朴素字节搜索的 KMP 替代：O(n + m)，最坏情况也不退化到 O(n·m)。
   static int _indexOfBytes(Uint8List haystack, Uint8List needle, [int start = 0]) {
     if (needle.isEmpty || start < 0 || start > haystack.length - needle.length) {
       return -1;
     }
-    for (var i = start; i <= haystack.length - needle.length; i++) {
-      var match = true;
-      for (var j = 0; j < needle.length; j++) {
-        if (haystack[i + j] != needle[j]) {
-          match = false;
-          break;
-        }
+    return _indexOfBytesKmp(haystack, needle, start, _kmpPrefix(needle));
+  }
+
+  static int _indexOfBytesKmp(
+    Uint8List haystack,
+    Uint8List needle,
+    int start,
+    List<int> prefix,
+  ) {
+    final n = haystack.length;
+    final m = needle.length;
+    var j = 0; // 已匹配的 needle 前缀长度
+    for (var i = start; i < n; i++) {
+      while (j > 0 && haystack[i] != needle[j]) {
+        j = prefix[j - 1];
       }
-      if (match) return i;
+      if (haystack[i] == needle[j]) {
+        j++;
+        if (j == m) return i - m + 1;
+      }
     }
     return -1;
   }

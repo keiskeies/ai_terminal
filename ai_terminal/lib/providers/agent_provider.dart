@@ -642,26 +642,29 @@ class AgentNotifier extends StateNotifier<AgentState> {
         const Duration(milliseconds: _agentStreamThrottleMs),
         (content) {
           _updateScopeState(scopeId, (s) {
-            final items = [...s.chatItems];
+            // 延迟复制：仅当确实要改尾项时才复制列表。条件不满足时复用
+            // 原不可变列表（无原地修改，安全），省去每 tick 的 O(n) 拷贝。
+            var items = s.chatItems;
             if (items.isNotEmpty && items.last.role == 'assistant') {
               final lastItem = items.last;
               // 保持原有设计：streamingContent 存放当前轮增量，content 存放已固化的内容
               // UI 渲染时优先显示 streamingContent（流式效果），content 作为兜底
+              items = [...items];
               items[items.length - 1] = lastItem.copyWith(
                 streamingContent: content,
                 isStreaming: true,
               );
               // 周期性持久化：将 content + streamingContent 合并写入磁盘
               // 防止 app 异常退出时丢失全部流式内容（events 由 onCompleted 时统一回写）
-              final fullContent = lastItem.content + content;
+              // 仅需长度判断时先用算术算，命中门槛（约 1/8 的 tick）才真正拼接，
+              // 避免每 120ms 都复制一遍可能长达数十 KB 的整串。
               final lastLen = _lastPersistedLen[scopeId] ?? 0;
-              // 2000 字符≈一次较长段落；再叠加 1.5s 时间门槛：快速流下
-              // 限制整会话序列化频率，异常退出的丢失窗口仍≤1.5s 的增量。
               final lastAt = _lastPersistedAt[scopeId];
               final now = DateTime.now();
-              if (fullContent.length - lastLen > 2000 &&
+              if (lastItem.content.length + content.length - lastLen > 2000 &&
                   (lastAt == null ||
                       now.difference(lastAt).inMilliseconds >= 1500)) {
+                final fullContent = lastItem.content + content;
                 _lastPersistedLen[scopeId] = fullContent.length;
                 _persistAssistantCompletion(scopeId, fullContent,
                     events: lastItem.events);
@@ -680,10 +683,12 @@ class AgentNotifier extends StateNotifier<AgentState> {
       AgentState? scopeState;
       _updateScopeState(scopeId, (s) {
         scopeState = s; // 捕获更新前的 tab 状态引用
-        final items = [...s.chatItems];
-        if (items.isEmpty || items.last.role != 'assistant') return s;
-        final lastItem = items.last;
+        if (s.chatItems.isEmpty || s.chatItems.last.role != 'assistant') {
+          return s;
+        }
+        final lastItem = s.chatItems.last;
         final events = [...lastItem.events, event];
+        final items = [...s.chatItems];
         items[items.length - 1] = lastItem.copyWith(
           events: events,
           isStreaming: s.isRunning,

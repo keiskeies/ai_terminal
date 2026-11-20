@@ -142,14 +142,15 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                 ),
               ),
               data: (hosts) {
-                // 过滤
+                // 过滤：q 只算一次（原来每个字段重复小写化 4 次）
+                final q = _searchQuery.toLowerCase();
                 final filtered = _searchQuery.isEmpty
                     ? hosts
                     : hosts.where((h) =>
-                        h.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                        h.host.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                        h.username.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                        h.group.toLowerCase().contains(_searchQuery.toLowerCase())
+                        h.name.toLowerCase().contains(q) ||
+                        h.host.toLowerCase().contains(q) ||
+                        h.username.toLowerCase().contains(q) ||
+                        h.group.toLowerCase().contains(q)
                       ).toList();
 
                 if (filtered.isEmpty && hosts.isEmpty) {

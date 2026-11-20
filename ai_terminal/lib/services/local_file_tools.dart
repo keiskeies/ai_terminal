@@ -370,7 +370,10 @@ class LocalFileSearchTool extends LocalFileTool {
     } else {
       await for (final c in Directory(path).list(recursive: true, followLinks: false)) {
         if (c is! File) continue;
-        if (_skippedDirs.any((d) => p.split(c.path).contains(d))) continue;
+        // 完整路径只拆一次，再在 Set 上做 O(1) 命中判断。
+        // 原来对每个跳过目录都重新 split 一次完整路径（7 目录约 7×）。
+        final segments = p.split(c.path);
+        if (segments.any(_skippedDirs.contains)) continue;
         if (patterns.isNotEmpty && !patterns.any((r) => r.hasMatch(p.basename(c.path)))) continue;
         files.add(c.path);
         if (files.length >= 5000) {
