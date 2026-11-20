@@ -131,15 +131,20 @@ terminal_page.dart ──(ref.read/watch, 40+ 处)──▶ agent_provider.dart
 
 ### 3.3 R5 终态审计（关键）
 
-| 路径 | status | finish | flush |
-|---|---|---|---|
-| AI finish / no-command 耗尽 / 工具重试耗尽 / maxSteps / cancel | ✅ | ✅ | ✅ |
-| executor 为 null（1040–1056） | ✅ | ✅ | ❌ |
-| `_startTask` 外层 catch（1059–1098） | ✅ | ✅ | ❌（1082 注释把"失败不 flush"写成既定语义，与 R5 冲突） |
-| `_resumeTask` catch（1345–1362） | ✅ | ✅ | ❌ |
-| 未连接（1422–1439） | ✅ | ✅ | ❌ |
-| `_callAI` 异常（1618–1665） | ✅ | ✅ | ❌（1638 还把半截正文覆盖成错误串） |
-| ask 用户取消选择（3934–3937） | ❌ | ❌ | ❌（任务悬在 waitingConfirm） |
+> **复核修正（见 §5.2）**：初版把失败路径的 flush 全标 ❌，是基于"flush 只走 onCompleted"的误判。
+> 实际 provider 的 `onError`（`:735`）同样会调 `_flushStreamingToContent`。下表已按复核结果修正：
+> 只有 `_resumeTask` catch 与 ask 异常取消两条真缺 flush，均已修。
+
+| 路径 | status | finish | flush | 说明 |
+|---|---|---|---|---|
+| AI finish / no-command 耗尽 / 工具重试耗尽 / maxSteps / cancel | ✅ | ✅ | ✅ | cancel 走 onCompleted（:1197） |
+| executor 为 null（1040–1056） | ✅ | ✅ | ✅ | onError :1041 触发 flush |
+| `_startTask` 外层 catch（1059–1098） | ✅ | ✅ | ✅ | onError :1092 触发；:1082 注释措辞有误但不影响行为 |
+| `_resumeTask` catch（1345–1362） | ✅ | ✅ | ❌→✅ | **真缺**，原两回调都不调，已补 onError |
+| 未连接（1422–1439） | ✅ | ✅ | ✅ | onError :1424 触发 |
+| `_callAI` 异常（1618–1665） | ✅ | ✅ | ✅ | onError :1644 触发（:1638 覆盖 engine 侧正文，但 provider reducer 独立，不影响 flush 内容） |
+| ask 正常取消/pause（3934–3937） | ✅(cancelled/paused) | ✅ | ✅ | cancel/pause 先设状态再 complete('')，前面分支已 return |
+| ask 异常取消（外部 selectChoice('')） | ❌ | ❌ | ❌→✅ | 悬在 waitingConfirm，已补防御性收口 |
 
 ### 3.4 R1 竞态缺口
 
@@ -241,9 +246,9 @@ AgentEngine facade (循环 + 生命周期 + 7 Completer)
 | P0 | `agent_provider.dart:1524/1537/1550` | 走 `_activeEngine()`，去掉 `_engineScopeId ?? ''` | 低 |
 | P0 | `agent_provider.dart:405–420 / 2205–2220` | clear 前补 `_flushStreamingToContent(scopeId)` | 低 |
 | P0 | `agent_engine.dart:3753/4003/3302/3330/3441/3780/4031` | await 后加 `generation != _currentTaskGeneration` 检查 | 低 |
-| P1 | `agent_engine.dart:1082` 及相关 5 处 | 失败终态统一 flush（与 R5 对齐），保留 error 状态 | 中（需确认 UI 兼容） |
-| P1 | `agent_engine.dart:902 / 4658` | `_aiDoneCompleter = null` 前先 `complete()` | 低 |
-| P1 | `agent_engine.dart:3934–3937` | ask 取消选择补终态（status/finish/flush） | 低 |
+| P1 | `agent_engine.dart` 失败终态 | 复核后仅 `_resumeTask` catch 真缺 flush（详见 §5.2），已补 onError | 低 |
+| P1 | `agent_engine.dart:902 / 4679`（原记 4658，为改前行号） | `_aiDoneCompleter = null` 前先 `complete()` | 低 |
+| P1 | `agent_engine.dart:3949–3960` | ask 异常取消补防御性终态（正常 cancel/pause 已正确） | 低 |
 
 建议单独一个 commit 修前 5 项（P0），第 6 项单独评估后再做。
 
@@ -265,7 +270,32 @@ AgentEngine facade (循环 + 生命周期 + 7 Completer)
 
 **验证**：`flutter analyze` 81 issues / 0 error（与基线持平，无新增告警）；`flutter test` 1689 passed / 25 skipped（与基线一致）。
 
-第 6 项（P1，5 条失败终态统一 flush）单独评估后再做，本轮不动。
+### 5.2 P1 实施记录（2026-11-20）
+
+第 6–8 项 P1 也已落地，改动 1 个文件（`agent_engine.dart`，+25/−0）。
+
+**关键复核修正**：§3.3/§5 曾声称"5 条失败终态缺 flush"，逐条核查后**证实只有 1 条真缺**。判断依据是 flush 的实际触发点——provider 的 `onError` 回调（`:735`）和 `onCompleted`（`:777`）都会调 `_flushStreamingToContent`，并非只有 `onCompleted`：
+
+| 失败终态 | 是否调 onError/onCompleted | 是否真缺 flush |
+|---|---|---|
+| executor null（:1043） | onError :1041 | ✗ 不缺 |
+| `_startTask` catch（:1068） | onError :1092 | ✗ 不缺 |
+| 未连接（:1426） | onError :1424 | ✗ 不缺 |
+| `_callAI` 异常（:1647） | onError :1644 | ✗ 不缺 |
+| cancel（:1109） | onCompleted :1197 | ✗ 不缺 |
+| **`_resumeTask` catch（:1349）** | **两者都不调** | **✓ 真缺，已修** |
+
+| 项 | 落地方式 |
+|---|---|
+| P1-1（修正后） | 仅 `_resumeTask` catch 补 `onError?.call(_friendlyErrorMessage(e))`，触发 flush + 错误状态，与其余失败终态一致 |
+| P1-2 | `_resetTransientState`（:902）与 `_finishTask`（:4679）的 `_aiDoneCompleter = null` 前均补 `if (!dc.isCompleted) dc.complete()`，与 cancelTask/pauseTask 一致，消除 awaiter 永久挂起 |
+| P1-3 | `_handleAskAction` 的 `choice.isEmpty` 分支加防御：若状态仍为 `waitingConfirm`（非 cancel 的 cancelled / pause 的 paused，正常来源已在前面 return），用 `_finishTask(success:false)` 主动收口，避免异常路径下任务永久悬在等待选择态 |
+
+**未改的点（附理由）**：
+- `_callAI` 异常 :1638 的 `_accumulatedMessage = errorMsg`：provider reducer 通过 `onMessage` 独立累积流式正文，engine 侧这个覆盖不影响 flush 内容；改动反而影响"继续对话"的历史，风险超收益。
+- §3.2 表中 902/4658 之外，`cancelTask`(:1160)、`pauseTask`(:1236)、流 onDone(:2257) 三处 complete 本就正确，无需动。
+
+**验证**：`flutter analyze` 81 issues / 0 error；`flutter test` 1689 passed / 25 skipped（与基线一致）。
 
 ---
 

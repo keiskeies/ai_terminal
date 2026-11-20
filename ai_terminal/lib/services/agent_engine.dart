@@ -899,6 +899,11 @@ class AgentEngine {
     _aiStreamTimeoutRetries = 0;
     _aiStreamSub?.cancel();
     _aiStreamSub = null;
+    // R1: 与 cancelTask/pauseTask 一致，等待中的 awaiter 必须先 complete 再置 null。
+    // 只置 null 会丢掉 future 唯一出口，挂起的旧循环永远醒不过来（等确认时
+    // 暂停→resumeTask 开头调本方法即可走到）。complete 幂等，已完成的不会报错。
+    final dc = _aiDoneCompleter;
+    if (dc != null && !dc.isCompleted) dc.complete();
     _aiDoneCompleter = null;
     _aiCancelToken = null;
     _commandCancelToken = null;
@@ -1359,6 +1364,11 @@ class AgentEngine {
           summary: '${L10n.str.taskFailed}: ${_friendlyErrorMessage(e)}',
           finishState: AgentFinishState.failed,
         ));
+        // R5/R2: 恢复失败也要 flush 流式内容到持久化。provider 侧只在
+        // onError/onCompleted 回调里做 flush；这条路径原先两个都不调，
+        // 暂停前已流式输出的内容会随 _resetTransientState 丢失。
+        // 与其他失败终态一致，调 onError 触发 flush + 错误状态写入。
+        onError?.call(_friendlyErrorMessage(e));
       }
     }
   }
@@ -3939,6 +3949,14 @@ class AgentEngine {
 
     if (choice.isEmpty) {
       agentLogger.info('ReAct', '用户取消选择');
+      // R5: 正常来源（cancelTask/pauseTask）会在 complete('') 前把状态设为
+      // cancelled/paused，上面已分别 return。若走到这里状态仍是 waitingConfirm，
+      // 说明是外部直接 selectChoice('') 等异常路径 —— 必须主动收口，否则任务
+      // 永久悬在等待选择态、UI 卡住。用 _finishTask 一次完成 status/report/
+      // finish/flush，与其他失败终态一致。
+      if (_currentTask?.status == AgentStatus.waitingConfirm) {
+        _finishTask(success: false, summary: L10n.str.taskCancelled);
+      }
       return false;
     }
 
@@ -4666,6 +4684,11 @@ class AgentEngine {
     _aiStreamTimedOut = false;
     _aiStreamSub?.cancel();
     _aiStreamSub = null;
+    // R1: 与 _resetTransientState/cancelTask/pauseTask 一致，先 complete 再置 null。
+    // 若走到这里 doneCompleter 尚未 complete（流未 onDone），说明仍有 awaiter
+    // 挂在 future 上，直接置 null 会让它永久挂起；complete 幂等，已完成时是 no-op。
+    final dc = _aiDoneCompleter;
+    if (dc != null && !dc.isCompleted) dc.complete();
     _aiDoneCompleter = null;
     _aiCancelToken = null;
     _commandCancelToken = null;
