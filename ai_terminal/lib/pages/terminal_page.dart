@@ -250,14 +250,20 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       ? _defaultAiPanelWidth
       : (_tabAiPanelWidth[tabId] ?? _defaultAiPanelWidth);
 
-  void _setAiPanelVisible(String? tabId, bool visible) {
+  /// [updateDefault] 表示是否同步写全局默认并落盘。用户显式切开关时为 true；
+  /// 仅对某个（可能是后台）tab 调整自身面板态时为 false，避免后台 tab 渗透全局。
+  void _setAiPanelVisible(String? tabId, bool visible,
+      {bool updateDefault = true}) {
     if (tabId != null) _tabAiPanelVisible[tabId] = visible;
+    if (!updateDefault) return;
     _defaultAiPanelVisible = visible;
     SettingsDao.set('aiPanelVisible', visible);
   }
 
-  void _setAiPanelPosition(String? tabId, _AiPanelPosition position) {
+  void _setAiPanelPosition(String? tabId, _AiPanelPosition position,
+      {bool updateDefault = true}) {
     if (tabId != null) _tabAiPanelPosition[tabId] = position;
+    if (!updateDefault) return;
     _defaultAiPanelPosition = position;
     SettingsDao.set('aiPanelPosition', position.name);
   }
@@ -352,15 +358,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   bool get _isMobile => Platform.isAndroid || Platform.isIOS;
 
   // Per-tab 状态便捷访问器（自动根据 _currentTabId 读写对应 tab 的状态）
+  // 注意：命令执行/确认的写入路径已改用 tab.id 显式寻址（见 _executeLineDirectly），
+  // 不再经过这些隐式 getter，避免 await 期间切 tab 写错对象。
   String? get _executingCommand =>
       _currentTabId != null ? _tabExecutingCommand[_currentTabId!] : null;
-  set _executingCommand(String? v) {
-    if (_currentTabId != null) _tabExecutingCommand[_currentTabId!] = v;
-  }
-
-  Set<String> get _executedCommands => _currentTabId != null
-      ? (_tabExecutedCommands[_currentTabId!] ??= {})
-      : {};
   String? get _pendingConfirmCommand =>
       _currentTabId != null ? _tabPendingConfirm[_currentTabId!] : null;
   set _pendingConfirmCommand(String? v) {
@@ -5134,15 +5135,21 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 直接执行命令行
   Future<void> _executeLineDirectly(
       String command, bool dangerous, tp.TerminalTab tab) async {
+    // R1+R3: 命令发给传入的 tab，状态也必须记到该 tab 名下。
+    // 下方有 800ms await，期间用户可能切 tab；_executingCommand / _executedCommands
+    // 这些便捷 getter 是按 _currentTabId 寻址的，await 后会写到新 tab 上。
+    // 这里全部改为用捕获的 tab.id 显式寻址，全程绑定命令归属的 tab。
+    final tabId = tab.id;
+
     // 危险命令：首次点击展开内联确认按钮，第二次点击确认才执行
-    if (dangerous && _pendingConfirmCommand != command) {
-      setState(() => _pendingConfirmCommand = command);
+    if (dangerous && _tabPendingConfirm[tabId] != command) {
+      setState(() => _tabPendingConfirm[tabId] = command);
       return;
     }
     // 确认执行或安全命令直接执行
-    setState(() => _pendingConfirmCommand = null);
+    setState(() => _tabPendingConfirm[tabId] = null);
 
-    setState(() => _executingCommand = command);
+    setState(() => _tabExecutingCommand[tabId] = command);
 
     // 发送命令到终端
     if (tab.isLocal) {
@@ -5155,8 +5162,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
     if (mounted) {
       setState(() {
-        _executedCommands.add(command);
-        _executingCommand = null;
+        (_tabExecutedCommands[tabId] ??= {}).add(command);
+        _tabExecutingCommand[tabId] = null;
       });
     }
   }
@@ -5419,7 +5426,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final tabId = tab?.id ?? _currentTabId ?? '';
     setState(() {
       _tabAiInputText[tabId] = prompt;
-      _setAiPanelVisible(tabId, true);
+      // 右键的可能是后台 tab：只展开它自己的面板，不写全局默认、不落盘
+      _setAiPanelVisible(tabId, true, updateDefault: false);
     });
     clearTopToast();
     showTopSnackBar(

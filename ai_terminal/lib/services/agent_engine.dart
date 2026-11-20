@@ -3749,6 +3749,10 @@ class AgentEngine {
     // 变更台账：非 safe 级命令（即修改性命令）记录到台账，便于事后追溯和回滚
     // safe 级命令（ls/cat/grep 等只读命令）不记录，避免台账膨胀
     if (safetyLevel != SafetyLevel.safe && hostId != null) {
+      // R1: await 期间用户可能 cancel + startTask 开启新任务。下面的台账写入
+      // 是共享 list（_operationChanges/_operationChangeIds），捕获本任务代际，
+      // await 回来后若代际已变，说明命令属于旧任务，不能污染新 operation 报告。
+      final genAtRecord = _currentTaskGeneration;
       try {
         final record = await ChangeRecordService.record(
           hostId: hostId!,
@@ -3756,7 +3760,9 @@ class AgentEngine {
           success: result.success,
           conversationId: _currentTask?.operationId ?? _operationId,
         );
-        if (record.success && _operationChanges.length < 100) {
+        if (genAtRecord == _currentTaskGeneration &&
+            record.success &&
+            _operationChanges.length < 100) {
           _operationChangeIds.add(record.id);
           _operationChanges.add(OperationChange(
             id: record.id,
@@ -3999,6 +4005,9 @@ class AgentEngine {
     final description =
         ChangeRecordService.describeFileToolChange(toolName, args);
 
+    // R1: 同 shell 命令台账，await 写库期间可能切到新任务；捕获代际后再决定
+    // 是否写入共享 list，避免旧文件变更污染新 operation 报告。
+    final genAtRecord = _currentTaskGeneration;
     try {
       final record = await ChangeRecordService.record(
         hostId: targetHost,
@@ -4009,7 +4018,9 @@ class AgentEngine {
         localRestoreFrom: result.restoreFrom,
         localRestoreTo: result.restoreTo,
       );
-      if (record.success && _operationChanges.length < 100) {
+      if (genAtRecord == _currentTaskGeneration &&
+          record.success &&
+          _operationChanges.length < 100) {
         _operationChangeIds.add(record.id);
         _operationChanges.add(OperationChange(
           id: record.id,

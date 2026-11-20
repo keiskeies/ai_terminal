@@ -405,6 +405,11 @@ class AgentNotifier extends StateNotifier<AgentState> {
   void removeTab(String tabId, {String? hostId}) {
     final scopeId = tabId.isNotEmpty ? tabId : hostId;
     if (scopeId == null) return;
+    // R2: 关 tab 时先把最后的 assistant 流式正文固化到 content 并落盘。
+    // 必须在 removeScope（清理 conversationId）和 _reducer.reset（清空增量）
+    // 之前做，否则这段正文会随 tab 一起丢失；也不能依赖 cancelTask 的
+    // onCompleted，因为紧接着就会 _clearEngineCallbacks 把它清空。
+    _flushStreamingToContent(scopeId);
     final engine = _registry.getEngine(scopeId);
     if (engine != null) {
       // L16 修复：先清空回调再 cancel，避免 cancelTask 触发的 onTaskUpdated 污染状态
@@ -1522,41 +1527,49 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
   /// 确认执行危险命令（自动模式）
   void confirmCommand() {
-    if (_engine != null && _engine!.hasPendingConfirm) {
-      _engine!.confirmDangerousCommand();
-      _updateScopeState(
-          _engineScopeId ?? '',
-          (s) => s.copyWith(
-                status: AgentStatus.executing,
-                clearPendingConfirm: true,
-              ));
-    }
+    // R3: 与 cancel/pause/resume 一致，活跃 tab 的用户交互统一走 _activeEngine，
+    // 不能直读可能滞后的 _engine + _engineScopeId（removeTab 后后者为空串会串台）。
+    final active = _activeEngine();
+    final engine = active.engine;
+    final scopeId = active.scopeId;
+    if (engine == null || scopeId == null || !engine.hasPendingConfirm) return;
+    engine.confirmDangerousCommand();
+    _updateScopeState(
+        scopeId,
+        (s) => s.copyWith(
+              status: AgentStatus.executing,
+              clearPendingConfirm: true,
+            ));
   }
 
   /// 拒绝执行危险命令（自动模式）
   void rejectCommand() {
-    if (_engine != null && _engine!.hasPendingConfirm) {
-      _engine!.rejectDangerousCommand();
-      _updateScopeState(
-          _engineScopeId ?? '',
-          (s) => s.copyWith(
-                status: AgentStatus.thinking,
-                clearPendingConfirm: true,
-              ));
-    }
+    final active = _activeEngine();
+    final engine = active.engine;
+    final scopeId = active.scopeId;
+    if (engine == null || scopeId == null || !engine.hasPendingConfirm) return;
+    engine.rejectDangerousCommand();
+    _updateScopeState(
+        scopeId,
+        (s) => s.copyWith(
+              status: AgentStatus.thinking,
+              clearPendingConfirm: true,
+            ));
   }
 
   /// 用户选择选项
   void selectChoice(String choice) {
-    if (_engine != null && _engine!.hasPendingChoice) {
-      _engine!.selectChoice(choice);
-      _updateScopeState(
-          _engineScopeId ?? '',
-          (s) => s.copyWith(
-                status: AgentStatus.thinking,
-                clearPendingOptions: true,
-              ));
-    }
+    final active = _activeEngine();
+    final engine = active.engine;
+    final scopeId = active.scopeId;
+    if (engine == null || scopeId == null || !engine.hasPendingChoice) return;
+    engine.selectChoice(choice);
+    _updateScopeState(
+        scopeId,
+        (s) => s.copyWith(
+              status: AgentStatus.thinking,
+              clearPendingOptions: true,
+            ));
   }
 
   /// 清空消息（同时清除引擎对话历史 + 持久化）
@@ -2203,6 +2216,12 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
   @override
   void dispose() {
+    // R2: 与 removeTab/switchTab 一致，dispose 时也先固化各 scope 的流式正文，
+    // 再做清回调/cancel。顺序不能反：clear 回调后 cancelTask 的 onCompleted 为空，
+    // 后面的 _reducer.dispose 会直接丢弃未固化的 streamingContent。
+    for (final scopeId in _registry.scopeIds.toList()) {
+      _flushStreamingToContent(scopeId);
+    }
     // R2: 先清空所有回调，再 cancelTask，防止 cancelTask 触发的 onTaskUpdated 写已 disposed 的 state
     for (final engine in _registry.engines) {
       _clearEngineCallbacks(engine);
