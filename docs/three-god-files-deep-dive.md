@@ -177,16 +177,29 @@ AgentEngine facade (循环 + 生命周期 + 7 Completer)
 - **Step 0 特征化测试**：✅ 已补（提交 `40853c8`）——`test/react_parser_test.dart` 15 例 + CI quality 门禁 + 终态写入棘轮脚本 `tools/check_terminal_writes.py`（基线 10，待 TerminationGuard 落地后降为 0）。终态断言经复核修正：5 条失败终态缺 flush 实为 1 条（`_resumeTask` catch），已在 P1 修复。
 - **Step 1–4 叶子拆分**：✅ 已落地 3/4（保留 `*ForTesting` 转发，145 个 agent 测试零改动）：
   - Step 1 `ReActParser`（`287ffb4`）：358 行纯静态解析 → `lib/services/react_parser.dart`，engine 留薄转发壳。
-  - Step 2 `PromptBuilder`：**部分落地**（`3d701f1`）—— 复核发现 `_buildSystemPrompt` 并非报告原判的「纯函数无引擎依赖」，而是直接/间接依赖 7 个实例字段（`_modelConfig`/`hostId`/`_tools`/`_orchestratorMode`/`_memory`/`_webSearchEnabled`/`_permissionMode`），且 `_syncWebToolsRegistration` 带副作用改写 `_tools`。主体整体提取等于重构语义，风险中-高，**暂缓**；留待 `ToolOrchestrator`（`_tools` 所有权迁移）之后一并处理。本轮先抽出 4 个可显式传参的纯文本叶子到 `lib/services/prompt_builder.dart`：`isSudoCommand`、`planStatusGlyph`、`buildPlanProgressBlock(plan)`、`executionLocationPrompt(executor)`、`permissionModePrompt(mode)`；计划进度标记常量也收敛为单一来源。engine 留薄转发壳，调用点零改动；新增 `test/prompt_builder_test.dart` 6 例。至此 Step 1–4 叶子拆分 **4/4 均已有产出**（PromptBuilder 主体除外）。
+  - Step 2 `PromptBuilder`：**部分落地**（`3d701f1`）—— 复核发现 `_buildSystemPrompt` 并非报告原判的「纯函数无引擎依赖」，而是直接/间接依赖 7 个实例字段（`_modelConfig`/`hostId`/`_tools`/`_orchestratorMode`/`_memory`/`_webSearchEnabled`/`_permissionMode`），且 `_syncWebToolsRegistration` 带副作用改写 `_tools`。主体整体提取等于重构语义，风险中-高，**暂缓**；Step 6 已判定 `_tools` 所有权迁移否决（见下），故维持暂缓，不再以「等 ToolOrchestrator」为前置。本轮先抽出 4 个可显式传参的纯文本叶子到 `lib/services/prompt_builder.dart`：`isSudoCommand`、`planStatusGlyph`、`buildPlanProgressBlock(plan)`、`executionLocationPrompt(executor)`、`permissionModePrompt(mode)`；计划进度标记常量也收敛为单一来源。engine 留薄转发壳，调用点零改动；新增 `test/prompt_builder_test.dart` 6 例。至此 Step 1–4 叶子拆分 **4/4 均已有产出**（PromptBuilder 主体除外）。
   - Step 3 `EventStore`（`88cd6fb`）：`_eventSeq` + 轮内两个集合 → `lib/services/event_store.dart`（`EventStore` 跨轮序号 + `EventScope` 轮内去重）。保留「序号跨轮递增、去重集合轮内隔离」的原始语义；新增 7 例特征化测试，含「两轮相同 ask 不撞 id」回归。
   - Step 4 `HistoryPolicy`（`720d6fd`）：三层裁剪 + 3 个上限常量 → `lib/services/history_policy.dart`，唯一实例依赖 `effectiveContextWindow` 改显式入参；22 处调用点经 `_trimMessages` 转发零改动。新增 8 例特征化测试。
-  - 每次拆分均通过 `flutter analyze`（81 issues / 0 error 基线）与全量测试（Step 5 后现 1758 passed / 25 skipped）。
+  - 每次拆分均通过 `flutter analyze`（81 issues / 0 error 基线）与全量测试（Step 6 后现 1793 passed / 25 skipped）。
 - **Step 5 已落地（`b2b6593`，2026-11-20）**：新建 `lib/services/command_runner.dart`，按「无状态判定层 → 引擎状态机」分层抽取，engine 净减 159 行、调用点零改动：
   - `CommandRunner`：5 个纯叶子 `logCommand` / `truncateForAudit` / `remainingAnnouncedCommands` / `phaseForCommand` / `enrichCommandEvent`，以及 `blockedCommandReasons` 常量（`_blockedCommandReasons` 改为引用它，单一来源）。
   - `CommandPreflight.evaluate(...)`：执行前五道守卫（链式修改 → PS5.1 `&&` → 远程误发 → 封网期 → 权限拒绝）整体迁出，返回 `CommandBlock{reasonCode, observation, auditOutput, auditTag}`；**顺序在代码与注释中固化**（远程误发必须早于封网期、链式必须最前）。审计写入仍留 engine（需 `hostId` 且 `await`）。
   - **不搬的部分**：`_runCommandWithSafetyInner`(538 行) 与 `_executeCommand`(143 行) 保留原处。复核确认 TerminationGuard 与本区段**零引用**——Guard 统一的是终态顺序，而 Inner 管的是过程态（waitingConfirm/executing 切换、`_confirmCompleter` 与 cancelTask 共享、计数/台账/memory）。搬走会让取消路径只 complete 引擎侧 Completer，runner 的 await 永久挂起（违反 R1）。因此 `_executeCommand` 的 `_commandCancelToken` 生命周期（创建/清空/取消）**不得外移**。
   - 新增 `test/command_runner_test.dart` 24 例（纯叶子 17 + 预检 7），锁定五道守卫的 reasonCode 与审计条件。
-- **Step 6 `ToolOrchestrator`（仍推迟）**：`_tools` 所有权迁移牵动 `_syncWebToolsRegistration` 副作用与 `_buildSystemPrompt`，且与工具确认通道（`_confirmCompleter` 三方共享）交织；待 Step 6 单独立项评估，不与 Step 5 合并。
+- **Step 6 已落地（2026-11-20）**：新建 `lib/services/tool_orchestrator.dart`（350 行），沿用 Step 5 的「无状态判定层 → 引擎状态机」分层，`_handleToolAction` 主体仍留引擎。engine 5158 → 5088（净减 70 行），调用点零改动：
+  - `ToolArgNormalizer`：`{"args": {...}}` 嵌套解包（唯一键 + Map 才解，平铺参数不误伤）。
+  - `ToolAliasRouter`：幻觉别名分类（think / execute / placeholder + 字段优先级），原来约 120 行硬编码分支变成一次 `resolve` + 引擎按 kind 分派。
+  - `ToolDisplayFormatter.describe`：工具参数多行展示；`_formatToolCommandForDisplay` 保留薄转发壳。
+  - `ToolResultPresenter`：8000 字符阈值、成功取 output / 失败优先 error、异常路径不截断；`ToolResultView` 统一派生 result 事件字段。
+  - `ToolGate.evaluate`：三道门禁（未注册 → 只读档 → 作用域）**顺序固化**，返回 `ToolBlock{reason, notice, observation, logMessage, isWarning}`；可用工具清单用惰性 getter，放行路径不构建列表。
+  - `ToolConfirmation`：破坏性工具被拒绝 / 确认超时的文案与事件。保留「10 分钟没人点 ≠ 用户说不」的区分：超时允许重申一次，明确拒绝引导改走 ask/finish。
+  - **不搬的部分**：破坏性工具确认（`_confirmCompleter` 与危险命令、`cancelTask` 三方共享）、`executing/thinking` 状态切换、`_toolCalls`/`_noCommandRetryCount` 计数与终态收口、`_currentProjectRoot`、工具注入回调（cancelToken/sudo/localDir/isTaskActive）、文件变更台账 `_recordToolFileChange`。这些都是过程态所有权，外移会让取消路径只 complete 引擎侧 Completer、编排侧 await 永久挂起（R1）。
+  - 新增 `test/tool_orchestrator_test.dart` **35 例**（解包 5 + 别名 9 + 展示 5 + 结果 6 + 门禁 7 + 确认 4）；全量 **1793 passed / 25 skipped**，analyze 81 issues / 0 error，终态硬禁令 0/0。
+- **Step 6 判定变更：`_tools` 所有权迁移否决（2026-11-20）**。原计划把 `AgentToolRegistry` 从引擎迁出，为 Step 2 `_buildSystemPrompt` 主体提取铺路。实测否决，理由三条：
+  1. `_tools` 不是纯数据容器——`_syncWebToolsRegistration()` 带副作用改写注册状态，且必须在 `buildToolsPrompt()` 之前调用，顺序本身就是正确性约束；
+  2. registry 被 5 条引擎路径横向使用（schema 构建、prompt 构建、作用域过滤、编排器启停、变更工具判定），换持有者不减少耦合，只增加一层间接；
+  3. `setLocalFileRoots` 注入的是闭包，读 `_currentProjectRoot`；`dispose` 又与引擎生命周期绑定（R2）。迁移会把「注册状态 / 项目根 / 释放顺序」三件事拆到两个对象，反而扩大生命周期缺口。
+  结论：`ToolOrchestrator` 只承接无状态部分；`_tools` 继续由引擎持有，Step 2 PromptBuilder 主体**维持暂缓**（理由从「等 ToolOrchestrator」改为「registry 生命周期设计的收益低于风险」）。这也是 Step 5 那条教训的延续：**Guard 只统一终态顺序，不改变过程态所有权**。
 - **Step 5–6 旧判定（已失效，保留供追溯）**：原判「Step 5 推迟到 Guard 之后、`_executeCommand` 可变成纯执行器」——前一句成立（Guard 已落地），后一句经实测**不成立**：Guard 只统一终态，不改变过程态所有权。实际落地改为上述分层方案。
 - **Step 7 已落地（阶段 A/B/C，2026-11-20）**：新建 `lib/services/termination_guard.dart`，每引擎一个实例（严禁 static），`terminate({status, finishState, writeStatus, emitReport, emitFinish, flush, endTracer, cleanup, expectedGeneration})` 固定顺序 status→report→finish→flush→tracer，cleanup 放 try/finally，入口代际检查 + 同代际幂等。分三阶段零回归落地：
   - **阶段 A**（`352ab83`）：`_finishTask` 委托 Guard，9 个调用点零改动；新增 7 例 Guard 测试。
@@ -342,7 +355,7 @@ AgentEngine facade (循环 + 生命周期 + 7 Completer)
 
 ## 7. 测试安全网
 
-- 现有全量基线：`flutter test` = **1758 passed / 25 skipped**，`flutter analyze` = 81 issues / 0 error。
+- 现有全量基线：`flutter test` = **1793 passed / 25 skipped**，`flutter analyze` = 81 issues / 0 error。
 - `test/agent_*` 约 145 例，其中 `agent_engine_resilience_test.dart` 25 例、`agent_tab_scope_test.dart` 9 例是直接安全网。
 - **已补（2026-11-20）**：`test/react_parser_test.dart` 新增 15 例，直接覆盖刚抽出的 `ReActParser.parseReActResponse` 动作分流（execute/finish/ask/tool/空响应/无动作回退/isTaskComplete/复用 parsedEvents）与 `parseAnswerBlock`（围栏防误切、有界截断、无回答返回 null）、`parseReportSections`。这是 ReActParser 拆分的行为锁定安全网。
 - **仍存缺口（待 TerminationGuard 落地后补）**：失败终态 finish+flush 的独立断言；"旧命令 record 在 cancel+新任务后返回"回归；"两 scope 同时终态 guard 不串台"用例；`_aiDoneCompleter` 置 null 断言；ask 取消选择终态断言。这些路径深度耦合引擎私有状态，补单测需大量 `ForTesting` 后门，风险超收益，留到 TerminationGuard 收口时一并补。
