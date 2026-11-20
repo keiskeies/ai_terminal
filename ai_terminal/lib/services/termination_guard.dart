@@ -77,4 +77,26 @@ class TerminationGuard {
     }
     return true;
   }
+
+  /// UI 状态层（AgentNotifier 的 AgentState.status）终态决策的唯一入口。
+  ///
+  /// 与 [terminate] 不同：这里是 provider 的 UI 态（让界面退出运行态），
+  /// 没有 engine 的 report/finish/tracer 骨架，也不做代际检查（provider
+  /// 不持有 engine generation）。返回传入的终态原值供 `copyWith` 使用，
+  /// 同时记入 [_uiStatusHistory] 便于诊断；流式落盘由调用方在写入前完成。
+  ///
+  /// 所有 UI 终态赋值都经此入口，棘轮检查才能安全降为硬禁令。
+  AgentStatus resolveUiStatus(AgentStatus status) {
+    _uiStatusHistory.add(status);
+    if (_uiStatusHistory.length > 32) {
+      _uiStatusHistory.removeAt(0);
+    }
+    return status;
+  }
+
+  /// 最近若干次 UI 终态决策（诊断用，有界避免无界增长）。
+  final List<AgentStatus> _uiStatusHistory = <AgentStatus>[];
+
+  /// UI 终态决策次数（诊断用）。
+  int get uiStatusCount => _uiStatusHistory.length;
 }

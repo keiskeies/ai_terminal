@@ -138,5 +138,26 @@ void main() {
 
       expect(written, AgentStatus.cancelled);
     });
+
+    group('UI 态终口', () {
+      test('resolveUiStatus 返回原值并记录决策', () {
+        final uiGuard = TerminationGuard(hostId: null, generation: () => 0);
+
+        expect(uiGuard.resolveUiStatus(AgentStatus.cancelled),
+            AgentStatus.cancelled);
+        expect(uiGuard.resolveUiStatus(AgentStatus.failed), AgentStatus.failed);
+        expect(uiGuard.uiStatusCount, 2);
+      });
+
+      test('UI 终态历史有界（不超过 32 条）', () {
+        final uiGuard = TerminationGuard(hostId: null, generation: () => 0);
+
+        for (var i = 0; i < 100; i++) {
+          uiGuard.resolveUiStatus(AgentStatus.cancelled);
+        }
+
+        expect(uiGuard.uiStatusCount, 32);
+      });
+    });
   });
 }

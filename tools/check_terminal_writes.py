@@ -4,17 +4,18 @@
 背景
 ----
 深度分析报告 §7 要求「除 TerminationGuard 外禁止直接给
-AgentStatus.completed|failed|cancelled 赋值」。但 TerminationGuard 尚未实现，
-当前引擎/ provider 内有若干**合法**的直接终态写入。此刻就上硬性禁令会全红。
+AgentStatus.completed|failed|cancelled 赋值」。
 
-本脚本采用「棘轮（ratchet）」策略：把当前终态写入点数量记为基线，
-CI 中若发现**新增**写入点即失败，防止在 TerminationGuard 落地前写入点继续扩散。
-等 TerminationGuard 收口后，把基线逐步降到 0 并切换为硬禁令即可。
+TerminationGuard 已落地（阶段 A/B/C）：engine 7 条裸写终态路径与
+provider 2 处 UI 终态写入均已收口。本脚本由「棘轮」切换为**硬禁令**：
+基线 0，lib/ 下任何绕过 Guard 的裸写终态赋值都会令 CI 失败。
+
+合法收口入口（不计入裸写）：
+- engine: `_terminationGuard.terminate(status: ...)`
+- provider UI 态: `_uiTerminationGuard.resolveUiStatus(...)`
 
 计数口径：lib/ 下形如 `status: ... AgentStatus.(completed|failed|cancelled)` 的
-写入（copyWith / 构造器），排除 `==`、`case`、`?.status` 等只读比较，
-以及 TerminationGuard 的 `terminate(status: ...)` 收口参数（那是合法收口，
-不是裸写；收口进度另由文档跟踪）。
+写入（copyWith / 构造器），排除 `==`、`case`、`?.status` 等只读比较。
 """
 from __future__ import annotations
 
@@ -22,9 +23,9 @@ import re
 import sys
 from pathlib import Path
 
-# 当前合法基线（阶段 B 逐条收口中，只降不升）
-# 2026-11-20 初始 10（engine 8 + provider 2）→ 阶段A 后 8 → engine 7 条裸写全收口后 2（仅 provider）
-BASELINE = 2
+# 硬禁令：TerminationGuard 阶段 C 完成后裸写终态必须为 0
+# 2026-11-20 演进：10 → 8（阶段A）→ 2（阶段B engine 收口）→ 0（阶段C provider 收口）
+BASELINE = 0
 
 # 匹配终态写入：status: <expr>AgentStatus.<terminal>
 WRITE_RE = re.compile(
@@ -51,7 +52,9 @@ def count_writes(lib_dir: Path) -> list[str]:
                 if terminate_depth <= 0:
                     in_terminate = False
 
-            if WRITE_RE.search(line) and not in_terminate:
+            # 经 TerminationGuard 收口的写入（engine terminate / UI resolveUiStatus）不算裸写
+            via_guard = in_terminate or ".resolveUiStatus(" in stripped
+            if WRITE_RE.search(line) and not via_guard:
                 # 排除以比较/switch 形式出现的误命中
                 if any(hint in stripped for hint in READ_HINTS) and "status:" not in stripped:
                     continue
@@ -74,8 +77,9 @@ def main() -> int:
 
     if n > BASELINE:
         print(
-            "::error::终态写入点超过基线。TerminationGuard 收口前请复用现有终态路径；"
-            "如确需新增，先更新 BASELINE 并说明理由。"
+            "::error::发现绕过 TerminationGuard 的裸写终态赋值。"
+            "请改用 _terminationGuard.terminate(...)（engine）或 "
+            "_uiTerminationGuard.resolveUiStatus(...)（provider UI 态）。"
         )
         return 1
     return 0

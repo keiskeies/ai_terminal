@@ -9,6 +9,7 @@ import '../models/agent_permission_mode.dart';
 import '../models/ai_model_config.dart';
 import '../models/conversation.dart';
 import '../services/agent_engine.dart';
+import '../services/termination_guard.dart';
 import '../services/agent_host_registry.dart';
 import '../services/agent_stream_reducer.dart';
 import '../services/ai_service.dart';
@@ -44,6 +45,14 @@ class AgentNotifier extends StateNotifier<AgentState> {
   AgentEngine? _engine;
   CommandExecutor? _executor;
   AIModelConfig? _modelConfig;
+
+  /// R5: UI 状态层的终态收口入口（每 Notifier 一个实例，非 static）。
+  /// provider 不持有 engine generation，故 generation 闭包返回常量；
+  /// 仅用 terminateUi 收口 AgentState.status 的终态赋值。
+  final TerminationGuard _uiTerminationGuard = TerminationGuard(
+    hostId: null,
+    generation: () => 0,
+  );
 
   /// 多 host 状态注册表：管理每个 host 的状态、引擎、执行器、记忆等
   final AgentHostRegistry _registry = AgentHostRegistry();
@@ -314,7 +323,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
         }
       }
       return s.copyWith(
-        status: AgentStatus.cancelled,
+        status: _uiTerminationGuard.resolveUiStatus(AgentStatus.cancelled),
         currentTask: engine.currentTask,
         chatItems: items,
         clearPendingConfirm: true,
@@ -1510,7 +1519,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
         }
         // 不依赖引擎回调：即使 engine 还没有 _currentTask，UI 也必须马上退出运行态
         return s.copyWith(
-          status: AgentStatus.cancelled,
+          status: _uiTerminationGuard.resolveUiStatus(AgentStatus.cancelled),
           currentTask: engine?.currentTask,
           chatItems: items,
           clearPendingConfirm: true,
