@@ -389,4 +389,36 @@ void main() {
       expect(events.where((e) => e.type == AgentEventType.text), isEmpty);
     });
   });
+
+  // 回归（2026-11-20 真机）：模型在文本协议里吐孤立 XML 闭合标签，
+  // 成对正则匹配不到，脏标签漏进 命令: 被原样执行 →
+  // PowerShell 报 "'<' 不是可识别的 cmdlet"。
+  group('ReActStreamParser - XML 残留清理', () {
+    test('命令行尾孤立 </parameter> 被剥离', () {
+      const response =
+          '动作: execute\n命令: Get-ChildItem -Force | Format-Table\n</parameter>';
+      final events = ReActStreamParser.parse(response);
+      final cmd = events.lastWhere((e) => e.type == AgentEventType.command);
+      expect(cmd.command, isNot(contains('parameter>')));
+      expect(cmd.command, contains('Get-ChildItem'));
+    });
+
+    test('同一行尾巴带 </parameter> 也被剥离', () {
+      const response =
+          '动作: execute\n命令: Get-ChildItem C:\\Temp</parameter>';
+      final events = ReActStreamParser.parse(response);
+      final cmd = events.lastWhere((e) => e.type == AgentEventType.command);
+      expect(cmd.command, isNot(contains('parameter>')));
+      expect(cmd.command, contains('C:'));
+    });
+
+    test('真正的尖括号内容不被误删', () {
+      const response =
+          '动作: execute\n命令: echo "a<b>c" > out.txt';
+      final events = ReActStreamParser.parse(response);
+      final cmd = events.lastWhere((e) => e.type == AgentEventType.command);
+      expect(cmd.command, contains('a<b>c'));
+      expect(cmd.command, contains('out.txt'));
+    });
+  });
 }

@@ -373,7 +373,8 @@ class ReActParser {
             break;
           }
         }
-        final parsed = ToolArgsParser.parse(argsBuffer.toString());
+        final parsed = ToolArgsParser.parse(
+            ReActStreamParser.stripXmlToolCallResidue(argsBuffer.toString()));
         if (parsed != null) {
           toolArgs = parsed;
         } else {

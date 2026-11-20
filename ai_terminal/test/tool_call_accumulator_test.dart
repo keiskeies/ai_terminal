@@ -236,5 +236,65 @@ void main() {
           reason: 'thought + tool_calls 拼接后 "动作: tool" 必须独立成行，'
               '否则 _parseReActResponse 会忽略工具调用。fullResponse=$fullResponse');
     });
+
+    // 回归：真机实测（2026-11-20）模型把 XML 风格工具调用的闭合标签
+    // 残留进了 JSON 参数值内部，导致命令被原样执行后 PowerShell 报
+    // "'<' 不是可识别的 cmdlet"。历史 trace 自 11-06 起多次出现。
+    test('剥离值尾的 </parameter> 残留', () {
+      final acc = ToolCallAccumulator();
+      acc.addDelta([
+        {
+          'index': 0,
+          'id': 'call_x',
+          'type': 'function',
+          'function': {
+            'name': 'execute',
+            'arguments':
+                r'{"command":"Get-ChildItem -Force -File | ForEach-Object { $_.Name }\n</parameter>"}',
+          },
+        },
+      ]);
+      final calls = acc.finalize();
+      expect(calls.single.arguments, isNot(contains('</parameter>')));
+      expect(calls.single.arguments, contains('ForEach-Object'));
+      // 剥离后仍是合法 JSON
+      expect(calls.single.arguments, contains('"command"'));
+    });
+
+    test('剥离 </function> 与值首开启标签', () {
+      final acc = ToolCallAccumulator();
+      acc.addDelta([
+        {
+          'index': 0,
+          'id': 'call_y',
+          'type': 'function',
+          'function': {
+            'name': 'execute',
+            'arguments':
+                r'{"command":"<parameter=command>uptime</function>"}',
+          },
+        },
+      ]);
+      final args = acc.finalize().single.arguments;
+      expect(args, isNot(contains('parameter>')));
+      expect(args, isNot(contains('function>')));
+      expect(args, contains('uptime'));
+    });
+
+    test('正常参数不被残留清理误伤', () {
+      final acc = ToolCallAccumulator();
+      const raw = r'{"path":"C:\\tmp\\a<b>.txt","command":"echo 1 > out.txt"}';
+      acc.addDelta([
+        {
+          'index': 0,
+          'id': 'call_z',
+          'type': 'function',
+          'function': {'name': 'execute', 'arguments': raw},
+        },
+      ]);
+      final args = acc.finalize().single.arguments;
+      expect(args, contains('a<b>'), reason: '真正的尖括号内容必须保留');
+      expect(args, contains('out.txt'));
+    });
   });
 }

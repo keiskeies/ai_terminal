@@ -359,10 +359,33 @@ class ReActStreamParser {
   }
 
   static String _cleanCommand(String command) {
-    return command
+    return stripXmlToolCallResidue(command)
         .replaceAll(_codeFencePrefix, '')
         .replaceAll(_codeFenceSuffix, '')
         .trim();
+  }
+
+  /// 剥离混入命令里的 XML 工具调用残留标签。
+  ///
+  /// 模型受其它 agent 框架先验影响时，会在文本协议里吐孤立的 `</parameter>`、
+  /// `</function>`（没有配套的 `<function=`），上面的两个成对正则都匹配不到，
+  /// 脏标签会漏进 `命令:` 被原样执行 —— PowerShell 报
+  /// `'<' 不是可识别的 cmdlet`。它与 FC 路径的
+  /// `ToolCallAccumulator._stripXmlToolCallResidue` 是同一类污染的两条入口。
+  static final RegExp _xmlResidueTail = RegExp(
+    r'\n\s*</\s*(?:parameter|function|antml:parameter|antml:invoke)\s*>',
+    caseSensitive: false,
+  );
+  static final RegExp _xmlResidueAny = RegExp(
+    r'</\s*(?:parameter|function|antml:parameter|antml:invoke)\s*>',
+    caseSensitive: false,
+  );
+
+  static String stripXmlToolCallResidue(String command) {
+    if (!command.contains('<')) return command;
+    return command
+        .replaceAll(_xmlResidueTail, '')
+        .replaceAll(_xmlResidueAny, '');
   }
 
   /// 解析计划块：

@@ -123,15 +123,16 @@ class ToolCallAccumulator {
   /// （OpenAI 流式拼接有时会丢失尾部 } ）
   static String _repairArguments(String args) {
     if (args.isEmpty) return '{}';
+    final cleaned = _stripXmlToolCallResidue(args);
     try {
-      jsonDecode(args);
-      return args;
+      jsonDecode(cleaned);
+      return cleaned;
     } catch (_) {
       // 简单修复：补全尾部 }
-      final openCount = '{'.allMatches(args).length;
-      final closeCount = '}'.allMatches(args).length;
+      final openCount = '{'.allMatches(cleaned).length;
+      final closeCount = '}'.allMatches(cleaned).length;
       if (openCount > closeCount) {
-        final repaired = '$args${'}' * (openCount - closeCount)}';
+        final repaired = '$cleaned${'}' * (openCount - closeCount)}';
         try {
           jsonDecode(repaired);
           return repaired;
@@ -139,8 +140,43 @@ class ToolCallAccumulator {
           // 修复失败，返回原始（由 ToolArgsParser 走多行格式）
         }
       }
-      return args;
+      return cleaned;
     }
+  }
+
+  /// 剥离混入 FC arguments 的 XML 工具调用残留。
+  ///
+  /// 部分模型受其它 agent 框架（`<function=..><parameter=..>` 风格）先验影响，
+  /// 会在 JSON 参数值内部残留 `\n</parameter>`、`</function>` 之类的标签。
+  /// 这类 JSON 本身合法（标签在字符串值里），`_repairArguments` 不会介入，
+  /// 脏字符被原样当命令执行：PowerShell 报 `'<' 不是可识别的 cmdlet`。
+  ///
+  /// 只删三种明确的残留形态，避免误伤用户真正想写入的文本：
+  /// 1. 值尾的 `\n</tag>`
+  /// 2. 任意位置的已知闭合标签 `</tag>`
+  /// 3. 紧跟字符串起始引号的开启标签 `<parameter=xxx>`
+  static String _stripXmlToolCallResidue(String args) {
+    if (!args.contains('<')) return args;
+    var out = args;
+    // 1. 值尾：转义换行 + 闭合标签（实测最常见的形态）
+    out = out.replaceAll(
+      RegExp(r'\\n\s*</\s*(?:parameter|function|antml:parameter|antml:invoke)\s*>',
+          caseSensitive: false),
+      '',
+    );
+    // 2. 残余的闭合标签
+    out = out.replaceAll(
+      RegExp(r'</\s*(?:parameter|function|antml:parameter|antml:invoke)\s*>',
+          caseSensitive: false),
+      '',
+    );
+    // 3. 值首的开启标签
+    out = out.replaceAll(
+      RegExp(r'(?<=")<(?:parameter|antml:parameter)\s*=\s*[^<>]*>',
+          caseSensitive: false),
+      '',
+    );
+    return out;
   }
 
   bool get hasPendingCalls => _partials.isNotEmpty;

@@ -81,5 +81,30 @@ void main() {
       expect(args, isNotNull);
       expect(args!['path'], '/etc/hosts');
     });
+
+    // 回归（2026-11-20 真机）：文本协议下模型会吐孤立 XML 闭合标签，
+    // 未配对时上面的成对正则匹配不到，脏标签会漏进参数值被原样使用。
+    test('参数值尾部的 </parameter> 残留被剥离', () {
+      final (_, args) = AgentEngine.parseToolAction([
+        '工具: local_file_delete',
+        '参数:',
+        r'  path: C:\Windows\Temp\a.tmp</parameter>',
+      ], 0);
+      expect(args, isNotNull);
+      expect(args!['path'], isNot(contains('parameter>')));
+      expect(args['path'], contains('a.tmp'));
+    });
+
+    test('参数值为纯残留时不产生脏参数', () {
+      final (_, args) = AgentEngine.parseToolAction([
+        '工具: local_file_delete',
+        '参数:',
+        '  </parameter>',
+      ], 0);
+      // 剥离后无有效键值 → 参数为空，下游走"缺参数"提示而不是执行脏值
+      if (args != null) {
+        expect(args.toString(), isNot(contains('parameter>')));
+      }
+    });
   });
 }
