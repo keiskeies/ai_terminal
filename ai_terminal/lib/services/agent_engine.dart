@@ -1044,21 +1044,28 @@ class AgentEngine {
       // _executeAutomatic 要求非空 executor，此处显式检查避免调用方误传 null
       if (executor == null) {
         agentLogger.error('AgentEngine', '执行器为 null，无法启动任务');
-        onError?.call(L10n.str.terminalNotConnected);
-        _currentTask = _currentTask!.copyWith(
+        // R5: 经 TerminationGuard 收口；失败路径的 flush 走 onError（既有语义）
+        _terminationGuard.terminate(
           status: AgentStatus.failed,
-          completedAt: DateTime.now(),
-        );
-        _notifyTaskUpdate();
-        // R5: 该路径原先既无 finish 也无 report，补成完整终态
-        _emitOperationReport(
           finishState: AgentFinishState.failed,
-          reason: L10n.str.terminalNotConnected,
+          expectedGeneration: myGeneration,
+          writeStatus: (status) {
+            _currentTask = _currentTask!.copyWith(
+              status: status,
+              completedAt: DateTime.now(),
+            );
+            _notifyTaskUpdate();
+          },
+          emitReport: () => _emitOperationReport(
+            finishState: AgentFinishState.failed,
+            reason: L10n.str.terminalNotConnected,
+          ),
+          emitFinish: () => onEvent?.call(AgentEvent.finish(
+            summary: L10n.str.terminalNotConnected,
+            finishState: AgentFinishState.failed,
+          )),
+          flush: () => onError?.call(L10n.str.terminalNotConnected),
         );
-        onEvent?.call(AgentEvent.finish(
-          summary: L10n.str.terminalNotConnected,
-          finishState: AgentFinishState.failed,
-        ));
         return;
       }
       await _executeAutomatic(goal, executor, myGeneration);
@@ -1070,34 +1077,40 @@ class AgentEngine {
         return;
       }
       final startTime = _currentTask?.createdAt;
-      _currentTask = _currentTask?.copyWith(
+      final errText = _friendlyErrorMessage(e);
+      // R5: 经 TerminationGuard 收口；失败路径 flush 走 onError（既有语义）
+      final emitted = _terminationGuard.terminate(
         status: AgentStatus.failed,
-        completedAt: DateTime.now(),
+        finishState: AgentFinishState.failed,
+        expectedGeneration: myGeneration,
+        writeStatus: (status) {
+          _currentTask = _currentTask?.copyWith(
+            status: status,
+            completedAt: DateTime.now(),
+          );
+          // 最后一条是 user 消息（无 assistant 响应）时补一条错误消息，保持历史完整
+          if (_currentTask != null &&
+              _conversationHistory.isNotEmpty &&
+              _conversationHistory.last.role == 'user') {
+            _conversationHistory.add(ChatMessage.create(
+              role: 'assistant',
+              content: '${L10n.str.taskExecutionError}: $errText',
+            ));
+          }
+          _notifyTaskUpdate();
+        },
+        emitReport: () => _emitOperationReport(
+          finishState: AgentFinishState.failed,
+          reason: errText,
+        ),
+        emitFinish: () => onEvent?.call(AgentEvent.finish(
+          summary: '⚠️ 任务异常终止: $errText',
+          finishState: AgentFinishState.failed,
+        )),
+        flush: () => onError?.call(errText),
       );
-      if (_currentTask != null) {
-        // 如果最后一条是 user 消息（无 assistant 响应），添加错误消息保持历史完整
-        if (_conversationHistory.isNotEmpty &&
-            _conversationHistory.last.role == 'user') {
-          _conversationHistory.add(ChatMessage.create(
-            role: 'assistant',
-            content:
-                '${L10n.str.taskExecutionError}: ${_friendlyErrorMessage(e)}',
-          ));
-        }
-        // R5: 所有终态路径必须 emit finish 事件 + flush 流式内容到持久化
-        // 但失败路径不调用 onCompleted（保持既有终态语义：失败不走完成回调）
-        // 只 emit finish 事件让 UI 停止流式状态，流式内容由 onError 回调中的 error 状态替代
-        _emitOperationReport(
-          finishState: AgentFinishState.failed,
-          reason: _friendlyErrorMessage(e),
-        );
-        onEvent?.call(AgentEvent.finish(
-          summary: '⚠️ 任务异常终止: ${_friendlyErrorMessage(e)}',
-          finishState: AgentFinishState.failed,
-        ));
-        onError?.call(_friendlyErrorMessage(e));
-        _notifyTaskUpdate();
-        // 任务失败通知
+      if (emitted) {
+        // 任务失败通知（仅本次真正收口时发，避免 Guard 幂等拒绝后重复通知）
         _notifyTaskCompletion(
             success: false, startTime: startTime, error: e.toString());
       }
@@ -1111,18 +1124,36 @@ class AgentEngine {
         _currentTask!.status != AgentStatus.completed &&
         _currentTask!.status != AgentStatus.failed;
     if (wasActive) {
-      _currentTask = _currentTask!.copyWith(
+      // R5: 经 TerminationGuard 收口。必须在下面递近代际之前调用 ——
+      // Guard 按当前代际记录幂等，代际++ 后本代际即失效。
+      final finishSummary =
+          _accumulatedMessage.isNotEmpty ? _accumulatedMessage : '任务已取消';
+      _terminationGuard.terminate(
         status: AgentStatus.cancelled,
-        phase: '已取消',
-        completedAt: DateTime.now(),
-      );
-      _notifyTaskUpdate();
-      // P0-2: trace 任务取消
-      AgentTracer.instance.endTask(
-        _currentTask!.id,
-        status: 'cancelled',
-        summary: '用户取消任务',
-        hostId: hostId,
+        finishState: AgentFinishState.cancelled,
+        writeStatus: (status) {
+          _currentTask = _currentTask!.copyWith(
+            status: status,
+            phase: '已取消',
+            completedAt: DateTime.now(),
+          );
+          _notifyTaskUpdate();
+        },
+        emitReport: () =>
+            _emitOperationReport(finishState: AgentFinishState.cancelled),
+        emitFinish: () => onEvent?.call(AgentEvent.finish(
+          summary: finishSummary,
+          finishState: AgentFinishState.cancelled,
+        )),
+        flush: _accumulatedMessage.isEmpty
+            ? null
+            : () => onCompleted?.call(_accumulatedMessage),
+        endTracer: () => AgentTracer.instance.endTask(
+          _currentTask!.id,
+          status: 'cancelled',
+          summary: '用户取消任务',
+          hostId: hostId,
+        ),
       );
     }
     // 递近代际，使任何残留的旧循环立即退出
@@ -1186,23 +1217,8 @@ class AgentEngine {
     }
     _earlyExecutionCompleter = null;
     _earlyExecutionCommand = null;
-
-    // R5: cancel 是终态路径，必须 emit finish 事件，让 UI 停止流式渲染状态
-    // 否则依赖 finish 事件关闭"运行中"动画的 UI 会卡住
-    if (wasActive) {
-      final finishSummary =
-          _accumulatedMessage.isNotEmpty ? _accumulatedMessage : '任务已取消';
-      // 取消是终态：先发操作单报告，再发 finish
-      _emitOperationReport(finishState: AgentFinishState.cancelled);
-      onEvent?.call(AgentEvent.finish(
-        summary: finishSummary,
-        finishState: AgentFinishState.cancelled,
-      ));
-      // flush 流式内容到持久化（与 _finishTask 的 onCompleted 路径对齐）
-      if (_accumulatedMessage.isNotEmpty) {
-        onCompleted?.call(_accumulatedMessage);
-      }
-    }
+    // R5: 终态动作（status/report/finish/flush/tracer）已由上方 Guard 在
+    // 递近代际前收口；此处只保留资源清理。
   }
 
   /// P2-7: 暂停当前任务
@@ -1351,25 +1367,30 @@ class AgentEngine {
     } catch (e, stack) {
       agentLogger.error('AgentEngine', '恢复执行异常: $e\n$stack');
       if (myGeneration == _currentTaskGeneration && _currentTask != null) {
-        _currentTask = _currentTask!.copyWith(
+        final errText = _friendlyErrorMessage(e);
+        // R5: 经 TerminationGuard 收口。恢复失败也要 flush 流式内容到持久化
+        // （provider 侧只在 onError/onCompleted 回调里 flush），走 onError。
+        _terminationGuard.terminate(
           status: AgentStatus.failed,
-          completedAt: DateTime.now(),
-        );
-        _notifyTaskUpdate();
-        // R5: 恢复失败同样必须有 report + finish
-        _emitOperationReport(
           finishState: AgentFinishState.failed,
-          reason: _friendlyErrorMessage(e),
+          expectedGeneration: myGeneration,
+          writeStatus: (status) {
+            _currentTask = _currentTask!.copyWith(
+              status: status,
+              completedAt: DateTime.now(),
+            );
+            _notifyTaskUpdate();
+          },
+          emitReport: () => _emitOperationReport(
+            finishState: AgentFinishState.failed,
+            reason: errText,
+          ),
+          emitFinish: () => onEvent?.call(AgentEvent.finish(
+            summary: '${L10n.str.taskFailed}: $errText',
+            finishState: AgentFinishState.failed,
+          )),
+          flush: () => onError?.call(errText),
         );
-        onEvent?.call(AgentEvent.finish(
-          summary: '${L10n.str.taskFailed}: ${_friendlyErrorMessage(e)}',
-          finishState: AgentFinishState.failed,
-        ));
-        // R5/R2: 恢复失败也要 flush 流式内容到持久化。provider 侧只在
-        // onError/onCompleted 回调里做 flush；这条路径原先两个都不调，
-        // 暂停前已流式输出的内容会随 _resetTransientState 丢失。
-        // 与其他失败终态一致，调 onError 触发 flush + 错误状态写入。
-        onError?.call(_friendlyErrorMessage(e));
       }
     }
   }
@@ -1432,21 +1453,28 @@ class AgentEngine {
 
     if (!executor.isConnected) {
       agentLogger.error('ReAct', '执行器未连接!');
-      onError?.call(L10n.str.terminalNotConnected);
-      _currentTask = _currentTask!.copyWith(
+      // R5: 经 TerminationGuard 收口；失败路径 flush 走 onError（既有语义）
+      _terminationGuard.terminate(
         status: AgentStatus.failed,
-        completedAt: DateTime.now(),
-      );
-      _notifyTaskUpdate();
-      // R5: 未连接是终态，补 report + finish
-      _emitOperationReport(
         finishState: AgentFinishState.failed,
-        reason: L10n.str.terminalNotConnected,
+        expectedGeneration: myGeneration,
+        writeStatus: (status) {
+          _currentTask = _currentTask!.copyWith(
+            status: status,
+            completedAt: DateTime.now(),
+          );
+          _notifyTaskUpdate();
+        },
+        emitReport: () => _emitOperationReport(
+          finishState: AgentFinishState.failed,
+          reason: L10n.str.terminalNotConnected,
+        ),
+        emitFinish: () => onEvent?.call(AgentEvent.finish(
+          summary: L10n.str.terminalNotConnected,
+          finishState: AgentFinishState.failed,
+        )),
+        flush: () => onError?.call(L10n.str.terminalNotConnected),
       );
-      onEvent?.call(AgentEvent.finish(
-        summary: L10n.str.terminalNotConnected,
-        finishState: AgentFinishState.failed,
-      ));
       return;
     }
 
@@ -1652,25 +1680,34 @@ class AgentEngine {
             role: 'assistant',
             content: errorMsg,
           ));
-          onError?.call(friendlyMsg);
           final startTime = _currentTask!.createdAt;
-          _currentTask = _currentTask!.copyWith(
+          // R5: 经 TerminationGuard 收口；失败路径 flush 走 onError（既有语义）
+          final emitted = _terminationGuard.terminate(
             status: AgentStatus.failed,
-            completedAt: DateTime.now(),
-          );
-          _notifyTaskUpdate();
-          // R5: 失败路径也要 emit finish 事件，避免 UI 卡 running
-          _emitOperationReport(
             finishState: AgentFinishState.failed,
-            reason: friendlyMsg,
+            expectedGeneration: myGeneration,
+            writeStatus: (status) {
+              _currentTask = _currentTask!.copyWith(
+                status: status,
+                completedAt: DateTime.now(),
+              );
+              _notifyTaskUpdate();
+            },
+            emitReport: () => _emitOperationReport(
+              finishState: AgentFinishState.failed,
+              reason: friendlyMsg,
+            ),
+            emitFinish: () => onEvent?.call(AgentEvent.finish(
+              summary: '${L10n.str.taskFailed}: $friendlyMsg',
+              finishState: AgentFinishState.failed,
+            )),
+            flush: () => onError?.call(friendlyMsg),
           );
-          onEvent?.call(AgentEvent.finish(
-            summary: '${L10n.str.taskFailed}: $friendlyMsg',
-            finishState: AgentFinishState.failed,
-          ));
-          // 任务失败通知（与外层 catch 保持一致）
-          _notifyTaskCompletion(
-              success: false, startTime: startTime, error: e.toString());
+          if (emitted) {
+            // 任务失败通知（与外层 catch 保持一致）
+            _notifyTaskCompletion(
+                success: false, startTime: startTime, error: e.toString());
+          }
         }
         return;
       }
@@ -1919,31 +1956,45 @@ class AgentEngine {
     // 标 completed 会误导用户以为任务成功完成
     // 无限制模式下永远不会 hitMaxSteps（循环只会因 finish/noCommand/cancel 退出）
     final hitMaxSteps = !isUnlimited && stepCount >= maxSteps;
-    _currentTask = _currentTask!.copyWith(
-      status: hitMaxSteps ? AgentStatus.failed : AgentStatus.completed,
-      completedAt: DateTime.now(),
-    );
-    _notifyTaskUpdate();
     agentLogger.info('ReAct',
         '=== 执行结束 (步数: $stepCount/${isUnlimited ? "∞" : maxSteps}) ===');
-
     if (hitMaxSteps) {
       agentLogger.warn('ReAct', '达到最大执行步数 $maxSteps');
       onEvent?.call(AgentEvent.info(L10n.str.ut_478eec6181(maxSteps)));
-      _emitOperationReport(finishState: AgentFinishState.interrupted);
-      onEvent?.call(AgentEvent.finish(
-        summary: L10n.str.taskMaxSteps,
-        finishState: AgentFinishState.interrupted,
-      ));
-      // L15 修复：maxSteps 路径也调 onCompleted，确保流式内容 flush 到 content
-      if (_accumulatedMessage.isNotEmpty) {
-        onCompleted?.call(_accumulatedMessage);
-      }
-    } else {
-      if (_accumulatedMessage.isNotEmpty) {
-        onCompleted?.call(_accumulatedMessage);
-      }
     }
+
+    // R5: 经 TerminationGuard 收口。步数耗尽=failed/interrupted；
+    // 兜底 completed 分支原先只有 flush 无 report/finish（不可达的防御路径），
+    // 统一走 Guard 补齐 report/finish，避免 UI 卡 running。
+    _terminationGuard.terminate(
+      status: hitMaxSteps ? AgentStatus.failed : AgentStatus.completed,
+      finishState:
+          hitMaxSteps ? AgentFinishState.interrupted : AgentFinishState.success,
+      expectedGeneration: myGeneration,
+      writeStatus: (status) {
+        _currentTask = _currentTask!.copyWith(
+          status: status,
+          completedAt: DateTime.now(),
+        );
+        _notifyTaskUpdate();
+      },
+      emitReport: () {
+        if (hitMaxSteps) {
+          _emitOperationReport(finishState: AgentFinishState.interrupted);
+        }
+      },
+      emitFinish: () {
+        if (hitMaxSteps) {
+          onEvent?.call(AgentEvent.finish(
+            summary: L10n.str.taskMaxSteps,
+            finishState: AgentFinishState.interrupted,
+          ));
+        }
+      },
+      flush: _accumulatedMessage.isEmpty
+          ? null
+          : () => onCompleted?.call(_accumulatedMessage),
+    );
 
     // 清理编排取消令牌（ReAct 循环结束）
     _orchestratorCancelToken = null;

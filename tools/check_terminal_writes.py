@@ -12,7 +12,9 @@ CI 中若发现**新增**写入点即失败，防止在 TerminationGuard 落地�
 等 TerminationGuard 收口后，把基线逐步降到 0 并切换为硬禁令即可。
 
 计数口径：lib/ 下形如 `status: ... AgentStatus.(completed|failed|cancelled)` 的
-写入（copyWith / 构造器），排除 `==`、`case`、`?.status` 等只读比较。
+写入（copyWith / 构造器），排除 `==`、`case`、`?.status` 等只读比较，
+以及 TerminationGuard 的 `terminate(status: ...)` 收口参数（那是合法收口，
+不是裸写；收口进度另由文档跟踪）。
 """
 from __future__ import annotations
 
@@ -20,8 +22,9 @@ import re
 import sys
 from pathlib import Path
 
-# 当前合法基线（2026-11-20 实测：engine 8 + provider 2）
-BASELINE = 10
+# 当前合法基线（阶段 B 逐条收口中，只降不升）
+# 2026-11-20 初始 10（engine 8 + provider 2）→ 阶段A 后 8 → engine 7 条裸写全收口后 2（仅 provider）
+BASELINE = 2
 
 # 匹配终态写入：status: <expr>AgentStatus.<terminal>
 WRITE_RE = re.compile(
@@ -34,10 +37,22 @@ READ_HINTS = ("==", "!=", "case ", "?.")
 def count_writes(lib_dir: Path) -> list[str]:
     hits: list[str] = []
     for path in sorted(lib_dir.rglob("*.dart")):
-        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if WRITE_RE.search(line):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        # 跟踪 TerminationGuard.terminate(...) 的多行调用块：块内的 status: 是收口参数
+        in_terminate = False
+        terminate_depth = 0
+        for lineno, line in enumerate(lines, 1):
+            stripped = line.strip()
+            if ".terminate(" in stripped and not in_terminate:
+                in_terminate = True
+                terminate_depth = line.count("(") - line.count(")")
+            elif in_terminate:
+                terminate_depth += line.count("(") - line.count(")")
+                if terminate_depth <= 0:
+                    in_terminate = False
+
+            if WRITE_RE.search(line) and not in_terminate:
                 # 排除以比较/switch 形式出现的误命中
-                stripped = line.strip()
                 if any(hint in stripped for hint in READ_HINTS) and "status:" not in stripped:
                     continue
                 hits.append(f"{path.as_posix()}:{lineno}: {stripped}")
