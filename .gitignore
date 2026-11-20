@@ -69,3 +69,12 @@ ai_terminal/lib/l10n/app_localizations*.dart
 
 # Runtime data
 /app_data_copy.db
+
+# 本地工作产物：截图、IDE 辅助目录、i18n 迁移一次性脚本
+/_shots/
+/.qoder/
+/tools/i18n_*
+/tools/agent_ui_*
+/tools/uitext_*
+/tools/verify_arb_tmp.py
+/tools/_agent_ui_golden.json
