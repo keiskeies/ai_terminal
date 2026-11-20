@@ -25,6 +25,7 @@ import 'agent_tool.dart';
 import 'agent_host_registry.dart' as agent_host_registry;
 import 'react_parser.dart';
 import 'event_store.dart';
+import 'history_policy.dart';
 import 'agent_logger.dart';
 export 'agent_logger.dart';
 import 'agent_tracer.dart';
@@ -461,16 +462,6 @@ class AgentEngine {
 
   /// AI 流式响应超时：连续无数据超过该时长即判定超时（Agent 设置页可配置）
   Duration aiResponseTimeout;
-
-  /// 对话历史最大轮数（每轮 = assistant + user），超出时裁剪最早的轮次
-  static const int _maxConversationRounds = 40;
-
-  /// 单条消息最大字符数，超出截断
-  static const int _maxMessageChars = 4000;
-
-  /// 观测消息专用上限：失败观测头 2000+尾 6000 必须完整进模型，
-  /// 通用 4000 上限会把分级截断保留的报错头部再次砍掉（O2）
-  static const int _maxObservationMessageChars = 12000;
 
   AgentEngine({
     required AIProvider aiProvider,
@@ -5238,15 +5229,7 @@ $hostList
     }
   }
 
-  /// 裁剪对话历史：token-aware 裁剪 + 轮数兜底 + 长消息截断
-  ///
-  /// 三层策略：
-  /// 1. 单条消息截断：超过 _maxMessageChars 的内容保留尾部
-  /// 2. 轮数兜底：保留最近 _maxConversationRounds 轮（防止极端情况 token 估算偏低）
-  /// 3. token-aware 裁剪：估算非系统消息总 token 数，超出 contextWindow * 0.7 时
-  ///    丢弃最早的非系统消息，直到总 token 数降至阈值以下
-  ///
-  /// 阈值 0.7 留出 30% 给 system prompt + 当前 user prompt + completion
+  /// 裁剪对话历史：委托 HistoryPolicy（上限常量与三层策略都在那里）
   @visibleForTesting
   void trimMessagesForTesting(List<ChatMessage> messages) =>
       _trimMessages(messages);
@@ -5258,69 +5241,9 @@ $hostList
   @visibleForTesting
   AgentToolRegistry get toolsForTesting => _tools;
 
-  void _trimMessages(List<ChatMessage> messages) {
-    // 保留 system 消息
-    final systemMsgs = messages.where((m) => m.role == 'system').toList();
-    final nonSystemMsgs = messages.where((m) => m.role != 'system').toList();
-
-    // 第 1 层：单条消息截断（先截断再做 token 估算，避免单条消息撑爆预算）
-    final truncated = <ChatMessage>[];
-    for (final msg in nonSystemMsgs) {
-      final cap = msg.content.startsWith('观测:')
-          ? _maxObservationMessageChars
-          : _maxMessageChars;
-      if (msg.content.length > cap) {
-        var t = msg.content.substring(msg.content.length - cap);
-        // 确保代码块完整闭合：统计 ``` 数量，奇数则补一个 ```
-        final openCount = '```'.allMatches(t).length;
-        if (openCount % 2 != 0) {
-          t = '$t\n```';
-        }
-        truncated.add(ChatMessage.create(
-          role: msg.role,
-          content: '...(已截断前 ${msg.content.length - cap} 字符)\n$t',
-        ));
-      } else {
-        truncated.add(msg);
-      }
-    }
-
-    // 第 2 层：轮数兜底裁剪
-    const maxNonSystem = _maxConversationRounds * 2;
-    var kept = truncated.length > maxNonSystem
-        ? truncated.skip(truncated.length - maxNonSystem).toList()
-        : truncated;
-    if (kept.length != truncated.length) {
-      agentLogger.info(
-          'TrimMsgs', '轮数裁剪: ${truncated.length} → ${kept.length} 条');
-    }
-
-    // 第 3 层：token-aware 裁剪（保留最近消息，丢弃最早的）
-    final contextWindow = _modelConfig.effectiveContextWindow;
-    final tokenBudget = (contextWindow * 0.7).round();
-    var totalTokens = TokenEstimator.estimateHistory(kept);
-    if (totalTokens > tokenBudget) {
-      final originalCount = kept.length;
-      // 从最早开始丢弃，直到总 token 数降至预算以下或仅剩 2 条。
-      // 先算删除下标再 sublist，避免循环 removeAt(0) 的 O(n²) 移动。
-      var drop = 0;
-      while (drop < kept.length - 2 && totalTokens > tokenBudget) {
-        totalTokens -= TokenEstimator.estimateMessage(kept[drop]);
-        drop++;
-      }
-      if (drop > 0) kept = kept.sublist(drop);
-      agentLogger.info(
-        'TrimMsgs',
-        'token-aware 裁剪: $originalCount → ${kept.length} 条, '
-            'tokens=$totalTokens/$tokenBudget (ctx=$contextWindow)',
-      );
-    }
-
-    messages
-      ..clear()
-      ..addAll(systemMsgs)
-      ..addAll(kept);
-  }
+  void _trimMessages(List<ChatMessage> messages) =>
+      HistoryPolicy.trimMessages(messages,
+          contextWindow: _modelConfig.effectiveContextWindow);
 
   Future<void> collectSystemInfo(CommandExecutor executor) async {
     try {
