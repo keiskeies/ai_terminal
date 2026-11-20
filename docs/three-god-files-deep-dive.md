@@ -148,9 +148,13 @@ terminal_page.dart ──(ref.read/watch, 40+ 处)──▶ agent_provider.dart
 
 ### 3.4 R1 竞态缺口
 
-- `await AuditLogger.log` 3302/3330/3441/3780/4031 与 `await ChangeRecordService.record` 3753/4003 之后**无代际检查**就写 `_operationChangeIds/_operationChanges`（3757–3762、4012–4023）。cancel + 立即 startTask 后，旧命令记录会写进新 operation 的报告。
-- `requestSudoPassword` 5513/5517 两个 await 后把旧任务密码写进共享 `_sudoPassword`（5516）。
-- `.then()` 仅 2 处且都有 `onError`/`catchError` ✅；其余 `sub.cancel()` 配对 complete ✅（除 §3.2 的 902/4658）。
+> **2026-11-20 复核（当前磁盘，agent_engine.dart 共 5314 行）**：本节行号为旧基线，**R1 缺口已全部修完**，不再是待办。
+>
+> - 真正会污染新 operation 的两处台账写入已加代际比对：shell 路径 3407 捕获 `genAtRecord` → `await ChangeRecordService.record`(3409) → 3415–3417 比对 → 才写 `_operationChangeIds`(3418)/`_operationChanges`(3419)；文件工具路径同构（3670 / 3672 await / 3681–3683 比对 / 3684–3685 写）。这是 P0-5 的落地。
+> - 5 处 `await AuditLogger.log`（当前 2954/2982/3093/3438/3702）无代际检查是**有意为之**：append-only 落盘、不写引擎共享 list，加检查反而丢历史审计。
+> - shell 主结果路径 3282 还有总代际门；`_executeCommand` 自身 4397/4489 各有检查。整条命令链代际检查 18+ 处。
+> - `requestSudoPassword` 的 await 后写 `_sudoPassword` 问题：已在 P0/P1 收口阶段处理（见 §5 实施记录）。
+> - `.then()` 仅 2 处且都有 `onError`/`catchError` ✅；其余 `sub.cancel()` 配对 complete ✅（除 §3.2 的 902/4658）。
 
 ### 3.5 拆分方案
 
@@ -177,7 +181,7 @@ AgentEngine facade (循环 + 生命周期 + 7 Completer)
   - Step 3 `EventStore`（`88cd6fb`）：`_eventSeq` + 轮内两个集合 → `lib/services/event_store.dart`（`EventStore` 跨轮序号 + `EventScope` 轮内去重）。保留「序号跨轮递增、去重集合轮内隔离」的原始语义；新增 7 例特征化测试，含「两轮相同 ask 不撞 id」回归。
   - Step 4 `HistoryPolicy`（`720d6fd`）：三层裁剪 + 3 个上限常量 → `lib/services/history_policy.dart`，唯一实例依赖 `effectiveContextWindow` 改显式入参；22 处调用点经 `_trimMessages` 转发零改动。新增 8 例特征化测试。
   - 每次拆分均通过 `flutter analyze`（81 issues / 0 error 基线）与全量测试（现 1719 passed / 25 skipped）。
-- **Step 5–6**：抽 `CommandRunner`（3016–3110/3275–3806/4713–4855，顺手修 §3.4）→ `ToolOrchestrator`（4070–4476，`_tools` 所有权迁移）。
+- **Step 5–6（判定：推迟）**：`CommandRunner`（旧 3016–3110/3275–3806/4713–4855 → 当前 2668–2851/2927–3535/4389–4531）**不在本阶段提取**。复核结论：①「顺手修 §3.4」前提已不成立（R1 缺口修完，见 §3.4）；② `_runCommandWithSafetyInner`(2927–3464，538 行) 不是可提取的执行器，而是引擎状态机本身——5 次 `_currentTask.copyWith`、6/7 个 Completer、终态门、台账/badges/memory、3 回调、10+ `onEvent` 全部交织；③ 代际检查 18+ 处与 cancel/pause/resume 的 Completer 顺序强耦合。推迟到 **Step 7 TerminationGuard 之后**：Guard 落地后可在入口统一收口 generation，`_executeCommand`(4389–4531) 才能真正变成接收显式 generation/executor 的纯执行器。`ToolOrchestrator` 同理待 Guard 后再评估。
 - **Step 7 最后做**：引入 `TerminationGuard.terminate({status, finishState, flush})`，固定顺序执行 status→report→finish→flush→tracer→清理，包 try/finally；替换全部 11 条终态路径。**必须每引擎一个实例，严禁 static**；guard 接收 `generation/hostId/operationId`，进入时统一代际检查。
 - **暂时别动**：`_callAI`（stream + watchdog + doneCompleter 六件事咬合）、`cancelTask/pauseTask/resumeTask`（与 7 Completer 和回调清空顺序强耦合）。
 
