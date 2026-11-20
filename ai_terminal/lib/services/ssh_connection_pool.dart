@@ -18,6 +18,11 @@ class SSHConnectionPool {
   static final Map<String, _PoolEntry> _pool = {};
   static Timer? _cleanupTimer;
 
+  /// 仅供测试注入假的 SSHService 工厂，避免单测依赖真实 SSH 连接。
+  /// 生产路径恒为 null → 正常构造 SSHService。
+  @visibleForTesting
+  static SSHService Function(HostConfig config)? serviceFactoryForTesting;
+
   /// 正在进行的 acquire（去重，避免并发创建多个连接）
   static final Map<String, Future<SSHService>> _pendingAcquires = {};
 
@@ -80,7 +85,7 @@ class SSHConnectionPool {
     String? jumpPassword,
     String? jumpPrivateKeyContent,
   }) async {
-    final service = SSHService(config);
+    final service = serviceFactoryForTesting?.call(config) ?? SSHService(config);
     try {
       await service.connect(
         password: password,
@@ -111,15 +116,15 @@ class SSHConnectionPool {
 
     if (entry.refCount <= 0) {
       _pool.remove(hostId);
-      // R2: 异步 disconnect，不阻塞调用方；失败仅记录日志
-      () async {
-        try {
-          await entry.service.disconnect();
-        } catch (e) {
-          // disconnect 失败通常是无害的（连接已断开），仅记录
-          debugPrint('[SSHConnectionPool] disconnect 失败 (hostId=$hostId): $e');
-        }
-      }();
+      // R2: dispose 同时断开 SSH 会话并关闭 outputController。
+      // disconnect() 内部全是同步操作（签名 async 只是历史遗留），
+      // 不需要 fire-and-forget 的 async 闭包。
+      try {
+        entry.service.dispose();
+      } catch (e) {
+        // dispose 失败通常是重复关闭，仅记录，不影响引用计数已递减的事实
+        debugPrint('[SSHConnectionPool] dispose 失败 (hostId=$hostId): $e');
+      }
     }
   }
 
@@ -135,9 +140,11 @@ class SSHConnectionPool {
 
   /// 强制断开连接
   static Future<void> forceDisconnect(String hostId) async {
-    if (_pool.containsKey(hostId)) {
-      await _pool[hostId]!.service.disconnect();
-      _pool.remove(hostId);
+    final entry = _pool.remove(hostId);
+    if (entry != null) {
+      // dispose = disconnect + 关闭 outputController；重连会新建 service，
+      // 旧 service 的流对象必须一并释放，否则每次重连泄漏一个 StreamController。
+      entry.service.dispose();
     }
   }
 
@@ -160,8 +167,11 @@ class SSHConnectionPool {
     final toRemove = <String>[];
 
     _pool.forEach((hostId, entry) {
-      if (entry.refCount == 0 && now.difference(entry.lastActive) > timeout) {
-        entry.service.disconnect();
+      // 归零条目已在 release() 中立即移出池，这里兜底回收"仅创建者持有、
+      // 且超过 idle 阈值未再被 acquire"的孤儿条目。有并发借用者（>1）
+      // 时不能回收；原判定 refCount == 0 因归零即移除而永假。
+      if (entry.refCount <= 1 && now.difference(entry.lastActive) > timeout) {
+        entry.service.dispose();
         toRemove.add(hostId);
       }
     });
@@ -170,6 +180,10 @@ class SSHConnectionPool {
       _pool.remove(hostId);
     }
   }
+
+  /// 仅供测试触发一次空闲回收，无需等 5 分钟定时器
+  @visibleForTesting
+  static void cleanupForTesting(Duration timeout) => _cleanup(timeout);
 
   /// 获取统计信息
   static Map<String, dynamic> get stats {
@@ -187,7 +201,7 @@ class SSHConnectionPool {
   static Future<void> dispose() async {
     stopIdleCleanup();
     for (final entry in _pool.values) {
-      await entry.service.disconnect();
+      entry.service.dispose();
     }
     _pool.clear();
   }

@@ -47,6 +47,9 @@ class SSHService implements CommandExecutor {
   VoidCallback? onDisconnected;
   bool _intentionalDisconnect = false;
   bool _dropNotified = false;
+  // 连接池的 release/forceDisconnect/dispose 都可能走到 dispose()，
+  // 幂等守卫避免重复断开向已关闭的 outputController 写数据。
+  bool _disposed = false;
   // M2: _handleDrop 会 complete 所有等待者且不写原因，异常完成分支据此
   // 把「服务级掉线」归类 disconnected，AI 才能收到明确的「该重连」信号
   bool _droppedWhileWaiting = false;
@@ -1153,11 +1156,15 @@ class SSHService implements CommandExecutor {
     _socket = null;
     _jumpClient = null;
     _jumpSocket = null;
-    outputController.add('\r\n${UiText.t('[已断开连接]', '[disconnected]')}\r\n');
+    if (!outputController.isClosed) {
+      outputController.add('\r\n${UiText.t('[已断开连接]', '[disconnected]')}\r\n');
+    }
   }
 
   void dispose() {
-    disconnect();
-    outputController.close();
+    if (_disposed) return;
+    _disposed = true;
+    unawaited(disconnect());
+    unawaited(outputController.close());
   }
 }

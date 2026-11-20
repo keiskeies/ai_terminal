@@ -40,7 +40,6 @@ import '../widgets/local_dir_auth_dialog.dart';
 import '../widgets/tab_item_widget.dart';
 import '../utils/interrupted_turn_detector.dart';
 import '../utils/command_tracker.dart';
-import '../utils/reconnect_policy.dart';
 import '../utils/terminal_blocks.dart';
 import '../utils/terminal_input_line.dart';
 import '../utils/streaming_markdown.dart';
@@ -204,10 +203,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 正在重连的主机名称（非 null 时显示"连接恢复中"横幅）
   String? _reconnectingHostLabel;
 
-  /// 空闲断线自动重连（docs §5）：每个 tab 的已尝试次数与待执行定时器。
-  /// 任务运行中的 tab 不自动重连（isRunningFor 判定），断线即任务 failed。
-  final Map<String, int> _autoReconnectAttempts = {};
-  final Map<String, Timer> _autoReconnectTimers = {};
+  /// 自动重连的定时器与退避计数已下沉到 TerminalNotifier（A2）；
+  /// 页面只订阅"重连完成"事件来做 UI 副作用。
+  StreamSubscription<String>? _reconnectSub;
   // tab 对象在 provider 里原地复用，prev/next state 拿到的是同一实例，
   // 状态迁移必须自己记上一帧的值
   final Map<String, tp.TabStatus> _lastTabStatus = {};
@@ -450,6 +448,19 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     super.initState();
     _loadSettings(); // 先加载设置（含 maxSteps），确保 _initAgent 使用正确的 maxSteps
     _initAgent();
+    // 重连的调度与业务重绑在 notifier 内完成；页面只接管 UI 副作用。
+    // 页面销毁期间发生的重连不会丢失，重建后仍能收到后续事件。
+    _reconnectSub = ref
+        .read(tp.terminalProvider.notifier)
+        .reconnectedTabIds
+        .listen((tabId) {
+      if (!mounted) return;
+      final tab = ref.read(tp.terminalProvider).tabs.cast<tp.TerminalTab?>().firstWhere(
+            (t) => t?.id == tabId,
+            orElse: () => null,
+          );
+      if (tab != null) _onReconnected(tab);
+    });
     // 页面持有 notifier 引用而非在 dispose 里读 ref：TerminalPage 按路由存在，
     // 同一时刻只有一个实例，直接占位注册，dispose 里按身份判断后释放，
     // 避免误清掉下一个页面的注册。在 dispose 中用 ref 会抛
@@ -1478,28 +1489,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     await _reconnectTab(tab);
   }
 
-  /// 重连指定 tab（手动与空闲自动重连共用）。成功后重绑 AI executor。
+  /// 重连指定 tab（手动与空闲自动重连共用）。
+  /// 调度、退避、executor 重绑由 notifier 承担；UI 副作用由
+  /// reconnectedTabIds 事件统一触发，手动/自动两条路径完全一致。
   Future<void> _reconnectTab(tp.TerminalTab tab) async {
     if (tab.isConnecting) return;
-    _autoReconnectTimers.remove(tab.id)?.cancel();
 
     tp.TerminalTab? newTab;
     if (tab.isLocal) {
       newTab =
           await ref.read(tp.terminalProvider.notifier).reconnectLocal(tab.id);
-      if (!mounted) return;
-      if (newTab?.localService != null) {
-        // 重新绑定 executor（service 已更新）
-        ref.read(agentProvider.notifier).setExecutor(newTab!.localService,
-            hostId: newTab.hostId, tabId: newTab.id);
-        // 终端的 onOutput 闭包读的是 tab 上的实时 service，重连不需要重绑订阅
-        _ensureTabTerminal(newTab);
-        // 新会话的提示符与旧连接无关，清掉残留的提示语判定
-        _tabCommandTrackers[newTab.id]?.reset();
-        // 旧连接的块与新 shell 无关（新 shell 甚至可能没装集成）
-        _tabBlockTrackers[newTab.id]?.reset();
-        if (newTab.id == _currentTabId) _scheduleSizeSync(newTab);
-      }
     } else {
       final host = ref.read(hostsProvider.notifier).getHostById(tab.hostId);
       if (host == null) {
@@ -1508,53 +1507,25 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       }
       newTab =
           await ref.read(tp.terminalProvider.notifier).reconnect(tab.id, host);
-      if (!mounted) return;
-      if (newTab?.service != null) {
-        ref.read(agentProvider.notifier).setExecutor(newTab!.service,
-            hostId: newTab.hostId, tabId: newTab.id);
-        // 终端的 onOutput 闭包读的是 tab 上的实时 service，重连不需要重绑订阅
-        _ensureTabTerminal(newTab);
-        _tabCommandTrackers[newTab.id]?.reset();
-        _tabBlockTrackers[newTab.id]?.reset();
-        if (newTab.id == _currentTabId) _scheduleSizeSync(newTab);
-      }
     }
-
+    if (!mounted) return;
     if (newTab == null) {
       // 失败原因存在 tab.connectionError 上，主区按状态渲染；这里补一条即时反馈
       _showOperationMessage(
           tab.connectionError ?? L10n.str.connectionFailedHint,
           isError: true);
-    } else {
-      // 重连成功：清零自动重连计数，下次掉线重新获得完整退避预算
-      _autoReconnectAttempts.remove(tab.id);
     }
   }
 
-  /// 空闲断线自动重连（docs §5）：connected→lost 且该 tab 无运行中任务时，
-  /// 按 1s/2s/4s 退避最多自动重连 3 次；任务运行中不重连（断线即任务 failed，
-  /// 留给用户/引擎显式重试）。本地 PTY 退出是正常结束，不自动重启。
-  void _maybeAutoReconnect(tp.TerminalTab tab) {
-    if (tab.isLocal || tab.status != tp.TabStatus.lost) return;
-    if (ref.read(agentProvider.notifier).isRunningFor(tab.id)) return;
-    final attempts = _autoReconnectAttempts[tab.id] ?? 0;
-    if (!ReconnectPolicy.shouldRetry(attempts)) return;
-    _autoReconnectTimers.remove(tab.id)?.cancel();
-    _autoReconnectTimers[tab.id] =
-        Timer(ReconnectPolicy.delayForAttempt(attempts), () {
-      _autoReconnectTimers.remove(tab.id);
-      if (!mounted) return;
-      final current = ref
-          .read(tp.terminalProvider)
-          .tabs
-          .cast<tp.TerminalTab?>()
-          .firstWhere((t) => t?.id == tab.id, orElse: () => null);
-      // 等待期间用户可能已手动重连/关闭 tab，或任务已启动
-      if (current == null || current.status != tp.TabStatus.lost) return;
-      if (ref.read(agentProvider.notifier).isRunningFor(tab.id)) return;
-      _autoReconnectAttempts[tab.id] = attempts + 1;
-      _reconnectTab(current);
-    });
+  /// 重连成功后的 UI 副作用。业务层 executor 重绑已在 notifier 内完成，
+  /// 因此页面销毁期间发生的重连同样完整生效。
+  void _onReconnected(tp.TerminalTab tab) {
+    // 终端的 onOutput 闭包读的是 tab 上的实时 service，重连不需要重绑订阅
+    _ensureTabTerminal(tab);
+    // 新会话的提示符与旧连接无关，旧连接的输出块与新 shell 也无关
+    _tabCommandTrackers[tab.id]?.reset();
+    _tabBlockTrackers[tab.id]?.reset();
+    if (tab.id == _currentTabId) _scheduleSizeSync(tab);
   }
 
   void _showAddHostDialog() {
@@ -1736,11 +1707,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     _paneOpening.clear();
     _tabPaneLayout.clear();
     _paneTerminals.clear();
-    for (final timer in _autoReconnectTimers.values) {
-      timer.cancel();
-    }
-    _autoReconnectTimers.clear();
-    _autoReconnectAttempts.clear();
+    // 重连完成事件订阅：定时器已随 notifier 保活，这里只断开页面自己的监听
+    _reconnectSub?.cancel();
+    _reconnectSub = null;
     _lastTabStatus.clear();
     for (final recorder in _sessionRecorders.values) {
       recorder.close();
@@ -1773,9 +1742,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   @override
   Widget build(BuildContext context) {
-    // 终端字号是终端自己的状态（Ctrl +/- 改它），但顶栏外观浮层的字号控件走
-    // settingsProvider：只写库不通知这边，滑块拖完终端不动，看着就像「设置没生效」。
-    // 这里把外部改动收回本地状态，两处入口操作的是同一份显示。
+    // 终端字号是终端自己的状态（Ctrl +/- 改它），顶栏外观浮层的字号控件走
+    // settingsProvider。两边入口现在都统一写 settingsProvider，但终端本地
+    // 字号仍需要跟随外部改动（例如设置页/迁移逻辑改了值），所以保留监听。
     ref.listen(settingsProvider.select((s) => s['terminalFontSize']),
         (_, next) {
       if (next is num && next.toDouble() != _terminalFontSize) {
@@ -1860,7 +1829,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           // 额外 pane 的 shell 挂在同一个 client 上，掉线即作废（先清后重连，
           // 否则重连补开了新 client，旧 pane 还握着已关闭的会话）
           _invalidatePaneSessions(tab.id);
-          _maybeAutoReconnect(tab);
+          // 自动重连已由 TerminalNotifier 在 onDisconnected 里调度，
+          // 不再依赖本页面的生命周期。
         }
       }
       // 先建 id Set，避免对每个 map entry 线性扫描 tabs（O(n²)→O(n)）

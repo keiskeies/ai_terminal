@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import '../models/host_config.dart';
@@ -7,6 +8,9 @@ import '../services/local_terminal_service.dart';
 import '../services/ssh_connection_pool.dart';
 import '../core/credentials_store.dart';
 import '../core/l10n_holder.dart';
+import '../utils/reconnect_policy.dart';
+import 'agent_provider.dart';
+import 'app_providers.dart';
 
 const _uuid = Uuid();
 
@@ -127,11 +131,34 @@ class TerminalState {
 
 /// 终端 Provider
 final terminalProvider = StateNotifierProvider<TerminalNotifier, TerminalState>((ref) {
-  return TerminalNotifier();
+  // 自动重连的定时器归 notifier 所有。若允许 Riverpod 在页面销毁后回收
+  // provider，后台自愈会随之失效（A2 根因），因此这里必须保活。
+  ref.keepAlive();
+  return TerminalNotifier(ref);
 });
 
 class TerminalNotifier extends StateNotifier<TerminalState> {
-  TerminalNotifier() : super(TerminalState());
+  TerminalNotifier(this._ref) : super(TerminalState());
+  final Ref _ref;
+
+  /// 断线自动重连的退避计数与定时器（按 tabId 隔离）
+  final Map<String, int> _reconnectAttempts = {};
+  final Map<String, Timer> _reconnectTimers = {};
+
+  /// 重连成功后广播 tabId，UI 侧据此重绑 terminal / tracker / 尺寸同步。
+  /// 业务层（executor 重绑）在 notifier 内完成，不依赖页面是否存活。
+  final StreamController<String> _reconnectedTabIds =
+      StreamController<String>.broadcast();
+
+  Stream<String> get reconnectedTabIds => _reconnectedTabIds.stream;
+
+  TerminalTab? _findTab(String tabId) {
+    final tabs = state.tabs;
+    for (final tab in tabs) {
+      if (tab.id == tabId) return tab;
+    }
+    return null;
+  }
 
   /// 注册本地终端标签（不建连）。
   /// 拆成"注册 + 建连"两步，是为了让页面能立刻切过去显示过渡态，
@@ -233,6 +260,65 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
 
   bool _isOpen(String tabId) => state.tabs.any((t) => t.id == tabId);
 
+  /// 断线后按 1s/2s/4s 退避自动重连（最多 3 次）。
+  /// 调度权归 notifier：页面销毁后仍要完成自愈（A2）。
+  void scheduleAutoReconnect(String tabId) {
+    final tab = _findTab(tabId);
+    if (tab == null || tab.isLocal || tab.status != TabStatus.lost) return;
+    if (_reconnectTimers.containsKey(tabId)) return; // 已有调度，避免重复
+    if (_ref.read(agentProvider.notifier).isRunningFor(tabId)) return;
+    final attempts = _reconnectAttempts[tabId] ?? 0;
+    if (!ReconnectPolicy.shouldRetry(attempts)) return;
+
+    _reconnectTimers[tabId] =
+        Timer(ReconnectPolicy.delayForAttempt(attempts), () async {
+      _reconnectTimers.remove(tabId);
+      // 等待期间用户可能已手动重连、关 tab，或启动了任务
+      final current = _findTab(tabId);
+      if (current == null || current.status != TabStatus.lost) return;
+      if (_ref.read(agentProvider.notifier).isRunningFor(tabId)) return;
+      // 定时器已到点即消耗一次尝试预算，后续即使找不到主机配置也不再
+      // 无限重试（配置缺失属于用户侧问题，交给手动重连处理）。
+      _reconnectAttempts[tabId] = attempts + 1;
+      final host =
+          _ref.read(hostsProvider.notifier).getHostById(current.hostId);
+      if (host == null) return;
+      try {
+        await reconnect(tabId, host, autoRetryOnFailure: true);
+      } catch (e) {
+        // 后台定时器里不能让异常逸出，否则变成 uncaught zone error
+        debugPrint('[TerminalNotifier] 自动重连失败 (tabId=$tabId): $e');
+      }
+    });
+  }
+
+  /// 手动重连 / 关 tab 时取消后台调度，避免与用户操作竞争。
+  /// [keepAttempts] 供自动重连路径使用：重连失败后还要按下一档退避，
+  /// 不能把已用掉的尝试次数清掉。
+  void cancelAutoReconnect(String tabId, {bool keepAttempts = false}) {
+    _reconnectTimers.remove(tabId)?.cancel();
+    if (!keepAttempts) _reconnectAttempts.remove(tabId);
+  }
+
+  /// 仅供测试观察调度状态
+  @visibleForTesting
+  int get pendingReconnectCount => _reconnectTimers.length;
+
+  @visibleForTesting
+  int reconnectAttemptsFor(String tabId) => _reconnectAttempts[tabId] ?? 0;
+
+  /// 重连成功后的统一收尾：清退避、重绑 executor、通知 UI。
+  /// 业务绑定放在 notifier 内，页面不在时 AI 也不会拿着旧 executor。
+  void _finishReconnect(TerminalTab tab) {
+    cancelAutoReconnect(tab.id);
+    final service = tab.service ?? tab.localService;
+    if (service != null) {
+      _ref.read(agentProvider.notifier).setExecutor(service,
+          hostId: tab.hostId, tabId: tab.id);
+    }
+    if (!_reconnectedTabIds.isClosed) _reconnectedTabIds.add(tab.id);
+  }
+
   /// 建连主流程：取凭据 → 组跳板机 → acquire → 绑定输出
   /// [hadConnectedBefore] 决定失败后是整屏错误（failed）还是角标重连（lost）
   Future<TerminalTab?> _openSsh(
@@ -295,6 +381,8 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
         if (!_isOpen(tab.id) || tab.status != TabStatus.connected) return;
         tab.markFailed(L10n.str.orchHostDisconnected, hadConnectedBefore: true);
         _publish();
+        // 自动重连由 notifier 调度，不依赖 TerminalPage 是否存活
+        scheduleAutoReconnect(tab.id);
       };
       tab.connectionError = null;
       tab.status = TabStatus.connected;
@@ -334,6 +422,7 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
     );
 
     if (tab != null) {
+      cancelAutoReconnect(tabId); // 关掉 tab 后不再有重连目标
       if (tab.isLocal) {
         tab.localService?.disconnect();
       } else {
@@ -387,7 +476,11 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
 
   /// 重连：在原 tab 上重建 SSH 连接（保留 tabId、终端内容、outputController）
   /// 返回重连后的 tab；失败返回 null（原因写在 tab.connectionError）。
-  Future<TerminalTab?> reconnect(String tabId, HostConfig config) async {
+  /// 取消当前调度：用户开始手动重连，后台退避必须让位。
+  Future<TerminalTab?> reconnect(String tabId, HostConfig config,
+      {bool autoRetryOnFailure = false}) async {
+    // 取消待执行的定时器，但保留已用次数：失败后还要按下一档退避
+    cancelAutoReconnect(tabId, keepAttempts: true);
     final existingTab = state.tabs.cast<TerminalTab?>().firstWhere(
       (t) => t?.id == tabId,
       orElse: () => null,
@@ -413,13 +506,21 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
         hadConnectedBefore ? TabStatus.reconnecting : TabStatus.connecting;
     _publish();
 
-    return _openSsh(existingTab, config,
+    final result = await _openSsh(existingTab, config,
         hadConnectedBefore: hadConnectedBefore);
+    if (result != null) {
+      _finishReconnect(result);
+    } else if (autoRetryOnFailure) {
+      // 自动重连失败：tab 仍是 lost，继续下一档退避
+      scheduleAutoReconnect(tabId);
+    }
+    return result;
   }
 
   /// 本地终端重连：在原 tab 上重启 PTY（保留 tabId、终端内容）
   /// 返回重连后的 tab；失败返回 null（原因写在 tab.connectionError）。
   Future<TerminalTab?> reconnectLocal(String tabId) async {
+    cancelAutoReconnect(tabId, keepAttempts: true);
     final existingTab = state.tabs.cast<TerminalTab?>().firstWhere(
       (t) => t?.id == tabId,
       orElse: () => null,
@@ -445,11 +546,18 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
 
     final result = await connectLocalTab(existingTab,
         hadConnectedBefore: hadConnectedBefore);
+    if (result != null) _finishReconnect(result);
     return result;
   }
 
   @override
   void dispose() {
+    for (final timer in _reconnectTimers.values) {
+      timer.cancel();
+    }
+    _reconnectTimers.clear();
+    _reconnectAttempts.clear();
+    _reconnectedTabIds.close();
     for (final tab in state.tabs) {
       tab.dispose();
     }

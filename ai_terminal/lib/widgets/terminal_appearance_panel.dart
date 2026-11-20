@@ -7,7 +7,6 @@ import '../core/terminal_themes.dart';
 import '../core/theme_colors.dart';
 import '../core/ui_text.dart';
 import '../providers/app_providers.dart';
-import '../services/daos.dart';
 
 /// 终端外观的即时调整区：主题模式（深/浅/跟随系统）+ 配色 + 字号。
 /// 顶栏浮层专用，设置抽屉里不再重复出现这三项。
@@ -56,9 +55,10 @@ class TerminalAppearancePanel extends ConsumerWidget {
     final theme = resolveTerminalTheme(
         paletteId: paletteId, isLight: isLight);
 
+    // 唯一写入口是 SettingsNotifier.setSetting（内部写库 + 更新 state），
+    // 这里不要再直写 DAO —— 之前双写会让库与 provider 短暂不一致。
     Future<void> save(String key, dynamic value) async {
-      await SettingsDao.set(key, value);
-      ref.read(settingsProvider.notifier).setSetting(key, value);
+      await ref.read(settingsProvider.notifier).setSetting(key, value);
     }
 
     // 步进时现场从 provider 读当前值，不闭包捕获 build 时的 fontSize：

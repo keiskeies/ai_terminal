@@ -1436,13 +1436,21 @@ class AgentNotifier extends StateNotifier<AgentState> {
             ));
   }
 
+  /// 解析「当前活跃 scope 的引擎」：registry 优先，_engine 只作兜底缓存。
+  /// 切 tab / 重建模型后 _engine 可能滞后，所有针对活跃 tab 的操作
+  /// （cancel/pause/resume）统一走这里，避免 R3 串台。
+  ({String? scopeId, AgentEngine? engine}) _activeEngine() {
+    final scopeId = _registry.activeScopeId ?? _engineScopeId;
+    final engine =
+        scopeId == null ? _engine : (_registry.getEngine(scopeId) ?? _engine);
+    return (scopeId: scopeId, engine: engine);
+  }
+
   /// 取消任务
   void cancel() {
-    // 以活跃 tab 的当前引擎为准；_engine 只是缓存，切 tab/重建模型后可能滞后
-    final scopeId = _registry.activeScopeId ?? _engineScopeId;
-    final engine = scopeId == null
-        ? _engine
-        : (_registry.getEngine(scopeId) ?? _engine);
+    final active = _activeEngine();
+    final scopeId = active.scopeId;
+    final engine = active.engine;
 
     if (scopeId != null) {
       // 任务已显示"运行中"、但 engine.startTask 尚未执行的窗口：
@@ -1491,18 +1499,20 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
   /// P2-7: 暂停任务
   void pause() {
-    if (_engine == null || !_engine!.isRunning) return;
-    _engine!.pauseTask();
+    final engine = _activeEngine().engine;
+    if (engine == null || !engine.isRunning) return;
+    engine.pauseTask();
   }
 
   /// P2-7: 恢复任务
   Future<void> resume() async {
-    final engine = _engine;
-    final scopeId = _engineScopeId;
+    final active = _activeEngine();
+    final engine = active.engine;
+    final scopeId = active.scopeId;
     if (engine == null || scopeId == null || engine.currentTask == null) {
       return;
     }
-    final executor = _executor;
+    final executor = _registry.getScopeExecutor(scopeId) ?? _executor;
     await engine.resumeTask(executor);
     // 任务结束后检查是否需要自动压缩（引擎可能已被模型切换替换）
     if (_registry.getEngine(scopeId) == engine) {
