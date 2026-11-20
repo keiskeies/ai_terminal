@@ -85,10 +85,36 @@ class SafetyGuard {
         'Truncates a disk device; destroys the partition table and all data on the disk'),
     _SafetyRule(RegExp(r'^swapoff\s+-a\b'), '关闭所有交换分区，内存不足时系统将直接 OOM 杀进程',
         'Disables all swap; under memory pressure the kernel will OOM-kill processes directly'),
+    // Windows 磁盘级破坏操作，对应 POSIX 的 mkfs / dd 直接拦截
+    _SafetyRule(RegExp(r'^\s*(&\s*)?(format-volume|clear-disk|initialize-disk|remove-partition)\b', caseSensitive: false), '格式化/初始化/清除磁盘或分区，目标磁盘数据将被擦除，不可恢复',
+        'Formats/initializes/clears a disk or partition; all data on it is erased and cannot be recovered'),
   ];
 
   // 需二次确认的命令模式（高风险修改操作）
   static final List<_SafetyRule> _warnRules = [
+    // PowerShell/CMD 写操作：本表其余规则全是 POSIX 模式，Windows 本机终端
+    // 跑的是 PowerShell 5.1，Set-Content 这类 cmdlet 若不在此登记就会被判成
+    // safe，导致「只读档」在 Windows 上形同虚设（实测 Set-Content 直接写盘成功）。
+    // 统一按 warn 处理：只读档拒绝、询问档确认、自动/全自动照常执行。
+    _SafetyRule(
+        RegExp(
+            r'^(&\s*)?(set-content|add-content|out-file|new-item|remove-item|rename-item|move-item|copy-item|clear-content|set-itemproperty|new-itemproperty|remove-itemproperty|set-acl|icacls|takeown|robocopy|xcopy|attrib)\b',
+            caseSensitive: false),
+        '执行文件/目录写入、修改或删除操作，可能改变或丢失数据，请确认目标路径',
+        'Writes, modifies, or deletes files/directories; data may be changed or lost — confirm the target path'),
+    // PowerShell 重定向写文件：POSIX 的 `> file` 在本表里一直是 safe（只有
+    // `> /etc/` 这类系统路径被拦），为不改动既有跨平台语义，这里不笼统拦
+    // `>`，只拦显式写系统路径的盘符/绝对路径形式。
+    _SafetyRule(
+        RegExp(r'>>?\s*[A-Za-z]:[\\/][^\s|;]*', caseSensitive: false),
+        '通过重定向写入磁盘文件，将覆盖或追加目标文件内容，请确认目标路径',
+        'Redirects output into a disk file; overwrites or appends to the target — confirm the target path'),
+    // CMD 系写操作（Windows 本机也可能被建议使用）
+    _SafetyRule(
+        RegExp(r'^(del|erase|rd|rmdir|move|copy|ren|rename|mkdir)\s+',
+            caseSensitive: false),
+        '执行文件/目录创建、移动、重命名或删除操作，可能改变或丢失数据，请确认目标路径',
+        'Creates, moves, renames, or deletes files/directories; data may be changed or lost — confirm the target path'),
     // 文件/目录删除：任何形式的删除都不可恢复，必须让用户确认
     // （rm -rf / 等系统级删除已被 _blockRules 直接拦截，此处覆盖其余删除）
     _SafetyRule(RegExp(r'^(sudo\s+)?rm\s+'), '删除文件或目录，操作不可恢复，请确认目标路径',
@@ -240,6 +266,14 @@ class SafetyGuard {
   /// - 去除反斜杠转义（如 r\m → rm）
   static String _normalizeCommand(String command) {
     var cmd = command.trim();
+    // 剥掉解释器外壳后再判定：`powershell -Command "Set-Content ..."` 的真实
+    // 动作是 Set-Content，若按外层 powershell 判定就永远命不中 cmdlet 规则。
+    // 循环几次以覆盖嵌套调用。
+    for (var i = 0; i < 3; i++) {
+      final unwrapped = _unwrapInterpreter(cmd);
+      if (unwrapped == cmd) break;
+      cmd = unwrapped.trim();
+    }
     // 去除命令名周围的引号：匹配开头的 "xxx" 或 'xxx" 并去除引号
     // 注意：replaceFirst 不支持 $1 反向引用，必须用 replaceFirstMapped
     cmd = cmd.replaceFirstMapped(
@@ -254,6 +288,41 @@ class SafetyGuard {
     // 合并多余空格
     cmd = cmd.replaceAll(RegExp(r'\s{2,}'), ' ');
     return cmd;
+  }
+
+  /// 去掉 `powershell|pwsh ... -Command "..."` / `cmd /c "..."` 外壳，
+  /// 返回真正被执行的命令；无法识别时原样返回。
+  static String _unwrapInterpreter(String cmd) {
+    final ps = RegExp(r'^(?:powershell|pwsh)(?:\.exe)?\s+(.+)$',
+            caseSensitive: false, dotAll: true)
+        .firstMatch(cmd);
+    if (ps != null) {
+      final rest = ps.group(1)!;
+      final flag = RegExp('(?:^|\\s)-(?:command|c)(?=\\s|["\'])',
+              caseSensitive: false)
+          .firstMatch(rest);
+      if (flag != null) {
+        return _stripOuterQuotes(rest.substring(flag.end).trim());
+      }
+      return cmd;
+    }
+    final cmdExe = RegExp(r'^cmd(?:\.exe)?\s+/c\s+(.+)$',
+            caseSensitive: false, dotAll: true)
+        .firstMatch(cmd);
+    if (cmdExe != null) {
+      return _stripOuterQuotes(cmdExe.group(1)!.trim());
+    }
+    return cmd;
+  }
+
+  static String _stripOuterQuotes(String s) {
+    if (s.length < 2) return s;
+    final first = s[0];
+    final last = s[s.length - 1];
+    if ((first == '"' && last == '"') || (first == "'" && last == "'")) {
+      return s.substring(1, s.length - 1).trim();
+    }
+    return s;
   }
 
   /// 获取命令的风险说明（人类可读的具体原因，按当前 UI 语言）

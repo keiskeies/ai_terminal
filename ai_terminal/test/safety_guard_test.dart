@@ -133,6 +133,104 @@ void main() {
     test('rm 命令的 getReason 返回删除风险说明', () {
       expect(SafetyGuard.getReason('rm /tmp/foo.txt'), contains('不可恢复'));
     });
+
+    // 回归：Windows 本机终端是 PowerShell 5.1，写 cmdlet 曾被判成 safe，
+    // 导致只读档在 Windows 上完全没有隔离（实测 Set-Content 直接写盘成功）。
+    test('Set-Content 写文件返回 warn', () {
+      expect(
+        SafetyGuard.check(
+            r'Set-Content -Path C:\Users\Administrator\Desktop\test.txt -Value 123'),
+        SafetyLevel.warn,
+      );
+    });
+
+    test('Out-File 返回 warn', () {
+      expect(SafetyGuard.check(r'Get-Date | Out-File D:\tmp\a.txt'),
+          SafetyLevel.warn);
+    });
+
+    test('New-Item / Remove-Item / Copy-Item 返回 warn', () {
+      expect(SafetyGuard.check(r'New-Item -ItemType File -Path D:\tmp\a.txt'),
+          SafetyLevel.warn);
+      expect(SafetyGuard.check(r'Remove-Item D:\tmp\a.txt'),
+          SafetyLevel.warn);
+      expect(SafetyGuard.check(r'Copy-Item a.txt b.txt'), SafetyLevel.warn);
+    });
+
+    test('大小写与 & 调用运算符下的 cmdlet 仍为 warn', () {
+      expect(SafetyGuard.check(r'set-content -path a.txt -value 1'),
+          SafetyLevel.warn);
+      expect(SafetyGuard.check(r'& Remove-Item D:\tmp\a.txt'),
+          SafetyLevel.warn);
+    });
+
+    test('盘符重定向写文件返回 warn', () {
+      expect(SafetyGuard.check(r'"abc" > D:\tmp\a.txt'), SafetyLevel.warn);
+      expect(SafetyGuard.check(r'echo hi >> C:\tmp\a.log'), SafetyLevel.warn);
+    });
+
+    test('CMD 系写命令返回 warn', () {
+      expect(SafetyGuard.check(r'del C:\Windows\Temp\a.tmp'),
+          SafetyLevel.warn);
+      expect(SafetyGuard.check(r'move a.txt b.txt'), SafetyLevel.warn);
+      expect(SafetyGuard.check(r'mkdir D:\tmp\newdir'), SafetyLevel.warn);
+    });
+
+    test('Windows 磁盘级破坏命令返回 blocked', () {
+      expect(SafetyGuard.check('Format-Volume -DriveLetter D'),
+          SafetyLevel.blocked);
+      expect(SafetyGuard.check('Clear-Disk -Number 1'),
+          SafetyLevel.blocked);
+    });
+
+    test('只读 PowerShell 命令仍为 safe', () {
+      expect(SafetyGuard.check(r'Get-ChildItem C:\Windows'), SafetyLevel.safe);
+      expect(SafetyGuard.check(r'Test-Path D:\tmp\a.txt'), SafetyLevel.safe);
+      expect(SafetyGuard.check(r'Get-Content D:\tmp\a.txt'), SafetyLevel.safe);
+    });
+
+    test('引号内的写 cmdlet 文本不误判（echo 只读）', () {
+      expect(SafetyGuard.check('echo "Set-Content"'), SafetyLevel.safe);
+    });
+
+    // 回归：模型实际发出的命令是 powershell -Command "Set-Content ..." 外壳形式。
+    // 第一版修复只锚定行首 cmdlet，被解释器外壳绕过，实测仍写盘成功。
+    test('powershell -Command 外壳内的写 cmdlet 返回 warn', () {
+      expect(
+        SafetyGuard.check(
+            "powershell -NoProfile -Command \"Set-Content -Path 'C:\\Users\\Administrator\\Desktop\\test2.txt' -Value 999\""),
+        SafetyLevel.warn,
+      );
+      expect(
+        SafetyGuard.check(
+            r'powershell -NoProfile -Command Set-Content -Path D:\a.txt -Value 1'),
+        SafetyLevel.warn,
+      );
+    });
+
+    test('pwsh / cmd /c 外壳内的写操作同样返回 warn', () {
+      expect(
+        SafetyGuard.check(r'pwsh -NoProfile -Command "Remove-Item D:\a.txt"'),
+        SafetyLevel.warn,
+      );
+      expect(
+        SafetyGuard.check(r'cmd /c "del C:\Windows\Temp\a.tmp"'),
+        SafetyLevel.warn,
+      );
+    });
+
+    test('powershell 外壳内的只读命令仍为 safe', () {
+      expect(
+        SafetyGuard.check(
+            "powershell -NoProfile -Command \"[Environment]::GetFolderPath('Desktop')\""),
+        SafetyLevel.safe,
+      );
+      expect(
+        SafetyGuard.check(
+            "powershell -NoProfile -Command \"Get-Item 'C:\\a.txt' | Select-Object Length\""),
+        SafetyLevel.safe,
+      );
+    });
   });
 
   group('SafetyGuard.check - info 命令', () {
