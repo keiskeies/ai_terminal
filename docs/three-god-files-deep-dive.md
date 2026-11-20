@@ -170,8 +170,13 @@ TerminationGuard (R5: 唯一终态收口)
 AgentEngine facade (循环 + 生命周期 + 7 Completer)
 ```
 
-- **Step 0 特征化测试**：补 5 条失败终态的 finish+flush 断言、旧命令 record 回归、`_aiDoneCompleter` complete 断言。
-- **Step 1–4**：依次抽 `ReActParser`（2638–3010，全 static 最低风险）→ `PromptBuilder`（5133–5451、5051–5110）→ `EventStore`（187/1981–1996/2321–2469/3819）→ `HistoryPolicy`（845–961/5556–5638）。保留 `*ForTesting` 转发，避免 145 个 agent 测试大面积红灯。
+- **Step 0 特征化测试**：✅ 已补（提交 `40853c8`）——`test/react_parser_test.dart` 15 例 + CI quality 门禁 + 终态写入棘轮脚本 `tools/check_terminal_writes.py`（基线 10，待 TerminationGuard 落地后降为 0）。终态断言经复核修正：5 条失败终态缺 flush 实为 1 条（`_resumeTask` catch），已在 P1 修复。
+- **Step 1–4 叶子拆分**：✅ 已落地 3/4（保留 `*ForTesting` 转发，145 个 agent 测试零改动）：
+  - Step 1 `ReActParser`（`287ffb4`）：358 行纯静态解析 → `lib/services/react_parser.dart`，engine 留薄转发壳。
+  - Step 2 `PromptBuilder`：**暂缓** —— 复核发现 `_buildSystemPrompt` 并非报告原判的「纯函数无引擎依赖」，而是直接/间接依赖 7 个实例字段（`_modelConfig`/`hostId`/`_tools`/`_orchestratorMode`/`_memory`/`_webSearchEnabled`/`_permissionMode`），且 `_syncWebToolsRegistration` 带副作用改写 `_tools`。整体提取等于重构语义，风险中-高；仅 `_executionLocationPrompt`/`_permissionModePrompt` 等少数叶子可低风险抽，收益有限。留待 `ToolOrchestrator`（`_tools` 所有权迁移）之后一并处理。
+  - Step 3 `EventStore`（`88cd6fb`）：`_eventSeq` + 轮内两个集合 → `lib/services/event_store.dart`（`EventStore` 跨轮序号 + `EventScope` 轮内去重）。保留「序号跨轮递增、去重集合轮内隔离」的原始语义；新增 7 例特征化测试，含「两轮相同 ask 不撞 id」回归。
+  - Step 4 `HistoryPolicy`（`720d6fd`）：三层裁剪 + 3 个上限常量 → `lib/services/history_policy.dart`，唯一实例依赖 `effectiveContextWindow` 改显式入参；22 处调用点经 `_trimMessages` 转发零改动。新增 8 例特征化测试。
+  - 每次拆分均通过 `flutter analyze`（81 issues / 0 error 基线）与全量测试（现 1719 passed / 25 skipped）。
 - **Step 5–6**：抽 `CommandRunner`（3016–3110/3275–3806/4713–4855，顺手修 §3.4）→ `ToolOrchestrator`（4070–4476，`_tools` 所有权迁移）。
 - **Step 7 最后做**：引入 `TerminationGuard.terminate({status, finishState, flush})`，固定顺序执行 status→report→finish→flush→tracer→清理，包 try/finally；替换全部 11 条终态路径。**必须每引擎一个实例，严禁 static**；guard 接收 `generation/hostId/operationId`，进入时统一代际检查。
 - **暂时别动**：`_callAI`（stream + watchdog + doneCompleter 六件事咬合）、`cancelTask/pauseTask/resumeTask`（与 7 Completer 和回调清空顺序强耦合）。
