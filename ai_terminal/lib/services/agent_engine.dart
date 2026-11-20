@@ -27,6 +27,7 @@ import 'react_parser.dart';
 import 'event_store.dart';
 import 'history_policy.dart';
 import 'prompt_builder.dart';
+import 'termination_guard.dart';
 import 'agent_logger.dart';
 export 'agent_logger.dart';
 import 'agent_tracer.dart';
@@ -213,6 +214,13 @@ class AgentEngine {
   /// 任务代际 token：每次 startTask 递增，循环中检查此 token 是否仍为当前任务
   /// 防止取消+立即发送导致旧循环与新循环并发
   int _currentTaskGeneration = 0;
+
+  /// R5: 终态收口器（每引擎一个实例，严禁 static）。
+  /// 延迟初始化以闭包读取当前代际；多 scope 各自独立，避免终态串台。
+  late final TerminationGuard _terminationGuard = TerminationGuard(
+    hostId: hostId,
+    generation: () => _currentTaskGeneration,
+  );
 
   /// 等待用户选择选项的 Completer（ReAct ask 动作 / :::choose A|B|C:::）
   Completer<String>? _choiceCompleter;
@@ -4273,55 +4281,79 @@ class AgentEngine {
   }
 
   /// 标记任务为已完成（统一的结束逻辑）
+  ///
+  /// R5: 终态骨架由 [_terminationGuard] 编排（status→report→finish→flush→tracer，
+  /// 清理放 finally）；本方法只负责裁剪历史、合成收尾文本、引擎私有资源清理
+  /// 与完成通知。所有调用点保持不变。
   void _finishTask({bool success = true, String? summary, String? answer}) {
     _trimMessages(_conversationHistory);
     final startTime = _currentTask?.createdAt;
-    _currentTask = _currentTask!.copyWith(
-      status: success ? AgentStatus.completed : AgentStatus.failed,
-      phase: success
-          ? UiText.t('整理结论', 'Summarizing')
-          : UiText.t('执行失败', 'Failed'),
-      completedAt: DateTime.now(),
-    );
-    _notifyTaskUpdate();
-    agentLogger.info('AutoExec', '=== 任务${success ? "完成" : "终止"} ===');
-    // R5: 先发操作单报告，再发 finish（消费方看到 finish 即停止渲染）
+    final finishState =
+        success ? AgentFinishState.success : AgentFinishState.failed;
     final finishSummary =
         _composeFinishSummary(summary: summary, answer: answer);
-    // 报告结论只接受模型显式总结；summary 为空时用确定性模板，
-    // 绝不把 _accumulatedMessage（完整 ReAct 文本）当结论。
-    _emitOperationReport(
-      finishState: success ? AgentFinishState.success : AgentFinishState.failed,
-      summary: success ? summary : null,
-      reason: success ? null : summary,
-      answer: success ? answer : null,
-    );
-    // L6 修复：补发 finish 事件，让 UI 显示完成卡片并正确结束渲染状态
-    onEvent?.call(AgentEvent.finish(
-      summary: finishSummary,
-      finishState: success ? AgentFinishState.success : AgentFinishState.failed,
-    ));
     // onCompleted 仍传完整累积文本：持久化需要完整上下文，
     // 操作单结论只使用 step.thought 生成的 finishSummary。
     final completionMessage =
         _accumulatedMessage.isNotEmpty ? _accumulatedMessage : finishSummary;
-    if (completionMessage.isNotEmpty) {
-      onCompleted?.call(completionMessage);
-    }
-    // P0-2: trace 任务结束
-    final taskId = _currentTask?.id;
-    if (taskId != null) {
-      AgentTracer.instance.endTask(
-        taskId,
-        status: success ? 'completed' : 'failed',
+
+    _terminationGuard.terminate(
+      status: success ? AgentStatus.completed : AgentStatus.failed,
+      finishState: finishState,
+      writeStatus: (status) {
+        _currentTask = _currentTask!.copyWith(
+          status: status,
+          phase: success
+              ? UiText.t('整理结论', 'Summarizing')
+              : UiText.t('执行失败', 'Failed'),
+          completedAt: DateTime.now(),
+        );
+        _notifyTaskUpdate();
+        agentLogger.info(
+            'AutoExec', '=== 任务${success ? "完成" : "终止"} ===');
+      },
+      // 报告结论只接受模型显式总结；summary 为空时用确定性模板，
+      // 绝不把 _accumulatedMessage（完整 ReAct 文本）当结论。
+      emitReport: () => _emitOperationReport(
+        finishState: finishState,
+        summary: success ? summary : null,
+        reason: success ? null : summary,
+        answer: success ? answer : null,
+      ),
+      // L6 修复：补发 finish 事件，让 UI 显示完成卡片并正确结束渲染状态
+      emitFinish: () => onEvent?.call(AgentEvent.finish(
         summary: finishSummary,
-        hostId: hostId,
-      );
-    }
-    // R2: 任务终态后清理瞬态资源（不依赖下次 startTask 才清理）
-    // 避免正常 completed 后 _orchestratorCancelToken/_earlyExecutionCompleter 等仍指向旧资源
-    // 注意：不清理 _currentTask / _accumulatedMessage / _conversationHistory —
-    //   这些是任务结果数据，需要保留供 UI 显示和下次"继续"对话
+        finishState: finishState,
+      )),
+      flush: completionMessage.isEmpty
+          ? null
+          : () => onCompleted?.call(completionMessage),
+      endTracer: () {
+        final taskId = _currentTask?.id;
+        if (taskId != null) {
+          AgentTracer.instance.endTask(
+            taskId,
+            status: success ? 'completed' : 'failed',
+            summary: finishSummary,
+            hostId: hostId,
+          );
+        }
+      },
+      cleanup: _cleanupAfterTermination,
+    );
+
+    // 任务完成通知（异步，不阻塞引擎）
+    _notifyTaskCompletion(success: success, startTime: startTime);
+    // 重置会话级本地项目状态（R2：资源生命周期 — 任务结束清理）
+    _sessionSourceCodeGranted = false;
+    _currentProjectRoot = null;
+  }
+
+  /// 终态后的瞬态资源清理（供 TerminationGuard 的 finally 调用）。
+  ///
+  /// R2: 不依赖下次 startTask 才清理；不清理 _currentTask /
+  /// _accumulatedMessage / _conversationHistory（任务结果数据要保留）。
+  void _cleanupAfterTermination() {
     _aiWatchdog?.cancel();
     _aiWatchdog = null;
     _aiStreamTimedOut = false;
@@ -4355,12 +4387,6 @@ class AgentEngine {
     _interactiveInputTimeoutTimer = null;
     // 不清 _confirmCompleter / _choiceCompleter / _interactiveInputCompleter —
     // _finishTask 调用前已退出等待状态
-
-    // 任务完成通知（异步，不阻塞引擎）
-    _notifyTaskCompletion(success: success, startTime: startTime);
-    // 重置会话级本地项目状态（R2：资源生命周期 — 任务结束清理）
-    _sessionSourceCodeGranted = false;
-    _currentProjectRoot = null;
   }
 
   /// 推送任务完成通知（异步触发，不阻塞引擎主流程）
