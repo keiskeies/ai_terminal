@@ -1359,10 +1359,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         behavior: HitTestBehavior.opaque,
         onPanUpdate: (d) => _dragPaneDivider(
             tab, index, isRow ? d.delta.dx : d.delta.dy, extent),
-        child: Container(
-          width: isRow ? 6 : double.infinity,
-          height: isRow ? double.infinity : 6,
-          color: tc.border.withValues(alpha: 0.6),
+        // 与 _panelDivider（AI 面板/SFTP 分隔条）同一画法：热区 5px，
+        // 可见线只有 1px 实心 —— 粗色块是旧样式，分屏界线要保持细线一致。
+        child: SizedBox(
+          width: isRow ? 5 : double.infinity,
+          height: isRow ? double.infinity : 5,
+          child: Center(
+            child: Container(
+              width: isRow ? 1 : double.infinity,
+              height: isRow ? double.infinity : 1,
+              color: tc.border,
+            ),
+          ),
         ),
       ),
     );
