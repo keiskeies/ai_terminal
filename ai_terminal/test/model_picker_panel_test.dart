@@ -5,7 +5,6 @@ import 'package:ai_terminal/core/theme.dart';
 import 'package:ai_terminal/core/theme_colors.dart';
 import 'package:ai_terminal/l10n/app_localizations.dart';
 import 'package:ai_terminal/models/ai_endpoint.dart';
-import 'package:ai_terminal/services/ai_model_selection_service.dart';
 import 'package:ai_terminal/widgets/model_picker_panel.dart';
 
 void main() {

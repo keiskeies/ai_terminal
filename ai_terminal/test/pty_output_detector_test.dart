@@ -99,10 +99,6 @@ void main() {
     test('误报规避：cat 日志里含 "bash:" 字样但不是 syntax error', () {
       // 日志里只有 "bash: foo: command not found"，不含 syntax error
       // 不应该被识别为语法错误
-      final buffer = '''
-bash: foo: command not found
-EXITCODE_1:127
-''';
       // marker 未出现的窗口内（但日志本身合法）不应误报
       final diag = PtyOutputDetector.detect(
         buffer: 'bash: foo: command not found\n',  // 不含 marker

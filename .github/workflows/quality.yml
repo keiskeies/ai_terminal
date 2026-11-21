@@ -36,7 +36,8 @@ jobs:
       - name: Analyze
         run: |
           cd ai_terminal
-          flutter analyze
+          # info 级 lint（prefer_const 等风格建议）不设防，warning/error 仍致失败
+          flutter analyze --no-fatal-infos
       - name: Test
         run: |
           cd ai_terminal
