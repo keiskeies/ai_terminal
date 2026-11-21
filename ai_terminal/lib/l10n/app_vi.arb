@@ -442,7 +442,7 @@
   "settingsSnippets": "Lệnh tắt",
   "settingsSnippetsDesc": "Lưu các lệnh được sử dụng thường xuyên và thực hiện chúng bằng một cú nhấp chuột vào lần tiếp theo",
   "settingsTitle": "cài đặt",
-  "settingsVersion": "Phiên bản 1.5.1",
+  "settingsVersion": "Phiên bản 1.5.2",
   "simplifiedChinese": "简体中文",
   "snippetCommandHint": "Ví dụ: docker exec -it '{container}' /bin/bash",
   "snippetCommandLabel": "Lệnh:",

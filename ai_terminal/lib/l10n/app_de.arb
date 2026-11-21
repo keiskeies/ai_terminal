@@ -442,7 +442,7 @@
   "settingsSnippets": "Shortcut-Befehle",
   "settingsSnippetsDesc": "Speichern Sie häufig verwendete Befehle und führen Sie sie beim nächsten Mal mit einem Klick aus",
   "settingsTitle": "Einstellungen",
-  "settingsVersion": "Version 1.5.1",
+  "settingsVersion": "Version 1.5.2",
   "simplifiedChinese": "简体中文",
   "snippetCommandHint": "Zum Beispiel: docker exec -it '{container}' /bin/bash",
   "snippetCommandLabel": "Befehl:",

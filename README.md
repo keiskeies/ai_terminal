@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.5.1-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.5.2-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.5.1</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.5.2</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">Visit the website</a>
 </p>
@@ -53,6 +53,15 @@ A chat assistant tells you what to run. AI Terminal runs it on your servers and 
 ## At a glance
 
 `5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `27 built-in tools` · `8 slash commands` · `11 web search backends`
+
+## New in 1.5.2
+
+Agent is the product, so 1.5.2 puts that claim under the microscope: the engine's god files are split into testable layers, every terminal-state write funnels through one guard, safety rules now understand Windows commands, and the whole UI follows one theme-token ladder in light and dark.
+
+- **Engine architecture governance** — the single-file engine is split into pure, unit-tested layers: `ReActParser` (protocol parsing), `EventStore` (event dedup and id allocation), `HistoryPolicy` (conversation trimming), `PromptBuilder` (prompt assembly), `TerminationGuard` (all terminal-state writes), `CommandRunner` (preflight + execution), and `ToolOrchestrator` (the three tool gates). Same behavior, one test per unit, and the parser gets feature-tested against CI
+- **Terminal-state consistency** — every path that ends a task now exits through `TerminationGuard`; the lazy-race that could flip a finished task back to "running" (U2/U4/U5/U6) is closed and hard-wired as a test baseline of zero
+- **Safety guard understands Windows** — read-only mode no longer lets `Set-Content` / `Out-File` / `Remove-Item` through; write cmdlets, drive-letter redirection and CMD write verbs are graded warn, disk-level destruction is blocked, and `powershell -Command "…"` wrappers are unwrapped so grading hits the real command
+- **UI theme-token unification** — ~200 legacy hard-coded colors across 24 files replaced with theme-aware tokens so light theme can meet contrast everywhere; dividers and input outlines follow one spec, radius/font sizes climb one ladder, and desktop controls gain hover/press states and pointer cursors
 
 ## New in 1.5.1
 
@@ -210,11 +219,11 @@ Get the latest build from [GitHub Releases](https://github.com/keiskeies/ai_term
 
 | Platform | File |
 |---|---|
-| macOS | `AI_Terminal_v1.5.1_macOS.zip` |
-| iOS | `AI_Terminal_v1.5.1_iOS.ipa` (unsigned) |
-| Android | `AI_Terminal_v1.5.1_Android.apk` |
-| Windows | `AI_Terminal_v1.5.1_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.5.1_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.5.2_macOS.zip` |
+| iOS | `AI_Terminal_v1.5.2_iOS.ipa` (unsigned) |
+| Android | `AI_Terminal_v1.5.2_Android.apk` |
+| Windows | `AI_Terminal_v1.5.2_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.5.2_Linux_x64.tar.gz` |
 
 If macOS reports that the developer cannot be verified:
 

@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.5.1-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.5.2-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.5.1</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.5.2</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">访问官网</a>
 </p>
@@ -53,6 +53,15 @@
 ## 一眼看懂
 
 `5 个平台` · `14 种界面语言` · `22 个 AI 供应商` · `90+ 预设模型` · `27 个内置工具` · `8 个斜杠命令` · `11 种联网搜索后端`
+
+## 1.5.2 新增
+
+Agent 是这款产品的核心，1.5.2 就把这句口号放到显微镜下：引擎的上帝文件拆成可测试的分层，所有终态写入收口到一个守卫，安全规则学会了 Windows 命令，整套 UI 在浅色与深色两套主题里走同一条设计令牌阶梯。
+
+- **引擎架构治理**——单文件引擎拆成纯逻辑、各自带单测的分层：`ReActParser`（协议解析）、`EventStore`（事件去重与 id 分配）、`HistoryPolicy`（对话历史裁剪）、`PromptBuilder`（提示词组装）、`TerminationGuard`（全部终态写入收口）、`CommandRunner`（预检 + 执行）、`ToolOrchestrator`（三道工具门禁）。行为不变，每个单元都有测试兜底，解析器还按特征用例挂进 CI
+- **终态一致性**——所有结束任务的路径统一走 `TerminationGuard` 收口；那条把已结束任务翻回「运行中」的懒加载竞态（U2/U4/U5/U6）已修复，并以「终态硬禁令基线归零」固化成测试
+- **安全门禁认得 Windows**——只读档位下 `Set-Content` / `Out-File` / `Remove-Item` 不再被放行；写 cmdlet、盘符重定向、CMD 写动词升级为 warn 分级，磁盘级破坏直接 block；`powershell -Command "…"` 包装会在分级前逐层剥离，让规则真正作用于底层命令
+- **UI 令牌统一**——24 个文件里约 200 处遗留硬编码色替换为主题感知令牌，浅色主题全线达到对比度要求；分隔线与输入框收拢到同一规格，圆角/字号走同一梯度，桌面控件补齐悬停/按下态与手型光标
 
 ## 1.5.1 新增
 
@@ -210,11 +219,11 @@ Agent 也能直接读写跑着这个 App 的这台电脑，而不只是服务器
 
 | 平台 | 文件 |
 |---|---|
-| macOS | `AI_Terminal_v1.5.1_macOS.zip` |
-| iOS | `AI_Terminal_v1.5.1_iOS.ipa`（未签名） |
-| Android | `AI_Terminal_v1.5.1_Android.apk` |
-| Windows | `AI_Terminal_v1.5.1_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.5.1_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.5.2_macOS.zip` |
+| iOS | `AI_Terminal_v1.5.2_iOS.ipa`（未签名） |
+| Android | `AI_Terminal_v1.5.2_Android.apk` |
+| Windows | `AI_Terminal_v1.5.2_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.5.2_Linux_x64.tar.gz` |
 
 macOS 首次打开如提示“无法验证开发者”，可执行：
 
