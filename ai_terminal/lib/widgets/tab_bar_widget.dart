@@ -149,10 +149,10 @@ class _TabItemState extends State<_TabItem> {
                 height: 6,
                 margin: const EdgeInsets.only(right: 5),
                 decoration: BoxDecoration(
-                  color: widget.tab.isConnected ? cSuccess : cDanger,
+                  color: widget.tab.isConnected ? tc.ok : tc.error,
                   shape: BoxShape.circle,
                   boxShadow: widget.tab.isConnected
-                      ? [BoxShadow(color: cSuccess.withValues(alpha: 0.4), blurRadius: 4)]
+                      ? [BoxShadow(color: tc.ok.withValues(alpha: 0.4), blurRadius: 4)]
                       : null,
                 ),
               ),

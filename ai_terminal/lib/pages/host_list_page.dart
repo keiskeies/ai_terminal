@@ -130,7 +130,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, size: 48, color: cDanger),
+                    Icon(Icons.error_outline, size: 48, color: tc.error),
                     const SizedBox(height: 16),
                     Text(l10n.hostListLoadFailed('$error'), style: TextStyle(color: tc.textSub)),
                     const SizedBox(height: 16),
@@ -312,6 +312,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
 
   /// P1-4: 分组区域 - 支持展开/收起状态持久化
   Widget _buildGroupSection(String groupName, List<HostConfig> hosts) {
+    final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     // 默认只展开"默认"分组
     final isExpanded = _groupExpanded.putIfAbsent(groupName, () => groupName == '默认');
@@ -333,14 +334,14 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                 AnimatedRotation(
                   turns: isExpanded ? 0.25 : 0,
                   duration: animFast,
-                  child: const Icon(
+                  child: Icon(
                     Icons.chevron_right,
-                    color: cPrimary,
+                    color: tc.brand,
                     size: 20,
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Icon(Icons.folder, color: cPrimary, size: 18),
+                Icon(Icons.folder, color: tc.brand, size: 18),
                 const SizedBox(width: 8),
                 Text(
                   groupName == '默认' ? l10n.hostDefaultGroup : groupName,
@@ -354,13 +355,13 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: cPrimary.withValues(alpha: 0.1),
+                    color: tc.brand.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rFull),
                   ),
                   child: Text(
                     '${hosts.length}',
-                    style: const TextStyle(
-                      color: cPrimary,
+                    style: TextStyle(
+                      color: tc.brand,
                       fontSize: fMicro,
                       fontWeight: FontWeight.w600,
                     ),
@@ -385,6 +386,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
 
   /// 移动端左滑快捷操作（编辑/删除），桌面端直接 HostCard
   Widget _buildSwipeableHostCard(HostConfig host) {
+    final tc = ThemeColors.of(context);
     final isMobile = Platform.isAndroid || Platform.isIOS;
 
     if (!isMobile) {
@@ -406,16 +408,16 @@ class _HostListPageState extends ConsumerState<HostListPage> {
         margin: const EdgeInsets.symmetric(horizontal: pStandard, vertical: pCompact / 2),
         padding: const EdgeInsets.only(right: pStandard),
         decoration: BoxDecoration(
-          color: cPrimary.withValues(alpha: 0.1),
+          color: tc.brand.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(rCard),
         ),
         alignment: Alignment.centerRight,
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.edit_outlined, color: cPrimary, size: 20),
-            SizedBox(width: 12),
-            Icon(Icons.delete_outline, color: cDanger, size: 20),
+            Icon(Icons.edit_outlined, color: tc.brand, size: 20),
+            const SizedBox(width: 12),
+            Icon(Icons.delete_outline, color: tc.error, size: 20),
           ],
         ),
       ),
@@ -471,7 +473,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             const Divider(height: 1),
             // 连接终端
             ListTile(
-              leading: const Icon(Icons.terminal, color: cPrimary),
+              leading: Icon(Icons.terminal, color: tc.brand),
               title: Text(l10n.hostListConnectTerminal),
               onTap: () {
                 Navigator.pop(context);
@@ -480,7 +482,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             ),
             // SFTP
             ListTile(
-              leading: const Icon(Icons.folder_open, color: cPrimary),
+              leading: Icon(Icons.folder_open, color: tc.brand),
               title: const Text('SFTP'),
               onTap: () {
                 Navigator.pop(context);
@@ -489,7 +491,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             ),
             // 编辑
             ListTile(
-              leading: const Icon(Icons.edit_outlined, color: cPrimary),
+              leading: Icon(Icons.edit_outlined, color: tc.brand),
               title: Text(l10n.hostListEditConfig),
               onTap: () {
                 Navigator.pop(context);
@@ -498,8 +500,8 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             ),
             // 删除
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: cDanger),
-              title: Text(l10n.delete, style: const TextStyle(color: cDanger)),
+              leading: Icon(Icons.delete_outline, color: tc.error),
+              title: Text(l10n.delete, style: TextStyle(color: tc.error)),
               onTap: () {
                 Navigator.pop(context);
                 _showDeleteDialog(host);
@@ -512,6 +514,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
   }
 
   void _showDeleteDialog(HostConfig host) {
+    final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
@@ -534,7 +537,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                 );
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: cDanger),
+            style: ElevatedButton.styleFrom(backgroundColor: tc.error),
             child: Text(l10n.delete),
           ),
         ],

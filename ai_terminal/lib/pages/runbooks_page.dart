@@ -156,7 +156,7 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(rInput),
-                borderSide: const BorderSide(color: cPrimary),
+                borderSide: BorderSide(color: tc.brand),
               ),
             ),
           ),
@@ -190,16 +190,16 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
           padding: const EdgeInsets.symmetric(horizontal: pCompact),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: selected ? cPrimaryBg : tc.card,
+            color: selected ? tc.brandBg : tc.card,
             borderRadius: BorderRadius.circular(rFull),
             border: Border.all(
-              color: selected ? cPrimary : tc.border,
+              color: selected ? tc.brand : tc.border,
             ),
           ),
           child: Text(
             label,
             style: TextStyle(
-              color: selected ? cPrimary : tc.textSub,
+              color: selected ? tc.brand : tc.textSub,
               fontSize: fSmall,
             ),
           ),
@@ -364,26 +364,28 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
   }
 
   Widget _buildBuiltinTag() {
+    final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
       decoration: BoxDecoration(
-        color: cWarningBg,
+        color: tc.warnBg,
         borderRadius: BorderRadius.circular(rXSmall),
-        border: Border.all(color: cWarning),
+        border: Border.all(color: tc.warn),
       ),
       child: Text(
         l10n.runbookBuiltinTag,
-        style: const TextStyle(color: cWarning, fontSize: fMicro),
+        style: TextStyle(color: tc.warn, fontSize: fMicro),
       ),
     );
   }
 
   Widget _buildTypeTag(RunbookType type) {
+    final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     final isAgent = type == RunbookType.agent;
-    final color = isAgent ? cPrimary : cSuccess;
-    final bg = isAgent ? cPrimaryBg : cSuccessBg;
+    final color = isAgent ? tc.brand : tc.ok;
+    final bg = isAgent ? tc.brandBg : tc.okBg;
     final label = isAgent ? l10n.runbookTypeAgentTag : l10n.runbookTypeCommand;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
@@ -440,7 +442,7 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
           _iconButton(
             icon: Icons.delete_outline,
             tooltip: l10n.runbookDeleteTooltip,
-            color: cDanger,
+            color: tc.error,
             onTap: () => _deleteRunbook(rb),
           ),
       ],
@@ -600,7 +602,7 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(rInput),
-                        borderSide: const BorderSide(color: cPrimary),
+                        borderSide: BorderSide(color: tc.brand),
                       ),
                     ),
                   ),
@@ -644,6 +646,7 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
 
   // ===== 删除 =====
   Future<void> _deleteRunbook(Runbook rb) async {
+    final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     if (rb.isBuiltin) {
       _toast(l10n.runbookBuiltinCannotDelete);
@@ -661,7 +664,7 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: cDanger),
+            style: ElevatedButton.styleFrom(backgroundColor: tc.error),
             child: Text(l10n.delete),
           ),
         ],
@@ -884,7 +887,7 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
                   padding: const EdgeInsets.only(top: pSmall),
                   child: Text(
                     l10n.runbookBuiltinNotEditable,
-                    style: const TextStyle(color: cWarning, fontSize: fSmall),
+                    style: TextStyle(color: tc.warn, fontSize: fSmall),
                   ),
                 ),
             ],
@@ -927,7 +930,7 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(rInput),
-        borderSide: const BorderSide(color: cPrimary),
+        borderSide: BorderSide(color: tc.brand),
       ),
       disabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(rInput),
@@ -964,10 +967,10 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
                     height: 36,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: selected ? cPrimaryBg : tc.cardElevated,
+                      color: selected ? tc.brandBg : tc.cardElevated,
                       borderRadius: BorderRadius.circular(rSmall),
                       border: Border.all(
-                        color: selected ? cPrimary : tc.border,
+                        color: selected ? tc.brand : tc.border,
                       ),
                     ),
                     child: Text(e, style: const TextStyle(fontSize: 18)),
@@ -994,13 +997,14 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
 
   // 类型单选（紧凑分段）
   Widget _buildTypeSelector() {
+    final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _buildTypeOption(RunbookType.agent, l10n.runbookTypeAgentOption, cPrimary),
+        _buildTypeOption(RunbookType.agent, l10n.runbookTypeAgentOption, tc.brand),
         const SizedBox(width: pSmall),
-        _buildTypeOption(RunbookType.command, l10n.runbookTypeCommand, cSuccess),
+        _buildTypeOption(RunbookType.command, l10n.runbookTypeCommand, tc.ok),
       ],
     );
   }
@@ -1243,7 +1247,7 @@ class _RunbookImportDialogState extends State<_RunbookImportDialog> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(rInput),
-                  borderSide: const BorderSide(color: cPrimary),
+                  borderSide: BorderSide(color: tc.brand),
                 ),
               ),
               onChanged: (_) {
@@ -1256,7 +1260,7 @@ class _RunbookImportDialogState extends State<_RunbookImportDialog> {
               const SizedBox(height: pSmall),
               Text(
                 _errorMsg!,
-                style: const TextStyle(color: cDanger, fontSize: fSmall),
+                style: TextStyle(color: tc.error, fontSize: fSmall),
               ),
             ],
           ],

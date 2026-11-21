@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'constants.dart';
+import 'theme_colors.dart';
 
 OverlayEntry? _currentToastEntry;
 
@@ -112,8 +113,9 @@ class _TopToastState extends State<_TopToast>
 
   @override
   Widget build(BuildContext context) {
+    final tc = ThemeColors.of(context);
     final snackBar = widget.snackBar;
-    final accent = snackBar.backgroundColor ?? cBrand;
+    final accent = snackBar.backgroundColor ?? tc.brand;
     final action = snackBar.action;
     return Positioned(
       top: MediaQuery.paddingOf(context).top + 12,
@@ -135,9 +137,9 @@ class _TopToastState extends State<_TopToast>
                   child: Container(
                     clipBehavior: Clip.antiAlias,
                     decoration: BoxDecoration(
-                      color: cCardElevated,
+                      color: tc.cardElevated,
                       borderRadius: BorderRadius.circular(rLarge),
-                      border: Border.all(color: cBorderHover),
+                      border: Border.all(color: tc.borderHover),
                       boxShadow: shadowMd,
                     ),
                     child: Padding(
@@ -157,8 +159,8 @@ class _TopToastState extends State<_TopToast>
                           const SizedBox(width: pSmall),
                           Expanded(
                             child: DefaultTextStyle(
-                              style: const TextStyle(
-                                color: cTextMain,
+                              style: TextStyle(
+                                color: tc.textMain,
                                 fontSize: fSmall,
                                 height: 1.4,
                               ),

@@ -231,9 +231,9 @@ class _HostCardState extends State<HostCard> {
                                 value: 'delete',
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.delete, size: 20, color: cDanger),
+                                    Icon(Icons.delete, size: 20, color: tc.error),
                                     const SizedBox(width: 12),
-                                    Text(UiText.t('删除', 'Delete'), style: const TextStyle(color: cDanger)),
+                                    Text(UiText.t('删除', 'Delete'), style: TextStyle(color: tc.error)),
                                   ],
                                 ),
                               ),

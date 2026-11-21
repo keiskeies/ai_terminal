@@ -10,7 +10,7 @@ Future<bool> showConfirmDialog(BuildContext context, CommandBlock cmd) async {
     showTopSnackBar(context, 
       SnackBar(
         content: Text(UiText.t('此命令被安全策略拦截', 'This command is blocked by the safety policy')),
-        backgroundColor: cDanger,
+        backgroundColor: ThemeColors.of(context).error,
       ),
     );
     return false;
@@ -105,8 +105,8 @@ class _WarnConfirmDialogState extends State<_WarnConfirmDialog> {
     return AlertDialog(
       title: Row(
         children: [
-          Icon(Icons.warning, color: cWarning),
-          SizedBox(width: 8),
+          Icon(Icons.warning, color: tc.warn),
+          const SizedBox(width: 8),
           Text(UiText.t('危险操作确认', 'Confirm dangerous operation')),
         ],
       ),
@@ -125,10 +125,10 @@ class _WarnConfirmDialogState extends State<_WarnConfirmDialog> {
             ),
             child: SelectableText(
               widget.cmd.command,
-              style: const TextStyle(
+              style: TextStyle(
                 fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
                 fontSize: fMono,
-                color: cWarning,
+                color: tc.warn,
               ),
             ),
           ),
@@ -136,19 +136,19 @@ class _WarnConfirmDialogState extends State<_WarnConfirmDialog> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: cDanger.withValues(alpha: 0.1),
+              color: tc.error.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: cDanger.withValues(alpha: 0.3)),
+              border: Border.all(color: tc.error.withValues(alpha: 0.3)),
             ),
             child: Row(
               children: [
-                Icon(Icons.error_outline, color: cDanger, size: 20),
-                SizedBox(width: 8),
+                Icon(Icons.error_outline, color: tc.error, size: 20),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     UiText.t('此操作可能造成系统不可用，请谨慎执行！',
                         'This operation can make the system unavailable. Proceed with caution!'),
-                    style: TextStyle(color: cDanger, fontSize: fSmall),
+                    style: TextStyle(color: tc.error, fontSize: fSmall),
                   ),
                 ),
               ],
@@ -157,7 +157,7 @@ class _WarnConfirmDialogState extends State<_WarnConfirmDialog> {
           const SizedBox(height: 16),
           Text(
             UiText.t('请输入 CONFIRM 继续:', 'Type CONFIRM to continue:'),
-            style: TextStyle(color: cWarning, fontSize: fSmall),
+            style: TextStyle(color: tc.warn, fontSize: fSmall),
           ),
           const SizedBox(height: 8),
           TextField(
@@ -180,7 +180,7 @@ class _WarnConfirmDialogState extends State<_WarnConfirmDialog> {
               ? () => Navigator.pop(context, true)
               : null,
           style: ElevatedButton.styleFrom(
-            backgroundColor: cDanger,
+            backgroundColor: tc.error,
           ),
           child: Text(UiText.t('确认执行', 'Run')),
         ),

@@ -29,13 +29,14 @@ class KnowledgeRulesPage extends ConsumerStatefulWidget {
 
 class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
   Future<void> _export() async {
+    final tc = ThemeColors.of(context);
     final rules = ref.read(knowledgeRulesProvider);
     if (rules.isEmpty) {
       if (!mounted) return;
       showTopSnackBar(context,
         SnackBar(
           content: Text(UiText.t('没有可导出的规范条目', 'Nothing to export')),
-          backgroundColor: cWarning,
+          backgroundColor: tc.warn,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -56,7 +57,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
       showTopSnackBar(context,
         SnackBar(
           content: Text(L10n.str.ut_cbd8c9bc33(rules.length, path)),
-          backgroundColor: cSuccess,
+          backgroundColor: tc.ok,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -65,7 +66,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
       showTopSnackBar(context,
         SnackBar(
           content: Text(L10n.str.ut_b078e9e8b1(e)),
-          backgroundColor: cDanger,
+          backgroundColor: tc.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -73,6 +74,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
   }
 
   Future<void> _import() async {
+    final tc = ThemeColors.of(context);
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['json'],
@@ -95,7 +97,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
       showTopSnackBar(context,
         SnackBar(
           content: Text(L10n.str.ut_f59978a9af(result.imported, skippedHint)),
-          backgroundColor: cSuccess,
+          backgroundColor: tc.ok,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -104,7 +106,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
       showTopSnackBar(context,
         SnackBar(
           content: Text(L10n.str.ut_4bda191f7f(e)),
-          backgroundColor: cDanger,
+          backgroundColor: tc.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -130,6 +132,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
 
   Future<void> _confirmDelete(KnowledgeRule rule) async {
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -144,7 +147,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: cDanger),
+            style: ElevatedButton.styleFrom(backgroundColor: tc.error),
             child: Text(l10n.delete),
           ),
         ],
@@ -265,7 +268,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
                     rule.strict
                         ? UiText.t('严格', 'Strict')
                         : UiText.t('建议', 'Suggested'),
-                    rule.strict ? cWarning : cInfo,
+                    rule.strict ? tc.warn : tc.brand,
                   ),
                   // 作用域用 gold（第二种强调色）而不是旧紫：紫 #8B5CF6
                   // 不在石墨青配色阶梯里，出现在设置系页面里格外突兀。
@@ -317,9 +320,9 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
                   ),
                   TextButton.icon(
                     onPressed: () => _confirmDelete(rule),
-                    icon: const Icon(Icons.delete_outline, size: 16, color: cDanger),
+                    icon: Icon(Icons.delete_outline, size: 16, color: tc.error),
                     label: Text(UiText.t('删除', 'Delete'),
-                        style: const TextStyle(color: cDanger)),
+                        style: TextStyle(color: tc.error)),
                   ),
                 ],
               ),

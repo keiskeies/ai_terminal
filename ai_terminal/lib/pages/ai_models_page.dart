@@ -147,8 +147,8 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
                   IconButton(
                     tooltip: l10n.delete,
                     onPressed: () => _deleteEndpoint(endpoint),
-                    icon: const Icon(Icons.delete_outline,
-                        size: 18, color: cDanger),
+                    icon: Icon(Icons.delete_outline,
+                        size: 18, color: tc.error),
                   ),
                 ],
               ),
@@ -190,6 +190,7 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
 
   void _deleteEndpoint(AIEndpoint endpoint) {
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -206,7 +207,7 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
               Navigator.pop(dialogContext);
               ref.read(aiEndpointsProvider.notifier).deleteEndpoint(endpoint.id);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: cDanger),
+            style: ElevatedButton.styleFrom(backgroundColor: tc.error),
             child: Text(l10n.delete),
           ),
         ],
@@ -574,10 +575,11 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
 
   void _showSnack(String message, {bool isError = false}) {
     if (!mounted) return;
+    final tc = ThemeColors.of(context);
     showTopSnackBar(context, 
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? cDanger : cSuccess,
+        backgroundColor: isError ? tc.error : tc.ok,
         duration: const Duration(seconds: 3),
       ),
     );
@@ -895,7 +897,7 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                 if (_error != null) ...[
                   const SizedBox(height: 8),
                   Text(_error!,
-                      style: const TextStyle(color: cDanger, fontSize: fSmall)),
+                      style: TextStyle(color: tc.error, fontSize: fSmall)),
                 ],
                 const SizedBox(height: 12),
                 const Divider(height: 1),
@@ -999,7 +1001,7 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
           IconButton(
             tooltip: l10n.delete,
             onPressed: () => setState(() => _models.removeAt(index)),
-            icon: const Icon(Icons.delete_outline, size: 16, color: cDanger),
+            icon: Icon(Icons.delete_outline, size: 16, color: tc.error),
             visualDensity: VisualDensity.compact,
           ),
         ],
@@ -1371,8 +1373,8 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
                                   ),
                                   IconButton(
                                     onPressed: () => _removeTier(i),
-                                    icon: const Icon(Icons.delete_outline,
-                                        size: 16, color: cDanger),
+                                    icon: Icon(Icons.delete_outline,
+                                        size: 16, color: tc.error),
                                     visualDensity: VisualDensity.compact,
                                   ),
                                 ],
@@ -1476,7 +1478,7 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
                 if (_error != null) ...[
                   const SizedBox(height: 8),
                   Text(_error!,
-                      style: const TextStyle(color: cDanger, fontSize: fSmall)),
+                      style: TextStyle(color: tc.error, fontSize: fSmall)),
                 ],
                 const SizedBox(height: 12),
                 const Divider(height: 1),

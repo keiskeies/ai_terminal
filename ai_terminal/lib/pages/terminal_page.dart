@@ -1611,8 +1611,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                         color: host.tagColor != null
                             ? tagColors.firstWhere(
                                 (c) => c.toARGB32().toString() == host.tagColor,
-                                orElse: () => cPrimary)
-                            : cPrimary,
+                                orElse: () => tc.brand)
+                            : tc.brand,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -3166,8 +3166,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 曾连接的标签处于断开/重连阶段时的角标（保留终端内容，只叠加提示）
   Widget _buildDisconnectedChip(tp.TerminalTab tab) {
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     final retrying = tab.status == tp.TabStatus.reconnecting;
-    final color = retrying ? cWarning : cDanger;
+    final color = retrying ? tc.warn : tc.error;
     return GestureDetector(
       onTap: retrying ? null : _reconnect,
       child: Container(
@@ -3188,7 +3189,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                     CircularProgressIndicator(strokeWidth: 1.5, color: color),
               )
             else
-              const Icon(Icons.warning_amber_rounded, color: cDanger, size: 12),
+              Icon(Icons.warning_amber_rounded, color: tc.error, size: 12),
             const SizedBox(width: 4),
             Text(
               retrying ? l10n.connecting : l10n.connectionInterrupted,
@@ -3199,8 +3200,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               const SizedBox(width: 4),
               Text(
                 l10n.terminalReconnect,
-                style: const TextStyle(
-                  color: cDanger,
+                style: TextStyle(
+                  color: tc.error,
                   fontSize: fMicro,
                   fontWeight: FontWeight.w600,
                   decoration: TextDecoration.underline,
@@ -4399,7 +4400,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           duration: Duration(seconds: isError ? 4 : 2),
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(16),
-          backgroundColor: isError ? cDanger.withValues(alpha: 0.95) : null,
+          backgroundColor: isError
+              ? ThemeColors.of(context).error.withValues(alpha: 0.95)
+              : null,
         ));
   }
 
@@ -6066,11 +6069,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: active ? cWarning.withValues(alpha: 0.10) : tc.surface,
+            color: active ? tc.warn.withValues(alpha: 0.10) : tc.surface,
             borderRadius: BorderRadius.circular(rSmall),
-            border: active ? Border.all(color: cWarning) : null,
+            border: active ? Border.all(color: tc.warn) : null,
           ),
-          child: Icon(icon, size: 14, color: active ? cWarning : tc.textSub),
+          child: Icon(icon, size: 14, color: active ? tc.warn : tc.textSub),
         ),
       ),
     );
@@ -6093,19 +6096,19 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             height: 30,
             padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: BoxDecoration(
-              color: cWarning.withValues(alpha: 0.12),
+              color: tc.warn.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(rFull),
-              border: Border.all(color: cWarning.withValues(alpha: 0.4)),
+              border: Border.all(color: tc.warn.withValues(alpha: 0.4)),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.warning_amber_rounded,
-                    size: 12, color: cWarning),
+                Icon(Icons.warning_amber_rounded,
+                    size: 12, color: tc.warn),
                 const SizedBox(width: 4),
                 Text(
                   l10n.terminalConfigureModel,
-                  style: const TextStyle(fontSize: fMicro, color: cWarning),
+                  style: TextStyle(fontSize: fMicro, color: tc.warn),
                 ),
               ],
             ),
@@ -6954,21 +6957,22 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   void _showAIModelNotConfiguredHint() {
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     showTopSnackBar(
       context,
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.warning_amber, color: Colors.white, size: 18),
+            Icon(Icons.warning_amber, color: tc.warn, size: 18),
             const SizedBox(width: 8),
             Text(l10n.pleaseConfigAIModel,
                 style: const TextStyle(fontSize: fBody)),
           ],
         ),
-        backgroundColor: cWarning,
+        backgroundColor: tc.warn,
         action: SnackBarAction(
           label: l10n.terminalConfigure,
-          textColor: Colors.white,
+          textColor: tc.warn,
           onPressed: () =>
               _showNavDrawer(NavDrawer.sectionSettings, group: 'ai'),
         ),
@@ -6982,21 +6986,22 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   Widget _buildErrorBanner(String? error) {
     if (error == null) return const SizedBox.shrink();
+    final tc = ThemeColors.of(context);
     return Container(
       padding: const EdgeInsets.all(6),
       margin: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: cDanger.withValues(alpha: 0.08),
+        color: tc.error.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: cDanger.withValues(alpha: 0.15)),
+        border: Border.all(color: tc.error.withValues(alpha: 0.15)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: cDanger, size: 14),
+          Icon(Icons.error_outline, color: tc.error, size: 14),
           const SizedBox(width: 6),
           Expanded(
               child: Text(error,
-                  style: const TextStyle(color: cDanger, fontSize: fSmall),
+                  style: TextStyle(color: tc.error, fontSize: fSmall),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis)),
         ],
@@ -7222,7 +7227,7 @@ class _ModeCapsuleState extends State<_ModeCapsule>
     final isOrch = widget.isOrchestratorMode;
     // 描边/底色在 build 里按 .mode-capsule 配方走品牌青；图标与文字同色，
     // 编排态继续用橙色保持模式可辨。
-    final accent = isOrch ? cWarning : tc.brand;
+    final accent = isOrch ? tc.warn : tc.brand;
 
     return GestureDetector(
       onTap: widget.onTap,
@@ -7232,10 +7237,10 @@ class _ModeCapsuleState extends State<_ModeCapsule>
         // 设计稿 .mode-capsule：Agent 态用品牌青 10% 底 + 中性发丝边；
         // 编排态保留橙色以示模式差异。
         decoration: BoxDecoration(
-          color: (isOrch ? cWarning : tc.brand).withValues(alpha: 0.10),
+          color: (isOrch ? tc.warn : tc.brand).withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(rFull),
           border: Border.all(
-              color: isOrch ? cWarning.withValues(alpha: 0.4) : tc.border),
+              color: isOrch ? tc.warn.withValues(alpha: 0.4) : tc.border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -7373,7 +7378,7 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(
               children: [
-                const Icon(Icons.hub, size: 16, color: cWarning),
+                Icon(Icons.hub, size: 16, color: tc.warn),
                 const SizedBox(width: 8),
                 Text(
                   l10n.terminalOrchestratorHostList,
@@ -7515,16 +7520,16 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
                       height: 36,
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: cWarning.withValues(alpha: 0.12),
+                        color: tc.warn.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(rSmall),
                         border:
-                            Border.all(color: cWarning.withValues(alpha: 0.3)),
+                            Border.all(color: tc.warn.withValues(alpha: 0.3)),
                       ),
                       child: Text(
                         l10n.terminalExitOrchestrator,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: fBody,
-                          color: cWarning,
+                          color: tc.warn,
                           fontWeight: FontWeight.w500,
                         ),
                       ),
@@ -7548,12 +7553,12 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
             color: selected
-                ? cWarning.withValues(alpha: 0.15)
+                ? tc.warn.withValues(alpha: 0.15)
                 : tc.textMuted.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(rSmall),
             border: Border.all(
               color: selected
-                  ? cWarning.withValues(alpha: 0.4)
+                  ? tc.warn.withValues(alpha: 0.4)
                   : tc.border.withValues(alpha: 0.3),
             ),
           ),
@@ -7561,7 +7566,7 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
             label,
             style: TextStyle(
               fontSize: fSmall,
-              color: selected ? cWarning : tc.textSub,
+              color: selected ? tc.warn : tc.textSub,
               fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
             ),
           ),

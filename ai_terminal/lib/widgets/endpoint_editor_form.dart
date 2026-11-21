@@ -271,11 +271,12 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
 
   void _snack(String message, {bool error = false}) {
     if (!mounted) return;
+    final tc = ThemeColors.of(context);
     showTopSnackBar(
       context,
       SnackBar(
         content: Text(message),
-        backgroundColor: error ? cDanger : cSuccess,
+        backgroundColor: error ? tc.error : tc.ok,
         duration: const Duration(seconds: 3),
       ),
     );

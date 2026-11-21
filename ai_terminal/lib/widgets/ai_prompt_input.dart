@@ -597,7 +597,7 @@ class _AIPromptInputState extends State<AIPromptInput> {
     final running = widget.isRunning;
     final accent = widget.accentColor;
     final isOrch = widget.isOrchestratorMode;
-    final effectiveAccent = isOrch ? cWarning : accent;
+    final effectiveAccent = isOrch ? tc.warn : accent;
     final borderColor = _isFocused
         ? effectiveAccent
         : (isOrch ? tc.warn : tc.border);

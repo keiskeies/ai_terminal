@@ -736,6 +736,7 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
   }
 
   Future<void> _saveChangeWindow() async {
+    final tc = ThemeColors.of(context);
     final cfg = ChangeWindowConfig(
       enabled: _cwEnabled,
       startHour: _cwStart,
@@ -751,7 +752,7 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
         SnackBar(
           content: Text(
               AppLocalizations.of(context)!.changeWindowSaveFailed(e.toString())),
-          backgroundColor: cDanger,
+          backgroundColor: tc.error,
           behavior: SnackBarBehavior.floating,
         ),
       );

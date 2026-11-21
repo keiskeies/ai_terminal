@@ -51,7 +51,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
           children: [
             Row(
               children: [
-                const Icon(Icons.history, color: cPrimary, size: 18),
+                Icon(Icons.history, color: tc.brand, size: 18),
                 const SizedBox(width: 8),
                 Text(l10n.terminalSessionHistory, style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
                 const Spacer(),
@@ -63,8 +63,8 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
                     if (!ctx.mounted) return;
                     Navigator.of(ctx).pop();
                   },
-                  icon: const Icon(Icons.add, size: 14, color: cPrimary),
-                  label: Text(l10n.sessionNew, style: const TextStyle(fontSize: fSmall, color: cPrimary)),
+                  icon: Icon(Icons.add, size: 14, color: tc.brand),
+                  label: Text(l10n.sessionNew, style: TextStyle(fontSize: fSmall, color: tc.brand)),
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     minimumSize: Size.zero,
@@ -104,10 +104,10 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       decoration: BoxDecoration(
-        color: isActive ? cPrimary.withValues(alpha: 0.08) : Colors.transparent,
+        color: isActive ? tc.brand.withValues(alpha: 0.08) : Colors.transparent,
         borderRadius: BorderRadius.circular(rSmall),
         border: Border.all(
-          color: isActive ? cPrimary.withValues(alpha: 0.3) : tc.border.withValues(alpha: 0.3),
+          color: isActive ? tc.brand.withValues(alpha: 0.3) : tc.border.withValues(alpha: 0.3),
         ),
       ),
       child: InkWell(
@@ -133,8 +133,8 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
                             width: 6,
                             height: 6,
                             margin: const EdgeInsets.only(right: 6),
-                            decoration: const BoxDecoration(
-                              color: cPrimary,
+                            decoration: BoxDecoration(
+                              color: tc.brand,
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -142,7 +142,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
                           child: Text(
                             conv.displayTitle,
                             style: TextStyle(
-                              color: isActive ? cPrimary : tc.textMain,
+                              color: isActive ? tc.brand : tc.textMain,
                               fontSize: fBody,
                               fontWeight: FontWeight.w500,
                             ),
@@ -250,6 +250,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
 
   void _confirmDelete(Conversation conv) {
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -270,7 +271,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
               Navigator.pop(ctx);
               _loadSessions();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: cDanger, foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: tc.error, foregroundColor: tc.onAccent),
             child: Text(l10n.delete, style: const TextStyle(fontSize: fBody)),
           ),
         ],

@@ -58,6 +58,10 @@ class ThemeColors {
   Color get brandHover => isLight ? cBrandLightHover : cBrandHover;
   Color get brandPressed => isLight ? cBrandLightPressed : cBrandPressed;
   Color get brandBg => isLight ? cBrandLightBg : cBrandBg;
+
+  /// 实心品牌色/语义色（按钮、开关、实心标签）上的前景色。
+  /// 深色主题的品牌青/状态色是亮色，前景取近黑；浅色主题是深色，前景取白。
+  Color get onAccent => isLight ? Colors.white : cBg;
   Color get gold => isLight ? cGoldLight : cGold;
   Color get goldBg => isLight ? cGoldBgLight : cGoldBg;
   Color get ok => isLight ? cStatusOkLight : cStatusOk;

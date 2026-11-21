@@ -40,6 +40,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   }
 
   Future<void> _save() async {
+    final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     final url = _webhookController.text.trim();
     if (_enabled && url.isNotEmpty) {
@@ -48,7 +49,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
         showTopSnackBar(context, 
           SnackBar(
             content: Text(l10n.notificationInvalidUrl(err)),
-            backgroundColor: cDanger,
+            backgroundColor: tc.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -66,7 +67,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       showTopSnackBar(context, 
         SnackBar(
           content: Text(l10n.notificationSaved),
-          backgroundColor: cSuccess,
+          backgroundColor: tc.ok,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -75,7 +76,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       showTopSnackBar(context, 
         SnackBar(
           content: Text(l10n.notificationSaveFailed(e.toString())),
-          backgroundColor: cDanger,
+          backgroundColor: tc.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -83,6 +84,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
   }
 
   Future<void> _testNotification() async {
+    final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     final url = _webhookController.text.trim();
     if (url.isEmpty) {
@@ -96,7 +98,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       showTopSnackBar(context, 
         SnackBar(
           content: Text(l10n.notificationInvalidUrl(err)),
-          backgroundColor: cDanger,
+          backgroundColor: tc.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -111,7 +113,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       showTopSnackBar(context, 
         SnackBar(
           content: Text(ok ? l10n.notificationTestSent : l10n.notificationTestSendFailed),
-          backgroundColor: ok ? cSuccess : cDanger,
+          backgroundColor: ok ? tc.ok : tc.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -120,7 +122,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       showTopSnackBar(context, 
         SnackBar(
           content: Text(l10n.notificationTestFailed(e.toString())),
-          backgroundColor: cDanger,
+          backgroundColor: tc.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -153,7 +155,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
               child: Row(
                 children: [
                   Icon(_enabled ? Icons.notifications_active : Icons.notifications_off,
-                      color: _enabled ? cWarning : tc.textSub),
+                      color: _enabled ? tc.warn : tc.textSub),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -167,7 +169,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                   ),
                   Switch(
                     value: _enabled,
-                    activeThumbColor: cWarning,
+                    activeThumbColor: tc.warn,
                     onChanged: (v) => setState(() => _enabled = v),
                   ),
                 ],
@@ -208,7 +210,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                         ),
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(rSmall),
-                          borderSide: const BorderSide(color: cPrimary),
+                          borderSide: BorderSide(color: tc.brand),
                         ),
                       ),
                     ),
@@ -238,7 +240,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                         value: 'failedOnly',
                         title: Text(l10n.notificationFailedOnly),
                         subtitle: Text(l10n.notificationFailedOnlySubtitle),
-                        activeColor: cPrimary,
+                        activeColor: tc.brand,
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                       ),
@@ -247,7 +249,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                         value: 'always',
                         title: Text(l10n.notificationAlways),
                         subtitle: Text(l10n.notificationAlwaysSubtitle),
-                        activeColor: cPrimary,
+                        activeColor: tc.brand,
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                       ),
@@ -294,18 +296,18 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: cInfo.withValues(alpha: 0.06),
+              color: tc.brand.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(rSmall),
-              border: Border.all(color: cInfo.withValues(alpha: 0.2)),
+              border: Border.all(color: tc.brand.withValues(alpha: 0.2)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.info_outline, size: 14, color: cInfo),
+                    Icon(Icons.info_outline, size: 14, color: tc.brand),
                     const SizedBox(width: 6),
-                    Text(l10n.notificationInstructionsTitle, style: const TextStyle(color: cInfo, fontSize: fSmall, fontWeight: FontWeight.w600)),
+                    Text(l10n.notificationInstructionsTitle, style: TextStyle(color: tc.brand, fontSize: fSmall, fontWeight: FontWeight.w600)),
                   ],
                 ),
                 const SizedBox(height: 6),

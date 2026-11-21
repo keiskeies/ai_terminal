@@ -73,9 +73,9 @@ class _TabItemWidgetState extends State<TabItemWidget> {
                     decoration: BoxDecoration(
                       // 连接中给琥珀色，别让用户把"还在建连"读成"已掉线"
                       color: switch (tab.status) {
-                        tp.TabStatus.connected => cSuccess,
-                        tp.TabStatus.connecting || tp.TabStatus.reconnecting => cWarning,
-                        _ => cDanger,
+                        tp.TabStatus.connected => tc.ok,
+                        tp.TabStatus.connecting || tp.TabStatus.reconnecting => tc.warn,
+                        _ => tc.error,
                       },
                       shape: BoxShape.circle,
                     ),

@@ -228,9 +228,9 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
     final hasData = _last != null;
     final l10n = AppLocalizations.of(context)!;
     final dotColor = isFailed
-        ? cDanger
+        ? tc.error
         : hasData
-            ? cSuccess
+            ? tc.ok
             : tc.textMuted.withValues(alpha: 0.5);
     final tooltip = isFailed
         ? l10n.monitorCollectingFailed(_consecutiveFailures)
@@ -303,7 +303,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 label: 'CPU',
                 showLabel: false,
                 value: '${(snap?.cpuPercent ?? 0).toStringAsFixed(1)}%',
-                color: staleColor(monitorColorByPercent(snap?.cpuPercent ?? 0, tc.brand)),
+                color: staleColor(monitorColorByPercent(snap?.cpuPercent ?? 0, tc, normal: tc.brand)),
                 chartData: history.map((s) => s.cpuPercent).toList(),
                 chartMax: 100,
               ),
@@ -321,8 +321,8 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 value: snap != null && snap.memTotalMB > 0
                     ? '${fmtFromMB(snap.memUsedMB)}/${fmtFromMB(snap.memTotalMB)}'
                     : '-',
-                color: staleColor(monitorColorByPercent(snap?.memPercent ?? 0, cSuccess)),
-                valueColor: staleColor(monitorColorByPercent(snap?.memPercent ?? 0, cSuccess)),
+                color: staleColor(monitorColorByPercent(snap?.memPercent ?? 0, tc)),
+                valueColor: staleColor(monitorColorByPercent(snap?.memPercent ?? 0, tc)),
                 valueMaxWidth: 110,
               ),
               _divider(tc),
@@ -343,8 +343,8 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 label: l10n.monitorDownload,
                 showLabel: false,
                 value: fmtRate(snap?.netDownKBps ?? 0),
-                color: staleColor(cSuccess),
-                valueColor: staleColor(cSuccess),
+                color: staleColor(tc.ok),
+                valueColor: staleColor(tc.ok),
                 valueMaxWidth: 90,
               ),
               _divider(tc),
@@ -354,7 +354,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 label: l10n.monitorDisk,
                 showLabel: false,
                 value: '${(snap?.diskPercent ?? 0).toStringAsFixed(1)}%',
-                color: staleColor(monitorColorByPercent(snap?.diskPercent ?? 0, cWarning)),
+                color: staleColor(monitorColorByPercent(snap?.diskPercent ?? 0, tc, normal: tc.warn)),
               ),
               _divider(tc),
               _buildMetricChip(
@@ -741,7 +741,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
         traffic: '${fmtBytes(iface.rxBytes)} / ${fmtBytes(iface.txBytes)}',
         rate: '${fmtRate(iface.downKBps)} / ${fmtRate(iface.upKBps)}',
         issues: hasIssue ? '$errs/$drops' : '-',
-        issuesColor: hasIssue ? (errs > 0 ? cDanger : cWarning) : tc.textMuted,
+        issuesColor: hasIssue ? (errs > 0 ? tc.error : tc.warn) : tc.textMuted,
       );
     }
 
@@ -816,7 +816,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
       children: [
         twoColumnRows(tc, summary),
         const SizedBox(height: 8),
-        usageBar(tc, overallPercent, monitorColorByPercent(overallPercent, cSuccess)),
+        usageBar(tc, overallPercent, monitorColorByPercent(overallPercent, tc)),
         const SizedBox(height: 10),
         Text(
           l10n.monitorDiskPartitionDetail,

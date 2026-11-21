@@ -137,9 +137,9 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
   Color _levelColor(_LogEntry e, ThemeColors tc) {
     switch (e.level) {
       case 'ERROR':
-        return cDanger;
+        return tc.error;
       case 'WARN':
-        return cWarning;
+        return tc.warn;
       case 'DEBUG':
         return tc.textMuted;
       case 'INFO':
@@ -191,7 +191,7 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
           children: [
             Row(
               children: [
-                const Icon(Icons.terminal, color: cPrimary, size: 18),
+                Icon(Icons.terminal, color: tc.brand, size: 18),
                 const SizedBox(width: 8),
                 Text(UiText.t('Agent 日志', 'Agent logs'),
                     style: TextStyle(

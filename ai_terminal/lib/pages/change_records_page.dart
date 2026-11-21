@@ -177,8 +177,8 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
           ),
           FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: cWarning,
-              foregroundColor: Colors.white,
+              backgroundColor: tc.warn,
+              foregroundColor: tc.onAccent,
             ),
             onPressed: () {
               Navigator.pop(ctx);
@@ -193,6 +193,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
 
   Future<void> _executeRollback(ChangeRecord record) async {
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     if (!record.isRollbackable) {
       showTopSnackBar(context, 
         SnackBar(content: Text(l10n.changeRecordNotRollbackable), behavior: SnackBarBehavior.floating),
@@ -218,7 +219,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
         showTopSnackBar(context, 
           SnackBar(
             content: Text(l10n.changeRecordHostNotConnected(record.hostId)),
-            backgroundColor: cDanger,
+            backgroundColor: tc.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -244,7 +245,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       if (!mounted) return;
       if (result == null) {
         showTopSnackBar(context, 
-          SnackBar(content: Text(l10n.changeRecordRollbackFailedNoExec), backgroundColor: cDanger,
+          SnackBar(content: Text(l10n.changeRecordRollbackFailedNoExec), backgroundColor: tc.error,
               behavior: SnackBarBehavior.floating),
         );
         return;
@@ -253,7 +254,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
         showTopSnackBar(context, 
           SnackBar(
             content: Text(l10n.changeRecordRollbackSuccess(record.rollbackHint)),
-            backgroundColor: cSuccess,
+            backgroundColor: tc.ok,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -262,7 +263,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
         showTopSnackBar(context, 
           SnackBar(
             content: Text(l10n.changeRecordRollbackFailed(result.stderr)),
-            backgroundColor: cDanger,
+            backgroundColor: tc.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -272,7 +273,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       showTopSnackBar(context, 
         SnackBar(
           content: Text(l10n.changeRecordRollbackError(e.toString())),
-          backgroundColor: cDanger,
+          backgroundColor: tc.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -402,14 +403,14 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
-                    color: (record.success ? cSuccess : cDanger).withValues(alpha: 0.1),
+                    color: (record.success ? tc.ok : tc.error).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rXSmall),
                   ),
                   child: Text(
                     record.success ? l10n.changeRecordSuccess : l10n.changeRecordFailed,
                     style: TextStyle(
                       fontSize: fMicro,
-                      color: record.success ? cSuccess : cDanger,
+                      color: record.success ? tc.ok : tc.error,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -448,7 +449,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
                     icon: const Icon(Icons.undo, size: 14),
                     label: Text(l10n.changeRecordRollbackButton, style: const TextStyle(fontSize: fMicro)),
                     style: TextButton.styleFrom(
-                      foregroundColor: cWarning,
+                      foregroundColor: tc.warn,
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
                       minimumSize: const Size(0, 28),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,

@@ -84,15 +84,15 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 4),
                             decoration: BoxDecoration(
-                              color: cPrimary.withValues(alpha: 0.1),
+                              color: tc.brand.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(rSmall),
                             ),
                             child: Text(
                               maxSteps == 0
                                   ? l10n.commonUnlimited
                                   : '$maxSteps',
-                              style: const TextStyle(
-                                color: cPrimary,
+                              style: TextStyle(
+                                color: tc.brand,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -156,13 +156,13 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 4),
                             decoration: BoxDecoration(
-                              color: cPrimary.withValues(alpha: 0.1),
+                              color: tc.brand.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(rSmall),
                             ),
                             child: Text(
                               '${aiTimeoutSeconds}s',
-                              style: const TextStyle(
-                                color: cPrimary,
+                              style: TextStyle(
+                                color: tc.brand,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -230,13 +230,13 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 4),
                             decoration: BoxDecoration(
-                              color: cPrimary.withValues(alpha: 0.1),
+                              color: tc.brand.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(rSmall),
                             ),
                             child: Text(
                               '${_commandTimeoutMultiplier.toStringAsFixed(1)}x',
-                              style: const TextStyle(
-                                color: cPrimary,
+                              style: TextStyle(
+                                color: tc.brand,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -323,7 +323,7 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ExpansionTile(
                   leading:
-                      const Icon(Icons.description_outlined, color: cWarning),
+                      Icon(Icons.description_outlined, color: tc.warn),
                   title: Text(l10n.agentSettingBuiltInPrompt),
                   subtitle: Text(l10n.agentSettingBuiltInPromptSubtitle,
                       style: TextStyle(color: tc.textSub, fontSize: fSmall)),
@@ -341,8 +341,8 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                           const SizedBox(height: 8),
                           Text(
                             l10n.agentSettingPromptWarning,
-                            style: const TextStyle(
-                                color: cWarning, fontSize: fMicro),
+                            style: TextStyle(
+                                color: tc.warn, fontSize: fMicro),
                           ),
                           const SizedBox(height: 12),
                           _BuiltInPromptEditor(),
@@ -391,14 +391,15 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
   }
 
   Widget _buildSectionTitle(String title) {
+    final tc = ThemeColors.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: fTitle,
           fontWeight: FontWeight.w600,
-          color: cPrimary,
+          color: tc.brand,
         ),
       ),
     );
@@ -445,8 +446,8 @@ class _BuiltInPromptEditorState extends State<_BuiltInPromptEditor> {
           decoration: InputDecoration(
             enabledBorder: OutlineInputBorder(
                 borderSide: BorderSide(color: ThemeColors.of(context).border)),
-            focusedBorder: const OutlineInputBorder(
-                borderSide: BorderSide(color: cPrimary)),
+            focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: tc.brand)),
           ),
         ),
         const SizedBox(height: 12),
@@ -456,9 +457,9 @@ class _BuiltInPromptEditorState extends State<_BuiltInPromptEditor> {
               onPressed: () {
                 setState(() => _controller.text = defaultSystemPrompt);
               },
-              icon: const Icon(Icons.restore, color: cWarning, size: 18),
+              icon: Icon(Icons.restore, color: tc.warn, size: 18),
               label: Text(l10n.commonResetDefault,
-                  style: const TextStyle(color: cWarning)),
+                  style: TextStyle(color: tc.warn)),
             ),
             const Spacer(),
             ElevatedButton.icon(
@@ -532,8 +533,8 @@ class _CustomPromptEditorState extends State<_CustomPromptEditor> {
                 color: ThemeColors.of(context).textMuted, fontSize: fSmall),
             enabledBorder: OutlineInputBorder(
                 borderSide: BorderSide(color: ThemeColors.of(context).border)),
-            focusedBorder: const OutlineInputBorder(
-                borderSide: BorderSide(color: cPrimary)),
+            focusedBorder: OutlineInputBorder(
+                borderSide: BorderSide(color: tc.brand)),
           ),
         ),
         const SizedBox(height: 12),
@@ -787,7 +788,7 @@ class LocalFileAccessSectionState extends State<LocalFileAccessSection> {
             const SizedBox(height: 8),
             Text(
               ui.localFileBlacklistHint,
-              style: const TextStyle(color: cWarning, fontSize: fMicro),
+              style: TextStyle(color: tc.warn, fontSize: fMicro),
             ),
           ],
         ),

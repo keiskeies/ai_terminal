@@ -68,6 +68,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
 
   void _exportLogs() {
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     if (_filteredLogs.isEmpty) {
       showTopSnackBar(context, 
         SnackBar(content: Text(l10n.auditLogNoRecordsToCopy), behavior: SnackBarBehavior.floating),
@@ -92,22 +93,23 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
     showTopSnackBar(context, 
       SnackBar(
         content: Text(l10n.auditLogCopied(_filteredLogs.length)),
-        backgroundColor: cSuccess,
+        backgroundColor: tc.ok,
         behavior: SnackBarBehavior.floating,
       ),
     );
   }
 
   Color _safetyColor(String level) {
+    final tc = ThemeColors.of(context);
     switch (level) {
       case 'safe':
-        return cSuccess;
+        return tc.ok;
       case 'warning':
-        return cWarning;
+        return tc.warn;
       case 'danger':
-        return cDanger;
+        return tc.error;
       case 'blocked':
-        return cDanger;
+        return tc.error;
       default:
         return ThemeColors.of(context).textSub;
     }
@@ -222,7 +224,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(rSmall),
-                  borderSide: const BorderSide(color: cPrimary),
+                  borderSide: BorderSide(color: tc.brand),
                 ),
                 isDense: true,
               ),
@@ -318,14 +320,14 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
-                    color: (executed ? cSuccess : cDanger).withValues(alpha: 0.1),
+                    color: (executed ? tc.ok : tc.error).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rXSmall),
                   ),
                   child: Text(
                     executed ? l10n.auditLogExecuted : l10n.auditLogNotExecuted,
                     style: TextStyle(
                       fontSize: fMicro,
-                      color: executed ? cSuccess : cDanger,
+                      color: executed ? tc.ok : tc.error,
                       fontWeight: FontWeight.w500,
                     ),
                   ),

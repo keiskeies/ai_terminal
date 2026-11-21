@@ -110,7 +110,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.terminal, size: 64, color: cPrimary),
+                Icon(Icons.terminal, size: 64, color: tc.brand),
                 const SizedBox(height: 24),
                 Text(
                   l10n.chatNeedTerminal,
@@ -226,15 +226,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           if (chatState.error != null)
             Container(
               padding: const EdgeInsets.all(12),
-              color: cDanger.withValues(alpha: 0.2),
+              color: tc.error.withValues(alpha: 0.2),
               child: Row(
                 children: [
-                  const Icon(Icons.error, color: cDanger, size: 16),
+                  Icon(Icons.error, color: tc.error, size: 16),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       chatState.error!,
-                      style: const TextStyle(color: cDanger, fontSize: fSmall),
+                      style: TextStyle(color: tc.error, fontSize: fSmall),
                     ),
                   ),
                   IconButton(
@@ -344,7 +344,7 @@ class _SendButton extends StatelessWidget {
               height: 24,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : Icon(Icons.send, color: canSend ? cPrimary : tc.textSub),
+          : Icon(Icons.send, color: canSend ? tc.brand : tc.textSub),
       onPressed: canSend && !isLoading ? onPressed : null,
     );
   }

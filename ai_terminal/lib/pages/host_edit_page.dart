@@ -567,6 +567,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
   }
 
   Future<void> _pickKeyFile(AppLocalizations l10n) async {
+    final tc = ThemeColors.of(context);
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -598,7 +599,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
           context,
           SnackBar(
             content: Text(l10n.hostEditReadFileFailed(e.toString())),
-            backgroundColor: cDanger,
+            backgroundColor: tc.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -724,6 +725,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
   Future<void> _saveHost() async {
     if (!_formKey.currentState!.validate()) return;
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
 
     final hostId = _isEditing ? _existingHost!.id : _uuid.v4();
     final config = HostConfig.create(
@@ -830,7 +832,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
           SnackBar(
             content:
                 Text(l10n.hostEditConfigSavedButCredFailed(credentialsError)),
-            backgroundColor: cWarning,
+            backgroundColor: tc.warn,
             duration: const Duration(seconds: 4),
           ),
         );

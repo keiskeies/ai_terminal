@@ -204,6 +204,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
 
   void _showDeleteDialog(CommandSnippet snippet) {
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -219,7 +220,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
               Navigator.pop(context);
               ref.read(snippetsProvider.notifier).deleteSnippet(snippet.id);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: cDanger),
+            style: ElevatedButton.styleFrom(backgroundColor: tc.error),
             child: Text(l10n.delete),
           ),
         ],

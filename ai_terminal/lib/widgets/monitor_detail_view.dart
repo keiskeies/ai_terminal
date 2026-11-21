@@ -32,10 +32,10 @@ String fmtFromMB(double mb) {
 }
 
 /// < 80%: 正常色, 80~95%: 警告橙, >= 95%: 危险红
-Color monitorColorByPercent(double percent, Color normal) {
-  if (percent >= 95) return cDanger;
-  if (percent >= 80) return cWarning;
-  return normal;
+Color monitorColorByPercent(double percent, ThemeColors tc, {Color? normal}) {
+  if (percent >= 95) return tc.error;
+  if (percent >= 80) return tc.warn;
+  return normal ?? tc.ok;
 }
 
 /// 虚拟/容器网卡判定：Docker/K8s/网桥/veth/tap 这类接口在一台跑容器的机器上
@@ -125,7 +125,7 @@ Widget diskTableRow(
   double usePercent = 0,
 }) {
   final textColor = isHeader ? tc.textMuted : tc.textSub;
-  final barColor = isHeader ? tc.textMuted : monitorColorByPercent(usePercent, cSuccess);
+  final barColor = isHeader ? tc.textMuted : monitorColorByPercent(usePercent, tc);
   final rowStyle = TextStyle(
     fontSize: fMicro,
     color: textColor,
@@ -473,7 +473,7 @@ class _MonitorDetailDialogState extends State<_MonitorDetailDialog> {
         rate: '${fmtRate(iface.downKBps)} / ${fmtRate(iface.upKBps)}',
         issues: issues > 0 ? '${iface.rxErrors + iface.txErrors}/${iface.rxDropped + iface.txDropped}' : '-',
         issuesColor: issues > 0
-            ? (iface.rxErrors + iface.txErrors > 0 ? cDanger : cWarning)
+            ? (iface.rxErrors + iface.txErrors > 0 ? tc.error : tc.warn)
             : tc.textMuted,
       );
     }
@@ -532,7 +532,7 @@ class _MonitorDetailDialogState extends State<_MonitorDetailDialog> {
           (l10n.monitorDiskPartitionCount, '${partitions.length}'),
         ]),
         const SizedBox(height: 10),
-        usageBar(tc, overall, monitorColorByPercent(overall, cSuccess)),
+        usageBar(tc, overall, monitorColorByPercent(overall, tc)),
         _sectionTitle(tc, l10n.monitorDiskPartitionDetail),
         diskTableRow(
           tc,

@@ -136,6 +136,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
   }
 
   void _showEntryActions(SftpEntry entry) {
+    final tc = ThemeColors.of(context);
     showModalBottomSheet(
       context: context,
       backgroundColor: Theme.of(context).cardColor,
@@ -152,7 +153,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                 children: [
                   Icon(
                     entry.isDirectory ? Icons.folder : Icons.insert_drive_file,
-                    color: entry.isDirectory ? cWarning : cPrimary,
+                    color: entry.isDirectory ? tc.warn : tc.brand,
                     size: 18,
                   ),
                   const SizedBox(width: 8),
@@ -209,7 +210,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                 Navigator.pop(ctx);
                 _deleteEntry(entry);
               },
-              color: cDanger,
+              color: tc.error,
             ),
           ],
         ),
@@ -228,6 +229,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
   }
 
   Future<void> _downloadFile(SftpEntry entry) async {
+    final tc = ThemeColors.of(context);
     try {
       await _controller.downloadFile(entry);
       if (mounted) {
@@ -246,7 +248,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         showTopSnackBar(context, 
           SnackBar(
             content: Text(L10n.str.ut_7a77df19f2(e)),
-            backgroundColor: cDanger,
+            backgroundColor: tc.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -256,6 +258,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
 
   /// 预览或编辑远程文件
   Future<void> _editOrPreviewFile(SftpEntry entry, {bool readOnly = false}) async {
+    final tc = ThemeColors.of(context);
     // 先加载文件内容
     String? content;
     try {
@@ -263,7 +266,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
     } catch (e) {
       if (mounted) {
         showTopSnackBar(context, 
-          SnackBar(content: Text(L10n.str.ut_9c9db79438(e)), backgroundColor: cDanger),
+          SnackBar(content: Text(L10n.str.ut_9c9db79438(e)), backgroundColor: tc.error),
         );
       }
       return;
@@ -271,7 +274,6 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
 
     if (!mounted) return;
 
-    final tc = ThemeColors.of(context);
     final controller = TextEditingController(text: content);
     bool hasModified = false;
 
@@ -288,7 +290,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
               actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
               title: Row(
                 children: [
-                  const Icon(Icons.insert_drive_file, size: 14, color: cPrimary),
+                  Icon(Icons.insert_drive_file, size: 14, color: tc.brand),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -310,10 +312,10 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: cWarning.withValues(alpha: 0.15),
+                        color: tc.warn.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(UiText.t('已修改', 'Modified'), style: TextStyle(fontSize: 9, color: cWarning)),
+                      child: Text(UiText.t('已修改', 'Modified'), style: TextStyle(fontSize: 9, color: tc.warn)),
                     ),
                 ],
               ),
@@ -369,7 +371,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                       } catch (e) {
                         if (ctx.mounted) {
                           showTopSnackBar(ctx, 
-                            SnackBar(content: Text(L10n.str.ut_5fe0b81932(e)), backgroundColor: cDanger),
+                            SnackBar(content: Text(L10n.str.ut_5fe0b81932(e)), backgroundColor: tc.error),
                           );
                         }
                       }
@@ -386,6 +388,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
   }
 
   Future<void> _renameEntry(SftpEntry entry) async {
+    final tc = ThemeColors.of(context);
     final controller = TextEditingController(text: entry.name);
     final confirmed = await showDialog<bool>(
       context: context,
@@ -420,7 +423,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
           showTopSnackBar(context, 
             SnackBar(
                 content: Text(L10n.str.ut_6f2c34a667(e)),
-                backgroundColor: cDanger),
+                backgroundColor: tc.error),
           );
         }
       }
@@ -428,12 +431,13 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
   }
 
   Future<void> _deleteEntry(SftpEntry entry) async {
+    final tc = ThemeColors.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: DialogTheme.of(context).backgroundColor,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text(UiText.t('确认删除', 'Confirm delete'), style: const TextStyle(color: cDanger, fontSize: fSmall)),
+        title: Text(UiText.t('确认删除', 'Confirm delete'), style: TextStyle(color: tc.error, fontSize: fSmall)),
         content: Text(UiText.t('确定删除 "${entry.name}" 吗？此操作不可恢复。', 'Delete "${entry.name}"? This cannot be undone.'), style: const TextStyle(fontSize: fSmall)),
         actions: [
           TextButton(
@@ -442,7 +446,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(backgroundColor: cDanger),
+            style: ElevatedButton.styleFrom(backgroundColor: tc.error),
             child: Text(UiText.t('删除', 'Delete')),
           ),
         ],
@@ -455,7 +459,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       } catch (e) {
         if (mounted) {
           showTopSnackBar(context, 
-            SnackBar(content: Text(L10n.str.ut_cf4419589b(e)), backgroundColor: cDanger),
+            SnackBar(content: Text(L10n.str.ut_cf4419589b(e)), backgroundColor: tc.error),
           );
         }
       }
@@ -463,6 +467,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
   }
 
   Future<void> _uploadFiles() async {
+    final tc = ThemeColors.of(context);
     FilePickerResult? result;
     try {
       result = await FilePicker.platform.pickFiles(allowMultiple: true);
@@ -471,7 +476,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         showTopSnackBar(context, 
           SnackBar(
             content: Text(L10n.str.ut_c3b890cd74(e)),
-            backgroundColor: cDanger,
+            backgroundColor: tc.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -507,7 +512,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
           showTopSnackBar(context, 
             SnackBar(
               content: Text(L10n.str.ut_9e12df0a1f(fileName, e)),
-              backgroundColor: cDanger,
+              backgroundColor: tc.error,
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -521,6 +526,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
   }
 
   void _showCreateDirectoryDialog() {
+    final tc = ThemeColors.of(context);
     final controller = TextEditingController();
     showDialog(
       context: context,
@@ -548,7 +554,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
               } catch (e) {
                 if (mounted) {
                   showTopSnackBar(context, 
-                    SnackBar(content: Text(L10n.str.ut_e89a046c8b(e)), backgroundColor: cDanger),
+                    SnackBar(content: Text(L10n.str.ut_e89a046c8b(e)), backgroundColor: tc.error),
                   );
                 }
               }
@@ -614,7 +620,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
             Positioned.fill(
               child: IgnorePointer(
                 child: Container(
-                  color: cPrimary.withValues(alpha: 0.12),
+                  color: tc.brand.withValues(alpha: 0.12),
                   alignment: Alignment.center,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
@@ -622,11 +628,11 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                     decoration: BoxDecoration(
                       color: tc.card,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: cPrimary),
+                      border: Border.all(color: tc.brand),
                     ),
                     child: Text(
                       UiText.t('松开以上传到当前目录', 'Drop to upload to the current folder'),
-                      style: const TextStyle(fontSize: fSmall, color: cPrimary),
+                      style: TextStyle(fontSize: fSmall, color: tc.brand),
                     ),
                   ),
                 ),
@@ -652,6 +658,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
   }
 
   Future<void> _handleDrop(DropDoneDetails details) async {
+    final tc = ThemeColors.of(context);
     if (_controller.isConnecting || _controller.error != null) return;
     final base = _controller.currentPath;
     var uploaded = 0;
@@ -675,7 +682,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
           showTopSnackBar(context,
             SnackBar(
               content: Text(L10n.str.ut_6c61736431(name, e)),
-              backgroundColor: cDanger,
+              backgroundColor: tc.error,
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -748,7 +755,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                     Text(UiText.t('名称', 'Name'), style: const TextStyle(fontSize: fSmall)),
                     if (_controller.sortBy == SftpSortFields.name) ...[
                       const SizedBox(width: 4),
-                      Icon(_controller.sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: cPrimary),
+                      Icon(_controller.sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: tc.brand),
                     ],
                   ],
                 ),
@@ -761,7 +768,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                     Text(UiText.t('大小', 'Size'), style: const TextStyle(fontSize: fSmall)),
                     if (_controller.sortBy == SftpSortFields.size) ...[
                       const SizedBox(width: 4),
-                      Icon(_controller.sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: cPrimary),
+                      Icon(_controller.sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: tc.brand),
                     ],
                   ],
                 ),
@@ -774,7 +781,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                     Text(UiText.t('修改时间', 'Modified'), style: const TextStyle(fontSize: fSmall)),
                     if (_controller.sortBy == SftpSortFields.modified) ...[
                       const SizedBox(width: 4),
-                      Icon(_controller.sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: cPrimary),
+                      Icon(_controller.sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: tc.brand),
                     ],
                   ],
                 ),
@@ -865,7 +872,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         children: [
           // 返回按钮
           IconButton(
-            icon: Icon(Icons.arrow_back, size: 14, color: _controller.pathHistory.isNotEmpty ? cPrimary : tc.textMuted),
+            icon: Icon(Icons.arrow_back, size: 14, color: _controller.pathHistory.isNotEmpty ? tc.brand : tc.textMuted),
             onPressed: _controller.pathHistory.isNotEmpty ? _controller.goBack : null,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
@@ -887,7 +894,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
             ),
           // 根目录按钮（右侧）
           IconButton(
-            icon: const Icon(Icons.home_outlined, size: 14, color: cPrimary),
+            icon: Icon(Icons.home_outlined, size: 14, color: tc.brand),
             onPressed: () => _controller.navigateTo('/'),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
@@ -908,7 +915,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), gapPadding: 0),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: const BorderSide(color: cPrimary, width: 1)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: tc.brand, width: 1)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: tc.border, width: 0.5)),
       ),
       onSubmitted: (_) => _submitPath(),
@@ -975,9 +982,9 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(
+            SizedBox(
               width: 20, height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: cPrimary),
+              child: CircularProgressIndicator(strokeWidth: 2, color: tc.brand),
             ),
             const SizedBox(height: 8),
             Text(UiText.t('正在连接...', 'Connecting...'), style: TextStyle(color: tc.textSub, fontSize: fSmall)),
@@ -993,9 +1000,9 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 28, color: cDanger),
+              Icon(Icons.error_outline, size: 28, color: tc.error),
               const SizedBox(height: 8),
-              Text(_controller.error!, style: const TextStyle(color: cDanger, fontSize: fMicro), textAlign: TextAlign.center),
+              Text(_controller.error!, style: TextStyle(color: tc.error, fontSize: fMicro), textAlign: TextAlign.center),
               const SizedBox(height: 12),
               ElevatedButton(
                 onPressed: _connect,
@@ -1140,24 +1147,25 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
   }
 
   Widget _buildTransferProgress() {
+    final tc = ThemeColors.of(context);
     return Container(
       height: 24,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: cPrimary.withValues(alpha: 0.08),
-        border: Border(top: BorderSide(color: cPrimary.withValues(alpha: 0.2))),
+        color: tc.brand.withValues(alpha: 0.08),
+        border: Border(top: BorderSide(color: tc.brand.withValues(alpha: 0.2))),
       ),
       child: Row(
         children: [
           SizedBox(
             width: 12, height: 12,
-            child: CircularProgressIndicator(strokeWidth: 1.5, color: cPrimary, value: _controller.transferProgress),
+            child: CircularProgressIndicator(strokeWidth: 1.5, color: tc.brand, value: _controller.transferProgress),
           ),
           const SizedBox(width: 6),
           Expanded(
             child: Text(
               '${_controller.transferName} ${(_controller.transferProgress * 100).toStringAsFixed(0)}%',
-              style: const TextStyle(fontSize: 9, color: cPrimary),
+              style: TextStyle(fontSize: 9, color: tc.brand),
               overflow: TextOverflow.ellipsis,
             ),
           ),
