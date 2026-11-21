@@ -730,7 +730,7 @@ class _AIPromptInputState extends State<AIPromptInput> {
             ),
             child: Icon(
               Icons.arrow_upward_rounded,
-              color: tc.isLight ? Colors.white : cBg,
+              color: tc.onAccent,
               size: 16,
             ),
           ),
@@ -770,12 +770,12 @@ class _AIPromptInputState extends State<AIPromptInput> {
                   child: Container(
                     width: 10,
                     height: 10,
-                    color: tc.isLight ? Colors.white : cBg,
+                    color: tc.onAccent,
                   ),
                 )
               : Icon(
                   Icons.arrow_upward_rounded,
-                  color: tc.isLight ? Colors.white : cBg,
+                  color: tc.onAccent,
                   size: 16,
                 ),
         ),

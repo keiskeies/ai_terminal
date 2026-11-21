@@ -286,7 +286,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(44),
               backgroundColor: tc.brand,
-              foregroundColor: tc.isLight ? Colors.white : cBg,
+              foregroundColor: tc.onAccent,
             ),
           ),
 

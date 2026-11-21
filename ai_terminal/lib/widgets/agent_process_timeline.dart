@@ -307,7 +307,7 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
                     decoration: BoxDecoration(
                       color: (isTool ? tc.brand : tc.ok)
                           .withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(rXSmall),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -347,7 +347,7 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
                             horizontal: 5, vertical: 1),
                         decoration: BoxDecoration(
                           color: tc.ok.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(4),
+                          borderRadius: BorderRadius.circular(rXSmall),
                         ),
                         child: Text(
                           ui.confirmedLabel,

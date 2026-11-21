@@ -54,7 +54,7 @@ class _SimpleConfirmDialog extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: tc.terminalBg,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(rSmall),
             ),
             child: SelectableText(
               cmd.command,
@@ -121,7 +121,7 @@ class _WarnConfirmDialogState extends State<_WarnConfirmDialog> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: tc.terminalBg,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(rSmall),
             ),
             child: SelectableText(
               widget.cmd.command,
@@ -137,7 +137,7 @@ class _WarnConfirmDialogState extends State<_WarnConfirmDialog> {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: tc.error.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(rSmall),
               border: Border.all(color: tc.error.withValues(alpha: 0.3)),
             ),
             child: Row(

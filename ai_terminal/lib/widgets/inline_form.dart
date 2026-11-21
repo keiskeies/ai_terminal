@@ -444,7 +444,7 @@ class InlineButton extends StatelessWidget {
     final fg = danger
         ? tc.error
         : primary
-            ? (tc.isLight ? Colors.white : tc.bg)
+            ? (tc.onAccent)
             : tc.textSub;
     final bg = danger
         ? Colors.transparent

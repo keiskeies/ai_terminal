@@ -62,7 +62,7 @@ class AgentAskCard extends StatelessWidget {
                 margin: const EdgeInsets.only(top: 1),
                 decoration: BoxDecoration(
                   color: tc.brand.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(rCard),
                 ),
                 child: Icon(Icons.help_outline, size: 13, color: tc.brand),
               ),

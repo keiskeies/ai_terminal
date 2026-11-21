@@ -366,7 +366,7 @@ class _PaletteChip extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 9,
+                fontSize: fMini,
                 height: 1.15,
                 color: theme.foreground,
                 fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
@@ -377,7 +377,7 @@ class _PaletteChip extends StatelessWidget {
                 UiText.t('仅暗色', 'Dark only'),
                 maxLines: 1,
                 style:
-                    TextStyle(fontSize: 8, height: 1.1, color: theme.brightBlack),
+                    TextStyle(fontSize: fMini, height: 1.1, color: theme.brightBlack),
               ),
           ],
         ),

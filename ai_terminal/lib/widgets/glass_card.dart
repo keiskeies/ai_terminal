@@ -44,7 +44,7 @@ class _PrimaryButtonState extends State<PrimaryButton> {
   @override
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
-    final fg = tc.isLight ? Colors.white : cBg;
+    final fg = tc.onAccent;
     final disabled = widget.isDisabled || widget.isLoading || widget.onPressed == null;
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),

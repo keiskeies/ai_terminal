@@ -503,7 +503,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
   Widget _buildMiniChart(List<double> data, Color color, double? max) {
     if (data.length < 2) {
       return Center(
-        child: Text('…', style: TextStyle(fontSize: 10, color: color.withValues(alpha: 0.5))),
+        child: Text('…', style: TextStyle(fontSize: fMini, color: color.withValues(alpha: 0.5))),
       );
     }
     // 降采样：60px 宽最多 60 个点，数据多时按桶取最大最小值保留趋势

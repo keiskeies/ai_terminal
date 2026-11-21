@@ -162,7 +162,7 @@ class _CommandPaletteState extends State<CommandPalette> {
               width: width,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(rFloat),
                   // 设计稿 .palette：1px 强描边（.18 白）+ 大投影。普通 border
                   // 在深底上几乎看不见，设计稿特意用了更亮的描边。
                   border: Border.all(color: tc.borderHover, width: 1),
@@ -176,7 +176,7 @@ class _CommandPaletteState extends State<CommandPalette> {
                 ),
                 child: Material(
                   color: tc.cardElevated,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(rFloat),
                   // 1px 强描边压在 Material 外侧：Material 自带 clip 会把
                   // Border 的圆角裁齐，放进 DecoratedBox 才有完整一圈。
                   clipBehavior: Clip.antiAlias,
@@ -354,7 +354,7 @@ class _PaletteRow extends StatelessWidget {
                         constraints: const BoxConstraints(minWidth: 32),
                         padding: const EdgeInsets.symmetric(horizontal: 5),
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(5),
+                          borderRadius: BorderRadius.circular(rXSmall),
                           border: Border.all(color: tc.border),
                         ),
                         child: Text(_typeBadge(entry.group),

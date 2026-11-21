@@ -75,7 +75,7 @@ class MessageBubble extends StatelessWidget {
                     ? SelectableText(
                         message.content,
                         style: TextStyle(
-                        color: tc.isLight ? Colors.white : cBg,
+                        color: tc.onAccent,
                         fontSize: fBody,
                         height: 1.5,
                         fontWeight: FontWeight.w500,

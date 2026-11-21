@@ -478,7 +478,7 @@ class _BuiltInPromptEditorState extends State<_BuiltInPromptEditor> {
               label: Text(l10n.save),
               style: ElevatedButton.styleFrom(
                 backgroundColor: tc.brand,
-                foregroundColor: tc.isLight ? Colors.white : cBg,
+                foregroundColor: tc.onAccent,
               ),
             ),
           ],
@@ -560,7 +560,7 @@ class _CustomPromptEditorState extends State<_CustomPromptEditor> {
               label: Text(l10n.save),
               style: ElevatedButton.styleFrom(
                 backgroundColor: tc.brand,
-                foregroundColor: tc.isLight ? Colors.white : cBg,
+                foregroundColor: tc.onAccent,
               ),
             ),
           ],

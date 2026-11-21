@@ -212,7 +212,7 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                     showTopSnackBar(ctx,
                       SnackBar(
                         content: Text(L10n.str.ut_0b13faa29b(visible.length),
-                            style: const TextStyle(fontSize: 13)),
+                            style: const TextStyle(fontSize: fBody)),
                         duration: const Duration(seconds: 1),
                       ),
                     );

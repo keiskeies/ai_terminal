@@ -187,19 +187,20 @@ class _HostListPageState extends ConsumerState<HostListPage> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showTipDialog(context),
         backgroundColor: tc.brand,
-        child: Icon(Icons.smart_toy, color: tc.isLight ? Colors.white : cBg),
+        child: Icon(Icons.smart_toy, color: tc.onAccent),
       ),
     );
   }
 
   void _showTipDialog(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
+    final tc = ThemeColors.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            const Icon(Icons.lightbulb, color: Colors.amber),
+            Icon(Icons.lightbulb, color: tc.gold),
             const SizedBox(width: 8),
             Text(l10n.hostListAITipTitle),
           ],
@@ -218,7 +219,7 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             const SizedBox(height: 12),
             Text(
               l10n.hostListAITipNote,
-              style: const TextStyle(color: Colors.grey),
+              style: TextStyle(color: tc.textMuted),
             ),
           ],
         ),

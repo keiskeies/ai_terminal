@@ -114,7 +114,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 const SizedBox(height: 24),
                 Text(
                   l10n.chatNeedTerminal,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500, color: tc.textMain),
+                  style: TextStyle(fontSize: fTitle, fontWeight: FontWeight.w500, color: tc.textMain),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -129,7 +129,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   label: Text(l10n.chatBackToServerList),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: tc.brand,
-                    foregroundColor: tc.isLight ? Colors.white : cBg,
+                    foregroundColor: tc.onAccent,
                   ),
                 ),
               ],
@@ -210,7 +210,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                               height: 36,
                               decoration: BoxDecoration(
                                 color: tc.card,
-                                borderRadius: BorderRadius.circular(18),
+                                borderRadius: BorderRadius.circular(rXLarge),
                                 border: Border.all(color: tc.border),
                                 boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 6)],
                               ),

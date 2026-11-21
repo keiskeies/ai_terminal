@@ -391,7 +391,7 @@ class AgentEventContent extends StatelessWidget {
                   height: 14,
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(7),
+                    borderRadius: BorderRadius.circular(rSmall),
                   ),
                   child: Icon(statusIcon, size: 9, color: statusColor),
                 ),
@@ -672,7 +672,7 @@ class AgentEventContent extends StatelessWidget {
             height: 28,
             decoration: BoxDecoration(
               color: accent.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(rLarge),
             ),
             child: Icon(icon, size: 15, color: accent),
           ),
@@ -704,12 +704,12 @@ class AgentEventContent extends StatelessWidget {
                     ),
                     h1: TextStyle(
                       color: accent,
-                      fontSize: 16,
+                      fontSize: fTitle,
                       fontWeight: FontWeight.bold,
                     ),
                     h2: TextStyle(
                       color: accent,
-                      fontSize: 14,
+                      fontSize: fSubtitle,
                       fontWeight: FontWeight.bold,
                     ),
                     h3: TextStyle(
@@ -820,7 +820,7 @@ class _RawOutputTailState extends State<_RawOutputTail> {
               decoration: BoxDecoration(
                 // 设计稿 mono-block：输出正文统一比卡片深一档 + 发丝边框
                 color: tc.terminalBg,
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(rSmall),
                 border: Border.all(color: tc.hairline, width: 1),
               ),
               child: ConstrainedBox(
@@ -949,7 +949,7 @@ class _ResultOutputPreview extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
           decoration: BoxDecoration(
             color: tc.terminalBg,
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(rSmall),
             border: Border.all(color: tc.hairline, width: 1),
           ),
           child: Column(

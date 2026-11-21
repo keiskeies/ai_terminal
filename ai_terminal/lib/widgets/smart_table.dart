@@ -301,10 +301,10 @@ class _SmartMarkdownTableState extends State<SmartMarkdownTable> {
           margin: const EdgeInsets.symmetric(vertical: 4),
           decoration: BoxDecoration(
             border: Border.all(color: tc.agentCardBorder, width: 1),
-            borderRadius: BorderRadius.circular(6),
+            borderRadius: BorderRadius.circular(rXSmall),
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(5),
+            borderRadius: BorderRadius.circular(rXSmall),
             child: body,
           ),
         ),

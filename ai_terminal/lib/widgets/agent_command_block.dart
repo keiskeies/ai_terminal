@@ -199,7 +199,7 @@ class AgentCommandBlock extends StatelessWidget {
                         height: 14,
                         decoration: BoxDecoration(
                           color: accentColor.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(7),
+                          borderRadius: BorderRadius.circular(rSmall),
                         ),
                         child: Icon(
                           isTool

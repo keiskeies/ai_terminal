@@ -118,7 +118,7 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showEditDialog(),
         backgroundColor: tc.brand,
-        child: Icon(Icons.add, color: tc.isLight ? Colors.white : cBg),
+        child: Icon(Icons.add, color: tc.onAccent),
       ),
     );
   }
@@ -414,7 +414,7 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
           label: Text(l10n.commonExecute),
           style: ElevatedButton.styleFrom(
             backgroundColor: tc.brand,
-            foregroundColor: tc.isLight ? Colors.white : cBg,
+            foregroundColor: tc.onAccent,
             padding: const EdgeInsets.symmetric(horizontal: pCompact),
             minimumSize: const Size(0, 30),
             textStyle: const TextStyle(fontSize: fSmall),
@@ -625,7 +625,7 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: tc.brand,
-              foregroundColor: tc.isLight ? Colors.white : cBg,
+              foregroundColor: tc.onAccent,
             ),
             child: Text(l10n.commonExecute),
           ),
@@ -904,7 +904,7 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
             onPressed: _save,
             style: ElevatedButton.styleFrom(
               backgroundColor: tc.brand,
-              foregroundColor: tc.isLight ? Colors.white : cBg,
+              foregroundColor: tc.onAccent,
             ),
             child: Text(isEdit ? l10n.save : l10n.runbookCreate),
           ),
@@ -1280,7 +1280,7 @@ class _RunbookImportDialogState extends State<_RunbookImportDialog> {
           onPressed: _importing ? null : _doImport,
           style: ElevatedButton.styleFrom(
               backgroundColor: tc.brand,
-              foregroundColor: tc.isLight ? Colors.white : cBg,
+              foregroundColor: tc.onAccent,
             ),
           child: _importing
               ? const SizedBox(

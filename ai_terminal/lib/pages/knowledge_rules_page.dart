@@ -183,7 +183,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showEditDialog(),
         backgroundColor: tc.brand,
-        child: Icon(Icons.add, color: tc.isLight ? Colors.white : cBg),
+        child: Icon(Icons.add, color: tc.onAccent),
       ),
     );
   }
@@ -295,7 +295,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: tc.terminalBg,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(rSmall),
                   ),
                   child: SelectableText(
                     rule.commands.trim(),
@@ -350,7 +350,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(rXSmall),
       ),
       child: Text(text, style: TextStyle(color: color, fontSize: fMicro)),
     );

@@ -175,6 +175,19 @@ class TerminalPage extends ConsumerStatefulWidget {
   ConsumerState<TerminalPage> createState() => _TerminalPageState();
 }
 
+/// 可点击区域的统一包装：手型光标 + 整块可命中。
+/// 裸 GestureDetector 不改光标，控件在桌面上会看着像静态装饰。
+Widget _clickable({VoidCallback? onTap, required Widget child}) {
+  return MouseRegion(
+    cursor: onTap == null ? MouseCursor.defer : SystemMouseCursors.click,
+    child: GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: child,
+    ),
+  );
+}
+
 class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   Terminal? _terminal;
 
@@ -1275,7 +1288,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(rXSmall),
           border: Border.all(color: color.withValues(alpha: 0.5)),
         ),
         child: Text(label,
@@ -2374,7 +2387,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     return Tooltip(
       message: UiText.t('命令面板 (Ctrl+K)', 'Command palette (Ctrl+K)'),
       waitDuration: const Duration(milliseconds: 500),
-      child: GestureDetector(
+      child: _clickable(
         onTap: _showCommandPalette,
         child: Container(
           height: 32,
@@ -2395,7 +2408,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   padding: const EdgeInsets.fromLTRB(5, 1, 5, 0),
                   decoration: BoxDecoration(
                     color: tc.surface,
-                    borderRadius: BorderRadius.circular(5),
+                    borderRadius: BorderRadius.circular(rXSmall),
                     border: Border(
                       top: BorderSide(color: tc.border),
                       left: BorderSide(color: tc.border),
@@ -2529,7 +2542,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     return PopupMenuButton<String>(
       tooltip: UiText.t('菜单', 'Menu'),
       color: tc.cardElevated,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rFloat)),
       offset: const Offset(0, 36),
       position: PopupMenuPosition.under,
       constraints: const BoxConstraints(minWidth: 280, maxWidth: 320),
@@ -2809,7 +2822,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final l10n = AppLocalizations.of(context)!;
     return Tooltip(
       message: l10n.terminalNewConnection,
-      child: GestureDetector(
+      child: _clickable(
         onTap: _showAddHostDialog,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -3079,7 +3092,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                     onPressed: _reconnect,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: tc.brand,
-                      foregroundColor: tc.isLight ? Colors.white : cBg,
+                      foregroundColor: tc.onAccent,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 10),
                       shape: RoundedRectangleBorder(
@@ -3169,7 +3182,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final tc = ThemeColors.of(context);
     final retrying = tab.status == tp.TabStatus.reconnecting;
     final color = retrying ? tc.warn : tc.error;
-    return GestureDetector(
+    return _clickable(
       onTap: retrying ? null : _reconnect,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -3293,7 +3306,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   Positioned(
                     right: 8,
                     bottom: 8,
-                    child: GestureDetector(
+                    child: _clickable(
                       onTap: _scrollChatToBottomManual,
                       child: Container(
                         width: 32,
@@ -3409,7 +3422,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       return Tooltip(
         message: tip,
         waitDuration: const Duration(milliseconds: 500),
-        child: GestureDetector(
+        child: _clickable(
           onTap: onTap,
           child: Container(
             width: 24,
@@ -4776,11 +4789,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 ),
                 h1: TextStyle(
                     color: theme.textMain,
-                    fontSize: 16,
+                    fontSize: fTitle,
                     fontWeight: FontWeight.bold),
                 h2: TextStyle(
                     color: theme.textMain,
-                    fontSize: 14,
+                    fontSize: fSubtitle,
                     fontWeight: FontWeight.bold),
                 h3: TextStyle(
                     color: theme.textMain,
@@ -5214,7 +5227,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     showTopSnackBar(
         context,
         SnackBar(
-          content: Text(message, style: const TextStyle(fontSize: 13)),
+          content: Text(message, style: const TextStyle(fontSize: fBody)),
           duration: const Duration(seconds: 3),
         ));
   }
@@ -5668,7 +5681,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           context,
           SnackBar(
             content: Text(l10n.terminalSessionCreated,
-                style: const TextStyle(fontSize: 13)),
+                style: const TextStyle(fontSize: fBody)),
             duration: const Duration(seconds: 1),
           ),
         );
@@ -5720,7 +5733,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             context,
             SnackBar(
               content: Text(l10n.terminalConnectTerminalFirst,
-                  style: const TextStyle(fontSize: 13)),
+                  style: const TextStyle(fontSize: fBody)),
               duration: const Duration(seconds: 1),
             ),
           );
@@ -5736,7 +5749,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             context,
             SnackBar(
               content: Text(l10n.terminalCompactionDone,
-                  style: const TextStyle(fontSize: 13)),
+                  style: const TextStyle(fontSize: fBody)),
               duration: const Duration(seconds: 1),
             ),
           );
@@ -5746,7 +5759,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             context,
             SnackBar(
               content: Text(l10n.terminalCompactionFailed('$e'),
-                  style: const TextStyle(fontSize: 13)),
+                  style: const TextStyle(fontSize: fBody)),
               duration: const Duration(seconds: 2),
             ),
           );
@@ -6058,9 +6071,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }) {
     return Tooltip(
       message: tooltip,
-      child: GestureDetector(
-        // 只有图标本体可命中的话，28×28 按钮的边框与间隙点了没反应
-        behavior: HitTestBehavior.opaque,
+      child: _clickable(
         onTap: onTap,
         child: Container(
           width: 30,
@@ -6281,7 +6292,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           final key = keys[index];
           final isCore = index < coreCount;
           final isNav = index >= coreCount + readlineKeys.length;
-          return GestureDetector(
+          return _clickable(
             onTap: isConnected ? () => _sendKey(key.sequence, activeTab) : null,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -6923,7 +6934,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: tc.brand,
-              foregroundColor: tc.isLight ? Colors.white : cBg,
+              foregroundColor: tc.onAccent,
             ),
             child: Text(l10n.commonExecute),
           ),
@@ -7088,7 +7099,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: tc.brand,
-              foregroundColor: tc.isLight ? Colors.white : cBg,
+              foregroundColor: tc.onAccent,
             ),
             child: Text(l10n.commonExecute),
           ),
@@ -7225,7 +7236,7 @@ class _ModeCapsuleState extends State<_ModeCapsule>
     // 编排态继续用橙色保持模式可辨。
     final accent = isOrch ? tc.warn : tc.brand;
 
-    return GestureDetector(
+    return _clickable(
       onTap: widget.onTap,
       child: Container(
         height: 30,
@@ -7510,7 +7521,7 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
             child: Row(
               children: [
                 Expanded(
-                  child: GestureDetector(
+                  child: _clickable(
                     onTap: widget.onExit,
                     child: Container(
                       height: 36,

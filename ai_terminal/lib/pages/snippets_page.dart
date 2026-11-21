@@ -42,7 +42,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showSnippetDialog(),
         backgroundColor: tc.brand,
-        child: Icon(Icons.add, color: tc.isLight ? Colors.white : cBg),
+        child: Icon(Icons.add, color: tc.onAccent),
       ),
     );
   }
@@ -144,7 +144,7 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: tc.terminalBg,
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(rSmall),
               ),
               child: SelectableText(
                 snippet.command,

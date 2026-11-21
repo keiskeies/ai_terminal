@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:dartssh2/dartssh2.dart';
 import 'package:flutter/material.dart';
+import '../core/constants.dart';
 import '../core/theme_colors.dart';
 import '../core/ui_text.dart';
 import '../services/port_forward_service.dart';
@@ -98,7 +99,7 @@ class _PortForwardDialogState extends State<PortForwardDialog> {
                     child: Text(
                       UiText.t('端口转发', 'Port forwarding'),
                       style: TextStyle(
-                          fontSize: 16,
+                          fontSize: fTitle,
                           fontWeight: FontWeight.w600,
                           color: tc.textMain),
                     ),
@@ -120,7 +121,7 @@ class _PortForwardDialogState extends State<PortForwardDialog> {
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Text(
                           UiText.t('暂无转发规则', 'No forwarding rules'),
-                          style: TextStyle(color: tc.textMuted, fontSize: 13),
+                          style: TextStyle(color: tc.textMuted, fontSize: fBody),
                         ),
                       );
                     }
@@ -143,7 +144,7 @@ class _PortForwardDialogState extends State<PortForwardDialog> {
                           ),
                           title: Text(rule.label,
                               style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: fBody,
                                   color: tc.textMain,
                                   fontFamily: 'JetBrainsMono')),
                           subtitle: Text(
@@ -152,7 +153,7 @@ class _PortForwardDialogState extends State<PortForwardDialog> {
                                     '${rule.direction == ForwardDirection.local ? "本地" : "远程"}转发 · 已转发 ${rule.connections} 个连接',
                                     '${rule.direction == ForwardDirection.local ? "Local" : "Remote"} · ${rule.connections} connections'),
                             style: TextStyle(
-                                fontSize: 11,
+                                fontSize: fMicro,
                                 color: rule.error != null
                                     ? tc.error
                                     : tc.textSub),
@@ -227,7 +228,7 @@ class _PortForwardDialogState extends State<PortForwardDialog> {
               if (_formError != null) ...[
                 const SizedBox(height: 8),
                 Text(_formError!,
-                    style: TextStyle(fontSize: 12, color: tc.error)),
+                    style: TextStyle(fontSize: fSmall, color: tc.error)),
               ],
               const SizedBox(height: 12),
               Align(

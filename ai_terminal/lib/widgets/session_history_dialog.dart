@@ -240,7 +240,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
               if (!ctx.mounted) return;
               Navigator.pop(ctx);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: tc.brand, foregroundColor: tc.isLight ? Colors.white : cBg),
+            style: ElevatedButton.styleFrom(backgroundColor: tc.brand, foregroundColor: tc.onAccent),
             child: Text(l10n.save, style: const TextStyle(fontSize: fBody)),
           ),
         ],

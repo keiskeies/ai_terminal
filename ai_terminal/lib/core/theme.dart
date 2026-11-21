@@ -217,7 +217,7 @@ class AppTheme {
         color: cCardElevated,
         // 设计稿 .menu：1px 描边 + 12 圆角，菜单是浮层但不该是一块"无边界色块"。
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(rMedium),
+          borderRadius: BorderRadius.circular(rFloat),
           side: const BorderSide(color: cBorder),
         ),
       ),

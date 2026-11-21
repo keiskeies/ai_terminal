@@ -46,7 +46,7 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
         onPressed: () => _showEndpointDialog(),
         tooltip: l10n.aiEndpointAdd,
         backgroundColor: tc.brand,
-        foregroundColor: tc.isLight ? Colors.white : cBg,
+        foregroundColor: tc.onAccent,
         child: const Icon(Icons.add),
       ),
     );
@@ -914,14 +914,14 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                       onPressed: _saving ? null : _save,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: tc.brand,
-                        foregroundColor: tc.isLight ? Colors.white : cBg,
+                        foregroundColor: tc.onAccent,
                       ),
                       child: _saving
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 14,
                               height: 14,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
+                                  strokeWidth: 2, color: tc.onAccent),
                             )
                           : Text(l10n.save),
                     ),
@@ -1495,7 +1495,7 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
                       onPressed: _save,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: tc.brand,
-                        foregroundColor: tc.isLight ? Colors.white : cBg,
+                        foregroundColor: tc.onAccent,
                       ),
                       child: Text(l10n.save),
                     ),

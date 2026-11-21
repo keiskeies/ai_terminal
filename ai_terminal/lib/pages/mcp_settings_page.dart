@@ -1239,7 +1239,7 @@ class _McpServerEditorDialogState extends State<McpServerEditorDialog> {
                     onPressed: _save,
                     style: FilledButton.styleFrom(
                       backgroundColor: tc.brand,
-                      foregroundColor: tc.isLight ? Colors.white : cBg,
+                      foregroundColor: tc.onAccent,
                     ),
                     child: Text(_enabled ? UiText.t('保存并连接', 'Save & connect') : UiText.t('保存', 'Save')),
                   ),

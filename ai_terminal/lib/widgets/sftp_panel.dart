@@ -304,18 +304,18 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: tc.textMuted.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(rXSmall),
                       ),
-                      child: Text(UiText.t('只读', 'Read-only'), style: TextStyle(fontSize: 9, color: tc.textMuted)),
+                      child: Text(UiText.t('只读', 'Read-only'), style: TextStyle(fontSize: fMini, color: tc.textMuted)),
                     ),
                   if (!readOnly && hasModified)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: tc.warn.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(4),
+                        borderRadius: BorderRadius.circular(rXSmall),
                       ),
-                      child: Text(UiText.t('已修改', 'Modified'), style: TextStyle(fontSize: 9, color: tc.warn)),
+                      child: Text(UiText.t('已修改', 'Modified'), style: TextStyle(fontSize: fMini, color: tc.warn)),
                     ),
                 ],
               ),
@@ -627,7 +627,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                         horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: tc.card,
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(rSmall),
                       border: Border.all(color: tc.brand),
                     ),
                     child: Text(
@@ -847,7 +847,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               color: tc.surface,
-              borderRadius: BorderRadius.circular(7),
+              borderRadius: BorderRadius.circular(rSmall),
               border: Border.all(
                 color: isHovered ? tc.border : Colors.transparent,
               ),
@@ -1075,7 +1075,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
           }
         },
         onLongPress: () => _showEntryActions(entry),
-        borderRadius: BorderRadius.circular(7),
+        borderRadius: BorderRadius.circular(rSmall),
         child: Container(
           constraints: const BoxConstraints(minHeight: 30),
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
@@ -1083,7 +1083,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
           // 不再用 0.3px 分隔线切行。
           decoration: BoxDecoration(
             color: isHovered ? tc.surface : null,
-            borderRadius: BorderRadius.circular(7),
+            borderRadius: BorderRadius.circular(rSmall),
           ),
           child: Row(
             children: [
@@ -1170,7 +1170,7 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
           Expanded(
             child: Text(
               '${_controller.transferName} ${(_controller.transferProgress * 100).toStringAsFixed(0)}%',
-              style: TextStyle(fontSize: 9, color: tc.brand),
+              style: TextStyle(fontSize: fMini, color: tc.brand),
               overflow: TextOverflow.ellipsis,
             ),
           ),
