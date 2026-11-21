@@ -1,4 +1,4 @@
-package com.example.ai_terminal
+package top.keiskei.ai_terminal
 
 import io.flutter.embedding.android.FlutterActivity
 

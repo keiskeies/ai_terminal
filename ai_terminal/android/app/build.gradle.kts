@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.ai_terminal"
+    namespace = "top.keiskei.ai_terminal"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
