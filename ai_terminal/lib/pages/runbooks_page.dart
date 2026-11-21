@@ -1283,12 +1283,12 @@ class _RunbookImportDialogState extends State<_RunbookImportDialog> {
               foregroundColor: tc.onAccent,
             ),
           child: _importing
-              ? const SizedBox(
+              ? SizedBox(
                   width: 14,
                   height: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: Colors.white,
+                    color: tc.onAccent,
                   ),
                 )
               : Text(l10n.runbookImportButton),
