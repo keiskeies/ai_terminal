@@ -28,7 +28,7 @@ class TabBarWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: tc.bg,
         border: Border(
-          bottom: BorderSide(color: tc.border.withValues(alpha: 0.6), width: 1),
+          bottom: BorderSide(color: tc.hairline),
         ),
       ),
       child: ListView.builder(
@@ -76,7 +76,7 @@ class _AddTabButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: tc.surface,
             borderRadius: BorderRadius.circular(rSmall),
-            border: Border.all(color: tc.border.withValues(alpha: 0.3)),
+            border: Border.all(color: tc.border),
           ),
           child: Icon(Icons.add, size: 16, color: tc.textSub),
         ),
@@ -135,8 +135,8 @@ class _TabItemState extends State<_TabItem> {
             border: isActive
                 ? Border(
                     top: BorderSide(color: tc.brand, width: 2),
-                    left: BorderSide(color: tc.border.withValues(alpha: 0.3), width: 0.5),
-                    right: BorderSide(color: tc.border.withValues(alpha: 0.3), width: 0.5),
+                    left: BorderSide(color: tc.hairline),
+                    right: BorderSide(color: tc.hairline),
                   )
                 : null,
           ),

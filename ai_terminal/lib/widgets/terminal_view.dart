@@ -793,16 +793,16 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
                     filled: true,
                     fillColor: tc.bg,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(rInput),
                       borderSide: BorderSide(color: tc.border),
                     ),
                     enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius: BorderRadius.circular(rInput),
                       borderSide: BorderSide(color: tc.border),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(4),
-                      borderSide: BorderSide(color: tc.brand),
+                      borderRadius: BorderRadius.circular(rInput),
+                      borderSide: BorderSide(color: tc.brand, width: 1.5),
                     ),
                   ),
                   onChanged: (_) => _runSearch(),

@@ -217,7 +217,7 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
               decoration: BoxDecoration(
                 color: tc.terminalBg,
                 borderRadius: BorderRadius.circular(rXSmall),
-                border: Border.all(color: tc.border.withValues(alpha: 0.6)),
+                border: Border.all(color: tc.border),
               ),
               child: Text(
                 detail,

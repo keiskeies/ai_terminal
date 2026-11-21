@@ -423,7 +423,7 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: tc.border, width: 0.5)),
+        border: Border(top: BorderSide(color: tc.hairline)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -735,7 +735,7 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
       decoration: BoxDecoration(
         color: tc.agentCardFill,
         borderRadius: BorderRadius.circular(rCard),
-        border: Border.all(color: tc.border, width: 0.5),
+        border: Border.all(color: tc.border),
       ),
       child: Row(
         children: [
@@ -805,7 +805,7 @@ class _AskRow extends StatelessWidget {
       decoration: BoxDecoration(
         color: tc.warn.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(rCard),
-        border: Border.all(color: tc.warn.withValues(alpha: 0.3), width: 0.5),
+        border: Border.all(color: tc.warn.withValues(alpha: 0.3)),
       ),
       child: Text(
         event.question ?? event.text ?? '',

@@ -1594,7 +1594,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 ],
               ),
             ),
-            Divider(color: tc.border, height: 1),
+            Divider(color: tc.hairline, height: 1),
             Flexible(
               child: ListView.builder(
                 shrinkWrap: true,
@@ -3550,10 +3550,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           ],
           const SizedBox(width: 10),
           Expanded(
-            child: Container(
-              height: 1,
-              color: tc.border.withValues(alpha: 0.6),
-            ),
+            child: Container(height: 1, color: tc.hairline),
           ),
         ],
       ),
@@ -6262,8 +6259,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       height: 36,
       decoration: BoxDecoration(
         color: tc.card,
-        border:
-            Border(top: BorderSide(color: tc.border.withValues(alpha: 0.3))),
+        border: Border(top: BorderSide(color: tc.hairline)),
       ),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
@@ -6276,7 +6272,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             return Container(
               width: 1,
               margin: const EdgeInsets.symmetric(vertical: 4),
-              color: tc.border.withValues(alpha: 0.4),
+              color: tc.hairline,
             );
           }
           return const SizedBox(width: 3);
@@ -6301,7 +6297,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                       ? tc.brand.withValues(alpha: isConnected ? 0.3 : 0.1)
                       : isNav
                           ? tc.ok.withValues(alpha: isConnected ? 0.2 : 0.05)
-                          : tc.border.withValues(alpha: 0.3),
+                          : tc.border,
                 ),
               ),
               child: Center(
@@ -6450,7 +6446,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   ],
                 ),
               ),
-              Divider(height: 1, color: tc.border.withValues(alpha: 0.5)),
+              Divider(height: 1, color: tc.hairline),
               if (runbooks.isEmpty)
                 Padding(
                   padding:
@@ -7397,7 +7393,7 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
               ],
             ),
           ),
-          Divider(height: 1, color: tc.border.withValues(alpha: 0.5)),
+          Divider(height: 1, color: tc.hairline),
           // 分组筛选 chip 行
           if (widget.groupNames.length > 1)
             SizedBox(
@@ -7507,7 +7503,7 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
                     },
                   ),
           ),
-          Divider(height: 1, color: tc.border.withValues(alpha: 0.5)),
+          Divider(height: 1, color: tc.hairline),
           // 底部操作栏
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -7559,7 +7555,7 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
             border: Border.all(
               color: selected
                   ? tc.warn.withValues(alpha: 0.4)
-                  : tc.border.withValues(alpha: 0.3),
+                  : tc.border,
             ),
           ),
           child: Text(
@@ -7672,7 +7668,7 @@ class _AnswerCopyButtonState extends State<_AnswerCopyButton> {
             borderRadius: BorderRadius.circular(rXSmall),
             // 静止时不画边框：它是回答末尾的一个动作入口，不该再起一个方块
             border: _copied || _hover || _pressed
-                ? Border.all(color: accent, width: 0.5)
+                ? Border.all(color: accent)
                 : null,
           ),
           child: Row(

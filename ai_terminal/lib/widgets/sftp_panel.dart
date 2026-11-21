@@ -914,9 +914,14 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       decoration: InputDecoration(
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), gapPadding: 0),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: tc.brand, width: 1)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: tc.border, width: 0.5)),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(rInput), gapPadding: 0),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(rInput),
+            borderSide: BorderSide(color: tc.brand, width: 1.5)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(rInput),
+            borderSide: BorderSide(color: tc.border)),
       ),
       onSubmitted: (_) => _submitPath(),
     );

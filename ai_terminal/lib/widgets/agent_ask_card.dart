@@ -242,7 +242,7 @@ class _AgentAskStepRowState extends State<AgentAskStepRow> {
                           color: tc.ok.withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(rFull),
                           border: Border.all(
-                              color: tc.ok.withValues(alpha: 0.35), width: 0.5),
+                              color: tc.ok.withValues(alpha: 0.35)),
                         ),
                         child: Text(
                           chosen,
@@ -270,7 +270,7 @@ class _AgentAskStepRowState extends State<AgentAskStepRow> {
             Container(
               padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
               decoration: BoxDecoration(
-                border: Border(top: BorderSide(color: tc.border, width: 0.5)),
+                border: Border(top: BorderSide(color: tc.hairline)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -244,7 +244,7 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
                         dense: true,
                         contentPadding: EdgeInsets.zero,
                       ),
-                      Divider(color: tc.border, height: 1),
+                      Divider(color: tc.hairline, height: 1),
                       RadioListTile<String>(
                         value: 'always',
                         title: Text(l10n.notificationAlways),

@@ -250,7 +250,7 @@ class _ModelChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: tc.surface,
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: tc.border.withValues(alpha: 0.5)),
+        border: Border.all(color: tc.border),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -803,7 +803,7 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        Divider(height: 1, color: tc.border),
+                        Divider(height: 1, color: tc.hairline),
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -877,8 +877,7 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                             decoration: BoxDecoration(
                               color: tc.surface,
                               borderRadius: BorderRadius.circular(rSmall),
-                              border: Border.all(
-                                  color: tc.border.withValues(alpha: 0.5)),
+                              border: Border.all(color: tc.border),
                             ),
                             child: Text(
                               l10n.aiEndpointNoModels,
@@ -944,7 +943,7 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
       decoration: BoxDecoration(
         color: tc.surface,
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: tc.border.withValues(alpha: 0.5)),
+        border: Border.all(color: tc.border),
       ),
       child: Row(
         children: [

@@ -273,7 +273,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
       height: widget.height,
       decoration: BoxDecoration(
         color: tc.card,
-        border: Border(top: BorderSide(color: tc.border, width: 0.5)),
+        border: Border(top: BorderSide(color: tc.hairline)),
       ),
       child: Listener(
         // 点击面板外部时隐藏浮层
@@ -388,7 +388,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
       width: 1,
       height: 16,
       margin: const EdgeInsets.symmetric(horizontal: 4),
-      color: tc.border.withValues(alpha: 0.3),
+      color: tc.hairline,
     );
   }
 
@@ -680,7 +680,7 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                     ),
                   ],
                 ),
-                Divider(height: 6, color: tc.border.withValues(alpha: 0.3)),
+                Divider(height: 6, color: tc.hairline),
                 // 明细区用 Flexible 吃剩余高度：固定块（标题/汇总/表头）先占位，
                 // 若不收缩明细，弹层高度不足时表格会被 RenderFlex 裁掉
                 // （磁盘分区"挤到下面"就是这么来的）

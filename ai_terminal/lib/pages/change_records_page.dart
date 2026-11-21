@@ -354,7 +354,7 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       margin: const EdgeInsets.only(bottom: 8),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(rCard),
-        side: BorderSide(color: tc.border, width: 0.5),
+        side: BorderSide(color: tc.border),
       ),
       child: Padding(
         padding: const EdgeInsets.all(pCompact),

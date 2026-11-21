@@ -109,7 +109,7 @@ class _ModelPickerPanelState extends State<ModelPickerPanel> {
               ],
             ),
           ),
-          Divider(height: 1, color: tc.border),
+          Divider(height: 1, color: tc.hairline),
           Expanded(
             child: widget.endpoints.every((e) => e.models.isEmpty)
                 ? Center(
@@ -157,7 +157,7 @@ class _ModelPickerPanelState extends State<ModelPickerPanel> {
                     ],
                   ),
           ),
-          Divider(height: 1, color: tc.border),
+          Divider(height: 1, color: tc.hairline),
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
             child: Column(
@@ -281,7 +281,7 @@ class _ModelPickerPanelState extends State<ModelPickerPanel> {
           color: selected ? tc.brand.withValues(alpha: 0.15) : tc.surface,
           borderRadius: BorderRadius.circular(rSmall),
           border: Border.all(
-            color: selected ? tc.brand : tc.border.withValues(alpha: 0.5),
+            color: selected ? tc.brand : tc.border,
           ),
         ),
         child: Text(

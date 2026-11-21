@@ -158,7 +158,7 @@ class _PlanPanelState extends State<PlanPanel> {
             ),
           ),
           if (_expanded) ...[
-            Divider(height: 0.5, thickness: 0.5, color: tc.hairline),
+            Divider(height: 1, color: tc.hairline),
             _buildExpandedList(ui, currentIndex),
           ],
         ],

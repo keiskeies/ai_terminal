@@ -382,7 +382,7 @@ class AgentEventContent extends StatelessWidget {
             decoration: BoxDecoration(
               color: statusBg,
               border: Border(
-                  bottom: BorderSide(color: tc.border, width: 0.5)),
+                  bottom: BorderSide(color: tc.hairline)),
             ),
             child: Row(
               children: [
@@ -767,7 +767,7 @@ class _RawOutputTailState extends State<_RawOutputTail> {
       decoration: BoxDecoration(
         color: tc.agentCardFill,
         borderRadius: BorderRadius.circular(rSmall),
-        border: Border.all(color: tc.border.withValues(alpha: 0.5)),
+        border: Border.all(color: tc.agentCardBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

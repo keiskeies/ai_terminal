@@ -78,7 +78,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
                 ),
               ],
             ),
-            Divider(color: tc.border, height: 16),
+            Divider(color: tc.hairline, height: 16),
             Expanded(
               child: _sessions.isEmpty
                   ? Center(child: Text(l10n.sessionNoSessions, style: TextStyle(color: tc.textMuted, fontSize: fBody)))
@@ -107,7 +107,7 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
         color: isActive ? tc.brand.withValues(alpha: 0.08) : Colors.transparent,
         borderRadius: BorderRadius.circular(rSmall),
         border: Border.all(
-          color: isActive ? tc.brand.withValues(alpha: 0.3) : tc.border.withValues(alpha: 0.3),
+          color: isActive ? tc.brand.withValues(alpha: 0.3) : tc.border,
         ),
       ),
       child: InkWell(

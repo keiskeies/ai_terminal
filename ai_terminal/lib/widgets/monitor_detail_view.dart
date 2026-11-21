@@ -158,7 +158,7 @@ Widget diskTableRow(
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 3),
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: tc.border.withValues(alpha: 0.3), width: 0.5)),
+        border: Border(bottom: BorderSide(color: tc.hairline)),
       ),
       child: headerRow,
     );
@@ -405,7 +405,7 @@ class _MonitorDetailDialogState extends State<_MonitorDetailDialog> {
               ],
             ),
             const SizedBox(height: 8),
-            Divider(height: 1, color: tc.border.withValues(alpha: 0.4)),
+            Divider(height: 1, color: tc.hairline),
             const SizedBox(height: 10),
             if (snap == null || snap.error != null)
               Expanded(

@@ -190,7 +190,7 @@ class AgentCommandBlock extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: headerBg,
                     border: Border(
-                        bottom: BorderSide(color: tc.border, width: 0.5)),
+                        bottom: BorderSide(color: tc.hairline)),
                   ),
                   child: Row(
                     children: [

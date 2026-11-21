@@ -160,7 +160,6 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
           borderRadius: BorderRadius.circular(rFull),
           border: Border.all(
             color: selected ? tc.brand.withValues(alpha: 0.5) : tc.border,
-            width: 0.5,
           ),
         ),
         child: Text(
@@ -245,7 +244,7 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(rFull),
-                    border: Border.all(color: tc.border, width: 0.5),
+                    border: Border.all(color: tc.border),
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<String?>(
@@ -285,7 +284,6 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                         color: _currentTaskOnly
                             ? tc.brand.withValues(alpha: 0.5)
                             : tc.border,
-                        width: 0.5,
                       ),
                     ),
                     child: Row(
@@ -309,7 +307,7 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                 ),
               ],
             ),
-            Divider(color: tc.border, height: 16),
+            Divider(color: tc.hairline, height: 16),
             Expanded(
               child: Stack(
                 children: [

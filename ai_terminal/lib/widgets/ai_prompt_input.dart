@@ -612,7 +612,7 @@ class _AIPromptInputState extends State<AIPromptInput> {
           border: Border.all(
             color: widget.enabled
                 ? borderColor
-                : tc.border.withValues(alpha: 0.5),
+                : tc.hairline,
             width: 1,
           ),
           // 设计稿 .ai-compose:focus-within 是「1px 品牌色边框 + 0 0 0 1px 光晕」，

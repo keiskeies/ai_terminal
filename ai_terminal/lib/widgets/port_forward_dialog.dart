@@ -128,7 +128,7 @@ class _PortForwardDialogState extends State<PortForwardDialog> {
                       shrinkWrap: true,
                       itemCount: rules.length,
                       separatorBuilder: (_, __) =>
-                          Divider(height: 1, color: tc.border),
+                          Divider(height: 1, color: tc.hairline),
                       itemBuilder: (context, i) {
                         final rule = rules[i];
                         return ListTile(
@@ -169,7 +169,7 @@ class _PortForwardDialogState extends State<PortForwardDialog> {
                 ),
               ),
               const SizedBox(height: 8),
-              Divider(height: 1, color: tc.border),
+              Divider(height: 1, color: tc.hairline),
               const SizedBox(height: 12),
               SegmentedButton<ForwardDirection>(
                 segments: [
