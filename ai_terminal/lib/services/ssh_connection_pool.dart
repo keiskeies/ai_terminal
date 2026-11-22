@@ -87,14 +87,21 @@ class SSHConnectionPool {
   }) async {
     final service = serviceFactoryForTesting?.call(config) ?? SSHService(config);
     try {
-      await service.connect(
+      // 总超时必须大于单次建连超时（跳板机要串两段），否则用户把
+      // 「连接超时」调到 60 s 也会被这里 30 s 先掐断。
+      await service
+          .connect(
         password: password,
         privateKeyContent: privateKeyContent,
         passphrase: passphrase,
         jumpHostConfig: jumpHostConfig,
         jumpPassword: jumpPassword,
         jumpPrivateKeyContent: jumpPrivateKeyContent,
-      ).timeout(const Duration(seconds: 30));
+      )
+          .timeout(overallConnectTimeoutFor(
+        config,
+        jumpHostConfig: jumpHostConfig,
+      ));
     } catch (e) {
       // N4: 异常时清理 service，避免连接泄漏
       service.dispose();
@@ -103,6 +110,21 @@ class SSHConnectionPool {
 
     _pool[hostId] = _PoolEntry(service: service);
     return service;
+  }
+
+  /// 池侧整体建连超时：必须覆盖每一段的建连超时（跳板机串两段），
+  /// 否则用户把「连接超时」调大反而会被池里的固定值先掐断。
+  /// 跳板机段的超时按 [jumpHostConfig] 自己算，不按主机配置猜：
+  /// 调用方合成的跳板机 HostConfig 不带 timeout，两段并不相等。
+  static Duration overallConnectTimeoutFor(
+    HostConfig config, {
+    HostConfig? jumpHostConfig,
+  }) {
+    final legs = SSHService.connectTimeoutFor(config) +
+        (jumpHostConfig == null
+            ? Duration.zero
+            : SSHService.connectTimeoutFor(jumpHostConfig));
+    return legs + const Duration(seconds: 15);
   }
 
   /// 释放连接

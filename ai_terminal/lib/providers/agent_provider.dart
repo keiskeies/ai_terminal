@@ -957,6 +957,15 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
   }
 
+  /// 连接自愈成功后通知对应 scope 的引擎：放宽连续失败预算，并登记一条
+  /// "新会话状态已丢失"提示。由 TerminalNotifier 在重连收尾时调用。
+  ///
+  /// 按 tabId 定位引擎而不是用活跃引擎——后台 tab 重连时活跃 tab
+  /// 可能是另一台机器（AGENTS.md R3）。
+  void noteConnectionRestored(String tabId) {
+    _registry.getEngine(tabId)?.noteConnectionRestored();
+  }
+
   /// 指定 tab 是否正在执行 Agent 任务。
   /// 关闭后台 tab 时不能只看活跃 tab 的 state，否则会静默取消另一个 tab 的任务。
   bool isRunningFor(String tabId) {

@@ -260,23 +260,26 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
 
   bool _isOpen(String tabId) => state.tabs.any((t) => t.id == tabId);
 
-  /// 断线后按 1s/2s/4s 退避自动重连（最多 3 次）。
+  /// 断线后按退避自动重连（见 ReconnectPolicy）。
   /// 调度权归 notifier：页面销毁后仍要完成自愈（A2）。
+  ///
+  /// 任务运行中**同样要重连**：这里重连不会取消任务，只是把 executor 换成
+  /// 新的连接，引擎下一步会自动取用（AgentEngine.setExecutor 自愈通道）。
+  /// 早先的 `isRunningFor` 拦截会让自愈链彻底失效——掉线事件的首次触发只有
+  /// onDisconnected 一个入口，拒掉就没有下一次，半开连接上任务只能干等到超时。
   void scheduleAutoReconnect(String tabId) {
     final tab = _findTab(tabId);
     if (tab == null || tab.isLocal || tab.status != TabStatus.lost) return;
     if (_reconnectTimers.containsKey(tabId)) return; // 已有调度，避免重复
-    if (_ref.read(agentProvider.notifier).isRunningFor(tabId)) return;
     final attempts = _reconnectAttempts[tabId] ?? 0;
     if (!ReconnectPolicy.shouldRetry(attempts)) return;
 
     _reconnectTimers[tabId] =
         Timer(ReconnectPolicy.delayForAttempt(attempts), () async {
       _reconnectTimers.remove(tabId);
-      // 等待期间用户可能已手动重连、关 tab，或启动了任务
+      // 等待期间用户可能已手动重连或关 tab
       final current = _findTab(tabId);
       if (current == null || current.status != TabStatus.lost) return;
-      if (_ref.read(agentProvider.notifier).isRunningFor(tabId)) return;
       // 定时器已到点即消耗一次尝试预算，后续即使找不到主机配置也不再
       // 无限重试（配置缺失属于用户侧问题，交给手动重连处理）。
       _reconnectAttempts[tabId] = attempts + 1;
@@ -307,14 +310,17 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
   @visibleForTesting
   int reconnectAttemptsFor(String tabId) => _reconnectAttempts[tabId] ?? 0;
 
-  /// 重连成功后的统一收尾：清退避、重绑 executor、通知 UI。
+  /// 重连成功后的统一收尾：清退避、重绑 executor、通知 UI 与引擎。
   /// 业务绑定放在 notifier 内，页面不在时 AI 也不会拿着旧 executor。
   void _finishReconnect(TerminalTab tab) {
     cancelAutoReconnect(tab.id);
     final service = tab.service ?? tab.localService;
     if (service != null) {
-      _ref.read(agentProvider.notifier).setExecutor(service,
-          hostId: tab.hostId, tabId: tab.id);
+      final agent = _ref.read(agentProvider.notifier);
+      agent.setExecutor(service, hostId: tab.hostId, tabId: tab.id);
+      // 引擎侧：放宽连续失败预算 + 登记"新会话状态已丢"提示。
+      // 必须在 setExecutor 之后——它会把新 executor 的存活状态告知引擎。
+      agent.noteConnectionRestored(tab.id);
     }
     if (!_reconnectedTabIds.isClosed) _reconnectedTabIds.add(tab.id);
   }

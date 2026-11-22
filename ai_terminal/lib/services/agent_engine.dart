@@ -356,9 +356,22 @@ class AgentEngine {
 
   /// 连续连接失败计数（防止 AI 在 SSH 断开后反复尝试命令空转）
   /// 每次命令因"连接已断开"失败时递增，成功执行命令时重置
-  /// 达到 _maxConnFailRetries 时暂停任务并提示用户重连
+  /// 达到 [_connFailBudget] 时暂停任务并提示用户重连
   int _consecutiveConnFailures = 0;
   static const int _maxConnFailRetries = 3;
+
+  /// 本轮允许的连续连接失败次数。默认 [_maxConnFailRetries]；
+  /// 任务途中连接自愈成功一次后翻倍（见 [noteConnectionRestored]）——
+  /// 自动重连已能在后台跑完 1+2+4+8+16+32s 的退避，3 次门限会在重连
+  /// 还没到点前就把任务判死。没有发生过重连时维持原门限，不放宽纯离线场景。
+  int _connFailBudget = _maxConnFailRetries;
+
+  /// 重连成功后待注入的一次性提示：新会话的工作目录/环境变量/sudo 态全丢，
+  /// 直接重跑上一步非幂等命令会二次生效。置位一次、消费一次。
+  ///
+  /// 故意不在 _resetTransientState 里清：任务因断线终止后，危险恰恰落在
+  /// 用户接着发的下一条任务的第一条命令上——那条命令最容易被当成"重跑上一步"。
+  bool _needsStateNote = false;
 
   /// _accumulatedMessage 最大字符数（防止长任务内存无界增长）
   static const int _maxAccumulatedChars = 20000;
@@ -462,10 +475,56 @@ class AgentEngine {
     if (executor == null) return;
     final old = _currentExecutor;
     _currentExecutor = executor;
+    if (executor.isConnected) _consecutiveConnFailures = 0;
     if (old != executor) {
       agentLogger.info('AgentEngine',
           'executor 已刷新 (old.isConnected=${old?.isConnected}, new.isConnected=${executor.isConnected})');
     }
+  }
+
+  /// 连接自愈（自动/手动重连成功）后由 AgentNotifier 调用。
+  ///
+  /// 做两件事：把连续失败预算翻倍（重连已在后台跑完退避，此时 3 次门限会误杀
+  /// 任务），并登记一条一次性的"新会话状态已丢失"提示。
+  /// 只记标志不做别的事——写对话历史必须发生在 ReAct 循环的代际检查之后，
+  /// 否则旧任务的重连事件会污染新任务历史（AGENTS.md R5）。
+  void noteConnectionRestored() {
+    _connFailBudget = _maxConnFailRetries * 2;
+    _needsStateNote = true;
+    agentLogger.info('AgentEngine', '连接已自愈：连续失败预算放宽至 $_connFailBudget，待注入新会话提示');
+  }
+
+  /// 取走（并清除）重连后的一次性提示。命中时返回提示正文，否则返回 null。
+  String? _takeStateNote() {
+    if (!_needsStateNote) return null;
+    _needsStateNote = false;
+    return '[注意] 这是重连后的新会话：工作目录、环境变量、已导入的 sudo 状态全部丢失。'
+        '不要直接重跑上一步命令——先核验它是否已生效（非幂等命令尤其危险）。';
+  }
+
+  /// 断线后该对 AI 说什么。到预算就要求停手改问用户，否则只引导。
+  String _connFailGuidance() => _consecutiveConnFailures >= _connFailBudget
+      ? '（已连续失败 $_consecutiveConnFailures 次，请立即使用 动作: ask 询问用户是否已重连，'
+          '不要再尝试执行命令）'
+      : '（请使用 动作: ask 询问用户是否已重连，或等待用户重连后继续）';
+
+  /// 执行器自己判定断线（等待期看门狗、开工前预检）也要计入连续失败预算。
+  ///
+  /// 预算原本只在"执行前发现 isConnected==false"这条路上累加，而看门狗救的正是
+  /// "isConnected 还写着 true 但链路已死"这一档——那条路上的断线原本不计数，
+  /// 结果最常见的断线要跑到 maxSteps 才停，指引比预算晚整整一条命令。
+  /// 返回带指引的诊断文本（无断线时原样返回）。
+  String? _withConnGuidance(CommandResult result,
+      {required bool countDisconnect}) {
+    final reason = result.failureReason;
+    if (result.failureKind != CommandFailureKind.disconnected) return reason;
+    if (!countDisconnect) return reason;
+    _consecutiveConnFailures++;
+    agentLogger.warn('AgentEngine',
+        '执行器判定断线 (连续 $_consecutiveConnFailures/$_connFailBudget)');
+    return reason == null || reason.isEmpty
+        ? _connFailGuidance()
+        : '$reason${_connFailGuidance()}';
   }
 
   /// AI 流式响应超时：连续无数据超过该时长即判定超时（Agent 设置页可配置）
@@ -736,6 +795,15 @@ class AgentEngine {
   }
 
   @visibleForTesting
+  int get connFailBudgetForTesting => _connFailBudget;
+
+  @visibleForTesting
+  int get consecutiveConnFailuresForTesting => _consecutiveConnFailures;
+
+  @visibleForTesting
+  bool get hasPendingStateNoteForTesting => _needsStateNote;
+
+  @visibleForTesting
   void seedHistoryForTesting(List<ChatMessage> messages) {
     _conversationHistory
       ..clear()
@@ -875,6 +943,7 @@ class AgentEngine {
     _userForbadeCommands = false;
     _planFinishRetryCount = 0; // O4/WP6: 计划 finish 门控计数新任务归零（R5）
     _consecutiveConnFailures = 0;
+    _connFailBudget = _maxConnFailRetries; // 放宽只针对"本次任务途中重连过"，新任务归零
     _currentExecutor = null;
     _lastCommandEventId = '';
     _currentTask = null;
@@ -1595,6 +1664,15 @@ class AgentEngine {
         executor = refreshed;
         agentLogger.info('ReAct',
             '检测到 executor 已刷新，使用新引用 (isConnected=${executor.isConnected})');
+      }
+
+      // 重连后的一次性状态提示：放在代际检查之后、_callAI 之前，同步写入，
+      // 旧任务的重连事件不会漏进新任务历史（R1/R5）。
+      final stateNote = _takeStateNote();
+      if (stateNote != null) {
+        _conversationHistory
+            .add(ChatMessage.create(role: 'user', content: stateNote));
+        _trimMessages(_conversationHistory);
       }
 
       // O4/WP6: 把计划进度快照幂等注入 system 消息（每轮替换整段，不累积）。
@@ -3149,7 +3227,7 @@ class AgentEngine {
         agentLogger.info('Rollback', '检测到修改类命令，执行预快照: ${modifyTarget.type}');
         try {
           final snapshotResult = await _executeCommand(executor, snapshotCmd,
-              myGeneration: myGeneration);
+              myGeneration: myGeneration, countDisconnect: false);
           // R1: 快照执行后检查代际，避免旧任务快照污染新任务
           if (myGeneration != null && myGeneration != _currentTaskGeneration) {
             onSuccess(false, 'generation_invalid_after_snapshot', 0);
@@ -4235,8 +4313,11 @@ class AgentEngine {
 
   /// 执行单条命令（支持 SSH 和本地 PTY）
   /// [myGeneration] 任务代际，用于 await 后识别"取消 + 立即新任务"竞态
+  /// [countDisconnect] 断线是否计入连续失败预算。回滚预快照走同一条执行路径，
+  /// 但它不产生 AI 可见的观测——若也计数，一条断链的主命令会记 2 次，
+  /// 门限比宣称的提前一条命中。
   Future<AgentResult> _executeCommand(CommandExecutor executor, String command,
-      {int? myGeneration}) async {
+      {int? myGeneration, bool countDisconnect = true}) async {
     final stopwatch = Stopwatch()..start();
 
     // R1: 取消可能落在安全检查/快照与真正创建 _commandCancelToken 之间。
@@ -4273,15 +4354,14 @@ class AgentEngine {
         agentLogger.info('AgentEngine', '检测到旧 executor 断开，自愈切换到新 executor');
         executor = refreshed;
       } else {
-        _consecutiveConnFailures++;
-        agentLogger.warn('AgentEngine',
-            '连接已断开 (连续 $_consecutiveConnFailures/$_maxConnFailRetries)');
+        if (countDisconnect) {
+          _consecutiveConnFailures++;
+          agentLogger.warn('AgentEngine',
+              '连接已断开 (连续 $_consecutiveConnFailures/$_connFailBudget)');
+        }
         // 连续多次断开 → 返回明确错误引导 AI 用 ask 动作等待用户重连
         final isSSH = executor is SSHService;
-        final hint = _consecutiveConnFailures >= _maxConnFailRetries
-            ? '（已连续失败 $_consecutiveConnFailures 次，请立即使用 动作: ask 询问用户是否已重连，'
-                '不要再尝试执行命令）'
-            : '（请使用 动作: ask 询问用户是否已重连，或等待用户重连后继续）';
+        final hint = countDisconnect ? _connFailGuidance() : '';
         return AgentResult(
           success: false,
           error: isSSH ? 'SSH 连接已断开，请重连后重试$hint' : '本地终端已退出，请重新打开终端$hint',
@@ -4289,8 +4369,9 @@ class AgentEngine {
           failureKind: CommandFailureKind.disconnected.name,
         );
       }
-    } else {
-      // 连接正常：重置连续失败计数
+    } else if (countDisconnect) {
+      // 连接正常：重置连续失败计数。快照命令不参与，交给它自己的主命令记账，
+      // 否则"主命令断线 + 下一条前快照正常"会把计数抹掉，门限永远打不满。
       _consecutiveConnFailures = 0;
     }
 
@@ -4361,7 +4442,8 @@ class AgentEngine {
         failureKind: result.failureKind == CommandFailureKind.none
             ? null
             : result.failureKind.name,
-        failureReason: result.failureReason,
+        failureReason: _withConnGuidance(result,
+            countDisconnect: countDisconnect),
       );
     } catch (e) {
       stopwatch.stop();

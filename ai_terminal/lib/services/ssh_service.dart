@@ -11,6 +11,7 @@ import '../utils/tail_text_buffer.dart';
 import '../utils/terminal_charset.dart';
 import 'command_executor.dart';
 import 'session_log_service.dart';
+import 'ssh_keepalive_socket.dart';
 import '../core/l10n_holder.dart';
 
 /// SSH 连接状态
@@ -89,6 +90,40 @@ class SSHService implements CommandExecutor {
   /// 暴露内部 SSHClient（只读），供 SFTP 等子工具复用连接
   /// 调用方不得 close 此 client，生命周期由 SSHService 管理
   SSHClient? get client => _client;
+
+  /// 建连超时。此前 `config.timeout` 只存不用（建连恒 15 s），
+  /// 用户的「连接超时」设置完全无效；范围与 UI 滑杆一致（10–120 s）。
+  static Duration connectTimeoutFor(HostConfig cfg) =>
+      Duration(seconds: cfg.timeout.clamp(10, 120).toInt());
+
+  Duration get _connectTimeout => connectTimeoutFor(config);
+
+  /// 连接建立后写进 PTY 的初始化串。
+  ///
+  /// 关分页器：PTY 下的 journalctl/systemctl/git/man 默认调 less，命令停在
+  /// `(END)` 等按键，退出码 marker 永远不会执行。
+  ///
+  /// TMOUT 是等保基线里常见的空闲自动登出（常见 300 s，且常设成 readonly）。
+  /// 一旦生效，Agent 等待期内 shell 自己退出，marker 永远不出现，
+  /// 用户看到的是"莫名断线"。先置 0 再 unset：只有一种生效即可。
+  /// 两段都要能真正抑制报错：裸赋值 `TMOUT=0 2>/dev/null` 的那个
+  /// `2>/dev/null` 对 "readonly variable" 这条 shell 级报错无效（bash/dash 实测），
+  /// 报错会照常打在用户终端上；`export TMOUT=0 2>/dev/null` 才咽得掉。
+  /// 仅 POSIX：cmd/PowerShell 没有这套语法（R6 按 shell 分支）。
+  /// 已知遗留：alias/LS_COLORS 两段仍是 POSIX 专属，cmd 远端会回显报错；
+  /// 修改需要在真实 Windows SSH 目标上验证，不在本次范围内。
+  @visibleForTesting
+  static String initCommandsFor({required bool remoteIsWindowsCmd}) =>
+      'export PAGER=cat SYSTEMD_PAGER=cat GIT_PAGER=cat MANPAGER=cat;'
+      'export LS_COLORS="rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32";'
+      'alias ls="ls --color=auto" 2>/dev/null;'
+      'alias ll="ls -la --color=auto" 2>/dev/null;'
+      'alias grep="grep --color=auto" 2>/dev/null;'
+      '${remoteIsWindowsCmd ? '' : 'export TMOUT=0 2>/dev/null;unset TMOUT 2>/dev/null;'}'
+      // 用 ANSI 清屏，避免最小化容器没有 clear 命令时打印
+      // "clear: command not found" 并把初始化命令留在屏幕上
+      'printf \'\\033[2J\\033[H\'\n';
+
   SSHConnectionState get state => _isConnected
       ? SSHConnectionState.connected
       : SSHConnectionState.disconnected;
@@ -113,11 +148,11 @@ class SSHService implements CommandExecutor {
         outputController.add(L10n.str.ut_2574cd27d5(jumpHostConfig.host) +
             '\n');
 
-        // 1. 先连接跳板机（加超时）
-        _jumpSocket = await SSHSocket.connect(
+        // 1. 先连接跳板机（用跳板机自己的超时配置）
+        _jumpSocket = await KeepaliveSSHSocket.connect(
           jumpHostConfig.host,
           jumpHostConfig.port,
-          timeout: const Duration(seconds: 15),
+          timeout: connectTimeoutFor(jumpHostConfig),
         );
         _jumpClient = SSHClient(
           _jumpSocket!,
@@ -137,11 +172,11 @@ class SSHService implements CommandExecutor {
 
         _socket = forwardSocket;
       } else {
-        // 直连（加超时）
-        _socket = await SSHSocket.connect(
+        // 直连（加超时 + TCP keepalive）
+        _socket = await KeepaliveSSHSocket.connect(
           config.host,
           config.port,
-          timeout: const Duration(seconds: 15),
+          timeout: _connectTimeout,
         );
       }
 
@@ -245,17 +280,11 @@ class SSHService implements CommandExecutor {
       _isConnected = true;
 
       await Future.delayed(const Duration(milliseconds: 300));
-      // 关闭分页器：PTY 下的 journalctl/systemctl/git/man 默认调 less，
-      // 命令停在 (END) 等按键，退出码 marker 永远不会执行。
       _session!.write(Uint8List.fromList(utf8.encode(
-          'export PAGER=cat SYSTEMD_PAGER=cat GIT_PAGER=cat MANPAGER=cat;'
-          'export LS_COLORS="rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32";'
-          'alias ls="ls --color=auto" 2>/dev/null;'
-          'alias ll="ls -la --color=auto" 2>/dev/null;'
-          'alias grep="grep --color=auto" 2>/dev/null;'
-          // 用 ANSI 清屏，避免最小化容器没有 clear 命令时打印
-          // "clear: command not found" 并把初始化命令留在屏幕上
-          'printf \'\\033[2J\\033[H\'\n')));
+          initCommandsFor(remoteIsWindowsCmd: _remoteIsWindowsCmd))));
+
+      // 刚建好的连接即为"刚刚确认活着"，第一条命令不必再付一次探测 RTT。
+      _lastConfirmedAliveAt = DateTime.now();
 
       outputController.add('\r\n✅ ${UiText.t('连接成功', 'Connected')}\r\n');
       outputController.add('OS: $_osInfo\r\n');
@@ -301,21 +330,35 @@ class SSHService implements CommandExecutor {
       );
     }
 
-    // 后台→前台假连接检测：app 从后台恢复后 SSH socket 可能已死但 _isConnected 仍为 true
-    // 通过发送空命令（echo）检测连接是否真的活着
-    try {
-      _writeTextQuietly('\n');
-    } catch (e) {
-      _isConnected = false;
-      return CommandResult(
-        stdout: '',
-        stderr: 'SSH 连接已断开（后台恢复检测失败），请重新连接',
-        exitCode: -1,
-        duration: Duration.zero,
-        failureKind: CommandFailureKind.disconnected,
-        failureReason: 'SSH 连接已断开: $e',
-      );
+    // 后台→前台假连接检测 / 空闲后的活性复检。
+    // 注意：`_writeTextQuietly` 的 catch 在这里是死代码——SSHSession.write 是
+    // void（fire-and-forget），socket 已死时写入不会抛，这个 try 永远进不去。
+    // 真正能证伪"假连接"的只有传输层 ping，见 _probeLiveness。
+    // 命令连发（30 s 内刚确认过）时跳过，避免每条命令多付一个 RTT。
+    final lastAlive = _lastConfirmedAliveAt;
+    final staleSince =
+        lastAlive == null ? null : DateTime.now().difference(lastAlive);
+    final needsRevalidate = _client != null || livenessProbeForTesting != null;
+    if (needsRevalidate &&
+        (staleSince == null || staleSince >= _idleRevalidateGap)) {
+      if (!await _probeLiveness()) {
+        _isConnected = false;
+        _handleDrop();
+        return CommandResult(
+          stdout: '',
+          stderr: 'SSH 连接已断开（活性探测无响应），请重新连接',
+          exitCode: -1,
+          duration: Duration.zero,
+          failureKind: CommandFailureKind.disconnected,
+          failureReason: 'SSH 连接已断开：主动探测无响应（连接已空闲 '
+              '${staleSince?.inSeconds ?? 0}s 以上）',
+        );
+      }
+      _lastConfirmedAliveAt = DateTime.now();
     }
+    // 保留原有行为：向 PTY 敲一次换行，让后台恢复后停在半途的交互提示
+    // （分页器 / PS2 续行）露出提示符。它证明不了连接活着，只是刷一下屏。
+    _writeTextQuietly('\n');
 
     final stopwatch = Stopwatch()..start();
     _markerSeq++;
@@ -351,6 +394,16 @@ class SSHService implements CommandExecutor {
     var pagerQuitSent = false;
     var pagerDetections = 0;
     var lastEvaluateAtMs = -evaluateIntervalMs;
+    // 等待期活性看门狗：最后一次收到输出的时刻 + 连续探测失败次数。
+    // 半开连接上没有任何事件会告诉我们链路已死（write 是 void、对端不发 FIN），
+    // 只有这里能主动提问；不提问就只能干等满命令超时（60 s–10 min）。
+    var lastOutputAtMs = 0;
+    var probeFailures = 0;
+    var probeInFlight = false;
+    // 看门狗判定断连的显式标记：kind 不靠 reason 文案反推（R8 忌裸子串匹配）
+    var droppedByProbe = false;
+    final silenceLimitMs =
+        (silenceLimitForTesting ?? silenceLimitFor(timeout)).inMilliseconds;
     // sudo 提示应答器：命中提示时把密码写进 stdin，而不是让检测器中断命令
     final sudoResponder = SudoPromptResponder();
     // 确认类提示应答器：命中提示时桥接给上层（UI/自动应答），而不是中断命令
@@ -442,6 +495,7 @@ class SSHService implements CommandExecutor {
     sub = outputController.stream.listen(
       (data) {
         if (doneCompleter.isCompleted) return; // marker 已出现，停止写入避免残留污染
+        lastOutputAtMs = stopwatch.elapsedMilliseconds;
         buffer.write(data);
         detectBuffer.write(data);
         // 增量 marker 检测：只拼接上一块尾部，不做全缓冲扫描
@@ -497,12 +551,45 @@ class SSHService implements CommandExecutor {
 
     // 命令停在密码提示上时不再有任何输出，只靠流回调就永远等不到判定。
     // 定时补一次求值，让"卡在交互提示"在秒级被识别，而不是干满超时。
+    // 同一个定时器兼任活性看门狗：静默超过阈值就主动探一次链路，
+    // 连续 _probeFailuresToDrop 次无响应即按断连收尾——否则半开连接上
+    // 只能干等满 timeout（最长 10 分钟）才知道连接早死了。
+    // 只有真拿得到 SSHClient（或测试注入的探针）才有探测能力；
+    // 没有 client 时探测无从进行，绝不能把"探测不了"当成"已断连"。
+    final canProbe = _client != null || livenessProbeForTesting != null;
     late final Timer recheck;
     recheck = Timer.periodic(
       const Duration(milliseconds: 400),
-      (_) {
+      (_) async {
         evaluate(force: true);
-        if (doneCompleter.isCompleted) recheck.cancel();
+        if (doneCompleter.isCompleted) {
+          recheck.cancel();
+          return;
+        }
+        if (!canProbe || probeInFlight) return;
+        if (stopwatch.elapsedMilliseconds - lastOutputAtMs < silenceLimitMs) {
+          return;
+        }
+        probeInFlight = true;
+        final alive = await _probeLiveness();
+        probeInFlight = false;
+        if (doneCompleter.isCompleted) return; // 探测期间已收尾（R1）
+        if (alive) {
+          probeFailures = 0;
+          lastOutputAtMs = stopwatch.elapsedMilliseconds;
+          _lastConfirmedAliveAt = DateTime.now();
+          return;
+        }
+        probeFailures++;
+        if (probeFailures < _probeFailuresToDrop) return;
+        droppedByProbe = true;
+        abnormalReason.add('连接静默 ${silenceLimitMs ~/ 1000}s 以上且主动探测无响应'
+            '（判定为断连）');
+        // _handleDrop 会 complete 全部等待者并只通知一次 onDisconnected，
+        // 这里只补标记，等待侧随即返回 disconnected。
+        _isConnected = false;
+        _handleDrop();
+        recheck.cancel();
       },
     );
 
@@ -558,6 +645,9 @@ class SSHService implements CommandExecutor {
     _pendingDoneCompleters.remove(doneCompleter);
     SecretMasker.unregister(sudoPassword);
     stopwatch.stop();
+    // marker 正常出现 = 链路此刻确实可用，记为"最近确认活着"，
+    // 后续命令在 _idleRevalidateGap 内不再重复付费探测。
+    _lastConfirmedAliveAt = DateTime.now();
 
     var rawOutput = buffer.toString();
 
@@ -591,7 +681,9 @@ class SSHService implements CommandExecutor {
                   : '命令未完成'));
       // 推断 failureKind
       CommandFailureKind kind = CommandFailureKind.unknown;
-      if (reason.contains('syntax error') || reason.contains('PS2')) {
+      if (droppedByProbe) {
+        kind = CommandFailureKind.disconnected;
+      } else if (reason.contains('syntax error') || reason.contains('PS2')) {
         kind = CommandFailureKind.syntaxError;
       } else if (reason.contains('交互式') || reason.contains('password')) {
         kind = CommandFailureKind.interactivePrompt;
@@ -1113,6 +1205,78 @@ class SSHService implements CommandExecutor {
     _writeText(text).catchError((Object e) {
       debugPrint('[SSHService] 会话写入失败: $e');
     });
+  }
+
+  /// 活性探测钩子，供测试替换成可控的假实现。
+  /// 默认走 SSH 传输层 `ping()`（一个 RTT，不进 PTY、不打扰正在跑的命令）。
+  @visibleForTesting
+  Future<void> Function()? livenessProbeForTesting;
+
+  /// 覆盖静默判定阈值，让看门狗行为能在测试里秒级验证。
+  @visibleForTesting
+  Duration? silenceLimitForTesting;
+
+  /// 等待期静默多久后主动探一次活。
+  ///
+  /// 太短会在正常长命令上白发探测，太长等于没有：按命令超时收在 10–30 s，
+  /// 保证短命令也能在被判"超时"之前先被判定"断线"。
+  @visibleForTesting
+  static Duration silenceLimitFor(Duration timeout) {
+    final quarter = timeout ~/ 4;
+    if (quarter < const Duration(seconds: 10)) return const Duration(seconds: 10);
+    if (quarter > const Duration(seconds: 30)) return const Duration(seconds: 30);
+    return quarter;
+  }
+
+  /// 单次探测超时。链路需要两个 RTT（请求+应答），给弱网留余量，
+  /// 但必须远小于任何命令超时——探测本身不能变成新的等待源。
+  static const Duration _probeTimeout = Duration(seconds: 4);
+
+  /// 连续几次探测无响应才判定断连。单次超时可能是抖动/高 RTT，
+  /// 两次才能把"慢"和"死"分开（误判的代价是打断一条正在跑的好命令）。
+  static const int _probeFailuresToDrop = 2;
+
+  /// 空闲超过这个再动命令时先验一次活。
+  /// 命令连发时不付费（零额外 RTT），只在"停了一阵"后补一次，
+  /// 覆盖 app 后台恢复、用户停顿、服务器空闲回收这类"两条命令之间死掉"的场景。
+  static const Duration _idleRevalidateGap = Duration(seconds: 30);
+
+  /// 最近一次确认链路可用的时刻（建连成功 / 命令收尾 / 探测成功）。
+  /// null = 本次连接还没确认过，下一条命令开工前先验一次活。
+  DateTime? _lastConfirmedAliveAt;
+
+  @visibleForTesting
+  void confirmAliveForTesting() => _lastConfirmedAliveAt = DateTime.now();
+
+  @visibleForTesting
+  void expireAliveConfirmationForTesting() =>
+      _lastConfirmedAliveAt = DateTime.now().subtract(const Duration(hours: 1));
+
+  /// 主动探一次活。
+  ///
+  /// 返回 `true` 表示"链路可用**或无从探测**"——探测失败必须是肯定证据，
+  /// 不能拿"没有 client"当断连证据，否则会凭空打断好连接。
+  Future<bool> _probeLiveness() async {
+    final probe = livenessProbeForTesting;
+    if (probe != null) {
+      try {
+        await probe().timeout(_probeTimeout);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+    final client = _client;
+    if (client == null) return true;
+    try {
+      // SSH 传输层 global request：不进 PTY、不打扰正在运行的命令、无输出。
+      // 必须自带超时——dartssh2 的 ping() 等应答没有超时，半开连接上会永久挂住，
+      // 且它内部 _isPinging 一旦卡住就再也不发第二次 keepalive。
+      await client.ping().timeout(_probeTimeout);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   void _writeUserInput(String data) {
