@@ -599,6 +599,7 @@ class ConversationsDao {
 
   static Map<String, dynamic> _toRow(Conversation c) => {
     'id': c.id, 'hostId': c.hostId, 'title': c.title,
+    'titleSource': c.titleSource,
     'messages': jsonEncode(c.messages.map(_msgToJson).toList()),
     'agentLogs': c.rawAgentLogsJson ??
         jsonEncode(c.agentLogs.map(_logToJson).toList()),
@@ -615,6 +616,9 @@ class ConversationsDao {
       ..id = r['id'] as String
       ..hostId = r['hostId'] as String
       ..title = r['title'] as String
+      ..titleSource = r['titleSource'] as String? ??
+          // 旧数据库行没有该列：存量标题一律视为「不可被 AI 自动改写」
+          Conversation.titleSourceUser
       ..messages = (jsonDecode(r['messages'] as String) as List)
           .map((e) => _msgFromJson(e as Map<String, dynamic>)).toList()
       ..setAgentLogsJson(r['agentLogs'] as String?)

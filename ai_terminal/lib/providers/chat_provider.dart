@@ -5,6 +5,7 @@ import '../models/ai_model_config.dart';
 import '../services/ai_service.dart';
 import '../services/ai_model_selection_service.dart';
 import '../services/conversation_service.dart';
+import '../services/conversation_title_service.dart';
 import '../services/daos.dart';
 import '../services/agent_logger.dart';
 import '../utils/ansi_stripper.dart';
@@ -91,6 +92,7 @@ class ChatNotifier extends StateNotifier<ChatState> {
   Timer? _throttleTimer;
 
   final ConversationService _convService = ConversationService();
+  final ConversationTitleService _titleService = ConversationTitleService();
 
   ChatNotifier() : super(ChatState());
 
@@ -169,8 +171,13 @@ class ChatNotifier extends StateNotifier<ChatState> {
     );
 
     // 持久化用户消息
+    String? persistedConvId;
+    var isFirstUserMessage = false;
     try {
       final conv = await _convService.appendMessage(effectiveHostId, role: 'user', content: content);
+      persistedConvId = conv.id;
+      // 只在「这是该会话首条用户消息」时，让本轮 AI 回复顺带起个会话标题
+      isFirstUserMessage = conv.messages.where((m) => m.isUser).length == 1;
       if (state.conversationId != conv.id) {
         state = state.copyWith(conversationId: conv.id);
       }
@@ -238,6 +245,20 @@ class ChatNotifier extends StateNotifier<ChatState> {
           );
           // 持久化 assistant 响应
           _persistAssistant(effectiveHostId, fullResponse);
+          // 首轮回复结束：用 AI 给会话起个有信息量的标题（幂等，失败静默）
+          if (isFirstUserMessage && persistedConvId != null) {
+            _titleService
+                .generateAndApplyTexts(
+                  persistedConvId,
+                  model,
+                  userText: content,
+                  assistantText: fullResponse,
+                )
+                .catchError((Object e) {
+              agentLogger.warn('ChatNotifier', 'AI 生成会话标题失败: $e');
+              return false;
+            });
+          }
         },
       );
     } catch (e) {

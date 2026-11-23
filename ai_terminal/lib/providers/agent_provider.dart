@@ -16,6 +16,7 @@ import '../services/ai_service.dart';
 import '../services/ai_model_selection_service.dart';
 import '../services/command_executor.dart';
 import '../services/conversation_service.dart';
+import '../services/conversation_title_service.dart';
 import '../core/credentials_store.dart';
 import '../services/daos.dart';
 import '../utils/goal_continuation.dart';
@@ -118,6 +119,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
   Future<bool> Function(String path, String reason)? localDirRequestHandler;
 
   final ConversationService _convService = ConversationService();
+  final ConversationTitleService _titleService = ConversationTitleService();
 
   /// 日志订阅取消函数
   void Function()? _logUnsubscribe;
@@ -812,6 +814,16 @@ class AgentNotifier extends StateNotifier<AgentState> {
         }
         return s.copyWith(chatItems: items);
       });
+      // 首轮结束后用 AI 起个有信息量的标题（幂等：titleSource 非 auto 即跳过）。
+      // R5 白名单门控：只在任务**正常完成**时命名。onCompleted 是所有终态的
+      // 共同收口（取消、步数耗尽、失败都会 flush），而这两类首轮不该命名：
+      // 一是白烧一次 LLM 调用，二是失败/取消首轮的正文可能是 '⚠️ 错误' 或空串
+      // （onError 会把错误文本写进首条 assistant 消息），据其命名只会得到
+      // 无意义标题。Guard 在 flush 之前已同步 writeStatus，
+      // 故此处 engine.currentTask?.status 就是本次任务的终态。
+      if (engine.currentTask?.status == AgentStatus.completed) {
+        _maybeGenerateTitle(scopeId);
+      }
     };
   }
 
@@ -2128,6 +2140,27 @@ class AgentNotifier extends StateNotifier<AgentState> {
         debugPrint('[AgentNotifier] 自动压缩失败: $e');
       });
     }
+  }
+
+  /// 首轮任务结束后为会话生成 AI 标题。
+  ///
+  /// 调用点已用 `status == completed` 白名单门控（R5）：取消/步数耗尽/失败
+  /// 首轮不进这里，避免白烧一次 LLM 与据错误文本命名。
+  /// fire-and-forget，失败静默保留占位标题，不影响任务结果。
+  /// 捕获本 scope 的 conversationId 与模型配置（R3），不用 activeHost 顶替。
+  void _maybeGenerateTitle(String scopeId) {
+    final config = _registry.getModelConfig(scopeId) ?? _modelConfig;
+    if (config == null) return;
+    final convId = _registry.isActive(scopeId)
+        ? state.conversationId
+        : _registry.getState(scopeId)?.conversationId;
+    if (convId == null) return;
+    _titleService
+        .generateAndApply(convId, config)
+        .catchError((Object e) {
+      agentLogger.warn('AgentNotifier', 'AI 生成会话标题失败: $e');
+      return false;
+    });
   }
 
   /// 滚动压缩对话（O7）：调用 AI 把早期消息整体并入会话级 rollingSummary，

@@ -51,6 +51,9 @@ class ConversationService {
       id: _uuid.v4(),
       hostId: hostId,
       title: title ?? _defaultTitle(),
+      titleSource: title != null
+          ? Conversation.titleSourceUser
+          : Conversation.titleSourceAuto,
     );
     ConversationsDao.cacheOnly(conv);
     _drafts[conv.id] = conv;
@@ -67,6 +70,10 @@ class ConversationService {
     }
     return ConversationsDao.getCachedById(conversationId);
   }
+
+  /// 公开的按 id 取会话（含未落盘草稿）。供 AI 命名等旁路特性读取会话，
+  /// 避免它们直接触碰 DAO 而绕过草稿登记与写库串行化。
+  Conversation? lookup(String conversationId) => _lookup(conversationId);
 
   /// 统一写盘入口：未落盘且仍空白的会话不入库
   Future<void> _persist(Conversation conv) async {
@@ -116,11 +123,24 @@ class ConversationService {
     ConversationsDao.setActive(conversationId, hostId); // fire-and-forget 写库 + 同步更新缓存
   }
 
-  /// 重命名会话
+  /// 重命名会话（用户手动）：锁定 titleSource 为 user，后续 AI 不再覆盖
   Future<void> rename(String conversationId, String title) async {
     final conv = _lookup(conversationId);
     if (conv == null) return;
     conv.title = title;
+    conv.titleSource = Conversation.titleSourceUser;
+    await _persist(conv);
+  }
+
+  /// AI 自动命名：仅当会话仍为占位标题（titleSource == auto）时写入，
+  /// 否则（用户改过名 / 已有 AI 标题）直接跳过。不改变 updatedAt，
+  /// 避免历史列表按时间排序时因改名跳动。
+  Future<void> applyAiTitle(String conversationId, String title) async {
+    final conv = _lookup(conversationId);
+    if (conv == null) return;
+    if (conv.titleSource != Conversation.titleSourceAuto) return;
+    conv.title = title;
+    conv.titleSource = Conversation.titleSourceAi;
     await _persist(conv);
   }
 

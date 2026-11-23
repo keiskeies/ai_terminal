@@ -15,7 +15,7 @@ import 'credentials_store.dart';
 /// 升级时通过 onUpgrade 回调做增量迁移。
 class DbInit {
   static Database? _db;
-  static const int _schemaVersion = 9;
+  static const int _schemaVersion = 10;
 
   /// 数据库文件名
   static const String dbFileName = 'app_data.db';
@@ -593,6 +593,7 @@ class DbInit {
         id TEXT PRIMARY KEY,
         hostId TEXT NOT NULL,
         title TEXT NOT NULL,
+        titleSource TEXT NOT NULL DEFAULT 'auto',
         messages TEXT NOT NULL DEFAULT '[]',
         agentLogs TEXT NOT NULL DEFAULT '[]',
         summary TEXT,
@@ -794,6 +795,13 @@ class DbInit {
     if (oldVersion < 9) {
       await db.execute(
         'ALTER TABLE conversations ADD COLUMN rollingSummary TEXT',
+      );
+    }
+    // v10: 会话标题来源（auto/ai/user）。AI 自动命名只对 auto 占位标题生效，
+    //      存量行统一视为 user，避免 AI 覆盖用户早已改过名的旧会话
+    if (oldVersion < 10) {
+      await db.execute(
+        "ALTER TABLE conversations ADD COLUMN titleSource TEXT NOT NULL DEFAULT 'user'",
       );
     }
   }

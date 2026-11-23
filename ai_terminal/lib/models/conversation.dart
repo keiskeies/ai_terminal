@@ -139,19 +139,38 @@ class Conversation {
   static final RegExp _autoTitlePattern =
       RegExp(r'^会话\s+\d{1,2}/\d{1,2}\s+\d{1,2}:\d{2}$');
 
-  static const int autoTitleMaxChars = 20;
+  /// 占位标题（首条用户消息截断）的最大字符数
+  static const int autoTitleMaxChars = 50;
+
+  /// 会话历史列表里标题的展示上限（超过按 rune 截断加省略号）
+  static const int listTitleMaxChars = 60;
+
+  // 标题来源：决定「自动改写」还能否覆盖当前标题。
+  // - auto：日期默认标题或首条消息截断的占位标题，AI 可以改写
+  // - ai：已由 AI 生成，不再自动改写（用户仍可手动重命名）
+  // - user：用户手动命名过（或旧版本数据库的存量行，保守地视为不可覆盖）
+  static const String titleSourceAuto = 'auto';
+  static const String titleSourceAi = 'ai';
+  static const String titleSourceUser = 'user';
+
+  /// 标题来源（见 titleSource* 常量）。旧数据库行读出来为 null 时
+  /// 由 DAO 映射成 titleSourceUser，保证存量会话（含用户改过名的）不被 AI 覆盖。
+  String titleSource = titleSourceAuto;
 
   bool get hasAutoTitle => _autoTitlePattern.hasMatch(title.trim());
 
   /// 还没有写过任何消息或摘要：落盘只会在历史里留下一条空对话
   bool get isBlank => messages.isEmpty && (summary == null || summary!.isEmpty);
 
-  /// 会话列表展示标题：仍是日期默认标题时，回退到首条用户消息前 20 字
+  /// 会话列表展示标题：仍是占位标题（日期默认或首条消息截断）时，
+  /// 回退到首条用户消息的片段
   String get displayTitle {
     final stored = title.trim();
-    if (!hasAutoTitle) return stored.isEmpty ? '会话' : stored;
+    if (titleSource != titleSourceAuto) {
+      return stored.isEmpty ? '会话' : stored;
+    }
     final snippet = _firstUserSnippet;
-    return snippet.isEmpty ? stored : snippet;
+    return snippet.isEmpty ? (stored.isEmpty ? '会话' : stored) : snippet;
   }
 
   String get _firstUserSnippet {
@@ -163,15 +182,31 @@ class Conversation {
     return '';
   }
 
-  /// 首条用户消息到达时，把日期默认标题替换成内容摘要。
-  /// 用户手动改过标题（不再匹配默认格式）时不覆盖。
+  /// 会话历史列表用的展示标题：在 displayTitle 基础上按 [listTitleMaxChars] 截断
+  String get listDisplayTitle => clampToRunes(
+        displayTitle,
+        maxChars: listTitleMaxChars,
+      );
+
+  /// 按 rune 截断并补省略号（避免劈开 emoji）
+  static String clampToRunes(String text, {required int maxChars}) {
+    final runes = text.runes.toList(growable: false);
+    if (runes.length <= maxChars) return text;
+    return '${String.fromCharCodes(runes.take(maxChars))}…';
+  }
+
+  /// 是否允许 AI 自动改写标题：占位标题且用户/ AI 都没定过名
+  bool get canAdoptAiTitle => titleSource == titleSourceAuto;
+
+  /// 首条用户消息到达时，把日期默认标题替换成内容摘要（仍是占位，AI 可继续改写）。
+  /// 用户手动改过标题（titleSource != auto）时不覆盖。
   void adoptTitleFromFirstMessage(String content) {
-    if (!hasAutoTitle) return;
+    if (titleSource != titleSourceAuto) return;
     final snippet = snippetFromUserMessage(content);
     if (snippet.isNotEmpty) title = snippet;
   }
 
-  /// 首行 + 空白折叠 + 最多 20 个字符（按 rune 截断，避免劈开 emoji）
+  /// 首行 + 空白折叠 + 最多 [autoTitleMaxChars] 个字符（按 rune 截断，避免劈开 emoji）
   static String snippetFromUserMessage(String content) {
     final firstLine = content
         .split(RegExp(r'\r?\n'))
@@ -192,6 +227,7 @@ class Conversation {
     required this.title,
     List<ConvMessage>? messages,
     List<ConvAgentLog>? agentLogs,
+    this.titleSource = Conversation.titleSourceAuto,
   })  : messages = messages ?? [],
         summarizedUpToIndex = 0,
         isActive = true,

@@ -121,18 +121,20 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (isActive)
                           Container(
                             width: 6,
                             height: 6,
-                            margin: const EdgeInsets.only(right: 6),
+                            margin: const EdgeInsets.only(right: 6, top: 6),
                             decoration: BoxDecoration(
                               color: tc.brand,
                               shape: BoxShape.circle,
@@ -140,13 +142,14 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
                           ),
                         Expanded(
                           child: Text(
-                            conv.displayTitle,
+                            conv.listDisplayTitle,
                             style: TextStyle(
                               color: isActive ? tc.brand : tc.textMain,
                               fontSize: fBody,
                               fontWeight: FontWeight.w500,
+                              height: 1.3,
                             ),
-                            maxLines: 1,
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -209,6 +212,8 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
   void _showRenameDialog(Conversation conv) {
     final l10n = AppLocalizations.of(context)!;
     final tc = ThemeColors.of(context);
+    // 回填用未截断的 displayTitle：这里若用 listDisplayTitle，超过 60 字的
+    // 标题会带着省略号进输入框，用户直接保存就把「…」写进真实标题了。
     final controller = TextEditingController(text: conv.displayTitle);
     showDialog(
       context: context,
@@ -257,7 +262,8 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
         backgroundColor: ThemeColors.of(context).cardElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
         title: Text(l10n.sessionDeleteTitle, style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
-        content: Text(l10n.sessionDeleteConfirm(conv.displayTitle),
+        // 与列表展示同一口径（60 字截断），用户手动改过的超长标题不会把弹窗顶高
+        content: Text(l10n.sessionDeleteConfirm(conv.listDisplayTitle),
             style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fSmall)),
         actions: [
           TextButton(
