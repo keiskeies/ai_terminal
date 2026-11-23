@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/constants.dart';
@@ -26,6 +28,19 @@ class AgentCommandBlock extends StatelessWidget {
 
   /// 当前正在执行的命令（用于显示加载态 / 禁用其它按钮）
   final String? executingCommand;
+
+  /// 引擎此刻真的在执行这一条（任务 phase 已经进入执行阶段）。
+  ///
+  /// 引擎执行不会设置 [executingCommand]，所以运行中样式/计时不能只靠
+  /// 命令串相等来判断；这个信号由时间线按"最后一条无结果命令"给出。
+  final bool runningNow;
+
+  /// 本次执行的实际开始时间。
+  ///
+  /// 不能拿命令事件的 timestamp：那条事件在等待用户确认时就发了，
+  /// 会把确认等待算进执行耗时。时间线在真正开始执行时记下这一笔，
+  /// 块内只负责按秒刷新显示。
+  final DateTime? runningSince;
 
   /// 当前等待内联确认的危险命令（与 [command] 相等时显示确认/取消按钮）
   final String? pendingConfirmCommand;
@@ -61,6 +76,8 @@ class AgentCommandBlock extends StatelessWidget {
     this.showAutoExecute = false,
     this.isLoading = false,
     this.executingCommand,
+    this.runningNow = false,
+    this.runningSince,
     this.pendingConfirmCommand,
     this.isTool = false,
     this.executed = false,
@@ -124,6 +141,13 @@ class AgentCommandBlock extends StatelessWidget {
     // 手动执行按钮只给非 blocked 级命令；等待确认的 blocked 命令不能绕开引擎确认
     final blockedLevel = !isTool && safetyLevel == SafetyLevel.blocked;
 
+    // 引擎正在跑的就是这一条：头部换成「执行中 + 已用时间」，
+    // 用交互主色（青）标当前状态，长命令不用去底部状态条找进度。
+    final isRunning = !executed &&
+        !hardBlocked &&
+        !isWaitingConfirm &&
+        (runningNow || executingCommand == trimmed);
+
     final cmdColor = hardBlocked
         ? tc.error
         : dangerous
@@ -134,18 +158,22 @@ class AgentCommandBlock extends StatelessWidget {
 
     final accentColor = hardBlocked
         ? tc.error
-        : (dangerous || notExecuted || allowed)
-            ? tc.warn
-            : isTool
-                ? tc.brand
-                : tc.ok;
+        : isRunning
+            ? tc.brand
+            : (dangerous || notExecuted || allowed)
+                ? tc.warn
+                : isTool
+                    ? tc.brand
+                    : tc.ok;
     final headerBg = hardBlocked
         ? tc.error.withValues(alpha: 0.08)
-        : (dangerous || notExecuted || allowed)
-            ? tc.warn.withValues(alpha: 0.08)
-            : isTool
-                ? tc.brand.withValues(alpha: 0.06)
-                : tc.ok.withValues(alpha: 0.08);
+        : isRunning
+            ? tc.brand.withValues(alpha: 0.08)
+            : (dangerous || notExecuted || allowed)
+                ? tc.warn.withValues(alpha: 0.08)
+                : isTool
+                    ? tc.brand.withValues(alpha: 0.06)
+                    : tc.ok.withValues(alpha: 0.08);
 
     final label = isTool
         ? ui.toolCall
@@ -153,15 +181,17 @@ class AgentCommandBlock extends StatelessWidget {
             ? ui.blocked
             : isWaitingConfirm
                 ? ui.needsConfirm
-                : notExecuted
-                    ? ui.permissionNotExecuted
-                    : allowed
-                        ? ui.permissionAllowed
-                        : executed
-                            ? ui.executedLabel
-                            : dangerous
-                                ? ui.needsConfirm
-                                : ui.executable;
+                : isRunning
+                    ? ui.executing
+                    : notExecuted
+                        ? ui.permissionNotExecuted
+                        : allowed
+                            ? ui.permissionAllowed
+                            : executed
+                                ? ui.executedLabel
+                                : dangerous
+                                    ? ui.needsConfirm
+                                    : ui.executable;
 
     final block = Container(
       margin: const EdgeInsets.symmetric(vertical: 6),
@@ -201,17 +231,25 @@ class AgentCommandBlock extends StatelessWidget {
                           color: accentColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(rSmall),
                         ),
-                        child: Icon(
-                          isTool
-                              ? Icons.build
-                              : hardBlocked
-                                  ? Icons.block
-                                  : (dangerous || notExecuted || allowed)
-                                      ? Icons.warning_amber
-                                      : Icons.check,
-                          size: 9,
-                          color: accentColor,
-                        ),
+                        child: isRunning
+                            ? Padding(
+                                padding: const EdgeInsets.all(3),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.5,
+                                  color: accentColor,
+                                ),
+                              )
+                            : Icon(
+                                isTool
+                                    ? Icons.build
+                                    : hardBlocked
+                                        ? Icons.block
+                                        : (dangerous || notExecuted || allowed)
+                                            ? Icons.warning_amber
+                                            : Icons.check,
+                                size: 9,
+                                color: accentColor,
+                              ),
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -222,6 +260,10 @@ class AgentCommandBlock extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
+                      if (isRunning) ...[
+                        const SizedBox(width: 6),
+                        _RunningElapsed(since: runningSince, tc: tc),
+                      ],
                       const Spacer(),
                       // 复制按钮
                       _buildCopyButton(trimmed, tc, context),
@@ -579,4 +621,69 @@ Widget buildPlainCodeBlock(String codeBlock, ThemeColors tc) {
       ),
     ),
   );
+}
+
+/// 运行中的已用时间：每秒刷新一次，格式与操作单里的耗时一致。
+///
+/// `since` 由调用方给出（时间线在真正开始执行的那一刻记下）；
+/// 手动的独立命令块拿不到起点时，退化为组件挂载时间。
+class _RunningElapsed extends StatefulWidget {
+  final DateTime? since;
+  final ThemeColors tc;
+
+  const _RunningElapsed({this.since, required this.tc});
+
+  @override
+  State<_RunningElapsed> createState() => _RunningElapsedState();
+}
+
+class _RunningElapsedState extends State<_RunningElapsed> {
+  late DateTime _fallbackStart;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _fallbackStart = DateTime.now();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _RunningElapsed oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.since != widget.since) _fallbackStart = DateTime.now();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  static String _format(int seconds) {
+    if (seconds < 60) return '${seconds}s';
+    final m = seconds ~/ 60;
+    final s = seconds % 60;
+    if (m < 60) return '${m}m${s.toString().padLeft(2, '0')}s';
+    final h = m ~/ 60;
+    return '${h}h${(m % 60).toString().padLeft(2, '0')}m';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final seconds =
+        DateTime.now().difference(widget.since ?? _fallbackStart).inSeconds;
+    if (seconds <= 0) return const SizedBox.shrink();
+    return Text(
+      _format(seconds),
+      style: TextStyle(
+        color: widget.tc.textSub,
+        fontSize: fMicro,
+        fontFamily: 'JetBrainsMono',
+        fontFamilyFallback: kMonoFontFallback,
+      ),
+    );
+  }
 }

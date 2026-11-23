@@ -4,6 +4,7 @@ import 'package:ai_terminal/core/theme.dart';
 import 'package:ai_terminal/core/theme_colors.dart';
 import 'package:ai_terminal/l10n/app_localizations.dart';
 import 'package:ai_terminal/models/agent_event.dart';
+import 'package:ai_terminal/widgets/agent_command_block.dart';
 import 'package:ai_terminal/widgets/agent_event_cards.dart';
 
 /// 过程时间线渲染测试
@@ -24,6 +25,8 @@ Widget _wrap(Widget child) => MaterialApp(
 
 Widget _content(List<AgentEvent> events,
     {bool isLoading = false,
+    String? executingCommand,
+    bool agentExecuting = false,
     String? pendingConfirmCommand,
     bool isWaitingChoice = false,
     List<String> pendingOptions = const [],
@@ -32,6 +35,8 @@ Widget _content(List<AgentEvent> events,
         events: events,
         tc: ThemeColors.of(context),
         isLoading: isLoading,
+        executingCommand: executingCommand,
+        agentExecuting: agentExecuting,
         pendingConfirmCommand: pendingConfirmCommand,
         isWaitingChoice: isWaitingChoice,
         pendingOptions: pendingOptions,
@@ -116,6 +121,133 @@ void main() {
     expect(find.textContaining('更早'), findsNothing);
   });
 
+  testWidgets('两步全部展示，没有折叠头', (tester) async {
+    await tester.pumpWidget(_wrap(_content(_turn(steps: 2))));
+    await tester.pump();
+
+    expect(find.text('local_file_read').evaluate().length, 2);
+    expect(find.text('全部完成'), findsNothing,
+        reason: '不做批次折叠：无论几条命令都不会冒出折叠头');
+  });
+
+  testWidgets('命令之间夹着日志与思考：各自留在原位，不折叠', (tester) async {
+    // 真机会话形态：说明文字与日志夹在命令之间。批次折叠在这里只会
+    // 产生"前两条成组、后面全单条"的随机结构（2026-11-22 用户反馈），
+    // 所以过程行一律留在原位，各占一行。
+    final events = <AgentEvent>[
+      AgentEvent.command('echo c1', id: 'n1'),
+      AgentEvent.result(commandId: 'n1', success: true, output: 'a'),
+      AgentEvent.command('echo c2', id: 'n2'),
+      AgentEvent.result(commandId: 'n2', success: true, output: 'b'),
+      AgentEvent.thought('开头的统计行被截断了，再补一条短命令'),
+      AgentEvent.info('The current directory is C:\\Users\\Administrator'),
+      AgentEvent.command('echo c3', id: 'n3'),
+      AgentEvent.result(commandId: 'n3', success: true, output: 'c'),
+    ];
+    await tester.pumpWidget(_wrap(_content(events)));
+    await tester.pump();
+
+    expect(find.text('终端命令'), findsNWidgets(3));
+    expect(find.textContaining('开头的统计行被截断了'), findsOneWidget);
+    expect(find.textContaining('C:\\Users\\Administrator'), findsOneWidget);
+    expect(find.text('全部完成'), findsNothing);
+  });
+
+  testWidgets('运行中的命令留在原位并切到「执行中」（相邻命令不折叠）',
+      (tester) async {
+    final events = <AgentEvent>[];
+    for (var i = 0; i < 3; i++) {
+      events.add(AgentEvent.command('echo done$i', id: 'd$i'));
+      events.add(AgentEvent.result(
+          commandId: 'd$i', success: true, output: 'ok$i'));
+    }
+    events.add(AgentEvent.command('sleep 300', id: 'running'));
+    await tester.pumpWidget(_wrap(_content(
+      events,
+      isLoading: true,
+      executingCommand: 'sleep 300',
+    )));
+    await tester.pump();
+
+    expect(find.text('终端命令'), findsNWidgets(3),
+        reason: '已完成的命令照常各占一行');
+    expect(find.textContaining('sleep 300'), findsWidgets,
+        reason: '运行中的行必须直接可见');
+    expect(find.text('执行中'), findsOneWidget);
+  });
+
+  testWidgets('浅色主题下过程行可读', (tester) async {
+    await tester.pumpWidget(MaterialApp(
+      theme: AppTheme.lightTheme,
+      locale: const Locale('zh'),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(
+        body: SingleChildScrollView(
+          child: _content(_turn(steps: 3)),
+        ),
+      ),
+    ));
+    await tester.pump();
+
+    expect(find.text('local_file_read'), findsNWidgets(3));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('引擎执行阶段用 agentExecuting 标记运行中（executingCommand 为空）',
+      (tester) async {
+    // 引擎执行从不设置 executingCommand（那是手动播放的 800ms 状态），
+    // 真机回归：只有命令串相等判断时，运行中的卡片一直显示「可执行」。
+    final events = <AgentEvent>[
+      AgentEvent.command('echo done', id: 'e1'),
+      AgentEvent.result(commandId: 'e1', success: true, output: 'ok'),
+      AgentEvent.command('Start-Sleep -Seconds 20', id: 'e2'),
+    ];
+    await tester.pumpWidget(_wrap(_content(
+      events,
+      isLoading: true,
+      agentExecuting: true,
+    )));
+    await tester.pump();
+
+    expect(find.text('执行中'), findsOneWidget,
+        reason: 'phase 已进入执行阶段，最后一条无结果命令就是运行中的那条');
+    expect(find.text('可执行'), findsNothing);
+  });
+
+  testWidgets('引擎思考阶段不误标运行中', (tester) async {
+    final events = <AgentEvent>[
+      AgentEvent.command('echo done', id: 't1'),
+      AgentEvent.result(commandId: 't1', success: true, output: 'ok'),
+      AgentEvent.command('Start-Sleep -Seconds 20', id: 't2'),
+    ];
+    await tester.pumpWidget(_wrap(_content(
+      events,
+      isLoading: true,
+      agentExecuting: false,
+    )));
+    await tester.pump();
+
+    expect(find.text('执行中'), findsNothing);
+    expect(find.text('可执行'), findsOneWidget);
+  });
+
+  testWidgets('运行中的命令块显示已用时间（秒级）', (tester) async {
+    await tester.pumpWidget(_wrap(Builder(
+      builder: (context) => AgentCommandBlock(
+        command: 'tail -f /var/log/syslog',
+        tc: ThemeColors.of(context),
+        executingCommand: 'tail -f /var/log/syslog',
+        runningSince:
+            DateTime.now().subtract(const Duration(minutes: 1, seconds: 5)),
+      ),
+    )));
+    await tester.pump();
+
+    expect(find.text('执行中'), findsOneWidget);
+    expect(find.text('1m05s'), findsOneWidget);
+  });
+
   testWidgets('还没结果的可执行命令不被折叠', (tester) async {
     final pending = AgentEvent.command('apt install nginx', id: 'p1');
     await tester.pumpWidget(_wrap(_content([pending], isLoading: true)));
@@ -175,12 +307,12 @@ void main() {
     expect(find.textContaining('这是夹在中间的回答正文'), findsOneWidget);
   });
 
-  testWidgets('两步也全部展示，没有折叠头', (tester) async {
+  testWidgets('单步与两连跑都保持原卡，不折叠', (tester) async {
     await tester.pumpWidget(_wrap(_content(_turn(steps: 2))));
     await tester.pump();
 
-    expect(find.text('local_file_read').evaluate().length, 2);
-    expect(find.textContaining('更早'), findsNothing);
+    expect(find.text('local_file_read'), findsNWidgets(2));
+    expect(find.text('全部完成'), findsNothing);
   });
 
   testWidgets('询问之后的过程事件必须渲染在询问下方（按原始顺序交错）',

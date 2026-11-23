@@ -60,6 +60,12 @@ class AgentEventContent extends StatelessWidget {
   /// 当前正在执行的命令（传给内部命令块）
   final String? executingCommand;
 
+  /// 引擎此刻真的在执行命令/工具（由任务 phase 推导）。
+  ///
+  /// 引擎执行不设置 [executingCommand]（那是手动播放专用），时间线靠这个
+  /// 信号把"最后一条没有结果的命令"标记成运行中并开始计时。
+  final bool agentExecuting;
+
   /// 当前等待内联确认的危险命令（传给内部命令块）
   final String? pendingConfirmCommand;
 
@@ -101,6 +107,7 @@ class AgentEventContent extends StatelessWidget {
     this.isWaitingChoice = false,
     this.pendingOptions = const [],
     this.executingCommand,
+    this.agentExecuting = false,
     this.pendingConfirmCommand,
     required this.markdownBuilder,
     this.onExecuteCommand,
@@ -168,6 +175,10 @@ class AgentEventContent extends StatelessWidget {
         showAutoExecute: showAutoExecute,
         isLoading: isLoading,
         executingCommand: executingCommand,
+        // 只有最后一段（当前正在推进的那一段）才可能有执行中的行：
+        // 早先段落里的命令都有自己的结果，误标会同时出现两个"执行中"。
+        agentExecuting:
+            agentExecuting && segmentEvents.last.id == events.last.id,
         pendingConfirmCommand: pendingConfirmCommand,
         onExecuteCommand: onExecuteCommand,
         onConfirmCommand: onConfirmCommand,

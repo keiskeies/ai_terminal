@@ -15,6 +15,9 @@ import 'agent_command_block.dart';
 /// - 工具调用 / shell 命令 → 一行「名称 · 关键参数」+ 尾部状态与耗时
 /// - 命令结果不再单独成卡，并进它所属的那一行，点开才展开输出
 /// - 需要用户动作的行（待确认、询问、正在执行）**永远不被折叠**，否则用户会被卡住
+/// - 不做批次折叠：本引擎每一步是「说明→命令」交替，正文卡片天然切段，
+///   按连续性分组只会随机地出现"前两条成组、后面全单条"（真机反馈），
+///   压缩交给回合头部的命令统计与操作单，过程行全部留在原位。
 class AgentProcessTimeline extends StatefulWidget {
   final List<AgentEvent> events;
   final ThemeColors tc;
@@ -22,6 +25,13 @@ class AgentProcessTimeline extends StatefulWidget {
   final bool showAutoExecute;
   final bool isLoading;
   final String? executingCommand;
+
+  /// 引擎此刻真的在执行命令/工具（由任务 phase 推导）。
+  ///
+  /// 引擎执行不设置 [executingCommand]，时间线靠这个信号把"最后一条没有
+  /// 结果的命令"标记为运行中并开始计时；等待确认/思考阶段都为 false。
+  final bool agentExecuting;
+
   final String? pendingConfirmCommand;
   final void Function(String command, bool dangerous, tp.TerminalTab tab)?
       onExecuteCommand;
@@ -55,6 +65,7 @@ class AgentProcessTimeline extends StatefulWidget {
     this.showAutoExecute = false,
     this.isLoading = false,
     this.executingCommand,
+    this.agentExecuting = false,
     this.pendingConfirmCommand,
     this.onExecuteCommand,
     this.onConfirmCommand,
@@ -77,6 +88,12 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
 
   /// 展开逐条的进度组（key 用组内第一条事件 id）
   final Set<String> _openProgress = {};
+
+  /// 正在执行的命令的真实起点（key 用命令事件 id）。
+  ///
+  /// 不能用 command 事件的 timestamp：那条事件在等待确认时就发了，
+  /// 会把确认等待也算进执行耗时。
+  final Map<String, DateTime> _runningSince = {};
 
   /// `上传进度: 1/100 文件` —— 前缀 + 分子/分母 + 单位
   static final RegExp _progressPattern =
@@ -190,8 +207,35 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
       ..clear()
       ..addAll(merged);
 
-    // 每个步骤都留在原位：不做「更早 N 步」折叠。
-    // 上面已经把连续进度合并成一条，剩下的都是用户要看的真实动作。
+    // 运行时起点：只在引擎真的执行这一条时记时，结束后立刻清掉。
+    // 引擎同一时刻只执行一条，所以"最后一条没有结果的调用"就是它；
+    // 手动播放仍按 executingCommand 精确匹配（那条路径不发 phase 信号）。
+    final activeRunning = <String>{};
+    if (widget.agentExecuting) {
+      String? lastPendingId;
+      for (final r in rows) {
+        if (r.kind == _RowKind.call && r.result == null) {
+          lastPendingId = r.event.id;
+        }
+      }
+      if (lastPendingId != null) {
+        activeRunning.add(lastPendingId);
+        _runningSince.putIfAbsent(lastPendingId, DateTime.now);
+      }
+    }
+    final runningCmd = widget.executingCommand;
+    if (runningCmd != null) {
+      for (final r in rows) {
+        if (r.kind == _RowKind.call &&
+            r.result == null &&
+            r.event.command == runningCmd) {
+          activeRunning.add(r.event.id);
+          _runningSince.putIfAbsent(r.event.id, DateTime.now);
+        }
+      }
+    }
+    _runningSince.removeWhere((id, _) => !activeRunning.contains(id));
+
     final children = <Widget>[];
     for (var i = 0; i < rows.length; i++) {
       final r = rows[i];
@@ -256,6 +300,8 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
         showAutoExecute: widget.showAutoExecute,
         isLoading: widget.isLoading,
         executingCommand: widget.executingCommand,
+        runningNow: _runningSince.containsKey(e.id),
+        runningSince: _runningSince[e.id],
         pendingConfirmCommand: widget.pendingConfirmCommand,
         isTool: isTool,
         executed: false,

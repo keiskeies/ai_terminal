@@ -3715,6 +3715,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   tab: tab,
                   showAutoExecute: true,
                   isAgentRunning: agentState.isRunning,
+                  // 引擎真正在跑命令/工具时才给时间线"运行中"信号。
+                  // executingCommand 只是手动播放的 800ms 状态，引擎执行从不设置它。
+                  isAgentExecuting: isLast &&
+                      agentState.isRunning &&
+                      _isEngineExecutePhase(agentState.currentTask?.phase),
                   // 只有最后一条消息可能是"当前等待的询问"；历史消息里的旧询问不能
                   // 跟着变成可点，否则用户会误答一个早已结束的问题。
                   isWaitingChoice: agentState.isWaitingChoice && isLast,
@@ -3824,6 +3829,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }
 
   // ==================== 消息气泡 ====================
+  /// 引擎正在执行命令/工具的阶段。
+  ///
+  /// phase 由 CommandRunner.phaseForCommand / 引擎常量直接给出中文原值
+  /// （不经过 UiText.t），所以这里按原值匹配是稳定的。
+  static bool _isEngineExecutePhase(String? phase) =>
+      phase == '执行命令' ||
+      phase == '执行工具' ||
+      phase == '检查环境' ||
+      phase == '执行变更';
+
   Widget _buildMessageBubble({
     Key? key,
     required String role,
@@ -3832,6 +3847,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     tp.TerminalTab? tab,
     bool showAutoExecute = false,
     bool isAgentRunning = false,
+    bool isAgentExecuting = false,
     bool isWaitingChoice = false,
     List<String> pendingOptions = const [],
     List<AgentEvent> events = const [],
@@ -3922,7 +3938,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   liveReasoning: liveReasoning,
                   turnGoal: turnGoal,
                   enginePendingConfirm: enginePendingConfirm,
-                  isLastTurn: isLastTurn),
+                  isLastTurn: isLastTurn,
+                  isAgentExecuting: isAgentExecuting),
               // 整段复制固定在回答左下角：Markdown 段落、命令卡、输出卡都是独立
               // Text，拖选跨不过去，整段复制只能靠这一个按钮。放在左边缘是因为
               // 右对齐会飘到滚动条旁边，且和结论卡的右端对齐线打架。
@@ -4490,6 +4507,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     String? turnGoal,
     String? enginePendingConfirm,
     bool isLastTurn = false,
+    bool isAgentExecuting = false,
   }) {
     // 合并两种待确认来源：引擎自动流程（enginePendingConfirm）和手动播放（_pendingConfirmCommand）
     final effectivePendingConfirm = enginePendingConfirm ??
@@ -4511,6 +4529,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           // 实时推理接到时间线末尾：思考发生在它真实的位置上，
           // 而不是浮在整条回答顶部、结束后又凭空消失
           liveReasoning: liveReasoning,
+          agentExecuting: isAgentExecuting,
           executingCommand:
               tab == null ? _executingCommand : _tabExecutingCommand[tab.id],
           pendingConfirmCommand: effectivePendingConfirm,
