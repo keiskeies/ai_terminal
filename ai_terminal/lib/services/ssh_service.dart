@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import '../models/host_config.dart';
 import '../core/ssh_algorithms.dart';
 import '../core/ui_text.dart';
+import '../utils/command_markers.dart';
 import '../utils/exit_marker_scanner.dart';
 import '../utils/output_processor.dart';
 import '../utils/tail_text_buffer.dart';
@@ -362,7 +363,7 @@ class SSHService implements CommandExecutor {
 
     final stopwatch = Stopwatch()..start();
     _markerSeq++;
-    final marker = 'EXITCODE_$_markerSeq:';
+    final marker = CommandMarkers.next(_markerSeq);
     // 标记必须另起一行：`command; echo` 会破坏 heredoc 的结束行
     // （EOF; echo ... 不再被识别为结束标记），导致多行文件写入永远不结束。
     //
@@ -584,7 +585,8 @@ class SSHService implements CommandExecutor {
           if (PtyOutputDetector.waitsForContinuation(buffer.tail())) {
             debugPrint('[SSHService] 静默且尾部停在续行提示符，判定命令未闭合，主动中断');
             abnormalReason.add('PS2：shell 停在续行提示符（引号或括号未闭合），已主动中断');
-            _writeTextQuietly('\x03');
+            // 补换行：确保 shell 退回 PS1，否则下一条命令会被当成续行内容吞掉。
+            _writeTextQuietly('\x03\n');
             await Future<void>.delayed(const Duration(milliseconds: 200));
             if (!doneCompleter.isCompleted) doneCompleter.complete();
             recheck.cancel();
@@ -621,6 +623,9 @@ class SSHService implements CommandExecutor {
       // 同 markerSeen==false 分支：给被打断的程序留出退出窗口，
       // 否则它会吃掉调用方下一条命令的输入
       await Future<void>.delayed(const Duration(milliseconds: 300));
+      // 换行必须在程序退出后再补：空密码提示（sudo）会把紧跟 Ctrl+C 的 \n
+      // 当成一次密码尝试，反而污染输出。此时 shell 已回 PS1，空行无副作用。
+      _writeTextQuietly('\n');
       recheck.cancel();
       await sub.cancel();
       _pendingDoneCompleters.remove(doneCompleter);
@@ -682,6 +687,8 @@ class SSHService implements CommandExecutor {
       // 字节当密码尝试吃掉。调用方紧接着发的下一条命令（`sudo -k id; echo ...`）
       // 整条会被吞进密码提示，于是命令根本没跑、marker 永远不出现、只能干等超时。
       await Future<void>.delayed(const Duration(milliseconds: 300));
+      // 换行放在等待之后：与上面同一理由，避免 \n 被存活期的 sudo 当空密码吞掉
+      _writeTextQuietly('\n');
 
       final reason = abnormalReason.isNotEmpty
           ? abnormalReason.join('; ')
@@ -869,7 +876,7 @@ class SSHService implements CommandExecutor {
 
     final stopwatch = Stopwatch()..start();
     _markerSeq++;
-    final marker = 'EXITCODE_$_markerSeq:';
+    final marker = CommandMarkers.next(_markerSeq);
     // 关闭终端输入的行尾转换，否则 PTY 的 ICRNL 会把 CRLF 中的 \r 变成 \n，
     // 导致通过 PTY fallback 写入的文件与原文不一致。写入完成后恢复原 stty。
     final wrappedCommand = '__ai_terminal_stty=\$(stty -g 2>/dev/null); '

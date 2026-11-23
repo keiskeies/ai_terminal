@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_terminal/models/host_config.dart';
 import 'package:ai_terminal/services/command_executor.dart';
 import 'package:ai_terminal/services/ssh_service.dart';
+import 'package:ai_terminal/utils/command_markers.dart';
 
 /// 等待期活性看门狗（docs/ssh-disconnect-resilience-design.md C1/C3）。
 ///
@@ -12,6 +13,9 @@ import 'package:ai_terminal/services/ssh_service.dart';
 /// 靠 outputController 注入输出、靠 livenessProbeForTesting 替换传输层 ping。
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() => CommandMarkers.nonceForTesting = '');
+  tearDownAll(() => CommandMarkers.nonceForTesting = null);
 
   late SSHService ssh;
   late int probes;

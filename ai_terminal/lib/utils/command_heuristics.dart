@@ -56,6 +56,214 @@ bool isQueryCommand(String command) {
   return _isSingleQueryCommand(command);
 }
 
+enum _ExitCodeReliability { reliable, background, pipe }
+
+/// 扫描命令里是否有「裸 |」（管道）或「结尾裸 &」（后台），跳过引号/转义/heredoc。
+_ExitCodeReliability _scanExitCodeReliability(String command) {
+  var inSingle = false;
+  var inDouble = false;
+  var arithDepth = 0; // $(( ... )) 算术展开内的 | 是位运算，不是管道
+  String? heredocTag;
+  final heredocStart = RegExp(r'''<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1''');
+
+  for (final line in command.split('\n')) {
+    if (heredocTag != null) {
+      if (line.trim() == heredocTag) heredocTag = null;
+      continue;
+    }
+    for (var i = 0; i < line.length; i++) {
+      final c = line[i];
+      if (c == "'" && !inDouble) {
+        inSingle = !inSingle;
+        continue;
+      }
+      if (c == '"' && !inSingle) {
+        inDouble = !inDouble;
+        continue;
+      }
+      if (c == '\\' && i + 1 < line.length) {
+        i++;
+        continue;
+      }
+      if (inSingle || inDouble) continue;
+
+      // $(( ... )) 算术展开：内部 | & 是位运算，不是管道/后台
+      if (c.codeUnitAt(0) == 0x24 &&
+          i + 2 < line.length &&
+          line[i + 1] == '(' &&
+          line[i + 2] == '(') {
+        arithDepth++;
+        i += 2;
+        continue;
+      }
+      if (arithDepth > 0) {
+        if (c == '(' && i + 1 < line.length && line[i + 1] == ')') {
+          arithDepth--;
+          i++;
+        }
+        continue;
+      }
+
+      // heredoc 起始行：整段 body 跳过，避免 body 里的 | / & 误判
+      if (c == '<' && i + 1 < line.length && line[i + 1] == '<') {
+        final m = heredocStart.matchAsPrefix(line, i);
+        if (m != null) {
+          heredocTag = m.group(2);
+          i = m.end - 1;
+          continue;
+        }
+      }
+      if (c == '|') {
+        // 排除 ||（逻辑或）与 | 紧邻 | 的情况
+        if ((i > 0 && line[i - 1] == '|') ||
+            (i + 1 < line.length && line[i + 1] == '|')) {
+          continue;
+        }
+        return _ExitCodeReliability.pipe;
+      }
+      if (c == '&') {
+        // 排除 &&（逻辑与）、2>&1（重定向）、&>file（重定向）
+        if ((i > 0 && (line[i - 1] == '&' || line[i - 1] == '>')) ||
+            (i + 1 < line.length &&
+                (line[i + 1] == '&' || line[i + 1] == '>'))) {
+          continue;
+        }
+        return _ExitCodeReliability.background;
+      }
+    }
+  }
+  return _ExitCodeReliability.reliable;
+}
+
+/// 命令的退出码是否不可靠（wrapper 的 `$?` 取最后一段，不能反映真实结果）。
+///
+/// - 后台命令（`&`）：启动成功 ≠ 进程跑完，状态未知，一律拦截。
+/// - 管道（`|`）：纯查询管道（如 `ps aux | head`）只关心输出、无假成功风险，
+///   放行；含修改类子命令的管道（如 `apt install | tee`、`curl | sh`）前段
+///   失败可能被后段的成功码掩盖，拦截并提示。
+String? unreliableExitCodeReason(String command) {
+  switch (_scanExitCodeReliability(command)) {
+    case _ExitCodeReliability.background:
+      return '后台命令（&）的退出码只表示启动成功，无法确认进程最终状态';
+    case _ExitCodeReliability.pipe:
+      final subs = _subCommands(command);
+      if (subs.every(_isReadOnlyPipeStage)) return null;
+      return '管道（|）的退出码取最后一段，前段命令失败可能被掩盖';
+    case _ExitCodeReliability.reliable:
+      return null;
+  }
+}
+
+/// 纯格式化/拼接类尾段：只消费 stdin、不改系统状态，前段失败仍会体现在输出里。
+const _pipeFormatters = <String>[
+  'jq', 'yq', 'column', 'fmt', 'fold', 'paste', 'join', 'expand',
+  'unexpand', 'rev', 'base64', 'iconv', 'strings', 'numfmt', 'echo', 'printf',
+];
+
+/// 管道某一段是否只读（查询命令、纯格式化命令、或 xargs 调用只读命令）。
+///
+/// 这里不能简单套用 [isQueryCommand]：`curl … | jq`、`cat … | tr`、
+/// `find … | xargs grep` 都是纯读取，前段失败只影响输出、不会产生假成功；
+/// 全部按"非查询"拦掉会让 agent 连最常用的诊断管道都发不出去。
+bool _isReadOnlyPipeStage(String stage) {
+  final s = stage.trim().toLowerCase();
+  if (s.isEmpty) return true;
+  if (_isSingleQueryCommand(s)) return true;
+  final head = s.split(RegExp(r'\s+')).first;
+  if (_pipeFormatters.contains(head)) return true;
+  if (head == 'xargs') {
+    // xargs 的退出码会传播子命令失败，只要子命令本身只读就无需拦
+    final words = s
+        .split(RegExp(r'\s+'))
+        .where((w) => w.isNotEmpty && !w.startsWith('-'))
+        .toList();
+    return words.length > 1 && _isSingleQueryCommand(words[1]);
+  }
+  return false;
+}
+
+/// 判定命令是否会持续阻塞 PTY、永不自行返回（top/vim/tail -f/REPL 等）。
+///
+/// 与 [isQueryCommand] 里的排除列表不同：那里只把它们排除出"只读"分类，
+/// 命令仍会下发并卡到超时。这里是执行前的硬判定，供引擎在写入终端前拦截。
+///
+/// 保守原则：只拦首词是明确交互程序、且没有把它变成一次性命令的 flag 的场景；
+/// 拿不准的（git log 的 pager 会自行退出、python -c 等）一律放行，交给下游兜底。
+bool isBlockingInteractiveCommand(String command) =>
+    _subCommands(command).any(_isBlockingInteractiveSingle);
+
+bool _isBlockingInteractiveSingle(String command) {
+  final parts = command.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+  if (parts.isEmpty) return false;
+
+  // 跳过前置 env 赋值（FOO=bar top）与 sudo/nice 及其参数
+  var i = 0;
+  while (i < parts.length &&
+      RegExp(r'^[A-Za-z_][A-Za-z0-9_]*=').hasMatch(parts[i])) {
+    i++;
+  }
+  if (i < parts.length && (parts[i] == 'sudo' || parts[i] == 'nice')) {
+    i++;
+    while (i + 1 < parts.length && (parts[i] == '-u' || parts[i] == '-n')) {
+      i += 2;
+    }
+  }
+  if (i >= parts.length) return false;
+
+  final cmd = parts[i].toLowerCase();
+  final rest = parts.sublist(i + 1);
+
+  // 明确的交互式 TUI / 分页器：通常任何调用形式都阻塞
+  const alwaysBlocking = {
+    // man 保留在内：本地会话只设了 GIT_PAGER，未设 MANPAGER，仍会进 less 等待输入
+    'top', 'htop', 'vim', 'vi', 'nano', 'less', 'more', 'man', 'watch', 'stern',
+  };
+  if (alwaysBlocking.contains(cmd)) {
+    // top -b（batch 模式）一次性输出后退出，放行
+    if (cmd == 'top' && rest.any((a) => a == '-b' || a.startsWith('-b'))) {
+      return false;
+    }
+    return true;
+  }
+
+  // 容器/日志的 follow 模式：docker logs -f、kubectl logs -f、journalctl -f、
+  // dmesg -w 与 tail -f 同构（永不返回），但首词不是交互程序，需按子命令 + flag 判定。
+  // man/git log 不在此列：会话已 export PAGER=cat / GIT_PAGER=cat，它们会直接输出退出。
+  const followSubcommands = [
+    'docker logs', 'kubectl logs', 'journalctl', 'dmesg',
+  ];
+  final lower = command.trim().toLowerCase();
+  final isFollowScope =
+      followSubcommands.any((p) => lower == p || lower.startsWith('$p '));
+  if (isFollowScope &&
+      rest.any((a) =>
+          a == '-f' ||
+          a == '-F' ||
+          a == '-w' ||
+          a == '--follow' ||
+          a.startsWith('--follow='))) {
+    return true;
+  }
+
+  // tail 的 follow 模式（tailf 本身就是 follow）；-n 50 等非 follow 放行
+  if (cmd == 'tailf') return true;
+  if (cmd == 'tail') {
+    return rest.any((a) =>
+        a == '-f' || a == '-F' || a == '--follow' || a.startsWith('--follow='));
+  }
+
+  // 无参数的交互式 REPL / shell；带 -c 或脚本参数则是一次性执行，放行
+  if (rest.isEmpty) {
+    const repls = {
+      'python', 'python2', 'python3', 'node', 'ruby', 'php', 'lua',
+      'mysql', 'psql', 'sqlite3', 'redis-cli', 'mongo', 'irb',
+      'sh', 'bash', 'zsh', 'dash',
+    };
+    return repls.contains(cmd);
+  }
+  return false;
+}
+
 bool _isSingleQueryCommand(String command) {
   final queryPrefixes = [
     // 文件搜索与内容查找

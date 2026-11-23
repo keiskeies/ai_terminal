@@ -17,6 +17,7 @@ import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/command_executor.dart';
 import 'package:ai_terminal/services/daos.dart';
 import 'package:ai_terminal/services/ssh_service.dart';
+import 'package:ai_terminal/utils/command_markers.dart';
 import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 
 /// WP5（O3）：交互式命令输入桥接。
@@ -36,7 +37,10 @@ void main() {
     if (!L10n.isReady) {
       L10n.setup(AppLocalizationsZh());
     }
+    // 测试里硬编码 EXITCODE_1:0 注入输出，固定 marker 格式（空 nonce 回退旧格式）
+    CommandMarkers.nonceForTesting = '';
   });
+  tearDownAll(() => CommandMarkers.nonceForTesting = null);
 
   group('SSH 执行器桥接', () {
     HostConfig makeConfig() => HostConfig.create(

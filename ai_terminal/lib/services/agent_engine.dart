@@ -309,11 +309,21 @@ class AgentEngine {
   int _finishWithoutExecCount = 0;
   static const int _maxFinishWithoutExecRetries = 2;
 
-  /// 命令闭合预检连续拦截次数。AI 反复生成未闭合命令时用于收敛：
-  /// 前 [_maxSyntaxRejects] 次回灌修正提示，超限后改发终止性诊断，
-  /// 避免 maxSteps=0（无限制）时无限空转烧配额。真正执行的命令会归零。
+  /// 预检连续拦截次数（未闭合 / 交互阻塞 / 退出码不可靠）。
+  /// 前 [_maxSyntaxRejects] 次回灌修正提示，超限后改发终止性诊断。
+  /// 真正通过预检的命令会归零。
   int _syntaxRejectCount = 0;
   static const int _maxSyntaxRejects = 2;
+
+  /// 本轮是否有命令真正通过了预检（进入执行器）。
+  /// 预检在 `_executeCommand` 内拦截，外层拿不到"是否执行过"，用这个标记补上。
+  bool _commandPassedPrecheckThisTurn = false;
+
+  /// 连续多少轮**一条命令都没通过预检**。maxSteps 默认 0（无限制），
+  /// 若只靠 `_syntaxRejectCount` 提示而不真正收尾，模型坚持提交被拦的命令
+  /// 会让任务无限空转。达到 [_maxBlockedTurnsBeforeAbort] 轮直接失败收尾。
+  int _blockedTurnsStreak = 0;
+  static const int _maxBlockedTurnsBeforeAbort = 3;
 
   /// 纯问答显式声明标记：模型在 finish 的思考/正文里写明这句话，
   /// 表示本轮是基于已有上下文的问答，幻觉门控让路。
@@ -948,6 +958,8 @@ class AgentEngine {
     _hasExecutedAnyCommand = false;
     _finishWithoutExecCount = 0;
     _syntaxRejectCount = 0;
+    _commandPassedPrecheckThisTurn = false;
+    _blockedTurnsStreak = 0;
     _userForbadeCommands = false;
     _planFinishRetryCount = 0; // O4/WP6: 计划 finish 门控计数新任务归零（R5）
     _consecutiveConnFailures = 0;
@@ -2123,6 +2135,10 @@ class AgentEngine {
     int chunkCount = 0;
     final eventScope = _eventStore.newScope();
     bool commandDetectedNotified = false; // 是否已通知过命令检测（一轮只通知一次）
+    // 流式提前执行的命令文本：流末全量解析若产出不同命令，stableId 会自动去重，
+    // 但 UI 展示的会是后者、与实际执行的前者不一致。记录实际下发文本，流末检测
+    // 到漂移时发一条 info 说明，让用户知道真正执行的是哪条（纯增量，不动状态机）。
+    String? earlyExecutedCommand;
 
     // P1-4: Fallback 模型 — 主模型 maxRetries 次重试仍失败时切换备用模型重试一次
     var activeProvider = _aiProvider;
@@ -2208,6 +2224,7 @@ class AgentEngine {
                 // 的闭合预检统一拦截并回灌修正，避免半成品命令先进 PTY 卡死。
                 if (!_commandIsShellBalanced(cmd)) continue;
                 commandDetectedNotified = true;
+                earlyExecutedCommand = cmd;
                 final e = AgentEvent.command(
                   cmd,
                   id: ReActStreamParser.stableId(AgentEventType.command, cmd),
@@ -2355,6 +2372,7 @@ class AgentEngine {
                     final cmd = e.command ?? '';
                     if (cmd.isNotEmpty && _commandIsShellBalanced(cmd)) {
                       commandDetectedNotified = true;
+                      earlyExecutedCommand = cmd;
                       // A5 修复：先记录 stableId，再改写为 finalId
                       final stableId = e.id;
                       final finalId = eventScope.assignFinalId(e);
@@ -2578,6 +2596,29 @@ class AgentEngine {
       if (e.isCommand && !firstCommandIdSet) {
         _lastCommandEventId = eventScope.finalIdFor(stableId);
         firstCommandIdSet = true;
+      }
+    }
+
+    // 流式提前执行 vs 流末全量解析漂移检测：流式阶段围栏一旦闭合就把命令 A
+    // 下发执行，流末模型若又改写了围栏内容得到 B，B 的 stableId 不同会被 emit
+    // 到时间线，实际执行的却是 A。这里不碰事件状态机（风险太高），只补一条
+    // info 让用户知道"真正执行的是 A、B 未执行"，避免展示与执行静默不一致。
+    if (earlyExecutedCommand != null) {
+      final executed = earlyExecutedCommand!.trim();
+      // 判定口径：最终事件流里还能找到这条命令（哪怕不是第一条）就算展示与执行一致。
+      // 只比"第一条"会在两种正常场景误报：① 首个围栏未闭合被跳过、实际提前执行的是
+      // 第二条；② FC 批量调用里第一条被拦截、第二条先执行。只有它彻底消失才算漂移。
+      final finalCommands = events
+          .where((e) => e.isCommand)
+          .map((e) => (e.command ?? '').trim())
+          .toList();
+      if (finalCommands.isNotEmpty && !finalCommands.contains(executed)) {
+        agentLogger.warn('ReAct',
+            '流式提前执行与流末解析命令不一致，实际执行前者: ${_logCommand(earlyExecutedCommand!)}');
+        onEvent?.call(AgentEvent.info(UiText.t(
+          '⚠️ 命令在流式生成过程中发生变化：实际执行的是先下发的版本，末尾展示的最终版本未执行。请以执行结果为准。',
+          'The command changed during streaming: the earlier dispatched version was executed; the final version shown was not. Trust the execution result.',
+        )));
       }
     }
 
@@ -2863,9 +2904,17 @@ class AgentEngine {
     final followUps = _announcedFollowUps;
     _announcedFollowUps = const [];
     var ran = 0;
+    // 超上限时不再静默丢弃：记录被跳过的命令，末尾发一条可见提示并写入观测，
+    // 让 AI/用户知道还有命令没执行，避免时间线出现"声明了却没跑"的悬空块。
+    final skipped = <String>[];
     for (final c in followUps) {
-      if (ran >= maxFollowUps) break;
+      // 取消检查放在最前：否则超过上限后的 continue 会绕过它，
+      // 在用户已停止的轮次里仍然追加"还有 N 条未执行"的提示与历史。
       if (_currentTask?.status == AgentStatus.cancelled) break;
+      if (ran >= maxFollowUps) {
+        skipped.add(c.command);
+        continue;
+      }
       if (myGeneration != _currentTaskGeneration) return false;
       ran++;
       final r = await _runCommandWithSafety(c.command, executor,
@@ -2878,6 +2927,36 @@ class AgentEngine {
         _trimMessages(_conversationHistory);
       }
     }
+    if (skipped.isNotEmpty &&
+        _currentTask?.status != AgentStatus.cancelled) {
+      agentLogger.warn('ReAct', '本轮命令数超过上限，${skipped.length} 条未执行');
+      onEvent?.call(AgentEvent.info(UiText.t(
+        '⚠️ 本轮声明了 ${skipped.length} 条额外命令，超过单次执行上限（$maxFollowUps），未执行。请分批提交。',
+        '${skipped.length} additional commands exceeded the per-turn limit ($maxFollowUps) and were skipped. Submit them in smaller batches.',
+      )));
+      // 写入对话历史：让 AI 在下一轮知道哪些命令还没跑，避免重复声明或遗漏
+      _conversationHistory.add(ChatMessage.create(
+        role: 'user',
+        content: '以下 ${skipped.length} 条命令因单轮上限未执行，需要时请在后续步骤中单独提交：\n'
+            '${skipped.map((c) => '- $c').join('\n')}',
+      ));
+      _trimMessages(_conversationHistory);
+    }
+    // 轮次预检收敛：maxSteps 默认 0（无限制），若模型坚持提交被拦的命令，
+    // 只靠提示语不会停。连续 [_maxBlockedTurnsBeforeAbort] 轮没有任何命令
+    // 通过预检就失败收尾——正常任务只要有一轮跑通命令就清零。
+    if (_commandPassedPrecheckThisTurn) {
+      _blockedTurnsStreak = 0;
+    } else if (_syntaxRejectCount > 0) {
+      _blockedTurnsStreak++;
+      if (_blockedTurnsStreak >= _maxBlockedTurnsBeforeAbort) {
+        agentLogger.warn('ReAct',
+            '连续 $_blockedTurnsStreak 轮命令被预检拦截，任务终止 (failed)');
+        _finishTask(success: false, summary: '命令连续被预检拦截，未能推进任务');
+        return false;
+      }
+    }
+    _commandPassedPrecheckThisTurn = false;
     // L2 修复：成功执行命令后重置无命令重试计数
     _noCommandRetryCount = 0;
     return true;
@@ -4322,7 +4401,9 @@ class AgentEngine {
     }();
   }
 
-  /// 命令闭合防护开关（设置页可关，默认开）。
+  /// 命令执行预检总开关（默认开）：未闭合命令、交互式阻塞命令、退出码不可靠的
+  /// 管道/后台命令都在下发前静态拦截并回灌 AI 改写。
+  /// 关闭后仅依赖执行器的 PS2 检测与超时兜底（兼容个别被误判的特殊命令）。
   bool get _commandClosureGuard =>
       SettingsDao.getCached('commandClosureGuard', defaultValue: true) != false;
 
@@ -4385,9 +4466,8 @@ class AgentEngine {
       _syntaxRejectCount++;
       agentLogger.warn('ReAct',
           '命令闭合预检拦截(${"$_syntaxRejectCount/$_maxSyntaxRejects"}): $unclosed — ${_logCommand(command)}');
-      // 计入无命令重试预算：连续多轮都提交未闭合命令属于"空转"，
-      // 由既有 _noCommandRetryCount 终止链路收敛，避免 maxSteps=0 时无限烧配额。
-      _noCommandRetryCount++;
+      // 拦截计数只用 _syntaxRejectCount + 轮次硬停止收敛（见 _blockedTurnsStreak）；
+      // 不再借 _noCommandRetryCount：那条计数每轮会被 follow-up 收尾清零，等于无效。
       final exhausted = _syntaxRejectCount >= _maxSyntaxRejects;
       return AgentResult(
         success: false,
@@ -4402,8 +4482,57 @@ class AgentEngine {
       );
     }
 
-    // 命令通过闭合预检：重置连续拦截计数（本轮不再空转）
+    // 交互式阻塞命令预检：top/vim/tail -f/REPL 这类命令永不自行返回，
+    // 进 PTY 只会卡到超时（且不在 PS2，闭合预检与续行兜底都覆盖不到）。
+    // 与闭合预检共用拦截计数预算，回灌非交互等价命令建议让 AI 自行改写。
+    if (_commandClosureGuard && isBlockingInteractiveCommand(command)) {
+      _syntaxRejectCount++;
+      final exhausted = _syntaxRejectCount >= _maxSyntaxRejects;
+      agentLogger.warn('ReAct',
+          '交互阻塞命令拦截(${"$_syntaxRejectCount/$_maxSyntaxRejects"}): ${_logCommand(command)}');
+      return AgentResult(
+        success: false,
+        error: '交互式命令会持续运行不返回',
+        duration: stopwatch.elapsed,
+        failureKind: CommandFailureKind.syntaxError.name,
+        failureReason: exhausted
+            ? '已连续 $_syntaxRejectCount 次提交交互式命令。请勿再提交：用 回答: 说明阻碍，'
+                '或改用一次性命令（ps aux 代替 top、tail -n 50 代替 tail -f、sed 代替 vim）。'
+            : '检测到交互式命令，它会持续运行不返回、导致超时。请改用一次性等价命令：'
+                'ps aux --sort=-%cpu | head 代替 top；tail -n 50 代替 tail -f；'
+                'grep/sed 代替 less/vim；python -c "..." 代替 python REPL。',
+      );
+    }
+
+    // 退出码可靠性预检：wrapper 的 `$?` 取最后一段，后台/修改类管道会给出
+    // 假成功观测——不卡死但结论错误，比卡死更隐蔽。纯查询管道（ps | head）
+    // 已由 unreliableExitCodeReason 放行，避免与上面的非交互建议形成死循环。
+    // Windows 跳过：cmd 的 `&` 是顺序执行、PowerShell 的 `&` 是调用运算符，
+    // 都不是后台语义，套用 POSIX 规则会把 `& $env:APP\app.exe` 判成后台命令。
+    final exitCodeIssue = _commandClosureGuard && !isWindowsShell
+        ? unreliableExitCodeReason(command)
+        : null;
+    if (exitCodeIssue != null) {
+      _syntaxRejectCount++;
+      final exhausted = _syntaxRejectCount >= _maxSyntaxRejects;
+      agentLogger.warn('ReAct',
+          '退出码不可靠拦截(${"$_syntaxRejectCount/$_maxSyntaxRejects"}): $exitCodeIssue — ${_logCommand(command)}');
+      return AgentResult(
+        success: false,
+        error: exitCodeIssue,
+        duration: stopwatch.elapsed,
+        failureKind: CommandFailureKind.syntaxError.name,
+        failureReason: exhausted
+            ? '已连续 $_syntaxRejectCount 次提交退出码不可靠的命令。请勿再提交：用 回答: 说明阻碍，'
+                '或改用拆分后的顺序命令。'
+            : '$exitCodeIssue。请改为可确认完成状态的写法：后台任务用前台 + timeout；'
+                '管道拆成顺序命令（先落盘到临时文件再处理），或显式检查 \${PIPESTATUS[0]} / \$!。',
+      );
+    }
+
+    // 命令通过全部预检：重置连续拦截计数，并标记本轮确实有命令进入执行器
     _syntaxRejectCount = 0;
+    _commandPassedPrecheckThisTurn = true;
 
     // 执行前检查连接状态
     // 自愈：若传入的 executor 已断开，但 _currentExecutor 已被 setExecutor 刷新（用户重连），

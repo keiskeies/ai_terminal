@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_pty/flutter_pty.dart';
 import '../core/ui_text.dart';
+import '../utils/command_markers.dart';
 import '../utils/exit_marker_scanner.dart';
 import '../utils/output_processor.dart';
 import '../utils/tail_text_buffer.dart';
@@ -286,7 +287,7 @@ class LocalTerminalService implements CommandExecutor {
 
     final stopwatch = Stopwatch()..start();
     _markerSeq++;
-    final marker = 'EXITCODE_$_markerSeq:';
+    final marker = CommandMarkers.next(_markerSeq);
     // 平台+shell 分支：见 [wrapCommandWithExitMarker]
     final wrappedCommand = wrapCommandWithExitMarker(
       command,
@@ -466,8 +467,9 @@ class LocalTerminalService implements CommandExecutor {
             stopwatch.elapsedMilliseconds - lastOutputAtMs >= 30000 &&
             PtyOutputDetector.waitsForContinuation(buffer.tail())) {
           abnormalReason.add('PS2：shell 停在续行提示符（引号或括号未闭合），已主动中断');
+          // 补换行：确保 shell 退回 PS1，避免残留续行状态吞掉下一条命令
           try {
-            _pty!.write(utf8.encode('\x03'));
+            _pty!.write(utf8.encode('\x03\n'));
           } catch (_) {}
           recheck.cancel();
           doneCompleter.complete();
@@ -495,6 +497,11 @@ class LocalTerminalService implements CommandExecutor {
       // 给被打断的程序留出退出窗口：它还活着时会把 tty 输入队列里的字节
       // 当密码尝试吃掉，调用方紧接着发的下一条命令就被吞了
       await Future<void>.delayed(const Duration(milliseconds: 300));
+      // 换行必须等程序退出后再补：紧跟 Ctrl+C 的 \r 会被 sudo 当空密码尝试，
+      // 反而污染输出。此刻 shell 已回 PS1，空行无副作用。
+      try {
+        _pty!.write(utf8.encode('\r'));
+      } catch (_) {}
       recheck.cancel();
       await sub.cancel();
       _pendingDoneCompleters.remove(doneCompleter);
@@ -552,6 +559,10 @@ class LocalTerminalService implements CommandExecutor {
       } catch (_) {}
       // 同超时分支：等被打断的程序真正退出再返回，避免它吃掉下一条命令的输入
       await Future<void>.delayed(const Duration(milliseconds: 300));
+      // 换行放在等待之后：避免 \r 被存活期的 sudo 当空密码吞掉
+      try {
+        _pty!.write(utf8.encode('\r'));
+      } catch (_) {}
       final reason = abnormalReason.isNotEmpty
           ? abnormalReason.join('; ')
           : (rawOutput.contains(marker) ? 'marker 出现但未触发完成' : '命令未完成');
@@ -699,7 +710,7 @@ class LocalTerminalService implements CommandExecutor {
 
     final stopwatch = Stopwatch()..start();
     _markerSeq++;
-    final marker = 'EXITCODE_$_markerSeq:';
+    final marker = CommandMarkers.next(_markerSeq);
     final wrappedCommand = '$writeCmd; echo "$marker\$?"';
     final markerScanner = ExitMarkerScanner(marker);
     final donePattern = markerScanner.donePattern;

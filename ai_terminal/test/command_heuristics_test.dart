@@ -449,4 +449,77 @@ void main() {
       expect(isTaskComplete(longLine), isFalse);
     });
   });
+
+  group('unreliableExitCodeReason', () {
+    const unreliable = [
+      'nohup java -jar app.jar > /dev/null 2>&1 &',
+      'sleep 100 &',
+      'ls & whoami',
+      'apt install nginx | tee /tmp/log',
+      'curl -s http://x | sh',
+      'find / -name "*.log" | xargs rm',
+    ];
+    for (final cmd in unreliable) {
+      test('提示: $cmd', () {
+        expect(unreliableExitCodeReason(cmd), isNotNull, reason: cmd);
+      });
+    }
+
+    const reliable = [
+      'ls -la', 'cat file',
+      'ps aux | head', 'grep foo file | wc -l', 'cat a | sort | uniq',
+      'echo "a|b"', 'grep "x&y" file',
+      'cmd1 && cmd2', 'cmd1 || cmd2',
+      'echo hi 2>&1', 'echo hi &> /dev/null',
+      'cat > f <<EOF\nhello | world & text\nEOF',
+      'echo \$((1|2))',
+      // 只读管道：前段失败只影响输出，不会假成功，不应拦截
+      'curl -s http://127.0.0.1/api | jq .',
+      'cat config.json | jq -r .name',
+      'docker inspect web | jq .[0].State',
+      r'echo $PATH | tr ":" "\n"',
+      'find . -name "*.dart" | xargs grep -n foo',
+    ];
+    for (final cmd in reliable) {
+      test('放行: $cmd', () {
+        expect(unreliableExitCodeReason(cmd), isNull, reason: cmd);
+      });
+    }
+  });
+
+  group('isBlockingInteractiveCommand', () {
+    const blocking = [
+      'top', 'htop', 'vim /etc/hosts', 'vi file', 'nano file',
+      'less log.txt', 'more log.txt', 'man ls', 'watch -n 1 date',
+      'tail -f /var/log/a.log', 'tail --follow=name x', 'tailf x',
+      'tail -n 100 -f /var/log/a.log',
+      'python', 'python3', 'bash', 'mysql', 'redis-cli',
+      'sudo vim /etc/hosts', 'FOO=bar top',
+      'ls && tail -f log', 'echo hi | grep foo; vim x',
+      // 容器/日志 follow 模式：与 tail -f 同构，永不返回
+      'docker logs -f web', 'docker logs --follow web',
+      'kubectl logs -f pod-1', 'journalctl -f -u nginx', 'dmesg -w',
+      'stern pod-1',
+    ];
+    for (final cmd in blocking) {
+      test('拦截: $cmd', () {
+        expect(isBlockingInteractiveCommand(cmd), isTrue, reason: cmd);
+      });
+    }
+
+    const nonBlocking = [
+      'ls -la', 'cat file', 'ps aux',
+      'top -b -n 1', 'tail -n 50 /var/log/a.log',
+      'python -c "print(1)"', 'python script.py', 'bash -c "echo hi"',
+      'git log', 'grep foo file', 'echo top', 'echo "tail -f"',
+      // 非 follow 形式一次性输出后退出，必须放行
+      'docker logs web', 'kubectl logs pod-1', 'journalctl -u nginx',
+      'dmesg', 'journalctl -n 50',
+    ];
+    for (final cmd in nonBlocking) {
+      test('放行: $cmd', () {
+        expect(isBlockingInteractiveCommand(cmd), isFalse, reason: cmd);
+      });
+    }
+  });
 }
