@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.5.2-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.5.3-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.5.2</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.5.3</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">Visit the website</a>
 </p>
@@ -53,6 +53,17 @@ A chat assistant tells you what to run. AI Terminal runs it on your servers and 
 ## At a glance
 
 `5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `27 built-in tools` · `8 slash commands` · `11 web search backends`
+
+## New in 1.5.3
+
+One agent task waits on dozens of commands, and the worst failure is not a command erroring out but the link going silent — the user just watches a spinner until something times out. 1.5.3 detects that in seconds and lets the task carry on, and makes the session list and the command cards say what they are actually doing.
+
+- **Half-open disconnects surface in seconds** — when a NAT drops its mapping or a server loses power, no FIN/RST ever reaches the client and every previous check missed it: the keepalive wrote a fire-and-forget newline into the PTY (which cannot throw), while disconnects came only from the output stream's `onDone` (which never arrives half-open). An activity watchdog now owns the waiting period — only after output stays quiet past a threshold does it send a transport-level ping, with its own timeout and two consecutive failures before the link is declared dead — so a task closes honestly as disconnected instead of being dressed up as a timeout
+- **Reconnect mid-task and keep going** — reconnecting is no longer refused outright while a task runs (that was the single entry point, so refusing once meant never retrying); it now swaps only the executor, leaving the task and the terminal view untouched, and the backoff window grows from 7s to 63s to cover a peer restart. On success the engine for that tab is told: the consecutive-failure budget relaxes and a one-shot "the new session lost its state" note lands in the conversation so a non-idempotent command is never blindly re-run
+- **Connection settings stop lying** — the connection-timeout slider used to be stored and ignored, and now applies; sockets request TCP keepalive at connect time (best effort on Windows); initialization neutralizes `TMOUT`, so the 300s idle logout common in hardening baselines no longer kicks your shell out mid-task
+- **Session titles become readable** — the placeholder takes the first 50 characters of the opening request instead of a hard 20, and the history list shows 60 across two lines; the AI names a session after its first completed turn but never overwrites a name you set (new `titleSource` gate, existing rows treated as user-named), and a session that errors on turn one and succeeds on turn two is named from the real answer rather than the error
+- **Command cards know they are running** — while the engine ran a 25-second command the card still read "executable", because the running signal was never wired in. It now derives from the task `phase`, so the header shows "running" with a progress ring and elapsed time refreshing every second (`12s` / `3m05s`), measured from when execution actually starts rather than including the confirmation wait
+- **One bundle id per platform** — the Android `applicationId` and the iOS/macOS `PRODUCT_BUNDLE_IDENTIFIER` move under one namespace with the `com.example` leftovers removed, and the Android/iOS display names match the other platforms, so an upgrade no longer leaves two apps installed side by side
 
 ## New in 1.5.2
 
@@ -219,11 +230,11 @@ Get the latest build from [GitHub Releases](https://github.com/keiskeies/ai_term
 
 | Platform | File |
 |---|---|
-| macOS | `AI_Terminal_v1.5.2_macOS.zip` |
-| iOS | `AI_Terminal_v1.5.2_iOS.ipa` (unsigned) |
-| Android | `AI_Terminal_v1.5.2_Android.apk` |
-| Windows | `AI_Terminal_v1.5.2_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.5.2_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.5.3_macOS.zip` |
+| iOS | `AI_Terminal_v1.5.3_iOS.ipa` (unsigned) |
+| Android | `AI_Terminal_v1.5.3_Android.apk` |
+| Windows | `AI_Terminal_v1.5.3_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.5.3_Linux_x64.tar.gz` |
 
 If macOS reports that the developer cannot be verified:
 

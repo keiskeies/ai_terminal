@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.5.2-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.5.3-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.5.2</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.5.3</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">访问官网</a>
 </p>
@@ -53,6 +53,17 @@
 ## 一眼看懂
 
 `5 个平台` · `14 种界面语言` · `22 个 AI 供应商` · `90+ 预设模型` · `27 个内置工具` · `8 个斜杠命令` · `11 种联网搜索后端`
+
+## 1.5.3 新增
+
+Agent 一次任务要等几十条命令，最可怕的从来不是命令失败，而是链路静默失效——用户体感是「卡住干等到超时」。1.5.3 把它改成秒级发现、任务续跑，顺手让会话列表和命令卡都说得清自己在干什么。
+
+- **半开断连秒级发现**——NAT 悄悄回收映射、服务器掉电时客户端收不到 FIN/RST，旧检测全部失效：探活写的是即发即忘的 PTY 换行（永不抛错），断线事件只由输出流的 onDone 驱动（半开时根本不会来）。等待期改由活性看门狗接管，输出静默达阈值才发传输层 ping（自带超时、连续 2 次失败才判死），如实以「已断连」收尾，不再把断线压成「超时」
+- **任务跑一半也能自动重连续跑**——重连不再被「任务运行中」一口拒掉（旧逻辑只有那一个入口，拒掉就没有下一次），改为只换执行器、不碰任务与终端视图；退避窗口 7s→63s 覆盖对端重启。重连成功按 tab 通知对应引擎：放宽连续失败预算，并注入一次性「新会话状态已丢失」提示，防止盲目重跑非幂等命令
+- **连接配置不再骗人**——连接超时滑杆此前只存而不用，现在真正生效；建连自建 socket 下发 TCP keepalive（Windows 尽力而为）；初始化串中和 TMOUT，等保基线常见的 300s 空闲登出不会再半路踢掉你的 shell
+- **会话标题看得出了**——占位标题从 20 字扩到首条诉求前 50 字、历史列表按 60 字两行展示；首轮结束后由 AI 自动命名，你改过名的会话永不再覆盖（新增 `titleSource` 来源门控，存量会话统一视为用户命名）；首轮报错、次轮才成功的会话用真正的结论命名，不会把警告符写进标题
+- **命令卡知道自己在跑**——引擎执行一条 25 秒的命令时卡片此前一直挂着「可执行」，因为运行信号压根没接进来。现在运行态由任务 `phase` 推导，头部换成「执行中」+ 进度圈 + 秒级刷新的已用时间（`12s` / `3m05s`），计时从真正开始执行那一刻算起，不把等待确认的时间混进耗时
+- **各平台包名统一**——Android `applicationId` 与 iOS/macOS `PRODUCT_BUNDLE_IDENTIFIER` 收拢到统一标识、清除 `com.example` 残留，Android/iOS 桌面显示名与其他平台对齐，升级安装不再并存两个 App
 
 ## 1.5.2 新增
 
@@ -219,11 +230,11 @@ Agent 也能直接读写跑着这个 App 的这台电脑，而不只是服务器
 
 | 平台 | 文件 |
 |---|---|
-| macOS | `AI_Terminal_v1.5.2_macOS.zip` |
-| iOS | `AI_Terminal_v1.5.2_iOS.ipa`（未签名） |
-| Android | `AI_Terminal_v1.5.2_Android.apk` |
-| Windows | `AI_Terminal_v1.5.2_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.5.2_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.5.3_macOS.zip` |
+| iOS | `AI_Terminal_v1.5.3_iOS.ipa`（未签名） |
+| Android | `AI_Terminal_v1.5.3_Android.apk` |
+| Windows | `AI_Terminal_v1.5.3_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.5.3_Linux_x64.tar.gz` |
 
 macOS 首次打开如提示“无法验证开发者”，可执行：
 
