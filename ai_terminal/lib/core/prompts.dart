@@ -336,6 +336,17 @@ const String behaviorBoundaryRule = '''
 10. 【错误理解】宁可保守不操作，也不要过度执行。不确定时只报告信息，不执行修改
 ''';
 
+/// 命令闭合规则 — 防止 AI 生成未闭合命令导致 shell 停在 PS2 等待输入而卡死。
+/// 引擎侧有静态预检拦截，这里从源头降低出错率。
+const String commandClosureRule = '''
+【命令闭合 - 严格遵守】
+- 引号、圆括号必须成对闭合；反斜杠转义只按 shell 规则使用
+- 使用 heredoc（<<EOF）时，必须在独立一行写结束定界符 EOF，且该行不能再有其他字符
+- 反例（错误）：cat > /tmp/a <<EOF 后面没有单独的 EOF 行；echo "hello（缺右引号）
+- 正例（正确）：printf '%s\\n' "hello"；heredoc 用三行写：cat > f <<EOF / 内容 / 单独一行 EOF
+- 未闭合命令会导致 shell 停在与你的交互等待、任务卡住，务必在提交前逐项核对闭合
+''';
+
 /// 安装安全规则 — 安装失败路径的防自救循环约束（原寄居知识库规则，剔除时独立保留）
 const String installSafetyRule = '''
 【安装安全规则 - 不可违背】

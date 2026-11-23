@@ -308,4 +308,22 @@ void main() {
       expect(PtyOutputDetector.waitsForPager(''), isFalse);
     });
   });
+
+  group('PtyOutputDetector.waitsForContinuation', () {
+    test('标准 PS2 提示符命中', () {
+      expect(PtyOutputDetector.waitsForContinuation('echo "abc\r\n> '), isTrue);
+      expect(PtyOutputDetector.waitsForContinuation('cmd\r\ndquote> '), isTrue);
+      expect(PtyOutputDetector.waitsForContinuation('a\nbquote> '), isTrue);
+      // 带 ANSI 色的自定义提示符（去色后是标准形态）
+      expect(PtyOutputDetector.waitsForContinuation('a\r\n\x1B[31m> \x1B[0m'), isTrue);
+    });
+
+    test('普通以 > 结尾的输出不得命中（回归：避免误杀长命令）', () {
+      expect(PtyOutputDetector.waitsForContinuation('last line ends with angle >'), isFalse);
+      expect(PtyOutputDetector.waitsForContinuation('echo abc >'), isFalse);
+      expect(PtyOutputDetector.waitsForContinuation('total 3\r\necho abc >'), isFalse);
+      expect(PtyOutputDetector.waitsForContinuation('> b'), isFalse);
+      expect(PtyOutputDetector.waitsForContinuation(''), isFalse);
+    });
+  });
 }

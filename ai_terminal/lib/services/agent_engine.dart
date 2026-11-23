@@ -55,6 +55,7 @@ import '../utils/token_estimator.dart';
 import '../utils/tool_call_accumulator.dart';
 import '../utils/audit_logger.dart';
 import '../utils/tail_text_buffer.dart';
+import '../utils/shell_syntax.dart';
 import 'change_record_service.dart';
 import 'notification_service.dart';
 
@@ -307,6 +308,12 @@ class AgentEngine {
   /// 达到 _maxFinishWithoutExecRetries 后放行 finish（避免死循环）
   int _finishWithoutExecCount = 0;
   static const int _maxFinishWithoutExecRetries = 2;
+
+  /// 命令闭合预检连续拦截次数。AI 反复生成未闭合命令时用于收敛：
+  /// 前 [_maxSyntaxRejects] 次回灌修正提示，超限后改发终止性诊断，
+  /// 避免 maxSteps=0（无限制）时无限空转烧配额。真正执行的命令会归零。
+  int _syntaxRejectCount = 0;
+  static const int _maxSyntaxRejects = 2;
 
   /// 纯问答显式声明标记：模型在 finish 的思考/正文里写明这句话，
   /// 表示本轮是基于已有上下文的问答，幻觉门控让路。
@@ -940,6 +947,7 @@ class AgentEngine {
     _noCommandRetryCount = 0;
     _hasExecutedAnyCommand = false;
     _finishWithoutExecCount = 0;
+    _syntaxRejectCount = 0;
     _userForbadeCommands = false;
     _planFinishRetryCount = 0; // O4/WP6: 计划 finish 门控计数新任务归零（R5）
     _consecutiveConnFailures = 0;
@@ -2196,6 +2204,9 @@ class AgentEngine {
                 final args = _decodeFcArgs(c.arguments);
                 final cmd = (args['command'] ?? '').toString().trim();
                 if (cmd.isEmpty) continue;
+                // 未闭合命令不提前执行：交给流结束后的全量解析，由 _executeCommand
+                // 的闭合预检统一拦截并回灌修正，避免半成品命令先进 PTY 卡死。
+                if (!_commandIsShellBalanced(cmd)) continue;
                 commandDetectedNotified = true;
                 final e = AgentEvent.command(
                   cmd,
@@ -2342,7 +2353,7 @@ class AgentEngine {
                   final e = currentEvents[i];
                   if (e.isCommand) {
                     final cmd = e.command ?? '';
-                    if (cmd.isNotEmpty) {
+                    if (cmd.isNotEmpty && _commandIsShellBalanced(cmd)) {
                       commandDetectedNotified = true;
                       // A5 修复：先记录 stableId，再改写为 finalId
                       final stableId = e.id;
@@ -4311,6 +4322,21 @@ class AgentEngine {
     }();
   }
 
+  /// 命令闭合防护开关（设置页可关，默认开）。
+  bool get _commandClosureGuard =>
+      SettingsDao.getCached('commandClosureGuard', defaultValue: true) != false;
+
+  /// 命令是否可安全提前执行（流式阶段未闭合的命令不提前下发）。
+  /// 与 [_executeCommand] 的预检同一口径，避免两处判断漂移。
+  bool _commandIsShellBalanced(String command) {
+    if (!_commandClosureGuard) return true;
+    final ex = _currentExecutor;
+    final isWindows = ex is SSHService
+        ? ex.osInfo.toLowerCase().contains('window')
+        : Platform.isWindows;
+    return ShellSyntax.unclosedReason(command, isWindows: isWindows) == null;
+  }
+
   /// 执行单条命令（支持 SSH 和本地 PTY）
   /// [myGeneration] 任务代际，用于 await 后识别"取消 + 立即新任务"竞态
   /// [countDisconnect] 断线是否计入连续失败预算。回滚预快照走同一条执行路径，
@@ -4344,6 +4370,40 @@ class AgentEngine {
         duration: stopwatch.elapsed,
       );
     }
+
+    // 命令闭合预检（任务②）：未闭合命令进 PTY 会让 shell 停在 PS2 等待输入，
+    // marker 永不出现 → 干等超时。这里在写入终端前静态拦截，返回 syntaxError
+    // 并通过 failureReason 回灌给 AI，让它自行修正（比等 60s–10min 超时廉价得多）。
+    // Windows 的 cmd/PowerShell 规则不同，直接放行交给执行器的 PS2/超时兜底。
+    final isWindowsShell = executor is SSHService
+        ? executor.osInfo.toLowerCase().contains('window')
+        : Platform.isWindows;
+    final unclosed = _commandClosureGuard
+        ? ShellSyntax.unclosedReason(command, isWindows: isWindowsShell)
+        : null;
+    if (unclosed != null) {
+      _syntaxRejectCount++;
+      agentLogger.warn('ReAct',
+          '命令闭合预检拦截(${"$_syntaxRejectCount/$_maxSyntaxRejects"}): $unclosed — ${_logCommand(command)}');
+      // 计入无命令重试预算：连续多轮都提交未闭合命令属于"空转"，
+      // 由既有 _noCommandRetryCount 终止链路收敛，避免 maxSteps=0 时无限烧配额。
+      _noCommandRetryCount++;
+      final exhausted = _syntaxRejectCount >= _maxSyntaxRejects;
+      return AgentResult(
+        success: false,
+        error: '命令未闭合：$unclosed',
+        duration: stopwatch.elapsed,
+        failureKind: CommandFailureKind.syntaxError.name,
+        failureReason: exhausted
+            ? '命令未闭合：$unclosed。已连续 $_syntaxRejectCount 次拦截同类错误。'
+                '请勿再直接提交命令：先用 回答: 说明当前阻碍并请求人工介入，或改用不涉及引号/heredoc 的极简命令。'
+            : '命令未闭合：$unclosed。命令未进入 shell，请补全后再提交（heredoc 必须有独立结束行；'
+                '引号/圆括号必须成对）。',
+      );
+    }
+
+    // 命令通过闭合预检：重置连续拦截计数（本轮不再空转）
+    _syntaxRejectCount = 0;
 
     // 执行前检查连接状态
     // 自愈：若传入的 executor 已断开，但 _currentExecutor 已被 setExecutor 刷新（用户重连），
@@ -4737,6 +4797,8 @@ class AgentEngine {
 
     buffer.writeln();
     buffer.writeln(prompts.behaviorBoundaryRule);
+    buffer.writeln();
+    buffer.writeln(prompts.commandClosureRule);
     buffer.writeln();
     buffer.writeln(prompts.installSafetyRule);
     buffer.writeln();

@@ -48,6 +48,17 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
     setState(() {});
   }
 
+  /// 命令闭合防护（默认开）：下发前静态检测引号/括号/heredoc 未闭合，
+  /// 拦截会让 shell 停在 PS2 卡死的半成品命令并回灌 AI 修正。
+  /// 关闭后仅依赖执行器的 PS2 检测与超时兜底（兼容个别被误判的特殊命令）。
+  bool get _commandClosureGuard =>
+      SettingsDao.getCached('commandClosureGuard', defaultValue: true) != false;
+
+  void _setCommandClosureGuard(bool value) {
+    SettingsDao.set('commandClosureGuard', value);
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
@@ -269,6 +280,44 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                               style: TextStyle(
                                   color: tc.textMuted, fontSize: fMicro)),
                         ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // 命令闭合防护
+              Card(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Padding(
+                  padding: const EdgeInsets.all(pStandard),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              UiText.t('命令闭合防护',
+                                  'Command closure guard'),
+                              style: TextStyle(color: tc.textMain),
+                            ),
+                          ),
+                          Switch(
+                            value: _commandClosureGuard,
+                            onChanged: _setCommandClosureGuard,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        UiText.t(
+                          '下发前静态检测引号/括号/heredoc 未闭合，拦截会让 shell 卡住的半成品命令并让 AI 自动修正。个别命令被误判时可关闭。',
+                          'Statically detect unclosed quotes/parens/heredoc before execution, blocking half-typed commands that stall the shell and letting AI self-correct. Turn off if a command is falsely flagged.',
+                        ),
+                        style: TextStyle(color: tc.textSub, fontSize: fSmall),
                       ),
                     ],
                   ),

@@ -322,6 +322,8 @@ class LocalTerminalService implements CommandExecutor {
     final confirmationResponder = ConfirmationPromptResponder();
     // 桥接回调进行中：同一提示的增量 chunk 不再重复触发回调
     var waitingInteractiveAnswer = false;
+    // 静默兜底：记录最后一次输出时刻，用于识别「链路活着但 shell 停在 PS2」的卡死
+    var lastOutputAtMs = 0;
     _pendingDoneCompleters.add(doneCompleter);
     StreamSubscription<String>? sub;
 
@@ -411,6 +413,7 @@ class LocalTerminalService implements CommandExecutor {
     sub = _outputController.stream.listen(
       (data) {
         if (doneCompleter.isCompleted) return;
+        lastOutputAtMs = stopwatch.elapsedMilliseconds;
         buffer.write(data);
         detectBuffer.write(data);
         if (markerScanner.add(data)) {
@@ -452,7 +455,23 @@ class LocalTerminalService implements CommandExecutor {
       const Duration(milliseconds: 400),
       (_) {
         evaluate(force: true);
-        if (doneCompleter.isCompleted) recheck.cancel();
+        if (doneCompleter.isCompleted) {
+          recheck.cancel();
+          return;
+        }
+        // 静默兜底（POSIX）：链路活着但 shell 停在 PS2 等待输入时没有任何新输出，
+        // 行首 PS2 正则可能漏检（自定义/置空 PS2）。静默 ≥30s 且尾部像续行 →
+        // 主动 Ctrl+C 退出并按语法错误收尾，避免干等满总超时。
+        if (!Platform.isWindows &&
+            stopwatch.elapsedMilliseconds - lastOutputAtMs >= 30000 &&
+            PtyOutputDetector.waitsForContinuation(buffer.tail())) {
+          abnormalReason.add('PS2：shell 停在续行提示符（引号或括号未闭合），已主动中断');
+          try {
+            _pty!.write(utf8.encode('\x03'));
+          } catch (_) {}
+          recheck.cancel();
+          doneCompleter.complete();
+        }
       },
     );
 

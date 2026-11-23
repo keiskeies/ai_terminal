@@ -131,6 +131,36 @@ class PtyOutputDetector {
     r'|\x1B[A-Za-z])*$',
   );
 
+  /// 缓冲尾部是否停在 shell 续行（PS2）提示符上——供静默兜底用。
+  ///
+  /// 与 [_ps2PromptPattern] 的区别：只看**尾部一行**，且允许自定义 PS2 前缀。
+  ///
+  /// 关键约束（R8）：必须**整行**就是提示符形态才命中，`>` 前只允许已知的
+  /// PS2 名称前缀或行首空白。绝不能是"任意以 > 结尾的文本"——否则正常命令
+  /// 输出（`echo abc >`、日志、diff 的 `> `）在静默超时后会被误判为未闭合，
+  /// 主动 Ctrl+C 打断一条正在执行的长命令。误判代价远高于漏判（漏判还有
+  /// 原 [_ps2PromptPattern] 与超时兜底）。
+  static final RegExp _continuationTail = RegExp(
+    r'^(?:dquote|quote|cmdsubst|bquote|curly|paren)?>[\s\x08]*$',
+  );
+
+  static bool waitsForContinuation(String buffer) {
+    const tailLength = 512;
+    final tail = buffer.length > tailLength
+        ? buffer.substring(buffer.length - tailLength)
+        : buffer;
+    // 取最后一行（去掉 ANSI），尾部匹配续行提示符
+    final plain = tail.replaceAll(
+      RegExp(r'\x1B\[[\x20-\x3F]*[\x40-\x7E]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)'),
+      '',
+    );
+    final lines = plain.split(RegExp(r'[\r\n]+'));
+    if (lines.isEmpty) return false;
+    final last = lines.last.trimRight();
+    if (last.isEmpty) return false;
+    return _continuationTail.hasMatch(last);
+  }
+
   /// 缓冲尾部是否停在 less/more 的分页状态行上
   ///
   /// 命中后调用方应向 stdin 发送 `q`，让 pager 退出、命令继续执行到 marker。

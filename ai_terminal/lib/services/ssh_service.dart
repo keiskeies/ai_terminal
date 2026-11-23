@@ -578,6 +578,17 @@ class SSHService implements CommandExecutor {
           probeFailures = 0;
           lastOutputAtMs = stopwatch.elapsedMilliseconds;
           _lastConfirmedAliveAt = DateTime.now();
+          // 链路活着但长时间无新输出且尾部停在续行提示符（PS2 被置空/自定义，
+          // 行首正则漏检的情况）：shell 在等引号/括号闭合，命令永远不会结束。
+          // 主动发 Ctrl+C 退出等待并按语法错误收尾，避免干等满总超时（最长 10min）。
+          if (PtyOutputDetector.waitsForContinuation(buffer.tail())) {
+            debugPrint('[SSHService] 静默且尾部停在续行提示符，判定命令未闭合，主动中断');
+            abnormalReason.add('PS2：shell 停在续行提示符（引号或括号未闭合），已主动中断');
+            _writeTextQuietly('\x03');
+            await Future<void>.delayed(const Duration(milliseconds: 200));
+            if (!doneCompleter.isCompleted) doneCompleter.complete();
+            recheck.cancel();
+          }
           return;
         }
         probeFailures++;
