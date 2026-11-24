@@ -54,7 +54,8 @@ class CredentialsStore {
     _storage = const FlutterSecureStorage(
       mOptions: _macOsOptions,
       aOptions: AndroidOptions(encryptedSharedPreferences: true),
-      iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+      iOptions: IOSOptions(
+          accessibility: KeychainAccessibility.first_unlock_this_device),
     );
 
     // 从原生平台获取主密钥（若未提前加载）
@@ -89,7 +90,8 @@ class CredentialsStore {
       if (key != null) {
         _masterKey = key;
         _encrypter = Encrypter(AES(_masterKey!));
-        debugPrint('CredentialsStore: 主密钥已从 IOPlatformUUID 派生 (Dart Process.run)');
+        debugPrint(
+            'CredentialsStore: 主密钥已从 IOPlatformUUID 派生 (Dart Process.run)');
         return;
       }
     }
@@ -187,7 +189,8 @@ class CredentialsStore {
       // 旧格式: 纯 cipherBase64（固定 IV，用旧版密钥解密）
       // 用旧版密钥创建临时解密器
       final legacyEncrypter = Encrypter(AES(_legacyKey));
-      return legacyEncrypter.decrypt64(cipherText, iv: IV.fromUtf8('A1TerminalIV2024'));
+      return legacyEncrypter.decrypt64(cipherText,
+          iv: IV.fromUtf8('A1TerminalIV2024'));
     } catch (e) {
       // 尝试交叉解密：新格式用旧密钥
       try {
@@ -220,7 +223,8 @@ class CredentialsStore {
     // 1. 尝试 secure_storage
     try {
       await _storage.write(key: key, value: value);
-      debugPrint('✅ CredentialsStore: 保存到 Keychain 成功 hostId=$hostId type=$type');
+      debugPrint(
+          '✅ CredentialsStore: 保存到 Keychain 成功 hostId=$hostId type=$type');
       return true;
     } catch (e, stack) {
       debugPrint('⚠️ CredentialsStore: Keychain 写入失败，降级到加密存储: $e');
@@ -231,7 +235,8 @@ class CredentialsStore {
     try {
       final encrypted = _encrypt(value);
       await CredentialsFallbackDao.put(key, encrypted);
-      debugPrint('✅ CredentialsStore: 保存到加密 SQLite 成功 hostId=$hostId type=$type');
+      debugPrint(
+          '✅ CredentialsStore: 保存到加密 SQLite 成功 hostId=$hostId type=$type');
       return true;
     } catch (e) {
       debugPrint('❌ CredentialsStore: 加密 SQLite 保存也失败: $e');
@@ -264,7 +269,8 @@ class CredentialsStore {
       if (encrypted != null) {
         final decrypted = _decrypt(encrypted);
         if (decrypted != null) {
-          debugPrint('CredentialsStore: 从加密 SQLite 恢复凭据 hostId=$hostId type=$type');
+          debugPrint(
+              'CredentialsStore: 从加密 SQLite 恢复凭据 hostId=$hostId type=$type');
           return decrypted;
         }
       }

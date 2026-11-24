@@ -246,10 +246,10 @@ void main() {
 命令: ls -la''';
 
       final events = ReActStreamParser.parse(response);
-      final thought = events.firstWhere(
-          (e) => e.type == AgentEventType.thought);
-      final command = events.firstWhere(
-          (e) => e.type == AgentEventType.command);
+      final thought =
+          events.firstWhere((e) => e.type == AgentEventType.thought);
+      final command =
+          events.firstWhere((e) => e.type == AgentEventType.command);
 
       expect(thought.text, '需要查看目录');
       expect(thought.text, isNot(contains('只读操作')));
@@ -267,9 +267,8 @@ void main() {
 命令: pwd''';
 
       final events = ReActStreamParser.parse(response);
-      final commands = events
-          .where((e) => e.type == AgentEventType.command)
-          .toList();
+      final commands =
+          events.where((e) => e.type == AgentEventType.command).toList();
 
       expect(commands.length, 2);
       expect(commands[0].command, 'ls');
@@ -288,10 +287,9 @@ void main() {
 命令: sudo apt install -y nginx''';
 
       final events = ReActStreamParser.parse(response);
-      final command = events.firstWhere(
-          (e) => e.type == AgentEventType.command);
-      final plan =
-          events.firstWhere((e) => e.type == AgentEventType.plan);
+      final command =
+          events.firstWhere((e) => e.type == AgentEventType.command);
+      final plan = events.firstWhere((e) => e.type == AgentEventType.plan);
 
       expect(plan.planSteps!.any((s) => s.title.contains('安装 Nginx')), isTrue);
       expect(command.command, 'sudo apt install -y nginx');

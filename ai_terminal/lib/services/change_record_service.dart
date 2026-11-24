@@ -12,11 +12,11 @@ import '../utils/tool_args_parser.dart';
 class ChangeRecordService {
   static const _uuid = Uuid();
 
-  static final RegExp _sudoPrefixRegex = RegExp(
-      r'^sudo\s+(?:-u\s+\S+\s+)?(?:-[A-Za-z]+\s+)*');
+  static final RegExp _sudoPrefixRegex =
+      RegExp(r'^sudo\s+(?:-u\s+\S+\s+)?(?:-[A-Za-z]+\s+)*');
   static final RegExp _sudoAnywhereRegex = RegExp(r'^sudo\s+');
-  static final RegExp _installRegex = RegExp(
-      r'^(apt|apt-get|yum|dnf|apk|pacman|snap|brew)\s+(install|add|-S)');
+  static final RegExp _installRegex =
+      RegExp(r'^(apt|apt-get|yum|dnf|apk|pacman|snap|brew)\s+(install|add|-S)');
   static final RegExp _uninstallRegex = RegExp(
       r'^(apt|apt-get|yum|dnf|apk|pacman)\s+(remove|purge|erase|-R|autoremove)');
   static final RegExp _systemctlStartRegex = RegExp(r'^systemctl\s+start');
@@ -24,7 +24,8 @@ class ChangeRecordService {
   static final RegExp _systemctlRestartRegex = RegExp(r'^systemctl\s+restart');
   static final RegExp _serviceStartRegex = RegExp(r'^service\s+\w+\s+start');
   static final RegExp _serviceStopRegex = RegExp(r'^service\s+\w+\s+stop');
-  static final RegExp _serviceRestartRegex = RegExp(r'^service\s+\w+\s+restart');
+  static final RegExp _serviceRestartRegex =
+      RegExp(r'^service\s+\w+\s+restart');
   static final RegExp _permissionRegex = RegExp(r'chmod|chown');
   static final RegExp _fileOpRegex =
       RegExp(r'^(cp|mv|rm|mkdir|tee|sed|echo.*>)');
@@ -173,9 +174,8 @@ class ChangeRecordService {
       command: command,
       type: type,
       rollbackCommand: rollbackCmd,
-      rollbackDescription: hasLocalRestore
-          ? '本机文件还原'
-          : (rollbackCmd != null ? '可自动回滚' : null),
+      rollbackDescription:
+          hasLocalRestore ? '本机文件还原' : (rollbackCmd != null ? '可自动回滚' : null),
       localRestoreFrom: localRestoreFrom,
       localRestoreTo: localRestoreTo,
       timestamp: DateTime.now(),
@@ -242,7 +242,8 @@ class ChangeRecordService {
         duration: Duration.zero,
       );
     }
-    final result = await executor.executeAndWait(record.rollbackCommand!, timeout: timeout);
+    final result = await executor.executeAndWait(record.rollbackCommand!,
+        timeout: timeout);
     // 审计日志：记录回滚命令的执行（无论成败）
     try {
       await AuditLogger.log(
@@ -250,7 +251,9 @@ class ChangeRecordService {
         command: record.rollbackCommand!,
         safetyLevel: rollbackSafety.name,
         output: result.success
-            ? (result.stdout.isNotEmpty ? result.stdout.substring(0, result.stdout.length.clamp(0, 500)) : null)
+            ? (result.stdout.isNotEmpty
+                ? result.stdout.substring(0, result.stdout.length.clamp(0, 500))
+                : null)
             : result.stderr,
         executed: true,
       );
@@ -277,8 +280,7 @@ class ChangeRecordService {
       final srcIsDir = Directory(from).existsSync();
       final srcIsFile = !srcIsDir && File(from).existsSync();
       if (!srcIsDir && !srcIsFile) {
-        return _restoreFailure(
-            '$stage失败：副本已不存在（$from），无法还原');
+        return _restoreFailure('$stage失败：副本已不存在（$from），无法还原');
       }
 
       final parent = p.dirname(to);
@@ -287,9 +289,8 @@ class ChangeRecordService {
       }
 
       String? displaced;
-      final targetExists = srcIsDir
-          ? Directory(to).existsSync()
-          : File(to).existsSync();
+      final targetExists =
+          srcIsDir ? Directory(to).existsSync() : File(to).existsSync();
       if (targetExists) {
         displaced = '$to.displaced.${DateTime.now().millisecondsSinceEpoch}';
         if (srcIsDir) {
@@ -333,8 +334,8 @@ class ChangeRecordService {
       );
 
   /// 还原动作必须留痕：它改的是本机文件，远程审计里看不到
-  static Future<void> _auditRestore(
-      ChangeRecord record, String message, {required bool ok}) async {
+  static Future<void> _auditRestore(ChangeRecord record, String message,
+      {required bool ok}) async {
     try {
       await AuditLogger.log(
         hostId: record.hostId,

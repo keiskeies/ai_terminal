@@ -131,10 +131,8 @@ void main() {
     bool begs(int i) => obs[i].contains('请立即使用 动作: ask');
     final first = List.generate(obs.length, begs).indexOf(true);
 
-    expect(first, 2,
-        reason: '默认门限 3：第 3 次断线起才要求停手，前两次仍给重连机会');
-    expect(obs[0], contains('请使用 动作: ask'),
-        reason: '未到门限时也要引导，只是不禁止再试');
+    expect(first, 2, reason: '默认门限 3：第 3 次断线起才要求停手，前两次仍给重连机会');
+    expect(obs[0], contains('请使用 动作: ask'), reason: '未到门限时也要引导，只是不禁止再试');
     for (var i = first; i < obs.length; i++) {
       expect(begs(i), isTrue, reason: '升级后不应回落');
     }

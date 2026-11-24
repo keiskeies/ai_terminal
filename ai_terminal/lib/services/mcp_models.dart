@@ -472,7 +472,8 @@ class McpOAuthTokenData {
   });
 
   bool get isExpired =>
-      expiresAtMs != null && DateTime.now().millisecondsSinceEpoch >= expiresAtMs!;
+      expiresAtMs != null &&
+      DateTime.now().millisecondsSinceEpoch >= expiresAtMs!;
 
   Map<String, dynamic> toJson() => {
         'accessToken': accessToken,

@@ -162,9 +162,7 @@ class McpConnection {
         return;
       }
       throw McpAuthRequiredException(
-        oauth == null
-            ? '服务器要求 OAuth 授权，请编辑服务器并开启 OAuth 后重试'
-            : '需要 OAuth 授权',
+        oauth == null ? '服务器要求 OAuth 授权，请编辑服务器并开启 OAuth 后重试' : '需要 OAuth 授权',
         authUrl: oauth?.pendingAuthUrl ?? '',
       );
     } finally {
@@ -502,7 +500,8 @@ class McpConnection {
       );
     } on UnauthorizedError {
       _status = McpServerStatus.authRequired;
-      _error = UiText.t('OAuth 授权已过期，请重新登录', 'OAuth authorization has expired; sign in again');
+      _error = UiText.t('OAuth 授权已过期，请重新登录',
+          'OAuth authorization has expired; sign in again');
       _emit();
       throw const McpAuthRequiredException('OAuth 授权已过期，请重新登录');
     } catch (e) {
@@ -524,7 +523,8 @@ class McpConnection {
     if (buffer.isEmpty && result.hasStructuredContent) {
       buffer.write(encodeMcpJson(result.structuredContentJson?.toJson()));
     }
-    if (buffer.isEmpty) return UiText.t('（MCP 工具返回空结果）', '(MCP tool returned an empty result)');
+    if (buffer.isEmpty)
+      return UiText.t('（MCP 工具返回空结果）', '(MCP tool returned an empty result)');
     return _cap(buffer.toString(), 20000);
   }
 

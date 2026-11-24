@@ -241,8 +241,8 @@ class _AgentAskStepRowState extends State<AgentAskStepRow> {
                         decoration: BoxDecoration(
                           color: tc.ok.withValues(alpha: 0.10),
                           borderRadius: BorderRadius.circular(rFull),
-                          border: Border.all(
-                              color: tc.ok.withValues(alpha: 0.35)),
+                          border:
+                              Border.all(color: tc.ok.withValues(alpha: 0.35)),
                         ),
                         child: Text(
                           chosen,

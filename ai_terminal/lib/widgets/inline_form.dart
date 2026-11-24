@@ -157,8 +157,7 @@ class InlineField extends StatelessWidget {
         isDense: true,
         hintText: hint,
         hintStyle: TextStyle(fontSize: fMicro, color: tc.textMuted),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 9, vertical: 9),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 9, vertical: 9),
         enabledBorder: OutlineInputBorder(
           borderSide: BorderSide(color: tc.border),
           borderRadius: BorderRadius.circular(rXSmall),
@@ -247,7 +246,8 @@ class _InlineSelectState<T> extends State<InlineSelect<T>> {
             ),
             child: Row(
               children: [
-                if (widget.leadingBuilder?.call(widget.value) case final leading?) ...[
+                if (widget.leadingBuilder?.call(widget.value)
+                    case final leading?) ...[
                   leading,
                   const SizedBox(width: 7),
                 ],
@@ -474,8 +474,7 @@ class InlineButton extends StatelessWidget {
             ? SizedBox(
                 width: 11,
                 height: 11,
-                child: CircularProgressIndicator(
-                    strokeWidth: 1.4, color: fg),
+                child: CircularProgressIndicator(strokeWidth: 1.4, color: fg),
               )
             : Text(label,
                 style: TextStyle(fontSize: fMicro, color: fg, height: 1.1)),
@@ -520,8 +519,8 @@ class InlineConfirm extends StatelessWidget {
           Expanded(
             child: Text(
               message,
-              style: TextStyle(
-                  fontSize: fMicro, color: tc.textMain, height: 1.35),
+              style:
+                  TextStyle(fontSize: fMicro, color: tc.textMain, height: 1.35),
             ),
           ),
           const SizedBox(width: 8),

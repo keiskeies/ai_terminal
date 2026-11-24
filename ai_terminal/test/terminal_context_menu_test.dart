@@ -111,8 +111,8 @@ void main() {
 
     // 分隔线是一个 1px 高的 Container
     expect(
-      find.byWidgetPredicate((w) =>
-          w is Container && w.constraints?.maxHeight == 1),
+      find.byWidgetPredicate(
+          (w) => w is Container && w.constraints?.maxHeight == 1),
       findsOneWidget,
     );
     expect(find.text('清屏'), findsOneWidget);

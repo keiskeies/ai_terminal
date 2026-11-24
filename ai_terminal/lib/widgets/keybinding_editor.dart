@@ -90,8 +90,8 @@ class _KeybindingEditorPanelState extends State<KeybindingEditorPanel> {
                       ActionChip(
                         visualDensity: VisualDensity.compact,
                         avatar: const Icon(Icons.add, size: 14),
-                        label: const Text('+',
-                            style: TextStyle(fontSize: fMicro)),
+                        label:
+                            const Text('+', style: TextStyle(fontSize: fMicro)),
                         onPressed: () => _edit(action, null),
                       ),
                       if (widget.overrides.containsKey(action.id))
@@ -111,7 +111,7 @@ class _KeybindingEditorPanelState extends State<KeybindingEditorPanel> {
           UiText.t(
             'Ctrl+A/C/D/H 这些 shell 自己的键不在列表里：抢过来只会让命令行少键。',
             'Keys the shell itself uses (Ctrl+A/C/D/H) are deliberately not '
-            'rebindable — taking them would only cost you shell bindings.',
+                'rebindable — taking them would only cost you shell bindings.',
           ),
           style: TextStyle(color: tc.textMuted, fontSize: fMicro),
         ),
@@ -296,7 +296,8 @@ class _RecordShortcutDialogState extends State<_RecordShortcutDialog> {
           child: Text(UiText.t('取消', 'Cancel')),
         ),
         FilledButton(
-          onPressed: canAccept ? () => Navigator.of(context).pop(captured) : null,
+          onPressed:
+              canAccept ? () => Navigator.of(context).pop(captured) : null,
           child: Text(UiText.t('确定', 'Save')),
         ),
       ],

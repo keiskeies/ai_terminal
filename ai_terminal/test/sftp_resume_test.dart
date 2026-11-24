@@ -51,7 +51,8 @@ void main() {
 
     test('同指纹且未满的残留可续传', () {
       final part = makePart('${tmp.path}/f.bin', 'tok', 400);
-      final r = SftpService.pickResumePart([part], '${tmp.path}/f.bin', 'tok', 1000);
+      final r =
+          SftpService.pickResumePart([part], '${tmp.path}/f.bin', 'tok', 1000);
       expect(r.resume, part);
       expect(r.stale, isEmpty);
     });
@@ -83,7 +84,8 @@ void main() {
 
     test('残留文件读不到时判陈旧而非抛异常', () {
       final ghost = '${tmp.path}/f.bin.ai-download-tok.part';
-      final r = SftpService.pickResumePart([ghost], '${tmp.path}/f.bin', 'tok', 10);
+      final r =
+          SftpService.pickResumePart([ghost], '${tmp.path}/f.bin', 'tok', 10);
       expect(r.resume, isNull);
       expect(r.stale, [ghost]);
     });
@@ -93,7 +95,10 @@ void main() {
       makePart('$dir/f.bin', 'stale1', 100);
       final keep = makePart('$dir/f.bin', 'tok', 700);
       final r = SftpService.pickResumePart(
-          [keep, '$dir/f.bin.ai-download-stale1.part'], '$dir/f.bin', 'tok', 5000);
+          [keep, '$dir/f.bin.ai-download-stale1.part'],
+          '$dir/f.bin',
+          'tok',
+          5000);
       expect(r.resume, keep);
       expect(r.stale, ['$dir/f.bin.ai-download-stale1.part']);
     });

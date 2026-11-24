@@ -52,8 +52,8 @@ void main() {
 
   test('buildConfig 使用已保存档位', () async {
     await AIModelSelectionService.saveReasoningTier('m-a1', 'high');
-    final config = AIModelSelectionService.buildConfig(
-        [endpointA, endpointB], 'm-a1');
+    final config =
+        AIModelSelectionService.buildConfig([endpointA, endpointB], 'm-a1');
     expect(config, isNotNull);
     expect(config!.endpointId, 'ep-a');
     expect(config.apiKey, 'sk-a');

@@ -64,8 +64,7 @@ class AIModelSelectionService {
     return result;
   }
 
-  static AIModelChoice? findChoice(
-      List<AIEndpoint> endpoints, String modelId) {
+  static AIModelChoice? findChoice(List<AIEndpoint> endpoints, String modelId) {
     for (final e in endpoints) {
       for (final m in e.models) {
         if (m.id == modelId) {
@@ -102,9 +101,8 @@ class AIModelSelectionService {
     final list = endpoints ?? AIEndpointsDao.cached;
     if (list.isEmpty) return null;
 
-    var choice = selectedModelId == null
-        ? null
-        : findChoice(list, selectedModelId!);
+    var choice =
+        selectedModelId == null ? null : findChoice(list, selectedModelId!);
     if (choice == null) {
       final all = allChoices(list);
       if (all.isEmpty) return null;
@@ -119,8 +117,9 @@ class AIModelSelectionService {
       apiKey =
           await CredentialsStore.get(hostId: endpoint.id, type: 'apiKey') ?? '';
     }
-    final resolvedEndpoint =
-        apiKey == endpoint.apiKey ? endpoint : endpoint.copyWith(apiKey: apiKey);
+    final resolvedEndpoint = apiKey == endpoint.apiKey
+        ? endpoint
+        : endpoint.copyWith(apiKey: apiKey);
     final tier = choice.model.resolveReasoningTier(tierFor(choice.modelId));
     return AIModelConfig.fromEndpoint(
       endpoint: resolvedEndpoint,

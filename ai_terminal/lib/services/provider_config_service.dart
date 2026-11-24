@@ -5,25 +5,32 @@ import 'package:dio/dio.dart';
 import 'daos.dart';
 
 const String _providersKey = 'providers_json';
+
 /// 本地 asset 内置版本号存储键。App 升级时若内置版本号 > 缓存版本号，
 /// 则强制丢弃旧缓存重新从 asset 加载，保证用户在 App 升级后能拿到最新内置配置。
 const String _versionKey = 'providers_version';
+
 /// 远程配置 ETag 存储键（仅用于追踪上次刷新状态，不参与 asset 升级判断）
 const String _remoteEtagKey = 'providers_remote_etag';
+
 /// 本地 asset 的内置版本号。每次修改 assets/config/ai_providers.json 后递增此值，
 /// 启动时若缓存版本号 < 此值则强制丢弃旧缓存重新从 asset 加载，
 /// 保证 App 升级后用户能拿到最新内置配置。
 const int _embeddedVersion = 7;
-const String _remoteConfigUrl = 'https://ai-terminal.keiskei.top/config/ai_providers.json';
+const String _remoteConfigUrl =
+    'https://ai-terminal.keiskei.top/config/ai_providers.json';
 
 class ModelInfo {
   final String name;
   final String label;
   final bool free;
+
   /// 最大输出 tokens（0 表示未知，由 UI/模型层用默认值）
   final int maxTokens;
+
   /// 上下文窗口（0 表示未知，AIModelConfig.effectiveContextWindow 回退到 32768）
   final int contextWindow;
+
   /// 是否支持 OpenAI 原生 Function Calling（tools API）
   final bool supportsFunctionCalling;
 
@@ -43,7 +50,8 @@ class ModelInfo {
       free: json['free'] as bool? ?? false,
       maxTokens: (json['max_tokens'] as num?)?.toInt() ?? 0,
       contextWindow: (json['context_window'] as num?)?.toInt() ?? 0,
-      supportsFunctionCalling: json['supports_function_calling'] as bool? ?? false,
+      supportsFunctionCalling:
+          json['supports_function_calling'] as bool? ?? false,
     );
   }
 
@@ -53,7 +61,8 @@ class ModelInfo {
         if (free) 'free': free,
         if (maxTokens > 0) 'max_tokens': maxTokens,
         if (contextWindow > 0) 'context_window': contextWindow,
-        if (supportsFunctionCalling) 'supports_function_calling': supportsFunctionCalling,
+        if (supportsFunctionCalling)
+          'supports_function_calling': supportsFunctionCalling,
       };
 }
 
@@ -103,7 +112,9 @@ class ProviderInfo {
       websiteUrl: json['websiteUrl'] as String?,
       icon: json['icon'] as String? ?? '💬',
       colorValue: _parseColor(json['color']),
-      models: modelsList.map((e) => ModelInfo.fromJson(e as Map<String, dynamic>)).toList(),
+      models: modelsList
+          .map((e) => ModelInfo.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 
@@ -119,7 +130,8 @@ class ProviderInfo {
         if (codingPlanUrl != null) 'codingPlanUrl': codingPlanUrl,
         if (websiteUrl != null) 'websiteUrl': websiteUrl,
         'icon': icon,
-        'color': '0x${colorValue.toRadixString(16).padLeft(8, '0').toUpperCase()}',
+        'color':
+            '0x${colorValue.toRadixString(16).padLeft(8, '0').toUpperCase()}',
         'models': models.map((m) => m.toJson()).toList(),
       };
 
@@ -149,7 +161,8 @@ class ProviderConfigService {
     final cacheStale = cachedVersion < _embeddedVersion;
 
     if (cacheStale) {
-      debugPrint('[ProviderConfig] 缓存版本 $cachedVersion < embedded $_embeddedVersion，丢弃旧缓存重载 asset');
+      debugPrint(
+          '[ProviderConfig] 缓存版本 $cachedVersion < embedded $_embeddedVersion，丢弃旧缓存重载 asset');
       _providers = await _loadEmbedded();
       await _saveProviders(_providers);
       // 用本地 asset 版本号初始化缓存，保证后续启动不再重复重载
@@ -176,7 +189,8 @@ class ProviderConfigService {
 
   static Future<List<ProviderInfo>> _loadEmbedded() async {
     try {
-      final jsonStr = await rootBundle.loadString('assets/config/ai_providers.json');
+      final jsonStr =
+          await rootBundle.loadString('assets/config/ai_providers.json');
       return _parseProvidersJson(jsonStr);
     } catch (_) {
       return [
@@ -238,7 +252,8 @@ class ProviderConfigService {
         if (newProviders.isNotEmpty) {
           _providers = newProviders;
           await _saveProviders(_providers);
-          final etag = response.headers.value('etag') ?? DateTime.now().millisecondsSinceEpoch.toString();
+          final etag = response.headers.value('etag') ??
+              DateTime.now().millisecondsSinceEpoch.toString();
           await SettingsDao.set(_remoteEtagKey, etag);
           return RefreshResult.success(newProviders.length);
         }
@@ -271,7 +286,9 @@ class ProviderConfigService {
   static List<ProviderInfo> _parseProvidersJson(String jsonStr) {
     final data = jsonDecode(jsonStr) as Map<String, dynamic>;
     final list = data['providers'] as List<dynamic>? ?? [];
-    return list.map((e) => ProviderInfo.fromJson(e as Map<String, dynamic>)).toList();
+    return list
+        .map((e) => ProviderInfo.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   static ProviderInfo? getProviderById(String id) {
@@ -296,7 +313,9 @@ class RefreshResult {
     this.count,
   });
 
-  factory RefreshResult.success(int count) => RefreshResult._(isSuccess: true, count: count);
+  factory RefreshResult.success(int count) =>
+      RefreshResult._(isSuccess: true, count: count);
   factory RefreshResult.empty() => const RefreshResult._(isEmpty: true);
-  factory RefreshResult.failed(String msg) => RefreshResult._(errorMessage: msg);
+  factory RefreshResult.failed(String msg) =>
+      RefreshResult._(errorMessage: msg);
 }

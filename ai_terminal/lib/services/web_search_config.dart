@@ -277,8 +277,7 @@ class WebSearchConfig {
 
   Duration get backendTimeout => Duration(milliseconds: backendTimeoutMs);
 
-  bool get hasUsableBackends =>
-      enabledBackends.any((p) => p.isAvailable);
+  bool get hasUsableBackends => enabledBackends.any((p) => p.isAvailable);
 
   int get enabledCount => enabledBackends.where((p) => p.isAvailable).length;
 
@@ -300,8 +299,7 @@ class WebSearchConfig {
   static String? normalizeProxy(String raw) {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) return '';
-    final withScheme =
-        trimmed.contains('://') ? trimmed : 'http://$trimmed';
+    final withScheme = trimmed.contains('://') ? trimmed : 'http://$trimmed';
     final uri = Uri.tryParse(withScheme);
     if (uri == null || uri.host.isEmpty) return null;
     if (uri.scheme != 'http') return null;
@@ -385,8 +383,7 @@ class WebSearchConfig {
       concurrency: _readInt(json['concurrency'], 6, 1, 12),
       backendTimeoutMs: timeoutMs,
       proxy: (json['proxy'] as String? ?? '').trim(),
-      searxngInstanceUrl:
-          (json['searxngInstanceUrl'] as String? ?? '').trim(),
+      searxngInstanceUrl: (json['searxngInstanceUrl'] as String? ?? '').trim(),
     );
   }
 
@@ -406,7 +403,8 @@ class WebSearchConfig {
     if (raw == null) return const WebSearchConfig();
     try {
       if (raw is String) {
-        return WebSearchConfig.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        return WebSearchConfig.fromJson(
+            jsonDecode(raw) as Map<String, dynamic>);
       }
       if (raw is Map) {
         return WebSearchConfig.fromJson(Map<String, dynamic>.from(raw));

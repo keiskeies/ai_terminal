@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ai_terminal/models/agent_event.dart';
 import 'package:ai_terminal/models/agent_model.dart';
 import 'package:ai_terminal/services/react_parser.dart';
+import 'package:ai_terminal/utils/react_stream_parser.dart';
 
 /// ReActParser 特征化测试 —— 从 agent_engine.dart 抽出解析层后锁定其行为。
 ///
@@ -38,7 +39,8 @@ void main() {
     });
 
     test('显式 tool：提取工具名与参数', () {
-      const response = '动作: tool\n工具: sftp_upload\n参数:\n  local: /tmp/a\n  remote: /var/www';
+      const response =
+          '动作: tool\n工具: sftp_upload\n参数:\n  local: /tmp/a\n  remote: /var/www';
       final step = ReActParser.parseReActResponse(response);
 
       expect(step.action, ActionType.tool);
@@ -82,8 +84,8 @@ void main() {
       // 流结束路径缓存了解析结果；即便 content 里没有可再解析的命令行，
       // 传入的 parsedEvents 仍应提供命令（证明复用的是事件，不是重新解析文本）。
       final events = [AgentEvent.command('from_cached_events')];
-      final step = ReActParser.parseReActResponse('动作: execute',
-          parsedEvents: events);
+      final step =
+          ReActParser.parseReActResponse('动作: execute', parsedEvents: events);
 
       expect(step.action, ActionType.execute);
       expect(step.command, 'from_cached_events');
@@ -101,7 +103,8 @@ void main() {
     });
 
     test('围栏内的协议关键词行不触发提前截断', () {
-      final lines = '回答: 示例\n```\n动作: execute\n命令: echo hi\n```\n结尾'.split('\n');
+      final lines =
+          '回答: 示例\n```\n动作: execute\n命令: echo hi\n```\n结尾'.split('\n');
       final answer = ReActParser.parseAnswerBlock(lines);
 
       expect(answer, isNotNull);
@@ -124,9 +127,42 @@ void main() {
     });
   });
 
+  group('execute 示例围栏端到端解析', () {
+    test('execute→示例围栏→真实命令，流拼接后只派发真实命令', () {
+      const chunks = [
+        '思考: 先展示写法，再执行检查\n动作: execute\n',
+        '下面是格式示例：\n```text\n动作: execute\n命',
+        '令: echo example-must-not-run\n```\n实际执行：\n',
+        '命令: echo real-command',
+      ];
+      final fullResponse = chunks.join();
+      final events = ReActParser.parseEvents(fullResponse);
+      final step =
+          ReActParser.parseReActResponse(fullResponse, parsedEvents: events);
+      final dispatched = events.where((event) => event.isCommand).toList();
+
+      expect(step.action, ActionType.execute);
+      expect(dispatched, hasLength(1));
+      expect(dispatched.single.command, 'echo real-command');
+      expect(step.command, 'echo real-command');
+      expect(
+          dispatched.single.command, isNot(contains('example-must-not-run')));
+
+      // 聊天渲染/导出直接调用流解析器时，协议示例也不能降级成命令。
+      final directEvents = ReActStreamParser.parse(fullResponse);
+      expect(
+        directEvents
+            .where((event) => event.isCommand)
+            .map((event) => event.command),
+        ['echo real-command'],
+      );
+    });
+  });
+
   group('ReActParser.parseReportSections 操作单四段', () {
     test('解析结论/现状/变更/建议四段', () {
-      final lines = '回答: 摘要\n结论: 安装成功\n现状: 服务运行中\n变更: 新增 nginx\n建议: 无'.split('\n');
+      final lines =
+          '回答: 摘要\n结论: 安装成功\n现状: 服务运行中\n变更: 新增 nginx\n建议: 无'.split('\n');
       final sections = ReActParser.parseReportSections(lines);
 
       expect(sections, isNotNull);

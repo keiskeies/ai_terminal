@@ -54,7 +54,8 @@ class _HostListPageState extends ConsumerState<HostListPage> {
 
   /// P1-4: 保存分组展开状态
   void _saveGroupExpandedState() {
-    SettingsDao.set('hostGroupExpanded', Map<String, bool>.from(_groupExpanded));
+    SettingsDao.set(
+        'hostGroupExpanded', Map<String, bool>.from(_groupExpanded));
   }
 
   @override
@@ -85,7 +86,8 @@ class _HostListPageState extends ConsumerState<HostListPage> {
         children: [
           // 搜索栏
           Padding(
-            padding: const EdgeInsets.fromLTRB(pStandard, 0, pStandard, pStandard),
+            padding:
+                const EdgeInsets.fromLTRB(pStandard, 0, pStandard, pStandard),
             child: TextField(
               controller: _searchController,
               onChanged: (value) => setState(() => _searchQuery = value),
@@ -117,7 +119,8 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                   borderRadius: BorderRadius.circular(rSmall),
                   borderSide: BorderSide(color: tc.brand, width: 1.5),
                 ),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 isDense: true,
               ),
             ),
@@ -132,10 +135,12 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                   children: [
                     Icon(Icons.error_outline, size: 48, color: tc.error),
                     const SizedBox(height: 16),
-                    Text(l10n.hostListLoadFailed('$error'), style: TextStyle(color: tc.textSub)),
+                    Text(l10n.hostListLoadFailed('$error'),
+                        style: TextStyle(color: tc.textSub)),
                     const SizedBox(height: 16),
                     ElevatedButton(
-                      onPressed: () => ref.read(hostsProvider.notifier).loadHosts(),
+                      onPressed: () =>
+                          ref.read(hostsProvider.notifier).loadHosts(),
                       child: Text(l10n.retry),
                     ),
                   ],
@@ -146,12 +151,13 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                 final q = _searchQuery.toLowerCase();
                 final filtered = _searchQuery.isEmpty
                     ? hosts
-                    : hosts.where((h) =>
-                        h.name.toLowerCase().contains(q) ||
-                        h.host.toLowerCase().contains(q) ||
-                        h.username.toLowerCase().contains(q) ||
-                        h.group.toLowerCase().contains(q)
-                      ).toList();
+                    : hosts
+                        .where((h) =>
+                            h.name.toLowerCase().contains(q) ||
+                            h.host.toLowerCase().contains(q) ||
+                            h.username.toLowerCase().contains(q) ||
+                            h.group.toLowerCase().contains(q))
+                        .toList();
 
                 if (filtered.isEmpty && hosts.isEmpty) {
                   return _buildEmptyState();
@@ -282,7 +288,8 @@ class _HostListPageState extends ConsumerState<HostListPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off, size: 48, color: ThemeColors.of(context).textMuted),
+          Icon(Icons.search_off,
+              size: 48, color: ThemeColors.of(context).textMuted),
           const SizedBox(height: 16),
           Text(
             l10n.hostListNoSearchResults,
@@ -316,7 +323,8 @@ class _HostListPageState extends ConsumerState<HostListPage> {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     // 默认只展开"默认"分组
-    final isExpanded = _groupExpanded.putIfAbsent(groupName, () => groupName == '默认');
+    final isExpanded =
+        _groupExpanded.putIfAbsent(groupName, () => groupName == '默认');
 
     return Column(
       children: [
@@ -329,7 +337,8 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             _saveGroupExpandedState();
           },
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: pStandard, vertical: 12),
+            padding:
+                const EdgeInsets.symmetric(horizontal: pStandard, vertical: 12),
             child: Row(
               children: [
                 AnimatedRotation(
@@ -354,7 +363,8 @@ class _HostListPageState extends ConsumerState<HostListPage> {
                 ),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
                     color: tc.brand.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rFull),
@@ -375,10 +385,12 @@ class _HostListPageState extends ConsumerState<HostListPage> {
         // 分组内容
         AnimatedCrossFade(
           firstChild: Column(
-            children: hosts.map((host) => _buildSwipeableHostCard(host)).toList(),
+            children:
+                hosts.map((host) => _buildSwipeableHostCard(host)).toList(),
           ),
           secondChild: const SizedBox.shrink(),
-          crossFadeState: isExpanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+          crossFadeState:
+              isExpanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
           duration: animNormal,
         ),
       ],
@@ -406,7 +418,8 @@ class _HostListPageState extends ConsumerState<HostListPage> {
       direction: DismissDirection.endToStart, // 仅左滑
       confirmDismiss: (direction) async => false, // 不自动消失，只显示操作
       background: Container(
-        margin: const EdgeInsets.symmetric(horizontal: pStandard, vertical: pCompact / 2),
+        margin: const EdgeInsets.symmetric(
+            horizontal: pStandard, vertical: pCompact / 2),
         padding: const EdgeInsets.only(right: pStandard),
         decoration: BoxDecoration(
           color: tc.brand.withValues(alpha: 0.1),
@@ -465,10 +478,14 @@ class _HostListPageState extends ConsumerState<HostListPage> {
             ),
             // 主机名称
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: pStandard, vertical: 8),
+              padding: const EdgeInsets.symmetric(
+                  horizontal: pStandard, vertical: 8),
               child: Text(
                 host.name,
-                style: TextStyle(fontSize: fBody, fontWeight: FontWeight.w600, color: tc.textMain),
+                style: TextStyle(
+                    fontSize: fBody,
+                    fontWeight: FontWeight.w600,
+                    color: tc.textMain),
               ),
             ),
             const Divider(height: 1),
@@ -533,7 +550,8 @@ class _HostListPageState extends ConsumerState<HostListPage> {
               await CredentialsStore.deleteAll(host.id);
               await ref.read(hostsProvider.notifier).deleteHost(host.id);
               if (context.mounted) {
-                showTopSnackBar(context, 
+                showTopSnackBar(
+                  context,
                   SnackBar(content: Text(l10n.hostListDeleteSuccess)),
                 );
               }
@@ -546,4 +564,3 @@ class _HostListPageState extends ConsumerState<HostListPage> {
     );
   }
 }
-

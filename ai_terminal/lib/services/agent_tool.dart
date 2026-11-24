@@ -13,10 +13,12 @@ import 'agent_host_registry.dart';
 import '../core/l10n_holder.dart';
 import '../core/ui_text.dart';
 import '../models/host_execution_result.dart';
+import '../models/agent_permission_mode.dart';
 import '../utils/line_diff.dart';
 import '../utils/local_file_ops.dart';
 import '../utils/tool_args_parser.dart';
 import 'local_file_tools.dart';
+import 'local_file_policy.dart';
 import 'local_exec_tool.dart';
 import 'project_tools.dart';
 import 'web_tools.dart';
@@ -258,6 +260,183 @@ abstract class AgentTool {
 /// 工具层的旧上传在任务取消后不会自己知道（工具没有 cancelToken 时尤其如此），
 /// 这里用 isTaskActive 每 250ms 探测一次，并把它转成 SftpService 能识别的
 /// cancelToken；同时用 host:port:user 锁避免新旧两个上传同时跑。
+
+/// POSIX 参数引用。单引号内部不能直接转义单引号，必须结束当前引号、
+/// 插入转义的单引号，再重新开始；仅替换单引号或使用黑名单都不安全。
+String _quotePosixArgument(String value) =>
+    "'${value.replaceAll("'", "'\\''")}'";
+
+LocalPathDecision _decideLocalPath(String path) =>
+    LocalFilePolicy.load().decide(path);
+
+LocalPathDecision _verifyLocalPath(String rawPath, String expectedResolved) =>
+    LocalFilePolicy.load().verify(rawPath, expectedResolved);
+
+String _localPathDeniedMessage(String path, LocalPathDecision decision) =>
+    '本地路径未获授权: $path${decision.reason == null ? '' : '\n${decision.reason}'}';
+
+String? _freshLocalPathDenial(String rawPath, String expectedResolved) {
+  final decision = _verifyLocalPath(rawPath, expectedResolved);
+  return decision.isAllowed ? null : _localPathDeniedMessage(rawPath, decision);
+}
+
+Future<String?> _createVerifiedLocalDirectory(
+  String path,
+  Completer<void>? cancelToken,
+) async {
+  if (cancelToken?.isCompleted == true) return '下载已取消';
+  if (await Directory(path).exists()) return _freshLocalPathDenial(path, path);
+  final parent = p.dirname(path);
+  final parentDenial = _freshLocalPathDenial(parent, parent);
+  if (parentDenial != null) return parentDenial;
+  final denial = _freshLocalPathDenial(path, path);
+  if (denial != null) return denial;
+  await Directory(path).create(recursive: true);
+  return _freshLocalPathDenial(path, path);
+}
+
+/// 返回空字符串表示已确认是 POSIX shell；否则给出保守拒绝原因。
+String _unsupportedPosixShellReason(CommandExecutor? executor) {
+  if (executor is SSHService) {
+    final os = executor.osInfo.trim().toLowerCase();
+    if (os.contains('windows') ||
+        os.contains('mingw') ||
+        os.contains('cygwin')) {
+      return '目标主机使用 Windows shell，不支持 POSIX grep/tail/diff 命令';
+    }
+    if (os.isEmpty || os == 'unknown') {
+      return '无法确认目标主机 shell，拒绝执行 POSIX grep/tail/diff 命令';
+    }
+    return '';
+  }
+  if (executor is LocalTerminalService) {
+    return Platform.isWindows
+        ? '目标主机使用 Windows PowerShell/cmd，不支持 POSIX grep/tail/diff 命令'
+        : '';
+  }
+  return '无法确认目标主机 shell，拒绝执行 POSIX grep/tail/diff 命令';
+}
+
+String? _normalizedRemotePath(String path) {
+  if (path.isEmpty || path.contains('\x00') || !p.posix.isAbsolute(path)) {
+    return null;
+  }
+  return p.posix.normalize(path);
+}
+
+/// 目录上传会在 SftpService 内再次遍历。这里先按相同排除规则检查所有实际
+/// 文件/目录，避免只检查根目录后，把授权目录内的敏感文件一并读走。
+Future<String?> _preflightDirectoryUpload(
+    String rawPath, List<String> excludeNames) async {
+  final decision = _decideLocalPath(rawPath);
+  if (!decision.isAllowed) return _localPathDeniedMessage(rawPath, decision);
+  final root = Directory(decision.resolved);
+  if (!await root.exists()) return '本地目录不存在: ${decision.resolved}';
+  var entries = 0;
+  await for (final entity in root.list(recursive: true, followLinks: false)) {
+    if (++entries > 10000) {
+      return '本地目录条目超过 10000，拒绝递归上传；请缩小范围或改用归档。';
+    }
+    final relative = p.relative(entity.path, from: decision.resolved);
+    if (p.split(relative).any(excludeNames.contains)) continue;
+    if (entity is! File && entity is! Directory) continue;
+    final entityDecision = _decideLocalPath(entity.path);
+    if (!entityDecision.isAllowed) {
+      return _localPathDeniedMessage(entity.path, entityDecision);
+    }
+  }
+  return null;
+}
+
+class _DirectoryDownloadPlan {
+  final List<String> directories = [];
+  final List<_DirectoryDownloadFile> files = [];
+  final DownloadDirectoryResult result = DownloadDirectoryResult();
+  String? error;
+}
+
+class _DirectoryDownloadFile {
+  final String remote;
+  final String local;
+  const _DirectoryDownloadFile(this.remote, this.local);
+}
+
+bool _isSafeRemoteEntryName(String name) =>
+    name.isNotEmpty &&
+    name != '.' &&
+    name != '..' &&
+    !name.contains('/') &&
+    !name.contains(r'\');
+
+/// 先列出完整远程清单并检查每个最终本地路径，全部通过后才允许创建目录或
+/// 下载文件。不能直接调用 SftpService.downloadDirectory：它在内部重新遍历，
+/// 预检与实际写入之间新增的路径会绕过策略。
+Future<_DirectoryDownloadPlan> _planDirectoryDownload({
+  required Future<List<SftpEntry>> Function(String remotePath) listDirectory,
+  required String remoteDir,
+  required String localRoot,
+  required List<String> excludeNames,
+}) async {
+  final plan = _DirectoryDownloadPlan();
+  var scannedEntries = 0;
+  Future<void> collect(String remotePath, List<String> relativeParts) async {
+    if (relativeParts.length > 64) {
+      plan.error = '远程目录层级超过 64，已停止下载。';
+      return;
+    }
+    final entries = await listDirectory(remotePath);
+    for (final entry in entries) {
+      if (++scannedEntries > 10000) {
+        plan.error = '远程目录条目超过 10000，已停止下载；请缩小范围。';
+        return;
+      }
+      if (excludeNames.contains(entry.name)) continue;
+      if (!_isSafeRemoteEntryName(entry.name)) {
+        plan.error = '远程目录包含不安全的文件名，已停止下载: ${entry.path}';
+        return;
+      }
+      final childParts = [...relativeParts, entry.name];
+      final relative = p.posix.joinAll(childParts);
+      if (entry.isDirectory) {
+        final localDir = p.joinAll([localRoot, ...childParts]);
+        final decision = _decideLocalPath(localDir);
+        if (!decision.isAllowed) {
+          plan.error = _localPathDeniedMessage(localDir, decision);
+          return;
+        }
+        if (!p.isWithin(
+            p.normalize(localRoot), p.normalize(decision.resolved))) {
+          plan.error = '下载目录越出本地根目录: $localDir';
+          return;
+        }
+        plan.directories.add(decision.resolved);
+        await collect(entry.path, childParts);
+        if (plan.error != null) return;
+      } else if (entry.isSymbolicLink) {
+        plan.result.skippedLinks.add(relative);
+      } else {
+        final localFile = p.joinAll([localRoot, ...childParts]);
+        final decision = _decideLocalPath(localFile);
+        if (!decision.isAllowed) {
+          plan.error = _localPathDeniedMessage(localFile, decision);
+          return;
+        }
+        if (!p.isWithin(
+            p.normalize(localRoot), p.normalize(decision.resolved))) {
+          plan.error = '下载目标越出本地根目录: $localFile';
+          return;
+        }
+        plan.files.add(_DirectoryDownloadFile(
+            p.posix.join(remoteDir, relative), decision.resolved));
+      }
+    }
+  }
+
+  await collect(remoteDir, const []);
+  plan.result.totalFiles = plan.files.length;
+  return plan;
+}
+
 Future<ToolResult> _runDirectoryUploadWithCancel({
   required SftpService sftp,
   required SSHService ssh,
@@ -271,6 +450,13 @@ Future<ToolResult> _runDirectoryUploadWithCancel({
 }) async {
   if (isTaskActive?.call() == false || cancelToken?.isCompleted == true) {
     return ToolResult.failure('$prefix上传已取消');
+  }
+  final policyError = await _preflightDirectoryUpload(local, excludeNames);
+  if (policyError != null) return ToolResult.failure('$prefix$policyError');
+  final checked = _verifyLocalPath(local, local);
+  if (!checked.isAllowed) {
+    return ToolResult.failure(
+        '$prefix${_localPathDeniedMessage(local, checked)}');
   }
 
   final transferCancel = Completer<void>();
@@ -293,6 +479,11 @@ Future<ToolResult> _runDirectoryUploadWithCancel({
     }
     await DirectoryUploadLock.acquire(lockKey, cancelToken: transferCancel);
     locked = true;
+    final beforeUpload = _verifyLocalPath(local, local);
+    if (!beforeUpload.isAllowed) {
+      return ToolResult.failure(
+          '$prefix${_localPathDeniedMessage(local, beforeUpload)}');
+    }
 
     final progressWatch = Stopwatch()..start();
     var lastProgressMs = -1000;
@@ -301,6 +492,8 @@ Future<ToolResult> _runDirectoryUploadWithCancel({
       effectiveRemote,
       excludeNames: excludeNames,
       cancelToken: transferCancel,
+      validateLocalPath: (raw, expected) async =>
+          _freshLocalPathDenial(raw, expected),
       onProgress: (uploaded, total) {
         final now = progressWatch.elapsedMilliseconds;
         if (uploaded >= total || now - lastProgressMs >= 1000) {
@@ -342,12 +535,14 @@ class SftpUploadTool extends AgentTool {
   ToolKind get kind => ToolKind.write;
 
   @override
-  String get description => '上传本地文件或目录到 SSH 远程服务器。用于部署项目、传输文件等场景。仅适用于已连接 SSH 远程会话。'
+  String get description =>
+      '上传本地文件或目录到 SSH 远程服务器。用于部署项目、传输文件等场景。仅适用于已连接 SSH 远程会话。'
       '目录上传语义：把 local 目录放到 remote 目录下，自动在 remote 内创建 basename(local) 子目录。'
       '例如 local=/path/story、remote=/tmp → 实际传到 /tmp/story；若 remote 已含同名末段（如 /tmp/story）则不重复追加。';
 
   @override
-  String get paramSpec => '参数列表（多行 key:value 格式）：\n  local: 本地路径（必填）\n  remote: 远程目标父目录（必填，目录上传时自动在其下创建 basename 子目录）\n  recursive: 是否递归上传目录（true/false，默认 false）\n  exclude: 排除项（可选，逗号分隔，如 node_modules,.git）';
+  String get paramSpec =>
+      '参数列表（多行 key:value 格式）：\n  local: 本地路径（必填）\n  remote: 远程目标父目录（必填，目录上传时自动在其下创建 basename 子目录）\n  recursive: 是否递归上传目录（true/false，默认 false）\n  exclude: 排除项（可选，逗号分隔，如 node_modules,.git）';
 
   @override
   Future<ToolResult> execute({
@@ -357,13 +552,24 @@ class SftpUploadTool extends AgentTool {
   }) async {
     // 参数校验
     final local = args.getString('local');
-    final remote = args.getString('remote');
+    final rawRemote = args.getString('remote');
+    final remote = _normalizedRemotePath(rawRemote);
     final recursive = args.getBool('recursive');
     final excludeArg = args.getStringList('exclude');
 
-    if (local.isEmpty || remote.isEmpty) {
-      return ToolResult.failure('参数缺失: local 和 remote 为必填项');
+    if (local.isEmpty || remote == null) {
+      return ToolResult.failure('参数缺失或无效: local 必填，remote 必须是 POSIX 绝对路径');
     }
+    if (cancelToken?.isCompleted == true || isTaskActive?.call() == false) {
+      return ToolResult.failure('上传已取消');
+    }
+
+    // 本地源文件/目录与远程目标不同，必须先过本机路径策略。
+    final localDecision = _decideLocalPath(local);
+    if (!localDecision.isAllowed) {
+      return ToolResult.failure(_localPathDeniedMessage(local, localDecision));
+    }
+    final localPath = localDecision.resolved;
 
     // 仅支持 SSH 远程会话
     if (executor is! SSHService) {
@@ -372,14 +578,14 @@ class SftpUploadTool extends AgentTool {
 
     // 校验本地路径存在
     bool isDir;
-    final dir = Directory(local);
-    final file = File(local);
+    final dir = Directory(localPath);
+    final file = File(localPath);
     if (await dir.exists()) {
       isDir = true;
     } else if (await file.exists()) {
       isDir = false;
     } else {
-      return ToolResult.failure(L10n.str.orchToolLocalNotFound(local));
+      return ToolResult.failure(L10n.str.orchToolLocalNotFound(localPath));
     }
 
     // 如果是目录但没指定 recursive，提示
@@ -391,12 +597,17 @@ class SftpUploadTool extends AgentTool {
     }
 
     // 解析排除列表
-    List<String> excludeNames = excludeArg.isEmpty
-        ? ['node_modules', '.git', '.DS_Store']
-        : excludeArg;
+    List<String> excludeNames =
+        excludeArg.isEmpty ? ['node_modules', '.git', '.DS_Store'] : excludeArg;
+    if (isDir) {
+      final policyError =
+          await _preflightDirectoryUpload(localPath, excludeNames);
+      if (policyError != null) return ToolResult.failure(policyError);
+    }
 
     onProgress?.call(UiText.t('正在打开 SFTP 子系统...', 'Opening SFTP subsystem...'));
-    debugPrint('[SftpUploadTool] 开始上传: local=$local, remote=$remote, recursive=$recursive');
+    debugPrint(
+        '[SftpUploadTool] 开始上传: local=$local, remote=$remote, recursive=$recursive');
 
     // 复用 SSHService 的 SSHClient 打开 SFTP（不重新建连）
     final sftp = SftpService();
@@ -412,33 +623,45 @@ class SftpUploadTool extends AgentTool {
 
     try {
       if (!isDir) {
-        // 单文件上传
-        onProgress?.call(L10n.str.ut_91700996f4(p.basename(local)));
+        // 连接/备份等异步步骤后再次验证，链接换目标不得读出敏感文件。
+        final checked = _verifyLocalPath(local, localPath);
+        if (!checked.isAllowed) {
+          return ToolResult.failure(_localPathDeniedMessage(local, checked));
+        }
+        onProgress?.call(L10n.str.ut_91700996f4(p.basename(localPath)));
         // R6: 远程路径用 posix
         final remoteParent = p.posix.dirname(remote);
         if (remoteParent.isNotEmpty && remoteParent != '.') {
           await sftp.ensureDirectory(remoteParent);
         }
-        await sftp.uploadFile(local, remote);
-        final size = await file.length();
+        final size = await sftp.uploadFile(
+          localPath,
+          remote,
+          cancelToken: cancelToken,
+          validateLocalPath: (raw, expected) async =>
+              _freshLocalPathDenial(raw, expected),
+        );
+        if (cancelToken?.isCompleted == true || isTaskActive?.call() == false) {
+          return ToolResult.failure('上传已取消');
+        }
         onProgress?.call(UiText.t('上传完成', 'Upload complete'));
         return ToolResult.success(
-          L10n.str.ut_ded2242c8f(local, remote, _formatSize(size)),
+          L10n.str.ut_ded2242c8f(localPath, remote, _formatSize(size)),
         );
       } else {
         // 目录递归上传
         // 语义：把 local 目录传到 remote 下，期望 remote/basename(local) 存在
         // 如果 remote 路径不以 basename(local) 结尾，自动追加，避免目录内容被平铺到 remote 根下
-        final baseName = p.basename(local);
+        final baseName = p.basename(localPath);
         String effectiveRemote = remote;
         if (p.posix.basename(remote) != baseName) {
           effectiveRemote = p.posix.join(remote, baseName);
         }
-        onProgress?.call(L10n.str.ut_d72746d0d0(local, effectiveRemote));
+        onProgress?.call(L10n.str.ut_d72746d0d0(localPath, effectiveRemote));
         return await _runDirectoryUploadWithCancel(
           sftp: sftp,
           ssh: executor,
-          local: local,
+          local: localPath,
           effectiveRemote: effectiveRemote,
           excludeNames: excludeNames,
           onProgress: onProgress,
@@ -446,6 +669,8 @@ class SftpUploadTool extends AgentTool {
           isTaskActive: isTaskActive,
         );
       }
+    } on SftpTransferCancelled {
+      return ToolResult.failure('上传已取消');
     } catch (e) {
       debugPrint('[SftpUploadTool] 上传失败: $e');
       return ToolResult.failure('上传失败: $e');
@@ -458,7 +683,9 @@ class SftpUploadTool extends AgentTool {
   String _formatSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }
@@ -490,20 +717,48 @@ class SftpDownloadTool extends AgentTool {
       '  recursive: 是否递归下载目录（true/false，默认 false）\n'
       '  exclude: 排除项（可选，逗号分隔，如 node_modules,.git）';
 
+  /// 仅测试目录下载清单预检；返回错误表示在任何本地创建/下载前即应拒绝。
+  @visibleForTesting
+  static Future<String?> validateDirectoryDownloadPathsForTest({
+    required String remoteDir,
+    required String localRoot,
+    required Future<List<SftpEntry>> Function(String remotePath) listDirectory,
+    List<String> excludeNames = const ['node_modules', '.git', '.DS_Store'],
+  }) async {
+    final rootDecision = _decideLocalPath(localRoot);
+    if (!rootDecision.isAllowed) {
+      return _localPathDeniedMessage(localRoot, rootDecision);
+    }
+    final plan = await _planDirectoryDownload(
+      listDirectory: listDirectory,
+      remoteDir: remoteDir,
+      localRoot: rootDecision.resolved,
+      excludeNames: excludeNames,
+    );
+    return plan.error;
+  }
+
   @override
   Future<ToolResult> execute({
     required CommandExecutor executor,
     required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final remote = args.getString('remote');
+    final rawRemote = args.getString('remote');
+    final remote = _normalizedRemotePath(rawRemote);
     final local = args.getString('local');
     final recursive = args.getBool('recursive');
     final excludeArg = args.getStringList('exclude');
 
-    if (remote.isEmpty || local.isEmpty) {
-      return ToolResult.failure('参数缺失: remote 和 local 为必填项');
+    if (remote == null || local.isEmpty) {
+      return ToolResult.failure('参数缺失或无效: remote 必须是 POSIX 绝对路径，local 必填');
     }
+    // local 可能是目标文件，也可能是目标目录；先在连接/任何本地写入前判定。
+    final localDecision = _decideLocalPath(local);
+    if (!localDecision.isAllowed) {
+      return ToolResult.failure(_localPathDeniedMessage(local, localDecision));
+    }
+    final localPath = localDecision.resolved;
     if (executor is! SSHService) {
       return ToolResult.failure('sftp_download 仅支持 SSH 远程会话，当前为本地终端');
     }
@@ -526,13 +781,38 @@ class SftpDownloadTool extends AgentTool {
       }
 
       if (!stat.isDirectory) {
-        var target = local;
-        final localIsDir = await Directory(local).exists();
+        var target = localPath;
+        final localIsDir = await Directory(localPath).exists();
         if (localIsDir || local.endsWith('/') || local.endsWith('\\')) {
-          target = p.join(local, p.posix.basename(remote));
+          target = p.join(localPath, p.posix.basename(remote));
         }
-        onProgress?.call(L10n.str.ut_0e800a8406(p.posix.basename(remote), target));
-        await sftp.downloadFile(remote, target);
+        // 最终 target 可能与最初传入的 local 不同，必须在 downloadFile 前再次判定。
+        final targetDecision = _decideLocalPath(target);
+        if (!targetDecision.isAllowed) {
+          return ToolResult.failure(
+              _localPathDeniedMessage(target, targetDecision));
+        }
+        target = targetDecision.resolved;
+        if (cancelToken?.isCompleted == true) {
+          return ToolResult.failure('下载已取消');
+        }
+        final beforeWrite = _verifyLocalPath(target, target);
+        if (!beforeWrite.isAllowed) {
+          return ToolResult.failure(
+              _localPathDeniedMessage(target, beforeWrite));
+        }
+        onProgress
+            ?.call(L10n.str.ut_0e800a8406(p.posix.basename(remote), target));
+        await sftp.downloadFile(
+          remote,
+          target,
+          cancelToken: cancelToken,
+          validateLocalPath: (raw, expected) async =>
+              _freshLocalPathDenial(raw, expected),
+        );
+        if (cancelToken?.isCompleted == true) {
+          return ToolResult.failure('下载已取消');
+        }
         final size = stat.size ?? 0;
         onProgress?.call(UiText.t('下载完成', 'Download complete'));
         return ToolResult.success(
@@ -548,23 +828,85 @@ class SftpDownloadTool extends AgentTool {
       }
 
       final remoteBase = p.posix.basename(remote);
-      var effectiveLocal = local;
-      if (p.basename(local) != remoteBase) {
-        effectiveLocal = p.join(local, remoteBase);
+      var effectiveLocal = localPath;
+      if (p.basename(localPath) != remoteBase) {
+        effectiveLocal = p.join(localPath, remoteBase);
       }
+      final rootDecision = _decideLocalPath(effectiveLocal);
+      if (!rootDecision.isAllowed) {
+        return ToolResult.failure(
+            _localPathDeniedMessage(effectiveLocal, rootDecision));
+      }
+      effectiveLocal = rootDecision.resolved;
       final excludeNames = excludeArg.isEmpty
           ? ['node_modules', '.git', '.DS_Store']
           : excludeArg;
 
       onProgress?.call(L10n.str.ut_2bc26619aa(remote, effectiveLocal));
-      final result = await sftp.downloadDirectory(
-        remote,
-        effectiveLocal,
+      final plan = await _planDirectoryDownload(
+        listDirectory: sftp.listDirectory,
+        remoteDir: remote,
+        localRoot: effectiveLocal,
         excludeNames: excludeNames,
-        onProgress: (downloaded, total) {
-          onProgress?.call(L10n.str.ut_52a01019d8(downloaded, total));
-        },
       );
+      if (plan.error != null) return ToolResult.failure(plan.error!);
+      if (cancelToken?.isCompleted == true) return ToolResult.failure('下载已取消');
+
+      // 全部最终路径已授权，以下才允许创建目录和写入文件。
+      final beforeCreate = _verifyLocalPath(effectiveLocal, effectiveLocal);
+      if (!beforeCreate.isAllowed) {
+        return ToolResult.failure(
+            _localPathDeniedMessage(effectiveLocal, beforeCreate));
+      }
+      final createError =
+          await _createVerifiedLocalDirectory(effectiveLocal, cancelToken);
+      if (createError != null) return ToolResult.failure(createError);
+      for (final directory in plan.directories) {
+        if (cancelToken?.isCompleted == true) {
+          return ToolResult.failure('下载已取消', output: plan.result.summary);
+        }
+        final checked = _verifyLocalPath(directory, directory);
+        if (!checked.isAllowed) {
+          return ToolResult.failure(
+              _localPathDeniedMessage(directory, checked));
+        }
+        final directoryError =
+            await _createVerifiedLocalDirectory(directory, cancelToken);
+        if (directoryError != null) {
+          return ToolResult.failure(directoryError,
+              output: plan.result.summary);
+        }
+      }
+      for (final file in plan.files) {
+        if (cancelToken?.isCompleted == true) {
+          return ToolResult.failure('下载已取消', output: plan.result.summary);
+        }
+        try {
+          final checked = _verifyLocalPath(file.local, file.local);
+          if (!checked.isAllowed) {
+            throw FileSystemException(
+                _localPathDeniedMessage(file.local, checked));
+          }
+          await sftp.downloadFile(
+            file.remote,
+            file.local,
+            cancelToken: cancelToken,
+            validateLocalPath: (raw, expected) async =>
+                _freshLocalPathDenial(raw, expected),
+          );
+          if (cancelToken?.isCompleted == true) {
+            return ToolResult.failure('下载已取消', output: plan.result.summary);
+          }
+          plan.result.downloadedFiles++;
+          onProgress?.call(L10n.str.ut_52a01019d8(
+              plan.result.downloadedFiles, plan.result.totalFiles));
+        } catch (e) {
+          final relative = p.relative(file.local, from: effectiveLocal);
+          plan.result.failedFiles.add(relative);
+          plan.result.errors.add('$relative: $e');
+        }
+      }
+      final result = plan.result;
       if (result.allSuccess) {
         return ToolResult.success(
           L10n.str.ut_4452077d81(result.summary, effectiveLocal),
@@ -760,8 +1102,7 @@ class SftpFileReadTool extends AgentTool {
     }
     // CRLF 文件去掉行尾 \r，避免行号输出里混入不可见字符
     lines = [
-      for (final l in lines)
-        l.endsWith('\r') ? l.substring(0, l.length - 1) : l
+      for (final l in lines) l.endsWith('\r') ? l.substring(0, l.length - 1) : l
     ];
     final total = lines.length;
     if (total == 0) {
@@ -822,12 +1163,14 @@ class FileSyncTool extends AgentTool {
   ToolKind get kind => ToolKind.write;
 
   @override
-  String get description => '启动或停止本地目录与远程服务器目录的自动同步。本地文件修改自动上传到远程；bidirectional 模式下还会轮询远程变化下载到本地。'
+  String get description =>
+      '启动或停止本地目录与远程服务器目录的自动同步。本地文件修改自动上传到远程；bidirectional 模式下还会轮询远程变化下载到本地。'
       '注意：localDir 和 remoteDir 是一一对应的完整路径，remoteDir 应包含目标子目录名（如 localDir=/path/story、remoteDir=/tmp/story），'
       '否则 story 内的文件会被平铺到 remoteDir 根下。';
 
   @override
-  String get paramSpec => '参数列表（多行 key:value 格式）：\n  action: start|stop|status（必填）\n  localDir: 本地目录完整路径（start 必填）\n  remoteDir: 远程目录完整路径（start 必填，应含目标子目录名，如 /tmp/story 而非 /tmp）\n  direction: localToRemote|bidirectional（默认 localToRemote）\n  exclude: 排除项（可选，逗号分隔）';
+  String get paramSpec =>
+      '参数列表（多行 key:value 格式）：\n  action: start|stop|status（必填）\n  localDir: 本地目录完整路径（start 必填）\n  remoteDir: 远程目录完整路径（start 必填，应含目标子目录名，如 /tmp/story 而非 /tmp）\n  direction: localToRemote|bidirectional（默认 localToRemote）\n  exclude: 排除项（可选，逗号分隔）';
 
   @override
   Future<ToolResult> execute({
@@ -856,11 +1199,20 @@ class FileSyncTool extends AgentTool {
     if (action == 'start') {
       final localDir = args.getString('localDir');
       final remoteDir = args.getString('remoteDir');
-      final directionStr = args.getString('direction', defaultValue: 'localToRemote');
+      final directionStr =
+          args.getString('direction', defaultValue: 'localToRemote');
       final excludeArg = args.getStringList('exclude');
 
       if (localDir.isEmpty || remoteDir.isEmpty) {
         return ToolResult.failure('start 需要 localDir 和 remoteDir 参数');
+      }
+
+      // 同步会持续读本地目录并往本地写回下载文件，必须与 local_* 工具
+      // 共用 LocalFilePolicy 白名单；仅靠提示词约束目录范围不算授权。
+      final localDecision = _decideLocalPath(localDir);
+      if (!localDecision.isAllowed) {
+        return ToolResult.failure(
+            _localPathDeniedMessage(localDir, localDecision));
       }
 
       if (executor is! SSHService) {
@@ -892,6 +1244,9 @@ class FileSyncTool extends AgentTool {
       final ok = await _service.start(
         clientGetter: () => sshService.client,
         config: config,
+        // 每次实际上传/下载前重读策略：watcher 运行期间用户可能收窄白名单。
+        validateLocalPath: (rawPath, expectedResolved) async =>
+            _freshLocalPathDenial(rawPath, expectedResolved),
       );
       if (ok) {
         return ToolResult.success(
@@ -918,14 +1273,15 @@ class ExecOnTool extends AgentTool {
   String get name => 'exec_on';
 
   @override
-  ToolKind get kind => ToolKind.orchestration;
+  ToolKind get kind => ToolKind.destructive;
 
   @override
   String get description => '【多机编排】在指定主机上执行命令。用于跨主机调度操作。'
       '仅在编排模式下可用；非编排模式请用普通 execute。';
 
   @override
-  String get paramSpec => '参数列表（多行 key:value 格式）：\n  hostId: 目标主机 ID（必填）\n  command: 要执行的命令（必填）\n  timeout: 超时秒数（可选，默认 60）';
+  String get paramSpec =>
+      '参数列表（多行 key:value 格式）：\n  hostId: 目标主机 ID（必填）\n  command: 要执行的命令（必填）\n  timeout: 超时秒数（可选，默认 60）';
 
   @override
   Future<ToolResult> execute({
@@ -935,10 +1291,12 @@ class ExecOnTool extends AgentTool {
   }) async {
     final hostId = args.getString('hostId');
     final command = args.getString('command');
-    final timeoutSec = args.getInt('timeout', defaultValue: 60);
+    final timeoutSec = MultiHostExecutor.clampTimeoutSeconds(
+        args.getInt('timeout', defaultValue: 60));
 
     if (hostId.isEmpty || command.isEmpty) {
-      return ToolResult.failure(L10n.str.orchToolParamMissing('hostId 和 command'));
+      return ToolResult.failure(
+          L10n.str.orchToolParamMissing('hostId 和 command'));
     }
 
     onProgress?.call(L10n.str.orchToolExecProgress(hostId, command));
@@ -973,12 +1331,15 @@ class ExecOnTool extends AgentTool {
     final detail = result.success
         ? (output.isNotEmpty ? output : L10n.str.orchToolNoOutput)
         : (output.isNotEmpty
-            ? (err.isNotEmpty ? 'stdout: $output\nstderr: $err' : 'output: $output')
+            ? (err.isNotEmpty
+                ? 'stdout: $output\nstderr: $err'
+                : 'output: $output')
             : (err.isNotEmpty ? 'stderr: $err' : L10n.str.orchToolNoOutput));
     // 失败原因（人类可读诊断，指导 AI 修正命令而非盲目重试）
-    final reasonLine = (result.failureReason != null && result.failureReason!.isNotEmpty)
-        ? '\nreason: ${result.failureReason}'
-        : '';
+    final reasonLine =
+        (result.failureReason != null && result.failureReason!.isNotEmpty)
+            ? '\nreason: ${result.failureReason}'
+            : '';
 
     if (result.success) {
       return ToolResult.success('$summary\n$detail');
@@ -1008,7 +1369,7 @@ class ExecBatchTool extends AgentTool {
   String get name => 'exec_batch';
 
   @override
-  ToolKind get kind => ToolKind.orchestration;
+  ToolKind get kind => ToolKind.destructive;
 
   @override
   String get description => '【多机编排】批量执行同一命令到多台主机（只读命令并行执行，修改性命令串行执行）。'
@@ -1016,7 +1377,8 @@ class ExecBatchTool extends AgentTool {
       '一台失败不影响其他主机（除非 stopOnFailure=true）。';
 
   @override
-  String get paramSpec => '参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，逗号分隔，如 web1,web2,db1）\n  command: 要执行的命令（必填）\n  timeout: 超时秒数（可选，默认 60）\n  stopOnFailure: 某台失败是否停止后续（true/false，默认 false）';
+  String get paramSpec =>
+      '参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，逗号分隔，如 web1,web2,db1）\n  command: 要执行的命令（必填）\n  timeout: 超时秒数（可选，默认 60）\n  stopOnFailure: 某台失败是否停止后续（true/false，默认 false）';
 
   @override
   Future<ToolResult> execute({
@@ -1025,12 +1387,14 @@ class ExecBatchTool extends AgentTool {
     void Function(String message)? onProgress,
   }) async {
     final command = args.getString('command');
-    final timeoutSec = args.getInt('timeout', defaultValue: 60);
+    final timeoutSec = MultiHostExecutor.clampTimeoutSeconds(
+        args.getInt('timeout', defaultValue: 60));
     final stopOnFailure = args.getBool('stopOnFailure');
     final hostIds = args.getStringList('hostIds');
 
     if (hostIds.isEmpty || command.isEmpty) {
-      return ToolResult.failure(L10n.str.orchToolParamMissing('hostIds 和 command'));
+      return ToolResult.failure(
+          L10n.str.orchToolParamMissing('hostIds 和 command'));
     }
 
     onProgress?.call(L10n.str.orchToolBatchProgress(command, hostIds.length));
@@ -1045,12 +1409,12 @@ class ExecBatchTool extends AgentTool {
     final allSuccess = results.values.every((r) => r.success);
     final hostResults = <String, HostExecutionResult>{};
     results.forEach((hostId, r) {
-      final out = r.stdout.length > 2000
-          ? '${r.stdout.substring(0, 2000)}…'
-          : r.stdout;
-      final err = r.stderr.length > 1000
-          ? '${r.stderr.substring(0, 1000)}…'
-          : r.stderr;
+      final out =
+          r.stdout.length > 2000 ? '${r.stdout.substring(0, 2000)}…' : r.stdout;
+      final failureDetail = MultiHostExecutor.failureDetail(r);
+      final err = !r.success && failureDetail.length > 1000
+          ? '${failureDetail.substring(0, 1000)}…'
+          : (!r.success ? failureDetail : '');
       hostResults[hostId] = HostExecutionResult(
         hostId: hostId,
         success: r.success,
@@ -1066,11 +1430,21 @@ class ExecBatchTool extends AgentTool {
     if (allSuccess) {
       return ToolResult.success(summary, hostResults: hostResults);
     } else {
-      final failedCount = results.values.where((r) => !r.success).length;
+      final notRunCount = results.values
+          .where((r) =>
+              !r.success &&
+              (r.failureKind == CommandFailureKind.skipped ||
+                  r.failureKind == CommandFailureKind.cancelled))
+          .length;
+      final failedCount = results.length -
+          notRunCount -
+          results.values.where((r) => r.success).length;
       return ToolResult(
         success: false,
         output: summary,
-        error: L10n.str.orchToolBatchFailed(failedCount, hostIds.length),
+        error: failedCount > 0
+            ? L10n.str.orchToolBatchFailed(failedCount, hostIds.length)
+            : '${L10n.str.taskCancelled}（$notRunCount 台未执行）',
         hostResults: hostResults,
       );
     }
@@ -1095,7 +1469,8 @@ class CheckConnectivityTool extends AgentTool {
       '源主机必须是已连接的编排参与者。';
 
   @override
-  String get paramSpec => '参数列表（多行 key:value 格式）：\n  fromHostId: 源主机 ID（必填，命令从这台机执行）\n  targetHost: 目标主机 IP 或域名（必填）\n  port: 目标端口（必填）\n  timeout: 超时秒数（可选，默认 5）';
+  String get paramSpec =>
+      '参数列表（多行 key:value 格式）：\n  fromHostId: 源主机 ID（必填，命令从这台机执行）\n  targetHost: 目标主机 IP 或域名（必填）\n  port: 目标端口（必填）\n  timeout: 超时秒数（可选，默认 5）';
 
   @override
   Future<ToolResult> execute({
@@ -1106,13 +1481,15 @@ class CheckConnectivityTool extends AgentTool {
     final fromHostId = args.getString('fromHostId');
     final targetHost = args.getString('targetHost');
     final port = args.getInt('port');
-    final timeoutSec = args.getInt('timeout', defaultValue: 5);
+    final timeoutSec = MultiHostExecutor.clampTimeoutSeconds(
+        args.getInt('timeout', defaultValue: 5));
 
     if (fromHostId.isEmpty || targetHost.isEmpty || port <= 0) {
       return ToolResult.failure(L10n.str.orchToolConnParamMissing);
     }
 
-    onProgress?.call(L10n.str.orchToolConnProgress(fromHostId, targetHost, port.toString()));
+    onProgress?.call(
+        L10n.str.orchToolConnProgress(fromHostId, targetHost, port.toString()));
     final result = await _executor.checkConnectivity(
       fromHostId: fromHostId,
       targetHost: targetHost,
@@ -1151,7 +1528,8 @@ class UploadToTool extends AgentTool {
       '目录上传语义同 sftp_upload：把 local 目录放到 remote 下，自动创建 basename(local) 子目录。';
 
   @override
-  String get paramSpec => '参数列表（多行 key:value 格式）：\n  hostId: 目标主机 ID（必填）\n  local: 本地文件/目录绝对路径（必填）\n  remote: 远程目标父目录（必填，目录上传时自动在其下创建 basename 子目录）\n  recursive: 是否递归上传目录（true/false，默认 false）\n  exclude: 排除项（可选，逗号分隔，如 node_modules,.git）';
+  String get paramSpec =>
+      '参数列表（多行 key:value 格式）：\n  hostId: 目标主机 ID（必填）\n  local: 本地文件/目录绝对路径（必填）\n  remote: 远程目标父目录（必填，目录上传时自动在其下创建 basename 子目录）\n  recursive: 是否递归上传目录（true/false，默认 false）\n  exclude: 排除项（可选，逗号分隔，如 node_modules,.git）';
 
   @override
   Future<ToolResult> execute({
@@ -1161,12 +1539,48 @@ class UploadToTool extends AgentTool {
   }) async {
     final hostId = args.getString('hostId');
     final local = args.getString('local');
-    final remote = args.getString('remote');
+    final remote = _normalizedRemotePath(args.getString('remote'));
     final recursive = args.getBool('recursive');
     final excludeArg = args.getStringList('exclude');
 
-    if (hostId.isEmpty || local.isEmpty || remote.isEmpty) {
-      return ToolResult.failure(L10n.str.orchToolUploadParamMissing);
+    if (hostId.isEmpty || local.isEmpty || remote == null) {
+      return ToolResult.failure(
+          '参数缺失或无效: hostId、local 必填，remote 必须是 POSIX 绝对路径');
+    }
+    if (cancelToken?.isCompleted == true || isTaskActive?.call() == false) {
+      return ToolResult.failure('[$hostId] 上传已取消');
+    }
+
+    // 本地源路径策略必须先于远程连接与文件读取。
+    final localDecision = _decideLocalPath(local);
+    if (!localDecision.isAllowed) {
+      return ToolResult.failure(_localPathDeniedMessage(local, localDecision));
+    }
+    final localPath = localDecision.resolved;
+
+    // 校验本地路径，并在连接远程前检查目录内每个实际上传文件。
+    bool isDir;
+    final dir = Directory(localPath);
+    final file = File(localPath);
+    if (await dir.exists()) {
+      isDir = true;
+    } else if (await file.exists()) {
+      isDir = false;
+    } else {
+      return ToolResult.failure(L10n.str.orchToolLocalNotFound(localPath));
+    }
+    if (isDir && !recursive) {
+      return ToolResult.failure(L10n.str.orchToolLocalIsDir);
+    }
+
+    List<String> excludeNames =
+        excludeArg.isEmpty ? ['node_modules', '.git', '.DS_Store'] : excludeArg;
+    if (isDir) {
+      final policyError =
+          await _preflightDirectoryUpload(localPath, excludeNames);
+      if (policyError != null) {
+        return ToolResult.failure('[$hostId] $policyError');
+      }
     }
 
     // 通过 hostId 获取目标主机的 executor（必须是 SSHService 才能开 SFTP）
@@ -1183,25 +1597,6 @@ class UploadToTool extends AgentTool {
       return ToolResult.failure(L10n.str.orchToolSshNotEstablished(hostId));
     }
 
-    // 校验本地路径
-    bool isDir;
-    final dir = Directory(local);
-    final file = File(local);
-    if (await dir.exists()) {
-      isDir = true;
-    } else if (await file.exists()) {
-      isDir = false;
-    } else {
-      return ToolResult.failure(L10n.str.orchToolLocalNotFound(local));
-    }
-    if (isDir && !recursive) {
-      return ToolResult.failure(L10n.str.orchToolLocalIsDir);
-    }
-
-    List<String> excludeNames = excludeArg.isEmpty
-        ? ['node_modules', '.git', '.DS_Store']
-        : excludeArg;
-
     onProgress?.call(L10n.str.orchToolSftpOpening(hostId));
     final sftp = SftpService();
     try {
@@ -1212,28 +1607,41 @@ class UploadToTool extends AgentTool {
 
     try {
       if (!isDir) {
-        onProgress?.call(L10n.str.ut_2d44fe0c64(hostId, p.basename(local)));
+        final checked = _verifyLocalPath(local, localPath);
+        if (!checked.isAllowed) {
+          return ToolResult.failure(_localPathDeniedMessage(local, checked));
+        }
+        onProgress?.call(L10n.str.ut_2d44fe0c64(hostId, p.basename(localPath)));
         final remoteParent = p.posix.dirname(remote);
         if (remoteParent.isNotEmpty && remoteParent != '.') {
           await sftp.ensureDirectory(remoteParent);
         }
-        await sftp.uploadFile(local, remote);
-        final size = await file.length();
+        final size = await sftp.uploadFile(
+          localPath,
+          remote,
+          cancelToken: cancelToken,
+          validateLocalPath: (raw, expected) async =>
+              _freshLocalPathDenial(raw, expected),
+        );
+        if (cancelToken?.isCompleted == true || isTaskActive?.call() == false) {
+          return ToolResult.failure('上传已取消');
+        }
         onProgress?.call(L10n.str.ut_7ef1cd9389(hostId));
         return ToolResult.success(
-          L10n.str.ut_a465e8a3ee(hostId, local, remote, _formatSize(size)),
+          L10n.str.ut_a465e8a3ee(hostId, localPath, remote, _formatSize(size)),
         );
       } else {
-        final baseName = p.basename(local);
+        final baseName = p.basename(localPath);
         String effectiveRemote = remote;
         if (p.posix.basename(remote) != baseName) {
           effectiveRemote = p.posix.join(remote, baseName);
         }
-        onProgress?.call(L10n.str.ut_699c3fa8dc(hostId, local, effectiveRemote));
+        onProgress
+            ?.call(L10n.str.ut_699c3fa8dc(hostId, localPath, effectiveRemote));
         return await _runDirectoryUploadWithCancel(
           sftp: sftp,
           ssh: targetExecutor,
-          local: local,
+          local: localPath,
           effectiveRemote: effectiveRemote,
           excludeNames: excludeNames,
           onProgress: onProgress,
@@ -1242,6 +1650,8 @@ class UploadToTool extends AgentTool {
           prefix: '[$hostId] ',
         );
       }
+    } on SftpTransferCancelled {
+      return ToolResult.failure('[$hostId] 上传已取消');
     } catch (e) {
       return ToolResult.failure('[$hostId] 上传失败: $e');
     } finally {
@@ -1253,7 +1663,9 @@ class UploadToTool extends AgentTool {
   String _formatSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 }
@@ -1275,7 +1687,8 @@ class BroadcastUploadTool extends AgentTool {
       '执行是串行的，每台主机的结果单独报告。';
 
   @override
-  String get paramSpec => '参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，逗号分隔，如 web1,web2）\n  local: 本地文件/目录绝对路径（必填）\n  remote: 远程目标父目录（必填）\n  recursive: 是否递归（true/false，默认 false）';
+  String get paramSpec =>
+      '参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，逗号分隔，如 web1,web2）\n  local: 本地文件/目录绝对路径（必填）\n  remote: 远程目标父目录（必填）\n  recursive: 是否递归（true/false，默认 false）';
 
   @override
   Future<ToolResult> execute({
@@ -1285,33 +1698,51 @@ class BroadcastUploadTool extends AgentTool {
   }) async {
     final hostIds = args.getStringList('hostIds');
     final local = args.getString('local');
-    final remote = args.getString('remote');
+    final remote = _normalizedRemotePath(args.getString('remote'));
     final recursive = args.getBool('recursive');
 
-    if (local.isEmpty || remote.isEmpty) {
-      return ToolResult.failure('参数缺失: local、remote 为必填项');
+    if (local.isEmpty || remote == null) {
+      return ToolResult.failure('参数缺失或无效: local 必填，remote 必须是 POSIX 绝对路径');
     }
     if (hostIds.isEmpty) {
       return ToolResult.failure('参数缺失: hostIds 为必填项（数组或逗号分隔）');
     }
+    if (hostIds.length > 64) {
+      return ToolResult.failure('hostIds 超过 64 台，拒绝广播上传');
+    }
+    final taskToken = _executor.cancelToken;
 
     // remote 是目标目录：单文件必须拼上本地文件名，否则会把目录名当成文件名。
     // 目录上传由 UploadToTool 自己追加 basename(local)。
-    final localIsDir = await Directory(local).exists();
+    final localDecision = _decideLocalPath(local);
+    if (!localDecision.isAllowed) {
+      return ToolResult.failure(_localPathDeniedMessage(local, localDecision));
+    }
+    final localPath = localDecision.resolved;
+    final localIsDir = await Directory(localPath).exists();
     final effectiveRemote =
-        localIsDir ? remote : p.posix.join(remote, p.basename(local));
+        localIsDir ? remote : p.posix.join(remote, p.basename(localPath));
 
     // 复用 UploadToTool 的逻辑：逐台上传
-    final uploadTool = UploadToTool(_executor);
+    final uploadTool = UploadToTool(_executor)
+      ..cancelToken = cancelToken
+      ..isTaskActive = () =>
+          !_executor.isTaskCancelled(taskToken) &&
+          cancelToken?.isCompleted != true &&
+          (isTaskActive?.call() ?? true);
     final results = <String>[];
     int successCount = 0;
     for (final hid in hostIds) {
+      if (_executor.isTaskCancelled(taskToken)) {
+        results.add('[$hid] 已取消，未上传');
+        continue;
+      }
       onProgress?.call(L10n.str.ut_2996de9000(hid));
       final r = await uploadTool.execute(
         executor: executor,
         args: ToolArgs({
           'hostId': hid,
-          'local': local,
+          'local': localPath,
           'remote': effectiveRemote,
           'recursive': recursive,
         }),
@@ -1325,10 +1756,14 @@ class BroadcastUploadTool extends AgentTool {
       }
     }
 
-    final summary = '广播分发完成: $successCount/${hostIds.length} 成功\n${results.join('\n')}';
+    final summary =
+        '广播分发完成: $successCount/${hostIds.length} 成功\n${results.join('\n')}';
     return successCount == hostIds.length
         ? ToolResult.success(summary)
-        : ToolResult(success: successCount > 0, output: summary, error: '${hostIds.length - successCount} 台失败');
+        : ToolResult(
+            success: false,
+            output: summary,
+            error: '${hostIds.length - successCount} 台失败');
   }
 }
 
@@ -1341,14 +1776,15 @@ class CollectFileTool extends AgentTool {
   String get name => 'collect_file';
 
   @override
-  ToolKind get kind => ToolKind.read;
+  ToolKind get kind => ToolKind.write;
 
   @override
   String get description => '【多机编排】从多台主机采集同名远程文件到本地目录，每个文件自动加 hostId 后缀。'
       '用于配置对比、日志收集等场景。';
 
   @override
-  String get paramSpec => '参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，逗号分隔）\n  remote: 远程文件绝对路径（必填）\n  localDir: 本地保存目录（必填）';
+  String get paramSpec =>
+      '参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，逗号分隔）\n  remote: 远程文件绝对路径（必填）\n  localDir: 本地保存目录（必填）';
 
   @override
   Future<ToolResult> execute({
@@ -1357,29 +1793,71 @@ class CollectFileTool extends AgentTool {
     void Function(String message)? onProgress,
   }) async {
     final hostIds = args.getStringList('hostIds');
-    final remote = args.getString('remote');
+    final remote = _normalizedRemotePath(args.getString('remote'));
     final localDir = args.getString('localDir');
 
-    if (remote.isEmpty || localDir.isEmpty) {
-      return ToolResult.failure('参数缺失: remote、localDir 为必填项');
+    if (remote == null || localDir.isEmpty) {
+      return ToolResult.failure('参数缺失或无效: remote 必须是 POSIX 绝对路径，localDir 必填');
     }
     if (hostIds.isEmpty) {
       return ToolResult.failure('参数缺失: hostIds 为必填项');
     }
+    if (hostIds.length > 64) {
+      return ToolResult.failure('hostIds 超过 64 台，拒绝文件采集');
+    }
+    final taskToken = _executor.cancelToken;
 
-    // 确保本地目录存在
-    final dir = Directory(localDir);
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
+    final rootDecision = _decideLocalPath(localDir);
+    if (!rootDecision.isAllowed) {
+      return ToolResult.failure(
+          _localPathDeniedMessage(localDir, rootDecision));
+    }
+    final rootPath = rootDecision.resolved;
+    final remoteBasename = p.posix.basename(remote);
+    if (!_isSafeRemoteEntryName(remoteBasename)) {
+      return ToolResult.failure('remote 的文件名不安全: $remote');
     }
 
-    final remoteBasename = p.posix.basename(remote);
+    // 先检查全部最终文件，再创建目录；hostId 也参与文件名，不能含路径分隔符。
+    final targetPaths = <String, String>{};
+    for (final hid in hostIds) {
+      if (!_isSafeRemoteEntryName(hid)) {
+        return ToolResult.failure('hostId 不能包含路径分隔符: $hid');
+      }
+      final rawTarget = p.join(rootPath, '${hid}_$remoteBasename');
+      final targetDecision = _decideLocalPath(rawTarget);
+      if (!targetDecision.isAllowed) {
+        return ToolResult.failure(
+            _localPathDeniedMessage(rawTarget, targetDecision));
+      }
+      if (!p.isWithin(
+          p.normalize(rootPath), p.normalize(targetDecision.resolved))) {
+        return ToolResult.failure('采集目标越出本地根目录: $rawTarget');
+      }
+      targetPaths[hid] = targetDecision.resolved;
+    }
+    if (_executor.isTaskCancelled(taskToken)) {
+      return ToolResult.failure('采集已取消');
+    }
+
+    final dir = Directory(rootPath);
+    if (!await dir.exists()) {
+      final beforeCreate = _verifyLocalPath(localDir, rootPath);
+      if (!beforeCreate.isAllowed) {
+        return ToolResult.failure(
+            _localPathDeniedMessage(localDir, beforeCreate));
+      }
+      final createError =
+          await _createVerifiedLocalDirectory(rootPath, taskToken);
+      if (createError != null) return ToolResult.failure(createError);
+    }
+
     final sftp = SftpService();
     final results = <String>[];
     int successCount = 0;
 
     for (final hid in hostIds) {
-      if (_executor.isCancelled) {
+      if (_executor.isTaskCancelled(taskToken)) {
         results.add(L10n.str.ut_0f735fba75(hid));
         continue;
       }
@@ -1396,8 +1874,22 @@ class CollectFileTool extends AgentTool {
       }
       try {
         await sftp.attachToClient(client);
-        final localPath = p.join(localDir, '${hid}_$remoteBasename');
-        await sftp.downloadFile(remote, localPath);
+        final localPath = targetPaths[hid]!;
+        final checked = _verifyLocalPath(localPath, localPath);
+        if (!checked.isAllowed) {
+          throw FileSystemException(
+              _localPathDeniedMessage(localPath, checked));
+        }
+        await sftp.downloadFile(
+          remote,
+          localPath,
+          cancelToken: taskToken,
+          validateLocalPath: (raw, expected) async =>
+              _freshLocalPathDenial(raw, expected),
+        );
+        if (_executor.isTaskCancelled(taskToken)) {
+          throw const FileSystemException('采集已取消');
+        }
         successCount++;
         results.add('[$hid] ✓ 已保存到 $localPath');
       } catch (e) {
@@ -1407,10 +1899,14 @@ class CollectFileTool extends AgentTool {
       }
     }
 
-    final summary = '采集完成: $successCount/${hostIds.length} 成功\n${results.join('\n')}';
+    final summary =
+        '采集完成: $successCount/${hostIds.length} 成功\n${results.join('\n')}';
     return successCount == hostIds.length
         ? ToolResult.success(summary)
-        : ToolResult(success: successCount > 0, output: summary, error: '${hostIds.length - successCount} 台失败');
+        : ToolResult(
+            success: false,
+            output: summary,
+            error: '${hostIds.length - successCount} 台失败');
   }
 }
 
@@ -1431,7 +1927,8 @@ class MultiGrepTool extends AgentTool {
       '注意：命令在远程执行，grep 语法须兼容目标 shell。';
 
   @override
-  String get paramSpec => '参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，逗号分隔）\n  pattern: 搜索关键词（必填，正则）\n  files: 要搜索的文件路径（必填，多个用逗号分隔）\n  tail: 仅搜索文件末尾 N 行（可选，如 1000）\n  ignoreCase: 是否忽略大小写（true/false，默认 false）';
+  String get paramSpec =>
+      '参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，逗号分隔）\n  pattern: 搜索关键词（必填，正则）\n  files: 要搜索的文件路径（必填，多个用逗号分隔）\n  tail: 仅搜索文件末尾 N 行（可选，如 1000）\n  ignoreCase: 是否忽略大小写（true/false，默认 false）';
 
   @override
   Future<ToolResult> execute({
@@ -1441,53 +1938,147 @@ class MultiGrepTool extends AgentTool {
   }) async {
     final hostIds = args.getStringList('hostIds');
     final pattern = args.getString('pattern');
-    final files = args.getString('files');
+    final files = args.getStringList('files');
     final tail = args.getString('tail');
     final ignoreCase = args.getBool('ignoreCase');
 
-    if (pattern.isEmpty || files.isEmpty) {
-      return ToolResult.failure('参数缺失: pattern、files 为必填项');
+    if (pattern.isEmpty ||
+        files.isEmpty ||
+        files.any((file) => file.trim().isEmpty)) {
+      return ToolResult.failure('参数缺失或无效: pattern、files 为必填项');
     }
     if (hostIds.isEmpty) {
       return ToolResult.failure('参数缺失: hostIds 为必填项');
     }
-
-    // 构造 grep 命令：支持 tail + ignoreCase
-    final safePattern = pattern.replaceAll("'", "'\\''");
-    final grepFlags = ignoreCase ? '-iE' : '-E';
-    final fileList = files.split(',').map((f) => f.trim()).where((f) => f.isNotEmpty).join(' ');
-    String cmd;
-    if (tail.isNotEmpty) {
-      final n = int.tryParse(tail) ?? 1000;
-      cmd = "tail -n $n $fileList | grep $grepFlags '$safePattern'";
-    } else {
-      cmd = "grep $grepFlags '$safePattern' $fileList";
+    if (hostIds.length > 64) {
+      return ToolResult.failure('hostIds 超过 64 台，拒绝多机搜索');
     }
+    if (pattern.length > 4096) {
+      return ToolResult.failure('pattern 超过 4096 字符，拒绝多机搜索');
+    }
+    if (files.length > 64) {
+      return ToolResult.failure('files 超过 64 个，拒绝多机搜索');
+    }
+    final normalizedFiles = <String>[];
+    for (final file in files) {
+      final normalized = _normalizedRemotePath(file.trim());
+      if (normalized == null) {
+        return ToolResult.failure('files 必须是 POSIX 绝对路径: $file');
+      }
+      normalizedFiles.add(normalized);
+    }
+
+    int? tailLines;
+    if (tail.isNotEmpty) {
+      if (!RegExp(r'^[1-9][0-9]*$').hasMatch(tail)) {
+        return ToolResult.failure('tail 必须是正整数，实际值为 "$tail"');
+      }
+      tailLines = int.tryParse(tail);
+      if (tailLines == null || tailLines <= 0 || tailLines > 1000000) {
+        return ToolResult.failure('tail 必须是 1..1000000 的正整数，实际值为 "$tail"');
+      }
+    }
+
+    // 每个文件独立执行：tail | grep 的管道退出码只反映 grep，
+    // 任一输入不可读时不能因另一个文件命中而伪装成完整成功。
+    final grepFlags = ignoreCase ? '-iE' : '-E';
+    final grepPart = 'grep $grepFlags -- ${_quotePosixArgument(pattern)}';
+    final taskToken = _executor.cancelToken;
 
     final results = <String>[];
     int hitCount = 0;
+    int failureCount = 0;
     for (final hid in hostIds) {
-      if (_executor.isCancelled) {
-        results.add(L10n.str.ut_2e01615eec(hid));
+      if (_executor.isTaskCancelled(taskToken)) {
+        failureCount++;
+        results.add('=== [$hid] 已取消 ===');
         continue;
       }
       onProgress?.call(L10n.str.ut_ffebfc53a6(hid));
-      final r = await _executor.executeOn(hid, cmd, timeout: const Duration(seconds: 30));
-      if (r == null) {
+      final target = _executor.executorFor(hid);
+      if (target == null) {
+        failureCount++;
         results.add(L10n.str.ut_38bc3dac85(hid));
         continue;
       }
-      final out = r.stdout.trim();
-      if (out.isEmpty) {
-        results.add('=== [$hid] 无匹配 ===');
-      } else {
-        hitCount++;
-        final truncated = out.length > 2000 ? '${out.substring(0, 2000)}\n...(已截断)' : out;
-        results.add('=== [$hid] 命中 ${out.split('\n').length} 行 ===\n$truncated');
+      final shellReason = _unsupportedPosixShellReason(target);
+      if (shellReason.isNotEmpty) {
+        failureCount++;
+        results.add('=== [$hid] 搜索失败 ===\n$shellReason');
+        continue;
       }
+      final hostBuffer = StringBuffer('=== [$hid] ===\n');
+      var hostHit = false;
+      var hostFailed = false;
+      var hostOutputLength = 0;
+      for (final file in normalizedFiles) {
+        if (_executor.isTaskCancelled(taskToken)) {
+          hostFailed = true;
+          hostBuffer.writeln('已取消，未继续搜索剩余文件');
+          break;
+        }
+        final quotedFile = _quotePosixArgument(file);
+        final cmd = tailLines == null
+            ? '$grepPart $quotedFile'
+            : 'tail -n $tailLines -- $quotedFile | $grepPart';
+        final r = await _executor.executeOn(hid, cmd,
+            timeout: const Duration(seconds: 30));
+        if (_executor.isTaskCancelled(taskToken)) {
+          hostFailed = true;
+          hostBuffer.writeln('已取消: $file');
+          break;
+        }
+        final fileLabel =
+            file.length > 500 ? '${file.substring(0, 500)}...' : file;
+        final noMatch = r != null &&
+            r.exitCode == 1 &&
+            r.stdout.trim().isEmpty &&
+            r.stderr.trim().isEmpty;
+        if (r == null || (!r.success && !noMatch)) {
+          hostFailed = true;
+          hostBuffer.writeln('[失败] $fileLabel');
+          final base = r == null
+              ? L10n.str.ut_38bc3dac85(hid)
+              : MultiHostExecutor.failureDetail(r);
+          // 结构化 failureReason 可能只说明「读取失败」，真实诊断（如
+          // Permission denied）只存在于 stderr；两者都要回传给模型。
+          final stderrText = r?.stderr.trim() ?? '';
+          final detail = stderrText.isNotEmpty && !base.contains(stderrText)
+              ? '$base\n$stderrText'
+              : base;
+          hostBuffer.writeln(detail.length > 1000
+              ? '${detail.substring(0, 1000)}...(已截断)'
+              : detail);
+        } else {
+          final out = r.stdout.trim();
+          if (out.isEmpty) {
+            hostBuffer.writeln('[无匹配] $fileLabel');
+          } else {
+            hostHit = true;
+            hostBuffer.writeln('[命中] $fileLabel');
+            final remaining = 8000 - hostOutputLength;
+            if (remaining > 0) {
+              final truncated = out.length > remaining
+                  ? '${out.substring(0, remaining)}\n...(已截断)'
+                  : out;
+              hostBuffer.writeln(truncated);
+              hostOutputLength += truncated.length;
+            } else {
+              hostBuffer.writeln('...(该文件输出已达上限，仅保留搜索状态)');
+            }
+          }
+        }
+      }
+      if (hostFailed) failureCount++;
+      if (hostHit) hitCount++;
+      results.add(hostBuffer.toString().trimRight());
     }
 
-    final summary = '多机搜索完成: $hitCount/${hostIds.length} 台命中\n\n${results.join('\n\n')}';
+    final summary =
+        '多机搜索完成: $hitCount/${hostIds.length} 台命中，$failureCount 台失败\n\n${results.join('\n\n')}';
+    if (failureCount > 0) {
+      return ToolResult.failure('$failureCount 台主机搜索失败或取消', output: summary);
+    }
     return ToolResult.success(summary);
   }
 }
@@ -1509,7 +2100,8 @@ class DiffFilesTool extends AgentTool {
       '返回每台主机文件的 md5 和两两 diff 摘要。';
 
   @override
-  String get paramSpec => '参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，至少 2 台，逗号分隔）\n  remote: 远程文件绝对路径（必填）';
+  String get paramSpec =>
+      '参数列表（多行 key:value 格式）：\n  hostIds: 主机 ID 列表（必填，至少 2 台，逗号分隔）\n  remote: 远程文件绝对路径（必填）';
 
   @override
   Future<ToolResult> execute({
@@ -1518,40 +2110,72 @@ class DiffFilesTool extends AgentTool {
     void Function(String message)? onProgress,
   }) async {
     final hostIds = args.getStringList('hostIds');
-    final remote = args.getString('remote');
+    final remote = _normalizedRemotePath(args.getString('remote'));
 
-    if (remote.isEmpty) {
-      return ToolResult.failure('参数缺失: remote 为必填项');
+    if (remote == null) {
+      return ToolResult.failure('参数缺失或无效: remote 必须是 POSIX 绝对路径');
     }
     if (hostIds.length < 2) {
       return ToolResult.failure('diff 至少需要 2 台主机');
     }
+    if (hostIds.length > 64) {
+      return ToolResult.failure('hostIds 超过 64 台，拒绝多机 diff');
+    }
+    if (hostIds.toSet().length != hostIds.length) {
+      return ToolResult.failure('hostIds 包含重复主机，拒绝 diff_files');
+    }
 
-    // 采集每台主机的 md5 和内容
+    // 采集每台主机的 md5 和内容；remote 始终作为单个 POSIX 参数引用。
+    final quotedRemote = _quotePosixArgument(remote);
+    final command = "md5sum -- $quotedRemote && "
+        "printf '%s\\n' '---CONTENT---' && "
+        "head -n 200 -- $quotedRemote";
+    final taskToken = _executor.cancelToken;
     final md5Results = <String, String>{};
     final contentResults = <String, String>{};
+    int failureCount = 0;
+    int successfulReads = 0;
     for (final hid in hostIds) {
-      if (_executor.isCancelled) {
-        md5Results[hid] = UiText.t('已取消', 'Cancelled');
-        contentResults[hid] = '';
+      if (_executor.isTaskCancelled(taskToken)) {
+        failureCount++;
         continue;
       }
       onProgress?.call(L10n.str.ut_8dc55e0134(hid, remote));
-      final r = await _executor.executeOn(
-        hid,
-        "md5sum '$remote' 2>/dev/null; echo '---CONTENT---'; cat '$remote' 2>/dev/null | head -200",
-        timeout: const Duration(seconds: 15),
-      );
-      if (r == null) {
-        md5Results[hid] = '未连接';
-        contentResults[hid] = '';
+      final target = _executor.executorFor(hid);
+      if (target == null) {
+        failureCount++;
         continue;
       }
-      final out = r.stdout;
-      final md5Match = RegExp(r'^([a-f0-9]{32})').firstMatch(out);
-      md5Results[hid] = md5Match?.group(1) ?? '读取失败';
-      final contentStart = out.indexOf('---CONTENT---');
-      contentResults[hid] = contentStart >= 0 ? out.substring(contentStart + 13).trim() : '';
+      final shellReason = _unsupportedPosixShellReason(target);
+      if (shellReason.isNotEmpty) {
+        failureCount++;
+        continue;
+      }
+      final r = await _executor.executeOn(
+        hid,
+        command,
+        timeout: const Duration(seconds: 15),
+      );
+      if (_executor.isTaskCancelled(taskToken)) {
+        failureCount++;
+      } else if (r == null) {
+        failureCount++;
+      } else if (!r.success) {
+        failureCount++;
+      } else {
+        final out = r.stdout;
+        final md5Match =
+            RegExp(r'^([a-f0-9]{32})', multiLine: true).firstMatch(out);
+        final contentStart = out.indexOf('---CONTENT---');
+        if (md5Match == null || contentStart < 0) {
+          // 命令退出 0 但缺少有效 MD5 或内容标记，仍不能作为一致性的证据。
+          failureCount++;
+        } else {
+          md5Results[hid] = md5Match.group(1)!;
+          contentResults[hid] = out.substring(contentStart + 13).trim();
+          successfulReads++;
+        }
+      }
     }
 
     // 构建 md5 对比表
@@ -1559,7 +2183,14 @@ class DiffFilesTool extends AgentTool {
     buffer.writeln('文件: $remote');
     buffer.writeln('MD5 对比:');
     for (final hid in hostIds) {
-      buffer.writeln('  [$hid] ${md5Results[hid]}');
+      buffer.writeln('  [$hid] ${md5Results[hid] ?? '读取失败/取消/未连接'}');
+    }
+    if (failureCount > 0 || successfulReads != hostIds.length) {
+      buffer.writeln('\n无法判断一致性：$failureCount 台主机读取失败、取消或未返回完整证据。');
+      return ToolResult.failure(
+        '$failureCount 台主机文件读取失败，无法比较',
+        output: buffer.toString().trimRight(),
+      );
     }
 
     // 检查是否全部一致
@@ -1599,7 +2230,8 @@ class CertMonitorTool extends AgentTool {
       '用于证书到期监控、安全审计。返回证书有效期剩余天数、到期日期、颁发者等。';
 
   @override
-  String get paramSpec => '参数列表（多行 key:value 格式）：\n  mode: remote|local_file|ssh_hostkey（必填）\n  host: 远程 HTTPS 主机名或 IP（mode=remote 时必填）\n  port: HTTPS 端口（默认 443）\n  certPath: 本地证书文件路径（mode=local_file 时必填）';
+  String get paramSpec =>
+      '参数列表（多行 key:value 格式）：\n  mode: remote|local_file|ssh_hostkey（必填）\n  host: 远程 HTTPS 主机名或 IP（mode=remote 时必填）\n  port: HTTPS 端口（默认 443）\n  certPath: 本地证书文件路径（mode=local_file 时必填）';
 
   @override
   Future<ToolResult> execute({
@@ -1609,7 +2241,9 @@ class CertMonitorTool extends AgentTool {
   }) async {
     final mode = args.getString('mode');
     if (mode.isEmpty) {
-      return ToolResult.failure(UiText.t('参数缺失: mode 必填（remote/local_file/ssh_hostkey）', 'Missing parameter: mode is required (remote/local_file/ssh_hostkey)'));
+      return ToolResult.failure(UiText.t(
+          '参数缺失: mode 必填（remote/local_file/ssh_hostkey）',
+          'Missing parameter: mode is required (remote/local_file/ssh_hostkey)'));
     }
 
     if (mode == 'remote') {
@@ -1623,18 +2257,22 @@ class CertMonitorTool extends AgentTool {
         return ToolResult.failure('host 格式非法（仅允许字母、数字、点、连字符）');
       }
       if (port < 1 || port > 65535) {
-        return ToolResult.failure(UiText.t('port 范围非法（1-65535）', 'Invalid port range (1-65535)'));
+        return ToolResult.failure(
+            UiText.t('port 范围非法（1-65535）', 'Invalid port range (1-65535)'));
       }
 
       onProgress?.call(L10n.str.ut_475dcf3309(host, port));
       // 通过 executor 在已连接主机上执行 openssl 命令
       // 用 -servername 启用 SNI；用 2>/dev/null 屏蔽 s_client 的握手交互输出
-      final cmd = "echo | openssl s_client -connect $host:$port -servername $host 2>/dev/null "
+      final cmd =
+          "echo | openssl s_client -connect $host:$port -servername $host 2>/dev/null "
           "| openssl x509 -noout -dates -issuer -subject 2>/dev/null";
       try {
-        final result = await executor.executeAndWait(cmd, timeout: const Duration(seconds: 15));
+        final result = await executor.executeAndWait(cmd,
+            timeout: const Duration(seconds: 15));
         if (!result.success) {
-          return ToolResult.failure(L10n.str.ut_1e823bfa18(result.stderr), output: result.stdout);
+          return ToolResult.failure(L10n.str.ut_1e823bfa18(result.stderr),
+              output: result.stdout);
         }
         final output = result.stdout.trim();
         if (output.isEmpty) {
@@ -1655,14 +2293,18 @@ class CertMonitorTool extends AgentTool {
       }
       // R7: 校验路径不含 shell 元字符（防注入；单引号防护可被单引号突破）
       if (RegExp(r"[';`$\\|&><\n\r]").hasMatch(certPath)) {
-        return ToolResult.failure(UiText.t('certPath 含非法字符（禁止引号/分号/管道/反引号等）', 'certPath contains illegal characters (quotes, semicolons, pipes, backticks, etc. are not allowed)'));
+        return ToolResult.failure(UiText.t('certPath 含非法字符（禁止引号/分号/管道/反引号等）',
+            'certPath contains illegal characters (quotes, semicolons, pipes, backticks, etc. are not allowed)'));
       }
       onProgress?.call(L10n.str.ut_bde384cf72(certPath));
-      final cmd = "openssl x509 -in '$certPath' -noout -dates -issuer -subject 2>&1";
+      final cmd =
+          "openssl x509 -in '$certPath' -noout -dates -issuer -subject 2>&1";
       try {
-        final result = await executor.executeAndWait(cmd, timeout: const Duration(seconds: 10));
+        final result = await executor.executeAndWait(cmd,
+            timeout: const Duration(seconds: 10));
         if (!result.success) {
-          return ToolResult.failure(L10n.str.ut_1e823bfa18(result.stderr), output: result.stdout);
+          return ToolResult.failure(L10n.str.ut_1e823bfa18(result.stderr),
+              output: result.stdout);
         }
         final output = result.stdout.trim();
         if (output.isEmpty || output.contains('unable to load certificate')) {
@@ -1676,15 +2318,18 @@ class CertMonitorTool extends AgentTool {
     }
 
     if (mode == 'ssh_hostkey') {
-      onProgress?.call(UiText.t('正在读取 SSH host key 指纹...', 'Reading SSH host key fingerprints...'));
+      onProgress?.call(UiText.t(
+          '正在读取 SSH host key 指纹...', 'Reading SSH host key fingerprints...'));
       // 列出 /etc/ssh/ 下所有 host key 的指纹
       const cmd = "for f in /etc/ssh/ssh_host_*_key.pub; do "
           "ssh-keygen -lf \"\$f\" 2>/dev/null; "
           "done";
       try {
-        final result = await executor.executeAndWait(cmd, timeout: const Duration(seconds: 10));
+        final result = await executor.executeAndWait(cmd,
+            timeout: const Duration(seconds: 10));
         if (!result.success) {
-          return ToolResult.failure('ssh-keygen 执行失败: ${result.stderr}', output: result.stdout);
+          return ToolResult.failure('ssh-keygen 执行失败: ${result.stderr}',
+              output: result.stdout);
         }
         final output = result.stdout.trim();
         if (output.isEmpty) {
@@ -1696,7 +2341,8 @@ class CertMonitorTool extends AgentTool {
       }
     }
 
-    return ToolResult.failure('未知 mode: $mode（支持 remote/local_file/ssh_hostkey）');
+    return ToolResult.failure(
+        '未知 mode: $mode（支持 remote/local_file/ssh_hostkey）');
   }
 
   /// 解析 openssl x509 -dates -issuer -subject 输出
@@ -1708,7 +2354,9 @@ class CertMonitorTool extends AgentTool {
 
     for (final line in output.split('\n')) {
       final l = line.trim();
-      if (l.startsWith('notBefore=')) notBefore = l.substring('notBefore='.length);
+      if (l.startsWith('notBefore=')) {
+        notBefore = l.substring('notBefore='.length);
+      }
       if (l.startsWith('notAfter=')) notAfter = l.substring('notAfter='.length);
       if (l.startsWith('issuer=')) issuer = l.substring('issuer='.length);
       if (l.startsWith('subject=')) subject = l.substring('subject='.length);
@@ -1755,8 +2403,18 @@ class CertMonitorTool extends AgentTool {
     try {
       // 简单解析：用 Locale 不敏感的方式手动解析
       final months = {
-        'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
-        'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12,
+        'Jan': 1,
+        'Feb': 2,
+        'Mar': 3,
+        'Apr': 4,
+        'May': 5,
+        'Jun': 6,
+        'Jul': 7,
+        'Aug': 8,
+        'Sep': 9,
+        'Oct': 10,
+        'Nov': 11,
+        'Dec': 12,
       };
       final parts = s.split(RegExp(r'\s+'));
       if (parts.length < 5) return null;
@@ -1828,6 +2486,9 @@ class FileWriteTool extends AgentTool {
   /// 超过此值的 content_b64 会被拒绝，强制 AI 分块写入
   static const int _maxChunkSize = 8 * 1024;
 
+  /// base64 展开系数为 4/3；解码前先拒绝超限编码串，避免先分配超大字节数组。
+  static const int _maxEncodedChunkSize = ((_maxChunkSize + 2) ~/ 3) * 4;
+
   /// 备份文件大小上限：10MB（更大的文件应该走 sftp_upload，不应整体重写）
   static const int _maxBackupSize = 10 * 1024 * 1024;
 
@@ -1847,7 +2508,11 @@ class FileWriteTool extends AgentTool {
       return ToolResult.failure('参数缺失: path 为必填项');
     }
     if (contentB64.isEmpty && !args.containsKey('content')) {
-      return ToolResult.failure(UiText.t('参数缺失: content 或 content_b64 必须提供一个', 'Missing parameter: provide either content or content_b64'));
+      return ToolResult.failure(UiText.t('参数缺失: content 或 content_b64 必须提供一个',
+          'Missing parameter: provide either content or content_b64'));
+    }
+    if (contentB64.isNotEmpty && args.containsKey('content')) {
+      return ToolResult.failure('参数错误: content 与 content_b64 不能同时提供');
     }
     if (contentB64.isEmpty && contentPlain.isEmpty) {
       // 多行内容若直接写在 content: 后面，解析器只会得到空值，
@@ -1855,9 +2520,9 @@ class FileWriteTool extends AgentTool {
       return ToolResult.failure(
         UiText.t(
           'content 为空。若内容是文本，请写成一行并用 \\n 表示换行；'
-          '若需逐字节精确内容，请用 content_b64。已中止写入，文件未修改。',
+              '若需逐字节精确内容，请用 content_b64。已中止写入，文件未修改。',
           'content is empty. For text, write it on one line using \\n for newlines; '
-          'for byte-exact content use content_b64. Write aborted, file unchanged.',
+              'for byte-exact content use content_b64. Write aborted, file unchanged.',
         ),
       );
     }
@@ -1867,12 +2532,22 @@ class FileWriteTool extends AgentTool {
 
     final Uint8List contentBytes;
     if (contentB64.isNotEmpty) {
+      if (contentB64.length > _maxEncodedChunkSize) {
+        return ToolResult.failure(
+          'content_b64 编码内容过大 (${contentB64.length} 字符 > $_maxEncodedChunkSize 字符)，'
+          '已中止解码与写入；请将原文分成小于 8KB 的块。',
+        );
+      }
       try {
         contentBytes = base64Decode(contentB64);
       } catch (e) {
         return ToolResult.failure('content_b64 base64 解码失败: $e');
       }
     } else {
+      if (contentPlain.length > _maxChunkSize) {
+        return ToolResult.failure(
+            'content 原文超过 8KB，已中止转义编码；请分块写入或使用 content_b64。');
+      }
       // 纯文本：把单行参数里的 \n / \r / \t / \\ 还原为真实控制字符
       contentBytes =
           Uint8List.fromList(utf8.encode(decodeEscapedText(contentPlain)));
@@ -1883,16 +2558,18 @@ class FileWriteTool extends AgentTool {
       return ToolResult.failure(
         UiText.t(
           '单次写入内容过大 (${contentBytes.length} 字节 > $_maxChunkSize 字节)。'
-          '请分块写入：第一次 mode=write 写入前 8KB，后续 mode=append 追加剩余内容。'
-          '提示：每次调用前在本地把内容切成 < 8KB 的块，分别 base64 编码后调用本工具。',
+              '请分块写入：第一次 mode=write 写入前 8KB，后续 mode=append 追加剩余内容。'
+              '提示：每次调用前在本地把内容切成 < 8KB 的块，分别 base64 编码后调用本工具。',
           'Single-write content too large (${contentBytes.length} bytes > $_maxChunkSize bytes). '
-          'Write in chunks: first mode=write with the leading 8KB, then mode=append for the rest. '
-          'Tip: split the content into blocks < 8KB locally, base64-encode each block, then call this tool per block.',
+              'Write in chunks: first mode=write with the leading 8KB, then mode=append for the rest. '
+              'Tip: split the content into blocks < 8KB locally, base64-encode each block, then call this tool per block.',
         ),
       );
     }
 
-    onProgress?.call(UiText.t('正在${mode == 'write' ? '写入' : '追加'} $path (${contentBytes.length} 字节)...', '${mode == 'write' ? 'Writing' : 'Appending'} $path (${contentBytes.length} bytes)...'));
+    onProgress?.call(UiText.t(
+        '正在${mode == 'write' ? '写入' : '追加'} $path (${contentBytes.length} 字节)...',
+        '${mode == 'write' ? 'Writing' : 'Appending'} $path (${contentBytes.length} bytes)...'));
 
     // SSH 远程会话：用 SFTP 直接写入
     if (executor is SSHService) {
@@ -1906,6 +2583,9 @@ class FileWriteTool extends AgentTool {
           '改本机文件请用 local_file_write；改服务器文件请给远程绝对路径（如 /etc/nginx/nginx.conf）。',
         );
       }
+      if (_normalizedRemotePath(path) == null) {
+        return ToolResult.failure('远程 path 必须是 POSIX 绝对路径: $path');
+      }
       final client = executor.client;
       if (client == null) {
         return ToolResult.failure('SSH 连接未建立，无法打开 SFTP');
@@ -1918,7 +2598,7 @@ class FileWriteTool extends AgentTool {
       }
 
       String? backupPath; // 用于失败时回滚
-      String? sftpError;  // SFTP 失败原因（非 null 时触发 PTY fallback）
+      String? sftpError; // SFTP 失败原因（非 null 时触发 PTY fallback）
       try {
         // 创建父目录（如 /etc/nginx/conf.d/ 不存在）
         final parentDir = p.posix.dirname(path);
@@ -1946,16 +2626,21 @@ class FileWriteTool extends AgentTool {
               return ToolResult.failure(
                 UiText.t(
                   '原文件过大 ($fileSize 字节 > $_maxBackupSize 字节)，无法自动备份。'
-                  '请先手动备份（如 cp $path $path.manual.bak），再用 backup: false 调用本工具。',
+                      '请先手动备份（如 cp $path $path.manual.bak），再用 backup: false 调用本工具。',
                   'Original file too large ($fileSize bytes > $_maxBackupSize bytes), cannot back up automatically. '
-                  'Back it up manually first (e.g. cp $path $path.manual.bak), then call this tool with backup: false.',
+                      'Back it up manually first (e.g. cp $path $path.manual.bak), then call this tool with backup: false.',
                 ),
               );
             }
             backupPath = '$path.bak.${DateTime.now().millisecondsSinceEpoch}';
             onProgress?.call(L10n.str.ut_a2a80977d9(backupPath));
             try {
-              await sftp.copyFile(path, backupPath);
+              await sftp.copyFile(
+                path,
+                backupPath,
+                maxBytes: _maxBackupSize,
+                cancelToken: cancelToken,
+              );
             } catch (e) {
               return ToolResult.failure(L10n.str.ut_e39887dfed(e));
             }
@@ -1964,14 +2649,18 @@ class FileWriteTool extends AgentTool {
 
         // 写入
         if (mode == 'write') {
-          await sftp.writeFileBytes(path, contentBytes);
+          await sftp.writeFileBytes(path, contentBytes,
+              cancelToken: cancelToken);
         } else {
-          await sftp.appendFileBytes(path, contentBytes);
+          await sftp.appendFileBytes(path, contentBytes,
+              cancelToken: cancelToken);
         }
 
         onProgress?.call(UiText.t('写入完成', 'Write complete'));
         final msg = StringBuffer()
-          ..writeln(UiText.t('文件${mode == 'write' ? '写入' : '追加'}成功: $path (${contentBytes.length} 字节)', '${mode == 'write' ? 'File written' : 'Content appended'}: $path (${contentBytes.length} bytes)'));
+          ..writeln(UiText.t(
+              '文件${mode == 'write' ? '写入' : '追加'}成功: $path (${contentBytes.length} 字节)',
+              '${mode == 'write' ? 'File written' : 'Content appended'}: $path (${contentBytes.length} bytes)'));
         if (backupPath != null) {
           msg.writeln(L10n.str.ut_fcda8e6588(backupPath));
           msg.writeln(L10n.str.ut_b9beeabb91(backupPath, path));
@@ -1981,10 +2670,12 @@ class FileWriteTool extends AgentTool {
         sftpError = e.toString();
         // H3 失败回滚：恢复备份
         if (backupPath != null) {
-          onProgress?.call(UiText.t('SFTP 写入失败，正在回滚备份 ...', 'SFTP write failed, rolling back from backup ...'));
+          onProgress?.call(UiText.t('SFTP 写入失败，正在回滚备份 ...',
+              'SFTP write failed, rolling back from backup ...'));
           try {
             await sftp.copyFile(backupPath, path);
-            onProgress?.call(UiText.t('原文件已从备份恢复', 'Original file restored from backup'));
+            onProgress?.call(
+                UiText.t('原文件已从备份恢复', 'Original file restored from backup'));
           } catch (rollbackErr) {
             // 回滚失败也继续走 PTY fallback（PTY 会覆盖原文件）
             onProgress?.call(L10n.str.ut_a7bd551b52(rollbackErr));
@@ -1998,10 +2689,10 @@ class FileWriteTool extends AgentTool {
       // 适用于：SFTP 子系统被禁用 / 当前用户对目标路径无写权限 / 已 sudo -i 进 root
       // 走到这行说明 try 块抛了异常（catch 已执行，sftpError 已被赋值）
       if (mode == 'write') {
-        onProgress?.call(UiText.t('SFTP 写入失败，尝试 PTY stdin 模式 (cat > file)...', 'SFTP write failed, trying PTY stdin mode (cat > file)...'));
-        final backupInfo = backupPath != null
-            ? L10n.str.ut_f8d0ae7c3c(backupPath)
-            : '';
+        onProgress?.call(UiText.t('SFTP 写入失败，尝试 PTY stdin 模式 (cat > file)...',
+            'SFTP write failed, trying PTY stdin mode (cat > file)...'));
+        final backupInfo =
+            backupPath != null ? L10n.str.ut_f8d0ae7c3c(backupPath) : '';
 
         // 第一次：cat > /path（适用于 root shell 或用户有权限）
         var ptyResult = await executor.writeFileViaPty(
@@ -2018,7 +2709,8 @@ class FileWriteTool extends AgentTool {
         }
         // cancelToken 触发时不再尝试 sudo tee，直接返回
         if (cancelToken != null && cancelToken!.isCompleted) {
-          return ToolResult.failure(UiText.t('用户取消任务，PTY 写入中止', 'Task cancelled by user, PTY write aborted'));
+          return ToolResult.failure(UiText.t(
+              '用户取消任务，PTY 写入中止', 'Task cancelled by user, PTY write aborted'));
         }
         onProgress?.call(L10n.str.ut_caa84ab310(ptyResult.failureReason ?? ''));
 
@@ -2048,131 +2740,102 @@ class FileWriteTool extends AgentTool {
       }
 
       // append 模式不走 PTY fallback（PTY stdin 无法精确追加）
-      return ToolResult.failure('SFTP 追加写入失败: $sftpError。append 模式不支持 PTY fallback，请检查 SFTP 子系统。');
+      return ToolResult.failure(
+          'SFTP 追加写入失败: $sftpError。append 模式不支持 PTY fallback，请检查 SFTP 子系统。');
     }
 
-    // 本地终端：优先使用 Dart 文件 I/O（Windows 没有 cat，且 PTY 无法表达 append）。
-    // 直接写入保留原文件 inode/权限；Unix 上若因权限失败（例如当前 shell 已
-    // sudo -i 进 root），回退到 PTY stdin，保持旧版可写 root 文件的能力。
+    // 本地终端：共享非截断打开、句柄身份校验与句柄回滚实现。
     if (executor is LocalTerminalService) {
-      final file = File(path);
-      final exists = await file.exists();
-      if (mode == 'append' && !exists) {
-        return ToolResult.failure(
-          'append 模式要求文件已存在，但 $path 不存在。'
-          '请先调用 file_write mode=write 创建文件，再用 mode=append 追加后续块。',
-        );
+      final decision = _decideLocalPath(path);
+      if (!decision.isAllowed) {
+        return ToolResult.failure(_localPathDeniedMessage(path, decision));
       }
-
-      String? backupPath;
-      var backupUnavailable = false;
-      if (mode == 'write' && backup && exists) {
-        onProgress?.call(UiText.t('正在备份原文件 ...', 'Backing up original file ...'));
-        try {
-          backupPath = await backupLocalFile(path);
-        } on FileSystemException catch (e) {
-          if (!Platform.isWindows) {
-            // 文件可能属于 root，而 Dart 进程无读权限；当前 shell 可能有 sudo 权限
-            backupUnavailable = true;
-          } else {
-            return ToolResult.failure(
-              L10n.str.ut_e39887dfed(e),
-            );
-          }
-        } catch (e) {
-          return ToolResult.failure(L10n.str.ut_e39887dfed(e));
-        }
-      }
-
-      try {
-        if (mode == 'append') {
-          await file.writeAsBytes(contentBytes, mode: FileMode.append, flush: true);
-        } else {
-          final parentDir = p.dirname(path);
-          if (parentDir.isNotEmpty && parentDir != '.') {
-            await Directory(parentDir).create(recursive: true);
-          }
-          await file.writeAsBytes(contentBytes, mode: FileMode.write, flush: true);
-        }
-
+      final localPath = decision.resolved;
+      final outcome = await writeLocalFile(
+        path: localPath,
+        bytes: contentBytes,
+        append: mode == 'append',
+        backup: backup,
+        authorizePath: (raw, expected) async =>
+            _freshLocalPathDenial(raw, expected),
+      );
+      if (outcome.success) {
         onProgress?.call(UiText.t('写入完成', 'Write complete'));
         return _localWriteSuccess(
-          path: path,
+          path: localPath,
           byteCount: contentBytes.length,
           mode: mode,
           method: UiText.t('本地文件', 'Local file'),
-          backupPath: backupPath,
-          backupUnavailable: backupUnavailable,
+          backupPath: outcome.backupPath,
         );
-      } catch (e) {
-        if (backupPath != null) {
-          try {
-            await File(backupPath).copy(path);
-            return ToolResult.failure(
-              '本地文件写入失败: $e\n已自动回滚：原文件已从备份 $backupPath 恢复。',
-            );
-          } catch (rollbackErr) {
-            return ToolResult.failure(
-              '本地文件写入失败: $e\n回滚也失败: $rollbackErr。'
-              '请手动用备份 $backupPath 恢复 $path',
-            );
-          }
-        }
-
-        if (!Platform.isWindows && mode == 'write') {
-          onProgress?.call(UiText.t('本地直接写入失败，尝试通过当前 shell 写入 ...', 'Direct local write failed, writing via the current shell ...'));
-          final ptyResult = await executor.writeFileViaPty(
-            path: path,
-            content: contentBytes,
-            useSudo: false,
-            timeout: const Duration(seconds: 30),
-            cancelToken: cancelToken,
-          );
-          if (ptyResult.success) {
-            return _localWriteSuccess(
-              path: path,
-              byteCount: contentBytes.length,
-              mode: mode,
-              method: UiText.t('本地 PTY stdin', 'local PTY stdin'),
-              backupPath: backupPath,
-              backupUnavailable: backupUnavailable,
-            );
-          }
-          if (cancelToken != null && cancelToken!.isCompleted) {
-            return ToolResult.failure(UiText.t('用户取消任务，PTY 写入中止', 'Task cancelled by user, PTY write aborted'));
-          }
-
-          final ptyResult2 = await executor.writeFileViaPty(
-            path: path,
-            content: contentBytes,
-            useSudo: true,
-            timeout: const Duration(seconds: 30),
-            cancelToken: cancelToken,
-          );
-          if (ptyResult2.success) {
-            return _localWriteSuccess(
-              path: path,
-              byteCount: contentBytes.length,
-              mode: mode,
-              method: UiText.t('本地 PTY stdin + sudo tee', 'local PTY stdin + sudo tee'),
-              backupPath: backupPath,
-              backupUnavailable: backupUnavailable,
-            );
-          }
-
-          return ToolResult.failure(
-            '本地文件写入失败。\n'
-            '直接写入: $e\n'
-            'PTY cat: ${ptyResult.failureReason ?? ptyResult.stderr}\n'
-            'PTY sudo tee: ${ptyResult2.failureReason ?? ptyResult2.stderr}',
-          );
-        }
-
-        return ToolResult.failure('本地文件写入失败: $e');
       }
+
+      // 仅在没有备份、且直接写入尚未开始时才允许旧 PTY 权限回退。
+      // 有备份而写入失败的路径必须由共享原语回滚，不能再用 shell 覆盖。
+      if (!Platform.isWindows &&
+          mode == 'write' &&
+          outcome.backupPath == null &&
+          !(outcome.error ?? '').contains('原子性校验') &&
+          !(outcome.error ?? '').contains('授权') &&
+          cancelToken?.isCompleted != true) {
+        final fallbackCheck = _verifyLocalPath(path, localPath);
+        if (!fallbackCheck.isAllowed) {
+          return ToolResult.failure(
+              _localPathDeniedMessage(path, fallbackCheck));
+        }
+        onProgress?.call(UiText.t('本地直接写入失败，尝试通过当前 shell 写入 ...',
+            'Direct local write failed, writing via the current shell ...'));
+        final ptyResult = await executor.writeFileViaPty(
+          path: localPath,
+          content: contentBytes,
+          useSudo: false,
+          timeout: const Duration(seconds: 30),
+          cancelToken: cancelToken,
+        );
+        if (ptyResult.success) {
+          return _localWriteSuccess(
+            path: localPath,
+            byteCount: contentBytes.length,
+            mode: mode,
+            method: UiText.t('本地 PTY stdin', 'local PTY stdin'),
+          );
+        }
+        if (cancelToken?.isCompleted == true) {
+          return ToolResult.failure(UiText.t(
+              '用户取消任务，PTY 写入中止', 'Task cancelled by user, PTY write aborted'));
+        }
+        final sudoCheck = _verifyLocalPath(path, localPath);
+        if (!sudoCheck.isAllowed) {
+          return ToolResult.failure(_localPathDeniedMessage(path, sudoCheck));
+        }
+        final ptyResult2 = await executor.writeFileViaPty(
+          path: localPath,
+          content: contentBytes,
+          useSudo: true,
+          timeout: const Duration(seconds: 30),
+          cancelToken: cancelToken,
+        );
+        if (ptyResult2.success) {
+          return _localWriteSuccess(
+            path: localPath,
+            byteCount: contentBytes.length,
+            mode: mode,
+            method: UiText.t(
+                '本地 PTY stdin + sudo tee', 'local PTY stdin + sudo tee'),
+          );
+        }
+        return ToolResult.failure(
+          '本地文件写入失败。\n'
+          '直接写入: ${outcome.error}\n'
+          'PTY cat: ${ptyResult.failureReason ?? ptyResult.stderr}\n'
+          'PTY sudo tee: ${ptyResult2.failureReason ?? ptyResult2.stderr}',
+        );
+      }
+      return ToolResult.failure('本地文件写入失败: ${outcome.error}');
     }
 
-    return ToolResult.failure('file_write 仅支持 SSHService / LocalTerminalService，当前 executor 类型不支持');
+    return ToolResult.failure(
+        'file_write 仅支持 SSHService / LocalTerminalService，当前 executor 类型不支持');
   }
 
   ToolResult _localWriteSuccess({
@@ -2184,13 +2847,15 @@ class FileWriteTool extends AgentTool {
     bool backupUnavailable = false,
   }) {
     final msg = StringBuffer()
-      ..writeln(
-          UiText.t('文件${mode == 'write' ? '写入' : '追加'}成功（$method）: $path ($byteCount 字节)', '${mode == 'write' ? 'File written' : 'Content appended'} ($method): $path ($byteCount bytes)'));
+      ..writeln(UiText.t(
+          '文件${mode == 'write' ? '写入' : '追加'}成功（$method）: $path ($byteCount 字节)',
+          '${mode == 'write' ? 'File written' : 'Content appended'} ($method): $path ($byteCount bytes)'));
     if (backupPath != null) {
       msg.writeln(L10n.str.ut_fcda8e6588(backupPath));
       msg.writeln(L10n.str.ut_c4acfd10f3(path));
     } else if (backupUnavailable) {
-      msg.writeln(UiText.t('  注意：当前进程无权限读取原文件，未能生成备份。', '  Note: this process cannot read the original file, so no backup was created.'));
+      msg.writeln(UiText.t('  注意：当前进程无权限读取原文件，未能生成备份。',
+          '  Note: this process cannot read the original file, so no backup was created.'));
     }
     return ToolResult.success(msg.toString().trimRight());
   }
@@ -2243,6 +2908,9 @@ class FilePatchTool extends AgentTool {
 
   /// 文件大小上限：1MB（patch 仅适用于小配置文件，大文件请用 file_write 整体重写）
   static const int _maxFileSize = 1024 * 1024;
+  static const int _maxPlainFieldLength = 64 * 1024;
+  static const int _maxEncodedFieldSize = ((_maxFileSize + 2) ~/ 3) * 4;
+  static const int _maxPatchedFileSize = 2 * _maxFileSize;
 
   @override
   Future<ToolResult> execute({
@@ -2263,29 +2931,53 @@ class FilePatchTool extends AgentTool {
     if (oldB64.isEmpty && oldPlain.isEmpty) {
       return ToolResult.failure('参数缺失: old 或 old_b64 必须提供一个');
     }
+    if (oldB64.isNotEmpty && args.containsKey('old')) {
+      return ToolResult.failure('参数错误: old 与 old_b64 不能同时提供');
+    }
+    if (newB64.isNotEmpty && args.containsKey('new')) {
+      return ToolResult.failure('参数错误: new 与 new_b64 不能同时提供');
+    }
 
     // 替换按原始字节进行，避免解码/重编码损坏 BOM、CRLF 或非 UTF-8 字节。
     // 文本视图仅用于错误提示和 diff 统计。
     Uint8List oldBytes;
     Uint8List newBytes;
     if (oldB64.isNotEmpty) {
+      if (oldB64.length > _maxEncodedFieldSize) {
+        return ToolResult.failure('old_b64 编码内容过大，已中止解码。');
+      }
       try {
         oldBytes = base64Decode(oldB64);
       } catch (e) {
         return ToolResult.failure('old_b64 base64 解码失败: $e');
       }
     } else {
+      if (oldPlain.length > _maxPlainFieldLength) {
+        return ToolResult.failure('old 原文超过 64KB，已中止编码；更大内容请使用 old_b64。');
+      }
       oldBytes = Uint8List.fromList(utf8.encode(oldPlain));
     }
+    if (oldBytes.length > _maxFileSize) {
+      return ToolResult.failure('old 内容超过 1MB，拒绝 patch。');
+    }
     if (newB64.isNotEmpty) {
+      if (newB64.length > _maxEncodedFieldSize) {
+        return ToolResult.failure('new_b64 编码内容过大，已中止解码。');
+      }
       try {
         newBytes = base64Decode(newB64);
       } catch (e) {
         return ToolResult.failure('new_b64 base64 解码失败: $e');
       }
     } else {
+      if (newPlain.length > _maxPlainFieldLength) {
+        return ToolResult.failure('new 原文超过 64KB，已中止编码；更大内容请使用 new_b64。');
+      }
       // new 允许为空：表示删除 old
       newBytes = Uint8List.fromList(utf8.encode(newPlain));
+    }
+    if (newBytes.length > _maxFileSize) {
+      return ToolResult.failure('new 内容超过 1MB，拒绝 patch。');
     }
     final oldStr = utf8.decode(oldBytes, allowMalformed: true);
     final newStr = utf8.decode(newBytes, allowMalformed: true);
@@ -2300,6 +2992,9 @@ class FilePatchTool extends AgentTool {
           'file_patch 会把整串当成服务器上的文件名去改，不会碰到这台电脑。\n'
           '改本机文件请用 local_file_patch；改服务器文件请给远程绝对路径（如 /etc/nginx/nginx.conf）。',
         );
+      }
+      if (_normalizedRemotePath(path) == null) {
+        return ToolResult.failure('远程 path 必须是 POSIX 绝对路径: $path');
       }
       final client = executor.client;
       if (client == null) {
@@ -2323,6 +3018,12 @@ class FilePatchTool extends AgentTool {
           );
         }
         final beforeSize = beforeStat.size ?? 0;
+        if (beforeSize > _maxFileSize) {
+          return ToolResult.failure(
+            '文件过大 ($beforeSize 字节 > $_maxFileSize 字节)，已拒绝读取。'
+            'patch 仅适用于 < 1MB 的配置文件，大文件请用 file_write 整体重写。',
+          );
+        }
         final beforeMtime = beforeStat.modifyTime ?? 0;
 
         // 读取原文件
@@ -2346,26 +3047,31 @@ class FilePatchTool extends AgentTool {
           return ToolResult.failure(
             'old 在文件中出现 $occurrences 次，无法确定替换哪个。'
             '请提供更长的上下文（包含前后行）使 old 唯一。',
-            output: 'old 内容预览: ${oldStr.length > 100 ? '${oldStr.substring(0, 100)}...' : oldStr}',
+            output:
+                'old 内容预览: ${oldStr.length > 100 ? '${oldStr.substring(0, 100)}...' : oldStr}',
           );
         }
 
         // 字节级替换：文件其他部分（BOM/CRLF/非 UTF-8 字节）原样保留
         final newFileBytes = _replaceFirstBytes(bytes, oldBytes, newBytes);
+        if (newFileBytes.length > _maxPatchedFileSize) {
+          return ToolResult.failure('patch 后文件超过 2MB，拒绝写入。');
+        }
 
         // H1 原子性：write 前再 stat 一次，若 size/mtime 变化则拒绝写入
         final afterStat = await sftp.statFile(path);
-        if (afterStat != null) {
-          final afterSize = afterStat.size ?? 0;
-          final afterMtime = afterStat.modifyTime ?? 0;
-          if (afterSize != beforeSize || afterMtime != beforeMtime) {
-            return ToolResult.failure(
-              '原子性校验失败：文件在读取后被外部修改 '
-              '(before: size=$beforeSize, mtime=$beforeMtime; '
-              'after: size=$afterSize, mtime=$afterMtime)。'
-              '已中止写入，请用 cat 重新查看文件内容后再次尝试 file_patch。',
-            );
-          }
+        if (afterStat == null) {
+          return ToolResult.failure('原子性校验失败：文件在读取后已不存在，已中止写入。');
+        }
+        final afterSize = afterStat.size ?? 0;
+        final afterMtime = afterStat.modifyTime ?? 0;
+        if (afterSize != beforeSize || afterMtime != beforeMtime) {
+          return ToolResult.failure(
+            '原子性校验失败：文件在读取后被外部修改 '
+            '(before: size=$beforeSize, mtime=$beforeMtime; '
+            'after: size=$afterSize, mtime=$afterMtime)。'
+            '已中止写入，请用 cat 重新查看文件内容后再次尝试 file_patch。',
+          );
         }
 
         // 自动备份
@@ -2373,14 +3079,19 @@ class FilePatchTool extends AgentTool {
           backupPath = '$path.bak.${DateTime.now().millisecondsSinceEpoch}';
           onProgress?.call(L10n.str.ut_a2a80977d9(backupPath));
           try {
-            await sftp.copyFile(path, backupPath);
+            await sftp.copyFile(
+              path,
+              backupPath,
+              maxBytes: _maxFileSize,
+              cancelToken: cancelToken,
+            );
           } catch (e) {
             return ToolResult.failure(L10n.str.ut_e39887dfed(e));
           }
         }
 
         // 写回
-        await sftp.writeFileBytes(path, newFileBytes);
+        await sftp.writeFileBytes(path, newFileBytes, cancelToken: cancelToken);
 
         onProgress?.call(UiText.t('替换完成', 'Replacement complete'));
         final msg = StringBuffer()
@@ -2400,7 +3111,8 @@ class FilePatchTool extends AgentTool {
       } catch (e) {
         // 失败回滚：恢复备份
         if (backupPath != null) {
-          onProgress?.call(UiText.t('写入失败，正在回滚 ...', 'Write failed, rolling back ...'));
+          onProgress?.call(
+              UiText.t('写入失败，正在回滚 ...', 'Write failed, rolling back ...'));
           try {
             await sftp.copyFile(backupPath, path);
             return ToolResult.failure(
@@ -2422,101 +3134,58 @@ class FilePatchTool extends AgentTool {
       }
     }
 
-    // 本地终端：直接读取/写回本地文件
+    // 本地终端：字节级补丁走共享句柆实现，保留非 UTF-8 内容并绑定写时授权。
     if (executor is LocalTerminalService) {
-      final file = File(path);
-      String? backupPath;
-      try {
-        if (!await file.exists()) {
-          return ToolResult.failure(
-            '文件不存在: $path。file_patch 仅能修改已存在的文件，'
-            '如需新建文件请用 file_write。',
-          );
-        }
-        final beforeStat = await file.stat();
-        final beforeSize = beforeStat.size;
-        final beforeMtime = beforeStat.modified.millisecondsSinceEpoch;
-
-        final bytes = await file.readAsBytes();
-        if (bytes.length > _maxFileSize) {
-          return ToolResult.failure(
-            '文件过大 (${bytes.length} 字节 > $_maxFileSize 字节)。'
-            'patch 仅适用于 < 1MB 的配置文件，大文件请用 file_write 整体重写。',
-          );
-        }
-
-        final occurrences = _countOccurrencesBytes(bytes, oldBytes);
-        if (occurrences == 0) {
-          return ToolResult.failure(
-            'old 在文件中未找到。请检查 old 是否正确（包括前后空白、换行符）。',
-            output: '提示：old 必须与文件内容完全匹配。'
-                '建议先用 cat 查看文件内容，再选取要替换的精确字符串。',
-          );
-        }
-        if (occurrences > 1) {
-          return ToolResult.failure(
-            'old 在文件中出现 $occurrences 次，无法确定替换哪个。'
-            '请提供更长的上下文（包含前后行）使 old 唯一。',
-            output:
-                'old 内容预览: ${oldStr.length > 100 ? '${oldStr.substring(0, 100)}...' : oldStr}',
-          );
-        }
-
-        final newFileBytes = _replaceFirstBytes(bytes, oldBytes, newBytes);
-
-        final afterStat = await file.stat();
-        if (afterStat.size != beforeSize ||
-            afterStat.modified.millisecondsSinceEpoch != beforeMtime) {
-          return ToolResult.failure(
-            '原子性校验失败：文件在读取后被外部修改 '
-            '(before: size=$beforeSize, mtime=$beforeMtime; '
-            'after: size=${afterStat.size}, '
-            'mtime=${afterStat.modified.millisecondsSinceEpoch})。'
-            '已中止写入，请重新查看文件内容后再次尝试 file_patch。',
-          );
-        }
-
-        if (backup) {
-          backupPath = await backupLocalFile(path);
-        }
-
-        await file.writeAsBytes(newFileBytes, mode: FileMode.write, flush: true);
-
-        onProgress?.call(UiText.t('替换完成', 'Replacement complete'));
-        final msg = StringBuffer()
-          ..writeln(L10n.str.ut_af40dec29f(path))
-          ..writeln(L10n.str.ut_fb892c6b10(oldBytes.length, newBytes.length))
-          ..writeln(L10n.str.ut_59e5f6620a(bytes.length, newFileBytes.length));
-        if (backupPath != null) {
-          msg.writeln(L10n.str.ut_fcda8e6588(backupPath));
-          msg.writeln(L10n.str.ut_c4acfd10f3(path));
-        }
-        final diff = LineDiff.compute(oldStr, newStr);
-        return ToolResult.success(
-          msg.toString().trimRight(),
-          diffAdditions: diff?.additions,
-          diffDeletions: diff?.deletions,
-        );
-      } catch (e) {
-        if (backupPath != null) {
-          onProgress?.call(UiText.t('写入失败，正在回滚 ...', 'Write failed, rolling back ...'));
-          try {
-            await File(backupPath).copy(path);
-            return ToolResult.failure(
-              UiText.t(
-                'file_patch 写入失败: $e\n已自动回滚：原文件已从备份 $backupPath 恢复。',
-                'file_patch write failed: $e\nAutomatically rolled back: the original file was restored from backup $backupPath.',
-              ),
-            );
-          } catch (rollbackErr) {
-            return ToolResult.failure(
-              'file_patch 写入失败: $e\n回滚也失败: $rollbackErr。'
-              '请手动用备份 $backupPath 恢复 $path',
-            );
-          }
-        }
-        return ToolResult.failure('file_patch 失败: $e');
+      final decision = _decideLocalPath(path);
+      if (!decision.isAllowed) {
+        return ToolResult.failure(_localPathDeniedMessage(path, decision));
       }
+      final localPath = decision.resolved;
+      final file = File(localPath);
+      if (!await file.exists()) {
+        return ToolResult.failure(
+          '文件不存在: $path。file_patch 仅能修改已存在的文件，'
+          '如需新建文件请用 file_write。',
+        );
+      }
+      final initialSize = await file.length();
+      if (initialSize > _maxFileSize) {
+        return ToolResult.failure(
+          '文件过大 ($initialSize 字节 > $_maxFileSize 字节)，已拒绝读取。'
+          'patch 仅适用于 < 1MB 的配置文件，大文件请用 file_write 整体重写。',
+        );
+      }
+      final outcome = await patchLocalFileBytes(
+        path: localPath,
+        oldBytes: oldBytes,
+        newBytes: newBytes,
+        backup: backup,
+        maxBytes: _maxFileSize,
+        maxPatchedBytes: _maxPatchedFileSize,
+        authorizePath: (raw, expected) async =>
+            _freshLocalPathDenial(raw, expected),
+      );
+      if (!outcome.success) {
+        return ToolResult.failure(outcome.error ?? 'file_patch 失败');
+      }
+
+      onProgress?.call(UiText.t('替换完成', 'Replacement complete'));
+      final msg = StringBuffer()
+        ..writeln(L10n.str.ut_af40dec29f(path))
+        ..writeln(L10n.str.ut_fb892c6b10(oldBytes.length, newBytes.length))
+        ..writeln(L10n.str
+            .ut_59e5f6620a(outcome.originalBytes, outcome.patchedBytes));
+      final backupPath = outcome.backupPath;
+      if (backupPath != null) {
+        msg.writeln(L10n.str.ut_fcda8e6588(backupPath));
+        msg.writeln(L10n.str.ut_c4acfd10f3(path));
+      }
+      final diff = LineDiff.compute(oldStr, newStr);
+      return ToolResult.success(
+        msg.toString().trimRight(),
+        diffAdditions: diff?.additions,
+        diffDeletions: diff?.deletions,
+      );
     }
 
     return ToolResult.failure(
@@ -2554,8 +3223,11 @@ class FilePatchTool extends AgentTool {
   }
 
   /// 朴素字节搜索的 KMP 替代：O(n + m)，最坏情况也不退化到 O(n·m)。
-  static int _indexOfBytes(Uint8List haystack, Uint8List needle, [int start = 0]) {
-    if (needle.isEmpty || start < 0 || start > haystack.length - needle.length) {
+  static int _indexOfBytes(Uint8List haystack, Uint8List needle,
+      [int start = 0]) {
+    if (needle.isEmpty ||
+        start < 0 ||
+        start > haystack.length - needle.length) {
       return -1;
     }
     return _indexOfBytesKmp(haystack, needle, start, _kmpPrefix(needle));
@@ -2652,8 +3324,7 @@ class ProvidePasswordTool extends AgentTool {
   bool get recordsChanges => false;
 
   @override
-  String get description =>
-      '请用户输入当前主机的 sudo（特权）密码，保存到本机凭据库并立即启用密码提示自动应答。'
+  String get description => '请用户输入当前主机的 sudo（特权）密码，保存到本机凭据库并立即启用密码提示自动应答。'
       '仅在命令因「等待 sudo 密码」失败、且该主机尚未配置 sudo 密码时调用。'
       '调用成功后重试原命令即可；本工具不会把密码内容返回给你。';
 
@@ -2681,16 +3352,18 @@ class ProvidePasswordTool extends AgentTool {
   }) async {
     final request = sudoPasswordRequest;
     if (request == null) {
-      return ToolResult.failure(UiText.t('当前会话未接入密码输入，请在主机设置中填写 sudo 密码', 'This session has no password prompt wired up; set the sudo password in host settings'));
+      return ToolResult.failure(UiText.t('当前会话未接入密码输入，请在主机设置中填写 sudo 密码',
+          'This session has no password prompt wired up; set the sudo password in host settings'));
     }
-    onProgress?.call(UiText.t('等待用户输入 sudo 密码…', 'Waiting for user to enter sudo password…'));
+    onProgress?.call(UiText.t(
+        '等待用户输入 sudo 密码…', 'Waiting for user to enter sudo password…'));
     final accepted = await request(args.getString('reason'));
     if (!accepted) {
       return ToolResult.failure(UiText.t(
           '用户未提供密码（取消或输入为空）。'
-          '请改用 动作: ask 与用户确认，或改以非特权方式执行。',
+              '请改用 动作: ask 与用户确认，或改以非特权方式执行。',
           'No password provided by the user (cancelled or empty). '
-          'Use 动作: ask to confirm with the user, or run without privileges.'));
+              'Use 动作: ask to confirm with the user, or run without privileges.'));
     }
     return ToolResult.success('已收到 sudo 密码并保存到本机凭据库。'
         '请重试原命令，遇到 sudo 密码提示时系统会自动应答。');
@@ -2700,10 +3373,15 @@ class ProvidePasswordTool extends AgentTool {
 /// Agent 工具注册表 — 管理所有可用的工具
 class AgentToolRegistry {
   final Map<String, _RegisteredTool> _entries = {};
+
   /// 文件同步服务实例（由 registry 持有，工具共享）
   final FileSyncService fileSyncService = FileSyncService();
+
   /// 多机执行器实例（编排模式用）
   MultiHostExecutor? _multiHostExecutor;
+
+  /// 编排命令权限档位提供者：由拥有本 registry 的引擎注入，锁定任务归属 tab。
+  AgentPermissionMode? Function()? permissionModeProvider;
 
   /// 本地文件工具的额外授权根（由引擎注入，返回本次任务记录的项目目录）
   List<String> Function()? _localFileRoots;
@@ -2736,7 +3414,8 @@ class AgentToolRegistry {
     register(PackageProjectTool(), scope: ToolScope.localSession);
     // 本地文件工具：作用域不限（SSH 会话里也要能改本机的部署配置），
     // 但每个路径都要过 LocalFilePolicy 的白名单 + 黑名单判定。
-    registerLocalFileTools(this, extraRoots: () => _localFileRoots?.call() ?? const []);
+    registerLocalFileTools(this,
+        extraRoots: () => _localFileRoots?.call() ?? const []);
     // 本机 shell：只在 SSH 会话暴露。本地会话的 execute 已经在本机，
     // 再暴露 local_exec 只会让模型在两个等价入口之间犹豫。
     if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
@@ -2748,13 +3427,19 @@ class AgentToolRegistry {
   /// [registry] 来自 AgentNotifier，可访问所有 host 的 executor
   void enableOrchestrator(AgentHostRegistry registry) {
     if (_multiHostExecutor != null) return; // 已启用
-    _multiHostExecutor = MultiHostExecutor(registry);
+    _multiHostExecutor = MultiHostExecutor(registry,
+        // 延迟取值：引擎在任务运行中切换权限档位时立即生效，
+        // 但读的是本 registry 归属的引擎，不是当时的活跃 tab。
+        permissionModeProvider: () => permissionModeProvider?.call());
     register(ExecOnTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
     register(ExecBatchTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
-    register(CheckConnectivityTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
+    register(CheckConnectivityTool(_multiHostExecutor!),
+        scope: ToolScope.orchestrator);
     register(UploadToTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
-    register(BroadcastUploadTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
-    register(CollectFileTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
+    register(BroadcastUploadTool(_multiHostExecutor!),
+        scope: ToolScope.orchestrator);
+    register(CollectFileTool(_multiHostExecutor!),
+        scope: ToolScope.orchestrator);
     register(MultiGrepTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
     register(DiffFilesTool(_multiHostExecutor!), scope: ToolScope.orchestrator);
   }
@@ -2762,9 +3447,16 @@ class AgentToolRegistry {
   /// 禁用编排模式：注销多机编排工具
   void disableOrchestrator() {
     _multiHostExecutor = null;
+    permissionModeProvider = null;
     for (final name in const [
-      'exec_on', 'exec_batch', 'check_connectivity', 'upload_to',
-      'broadcast_upload', 'collect_file', 'multi_grep', 'diff_files',
+      'exec_on',
+      'exec_batch',
+      'check_connectivity',
+      'upload_to',
+      'broadcast_upload',
+      'collect_file',
+      'multi_grep',
+      'diff_files',
     ]) {
       _entries.remove(name);
     }
@@ -2821,27 +3513,33 @@ class AgentToolRegistry {
   /// 任何"告诉 AI 有哪些能力"的文本都必须走这里。历史上部署工作流提示词
   /// 手写了三个未注册的工具名，AI 照着调必然失败（设计稿 D1）。
   List<AgentTool> visibleFor({required bool isLocalSession}) {
-    return _entries.values.where((e) {
-      switch (e.scope) {
-        case ToolScope.all:
-        case ToolScope.orchestrator:
-          return true;
-        case ToolScope.localSession:
-          return isLocalSession;
-        case ToolScope.sshSession:
-          return !isLocalSession;
-      }
-    }).map((e) => e.tool).toList();
+    return _entries.values
+        .where((e) {
+          switch (e.scope) {
+            case ToolScope.all:
+            case ToolScope.orchestrator:
+              return true;
+            case ToolScope.localSession:
+              return isLocalSession;
+            case ToolScope.sshSession:
+              return !isLocalSession;
+          }
+        })
+        .map((e) => e.tool)
+        .toList();
   }
 
   /// 是否会产生需要记入变更台账的改动
   ///
   /// 由 [AgentTool.kind] / [AgentTool.recordsChanges] 派生，不再维护工具名清单：
   /// 新增写类工具自动进台账，忘记登记导致的"变更不可追溯"不会再发生。
-  bool isChangeRecordingTool(String toolName) => get(toolName)?.recordsChanges ?? false;
+  bool isChangeRecordingTool(String toolName) =>
+      get(toolName)?.recordsChanges ?? false;
 
-  List<String> get changeRecordingToolNames =>
-      _entries.values.where((e) => e.tool.recordsChanges).map((e) => e.tool.name).toList();
+  List<String> get changeRecordingToolNames => _entries.values
+      .where((e) => e.tool.recordsChanges)
+      .map((e) => e.tool.name)
+      .toList();
 
   /// 构建工具说明文本，注入 system prompt。
   /// [fcMode] 为 true 时（O8 FC-first），工具已通过 Function Calling schema 暴露，
@@ -2884,7 +3582,8 @@ class AgentToolRegistry {
   ///
   /// O8 FC-first：execute/finish/ask 三个核心动作也作为工具暴露，
   /// 让 FC 模型全程走结构化 tool_calls，不再依赖文本协议行。
-  List<Map<String, dynamic>> buildOpenAIToolsSchema({required bool isLocalSession}) {
+  List<Map<String, dynamic>> buildOpenAIToolsSchema(
+      {required bool isLocalSession}) {
     final result = <Map<String, dynamic>>[
       {
         'type': 'function',

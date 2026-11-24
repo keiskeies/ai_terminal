@@ -65,13 +65,11 @@ class _RuleEditorFormState extends State<RuleEditorForm> {
 
   void _save() {
     if (_title.text.trim().isEmpty) {
-      setState(() =>
-          _error = UiText.t('请填写标题', 'Title is required'));
+      setState(() => _error = UiText.t('请填写标题', 'Title is required'));
       return;
     }
     if (_content.text.trim().isEmpty) {
-      setState(() => _error =
-          UiText.t('请填写规范内容', 'Rule content is required'));
+      setState(() => _error = UiText.t('请填写规范内容', 'Rule content is required'));
       return;
     }
     final rule = widget.rule ??
@@ -101,8 +99,7 @@ class _RuleEditorFormState extends State<RuleEditorForm> {
       onBack: widget.onCancel,
       error: _error,
       actions: [
-        InlineButton(
-            label: UiText.t('取消', 'Cancel'), onTap: widget.onCancel),
+        InlineButton(label: UiText.t('取消', 'Cancel'), onTap: widget.onCancel),
         InlineButton(
             label: UiText.t('保存', 'Save'), primary: true, onTap: _save),
       ],
@@ -117,8 +114,7 @@ class _RuleEditorFormState extends State<RuleEditorForm> {
           label: UiText.t('规范内容', 'Rule'),
           controller: _content,
           maxLines: 6,
-          hint: UiText.t(
-              '用自然语言写清楚约束，AI 会原样遵循。',
+          hint: UiText.t('用自然语言写清楚约束，AI 会原样遵循。',
               'Describe the constraint in plain language.'),
         ),
         const SizedBox(height: 10),
@@ -161,9 +157,8 @@ class _RuleEditorFormState extends State<RuleEditorForm> {
           else
             InlineSelect<String>(
               label: UiText.t('主机', 'Host'),
-              value: hosts.any((h) => h.id == _hostId)
-                  ? _hostId
-                  : hosts.first.id,
+              value:
+                  hosts.any((h) => h.id == _hostId) ? _hostId : hosts.first.id,
               items: [
                 for (final h in hosts) (h.id, '${h.name} · ${h.host}'),
               ],
@@ -174,8 +169,7 @@ class _RuleEditorFormState extends State<RuleEditorForm> {
         InlineSwitchRow(
           label: UiText.t('严格遵循', 'Strict'),
           subtitle: _strict
-              ? UiText.t('AI 必须原样执行，不得自行调整',
-                  'The AI must follow this verbatim')
+              ? UiText.t('AI 必须原样执行，不得自行调整', 'The AI must follow this verbatim')
               : UiText.t('允许 AI 在不违背约定前提下调整参数',
                   'The AI may tune parameters within this rule'),
           value: _strict,

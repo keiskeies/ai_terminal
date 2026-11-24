@@ -12,7 +12,8 @@ class SessionHistoryDialog extends ConsumerStatefulWidget {
   const SessionHistoryDialog({super.key});
 
   @override
-  ConsumerState<SessionHistoryDialog> createState() => _SessionHistoryDialogState();
+  ConsumerState<SessionHistoryDialog> createState() =>
+      _SessionHistoryDialogState();
 }
 
 class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
@@ -41,7 +42,8 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
     final tc = ThemeColors.of(context);
     return Dialog(
       backgroundColor: tc.card,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
       child: Container(
         width: MediaQuery.of(context).size.width * 0.55,
         height: MediaQuery.of(context).size.height * 0.7,
@@ -53,7 +55,11 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
               children: [
                 Icon(Icons.history, color: tc.brand, size: 18),
                 const SizedBox(width: 8),
-                Text(l10n.terminalSessionHistory, style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
+                Text(l10n.terminalSessionHistory,
+                    style: TextStyle(
+                        color: tc.textMain,
+                        fontSize: fBody,
+                        fontWeight: FontWeight.w600)),
                 const Spacer(),
                 // 新建会话按钮
                 TextButton.icon(
@@ -64,9 +70,11 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
                     Navigator.of(ctx).pop();
                   },
                   icon: Icon(Icons.add, size: 14, color: tc.brand),
-                  label: Text(l10n.sessionNew, style: TextStyle(fontSize: fSmall, color: tc.brand)),
+                  label: Text(l10n.sessionNew,
+                      style: TextStyle(fontSize: fSmall, color: tc.brand)),
                   style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     minimumSize: Size.zero,
                   ),
                 ),
@@ -74,14 +82,18 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
                   icon: Icon(Icons.close, color: tc.textSub, size: 18),
                   onPressed: () => Navigator.of(context).pop(),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  constraints:
+                      const BoxConstraints(minWidth: 28, minHeight: 28),
                 ),
               ],
             ),
             Divider(color: tc.hairline, height: 16),
             Expanded(
               child: _sessions.isEmpty
-                  ? Center(child: Text(l10n.sessionNoSessions, style: TextStyle(color: tc.textMuted, fontSize: fBody)))
+                  ? Center(
+                      child: Text(l10n.sessionNoSessions,
+                          style:
+                              TextStyle(color: tc.textMuted, fontSize: fBody)))
                   : ListView.builder(
                       itemCount: _sessions.length,
                       itemBuilder: (context, index) {
@@ -160,24 +172,28 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
                       children: [
                         Text(
                           '${conv.updatedAt.month}/${conv.updatedAt.day} ${conv.updatedAt.hour.toString().padLeft(2, '0')}:${conv.updatedAt.minute.toString().padLeft(2, '0')}',
-                          style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+                          style:
+                              TextStyle(color: tc.textMuted, fontSize: fMicro),
                         ),
                         const SizedBox(width: 8),
                         Text(
                           l10n.sessionMessageCount(msgCount),
-                          style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+                          style:
+                              TextStyle(color: tc.textMuted, fontSize: fMicro),
                         ),
                         if (hasSummary) ...[
                           const SizedBox(width: 8),
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 4, vertical: 1),
                             decoration: BoxDecoration(
                               color: tc.agentGreen.withValues(alpha: 0.15),
                               borderRadius: BorderRadius.circular(rXSmall),
                             ),
                             child: Text(
                               l10n.sessionCompressed,
-                              style: TextStyle(color: tc.agentGreen, fontSize: fMicro),
+                              style: TextStyle(
+                                  color: tc.agentGreen, fontSize: fMicro),
                             ),
                           ),
                         ],
@@ -219,12 +235,16 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: ThemeColors.of(context).cardElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text(l10n.sessionRenameTitle, style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+        title: Text(l10n.sessionRenameTitle,
+            style: TextStyle(
+                color: ThemeColors.of(context).textMain, fontSize: fBody)),
         content: TextField(
           controller: controller,
           autofocus: true,
-          style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody),
+          style: TextStyle(
+              color: ThemeColors.of(context).textMain, fontSize: fBody),
           decoration: InputDecoration(
             hintText: l10n.sessionRenameHint,
             hintStyle: TextStyle(color: ThemeColors.of(context).textMuted),
@@ -233,7 +253,9 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.commonCancel, style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fBody)),
+            child: Text(l10n.commonCancel,
+                style: TextStyle(
+                    color: ThemeColors.of(context).textSub, fontSize: fBody)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -245,7 +267,8 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
               if (!ctx.mounted) return;
               Navigator.pop(ctx);
             },
-            style: ElevatedButton.styleFrom(backgroundColor: tc.brand, foregroundColor: tc.onAccent),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: tc.brand, foregroundColor: tc.onAccent),
             child: Text(l10n.save, style: const TextStyle(fontSize: fBody)),
           ),
         ],
@@ -260,15 +283,21 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: ThemeColors.of(context).cardElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text(l10n.sessionDeleteTitle, style: TextStyle(color: ThemeColors.of(context).textMain, fontSize: fBody)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+        title: Text(l10n.sessionDeleteTitle,
+            style: TextStyle(
+                color: ThemeColors.of(context).textMain, fontSize: fBody)),
         // 与列表展示同一口径（60 字截断），用户手动改过的超长标题不会把弹窗顶高
         content: Text(l10n.sessionDeleteConfirm(conv.listDisplayTitle),
-            style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fSmall)),
+            style: TextStyle(
+                color: ThemeColors.of(context).textSub, fontSize: fSmall)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(l10n.commonCancel, style: TextStyle(color: ThemeColors.of(context).textSub, fontSize: fBody)),
+            child: Text(l10n.commonCancel,
+                style: TextStyle(
+                    color: ThemeColors.of(context).textSub, fontSize: fBody)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -277,7 +306,8 @@ class _SessionHistoryDialogState extends ConsumerState<SessionHistoryDialog> {
               Navigator.pop(ctx);
               _loadSessions();
             },
-            style: ElevatedButton.styleFrom(backgroundColor: tc.error, foregroundColor: tc.onAccent),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: tc.error, foregroundColor: tc.onAccent),
             child: Text(l10n.delete, style: const TextStyle(fontSize: fBody)),
           ),
         ],

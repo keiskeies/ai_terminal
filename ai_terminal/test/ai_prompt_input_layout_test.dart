@@ -139,9 +139,8 @@ void main() {
     );
     expect(texts, findsWidgets);
     for (final el in texts.evaluate()) {
-      final style = DefaultTextStyle.of(el)
-          .style
-          .merge((el.widget as Text).style);
+      final style =
+          DefaultTextStyle.of(el).style.merge((el.widget as Text).style);
       expect(style.decoration, anyOf(isNull, TextDecoration.none));
       expect(style.decorationStyle, isNot(TextDecorationStyle.double));
     }
@@ -166,7 +165,8 @@ void main() {
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pump();
     expect(selected, isTrue);
-    expect(tester.widget<TextField>(find.byType(TextField)).controller?.text, '');
+    expect(
+        tester.widget<TextField>(find.byType(TextField)).controller?.text, '');
     expect(find.byKey(kSlashOverlayKey), findsNothing);
   });
 }

@@ -24,15 +24,12 @@ void main() {
         ..addMessage(ConvMessage.create(role: 'assistant', content: '...'));
 
       // 42 个 rune，未超 50，完整保留
-      expect(conv.displayTitle,
-          '请检查本机 gdm 和 systemd-logind 两个服务是否正在运行，然后总结');
+      expect(conv.displayTitle, '请检查本机 gdm 和 systemd-logind 两个服务是否正在运行，然后总结');
     });
 
     test('超过 50 字按 rune 截断并加省略号', () {
       final conv = _conv()
-        ..addMessage(ConvMessage.create(
-            role: 'user',
-            content: 'A' * 80));
+        ..addMessage(ConvMessage.create(role: 'user', content: 'A' * 80));
 
       final title = conv.displayTitle;
       expect(title.runes.length, 51); // 50 个 A + 省略号
@@ -80,28 +77,33 @@ void main() {
 
   group('标题来源门控（AI/用户命名后不被自动覆盖）', () {
     test('用户手动命名后，占位逻辑不再改写', () {
-      final conv = _conv(title: '生产环境巡检', titleSource: Conversation.titleSourceUser);
+      final conv =
+          _conv(title: '生产环境巡检', titleSource: Conversation.titleSourceUser);
       conv.adoptTitleFromFirstMessage('另一个任务');
       expect(conv.title, '生产环境巡检');
       expect(conv.canAdoptAiTitle, isFalse);
     });
 
     test('AI 命名后不可再被自动覆盖', () {
-      final conv = _conv(title: 'AI 起的名字', titleSource: Conversation.titleSourceAi);
+      final conv =
+          _conv(title: 'AI 起的名字', titleSource: Conversation.titleSourceAi);
       expect(conv.canAdoptAiTitle, isFalse);
       conv.adoptTitleFromFirstMessage('另一个任务');
       expect(conv.title, 'AI 起的名字');
     });
 
     test('列表展示标题按 60 字截断', () {
-      final conv = _conv(title: 'A' * 80, titleSource: Conversation.titleSourceUser);
+      final conv =
+          _conv(title: 'A' * 80, titleSource: Conversation.titleSourceUser);
       final list = conv.listDisplayTitle;
       expect(list.runes.length, 61); // 60 + 省略号
       expect(list.endsWith('…'), isTrue);
     });
 
     test('60 字内的用户标题完整展示', () {
-      final conv = _conv(title: 'Metersphere 部署与磁盘排查', titleSource: Conversation.titleSourceUser);
+      final conv = _conv(
+          title: 'Metersphere 部署与磁盘排查',
+          titleSource: Conversation.titleSourceUser);
       expect(conv.listDisplayTitle, 'Metersphere 部署与磁盘排查');
     });
   });
@@ -110,8 +112,8 @@ void main() {
     test('首轮报错、次轮完成时跳过 ⚠️ 占位，用真正完成的结论', () {
       final conv = _conv()
         ..addMessage(ConvMessage.create(role: 'user', content: '排查服务器自动关机原因'))
-        ..addMessage(ConvMessage.create(
-            role: 'assistant', content: '⚠️ 连接超时，请检查网络'))
+        ..addMessage(
+            ConvMessage.create(role: 'assistant', content: '⚠️ 连接超时，请检查网络'))
         ..addMessage(ConvMessage.create(role: 'user', content: '重试'))
         ..addMessage(ConvMessage.create(
             role: 'assistant', content: '由定时任务 poweroff 触发，已禁用该任务'));
@@ -125,7 +127,8 @@ void main() {
     test('所有 assistant 都是错误/空占位时不带结论（仅按诉求命名）', () {
       final conv = _conv()
         ..addMessage(ConvMessage.create(role: 'user', content: '看下 nginx 日志'))
-        ..addMessage(ConvMessage.create(role: 'assistant', content: '⚠️ API Key 无效或已过期'))
+        ..addMessage(
+            ConvMessage.create(role: 'assistant', content: '⚠️ API Key 无效或已过期'))
         ..addMessage(ConvMessage.create(role: 'assistant', content: '   '));
 
       final texts = ConversationTitleService.selectFirstRoundTexts(conv);
@@ -137,7 +140,8 @@ void main() {
       final conv = _conv()
         ..addMessage(ConvMessage.create(role: 'system', content: '你是运维助手'))
         ..addMessage(ConvMessage.create(role: 'user', content: '重启 docker'))
-        ..addMessage(ConvMessage.create(role: 'assistant', content: '已重启并确认自启'));
+        ..addMessage(
+            ConvMessage.create(role: 'assistant', content: '已重启并确认自启'));
 
       final texts = ConversationTitleService.selectFirstRoundTexts(conv);
       expect(texts.userText, '重启 docker');
@@ -160,25 +164,20 @@ void main() {
       expect(
           ConversationTitleService.sanitizeTitle('```\n排查 Nginx 502 错误\n```'),
           '排查 Nginx 502 错误');
-      expect(
-          ConversationTitleService.sanitizeTitle('“定位 /var/log 磁盘占用”'),
+      expect(ConversationTitleService.sanitizeTitle('“定位 /var/log 磁盘占用”'),
           '定位 /var/log 磁盘占用');
-      expect(ConversationTitleService.sanitizeTitle('分析磁盘占用情况。'),
-          '分析磁盘占用情况');
+      expect(ConversationTitleService.sanitizeTitle('分析磁盘占用情况。'), '分析磁盘占用情况');
     });
 
     test('多行输出只取首行并折叠空白', () {
       expect(
-          ConversationTitleService.sanitizeTitle('检查服务状态\n第二行不该出现'),
-          '检查服务状态');
-      expect(
-          ConversationTitleService.sanitizeTitle('  排查   nginx 重启  原因 '),
+          ConversationTitleService.sanitizeTitle('检查服务状态\n第二行不该出现'), '检查服务状态');
+      expect(ConversationTitleService.sanitizeTitle('  排查   nginx 重启  原因 '),
           '排查 nginx 重启 原因');
     });
 
     test('去掉「标题：」类前缀', () {
-      expect(
-          ConversationTitleService.sanitizeTitle('标题：排查服务器自动关机原因'),
+      expect(ConversationTitleService.sanitizeTitle('标题：排查服务器自动关机原因'),
           '排查服务器自动关机原因');
     });
 

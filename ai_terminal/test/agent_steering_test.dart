@@ -137,8 +137,7 @@ AIModelConfig _makeConfig() {
   );
 }
 
-const _finishTurn =
-    '思考: 结论: 完成\n现状: ok\n变更: 无\n建议: 无\n动作: finish\n';
+const _finishTurn = '思考: 结论: 完成\n现状: ok\n变更: 无\n建议: 无\n动作: finish\n';
 
 void main() {
   setUpAll(() {
@@ -225,8 +224,7 @@ void main() {
       final body = last.content.substring(0, last.content.length - 4);
       expect('A'.allMatches(body).length, AgentEngine.maxSteeringChars - 4,
           reason: 'steering 入队时应保尾截断到 maxSteeringChars');
-      expect(last.content.length, lessThan(long.length),
-          reason: '超长内容必须被截断');
+      expect(last.content.length, lessThan(long.length), reason: '超长内容必须被截断');
     });
 
     test('队列条数有上限，超出丢弃最早一条（R8）', () async {
@@ -360,8 +358,7 @@ void main() {
       provider.enqueueStream([_finishTurn]);
       await engine.startTask('新任务', _MockExecutor());
       expect(
-        provider.receivedHistories.last
-            .any((m) => m.content.contains('用户补充')),
+        provider.receivedHistories.last.any((m) => m.content.contains('用户补充')),
         isFalse,
         reason: '代际失效后旧补充不得污染新任务历史',
       );

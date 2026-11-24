@@ -13,8 +13,24 @@ void main() {
     expect(kUiTextIndex.length, kUiTextPairToKey.length);
     for (final entry in kUiTextIndex.entries) {
       final rec = entry.value;
-      for (final lang in ['zh', 'en', 'ar', 'de', 'es', 'fr', 'hi', 'it', 'ja', 'ko', 'pt', 'ru', 'th', 'vi']) {
-        expect(rec.containsKey(lang), true, reason: '${entry.key} missing $lang');
+      for (final lang in [
+        'zh',
+        'en',
+        'ar',
+        'de',
+        'es',
+        'fr',
+        'hi',
+        'it',
+        'ja',
+        'ko',
+        'pt',
+        'ru',
+        'th',
+        'vi'
+      ]) {
+        expect(rec.containsKey(lang), true,
+            reason: '${entry.key} missing $lang');
         expect(rec[lang], isNotEmpty);
       }
     }
@@ -37,7 +53,8 @@ void main() {
 
   test('mt translations are distinct per locale', () {
     final rec = kUiTextIndex.values
-        .where((r) => r['ja'] != r['zh'] && r['ja'] != r['en'] && r['de'] != r['zh'])
+        .where((r) =>
+            r['ja'] != r['zh'] && r['ja'] != r['en'] && r['de'] != r['zh'])
         .first;
     expect(rec['ja'], isNot(rec['zh']));
     expect(rec['de'], isNot(rec['zh']));
@@ -70,7 +87,8 @@ void main() {
     expect(kUiTextIndex.keys, contains(key));
   });
 
-  test('MCP summary template keys are pure ARB templates, not literal pairs', () {
+  test('MCP summary template keys are pure ARB templates, not literal pairs',
+      () {
     // The MCP settings page（新建服务器 flow）summary and capability lines call
     // L10n.str.ut_* ARB template keys directly — the same pattern as
     // terminalOrchestratorConnected. Such keys must NOT get a kUiTextIndex
@@ -83,7 +101,8 @@ void main() {
       'ut_3330b55acf', // {value} 个资源
       'ut_cf674ef0f8', // {value} 个提示词
     ]) {
-      expect(kUiTextIndex.containsKey(key), false, reason: '$key must not be in the literal-pair index');
+      expect(kUiTextIndex.containsKey(key), false,
+          reason: '$key must not be in the literal-pair index');
       expect(kUiTextPairToKey.containsValue(key), false,
           reason: '$key must not have a literal-pair mapping');
     }
@@ -91,8 +110,7 @@ void main() {
 
   test('MCP summary getters render counts in zh and ko', () {
     L10n.setup(AppLocalizationsZh());
-    final zhSummary =
-        L10n.str.ut_e12efa5ddb(2, 3, 8);
+    final zhSummary = L10n.str.ut_e12efa5ddb(2, 3, 8);
     expect(zhSummary, contains('2/3'));
     expect(zhSummary, contains('8'));
     expect(zhSummary, contains('个服务器'));
@@ -108,6 +126,7 @@ void main() {
     // Must NOT contain the English words the old UiText.t fallback produced.
     expect(koSummary.toLowerCase(), isNot(contains('servers')));
     expect(koSummary.toLowerCase(), isNot(contains('tools')));
-    expect(L10n.str.ut_95860656bf(0, 3).toLowerCase(), isNot(contains('switch')));
+    expect(
+        L10n.str.ut_95860656bf(0, 3).toLowerCase(), isNot(contains('switch')));
   });
 }

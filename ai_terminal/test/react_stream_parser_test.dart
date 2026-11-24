@@ -33,6 +33,35 @@ void main() {
       expect(events[0].command, 'docker ps -a');
     });
 
+    test('parseWithState 标记仍在增长的命令字段', () {
+      final parsed =
+          ReActStreamParser.parseWithState('动作: execute\n命令: echo fir');
+      expect(
+          parsed.events.where((e) => e.isCommand).single.command, 'echo fir');
+      expect(parsed.openCommand, isTrue);
+    });
+
+    test('parseWithState 在后续说明行出现后视为命令已闭合', () {
+      final parsed = ReActStreamParser.parseWithState(
+          '动作: execute\n命令: echo first\n说明: 第一条');
+      expect(
+          parsed.events.where((e) => e.isCommand).single.command, 'echo first');
+      expect(parsed.openCommand, isFalse);
+    });
+
+    test('parseWithState 区分闭合与未闭合代码围栏', () {
+      final settled = ReActStreamParser.parseWithState(
+          '动作: execute\n```bash\necho hi\n```');
+      expect(
+          settled.events.where((e) => e.isCommand).single.command, 'echo hi');
+      expect(settled.openCommand, isFalse);
+
+      final open =
+          ReActStreamParser.parseWithState('动作: execute\n```bash\necho hi');
+      expect(open.events.where((e) => e.isCommand).single.command, 'echo hi');
+      expect(open.openCommand, isTrue);
+    });
+
     test('全角冒号关键字也能解析', () {
       const response = '思考：需要检查进程\n命令：ps aux';
       final events = ReActStreamParser.parse(response);
@@ -404,8 +433,7 @@ void main() {
     });
 
     test('同一行尾巴带 </parameter> 也被剥离', () {
-      const response =
-          '动作: execute\n命令: Get-ChildItem C:\\Temp</parameter>';
+      const response = '动作: execute\n命令: Get-ChildItem C:\\Temp</parameter>';
       final events = ReActStreamParser.parse(response);
       final cmd = events.lastWhere((e) => e.type == AgentEventType.command);
       expect(cmd.command, isNot(contains('parameter>')));
@@ -413,8 +441,7 @@ void main() {
     });
 
     test('真正的尖括号内容不被误删', () {
-      const response =
-          '动作: execute\n命令: echo "a<b>c" > out.txt';
+      const response = '动作: execute\n命令: echo "a<b>c" > out.txt';
       final events = ReActStreamParser.parse(response);
       final cmd = events.lastWhere((e) => e.type == AgentEventType.command);
       expect(cmd.command, contains('a<b>c'));

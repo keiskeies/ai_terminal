@@ -30,12 +30,19 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
   Widget build(BuildContext context) {
     final tc = widget.tc;
     final hostIds = widget.results.keys.toList()..sort();
-    final success =
-        widget.results.values.where((r) => r.success).length;
-    final failed = widget.results.length - success;
-    final failedHostIds = hostIds
-        .where((id) => widget.results[id]?.success == false)
-        .toList(growable: false);
+    final success = widget.results.values.where((r) => r.success).length;
+    final notRun = widget.results.values.where(_isNotRun).length;
+    final failed = widget.results.length - success - notRun;
+    final failedHostIds = hostIds.where((id) {
+      final result = widget.results[id];
+      return result != null && !result.success && !_isNotRun(result);
+    }).toList(growable: false);
+    final summaryParts = <String>[
+      '${widget.results.length} 台主机',
+      '$success 成功',
+      if (failed > 0) '$failed 失败',
+      if (notRun > 0) '$notRun 未执行',
+    ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -47,10 +54,10 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
             Expanded(
               child: Text(
                 UiText.t(
-                    '${widget.results.length} 台主机 · $success 成功'
-                    '${failed > 0 ? " · $failed 失败" : ""}',
+                    summaryParts.join(' · '),
                     '${widget.results.length} hosts · $success succeeded'
-                    '${failed > 0 ? " · $failed failed" : ""}'),
+                    '${failed > 0 ? " · $failed failed" : ""}'
+                    '${notRun > 0 ? " · $notRun not run" : ""}'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -70,8 +77,7 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
                   decoration: BoxDecoration(
                     color: tc.brand.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rXSmall),
-                    border:
-                        Border.all(color: tc.brand.withValues(alpha: 0.3)),
+                    border: Border.all(color: tc.brand.withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -99,23 +105,38 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
     );
   }
 
+  static bool _isNotRun(HostExecutionResult result) =>
+      !result.success &&
+      (result.failureKind == 'skipped' || result.failureKind == 'cancelled');
+
   Widget _buildRow(String hostId, HostExecutionResult result) {
     final tc = widget.tc;
-    final color = result.success ? tc.ok : tc.error;
+    final notRun = _isNotRun(result);
+    final color = result.success ? tc.ok : (notRun ? tc.textMuted : tc.error);
     final expanded = _expandedHosts.contains(hostId);
-    final detail = (result.success ? result.output : (result.error ?? result.output)) ?? '';
+    final detail =
+        (result.success ? result.output : (result.error ?? result.output)) ??
+            '';
     final preview = _firstLine(detail);
     final meta = <String>[
       if (result.durationMs != null) _formatDuration(result.durationMs!),
-      if (result.exitCode != null)
-        L10n.str.ut_00fefb12c8(result.exitCode ?? 0),
-      if (!result.success) _failureLabel(result.failureKind),
+      if (result.exitCode != null) L10n.str.ut_00fefb12c8(result.exitCode ?? 0),
     ];
+    final statusText = result.success
+        ? UiText.t('成功', 'OK')
+        : _failureLabel(result.failureKind);
+    final icon = result.success
+        ? Icons.check_circle
+        : (result.failureKind == 'skipped'
+            ? Icons.remove_circle_outline
+            : (result.failureKind == 'cancelled'
+                ? Icons.cancel_outlined
+                : Icons.error_outline));
 
     return Container(
       margin: const EdgeInsets.only(bottom: 3),
       decoration: BoxDecoration(
-        color: result.success
+        color: result.success || notRun
             ? Colors.transparent
             : tc.error.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(rXSmall),
@@ -139,13 +160,7 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    result.success
-                        ? Icons.check_circle
-                        : Icons.error_outline,
-                    size: 13,
-                    color: color,
-                  ),
+                  Icon(icon, size: 13, color: color),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Column(
@@ -161,16 +176,15 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
                                 style: TextStyle(
                                   color: tc.textMain,
                                   fontSize: fSmall,
-                                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                                  fontFamily: 'JetBrainsMono',
+                                  fontFamilyFallback: kMonoFontFallback,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              result.success
-                                  ? UiText.t('成功', 'OK')
-                                  : UiText.t('失败', 'Failed'),
+                              statusText,
                               style: TextStyle(
                                 color: color,
                                 fontSize: fMicro,
@@ -222,7 +236,8 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
               child: Text(
                 detail,
                 style: TextStyle(
-                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: kMonoFontFallback,
                   fontSize: fMicro,
                   color: tc.textBody,
                   height: 1.4,
@@ -255,6 +270,8 @@ class _HostResultMatrixState extends State<HostResultMatrix> {
         return UiText.t('语法错误', 'Syntax error');
       case 'cancelled':
         return UiText.t('已取消', 'Cancelled');
+      case 'skipped':
+        return UiText.t('未执行', 'Skipped');
       default:
         return UiText.t('执行失败', 'Failed');
     }

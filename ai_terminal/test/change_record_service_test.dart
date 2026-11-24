@@ -149,14 +149,16 @@ void main() {
       expect(
         ChangeRecordService.describeFileToolChange(
           'sftp_download',
-          const ToolArgs({'remote': '/var/log/app.log', 'local': '/tmp/app.log'}),
+          const ToolArgs(
+              {'remote': '/var/log/app.log', 'local': '/tmp/app.log'}),
         ),
         'sftp_download /var/log/app.log -> /tmp/app.log',
       );
       expect(
         ChangeRecordService.describeFileToolChange(
           'file_sync',
-          const ToolArgs({'localDir': '/local/story', 'remoteDir': '/remote/story'}),
+          const ToolArgs(
+              {'localDir': '/local/story', 'remoteDir': '/remote/story'}),
         ),
         'file_sync /local/story -> /remote/story',
       );
@@ -182,7 +184,8 @@ void main() {
       expect(recording.contains('package_project'), isFalse);
     });
 
-    test('executeRollback runs the rollback command through executor', () async {
+    test('executeRollback runs the rollback command through executor',
+        () async {
       final executor = _MockExecutor();
       final record = ChangeRecord(
         id: 'record-1',
@@ -194,7 +197,8 @@ void main() {
         success: true,
       );
 
-      final result = await ChangeRecordService.executeRollback(record, executor);
+      final result =
+          await ChangeRecordService.executeRollback(record, executor);
 
       expect(result, isNotNull);
       expect(result!.success, isTrue);
@@ -231,7 +235,8 @@ void main() {
       } catch (_) {}
     });
 
-    ChangeRecord rec({required String from, required String to}) => ChangeRecord(
+    ChangeRecord rec({required String from, required String to}) =>
+        ChangeRecord(
           id: 'rec-${DateTime.now().microsecondsSinceEpoch}',
           hostId: 'local',
           command: 'local_file_delete $to',
@@ -294,7 +299,8 @@ void main() {
 
     test('目标已存在时先另存再还原，不静默覆盖', () async {
       final copy = File('${sandbox.path}/bak')..writeAsStringSync('old');
-      final target = File('${sandbox.path}/cfg')..writeAsStringSync('user edits');
+      final target = File('${sandbox.path}/cfg')
+        ..writeAsStringSync('user edits');
 
       final result = await ChangeRecordService.executeRollback(
         rec(from: copy.path, to: target.path),
@@ -322,7 +328,8 @@ void main() {
     });
 
     test('目录整体放回原位', () async {
-      final trashDir = Directory('${sandbox.path}/trash/run')..createSync(recursive: true);
+      final trashDir = Directory('${sandbox.path}/trash/run')
+        ..createSync(recursive: true);
       File('${trashDir.path}/inner.txt').writeAsStringSync('i');
       final target = '${sandbox.path}/restored/dir';
 

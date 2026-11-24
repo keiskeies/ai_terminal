@@ -92,8 +92,7 @@ class TaskMetrics {
         'task_id': taskId,
         'goal': goal,
         'start_time': startTime.toIso8601String(),
-        if (endTime != null)
-          'end_time': endTime!.toIso8601String(),
+        if (endTime != null) 'end_time': endTime!.toIso8601String(),
         'duration_seconds': duration.inSeconds,
         'status': status,
         'step_count': stepCount,

@@ -8,8 +8,7 @@ import 'package:ai_terminal/core/settings_catalog.dart';
 void main() {
   test('分组 id 唯一，路由严格等于 /settings/<id>', () {
     final ids = kSettingsEntries.map((e) => e.id).toList();
-    expect(ids.toSet().length, ids.length,
-        reason: 'id 重复会让抽屉的折叠状态互相串台');
+    expect(ids.toSet().length, ids.length, reason: 'id 重复会让抽屉的折叠状态互相串台');
 
     for (final entry in kSettingsEntries) {
       expect(entry.route, '/settings/${entry.id}');

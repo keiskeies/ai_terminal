@@ -202,10 +202,15 @@ void main() {
         username: _sshUser!,
         authType: 'password',
       ));
-        await connectE2ESsh(ssh, password: _sshPassword!, user: _sshUser!, host: _sshHost!, port: _sshPort);
+      await connectE2ESsh(ssh,
+          password: _sshPassword!,
+          user: _sshUser!,
+          host: _sshHost!,
+          port: _sshPort);
       await ssh.executeAndWait('rm -rf ${_shq(remoteRoot)}');
       await ssh.executeAndWait('mkdir -p ${_shq(remoteRoot)}');
-      localRoot = await Directory.systemTemp.createTemp('ai_terminal_llm_transfer_');
+      localRoot =
+          await Directory.systemTemp.createTemp('ai_terminal_llm_transfer_');
     });
 
     tearDownAll(() async {
@@ -253,8 +258,8 @@ void main() {
           '（remote=$remotePath, local=$localDownload）。\n'
           '3) 不要用 shell 的 scp/cp/cat/echo 写文件，直接执行，完成后用 finish 总结。';
 
-      final events =
-          await _runAgent(goal: goal, executor: ssh, hostId: 'llm-transfer-e2e');
+      final events = await _runAgent(
+          goal: goal, executor: ssh, hostId: 'llm-transfer-e2e');
 
       final uploads = _toolResults(events, 'sftp_upload');
       final downloads = _toolResults(events, 'sftp_download');

@@ -8,10 +8,32 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:ai_terminal/main.dart';
 import 'package:ai_terminal/pages/terminal_page.dart';
+import 'package:ai_terminal/providers/terminal_provider.dart';
+
+/// 冒烟测试不启动真实 PTY：Process.start 在 fake async 下会留下 pending timer。
+class _NoConnectTerminalNotifier extends TerminalNotifier {
+  _NoConnectTerminalNotifier(super.ref);
+
+  @override
+  Future<TerminalTab?> connectLocalTab(
+    TerminalTab tab, {
+    bool? hadConnectedBefore,
+  }) async {
+    return null;
+  }
+}
 
 void main() {
   testWidgets('App loads successfully', (WidgetTester tester) async {
-    await tester.pumpWidget(const ProviderScope(child: AISTerminalApp()));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          terminalProvider
+              .overrideWith((ref) => _NoConnectTerminalNotifier(ref)),
+        ],
+        child: const AISTerminalApp(),
+      ),
+    );
     await tester.pump();
 
     expect(find.byType(TerminalPage), findsOneWidget);

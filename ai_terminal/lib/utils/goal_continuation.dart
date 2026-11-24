@@ -57,10 +57,8 @@ bool shouldHandleGoalFinish({
 /// 得到一条 CommandNotFoundException。提示词只能降低概率，挡不住，
 /// 所以执行侧必须有一道硬守卫。
 bool isGoalMarkerOnlyCommand(String command) {
-  final stripped = command
-      .replaceAll(
-          RegExp(r'''["'`()\[\]【】「」『』。，,：:；;！!]'''), '')
-      .trim();
+  final stripped =
+      command.replaceAll(RegExp(r'''["'`()\[\]【】「」『』。，,：:；;！!]'''), '').trim();
   return stripped.isNotEmpty && stripped == kGoalDoneMarker;
 }
 
@@ -160,15 +158,23 @@ GoalDecision decideGoalContinuation({
     );
   }
 
-  // 5. 硬止损：预算耗尽。放在"失败"之前——预算没了就该结束而不是暂停等恢复
-  if (goal.budgetExhausted) {
+  // 5. 硬止损：预算耗尽。roundsUsed 是已经结束的目标轮数，当前轮结束后若要
+  //    再调度一轮，轮号会是 roundsUsed + 1。必须在调度前挡住最后一轮之后
+  //    的额外续跑，否则 maxRounds=1 也会跑两轮。
+  final nextRound = goal.roundsUsed + 1;
+  // 已耗尽的旧快照不再把计数推到 maxRounds+1，保持预算展示可解释。
+  final roundsAfterThis =
+      nextRound > goal.maxRounds ? goal.maxRounds : nextRound;
+  if (roundsAfterThis >= goal.maxRounds) {
+    final note = '轮次预算耗尽（$roundsAfterThis/${goal.maxRounds}）';
     return GoalDecision(
       action: GoalAction.finish,
       reason: 'budget_exhausted',
-      note: '轮次预算耗尽（${goal.roundsUsed}/${goal.maxRounds}）',
+      note: note,
       goal: goal.copyWith(
         status: AgentGoalStatus.finished,
-        note: '轮次预算耗尽（${goal.roundsUsed}/${goal.maxRounds}）',
+        roundsUsed: roundsAfterThis,
+        note: note,
         updatedAt: DateTime.now(),
       ),
     );

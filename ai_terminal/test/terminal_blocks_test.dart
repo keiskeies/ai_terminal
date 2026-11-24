@@ -170,7 +170,8 @@ void main() {
         h.feed('cmd$i', 'out$i');
       }
       expect(h.tracker.length, cap);
-      expect(h.lineAt(h.tracker.blocks.last.startLine!), contains('cmd${cap + 39}'));
+      expect(h.lineAt(h.tracker.blocks.last.startLine!),
+          contains('cmd${cap + 39}'));
       h.dispose();
     });
 

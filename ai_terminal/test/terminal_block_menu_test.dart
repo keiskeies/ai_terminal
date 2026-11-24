@@ -71,8 +71,8 @@ Future<void> pumpTerminal(
 void main() {
   testWidgets('没装 shell 集成：菜单里完全不出现命令块项', (tester) async {
     final terminal = xterm.Terminal()..write('user@web1:~\$ ls\r\nfile\r\n');
-    await pumpTerminal(tester, terminal, TerminalBlockTracker(terminal: terminal),
-        (_, __) {});
+    await pumpTerminal(
+        tester, terminal, TerminalBlockTracker(terminal: terminal), (_, __) {});
 
     final gesture = await rightClick(tester, const Offset(30, 10));
     expect(find.byIcon(Icons.auto_awesome_outlined), findsNothing);
@@ -104,8 +104,8 @@ void main() {
       (cmd: 'systemctl status nginx', out: 'Active: failed', exit: 3),
       (cmd: 'journalctl -u nginx', out: 'Permission denied', exit: 1),
     ]);
-    await pumpTerminal(
-        tester, h.terminal, h.tracker, (i, t) => captured.add((intent: i, text: t)));
+    await pumpTerminal(tester, h.terminal, h.tracker,
+        (i, t) => captured.add((intent: i, text: t)));
 
     final gesture = await rightClick(tester, const Offset(30, 10));
     await tester.tap(find.text('让 Agent 解释这一整块'));

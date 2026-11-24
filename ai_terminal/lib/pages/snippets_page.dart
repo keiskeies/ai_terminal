@@ -81,7 +81,8 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: TextStyle(
-            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+            fontFamily: 'JetBrainsMono',
+            fontFamilyFallback: kMonoFontFallback,
             fontSize: fSmall,
             color: tc.terminalGreen,
           ),
@@ -126,78 +127,81 @@ class _SnippetsPageState extends ConsumerState<SnippetsPage> {
       builder: (context) {
         final tc = ThemeColors.of(context);
         return AlertDialog(
-        title: Text(snippet.name),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (snippet.description != null) ...[
-              Text(snippet.description!, style: TextStyle(color: tc.textSub)),
-              const SizedBox(height: 16),
-            ],
-            Text(
-              l10n.snippetCommandLabel,
-              style: TextStyle(color: tc.textSub, fontSize: fSmall),
-            ),
-            const SizedBox(height: 4),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: tc.terminalBg,
-                borderRadius: BorderRadius.circular(rSmall),
+          title: Text(snippet.name),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (snippet.description != null) ...[
+                Text(snippet.description!, style: TextStyle(color: tc.textSub)),
+                const SizedBox(height: 16),
+              ],
+              Text(
+                l10n.snippetCommandLabel,
+                style: TextStyle(color: tc.textSub, fontSize: fSmall),
               ),
-              child: SelectableText(
-                snippet.command,
-                style: TextStyle(
-                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
-                  fontSize: fMono,
-                  color: tc.terminalGreen,
+              const SizedBox(height: 4),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: tc.terminalBg,
+                  borderRadius: BorderRadius.circular(rSmall),
                 ),
-              ),
-            ),
-            if (variables.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              ...variables.map((v) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: TextField(
-                  controller: controllers[v],
-                  decoration: InputDecoration(
-                    labelText: '{{$v}}',
+                child: SelectableText(
+                  snippet.command,
+                  style: TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: kMonoFontFallback,
+                    fontSize: fMono,
+                    color: tc.terminalGreen,
                   ),
                 ),
-              )),
+              ),
+              if (variables.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                ...variables.map((v) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: TextField(
+                        controller: controllers[v],
+                        decoration: InputDecoration(
+                          labelText: '{{$v}}',
+                        ),
+                      ),
+                    )),
+              ],
             ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(l10n.commonCancel),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final resolved = snippet.resolveCommand(
+                  controllers.map((k, c) => MapEntry(k, c.text)),
+                );
+                // 按钮就叫「复制命令」，必须真的落到剪贴板；
+                // 原来只弹一个提示框把命令显示出来，用户还得自己选中再复制。
+                Clipboard.setData(ClipboardData(text: resolved));
+                Navigator.pop(context);
+                showTopSnackBar(
+                  context,
+                  SnackBar(
+                    content:
+                        SelectableText(l10n.snippetResolvedCommand(resolved)),
+                    action: SnackBarAction(
+                      label: l10n.copy,
+                      onPressed: () =>
+                          Clipboard.setData(ClipboardData(text: resolved)),
+                    ),
+                  ),
+                );
+              },
+              child: Text(l10n.snippetCopyCommand),
+            ),
           ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.commonCancel),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final resolved = snippet.resolveCommand(
-                controllers.map((k, c) => MapEntry(k, c.text)),
-              );
-              // 按钮就叫「复制命令」，必须真的落到剪贴板；
-              // 原来只弹一个提示框把命令显示出来，用户还得自己选中再复制。
-              Clipboard.setData(ClipboardData(text: resolved));
-              Navigator.pop(context);
-              showTopSnackBar(context, 
-                SnackBar(
-                  content: SelectableText(l10n.snippetResolvedCommand(resolved)),
-                  action: SnackBarAction(
-                    label: l10n.copy,
-                    onPressed: () =>
-                        Clipboard.setData(ClipboardData(text: resolved)),
-                  ),
-                ),
-              );
-            },
-            child: Text(l10n.snippetCopyCommand),
-          ),
-        ],
-      );
+        );
       },
     );
   }
@@ -268,7 +272,9 @@ class _SnippetDialogState extends State<SnippetDialog> {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
-      title: Text(widget.snippet != null ? l10n.snippetEditTitle : l10n.snippetNewTitle),
+      title: Text(widget.snippet != null
+          ? l10n.snippetEditTitle
+          : l10n.snippetNewTitle),
       content: SingleChildScrollView(
         child: Form(
           key: _formKey,
@@ -278,7 +284,8 @@ class _SnippetDialogState extends State<SnippetDialog> {
               TextFormField(
                 controller: _nameController,
                 decoration: InputDecoration(labelText: l10n.commonName),
-                validator: (v) => v?.isEmpty == true ? l10n.snippetNameRequired : null,
+                validator: (v) =>
+                    v?.isEmpty == true ? l10n.snippetNameRequired : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -289,13 +296,18 @@ class _SnippetDialogState extends State<SnippetDialog> {
                   hintText: '例如: docker exec -it {{container}} /bin/bash',
                   hintStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
                 ),
-                style: const TextStyle(fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback, fontSize: fMono),
-                validator: (v) => v?.isEmpty == true ? l10n.snippetCommandRequired : null,
+                style: const TextStyle(
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: kMonoFontFallback,
+                    fontSize: fMono),
+                validator: (v) =>
+                    v?.isEmpty == true ? l10n.snippetCommandRequired : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _descriptionController,
-                decoration: InputDecoration(labelText: l10n.snippetFieldDescription),
+                decoration:
+                    InputDecoration(labelText: l10n.snippetFieldDescription),
               ),
             ],
           ),
@@ -321,7 +333,9 @@ class _SnippetDialogState extends State<SnippetDialog> {
       id: widget.snippet?.id ?? _uuid.v4(),
       name: _nameController.text.trim(),
       command: _commandController.text.trim(),
-      description: _descriptionController.text.trim().isEmpty ? null : _descriptionController.text.trim(),
+      description: _descriptionController.text.trim().isEmpty
+          ? null
+          : _descriptionController.text.trim(),
     );
 
     widget.onSave(snippet);

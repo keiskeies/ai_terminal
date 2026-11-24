@@ -65,7 +65,11 @@ void main() {
         username: _sshUser!,
         authType: 'password',
       ));
-      await connectE2ESsh(ssh, password: _sshPassword!, user: _sshUser!, host: _sshHost!, port: _sshPort);
+      await connectE2ESsh(ssh,
+          password: _sshPassword!,
+          user: _sshUser!,
+          host: _sshHost!,
+          port: _sshPort);
       expect(ssh.isConnected, isTrue);
 
       sftp = SftpService();
@@ -74,7 +78,8 @@ void main() {
       await ssh.executeAndWait('rm -rf ${_shq(_remoteRoot)}');
       await ssh.executeAndWait('mkdir -p ${_shq(_remoteRoot)}');
 
-      localRoot = await Directory.systemTemp.createTemp('ai_terminal_transfer_');
+      localRoot =
+          await Directory.systemTemp.createTemp('ai_terminal_transfer_');
     });
 
     tearDownAll(() async {
@@ -147,7 +152,8 @@ void main() {
       );
     }
 
-    test('single file upload/download preserves bytes, names and overwrite safety',
+    test(
+        'single file upload/download preserves bytes, names and overwrite safety',
         () async {
       const remoteDir = '$_remoteRoot/单文件 上传 😀/nested';
       const remotePath = '$remoteDir/配置 名称 😀.txt';
@@ -187,10 +193,7 @@ void main() {
       final downloadedPath = p.join(downloadDir.path, '配置 名称 😀.txt');
       expect(await File(downloadedPath).readAsBytes(), bytesV2);
       expect(
-        downloadDir
-            .listSync()
-            .whereType<File>()
-            .map((f) => p.basename(f.path)),
+        downloadDir.listSync().whereType<File>().map((f) => p.basename(f.path)),
         isNot(anyElement(endsWith('.part'))),
       );
 
@@ -202,16 +205,15 @@ void main() {
       expect((await download(remotePath, downloadedPath)).success, isTrue);
       expect(await File(downloadedPath).readAsBytes(), bytesV3);
       expect(
-        downloadDir
-            .listSync()
-            .whereType<File>()
-            .map((f) => p.basename(f.path)),
+        downloadDir.listSync().whereType<File>().map((f) => p.basename(f.path)),
         isNot(anyElement(endsWith('.part'))),
       );
 
       // BOM + CRLF + 无尾换行：逐字节一致
       final bomBytes = <int>[
-        0xEF, 0xBB, 0xBF,
+        0xEF,
+        0xBB,
+        0xBF,
         ...utf8.encode('BOM 第一行\r\nBOM 第二行 😀\r\nBOM 无尾'),
       ];
       final bomLocal = p.join(localDir.path, 'bom.txt');
@@ -258,15 +260,13 @@ void main() {
       expect(_sha256(downloaded), expectedSha);
       expect(File(downloadedPath).existsSync(), isTrue);
       expect(
-        localRoot
-            .listSync()
-            .whereType<File>()
-            .map((f) => p.basename(f.path)),
+        localRoot.listSync().whereType<File>().map((f) => p.basename(f.path)),
         isNot(anyElement(endsWith('.part'))),
       );
     }, timeout: const Timeout(Duration(minutes: 5)));
 
-    test('recursive directory upload/download keeps tree, empty dir and excludes',
+    test(
+        'recursive directory upload/download keeps tree, empty dir and excludes',
         () async {
       final source = Directory(p.join(localRoot.path, 'tree 源 😀'));
       final sub = Directory(p.join(source.path, 'sub'));
@@ -281,8 +281,7 @@ void main() {
       await gitDir.create(recursive: true);
 
       final files = <String, List<int>>{
-        p.join(source.path, 'index.html'):
-            utf8.encode('<h1>首页 中文 😀</h1>\r\n'),
+        p.join(source.path, 'index.html'): utf8.encode('<h1>首页 中文 😀</h1>\r\n'),
         p.join(sub.path, '中文 文件.txt'): utf8.encode('子目录内容\n无尾换行'),
         p.join(sub.path, 'emoji 😀.log'): utf8.encode('log 😀🚀\r\nline2\r\n'),
         p.join(ignored.path, 'ignored.js'): utf8.encode('ignored'),
@@ -294,7 +293,8 @@ void main() {
       }
 
       const remoteBase = '$_remoteRoot/部署 目标 😀';
-      final uploadResult = await upload(source.path, remoteBase, recursive: true);
+      final uploadResult =
+          await upload(source.path, remoteBase, recursive: true);
       expect(uploadResult.success, isTrue,
           reason: uploadResult.error ?? uploadResult.output);
 
@@ -324,8 +324,8 @@ void main() {
 
       final restored = Directory(p.join(restoreParent.path, 'tree 源 😀'));
       expect(await restored.exists(), isTrue);
-      expect(await Directory(p.join(restored.path, 'empty-dir')).exists(),
-          isTrue);
+      expect(
+          await Directory(p.join(restored.path, 'empty-dir')).exists(), isTrue);
 
       final restoredFiles = <String, List<int>>{};
       await for (final entity
@@ -338,10 +338,8 @@ void main() {
 
       final expectedRelative = <String, List<int>>{
         'index.html': files[p.join(source.path, 'index.html')]!,
-        p.join('sub', '中文 文件.txt'):
-            files[p.join(sub.path, '中文 文件.txt')]!,
-        p.join('sub', 'emoji 😀.log'):
-            files[p.join(sub.path, 'emoji 😀.log')]!,
+        p.join('sub', '中文 文件.txt'): files[p.join(sub.path, '中文 文件.txt')]!,
+        p.join('sub', 'emoji 😀.log'): files[p.join(sub.path, 'emoji 😀.log')]!,
       };
       expect(restoredFiles.keys.toSet(), expectedRelative.keys.toSet());
       for (final entry in expectedRelative.entries) {
@@ -350,7 +348,8 @@ void main() {
       }
 
       // 目录未设置 recursive → 明确拒绝
-      final noRecursive = await upload(source.path, '$_remoteRoot/no-recursive');
+      final noRecursive =
+          await upload(source.path, '$_remoteRoot/no-recursive');
       expect(noRecursive.success, isFalse);
       expect(noRecursive.error, contains('recursive'));
       expect(await sftp.statFile('$_remoteRoot/no-recursive'), isNull);
@@ -361,8 +360,7 @@ void main() {
       final source = Directory(p.join(localRoot.path, 'cancel-src'))
         ..createSync(recursive: true);
       for (var i = 0; i < 80; i++) {
-        File(p.join(source.path, 'f$i.txt'))
-            .writeAsStringSync('x' * 2048);
+        File(p.join(source.path, 'f$i.txt')).writeAsStringSync('x' * 2048);
       }
       final remoteDir = p.posix.join(_remoteRoot, 'cancel-dst');
       final token = Completer<void>();
@@ -396,7 +394,8 @@ void main() {
       // 远程包含引号/空格/emoji/中文，本地包含 $、反引号、&、;、空格和 emoji。
       // 传输全程走 SFTP，不能经过 shell 解释。
       const localName = r'本地 $NAME `tick` & ; (1) 😀.txt';
-      const remoteName = r'''特殊 $NAME `tick` "double" 'single' & ; (1) 😀.txt''';
+      const remoteName =
+          r'''特殊 $NAME `tick` "double" 'single' & ; (1) 😀.txt''';
       final content = utf8.encode('特殊文件名内容 😀\n\$HOME `id` & ;\n');
       final localPath = p.join(localRoot.path, localName);
       const remotePath = '$_remoteRoot/特殊 目录 😀/$remoteName';
@@ -440,10 +439,10 @@ void main() {
       // 3) 远程目录未 recursive
       const remoteDir = '$_remoteRoot/failure-dir';
       await sftp.ensureDirectory(remoteDir);
-      await ssh.executeAndWait(
-          'printf keep > ${_shq('$remoteDir/sentinel.txt')}');
-      final dirAsFile = await download(remoteDir,
-          p.join(localRoot.path, 'failure-dir-local.txt'));
+      await ssh
+          .executeAndWait('printf keep > ${_shq('$remoteDir/sentinel.txt')}');
+      final dirAsFile = await download(
+          remoteDir, p.join(localRoot.path, 'failure-dir-local.txt'));
       expect(dirAsFile.success, isFalse);
       expect(dirAsFile.error, contains('目录'));
       expect(File(p.join(localRoot.path, 'failure-dir-local.txt')).existsSync(),
@@ -491,7 +490,8 @@ void main() {
       const remoteSingle = '$_remoteRoot/orchestration/web1/app 文件 😀.txt';
       final uploadTo = await UploadToTool(multi).execute(
         executor: ssh,
-        args: ToolArgs({'hostId': 'web1', 'local': localPath, 'remote': remoteSingle}),
+        args: ToolArgs(
+            {'hostId': 'web1', 'local': localPath, 'remote': remoteSingle}),
       );
       expect(uploadTo.success, isTrue,
           reason: uploadTo.error ?? uploadTo.output);
@@ -509,8 +509,7 @@ void main() {
       expect(broadcast.success, isTrue,
           reason: broadcast.error ?? broadcast.output);
       expect(
-        await readRemote(
-            '$remoteBroadcast/${p.basename(localPath)}'),
+        await readRemote('$remoteBroadcast/${p.basename(localPath)}'),
         localBytes,
       );
 
@@ -525,15 +524,14 @@ void main() {
       );
       expect(collect.success, isTrue, reason: collect.error ?? collect.output);
       final remoteBase = p.posix.basename(remoteSingle);
-      expect(await File(p.join(collectDir.path, 'web1_$remoteBase'))
-          .readAsBytes(), localBytes);
-      expect(await File(p.join(collectDir.path, 'web2_$remoteBase'))
-          .readAsBytes(), localBytes);
       expect(
-        collectDir
-            .listSync()
-            .whereType<File>()
-            .map((f) => p.basename(f.path)),
+          await File(p.join(collectDir.path, 'web1_$remoteBase')).readAsBytes(),
+          localBytes);
+      expect(
+          await File(p.join(collectDir.path, 'web2_$remoteBase')).readAsBytes(),
+          localBytes);
+      expect(
+        collectDir.listSync().whereType<File>().map((f) => p.basename(f.path)),
         isNot(anyElement(endsWith('.part'))),
       );
     }, timeout: const Timeout(Duration(minutes: 4)));
@@ -577,7 +575,9 @@ void main() {
       // BOM + CRLF 经编辑器读/写后逐字节保留
       const bomPath = '$_remoteRoot/editor_bom.txt';
       final bomBytes = <int>[
-        0xEF, 0xBB, 0xBF,
+        0xEF,
+        0xBB,
+        0xBF,
         ...utf8.encode('BOM 第一行\r\nBOM 第二行 😀\r\n'),
       ];
       await sftp.writeFileBytes(bomPath, Uint8List.fromList(bomBytes));
@@ -614,7 +614,8 @@ void main() {
       expect(await readRemote(largePath), largeBytes);
     }, timeout: const Timeout(Duration(minutes: 3)));
 
-    test('single file download with explicit local file path and trailing separator',
+    test(
+        'single file download with explicit local file path and trailing separator',
         () async {
       const remotePath = '$_remoteRoot/trailing-remote.txt';
       final content = utf8.encode('trailing separator test ✅');
@@ -630,8 +631,7 @@ void main() {
       await dir.create();
       final withSeparator = '${dir.path}${Platform.pathSeparator}';
       expect((await download(remotePath, withSeparator)).success, isTrue);
-      expect(
-          await File(p.join(dir.path, 'trailing-remote.txt')).readAsBytes(),
+      expect(await File(p.join(dir.path, 'trailing-remote.txt')).readAsBytes(),
           content);
     }, timeout: const Timeout(Duration(minutes: 3)));
   });

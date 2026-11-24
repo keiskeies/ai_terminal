@@ -110,7 +110,8 @@ class ToolArgsParser {
   // ──────────────────────────────────────────────────────────
 
   /// 取 String 参数。缺失或类型不匹配返回 [defaultValue]。
-  static String getString(Map<String, dynamic> args, String key, {String defaultValue = ''}) {
+  static String getString(Map<String, dynamic> args, String key,
+      {String defaultValue = ''}) {
     final v = args[key];
     if (v == null) return defaultValue;
     if (v is String) return v;
@@ -122,7 +123,8 @@ class ToolArgsParser {
   /// - List 值 → map toString
   /// - String 值 → 按逗号切分（并剥掉 AI 误写的 JSON 方括号）
   /// - 缺失 → [defaultValue]
-  static List<String> getStringList(Map<String, dynamic> args, String key, {List<String> defaultValue = const []}) {
+  static List<String> getStringList(Map<String, dynamic> args, String key,
+      {List<String> defaultValue = const []}) {
     final v = args[key];
     if (v == null) return defaultValue;
     if (v is List) {
@@ -156,7 +158,8 @@ class ToolArgsParser {
   /// - bool 值 → 直接返回
   /// - String "true"/"false" → 解析
   /// - 其他 → [defaultValue]
-  static bool getBool(Map<String, dynamic> args, String key, {bool defaultValue = false}) {
+  static bool getBool(Map<String, dynamic> args, String key,
+      {bool defaultValue = false}) {
     final v = args[key];
     if (v == null) return defaultValue;
     if (v is bool) return v;
@@ -168,7 +171,8 @@ class ToolArgsParser {
   /// - int 值 → 直接返回
   /// - String → int.tryParse，失败返回 [defaultValue]
   /// - 其他 → [defaultValue]
-  static int getInt(Map<String, dynamic> args, String key, {int defaultValue = 0}) {
+  static int getInt(Map<String, dynamic> args, String key,
+      {int defaultValue = 0}) {
     final v = args[key];
     if (v == null) return defaultValue;
     if (v is int) return v;
@@ -239,7 +243,8 @@ class ToolArgs {
     return defaultValue;
   }
 
-  List<String> getStringList(String key, {List<String> defaultValue = const []}) =>
+  List<String> getStringList(String key,
+          {List<String> defaultValue = const []}) =>
       ToolArgsParser.getStringList(_raw, key, defaultValue: defaultValue);
 
   bool getBool(String key, {bool defaultValue = false}) =>
@@ -252,7 +257,8 @@ class ToolArgs {
   String describe({int maxValueChars = 80}) {
     if (_raw.isEmpty) return '(无参数)';
     return _raw.entries.map((e) {
-      var v = e.value is List ? (e.value as List).join(',') : e.value.toString();
+      var v =
+          e.value is List ? (e.value as List).join(',') : e.value.toString();
       if (v.length > maxValueChars) {
         v = '${v.substring(0, maxValueChars)}…(${v.length} 字符)';
       }

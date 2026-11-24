@@ -44,6 +44,7 @@ abstract class AIProvider {
     Duration? responseTimeout,
     List<Map<String, dynamic>>? tools,
     void Function(TokenUsage usage)? onUsage,
+
     /// 模型原生推理增量（reasoning_content）；网关不给该字段时不会触发
     void Function(String delta)? onReasoning,
     void Function(List<ToolCall> calls)? onToolCalls,
@@ -100,11 +101,15 @@ String mapDioError(dynamic error) {
 }
 
 class OpenAIProvider implements AIProvider {
-  final Dio _dio = Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 30),
-    receiveTimeout: const Duration(seconds: 120),
-    sendTimeout: const Duration(seconds: 30),
-  ));
+  OpenAIProvider({Dio? dio})
+      : _dio = dio ??
+            Dio(BaseOptions(
+              connectTimeout: const Duration(seconds: 30),
+              receiveTimeout: const Duration(seconds: 120),
+              sendTimeout: const Duration(seconds: 30),
+            ));
+
+  final Dio _dio;
 
   /// 构建 OpenAI 兼容的 messages 数组。
   ///
@@ -213,6 +218,7 @@ class OpenAIProvider implements AIProvider {
       }
 
       final streamController = StreamController<String>();
+      late final StreamSubscription<String> upstream;
       // P2-6: tool_calls 累积器（仅当传入 tools 时启用）
       final toolCallAcc =
           tools != null && tools.isNotEmpty ? ToolCallAccumulator() : null;
@@ -231,6 +237,7 @@ class OpenAIProvider implements AIProvider {
 
       if (cancelToken != null) {
         cancelToken.whenCancel.then((err) {
+          unawaited(upstream.cancel());
           if (!streamController.isClosed) {
             streamController.addError(err);
             streamController.close();
@@ -293,7 +300,7 @@ class OpenAIProvider implements AIProvider {
 
       // 用流式解码器处理跨包的多字节字符：逐 chunk utf8.decode 在分包切到
       // 半个汉字时会抛异常并退化成 "[...]" 字节数组文本，导致 SSE 行解析失败。
-      response.data!.stream
+      upstream = response.data!.stream
           .cast<List<int>>()
           .transform(const Utf8Decoder(allowMalformed: true))
           .transform(const LineSplitter())
@@ -321,6 +328,8 @@ class OpenAIProvider implements AIProvider {
           }
         },
       );
+
+      streamController.onCancel = () => upstream.cancel();
 
       return streamController.stream;
     } catch (e) {
@@ -471,10 +480,12 @@ class ErnieProvider implements AIProvider {
       );
 
       final streamController = StreamController<String>();
+      late final StreamSubscription<String> upstream;
 
       // 与 OpenAIProvider 一致：cancelToken 触发时主动关闭 streamController
       if (cancelToken != null) {
         cancelToken.whenCancel.then((err) {
+          unawaited(upstream.cancel());
           if (!streamController.isClosed) {
             streamController.addError(err);
             streamController.close();
@@ -482,7 +493,7 @@ class ErnieProvider implements AIProvider {
         });
       }
 
-      response.data!.stream
+      upstream = response.data!.stream
           .cast<List<int>>()
           .transform(const Utf8Decoder(allowMalformed: true))
           .transform(const LineSplitter())
@@ -535,6 +546,8 @@ class ErnieProvider implements AIProvider {
           }
         },
       );
+
+      streamController.onCancel = () => upstream.cancel();
 
       return streamController.stream;
     } catch (e) {

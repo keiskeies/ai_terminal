@@ -43,8 +43,7 @@ class McpToolAdapter extends AgentTool {
   final String? _name;
 
   @override
-  String get name =>
-      _name ?? mcpToolFullName(serverId, descriptor.name);
+  String get name => _name ?? mcpToolFullName(serverId, descriptor.name);
 
   @override
   String get description {
@@ -59,7 +58,8 @@ class McpToolAdapter extends AgentTool {
   @override
   String get paramSpec {
     final schema = jsonEncode(descriptor.inputSchema);
-    final bounded = schema.length <= 2000 ? schema : '${schema.substring(0, 2000)}…';
+    final bounded =
+        schema.length <= 2000 ? schema : '${schema.substring(0, 2000)}…';
     return '参数列表（多行 key:value 格式）：\n'
         '  json: 一个单行 JSON 对象，符合下面的 inputSchema\n\n'
         'inputSchema: $bounded';
@@ -107,9 +107,9 @@ class McpToolAdapter extends AgentTool {
       return ToolResult.failure(
         UiText.t(
           '参数格式错误：请把 MCP 工具参数写成单行 JSON，例如 '
-          '`json: {"query":"flutter"}`',
+              '`json: {"query":"flutter"}`',
           'Invalid argument format: pass MCP tool arguments as a single-line JSON object, e.g. '
-          '`json: {"query":"flutter"}`',
+              '`json: {"query":"flutter"}`',
         ),
       );
     }
@@ -270,7 +270,8 @@ class McpSideToolAdapter extends AgentTool {
   }) async {
     final runtime = caller.mcpRuntime(serverId);
     if (runtime == null || !runtime.isConnected) {
-      return ToolResult.failure(UiText.t('MCP 服务器「$serverName」未连接', 'MCP server "$serverName" is not connected'));
+      return ToolResult.failure(UiText.t('MCP 服务器「$serverName」未连接',
+          'MCP server "$serverName" is not connected'));
     }
     try {
       switch (sideKind) {
@@ -297,7 +298,8 @@ class McpSideToolAdapter extends AgentTool {
           return ToolResult.success(text);
         case McpSideToolKind.listPrompts:
           if (runtime.prompts.isEmpty) {
-            return ToolResult.success(UiText.t('该 MCP 服务器没有提供提示词。', 'This MCP server provides no prompts.'));
+            return ToolResult.success(UiText.t(
+                '该 MCP 服务器没有提供提示词。', 'This MCP server provides no prompts.'));
           }
           final buffer = StringBuffer('提示词列表：\n');
           for (final prompt in runtime.prompts) {

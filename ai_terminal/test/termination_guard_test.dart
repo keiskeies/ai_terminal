@@ -38,20 +38,27 @@ void main() {
       ]);
     });
 
-    test('回调抛异常时 cleanup 仍在 finally 执行', () {
-      expect(
-        () => guard.terminate(
-          status: AgentStatus.failed,
-          finishState: AgentFinishState.failed,
-          writeStatus: (_) => order.add('status'),
-          emitReport: () => throw StateError('report boom'),
-          emitFinish: () => order.add('finish'),
-          cleanup: () => order.add('cleanup'),
-        ),
-        throwsStateError,
+    test('回调抛异常时后续终态动作仍执行并记录错误', () {
+      final fired = guard.terminate(
+        status: AgentStatus.failed,
+        finishState: AgentFinishState.failed,
+        writeStatus: (_) => order.add('status'),
+        emitReport: () => throw StateError('report boom'),
+        emitFinish: () => order.add('finish'),
+        flush: () => order.add('flush'),
+        endTracer: () => order.add('tracer'),
+        cleanup: () => order.add('cleanup'),
       );
 
-      expect(order, ['status', 'cleanup']);
+      expect(fired, isTrue);
+      expect(order, [
+        'status',
+        'finish',
+        'flush',
+        'tracer',
+        'cleanup',
+      ]);
+      expect(guard.lastErrors.single, contains('report boom'));
     });
 
     test('代际不符时整组动作不执行', () {

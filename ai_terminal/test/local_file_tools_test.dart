@@ -13,7 +13,9 @@ import 'package:ai_terminal/services/daos.dart';
 import 'package:ai_terminal/services/local_file_policy.dart';
 import 'package:ai_terminal/models/host_config.dart';
 import 'package:ai_terminal/services/local_file_tools.dart';
+import 'package:ai_terminal/utils/local_file_ops.dart';
 import 'package:ai_terminal/services/ssh_service.dart';
+import 'package:ai_terminal/services/file_sync_service.dart';
 import 'package:ai_terminal/utils/tool_args_parser.dart';
 
 /// 本地文件工具不经过 shell，所以不需要真 executor；
@@ -30,7 +32,8 @@ class _NullExecutor implements CommandExecutor {
           {Duration timeout = const Duration(seconds: 1),
           Completer<void>? cancelToken,
           String? sudoPassword,
-          Future<String?> Function(String prompt)? onInteractivePrompt}) async =>
+          Future<String?> Function(String prompt)?
+              onInteractivePrompt}) async =>
       CommandResult(
           stdout: '', stderr: '', exitCode: 0, duration: Duration.zero);
   @override
@@ -94,12 +97,18 @@ void main() {
   }
 
   group('LocalFilePolicy 判定', () {
-    test('总开关关闭时一切本地文件访问都被拒绝', () async {
+    test('总开关关闭时拒绝访问，敏感路径与回收区仍优先拦截', () async {
       await _configurePolicy(enabled: false, dirs: [sandbox.path]);
-      final path = sandboxFile('a.txt', 'hello');
+      final path = p.join(outside.path, 'outside.txt');
+      File(path).writeAsStringSync('hello');
       final r = await _run(LocalFileReadTool(), {'path': path});
       expect(r.success, isFalse);
-      expect(r.error, contains('本地文件访问未开启'));
+      expect(r.error, contains('总开关已关闭'));
+      final sensitive = File(p.join(sandbox.path, '.env'))
+        ..writeAsStringSync('SECRET=1');
+      final blocked = await _run(LocalFileReadTool(), {'path': sensitive.path});
+      expect(blocked.success, isFalse);
+      expect(blocked.error, contains('敏感'));
     });
 
     test('白名单外的路径被拒绝', () async {
@@ -132,9 +141,25 @@ void main() {
           reason: '拒绝发生在任何 I/O 之前');
     });
 
+    test('读取按单行与整段字符上限截断', () async {
+      final path = sandboxFile(
+          'long.txt',
+          '${'A' * 3000}\n'
+              '${List.generate(30, (_) => 'B' * 1000).join('\n')}');
+      final r =
+          await _run(LocalFileReadTool(), {'path': path, 'max_lines': 5000});
+      expect(r.success, isTrue);
+      final out = r.output;
+      expect(out, contains('行过长'));
+      expect(out, contains('用 start_line:'));
+      expect(out.length, lessThan(25000));
+    });
+
     test('敏感文件即使在白名单内也拒绝', () async {
-      final sshDir = Directory('${sandbox.path}/.ssh')..createSync(recursive: true);
-      final key = File('${sshDir.path}/id_rsa')..writeAsStringSync('PRIVATE KEY');
+      final sshDir = Directory('${sandbox.path}/.ssh')
+        ..createSync(recursive: true);
+      final key = File('${sshDir.path}/id_rsa')
+        ..writeAsStringSync('PRIVATE KEY');
       final r = await _run(LocalFileReadTool(), {'path': key.path});
       expect(r.success, isFalse);
       expect(r.error, contains('敏感'));
@@ -163,6 +188,57 @@ void main() {
       expect(target.existsSync(), isTrue, reason: '拒绝不得影响目标文件');
     });
 
+    test('断链解析失败必须拒绝，不能按字面路径放行', () {
+      final link = Link(p.join(sandbox.path, 'broken-link'));
+      try {
+        link.createSync(p.join(outside.path, 'missing-target.txt'));
+      } catch (_) {
+        if (Platform.isWindows) return; // 未开发者模式时跳过
+      }
+      final decision = LocalFilePolicy.load().decide(link.path);
+      expect(decision.isAllowed, isFalse);
+      expect(decision.verdict, LocalPathVerdict.escape);
+      expect(decision.reason, contains('符号链接解析失败'));
+    });
+
+    test('校验后 link-swap 再验证必须失败并保护目标文件', () {
+      final allowedTarget = File(p.join(sandbox.path, 'real.txt'))
+        ..writeAsStringSync('allowed');
+      final outsideTarget = File(p.join(outside.path, 'secret.txt'))
+        ..writeAsStringSync('secret');
+      final link = Link(p.join(sandbox.path, 'swap-link'));
+      try {
+        link.createSync(allowedTarget.path);
+      } catch (_) {
+        if (Platform.isWindows) return; // 未开发者模式时跳过
+      }
+      final policy = LocalFilePolicy.load();
+      final first = policy.decide(link.path);
+      expect(first.isAllowed, isTrue);
+      link.deleteSync();
+      link.createSync(outsideTarget.path);
+      final swapped = policy.verify(link.path, first.resolved);
+      expect(swapped.isAllowed, isFalse);
+      expect(swapped.verdict, LocalPathVerdict.escape);
+      expect(outsideTarget.readAsStringSync(), 'secret');
+    });
+
+    test('规范化结果不保留重复根分隔符', () {
+      final raw =
+          '${sandbox.path}${Platform.pathSeparator}${Platform.pathSeparator}new.txt';
+      final decision = LocalFilePolicy.load().decide(raw);
+      expect(decision.isAllowed, isTrue);
+      expect(decision.resolved.replaceAll(r'\', '/'), isNot(contains('//')));
+    });
+
+    test('POSIX 授权根目录 / 允许其下所有非敏感路径', () {
+      if (Platform.isWindows) return;
+      const policy = LocalFilePolicy(enabled: true, allowedDirs: ['/']);
+      final path = p.join(Directory.systemTemp.path, 'root-policy-file.txt');
+      expect(policy.decide(path).isAllowed, isTrue);
+      expect(policy.decide('/etc/hosts').verdict, LocalPathVerdict.sensitive);
+    });
+
     test('decide 直接判定：新建文件（末段不存在）也允许', () {
       final policy = LocalFilePolicy.load();
       final d = policy.decide('${sandbox.path}/new/deep/file.txt');
@@ -188,8 +264,8 @@ void main() {
     test('read 目录/不存在/二进制都给出明确错误', () async {
       expect((await _run(LocalFileReadTool(), {'path': sandbox.path})).success,
           isFalse);
-      final missing = await _run(
-          LocalFileReadTool(), {'path': '${sandbox.path}/nope.txt'});
+      final missing =
+          await _run(LocalFileReadTool(), {'path': '${sandbox.path}/nope.txt'});
       expect(missing.error, contains('不存在'));
       final bin = File('${sandbox.path}/bin.dat')
         ..writeAsBytesSync([0, 1, 2, 255, 254]);
@@ -207,8 +283,8 @@ void main() {
       expect(r.output, contains('.git/  (已跳过)'));
       expect(r.output, isNot(contains('main.dart')), reason: 'depth=1 不进子目录');
 
-      final deep = await _run(
-          LocalDirListTool(), {'path': sandbox.path, 'depth': 2});
+      final deep =
+          await _run(LocalDirListTool(), {'path': sandbox.path, 'depth': 2});
       expect(deep.output, contains('main.dart'));
     });
 
@@ -232,20 +308,65 @@ void main() {
           LocalFileSearchTool(), {'path': sandbox.path, 'query': 'zzz'});
       expect(none.output, contains('未命中'));
     });
+
+    test('search 报告超大文件跳过且不计入已扫描', () async {
+      sandboxFile('ok.txt', 'needle');
+      File(p.join(sandbox.path, 'huge.txt'))
+        ..writeAsBytesSync(List<int>.filled(3 * 1024 * 1024, 0));
+      final r = await _run(
+          LocalFileSearchTool(), {'path': sandbox.path, 'query': 'needle'});
+      expect(r.success, isTrue);
+      final out = r.output;
+      expect(out, contains('1 处命中（扫描 1 个文件）'));
+      expect(out, contains('超过 2MB'));
+      expect(out, contains('huge.txt'));
+    });
+
+    test('递归 search 逐个授权后代并报告敏感文件跳过', () async {
+      sandboxFile('safe.txt', 'SAFE_SENTINEL');
+      sandboxFile('nested/.env', 'SECRET=ENV_SENTINEL');
+      sandboxFile('nested/.ssh/id_rsa', 'PRIVATE_KEY_SENTINEL');
+      sandboxFile('nested/private.key', 'PRIVATE_FILE_SENTINEL');
+      sandboxFile('nested/.ai_terminal_trash/copy.txt', 'TRASH_SENTINEL');
+
+      final result = await _run(LocalFileSearchTool(), {
+        'path': sandbox.path,
+        'query': 'SENTINEL',
+      });
+
+      expect(result.success, isTrue, reason: result.error ?? result.output);
+      expect(result.output, contains('safe.txt:1: SAFE_SENTINEL'));
+      expect(result.output, contains('1 处命中（扫描 1 个文件）'));
+      expect(result.output, contains('已跳过 4 个未获授权/敏感文件'));
+      expect(result.output, contains('.env'));
+      expect(result.output, contains('id_rsa'));
+      expect(result.output, contains('private.key'));
+      expect(result.output, contains('.ai_terminal_trash'));
+      expect(result.output, isNot(contains('ENV_SENTINEL')));
+      expect(result.output, isNot(contains('PRIVATE_KEY_SENTINEL')));
+      expect(result.output, isNot(contains('PRIVATE_FILE_SENTINEL')));
+      expect(result.output, isNot(contains('TRASH_SENTINEL')));
+    });
   });
 
   group('local_file_write / patch', () {
     test('新建文件成功；覆盖前自动备份', () async {
       final path = '${sandbox.path}/cfg.conf';
-      final first = await _run(LocalFileWriteTool(), {'path': path, 'content': 'a=1'});
+      final first =
+          await _run(LocalFileWriteTool(), {'path': path, 'content': 'a=1'});
       expect(first.success, isTrue);
       expect(File(path).readAsStringSync(), 'a=1');
 
-      final second = await _run(LocalFileWriteTool(), {'path': path, 'content': 'a=2'});
+      final second =
+          await _run(LocalFileWriteTool(), {'path': path, 'content': 'a=2'});
       expect(second.success, isTrue);
       expect(second.output, contains('原文件已备份'));
       expect(File(path).readAsStringSync(), 'a=2');
-      final backups = sandbox.listSync().whereType<File>().where((f) => f.path.contains('cfg.conf.bak.')).toList();
+      final backups = sandbox
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.contains('cfg.conf.bak.'))
+          .toList();
       expect(backups, hasLength(1));
       expect(backups.single.readAsStringSync(), 'a=1');
     });
@@ -258,9 +379,20 @@ void main() {
       expect(File(path).readAsStringSync(), 'l1\nl2\tl3');
     });
 
+    test('write 空 content 被拒绝，不能把已有文件截断还报成功', () async {
+      final path = sandboxFile('keep.txt', 'keep me');
+      final r = await _run(LocalFileWriteTool(), {'path': path, 'content': ''});
+      expect(r.success, isFalse);
+      expect(r.error, contains('不能为空'));
+      expect(File(path).readAsStringSync(), 'keep me');
+    });
+
     test('append 要求文件已存在；超 8KB 拒绝并教分块', () async {
-      final missing = await _run(LocalFileWriteTool(),
-          {'path': '${sandbox.path}/none.txt', 'mode': 'append', 'content': 'x'});
+      final missing = await _run(LocalFileWriteTool(), {
+        'path': '${sandbox.path}/none.txt',
+        'mode': 'append',
+        'content': 'x'
+      });
       expect(missing.success, isFalse);
       expect(missing.error, contains('append'));
 
@@ -270,24 +402,119 @@ void main() {
       expect(big.error, contains('分块'));
     });
 
+    test('写前策略收缩后拒绝覆盖并保留原内容', () async {
+      final path = sandboxFile('policy-change.txt', 'original');
+      const allowed = LocalFilePolicy(enabled: true, allowedDirs: []);
+      var checks = 0;
+      final result = await _run(
+        LocalFileWriteTool(policyLoader: () {
+          // 前几次检查覆盖初始解析/备份；随后模拟用户在写入前撤销授权。
+          return checks++ < 5
+              ? LocalFilePolicy(enabled: true, allowedDirs: [sandbox.path])
+              : allowed;
+        }),
+        {'path': path, 'content': 'replacement'},
+      );
+      expect(checks, greaterThanOrEqualTo(5));
+      expect(result.success, isFalse);
+      expect(result.error, contains('授权'));
+      expect(File(path).readAsStringSync(), 'original');
+    });
+
+    test('patch 非 UTF-8 字节走字节级替换，不重编码其它内容', () async {
+      final path = p.join(sandbox.path, 'latin1.bin');
+      File(path).writeAsBytesSync([0x61, 0xE9, 0x62, 0x0A]);
+      final r = await _run(LocalFilePatchTool(), {
+        'path': path,
+        'old_b64': base64Encode([0x61, 0xE9, 0x62]),
+        'new_b64': base64Encode([0x61, 0xE9, 0x63]),
+        'backup': false,
+      });
+      expect(r.success, isTrue, reason: r.error);
+      expect(File(path).readAsBytesSync(), [0x61, 0xE9, 0x63, 0x0A]);
+    });
+
+    test('非截断打开后策略撤销则回滚且不改写目标', () async {
+      final path = sandboxFile('opened-policy-change.txt', 'original');
+      var current = LocalFilePolicy(enabled: true, allowedDirs: [sandbox.path]);
+      // 用共享原语精确控制授权回调发生的时机。
+      final outcome = await writeLocalFile(
+        path: path,
+        bytes: utf8.encode('replacement'),
+        authorizePath: (_, __) async =>
+            current.allowedDirs.isNotEmpty ? null : '授权已撤销',
+        authorizeOpenedWrite: (_) async {
+          current = const LocalFilePolicy(enabled: true, allowedDirs: []);
+          return '授权已撤销';
+        },
+      );
+      expect(outcome.success, isFalse);
+      expect(outcome.error, contains('授权已撤销'));
+      expect(File(path).readAsStringSync(), 'original');
+    });
+
+    test('patch 非截断打开后父目录被替换则 fail-closed', () async {
+      if (Platform.isWindows) return;
+      final parent = Directory(p.join(sandbox.path, 'swap-parent'))
+        ..createSync();
+      final target = File(p.join(parent.path, 'target.txt'))
+        ..writeAsStringSync('original');
+      final moved = Directory(p.join(sandbox.path, 'moved-parent'));
+      final outsideParent = Directory(p.join(outside.path, 'outside-parent'))
+        ..createSync();
+      final outsideFile = File(p.join(outsideParent.path, 'target.txt'))
+        ..writeAsStringSync('outside-original');
+      var swapped = false;
+      final outcome = await patchLocalFile(
+        path: target.path,
+        oldText: 'original',
+        newText: 'replacement',
+        backup: false,
+        authorizePath: (rawPath, expected) async {
+          final decision = LocalFilePolicy.load().decide(rawPath);
+          if (!decision.isAllowed) return decision.reason;
+          if (p.normalize(decision.resolved) != p.normalize(expected)) {
+            return '路径身份已变化';
+          }
+          return null;
+        },
+        authorizeOpenedWrite: (_) async {
+          if (!swapped) {
+            swapped = true;
+            parent.renameSync(moved.path);
+            Link(parent.path).createSync(outsideParent.path);
+          }
+          return null;
+        },
+      );
+      expect(swapped, isTrue);
+      expect(outcome.success, isFalse);
+      expect(outcome.error, contains('授权'));
+      expect(
+          File(p.join(moved.path, 'target.txt')).readAsStringSync(), 'original',
+          reason: '已打开的原句柄内容必须保持原样');
+      expect(outsideFile.readAsStringSync(), 'outside-original',
+          reason: '父目录替换不得写到白名单外目标');
+    });
+
     test('backup: false 时不留备份', () async {
       final path = sandboxFile('nb.txt', 'old');
-      final r = await _run(
-          LocalFileWriteTool(), {'path': path, 'content': 'new', 'backup': false});
+      final r = await _run(LocalFileWriteTool(),
+          {'path': path, 'content': 'new', 'backup': false});
       expect(r.success, isTrue);
       expect(r.output, isNot(contains('已备份')));
     });
 
     test('patch 要求 old 唯一；0 次与多次都失败且不改动文件', () async {
       final path = sandboxFile('p.conf', 'listen 80;\nlisten 80;\n');
-      final dup = await _run(
-          LocalFilePatchTool(), {'path': path, 'old': 'listen 80;', 'new': 'listen 8080;'});
+      final dup = await _run(LocalFilePatchTool(),
+          {'path': path, 'old': 'listen 80;', 'new': 'listen 8080;'});
       expect(dup.success, isFalse);
       expect(dup.error, contains('出现 2 次'));
       expect(File(path).readAsStringSync(), contains('listen 80;'));
 
-      final none = await _run(
-          LocalFilePatchTool(), {'path': path, 'old': 'server_name x;', 'new': 'y'});
+      final none = await _run(LocalFilePatchTool(),
+          {'path': path, 'old': 'server_name x;', 'new': 'y'});
       expect(none.success, isFalse);
       expect(none.error, contains('未找到'));
 
@@ -312,10 +539,14 @@ void main() {
     });
 
     test('patch 二进制文件给出可读错误而不是崩', () async {
-      final bin = File('${sandbox.path}/bin.bin')..writeAsBytesSync([0, 159, 146, 250]);
-      final r = await _run(LocalFilePatchTool(), {'path': bin.path, 'old': 'x', 'new': 'y'});
+      final bin = File('${sandbox.path}/bin.bin')
+        ..writeAsBytesSync([0, 159, 146, 250]);
+      final before = bin.readAsBytesSync();
+      final r = await _run(
+          LocalFilePatchTool(), {'path': bin.path, 'old': 'x', 'new': 'y'});
       expect(r.success, isFalse);
       expect(r.error, isNotNull);
+      expect(bin.readAsBytesSync(), before, reason: '读取或校验失败不得截断原文件');
     });
   });
 
@@ -323,7 +554,8 @@ void main() {
     test('move 默认不覆盖，overwrite 才替换', () async {
       final src = sandboxFile('src.txt', 'src');
       final dst = sandboxFile('dst.txt', 'dst');
-      final refused = await _run(LocalFileMoveTool(), {'path': src, 'dst': dst});
+      final refused =
+          await _run(LocalFileMoveTool(), {'path': src, 'dst': dst});
       expect(refused.success, isFalse);
       expect(refused.error, contains('目标已存在'));
       expect(File(src).existsSync(), isTrue, reason: '被拒绝时不得动源文件');
@@ -361,8 +593,8 @@ void main() {
     test('delete 目录需要 recursive；hard 才真删', () async {
       Directory('${sandbox.path}/d').createSync();
       File('${sandbox.path}/d/inner.txt').writeAsStringSync('i');
-      final noRecurse = await _run(
-          LocalFileDeleteTool(), {'path': '${sandbox.path}/d'});
+      final noRecurse =
+          await _run(LocalFileDeleteTool(), {'path': '${sandbox.path}/d'});
       expect(noRecurse.success, isFalse);
       expect(noRecurse.error, contains('recursive'));
 
@@ -392,22 +624,26 @@ void main() {
           .firstWhere((f) => f.path.endsWith('target.txt'));
 
       // "删了还能捞回来"这个承诺依赖这份副本不被二次破坏
-      expect((await _run(LocalFileReadTool(), {'path': copy.path})).success, isFalse);
+      expect((await _run(LocalFileReadTool(), {'path': copy.path})).success,
+          isFalse);
       expect(
-        (await _run(
-                LocalFileWriteTool(), {'path': copy.path, 'content': 'clobbered'}))
+        (await _run(LocalFileWriteTool(),
+                {'path': copy.path, 'content': 'clobbered'}))
             .success,
         isFalse,
       );
-      expect((await _run(LocalFileDeleteTool(), {'path': copy.path})).success, isFalse);
-      expect((await _run(LocalDirListTool(), {'path': trash.path})).success, isFalse);
+      expect((await _run(LocalFileDeleteTool(), {'path': copy.path})).success,
+          isFalse);
+      expect((await _run(LocalDirListTool(), {'path': trash.path})).success,
+          isFalse);
       expect(copy.readAsStringSync(), 'recoverable', reason: '副本必须原样还在');
     });
 
     test('嵌套一层的回收区同样是保留目录', () async {
       // 回收区跟着被删文件的目录走，所以它可能出现在授权根的任意深度。
       // 保留判定必须是"路径段里出现 .ai_terminal_trash 就拒"，只看根一层会漏。
-      final nested = sandboxFile(p.join('sub', 'deep', 'victim.txt'), 'nested-copy');
+      final nested =
+          sandboxFile(p.join('sub', 'deep', 'victim.txt'), 'nested-copy');
       final deleted = await _run(LocalFileDeleteTool(), {'path': nested});
       expect(deleted.success, isTrue);
 
@@ -419,7 +655,8 @@ void main() {
           .whereType<File>()
           .firstWhere((f) => f.path.endsWith('victim.txt'));
 
-      expect((await _run(LocalFileReadTool(), {'path': copy.path})).success, isFalse);
+      expect((await _run(LocalFileReadTool(), {'path': copy.path})).success,
+          isFalse);
       expect(
         (await _run(LocalFileDeleteTool(), {'path': copy.path})).success,
         isFalse,
@@ -476,18 +713,42 @@ void main() {
       expect(restored.maxReadBytes, 1234);
     });
 
-    test('未配置时 fail-closed：默认关闭且无授权目录', () async {
+    test('未配置时默认关闭且无授权目录，decide 拒绝访问', () async {
       await SettingsDao.set('localFilePolicy', null);
-      final p = LocalFilePolicy.load();
-      expect(p.enabled, isFalse);
-      expect(p.allowedDirs, isEmpty);
+      final policy = LocalFilePolicy.load();
+      expect(policy.enabled, isFalse);
+      expect(policy.allowedDirs, isEmpty);
+      expect(
+          policy.decide(p.join(outside.path, 'open.txt')).isAllowed, isFalse);
     });
 
-    test('配置被写坏时 fail-closed，不放开文件访问', () async {
+    test('配置形状无效时 fail-closed，不开放本地文件', () async {
       await SettingsDao.set('localFilePolicy', 'not-a-map');
-      final p = LocalFilePolicy.load();
-      expect(p.enabled, isFalse, reason: '解析失败绝不能当成已授权');
-      expect(p.allowedDirs, isEmpty);
+      final policy = LocalFilePolicy.load();
+      expect(policy.enabled, isFalse, reason: '解析失败不能当成 enabled=true');
+      expect(policy.allowedDirs, isEmpty);
+      expect(
+          policy.decide(p.join(outside.path, 'open.txt')).isAllowed, isFalse);
+    });
+
+    test('授权目录或读取上限形状损坏时 fail-closed', () async {
+      for (final malformed in [
+        {'enabled': true, 'allowedDirs': 'not-a-list'},
+        {
+          'enabled': true,
+          'allowedDirs': [123]
+        },
+        {
+          'enabled': true,
+          'allowedDirs': [sandbox.path],
+          'maxReadBytes': -1
+        },
+      ]) {
+        await SettingsDao.set('localFilePolicy', malformed);
+        final policy = LocalFilePolicy.load();
+        expect(policy.enabled, isFalse);
+        expect(policy.decide(p.join(sandbox.path, 'a.txt')).isAllowed, isFalse);
+      }
     });
   });
 
@@ -603,7 +864,8 @@ void main() {
 
     test('write 覆盖时报告备份位置', () async {
       final path = sandboxFile('w.txt', 'old');
-      final r = await _run(LocalFileWriteTool(), {'path': path, 'content': 'new'});
+      final r =
+          await _run(LocalFileWriteTool(), {'path': path, 'content': 'new'});
       expect(r.restoreFrom, isNotNull);
       expect(r.restoreTo, path);
       expect(File(r.restoreFrom!).readAsStringSync(), 'old');
@@ -611,7 +873,8 @@ void main() {
 
     test('write 新建文件没有可回滚对象，还原对为空', () async {
       final path = '${sandbox.path}/brand-new.txt';
-      final r = await _run(LocalFileWriteTool(), {'path': path, 'content': 'x'});
+      final r =
+          await _run(LocalFileWriteTool(), {'path': path, 'content': 'x'});
       expect(r.success, isTrue);
       expect(r.restoreFrom, isNull);
       expect(r.restoreTo, isNull);
@@ -619,8 +882,8 @@ void main() {
 
     test('patch 报告备份位置', () async {
       final path = sandboxFile('p2.txt', 'listen 80;');
-      final r = await _run(
-          LocalFilePatchTool(), {'path': path, 'old': 'listen 80;', 'new': 'listen 90;'});
+      final r = await _run(LocalFilePatchTool(),
+          {'path': path, 'old': 'listen 80;', 'new': 'listen 90;'});
       expect(r.restoreFrom, isNotNull);
       expect(r.restoreTo, path);
       expect(File(r.restoreFrom!).readAsStringSync(), 'listen 80;');
@@ -629,8 +892,7 @@ void main() {
     test('move 报告"从新位置移回原位置"', () async {
       final src = sandboxFile('m1.txt', 'data');
       final dst = p.join(sandbox.path, 'm2.txt');
-      final r = await _run(
-          LocalFileMoveTool(), {'path': src, 'dst': dst});
+      final r = await _run(LocalFileMoveTool(), {'path': src, 'dst': dst});
       expect(p.normalize(r.restoreFrom!), p.normalize(dst));
       expect(p.normalize(r.restoreTo!), p.normalize(src));
     });
@@ -664,11 +926,8 @@ void main() {
     test('SSH 会话里 file_patch 同样拦本机路径', () async {
       final r = await FilePatchTool().execute(
         executor: sshSession(),
-        args: const ToolArgs({
-          'path': r'D:\deploy\app.conf',
-          'old': 'a',
-          'new': 'b'
-        }),
+        args: const ToolArgs(
+            {'path': r'D:\deploy\app.conf', 'old': 'a', 'new': 'b'}),
       );
       expect(r.success, isFalse);
       expect(r.error, contains('local_file_patch'));
@@ -684,7 +943,8 @@ void main() {
     });
 
     test('本机工具收到远程风格路径时指路远程工具', () async {
-      final r = await _run(LocalFileReadTool(), {'path': '/etc/nginx/nginx.conf'});
+      final r =
+          await _run(LocalFileReadTool(), {'path': '/etc/nginx/nginx.conf'});
       expect(r.success, isFalse);
       if (Platform.isWindows) {
         // 只有 Windows 本机才存在这种歧义：macOS/Linux 的本地路径本来就是 / 开头
@@ -703,5 +963,17 @@ void main() {
       expect(r.success, isFalse);
       expect(r.error ?? '', isNot(contains('看起来是远程主机的路径')));
     });
+  });
+
+  test('file_sync 启动前必须通过本地目录白名单', () async {
+    // 同步会持续读本地文件并往本地写下载结果，不能绕过 local_* 的路径策略。
+    final tool = FileSyncTool(FileSyncService());
+    final r = await _run(tool, {
+      'action': 'start',
+      'localDir': outside.path,
+      'remoteDir': '/tmp/story',
+    });
+    expect(r.success, isFalse);
+    expect(r.error, contains('本地路径未获授权'));
   });
 }

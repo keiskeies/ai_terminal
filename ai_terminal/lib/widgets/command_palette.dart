@@ -54,7 +54,8 @@ class CommandPalette extends StatefulWidget {
     return showDialog(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.45),
-      builder: (_) => CommandPalette(entries: entries, placeholder: placeholder),
+      builder: (_) =>
+          CommandPalette(entries: entries, placeholder: placeholder),
     );
   }
 
@@ -128,8 +129,7 @@ class _CommandPaletteState extends State<CommandPalette> {
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.tab) {
-      _move(event is KeyDownEvent &&
-              HardwareKeyboard.instance.isShiftPressed
+      _move(event is KeyDownEvent && HardwareKeyboard.instance.isShiftPressed
           ? -1
           : 1);
       return KeyEventResult.handled;
@@ -261,14 +261,11 @@ class _CommandPaletteState extends State<CommandPalette> {
                           ),
                           child: Row(
                             children: [
-                              _footHint(tc, '↑↓',
-                                  UiText.t('选择', 'select')),
+                              _footHint(tc, '↑↓', UiText.t('选择', 'select')),
                               const SizedBox(width: 12),
-                              _footHint(tc, 'Enter',
-                                  UiText.t('执行', 'run')),
+                              _footHint(tc, 'Enter', UiText.t('执行', 'run')),
                               const SizedBox(width: 12),
-                              _footHint(tc, 'Esc',
-                                  UiText.t('关闭', 'close')),
+                              _footHint(tc, 'Esc', UiText.t('关闭', 'close')),
                             ],
                           ),
                         ),
@@ -359,7 +356,8 @@ class _PaletteRow extends StatelessWidget {
                         ),
                         child: Text(_typeBadge(entry.group),
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: fMicro, color: tc.textSub)),
+                            style:
+                                TextStyle(fontSize: fMicro, color: tc.textSub)),
                       ),
                       const SizedBox(width: 9),
                     ],
@@ -439,8 +437,7 @@ Widget _kbd(ThemeColors tc, String text) {
       borderRadius: BorderRadius.circular(3),
       border: Border.all(color: tc.border),
     ),
-    child: Text(text,
-        style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
+    child: Text(text, style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
   );
 }
 

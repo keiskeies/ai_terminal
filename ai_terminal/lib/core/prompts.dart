@@ -1,4 +1,5 @@
 import '../services/daos.dart';
+
 const String commandFormatRule = '''
 【输出规则 - 严格执行】
 1. 所有可执行命令必须放在 ```bash 代码块中
@@ -507,5 +508,6 @@ String buildContextPrompt({
     fullContext = contextStr;
   }
 
-  return getSystemPrompt(isWindows: isWindows).replaceAll('{context}', fullContext);
+  return getSystemPrompt(isWindows: isWindows)
+      .replaceAll('{context}', fullContext);
 }

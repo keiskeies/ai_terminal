@@ -37,7 +37,8 @@ void main() {
     // 性能优化后只扫尾部 4096 字符窗口，以下用例保证长文本行为不变
     test('超长历史 + 尾部当前思考：仍取最后一段思考', () {
       final raw = '思考: 旧思考\n动作: execute\n命令: uname -a\n'
-          '${'填' * 80}\n' * 80 +
+                  '${'填' * 80}\n' *
+              80 +
           '思考: 当前正在想的内容';
       expect(raw.length, greaterThan(4096));
       expect(extractLiveThought(raw), '当前正在想的内容');

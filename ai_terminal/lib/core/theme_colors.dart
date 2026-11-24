@@ -19,6 +19,7 @@ class ThemeColors {
   // 通用 token：保留供其它需要"比面板亮一档"的容器使用；AI 回答卡片已统一
   // 改用下面的 agentCardFill，不再用它做填充。
   Color get dataCard => isLight ? cCardDataLight : cCardData;
+
   /// AI 回答里的卡片（执行清单、结论、证据、命令、事件、思考块）：与 demo 一致，
   /// 不填背景色，只靠 1px 边框 + 间距分层。去掉外层气泡后，原先比面板亮一档的
   /// dataCard 会让每张卡变成"浮起来的独立色块"；透明填充让内容直接坐在面板上，
@@ -81,6 +82,7 @@ class ThemeColors {
       isLight ? const Color(0xFFF1F8F6) : const Color(0xFF0E1D1A);
   Color get userBubbleBorder =>
       isLight ? const Color(0xFFC9DFD9) : const Color(0xFF1E3A34);
+
   /// demo 的 `.ucard` 有一层 180° 极淡渐变（顶部 4.5% 品牌青 → 60% 处透明）。
   /// 折进 BoxDecoration.gradient 的两段实色：深色顶部略亮带青，浅色顶部提亮到
   /// 近白，都是"顶部一层高光"，深浅语义一致。与 color 互斥，调用处只给 gradient。

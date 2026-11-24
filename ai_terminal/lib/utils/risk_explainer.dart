@@ -124,8 +124,7 @@ const _readOnlyRestoreEn = 'Restore: read-only, nothing to roll back';
 const _noChangeRestoreEn = 'Restore: no changes, nothing to roll back';
 
 const _readOnly = _ToolImpact('只读操作，不改动任何状态',
-    'Read-only operation; changes nothing', '还原：只读操作无需回滚',
-    _readOnlyRestoreEn);
+    'Read-only operation; changes nothing', '还原：只读操作无需回滚', _readOnlyRestoreEn);
 
 const Map<String, _ToolImpact> _toolImpacts = {
   // 本机文件：路径已过 LocalFilePolicy 白名单，改动进变更台账
@@ -134,13 +133,18 @@ const Map<String, _ToolImpact> _toolImpacts = {
       'Deletes a local file (moved to the trash by default, not erased)',
       '还原：移入回收区的文件可在改动记录放回原路径',
       'Restore: trashed files can be put back to their original path from the change log'),
-  'local_file_write': _ToolImpact('写入本机文件（默认覆盖前自动备份）',
+  'local_file_write': _ToolImpact(
+      '写入本机文件（默认覆盖前自动备份）',
       'Writes a local file (auto-backup before overwrite by default)',
-      '还原：生成的备份可在改动记录放回原路径', _restoreFromBackupEn),
-  'local_file_patch': _ToolImpact('替换本机文件中的一段文本（默认覆盖前自动备份）',
+      '还原：生成的备份可在改动记录放回原路径',
+      _restoreFromBackupEn),
+  'local_file_patch': _ToolImpact(
+      '替换本机文件中的一段文本（默认覆盖前自动备份）',
       'Replaces a text block in a local file (auto-backup before overwrite by default)',
-      '还原：生成的备份可在改动记录放回原路径', _restoreFromBackupEn),
-  'local_file_move': _ToolImpact('移动或重命名本机文件',
+      '还原：生成的备份可在改动记录放回原路径',
+      _restoreFromBackupEn),
+  'local_file_move': _ToolImpact(
+      '移动或重命名本机文件',
       'Moves or renames a local file',
       '还原：可在改动记录放回原路径，被占用的目标保留为 .displaced 副本',
       'Restore: can be put back from the change log; an occupied target is kept as a .displaced copy'),
@@ -153,18 +157,21 @@ const Map<String, _ToolImpact> _toolImpacts = {
   'diff_files': _readOnly,
 
   // 远程文件：file_write/file_patch 会备份，传输类不会
-  'file_write': _ToolImpact('写入服务器上的文件（默认覆盖前自动备份）',
+  'file_write': _ToolImpact(
+      '写入服务器上的文件（默认覆盖前自动备份）',
       'Writes a file on the server (auto-backup before overwrite by default)',
-      '还原：生成的备份可在改动记录放回原路径', _restoreFromBackupEn),
-  'file_patch': _ToolImpact('替换服务器文件中的一段文本（默认覆盖前自动备份）',
+      '还原：生成的备份可在改动记录放回原路径',
+      _restoreFromBackupEn),
+  'file_patch': _ToolImpact(
+      '替换服务器文件中的一段文本（默认覆盖前自动备份）',
       'Replaces a text block in a server file (auto-backup before overwrite by default)',
-      '还原：生成的备份可在改动记录放回原路径', _restoreFromBackupEn),
+      '还原：生成的备份可在改动记录放回原路径',
+      _restoreFromBackupEn),
   'sftp_upload': _ToolImpact('上传本机文件到服务器，同名远程文件会被覆盖且不备份',
       'Uploads a local file to the server; a same-named remote file is overwritten without backup'),
   'upload_to': _ToolImpact('上传本机文件到指定主机，同名远程文件会被覆盖且不备份',
       'Uploads a local file to the selected host; a same-named remote file is overwritten without backup'),
-  'broadcast_upload': _ToolImpact(
-      '向多台主机广播上传，各主机的同名文件都会被覆盖且不备份',
+  'broadcast_upload': _ToolImpact('向多台主机广播上传，各主机的同名文件都会被覆盖且不备份',
       'Broadcast-uploads to multiple hosts; same-named files on every host are overwritten without backup'),
   'sftp_download': _ToolImpact('下载远程文件到本机，同名本地文件会被覆盖且不备份',
       'Downloads a remote file to this machine; a same-named local file is overwritten without backup'),
@@ -179,9 +186,11 @@ const Map<String, _ToolImpact> _toolImpacts = {
       'Runs a command on the remote host; may change that host\'s state'),
   'exec_batch': _ToolImpact('在多台主机上执行同一条命令，可能改变这些主机状态',
       'Runs the same command on multiple hosts; may change their state'),
-  'check_connectivity': _ToolImpact('探测各主机的连通性，不改动主机状态',
+  'check_connectivity': _ToolImpact(
+      '探测各主机的连通性，不改动主机状态',
       'Probes connectivity of each host; changes nothing on them',
-      '还原：只读操作无需回滚', _readOnlyRestoreEn),
+      '还原：只读操作无需回滚',
+      _readOnlyRestoreEn),
   'build_project': _ToolImpact('在本机执行构建命令，会写入项目的产物目录',
       'Runs the build on this machine; writes into the project output directory'),
   'package_project': _ToolImpact('在本机打包构建产物，会写出压缩包文件',
@@ -191,12 +200,16 @@ const Map<String, _ToolImpact> _toolImpacts = {
       'Runs a command on the machine hosting this app; may modify local files, Docker or system services',
       '还原：本机 shell 无自动回滚，请以确认卡片中的命令与 cwd 为准',
       'Restore: the local shell has no automatic rollback — rely on the command and cwd shown in the confirmation card'),
-  'web_search': _ToolImpact('访问公网检索，不改动任何主机状态',
+  'web_search': _ToolImpact(
+      '访问公网检索，不改动任何主机状态',
       'Searches the public web; changes nothing on any host',
-      '还原：不涉及改动无需回滚', _noChangeRestoreEn),
-  'fetch_url': _ToolImpact('访问公网拉取内容，不改动任何主机状态',
+      '还原：不涉及改动无需回滚',
+      _noChangeRestoreEn),
+  'fetch_url': _ToolImpact(
+      '访问公网拉取内容，不改动任何主机状态',
       'Fetches content from the public web; changes nothing on any host',
-      '还原：不涉及改动无需回滚', _noChangeRestoreEn),
+      '还原：不涉及改动无需回滚',
+      _noChangeRestoreEn),
   // 密码只写进本机加密凭据库，不改动服务器；但用户要知道自己正在交出特权凭据
   'provide_password': _ToolImpact(
       '请用户输入特权（sudo）密码，保存到本机加密凭据库；不改动服务器上的任何状态',

@@ -69,8 +69,7 @@ List<MarkdownTableChunk> splitMarkdownTables(String content) {
             chunks.add(MarkdownTableChunk.text(before));
           }
         }
-        chunks.add(
-            MarkdownTableChunk.ofTable(MarkdownTableData(header, rows)));
+        chunks.add(MarkdownTableChunk.ofTable(MarkdownTableData(header, rows)));
         i = j;
         textStart = j;
         continue;

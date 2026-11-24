@@ -45,7 +45,10 @@ void main() {
 
     test('改远程的工具点名远程，不冒充本机操作', () {
       bool mentionsRemote(String s) =>
-          s.contains('服务器') || s.contains('远程') || s.contains('远端') || s.contains('主机');
+          s.contains('服务器') ||
+          s.contains('远程') ||
+          s.contains('远端') ||
+          s.contains('主机');
       for (final name in [
         'file_write',
         'file_patch',
@@ -90,8 +93,7 @@ void main() {
         'file_sync',
         'collect_file',
       ]) {
-        expect(RiskExplainer.explainTool(name).impact,
-            isNot(contains('自动备份')),
+        expect(RiskExplainer.explainTool(name).impact, isNot(contains('自动备份')),
             reason: '$name 不备份，文案不能声称会备份');
       }
     });

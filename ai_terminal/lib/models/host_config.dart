@@ -71,7 +71,8 @@ class HostConfig {
   bool get hasJumpHost => jumpHost != null && jumpHost!.isNotEmpty;
 
   /// 跳板机是否使用密码认证
-  bool get isJumpPasswordAuth => jumpAuthType == null || jumpAuthType == 'password';
+  bool get isJumpPasswordAuth =>
+      jumpAuthType == null || jumpAuthType == 'password';
 
   /// 跳板机是否使用私钥认证
   bool get isJumpKeyAuth => jumpAuthType == 'privateKey';

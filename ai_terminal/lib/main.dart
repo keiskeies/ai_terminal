@@ -58,11 +58,13 @@ void main() {
             'FlutterError', '框架异常: ${details.exception}（栈见 crash.log）');
       } catch (_) {}
       // P2-8: 同步写入 crash.log（独立于 agentLogger，保证结构化字段）
-      crashReporter.report(
+      crashReporter
+          .report(
         details.exception,
         details.stack,
         context: 'FlutterError',
-      ).catchError((e) {
+      )
+          .catchError((e) {
         debugPrint('[main] crashReporter 写入失败: $e');
       });
     };
@@ -111,11 +113,13 @@ void main() {
       debugPrint('[ZONE] agentLogger 不可用: $error');
     }
     // P2-8: 同步写入 crash.log（独立于 agentLogger，保证结构化字段）
-    crashReporter.report(
+    crashReporter
+        .report(
       error,
       stack,
       context: 'Zone',
-    ).catchError((e) {
+    )
+        .catchError((e) {
       debugPrint('[ZONE] crashReporter 写入失败: $e');
     });
   });
@@ -147,7 +151,8 @@ class AppLifecycleObserver with WidgetsBindingObserver {
     } else if (state == AppLifecycleState.paused) {
       // 系统可能在毫秒级内挂起进程，每个操作加 3 秒超时确保后续操作能执行
       try {
-        await ConversationService().flushAll()
+        await ConversationService()
+            .flushAll()
             .timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('[AppLifecycle] flushAll 失败: $e');
@@ -160,7 +165,8 @@ class AppLifecycleObserver with WidgetsBindingObserver {
       // SQLite WAL 自动刷盘，无需手动 flush
     } else if (state == AppLifecycleState.detached) {
       try {
-        await ConversationService().flushAll()
+        await ConversationService()
+            .flushAll()
             .timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('[AppLifecycle] flushAll 失败: $e');
@@ -178,7 +184,9 @@ class AppLifecycleObserver with WidgetsBindingObserver {
       }
       // 关闭 MCP HTTP 连接并终止 stdio 子进程
       try {
-        await McpManager.instance.shutdown().timeout(const Duration(seconds: 3));
+        await McpManager.instance
+            .shutdown()
+            .timeout(const Duration(seconds: 3));
       } catch (e) {
         debugPrint('[AppLifecycle] McpManager.dispose 失败: $e');
       }
@@ -257,7 +265,8 @@ class AISTerminalApp extends ConsumerWidget {
       builder: (context, child) {
         // 每次路由重建时更新全局 L10n holder，让非 Widget 类也能访问本地化字符串
         // 语言切换后 context 会重建，此处会同步更新
-        final l10n = Localizations.of<AppLocalizations>(context, AppLocalizations);
+        final l10n =
+            Localizations.of<AppLocalizations>(context, AppLocalizations);
         if (l10n != null) L10n.setup(l10n);
         return child!;
       },

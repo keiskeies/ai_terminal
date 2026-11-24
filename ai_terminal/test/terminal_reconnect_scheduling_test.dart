@@ -44,14 +44,12 @@ void main() {
     final ssh = notifier.registerTab(host('h2'));
     ssh.status = TabStatus.connected;
     notifier.scheduleAutoReconnect(ssh.id);
-    expect(notifier.pendingReconnectCount, 0,
-        reason: 'connected 不该触发自动重连');
+    expect(notifier.pendingReconnectCount, 0, reason: 'connected 不该触发自动重连');
 
     final local = notifier.registerLocalTab();
     local.status = TabStatus.lost;
     notifier.scheduleAutoReconnect(local.id);
-    expect(notifier.pendingReconnectCount, 0,
-        reason: '本地 PTY 退出是正常结束，不自动重启');
+    expect(notifier.pendingReconnectCount, 0, reason: '本地 PTY 退出是正常结束，不自动重启');
 
     ssh.status = TabStatus.lost;
     notifier.scheduleAutoReconnect(ssh.id);
@@ -66,8 +64,7 @@ void main() {
     tab.status = TabStatus.lost;
     final agent = container.read(agentProvider.notifier)
       ..beginStartupForTesting(tab.id);
-    expect(agent.isRunningFor(tab.id), isTrue,
-        reason: '前置条件：该 tab 上确有任务在跑');
+    expect(agent.isRunningFor(tab.id), isTrue, reason: '前置条件：该 tab 上确有任务在跑');
 
     notifier.scheduleAutoReconnect(tab.id);
     expect(notifier.pendingReconnectCount, 1,

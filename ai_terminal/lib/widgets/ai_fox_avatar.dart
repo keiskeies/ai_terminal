@@ -167,14 +167,16 @@ class _FoxPainter extends CustomPainter {
     canvas.drawOval(face, edgePaint);
 
     // 浅色口鼻，压在脸下方。
-    canvas.drawOval(const Rect.fromLTWH(-12, 3, 24, 16), Paint()..color = _muzzle);
+    canvas.drawOval(
+        const Rect.fromLTWH(-12, 3, 24, 16), Paint()..color = _muzzle);
 
     // 眼睛：Y 轴随 eyeOpen 压缩，X 轴保持不变 —— 眨眼而非眯眼。
     final eyeRy = 3.4 * eyeOpen;
     for (final cx in [-9.0, 9.0]) {
       if (eyeRy > 0.25) {
         canvas.drawOval(
-          Rect.fromCenter(center: Offset(cx, -3), width: 5.2, height: eyeRy * 2),
+          Rect.fromCenter(
+              center: Offset(cx, -3), width: 5.2, height: eyeRy * 2),
           inkPaint,
         );
       } else {

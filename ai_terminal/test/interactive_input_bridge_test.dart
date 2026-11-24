@@ -231,8 +231,7 @@ void main() {
         );
 
     const executeResponse = '思考: 执行\n动作: execute\n命令: echo hi\n';
-    const finishResponse =
-        '思考: 结论: 完成\n现状: ok\n变更: 无\n建议: 无\n动作: finish\n';
+    const finishResponse = '思考: 结论: 完成\n现状: ok\n变更: 无\n建议: 无\n动作: finish\n';
 
     Future<void> waitUntil(bool Function() cond,
         {Duration timeout = const Duration(seconds: 5)}) async {
@@ -274,8 +273,7 @@ void main() {
       }
     });
 
-    test('提示+答案的回显不进观测，模型不会把它当命令执行（O3 真机缺陷）',
-        () async {
+    test('提示+答案的回显不进观测，模型不会把它当命令执行（O3 真机缺陷）', () async {
       const answer = 'y';
       final provider = _ScriptedAI([executeResponse, finishResponse]);
       final engine = makeEngine(provider);
@@ -292,9 +290,8 @@ void main() {
 
       // 第二次调用（finish 轮）的上下文里不得出现回显行：
       // 真机上模型正是看到它才发出了 `命令: Continue? y`
-      final secondHistory = provider.receivedHistories.last
-          .map((m) => m.content)
-          .join('\n');
+      final secondHistory =
+          provider.receivedHistories.last.map((m) => m.content).join('\n');
       expect(secondHistory, contains('got-y'), reason: '真实输出必须保留');
       expect(secondHistory, isNot(contains('Continue? y')),
           reason: '提示+答案的回显不得进入观测');
@@ -374,8 +371,7 @@ void main() {
         uiCalls++;
         return 'UI';
       };
-      final exec =
-          _BridgeExecutor(prompt: 'Do you want to continue? [Y/n] ');
+      final exec = _BridgeExecutor(prompt: 'Do you want to continue? [Y/n] ');
 
       await engine.startTask('测试目标', exec);
 
@@ -415,8 +411,7 @@ void main() {
         uiCalls++;
         return 'Y';
       };
-      final exec =
-          _BridgeExecutor(prompt: 'Do you want to continue? [Y/n] ');
+      final exec = _BridgeExecutor(prompt: 'Do you want to continue? [Y/n] ');
 
       await engine.startTask('测试目标', exec);
 
@@ -460,7 +455,8 @@ class _ScriptedAI implements AIProvider {
     void Function(List<ToolCall> calls)? onToolCalls,
   }) async {
     receivedHistories.add(List.from(history));
-    final text = responses[_index < responses.length ? _index : responses.length - 1];
+    final text =
+        responses[_index < responses.length ? _index : responses.length - 1];
     _index++;
     return (() async* {
       yield text;

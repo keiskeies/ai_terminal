@@ -54,8 +54,10 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
 
   // 拖拽上传：drag 悬停高亮 + 路由覆盖判定（弹层/编辑页在上时不接拖放）
   bool _dragging = false;
+
   /// 文件行 hover 下标（设计稿 .sftp-row:hover 的行块高亮）
   int _hoveredFileIndex = -1;
+
   /// 头部操作按钮 hover 标识（设计稿 .sftp-act:hover）
   String? _hoveredHeaderAct;
   bool _routeCovered = false;
@@ -160,7 +162,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                   Expanded(
                     child: Text(
                       entry.name,
-                      style: const TextStyle(fontWeight: FontWeight.w500, fontSize: fSmall),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w500, fontSize: fSmall),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -169,29 +172,26 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
             ),
             const Divider(height: 1),
             if (entry.isDirectory)
-              _actionTile(
-                  context,
-                  Icons.folder_open,
-                  UiText.t('打开', 'Open'),
+              _actionTile(context, Icons.folder_open, UiText.t('打开', 'Open'),
                   () {
-                    Navigator.pop(ctx);
-                    _controller.navigateTo(entry.path);
-                  }),
+                Navigator.pop(ctx);
+                _controller.navigateTo(entry.path);
+              }),
             if (!entry.isDirectory)
-              _actionTile(context, Icons.download,
-                  UiText.t('下载到本地', 'Download'), () {
+              _actionTile(
+                  context, Icons.download, UiText.t('下载到本地', 'Download'), () {
                 Navigator.pop(ctx);
                 _downloadFile(entry);
               }),
             if (!entry.isDirectory)
-              _actionTile(context, Icons.visibility,
-                  UiText.t('预览内容', 'Preview'), () {
+              _actionTile(
+                  context, Icons.visibility, UiText.t('预览内容', 'Preview'), () {
                 Navigator.pop(ctx);
                 _editOrPreviewFile(entry, readOnly: true);
               }),
             if (!entry.isDirectory)
-              _actionTile(context, Icons.edit_outlined,
-                  UiText.t('编辑', 'Edit'), () {
+              _actionTile(context, Icons.edit_outlined, UiText.t('编辑', 'Edit'),
+                  () {
                 Navigator.pop(ctx);
                 _editOrPreviewFile(entry, readOnly: false);
               }),
@@ -218,7 +218,9 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
     );
   }
 
-  Widget _actionTile(BuildContext context, IconData icon, String label, VoidCallback onTap, {Color? color}) {
+  Widget _actionTile(
+      BuildContext context, IconData icon, String label, VoidCallback onTap,
+      {Color? color}) {
     final tc = ThemeColors.of(context);
     return ListTile(
       dense: true,
@@ -235,7 +237,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       if (mounted) {
         // 与 controller 内下载路径保持一致（系统临时目录）
         final localPath = '${Directory.systemTemp.path}/${entry.name}';
-        showTopSnackBar(context, 
+        showTopSnackBar(
+          context,
           SnackBar(
             content: Text(L10n.str.ut_e42173cc90(localPath)),
             duration: const Duration(seconds: 3),
@@ -245,7 +248,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       }
     } catch (e) {
       if (mounted) {
-        showTopSnackBar(context, 
+        showTopSnackBar(
+          context,
           SnackBar(
             content: Text(L10n.str.ut_7a77df19f2(e)),
             backgroundColor: tc.error,
@@ -257,7 +261,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
   }
 
   /// 预览或编辑远程文件
-  Future<void> _editOrPreviewFile(SftpEntry entry, {bool readOnly = false}) async {
+  Future<void> _editOrPreviewFile(SftpEntry entry,
+      {bool readOnly = false}) async {
     final tc = ThemeColors.of(context);
     // 先加载文件内容
     String? content;
@@ -265,8 +270,11 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       content = await _controller.readFile(entry.path);
     } catch (e) {
       if (mounted) {
-        showTopSnackBar(context, 
-          SnackBar(content: Text(L10n.str.ut_9c9db79438(e)), backgroundColor: tc.error),
+        showTopSnackBar(
+          context,
+          SnackBar(
+              content: Text(L10n.str.ut_9c9db79438(e)),
+              backgroundColor: tc.error),
         );
       }
       return;
@@ -284,7 +292,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
           builder: (ctx, setDialogState) {
             return AlertDialog(
               backgroundColor: DialogTheme.of(context).backgroundColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(rLarge)),
               titlePadding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
               contentPadding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
               actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
@@ -301,21 +310,26 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                   ),
                   if (readOnly)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: tc.textMuted.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(rXSmall),
                       ),
-                      child: Text(UiText.t('只读', 'Read-only'), style: TextStyle(fontSize: fMini, color: tc.textMuted)),
+                      child: Text(UiText.t('只读', 'Read-only'),
+                          style:
+                              TextStyle(fontSize: fMini, color: tc.textMuted)),
                     ),
                   if (!readOnly && hasModified)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
                         color: tc.warn.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(rXSmall),
                       ),
-                      child: Text(UiText.t('已修改', 'Modified'), style: TextStyle(fontSize: fMini, color: tc.warn)),
+                      child: Text(UiText.t('已修改', 'Modified'),
+                          style: TextStyle(fontSize: fMini, color: tc.warn)),
                     ),
                 ],
               ),
@@ -334,7 +348,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                     expands: true,
                     readOnly: readOnly,
                     style: TextStyle(
-                      fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                      fontFamily: 'JetBrainsMono',
+                      fontFamilyFallback: kMonoFontFallback,
                       fontSize: fMono,
                       color: tc.terminalGreen,
                     ),
@@ -343,7 +358,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                       contentPadding: EdgeInsets.zero,
                     ),
                     onChanged: (_) {
-                      if (!hasModified) setDialogState(() => hasModified = true);
+                      if (!hasModified)
+                        setDialogState(() => hasModified = true);
                     },
                   ),
                 ),
@@ -355,27 +371,34 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                 ),
                 if (!readOnly)
                   ElevatedButton(
-                    onPressed: hasModified ? () async {
-                      try {
-                        await _controller.writeFile(entry.path, controller.text);
-                        if (ctx.mounted) {
-                          Navigator.pop(ctx);
-                          showTopSnackBar(ctx, 
-                            SnackBar(
-                              content: Text(UiText.t('已保存', 'Saved')),
-                              duration: const Duration(seconds: 2),
-                              behavior: SnackBarBehavior.floating,
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        if (ctx.mounted) {
-                          showTopSnackBar(ctx, 
-                            SnackBar(content: Text(L10n.str.ut_5fe0b81932(e)), backgroundColor: tc.error),
-                          );
-                        }
-                      }
-                    } : null,
+                    onPressed: hasModified
+                        ? () async {
+                            try {
+                              await _controller.writeFile(
+                                  entry.path, controller.text);
+                              if (ctx.mounted) {
+                                Navigator.pop(ctx);
+                                showTopSnackBar(
+                                  ctx,
+                                  SnackBar(
+                                    content: Text(UiText.t('已保存', 'Saved')),
+                                    duration: const Duration(seconds: 2),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              if (ctx.mounted) {
+                                showTopSnackBar(
+                                  ctx,
+                                  SnackBar(
+                                      content: Text(L10n.str.ut_5fe0b81932(e)),
+                                      backgroundColor: tc.error),
+                                );
+                              }
+                            }
+                          }
+                        : null,
                     child: Text(UiText.t('保存', 'Save')),
                   ),
               ],
@@ -394,13 +417,16 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: DialogTheme.of(context).backgroundColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text(UiText.t('重命名', 'Rename'), style: const TextStyle(fontSize: fSmall)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+        title: Text(UiText.t('重命名', 'Rename'),
+            style: const TextStyle(fontSize: fSmall)),
         content: TextField(
           controller: controller,
           autofocus: true,
           style: const TextStyle(fontSize: fSmall),
-          decoration: InputDecoration(labelText: UiText.t('新名称', 'New name'), isDense: true),
+          decoration: InputDecoration(
+              labelText: UiText.t('新名称', 'New name'), isDense: true),
         ),
         actions: [
           TextButton(
@@ -420,7 +446,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         await _controller.renameEntry(entry, controller.text);
       } catch (e) {
         if (mounted) {
-          showTopSnackBar(context, 
+          showTopSnackBar(
+            context,
             SnackBar(
                 content: Text(L10n.str.ut_6f2c34a667(e)),
                 backgroundColor: tc.error),
@@ -436,9 +463,14 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: DialogTheme.of(context).backgroundColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text(UiText.t('确认删除', 'Confirm delete'), style: TextStyle(color: tc.error, fontSize: fSmall)),
-        content: Text(UiText.t('确定删除 "${entry.name}" 吗？此操作不可恢复。', 'Delete "${entry.name}"? This cannot be undone.'), style: const TextStyle(fontSize: fSmall)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+        title: Text(UiText.t('确认删除', 'Confirm delete'),
+            style: TextStyle(color: tc.error, fontSize: fSmall)),
+        content: Text(
+            UiText.t('确定删除 "${entry.name}" 吗？此操作不可恢复。',
+                'Delete "${entry.name}"? This cannot be undone.'),
+            style: const TextStyle(fontSize: fSmall)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
@@ -458,8 +490,11 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         await _controller.deleteEntry(entry);
       } catch (e) {
         if (mounted) {
-          showTopSnackBar(context, 
-            SnackBar(content: Text(L10n.str.ut_cf4419589b(e)), backgroundColor: tc.error),
+          showTopSnackBar(
+            context,
+            SnackBar(
+                content: Text(L10n.str.ut_cf4419589b(e)),
+                backgroundColor: tc.error),
           );
         }
       }
@@ -473,7 +508,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       result = await FilePicker.platform.pickFiles(allowMultiple: true);
     } catch (e) {
       if (mounted) {
-        showTopSnackBar(context, 
+        showTopSnackBar(
+          context,
           SnackBar(
             content: Text(L10n.str.ut_c3b890cd74(e)),
             backgroundColor: tc.error,
@@ -499,7 +535,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       try {
         await _controller.uploadFile(localPath, remotePath);
         if (mounted) {
-          showTopSnackBar(context, 
+          showTopSnackBar(
+            context,
             SnackBar(
               content: Text(L10n.str.ut_3f446bd9fe(fileName)),
               duration: const Duration(seconds: 2),
@@ -509,7 +546,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         }
       } catch (e) {
         if (mounted) {
-          showTopSnackBar(context, 
+          showTopSnackBar(
+            context,
             SnackBar(
               content: Text(L10n.str.ut_9e12df0a1f(fileName, e)),
               backgroundColor: tc.error,
@@ -532,13 +570,16 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: DialogTheme.of(context).backgroundColor,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text(UiText.t('新建目录', 'New folder'), style: const TextStyle(fontSize: fSmall)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+        title: Text(UiText.t('新建目录', 'New folder'),
+            style: const TextStyle(fontSize: fSmall)),
         content: TextField(
           controller: controller,
           autofocus: true,
           style: const TextStyle(fontSize: fSmall),
-          decoration: InputDecoration(labelText: UiText.t('目录名称', 'Folder name'), isDense: true),
+          decoration: InputDecoration(
+              labelText: UiText.t('目录名称', 'Folder name'), isDense: true),
         ),
         actions: [
           TextButton(
@@ -553,8 +594,11 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                 await _controller.createDirectory(controller.text);
               } catch (e) {
                 if (mounted) {
-                  showTopSnackBar(context, 
-                    SnackBar(content: Text(L10n.str.ut_e89a046c8b(e)), backgroundColor: tc.error),
+                  showTopSnackBar(
+                    context,
+                    SnackBar(
+                        content: Text(L10n.str.ut_e89a046c8b(e)),
+                        backgroundColor: tc.error),
                   );
                 }
               }
@@ -570,17 +614,50 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
     if (entry.isDirectory) return Icons.folder;
     final ext = p.extension(entry.name).toLowerCase();
     switch (ext) {
-      case '.txt': case '.md': case '.log': return Icons.description;
-      case '.py': case '.js': case '.ts': case '.dart': case '.java':
-      case '.go': case '.rs': case '.c': case '.cpp': case '.h':
-      case '.sh': case '.bash': case '.zsh': return Icons.code;
-      case '.json': case '.yaml': case '.yml': case '.xml': case '.toml':
-      case '.ini': case '.conf': case '.cfg': return Icons.settings;
-      case '.jpg': case '.jpeg': case '.png': case '.gif': case '.svg':
-      case '.webp': return Icons.image;
-      case '.zip': case '.tar': case '.gz': case '.bz2': case '.xz':
-      case '.7z': case '.rar': return Icons.archive;
-      default: return Icons.insert_drive_file;
+      case '.txt':
+      case '.md':
+      case '.log':
+        return Icons.description;
+      case '.py':
+      case '.js':
+      case '.ts':
+      case '.dart':
+      case '.java':
+      case '.go':
+      case '.rs':
+      case '.c':
+      case '.cpp':
+      case '.h':
+      case '.sh':
+      case '.bash':
+      case '.zsh':
+        return Icons.code;
+      case '.json':
+      case '.yaml':
+      case '.yml':
+      case '.xml':
+      case '.toml':
+      case '.ini':
+      case '.conf':
+      case '.cfg':
+        return Icons.settings;
+      case '.jpg':
+      case '.jpeg':
+      case '.png':
+      case '.gif':
+      case '.svg':
+      case '.webp':
+        return Icons.image;
+      case '.zip':
+      case '.tar':
+      case '.gz':
+      case '.bz2':
+      case '.xz':
+      case '.7z':
+      case '.rar':
+        return Icons.archive;
+      default:
+        return Icons.insert_drive_file;
     }
   }
 
@@ -623,15 +700,16 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                   color: tc.brand.withValues(alpha: 0.12),
                   alignment: Alignment.center,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: tc.card,
                       borderRadius: BorderRadius.circular(rSmall),
                       border: Border.all(color: tc.brand),
                     ),
                     child: Text(
-                      UiText.t('松开以上传到当前目录', 'Drop to upload to the current folder'),
+                      UiText.t(
+                          '松开以上传到当前目录', 'Drop to upload to the current folder'),
                       style: TextStyle(fontSize: fSmall, color: tc.brand),
                     ),
                   ),
@@ -679,7 +757,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       } catch (e) {
         failed++;
         if (mounted) {
-          showTopSnackBar(context,
+          showTopSnackBar(
+            context,
             SnackBar(
               content: Text(L10n.str.ut_6c61736431(name, e)),
               backgroundColor: tc.error,
@@ -691,11 +770,12 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
     }
     if (!mounted) return;
     if (uploaded > 0) {
-      showTopSnackBar(context,
+      showTopSnackBar(
+        context,
         SnackBar(
-          content: Text(
-              UiText.t('拖拽上传完成: $uploaded 项${failed > 0 ? '，失败 $failed 项' : ''}',
-                  'Drop upload complete: $uploaded item(s)${failed > 0 ? ', $failed failed' : ''}')),
+          content: Text(UiText.t(
+              '拖拽上传完成: $uploaded 项${failed > 0 ? '，失败 $failed 项' : ''}',
+              'Drop upload complete: $uploaded item(s)${failed > 0 ? ', $failed failed' : ''}')),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
         ),
@@ -741,7 +821,9 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
           const Spacer(),
           // 排序按钮
           PopupMenuButton<String>(
-            icon: Icon(Icons.sort, size: 16, color: _controller.isConnected ? tc.textSub : tc.textMuted),
+            icon: Icon(Icons.sort,
+                size: 16,
+                color: _controller.isConnected ? tc.textSub : tc.textMuted),
             tooltip: UiText.t('排序', 'Sort'),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
@@ -752,10 +834,16 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(UiText.t('名称', 'Name'), style: const TextStyle(fontSize: fSmall)),
+                    Text(UiText.t('名称', 'Name'),
+                        style: const TextStyle(fontSize: fSmall)),
                     if (_controller.sortBy == SftpSortFields.name) ...[
                       const SizedBox(width: 4),
-                      Icon(_controller.sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: tc.brand),
+                      Icon(
+                          _controller.sortAsc
+                              ? Icons.arrow_upward
+                              : Icons.arrow_downward,
+                          size: 12,
+                          color: tc.brand),
                     ],
                   ],
                 ),
@@ -765,10 +853,16 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(UiText.t('大小', 'Size'), style: const TextStyle(fontSize: fSmall)),
+                    Text(UiText.t('大小', 'Size'),
+                        style: const TextStyle(fontSize: fSmall)),
                     if (_controller.sortBy == SftpSortFields.size) ...[
                       const SizedBox(width: 4),
-                      Icon(_controller.sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: tc.brand),
+                      Icon(
+                          _controller.sortAsc
+                              ? Icons.arrow_upward
+                              : Icons.arrow_downward,
+                          size: 12,
+                          color: tc.brand),
                     ],
                   ],
                 ),
@@ -778,10 +872,16 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(UiText.t('修改时间', 'Modified'), style: const TextStyle(fontSize: fSmall)),
+                    Text(UiText.t('修改时间', 'Modified'),
+                        style: const TextStyle(fontSize: fSmall)),
                     if (_controller.sortBy == SftpSortFields.modified) ...[
                       const SizedBox(width: 4),
-                      Icon(_controller.sortAsc ? Icons.arrow_upward : Icons.arrow_downward, size: 12, color: tc.brand),
+                      Icon(
+                          _controller.sortAsc
+                              ? Icons.arrow_upward
+                              : Icons.arrow_downward,
+                          size: 12,
+                          color: tc.brand),
                     ],
                   ],
                 ),
@@ -798,13 +898,16 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
               id: 'mkdir',
               icon: Icons.create_new_folder_outlined,
               tooltip: UiText.t('新建目录', 'New folder'),
-              onPressed: _controller.isConnected ? _showCreateDirectoryDialog : null),
+              onPressed:
+                  _controller.isConnected ? _showCreateDirectoryDialog : null),
           const SizedBox(width: 4),
           _headerActButton(tc,
               id: 'refresh',
               icon: Icons.refresh,
               tooltip: UiText.t('刷新', 'Refresh'),
-              onPressed: _controller.isConnected ? () => _controller.loadDirectory(_controller.currentPath) : null),
+              onPressed: _controller.isConnected
+                  ? () => _controller.loadDirectory(_controller.currentPath)
+                  : null),
           if (widget.onClose != null) ...[
             const SizedBox(width: 4),
             _headerActButton(tc,
@@ -836,7 +939,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         onEnter: enabled ? (_) => setState(() => _hoveredHeaderAct = id) : null,
         onExit: enabled
             ? (_) {
-                if (_hoveredHeaderAct == id) setState(() => _hoveredHeaderAct = null);
+                if (_hoveredHeaderAct == id)
+                  setState(() => _hoveredHeaderAct = null);
               }
             : null,
         child: GestureDetector(
@@ -872,16 +976,19 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
         children: [
           // 返回按钮
           IconButton(
-            icon: Icon(Icons.arrow_back, size: 14, color: _controller.pathHistory.isNotEmpty ? tc.brand : tc.textMuted),
-            onPressed: _controller.pathHistory.isNotEmpty ? _controller.goBack : null,
+            icon: Icon(Icons.arrow_back,
+                size: 14,
+                color: _controller.pathHistory.isNotEmpty
+                    ? tc.brand
+                    : tc.textMuted),
+            onPressed:
+                _controller.pathHistory.isNotEmpty ? _controller.goBack : null,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 22, minHeight: 22),
           ),
           // 路径紧贴返回按钮
           Expanded(
-            child: _isPathEditing
-                ? _buildPathInput()
-                : _buildBreadcrumbPath(),
+            child: _isPathEditing ? _buildPathInput() : _buildBreadcrumbPath(),
           ),
           // 编辑路径按钮
           if (!_isPathEditing)
@@ -910,7 +1017,11 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
     return TextField(
       controller: _pathController,
       focusNode: _pathFocusNode,
-      style: TextStyle(fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback, fontSize: fMicro, color: tc.textMain),
+      style: TextStyle(
+          fontFamily: 'JetBrainsMono',
+          fontFamilyFallback: kMonoFontFallback,
+          fontSize: fMicro,
+          color: tc.textMain),
       decoration: InputDecoration(
         isDense: true,
         contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -930,7 +1041,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
   Widget _buildBreadcrumbPath() {
     // 路径格式：/home/user/docs → 面包屑: /home/user/docs（每段可点击）
     final tc = ThemeColors.of(context);
-    final parts = _controller.currentPath.split('/').where((s) => s.isNotEmpty).toList();
+    final parts =
+        _controller.currentPath.split('/').where((s) => s.isNotEmpty).toList();
     final widgets = <Widget>[];
 
     if (parts.isEmpty) {
@@ -943,10 +1055,17 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       for (int i = 0; i < parts.length; i++) {
         final accumulated = '/${parts.sublist(0, i + 1).join('/')}';
         final targetPath = accumulated;
-        widgets.add(_pathSegment(parts[i], () => _controller.navigateTo(targetPath)));
+        widgets.add(
+            _pathSegment(parts[i], () => _controller.navigateTo(targetPath)));
         // 非最后一段后面加斜杠分隔
         if (i < parts.length - 1) {
-          widgets.add(Text('/', style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback, height: 1.2)));
+          widgets.add(Text('/',
+              style: TextStyle(
+                  fontSize: fMicro,
+                  color: tc.textMuted,
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: kMonoFontFallback,
+                  height: 1.2)));
         }
       }
     }
@@ -988,11 +1107,13 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             SizedBox(
-              width: 20, height: 20,
+              width: 20,
+              height: 20,
               child: CircularProgressIndicator(strokeWidth: 2, color: tc.brand),
             ),
             const SizedBox(height: 8),
-            Text(UiText.t('正在连接...', 'Connecting...'), style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+            Text(UiText.t('正在连接...', 'Connecting...'),
+                style: TextStyle(color: tc.textSub, fontSize: fSmall)),
           ],
         ),
       );
@@ -1007,12 +1128,17 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
             children: [
               Icon(Icons.error_outline, size: 28, color: tc.error),
               const SizedBox(height: 8),
-              Text(_controller.error!, style: TextStyle(color: tc.error, fontSize: fMicro), textAlign: TextAlign.center),
+              Text(_controller.error!,
+                  style: TextStyle(color: tc.error, fontSize: fMicro),
+                  textAlign: TextAlign.center),
               const SizedBox(height: 12),
               ElevatedButton(
                 onPressed: _connect,
-                style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4)),
-                child: Text(UiText.t('重试', 'Retry'), style: const TextStyle(fontSize: fSmall)),
+                style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 4)),
+                child: Text(UiText.t('重试', 'Retry'),
+                    style: const TextStyle(fontSize: fSmall)),
               ),
             ],
           ),
@@ -1034,7 +1160,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
             children: [
               Icon(Icons.folder_open, size: 32, color: tc.textMuted),
               const SizedBox(height: 6),
-              Text(UiText.t('空目录', 'Empty folder'), style: TextStyle(color: tc.textMuted, fontSize: fMicro)),
+              Text(UiText.t('空目录', 'Empty folder'),
+                  style: TextStyle(color: tc.textMuted, fontSize: fMicro)),
             ],
           ),
         ),
@@ -1087,7 +1214,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
           ),
           child: Row(
             children: [
-              Icon(_getFileIcon(entry), size: 15, color: _getFileIconColor(context, entry)),
+              Icon(_getFileIcon(entry),
+                  size: 15, color: _getFileIconColor(context, entry)),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
@@ -1095,7 +1223,8 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                   style: TextStyle(
                     fontSize: fMicro,
                     color: tc.textBody,
-                    fontWeight: entry.isDirectory ? FontWeight.w500 : FontWeight.normal,
+                    fontWeight:
+                        entry.isDirectory ? FontWeight.w500 : FontWeight.normal,
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1106,7 +1235,11 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                 width: 58,
                 child: Text(
                   sizeStr,
-                  style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
+                  style: TextStyle(
+                      fontSize: fMicro,
+                      color: tc.textMuted,
+                      fontFamily: 'JetBrainsMono',
+                      fontFamilyFallback: kMonoFontFallback),
                   textAlign: TextAlign.right,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1117,7 +1250,11 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
                 width: 76,
                 child: Text(
                   timeStr,
-                  style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback),
+                  style: TextStyle(
+                      fontSize: fMicro,
+                      color: tc.textMuted,
+                      fontFamily: 'JetBrainsMono',
+                      fontFamilyFallback: kMonoFontFallback),
                   textAlign: TextAlign.right,
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -1163,8 +1300,12 @@ class _SftpPanelState extends ConsumerState<SftpPanel> with RouteAware {
       child: Row(
         children: [
           SizedBox(
-            width: 12, height: 12,
-            child: CircularProgressIndicator(strokeWidth: 1.5, color: tc.brand, value: _controller.transferProgress),
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+                strokeWidth: 1.5,
+                color: tc.brand,
+                value: _controller.transferProgress),
           ),
           const SizedBox(width: 6),
           Expanded(

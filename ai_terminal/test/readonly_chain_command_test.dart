@@ -245,8 +245,7 @@ void main() {
       expect(SafetyGuard.containsUnquotedOperator('a && b', '&&'), isTrue);
       expect(
           SafetyGuard.containsUnquotedOperator('echo "a && b"', '&&'), isFalse);
-      expect(
-          SafetyGuard.containsUnquotedOperator(r'a \&\& b', '&&'), isFalse);
+      expect(SafetyGuard.containsUnquotedOperator(r'a \&\& b', '&&'), isFalse);
     });
   });
 
@@ -351,8 +350,7 @@ void main() {
   });
 
   group('引擎 chain guard 拦截路径', () {
-    const finishTurn =
-        '思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n';
+    const finishTurn = '思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n';
 
     AgentEngine makeEngine(_MockAIProvider provider) => AgentEngine(
           aiProvider: provider,
@@ -367,6 +365,9 @@ void main() {
       provider.enqueueStream([
         '思考: 查看并清理\n动作: execute\n命令: cat a && rm b\n',
       ]);
+      provider.enqueueStream([finishTurn]);
+      // 拦截的命令没有真正执行：finish 幻觉门控会强制继续 2 次后才放行。
+      provider.enqueueStream([finishTurn]);
       provider.enqueueStream([finishTurn]);
 
       final engine = makeEngine(provider);

@@ -133,29 +133,27 @@ class _McpServerEditorFormState extends State<McpServerEditorForm> {
           (uri.scheme != 'http' && uri.scheme != 'https') ||
           uri.host.isEmpty) {
         setState(() => _error = UiText.t(
-            '服务器 URL 必须是 http(s) 地址',
-            'Server URL must be an http(s) address'));
+            '服务器 URL 必须是 http(s) 地址', 'Server URL must be an http(s) address'));
         return;
       }
     }
     final timeout = int.tryParse(_timeout.text.trim());
     if (timeout == null || timeout < 3000 || timeout > 120000) {
-      setState(() => _error = UiText.t(
-          '超时需在 3000-120000ms 之间',
+      setState(() => _error = UiText.t('超时需在 3000-120000ms 之间',
           'Timeout must be between 3000 and 120000 ms'));
       return;
     }
     final maxTools = int.tryParse(_maxTools.text.trim());
     if (maxTools == null || maxTools < 1 || maxTools > 40) {
-      setState(() => _error = UiText.t(
-          '工具上限需在 1-40 之间', 'Tool limit must be between 1 and 40'));
+      setState(() => _error =
+          UiText.t('工具上限需在 1-40 之间', 'Tool limit must be between 1 and 40'));
       return;
     }
     final proxyRaw = _proxy.text.trim();
     final proxy = _normalizeProxy(proxyRaw);
     if (proxyRaw.isNotEmpty && proxy == null) {
-      setState(() => _error = UiText.t('代理仅支持 http://host:port',
-          'Proxy only supports http://host:port'));
+      setState(() => _error = UiText.t(
+          '代理仅支持 http://host:port', 'Proxy only supports http://host:port'));
       return;
     }
 
@@ -257,8 +255,7 @@ class _McpServerEditorFormState extends State<McpServerEditorForm> {
       onBack: widget.onCancel,
       error: _error,
       actions: [
-        InlineButton(
-            label: UiText.t('取消', 'Cancel'), onTap: widget.onCancel),
+        InlineButton(label: UiText.t('取消', 'Cancel'), onTap: widget.onCancel),
         InlineButton(
           label: _enabled
               ? UiText.t('保存并连接', 'Save & connect')
@@ -274,8 +271,7 @@ class _McpServerEditorFormState extends State<McpServerEditorForm> {
           label: UiText.t('传输方式', 'Transport'),
           value: _transport,
           items: [
-            for (final t in McpTransportKind.values)
-              (t, _transportLabel(t)),
+            for (final t in McpTransportKind.values) (t, _transportLabel(t)),
           ],
           onChanged: (v) => setState(() => _transport = v),
         ),
@@ -303,8 +299,8 @@ class _McpServerEditorFormState extends State<McpServerEditorForm> {
           ),
           const SizedBox(height: 10),
           InlineField(
-            label: UiText.t('环境变量（每行 KEY=VALUE）',
-                'Environment (KEY=VALUE per line)'),
+            label: UiText.t(
+                '环境变量（每行 KEY=VALUE）', 'Environment (KEY=VALUE per line)'),
             controller: _env,
             mono: true,
             maxLines: 3,
@@ -316,7 +312,8 @@ class _McpServerEditorFormState extends State<McpServerEditorForm> {
               'Node.js is required. filesystem takes allowed folders (multiple allowed); '
                   'context7 works without a key.',
             ),
-            style: TextStyle(fontSize: fMicro, color: tc.textMuted, height: 1.4),
+            style:
+                TextStyle(fontSize: fMicro, color: tc.textMuted, height: 1.4),
           ),
         ] else ...[
           InlineField(
@@ -351,8 +348,7 @@ class _McpServerEditorFormState extends State<McpServerEditorForm> {
             const SizedBox(width: 8),
             Expanded(
               child: InlineField(
-                  label: UiText.t('工具上限', 'Tool limit'),
-                  controller: _maxTools),
+                  label: UiText.t('工具上限', 'Tool limit'), controller: _maxTools),
             ),
           ],
         ),
@@ -361,11 +357,15 @@ class _McpServerEditorFormState extends State<McpServerEditorForm> {
           label: UiText.t('Agent 可用工具', 'Tools available to the Agent'),
           value: _exposure,
           items: [
-            (McpToolExposure.readOnly,
-                UiText.t('只读工具（推荐）', 'Read-only tools (recommended)')),
+            (
+              McpToolExposure.readOnly,
+              UiText.t('只读工具（推荐）', 'Read-only tools (recommended)')
+            ),
             (McpToolExposure.all, UiText.t('全部工具', 'All tools')),
-            (McpToolExposure.custom,
-                UiText.t('自定义（连接后勾选）', 'Custom (pick after connect)')),
+            (
+              McpToolExposure.custom,
+              UiText.t('自定义（连接后勾选）', 'Custom (pick after connect)')
+            ),
           ],
           onChanged: (v) => setState(() => _exposure = v),
         ),

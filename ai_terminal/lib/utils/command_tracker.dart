@@ -40,8 +40,7 @@ class CommandTracker {
 
   /// `[sudo]` 前缀在所有 locale 下保留（`[sudo] cjm 的密码：`），且必须卡在
   /// 缓冲尾部 —— 正文里的 `[sudo]` 不算（R8：不用裸子串判定）。
-  static final RegExp _sudoPromptAtEnd =
-      RegExp(r'\[sudo\][^\r\n]*[:：][ \t]*$');
+  static final RegExp _sudoPromptAtEnd = RegExp(r'\[sudo\][^\r\n]*[:：][ \t]*$');
 
   /// ssh / mysql / keychain 之类提示，含中英文。同样只看尾部。
   static final RegExp _secretPromptAtEnd = RegExp(

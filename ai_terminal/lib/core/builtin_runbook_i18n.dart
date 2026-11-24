@@ -53,23 +53,34 @@ class BuiltinRunbookI18n {
   };
 
   static const Map<String, String> _descriptions = {
-    'builtin_health_check': 'Parameterized host inspection: quick reports anomalies only, full adds baseline drift and capacity advice',
-    'builtin_stack_inspection': 'Auto-detect installed components (DB/Redis/Docker/K8s), inspect only what exists, report by severity',
-    'builtin_service_down': 'Evidence-first outage response: branch to root cause, recover with rollback, clear escalation boundary',
-    'builtin_cpu_spike': 'Branch on us/sy/wa to locate the high-CPU root cause, remediate with rollback',
-    'builtin_mem_leak': 'Two entry points: already OOM-killed (after) or memory keeps growing (before), then branch',
-    'builtin_disk_check': 'Decide space-full vs I/O bottleneck first, two remediation branches; cleanup only for regenerable data',
-    'builtin_slow_query': 'Evidence to plan to classification to verifiable optimization advice; never change production indexes directly',
-    'builtin_app_deploy': 'Rollback-safe release: pre-check, pinned version, health gate, auto-rollback on failure',
-    'builtin_config_push': 'Backup, validate, graceful apply, verify, one-step rollback',
-    'builtin_db_backup': 'Consistent backup plus isolated restore drill; a backup is usable only if the restore passes',
-    'builtin_security_audit': 'Read-only audit of SSH/accounts/permissions/firewall/patches/persistence; graded report, no auto-hardening',
-    'builtin_intrusion_detect': 'Forensics and minimal containment on suspected intrusion; preserve evidence, avoid tipping off the attacker',
+    'builtin_health_check':
+        'Parameterized host inspection: quick reports anomalies only, full adds baseline drift and capacity advice',
+    'builtin_stack_inspection':
+        'Auto-detect installed components (DB/Redis/Docker/K8s), inspect only what exists, report by severity',
+    'builtin_service_down':
+        'Evidence-first outage response: branch to root cause, recover with rollback, clear escalation boundary',
+    'builtin_cpu_spike':
+        'Branch on us/sy/wa to locate the high-CPU root cause, remediate with rollback',
+    'builtin_mem_leak':
+        'Two entry points: already OOM-killed (after) or memory keeps growing (before), then branch',
+    'builtin_disk_check':
+        'Decide space-full vs I/O bottleneck first, two remediation branches; cleanup only for regenerable data',
+    'builtin_slow_query':
+        'Evidence to plan to classification to verifiable optimization advice; never change production indexes directly',
+    'builtin_app_deploy':
+        'Rollback-safe release: pre-check, pinned version, health gate, auto-rollback on failure',
+    'builtin_config_push':
+        'Backup, validate, graceful apply, verify, one-step rollback',
+    'builtin_db_backup':
+        'Consistent backup plus isolated restore drill; a backup is usable only if the restore passes',
+    'builtin_security_audit':
+        'Read-only audit of SSH/accounts/permissions/firewall/patches/persistence; graded report, no auto-hardening',
+    'builtin_intrusion_detect':
+        'Forensics and minimal containment on suspected intrusion; preserve evidence, avoid tipping off the attacker',
   };
 
   static const Map<String, String> _agentContent = {
-    'builtin_health_check':
-        'Host inspection (read-only). Default quick: report anomalies and risks only; when I ask for full, add baseline drift and capacity advice.\n'
+    'builtin_health_check': 'Host inspection (read-only). Default quick: report anomalies and risks only; when I ask for full, add baseline drift and capacity advice.\n'
         '[Hard constraints]\n'
         '- Read-only throughout: no install, no modify, no restart, no cleanup; report findings as advice only, remediation goes in a separate runbook.\n'
         '- Every conclusion must cite evidence (command output snippets); never conclude from impression.\n'
@@ -89,8 +100,7 @@ class BuiltinRunbookI18n {
         '[Output]\n'
         'List anomalies by critical/warning/info, each with evidence and advice; if none, state explicitly "no anomalies found".\n'
         'full also appends a baseline table and a capacity conclusion.',
-    'builtin_stack_inspection':
-        'Stack inspection (read-only). First detect which components exist on this host, inspect only those; explicitly skip what is not installed, do not error.\n'
+    'builtin_stack_inspection': 'Stack inspection (read-only). First detect which components exist on this host, inspect only those; explicitly skip what is not installed, do not error.\n'
         '[Hard constraints] Read-only; no restart, no cleanup, no config change; cleanup and tuning go in a separate runbook.\n'
         '[Detect] command -v mysql psql redis-cli docker kubectl; matching systemctl units; for containerized components check docker ps.\n'
         '[MySQL/PostgreSQL (if present)]\n'
@@ -108,8 +118,7 @@ class BuiltinRunbookI18n {
         '- Node status and resource pressure; Pods not Running/Ready\n'
         '- Deployment rollout status; last 20 Warning events\n'
         '[Output] One section per component, each graded critical/warning/info with evidence and advice; explicitly skip components that are not installed.',
-    'builtin_service_down':
-        'Service outage response. Goal: restore service in the shortest time while preserving traceable root-cause evidence.\n'
+    'builtin_service_down': 'Service outage response. Goal: restore service in the shortest time while preserving traceable root-cause evidence.\n'
         '[Hard constraints]\n'
         '- Evidence first, remediation second. Before any restart/kill/config change, complete the Phase 1 scene snapshot.\n'
         '- One change action at a time, verify immediately after; if ineffective, roll back that action before trying the next hypothesis.\n'
@@ -145,8 +154,7 @@ class BuiltinRunbookI18n {
         '[Output]\n'
         'Root cause + evidence chain (which log/metric supports it), actions taken and rollback points, current recovery state,\n'
         'residual risk and long-term fix advice; if not recovered, give the 1-2 hypotheses most worth verifying next.',
-    'builtin_cpu_spike':
-        'High CPU investigation. Goal: locate the root cause and give remediation advice; evidence first, remediation second.\n'
+    'builtin_cpu_spike': 'High CPU investigation. Goal: locate the root cause and give remediation advice; evidence first, remediation second.\n'
         '[Hard constraints] Snapshot before remediation; one change action at a time and verify; confirm with me before kill/throttle/restart;\n'
         'do not kill business processes directly just to lower CPU.\n'
         '[Phase 1 snapshot] uptime; top -bn1 | head -20 (read us/sy/wa); mpstat -P ALL 1 3 (if available);\n'
@@ -163,8 +171,7 @@ class BuiltinRunbookI18n {
         'Record a rollback point each step and verify CPU falls; if ineffective, roll back and switch branch.\n'
         '[Escalation] Two rounds without locating it; need to kill business processes / change kernel parameters; evidence points to intrusion (unusual outbound + high CPU).\n'
         '[Output] Root cause + evidence chain (which thread/stack/metric), actions taken and rollback points, current CPU, long-term fix advice.',
-    'builtin_mem_leak':
-        'Memory and OOM investigation. Two entry points: already OOM-killed (after) or memory keeps growing (before); decide the entry first, then branch.\n'
+    'builtin_mem_leak': 'Memory and OOM investigation. Two entry points: already OOM-killed (after) or memory keeps growing (before); decide the entry first, then branch.\n'
         '[Hard constraints] Evidence first, remediation second; do not kill business processes or drop_caches just to free memory and mask the problem;\n'
         'confirm before changing limits / restarting.\n'
         '[Phase 1 snapshot] free -h; ps aux --sort=-%mem | head -10;\n'
@@ -184,8 +191,7 @@ class BuiltinRunbookI18n {
         'Verify the rss curve stops rising each step.\n'
         '[Escalation] Need to kill business / change kernel vm parameters; evidence points to a kernel Slab leak; two rounds without locating it.\n'
         '[Output] Entry (A/B) + root cause + evidence chain, killed/growing process, actions taken and rollback points, long-term fix advice.',
-    'builtin_disk_check':
-        'Disk problem investigation. Decide first whether it is "space full" or "I/O bottleneck"; the two remediations are completely different, do not mix them.\n'
+    'builtin_disk_check': 'Disk problem investigation. Decide first whether it is "space full" or "I/O bottleneck"; the two remediations are completely different, do not mix them.\n'
         '[Hard constraints] Evidence first, remediation second; before deleting any file you must confirm with me and only regenerable data (logs/temp/cache) is allowed;\n'
         'never delete business data / database files; confirm before changing I/O tuning parameters.\n'
         '[Phase 1 snapshot] df -h, df -i; iostat -x 1 3 (if available);\n'
@@ -206,8 +212,7 @@ class BuiltinRunbookI18n {
         'verify usage drops or await falls; if ineffective, roll back and switch branch.\n'
         '[Escalation] Need to delete business data; dmesg has hardware I/O errors / filesystem corruption; two rounds without relief.\n'
         '[Output] Entry (S/I) + root cause + evidence, top consumers / I/O processes, actions taken and rollback points, long-term advice (rotation / scale-out / archiving).',
-    'builtin_slow_query':
-        'Slow query investigation. Goal: find the queries most worth optimizing and give a verifiable optimization plan; never change production indexes directly.\n'
+    'builtin_slow_query': 'Slow query investigation. Goal: find the queries most worth optimizing and give a verifiable optimization plan; never change production indexes directly.\n'
         '[Hard constraints] Read-only evidence gathering; use read-only EXPLAIN; before adding indexes / changing SQL / changing parameters you must confirm with me and run off-peak;\n'
         'do not run full-table-scan analysis on a business database.\n'
         '[Phase 1 evidence] Confirm the engine (MySQL/PG); slow log toggle and threshold;\n'
@@ -220,8 +225,7 @@ class BuiltinRunbookI18n {
         'after confirmation run off-peak, and verify by comparing time / rows scanned for the same query before and after; if ineffective roll back (drop the new index / restore the SQL).\n'
         '[Escalation] Need to change production schema with no off-peak window; evidence points to frequent locks/deadlocks; statistics / hardware level problems.\n'
         '[Output] Top slow query list (time / count / plan summary), root-cause classification, verified optimizations and gains, unexecuted advice and risks.',
-    'builtin_app_deploy':
-        'Application release. Goal: complete a rollback-safe release; it counts as success only when the health gate passes.\n'
+    'builtin_app_deploy': 'Application release. Goal: complete a rollback-safe release; it counts as success only when the health gate passes.\n'
         '[Hard constraints] Before release you must confirm the target version/artifact and the rollback version; any step failing triggers immediate rollback, never "ship while sick";\n'
         'confirm before switching production traffic.\n'
         '[Phase 0 pre-check] Current version and running state; enough disk/memory headroom to build/pull; dependency services reachable;\n'
@@ -232,8 +236,7 @@ class BuiltinRunbookI18n {
         '[Phase 3 rollback] On failure -> restore the previous artifact/config pointer -> restart -> re-run the health gate;\n'
         'still failing after rollback -> stop auto-remediation and escalate to human.\n'
         '[Output] Released version / rollback point, each health gate result, whether rolled back and why, residual risk. Even on success provide a rollback command for standby.',
-    'builtin_config_push':
-        'Config/certificate change. Goal: apply one change with backup and validation, with one-step rollback on failure.\n'
+    'builtin_config_push': 'Config/certificate change. Goal: apply one change with backup and validation, with one-step rollback on failure.\n'
         '[Hard constraints] Back up before modifying; reload only after syntax/chain validation passes; use graceful reload rather than restart (if supported);\n'
         'confirm before overwriting production config.\n'
         '[Phase 0] Confirm the change target (file path / domain) and intended content; back up the current file/certificate to a timestamped copy (record the rollback point).\n'
@@ -242,8 +245,7 @@ class BuiltinRunbookI18n {
         '[Phase 2 apply] Write the new config/certificate -> reload -> verify: service active + health URL + certificate s_client chain/expiry + spot-check the applied config items.\n'
         '[Phase 3 rollback] Verification fails -> restore the backup -> reload -> re-verify; still failing -> escalate to human.\n'
         '[Output] Change summary, backup/rollback point, validation and verification results, new certificate expiry date, whether rolled back.',
-    'builtin_db_backup':
-        'Database backup and restore drill. A backup file existing does not mean the backup is usable; it is complete only when the restore drill passes.\n'
+    'builtin_db_backup': 'Database backup and restore drill. A backup file existing does not mean the backup is usable; it is complete only when the restore drill passes.\n'
         '[Hard constraints] Use a consistent backup method (mysqldump --single-transaction / pg_dump / xtrabackup if applicable);\n'
         'the restore drill must run on an isolated instance / temporary directory, never overwrite the production database; confirm before deleting old backups.\n'
         '[Phase 1 backup] Confirm engine / data size / target path and free space; run a consistent backup; record checksum + size + duration.\n'
@@ -252,8 +254,7 @@ class BuiltinRunbookI18n {
         '[Phase 3 retention] Find gaps against the expected schedule; list expirable old backups (list only, do not delete); give retention / off-site advice.\n'
         '[Escalation] Restore drill fails (backup unusable) -> alert immediately and stop overwriting subsequent backups; insufficient space; need to touch the production database.\n'
         '[Output] Backup path/size/checksum, restore drill result and duration, schedule gaps, retention advice. State an explicit "backup usable / unusable" conclusion.',
-    'builtin_security_audit':
-        'Security baseline audit (read-only). Covers SSH/accounts/permissions/firewall/patches/persistence, produces a graded report, no auto-hardening.\n'
+    'builtin_security_audit': 'Security baseline audit (read-only). Covers SSH/accounts/permissions/firewall/patches/persistence, produces a graded report, no auto-hardening.\n'
         '[Hard constraints] Read-only throughout; do not print password hashes / private key contents; do not change any config/rule/account; hardening advice is executed separately after confirmation.\n'
         '[Checks]\n'
         '- SSH: root login / password login / port / AllowUsers; unexpected new authorized_keys\n'
@@ -265,8 +266,7 @@ class BuiltinRunbookI18n {
         '- Logins: lastb brute-force sources / unusual sources and times of successful logins\n'
         '[Output] Grade by critical/warning/info, each with evidence and hardening advice (include commands but do not execute); give an overall risk conclusion.\n'
         'State explicitly that nothing was modified.',
-    'builtin_intrusion_detect':
-        'Intrusion response. Forensics and containment on suspected intrusion; preserve evidence first, avoid tipping off the attacker.\n'
+    'builtin_intrusion_detect': 'Intrusion response. Forensics and containment on suspected intrusion; preserve evidence first, avoid tipping off the attacker.\n'
         '[Hard constraints] Evidence first, containment second; do not restart/clean/antivirus (it destroys evidence and may trigger attacker self-destruct);\n'
         'you must confirm with me before isolating the network / blocking IPs / changing credentials; do not print plaintext credentials.\n'
         '[Phase 1 forensic snapshot] (read-only, archive)\n'

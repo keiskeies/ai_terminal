@@ -6,7 +6,8 @@ import 'package:ai_terminal/core/terminal_keybindings.dart';
 Set<KeyBinding> _b(Iterable<String> raw) =>
     {for (final s in raw) parseKeyBinding(s)!};
 
-void main() {  group('parseKeyBinding', () {
+void main() {
+  group('parseKeyBinding', () {
     test('字母要写全名，也接受裸字母', () {
       expect(parseKeyBinding('ctrl+keyF')!.keyName, 'keyF');
       expect(parseKeyBinding('ctrl+f')!.keyName, 'keyF');
@@ -62,7 +63,8 @@ void main() {  group('parseKeyBinding', () {
 
     test('既有习惯一个都不能丢（回归基线）', () {
       final map = TerminalKeymap.fromSettings(null);
-      Set<KeyBinding> bindings(TerminalKeyAction a) => map.bindingsFor(a).toSet();
+      Set<KeyBinding> bindings(TerminalKeyAction a) =>
+          map.bindingsFor(a).toSet();
       expect(bindings(TerminalKeyAction.paste),
           containsAll(_b(<String>{'ctrl+v', 'meta+v'})));
       expect(bindings(TerminalKeyAction.search),
@@ -72,14 +74,20 @@ void main() {  group('parseKeyBinding', () {
       expect(
           bindings(TerminalKeyAction.zoomIn),
           containsAll(_b(<String>{
-            'ctrl+equal', 'ctrl+add', 'ctrl+numpadAdd',
-            'meta+equal', 'meta+add', 'meta+numpadAdd'
+            'ctrl+equal',
+            'ctrl+add',
+            'ctrl+numpadAdd',
+            'meta+equal',
+            'meta+add',
+            'meta+numpadAdd'
           })));
       expect(
           bindings(TerminalKeyAction.zoomOut),
           containsAll(_b(<String>{
-            'ctrl+minus', 'ctrl+numpadSubtract',
-            'meta+minus', 'meta+numpadSubtract'
+            'ctrl+minus',
+            'ctrl+numpadSubtract',
+            'meta+minus',
+            'meta+numpadSubtract'
           })));
       expect(bindings(TerminalKeyAction.zoomReset),
           containsAll(_b(<String>{'ctrl+digit0', 'ctrl+numpad0'})));
@@ -167,22 +175,20 @@ void main() {  group('parseKeyBinding', () {
             bool alt = false,
             bool meta = false}) =>
         map.actionFor(
-            keyId: key.keyId,
-            ctrl: ctrl,
-            shift: shift,
-            alt: alt,
-            meta: meta);
+            keyId: key.keyId, ctrl: ctrl, shift: shift, alt: alt, meta: meta);
 
     test('命中默认组合', () {
       expect(hit(LogicalKeyboardKey.keyF, ctrl: true, shift: true),
           TerminalKeyAction.search);
-      expect(hit(LogicalKeyboardKey.keyF, meta: true), TerminalKeyAction.search);
+      expect(
+          hit(LogicalKeyboardKey.keyF, meta: true), TerminalKeyAction.search);
       expect(hit(LogicalKeyboardKey.keyV, ctrl: true), TerminalKeyAction.paste);
-      expect(hit(LogicalKeyboardKey.equal, ctrl: true), TerminalKeyAction.zoomIn);
+      expect(
+          hit(LogicalKeyboardKey.equal, ctrl: true), TerminalKeyAction.zoomIn);
       expect(hit(LogicalKeyboardKey.numpadAdd, ctrl: true),
           TerminalKeyAction.zoomIn);
-      expect(hit(LogicalKeyboardKey.minus, meta: true),
-          TerminalKeyAction.zoomOut);
+      expect(
+          hit(LogicalKeyboardKey.minus, meta: true), TerminalKeyAction.zoomOut);
       expect(hit(LogicalKeyboardKey.digit0, ctrl: true),
           TerminalKeyAction.zoomReset);
     });
@@ -217,7 +223,8 @@ void main() {  group('parseKeyBinding', () {
         LogicalKeyboardKey.keyU, // readline 删到行首
         LogicalKeyboardKey.keyZ, // 挂起
       ]) {
-        expect(hit(key, ctrl: true), isNull, reason: 'Ctrl+${key.keyLabel} 被抢了');
+        expect(hit(key, ctrl: true), isNull,
+            reason: 'Ctrl+${key.keyLabel} 被抢了');
       }
     });
 
@@ -277,8 +284,8 @@ void main() {  group('parseKeyBinding', () {
       // Ctrl+Alt+字母 发的是 ESC 前缀，不是控制字节，就不打扰
       expect(validateKeyBinding(b('ctrl+shift+j'), isMac: false),
           BindingVerdict.shadowShellControlKey);
-      expect(validateKeyBinding(b('ctrl+alt+j'), isMac: false),
-          BindingVerdict.ok);
+      expect(
+          validateKeyBinding(b('ctrl+alt+j'), isMac: false), BindingVerdict.ok);
     });
 
     test('Ctrl+Shift+C（复制）与裸 ⌘W 之类系统键被硬拦', () {
@@ -300,8 +307,7 @@ void main() {  group('parseKeyBinding', () {
       for (final isMac in [false, true]) {
         for (final entry in kDefaultTerminalKeybindings.entries) {
           for (final binding in entry.value) {
-            final verdict =
-                validateKeyBinding(binding, isMac: isMac);
+            final verdict = validateKeyBinding(binding, isMac: isMac);
             expect(verdict.isBlocking, isFalse,
                 reason:
                     '${entry.key.id} 的默认值 ${binding.serialized} 在 isMac=$isMac 下被判为 ${verdict.name}');
@@ -346,19 +352,27 @@ void main() {  group('parseKeyBinding', () {
         'search': ['ctrl+alt+keyG']
       });
       expect(normalizeOverrides('not json'), isEmpty);
-      expect(normalizeOverrides({'nope': ['ctrl+alt+j']}), isEmpty);
+      expect(
+          normalizeOverrides({
+            'nope': ['ctrl+alt+j']
+          }),
+          isEmpty);
       expect(normalizeOverrides({'search': 'not-a-list'}), isEmpty);
-      expect(normalizeOverrides({'search': ['garbage', 'ctrl+alt+g']}).values.single,
+      expect(
+          normalizeOverrides({
+            'search': ['garbage', 'ctrl+alt+g']
+          }).values.single,
           ['ctrl+alt+keyG']);
     });
 
     test('在默认表上加一条：默认那几条都留着', () {
-      final next =
-          addBinding(const {}, search, parseKeyBinding('ctrl+alt+g')!);
+      final next = addBinding(const {}, search, parseKeyBinding('ctrl+alt+g')!);
       final effective = effectiveBindingStrings(next, search);
       expect(effective, contains('ctrl+alt+keyG'));
-      expect(effective, containsAll(
-          kDefaultTerminalKeybindings[search]!.map((b) => b.serialized)));
+      expect(
+          effective,
+          containsAll(
+              kDefaultTerminalKeybindings[search]!.map((b) => b.serialized)));
     });
 
     test('原位替换一条不动其它组合', () {
@@ -368,14 +382,13 @@ void main() {  group('parseKeyBinding', () {
       final effective = effectiveBindingStrings(next, search);
       expect(effective, isNot(contains(old.serialized)));
       // mac 的 ⌘F 是另一条默认，不该被牵连
-      expect(
-          effective,
-          contains(
-              kDefaultTerminalKeybindings[search]!.last.serialized));
+      expect(effective,
+          contains(kDefaultTerminalKeybindings[search]!.last.serialized));
     });
 
     test('删到与默认一致时把覆盖整条撤掉（不留无意义覆盖）', () {
-      final added = addBinding(const {}, search, parseKeyBinding('ctrl+alt+g')!);
+      final added =
+          addBinding(const {}, search, parseKeyBinding('ctrl+alt+g')!);
       final back = removeBinding(added, search, parseKeyBinding('ctrl+alt+g')!);
       expect(back.containsKey('search'), isFalse);
       expect(effectiveBindingStrings(back, search),
@@ -388,27 +401,34 @@ void main() {  group('parseKeyBinding', () {
         overrides = removeBinding(overrides, search, b);
       }
       expect(overrides['search'], isEmpty);
-      expect(TerminalKeymap.fromSettings(overrides).bindingsFor(search), isEmpty);
+      expect(
+          TerminalKeymap.fromSettings(overrides).bindingsFor(search), isEmpty);
     });
 
     test('恢复默认清掉覆盖', () {
-      final added = addBinding(const {}, search, parseKeyBinding('ctrl+alt+g')!);
+      final added =
+          addBinding(const {}, search, parseKeyBinding('ctrl+alt+g')!);
       expect(resetAction(added, search), isEmpty);
     });
 
     test('改一个动作不碰别人的覆盖', () {
       final history = addBinding(const {}, TerminalKeyAction.commandHistory,
           parseKeyBinding('alt+f9')!);
-      final withSearch = addBinding(history, search, parseKeyBinding('alt+f8')!);
+      final withSearch =
+          addBinding(history, search, parseKeyBinding('alt+f8')!);
       expect(withSearch.keys.toSet(), {'commandHistory', 'search'});
       expect(withSearch['commandHistory'], history['commandHistory']);
     });
 
     test('写入函数不改入参（UI 直接拿返回值 setState）', () {
-      const original = {'search': ['ctrl+alt+keyG']};
+      const original = {
+        'search': ['ctrl+alt+keyG']
+      };
       removeBinding(original, search, parseKeyBinding('ctrl+alt+g')!);
       addBinding(original, search, parseKeyBinding('alt+f7')!);
-      expect(original, {'search': ['ctrl+alt+keyG']});
+      expect(original, {
+        'search': ['ctrl+alt+keyG']
+      });
     });
   });
 
@@ -425,8 +445,10 @@ void main() {  group('parseKeyBinding', () {
     test('字母 26 个、数字 10 个、功能键 12 个', () {
       expect(kBindableKeys.where((k) => k.name.startsWith('key')).length, 26);
       expect(kBindableKeys.where((k) => k.name.startsWith('digit')).length, 10);
-      expect(kBindableKeys.where((k) => k.name.startsWith('numpad')).length, 12);
-      expect(kBindableKeys.where((k) => RegExp(r'^f\d+$').hasMatch(k.name)).length,
+      expect(
+          kBindableKeys.where((k) => k.name.startsWith('numpad')).length, 12);
+      expect(
+          kBindableKeys.where((k) => RegExp(r'^f\d+$').hasMatch(k.name)).length,
           12);
     });
   });

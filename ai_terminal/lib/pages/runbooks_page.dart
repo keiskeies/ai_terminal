@@ -17,8 +17,21 @@ const _uuid = Uuid();
 
 // 常用 emoji 图标列表
 const List<String> _kEmojiIcons = [
-  '🩺', '🛡️', '💾', '🌐', '⚙️', '🔐', '🚀', '📦',
-  '🔧', '📋', '🔥', '⚠️', '✅', '🔍', '📈',
+  '🩺',
+  '🛡️',
+  '💾',
+  '🌐',
+  '⚙️',
+  '🔐',
+  '🚀',
+  '📦',
+  '🔧',
+  '📋',
+  '🔥',
+  '⚠️',
+  '✅',
+  '🔍',
+  '📈',
 ];
 
 // 分类顺序
@@ -169,7 +182,8 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
               children: [
                 _buildFilterChip(null, l10n.runbookFilterAll),
                 ..._kCategoryOrder.map(
-                  (cat) => _buildFilterChip(cat, _runbookCategoryLabel(cat, l10n)),
+                  (cat) =>
+                      _buildFilterChip(cat, _runbookCategoryLabel(cat, l10n)),
                 ),
               ],
             ),
@@ -541,103 +555,107 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
       builder: (context) {
         final tc = ThemeColors.of(context);
         return AlertDialog(
-        title: Text(l10n.terminalFillVariables(rb.name)),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (rb.description != null && rb.description!.isNotEmpty) ...[
-                Text(
-                  rb.description!,
-                  style: TextStyle(color: tc.textSub, fontSize: fSmall),
-                ),
-                const SizedBox(height: pCompact),
-              ],
-              // 原始命令预览
-              Text(l10n.terminalCommandTemplate, style: TextStyle(color: tc.textSub, fontSize: fSmall)),
-              const SizedBox(height: 4),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(pSmall),
-                decoration: BoxDecoration(
-                  color: tc.terminalBg,
-                  borderRadius: BorderRadius.circular(rSmall),
-                  border: Border.all(color: tc.border),
-                ),
-                child: SelectableText(
-                  rb.content,
-                  style: TextStyle(
-                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
-                    fontSize: fMono,
-                    color: tc.terminalGreen,
+          title: Text(l10n.terminalFillVariables(rb.name)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (rb.description != null && rb.description!.isNotEmpty) ...[
+                  Text(
+                    rb.description!,
+                    style: TextStyle(color: tc.textSub, fontSize: fSmall),
+                  ),
+                  const SizedBox(height: pCompact),
+                ],
+                // 原始命令预览
+                Text(l10n.terminalCommandTemplate,
+                    style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+                const SizedBox(height: 4),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(pSmall),
+                  decoration: BoxDecoration(
+                    color: tc.terminalBg,
+                    borderRadius: BorderRadius.circular(rSmall),
+                    border: Border.all(color: tc.border),
+                  ),
+                  child: SelectableText(
+                    rb.content,
+                    style: TextStyle(
+                      fontFamily: 'JetBrainsMono',
+                      fontFamilyFallback: kMonoFontFallback,
+                      fontSize: fMono,
+                      color: tc.terminalGreen,
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: pCompact),
-              // 变量输入框
-              ...variables.map(
-                (v) => Padding(
-                  padding: const EdgeInsets.only(bottom: pSmall),
-                  child: TextField(
-                    controller: controllers[v],
-                    style: TextStyle(color: tc.textMain, fontSize: fBody),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      labelText: '{{$v}}',
-                      labelStyle: TextStyle(
-                        color: tc.textSub,
-                        fontSize: fSmall,
-                        fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
-                      ),
-                      filled: true,
-                      fillColor: tc.cardElevated,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: pCompact,
-                        vertical: pSmall,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(rInput),
-                        borderSide: BorderSide(color: tc.border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(rInput),
-                        borderSide: BorderSide(color: tc.brand),
+                const SizedBox(height: pCompact),
+                // 变量输入框
+                ...variables.map(
+                  (v) => Padding(
+                    padding: const EdgeInsets.only(bottom: pSmall),
+                    child: TextField(
+                      controller: controllers[v],
+                      style: TextStyle(color: tc.textMain, fontSize: fBody),
+                      decoration: InputDecoration(
+                        isDense: true,
+                        labelText: '{{$v}}',
+                        labelStyle: TextStyle(
+                          color: tc.textSub,
+                          fontSize: fSmall,
+                          fontFamily: 'JetBrainsMono',
+                          fontFamilyFallback: kMonoFontFallback,
+                        ),
+                        filled: true,
+                        fillColor: tc.cardElevated,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: pCompact,
+                          vertical: pSmall,
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(rInput),
+                          borderSide: BorderSide(color: tc.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(rInput),
+                          borderSide: BorderSide(color: tc.brand),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.commonCancel),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(
-                context,
-                {for (final v in variables) v: controllers[v]!.text.trim()},
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: tc.brand,
-              foregroundColor: tc.onAccent,
+              ],
             ),
-            child: Text(l10n.commonExecute),
           ),
-        ],
-      );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(l10n.commonCancel),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(
+                  context,
+                  {for (final v in variables) v: controllers[v]!.text.trim()},
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: tc.brand,
+                foregroundColor: tc.onAccent,
+              ),
+              child: Text(l10n.commonExecute),
+            ),
+          ],
+        );
       },
     );
   }
 
   // ===== 克隆 =====
   Future<void> _cloneRunbook(Runbook rb) async {
-    final cloned = await ref.read(runbooksProvider.notifier).cloneRunbook(rb.id);
+    final cloned =
+        await ref.read(runbooksProvider.notifier).cloneRunbook(rb.id);
     if (cloned != null && mounted) {
       final l10n = AppLocalizations.of(context)!;
       _toast(l10n.runbookClonedToast(cloned.name));
@@ -744,7 +762,8 @@ class _RunbooksPageState extends ConsumerState<RunbooksPage> {
 
   void _toast(String msg) {
     if (!mounted) return;
-    showTopSnackBar(context, 
+    showTopSnackBar(
+      context,
       SnackBar(
         content: Text(msg),
         duration: const Duration(seconds: 2),
@@ -827,7 +846,9 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
                       enabled: !isBuiltin,
                       style: TextStyle(color: tc.textMain, fontSize: fBody),
                       decoration: _inputDecoration(l10n.runbookFieldName),
-                      validator: (v) => v == null || v.trim().isEmpty ? l10n.runbookNameRequired : null,
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? l10n.runbookNameRequired
+                          : null,
                     ),
                   ),
                 ],
@@ -843,7 +864,9 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
               ),
               const SizedBox(height: 4),
               Text(
-                _type == RunbookType.agent ? l10n.runbookTypeAgentDesc : l10n.runbookTypeCommandDesc,
+                _type == RunbookType.agent
+                    ? l10n.runbookTypeAgentDesc
+                    : l10n.runbookTypeCommandDesc,
                 style: TextStyle(color: tc.textSub, fontSize: fMicro),
               ),
               const SizedBox(height: pSmall),
@@ -856,7 +879,9 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
               const SizedBox(height: pSmall),
               // 内容（撑满剩余高度）
               Text(
-                _type == RunbookType.agent ? l10n.runbookContentAgent : l10n.runbookContentCommand,
+                _type == RunbookType.agent
+                    ? l10n.runbookContentAgent
+                    : l10n.runbookContentCommand,
                 style: TextStyle(color: tc.textSub, fontSize: fSmall),
               ),
               const SizedBox(height: pSmall),
@@ -868,18 +893,22 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
                   expands: true,
                   textAlignVertical: TextAlignVertical.top,
                   style: TextStyle(
-                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: kMonoFontFallback,
                     fontSize: fMono,
                     color: tc.textMain,
                   ),
                   decoration: _inputDecoration(
                     _type == RunbookType.agent
                         ? l10n.runbookContentAgentHint('{{host}}')
-                        : l10n.runbookContentCommandHint('{{host}}', '{{user}}'),
+                        : l10n.runbookContentCommandHint(
+                            '{{host}}', '{{user}}'),
                   ).copyWith(
                     alignLabelWithHint: true,
                   ),
-                  validator: (v) => v == null || v.trim().isEmpty ? l10n.runbookContentRequired : null,
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? l10n.runbookContentRequired
+                      : null,
                 ),
               ),
               if (isBuiltin)
@@ -1002,7 +1031,8 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _buildTypeOption(RunbookType.agent, l10n.runbookTypeAgentOption, tc.brand),
+        _buildTypeOption(
+            RunbookType.agent, l10n.runbookTypeAgentOption, tc.brand),
         const SizedBox(width: pSmall),
         _buildTypeOption(RunbookType.command, l10n.runbookTypeCommand, tc.ok),
       ],
@@ -1019,7 +1049,8 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
     return GestureDetector(
       onTap: () => setState(() => _type = type),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: pCompact, vertical: pSmall),
+        padding:
+            const EdgeInsets.symmetric(horizontal: pCompact, vertical: pSmall),
         decoration: BoxDecoration(
           color: selected ? color.withValues(alpha: 0.12) : tc.cardElevated,
           borderRadius: BorderRadius.circular(rInput),
@@ -1029,7 +1060,9 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+              selected
+                  ? Icons.radio_button_checked
+                  : Icons.radio_button_unchecked,
               size: 16,
               color: selected ? color : tc.textSub,
             ),
@@ -1069,7 +1102,8 @@ class _RunbookEditDialogState extends State<_RunbookEditDialog> {
           items: _kCategoryOrder
               .map((cat) => DropdownMenuItem(
                     value: cat,
-                    child: Text('${_kCategoryEmoji[cat]} ${_runbookCategoryLabel(cat, l10n)}'),
+                    child: Text(
+                        '${_kCategoryEmoji[cat]} ${_runbookCategoryLabel(cat, l10n)}'),
                   ))
               .toList(),
           onChanged: (v) {
@@ -1213,7 +1247,8 @@ class _RunbookImportDialogState extends State<_RunbookImportDialog> {
                       ']',
                 ),
                 style: TextStyle(
-                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: kMonoFontFallback,
                   fontSize: fMono,
                   color: tc.terminalGreen,
                   height: 1.4,
@@ -1226,7 +1261,8 @@ class _RunbookImportDialogState extends State<_RunbookImportDialog> {
               controller: _controller,
               maxLines: 12,
               style: TextStyle(
-                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: kMonoFontFallback,
                 fontSize: fMono,
                 color: tc.textMain,
               ),
@@ -1279,9 +1315,9 @@ class _RunbookImportDialogState extends State<_RunbookImportDialog> {
         ElevatedButton(
           onPressed: _importing ? null : _doImport,
           style: ElevatedButton.styleFrom(
-              backgroundColor: tc.brand,
-              foregroundColor: tc.onAccent,
-            ),
+            backgroundColor: tc.brand,
+            foregroundColor: tc.onAccent,
+          ),
           child: _importing
               ? SizedBox(
                   width: 14,

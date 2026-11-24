@@ -22,6 +22,7 @@ class AIPromptInput extends StatefulWidget {
   final String hintText;
   final String initialText;
   final Function(String) onSend;
+
   /// O5: 运行中补充指令（steering）回调。提供时运行态输入保持可用，
   /// Enter/补充按钮走这里而不是 onSend；null 时保持旧行为（运行中禁发）。
   final ValueChanged<String>? onSteer;
@@ -29,13 +30,17 @@ class AIPromptInput extends StatefulWidget {
   final ValueChanged<String>? onChanged;
   final ValueChanged<bool>? onFocusChanged;
   final Color accentColor;
+
   /// 斜杠命令回调：返回 true 表示命令已被处理（不再走 onSend）
   final bool Function(String command)? onSlashCommand;
+
   /// 额外的建议项（运维模板等）。与 [kSlashCommands] 分开，避免污染
   /// `parseSlashCommand` 的已知命令集合——模板名不是可解析的命令。
   final List<SlashCommand> slashExtras;
+
   /// 是否处于多机编排模式（只影响边框配色，开关按钮在上方工具栏）
   final bool isOrchestratorMode;
+
   /// 输入框底部工具行里的附加控件（模型/思考档位胶囊等）。
   /// 放在发送按钮左侧，宽度自适应并允许省略。
   final Widget? footer;
@@ -120,7 +125,8 @@ const List<SlashCommand> kSlashCommands = [
   SlashCommand('/new', '新建会话', descriptionEn: 'New session'),
   SlashCommand('/compact', '压缩记忆（总结早期对话）',
       descriptionEn: 'Compact memory (summarise earlier turns)'),
-  SlashCommand('/goal', '目标模式：/goal <目标> 开始；子命令 pause / resume / edit / done / clear',
+  SlashCommand(
+      '/goal', '目标模式：/goal <目标> 开始；子命令 pause / resume / edit / done / clear',
       descriptionEn:
           'Goal mode: /goal <objective>; subcommands pause / resume / edit / done / clear'),
   SlashCommand('/plan', '只要计划不执行：/plan <目标>（临时只读，结束自动还原）',
@@ -147,6 +153,7 @@ class _AIPromptInputState extends State<AIPromptInput> {
   static const double _kMaxOverlayHeight = 500.0;
   static const double _kBorderWidth = 1.0;
   static const double _kGap = 6.0;
+
   /// 首屏至少能同时看到 8 条内置命令和几条运维模板，避免模板被完全藏住。
   static const int _kMaxVisibleItems = 12;
 
@@ -236,7 +243,8 @@ class _AIPromptInputState extends State<AIPromptInput> {
 
     final raw = text.substring(1);
     final space = raw.indexOf(' ');
-    final token = (space < 0 ? raw : raw.substring(0, space)).trim().toLowerCase();
+    final token =
+        (space < 0 ? raw : raw.substring(0, space)).trim().toLowerCase();
     final hasArgs = space >= 0;
 
     final builtins = <SlashCommand>[];
@@ -295,7 +303,8 @@ class _AIPromptInputState extends State<AIPromptInput> {
     final maxStart = math.max(0, len - count);
     var start = _windowStart.clamp(0, maxStart);
     if (_highlightedIndex < start) start = _highlightedIndex;
-    if (_highlightedIndex >= start + count) start = _highlightedIndex - count + 1;
+    if (_highlightedIndex >= start + count)
+      start = _highlightedIndex - count + 1;
     _windowStart = start.clamp(0, maxStart);
   }
 
@@ -341,9 +350,11 @@ class _AIPromptInputState extends State<AIPromptInput> {
     }
     _visibleCount = math.max(1, count);
     _syncWindow();
-    final end = math.min(_filteredCommands.length, _windowStart + _visibleCount);
+    final end =
+        math.min(_filteredCommands.length, _windowStart + _visibleCount);
     final shown = math.max(0, end - _windowStart);
-    final contentHeight = shown * _kItemHeight + _kHintHeight + _kVerticalPadding;
+    final contentHeight =
+        shown * _kItemHeight + _kHintHeight + _kVerticalPadding;
     final outerHeight = contentHeight + borderInset;
 
     // 记录全局矩形：点击浮层时不让 TextField 失焦，否则浮层会在
@@ -393,14 +404,16 @@ class _AIPromptInputState extends State<AIPromptInput> {
                             child: Text(
                               UiText.t('↑↓ 切换   Tab 选择   Enter 执行   Esc 关闭',
                                   '↑↓ navigate   Tab select   Enter run   Esc close'),
-                              style: TextStyle(color: tc.textSub, fontSize: fMicro),
+                              style: TextStyle(
+                                  color: tc.textSub, fontSize: fMicro),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           const SizedBox(width: 6),
                           Text(
                             '${_filteredCommands.length}',
-                            style: TextStyle(color: tc.textMuted, fontSize: fMicro),
+                            style: TextStyle(
+                                color: tc.textMuted, fontSize: fMicro),
                           ),
                         ],
                       ),
@@ -598,9 +611,8 @@ class _AIPromptInputState extends State<AIPromptInput> {
     final accent = widget.accentColor;
     final isOrch = widget.isOrchestratorMode;
     final effectiveAccent = isOrch ? tc.warn : accent;
-    final borderColor = _isFocused
-        ? effectiveAccent
-        : (isOrch ? tc.warn : tc.border);
+    final borderColor =
+        _isFocused ? effectiveAccent : (isOrch ? tc.warn : tc.border);
 
     return Focus(
       focusNode: _focusNode,
@@ -610,9 +622,7 @@ class _AIPromptInputState extends State<AIPromptInput> {
           color: tc.card,
           borderRadius: BorderRadius.circular(rMedium),
           border: Border.all(
-            color: widget.enabled
-                ? borderColor
-                : tc.hairline,
+            color: widget.enabled ? borderColor : tc.hairline,
             width: 1,
           ),
           // 设计稿 .ai-compose:focus-within 是「1px 品牌色边框 + 0 0 0 1px 光晕」，
@@ -715,7 +725,8 @@ class _AIPromptInputState extends State<AIPromptInput> {
     final tc = ThemeColors.of(context);
     final isOrch = widget.isOrchestratorMode;
     return Tooltip(
-      message: UiText.t('补充指令（下一轮生效）', 'Steering instruction (applies next turn)'),
+      message:
+          UiText.t('补充指令（下一轮生效）', 'Steering instruction (applies next turn)'),
       child: MouseRegion(
         cursor: SystemMouseCursors.click,
         child: GestureDetector(
@@ -753,9 +764,7 @@ class _AIPromptInputState extends State<AIPromptInput> {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
-        onTap: running
-            ? widget.onStop
-            : (canSend ? _send : null),
+        onTap: running ? widget.onStop : (canSend ? _send : null),
         child: AnimatedContainer(
           duration: animFast,
           width: 34,
@@ -840,7 +849,8 @@ class _SlashCommandItemState extends State<_SlashCommandItem> {
                   style: TextStyle(
                     color: active ? widget.accentColor : widget.tc.textMain,
                     fontSize: fSmall,
-                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: kMonoFontFallback,
                     fontWeight: FontWeight.w600,
                   ),
                   maxLines: 1,
@@ -850,7 +860,8 @@ class _SlashCommandItemState extends State<_SlashCommandItem> {
               if (cmd.badge != null && cmd.badge!.isNotEmpty) ...[
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                   decoration: BoxDecoration(
                     color: widget.accentColor.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(rXSmall),

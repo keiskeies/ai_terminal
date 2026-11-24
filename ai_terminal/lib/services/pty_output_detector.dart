@@ -1,5 +1,6 @@
-/// 命令执行失败的细分类原因
-///
+import '../utils/exit_marker_scanner.dart';
+
+/// 命令执行失败的细分类原因///
 /// 让 AI 能区分"命令真的失败"vs"环境问题"，避免盲目重试。
 /// 例如 syntaxError 应该修正命令而非重试；disconnected 应该重连而非重试。
 enum CommandFailureKind {
@@ -23,6 +24,9 @@ enum CommandFailureKind {
 
   /// 取消执行
   cancelled,
+
+  /// 前序主机失败/任务取消导致本机未派发（区别于“执行后被取消”）
+  skipped,
 
   /// 其他未分类错误
   unknown,
@@ -53,17 +57,19 @@ class PtyOutputDetector {
   /// 严格模式：必须以 `bash:` 或 `-bash:` 开头，且包含 `syntax error`
   /// 误报规避：用户 `cat` 日志时，日志中包含 `bash:` 字样不会同时满足两个条件
   static final _syntaxErrorPattern = RegExp(
-    r'(?:^|\n|[\r\n])\-?(?:bash|sh|zsh|ksh):\s*(.+)',
+    r'(?:(?<=\n)|(?<=\r)|^)\-?(?:bash|sh|zsh|ksh):\s*(.+)',
     dotAll: false,
   );
-  static final _syntaxErrorKeyword = RegExp(r'syntax error', caseSensitive: false);
+  static final _syntaxErrorKeyword =
+      RegExp(r'syntax error', caseSensitive: false);
 
   /// PS2 多行提示符（引号/括号未闭合）
-  /// 模式：行首 `> ` 或 `dquote> ` / `quote> ` / `cmdsubst> ` / `bquote> `
-  /// 误报规避：要求出现在新行行首，且命令已发出超过 200ms（避免命令回显瞬间误判）
+  /// 命名前缀（dquote> / quote> / cmdsubst> 等）可以独立证明这是 shell 提示符。
+  /// 裸 `> ` 也可能是 diff、日志或重定向输出，只有调用方在执行前确认命令未闭合时才允许。
   static final _ps2PromptPattern = RegExp(
-    r'(?:^|\n)\s*(?:dquote|quote|cmdsubst|bquote|curly|paren|)> ',
+    r'(?:^|\n)\s*((?:dquote|quote|cmdsubst|bquote|curly|paren)> )',
   );
+  static final _barePs2PromptPattern = RegExp(r'(?:^|\n)\s*> ');
 
   /// 交互式**密码类**提示（sudo 之外的）
   ///
@@ -74,17 +80,7 @@ class PtyOutputDetector {
   /// 密码类提示**永远不走自由文本输入桥**（AGENTS.md R7）：无论调用方是否
   /// 声明桥接，命中即打断，走 provide_password / sudo 密码的既有流程。
   static final _passwordPromptPattern = RegExp(
-    r'(?:Password:\s*$|Enter passphrase)',
-    multiLine: true,
-  );
-
-  /// 交互式**确认类**提示（yes/no、fingerprint 等，历史行首模式）
-  ///
-  /// 保留原有的行首/子串匹配用于"未桥接时打断"的向后兼容路径；
-  /// 桥接路径使用尾部锚定的 [_confirmationPromptAtEnd]（R8）。
-  static final _confirmationPromptPattern = RegExp(
-    r'(?:Are you sure you want to continue|^\s*\(yes/no\)|^\s*\(yes/no/\[fingerprint\]\))',
-    multiLine: true,
+    r'(?:Password:[ \t\r]*|Enter passphrase[^\r\n]*[ \t\r]*)(?![\s\S])',
   );
 
   /// 确认类提示的**尾部锚定**模式（桥接用，AGENTS.md R8）
@@ -141,24 +137,30 @@ class PtyOutputDetector {
   /// 主动 Ctrl+C 打断一条正在执行的长命令。误判代价远高于漏判（漏判还有
   /// 原 [_ps2PromptPattern] 与超时兜底）。
   static final RegExp _continuationTail = RegExp(
-    r'^(?:dquote|quote|cmdsubst|bquote|curly|paren)?>[\s\x08]*$',
+    r'^(?:dquote|quote|cmdsubst|bquote|curly|paren)>[\s\x08]*$',
   );
+  static final RegExp _bareContinuationTail = RegExp(r'^>[\s\x08]*$');
 
-  static bool waitsForContinuation(String buffer) {
+  static bool waitsForContinuation(
+    String buffer, {
+    bool unclosedSyntaxConfirmed = false,
+  }) {
     const tailLength = 512;
     final tail = buffer.length > tailLength
         ? buffer.substring(buffer.length - tailLength)
         : buffer;
     // 取最后一行（去掉 ANSI），尾部匹配续行提示符
     final plain = tail.replaceAll(
-      RegExp(r'\x1B\[[\x20-\x3F]*[\x40-\x7E]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)'),
+      RegExp(
+          r'\x1B\[[\x20-\x3F]*[\x40-\x7E]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)'),
       '',
     );
     final lines = plain.split(RegExp(r'[\r\n]+'));
     if (lines.isEmpty) return false;
     final last = lines.last.trimRight();
     if (last.isEmpty) return false;
-    return _continuationTail.hasMatch(last);
+    return _continuationTail.hasMatch(last) ||
+        (unclosedSyntaxConfirmed && _bareContinuationTail.hasMatch(last));
   }
 
   /// 缓冲尾部是否停在 less/more 的分页状态行上
@@ -197,7 +199,8 @@ class PtyOutputDetector {
   /// 去掉 ANSI 转义序列和首尾空白，只保留最后一行非空文本。
   static String confirmationPromptText(String buffer) {
     final plain = buffer.replaceAll(
-      RegExp(r'\x1B\[[\x20-\x3F]*[\x40-\x7E]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)'),
+      RegExp(
+          r'\x1B\[[\x20-\x3F]*[\x40-\x7E]|\x1B\][^\x07\x1B]*(?:\x07|\x1B\\)'),
       '',
     );
     final lines = plain
@@ -237,6 +240,8 @@ class PtyOutputDetector {
   /// [sudoPromptWillBeAnswered] 调用方会在命中 sudo 提示时写入密码。
   ///   为 true 时 sudo 提示不再算异常 —— 否则检测器抢在注入之前 complete()，
   ///   调用方随即发 Ctrl+C，把刚要接受密码的 sudo 打断（中英文 locale 都会）。
+  /// [unclosedSyntaxConfirmed] 仅在整个命令已由静态扫描确认未闭合时允许裸 `> `
+  /// 作为 PS2；普通输出中的裸 `> ` 永不触发续行失败。
   /// [confirmationPromptWillBeBridged] 调用方会把确认类提示桥接给上层
   ///   （UI 弹窗 / 自动应答）。为 true 时确认提示不再算异常；密码类提示
   ///   **不受此开关影响**，永远打断（R7：密码不走自由文本桥）。
@@ -253,13 +258,20 @@ class PtyOutputDetector {
     required bool isWindows,
     bool sudoPromptWillBeAnswered = false,
     bool confirmationPromptWillBeBridged = false,
+    bool unclosedSyntaxConfirmed = false,
     RegExp? donePattern,
+    int scanStart = 0,
   }) {
-    // 命令真正完成 = marker+数字出现（由调用方 donePattern 判定）
-    // 检测器只在尚未完成时识别异常，故检查 buffer 是否含 marker+数字
+    // scanStart > 0 时 buffer 由“上一块尾部 carry + 本次新增输出”组成。
+    // 只有从新增区域开始的行首模式才参与判定，历史错误不会反复触发假 positive；
+    // 尾部锚定提示允许从 carry 开始，以支持提示被拆成多个 chunk。
+    final added = scanStart.clamp(0, buffer.length);
     final completedPattern =
         donePattern ?? RegExp('${RegExp.escape(marker)}\\d+');
-    if (completedPattern.hasMatch(buffer)) return null;
+    if (completedPattern.hasMatch(buffer) ||
+        ExitMarkerScanner.matchesAtEnd(buffer, marker)) {
+      return null;
+    }
 
     // 太早检测会误报（命令回显瞬间）—— 至少等 150ms 让回显稳定
     if (elapsedMs < 150) return null;
@@ -270,7 +282,13 @@ class PtyOutputDetector {
       // 2. Shell 语法错误检测
       // 严格匹配：bash/sh/zsh 行 + syntax error 关键字
       // 排除普通 stderr 输出（如 `bash: line 1: foo: command not found` 不含 syntax error）
-      final syntaxMatch = _syntaxErrorPattern.firstMatch(buffer);
+      RegExpMatch? syntaxMatch;
+      for (final match in _syntaxErrorPattern.allMatches(buffer)) {
+        if (match.end > added) {
+          syntaxMatch = match;
+          break;
+        }
+      }
       if (syntaxMatch != null) {
         final rest = syntaxMatch.group(1) ?? '';
         if (_syntaxErrorKeyword.hasMatch(rest)) {
@@ -285,7 +303,24 @@ class PtyOutputDetector {
 
       // 3. PS2 多行提示符检测（引号未闭合）
       // 仅在命令发出超过 500ms 后检测（短命令正常早已完成，避免误报）
-      if (elapsedMs > 500 && _ps2PromptPattern.hasMatch(buffer)) {
+      var newPs2Prompt = false;
+      if (elapsedMs > 500) {
+        for (final match in _ps2PromptPattern.allMatches(buffer)) {
+          if (match.end > added) {
+            newPs2Prompt = true;
+            break;
+          }
+        }
+        if (!newPs2Prompt && unclosedSyntaxConfirmed) {
+          for (final match in _barePs2PromptPattern.allMatches(buffer)) {
+            if (match.end > added) {
+              newPs2Prompt = true;
+              break;
+            }
+          }
+        }
+      }
+      if (newPs2Prompt) {
         return CommandFailureDiagnostic(
           kind: CommandFailureKind.syntaxError,
           reason: 'Shell 等待更多输入（引号或括号未闭合），进入 PS2 提示符',
@@ -312,8 +347,7 @@ class PtyOutputDetector {
           kind: CommandFailureKind.interactivePrompt,
           reason: '命令进入交互式密码提示，无法在非交互模式完成',
         );
-      } else if (_confirmationPromptPattern.hasMatch(buffer) ||
-          _confirmationPromptAtEnd.hasMatch(buffer)) {
+      } else if (_confirmationPromptAtEnd.hasMatch(buffer)) {
         // 确认类提示：调用方声明桥接时不打断，等 UI/自动应答写入答案
         if (!confirmationPromptWillBeBridged) {
           return CommandFailureDiagnostic(
@@ -334,6 +368,100 @@ class CommandFailureDiagnostic {
   final String reason;
 
   CommandFailureDiagnostic({required this.kind, required this.reason});
+}
+
+/// 只消费新增输出的检测入口。
+///
+/// carry 仅用于识别跨 chunk 的提示符；历史缓冲不会在每次定时 recheck 时重新扫描。
+/// pending 也有上限，数据洪峰只保留最新增量，避免检测层成为第二个无界 buffer。
+class PtyIncrementalOutputDetector {
+  static const int carryChars = 512;
+  static const int maxPendingChars = 8192;
+  String _carry = '';
+  String _pending = '';
+
+  static String _safeTail(String text, int limit) {
+    if (text.length <= limit) return text;
+    var start = text.length - limit;
+    final previous = text.codeUnitAt(start - 1);
+    final first = text.codeUnitAt(start);
+    if (previous >= 0xD800 &&
+        previous <= 0xDBFF &&
+        first >= 0xDC00 &&
+        first <= 0xDFFF) {
+      start++;
+    }
+    return text.substring(start);
+  }
+
+  void add(String data) {
+    if (data.isEmpty) return;
+    _pending += data;
+    if (_pending.length > maxPendingChars * 2) {
+      _pending = _safeTail(_pending, maxPendingChars);
+    }
+  }
+
+  CommandFailureDiagnostic? consume({
+    required String marker,
+    required int elapsedMs,
+    required bool isWindows,
+    bool sudoPromptWillBeAnswered = false,
+    bool confirmationPromptWillBeBridged = false,
+    bool unclosedSyntaxConfirmed = false,
+    RegExp? donePattern,
+  }) {
+    if (_pending.isEmpty) return null;
+    final pending = _pending.length > maxPendingChars
+        ? _safeTail(_pending, maxPendingChars)
+        : _pending;
+    _pending = '';
+    final scanStart = _carry.length;
+    final diagnostic = PtyOutputDetector.detect(
+      buffer: '$_carry$pending',
+      marker: marker,
+      elapsedMs: elapsedMs,
+      isWindows: isWindows,
+      sudoPromptWillBeAnswered: sudoPromptWillBeAnswered,
+      confirmationPromptWillBeBridged: confirmationPromptWillBeBridged,
+      unclosedSyntaxConfirmed: unclosedSyntaxConfirmed,
+      donePattern: donePattern,
+      scanStart: scanStart,
+    );
+    final combined = '$_carry$pending';
+    _carry = combined.length > carryChars
+        ? _safeTail(combined, carryChars)
+        : combined;
+    return diagnostic;
+  }
+
+  /// 定时重扫最近的尾部输出。
+  ///
+  /// [consume] 只扫描新增块，但 detect 有 150/300/500ms 时间门槛：提示若在
+  /// 门槛前到达，会先被 consume 判成 null 并清空 pending，之后命令不再有输出，
+  /// 定时 recheck 就永远看不到它。这里对 carry 尾窗重跑一次完整检测，
+  /// 让密码/PS2 提示在门槛过后仍能被识别（旧实现每 tick 扫全尾窗）。
+  CommandFailureDiagnostic? recheck({
+    required String marker,
+    required int elapsedMs,
+    required bool isWindows,
+    bool sudoPromptWillBeAnswered = false,
+    bool confirmationPromptWillBeBridged = false,
+    bool unclosedSyntaxConfirmed = false,
+    RegExp? donePattern,
+  }) {
+    if (_carry.isEmpty) return null;
+    return PtyOutputDetector.detect(
+      buffer: _carry,
+      marker: marker,
+      elapsedMs: elapsedMs,
+      isWindows: isWindows,
+      sudoPromptWillBeAnswered: sudoPromptWillBeAnswered,
+      confirmationPromptWillBeBridged: confirmationPromptWillBeBridged,
+      unclosedSyntaxConfirmed: unclosedSyntaxConfirmed,
+      donePattern: donePattern,
+    );
+  }
 }
 
 /// sudo 密码应答状态机（每次 executeAndWait 一个实例）。
@@ -359,21 +487,27 @@ class SudoPromptResponder {
 
 /// 确认类提示应答状态机（每次 executeAndWait 一个实例）。
 ///
-/// 与 [SudoPromptResponder] 同一套下标去重逻辑：同一个确认提示可能分多个
-/// chunk 到达（尾随空格、ANSI 重绘），下标没变 = 同一提示的增量，不再触发
-/// 桥接回调；下标变大 = 命令链里的下一个确认提示，需要再问一次。
-/// 答重了会把上一轮答案泄漏给下一条命令的 stdin。
+/// 用稳定的提示文本指纹去重，不使用绝对下标：256KB 滑动窗口截断会让同一提示的
+/// 下标整体前移。只有提示真正离开缓冲区尾部才重置，因此命令链里的下一条确认
+/// （即使文本完全相同）仍会再次桥接。
 class ConfirmationPromptResponder {
-  int _lastAnsweredStart = -1;
+  String? _lastFingerprint;
+  bool _promptPresent = false;
 
   /// 此刻是否应该把确认提示桥接给上层（UI 弹窗 / 自动应答）。
   bool shouldAnswer(String buffer) {
     final match = PtyOutputDetector.confirmationPromptMatch(buffer);
-    if (match == null) return false;
-    // 缓冲按尾部截断后下标整体前移，旧游标失效
-    if (_lastAnsweredStart >= buffer.length) _lastAnsweredStart = -1;
-    if (match.start <= _lastAnsweredStart) return false;
-    _lastAnsweredStart = match.start;
+    if (match == null) {
+      _promptPresent = false;
+      return false;
+    }
+    // 指纹只取命中的提示片段并剥掉尾随冒号/问号/空白：
+    // 同一提示分 chunk 到达、或滑动窗口把前缀截掉，都会归一到同一指纹；
+    // 不能取整行文本，否则截断前后前缀差异会让同一提示被重复应答。
+    final fingerprint = match.group(0)!.replaceAll(RegExp(r'[ \t\r:：?]+$'), '');
+    if (_promptPresent && fingerprint == _lastFingerprint) return false;
+    _promptPresent = true;
+    _lastFingerprint = fingerprint;
     return true;
   }
 }

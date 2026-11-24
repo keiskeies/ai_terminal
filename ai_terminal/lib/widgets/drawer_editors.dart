@@ -114,7 +114,9 @@ class _SnippetEditorFormState extends State<SnippetEditorForm> {
     if (name.isEmpty || command.isEmpty) {
       setState(() => _error = UiText.t(
           name.isEmpty ? '起个名字，列表里才认得出。' : '命令不能为空。',
-          name.isEmpty ? 'Name it so the list stays readable.' : 'Command is required.'));
+          name.isEmpty
+              ? 'Name it so the list stays readable.'
+              : 'Command is required.'));
       return;
     }
     final description = _description.text.trim();
@@ -177,8 +179,21 @@ class RunbookEditorForm extends StatefulWidget {
 
 class _RunbookEditorFormState extends State<RunbookEditorForm> {
   static const _icons = <String>[
-    '🩺', '🛡️', '💾', '🌐', '⚙️', '🔐', '🚀', '📦',
-    '🔧', '📋', '🔥', '⚠️', '✅', '🔍', '📈',
+    '🩺',
+    '🛡️',
+    '💾',
+    '🌐',
+    '⚙️',
+    '🔐',
+    '🚀',
+    '📦',
+    '🔧',
+    '📋',
+    '🔥',
+    '⚠️',
+    '✅',
+    '🔍',
+    '📈',
   ];
 
   late final _name = TextEditingController(text: widget.initial?.name ?? '');
@@ -189,9 +204,8 @@ class _RunbookEditorFormState extends State<RunbookEditorForm> {
   late RunbookType _type = widget.initial?.type ?? RunbookType.agent;
   late RunbookCategory _category =
       widget.initial?.category ?? RunbookCategory.custom;
-  late String _icon = widget.initial?.icon.isEmpty == false
-      ? widget.initial!.icon
-      : '📋';
+  late String _icon =
+      widget.initial?.icon.isEmpty == false ? widget.initial!.icon : '📋';
   String? _error;
   bool _saving = false;
 
@@ -209,8 +223,7 @@ class _RunbookEditorFormState extends State<RunbookEditorForm> {
         RunbookCategory.inspection => UiText.t('巡检', 'Inspection'),
         RunbookCategory.security => UiText.t('安全', 'Security'),
         RunbookCategory.deployment => UiText.t('部署', 'Deployment'),
-        RunbookCategory.troubleshooting =>
-          UiText.t('故障排查', 'Troubleshooting'),
+        RunbookCategory.troubleshooting => UiText.t('故障排查', 'Troubleshooting'),
         RunbookCategory.maintenance => UiText.t('日常维护', 'Maintenance'),
         RunbookCategory.custom => UiText.t('自定义', 'Custom'),
       };
@@ -248,7 +261,8 @@ class _RunbookEditorFormState extends State<RunbookEditorForm> {
     return DrawerFormBody(
       onCancel: widget.onCancel,
       onSave: _isBuiltin ? () {} : _save,
-      saveLabel: _isBuiltin ? UiText.t('内置模板只读', 'Built-in is read-only') : null,
+      saveLabel:
+          _isBuiltin ? UiText.t('内置模板只读', 'Built-in is read-only') : null,
       error: _error,
       busy: _saving,
       children: [
@@ -269,8 +283,8 @@ class _RunbookEditorFormState extends State<RunbookEditorForm> {
                   decoration: BoxDecoration(
                     color: e == _icon ? tc.brandBg : tc.surface,
                     borderRadius: BorderRadius.circular(rSmall),
-                    border: Border.all(
-                        color: e == _icon ? tc.brand : tc.border),
+                    border:
+                        Border.all(color: e == _icon ? tc.brand : tc.border),
                   ),
                   child: Text(e, style: const TextStyle(fontSize: 15)),
                 ),
@@ -286,7 +300,10 @@ class _RunbookEditorFormState extends State<RunbookEditorForm> {
           label: UiText.t('类型', 'Type'),
           value: _type,
           items: [
-            (RunbookType.agent, UiText.t('AI 执行（自然语言步骤）', 'AI (natural-language steps)')),
+            (
+              RunbookType.agent,
+              UiText.t('AI 执行（自然语言步骤）', 'AI (natural-language steps)')
+            ),
             (RunbookType.command, UiText.t('直接执行（shell 命令）', 'Shell commands')),
           ],
           onChanged: (v) => setState(() => _type = v),
@@ -311,7 +328,8 @@ class _RunbookEditorFormState extends State<RunbookEditorForm> {
           controller: _content,
           mono: true,
           maxLines: 10,
-          hint: UiText.t('可用 {{host}}、{{user}} 等变量。', 'Use {{host}}, {{user}}…'),
+          hint:
+              UiText.t('可用 {{host}}、{{user}} 等变量。', 'Use {{host}}, {{user}}…'),
         ),
       ],
     );

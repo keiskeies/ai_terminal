@@ -137,8 +137,10 @@ void main() {
 
   group('stripWrappedEcho（执行器层唯一回显清洗点，R8）', () {
     test('精确回显被剥离', () {
-      expect(stripWrappedEcho('ls -la; echo "EXITCODE_1:\$?"\nfile1\n',
-          'ls -la; echo "EXITCODE_1:\$?"'), '\nfile1\n');
+      expect(
+          stripWrappedEcho('ls -la; echo "EXITCODE_1:\$?"\nfile1\n',
+              'ls -la; echo "EXITCODE_1:\$?"'),
+          '\nfile1\n');
     });
 
     test('折行回显被容忍剥离', () {
@@ -150,7 +152,8 @@ void main() {
 
     test('找不到回显时原样返回（不误删真实输出）', () {
       final wrapped = 'pwd; echo "EXITCODE_1:\$?"';
-      expect(stripWrappedEcho('/home/user/pwd\nx', wrapped), '/home/user/pwd\nx');
+      expect(
+          stripWrappedEcho('/home/user/pwd\nx', wrapped), '/home/user/pwd\nx');
     });
   });
 

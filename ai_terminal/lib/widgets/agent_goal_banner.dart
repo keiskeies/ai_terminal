@@ -34,9 +34,8 @@ class AgentGoalBanner extends StatelessWidget {
     final ui = AgentUiText.of(context);
     final isFinished = goal.status == AgentGoalStatus.finished;
     final isActive = goal.status == AgentGoalStatus.active;
-    final statusColor = isActive
-        ? tc.brand
-        : (isFinished ? tc.textMuted : tc.gold);
+    final statusColor =
+        isActive ? tc.brand : (isFinished ? tc.textMuted : tc.gold);
     final title = isActive
         ? ui.goalRunning
         : (isFinished ? ui.goalFinished : ui.goalPaused);
@@ -104,9 +103,12 @@ class AgentGoalBanner extends StatelessWidget {
                 ),
               const SizedBox(width: 2),
               _actionButton(
-                icon: isFinished ? Icons.delete_outline : Icons.stop_circle_outlined,
+                icon: isFinished
+                    ? Icons.delete_outline
+                    : Icons.stop_circle_outlined,
                 tooltip: isFinished ? ui.goalClearAction : ui.goalFinishAction,
-                onTap: isFinished ? onFinish : () => _confirmFinish(context, ui),
+                onTap:
+                    isFinished ? onFinish : () => _confirmFinish(context, ui),
               ),
             ],
           ),
@@ -123,7 +125,8 @@ class AgentGoalBanner extends StatelessWidget {
                   style: TextStyle(
                     color: tc.textSub,
                     fontSize: fMicro,
-                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: kMonoFontFallback,
                   ),
                 ),
                 if (!isFinished)
@@ -169,16 +172,16 @@ class AgentGoalBanner extends StatelessWidget {
           width: 24,
           height: 24,
           decoration: BoxDecoration(
-            color: onTap == null
-                ? Colors.transparent
-                : tc.cardElevated,
+            color: onTap == null ? Colors.transparent : tc.cardElevated,
             borderRadius: BorderRadius.circular(rXSmall),
             border: Border.all(color: tc.border, width: 1),
           ),
           child: Icon(
             icon,
             size: 14,
-            color: onTap == null ? tc.textMuted.withValues(alpha: 0.4) : tc.textSub,
+            color: onTap == null
+                ? tc.textMuted.withValues(alpha: 0.4)
+                : tc.textSub,
           ),
         ),
       ),
@@ -191,8 +194,8 @@ class AgentGoalBanner extends StatelessWidget {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: Text(ui.goalEditTitle,
-              style: const TextStyle(fontSize: fBody)),
+          title:
+              Text(ui.goalEditTitle, style: const TextStyle(fontSize: fBody)),
           content: SizedBox(
             width: 420,
             child: TextField(
@@ -227,8 +230,8 @@ class AgentGoalBanner extends StatelessWidget {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: Text(ui.goalFinishTitle,
-              style: const TextStyle(fontSize: fBody)),
+          title:
+              Text(ui.goalFinishTitle, style: const TextStyle(fontSize: fBody)),
           content: SizedBox(
             width: 420,
             child: Text(ui.goalFinishBody,

@@ -152,16 +152,15 @@ void main() {
     test('New-Item / Remove-Item / Copy-Item 返回 warn', () {
       expect(SafetyGuard.check(r'New-Item -ItemType File -Path D:\tmp\a.txt'),
           SafetyLevel.warn);
-      expect(SafetyGuard.check(r'Remove-Item D:\tmp\a.txt'),
-          SafetyLevel.warn);
+      expect(SafetyGuard.check(r'Remove-Item D:\tmp\a.txt'), SafetyLevel.warn);
       expect(SafetyGuard.check(r'Copy-Item a.txt b.txt'), SafetyLevel.warn);
     });
 
     test('大小写与 & 调用运算符下的 cmdlet 仍为 warn', () {
       expect(SafetyGuard.check(r'set-content -path a.txt -value 1'),
           SafetyLevel.warn);
-      expect(SafetyGuard.check(r'& Remove-Item D:\tmp\a.txt'),
-          SafetyLevel.warn);
+      expect(
+          SafetyGuard.check(r'& Remove-Item D:\tmp\a.txt'), SafetyLevel.warn);
     });
 
     test('盘符重定向写文件返回 warn', () {
@@ -170,8 +169,7 @@ void main() {
     });
 
     test('CMD 系写命令返回 warn', () {
-      expect(SafetyGuard.check(r'del C:\Windows\Temp\a.tmp'),
-          SafetyLevel.warn);
+      expect(SafetyGuard.check(r'del C:\Windows\Temp\a.tmp'), SafetyLevel.warn);
       expect(SafetyGuard.check(r'move a.txt b.txt'), SafetyLevel.warn);
       expect(SafetyGuard.check(r'mkdir D:\tmp\newdir'), SafetyLevel.warn);
     });
@@ -179,8 +177,7 @@ void main() {
     test('Windows 磁盘级破坏命令返回 blocked', () {
       expect(SafetyGuard.check('Format-Volume -DriveLetter D'),
           SafetyLevel.blocked);
-      expect(SafetyGuard.check('Clear-Disk -Number 1'),
-          SafetyLevel.blocked);
+      expect(SafetyGuard.check('Clear-Disk -Number 1'), SafetyLevel.blocked);
     });
 
     test('只读 PowerShell 命令仍为 safe', () {
@@ -230,6 +227,71 @@ void main() {
             "powershell -NoProfile -Command \"Get-Item 'C:\\a.txt' | Select-Object Length\""),
         SafetyLevel.safe,
       );
+    });
+  });
+
+  group('SafetyGuard.check - POSIX 通用写命令', () {
+    test('cp / mv 复制移动文件返回 warn', () {
+      expect(SafetyGuard.check('cp a.txt b.txt'), SafetyLevel.warn);
+      expect(SafetyGuard.check('mv /tmp/a /tmp/b'), SafetyLevel.warn);
+      expect(SafetyGuard.check('sudo cp a.txt /srv/b.txt'), SafetyLevel.warn);
+    });
+
+    test('sed -i 原地编辑返回 warn，纯管道 sed 不误判', () {
+      expect(SafetyGuard.check("sed -i 's/a/b/' app.conf"), SafetyLevel.warn);
+      expect(SafetyGuard.check("sed -Ei 's/a/b/' app.conf"), SafetyLevel.warn);
+      expect(SafetyGuard.check("sed --in-place 's/a/b/' app.conf"),
+          SafetyLevel.warn);
+      expect(SafetyGuard.check("sed 's/a/b/' app.conf"), SafetyLevel.safe);
+    });
+
+    test('sed -i 在参数任意位置都识别（选项顺序不应绕过只读档）', () {
+      expect(
+          SafetyGuard.check("sed -E -i 's/a/b/' app.conf"), SafetyLevel.warn);
+      expect(
+          SafetyGuard.check("sed -n -i 's/a/b/p' app.conf"), SafetyLevel.warn);
+      expect(
+          SafetyGuard.check("sed -e 's/a/b/' -i app.conf"), SafetyLevel.warn);
+      expect(SafetyGuard.check("sudo -E sed -i 's/a/b/' app.conf"),
+          SafetyLevel.warn);
+      expect(
+          SafetyGuard.check("sed -i.bak 's/a/b/' app.conf"), SafetyLevel.warn);
+      // 只有脚本/文件名里出现字母 i，不许误判
+      expect(SafetyGuard.check("sed -e 's/i/x/' input.txt"), SafetyLevel.safe);
+    });
+
+    test('sed 不在行首时也不能绕过只读档', () {
+      expect(SafetyGuard.check("sudo -u root sed -i 's/a/b/' app.conf"),
+          SafetyLevel.warn);
+      expect(SafetyGuard.check("LC_ALL=C sed -i 's/a/b/' app.conf"),
+          SafetyLevel.warn);
+      expect(SafetyGuard.check("env X=1 sed -i 's/a/b/' app.conf"),
+          SafetyLevel.warn);
+      expect(SafetyGuard.check("bash -c \"sed -i 's/a/b/' app.conf\""),
+          SafetyLevel.warn);
+      expect(SafetyGuard.check("xargs sed -i 's/a/b/'"), SafetyLevel.warn);
+    });
+
+    test('tee 管道写文件返回 warn', () {
+      expect(
+          SafetyGuard.check('echo hi | sudo tee /etc/hosts'), SafetyLevel.warn);
+      expect(SafetyGuard.check('echo hi | tee -a app.log'), SafetyLevel.warn);
+    });
+
+    test('chmod / chown / chgrp / touch / ln 返回 warn', () {
+      expect(SafetyGuard.check('chmod 644 app.conf'), SafetyLevel.warn);
+      expect(
+          SafetyGuard.check('sudo chown root:root app.conf'), SafetyLevel.warn);
+      expect(SafetyGuard.check('chgrp www-data app.conf'), SafetyLevel.warn);
+      expect(SafetyGuard.check('touch app.lock'), SafetyLevel.warn);
+      expect(SafetyGuard.check('ln -s /srv/app current'), SafetyLevel.warn);
+    });
+
+    test('dd 写普通文件与任意 truncate 返回 warn', () {
+      expect(SafetyGuard.check('dd if=/dev/zero of=/tmp/fill bs=1M count=1'),
+          SafetyLevel.warn);
+      expect(
+          SafetyGuard.check('truncate -s 1M /tmp/app.log'), SafetyLevel.warn);
     });
   });
 

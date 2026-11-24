@@ -43,8 +43,7 @@ void main() {
         maxSteps: 5,
       );
 
-  const finishTurn =
-      '思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n';
+  const finishTurn = '思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n';
 
   test('非查询失败：观测保留报错头部与尾部，中间标注省略', () async {
     final provider = _MockAIProvider();
@@ -132,8 +131,7 @@ void main() {
     expect(result.success, isTrue);
     expect(result.output, contains('TAIL_Q_MARKER'));
     expect(result.output, isNot(contains('HEAD_Q_MARKER')));
-    expect(result.output,
-        contains('已截断前 ${stdout.length - 20000} 字符'));
+    expect(result.output, contains('已截断前 ${stdout.length - 20000} 字符'));
   });
 
   test('短失败输出不截断，头尾完整', () async {

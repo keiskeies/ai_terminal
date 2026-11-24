@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'pty_output_detector.dart';
+import '../utils/shell_syntax.dart';
 
 // CommandFailureKind / PtyOutputDetector / CommandFailureDiagnostic 集中定义在
 // pty_output_detector.dart，这里统一导出，方便调用方一处导入。
@@ -21,10 +22,28 @@ export 'pty_output_detector.dart'
 ///
 /// 多行命令（heredoc）必须换行：`EOF; echo …` 不再被识别为结束标记，
 /// 文件写入会永远等下去。
-String posixWrapWithExitMarker(String command, String marker) =>
-    command.contains('\n')
-        ? '$command\necho "$marker\$?"'
-        : '$command; echo "$marker\$?"';
+/// 后台命令的 `$?` 只表示“已启动”，不能代表后台任务最终成功，因此明确拒绝
+/// 这种不可观测包装；调用方可改为前台执行或自行管理后台任务。
+String posixWrapWithExitMarker(String command, String marker) {
+  final scan = ShellSyntax.scanPosixCommand(command);
+  final reliabilityReason = scan.reliabilityReason;
+  if (reliabilityReason != null) {
+    throw StateError(reliabilityReason);
+  }
+  if (command.contains('\n')) {
+    return '$command\necho "$marker\$?"';
+  }
+  final commentStart = scan.commentStart;
+  if (commentStart == null) return '$command; echo "$marker\$?"';
+
+  final prefix = command.substring(0, commentStart);
+  // 纯注释命令的退出码为 0；marker 放到下一行，不能插到注释里面。
+  if (prefix.trim().isEmpty) return '$command\necho "$marker\$?"';
+  final separator = RegExp(r'[;|&]\s*$').hasMatch(prefix) ? ' ' : '; ';
+  return '$prefix${separator}__ai_terminal_exit_code=\$?; '
+      'echo "$marker\$__ai_terminal_exit_code" '
+      '${command.substring(commentStart)}';
+}
 
 /// Windows shell 的退出码标记包装（R6 分支逻辑单点维护，本地 PTY 与
 /// 远端 Windows SSH 共用）。
@@ -39,6 +58,11 @@ String windowsWrapWithExitMarker(
   required bool isPowerShell,
 }) {
   if (!isPowerShell) return '$command & call echo $marker%^errorlevel^%';
+  // 行尾注释会吞掉后面的退出码捕获与 marker。宁可明确拒绝，也不能制造一个
+  // 永远等不到 marker 的命令；引号内（含单引号转义）的 # 仍是普通字符。
+  if (_hasPowerShellComment(command)) {
+    throw StateError('PowerShell 命令含注释，无法安全追加退出码标记，请移除注释后重试');
+  }
   // PowerShell 分支里全是 `$var` 字面量，用 raw 字符串拼，避免 Dart 插值吃掉它们。
   // 置空是必需的：`$LASTEXITCODE` 是会话级变量，上一条命令留下的非零值会串到
   // 这一条（例如上一条 `cmd /c exit 7`、这一条 cmdlet 失败 → 报 7 而不是 1）。
@@ -49,6 +73,72 @@ String windowsWrapWithExitMarker(
       r'else{1}; echo "' +
       marker +
       r'$__ec"';
+}
+
+enum _PowerShellContext { code, singleQuote, doubleQuote }
+
+class _PowerShellFrame {
+  _PowerShellFrame(this.context, {this.interpolation = false});
+
+  final _PowerShellContext context;
+  final bool interpolation;
+  int parenDepth = 0;
+}
+
+/// 只在明确的 PowerShell 注释位置失败；单引号、双引号与插值子表达式分别扫描，
+/// 避免把字符串里的 # 当成注释，也避免漏掉 `"$(... # comment)"` 中的真实注释。
+bool _hasPowerShellComment(String command) {
+  final stack = <_PowerShellFrame>[_PowerShellFrame(_PowerShellContext.code)];
+  for (var i = 0; i < command.length; i++) {
+    final frame = stack.last;
+    final c = command[i];
+    if (frame.context == _PowerShellContext.singleQuote) {
+      if (c != "'") continue;
+      if (i + 1 < command.length && command[i + 1] == "'") {
+        i++; // PowerShell 单引号字符串用 '' 表示一个字面量引号。
+      } else {
+        stack.removeLast();
+      }
+      continue;
+    }
+    if (c == '`' && i + 1 < command.length) {
+      i++; // 反引号转义在 code/double-quote 中跳过下一个字符。
+      continue;
+    }
+    if (frame.context == _PowerShellContext.doubleQuote) {
+      if (c == '"') {
+        stack.removeLast();
+      } else if (c == r'$' && i + 1 < command.length && command[i + 1] == '(') {
+        stack.add(
+            _PowerShellFrame(_PowerShellContext.code, interpolation: true));
+        i++;
+      }
+      continue;
+    }
+
+    if (c == "'") {
+      stack.add(_PowerShellFrame(_PowerShellContext.singleQuote));
+    } else if (c == '"') {
+      stack.add(_PowerShellFrame(_PowerShellContext.doubleQuote));
+    } else if (c == r'$' && i + 1 < command.length && command[i + 1] == '(') {
+      stack.add(_PowerShellFrame(_PowerShellContext.code, interpolation: true));
+      i++;
+    } else if (c == '<' && i + 1 < command.length && command[i + 1] == '#') {
+      return true; // 块注释同样会吞掉后续包装，统一安全拒绝。
+    } else if (c == '#' &&
+        (i == 0 || RegExp(r'[\s;|&(){}.,]').hasMatch(command[i - 1]))) {
+      return true;
+    } else if (c == '(') {
+      frame.parenDepth++;
+    } else if (c == ')') {
+      if (frame.interpolation && frame.parenDepth == 0) {
+        stack.removeLast();
+      } else if (frame.parenDepth > 0) {
+        frame.parenDepth--;
+      }
+    }
+  }
+  return false;
 }
 
 /// 命令执行结果（包含退出码）
@@ -76,7 +166,8 @@ class CommandResult {
     this.failureReason,
   });
 
-  bool get success => exitCode == 0 && !timedOut && failureKind == CommandFailureKind.none;
+  bool get success =>
+      exitCode == 0 && !timedOut && failureKind == CommandFailureKind.none;
 }
 
 /// 终端命令执行器接口
@@ -138,7 +229,8 @@ abstract class CommandExecutor {
   /// 静默执行命令并返回 stdout（不写入交互终端）
   ///
   /// 用于监控采集、系统信息探测等内部操作：这些命令不应出现在用户终端里。
-  Future<String> runOnce(String command, {Duration timeout = const Duration(seconds: 5)});
+  Future<String> runOnce(String command,
+      {Duration timeout = const Duration(seconds: 5)});
 
   /// 直接写入终端（用于交互式输入）
   void writeToTerminal(String data);

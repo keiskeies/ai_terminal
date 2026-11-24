@@ -36,8 +36,7 @@ Dio createSearchDio({
 String? _parseProxy(String? raw) {
   final trimmed = raw?.trim() ?? '';
   if (trimmed.isEmpty) return null;
-  final withScheme =
-      trimmed.contains('://') ? trimmed : 'http://$trimmed';
+  final withScheme = trimmed.contains('://') ? trimmed : 'http://$trimmed';
   final uri = Uri.tryParse(withScheme);
   if (uri == null || uri.host.isEmpty) return null;
   if (uri.scheme != 'http') return null;

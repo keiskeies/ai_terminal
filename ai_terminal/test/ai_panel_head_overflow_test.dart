@@ -12,12 +12,9 @@ void main() {
 
   /// - 'spacer'：原写法（标题/胶囊不可收缩 + Spacer）。
   /// - 'spaceBetween'：左侧整组包 Flexible，行用 spaceBetween 顶开按钮。
-  Future<double?> probe(
-      WidgetTester tester, String mode, double width) async {
-    const title =
-        Text(name, maxLines: 1, overflow: TextOverflow.ellipsis);
-    const capsule =
-        Text(name, maxLines: 1, overflow: TextOverflow.ellipsis);
+  Future<double?> probe(WidgetTester tester, String mode, double width) async {
+    const title = Text(name, maxLines: 1, overflow: TextOverflow.ellipsis);
+    const capsule = Text(name, maxLines: 1, overflow: TextOverflow.ellipsis);
     const controls = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -95,7 +92,8 @@ void main() {
   // 左侧是固定宽度的胶囊 + 图标按钮排（合计超过窄面板宽度），右侧是运行状态。
   // 原写法用 Spacer 顶开两侧，左侧又不许收缩 → 窄面板必然溢出。
   // 新写法：左侧 Flexible(SingleChildScrollView)，固定内容滚得出来，行不再炸。
-  Future<double?> probeToolbar(WidgetTester tester, String mode, double width) async {
+  Future<double?> probeToolbar(
+      WidgetTester tester, String mode, double width) async {
     const left = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -154,8 +152,7 @@ void main() {
     expect(right, lessThanOrEqualTo(240));
   });
 
-  testWidgets('工具栏 scroll：宽宽度不改变原布局（首按钮贴左、状态贴右）',
-      (tester) async {
+  testWidgets('工具栏 scroll：宽宽度不改变原布局（首按钮贴左、状态贴右）', (tester) async {
     final right = await probeToolbar(tester, 'scroll', 600);
     expect(right, isNotNull);
     expect(right, closeTo(600, 0.5));

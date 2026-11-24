@@ -47,7 +47,8 @@ class ModelReasoningBlock extends StatelessWidget {
               primary: false,
               child: Text(
                 text,
-                style: TextStyle(color: tc.textSub, fontSize: fSmall, height: 1.5),
+                style:
+                    TextStyle(color: tc.textSub, fontSize: fSmall, height: 1.5),
               ),
             ),
           ),
@@ -87,7 +88,8 @@ class LiveThoughtBlock extends StatelessWidget {
               // 常驻 spinner 会以满帧率持续调度重绘，把整机的 GPU 占用拉高
               Icon(Icons.psychology_outlined, size: 11, color: tc.brand),
               const SizedBox(width: 5),
-              Text(UiText.t('思考中', 'Thinking'), style: TextStyle(fontSize: fMicro, color: tc.textSub)),
+              Text(UiText.t('思考中', 'Thinking'),
+                  style: TextStyle(fontSize: fMicro, color: tc.textSub)),
             ],
           ),
           const SizedBox(height: 3),

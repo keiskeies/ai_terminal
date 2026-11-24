@@ -4,14 +4,19 @@
 enum ModifyTargetType {
   /// 配置文件（如 nginx.conf）
   configFile,
+
   /// 系统服务（如 nginx/mysql）
   service,
+
   /// 包安装（如 apt install）
   package,
+
   /// 用户/权限（如 useradd/chmod）
   permission,
+
   /// 普通文件写入（如 echo > file）
   fileWrite,
+
   /// 无法识别的修改
   unknown,
 }
@@ -19,8 +24,10 @@ enum ModifyTargetType {
 /// 修改目标信息
 class ModifyTarget {
   final ModifyTargetType type;
+
   /// 目标名称（文件路径 / 服务名 / 包名）
   final String name;
+
   /// 原始命令
   final String command;
 
@@ -37,10 +44,13 @@ class ModifyTarget {
 /// 快照结果 — 修改前的状态记录
 class PreSnapshot {
   final ModifyTarget target;
+
   /// 快照命令（用于执行并收集输出）
   final String snapshotCommand;
+
   /// 快照输出（修改前状态）
   final String? snapshotOutput;
+
   /// 回滚建议命令（失败时供 AI 参考）
   final String? rollbackSuggestion;
 
@@ -126,7 +136,8 @@ class RollbackAdvisor {
   }
 
   /// 根据快照输出和失败命令，生成回滚建议
-  static String? buildRollbackSuggestion(ModifyTarget target, String? snapshotOutput) {
+  static String? buildRollbackSuggestion(
+      ModifyTarget target, String? snapshotOutput) {
     switch (target.type) {
       case ModifyTargetType.configFile:
         // crontab 特殊处理
@@ -168,21 +179,24 @@ class RollbackAdvisor {
               'chown <原属主:原组> ${chownMatch.group(2)} (原属主见 ls -la 输出)';
         }
         if (cmd.contains('useradd')) {
-          final userMatch = RegExp(r'useradd\s+(?:.*?\s+)?(\S+)\s*$').firstMatch(cmd);
+          final userMatch =
+              RegExp(r'useradd\s+(?:.*?\s+)?(\S+)\s*$').firstMatch(cmd);
           final user = userMatch?.group(1) ?? '新用户';
           return '回滚建议: sudo userdel -r $user (删除刚创建的用户及家目录)';
         }
         return '回滚建议: 参考快照中的原权限(ls -la 输出)，用 chmod/chown 恢复';
       case ModifyTargetType.fileWrite:
         // mv 命令可以生成具体的回滚命令
-        final mvMatch = RegExp(r'^mv\s+(\S+)\s+(\S+)').firstMatch(target.command);
+        final mvMatch =
+            RegExp(r'^mv\s+(\S+)\s+(\S+)').firstMatch(target.command);
         if (mvMatch != null) {
           final src = mvMatch.group(1)!;
           final dst = mvMatch.group(2)!;
           return '回滚建议: mv $dst $src (将文件移回原位置)';
         }
         // ln -s 可以生成具体的回滚命令（兼容 -sf / -snf 等 flag 变体）
-        final lnMatch = RegExp(r'^ln\s+-\w*s\w*\s+\S+\s+(\S+)').firstMatch(target.command);
+        final lnMatch =
+            RegExp(r'^ln\s+-\w*s\w*\s+\S+\s+(\S+)').firstMatch(target.command);
         if (lnMatch != null) {
           final linkPath = lnMatch.group(1)!;
           return '回滚建议: rm $linkPath (删除刚创建的符号链接)';
@@ -200,9 +214,25 @@ class RollbackAdvisor {
   static bool _isQueryCommand(String cmdLower) {
     // 复用 command_heuristics 的逻辑（这里简化，避免循环依赖）
     final queryPrefixes = [
-      'grep', 'find', 'cat', 'head', 'tail', 'ls', 'stat', 'diff',
-      'ps', 'top', 'systemctl status', 'docker ps', 'kubectl get',
-      'ping', 'curl', 'wget', 'uname', 'whoami', 'pwd',
+      'grep',
+      'find',
+      'cat',
+      'head',
+      'tail',
+      'ls',
+      'stat',
+      'diff',
+      'ps',
+      'top',
+      'systemctl status',
+      'docker ps',
+      'kubectl get',
+      'ping',
+      'curl',
+      'wget',
+      'uname',
+      'whoami',
+      'pwd',
     ];
     return queryPrefixes.any((prefix) => cmdLower.startsWith(prefix));
   }
@@ -211,17 +241,32 @@ class RollbackAdvisor {
     // sed -i
     final sedMatch = RegExp(r'sed\s+-i.*?\s+(\S+)$').firstMatch(cmd);
     if (sedMatch != null) {
-      return ModifyTarget(type: ModifyTargetType.configFile, name: sedMatch.group(1)!, command: cmd);
+      return ModifyTarget(
+          type: ModifyTargetType.configFile,
+          name: sedMatch.group(1)!,
+          command: cmd);
     }
     // cp / mv / rm 涉及配置目录
-    if (cmdLower.startsWith('cp ') || cmdLower.startsWith('mv ') || cmdLower.startsWith('rm ')) {
-      final configPaths = ['/etc/', '/usr/local/etc/', '/opt/', '/var/www/', 'nginx.conf', '.conf'];
+    if (cmdLower.startsWith('cp ') ||
+        cmdLower.startsWith('mv ') ||
+        cmdLower.startsWith('rm ')) {
+      final configPaths = [
+        '/etc/',
+        '/usr/local/etc/',
+        '/opt/',
+        '/var/www/',
+        'nginx.conf',
+        '.conf'
+      ];
       for (final pathPrefix in configPaths) {
         if (cmd.contains(pathPrefix)) {
           // 提取最后一个路径参数
           final parts = cmd.split(RegExp(r'\s+'));
           if (parts.length >= 2) {
-            return ModifyTarget(type: ModifyTargetType.configFile, name: parts.last, command: cmd);
+            return ModifyTarget(
+                type: ModifyTargetType.configFile,
+                name: parts.last,
+                command: cmd);
           }
         }
       }
@@ -231,38 +276,53 @@ class RollbackAdvisor {
     final mvMatch = RegExp(r'^mv\s+(\S+)\s+(\S+)').firstMatch(cmd);
     if (mvMatch != null) {
       final dst = mvMatch.group(2)!;
-      final isBackup = RegExp(r'\.(bak|old|backup|orig)$', caseSensitive: false).hasMatch(dst);
+      final isBackup = RegExp(r'\.(bak|old|backup|orig)$', caseSensitive: false)
+          .hasMatch(dst);
       if (!isBackup) {
-        return ModifyTarget(type: ModifyTargetType.fileWrite, name: dst, command: cmd);
+        return ModifyTarget(
+            type: ModifyTargetType.fileWrite, name: dst, command: cmd);
       }
     }
     // ln -s 创建符号链接（兼容 -sf / -snf 等 flag 变体）
     final lnMatch = RegExp(r'^ln\s+-\w*s\w*\s+(\S+)\s+(\S+)').firstMatch(cmd);
     if (lnMatch != null) {
-      return ModifyTarget(type: ModifyTargetType.fileWrite, name: lnMatch.group(2)!, command: cmd);
+      return ModifyTarget(
+          type: ModifyTargetType.fileWrite,
+          name: lnMatch.group(2)!,
+          command: cmd);
     }
     // cat > / echo > / tee 写入文件
-    final writeMatch = RegExp(r'(?:cat|echo|tee)\s+>?\\?\s*(\S+)').firstMatch(cmd);
+    final writeMatch =
+        RegExp(r'(?:cat|echo|tee)\s+>?\\?\s*(\S+)').firstMatch(cmd);
     if (writeMatch != null) {
       final path = writeMatch.group(1)!;
-      if (path.startsWith('/') || path.contains('.conf') || path.contains('.sh')) {
-        return ModifyTarget(type: ModifyTargetType.fileWrite, name: path, command: cmd);
+      if (path.startsWith('/') ||
+          path.contains('.conf') ||
+          path.contains('.sh')) {
+        return ModifyTarget(
+            type: ModifyTargetType.fileWrite, name: path, command: cmd);
       }
     }
     // heredoc: cat > file << 'EOF'
     final heredocMatch = RegExp(r"cat\s*>\s*(\S+)\s*<<").firstMatch(cmd);
     if (heredocMatch != null) {
-      return ModifyTarget(type: ModifyTargetType.fileWrite, name: heredocMatch.group(1)!, command: cmd);
+      return ModifyTarget(
+          type: ModifyTargetType.fileWrite,
+          name: heredocMatch.group(1)!,
+          command: cmd);
     }
     // crontab 操作（替换/编辑）
     if (cmdLower.startsWith('crontab ') && !cmdLower.contains('-l')) {
-      return ModifyTarget(type: ModifyTargetType.configFile, name: 'crontab', command: cmd);
+      return ModifyTarget(
+          type: ModifyTargetType.configFile, name: 'crontab', command: cmd);
     }
     return null;
   }
 
   static ModifyTarget? _detectServiceModify(String cmdLower) {
-    final serviceMatch = RegExp(r'systemctl\s+(restart|stop|start|disable|enable)\s+(\S+)').firstMatch(cmdLower);
+    final serviceMatch =
+        RegExp(r'systemctl\s+(restart|stop|start|disable|enable)\s+(\S+)')
+            .firstMatch(cmdLower);
     if (serviceMatch != null) {
       return ModifyTarget(
         type: ModifyTargetType.service,
@@ -270,7 +330,8 @@ class RollbackAdvisor {
         command: cmdLower,
       );
     }
-    final oldServiceMatch = RegExp(r'service\s+(\S+)\s+(restart|stop|start)').firstMatch(cmdLower);
+    final oldServiceMatch =
+        RegExp(r'service\s+(\S+)\s+(restart|stop|start)').firstMatch(cmdLower);
     if (oldServiceMatch != null) {
       return ModifyTarget(
         type: ModifyTargetType.service,
@@ -279,7 +340,8 @@ class RollbackAdvisor {
       );
     }
     // update-alternatives --set
-    final altMatch = RegExp(r'update-alternatives\s+--set\s+(\S+)').firstMatch(cmdLower);
+    final altMatch =
+        RegExp(r'update-alternatives\s+--set\s+(\S+)').firstMatch(cmdLower);
     if (altMatch != null) {
       return ModifyTarget(
         type: ModifyTargetType.service,
@@ -304,7 +366,10 @@ class RollbackAdvisor {
     for (final p in patterns) {
       final m = p.firstMatch(cmdLower);
       if (m != null) {
-        return ModifyTarget(type: ModifyTargetType.package, name: m.group(1)!, command: cmdLower);
+        return ModifyTarget(
+            type: ModifyTargetType.package,
+            name: m.group(1)!,
+            command: cmdLower);
       }
     }
     return null;
@@ -313,14 +378,23 @@ class RollbackAdvisor {
   static ModifyTarget? _detectPermissionModify(String cmdLower) {
     final chmodMatch = RegExp(r'chmod\s+\S+\s+(\S+)').firstMatch(cmdLower);
     if (chmodMatch != null) {
-      return ModifyTarget(type: ModifyTargetType.permission, name: chmodMatch.group(1)!, command: cmdLower);
+      return ModifyTarget(
+          type: ModifyTargetType.permission,
+          name: chmodMatch.group(1)!,
+          command: cmdLower);
     }
     final chownMatch = RegExp(r'chown\s+\S+\s+(\S+)').firstMatch(cmdLower);
     if (chownMatch != null) {
-      return ModifyTarget(type: ModifyTargetType.permission, name: chownMatch.group(1)!, command: cmdLower);
+      return ModifyTarget(
+          type: ModifyTargetType.permission,
+          name: chownMatch.group(1)!,
+          command: cmdLower);
     }
-    if (cmdLower.startsWith('useradd') || cmdLower.startsWith('usermod') || cmdLower.startsWith('userdel')) {
-      return ModifyTarget(type: ModifyTargetType.permission, name: 'user', command: cmdLower);
+    if (cmdLower.startsWith('useradd') ||
+        cmdLower.startsWith('usermod') ||
+        cmdLower.startsWith('userdel')) {
+      return ModifyTarget(
+          type: ModifyTargetType.permission, name: 'user', command: cmdLower);
     }
     return null;
   }

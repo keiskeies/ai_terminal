@@ -199,11 +199,11 @@ class ToolResultPresenter {
   static const int maxEventChars = 8000;
 
   static ToolResultView fromResult(ToolResult result) {
-    final text = result.success ? result.output : (result.error ?? result.output);
+    final text =
+        result.success ? result.output : (result.error ?? result.output);
     final truncated = text.length > maxEventChars;
-    final displayed = truncated
-        ? '${text.substring(0, maxEventChars)}\n...(输出已截断)'
-        : text;
+    final displayed =
+        truncated ? '${text.substring(0, maxEventChars)}\n...(输出已截断)' : text;
     return ToolResultView(
       text: text,
       displayed: displayed,
@@ -268,8 +268,7 @@ class ToolBlock {
 class ToolGate {
   const ToolGate._();
 
-  static const String readOnlyObservation =
-      '观测: 当前为只读模式，禁止调用会产生变更的工具。'
+  static const String readOnlyObservation = '观测: 当前为只读模式，禁止调用会产生变更的工具。'
       '请改用只读工具/命令收集信息，或用 finish 告知用户"当前为只读模式，请关闭后重试"。';
 
   /// 返回 null 表示放行。
@@ -332,9 +331,8 @@ class ToolGate {
 class ToolConfirmation {
   const ToolConfirmation._();
 
-  static String reason(bool timedOut) => timedOut
-      ? '确认超时（10 分钟无响应），已自动拒绝'
-      : '用户拒绝执行该操作';
+  static String reason(bool timedOut) =>
+      timedOut ? '确认超时（10 分钟无响应），已自动拒绝' : '用户拒绝执行该操作';
 
   static AgentEvent notice(bool timedOut) => AgentEvent.info(timedOut
       ? '⏱ ${UiText.t('确认超时（10 分钟无响应），已自动拒绝', 'Confirmation timed out (no response for 10 minutes); auto-rejected')}'

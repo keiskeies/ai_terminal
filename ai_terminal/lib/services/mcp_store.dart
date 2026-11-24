@@ -56,8 +56,7 @@ class McpStore {
     for (final config in configs) {
       final headers = await _readMap('headers_${config.id}');
       final env = await _readMap('env_${config.id}');
-      final clientSecret =
-          await _readString('oauthClient_${config.id}') ?? '';
+      final clientSecret = await _readString('oauthClient_${config.id}') ?? '';
       out.add(config.copyWith(
         headers: headers,
         env: env,

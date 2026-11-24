@@ -66,54 +66,58 @@ class _TabItemWidgetState extends State<TabItemWidget> {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-                  Container(
-                    width: 7,
-                    height: 7,
-                    margin: const EdgeInsets.only(right: 6),
+              Container(
+                width: 7,
+                height: 7,
+                margin: const EdgeInsets.only(right: 6),
+                decoration: BoxDecoration(
+                  // 连接中给琥珀色，别让用户把"还在建连"读成"已掉线"
+                  color: switch (tab.status) {
+                    tp.TabStatus.connected => tc.ok,
+                    tp.TabStatus.connecting ||
+                    tp.TabStatus.reconnecting =>
+                      tc.warn,
+                    _ => tc.error,
+                  },
+                  shape: BoxShape.circle,
+                ),
+              ),
+              Flexible(
+                child: Text(
+                  tab.title,
+                  style: TextStyle(
+                    color: isActive ? tc.textMain : tc.textSub,
+                    fontSize: fSmall,
+                    fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ),
+              // 关闭按钮：hover / active 时显示
+              AnimatedOpacity(
+                duration: animFast,
+                opacity: (_isHovered || isActive) ? 1.0 : 0.0,
+                child: GestureDetector(
+                  onTap: widget.onClose,
+                  child: Container(
+                    width: 18,
+                    height: 18,
+                    margin: const EdgeInsets.only(left: 4),
                     decoration: BoxDecoration(
-                      // 连接中给琥珀色，别让用户把"还在建连"读成"已掉线"
-                      color: switch (tab.status) {
-                        tp.TabStatus.connected => tc.ok,
-                        tp.TabStatus.connecting || tp.TabStatus.reconnecting => tc.warn,
-                        _ => tc.error,
-                      },
-                      shape: BoxShape.circle,
+                      color: _isHovered
+                          ? tc.border.withValues(alpha: 0.5)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(rXSmall),
+                    ),
+                    child: Icon(
+                      Icons.close,
+                      size: 10,
+                      color: isActive ? tc.textSub : tc.textMuted,
                     ),
                   ),
-                  Flexible(
-                    child: Text(
-                      tab.title,
-                      style: TextStyle(
-                        color: isActive ? tc.textMain : tc.textSub,
-                        fontSize: fSmall,
-                        fontWeight: isActive ? FontWeight.w500 : FontWeight.normal,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  ),
-                  // 关闭按钮：hover / active 时显示
-                  AnimatedOpacity(
-                    duration: animFast,
-                    opacity: (_isHovered || isActive) ? 1.0 : 0.0,
-                    child: GestureDetector(
-                      onTap: widget.onClose,
-                      child: Container(
-                        width: 18,
-                        height: 18,
-                        margin: const EdgeInsets.only(left: 4),
-                        decoration: BoxDecoration(
-                          color: _isHovered ? tc.border.withValues(alpha: 0.5) : Colors.transparent,
-                          borderRadius: BorderRadius.circular(rXSmall),
-                        ),
-                        child: Icon(
-                          Icons.close,
-                          size: 10,
-                          color: isActive ? tc.textSub : tc.textMuted,
-                        ),
-                      ),
-                    ),
-                  ),
+                ),
+              ),
             ],
           ),
         ),

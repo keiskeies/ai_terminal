@@ -4,18 +4,19 @@ import '../core/l10n_holder.dart';
 enum RunbookType {
   /// AI 执行：自然语言描述任务，AI 按 ReAct 框架执行
   agent,
+
   /// 直接执行：变量替换后在终端直接执行命令
   command,
 }
 
 /// 工作流分类
 enum RunbookCategory {
-  inspection,    // 巡检
-  security,      // 安全
-  deployment,    // 部署
+  inspection, // 巡检
+  security, // 安全
+  deployment, // 部署
   troubleshooting, // 故障排查
-  maintenance,   // 日常维护
-  custom,        // 自定义
+  maintenance, // 日常维护
+  custom, // 自定义
 }
 
 /// 运维工作流 — 用户可沉淀的运维操作模板

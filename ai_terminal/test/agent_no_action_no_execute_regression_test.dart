@@ -57,10 +57,12 @@ void main() {
     await engine.startTask('盘点磁盘和 binlog', executor);
 
     // 引擎侧：不允许出现任何 command 事件
-    final cmds = events.where((e) => e.isCommand).map((e) => e.command).toList();
+    final cmds =
+        events.where((e) => e.isCommand).map((e) => e.command).toList();
     expect(cmds, isEmpty, reason: '无动作行时任何行都不得变成命令: $cmds');
     // 执行器侧：一条命令都不该被下发
-    expect(executor.executed, isEmpty, reason: '不得向终端下发任何命令: ${executor.executed}');
+    expect(executor.executed, isEmpty,
+        reason: '不得向终端下发任何命令: ${executor.executed}');
     // 任务不挂死：正常走完（第 2 轮 finish）
     expect(provider.callCount, greaterThanOrEqualTo(2));
     expect(engine.currentTask?.status, AgentStatus.completed);

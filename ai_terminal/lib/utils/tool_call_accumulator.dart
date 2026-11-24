@@ -160,7 +160,8 @@ class ToolCallAccumulator {
     var out = args;
     // 1. 值尾：转义换行 + 闭合标签（实测最常见的形态）
     out = out.replaceAll(
-      RegExp(r'\\n\s*</\s*(?:parameter|function|antml:parameter|antml:invoke)\s*>',
+      RegExp(
+          r'\\n\s*</\s*(?:parameter|function|antml:parameter|antml:invoke)\s*>',
           caseSensitive: false),
       '',
     );

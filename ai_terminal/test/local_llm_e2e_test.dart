@@ -65,7 +65,11 @@ void main() {
       var connected = false;
 
       try {
-          await connectE2ESsh(ssh, password: _sshPassword!, user: _sshUser!, host: _sshHost!, port: _sshPort);
+        await connectE2ESsh(ssh,
+            password: _sshPassword!,
+            user: _sshUser!,
+            host: _sshHost!,
+            port: _sshPort);
         expect(ssh.isConnected, isTrue);
         connected = true;
 
@@ -123,7 +127,8 @@ void main() {
         print(
             'E2E_PLAN: ${report.plan.map((s) => '${s.status.name}:${s.title}').join(' | ')}');
         // ignore: avoid_print
-        print('E2E_BADGES: ${report.stateBadges.map((b) => b.text).join(', ')}');
+        print(
+            'E2E_BADGES: ${report.stateBadges.map((b) => b.text).join(', ')}');
 
         expect(report.finishState, 'success');
         expect(report.conclusion.trim(), isNotEmpty);
@@ -154,7 +159,11 @@ void main() {
       const path = '/tmp/ai_terminal_llm_cn.txt';
 
       try {
-              await connectE2ESsh(ssh, password: _sshPassword!, user: _sshUser!, host: _sshHost!, port: _sshPort);
+        await connectE2ESsh(ssh,
+            password: _sshPassword!,
+            user: _sshUser!,
+            host: _sshHost!,
+            port: _sshPort);
         expect(ssh.isConnected, isTrue);
         connected = true;
         await ssh.executeAndWait('rm -f $path');

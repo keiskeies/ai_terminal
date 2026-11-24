@@ -92,7 +92,8 @@ final GoRouter appRouter = GoRouter(
     // 内部规范（用户自维护、注入给 AI 的组织约定）
     GoRoute(
       path: '/settings/knowledge_rules',
-      builder: (context, state) => SettingsPage(initialGroup: 'knowledge_rules'),
+      builder: (context, state) =>
+          SettingsPage(initialGroup: 'knowledge_rules'),
     ),
     // 快捷命令
     GoRoute(

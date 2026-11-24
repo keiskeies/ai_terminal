@@ -24,7 +24,18 @@ class UiText {
     if (name == 'zh' || name == 'zh_cn' || name == 'zh_hans') return 'zh';
     if (name == 'en' || name == 'en_us') return 'en';
     for (final l in const [
-      'ar', 'de', 'es', 'fr', 'hi', 'it', 'ja', 'ko', 'pt', 'ru', 'th', 'vi',
+      'ar',
+      'de',
+      'es',
+      'fr',
+      'hi',
+      'it',
+      'ja',
+      'ko',
+      'pt',
+      'ru',
+      'th',
+      'vi',
     ]) {
       if (name.startsWith(l)) return l;
     }

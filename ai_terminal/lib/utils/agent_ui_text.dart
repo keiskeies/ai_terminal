@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../core/l10n_holder.dart';
+import '../core/ui_text.dart';
 import '../l10n/app_localizations.dart';
 import '../models/agent_permission_mode.dart';
 
@@ -49,6 +50,7 @@ class AgentUiText {
   // ── 底部指标带 ──
   String roundsCount(int n) => _l.agentUiRoundsCount(n);
   String stepsCount(int n) => _l.agentUiStepsCount(n);
+
   /// 含估算成分时必须带 `≈`：provider 没给 usage 的那些轮是估出来的，
   /// 把估算说成实测属于失准文案。
   String tokensCount(String n, {required bool estimated}) =>
@@ -85,7 +87,8 @@ class AgentUiText {
   String get paused => _l.agentUiPaused;
   String get idle => _l.agentUiIdle;
   String successCount(int n) => _l.agentUiSuccessCount(n);
-  String planProgress(int done, int total) => _l.agentUiPlanProgress(done, total);
+  String planProgress(int done, int total) =>
+      _l.agentUiPlanProgress(done, total);
   String get toolCall => _l.agentUiToolCall;
   String get blocked => _l.agentUiBlocked;
   String get needsConfirm => _l.agentUiNeedsConfirm;
@@ -101,6 +104,7 @@ class AgentUiText {
   String get confirmExecute => _l.agentUiConfirmExecute;
   String get confirmedLabel => _l.agentUiConfirmedLabel;
   String get confirmedRecord => _l.agentUiConfirmedRecord;
+
   /// 引擎阶段是中文常量；ARB 里 zh 存原常量、其余语言存译文，
   /// 未知阶段原样透传，null 回退到「思考中」。
   String phase(String? raw) {
@@ -150,6 +154,9 @@ class AgentUiText {
         return _l.agentUiFailureLabelSyntaxError;
       case 'cancelled':
         return _l.agentUiFailureLabelCancelled;
+      case 'skipped':
+        // 未派发不是失败，不套用“执行失败”；沿用通用“未执行/not run”文案。
+        return UiText.t('未执行', 'not run');
       default:
         return _l.agentUiFailed;
     }
@@ -221,7 +228,8 @@ class AgentUiText {
   String localFileTrashCleared(int count, String size) =>
       _l.agentUiLocalFileTrashCleared(count, size);
   String get localFileTrashClearRefused => _l.agentUiLocalFileTrashClearRefused;
-  String localFileTrashClearFailed(int count) => _l.agentUiLocalFileTrashClearFailed(count);
+  String localFileTrashClearFailed(int count) =>
+      _l.agentUiLocalFileTrashClearFailed(count);
   // ── local_exec 目录授权 ──
   String get localExecAuthTitle => _l.agentUiLocalExecAuthTitle;
   String localExecAuthBody(String path, String reason, bool willCreate) =>
@@ -232,7 +240,8 @@ class AgentUiText {
 
   String get localExecAuthNote => _l.agentUiLocalExecAuthNote;
   String get localExecAuthAllow => _l.agentUiLocalExecAuthAllow;
-  String localExecAuthorized(String path) => _l.agentUiLocalExecAuthorized(path);
+  String localExecAuthorized(String path) =>
+      _l.agentUiLocalExecAuthorized(path);
   // ── 过程时间线 ──
   String get commandLabel => _l.agentUiCommandLabel;
   String get pendingLabel => _l.agentUiPendingLabel;
@@ -247,10 +256,12 @@ class AgentUiText {
   String toolCallsCount(int n) => _l.agentUiToolCallsCount(n);
   String commandCallsCount(int n) => _l.agentUiCommandCallsCount(n);
   String moreSteps(int n) => _l.agentUiMoreSteps(n);
+
   /// 折叠头要写清"藏了什么"：只报命令数时，用户不知道点开是 3 行还是 1 万行。
   String thoughtCount(int n) =>
       n == 1 ? _l.agentUiThoughtCountOne : _l.agentUiThoughtCount(n);
-  String logCount(int n) => n == 1 ? _l.agentUiLogCountOne : _l.agentUiLogCount(n);
+  String logCount(int n) =>
+      n == 1 ? _l.agentUiLogCountOne : _l.agentUiLogCount(n);
   String progressLines(int n) => _l.agentUiProgressLines(n);
   String get expandEach => _l.agentUiExpandEach;
   String turnLabel(int n) => _l.agentUiTurnLabel(n);
@@ -259,16 +270,14 @@ class AgentUiText {
   String moreOutputLines(int n) => _l.agentUiMoreOutputLines(n);
   // ── 执行权限档位 ──
   String get permissionModeTitle => _l.agentUiPermissionModeTitle;
-  String permissionModeLabel(AgentPermissionMode mode) =>
-      switch (mode) {
+  String permissionModeLabel(AgentPermissionMode mode) => switch (mode) {
         AgentPermissionMode.readOnly => _l.agentUiPermLabelReadOnly,
         AgentPermissionMode.ask => _l.agentUiPermLabelAsk,
         AgentPermissionMode.auto => _l.agentUiPermLabelAuto,
         AgentPermissionMode.fullAuto => _l.agentUiPermLabelFullAuto,
       };
 
-  String permissionModeDescription(AgentPermissionMode mode) =>
-      switch (mode) {
+  String permissionModeDescription(AgentPermissionMode mode) => switch (mode) {
         AgentPermissionMode.readOnly => _l.agentUiPermDescReadOnly,
         AgentPermissionMode.ask => _l.agentUiPermDescAsk,
         AgentPermissionMode.auto => _l.agentUiPermDescAuto,
@@ -277,10 +286,13 @@ class AgentUiText {
 
   String get permissionAllowed => _l.agentUiPermissionAllowed;
   String get permissionNotExecuted => _l.agentUiPermissionNotExecuted;
-  String get permissionModeFullAutoWarningTitle => _l.agentUiPermFullAutoWarningTitle;
-  String get permissionModeFullAutoWarningBody => _l.agentUiPermFullAutoWarningBody;
+  String get permissionModeFullAutoWarningTitle =>
+      _l.agentUiPermFullAutoWarningTitle;
+  String get permissionModeFullAutoWarningBody =>
+      _l.agentUiPermFullAutoWarningBody;
   String get permissionModeEnable => _l.agentUiPermissionEnable;
-  String permissionModeCurrent(String mode) => _l.agentUiPermissionModeCurrent(mode);
+  String permissionModeCurrent(String mode) =>
+      _l.agentUiPermissionModeCurrent(mode);
   String get permissionModeUsage => _l.agentUiPermissionModeUsage;
   String permissionModeSwitched(String mode, String desc) =>
       _l.agentUiPermissionModeSwitched(mode, desc);

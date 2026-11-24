@@ -42,18 +42,22 @@ class _PortForwardDialogState extends State<PortForwardDialog> {
   Future<void> _addRule() async {
     final client = widget.client();
     if (client == null) {
-      setState(() => _formError =
-          UiText.t('当前标签未连接，无法建立转发', 'Tab is not connected'));
+      setState(() =>
+          _formError = UiText.t('当前标签未连接，无法建立转发', 'Tab is not connected'));
       return;
     }
     final bindPort = int.tryParse(_bindPortController.text.trim());
     final targetPort = int.tryParse(_targetPortController.text.trim());
     final targetHost = _targetHostController.text.trim();
-    if (bindPort == null || bindPort <= 0 || bindPort > 65535 ||
-        targetPort == null || targetPort <= 0 || targetPort > 65535 ||
+    if (bindPort == null ||
+        bindPort <= 0 ||
+        bindPort > 65535 ||
+        targetPort == null ||
+        targetPort <= 0 ||
+        targetPort > 65535 ||
         targetHost.isEmpty) {
-      setState(() => _formError =
-          UiText.t('请填写有效的端口（1-65535）和目标主机', 'Enter valid ports (1-65535) and target host'));
+      setState(() => _formError = UiText.t('请填写有效的端口（1-65535）和目标主机',
+          'Enter valid ports (1-65535) and target host'));
       return;
     }
     setState(() {
@@ -121,7 +125,8 @@ class _PortForwardDialogState extends State<PortForwardDialog> {
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Text(
                           UiText.t('暂无转发规则', 'No forwarding rules'),
-                          style: TextStyle(color: tc.textMuted, fontSize: fBody),
+                          style:
+                              TextStyle(color: tc.textMuted, fontSize: fBody),
                         ),
                       );
                     }
@@ -154,9 +159,8 @@ class _PortForwardDialogState extends State<PortForwardDialog> {
                                     '${rule.direction == ForwardDirection.local ? "Local" : "Remote"} · ${rule.connections} connections'),
                             style: TextStyle(
                                 fontSize: fMicro,
-                                color: rule.error != null
-                                    ? tc.error
-                                    : tc.textSub),
+                                color:
+                                    rule.error != null ? tc.error : tc.textSub),
                           ),
                           trailing: IconButton(
                             icon: const Icon(Icons.delete_outline, size: 18),
@@ -184,8 +188,7 @@ class _PortForwardDialogState extends State<PortForwardDialog> {
                   ),
                 ],
                 selected: {_direction},
-                onSelectionChanged: (s) =>
-                    setState(() => _direction = s.first),
+                onSelectionChanged: (s) => setState(() => _direction = s.first),
               ),
               const SizedBox(height: 12),
               Row(

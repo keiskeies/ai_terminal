@@ -3,14 +3,15 @@ import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:dartssh2/dartssh2.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import '../models/host_config.dart';
 import '../core/ssh_algorithms.dart';
 import '../core/credentials_store.dart';
 import '../utils/adaptive_concurrency.dart';
+import '../utils/local_file_ops.dart';
 
 /// SFTP 文件条目
 class SftpEntry {
@@ -36,15 +37,19 @@ class SftpEntry {
     if (isDirectory) return '--';
     if (size < 1024) return '$size B';
     if (size < 1024 * 1024) return '${(size / 1024).toStringAsFixed(1)} KB';
-    if (size < 1024 * 1024 * 1024) return '${(size / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (size < 1024 * 1024 * 1024)
+      return '${(size / (1024 * 1024)).toStringAsFixed(1)} MB';
     return '${(size / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
   }
 
   String get displayPermissions {
     final mode = permissions;
-    final owner = _permChar(mode, 8, 'r') + _permChar(mode, 7, 'w') + _execChar(mode, 6);
-    final group = _permChar(mode, 5, 'r') + _permChar(mode, 4, 'w') + _execChar(mode, 3);
-    final other = _permChar(mode, 2, 'r') + _permChar(mode, 1, 'w') + _execChar(mode, 0);
+    final owner =
+        _permChar(mode, 8, 'r') + _permChar(mode, 7, 'w') + _execChar(mode, 6);
+    final group =
+        _permChar(mode, 5, 'r') + _permChar(mode, 4, 'w') + _execChar(mode, 3);
+    final other =
+        _permChar(mode, 2, 'r') + _permChar(mode, 1, 'w') + _execChar(mode, 0);
     return (isDirectory ? 'd' : '-') + owner + group + other;
   }
 
@@ -57,8 +62,7 @@ class SftpEntry {
 
   String _permChar(int mode, int bit, String char) =>
       (mode & (1 << bit)) != 0 ? char : '-';
-  String _execChar(int mode, int bit) =>
-      (mode & (1 << bit)) != 0 ? 'x' : '-';
+  String _execChar(int mode, int bit) => (mode & (1 << bit)) != 0 ? 'x' : '-';
 }
 
 /// 目录上传结果
@@ -87,10 +91,9 @@ class UploadDirectoryResult {
       final change = initialConcurrency == finalConcurrency
           ? '$initialConcurrency'
           : '$initialConcurrency → $finalConcurrency';
-      final dropped = finalConcurrency > 0 &&
-          finalConcurrency < initialConcurrency;
-      buffer.writeln(
-          '并发: $change${dropped ? '（连续失败后降速）' : ''}');
+      final dropped =
+          finalConcurrency > 0 && finalConcurrency < initialConcurrency;
+      buffer.writeln('并发: $change${dropped ? '（连续失败后降速）' : ''}');
     }
     if (failedFiles.isNotEmpty) {
       buffer.writeln('失败 ${failedFiles.length} 个:');
@@ -160,12 +163,88 @@ class SftpService {
 
   bool get isConnected => _isConnected;
 
+  SftpService();
+
+  @visibleForTesting
+  SftpService.forTesting(SftpClient client)
+      : _sftp = client,
+        _isConnected = true;
+
+  void _throwIfCancelled(Completer<void>? cancelToken) {
+    if (cancelToken?.isCompleted == true) {
+      throw const SftpTransferCancelled();
+    }
+  }
+
+  Future<void> _validateLocal(
+      LocalPathAuthorizer? validate, String rawPath, String expectedPath,
+      {Completer<void>? cancelToken}) async {
+    _throwIfCancelled(cancelToken);
+    final denial = await validate?.call(rawPath, expectedPath);
+    _throwIfCancelled(cancelToken);
+    if (denial != null) {
+      throw FileSystemException('本地路径授权失败: $denial');
+    }
+  }
+
+  Future<T> _withCancellation<T>(
+    Future<T> future,
+    Completer<void>? cancelToken, {
+    Future<void> Function()? onCancel,
+  }) async {
+    if (cancelToken == null) return future;
+    if (cancelToken.isCompleted) {
+      // 已取消时也不能让传入的后台 future 产生未处理异常。
+      future.ignore();
+      _throwIfCancelled(cancelToken);
+    }
+    final cancellation = cancelToken.future.then<T>((_) async {
+      try {
+        await onCancel?.call();
+      } catch (_) {
+        // 中止失败不掩盖取消语义；调用方仍会关闭资源。
+      }
+      throw const SftpTransferCancelled();
+    });
+    return await Future.any<T>([future, cancellation]);
+  }
+
+  Future<void> _writeRemoteStream(
+    SftpFile file,
+    Stream<List<int>> stream, {
+    Completer<void>? cancelToken,
+    void Function(int total)? onProgress,
+  }) async {
+    _throwIfCancelled(cancelToken);
+    final uint8Stream = stream
+        .map((chunk) => chunk is Uint8List ? chunk : Uint8List.fromList(chunk));
+    final writer = file.write(uint8Stream, onProgress: onProgress);
+    if (cancelToken != null) {
+      unawaited(cancelToken.future.then((_) async {
+        try {
+          await writer.abort();
+        } catch (_) {
+          // writer 可能已正常完成；取消竞态由 done/isCompleted 判定。
+        }
+      }, onError: (Object _) {}));
+    }
+    await _withCancellation(writer.done, cancelToken);
+    _throwIfCancelled(cancelToken);
+  }
+
   /// 连接 SSH 并打开 SFTP 子系统
   Future<void> connect({
     required HostConfig config,
     String? password,
     String? privateKeyContent,
   }) async {
+    // R2: 本次尝试创建的资源先留在局部变量里，全部成功后才写入字段。
+    // 失败时只回收本次创建的 socket/client，不能把半开的连接留给下一次重连。
+    SSHSocket? jumpSocket;
+    SSHClient? jumpClient;
+    SSHSocket? socket;
+    SSHClient? client;
+    SftpClient? sftp;
     try {
       // 跳板机
       if (config.hasJumpHost) {
@@ -178,15 +257,17 @@ class SftpService {
           authType: config.jumpAuthType ?? 'password',
         );
         final jumpPassword = await CredentialsStore.get(
-          hostId: '${config.id}_jump', type: 'password',
+          hostId: '${config.id}_jump',
+          type: 'password',
         );
         final jumpPrivateKey = await CredentialsStore.get(
-          hostId: '${config.id}_jump', type: 'privateKey',
+          hostId: '${config.id}_jump',
+          type: 'privateKey',
         );
 
-        _jumpSocket = await SSHSocket.connect(jumpConfig.host, jumpConfig.port);
-        _jumpClient = SSHClient(
-          _jumpSocket!,
+        jumpSocket = await SSHSocket.connect(jumpConfig.host, jumpConfig.port);
+        jumpClient = SSHClient(
+          jumpSocket,
           username: jumpConfig.username,
           onPasswordRequest: () => jumpPassword ?? '',
           algorithms: kFastSshAlgorithms,
@@ -194,14 +275,13 @@ class SftpService {
               ? [...SSHKeyPair.fromPem(jumpPrivateKey)]
               : null,
         );
-        final forwardSocket = await _jumpClient!.forwardLocal(config.host, config.port);
-        _socket = forwardSocket;
+        socket = await jumpClient.forwardLocal(config.host, config.port);
       } else {
-        _socket = await SSHSocket.connect(config.host, config.port);
+        socket = await SSHSocket.connect(config.host, config.port);
       }
 
-      _client = SSHClient(
-        _socket!,
+      client = SSHClient(
+        socket,
         username: config.username,
         onPasswordRequest: () => password ?? '',
         algorithms: kFastSshAlgorithms,
@@ -210,10 +290,31 @@ class SftpService {
             : null,
       );
 
-      _sftp = await _client!.sftp();
+      sftp = await client.sftp();
+
+      _jumpSocket = jumpSocket;
+      _jumpClient = jumpClient;
+      _socket = socket;
+      _client = client;
+      _sftp = sftp;
       _isConnected = true;
     } catch (e) {
       _isConnected = false;
+      try {
+        sftp?.close();
+      } catch (_) {}
+      try {
+        client?.close();
+      } catch (_) {}
+      try {
+        socket?.destroy();
+      } catch (_) {}
+      try {
+        jumpClient?.close();
+      } catch (_) {}
+      try {
+        jumpSocket?.destroy();
+      } catch (_) {}
       rethrow;
     }
   }
@@ -222,10 +323,14 @@ class SftpService {
   /// 用于 agent 工具调用场景：从 SSHService 拿到已认证的 SSHClient
   Future<void> attachToClient(SSHClient client) async {
     try {
+      final sftp = await client.sftp();
       _client = client;
-      _sftp = await client.sftp();
+      _sftp = sftp;
       _isConnected = true;
     } catch (e) {
+      // 借用的 SSHClient 不能关闭；子通道打开失败时也不要留下半附着状态。
+      _client = null;
+      _sftp = null;
       _isConnected = false;
       rethrow;
     }
@@ -247,8 +352,12 @@ class SftpService {
     void Function(int uploaded, int total)? onProgress,
     int? concurrency,
     Completer<void>? cancelToken,
+    LocalPathAuthorizer? validateLocalPath,
   }) async {
     if (_sftp == null) throw Exception('SFTP 未连接');
+    _throwIfCancelled(cancelToken);
+    await _validateLocal(validateLocalPath, localDir, localDir,
+        cancelToken: cancelToken);
 
     final localDirObj = Directory(localDir);
     if (!await localDirObj.exists()) {
@@ -260,7 +369,8 @@ class SftpService {
     final allDirs = <String>[];
 
     // 1. 收集所有要上传的文件和目录（排除指定目录）
-    await for (final entity in localDirObj.list(recursive: true, followLinks: false)) {
+    await for (final entity
+        in localDirObj.list(recursive: true, followLinks: false)) {
       final relative = p.relative(entity.path, from: localDir);
       final parts = p.split(relative);
       final excluded = parts.any((part) => excludeNames.contains(part));
@@ -282,7 +392,11 @@ class SftpService {
     //    小文件是每文件往返延迟受限，高并发；大文件受 2MB 通道窗口限制，
     //    多开只会排队并增加服务端句柄/内存。
     final fixedConcurrency = concurrency?.clamp(1, 16).toInt();
-    final averageBytes = await _averageFileSize(allFiles);
+    final averageBytes = await _averageFileSize(
+      allFiles,
+      validateLocalPath: validateLocalPath,
+      cancelToken: cancelToken,
+    );
     final controller = AdaptiveConcurrency(
       initial: fixedConcurrency ??
           chooseInitialUploadConcurrency(
@@ -328,14 +442,14 @@ class SftpService {
     Future<void> uploadOne(File file) async {
       final relative = p.relative(file.path, from: localDir);
       // R6: 远程路径用 posix join
-      final remotePath =
-          p.posix.join(remoteDir, p.split(relative).join('/'));
+      final remotePath = p.posix.join(remoteDir, p.split(relative).join('/'));
       try {
         await uploadFile(
           file.path,
           remotePath,
           checkExisting: false,
           cancelToken: cancelToken,
+          validateLocalPath: validateLocalPath,
         );
         result.uploadedFiles++;
         controller.onSuccess();
@@ -393,7 +507,11 @@ class SftpService {
   }
 
   /// 采样最多 32 个文件估算平均大小；本地 stat 很便宜，但不要 2 万次全读。
-  Future<double> _averageFileSize(List<File> files) async {
+  Future<double> _averageFileSize(
+    List<File> files, {
+    required LocalPathAuthorizer? validateLocalPath,
+    required Completer<void>? cancelToken,
+  }) async {
     if (files.isEmpty) return 0;
     const sampleCount = 32;
     final step = files.length <= sampleCount ? 1 : files.length ~/ sampleCount;
@@ -401,17 +519,29 @@ class SftpService {
     var count = 0;
     for (var i = 0; i < files.length && count < sampleCount; i += step) {
       try {
+        await _validateLocal(validateLocalPath, files[i].path, files[i].path,
+            cancelToken: cancelToken);
         total += await files[i].length();
         count++;
+      } on SftpTransferCancelled {
+        rethrow;
       } catch (_) {
-        // 文件在遍历后消失：跳过样本，不影响上传阶段的失败统计
+        // 文件在遍历后消失：跳过样本，不影响上传阶段的失败统计。
+        // 授权拒绝不属于消失，必须 fail-closed，不能降级成无权限样本。
+        if (validateLocalPath != null) {
+          final denial = await validateLocalPath(files[i].path, files[i].path);
+          if (denial != null) {
+            throw FileSystemException('本地路径授权失败: $denial');
+          }
+        }
       }
     }
     return count == 0 ? 0 : total / count;
   }
 
   /// 递归确保远程目录存在（类似 mkdir -p）
-  Future<void> _ensureRemoteDir(String remotePath) => ensureDirectory(remotePath);
+  Future<void> _ensureRemoteDir(String remotePath) =>
+      ensureDirectory(remotePath);
 
   /// 列出目录内容
   Future<List<SftpEntry>> listDirectory(String path) async {
@@ -511,27 +641,59 @@ class SftpService {
     }
   }
 
-  /// 远程文件复制（用于 H3/H5 备份）
-  /// 通过 read → write 实现，不依赖服务端 cp 命令（跨平台兼容）
-  Future<void> copyFile(String srcPath, String dstPath) async {
+  /// 远程文件复制（用于 H3/H5 备份）。
+  /// 流式读取并按实际字节计数，拒绝伪造的小 stat / 读取期间增长；源句柄必关。
+  Future<void> copyFile(
+    String srcPath,
+    String dstPath, {
+    int maxBytes = 10 * 1024 * 1024,
+    Completer<void>? cancelToken,
+  }) async {
     if (_sftp == null) throw Exception('SFTP 未连接');
+    _throwIfCancelled(cancelToken);
+    if (maxBytes < 0) throw ArgumentError.value(maxBytes, 'maxBytes');
 
-    // 读源文件
     final srcFile = await _sftp!.open(srcPath);
-    final bytes = await srcFile.readBytes();
-    await srcFile.close();
-
-    // 写目标
-    final dstFile = await _sftp!.open(
-      dstPath,
-      mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.truncate,
-    );
+    SftpFile? dstFile;
     try {
-      final stream = Stream.fromIterable([bytes]);
-      final writer = dstFile.write(stream);
-      await writer.done;
+      final sourceStat = await srcFile.stat();
+      if (sourceStat.isDirectory) {
+        throw Exception('远程源路径是目录，不能复制: $srcPath');
+      }
+      if ((sourceStat.size ?? 0) > maxBytes) {
+        throw Exception('远程源文件超过 $maxBytes 字节上限，拒绝复制: $srcPath');
+      }
+      _throwIfCancelled(cancelToken);
+      dstFile = await _sftp!.open(
+        dstPath,
+        mode: SftpFileOpenMode.create |
+            SftpFileOpenMode.write |
+            SftpFileOpenMode.truncate,
+      );
+      var copied = 0;
+      Stream<Uint8List> cappedSource() async* {
+        await for (final chunk in srcFile.read()) {
+          _throwIfCancelled(cancelToken);
+          copied += chunk.length;
+          if (copied > maxBytes) {
+            throw Exception('远程源文件实际读取超过 $maxBytes 字节上限: $srcPath');
+          }
+          yield chunk;
+        }
+      }
+
+      await _writeRemoteStream(
+        dstFile,
+        cappedSource(),
+        cancelToken: cancelToken,
+      );
+      _throwIfCancelled(cancelToken);
     } finally {
-      await dstFile.close();
+      try {
+        await dstFile?.close();
+      } finally {
+        await srcFile.close();
+      }
     }
   }
 
@@ -589,8 +751,8 @@ class SftpService {
       if (!part.startsWith(prefix) || !part.endsWith(downloadPartSuffix)) {
         continue;
       }
-      final tok =
-          part.substring(prefix.length, part.length - downloadPartSuffix.length);
+      final tok = part.substring(
+          prefix.length, part.length - downloadPartSuffix.length);
       if (tok != token) {
         stale.add(part);
         continue;
@@ -649,14 +811,20 @@ class SftpService {
   ///
   /// 先写同目录临时文件，完整落盘后再原子替换目标；中途失败只删除临时文件，
   /// 不会把目标文件截断成半成品。自动创建本地父目录。
-  Future<void> downloadFile(String remotePath, String localPath,
-      {void Function(int, int)? onProgress}) async {
+  Future<void> downloadFile(
+    String remotePath,
+    String localPath, {
+    void Function(int, int)? onProgress,
+    Completer<void>? cancelToken,
+    LocalPathAuthorizer? validateLocalPath,
+  }) async {
     if (_sftp == null) throw Exception('SFTP 未连接');
-
+    _throwIfCancelled(cancelToken);
     final localParent = p.dirname(localPath);
-    if (localParent.isNotEmpty && localParent != '.') {
-      await Directory(localParent).create(recursive: true);
-    }
+    await _validateLocal(validateLocalPath, localParent, localParent,
+        cancelToken: cancelToken);
+    await _validateLocal(validateLocalPath, localPath, localPath,
+        cancelToken: cancelToken);
 
     final remoteStat = await statFile(remotePath);
     if (remoteStat == null) {
@@ -666,79 +834,160 @@ class SftpService {
       throw Exception('远程路径是目录，不能按文件下载: $remotePath');
     }
     final totalSize = remoteStat.size ?? 0;
-
-    // 断点续传：临时文件名带远程指纹，指纹变了（远程文件被改）说明残留字节
-    // 不再可用，删掉整体重下；指纹相同则从已下载长度处续传。
-    final token = resumeToken(remotePath, totalSize, remoteStat.modifyTime);
-    final tempPath = partPathFor(localPath, token);
-    var offset = 0;
-    var hasOwnPart = false;
-    try {
-      final part = File(tempPath);
-      if (await part.exists()) {
-        hasOwnPart = true;
-        final len = await part.length();
-        if (len >= totalSize && totalSize > 0) {
-          // 字节齐了但没改名：上次在 close→rename 之间被打断，直接落位
-          await part.rename(localPath);
-          onProgress?.call(totalSize, totalSize);
-          return;
-        }
-        if (len > 0) offset = len;
-      }
-    } catch (_) {
-      // 指纹判定失败按「无残留」处理，最坏是重下一遍，不会拼坏文件
-    }
-    // 只在确实碰到残留时扫目录：批量下载的热路径不背这个开销
-    if (hasOwnPart) {
-      await _deleteStaleParts(localParent, localPath, token, totalSize);
-    }
-
     final remoteFile = await _sftp!.open(remotePath);
-    IOSink? sink;
-    final progress = _ProgressThrottle();
-    final base = offset;
+    RandomAccessFile? localHandle;
     try {
-      sink = File(tempPath).openWrite(
-          mode: offset > 0 ? FileMode.append : FileMode.write);
-      await for (final chunk in remoteFile.read(
-          offset: offset,
-          onProgress: (bytesRead) {
-            final done = base + bytesRead;
-            if (progress.shouldReport(done, totalSize)) {
-              onProgress?.call(done, totalSize);
-            }
-          })) {
-        sink.add(chunk);
+      final openedRemoteStat = await remoteFile.stat();
+      if (!_sameRemoteIdentity(remoteStat, openedRemoteStat)) {
+        throw Exception('远程文件句柄与路径身份不一致，已中止下载: $remotePath');
       }
-      await sink.flush();
-      await sink.close();
-      sink = null;
-      onProgress?.call(totalSize, totalSize);
-    } catch (_) {
-      try {
-        await sink?.close();
-      } catch (_) {}
-      // 失败保留 .part 供下次续传；续传能力优先于「不留垃圾文件」
-      rethrow;
-    } finally {
-      await remoteFile.close();
-    }
 
-    try {
+      if (localParent.isNotEmpty && localParent != '.') {
+        final parentBefore = await Directory(localParent).exists()
+            ? await Directory(localParent).stat()
+            : null;
+        await _validateLocal(validateLocalPath, localParent, localParent,
+            cancelToken: cancelToken);
+        await Directory(localParent).create(recursive: true);
+        await _validateLocal(validateLocalPath, localParent, localParent,
+            cancelToken: cancelToken);
+        final parentAfter = await Directory(localParent).stat();
+        if (parentBefore != null &&
+            !sameLocalFileIdentity(parentBefore, parentAfter)) {
+          throw Exception('本地父目录在创建/复核期间身份变化，已中止: $localParent');
+        }
+      }
+
+      final targetBefore =
+          await File(localPath).exists() ? await File(localPath).stat() : null;
+      await _validateLocal(validateLocalPath, localPath, localPath,
+          cancelToken: cancelToken);
+
+      // 断点续传：临时文件名带远程指纹，指纹变了（远程文件被改）说明残留字节
+      // 不再可用，删掉整体重下；指纹相同则从已下载长度处续传。
+      final token = resumeToken(remotePath, totalSize, remoteStat.modifyTime);
+      final tempPath = partPathFor(localPath, token);
+      final part = File(tempPath);
+      var offset = 0;
+      var hasOwnPart = false;
+      var partBefore = await part.exists() ? await part.stat() : null;
+      if (partBefore != null) {
+        hasOwnPart = true;
+        await _validateLocal(validateLocalPath, tempPath, tempPath,
+            cancelToken: cancelToken);
+        final len = partBefore.size;
+        if (len >= totalSize && totalSize > 0) {
+          // 不信任“恰好写完”的残留：重新传输并校验远端句柄身份。
+          await part.delete();
+          partBefore = null;
+          offset = 0;
+        } else if (len > 0 && totalSize > 0) {
+          offset = len;
+        }
+      }
+      if (hasOwnPart) {
+        await _deleteStaleParts(localParent, localPath, token, totalSize);
+      }
+
+      await _validateLocal(validateLocalPath, tempPath, tempPath,
+          cancelToken: cancelToken);
+      localHandle = await openVerifiedLocalFile(
+        file: part,
+        mode: FileMode.append,
+        before: partBefore,
+        authorizePath: validateLocalPath,
+      );
+      if (offset == 0) {
+        // append 打开保证授权复核前不截断；验证后才清空重下。
+        await localHandle.truncate(0);
+        await localHandle.setPosition(0);
+      }
+      final progress = _ProgressThrottle();
+      final iterator = StreamIterator<Uint8List>(remoteFile.read(
+        offset: offset,
+        onProgress: (bytesRead) {
+          final done = offset + bytesRead;
+          if (progress.shouldReport(done, totalSize)) {
+            onProgress?.call(done, totalSize);
+          }
+        },
+      ));
+      var downloaded = 0;
+      try {
+        while (await _withCancellation(iterator.moveNext(), cancelToken)) {
+          final chunk = iterator.current;
+          downloaded += chunk.length;
+          await _withCancellation(localHandle.writeFrom(chunk), cancelToken);
+        }
+      } finally {
+        await iterator.cancel();
+      }
+      await _withCancellation(localHandle.flush(), cancelToken);
+      final actualSize = await localHandle.length();
+      if (actualSize != offset + downloaded ||
+          (totalSize > 0 && actualSize != totalSize)) {
+        throw Exception('下载长度校验失败: $localPath');
+      }
+      if (!_sameRemoteIdentity(remoteStat, await remoteFile.stat())) {
+        throw Exception('远程文件在下载期间发生变化，已中止: $remotePath');
+      }
+      final partAfter = await part.stat();
+      if (partAfter.size != actualSize) {
+        throw Exception('下载临时文件句柄与路径长度不一致: $tempPath');
+      }
+      await _validateLocal(validateLocalPath, tempPath, tempPath,
+          cancelToken: cancelToken);
+      await _validateLocal(validateLocalPath, localParent, localParent,
+          cancelToken: cancelToken);
+      await _validateLocal(validateLocalPath, localPath, localPath,
+          cancelToken: cancelToken);
+      _throwIfCancelled(cancelToken);
+      final targetNow =
+          await File(localPath).exists() ? await File(localPath).stat() : null;
+      if (targetBefore == null && targetNow != null ||
+          targetBefore != null &&
+              (targetNow == null ||
+                  !sameLocalFileIdentity(targetBefore, targetNow))) {
+        throw Exception('下载目标在传输期间被外部修改，已拒绝替换: $localPath');
+      }
+      await localHandle.close();
+      localHandle = null;
+      await _validateLocal(validateLocalPath, tempPath, tempPath,
+          cancelToken: cancelToken);
+      await _validateLocal(validateLocalPath, localPath, localPath,
+          cancelToken: cancelToken);
       await File(tempPath).rename(localPath);
-    } catch (e) {
-      throw Exception('下载已完成但保存到 $localPath 失败: $e；临时文件保留在 $tempPath');
+      await _validateLocal(validateLocalPath, localPath, localPath,
+          cancelToken: cancelToken);
+      onProgress?.call(totalSize, totalSize);
+    } finally {
+      try {
+        await remoteFile.close();
+      } finally {
+        await localHandle?.close();
+      }
     }
   }
 
-  Future<void> _deleteStaleParts(
-      String localParent, String localPath, String token, int remoteSize) async {
+  bool _sameRemoteIdentity(SftpFileAttrs before, SftpFileAttrs after) =>
+      before.size == after.size &&
+      before.modifyTime == after.modifyTime &&
+      before.isDirectory == after.isDirectory &&
+      before.isSymbolicLink == after.isSymbolicLink &&
+      before.mode?.value == after.mode?.value;
+
+  Future<void> _deleteStaleParts(String localParent, String localPath,
+      String token, int remoteSize) async {
     try {
       final dir = Directory(localParent.isEmpty ? '.' : localParent);
       if (!dir.existsSync()) return;
-      final existing = dir.listSync(followLinks: false).whereType<File>().map((f) => f.path).toList();
-      for (final stale in pickResumePart(existing, localPath, token, remoteSize).stale) {
+      final existing = dir
+          .listSync(followLinks: false)
+          .whereType<File>()
+          .map((f) => f.path)
+          .toList();
+      for (final stale
+          in pickResumePart(existing, localPath, token, remoteSize).stale) {
         try {
           await File(stale).delete();
         } catch (_) {}
@@ -753,74 +1002,116 @@ class SftpService {
   /// [checkExisting] 为 false 时跳过目标路径的远程 stat；目录批量上传已知
   /// 目标是文件路径，可省掉每文件一次往返。
   /// [cancelToken] 完成时中止当前 writer，已完成的文件保留。
-  Future<void> uploadFile(String localPath, String remotePath,
-      {void Function(int, int)? onProgress,
-      bool checkExisting = true,
-      Completer<void>? cancelToken}) async {
+  Future<int> uploadFile(
+    String localPath,
+    String remotePath, {
+    void Function(int, int)? onProgress,
+    bool checkExisting = true,
+    Completer<void>? cancelToken,
+    LocalPathAuthorizer? validateLocalPath,
+  }) async {
     if (_sftp == null) throw Exception('SFTP 未连接');
+    _throwIfCancelled(cancelToken);
+    await _validateLocal(validateLocalPath, localPath, localPath,
+        cancelToken: cancelToken);
 
     final localFile = File(localPath);
-    final totalSize = await localFile.length();
-
-    if (checkExisting) {
-      final existing = await statFile(remotePath);
-      if (existing != null && existing.isDirectory) {
-        throw Exception('远程目标是目录，不能按文件上传: $remotePath');
-      }
+    final before = await localFile.stat();
+    if (before.type != FileSystemEntityType.file) {
+      throw Exception('本地上传源不是普通文件: $localPath');
     }
-
-    final remoteParent = p.posix.dirname(remotePath);
-    final tempName =
-        '.${p.posix.basename(remotePath)}.ai-upload-${_tempToken()}.part';
-    final tempPath = remoteParent == '.'
-        ? tempName
-        : p.posix.join(remoteParent, tempName);
-
+    final source = await openVerifiedLocalFile(
+      file: localFile,
+      mode: FileMode.read,
+      before: before,
+      authorizePath: validateLocalPath,
+    );
+    var totalSize = 0;
+    var uploaded = 0;
     try {
-      final remoteFile = await _sftp!.open(
-        tempPath,
-        mode: SftpFileOpenMode.create |
-            SftpFileOpenMode.write |
-            SftpFileOpenMode.truncate,
-      );
+      // 放进 try：length() 抛错时 finally 仍会关闭源句柄，避免文件句柄泄漏。
+      totalSize = await source.length();
+      await _validateLocal(validateLocalPath, localPath, localPath,
+          cancelToken: cancelToken);
+      if (checkExisting) {
+        final existing = await statFile(remotePath);
+        if (existing != null && existing.isDirectory) {
+          throw Exception('远程目标是目录，不能按文件上传: $remotePath');
+        }
+      }
+
+      final remoteParent = p.posix.dirname(remotePath);
+      final tempName =
+          '.${p.posix.basename(remotePath)}.ai-upload-${_tempToken()}.part';
+      final tempPath =
+          remoteParent == '.' ? tempName : p.posix.join(remoteParent, tempName);
+
       try {
-        final stream =
-            localFile.openRead().map((chunk) => Uint8List.fromList(chunk));
-        final progress = _ProgressThrottle();
-        final writer = remoteFile.write(
-          stream,
-          onProgress: (total) {
-            if (progress.shouldReport(total, totalSize)) {
-              onProgress?.call(total, totalSize);
-            }
-          },
+        final remoteFile = await _sftp!.open(
+          tempPath,
+          mode: SftpFileOpenMode.create |
+              SftpFileOpenMode.write |
+              SftpFileOpenMode.truncate,
         );
-        if (cancelToken != null) {
-          unawaited(cancelToken.future.then((_) async {
-            try {
-              await writer.abort();
-            } catch (_) {}
-          }));
-        }
-        await writer.done;
-        if (cancelToken?.isCompleted == true) {
-          throw const SftpTransferCancelled();
-        }
-        onProgress?.call(totalSize, totalSize);
-      } finally {
         try {
-          await remoteFile.close();
+          final progress = _ProgressThrottle();
+          Stream<Uint8List> remainingSource() async* {
+            while (true) {
+              final chunk = await source.read(64 * 1024);
+              if (chunk.isEmpty) break;
+              yield chunk;
+            }
+          }
+
+          Stream<Uint8List> verifiedSource() async* {
+            await for (final chunk in remainingSource()) {
+              _throwIfCancelled(cancelToken);
+              uploaded += chunk.length;
+              if (uploaded > totalSize) {
+                throw Exception('本地上传源在读取期间增长，已中止: $localPath');
+              }
+              yield chunk;
+            }
+          }
+
+          await _writeRemoteStream(
+            remoteFile,
+            verifiedSource(),
+            cancelToken: cancelToken,
+            onProgress: (total) {
+              if (progress.shouldReport(total, totalSize)) {
+                onProgress?.call(total, totalSize);
+              }
+            },
+          );
+          if (uploaded != totalSize || await source.length() != totalSize) {
+            throw Exception('本地上传源在传输期间发生变化，已中止: $localPath');
+          }
+          final after = await localFile.stat();
+          if (!sameLocalFileIdentity(before, after)) {
+            throw Exception('本地上传源路径身份在传输后发生变化，已中止: $localPath');
+          }
+          final denial = await validateLocalPath?.call(localPath, localPath);
+          if (denial != null) {
+            throw FileSystemException('本地路径授权复核失败: $denial');
+          }
+          onProgress?.call(totalSize, totalSize);
+        } finally {
+          try {
+            await remoteFile.close();
+          } catch (_) {}
+        }
+        _throwIfCancelled(cancelToken);
+        await _renameReplace(tempPath, remotePath);
+        return totalSize;
+      } catch (_) {
+        try {
+          await _sftp!.remove(tempPath);
         } catch (_) {}
+        rethrow;
       }
-      if (cancelToken?.isCompleted == true) {
-        throw const SftpTransferCancelled();
-      }
-      await _renameReplace(tempPath, remotePath);
-    } catch (_) {
-      try {
-        await _sftp!.remove(tempPath);
-      } catch (_) {}
-      rethrow;
+    } finally {
+      await source.close();
     }
   }
 
@@ -832,8 +1123,13 @@ class SftpService {
     String localDir, {
     List<String> excludeNames = const ['node_modules', '.git', '.DS_Store'],
     void Function(int downloaded, int total)? onProgress,
+    Completer<void>? cancelToken,
+    LocalPathAuthorizer? validateLocalPath,
   }) async {
     if (_sftp == null) throw Exception('SFTP 未连接');
+    _throwIfCancelled(cancelToken);
+    await _validateLocal(validateLocalPath, localDir, localDir,
+        cancelToken: cancelToken);
 
     final result = DownloadDirectoryResult();
     final relativeFiles = <String>[];
@@ -845,19 +1141,35 @@ class SftpService {
       relativeFiles,
       relativeDirs,
       result,
+      cancelToken,
     );
     result.totalFiles = relativeFiles.length;
 
+    await _validateLocal(validateLocalPath, localDir, localDir,
+        cancelToken: cancelToken);
     await Directory(localDir).create(recursive: true);
+    await _validateLocal(validateLocalPath, localDir, localDir,
+        cancelToken: cancelToken);
     for (final relative in relativeDirs) {
+      _throwIfCancelled(cancelToken);
       final localPath = p.joinAll([localDir, ...p.posix.split(relative)]);
+      await _validateLocal(validateLocalPath, localPath, localPath,
+          cancelToken: cancelToken);
       await Directory(localPath).create(recursive: true);
+      await _validateLocal(validateLocalPath, localPath, localPath,
+          cancelToken: cancelToken);
     }
     for (final relative in relativeFiles) {
+      _throwIfCancelled(cancelToken);
       final remotePath = p.posix.join(remoteDir, relative);
       final localPath = p.joinAll([localDir, ...p.posix.split(relative)]);
       try {
-        await downloadFile(remotePath, localPath);
+        await downloadFile(
+          remotePath,
+          localPath,
+          cancelToken: cancelToken,
+          validateLocalPath: validateLocalPath,
+        );
         result.downloadedFiles++;
         onProgress?.call(result.downloadedFiles, result.totalFiles);
       } catch (e) {
@@ -875,13 +1187,15 @@ class SftpService {
     List<String> out,
     List<String> outDirs,
     DownloadDirectoryResult result,
+    Completer<void>? cancelToken,
   ) async {
+    _throwIfCancelled(cancelToken);
     final entries = await listDirectory(dirPath);
     for (final entry in entries) {
+      _throwIfCancelled(cancelToken);
       if (excludeNames.contains(entry.name)) continue;
-      final childRelative = relative.isEmpty
-          ? entry.name
-          : p.posix.join(relative, entry.name);
+      final childRelative =
+          relative.isEmpty ? entry.name : p.posix.join(relative, entry.name);
       if (entry.isDirectory) {
         outDirs.add(childRelative);
         await _collectRemoteFiles(
@@ -891,6 +1205,7 @@ class SftpService {
           out,
           outDirs,
           result,
+          cancelToken,
         );
       } else if (entry.isSymbolicLink) {
         // 不跟随符号链接，避免循环或下载到预期之外的目标
@@ -905,7 +1220,8 @@ class SftpService {
   ///
   /// 超过 [maxSize] 或不是有效 UTF-8 时直接报错：编辑器保存会整文件覆盖，
   /// 若只读取前 N 字节再保存，会静默截断文件剩余内容。
-  Future<String> readFileContent(String path, {int maxSize = 1024 * 100}) async {
+  Future<String> readFileContent(String path,
+      {int maxSize = 1024 * 100}) async {
     if (_sftp == null) throw Exception('SFTP 未连接');
 
     final stat = await _sftp!.stat(path);
@@ -978,25 +1294,32 @@ class SftpService {
   /// 设计理由：AI 一次输出大文件 base64 易出错（>10KB 风险高），
   /// 强制分块写入：第一次 mode=write，后续 mode=append，每块保持小尺寸
   /// 保证 base64 编码不会算错。
-  Future<void> appendFileContent(String path, String content) async {
+  Future<void> appendFileContent(String path, String content,
+      {Completer<void>? cancelToken}) async {
     if (_sftp == null) throw Exception('SFTP 未连接');
+    _throwIfCancelled(cancelToken);
 
     final remoteFile = await _sftp!.open(
       path,
-      mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.append,
+      mode: SftpFileOpenMode.create |
+          SftpFileOpenMode.write |
+          SftpFileOpenMode.append,
     );
     try {
       final data = Uint8List.fromList(utf8.encode(content));
-      final stream = Stream.fromIterable([data]);
-      final writer = remoteFile.write(stream);
-      await writer.done;
+      await _writeRemoteStream(
+        remoteFile,
+        Stream.value(data),
+        cancelToken: cancelToken,
+      );
     } finally {
       await remoteFile.close();
     }
   }
 
   /// 读取文件字节（用于 file_patch 唯一性校验和替换）
-  Future<Uint8List> readFileBytes(String path, {int maxSize = 1024 * 1024}) async {
+  Future<Uint8List> readFileBytes(String path,
+      {int maxSize = 1024 * 1024}) async {
     if (_sftp == null) throw Exception('SFTP 未连接');
 
     final file = await _sftp!.open(path);
@@ -1009,17 +1332,26 @@ class SftpService {
 
   /// 写入文件字节（truncate 模式，完全覆盖原文件）
   /// 用于 file_write mode=write
-  Future<void> writeFileBytes(String path, Uint8List bytes) async {
+  Future<void> writeFileBytes(
+    String path,
+    Uint8List bytes, {
+    Completer<void>? cancelToken,
+  }) async {
     if (_sftp == null) throw Exception('SFTP 未连接');
+    _throwIfCancelled(cancelToken);
 
     final remoteFile = await _sftp!.open(
       path,
-      mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.truncate,
+      mode: SftpFileOpenMode.create |
+          SftpFileOpenMode.write |
+          SftpFileOpenMode.truncate,
     );
     try {
-      final stream = Stream.fromIterable([bytes]);
-      final writer = remoteFile.write(stream);
-      await writer.done;
+      await _writeRemoteStream(
+        remoteFile,
+        Stream.value(bytes),
+        cancelToken: cancelToken,
+      );
     } finally {
       await remoteFile.close();
     }
@@ -1027,17 +1359,26 @@ class SftpService {
 
   /// 追加文件字节（append 模式，写到文件末尾）
   /// 用于 file_write mode=append（分块写入场景）
-  Future<void> appendFileBytes(String path, Uint8List bytes) async {
+  Future<void> appendFileBytes(
+    String path,
+    Uint8List bytes, {
+    Completer<void>? cancelToken,
+  }) async {
     if (_sftp == null) throw Exception('SFTP 未连接');
+    _throwIfCancelled(cancelToken);
 
     final remoteFile = await _sftp!.open(
       path,
-      mode: SftpFileOpenMode.create | SftpFileOpenMode.write | SftpFileOpenMode.append,
+      mode: SftpFileOpenMode.create |
+          SftpFileOpenMode.write |
+          SftpFileOpenMode.append,
     );
     try {
-      final stream = Stream.fromIterable([bytes]);
-      final writer = remoteFile.write(stream);
-      await writer.done;
+      await _writeRemoteStream(
+        remoteFile,
+        Stream.value(bytes),
+        cancelToken: cancelToken,
+      );
     } finally {
       await remoteFile.close();
     }
@@ -1178,4 +1519,3 @@ class _ProgressThrottle {
     return false;
   }
 }
-

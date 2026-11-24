@@ -102,21 +102,26 @@ List<String> applyTcpKeepAlive(
     }
   }
 
-  apply('SO_KEEPALIVE',
-      RawSocketOption.fromInt(level, _soKeepAlive, 1));
+  apply('SO_KEEPALIVE', RawSocketOption.fromInt(level, _soKeepAlive, 1));
 
   if (Platform.isLinux || Platform.isAndroid) {
-    apply('TCP_KEEPIDLE', RawSocketOption.fromInt(
-        tcpLevel, _linuxTcpKeepIdle, wholeSeconds(idle)));
-    apply('TCP_KEEPINTVL', RawSocketOption.fromInt(
-        tcpLevel, _linuxTcpKeepIntvl, wholeSeconds(interval)));
+    apply(
+        'TCP_KEEPIDLE',
+        RawSocketOption.fromInt(
+            tcpLevel, _linuxTcpKeepIdle, wholeSeconds(idle)));
+    apply(
+        'TCP_KEEPINTVL',
+        RawSocketOption.fromInt(
+            tcpLevel, _linuxTcpKeepIntvl, wholeSeconds(interval)));
     apply('TCP_KEEPCNT',
         RawSocketOption.fromInt(tcpLevel, _linuxTcpKeepCnt, probes));
   } else if (Platform.isMacOS || Platform.isIOS) {
-    apply('TCP_KEEPALIVE', RawSocketOption.fromInt(
-        tcpLevel, _bsdTcpKeepIdle, wholeSeconds(idle)));
-    apply('TCP_KEEPINTVL', RawSocketOption.fromInt(
-        tcpLevel, _bsdTcpKeepIntvl, wholeSeconds(interval)));
+    apply('TCP_KEEPALIVE',
+        RawSocketOption.fromInt(tcpLevel, _bsdTcpKeepIdle, wholeSeconds(idle)));
+    apply(
+        'TCP_KEEPINTVL',
+        RawSocketOption.fromInt(
+            tcpLevel, _bsdTcpKeepIntvl, wholeSeconds(interval)));
     apply('TCP_KEEPCNT',
         RawSocketOption.fromInt(tcpLevel, _bsdTcpKeepCnt, probes));
   } else {

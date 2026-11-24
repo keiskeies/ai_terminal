@@ -34,8 +34,7 @@ class McpManager extends ChangeNotifier implements McpToolCaller {
   int get toolsetVersion => _toolsetVersion;
   bool get enabled => _enabled;
 
-  int get connectedCount =>
-      _runtimes.values.where((r) => r.isConnected).length;
+  int get connectedCount => _runtimes.values.where((r) => r.isConnected).length;
 
   int get exposedToolCount => buildAgentTools().length;
 
@@ -328,8 +327,9 @@ class McpManager extends ChangeNotifier implements McpToolCaller {
           McpSideToolKind.listPrompts,
           McpSideToolKind.getPrompt,
         ]) {
-          final suffix =
-              kind == McpSideToolKind.listPrompts ? 'list_prompts' : 'get_prompt';
+          final suffix = kind == McpSideToolKind.listPrompts
+              ? 'list_prompts'
+              : 'get_prompt';
           final name = _uniqueName(
             mcpToolFullName(config.id, suffix),
             usedNames,

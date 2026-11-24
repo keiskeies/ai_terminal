@@ -469,10 +469,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         .reconnectedTabIds
         .listen((tabId) {
       if (!mounted) return;
-      final tab = ref.read(tp.terminalProvider).tabs.cast<tp.TerminalTab?>().firstWhere(
-            (t) => t?.id == tabId,
-            orElse: () => null,
-          );
+      final tab =
+          ref.read(tp.terminalProvider).tabs.cast<tp.TerminalTab?>().firstWhere(
+                (t) => t?.id == tabId,
+                orElse: () => null,
+              );
       if (tab != null) _onReconnected(tab);
     });
     // 页面持有 notifier 引用而非在 dispose 里读 ref：TerminalPage 按路由存在，
@@ -1446,7 +1447,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       text = text.substring(text.length - _chatOutputMaxChars);
     }
     if (!mounted) return;
-    ref.read(chatProvider.notifier).updateLastOutput(text);
+    final hostId = _tabById(tabId)?.hostId;
+    if (hostId == null) return;
+    ref.read(chatProvider.notifier).updateLastOutput(text, hostId: hostId);
   }
 
   void _discardChatOutput(String tabId) {
@@ -2533,8 +2536,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final counts = <String, String>{
       'drawer:${NavDrawer.sectionHosts}':
           UiText.count(HostsDao.cached.length, '台', 'hosts'),
-      'drawer:${NavDrawer.sectionAudit}':
-          L10n.str.ut_2596a43876(auditToday),
+      'drawer:${NavDrawer.sectionAudit}': L10n.str.ut_2596a43876(auditToday),
       // 组数跟着 kSettingsEntries 走：写死「8 组」的话，以后加一组就悄悄错了。
       'drawer:${NavDrawer.sectionSettings}':
           UiText.count(kSettingsEntries.length, '组', 'groups'),
@@ -2542,7 +2544,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     return PopupMenuButton<String>(
       tooltip: UiText.t('菜单', 'Menu'),
       color: tc.cardElevated,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rFloat)),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(rFloat)),
       offset: const Offset(0, 36),
       position: PopupMenuPosition.under,
       constraints: const BoxConstraints(minWidth: 280, maxWidth: 320),
@@ -2780,7 +2783,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   /// 关闭标签并清理页面侧的 per-tab 状态（tab 项的 x 与连接失败视图共用）
   Future<void> _removeTab(tp.TerminalTab tab) async {
-    ref.read(chatProvider.notifier).removeTab(tab.id);
+    ref.read(chatProvider.notifier).removeTab(tab.id, hostId: tab.hostId);
     ref.read(agentProvider.notifier).removeTab(tab.id, hostId: tab.hostId);
     _tabAiInputText.remove(tab.id);
     _tabExecutingCommand.remove(tab.id);
@@ -3834,10 +3837,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// phase 由 CommandRunner.phaseForCommand / 引擎常量直接给出中文原值
   /// （不经过 UiText.t），所以这里按原值匹配是稳定的。
   static bool _isEngineExecutePhase(String? phase) =>
-      phase == '执行命令' ||
-      phase == '执行工具' ||
-      phase == '检查环境' ||
-      phase == '执行变更';
+      phase == '执行命令' || phase == '执行工具' || phase == '检查环境' || phase == '执行变更';
 
   Widget _buildMessageBubble({
     Key? key,
@@ -4150,19 +4150,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             isError: true);
       } else if (result.success) {
         setState(() => _rolledBackChangeIds.add(change.id));
-        _showOperationMessage(L10n.str.ut_35b3e86940(isLocalRestore ? result.stdout : rollbackCommand));
+        _showOperationMessage(L10n.str
+            .ut_35b3e86940(isLocalRestore ? result.stdout : rollbackCommand));
       } else {
         final reason = result.stderr.trim().isNotEmpty
             ? result.stderr.trim()
             : L10n.str.ut_21823fef80(result.exitCode);
-        _showOperationMessage(
-            L10n.str.ut_34ec0a3e03(reason),
-            isError: true);
+        _showOperationMessage(L10n.str.ut_34ec0a3e03(reason), isError: true);
       }
     } catch (e) {
       if (mounted)
-        _showOperationMessage(L10n.str.ut_be42c8efee(e),
-            isError: true);
+        _showOperationMessage(L10n.str.ut_be42c8efee(e), isError: true);
     } finally {
       if (mounted) setState(() => _rollbackBusy = false);
     }
@@ -4218,8 +4216,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       _showOperationMessage(UiText.t('重连成功', 'Reconnected'));
     } catch (e) {
       if (mounted)
-        _showOperationMessage(L10n.str.ut_c1dbbf6a2c(e),
-            isError: true);
+        _showOperationMessage(L10n.str.ut_c1dbbf6a2c(e), isError: true);
     } finally {
       if (mounted) {
         setState(() => _reconnectingHostLabel = null);
@@ -5549,8 +5546,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     showTopSnackBar(
       context,
       SnackBar(
-        content: Text(
-            L10n.str.ut_e77b2cd18c(trimmed),
+        content: Text(L10n.str.ut_e77b2cd18c(trimmed),
             style: const TextStyle(fontSize: fSmall)),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
@@ -6130,8 +6126,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.warning_amber_rounded,
-                    size: 12, color: tc.warn),
+                Icon(Icons.warning_amber_rounded, size: 12, color: tc.warn),
                 const SizedBox(width: 4),
                 Text(
                   l10n.terminalConfigureModel,
@@ -7583,9 +7578,7 @@ class _OrchestratorHostsSheetState extends State<_OrchestratorHostsSheet> {
                 : tc.textMuted.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(rSmall),
             border: Border.all(
-              color: selected
-                  ? tc.warn.withValues(alpha: 0.4)
-                  : tc.border,
+              color: selected ? tc.warn.withValues(alpha: 0.4) : tc.border,
             ),
           ),
           child: Text(

@@ -27,7 +27,7 @@ void main() {
       final m = CommandMarkers.next(7);
       final scanner = ExitMarkerScanner(m);
       expect(scanner.add('some output\n'), isFalse);
-      expect(scanner.add('$m''0\r\n'), isTrue);
+      expect(scanner.add('$m' '0\r\n'), isTrue);
     });
 
     test('旧格式文本不再触发随机 marker 的完成判定（防碰撞）', () {

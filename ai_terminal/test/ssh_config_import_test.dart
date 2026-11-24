@@ -43,13 +43,17 @@ void main() {
     test('默认路径落在 ~/.ssh/config', () {
       final p = SshConfigImportService.defaultConfigPath();
       if (p == null) return; // 环境无 HOME/USERPROFILE
-      expect(p, endsWith('${Platform.pathSeparator}.ssh${Platform.pathSeparator}config'));
+      expect(
+          p,
+          endsWith(
+              '${Platform.pathSeparator}.ssh${Platform.pathSeparator}config'));
     });
   });
 
   group('Include 展开（真实文件系统）', () {
     test('Include 目录内文件按文件名排序读取', () {
-      final cfg = write('cfg/config', 'Include conf.d\n\nHost b\n  User bu\n  HostName 9.9.9.9');
+      final cfg = write('cfg/config',
+          'Include conf.d\n\nHost b\n  User bu\n  HostName 9.9.9.9');
       write('cfg/conf.d/2-b.conf', 'Host two\n  User t2\n  HostName 8.8.8.2');
       write('cfg/conf.d/1-a.conf', 'Host one\n  User t1\n  HostName 8.8.8.1');
 
@@ -57,13 +61,13 @@ void main() {
         File(cfg).readAsStringSync(),
         dirOfConfig: '${tmp.path}/cfg',
       );
-      expect(result.entries.map((e) => e.alias).toSet(),
-          {'one', 'two', 'b'});
+      expect(result.entries.map((e) => e.alias).toSet(), {'one', 'two', 'b'});
     });
 
     test('Include 通配只取匹配项', () {
       final cfg = write('cfg/config', 'Include hosts/*.conf\n');
-      write('cfg/hosts/included.conf', 'Host yes\n  User u\n  HostName 1.1.1.1');
+      write(
+          'cfg/hosts/included.conf', 'Host yes\n  User u\n  HostName 1.1.1.1');
       write('cfg/hosts/skipped.txt', 'Host no\n  User u\n  HostName 2.2.2.2');
 
       final result = SshConfigImportService.parse(
@@ -102,8 +106,8 @@ void main() {
 
     test('同 host:port 判重（大小写不敏感）', () {
       expect(
-          SshConfigImportService.isDuplicate(
-              entry('WEB1.Example.com', 22), [existing('web1.example.com', 22)]),
+          SshConfigImportService.isDuplicate(entry('WEB1.Example.com', 22),
+              [existing('web1.example.com', 22)]),
           isTrue);
     });
 
@@ -115,8 +119,7 @@ void main() {
     });
 
     test('空列表不判重', () {
-      expect(
-          SshConfigImportService.isDuplicate(entry('web1', 22), const []),
+      expect(SshConfigImportService.isDuplicate(entry('web1', 22), const []),
           isFalse);
     });
   });

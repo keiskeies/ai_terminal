@@ -114,8 +114,7 @@ void main() {
       expect(sizes, [14, 14]);
     });
 
-    testWidgets('shell 的键不抢：Ctrl+A 发到 shell 而不是触发 app 动作',
-        (tester) async {
+    testWidgets('shell 的键不抢：Ctrl+A 发到 shell 而不是触发 app 动作', (tester) async {
       final sizes = <double>[];
       var history = 0;
       final terminal = readyTerminal();
@@ -133,8 +132,7 @@ void main() {
     testWidgets('Ctrl+H 仍是退格（历史面板必须带 Shift 才抢）', (tester) async {
       var history = 0;
       final terminal = readyTerminal();
-      await pump(tester,
-          terminal: terminal, onHistory: () => history++);
+      await pump(tester, terminal: terminal, onHistory: () => history++);
       await press(tester, LogicalKeyboardKey.keyH, ctrl: ctrl);
       expect(history, 0);
       expect(toShell.toString(), contains(String.fromCharCode(8)));
@@ -162,9 +160,7 @@ void main() {
       final sizes = <double>[];
       final terminal = readyTerminal();
       await pump(tester,
-          terminal: terminal,
-          keymap: keymap,
-          onFontSizeChanged: sizes.add);
+          terminal: terminal, keymap: keymap, onFontSizeChanged: sizes.add);
       await press(tester, LogicalKeyboardKey.digit0, ctrl: ctrl);
       expect(sizes, isEmpty);
       // 放行后字节要发出去（xterm 对 Ctrl+0 的编码），不能凭空消失

@@ -35,7 +35,8 @@ void main() {
     });
 
     test('too many lines returns null instead of doing expensive LCS', () {
-      final oldText = List.generate(LineDiff.maxLines + 1, (i) => 'a$i').join('\n');
+      final oldText =
+          List.generate(LineDiff.maxLines + 1, (i) => 'a$i').join('\n');
       final diff = LineDiff.compute(oldText, 'b');
       expect(diff, isNull);
     });

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
@@ -62,11 +63,139 @@ DecodedContent decodeContent({required String plain, required String b64}) {
   return DecodedContent(utf8.encode(plain));
 }
 
-/// 备份本地文件到同目录 `.bak.{microseconds}`，返回备份路径
-Future<String> backupLocalFile(String path) async {
-  final backupPath = '$path.bak.${DateTime.now().microsecondsSinceEpoch}';
-  await File(path).copy(backupPath);
-  return backupPath;
+/// 在每次路径 I/O 前重新授权；[expectedResolved] 是本次操作最初授权的真实路径。
+typedef LocalPathAuthorizer = Future<String?> Function(
+    String rawPath, String expectedResolved);
+
+/// 备份本地文件到同目录 `.bak.{时间戳}-{随机数}`，返回备份路径。
+///
+/// 源文件从已打开的句柄读取，备份文件以 append 模式创建（不截断已有文件），
+/// 打开后再次校验路径与零长度。Dart 没有公开的 fstat/inode 句柄身份 API，
+/// 因此这里用路径复核 + size/mtime/mode + 句柄长度 fail-closed，不能承诺消除
+/// 最后一次校验与 open 之间的平台级 TOCTOU 窗口。
+Future<String> backupLocalFile(
+  String path, {
+  LocalPathAuthorizer? authorizePath,
+}) async {
+  final file = File(path);
+  final before = await file.stat();
+  final source = await openVerifiedLocalFile(
+    file: file,
+    mode: FileMode.read,
+    before: before,
+    authorizePath: authorizePath,
+  );
+  final backupPath = '$path.bak.${DateTime.now().microsecondsSinceEpoch}-'
+      '${_secureToken()}';
+  RandomAccessFile? destination;
+  var created = false;
+  try {
+    final denial = await authorizePath?.call(backupPath, backupPath);
+    if (denial != null) throw FileSystemException('备份路径授权失败: $denial');
+    if (await File(backupPath).exists()) {
+      throw FileSystemException('备份路径已存在，拒绝覆盖: $backupPath');
+    }
+    destination = await openVerifiedLocalFile(
+      file: File(backupPath),
+      mode: FileMode.append,
+      before: null,
+      authorizePath: authorizePath,
+    );
+    created = true;
+
+    await source.setPosition(0);
+    while (true) {
+      final chunk = await source.read(64 * 1024);
+      if (chunk.isEmpty) break;
+      await destination.writeFrom(chunk);
+    }
+    await destination.flush();
+    if (await destination.length() != await source.length()) {
+      throw FileSystemException('备份长度校验失败: $backupPath');
+    }
+    final finalDenial = await authorizePath?.call(backupPath, backupPath);
+    if (finalDenial != null) {
+      throw FileSystemException('备份路径最终复核失败: $finalDenial');
+    }
+    return backupPath;
+  } catch (_) {
+    if (created) {
+      try {
+        await File(backupPath).delete();
+      } catch (_) {}
+    }
+    rethrow;
+  } finally {
+    try {
+      await destination?.close();
+    } finally {
+      await source.close();
+    }
+  }
+}
+
+String _secureToken() {
+  final random = Random.secure();
+  return List.generate(
+      16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+}
+
+bool sameLocalFileIdentity(FileStat before, FileStat after) =>
+    before.size == after.size &&
+    before.modified == after.modified &&
+    before.mode == after.mode &&
+    before.type == after.type;
+
+Future<FileStat?> _statIfExists(File file) async =>
+    await file.exists() ? await file.stat() : null;
+
+/// 以非截断模式打开后绑定路径身份和句柄长度。末段不存在时只接受新建空文件。
+Future<RandomAccessFile> openVerifiedLocalFile({
+  required File file,
+  required FileMode mode,
+  required FileStat? before,
+  LocalPathAuthorizer? authorizePath,
+}) async {
+  final handle = await file.open(mode: mode);
+  try {
+    final denial = await authorizePath?.call(file.path, file.path);
+    if (denial != null) {
+      throw FileSystemException('路径授权复核失败: $denial');
+    }
+    final after = await file.stat();
+    if (before == null) {
+      if (after.size != 0) {
+        throw const FileSystemException('原子性校验失败：新建路径不是空文件。');
+      }
+    } else if (!sameLocalFileIdentity(before, after)) {
+      throw const FileSystemException('原子性校验失败：路径在打开后已变化。');
+    }
+    if (await handle.length() != after.size) {
+      throw const FileSystemException('原子性校验失败：写入句柄与路径身份不一致。');
+    }
+    return handle;
+  } catch (_) {
+    await handle.close();
+    rethrow;
+  }
+}
+
+Future<void> _restoreHandleFromBackup(
+    RandomAccessFile handle, String backupPath) async {
+  final backup = await File(backupPath).open(mode: FileMode.read);
+  try {
+    await backup.setPosition(0);
+    await handle.truncate(0);
+    await handle.setPosition(0);
+    while (true) {
+      final chunk = await backup.read(64 * 1024);
+      if (chunk.isEmpty) break;
+      await handle.writeFrom(chunk);
+    }
+    await handle.flush();
+  } finally {
+    await backup.close();
+  }
 }
 
 /// 写入结果（含备份路径与失败原因），供调用方拼 ToolResult 文案
@@ -95,10 +224,16 @@ Future<LocalWriteOutcome> writeLocalFile({
   bool backup = true,
 
   /// 备份步骤的可注入点。生产路径不传，走 [backupLocalFile]。
-  ///
-  /// 备份失败必须中止写入，但真要把备份弄失败只能靠文件锁 / 超长路径 / ACL 这类
-  /// 平台相关且不稳的手段 —— 用注入点换一条确定性的安全断言更值。
   @visibleForTesting Future<String> Function(String path)? backupForTesting,
+
+  /// 每次路径 I/O 前重新加载策略；生产调用方必须传，不能捕获旧策略快照。
+  LocalPathAuthorizer? authorizePath,
+
+  /// 非截断打开后的兼容授权回调。
+  @visibleForTesting Future<String?> Function()? authorizeWrite,
+
+  /// 非截断打开并验证句柄身份后的授权回调。
+  Future<String?> Function(RandomAccessFile handle)? authorizeOpenedWrite,
 }) async {
   final file = File(path);
   final exists = await file.exists();
@@ -113,72 +248,86 @@ Future<LocalWriteOutcome> writeLocalFile({
   String? backupPath;
   if (!append && backup && exists) {
     try {
-      backupPath =
-          await (backupForTesting ?? backupLocalFile)(path);
+      final denial = await authorizePath?.call(path, path);
+      if (denial != null) throw FileSystemException('备份前授权失败: $denial');
+      backupPath = backupForTesting == null
+          ? await backupLocalFile(path, authorizePath: authorizePath)
+          : await backupForTesting(path);
+      final afterBackup = await authorizePath?.call(path, path);
+      if (afterBackup != null) {
+        throw FileSystemException('备份后授权失败: $afterBackup');
+      }
     } catch (e) {
-      // 备份失败即中止：没有回滚路径的覆盖写入不可接受
+      // 备份失败即中止：没有回滚路径的覆盖写入不可接受。
       return LocalWriteOutcome(
           success: false, error: '备份原文件失败: $e。已中止写入，原文件未被修改。');
     }
   }
 
+  RandomAccessFile? handle;
+  var writeStarted = false;
   try {
     if (!append) {
       final parentDir = p.dirname(path);
       if (parentDir.isNotEmpty && parentDir != '.') {
+        final denial = await authorizePath?.call(parentDir, parentDir);
+        if (denial != null) throw FileSystemException('父目录授权失败: $denial');
         await Directory(parentDir).create(recursive: true);
       }
     }
-    await file.writeAsBytes(bytes,
-        mode: append ? FileMode.append : FileMode.write, flush: true);
-  } catch (e) {
-    if (backupPath != null) {
-      try {
-        await File(backupPath).copy(path);
-        return LocalWriteOutcome(
-          success: false,
-          backupPath: backupPath,
-          error: '写入失败: $e\n已自动回滚：原文件已从备份 $backupPath 恢复。',
-        );
-      } catch (rollbackErr) {
-        return LocalWriteOutcome(
-          success: false,
-          backupPath: backupPath,
-          error: '写入失败: $e\n回滚也失败: $rollbackErr。请手动用备份 $backupPath 恢复 $path',
-        );
-      }
+    final beforeOpen = await _statIfExists(file);
+    // append 只创建/打开文件，不会在授权复核前截断目标。
+    handle = await openVerifiedLocalFile(
+      file: file,
+      mode: FileMode.append,
+      before: beforeOpen,
+      authorizePath: authorizePath,
+    );
+    final denial = await authorizeWrite?.call();
+    if (denial != null) throw FileSystemException('写入前授权复核失败: $denial');
+    final openedDenial = await authorizeOpenedWrite?.call(handle);
+    if (openedDenial != null) {
+      throw FileSystemException('写入句柄授权复核失败: $openedDenial');
     }
-    return LocalWriteOutcome(success: false, error: '写入失败: $e');
-  }
 
-  // 写完校验：写入被中断时长度会短于预期，静默截断比报错更难查
-  int? actual;
-  try {
-    actual = await file.length();
+    writeStarted = true;
+    if (!append) {
+      await handle.truncate(0);
+      await handle.setPosition(0);
+    }
+    await handle.writeFrom(bytes);
+    await handle.flush();
+    final actual = await handle.length();
+    if (!append && actual != bytes.length) {
+      throw StateError('写入后长度校验失败: 期望 ${bytes.length}, 实际 $actual');
+    }
+    final finalDenial = await authorizePath?.call(path, path);
+    if (finalDenial != null) {
+      throw FileSystemException('写入后路径复核失败: $finalDenial');
+    }
+    return LocalWriteOutcome(
+      success: true,
+      backupPath: backupPath,
+      bytesWritten: actual,
+    );
   } catch (e) {
-    debugPrint('[LocalFileOps] 写入后取长度失败: $e');
-  }
-  if (!append && actual != null && actual != bytes.length) {
-    if (backupPath != null) {
+    String? rollbackError;
+    if (writeStarted && backupPath != null && handle != null) {
       try {
-        await File(backupPath).copy(path);
-      } catch (_) {
-        // 回滚再失败时，下面的错误文案里已经带了备份路径
+        await _restoreHandleFromBackup(handle, backupPath);
+      } catch (rollbackErr) {
+        rollbackError = rollbackErr.toString();
       }
     }
     return LocalWriteOutcome(
       success: false,
       backupPath: backupPath,
-      error: '写入后校验失败：期望 ${bytes.length} 字节，实际 $actual 字节。'
-          '${backupPath != null ? "已从备份 $backupPath 回滚。" : "该文件是新建的，无需回滚。"}',
+      error:
+          '写入失败: $e${rollbackError != null ? '\n回滚也失败: $rollbackError。请手动用备份 $backupPath 恢复 $path' : ''}',
     );
+  } finally {
+    await handle?.close();
   }
-
-  return LocalWriteOutcome(
-    success: true,
-    backupPath: backupPath,
-    bytesWritten: actual ?? bytes.length,
-  );
 }
 
 /// 统计 substring 在 string 中出现的次数（非重叠）
@@ -202,12 +351,16 @@ class LocalPatchOutcome {
   final String? backupPath;
   final String? oldText;
   final String? newText;
+  final int originalBytes;
+  final int patchedBytes;
   const LocalPatchOutcome({
     required this.success,
     this.error,
     this.backupPath,
     this.oldText,
     this.newText,
+    this.originalBytes = 0,
+    this.patchedBytes = 0,
   });
 }
 
@@ -217,26 +370,78 @@ Future<LocalPatchOutcome> patchLocalFile({
   required String oldText,
   required String newText,
   bool backup = true,
+  int maxBytes = 2 * 1024 * 1024,
+  Future<String?> Function()? authorizeWrite,
+  LocalPathAuthorizer? authorizePath,
+  Future<String?> Function(RandomAccessFile handle)? authorizeOpenedWrite,
+}) =>
+    patchLocalFileBytes(
+      path: path,
+      oldBytes: utf8.encode(oldText),
+      newBytes: utf8.encode(newText),
+      backup: backup,
+      maxBytes: maxBytes,
+      authorizeWrite: authorizeWrite,
+      authorizePath: authorizePath,
+      authorizeOpenedWrite: authorizeOpenedWrite,
+      oldText: oldText,
+      newText: newText,
+    );
+
+/// 字节级补丁：保留 BOM、CRLF 和非 UTF-8 内容。授权与回滚语义同字符串补丁。
+Future<LocalPatchOutcome> patchLocalFileBytes({
+  required String path,
+  required List<int> oldBytes,
+  required List<int> newBytes,
+  bool backup = true,
+  int maxBytes = 2 * 1024 * 1024,
+  int? maxPatchedBytes,
+  Future<String?> Function()? authorizeWrite,
+  LocalPathAuthorizer? authorizePath,
+  Future<String?> Function(RandomAccessFile handle)? authorizeOpenedWrite,
+  String? oldText,
+  String? newText,
 }) async {
   final file = File(path);
   if (!await file.exists()) {
     return const LocalPatchOutcome(
         success: false, error: '文件不存在，无法做字符串替换。请先确认路径。');
   }
-  if (oldText.isEmpty) {
+  if (oldBytes.isEmpty) {
     return const LocalPatchOutcome(success: false, error: 'old 不能为空');
   }
 
-  final statBefore = await file.stat();
-  final String original;
-  try {
-    original = await file.readAsString();
-  } catch (e) {
+  final beforeOpen = await file.stat();
+  if (beforeOpen.size > maxBytes) {
     return LocalPatchOutcome(
-        success: false, error: '读取文件失败（可能是二进制文件或编码不是 UTF-8）: $e');
+      success: false,
+      error: '文件过大（${beforeOpen.size} 字节，上限 $maxBytes 字节），已中止读取和修改。',
+    );
+  }
+  final List<int> original;
+  RandomAccessFile? readHandle;
+  try {
+    readHandle = await openVerifiedLocalFile(
+      file: file,
+      mode: FileMode.read,
+      before: beforeOpen,
+      authorizePath: authorizePath,
+    );
+    final bytes = await readHandle.read(maxBytes + 1);
+    if (bytes.length > maxBytes) {
+      return LocalPatchOutcome(
+        success: false,
+        error: '文件在读取期间增长到超过 $maxBytes 字节，已中止修改。',
+      );
+    }
+    original = bytes;
+  } catch (e) {
+    return LocalPatchOutcome(success: false, error: '读取文件失败: $e');
+  } finally {
+    await readHandle?.close();
   }
 
-  final hits = countOccurrences(original, oldText);
+  final hits = _countByteOccurrences(original, oldBytes);
   if (hits == 0) {
     return const LocalPatchOutcome(
       success: false,
@@ -250,9 +455,9 @@ Future<LocalPatchOutcome> patchLocalFile({
     );
   }
 
-  // 读与写之间被外部改过就放弃，避免覆盖别人的更新
+  // 读与写之间被外部改过就放弃，避免覆盖别人的更新。
   final statNow = await file.stat();
-  if (statNow.size != statBefore.size || statNow.modified != statBefore.modified) {
+  if (!sameLocalFileIdentity(beforeOpen, statNow)) {
     return const LocalPatchOutcome(
       success: false,
       error: '文件在读取后被外部修改（大小或修改时间变了）。已中止写入，请重新读取后再试。',
@@ -262,33 +467,144 @@ Future<LocalPatchOutcome> patchLocalFile({
   String? backupPath;
   if (backup) {
     try {
-      backupPath = await backupLocalFile(path);
+      backupPath = await backupLocalFile(path, authorizePath: authorizePath);
     } catch (e) {
       return LocalPatchOutcome(
           success: false, error: '备份原文件失败: $e。已中止写入，原文件未被修改。');
     }
   }
 
-  final write = await writeLocalFile(
-    path: path,
-    bytes: utf8.encode(original.replaceFirst(oldText, newText)),
-    backup: false, // 上面已备份，不再留第二份
-  );
-  if (!write.success) {
+  final patched = _replaceFirstBytes(original, oldBytes, newBytes);
+  if (maxPatchedBytes != null && patched.length > maxPatchedBytes) {
+    return LocalPatchOutcome(
+      success: false,
+      error: 'patch 后文件超过 ${maxPatchedBytes ~/ (1024 * 1024)}MB，拒绝写入。',
+    );
+  }
+  RandomAccessFile? handle;
+  var writeStarted = false;
+  try {
+    // append 只创建/打开文件，不会在授权复核前截断目标。
+    handle = await openVerifiedLocalFile(
+      file: file,
+      mode: FileMode.append,
+      before: statNow,
+      authorizePath: authorizePath,
+    );
+    final denial = await authorizeWrite?.call();
+    if (denial != null) {
+      return LocalPatchOutcome(
+        success: false,
+        backupPath: backupPath,
+        error: '写入前授权复核失败: $denial',
+        oldText: oldText,
+        newText: newText,
+      );
+    }
+    final openedDenial = await authorizeOpenedWrite?.call(handle);
+    if (openedDenial != null) {
+      return LocalPatchOutcome(
+        success: false,
+        backupPath: backupPath,
+        error: '写入句柄授权复核失败: $openedDenial',
+        oldText: oldText,
+        newText: newText,
+      );
+    }
+    writeStarted = true;
+    await handle.truncate(0);
+    await handle.setPosition(0);
+    await handle.writeFrom(patched);
+    await handle.flush();
+    if (await handle.length() != patched.length) {
+      throw StateError('写入后长度校验失败');
+    }
+    final finalDenial = await authorizePath?.call(path, path);
+    if (finalDenial != null) {
+      throw FileSystemException('写入后路径复核失败: $finalDenial');
+    }
+  } catch (e) {
+    String? rollbackError;
+    if (writeStarted && backupPath != null && handle != null) {
+      try {
+        await _restoreHandleFromBackup(handle, backupPath);
+      } catch (rollbackErr) {
+        rollbackError = rollbackErr.toString();
+      }
+    }
     return LocalPatchOutcome(
       success: false,
       backupPath: backupPath,
-      error: write.error,
+      error:
+          '写入失败: $e${rollbackError != null ? '\n回滚也失败: $rollbackError' : ''}',
       oldText: oldText,
       newText: newText,
     );
+  } finally {
+    await handle?.close();
   }
   return LocalPatchOutcome(
     success: true,
-    backupPath: backupPath ?? write.backupPath,
+    backupPath: backupPath,
     oldText: oldText,
     newText: newText,
+    originalBytes: original.length,
+    patchedBytes: patched.length,
   );
+}
+
+int _countByteOccurrences(List<int> source, List<int> needle) {
+  if (needle.isEmpty || needle.length > source.length) return 0;
+  final prefix = List<int>.filled(needle.length, 0);
+  for (var i = 1, j = 0; i < needle.length; i++) {
+    while (j > 0 && needle[i] != needle[j]) {
+      j = prefix[j - 1];
+    }
+    if (needle[i] == needle[j]) j++;
+    prefix[i] = j;
+  }
+  var count = 0;
+  for (var i = 0, j = 0; i < source.length; i++) {
+    while (j > 0 && source[i] != needle[j]) {
+      j = prefix[j - 1];
+    }
+    if (source[i] == needle[j]) j++;
+    if (j == needle.length) {
+      count++;
+      j = prefix[j - 1];
+    }
+  }
+  return count;
+}
+
+List<int> _replaceFirstBytes(
+    List<int> source, List<int> oldBytes, List<int> newBytes) {
+  final index = _indexOfBytes(source, oldBytes);
+  if (index < 0) return source;
+  return [
+    ...source.sublist(0, index),
+    ...newBytes,
+    ...source.sublist(index + oldBytes.length),
+  ];
+}
+
+int _indexOfBytes(List<int> source, List<int> needle) {
+  final prefix = List<int>.filled(needle.length, 0);
+  for (var i = 1, j = 0; i < needle.length; i++) {
+    while (j > 0 && needle[i] != needle[j]) {
+      j = prefix[j - 1];
+    }
+    if (needle[i] == needle[j]) j++;
+    prefix[i] = j;
+  }
+  for (var i = 0, j = 0; i < source.length; i++) {
+    while (j > 0 && source[i] != needle[j]) {
+      j = prefix[j - 1];
+    }
+    if (source[i] == needle[j]) j++;
+    if (j == needle.length) return i - needle.length + 1;
+  }
+  return -1;
 }
 
 /// 回收区条目（`<所在目录>/.ai_terminal_trash/<时间戳>/`）的用量
@@ -405,7 +721,8 @@ Future<TrashClearResult> clearTrashEntries(
 
 Future<int> _directoryBytes(String dir) async {
   var sum = 0;
-  await for (final entity in Directory(dir).list(recursive: true, followLinks: false)) {
+  await for (final entity
+      in Directory(dir).list(recursive: true, followLinks: false)) {
     if (entity is! File) continue;
     try {
       sum += await entity.length();

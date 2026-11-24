@@ -1291,12 +1291,14 @@ void main() {
       ];
 
       await tester.pumpWidget(_wrap(Builder(
-        builder: (context) => PlanPanel(steps: running, tc: ThemeColors.of(context)),
+        builder: (context) =>
+            PlanPanel(steps: running, tc: ThemeColors.of(context)),
       )));
       expect(find.text('检查磁盘'), findsWidgets);
 
       await tester.pumpWidget(_wrap(Builder(
-        builder: (context) => PlanPanel(steps: done, tc: ThemeColors.of(context)),
+        builder: (context) =>
+            PlanPanel(steps: done, tc: ThemeColors.of(context)),
       )));
       await tester.pump();
       // 收起后只剩标题行，步骤标题不再逐条展示
@@ -1316,7 +1318,8 @@ void main() {
       ];
 
       await tester.pumpWidget(_wrap(Builder(
-        builder: (context) => PlanPanel(steps: steps, tc: ThemeColors.of(context)),
+        builder: (context) =>
+            PlanPanel(steps: steps, tc: ThemeColors.of(context)),
       )));
 
       expect(find.textContaining('第 3 步'), findsOneWidget);
@@ -1324,5 +1327,4 @@ void main() {
       expect(find.text('任务 5'), findsNothing); // 其余步骤仍收起
     });
   });
-
 }

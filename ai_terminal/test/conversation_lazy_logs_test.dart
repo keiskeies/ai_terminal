@@ -9,12 +9,14 @@ void main() {
         id: 'c1',
         hostId: 'h1',
         title: 't',
-        agentLogs: [ConvAgentLog.create(
-          timestamp: DateTime(2026, 1, 1),
-          level: 'INFO',
-          tag: 'tag',
-          message: 'hello',
-        )],
+        agentLogs: [
+          ConvAgentLog.create(
+            timestamp: DateTime(2026, 1, 1),
+            level: 'INFO',
+            tag: 'tag',
+            message: 'hello',
+          )
+        ],
       );
       expect(conversation.agentLogs.length, 1);
       expect(conversation.agentLogs.first.message, 'hello');

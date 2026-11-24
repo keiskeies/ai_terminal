@@ -22,13 +22,11 @@ class VerificationDetector {
       final state = _firstLine(out).toLowerCase();
       if (state == 'active') {
         return OperationBadge(
-            text: L10n.str.ut_080de8536f(service),
-            level: 'success');
+            text: L10n.str.ut_080de8536f(service), level: 'success');
       }
       if (state == 'inactive' || state == 'failed' || state == 'unknown') {
         return OperationBadge(
-            text: L10n.str.ut_8f24f3ec45(service),
-            level: 'warning');
+            text: L10n.str.ut_8f24f3ec45(service), level: 'warning');
       }
       return null;
     }
@@ -39,18 +37,17 @@ class VerificationDetector {
       final state = _firstLine(out).toLowerCase();
       if (state == 'enabled') {
         return OperationBadge(
-            text: L10n.str.ut_622000e27f(service),
-            level: 'success');
+            text: L10n.str.ut_622000e27f(service), level: 'success');
       }
       if (state == 'disabled') {
         return OperationBadge(
-            text: L10n.str.ut_371d1b3d69(service),
-            level: 'info');
+            text: L10n.str.ut_371d1b3d69(service), level: 'info');
       }
       return null;
     }
 
-    if (RegExp(r'^ss\s+.*-l').hasMatch(cmd) || RegExp(r'^netstat\s+.*-l').hasMatch(cmd)) {
+    if (RegExp(r'^ss\s+.*-l').hasMatch(cmd) ||
+        RegExp(r'^netstat\s+.*-l').hasMatch(cmd)) {
       final ports = <String>{};
       for (final line in out.split('\n')) {
         if (!line.toUpperCase().contains('LISTEN')) continue;
@@ -64,12 +61,10 @@ class VerificationDetector {
       if (ports.isEmpty) return null;
       final sorted = ports.map(int.parse).toList()..sort();
       final shown = sorted.take(4).join('/');
-      final suffix = sorted.length > 4
-          ? L10n.str.ut_e7e9d06df9(sorted.length)
-          : '';
+      final suffix =
+          sorted.length > 4 ? L10n.str.ut_e7e9d06df9(sorted.length) : '';
       return OperationBadge(
-          text: L10n.str.ut_9def515d87(shown, suffix),
-          level: 'success');
+          text: L10n.str.ut_9def515d87(shown, suffix), level: 'success');
     }
 
     if (cmd.contains('nginx -t')) {

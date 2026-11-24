@@ -130,13 +130,15 @@ void main() {
 
     group('phaseForCommand', () {
       test('只读查询命令 → 检查环境', () {
-        expect(CommandRunner.phaseForCommand('ls -la', SafetyLevel.safe), '检查环境');
+        expect(
+            CommandRunner.phaseForCommand('ls -la', SafetyLevel.safe), '检查环境');
       });
 
       test('warn/blocked 的修改命令 → 执行变更', () {
-        expect(CommandRunner.phaseForCommand('mycmd', SafetyLevel.warn), '执行变更');
         expect(
-            CommandRunner.phaseForCommand('mycmd', SafetyLevel.blocked), '执行变更');
+            CommandRunner.phaseForCommand('mycmd', SafetyLevel.warn), '执行变更');
+        expect(CommandRunner.phaseForCommand('mycmd', SafetyLevel.blocked),
+            '执行变更');
       });
 
       test('safe 的非查询命令 → 执行命令', () {
@@ -146,7 +148,8 @@ void main() {
 
       test('查询命令优先于风险等级', () {
         // isQueryCommand 先判：即使是 warn 级也只读展示
-        expect(CommandRunner.phaseForCommand('cat a', SafetyLevel.warn), '检查环境');
+        expect(
+            CommandRunner.phaseForCommand('cat a', SafetyLevel.warn), '检查环境');
       });
     });
 
@@ -166,9 +169,7 @@ void main() {
 
       test('已有值不被覆盖', () {
         final e = AgentEvent.command('ls',
-            hostId: 'original',
-            toolName: 'custom_tool',
-            riskLevel: 'custom');
+            hostId: 'original', toolName: 'custom_tool', riskLevel: 'custom');
         CommandRunner.enrichCommandEvent(
           e,
           hostId: 'h1',

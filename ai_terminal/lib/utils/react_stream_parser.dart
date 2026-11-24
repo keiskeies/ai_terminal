@@ -1,6 +1,7 @@
 import 'dart:convert';
 import '../models/agent_event.dart';
 import '../models/plan_step.dart';
+import 'shell_syntax.dart';
 
 /// ReAct 格式解析器，支持标准 ReAct 和 XML tool_call 两种格式
 class ReActStreamParser {
@@ -29,11 +30,8 @@ class ReActStreamParser {
   static final RegExp _planStatusBox =
       RegExp(r'^[\[【(（]\s*([^\]】)）]+)\s*[\]】)）]\s*');
   static final RegExp _planTitlePrefix = RegExp(r'^[-–—:：]\s*');
-  // heredoc 起始：<< / <<- / <<~ 后可跟一层可选引号再跟定界符词。
-  // 前断言排除 <<<（here-string，不是 heredoc）。用三引号 raw 串承载——
-  // 双引号 raw 串内 \" 不会转义，单引号 raw 串内 ' 会截断字面量。
-  static final RegExp _heredocStart =
-      RegExp(r"""(^|[^<])<<(?!<)[-~]?['"]?(\w+)['"]?""");
+  static final RegExp _protocolExampleLine =
+      RegExp(r'^(?:思考|计划|说明|动作|命令|选项|工具|参数|回答)\s*[:：]');
 
   static String stableId(AgentEventType type, String content) {
     final bytes = utf8.encode('${type.name}:$content');
@@ -46,7 +44,13 @@ class ReActStreamParser {
     return 'evt_${hash.toRadixString(16)}';
   }
 
-  static List<AgentEvent> parse(String fullResponse) {
+  static List<AgentEvent> parse(String fullResponse) =>
+      parseWithState(fullResponse).events;
+
+  /// [openCommand] 为 true 表示最后一个 command 事件可能仍在流式增长
+  /// （命令字段或代码围栏尚未遇到下一个协议行/闭合围栏），调用方不得提前执行。
+  static ({List<AgentEvent> events, bool openCommand}) parseWithState(
+      String fullResponse) {
     final events = <AgentEvent>[];
     var content = fullResponse;
 
@@ -159,23 +163,49 @@ class ReActStreamParser {
       currentField = null;
     }
 
+    var fenceIsCommandContent = false;
+    void emitFencedContent(String code) {
+      if (code.isEmpty) return;
+      final isExample = !fenceIsCommandContent &&
+          (code
+                  .split('\n')
+                  .any((line) => _protocolExampleLine.hasMatch(line.trim())) ||
+              code.contains('<function=') ||
+              code.contains('</tool_call>'));
+      if (isExample) {
+        final id = stableId(AgentEventType.text, code);
+        events.add(AgentEvent.text(code, id: id));
+      } else {
+        final id = stableId(AgentEventType.command, code);
+        events.add(
+            AgentEvent.command(code, id: id, description: pendingDescription));
+      }
+      pendingDescription = null;
+    }
+
     final lines = content.split('\n');
     bool inCodeBlock = false;
     final codeBlockBuffer = StringBuffer();
-    // heredoc 保护（设计 §6.1）：命令字段行含 <<定界符 后，直到某行 trim
-    // 等于定界符为止，所有行不做关键词切分、整行并入命令 buffer——
+    // heredoc 保护（设计 §6.1）：命令字段行含 <<定界符 后，直到某行精确等于
+    // 定界符为止，所有行不做关键词切分、整行并入命令 buffer——
     // 防止 heredoc 正文里的 命令:/说明: 行被当协议行切走、截断命令。
-    String? heredocDelim;
+    // 队列支持同一行多个 heredoc；起始识别复用 ShellSyntax 的词法层，
+    // 引号/注释/算术移位里的伪 heredoc 不启动保护。
+    final heredocQueue = <({String tag, bool stripTabs})>[];
+    ShellHeredocScanner? heredocScanner;
+    final commandQuotes = _CommandQuoteState();
 
     for (int i = 0; i < lines.length; i++) {
       final line = lines[i];
       final trimmed = line.trim();
 
-      if (heredocDelim != null) {
+      if (heredocQueue.isNotEmpty) {
         // heredoc 内容期：整行（含定界符行本身）原样并入命令 buffer
         buffer.writeln(line);
-        if (trimmed == heredocDelim) {
-          heredocDelim = null;
+        final current = heredocQueue.first;
+        if (ShellSyntax.isHeredocTerminator(line, current.tag,
+            stripTabs: current.stripTabs)) {
+          heredocQueue.removeAt(0);
         }
         continue;
       }
@@ -187,12 +217,10 @@ class ReActStreamParser {
           codeBlockBuffer.clear();
           if (code.isNotEmpty) {
             flush();
-            final id = stableId(AgentEventType.command, code);
-            events.add(AgentEvent.command(code,
-                id: id, description: pendingDescription));
-            pendingDescription = null;
+            emitFencedContent(code);
           }
         } else {
+          fenceIsCommandContent = currentField == _FieldType.command;
           flush();
           inCodeBlock = true;
           codeBlockBuffer.clear();
@@ -205,7 +233,20 @@ class ReActStreamParser {
         continue;
       }
 
-      final segments = _splitLineByKeywords(line);
+      // 命令字段是 shell 原文：非行首关键词即使前面有空格或位于 # 注释里，
+      // 也不能切出新协议字段。跨行引号未闭合时，行首协议词也仍是 shell 原文。
+      final wasCommandField = currentField == _FieldType.command;
+      final commandQuoted = commandQuotes.isQuoted;
+      final commandCommented = commandQuotes.isCommentContinuation;
+      if (wasCommandField && (commandQuoted || commandCommented)) {
+        buffer.writeln(line);
+        commandQuotes.appendLine(line);
+        continue;
+      }
+      final segments = _splitLineByKeywords(
+        line,
+        commandField: wasCommandField && !commandQuoted,
+      );
       for (final seg in segments) {
         final segTrimmed = seg.trim();
         if (segTrimmed.isEmpty) continue;
@@ -243,6 +284,7 @@ class ReActStreamParser {
             case '命令':
               flush();
               currentField = _FieldType.command;
+              heredocScanner = ShellHeredocScanner();
               if (content.isNotEmpty) buffer.writeln(content);
               break;
             case '选项':
@@ -300,39 +342,63 @@ class ReActStreamParser {
         }
       }
 
-      // 处于命令字段且本行含 heredoc 起始 → 记录定界符，进入内容保护期
-      if (heredocDelim == null && currentField == _FieldType.command) {
-        final hs = _heredocStart.firstMatch(line);
-        if (hs != null) heredocDelim = hs.group(2);
+      final firstContentIndex = line.length - line.trimLeft().length;
+      final logicalLine = firstContentIndex < line.length
+          ? line.substring(firstContentIndex)
+          : '';
+      final startsCommand =
+          logicalLine.startsWith('命令:') || logicalLine.startsWith('命令：');
+      final startsProtocol = _keywords.any(logicalLine.startsWith);
+      if (commandQuoted ||
+          commandCommented ||
+          startsCommand ||
+          (wasCommandField && !startsProtocol)) {
+        commandQuotes.appendLine(line);
+      }
+
+      // 处于命令字段时登记本行合法 heredoc 起始；多 heredoc 按 POSIX 顺序入队
+      if (currentField == _FieldType.command) {
+        heredocScanner ??= ShellHeredocScanner();
+        final tags = ShellSyntax.heredocTagsOnLine(line, heredocScanner);
+        if (tags.isNotEmpty) heredocQueue.addAll(tags);
       }
     }
 
+    final openCodeBlockAtEnd = inCodeBlock;
+    final commandFieldAtEnd = currentField == _FieldType.command;
     if (inCodeBlock) {
       final code = codeBlockBuffer.toString().trim();
       if (code.isNotEmpty) {
         flush();
-        final id = stableId(AgentEventType.command, code);
-        events.add(AgentEvent.command(code,
-            id: id, description: pendingDescription));
-        pendingDescription = null;
+        emitFencedContent(code);
       }
     }
 
     flush();
-    return events;
+    final openCommand = events.isNotEmpty &&
+        events.last.isCommand &&
+        (openCodeBlockAtEnd || commandFieldAtEnd);
+    return (events: events, openCommand: openCommand);
   }
 
-  /// 将一行文本按 ReAct 关键词分割成多段
-  static List<String> _splitLineByKeywords(String line) {
+  /// 将一行文本按 ReAct 关键词分割成多段。
+  ///
+  /// 普通协议行保留空白前缀的行内切分；命令字段只认行首字段边界，且从首个
+  /// `命令:` 起右侧全部是 shell 原文，避免 `# 命令:` 注释被再次切段执行。
+  static List<String> _splitLineByKeywords(
+    String line, {
+    required bool commandField,
+  }) {
     final result = <String>[];
     int lastIdx = 0;
     final matches = <_KeywordMatch>[];
+    final firstContentIndex = line.length - line.trimLeft().length;
     for (final kw in _keywords) {
       int idx = 0;
       while (true) {
         final pos = line.indexOf(kw, idx);
         if (pos < 0) break;
-        // 行内（position>0）命中仅当前一字符为空格/Tab 才是字段边界：
+        // 行内（position>0）命中仅当前一字符为空白/Tab 才是字段边界：
         // echo "命令: x" 的引号前缀不是边界，思考: a 动作: execute 的空格前缀才是。
         // 行首命中不受限。
         if (pos == 0 || line[pos - 1] == ' ' || line[pos - 1] == '\t') {
@@ -346,6 +412,17 @@ class ReActStreamParser {
       return result;
     }
     matches.sort((a, b) => a.position.compareTo(b.position));
+    if (commandField) {
+      final first = matches.first;
+      if (first.position != firstContentIndex) return [line];
+      matches.removeRange(1, matches.length);
+    } else {
+      final firstCommand =
+          matches.indexWhere((m) => m.keyword == '命令:' || m.keyword == '命令：');
+      if (firstCommand >= 0) {
+        matches.removeRange(firstCommand + 1, matches.length);
+      }
+    }
     for (final m in matches) {
       if (m.position > lastIdx) {
         result.add(line.substring(lastIdx, m.position));
@@ -455,6 +532,74 @@ class ReActStreamParser {
   static String _clip(String s, int max) {
     if (s.length <= max) return s;
     return '${s.substring(0, max)}…';
+  }
+}
+
+/// 命令字段的跨行引号/注释上下文，用于判断协议关键词是否仍处于 shell 原文内。
+class _CommandQuoteState {
+  bool single = false;
+  bool double = false;
+  bool backtick = false;
+  bool _commentContinuation = false;
+
+  bool get isQuoted => single || double || backtick;
+  bool get isCommentContinuation => _commentContinuation;
+
+  void appendLine(String line) {
+    if (_commentContinuation) {
+      _commentContinuation = _endsWithBackslash(line);
+      return;
+    }
+    _commentContinuation = false;
+    var escaped = false;
+    for (var i = 0; i < line.length; i++) {
+      final c = line[i];
+      if (escaped) {
+        escaped = false;
+        continue;
+      }
+      if (single) {
+        if (c == "'") single = false;
+        continue;
+      }
+      if (backtick) {
+        if (c == '\\') {
+          escaped = true;
+        } else if (c == '`') {
+          backtick = false;
+        }
+        continue;
+      }
+      if (double) {
+        if (c == '\\') {
+          escaped = true;
+        } else if (c == '"') {
+          double = false;
+        } else if (c == '`') {
+          backtick = true;
+        }
+        continue;
+      }
+      if (c == '\\') {
+        escaped = true;
+      } else if (c == "'") {
+        single = true;
+      } else if (c == '"') {
+        double = true;
+      } else if (c == '`') {
+        backtick = true;
+      } else if (c == '#' && (i == 0 || ' \t;|&()'.contains(line[i - 1]))) {
+        _commentContinuation = _endsWithBackslash(line);
+        break;
+      }
+    }
+    // POSIX 反斜杠换行会被移除，不转义下一物理行；局部 escaped 随行结束丢弃。
+  }
+
+  static bool _endsWithBackslash(String line) {
+    var end = line.length;
+    if (end > 0 && line[end - 1] == '\r') end--;
+    return end > 0 && line[end - 1] == '\\';
   }
 }
 

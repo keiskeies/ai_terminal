@@ -17,7 +17,8 @@ import '../core/terminal_keybindings.dart';
 import '../core/terminal_themes.dart';
 import '../core/theme_colors.dart';
 import '../core/ui_text.dart';
-import '../utils/terminal_blocks.dart';import '../utils/terminal_panes.dart';
+import '../utils/terminal_blocks.dart';
+import '../utils/terminal_panes.dart';
 import '../utils/terminal_search.dart';
 import '../utils/terminal_text_actions.dart';
 import 'terminal_context_menu.dart';
@@ -35,7 +36,8 @@ class TerminalView extends StatefulWidget {
   final ValueChanged<double>? onFontSizeChanged;
 
   /// 需要页面能力的菜单动作（Agent / 片段 / SFTP / 审计）
-  final Future<void> Function(TerminalMenuIntent intent, String text)? onMenuIntent;
+  final Future<void> Function(TerminalMenuIntent intent, String text)?
+      onMenuIntent;
 
   /// 是否为当前可见 tab。多个 tab 的 TerminalView 会同时挂在树上，
   /// 只有 active 的可以抢焦点/自动聚焦，否则后台 tab 会把键盘焦点抢走。
@@ -121,9 +123,9 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
   static const int _searchMaxMatches = 5000;
 
   xterm.TerminalTheme get _theme => resolveTerminalTheme(
-      paletteId: widget.paletteId,
-      isLight: ThemeColors.of(context).isLight,
-    );
+        paletteId: widget.paletteId,
+        isLight: ThemeColors.of(context).isLight,
+      );
 
   @override
   void initState() {
@@ -339,7 +341,8 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
   void _onBell() {
     final now = DateTime.now();
     final last = _lastBellAt;
-    if (last != null && now.difference(last) < const Duration(milliseconds: 500)) {
+    if (last != null &&
+        now.difference(last) < const Duration(milliseconds: 500)) {
       return;
     }
     _lastBellAt = now;
@@ -496,8 +499,8 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     // （xterm shortcuts.dart），Linux 上 SSH 进 shell 就丢了这个键；Insert
     // 两个键任何一张快捷键表里都没有，character 为空，一路掉到 keyInput。
     if (event.logicalKey == LogicalKeyboardKey.insert) {
-      final routing =
-          resolveInsertRouting(ctrl: hw.isControlPressed, shift: hw.isShiftPressed);
+      final routing = resolveInsertRouting(
+          ctrl: hw.isControlPressed, shift: hw.isShiftPressed);
       if (routing == InsertRouting.none) {
         // 裸 Insert：不吞键，交回 xterm（vi 插入模式等）
         return KeyEventResult.ignored;
@@ -626,8 +629,7 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     final terminal = widget.terminal;
     if (terminal == null) return;
     final light = ThemeColors.of(context).isLight;
-    final hitColor =
-        light ? const Color(0x59A66F00) : const Color(0x59F2C276);
+    final hitColor = light ? const Color(0x59A66F00) : const Color(0x59F2C276);
     final currentColor =
         light ? const Color(0x80D14343) : const Color(0x99FF9AA2);
     _searchHitColor = hitColor;
@@ -720,9 +722,8 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     final viewportHeight = render.size.height;
     final maxExtent =
         math.max(0.0, terminal.buffer.height * lineHeight - viewportHeight);
-    final target =
-        (line * lineHeight - (viewportHeight - lineHeight) / 2)
-            .clamp(0.0, maxExtent);
+    final target = (line * lineHeight - (viewportHeight - lineHeight) / 2)
+        .clamp(0.0, maxExtent);
     _scrollController.jumpTo(target);
     return true;
   }
@@ -734,8 +735,8 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
       return;
     }
     final lineHeight = render.cellSize.height;
-    final maxExtent = math.max(
-        0.0, terminal.buffer.height * lineHeight - render.size.height);
+    final maxExtent =
+        math.max(0.0, terminal.buffer.height * lineHeight - render.size.height);
     _scrollController.jumpTo(maxExtent);
   }
 
@@ -786,8 +787,8 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
                   style: TextStyle(fontSize: fSmall, color: tc.textMain),
                   decoration: InputDecoration(
                     isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 6),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     hintText: UiText.t('搜索终端输出', 'Search output'),
                     hintStyle: TextStyle(fontSize: fSmall, color: tc.textMuted),
                     filled: true,
@@ -839,7 +840,8 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
                 ),
               ),
               IconButton(
-                tooltip: UiText.t('上一个 (Shift+Enter)', 'Previous (Shift+Enter)'),
+                tooltip:
+                    UiText.t('上一个 (Shift+Enter)', 'Previous (Shift+Enter)'),
                 iconSize: 16,
                 visualDensity: VisualDensity.compact,
                 onPressed: _searchMatches.isEmpty ? null : _prevMatch,
@@ -1059,8 +1061,8 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
       items.add(TerminalMenuItem(
         label: UiText.t('存为命令片段', 'Save as snippet'),
         icon: Icons.bookmark_add_outlined,
-        onTap: () => onIntent(
-            TerminalMenuIntent.saveSnippet, stripPromptPrefix(text)),
+        onTap: () =>
+            onIntent(TerminalMenuIntent.saveSnippet, stripPromptPrefix(text)),
       ));
       final command = stripPromptPrefix(text);
       if (looksLikeCommand(command)) {
@@ -1094,8 +1096,7 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
       if (paneActions.isSplit) {
         items.add(TerminalMenuItem(
           label: paneActions.isPrimary
-              ? UiText.t('关掉此分屏（AI 在这屏）',
-                  'Close this pane (AI is bound here)')
+              ? UiText.t('关掉此分屏（AI 在这屏）', 'Close this pane (AI is bound here)')
               : UiText.t('关掉此分屏', 'Close this pane'),
           icon: Icons.close_fullscreen_outlined,
           shortcut: _shortcutFor(TerminalKeyAction.closePane),
@@ -1185,7 +1186,8 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
   }) {
     final tracker = widget.blockTracker;
     final terminal = widget.terminal;
-    if (tracker == null || terminal == null || onIntent == null) return const [];
+    if (tracker == null || terminal == null || onIntent == null)
+      return const [];
     if (lineY == null || tracker.isEmpty) return const [];
     final height = terminal.buffer.height;
     final lineAt = blockLineReader(terminal);
@@ -1270,7 +1272,6 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     widget.terminal?.paste(pasted);
   }
 
-
   /// 复制选区到系统剪贴板，并弹「已复制」提示。
   /// 右键菜单的「复制」项走同一入口，避免两处各拼一遍。
   void _copySelection(xterm.Terminal terminal) {
@@ -1315,7 +1316,9 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(UiText.t('多行内容会被依次执行，请确认没有误粘贴：', 'Multi-line content will run sequentially. Check that nothing was pasted by mistake:'),
+                Text(
+                    UiText.t('多行内容会被依次执行，请确认没有误粘贴：',
+                        'Multi-line content will run sequentially. Check that nothing was pasted by mistake:'),
                     style: TextStyle(color: tc.textSub, fontSize: fSmall)),
                 const SizedBox(height: 8),
                 Container(
@@ -1327,9 +1330,7 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
                     border: Border.all(color: tc.border),
                   ),
                   child: Text(
-                    more > 0
-                        ? L10n.str.ut_c40c983842(preview, more)
-                        : preview,
+                    more > 0 ? L10n.str.ut_c40c983842(preview, more) : preview,
                     style: TextStyle(
                       fontFamily: 'JetBrainsMono',
                       fontFamilyFallback: kMonoFontFallback,
@@ -1364,7 +1365,8 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
         final tc = ThemeColors.of(context);
         return AlertDialog(
           backgroundColor: tc.cardElevated,
-          title: Text(UiText.t('在终端执行这条命令？', 'Run this command in the terminal?'),
+          title: Text(
+              UiText.t('在终端执行这条命令？', 'Run this command in the terminal?'),
               style: TextStyle(color: tc.textMain, fontSize: fBody)),
           content: Container(
             width: 460,
@@ -1416,9 +1418,12 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     } catch (_) {
       await Clipboard.setData(ClipboardData(text: url));
       if (!mounted) return;
-      showTopSnackBar(context,
+      showTopSnackBar(
+        context,
         SnackBar(
-          content: Text(UiText.t('打开链接失败，已复制到剪贴板', 'Failed to open the link; copied to clipboard'),
+          content: Text(
+              UiText.t('打开链接失败，已复制到剪贴板',
+                  'Failed to open the link; copied to clipboard'),
               style: const TextStyle(fontSize: fSmall)),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
@@ -1433,9 +1438,11 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     if (text.trim().isEmpty) return;
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
-    showTopSnackBar(context,
+    showTopSnackBar(
+      context,
       SnackBar(
-        content: Text(L10n.str.ut_1dd514c792(text.length), style: const TextStyle(fontSize: fSmall)),
+        content: Text(L10n.str.ut_1dd514c792(text.length),
+            style: const TextStyle(fontSize: fSmall)),
         duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
@@ -1459,9 +1466,11 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     if (path == null) return;
     await File(path).writeAsString(text);
     if (!mounted) return;
-    showTopSnackBar(context,
+    showTopSnackBar(
+      context,
       SnackBar(
-        content: Text(L10n.str.ut_3482231651(path), style: const TextStyle(fontSize: fSmall)),
+        content: Text(L10n.str.ut_3482231651(path),
+            style: const TextStyle(fontSize: fSmall)),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
@@ -1477,7 +1486,8 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
         // 用配色预设的背景，否则换了配色后「等待连接」这块和终端本体两个颜色
         color: _theme.background,
         child: Center(
-          child: Text(UiText.t('等待连接...', 'Waiting for connection...'), style: TextStyle(color: tc.textSub)),
+          child: Text(UiText.t('等待连接...', 'Waiting for connection...'),
+              style: TextStyle(color: tc.textSub)),
         ),
       );
     }

@@ -22,7 +22,8 @@ class UpdateCheckService {
       },
     ));
     try {
-      final resp = await dio.get<dynamic>('https://api.github.com/repos/$githubRepo/releases/latest');
+      final resp = await dio.get<dynamic>(
+          'https://api.github.com/repos/$githubRepo/releases/latest');
       final data = resp.data;
       if (data is! Map) throw const UpdateCheckException('返回格式不认识');
       final tag = (data['tag_name'] as String?)?.trim() ?? '';

@@ -59,7 +59,8 @@ class SSHConnectionPool {
     }
 
     final future = _doAcquire(
-      hostId, config,
+      hostId,
+      config,
       password: password,
       privateKeyContent: privateKeyContent,
       passphrase: passphrase,
@@ -85,23 +86,24 @@ class SSHConnectionPool {
     String? jumpPassword,
     String? jumpPrivateKeyContent,
   }) async {
-    final service = serviceFactoryForTesting?.call(config) ?? SSHService(config);
+    final service =
+        serviceFactoryForTesting?.call(config) ?? SSHService(config);
     try {
       // 总超时必须大于单次建连超时（跳板机要串两段），否则用户把
       // 「连接超时」调到 60 s 也会被这里 30 s 先掐断。
       await service
           .connect(
-        password: password,
-        privateKeyContent: privateKeyContent,
-        passphrase: passphrase,
-        jumpHostConfig: jumpHostConfig,
-        jumpPassword: jumpPassword,
-        jumpPrivateKeyContent: jumpPrivateKeyContent,
-      )
+            password: password,
+            privateKeyContent: privateKeyContent,
+            passphrase: passphrase,
+            jumpHostConfig: jumpHostConfig,
+            jumpPassword: jumpPassword,
+            jumpPrivateKeyContent: jumpPrivateKeyContent,
+          )
           .timeout(overallConnectTimeoutFor(
-        config,
-        jumpHostConfig: jumpHostConfig,
-      ));
+            config,
+            jumpHostConfig: jumpHostConfig,
+          ));
     } catch (e) {
       // N4: 异常时清理 service，避免连接泄漏
       service.dispose();
@@ -212,10 +214,10 @@ class SSHConnectionPool {
     return {
       'totalConnections': _pool.length,
       'connections': _pool.map((key, value) => MapEntry(key, {
-        'refCount': value.refCount,
-        'isConnected': value.service.isConnected,
-        'osInfo': value.service.osInfo,
-      })),
+            'refCount': value.refCount,
+            'isConnected': value.service.isConnected,
+            'osInfo': value.service.osInfo,
+          })),
     };
   }
 

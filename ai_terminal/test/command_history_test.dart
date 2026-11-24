@@ -34,11 +34,9 @@ void main() {
   test('search 子串匹配且忽略大小写', () async {
     await CommandHistoryDao.record('docker compose up -d');
     await CommandHistoryDao.record('git status');
-    expect(
-        CommandHistoryDao.search('DOCKER').map((e) => e.command),
+    expect(CommandHistoryDao.search('DOCKER').map((e) => e.command),
         ['docker compose up -d']);
-    expect(
-        CommandHistoryDao.search('status').map((e) => e.command),
+    expect(CommandHistoryDao.search('status').map((e) => e.command),
         ['git status']);
     expect(CommandHistoryDao.search('').length, 2);
   });

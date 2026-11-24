@@ -113,8 +113,7 @@ void main() {
         sudoPassword: _sudoPassword,
       );
       expect(answered.failureKind, CommandFailureKind.none);
-      expect(answered.exitCode, 0,
-          reason: '用户实机正是卡死在这一步：英文整句匹配不上中文提示');
+      expect(answered.exitCode, 0, reason: '用户实机正是卡死在这一步：英文整句匹配不上中文提示');
     }, timeout: const Timeout(Duration(minutes: 2)));
 
     test('探测失败后立即重试（AI 的真实流程：失败 → 收密码 → 重试）', () async {
@@ -154,8 +153,7 @@ void main() {
         sudoPassword: 'definitely-not-the-password',
       );
       expect(result.exitCode, isNot(0));
-      expect(result.timedOut, isFalse,
-          reason: '答错后 sudo 会重试并最终退出，marker 仍要出现');
+      expect(result.timedOut, isFalse, reason: '答错后 sudo 会重试并最终退出，marker 仍要出现');
     });
 
     test('用户实机命令 sudo apt update 走长超时并成功', () async {

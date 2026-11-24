@@ -8,6 +8,7 @@ import 'package:path/path.dart' as p;
 import 'package:ai_terminal/services/agent_tool.dart';
 import 'package:ai_terminal/utils/tool_args_parser.dart';
 import 'package:ai_terminal/services/local_terminal_service.dart';
+import 'package:ai_terminal/services/daos.dart';
 import 'package:ai_terminal/utils/local_file_ops.dart';
 
 /// 本地文件编辑回归测试。
@@ -25,12 +26,22 @@ void main() {
 
   setUp(() async {
     tempDir = await Directory.systemTemp.createTemp('ai_terminal_local_edit_');
+    await SettingsDao.set('localFilePolicy', {
+      'enabled': true,
+      'allowedDirs': <String>[tempDir.path],
+      'maxReadBytes': 2 * 1024 * 1024,
+    });
     local = LocalTerminalService();
     writeTool = FileWriteTool();
     patchTool = FilePatchTool();
   });
 
   tearDown(() async {
+    await SettingsDao.set('localFilePolicy', {
+      'enabled': false,
+      'allowedDirs': <String>[],
+      'maxReadBytes': 2 * 1024 * 1024,
+    });
     if (await tempDir.exists()) {
       await tempDir.delete(recursive: true);
     }
@@ -176,6 +187,58 @@ void main() {
       expect(await File(path).exists(), isFalse);
     });
 
+    test('L-W9: 策略拒绝时不创建目标或父目录', () async {
+      final allowed = Directory(p.join(tempDir.path, 'allowed'))..createSync();
+      await SettingsDao.set('localFilePolicy', {
+        'enabled': true,
+        'allowedDirs': [allowed.path],
+        'maxReadBytes': 2 * 1024 * 1024,
+      });
+      final denied = p.join(tempDir.path, 'denied', 'deep', 'new.txt');
+      final result = await writeTool.execute(
+        executor: local,
+        args: ToolArgs({
+          'path': denied,
+          'content_b64': b64('must not write'),
+          'backup': false,
+        }),
+      );
+      expect(result.success, isFalse);
+      expect(result.error, contains('未获授权'));
+      expect(await Directory(p.dirname(denied)).exists(), isFalse);
+    });
+
+    test('L-W9b: 总开关关闭时拒绝写入且不创建文件', () async {
+      await SettingsDao.set('localFilePolicy', {
+        'enabled': false,
+        'allowedDirs': [tempDir.path],
+        'maxReadBytes': 2 * 1024 * 1024,
+      });
+      final path = p.join(tempDir.path, 'disabled.txt');
+      final result = await writeTool.execute(
+        executor: local,
+        args: ToolArgs({'path': path, 'content': 'x', 'backup': false}),
+      );
+      expect(result.success, isFalse);
+      expect(result.error, contains('总开关已关闭'));
+      expect(await File(path).exists(), isFalse);
+    });
+
+    test('L-W9c: 纯文本在转义解码前按 8KB 原文上限拒绝', () async {
+      final path = p.join(tempDir.path, 'raw-limit.txt');
+      final result = await writeTool.execute(
+        executor: local,
+        args: ToolArgs({
+          'path': path,
+          'content': r'\n' * 5000,
+          'backup': false,
+        }),
+      );
+      expect(result.success, isFalse);
+      expect(result.error, contains('已中止'));
+      expect(await File(path).exists(), isFalse);
+    });
+
     test('L-W6: 写入目录路径 → 失败但不影响其他文件', () async {
       final other = p.join(tempDir.path, 'keep.txt');
       await File(other).writeAsString('keep');
@@ -194,10 +257,31 @@ void main() {
   });
 
   group('file_patch 本地文件', () {
+    test('L-P0: old/new 纯文本在编码前按 64KB 原文上限拒绝', () async {
+      final path = p.join(tempDir.path, 'raw-limit.txt');
+      const original = 'a';
+      await File(path).writeAsString(original);
+      final oversized = 'x' * (64 * 1024 + 1);
+      for (final args in [
+        {'path': path, 'old': oversized, 'new': 'z'},
+        {'path': path, 'old': 'a', 'new': oversized},
+      ]) {
+        final result = await patchTool.execute(
+          executor: local,
+          args: ToolArgs(args),
+        );
+        expect(result.success, isFalse);
+        expect(result.error, contains('64KB'));
+        expect(result.error, contains('已中止'));
+        expect(await File(path).readAsString(), original);
+      }
+    });
+
     test('L-P1: 字节级替换保留 BOM/CRLF/非 UTF-8 字节', () async {
       final path = p.join(tempDir.path, 'nginx 配置.log');
       final prefix = <int>[0xEF, 0xBB, 0xBF]; // UTF-8 BOM
-      final head = utf8.encode('server {\r\n  listen 80;\r\n  name 中文;\r\n}\r\n');
+      final head =
+          utf8.encode('server {\r\n  listen 80;\r\n  name 中文;\r\n}\r\n');
       final invalidTail = <int>[0xFF, 0xFE, 0x00, 0x01];
       final original = <int>[...prefix, ...head, ...invalidTail];
       await File(path).writeAsBytes(original);
@@ -270,6 +354,39 @@ void main() {
           .toList();
       expect(backups, hasLength(1));
       expect(await backups.single.readAsString(), 'value=旧\n');
+    });
+
+    test('L-P10: 策略拒绝时原文件不变且不生成备份', () async {
+      final allowed = Directory(p.join(tempDir.path, 'allowed'))..createSync();
+      await SettingsDao.set('localFilePolicy', {
+        'enabled': true,
+        'allowedDirs': [allowed.path],
+        'maxReadBytes': 2 * 1024 * 1024,
+      });
+      final denied = File(p.join(tempDir.path, 'denied.txt'))
+        ..writeAsStringSync('original');
+      final result =
+          await patchLocal(denied.path, 'original', 'changed', backup: true);
+      expect(result.success, isFalse);
+      expect(result.error, contains('未获授权'));
+      expect(await denied.readAsString(), 'original');
+      expect(
+          tempDir
+              .listSync()
+              .whereType<File>()
+              .where((f) => f.path.contains('.bak.')),
+          isEmpty);
+    });
+
+    test('L-P11: stat 发现超大文件时拒绝读取且不修改', () async {
+      final path = p.join(tempDir.path, 'sparse-large.bin');
+      final raf = await File(path).open(mode: FileMode.write);
+      await raf.truncate(1024 * 1024 + 1);
+      await raf.close();
+      final result = await patchLocal(path, 'a', 'b');
+      expect(result.success, isFalse);
+      expect(result.error, contains('已拒绝读取'));
+      expect(await File(path).length(), 1024 * 1024 + 1);
     });
 
     test('L-P8: 单行中文用 old/new 纯文本参数（无需 base64）', () async {

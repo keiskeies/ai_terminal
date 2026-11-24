@@ -45,8 +45,7 @@ void main() {
         maxSteps: 5,
       );
 
-  const finishTurn =
-      '思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n';
+  const finishTurn = '思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n';
 
   /// 从最后一段历史里取引擎写入的观测消息（format() 以「观测: 」开头）。
   /// 不能用「执行失败」等词直接 firstWhere —— 系统提示里也含这些词。
@@ -77,8 +76,8 @@ void main() {
       ..exitCode = 127
       ..stdout = '-bash: foo: command not found';
 
-    final (:result, :obsHistory) = await runFailure(
-        command: 'foo --version', executor: executor);
+    final (:result, :obsHistory) =
+        await runFailure(command: 'foo --version', executor: executor);
 
     expect(result.success, isFalse);
     expect(result.error, contains('-bash: foo: command not found'),
@@ -100,8 +99,8 @@ void main() {
       ..failureKind = 'timeout'
       ..failureReason = '命令执行超时 (60s)';
 
-    final (:result, :obsHistory) = await runFailure(
-        command: 'wget http://slow/file', executor: executor);
+    final (:result, :obsHistory) =
+        await runFailure(command: 'wget http://slow/file', executor: executor);
 
     expect(result.success, isFalse);
     final observationMsg = observationOf(obsHistory);
@@ -111,8 +110,7 @@ void main() {
         reason: '已收到的部分输出也要进观测');
   });
 
-  test('交互提示中断：kind 与提示文本同时到达（sudo provide_password 依据）',
-      () async {
+  test('交互提示中断：kind 与提示文本同时到达（sudo provide_password 依据）', () async {
     final executor = _MockExecutor()
       ..exitCode = -1
       ..stdout = 'Reading package lists... Done\n[sudo] password for root: '
@@ -218,7 +216,8 @@ class _MockExecutor implements CommandExecutor {
         timedOut: timedOut,
         failureKind: failureKind == null
             ? CommandFailureKind.none
-            : CommandFailureKind.values.firstWhere((k) => k.name == failureKind),
+            : CommandFailureKind.values
+                .firstWhere((k) => k.name == failureKind),
         failureReason: failureReason,
       );
 

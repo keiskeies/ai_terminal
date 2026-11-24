@@ -19,7 +19,8 @@ class MemoryEntry {
     return _parseSimpleJson(metadata!);
   }
 
-  static MemoryEntry command(String command, {String? description, String? result}) {
+  static MemoryEntry command(String command,
+      {String? description, String? result}) {
     return MemoryEntry(
       id: 'cmd_${DateTime.now().millisecondsSinceEpoch}',
       type: 'command',
@@ -37,7 +38,8 @@ class MemoryEntry {
     );
   }
 
-  static MemoryEntry result(String command, String output, {bool success = true}) {
+  static MemoryEntry result(String command, String output,
+      {bool success = true}) {
     return MemoryEntry(
       id: 'res_${DateTime.now().millisecondsSinceEpoch}',
       type: 'result',

@@ -19,9 +19,8 @@ String extractLiveThought(String raw, {int maxChars = 1200}) {
   // 窗口内没有标记时必须回退全量扫描：最后一个标记可能在窗口外，
   // 其后跟着长回答/长代码（如「思考: …\n回答: <长文>」），若直接用窗口
   // 文本会把回答尾部误显示为思考，且丢掉协议行截断。
-  final window = raw.length > _scanWindow
-      ? raw.substring(raw.length - _scanWindow)
-      : raw;
+  final window =
+      raw.length > _scanWindow ? raw.substring(raw.length - _scanWindow) : raw;
   var matches = _thoughtMarker.allMatches(window);
   var source = window;
   if (matches.isEmpty && !identical(source, raw)) {

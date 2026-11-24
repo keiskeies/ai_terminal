@@ -108,7 +108,8 @@ class _OutputViewerSheetState extends State<OutputViewerSheet> {
                       onTap: () {
                         Clipboard.setData(ClipboardData(text: widget.text));
                         clearTopToast();
-                        showTopSnackBar(context, 
+                        showTopSnackBar(
+                          context,
                           SnackBar(
                             content: Text(UiText.t('已复制', 'Copied'),
                                 style: const TextStyle(fontSize: fSmall)),
@@ -152,8 +153,8 @@ class _OutputViewerSheetState extends State<OutputViewerSheet> {
                           ),
                     filled: true,
                     fillColor: tc.terminalBg,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 8),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(rXSmall),
                       borderSide: BorderSide(color: tc.border),
@@ -179,7 +180,8 @@ class _OutputViewerSheetState extends State<OutputViewerSheet> {
                     child: SelectableText(
                       display,
                       style: TextStyle(
-                        fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                        fontFamily: 'JetBrainsMono',
+                        fontFamilyFallback: kMonoFontFallback,
                         fontSize: fMono,
                         color: tc.textBody,
                         height: 1.4,

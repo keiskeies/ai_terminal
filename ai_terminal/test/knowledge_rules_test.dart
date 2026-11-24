@@ -47,7 +47,11 @@ void main() {
     });
 
     test('分组规则只对该分组主机生效', () {
-      final r = rule(id: 'gr1', title: '生产约定', scope: KnowledgeRuleScope.group, group: '生产');
+      final r = rule(
+          id: 'gr1',
+          title: '生产约定',
+          scope: KnowledgeRuleScope.group,
+          group: '生产');
       expect(r.appliesTo(targetHostId: 'h1', targetGroup: '生产'), isTrue);
       expect(r.appliesTo(targetHostId: 'h2', targetGroup: '测试'), isFalse);
       // 本机终端/普通聊天没有分组上下文，分组规则不生效
@@ -55,7 +59,11 @@ void main() {
     });
 
     test('主机规则只对绑定的那台主机生效', () {
-      final r = rule(id: 'h1r', title: 'db01 约定', scope: KnowledgeRuleScope.host, hostId: 'db01');
+      final r = rule(
+          id: 'h1r',
+          title: 'db01 约定',
+          scope: KnowledgeRuleScope.host,
+          hostId: 'db01');
       expect(r.appliesTo(targetHostId: 'db01'), isTrue);
       expect(r.appliesTo(targetHostId: 'db02'), isFalse);
       expect(r.appliesTo(), isFalse);
@@ -69,14 +77,17 @@ void main() {
 
   group('effectiveFor', () {
     test('禁用条目不注入', () async {
-      await KnowledgeRulesDao.upsert(rule(id: 'on', title: '启用', enabled: true));
-      await KnowledgeRulesDao.upsert(rule(id: 'off', title: '停用', enabled: false));
+      await KnowledgeRulesDao.upsert(
+          rule(id: 'on', title: '启用', enabled: true));
+      await KnowledgeRulesDao.upsert(
+          rule(id: 'off', title: '停用', enabled: false));
       expect(KnowledgeRulesDao.effectiveFor(null).map((r) => r.id), ['on']);
     });
 
     test('未知 hostId 只拿到全局条目', () async {
       await KnowledgeRulesDao.upsert(rule(id: 'g', title: '全局'));
-      await KnowledgeRulesDao.upsert(rule(id: 'p', title: '生产', scope: KnowledgeRuleScope.group, group: '生产'));
+      await KnowledgeRulesDao.upsert(rule(
+          id: 'p', title: '生产', scope: KnowledgeRuleScope.group, group: '生产'));
       expect(KnowledgeRulesDao.effectiveFor('不存在的id').map((r) => r.id), ['g']);
     });
   });
@@ -87,12 +98,14 @@ void main() {
       expect(strict.buildInjectionText(), contains('- [严格] 走内网源'));
       expect(strict.buildInjectionText(), contains('  不要用公网 apt 源'));
 
-      final soft = rule(id: 'b', title: '平滑重载', content: '优先 reload', strict: false);
+      final soft =
+          rule(id: 'b', title: '平滑重载', content: '优先 reload', strict: false);
       expect(soft.buildInjectionText(), contains('- [建议] 平滑重载'));
     });
 
     test('有参考命令时才输出命令块', () {
-      final withCmd = rule(id: 'a', title: 't', commands: 'apt update\napt upgrade -y');
+      final withCmd =
+          rule(id: 'a', title: 't', commands: 'apt update\napt upgrade -y');
       final text = withCmd.buildInjectionText();
       expect(text, contains('参考命令：'));
       expect(text, contains('    apt update'));
@@ -114,7 +127,8 @@ void main() {
   group('buildRulesInjection', () {
     test('无启用条目时返回 null，不往提示词塞空壳', () async {
       expect(buildRulesInjection(), isNull);
-      await KnowledgeRulesDao.upsert(rule(id: 'off', title: '停用', enabled: false));
+      await KnowledgeRulesDao.upsert(
+          rule(id: 'off', title: '停用', enabled: false));
       expect(buildRulesInjection(), isNull);
     });
 
@@ -130,7 +144,10 @@ void main() {
 
     test('主机作用域条目只对匹配 hostId 注入', () async {
       await KnowledgeRulesDao.upsert(rule(
-          id: 'h1', title: '生产约定', scope: KnowledgeRuleScope.host, hostId: 'prod-1'));
+          id: 'h1',
+          title: '生产约定',
+          scope: KnowledgeRuleScope.host,
+          hostId: 'prod-1'));
       expect(buildRulesInjection(hostId: 'prod-1'), contains('生产约定'));
       expect(buildRulesInjection(hostId: 'other'), isNull);
       expect(buildRulesInjection(), isNull);
@@ -140,7 +157,8 @@ void main() {
   group('导入导出', () {
     test('导出的 JSON 再导入不新增条目', () async {
       final notifier = KnowledgeRuleNotifier();
-      await notifier.addRule(rule(id: 'x1', title: '走内网源', content: '用 mirrors.corp'));
+      await notifier
+          .addRule(rule(id: 'x1', title: '走内网源', content: '用 mirrors.corp'));
       final json = notifier.exportJson();
 
       final before = notifier.state.length;
@@ -161,7 +179,8 @@ void main() {
 
     test('本机不存在的主机作用域条目被跳过，不放大成全局', () async {
       final notifier = KnowledgeRuleNotifier();
-      const json = '[{"title":"A","content":"c","scope":"host","hostId":"remote-only"}]';
+      const json =
+          '[{"title":"A","content":"c","scope":"host","hostId":"remote-only"}]';
       final result = await notifier.importFromJson(json);
       expect(result.imported, 0);
       expect(result.skippedUnknownHost, 1);
@@ -187,7 +206,8 @@ void main() {
 
     test('缺少 title 或 content 的条目被跳过', () async {
       final notifier = KnowledgeRuleNotifier();
-      const json = '[{"title":"","content":"c"},{"title":"B","content":""},{"title":"C","content":"ok"}]';
+      const json =
+          '[{"title":"","content":"c"},{"title":"B","content":""},{"title":"C","content":"ok"}]';
       final imported = await notifier.importFromJson(json);
       expect(imported.imported, 1);
       expect(notifier.state.single.title, 'C');

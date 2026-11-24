@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ai_terminal/models/host_config.dart';
 import 'package:ai_terminal/services/agent_tool.dart';
 import 'package:ai_terminal/services/command_executor.dart';
+import 'package:ai_terminal/services/ssh_service.dart';
 import 'package:ai_terminal/utils/tool_args_parser.dart';
 
 /// file_write / file_patch 工具测试
@@ -87,6 +89,20 @@ void main() {
       expect(result.error, contains('分块'));
     });
 
+    test('W-5b: 超限编码串在 base64 解码前拒绝', () async {
+      final result = await tool.execute(
+        executor: executor,
+        args: ToolArgs({
+          'path': '/tmp/huge-invalid.txt',
+          'content_b64': '!' * 20000,
+          'mode': 'write',
+        }),
+      );
+      expect(result.success, isFalse);
+      expect(result.error, contains('编码内容过大'));
+      expect(result.error, isNot(contains('解码失败')));
+    });
+
     test('W-6: 单次写入 = 8KB（边界值）→ 允许通过大小校验', () async {
       // 8KB 正好等于上限，应通过大小校验（非 SSH 会话会在后续报错）
       final content = 'A' * (8 * 1024);
@@ -103,6 +119,37 @@ void main() {
       expect(result.success, isFalse);
       expect(result.error, contains('SSH'),
           reason: '大小校验通过，但 FakeExecutor 非 SSHService，应拒绝');
+    });
+
+    test('W-11: content 与 content_b64 同时提供必须拒绝', () async {
+      final result = await tool.execute(
+        executor: executor,
+        args: const ToolArgs({
+          'path': '/tmp/test.txt',
+          'content': 'text',
+          'content_b64': 'aGVsbG8=',
+        }),
+      );
+      expect(result.success, isFalse);
+      expect(result.error, contains('不能同时提供'));
+    });
+
+    test('W-12: 远程相对路径必须拒绝', () async {
+      final ssh = SSHService(HostConfig.create(
+        id: 'path-test',
+        name: 'path-test',
+        host: '127.0.0.1',
+        username: 'tester',
+        authType: 'password',
+      ));
+      final result = await tool.execute(
+        executor: ssh,
+        args: const ToolArgs(
+            {'path': 'relative/file.txt', 'content_b64': 'eA=='}),
+      );
+      expect(result.success, isFalse);
+      expect(result.error, contains('POSIX 绝对路径'));
+      ssh.dispose();
     });
 
     test('W-7: 非 SSH 会话 → 拒绝', () async {
@@ -234,6 +281,34 @@ void main() {
       expect(result.error, isNot(contains('base64')));
     });
 
+    test('P-5b: 超限 base64 在解码前拒绝，避免无界分配', () async {
+      final result = await tool.execute(
+        executor: executor,
+        args: ToolArgs({
+          'path': '/tmp/test.txt',
+          'old_b64': '!' * 1400000,
+          'new_b64': '',
+        }),
+      );
+      expect(result.success, isFalse);
+      expect(result.error, contains('编码内容过大'));
+      expect(result.error, isNot(contains('解码失败')));
+    });
+
+    test('P-5c: old/new 与对应 base64 字段同时提供必须拒绝', () async {
+      final result = await tool.execute(
+        executor: executor,
+        args: const ToolArgs({
+          'path': '/tmp/test.txt',
+          'old': 'hello',
+          'old_b64': 'aGVsbG8=',
+          'new_b64': '',
+        }),
+      );
+      expect(result.success, isFalse);
+      expect(result.error, contains('不能同时提供'));
+    });
+
     test('P-6: 非 SSH 会话 → 拒绝', () async {
       final result = await tool.execute(
         executor: executor,
@@ -344,7 +419,8 @@ new_b64: bGlzdGVuIDgwODA7''';
       const originalContent = '# nginx 配置\nserver_name 中文网站.com;\n';
       final b64 = base64Encode(utf8.encode(originalContent));
       // 通过 parser 解析参数
-      final args = ToolArgsParser.parse('path: /tmp/test.conf\ncontent_b64: $b64');
+      final args =
+          ToolArgsParser.parse('path: /tmp/test.conf\ncontent_b64: $b64');
       expect(args, isNotNull);
       expect(args!['content_b64'], b64);
       // 工具内部解码后应得到原文（UTF-8 完整保留）
@@ -362,7 +438,8 @@ echo 'Single quotes: $HOME'
 VAR="hello\nworld"
 EOF'''; // 故意包含 EOF 字符串、$ 变量替换、单双引号
       final b64 = base64Encode(utf8.encode(originalContent));
-      final args = ToolArgsParser.parse('path: /tmp/test.sh\ncontent_b64: $b64');
+      final args =
+          ToolArgsParser.parse('path: /tmp/test.sh\ncontent_b64: $b64');
       expect(args, isNotNull);
       final decoded = utf8.decode(base64Decode(args!['content_b64'] as String));
       expect(decoded, originalContent);

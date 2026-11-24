@@ -88,8 +88,7 @@ class SessionRecorder {
       final stamp = '${ts.year}${two(ts.month)}${two(ts.day)}'
           '_${two(ts.hour)}${two(ts.minute)}${two(ts.second)}'
           '_${ts.millisecond}';
-      final safeLabel =
-          label.replaceAll(RegExp(r'[^\w\u4e00-\u9fff.-]'), '_');
+      final safeLabel = label.replaceAll(RegExp(r'[^\w\u4e00-\u9fff.-]'), '_');
       final file = File('${logDir.path}/${safeLabel}_$stamp.log');
       _sink = file.openWrite(mode: FileMode.append);
       filePath = file.path;
@@ -127,8 +126,7 @@ class SessionRecorder {
     _pending.clear();
     // 尾部扣住等下一轮，close 时全量刷出；不足窗口长度则整段扣住
     if (!_closed) {
-      final keep =
-          text.length < _holdbackChars ? text.length : _holdbackChars;
+      final keep = text.length < _holdbackChars ? text.length : _holdbackChars;
       final cut = text.length - keep;
       if (keep > 0) _pending.write(text.substring(cut));
       text = text.substring(0, cut);

@@ -53,8 +53,7 @@ class SshConfigImportService {
       return SshConfigImportSource(
           path: path,
           exists: true,
-          readError:
-              L10n.str.ut_62e6c24a03(e.message));
+          readError: L10n.str.ut_62e6c24a03(e.message));
     }
   }
 
@@ -88,10 +87,10 @@ class SshConfigImportService {
   }
 
   /// 与已有主机比对：同 host:port 视为已存在（用户名可能不同，仍标出来让用户判断）
-  static bool isDuplicate(
-      SshConfigEntry entry, List<HostConfig> existing) {
+  static bool isDuplicate(SshConfigEntry entry, List<HostConfig> existing) {
     return existing.any((h) =>
-        h.host.toLowerCase() == entry.host.toLowerCase() && h.port == entry.port);
+        h.host.toLowerCase() == entry.host.toLowerCase() &&
+        h.port == entry.port);
   }
 
   static List<SshConfigIncludedFile> _resolveInclude(
@@ -110,7 +109,8 @@ class SshConfigImportService {
       // ssh_config 允许 Include 指向目录：目录下所有可读文件都算
       final dir = Directory(absolute);
       if (dir.existsSync()) {
-        for (final e in dir.listSync().whereType<File>().toList()..sort(_byName)) {
+        for (final e in dir.listSync().whereType<File>().toList()
+          ..sort(_byName)) {
           final text = _tryRead(e);
           if (text != null) results.add(SshConfigIncludedFile(e.path, text));
         }
@@ -121,7 +121,8 @@ class SshConfigImportService {
     final normalized = absolute.replaceAll(r'\', '/');
     final slash = normalized.lastIndexOf('/');
     final dirPath = slash <= 0 ? normalized : normalized.substring(0, slash);
-    final namePattern = slash < 0 ? normalized : normalized.substring(slash + 1);
+    final namePattern =
+        slash < 0 ? normalized : normalized.substring(slash + 1);
     final dir = Directory(dirPath);
     if (!dir.existsSync()) return results;
     final matcher = _globMatcher(namePattern);

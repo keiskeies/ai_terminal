@@ -108,8 +108,7 @@ class RunbookNotifier extends StateNotifier<List<Runbook>> {
         }
 
         // category 映射
-        final catStr =
-            (item['category'] ?? 'custom').toString().toLowerCase();
+        final catStr = (item['category'] ?? 'custom').toString().toLowerCase();
         final RunbookCategory category;
         switch (catStr) {
           case 'inspection':

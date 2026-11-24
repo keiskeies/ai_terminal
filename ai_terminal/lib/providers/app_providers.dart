@@ -9,7 +9,8 @@ import '../models/command_snippet.dart';
 import '../models/chat_session.dart';
 
 // ===== 主机 Provider =====
-final hostsProvider = StateNotifierProvider<HostsNotifier, AsyncValue<List<HostConfig>>>((ref) {
+final hostsProvider =
+    StateNotifierProvider<HostsNotifier, AsyncValue<List<HostConfig>>>((ref) {
   return HostsNotifier();
 });
 
@@ -115,7 +116,8 @@ class AIEndpointsNotifier extends StateNotifier<List<AIEndpoint>> {
 }
 
 // ===== 快捷命令 Provider =====
-final snippetsProvider = StateNotifierProvider<SnippetsNotifier, List<CommandSnippet>>((ref) {
+final snippetsProvider =
+    StateNotifierProvider<SnippetsNotifier, List<CommandSnippet>>((ref) {
   return SnippetsNotifier();
 });
 
@@ -145,7 +147,8 @@ class SnippetsNotifier extends StateNotifier<List<CommandSnippet>> {
 }
 
 // ===== 聊天会话 Provider =====
-final chatSessionsProvider = StateNotifierProvider<ChatSessionsNotifier, List<ChatSession>>((ref) {
+final chatSessionsProvider =
+    StateNotifierProvider<ChatSessionsNotifier, List<ChatSession>>((ref) {
   return ChatSessionsNotifier();
 });
 
@@ -175,7 +178,8 @@ class ChatSessionsNotifier extends StateNotifier<List<ChatSession>> {
 }
 
 // ===== 设置 Provider =====
-final settingsProvider = StateNotifierProvider<SettingsNotifier, Map<String, dynamic>>((ref) {
+final settingsProvider =
+    StateNotifierProvider<SettingsNotifier, Map<String, dynamic>>((ref) {
   return SettingsNotifier();
 });
 

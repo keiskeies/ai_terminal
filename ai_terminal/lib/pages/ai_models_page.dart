@@ -132,7 +132,8 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
                           style: TextStyle(
                             color: tc.textSub,
                             fontSize: fSmall,
-                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                            fontFamily: 'JetBrainsMono',
+                            fontFamilyFallback: kMonoFontFallback,
                           ),
                         ),
                       ],
@@ -141,14 +142,13 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
                   IconButton(
                     tooltip: l10n.edit,
                     onPressed: () => _showEndpointDialog(endpoint),
-                    icon: Icon(Icons.edit_outlined,
-                        size: 18, color: tc.textSub),
+                    icon:
+                        Icon(Icons.edit_outlined, size: 18, color: tc.textSub),
                   ),
                   IconButton(
                     tooltip: l10n.delete,
                     onPressed: () => _deleteEndpoint(endpoint),
-                    icon: Icon(Icons.delete_outline,
-                        size: 18, color: tc.error),
+                    icon: Icon(Icons.delete_outline, size: 18, color: tc.error),
                   ),
                 ],
               ),
@@ -205,7 +205,9 @@ class _AIModelsPageState extends ConsumerState<AIModelsPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(dialogContext);
-              ref.read(aiEndpointsProvider.notifier).deleteEndpoint(endpoint.id);
+              ref
+                  .read(aiEndpointsProvider.notifier)
+                  .deleteEndpoint(endpoint.id);
             },
             style: ElevatedButton.styleFrom(backgroundColor: tc.error),
             child: Text(l10n.delete),
@@ -354,8 +356,8 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
     setState(() {
       _providerId = id;
       if (!_isEditing && preset != null) {
-        final nameWasPreset = oldPreset != null &&
-            _nameController.text.trim() == oldPreset.name;
+        final nameWasPreset =
+            oldPreset != null && _nameController.text.trim() == oldPreset.name;
         if (_nameController.text.trim().isEmpty || nameWasPreset) {
           _nameController.text = preset.id == 'custom' ? '' : preset.name;
         }
@@ -477,8 +479,7 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
         connectTimeout: const Duration(seconds: 10),
         receiveTimeout: const Duration(seconds: 15),
       ));
-      final normalizedBase =
-          baseUrl.replaceAll(RegExp(r'/+$'), '');
+      final normalizedBase = baseUrl.replaceAll(RegExp(r'/+$'), '');
       final response = await dio.get<dynamic>(
         '$normalizedBase/models',
         options: Options(
@@ -576,7 +577,8 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
   void _showSnack(String message, {bool isError = false}) {
     if (!mounted) return;
     final tc = ThemeColors.of(context);
-    showTopSnackBar(context, 
+    showTopSnackBar(
+      context,
       SnackBar(
         content: Text(message),
         backgroundColor: isError ? tc.error : tc.ok,
@@ -607,8 +609,7 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
           ? _apiKeyController.text.trim()
           : (initial?.apiKey ?? ''),
       models: List<AIEndpointModel>.of(_models),
-      createdAt:
-          initial?.createdAt ?? DateTime.now().millisecondsSinceEpoch,
+      createdAt: initial?.createdAt ?? DateTime.now().millisecondsSinceEpoch,
     );
     try {
       await widget.onSave(endpoint);
@@ -628,13 +629,13 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
     final l10n = AppLocalizations.of(context)!;
     final tc = ThemeColors.of(context);
     final presets = ProviderConfigService.providers;
-    final preset =
-        ProviderConfigService.getProviderById(_providerId);
+    final preset = ProviderConfigService.getProviderById(_providerId);
     final canRestore = preset != null && preset.models.isNotEmpty;
 
     return Dialog(
       backgroundColor: tc.cardElevated,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: 760,
@@ -715,14 +716,13 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                           decoration: InputDecoration(
                             labelText: l10n.aiEndpointApiKey,
                             labelStyle: TextStyle(color: tc.textSub),
-                            helperText: _isEditing
-                                ? l10n.aiEndpointApiKeyHint
-                                : null,
-                            helperStyle:
-                                TextStyle(color: tc.textMuted, fontSize: fMicro),
+                            helperText:
+                                _isEditing ? l10n.aiEndpointApiKeyHint : null,
+                            helperStyle: TextStyle(
+                                color: tc.textMuted, fontSize: fMicro),
                             suffixIcon: IconButton(
-                              onPressed: () => setState(
-                                  () => _obscureKey = !_obscureKey),
+                              onPressed: () =>
+                                  setState(() => _obscureKey = !_obscureKey),
                               icon: Icon(
                                 _obscureKey
                                     ? Icons.visibility_outlined
@@ -734,7 +734,8 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                           ),
                           style: TextStyle(
                             color: tc.textMain,
-                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                            fontFamily: 'JetBrainsMono',
+                            fontFamilyFallback: kMonoFontFallback,
                             fontSize: fSmall,
                           ),
                         ),
@@ -743,8 +744,8 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                           tilePadding: EdgeInsets.zero,
                           initiallyExpanded: true,
                           title: Text(l10n.aiEndpointCustomSettings,
-                              style:
-                                  TextStyle(color: tc.textSub, fontSize: fBody)),
+                              style: TextStyle(
+                                  color: tc.textSub, fontSize: fBody)),
                           children: [
                             const SizedBox(height: 8),
                             TextFormField(
@@ -767,7 +768,8 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                               ),
                               style: TextStyle(
                                 color: tc.textMain,
-                                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                                fontFamily: 'JetBrainsMono',
+                                fontFamilyFallback: kMonoFontFallback,
                                 fontSize: fSmall,
                               ),
                               validator: (v) => (v == null || v.trim().isEmpty)
@@ -785,13 +787,11 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                               items: [
                                 DropdownMenuItem(
                                   value: 'openai',
-                                  child:
-                                      Text(l10n.aiEndpointProtocolOpenai),
+                                  child: Text(l10n.aiEndpointProtocolOpenai),
                                 ),
                                 DropdownMenuItem(
                                   value: 'ernie',
-                                  child:
-                                      Text(l10n.aiEndpointProtocolErnie),
+                                  child: Text(l10n.aiEndpointProtocolErnie),
                                 ),
                               ],
                               onChanged: (value) {
@@ -829,19 +829,16 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                           runSpacing: 4,
                           children: [
                             TextButton.icon(
-                              onPressed:
-                                  canRestore ? _restoreDefaults : null,
+                              onPressed: canRestore ? _restoreDefaults : null,
                               icon: const Icon(Icons.restart_alt, size: 15),
                               label: Text(l10n.aiEndpointRestoreDefaults),
                               style: TextButton.styleFrom(
                                   foregroundColor: tc.textSub,
-                                  textStyle:
-                                      const TextStyle(fontSize: fSmall)),
+                                  textStyle: const TextStyle(fontSize: fSmall)),
                             ),
                             TextButton.icon(
-                              onPressed: _fetching
-                                  ? null
-                                  : _fetchAvailableModels,
+                              onPressed:
+                                  _fetching ? null : _fetchAvailableModels,
                               icon: _fetching
                                   ? const SizedBox(
                                       width: 13,
@@ -849,14 +846,12 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                                       child: CircularProgressIndicator(
                                           strokeWidth: 2),
                                     )
-                                  : const Icon(
-                                      Icons.cloud_download_outlined,
+                                  : const Icon(Icons.cloud_download_outlined,
                                       size: 15),
                               label: Text(l10n.aiEndpointFetchModels),
                               style: TextButton.styleFrom(
                                   foregroundColor: tc.textSub,
-                                  textStyle:
-                                      const TextStyle(fontSize: fSmall)),
+                                  textStyle: const TextStyle(fontSize: fSmall)),
                             ),
                             TextButton.icon(
                               onPressed: _addModel,
@@ -864,8 +859,7 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                               label: Text(l10n.aiEndpointAddModel),
                               style: TextButton.styleFrom(
                                   foregroundColor: tc.brand,
-                                  textStyle:
-                                      const TextStyle(fontSize: fSmall)),
+                                  textStyle: const TextStyle(fontSize: fSmall)),
                             ),
                           ],
                         ),
@@ -979,7 +973,8 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
                   style: TextStyle(
                     color: tc.textSub,
                     fontSize: fMicro,
-                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: kMonoFontFallback,
                   ),
                 ),
               ],
@@ -1084,8 +1079,8 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
       _temperature = initial.temperature;
       _fallbackModelId = initial.fallbackModelId;
       for (final tier in initial.activeReasoningTiers) {
-        _tiers.add(
-            _TierControllers(level: tier.level, apiValue: tier.apiValue));
+        _tiers
+            .add(_TierControllers(level: tier.level, apiValue: tier.apiValue));
       }
     } else {
       // 新模型显式给出默认值：256K 上下文 / 32K 最大输出
@@ -1111,8 +1106,7 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
       _reasoningEnabled = enabled;
       if (enabled && _tiers.isEmpty) {
         for (final t in kDefaultReasoningTiers) {
-          _tiers.add(
-              _TierControllers(level: t.level, apiValue: t.apiValue));
+          _tiers.add(_TierControllers(level: t.level, apiValue: t.apiValue));
         }
       }
     });
@@ -1147,8 +1141,8 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
         setState(() => _error = l10n.aiModelTierDuplicate);
         return;
       }
-      tiers.add(AIReasoningTier(
-          level: level, apiValue: t.apiValue.text.trim()));
+      tiers
+          .add(AIReasoningTier(level: level, apiValue: t.apiValue.text.trim()));
     }
     if (_reasoningEnabled && tiers.isEmpty) {
       setState(() => _error = l10n.aiModelTierRequired);
@@ -1156,17 +1150,16 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
     }
 
     final fallback = _fallbackModelId;
-    final validFallback = fallback != null &&
-        widget.fallbackChoices.any((c) => c.id == fallback);
+    final validFallback =
+        fallback != null && widget.fallbackChoices.any((c) => c.id == fallback);
 
     final model = AIEndpointModel(
       id: widget.initial?.id ?? const Uuid().v4(),
       name: _nameController.text.trim(),
       modelName: _modelNameController.text.trim(),
       contextWindow: int.tryParse(_contextController.text.trim()) ?? 0,
-      maxTokens:
-          int.tryParse(_maxTokensController.text.trim()) ??
-              kDefaultMaxOutputTokens,
+      maxTokens: int.tryParse(_maxTokensController.text.trim()) ??
+          kDefaultMaxOutputTokens,
       temperature: _temperature,
       supportsFunctionCalling: _supportsFunctionCalling,
       fallbackModelId: validFallback ? fallback : null,
@@ -1181,14 +1174,15 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
     final l10n = AppLocalizations.of(context)!;
     final tc = ThemeColors.of(context);
     final fallbackIds = widget.fallbackChoices.map((c) => c.id).toSet();
-    final fallbackValue = _fallbackModelId != null &&
-            fallbackIds.contains(_fallbackModelId)
-        ? _fallbackModelId
-        : null;
+    final fallbackValue =
+        _fallbackModelId != null && fallbackIds.contains(_fallbackModelId)
+            ? _fallbackModelId
+            : null;
 
     return Dialog(
       backgroundColor: tc.cardElevated,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: 620,
@@ -1253,7 +1247,8 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
                                 ),
                                 style: TextStyle(
                                   color: tc.textMain,
-                                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                                  fontFamily: 'JetBrainsMono',
+                                  fontFamilyFallback: kMonoFontFallback,
                                   fontSize: fSmall,
                                 ),
                                 validator: (v) =>
@@ -1274,11 +1269,9 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
                                 decoration: InputDecoration(
                                   labelText: l10n.aiModelContextWindow,
                                   labelStyle: TextStyle(color: tc.textSub),
-                                  helperText:
-                                      l10n.aiModelContextWindowHint,
+                                  helperText: l10n.aiModelContextWindowHint,
                                   helperStyle: TextStyle(
-                                      color: tc.textMuted,
-                                      fontSize: fMicro),
+                                      color: tc.textMuted, fontSize: fMicro),
                                 ),
                                 style: TextStyle(color: tc.textMain),
                               ),
@@ -1315,15 +1308,13 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
                               Expanded(
                                 child: Text(l10n.aiModelTier,
                                     style: TextStyle(
-                                        color: tc.textMuted,
-                                        fontSize: fMicro)),
+                                        color: tc.textMuted, fontSize: fMicro)),
                               ),
                               SizedBox(
                                 width: 200,
                                 child: Text(l10n.aiModelApiValue,
                                     style: TextStyle(
-                                        color: tc.textMuted,
-                                        fontSize: fMicro)),
+                                        color: tc.textMuted, fontSize: fMicro)),
                               ),
                               const SizedBox(width: 32),
                             ],
@@ -1347,7 +1338,8 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
                                       style: TextStyle(
                                         color: tc.textMain,
                                         fontSize: fSmall,
-                                        fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                                        fontFamily: 'JetBrainsMono',
+                                        fontFamilyFallback: kMonoFontFallback,
                                       ),
                                     ),
                                   ),
@@ -1366,7 +1358,8 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
                                       style: TextStyle(
                                         color: tc.textMain,
                                         fontSize: fSmall,
-                                        fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                                        fontFamily: 'JetBrainsMono',
+                                        fontFamilyFallback: kMonoFontFallback,
                                       ),
                                     ),
                                   ),
@@ -1385,8 +1378,7 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
                             label: Text(l10n.aiModelAddTier),
                             style: TextButton.styleFrom(
                                 foregroundColor: tc.brand,
-                                textStyle:
-                                    const TextStyle(fontSize: fSmall)),
+                                textStyle: const TextStyle(fontSize: fSmall)),
                           ),
                         ],
                         const SizedBox(height: 4),
@@ -1436,8 +1428,7 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
                                     _temperature.toStringAsFixed(1),
                                     textAlign: TextAlign.right,
                                     style: TextStyle(
-                                        color: tc.textMain,
-                                        fontSize: fSmall),
+                                        color: tc.textMain, fontSize: fSmall),
                                   ),
                                 ),
                               ],
@@ -1455,15 +1446,14 @@ class _ModelEditorDialogState extends State<ModelEditorDialog> {
                                 DropdownMenuItem<String?>(
                                   value: null,
                                   child: Text(l10n.aiModelNoFallback,
-                                      style:
-                                          TextStyle(color: tc.textMuted)),
+                                      style: TextStyle(color: tc.textMuted)),
                                 ),
-                                ...widget.fallbackChoices.map((c) =>
-                                    DropdownMenuItem<String?>(
-                                      value: c.id,
-                                      child: Text(c.label,
-                                          overflow: TextOverflow.ellipsis),
-                                    )),
+                                ...widget.fallbackChoices
+                                    .map((c) => DropdownMenuItem<String?>(
+                                          value: c.id,
+                                          child: Text(c.label,
+                                              overflow: TextOverflow.ellipsis),
+                                        )),
                               ],
                               onChanged: (v) =>
                                   setState(() => _fallbackModelId = v),
@@ -1564,7 +1554,8 @@ class _ModelFetchDialogState extends State<_ModelFetchDialog> {
                         style: TextStyle(
                           color: tc.textMain,
                           fontSize: fSmall,
-                          fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                          fontFamily: 'JetBrainsMono',
+                          fontFamilyFallback: kMonoFontFallback,
                         )),
                     value: _selected.contains(id),
                     onChanged: (v) {

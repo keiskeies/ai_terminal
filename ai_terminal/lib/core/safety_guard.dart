@@ -5,9 +5,9 @@ import '../core/l10n_holder.dart';
 
 /// 命令安全等级
 enum SafetyLevel {
-  safe,    // 安全（只读命令）
-  info,    // 仅提示（低风险修改）
-  warn,    // 需二次确认（高风险修改）
+  safe, // 安全（只读命令）
+  info, // 仅提示（低风险修改）
+  warn, // 需二次确认（高风险修改）
   blocked, // 直接拦截（不可逆操作）
 }
 
@@ -35,6 +35,7 @@ class _SafetyRule {
 class SafetyGuard {
   /// 静态缓存，避免对同一条命令重复正则匹配
   static final Map<String, SafetyLevel> _cache = {};
+
   /// 缓存命中的风险规则（含 null，表示已查过但未命中），避免重复匹配。
   /// 缓存规则对象而非已选语言的文案：用户运行时切换 UI 语言后，
   /// 读缓存时仍按当前语言取字段，不会停留在旧语言。
@@ -42,25 +43,39 @@ class SafetyGuard {
 
   // 直接拦截的命令模式（不可逆操作）
   static final List<_SafetyRule> _blockRules = [
-    _SafetyRule(RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+/\s*$'), '递归删除根目录，将清空整个文件系统，完全不可恢复',
+    _SafetyRule(
+        RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+/\s*$'),
+        '递归删除根目录，将清空整个文件系统，完全不可恢复',
         'Recursively deletes the filesystem root; destroys all data and cannot be undone'),
-    _SafetyRule(RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+\/\*?\s*$'), '递归删除根目录下所有内容，将清空整个文件系统，完全不可恢复',
+    _SafetyRule(
+        RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+\/\*?\s*$'),
+        '递归删除根目录下所有内容，将清空整个文件系统，完全不可恢复',
         'Recursively deletes everything under the root directory; destroys the entire filesystem and cannot be undone'),
     _SafetyRule(RegExp(r'^dd\s+if=.*of=/dev/'), '直接写入块设备，将覆盖目标磁盘所有数据，不可恢复',
         'Writes directly to a block device; overwrites all data on the target disk and cannot be undone'),
-    _SafetyRule(RegExp(r'^:\(\)\{\s*:\|\:&\s*\};:', caseSensitive: false), 'Fork 炸弹，将瞬间耗尽系统进程资源导致系统崩溃',
+    _SafetyRule(
+        RegExp(r'^:\(\)\{\s*:\|\:&\s*\};:', caseSensitive: false),
+        'Fork 炸弹，将瞬间耗尽系统进程资源导致系统崩溃',
         'Fork bomb; instantly exhausts process resources and crashes the system'),
-    _SafetyRule(RegExp(r'chmod\s+-R\s+777\s+/'), '递归修改根目录权限为 777，将破坏所有文件权限，系统将无法正常运行',
+    _SafetyRule(
+        RegExp(r'chmod\s+-R\s+777\s+/'),
+        '递归修改根目录权限为 777，将破坏所有文件权限，系统将无法正常运行',
         'Recursively sets 777 permissions on the root directory; breaks all file permissions and the system will stop working correctly'),
     _SafetyRule(RegExp(r'^init\s+0\s*$'), '立即关机，所有未保存数据将丢失',
         'Shuts the system down immediately; all unsaved data will be lost'),
     _SafetyRule(RegExp(r'^shutdown\s+-h\s+now'), '立即关机，所有未保存数据将丢失',
         'Shuts the system down immediately; all unsaved data will be lost'),
-    _SafetyRule(RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+/etc/'), '删除 /etc 下的系统配置文件，相关服务可能无法运行，且不可恢复',
+    _SafetyRule(
+        RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+/etc/'),
+        '删除 /etc 下的系统配置文件，相关服务可能无法运行，且不可恢复',
         'Recursively deletes system configuration under /etc; dependent services may fail to run and the change cannot be undone'),
-    _SafetyRule(RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+/boot/'), '删除 /boot 启动目录，系统将无法启动',
+    _SafetyRule(
+        RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+/boot/'),
+        '删除 /boot 启动目录，系统将无法启动',
         'Recursively deletes /boot; the system will no longer boot'),
-    _SafetyRule(RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+~'), '递归删除用户主目录，所有用户数据将丢失',
+    _SafetyRule(
+        RegExp(r'^rm\s+(-[a-z]*r[a-z]*f*|-[a-z]*f[a-z]*r*)\s+~'),
+        '递归删除用户主目录，所有用户数据将丢失',
         'Recursively deletes the user home directory; all user data will be lost'),
     _SafetyRule(RegExp(r'^mkfs\.'), '格式化磁盘，目标分区所有数据将被擦除，不可恢复',
         'Formats a filesystem; all data on the target partition will be erased and cannot be recovered'),
@@ -69,24 +84,36 @@ class SafetyGuard {
     // 新增：常见高危操作
     _SafetyRule(RegExp(r'^crontab\s+-r\b'), '清空当前用户的所有定时任务，所有 cron 作业将丢失且不可恢复',
         'Removes all cron jobs for the current user; every scheduled task is lost and cannot be recovered'),
-    _SafetyRule(RegExp(r'^systemctl\s+mask\s+'), '屏蔽系统服务，被 mask 的服务将无法启动，需手动 unmask 恢复',
+    _SafetyRule(
+        RegExp(r'^systemctl\s+mask\s+'),
+        '屏蔽系统服务，被 mask 的服务将无法启动，需手动 unmask 恢复',
         'Masks a system service; it cannot be started until manually unmasked'),
-    _SafetyRule(RegExp(r'iptables\s+.*-P\s+(INPUT|OUTPUT|FORWARD)\s+DROP'), '设置防火墙默认策略为 DROP，将立即断开所有网络连接，可能导致远程无法访问',
+    _SafetyRule(
+        RegExp(r'iptables\s+.*-P\s+(INPUT|OUTPUT|FORWARD)\s+DROP'),
+        '设置防火墙默认策略为 DROP，将立即断开所有网络连接，可能导致远程无法访问',
         'Sets the firewall default policy to DROP; severs all network connections immediately and may lock you out of remote access'),
-    _SafetyRule(RegExp(r'echo\s+c\s*>\s*/proc/sysrq-trigger'), '触发 SysRq 崩溃，将导致系统立即崩溃重启',
+    _SafetyRule(
+        RegExp(r'echo\s+c\s*>\s*/proc/sysrq-trigger'),
+        '触发 SysRq 崩溃，将导致系统立即崩溃重启',
         'Triggers a SysRq crash; the system will immediately crash and reboot'),
     _SafetyRule(RegExp(r'^pkill\s+-9\b'), '强制杀死所有匹配进程，可能导致数据损坏或服务异常',
         'Force-kills all matching processes; may cause data corruption or service outages'),
     _SafetyRule(RegExp(r'^killall\s+-9\b'), '强制杀死所有同名进程，可能导致数据损坏或服务异常',
         'Force-kills all processes with the given name; may cause data corruption or service outages'),
-    _SafetyRule(RegExp(r'^kill\s+-9\s+-1\b'), '杀死所有用户进程（kill -9 -1），将终止除 init 外的所有进程',
+    _SafetyRule(
+        RegExp(r'^kill\s+-9\s+-1\b'),
+        '杀死所有用户进程（kill -9 -1），将终止除 init 外的所有进程',
         'Kills all user processes (kill -9 -1); terminates every process except init'),
     _SafetyRule(RegExp(r'^>\s*/dev/sda'), '清空磁盘设备数据，将破坏磁盘分区表和所有数据',
         'Truncates a disk device; destroys the partition table and all data on the disk'),
     _SafetyRule(RegExp(r'^swapoff\s+-a\b'), '关闭所有交换分区，内存不足时系统将直接 OOM 杀进程',
         'Disables all swap; under memory pressure the kernel will OOM-kill processes directly'),
     // Windows 磁盘级破坏操作，对应 POSIX 的 mkfs / dd 直接拦截
-    _SafetyRule(RegExp(r'^\s*(&\s*)?(format-volume|clear-disk|initialize-disk|remove-partition)\b', caseSensitive: false), '格式化/初始化/清除磁盘或分区，目标磁盘数据将被擦除，不可恢复',
+    _SafetyRule(
+        RegExp(
+            r'^\s*(&\s*)?(format-volume|clear-disk|initialize-disk|remove-partition)\b',
+            caseSensitive: false),
+        '格式化/初始化/清除磁盘或分区，目标磁盘数据将被擦除，不可恢复',
         'Formats/initializes/clears a disk or partition; all data on it is erased and cannot be recovered'),
   ];
 
@@ -115,37 +142,92 @@ class SafetyGuard {
             caseSensitive: false),
         '执行文件/目录创建、移动、重命名或删除操作，可能改变或丢失数据，请确认目标路径',
         'Creates, moves, renames, or deletes files/directories; data may be changed or lost — confirm the target path'),
+    // POSIX 通用写操作：只按“是否命中系统路径”判定会让普通 cp/mv/chmod
+    // 落成 safe，只读档在 Linux/macOS 上对最常见的数据修改形同虚设。
+    _SafetyRule(
+        RegExp(r'^(sudo\s+)?(cp|mv)\s+'),
+        '复制/移动文件或目录，可能覆盖目标路径的现有内容，请确认源和目标',
+        'Copies/moves files or directories; may overwrite the destination — confirm source and target'),
+    _SafetyRule(
+        // -i 不一定紧跟 sed：`sed -E -i`、`sed -n -i`、`sed -e ... -i`、
+        // `sudo -E sed -i` 都是原地改写。按“参数里出现 -i/--in-place”匹配。
+        // 不锚定行首：`sudo -u root sed -i`、`LC_ALL=C sed -i`、`env X=1 sed -i`、
+        // `bash -c 'sed -i ...'` 里 sed 都不是第一个 token，锚定会被绕过。
+        RegExp(r'\bsed\b.*(\s-[a-zA-Z]*i[a-zA-Z]*\b|\s--in-place\b)'),
+        '原地编辑文件（sed -i），会直接改写目标文件内容',
+        'Edits a file in place (sed -i); rewrites the target file content directly'),
+    _SafetyRule(
+        RegExp(r'^(sudo\s+)?tee\s+'),
+        '通过 tee 写入文件，会覆盖或追加目标文件内容，请确认目标路径',
+        'Writes to a file via tee; overwrites or appends to the target — confirm the target path'),
+    _SafetyRule(RegExp(r'^(sudo\s+)?chmod\s+'), '修改文件权限，可能影响服务的访问控制',
+        'Changes file permissions; may affect service access control'),
+    _SafetyRule(
+        RegExp(r'^(sudo\s+)?chown\s+|^(sudo\s+)?chgrp\s+'),
+        '修改文件所有者/所属组，可能影响服务的访问控制',
+        'Changes file ownership/group; may affect service access control'),
+    _SafetyRule(RegExp(r'^(sudo\s+)?touch\s+'), '创建文件或更新文件时间戳，可能改变目标路径状态',
+        'Creates files or updates timestamps; may change the target path state'),
+    _SafetyRule(RegExp(r'^(sudo\s+)?ln\s+'), '创建链接，可能覆盖已有路径或指向错误目标',
+        'Creates links; may overwrite an existing path or point at the wrong target'),
+    _SafetyRule(
+        RegExp(r'^(sudo\s+)?dd\s+.*\bof=\S+'),
+        '通过 dd 写入文件，会覆盖目标文件内容且不可恢复',
+        'Writes to a file via dd; overwrites the target and cannot be undone'),
     // 文件/目录删除：任何形式的删除都不可恢复，必须让用户确认
     // （rm -rf / 等系统级删除已被 _blockRules 直接拦截，此处覆盖其余删除）
     _SafetyRule(RegExp(r'^(sudo\s+)?rm\s+'), '删除文件或目录，操作不可恢复，请确认目标路径',
         'Deletes files or directories; the change cannot be undone — confirm the target path'),
-    _SafetyRule(RegExp(r'^(sudo\s+)?(unlink|shred)\s+'), '删除/粉碎文件，操作不可恢复，请确认目标路径',
+    _SafetyRule(
+        RegExp(r'^(sudo\s+)?(unlink|shred)\s+'),
+        '删除/粉碎文件，操作不可恢复，请确认目标路径',
         'Deletes/shreds files; the change cannot be undone — confirm the target path'),
     _SafetyRule(RegExp(r'\bfind\b.*\s-delete\b'), '批量删除匹配的文件，操作不可恢复，请确认匹配范围',
         'Bulk-deletes all matched files; the change cannot be undone — confirm the match scope'),
-    _SafetyRule(RegExp(r'^(sudo\s+)?truncate\s+.*-s\s*0\b'), '清空文件内容，原数据不可恢复，请确认目标文件',
+    _SafetyRule(
+        RegExp(r'^(sudo\s+)?truncate\s+.*-s\s*0\b'),
+        '清空文件内容，原数据不可恢复，请确认目标文件',
         'Truncates a file to zero bytes; the original content cannot be recovered — confirm the target file'),
+    _SafetyRule(
+        RegExp(r'^(sudo\s+)?truncate\s+'),
+        '调整文件大小，可能截断或丢失原文件内容，请确认目标文件',
+        'Resizes a file; may truncate or lose existing content — confirm the target file'),
     // 系统级操作
-    _SafetyRule(RegExp(r'^sudo\s+(reboot|shutdown|halt|poweroff|init\s+)'), '关机/重启服务器，所有运行中的进程将终止，未保存数据丢失',
+    _SafetyRule(
+        RegExp(r'^sudo\s+(reboot|shutdown|halt|poweroff|init\s+)'),
+        '关机/重启服务器，所有运行中的进程将终止，未保存数据丢失',
         'Shuts down or reboots the server; all running processes terminate and unsaved data is lost'),
-    _SafetyRule(RegExp(r'^systemctl\s+(stop|disable)\s+ssh'), '停止/禁用 SSH 服务，将断开所有远程连接，可能导致无法再次远程登录',
+    _SafetyRule(
+        RegExp(r'^systemctl\s+(stop|disable)\s+ssh'),
+        '停止/禁用 SSH 服务，将断开所有远程连接，可能导致无法再次远程登录',
         'Stops/disables the SSH service; drops all remote sessions and may lock you out of remote login'),
-    _SafetyRule(RegExp(r'^(iptables|firewall-cmd|ufw).*(-F|--flush|--delete-chain)'), '清空防火墙规则，将影响网络安全策略',
+    _SafetyRule(
+        RegExp(r'^(iptables|firewall-cmd|ufw).*(-F|--flush|--delete-chain)'),
+        '清空防火墙规则，将影响网络安全策略',
         'Flushes firewall rules; changes the host network security policy'),
     _SafetyRule(RegExp(r'^fdisk\s+/'), '分区操作，错误的分区表修改可能导致磁盘数据丢失',
         'Partitioning operation; a wrong partition-table change can lose disk data'),
-    _SafetyRule(RegExp(r'^mkfs\.(ext4|xfs|btrfs)\s+/dev/'), '格式化分区为文件系统，目标分区所有数据将被擦除',
+    _SafetyRule(
+        RegExp(r'^mkfs\.(ext4|xfs|btrfs)\s+/dev/'),
+        '格式化分区为文件系统，目标分区所有数据将被擦除',
         'Creates a filesystem on a partition; all data on the target partition will be erased'),
     _SafetyRule(RegExp(r'^dd\s+if=.*of=/dev/'), '直接写入块设备，将覆盖目标磁盘数据',
         'Writes directly to a block device; overwrites data on the target disk'),
     _SafetyRule(RegExp(r'^rm\s+-rf\s+/'), '递归删除系统目录，可能影响系统运行，不可恢复',
         'Recursively deletes a system directory; may break the running system and cannot be undone'),
     // 安装/升级/替换软件包
-    _SafetyRule(RegExp(r'^sudo\s+(apt|apt-get)\s+(install|upgrade|dist-upgrade|remove|purge)\s+'), '安装/升级/卸载软件包，可能改变系统依赖关系，影响其他服务',
+    _SafetyRule(
+        RegExp(
+            r'^sudo\s+(apt|apt-get)\s+(install|upgrade|dist-upgrade|remove|purge)\s+'),
+        '安装/升级/卸载软件包，可能改变系统依赖关系，影响其他服务',
         'Installs/upgrades/removes packages; may change system dependencies and affect other services'),
-    _SafetyRule(RegExp(r'^sudo\s+yum\s+(install|update|remove|erase)\s+'), '安装/更新/卸载软件包，可能改变系统依赖关系',
+    _SafetyRule(
+        RegExp(r'^sudo\s+yum\s+(install|update|remove|erase)\s+'),
+        '安装/更新/卸载软件包，可能改变系统依赖关系',
         'Installs/updates/removes packages; may change system dependencies'),
-    _SafetyRule(RegExp(r'^sudo\s+dnf\s+(install|upgrade|remove)\s+'), '安装/升级/卸载软件包，可能改变系统依赖关系',
+    _SafetyRule(
+        RegExp(r'^sudo\s+dnf\s+(install|upgrade|remove)\s+'),
+        '安装/升级/卸载软件包，可能改变系统依赖关系',
         'Installs/upgrades/removes packages; may change system dependencies'),
     _SafetyRule(RegExp(r'^sudo\s+apk\s+add\s+'), '安装软件包，可能改变系统配置',
         'Installs packages; may change system configuration'),
@@ -154,17 +236,27 @@ class SafetyGuard {
     _SafetyRule(RegExp(r'^sudo\s+snap\s+install\s+'), '安装 Snap 软件包',
         'Installs a Snap package'),
     // 修改环境配置
-    _SafetyRule(RegExp(r'(>>|>)\s*(/etc/profile|/etc/environment|/etc/bashrc|~/\.bashrc|~/\.zshrc|~/\.bash_profile|~/\.profile)\s*$'), '修改 Shell 环境配置文件，可能影响所有用户的登录环境',
+    _SafetyRule(
+        RegExp(
+            r'(>>|>)\s*(/etc/profile|/etc/environment|/etc/bashrc|~/\.bashrc|~/\.zshrc|~/\.bash_profile|~/\.profile)\s*$'),
+        '修改 Shell 环境配置文件，可能影响所有用户的登录环境',
         'Modifies a shell environment config file; may affect the login environment of all users'),
-    _SafetyRule(RegExp(r'^sudo\s+(tee|sed|echo.*>)\s+.*(/etc/profile|/etc/environment|/etc/bashrc)\s*$'), '修改系统级环境配置文件，可能影响所有用户',
+    _SafetyRule(
+        RegExp(
+            r'^sudo\s+(tee|sed|echo.*>)\s+.*(/etc/profile|/etc/environment|/etc/bashrc)\s*$'),
+        '修改系统级环境配置文件，可能影响所有用户',
         'Modifies a system-wide environment config file; may affect all users'),
     // alternatives/update-alternatives
-    _SafetyRule(RegExp(r'^sudo\s+update-alternatives\s+--set\s+'), '修改系统默认程序指向，影响相关命令的默认版本',
+    _SafetyRule(
+        RegExp(r'^sudo\s+update-alternatives\s+--set\s+'),
+        '修改系统默认程序指向，影响相关命令的默认版本',
         'Changes the system default program alternative; switches the default version of related commands'),
     _SafetyRule(RegExp(r'^sudo\s+alternatives\s+--set\s+'), '修改系统默认程序指向',
         'Changes the system default program alternative'),
     // 卸载操作
-    _SafetyRule(RegExp(r'^sudo\s+(apt|apt-get)\s+(remove|purge|autoremove)\s+'), '卸载软件包，依赖该包的其他服务可能无法运行；purge 会同时删除配置文件',
+    _SafetyRule(
+        RegExp(r'^sudo\s+(apt|apt-get)\s+(remove|purge|autoremove)\s+'),
+        '卸载软件包，依赖该包的其他服务可能无法运行；purge 会同时删除配置文件',
         'Removes packages; services depending on them may fail to run — purge also deletes their config files'),
     _SafetyRule(RegExp(r'^sudo\s+yum\s+remove\s+'), '卸载软件包，依赖该包的其他服务可能无法运行',
         'Removes packages; services depending on them may fail to run'),
@@ -298,9 +390,9 @@ class SafetyGuard {
         .firstMatch(cmd);
     if (ps != null) {
       final rest = ps.group(1)!;
-      final flag = RegExp('(?:^|\\s)-(?:command|c)(?=\\s|["\'])',
-              caseSensitive: false)
-          .firstMatch(rest);
+      final flag =
+          RegExp('(?:^|\\s)-(?:command|c)(?=\\s|["\'])', caseSensitive: false)
+              .firstMatch(rest);
       if (flag != null) {
         return _stripOuterQuotes(rest.substring(flag.end).trim());
       }
@@ -332,7 +424,8 @@ class SafetyGuard {
 
   /// 风险说明的规范中文串：ReAct observation 会把该文案原样喂回模型，
   /// 语言不跟随 UI（见 R2：喂给模型的规范串保持中文，只在用户事件里本地化）
-  static String? getReasonZh(String command) => _matchReasonRule(command)?.reason;
+  static String? getReasonZh(String command) =>
+      _matchReasonRule(command)?.reason;
 
   /// 命中规则查询（带缓存）：缓存规则对象本身，语言在读取点选择
   static _SafetyRule? _matchReasonRule(String command) {
@@ -458,8 +551,7 @@ class SafetyGuard {
             final m = _heredocStartPattern.matchAsPrefix(line, i);
             // 起始标记后必须跟行尾/空白/分隔符，排除 $((1<<2)) 这类算术移位
             if (m != null &&
-                (m.end == line.length ||
-                    ' \t;|&'.contains(line[m.end]))) {
+                (m.end == line.length || ' \t;|&'.contains(line[m.end]))) {
               pendingHeredocTag = m.group(2);
               buf.write(m.group(0));
               i = m.end - 1;
@@ -517,10 +609,11 @@ class SafetyGuard {
     for (int i = 0; i < chars.length; i++) {
       final c = chars[i];
       if (c == 0x27 && !inDouble) {
-        inSingle = !inSingle;  // '
+        inSingle = !inSingle; // '
       } else if (c == 0x22 && !inSingle) {
-        inDouble = !inDouble;  // "
-      } else if (c == 0x23 && !inSingle && !inDouble) {  // #
+        inDouble = !inDouble; // "
+      } else if (c == 0x23 && !inSingle && !inDouble) {
+        // #
         // # 前需有空格或位于行首才算注释
         if (i == 0 || chars[i - 1] == 0x20) {
           return command.substring(0, i);
@@ -532,7 +625,12 @@ class SafetyGuard {
 
   /// 比较安全等级：blocked > warn > info > safe
   static int _compareLevel(SafetyLevel a, SafetyLevel b) {
-    const order = [SafetyLevel.safe, SafetyLevel.info, SafetyLevel.warn, SafetyLevel.blocked];
+    const order = [
+      SafetyLevel.safe,
+      SafetyLevel.info,
+      SafetyLevel.warn,
+      SafetyLevel.blocked
+    ];
     return order.indexOf(a) - order.indexOf(b);
   }
 
@@ -640,16 +738,18 @@ class SafetyGuard {
   /// [isWrite] 是否为写操作（写操作更严格）
   ///
   /// 返回 PathSafetyResult，包含等级和说明
-  static PathSafetyResult checkPath(String path, {String? projectRoot, bool isWrite = false}) {
+  static PathSafetyResult checkPath(String path,
+      {String? projectRoot, bool isWrite = false}) {
     if (path.isEmpty) {
-      return PathSafetyResult(SafetyLevel.warn, UiText.t('路径为空', 'Path is empty'));
+      return PathSafetyResult(
+          SafetyLevel.warn, UiText.t('路径为空', 'Path is empty'));
     }
 
     // 规范化路径（去尾斜杠、合并重复斜杠）
     final normalized = _normalizePath(path);
     if (normalized.isEmpty) {
-      return PathSafetyResult(
-          SafetyLevel.warn, UiText.t('路径规范化后为空', 'Path is empty after normalization'));
+      return PathSafetyResult(SafetyLevel.warn,
+          UiText.t('路径规范化后为空', 'Path is empty after normalization'));
     }
 
     // 1. 检查是否在项目根目录内（最高优先级白名单）
@@ -660,15 +760,15 @@ class SafetyGuard {
         final fileName = normalized.split('/').last;
         for (final pattern in _blockedFilePatterns) {
           if (pattern.hasMatch(fileName)) {
-            return PathSafetyResult(SafetyLevel.blocked,
-                L10n.str.ut_e275b00675(fileName));
+            return PathSafetyResult(
+                SafetyLevel.blocked, L10n.str.ut_e275b00675(fileName));
           }
         }
         // 检查路径分段是否含敏感目录名
         for (final segment in normalized.split('/')) {
           if (_blockedDirNames.contains(segment)) {
-            return PathSafetyResult(SafetyLevel.blocked,
-                L10n.str.ut_3ae63b10aa(segment));
+            return PathSafetyResult(
+                SafetyLevel.blocked, L10n.str.ut_3ae63b10aa(segment));
           }
         }
         return const PathSafetyResult(SafetyLevel.safe, null);
@@ -678,8 +778,8 @@ class SafetyGuard {
     // 2. 检查全局路径黑名单前缀
     for (final prefix in _blockedPathPrefixes) {
       if (normalized == prefix || normalized.startsWith('$prefix/')) {
-        return PathSafetyResult(SafetyLevel.blocked,
-            L10n.str.ut_5b6668af25(prefix));
+        return PathSafetyResult(
+            SafetyLevel.blocked, L10n.str.ut_5b6668af25(prefix));
       }
     }
 
@@ -688,9 +788,10 @@ class SafetyGuard {
     if (home != null) {
       for (final suffix in _homeBlockedSuffixes) {
         final sensitivePath = '$home/$suffix';
-        if (normalized == sensitivePath || normalized.startsWith('$sensitivePath/')) {
-          return PathSafetyResult(SafetyLevel.blocked,
-              L10n.str.ut_337b92f903(suffix));
+        if (normalized == sensitivePath ||
+            normalized.startsWith('$sensitivePath/')) {
+          return PathSafetyResult(
+              SafetyLevel.blocked, L10n.str.ut_337b92f903(suffix));
         }
       }
       // 直接读 ~/.ssh/id_rsa 这种情况已被上面覆盖
@@ -700,16 +801,16 @@ class SafetyGuard {
     final fileName = normalized.split('/').last;
     for (final pattern in _blockedFilePatterns) {
       if (pattern.hasMatch(fileName)) {
-        return PathSafetyResult(SafetyLevel.blocked,
-            L10n.str.ut_0c25c4bff1(fileName));
+        return PathSafetyResult(
+            SafetyLevel.blocked, L10n.str.ut_0c25c4bff1(fileName));
       }
     }
 
     // 5. 检查路径分段中的敏感目录
     for (final segment in normalized.split('/')) {
       if (_blockedDirNames.contains(segment)) {
-        return PathSafetyResult(SafetyLevel.blocked,
-            L10n.str.ut_fffc2d39d8(segment));
+        return PathSafetyResult(
+            SafetyLevel.blocked, L10n.str.ut_fffc2d39d8(segment));
       }
     }
 
@@ -746,7 +847,8 @@ class SafetyGuard {
 
   /// 获取用户主目录（用于检查 ~/.ssh 等）
   static String? _getHomeDir() {
-    final home = Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+    final home =
+        Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
     return home != null ? _normalizePath(home) : null;
   }
 
@@ -754,7 +856,8 @@ class SafetyGuard {
   /// [path] 待读取路径
   /// [projectRoot] 项目根目录
   /// [sourceCodeGranted] 是否已获得源码读取授权（会话级）
-  static PathSafetyResult checkReadPath(String path, {
+  static PathSafetyResult checkReadPath(
+    String path, {
     String? projectRoot,
     bool sourceCodeGranted = false,
   }) {

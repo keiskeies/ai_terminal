@@ -19,22 +19,22 @@ class AuditLogEntry {
   });
 
   Map<String, dynamic> toJson() => {
-    'timestamp': timestamp.toIso8601String(),
-    'hostId': hostId,
-    'command': command,
-    'safetyLevel': safetyLevel,
-    'output': output,
-    'executed': executed,
-  };
+        'timestamp': timestamp.toIso8601String(),
+        'hostId': hostId,
+        'command': command,
+        'safetyLevel': safetyLevel,
+        'output': output,
+        'executed': executed,
+      };
 
   static AuditLogEntry fromJson(Map<dynamic, dynamic> json) => AuditLogEntry(
-    timestamp: DateTime.parse(json['timestamp'] as String),
-    hostId: json['hostId'] as String,
-    command: json['command'] as String,
-    safetyLevel: json['safetyLevel'] as String,
-    output: json['output'] as String?,
-    executed: json['executed'] as bool,
-  );
+        timestamp: DateTime.parse(json['timestamp'] as String),
+        hostId: json['hostId'] as String,
+        command: json['command'] as String,
+        safetyLevel: json['safetyLevel'] as String,
+        output: json['output'] as String?,
+        executed: json['executed'] as bool,
+      );
 }
 
 /// 审计日志记录器
@@ -66,7 +66,8 @@ class AuditLogger {
   }
 
   /// 获取主机的审计日志（最近的 limit 条，正序：最早到最新）
-  static List<Map<String, dynamic>> getLogsForHost(String hostId, {int limit = 100}) {
+  static List<Map<String, dynamic>> getLogsForHost(String hostId,
+      {int limit = 100}) {
     try {
       return AuditLogsDao.getCachedLogsForHost(hostId, limit: limit);
     } catch (e) {

@@ -56,8 +56,7 @@ class AgentGoal {
   /// 预算是否已用尽
   bool get budgetExhausted => roundsUsed >= maxRounds;
 
-  int get roundsLeft =>
-      maxRounds - roundsUsed > 0 ? maxRounds - roundsUsed : 0;
+  int get roundsLeft => maxRounds - roundsUsed > 0 ? maxRounds - roundsUsed : 0;
 
   AgentGoal copyWith({
     AgentGoalStatus? status,

@@ -75,9 +75,8 @@ class SettingsEntry {
     final scrollback =
         (SettingsDao.getCached('terminalScrollback') as num?)?.toInt() ?? 10000;
     final log = SettingsDao.getCached('sessionLogEnabled') == true;
-    final logLabel = log
-        ? UiText.t('会话日志开', 'Log on')
-        : UiText.t('会话日志关', 'Log off');
+    final logLabel =
+        log ? UiText.t('会话日志开', 'Log on') : UiText.t('会话日志关', 'Log off');
     final scrollLabel = switch (scrollback) {
       1000 => UiText.t('1 千行', '1k'),
       10000 => UiText.t('1 万行', '10k'),
@@ -92,8 +91,7 @@ class SettingsEntry {
     final count =
         AIEndpointsDao.cached.fold<int>(0, (sum, e) => sum + e.models.length);
     if (count == 0) return UiText.t('还没有配置模型', 'No model configured');
-    final selectedId =
-        SettingsDao.getCached('aiSelectedModelId') as String?;
+    final selectedId = SettingsDao.getCached('aiSelectedModelId') as String?;
     String selectedName = '';
     for (final e in AIEndpointsDao.cached) {
       for (final m in e.models) {
@@ -119,8 +117,7 @@ class SettingsEntry {
   static String _webSearchSubtitle() {
     final web = WebSearchConfig.load();
     if (!web.enabled) {
-      return UiText.t('已关闭 · AI 只靠本地上下文',
-          'Off · AI uses local context only');
+      return UiText.t('已关闭 · AI 只靠本地上下文', 'Off · AI uses local context only');
     }
     final base = L10n.str.ut_9947165032(web.enabledCount);
     // 地址没填的后端每次搜索都会被跳过，不展开抽屉也得看出来
@@ -150,8 +147,8 @@ class SettingsEntry {
     // 「2/2 connected · 8 tools」这类带上数字的串在索引里没有对应条目，
     // ko/ja 等 12 种语言会回退英文。两块碎片（连接分数 + 工具数）分别
     // 用各自的 ARB 键组装。
-    final connected = L10n.str.terminalOrchestratorConnected(
-        mcp.connectedCount, mcp.configs.length);
+    final connected = L10n.str
+        .terminalOrchestratorConnected(mcp.connectedCount, mcp.configs.length);
     // 工具数用纯数量的模板键「{value} 个工具」；不能用 ut_8ecd2c14b5
     // （「已连接 · {value} 个工具」），否则和前面的分数拼接出
     // 「2/2 已连接 · 已连接 · 8 个工具」双份「已连接」。
@@ -171,8 +168,8 @@ class SettingsEntry {
     final notify = NotificationService.config;
     if (!notify.enabled) return UiText.t('未开启', 'Off');
     if (notify.webhookUrl.trim().isEmpty) {
-      return UiText.t('已开启 · 缺 Webhook 地址，发不出去',
-          'On · no webhook URL, nothing is sent');
+      return UiText.t(
+          '已开启 · 缺 Webhook 地址，发不出去', 'On · no webhook URL, nothing is sent');
     }
     return notify.trigger == 'always'
         ? UiText.t('已开启 · 每次任务都提醒', 'On · every run')
@@ -192,15 +189,9 @@ const List<SettingsEntry> kSettingsEntries = [
       titleEn: 'Terminal',
       route: '/settings/terminal'),
   SettingsEntry(
-      id: 'ai',
-      title: 'AI 模型',
-      titleEn: 'AI model',
-      route: '/settings/ai'),
+      id: 'ai', title: 'AI 模型', titleEn: 'AI model', route: '/settings/ai'),
   SettingsEntry(
-      id: 'agent',
-      title: 'Agent',
-      titleEn: 'Agent',
-      route: '/settings/agent'),
+      id: 'agent', title: 'Agent', titleEn: 'Agent', route: '/settings/agent'),
   SettingsEntry(
       id: 'security',
       title: '安全',

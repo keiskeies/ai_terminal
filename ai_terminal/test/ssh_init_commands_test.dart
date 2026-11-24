@@ -26,12 +26,13 @@ void main() {
     // 验证（见设计文档 §11），本用例刻意不断言。
   });
 
-  test('分页器在两种 shell 下都关掉', () {
-    for (final windows in [false, true]) {
-      final s = SSHService.initCommandsFor(remoteIsWindowsCmd: windows);
-      // less 停在 (END) 等按键 → 退出码 marker 永不执行 → 命令被判超时
-      expect(s, contains('PAGER=cat'), reason: 'windows=$windows');
-      expect(s, contains('SYSTEMD_PAGER=cat'), reason: 'windows=$windows');
-    }
+  test('POSIX 分页器关闭；Windows cmd/PowerShell 不下发 POSIX 初始化', () {
+    final posix = SSHService.initCommandsFor(remoteIsWindowsCmd: false);
+    // less 停在 (END) 等按键 → 退出码 marker 永不执行 → 命令被判超时
+    expect(posix, contains('PAGER=cat'));
+    expect(posix, contains('SYSTEMD_PAGER=cat'));
+
+    final windows = SSHService.initCommandsFor(remoteIsWindowsCmd: true);
+    expect(windows, isEmpty);
   });
 }

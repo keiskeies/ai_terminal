@@ -202,7 +202,8 @@ class OperationSheet extends StatelessWidget {
                           Expanded(child: _buildMetaLine(ui)),
                           // 继续任务贴着"失败"状态放：它原来是单独一行右对齐，
                           // 上下各 12px，结果在清单和过程之间留出一条空带
-                          if (!report.isSuccess && onContinueOperation != null) ...[
+                          if (!report.isSuccess &&
+                              onContinueOperation != null) ...[
                             const SizedBox(width: pSmall),
                             _buildContinueButton(ui),
                           ],
@@ -416,7 +417,8 @@ class OperationSheet extends StatelessWidget {
 
     final host = report.hostId;
     if (host != null && host.isNotEmpty) {
-      add(host == 'local' ? UiText.t('本地', 'Local') : host, tc.textSub, mono: true, maxWidth: 200);
+      add(host == 'local' ? UiText.t('本地', 'Local') : host, tc.textSub,
+          mono: true, maxWidth: 200);
     }
     add(_formatElapsed(report.elapsedSeconds, ui), tc.gold, mono: true);
     if (report.stepIndex > 0) add(ui.step(report.stepIndex), tc.textSub);
@@ -517,7 +519,8 @@ class OperationSheet extends StatelessWidget {
                           style: TextStyle(
                             color: tc.textBody,
                             fontSize: fMicro,
-                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                            fontFamily: 'JetBrainsMono',
+                            fontFamilyFallback: kMonoFontFallback,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -535,7 +538,8 @@ class OperationSheet extends StatelessWidget {
                           style: TextStyle(
                             color: tc.ok,
                             fontSize: fMicro,
-                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                            fontFamily: 'JetBrainsMono',
+                            fontFamilyFallback: kMonoFontFallback,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -547,7 +551,8 @@ class OperationSheet extends StatelessWidget {
                           style: TextStyle(
                             color: tc.error,
                             fontSize: fMicro,
-                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                            fontFamily: 'JetBrainsMono',
+                            fontFamilyFallback: kMonoFontFallback,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -560,7 +565,8 @@ class OperationSheet extends StatelessWidget {
                       ? UiText.t('已执行回滚', 'Rolled back')
                       : change.canRollback
                           ? L10n.str.ut_e36a5ac905(change.rollbackCommand ?? '')
-                          : UiText.t('无自动回滚，建议使用执行前快照', 'No automatic rollback; use a pre-change snapshot'),
+                          : UiText.t('无自动回滚，建议使用执行前快照',
+                              'No automatic rollback; use a pre-change snapshot'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -612,7 +618,9 @@ class OperationSheet extends StatelessWidget {
             Icon(Icons.undo, size: 11, color: color),
             const SizedBox(width: 3),
             Text(
-              rollbackBusy ? UiText.t('回滚中', 'Rolling back') : UiText.t('回滚', 'Rollback'),
+              rollbackBusy
+                  ? UiText.t('回滚中', 'Rolling back')
+                  : UiText.t('回滚', 'Rollback'),
               style: TextStyle(
                 color: color,
                 fontSize: fMicro,

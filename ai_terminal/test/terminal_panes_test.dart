@@ -188,8 +188,8 @@ void main() {
 
     test('setActive 拒绝不存在的 pane', () {
       final layout = split('t', 1);
-      expect(setActive(layout, 'ghost').activeOrPrimary,
-          layout.activeOrPrimary);
+      expect(
+          setActive(layout, 'ghost').activeOrPrimary, layout.activeOrPrimary);
     });
 
     test('方向 id 往返一致，未知值回落左右并排', () {

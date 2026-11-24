@@ -159,8 +159,7 @@ void main() {
       expect(log, isEmpty);
     });
 
-    testWidgets('panes=null（不参与分屏）时这些键全部交回 shell',
-        (tester) async {
+    testWidgets('panes=null（不参与分屏）时这些键全部交回 shell', (tester) async {
       await pump(tester, terminal: readyTerminal(), panes: null);
       await press(tester, LogicalKeyboardKey.keyD, ctrl: true, shift: true);
       await press(tester, LogicalKeyboardKey.keyW, ctrl: true, shift: true);
@@ -255,7 +254,8 @@ void main() {
       for (final entry in kDefaultTerminalKeybindings.entries) {
         for (final b in entry.value) {
           expect(seen[b.serialized], isNull,
-              reason: '${b.serialized} 同属 ${seen[b.serialized]?.id} 和 ${entry.key.id}');
+              reason:
+                  '${b.serialized} 同属 ${seen[b.serialized]?.id} 和 ${entry.key.id}');
           seen[b.serialized] = entry.key;
         }
       }

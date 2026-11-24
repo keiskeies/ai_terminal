@@ -51,9 +51,8 @@ class ChangeRecord {
       (localRestoreTo?.isNotEmpty ?? false);
 
   /// UI 提示文案：本机还原没有"回滚命令"可展示，显示还原目标
-  String get rollbackHint => isLocalFileRestore
-      ? '还原本机文件 → $localRestoreTo'
-      : (rollbackCommand ?? '');
+  String get rollbackHint =>
+      isLocalFileRestore ? '还原本机文件 → $localRestoreTo' : (rollbackCommand ?? '');
 
   /// 执行时间
   DateTime timestamp;

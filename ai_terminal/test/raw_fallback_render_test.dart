@@ -26,8 +26,7 @@ void main() {
       final events = parseRawReactFallbackEvents(raw);
 
       expect(events.any((e) => e.isThought), isTrue);
-      expect(
-          events.any((e) => e.isCommand && e.command == 'df -h'), isTrue,
+      expect(events.any((e) => e.isCommand && e.command == 'df -h'), isTrue,
           reason: '命令必须解析为命令事件，交给命令卡渲染');
       expect(hasVisibleReactEvents(events), isTrue);
       // 没有任何事件把「动作:」协议行当正文携带
@@ -125,8 +124,7 @@ void main() {
           ),
         );
 
-    testWidgets('无事件老会话：协议正文渲染后 find 不到「动作:」协议行',
-        (tester) async {
+    testWidgets('无事件老会话：协议正文渲染后 find 不到「动作:」协议行', (tester) async {
       const raw = '思考: 先看磁盘占用\n'
           '动作: execute\n'
           '命令: df -h\n'
@@ -135,8 +133,7 @@ void main() {
       await tester.pumpWidget(wrap(content(events)));
       await tester.pump();
 
-      expect(find.textContaining('动作:'), findsNothing,
-          reason: 'D1：协议行不得当正文渲染');
+      expect(find.textContaining('动作:'), findsNothing, reason: 'D1：协议行不得当正文渲染');
       expect(find.textContaining('先看磁盘占用'), findsWidgets);
       expect(find.textContaining('df -h'), findsWidgets);
       expect(find.textContaining('这是最终回答正文。'), findsWidgets);

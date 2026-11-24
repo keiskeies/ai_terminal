@@ -38,8 +38,7 @@ void main() {
     const keyC = 'test-lock-c';
     const keyD = 'test-lock-d';
     await DirectoryUploadLock.acquire(keyC);
-    await DirectoryUploadLock.acquire(keyD)
-        .timeout(const Duration(seconds: 1));
+    await DirectoryUploadLock.acquire(keyD).timeout(const Duration(seconds: 1));
     DirectoryUploadLock.release(keyC);
     DirectoryUploadLock.release(keyD);
   });

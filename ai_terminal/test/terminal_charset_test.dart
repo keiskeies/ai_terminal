@@ -41,7 +41,9 @@ void main() {
       // "a你b" = 0x61 0xC4 0xE3 0x62
       expect(charsetSafeEnd([0x61, 0xC4, 0xE3, 0x62], allowFourByte: true), 4);
       // 末尾半个字符
-      expect(charsetSafeEnd([0x61, 0xC4, 0xE3, 0x62, 0xC4], allowFourByte: true), 4);
+      expect(
+          charsetSafeEnd([0x61, 0xC4, 0xE3, 0x62, 0xC4], allowFourByte: true),
+          4);
     });
   });
 

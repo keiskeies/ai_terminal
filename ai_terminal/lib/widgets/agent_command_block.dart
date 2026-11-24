@@ -117,8 +117,7 @@ class AgentCommandBlock extends StatelessWidget {
     final decision = permissionDecision;
     final isWaitingConfirm = !executed && pendingConfirmCommand == trimmed;
     final levelDangerous = !isTool &&
-        (safetyLevel == SafetyLevel.warn ||
-            safetyLevel == SafetyLevel.blocked);
+        (safetyLevel == SafetyLevel.warn || safetyLevel == SafetyLevel.blocked);
     final dangerous = isTool ? isWaitingConfirm : levelDangerous;
     // 旧事件没有 permissionDecision：blocked 仍按硬拦截展示
     final hardBlocked = !isTool &&
@@ -219,8 +218,7 @@ class AgentCommandBlock extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
                     color: headerBg,
-                    border: Border(
-                        bottom: BorderSide(color: tc.hairline)),
+                    border: Border(bottom: BorderSide(color: tc.hairline)),
                   ),
                   child: Row(
                     children: [
@@ -296,7 +294,8 @@ class AgentCommandBlock extends StatelessWidget {
                       Text(
                         isTool ? '› ' : '\$ ',
                         style: TextStyle(
-                          fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                          fontFamily: 'JetBrainsMono',
+                          fontFamilyFallback: kMonoFontFallback,
                           fontSize: fMono,
                           color: accentColor,
                           fontWeight: FontWeight.w600,
@@ -308,7 +307,8 @@ class AgentCommandBlock extends StatelessWidget {
                         child: Text(
                           trimmed,
                           style: TextStyle(
-                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                            fontFamily: 'JetBrainsMono',
+                            fontFamilyFallback: kMonoFontFallback,
                             fontSize: fMono,
                             color: cmdColor,
                             height: 1.45,
@@ -431,10 +431,9 @@ class AgentCommandBlock extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color:
-                  explanation.canRollback || explanation.restoreHint != null
-                      ? tc.textSub
-                      : color,
+              color: explanation.canRollback || explanation.restoreHint != null
+                  ? tc.textSub
+                  : color,
               fontSize: fMicro,
               fontWeight: FontWeight.w500,
             ),
@@ -455,7 +454,8 @@ class AgentCommandBlock extends StatelessWidget {
       onTap: () {
         Clipboard.setData(ClipboardData(text: text));
         clearTopToast();
-        showTopSnackBar(context, 
+        showTopSnackBar(
+          context,
           SnackBar(
             content: Text(ui.copied, style: const TextStyle(fontSize: fSmall)),
             duration: const Duration(seconds: 1),
@@ -474,8 +474,8 @@ class AgentCommandBlock extends StatelessWidget {
   }
 
   /// 命令执行按钮（带背景色的三角形按钮）
-  Widget _buildExecuteButton(
-      String command, bool dangerous, bool isBlocked, ThemeColors tc, tp.TerminalTab tab) {
+  Widget _buildExecuteButton(String command, bool dangerous, bool isBlocked,
+      ThemeColors tc, tp.TerminalTab tab) {
     final isExecuting = executingCommand == command;
     final hasAnyExecuting = executingCommand != null;
     final isDisabled = isBlocked || (hasAnyExecuting && !isExecuting);
@@ -493,15 +493,19 @@ class AgentCommandBlock extends StatelessWidget {
         height: 28,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: isDisabled ? Colors.transparent : color.withValues(alpha: 0.12),
+          color:
+              isDisabled ? Colors.transparent : color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(rSmall),
-          border: isDisabled ? null : Border.all(color: color.withValues(alpha: 0.35)),
+          border: isDisabled
+              ? null
+              : Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: isExecuting
             ? SizedBox(
                 width: 14,
                 height: 14,
-                child: CircularProgressIndicator(strokeWidth: 1.5, color: color),
+                child:
+                    CircularProgressIndicator(strokeWidth: 1.5, color: color),
               )
             : isBlocked
                 ? Icon(Icons.block, size: 14, color: tc.error)
@@ -614,7 +618,8 @@ Widget buildPlainCodeBlock(String codeBlock, ThemeColors tc) {
     child: Text(
       codeBlock.trimRight(),
       style: TextStyle(
-        fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+        fontFamily: 'JetBrainsMono',
+        fontFamilyFallback: kMonoFontFallback,
         fontSize: fMono,
         color: tc.textSub,
         height: 1.4,

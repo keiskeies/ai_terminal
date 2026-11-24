@@ -173,8 +173,8 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
   Future<void> _fetchAvailableModels() async {
     final baseUrl = _baseUrlController.text.trim();
     if (baseUrl.isEmpty) {
-      setState(() => _error =
-          UiText.t('先填 Base URL', 'Fill in the base URL first'));
+      setState(
+          () => _error = UiText.t('先填 Base URL', 'Fill in the base URL first'));
       return;
     }
     setState(() {
@@ -285,18 +285,16 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
   Future<void> _save() async {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
-      setState(() => _error =
-          UiText.t('显示名称不能为空', 'Display name is required'));
+      setState(() => _error = UiText.t('显示名称不能为空', 'Display name is required'));
       return;
     }
     if (_baseUrlController.text.trim().isEmpty) {
-      setState(() =>
-          _error = UiText.t('Base URL 不能为空', 'Base URL is required'));
+      setState(
+          () => _error = UiText.t('Base URL 不能为空', 'Base URL is required'));
       return;
     }
     if (_models.isEmpty) {
-      setState(() => _error =
-          UiText.t('至少保留一个模型', 'Keep at least one model'));
+      setState(() => _error = UiText.t('至少保留一个模型', 'Keep at least one model'));
       return;
     }
     setState(() {
@@ -347,8 +345,7 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
       onBack: widget.onCancel,
       error: _error,
       actions: [
-        InlineButton(
-            label: UiText.t('取消', 'Cancel'), onTap: widget.onCancel),
+        InlineButton(label: UiText.t('取消', 'Cancel'), onTap: widget.onCancel),
         InlineButton(
           label: UiText.t('保存', 'Save'),
           primary: true,
@@ -358,8 +355,8 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
       ],
       children: [
         if (_isEditing)
-          _readonly(UiText.t('服务商', 'Provider'),
-              preset?.name ?? _providerId, tc)
+          _readonly(
+              UiText.t('服务商', 'Provider'), preset?.name ?? _providerId, tc)
         else
           InlineSelect<String>(
             label: UiText.t('服务商', 'Provider'),
@@ -428,8 +425,12 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
                 style: TextStyle(fontSize: fMicro, color: tc.textSub),
               ),
             ),
-            _textAction(tc, UiText.t('恢复默认', 'Restore'),
-                canRestore ? () => setState(() => _confirmRestore = true) : null),
+            _textAction(
+                tc,
+                UiText.t('恢复默认', 'Restore'),
+                canRestore
+                    ? () => setState(() => _confirmRestore = true)
+                    : null),
             const SizedBox(width: 8),
             _textAction(
                 tc,
@@ -699,8 +700,7 @@ class _InlineModelFormState extends State<_InlineModelForm> {
       _modelName.text = initial.modelName;
       _context.text =
           initial.contextWindow > 0 ? '${initial.contextWindow}' : '';
-      _maxTokens.text =
-          initial.maxTokens > 0 ? '${initial.maxTokens}' : '';
+      _maxTokens.text = initial.maxTokens > 0 ? '${initial.maxTokens}' : '';
       _reasoning = initial.reasoningEnabled;
       _functionCalling = initial.supportsFunctionCalling;
       _temperature = initial.temperature;
@@ -746,13 +746,11 @@ class _InlineModelFormState extends State<_InlineModelForm> {
 
   void _save() {
     if (_name.text.trim().isEmpty) {
-      setState(() => _error =
-          UiText.t('显示名称不能为空', 'Display name is required'));
+      setState(() => _error = UiText.t('显示名称不能为空', 'Display name is required'));
       return;
     }
     if (_modelName.text.trim().isEmpty) {
-      setState(() =>
-          _error = UiText.t('模型 ID 不能为空', 'Model ID is required'));
+      setState(() => _error = UiText.t('模型 ID 不能为空', 'Model ID is required'));
       return;
     }
     final tiers = <AIReasoningTier>[];
@@ -761,20 +759,19 @@ class _InlineModelFormState extends State<_InlineModelForm> {
       final level = t.level.text.trim();
       if (level.isEmpty) continue;
       if (!seen.add(level)) {
-        setState(() =>
-            _error = UiText.t('档位名重复', 'Duplicate tier level'));
+        setState(() => _error = UiText.t('档位名重复', 'Duplicate tier level'));
         return;
       }
       tiers.add(AIReasoningTier(level: level, apiValue: t.value.text.trim()));
     }
     if (_reasoning && tiers.isEmpty) {
-      setState(() =>
-          _error = UiText.t('开启推理至少需要一个档位', 'Add at least one tier'));
+      setState(
+          () => _error = UiText.t('开启推理至少需要一个档位', 'Add at least one tier'));
       return;
     }
     final fallback = _fallbackId;
-    final validFallback = fallback != null &&
-        widget.fallbackChoices.any((c) => c.id == fallback);
+    final validFallback =
+        fallback != null && widget.fallbackChoices.any((c) => c.id == fallback);
     widget.onSaved(AIEndpointModel(
       id: widget.initial?.id ?? const Uuid().v4(),
       name: _name.text.trim(),
@@ -806,14 +803,12 @@ class _InlineModelFormState extends State<_InlineModelForm> {
       onBack: widget.onCancel,
       error: _error,
       actions: [
-        InlineButton(
-            label: UiText.t('取消', 'Cancel'), onTap: widget.onCancel),
+        InlineButton(label: UiText.t('取消', 'Cancel'), onTap: widget.onCancel),
         InlineButton(
             label: UiText.t('确定', 'Done'), primary: true, onTap: _save),
       ],
       children: [
-        InlineField(
-            label: l10n.aiModelDisplayName, controller: _name),
+        InlineField(label: l10n.aiModelDisplayName, controller: _name),
         const SizedBox(height: 10),
         InlineField(
           label: l10n.aiModelId,

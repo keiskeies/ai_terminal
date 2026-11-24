@@ -7,7 +7,8 @@ class AppLock {
 
   /// 初始化应用锁
   static Future<bool> init() async {
-    final enabled = SettingsDao.getCached('appLockEnabled', defaultValue: false);
+    final enabled =
+        SettingsDao.getCached('appLockEnabled', defaultValue: false);
     if (!enabled) return true;
 
     // 如果启用了应用锁，验证身份
@@ -17,7 +18,8 @@ class AppLock {
   /// 验证身份
   static Future<bool> requireAuth() async {
     try {
-      final canAuth = await _localAuth.canCheckBiometrics || await _localAuth.isDeviceSupported();
+      final canAuth = await _localAuth.canCheckBiometrics ||
+          await _localAuth.isDeviceSupported();
 
       if (!canAuth) {
         // 设备不支持生物识别，允许访问

@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../utils/tail_text_buffer.dart';
+
 /// Agent 日志记录器
 ///
 /// 性能优化要点：
@@ -47,16 +49,57 @@ class AgentLogger {
     );
   }
 
-  /// 文件写入缓冲区：聚合多条件日志一次性异步写入
-  final StringBuffer _fileBuffer = StringBuffer();
+  /// 文件写入缓冲区：聚合多条件日志一次性异步写入。与 UI 循环队列独立，
+  /// 文件初始化失败或磁盘持续报错时也必须有界，只保留最新内容。
+  final TailTextBuffer _fileBuffer = TailTextBuffer(_maxFileBufferChars ~/ 2);
+  static const int _maxFileBufferChars = 1024 * 1024;
+  int _droppedFileChars = 0;
+  int _droppedFileEntries = 0;
+  int get droppedFileChars => _droppedFileChars;
+  int get droppedFileEntries => _droppedFileEntries;
+
+  void _appendFileBuffer(String entry) {
+    final before = _fileBuffer.length;
+    _fileBuffer.write(entry);
+    final retained = _fileBuffer.length;
+    final dropped = before + entry.length - retained;
+    if (dropped > 0) {
+      _droppedFileChars += dropped;
+      _droppedFileEntries++;
+      debugPrint('[AgentLogger] 文件写缓冲已满，丢弃最旧 $dropped 字符；'
+          '累计丢弃 $_droppedFileChars 字符/$_droppedFileEntries 次');
+    }
+  }
+
+  /// 取走缓冲区尾部内容并清空。
+  /// TailTextBuffer 内部允许增长到上限的 2× 才裁剪，[toString] 只返回尾部；
+  /// 直接 clear 会把超出部分悄悄丢掉，必须在这里显式记账。
+  String _takeFileBuffer() {
+    final pending = _fileBuffer.toString();
+    final discarded = _fileBuffer.length - pending.length;
+    if (discarded > 0) {
+      _droppedFileChars += discarded;
+      _droppedFileEntries++;
+      debugPrint('[AgentLogger] 刷盘截断保留尾部，丢弃最旧 $discarded 字符；'
+          '累计丢弃 $_droppedFileChars 字符/$_droppedFileEntries 次');
+    }
+    _fileBuffer.clear();
+    return pending;
+  }
+
   Timer? _flushTimer;
   bool _fileWriting = false;
+  Completer<void>? _fileWriteDone;
+  final Completer<void> _initDone = Completer<void>();
 
   /// 控制台输出级别控制（避免 release 模式下大量 print 阻塞）
   /// 仅在 debug 模式输出 INFO/DEBUG，WARN/ERROR 始终输出
   static bool get _isDebugMode {
     bool inDebugMode = false;
-    assert(() { inDebugMode = true; return true; }());
+    assert(() {
+      inDebugMode = true;
+      return true;
+    }());
     return inDebugMode;
   }
 
@@ -66,12 +109,14 @@ class AgentLogger {
       final dir = await getApplicationDocumentsDirectory();
       _logFile = File('${dir.path}/agent.log');
       // 启动时写入分隔标记（append 模式，保留历史日志）
-      _logFile!.writeAsString(
+      await _logFile!.writeAsString(
         '\n=== Agent Log Started ${DateTime.now()} ===\n',
         mode: FileMode.append,
       );
     } catch (e) {
       debugPrint('[AgentLogger] 日志文件初始化失败: $e');
+    } finally {
+      if (!_initDone.isCompleted) _initDone.complete();
     }
   }
 
@@ -89,19 +134,22 @@ class AgentLogger {
     }
 
     // 文件写入：缓冲聚合，500ms 刷一次
-    _fileBuffer.writeln(logEntry);
+    _appendFileBuffer('$logEntry\n');
     _scheduleFlush();
 
     // 通知订阅者（会话持久化层订阅，将日志写入对应 Conversation）
     // 复制监听器列表避免回调中修改列表导致并发问题
     if (_listeners.isNotEmpty) {
       final conversationId = Zone.current[_conversationZoneKey] as String?;
-      final listeners =
-          List<void Function(String, String, String, DateTime, String?, String?)>.from(_listeners);
+      final listeners = List<
+          void Function(String, String, String, DateTime, String?,
+              String?)>.from(_listeners);
       for (final l in listeners) {
         try {
           l(level, tag, message, timestamp, currentHostId, conversationId);
-        } catch (e) { debugPrint('[AgentLogger] 日志监听器异常: $e'); }
+        } catch (e) {
+          debugPrint('[AgentLogger] 日志监听器异常: $e');
+        }
       }
     }
   }
@@ -120,33 +168,36 @@ class AgentLogger {
       return;
     }
     final file = _logFile;
-    if (file == null || _fileBuffer.isEmpty) {
-      // 日志文件初始化失败时清空缓冲区，防止 StringBuffer 无限增长导致 OOM
-      if (file == null && _fileBuffer.length > 10000) {
-        _fileBuffer.clear();
-      }
+    if (file == null || _fileBuffer.length == 0) {
+      // 初始化失败时不清空：统一由 _appendFileBuffer 限长并记录丢弃诊断。
       return;
     }
 
-    final pending = _fileBuffer.toString();
-    _fileBuffer.clear();
+    final pending = _takeFileBuffer();
     _fileWriting = true;
+    final writeDone = Completer<void>();
+    _fileWriteDone = writeDone;
     try {
       await file.writeAsString(pending, mode: FileMode.append, flush: false);
       // 日志轮转：文件超过 5MB 时保留尾部 2MB，防止无限增长
       await _rotateIfNeeded(file);
     } catch (e) {
       debugPrint('[AgentLogger] 日志文件写入失败: $e');
-      // 写入失败时把内容放回缓冲区，下次再试
-      _fileBuffer.write(pending);
+      // 写失败的旧内容不能把等待期间新产生的日志挤掉：先旧后新重新合并，
+      // TailTextBuffer 只保留最新的有限尾部。
+      final newer = _takeFileBuffer();
+      _appendFileBuffer(pending);
+      _appendFileBuffer(newer);
     } finally {
       _fileWriting = false;
+      if (identical(_fileWriteDone, writeDone)) _fileWriteDone = null;
+      if (!writeDone.isCompleted) writeDone.complete();
     }
   }
 
   /// 日志文件轮转：超过 5MB 时保留尾部 2MB
-  static const int _maxLogSize = 5 * 1024 * 1024;  // 5MB
-  static const int _keepLogSize = 2 * 1024 * 1024;  // 2MB
+  static const int _maxLogSize = 5 * 1024 * 1024; // 5MB
+  static const int _keepLogSize = 2 * 1024 * 1024; // 2MB
 
   Future<void> _rotateIfNeeded(File file) async {
     try {
@@ -182,14 +233,21 @@ class AgentLogger {
   // ═══════════════════════════════════════════
   // 日志订阅：供会话持久化层订阅，将日志写入对应 Conversation
   // ═══════════════════════════════════════════
-  final List<void Function(String level, String tag, String message, DateTime timestamp, String? hostId, String? conversationId)> _listeners = [];
+  final List<
+      void Function(
+          String level,
+          String tag,
+          String message,
+          DateTime timestamp,
+          String? hostId,
+          String? conversationId)> _listeners = [];
 
   /// 订阅日志写入事件（返回取消订阅的函数）
   /// 回调参数 hostId 是日志产生时的当前 hostId；conversationId 是任务通过
   /// [runWithConversation] 绑定的会话 id，存在时优先按会话路由。
   void Function() subscribe(
-      void Function(String level, String tag, String message, DateTime timestamp,
-              String? hostId, String? conversationId)
+      void Function(String level, String tag, String message,
+              DateTime timestamp, String? hostId, String? conversationId)
           listener) {
     _listeners.add(listener);
     return () => _listeners.remove(listener);
@@ -199,6 +257,10 @@ class AgentLogger {
   Future<void> flush() async {
     _flushTimer?.cancel();
     _flushTimer = null;
+    await _initDone.future;
+    while (_fileWriteDone != null) {
+      await _fileWriteDone!.future;
+    }
     await _flushToFile();
   }
 }

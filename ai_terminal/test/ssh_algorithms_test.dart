@@ -12,7 +12,6 @@ void main() {
 
     expect(chacha, 0, reason: '纯 Dart AES-GCM 实测约 1.5MB/s，必须排在后面');
     expect(aesCtr, lessThan(aesGcm), reason: 'AES-CTR 作为高速后备');
-    expect(ciphers.last, SSHCipherType.aes256cbc,
-        reason: 'CBC 只作为老服务器兜底');
+    expect(ciphers.last, SSHCipherType.aes256cbc, reason: 'CBC 只作为老服务器兜底');
   });
 }

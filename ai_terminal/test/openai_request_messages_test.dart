@@ -18,7 +18,8 @@ void main() {
       expect(messages[0]['role'], 'system');
       expect(messages[1]['role'], 'system');
       expect(messages[2]['role'], 'user');
-      expect(messages.every((m) => (m['content'] as String).isNotEmpty), isTrue);
+      expect(
+          messages.every((m) => (m['content'] as String).isNotEmpty), isTrue);
     });
 
     test('过滤内容为空或仅空白的消息', () {
@@ -34,8 +35,10 @@ void main() {
       );
 
       expect(messages.length, 4);
-      expect(messages.map((m) => m['content']).toList(), ['system', 'system', 'hello', 'next']);
-      expect(messages.every((m) => (m['content'] as String).trim().isNotEmpty), isTrue);
+      expect(messages.map((m) => m['content']).toList(),
+          ['system', 'system', 'hello', 'next']);
+      expect(messages.every((m) => (m['content'] as String).trim().isNotEmpty),
+          isTrue);
     });
 
     test('空 systemPrompt 不生成 system 消息', () {

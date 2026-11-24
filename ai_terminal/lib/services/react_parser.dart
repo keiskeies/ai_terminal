@@ -31,10 +31,40 @@ class ReActParser {
     return RegExp(r'^[^\s（(【\[]+').firstMatch(rest)?.group(0) ?? '';
   }
 
+  /// Markdown 围栏标记（支持 ``` 与 ~~~，标记必须独占行首）。
+  static String? _fenceMarker(String line) =>
+      RegExp(r'^\s*(`{3,}|~{3,})').firstMatch(line)?.group(1);
+
+  static bool _closesFence(String line, String openMarker) {
+    // 关闭围栏必须独占一行：只能有空白、同一种标记字符，且数量不少于
+    // 打开围栏。带 info string / 尾随正文的 ```bash、``` 说明 都不是关闭行。
+    final markerChar = RegExp.escape(openMarker[0]);
+    return RegExp('^\\s*$markerChar{${openMarker.length},}\\s*\$')
+        .hasMatch(line);
+  }
+
+  /// 协议行只允许出现在围栏外。围栏里的「动作: execute」是给用户看的示例，
+  /// 不是本轮流式协议；旧实现会把它当成真实动作并执行示例命令。
+  static Iterable<String> _outsideFenceLines(String content) sync* {
+    String? openMarker;
+    for (final line in content.split('\n')) {
+      if (openMarker != null) {
+        if (_closesFence(line, openMarker)) openMarker = null;
+        continue;
+      }
+      final marker = _fenceMarker(line);
+      if (marker != null) {
+        openMarker = marker;
+        continue;
+      }
+      yield line;
+    }
+  }
+
   /// 正文里声明的动作类型（`动作: xxx` 行首次出现即定型）。
   /// 供流结束路径判断「本轮是不是 finish/ask」以剔除围栏误解析出的命令。
   static ActionType? declaredTextAction(String content) {
-    for (final line in content.split('\n')) {
+    for (final line in _outsideFenceLines(content)) {
       final trimmedLine = line.trim();
       if (!trimmedLine.startsWith('动作:') && !trimmedLine.startsWith('动作：')) {
         continue;
@@ -62,9 +92,8 @@ class ReActParser {
   /// 与 textFromDeclaredAction 共用同一套动作行识别，避免两处口径漂移。
   static bool declaresExecuteAction(String content) {
     if (content.isEmpty) return false;
-    final lines = content.split('\n');
-    for (var i = 0; i < lines.length; i++) {
-      final trimmedLine = lines[i].trim();
+    for (final line in _outsideFenceLines(content)) {
+      final trimmedLine = line.trim();
       if (!trimmedLine.startsWith('动作:') && !trimmedLine.startsWith('动作：')) {
         continue;
       }
@@ -82,7 +111,17 @@ class ReActParser {
   /// 返回 null 表示正文里没有声明 execute 的动作行。
   static String? textFromDeclaredAction(String content) {
     final lines = content.split('\n');
+    String? openMarker;
     for (var i = 0; i < lines.length; i++) {
+      if (openMarker != null) {
+        if (_closesFence(lines[i], openMarker)) openMarker = null;
+        continue;
+      }
+      final marker = _fenceMarker(lines[i]);
+      if (marker != null) {
+        openMarker = marker;
+        continue;
+      }
       final trimmedLine = lines[i].trim();
       if (!trimmedLine.startsWith('动作:') && !trimmedLine.startsWith('动作：')) {
         continue;
@@ -95,6 +134,60 @@ class ReActParser {
     return null;
   }
 
+  static final RegExp _protocolExampleLine =
+      RegExp(r'^(?:思考|计划|说明|动作|命令|选项|工具|参数|回答)\s*[:：]');
+  static final RegExp _actionExampleLine = RegExp(r'^动作\s*[:：]');
+
+  /// 围栏内若含协议行，整段是格式示例而不是命令；保留普通 shell 围栏，
+  /// 因为「动作: execute + ```bash ... ```」是现有合法命令格式。
+  ///
+  /// 分类只看围栏自身的局部上下文：只有显式 `命令:` 字段内的围栏才可把协议状
+  /// 文本当作 shell/heredoc 正文。不能用全局 `动作: execute` 放行后续所有围栏，
+  /// 否则 execute 轮里先出现的示例会抢在真实命令之前执行。
+  static String _withoutProtocolExampleFences(String content) {
+    final lines = content.split('\n');
+    final out = <String>[];
+    var inCommandField = false;
+    for (var i = 0; i < lines.length; i++) {
+      final openMarker = _fenceMarker(lines[i]);
+      if (openMarker == null) {
+        out.add(lines[i]);
+        final trimmed = lines[i].trim();
+        if (_protocolExampleLine.hasMatch(trimmed)) {
+          inCommandField =
+              trimmed.startsWith('命令:') || trimmed.startsWith('命令：');
+        }
+        continue;
+      }
+      final fenceIsCommandContent = inCommandField;
+      var end = i + 1;
+      while (end < lines.length && !_closesFence(lines[end], openMarker)) {
+        end++;
+      }
+      final fenceLines = lines.sublist(i + 1, end);
+      final isExample = !fenceIsCommandContent &&
+          (fenceLines.any((line) => _actionExampleLine.hasMatch(line.trim())) ||
+              fenceLines.any((line) =>
+                  line.contains('<function=') ||
+                  line.contains('</tool_call>')) ||
+              fenceLines
+                  .any((line) => _protocolExampleLine.hasMatch(line.trim())));
+      if (isExample) {
+        // 保留行数，避免下游按行号关联协议字段时错位。
+        out.addAll(List.filled(end - i + (end < lines.length ? 1 : 0), ''));
+        i = end;
+      } else {
+        out.addAll(lines.sublist(i, end < lines.length ? end + 1 : end));
+        i = end;
+      }
+    }
+    return out.join('\n');
+  }
+
+  /// 命令事件提取的统一入口：先剔除协议示例围栏，再复用流式解析器。
+  static List<AgentEvent> parseEvents(String content) =>
+      ReActStreamParser.parse(_withoutProtocolExampleFences(content));
+
   /// 解析完整 ReAct 响应，提取思考/动作/命令/选项/计划/工具等结构化字段。
   static ReActStep parseReActResponse(String content,
       {List<AgentEvent>? parsedEvents}) {
@@ -106,7 +199,7 @@ class ReActParser {
 
     // 使用 ReActStreamParser 统一提取命令（正确处理多行 heredoc 和代码块）。
     // 流结束路径已经解析过一次，直接复用结果；其它调用方仍走完整解析。
-    final events = parsedEvents ?? ReActStreamParser.parse(content);
+    final events = parsedEvents ?? parseEvents(content);
     for (final e in events) {
       if (e.isCommand && command == null) {
         command = e.command;
@@ -126,13 +219,15 @@ class ReActParser {
     final lines = content.split('\n');
     final answer = parseAnswerBlock(lines);
     final sections = parseReportSections(lines);
-    action = declaredTextAction(content);
+    final protocolContent = _withoutProtocolExampleFences(content);
+    final protocolLines = protocolContent.split('\n');
+    action = declaredTextAction(protocolContent);
     // 工具动作需要顺序扫描后续 `工具:` / `参数:` 行（遇到首个动作行即停）
     if (action == ActionType.tool) {
-      for (var i = 0; i < lines.length; i++) {
-        final trimmedLine = lines[i].trim();
+      for (var i = 0; i < protocolLines.length; i++) {
+        final trimmedLine = protocolLines[i].trim();
         if (trimmedLine.startsWith('动作:') || trimmedLine.startsWith('动作：')) {
-          final toolResult = parseToolAction(lines, i + 1);
+          final toolResult = parseToolAction(protocolLines, i + 1);
           toolName = toolResult.$1;
           toolArgs = toolResult.$2;
           break;
@@ -156,7 +251,7 @@ class ReActParser {
       if (content.trim().isEmpty) {
         return ReActStep(thought: '', action: null, rawResponse: content);
       }
-      if (isTaskComplete(content)) {
+      if (isTaskComplete(protocolContent)) {
         return ReActStep(
           thought: thought ?? content,
           action: ActionType.finish,
@@ -360,8 +455,8 @@ class ReActParser {
         toolName = _protocolValue(tlTrim);
       } else if (tlTrim.startsWith('参数:') || tlTrim.startsWith('参数：')) {
         // 收集参数：参数: 行本身 + 后续所有缩进行（多行 key:value 格式）
-        final argsBuffer =
-            StringBuffer()..writeln(_protocolValue(tlTrim, includeRestOfLine: true) ?? '');
+        final argsBuffer = StringBuffer()
+          ..writeln(_protocolValue(tlTrim, includeRestOfLine: true) ?? '');
         // 收集后续缩进行（2 空格或 Tab 开头）
         for (var k = j + 1; k < lines.length; k++) {
           final pl = lines[k];

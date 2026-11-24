@@ -60,8 +60,7 @@ void main() {
         ..setState('tabA', AgentState(hostId: 'host1'))
         ..setState('tabB', AgentState(hostId: 'host1'));
 
-      registry.updateState(
-          'tabA', (s) => s.copyWith(error: 'only-A'));
+      registry.updateState('tabA', (s) => s.copyWith(error: 'only-A'));
 
       expect(registry.getState('tabA')!.error, 'only-A');
       expect(registry.getState('tabB')!.error, isNull);
@@ -106,8 +105,7 @@ void main() {
       notifier.switchTab('tabA', hostId: 'host1');
       expect(notifier.state.hostId, 'host1');
 
-      notifier.setPermissionModeForHost(
-          'host1', AgentPermissionMode.readOnly);
+      notifier.setPermissionModeForHost('host1', AgentPermissionMode.readOnly);
       expect(notifier.state.permissionMode, AgentPermissionMode.readOnly);
 
       notifier.switchTab('tabB', hostId: 'host1');
@@ -123,8 +121,7 @@ void main() {
     test('stateForScope 能读到非活跃 tab 自己的状态', () {
       final notifier = AgentNotifier();
       notifier.switchTab('tabA', hostId: 'host1');
-      notifier.setPermissionModeForHost(
-          'host1', AgentPermissionMode.readOnly);
+      notifier.setPermissionModeForHost('host1', AgentPermissionMode.readOnly);
 
       notifier.switchTab('tabB', hostId: 'host1');
 
@@ -165,8 +162,8 @@ void main() {
 
     test('Agent 日志按任务会话路由，而不是按 host 的 active 会话', () async {
       final events = <String?>[];
-      final unsubscribe = agentLogger.subscribe(
-          (level, tag, message, timestamp, hostId, conversationId) {
+      final unsubscribe = agentLogger
+          .subscribe((level, tag, message, timestamp, hostId, conversationId) {
         events.add(conversationId);
       });
 

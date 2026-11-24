@@ -37,7 +37,8 @@ void main() {
           isTrashEntryDir(sandboxPath('.ai_terminal_trash/1700000000000'),
               trashDirName: trash),
           isTrue);
-      expect(isTrashEntryDir(sandboxPath('.ai_terminal_trash'),
+      expect(
+          isTrashEntryDir(sandboxPath('.ai_terminal_trash'),
               trashDirName: trash),
           isFalse,
           reason: '回收区根目录是保留目录，删了后续删除就无处可去');
@@ -106,8 +107,7 @@ void main() {
     test('删除条目并报告释放量', () async {
       final entry = makeEntry('d1', '100', {'a.txt': '12345'});
 
-      final result =
-          await clearTrashEntries([entry], trashDirName: trash);
+      final result = await clearTrashEntries([entry], trashDirName: trash);
 
       expect(result.removed, 1);
       expect(result.bytesFreed, 5);
@@ -139,8 +139,7 @@ void main() {
     test('条目不存在时算跳过，不算失败', () async {
       final missing = p.join(sandboxPath('d1'), trash, '999');
 
-      final result =
-          await clearTrashEntries([missing], trashDirName: trash);
+      final result = await clearTrashEntries([missing], trashDirName: trash);
 
       expect(result.removed, 0);
       expect(result.failed, isEmpty);
@@ -171,7 +170,9 @@ void main() {
             p.join(entry, 'a.txt'),
             p.join(entry, 'b.txt'),
             sandboxPath('.ai_terminal_trash/200/c.txt'),
-          ], [entry]),
+          ], [
+            entry
+          ]),
           2);
     });
 

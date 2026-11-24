@@ -61,8 +61,7 @@ void main() {
           light.background.computeLuminance(),
           light.foreground.computeLuminance(),
         );
-        expect(contrast, greaterThan(3.0),
-            reason: '${palette.id} 亮色前景与背景对比过低');
+        expect(contrast, greaterThan(3.0), reason: '${palette.id} 亮色前景与背景对比过低');
       }
     });
 
@@ -73,14 +72,16 @@ void main() {
           dark.background.computeLuminance(),
           dark.foreground.computeLuminance(),
         );
-        expect(contrast, greaterThan(4.0),
-            reason: '${palette.id} 暗色前景与背景对比过低');
+        expect(contrast, greaterThan(4.0), reason: '${palette.id} 暗色前景与背景对比过低');
       }
     });
 
     test('搜索高亮色不与背景同色（否则搜到的命中看不见）', () {
       for (final palette in kTerminalPalettes) {
-        final themes = [palette.dark, if (palette.light != null) palette.light!];
+        final themes = [
+          palette.dark,
+          if (palette.light != null) palette.light!
+        ];
         for (final theme in themes) {
           expect(theme.searchHitBackground, isNot(theme.background),
               reason: '${palette.id} 搜索命中底色与终端底色相同');

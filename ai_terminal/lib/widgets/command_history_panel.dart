@@ -89,13 +89,13 @@ class _CommandHistoryPanelState extends State<CommandHistoryPanel> {
     return Dialog(
       backgroundColor: tc.cardElevated,
       insetPadding: const EdgeInsets.all(32),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
       child: ConstrainedBox(
         // 小屏按视口 92% 缩放，大屏保持 680 上限；高度加 85% 视口保护
         constraints: BoxConstraints(
           maxWidth: math.min(680, MediaQuery.sizeOf(context).width * 0.92),
-          maxHeight:
-              math.min(520, MediaQuery.sizeOf(context).height * 0.85),
+          maxHeight: math.min(520, MediaQuery.sizeOf(context).height * 0.85),
         ),
         child: Column(
           children: [
@@ -127,7 +127,8 @@ class _CommandHistoryPanelState extends State<CommandHistoryPanel> {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(pStandard, pSmall, pStandard, pSmall),
+              padding: const EdgeInsets.fromLTRB(
+                  pStandard, pSmall, pStandard, pSmall),
               child: TextField(
                 controller: _query,
                 autofocus: true,
@@ -177,7 +178,8 @@ class _CommandHistoryPanelState extends State<CommandHistoryPanel> {
                 ),
               ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(pStandard, pSmall, pStandard, pSmall),
+              padding: const EdgeInsets.fromLTRB(
+                  pStandard, pSmall, pStandard, pSmall),
               child: Row(
                 children: [
                   Text(

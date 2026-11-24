@@ -44,29 +44,80 @@ class CommandExtractor {
 
     // ========== 模式 3: 独立行的命令（常见命令前缀）==========
     final commandPrefixes = [
-      r'^sudo\s+', r'^yum\s+', r'^apt\s+', r'^apt-get\s+', r'^dnf\s+',
-      r'^apk\s+', r'^pacman\s+', r'^brew\s+', r'^curl\s+', r'^wget\s+',
-      r'^tar\s+', r'^unzip\s+', r'^cat\s+', r'^echo\s+', r'^export\s+',
-      r'^source\s+', r'^cd\s+', r'^mkdir\s+', r'^chmod\s+', r'^chown\s+',
-      r'^rm\s+', r'^cp\s+', r'^mv\s+', r'^ln\s+', r'^systemctl\s+',
-      r'^service\s+', r'^java\s+', r'^javac\s+', r'^python\s+',
-      r'^pip\s+', r'^npm\s+', r'^node\s+', r'^git\s+', r'^docker\s+',
-      r'^kubectl\s+', r'^ls\s+', r'^grep\s+', r'^find\s+', r'^head\s+',
-      r'^tail\s+', r'^which\s+', r'^where\s+', r'^type\s+',
-      r'^uname\s+', r'^date\s+', r'^whoami\s+', r'^id\s+',
-      r'^pwd\s+', r'^env\s+', r'^printenv\s+', r'^sed\s+',
-      r'^awk\s+', r'^sort\s+', r'^uniq\s+', r'^wc\s+',
-      r'^chmod\s+', r'^chgrp\s+', r'^touch\s+', r'^dd\s+',
+      r'^sudo\s+',
+      r'^yum\s+',
+      r'^apt\s+',
+      r'^apt-get\s+',
+      r'^dnf\s+',
+      r'^apk\s+',
+      r'^pacman\s+',
+      r'^brew\s+',
+      r'^curl\s+',
+      r'^wget\s+',
+      r'^tar\s+',
+      r'^unzip\s+',
+      r'^cat\s+',
+      r'^echo\s+',
+      r'^export\s+',
+      r'^source\s+',
+      r'^cd\s+',
+      r'^mkdir\s+',
+      r'^chmod\s+',
+      r'^chown\s+',
+      r'^rm\s+',
+      r'^cp\s+',
+      r'^mv\s+',
+      r'^ln\s+',
+      r'^systemctl\s+',
+      r'^service\s+',
+      r'^java\s+',
+      r'^javac\s+',
+      r'^python\s+',
+      r'^pip\s+',
+      r'^npm\s+',
+      r'^node\s+',
+      r'^git\s+',
+      r'^docker\s+',
+      r'^kubectl\s+',
+      r'^ls\s+',
+      r'^grep\s+',
+      r'^find\s+',
+      r'^head\s+',
+      r'^tail\s+',
+      r'^which\s+',
+      r'^where\s+',
+      r'^type\s+',
+      r'^uname\s+',
+      r'^date\s+',
+      r'^whoami\s+',
+      r'^id\s+',
+      r'^pwd\s+',
+      r'^env\s+',
+      r'^printenv\s+',
+      r'^sed\s+',
+      r'^awk\s+',
+      r'^sort\s+',
+      r'^uniq\s+',
+      r'^wc\s+',
+      r'^chmod\s+',
+      r'^chgrp\s+',
+      r'^touch\s+',
+      r'^dd\s+',
     ];
 
     final lines = content.split('\n');
     for (final line in lines) {
       var trimmed = line.trim();
-      if (trimmed.startsWith('#') || trimmed.startsWith('//') ||
-          trimmed.startsWith('请') || trimmed.startsWith('执行') ||
-          trimmed.startsWith('命令') || trimmed.startsWith('说明') ||
-          trimmed.startsWith('注意') || trimmed.startsWith('提示') ||
-          trimmed.startsWith('警告') || trimmed.startsWith('- ') ||
+      if (trimmed.startsWith('#') ||
+          trimmed.startsWith('//') ||
+          trimmed.startsWith('请') ||
+          trimmed.startsWith('执行') ||
+          trimmed.startsWith('命令') ||
+          trimmed.startsWith('说明') ||
+          trimmed.startsWith('注意') ||
+          trimmed.startsWith('提示') ||
+          trimmed.startsWith('警告') ||
+          trimmed.startsWith('- ') ||
           trimmed.startsWith('* ')) {
         continue;
       }
@@ -174,7 +225,8 @@ class CommandExtractor {
 
         final heredocCommand = heredocLines.join('\n');
         commands.add(heredocCommand);
-        agentLogger.info('ExtractCmd', 'heredoc 命令提取: ${heredocCommand.length} 字符');
+        agentLogger.info(
+            'ExtractCmd', 'heredoc 命令提取: ${heredocCommand.length} 字符');
         continue;
       }
 
@@ -207,8 +259,14 @@ class CommandExtractor {
     int i = 0;
     while (i < lines.length) {
       final cmd = lines[i].trim();
-      if (cmd.isEmpty || cmd.startsWith('#')) { i++; continue; }
-      if (cmd.startsWith('```') || cmd.endsWith('```')) { i++; continue; }
+      if (cmd.isEmpty || cmd.startsWith('#')) {
+        i++;
+        continue;
+      }
+      if (cmd.startsWith('```') || cmd.endsWith('```')) {
+        i++;
+        continue;
+      }
 
       // 检测 heredoc：将后续行直到定界符合并为一条命令
       final heredocStart = RegExp(r'''<<-?\s*['"]?(\w+)['"]?''');
@@ -220,7 +278,10 @@ class CommandExtractor {
         while (i < lines.length) {
           final heredocLine = lines[i];
           heredocLines.add(heredocLine);
-          if (heredocLine.trim() == delimiter) { i++; break; }
+          if (heredocLine.trim() == delimiter) {
+            i++;
+            break;
+          }
           i++;
         }
         return heredocLines.join('\n');

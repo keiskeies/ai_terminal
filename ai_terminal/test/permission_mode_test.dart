@@ -77,7 +77,8 @@ void main() {
       expect(destructiveToolNeedsConfirm(AgentPermissionMode.readOnly), isTrue);
       expect(destructiveToolNeedsConfirm(AgentPermissionMode.ask), isTrue);
       expect(destructiveToolNeedsConfirm(AgentPermissionMode.auto), isTrue);
-      expect(destructiveToolNeedsConfirm(AgentPermissionMode.fullAuto), isFalse);
+      expect(
+          destructiveToolNeedsConfirm(AgentPermissionMode.fullAuto), isFalse);
     });
   });
 

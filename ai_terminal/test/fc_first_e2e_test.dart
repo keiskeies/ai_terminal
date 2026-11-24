@@ -202,8 +202,7 @@ void main() {
   }
 
   group('引擎 FC-first 端到端', () {
-    test('execute→finish：命令事件唯一、说明保留、结果关联、操作单来自结构化字段',
-        () async {
+    test('execute→finish：命令事件唯一、说明保留、结果关联、操作单来自结构化字段', () async {
       final provider = _FcMockProvider();
       provider.enqueueFc(
         ['先查看 Java 版本'],
@@ -333,12 +332,41 @@ void main() {
 
       expect(executor.executed, ['echo hi']);
       expect(
-          events.any((e) =>
-              e.isInfo && (e.text ?? '').contains('忽略多余的工具调用: finish')),
+          events.any(
+              (e) => e.isInfo && (e.text ?? '').contains('忽略多余的工具调用: finish')),
           isTrue);
       expect(engine.currentTask?.status, AgentStatus.completed);
       // 第一轮不能直接收尾：finish 被忽略后必须还有第二轮
       expect(provider.callCount, 2);
+    });
+
+    test('提前执行只认首个 tool_call：后续 execute 不得幽灵执行', () {
+      // 首个调用是 think、第二个是 execute 时，_stepFromFcCalls 只消费首个，
+      // 提前执行若扫描全部调用，就会把本轮不会消费的命令先跑掉。
+      expect(AgentEngine.earlyExecuteCandidate([]), isNull);
+      expect(AgentEngine.earlyExecuteCandidate([_executeCall('ls')])?.name,
+          'execute');
+      expect(
+        AgentEngine.earlyExecuteCandidate([
+          ToolCall(
+            id: 'call_think',
+            name: 'think',
+            arguments: jsonEncode({'thought': '先梳理步骤'}),
+          ),
+          _executeCall('echo ghost'),
+        ]),
+        isNull,
+      );
+      expect(
+        AgentEngine.earlyExecuteCandidate([
+          ToolCall(
+            id: 'call_empty',
+            name: 'execute',
+            arguments: jsonEncode({'command': '   '}),
+          ),
+        ]),
+        isNull,
+      );
     });
 
     test('注册工具别名 think：走 _handleToolAction 路由，记录思考', () async {
@@ -360,8 +388,8 @@ void main() {
 
       expect(engine.toolCallsForTesting, 1);
       expect(
-          events.any(
-              (e) => e.isThought && (e.text ?? '').contains('先梳理一下排查思路')),
+          events
+              .any((e) => e.isThought && (e.text ?? '').contains('先梳理一下排查思路')),
           isTrue);
       expect(engine.currentTask?.status, AgentStatus.completed);
     });
@@ -455,14 +483,14 @@ void main() {
       await engine.startTask('测试 schema', _MockExecutor());
 
       final tools = provider.receivedTools.first!;
-      final names = tools
-          .map((t) => (t['function'] as Map)['name'] as String)
-          .toList();
+      final names =
+          tools.map((t) => (t['function'] as Map)['name'] as String).toList();
       expect(names, containsAll(['execute', 'finish', 'ask']));
       // 注册工具仍然在列
       expect(names, contains('cert_check'));
       final execSchema = tools.firstWhere(
-          (t) => (t['function'] as Map)['name'] == 'execute')['function'] as Map;
+              (t) => (t['function'] as Map)['name'] == 'execute')['function']
+          as Map;
       final params = execSchema['parameters'] as Map;
       expect((params['required'] as List), contains('command'));
       expect((params['properties'] as Map).containsKey('description'), isTrue);
@@ -503,14 +531,17 @@ void main() {
       expect(fcPrompt, contains('降级兼容'));
 
       final textEngine = makeEngine(provider: _FcMockProvider(), fc: false);
-      final textPrompt = textEngine.buildSystemPromptForTesting(_MockExecutor());
+      final textPrompt =
+          textEngine.buildSystemPromptForTesting(_MockExecutor());
       expect(textPrompt, contains('严格格式要求'));
       expect(textPrompt, isNot(contains('Function Calling 模式')));
     });
 
     test('用户禁止执行命令：未执行任何命令也能直接 finish', () async {
       final provider = _FcMockProvider();
-      provider.enqueueFc(['用户要求不执行命令，直接基于会话内容作答'], [
+      provider.enqueueFc([
+        '用户要求不执行命令，直接基于会话内容作答'
+      ], [
         _finishCall(
           answer: '根据本会话内容，结论如下……',
           conclusion: '未执行命令，依据为会话内容',
@@ -713,8 +744,8 @@ void main() {
       await engine.startTask('为何不直接复制文件非要用压缩', executor);
 
       // 首条消息不再强制"开始执行"
-      final firstUser = provider.receivedHistories.first
-          .firstWhere((m) => m.role == 'user');
+      final firstUser =
+          provider.receivedHistories.first.firstWhere((m) => m.role == 'user');
       expect(firstUser.content, contains('请先判断意图'));
       expect(firstUser.content, isNot(contains('请分析任务并开始执行')));
       // 第二轮的新问题带独立请求框架，防止被当成上一任务续跑
@@ -756,8 +787,8 @@ void main() {
       await engine.startTask(prompt, executor, isGoalRound: true);
 
       expect(engine.currentTaskIsGoalRound, isTrue);
-      final lastUser = provider.receivedHistories.last
-          .lastWhere((m) => m.role == 'user');
+      final lastUser =
+          provider.receivedHistories.last.lastWhere((m) => m.role == 'user');
       expect(lastUser.content, contains('自动续跑轮'));
       expect(lastUser.content, isNot(contains('独立的新请求')));
     });
@@ -775,7 +806,8 @@ void main() {
       expect(engine.currentTask?.status, AgentStatus.completed);
       final history = provider.receivedHistories.last;
       expect(
-        history.any((m) => m.role == 'user' && m.content == '用户补充: 刚才为何用压缩不直接复制'),
+        history
+            .any((m) => m.role == 'user' && m.content == '用户补充: 刚才为何用压缩不直接复制'),
         isTrue,
       );
       expect(

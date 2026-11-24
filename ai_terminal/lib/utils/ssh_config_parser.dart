@@ -286,7 +286,9 @@ HostConfig buildHostConfig({
 }
 
 bool _isConcrete(String pattern) =>
-    !pattern.contains('*') && !pattern.contains('?') && !pattern.startsWith('!');
+    !pattern.contains('*') &&
+    !pattern.contains('?') &&
+    !pattern.startsWith('!');
 
 /// ssh_config 的 glob：`*` 任意串，`?` 单字符
 bool _patternMatches(String pattern, String alias) {

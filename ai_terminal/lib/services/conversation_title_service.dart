@@ -136,8 +136,7 @@ class ConversationTitleService {
       reasoningLabel: '',
     );
     final prompt = _buildPrompt(userText, assistantText);
-    const systemPrompt =
-        '你是会话命名助手，只输出标题文本本身，不要解释、不要引号、不要换行。';
+    const systemPrompt = '你是会话命名助手，只输出标题文本本身，不要解释、不要引号、不要换行。';
     try {
       final stream = await provider.chatStream(
         history: const [],
@@ -207,8 +206,7 @@ class ConversationTitleService {
       if (text.length >= open.length + close.length &&
           text.startsWith(open) &&
           text.endsWith(close)) {
-        text =
-            text.substring(open.length, text.length - close.length).trim();
+        text = text.substring(open.length, text.length - close.length).trim();
       }
     }
     // 4) 去「标题：」类前缀

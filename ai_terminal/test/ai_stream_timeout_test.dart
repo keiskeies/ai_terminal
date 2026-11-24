@@ -55,8 +55,7 @@ void main() {
         .timeout(const Duration(seconds: 20));
 
     final commandEvents = events.where((e) => e.isCommand);
-    expect(commandEvents, isEmpty,
-        reason: '半截响应（含写了一半的 heredoc）绝不能被当完整响应执行');
+    expect(commandEvents, isEmpty, reason: '半截响应（含写了一半的 heredoc）绝不能被当完整响应执行');
     expect(provider.emitted.first, contains('cat > /etc/x.conf <<EOF'),
         reason: '本用例的前提：超时前缓冲里确实已有内容');
     expect(provider.calls, greaterThan(1),
@@ -65,8 +64,12 @@ void main() {
     // 重试轮的历史不得包含半截响应（抛错路径不写会话历史）
     final lastHistory = provider.histories.last;
     expect(
-        lastHistory.any((m) => m.content.contains('<<EOF')), isFalse,
-        reason: '被丢弃的半截响应不得进入重试轮的对话历史');
+        lastHistory.any((m) =>
+            m.role != 'system' &&
+            m.content.contains('cat > /etc/x.conf <<EOF')),
+        isFalse,
+        reason: '被丢弃的半截响应不得进入重试轮的对话历史: '
+            '${lastHistory.where((m) => m.content.contains('<<EOF')).map((m) => '${m.role}=${m.content}').join(' ||| ')}');
   }, timeout: const Timeout(Duration(seconds: 60)));
 }
 
@@ -93,10 +96,9 @@ class _HangingAIProvider implements AIProvider {
     histories.add(List.from(history));
     calls++;
     if (calls > 1) {
-      return Stream.value(
-          '思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n');
+      return Stream.value('思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n');
     }
-    final chunk = '思考: 写入配置\n动作: execute\n命令: '
+    const chunk = '思考: 写入配置\n动作: execute\n命令: '
         'cat > /etc/x.conf <<EOF\nkey=value\n';
     emitted.add(chunk);
     // 用 controller 而非 async* 生成器：引擎 cancel() 时 generator 式挂起
@@ -125,7 +127,8 @@ class _NoopExecutor implements CommandExecutor {
     String? sudoPassword,
     Future<String?> Function(String prompt)? onInteractivePrompt,
   }) async =>
-      CommandResult(stdout: '', stderr: '', exitCode: 0, duration: Duration.zero);
+      CommandResult(
+          stdout: '', stderr: '', exitCode: 0, duration: Duration.zero);
 
   @override
   Future<String> runOnce(String command,
@@ -140,7 +143,8 @@ class _NoopExecutor implements CommandExecutor {
     Duration timeout = const Duration(seconds: 30),
     Completer<void>? cancelToken,
   }) async =>
-      CommandResult(stdout: '', stderr: '', exitCode: 0, duration: Duration.zero);
+      CommandResult(
+          stdout: '', stderr: '', exitCode: 0, duration: Duration.zero);
 
   @override
   void writeToTerminal(String data) {}

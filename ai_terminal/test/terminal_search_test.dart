@@ -89,8 +89,7 @@ void main() {
     test('maxMatches 封顶', () {
       final terminal = xterm.Terminal();
       terminal.write('x\r\nx\r\nx\r\n');
-      final matches =
-          searchTerminalBuffer(terminal.buffer, 'x', maxMatches: 2);
+      final matches = searchTerminalBuffer(terminal.buffer, 'x', maxMatches: 2);
       expect(matches.length, 2);
     });
 
@@ -102,7 +101,8 @@ void main() {
   });
 
   group('搜索栏 widget 集成', () {
-    Future<void> pumpTerminal(WidgetTester tester, xterm.Terminal terminal) async {
+    Future<void> pumpTerminal(
+        WidgetTester tester, xterm.Terminal terminal) async {
       await tester.pumpWidget(MaterialApp(
         theme: AppTheme.darkTheme,
         home: Scaffold(

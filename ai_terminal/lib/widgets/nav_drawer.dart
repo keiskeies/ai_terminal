@@ -110,12 +110,12 @@ class NavDrawer extends StatefulWidget {
   ///
   /// 用访问器而不是直接读 [titles]：两个表都是 `const`，在表里写
   /// `UiText.t(...)` 会把文案冻在编译时语言上（切语言不刷新）。
-  static String titleOf(String section) => UiText.t(
-      titles[section] ?? '功能', titlesEn[section] ?? 'Features');
+  static String titleOf(String section) =>
+      UiText.t(titles[section] ?? '功能', titlesEn[section] ?? 'Features');
 
   /// 跟随界面语言的分区短标签。
-  static String shortTitleOf(String section) =>
-      UiText.t(shortTitles[section] ?? section, shortTitlesEn[section] ?? section);
+  static String shortTitleOf(String section) => UiText.t(
+      shortTitles[section] ?? section, shortTitlesEn[section] ?? section);
 
   /// 设置搜索索引：组 id → 该组可被搜到的词。
   ///
@@ -139,36 +139,104 @@ class NavDrawer extends StatefulWidget {
       '外观', 'appearance', 'theme', 'font', 'palette',
     ],
     'ai': [
-      '模型', '当前使用的模型', '端点', '接口地址', 'api key',
-      '添加端点', '编辑端点', '删除端点',
-      'model', 'endpoint', 'api', 'key', 'add', 'edit', 'delete',
+      '模型',
+      '当前使用的模型',
+      '端点',
+      '接口地址',
+      'api key',
+      '添加端点',
+      '编辑端点',
+      '删除端点',
+      'model',
+      'endpoint',
+      'api',
+      'key',
+      'add',
+      'edit',
+      'delete',
     ],
     'agent': [
-      '最大执行步数', '步数', '单步响应超时', '超时', '命令超时倍数',
-      '自定义提示词', '提示词',
-      'step', 'steps', 'timeout', 'multiplier', 'prompt', 'system prompt',
+      '最大执行步数',
+      '步数',
+      '单步响应超时',
+      '超时',
+      '命令超时倍数',
+      '自定义提示词',
+      '提示词',
+      'step',
+      'steps',
+      'timeout',
+      'multiplier',
+      'prompt',
+      'system prompt',
     ],
     'security': [
-      '应用锁', '生物识别', '面容', '指纹', '凭据存储',
-      '高危命令', '二次确认', '清除本机数据', '清除数据',
-      'app lock', 'biometric', 'face', 'fingerprint', 'credential',
-      'dangerous', 'confirm', 'clear', 'wipe', 'reset',
+      '应用锁',
+      '生物识别',
+      '面容',
+      '指纹',
+      '凭据存储',
+      '高危命令',
+      '二次确认',
+      '清除本机数据',
+      '清除数据',
+      'app lock',
+      'biometric',
+      'face',
+      'fingerprint',
+      'credential',
+      'dangerous',
+      'confirm',
+      'clear',
+      'wipe',
+      'reset',
     ],
     'mcp': [
-      '服务器', '启用', '添加服务器', '工具', 'mcp',
-      'server', 'enable', 'add', 'tool', 'tools',
+      '服务器',
+      '启用',
+      '添加服务器',
+      '工具',
+      'mcp',
+      'server',
+      'enable',
+      'add',
+      'tool',
+      'tools',
     ],
     'web_search': [
-      '联网', '联网搜索', '后端', '返回条数', '搜索',
-      'web', 'search', 'backend', 'provider', 'results',
+      '联网',
+      '联网搜索',
+      '后端',
+      '返回条数',
+      '搜索',
+      'web',
+      'search',
+      'backend',
+      'provider',
+      'results',
     ],
     'knowledge_rules': [
-      '规范', '规则', '添加规则', '内部规范',
-      'rule', 'rules', 'convention', 'add',
+      '规范',
+      '规则',
+      '添加规则',
+      '内部规范',
+      'rule',
+      'rules',
+      'convention',
+      'add',
     ],
     'notification': [
-      '提醒', '任务完成提醒', '什么时候提醒', 'webhook', '通知',
-      'notify', 'notification', 'reminder', 'trigger', 'always', 'failure',
+      '提醒',
+      '任务完成提醒',
+      '什么时候提醒',
+      'webhook',
+      '通知',
+      'notify',
+      'notification',
+      'reminder',
+      'trigger',
+      'always',
+      'failure',
     ],
   };
 
@@ -196,7 +264,8 @@ class NavDrawer extends StatefulWidget {
       ),
       // 设计稿 @keyframes atdp-slide：右侧滑入 24px + 淡入
       transitionBuilder: (context, animation, _, child) {
-        final curved = CurvedAnimation(parent: animation, curve: Curves.easeOut);
+        final curved =
+            CurvedAnimation(parent: animation, curve: Curves.easeOut);
         return FadeTransition(
           opacity: curved,
           child: SlideTransition(
@@ -539,8 +608,8 @@ class _NavDrawerState extends State<NavDrawer> {
     // 直接读 DAO 缓存：新增/编辑回来后 setState 就能刷出新列表，
     // 不依赖打开抽屉那一刻传进来的快照。
     final all = HostsDao.cached;
-    final matched = _filter(all,
-        (h) => '${h.name} ${h.host} ${h.username} ${h.group}');
+    final matched =
+        _filter(all, (h) => '${h.name} ${h.host} ${h.username} ${h.group}');
     // 按 group 分组；LinkedHashMap 保留 DAO 原序
     final grouped = <String, List<HostConfig>>{};
     for (final h in matched) {
@@ -549,8 +618,8 @@ class _NavDrawerState extends State<NavDrawer> {
     return _list([
       _searchField(tc, UiText.t('搜索名称 / IP / 分组', 'Search name / IP / group')),
       const SizedBox(height: 10),
-      _addRow(tc, UiText.t('新增主机', 'New host'),
-          () => _openForm(_FormKind.host)),
+      _addRow(
+          tc, UiText.t('新增主机', 'New host'), () => _openForm(_FormKind.host)),
       const SizedBox(height: 12),
       for (final e in grouped.entries) ...[
         _groupHead(tc, e.key, e.value.length, all.length),
@@ -690,8 +759,10 @@ class _NavDrawerState extends State<NavDrawer> {
                       widget.onRunSnippet!(s);
                     }
                   ),
-                (UiText.t('编辑', 'Edit'),
-                    () => _openForm(_FormKind.snippet, itemId: s.id)),
+                (
+                  UiText.t('编辑', 'Edit'),
+                  () => _openForm(_FormKind.snippet, itemId: s.id)
+                ),
               ]),
             ],
           ),
@@ -707,8 +778,7 @@ class _NavDrawerState extends State<NavDrawer> {
     final matched = _filter(BuiltinRunbookI18n.localizeAll(RunbooksDao.cached),
         (r) => '${r.name} ${r.description ?? ''}');
     return _list([
-      _searchField(
-          tc, UiText.t('搜索名称 / 说明', 'Search name / description')),
+      _searchField(tc, UiText.t('搜索名称 / 说明', 'Search name / description')),
       const SizedBox(height: 10),
       _addRow(tc, UiText.t('新建工作流', 'New runbook'),
           () => _openForm(_FormKind.runbook)),
@@ -740,8 +810,10 @@ class _NavDrawerState extends State<NavDrawer> {
                       widget.onRunRunbook!(rb);
                     }
                   ),
-                (UiText.t('编辑', 'Edit'),
-                    () => _openForm(_FormKind.runbook, itemId: rb.id)),
+                (
+                  UiText.t('编辑', 'Edit'),
+                  () => _openForm(_FormKind.runbook, itemId: rb.id)
+                ),
               ]),
             ],
           ),
@@ -800,8 +872,7 @@ class _NavDrawerState extends State<NavDrawer> {
     showTopSnackBar(
       context,
       SnackBar(
-        content:
-            Text(L10n.str.ut_afa890cf1c(logs.length)),
+        content: Text(L10n.str.ut_afa890cf1c(logs.length)),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -835,9 +906,7 @@ class _NavDrawerState extends State<NavDrawer> {
             tc,
             '$host · $ts'
             '\n${log['safetyLevel'] ?? ''} · '
-            '${(log['executed'] as bool? ?? false)
-                ? UiText.t('已执行', 'executed')
-                : UiText.t('未执行', 'not run')}'),
+            '${(log['executed'] as bool? ?? false) ? UiText.t('已执行', 'executed') : UiText.t('未执行', 'not run')}'),
         if (out.isNotEmpty) _monoBlock(tc, out),
         _cardActions(tc, [
           (
@@ -877,8 +946,7 @@ class _NavDrawerState extends State<NavDrawer> {
       const SizedBox(height: kSettingsGroupGap - kSettingsRowGap),
 
       // 搜索命中为 0 时给空态，而不是把八组全藏掉、屏幕一片空白。
-      if (searching && matched.isEmpty)
-        _settingsEmptyState(tc, query),
+      if (searching && matched.isEmpty) _settingsEmptyState(tc, query),
 
       // 「已修改」：只列偏离默认值的项。全默认时整块不渲染 —— 零占位，
       // 不给一个永远空着的区块。搜索时也不渲染（搜索已经把范围缩小了）。
@@ -1055,8 +1123,7 @@ class _NavDrawerState extends State<NavDrawer> {
             final ctx = _cardKeys[row.groupId]?.currentContext;
             if (ctx == null) return;
             Scrollable.ensureVisible(ctx,
-                duration: const Duration(milliseconds: 220),
-                alignment: 0.1);
+                duration: const Duration(milliseconds: 220), alignment: 0.1);
           });
         },
         child: Container(
@@ -1124,21 +1191,20 @@ class _NavDrawerState extends State<NavDrawer> {
 
     final steps = i('agentMaxSteps', 0);
     if (steps != 0) {
-      rows.add(_ChangedRow('agent',
-          UiText.t('最大执行步数', 'Max steps'), '$steps'));
+      rows.add(_ChangedRow('agent', UiText.t('最大执行步数', 'Max steps'), '$steps'));
     }
 
     final timeout = i('agentAiTimeoutSeconds', 120);
     if (timeout != 120) {
-      rows.add(_ChangedRow(
-          'agent', UiText.t('单步响应超时', 'Timeout'), '${timeout}s'));
+      rows.add(
+          _ChangedRow('agent', UiText.t('单步响应超时', 'Timeout'), '${timeout}s'));
     }
 
-    final multiplier = (SettingsDao.getCached('commandTimeoutMultiplier') as num?)
-        ?.toDouble();
+    final multiplier =
+        (SettingsDao.getCached('commandTimeoutMultiplier') as num?)?.toDouble();
     if (multiplier != null && multiplier != 1.0) {
-      rows.add(_ChangedRow('agent', UiText.t('命令超时倍数', 'Timeout x'),
-          '${multiplier}x'));
+      rows.add(_ChangedRow(
+          'agent', UiText.t('命令超时倍数', 'Timeout x'), '${multiplier}x'));
     }
 
     if (SettingsDao.getCached('appLockEnabled', defaultValue: false) == true) {
@@ -1250,8 +1316,8 @@ class _NavDrawerState extends State<NavDrawer> {
                     });
                     _searchNode.requestFocus();
                   },
-                  child: Icon(Icons.close_rounded,
-                      size: 15, color: tc.textMuted),
+                  child:
+                      Icon(Icons.close_rounded, size: 15, color: tc.textMuted),
                 )
               : null,
           suffixIconConstraints:
@@ -1294,8 +1360,7 @@ class _NavDrawerState extends State<NavDrawer> {
         borderRadius: BorderRadius.circular(rFull),
         border: Border.all(color: tc.border),
       ),
-      child:
-          Text(text, style: TextStyle(fontSize: fMicro, color: tc.textSub)),
+      child: Text(text, style: TextStyle(fontSize: fMicro, color: tc.textSub)),
     );
   }
 
@@ -1516,8 +1581,8 @@ class _IconBox30 extends StatelessWidget {
               border: Border.all(
                   color: hovering ? tc.border : Colors.transparent, width: 1),
             ),
-            child:
-                Icon(icon, size: 15, color: hovering ? tc.textMain : tc.textSub),
+            child: Icon(icon,
+                size: 15, color: hovering ? tc.textMain : tc.textSub),
           ),
         ),
       ),

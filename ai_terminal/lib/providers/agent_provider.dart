@@ -91,6 +91,12 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 正在被某个 tab 启动任务的会话：两个 tab 共享同一会话查看时，必须串行使用
   final Map<String, String> _startingConversations = {};
 
+  /// 每个 scope 当前压缩操作的令牌。旧压缩失败/完成时不能清掉新压缩的锁。
+  final Map<String, Object> _compactTokens = {};
+
+  /// startTask 异步启动窗口的代际令牌，防止旧落盘结果改写新任务。
+  final Map<String, Object> _startTaskTokens = {};
+
   /// 启动窗口内用户已点过停止的 tab。
   /// 此时 state 已显示"运行中"、但 engine.startTask 还没真正执行，
   /// engine.cancelTask() 会因 _currentTask==null 变成 no-op；必须记住意图，
@@ -127,8 +133,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
   AgentNotifier() : super(AgentState()) {
     _loadStoredGoals();
     // 订阅 AgentLogger，将日志写入产生日志时的 hostId 会话（避免多 host 串台）
-    _logUnsubscribe = agentLogger.subscribe(
-        (level, tag, message, timestamp, hostId, conversationId) {
+    _logUnsubscribe = agentLogger
+        .subscribe((level, tag, message, timestamp, hostId, conversationId) {
       // 任务日志优先按任务开始时的会话路由：同 host 多 tab 并行时
       // hostId 相同，只有 conversationId 能区分各自该写哪个会话。
       final effectiveHostId =
@@ -136,12 +142,12 @@ class AgentNotifier extends StateNotifier<AgentState> {
       if (conversationId == null && effectiveHostId == null) return;
       _convService
           .appendAgentLog(
-            effectiveHostId ?? 'local',
-            level: level,
-            tag: tag,
-            message: message,
-            conversationId: conversationId,
-          )
+        effectiveHostId ?? 'local',
+        level: level,
+        tag: tag,
+        message: message,
+        conversationId: conversationId,
+      )
           .catchError((e) {
         debugPrint('[AgentNotifier] 日志写入失败: $e');
       });
@@ -160,14 +166,17 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
   /// 从安全存储加载 sudo 密码并注入到指定 engine
   /// R3: 传入 engine 实例避免 tab 切换后写到错误的 engine
-  void _loadSudoPasswordForHost(String hostId, AgentEngine engine) {
+  void _loadSudoPasswordForHost(
+      String scopeId, String hostId, AgentEngine engine) {
     Future.microtask(() async {
       try {
         final sudoPassword = await CredentialsStore.get(
           hostId: hostId,
           type: 'sudoPassword',
         );
-        engine.setSudoPassword(sudoPassword);
+        if (mounted && identical(_registry.getEngine(scopeId), engine)) {
+          engine.setSudoPassword(sudoPassword);
+        }
       } catch (e) {
         debugPrint('[AgentNotifier] 加载 sudo 密码失败 (hostId=$hostId): $e');
       }
@@ -197,22 +206,28 @@ class AgentNotifier extends StateNotifier<AgentState> {
         // 离开一台服务器时，取消该服务器上**所有** tab 的任务，而不是只取消
         // 当前 tab。同 host 多 tab 允许并行，但用户已经切到另一台机器后，
         // 继续在旧机器上自动执行会变成“背着他动手”（AGENTS.md R3）。
-        final scopesToCancel =
-            _registry.scopesForHost(oldHost).toSet()
-              ..add(oldScopeId);
+        final scopesToCancel = _registry.scopesForHost(oldHost).toSet()
+          ..add(oldScopeId);
         for (final scope in scopesToCancel) {
-          final oldEngine =
-              _registry.getEngine(scope) ?? (scope == oldScopeId ? _engine : null);
-          if (oldEngine != null && oldEngine.isRunning) {
+          final oldEngine = _registry.getEngine(scope) ??
+              (scope == oldScopeId ? _engine : null);
+          if (_isEngineBusy(oldEngine)) {
+            final engine = oldEngine!;
             // R2: 先 flush 流式内容到 content，再清空回调
             // 否则清空回调后 cancelTask 中的 onCompleted 是 null，不会触发 _flushStreamingToContent，
             // _reducer.reset 会直接丢弃 streamingContent，导致切走 tab 时正在流式输出的内容丢失
             _flushStreamingToContent(scope);
             // R2: 先清空回调再 cancel，避免 cancelTask 触发的 onTaskUpdated/onEvent 写到新 tab state
-            _clearEngineCallbacks(oldEngine);
-            oldEngine.cancelTask();
+            _clearEngineCallbacks(engine);
+            engine.cancelTask();
             // 回调已清空，cancelTask 不会再通知 UI；这里主动把该 tab 状态收尾
-            _applyCancelledState(scope, oldEngine);
+            _applyCancelledState(scope, engine);
+          }
+          final compactConvId = _stateForScope(scope)?.conversationId;
+          if (compactConvId != null) {
+            _invalidateCompactForConversation(compactConvId);
+          } else {
+            _compactTokens.remove(scope);
           }
           _reducer.cancelTimer(scope);
           _reducer.reset(scope);
@@ -306,19 +321,31 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
   /// 回调已清空后再 cancel 的兜底收尾：不依赖 engine 回调，直接把该 tab
   /// 的状态置为 cancelled 并结束流式光标，避免切回来看到“仍在运行”。
-  void _applyCancelledState(String scopeId, AgentEngine engine) {
+  bool _applyCancelledState(
+    String scopeId,
+    AgentEngine engine, {
+    String? conversationId,
+  }) {
+    final current = _stateForScope(scopeId);
+    if (current == null ||
+        (conversationId != null && current.conversationId != conversationId)) {
+      return false;
+    }
+    var updatedAssistant = false;
     _updateScopeState(scopeId, (s) {
       final items = [...s.chatItems];
       if (items.isNotEmpty && items.last.role == 'assistant') {
         final lastItem = items.last;
-        final newContent = lastItem.content.isEmpty
-            ? L10n.str.taskCancelled
-            : lastItem.content;
+        final newContent = ConversationService.capAssistantContent(
+            lastItem.content.isEmpty
+                ? L10n.str.taskCancelled
+                : lastItem.content);
         items[items.length - 1] = lastItem.copyWith(
           content: newContent,
           streamingContent: '',
           isStreaming: false,
         );
+        updatedAssistant = true;
         if (lastItem.content != newContent) {
           _persistAssistantCompletion(scopeId, newContent,
               events: lastItem.events);
@@ -333,6 +360,39 @@ class AgentNotifier extends StateNotifier<AgentState> {
         clearError: true,
       );
     });
+    return updatedAssistant;
+  }
+
+  /// startTask 的落盘/系统信息窗口里取消：先确保本轮 assistant 占位有取消
+  /// 正文，再等写链排空。scope 已被关闭时退化为按原 convId 定点写回，避免
+  /// 磁盘留下空白 assistant。
+  Future<void> _cancelStartupTurn(
+    String scopeId,
+    AgentEngine engine, {
+    required String hostId,
+    required String conversationId,
+  }) async {
+    final handled =
+        _applyCancelledState(scopeId, engine, conversationId: conversationId);
+    if (handled) {
+      await _persistDrainFutures[conversationId];
+      return;
+    }
+    try {
+      await _convService.updateLastAssistantContent(
+        hostId,
+        L10n.str.taskCancelled,
+        conversationId: conversationId,
+      );
+    } catch (e) {
+      agentLogger.error('AgentNotifier',
+          '取消占位保存失败 (hostId=$hostId, conv=$conversationId): $e');
+      _updateScopeState(
+          scopeId,
+          (s) => s.conversationId == conversationId
+              ? s.copyWith(error: '${L10n.str.messageSaveFailed}: $e')
+              : s);
+    }
   }
 
   /// 把编排 / 执行权限 / 联网搜索这些引擎级开关同步到当前 engine。
@@ -386,10 +446,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       debugPrint(
           '[AgentNotifier]   msg: role=${m.role} contentLength=${m.content.length} events=${m.events?.length}');
     }
-    final items = conv.messages
-        .where((m) => m.role != 'system')
-        .map((m) => ChatItem.fromConvMessage(m))
-        .toList();
+    final items = _chatItemsFromConversation(conv);
     state = AgentState(
       hostId: hostId,
       conversationId: conv.id,
@@ -444,6 +501,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
     _reducer.reset(scopeId);
     _lastPersistedLen.remove(scopeId);
     _lastPersistedAt.remove(scopeId);
+    _compactTokens.remove(scopeId);
+    _startTaskTokens.remove(scopeId);
     _startingScopes.remove(scopeId);
     _startingConversations.removeWhere((_, owner) => owner == scopeId);
     // 如果移除的是当前活跃 tab，清空引用防止后续操作命中已 disposed 的引擎
@@ -482,7 +541,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
     // 从持久化恢复引擎对话历史和摘要
     _restoreEngineHistory();
     // 从安全存储加载 sudo 密码注入到 engine
-    _loadSudoPasswordForHost(hostId, _engine!);
+    _loadSudoPasswordForHost(scopeId, hostId, _engine!);
   }
 
   /// 加载 fallback AIProvider 和 AIModelConfig
@@ -540,6 +599,21 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
   }
 
+  AgentState? _stateForScope(String scopeId) =>
+      _registry.isActive(scopeId) ? state : _registry.getState(scopeId);
+
+  /// 恢复/刷新 UI 时也收敛 assistant 正文，旧数据库中的超长消息不会在界面
+  /// 上绕过总上限；events 与命令元数据保持原样。
+  List<ChatItem> _chatItemsFromConversation(Conversation conv) {
+    return conv.messages.where((m) => m.role != 'system').map((m) {
+      final item = ChatItem.fromConvMessage(m);
+      return m.isAssistant
+          ? item.copyWith(
+              content: ConversationService.capAssistantContent(m.content))
+          : item;
+    }).toList();
+  }
+
   /// 初始化 Agent。
   ///
   /// 页面首次初始化时可能还没有活跃 tab；此时只保存模型配置，等
@@ -594,7 +668,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
     _restoreEngineHistory();
 
     // 从安全存储加载 sudo 密码注入到 engine
-    _loadSudoPasswordForHost(hostId, _engine!);
+    _loadSudoPasswordForHost(scopeId, hostId, _engine!);
 
     // 重建引擎后同步编排/只读/联网搜索开关，避免状态与引擎不一致
     _syncEngineFlags();
@@ -690,7 +764,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
               if (lastItem.content.length + content.length - lastLen > 2000 &&
                   (lastAt == null ||
                       now.difference(lastAt).inMilliseconds >= 1500)) {
-                final fullContent = lastItem.content + content;
+                final fullContent = ConversationService.capAssistantContent(
+                    lastItem.content + content);
                 _lastPersistedLen[scopeId] = fullContent.length;
                 _persistAssistantCompletion(scopeId, fullContent,
                     events: lastItem.events);
@@ -764,12 +839,16 @@ class AgentNotifier extends StateNotifier<AgentState> {
             items.last.role == 'assistant' &&
             items.last.content.isEmpty) {
           final errorMsg = '⚠️ $error';
-          items[items.length - 1] = ChatItem(
-            role: 'assistant',
+          final lastItem = items.last;
+          items[items.length - 1] = lastItem.copyWith(
             content: errorMsg,
+            streamingContent: '',
             isStreaming: false,
           );
-          _persistAssistantCompletion(scopeId, errorMsg);
+          // 空正文替换必须保留 events/command 等元数据，否则失败前的命令与
+          // 结果证据会从 UI 和持久化历史中一起消失。
+          _persistAssistantCompletion(scopeId, errorMsg,
+              events: lastItem.events);
           return s.copyWith(chatItems: items, error: error);
         }
         return s.copyWith(error: error);
@@ -802,11 +881,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
         final items = [...s.chatItems];
         if (items.isNotEmpty && items.last.role == 'assistant') {
           final lastItem = items.last;
-          items[items.length - 1] = ChatItem(
-            role: 'assistant',
+          items[items.length - 1] = lastItem.copyWith(
             content: lastItem.content,
+            streamingContent: '',
             isStreaming: false,
-            events: lastItem.events,
           );
           // 最后再保存一次（确保 finish 等事件也被持久化）
           _persistAssistantCompletion(scopeId, lastItem.content,
@@ -836,7 +914,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
       final items = [...s.chatItems];
       if (items.isEmpty || items.last.role != 'assistant') return s;
       final lastItem = items.last;
-      final newContent = lastItem.content + streamingContent;
+      final newContent = ConversationService.capAssistantContent(
+          lastItem.content + streamingContent);
       // isStreaming 必须置 false：流式已结束，UI 停止显示"运行中"光标和停止按钮
       // 之前遗漏此字段导致 cancel() 后 UI 仍显示 streaming 状态
       items[items.length - 1] = lastItem.copyWith(
@@ -871,18 +950,18 @@ class AgentNotifier extends StateNotifier<AgentState> {
         ? state.conversationId
         : _registry.getState(scopeId)?.conversationId;
     if (convId == null) {
-      agentLogger.warn('Persist',
-          '跳过 assistant 持久化：scope=$scopeId 尚无会话 id');
+      agentLogger.warn('Persist', '跳过 assistant 持久化：scope=$scopeId 尚无会话 id');
       return;
     }
     final hostId = _registry.getHostId(scopeId) ??
         _registry.getState(scopeId)?.hostId ??
         'local';
+    final boundedContent = ConversationService.capAssistantContent(content);
 
     _lastPersistedAt[scopeId] = DateTime.now();
     _pendingPersist[convId] = (
       hostId: hostId,
-      content: content,
+      content: boundedContent,
       events: events,
     );
     // 已有写入在跑：更新完待写快照即可，当前 drain 循环会取到最新值。
@@ -958,14 +1037,33 @@ class AgentNotifier extends StateNotifier<AgentState> {
       // 同步刷新 engine 的 executor 引用：解决 sudo reboot 后用户重连 SSH
       // 创建新 SSHService 实例，但 ReAct 循环仍持有旧引用导致连续失败的问题。
       engine.setExecutor(executor);
-      if (scopeId == null || !_registry.hasSysInfoFuture(scopeId)) {
-        final future = engine.collectSystemInfo(executor);
-        if (scopeId != null) {
-          _registry.setSysInfoFuture(scopeId, future);
-        }
+      // 新 executor/重连必须刷新系统信息，不能永久复用连接建立时的旧 future。
+      // 同一 scope 的刷新串行化，确保慢的旧探测不会在新探测之后写回陈旧信息。
+      final previous =
+          scopeId == null ? null : _registry.getSysInfoFuture(scopeId);
+      final refreshed = previous == null
+          ? engine.collectSystemInfo(executor)
+          : previous.catchError((Object _) {}).then((_) {
+              // 旧探测结束后引擎可能已因切模型/重建被替换；只允许当前引擎
+              // 接收这次刷新，不能把系统信息写回已废弃的 engine。
+              if (scopeId == null ||
+                  !identical(_registry.getEngine(scopeId), engine)) {
+                return Future<void>.value();
+              }
+              return engine.collectSystemInfo(executor);
+            });
+      final future = refreshed.catchError((Object e) {
+        agentLogger.warn(
+            'AgentNotifier', '刷新系统信息失败 (hostId=$hostId, scope=$scopeId): $e');
+      });
+      if (scopeId != null) {
+        _registry.setSysInfoFuture(scopeId, future);
       }
-      // 连接建立后（重新）加载 sudo 密码，覆盖 host 配置变更后的场景
-      _loadSudoPasswordForHost(hostId, engine);
+      // 连接建立后（重新）加载 sudo 密码，覆盖 host 配置变更后的场景。
+      // 同样以注册表中的当前引擎为准，避免注入已废弃实例。
+      if (scopeId != null && identical(_registry.getEngine(scopeId), engine)) {
+        _loadSudoPasswordForHost(scopeId, hostId, engine);
+      }
     }
   }
 
@@ -1120,8 +1218,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       goal = '${goal.substring(0, 10000)}\n\n${L10n.str.orchInputTruncated}';
     }
 
-    final hostId =
-        _registry.getHostId(scopeId) ?? state.hostId ?? 'local';
+    final hostId = _registry.getHostId(scopeId) ?? state.hostId ?? 'local';
     _reducer.cancelTimer(scopeId);
     _reducer.reset(scopeId);
     // 确保日志路由到正确的 host（startTask 可能从非 UI 线程触发）
@@ -1132,8 +1229,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
       state = state.copyWith(error: 'Agent 正在执行任务，请等待完成');
       return;
     }
-    // 清掉上一次启动窗口遗留的取消请求
+    // 清掉上一次启动窗口遗留的取消请求，并为本次异步启动建立代际。
     _cancelRequestedScopes.remove(scopeId);
+    final startToken = Object();
+    _startTaskTokens[scopeId] = startToken;
     String? claimedConversation;
     try {
       // 会话冲突处理：同一服务器的另一个 tab 若正**执行**在同一会话上，
@@ -1141,8 +1240,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
       // 如果只是空闲 tab 也在看这个会话，可以继续使用；启动前先按磁盘
       // 最新内容刷新状态和引擎历史，避免拿着旧上下文接话。
       var convId = state.conversationId;
-      final needsNewConversation = convId == null ||
-          _isConversationBusyInOtherScope(scopeId, convId);
+      final needsNewConversation =
+          convId == null || _isConversationBusyInOtherScope(scopeId, convId);
       if (needsNewConversation) {
         try {
           final conv = _convService.createSession(hostId: hostId);
@@ -1160,9 +1259,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
         _reducer.reset(scopeId);
         _lastPersistedLen[scopeId] = 0;
         // 新会话不复用旧会话的聊天记录；保留编排/只读/联网搜索等会话级开关
-        final oldState = _registry.isActive(scopeId)
-            ? state
-            : _registry.getState(scopeId);
+        final oldState =
+            _registry.isActive(scopeId) ? state : _registry.getState(scopeId);
         _updateScopeState(
           scopeId,
           (s) => AgentState(
@@ -1189,107 +1287,136 @@ class AgentNotifier extends StateNotifier<AgentState> {
       _startingConversations[convId] = scopeId;
       claimedConversation = convId;
 
-      // 持久化用户消息 + assistant 占位（原子写入，消除两次 save 之间的崩溃窗口）
-      try {
-        await _convService.appendMessagePair(
-          hostId,
-          userContent: goal,
-          assistantContent: '',
-          conversationId: convId,
-        );
-      } catch (e) {
-        // R8: 持久化失败必须告知用户，不能静默吞掉后继续启动引擎制造假象
-        agentLogger.error('AgentNotifier', '持久化消息失败: $e');
-        _updateScopeState(
-          scopeId,
-          (s) => s.copyWith(error: '${L10n.str.messageSaveFailed}: $e'),
-        );
-        return;
-      }
-
-      // 用户在落盘窗口内点过停止：engine 还没有 _currentTask，
-      // cancelTask 无法生效，这里按取消收尾并放弃启动。
-      if (_cancelRequestedScopes.remove(scopeId)) {
-        _applyCancelledState(scopeId, engine);
-        return;
-      }
-
-      // R1: await 期间用户可能切换 tab / 更换引擎。任务必须继续在发起它的
-      // scope 上执行；但若已切到另一台服务器，switchTab 已经取消了这个引擎，
-      // 不再启动一个后台任务。
-      if (_registry.getEngine(scopeId) != engine) return;
-      final activeScope = _registry.activeScopeId;
-      final activeHost =
-          activeScope == null ? null : _registry.getHostId(activeScope);
-      if (activeHost != null && activeHost != hostId) {
-        // 已离开这台机器：保留用户消息 + 取消占位，不启动后台任务
-        _updateScopeState(
-          scopeId,
-          (s) => s.copyWith(
-            hostId: hostId,
-            conversationId: convId,
-            chatItems: [
-              ...s.chatItems,
-              ChatItem(role: 'user', content: goal),
-              ChatItem(
-                  role: 'assistant',
-                  content: L10n.str.taskCancelled,
-                  isStreaming: false),
-            ],
-            clearError: true,
-          ),
-        );
-        _persistAssistantCompletion(scopeId, L10n.str.taskCancelled);
-        return;
-      }
-
-      // 添加用户消息 + AI 占位到该 tab 的 chatItems
+      // 持久化用户消息 + assistant 占位（原子写入，消除两次 save 之间的崩溃窗口）。
+      // appendMessagePair 在首个 await 前已同步追加内存对象；UI 必须同步拆分，
+      // 否则用户在落盘窗口点停止时，磁盘有本轮消息而 UI 仍停在上一轮。
+      final appendFuture = _convService.appendMessagePair(
+        hostId,
+        userContent: goal,
+        assistantContent: '',
+        conversationId: convId,
+      );
+      final userItem = ChatItem(role: 'user', content: goal);
+      final assistantItem =
+          ChatItem(role: 'assistant', content: '', isStreaming: true);
       _updateScopeState(
         scopeId,
         (s) => s.copyWith(
           status: AgentStatus.thinking,
           hostId: hostId,
           conversationId: convId,
-          chatItems: [
-            ...s.chatItems,
-            ChatItem(role: 'user', content: goal),
-            ChatItem(role: 'assistant', content: '', isStreaming: true),
-          ],
+          chatItems: [...s.chatItems, userItem, assistantItem],
           currentTask: null,
           clearError: true,
         ),
       );
-      // 重置该 tab 的持久化长度计数器（新 assistant 消息从 0 开始累积）
+      // 新 assistant 占位从 0 开始累积（与 startTask 一致）
       _lastPersistedLen[scopeId] = 0;
+
+      try {
+        await appendFuture;
+      } catch (e) {
+        // R8: 持久化失败必须告知用户，不能静默吞掉后继续启动引擎制造假象。
+        // UI 也只移除本轮两个对象身份，避免误删 await 期间并发追加的消息；
+        // 同时退出 thinking、清掉 reducer/启动代际，让用户修正后可立即重试。
+        agentLogger.error('AgentNotifier', '持久化消息失败: $e');
+        if (identical(_startTaskTokens[scopeId], startToken) &&
+            identical(_registry.getEngine(scopeId), engine) &&
+            (_registry.getHostId(scopeId) ?? 'local') == hostId &&
+            _stateForScope(scopeId)?.conversationId == convId) {
+          _reducer.cancelTimer(scopeId);
+          _reducer.reset(scopeId);
+          _lastPersistedLen[scopeId] = 0;
+          _updateScopeState(scopeId, (s) {
+            final items = s.chatItems
+                .where((item) =>
+                    !identical(item, userItem) &&
+                    !identical(item, assistantItem))
+                .toList();
+            return s.copyWith(
+              status: _uiTerminationGuard.resolveUiStatus(AgentStatus.failed),
+              chatItems: items,
+              error: '${L10n.str.messageSaveFailed}: $e',
+              clearPendingConfirm: true,
+              clearPendingOptions: true,
+            );
+          });
+        }
+        return;
+      }
+
+      // await 跨启动边界：旧任务不得继续消费取消意图或启动引擎。
+      if (!identical(_startTaskTokens[scopeId], startToken)) {
+        await _cancelStartupTurn(scopeId, engine,
+            hostId: hostId, conversationId: convId);
+        return;
+      }
+
+      // 用户在落盘窗口内点过停止：engine 还没有 _currentTask，
+      // cancelTask 无法生效，这里按取消收尾并放弃启动。
+      if (_cancelRequestedScopes.remove(scopeId)) {
+        await _cancelStartupTurn(scopeId, engine,
+            hostId: hostId, conversationId: convId);
+        return;
+      }
+
+      // R1: await 期间用户可能切换 tab / 更换引擎。任务必须继续在发起它的
+      // scope 上执行；但若已切到另一台服务器，switchTab 已经取消了这个引擎，
+      // 不再启动一个后台任务。所有放弃启动的路径都要固化取消占位。
+      if (_registry.getEngine(scopeId) != engine) {
+        await _cancelStartupTurn(scopeId, engine,
+            hostId: hostId, conversationId: convId);
+        return;
+      }
+      final activeScope = _registry.activeScopeId;
+      final activeHost =
+          activeScope == null ? null : _registry.getHostId(activeScope);
+      if (activeHost != null && activeHost != hostId) {
+        await _cancelStartupTurn(scopeId, engine,
+            hostId: hostId, conversationId: convId);
+        return;
+      }
 
       // 如果系统信息还没收集，先收集再开始任务，避免命令混在一起
       if (executor != null && !_registry.hasSysInfoFuture(scopeId)) {
-        _registry.setSysInfoFuture(
-            scopeId, engine.collectSystemInfo(executor));
+        _registry.setSysInfoFuture(scopeId, engine.collectSystemInfo(executor));
       }
       final sysInfoFuture = _registry.getSysInfoFuture(scopeId);
       if (sysInfoFuture != null) {
         await sysInfoFuture;
       }
 
+      // await 跨启动边界：代际、引擎、host 与 conv 必须全部保持原身份。
+      if (!identical(_startTaskTokens[scopeId], startToken) ||
+          !identical(_registry.getEngine(scopeId), engine) ||
+          (_registry.getHostId(scopeId) ?? 'local') != hostId ||
+          _stateForScope(scopeId)?.conversationId != convId ||
+          engine.conversationId != convId) {
+        await _cancelStartupTurn(scopeId, engine,
+            hostId: hostId, conversationId: convId);
+        return;
+      }
+
       // 系统信息收集期间用户点了停止
       if (_cancelRequestedScopes.remove(scopeId)) {
-        _applyCancelledState(scopeId, engine);
+        await _cancelStartupTurn(scopeId, engine,
+            hostId: hostId, conversationId: convId);
         return;
       }
 
       // R1: 系统信息收集/切 tab 期间引擎可能已被替换或取消，不能再启动
       if (_registry.getEngine(scopeId) != engine) {
-        _applyCancelledState(scopeId, engine);
+        await _cancelStartupTurn(scopeId, engine,
+            hostId: hostId, conversationId: convId);
         return;
       }
       final activeScopeNow = _registry.activeScopeId;
-      final activeHostNow = activeScopeNow == null
-          ? null
-          : _registry.getHostId(activeScopeNow);
+      final activeHostNow =
+          activeScopeNow == null ? null : _registry.getHostId(activeScopeNow);
       if (activeHostNow != null && activeHostNow != hostId) {
         // 已切到另一台服务器：switchTab 已取消旧 host 的所有引擎
-        _applyCancelledState(scopeId, engine);
+        await _cancelStartupTurn(scopeId, engine,
+            hostId: hostId, conversationId: convId);
         return;
       }
 
@@ -1298,19 +1425,28 @@ class AgentNotifier extends StateNotifier<AgentState> {
       final roundIndex = _bumpConversationRound(convId);
       // /goal 首轮经 _sendToAgent 普通发送进来，没带 isGoalRound 参数：
       // 按续跑提示词前缀兜底识别，否则首轮收尾后不会自动续跑。
-      final goalRound =
-          isGoalRound || goal.startsWith(kGoalContinuationPrefix);
+      final goalRound = isGoalRound || goal.startsWith(kGoalContinuationPrefix);
       final startFuture = engine.startTask(goal, executor,
           roundIndex: roundIndex, isGoalRound: goalRound);
+      final task = engine.currentTask;
       // engine.startTask 同步进入 thinking 状态，之后由 isRunning 接管防重
       _startingScopes.remove(scopeId);
       await startFuture;
 
-      // 任务结束后检查是否需要自动压缩
-      _maybeAutoCompact(scopeId);
+      // 任务结束后只允许本任务仍持有原 host/conv/engine/task 身份时压缩。
+      _maybeAutoCompact(
+        scopeId,
+        hostId: hostId,
+        conversationId: convId,
+        engine: engine,
+        task: task,
+      );
     } finally {
-      _startingScopes.remove(scopeId);
-      _cancelRequestedScopes.remove(scopeId);
+      if (identical(_startTaskTokens[scopeId], startToken)) {
+        _startTaskTokens.remove(scopeId);
+        _startingScopes.remove(scopeId);
+        _cancelRequestedScopes.remove(scopeId);
+      }
       if (claimedConversation != null &&
           _startingConversations[claimedConversation] == scopeId) {
         _startingConversations.remove(claimedConversation);
@@ -1348,8 +1484,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
     // 保证持久化内容与下一轮注入内容完全一致
     var normalized = trimmed;
     if (normalized.length > AgentEngine.maxSteeringChars) {
-      normalized = normalized.substring(
-          normalized.length - AgentEngine.maxSteeringChars);
+      normalized = normalized
+          .substring(normalized.length - AgentEngine.maxSteeringChars);
     }
     final content = '用户补充: $normalized';
 
@@ -1360,9 +1496,48 @@ class AgentNotifier extends StateNotifier<AgentState> {
             : _registry.getState(scopeId)?.conversationId) ??
         engine.conversationId;
     if (convId == null) {
-      _updateScopeState(
-          scopeId, (s) => s.copyWith(error: '${L10n.str.messageSaveFailed}: 无会话 id'));
+      _updateScopeState(scopeId,
+          (s) => s.copyWith(error: '${L10n.str.messageSaveFailed}: 无会话 id'));
       return;
+    }
+    final taskId = engine.currentTask?.id;
+    final taskGeneration = engine.taskGeneration;
+    bool isCurrentSteeringContext() {
+      final currentEngine = _registry.getEngine(scopeId) ??
+          (scopeId == _registry.activeScopeId ? _engine : null);
+      final currentConvId = _registry.isActive(scopeId)
+          ? state.conversationId
+          : _registry.getState(scopeId)?.conversationId;
+      return mounted &&
+          identical(currentEngine, engine) &&
+          engine.taskGeneration == taskGeneration &&
+          identical(engine.currentTask?.id, taskId) &&
+          engine.isRunning &&
+          currentConvId == convId;
+    }
+
+    void rollbackSteeringPlaceholders(ChatItem user) {
+      _updateScopeState(scopeId, (s) {
+        final items = [...s.chatItems];
+        if (items.length < 2 ||
+            !identical(items[items.length - 2], user) ||
+            items.last.role != 'assistant') {
+          return s;
+        }
+        final currentPlaceholder = items.removeLast();
+        items.removeLast();
+        if (items.isNotEmpty && items.last.role == 'assistant') {
+          final old = items.last;
+          items[items.length - 1] = old.copyWith(
+            content: old.content +
+                currentPlaceholder.content +
+                currentPlaceholder.streamingContent,
+            events: [...old.events, ...currentPlaceholder.events],
+            isStreaming: isCurrentSteeringContext(),
+          );
+        }
+        return s.copyWith(chatItems: items);
+      });
     }
 
     // 1) 固化当前流式内容与事件并等待落盘：追加补充消息前，
@@ -1377,6 +1552,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       await _persistAssistantCompletion(scopeId, itemsBefore.last.content,
           events: itemsBefore.last.events);
     }
+    if (!isCurrentSteeringContext()) return;
 
     // 2) 原子追加 user 补充 + 新 assistant 占位（与 startTask 同路径）。
     //    appendMessagePair 的同步部分在首个 await 前完成内存追加，紧接着
@@ -1389,14 +1565,17 @@ class AgentNotifier extends StateNotifier<AgentState> {
       assistantContent: '',
       conversationId: convId,
     );
+    final steeringUser = ChatItem(role: 'user', content: content);
+    final steeringPlaceholder =
+        ChatItem(role: 'assistant', content: '', isStreaming: true);
     _updateScopeState(scopeId, (s) {
       final items = [...s.chatItems];
       if (items.isNotEmpty && items.last.role == 'assistant') {
         items[items.length - 1] =
             items.last.copyWith(streamingContent: '', isStreaming: false);
       }
-      items.add(ChatItem(role: 'user', content: content));
-      items.add(ChatItem(role: 'assistant', content: '', isStreaming: true));
+      items.add(steeringUser);
+      items.add(steeringPlaceholder);
       return s.copyWith(chatItems: items, clearError: true);
     });
     // 新 assistant 占位从 0 开始累积（与 startTask 一致）
@@ -1407,27 +1586,32 @@ class AgentNotifier extends StateNotifier<AgentState> {
     } catch (e) {
       // R8: 持久化失败必须 surface；回滚 UI 拆分且不入队引擎，
       // 避免「内存已注入、磁盘没有」的假象
-      agentLogger.error('AgentNotifier',
-          '补充指令持久化失败 (hostId=$hostId, conv=$convId): $e');
+      agentLogger.error(
+          'AgentNotifier', '补充指令持久化失败 (hostId=$hostId, conv=$convId): $e');
+      rollbackSteeringPlaceholders(steeringUser);
+      if (isCurrentSteeringContext()) {
+        _updateScopeState(scopeId,
+            (s) => s.copyWith(error: '${L10n.str.messageSaveFailed}: $e'));
+      }
+      return;
+    }
+    if (!isCurrentSteeringContext()) {
+      // 消息已落盘，回滚 UI 反而会造成磁盘与界面不一致；只结束占位并禁止注入新任务。
       _updateScopeState(scopeId, (s) {
         final items = [...s.chatItems];
-        if (items.length >= 2 &&
-            items[items.length - 2].role == 'user' &&
-            items[items.length - 2].content == content &&
-            items.last.role == 'assistant') {
-          final placeholder = items.removeLast();
-          items.removeLast();
-          if (items.isNotEmpty && items.last.role == 'assistant') {
-            final old = items.last;
-            items[items.length - 1] = old.copyWith(
-              content: old.content + placeholder.content,
-              events: [...old.events, ...placeholder.events],
-              isStreaming: true,
-            );
-          }
+        if (items.length < 2 ||
+            !identical(items[items.length - 2], steeringUser) ||
+            items.last.role != 'assistant') {
+          return s;
         }
-        return s.copyWith(
-            chatItems: items, error: '${L10n.str.messageSaveFailed}: $e');
+        final currentPlaceholder = items.last;
+        items[items.length - 1] = currentPlaceholder.copyWith(
+          content:
+              currentPlaceholder.content + currentPlaceholder.streamingContent,
+          streamingContent: '',
+          isStreaming: false,
+        );
+        return s.copyWith(chatItems: items);
       });
       return;
     }
@@ -1450,8 +1634,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
   }
 
   /// 指定会话是否正被其他 tab **执行中**（含启动中的异步窗口）。
-  bool _isConversationBusyInOtherScope(
-      String scopeId, String conversationId) {
+  bool _isConversationBusyInOtherScope(String scopeId, String conversationId) {
     final starter = _startingConversations[conversationId];
     if (starter != null && starter != scopeId) return true;
     final activeScope = _registry.activeScopeId;
@@ -1463,9 +1646,8 @@ class AgentNotifier extends StateNotifier<AgentState> {
       if (otherConv != conversationId) continue;
       final otherEngine = _registry.getEngine(otherScope);
       if (_isEngineBusy(otherEngine)) return true;
-      final otherState = otherScope == activeScope
-          ? state
-          : _registry.getState(otherScope);
+      final otherState =
+          otherScope == activeScope ? state : _registry.getState(otherScope);
       if (_isStateBusy(otherState)) return true;
     }
     return false;
@@ -1476,10 +1658,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
   void _reloadScopeFromConversation(String scopeId, String conversationId) {
     final conv = ConversationsDao.getCachedById(conversationId);
     if (conv == null) return;
-    final items = conv.messages
-        .where((m) => m.role != 'system')
-        .map((m) => ChatItem.fromConvMessage(m))
-        .toList();
+    final items = _chatItemsFromConversation(conv);
     final effectiveSummary = conv.rollingSummary ?? conv.summary;
     final hasSummary = effectiveSummary != null && effectiveSummary.isNotEmpty;
     _updateScopeState(
@@ -1568,10 +1747,32 @@ class AgentNotifier extends StateNotifier<AgentState> {
       return;
     }
     final executor = _registry.getScopeExecutor(scopeId) ?? _executor;
-    await engine.resumeTask(executor);
-    // 任务结束后检查是否需要自动压缩（引擎可能已被模型切换替换）
-    if (_registry.getEngine(scopeId) == engine) {
-      _maybeAutoCompact(scopeId);
+    final hostId = _registry.getHostId(scopeId) ?? state.hostId ?? 'local';
+    final convId =
+        _stateForScope(scopeId)?.conversationId ?? engine.conversationId;
+    final pausedTask = engine.currentTask;
+    final resumeFuture = engine.resumeTask(executor);
+    final resumedTask = engine.currentTask;
+    await resumeFuture;
+    // 任务结束后检查是否需要自动压缩。必须仍持有发起恢复时的 host/conv/
+    // engine/task 身份；resume 未真正启动（如连接断开）也不能压缩。
+    if (convId != null &&
+        resumedTask != null &&
+        !identical(resumedTask, pausedTask) &&
+        _isTaskContextCurrent(
+          scopeId,
+          hostId: hostId,
+          conversationId: convId,
+          engine: engine,
+          task: resumedTask,
+        )) {
+      _maybeAutoCompact(
+        scopeId,
+        hostId: hostId,
+        conversationId: convId,
+        engine: engine,
+        task: resumedTask,
+      );
     }
   }
 
@@ -1622,23 +1823,42 @@ class AgentNotifier extends StateNotifier<AgentState> {
             ));
   }
 
+  /// 立即使该会话所有进行中的压缩失效，并清掉对应 UI 锁。
+  /// 内容 mutation epoch 仍负责阻止旧压缩写盘；这里负责 provider 令牌与横幅。
+  void _invalidateCompactForConversation(String conversationId) {
+    for (final scopeId in _compactTokens.keys.toList()) {
+      if (_stateForScope(scopeId)?.conversationId != conversationId) continue;
+      _compactTokens.remove(scopeId);
+      _updateScopeState(scopeId, (s) => s.copyWith(isCompacting: false));
+    }
+  }
+
   /// 清空消息（同时清除引擎对话历史 + 持久化）
   Future<void> clearMessages() async {
-    final activeScope = _registry.activeScopeId;
-    if (_engine?.isRunning == true ||
-        (activeScope != null && _startingScopes.contains(activeScope))) {
+    final scopeId = _registry.activeScopeId;
+    final active = _activeEngine();
+    if (_isEngineBusy(active.engine) ||
+        _isStateBusy(state) ||
+        (scopeId != null && _startingScopes.contains(scopeId))) {
       state = state.copyWith(error: 'Agent 正在执行任务，请先停止后再清空会话');
       return;
     }
-    _engine?.clearHistory();
     final convId = state.conversationId;
+    if (convId != null) _invalidateCompactForConversation(convId);
+    active.engine?.clearHistory();
     state = state.copyWith(chatItems: [], clearSummary: true);
     if (convId != null) {
       try {
         await _convService.clearMessages(convId);
       } catch (e) {
         agentLogger.error('AgentNotifier', '清空持久化消息失败: $e');
-        state = state.copyWith(error: '${L10n.str.clearMessagesFailed}: $e');
+        if (mounted && scopeId != null && _registry.activeScopeId == scopeId) {
+          _updateScopeState(
+              scopeId,
+              (s) => s.conversationId == convId
+                  ? s.copyWith(error: '${L10n.str.clearMessagesFailed}: $e')
+                  : s);
+        }
       }
     }
   }
@@ -1741,8 +1961,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       state = state.copyWith(error: 'Agent 正在执行任务，请先停止后再新建会话');
       return;
     }
-    final hostId =
-        _registry.getHostId(scopeId) ?? state.hostId ?? 'local';
+    final hostId = _registry.getHostId(scopeId) ?? state.hostId ?? 'local';
     _engine?.clearHistory();
     final conv = _convService.createSession(hostId: hostId);
     _engine?.conversationId = conv.id;
@@ -1777,8 +1996,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
   Future<void> switchSession(String conversationId) async {
     final scopeId = _registry.activeScopeId;
     if (scopeId == null) return;
-    final hostId =
-        _registry.getHostId(scopeId) ?? state.hostId ?? 'local';
+    final hostId = _registry.getHostId(scopeId) ?? state.hostId ?? 'local';
     // 本 tab 自己的启动窗口内不能切会话
     if (_startingScopes.contains(scopeId)) {
       state = state.copyWith(error: 'Agent 正在启动任务，请稍后再切换会话');
@@ -1790,13 +2008,47 @@ class AgentNotifier extends StateNotifier<AgentState> {
       state = state.copyWith(error: '该会话正在另一个标签中执行，请先切回那个标签');
       return;
     }
+    // 先落库 active 选择：失败时保持原会话不动（不取消任务、不清 UI），
+    // 不能把持久化写入当成"必然成功"继续切。
+    final previousConversationId =
+        _stateForScope(scopeId)?.conversationId ?? _engine?.conversationId;
+    // 旧会话可能刚被删除：回滚 setActive 前必须确认它仍存在，否则会把
+    // DB active 指回一个墓碑会话。
+    final previousConversationExists = previousConversationId != null &&
+        ConversationsDao.getCachedById(previousConversationId) != null;
+    try {
+      await _convService.setActive(hostId, conversationId);
+    } catch (e) {
+      agentLogger.error('AgentNotifier', '切换会话失败 ($conversationId): $e');
+      if (mounted && _registry.isActive(scopeId)) {
+        _updateScopeState(scopeId,
+            (s) => s.copyWith(error: '${L10n.str.messageSaveFailed}: $e'));
+      }
+      return;
+    }
+    // 等待落库期间用户可能切走 tab；后面的写入都假定本 tab 仍是活跃 scope。
+    // 此时 DB 的 active 已被改成新会话，但本 tab 已不显示它——回滚落库，
+    // 否则“数据库 active ≠ 界面会话”，下次恢复会载入用户没选的会话。
+    if (!mounted || !_registry.isActive(scopeId)) {
+      if (previousConversationId != null &&
+          previousConversationExists &&
+          previousConversationId != conversationId &&
+          _convService.getActiveSession(hostId)?.id == conversationId) {
+        try {
+          await _convService.setActive(hostId, previousConversationId);
+        } catch (e) {
+          agentLogger.error(
+              'AgentNotifier', '切换被抢先后回滚 active 失败 (hostId=$hostId): $e');
+        }
+      }
+      return;
+    }
     // 先保存当前流式内容到旧会话（cancelTask 后引擎退出，不再有 onCompleted 触发保存）
     _flushStreamingToContent(scopeId);
     // L7 修复：取消当前任务 + 重置 reducer，避免旧任务的事件/流式内容串台到新会话
     _engine?.cancelTask();
     _reducer.cancelTimer(scopeId);
     _reducer.reset(scopeId);
-    _convService.setActive(hostId, conversationId);
     _restoreFromPersistence(scopeId, hostId, startFresh: false);
     // 从持久化恢复引擎对话历史（不含已摘要的消息，那些已压缩为 summary）
     _restoreEngineHistory();
@@ -1811,13 +2063,66 @@ class AgentNotifier extends StateNotifier<AgentState> {
 
   /// 删除会话
   Future<void> deleteSession(String conversationId) async {
-    await _convService.delete(conversationId);
+    final activeScope = _registry.activeScopeId;
+    final scopes = <String>{
+      ..._registry.scopeIds,
+      if (activeScope != null) activeScope,
+    };
+    final usingScopes = scopes.where((scopeId) {
+      final stateConvId = _stateForScope(scopeId)?.conversationId;
+      final engine = _registry.getEngine(scopeId) ??
+          (scopeId == activeScope ? _engine : null);
+      // state 是 UI 真相，engine.conversationId 是任务写入真相；任一匹配都不能删。
+      return stateConvId == conversationId ||
+          engine?.conversationId == conversationId;
+    }).toList();
+
+    String? rejection;
+    if (_startingConversations.containsKey(conversationId) ||
+        _persistingConversations.contains(conversationId) ||
+        _persistDrainFutures.containsKey(conversationId)) {
+      rejection = '该会话正在启动或保存消息，请等待完成后再删除';
+    } else {
+      for (final scopeId in usingScopes) {
+        if (isRunningFor(scopeId)) {
+          rejection = '该会话正在执行任务，请先停止并保存后再删除';
+          break;
+        }
+        if (scopeId != activeScope) {
+          rejection = '该会话正在其他标签中查看，请先切换那个标签后再删除';
+          break;
+        }
+      }
+    }
+    if (rejection != null) {
+      agentLogger.warn('AgentNotifier', '拒绝删除会话 $conversationId: $rejection');
+      if (activeScope != null) {
+        _updateScopeState(activeScope, (s) => s.copyWith(error: rejection));
+      }
+      return;
+    }
+
+    try {
+      await _convService.delete(conversationId);
+    } catch (e) {
+      agentLogger.error('AgentNotifier', '删除会话失败 ($conversationId): $e');
+      if (mounted && activeScope != null) {
+        _updateScopeState(
+            activeScope,
+            (s) => s.conversationId == conversationId
+                ? s.copyWith(error: '${L10n.str.messageSaveFailed}: $e')
+                : s);
+      }
+      return;
+    }
     // 如果删除的是当前会话，切到最近的会话或新建
-    if (state.conversationId == conversationId) {
+    if (mounted &&
+        activeScope != null &&
+        _registry.activeScopeId == activeScope &&
+        state.conversationId == conversationId) {
       final scopeId = _registry.activeScopeId;
       if (scopeId != null) {
-        final hostId =
-            _registry.getHostId(scopeId) ?? state.hostId ?? 'local';
+        final hostId = _registry.getHostId(scopeId) ?? state.hostId ?? 'local';
         final sessions = _convService.listSessions(hostId);
         if (sessions.isEmpty) {
           await newSession();
@@ -1848,6 +2153,36 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// hostId → 目标。`AgentState.goal` 是它的 UI 镜像；所有变更都经 [_setGoal]
   /// 同时写存储与刷状态，避免两份真相各自漂移。
   final Map<String, AgentGoal> _goals = {};
+
+  /// 同一 host 的目标写盘串行化，避免同步 UI 连续变更时旧快照晚落盘覆盖新状态。
+  /// static：应用退出时 [DbInit.close] 可在拿不到 notifier 实例的情况下等待落盘。
+  static final Map<String, Future<void>> _goalPersistChains = {};
+
+  /// 等待所有目标写盘链结束（仅用于退出关库前的兜底）。
+  static Future<void> waitForPendingGoalWrites({
+    Duration budget = const Duration(seconds: 2),
+  }) async {
+    // 写链可能继续派生新链（一次变更触发一次），有界循环避免关库被拖死。
+    // 整体预算：单条 SettingsDao.set 挂死时不能让退出流程无限等待。
+    final deadline = DateTime.now().add(budget);
+    for (var i = 0; i < 20 && _goalPersistChains.isNotEmpty; i++) {
+      final remaining = deadline.difference(DateTime.now());
+      if (remaining <= Duration.zero) {
+        agentLogger.warn(
+            'AgentNotifier', '目标写盘等待超时，仍有 ${_goalPersistChains.length} 条未落盘');
+        return;
+      }
+      final pending = _goalPersistChains.values.toList();
+      try {
+        await Future.wait(pending.map((f) => f.catchError((Object _) {})))
+            .timeout(remaining);
+      } on TimeoutException {
+        agentLogger.warn(
+            'AgentNotifier', '目标写盘等待超时，仍有 ${_goalPersistChains.length} 条未落盘');
+        return;
+      }
+    }
+  }
 
   /// 已为哪个终局任务发起过续跑。取消与异常可能连着发出两个 finish 事件，
   /// 不去重就会在一次结束后起两个任务。
@@ -1901,23 +2236,44 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 只读取，不改状态——供命令回显与测试用
   AgentGoal? goalFor(String hostId) => _goals[hostId];
 
-  void _setGoal(String hostId, AgentGoal? goal) {
+  Future<void> _setGoal(String hostId, AgentGoal? goal) async {
     if (goal == null) {
       _goals.remove(hostId);
     } else {
       _goals[hostId] = goal;
-    }
-    try {
-      // 空串代表"没有目标"：读侧 AgentGoal.fromJson 会把它当无效数据丢弃
-      SettingsDao.set(_goalKey(hostId), goal?.toJson() ?? '');
-    } catch (e) {
-      debugPrint('[AgentNotifier] 目标存盘失败 (hostId=$hostId): $e');
     }
     _updateStatesForHost(
         hostId,
         (s) => goal == null
             ? s.copyWith(clearGoal: true)
             : s.copyWith(goal: goal));
+
+    // 空串代表"没有目标"：读侧 AgentGoal.fromJson 会把它当无效数据丢弃。
+    // 同步调用方无法 await，因此按 host 安全排队；异步错误在队列内捕获并
+    // 显式 surface 到 UI/日志，而不是用同步 try/catch 漏掉 Future 失败。
+    final snapshot = goal?.toJson() ?? '';
+    final previous = _goalPersistChains[hostId] ?? Future<void>.value();
+    final completer = Completer<void>();
+    _goalPersistChains[hostId] = completer.future;
+    completer.future.catchError((Object _) {});
+    previous.catchError((Object _) {}).then((_) async {
+      try {
+        await SettingsDao.set(_goalKey(hostId), snapshot);
+        completer.complete();
+      } catch (e) {
+        agentLogger.error('AgentNotifier', '目标存盘失败 (hostId=$hostId): $e');
+        if (mounted && identical(_goals[hostId], goal)) {
+          _updateStatesForHost(
+              hostId, (s) => s.copyWith(error: '目标保存失败，重启后可能丢失: $e'));
+        }
+        completer.complete();
+      } finally {
+        if (identical(_goalPersistChains[hostId], completer.future)) {
+          _goalPersistChains.remove(hostId);
+        }
+      }
+    });
+    return completer.future;
   }
 
   /// 创建并激活目标。已有活跃目标时返回 null，由调用方提示，不静默覆盖。
@@ -1935,21 +2291,21 @@ class AgentNotifier extends StateNotifier<AgentState> {
       updatedAt: now,
     );
     _continuedFromTaskId = null;
-    _setGoal(hostId, goal);
+    unawaited(_setGoal(hostId, goal));
     return goal;
   }
 
   bool pauseGoal(String hostId) {
     final goal = _goals[hostId];
     if (goal == null || !goal.isActive) return false;
-    _setGoal(
+    unawaited(_setGoal(
       hostId,
       goal.copyWith(
         status: AgentGoalStatus.paused,
         note: '手动暂停',
         updatedAt: DateTime.now(),
       ),
-    );
+    ));
     return true;
   }
 
@@ -1989,7 +2345,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       noProgressRounds: 0,
       updatedAt: DateTime.now(),
     );
-    _setGoal(hostId, resumed);
+    unawaited(_setGoal(hostId, resumed));
     if (!shouldKickGoalRound(
       goalActive: true,
       isForegroundHost: isForegroundHost,
@@ -2015,28 +2371,30 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final goal = _goals[hostId];
     final text = objective.trim();
     if (goal == null || text.isEmpty) return false;
-    _setGoal(
+    unawaited(_setGoal(
       hostId,
       goal.copyWith(objective: text, updatedAt: DateTime.now()),
-    );
+    ));
     return true;
   }
 
   bool finishGoal(String hostId, {String? note}) {
     final goal = _goals[hostId];
     if (goal == null) return false;
-    _setGoal(
+    unawaited(_setGoal(
       hostId,
       goal.copyWith(
         status: AgentGoalStatus.finished,
         note: note ?? '手动结束',
         updatedAt: DateTime.now(),
       ),
-    );
+    ));
     return true;
   }
 
-  void clearGoal(String hostId) => _setGoal(hostId, null);
+  void clearGoal(String hostId) {
+    unawaited(_setGoal(hostId, null));
+  }
 
   static int _clampMaxRounds(int? raw) {
     final v = raw ?? AgentGoal.defaultMaxRounds;
@@ -2050,8 +2408,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 失败路径与空输出路径，用它会出现"任务失败了但目标再也不动"。
   void _onGoalTaskFinished(
       String scopeId, AgentEngine engine, AgentEvent event) {
-    final hostId =
-        _registry.getHostId(scopeId) ?? engine.hostId ?? 'local';
+    final hostId = _registry.getHostId(scopeId) ?? engine.hostId ?? 'local';
     final goal = _goals[hostId];
     // 只处理目标轮：用户提问/普通指令的收尾不参与续跑判定，
     // 否则纯问答零命令收尾会被算成"无进展"，答完又自动续跑旧目标。
@@ -2092,7 +2449,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
       finishSummary: event.text,
     );
 
-    _setGoal(hostId, decision.goal);
+    unawaited(_setGoal(hostId, decision.goal));
     if (decision.action != GoalAction.continueRound) {
       agentLogger.info('Goal', '目标停止自动续跑：${decision.reason}');
       return;
@@ -2119,13 +2476,46 @@ class AgentNotifier extends StateNotifier<AgentState> {
     });
   }
 
-  void _maybeAutoCompact(String scopeId) {
-    final convId = _registry.isActive(scopeId)
-        ? state.conversationId
-        : _registry.getState(scopeId)?.conversationId;
-    if (convId == null) return;
+  /// 跨 await 后的任务身份校验：host、会话、引擎和 task 必须都是原对象。
+  bool _isTaskContextCurrent(
+    String scopeId, {
+    required String hostId,
+    required String conversationId,
+    required AgentEngine engine,
+    required AgentTask? task,
+  }) {
+    if (!mounted || task == null) return false;
+    final current = _stateForScope(scopeId);
+    return identical(_registry.getEngine(scopeId), engine) &&
+        (_registry.getHostId(scopeId) ?? 'local') == hostId &&
+        current != null &&
+        current.conversationId == conversationId &&
+        current.hostId == hostId &&
+        engine.conversationId == conversationId &&
+        // task 状态更新会 copyWith 出新对象，稳定身份是任务 id 而非对象引用。
+        engine.currentTask?.id == task.id &&
+        engine.currentTask?.operationId == task.operationId;
+  }
 
-    final conv = ConversationsDao.getCachedById(convId);
+  void _maybeAutoCompact(
+    String scopeId, {
+    required String hostId,
+    required String conversationId,
+    required AgentEngine engine,
+    required AgentTask? task,
+  }) {
+    // 旧任务结束不得读取 scope 当前的 convId 去压缩新会话。
+    if (!_isTaskContextCurrent(
+      scopeId,
+      hostId: hostId,
+      conversationId: conversationId,
+      engine: engine,
+      task: task,
+    )) {
+      return;
+    }
+
+    final conv = ConversationsDao.getCachedById(conversationId);
     if (conv == null) return;
 
     final needsCompact = conv.needsCompaction(
@@ -2155,9 +2545,7 @@ class AgentNotifier extends StateNotifier<AgentState> {
         ? state.conversationId
         : _registry.getState(scopeId)?.conversationId;
     if (convId == null) return;
-    _titleService
-        .generateAndApply(convId, config)
-        .catchError((Object e) {
+    _titleService.generateAndApply(convId, config).catchError((Object e) {
       agentLogger.warn('AgentNotifier', 'AI 生成会话标题失败: $e');
       return false;
     });
@@ -2171,14 +2559,13 @@ class AgentNotifier extends StateNotifier<AgentState> {
     final effectiveScope = scopeId ?? _registry.activeScopeId;
     if (effectiveScope == null) return;
     final isActiveScope = _registry.isActive(effectiveScope);
-    final scopeState = isActiveScope
-        ? state
-        : _registry.getState(effectiveScope);
+    final scopeState =
+        isActiveScope ? state : _registry.getState(effectiveScope);
     if (scopeState == null) return;
     final convId = scopeState.conversationId;
     if (convId == null) return;
-    final engine = _registry.getEngine(effectiveScope) ??
-        (isActiveScope ? _engine : null);
+    final engine =
+        _registry.getEngine(effectiveScope) ?? (isActiveScope ? _engine : null);
     if (engine == null) return;
     if (scopeState.isCompacting) return; // 防止并发压缩
 
@@ -2198,7 +2585,47 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
     if (toCompact.isEmpty) return;
 
-    // 加锁 + UI 提示
+    final compactToken = Object();
+    _compactTokens[effectiveScope] = compactToken;
+    final taskAtStart = engine.currentTask;
+    final taskIdAtStart = taskAtStart?.id;
+    final engineConversationIdAtStart = engine.conversationId;
+    final startingAtStart = _startingScopes.contains(effectiveScope);
+    // clearMessages/摘要落库会原地清空或改写消息但保留同一 conv 对象，
+    // 仅靠对象身份无法发现；epoch 是唯一能识别"内容已被换掉"的证据。
+    final mutationEpochAtStart = conv.mutationEpoch;
+
+    AgentEngine? currentEngine() =>
+        _registry.getEngine(effectiveScope) ??
+        (_registry.isActive(effectiveScope) ? _engine : null);
+
+    bool isContextCurrent() {
+      final currentState = _stateForScope(effectiveScope);
+      final currentTask = engine.currentTask;
+      return identical(_compactTokens[effectiveScope], compactToken) &&
+          currentState?.conversationId == convId &&
+          identical(currentEngine(), engine) &&
+          // 老测试/兼容路径允许 engine 尚未绑定会话；绑定后必须仍指向本会话。
+          (engineConversationIdAtStart == null ||
+              engineConversationIdAtStart == convId) &&
+          engine.conversationId == engineConversationIdAtStart &&
+          identical(currentTask, taskAtStart) &&
+          currentTask?.id == taskIdAtStart &&
+          identical(ConversationsDao.getCachedById(convId), conv) &&
+          conv.mutationEpoch == mutationEpochAtStart &&
+          _startingScopes.contains(effectiveScope) == startingAtStart;
+    }
+
+    void releaseCompactLock() {
+      if (!identical(_compactTokens[effectiveScope], compactToken)) return;
+      _compactTokens.remove(effectiveScope);
+      if (_stateForScope(effectiveScope)?.isCompacting ?? false) {
+        _updateScopeState(
+            effectiveScope, (s) => s.copyWith(isCompacting: false));
+      }
+    }
+
+    // 加锁 + UI 提示。锁由 token 保护，旧压缩结束时不会清掉新压缩的锁。
     _updateScopeState(effectiveScope, (s) => s.copyWith(isCompacting: true));
 
     try {
@@ -2222,29 +2649,48 @@ class AgentNotifier extends StateNotifier<AgentState> {
         messages: tuples,
       );
 
-      // R1: await 期间会话可能被切换/删除/重载。缓存对象被替换时放弃本次
-      // 结果——toCompact 持有的是旧快照的消息引用，写进去会污染新快照。
-      final current = ConversationsDao.getCachedById(convId);
-      if (!identical(current, conv)) {
-        agentLogger.warn('AgentNotifier', '压缩期间会话已变更，放弃本次摘要');
-        _updateScopeState(
-            effectiveScope, (s) => s.copyWith(isCompacting: false));
+      // R1: 每个 await 后都复核 scope、engine、任务代际和缓存对象身份。
+      // 任一项变化都不能把旧摘要写进新会话或新 engine 的历史。
+      if (!isContextCurrent()) {
+        agentLogger.warn('AgentNotifier', '压缩期间会话或任务已变更，放弃本次摘要');
         return;
       }
       if (summary == null || summary.isEmpty) {
         agentLogger.warn('AgentNotifier', '对话压缩未产生摘要（AI 返回空或失败）');
-        _updateScopeState(
-            effectiveScope, (s) => s.copyWith(isCompacting: false));
         return;
       }
 
-      // 整体写入滚动摘要 + 标记被吸收消息（先改内存再落库，失败时错误可见）
+      // 整体写入滚动摘要 + 标记被吸收消息。先保存精确快照，upsert 失败时
+      // 回滚共享对象，避免 UI/缓存显示一份数据库从未接收过的摘要。
+      final previousRollingSummary = conv.rollingSummary;
+      final previousRolledUp = toCompact.map((m) => m.rolledUp).toList();
       conv.rollingSummary = summary;
       for (final m in toCompact) {
         m.rolledUp = true;
       }
-      conv.updatedAt = DateTime.now();
-      await ConversationsDao.upsert(conv);
+      // 压缩不改 updatedAt（不把会话顶到历史列表前排）。
+      try {
+        await ConversationsDao.upsert(conv);
+      } catch (_) {
+        // 回滚只关心“这份会话快照是否仍是我改动的那份”。不能绑定 scope 的
+        // compactToken：同 host 另一个会话的新压缩会替换 token，旧会话失败
+        // 时若不回滚，缓存里会留下数据库从未接收的摘要与 rolledUp 标记。
+        // 不能用 updatedAt 身份比较：并发 append 会改它，导致该回滚被跳过。
+        if (identical(ConversationsDao.getCachedById(convId), conv) &&
+            conv.rollingSummary == summary) {
+          conv.rollingSummary = previousRollingSummary;
+          for (var i = 0; i < toCompact.length; i++) {
+            toCompact[i].rolledUp = previousRolledUp[i];
+          }
+        }
+        rethrow;
+      }
+
+      // upsert 也可能与切换/删除/新任务交错，落库后仍须再次确认上下文。
+      if (!isContextCurrent()) {
+        agentLogger.warn('AgentNotifier', '压缩落库期间会话或任务已变更，放弃同步');
+        return;
+      }
 
       // 同步引擎内存历史：滚动摘要 + 未吸收消息，使后续 AI 调用使用压缩后的内容
       _syncEngineHistoryAfterCompact(effectiveScope, convId);
@@ -2252,27 +2698,24 @@ class AgentNotifier extends StateNotifier<AgentState> {
       // 更新 UI 状态（摘要横幅让用户感知压缩结果）
       final restored = ConversationsDao.getCachedById(convId);
       if (restored != null) {
-        final items = restored.messages
-            .where((m) => m.role != 'system')
-            .map((m) => ChatItem.fromConvMessage(m))
-            .toList();
         _updateScopeState(
             effectiveScope,
             (s) => s.copyWith(
-                  chatItems: items,
+                  chatItems: _chatItemsFromConversation(restored),
                   isCompacting: false,
                   summary: restored.rollingSummary,
                 ));
-      } else {
-        _updateScopeState(
-            effectiveScope, (s) => s.copyWith(isCompacting: false));
       }
     } catch (e) {
       agentLogger.error('AgentNotifier', '对话压缩失败: $e');
-      _updateScopeState(
-          effectiveScope,
-          (s) => s.copyWith(
-              isCompacting: false, error: '${L10n.str.compactFailed}: $e'));
+      if (isContextCurrent()) {
+        _updateScopeState(
+            effectiveScope,
+            (s) => s.copyWith(
+                isCompacting: false, error: '${L10n.str.compactFailed}: $e'));
+      }
+    } finally {
+      releaseCompactLock();
     }
   }
 
@@ -2302,6 +2745,9 @@ class AgentNotifier extends StateNotifier<AgentState> {
     }
     _startingScopes.clear();
     _startingConversations.clear();
+    _cancelRequestedScopes.clear();
+    _startTaskTokens.clear();
+    _compactTokens.clear();
     _registry.dispose();
     _reducer.dispose();
     _logUnsubscribe?.call();

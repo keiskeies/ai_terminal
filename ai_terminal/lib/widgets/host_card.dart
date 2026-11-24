@@ -70,10 +70,8 @@ class _HostCardState extends State<HostCard> {
     if (diff.inMinutes < 1) return UiText.t('刚刚', 'just now');
     if (diff.inMinutes < 60)
       return UiText.count(diff.inMinutes, '分钟前', 'min ago');
-    if (diff.inHours < 24)
-      return UiText.count(diff.inHours, '小时前', 'h ago');
-    if (diff.inDays < 30)
-      return UiText.count(diff.inDays, '天前', 'd ago');
+    if (diff.inHours < 24) return UiText.count(diff.inHours, '小时前', 'h ago');
+    if (diff.inDays < 30) return UiText.count(diff.inDays, '天前', 'd ago');
     return null;
   }
 
@@ -94,7 +92,8 @@ class _HostCardState extends State<HostCard> {
         onTap: widget.onTap,
         child: AnimatedContainer(
           duration: animFast,
-          margin: const EdgeInsets.symmetric(horizontal: pStandard, vertical: pCompact / 2),
+          margin: const EdgeInsets.symmetric(
+              horizontal: pStandard, vertical: pCompact / 2),
           decoration: BoxDecoration(
             color: _isHovered ? tc.cardElevated : tc.card,
             borderRadius: BorderRadius.circular(rCard),
@@ -126,7 +125,9 @@ class _HostCardState extends State<HostCard> {
                             ),
                             child: Center(
                               child: Text(
-                                widget.host.name.isNotEmpty ? widget.host.name[0].toUpperCase() : '?',
+                                widget.host.name.isNotEmpty
+                                    ? widget.host.name[0].toUpperCase()
+                                    : '?',
                                 style: TextStyle(
                                   fontSize: fTitle,
                                   fontWeight: FontWeight.w600,
@@ -146,7 +147,8 @@ class _HostCardState extends State<HostCard> {
                                     decoration: BoxDecoration(
                                       color: _statusColor,
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: tc.card, width: 2),
+                                      border:
+                                          Border.all(color: tc.card, width: 2),
                                     ),
                                   ),
                           ),
@@ -195,17 +197,20 @@ class _HostCardState extends State<HostCard> {
                           _ActionButton(
                             icon: Icons.terminal,
                             tooltip: UiText.t('连接终端', 'Open terminal'),
-                            onTap: () => context.push('/terminal/${widget.host.id}'),
+                            onTap: () =>
+                                context.push('/terminal/${widget.host.id}'),
                           ),
                           const SizedBox(width: 2),
                           _ActionButton(
                             icon: Icons.folder_open,
                             tooltip: 'SFTP',
-                            onTap: () => context.push('/sftp/${widget.host.id}'),
+                            onTap: () =>
+                                context.push('/sftp/${widget.host.id}'),
                           ),
                           const SizedBox(width: 2),
                           PopupMenuButton<String>(
-                            icon: Icon(Icons.more_vert, color: tc.textSub, size: 20),
+                            icon: Icon(Icons.more_vert,
+                                color: tc.textSub, size: 20),
                             onSelected: (value) {
                               switch (value) {
                                 case 'edit':
@@ -231,9 +236,11 @@ class _HostCardState extends State<HostCard> {
                                 value: 'delete',
                                 child: Row(
                                   children: [
-                                    Icon(Icons.delete, size: 20, color: tc.error),
+                                    Icon(Icons.delete,
+                                        size: 20, color: tc.error),
                                     const SizedBox(width: 12),
-                                    Text(UiText.t('删除', 'Delete'), style: TextStyle(color: tc.error)),
+                                    Text(UiText.t('删除', 'Delete'),
+                                        style: TextStyle(color: tc.error)),
                                   ],
                                 ),
                               ),
@@ -328,7 +335,8 @@ class _PulsingDotState extends State<_PulsingDot>
             ),
             boxShadow: [
               BoxShadow(
-                color: widget.color.withValues(alpha: 0.4 * (1 - _controller.value)),
+                color: widget.color
+                    .withValues(alpha: 0.4 * (1 - _controller.value)),
                 blurRadius: 4 * _scaleAnimation.value,
                 spreadRadius: 2 * _scaleAnimation.value,
               ),

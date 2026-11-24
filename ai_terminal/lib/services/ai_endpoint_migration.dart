@@ -50,9 +50,8 @@ class AIEndpointsMigration {
         var endpoint = _findEndpoint(existing, providerId, first.baseUrl);
         final endpointId = endpoint?.id ?? _uuid.v4();
 
-        final baseName = preset != null && preset.id != 'custom'
-            ? preset.name
-            : '自定义端点';
+        final baseName =
+            preset != null && preset.id != 'custom' ? preset.name : '自定义端点';
         final name = endpoint != null && endpoint.name.isNotEmpty
             ? endpoint.name
             : _uniqueName(baseName, usedNames);
@@ -82,8 +81,8 @@ class AIEndpointsMigration {
           baseUrl: first.baseUrl,
           protocol: protocol,
           models: mergedModels,
-          createdAt: endpoint?.createdAt ??
-              DateTime.now().millisecondsSinceEpoch,
+          createdAt:
+              endpoint?.createdAt ?? DateTime.now().millisecondsSinceEpoch,
         );
         await AIEndpointsDao.upsert(endpoint);
 
@@ -105,8 +104,8 @@ class AIEndpointsMigration {
 
       await AIEndpointsDao.loadCache();
       await SettingsDao.set(flagKey, 'done');
-      agentLogger.info(
-          'AIEndpointMigration', '迁移完成：${grouped.length} 个端点，${legacy.length} 个模型');
+      agentLogger.info('AIEndpointMigration',
+          '迁移完成：${grouped.length} 个端点，${legacy.length} 个模型');
     } catch (e, stack) {
       // 不写 done 标记：下次启动重试；旧表仍在，不会丢数据
       agentLogger.error('AIEndpointMigration', '迁移失败（下次启动重试）: $e\n$stack');
@@ -150,8 +149,7 @@ class AIEndpointsMigration {
           await CredentialsStore.get(hostId: endpointId, type: 'apiKey');
       if (existingKey != null && existingKey.isNotEmpty) return;
       for (final m in models) {
-        final stored =
-            await CredentialsStore.get(hostId: m.id, type: 'apiKey');
+        final stored = await CredentialsStore.get(hostId: m.id, type: 'apiKey');
         // 兼容更早版本把明文 key 留在 ai_models 行里的情况（R7 旧数据迁移）
         final key = (stored != null && stored.isNotEmpty) ? stored : m.apiKey;
         if (key.isNotEmpty) {

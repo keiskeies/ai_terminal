@@ -6,11 +6,13 @@ import 'package:path/path.dart' as p;
 import 'package:watcher/watcher.dart';
 import 'sftp_service.dart';
 import '../core/l10n_holder.dart';
+import '../utils/local_file_ops.dart';
 
 /// 同步方向
 enum SyncDirection {
   /// 本地 → 远端（上传）
   localToRemote,
+
   /// 双向
   bidirectional,
 }
@@ -51,12 +53,16 @@ class SyncEvent {
 class SyncConfig {
   /// 本地目录绝对路径
   final String localDir;
+
   /// 远端目录绝对路径
   final String remoteDir;
+
   /// 同步方向
   final SyncDirection direction;
+
   /// 排除的文件/目录名
   final List<String> excludeNames;
+
   /// 是否启用（可暂停/恢复）
   bool enabled;
 
@@ -78,18 +84,25 @@ class SyncConfig {
 /// - 单连接：复用 SSHService 的 SSHClient 打开 SFTP
 class FileSyncService {
   final SftpService _sftp = SftpService();
+
   /// client getter：每次操作时获取最新 SSHClient（避免持有重连后过期的 client）
   SSHClient? Function()? _clientGetter;
   SSHClient? _lastAttachedClient;
   SyncConfig? _config;
+
+  /// 本地路径授权：watcher 事件与远端下载最终都会落到本机磁盘，
+  /// 每一次实际读/写前都要重新过 LocalFilePolicy，不能只信启动时的根目录。
+  LocalPathAuthorizer? _validateLocalPath;
   StreamSubscription<WatchEvent>? _watchSub;
   Timer? _pollTimer;
   bool _isSyncing = false;
   bool _disposed = false;
+
   /// watcher 待处理变更队列：path → 变更类型（同路径多次修改自动合并为最后一次）
   final Map<String, ChangeType> _pendingChanges = {};
   bool _watcherProcessing = false;
   final Map<String, DateTime> _lastSyncTime = {};
+
   /// _lastSyncTime 容量上限（R8：避免无限增长）
   static const int _maxLastSyncEntries = 500;
 
@@ -102,7 +115,8 @@ class FileSyncService {
   SyncConfig? get config => _config;
 
   /// R2: 统一的事件发射，守卫 isClosed
-  void _emit(SyncEventType type, String message, {String? filePath, int? uploaded, int? total}) {
+  void _emit(SyncEventType type, String message,
+      {String? filePath, int? uploaded, int? total}) {
     if (_eventController.isClosed) return;
     _eventController.add(SyncEvent(
       type: type,
@@ -118,6 +132,7 @@ class FileSyncService {
   Future<bool> start({
     required SSHClient? Function() clientGetter,
     required SyncConfig config,
+    LocalPathAuthorizer? validateLocalPath,
   }) async {
     if (isRunning) {
       debugPrint('[FileSync] 已在运行，先停止再启动');
@@ -126,6 +141,17 @@ class FileSyncService {
 
     _clientGetter = clientGetter;
     _config = config;
+    _validateLocalPath = validateLocalPath;
+
+    // 启动时先授权根目录；之后每个文件/下载目标还会再次授权。
+    if (_validateLocalPath != null) {
+      final denial =
+          await _validateLocalPath!(config.localDir, config.localDir);
+      if (denial != null) {
+        _emit(SyncEventType.uploadFailed, '本地目录未获授权: $denial');
+        return false;
+      }
+    }
 
     // 初次 attach
     if (!await _ensureClient()) {
@@ -150,7 +176,8 @@ class FileSyncService {
       _startRemotePolling(config);
     }
 
-    _emit(SyncEventType.info, '同步已启动: ${config.localDir} ↔ ${config.remoteDir}');
+    _emit(
+        SyncEventType.info, '同步已启动: ${config.localDir} ↔ ${config.remoteDir}');
     return true;
   }
 
@@ -235,7 +262,8 @@ class FileSyncService {
           // 防抖：同一文件 500ms 内只处理一次
           final lastTime = _lastSyncTime[path];
           final now = DateTime.now();
-          if (lastTime != null && now.difference(lastTime).inMilliseconds < 500) {
+          if (lastTime != null &&
+              now.difference(lastTime).inMilliseconds < 500) {
             // 重新入队延后处理
             _pendingChanges[path] = type;
             continue;
@@ -243,8 +271,8 @@ class FileSyncService {
           _lastSyncTime[path] = now;
           // R8: _lastSyncTime 容量控制（保留最近的）
           if (_lastSyncTime.length > _maxLastSyncEntries) {
-            final oldest = _lastSyncTime.keys
-                .reduce((a, b) => _lastSyncTime[a]!.isBefore(_lastSyncTime[b]!) ? a : b);
+            final oldest = _lastSyncTime.keys.reduce((a, b) =>
+                _lastSyncTime[a]!.isBefore(_lastSyncTime[b]!) ? a : b);
             _lastSyncTime.remove(oldest);
           }
 
@@ -286,7 +314,8 @@ class FileSyncService {
 
       // R6: 远端路径用 posix
       final relative = p.relative(localPath, from: config.localDir);
-      final remotePath = p.posix.joinAll([config.remoteDir, ...p.split(relative)]);
+      final remotePath =
+          p.posix.joinAll([config.remoteDir, ...p.split(relative)]);
 
       _emit(SyncEventType.uploadStart, '上传: $relative', filePath: localPath);
 
@@ -294,7 +323,8 @@ class FileSyncService {
       final remoteParent = p.posix.dirname(remotePath);
       await _sftp.ensureDirectory(remoteParent);
 
-      await _sftp.uploadFile(localPath, remotePath);
+      await _sftp.uploadFile(localPath, remotePath,
+          validateLocalPath: _validateLocalPath);
 
       _emit(SyncEventType.uploadSuccess, '已上传: $relative', filePath: localPath);
     } catch (e) {
@@ -307,7 +337,8 @@ class FileSyncService {
     if (!await _ensureClient()) return;
     try {
       final relative = p.relative(localPath, from: config.localDir);
-      final remotePath = p.posix.joinAll([config.remoteDir, ...p.split(relative)]);
+      final remotePath =
+          p.posix.joinAll([config.remoteDir, ...p.split(relative)]);
 
       await _sftp.deleteFile(remotePath);
       _emit(SyncEventType.info, '已删除远端: $relative', filePath: localPath);
@@ -323,7 +354,8 @@ class FileSyncService {
     _isSyncing = true;
     try {
       final remoteFiles = <_RemoteFileInfo>[];
-      await _collectRemoteFiles(config.remoteDir, config.remoteDir, remoteFiles, config.excludeNames);
+      await _collectRemoteFiles(
+          config.remoteDir, config.remoteDir, remoteFiles, config.excludeNames);
 
       for (final remoteFile in remoteFiles) {
         final localPath = p.join(config.localDir, remoteFile.relativePath);
@@ -341,15 +373,20 @@ class FileSyncService {
         }
 
         if (needDownload) {
-          _emit(SyncEventType.downloadStart, '下载: ${remoteFile.relativePath}', filePath: localPath);
+          _emit(SyncEventType.downloadStart, '下载: ${remoteFile.relativePath}',
+              filePath: localPath);
           try {
             // 确保本地父目录存在
             final localParent = p.dirname(localPath);
             await Directory(localParent).create(recursive: true);
-            await _sftp.downloadFile(remoteFile.fullPath, localPath);
-            _emit(SyncEventType.downloadSuccess, '已下载: ${remoteFile.relativePath}', filePath: localPath);
+            await _sftp.downloadFile(remoteFile.fullPath, localPath,
+                validateLocalPath: _validateLocalPath);
+            _emit(SyncEventType.downloadSuccess,
+                '已下载: ${remoteFile.relativePath}',
+                filePath: localPath);
           } catch (err) {
-            _emit(SyncEventType.downloadFailed, '下载失败: $err', filePath: localPath);
+            _emit(SyncEventType.downloadFailed, '下载失败: $err',
+                filePath: localPath);
           }
         }
       }
@@ -410,6 +447,7 @@ class FileSyncService {
         config.localDir,
         config.remoteDir,
         excludeNames: config.excludeNames,
+        validateLocalPath: _validateLocalPath,
         onProgress: (uploaded, total) {
           _emit(SyncEventType.uploadProgress,
               L10n.str.ut_6f51e792f4(uploaded, total),

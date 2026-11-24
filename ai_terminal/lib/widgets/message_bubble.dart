@@ -35,7 +35,8 @@ class MessageBubble extends StatelessWidget {
           right: isUser ? 0 : 48,
         ),
         child: Column(
-          crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          crossAxisAlignment:
+              isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             // 头像和名称
             if (!isUser)
@@ -48,7 +49,10 @@ class MessageBubble extends StatelessWidget {
                     const SizedBox(width: 6),
                     Text(
                       UiText.t('AI 助手', 'AI Assistant'),
-                      style: TextStyle(fontSize: fSmall, color: tc.textSub, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                          fontSize: fSmall,
+                          color: tc.textSub,
+                          fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
@@ -58,7 +62,8 @@ class MessageBubble extends StatelessWidget {
             GestureDetector(
               onLongPress: onLongPress,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(
                   color: isUser ? tc.brand : tc.card,
                   borderRadius: BorderRadius.only(
@@ -67,19 +72,17 @@ class MessageBubble extends StatelessWidget {
                     bottomLeft: Radius.circular(isUser ? rBubble : rXSmall),
                     bottomRight: Radius.circular(isUser ? rXSmall : rBubble),
                   ),
-                  border: isUser
-                      ? null
-                      : Border.all(color: tc.border),
+                  border: isUser ? null : Border.all(color: tc.border),
                 ),
                 child: isUser
                     ? SelectableText(
                         message.content,
                         style: TextStyle(
-                        color: tc.onAccent,
-                        fontSize: fBody,
-                        height: 1.5,
-                        fontWeight: FontWeight.w500,
-                      ),
+                          color: tc.onAccent,
+                          fontSize: fBody,
+                          height: 1.5,
+                          fontWeight: FontWeight.w500,
+                        ),
                       )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,7 +100,8 @@ class MessageBubble extends StatelessWidget {
                                 fontWeight: FontWeight.w500,
                               ),
                               code: TextStyle(
-                                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                                fontFamily: 'JetBrainsMono',
+                                fontFamilyFallback: kMonoFontFallback,
                                 fontSize: fMono,
                                 fontWeight: FontWeight.w500,
                                 color: tc.textMain,
@@ -114,14 +118,29 @@ class MessageBubble extends StatelessWidget {
                                   left: BorderSide(color: tc.brand, width: 2),
                                 ),
                               ),
-                              h1: TextStyle(color: tc.textMain, fontSize: fTitle, fontWeight: FontWeight.bold),
-                              h2: TextStyle(color: tc.textMain, fontSize: fBody + 2, fontWeight: FontWeight.bold),
-                              h3: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600),
+                              h1: TextStyle(
+                                  color: tc.textMain,
+                                  fontSize: fTitle,
+                                  fontWeight: FontWeight.bold),
+                              h2: TextStyle(
+                                  color: tc.textMain,
+                                  fontSize: fBody + 2,
+                                  fontWeight: FontWeight.bold),
+                              h3: TextStyle(
+                                  color: tc.textMain,
+                                  fontSize: fBody,
+                                  fontWeight: FontWeight.w600),
                               listBullet: TextStyle(color: tc.textMain),
-                              strong: TextStyle(color: tc.textMain, fontWeight: FontWeight.bold),
-                              em: TextStyle(color: tc.textMain, fontStyle: FontStyle.italic),
+                              strong: TextStyle(
+                                  color: tc.textMain,
+                                  fontWeight: FontWeight.bold),
+                              em: TextStyle(
+                                  color: tc.textMain,
+                                  fontStyle: FontStyle.italic),
                               a: TextStyle(color: tc.brand),
-                              tableHead: TextStyle(color: tc.textMain, fontWeight: FontWeight.bold),
+                              tableHead: TextStyle(
+                                  color: tc.textMain,
+                                  fontWeight: FontWeight.bold),
                               tableBody: TextStyle(color: tc.textMain),
                               tableBorder: TableBorder.all(color: tc.border),
                             ),
@@ -134,7 +153,8 @@ class MessageBubble extends StatelessWidget {
                               margin: const EdgeInsets.only(top: 6),
                               decoration: BoxDecoration(
                                 color: tc.brand,
-                                borderRadius: const BorderRadius.all(Radius.circular(1)),
+                                borderRadius:
+                                    const BorderRadius.all(Radius.circular(1)),
                               ),
                             ),
                         ],

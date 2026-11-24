@@ -303,7 +303,9 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 label: 'CPU',
                 showLabel: false,
                 value: '${(snap?.cpuPercent ?? 0).toStringAsFixed(1)}%',
-                color: staleColor(monitorColorByPercent(snap?.cpuPercent ?? 0, tc, normal: tc.brand)),
+                color: staleColor(monitorColorByPercent(
+                    snap?.cpuPercent ?? 0, tc,
+                    normal: tc.brand)),
                 chartData: history.map((s) => s.cpuPercent).toList(),
                 chartMax: 100,
               ),
@@ -321,8 +323,10 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 value: snap != null && snap.memTotalMB > 0
                     ? '${fmtFromMB(snap.memUsedMB)}/${fmtFromMB(snap.memTotalMB)}'
                     : '-',
-                color: staleColor(monitorColorByPercent(snap?.memPercent ?? 0, tc)),
-                valueColor: staleColor(monitorColorByPercent(snap?.memPercent ?? 0, tc)),
+                color: staleColor(
+                    monitorColorByPercent(snap?.memPercent ?? 0, tc)),
+                valueColor: staleColor(
+                    monitorColorByPercent(snap?.memPercent ?? 0, tc)),
                 valueMaxWidth: 110,
               ),
               _divider(tc),
@@ -354,7 +358,9 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 label: l10n.monitorDisk,
                 showLabel: false,
                 value: '${(snap?.diskPercent ?? 0).toStringAsFixed(1)}%',
-                color: staleColor(monitorColorByPercent(snap?.diskPercent ?? 0, tc, normal: tc.warn)),
+                color: staleColor(monitorColorByPercent(
+                    snap?.diskPercent ?? 0, tc,
+                    normal: tc.warn)),
               ),
               _divider(tc),
               _buildMetricChip(
@@ -372,7 +378,8 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 icon: Icons.person_outline,
                 label: l10n.monitorUser,
                 showLabel: false,
-                value: (snap?.hostname.isNotEmpty ?? false) ? snap!.hostname : '-',
+                value:
+                    (snap?.hostname.isNotEmpty ?? false) ? snap!.hostname : '-',
                 color: isStale ? tc.textMuted : tc.textSub,
                 valueMaxWidth: 120,
               ),
@@ -428,7 +435,8 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
               Icon(icon, size: 11, color: color),
             const SizedBox(width: 3),
             if (showLabel)
-              Text('$label ', style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
+              Text('$label ',
+                  style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
             ConstrainedBox(
               constraints: BoxConstraints(maxWidth: valueMaxWidth ?? 80),
               child: Text(
@@ -436,8 +444,10 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                 style: TextStyle(
                   fontSize: fMicro,
                   color: valueColor ?? tc.textSub,
-                  fontWeight: valueColor != null ? FontWeight.w600 : FontWeight.w500,
-                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                  fontWeight:
+                      valueColor != null ? FontWeight.w600 : FontWeight.w500,
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: kMonoFontFallback,
                 ),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -469,14 +479,16 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
           Icon(icon, size: 11, color: color),
           const SizedBox(width: 3),
           if (showLabel)
-            Text('$label ', style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
+            Text('$label ',
+                style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
           Text(
             value,
             style: TextStyle(
               fontSize: fMicro,
               color: color,
               fontWeight: FontWeight.w600,
-              fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+              fontFamily: 'JetBrainsMono',
+              fontFamilyFallback: kMonoFontFallback,
             ),
           ),
           const SizedBox(width: 4),
@@ -503,20 +515,23 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
   Widget _buildMiniChart(List<double> data, Color color, double? max) {
     if (data.length < 2) {
       return Center(
-        child: Text('…', style: TextStyle(fontSize: fMini, color: color.withValues(alpha: 0.5))),
+        child: Text('…',
+            style: TextStyle(
+                fontSize: fMini, color: color.withValues(alpha: 0.5))),
       );
     }
     // 降采样：60px 宽最多 60 个点，数据多时按桶取最大最小值保留趋势
     const targetPoints = 60;
-    final sampled = data.length <= targetPoints
-        ? data
-        : _downsample(data, targetPoints);
+    final sampled =
+        data.length <= targetPoints ? data : _downsample(data, targetPoints);
 
     final spots = <FlSpot>[];
     for (int i = 0; i < sampled.length; i++) {
-      spots.add(FlSpot(i.toDouble(), sampled[i].clamp(0, max ?? double.infinity)));
+      spots.add(
+          FlSpot(i.toDouble(), sampled[i].clamp(0, max ?? double.infinity)));
     }
-    final actualMax = max ?? sampled.fold<double>(0, (a, b) => a > b ? a : b) * 1.2;
+    final actualMax =
+        max ?? sampled.fold<double>(0, (a, b) => a > b ? a : b) * 1.2;
 
     // duration: Duration.zero —— fl_chart 是 ImplicitlyAnimatedWidget，默认
     // 150ms 补间，而 LineChartData 的相等性比较落在 FlSpot 列表上，每次
@@ -709,7 +724,8 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
     List<(String, String)> rows,
   ) {
     // 网络/磁盘 → 表格布局；系统信息 → 单栏（长文本）；其他 → 两栏
-    if (metric == 'netUp' || metric == 'netDown') return _buildNetOverlayContent(tc, snap);
+    if (metric == 'netUp' || metric == 'netDown')
+      return _buildNetOverlayContent(tc, snap);
     if (metric == 'disk') return _buildDiskOverlayContent(tc, snap);
     if (metric == 'uptime') return _buildSingleColumnRows(tc, rows);
     return twoColumnRows(tc, rows);
@@ -752,7 +768,8 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
         const SizedBox(height: 8),
         Text(
           l10n.monitorNetInterfaceDetail,
-          style: TextStyle(fontSize: fMicro, color: tc.textSub, fontWeight: FontWeight.w600),
+          style: TextStyle(
+              fontSize: fMicro, color: tc.textSub, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 4),
         netTableRow(
@@ -770,7 +787,8 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
             child: Text(
               [
                 if (virtualCount > 0) l10n.monitorNetVirtualGroup(virtualCount),
-                if (real.length > _overlayMaxRows) '+${real.length - _overlayMaxRows}',
+                if (real.length > _overlayMaxRows)
+                  '+${real.length - _overlayMaxRows}',
               ].join(' · '),
               style: TextStyle(fontSize: fMicro, color: tc.textMuted),
             ),
@@ -806,7 +824,10 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
     final summary = [
       (l10n.monitorDiskTotal, '${totalDisk.toStringAsFixed(1)} GB'),
       (l10n.monitorDiskUsed, '${usedDisk.toStringAsFixed(1)} GB'),
-      (l10n.monitorDiskAvailable, '${(totalDisk - usedDisk).toStringAsFixed(1)} GB'),
+      (
+        l10n.monitorDiskAvailable,
+        '${(totalDisk - usedDisk).toStringAsFixed(1)} GB'
+      ),
       (l10n.monitorDiskOverallUsage, '${overallPercent.toStringAsFixed(1)}%'),
       (l10n.monitorDiskPartitionCount, '${partitions.length}'),
     ];
@@ -820,7 +841,8 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
         const SizedBox(height: 10),
         Text(
           l10n.monitorDiskPartitionDetail,
-          style: TextStyle(fontSize: fMicro, color: tc.textSub, fontWeight: FontWeight.w600),
+          style: TextStyle(
+              fontSize: fMicro, color: tc.textSub, fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 4),
         diskTableRow(
@@ -834,7 +856,8 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
               (p) => diskTableRow(
                 tc,
                 mount: p.mountPoint,
-                used: '${fmtFromMB(p.usedGB * 1024)} / ${fmtFromMB(p.totalGB * 1024)}',
+                used:
+                    '${fmtFromMB(p.usedGB * 1024)} / ${fmtFromMB(p.totalGB * 1024)}',
                 percent: '${p.usePercent.toStringAsFixed(1)}%',
                 usePercent: p.usePercent,
               ),
@@ -878,7 +901,8 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                   style: TextStyle(
                     fontSize: fMicro,
                     color: tc.textSub,
-                    fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                    fontFamily: 'JetBrainsMono',
+                    fontFamilyFallback: kMonoFontFallback,
                     fontWeight: FontWeight.w500,
                   ),
                   textAlign: TextAlign.right,
@@ -892,7 +916,8 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
   }
 
   /// 返回浮层标题 + 数据行（label, value）
-  (String, List<(String, String)>) _getOverlayData(String metric, ServerSnapshot s) {
+  (String, List<(String, String)>) _getOverlayData(
+      String metric, ServerSnapshot s) {
     final l10n = AppLocalizations.of(context)!;
     switch (metric) {
       case 'cpu':
@@ -922,7 +947,10 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
             (l10n.monitorMemoryFree, memValue(s.memFreeMB)),
             (l10n.monitorMemoryCached, memValue(s.memCachedMB)),
             (l10n.monitorMemoryBuffers, memValue(s.memBuffersMB)),
-            (l10n.monitorMemoryUsage, hasMem ? '${s.memPercent.toStringAsFixed(1)}%' : '-'),
+            (
+              l10n.monitorMemoryUsage,
+              hasMem ? '${s.memPercent.toStringAsFixed(1)}%' : '-'
+            ),
             (l10n.monitorSwapTotal, memValue(s.swapTotalMB)),
             (l10n.monitorSwapUsed, memValue(s.swapUsedMB)),
           ],
@@ -933,7 +961,10 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
           [
             (l10n.monitorDiskTotal2, '${s.diskTotalGB.toStringAsFixed(1)} GB'),
             (l10n.monitorDiskUsed, '${s.diskUsedGB.toStringAsFixed(1)} GB'),
-            (l10n.monitorDiskAvailable, '${s.diskFreeGB.toStringAsFixed(1)} GB'),
+            (
+              l10n.monitorDiskAvailable,
+              '${s.diskFreeGB.toStringAsFixed(1)} GB'
+            ),
             (l10n.monitorDiskUsage, '${s.diskPercent.toStringAsFixed(1)}%'),
           ],
         );
@@ -958,7 +989,10 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
           l10n.monitorSystemInfo,
           [
             (l10n.monitorUptimeLabel, s.uptime),
-            (l10n.monitorKernelVersion, s.kernelVersion.isEmpty ? '-' : s.kernelVersion),
+            (
+              l10n.monitorKernelVersion,
+              s.kernelVersion.isEmpty ? '-' : s.kernelVersion
+            ),
             (l10n.monitorLoad1, s.loadAvg1.toStringAsFixed(2)),
             (l10n.monitorLoad5, s.loadAvg5.toStringAsFixed(2)),
             (l10n.monitorLoad15, s.loadAvg15.toStringAsFixed(2)),
@@ -1018,7 +1052,8 @@ class _RamStickPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_RamStickPainter oldDelegate) => oldDelegate.color != color;
+  bool shouldRepaint(_RamStickPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 /// 指标项的 hover/tap 包装器
@@ -1076,11 +1111,14 @@ class _MetricHoverWrapperState extends State<_MetricHoverWrapper> {
       child: GestureDetector(
         // onTapUp 而不是 onTapDown：按下后拖出再松手（按住拖动横向滚动监控栏）
         // 不应触发开窗/切浮层
-        onTapUp: (details) => widget.onTap(widget.metric, details.globalPosition),
+        onTapUp: (details) =>
+            widget.onTap(widget.metric, details.globalPosition),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
           decoration: BoxDecoration(
-            color: isActive ? widget.color.withValues(alpha: 0.12) : Colors.transparent,
+            color: isActive
+                ? widget.color.withValues(alpha: 0.12)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(rXSmall),
           ),
           child: widget.child,

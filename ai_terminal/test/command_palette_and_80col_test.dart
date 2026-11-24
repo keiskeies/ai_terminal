@@ -4,8 +4,10 @@ import 'package:ai_terminal/widgets/command_palette.dart';
 
 /// 命令面板检索 + 80 列保护这两条纯逻辑的契约测试。
 void main() {
-  CommandPaletteEntry e(String label, {String group = '', List<String> kw = const []}) =>
-      CommandPaletteEntry(label: label, group: group, keywords: kw, onRun: () {});
+  CommandPaletteEntry e(String label,
+          {String group = '', List<String> kw = const []}) =>
+      CommandPaletteEntry(
+          label: label, group: group, keywords: kw, onRun: () {});
 
   group('rankPaletteEntries', () {
     final entries = [
@@ -65,7 +67,8 @@ void main() {
         minRatio: 0.15,
         maxRatio: 0.7,
       );
-      expect(total - s, greaterThanOrEqualTo(minTerminalWidthForFontSize(14) - 0.01));
+      expect(total - s,
+          greaterThanOrEqualTo(minTerminalWidthForFontSize(14) - 0.01));
       expect(s, lessThan(total * 0.7));
     });
 

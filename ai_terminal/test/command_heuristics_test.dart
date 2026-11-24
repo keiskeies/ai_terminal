@@ -185,7 +185,8 @@ void main() {
 
   group('getCommandTimeout', () {
     test('apt install 返回 10 分钟', () {
-      expect(getCommandTimeout('apt install nginx'), const Duration(minutes: 10));
+      expect(
+          getCommandTimeout('apt install nginx'), const Duration(minutes: 10));
     });
 
     test('apt-get install 返回 10 分钟', () {
@@ -232,7 +233,8 @@ void main() {
     });
 
     test('journalctl 返回 3 分钟', () {
-      expect(getCommandTimeout('journalctl -u nginx'), const Duration(minutes: 3));
+      expect(
+          getCommandTimeout('journalctl -u nginx'), const Duration(minutes: 3));
     });
 
     test('curl 返回 3 分钟', () {
@@ -303,7 +305,8 @@ void main() {
 
     test('裸 sudo 与无法识别的包装回落到默认档', () {
       expect(getCommandTimeout('sudo'), const Duration(seconds: 60));
-      expect(getCommandTimeout('sudo -u postgres psql'), const Duration(seconds: 60));
+      expect(getCommandTimeout('sudo -u postgres psql'),
+          const Duration(seconds: 60));
     });
 
     test('剥壳不影响 heredoc 多行命令的档位匹配', () {
@@ -445,7 +448,8 @@ void main() {
     });
 
     test('AI 长篇思考中偶然出现"任务完成" 返回 false（行过长）', () {
-      const longLine = '我现在需要检查系统状态，包括服务运行情况、日志输出、端口监听等，任务完成情况的评估需要等所有检查都做完才能下结论。';
+      const longLine =
+          '我现在需要检查系统状态，包括服务运行情况、日志输出、端口监听等，任务完成情况的评估需要等所有检查都做完才能下结论。';
       expect(isTaskComplete(longLine), isFalse);
     });
   });

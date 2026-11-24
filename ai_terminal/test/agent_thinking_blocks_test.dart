@@ -9,14 +9,15 @@ void main() {
       WidgetTester tester, Widget Function(ThemeColors tc) build) async {
     await tester.pumpWidget(MaterialApp(
       theme: ThemeData.dark(),
-      home: Scaffold(body: Builder(builder: (ctx) => build(ThemeColors.of(ctx)))),
+      home:
+          Scaffold(body: Builder(builder: (ctx) => build(ThemeColors.of(ctx)))),
     ));
   }
 
   group('ModelReasoningBlock', () {
     testWidgets('渲染推理正文，并限制在 160 高度内', (tester) async {
-      await pump(tester,
-          (tc) => ModelReasoningBlock(text: '先确认磁盘占用，再看服务', tc: tc));
+      await pump(
+          tester, (tc) => ModelReasoningBlock(text: '先确认磁盘占用，再看服务', tc: tc));
 
       expect(find.text('模型思考'), findsOneWidget);
       expect(find.text('先确认磁盘占用，再看服务'), findsOneWidget);
@@ -52,8 +53,8 @@ void main() {
     });
 
     testWidgets('拿不到协议头时按纯文本显示（非 ReAct 模型）', (tester) async {
-      await pump(tester,
-          (tc) => LiveThoughtBlock(rawText: '正在检查磁盘使用率…', tc: tc));
+      await pump(
+          tester, (tc) => LiveThoughtBlock(rawText: '正在检查磁盘使用率…', tc: tc));
 
       expect(find.text('正在检查磁盘使用率…'), findsOneWidget);
     });

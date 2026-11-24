@@ -65,8 +65,8 @@ void main() {
       // web2 自己写的 User 被更早的 Host * 遮蔽——这正是 OpenSSH 的实际行为
       final web2 = r.entries.firstWhere((e) => e.alias == 'web2');
       expect(web2.username, 'git');
-      expect(
-          r.warnings.any((w) => w.contains('web2') && w.contains('未生效')), isTrue);
+      expect(r.warnings.any((w) => w.contains('web2') && w.contains('未生效')),
+          isTrue);
     });
 
     test('Host * 在后时不覆盖具体块', () {
@@ -137,12 +137,14 @@ void main() {
 
   group('Include', () {
     test('展开被包含文件并保持先出现者生效', () {
-      const main = 'Include conf.d/*\n\nHost a\n  HostName main.example.com\n  User u';
-      final r = parseSshConfig(main, homeDir: '/home/u', includeResolver: (p, h) {
+      const main =
+          'Include conf.d/*\n\nHost a\n  HostName main.example.com\n  User u';
+      final r =
+          parseSshConfig(main, homeDir: '/home/u', includeResolver: (p, h) {
         expect(p, 'conf.d/*');
         return [
-          const SshConfigIncludedFile(
-              '/home/u/.ssh/conf.d/x.conf', 'Host a\n  HostName included.example.com\n  User iu')
+          const SshConfigIncludedFile('/home/u/.ssh/conf.d/x.conf',
+              'Host a\n  HostName included.example.com\n  User iu')
         ];
       });
       final a = r.entries.firstWhere((e) => e.alias == 'a');
@@ -151,7 +153,8 @@ void main() {
     });
 
     test('未提供读取能力时只告警，不崩', () {
-      final r = parseSshConfig('Include other\nHost a\n  User u', homeDir: '/h');
+      final r =
+          parseSshConfig('Include other\nHost a\n  User u', homeDir: '/h');
       expect(r.entries.single.alias, 'a');
       expect(r.warnings.any((w) => w.contains('Include')), isTrue);
     });
@@ -197,7 +200,8 @@ void main() {
         'Host a\n  User u\n  ServerAliveInterval 30\n  SetEnv FOO=bar',
         homeDir: '/h',
       );
-      expect(r.entries.single.ignoredKeys, containsAll(['serveraliveinterval', 'setenv']));
+      expect(r.entries.single.ignoredKeys,
+          containsAll(['serveraliveinterval', 'setenv']));
     });
 
     test('空内容不报错', () {
@@ -281,8 +285,7 @@ Host prod-web2
       expect(r.entries.firstWhere((e) => e.alias == 'prod-web2').identityFile,
           '~/.ssh/id_ed25519');
       expect(
-          r.warnings
-              .any((w) => w.contains('prod-web2') && w.contains('未生效')),
+          r.warnings.any((w) => w.contains('prod-web2') && w.contains('未生效')),
           isTrue);
       expect(r.entries.firstWhere((e) => e.alias == 'bastion').port, 2200);
     });

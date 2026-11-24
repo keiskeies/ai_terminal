@@ -67,13 +67,19 @@ class KnowledgeRule {
         return true;
       case KnowledgeRuleScope.group:
         final g = group;
-        if (g == null || g.isEmpty || targetGroup == null || targetGroup.isEmpty) {
+        if (g == null ||
+            g.isEmpty ||
+            targetGroup == null ||
+            targetGroup.isEmpty) {
           return false;
         }
         return g == targetGroup;
       case KnowledgeRuleScope.host:
         final h = hostId;
-        if (h == null || h.isEmpty || targetHostId == null || targetHostId.isEmpty) {
+        if (h == null ||
+            h.isEmpty ||
+            targetHostId == null ||
+            targetHostId.isEmpty) {
           return false;
         }
         return h == targetHostId;

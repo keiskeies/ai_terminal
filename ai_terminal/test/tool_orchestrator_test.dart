@@ -120,7 +120,8 @@ void main() {
 
   group('ToolDisplayFormatter', () {
     test('空参数只返回工具名', () {
-      expect(ToolDisplayFormatter.describe('file_read', argsOf({})), 'file_read');
+      expect(
+          ToolDisplayFormatter.describe('file_read', argsOf({})), 'file_read');
     });
 
     test('多行 key:value 格式且无尾随换行', () {
@@ -191,7 +192,8 @@ void main() {
       expect(view.truncated, isTrue);
       expect(view.totalChars, long.length);
       // 截断后的前缀严格等于阈值长度（尾注另算，不能拿总长比较）
-      expect(view.displayed, startsWith('z' * ToolResultPresenter.maxEventChars));
+      expect(
+          view.displayed, startsWith('z' * ToolResultPresenter.maxEventChars));
       expect(view.displayed, endsWith('\n...(输出已截断)'));
     });
 

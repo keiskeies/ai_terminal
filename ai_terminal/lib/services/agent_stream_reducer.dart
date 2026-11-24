@@ -17,9 +17,18 @@ class AgentStreamReducer {
       ..write(chunk);
     if (buffer.length > _maxChars) {
       final tail = buffer.toString();
+      var start = tail.length - _maxChars;
+      final previous = tail.codeUnitAt(start - 1);
+      final first = tail.codeUnitAt(start);
+      if (previous >= 0xD800 &&
+          previous <= 0xDBFF &&
+          first >= 0xDC00 &&
+          first <= 0xDFFF) {
+        start++;
+      }
       buffer
         ..clear()
-        ..write(tail.substring(tail.length - _maxChars));
+        ..write(tail.substring(start));
     }
   }
 
@@ -30,7 +39,8 @@ class AgentStreamReducer {
   }
 
   /// 启动节流 Timer，到期后调用 onFlush 回调
-  void scheduleFlush(String hostId, Duration delay, void Function(String content) onFlush) {
+  void scheduleFlush(
+      String hostId, Duration delay, void Function(String content) onFlush) {
     _throttleTimers[hostId] ??= Timer(delay, () {
       _throttleTimers.remove(hostId);
       final content = getContent(hostId);

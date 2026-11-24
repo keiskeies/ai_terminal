@@ -138,8 +138,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
             children: [
               Switch(
                 value: enabled,
-                onChanged: (value) =>
-                    unawaited(_setGlobalEnabled(value)),
+                onChanged: (value) => unawaited(_setGlobalEnabled(value)),
                 activeThumbColor: tc.brand,
                 activeTrackColor: tc.brandBg,
                 inactiveThumbColor: tc.textMuted,
@@ -182,7 +181,8 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
       runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Text(UiText.t('快速添加：', 'Quick add:'), style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+        Text(UiText.t('快速添加：', 'Quick add:'),
+            style: TextStyle(color: tc.textSub, fontSize: fSmall)),
         ActionChip(
           label: const Text('Exa MCP'),
           avatar: const Icon(Icons.add_link, size: 15),
@@ -259,7 +259,8 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
         borderRadius: BorderRadius.circular(rLarge),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(pStandard, pCompact, pStandard, pSmall),
+        padding:
+            const EdgeInsets.fromLTRB(pStandard, pCompact, pStandard, pSmall),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -313,9 +314,13 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
                     }
                   },
                   itemBuilder: (context) => [
-                    PopupMenuItem(value: 'edit', child: Text(UiText.t('编辑', 'Edit'))),
-                    PopupMenuItem(value: 'reconnect', child: Text(UiText.t('重新连接', 'Reconnect'))),
-                    PopupMenuItem(value: 'delete', child: Text(UiText.t('删除', 'Delete'))),
+                    PopupMenuItem(
+                        value: 'edit', child: Text(UiText.t('编辑', 'Edit'))),
+                    PopupMenuItem(
+                        value: 'reconnect',
+                        child: Text(UiText.t('重新连接', 'Reconnect'))),
+                    PopupMenuItem(
+                        value: 'delete', child: Text(UiText.t('删除', 'Delete'))),
                   ],
                 ),
               ],
@@ -377,7 +382,9 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
                           : Icons.play_arrow_outlined,
                       size: 15,
                     ),
-                    label: Text(runtime.isConnected ? UiText.t('断开', 'Disconnect') : UiText.t('连接', 'Connect')),
+                    label: Text(runtime.isConnected
+                        ? UiText.t('断开', 'Disconnect')
+                        : UiText.t('连接', 'Connect')),
                   ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -439,7 +446,9 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            runtime.error.isEmpty ? UiText.t('需要 OAuth 授权', 'OAuth authorization required') : runtime.error,
+            runtime.error.isEmpty
+                ? UiText.t('需要 OAuth 授权', 'OAuth authorization required')
+                : runtime.error,
             style: TextStyle(color: tc.warn, fontSize: fSmall),
           ),
           const SizedBox(height: 8),
@@ -478,7 +487,8 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _sectionHeader(L10n.str.ut_1e9e2bf1a0(runtime.tools.length, exposure), tc),
+        _sectionHeader(
+            L10n.str.ut_1e9e2bf1a0(runtime.tools.length, exposure), tc),
         for (final tool in runtime.tools) _buildToolRow(runtime, tool, tc),
       ],
     );
@@ -557,7 +567,9 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
             )
           else
             Text(
-              exposed ? UiText.t('Agent 可用', 'Agent available') : UiText.t('未开放', 'Not exposed'),
+              exposed
+                  ? UiText.t('Agent 可用', 'Agent available')
+                  : UiText.t('未开放', 'Not exposed'),
               style: TextStyle(
                 color: exposed ? tc.ok : tc.textMuted,
                 fontSize: fMicro,
@@ -641,7 +653,8 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
               prompt.description.isEmpty
                   ? (prompt.arguments.isEmpty
                       ? UiText.t('无参数', 'No arguments')
-                      : UiText.t('参数: ', 'Arguments: ') + prompt.arguments.map((a) => a.name).join(', '))
+                      : UiText.t('参数: ', 'Arguments: ') +
+                          prompt.arguments.map((a) => a.name).join(', '))
                   : prompt.description,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -677,7 +690,8 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
               style: TextStyle(
                 color: tc.textMuted,
                 fontSize: fMicro,
-                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: kMonoFontFallback,
                 height: 1.35,
               ),
             ),
@@ -768,7 +782,8 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     String? directory;
     try {
       directory = await FilePicker.platform.getDirectoryPath(
-        dialogTitle: UiText.t('选择 filesystem MCP 允许访问的目录', 'Choose the folder the filesystem MCP may access'),
+        dialogTitle: UiText.t('选择 filesystem MCP 允许访问的目录',
+            'Choose the folder the filesystem MCP may access'),
       );
     } catch (e) {
       _snack(L10n.str.ut_169bc8e674(e), error: true);
@@ -776,8 +791,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
     }
     if (directory == null || directory.trim().isEmpty) return;
     _openEditor(
-      McpServerConfig.presetFilesystem(directory.trim())
-          .copyWith(id: _newId()),
+      McpServerConfig.presetFilesystem(directory.trim()).copyWith(id: _newId()),
       isNew: true,
     );
   }
@@ -869,7 +883,7 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
       final input = await _askText(
         UiText.t('提示词参数', 'Prompt arguments'),
         '${UiText.t('每行一个 key=value', 'One key=value per line')}\n'
-            '${prompt.arguments.map((a) => '${a.name}${a.required ? UiText.t('（必填）', ' (required)') : ''}: ${a.description}').join('\n')}',
+        '${prompt.arguments.map((a) => '${a.name}${a.required ? UiText.t('（必填）', ' (required)') : ''}: ${a.description}').join('\n')}',
       );
       if (input == null) return;
       args = _parseEnvInput(input);
@@ -967,7 +981,8 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
   void _snack(String message, {bool error = false}) {
     if (!mounted) return;
     final tc = ThemeColors.of(context);
-    showTopSnackBar(context, 
+    showTopSnackBar(
+      context,
       SnackBar(
         content: Text(message),
         duration: const Duration(seconds: 2),
@@ -980,7 +995,8 @@ class _McpSettingsPageState extends State<McpSettingsPage> {
 
 /// 添加/编辑服务器
 class McpServerEditorDialog extends StatefulWidget {
-  const McpServerEditorDialog({super.key, required this.initial, this.isNew = false});
+  const McpServerEditorDialog(
+      {super.key, required this.initial, this.isNew = false});
 
   final McpServerConfig initial;
   final bool isNew;
@@ -1024,8 +1040,8 @@ class _McpServerEditorDialogState extends State<McpServerEditorDialog> {
     _headers = TextEditingController(
       text: c.headers.entries.map((e) => '${e.key}: ${e.value}').join('\n'),
     );
-    _env =
-        TextEditingController(text: c.env.entries.map((e) => '${e.key}=${e.value}').join('\n'));
+    _env = TextEditingController(
+        text: c.env.entries.map((e) => '${e.key}=${e.value}').join('\n'));
     _timeout = TextEditingController(text: '${c.timeoutMs}');
     _maxTools = TextEditingController(text: '${c.maxTools}');
     _proxy = TextEditingController(text: c.proxy);
@@ -1074,12 +1090,15 @@ class _McpServerEditorDialogState extends State<McpServerEditorDialog> {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(pStandard, pCompact, pSmall, pSmall),
+              padding: const EdgeInsets.fromLTRB(
+                  pStandard, pCompact, pSmall, pSmall),
               child: Row(
                 children: [
                   Expanded(
                     child: Text(
-                      widget.isNew ? UiText.t('添加 MCP 服务器', 'Add MCP server') : UiText.t('编辑 MCP 服务器', 'Edit MCP server'),
+                      widget.isNew
+                          ? UiText.t('添加 MCP 服务器', 'Add MCP server')
+                          : UiText.t('编辑 MCP 服务器', 'Edit MCP server'),
                       style: TextStyle(
                         color: tc.textMain,
                         fontSize: fTitle,
@@ -1105,7 +1124,8 @@ class _McpServerEditorDialogState extends State<McpServerEditorDialog> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<McpTransportKind>(
                       initialValue: _transport,
-                      decoration: InputDecoration(labelText: UiText.t('传输方式', 'Transport')),
+                      decoration: InputDecoration(
+                          labelText: UiText.t('传输方式', 'Transport')),
                       items: McpTransportKind.values
                           .map((t) => DropdownMenuItem(
                                 value: t,
@@ -1118,13 +1138,24 @@ class _McpServerEditorDialogState extends State<McpServerEditorDialog> {
                     ),
                     const SizedBox(height: 12),
                     if (_transport == McpTransportKind.stdio) ...[
-                      _field(UiText.t('启动命令', 'Start command'), _command, hint: UiText.t('例如 npx', 'e.g. npx')),
+                      _field(UiText.t('启动命令', 'Start command'), _command,
+                          hint: UiText.t('例如 npx', 'e.g. npx')),
                       const SizedBox(height: 12),
-                      _field(UiText.t('参数（每行一个）', 'Arguments (one per line)'), _args, maxLines: 4, hint: '-y\n@modelcontextprotocol/server-filesystem\nD:\\data'),
+                      _field(UiText.t('参数（每行一个）', 'Arguments (one per line)'),
+                          _args,
+                          maxLines: 4,
+                          hint:
+                              '-y\n@modelcontextprotocol/server-filesystem\nD:\\data'),
                       const SizedBox(height: 12),
-                      _field(UiText.t('工作目录（可选）', 'Working directory (optional)'), _workdir),
+                      _field(
+                          UiText.t('工作目录（可选）', 'Working directory (optional)'),
+                          _workdir),
                       const SizedBox(height: 12),
-                      _field(UiText.t('环境变量（每行 KEY=VALUE）', 'Environment variables (KEY=VALUE per line)'), _env, maxLines: 3),
+                      _field(
+                          UiText.t('环境变量（每行 KEY=VALUE）',
+                              'Environment variables (KEY=VALUE per line)'),
+                          _env,
+                          maxLines: 3),
                       const SizedBox(height: 6),
                       _hint(
                         UiText.t(
@@ -1143,28 +1174,42 @@ class _McpServerEditorDialogState extends State<McpServerEditorDialog> {
                         ),
                       ),
                     ] else ...[
-                      _field(UiText.t('服务器 URL', 'Server URL'), _url, hint: 'https://example.com/mcp'),
+                      _field(UiText.t('服务器 URL', 'Server URL'), _url,
+                          hint: 'https://example.com/mcp'),
                       const SizedBox(height: 12),
-                      _field(UiText.t('出站代理（可选）', 'Outbound proxy (optional)'), _proxy, hint: 'http://127.0.0.1:7890'),
+                      _field(UiText.t('出站代理（可选）', 'Outbound proxy (optional)'),
+                          _proxy,
+                          hint: 'http://127.0.0.1:7890'),
                       const SizedBox(height: 12),
-                      _field(UiText.t('Headers（每行 Key: Value）', 'Headers (Key: Value per line)'), _headers, maxLines: 3),
+                      _field(
+                          UiText.t('Headers（每行 Key: Value）',
+                              'Headers (Key: Value per line)'),
+                          _headers,
+                          maxLines: 3),
                     ],
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        Expanded(child: _field(UiText.t('超时（ms）', 'Timeout (ms)'), _timeout)),
+                        Expanded(
+                            child: _field(
+                                UiText.t('超时（ms）', 'Timeout (ms)'), _timeout)),
                         const SizedBox(width: 12),
-                        Expanded(child: _field(UiText.t('工具上限', 'Tool limit'), _maxTools)),
+                        Expanded(
+                            child: _field(
+                                UiText.t('工具上限', 'Tool limit'), _maxTools)),
                       ],
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<McpToolExposure>(
                       initialValue: _exposure,
-                      decoration: InputDecoration(labelText: UiText.t('Agent 可用工具', 'Tools available to the Agent')),
+                      decoration: InputDecoration(
+                          labelText: UiText.t(
+                              'Agent 可用工具', 'Tools available to the Agent')),
                       items: [
                         DropdownMenuItem(
                           value: McpToolExposure.readOnly,
-                          child: Text(UiText.t('只读工具（推荐）', 'Read-only tools (recommended)')),
+                          child: Text(UiText.t(
+                              '只读工具（推荐）', 'Read-only tools (recommended)')),
                         ),
                         DropdownMenuItem(
                           value: McpToolExposure.all,
@@ -1172,7 +1217,8 @@ class _McpServerEditorDialogState extends State<McpServerEditorDialog> {
                         ),
                         DropdownMenuItem(
                           value: McpToolExposure.custom,
-                          child: Text(UiText.t('自定义（连接后在卡片中勾选）', 'Custom (select in the card after connecting)')),
+                          child: Text(UiText.t('自定义（连接后在卡片中勾选）',
+                              'Custom (select in the card after connecting)')),
                         ),
                       ],
                       onChanged: (value) {
@@ -1180,20 +1226,45 @@ class _McpServerEditorDialogState extends State<McpServerEditorDialog> {
                       },
                     ),
                     const SizedBox(height: 8),
-                    _switchRow(UiText.t('启用服务器', 'Enable server'), _enabled, (v) => setState(() => _enabled = v)),
-                    _switchRow(UiText.t('应用启动时自动连接', 'Auto-connect on app start'), _autoConnect, (v) => setState(() => _autoConnect = v)),
-                    _switchRow(UiText.t('允许 Agent 使用资源', 'Allow the Agent to use resources'), _exposeResources, (v) => setState(() => _exposeResources = v)),
-                    _switchRow(UiText.t('允许 Agent 使用提示词', 'Allow the Agent to use prompts'), _exposePrompts, (v) => setState(() => _exposePrompts = v)),
+                    _switchRow(UiText.t('启用服务器', 'Enable server'), _enabled,
+                        (v) => setState(() => _enabled = v)),
+                    _switchRow(
+                        UiText.t('应用启动时自动连接', 'Auto-connect on app start'),
+                        _autoConnect,
+                        (v) => setState(() => _autoConnect = v)),
+                    _switchRow(
+                        UiText.t('允许 Agent 使用资源',
+                            'Allow the Agent to use resources'),
+                        _exposeResources,
+                        (v) => setState(() => _exposeResources = v)),
+                    _switchRow(
+                        UiText.t(
+                            '允许 Agent 使用提示词', 'Allow the Agent to use prompts'),
+                        _exposePrompts,
+                        (v) => setState(() => _exposePrompts = v)),
                     if (_transport == McpTransportKind.streamableHttp) ...[
                       Divider(color: tc.hairline, height: 24),
-                      _switchRow(UiText.t('使用 OAuth 授权', 'Use OAuth authorization'), _oauth, (v) => setState(() => _oauth = v)),
+                      _switchRow(
+                          UiText.t('使用 OAuth 授权', 'Use OAuth authorization'),
+                          _oauth,
+                          (v) => setState(() => _oauth = v)),
                       if (_oauth) ...[
                         const SizedBox(height: 8),
-                        _field(UiText.t('OAuth scopes（空格/逗号分隔，可选）', 'OAuth scopes (space/comma separated, optional)'), _scopes),
+                        _field(
+                            UiText.t('OAuth scopes（空格/逗号分隔，可选）',
+                                'OAuth scopes (space/comma separated, optional)'),
+                            _scopes),
                         const SizedBox(height: 12),
-                        _field(UiText.t('OAuth clientId（留空走 DCR）', 'OAuth clientId (blank uses DCR)'), _clientId),
+                        _field(
+                            UiText.t('OAuth clientId（留空走 DCR）',
+                                'OAuth clientId (blank uses DCR)'),
+                            _clientId),
                         const SizedBox(height: 12),
-                        _field(UiText.t('OAuth clientSecret（可选）', 'OAuth clientSecret (optional)'), _clientSecret, obscure: true),
+                        _field(
+                            UiText.t('OAuth clientSecret（可选）',
+                                'OAuth clientSecret (optional)'),
+                            _clientSecret,
+                            obscure: true),
                       ],
                     ],
                     const SizedBox(height: 16),
@@ -1210,7 +1281,8 @@ class _McpServerEditorDialogState extends State<McpServerEditorDialog> {
                           'MCP servers can return tool descriptions and external content, so prompt injection is a risk. '
                               'Start with the read-only policy to confirm behavior. Headers/env/secret are stored in the local encrypted credential store; this editor shows their current values.',
                         ),
-                        style: TextStyle(color: tc.textSub, fontSize: fMicro, height: 1.5),
+                        style: TextStyle(
+                            color: tc.textSub, fontSize: fMicro, height: 1.5),
                       ),
                     ),
                     if (_error != null) ...[
@@ -1241,7 +1313,9 @@ class _McpServerEditorDialogState extends State<McpServerEditorDialog> {
                       backgroundColor: tc.brand,
                       foregroundColor: tc.onAccent,
                     ),
-                    child: Text(_enabled ? UiText.t('保存并连接', 'Save & connect') : UiText.t('保存', 'Save')),
+                    child: Text(_enabled
+                        ? UiText.t('保存并连接', 'Save & connect')
+                        : UiText.t('保存', 'Save')),
                   ),
                 ],
               ),
@@ -1311,7 +1385,8 @@ class _McpServerEditorDialogState extends State<McpServerEditorDialog> {
     }
     if (_transport == McpTransportKind.stdio) {
       if (_command.text.trim().isEmpty) {
-        setState(() => _error = UiText.t('stdio 传输需要启动命令', 'stdio transport requires a start command'));
+        setState(() => _error = UiText.t(
+            'stdio 传输需要启动命令', 'stdio transport requires a start command'));
         return;
       }
     } else {
@@ -1320,18 +1395,21 @@ class _McpServerEditorDialogState extends State<McpServerEditorDialog> {
           !uri.hasScheme ||
           (uri.scheme != 'http' && uri.scheme != 'https') ||
           uri.host.isEmpty) {
-        setState(() => _error = UiText.t('服务器 URL 必须是 http(s) 地址', 'Server URL must be an http(s) address'));
+        setState(() => _error = UiText.t(
+            '服务器 URL 必须是 http(s) 地址', 'Server URL must be an http(s) address'));
         return;
       }
     }
     final timeout = int.tryParse(_timeout.text.trim());
     if (timeout == null || timeout < 3000 || timeout > 120000) {
-      setState(() => _error = UiText.t('超时需在 3000-120000ms 之间', 'Timeout must be between 3000 and 120000 ms'));
+      setState(() => _error = UiText.t('超时需在 3000-120000ms 之间',
+          'Timeout must be between 3000 and 120000 ms'));
       return;
     }
     final maxTools = int.tryParse(_maxTools.text.trim());
     if (maxTools == null || maxTools < 1 || maxTools > 40) {
-      setState(() => _error = UiText.t('工具上限需在 1-40 之间', 'Tool limit must be between 1 and 40'));
+      setState(() => _error =
+          UiText.t('工具上限需在 1-40 之间', 'Tool limit must be between 1 and 40'));
       return;
     }
     final proxyRaw = _proxy.text.trim();

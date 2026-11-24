@@ -233,8 +233,7 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            UiText.t('命令超时倍数',
-                                'Command timeout multiplier'),
+                            UiText.t('命令超时倍数', 'Command timeout multiplier'),
                             style: TextStyle(color: tc.textMain),
                           ),
                           Container(
@@ -337,8 +336,7 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                         children: [
                           Expanded(
                             child: Text(
-                              UiText.t('确认提示自动应答',
-                                  'Auto-answer confirmations'),
+                              UiText.t('确认提示自动应答', 'Auto-answer confirmations'),
                               style: TextStyle(color: tc.textMain),
                             ),
                           ),
@@ -370,8 +368,7 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
               Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ExpansionTile(
-                  leading:
-                      Icon(Icons.description_outlined, color: tc.warn),
+                  leading: Icon(Icons.description_outlined, color: tc.warn),
                   title: Text(l10n.agentSettingBuiltInPrompt),
                   subtitle: Text(l10n.agentSettingBuiltInPromptSubtitle,
                       style: TextStyle(color: tc.textSub, fontSize: fSmall)),
@@ -389,8 +386,7 @@ class _AgentSettingsPageState extends ConsumerState<AgentSettingsPage> {
                           const SizedBox(height: 8),
                           Text(
                             l10n.agentSettingPromptWarning,
-                            style: TextStyle(
-                                color: tc.warn, fontSize: fMicro),
+                            style: TextStyle(color: tc.warn, fontSize: fMicro),
                           ),
                           const SizedBox(height: 12),
                           _BuiltInPromptEditor(),
@@ -494,8 +490,8 @@ class _BuiltInPromptEditorState extends State<_BuiltInPromptEditor> {
           decoration: InputDecoration(
             enabledBorder: OutlineInputBorder(
                 borderSide: BorderSide(color: ThemeColors.of(context).border)),
-            focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: tc.brand)),
+            focusedBorder:
+                OutlineInputBorder(borderSide: BorderSide(color: tc.brand)),
           ),
         ),
         const SizedBox(height: 12),
@@ -581,8 +577,8 @@ class _CustomPromptEditorState extends State<_CustomPromptEditor> {
                 color: ThemeColors.of(context).textMuted, fontSize: fSmall),
             enabledBorder: OutlineInputBorder(
                 borderSide: BorderSide(color: ThemeColors.of(context).border)),
-            focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: tc.brand)),
+            focusedBorder:
+                OutlineInputBorder(borderSide: BorderSide(color: tc.brand)),
           ),
         ),
         const SizedBox(height: 12),
@@ -753,94 +749,93 @@ class LocalFileAccessSectionState extends State<LocalFileAccessSection> {
     if (_loading) return const SizedBox.shrink();
 
     final content = Padding(
-        padding: const EdgeInsets.all(pStandard),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(ui.localFileEnable,
-                      style: TextStyle(color: tc.textMain)),
-                ),
-                Switch(
-                  value: _policy.enabled,
-                  onChanged: (v) => _save(_policy.copyWith(enabled: v)),
-                ),
-              ],
+      padding: const EdgeInsets.all(pStandard),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(ui.localFileEnable,
+                    style: TextStyle(color: tc.textMain)),
+              ),
+              Switch(
+                value: _policy.enabled,
+                onChanged: (v) => _save(_policy.copyWith(enabled: v)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: Text(ui.localFileDirs,
+                    style: TextStyle(
+                        color: tc.textMain, fontWeight: FontWeight.w600)),
+              ),
+              TextButton.icon(
+                onPressed: _addDirectory,
+                icon: const Icon(Icons.folder_open, size: 16),
+                label: Text(ui.localFileAddDir),
+              ),
+            ],
+          ),
+          if (_policy.allowedDirs.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                ui.localFileNoDirs,
+                style: TextStyle(color: tc.textMuted, fontSize: fSmall),
+              ),
             ),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(ui.localFileDirs,
-                      style: TextStyle(
-                          color: tc.textMain, fontWeight: FontWeight.w600)),
-                ),
-                TextButton.icon(
-                  onPressed: _addDirectory,
-                  icon: const Icon(Icons.folder_open, size: 16),
-                  label: Text(ui.localFileAddDir),
-                ),
-              ],
+          for (final dir in _policy.allowedDirs)
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(Icons.folder_outlined, size: 16, color: tc.textSub),
+              title: Text(dir,
+                  style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+              trailing: IconButton(
+                icon: Icon(Icons.close, size: 16, color: tc.textMuted),
+                tooltip: ui.localFileRemoveDir,
+                onPressed: () => _remove(dir),
+              ),
             ),
-            if (_policy.allowedDirs.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
                 child: Text(
-                  ui.localFileNoDirs,
-                  style: TextStyle(color: tc.textMuted, fontSize: fSmall),
+                  _trash.isEmpty
+                      ? ui.localFileTrashEmpty
+                      : ui.localFileTrashLabel(
+                          _trash.count, formatByteSize(_trash.bytes)),
+                  style: TextStyle(color: tc.textSub, fontSize: fSmall),
                 ),
               ),
-            for (final dir in _policy.allowedDirs)
-              ListTile(
-                dense: true,
-                contentPadding: EdgeInsets.zero,
-                leading:
-                    Icon(Icons.folder_outlined, size: 16, color: tc.textSub),
-                title: Text(dir,
-                    style: TextStyle(color: tc.textSub, fontSize: fSmall)),
-                trailing: IconButton(
-                  icon: Icon(Icons.close, size: 16, color: tc.textMuted),
-                  tooltip: ui.localFileRemoveDir,
-                  onPressed: () => _remove(dir),
-                ),
-              ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    _trash.isEmpty
-                        ? ui.localFileTrashEmpty
-                        : ui.localFileTrashLabel(
-                            _trash.count, formatByteSize(_trash.bytes)),
-                    style: TextStyle(color: tc.textSub, fontSize: fSmall),
-                  ),
-                ),
-                if (_trash.isNotEmpty)
-                  _trashBusy
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : TextButton.icon(
-                          onPressed: _clearTrash,
-                          icon: Icon(Icons.delete_sweep_outlined,
-                              size: 16, color: tc.textMuted),
-                          label: Text(ui.localFileTrashClear,
-                              style: const TextStyle(fontSize: fSmall)),
-                        ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              ui.localFileBlacklistHint,
-              style: TextStyle(color: tc.warn, fontSize: fMicro),
-            ),
-          ],
-        ),
-      );
+              if (_trash.isNotEmpty)
+                _trashBusy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : TextButton.icon(
+                        onPressed: _clearTrash,
+                        icon: Icon(Icons.delete_sweep_outlined,
+                            size: 16, color: tc.textMuted),
+                        label: Text(ui.localFileTrashClear,
+                            style: const TextStyle(fontSize: fSmall)),
+                      ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            ui.localFileBlacklistHint,
+            style: TextStyle(color: tc.warn, fontSize: fMicro),
+          ),
+        ],
+      ),
+    );
     return widget.flat
         ? content
         : Card(

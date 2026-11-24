@@ -13,7 +13,8 @@ class NotificationSettingsPage extends StatefulWidget {
   const NotificationSettingsPage({super.key});
 
   @override
-  State<NotificationSettingsPage> createState() => _NotificationSettingsPageState();
+  State<NotificationSettingsPage> createState() =>
+      _NotificationSettingsPageState();
 }
 
 class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
@@ -46,7 +47,8 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     if (_enabled && url.isNotEmpty) {
       final err = NotificationService.validateWebhookUrl(url);
       if (err != null) {
-        showTopSnackBar(context, 
+        showTopSnackBar(
+          context,
           SnackBar(
             content: Text(l10n.notificationInvalidUrl(err)),
             backgroundColor: tc.error,
@@ -64,7 +66,8 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     try {
       await NotificationService.save(cfg);
       if (!mounted) return;
-      showTopSnackBar(context, 
+      showTopSnackBar(
+        context,
         SnackBar(
           content: Text(l10n.notificationSaved),
           backgroundColor: tc.ok,
@@ -73,7 +76,8 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      showTopSnackBar(context, 
+      showTopSnackBar(
+        context,
         SnackBar(
           content: Text(l10n.notificationSaveFailed(e.toString())),
           backgroundColor: tc.error,
@@ -88,14 +92,18 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     final l10n = AppLocalizations.of(context)!;
     final url = _webhookController.text.trim();
     if (url.isEmpty) {
-      showTopSnackBar(context, 
-        SnackBar(content: Text(l10n.notificationEnterUrlFirst), behavior: SnackBarBehavior.floating),
+      showTopSnackBar(
+        context,
+        SnackBar(
+            content: Text(l10n.notificationEnterUrlFirst),
+            behavior: SnackBarBehavior.floating),
       );
       return;
     }
     final err = NotificationService.validateWebhookUrl(url);
     if (err != null) {
-      showTopSnackBar(context, 
+      showTopSnackBar(
+        context,
         SnackBar(
           content: Text(l10n.notificationInvalidUrl(err)),
           backgroundColor: tc.error,
@@ -110,16 +118,19 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
     try {
       final ok = await NotificationService.sendTest();
       if (!mounted) return;
-      showTopSnackBar(context, 
+      showTopSnackBar(
+        context,
         SnackBar(
-          content: Text(ok ? l10n.notificationTestSent : l10n.notificationTestSendFailed),
+          content: Text(
+              ok ? l10n.notificationTestSent : l10n.notificationTestSendFailed),
           backgroundColor: ok ? tc.ok : tc.error,
           behavior: SnackBarBehavior.floating,
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      showTopSnackBar(context, 
+      showTopSnackBar(
+        context,
         SnackBar(
           content: Text(l10n.notificationTestFailed(e.toString())),
           backgroundColor: tc.error,
@@ -146,179 +157,205 @@ class _NotificationSettingsPageState extends State<NotificationSettingsPage> {
           child: ListView(
             padding: const EdgeInsets.all(pStandard),
             children: [
-          // 启用开关
-          Card(
-            color: tc.card,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rCard)),
-            child: Padding(
-              padding: const EdgeInsets.all(pStandard),
-              child: Row(
-                children: [
-                  Icon(_enabled ? Icons.notifications_active : Icons.notifications_off,
-                      color: _enabled ? tc.warn : tc.textSub),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(l10n.notificationEnable, style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
-                        Text(l10n.notificationEnableHint,
-                            style: TextStyle(color: tc.textSub, fontSize: fSmall)),
-                      ],
-                    ),
-                  ),
-                  Switch(
-                    value: _enabled,
-                    activeThumbColor: tc.warn,
-                    onChanged: (v) => setState(() => _enabled = v),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          if (_enabled) ...[
-            const SizedBox(height: 16),
-
-            // Webhook URL
-            _buildSectionTitle(l10n.notificationWebhookUrl),
-            Card(
-              color: tc.card,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rCard)),
-              child: Padding(
-                padding: const EdgeInsets.all(pStandard),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: _webhookController,
-                      style: TextStyle(color: tc.textMain, fontSize: fBody),
-                      maxLines: 2,
-                      decoration: InputDecoration(
-                        hintText: 'https://oapi.dingtalk.com/robot/send?access_token=xxx',
-                        hintStyle: TextStyle(color: tc.textMuted, fontSize: fSmall),
-                        filled: true,
-                        fillColor: tc.bg,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(rSmall),
-                          borderSide: BorderSide(color: tc.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(rSmall),
-                          borderSide: BorderSide(color: tc.border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(rSmall),
-                          borderSide: BorderSide(color: tc.brand),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(l10n.notificationWebhookSupport,
-                        style: TextStyle(color: tc.textMuted, fontSize: fMicro)),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // 触发条件
-            _buildSectionTitle(l10n.notificationTriggerTitle),
-            Card(
-              color: tc.card,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rCard)),
-              child: Padding(
-                padding: const EdgeInsets.all(pStandard),
-                child: RadioGroup<String>(
-                  groupValue: _trigger,
-                  onChanged: (v) => setState(() => _trigger = v ?? 'failedOnly'),
-                  child: Column(
+              // 启用开关
+              Card(
+                color: tc.card,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(rCard)),
+                child: Padding(
+                  padding: const EdgeInsets.all(pStandard),
+                  child: Row(
                     children: [
-                      RadioListTile<String>(
-                        value: 'failedOnly',
-                        title: Text(l10n.notificationFailedOnly),
-                        subtitle: Text(l10n.notificationFailedOnlySubtitle),
-                        activeColor: tc.brand,
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
+                      Icon(
+                          _enabled
+                              ? Icons.notifications_active
+                              : Icons.notifications_off,
+                          color: _enabled ? tc.warn : tc.textSub),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(l10n.notificationEnable,
+                                style: TextStyle(
+                                    color: tc.textMain,
+                                    fontSize: fBody,
+                                    fontWeight: FontWeight.w600)),
+                            Text(l10n.notificationEnableHint,
+                                style: TextStyle(
+                                    color: tc.textSub, fontSize: fSmall)),
+                          ],
+                        ),
                       ),
-                      Divider(color: tc.hairline, height: 1),
-                      RadioListTile<String>(
-                        value: 'always',
-                        title: Text(l10n.notificationAlways),
-                        subtitle: Text(l10n.notificationAlwaysSubtitle),
-                        activeColor: tc.brand,
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
+                      Switch(
+                        value: _enabled,
+                        activeThumbColor: tc.warn,
+                        onChanged: (v) => setState(() => _enabled = v),
                       ),
                     ],
                   ),
                 ),
               ),
-            ),
 
-            const SizedBox(height: 16),
+              if (_enabled) ...[
+                const SizedBox(height: 16),
 
-            // 测试按钮
-            OutlinedButton.icon(
-              onPressed: _testing ? null : _testNotification,
-              icon: _testing
-                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Icon(Icons.send, size: 16),
-              label: Text(_testing ? l10n.notificationSending : l10n.notificationSendTest),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(44),
-                foregroundColor: tc.brand,
-                side: BorderSide(color: tc.brand.withValues(alpha: 0.5)),
-              ),
-            ),
-          ],
-
-          const SizedBox(height: 24),
-
-          // 保存按钮
-          FilledButton.icon(
-            onPressed: _save,
-            icon: const Icon(Icons.save, size: 16),
-            label: Text(l10n.notificationSaveConfig),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(44),
-              backgroundColor: tc.brand,
-              foregroundColor: tc.onAccent,
-            ),
-          ),
-
-          const SizedBox(height: 16),
-          // 使用说明
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: tc.brand.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(rSmall),
-              border: Border.all(color: tc.brand.withValues(alpha: 0.2)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 14, color: tc.brand),
-                    const SizedBox(width: 6),
-                    Text(l10n.notificationInstructionsTitle, style: TextStyle(color: tc.brand, fontSize: fSmall, fontWeight: FontWeight.w600)),
-                  ],
+                // Webhook URL
+                _buildSectionTitle(l10n.notificationWebhookUrl),
+                Card(
+                  color: tc.card,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(rCard)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(pStandard),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: _webhookController,
+                          style: TextStyle(color: tc.textMain, fontSize: fBody),
+                          maxLines: 2,
+                          decoration: InputDecoration(
+                            hintText:
+                                'https://oapi.dingtalk.com/robot/send?access_token=xxx',
+                            hintStyle: TextStyle(
+                                color: tc.textMuted, fontSize: fSmall),
+                            filled: true,
+                            fillColor: tc.bg,
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 10),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(rSmall),
+                              borderSide: BorderSide(color: tc.border),
+                            ),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(rSmall),
+                              borderSide: BorderSide(color: tc.border),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(rSmall),
+                              borderSide: BorderSide(color: tc.brand),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(l10n.notificationWebhookSupport,
+                            style: TextStyle(
+                                color: tc.textMuted, fontSize: fMicro)),
+                      ],
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  l10n.notificationInstructionsBody,
-                  style: TextStyle(color: tc.textBody, fontSize: fMicro, height: 1.6),
+
+                const SizedBox(height: 16),
+
+                // 触发条件
+                _buildSectionTitle(l10n.notificationTriggerTitle),
+                Card(
+                  color: tc.card,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(rCard)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(pStandard),
+                    child: RadioGroup<String>(
+                      groupValue: _trigger,
+                      onChanged: (v) =>
+                          setState(() => _trigger = v ?? 'failedOnly'),
+                      child: Column(
+                        children: [
+                          RadioListTile<String>(
+                            value: 'failedOnly',
+                            title: Text(l10n.notificationFailedOnly),
+                            subtitle: Text(l10n.notificationFailedOnlySubtitle),
+                            activeColor: tc.brand,
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          Divider(color: tc.hairline, height: 1),
+                          RadioListTile<String>(
+                            value: 'always',
+                            title: Text(l10n.notificationAlways),
+                            subtitle: Text(l10n.notificationAlwaysSubtitle),
+                            activeColor: tc.brand,
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // 测试按钮
+                OutlinedButton.icon(
+                  onPressed: _testing ? null : _testNotification,
+                  icon: _testing
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.send, size: 16),
+                  label: Text(_testing
+                      ? l10n.notificationSending
+                      : l10n.notificationSendTest),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                    foregroundColor: tc.brand,
+                    side: BorderSide(color: tc.brand.withValues(alpha: 0.5)),
+                  ),
                 ),
               ],
-            ),
-          ),
-        ],
+
+              const SizedBox(height: 24),
+
+              // 保存按钮
+              FilledButton.icon(
+                onPressed: _save,
+                icon: const Icon(Icons.save, size: 16),
+                label: Text(l10n.notificationSaveConfig),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(44),
+                  backgroundColor: tc.brand,
+                  foregroundColor: tc.onAccent,
+                ),
+              ),
+
+              const SizedBox(height: 16),
+              // 使用说明
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: tc.brand.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(rSmall),
+                  border: Border.all(color: tc.brand.withValues(alpha: 0.2)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.info_outline, size: 14, color: tc.brand),
+                        const SizedBox(width: 6),
+                        Text(l10n.notificationInstructionsTitle,
+                            style: TextStyle(
+                                color: tc.brand,
+                                fontSize: fSmall,
+                                fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      l10n.notificationInstructionsBody,
+                      style: TextStyle(
+                          color: tc.textBody, fontSize: fMicro, height: 1.6),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

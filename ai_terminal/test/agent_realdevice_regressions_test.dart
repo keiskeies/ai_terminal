@@ -157,7 +157,8 @@ void main() {
       engine.onEvent = events.add;
 
       provider.enqueueText('思考: 先看一下 sshd 配置\n');
-      provider.enqueueText('动作: execute\n命令: cat /etc/ssh/sshd_config | head -3\n');
+      provider
+          .enqueueText('动作: execute\n命令: cat /etc/ssh/sshd_config | head -3\n');
       // 真机复现形状：工具观测回传后，模型在 finish 正文里贴回带行号的围栏
       provider.enqueueText(
         '前 3 行都是注释，尚未出现生效配置。\n'
@@ -176,8 +177,7 @@ void main() {
           reason: 'finish 正文里的围栏是引用内容，绝不能作为命令执行');
 
       final commandEvents = events.where((e) => e.isCommand).toList();
-      expect(commandEvents.length, 1,
-          reason: '只有 execute 轮的命令能产出 command 事件');
+      expect(commandEvents.length, 1, reason: '只有 execute 轮的命令能产出 command 事件');
       expect(commandEvents.single.command, contains('sshd_config'));
     });
 
@@ -214,7 +214,8 @@ void main() {
       final events = <AgentEvent>[];
       engine.onEvent = events.add;
 
-      provider.enqueueText('动作: execute\n命令: grep -n Port /etc/ssh/sshd_config\n');
+      provider
+          .enqueueText('动作: execute\n命令: grep -n Port /etc/ssh/sshd_config\n');
       provider.enqueueText(
         '```\n'
         'L17: #Port 22\n'

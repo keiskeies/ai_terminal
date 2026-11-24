@@ -14,8 +14,8 @@ void main() {
 
   group('parseSlashCommand', () {
     test('命令名与参数分离，参数保留原始大小写', () {
-      final parsed = parseSlashCommand('/goal FixNginx-Bug 并验证 200',
-          knownNames: known);
+      final parsed =
+          parseSlashCommand('/goal FixNginx-Bug 并验证 200', knownNames: known);
 
       expect(parsed?.name, '/goal');
       expect(parsed?.rest, 'FixNginx-Bug 并验证 200');
@@ -23,8 +23,7 @@ void main() {
     });
 
     test('命令名大小写不敏感，参数不受影响', () {
-      final parsed =
-          parseSlashCommand('/GOAL KeepThisCase', knownNames: known);
+      final parsed = parseSlashCommand('/GOAL KeepThisCase', knownNames: known);
 
       expect(parsed?.name, '/goal');
       expect(parsed?.rest, 'KeepThisCase');
@@ -55,8 +54,8 @@ void main() {
     test('以 / 开头的远程路径不是命令', () {
       // 这是"首个 / 就当命令"的失效场景：用户要 agent 处理绝对路径
       expect(parseSlashCommand('/etc/nginx 目录权限', knownNames: known), isNull);
-      expect(parseSlashCommand('/var/log/syslog 里的报错', knownNames: known),
-          isNull);
+      expect(
+          parseSlashCommand('/var/log/syslog 里的报错', knownNames: known), isNull);
     });
 
     test('非命令前缀不误判为命令', () {
@@ -71,12 +70,13 @@ void main() {
     });
 
     test('既有命令 /new 与 /compact 仍能解析（改造未回退）', () {
-      expect(parseSlashCommand('/new', knownNames: kSlashCommands.map((c) => c.command))?.name,
+      expect(
+          parseSlashCommand('/new',
+              knownNames: kSlashCommands.map((c) => c.command))?.name,
           '/new');
       expect(
           parseSlashCommand('/compact',
-              knownNames: kSlashCommands.map((c) => c.command))
-              ?.name,
+              knownNames: kSlashCommands.map((c) => c.command))?.name,
           '/compact');
       // 注册表里的命令名必须带前导斜杠，否则匹配不上输入
       for (final cmd in kSlashCommands) {
@@ -178,7 +178,8 @@ void main() {
     test('/plan 进入前不是只读、结束时仍只读 → 要还原原档位', () {
       expect(
         shouldRestorePermissionMode(
-            before: AgentPermissionMode.auto, now: AgentPermissionMode.readOnly),
+            before: AgentPermissionMode.auto,
+            now: AgentPermissionMode.readOnly),
         isTrue,
       );
       expect(
@@ -207,8 +208,7 @@ void main() {
       );
       expect(
         shouldRestorePermissionMode(
-            before: AgentPermissionMode.ask,
-            now: AgentPermissionMode.fullAuto),
+            before: AgentPermissionMode.ask, now: AgentPermissionMode.fullAuto),
         isFalse,
       );
       expect(

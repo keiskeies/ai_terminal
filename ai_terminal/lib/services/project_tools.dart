@@ -29,7 +29,8 @@ class BuildLock {
         await Future.any([
           _current!.future,
           if (cancelToken != null)
-            cancelToken.future.then((_) => throw CancellationException('构建锁等待被取消')),
+            cancelToken.future
+                .then((_) => throw CancellationException('构建锁等待被取消')),
         ]);
       } on CancellationException {
         rethrow;
@@ -78,7 +79,8 @@ class ProjectAnalyzeTool extends AgentTool {
   ToolKind get kind => ToolKind.read;
 
   @override
-  String get description => '分析本地项目目录，识别项目类型（Node/Flutter/Java/Rust/Python/Go等）、'
+  String get description =>
+      '分析本地项目目录，识别项目类型（Node/Flutter/Java/Rust/Python/Go等）、'
       '构建命令、入口文件、依赖管理器、部署配置。仅读取项目元数据文件（package.json/pubspec.yaml等）和'
       'README/AGENTS.md/CLAUDE.md，不读取源码。用于"本地项目部署到服务器"工作流的第一步。'
       '必须先调用此工具了解项目，再决定构建命令。';
@@ -110,17 +112,17 @@ class ProjectAnalyzeTool extends AgentTool {
       return ToolResult.failure(L10n.str.ut_b01822a097(path));
     }
 
-    onProgress?.call(
-        UiText.t('正在分析项目结构...', 'Analyzing project structure...'));
+    onProgress?.call(UiText.t('正在分析项目结构...', 'Analyzing project structure...'));
 
     final result = StringBuffer();
-    result.writeln(UiText.t('=== 项目分析报告 ===', '=== Project analysis report ==='));
-    result.writeln(
-        L10n.str.ut_f1acec8e02(dir.absolute.path));
+    result
+        .writeln(UiText.t('=== 项目分析报告 ===', '=== Project analysis report ==='));
+    result.writeln(L10n.str.ut_f1acec8e02(dir.absolute.path));
     result.writeln();
 
     // 收集项目根目录下的文件
-    final entities = await dir.list(recursive: false, followLinks: false).toList();
+    final entities =
+        await dir.list(recursive: false, followLinks: false).toList();
     final fileNames = <String>{};
     final dirNames = <String>{};
     for (final e in entities) {
@@ -153,14 +155,27 @@ class ProjectAnalyzeTool extends AgentTool {
     // 2. 读取项目元数据文件
     result.writeln('--- 项目元数据 ---');
     final metadataFiles = <String>[
-      'package.json', 'pubspec.yaml', 'pubspec.yml', 'pom.xml', 'build.gradle',
-      'build.gradle.kts', 'Cargo.toml', 'go.mod', 'requirements.txt',
-      'pyproject.toml', 'setup.py', 'Gemfile', 'composer.json',
-      'Package.swift', 'mix.exs', 'project.clj',
+      'package.json',
+      'pubspec.yaml',
+      'pubspec.yml',
+      'pom.xml',
+      'build.gradle',
+      'build.gradle.kts',
+      'Cargo.toml',
+      'go.mod',
+      'requirements.txt',
+      'pyproject.toml',
+      'setup.py',
+      'Gemfile',
+      'composer.json',
+      'Package.swift',
+      'mix.exs',
+      'project.clj',
     ];
     for (final name in metadataFiles) {
       if (fileNames.contains(name)) {
-        final content = await _readFileSafely(p.join(path, name), maxSize: 20000, projectRoot: path);
+        final content = await _readFileSafely(p.join(path, name),
+            maxSize: 20000, projectRoot: path);
         if (content != null) {
           result.writeln('[$name]');
           result.writeln(content);
@@ -171,10 +186,18 @@ class ProjectAnalyzeTool extends AgentTool {
 
     // 3. 读取说明文件
     result.writeln('--- 项目说明 ---');
-    final readmeFiles = ['README.md', 'README.rst', 'README.txt', 'README', 'AGENTS.md', 'CLAUDE.md'];
+    final readmeFiles = [
+      'README.md',
+      'README.rst',
+      'README.txt',
+      'README',
+      'AGENTS.md',
+      'CLAUDE.md'
+    ];
     for (final name in readmeFiles) {
       if (fileNames.contains(name)) {
-        final content = await _readFileSafely(p.join(path, name), maxSize: 30000, projectRoot: path);
+        final content = await _readFileSafely(p.join(path, name),
+            maxSize: 30000, projectRoot: path);
         if (content != null) {
           result.writeln('[$name]');
           result.writeln(content);
@@ -185,11 +208,19 @@ class ProjectAnalyzeTool extends AgentTool {
 
     // 4. 读取部署配置
     result.writeln('--- 部署配置 ---');
-    final deployFiles = ['Dockerfile', 'docker-compose.yml', 'docker-compose.yaml',
-      '.env.example', 'Makefile', 'justfile', 'Procfile'];
+    final deployFiles = [
+      'Dockerfile',
+      'docker-compose.yml',
+      'docker-compose.yaml',
+      '.env.example',
+      'Makefile',
+      'justfile',
+      'Procfile'
+    ];
     for (final name in deployFiles) {
       if (fileNames.contains(name)) {
-        final content = await _readFileSafely(p.join(path, name), maxSize: 15000, projectRoot: path);
+        final content = await _readFileSafely(p.join(path, name),
+            maxSize: 15000, projectRoot: path);
         if (content != null) {
           result.writeln('[$name]');
           result.writeln(content);
@@ -210,7 +241,8 @@ class ProjectAnalyzeTool extends AgentTool {
         }
         if (workflowNames.isNotEmpty) {
           result.writeln('.github/workflows/: ${workflowNames.join(", ")}');
-          result.writeln('（如需查看具体 CI 配置，请用 execute 动作 cat .github/workflows/xxx.yml）');
+          result.writeln(
+              '（如需查看具体 CI 配置，请用 execute 动作 cat .github/workflows/xxx.yml）');
         }
       } catch (e) {
         debugPrint('[ProjectAnalyze] 读取 CI 配置失败: $e');
@@ -240,14 +272,27 @@ class ProjectAnalyzeTool extends AgentTool {
 
     // 7. 构建产物检查
     result.writeln('--- 已有构建产物 ---');
-    final outputDirs = ['build', 'dist', 'target', 'out', '.next', '.nuxt',
-      'bin', 'obj', 'Release', 'Debug', '__pycache__', 'node_modules'];
+    final outputDirs = [
+      'build',
+      'dist',
+      'target',
+      'out',
+      '.next',
+      '.nuxt',
+      'bin',
+      'obj',
+      'Release',
+      'Debug',
+      '__pycache__',
+      'node_modules'
+    ];
     for (final d in outputDirs) {
       if (dirNames.contains(d)) {
         final outputDir = Directory(p.join(path, d));
         try {
           final stat = await outputDir.stat();
-          result.writeln('✓ $d/ (类型: ${_typeLabel(stat.type)}, 修改: ${stat.modified.toIso8601String().substring(0, 19)})');
+          result.writeln(
+              '✓ $d/ (类型: ${_typeLabel(stat.type)}, 修改: ${stat.modified.toIso8601String().substring(0, 19)})');
         } catch (_) {}
       }
     }
@@ -261,12 +306,14 @@ class ProjectAnalyzeTool extends AgentTool {
   }
 
   /// 检测项目类型
-  Future<_ProjectTypeInfo> _detectProjectType(String projectPath, Set<String> files, Set<String> dirs) async {
+  Future<_ProjectTypeInfo> _detectProjectType(
+      String projectPath, Set<String> files, Set<String> dirs) async {
     // Flutter / Dart
     if (files.contains('pubspec.yaml')) {
       // 区分 Flutter 和纯 Dart
       try {
-        final content = await File(p.join(projectPath, 'pubspec.yaml')).readAsString();
+        final content =
+            await File(p.join(projectPath, 'pubspec.yaml')).readAsString();
         if (content.contains('flutter:') && !content.contains('sdk: dart')) {
           return const _ProjectTypeInfo(
             type: 'Flutter',
@@ -289,15 +336,28 @@ class ProjectAnalyzeTool extends AgentTool {
     // Node.js
     if (files.contains('package.json')) {
       // 检查是否 Next.js / Nuxt / React / Vue
-      if (dirs.contains('.next') || files.contains('next.config.js') || files.contains('next.config.mjs')) {
-        return const _ProjectTypeInfo(type: 'Next.js', buildCommand: 'npm run build', buildOutput: '.next', packageManager: 'npm');
+      if (dirs.contains('.next') ||
+          files.contains('next.config.js') ||
+          files.contains('next.config.mjs')) {
+        return const _ProjectTypeInfo(
+            type: 'Next.js',
+            buildCommand: 'npm run build',
+            buildOutput: '.next',
+            packageManager: 'npm');
       }
-      if (dirs.contains('.nuxt') || files.contains('nuxt.config.ts') || files.contains('nuxt.config.js')) {
-        return const _ProjectTypeInfo(type: 'Nuxt', buildCommand: 'npm run build', buildOutput: '.output', packageManager: 'npm');
+      if (dirs.contains('.nuxt') ||
+          files.contains('nuxt.config.ts') ||
+          files.contains('nuxt.config.js')) {
+        return const _ProjectTypeInfo(
+            type: 'Nuxt',
+            buildCommand: 'npm run build',
+            buildOutput: '.output',
+            packageManager: 'npm');
       }
       // 检查 package.json scripts
       try {
-        final content = await File(p.join(projectPath, 'package.json')).readAsString();
+        final content =
+            await File(p.join(projectPath, 'package.json')).readAsString();
         final pkg = jsonDecode(content) as Map<String, dynamic>;
         final scripts = pkg['scripts'] as Map<String, dynamic>?;
         if (scripts != null) {
@@ -307,7 +367,9 @@ class ProjectAnalyzeTool extends AgentTool {
               type: 'Node.js',
               buildCommand: 'npm run build',
               buildOutput: _inferBuildOutput(buildCmd, dirs),
-              packageManager: pkg.containsKey('packageManager') ? pkg['packageManager'].toString().split('@').first : 'npm',
+              packageManager: pkg.containsKey('packageManager')
+                  ? pkg['packageManager'].toString().split('@').first
+                  : 'npm',
             );
           }
         }
@@ -356,7 +418,9 @@ class ProjectAnalyzeTool extends AgentTool {
     }
 
     // Python
-    if (files.contains('requirements.txt') || files.contains('pyproject.toml') || files.contains('setup.py')) {
+    if (files.contains('requirements.txt') ||
+        files.contains('pyproject.toml') ||
+        files.contains('setup.py')) {
       return _ProjectTypeInfo(
         type: 'Python',
         packageManager: files.contains('pyproject.toml') ? 'pip/poetry' : 'pip',
@@ -387,17 +451,23 @@ class ProjectAnalyzeTool extends AgentTool {
 
   String _typeLabel(FileSystemEntityType type) {
     switch (type) {
-      case FileSystemEntityType.directory: return '目录';
-      case FileSystemEntityType.file: return '文件';
-      case FileSystemEntityType.link: return '链接';
-      default: return '未知';
+      case FileSystemEntityType.directory:
+        return '目录';
+      case FileSystemEntityType.file:
+        return '文件';
+      case FileSystemEntityType.link:
+        return '链接';
+      default:
+        return '未知';
     }
   }
 
   /// 安全读取文件（带路径检查 + 大小限制）
-  Future<String?> _readFileSafely(String filePath, {required int maxSize, required String projectRoot}) async {
+  Future<String?> _readFileSafely(String filePath,
+      {required int maxSize, required String projectRoot}) async {
     try {
-      final check = SafetyGuard.checkReadPath(filePath, projectRoot: projectRoot);
+      final check =
+          SafetyGuard.checkReadPath(filePath, projectRoot: projectRoot);
       if (check.level == SafetyLevel.blocked) {
         debugPrint('[ProjectAnalyze] 跳过敏感文件: $filePath (${check.reason})');
         return null;
@@ -457,7 +527,8 @@ class BuildProjectTool extends AgentTool {
   bool get recordsChanges => false;
 
   @override
-  String get description => '在本地执行项目构建命令（如 npm run build / flutter build web / cargo build --release）。'
+  String get description =>
+      '在本地执行项目构建命令（如 npm run build / flutter build web / cargo build --release）。'
       '自动 cd 到项目目录，使用本地终端执行。构建失败时返回错误日志，请用 ask 动作询问用户"要我尝试修复吗"。'
       '同一时刻只允许一个构建任务运行（串行）。';
 
@@ -493,7 +564,8 @@ class BuildProjectTool extends AgentTool {
 
     // 必须使用本地终端执行
     if (executor is! LocalTerminalService) {
-      return ToolResult.failure('build_project 仅支持本地终端会话，当前为 SSH 远程会话。请切换到本地终端标签页。');
+      return ToolResult.failure(
+          'build_project 仅支持本地终端会话，当前为 SSH 远程会话。请切换到本地终端标签页。');
     }
 
     if (!executor.isConnected) {
@@ -506,7 +578,8 @@ class BuildProjectTool extends AgentTool {
       // 默认根据项目类型推断
       buildCmd = await _inferBuildCommand(path);
       if (buildCmd.isEmpty) {
-        return ToolResult.failure('未提供构建命令，且无法自动识别项目类型。请提供 command 参数（如 npm run build）');
+        return ToolResult.failure(
+            '未提供构建命令，且无法自动识别项目类型。请提供 command 参数（如 npm run build）');
       }
       onProgress?.call(L10n.str.ut_8a884e053e(buildCmd));
     }
@@ -514,7 +587,8 @@ class BuildProjectTool extends AgentTool {
     // 安全检查构建命令
     final cmdSafety = SafetyGuard.check(buildCmd);
     if (cmdSafety == SafetyLevel.blocked) {
-      return ToolResult.failure(L10n.str.ut_5ab7922da3(SafetyGuard.getReason(buildCmd) ?? ''));
+      return ToolResult.failure(
+          L10n.str.ut_5ab7922da3(SafetyGuard.getReason(buildCmd) ?? ''));
     }
 
     // 获取构建锁（串行化）
@@ -522,13 +596,12 @@ class BuildProjectTool extends AgentTool {
     try {
       await BuildLock.instance.acquire();
     } on CancellationException {
-      return ToolResult.failure(UiText.t(
-          '等待构建锁时被取消', 'Cancelled while waiting for the build lock'));
+      return ToolResult.failure(
+          UiText.t('等待构建锁时被取消', 'Cancelled while waiting for the build lock'));
     }
 
     try {
-      onProgress?.call(
-          L10n.str.ut_323ecc4b40(buildCmd));
+      onProgress?.call(L10n.str.ut_323ecc4b40(buildCmd));
       debugPrint('[BuildProject] 在 $path 执行: $buildCmd');
 
       // 拼接完整命令：cd 到项目目录 + 执行构建
@@ -545,12 +618,14 @@ class BuildProjectTool extends AgentTool {
       final stderr = result.stderr;
 
       if (result.success) {
-        final summary = L10n.str.ut_dd547aa71c(result.duration.inSeconds, output);
+        final summary =
+            L10n.str.ut_dd547aa71c(result.duration.inSeconds, output);
         onProgress?.call(UiText.t('构建成功', 'Build succeeded'));
         return ToolResult.success(summary);
       } else {
         final errorDetail = StringBuffer();
-        errorDetail.writeln(L10n.str.ut_fe98a458a9(result.exitCode, result.duration.inSeconds));
+        errorDetail.writeln(
+            L10n.str.ut_fe98a458a9(result.exitCode, result.duration.inSeconds));
         if (result.timedOut) {
           errorDetail.writeln('⏱ 构建超时');
         }
@@ -574,13 +649,17 @@ class BuildProjectTool extends AgentTool {
   /// 推断默认构建命令
   Future<String> _inferBuildCommand(String path) async {
     try {
-      final entities = await Directory(path).list(recursive: false, followLinks: false).toList();
-      final fileNames = entities.whereType<File>().map((e) => p.basename(e.path)).toSet();
+      final entities = await Directory(path)
+          .list(recursive: false, followLinks: false)
+          .toList();
+      final fileNames =
+          entities.whereType<File>().map((e) => p.basename(e.path)).toSet();
 
       // Flutter
       if (fileNames.contains('pubspec.yaml')) {
         try {
-          final content = await File(p.join(path, 'pubspec.yaml')).readAsString();
+          final content =
+              await File(p.join(path, 'pubspec.yaml')).readAsString();
           if (content.contains('flutter:')) {
             return 'flutter build web --release';
           }
@@ -591,7 +670,8 @@ class BuildProjectTool extends AgentTool {
       // Node.js
       if (fileNames.contains('package.json')) {
         try {
-          final content = await File(p.join(path, 'package.json')).readAsString();
+          final content =
+              await File(p.join(path, 'package.json')).readAsString();
           final pkg = jsonDecode(content) as Map<String, dynamic>;
           final scripts = pkg['scripts'] as Map<String, dynamic>?;
           if (scripts != null && scripts.containsKey('build')) {
@@ -616,7 +696,8 @@ class BuildProjectTool extends AgentTool {
       }
 
       // Gradle
-      if (fileNames.contains('build.gradle') || fileNames.contains('build.gradle.kts')) {
+      if (fileNames.contains('build.gradle') ||
+          fileNames.contains('build.gradle.kts')) {
         return './gradlew build -x test';
       }
     } catch (e) {
@@ -673,7 +754,8 @@ class PackageProjectTool extends AgentTool {
     final path = args.getString('path');
     final artifactDir = args.getString('artifact_dir');
     final output = args.getString('output');
-    final format = args.getString('format', defaultValue: 'tar.gz').toLowerCase();
+    final format =
+        args.getString('format', defaultValue: 'tar.gz').toLowerCase();
 
     if (path.isEmpty || artifactDir.isEmpty) {
       return ToolResult.failure('参数缺失: path 和 artifact_dir 为必填项');
@@ -687,14 +769,16 @@ class PackageProjectTool extends AgentTool {
 
     // 拼接产物目录绝对路径并检查
     final artifactAbsPath = p.join(path, artifactDir);
-    final artifactCheck = SafetyGuard.checkPath(artifactAbsPath, projectRoot: path);
+    final artifactCheck =
+        SafetyGuard.checkPath(artifactAbsPath, projectRoot: path);
     if (artifactCheck.level == SafetyLevel.blocked) {
       return ToolResult.failure('产物路径被安全策略拦截: ${artifactCheck.reason}');
     }
 
     final artifactDirectory = Directory(artifactAbsPath);
     if (!await artifactDirectory.exists()) {
-      return ToolResult.failure('构建产物目录不存在: $artifactAbsPath。请先调用 build_project 工具构建项目。');
+      return ToolResult.failure(
+          '构建产物目录不存在: $artifactAbsPath。请先调用 build_project 工具构建项目。');
     }
 
     // 必须使用本地终端
@@ -709,9 +793,8 @@ class PackageProjectTool extends AgentTool {
     final projectName = p.basename(path);
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final defaultExt = format == 'zip' ? 'zip' : 'tar.gz';
-    final outputFile = output.isNotEmpty
-        ? output
-        : '/tmp/$projectName-$timestamp.$defaultExt';
+    final outputFile =
+        output.isNotEmpty ? output : '/tmp/$projectName-$timestamp.$defaultExt';
 
     // 输出路径安全检查
     final outputCheck = SafetyGuard.checkPath(outputFile);
@@ -729,19 +812,23 @@ class PackageProjectTool extends AgentTool {
     String packageCmd;
     if (format == 'zip') {
       // zip 命令
-      final excludeArgs = excludes.map((e) => '-x "./$e" -x "./$e/*"').join(' ');
+      final excludeArgs =
+          excludes.map((e) => '-x "./$e" -x "./$e/*"').join(' ');
       // cd 到产物目录，打包其内容
-      packageCmd = 'cd "${_escapePath(artifactAbsPath)}" && zip -r "${_escapePath(outputFile)}" . $excludeArgs';
+      packageCmd =
+          'cd "${_escapePath(artifactAbsPath)}" && zip -r "${_escapePath(outputFile)}" . $excludeArgs';
     } else {
       // tar.gz 命令
       final excludeArgs = excludes.map((e) => '--exclude="./$e"').join(' ');
-      packageCmd = 'cd "${_escapePath(artifactAbsPath)}" && tar -czf "${_escapePath(outputFile)}" $excludeArgs .';
+      packageCmd =
+          'cd "${_escapePath(artifactAbsPath)}" && tar -czf "${_escapePath(outputFile)}" $excludeArgs .';
     }
 
     // 安全检查打包命令
     final cmdSafety = SafetyGuard.check(packageCmd);
     if (cmdSafety == SafetyLevel.blocked) {
-      return ToolResult.failure(L10n.str.ut_2192f982a0(SafetyGuard.getReason(packageCmd) ?? ''));
+      return ToolResult.failure(
+          L10n.str.ut_2192f982a0(SafetyGuard.getReason(packageCmd) ?? ''));
     }
 
     onProgress?.call(L10n.str.ut_5e9fa40ae2(artifactDir, outputFile));
@@ -757,13 +844,13 @@ class PackageProjectTool extends AgentTool {
         // 检查输出文件是否存在
         final outputFileObj = File(outputFile);
         if (!await outputFileObj.exists()) {
-          return ToolResult.failure('打包命令执行成功，但输出文件不存在: $outputFile\n输出: ${result.stdout}');
+          return ToolResult.failure(
+              '打包命令执行成功，但输出文件不存在: $outputFile\n输出: ${result.stdout}');
         }
         final fileSize = await outputFileObj.length();
         final sizeStr = _formatFileSize(fileSize);
         final summary = L10n.str.ut_9c3df15635(outputFile, sizeStr);
-        onProgress?.call(
-            L10n.str.ut_7884351654(sizeStr));
+        onProgress?.call(L10n.str.ut_7884351654(sizeStr));
         return ToolResult.success(summary);
       } else {
         return ToolResult.failure(
@@ -783,7 +870,8 @@ class PackageProjectTool extends AgentTool {
   String _formatFileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (bytes < 1024 * 1024 * 1024)
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 }

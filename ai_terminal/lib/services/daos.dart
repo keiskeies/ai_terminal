@@ -46,13 +46,18 @@ class HostsDao {
   }
 
   static Future<HostConfig?> getById(String id) async {
-    final rows = await DbInit.db.query('hosts', where: 'id = ?', whereArgs: [id], limit: 1);
+    final rows = await DbInit.db
+        .query('hosts', where: 'id = ?', whereArgs: [id], limit: 1);
     return rows.isEmpty ? null : _fromRow(rows.first);
   }
 
   static Future<void> upsert(HostConfig h) async {
     final idx = _cache.indexWhere((e) => e.id == h.id);
-    if (idx >= 0) { _cache[idx] = h; } else { _cache.add(h); }
+    if (idx >= 0) {
+      _cache[idx] = h;
+    } else {
+      _cache.add(h);
+    }
     await DbInit.db.insert('hosts', _toRow(h),
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
@@ -69,16 +74,24 @@ class HostsDao {
   }
 
   static Map<String, dynamic> _toRow(HostConfig h) => {
-    'id': h.id, 'name': h.name, 'host': h.host, 'port': h.port,
-    'username': h.username, 'authType': h.authType,
-    'group': h.group, 'tagColor': h.tagColor,
-    'jumpHost': h.jumpHost, 'jumpPort': h.jumpPort,
-    'jumpUsername': h.jumpUsername, 'jumpAuthType': h.jumpAuthType,
-    'timeout': h.timeout, 'encoding': h.encoding,
-    'createdAt': h.createdAt.millisecondsSinceEpoch,
-    'lastConnectedAt': h.lastConnectedAt?.millisecondsSinceEpoch,
-    'lastStatus': h.lastStatus,
-  };
+        'id': h.id,
+        'name': h.name,
+        'host': h.host,
+        'port': h.port,
+        'username': h.username,
+        'authType': h.authType,
+        'group': h.group,
+        'tagColor': h.tagColor,
+        'jumpHost': h.jumpHost,
+        'jumpPort': h.jumpPort,
+        'jumpUsername': h.jumpUsername,
+        'jumpAuthType': h.jumpAuthType,
+        'timeout': h.timeout,
+        'encoding': h.encoding,
+        'createdAt': h.createdAt.millisecondsSinceEpoch,
+        'lastConnectedAt': h.lastConnectedAt?.millisecondsSinceEpoch,
+        'lastStatus': h.lastStatus,
+      };
 
   static HostConfig _fromRow(Map<String, dynamic> r) {
     final h = HostConfig()
@@ -133,13 +146,18 @@ class AIModelsDao {
   }
 
   static Future<AIModelConfig?> getById(String id) async {
-    final rows = await DbInit.db.query('ai_models', where: 'id = ?', whereArgs: [id], limit: 1);
+    final rows = await DbInit.db
+        .query('ai_models', where: 'id = ?', whereArgs: [id], limit: 1);
     return rows.isEmpty ? null : _fromRow(rows.first);
   }
 
   static Future<void> upsert(AIModelConfig m) async {
     final idx = _cache.indexWhere((e) => e.id == m.id);
-    if (idx >= 0) { _cache[idx] = m; } else { _cache.add(m); }
+    if (idx >= 0) {
+      _cache[idx] = m;
+    } else {
+      _cache.add(m);
+    }
     await DbInit.db.insert('ai_models', _toRow(m),
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
@@ -157,19 +175,24 @@ class AIModelsDao {
 
   /// 旧数据的默认模型 id（仅迁移时用于初始化当前选择），新配置不再有默认模型
   static Future<String?> getLegacyDefaultId() async {
-    final rows = await DbInit.db.query('ai_models',
-        columns: ['id'], where: 'isDefault = 1', limit: 1);
+    final rows = await DbInit.db
+        .query('ai_models', columns: ['id'], where: 'isDefault = 1', limit: 1);
     return rows.isEmpty ? null : rows.first['id'] as String?;
   }
 
   static Map<String, dynamic> _toRow(AIModelConfig m) => {
-    'id': m.id, 'provider': m.provider, 'name': m.name,
-    'apiKey': m.apiKey, 'baseUrl': m.baseUrl, 'modelName': m.modelName,
-    'temperature': m.temperature, 'maxTokens': m.maxTokens,
-    'contextWindow': m.contextWindow,
-    'fallbackModelId': m.fallbackModelId,
-    'supportsFunctionCalling': m.supportsFunctionCalling ? 1 : 0,
-  };
+        'id': m.id,
+        'provider': m.provider,
+        'name': m.name,
+        'apiKey': m.apiKey,
+        'baseUrl': m.baseUrl,
+        'modelName': m.modelName,
+        'temperature': m.temperature,
+        'maxTokens': m.maxTokens,
+        'contextWindow': m.contextWindow,
+        'fallbackModelId': m.fallbackModelId,
+        'supportsFunctionCalling': m.supportsFunctionCalling ? 1 : 0,
+      };
 
   static AIModelConfig _fromRow(Map<String, dynamic> r) {
     final m = AIModelConfig()
@@ -261,8 +284,8 @@ class AIEndpointsDao {
         if (decoded is List) {
           models = decoded
               .whereType<Map>()
-              .map((m) =>
-                  AIEndpointModel.fromJson(Map<String, dynamic>.from(m)))
+              .map(
+                  (m) => AIEndpointModel.fromJson(Map<String, dynamic>.from(m)))
               .toList();
         }
       } catch (e) {
@@ -303,12 +326,14 @@ class ChatSessionsDao {
   static ChatSession? getCachedById(String id) => _cache[id];
 
   static Future<List<ChatSession>> getAll() async {
-    final rows = await DbInit.db.query('chat_sessions', orderBy: 'updatedAt DESC');
+    final rows =
+        await DbInit.db.query('chat_sessions', orderBy: 'updatedAt DESC');
     return rows.map(_fromRow).toList();
   }
 
   static Future<ChatSession?> getById(String id) async {
-    final rows = await DbInit.db.query('chat_sessions', where: 'id = ?', whereArgs: [id], limit: 1);
+    final rows = await DbInit.db
+        .query('chat_sessions', where: 'id = ?', whereArgs: [id], limit: 1);
     return rows.isEmpty ? null : _fromRow(rows.first);
   }
 
@@ -330,32 +355,39 @@ class ChatSessionsDao {
   }
 
   static Map<String, dynamic> _toRow(ChatSession s) => {
-    'id': s.id, 'hostId': s.hostId,
-    'messages': jsonEncode(s.messages.map(_chatMsgToJson).toList()),
-    'createdAt': s.createdAt.millisecondsSinceEpoch,
-    'updatedAt': s.updatedAt.millisecondsSinceEpoch,
-  };
+        'id': s.id,
+        'hostId': s.hostId,
+        'messages': jsonEncode(s.messages.map(_chatMsgToJson).toList()),
+        'createdAt': s.createdAt.millisecondsSinceEpoch,
+        'updatedAt': s.updatedAt.millisecondsSinceEpoch,
+      };
 
   static ChatSession _fromRow(Map<String, dynamic> r) {
     final s = ChatSession()
       ..id = r['id'] as String
       ..hostId = r['hostId'] as String?
       ..messages = (jsonDecode(r['messages'] as String) as List)
-          .map((e) => _chatMsgFromJson(e as Map<String, dynamic>)).toList()
+          .map((e) => _chatMsgFromJson(e as Map<String, dynamic>))
+          .toList()
       ..createdAt = DateTime.fromMillisecondsSinceEpoch(r['createdAt'] as int)
       ..updatedAt = DateTime.fromMillisecondsSinceEpoch(r['updatedAt'] as int);
     return s;
   }
 
   static Map<String, dynamic> _chatMsgToJson(ChatMessage m) => {
-    'role': m.role, 'content': m.content,
-    'timestamp': m.timestamp.toIso8601String(),
-    'commandBlocks': m.commandBlocks?.map((b) => {
-      'command': b.command, 'description': b.description,
-      'dangerous': b.dangerous, 'safetyLevel': b.safetyLevel,
-      'output': b.output,
-    }).toList(),
-  };
+        'role': m.role,
+        'content': m.content,
+        'timestamp': m.timestamp.toIso8601String(),
+        'commandBlocks': m.commandBlocks
+            ?.map((b) => {
+                  'command': b.command,
+                  'description': b.description,
+                  'dangerous': b.dangerous,
+                  'safetyLevel': b.safetyLevel,
+                  'output': b.output,
+                })
+            .toList(),
+      };
 
   static ChatMessage _chatMsgFromJson(Map<String, dynamic> j) {
     final m = ChatMessage()
@@ -407,7 +439,11 @@ class SnippetsDao {
 
   static Future<void> upsert(CommandSnippet s) async {
     final idx = _cache.indexWhere((e) => e.id == s.id);
-    if (idx >= 0) { _cache[idx] = s; } else { _cache.add(s); }
+    if (idx >= 0) {
+      _cache[idx] = s;
+    } else {
+      _cache.add(s);
+    }
     // 与 SettingsDao / KnowledgeRulesDao 同口径：DbInit 未初始化时只写缓存。
     if (!DbInit.isInitialized) {
       debugPrint('[SnippetsDao] WARN: DbInit 未初始化，upsert(${s.id}) 仅写缓存');
@@ -429,11 +465,13 @@ class SnippetsDao {
   }
 
   static Map<String, dynamic> _toRow(CommandSnippet s) => {
-    'id': s.id, 'name': s.name, 'command': s.command,
-    'description': s.description,
-    'variables': jsonEncode(s.variables),
-    'createdAt': s.createdAt.millisecondsSinceEpoch,
-  };
+        'id': s.id,
+        'name': s.name,
+        'command': s.command,
+        'description': s.description,
+        'variables': jsonEncode(s.variables),
+        'createdAt': s.createdAt.millisecondsSinceEpoch,
+      };
 
   static CommandSnippet _fromRow(Map<String, dynamic> r) {
     final s = CommandSnippet()
@@ -442,7 +480,8 @@ class SnippetsDao {
       ..command = r['command'] as String
       ..description = r['description'] as String?
       ..variables = (jsonDecode(r['variables'] as String) as List)
-          .map((e) => e as String).toList()
+          .map((e) => e as String)
+          .toList()
       ..createdAt = DateTime.fromMillisecondsSinceEpoch(r['createdAt'] as int);
     return s;
   }
@@ -455,6 +494,7 @@ class ConversationsDao {
   // 内存缓存：key = conversationId，启动时加载
   // ConversationService 的 sync 方法（getActiveSession 等）依赖此缓存
   static final Map<String, Conversation> _cache = {};
+
   /// active 会话的二级索引缓存：避免每次 tab 切换都线性扫全部会话
   static String? _activeHostKey;
   static Conversation? _activeConversation;
@@ -466,10 +506,17 @@ class ConversationsDao {
 
   static Future<void> loadCache() async {
     _cache.clear();
-    final rows = await DbInit.db.query('conversations');
+    _deletedConversations.clear();
+    _deleteChains.clear();
+    _activeIntents.clear();
+    _hostWriteChains.clear();
+    final rows = await _db.query('conversations');
     for (final r in rows) {
       final c = _fromRow(r);
       _cache[c.id] = c;
+      if (c.isActive) {
+        _activeIntents[c.hostId] = (id: c.id, token: Object());
+      }
     }
     _invalidateActiveCache();
   }
@@ -508,13 +555,13 @@ class ConversationsDao {
   }
 
   static Future<Conversation?> getActiveByHost(String hostId) async {
-    final rows = await DbInit.db.query('conversations',
+    final rows = await _db.query('conversations',
         where: 'hostId = ? AND isActive = 1', whereArgs: [hostId], limit: 1);
     return rows.isEmpty ? null : _fromRow(rows.first);
   }
 
   static Future<Conversation?> getById(String id) async {
-    final rows = await DbInit.db.query('conversations',
+    final rows = await _db.query('conversations',
         where: 'id = ?', whereArgs: [id], limit: 1);
     return rows.isEmpty ? null : _fromRow(rows.first);
   }
@@ -524,14 +571,80 @@ class ConversationsDao {
   /// 否则旧快照可能覆盖新快照。
   static final Map<String, Future<void>> _upsertChains = {};
 
+  /// 最新 active 意图与 host 级写链：整会话 upsert 会覆盖 isActive 快照，
+  /// 因此 active transaction 必须与同 host 的 insert 串行；延迟编码的旧快照
+  /// 落盘前也必须按最新意图重写 isActive，不能复活旧的 active 会话。
+  static final Map<String, ({String id, Object token})> _activeIntents = {};
+  static final Map<String, Future<void>> _hostWriteChains = {};
+
+  static Future<void> _enqueueHostWrite(
+      String hostId, Future<void> Function() write) {
+    final previous = _hostWriteChains[hostId] ?? Future<void>.value();
+    final completer = Completer<void>();
+    final chain = completer.future;
+    _hostWriteChains[hostId] = chain;
+    chain.catchError((Object _) {});
+    previous.catchError((Object _) {}).then((_) async {
+      try {
+        await write();
+        completer.complete();
+      } catch (e, st) {
+        completer.completeError(e, st);
+      } finally {
+        if (identical(_hostWriteChains[hostId], chain)) {
+          _hostWriteChains.remove(hostId);
+        }
+      }
+    });
+    return chain;
+  }
+
+  /// 等待所有已排队的会话写入/删除落盘。
+  /// 队列执行中可能追加新的 host 写链（upsert 内部再排队），因此循环复查，
+  /// 直到三张链表都清空；关库前不等待会让最后一批消息写进已关闭的库。
+  static Future<void> waitForPendingWrites({int maxRounds = 50}) async {
+    for (var round = 0; round < maxRounds; round++) {
+      if (_upsertChains.isEmpty &&
+          _hostWriteChains.isEmpty &&
+          _deleteChains.isEmpty) {
+        return;
+      }
+      final pending = <Future<void>>[
+        ..._upsertChains.values,
+        ..._hostWriteChains.values,
+        ..._deleteChains.values,
+      ];
+      // 失败已在各自调用方处理/上报，这里只负责等到链结束。
+      await Future.wait(pending.map((f) => f.catchError((Object _) {})));
+    }
+    debugPrint('[ConversationsDao] waitForPendingWrites 超过 $maxRounds 轮仍未清空');
+  }
+
+  /// 删除墓碑：delete 调用后，所有已排队或后续到达的旧快照 upsert 都必须失败，
+  /// 不能等删除完成后又把旧会话重插回数据库。
+  static final Set<String> _deletedConversations = {};
+  static final Map<String, Future<void>> _deleteChains = {};
+
+  /// 测试可注入内存/受控数据库；生产路径始终使用 DbInit.db。
+  @visibleForTesting
+  static Database? databaseOverride;
+
+  static Database get _db => databaseOverride ?? DbInit.db;
+
   /// 只登记进内存缓存，不写库。
   /// 用于空白会话：等它写出第一条内容时再由 upsert 落库。
   static void cacheOnly(Conversation c) {
     _cache[c.id] = c;
+    if (c.isActive) {
+      _activeIntents[c.hostId] = (id: c.id, token: Object());
+    }
     _invalidateActiveCache();
   }
 
   static Future<void> upsert(Conversation c) async {
+    if (_deletedConversations.contains(c.id)) {
+      throw StateError('conversation deleted: ${c.id}');
+    }
     _cache[c.id] = c;
     _invalidateActiveCache();
     final prev = _upsertChains[c.id] ?? Future<void>.value();
@@ -543,8 +656,20 @@ class ConversationsDao {
     prev.catchError((Object _) {}).then((_) async {
       try {
         final row = await _encodeRow(c);
-        await DbInit.db.insert('conversations', row,
-            conflictAlgorithm: ConflictAlgorithm.replace);
+        // encode 可能跨 isolate/await；删除可能在此期间登记墓碑。
+        if (_deletedConversations.contains(c.id)) {
+          throw StateError('conversation deleted: ${c.id}');
+        }
+        // 整会话快照可能编码于 setActive 之前。真正写盘前按最新 active 意图
+        // 归一化，且 insert 与 active transaction 共用 host 写链。
+        final activeIntent = _activeIntents[c.hostId];
+        if (activeIntent != null) {
+          row['isActive'] = activeIntent.id == c.id ? 1 : 0;
+        }
+        await _enqueueHostWrite(c.hostId, () async {
+          await _db.insert('conversations', row,
+              conflictAlgorithm: ConflictAlgorithm.replace);
+        });
         completer.complete();
       } catch (e, st) {
         completer.completeError(e, st);
@@ -574,42 +699,118 @@ class ConversationsDao {
     }
   }
 
-  /// 设置某个 hostId 下只允许一个 active（同步更新缓存 + 异步写库）
+  /// 设置某个 hostId 下只允许一个 active（同步更新缓存 + 异步写库）。
+  /// 与同 host 的整会话 upsert 串行，避免旧快照后落盘覆盖本次选择。
   static Future<void> setActive(String id, String hostId) async {
-    // 同步更新缓存
+    final previousIntent = _activeIntents[hostId];
+    final token = Object();
+    final previousFlags = <String, bool>{
+      for (final c in _cache.values)
+        if (c.hostId == hostId) c.id: c.isActive,
+    };
+    // 同步更新缓存与最新意图；延迟编码/排队的 upsert 会读取这份意图。
     for (final c in _cache.values) {
       if (c.hostId == hostId) {
         c.isActive = (c.id == id);
       }
     }
+    _activeIntents[hostId] = (id: id, token: token);
     _invalidateActiveCache();
-    await DbInit.db.transaction((txn) async {
-      await txn.update('conversations', {'isActive': 0},
-          where: 'hostId = ?', whereArgs: [hostId]);
-      await txn.update('conversations', {'isActive': 1},
-          where: 'id = ?', whereArgs: [id]);
-    });
+    try {
+      await _enqueueHostWrite(
+          hostId,
+          () => _db.transaction((txn) async {
+                await txn.update('conversations', {'isActive': 0},
+                    where: 'hostId = ?', whereArgs: [hostId]);
+                await txn.update('conversations', {'isActive': 1},
+                    where: 'id = ?', whereArgs: [id]);
+              }));
+    } catch (e) {
+      // 仅当前最新意图可回滚缓存；旧 setActive 失败不能覆盖更新的选择。
+      if (identical(_activeIntents[hostId]?.token, token)) {
+        if (previousIntent != null) {
+          _activeIntents[hostId] = previousIntent;
+        } else {
+          _activeIntents.remove(hostId);
+        }
+        for (final c in _cache.values) {
+          if (c.hostId == hostId) {
+            c.isActive = previousFlags[c.id] ?? false;
+          }
+        }
+        _invalidateActiveCache();
+      }
+      debugPrint('[ConversationsDao] setActive 失败 (hostId=$hostId, '
+          'conversationId=$id): $e');
+      rethrow;
+    }
   }
 
   static Future<void> delete(String id) async {
-    _cache.remove(id);
+    final removed = _cache.remove(id);
     _invalidateActiveCache();
-    await DbInit.db.delete('conversations', where: 'id = ?', whereArgs: [id]);
+
+    // 同一会话的重复删除共享同一条链；失败完成后清理链，允许后续重试。
+    final existing = _deleteChains[id];
+    if (existing != null) return existing;
+
+    // 必须先同步登记墓碑，再等待旧 upsert 链。否则等待期间新 upsert 会排到
+    // 删除后面并重插旧快照。
+    _deletedConversations.add(id);
+    final prev = _upsertChains[id] ?? Future<void>.value();
+    final completer = Completer<void>();
+    final chain = completer.future;
+    _deleteChains[id] = chain;
+    chain.catchError((Object _) {});
+    prev.catchError((Object _) {}).then((_) async {
+      try {
+        await _db.delete('conversations', where: 'id = ?', whereArgs: [id]);
+        final removedHost = removed?.hostId;
+        if (removedHost != null && _activeIntents[removedHost]?.id == id) {
+          _activeIntents.remove(removedHost);
+        }
+        completer.complete();
+      } catch (e, st) {
+        // DB 删除失败不能留下永久墓碑/失败链：恢复缓存供 UI 恢复，并允许
+        // 后续 upsert 或再次 delete。已排队的旧 upsert 已在等待期间被墓碑拦截。
+        _deletedConversations.remove(id);
+        if (removed != null) _cache[id] = removed;
+        _invalidateActiveCache();
+        completer.completeError(e, st);
+      } finally {
+        if (identical(_deleteChains[id], chain)) _deleteChains.remove(id);
+      }
+    });
+    return chain;
+  }
+
+  /// 测试隔离用；调用前必须确保没有尚未结束的写链。
+  @visibleForTesting
+  static void resetForTesting() {
+    _cache.clear();
+    _upsertChains.clear();
+    _deletedConversations.clear();
+    _deleteChains.clear();
+    _activeIntents.clear();
+    _hostWriteChains.clear();
+    _invalidateActiveCache();
   }
 
   static Map<String, dynamic> _toRow(Conversation c) => {
-    'id': c.id, 'hostId': c.hostId, 'title': c.title,
-    'titleSource': c.titleSource,
-    'messages': jsonEncode(c.messages.map(_msgToJson).toList()),
-    'agentLogs': c.rawAgentLogsJson ??
-        jsonEncode(c.agentLogs.map(_logToJson).toList()),
-    'summary': c.summary,
-    'rollingSummary': c.rollingSummary,
-    'summarizedUpToIndex': c.summarizedUpToIndex,
-    'createdAt': c.createdAt.millisecondsSinceEpoch,
-    'updatedAt': c.updatedAt.millisecondsSinceEpoch,
-    'isActive': c.isActive ? 1 : 0,
-  };
+        'id': c.id,
+        'hostId': c.hostId,
+        'title': c.title,
+        'titleSource': c.titleSource,
+        'messages': jsonEncode(c.messages.map(_msgToJson).toList()),
+        'agentLogs': c.rawAgentLogsJson ??
+            jsonEncode(c.agentLogs.map(_logToJson).toList()),
+        'summary': c.summary,
+        'rollingSummary': c.rollingSummary,
+        'summarizedUpToIndex': c.summarizedUpToIndex,
+        'createdAt': c.createdAt.millisecondsSinceEpoch,
+        'updatedAt': c.updatedAt.millisecondsSinceEpoch,
+        'isActive': c.isActive ? 1 : 0,
+      };
 
   static Conversation _fromRow(Map<String, dynamic> r) {
     final c = Conversation()
@@ -620,7 +821,8 @@ class ConversationsDao {
           // 旧数据库行没有该列：存量标题一律视为「不可被 AI 自动改写」
           Conversation.titleSourceUser
       ..messages = (jsonDecode(r['messages'] as String) as List)
-          .map((e) => _msgFromJson(e as Map<String, dynamic>)).toList()
+          .map((e) => _msgFromJson(e as Map<String, dynamic>))
+          .toList()
       ..setAgentLogsJson(r['agentLogs'] as String?)
       ..summary = r['summary'] as String?
       ..rollingSummary = r['rollingSummary'] as String?
@@ -632,13 +834,15 @@ class ConversationsDao {
   }
 
   static Map<String, dynamic> _msgToJson(ConvMessage m) => {
-    'role': m.role, 'content': m.content,
-    'timestamp': m.timestamp.toIso8601String(),
-    'command': m.command, 'commandSuccess': m.commandSuccess,
-    'events': m.events?.map(_eventToJson).toList(),
-    'summary': m.summary,
-    'rolledUp': m.rolledUp,
-  };
+        'role': m.role,
+        'content': m.content,
+        'timestamp': m.timestamp.toIso8601String(),
+        'command': m.command,
+        'commandSuccess': m.commandSuccess,
+        'events': m.events?.map(_eventToJson).toList(),
+        'summary': m.summary,
+        'rolledUp': m.rolledUp,
+      };
 
   static ConvMessage _msgFromJson(Map<String, dynamic> j) {
     final m = ConvMessage()
@@ -651,36 +855,49 @@ class ConversationsDao {
       ..rolledUp = j['rolledUp'] as bool? ?? false;
     final evs = j['events'];
     if (evs is List) {
-      m.events = evs.map((e) => _eventFromJson(e as Map<String, dynamic>)).toList();
+      m.events =
+          evs.map((e) => _eventFromJson(e as Map<String, dynamic>)).toList();
     }
     return m;
   }
 
   static Map<String, dynamic> _eventToJson(AgentEvent e) => {
-    'id': e.id, 'type': e.type.name,
-    'timestamp': e.timestamp.toIso8601String(),
-    'text': e.text, 'command': e.command, 'commandId': e.commandId,
-    'description': e.description,
-    'dangerous': e.dangerous, 'blocked': e.blocked,
-    'success': e.success, 'output': e.output, 'error': e.error,
-    'options': e.options, 'question': e.question, 'summary': e.summary,
-    'chosenAnswer': e.chosenAnswer,
-    'finishState': e.finishState?.name,
-    'hostId': e.hostId, 'toolName': e.toolName, 'riskLevel': e.riskLevel,
-    'permissionDecision': e.permissionDecision,
-    'durationMs': e.durationMs, 'exitCode': e.exitCode,
-    'failureKind': e.failureKind,
-    'outputTotalChars': e.outputTotalChars,
-    'outputTruncated': e.outputTruncated,
-    'outputTail': e.outputTail,
-    'diffAdditions': e.diffAdditions,
-    'diffDeletions': e.diffDeletions,
-    'operationReport': e.operationReport?.toJson(),
-    'planSteps': e.planSteps?.map((s) => s.toJson()).toList(growable: false),
-    'hostResults': e.hostResults?.map(
-        (hostId, r) => MapEntry(hostId, r.toJson())),
-    'isStreaming': e.isStreaming,
-  };
+        'id': e.id,
+        'type': e.type.name,
+        'timestamp': e.timestamp.toIso8601String(),
+        'text': e.text,
+        'command': e.command,
+        'commandId': e.commandId,
+        'description': e.description,
+        'dangerous': e.dangerous,
+        'blocked': e.blocked,
+        'success': e.success,
+        'output': e.output,
+        'error': e.error,
+        'options': e.options,
+        'question': e.question,
+        'summary': e.summary,
+        'chosenAnswer': e.chosenAnswer,
+        'finishState': e.finishState?.name,
+        'hostId': e.hostId,
+        'toolName': e.toolName,
+        'riskLevel': e.riskLevel,
+        'permissionDecision': e.permissionDecision,
+        'durationMs': e.durationMs,
+        'exitCode': e.exitCode,
+        'failureKind': e.failureKind,
+        'outputTotalChars': e.outputTotalChars,
+        'outputTruncated': e.outputTruncated,
+        'outputTail': e.outputTail,
+        'diffAdditions': e.diffAdditions,
+        'diffDeletions': e.diffDeletions,
+        'operationReport': e.operationReport?.toJson(),
+        'planSteps':
+            e.planSteps?.map((s) => s.toJson()).toList(growable: false),
+        'hostResults':
+            e.hostResults?.map((hostId, r) => MapEntry(hostId, r.toJson())),
+        'isStreaming': e.isStreaming,
+      };
 
   static AgentEvent _eventFromJson(Map<String, dynamic> j) {
     final rawReport = j['operationReport'];
@@ -729,8 +946,8 @@ class ConversationsDao {
     final results = <String, HostExecutionResult>{};
     raw.forEach((key, value) {
       if (key is String && value is Map) {
-        results[key] = HostExecutionResult.fromJson(
-            Map<String, dynamic>.from(value));
+        results[key] =
+            HostExecutionResult.fromJson(Map<String, dynamic>.from(value));
       }
     });
     return results.isEmpty ? null : results;
@@ -747,9 +964,11 @@ class ConversationsDao {
   }
 
   static Map<String, dynamic> _logToJson(ConvAgentLog l) => {
-    'timestamp': l.timestamp.toIso8601String(),
-    'level': l.level, 'tag': l.tag, 'message': l.message,
-  };
+        'timestamp': l.timestamp.toIso8601String(),
+        'level': l.level,
+        'tag': l.tag,
+        'message': l.message,
+      };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -764,7 +983,8 @@ class ChangeRecordsDao {
   }
 
   static Future<List<ChangeRecord>> getAll() async {
-    final rows = await DbInit.db.query('change_records', orderBy: 'timestamp DESC');
+    final rows =
+        await DbInit.db.query('change_records', orderBy: 'timestamp DESC');
     return rows.map(_fromRow).toList();
   }
 
@@ -790,16 +1010,23 @@ class ChangeRecordsDao {
     return null;
   }
 
-  static Future<List<ChangeRecord>> getByHost(String hostId, {int? limit}) async {
+  static Future<List<ChangeRecord>> getByHost(String hostId,
+      {int? limit}) async {
     final rows = await DbInit.db.query('change_records',
-        where: 'hostId = ?', whereArgs: [hostId],
-        orderBy: 'timestamp DESC', limit: limit);
+        where: 'hostId = ?',
+        whereArgs: [hostId],
+        orderBy: 'timestamp DESC',
+        limit: limit);
     return rows.map(_fromRow).toList();
   }
 
   static Future<void> upsert(ChangeRecord r) async {
     final idx = _cache.indexWhere((e) => e.id == r.id);
-    if (idx >= 0) { _cache[idx] = r; } else { _cache.add(r); }
+    if (idx >= 0) {
+      _cache[idx] = r;
+    } else {
+      _cache.add(r);
+    }
     await DbInit.db.insert('change_records', _toRow(r),
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
@@ -810,17 +1037,20 @@ class ChangeRecordsDao {
   }
 
   static Map<String, dynamic> _toRow(ChangeRecord r) => {
-    'id': r.id, 'hostId': r.hostId, 'command': r.command,
-    'type': r.type.name,
-    'rollbackCommand': r.rollbackCommand,
-    'rollbackDescription': r.rollbackDescription,
-    'localRestoreFrom': r.localRestoreFrom,
-    'localRestoreTo': r.localRestoreTo,
-    'timestamp': r.timestamp.millisecondsSinceEpoch,
-    'success': r.success ? 1 : 0,
-    'username': r.username, 'conversationId': r.conversationId,
-    'rolledBack': r.rolledBack ? 1 : 0,
-  };
+        'id': r.id,
+        'hostId': r.hostId,
+        'command': r.command,
+        'type': r.type.name,
+        'rollbackCommand': r.rollbackCommand,
+        'rollbackDescription': r.rollbackDescription,
+        'localRestoreFrom': r.localRestoreFrom,
+        'localRestoreTo': r.localRestoreTo,
+        'timestamp': r.timestamp.millisecondsSinceEpoch,
+        'success': r.success ? 1 : 0,
+        'username': r.username,
+        'conversationId': r.conversationId,
+        'rolledBack': r.rolledBack ? 1 : 0,
+      };
 
   static ChangeRecord _fromRow(Map<String, dynamic> r) {
     return ChangeRecord(
@@ -869,13 +1099,18 @@ class RunbooksDao {
   }
 
   static Future<Runbook?> getById(String id) async {
-    final rows = await DbInit.db.query('runbooks', where: 'id = ?', whereArgs: [id], limit: 1);
+    final rows = await DbInit.db
+        .query('runbooks', where: 'id = ?', whereArgs: [id], limit: 1);
     return rows.isEmpty ? null : _fromRow(rows.first);
   }
 
   static Future<void> upsert(Runbook r) async {
     final idx = _cache.indexWhere((e) => e.id == r.id);
-    if (idx >= 0) { _cache[idx] = r; } else { _cache.add(r); }
+    if (idx >= 0) {
+      _cache[idx] = r;
+    } else {
+      _cache.add(r);
+    }
     await DbInit.db.insert('runbooks', _toRow(r),
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
@@ -899,16 +1134,19 @@ class RunbooksDao {
   }
 
   static Map<String, dynamic> _toRow(Runbook r) => {
-    'id': r.id, 'name': r.name, 'icon': r.icon,
-    'description': r.description,
-    'type': r.type.name, 'category': r.category.name,
-    'content': r.content,
-    'isBuiltin': r.isBuiltin ? 1 : 0,
-    'createdAt': r.createdAt.millisecondsSinceEpoch,
-    'updatedAt': r.updatedAt.millisecondsSinceEpoch,
-    'runCount': r.runCount,
-    'lastRunAt': r.lastRunAt?.millisecondsSinceEpoch,
-  };
+        'id': r.id,
+        'name': r.name,
+        'icon': r.icon,
+        'description': r.description,
+        'type': r.type.name,
+        'category': r.category.name,
+        'content': r.content,
+        'isBuiltin': r.isBuiltin ? 1 : 0,
+        'createdAt': r.createdAt.millisecondsSinceEpoch,
+        'updatedAt': r.updatedAt.millisecondsSinceEpoch,
+        'runCount': r.runCount,
+        'lastRunAt': r.lastRunAt?.millisecondsSinceEpoch,
+      };
 
   static Runbook _fromRow(Map<String, dynamic> r) {
     final rb = Runbook()
@@ -937,6 +1175,12 @@ class SettingsDao {
   // 内存缓存：启动时加载，sync 读路径使用（prompts/app_lock/command_heuristics 等）
   static final Map<String, dynamic> _cache = {};
 
+  /// 测试可注入数据库；生产路径始终使用 DbInit.db。
+  @visibleForTesting
+  static Database? databaseOverride;
+
+  static Database get _db => databaseOverride ?? DbInit.db;
+
   static Future<void> loadCache() async {
     _cache.clear();
     _cache.addAll(await loadAll());
@@ -948,11 +1192,12 @@ class SettingsDao {
   }
 
   /// 同步获取整个缓存 Map（SettingsNotifier.loadSettings 使用）
-  static Map<String, dynamic> get cachedMap => Map<String, dynamic>.from(_cache);
+  static Map<String, dynamic> get cachedMap =>
+      Map<String, dynamic>.from(_cache);
 
   /// 异步加载所有设置
   static Future<Map<String, dynamic>> loadAll() async {
-    final rows = await DbInit.db.query('settings');
+    final rows = await _db.query('settings');
     final result = <String, dynamic>{};
     for (final r in rows) {
       final key = r['key'] as String;
@@ -976,28 +1221,28 @@ class SettingsDao {
     // 在测试环境下不被清理导致 "Timer is still pending" 错误。
     // debugPrint 在 debug 模式下输出控制台（开发可见），release 模式 no-op
     // 但 release 模式下生产环境不会触发此分支，无数据丢失风险。
-    if (!DbInit.isInitialized) {
+    if (databaseOverride == null && !DbInit.isInitialized) {
       debugPrint('[SettingsDao] WARN: DbInit 未初始化，set($key) 仅写缓存，未持久化');
       return;
     }
     final encoded = jsonEncode(value);
-    await DbInit.db.insert('settings', {'key': key, 'value': encoded},
+    await _db.insert('settings', {'key': key, 'value': encoded},
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
   static Future<void> remove(String key) async {
     _cache.remove(key);
     // R8: 与 set() 一致的防御：DbInit 未初始化时仅清缓存
-    if (!DbInit.isInitialized) {
+    if (databaseOverride == null && !DbInit.isInitialized) {
       debugPrint('[SettingsDao] WARN: DbInit 未初始化，remove($key) 仅清缓存，未持久化');
       return;
     }
-    await DbInit.db.delete('settings', where: 'key = ?', whereArgs: [key]);
+    await _db.delete('settings', where: 'key = ?', whereArgs: [key]);
   }
 
   static Future<void> clear() async {
     _cache.clear();
-    await DbInit.db.delete('settings');
+    await _db.delete('settings');
   }
 }
 
@@ -1013,8 +1258,8 @@ class AuditLogsDao {
 
   static Future<void> loadCache() async {
     _cache.clear();
-    final rows = await DbInit.db.query('audit_logs',
-        orderBy: 'timestamp DESC', limit: _maxEntries);
+    final rows = await DbInit.db
+        .query('audit_logs', orderBy: 'timestamp DESC', limit: _maxEntries);
     for (final r in rows.reversed) {
       _cache.add(_rowToMap(r));
     }
@@ -1027,7 +1272,8 @@ class AuditLogsDao {
   }
 
   /// 同步获取缓存中指定 host 的审计日志（正序：最早到最新）
-  static List<Map<String, dynamic>> getCachedLogsForHost(String hostId, {int limit = 100}) {
+  static List<Map<String, dynamic>> getCachedLogsForHost(String hostId,
+      {int limit = 100}) {
     final result = <Map<String, dynamic>>[];
     for (int i = _cache.length - 1; i >= 0 && result.length < limit; i--) {
       if (_cache[i]['hostId'] == hostId) {
@@ -1091,27 +1337,32 @@ class AuditLogsDao {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> getLogsForHost(String hostId, {int limit = 100}) async {
+  static Future<List<Map<String, dynamic>>> getLogsForHost(String hostId,
+      {int limit = 100}) async {
     final rows = await DbInit.db.query('audit_logs',
-        where: 'hostId = ?', whereArgs: [hostId],
-        orderBy: 'timestamp DESC', limit: limit);
+        where: 'hostId = ?',
+        whereArgs: [hostId],
+        orderBy: 'timestamp DESC',
+        limit: limit);
     return rows.map(_rowToMap).toList().reversed.toList();
   }
 
-  static Future<List<Map<String, dynamic>>> getRecentLogs({int limit = 100}) async {
-    final rows = await DbInit.db.query('audit_logs',
-        orderBy: 'timestamp DESC', limit: limit);
+  static Future<List<Map<String, dynamic>>> getRecentLogs(
+      {int limit = 100}) async {
+    final rows = await DbInit.db
+        .query('audit_logs', orderBy: 'timestamp DESC', limit: limit);
     return rows.map(_rowToMap).toList();
   }
 
   static Map<String, dynamic> _rowToMap(Map<String, dynamic> r) => {
-    'timestamp': DateTime.fromMillisecondsSinceEpoch(r['timestamp'] as int).toIso8601String(),
-    'hostId': r['hostId'],
-    'command': r['command'],
-    'safetyLevel': r['safetyLevel'],
-    'output': r['output'],
-    'executed': (r['executed'] as int) == 1,
-  };
+        'timestamp': DateTime.fromMillisecondsSinceEpoch(r['timestamp'] as int)
+            .toIso8601String(),
+        'hostId': r['hostId'],
+        'command': r['command'],
+        'safetyLevel': r['safetyLevel'],
+        'output': r['output'],
+        'executed': (r['executed'] as int) == 1,
+      };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1160,13 +1411,15 @@ class CommandHistoryDao {
     final now = DateTime.now();
     final entryIdx = _cache.indexWhere((e) => e.command == command);
     if (entryIdx < 0) {
-      _cache.insert(0, CommandHistoryEntry(
-        id: -(now.microsecondsSinceEpoch),
-        command: command,
-        hostId: hostId,
-        usedAt: now,
-        useCount: 1,
-      ));
+      _cache.insert(
+          0,
+          CommandHistoryEntry(
+            id: -(now.microsecondsSinceEpoch),
+            command: command,
+            hostId: hostId,
+            usedAt: now,
+            useCount: 1,
+          ));
       while (_cache.length > _maxEntries) {
         _cache.removeLast();
       }
@@ -1179,8 +1432,7 @@ class CommandHistoryDao {
       // 每条都打会把控制台刷满；只在第一次提示
       if (!_warnedNoDb) {
         _warnedNoDb = true;
-        debugPrint(
-            '[CommandHistoryDao] WARN: DbInit 未初始化，record 仅写缓存，未持久化');
+        debugPrint('[CommandHistoryDao] WARN: DbInit 未初始化，record 仅写缓存，未持久化');
       }
       return;
     }
@@ -1188,18 +1440,25 @@ class CommandHistoryDao {
     // 「没见过」才 INSERT（replace 兜住同命令并发回车的罕见竞态）。
     final millis = now.millisecondsSinceEpoch;
     if (entry.id > 0) {
-      await DbInit.db.update('command_history', {
-        'usedAt': millis,
-        'useCount': entry.useCount,
-        if (hostId != null) 'hostId': hostId,
-      }, where: 'id = ?', whereArgs: [entry.id]);
+      await DbInit.db.update(
+          'command_history',
+          {
+            'usedAt': millis,
+            'useCount': entry.useCount,
+            if (hostId != null) 'hostId': hostId,
+          },
+          where: 'id = ?',
+          whereArgs: [entry.id]);
     } else {
-      final id = await DbInit.db.insert('command_history', {
-        'command': command,
-        'hostId': hostId,
-        'usedAt': millis,
-        'useCount': 1,
-      }, conflictAlgorithm: ConflictAlgorithm.replace);
+      final id = await DbInit.db.insert(
+          'command_history',
+          {
+            'command': command,
+            'hostId': hostId,
+            'usedAt': millis,
+            'useCount': 1,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace);
       // 未落库的临时负 id 换成真实 id，后续 delete 才对得上
       if (_cache.first == entry) _cache[0] = entry.copyWith(id: id);
     }
@@ -1238,8 +1497,8 @@ class CommandHistoryDao {
 /// AES 加密密文存储（Keychain 不可用时的降级方案）
 class CredentialsFallbackDao {
   static Future<void> put(String key, String encryptedValue) async {
-    await DbInit.db.insert('credentials_fallback',
-        {'key': key, 'value': encryptedValue},
+    await DbInit.db.insert(
+        'credentials_fallback', {'key': key, 'value': encryptedValue},
         conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
@@ -1250,13 +1509,14 @@ class CredentialsFallbackDao {
   }
 
   static Future<void> delete(String key) async {
-    await DbInit.db.delete('credentials_fallback',
-        where: 'key = ?', whereArgs: [key]);
+    await DbInit.db
+        .delete('credentials_fallback', where: 'key = ?', whereArgs: [key]);
   }
 
   /// 获取所有 key（用于旧数据迁移）
   static Future<List<String>> getAllKeys() async {
-    final rows = await DbInit.db.query('credentials_fallback', columns: ['key']);
+    final rows =
+        await DbInit.db.query('credentials_fallback', columns: ['key']);
     return rows.map((r) => r['key'] as String).toList();
   }
 }
@@ -1275,7 +1535,8 @@ class KnowledgeRulesDao {
   static List<KnowledgeRule> get cached => _cache;
 
   static Future<List<KnowledgeRule>> getAll() async {
-    final rows = await DbInit.db.query('knowledge_rules', orderBy: 'createdAt ASC');
+    final rows =
+        await DbInit.db.query('knowledge_rules', orderBy: 'createdAt ASC');
     return rows.map(_fromRow).toList();
   }
 
@@ -1288,7 +1549,8 @@ class KnowledgeRulesDao {
       group = HostsDao.getCachedById(hostId)?.group;
     }
     return _cache
-        .where((r) => r.enabled && r.appliesTo(targetHostId: hostId, targetGroup: group))
+        .where((r) =>
+            r.enabled && r.appliesTo(targetHostId: hostId, targetGroup: group))
         .toList();
   }
 

@@ -59,8 +59,8 @@ void main() {
 
     expect(SettingsDao.getCached('terminalPalette'), 'dracula');
     // 预览块换成了 Dracula 的底色（#282A36），不是默认的青黑
-    final preview = tester.widget<TerminalPalettePreview>(
-        find.byType(TerminalPalettePreview));
+    final preview = tester
+        .widget<TerminalPalettePreview>(find.byType(TerminalPalettePreview));
     expect(preview.theme.background, const Color(0xFF282A36));
   });
 

@@ -14,7 +14,8 @@ String _raw(List<(String, String)> sections) {
   return buffer.toString();
 }
 
-const _cpu = 'Cpu(s):  8.0 us,  3.0 sy,  0.0 ni, 88.0 id,  0.0 wa,  1.0 hi,  0.0 si,  0.0 st';
+const _cpu =
+    'Cpu(s):  8.0 us,  3.0 sy,  0.0 ni, 88.0 id,  0.0 wa,  1.0 hi,  0.0 si,  0.0 st';
 
 const _meminfo = '''
 MemTotal:       16293652 kB
@@ -36,9 +37,12 @@ void main() {
       final snap = service.parseLinuxOutput(_raw([
         ('CPU', _cpu),
         // 中文服务器上 free -m 的真实标签（procps-ng zh_CN 翻译）
-        ('MEM', '               总计        已用        空闲      共享    缓冲/缓存    可用\n'
-            '内存：        15911        2419        9234          27        4257       13202\n'
-            '交换：         2047           0        2047'),
+        (
+          'MEM',
+          '               总计        已用        空闲      共享    缓冲/缓存    可用\n'
+              '内存：        15911        2419        9234          27        4257       13202\n'
+              '交换：         2047           0        2047'
+        ),
         ('MEMINFO', _meminfo),
       ]));
 
@@ -46,10 +50,12 @@ void main() {
       expect(snap.memTotalMB, closeTo(15911.77, 0.01));
       expect(snap.memAvailableMB, closeTo(13200.0, 0.01));
       expect(snap.memUsedMB, closeTo(15911.77 - 13200.0, 0.01));
-      expect(snap.memPercent, closeTo((15911.77 - 13200.0) / 15911.77 * 100, 0.01));
+      expect(snap.memPercent,
+          closeTo((15911.77 - 13200.0) / 15911.77 * 100, 0.01));
       expect(snap.memFreeMB, closeTo(9234.49, 0.01));
       expect(snap.memBuffersMB, closeTo(120.56, 0.01));
-      expect(snap.memCachedMB, closeTo((4027000 + 123000 - 28000) / 1024, 0.01));
+      expect(
+          snap.memCachedMB, closeTo((4027000 + 123000 - 28000) / 1024, 0.01));
       expect(snap.swapTotalMB, closeTo(2048.0, 0.01));
       expect(snap.swapUsedMB, 0);
     });
@@ -57,9 +63,12 @@ void main() {
     test('没有 /proc/meminfo 时回退到 free -m（LC_ALL=C 英文输出）', () {
       final snap = service.parseLinuxOutput(_raw([
         ('CPU', _cpu),
-        ('MEM', '               total        used        free      shared  buff/cache   available\n'
-            'Mem:           15911        2419        9234          27        4257       13202\n'
-            'Swap:           2047         100        1947'),
+        (
+          'MEM',
+          '               total        used        free      shared  buff/cache   available\n'
+              'Mem:           15911        2419        9234          27        4257       13202\n'
+              'Swap:           2047         100        1947'
+        ),
       ]));
 
       expect(snap.memTotalMB, 15911);
@@ -174,7 +183,8 @@ CJMD
       expect(snap.cpuPercent, 34);
       expect(snap.memTotalMB, closeTo(98178380 / 1024, 0.001));
       expect(snap.memPercent, greaterThan(15));
-      expect(snap.diskTotalGB, closeTo(1997684166656 / (1024 * 1024 * 1024), 0.01));
+      expect(snap.diskTotalGB,
+          closeTo(1997684166656 / (1024 * 1024 * 1024), 0.01));
       expect(snap.diskPercent, greaterThan(40));
       expect(snap.diskPartitions.length, 2);
       expect(snap.diskPartitions.first.mountPoint, 'C:');
@@ -199,7 +209,8 @@ CJMD
       final bytes = base64Decode(encoded);
       expect(bytes.length, script.length * 2);
       final decoded = String.fromCharCodes([
-        for (var i = 0; i < bytes.length; i += 2) bytes[i] | (bytes[i + 1] << 8),
+        for (var i = 0; i < bytes.length; i += 2)
+          bytes[i] | (bytes[i + 1] << 8),
       ]);
       expect(decoded, script);
     });

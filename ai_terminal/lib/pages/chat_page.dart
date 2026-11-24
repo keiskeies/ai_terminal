@@ -32,7 +32,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     // 监听滚动：用户手动上滚时禁用自动滚动
     _scrollController.addListener(() {
       if (!_scrollController.hasClients) return;
-      final distanceFromBottom = _scrollController.position.maxScrollExtent - _scrollController.offset;
+      final distanceFromBottom =
+          _scrollController.position.maxScrollExtent - _scrollController.offset;
       if (distanceFromBottom > 120 && _autoScroll) {
         _autoScroll = false;
         setState(() {});
@@ -57,9 +58,9 @@ class _ChatPageState extends ConsumerState<ChatPage> {
 
     _autoScroll = true; // 用户发送消息时恢复自动滚动
     ref.read(chatProvider.notifier).sendMessage(
-      content,
-      hostId: widget.hostId,
-    );
+          content,
+          hostId: widget.hostId,
+        );
     _inputController.clear();
     setState(() => _canSend = false);
   }
@@ -114,7 +115,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                 const SizedBox(height: 24),
                 Text(
                   l10n.chatNeedTerminal,
-                  style: TextStyle(fontSize: fTitle, fontWeight: FontWeight.w500, color: tc.textMain),
+                  style: TextStyle(
+                      fontSize: fTitle,
+                      fontWeight: FontWeight.w500,
+                      color: tc.textMain),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -170,14 +174,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         children: [
           // 消息列表
           Expanded(
-            child: chatState.messages.isEmpty && chatState.currentAssistantMessage == null
+            child: chatState.messages.isEmpty &&
+                    chatState.currentAssistantMessage == null
                 ? _buildEmptyState()
                 : Stack(
                     children: [
                       ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.all(pStandard),
-                        itemCount: chatState.messages.length + (chatState.currentAssistantMessage != null ? 1 : 0),
+                        itemCount: chatState.messages.length +
+                            (chatState.currentAssistantMessage != null ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (chatState.currentAssistantMessage != null &&
                               index == chatState.messages.length) {
@@ -212,9 +218,15 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                                 color: tc.card,
                                 borderRadius: BorderRadius.circular(rXLarge),
                                 border: Border.all(color: tc.border),
-                                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 6)],
+                                boxShadow: [
+                                  BoxShadow(
+                                      color:
+                                          Colors.black.withValues(alpha: 0.3),
+                                      blurRadius: 6)
+                                ],
                               ),
-                              child: Icon(Icons.keyboard_arrow_down, size: 20, color: tc.textSub),
+                              child: Icon(Icons.keyboard_arrow_down,
+                                  size: 20, color: tc.textSub),
                             ),
                           ),
                         ),
@@ -239,7 +251,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.close, size: 16),
-                    onPressed: () => ref.read(chatProvider.notifier).cancelLoading(),
+                    onPressed: () =>
+                        ref.read(chatProvider.notifier).cancelLoading(),
                   ),
                 ],
               ),
@@ -270,7 +283,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                         decoration: InputDecoration(
                           hintText: l10n.chatInputHint,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
                         ),
                         onSubmitted: (_) => _sendMessage(),
                       ),
@@ -316,7 +330,8 @@ class _ChatPageState extends ConsumerState<ChatPage> {
   void _copyMessage(String content) {
     final l10n = AppLocalizations.of(context)!;
     Clipboard.setData(ClipboardData(text: content));
-    showTopSnackBar(context, 
+    showTopSnackBar(
+      context,
       SnackBar(content: Text(l10n.commonCopiedToClipboard)),
     );
   }

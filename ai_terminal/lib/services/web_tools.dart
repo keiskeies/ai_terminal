@@ -66,7 +66,8 @@ class WebSearchTool extends AgentTool {
     final maxResults = args.getInt('max_results', defaultValue: 0);
 
     if (query.isEmpty) {
-      return ToolResult.failure(UiText.t('参数缺失: query 为必填项', 'Missing parameter: query is required'));
+      return ToolResult.failure(
+          UiText.t('参数缺失: query 为必填项', 'Missing parameter: query is required'));
     }
 
     onProgress?.call(L10n.str.ut_e230a6d105(query));
@@ -232,15 +233,15 @@ class FetchUrlTool extends AgentTool {
 
     // 超时：取全局配置与 _minTimeoutMs 的较大值；出站代理与搜索共用
     final config = WebSearchConfig.load();
-    final timeoutMs =
-        config.backendTimeoutMs.clamp(_minTimeoutMs, 120000);
+    final timeoutMs = config.backendTimeoutMs.clamp(_minTimeoutMs, 120000);
     final dio = createSearchDio(
       timeout: Duration(milliseconds: timeoutMs),
       proxy: config.proxy,
       headers: {
         'User-Agent':
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept':
+            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       },
     );
 
@@ -252,7 +253,8 @@ class FetchUrlTool extends AgentTool {
       );
       final html = resp.data ?? '';
       if (html.isEmpty) {
-        return ToolResult.success(UiText.t('抓取成功，但页面内容为空。', 'Fetched successfully, but the page content is empty.'));
+        return ToolResult.success(UiText.t('抓取成功，但页面内容为空。',
+            'Fetched successfully, but the page content is empty.'));
       }
 
       onProgress?.call(UiText.t('解析正文...', 'Parsing article text...'));
@@ -372,12 +374,11 @@ class FetchUrlTool extends AgentTool {
         .replaceAll('&apos;', "'")
         .replaceAll('&nbsp;', ' ')
         .replaceAllMapped(RegExp(r'&#(\d+);'), (m) {
-          final code = int.tryParse(m.group(1) ?? '');
-          return code != null ? String.fromCharCode(code) : (m.group(0) ?? '');
-        })
-        .replaceAllMapped(RegExp(r'&#x([0-9a-fA-F]+);'), (m) {
-          final code = int.tryParse(m.group(1) ?? '', radix: 16);
-          return code != null ? String.fromCharCode(code) : (m.group(0) ?? '');
-        });
+      final code = int.tryParse(m.group(1) ?? '');
+      return code != null ? String.fromCharCode(code) : (m.group(0) ?? '');
+    }).replaceAllMapped(RegExp(r'&#x([0-9a-fA-F]+);'), (m) {
+      final code = int.tryParse(m.group(1) ?? '', radix: 16);
+      return code != null ? String.fromCharCode(code) : (m.group(0) ?? '');
+    });
   }
 }

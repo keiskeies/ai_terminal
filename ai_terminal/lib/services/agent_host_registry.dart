@@ -84,6 +84,7 @@ class AgentHostRegistry {
     }
     return null;
   }
+
   AgentMemory? getMemory(String scopeId) => _memories[scopeId];
   bool hasState(String scopeId) => _states.containsKey(scopeId);
   bool hasSysInfoFuture(String scopeId) => _sysInfoFutures.containsKey(scopeId);
@@ -92,16 +93,19 @@ class AgentHostRegistry {
   Iterable<String> get scopeIds => _states.keys;
 
   // Setter 方法
-  void setScopeHost(String scopeId, String hostId) => _scopeHosts[scopeId] = hostId;
+  void setScopeHost(String scopeId, String hostId) =>
+      _scopeHosts[scopeId] = hostId;
   void setState(String scopeId, AgentState state) => _states[scopeId] = state;
-  void setEngine(String scopeId, AgentEngine engine) => _engines[scopeId] = engine;
+  void setEngine(String scopeId, AgentEngine engine) =>
+      _engines[scopeId] = engine;
   void setExecutor(String hostId, CommandExecutor? executor) =>
       _hostExecutors[hostId] = executor;
   void setScopeExecutor(String scopeId, CommandExecutor? executor) =>
       _executors[scopeId] = executor;
   void setModelConfig(String scopeId, AIModelConfig? config) =>
       _modelConfigs[scopeId] = config;
-  void setMemory(String scopeId, AgentMemory memory) => _memories[scopeId] = memory;
+  void setMemory(String scopeId, AgentMemory memory) =>
+      _memories[scopeId] = memory;
   void setSysInfoFuture(String scopeId, Future<void> future) =>
       _sysInfoFutures[scopeId] = future;
 

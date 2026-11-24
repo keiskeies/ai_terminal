@@ -33,7 +33,9 @@ class CommandRunner {
   static String logCommand(String command) {
     final firstLine = command.split('\n').first.trim();
     if (firstLine.isEmpty) return '(空命令)';
-    return firstLine.length <= 80 ? firstLine : '${firstLine.substring(0, 80)}…';
+    return firstLine.length <= 80
+        ? firstLine
+        : '${firstLine.substring(0, 80)}…';
   }
 
   /// 审计日志输出截断（避免 MB 级日志膨胀审计 box）

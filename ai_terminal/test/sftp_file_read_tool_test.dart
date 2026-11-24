@@ -120,8 +120,8 @@ void main() {
     });
 
     test('2MB + 1 字节 → 拒绝并提示 grep / sftp_download', () {
-      final err = SftpFileReadTool.oversizeError(
-          SftpFileReadTool.maxFileBytes + 1);
+      final err =
+          SftpFileReadTool.oversizeError(SftpFileReadTool.maxFileBytes + 1);
       expect(err, isNotNull);
       expect(err, contains('grep'));
       expect(err, contains('sftp_download'));
@@ -130,8 +130,7 @@ void main() {
   });
 
   group('formatSlice（分段读，纯函数）', () {
-    final tenLines =
-        List.generate(10, (i) => 'line${i + 1}').join('\n');
+    final tenLines = List.generate(10, (i) => 'line${i + 1}').join('\n');
 
     test('默认范围读全文件：总行数 / 范围 / hasMore', () {
       final r = SftpFileReadTool.formatSlice(tenLines,
@@ -231,8 +230,7 @@ void main() {
           path: '/tmp/a.txt', offset: 1, limit: 200);
       expect(r.success, isTrue);
       expect(r.output, contains('行过长'));
-      expect(r.output.length,
-          lessThan(SftpFileReadTool.maxLineChars + 200));
+      expect(r.output.length, lessThan(SftpFileReadTool.maxLineChars + 200));
     });
 
     test('总字符上限：返回行数收缩且 next offset 与实际末行一致', () {

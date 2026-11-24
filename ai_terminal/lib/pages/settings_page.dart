@@ -105,16 +105,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   _groupCard(entry),
                 const SizedBox(height: kSettingsRowGap),
               ],
-
               const SizedBox(height: kSettingsGroupGap - kSettingsRowGap),
-
               SettingsSectionLabel(UiText.t('管理', 'Manage')),
               SettingsManageRows(
                 onNavigate: (route) => context.push(route),
               ),
-
               const SizedBox(height: kSettingsGroupGap),
-
               SettingsSectionLabel(UiText.t('关于', 'About')),
               const SettingsAboutRows(),
             ],

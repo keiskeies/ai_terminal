@@ -52,8 +52,7 @@ class WebSearchService {
     }
 
     final perBackendLimit = _perBackendLimit(finalLimit);
-    final semaphore =
-        _Semaphore(config.concurrency.clamp(1, 12));
+    final semaphore = _Semaphore(config.concurrency.clamp(1, 12));
     final reports = <WebSearchBackendReport>[];
     final batches = <WebSearchBatch>[];
 
@@ -122,8 +121,9 @@ class WebSearchService {
               maxResults: perBackendLimit,
               timeout: config.backendTimeout,
               apiKey: apiKey.isEmpty ? null : apiKey,
-              instanceUrl:
-                  provider.requiresInstanceUrl ? config.searxngInstanceUrl : null,
+              instanceUrl: provider.requiresInstanceUrl
+                  ? config.searxngInstanceUrl
+                  : null,
               proxy: config.proxy,
               cancelToken: token,
             )
@@ -199,9 +199,8 @@ class WebSearchService {
     });
 
     if (reports.isNotEmpty && reports.every((r) => !r.ok)) {
-      final message = reports
-          .map((r) => '${r.provider.displayName}(${r.error})')
-          .join('；');
+      final message =
+          reports.map((r) => '${r.provider.displayName}(${r.error})').join('；');
       final first = reports.first;
       if (reports.every((r) => r.permanent)) {
         throw WebSearchQuotaError(

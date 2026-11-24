@@ -191,7 +191,8 @@ class LocalExecTool extends AgentTool {
       executed: false,
     );
 
-    onProgress?.call(L10n.str.ut_bb63c6672a(localShellLabel(shell), _clipForProgress(command)));
+    onProgress?.call(L10n.str
+        .ut_bb63c6672a(localShellLabel(shell), _clipForProgress(command)));
 
     // ── 4. 执行 ───────────────────────────────────────────────
     LocalCommandResult result;

@@ -152,7 +152,11 @@ class _TabItemState extends State<_TabItem> {
                   color: widget.tab.isConnected ? tc.ok : tc.error,
                   shape: BoxShape.circle,
                   boxShadow: widget.tab.isConnected
-                      ? [BoxShadow(color: tc.ok.withValues(alpha: 0.4), blurRadius: 4)]
+                      ? [
+                          BoxShadow(
+                              color: tc.ok.withValues(alpha: 0.4),
+                              blurRadius: 4)
+                        ]
                       : null,
                 ),
               ),

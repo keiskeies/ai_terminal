@@ -117,7 +117,8 @@ class KnowledgeRuleNotifier extends StateNotifier<List<KnowledgeRule>> {
       if (idx >= 0) {
         rule = pending[idx];
       } else {
-        rule = KnowledgeRule.create(id: _uuid.v4(), title: title, content: content);
+        rule = KnowledgeRule.create(
+            id: _uuid.v4(), title: title, content: content);
         pending.add(rule);
       }
       rule.title = title;

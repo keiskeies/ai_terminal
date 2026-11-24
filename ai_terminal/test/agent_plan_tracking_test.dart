@@ -164,13 +164,11 @@ int _countMarker(String content, String marker) =>
     marker.allMatches(content).length;
 
 /// 门控发出的 info 事件（文案含「未完成项」）
-List<AgentEvent> _gateEvents(List<AgentEvent> events) => events
-    .where((e) => e.isInfo && (e.text ?? '').contains('未完成项'))
-    .toList();
+List<AgentEvent> _gateEvents(List<AgentEvent> events) =>
+    events.where((e) => e.isInfo && (e.text ?? '').contains('未完成项')).toList();
 
 const _executeTurn = '思考: 执行检查\n动作: execute\n命令: echo hi\n';
-const _finishTurn =
-    '思考: 结论: 完成\n现状: ok\n变更: 无\n建议: 无\n动作: finish\n';
+const _finishTurn = '思考: 结论: 完成\n现状: ok\n变更: 无\n建议: 无\n动作: finish\n';
 
 void main() {
   setUpAll(() {
@@ -564,8 +562,8 @@ void main() {
 
       final engine = makeEngine(provider: provider);
       await engine.startTask('任务一', _MockExecutor());
-      expect(provider.receivedHistories[1].first.content,
-          contains(_startMarker));
+      expect(
+          provider.receivedHistories[1].first.content, contains(_startMarker));
 
       await engine.startTask('任务二', _MockExecutor());
       expect(engine.currentTask?.status, AgentStatus.completed);

@@ -79,8 +79,7 @@ String stripInteractiveEcho(
   return kept.length == lines.length ? output : kept.join('\n');
 }
 
-String _collapseSpaces(String s) =>
-    s.replaceAll(RegExp(r'[ \t]+'), ' ').trim();
+String _collapseSpaces(String s) => s.replaceAll(RegExp(r'[ \t]+'), ' ').trim();
 
 /// stripWrappedEcho 的折行正则缓存：同一命令重复执行时避免反复编译正则。
 /// 有界 LRU（64 条）：命中移到末尾，满时淘汰最久未用。命令种类有限，
@@ -122,7 +121,8 @@ String stripWrappedEcho(String output, String wrappedCommand) {
   if (exact >= 0) return output.substring(exact + wrappedCommand.length);
   // 折行容忍路径：只在头部窗口内试
   final window = output.substring(
-      0, output.length < 4096 + wrappedCommand.length
+      0,
+      output.length < 4096 + wrappedCommand.length
           ? output.length
           : 4096 + wrappedCommand.length);
   final m = _wrappedEchoPattern(wrappedCommand).firstMatch(window);
@@ -131,7 +131,8 @@ String stripWrappedEcho(String output, String wrappedCommand) {
 }
 
 final RegExp _promptLineBash = RegExp(r'^[\w.\-]+@[\w.\-]+:[^\n]*[#$]\s*$');
-final RegExp _promptLineBashRoot = RegExp(r'^\[[\w.\-]+@[\w.\-]+[^\]\n]*\][#$]\s*$');
+final RegExp _promptLineBashRoot =
+    RegExp(r'^\[[\w.\-]+@[\w.\-]+[^\]\n]*\][#$]\s*$');
 final RegExp _promptLineCmd = RegExp(r'^[A-Za-z]:\\[^\n]*>\s*$');
 final RegExp _promptLinePs = RegExp(r'^PS [^\n]*>\s*$');
 

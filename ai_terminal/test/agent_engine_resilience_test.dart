@@ -20,6 +20,7 @@ import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 /// 用于集成测试的 Mock CommandExecutor
 class _MockExecutor implements CommandExecutor {
   String stdout = '';
+  final List<String> executedCommands = [];
 
   @override
   bool get isConnected => true;
@@ -38,6 +39,7 @@ class _MockExecutor implements CommandExecutor {
     String? sudoPassword,
     Future<String?> Function(String prompt)? onInteractivePrompt,
   }) async {
+    executedCommands.add(command);
     return CommandResult(
       stdout: stdout,
       stderr: '',
@@ -101,6 +103,10 @@ class _MockAIProvider implements AIProvider {
     _responses.add('HANG');
   }
 
+  void enqueueController(Stream<String> stream) {
+    _responses.add(stream);
+  }
+
   @override
   Future<Stream<String>> chatStream({
     required List<ChatMessage> history,
@@ -124,6 +130,9 @@ class _MockAIProvider implements AIProvider {
 
     if (next is Exception) {
       throw next;
+    }
+    if (next is Stream<String>) {
+      return next;
     }
     if (next == 'HANG') {
       final controller = StreamController<String>();
@@ -506,6 +515,68 @@ void main() {
       expect(resultEvent.outputTruncated, isTrue);
     });
 
+    group('流式提前执行与最终命令序列', () {
+      Future<void> waitForCommands(_MockExecutor executor, int count) async {
+        final deadline = DateTime.now().add(const Duration(seconds: 5));
+        while (executor.executedCommands.length < count) {
+          if (DateTime.now().isAfter(deadline)) {
+            fail('提前执行未触发: ${executor.executedCommands}');
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 10));
+        }
+      }
+
+      test('首条提前执行后按最终顺序补跑后续命令', () async {
+        final provider = _MockAIProvider();
+        final controller = StreamController<String>();
+        addTearDown(controller.close);
+        provider.enqueueController(controller.stream);
+        provider.enqueueStream([
+          '思考: 结论: 完成\n现状: ok\n变更: 无\n建议: 无\n动作: finish\n',
+        ]);
+        final engine = makeEngine(provider: provider);
+        final executor = _MockExecutor();
+        final running = engine.startTask('顺序执行', executor);
+
+        controller.add('思考: 先执行两条诊断命令\n动作: execute\n');
+        await Future<void>.delayed(const Duration(milliseconds: 170));
+        controller.add('命令: echo first\n说明: 第一条已完整\n');
+        await waitForCommands(executor, 1);
+        expect(executor.executedCommands, ['echo first']);
+        controller.add('命令: echo second\n');
+        await controller.close();
+        await running;
+
+        expect(executor.executedCommands, ['echo first', 'echo second']);
+        expect(provider.callCount, 2);
+        expect(engine.currentTask?.status, AgentStatus.completed);
+      });
+
+      test('最终序列明确重复同一命令时不得被文本过滤吞掉', () async {
+        final provider = _MockAIProvider();
+        final controller = StreamController<String>();
+        addTearDown(controller.close);
+        provider.enqueueController(controller.stream);
+        provider.enqueueStream([
+          '思考: 结论: 完成\n现状: ok\n变更: 无\n建议: 无\n动作: finish\n',
+        ]);
+        final engine = makeEngine(provider: provider);
+        final executor = _MockExecutor();
+        final running = engine.startTask('重复执行', executor);
+
+        controller.add('思考: 同一检查需要连续执行两次\n动作: execute\n');
+        await Future<void>.delayed(const Duration(milliseconds: 170));
+        controller.add('命令: echo repeat\n说明: 第一条已完整\n');
+        await waitForCommands(executor, 1);
+        controller.add('命令: echo repeat\n');
+        await controller.close();
+        await running;
+
+        expect(executor.executedCommands, ['echo repeat', 'echo repeat']);
+        expect(engine.currentTask?.status, AgentStatus.completed);
+      });
+    });
+
     test('暂停恢复保留 operationId、步数与命令计数', () async {
       final provider = _MockAIProvider();
       provider.enqueueStream([
@@ -536,6 +607,32 @@ void main() {
       expect(report.operationId, operationId);
       expect(report.stepIndex, greaterThanOrEqualTo(2));
       expect(report.commandSuccessCount, greaterThanOrEqualTo(1));
+    });
+
+    test('暂停时已有完整 finish 缓冲也不得覆盖为 completed', () async {
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 第一步\n动作: execute\n命令: echo hi\n',
+      ]);
+      final controller = StreamController<String>();
+      addTearDown(controller.close);
+      provider.enqueueController(controller.stream);
+
+      final engine = makeEngine(provider: provider);
+      final events = <AgentEvent>[];
+      engine.onEvent = events.add;
+      final running = engine.startTask('暂停缓冲测试', _MockExecutor());
+      while (provider.callCount < 2) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      controller.add('思考: 结论: 完成\n现状: ok\n变更: 无\n建议: 无\n动作: finish\n');
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      engine.pauseTask();
+      await running;
+
+      expect(engine.currentTask?.status, AgentStatus.paused);
+      expect(events.where((e) => e.isFinish), isEmpty);
+      expect(events.where((e) => e.isReport), isEmpty);
     });
 
     test('用户取消发射 cancelled report', () async {
@@ -719,8 +816,7 @@ void main() {
 
   group('执行权限档位门控', () {
     const blockedCmd = 'rm -f /etc/systemd/system/virt-edid.service';
-    const finishTurn =
-        '思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n';
+    const finishTurn = '思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n';
 
     test('询问档：blocked 命令挂起等待确认，确认后执行', () async {
       final provider = _MockAIProvider();

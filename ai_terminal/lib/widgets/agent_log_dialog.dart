@@ -72,7 +72,8 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
     _loadLogs();
     _scrollController.addListener(() {
       if (!_scrollController.hasClients) return;
-      final distanceFromBottom = _scrollController.position.maxScrollExtent - _scrollController.offset;
+      final distanceFromBottom =
+          _scrollController.position.maxScrollExtent - _scrollController.offset;
       if (distanceFromBottom > 120 && _autoScroll) {
         setState(() => _autoScroll = false);
       }
@@ -81,7 +82,10 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
       }
     });
     _refreshTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
-      if (!mounted) { timer.cancel(); return; }
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       final newLogs = agentLogger.getLogs();
       if (newLogs.length != _all.length) {
         setState(() {
@@ -90,8 +94,10 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           if (_autoScroll && _scrollController.hasClients) {
-            _scrollController.animateTo(_scrollController.position.maxScrollExtent,
-                duration: animNormal, curve: Curves.easeOut);
+            _scrollController.animateTo(
+                _scrollController.position.maxScrollExtent,
+                duration: animNormal,
+                curve: Curves.easeOut);
           }
         });
       }
@@ -126,10 +132,16 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
       if (start >= 0) list = list.sublist(start);
     }
     if (_levelFilter != null) {
-      list = [for (final e in list) if (e.level == _levelFilter) e];
+      list = [
+        for (final e in list)
+          if (e.level == _levelFilter) e
+      ];
     }
     if (_tagFilter != null) {
-      list = [for (final e in list) if (e.tag == _tagFilter) e];
+      list = [
+        for (final e in list)
+          if (e.tag == _tagFilter) e
+      ];
     }
     return list;
   }
@@ -156,7 +168,8 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
         decoration: BoxDecoration(
-          color: selected ? tc.brand.withValues(alpha: 0.14) : Colors.transparent,
+          color:
+              selected ? tc.brand.withValues(alpha: 0.14) : Colors.transparent,
           borderRadius: BorderRadius.circular(rFull),
           border: Border.all(
             color: selected ? tc.brand.withValues(alpha: 0.5) : tc.border,
@@ -180,7 +193,8 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
     final visible = _visible;
     return Dialog(
       backgroundColor: tc.card,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
       child: Container(
         width: MediaQuery.of(context).size.width * 0.78,
         height: MediaQuery.of(context).size.height * 0.7,
@@ -206,10 +220,11 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                   icon: Icon(Icons.copy_all, color: tc.textSub, size: 16),
                   onPressed: () async {
                     final ctx = context;
-                    await Clipboard.setData(
-                        ClipboardData(text: visible.map((e) => e.raw).join('\n')));
+                    await Clipboard.setData(ClipboardData(
+                        text: visible.map((e) => e.raw).join('\n')));
                     if (!ctx.mounted) return;
-                    showTopSnackBar(ctx,
+                    showTopSnackBar(
+                      ctx,
                       SnackBar(
                         content: Text(L10n.str.ut_0b13faa29b(visible.length),
                             style: const TextStyle(fontSize: fBody)),
@@ -218,13 +233,15 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                     );
                   },
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  constraints:
+                      const BoxConstraints(minWidth: 28, minHeight: 28),
                 ),
                 IconButton(
                   icon: Icon(Icons.close, color: tc.textSub, size: 18),
                   onPressed: () => Navigator.of(context).pop(),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                  constraints:
+                      const BoxConstraints(minWidth: 28, minHeight: 28),
                 ),
               ],
             ),
@@ -251,10 +268,12 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                       value: _tagFilter,
                       isDense: true,
                       dropdownColor: tc.cardElevated,
-                      icon: Icon(Icons.arrow_drop_down, size: 16, color: tc.textSub),
+                      icon: Icon(Icons.arrow_drop_down,
+                          size: 16, color: tc.textSub),
                       style: TextStyle(fontSize: fMicro, color: tc.textSub),
                       hint: Text(UiText.t('全部 tag', 'All tags'),
-                          style: TextStyle(fontSize: fMicro, color: tc.textSub)),
+                          style:
+                              TextStyle(fontSize: fMicro, color: tc.textSub)),
                       items: [
                         DropdownMenuItem<String?>(
                             value: null,
@@ -271,7 +290,8 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                 ),
                 // 只看本次任务：从最后一条「开始任务」截断，旧任务和启动日志不再混进来
                 GestureDetector(
-                  onTap: () => setState(() => _currentTaskOnly = !_currentTaskOnly),
+                  onTap: () =>
+                      setState(() => _currentTaskOnly = !_currentTaskOnly),
                   child: Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -300,7 +320,8 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                         Text(UiText.t('只看本次任务', 'This task only'),
                             style: TextStyle(
                                 fontSize: fMicro,
-                                color: _currentTaskOnly ? tc.brand : tc.textSub)),
+                                color:
+                                    _currentTaskOnly ? tc.brand : tc.textSub)),
                       ],
                     ),
                   ),
@@ -337,10 +358,13 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
                                   TextSpan(
                                     text: '${e.tag}  ',
                                     style: TextStyle(
-                                        color: tc.brand.withValues(alpha: 0.75)),
+                                        color:
+                                            tc.brand.withValues(alpha: 0.75)),
                                   ),
                                 ],
-                                TextSpan(text: e.message, style: TextStyle(color: color)),
+                                TextSpan(
+                                    text: e.message,
+                                    style: TextStyle(color: color)),
                               ]),
                               style: const TextStyle(
                                 fontFamily: 'JetBrainsMono',

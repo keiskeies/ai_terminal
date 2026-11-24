@@ -184,9 +184,11 @@ class AIEndpointModel {
       name: json['name'] as String? ?? '',
       modelName: json['modelName'] as String? ?? '',
       contextWindow: (json['contextWindow'] as num?)?.toInt() ?? 0,
-      maxTokens: (json['maxTokens'] as num?)?.toInt() ?? kDefaultMaxOutputTokens,
+      maxTokens:
+          (json['maxTokens'] as num?)?.toInt() ?? kDefaultMaxOutputTokens,
       temperature: (json['temperature'] as num?)?.toDouble() ?? 0.3,
-      supportsFunctionCalling: json['supportsFunctionCalling'] as bool? ?? false,
+      supportsFunctionCalling:
+          json['supportsFunctionCalling'] as bool? ?? false,
       fallbackModelId: json['fallbackModelId'] as String?,
       reasoningEnabled: json['reasoningEnabled'] as bool? ?? false,
       reasoningTiers: rawTiers

@@ -221,8 +221,8 @@ class _BingRssProvider implements WebSearchProviderApi {
     for (final item in itemRegex.allMatches(xml)) {
       if (results.length >= max) break;
       final block = item.group(1) ?? '';
-      final url = _decodeEntities(linkRegex.firstMatch(block)?.group(1) ?? '')
-          .trim();
+      final url =
+          _decodeEntities(linkRegex.firstMatch(block)?.group(1) ?? '').trim();
       if (!url.startsWith('http')) continue;
       final title = _stripHtml(
         _decodeEntities(
@@ -813,7 +813,8 @@ class _OpenAIProvider implements WebSearchProviderApi {
               final start = int.tryParse(
                 annotation['start_index']?.toString() ?? '',
               );
-              final end = int.tryParse(annotation['end_index']?.toString() ?? '');
+              final end =
+                  int.tryParse(annotation['end_index']?.toString() ?? '');
               _putOpenAiResult(
                 merged,
                 url: url,
@@ -952,9 +953,8 @@ void _putOpenAiResult(
   out[url] = WebSearchResult(
     title: existing.title.isEmpty ? title : existing.title,
     url: url,
-    snippet: snippet.length > existing.snippet.length
-        ? snippet
-        : existing.snippet,
+    snippet:
+        snippet.length > existing.snippet.length ? snippet : existing.snippet,
   );
 }
 
@@ -990,13 +990,12 @@ String _decodeEntities(String input) {
       .replaceAll('&apos;', "'")
       .replaceAll('&nbsp;', ' ')
       .replaceAllMapped(RegExp(r'&#(\d+);'), (m) {
-        final code = int.tryParse(m.group(1) ?? '');
-        return code != null ? String.fromCharCode(code) : (m.group(0) ?? '');
-      })
-      .replaceAllMapped(RegExp(r'&#x([0-9a-fA-F]+);'), (m) {
-        final code = int.tryParse(m.group(1) ?? '', radix: 16);
-        return code != null ? String.fromCharCode(code) : (m.group(0) ?? '');
-      });
+    final code = int.tryParse(m.group(1) ?? '');
+    return code != null ? String.fromCharCode(code) : (m.group(0) ?? '');
+  }).replaceAllMapped(RegExp(r'&#x([0-9a-fA-F]+);'), (m) {
+    final code = int.tryParse(m.group(1) ?? '', radix: 16);
+    return code != null ? String.fromCharCode(code) : (m.group(0) ?? '');
+  });
 }
 
 String _stripCdata(String input) {

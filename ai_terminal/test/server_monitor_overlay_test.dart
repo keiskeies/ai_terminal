@@ -119,7 +119,8 @@ void main() {
   );
 
   testWidgets('网络浮层不再硬截断：真实网卡直接列出，虚拟网卡折叠成一行', (tester) async {
-    await _pump(tester, _snapshot(interfaces: interfaces, partitions: partitions));
+    await _pump(
+        tester, _snapshot(interfaces: interfaces, partitions: partitions));
 
     await _hover(tester, find.text('34.0 KB/s'));
 
@@ -136,7 +137,8 @@ void main() {
   });
 
   testWidgets('磁盘浮层多分区不溢出：速览限行 + 剩余数提示', (tester) async {
-    await _pump(tester, _snapshot(interfaces: interfaces, partitions: partitions));
+    await _pump(
+        tester, _snapshot(interfaces: interfaces, partitions: partitions));
 
     await _hover(tester, find.text('52.0%'));
 
@@ -147,7 +149,8 @@ void main() {
   });
 
   testWidgets('点击磁盘芯片打开详情窗并列出全部分区', (tester) async {
-    await _pump(tester, _snapshot(interfaces: interfaces, partitions: partitions));
+    await _pump(
+        tester, _snapshot(interfaces: interfaces, partitions: partitions));
 
     await tester.tap(find.text('52.0%'));
     await tester.pumpAndSettle();
@@ -199,8 +202,7 @@ void main() {
     final withDialog = service.collectCount;
     await tester.pump(const Duration(seconds: 10));
     await tester.pump();
-    expect(service.collectCount, withDialog + 1,
-        reason: '详情窗打开期间面板仍在轮询（双采集者）');
+    expect(service.collectCount, withDialog + 1, reason: '详情窗打开期间面板仍在轮询（双采集者）');
 
     await tester.tap(find.byIcon(Icons.close));
     await tester.pumpAndSettle();
@@ -211,7 +213,8 @@ void main() {
   });
 
   testWidgets('网络详情窗展开虚拟网卡分组后 27 个接口全部可见', (tester) async {
-    await _pump(tester, _snapshot(interfaces: interfaces, partitions: partitions));
+    await _pump(
+        tester, _snapshot(interfaces: interfaces, partitions: partitions));
 
     await tester.tap(find.text('34.0 KB/s'));
     await tester.pumpAndSettle();

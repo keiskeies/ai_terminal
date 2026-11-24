@@ -121,7 +121,8 @@ void main() {
       expect(manager.buildAgentTools(), isNotEmpty);
     }, timeout: const Timeout(Duration(seconds: 90)));
 
-    test('tools/list_changed 触发能力刷新', () async {      final manager = McpManager.instance;
+    test('tools/list_changed 触发能力刷新', () async {
+      final manager = McpManager.instance;
       manager.loadConfigsForTesting([config()]);
       await manager.connect('test');
       expect(

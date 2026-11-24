@@ -77,8 +77,8 @@ void main() {
     await addBackend(tester, 'SearXNG');
 
     // 表单里就两个输入框：地址在前，Token 在后
-    await tester.enterText(find.byType(TextField).first,
-        'http://192.168.1.5:8080/');
+    await tester.enterText(
+        find.byType(TextField).first, 'http://192.168.1.5:8080/');
     await tester.tap(find.text('保存并启用'));
     await tester.pump();
     await tester.pump();
@@ -115,15 +115,13 @@ void main() {
   });
 
   testWidgets('缺地址的 SearXNG 挂警示角标，缺 Key 的后端挂金锁', (tester) async {
-    await WebSearchConfig.load()
-        .copyWith(
-          enabled: true,
-          enabledBackends: const [
-            WebSearchProvider.searxng,
-            WebSearchProvider.tavily,
-          ],
-        )
-        .save();
+    await WebSearchConfig.load().copyWith(
+      enabled: true,
+      enabledBackends: const [
+        WebSearchProvider.searxng,
+        WebSearchProvider.tavily,
+      ],
+    ).save();
     await pumpPanel(tester);
     await tester.pump();
     await tester.pump();
@@ -168,11 +166,9 @@ void main() {
   });
 
   testWidgets('立即测试要先展开，跑完把每个后端的结果摊开', (tester) async {
-    await WebSearchConfig.load()
-        .copyWith(
-            enabled: true,
-            enabledBackends: const [WebSearchProvider.bingRss])
-        .save();
+    await WebSearchConfig.load().copyWith(
+        enabled: true,
+        enabledBackends: const [WebSearchProvider.bingRss]).save();
     await pumpPanel(tester);
 
     await tester.tap(find.textContaining('高级'));

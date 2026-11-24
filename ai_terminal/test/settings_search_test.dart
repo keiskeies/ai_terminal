@@ -76,8 +76,7 @@ void main() {
     await search(tester, '超时');
 
     // 展开才会渲染出来的字段标签。
-    expect(find.text('单步响应超时'), findsOneWidget,
-        reason: '命中即展开，不该再要求点一次');
+    expect(find.text('单步响应超时'), findsOneWidget, reason: '命中即展开，不该再要求点一次');
   });
 
   testWidgets('搜组名也能命中，且点开是同一个组', (tester) async {
@@ -138,8 +137,7 @@ void main() {
 
   testWidgets('全默认时没有「已修改」区', (tester) async {
     await pumpSettings(tester);
-    expect(find.text('已修改'), findsNothing,
-        reason: '全默认时整块不渲染，不给一个永远空着的区块');
+    expect(find.text('已修改'), findsNothing, reason: '全默认时整块不渲染，不给一个永远空着的区块');
   });
 
   testWidgets('改过缓冲后出现「已修改」区，点行展开终端组', (tester) async {
@@ -243,8 +241,7 @@ void main() {
     // 点一下应收起来 —— 以前 expanded 写死 `searching || ...`，点了没反应。
     await tester.tap(find.text('Agent'));
     await tester.pumpAndSettle();
-    expect(find.text('单步响应超时'), findsNothing,
-        reason: '搜索态下卡片也必须是可折叠的，否则点击无反馈');
+    expect(find.text('单步响应超时'), findsNothing, reason: '搜索态下卡片也必须是可折叠的，否则点击无反馈');
 
     // 再点一下还能展开回来。
     await tester.tap(find.text('Agent'));

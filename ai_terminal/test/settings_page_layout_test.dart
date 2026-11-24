@@ -78,8 +78,7 @@ void main() {
     // 设置是一份清单：八组配置之后的「管理」（独立功能页）和「关于」
     // （语言 / 版本 / 诊断）都得在，抽屉里调的是同两个组件。
     for (final s in settingsShortcuts()) {
-      expect(find.text(s.title), findsOneWidget,
-          reason: '缺少管理入口「${s.title}」');
+      expect(find.text(s.title), findsOneWidget, reason: '缺少管理入口「${s.title}」');
     }
     expect(find.text('语言'), findsOneWidget);
     expect(find.text('版本'), findsOneWidget);

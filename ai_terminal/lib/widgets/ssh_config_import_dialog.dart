@@ -99,8 +99,8 @@ class _SshConfigImportDialogState extends ConsumerState<SshConfigImportDialog> {
         if (!mounted) return;
         setState(() => _importing = false);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-              '${UiText.t('导入失败', 'Import failed')}: ${entry.alias} — $e'),
+          content:
+              Text('${UiText.t('导入失败', 'Import failed')}: ${entry.alias} — $e'),
         ));
         return;
       }
@@ -149,7 +149,7 @@ class _SshConfigImportDialogState extends ConsumerState<SshConfigImportDialog> {
                         UiText.t(
                           '只导入地址、端口、用户名与跳板机；密码和私钥内容需导入后在主机编辑页补填。',
                           'Imports address, port, user and jump host only. '
-                          'Passwords and private keys must be added after import.',
+                              'Passwords and private keys must be added after import.',
                         ),
                         style: TextStyle(color: tc.warn, fontSize: fMicro),
                       ),
@@ -159,7 +159,8 @@ class _SshConfigImportDialogState extends ConsumerState<SshConfigImportDialog> {
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           child: Text(
                             UiText.t('配置里没有可导入的主机', 'No importable hosts'),
-                            style: TextStyle(color: tc.textSub, fontSize: fSmall),
+                            style:
+                                TextStyle(color: tc.textSub, fontSize: fSmall),
                           ),
                         )
                       else
@@ -173,7 +174,8 @@ class _SshConfigImportDialogState extends ConsumerState<SshConfigImportDialog> {
                             ),
                           ),
                         ),
-                      if ((result?.warnings ?? const <String>[]).isNotEmpty) ...[
+                      if ((result?.warnings ?? const <String>[])
+                          .isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Text(
                           UiText.t('解析提示', 'Parse notes'),
@@ -207,8 +209,7 @@ class _SshConfigImportDialogState extends ConsumerState<SshConfigImportDialog> {
           child: Text(UiText.t('取消', 'Cancel')),
         ),
         FilledButton.icon(
-          onPressed:
-              _importing || _selected.isEmpty ? null : _import,
+          onPressed: _importing || _selected.isEmpty ? null : _import,
           icon: _importing
               ? const SizedBox(
                   width: 14,
@@ -241,8 +242,8 @@ class _SshConfigImportDialogState extends ConsumerState<SshConfigImportDialog> {
   Widget _row(ThemeColors tc, SshConfigEntry e) {
     final isDuplicate = _existingAliases.contains(e.alias);
     final checked = _selected.contains(e.alias);
-    void toggle() => setState(() =>
-        checked ? _selected.remove(e.alias) : _selected.add(e.alias));
+    void toggle() => setState(
+        () => checked ? _selected.remove(e.alias) : _selected.add(e.alias));
     return InkWell(
       onTap: isDuplicate ? null : toggle,
       child: Padding(
@@ -266,13 +267,14 @@ class _SshConfigImportDialogState extends ConsumerState<SshConfigImportDialog> {
                     ),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (e.proxyJump != null || e.hasPrivateKey || e.ignoredKeys.isNotEmpty)
+                  if (e.proxyJump != null ||
+                      e.hasPrivateKey ||
+                      e.ignoredKeys.isNotEmpty)
                     Text(
                       [
                         if (e.proxyJump != null)
                           '${UiText.t('跳板', 'jump')}: ${e.proxyJump}',
-                        if (e.hasPrivateKey)
-                          UiText.t('需补私钥', 'key needed'),
+                        if (e.hasPrivateKey) UiText.t('需补私钥', 'key needed'),
                         if (e.ignoredKeys.isNotEmpty)
                           '+${e.ignoredKeys.length} ${UiText.t('项未导入', 'ignored')}',
                       ].join(' · '),

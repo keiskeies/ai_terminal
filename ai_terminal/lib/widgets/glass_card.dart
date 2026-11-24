@@ -45,14 +45,16 @@ class _PrimaryButtonState extends State<PrimaryButton> {
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
     final fg = tc.onAccent;
-    final disabled = widget.isDisabled || widget.isLoading || widget.onPressed == null;
+    final disabled =
+        widget.isDisabled || widget.isLoading || widget.onPressed == null;
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() {
         _isHovered = false;
         _isPressed = false;
       }),
-      cursor: disabled ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
+      cursor:
+          disabled ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
       child: GestureDetector(
         onTapDown: disabled ? null : (_) => setState(() => _isPressed = true),
         onTapUp: disabled ? null : (_) => setState(() => _isPressed = false),
@@ -61,7 +63,8 @@ class _PrimaryButtonState extends State<PrimaryButton> {
         child: AnimatedContainer(
           duration: animFast,
           height: widget.height,
-          padding: EdgeInsets.symmetric(horizontal: widget.icon != null ? 12 : 16),
+          padding:
+              EdgeInsets.symmetric(horizontal: widget.icon != null ? 12 : 16),
           decoration: BoxDecoration(
             color: _bgColor,
             borderRadius: BorderRadius.circular(rButton),
@@ -76,7 +79,8 @@ class _PrimaryButtonState extends State<PrimaryButton> {
                   height: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(fg.withValues(alpha: 0.8)),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                        fg.withValues(alpha: 0.8)),
                   ),
                 )
               else ...[
@@ -152,14 +156,16 @@ class _SecondaryButtonState extends State<SecondaryButton> {
 
   @override
   Widget build(BuildContext context) {
-    final disabled = widget.isDisabled || widget.isLoading || widget.onPressed == null;
+    final disabled =
+        widget.isDisabled || widget.isLoading || widget.onPressed == null;
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() {
         _isHovered = false;
         _isPressed = false;
       }),
-      cursor: disabled ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
+      cursor:
+          disabled ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
       child: GestureDetector(
         onTapDown: disabled ? null : (_) => setState(() => _isPressed = true),
         onTapUp: disabled ? null : (_) => setState(() => _isPressed = false),
@@ -168,7 +174,8 @@ class _SecondaryButtonState extends State<SecondaryButton> {
         child: AnimatedContainer(
           duration: animFast,
           height: widget.height,
-          padding: EdgeInsets.symmetric(horizontal: widget.icon != null ? 12 : 16),
+          padding:
+              EdgeInsets.symmetric(horizontal: widget.icon != null ? 12 : 16),
           decoration: BoxDecoration(
             color: _bgColor,
             borderRadius: BorderRadius.circular(rButton),
@@ -184,7 +191,8 @@ class _SecondaryButtonState extends State<SecondaryButton> {
                   height: 14,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(ThemeColors.of(context).textSub),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                        ThemeColors.of(context).textSub),
                   ),
                 )
               else ...[
@@ -248,7 +256,8 @@ class _TextButtonXState extends State<TextButtonX> {
     return MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
-      cursor: disabled ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
+      cursor:
+          disabled ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
       child: GestureDetector(
         onTap: disabled ? null : widget.onPressed,
         child: AnimatedContainer(
@@ -336,7 +345,8 @@ class Popover extends StatelessWidget {
     final tc = ThemeColors.of(context);
     return Container(
       width: width,
-      constraints: maxHeight != null ? BoxConstraints(maxHeight: maxHeight!) : null,
+      constraints:
+          maxHeight != null ? BoxConstraints(maxHeight: maxHeight!) : null,
       decoration: BoxDecoration(
         color: tc.cardElevated,
         borderRadius: BorderRadius.circular(rSmall),
@@ -390,7 +400,8 @@ class _IconButtonXState extends State<IconButtonX> {
     final btn = MouseRegion(
       onEnter: (_) => setState(() => _isHovered = true),
       onExit: (_) => setState(() => _isHovered = false),
-      cursor: disabled ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
+      cursor:
+          disabled ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
       child: GestureDetector(
         onTap: disabled ? null : widget.onPressed,
         child: AnimatedContainer(

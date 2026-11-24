@@ -65,8 +65,7 @@ class TerminalBlock {
   int? get startLine => _prompt.attached ? _prompt.y : null;
 
   /// 命令文本所在行（B 存在时是 B 的行，否则退回提示符行）
-  int? get commandLine =>
-      command?.attached == true ? command!.y : startLine;
+  int? get commandLine => command?.attached == true ? command!.y : startLine;
 
   /// 输出首行（C 存在时是 C 的行；没有 C 就紧跟命令行）
   int? outputFirstLine(int bufferHeight) {

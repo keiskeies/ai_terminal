@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../models/agent_event.dart';
 import '../models/agent_model.dart';
 
@@ -19,16 +21,24 @@ class TerminationGuard {
   TerminationGuard({
     required this.hostId,
     required int Function() generation,
-  }) : _generation = generation;
+    bool Function(AgentStatus status)? isTerminalAllowed,
+  })  : _generation = generation,
+        _isTerminalAllowed = isTerminalAllowed;
 
   /// 所属引擎的主机 id（用于日志/诊断）
   final String? hostId;
 
   final int Function() _generation;
+  final bool Function(AgentStatus status)? _isTerminalAllowed;
 
   /// 同一引擎、同一代际的终态只收口一次；新任务代际变化后自动重新开放。
   bool _terminated = false;
   int _terminatedGeneration = -1;
+
+  /// 最近一次收口的回调错误摘要。单项失败不阻止后续终态动作，也不向任务循环
+  /// 抛异常；否则 report/finish/flush 会被同一个异常永久跳过。
+  List<String> _lastErrors = const [];
+  List<String> get lastErrors => List.unmodifiable(_lastErrors);
 
   /// 是否已为当前代际收口过（供引擎查询，避免重复 emit）。
   bool get isTerminatedForCurrentGeneration {
@@ -61,19 +71,37 @@ class TerminationGuard {
   }) {
     final gen = _generation();
     if (expectedGeneration != null && expectedGeneration != gen) return false;
+    if (_isTerminalAllowed?.call(status) == false) return false;
     if (_terminated && _terminatedGeneration == gen) return false;
 
+    // 先记终态，保证同代际重入不会造成重复报告/持久化。
     _terminated = true;
     _terminatedGeneration = gen;
-    try {
-      writeStatus(status);
-      emitReport();
-      emitFinish();
-      if (flush != null) flush();
-      if (endTracer != null) endTracer();
-    } finally {
-      // 清理必须在 finally：任一回调抛异常都不能跳过资源释放。
-      cleanup?.call();
+    final errors = <String>[];
+    _lastErrors = const [];
+
+    void attempt(String name, void Function()? action) {
+      if (action == null) return;
+      try {
+        action();
+      } catch (e, stack) {
+        errors.add('$name: $e');
+        debugPrint(
+            '[TerminationGuard] host=$hostId gen=$gen $name 失败: $e\n$stack');
+      }
+    }
+
+    attempt('writeStatus', () => writeStatus(status));
+    attempt('emitReport', emitReport);
+    attempt('emitFinish', emitFinish);
+    if (flush != null) attempt('flush', flush);
+    if (endTracer != null) attempt('endTracer', endTracer);
+    // cleanup 不是 finally 的附加项，而是与其它项一样必须独立尝试的终态动作。
+    if (cleanup != null) attempt('cleanup', cleanup);
+    _lastErrors = List.unmodifiable(errors);
+    if (errors.isNotEmpty) {
+      debugPrint('[TerminationGuard] host=$hostId gen=$gen 收口完成，'
+          '${errors.length} 项失败: ${errors.join('; ')}');
     }
     return true;
   }

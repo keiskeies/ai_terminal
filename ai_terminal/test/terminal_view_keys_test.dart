@@ -66,7 +66,8 @@ void main() {
       expect(result.pasted, 'a\nb');
     });
     test('多行 + skipConfirm → 不弹确认直接粘贴（Shift+Insert / 中键口径）', () {
-      final result = routePaste('a\nb\n c', skipConfirm: true, confirmed: false);
+      final result =
+          routePaste('a\nb\n c', skipConfirm: true, confirmed: false);
       expect(result.pasted, 'a\nb\n c');
       expect(result.confirmNeeded, false);
     });
@@ -87,8 +88,8 @@ void main() {
     });
     test('中键 + 左键 → false（组合按不按纯中键处理）', () {
       // 位或，不是逻辑或：buttons 是位掩码
-      expect(isMiddleClick(PointerButtons.middle | PointerButtons.primary),
-          false);
+      expect(
+          isMiddleClick(PointerButtons.middle | PointerButtons.primary), false);
     });
     test('右键 → false', () {
       expect(isMiddleClick(PointerButtons.secondary), false);
@@ -130,7 +131,6 @@ void main() {
       }
     });
   });
-
 
   group('右键菜单项构建（_buildMenuItems 的本地项，经 widget 集成验证）', () {
     testWidgets('集成：有选区时菜单含「复制」项', (tester) async {
@@ -181,10 +181,8 @@ void main() {
     testWidgets('无选区：粘贴显示 ⌘V、全选显示 ⌘A', (tester) async {
       final gesture = await openMenu(tester);
 
-      expect(find.text('⌘V'), findsOneWidget,
-          reason: 'mac 上粘贴提示必须是 ⌘V');
-      expect(find.text('⌘A'), findsOneWidget,
-          reason: 'mac 上全选提示必须是 ⌘A');
+      expect(find.text('⌘V'), findsOneWidget, reason: 'mac 上粘贴提示必须是 ⌘V');
+      expect(find.text('⌘A'), findsOneWidget, reason: 'mac 上全选提示必须是 ⌘A');
       // xterm 的苹果快捷键表（_defaultAppleShortcuts）只绑 ⌘，
       // 菜单里出现 Ctrl 系列就是让用户去按没有绑定的键
       expect(find.text('Ctrl+V'), findsNothing);

@@ -130,7 +130,7 @@ void main() {
     });
   });
 
-  group('ConfirmationPromptResponder 下标去重', () {
+  group('ConfirmationPromptResponder 稳定指纹去重', () {
     test('同一提示的增量 chunk 只应答一次', () {
       final r = ConfirmationPromptResponder();
       expect(r.shouldAnswer('echo hi\r\nContinue? [Y/n]'), isTrue);
@@ -151,14 +151,25 @@ void main() {
       );
     });
 
-    test('缓冲尾部截断导致下标前移时重置游标', () {
+    test('缓冲尾部截断导致下标前移时不重复应答', () {
       final r = ConfirmationPromptResponder();
       final big = '${'x' * 100}Continue? [Y/n] ';
       expect(r.shouldAnswer(big), isTrue);
       expect(r.shouldAnswer(big), isFalse);
-      // 截断后旧游标越界：必须重置，否则新缓冲里的提示永远答不上
+      // 仅滑动窗口截断、提示从未离开尾部：仍是同一个提示，不能重复弹窗/应答。
       const small = 'Continue? [Y/n] ';
-      expect(r.shouldAnswer(small), isTrue);
+      expect(r.shouldAnswer(small), isFalse);
+    });
+
+    test('相同提示在离开尾部后再次出现可应答', () {
+      final r = ConfirmationPromptResponder();
+      const prompt = 'Continue? [Y/n] ';
+      expect(r.shouldAnswer('echo hi\r\n$prompt'), isTrue);
+      expect(r.shouldAnswer('echo hi\r\n${prompt}yes\r\nOverwrite? [y/N] '),
+          isTrue);
+      // 第二次确认与第一次文本完全相同，但答案/普通输出已让上一个提示离开尾部。
+      expect(r.shouldAnswer('echo hi\r\n${prompt}yes\r\n$prompt'), isTrue);
+      expect(r.shouldAnswer('echo hi\r\n${prompt}yes\r\n$prompt '), isFalse);
     });
 
     test('无提示时不应答', () {
@@ -170,27 +181,38 @@ void main() {
 
   group('保守自动应答规则', () {
     test('[Y/n]（默认 Yes）→ Y', () {
-      expect(PtyOutputDetector.confirmationAutoAnswer(
-          'Do you want to continue? [Y/n] '), 'Y');
-      expect(PtyOutputDetector.confirmationAutoAnswer('Continue? [Y/n]: '), 'Y');
+      expect(
+          PtyOutputDetector.confirmationAutoAnswer(
+              'Do you want to continue? [Y/n] '),
+          'Y');
+      expect(
+          PtyOutputDetector.confirmationAutoAnswer('Continue? [Y/n]: '), 'Y');
     });
 
     test('Press ENTER → 空串（直接回车），大小写不敏感', () {
-      expect(PtyOutputDetector.confirmationAutoAnswer('Press ENTER to continue'), '');
-      expect(PtyOutputDetector.confirmationAutoAnswer('press enter or type a value'), '');
+      expect(
+          PtyOutputDetector.confirmationAutoAnswer('Press ENTER to continue'),
+          '');
+      expect(
+          PtyOutputDetector.confirmationAutoAnswer(
+              'press enter or type a value'),
+          '');
     });
 
     test('无安全默认值的提示一律 null（交回 UI）', () {
-      expect(PtyOutputDetector.confirmationAutoAnswer('Overwrite? [y/N] '), isNull);
+      expect(PtyOutputDetector.confirmationAutoAnswer('Overwrite? [y/N] '),
+          isNull);
       expect(PtyOutputDetector.confirmationAutoAnswer('(yes/no)? '), isNull);
       expect(PtyOutputDetector.confirmationAutoAnswer('Continue? '), isNull);
     });
 
     test('密码类提示永不自动应答（R7），即使带 [Y/n] 字样', () {
       expect(PtyOutputDetector.confirmationAutoAnswer('Password: '), isNull);
-      expect(PtyOutputDetector.confirmationAutoAnswer('Enter passphrase'), isNull);
+      expect(
+          PtyOutputDetector.confirmationAutoAnswer('Enter passphrase'), isNull);
       expect(PtyOutputDetector.confirmationAutoAnswer('输入密码：'), isNull);
-      expect(PtyOutputDetector.confirmationAutoAnswer('[Y/n] Password:'), isNull);
+      expect(
+          PtyOutputDetector.confirmationAutoAnswer('[Y/n] Password:'), isNull);
     });
   });
 }

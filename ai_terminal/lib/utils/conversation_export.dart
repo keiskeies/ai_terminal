@@ -12,9 +12,9 @@ import 'react_stream_parser.dart';
 /// 只解析**确实含协议行**的正文：解析器把任意 ``` 围栏都产出为可执行 command
 /// 事件，普通 Markdown 回答（带代码示例/引用块里写「命令:」）若进解析，
 /// 会被重排成分节文本、围栏还会挂上执行按钮。无协议行 → 返回空，原样渲染。
-final RegExp _reactProtocolLine =
-    RegExp(r'^\s*(思考|计划|说明|动作|命令|选项|工具|参数|回答|结论|现状|变更|建议)\s*[:：]',
-        multiLine: true);
+final RegExp _reactProtocolLine = RegExp(
+    r'^\s*(思考|计划|说明|动作|命令|选项|工具|参数|回答|结论|现状|变更|建议)\s*[:：]',
+    multiLine: true);
 
 List<AgentEvent> parseRawReactFallbackEvents(String raw) {
   if (raw.trim().isEmpty) return const [];
@@ -27,8 +27,8 @@ List<AgentEvent> parseRawReactFallbackEvents(String raw) {
 }
 
 /// 事件列表里是否有可作为正文展示的可见内容（与 terminal_page 的判定同口径）
-bool hasVisibleReactEvents(List<AgentEvent> events) =>
-    events.any((e) => e.isThought || e.isCommand || e.isText || e.isAsk || e.isFinish);
+bool hasVisibleReactEvents(List<AgentEvent> events) => events.any(
+    (e) => e.isThought || e.isCommand || e.isText || e.isAsk || e.isFinish);
 
 /// 把会话拼成纯文本，供 `/export` 复制到剪贴板。
 ///
@@ -59,7 +59,9 @@ String formatOperationReportCopy(OperationReport report) {
   }
   buffer.writeln(L10n.str.ut_304b011a8a(report.conclusion.trim()));
   final answerBody = report.answerBody?.trim();
-  if (answerBody != null && answerBody.isNotEmpty && !_sameText(answerBody, report.conclusion)) {
+  if (answerBody != null &&
+      answerBody.isNotEmpty &&
+      !_sameText(answerBody, report.conclusion)) {
     buffer
       ..writeln()
       ..writeln(answerBody);
@@ -68,7 +70,8 @@ String formatOperationReportCopy(OperationReport report) {
     buffer.writeln('变更：');
     for (final change in report.changes) {
       final rollback = change.canRollback
-          ? (change.localRestore && (change.rollbackCommand ?? '').trim().isEmpty
+          ? (change.localRestore &&
+                  (change.rollbackCommand ?? '').trim().isEmpty
               ? '（可回滚：从备份/回收区移回）'
               : '（可回滚：${change.rollbackCommand}）')
           : '（无自动回滚）';
@@ -183,7 +186,8 @@ String formatAnswerForCopy({
         case AgentEventType.ask:
           final options = event.options ?? const [];
           emit([
-            if ((event.question ?? '').trim().isNotEmpty) event.question!.trim(),
+            if ((event.question ?? '').trim().isNotEmpty)
+              event.question!.trim(),
             if (options.isNotEmpty) options.map((o) => '- $o').join('\n'),
             // 用户选了什么必须进复制文本：界面上它显示在提问步骤的胶囊里，
             // 复制走的是另一条路径，不带上就丢了

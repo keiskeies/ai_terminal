@@ -61,8 +61,10 @@ class SftpController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final password = await CredentialsStore.get(hostId: host.id, type: 'password');
-      final privateKey = await CredentialsStore.get(hostId: host.id, type: 'privateKey');
+      final password =
+          await CredentialsStore.get(hostId: host.id, type: 'password');
+      final privateKey =
+          await CredentialsStore.get(hostId: host.id, type: 'privateKey');
 
       if (password == null && privateKey == null) {
         isConnecting = false;
@@ -151,8 +153,10 @@ class SftpController extends ChangeNotifier {
         case SftpSortFields.size:
           cmp = a.size.compareTo(b.size);
         case SftpSortFields.modified:
-          final aTime = a.modifiedTime ?? DateTime.fromMillisecondsSinceEpoch(0);
-          final bTime = b.modifiedTime ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final aTime =
+              a.modifiedTime ?? DateTime.fromMillisecondsSinceEpoch(0);
+          final bTime =
+              b.modifiedTime ?? DateTime.fromMillisecondsSinceEpoch(0);
           cmp = aTime.compareTo(bTime);
         default:
           cmp = a.name.toLowerCase().compareTo(b.name.toLowerCase());

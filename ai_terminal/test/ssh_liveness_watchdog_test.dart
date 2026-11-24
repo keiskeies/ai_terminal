@@ -190,8 +190,8 @@ void main() {
     // 第一条命令：探测正常，正常收尾
     probeAlive();
     ssh.silenceLimitForTesting = const Duration(milliseconds: 200);
-    final first = ssh.executeAndWait('first',
-        timeout: const Duration(seconds: 5));
+    final first =
+        ssh.executeAndWait('first', timeout: const Duration(seconds: 5));
     await Future<void>.delayed(const Duration(milliseconds: 100));
     ssh.outputController.add('EXITCODE_1:0\r\n');
     expect((await first).exitCode, 0);

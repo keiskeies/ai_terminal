@@ -151,7 +151,8 @@ void main() {
       final t = CommandTracker(onCommand: captured.add);
       t.onOutput('x' * 40000);
       t.onOutput('\r\n[sudo] password for cjm: ');
-      t.onInput('secret\r', currentInputLine: () => '[sudo] password for cjm: secret');
+      t.onInput('secret\r',
+          currentInputLine: () => '[sudo] password for cjm: secret');
       expect(captured, isEmpty);
     });
   });

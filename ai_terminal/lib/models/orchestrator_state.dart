@@ -7,16 +7,22 @@ import '../core/l10n_holder.dart';
 enum OrchestratorPhase {
   /// AI 规划中
   planning,
+
   /// 等待用户确认矩阵
   confirming,
+
   /// 执行中
   executing,
+
   /// 连通性验证
   verifying,
+
   /// 已完成
   completed,
+
   /// 失败
   failed,
+
   /// 失败后暂停，等用户决策
   paused,
 }
@@ -25,12 +31,16 @@ enum OrchestratorPhase {
 class HostRole {
   /// 主机 id（对应 HostConfig.id）
   final String hostId;
+
   /// 主机显示名
   final String displayName;
+
   /// 角色（如 "后端"、"数据库"、"nginx"）
   final String role;
+
   /// 目标路径
   final String? targetPath;
+
   /// 操作描述
   final String? operation;
 
@@ -113,18 +123,25 @@ class ConnectivityResult {
 /// 编排状态
 class OrchestratorState {
   final OrchestratorPhase phase;
+
   /// 部署矩阵
   final List<HostRole> matrix;
+
   /// 每台机的状态
   final Map<String, HostTaskResult> hostResults;
+
   /// 当前阶段索引（用于进度展示）
   final int currentPhaseIndex;
+
   /// 总阶段数
   final int totalPhases;
+
   /// 失败的主机 id
   final String? failureHostId;
+
   /// 失败原因
   final String? failureReason;
+
   /// 参与编排的主机 id 列表
   final List<String> participantHostIds;
 
@@ -156,8 +173,10 @@ class OrchestratorState {
       hostResults: hostResults ?? this.hostResults,
       currentPhaseIndex: currentPhaseIndex ?? this.currentPhaseIndex,
       totalPhases: totalPhases ?? this.totalPhases,
-      failureHostId: clearFailure ? null : (failureHostId ?? this.failureHostId),
-      failureReason: clearFailure ? null : (failureReason ?? this.failureReason),
+      failureHostId:
+          clearFailure ? null : (failureHostId ?? this.failureHostId),
+      failureReason:
+          clearFailure ? null : (failureReason ?? this.failureReason),
       participantHostIds: participantHostIds ?? this.participantHostIds,
     );
   }

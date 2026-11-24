@@ -21,6 +21,31 @@ class ConversationService {
 
   static const _uuid = Uuid();
 
+  /// 单条 assistant 正文的持久化/UI 总上限。长任务会把多轮 ReAct 文本累积到
+  /// 同一条消息中，仅限制 streaming buffer 仍会让 content 无限增长。
+  /// 超限时保留尾部（最新结论与命令证据优先），UI 与写盘共用同一口径。
+  static const int maxAssistantContentChars = 200000;
+
+  static String capAssistantContent(String content) =>
+      tailCap(content, maxAssistantContentChars);
+
+  /// 按 UTF-16 单元保尾截断，但绝不把代理对劈成孤立 surrogate。
+  /// UI 输出与 assistant 持久化统一使用此口径。
+  static String tailCap(String text, int maxChars) {
+    if (maxChars <= 0) return '';
+    if (text.length <= maxChars) return text;
+    var start = text.length - maxChars;
+    if (start > 0 &&
+        _isLowSurrogate(text.codeUnitAt(start)) &&
+        _isHighSurrogate(text.codeUnitAt(start - 1))) {
+      start++;
+    }
+    return text.substring(start);
+  }
+
+  static bool _isHighSurrogate(int unit) => unit >= 0xD800 && unit <= 0xDBFF;
+  static bool _isLowSurrogate(int unit) => unit >= 0xDC00 && unit <= 0xDFFF;
+
   /// 尚未落盘的会话：新建时只驻内存，写出第一条内容时才入库。
   /// 空白会话因此不会出现在历史列表，也不会在重启后残留。
   final Map<String, Conversation> _drafts = {};
@@ -42,7 +67,10 @@ class ConversationService {
         conv.isActive = false;
         // 未落盘的会话没有数据库行，upsert 只会把它提前写入
         if (!_drafts.containsKey(conv.id)) {
-          ConversationsDao.upsert(conv); // fire-and-forget 写库
+          ConversationsDao.upsert(conv).catchError((Object e) {
+            agentLogger.warn(
+                'ConvService', '切换 active 时保存旧会话失败 (convId=${conv.id}): $e');
+          });
         }
       }
     }
@@ -77,6 +105,13 @@ class ConversationService {
 
   /// 统一写盘入口：未落盘且仍空白的会话不入库
   Future<void> _persist(Conversation conv) async {
+    // 写盘前沿统一收敛存量 assistant 正文，避免标题/日志等旁路写盘把超长内容
+    // 再次带回数据库。调用方写入时也应使用同一 cap，保证 UI 与磁盘一致。
+    for (final message in conv.messages) {
+      if (message.isAssistant) {
+        message.content = capAssistantContent(message.content);
+      }
+    }
     // 只有消息/摘要算内容：agent 日志跟着任务走，不足以让一条空对话留档
     final hasContent = !conv.isBlank;
     final isDraft = _drafts.containsKey(conv.id);
@@ -118,9 +153,10 @@ class ConversationService {
         .toList();
   }
 
-  /// 切换 active 会话（同 project 其他会话设为 inactive）
-  void setActive(String hostId, String conversationId) {
-    ConversationsDao.setActive(conversationId, hostId); // fire-and-forget 写库 + 同步更新缓存
+  /// 切换 active 会话（同 project 其他会话设为 inactive）。
+  /// 调用方必须 await 并处理失败，不能把持久化选择当成已完成。
+  Future<void> setActive(String hostId, String conversationId) {
+    return ConversationsDao.setActive(conversationId, hostId);
   }
 
   /// 重命名会话（用户手动）：锁定 titleSource 为 user，后续 AI 不再覆盖
@@ -146,11 +182,24 @@ class ConversationService {
 
   /// 删除会话
   Future<void> delete(String conversationId) async {
-    // 取消该会话的待刷盘 Timer，防止已删除会话被 Timer 复活
+    // 删除成功前保留草稿与待刷盘状态；DB 失败时完整恢复，后续可重试。
+    final hadPendingFlush = _flushTimers.containsKey(conversationId);
     _flushTimers[conversationId]?.cancel();
     _flushTimers.remove(conversationId);
-    _drafts.remove(conversationId);
-    await ConversationsDao.delete(conversationId);
+    final conv = _lookup(conversationId);
+    conv?.bumpMutationEpoch();
+    final draft = _drafts.remove(conversationId);
+    try {
+      await ConversationsDao.delete(conversationId);
+    } catch (_) {
+      // 无论草稿还是已持久化会话，删除失败都必须完整恢复缓存与延迟刷盘。
+      if (conv != null) {
+        if (draft != null) _drafts[conversationId] = draft;
+        ConversationsDao.cacheOnly(conv);
+        if (hadPendingFlush) _scheduleFlush(conv);
+      }
+      rethrow;
+    }
   }
 
   // ═══════════════════════════════════════════
@@ -164,25 +213,34 @@ class ConversationService {
     required String content,
     String? command,
     bool? commandSuccess,
+    String? conversationId,
   }) async {
-    final conv = getOrCreateActiveSession(hostId);
+    final conv = conversationId == null
+        ? getOrCreateActiveSession(hostId)
+        : _lookup(conversationId);
+    if (conv == null) {
+      throw StateError('conversation not found: $conversationId');
+    }
     final isFirstUserMessage =
         role == 'user' && !conv.messages.any((m) => m.isUser);
-    conv.addMessage(ConvMessage.create(
+    final appended = ConvMessage.create(
       role: role,
-      content: content,
+      content: role == 'assistant' ? capAssistantContent(content) : content,
       command: command,
       commandSuccess: commandSuccess,
-    ));
+    );
+    conv.addMessage(appended);
     if (isFirstUserMessage) conv.adoptTitleFromFirstMessage(content);
     try {
       await _persist(conv);
     } catch (e) {
-      // R8: 持久化失败不可静默吞掉 — 回滚内存中的消息追加，保持内存与磁盘一致
-      if (conv.messages.isNotEmpty) conv.messages.removeLast();
+      // R8: 持久化失败不可静默吞掉 — 只回滚本次追加的对象身份。
+      // await 期间可能有并发追加，removeLast 会误删别人的消息。
+      conv.messages.removeWhere((m) => identical(m, appended));
       rethrow;
     }
-    debugPrint('[ConversationService] appendMessage: hostId=$hostId role=$role contentLength=${content.length} messages=${conv.messages.length}');
+    debugPrint(
+        '[ConversationService] appendMessage: hostId=$hostId role=$role contentLength=${content.length} messages=${conv.messages.length}');
     return conv;
   }
 
@@ -205,14 +263,21 @@ class ConversationService {
       throw StateError('conversation not found: $conversationId');
     }
     final isFirstUserMessage = !conv.messages.any((m) => m.isUser);
-    conv.addMessage(ConvMessage.create(role: 'user', content: userContent));
-    conv.addMessage(ConvMessage.create(role: 'assistant', content: assistantContent));
+    final userMessage = ConvMessage.create(role: 'user', content: userContent);
+    final assistantMessage = ConvMessage.create(
+      role: 'assistant',
+      content: capAssistantContent(assistantContent),
+    );
+    conv.addMessage(userMessage);
+    conv.addMessage(assistantMessage);
     if (isFirstUserMessage) conv.adoptTitleFromFirstMessage(userContent);
     try {
       await _persist(conv);
     } catch (e) {
-      // 回滚两条消息追加
-      if (conv.messages.length >= 2) conv.messages.removeRange(conv.messages.length - 2, conv.messages.length);
+      // 回滚本次追加的两个对象身份。await 期间其他任务可能继续 append，
+      // 不能按末尾两条 removeRange，否则会删掉并发追加的成功消息。
+      conv.messages.removeWhere(
+          (m) => identical(m, userMessage) || identical(m, assistantMessage));
       rethrow;
     }
     return conv;
@@ -231,7 +296,8 @@ class ConversationService {
     if (conv == null || conv.messages.isEmpty) return;
     final lastIdx = conv.messages.length - 1;
     if (conv.messages[lastIdx].role != 'assistant') return;
-    conv.messages[lastIdx].content = content;
+    final boundedContent = capAssistantContent(content);
+    conv.messages[lastIdx].content = boundedContent;
     if (events != null) {
       conv.messages[lastIdx].events = events;
     }
@@ -239,8 +305,7 @@ class ConversationService {
     try {
       await _persist(conv);
     } catch (e) {
-      debugPrint(
-          '[ConversationService] updateLastAssistantContent 保存失败 '
+      debugPrint('[ConversationService] updateLastAssistantContent 保存失败 '
           '(hostId=$hostId, conversationId=${conv.id}): $e');
       rethrow;
     }
@@ -278,7 +343,8 @@ class ConversationService {
       // await upsert 确保 agent 日志落盘；fire-and-forget 会在 app 退出时丢失
       _persist(conv).catchError((e) {
         // R8: 日志刷盘失败不可静默吞掉，warn 级记录便于排查
-        agentLogger.warn('ConvService', 'agent 日志延迟保存失败 (convId=${conv.id}): $e');
+        agentLogger.warn(
+            'ConvService', 'agent 日志延迟保存失败 (convId=${conv.id}): $e');
       });
     });
   }
@@ -307,6 +373,16 @@ class ConversationService {
     }
   }
 
+  /// 测试隔离：取消全局单例的日志刷盘 Timer 并清除未落盘草稿。
+  @visibleForTesting
+  void resetForTesting() {
+    for (final timer in _flushTimers.values) {
+      timer.cancel();
+    }
+    _flushTimers.clear();
+    _drafts.clear();
+  }
+
   // ═══════════════════════════════════════════
   // 记忆压缩
   // ═══════════════════════════════════════════
@@ -317,8 +393,9 @@ class ConversationService {
   /// 写入压缩摘要并物理删除已摘要的旧消息
   /// [deleteCount] 需要从 conv.messages 头部删除的消息条数（由 compact 计算并传入）
   /// 删除后 summarizedUpToIndex 重置为 0，后续新消息从 0 开始追加
-  Future<void> applySummary(String conversationId, String summary, {int deleteCount = 0}) async {
-    final conv = ConversationsDao.getCachedById(conversationId);
+  Future<void> applySummary(String conversationId, String summary,
+      {int deleteCount = 0}) async {
+    final conv = _lookup(conversationId);
     if (conv == null) return;
     // 如果已有旧摘要，合并（旧摘要 + 新摘要）
     if (conv.summary != null && conv.summary!.isNotEmpty) {
@@ -328,7 +405,8 @@ class ConversationService {
       if (merged.length > _maxSummaryChars) {
         final keepOld = _maxSummaryChars - summary.length - 5;
         if (keepOld > 0) {
-          conv.summary = '...${conv.summary!.substring(conv.summary!.length - keepOld)}\n\n---\n\n$summary';
+          conv.summary =
+              '...${conv.summary!.substring(conv.summary!.length - keepOld)}\n\n---\n\n$summary';
         } else {
           conv.summary = summary.length > _maxSummaryChars
               ? summary.substring(summary.length - _maxSummaryChars)
@@ -346,18 +424,22 @@ class ConversationService {
     }
     conv.summarizedUpToIndex = 0;
     conv.updatedAt = DateTime.now();
-    await ConversationsDao.upsert(conv);
+    conv.bumpMutationEpoch();
+    await _persist(conv);
   }
 
-  /// 清空会话（删除所有消息和摘要，但保留会话本身）
+  /// 清空会话（删除所有消息和摘要，但保留会话本身）。
+  /// mutationEpoch 必须在首个 await 前递增，使进行中的压缩立即失效。
   Future<void> clearMessages(String conversationId) async {
-    final conv = ConversationsDao.getCachedById(conversationId);
+    final conv = _lookup(conversationId);
     if (conv == null) return;
+    conv.bumpMutationEpoch();
     conv.messages.clear();
     conv.agentLogs.clear();
     conv.summary = null;
+    conv.rollingSummary = null;
     conv.summarizedUpToIndex = 0;
     conv.updatedAt = DateTime.now();
-    await ConversationsDao.upsert(conv);
+    await _persist(conv);
   }
 }

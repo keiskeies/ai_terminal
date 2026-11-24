@@ -7,9 +7,11 @@ import '../core/app_toast.dart';
 
 Future<bool> showConfirmDialog(BuildContext context, CommandBlock cmd) async {
   if (cmd.safetyLevel == 'blocked') {
-    showTopSnackBar(context, 
+    showTopSnackBar(
+      context,
       SnackBar(
-        content: Text(UiText.t('此命令被安全策略拦截', 'This command is blocked by the safety policy')),
+        content: Text(UiText.t(
+            '此命令被安全策略拦截', 'This command is blocked by the safety policy')),
         backgroundColor: ThemeColors.of(context).error,
       ),
     );
@@ -59,7 +61,8 @@ class _SimpleConfirmDialog extends StatelessWidget {
             child: SelectableText(
               cmd.command,
               style: TextStyle(
-                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: kMonoFontFallback,
                 fontSize: fMono,
                 color: tc.terminalGreen,
               ),
@@ -126,7 +129,8 @@ class _WarnConfirmDialogState extends State<_WarnConfirmDialog> {
             child: SelectableText(
               widget.cmd.command,
               style: TextStyle(
-                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: kMonoFontFallback,
                 fontSize: fMono,
                 color: tc.warn,
               ),

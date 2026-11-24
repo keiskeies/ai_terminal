@@ -19,7 +19,8 @@ void main() {
 
     test('endTask 设置 status 和 endTime', () {
       AgentTracer.instance.startTask('task-2', 'goal');
-      AgentTracer.instance.endTask('task-2', status: 'completed', summary: 'done');
+      AgentTracer.instance
+          .endTask('task-2', status: 'completed', summary: 'done');
       final metrics = AgentTracer.instance.getMetrics('task-2');
       expect(metrics, isNotNull);
       expect(metrics!.status, 'completed');
@@ -66,7 +67,12 @@ void main() {
       AgentTracer.instance.emitSync(TraceEvent(
         taskId: 'task-5',
         type: TraceEventType.aiCallEnd,
-        payload: {'retry': true, 'fallback': false, 'prompt_tokens': 0, 'completion_tokens': 0},
+        payload: {
+          'retry': true,
+          'fallback': false,
+          'prompt_tokens': 0,
+          'completion_tokens': 0
+        },
       ));
       expect(AgentTracer.instance.getMetrics('task-5')!.retryCount, 1);
     });
@@ -76,7 +82,12 @@ void main() {
       AgentTracer.instance.emitSync(TraceEvent(
         taskId: 'task-6',
         type: TraceEventType.aiCallEnd,
-        payload: {'retry': false, 'fallback': true, 'prompt_tokens': 0, 'completion_tokens': 0},
+        payload: {
+          'retry': false,
+          'fallback': true,
+          'prompt_tokens': 0,
+          'completion_tokens': 0
+        },
       ));
       expect(AgentTracer.instance.getMetrics('task-6')!.fallbackModelUsed, 1);
     });

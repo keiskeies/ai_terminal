@@ -43,7 +43,8 @@ class ConvMessage {
   bool get isAssistant => role == 'assistant';
 
   /// 传给 AI 的有效内容：有压缩摘要用摘要，否则用原文
-  String get effectiveContent => (summary != null && summary!.isNotEmpty) ? summary! : content;
+  String get effectiveContent =>
+      (summary != null && summary!.isNotEmpty) ? summary! : content;
 }
 
 /// Agent 日志条目（与会话关联存储）
@@ -135,6 +136,12 @@ class Conversation {
   /// 是否为当前活跃会话（每个 hostId 只有一个 active）
   bool isActive = false;
 
+  /// 会话内容代际：append / clear / delete / summary 写入时递增。
+  /// 不落库；用于让压缩等跨 await 的旧操作发现会话已被 mutation。
+  int mutationEpoch = 0;
+
+  void bumpMutationEpoch() => mutationEpoch++;
+
   /// 创建时的默认日期标题形如「会话 11/4 02:34」；仍匹配它才允许自动改写
   static final RegExp _autoTitlePattern =
       RegExp(r'^会话\s+\d{1,2}/\d{1,2}\s+\d{1,2}:\d{2}$');
@@ -160,7 +167,10 @@ class Conversation {
   bool get hasAutoTitle => _autoTitlePattern.hasMatch(title.trim());
 
   /// 还没有写过任何消息或摘要：落盘只会在历史里留下一条空对话
-  bool get isBlank => messages.isEmpty && (summary == null || summary!.isEmpty);
+  bool get isBlank =>
+      messages.isEmpty &&
+      (summary == null || summary!.isEmpty) &&
+      (rollingSummary == null || rollingSummary!.isEmpty);
 
   /// 会话列表展示标题：仍是占位标题（日期默认或首条消息截断）时，
   /// 回退到首条用户消息的片段
@@ -239,6 +249,7 @@ class Conversation {
   /// 添加消息并更新时间戳
   void addMessage(ConvMessage msg) {
     messages.add(msg);
+    bumpMutationEpoch();
     updatedAt = DateTime.now();
   }
 

@@ -56,8 +56,10 @@ void main() {
 
     test('每条消息额外计入 4 token role 开销', () {
       final history = [
-        ChatMessage.create(role: 'user', content: 'hello'),     // 5 ascii → (5+3)~/4=2 + 4 = 6
-        ChatMessage.create(role: 'assistant', content: 'hi'),    // 2 ascii → (2+3)~/4=1 + 4 = 5
+        ChatMessage.create(
+            role: 'user', content: 'hello'), // 5 ascii → (5+3)~/4=2 + 4 = 6
+        ChatMessage.create(
+            role: 'assistant', content: 'hi'), // 2 ascii → (2+3)~/4=1 + 4 = 5
       ];
       // total = 6 + 5 = 11
       expect(TokenEstimator.estimateHistory(history), 11);
@@ -65,7 +67,7 @@ void main() {
 
     test('多条中文消息估算合理', () {
       final history = [
-        ChatMessage.create(role: 'user', content: '你好'),       // 2 + 4 = 6
+        ChatMessage.create(role: 'user', content: '你好'), // 2 + 4 = 6
         ChatMessage.create(role: 'assistant', content: '你好世界'), // 4 + 4 = 8
       ];
       expect(TokenEstimator.estimateHistory(history), 14);
@@ -76,7 +78,7 @@ void main() {
     test('单条消息估算与 estimateHistory 单元素一致', () {
       final msg = ChatMessage.create(role: 'user', content: 'hello');
       expect(TokenEstimator.estimateMessage(msg),
-             TokenEstimator.estimateHistory([msg]));
+          TokenEstimator.estimateHistory([msg]));
     });
   });
 }

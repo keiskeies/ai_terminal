@@ -82,8 +82,8 @@ class HealthCheckService {
         totalRefCount += refCount;
       });
       if (deadCount > 0) {
-        agentLogger.warn('HealthCheck',
-            'SSH 池存在 $deadCount/$total 个已死连接（未正常 release）');
+        agentLogger.warn(
+            'HealthCheck', 'SSH 池存在 $deadCount/$total 个已死连接（未正常 release）');
       }
 
       final snap = HealthSnapshot(

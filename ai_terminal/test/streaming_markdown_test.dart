@@ -82,10 +82,10 @@ void main() {
         final cut = stableParagraphCut(text);
         if (cut <= 0) continue;
         final head = text.substring(0, cut);
-        expect(head.startsWith(prevHead), isTrue,
-            reason: '前缀必须单调增长: len=$len');
+        expect(head.startsWith(prevHead), isTrue, reason: '前缀必须单调增长: len=$len');
         // 前缀终点必须在代码块外：前缀内围栏成对闭合
-        final fences = RegExp(r'^\s*```', multiLine: true).allMatches(head).length;
+        final fences =
+            RegExp(r'^\s*```', multiLine: true).allMatches(head).length;
         expect(fences.isEven, isTrue, reason: '前缀不能切在代码块内: len=$len');
         prevHead = head;
       }

@@ -243,6 +243,7 @@ class ServerMonitorService {
   final bool isLocal;
 
   final List<ServerSnapshot> _history = [];
+
   /// 历史数据上限：5s × 120 = 10 分钟
   static const int _maxHistory = 120;
 
@@ -269,7 +270,9 @@ class ServerMonitorService {
       // 上一次还没结束，返回上一次成功数据（如有），否则空快照
       return _history.isNotEmpty
           ? _history.last
-          : ServerSnapshot(timestamp: DateTime.now(), error: L10n.str.monitorErrorCollecting);
+          : ServerSnapshot(
+              timestamp: DateTime.now(),
+              error: L10n.str.monitorErrorCollecting);
     }
     _isCollecting = true;
     try {
@@ -364,7 +367,8 @@ class ServerMonitorService {
   ServerSnapshot parseLinuxOutput(String raw) {
     final now = DateTime.now();
     if (raw.isEmpty) {
-      return ServerSnapshot(timestamp: now, error: L10n.str.monitorErrorEmptyOutput);
+      return ServerSnapshot(
+          timestamp: now, error: L10n.str.monitorErrorEmptyOutput);
     }
 
     final sections = _splitSections(raw);
@@ -388,7 +392,8 @@ class ServerMonitorService {
       final syMatch = RegExp(r'([\d.]+)\s*sy').firstMatch(cpuRaw);
       final idMatch = RegExp(r'([\d.]+)\s*id').firstMatch(cpuRaw);
       cpuUser = usMatch != null ? (double.tryParse(usMatch.group(1)!) ?? 0) : 0;
-      cpuSystem = syMatch != null ? (double.tryParse(syMatch.group(1)!) ?? 0) : 0;
+      cpuSystem =
+          syMatch != null ? (double.tryParse(syMatch.group(1)!) ?? 0) : 0;
       cpuIdle = idMatch != null ? (double.tryParse(idMatch.group(1)!) ?? 0) : 0;
       cpu = (100 - cpuIdle).clamp(0, 100);
 
@@ -412,7 +417,8 @@ class ServerMonitorService {
         final memLines = memRaw.split('\n');
         for (final line in memLines) {
           if (line.startsWith('Mem:')) {
-            final parts = line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+            final parts =
+                line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
             if (parts.length >= 7) {
               memTotalMB = double.tryParse(parts[1]) ?? 0;
               memUsedMB = double.tryParse(parts[2]) ?? 0;
@@ -428,7 +434,8 @@ class ServerMonitorService {
               }
             }
           } else if (line.startsWith('-/+ buffers/cache:')) {
-            final parts = line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+            final parts =
+                line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
             if (parts.length >= 3) {
               memUsedMB = double.tryParse(parts[1]) ?? memUsedMB;
               memAvailableMB = double.tryParse(parts[2]) ?? memAvailableMB;
@@ -437,7 +444,8 @@ class ServerMonitorService {
               }
             }
           } else if (line.startsWith('Swap:')) {
-            final parts = line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+            final parts =
+                line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
             if (parts.length >= 4) {
               swapTotalMB = double.tryParse(parts[1]) ?? 0;
               swapUsedMB = double.tryParse(parts[2]) ?? 0;
@@ -470,7 +478,8 @@ class ServerMonitorService {
 
       // LOAD
       final loadRaw = sections['LOAD']?.trim() ?? '';
-      final loadParts = loadRaw.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+      final loadParts =
+          loadRaw.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
       if (loadParts.length >= 3) {
         load1 = double.tryParse(loadParts[0]) ?? 0;
         load5 = double.tryParse(loadParts[1]) ?? 0;
@@ -488,7 +497,8 @@ class ServerMonitorService {
       debugPrint('[Monitor] Linux 解析失败: $e');
     }
 
-    final (interfaces, totalRx, totalTx) = _parseLinuxNet(sections['NET'] ?? '', now);
+    final (interfaces, totalRx, totalTx) =
+        _parseLinuxNet(sections['NET'] ?? '', now);
 
     // 总速率 = 各接口速率之和（KB/s）
     final totalUpRate = interfaces.fold<double>(0, (s, i) => s + i.upKBps);
@@ -560,12 +570,14 @@ class ServerMonitorService {
     final freeKB = kb['MemFree'] ?? 0;
     final buffersKB = kb['Buffers'] ?? 0;
     // 与 free 的 buff/cache 口径一致：Cached + SReclaimable - Shmem
-    final cachedKB = (kb['Cached'] ?? 0) + (kb['SReclaimable'] ?? 0) - (kb['Shmem'] ?? 0);
+    final cachedKB =
+        (kb['Cached'] ?? 0) + (kb['SReclaimable'] ?? 0) - (kb['Shmem'] ?? 0);
     final availableKB = kb['MemAvailable'] ?? (freeKB + buffersKB + cachedKB);
     final usedKB = totalKB > availableKB ? totalKB - availableKB : 0.0;
     final swapTotalKB = kb['SwapTotal'] ?? 0;
     final swapFreeKB = kb['SwapFree'] ?? 0;
-    final swapUsedKB = swapTotalKB > swapFreeKB ? swapTotalKB - swapFreeKB : 0.0;
+    final swapUsedKB =
+        swapTotalKB > swapFreeKB ? swapTotalKB - swapFreeKB : 0.0;
 
     const kbPerMB = 1024.0;
     return (
@@ -581,7 +593,8 @@ class ServerMonitorService {
   }
 
   /// 解析 Linux /proc/net/dev
-  (List<NetInterface>, int totalRx, int totalTx) _parseLinuxNet(String raw, DateTime now) {
+  (List<NetInterface>, int totalRx, int totalTx) _parseLinuxNet(
+      String raw, DateTime now) {
     final interfaces = <NetInterface>[];
     var totalRx = 0;
     var totalTx = 0;
@@ -590,7 +603,12 @@ class ServerMonitorService {
       final colon = line.indexOf(':');
       if (colon == -1) continue;
       final name = line.substring(0, colon).trim();
-      final parts = line.substring(colon + 1).trim().split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+      final parts = line
+          .substring(colon + 1)
+          .trim()
+          .split(RegExp(r'\s+'))
+          .where((s) => s.isNotEmpty)
+          .toList();
       if (parts.length < 9) continue;
       // 跳过 loopback
       if (name == 'lo') continue;
@@ -658,7 +676,8 @@ class ServerMonitorService {
   ServerSnapshot parseMacOSOutput(String raw) {
     final now = DateTime.now();
     if (raw.isEmpty) {
-      return ServerSnapshot(timestamp: now, error: L10n.str.monitorErrorEmptyOutput);
+      return ServerSnapshot(
+          timestamp: now, error: L10n.str.monitorErrorEmptyOutput);
     }
 
     final sections = _splitSections(raw);
@@ -682,27 +701,34 @@ class ServerMonitorService {
       final syMatch = RegExp(r'([\d.]+)%\s*sys').firstMatch(cpuRaw);
       final idMatch = RegExp(r'([\d.]+)%\s*idle').firstMatch(cpuRaw);
       cpuUser = usMatch != null ? (double.tryParse(usMatch.group(1)!) ?? 0) : 0;
-      cpuSystem = syMatch != null ? (double.tryParse(syMatch.group(1)!) ?? 0) : 0;
-      cpuIdle = idMatch != null ? (double.tryParse(idMatch.group(1)!) ?? 0) : 100;
+      cpuSystem =
+          syMatch != null ? (double.tryParse(syMatch.group(1)!) ?? 0) : 0;
+      cpuIdle =
+          idMatch != null ? (double.tryParse(idMatch.group(1)!) ?? 0) : 100;
       cpu = (cpuUser + cpuSystem).clamp(0, 100);
 
       // MEM：vm_stat 输出（pages，单位 4096 字节）
       final memRaw = sections['MEM']?.trim() ?? '';
       const pageSize = 4096;
-      double pagesActive = 0, pagesFree = 0, pagesWired = 0, pagesCompressed = 0;
+      double pagesActive = 0,
+          pagesFree = 0,
+          pagesWired = 0,
+          pagesCompressed = 0;
       double pagesInactive = 0, pagesSpeculative = 0;
       for (final line in memRaw.split('\n')) {
         final m = RegExp(r'"?([^":]+)"?:\s*(.+)').firstMatch(line);
         if (m != null) {
           final key = m.group(1)!.trim().toLowerCase();
-          final val = double.tryParse(m.group(2)!.replaceAll('.', '').trim()) ?? 0;
+          final val =
+              double.tryParse(m.group(2)!.replaceAll('.', '').trim()) ?? 0;
           if (key.contains('active')) {
             pagesActive = val;
           } else if (key.contains('free')) {
             pagesFree = val;
           } else if (key.contains('wired')) {
             pagesWired = val;
-          } else if (key.contains('occupied by compressor') || key.contains('compressor')) {
+          } else if (key.contains('occupied by compressor') ||
+              key.contains('compressor')) {
             pagesCompressed = val;
           } else if (key.contains('inactive')) {
             pagesInactive = val;
@@ -716,7 +742,8 @@ class ServerMonitorService {
       memTotalMB = totalBytes / (1024 * 1024);
       final usedBytes = (pagesActive + pagesWired + pagesCompressed) * pageSize;
       memUsedMB = usedBytes / (1024 * 1024);
-      final availBytes = (pagesFree + pagesInactive + pagesSpeculative) * pageSize;
+      final availBytes =
+          (pagesFree + pagesInactive + pagesSpeculative) * pageSize;
       memAvailableMB = availBytes / (1024 * 1024);
       memFreeMB = (pagesFree * pageSize) / (1024 * 1024);
       if (totalBytes > 0) {
@@ -766,7 +793,8 @@ class ServerMonitorService {
       debugPrint('[Monitor] macOS 解析失败: $e');
     }
 
-    final (interfaces, totalRx, totalTx) = _parseMacOSNet(sections['NET'] ?? '', now);
+    final (interfaces, totalRx, totalTx) =
+        _parseMacOSNet(sections['NET'] ?? '', now);
 
     // 总速率 = 各接口速率之和（KB/s）
     final totalUpRate = interfaces.fold<double>(0, (s, i) => s + i.upKBps);
@@ -809,7 +837,8 @@ class ServerMonitorService {
   }
 
   /// 解析 macOS netstat -ib
-  (List<NetInterface>, int totalRx, int totalTx) _parseMacOSNet(String raw, DateTime now) {
+  (List<NetInterface>, int totalRx, int totalTx) _parseMacOSNet(
+      String raw, DateTime now) {
     final interfaces = <NetInterface>[];
     var totalRx = 0;
     var totalTx = 0;
@@ -827,7 +856,8 @@ class ServerMonitorService {
     final iOerrs = idx('Oerrs');
     final iDrop = idx('Drop');
 
-    if (iName == -1 || iIbytes == -1 || iObytes == -1) return (interfaces, totalRx, totalTx);
+    if (iName == -1 || iIbytes == -1 || iObytes == -1)
+      return (interfaces, totalRx, totalTx);
 
     final seen = <String>{};
     for (int i = 1; i < lines.length; i++) {
@@ -841,9 +871,15 @@ class ServerMonitorService {
       try {
         final rx = int.tryParse(parts[iIbytes]) ?? 0;
         final tx = int.tryParse(parts[iObytes]) ?? 0;
-        final rxErr = iIerrs >= 0 && parts.length > iIerrs ? int.tryParse(parts[iIerrs]) ?? 0 : 0;
-        final txErr = iOerrs >= 0 && parts.length > iOerrs ? int.tryParse(parts[iOerrs]) ?? 0 : 0;
-        final rxDrop = iDrop >= 0 && parts.length > iDrop ? int.tryParse(parts[iDrop]) ?? 0 : 0;
+        final rxErr = iIerrs >= 0 && parts.length > iIerrs
+            ? int.tryParse(parts[iIerrs]) ?? 0
+            : 0;
+        final txErr = iOerrs >= 0 && parts.length > iOerrs
+            ? int.tryParse(parts[iOerrs]) ?? 0
+            : 0;
+        final rxDrop = iDrop >= 0 && parts.length > iDrop
+            ? int.tryParse(parts[iDrop]) ?? 0
+            : 0;
         totalRx += rx;
         totalTx += tx;
         final (downRate, upRate) = _computeInterfaceRate(name, rx, tx, now);
@@ -905,7 +941,8 @@ class ServerMonitorService {
       'echo @@END@@',
     ].join('; ');
 
-    final out = await local.runOnce(script, timeout: const Duration(seconds: 8));
+    final out =
+        await local.runOnce(script, timeout: const Duration(seconds: 8));
     return parseLinuxOutput(out);
   }
 
@@ -937,7 +974,8 @@ class ServerMonitorService {
       'echo @@END@@',
     ].join('; ');
 
-    final out = await local.runOnce(script, timeout: const Duration(seconds: 10));
+    final out =
+        await local.runOnce(script, timeout: const Duration(seconds: 10));
     return parseMacOSOutput(out);
   }
 
@@ -1002,7 +1040,8 @@ Write-Output '@@END@@'
     return base64Encode(bytes.buffer.asUint8List());
   }
 
-  Future<ServerSnapshot> _collectWindowsLocal(LocalTerminalService local) async {
+  Future<ServerSnapshot> _collectWindowsLocal(
+      LocalTerminalService local) async {
     // 旧实现把多行脚本塞进 `powershell -Command "…"`；脚本里的 `find /c ">"` 会提前
     // 闭合外层引号 → PowerShell 报 "The string is missing the terminator"，stdout 为空，
     // 面板上只剩 0 与「-」。改用 EncodedCommand 后不再依赖任何引号转义。
@@ -1017,7 +1056,8 @@ Write-Output '@@END@@'
   ServerSnapshot parseWindowsOutput(String raw) {
     final now = DateTime.now();
     if (raw.isEmpty) {
-      return ServerSnapshot(timestamp: now, error: L10n.str.monitorErrorEmptyOutput);
+      return ServerSnapshot(
+          timestamp: now, error: L10n.str.monitorErrorEmptyOutput);
     }
 
     final sections = _splitSections(raw);
@@ -1042,9 +1082,12 @@ Write-Output '@@END@@'
 
       final memRaw = sections['MEM']?.trim() ?? '';
       final freeMatch = RegExp(r'FreePhysicalMemory=(\d+)').firstMatch(memRaw);
-      final totalMatch = RegExp(r'TotalVisibleMemorySize=(\d+)').firstMatch(memRaw);
-      final freeVirtMatch = RegExp(r'FreeVirtualMemory=(\d+)').firstMatch(memRaw);
-      final totalVirtMatch = RegExp(r'TotalVirtualMemorySize=(\d+)').firstMatch(memRaw);
+      final totalMatch =
+          RegExp(r'TotalVisibleMemorySize=(\d+)').firstMatch(memRaw);
+      final freeVirtMatch =
+          RegExp(r'FreeVirtualMemory=(\d+)').firstMatch(memRaw);
+      final totalVirtMatch =
+          RegExp(r'TotalVirtualMemorySize=(\d+)').firstMatch(memRaw);
       if (freeMatch != null && totalMatch != null) {
         final freeKB = double.tryParse(freeMatch.group(1)!) ?? 0;
         final totalKB = double.tryParse(totalMatch.group(1)!) ?? 0;
@@ -1110,7 +1153,8 @@ Write-Output '@@END@@'
       debugPrint('[Monitor] Windows 解析失败: $e');
     }
 
-    final (interfaces, totalRx, totalTx) = _parseWindowsNet(sections['NET'] ?? '', now);
+    final (interfaces, totalRx, totalTx) =
+        _parseWindowsNet(sections['NET'] ?? '', now);
 
     // 总速率 = 各接口速率之和（KB/s）
     final totalUpRate = interfaces.fold<double>(0, (s, i) => s + i.upKBps);
@@ -1153,7 +1197,8 @@ Write-Output '@@END@@'
   }
 
   /// 解析 Windows wmic perf raw 输出（/value 格式）
-  (List<NetInterface>, int totalRx, int totalTx) _parseWindowsNet(String raw, DateTime now) {
+  (List<NetInterface>, int totalRx, int totalTx) _parseWindowsNet(
+      String raw, DateTime now) {
     final interfaces = <NetInterface>[];
     var totalRx = 0;
     var totalTx = 0;
@@ -1172,8 +1217,10 @@ Write-Output '@@END@@'
 
       final rxMatch = RegExp(r'BytesReceivedPersec=(\d+)').firstMatch(block);
       final txMatch = RegExp(r'BytesSentPersec=(\d+)').firstMatch(block);
-      final rxErrMatch = RegExp(r'PacketsReceivedErrors=(\d+)').firstMatch(block);
-      final txErrMatch = RegExp(r'PacketsOutboundErrors=(\d+)').firstMatch(block);
+      final rxErrMatch =
+          RegExp(r'PacketsReceivedErrors=(\d+)').firstMatch(block);
+      final txErrMatch =
+          RegExp(r'PacketsOutboundErrors=(\d+)').firstMatch(block);
 
       if (rxMatch == null || txMatch == null) continue;
 
@@ -1222,7 +1269,8 @@ Write-Output '@@END@@'
   }
 
   /// 计算单个接口速率
-  (double down, double up) _computeInterfaceRate(String name, int rx, int tx, DateTime now) {
+  (double down, double up) _computeInterfaceRate(
+      String name, int rx, int tx, DateTime now) {
     final last = _lastNetCounters[name];
     if (last == null) {
       _lastNetCounters[name] = _NetCounter(rx: rx, tx: tx, time: now);
@@ -1243,10 +1291,27 @@ Write-Output '@@END@@'
 
   /// 虚拟文件系统类型（过滤掉）
   static const Set<String> _virtualFsTypes = {
-    'tmpfs', 'devtmpfs', 'sysfs', 'proc', 'devpts', 'overlay',
-    'squashfs', 'cgroup', 'cgroup2', 'pstore', 'bpf', 'tracefs',
-    'securityfs', 'debugfs', 'hugetlbfs', 'mqueue', 'autofs',
-    'configfs', 'fusectl', 'efivarfs', 'ramfs',
+    'tmpfs',
+    'devtmpfs',
+    'sysfs',
+    'proc',
+    'devpts',
+    'overlay',
+    'squashfs',
+    'cgroup',
+    'cgroup2',
+    'pstore',
+    'bpf',
+    'tracefs',
+    'securityfs',
+    'debugfs',
+    'hugetlbfs',
+    'mqueue',
+    'autofs',
+    'configfs',
+    'fusectl',
+    'efivarfs',
+    'ramfs',
   };
 
   /// 解析 Linux df -BG -PT 输出
@@ -1258,7 +1323,8 @@ Write-Output '@@END@@'
       if (line.isEmpty) continue;
       // 跳过表头
       if (line.startsWith('Filesystem')) continue;
-      final parts = line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+      final parts =
+          line.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
       // df -PT: Filesystem Type 1024-blocks Used Available Capacity Mounted on
       if (parts.length < 7) continue;
       final fs = parts[0];
@@ -1297,7 +1363,8 @@ Write-Output '@@END@@'
     for (final line in raw.split('\n')) {
       final trimmed = line.trim();
       if (trimmed.isEmpty || trimmed.startsWith('Filesystem')) continue;
-      final parts = trimmed.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+      final parts =
+          trimmed.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
       // df -k -P: Filesystem 1024-blocks Used Available Capacity Mounted on
       if (parts.length < 6) continue;
       final fs = parts[0];
@@ -1341,11 +1408,16 @@ Write-Output '@@END@@'
         final key = line.substring(0, idx).trim();
         final value = line.substring(idx + 1).trim();
         switch (key) {
-          case 'DeviceID': deviceId = value;
-          case 'DriveType': driveType = value;
-          case 'FileSystem': fileSystem = value;
-          case 'FreeSpace': freeBytes = double.tryParse(value) ?? 0;
-          case 'Size': sizeBytes = double.tryParse(value) ?? 0;
+          case 'DeviceID':
+            deviceId = value;
+          case 'DriveType':
+            driveType = value;
+          case 'FileSystem':
+            fileSystem = value;
+          case 'FreeSpace':
+            freeBytes = double.tryParse(value) ?? 0;
+          case 'Size':
+            sizeBytes = double.tryParse(value) ?? 0;
         }
       }
       if (deviceId.isEmpty || sizeBytes <= 0) continue;
@@ -1354,7 +1426,8 @@ Write-Output '@@END@@'
       final totalGB = sizeBytes / (1024 * 1024 * 1024);
       final freeGB = freeBytes / (1024 * 1024 * 1024);
       final usedGB = totalGB - freeGB;
-      final usePercent = totalGB > 0 ? (usedGB / totalGB * 100).clamp(0.0, 100.0) : 0.0;
+      final usePercent =
+          totalGB > 0 ? (usedGB / totalGB * 100).clamp(0.0, 100.0) : 0.0;
       result.add(DiskPartition(
         filesystem: fileSystem.isEmpty ? 'unknown' : fileSystem,
         mountPoint: deviceId,

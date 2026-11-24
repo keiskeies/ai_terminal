@@ -26,7 +26,8 @@ binlog 位置:  /app/docker_volume/mysql/data/  →  appvg-applv  (/app,  57%, �
     });
 
     test('纯命令行控制组仍可提取（无协议行、无中文）', () {
-      const content = 'cat /app/docker_volume/mysql/data/du.txt\nrm /tmp/old.tar';
+      const content =
+          'cat /app/docker_volume/mysql/data/du.txt\nrm /tmp/old.tar';
       expect(CommandExtractor.extractCommands(content),
           ['cat /app/docker_volume/mysql/data/du.txt']);
     });
@@ -38,7 +39,8 @@ binlog 位置:  /app  →  appvg-applv
 mv /var/log/old.tar /tmp/
 ```
 ''';
-      expect(CommandExtractor.extractCommands(content), ['mv /var/log/old.tar /tmp/']);
+      expect(CommandExtractor.extractCommands(content),
+          ['mv /var/log/old.tar /tmp/']);
     });
   });
 }

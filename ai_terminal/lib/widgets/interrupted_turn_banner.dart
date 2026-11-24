@@ -62,8 +62,7 @@ class InterruptedTurnBanner extends StatelessWidget {
             GestureDetector(
               onTap: onContinue,
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
                 decoration: BoxDecoration(
                   color: tc.brand.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(rXSmall),
@@ -72,8 +71,7 @@ class InterruptedTurnBanner extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.play_circle_outline,
-                        size: 12, color: tc.brand),
+                    Icon(Icons.play_circle_outline, size: 12, color: tc.brand),
                     const SizedBox(width: 4),
                     Text(
                       UiText.t('继续任务', 'Continue task'),

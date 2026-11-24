@@ -185,13 +185,11 @@ class AgentEventContent extends StatelessWidget {
         onRejectCommand: onRejectCommand,
         // 只有最后一段（当前正在推进的那一段）才挂实时推理：
         // 实时推理永远发生在时间线的末尾
-        liveReasoning: segmentEvents.last.id == events.last.id
-            ? liveReasoning
-            : '',
+        liveReasoning:
+            segmentEvents.last.id == events.last.id ? liveReasoning : '',
         resultBuilder: (ctx, result) => _buildResultCard(result, tc, ctx),
         // 询问行的渲染交给时间线：提问是流程里的一步，不是流程外的一块卡片
-        askBuilder: (ctx, ask) =>
-            _buildAskStep(ctx, ask, events, pendingAskId),
+        askBuilder: (ctx, ask) => _buildAskStep(ctx, ask, events, pendingAskId),
       ));
     }
 
@@ -345,8 +343,7 @@ class AgentEventContent extends StatelessWidget {
       final e = events[i];
       if (e.isAsk) break; // 下一次询问开始还没答案
       if (!e.isInfo) continue;
-      final m =
-          pattern.firstMatch((e.text ?? '').trim());
+      final m = pattern.firstMatch((e.text ?? '').trim());
       if (m != null) {
         final answer = m.group(1)?.trim();
         if (answer != null && answer.isNotEmpty) return answer;
@@ -357,11 +354,12 @@ class AgentEventContent extends StatelessWidget {
 
   /// 结果卡片：成功/失败状态 + 输出（全部展开显示）
   /// 背景保持 terminalBg，无左侧缩进，与命令块视觉对齐
-  Widget _buildResultCard(AgentEvent event, ThemeColors tc, BuildContext context) {
+  Widget _buildResultCard(
+      AgentEvent event, ThemeColors tc, BuildContext context) {
     final ui = AgentUiText.of(context);
     final success = event.success ?? false;
-    final output = event.output ?? event.error ??
-        UiText.t('(无输出)', '(no output)');
+    final output =
+        event.output ?? event.error ?? UiText.t('(无输出)', '(no output)');
     final lines = output.split('\n');
     final hostResults = event.hostResults;
     final showMatrix = hostResults != null && hostResults.length > 1;
@@ -371,9 +369,8 @@ class AgentEventContent extends StatelessWidget {
         ? tc.ok.withValues(alpha: 0.08)
         : tc.error.withValues(alpha: 0.08);
     final statusIcon = success ? Icons.check : Icons.close;
-    final statusText = success
-        ? ui.resultSuccess
-        : ui.failureLabel(event.failureKind);
+    final statusText =
+        success ? ui.resultSuccess : ui.failureLabel(event.failureKind);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8, top: 2),
@@ -388,12 +385,10 @@ class AgentEventContent extends StatelessWidget {
         children: [
           // 状态条
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: statusBg,
-              border: Border(
-                  bottom: BorderSide(color: tc.hairline)),
+              border: Border(bottom: BorderSide(color: tc.hairline)),
             ),
             child: Row(
               children: [
@@ -429,8 +424,7 @@ class AgentEventContent extends StatelessWidget {
                         _metaChip(ui.exitCode(event.exitCode!),
                             success ? tc.ok : tc.error),
                       if (event.durationMs != null)
-                        _metaChip(
-                            _formatDuration(event.durationMs!), tc.gold),
+                        _metaChip(_formatDuration(event.durationMs!), tc.gold),
                       if (event.outputTruncated == true)
                         _metaChip(
                           event.outputTotalChars != null
@@ -614,7 +608,8 @@ class AgentEventContent extends StatelessWidget {
       onTap: () {
         Clipboard.setData(ClipboardData(text: text));
         clearTopToast();
-        showTopSnackBar(context, 
+        showTopSnackBar(
+          context,
           SnackBar(
             content: Text(ui.copied, style: const TextStyle(fontSize: fSmall)),
             duration: const Duration(seconds: 1),
@@ -668,8 +663,7 @@ class AgentEventContent extends StatelessWidget {
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8, top: 4),
-      padding:
-          const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: tc.agentCardFill,
         borderRadius: BorderRadius.circular(rCard),
@@ -729,7 +723,8 @@ class AgentEventContent extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                     code: TextStyle(
-                      fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                      fontFamily: 'JetBrainsMono',
+                      fontFamilyFallback: kMonoFontFallback,
                       fontSize: fMono,
                       color: accent,
                     ),
@@ -738,7 +733,8 @@ class AgentEventContent extends StatelessWidget {
                       borderRadius: BorderRadius.circular(rXSmall),
                     ),
                     listBullet: TextStyle(color: accent),
-                    strong: TextStyle(color: accent, fontWeight: FontWeight.bold),
+                    strong:
+                        TextStyle(color: accent, fontWeight: FontWeight.bold),
                     a: TextStyle(color: accent),
                   ),
                 ),
@@ -749,7 +745,6 @@ class AgentEventContent extends StatelessWidget {
       ),
     );
   }
-
 }
 
 class _RawOutputTail extends StatefulWidget {
@@ -841,7 +836,8 @@ class _RawOutputTailState extends State<_RawOutputTail> {
                   child: Text(
                     widget.tail,
                     style: TextStyle(
-                      fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                      fontFamily: 'JetBrainsMono',
+                      fontFamilyFallback: kMonoFontFallback,
                       fontSize: fMicro,
                       color: tc.textBody,
                       height: 1.4,
@@ -880,8 +876,7 @@ Widget buildOptionButtons(
         return GestureDetector(
           onTap: disabled ? null : () => onSelectChoice?.call(option),
           child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
             decoration: BoxDecoration(
               color: bgColor,
               borderRadius: BorderRadius.circular(rSmall),
@@ -903,8 +898,7 @@ Widget buildOptionButtons(
                   style: TextStyle(
                     fontSize: fSmall,
                     color: color.withValues(alpha: disabled ? 0.4 : 1),
-                    fontWeight:
-                        isPrimary ? FontWeight.w600 : FontWeight.w400,
+                    fontWeight: isPrimary ? FontWeight.w600 : FontWeight.w400,
                   ),
                 ),
               ],

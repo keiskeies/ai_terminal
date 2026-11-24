@@ -184,11 +184,9 @@ class SshPaneSession implements PaneSession {
   void writeToTerminal(String data) {
     if (_closed) return;
     // 非 UTF-8 主机要排队编码，否则会乱序（与 SSHService 同一套做法）
-    _writer
-        .write(data, _encoding, (bytes) {
-          if (!_closed) _session.write(bytes);
-        })
-        .catchError((Object _) {});
+    _writer.write(data, _encoding, (bytes) {
+      if (!_closed) _session.write(bytes);
+    }).catchError((Object _) {});
   }
 
   @override

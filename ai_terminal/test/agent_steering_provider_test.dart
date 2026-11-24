@@ -111,7 +111,8 @@ void main() {
       engine.setTaskStatusForTesting(AgentStatus.executing);
       notifier.registryForTesting.setEngine('tabRun', engine);
 
-      final conv = ConversationService().createSession(hostId: 'host-steer-run');
+      final conv =
+          ConversationService().createSession(hostId: 'host-steer-run');
       engine.conversationId = conv.id;
       notifier.setStateForTest(notifier.state.copyWith(
         conversationId: conv.id,
@@ -148,7 +149,8 @@ void main() {
       engine.setTaskStatusForTesting(AgentStatus.thinking);
       notifier.registryForTesting.setEngine('tabConv', engine);
 
-      final conv = ConversationService().createSession(hostId: 'host-steer-conv');
+      final conv =
+          ConversationService().createSession(hostId: 'host-steer-conv');
       engine.conversationId = conv.id;
       notifier.setStateForTest(notifier.state.copyWith(
         conversationId: conv.id,

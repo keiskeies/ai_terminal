@@ -22,8 +22,7 @@ class CommandMarkers {
     if (nonceForTesting case final fixed?) {
       return fixed.isEmpty ? 'EXITCODE_$seq:' : 'EXITCODE_${seq}_$fixed:';
     }
-    final nonce =
-        _random.nextInt(0x1000000).toRadixString(16).padLeft(6, '0');
+    final nonce = _random.nextInt(0x1000000).toRadixString(16).padLeft(6, '0');
     return 'EXITCODE_${seq}_$nonce:';
   }
 }

@@ -59,7 +59,7 @@ class _SettingsRowCardState extends State<SettingsRowCard> {
   bool get _isLink => widget.detail == null && widget.onNavigate != null;
 
   /// 展开式卡片底部那行「打开完整设置」需要 onNavigate；跳转式整张卡片就是
-  /// onNavigate。两种形态都有 onNavigate，判形态只能看 detail 有没有给。 
+  /// onNavigate。两种形态都有 onNavigate，判形态只能看 detail 有没有给。
   bool get _hasAction => widget.detail != null && widget.onNavigate != null;
 
   @override
@@ -88,7 +88,8 @@ class _SettingsRowCardState extends State<SettingsRowCard> {
                 decoration: BoxDecoration(
                   border: Border(top: BorderSide(color: tc.hairline)),
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -172,8 +173,7 @@ class _SettingsRowCardState extends State<SettingsRowCard> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                widget.actionLabel ??
-                    UiText.t('打开完整设置', 'Open full settings'),
+                widget.actionLabel ?? UiText.t('打开完整设置', 'Open full settings'),
                 style: TextStyle(fontSize: fMicro, color: tc.brand),
               ),
               const SizedBox(width: 2),

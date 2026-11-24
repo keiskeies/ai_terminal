@@ -41,7 +41,6 @@ const Color cVioletDark = Color(0xFF7C3AED);
 const Color cTerminalGreen = cSuccess;
 const Color cAgentGreenLight = cLimeGreenLight;
 
-
 // ===== 颜色系统 (深色 · 石墨青) =====
 // 中性石墨底：层级靠 surface 阶梯 + 发丝线，不靠大面积色块。
 // 阶梯规则（G 通道）：终端/代码 7 → 窗口 12 → 内联输出 16 → 卡片 22 → 面板 32 → 控件 44，
@@ -147,12 +146,14 @@ const double rCard = rMedium;
 const double rButton = rSmall;
 const double rInput = rSmall;
 const double rBubble = rMedium;
+
 /// 浮层（菜单、命令面板）。设计稿给的是 12，阶梯里没有这一步。
 const double rFloat = 12.0;
 
 // ===== 间距系统 =====
 const double pXSmall = 4.0;
 const double pSmall = 8.0;
+
 /// 卡片级模块之间（结果卡 / 执行清单 / 正文 / 过程折叠）。
 /// 12 在 13px 正文的回答里会读成"两块东西断开了"，10 才是一段话的呼吸。
 const double pModule = 10.0;
@@ -226,8 +227,10 @@ const double fMicro = 11.0;
 // Agent 正文（Markdown 回答主体）专用字号：比过程证据再小一档，
 // 避免大段正文反过来压过命令/结果这些真正要读的内容。
 const double fAgentBody = 10.0;
+
 /// 最小文字：徽标、调色板标签。低于 10 在 Windows 上会糊。
 const double fMini = 10.0;
+
 /// 二级标题（Markdown h2 等），介于 fBody 与 fTitle 之间。
 const double fSubtitle = 14.0;
 

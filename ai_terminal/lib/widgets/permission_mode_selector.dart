@@ -127,7 +127,8 @@ class _PermissionModeSelectorState extends State<PermissionModeSelector> {
               // 之前 24 高 + 10% 同色底，和旁边 34px 的发送圆钮站在一起
               // 像两个被压扁的小标签，底栏一排控件高低不一。
               height: 30,
-              padding: EdgeInsets.symmetric(horizontal: widget.compact ? 6 : 10),
+              padding:
+                  EdgeInsets.symmetric(horizontal: widget.compact ? 6 : 10),
               decoration: BoxDecoration(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.circular(rFull),
@@ -223,8 +224,7 @@ class _PermissionModeItemState extends State<_PermissionModeItem> {
                     Text(
                       widget.ui.permissionModeLabel(widget.mode),
                       style: TextStyle(
-                        color:
-                            widget.selected ? widget.color : tc.textMain,
+                        color: widget.selected ? widget.color : tc.textMain,
                         fontSize: fSmall,
                         fontWeight: FontWeight.w600,
                       ),

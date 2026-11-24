@@ -7,7 +7,8 @@ void main() {
   group('normalizeSearchUrl', () {
     test('忽略协议、www、默认端口、尾斜杠和 fragment', () {
       expect(
-        normalizeSearchUrl('HTTPS://www.Example.com:443/docs/?utm_source=x#top'),
+        normalizeSearchUrl(
+            'HTTPS://www.Example.com:443/docs/?utm_source=x#top'),
         'example.com/docs',
       );
       expect(
@@ -98,13 +99,15 @@ void main() {
             provider: WebSearchProvider.bingRss,
             results: [
               WebSearchResult(title: 'single', url: 'https://example.com/1'),
-              WebSearchResult(title: 'shared', url: 'https://example.com/shared'),
+              WebSearchResult(
+                  title: 'shared', url: 'https://example.com/shared'),
             ],
           ),
           const WebSearchBatch(
             provider: WebSearchProvider.brave,
             results: [
-              WebSearchResult(title: 'shared 2', url: 'https://example.com/shared/'),
+              WebSearchResult(
+                  title: 'shared 2', url: 'https://example.com/shared/'),
             ],
           ),
         ],

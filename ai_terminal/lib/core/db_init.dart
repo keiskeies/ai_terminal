@@ -3,9 +3,13 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:crypto/crypto.dart' as crypto;
+import 'dart:async';
 import 'dart:io';
 import 'dart:convert';
 import '../services/daos.dart';
+import '../services/conversation_service.dart';
+import '../services/agent_logger.dart';
+import '../providers/agent_provider.dart';
 import 'credentials_store.dart';
 
 /// 应用主数据库初始化（替代 HiveInit）
@@ -127,8 +131,22 @@ class DbInit {
       try {
         final header = await raf.read(16);
         const sqliteHeader = [
-          0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66,
-          0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00,
+          0x53,
+          0x51,
+          0x4c,
+          0x69,
+          0x74,
+          0x65,
+          0x20,
+          0x66,
+          0x6f,
+          0x72,
+          0x6d,
+          0x61,
+          0x74,
+          0x20,
+          0x33,
+          0x00,
         ];
         isPlaintext = header.length == 16;
         for (int i = 0; isPlaintext && i < 16; i++) {
@@ -285,7 +303,8 @@ class DbInit {
             dbPath,
             version: _schemaVersion,
             onConfigure: (db) async {
-              await db.execute("PRAGMA key = '${_escapeSqlString(currentPassword)}';");
+              await db.execute(
+                  "PRAGMA key = '${_escapeSqlString(currentPassword)}';");
             },
             onCreate: (db, version) async {
               final batch = db.batch();
@@ -399,8 +418,22 @@ class DbInit {
       final header = await raf.read(16);
       // SQLite 明文文件头："SQLite format 3\0"
       const sqliteHeader = [
-        0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66,
-        0x6f, 0x72, 0x6d, 0x61, 0x74, 0x20, 0x33, 0x00,
+        0x53,
+        0x51,
+        0x4c,
+        0x69,
+        0x74,
+        0x65,
+        0x20,
+        0x66,
+        0x6f,
+        0x72,
+        0x6d,
+        0x61,
+        0x74,
+        0x20,
+        0x33,
+        0x00,
       ];
       bool isPlaintext = header.length == 16;
       for (int i = 0; isPlaintext && i < 16; i++) {
@@ -604,8 +637,10 @@ class DbInit {
         isActive INTEGER NOT NULL DEFAULT 0
       )
     ''');
-    batch.execute('CREATE INDEX idx_conversations_hostId ON conversations(hostId)');
-    batch.execute('CREATE INDEX idx_conversations_isActive ON conversations(isActive)');
+    batch.execute(
+        'CREATE INDEX idx_conversations_hostId ON conversations(hostId)');
+    batch.execute(
+        'CREATE INDEX idx_conversations_isActive ON conversations(isActive)');
 
     // ===== change_records =====
     batch.execute('''
@@ -625,8 +660,10 @@ class DbInit {
         rolledBack INTEGER NOT NULL DEFAULT 0
       )
     ''');
-    batch.execute('CREATE INDEX idx_change_records_hostId ON change_records(hostId)');
-    batch.execute('CREATE INDEX idx_change_records_timestamp ON change_records(timestamp)');
+    batch.execute(
+        'CREATE INDEX idx_change_records_hostId ON change_records(hostId)');
+    batch.execute(
+        'CREATE INDEX idx_change_records_timestamp ON change_records(timestamp)');
 
     // ===== runbooks =====
     batch.execute('''
@@ -667,7 +704,8 @@ class DbInit {
       )
     ''');
     batch.execute('CREATE INDEX idx_audit_logs_hostId ON audit_logs(hostId)');
-    batch.execute('CREATE INDEX idx_audit_logs_timestamp ON audit_logs(timestamp)');
+    batch.execute(
+        'CREATE INDEX idx_audit_logs_timestamp ON audit_logs(timestamp)');
 
     // ===== command_history =====
     // 终端里回车执行过的命令（P2 命令历史 UI）。只存屏幕上有回显的行，
@@ -727,7 +765,8 @@ class DbInit {
   ''';
 
   /// 升级数据库（未来版本在此追加迁移脚本）
-  static Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+  static Future<void> _onUpgrade(
+      Database db, int oldVersion, int newVersion) async {
     // v2: ai_models 添加 contextWindow 字段（用于 token-aware 上下文裁剪）
     if (oldVersion < 2) {
       await db.execute(
@@ -808,6 +847,30 @@ class DbInit {
 
   /// 关闭数据库
   static Future<void> close() async {
+    // 先等延迟刷盘与目标写链落盘，再等 DAO 队列，最后关库：否则 detached
+    // 时最后一批消息/目标/active 选择会对着已关闭的数据库执行，
+    // 异常被吞后表现为静默丢数据。
+    try {
+      await AgentNotifier.waitForPendingGoalWrites(
+          budget: const Duration(seconds: 1));
+    } catch (e) {
+      // 关库兜底不能因目标写失败而中断，但必须留下诊断。
+      agentLogger.warn('DbInit', '关库前等待目标写盘失败: $e');
+    }
+    try {
+      await ConversationService()
+          .flushAll()
+          .timeout(const Duration(seconds: 1));
+    } catch (e) {
+      // flush 失败已由各刷盘路径记录日志，这里只保证继续关库
+      agentLogger.warn('DbInit', '关库前刷盘失败或超时: $e');
+    }
+    try {
+      await ConversationsDao.waitForPendingWrites()
+          .timeout(const Duration(seconds: 1));
+    } catch (e) {
+      agentLogger.warn('DbInit', '关库前等待 DAO 写入队列失败或超时: $e');
+    }
     await _db?.close();
     _db = null;
   }

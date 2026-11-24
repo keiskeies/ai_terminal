@@ -39,7 +39,8 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       _records = ChangeRecordService.getAllHistory(limit: 200);
     }
     if (_showOnlyRollbackable) {
-      _records = _records.where((r) => r.isRollbackable && !r.rolledBack).toList();
+      _records =
+          _records.where((r) => r.isRollbackable && !r.rolledBack).toList();
     }
     setState(() {});
   }
@@ -136,15 +137,21 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: tc.cardElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
-        title: Text(l10n.changeRecordConfirmRollback, style: TextStyle(color: tc.textMain, fontSize: fBody, fontWeight: FontWeight.w600)),
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+        title: Text(l10n.changeRecordConfirmRollback,
+            style: TextStyle(
+                color: tc.textMain,
+                fontSize: fBody,
+                fontWeight: FontWeight.w600)),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(isLocalRestore
-                ? l10n.changeRecordRestoreLocalFile
-                : l10n.changeRecordRollbackOnHost(hostName),
+            Text(
+                isLocalRestore
+                    ? l10n.changeRecordRestoreLocalFile
+                    : l10n.changeRecordRollbackOnHost(hostName),
                 style: TextStyle(color: tc.textSub, fontSize: fSmall)),
             const SizedBox(height: 8),
             Container(
@@ -155,9 +162,12 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
                 borderRadius: BorderRadius.circular(rXSmall),
               ),
               child: SelectableText(
-                isLocalRestore ? record.rollbackHint : (record.rollbackCommand ?? ''),
+                isLocalRestore
+                    ? record.rollbackHint
+                    : (record.rollbackCommand ?? ''),
                 style: TextStyle(
-                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: kMonoFontFallback,
                   fontSize: fMono,
                   color: tc.terminalGreen,
                 ),
@@ -195,8 +205,11 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
     final l10n = AppLocalizations.of(context)!;
     final tc = ThemeColors.of(context);
     if (!record.isRollbackable) {
-      showTopSnackBar(context, 
-        SnackBar(content: Text(l10n.changeRecordNotRollbackable), behavior: SnackBarBehavior.floating),
+      showTopSnackBar(
+        context,
+        SnackBar(
+            content: Text(l10n.changeRecordNotRollbackable),
+            behavior: SnackBarBehavior.floating),
       );
       return;
     }
@@ -216,7 +229,8 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       }
 
       if (targetTab == null || targetTab.service == null) {
-        showTopSnackBar(context, 
+        showTopSnackBar(
+          context,
           SnackBar(
             content: Text(l10n.changeRecordHostNotConnected(record.hostId)),
             backgroundColor: tc.error,
@@ -228,7 +242,8 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       executor = targetTab.service!;
     }
 
-    showTopSnackBar(context, 
+    showTopSnackBar(
+      context,
       SnackBar(
         content: Text(l10n.changeRecordRollingBack(record.rollbackHint)),
         duration: const Duration(seconds: 1),
@@ -244,23 +259,29 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       );
       if (!mounted) return;
       if (result == null) {
-        showTopSnackBar(context, 
-          SnackBar(content: Text(l10n.changeRecordRollbackFailedNoExec), backgroundColor: tc.error,
+        showTopSnackBar(
+          context,
+          SnackBar(
+              content: Text(l10n.changeRecordRollbackFailedNoExec),
+              backgroundColor: tc.error,
               behavior: SnackBarBehavior.floating),
         );
         return;
       }
       if (result.success) {
-        showTopSnackBar(context, 
+        showTopSnackBar(
+          context,
           SnackBar(
-            content: Text(l10n.changeRecordRollbackSuccess(record.rollbackHint)),
+            content:
+                Text(l10n.changeRecordRollbackSuccess(record.rollbackHint)),
             backgroundColor: tc.ok,
             behavior: SnackBarBehavior.floating,
           ),
         );
         _loadRecords();
       } else {
-        showTopSnackBar(context, 
+        showTopSnackBar(
+          context,
           SnackBar(
             content: Text(l10n.changeRecordRollbackFailed(result.stderr)),
             backgroundColor: tc.error,
@@ -270,7 +291,8 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
       }
     } catch (e) {
       if (!mounted) return;
-      showTopSnackBar(context, 
+      showTopSnackBar(
+        context,
         SnackBar(
           content: Text(l10n.changeRecordRollbackError(e.toString())),
           backgroundColor: tc.error,
@@ -286,7 +308,9 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_filterHostId != null ? l10n.changeRecordTitle : l10n.changeRecordAllTitle),
+        title: Text(_filterHostId != null
+            ? l10n.changeRecordTitle
+            : l10n.changeRecordAllTitle),
         actions: [
           PopupMenuButton<String>(
             icon: const Icon(Icons.filter_list, size: 20),
@@ -307,10 +331,15 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
               _loadRecords();
             },
             itemBuilder: (ctx) => [
-              PopupMenuItem(value: 'all', child: Text(l10n.changeRecordFilterAll)),
-              PopupMenuItem(value: 'rollbackable', child: Text(l10n.changeRecordFilterRollbackable)),
+              PopupMenuItem(
+                  value: 'all', child: Text(l10n.changeRecordFilterAll)),
+              PopupMenuItem(
+                  value: 'rollbackable',
+                  child: Text(l10n.changeRecordFilterRollbackable)),
               if (widget.hostId != null)
-                PopupMenuItem(value: 'thisHost', child: Text(l10n.changeRecordFilterThisHost)),
+                PopupMenuItem(
+                    value: 'thisHost',
+                    child: Text(l10n.changeRecordFilterThisHost)),
             ],
           ),
         ],
@@ -325,17 +354,20 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
                     children: [
                       Icon(Icons.history, size: 48, color: tc.textMuted),
                       const SizedBox(height: 8),
-                      Text(l10n.changeRecordEmpty, style: TextStyle(color: tc.textSub, fontSize: fBody)),
+                      Text(l10n.changeRecordEmpty,
+                          style: TextStyle(color: tc.textSub, fontSize: fBody)),
                       const SizedBox(height: 4),
                       Text(l10n.changeRecordEmptyHint,
-                          style: TextStyle(color: tc.textMuted, fontSize: fSmall)),
+                          style:
+                              TextStyle(color: tc.textMuted, fontSize: fSmall)),
                     ],
                   ),
                 )
               : ListView.builder(
                   padding: const EdgeInsets.all(pStandard),
                   itemCount: _records.length,
-                  itemBuilder: (context, index) => _buildRecordCard(_records[index]),
+                  itemBuilder: (context, index) =>
+                      _buildRecordCard(_records[index]),
                 ),
         ),
       ),
@@ -367,7 +399,8 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
                 Icon(_typeIcon(record.type), size: 14, color: typeColor),
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
                     color: typeColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rXSmall),
@@ -385,29 +418,40 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
                 const SizedBox(width: 6),
                 if (record.rolledBack)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                     decoration: BoxDecoration(
                       color: tc.textSub.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(rXSmall),
-                  ),
-                  child: Text(
+                      borderRadius: BorderRadius.circular(rXSmall),
+                    ),
+                    child: Text(
                       l10n.changeRecordRolledBack,
-                      style: TextStyle(fontSize: fMicro, color: tc.textSub, fontWeight: FontWeight.w500),
+                      style: TextStyle(
+                          fontSize: fMicro,
+                          color: tc.textSub,
+                          fontWeight: FontWeight.w500),
                     ),
                   ),
                 const Spacer(),
                 Text(_formatTime(record.timestamp),
                     style: TextStyle(
-                        fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback)),
+                        fontSize: fMicro,
+                        color: tc.textMuted,
+                        fontFamily: 'JetBrainsMono',
+                        fontFamilyFallback: kMonoFontFallback)),
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
-                    color: (record.success ? tc.ok : tc.error).withValues(alpha: 0.1),
+                    color: (record.success ? tc.ok : tc.error)
+                        .withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rXSmall),
                   ),
                   child: Text(
-                    record.success ? l10n.changeRecordSuccess : l10n.changeRecordFailed,
+                    record.success
+                        ? l10n.changeRecordSuccess
+                        : l10n.changeRecordFailed,
                     style: TextStyle(
                       fontSize: fMicro,
                       color: record.success ? tc.ok : tc.error,
@@ -429,7 +473,8 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
               child: SelectableText(
                 record.command,
                 style: TextStyle(
-                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: kMonoFontFallback,
                   fontSize: fMono,
                   color: tc.terminalGreen,
                 ),
@@ -441,16 +486,21 @@ class _ChangeRecordsPageState extends ConsumerState<ChangeRecordsPage> {
               children: [
                 Icon(Icons.dns_outlined, size: 10, color: tc.textMuted),
                 const SizedBox(width: 4),
-                Text(hostName, style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
+                Text(hostName,
+                    style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
                 const Spacer(),
-                if (record.isRollbackable && !record.rolledBack && record.success)
+                if (record.isRollbackable &&
+                    !record.rolledBack &&
+                    record.success)
                   TextButton.icon(
                     onPressed: () => _confirmRollback(record),
                     icon: const Icon(Icons.undo, size: 14),
-                    label: Text(l10n.changeRecordRollbackButton, style: const TextStyle(fontSize: fMicro)),
+                    label: Text(l10n.changeRecordRollbackButton,
+                        style: const TextStyle(fontSize: fMicro)),
                     style: TextButton.styleFrom(
                       foregroundColor: tc.warn,
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 0),
                       minimumSize: const Size(0, 28),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),

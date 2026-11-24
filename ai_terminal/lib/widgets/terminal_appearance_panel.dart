@@ -45,15 +45,13 @@ class TerminalAppearancePanel extends ConsumerWidget {
     // 切完整个应用即时换肤 —— 设置抽屉里那份已随三项外观项一起删掉。
     final themeMode = ref.watch(
         settingsProvider.select((s) => s['themeMode'] as String? ?? 'dark'));
-    final paletteId = ref.watch(
-        settingsProvider.select((s) => s['terminalPalette'] as String?));
-    final fontSize =
-        (ref.watch(settingsProvider.select(
-                    (s) => s['terminalFontSize'] as num?)) ??
-                13)
-            .toDouble();
-    final theme = resolveTerminalTheme(
-        paletteId: paletteId, isLight: isLight);
+    final paletteId = ref
+        .watch(settingsProvider.select((s) => s['terminalPalette'] as String?));
+    final fontSize = (ref.watch(settingsProvider
+                .select((s) => s['terminalFontSize'] as num?)) ??
+            13)
+        .toDouble();
+    final theme = resolveTerminalTheme(paletteId: paletteId, isLight: isLight);
 
     // 唯一写入口是 SettingsNotifier.setSetting（内部写库 + 更新 state），
     // 这里不要再直写 DAO —— 之前双写会让库与 provider 短暂不一致。
@@ -65,7 +63,8 @@ class TerminalAppearancePanel extends ConsumerWidget {
     // 连点两下「+」如果两下落在同一帧，捕获的旧值会让第二下白点。
     Future<void> stepFont(int delta) async {
       final cur =
-          (ref.read(settingsProvider)['terminalFontSize'] as num?)?.toInt() ?? 13;
+          (ref.read(settingsProvider)['terminalFontSize'] as num?)?.toInt() ??
+              13;
       final next = (cur + delta).clamp(8, 24);
       if (next != cur) await save('terminalFontSize', next);
     }
@@ -347,7 +346,12 @@ class _PaletteChip extends StatelessWidget {
             // 红 / 绿 / 黄 / 蓝：终端里最常出现的一组对比
             Row(
               children: [
-                for (final c in [theme.red, theme.green, theme.yellow, theme.blue])
+                for (final c in [
+                  theme.red,
+                  theme.green,
+                  theme.yellow,
+                  theme.blue
+                ])
                   Container(
                     width: 9,
                     height: 3,
@@ -376,8 +380,8 @@ class _PaletteChip extends StatelessWidget {
               Text(
                 UiText.t('仅暗色', 'Dark only'),
                 maxLines: 1,
-                style:
-                    TextStyle(fontSize: fMini, height: 1.1, color: theme.brightBlack),
+                style: TextStyle(
+                    fontSize: fMini, height: 1.1, color: theme.brightBlack),
               ),
           ],
         ),
@@ -406,8 +410,8 @@ class _StepButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(rSmall),
           border: Border.all(color: onTap == null ? tc.hairline : tc.border),
         ),
-        child:
-            Icon(icon, size: 14, color: onTap == null ? tc.textMuted : tc.textSub),
+        child: Icon(icon,
+            size: 14, color: onTap == null ? tc.textMuted : tc.textSub),
       ),
     );
   }

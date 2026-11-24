@@ -41,7 +41,9 @@ int firstLineOfInput(
     int cursorLine, xterm.BufferLine Function(int index) lineAt) {
   var start = cursorLine;
   // 上限防止异常 buffer（每行都标记 wrapped）把整段回滚区吞进来
-  while (start > 0 && lineAt(start).isWrapped && cursorLine - start < _maxWrapLookback) {
+  while (start > 0 &&
+      lineAt(start).isWrapped &&
+      cursorLine - start < _maxWrapLookback) {
     start--;
   }
   return start;

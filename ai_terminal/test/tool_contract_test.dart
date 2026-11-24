@@ -286,8 +286,7 @@ void main() {
       }
     });
 
-    test('默认 FC schema 的参数是顶层键，不再嵌套 args 对象（真机 file_write 缺陷回归）',
-        () {
+    test('默认 FC schema 的参数是顶层键，不再嵌套 args 对象（真机 file_write 缺陷回归）', () {
       // 真机上模型按旧 schema 发出 {"args": {path, content}}，file_write 读不到
       // path 直接报「参数缺失: path 为必填项」。schema 必须让参数平铺。
       final schema = FileWriteTool().toJsonSchema()!;
@@ -551,8 +550,8 @@ void main() {
       expect(result.error, contains('缺少必填参数'));
       // 第二轮请求必须带上异常观测，AI 才知道要改动作而不是重复调用
       expect(
-        provider.receivedHistories.last.any(
-            (m) => m.content.contains('观测: 工具 throwing_probe 执行异常')),
+        provider.receivedHistories.last
+            .any((m) => m.content.contains('观测: 工具 throwing_probe 执行异常')),
         isTrue,
       );
     });

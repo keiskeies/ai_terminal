@@ -204,7 +204,8 @@ double get minPaneRatio => _minRatio;
 /// 键盘在 pane 之间移动焦点。[forward] 为真 = 向右 / 向下。
 /// 已经到头时返回 null，调用方据此什么都不做（不要绕圈：
 /// 绕一圈会让用户以为终端吞了键，而焦点其实跳到了屏幕另一边）。
-String? neighborPane(PaneLayout layout, String paneId, {required bool forward}) {
+String? neighborPane(PaneLayout layout, String paneId,
+    {required bool forward}) {
   final i = layout.indexOf(paneId);
   if (i < 0 || layout.paneIds.length < 2) return null;
   final next = forward ? i + 1 : i - 1;

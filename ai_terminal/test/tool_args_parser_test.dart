@@ -33,22 +33,21 @@ void main() {
       });
 
       test('路径含空格 — 值是冒号后整行', () {
-        final result = ToolArgsParser.parse(
-            'local: /Users/x/My Project/dist');
+        final result = ToolArgsParser.parse('local: /Users/x/My Project/dist');
         expect(result, isNotNull);
         expect(result!['local'], '/Users/x/My Project/dist');
       });
 
       test('值含冒号 — 只按第一个冒号切分', () {
-        final result = ToolArgsParser.parse(
-            'path: C:\\\\Users\\\\x\\\\file.txt');
+        final result =
+            ToolArgsParser.parse('path: C:\\\\Users\\\\x\\\\file.txt');
         expect(result, isNotNull);
         expect(result!['path'], 'C:\\\\Users\\\\x\\\\file.txt');
       });
 
       test('exclude 字段逗号分隔转 List', () {
-        final result = ToolArgsParser.parse(
-            'exclude: node_modules,.git,.DS_Store');
+        final result =
+            ToolArgsParser.parse('exclude: node_modules,.git,.DS_Store');
         expect(result, isNotNull);
         expect(result!['exclude'], isA<List>());
         expect((result['exclude'] as List).length, 3);
@@ -56,8 +55,7 @@ void main() {
       });
 
       test('hostIds 字段逗号分隔转 List', () {
-        final result = ToolArgsParser.parse(
-            'hostIds: web1,web2,db1');
+        final result = ToolArgsParser.parse('hostIds: web1,web2,db1');
         expect(result, isNotNull);
         expect(result!['hostIds'], isA<List>());
         expect((result['hostIds'] as List).length, 3);

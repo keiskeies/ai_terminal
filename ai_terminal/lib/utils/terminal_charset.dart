@@ -19,7 +19,8 @@ bool isUtf8Encoding(String encoding) {
   return name != 'gbk' && name != 'big5';
 }
 
-typedef CharsetEncoder = Future<Uint8List> Function(String text, String encoding);
+typedef CharsetEncoder = Future<Uint8List> Function(
+    String text, String encoding);
 typedef ByteSink = void Function(Uint8List bytes);
 
 /// 顺序保证的编码写入队列。
@@ -65,8 +66,7 @@ Stream<String> decodeTerminalOutput(Stream<List<int>> source, String encoding) {
       allowFourByte: encoding.toLowerCase() == 'gbk');
 }
 
-Stream<String> _decodeCharset(
-    Stream<List<int>> source, String charset,
+Stream<String> _decodeCharset(Stream<List<int>> source, String charset,
     {required bool allowFourByte}) async* {
   var pending = <int>[];
   await for (final chunk in source) {

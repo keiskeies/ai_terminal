@@ -49,8 +49,7 @@ void main() {
         maxSteps: 6,
       );
 
-  const finishTurn =
-      '思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n';
+  const finishTurn = '思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n';
 
   String turn(String command) => '思考: 执行\n动作: execute\n命令: $command\n';
 
@@ -60,8 +59,7 @@ void main() {
     final engine = makeEngine(provider);
     final executor = _MockExecutor();
 
-    expect(engine.connFailBudgetForTesting, 3,
-        reason: '默认门限保持原值，纯离线场景不放宽');
+    expect(engine.connFailBudgetForTesting, 3, reason: '默认门限保持原值，纯离线场景不放宽');
 
     engine.noteConnectionRestored();
     expect(engine.connFailBudgetForTesting, 6);
@@ -71,12 +69,12 @@ void main() {
     // 断线终止后用户接着发的下一条任务，第一条命令最容易被当成"重跑上一步"。
     provider.enqueueStream([finishTurn]);
     await engine.startTask('再来一轮', executor);
-    expect(engine.connFailBudgetForTesting, 3,
-        reason: '放宽只对本次任务途中发生过重连生效（R5）');
+    expect(engine.connFailBudgetForTesting, 3, reason: '放宽只对本次任务途中发生过重连生效（R5）');
     expect(engine.hasPendingStateNoteForTesting, isFalse,
         reason: '新任务开局消费掉提示，不留到第三条命令之后');
     expect(
-        provider.receivedHistories.last.any((m) => m.content.contains('重连后的新会话')),
+        provider.receivedHistories.last
+            .any((m) => m.content.contains('重连后的新会话')),
         isTrue);
   });
 
@@ -112,7 +110,8 @@ void main() {
       // 顺序就是命令顺序（expand 全部快照会把同一条观测数 N 遍）。
       return provider.receivedHistories.last
           .where((m) =>
-              m.content.startsWith('观测: ') && m.content.contains('disconnected'))
+              m.content.startsWith('观测: ') &&
+              m.content.contains('disconnected'))
           .map((m) => m.content)
           .toList();
     }
@@ -127,8 +126,7 @@ void main() {
 
     final without = await run();
     expect(without.length, 4);
-    expect(firstGiveUp(without), 2,
-        reason: '未重连时第 3 次断线就要求 AI 停手（纯离线场景不放宽）');
+    expect(firstGiveUp(without), 2, reason: '未重连时第 3 次断线就要求 AI 停手（纯离线场景不放宽）');
 
     final withReconnect = await run(restoreAt: 0);
     expect(firstGiveUp(withReconnect), -1,

@@ -130,7 +130,8 @@ class TerminalState {
 }
 
 /// 终端 Provider
-final terminalProvider = StateNotifierProvider<TerminalNotifier, TerminalState>((ref) {
+final terminalProvider =
+    StateNotifierProvider<TerminalNotifier, TerminalState>((ref) {
   // 自动重连的定时器归 notifier 所有。若允许 Riverpod 在页面销毁后回收
   // provider，后台自愈会随之失效（A2 根因），因此这里必须保活。
   ref.keepAlive();
@@ -183,7 +184,8 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
     final ever = hadConnectedBefore ?? tab.everConnected;
 
     if (!LocalTerminalService.isSupported) {
-      tab.markFailed(L10n.str.terminalLocalStartFailed, hadConnectedBefore: ever);
+      tab.markFailed(L10n.str.terminalLocalStartFailed,
+          hadConnectedBefore: ever);
       _publish();
       return null;
     }
@@ -200,7 +202,8 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
 
     if (!localService.isConnected) {
       localService.dispose();
-      tab.markFailed(L10n.str.terminalLocalStartFailed, hadConnectedBefore: ever);
+      tab.markFailed(L10n.str.terminalLocalStartFailed,
+          hadConnectedBefore: ever);
       _publish();
       return null;
     }
@@ -332,7 +335,8 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
     HostConfig config, {
     required bool hadConnectedBefore,
   }) async {
-    final password = await CredentialsStore.get(hostId: config.id, type: 'password');
+    final password =
+        await CredentialsStore.get(hostId: config.id, type: 'password');
     final privateKeyContent =
         await CredentialsStore.get(hostId: config.id, type: 'privateKey');
 
@@ -357,8 +361,8 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
         authType: config.jumpAuthType ?? 'password',
       );
       // 跳板机凭据从 CredentialsStore 获取（key 用主服务器 id + '_jump'）
-      jumpPassword =
-          await CredentialsStore.get(hostId: '${config.id}_jump', type: 'password');
+      jumpPassword = await CredentialsStore.get(
+          hostId: '${config.id}_jump', type: 'password');
       jumpPrivateKeyContent = await CredentialsStore.get(
           hostId: '${config.id}_jump', type: 'privateKey');
     }
@@ -413,19 +417,23 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
   String _describeConnectionError(Object error) {
     final message = error.toString();
     final hint = L10n.str;
-    if (message.contains('Connection refused')) return '$message\n\n💡 ${hint.connErrRefused}';
-    if (message.contains('timeout') || message.contains('Timeout')) return '$message\n\n💡 ${hint.connErrTimeout}';
-    if (message.contains('authentication') || message.contains('Auth')) return '$message\n\n💡 ${hint.connErrAuth}';
-    if (message.contains('No route to host')) return '$message\n\n💡 ${hint.connErrNoRoute}';
+    if (message.contains('Connection refused'))
+      return '$message\n\n💡 ${hint.connErrRefused}';
+    if (message.contains('timeout') || message.contains('Timeout'))
+      return '$message\n\n💡 ${hint.connErrTimeout}';
+    if (message.contains('authentication') || message.contains('Auth'))
+      return '$message\n\n💡 ${hint.connErrAuth}';
+    if (message.contains('No route to host'))
+      return '$message\n\n💡 ${hint.connErrNoRoute}';
     return '$message\n\n💡 ${hint.connErrGeneric}';
   }
 
   /// 关闭标签
   Future<void> closeTab(String tabId) async {
     final tab = state.tabs.cast<TerminalTab?>().firstWhere(
-      (t) => t?.id == tabId,
-      orElse: () => null,
-    );
+          (t) => t?.id == tabId,
+          orElse: () => null,
+        );
 
     if (tab != null) {
       cancelAutoReconnect(tabId); // 关掉 tab 后不再有重连目标
@@ -454,9 +462,9 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
   /// 发送命令
   void sendCommand(String tabId, String command) {
     final tab = state.tabs.cast<TerminalTab?>().firstWhere(
-      (t) => t?.id == tabId,
-      orElse: () => null,
-    );
+          (t) => t?.id == tabId,
+          orElse: () => null,
+        );
 
     tab?.service?.execute(command);
     tab?.localService?.execute(command);
@@ -465,9 +473,9 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
   /// 调整终端大小
   void resizeTab(String tabId, int columns, int rows) {
     final tab = state.tabs.cast<TerminalTab?>().firstWhere(
-      (t) => t?.id == tabId,
-      orElse: () => null,
-    );
+          (t) => t?.id == tabId,
+          orElse: () => null,
+        );
 
     tab?.service?.resize(columns, rows);
     tab?.localService?.resize(columns, rows);
@@ -488,9 +496,9 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
     // 取消待执行的定时器，但保留已用次数：失败后还要按下一档退避
     cancelAutoReconnect(tabId, keepAttempts: true);
     final existingTab = state.tabs.cast<TerminalTab?>().firstWhere(
-      (t) => t?.id == tabId,
-      orElse: () => null,
-    );
+          (t) => t?.id == tabId,
+          orElse: () => null,
+        );
     if (existingTab == null) {
       // 原 tab 已不在列表中（可能已被关闭），新建一个
       return _openSsh(registerTab(config), config, hadConnectedBefore: false);
@@ -528,9 +536,9 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
   Future<TerminalTab?> reconnectLocal(String tabId) async {
     cancelAutoReconnect(tabId, keepAttempts: true);
     final existingTab = state.tabs.cast<TerminalTab?>().firstWhere(
-      (t) => t?.id == tabId,
-      orElse: () => null,
-    );
+          (t) => t?.id == tabId,
+          orElse: () => null,
+        );
     if (existingTab == null) {
       // 原 tab 已不在列表中，新建一个
       final tab = registerLocalTab();

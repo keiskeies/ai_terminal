@@ -66,7 +66,8 @@ void main() {
       of: find.text(extra.label(isMac: isMac)),
       matching: find.byType(InkWell),
     );
-    await tester.tap(find.descendant(of: chip, matching: find.byIcon(Icons.close)));
+    await tester
+        .tap(find.descendant(of: chip, matching: find.byIcon(Icons.close)));
     await tester.pumpAndSettle();
 
     expect(saved, isNotNull);

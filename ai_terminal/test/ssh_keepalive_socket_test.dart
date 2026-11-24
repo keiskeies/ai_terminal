@@ -28,8 +28,7 @@ void main() {
     setUp(() async {
       server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
       final accepted = server.first;
-      client = await Socket.connect(
-          InternetAddress.loopbackIPv4, server.port);
+      client = await Socket.connect(InternetAddress.loopbackIPv4, server.port);
       await accepted;
     });
 
@@ -50,10 +49,8 @@ void main() {
         expect(applied, isNot(contains('TCP_KEEPIDLE')),
             reason: 'Windows 走 SIO_KEEPALIVE_VALS，setRawOption 传不了结构体');
       } else {
-        expect(
-            applied,
-            containsAll(
-                ['SO_KEEPALIVE', 'TCP_KEEPINTVL', 'TCP_KEEPCNT']),
+        expect(applied,
+            containsAll(['SO_KEEPALIVE', 'TCP_KEEPINTVL', 'TCP_KEEPCNT']),
             reason: 'Linux 用 TCP_KEEPIDLE、BSD 用 TCP_KEEPALIVE，'
                 '两者名字不同但都属"空闲阈值"，故不断言其字面名');
       }
@@ -74,8 +71,7 @@ void main() {
     test('建连后 stream/sink 直通原始 socket', () async {
       final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
       final accepted = server.first;
-      final socket =
-          await KeepaliveSSHSocket.connect('127.0.0.1', server.port);
+      final socket = await KeepaliveSSHSocket.connect('127.0.0.1', server.port);
       final remote = await accepted;
 
       remote.add([1, 2, 3]);

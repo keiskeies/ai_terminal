@@ -55,14 +55,14 @@ void main() {
 
   group('档位解析', () {
     test('未启用推理时返回 null', () {
-      expect(model.copyWith(reasoningEnabled: false).resolveReasoningTier('high'),
+      expect(
+          model.copyWith(reasoningEnabled: false).resolveReasoningTier('high'),
           isNull);
     });
 
     test('启用但未配置档位时回退标准四档', () {
       final tiers = model.activeReasoningTiers;
-      expect(tiers.map((t) => t.level),
-          ['off', 'low', 'medium', 'high']);
+      expect(tiers.map((t) => t.level), ['off', 'low', 'medium', 'high']);
     });
 
     test('没有保存值时默认 medium', () {

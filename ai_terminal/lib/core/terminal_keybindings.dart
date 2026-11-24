@@ -127,21 +127,19 @@ final List<BindableKey> kBindableKeys = [
       String.fromCharCode(65 + i),
       _letters[i].keyId,
     ),
-  for (var i = 0; i < 10; i++)
-    BindableKey('digit$i', '$i', _digits[i].keyId),
+  for (var i = 0; i < 10; i++) BindableKey('digit$i', '$i', _digits[i].keyId),
   for (var i = 0; i < 10; i++)
     BindableKey('numpad$i', 'Num $i', _numpadDigits[i].keyId),
-  for (var i = 1; i <= 12; i++) BindableKey('f$i', 'F$i', _functionKeys[i - 1].keyId),
+  for (var i = 1; i <= 12; i++)
+    BindableKey('f$i', 'F$i', _functionKeys[i - 1].keyId),
   BindableKey('numpadAdd', 'Num +', LogicalKeyboardKey.numpadAdd.keyId),
   BindableKey(
       'numpadSubtract', 'Num -', LogicalKeyboardKey.numpadSubtract.keyId),
   BindableKey('equal', '=', LogicalKeyboardKey.equal.keyId),
   BindableKey('add', '+', LogicalKeyboardKey.add.keyId),
   BindableKey('minus', '-', LogicalKeyboardKey.minus.keyId),
-  BindableKey(
-      'bracketLeft', '[', LogicalKeyboardKey.bracketLeft.keyId),
-  BindableKey(
-      'bracketRight', ']', LogicalKeyboardKey.bracketRight.keyId),
+  BindableKey('bracketLeft', '[', LogicalKeyboardKey.bracketLeft.keyId),
+  BindableKey('bracketRight', ']', LogicalKeyboardKey.bracketRight.keyId),
   BindableKey('semicolon', ';', LogicalKeyboardKey.semicolon.keyId),
   BindableKey('comma', ',', LogicalKeyboardKey.comma.keyId),
   BindableKey('period', '.', LogicalKeyboardKey.period.keyId),
@@ -169,37 +167,73 @@ final Map<int, BindableKey> _keysByKeyId = {
 };
 
 const List<LogicalKeyboardKey> _letters = [
-  LogicalKeyboardKey.keyA, LogicalKeyboardKey.keyB, LogicalKeyboardKey.keyC,
-  LogicalKeyboardKey.keyD, LogicalKeyboardKey.keyE, LogicalKeyboardKey.keyF,
-  LogicalKeyboardKey.keyG, LogicalKeyboardKey.keyH, LogicalKeyboardKey.keyI,
-  LogicalKeyboardKey.keyJ, LogicalKeyboardKey.keyK, LogicalKeyboardKey.keyL,
-  LogicalKeyboardKey.keyM, LogicalKeyboardKey.keyN, LogicalKeyboardKey.keyO,
-  LogicalKeyboardKey.keyP, LogicalKeyboardKey.keyQ, LogicalKeyboardKey.keyR,
-  LogicalKeyboardKey.keyS, LogicalKeyboardKey.keyT, LogicalKeyboardKey.keyU,
-  LogicalKeyboardKey.keyV, LogicalKeyboardKey.keyW, LogicalKeyboardKey.keyX,
-  LogicalKeyboardKey.keyY, LogicalKeyboardKey.keyZ,
+  LogicalKeyboardKey.keyA,
+  LogicalKeyboardKey.keyB,
+  LogicalKeyboardKey.keyC,
+  LogicalKeyboardKey.keyD,
+  LogicalKeyboardKey.keyE,
+  LogicalKeyboardKey.keyF,
+  LogicalKeyboardKey.keyG,
+  LogicalKeyboardKey.keyH,
+  LogicalKeyboardKey.keyI,
+  LogicalKeyboardKey.keyJ,
+  LogicalKeyboardKey.keyK,
+  LogicalKeyboardKey.keyL,
+  LogicalKeyboardKey.keyM,
+  LogicalKeyboardKey.keyN,
+  LogicalKeyboardKey.keyO,
+  LogicalKeyboardKey.keyP,
+  LogicalKeyboardKey.keyQ,
+  LogicalKeyboardKey.keyR,
+  LogicalKeyboardKey.keyS,
+  LogicalKeyboardKey.keyT,
+  LogicalKeyboardKey.keyU,
+  LogicalKeyboardKey.keyV,
+  LogicalKeyboardKey.keyW,
+  LogicalKeyboardKey.keyX,
+  LogicalKeyboardKey.keyY,
+  LogicalKeyboardKey.keyZ,
 ];
 
 const List<LogicalKeyboardKey> _digits = [
-  LogicalKeyboardKey.digit0, LogicalKeyboardKey.digit1, LogicalKeyboardKey.digit2,
-  LogicalKeyboardKey.digit3, LogicalKeyboardKey.digit4, LogicalKeyboardKey.digit5,
-  LogicalKeyboardKey.digit6, LogicalKeyboardKey.digit7, LogicalKeyboardKey.digit8,
+  LogicalKeyboardKey.digit0,
+  LogicalKeyboardKey.digit1,
+  LogicalKeyboardKey.digit2,
+  LogicalKeyboardKey.digit3,
+  LogicalKeyboardKey.digit4,
+  LogicalKeyboardKey.digit5,
+  LogicalKeyboardKey.digit6,
+  LogicalKeyboardKey.digit7,
+  LogicalKeyboardKey.digit8,
   LogicalKeyboardKey.digit9,
 ];
 
 const List<LogicalKeyboardKey> _numpadDigits = [
-  LogicalKeyboardKey.numpad0, LogicalKeyboardKey.numpad1,
-  LogicalKeyboardKey.numpad2, LogicalKeyboardKey.numpad3,
-  LogicalKeyboardKey.numpad4, LogicalKeyboardKey.numpad5,
-  LogicalKeyboardKey.numpad6, LogicalKeyboardKey.numpad7,
-  LogicalKeyboardKey.numpad8, LogicalKeyboardKey.numpad9,
+  LogicalKeyboardKey.numpad0,
+  LogicalKeyboardKey.numpad1,
+  LogicalKeyboardKey.numpad2,
+  LogicalKeyboardKey.numpad3,
+  LogicalKeyboardKey.numpad4,
+  LogicalKeyboardKey.numpad5,
+  LogicalKeyboardKey.numpad6,
+  LogicalKeyboardKey.numpad7,
+  LogicalKeyboardKey.numpad8,
+  LogicalKeyboardKey.numpad9,
 ];
 
 const List<LogicalKeyboardKey> _functionKeys = [
-  LogicalKeyboardKey.f1, LogicalKeyboardKey.f2, LogicalKeyboardKey.f3,
-  LogicalKeyboardKey.f4, LogicalKeyboardKey.f5, LogicalKeyboardKey.f6,
-  LogicalKeyboardKey.f7, LogicalKeyboardKey.f8, LogicalKeyboardKey.f9,
-  LogicalKeyboardKey.f10, LogicalKeyboardKey.f11, LogicalKeyboardKey.f12,
+  LogicalKeyboardKey.f1,
+  LogicalKeyboardKey.f2,
+  LogicalKeyboardKey.f3,
+  LogicalKeyboardKey.f4,
+  LogicalKeyboardKey.f5,
+  LogicalKeyboardKey.f6,
+  LogicalKeyboardKey.f7,
+  LogicalKeyboardKey.f8,
+  LogicalKeyboardKey.f9,
+  LogicalKeyboardKey.f10,
+  LogicalKeyboardKey.f11,
+  LogicalKeyboardKey.f12,
 ];
 
 String keyLabel(String keyName) => _keysByName[keyName]?.label ?? keyName;
@@ -215,12 +249,8 @@ String? bindableKeyName(LogicalKeyboardKey key) {
 
 /// 从设置里读出来的一条快捷键串；解析不了返回 null（不抛）
 KeyBinding? parseKeyBinding(String raw) {
-  final parts = raw
-      .trim()
-      .toLowerCase()
-      .split('+')
-      .where((p) => p.isNotEmpty)
-      .toList();
+  final parts =
+      raw.trim().toLowerCase().split('+').where((p) => p.isNotEmpty).toList();
   if (parts.isEmpty) return null;
   final keyName = parts.last;
   // 名字在表里要能对上：字母表存的是 keyA 这种大写形式，输入允许 `ctrl+f`
@@ -340,7 +370,11 @@ String bindingVerdictLabel(BindingVerdict verdict, {required bool isZh}) {
 /// mac 上按 ⌘ 会先被系统/窗口管理吃掉的那几个键。
 /// 不含 digit0 —— ⌘0 是「重置字号」的既有默认值，报它等于自己打自己。
 const Set<String> _macSystemKeys = {
-  'keyW', 'keyQ', 'keyH', 'keyM', 'keyTab',
+  'keyW',
+  'keyQ',
+  'keyH',
+  'keyM',
+  'keyTab',
 };
 
 final Set<String> _letterNames = {
@@ -367,38 +401,51 @@ final Map<TerminalKeyAction, List<KeyBinding>> kDefaultTerminalKeybindings = {
   // Ctrl++ 在不同布局上会报成 equal / add / numpadAdd，且按住 Shift 的
   // 那两种都要收 —— 旧实现是「不看 Shift 只看逻辑键」，默认表必须等价。
   TerminalKeyAction.zoomIn: _bindings([
-    'ctrl+equal', 'ctrl+shift+equal',
-    'ctrl+add', 'ctrl+shift+add',
+    'ctrl+equal',
+    'ctrl+shift+equal',
+    'ctrl+add',
+    'ctrl+shift+add',
     'ctrl+numpadAdd',
-    'meta+equal', 'meta+shift+equal',
-    'meta+add', 'meta+shift+add',
+    'meta+equal',
+    'meta+shift+equal',
+    'meta+add',
+    'meta+shift+add',
     'meta+numpadAdd',
   ]),
   TerminalKeyAction.zoomOut: _bindings([
-    'ctrl+minus', 'ctrl+numpadSubtract',
-    'meta+minus', 'meta+numpadSubtract',
+    'ctrl+minus',
+    'ctrl+numpadSubtract',
+    'meta+minus',
+    'meta+numpadSubtract',
   ]),
   TerminalKeyAction.zoomReset: _bindings([
-    'ctrl+digit0', 'ctrl+numpad0',
-    'meta+digit0', 'meta+numpad0',
+    'ctrl+digit0',
+    'ctrl+numpad0',
+    'meta+digit0',
+    'meta+numpad0',
   ]),
   // 分屏沿用 iTerm2 的 ⌘D / ⌘⇧D 肌肉记忆。Ctrl 侧一律 ctrl+shift+字母：
   // ctrl+alt 在 Windows 上就是 AltGr（会劫持 `@`、`€` 这些输入），不能用。
   TerminalKeyAction.splitVertical: _bindings([
-    'ctrl+shift+d', 'meta+d',
+    'ctrl+shift+d',
+    'meta+d',
   ]),
   TerminalKeyAction.splitHorizontal: _bindings([
-    'ctrl+shift+s', 'meta+shift+d',
+    'ctrl+shift+s',
+    'meta+shift+d',
   ]),
   // ⌘W 是「关窗口」，抢过来等于让用户丢窗口，分屏关闭只能加一层 Shift
   TerminalKeyAction.closePane: _bindings([
-    'ctrl+shift+w', 'meta+shift+w',
+    'ctrl+shift+w',
+    'meta+shift+w',
   ]),
   TerminalKeyAction.focusNextPane: _bindings([
-    'ctrl+shift+period', 'meta+bracketRight',
+    'ctrl+shift+period',
+    'meta+bracketRight',
   ]),
   TerminalKeyAction.focusPrevPane: _bindings([
-    'ctrl+shift+comma', 'meta+bracketLeft',
+    'ctrl+shift+comma',
+    'meta+bracketLeft',
   ]),
 };
 
@@ -455,9 +502,8 @@ Map<String, List<String>> setActionBindings(
   final next = <String, List<String>>{
     for (final entry in overrides.entries) entry.key: List.of(entry.value),
   };
-  final defaults = kDefaultTerminalKeybindings[action]!
-      .map((b) => b.serialized)
-      .toSet();
+  final defaults =
+      kDefaultTerminalKeybindings[action]!.map((b) => b.serialized).toSet();
   // 注意不能用 `combos.toSet() == defaults`：Dart 的 Set 没重载 ==，
   // 那是同一性比较，两个内容相同的集合永远不相等。
   final actual = combos.toSet();
@@ -476,9 +522,7 @@ List<String> effectiveBindingStrings(
 ) {
   final overridden = overrides[action.id];
   if (overridden != null) return List.of(overridden);
-  return kDefaultTerminalKeybindings[action]!
-      .map((b) => b.serialized)
-      .toList();
+  return kDefaultTerminalKeybindings[action]!.map((b) => b.serialized).toList();
 }
 
 /// 加一条组合（[replace] 非空时原位替换它，否则追加）

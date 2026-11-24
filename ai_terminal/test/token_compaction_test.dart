@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:ai_terminal/models/agent_memory.dart';
 import 'package:ai_terminal/models/ai_model_config.dart';
@@ -16,8 +17,8 @@ import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 
 /// O7 token 化压缩测试：token 阈值、滚动摘要、pinned 事实、旧数据兼容。
 ///
-/// provider 路径与 agent_steering_provider_test 同口径：DbInit 未初始化，
-/// 落库失败必须 surface（R8）；内存缓存层的压缩结果仍可断言。
+/// provider 路径用最小成功 Database 承接 upsert；落库失败时回滚缓存并
+/// surface 错误的行为由 agent_persistence_regression_test 覆盖。
 
 /// 按脚本应答的 AI provider：String → 分两块流式返回；Exception → 抛出。
 /// 记录每次收到的 prompt，供断言滚动合并输入。
@@ -42,9 +43,11 @@ class _ScriptedAIProvider implements AIProvider {
     void Function(List<ToolCall> calls)? onToolCalls,
   }) async {
     prompts.add(prompt);
-    final r = responses[calls < responses.length ? calls : responses.length - 1];
+    final r =
+        responses[calls < responses.length ? calls : responses.length - 1];
     calls++;
     if (r is Exception) throw r;
+    if (r is Stream<String>) return r;
     final text = r as String;
     final mid = text.length ~/ 2;
     return Stream.fromIterable([text.substring(0, mid), text.substring(mid)]);
@@ -86,6 +89,22 @@ class _TestNotifier extends AgentNotifier {
   }
 }
 
+/// 成功写库的最小 Database：本组只验证压缩逻辑，落库失败回滚由
+/// agent_persistence_regression_test 覆盖。
+class _OkDatabase implements Database {
+  @override
+  Future<int> insert(
+    String table,
+    Map<String, Object?> values, {
+    String? nullColumnHack,
+    ConflictAlgorithm? conflictAlgorithm,
+  }) async =>
+      1;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 void main() {
   setUpAll(() {
     TestWidgetsFlutterBinding.ensureInitialized();
@@ -118,21 +137,21 @@ void main() {
     test('needsCompaction：中文内容按 token 提前触发，英文同字符数不触发', () {
       final cjk = _makeConv(2, content: '中' * 150);
       final ascii = _makeConv(2, content: 'a' * 150);
-      expect(
-          cjk.needsCompaction(tokenThreshold: 200, roundThreshold: 999), isTrue);
-      expect(
-          ascii.needsCompaction(tokenThreshold: 200, roundThreshold: 999), isFalse);
+      expect(cjk.needsCompaction(tokenThreshold: 200, roundThreshold: 999),
+          isTrue);
+      expect(ascii.needsCompaction(tokenThreshold: 200, roundThreshold: 999),
+          isFalse);
     });
 
     test('needsCompaction：轮次阈值仍生效，rolledUp 与旧摘要不计轮次', () {
       final conv = _makeConv(40);
-      expect(
-          conv.needsCompaction(tokenThreshold: 1 << 30, roundThreshold: 20), isTrue);
+      expect(conv.needsCompaction(tokenThreshold: 1 << 30, roundThreshold: 20),
+          isTrue);
       for (final m in conv.messages) {
         m.rolledUp = true;
       }
-      expect(
-          conv.needsCompaction(tokenThreshold: 1 << 30, roundThreshold: 20), isFalse);
+      expect(conv.needsCompaction(tokenThreshold: 1 << 30, roundThreshold: 20),
+          isFalse);
       final legacy = _makeConv(40);
       for (final m in legacy.messages) {
         m.summary = '旧摘要';
@@ -146,8 +165,8 @@ void main() {
   group('buildAiHistory 重建口径', () {
     test('滚动摘要注入首条，rolledUp 跳过，system 跳过', () {
       final conv = _makeConv(4);
-      conv.messages.insert(
-          0, ConvMessage.create(role: 'system', content: '系统提示'));
+      conv.messages
+          .insert(0, ConvMessage.create(role: 'system', content: '系统提示'));
       conv.rollingSummary = '【关键事实】\n- Ubuntu 22.04';
       conv.messages[1].rolledUp = true;
       conv.messages[2].rolledUp = true;
@@ -178,7 +197,8 @@ void main() {
     test('rolledUp 默认 false，create 可显式指定', () {
       expect(ConvMessage.create(role: 'user', content: 'x').rolledUp, isFalse);
       expect(
-          ConvMessage.create(role: 'user', content: 'x', rolledUp: true).rolledUp,
+          ConvMessage.create(role: 'user', content: 'x', rolledUp: true)
+              .rolledUp,
           isTrue);
     });
   });
@@ -193,13 +213,18 @@ void main() {
     });
 
     test('prompt 携带已有摘要与 pinned 规则，输出整体摘要', () async {
-      final ai = _ScriptedAIProvider(
-          ['【关键事实】\n- Ubuntu 22.04\n【对话进展】\n- 已安装 nginx']);
+      final ai =
+          _ScriptedAIProvider(['【关键事实】\n- Ubuntu 22.04\n【对话进展】\n- 已安装 nginx']);
       final engine = _makeEngine(ai);
       final result = await engine.summarizeRolling(
         previousSummary: '【关键事实】\n- 主机名 web1',
         messages: [
-          (role: 'user', content: '装 nginx', command: null, commandSuccess: null),
+          (
+            role: 'user',
+            content: '装 nginx',
+            command: null,
+            commandSuccess: null
+          ),
           (
             role: 'assistant',
             content: '完成',
@@ -248,6 +273,32 @@ void main() {
       engine.cancelTask();
     });
 
+    test('流式摘要达到硬上限后停止消费，不再拉取后续块', () async {
+      var thirdChunkProduced = false;
+      var streamCancelled = false;
+      Stream<String> oversizedStream() async* {
+        try {
+          yield '【关键事实】\n';
+          yield '长' * 5000;
+          thirdChunkProduced = true;
+          yield '不应读取的后续内容';
+        } finally {
+          streamCancelled = true;
+        }
+      }
+
+      final engine = _makeEngine(_ScriptedAIProvider([oversizedStream()]));
+      final result = await engine.summarizeRolling(messages: [
+        (role: 'user', content: 'x', command: null, commandSuccess: null),
+      ]);
+      expect(result, isNotNull);
+      expect(result!.length, 4000);
+      expect(result, startsWith('【关键事实】'));
+      expect(thirdChunkProduced, isFalse, reason: '摘要达到上限后必须停止拉取网络流');
+      expect(streamCancelled, isTrue, reason: '离开 await-for 时应取消上游订阅');
+      engine.cancelTask();
+    });
+
     test('AI 返回空 → null；AI 抛错 → null（调用方保持原状）', () async {
       final empty = _makeEngine(_ScriptedAIProvider(['   ']));
       expect(
@@ -272,17 +323,19 @@ void main() {
     late Conversation conv;
 
     setUp(() {
+      ConversationsDao.databaseOverride = _OkDatabase();
       ai = _ScriptedAIProvider(['【关键事实】\n- Ubuntu 22.04\n【对话进展】\n- 已装 nginx']);
       notifier = _TestNotifier();
       notifier.switchTab('t-comp', hostId: 'h-comp');
       notifier.init(modelConfig: _makeConfig(), aiProvider: ai);
       conv = _makeConv(20);
       ConversationsDao.cacheOnly(conv);
-      notifier.setStateForTest(
-          notifier.state.copyWith(conversationId: conv.id));
+      notifier
+          .setStateForTest(notifier.state.copyWith(conversationId: conv.id));
     });
 
     tearDown(() {
+      ConversationsDao.databaseOverride = null;
       notifier.dispose();
     });
 
@@ -297,8 +350,7 @@ void main() {
         expect(conv.messages[i].rolledUp, isFalse, reason: '消息 $i 应保留原文');
       }
       expect(notifier.state.isCompacting, isFalse);
-      // 测试环境无 DbInit：落库失败必须 surface（R8），不得静默
-      expect(notifier.state.error, isNotNull);
+      expect(notifier.state.error, isNull);
     });
 
     test('二次压缩把已有摘要传给 AI 滚动合并', () async {
@@ -321,8 +373,8 @@ void main() {
     test('消息数不足保留窗口：不触发 AI', () async {
       final small = _makeConv(12);
       ConversationsDao.cacheOnly(small);
-      notifier.setStateForTest(
-          notifier.state.copyWith(conversationId: small.id));
+      notifier
+          .setStateForTest(notifier.state.copyWith(conversationId: small.id));
       await notifier.compact('t-comp');
       expect(ai.calls, 0);
       expect(small.rollingSummary, isNull);

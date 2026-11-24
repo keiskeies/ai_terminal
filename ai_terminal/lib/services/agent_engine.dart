@@ -87,6 +87,10 @@ class AgentEngine {
   /// 非 FC 模型或纯文本响应时为空，主循环据此走文本解析兜底。
   List<ToolCall> _lastFcToolCalls = const [];
 
+  /// 本轮 arguments 非法的结构化调用：不执行、不进入动作列表，只在成功收流后
+  /// 回灌一条不含原始参数的观测，让模型修正后重试。
+  List<ToolCall> _lastInvalidFcCalls = const [];
+
   /// 本条 AI 响应的解析结果里是否已带 ask 事件（主循环在解析后填入）
   bool _lastResponseHadAskEvent = false;
 
@@ -220,6 +224,9 @@ class AgentEngine {
   late final TerminationGuard _terminationGuard = TerminationGuard(
     hostId: hostId,
     generation: () => _currentTaskGeneration,
+    isTerminalAllowed: (status) =>
+        status == AgentStatus.cancelled ||
+        _currentTask?.status != AgentStatus.paused,
   );
 
   /// 等待用户选择选项的 Completer（ReAct ask 动作 / :::choose A|B|C:::）
@@ -269,7 +276,6 @@ class AgentEngine {
 
   /// AI 流式超时看门狗（_callAI 内创建，cancelTask 中取消）
   Timer? _aiWatchdog;
-  bool _aiStreamTimedOut = false;
 
   /// 本轮任务内「AI 流中途超时」已重试次数（上限 2，任务启动时清零）。
   /// 上限存在防抖：网络持续抖动时不能无限重试烧配额。
@@ -315,13 +321,19 @@ class AgentEngine {
   int _syntaxRejectCount = 0;
   static const int _maxSyntaxRejects = 2;
 
-  /// 本轮是否有命令真正通过了预检（进入执行器）。
+  /// 本轮是否有命令真正通过了全部守卫并进入执行器。
   /// 预检在 `_executeCommand` 内拦截，外层拿不到"是否执行过"，用这个标记补上。
   bool _commandPassedPrecheckThisTurn = false;
 
-  /// 连续多少轮**一条命令都没通过预检**。maxSteps 默认 0（无限制），
-  /// 若只靠 `_syntaxRejectCount` 提示而不真正收尾，模型坚持提交被拦的命令
-  /// 会让任务无限空转。达到 [_maxBlockedTurnsBeforeAbort] 轮直接失败收尾。
+  /// 本轮是否有命令被预检、权限或用户拒绝（从未进入执行器）。
+  bool _commandRejectedThisTurn = false;
+
+  /// 本轮是否有命令真正执行且返回成功；只有它才能清零 blocked-turn streak。
+  bool _commandSucceededThisTurn = false;
+
+  /// 连续多少轮**没有任何命令成功推进**且至少一条命令被拒绝。maxSteps 默认 0
+  /// （无限制），若只靠提示语不收尾，模型坚持提交被拦的命令会无限空烧配额。
+  /// 达到 [_maxBlockedTurnsBeforeAbort] 轮直接失败收尾。
   int _blockedTurnsStreak = 0;
   static const int _maxBlockedTurnsBeforeAbort = 3;
 
@@ -392,6 +404,9 @@ class AgentEngine {
 
   /// _accumulatedMessage 最大字符数（防止长任务内存无界增长）
   static const int _maxAccumulatedChars = 20000;
+
+  /// 单次模型响应上限。超限必须失败，不能截断后解析/执行半条 ReAct 或 heredoc。
+  static const int _maxAiResponseChars = 256 * 1024;
 
   /// 本步模型推理累积上限：推理只是过程展示，超长只保留尾部
   static const int _maxReasoningChars = 4000;
@@ -508,7 +523,8 @@ class AgentEngine {
   void noteConnectionRestored() {
     _connFailBudget = _maxConnFailRetries * 2;
     _needsStateNote = true;
-    agentLogger.info('AgentEngine', '连接已自愈：连续失败预算放宽至 $_connFailBudget，待注入新会话提示');
+    agentLogger.info(
+        'AgentEngine', '连接已自愈：连续失败预算放宽至 $_connFailBudget，待注入新会话提示');
   }
 
   /// 取走（并清除）重连后的一次性提示。命中时返回提示正文，否则返回 null。
@@ -547,6 +563,14 @@ class AgentEngine {
   /// AI 流式响应超时：连续无数据超过该时长即判定超时（Agent 设置页可配置）
   Duration aiResponseTimeout;
 
+  /// 凭据保存依赖注入点：默认走安全存储；测试用假实现验证保存失败/取消竞态。
+  @visibleForTesting
+  final Future<bool> Function({
+    required String hostId,
+    required String type,
+    required String value,
+  })? credentialSaver;
+
   AgentEngine({
     required AIProvider aiProvider,
     required AIModelConfig modelConfig,
@@ -557,6 +581,7 @@ class AgentEngine {
     this.hostId,
     AIProvider? fallbackProvider,
     AIModelConfig? fallbackConfig,
+    this.credentialSaver,
   })  : _aiProvider = aiProvider,
         _modelConfig = modelConfig,
         _memory = memory,
@@ -574,42 +599,56 @@ class AgentEngine {
   /// 与危险命令的确认共用 [_confirmCompleter] 与 10 分钟超时策略：
   /// cancelTask / confirmChoice 已经知道怎么处理这个 Completer（R1：
   /// 从外部取消订阅时必须手动 complete，否则等待方永久挂起）。
-  Future<bool> _confirmToolExecution(String toolName, String display) async {
+  Future<bool> _confirmToolExecution(String toolName, String display,
+      {required int myGeneration}) async {
+    final generation = myGeneration;
+    final taskId = _currentTask?.id;
+    if (!_isTaskActive(generation, taskId)) return false;
     agentLogger.info('ReAct', '破坏性工具需要确认: $toolName');
-    _pendingConfirmCommand = display;
-    _confirmCompleter = Completer<bool>();
-    _confirmTimedOut = false;
-    _confirmTimeoutTimer = Timer(const Duration(minutes: 10), () {
-      if (_confirmCompleter != null && !_confirmCompleter!.isCompleted) {
-        agentLogger.warn('ReAct', '工具确认超时(10min)，自动拒绝: $toolName');
+    final completer = Completer<bool>();
+    var timedOut = false;
+    final timer = Timer(const Duration(minutes: 10), () {
+      if (completer.isCompleted) return;
+      timedOut = true;
+      agentLogger.warn('ReAct', '工具确认超时(10min)，自动拒绝: $toolName');
+      if (identical(_confirmCompleter, completer) &&
+          _isTaskActive(generation, taskId)) {
         _confirmTimedOut = true;
         _taskHadConfirmTimeout = true;
-        _confirmCompleter!.complete(false);
       }
+      completer.complete(false);
     });
+    _pendingConfirmCommand = display;
+    _confirmCompleter = completer;
+    _confirmTimedOut = false;
+    _confirmTimeoutTimer = timer;
 
     onEvent?.call(AgentEvent.info(L10n.str.ut_07c39ce9ce(display)));
-    _currentTask = _currentTask?.copyWith(
+    _currentTask = _currentTask!.copyWith(
       status: AgentStatus.waitingConfirm,
       phase: UiText.t('等待确认', 'Waiting for confirmation'),
-      currentStep:
-          L10n.str.ut_b306912acf(toolName),
+      currentStep: L10n.str.ut_b306912acf(toolName),
     );
     _notifyTaskUpdate();
 
     // 等确认的墙钟要单独记账：它是人的反应时间，不该进 tok/s 的分母。
     final waitStart = DateTime.now();
-    final generationAtWait = _currentTaskGeneration;
-    final confirmed = await _confirmCompleter!.future;
-    // 只在仍是同一个任务时计入：切会话时 cancelTask 会补完成这个 future，
-    // 把旧任务的等待挂到新任务的计量上是错的。
-    if (generationAtWait == _currentTaskGeneration) {
-      _confirmWaitSeconds += DateTime.now().difference(waitStart).inSeconds;
+    final confirmed = await completer.future;
+    timer.cancel();
+    if (identical(_confirmCompleter, completer)) {
+      _confirmTimeoutTimer = null;
+      _confirmCompleter = null;
+      _pendingConfirmCommand = null;
     }
-    _confirmTimeoutTimer?.cancel();
-    _confirmTimeoutTimer = null;
-    _confirmCompleter = null;
-    _pendingConfirmCommand = null;
+    if (!_isSameTask(generation, taskId)) return false;
+    if (_currentTask?.status == AgentStatus.cancelled ||
+        _currentTask?.status == AgentStatus.paused ||
+        isTerminalStatus(_currentTask!.status)) {
+      return false;
+    }
+    _confirmWaitSeconds += DateTime.now().difference(waitStart).inSeconds;
+    // 保留给调用方区分超时/拒绝；只有本等待仍是当前确认时才可读取。
+    if (timedOut) _confirmTimedOut = true;
     return confirmed;
   }
 
@@ -637,7 +676,20 @@ class AgentEngine {
   /// 答案只作为 info 事件进事件时间线，**不进 [_conversationHistory]**
   /// （它不是模型需要的观测，进历史会污染上下文）、**不进凭据库**。
   /// 密码类提示不会到达这里 —— 检测器对密码永远走中断路径（R7）。
-  Future<String?> _requestInteractiveInput(String prompt) async {
+  Future<String?> _requestInteractiveInput(
+    String prompt, {
+    int? myGeneration,
+    String? taskId,
+    List<({String prompt, String answer})>? interactiveEchoes,
+    void Function(Completer<String?>)? onCompleter,
+  }) async {
+    final generation = myGeneration ?? _currentTaskGeneration;
+    final ownerTaskId = taskId ?? _currentTask?.id;
+    bool stillCurrent() => _isSameTask(generation, ownerTaskId);
+    bool active() => _isTaskActive(generation, ownerTaskId);
+    if (!stillCurrent() || !active()) return null;
+    final echoes = interactiveEchoes ?? _interactiveEchoes;
+
     // 自动应答（设置项 agentAutoAnswerEnabled，默认关）：
     // 只有保守规则表命中（[Y/n]→Y、Press ENTER→回车）才自动答，其余仍弹窗。
     final autoEnabled =
@@ -646,13 +698,14 @@ class AgentEngine {
     if (autoEnabled) {
       final auto = PtyOutputDetector.confirmationAutoAnswer(prompt);
       if (auto != null) {
+        if (!stillCurrent() || !active()) return null;
         // 只记"规则命中"，提示文本本身已在命令输出里，无需重复进日志
         agentLogger.info('ReAct', '确认提示命中自动应答规则');
         onEvent?.call(AgentEvent.info(UiText.t(
           '⌨️ 已自动应答确认提示: ${auto.isEmpty ? "(回车)" : auto}',
           '⌨️ Auto-answered prompt: ${auto.isEmpty ? "(Enter)" : auto}',
         )));
-        _interactiveEchoes.add((prompt: prompt, answer: auto));
+        echoes.add((prompt: prompt, answer: auto));
         return auto;
       }
     }
@@ -665,26 +718,27 @@ class AgentEngine {
 
     final completer = Completer<String?>();
     _interactiveInputCompleter = completer;
-    _interactiveInputTimeoutTimer = Timer(const Duration(minutes: 10), () {
-      if (!completer.isCompleted) {
-        agentLogger.warn('ReAct', '交互输入超时(10min)，按取消处理');
-        completer.complete(null);
-      }
+    onCompleter?.call(completer);
+    final timer = Timer(const Duration(minutes: 10), () {
+      if (completer.isCompleted) return;
+      agentLogger.warn('ReAct', '交互输入超时(10min)，按取消处理');
+      completer.complete(null);
     });
+    _interactiveInputTimeoutTimer = timer;
 
     onEvent?.call(AgentEvent.info(UiText.t(
       '⌨️ 命令等待输入: $prompt',
       '⌨️ Command awaiting input: $prompt',
     )));
-    _currentTask = _currentTask?.copyWith(
+    _currentTask = _currentTask!.copyWith(
       status: AgentStatus.waitingConfirm,
       phase: '等待输入',
       currentStep: '等待输入: $prompt',
     );
     _notifyTaskUpdate();
 
-    // UI 弹窗异步作答。cancelTask/超时会先 complete(null)，迟到的答案直接丢弃，
-    // 不会写进已经中断（或已被新任务接管）的终端。
+    // UI 弹窗异步作答。cancelTask/超时会先 complete(null)，迟到的答案只完成
+    // 本轮局部 future，不得写进已经中断（或已被新任务接管）的终端。
     request(prompt).then((answer) {
       if (!completer.isCompleted) completer.complete(answer);
     }).catchError((Object e) {
@@ -694,25 +748,22 @@ class AgentEngine {
 
     // 等输入的墙钟单独记账：人的反应时间不进 tok/s 分母（与确认等待同口径）
     final waitStart = DateTime.now();
-    final generationAtWait = _currentTaskGeneration;
     final answer = await completer.future;
-    if (generationAtWait == _currentTaskGeneration) {
-      _confirmWaitSeconds += DateTime.now().difference(waitStart).inSeconds;
+    timer.cancel();
+    if (identical(_interactiveInputCompleter, completer)) {
+      _interactiveInputTimeoutTimer = null;
+      _interactiveInputCompleter = null;
     }
-    _interactiveInputTimeoutTimer?.cancel();
-    _interactiveInputTimeoutTimer = null;
-    _interactiveInputCompleter = null;
-
-    // 取消/暂停/切任务（代际失效）→ 不再恢复状态、不发答案事件，
-    // 交给取消/暂停路径收口（把 paused 盖回 executing 会让循环漏检暂停）
-    if (generationAtWait != _currentTaskGeneration ||
-        _currentTask?.status == AgentStatus.cancelled ||
-        _currentTask?.status == AgentStatus.paused) {
+    if (!stillCurrent()) return null;
+    if (!active()) {
+      agentLogger.info('ReAct', '交互输入等待期间任务已终止或暂停');
       return null;
     }
+    _confirmWaitSeconds += DateTime.now().difference(waitStart).inSeconds;
+
     if (answer != null) {
       // 答案只进事件时间线（UI 可见），不进对话历史/凭据库
-      _interactiveEchoes.add((prompt: prompt, answer: answer));
+      echoes.add((prompt: prompt, answer: answer));
       onEvent?.call(AgentEvent.info(UiText.t(
         '⌨️ 已输入: ${answer.isEmpty ? "(回车)" : answer}',
         '⌨️ Input sent: ${answer.isEmpty ? "(Enter)" : answer}',
@@ -723,7 +774,7 @@ class AgentEngine {
         '⌨️ Input cancelled or timed out; command will be interrupted',
       )));
     }
-    _currentTask = _currentTask?.copyWith(
+    _currentTask = _currentTask!.copyWith(
       status: AgentStatus.executing,
       phase: UiText.t('执行中', 'Running'),
       currentStep: _progressStepText(),
@@ -762,6 +813,23 @@ class AgentEngine {
 
   /// P2-7: 任务是否已暂停（可恢复）
   bool get isPaused => _currentTask?.status == AgentStatus.paused;
+
+  /// 代际与任务 id 必须同时匹配；仅比较代际无法表达同一引擎内被替换的任务对象。
+  bool _isSameTask(int generation, String? taskId) {
+    if (generation != _currentTaskGeneration) return false;
+    final task = _currentTask;
+    return taskId == null ? task == null : task?.id == taskId;
+  }
+
+  /// 旧任务回调能否继续写 UI / 历史 / 共享瞬态状态。
+  bool _isTaskActive(int generation, String? taskId) {
+    if (!_isSameTask(generation, taskId)) return false;
+    final status = _currentTask?.status;
+    return status != AgentStatus.cancelled &&
+        status != AgentStatus.paused &&
+        (status == null || !isTerminalStatus(status));
+  }
+
   bool get hasPendingConfirm =>
       _confirmCompleter != null && !_confirmCompleter!.isCompleted;
 
@@ -805,6 +873,8 @@ class AgentEngine {
 
   @visibleForTesting
   int? get cacheHitForTesting => _cacheHitPercent;
+
+  int get taskGeneration => _currentTaskGeneration;
 
   @visibleForTesting
   void setTaskStatusForTesting(AgentStatus status) {
@@ -955,10 +1025,14 @@ class AgentEngine {
     _steeringQueue.clear(); // O5: 旧任务的补充指令不能带进新任务
     _currentTaskIsGoalRound = false;
     _noCommandRetryCount = 0;
+    _lastFcToolCalls = const [];
+    _lastInvalidFcCalls = const [];
     _hasExecutedAnyCommand = false;
     _finishWithoutExecCount = 0;
     _syntaxRejectCount = 0;
     _commandPassedPrecheckThisTurn = false;
+    _commandRejectedThisTurn = false;
+    _commandSucceededThisTurn = false;
     _blockedTurnsStreak = 0;
     _userForbadeCommands = false;
     _planFinishRetryCount = 0; // O4/WP6: 计划 finish 门控计数新任务归零（R5）
@@ -979,7 +1053,6 @@ class AgentEngine {
     // 清理取消令牌（防御性，cancelTask 应该已处理过）
     _aiWatchdog?.cancel();
     _aiWatchdog = null;
-    _aiStreamTimedOut = false;
     _aiStreamTimeoutRetries = 0;
     _aiStreamSub?.cancel();
     _aiStreamSub = null;
@@ -989,23 +1062,22 @@ class AgentEngine {
     final dc = _aiDoneCompleter;
     if (dc != null && !dc.isCompleted) dc.complete();
     _aiDoneCompleter = null;
+    _aiCancelToken?.cancel('引擎瞬态状态重置');
     _aiCancelToken = null;
+    if (_commandCancelToken != null && !_commandCancelToken!.isCompleted) {
+      _commandCancelToken!.complete();
+    }
     _commandCancelToken = null;
+    if (_orchestratorCancelToken != null &&
+        !_orchestratorCancelToken!.isCompleted) {
+      _orchestratorCancelToken!.complete();
+    }
     _orchestratorCancelToken = null;
     // R1：等待中的 awaiter 必须"先 complete 再置 null"。
     // 只置 null 等于把 future 唯一的出口丢掉，旧循环里的那个 await 永远醒不过来，
     // 那一轮的 result/finish 事件也就永远不发。这条路是真能走到的：
     // pauseTask 接受 waitingConfirm 状态（不唤醒确认等待），随后 resumeTask 开头
     // 就调本方法 —— 于是"破坏性工具等确认时点暂停、再恢复"会把任务永久挂死。
-    if (_earlyExecutionCompleter != null &&
-        !_earlyExecutionCompleter!.isCompleted) {
-      _earlyExecutionCompleter!.complete(_EarlyExecutionResult(
-        shouldContinue: false,
-        command: _earlyExecutionCommand ?? '',
-      ));
-    }
-    _earlyExecutionCompleter = null;
-    _earlyExecutionCommand = null;
     if (_confirmCompleter != null && !_confirmCompleter!.isCompleted) {
       _confirmCompleter!.complete(false);
     }
@@ -1290,16 +1362,6 @@ class AgentEngine {
     _aiWatchdog?.cancel();
     _aiWatchdog = null;
     _aiDoneCompleter = null;
-    // 清理提前执行残留，避免下一轮误用
-    if (_earlyExecutionCompleter != null &&
-        !_earlyExecutionCompleter!.isCompleted) {
-      _earlyExecutionCompleter!.complete(_EarlyExecutionResult(
-        shouldContinue: false,
-        command: _earlyExecutionCommand ?? '',
-      ));
-    }
-    _earlyExecutionCompleter = null;
-    _earlyExecutionCommand = null;
     // R5: 终态动作（status/report/finish/flush/tracer）已由上方 Guard 在
     // 递近代际前收口；此处只保留资源清理。
   }
@@ -1533,6 +1595,7 @@ class AgentEngine {
       agentLogger.info('ReAct', '代际失效，放弃执行');
       return;
     }
+    final myTaskId = _currentTask?.id;
 
     if (!executor.isConnected) {
       agentLogger.error('ReAct', '执行器未连接!');
@@ -1662,8 +1725,7 @@ class AgentEngine {
             role: 'user',
             content: '用户补充: $steering',
           ));
-          onEvent?.call(AgentEvent.info(
-              L10n.str.ut_0968807bf1(steering)));
+          onEvent?.call(AgentEvent.info(L10n.str.ut_0968807bf1(steering)));
         }
         // 补充可能是提问而不是指令（"刚才为何用压缩"这类）。不引导的话
         // 模型会把它当任务指令，继续执行甚至反刍上一任务的总结。
@@ -1703,6 +1765,10 @@ class AgentEngine {
       // ═══════════════════════════════════════════
       // 阶段1: 思考 (Think) — 调用 AI 获取响应
       // ═══════════════════════════════════════════
+      // 每轮命令状态独立记账；提前执行也发生在本轮 _callAI 内。
+      _commandPassedPrecheckThisTurn = false;
+      _commandRejectedThisTurn = false;
+      _commandSucceededThisTurn = false;
       _currentStepCount = stepCount;
       _currentTask = _currentTask!.copyWith(
         status: AgentStatus.thinking,
@@ -1713,51 +1779,55 @@ class AgentEngine {
       onThinking?.call(L10n.str.thinkingNextStep);
 
       String fullResponse;
+      _EarlyExecutionSlot? earlyExecution;
       try {
-        // 重置提前执行缓存
-        _earlyExecutionCompleter = null;
-        _earlyExecutionCommand = null;
         fullResponse = await _callAI(
           myGeneration: myGeneration,
           onCommandDetected: (command, commandId) {
-            // 检测到完整命令，启动提前执行（异步，不阻塞AI流式输出）
-            if (_earlyExecutionCompleter == null &&
-                _currentTask?.status != AgentStatus.cancelled) {
-              _earlyExecutionCommand = command;
-              _earlyExecutionCompleter = Completer<_EarlyExecutionResult>();
-              _runCommandWithSafety(command, executor,
-                      commandId: commandId, myGeneration: myGeneration)
-                  .then(
-                (result) {
-                  if (_earlyExecutionCompleter?.isCompleted == false) {
-                    _earlyExecutionCompleter?.complete(result);
-                  }
-                },
-                onError: (Object e) {
-                  agentLogger.error('ReAct', '提前执行异常: $e');
-                  if (_earlyExecutionCompleter?.isCompleted == false) {
-                    _earlyExecutionCompleter?.complete(_EarlyExecutionResult(
-                      shouldContinue: false,
-                      command: command,
-                    ));
-                  }
-                },
-              );
+            // 提前执行槽属于本轮局部调用：旧任务的 then/onError 只能完成
+            // 自己的 completer，绝不能通过共享字段完成新任务的等待。
+            if (earlyExecution != null ||
+                !_isTaskActive(myGeneration, myTaskId)) {
+              return;
             }
+            final slot = _EarlyExecutionSlot(command);
+            earlyExecution = slot;
+            _runCommandWithSafety(command, executor,
+                    commandId: commandId, myGeneration: myGeneration)
+                .then(
+              (result) {
+                if (!slot.completer.isCompleted) {
+                  slot.completer.complete(result);
+                }
+              },
+              onError: (Object e) {
+                agentLogger.error('ReAct', '提前执行异常: $e');
+                if (!slot.completer.isCompleted) {
+                  slot.completer.complete(_EarlyExecutionResult(
+                    shouldContinue: false,
+                    command: command,
+                  ));
+                }
+              },
+            );
           },
         );
       } catch (e, stack) {
         // R1: 区分"取消/代际变更"和真正的 AI 调用异常
         // 前者是正常流程的一部分（用户点了取消或新任务覆盖），不应记 error 日志
         final isCancellation = e is StateError &&
-            (e.message == '任务已取消' || e.message == '任务已被新任务覆盖');
+            (e.message == '任务已取消' ||
+                e.message == '任务已被新任务覆盖' ||
+                e.message == '任务已暂停');
         if (isCancellation) {
-          agentLogger.info('ReAct', 'AI 调用因取消/代际变更终止: ${e.message}');
+          agentLogger.info('ReAct', 'AI 调用因取消/暂停/代际变更终止: ${e.message}');
         } else {
           agentLogger.error('ReAct', 'AI 调用异常: $e\n$stack');
         }
         // L1 修复：AI 异常应标记 failed 并退出，不应走到循环后的 completed 逻辑
-        if (myGeneration == _currentTaskGeneration && _currentTask != null) {
+        if (myGeneration == _currentTaskGeneration &&
+            _isSameTask(myGeneration, myTaskId) &&
+            _currentTask != null) {
           if (isCancellation) {
             // 取消场景：cancelTask 已设置 status=cancelled 并 emit finish，不重复处理
             return;
@@ -1806,14 +1876,17 @@ class AgentEngine {
 
       // 代际失效：AI 流式期间被新任务覆盖，旧循环退出
       // L5 修复：先检查代际，再加入历史，避免旧响应污染新会话
-      if (myGeneration != _currentTaskGeneration) {
+      if (myGeneration != _currentTaskGeneration ||
+          !_isSameTask(myGeneration, myTaskId)) {
         agentLogger.info('ReAct', 'AI 响应期间代际失效，旧循环退出');
         return;
       }
 
-      // 用户在 AI 流式输出期间点了取消
-      if (_currentTask?.status == AgentStatus.cancelled) {
-        agentLogger.info('ReAct', 'AI 响应期间任务被取消');
+      // 用户在 AI 流式输出期间点了取消或暂停：缓冲的 finish 不得覆盖用户意图。
+      final responseStatus = _currentTask?.status;
+      if (responseStatus == AgentStatus.cancelled ||
+          responseStatus == AgentStatus.paused) {
+        agentLogger.info('ReAct', 'AI 响应期间任务被取消或暂停');
         return;
       }
 
@@ -1821,11 +1894,19 @@ class AgentEngine {
       // O8: FC 轮次把结构化动作按文本协议格式记进历史，保证模型（含 fallback
       // 到非 FC 模型时）能从历史读到自己上一轮做了什么；该文本不参与本轮解析。
       final fcCalls = _lastFcToolCalls;
+      final invalidFcCalls = _lastInvalidFcCalls;
       final historyContent = fcCalls.isEmpty
           ? fullResponse
           : '$fullResponse${_fcCallsToHistoryText(fcCalls)}';
       _conversationHistory
           .add(ChatMessage.create(role: 'assistant', content: historyContent));
+      if (invalidFcCalls.isNotEmpty) {
+        _conversationHistory.add(ChatMessage.create(
+          role: 'user',
+          content: invalidFcCalls.map(_invalidFcObservation).join('\n'),
+        ));
+        _trimMessages(_conversationHistory);
+      }
 
       // ═══════════════════════════════════════════
       // 阶段2: 解析 (Parse) — 从 AI 响应中提取结构化动作
@@ -1834,12 +1915,20 @@ class AgentEngine {
       // ═══════════════════════════════════════════
       final step = fcCalls.isNotEmpty
           ? _stepFromFcCalls(fcCalls, fullResponse)
-          : _parseReActResponse(fullResponse,
-              parsedEvents: _lastParsedResponseEvents);
+          : invalidFcCalls.isNotEmpty
+              ? ReActStep(
+                  thought: fullResponse.trim(),
+                  action: null,
+                  rawResponse: fullResponse,
+                )
+              : _parseReActResponse(fullResponse,
+                  parsedEvents: _lastParsedResponseEvents);
       // 第一条之外、同一条响应里宣布的其余命令：解析事件缓存马上要清空，
       // 先取出来留给 _executeRemainingAnnouncedCommands 按 id 关联结果
-      _announcedFollowUps =
+      final announcedFollowUps =
           _remainingAnnouncedCommands(_lastParsedResponseEvents);
+      // 首条已由主流程消费；按文本再过滤会吞掉明确声明要重复执行的同一命令。
+      _announcedFollowUps = announcedFollowUps;
       _lastParsedResponseEvents = null;
       // 解析结果是排查用的内部细节：thought 可能上千字，默认日志里只留动作与首行摘要
       agentLogger.debug(
@@ -2018,7 +2107,7 @@ class AgentEngine {
             continue;
           }
           final shouldContinue = await _handleExecuteAction(step, executor,
-              myGeneration: myGeneration);
+              myGeneration: myGeneration, earlyExecution: earlyExecution);
           if (!shouldContinue) return;
 
         case ActionType.tool:
@@ -2106,17 +2195,22 @@ class AgentEngine {
   }) async {
     agentLogger.info('ReAct', '调用 AI 模型...');
     agentLogger.debug('ReAct', '消息历史: ${_conversationHistory.length} 条');
+    final aiTaskId = _currentTask?.id;
+    final aiGeneration = myGeneration ?? _currentTaskGeneration;
+    var streamTimedOut = false;
+    StateError? responseOverflowError;
     _resetReasoning();
     // 不沿用上一轮的流超时标志：流建立阶段的异常不得被循环层误判为「流中途超时」
-    _aiStreamTimedOut = false;
     _lastParsedResponseEvents = null;
     _lastFcToolCalls = const [];
+    _lastInvalidFcCalls = const [];
     _announcedFollowUps = const [];
     _lastResponseHadAskEvent = false;
 
     final fullResponseBuffer = StringBuffer();
     // O8: 本轮收到的结构化 tool_calls（onToolCalls 回调写入，流结束后消费）
     final fcCalls = <ToolCall>[];
+    final invalidFcCalls = <ToolCall>[];
     // 本轮是否按 FC 模式发送了 tools schema：是则正文里的代码围栏只是思考示例，
     // 不能当命令提前执行（命令一律以 tool_calls 为准）。
     var fcToolsSent = false;
@@ -2145,10 +2239,13 @@ class AgentEngine {
     var activeConfig = _modelConfig;
     var fallbackAttempted = false;
     int attempt = 0;
+    CancelToken? activeToken;
+    StreamSubscription<String>? streamSub;
+    bool Function()? isCallbackActive;
     while (true) {
       // R1: 循环顶部先检查代际/取消，避免 cancelTask 后又立刻进入新一轮 chatStream 调用
       // 之前只在退避后检查，但首轮重试前没有检查，导致取消的任务仍会发起新请求
-      if (myGeneration != null && myGeneration != _currentTaskGeneration) {
+      if (!_isSameTask(aiGeneration, aiTaskId)) {
         throw StateError('任务已被新任务覆盖');
       }
       if (_currentTask?.status == AgentStatus.cancelled) {
@@ -2179,7 +2276,18 @@ class AgentEngine {
         // 改用 CancelToken 机制：cancelTask 触发后立即关闭底层 HTTP 连接，毫秒级响应。
         // 每轮重试都创建新 token（旧 token 可能已被 cancel）。
         final token = CancelToken();
+        activeToken = token;
         _aiCancelToken = token;
+        bool callbackActive() {
+          return !streamTimedOut &&
+              responseOverflowError == null &&
+              !token.isCancelled &&
+              identical(_aiCancelToken, token) &&
+              _isTaskActive(aiGeneration, aiTaskId);
+        }
+
+        isCallbackActive = callbackActive;
+
         // 一次请求算一轮（重试也计），与 trace 的 ai_call_count 同语义；
         // usage 按次判定，因为末包式 provider 只在流末给那一条
         _aiRounds++;
@@ -2200,47 +2308,55 @@ class AgentEngine {
           cancelToken: token,
           responseTimeout: aiResponseTimeout,
           tools: toolsSchema,
-          onUsage: _recordUsage,
-          onReasoning: _handleReasoningDelta,
+          onUsage: (usage) {
+            if (callbackActive()) _recordUsage(usage);
+          },
+          onReasoning: (delta) {
+            if (callbackActive()) _handleReasoningDelta(delta);
+          },
           onToolCalls: (calls) {
-            // R1: 取消/代际失效后不再接受结构化动作（回调可能晚于 cancelTask 到达）
-            if (token.isCancelled ||
-                _currentTask?.status == AgentStatus.cancelled ||
-                (myGeneration != null &&
-                    myGeneration != _currentTaskGeneration)) {
-              return;
+            // R1: 超时/取消/代际失效/终态后的迟到 FC 一律丢弃。
+            if (!callbackActive()) return;
+            for (final c in calls) {
+              try {
+                _decodeFcArgs(c.arguments);
+                fcCalls.add(c);
+              } on FormatException {
+                // 非法参数只记账；此时可能仍在流中，不能提前写历史，超时重试
+                // 会丢弃本轮。成功收流后再统一回灌观测。
+                invalidFcCalls.add(c);
+              }
             }
-            fcCalls.addAll(calls);
             _lastFcToolCalls = List.unmodifiable(fcCalls);
-            // 提前执行：与文本流的命令检测同语义 —— 第一个 execute 定型即触发，
-            // 不等流关闭。事件走同一套 stableId 去重，流结束合并时不会重发。
+            // 提前执行：只有首个 tool_call 是 execute 才触发，与 _stepFromFcCalls
+            // 只消费 calls.first 的语义对齐。若首个调用是其它工具，后续 execute
+            // 本轮不会被执行，提前跑会变成"命令已执行但步骤结果丢失"的幽灵执行。
             if (onCommandDetected != null && !commandDetectedNotified) {
-              for (final c in calls) {
-                if (c.name != 'execute') continue;
-                final args = _decodeFcArgs(c.arguments);
+              final early = earlyExecuteCandidate(fcCalls);
+              if (early != null) {
+                final args = _decodeFcArgs(early.arguments);
                 final cmd = (args['command'] ?? '').toString().trim();
-                if (cmd.isEmpty) continue;
-                // 未闭合命令不提前执行：交给流结束后的全量解析，由 _executeCommand
-                // 的闭合预检统一拦截并回灌修正，避免半成品命令先进 PTY 卡死。
-                if (!_commandIsShellBalanced(cmd)) continue;
-                commandDetectedNotified = true;
-                earlyExecutedCommand = cmd;
-                final e = AgentEvent.command(
-                  cmd,
-                  id: ReActStreamParser.stableId(AgentEventType.command, cmd),
-                  description: args['description']?.toString(),
-                );
-                final stableId = e.id;
-                final finalId = eventScope.assignFinalId(e);
-                _lastCommandEventId = finalId;
-                if (eventScope.isNew(stableId)) {
-                  eventScope.markEmitted(stableId);
-                  e.isStreaming = false;
-                  _enrichCommandEvent(e);
-                  onEvent?.call(e);
+                // 未闭合命令不提前执行：交给流结束后的全量解析，由
+                // _executeCommand 的闭合预检统一拦截并回灌修正。
+                if (_commandIsShellBalanced(cmd)) {
+                  commandDetectedNotified = true;
+                  earlyExecutedCommand = cmd;
+                  final e = AgentEvent.command(
+                    cmd,
+                    id: ReActStreamParser.stableId(AgentEventType.command, cmd),
+                    description: args['description']?.toString(),
+                  );
+                  final stableId = e.id;
+                  final finalId = eventScope.assignFinalId(e);
+                  _lastCommandEventId = finalId;
+                  if (eventScope.isNew(stableId)) {
+                    eventScope.markEmitted(stableId);
+                    e.isStreaming = false;
+                    _enrichCommandEvent(e);
+                    onEvent?.call(e);
+                  }
+                  onCommandDetected(cmd, finalId);
                 }
-                onCommandDetected(cmd, finalId);
-                break;
               }
             }
           },
@@ -2249,18 +2365,21 @@ class AgentEngine {
         // 实现不保证立刻响应 CancelToken：若这里直接订阅新流，_aiDoneCompleter
         // 是在 cancelTask 之后才创建的，取消逻辑根本拿不到它，UI 会一直停在
         // “运行中”直到该流自行结束/超时。这里补一次终态检查。
-        if (token.isCancelled ||
-            _currentTask?.status == AgentStatus.cancelled) {
+        if (!callbackActive()) {
           throw StateError('任务已取消');
         }
-        if (myGeneration != null && myGeneration != _currentTaskGeneration) {
+        if (!_isSameTask(aiGeneration, aiTaskId)) {
           throw StateError('任务已被新任务覆盖');
         }
         break; // 成功建立流
       } catch (e) {
+        if (!_isSameTask(aiGeneration, aiTaskId)) {
+          throw StateError('任务已被新任务覆盖');
+        }
         // 取消导致的异常不重试（重试会消耗新 API 配额且违背用户意图）
         if (_isCancellationError(e) ||
-            (myGeneration != null && myGeneration != _currentTaskGeneration) ||
+            activeToken?.isCancelled == true ||
+            _currentTask?.status == AgentStatus.paused ||
             _currentTask?.status == AgentStatus.cancelled) {
           rethrow;
         }
@@ -2276,7 +2395,8 @@ class AgentEngine {
             activeProvider = _fallbackProvider!;
             activeConfig = _fallbackConfig!;
             // 通知 UI：模型已切换
-            onEvent?.call(AgentEvent.info(L10n.str.ut_fa2224f3f9(_modelConfig.modelName, activeConfig.modelName)));
+            onEvent?.call(AgentEvent.info(L10n.str.ut_fa2224f3f9(
+                _modelConfig.modelName, activeConfig.modelName)));
             continue;
           }
           rethrow;
@@ -2289,7 +2409,7 @@ class AgentEngine {
         // （新任务把 status 重置为 thinking，旧检查会通过，导致旧任务继续发起新 chatStream
         // 调用、消耗 API 配额、并把旧响应通过 onMessage 写到新任务的 UI 流）
         // 修复：同时检查代际和取消状态，任一失效都放弃重试
-        if (myGeneration != null && myGeneration != _currentTaskGeneration) {
+        if (!_isSameTask(aiGeneration, aiTaskId)) {
           agentLogger.info('ReAct', '退避期间代际已变更（新任务已启动），放弃重试');
           throw StateError('任务已被新任务覆盖');
         }
@@ -2314,27 +2434,46 @@ class AgentEngine {
     // watchdog 已改为实例字段 _aiWatchdog
 
     // 超时看门狗：用实例字段以便 cancelTask 取消
-    _aiStreamTimedOut = false;
     final doneCompleter = Completer<void>();
     _aiDoneCompleter = doneCompleter;
+    Timer? watchdog;
     void resetWatchdog() {
-      _aiWatchdog?.cancel();
-      _aiWatchdog = Timer(aiResponseTimeout, () {
-        _aiStreamTimedOut = true;
+      watchdog?.cancel();
+      final timer = Timer(aiResponseTimeout, () {
+        if (isCallbackActive?.call() != true) return;
+        streamTimedOut = true;
         agentLogger.error(
             'ReAct', 'AI 流式输出超时（${aiResponseTimeout.inSeconds}s 无数据），强制中断');
-        _aiStreamSub?.cancel();
+        // 必须同时取消 HTTP token；只 cancel stream subscription 无法终止 Dio
+        // 上游连接，也无法保证 provider 不再投递迟到 tool_calls。
+        activeToken?.cancel('AI 流式输出超时');
+        streamSub?.cancel();
         if (!doneCompleter.isCompleted) doneCompleter.complete();
       });
+      watchdog = timer;
+      _aiWatchdog = timer;
     }
 
     resetWatchdog();
 
-    _aiStreamSub = stream.listen(
+    streamSub = stream.listen(
       (chunk) {
-        if (_aiStreamTimedOut) return;
+        if (isCallbackActive?.call() != true) return;
         resetWatchdog();
         chunkCount++;
+        if (fullResponseBuffer.length + chunk.length > _maxAiResponseChars) {
+          responseOverflowError =
+              StateError('AI 响应超过 $_maxAiResponseChars 字符上限，已丢弃，禁止执行截断内容');
+          agentLogger.error('ReAct', responseOverflowError!.message);
+          // 不静默保留尾部：截断可能破坏 ReAct/heredoc 协议。取消上游并让
+          // 本轮以 failed 收口，任何已收到的半截响应都不进入历史。
+          activeToken?.cancel('AI 响应超过字符上限');
+          streamSub?.cancel();
+          if (!doneCompleter.isCompleted) {
+            doneCompleter.completeError(responseOverflowError!);
+          }
+          return;
+        }
         fullResponseBuffer.write(chunk);
         // B5: 限制累积消息增长，超出上限只保留尾部
         _accumulatedMessageBuffer.write(chunk);
@@ -2347,11 +2486,15 @@ class AgentEngine {
             !fcToolsSent) {
           final elapsed = earlyParseStopwatch.elapsedMilliseconds;
           final bufLen = fullResponseBuffer.length;
+          // 短命令也可能要求提前执行；只要本 chunk 明确带命令标记，就不受
+          // 64 字符增长门槛限制（否则 `echo hi` 这类短命令永远等流结束）。
+          final hasCommandHint = chunk.contains('命令:') ||
+              chunk.contains('命令：') ||
+              chunk.contains('```');
           if (elapsed - lastEarlyParseAtMs >= earlyParseIntervalMs &&
-              bufLen - lastEarlyParseLen >= earlyParseMinGrowth &&
+              (hasCommandHint ||
+                  bufLen - lastEarlyParseLen >= earlyParseMinGrowth) &&
               bufLen <= earlyParseMaxChars) {
-            lastEarlyParseAtMs = elapsed;
-            lastEarlyParseLen = bufLen;
             final responseText = fullResponseBuffer.toString();
             // 只解析 `动作:` 行之后的正文：解析器把任意围栏当成 command，
             // 思考里的示例围栏（或 ask/finish 轮的文件摘录）会抢在真正的
@@ -2363,31 +2506,36 @@ class AgentEngine {
                 (tail.contains('命令:') ||
                     tail.contains('命令：') ||
                     tail.contains('```'))) {
-              final currentEvents = ReActStreamParser.parse(tail);
-              // 找第一个已确定完成的 command 事件（不是最后一个）
-              if (currentEvents.length > 1) {
-                for (int i = 0; i < currentEvents.length - 1; i++) {
-                  final e = currentEvents[i];
-                  if (e.isCommand) {
-                    final cmd = e.command ?? '';
-                    if (cmd.isNotEmpty && _commandIsShellBalanced(cmd)) {
-                      commandDetectedNotified = true;
-                      earlyExecutedCommand = cmd;
-                      // A5 修复：先记录 stableId，再改写为 finalId
-                      final stableId = e.id;
-                      final finalId = eventScope.assignFinalId(e);
-                      _lastCommandEventId = finalId;
-                      // 立即发出 command 事件，让 UI 先显示命令块
-                      if (eventScope.isNew(stableId)) {
-                        eventScope.markEmitted(stableId);
-                        e.id = finalId;
-                        e.isStreaming = false;
-                        _enrichCommandEvent(e);
-                        onEvent?.call(e);
-                      }
-                      onCommandDetected(cmd, finalId);
-                      break;
+              lastEarlyParseAtMs = elapsed;
+              lastEarlyParseLen = bufLen;
+              final parsed = ReActStreamParser.parseWithState(tail);
+              final currentEvents = parsed.events;
+              // 找第一个已确定完成的 command 事件（不是最后一个）。
+              // 末条命令若仍处于未闭合的命令字段/围栏（openCommand），
+              // 继续等后续 chunk，避免把半条命令提前下发。
+              final settledCount =
+                  currentEvents.length - (parsed.openCommand ? 1 : 0);
+              for (int i = 0; i < settledCount; i++) {
+                final e = currentEvents[i];
+                if (e.isCommand) {
+                  final cmd = e.command ?? '';
+                  if (cmd.isNotEmpty && _commandIsShellBalanced(cmd)) {
+                    commandDetectedNotified = true;
+                    earlyExecutedCommand = cmd;
+                    // A5 修复：先记录 stableId，再改写为 finalId
+                    final stableId = e.id;
+                    final finalId = eventScope.assignFinalId(e);
+                    _lastCommandEventId = finalId;
+                    // 立即发出 command 事件，让 UI 先显示命令块
+                    if (eventScope.isNew(stableId)) {
+                      eventScope.markEmitted(stableId);
+                      e.id = finalId;
+                      e.isStreaming = false;
+                      _enrichCommandEvent(e);
+                      onEvent?.call(e);
                     }
+                    onCommandDetected(cmd, finalId);
+                    break;
                   }
                 }
               }
@@ -2396,33 +2544,55 @@ class AgentEngine {
         }
       },
       onError: (e) {
-        if (!doneCompleter.isCompleted) doneCompleter.completeError(e);
+        if (doneCompleter.isCompleted) return;
+        if (isCallbackActive?.call() == true) {
+          doneCompleter.completeError(e);
+        } else {
+          doneCompleter.complete();
+        }
       },
       onDone: () {
         if (!doneCompleter.isCompleted) doneCompleter.complete();
       },
       cancelOnError: true,
     );
+    _aiStreamSub = streamSub;
 
-    // 在 finally 前记录 cancel 状态（finally 会清理 _aiCancelToken 引用）
-    final wasCancelled = _aiCancelToken?.isCancelled ?? false;
+    // 超时也会 cancel token，但它是超时而非用户取消，必须走下方超时重试分支。
     try {
       await doneCompleter.future;
     } catch (e) {
-      // R1: 如果 cancel 触发了 DioException(cancel) 错误路径，统一转换为 StateError
-      // 让外层 catch 用 _isCancellationError 识别走取消路径（不重试、不记 error 日志）
-      if (wasCancelled || _isCancellationError(e)) {
+      // 超时 token 的取消错误是超时信号的副产品，不能转成"用户取消"；
+      // 吞掉本次 error 后由下方局部 streamTimedOut 分支统一重试/失败。
+      if (responseOverflowError != null) {
+        rethrow;
+      } else if (streamTimedOut) {
+        // 继续进入 finally，等待本轮 subscription 完全取消后再重试。
+        agentLogger.debug('ReAct', 'AI 超时后收到取消错误，转入超时重试分支');
+      } else if ((activeToken.isCancelled && !streamTimedOut) ||
+          _isCancellationError(e)) {
         throw StateError('任务已取消');
+      } else {
+        rethrow;
       }
-      rethrow;
     } finally {
-      _aiWatchdog?.cancel();
-      _aiWatchdog = null;
-      await _aiStreamSub?.cancel();
-      _aiStreamSub = null;
+      watchdog?.cancel();
+      if (identical(_aiWatchdog, watchdog)) _aiWatchdog = null;
+      // 等待本轮局部 subscription，而不是可能已被 cancelTask 置空的实例引用。
+      await streamSub.cancel();
+      if (identical(_aiStreamSub, streamSub)) _aiStreamSub = null;
       if (_aiDoneCompleter == doneCompleter) _aiDoneCompleter = null;
-      // R2: 清理 CancelToken 引用（已完成的请求 token 无需保留）
-      _aiCancelToken = null;
+      if (identical(_aiCancelToken, activeToken)) _aiCancelToken = null;
+      isCallbackActive = null;
+    }
+
+    // cancel()/pause() 自身可跨异步边界；恢复后先确认仍是原任务，再发任何事件/改历史。
+    if (!_isSameTask(aiGeneration, aiTaskId)) {
+      throw StateError('任务已被新任务覆盖');
+    }
+    final wasCancelled = activeToken.isCancelled && !streamTimedOut;
+    if (_currentTask?.status == AgentStatus.paused && !streamTimedOut) {
+      throw StateError('任务已暂停');
     }
 
     // 取消导致的提前结束：抛 StateError 让外层 catch 走取消路径
@@ -2437,12 +2607,12 @@ class AgentEngine {
     // 重试用尾递归（新栈帧=全新局部状态，半截 buffer/去重集不流入下一轮），
     // 上限 2 次防网络抖动烧配额；提前执行已触发时不可重试——命令已经发出去了，
     // 重试会二次执行，退回抛错走 failed 路径（与历史行为一致）。
-    if (_aiStreamTimedOut) {
+    if (streamTimedOut) {
       final canRetry = !commandDetectedNotified && _aiStreamTimeoutRetries < 2;
       agentLogger.warn(
           'AI',
           'AI 流超时，丢弃已收 ${fullResponseBuffer.length} 字符'
-          '（${canRetry ? '重试第 ${_aiStreamTimeoutRetries + 1}/2 次' : '不再重试'}）');
+              '（${canRetry ? '重试第 ${_aiStreamTimeoutRetries + 1}/2 次' : '不再重试'}）');
       if (!canRetry) {
         throw TimeoutException('AI 响应超时（${aiResponseTimeout.inSeconds}s 无数据）');
       }
@@ -2450,15 +2620,20 @@ class AgentEngine {
       // 实例级残留清理：被丢弃的半截不得进入重试轮的观测/历史
       _accumulatedMessageBuffer.clear();
       _lastFcToolCalls = const [];
+      _lastInvalidFcCalls = const [];
       // UI 桥：丢弃当前轮 streamingContent（不并入 content），重试正文从零开始
       onStreamDiscarded?.call();
       await Future.delayed(const Duration(seconds: 1));
       // R1: 退避期间取消/代际变更则放弃重试
-      if (myGeneration != null && myGeneration != _currentTaskGeneration) {
+      if (!_isSameTask(aiGeneration, aiTaskId)) {
         throw StateError('任务已被新任务覆盖');
       }
       if (_currentTask?.status == AgentStatus.cancelled) {
         throw StateError('任务已取消');
+      }
+      // 退避窗口内用户可能已暂停：暂停状态下不能再发下一轮 API 请求。
+      if (_currentTask?.status == AgentStatus.paused) {
+        throw StateError('任务已暂停');
       }
       return _callAI(
         onCommandDetected: onCommandDetected,
@@ -2466,10 +2641,15 @@ class AgentEngine {
       );
     }
 
+    _lastInvalidFcCalls = List.unmodifiable(invalidFcCalls);
+    for (final call in invalidFcCalls) {
+      onEvent?.call(AgentEvent.info(_invalidFcObservation(call)));
+    }
+
     final fullResponse = fullResponseBuffer.toString();
 
     // 流式结束：一次性发出所有事件（e.id 此时是 stableId）
-    final events = ReActStreamParser.parse(fullResponse);
+    final events = ReActParser.parseEvents(fullResponse);
 
     // 解析器把任意围栏都产出为 command 事件，但只有 `动作: execute` 之后的
     // 内容才是本轮真正要执行的命令：
@@ -2479,7 +2659,7 @@ class AgentEngine {
     final declaredAction = _declaredTextAction(fullResponse);
     final commandScope = _textFromDeclaredAction(fullResponse);
     if (declaredAction == ActionType.execute && commandScope != null) {
-      final scopedCommands = ReActStreamParser.parse(commandScope)
+      final scopedCommands = ReActParser.parseEvents(commandScope)
           .where((e) => e.isCommand)
           .toList();
       final firstCmdIdx = events.indexWhere((e) => e.isCommand);
@@ -2502,6 +2682,12 @@ class AgentEngine {
         agentLogger.info('ReAct', '未声明动作行，丢弃 $dropped 条围栏/命令事件不执行');
         events.removeWhere((e) => e.isCommand);
       }
+    }
+
+    // 非法 FC 参数且没有任何合法调用时，本轮不执行任何工具；正文即使含
+    // ReAct 示例也不能退回文本协议执行。
+    if (invalidFcCalls.isNotEmpty && fcCalls.isEmpty) {
+      events.removeWhere((e) => e.isCommand || e.isAsk);
     }
 
     // O8 FC-first：结构化 tool_calls 合并进事件流。
@@ -2599,26 +2785,22 @@ class AgentEngine {
       }
     }
 
-    // 流式提前执行 vs 流末全量解析漂移检测：流式阶段围栏一旦闭合就把命令 A
-    // 下发执行，流末模型若又改写了围栏内容得到 B，B 的 stableId 不同会被 emit
-    // 到时间线，实际执行的却是 A。这里不碰事件状态机（风险太高），只补一条
-    // info 让用户知道"真正执行的是 A、B 未执行"，避免展示与执行静默不一致。
+    // 提前执行与最终首条命令必须完全一致；否则继续解析会执行 B，并把已执行的 A
+    // 当 follow-up 再跑一次。漂移时停止本轮，绝不基于不确定的最终序列继续下发。
     if (earlyExecutedCommand != null) {
       final executed = earlyExecutedCommand!.trim();
-      // 判定口径：最终事件流里还能找到这条命令（哪怕不是第一条）就算展示与执行一致。
-      // 只比"第一条"会在两种正常场景误报：① 首个围栏未闭合被跳过、实际提前执行的是
-      // 第二条；② FC 批量调用里第一条被拦截、第二条先执行。只有它彻底消失才算漂移。
       final finalCommands = events
           .where((e) => e.isCommand)
           .map((e) => (e.command ?? '').trim())
           .toList();
-      if (finalCommands.isNotEmpty && !finalCommands.contains(executed)) {
+      if (finalCommands.isEmpty || finalCommands.first != executed) {
         agentLogger.warn('ReAct',
-            '流式提前执行与流末解析命令不一致，实际执行前者: ${_logCommand(earlyExecutedCommand!)}');
+            '流式提前执行与流末首条命令不一致，停止后续执行: ${_logCommand(earlyExecutedCommand!)}');
         onEvent?.call(AgentEvent.info(UiText.t(
-          '⚠️ 命令在流式生成过程中发生变化：实际执行的是先下发的版本，末尾展示的最终版本未执行。请以执行结果为准。',
-          'The command changed during streaming: the earlier dispatched version was executed; the final version shown was not. Trust the execution result.',
+          '⚠️ 命令在流式生成过程中发生变化，已停止后续执行以避免误执行或重复执行。请以先下发的版本执行结果为准。',
+          'The command changed during streaming. Further execution was stopped to avoid unintended or duplicate commands. Trust the earlier execution result.',
         )));
+        throw StateError('流式提前执行与最终命令不一致，已停止后续执行');
       }
     }
 
@@ -2683,15 +2865,36 @@ class AgentEngine {
   /// O8 FC-first — 结构化 tool_calls → 动作
   /// ═══════════════════════════════════════════════════════
 
-  /// 解码 FC arguments JSON。累积器已做过尾括号修复，这里仍兜底：
-  /// 解不出 Map 就返回空参数，让下游走"缺参数"提示而不是崩溃。
+  /// 解码 FC arguments JSON。累积器只修复可安全补齐的尾括号；这里必须显式
+  /// 拒绝非法 JSON/非 object，不能再静默退化成 `{}` 让工具带着空参数执行。
   static Map<String, dynamic> _decodeFcArgs(String arguments) {
+    final Object? decoded;
     try {
-      final decoded = jsonDecode(arguments);
-      if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) return decoded.cast<String, dynamic>();
-    } catch (_) {}
-    return const {};
+      decoded = jsonDecode(arguments);
+    } on FormatException catch (e) {
+      throw FormatException('arguments 非法：必须是 JSON object（${e.message}）');
+    }
+    if (decoded is Map<String, dynamic>) return decoded;
+    if (decoded is Map) return decoded.cast<String, dynamic>();
+    throw const FormatException('arguments 非法：必须是 JSON object');
+  }
+
+  static String _invalidFcObservation(ToolCall call) =>
+      '观测: 工具 ${call.name} 的 arguments 非法（必须是 JSON object），未执行，请重新提交。';
+
+  @visibleForTesting
+  static Map<String, dynamic> decodeFcArgsForTesting(String arguments) =>
+      _decodeFcArgs(arguments);
+
+  /// 提前执行候选：仅当首个 tool_call 是 execute 且命令非空时返回。
+  /// [_stepFromFcCalls] 只消费 calls.first；若首个调用是其它工具，后续
+  /// execute 本轮不会被执行，提前下发会变成"执行了但结果丢失"的幽灵命令。
+  @visibleForTesting
+  static ToolCall? earlyExecuteCandidate(List<ToolCall> calls) {
+    if (calls.isEmpty || calls.first.name != 'execute') return null;
+    final args = _decodeFcArgs(calls.first.arguments);
+    final cmd = (args['command'] ?? '').toString().trim();
+    return cmd.isEmpty ? null : calls.first;
   }
 
   /// finish 工具的四段字段 → 操作单文本（与文本协议 parseReportSections 的输出同形）
@@ -2824,7 +3027,7 @@ class AgentEngine {
       ReActParser.textFromDeclaredAction(content);
 
   ReActStep _parseReActResponse(String content,
-      {List<AgentEvent>? parsedEvents}) =>
+          {List<AgentEvent>? parsedEvents}) =>
       ReActParser.parseReActResponse(content, parsedEvents: parsedEvents);
 
   static String? parseAnswerBlock(List<String> lines) =>
@@ -2835,9 +3038,12 @@ class AgentEngine {
 
   /// 动作行识别三件套的测试入口（N1：混用冒号/带注解值的回归覆盖）。
   @visibleForTesting
-  static ({ActionType? declared, bool executes, String? scopeText})
-      declaredActionForTest(String content) =>
-          ReActParser.declaredActionForTest(content);
+  static ({
+    ActionType? declared,
+    bool executes,
+    String? scopeText
+  }) declaredActionForTest(String content) =>
+      ReActParser.declaredActionForTest(content);
 
   /// 解析 "动作: tool" 行之后的 工具: 和 参数: 行。
   /// 返回 (toolName, toolArgs)，未找到时对应字段为 null。
@@ -2850,17 +3056,19 @@ class AgentEngine {
   /// ═══════════════════════════════════════════════════════
   /// 返回 true 表示继续循环，false 表示应退出
   Future<bool> _handleExecuteAction(ReActStep step, CommandExecutor executor,
-      {required int myGeneration}) async {
+      {required int myGeneration, _EarlyExecutionSlot? earlyExecution}) async {
     final command = step.command!.trim();
+    final taskId = _currentTask?.id;
 
-    // 如果有提前执行的结果（或正在执行中），直接用
-    if (_earlyExecutionCommand == command && _earlyExecutionCompleter != null) {
-      final result = await _earlyExecutionCompleter!.future;
-      _earlyExecutionCompleter = null;
-      _earlyExecutionCommand = null;
-
-      if (myGeneration != _currentTaskGeneration) return false;
-      if (!result.shouldContinue) {
+    // 提前执行槽由本轮 _callAI 局部持有；只消费命令文本与任务身份都匹配的槽。
+    final slot = earlyExecution;
+    if (slot != null && slot.command != command) {
+      throw StateError('提前执行命令与最终命令不一致，拒绝继续执行');
+    }
+    if (slot != null) {
+      final result = await slot.completer.future;
+      if (!_isSameTask(myGeneration, taskId)) return false;
+      if (!_isTaskActive(myGeneration, taskId) || !result.shouldContinue) {
         return false;
       }
       // 把观测加入对话历史
@@ -2875,8 +3083,7 @@ class AgentEngine {
 
     final result = await _runCommandWithSafety(command, executor,
         myGeneration: myGeneration);
-    if (myGeneration != _currentTaskGeneration) return false;
-    if (!result.shouldContinue) {
+    if (!_isTaskActive(myGeneration, taskId) || !result.shouldContinue) {
       return false;
     }
     if (result.observation != null) {
@@ -2901,6 +3108,8 @@ class AgentEngine {
     required int myGeneration,
   }) async {
     const maxFollowUps = 10;
+    final taskId = _currentTask?.id;
+    bool active() => _isTaskActive(myGeneration, taskId);
     final followUps = _announcedFollowUps;
     _announcedFollowUps = const [];
     var ran = 0;
@@ -2910,16 +3119,15 @@ class AgentEngine {
     for (final c in followUps) {
       // 取消检查放在最前：否则超过上限后的 continue 会绕过它，
       // 在用户已停止的轮次里仍然追加"还有 N 条未执行"的提示与历史。
-      if (_currentTask?.status == AgentStatus.cancelled) break;
+      if (!active()) break;
       if (ran >= maxFollowUps) {
         skipped.add(c.command);
         continue;
       }
-      if (myGeneration != _currentTaskGeneration) return false;
       ran++;
       final r = await _runCommandWithSafety(c.command, executor,
           commandId: c.eventId, myGeneration: myGeneration);
-      if (myGeneration != _currentTaskGeneration) return false;
+      if (!active()) return false;
       if (!r.shouldContinue) return false;
       if (r.observation != null) {
         _conversationHistory
@@ -2927,8 +3135,7 @@ class AgentEngine {
         _trimMessages(_conversationHistory);
       }
     }
-    if (skipped.isNotEmpty &&
-        _currentTask?.status != AgentStatus.cancelled) {
+    if (skipped.isNotEmpty && active()) {
       agentLogger.warn('ReAct', '本轮命令数超过上限，${skipped.length} 条未执行');
       onEvent?.call(AgentEvent.info(UiText.t(
         '⚠️ 本轮声明了 ${skipped.length} 条额外命令，超过单次执行上限（$maxFollowUps），未执行。请分批提交。',
@@ -2942,23 +3149,39 @@ class AgentEngine {
       ));
       _trimMessages(_conversationHistory);
     }
-    // 轮次预检收敛：maxSteps 默认 0（无限制），若模型坚持提交被拦的命令，
-    // 只靠提示语不会停。连续 [_maxBlockedTurnsBeforeAbort] 轮没有任何命令
-    // 通过预检就失败收尾——正常任务只要有一轮跑通命令就清零。
-    if (_commandPassedPrecheckThisTurn) {
+    // 轮次收敛：所有 execute 路径（普通、follow-up、工具别名）共用同一收尾。
+    // 一轮内只要真正执行成功就清零；只有拒绝、没有成功才累计一次，避免同一轮
+    // 多条被拦命令重复计数。执行失败不是"被拒绝"，不应凭空增加 blocked streak。
+    final commandSucceeded = _commandSucceededThisTurn;
+    if (!_finalizeCommandTurn()) return false;
+    // R5：只有成功执行才重置无命令重试；仅进入执行器但失败不能清零。
+    if (commandSucceeded) _noCommandRetryCount = 0;
+    return true;
+  }
+
+  bool _finalizeCommandTurn() {
+    final succeeded = _commandSucceededThisTurn;
+    final rejected = _commandRejectedThisTurn;
+    final started = _commandPassedPrecheckThisTurn;
+    _commandPassedPrecheckThisTurn = false;
+    _commandRejectedThisTurn = false;
+    _commandSucceededThisTurn = false;
+    if (succeeded) {
       _blockedTurnsStreak = 0;
-    } else if (_syntaxRejectCount > 0) {
+    } else if (rejected) {
       _blockedTurnsStreak++;
       if (_blockedTurnsStreak >= _maxBlockedTurnsBeforeAbort) {
-        agentLogger.warn('ReAct',
-            '连续 $_blockedTurnsStreak 轮命令被预检拦截，任务终止 (failed)');
-        _finishTask(success: false, summary: '命令连续被预检拦截，未能推进任务');
+        agentLogger.warn(
+            'ReAct', '连续 $_blockedTurnsStreak 轮命令被拦截且未成功执行，任务终止 (failed)');
+        _finishTask(success: false, summary: '命令连续被拦截，未能推进任务');
         return false;
       }
     }
-    _commandPassedPrecheckThisTurn = false;
-    // L2 修复：成功执行命令后重置无命令重试计数
-    _noCommandRetryCount = 0;
+    // started 已在调用方捕获；保留局部变量用于明确"进入执行器但失败"不会
+    // 被误判为拒绝，也不会重置 blocked streak。
+    if (!succeeded && !rejected && started) {
+      agentLogger.debug('ReAct', '本轮命令已执行但未成功，blocked streak 保持不变');
+    }
     return true;
   }
 
@@ -2966,10 +3189,6 @@ class AgentEngine {
   List<({String eventId, String command})> _remainingAnnouncedCommands(
           List<AgentEvent>? events) =>
       CommandRunner.remainingAnnouncedCommands(events);
-
-  /// 提前执行的结果缓存（用 Completer 处理执行中状态）
-  Completer<_EarlyExecutionResult>? _earlyExecutionCompleter;
-  String? _earlyExecutionCommand;
 
   /// 这些 reason 表示命令被策略/权限/用户拦下，从未真正执行（口径见 CommandRunner）
   static const Set<String> _blockedCommandReasons =
@@ -2983,8 +3202,6 @@ class AgentEngine {
     String? commandId,
     int? myGeneration,
   }) async {
-    // 标记本任务已实际执行过命令（防止 AI 幻觉 finish）
-    _hasExecutedAnyCommand = true;
     // 命令本身会在执行结束时随结果行一起记录，这里只留 debug 细节
     agentLogger.debug(
         'ReAct', '执行命令: ${_logCommand(command)} (commandId=$commandId)');
@@ -3022,7 +3239,11 @@ class AgentEngine {
           outputChars = chars;
           // 被策略拦下、从未执行的命令也计入「步」：用户视角是"AI 尝试过"。
           // 取消/代际失效/误发远程不是拦截，计进去会让步数随取消操作膨胀。
-          if (_blockedCommandReasons.contains(reason)) _blockedCount++;
+          if (_isSameTask(
+                  myGeneration ?? _currentTaskGeneration, traceTaskId) &&
+              _blockedCommandReasons.contains(reason)) {
+            _blockedCount++;
+          }
         },
       );
     } catch (e) {
@@ -3125,6 +3346,10 @@ class AgentEngine {
     required void Function(bool success, String reason, int outputChars)
         onSuccess,
   }) async {
+    final taskId = _currentTask?.id;
+    final generation = myGeneration ?? _currentTaskGeneration;
+    bool stillCurrent() => _isSameTask(generation, taskId);
+    bool active() => _isTaskActive(generation, taskId);
     // R5: 任务已终结（完成/失败/取消）后，流式提前执行的残余回调不能再把
     // 状态改回 executing —— 否则 UI 会永久停在「运行中」，且补充指令
     // 永远等不到下一轮循环边界（真机验证：finish 后提前执行复活任务）。
@@ -3155,6 +3380,15 @@ class AgentEngine {
       }
     }
 
+    // 审计写入跨过 await：旧任务不得继续设置确认框或 executing 状态。
+    if (!stillCurrent()) {
+      return _EarlyExecutionResult(shouldContinue: false, command: command);
+    }
+    if (!active()) {
+      onSuccess(false, 'task_already_terminal', 0);
+      return _EarlyExecutionResult(shouldContinue: false, command: command);
+    }
+
     // 执行前五道守卫（顺序敏感，语义见 CommandPreflight）。
     // 判定本身无状态；审计写入留在引擎侧——它要 hostId 且会 await。
     final decision = decideCommand(safetyLevel, _permissionMode);
@@ -3169,6 +3403,7 @@ class AgentEngine {
       emitInfo: (e) => onEvent?.call(e),
     );
     if (block != null) {
+      _commandRejectedThisTurn = true;
       agentLogger.warn(
           'ReAct', '预检拦截(${block.reasonCode}): ${_logCommand(command)}');
       if (block.auditOutput != null && hostId != null) {
@@ -3185,6 +3420,9 @@ class AgentEngine {
               'Audit', '审计日志写入失败(${block.auditTag ?? '拦截分支'}): $e');
         }
       }
+      if (!stillCurrent()) {
+        return _EarlyExecutionResult(shouldContinue: false, command: command);
+      }
       onSuccess(false, block.reasonCode, 0);
       return _EarlyExecutionResult(
           shouldContinue: true,
@@ -3195,21 +3433,26 @@ class AgentEngine {
     // 需要用户确认：warn（询问档）与 blocked（询问/自动档）
     if (decision == CommandGateDecision.confirm) {
       agentLogger.warn('ReAct', '命令需要确认: $command (模式: ${_permissionMode.id})');
+      final confirmCompleter = Completer<bool>();
+      var confirmTimedOut = false;
       _pendingConfirmCommand = command;
-      _confirmCompleter = Completer<bool>();
+      _confirmCompleter = confirmCompleter;
       // 每次开始等待都要清掉上一次的结论：残留的 true 会把下一次真实的
       // "用户拒绝"错标成超时。
       _confirmTimedOut = false;
-      // 超时定时器：10 分钟无响应自动拒绝，避免任务永久卡在 waitingConfirm
-      // 用实例字段以便 cancelTask 能 cancel 它
-      _confirmTimeoutTimer = Timer(const Duration(minutes: 10), () {
-        if (_confirmCompleter != null && !_confirmCompleter!.isCompleted) {
-          agentLogger.warn('ReAct', '确认超时(10min)，自动拒绝: $command');
+      // 超时后必须完成本轮局部 future，即使任务已被替换；共享状态仅在
+      // identity 与代际都仍匹配时更新，避免旧任务的定时器污染新任务。
+      final confirmTimer = Timer(const Duration(minutes: 10), () {
+        if (confirmCompleter.isCompleted) return;
+        agentLogger.warn('ReAct', '确认超时(10min)，自动拒绝: $command');
+        confirmTimedOut = true;
+        if (identical(_confirmCompleter, confirmCompleter) && active()) {
           _confirmTimedOut = true;
           _taskHadConfirmTimeout = true;
-          _confirmCompleter!.complete(false);
         }
+        confirmCompleter.complete(false);
       });
+      _confirmTimeoutTimer = confirmTimer;
 
       // 显示具体的风险说明，而非泛泛的"危险操作"
       final reason =
@@ -3232,29 +3475,29 @@ class AgentEngine {
       _notifyTaskUpdate();
 
       final waitStart = DateTime.now();
-      final confirmed = await _confirmCompleter!.future;
-      _confirmTimeoutTimer?.cancel();
-      _confirmTimeoutTimer = null;
-      _confirmCompleter = null;
-      _pendingConfirmCommand = null;
-      if (myGeneration == null || myGeneration == _currentTaskGeneration) {
-        _confirmWaitSeconds += DateTime.now().difference(waitStart).inSeconds;
+      final confirmed = await confirmCompleter.future;
+      confirmTimer.cancel();
+      if (identical(_confirmCompleter, confirmCompleter)) {
+        _confirmTimeoutTimer = null;
+        _confirmCompleter = null;
+        _pendingConfirmCommand = null;
       }
-
-      if (myGeneration != null && myGeneration != _currentTaskGeneration) {
-        onSuccess(false, 'generation_invalid_during_confirm', 0);
+      if (!stillCurrent()) {
+        onSuccess(false, 'task_replaced_during_confirm', 0);
         return _EarlyExecutionResult(shouldContinue: false, command: command);
       }
-      if (_currentTask?.status == AgentStatus.cancelled) {
-        agentLogger.info('ReAct', '任务在等待确认期间被取消');
+      if (!active()) {
+        agentLogger.info('ReAct', '任务在等待确认期间已终止或暂停');
         onSuccess(false, 'cancelled_during_confirm', 0);
         return _EarlyExecutionResult(shouldContinue: false, command: command);
       }
+      _confirmWaitSeconds += DateTime.now().difference(waitStart).inSeconds;
 
       if (!confirmed) {
+        _commandRejectedThisTurn = true;
         // 超时不是用户拒绝：写成"用户拒绝"会在历史里留下一件用户没做过的事，
         // 也会让模型以为被否决而不再重试。
-        final timedOut = _confirmTimedOut;
+        final timedOut = confirmTimedOut;
         final reason = timedOut ? '确认超时（10 分钟无响应），已自动拒绝' : '用户拒绝执行此命令';
         agentLogger.info('ReAct', '$reason: $command');
         onEvent?.call(AgentEvent.info(timedOut
@@ -3275,6 +3518,7 @@ class AgentEngine {
       // 绕过新的安全边界（全自动则本来就无需确认，重新校验仍是 execute）。
       if (decideCommand(safetyLevel, _permissionMode) ==
           CommandGateDecision.reject) {
+        _commandRejectedThisTurn = true;
         const reason = '等待确认期间权限档位已切换为只读，命令未执行';
         agentLogger.warn('ReAct', reason);
         onEvent?.call(AgentEvent.info(
@@ -3318,9 +3562,9 @@ class AgentEngine {
         try {
           final snapshotResult = await _executeCommand(executor, snapshotCmd,
               myGeneration: myGeneration, countDisconnect: false);
-          // R1: 快照执行后检查代际，避免旧任务快照污染新任务
-          if (myGeneration != null && myGeneration != _currentTaskGeneration) {
-            onSuccess(false, 'generation_invalid_after_snapshot', 0);
+          // R1: 快照执行后检查 identity/代际/终态，避免旧任务继续下发主命令。
+          if (!stillCurrent() || !active()) {
+            onSuccess(false, 'task_invalid_after_snapshot', 0);
             return _EarlyExecutionResult(
                 shouldContinue: false, command: command);
           }
@@ -3341,8 +3585,15 @@ class AgentEngine {
       }
     }
 
-    final result =
-        await _executeCommand(executor, command, myGeneration: myGeneration);
+    var commandStarted = false;
+    final result = await _executeCommand(executor, command,
+        myGeneration: myGeneration, onStarted: () {
+      commandStarted = true;
+      // 只有到达 executeAndWait 前才算真正开始；预检、权限、确认拒绝
+      // 都不能帮助 finish 绕过"未执行任何命令"验证。
+      _hasExecutedAnyCommand = true;
+      _commandPassedPrecheckThisTurn = true;
+    });
     // 一条命令一行：安全/权限两条细节降到 DEBUG，正常看日志时只留这一行
     final parts = <String>[
       '步骤 $_currentStepCount',
@@ -3357,11 +3608,13 @@ class AgentEngine {
 
     // R1: 主命令执行后检查代际，避免旧任务结果污染新任务的统计/事件流
     // 若代际已变更（cancel + 立即新任务），不再更新 _currentTask 统计、不再 emit result 事件
-    if (myGeneration != null && myGeneration != _currentTaskGeneration) {
-      agentLogger.info('ReAct', '命令执行后代际失效，丢弃结果不污染新任务');
-      onSuccess(result.success, 'generation_invalid_after_exec', 0);
+    if (!stillCurrent() || !active()) {
+      agentLogger.info('ReAct', '命令执行后任务失效，丢弃结果不污染新任务');
+      onSuccess(result.success, 'task_invalid_after_exec', 0);
       return _EarlyExecutionResult(shouldContinue: false, command: command);
     }
+
+    if (commandStarted && result.success) _commandSucceededThisTurn = true;
 
     // 更新命令成功/失败计数
     _currentTask = _currentTask!.copyWith(
@@ -3449,7 +3702,9 @@ class AgentEngine {
       output: outputText,
       error: result.success
           ? null
-          : (rollbackHint != null ? '$outputText\n\n$rollbackHint' : outputText),
+          : (rollbackHint != null
+              ? '$outputText\n\n$rollbackHint'
+              : outputText),
       hostId: hostId,
       toolName: 'exec_command',
       durationMs: result.duration?.inMilliseconds,
@@ -3490,7 +3745,8 @@ class AgentEngine {
           success: result.success,
           conversationId: _currentTask?.operationId ?? _operationId,
         );
-        if (genAtRecord == _currentTaskGeneration &&
+        if (genAtRecord == generation &&
+            stillCurrent() &&
             record.success &&
             _operationChanges.length < 100) {
           _operationChangeIds.add(record.id);
@@ -3532,6 +3788,11 @@ class AgentEngine {
       }
     }
 
+    // 台账/审计都可能跨任务边界；旧任务不得继续回灌观测或推进 ReAct。
+    if (!stillCurrent() || !active()) {
+      onSuccess(result.success, 'task_invalid_after_record', 0);
+      return _EarlyExecutionResult(shouldContinue: false, command: command);
+    }
     onSuccess(result.success, 'completed', outputText.length);
     return _EarlyExecutionResult(
       shouldContinue: true,
@@ -3635,8 +3896,10 @@ class AgentEngine {
 
     agentLogger.info('ReAct', '检测到选项，暂停等待用户选择: $options');
 
+    final taskId = _currentTask?.id;
+    final choiceCompleter = Completer<String>();
     _pendingOptions = options;
-    _choiceCompleter = Completer<String>();
+    _choiceCompleter = choiceCompleter;
     // 抓住本轮这一个 ask 事件：等待期间可能又有新事件进来，
     // 用变量固定住，回写答案时不会写到别的提问上。
     final pendingAsk = _pendingAskEvent;
@@ -3649,13 +3912,14 @@ class AgentEngine {
     _notifyTaskUpdate();
 
     // 暂停循环，等待用户选择
-    final choice = await _choiceCompleter!.future;
-    _choiceCompleter = null;
-    _pendingOptions = [];
-
-    if (myGeneration != _currentTaskGeneration) return false;
-    if (_currentTask?.status == AgentStatus.cancelled) {
-      agentLogger.info('ReAct', '任务在等待选择期间被取消');
+    final choice = await choiceCompleter.future;
+    if (identical(_choiceCompleter, choiceCompleter)) {
+      _choiceCompleter = null;
+      _pendingOptions = [];
+    }
+    if (!_isSameTask(myGeneration, taskId)) return false;
+    if (!_isTaskActive(myGeneration, taskId)) {
+      agentLogger.info('ReAct', '任务在等待选择期间已终止或暂停');
       return false;
     }
 
@@ -3678,8 +3942,7 @@ class AgentEngine {
     // 答案回写到 ask 事件本身：提问这一步要自带"问过什么 + 选了什么"，
     // 不能只靠后面那条 info 事件反推（跨轮/跨段就断了）。
     pendingAsk?.chosenAnswer = choice;
-    onEvent?.call(
-        AgentEvent.info(L10n.str.ut_a61b05ce9b(choice)));
+    onEvent?.call(AgentEvent.info(L10n.str.ut_a61b05ce9b(choice)));
 
     // 以 ReAct 观测格式反馈
     final observation = '观测: 用户选择了 "$choice"';
@@ -3786,6 +4049,10 @@ class AgentEngine {
   Future<bool> _handleToolAction(ReActStep step, CommandExecutor executor,
       {required int myGeneration}) async {
     final toolName = step.toolName?.trim() ?? '';
+    final toolTaskId = _currentTask?.id;
+    bool stillCurrent() => _isSameTask(myGeneration, toolTaskId);
+    bool active() => _isTaskActive(myGeneration, toolTaskId);
+    if (!stillCurrent() || !active()) return false;
     // 每次工具调用都计一步，含未知工具与只读档拦截：口径是"尝试过"，
     // 不是"成功变更过"。放在参数校验之前，失败调用同样计入。
     _toolCalls++;
@@ -3852,7 +4119,9 @@ class AgentEngine {
               ChatMessage.create(role: 'user', content: result.observation!));
           _trimMessages(_conversationHistory);
         }
-        _noCommandRetryCount = 0;
+        final commandSucceeded = _commandSucceededThisTurn;
+        if (!_finalizeCommandTurn()) return false;
+        if (commandSucceeded) _noCommandRetryCount = 0;
         return true;
       }
       // execute 别名但没给命令：告诉模型缺参数，不算致命失败
@@ -3926,13 +4195,16 @@ class AgentEngine {
     if (tool == null) return false;
 
     agentLogger.info('ReAct', '调用工具: $toolName, 参数: ${args.describe()}');
-    // R4: 工具调用必须有独立的 command 事件和 id，不能复用上一条 shell 命令的 id
-    // 本机 shell 的 command 是用户批准的依据，不能被 UI 的 160 字符摘要截掉；
+    // R4: 工具调用必须有独立的 command 事件和 id，不能复用上一条 shell 命令的 id。
+    // 本机 shell 与破坏性工具的完整参数是批准依据，任何后缀都不得被摘要隐藏；
     // 其余工具仍按摘要截断，避免 file_write 的大内容撑爆证据层。
+    final requiresFullConfirmation = toolName == 'local_exec' ||
+        (tool.kind == ToolKind.destructive &&
+            destructiveToolNeedsConfirm(_permissionMode));
     final toolUiDisplay = _formatToolCommandForDisplay(
       toolName,
       args,
-      maxValueChars: toolName == 'local_exec' ? 8000 : 160,
+      maxValueChars: requiresFullConfirmation ? 0 : 160,
     );
     final toolCommandEvent = AgentEvent.command(
       toolUiDisplay,
@@ -3947,9 +4219,10 @@ class AgentEngine {
     // 不另造一套等待机制。
     if (tool.kind == ToolKind.destructive &&
         destructiveToolNeedsConfirm(_permissionMode)) {
-      final approved = await _confirmToolExecution(toolName, toolUiDisplay);
-      // R1: await 之后先做代际检查，再决定后续状态写入
-      if (myGeneration != _currentTaskGeneration) return false;
+      final approved = await _confirmToolExecution(toolName, toolUiDisplay,
+          myGeneration: myGeneration);
+      // R1: await 之后先检查 identity + 代际 + 终态，再决定后续状态写入
+      if (!stillCurrent() || !active()) return false;
       if (!approved) {
         // 同上：10 分钟没人点，不等于用户说了"不"
         final timedOut = _confirmTimedOut;
@@ -4002,34 +4275,35 @@ class AgentEngine {
       // 密码类工具向用户索取秘密的通道。只回传"是否已收到"，明文由
       // requestSudoPassword 直接写进安全存储，不经过工具与 observation。
       tool.sudoPasswordRequest = (reason) async {
-        if (myGeneration != _currentTaskGeneration) return false;
-        return requestSudoPassword(reason: reason);
+        if (!active()) return false;
+        return requestSudoPassword(
+            reason: reason, myGeneration: myGeneration, taskId: toolTaskId);
       };
       // 本机目录授权：与密码弹窗同一套“跨 await 先查代际”的约束。
       // 只负责把路径/原因转给 UI；策略写回由页面完成后，工具重新判定。
       tool.localDirAuthorizationRequest = (path, reason) async {
-        if (myGeneration != _currentTaskGeneration) return false;
+        if (!active()) return false;
         final request = onLocalDirRequest;
         if (request == null) return false;
-        return request(path, reason);
+        final approved = await request(path, reason);
+        return approved && active();
       };
       // 授权弹窗可能在任务取消后才返回；工具在真正执行前用它再拦一次。
-      tool.isTaskActive = () =>
-          myGeneration == _currentTaskGeneration &&
-          _currentTask?.status != AgentStatus.cancelled;
+      tool.isTaskActive = active;
       final result = await tool.execute(
         executor: executor,
         args: args,
         onProgress: (msg) {
+          if (!active()) return;
           agentLogger.info('Tool', '[$toolName] $msg');
           onEvent?.call(AgentEvent.info('  $msg'));
         },
       );
 
-      // R1: await 后做代际检查
-      if (myGeneration != _currentTaskGeneration) return false;
-      if (_currentTask?.status == AgentStatus.cancelled) {
-        agentLogger.info('ReAct', '工具执行期间任务被取消');
+      // R1: await 后做 identity + 代际检查
+      if (!stillCurrent()) return false;
+      if (!active()) {
+        agentLogger.info('ReAct', '工具执行期间任务已终止或暂停');
         return false;
       }
 
@@ -4073,11 +4347,7 @@ class AgentEngine {
       // R1: 台账/审计是 await；用户可能在这期间点了停止或暂停。
       // 若继续走下面的 status=thinking，会把 cancelled/paused 覆盖回运行态，
       // UI 就会永远停在“思考中”，点停止看起来完全没反应。
-      if (myGeneration != _currentTaskGeneration) return false;
-      if (_currentTask?.status == AgentStatus.cancelled ||
-          _currentTask?.status == AgentStatus.paused) {
-        return false;
-      }
+      if (!stillCurrent() || !active()) return false;
 
       // 构造观测反馈给 AI
       // 注意：观测里的 command 用多行格式展示参数，避免 AI 从观测里学到 JSON 格式
@@ -4108,6 +4378,7 @@ class AgentEngine {
       return true;
     } catch (e) {
       toolStopwatch.stop();
+      if (!stillCurrent() || !active()) return false;
       agentLogger.error('ReAct', '工具 $toolName 执行异常: $e');
       onEvent?.call(AgentEvent.info(L10n.str.ut_2bd0b4985d(toolName, e)));
       // 工具异常也要有 result 事件，避免证据层只有命令没有结果
@@ -4125,11 +4396,7 @@ class AgentEngine {
         outputTruncated: errorView.truncated,
       ));
 
-      if (myGeneration != _currentTaskGeneration) return false;
-      if (_currentTask?.status == AgentStatus.cancelled ||
-          _currentTask?.status == AgentStatus.paused) {
-        return false;
-      }
+      if (!stillCurrent() || !active()) return false;
 
       final observation = '观测: 工具 $toolName 执行异常 — $e';
       _conversationHistory
@@ -4276,6 +4543,13 @@ class AgentEngine {
   /// 清理放 finally）；本方法只负责裁剪历史、合成收尾文本、引擎私有资源清理
   /// 与完成通知。所有调用点保持不变。
   void _finishTask({bool success = true, String? summary, String? answer}) {
+    final status = _currentTask?.status;
+    if (status == AgentStatus.paused ||
+        status == AgentStatus.cancelled ||
+        status == AgentStatus.completed ||
+        status == AgentStatus.failed) {
+      return;
+    }
     _trimMessages(_conversationHistory);
     final startTime = _currentTask?.createdAt;
     final finishState =
@@ -4299,8 +4573,7 @@ class AgentEngine {
           completedAt: DateTime.now(),
         );
         _notifyTaskUpdate();
-        agentLogger.info(
-            'AutoExec', '=== 任务${success ? "完成" : "终止"} ===');
+        agentLogger.info('AutoExec', '=== 任务${success ? "完成" : "终止"} ===');
       },
       // 报告结论只接受模型显式总结；summary 为空时用确定性模板，
       // 绝不把 _accumulatedMessage（完整 ReAct 文本）当结论。
@@ -4346,7 +4619,6 @@ class AgentEngine {
   void _cleanupAfterTermination() {
     _aiWatchdog?.cancel();
     _aiWatchdog = null;
-    _aiStreamTimedOut = false;
     _aiStreamSub?.cancel();
     _aiStreamSub = null;
     // R1: 与 _resetTransientState/cancelTask/pauseTask 一致，先 complete 再置 null。
@@ -4355,28 +4627,38 @@ class AgentEngine {
     final dc = _aiDoneCompleter;
     if (dc != null && !dc.isCompleted) dc.complete();
     _aiDoneCompleter = null;
+    _aiCancelToken?.cancel('引擎瞬态状态重置');
     _aiCancelToken = null;
+    if (_commandCancelToken != null && !_commandCancelToken!.isCompleted) {
+      _commandCancelToken!.complete();
+    }
     _commandCancelToken = null;
+    if (_orchestratorCancelToken != null &&
+        !_orchestratorCancelToken!.isCompleted) {
+      _orchestratorCancelToken!.complete();
+    }
     _orchestratorCancelToken = null;
     final mhe = _tools.multiHostExecutor;
     if (mhe != null) {
       mhe.cancelToken = null;
     }
-    if (_earlyExecutionCompleter != null &&
-        !_earlyExecutionCompleter!.isCompleted) {
-      _earlyExecutionCompleter!.complete(_EarlyExecutionResult(
-        shouldContinue: false,
-        command: _earlyExecutionCommand ?? '',
-      ));
-    }
-    _earlyExecutionCompleter = null;
-    _earlyExecutionCommand = null;
     _confirmTimeoutTimer?.cancel();
     _confirmTimeoutTimer = null;
     _interactiveInputTimeoutTimer?.cancel();
     _interactiveInputTimeoutTimer = null;
-    // 不清 _confirmCompleter / _choiceCompleter / _interactiveInputCompleter —
-    // _finishTask 调用前已退出等待状态
+    // 终态可能由 AI 失败/提前执行异常触发，未必已经退出所有等待。
+    // 必须先 complete 再清空，确保局部 awaiter 都能收口（R1/R2）。
+    final confirm = _confirmCompleter;
+    if (confirm != null && !confirm.isCompleted) confirm.complete(false);
+    _confirmCompleter = null;
+    _pendingConfirmCommand = null;
+    final choice = _choiceCompleter;
+    if (choice != null && !choice.isCompleted) choice.complete('');
+    _choiceCompleter = null;
+    _pendingOptions = [];
+    final input = _interactiveInputCompleter;
+    if (input != null && !input.isCompleted) input.complete(null);
+    _interactiveInputCompleter = null;
   }
 
   /// 推送任务完成通知（异步触发，不阻塞引擎主流程）
@@ -4424,14 +4706,21 @@ class AgentEngine {
   /// 但它不产生 AI 可见的观测——若也计数，一条断链的主命令会记 2 次，
   /// 门限比宣称的提前一条命中。
   Future<AgentResult> _executeCommand(CommandExecutor executor, String command,
-      {int? myGeneration, bool countDisconnect = true}) async {
+      {int? myGeneration,
+      bool countDisconnect = true,
+      void Function()? onStarted}) async {
     final stopwatch = Stopwatch()..start();
+    final generation = myGeneration ?? _currentTaskGeneration;
+    final taskId = _currentTask?.id;
+    final interactiveEchoes = <({String prompt, String answer})>[];
+    Completer<String?>? interactiveInputCompleter;
+    bool stillCurrent() => _isSameTask(generation, taskId);
+    bool active() => _isTaskActive(generation, taskId);
 
     // R1: 取消可能落在安全检查/快照与真正创建 _commandCancelToken 之间。
     // 若不在这里拦截，会新建一个没人取消的 token，静默把命令跑完，
     // 用户看到的就是“已点停止，Agent 还在执行”。
-    if (_currentTask?.status == AgentStatus.cancelled ||
-        (myGeneration != null && myGeneration != _currentTaskGeneration)) {
+    if (!stillCurrent() || !active()) {
       return AgentResult(
         success: false,
         error: '用户取消了任务',
@@ -4463,6 +4752,7 @@ class AgentEngine {
         ? ShellSyntax.unclosedReason(command, isWindows: isWindowsShell)
         : null;
     if (unclosed != null) {
+      _commandRejectedThisTurn = true;
       _syntaxRejectCount++;
       agentLogger.warn('ReAct',
           '命令闭合预检拦截(${"$_syntaxRejectCount/$_maxSyntaxRejects"}): $unclosed — ${_logCommand(command)}');
@@ -4486,6 +4776,7 @@ class AgentEngine {
     // 进 PTY 只会卡到超时（且不在 PS2，闭合预检与续行兜底都覆盖不到）。
     // 与闭合预检共用拦截计数预算，回灌非交互等价命令建议让 AI 自行改写。
     if (_commandClosureGuard && isBlockingInteractiveCommand(command)) {
+      _commandRejectedThisTurn = true;
       _syntaxRejectCount++;
       final exhausted = _syntaxRejectCount >= _maxSyntaxRejects;
       agentLogger.warn('ReAct',
@@ -4513,6 +4804,7 @@ class AgentEngine {
         ? unreliableExitCodeReason(command)
         : null;
     if (exitCodeIssue != null) {
+      _commandRejectedThisTurn = true;
       _syntaxRejectCount++;
       final exhausted = _syntaxRejectCount >= _maxSyntaxRejects;
       agentLogger.warn('ReAct',
@@ -4530,9 +4822,8 @@ class AgentEngine {
       );
     }
 
-    // 命令通过全部预检：重置连续拦截计数，并标记本轮确实有命令进入执行器
+    // 通过静态预检并不等于已执行；连接检查也通过后才标记 started。
     _syntaxRejectCount = 0;
-    _commandPassedPrecheckThisTurn = true;
 
     // 执行前检查连接状态
     // 自愈：若传入的 executor 已断开，但 _currentExecutor 已被 setExecutor 刷新（用户重连），
@@ -4564,10 +4855,17 @@ class AgentEngine {
       _consecutiveConnFailures = 0;
     }
 
-    // 创建取消令牌，cancelTask 时 complete 触发提前退出
-    _commandCancelToken = Completer<void>();
-    // 每条命令单独记账交互回显：上一条命令的提示文本不该清洗本条的正文
-    _interactiveEchoes.clear();
+    if (!stillCurrent() || !active()) {
+      return AgentResult(
+        success: false,
+        error: '用户取消了任务',
+        duration: stopwatch.elapsed,
+        failureKind: CommandFailureKind.cancelled.name,
+      );
+    }
+    // 每条命令使用局部 token 与回显表；旧执行器返回时不能清掉新命令的 token。
+    final commandCancelToken = Completer<void>();
+    _commandCancelToken = commandCancelToken;
 
     // sudo 密码交给执行器应答：执行器在输出流上识别提示并写入 PTY stdin。
     // 密码不进命令串、不进审计日志、也不回传给模型（AGENTS.md R7）。
@@ -4582,30 +4880,37 @@ class AgentEngine {
         : null;
 
     try {
+      onStarted?.call();
       final result = await executor.executeAndWait(
         command,
         timeout: getCommandTimeout(command),
-        cancelToken: _commandCancelToken,
+        cancelToken: commandCancelToken,
         sudoPassword: sudoPassword,
         // 确认类交互提示桥接：自动应答规则优先，否则 UI 弹窗（见方法注释）。
         // 密码类提示不走此桥，检测器仍按 interactivePrompt 中断（R7）。
-        onInteractivePrompt: _requestInteractiveInput,
+        onInteractivePrompt: (prompt) => _requestInteractiveInput(
+          prompt,
+          myGeneration: generation,
+          taskId: taskId,
+          interactiveEchoes: interactiveEchoes,
+          onCompleter: (completer) => interactiveInputCompleter = completer,
+        ),
       );
 
-      // 命令已返回（可能被密码提示/超时/取消打断）：若还挂着交互输入等待，
-      // 立即按取消收口，不让弹窗的 await 悬到 10 分钟超时（R1）。
-      if (_interactiveInputCompleter != null &&
-          !_interactiveInputCompleter!.isCompleted) {
-        _interactiveInputCompleter!.complete(null);
+      // 只收口本次执行创建的交互等待，不能 complete 新命令的弹窗。
+      final pendingInput = interactiveInputCompleter;
+      if (identical(_interactiveInputCompleter, pendingInput) &&
+          pendingInput != null &&
+          !pendingInput.isCompleted) {
+        pendingInput.complete(null);
       }
-
-      _commandCancelToken = null;
+      if (identical(_commandCancelToken, commandCancelToken)) {
+        _commandCancelToken = null;
+      }
       stopwatch.stop();
 
-      // R1: 用户取消或代际失效（cancelTask + 立即新任务）→ 返回已取消结果
-      // 仅检查 status==cancelled 无法识别"cancel + 立即新任务"场景（新任务会把 status 重置为 thinking）
-      if (_currentTask?.status == AgentStatus.cancelled ||
-          (myGeneration != null && myGeneration != _currentTaskGeneration)) {
+      // R1: 用户取消或任务被替换（cancelTask + 立即新任务）→ 返回已取消结果。
+      if (!stillCurrent() || !active()) {
         return AgentResult(
           success: false,
           error: '用户取消了任务',
@@ -4620,7 +4925,7 @@ class AgentEngine {
       // 第二遍 stripCommandEcho 会把首行恰含命令词的真实输出删掉（R8 单点清洗）
       // 清理交互提示 + 用户答案的回显行（O3）：它不是命令输出，
       // 留在观测里模型会当成下一条命令执行
-      cleanOutput = stripInteractiveEcho(cleanOutput, _interactiveEchoes);
+      cleanOutput = stripInteractiveEcho(cleanOutput, interactiveEchoes);
 
       return AgentResult.fromCommand(
         command: command,
@@ -4631,15 +4936,27 @@ class AgentEngine {
         failureKind: result.failureKind == CommandFailureKind.none
             ? null
             : result.failureKind.name,
-        failureReason: _withConnGuidance(result,
-            countDisconnect: countDisconnect),
+        failureReason:
+            _withConnGuidance(result, countDisconnect: countDisconnect),
       );
     } catch (e) {
       stopwatch.stop();
-      _commandCancelToken = null;
-      if (_interactiveInputCompleter != null &&
-          !_interactiveInputCompleter!.isCompleted) {
-        _interactiveInputCompleter!.complete(null);
+      if (identical(_commandCancelToken, commandCancelToken)) {
+        _commandCancelToken = null;
+      }
+      final pendingInput = interactiveInputCompleter;
+      if (identical(_interactiveInputCompleter, pendingInput) &&
+          pendingInput != null &&
+          !pendingInput.isCompleted) {
+        pendingInput.complete(null);
+      }
+      if (!stillCurrent() || !active()) {
+        return AgentResult(
+          success: false,
+          error: '用户取消了任务',
+          duration: stopwatch.elapsed,
+          failureKind: CommandFailureKind.cancelled.name,
+        );
       }
       return AgentResult(
         success: false,
@@ -4721,6 +5038,7 @@ class AgentEngine {
       );
 
       final raw = StringBuffer();
+      var truncated = false;
       // 压缩看门狗：防止 AI 流式卡住导致 compact 永久挂起
       await for (final chunk in stream.timeout(
         aiResponseTimeout,
@@ -4730,7 +5048,27 @@ class AgentEngine {
           sink.close();
         },
       )) {
-        raw.write(chunk);
+        final remaining = _maxRollingSummaryChars - raw.length;
+        if (remaining <= 0) {
+          truncated = true;
+          break;
+        }
+        if (chunk.length <= remaining) {
+          raw.write(chunk);
+        } else {
+          var end = remaining;
+          if (end > 0 &&
+              _isHighSurrogate(chunk.codeUnitAt(end - 1)) &&
+              _isLowSurrogate(chunk.codeUnitAt(end))) {
+            end--;
+          }
+          raw.write(chunk.substring(0, end));
+          truncated = true;
+          break;
+        }
+      }
+      if (truncated) {
+        agentLogger.warn('Compact', '滚动压缩结果超过上限，已截断并取消后续流');
       }
 
       var text = _stripCodeFence(raw.toString().trim());
@@ -4740,7 +5078,18 @@ class AgentEngine {
       }
       // 硬上限：摘要自身不能成为新的上下文负担。保头——【关键事实】段在开头
       if (text.length > _maxRollingSummaryChars) {
-        text = text.substring(0, _maxRollingSummaryChars);
+        var end = _maxRollingSummaryChars;
+        if (end > 0 &&
+            _isHighSurrogate(text.codeUnitAt(end - 1)) &&
+            _isLowSurrogate(text.codeUnitAt(end))) {
+          end--;
+        }
+        text = text.substring(0, end);
+      }
+      if (truncated &&
+          text.isNotEmpty &&
+          _isHighSurrogate(text.codeUnitAt(text.length - 1))) {
+        text = text.substring(0, text.length - 1);
       }
       agentLogger.info('Compact', '滚动压缩完成: ${text.length} 字符');
       return text;
@@ -4752,6 +5101,10 @@ class AgentEngine {
 
   /// 滚动摘要硬上限（字符）：提示词要求 ≤1200 字，模型超发时兜底截断
   static const int _maxRollingSummaryChars = 4000;
+
+  static bool _isHighSurrogate(int unit) => unit >= 0xD800 && unit <= 0xDBFF;
+
+  static bool _isLowSurrogate(int unit) => unit >= 0xDC00 && unit <= 0xDFFF;
 
   /// 去掉模型可能包裹的 markdown 代码块标记
   String _stripCodeFence(String raw) {
@@ -4789,8 +5142,9 @@ class AgentEngine {
   /// - DioExceptionType.cancel：Dio CancelToken.cancel() 触发的异常
   /// - StateError('任务已取消'/'任务已被新任务覆盖')：上层代际检查抛出
   bool _isCancellationError(dynamic error) {
-    if (error is DioException && error.type == DioExceptionType.cancel)
+    if (error is DioException && error.type == DioExceptionType.cancel) {
       return true;
+    }
     if (error is StateError &&
         (error.message == '任务已取消' || error.message == '任务已被新任务覆盖')) {
       return true;
@@ -4900,6 +5254,9 @@ class AgentEngine {
 
   @visibleForTesting
   int get finishWithoutExecCountForTesting => _finishWithoutExecCount;
+
+  @visibleForTesting
+  bool get hasExecutedAnyCommandForTesting => _hasExecutedAnyCommand;
 
   @visibleForTesting
   bool get userForbadeCommandsForTesting => _userForbadeCommands;
@@ -5150,6 +5507,8 @@ $hostList
   void enableOrchestrator(agent_host_registry.AgentHostRegistry registry) {
     if (_orchestratorMode) return;
     _orchestratorMode = true;
+    // 编排命令的权限必须以本引擎为准：并行 tab 的 activeScopeId 会漂移。
+    _tools.permissionModeProvider = () => _permissionMode;
     _tools.enableOrchestrator(registry);
     // 强制下次 startTask 重建 system prompt
     _invalidateSystemPromptCache();
@@ -5228,28 +5587,61 @@ $hostList
   /// 返回 true = 已保存并注入；false = 用户取消或保存失败。
   /// 明文只在本方法内流转到 CredentialsStore 和 [_sudoPassword]，
   /// 不进返回值、不进日志、不进对话历史（AGENTS.md R7）。
-  Future<bool> requestSudoPassword({String reason = ''}) async {
+  Future<bool> requestSudoPassword({
+    String reason = '',
+    Duration timeout = const Duration(minutes: 10),
+    int? myGeneration,
+    String? taskId,
+  }) async {
     final request = onSecretRequest;
     if (request == null) {
       agentLogger.warn('Sudo', 'UI 未接入密码输入回调，无法收集 sudo 密码');
       return false;
     }
+    final requestGeneration = myGeneration ?? _currentTaskGeneration;
+    final requestTaskId = taskId ?? _currentTask?.id;
+    bool requestActive() => _isTaskActive(requestGeneration, requestTaskId);
+
+    if (!requestActive()) return false;
     const title = '输入 sudo 密码';
     final message = reason.trim().isEmpty
         ? '命令需要特权密码才能继续。密码只写入本机凭据库与终端 stdin。'
         : '${reason.trim()}\n\n密码只写入本机凭据库与终端 stdin。';
-    final password = await request(title, message);
-    if (password == null || password.isEmpty) return false;
+    final String? password;
+    try {
+      password = await request(title, message).timeout(timeout);
+    } on TimeoutException {
+      agentLogger.warn('Sudo', '密码输入等待超时，未保存凭据');
+      return false;
+    } catch (e) {
+      // UI 回调异常不能冒泡成工具执行异常；日志只记异常，不记任何密码内容。
+      agentLogger.warn('Sudo', '密码输入回调异常，未保存凭据: $e');
+      return false;
+    }
+    if (password == null || password.isEmpty || !requestActive()) return false;
 
+    // 保存前再次检查 identity/代际/状态：取消或暂停后返回的密码既不落盘，
+    // 也不进缓存。保存调用一旦开始无法真正撤回，因此取消只能阻止后续注入。
+    final targetHostId = hostId ?? 'local';
+    final bool saved;
+    try {
+      saved = await (credentialSaver ?? CredentialsStore.save)(
+        hostId: targetHostId,
+        type: 'sudoPassword',
+        value: password,
+      );
+    } catch (e) {
+      agentLogger.warn('Sudo', '凭据保存失败: hostId=$targetHostId, err=$e');
+      return false;
+    }
+    if (!requestActive()) return false;
+    if (!saved) {
+      agentLogger.warn('Sudo', '凭据保存失败: hostId=$targetHostId');
+      return false;
+    }
     _sudoPassword = password;
-    final saved = await CredentialsStore.save(
-      hostId: hostId ?? 'local',
-      type: 'sudoPassword',
-      value: password,
-    );
     // 只记"存没存上"，不记内容
-    agentLogger.info(
-        'Sudo', '用户已提供 sudo 密码，凭据保存${saved ? "成功" : "失败（仅本次会话内有效）"}');
+    agentLogger.info('Sudo', '用户已提供 sudo 密码，凭据保存成功');
     return true;
   }
 
@@ -5343,6 +5735,14 @@ $hostList
       debugPrint('[AgentEngine] 收集系统信息失败: $e');
     }
   }
+}
+
+/// 单轮 AI 流式响应的提前执行槽，绝不复用跨任务/跨轮。
+class _EarlyExecutionSlot {
+  _EarlyExecutionSlot(this.command);
+  final String command;
+  final Completer<_EarlyExecutionResult> completer =
+      Completer<_EarlyExecutionResult>();
 }
 
 /// 提前执行结果

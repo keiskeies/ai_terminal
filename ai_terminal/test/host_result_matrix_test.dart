@@ -88,6 +88,44 @@ void main() {
       expect(find.textContaining('please use sudo'), findsOneWidget);
     });
 
+    testWidgets('skipped/cancelled are not counted as failed or retryable',
+        (tester) async {
+      const withNotRun = {
+        'web-01': HostExecutionResult(
+          hostId: 'web-01',
+          success: true,
+          output: 'ok',
+          exitCode: 0,
+        ),
+        'web-02': HostExecutionResult(
+          hostId: 'web-02',
+          success: false,
+          error: '前序主机失败，命令未执行',
+          failureKind: 'skipped',
+        ),
+        'web-03': HostExecutionResult(
+          hostId: 'web-03',
+          success: false,
+          error: '任务已取消',
+          failureKind: 'cancelled',
+        ),
+      };
+
+      await tester.pumpWidget(_wrap(Builder(
+        builder: (context) => HostResultMatrix(
+          results: withNotRun,
+          tc: ThemeColors.of(context),
+          onRetryFailedHosts: (_) {},
+        ),
+      )));
+
+      expect(find.text('3 台主机 · 1 成功 · 2 未执行'), findsOneWidget);
+      expect(find.text('未执行'), findsOneWidget);
+      expect(find.text('已取消'), findsOneWidget);
+      // 没有真正失败的主机，重试入口不应出现
+      expect(find.text('重试失败主机'), findsNothing);
+    });
+
     testWidgets('does not overflow at 360px', (tester) async {
       tester.view.physicalSize = const Size(360, 900);
       tester.view.devicePixelRatio = 1.0;

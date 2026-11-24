@@ -200,9 +200,7 @@ void main() {
                     const Text('AI 助手'),
                     const Text('回答正文一段。'),
                     _CopyPill(
-                        onTap: () => taps++,
-                        label: '复制回答',
-                        doneLabel: '已复制'),
+                        onTap: () => taps++, label: '复制回答', doneLabel: '已复制'),
                   ],
                 ),
               ),
@@ -215,7 +213,6 @@ void main() {
     final box = tester.getRect(find.byType(_CopyPill));
     await tester.tapAt(box.center);
     await tester.pump();
-    expect(taps, 1,
-        reason: '气泡内最后一个子节点点不中，说明被祖先或兄弟节点挡住了');
+    expect(taps, 1, reason: '气泡内最后一个子节点点不中，说明被祖先或兄弟节点挡住了');
   });
 }

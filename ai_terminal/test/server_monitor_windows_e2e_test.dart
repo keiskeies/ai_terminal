@@ -18,7 +18,8 @@ class _RealLocalShell extends LocalTerminalService {
   bool get isConnected => true;
 
   @override
-  Future<String> runOnce(String command, {Duration timeout = const Duration(seconds: 5)}) async {
+  Future<String> runOnce(String command,
+      {Duration timeout = const Duration(seconds: 5)}) async {
     // 全量测试并行跑时 PowerShell 冷启动可能超过服务的 12s，这里统一放宽
     final r = await Process.run('cmd', ['/c', command])
         .timeout(timeout + const Duration(seconds: 45));
@@ -28,7 +29,8 @@ class _RealLocalShell extends LocalTerminalService {
 
 void main() {
   test('Windows 本地采集链路返回真实数据', () async {
-    final service = ServerMonitorService(executor: _RealLocalShell(), isLocal: true);
+    final service =
+        ServerMonitorService(executor: _RealLocalShell(), isLocal: true);
     final snap = await service.collect();
 
     expect(snap.error, isNull, reason: '采集失败: ${snap.error}');

@@ -198,11 +198,8 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
               ),
               // 底部操作栏：发丝线分隔，按钮与内容同宽
               Container(
-                padding: EdgeInsets.fromLTRB(
-                    widget.embedded ? 0 : pStandard,
-                    8,
-                    widget.embedded ? 0 : pStandard,
-                    widget.embedded ? 8 : 12),
+                padding: EdgeInsets.fromLTRB(widget.embedded ? 0 : pStandard, 8,
+                    widget.embedded ? 0 : pStandard, widget.embedded ? 8 : 12),
                 decoration: BoxDecoration(
                   color: widget.embedded ? null : tc.card,
                   border: Border(top: BorderSide(color: tc.hairline)),
@@ -439,8 +436,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
                 ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
                   color: tc.goldBg,
                   borderRadius: BorderRadius.circular(rFull),
@@ -684,8 +680,7 @@ class _HostEditPageState extends ConsumerState<HostEditPage> {
         options: [
           _ChipOption(
               'password', l10n.hostEditPassword, Icons.lock_outline_rounded),
-          _ChipOption(
-              'privateKey', l10n.hostEditPrivateKey, Icons.key_rounded),
+          _ChipOption('privateKey', l10n.hostEditPrivateKey, Icons.key_rounded),
         ],
         value: _jumpAuthType ?? 'password',
         onChanged: (v) => setState(() => _jumpAuthType = v),
@@ -937,8 +932,7 @@ class _ChoiceChipState extends State<_ChoiceChip> {
   Widget build(BuildContext context) {
     final tc = widget.tc;
     final selected = widget.selected;
-    final fg =
-        selected ? tc.brand : (_hovering ? tc.textMain : tc.textBody);
+    final fg = selected ? tc.brand : (_hovering ? tc.textMain : tc.textBody);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovering = true),

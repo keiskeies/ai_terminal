@@ -33,7 +33,8 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
     final rules = ref.read(knowledgeRulesProvider);
     if (rules.isEmpty) {
       if (!mounted) return;
-      showTopSnackBar(context,
+      showTopSnackBar(
+        context,
         SnackBar(
           content: Text(UiText.t('没有可导出的规范条目', 'Nothing to export')),
           backgroundColor: tc.warn,
@@ -54,7 +55,8 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
     try {
       await File(path).writeAsString(json);
       if (!mounted) return;
-      showTopSnackBar(context,
+      showTopSnackBar(
+        context,
         SnackBar(
           content: Text(L10n.str.ut_cbd8c9bc33(rules.length, path)),
           backgroundColor: tc.ok,
@@ -63,7 +65,8 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      showTopSnackBar(context,
+      showTopSnackBar(
+        context,
         SnackBar(
           content: Text(L10n.str.ut_b078e9e8b1(e)),
           backgroundColor: tc.error,
@@ -94,7 +97,8 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
       final skippedHint = result.skippedUnknownHost > 0
           ? L10n.str.ut_81d685bdc0(result.skippedUnknownHost)
           : '';
-      showTopSnackBar(context,
+      showTopSnackBar(
+        context,
         SnackBar(
           content: Text(L10n.str.ut_f59978a9af(result.imported, skippedHint)),
           backgroundColor: tc.ok,
@@ -103,7 +107,8 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
       );
     } catch (e) {
       if (!mounted) return;
-      showTopSnackBar(context,
+      showTopSnackBar(
+        context,
         SnackBar(
           content: Text(L10n.str.ut_4bda191f7f(e)),
           backgroundColor: tc.error,
@@ -137,8 +142,7 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
       context: context,
       builder: (context) => AlertDialog(
         title: Text(UiText.t('删除规范', 'Delete rule')),
-        content: Text(UiText.t(
-            '确定删除「${rule.title}」？删除后 AI 不再遵循这条约定。',
+        content: Text(UiText.t('确定删除「${rule.title}」？删除后 AI 不再遵循这条约定。',
             'Delete "${rule.title}"? The AI will stop following this rule.')),
         actions: [
           TextButton(
@@ -206,12 +210,13 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
             Text(
               UiText.t(
                 '写下你所在环境的约定，例如「统一走内网镜像源」「nginx 只改 conf.d，不碰主配置」\n'
-                '「生产 MySQL 端口 3307」，AI 执行命令时会遵循它们。',
+                    '「生产 MySQL 端口 3307」，AI 执行命令时会遵循它们。',
                 'Record the conventions of your environment, e.g. "always use the internal mirror", '
-                '"edit nginx via conf.d only, never the main config".\nThe AI follows them when running commands.',
+                    '"edit nginx via conf.d only, never the main config".\nThe AI follows them when running commands.',
               ),
               textAlign: TextAlign.center,
-              style: TextStyle(color: tc.textSub, fontSize: fSmall, height: 1.6),
+              style:
+                  TextStyle(color: tc.textSub, fontSize: fSmall, height: 1.6),
             ),
           ],
         ),
@@ -253,8 +258,9 @@ class _KnowledgeRulesPageState extends ConsumerState<KnowledgeRulesPage> {
                 ),
                 Switch(
                   value: rule.enabled,
-                  onChanged: (v) =>
-                      ref.read(knowledgeRulesProvider.notifier).toggleEnabled(rule, v),
+                  onChanged: (v) => ref
+                      .read(knowledgeRulesProvider.notifier)
+                      .toggleEnabled(rule, v),
                 ),
               ],
             ),
@@ -362,11 +368,11 @@ class KnowledgeRuleEditDialog extends StatefulWidget {
   final KnowledgeRule? rule;
   final ValueChanged<KnowledgeRule> onSave;
 
-  const KnowledgeRuleEditDialog(
-      {super.key, this.rule, required this.onSave});
+  const KnowledgeRuleEditDialog({super.key, this.rule, required this.onSave});
 
   @override
-  State<KnowledgeRuleEditDialog> createState() => _KnowledgeRuleEditDialogState();
+  State<KnowledgeRuleEditDialog> createState() =>
+      _KnowledgeRuleEditDialogState();
 }
 
 class _KnowledgeRuleEditDialogState extends State<KnowledgeRuleEditDialog> {
@@ -388,8 +394,10 @@ class _KnowledgeRuleEditDialogState extends State<KnowledgeRuleEditDialog> {
     _contentController = TextEditingController(text: rule?.content ?? '');
     _commandsController = TextEditingController(text: rule?.commands ?? '');
     _scope = rule?.scope ?? KnowledgeRuleScope.global;
-    _group = rule?.group ?? (HostsDao.cached.isNotEmpty ? HostsDao.cached.first.group : '默认');
-    _hostId = rule?.hostId ?? (HostsDao.cached.isNotEmpty ? HostsDao.cached.first.id : '');
+    _group = rule?.group ??
+        (HostsDao.cached.isNotEmpty ? HostsDao.cached.first.group : '默认');
+    _hostId = rule?.hostId ??
+        (HostsDao.cached.isNotEmpty ? HostsDao.cached.first.id : '');
     _strict = rule?.strict ?? true;
   }
 
@@ -451,8 +459,8 @@ class _KnowledgeRuleEditDialogState extends State<KnowledgeRuleEditDialog> {
                   controller: _titleController,
                   decoration: InputDecoration(
                     labelText: UiText.t('标题', 'Title'),
-                    hintText: UiText.t(
-                        '例如：nginx 只改 conf.d', 'e.g. Edit nginx via conf.d only'),
+                    hintText: UiText.t('例如：nginx 只改 conf.d',
+                        'e.g. Edit nginx via conf.d only'),
                     hintStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
                   ),
                   style: TextStyle(color: tc.textMain, fontSize: fBody),
@@ -469,12 +477,13 @@ class _KnowledgeRuleEditDialogState extends State<KnowledgeRuleEditDialog> {
                     labelText: UiText.t('规范内容', 'Rule'),
                     hintText: UiText.t(
                         '用自然语言写清楚约束，AI 会原样遵循。\n例如：内网统一走 mirrors.corp.internal，'
-                        '不要使用公网 apt 源。',
+                            '不要使用公网 apt 源。',
                         'Describe the constraint in plain language.\ne.g. Always use mirrors.corp.internal; '
-                        'never the public apt mirrors.'),
+                            'never the public apt mirrors.'),
                     hintStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
                   ),
-                  style: TextStyle(color: tc.textMain, fontSize: fSmall, height: 1.5),
+                  style: TextStyle(
+                      color: tc.textMain, fontSize: fSmall, height: 1.5),
                   validator: (v) => (v == null || v.trim().isEmpty)
                       ? UiText.t('请填写规范内容', 'Rule content is required')
                       : null,
@@ -485,7 +494,8 @@ class _KnowledgeRuleEditDialogState extends State<KnowledgeRuleEditDialog> {
                   minLines: 2,
                   maxLines: 6,
                   decoration: InputDecoration(
-                    labelText: UiText.t('参考命令（可选）', 'Reference commands (optional)'),
+                    labelText:
+                        UiText.t('参考命令（可选）', 'Reference commands (optional)'),
                     hintText: 'apt -o Dir::Etc::sourcelist=... update',
                     hintStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
                   ),
@@ -521,7 +531,8 @@ class _KnowledgeRuleEditDialogState extends State<KnowledgeRuleEditDialog> {
                 if (_scope == KnowledgeRuleScope.group) ...[
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    initialValue: groups.contains(_group) ? _group : groups.first,
+                    initialValue:
+                        groups.contains(_group) ? _group : groups.first,
                     decoration: InputDecoration(
                       labelText: UiText.t('主机组', 'Host group'),
                     ),
@@ -537,7 +548,8 @@ class _KnowledgeRuleEditDialogState extends State<KnowledgeRuleEditDialog> {
                 if (_scope == KnowledgeRuleScope.host) ...[
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
-                    initialValue: hosts.any((h) => h.id == _hostId) ? _hostId : null,
+                    initialValue:
+                        hosts.any((h) => h.id == _hostId) ? _hostId : null,
                     decoration: InputDecoration(
                       labelText: UiText.t('主机', 'Host'),
                     ),

@@ -16,7 +16,8 @@ String fmtRate(double kb) {
 String fmtBytes(int bytes) {
   if (bytes < 1024) return '$bytes B';
   if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-  if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  if (bytes < 1024 * 1024 * 1024)
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
 }
 
@@ -125,7 +126,8 @@ Widget diskTableRow(
   double usePercent = 0,
 }) {
   final textColor = isHeader ? tc.textMuted : tc.textSub;
-  final barColor = isHeader ? tc.textMuted : monitorColorByPercent(usePercent, tc);
+  final barColor =
+      isHeader ? tc.textMuted : monitorColorByPercent(usePercent, tc);
   final rowStyle = TextStyle(
     fontSize: fMicro,
     color: textColor,
@@ -179,7 +181,8 @@ Widget diskTableRow(
           ),
           child: LayoutBuilder(
             builder: (ctx, constraints) {
-              final w = constraints.maxWidth * (usePercent / 100).clamp(0.0, 1.0);
+              final w =
+                  constraints.maxWidth * (usePercent / 100).clamp(0.0, 1.0);
               return Align(
                 alignment: Alignment.centerLeft,
                 child: Container(
@@ -247,7 +250,8 @@ Widget twoColumnRows(ThemeColors tc, List<(String, String)> rows) {
 }
 
 /// 细进度条（详情窗磁盘总使用率）
-Widget usageBar(ThemeColors tc, double percent, Color color, {double height = 6}) {
+Widget usageBar(ThemeColors tc, double percent, Color color,
+    {double height = 6}) {
   return Container(
     height: height,
     decoration: BoxDecoration(
@@ -364,12 +368,16 @@ class _MonitorDetailDialogState extends State<_MonitorDetailDialog> {
     return Dialog(
       backgroundColor: tc.card,
       insetPadding: const EdgeInsets.all(24),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
+      shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
       child: Container(
         // 上下限都要贴屏幕：clamp 下限 520/360 在小窗口里会把 dialog 撑出
         // 视口（insetPadding 也救不回来），先按可用尺寸取 min
-        width: (size.width * 0.6).clamp(520.0, 820.0).clamp(0.0, size.width - 48),
-        height: (size.height * 0.72).clamp(360.0, 760.0).clamp(0.0, size.height - 48),
+        width:
+            (size.width * 0.6).clamp(520.0, 820.0).clamp(0.0, size.width - 48),
+        height: (size.height * 0.72)
+            .clamp(360.0, 760.0)
+            .clamp(0.0, size.height - 48),
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -430,7 +438,8 @@ class _MonitorDetailDialogState extends State<_MonitorDetailDialog> {
     );
   }
 
-  Widget _toggleChip(ThemeColors tc, {required String label, required VoidCallback onTap}) {
+  Widget _toggleChip(ThemeColors tc,
+      {required String label, required VoidCallback onTap}) {
     return InkWell(
       borderRadius: BorderRadius.circular(rXSmall),
       onTap: onTap,
@@ -440,7 +449,8 @@ class _MonitorDetailDialogState extends State<_MonitorDetailDialog> {
           border: Border.all(color: tc.border, width: 1),
           borderRadius: BorderRadius.circular(rXSmall),
         ),
-        child: Text(label, style: TextStyle(fontSize: fMicro, color: tc.textSub)),
+        child:
+            Text(label, style: TextStyle(fontSize: fMicro, color: tc.textSub)),
       ),
     );
   }
@@ -465,13 +475,16 @@ class _MonitorDetailDialogState extends State<_MonitorDetailDialog> {
     final virtual = sorted.where((i) => isVirtualNetInterface(i.name)).toList();
 
     Widget ifaceRow(NetInterface iface) {
-      final issues = iface.rxErrors + iface.txErrors + iface.rxDropped + iface.txDropped;
+      final issues =
+          iface.rxErrors + iface.txErrors + iface.rxDropped + iface.txDropped;
       return netTableRow(
         tc,
         name: iface.name,
         traffic: '${fmtBytes(iface.rxBytes)} / ${fmtBytes(iface.txBytes)}',
         rate: '${fmtRate(iface.downKBps)} / ${fmtRate(iface.upKBps)}',
-        issues: issues > 0 ? '${iface.rxErrors + iface.txErrors}/${iface.rxDropped + iface.txDropped}' : '-',
+        issues: issues > 0
+            ? '${iface.rxErrors + iface.txErrors}/${iface.rxDropped + iface.txDropped}'
+            : '-',
         issuesColor: issues > 0
             ? (iface.rxErrors + iface.txErrors > 0 ? tc.error : tc.warn)
             : tc.textMuted,
@@ -527,7 +540,10 @@ class _MonitorDetailDialogState extends State<_MonitorDetailDialog> {
         twoColumnRows(tc, [
           (l10n.monitorDiskTotal, '${total.toStringAsFixed(1)} GB'),
           (l10n.monitorDiskUsed, '${used.toStringAsFixed(1)} GB'),
-          (l10n.monitorDiskAvailable, '${(total - used).toStringAsFixed(1)} GB'),
+          (
+            l10n.monitorDiskAvailable,
+            '${(total - used).toStringAsFixed(1)} GB'
+          ),
           (l10n.monitorDiskOverallUsage, '${overall.toStringAsFixed(1)}%'),
           (l10n.monitorDiskPartitionCount, '${partitions.length}'),
         ]),
@@ -545,7 +561,8 @@ class _MonitorDetailDialogState extends State<_MonitorDetailDialog> {
           (p) => diskTableRow(
             tc,
             mount: p.mountPoint,
-            used: '${fmtFromMB(p.usedGB * 1024)} / ${fmtFromMB(p.totalGB * 1024)}',
+            used:
+                '${fmtFromMB(p.usedGB * 1024)} / ${fmtFromMB(p.totalGB * 1024)}',
             percent: '${p.usePercent.toStringAsFixed(1)}%',
             usePercent: p.usePercent,
           ),

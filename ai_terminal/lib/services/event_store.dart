@@ -52,5 +52,6 @@ class EventScope {
   void markEmitted(String stableId) => _emittedStableIds.add(stableId);
 
   /// 查询 stableId 对应的 finalId；未分配时原样返回。
-  String finalIdFor(String stableId) => _stableIdToFinalId[stableId] ?? stableId;
+  String finalIdFor(String stableId) =>
+      _stableIdToFinalId[stableId] ?? stableId;
 }

@@ -28,9 +28,8 @@ void main() {
 
     expect(ids, isNotEmpty);
 
-    final missing = ids
-        .where((id) => !File('$logoDir/$id.svg').existsSync())
-        .toList();
+    final missing =
+        ids.where((id) => !File('$logoDir/$id.svg').existsSync()).toList();
     expect(missing, isEmpty, reason: '缺少官方 logo，需下载后放入 $logoDir');
   });
 

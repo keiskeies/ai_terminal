@@ -220,12 +220,15 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
         // 一次点击到），这里只留「配一次不再动」的三项。
         _label(tc, UiText.t('回滚缓冲行数', 'Scrollback buffer')),
         const SizedBox(height: 6),
-        _chips(tc, const [
-          ('1000', '1 千行', '1k'),
-          ('10000', '1 万行', '10k'),
-          ('50000', '5 万行', '50k'),
-          ('100000', '10 万行', '100k'),
-        ], '$_scrollback', (v) async {
+        _chips(
+            tc,
+            const [
+              ('1000', '1 千行', '1k'),
+              ('10000', '1 万行', '10k'),
+              ('50000', '5 万行', '50k'),
+              ('100000', '10 万行', '100k'),
+            ],
+            '$_scrollback', (v) async {
           _scrollback = int.parse(v);
           await _set('terminalScrollback', _scrollback);
         }),
@@ -252,8 +255,7 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
                   ? UiText.t('收起', 'Hide')
                   : UiText.t('编辑', 'Edit'),
               selected: _showKeybindings,
-              onTap: () =>
-                  setState(() => _showKeybindings = !_showKeybindings),
+              onTap: () => setState(() => _showKeybindings = !_showKeybindings),
             ),
           ],
         ),
@@ -305,8 +307,7 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
         '';
     final choices = <({String id, String name, String endpoint})>[
       for (final e in endpoints)
-        for (final m in e.models)
-          (id: m.id, name: m.name, endpoint: e.name),
+        for (final m in e.models) (id: m.id, name: m.name, endpoint: e.name),
     ];
 
     return Column(
@@ -328,8 +329,7 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
               selected: c.id == selected,
               onTap: () async {
                 await AIModelSelectionService.saveSelectedModel(c.id);
-                await _set(
-                    AIModelSelectionService.selectedModelKey, c.id);
+                await _set(AIModelSelectionService.selectedModelKey, c.id);
               },
             ),
         const SizedBox(height: 12),
@@ -407,8 +407,7 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
 
   Widget _agent(ThemeColors tc) {
     final maxSteps = ref.watch(agentProvider.select((s) => s.maxSteps));
-    final timeout =
-        ref.watch(agentProvider.select((s) => s.aiTimeoutSeconds));
+    final timeout = ref.watch(agentProvider.select((s) => s.aiTimeoutSeconds));
     final notifier = ref.read(agentProvider.notifier);
     final customPrompt =
         (SettingsDao.getCached('customSystemPrompt') as String?) ?? '';
@@ -457,12 +456,12 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
           '${_commandTimeoutMultiplier.toStringAsFixed(1)}x',
           onMinus: _commandTimeoutMultiplier <= 0.5
               ? null
-              : () => _setCommandTimeoutMultiplier(
-                  _commandTimeoutMultiplier - 0.5),
+              : () =>
+                  _setCommandTimeoutMultiplier(_commandTimeoutMultiplier - 0.5),
           onPlus: _commandTimeoutMultiplier >= 5.0
               ? null
-              : () => _setCommandTimeoutMultiplier(
-                  _commandTimeoutMultiplier + 0.5),
+              : () =>
+                  _setCommandTimeoutMultiplier(_commandTimeoutMultiplier + 0.5),
         ),
         const SizedBox(height: 8),
         // 确认类提示（[Y/n]、Press ENTER）按保守规则自动应答；默认关。
@@ -488,8 +487,9 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
               style: TextStyle(fontSize: fMicro, color: tc.textMuted),
             ),
             const SizedBox(width: 8),
-            _iconButton(tc, Icons.edit_note_rounded,
-                UiText.t('编辑提示词', 'Edit prompt'), () {
+            _iconButton(
+                tc, Icons.edit_note_rounded, UiText.t('编辑提示词', 'Edit prompt'),
+                () {
               setState(() => _showPrompt = !_showPrompt);
             }),
           ],
@@ -750,8 +750,8 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
       showTopSnackBar(
         context,
         SnackBar(
-          content: Text(
-              AppLocalizations.of(context)!.changeWindowSaveFailed(e.toString())),
+          content: Text(AppLocalizations.of(context)!
+              .changeWindowSaveFailed(e.toString())),
           backgroundColor: tc.error,
           behavior: SnackBarBehavior.floating,
         ),
@@ -916,8 +916,7 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
   Widget _mcpRow(ThemeColors tc, McpManager manager, McpServerConfig c) {
     if (_pendingDelete == c.id) {
       return InlineConfirm(
-        message: UiText.t(
-            '删除「${c.name}」？本机保存的 headers / env / token 一并清理。',
+        message: UiText.t('删除「${c.name}」？本机保存的 headers / env / token 一并清理。',
             'Delete "${c.name}"? Its headers/env/token on this machine are removed too.'),
         onCancel: () => setState(() => _pendingDelete = null),
         onConfirm: () async {
@@ -989,9 +988,8 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
   // ==================== 联网搜索 ====================
 
   Widget _webSearch(ThemeColors tc) {
-    final searxngPending = WebSearchConfig.load()
-        .backendsMissingInstanceUrl()
-        .isNotEmpty;
+    final searxngPending =
+        WebSearchConfig.load().backendsMissingInstanceUrl().isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1097,8 +1095,7 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
           const SizedBox(height: 6),
           _note(
               tc,
-              UiText.t(
-                  'SearXNG 还差实例地址：点它的胶囊补上，否则每次搜索都会跳过它。',
+              UiText.t('SearXNG 还差实例地址：点它的胶囊补上，否则每次搜索都会跳过它。',
                   'SearXNG still needs an instance URL — tap its chip, or every search skips it.')),
         ],
         const SizedBox(height: 10),
@@ -1159,11 +1156,14 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
           if (_webProxyError != null) ...[
             const SizedBox(height: 4),
             Text(_webProxyError!,
-                style: TextStyle(fontSize: fMicro, color: tc.error, height: 1.35)),
+                style:
+                    TextStyle(fontSize: fMicro, color: tc.error, height: 1.35)),
           ] else ...[
             const SizedBox(height: 4),
-            _note(tc, UiText.t('代理仅支持 http://host:port',
-                'Proxy only supports http://host:port')),
+            _note(
+                tc,
+                UiText.t('代理仅支持 http://host:port',
+                    'Proxy only supports http://host:port')),
           ],
           const SizedBox(height: 10),
           // 与「高级」同款折叠：收起时只剩一颗按钮，展开才占这半屏。
@@ -1218,8 +1218,8 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
   Future<void> _saveWebConcurrency(int v) =>
       _patchWeb((c) => c.copyWith(concurrency: v.clamp(1, 12)));
 
-  Future<void> _saveWebTimeout(int v) => _patchWeb(
-      (c) => c.copyWith(backendTimeoutMs: v.clamp(3000, 120000)));
+  Future<void> _saveWebTimeout(int v) =>
+      _patchWeb((c) => c.copyWith(backendTimeoutMs: v.clamp(3000, 120000)));
 
   Future<void> _saveWebProxy(String raw) async {
     final normalized = WebSearchConfig.normalizeProxy(raw);
@@ -1307,52 +1307,55 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
                 },
               )
             else
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(
-                children: [
-                  Icon(Icons.subject_rounded, size: 12, color: tc.textMuted),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          r.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              TextStyle(fontSize: fMicro, color: tc.textMain),
-                        ),
-                        Text(
-                          _ruleScopeLabel(r),
-                          style:
-                              TextStyle(fontSize: fMicro, color: tc.textMuted),
-                        ),
-                      ],
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Row(
+                  children: [
+                    Icon(Icons.subject_rounded, size: 12, color: tc.textMuted),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            r.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                TextStyle(fontSize: fMicro, color: tc.textMain),
+                          ),
+                          Text(
+                            _ruleScopeLabel(r),
+                            style: TextStyle(
+                                fontSize: fMicro, color: tc.textMuted),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  _MiniSwitch(
-                    tc: tc,
-                    value: r.enabled,
-                    onChanged: (v) async {
-                      await notifier.toggleEnabled(r, v);
-                      _changed();
-                    },
-                  ),
-                  _iconButton(
-                      tc, Icons.edit_outlined, UiText.t('编辑', 'Edit'), () {
-                    setState(() {
-                      _ruleInitial = r;
-                      _editingRule = true;
-                    });
-                  }),
-                  _iconButton(tc, Icons.delete_outline, UiText.t('删除', 'Delete'),
-                      () => setState(() => _pendingDelete = r.id),
-                      danger: true),
-                ],
+                    _MiniSwitch(
+                      tc: tc,
+                      value: r.enabled,
+                      onChanged: (v) async {
+                        await notifier.toggleEnabled(r, v);
+                        _changed();
+                      },
+                    ),
+                    _iconButton(tc, Icons.edit_outlined, UiText.t('编辑', 'Edit'),
+                        () {
+                      setState(() {
+                        _ruleInitial = r;
+                        _editingRule = true;
+                      });
+                    }),
+                    _iconButton(
+                        tc,
+                        Icons.delete_outline,
+                        UiText.t('删除', 'Delete'),
+                        () => setState(() => _pendingDelete = r.id),
+                        danger: true),
+                  ],
+                ),
               ),
-            ),
         const SizedBox(height: 6),
         _addButton(tc, UiText.t('添加规则', 'Add rule'), () {
           setState(() {
@@ -1398,10 +1401,13 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
         const SizedBox(height: 10),
         _label(tc, UiText.t('什么时候提醒', 'When to notify')),
         const SizedBox(height: 6),
-        _chips(tc, const [
-          ('failedOnly', '仅失败', 'Failures only'),
-          ('always', '每次都提醒', 'Every run'),
-        ], _notifyTrigger, (v) async {
+        _chips(
+            tc,
+            const [
+              ('failedOnly', '仅失败', 'Failures only'),
+              ('always', '每次都提醒', 'Every run'),
+            ],
+            _notifyTrigger, (v) async {
           await NotificationService.save(
               NotificationService.config.copyWith(trigger: v));
           _notifyTrigger = v;
@@ -1421,8 +1427,10 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
         ),
         if (_notifyEnabled && cfg.webhookUrl.trim().isEmpty) ...[
           const SizedBox(height: 4),
-          _note(tc,
-              UiText.t('还没填 Webhook 地址，发不出去。', 'No webhook URL — nothing will be sent.')),
+          _note(
+              tc,
+              UiText.t('还没填 Webhook 地址，发不出去。',
+                  'No webhook URL — nothing will be sent.')),
         ],
       ],
     );
@@ -1456,8 +1464,8 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
     );
   }
 
-  Widget _iconButton(ThemeColors tc, IconData icon, String tooltip,
-      VoidCallback onTap,
+  Widget _iconButton(
+      ThemeColors tc, IconData icon, String tooltip, VoidCallback onTap,
       {bool danger = false}) {
     return Tooltip(
       message: tooltip,
@@ -1466,8 +1474,7 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
         behavior: HitTestBehavior.opaque,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
-          child: Icon(icon,
-              size: 14, color: danger ? tc.error : tc.textSub),
+          child: Icon(icon, size: 14, color: danger ? tc.error : tc.textSub),
         ),
       ),
     );
@@ -1830,8 +1837,7 @@ class _StepButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(rXSmall),
           border: Border.all(color: enabled ? tc.border : tc.hairline),
         ),
-        child: Icon(icon,
-            size: 12, color: enabled ? tc.textSub : tc.textMuted),
+        child: Icon(icon, size: 12, color: enabled ? tc.textSub : tc.textMuted),
       ),
     );
   }
@@ -1912,8 +1918,7 @@ class _PromptEditorState extends State<_PromptEditor> {
       title: UiText.t('自定义提示词', 'Custom prompt'),
       onBack: widget.onCancel,
       actions: [
-        InlineButton(
-            label: UiText.t('取消', 'Cancel'), onTap: widget.onCancel),
+        InlineButton(label: UiText.t('取消', 'Cancel'), onTap: widget.onCancel),
         InlineButton(
           label: UiText.t('保存', 'Save'),
           primary: true,
@@ -1925,7 +1930,8 @@ class _PromptEditorState extends State<_PromptEditor> {
           label: UiText.t('追加到系统提示词之后', 'Appended after the system prompt'),
           controller: _controller,
           maxLines: 8,
-          hint: UiText.t('写给这台机器的额外约定。', 'Extra instructions for this machine.'),
+          hint:
+              UiText.t('写给这台机器的额外约定。', 'Extra instructions for this machine.'),
         ),
       ],
     );
@@ -1972,7 +1978,8 @@ class _ClearDataConfirmState extends State<_ClearDataConfirm> {
               '会删除：主机与密码、AI 模型配置、会话记录、快捷命令、全部设置。不可恢复。',
               'Removes hosts and passwords, AI model config, chats, snippets and all settings. This cannot be undone.',
             ),
-            style: TextStyle(fontSize: fMicro, color: tc.textMain, height: 1.35),
+            style:
+                TextStyle(fontSize: fMicro, color: tc.textMain, height: 1.35),
           ),
           const SizedBox(height: 8),
           InlineField(
@@ -2091,8 +2098,7 @@ class _WebKeyFormState extends State<_WebKeyForm> {
       title: L10n.str.ut_fddba05801(widget.provider.displayName),
       onBack: widget.onCancel,
       actions: [
-        InlineButton(
-            label: UiText.t('取消', 'Cancel'), onTap: widget.onCancel),
+        InlineButton(label: UiText.t('取消', 'Cancel'), onTap: widget.onCancel),
         InlineButton(
           label: UiText.t('保存并启用', 'Save & enable'),
           primary: true,
@@ -2113,7 +2119,9 @@ class _WebKeyFormState extends State<_WebKeyForm> {
             padding: EdgeInsets.zero,
             onPressed: () => setState(() => _obscure = !_obscure),
             icon: Icon(
-              _obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+              _obscure
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
               color: tc.textSub,
             ),
           ),
@@ -2122,13 +2130,12 @@ class _WebKeyFormState extends State<_WebKeyForm> {
           const SizedBox(height: 6),
           InkWell(
             onTap: () {
-              Clipboard.setData(
-                  ClipboardData(text: widget.provider.signupUrl));
+              Clipboard.setData(ClipboardData(text: widget.provider.signupUrl));
               showTopSnackBar(
                 context,
                 SnackBar(
-                  content: Text(L10n.str.ut_8de5894b72(
-                      widget.provider.signupUrl)),
+                  content:
+                      Text(L10n.str.ut_8de5894b72(widget.provider.signupUrl)),
                   duration: const Duration(seconds: 2),
                   behavior: SnackBarBehavior.floating,
                 ),
@@ -2214,8 +2221,7 @@ class _WebSearxngFormState extends State<_WebSearxngForm> {
       onBack: widget.onCancel,
       error: _error,
       actions: [
-        InlineButton(
-            label: UiText.t('取消', 'Cancel'), onTap: widget.onCancel),
+        InlineButton(label: UiText.t('取消', 'Cancel'), onTap: widget.onCancel),
         InlineButton(
           label: UiText.t('保存并启用', 'Save & enable'),
           primary: true,
@@ -2304,11 +2310,11 @@ class _WebSearxngFormState extends State<_WebSearxngForm> {
   Widget _searxngNote(ThemeColors tc) => Text(
         UiText.t(
           '公共实例（含 searx.be）通常禁用 format=json，只回 HTML，必须自建：'
-          'docker run -d -p 8080:8080 searxng/searxng，并在 settings.yml 启用 '
-          'search.formats: [html, json]。',
+              'docker run -d -p 8080:8080 searxng/searxng，并在 settings.yml 启用 '
+              'search.formats: [html, json]。',
           'Public instances (including searx.be) usually disable format=json and only '
-          'return HTML, so host your own: docker run -d -p 8080:8080 searxng/searxng, '
-          'then enable search.formats: [html, json] in settings.yml.',
+              'return HTML, so host your own: docker run -d -p 8080:8080 searxng/searxng, '
+              'then enable search.formats: [html, json] in settings.yml.',
         ),
         style: TextStyle(fontSize: fMicro, color: tc.textMuted, height: 1.35),
       );
@@ -2403,14 +2409,15 @@ class _WebTestPanelState extends State<_WebTestPanel> {
         if (response != null) ...[
           const SizedBox(height: 8),
           Text(
-              UiText.t(
-                '共 ${response.results.length} 条结果 · '
-                '${response.successCount} 个后端成功 · ${response.failureCount} 个失败',
-                '${response.results.length} results · '
-                '${response.successCount} ok · ${response.failureCount} failed',
-              ),
-              style: TextStyle(fontSize: fMicro, color: tc.textMuted, height: 1.35),
+            UiText.t(
+              '共 ${response.results.length} 条结果 · '
+                  '${response.successCount} 个后端成功 · ${response.failureCount} 个失败',
+              '${response.results.length} results · '
+                  '${response.successCount} ok · ${response.failureCount} failed',
             ),
+            style:
+                TextStyle(fontSize: fMicro, color: tc.textMuted, height: 1.35),
+          ),
           const SizedBox(height: 4),
           for (final report in response.reports)
             Padding(
@@ -2419,7 +2426,9 @@ class _WebTestPanelState extends State<_WebTestPanel> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Icon(
-                    report.ok ? Icons.check_circle_outline : Icons.error_outline,
+                    report.ok
+                        ? Icons.check_circle_outline
+                        : Icons.error_outline,
                     size: 12,
                     color: report.ok ? tc.ok : tc.error,
                   ),

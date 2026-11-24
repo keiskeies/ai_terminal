@@ -8,9 +8,12 @@ import '../core/ui_text.dart';
 import '../utils/command_markers.dart';
 import '../utils/exit_marker_scanner.dart';
 import '../utils/output_processor.dart';
+import '../utils/shell_syntax.dart';
 import '../utils/tail_text_buffer.dart';
 import '../utils/terminal_charset.dart';
 import 'command_executor.dart';
+import 'pty_execution_coordinator.dart';
+import 'pty_output_detector.dart';
 import 'session_log_service.dart';
 import 'ssh_keepalive_socket.dart';
 import '../core/l10n_holder.dart';
@@ -22,6 +25,9 @@ enum SSHConnectionState {
   connected,
   error,
 }
+
+/// SSH 默认命令解释器。由实际 exec 探测结果判定，不能只看操作系统。
+enum RemoteShellKind { posix, cmd, powerShell }
 
 /// SSH 连接错误
 class SSHConnectionError implements Exception {
@@ -55,10 +61,13 @@ class SSHService implements CommandExecutor {
   // M2: _handleDrop 会 complete 所有等待者且不写原因，异常完成分支据此
   // 把「服务级掉线」归类 disconnected，AI 才能收到明确的「该重连」信号
   bool _droppedWhileWaiting = false;
-  // M4: 远端为 Windows OpenSSH（默认 shell cmd.exe）时，POSIX 包装的
-  // `; echo "MARKER$?"` 永远不会产生 marker —— 每条命令干等到超时。
-  // 连接后由 _osInfo 判定（Windows 没有 uname），执行路径按此走 cmd 包装。
-  bool _remoteIsWindowsCmd = false;
+  // M4: Windows OpenSSH 的默认 shell 可能是 cmd 或 PowerShell。
+  // 必须通过实际命令上下文探测；uname/ver 只能识别操作系统，不能识别解释器。
+  RemoteShellKind _remoteShellKind = RemoteShellKind.posix;
+  final PtyExecutionMutex _executionMutex = PtyExecutionMutex();
+  final List<StreamSubscription<dynamic>> _sessionSubscriptions = [];
+  int _connectionGeneration = 0;
+  bool _connecting = false;
 
   // 跳板机相关
   SSHClient? _jumpClient;
@@ -83,6 +92,26 @@ class SSHService implements CommandExecutor {
   /// 注入输出来驱动 executeAndWait 的求值循环。
   @visibleForTesting
   set isConnectedForTesting(bool value) => _isConnected = value;
+
+  @visibleForTesting
+  set sessionForTesting(SSHSession? value) => _session = value;
+
+  @visibleForTesting
+  bool get isConnectingForTesting => _connecting;
+
+  @visibleForTesting
+  int get pendingExecutionCountForTesting => _pendingDoneCompleters.length;
+
+  /// 建连流程测试闸门：在发起网络连接前暂停，用于确定性触发 disconnect/重连竞态。
+  @visibleForTesting
+  Future<void> Function()? connectGateForTesting;
+
+  @visibleForTesting
+  set remoteShellKindForTesting(RemoteShellKind value) =>
+      _remoteShellKind = value;
+
+  @visibleForTesting
+  RemoteShellKind get remoteShellKindForTesting => _remoteShellKind;
 
   String get osInfo => _osInfo;
   @override
@@ -114,16 +143,40 @@ class SSHService implements CommandExecutor {
   /// 已知遗留：alias/LS_COLORS 两段仍是 POSIX 专属，cmd 远端会回显报错；
   /// 修改需要在真实 Windows SSH 目标上验证，不在本次范围内。
   @visibleForTesting
-  static String initCommandsFor({required bool remoteIsWindowsCmd}) =>
-      'export PAGER=cat SYSTEMD_PAGER=cat GIT_PAGER=cat MANPAGER=cat;'
-      'export LS_COLORS="rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32";'
-      'alias ls="ls --color=auto" 2>/dev/null;'
-      'alias ll="ls -la --color=auto" 2>/dev/null;'
-      'alias grep="grep --color=auto" 2>/dev/null;'
-      '${remoteIsWindowsCmd ? '' : 'export TMOUT=0 2>/dev/null;unset TMOUT 2>/dev/null;'}'
-      // 用 ANSI 清屏，避免最小化容器没有 clear 命令时打印
-      // "clear: command not found" 并把初始化命令留在屏幕上
-      'printf \'\\033[2J\\033[H\'\n';
+  static String initCommandsFor({required bool remoteIsWindowsCmd}) {
+    if (remoteIsWindowsCmd)
+      return ''; // cmd/PowerShell 不接收 POSIX export/alias 初始化。
+    return 'export PAGER=cat SYSTEMD_PAGER=cat GIT_PAGER=cat MANPAGER=cat;'
+        'export LS_COLORS="rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32";'
+        'alias ls="ls --color=auto" 2>/dev/null;'
+        'alias ll="ls -la --color=auto" 2>/dev/null;'
+        'alias grep="grep --color=auto" 2>/dev/null;'
+        '${remoteIsWindowsCmd ? '' : 'export TMOUT=0 2>/dev/null;unset TMOUT 2>/dev/null;'}'
+        // 用 ANSI 清屏，避免最小化容器没有 clear 命令时打印
+        // "clear: command not found" 并把初始化命令留在屏幕上
+        'printf \'\\033[2J\\033[H\'\n';
+  }
+
+  /// 从实际命令输出识别默认解释器。OS 为 Windows 并不代表默认 shell 是 cmd：
+  /// OpenSSH 可配置 PowerShell；反之 Git Bash/MSYS 可能运行在 Windows 上。
+  @visibleForTesting
+  static RemoteShellKind remoteShellFromProbe({
+    required String cmdOutput,
+    required String powerShellOutput,
+  }) {
+    final cmdValue = RegExp(r'__AI_CMD__([^\r\n]*)')
+            .firstMatch(cmdOutput)
+            ?.group(1)
+            ?.trim() ??
+        '';
+    if (cmdValue.isNotEmpty && !cmdValue.contains('%COMSPEC%')) {
+      return RemoteShellKind.cmd;
+    }
+    if (RegExp(r'__AI_PS__\d+').hasMatch(powerShellOutput)) {
+      return RemoteShellKind.powerShell;
+    }
+    return RemoteShellKind.posix;
+  }
 
   SSHConnectionState get state => _isConnected
       ? SSHConnectionState.connected
@@ -137,25 +190,78 @@ class SSHService implements CommandExecutor {
     String? jumpPassword,
     String? jumpPrivateKeyContent,
   }) async {
+    if (_disposed) throw StateError('SSHService 已释放');
+    if (_isConnected || _connecting) return;
+    _connecting = true;
+    final generation = ++_connectionGeneration;
     _intentionalDisconnect = false;
     _dropNotified = false;
+    _osInfo = '';
+    _remoteShellKind = RemoteShellKind.posix;
+    SSHSocket? ownedJumpSocket;
+    SSHSocket? ownedSocket;
+    SSHClient? ownedJumpClient;
+    SSHClient? ownedClient;
+    SSHSession? ownedSession;
+    void closeOwnedResources() {
+      // 关闭本次 connect 创建的全部资源；即使已登记到字段，也不能泄漏。
+      // 清字段前校验身份，避免误清较新连接。
+      try {
+        ownedSession?.close();
+      } catch (e) {
+        debugPrint('[SSHService] 关闭过期建连 session 失败: $e');
+      }
+      try {
+        ownedSocket?.destroy();
+      } catch (e) {
+        debugPrint('[SSHService] 销毁过期建连 socket 失败: $e');
+      }
+      try {
+        ownedJumpSocket?.destroy();
+      } catch (e) {
+        debugPrint('[SSHService] 销毁过期跳板 socket 失败: $e');
+      }
+      if (identical(_session, ownedSession)) _session = null;
+      if (identical(_socket, ownedSocket)) _socket = null;
+      if (identical(_client, ownedClient)) _client = null;
+      if (identical(_jumpSocket, ownedJumpSocket)) _jumpSocket = null;
+      if (identical(_jumpClient, ownedJumpClient)) _jumpClient = null;
+      ownedSession = null;
+      ownedSocket = null;
+      ownedClient = null;
+      ownedJumpSocket = null;
+      ownedJumpClient = null;
+    }
+
+    void checkCurrent() {
+      if (_disposed || generation != _connectionGeneration) {
+        closeOwnedResources();
+        throw StateError('SSH 连接已取消或已被新连接替代');
+      }
+    }
+
     try {
       // 连接过程的提示直接进终端输出流，是用户能看到的文案，必须过 UiText。
-      outputController.add(L10n.str.ut_ed6128ba80(config.host, config.port) +
-          '\n');
+      _addOutput('${L10n.str.ut_ed6128ba80(config.host, config.port)}\n');
+      final gate = connectGateForTesting;
+      if (gate != null) {
+        await gate();
+        checkCurrent();
+      }
 
       // 如果配置了跳板机
       if (jumpHostConfig != null) {
-        outputController.add(L10n.str.ut_2574cd27d5(jumpHostConfig.host) +
-            '\n');
+        _addOutput('${L10n.str.ut_2574cd27d5(jumpHostConfig.host)}\n');
 
         // 1. 先连接跳板机（用跳板机自己的超时配置）
-        _jumpSocket = await KeepaliveSSHSocket.connect(
+        ownedJumpSocket = await KeepaliveSSHSocket.connect(
           jumpHostConfig.host,
           jumpHostConfig.port,
           timeout: connectTimeoutFor(jumpHostConfig),
         );
-        _jumpClient = SSHClient(
+        checkCurrent();
+        _jumpSocket = ownedJumpSocket;
+        ownedJumpClient = SSHClient(
           _jumpSocket!,
           username: jumpHostConfig.username,
           onPasswordRequest: () => jumpPassword ?? '',
@@ -164,24 +270,30 @@ class SSHService implements CommandExecutor {
               ? [...SSHKeyPair.fromPem(jumpPrivateKeyContent)]
               : null,
         );
+        _jumpClient = ownedJumpClient;
 
         // 2. 通过跳板机端口转发到目标
-        final forwardSocket = await _jumpClient!.forwardLocal(
-          config.host,
-          config.port,
-        );
-
-        _socket = forwardSocket;
+        // await 返回后先校验代际再登记，避免旧请求覆盖较新连接的资源字段。
+        ownedSocket = await ownedJumpClient!
+            .forwardLocal(
+              config.host,
+              config.port,
+            )
+            .timeout(_connectTimeout);
+        checkCurrent();
+        _socket = ownedSocket;
       } else {
         // 直连（加超时 + TCP keepalive）
-        _socket = await KeepaliveSSHSocket.connect(
+        ownedSocket = await KeepaliveSSHSocket.connect(
           config.host,
           config.port,
           timeout: _connectTimeout,
         );
+        checkCurrent();
+        _socket = ownedSocket;
       }
 
-      _client = SSHClient(
+      ownedClient = SSHClient(
         _socket!,
         username: config.username,
         onPasswordRequest: () => password ?? '',
@@ -192,109 +304,261 @@ class SSHService implements CommandExecutor {
               ]
             : null,
       );
+      _client = ownedClient;
+      final client = ownedClient!;
 
-      // 验证连通性
-      try {
-        final echoResult = await _client!.execute("echo 'OK'");
-        await echoResult.stdout
-            .cast<List<int>>()
-            .transform(utf8.decoder)
-            .join();
-        outputController.add(UiText.t('连接验证通过\n', 'Connection verified\n'));
-      } catch (e) {
-        outputController
-            .add(L10n.str.ut_939fbbbde2(e));
+      // 验证失败必须使建连失败，不能吞异常后继续宣告成功。
+      // 不能带引号：cmd.exe 的 echo 会原样输出 'OK'（含单引号），
+      // 导致 Windows OpenSSH 主机在 shell 类型探测前就被误判为连接失败。
+      final echoOutput =
+          await _execProbe('echo OK', timeout: _connectTimeout, client: client);
+      checkCurrent();
+      if (!echoOutput
+          .split(RegExp(r'[\r\n]+'))
+          .any((line) => line.trim() == 'OK')) {
+        throw SSHConnectionError('SSH 连接验证失败：未收到命令响应');
       }
+      _addOutput(UiText.t('连接验证通过\n', 'Connection verified\n'));
 
-      // 获取系统信息
       try {
-        final sysInfo = await _client!.execute('uname -s -m');
-        _osInfo = (await sysInfo.stdout
-                .cast<List<int>>()
-                .transform(utf8.decoder)
-                .join())
+        _osInfo = (await _execProbe('uname -s -m',
+                timeout: _connectTimeout, client: client))
             .trim();
       } catch (e) {
+        checkCurrent();
         debugPrint('[SSHService] 获取系统信息失败: $e');
         _osInfo = 'Unknown';
       }
 
-      // M4: Windows OpenSSH 没有 uname（_osInfo 为空/Unknown）—— 补一次 ver
-      // 探测远端默认 shell。探测失败按 POSIX 处理（维持现状，无阻塞风险）。
-      if (_osInfo.isEmpty || _osInfo == 'Unknown') {
-        try {
-          final verSession = await _client!
-              .execute('ver')
-              .timeout(const Duration(seconds: 5));
-          final verOut = await verSession.stdout
-              .cast<List<int>>()
-              .transform(utf8.decoder)
-              .join()
-              .timeout(const Duration(seconds: 5), onTimeout: () => '');
-          if (verOut.contains('Windows')) {
-            _remoteIsWindowsCmd = true;
-            _osInfo = 'Windows';
-            debugPrint('[SSHService] 远端判定为 Windows cmd，使用 Windows 包装');
-          }
-        } catch (e) {
-          debugPrint('[SSHService] Windows 探测失败（按 POSIX 处理）: $e');
-        }
+      // Windows OpenSSH 默认 shell 可能是 cmd 或 PowerShell；探测实际上下文，
+      // ver/osInfo 只能识别操作系统，不能决定命令包装语法。
+      String verOutput = '';
+      try {
+        verOutput = await _execProbe('ver',
+            timeout: const Duration(seconds: 5), client: client);
+      } catch (e) {
+        checkCurrent();
+        debugPrint('[SSHService] Windows 探测失败: $e');
+      }
+      final cmdOutput = await _execProbe(
+        'echo "__AI_CMD__%COMSPEC%"',
+        timeout: const Duration(seconds: 5),
+        client: client,
+      ).catchError((Object e) {
+        checkCurrent();
+        debugPrint('[SSHService] cmd 上下文探测失败: $e');
+        return '';
+      });
+      checkCurrent();
+      final powerShellOutput = await _execProbe(
+        r'Write-Output "__AI_PS__$($PSVersionTable.PSVersion.Major)"',
+        timeout: const Duration(seconds: 5),
+        client: client,
+      ).catchError((Object e) {
+        checkCurrent();
+        debugPrint('[SSHService] PowerShell 上下文探测失败: $e');
+        return '';
+      });
+      checkCurrent();
+      _remoteShellKind = remoteShellFromProbe(
+        cmdOutput: cmdOutput,
+        powerShellOutput: powerShellOutput,
+      );
+      if (verOutput.contains('Windows') ||
+          _remoteShellKind != RemoteShellKind.posix) {
+        _osInfo = 'Windows';
+      }
+      if (_osInfo == 'Windows' && _remoteShellKind == RemoteShellKind.posix) {
+        throw SSHConnectionError(
+            '无法识别 Windows OpenSSH 默认 shell（cmd/PowerShell）');
       }
 
       // 打开 Shell
-      _session = await _client!.shell(
+      ownedSession = await client.shell(
         pty: const SSHPtyConfig(
           type: 'xterm-256color',
           width: 80,
           height: 24,
         ),
       );
+      checkCurrent();
+      _session = ownedSession;
+      final session = ownedSession!;
 
       // 流式解码：跨包的半个多字节字符会被 decoder 暂存到下一包，
       // 逐包 utf8.decode 会把中文显示成 �。
       // GBK/BIG5 主机按主机编码解码（terminal_charset），UTF-8 行为不变。
-      decodeTerminalOutput(_session!.stdout.cast<List<int>>(), config.encoding)
-          .listen(
-        (data) {
-          outputController.add(data);
-        },
-        onError: (error) {
-          outputController.add('\r\n${UiText.t('[错误]', '[error]')} $error\r\n');
-          _handleDrop();
-        },
-        onDone: () {
-          if (!outputController.isClosed) {
-            outputController
-                .add('\r\n${UiText.t('[连接已关闭]', '[connection closed]')}\r\n');
-          }
-          _handleDrop();
-        },
+      _sessionSubscriptions.add(
+        decodeTerminalOutput(session.stdout.cast<List<int>>(), config.encoding)
+            .listen(
+          (data) {
+            if (generation == _connectionGeneration) _addOutput(data);
+          },
+          onError: (error) {
+            if (generation != _connectionGeneration) return;
+            _addOutput('\r\n${UiText.t('[错误]', '[error]')} $error\r\n');
+            _handleDrop();
+          },
+          onDone: () {
+            if (generation != _connectionGeneration) return;
+            _addOutput('\r\n${UiText.t('[连接已关闭]', '[connection closed]')}\r\n');
+            _handleDrop();
+          },
+        ),
       );
-
-      decodeTerminalOutput(_session!.stderr.cast<List<int>>(), config.encoding)
-          .listen(
-        (data) {
-          outputController.add(data);
-        },
+      _sessionSubscriptions.add(
+        decodeTerminalOutput(session.stderr.cast<List<int>>(), config.encoding)
+            .listen(
+          (data) {
+            if (generation == _connectionGeneration) _addOutput(data);
+          },
+          onError: (error) {
+            if (generation == _connectionGeneration) {
+              debugPrint('[SSHService] stderr 解码失败: $error');
+            }
+          },
+        ),
       );
 
       _isConnected = true;
 
-      await Future.delayed(const Duration(milliseconds: 300));
-      _session!.write(Uint8List.fromList(utf8.encode(
-          initCommandsFor(remoteIsWindowsCmd: _remoteIsWindowsCmd))));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      checkCurrent();
+      final init = initCommandsFor(
+        remoteIsWindowsCmd: _remoteShellKind != RemoteShellKind.posix,
+      );
+      if (init.isNotEmpty) {
+        await _writeText(init);
+        checkCurrent();
+      }
 
       // 刚建好的连接即为"刚刚确认活着"，第一条命令不必再付一次探测 RTT。
       _lastConfirmedAliveAt = DateTime.now();
 
-      outputController.add('\r\n✅ ${UiText.t('连接成功', 'Connected')}\r\n');
-      outputController.add('OS: $_osInfo\r\n');
-      outputController.add('\$ ');
+      _addOutput('\r\n✅ ${UiText.t('连接成功', 'Connected')}\r\n');
+      _addOutput('OS: $_osInfo\r\n');
+      _addOutput('\$ ');
     } catch (e) {
-      _isConnected = false;
-      outputController
-          .add('\r\n❌ ${UiText.t('连接失败: ', 'Connection failed: ')}$e\r\n');
+      if (generation == _connectionGeneration) {
+        _isConnected = false;
+        _intentionalDisconnect = true; // 建连失败不是掉线通知。
+        await _closeResources();
+        _addOutput('\r\n❌ ${UiText.t('连接失败: ', 'Connection failed: ')}$e\r\n');
+      } else {
+        // 过期请求只关闭自己创建的资源，不能重置状态或关闭较新连接。
+        closeOwnedResources();
+      }
       rethrow;
+    } finally {
+      if (generation == _connectionGeneration) _connecting = false;
+    }
+  }
+
+  void _addOutput(String data) {
+    if (!outputController.isClosed) outputController.add(data);
+  }
+
+  /// exec channel 探测：有界 stdout、排空 stderr、所有路径关闭 session。
+  Future<String> _execProbe(
+    String command, {
+    required Duration timeout,
+    SSHClient? client,
+  }) async {
+    final probeClient = client ?? _client;
+    if (probeClient == null) throw StateError('SSH client 尚未创建');
+    SSHSession? session;
+    StreamSubscription<String>? sub;
+    final done = Completer<void>();
+    final output = TailTextBuffer(64 * 1024);
+    final stopwatch = Stopwatch()..start();
+    try {
+      session = await probeClient.execute(command).timeout(timeout);
+      sub = utf8.decoder.bind(session.stdout.cast<List<int>>()).listen(
+        output.write,
+        onError: (Object e) {
+          if (!done.isCompleted) done.completeError(e);
+        },
+        onDone: () {
+          if (!done.isCompleted) done.complete();
+        },
+      );
+      final stderrDone = session.stderr.drain<void>().catchError((_) {});
+      final remaining = timeout - stopwatch.elapsed;
+      if (remaining <= Duration.zero) throw TimeoutException('SSH 探测超时');
+      await Future.wait<void>([done.future, stderrDone]).timeout(remaining);
+      return output.toString();
+    } finally {
+      await sub?.cancel();
+      if (!done.isCompleted) done.complete();
+      session?.close();
+    }
+  }
+
+  /// 放弃一个无法验证已恢复的会话。
+  ///
+  /// [expectedGeneration] 是调用方开始等待时捕获的连接代际：探测/验证跨
+  /// 异步边界，期间可能已经重连，旧调用绝不能把新连接一起关掉。
+  Future<void> _abandonUnverifiedSession({int? expectedGeneration}) async {
+    if (expectedGeneration != null &&
+        (_disposed || expectedGeneration != _connectionGeneration)) {
+      return;
+    }
+    _isConnected = false;
+    try {
+      _handleDrop();
+    } finally {
+      // 外部掉线回调异常不能阻止 session/client/socket 回收。
+      await _closeResources();
+    }
+  }
+
+  Future<void> _closeResources() async {
+    _cancelSessionSubscriptions();
+    final session = _session;
+    final client = _client;
+    final socket = _socket;
+    final jumpClient = _jumpClient;
+    final jumpSocket = _jumpSocket;
+    _session = null;
+    _client = null;
+    _socket = null;
+    _jumpClient = null;
+    _jumpSocket = null;
+    try {
+      session?.close();
+    } catch (e) {
+      debugPrint('[SSHService] 关闭 session 失败: $e');
+    }
+    try {
+      client?.close();
+    } catch (e) {
+      debugPrint('[SSHService] 关闭 client 失败: $e');
+    }
+    try {
+      socket?.destroy();
+    } catch (e) {
+      debugPrint('[SSHService] 销毁 socket 失败: $e');
+    }
+    try {
+      jumpClient?.close();
+    } catch (e) {
+      debugPrint('[SSHService] 关闭跳板 client 失败: $e');
+    }
+    try {
+      jumpSocket?.destroy();
+    } catch (e) {
+      debugPrint('[SSHService] 销毁跳板 socket 失败: $e');
+    }
+  }
+
+  void _cancelSessionSubscriptions() {
+    final subscriptions =
+        List<StreamSubscription<dynamic>>.from(_sessionSubscriptions);
+    _sessionSubscriptions.clear();
+    for (final subscription in subscriptions) {
+      unawaited(subscription.cancel().catchError((Object e) {
+        debugPrint('[SSHService] 取消会话订阅失败: $e');
+      }));
     }
   }
 
@@ -317,6 +581,47 @@ class SSHService implements CommandExecutor {
     String? sudoPassword,
     Future<String?> Function(String prompt)? onInteractivePrompt,
   }) async {
+    final acquired = await _executionMutex.acquire(cancelToken: cancelToken);
+    if (!acquired) {
+      return CommandResult(
+        stdout: '',
+        stderr: '等待 SSH 执行锁时取消',
+        exitCode: -1,
+        duration: Duration.zero,
+        failureKind: CommandFailureKind.cancelled,
+        failureReason: '命令在执行队列中等待时被取消',
+      );
+    }
+    try {
+      if (cancelToken?.isCompleted ?? false) {
+        return CommandResult(
+          stdout: '',
+          stderr: '命令在获得 SSH 执行锁前已被取消',
+          exitCode: -1,
+          duration: Duration.zero,
+          failureKind: CommandFailureKind.cancelled,
+          failureReason: '命令在获得 SSH 执行锁后、写入前被取消',
+        );
+      }
+      return await _executeAndWaitLocked(
+        command,
+        timeout: timeout,
+        cancelToken: cancelToken,
+        sudoPassword: sudoPassword,
+        onInteractivePrompt: onInteractivePrompt,
+      );
+    } finally {
+      _executionMutex.release();
+    }
+  }
+
+  Future<CommandResult> _executeAndWaitLocked(
+    String command, {
+    Duration timeout = const Duration(seconds: 60),
+    Completer<void>? cancelToken,
+    String? sudoPassword,
+    Future<String?> Function(String prompt)? onInteractivePrompt,
+  }) async {
     // _isConnected 是权威状态位：connect 拿到 session 后才置 true，掉线即置
     // false，与 isConnected getter 同一口径。内部写入对 _session==null 已是
     // 空操作，测试缝隙（isConnectedForTesting）只注入该标志即可驱动求值循环。
@@ -331,6 +636,12 @@ class SSHService implements CommandExecutor {
       );
     }
 
+    // 捕获本次命令绑定的连接身份。活性探测会跨异步边界，期间用户可能
+    // disconnect/重连；旧命令不能向新 session 写入或注册完成等待者。
+    final expectedGeneration = _connectionGeneration;
+    final expectedSession = _session;
+    final expectedClient = _client;
+
     // 后台→前台假连接检测 / 空闲后的活性复检。
     // 注意：`_writeTextQuietly` 的 catch 在这里是死代码——SSHSession.write 是
     // void（fire-and-forget），socket 已死时写入不会抛，这个 try 永远进不去。
@@ -342,7 +653,27 @@ class SSHService implements CommandExecutor {
     final needsRevalidate = _client != null || livenessProbeForTesting != null;
     if (needsRevalidate &&
         (staleSince == null || staleSince >= _idleRevalidateGap)) {
-      if (!await _probeLiveness()) {
+      final alive = await _probeLiveness();
+      final cancelled = cancelToken?.isCompleted ?? false;
+      final connectionChanged = !_isConnected ||
+          expectedGeneration != _connectionGeneration ||
+          !identical(expectedSession, _session) ||
+          !identical(expectedClient, _client);
+      if (connectionChanged) {
+        return CommandResult(
+          stdout: '',
+          stderr: cancelled ? '命令在活性探测期间被取消' : 'SSH 连接在活性探测期间已断开或被替换',
+          exitCode: -1,
+          duration: Duration.zero,
+          failureKind: cancelled
+              ? CommandFailureKind.cancelled
+              : CommandFailureKind.disconnected,
+          failureReason: cancelled
+              ? '命令在活性探测期间被取消，未写入 SSH 会话'
+              : 'SSH 连接在活性探测期间已断开或被替换，未写入 SSH 会话',
+        );
+      }
+      if (!alive) {
         _isConnected = false;
         _handleDrop();
         return CommandResult(
@@ -355,6 +686,16 @@ class SSHService implements CommandExecutor {
               '${staleSince?.inSeconds ?? 0}s 以上）',
         );
       }
+      if (cancelled) {
+        return CommandResult(
+          stdout: '',
+          stderr: '命令在活性探测期间被取消',
+          exitCode: -1,
+          duration: Duration.zero,
+          failureKind: CommandFailureKind.cancelled,
+          failureReason: '命令在活性探测期间被取消，未写入 SSH 会话',
+        );
+      }
       _lastConfirmedAliveAt = DateTime.now();
     }
     // 保留原有行为：向 PTY 敲一次换行，让后台恢复后停在半途的交互提示
@@ -362,6 +703,8 @@ class SSHService implements CommandExecutor {
     _writeTextQuietly('\n');
 
     final stopwatch = Stopwatch()..start();
+    final unclosedSyntaxConfirmed = _remoteShellKind == RemoteShellKind.posix &&
+        ShellSyntax.unclosedReason(command) != null;
     _markerSeq++;
     final marker = CommandMarkers.next(_markerSeq);
     // 标记必须另起一行：`command; echo` 会破坏 heredoc 的结束行
@@ -371,9 +714,13 @@ class SSHService implements CommandExecutor {
     // sudo 随后打开 /dev/tty 读密码，把 `echo "EXITCODE_1:$?"` 当成第一次密码尝试吃掉
     // → "对不起，请重试"，而 marker 再也不会出现。用户实机 `sudo apt update`
     // 反复失败正是这条路径，与 locale 无关。
-    final wrappedCommand = _remoteIsWindowsCmd
-        ? windowsWrapWithExitMarker(command, marker, isPowerShell: false)
-        : posixWrapWithExitMarker(command, marker);
+    final wrappedCommand = switch (_remoteShellKind) {
+      RemoteShellKind.cmd =>
+        windowsWrapWithExitMarker(command, marker, isPowerShell: false),
+      RemoteShellKind.powerShell =>
+        windowsWrapWithExitMarker(command, marker, isPowerShell: true),
+      RemoteShellKind.posix => posixWrapWithExitMarker(command, marker),
+    };
     final markerScanner = ExitMarkerScanner(marker);
     final donePattern = markerScanner.donePattern;
 
@@ -409,6 +756,7 @@ class SSHService implements CommandExecutor {
     final sudoResponder = SudoPromptResponder();
     // 确认类提示应答器：命中提示时桥接给上层（UI/自动应答），而不是中断命令
     final confirmationResponder = ConfirmationPromptResponder();
+    final incrementalDetector = PtyIncrementalOutputDetector();
     // 桥接回调进行中：同一提示的增量 chunk 不再重复触发回调
     var waitingInteractiveAnswer = false;
     _droppedWhileWaiting = false;
@@ -478,15 +826,26 @@ class SSHService implements CommandExecutor {
           }
         }();
       }
-      final diag = PtyOutputDetector.detect(
-        buffer: snapshot,
-        marker: marker,
-        elapsedMs: elapsed,
-        isWindows: _remoteIsWindowsCmd,
-        sudoPromptWillBeAnswered: sudoPassword != null,
-        confirmationPromptWillBeBridged: onInteractivePrompt != null,
-        donePattern: donePattern,
-      );
+      final diag = incrementalDetector.consume(
+            marker: marker,
+            elapsedMs: elapsed,
+            isWindows: _remoteShellKind != RemoteShellKind.posix,
+            sudoPromptWillBeAnswered: sudoPassword != null,
+            confirmationPromptWillBeBridged: onInteractivePrompt != null,
+            unclosedSyntaxConfirmed: unclosedSyntaxConfirmed,
+            donePattern: donePattern,
+          ) ??
+          (force
+              ? incrementalDetector.recheck(
+                  marker: marker,
+                  elapsedMs: elapsed,
+                  isWindows: _remoteShellKind != RemoteShellKind.posix,
+                  sudoPromptWillBeAnswered: sudoPassword != null,
+                  confirmationPromptWillBeBridged: onInteractivePrompt != null,
+                  unclosedSyntaxConfirmed: unclosedSyntaxConfirmed,
+                  donePattern: donePattern,
+                )
+              : null);
       if (diag != null) {
         abnormalReason.add(diag.reason);
         doneCompleter.complete();
@@ -499,6 +858,7 @@ class SSHService implements CommandExecutor {
         lastOutputAtMs = stopwatch.elapsedMilliseconds;
         buffer.write(data);
         detectBuffer.write(data);
+        incrementalDetector.add(data);
         // 增量 marker 检测：只拼接上一块尾部，不做全缓冲扫描
         if (markerScanner.add(data)) {
           markerSeen = true;
@@ -550,6 +910,22 @@ class SSHService implements CommandExecutor {
       );
     }
 
+    Future<bool> verifyShellReady() => PtyInterruptionRecovery.verifyShellReady(
+          output: outputController.stream,
+          write: (line) => _writeTextQuietly('$line\n'),
+          interrupt: () => _writeTextQuietly('\x03'),
+          readyCommand: (marker) => switch (_remoteShellKind) {
+            RemoteShellKind.cmd => 'call echo $marker',
+            RemoteShellKind.powerShell => "Write-Output '$marker'",
+            RemoteShellKind.posix => 'echo $marker',
+          },
+          beforeInterrupt: () {
+            if (PtyOutputDetector.waitsForPager(buffer.tail())) {
+              _writeTextQuietly('q\n');
+            }
+          },
+        );
+
     // 命令停在密码提示上时不再有任何输出，只靠流回调就永远等不到判定。
     // 定时补一次求值，让"卡在交互提示"在秒级被识别，而不是干满超时。
     // 同一个定时器兼任活性看门狗：静默超过阈值就主动探一次链路，
@@ -582,7 +958,10 @@ class SSHService implements CommandExecutor {
           // 链路活着但长时间无新输出且尾部停在续行提示符（PS2 被置空/自定义，
           // 行首正则漏检的情况）：shell 在等引号/括号闭合，命令永远不会结束。
           // 主动发 Ctrl+C 退出等待并按语法错误收尾，避免干等满总超时（最长 10min）。
-          if (PtyOutputDetector.waitsForContinuation(buffer.tail())) {
+          if (PtyOutputDetector.waitsForContinuation(
+            buffer.tail(),
+            unclosedSyntaxConfirmed: unclosedSyntaxConfirmed,
+          )) {
             debugPrint('[SSHService] 静默且尾部停在续行提示符，判定命令未闭合，主动中断');
             abnormalReason.add('PS2：shell 停在续行提示符（引号或括号未闭合），已主动中断');
             // 补换行：确保 shell 退回 PS1，否则下一条命令会被当成续行内容吞掉。
@@ -613,20 +992,11 @@ class SSHService implements CommandExecutor {
         if (cancelToken != null) cancelToken.future,
       ]);
     } on TimeoutException {
-      // 分页器不会响应 Ctrl+C，先按 q 退出，否则它会把下一条命令当成按键吃掉
-      if (PtyOutputDetector.waitsForPager(buffer.toString())) {
-        _writeTextQuietly('q\n');
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      }
-      // 发送 Ctrl+C 中断远程命令，防止后台进程继续输出污染下一条命令
-      _writeTextQuietly('\x03');
-      // 同 markerSeen==false 分支：给被打断的程序留出退出窗口，
-      // 否则它会吃掉调用方下一条命令的输入
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-      // 换行必须在程序退出后再补：空密码提示（sudo）会把紧跟 Ctrl+C 的 \n
-      // 当成一次密码尝试，反而污染输出。此时 shell 已回 PS1，空行无副作用。
-      _writeTextQuietly('\n');
       recheck.cancel();
+      final recovered = await verifyShellReady();
+      if (!recovered) {
+        await _abandonUnverifiedSession(expectedGeneration: expectedGeneration);
+      }
       await sub.cancel();
       _pendingDoneCompleters.remove(doneCompleter);
       SecretMasker.unregister(sudoPassword);
@@ -638,10 +1008,16 @@ class SSHService implements CommandExecutor {
         duration: stopwatch.elapsed,
         timedOut: true,
         failureKind: CommandFailureKind.timeout,
-        failureReason: '命令执行超时 (${timeout.inSeconds}s)',
+        failureReason: '命令执行超时 (${timeout.inSeconds}s)；'
+            '${recovered ? '已验证 shell 恢复' : '未能验证进程退出，已关闭 SSH 会话'}',
       );
     } catch (e) {
       recheck.cancel();
+      final cancelled = cancelToken?.isCompleted ?? false;
+      final recovered = cancelled ? await verifyShellReady() : false;
+      if (cancelled && !recovered) {
+        await _abandonUnverifiedSession(expectedGeneration: expectedGeneration);
+      }
       await sub.cancel();
       _pendingDoneCompleters.remove(doneCompleter);
       SecretMasker.unregister(sudoPassword);
@@ -651,8 +1027,12 @@ class SSHService implements CommandExecutor {
         stderr: e.toString(),
         exitCode: -1,
         duration: stopwatch.elapsed,
-        failureKind: CommandFailureKind.unknown,
-        failureReason: e.toString(),
+        failureKind: cancelled
+            ? CommandFailureKind.cancelled
+            : CommandFailureKind.unknown,
+        failureReason: cancelled
+            ? '命令已取消；${recovered ? '已验证 shell 恢复' : '未能验证进程退出，已关闭 SSH 会话'}'
+            : e.toString(),
       );
     }
 
@@ -660,7 +1040,6 @@ class SSHService implements CommandExecutor {
     await sub.cancel();
     _pendingDoneCompleters.remove(doneCompleter);
     SecretMasker.unregister(sudoPassword);
-    stopwatch.stop();
     // marker 正常出现 = 链路此刻确实可用，记为"最近确认活着"，
     // 后续命令在 _idleRevalidateGap 内不再重复付费探测。
     _lastConfirmedAliveAt = DateTime.now();
@@ -676,30 +1055,23 @@ class SSHService implements CommandExecutor {
       }
     }
     if (!markerSeen) {
-      // 取消时如果停在分页器上，Ctrl+C 退不出 less，必须先按 q
-      if (PtyOutputDetector.waitsForPager(rawOutput)) {
-        _writeTextQuietly('q\n');
-        await Future<void>.delayed(const Duration(milliseconds: 100));
+      // 验证跨异步边界；期间重连时不能用旧判断关掉新会话。
+      final generationCurrent = expectedGeneration == _connectionGeneration;
+      final recovered =
+          generationCurrent && _isConnected ? await verifyShellReady() : false;
+      if (generationCurrent && _isConnected && !recovered) {
+        await _abandonUnverifiedSession(expectedGeneration: expectedGeneration);
       }
-      // 取消时 marker 可能未出现 — 发送 Ctrl+C 停止可能仍在运行的命令
-      _writeTextQuietly('\x03');
-      // 等一下再返回：被 Ctrl+C 打断的 sudo 还活着，并且会把 tty 输入队列里的
-      // 字节当密码尝试吃掉。调用方紧接着发的下一条命令（`sudo -k id; echo ...`）
-      // 整条会被吞进密码提示，于是命令根本没跑、marker 永远不出现、只能干等超时。
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-      // 换行放在等待之后：与上面同一理由，避免 \n 被存活期的 sudo 当空密码吞掉
-      _writeTextQuietly('\n');
-
       final reason = abnormalReason.isNotEmpty
           ? abnormalReason.join('; ')
           : (_droppedWhileWaiting
               ? 'SSH channel 已关闭（连接断开）'
-              : (rawOutput.contains(marker)
-                  ? 'marker 出现但未触发完成'
-                  : '命令未完成'));
+              : (rawOutput.contains(marker) ? 'marker 出现但未触发完成' : '命令未完成'));
       // 推断 failureKind
       CommandFailureKind kind = CommandFailureKind.unknown;
-      if (droppedByProbe) {
+      if (cancelToken?.isCompleted ?? false) {
+        kind = CommandFailureKind.cancelled;
+      } else if (droppedByProbe) {
         kind = CommandFailureKind.disconnected;
       } else if (reason.contains('syntax error') || reason.contains('PS2')) {
         kind = CommandFailureKind.syntaxError;
@@ -708,20 +1080,21 @@ class SSHService implements CommandExecutor {
       } else if (reason.contains('channel 已关闭') || reason.contains('断开')) {
         kind = CommandFailureKind.disconnected;
       }
+      stopwatch.stop();
       return CommandResult(
         stdout: rawOutput,
         stderr: '',
         exitCode: -1,
         duration: stopwatch.elapsed,
         failureKind: kind,
-        failureReason: reason,
+        failureReason: recovered ? '$reason；已验证 shell 恢复' : '$reason；SSH 会话未恢复',
       );
     }
+    stopwatch.stop();
 
     // 从输出中提取退出码：与 scanner 同一口径要求数字后有非数字边界
     // （H1），否则跨 chunk 的 137 在只到 "1" 时会被解析成 1
-    final exitCodeRegex =
-        RegExp('${RegExp.escape(marker)}(\\d+)(?:[^\\d]|\$)');
+    final exitCodeRegex = RegExp('${RegExp.escape(marker)}(\\d+)(?:[^\\d]|\$)');
     final match = exitCodeRegex.firstMatch(rawOutput);
     int exitCode = 0;
     if (match != null) {
@@ -775,6 +1148,47 @@ class SSHService implements CommandExecutor {
     Duration timeout = const Duration(seconds: 30),
     Completer<void>? cancelToken,
   }) async {
+    final acquired = await _executionMutex.acquire(cancelToken: cancelToken);
+    if (!acquired) {
+      return CommandResult(
+        stdout: '',
+        stderr: '等待 SSH 执行锁时取消',
+        exitCode: -1,
+        duration: Duration.zero,
+        failureKind: CommandFailureKind.cancelled,
+        failureReason: '文件写入在执行队列中等待时被取消',
+      );
+    }
+    try {
+      if (cancelToken?.isCompleted ?? false) {
+        return CommandResult(
+          stdout: '',
+          stderr: '文件写入在获得 SSH 执行锁前已被取消',
+          exitCode: -1,
+          duration: Duration.zero,
+          failureKind: CommandFailureKind.cancelled,
+          failureReason: '文件写入在获得 SSH 执行锁后、写入前被取消',
+        );
+      }
+      return await _writeFileViaPtyLocked(
+        path: path,
+        content: content,
+        useSudo: useSudo,
+        timeout: timeout,
+        cancelToken: cancelToken,
+      );
+    } finally {
+      _executionMutex.release();
+    }
+  }
+
+  Future<CommandResult> _writeFileViaPtyLocked({
+    required String path,
+    required Uint8List content,
+    bool useSudo = false,
+    Duration timeout = const Duration(seconds: 30),
+    Completer<void>? cancelToken,
+  }) async {
     if (_session == null || !_isConnected) {
       return CommandResult(
         stdout: '',
@@ -788,15 +1202,15 @@ class SSHService implements CommandExecutor {
 
     // M4: 远端 Windows cmd 没有 stty/cat-heredoc/Ctrl+D(EOF) 语义，
     // PTY 写文件流程整体不成立 —— 明确拒绝并给出替代路径，不冒然执行。
-    if (_remoteIsWindowsCmd) {
+    if (_remoteShellKind != RemoteShellKind.posix) {
       return CommandResult(
         stdout: '',
         stderr: '远端为 Windows，不支持 PTY 写文件',
         exitCode: -1,
         duration: Duration.zero,
         failureKind: CommandFailureKind.unknown,
-        failureReason: '远端是 Windows OpenSSH（cmd），cat/heredoc 与 stty 语义不存在。'
-            '建议：用 SFTP 上传，或 echo 重定向逐行写入，或 PowerShell Set-Content',
+        failureReason: '远端是 Windows OpenSSH（$_remoteShellKind），'
+            'cat/heredoc 与 POSIX stty 语义不存在。建议使用 SFTP 或 PowerShell Set-Content。',
       );
     }
 
@@ -812,7 +1226,7 @@ class SSHService implements CommandExecutor {
     if (useSudo) {
       // sudo 模式：验证 sudo 可用且不需要密码（NOPASSWD 或已缓存）
       // 用 `sudo -n true` —— -n 表示不提示输入密码，需要密码时直接失败
-      final sudoCheck = await executeAndWait(
+      final sudoCheck = await _executeAndWaitLocked(
         "sudo -n true",
         timeout: const Duration(seconds: 5),
         cancelToken: cancelToken,
@@ -840,7 +1254,7 @@ class SSHService implements CommandExecutor {
       }
     } else {
       // 非 sudo 模式：验证文件本身可写 OR 父目录可写（可创建新文件）
-      final permCheck = await executeAndWait(
+      final permCheck = await _executeAndWaitLocked(
         "test -w '$escapedPath' || test -w '$escapedParent'",
         timeout: const Duration(seconds: 5),
         cancelToken: cancelToken,
@@ -875,6 +1289,8 @@ class SSHService implements CommandExecutor {
         : "cat > '$escapedPath'";
 
     final stopwatch = Stopwatch()..start();
+    // 写入流程跨多个 await；期间重连后不能再用旧流程去中断/关闭新会话。
+    final writeGeneration = _connectionGeneration;
     _markerSeq++;
     final marker = CommandMarkers.next(_markerSeq);
     // 关闭终端输入的行尾转换，否则 PTY 的 ICRNL 会把 CRLF 中的 \r 变成 \n，
@@ -898,165 +1314,258 @@ class SSHService implements CommandExecutor {
     final buffer = TailTextBuffer(maxBufferChars);
     final detectBuffer = TailTextBuffer(detectTailChars);
     final doneCompleter = Completer<void>();
+    final incrementalDetector = PtyIncrementalOutputDetector();
     var markerSeen = false;
     var abnormalReason = <String?>[];
     var lastEvaluateAtMs = -evaluateIntervalMs;
     _droppedWhileWaiting = false;
     _pendingDoneCompleters.add(doneCompleter);
     StreamSubscription<String>? sub;
-
-    sub = outputController.stream.listen(
-      (data) {
-        if (doneCompleter.isCompleted) return;
-        buffer.write(data);
-        detectBuffer.write(data);
-        if (markerScanner.add(data)) {
-          markerSeen = true;
-          doneCompleter.complete();
-          return;
-        }
-        final elapsed = stopwatch.elapsedMilliseconds;
-        if (elapsed - lastEvaluateAtMs < evaluateIntervalMs) return;
-        lastEvaluateAtMs = elapsed;
-        if (contentSending) return;
-        final snapshot = detectBuffer.tail();
-        final diag = PtyOutputDetector.detect(
-          buffer: snapshot,
-          marker: marker,
-          elapsedMs: elapsed,
-          isWindows: false,
-          donePattern: donePattern,
-        );
-        if (diag != null) {
-          abnormalReason.add(diag.reason);
-          doneCompleter.complete();
-        }
-      },
-      onError: (e) {
-        if (!doneCompleter.isCompleted) {
-          abnormalReason.add('Stream error: $e');
-          doneCompleter.complete();
-        }
-      },
-      onDone: () {
-        if (!doneCompleter.isCompleted) {
-          if (!markerSeen) {
-            abnormalReason.add('SSH channel 已关闭（连接断开）');
-            _isConnected = false;
-          }
-          doneCompleter.complete();
-        }
-      },
-    );
-
-    // 1. 发送写入命令（cat > path / sudo tee path > /dev/null）
-    try {
-      await _writeText('$wrappedCommand\n');
-    } catch (e) {
-      _isConnected = false;
-      await sub.cancel();
+    var timedOut = false;
+    final timeoutCompleter = Completer<void>();
+    final timeoutTimer = Timer(timeout, () {
+      if (timeoutCompleter.isCompleted) return;
+      timedOut = true;
+      timeoutCompleter.complete();
+    });
+    var cleanedUp = false;
+    Future<void> cleanupWrite() async {
+      if (cleanedUp) return;
+      cleanedUp = true;
+      timeoutTimer.cancel();
       _pendingDoneCompleters.remove(doneCompleter);
+      if (!doneCompleter.isCompleted) doneCompleter.complete();
+      try {
+        await sub?.cancel();
+      } catch (e) {
+        debugPrint('[SSHService] 取消文件写入订阅失败: $e');
+      }
       stopwatch.stop();
-      return CommandResult(
-        stdout: '',
-        stderr: 'SSH 写入失败: $e',
-        exitCode: -1,
-        duration: stopwatch.elapsed,
-        failureKind: CommandFailureKind.disconnected,
-        failureReason: 'SSH 写入失败: $e',
-      );
     }
 
-    // 2. 等待 shell 进入 stdin 等待状态
-    await Future.delayed(const Duration(milliseconds: 100));
-
-    // 3. 逐行发送文件内容（进入内容期：交互式提示检测停止，见 contentSending）
-    contentSending = true;
-    // content 末尾换行判断：保留原文件的换行行为
-    final hasTrailingNewline = content.isNotEmpty && content.last == 0x0a;
-    final contentStr = utf8.decode(content, allowMalformed: true);
-    final lines = contentStr.split('\n');
-    for (int i = 0; i < lines.length; i++) {
-      if (doneCompleter.isCompleted) break; // 中途异常则停止
-      final line = lines[i];
-      final isLast = i == lines.length - 1;
-      // split('\n') 后最后一项若原内容以 \n 结尾则为空串，需跳过避免多送一个空行
-      if (isLast && line.isEmpty && hasTrailingNewline) break;
-      // 最后一行若原内容不以 \n 结尾，则不补 \n（保留无尾换行）
-      final suffix = (isLast && !hasTrailingNewline) ? '' : '\n';
-      // 非 UTF-8 主机必须按主机编码写入，否则中文内容到 GBK 主机就是 UTF-8 字节 → 乱码文件
-      try {
-        await _writeText('$line$suffix');
-      } catch (e) {
-        abnormalReason
-            .add(L10n.str.ut_5c09d2ebc3(e));
-        if (!doneCompleter.isCompleted) doneCompleter.complete();
-        break;
-      }
-      // 每 200 行小延迟，避免 PTY 输入缓冲区溢出
-      if (i > 0 && i % 200 == 0) {
-        await Future.delayed(const Duration(milliseconds: 5));
-      }
-    }
-
-    // 4. 发送 Ctrl+D 结束 stdin
-    // 终端处于 canonical 模式时，Ctrl+D 只会“提交当前行”：
-    // - 内容以 \n 结尾：缓冲区为空，一次 Ctrl+D 即 EOF
-    // - 内容不以 \n 结尾：第一次 Ctrl+D 只把残留内容交给 cat，cat 仍在等输入，
-    //   必须再发一次 Ctrl+D 才会产生 EOF（否则 cat 永久阻塞直到超时）
-    if (!doneCompleter.isCompleted) {
-      try {
-        await _writeText('\x04');
-        if (!hasTrailingNewline) {
-          await Future.delayed(const Duration(milliseconds: 100));
-          if (!doneCompleter.isCompleted) {
-            await _writeText('\x04');
-          }
-        }
-      } catch (e) {
-        abnormalReason.add(L10n.str.ut_160a20b4b9(e));
-        if (!doneCompleter.isCompleted) doneCompleter.complete();
-      }
-    }
-
-    // 5. 等待 marker / 超时 / 取消
-    try {
-      await Future.any([
-        doneCompleter.future,
-        Future.delayed(timeout, () => throw TimeoutException('文件写入超时')),
+    Future<bool> delayOrCancel(Duration duration) async {
+      if (cancelToken?.isCompleted ?? false || timedOut) return false;
+      await Future.any<void>([
+        Future<void>.delayed(duration),
+        timeoutCompleter.future,
         if (cancelToken != null) cancelToken.future,
       ]);
-    } on TimeoutException {
-      _writeTextQuietly('\x03');
-      await sub.cancel();
-      _pendingDoneCompleters.remove(doneCompleter);
-      stopwatch.stop();
-      return CommandResult(
-        stdout: buffer.toString(),
-        stderr: '',
-        exitCode: -1,
-        duration: stopwatch.elapsed,
-        timedOut: true,
-        failureKind: CommandFailureKind.timeout,
-        failureReason: '文件写入超时 (${timeout.inSeconds}s)',
-      );
-    } catch (e) {
-      await sub.cancel();
-      _pendingDoneCompleters.remove(doneCompleter);
-      stopwatch.stop();
-      return CommandResult(
-        stdout: buffer.toString(),
-        stderr: e.toString(),
-        exitCode: -1,
-        duration: stopwatch.elapsed,
-        failureKind: CommandFailureKind.unknown,
-        failureReason: e.toString(),
-      );
+      return !(cancelToken?.isCompleted ?? false) && !timedOut;
     }
 
-    await sub.cancel();
-    _pendingDoneCompleters.remove(doneCompleter);
-    stopwatch.stop();
+    try {
+      sub = outputController.stream.listen(
+        (data) {
+          if (doneCompleter.isCompleted) return;
+          buffer.write(data);
+          detectBuffer.write(data);
+          incrementalDetector.add(data);
+          if (markerScanner.add(data)) {
+            markerSeen = true;
+            doneCompleter.complete();
+            return;
+          }
+          final elapsed = stopwatch.elapsedMilliseconds;
+          if (elapsed - lastEvaluateAtMs < evaluateIntervalMs) return;
+          lastEvaluateAtMs = elapsed;
+          if (contentSending) return;
+          final diag = incrementalDetector.consume(
+            marker: marker,
+            elapsedMs: elapsed,
+            isWindows: false,
+            donePattern: donePattern,
+          );
+          if (diag != null) {
+            abnormalReason.add(diag.reason);
+            doneCompleter.complete();
+          }
+        },
+        onError: (e) {
+          if (!doneCompleter.isCompleted) {
+            abnormalReason.add('Stream error: $e');
+            doneCompleter.complete();
+          }
+        },
+        onDone: () {
+          if (!doneCompleter.isCompleted) {
+            if (!markerSeen) {
+              abnormalReason.add('SSH channel 已关闭（连接断开）');
+              _isConnected = false;
+            }
+            doneCompleter.complete();
+          }
+        },
+      );
+
+      // 1. 发送写入命令（cat > path / sudo tee path > /dev/null）
+      try {
+        if (!(cancelToken?.isCompleted ?? false) && !timedOut) {
+          await _writeText('$wrappedCommand\n');
+        }
+      } catch (e) {
+        _isConnected = false;
+        await sub.cancel();
+        _pendingDoneCompleters.remove(doneCompleter);
+        stopwatch.stop();
+        return CommandResult(
+          stdout: '',
+          stderr: 'SSH 写入失败: $e',
+          exitCode: -1,
+          duration: stopwatch.elapsed,
+          failureKind: CommandFailureKind.disconnected,
+          failureReason: 'SSH 写入失败: $e',
+        );
+      }
+
+      Future<bool> verifyShellReady() =>
+          PtyInterruptionRecovery.verifyShellReady(
+            output: outputController.stream,
+            write: (line) => _writeTextQuietly('$line\n'),
+            interrupt: () => _writeTextQuietly('\x03'),
+            // Ctrl+C 会丢弃 stty 恢复命令（它在同一条命令链的末尾），
+            // 必须在这里补一次恢复，否则用户的回车/换行永久失效。
+            readyCommand: (marker) => '[ -n "\$__ai_terminal_stty" ] && '
+                'stty "\$__ai_terminal_stty" 2>/dev/null || '
+                'stty icrnl inlcr igncr 2>/dev/null; echo $marker',
+          );
+
+      // 2. 等待 shell 进入 stdin 等待状态；取消/总超时立即结束等待。
+      if (!(cancelToken?.isCompleted ?? false) && !timedOut) {
+        await delayOrCancel(const Duration(milliseconds: 100));
+      }
+
+      // 3. 逐行发送文件内容（进入内容期：交互式提示检测停止，见 contentSending）
+      contentSending = true;
+      // content 末尾换行判断：保留原文件的换行行为
+      final hasTrailingNewline = content.isNotEmpty && content.last == 0x0a;
+      final contentStr = utf8.decode(content, allowMalformed: true);
+      final lines = contentStr.split('\n');
+      for (int i = 0; i < lines.length; i++) {
+        // 取消/超时后继续灌内容会把文件写脏，且用户要立即拿回终端。
+        if (doneCompleter.isCompleted ||
+            (cancelToken?.isCompleted ?? false) ||
+            timedOut) {
+          break;
+        }
+        final line = lines[i];
+        final isLast = i == lines.length - 1;
+        // split('\n') 后最后一项若原内容以 \n 结尾则为空串，需跳过避免多送一个空行
+        if (isLast && line.isEmpty && hasTrailingNewline) break;
+        // 最后一行若原内容不以 \n 结尾，则不补 \n（保留无尾换行）
+        final suffix = (isLast && !hasTrailingNewline) ? '' : '\n';
+        // 非 UTF-8 主机必须按主机编码写入，否则中文内容到 GBK 主机就是 UTF-8 字节 → 乱码文件
+        try {
+          await _writeText('$line$suffix');
+        } catch (e) {
+          abnormalReason.add(L10n.str.ut_5c09d2ebc3(e));
+          if (!doneCompleter.isCompleted) doneCompleter.complete();
+          break;
+        }
+        // 每 200 行小延迟，避免 PTY 输入缓冲区溢出
+        if (i > 0 && i % 200 == 0) {
+          await Future.delayed(const Duration(milliseconds: 5));
+        }
+      }
+
+      // 4. 发送 Ctrl+D 结束 stdin
+      // 终端处于 canonical 模式时，Ctrl+D 只会“提交当前行”：
+      // - 内容以 \n 结尾：缓冲区为空，一次 Ctrl+D 即 EOF
+      // - 内容不以 \n 结尾：第一次 Ctrl+D 只把残留内容交给 cat，cat 仍在等输入，
+      //   必须再发一次 Ctrl+D 才会产生 EOF（否则 cat 永久阻塞直到超时）
+      if (!doneCompleter.isCompleted &&
+          !(cancelToken?.isCompleted ?? false) &&
+          !timedOut) {
+        try {
+          await _writeText('\x04');
+          if (!hasTrailingNewline) {
+            await Future.delayed(const Duration(milliseconds: 100));
+            if (!doneCompleter.isCompleted) {
+              await _writeText('\x04');
+            }
+          }
+        } catch (e) {
+          abnormalReason.add(L10n.str.ut_160a20b4b9(e));
+          if (!doneCompleter.isCompleted) doneCompleter.complete();
+        }
+      }
+
+      // 5. 等待 marker / 超时 / 取消。
+      // 超时必须复用步骤 0 启动的总超时，而不是再起一个新的 timeout：
+      // 内容发送阶段已经耗掉的时间否则会被重复计算，持锁时间翻倍。
+      try {
+        await Future.any([
+          doneCompleter.future,
+          timeoutCompleter.future.then((_) => throw TimeoutException('文件写入超时')),
+          if (cancelToken != null) cancelToken.future,
+        ]);
+      } on TimeoutException {
+        // marker 已到 = 写入实际完成，超时只是竞态，走正常成功路径。
+        if (!markerSeen) {
+          final recovered = await verifyShellReady();
+          if (!recovered) {
+            await _abandonUnverifiedSession(
+                expectedGeneration: writeGeneration);
+          }
+          await sub.cancel();
+          _pendingDoneCompleters.remove(doneCompleter);
+          stopwatch.stop();
+          return CommandResult(
+            stdout: buffer.toString(),
+            stderr: '',
+            exitCode: -1,
+            duration: stopwatch.elapsed,
+            timedOut: true,
+            failureKind: CommandFailureKind.timeout,
+            failureReason: '文件写入超时 (${timeout.inSeconds}s)；'
+                '${recovered ? '已验证 shell 恢复' : '未能验证进程退出，已关闭 SSH 会话'}',
+          );
+        }
+      } catch (e) {
+        if (!markerSeen) {
+          final cancelled = cancelToken?.isCompleted ?? false;
+          final recovered = cancelled ? await verifyShellReady() : false;
+          if (cancelled && !recovered) {
+            await _abandonUnverifiedSession(
+                expectedGeneration: writeGeneration);
+          }
+          await sub.cancel();
+          _pendingDoneCompleters.remove(doneCompleter);
+          stopwatch.stop();
+          return CommandResult(
+            stdout: buffer.toString(),
+            stderr: e.toString(),
+            exitCode: -1,
+            duration: stopwatch.elapsed,
+            failureKind: cancelled
+                ? CommandFailureKind.cancelled
+                : CommandFailureKind.unknown,
+            failureReason: cancelled ? '文件写入已取消' : e.toString(),
+          );
+        }
+      }
+      // 取消令牌是正常 complete()，Future.any 不会抛异常，必须在这里显式分流；
+      // 否则会落到下方“marker 未出现”的兜底，被当成 unknown 失败。
+      // marker 已出现说明写入已完成，取消来得太晚，按成功处理。
+      if (!markerSeen && (cancelToken?.isCompleted ?? false)) {
+        final recovered = await verifyShellReady();
+        if (!recovered) {
+          await _abandonUnverifiedSession(expectedGeneration: writeGeneration);
+        }
+        await sub.cancel();
+        _pendingDoneCompleters.remove(doneCompleter);
+        stopwatch.stop();
+        return CommandResult(
+          stdout: buffer.toString(),
+          stderr: '',
+          exitCode: -1,
+          duration: stopwatch.elapsed,
+          failureKind: CommandFailureKind.cancelled,
+          failureReason: '文件写入已取消',
+        );
+      }
+    } finally {
+      await cleanupWrite();
+    }
 
     var rawOutput = buffer.toString();
 
@@ -1067,7 +1576,14 @@ class SSHService implements CommandExecutor {
     }
 
     if (!markerSeen) {
-      _writeTextQuietly('\x03');
+      // 只有仍是同一条连接时才补发中断，避免打断重连后的新会话。
+      if (writeGeneration == _connectionGeneration) {
+        _writeTextQuietly('\x03');
+        // Ctrl+C 丢弃了命令链末尾的 stty 恢复，这里补一次。
+        _writeTextQuietly('[ -n "\$__ai_terminal_stty" ] && '
+            'stty "\$__ai_terminal_stty" 2>/dev/null || '
+            'stty icrnl inlcr igncr 2>/dev/null\n');
+      }
       final reason = abnormalReason.isNotEmpty
           ? abnormalReason.join('; ')
           : (rawOutput.contains(marker) ? 'marker 出现但未触发完成' : '文件写入未完成');
@@ -1093,8 +1609,7 @@ class SSHService implements CommandExecutor {
     }
 
     // 提取退出码（与 scanner 同口径的数字边界，H1）
-    final exitCodeRegex =
-        RegExp('${RegExp.escape(marker)}(\\d+)(?:[^\\d]|\$)');
+    final exitCodeRegex = RegExp('${RegExp.escape(marker)}(\\d+)(?:[^\\d]|\$)');
     final match = exitCodeRegex.firstMatch(rawOutput);
     int exitCode = 0;
     if (match != null) {
@@ -1166,17 +1681,33 @@ class SSHService implements CommandExecutor {
       {Duration timeout = const Duration(seconds: 5)}) async {
     if (_client == null || !_isConnected) return '';
     SSHSession? session;
+    StreamSubscription<String>? sub;
+    final stdoutDone = Completer<void>();
+    final output = TailTextBuffer(256 * 1024);
+    final stopwatch = Stopwatch()..start();
     try {
       session = await _client!.execute(command).timeout(timeout);
-      return await session.stdout
-          .cast<List<int>>()
-          .transform(utf8.decoder)
-          .join()
-          .timeout(timeout);
+      sub = utf8.decoder.bind(session.stdout.cast<List<int>>()).listen(
+        output.write,
+        onError: (Object e) {
+          if (!stdoutDone.isCompleted) stdoutDone.completeError(e);
+        },
+        onDone: () {
+          if (!stdoutDone.isCompleted) stdoutDone.complete();
+        },
+      );
+      final stderrDone = session.stderr.drain<void>().catchError((_) {});
+      final remaining = timeout - stopwatch.elapsed;
+      if (remaining <= Duration.zero) throw TimeoutException('SSH runOnce 超时');
+      await Future.wait<void>([stdoutDone.future, stderrDone])
+          .timeout(remaining);
+      return output.toString();
     } catch (e) {
       debugPrint('[SSHService] runOnce 失败 ($command): $e');
       return '';
     } finally {
+      await sub?.cancel();
+      if (!stdoutDone.isCompleted) stdoutDone.complete();
       session?.close();
     }
   }
@@ -1241,8 +1772,10 @@ class SSHService implements CommandExecutor {
   @visibleForTesting
   static Duration silenceLimitFor(Duration timeout) {
     final quarter = timeout ~/ 4;
-    if (quarter < const Duration(seconds: 10)) return const Duration(seconds: 10);
-    if (quarter > const Duration(seconds: 30)) return const Duration(seconds: 30);
+    if (quarter < const Duration(seconds: 10))
+      return const Duration(seconds: 10);
+    if (quarter > const Duration(seconds: 30))
+      return const Duration(seconds: 30);
     return quarter;
   }
 
@@ -1316,30 +1849,30 @@ class SSHService implements CommandExecutor {
     _pendingDoneCompleters.clear();
     if (!_intentionalDisconnect && !_dropNotified) {
       _dropNotified = true;
-      onDisconnected?.call();
+      try {
+        onDisconnected?.call();
+      } catch (e) {
+        // 上层 UI/自动重连回调异常不能阻断本次掉线清理或向命令等待者传播。
+        debugPrint('[SSHService] 掉线回调失败: $e');
+      }
     }
   }
 
   Future<void> disconnect() async {
     _intentionalDisconnect = true;
     _isConnected = false;
+    _connecting = false;
+    // 先使所有在建 connect 失效，再关闭资源。过期 connect 的 catch/finally
+    // 看到代际不同，不会重置状态或关闭较新连接。
+    _connectionGeneration++;
     // complete 所有等待者，避免 executeAndWait / writeFileViaPty 永久挂起
     for (final p in _pendingDoneCompleters) {
       if (!p.isCompleted) p.complete();
     }
     _pendingDoneCompleters.clear();
-    _session?.close();
-    _client?.close();
-    _socket?.destroy();
-    _jumpClient?.close();
-    _jumpSocket?.destroy();
-    _session = null;
-    _client = null;
-    _socket = null;
-    _jumpClient = null;
-    _jumpSocket = null;
+    await _closeResources();
     if (!outputController.isClosed) {
-      outputController.add('\r\n${UiText.t('[已断开连接]', '[disconnected]')}\r\n');
+      _addOutput('\r\n${UiText.t('[已断开连接]', '[disconnected]')}\r\n');
     }
   }
 

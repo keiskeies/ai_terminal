@@ -27,15 +27,13 @@ class McpOAuthProvider implements OAuthAuthorizationCodeProvider {
   Uri? _redirectUri;
   String _pendingAuthUrl = '';
   bool _disposed = false;
-  final Completer<McpOAuthCallback> _callback =
-      Completer<McpOAuthCallback>();
+  final Completer<McpOAuthCallback> _callback = Completer<McpOAuthCallback>();
 
   String get pendingAuthUrl => _pendingAuthUrl;
 
   Future<void> init() async {
     _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    _redirectUri =
-        Uri.parse('http://127.0.0.1:${_server!.port}/callback');
+    _redirectUri = Uri.parse('http://127.0.0.1:${_server!.port}/callback');
     _server!.listen(_handleRequest);
   }
 
@@ -78,8 +76,7 @@ class McpOAuthProvider implements OAuthAuthorizationCodeProvider {
     if (tokens is OAuthAuthorizationCodeTokens) {
       final expiresIn = tokens.expiresIn;
       if (expiresIn != null && expiresIn > 0) {
-        expiresAtMs =
-            DateTime.now().millisecondsSinceEpoch + expiresIn * 1000;
+        expiresAtMs = DateTime.now().millisecondsSinceEpoch + expiresIn * 1000;
       }
     }
     if (tokens is OAuthIssuerBoundAuthorizationCodeTokens) {

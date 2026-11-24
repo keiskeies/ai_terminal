@@ -19,7 +19,8 @@ class FormValidators {
     }
     // 简单的 IP 或域名验证
     final ipRegex = RegExp(r'^(\d{1,3}\.){3}\d{1,3}$');
-    final domainRegex = RegExp(r'^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$');
+    final domainRegex = RegExp(
+        r'^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)*$');
     if (!ipRegex.hasMatch(value) && !domainRegex.hasMatch(value)) {
       return '请输入有效的 IP 地址或域名';
     }

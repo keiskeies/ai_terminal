@@ -39,7 +39,9 @@ class PlanStep {
       title: title is String ? title : '',
       status: parseStatus(rawStatus is String ? rawStatus : null),
       hostIds: json['hostIds'] is List
-          ? (json['hostIds'] as List).whereType<String>().toList(growable: false)
+          ? (json['hostIds'] as List)
+              .whereType<String>()
+              .toList(growable: false)
           : const [],
       note: json['note'] is String ? json['note'] as String : null,
     );

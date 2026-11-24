@@ -172,11 +172,27 @@ void main() {
       expect(second.goal.status, AgentGoalStatus.paused);
     });
 
-    test('续跑不越预算：第 23 轮跑完是 24 轮，下一轮判定才结束', () {
+    test('续跑不越预算：第 24 轮结束后直接结束，不再调度第 25 轮', () {
       final d = decide(g: goal(roundsUsed: 23, maxRounds: 24));
-      expect(d.action, GoalAction.continueRound);
+      expect(d.action, GoalAction.finish);
+      expect(d.reason, 'budget_exhausted');
       expect(d.goal.roundsUsed, 24);
       expect(d.goal.budgetExhausted, isTrue);
+      expect(d.goal.status, AgentGoalStatus.finished);
+    });
+
+    test('预算尚余一轮时才续跑：第 23 轮结束后进入第 24 轮', () {
+      final d = decide(g: goal(roundsUsed: 22, maxRounds: 24));
+      expect(d.action, GoalAction.continueRound);
+      expect(d.goal.roundsUsed, 23);
+      expect(d.goal.budgetExhausted, isFalse);
+    });
+
+    test('maxRounds=1：首轮结束后结束，绝不发起第二轮', () {
+      final d = decide(g: goal(roundsUsed: 0, maxRounds: 1));
+      expect(d.action, GoalAction.finish);
+      expect(d.reason, 'budget_exhausted');
+      expect(d.goal.roundsUsed, 1);
     });
   });
 

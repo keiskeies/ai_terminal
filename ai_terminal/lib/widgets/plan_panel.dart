@@ -66,11 +66,10 @@ class _PlanPanelState extends State<PlanPanel> {
     if (steps.isEmpty) return const SizedBox.shrink();
     final tc = widget.tc;
     final ui = AgentUiText.of(context);
-    final currentIndex = steps
-        .indexWhere((s) => s.status == PlanStepStatus.inProgress);
-    final doneCount = steps
-        .where((s) => s.status == PlanStepStatus.completed)
-        .length;
+    final currentIndex =
+        steps.indexWhere((s) => s.status == PlanStepStatus.inProgress);
+    final doneCount =
+        steps.where((s) => s.status == PlanStepStatus.completed).length;
     // 收起时把"当前在做哪一步"带到标题行：只留进度数字等于把计划藏没了
     final headerLabel = !_expanded && currentIndex >= 0
         ? '${ui.step(currentIndex + 1)} · ${steps[currentIndex].title}'
@@ -172,13 +171,10 @@ class _PlanPanelState extends State<PlanPanel> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ..._visibleSteps()
-              .asMap()
-              .entries
-              .map((entry) => _buildStepRow(
-                    entry.value,
-                    isCurrentStep: entry.key == currentIndex,
-                  )),
+          ..._visibleSteps().asMap().entries.map((entry) => _buildStepRow(
+                entry.value,
+                isCurrentStep: entry.key == currentIndex,
+              )),
           if (widget.steps.length > _collapsedLimit && !_showAll)
             Padding(
               padding: const EdgeInsets.only(top: 2),
@@ -226,7 +222,8 @@ class _PlanPanelState extends State<PlanPanel> {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
       decoration: BoxDecoration(
         // 面板底已经是 dataCard，用品牌色标"当前步"而不是再造一档灰
-        color: isCurrent ? tc.brand.withValues(alpha: 0.10) : Colors.transparent,
+        color:
+            isCurrent ? tc.brand.withValues(alpha: 0.10) : Colors.transparent,
         // 选中条是"胶囊"而不是表格单元：5px 在这条窄条上几乎看不出弧度，
         // 和卡片 10px 的圆角也接不上，统一到 8px
         borderRadius: BorderRadius.circular(rSmall),
@@ -255,8 +252,7 @@ class _PlanPanelState extends State<PlanPanel> {
                     color: titleColor,
                     fontSize: fSmall,
                     height: 1.35,
-                    fontWeight:
-                        isCurrent ? FontWeight.w600 : FontWeight.w500,
+                    fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
                     decoration: step.status == PlanStepStatus.skipped
                         ? TextDecoration.lineThrough
                         : null,
@@ -269,8 +265,7 @@ class _PlanPanelState extends State<PlanPanel> {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      Icon(Icons.terminal,
-                          size: 10, color: tc.textSub),
+                      Icon(Icons.terminal, size: 10, color: tc.textSub),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
@@ -280,7 +275,8 @@ class _PlanPanelState extends State<PlanPanel> {
                           style: TextStyle(
                             color: tc.textSub,
                             fontSize: fMicro,
-                            fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                            fontFamily: 'JetBrainsMono',
+                            fontFamilyFallback: kMonoFontFallback,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -300,7 +296,8 @@ class _PlanPanelState extends State<PlanPanel> {
               style: TextStyle(
                 color: tc.textSub,
                 fontSize: fMicro,
-                fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: kMonoFontFallback,
                 fontWeight: FontWeight.w500,
               ),
             ),

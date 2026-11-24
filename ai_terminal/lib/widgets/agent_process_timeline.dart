@@ -108,13 +108,13 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
   }
 
   bool _isOpen(AgentEvent commandEvent, AgentEvent? result) {
-    return _rowOpen[commandEvent.id] ?? _rowOpenedByDefault(commandEvent, result);
+    return _rowOpen[commandEvent.id] ??
+        _rowOpenedByDefault(commandEvent, result);
   }
 
   void _toggleRow(AgentEvent commandEvent, AgentEvent? result) {
     setState(() {
-      _rowOpen[commandEvent.id] =
-          !_isOpen(commandEvent, result);
+      _rowOpen[commandEvent.id] = !_isOpen(commandEvent, result);
     });
   }
 
@@ -138,8 +138,7 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
       if (e.isCommand) {
         askingCommandId = e.id;
       } else if (e.type == AgentEventType.info) {
-        if (askingCommandId != null &&
-            (e.text ?? '').contains('需要确认')) {
+        if (askingCommandId != null && (e.text ?? '').contains('需要确认')) {
           confirmedIds.add(askingCommandId);
         }
         askingCommandId = null;
@@ -241,7 +240,8 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
       final r = rows[i];
       switch (r.kind) {
         case _RowKind.call:
-          children.add(_callRow(r, confirmed: confirmedIds.contains(r.event.id)));
+          children
+              .add(_callRow(r, confirmed: confirmedIds.contains(r.event.id)));
           break;
         case _RowKind.thought:
         case _RowKind.note:
@@ -276,7 +276,6 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
       children: children,
     );
   }
-
 
   /// 头部：一行统计 + 展开/收起（仅在确实藏了行时渲染）
   /// 工具/命令行：一行摘要 + 尾部状态与耗时，点击展开参数与输出
@@ -318,9 +317,8 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
     // 执行前被询问过、且用户确认执行：行尾留一个「已确认」标记
     final showConfirmed = confirmed && ok;
     final statusColor = ok ? tc.ok : tc.error;
-    final statusText = ok
-        ? (isTool ? ui.toolDoneLabel : ui.executedLabel)
-        : ui.failedLabel;
+    final statusText =
+        ok ? (isTool ? ui.toolDoneLabel : ui.executedLabel) : ui.failedLabel;
     final duration = result.durationMs;
 
     return Container(
@@ -351,8 +349,8 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
                     decoration: BoxDecoration(
-                      color: (isTool ? tc.brand : tc.ok)
-                          .withValues(alpha: 0.12),
+                      color:
+                          (isTool ? tc.brand : tc.ok).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(rXSmall),
                     ),
                     child: Row(
@@ -405,8 +403,8 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
                       child: Text('${duration}ms',
-                          style: TextStyle(
-                              color: tc.textMuted, fontSize: fMicro)),
+                          style:
+                              TextStyle(color: tc.textMuted, fontSize: fMicro)),
                     ),
                   Text(
                     statusText,
@@ -437,7 +435,14 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
     // command 事件里存的是 "tool_name\n  key: value" 多行格式，取关键参数
     final parts = raw.split('\n').skip(1);
     const priority = [
-      'path', 'command', 'query', 'remote', 'local', 'url', 'hostIds', 'action'
+      'path',
+      'command',
+      'query',
+      'remote',
+      'local',
+      'url',
+      'hostIds',
+      'action'
     ];
     String? fallback;
     for (final line in parts) {
@@ -510,7 +515,8 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
               children: [
                 Padding(
                   padding: const EdgeInsets.only(top: 1, right: 5),
-                  child: Icon(Icons.info_outline, size: 12, color: tc.textMuted),
+                  child:
+                      Icon(Icons.info_outline, size: 12, color: tc.textMuted),
                 ),
                 Expanded(
                   child: Text(
@@ -608,8 +614,7 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
               child: Text(
                 text,
                 maxLines: opened ? null : 1,
-                overflow:
-                    opened ? TextOverflow.clip : TextOverflow.ellipsis,
+                overflow: opened ? TextOverflow.clip : TextOverflow.ellipsis,
                 style: TextStyle(
                   color: tc.textBody,
                   fontSize: fSmall,
@@ -639,8 +644,7 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
     final tc = widget.tc;
     final ui = AgentUiText.of(context);
     final group = row.events;
-    final first =
-        _progressPattern.firstMatch((group.first.text ?? '').trim());
+    final first = _progressPattern.firstMatch((group.first.text ?? '').trim());
     final last = _progressPattern.firstMatch((group.last.text ?? '').trim());
     final prefix = (first?.group(1) ?? '').trim();
     final current = int.tryParse(last?.group(2) ?? '') ?? 0;

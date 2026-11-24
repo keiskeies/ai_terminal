@@ -19,15 +19,18 @@ void main() {
 
   group('SSHService.connectTimeoutFor', () {
     test('中间值原样生效——这是本条修复的全部意义', () {
-      expect(SSHService.connectTimeoutFor(cfg(45)), const Duration(seconds: 45));
-      expect(SSHService.connectTimeoutFor(cfg(30)), const Duration(seconds: 30));
+      expect(
+          SSHService.connectTimeoutFor(cfg(45)), const Duration(seconds: 45));
+      expect(
+          SSHService.connectTimeoutFor(cfg(30)), const Duration(seconds: 30));
     });
 
     test('夹到 UI 滑杆区间 10–120 s', () {
       // 滑杆本身不给越界的机会，但存档/导入的 SSH config 可以带任意值进来。
       expect(SSHService.connectTimeoutFor(cfg(1)), const Duration(seconds: 10));
       expect(SSHService.connectTimeoutFor(cfg(0)), const Duration(seconds: 10));
-      expect(SSHService.connectTimeoutFor(cfg(9999)), const Duration(seconds: 120));
+      expect(SSHService.connectTimeoutFor(cfg(9999)),
+          const Duration(seconds: 120));
     });
   });
 

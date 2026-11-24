@@ -31,6 +31,7 @@ void main() {
         marker: 'EXITCODE_1:',
         elapsedMs: 800,
         isWindows: false,
+        unclosedSyntaxConfirmed: true,
       );
       expect(diag, isNotNull);
       expect(diag!.kind, CommandFailureKind.syntaxError);
@@ -101,7 +102,7 @@ void main() {
       // 不应该被识别为语法错误
       // marker 未出现的窗口内（但日志本身合法）不应误报
       final diag = PtyOutputDetector.detect(
-        buffer: 'bash: foo: command not found\n',  // 不含 marker
+        buffer: 'bash: foo: command not found\n', // 不含 marker
         marker: 'EXITCODE_1:',
         elapsedMs: 500,
         isWindows: false,
@@ -132,6 +133,33 @@ void main() {
         isWindows: false,
       );
       expect(diag, isNull, reason: '行内 > 不该误判为 PS2');
+    });
+
+    test('误报规避：独占一行的裸 > 仍是普通输出', () {
+      for (final buffer in ['diff output\r\n> \r\n', 'log line\n> ']) {
+        expect(
+          PtyOutputDetector.detect(
+            buffer: buffer,
+            marker: 'EXITCODE_1:',
+            elapsedMs: 800,
+            isWindows: false,
+          ),
+          isNull,
+          reason: '未预检确认未闭合时，裸 > 不得当成 PS2：$buffer',
+        );
+      }
+    });
+
+    test('预检确认未闭合后裸 > 才作为 PS2', () {
+      final diag = PtyOutputDetector.detect(
+        buffer: 'echo "abc\r\n> ',
+        marker: 'EXITCODE_1:',
+        elapsedMs: 800,
+        isWindows: false,
+        unclosedSyntaxConfirmed: true,
+      );
+      expect(diag?.kind, CommandFailureKind.syntaxError);
+      expect(diag?.reason, contains('PS2'));
     });
 
     test('Windows 跳过 POSIX shell 检测', () {
@@ -294,7 +322,8 @@ void main() {
     });
 
     test('正文中间的 (END) 不算分页器', () {
-      const buffer = '(END)\r\nIDX BOOT ID\r\n  0 156cc5d90dde403f9e674bd2bcd53dfd';
+      const buffer =
+          '(END)\r\nIDX BOOT ID\r\n  0 156cc5d90dde403f9e674bd2bcd53dfd';
       expect(PtyOutputDetector.waitsForPager(buffer), isFalse);
     });
 
@@ -304,25 +333,211 @@ void main() {
     });
 
     test('普通命令输出不误判', () {
-      expect(PtyOutputDetector.waitsForPager('total 0\r\ndrwxr-xr-x 2 root root'), isFalse);
+      expect(
+          PtyOutputDetector.waitsForPager('total 0\r\ndrwxr-xr-x 2 root root'),
+          isFalse);
       expect(PtyOutputDetector.waitsForPager(''), isFalse);
+    });
+  });
+
+  group('PtyIncrementalOutputDetector', () {
+    test('历史 Password 行不会被当成当前等待输入', () {
+      final detector = PtyIncrementalOutputDetector();
+      detector.add('Password:\n');
+      expect(
+          detector.consume(
+            marker: 'EXITCODE_1:',
+            elapsedMs: 500,
+            isWindows: false,
+          ),
+          isNull);
+      detector.add('ordinary output\n');
+      expect(
+          detector.consume(
+            marker: 'EXITCODE_1:',
+            elapsedMs: 500,
+            isWindows: false,
+          ),
+          isNull);
+    });
+
+    test('历史语法错误不会在后续增量检查中重复触发', () {
+      final detector = PtyIncrementalOutputDetector();
+      detector.add('bash: syntax error near unexpected token\n');
+      expect(
+          detector
+              .consume(
+                marker: 'EXITCODE_1:',
+                elapsedMs: 500,
+                isWindows: false,
+              )
+              ?.kind,
+          CommandFailureKind.syntaxError);
+      detector.add('normal output\n');
+      expect(
+          detector.consume(
+            marker: 'EXITCODE_1:',
+            elapsedMs: 900,
+            isWindows: false,
+          ),
+          isNull);
+      detector.add('bash: syntax error near unexpected token\n');
+      expect(
+          detector
+              .consume(
+                marker: 'EXITCODE_1:',
+                elapsedMs: 1200,
+                isWindows: false,
+              )
+              ?.kind,
+          CommandFailureKind.syntaxError);
+    });
+
+    test('跨 chunk 的 shell 语法错误可识别', () {
+      final detector = PtyIncrementalOutputDetector();
+      detector.add('-bash: syntax ');
+      expect(
+          detector.consume(
+            marker: 'EXITCODE_1:',
+            elapsedMs: 400,
+            isWindows: false,
+          ),
+          isNull);
+      detector.add('error near unexpected token\n');
+      expect(
+          detector
+              .consume(
+                marker: 'EXITCODE_1:',
+                elapsedMs: 500,
+                isWindows: false,
+              )
+              ?.kind,
+          CommandFailureKind.syntaxError);
+    });
+
+    test('跨 chunk 的 sudo 提示可识别且不重复应答', () {
+      final detector = PtyIncrementalOutputDetector();
+      final responder = SudoPromptResponder();
+      detector.add('[sudo] password for');
+      expect(
+          detector.consume(
+            marker: 'EXITCODE_1:',
+            elapsedMs: 400,
+            isWindows: false,
+          ),
+          isNull);
+      detector.add(' cjm: ');
+      final prompt = responder.shouldAnswer('[sudo] password for cjm: ');
+      expect(prompt, isTrue);
+      expect(
+          detector
+              .consume(
+                marker: 'EXITCODE_1:',
+                elapsedMs: 500,
+                isWindows: false,
+              )
+              ?.kind,
+          CommandFailureKind.interactivePrompt);
+      expect(responder.shouldAnswer('[sudo] password for cjm:  '), isFalse);
+    });
+
+    test('裸 PS2 仅在执行前确认未闭合时经增量检测识别', () {
+      final detector = PtyIncrementalOutputDetector();
+      detector.add('echo "abc\r\n> ');
+      expect(
+          detector.consume(
+            marker: 'EXITCODE_1:',
+            elapsedMs: 800,
+            isWindows: false,
+          ),
+          isNull);
+      detector.add('\n> ');
+      expect(
+          detector
+              .consume(
+                marker: 'EXITCODE_1:',
+                elapsedMs: 900,
+                isWindows: false,
+                unclosedSyntaxConfirmed: true,
+              )
+              ?.kind,
+          CommandFailureKind.syntaxError);
+    });
+
+    test('洪峰截断不会拆开 UTF-16 代理对', () {
+      final detector = PtyIncrementalOutputDetector();
+      final emoji = '😀';
+      final data =
+          List.filled(PtyIncrementalOutputDetector.maxPendingChars * 2 + 1, 'x')
+                  .join() +
+              emoji;
+      detector.add(data);
+      expect(
+          detector.consume(
+            marker: 'EXITCODE_1:',
+            elapsedMs: 800,
+            isWindows: false,
+          ),
+          isNull);
+      detector.add('\nbash: syntax error: unexpected token\n');
+      expect(
+          detector
+              .consume(
+                marker: 'EXITCODE_1:',
+                elapsedMs: 1000,
+                isWindows: false,
+              )
+              ?.kind,
+          CommandFailureKind.syntaxError);
+    });
+    test('门槛前到达的密码提示不会被 consume 清空后永久丢失', () {
+      final detector = PtyIncrementalOutputDetector();
+      detector.add('Password: ');
+      // 150ms 门槛内 consume 返回 null 并清空 pending。
+      expect(
+          detector.consume(
+            marker: 'EXITCODE_1:',
+            elapsedMs: 100,
+            isWindows: false,
+          ),
+          isNull);
+      // 定时 recheck 必须还能从尾窗重新识别出提示。
+      expect(
+          detector
+              .recheck(
+                marker: 'EXITCODE_1:',
+                elapsedMs: 400,
+                isWindows: false,
+              )
+              ?.kind,
+          CommandFailureKind.interactivePrompt);
     });
   });
 
   group('PtyOutputDetector.waitsForContinuation', () {
     test('标准 PS2 提示符命中', () {
-      expect(PtyOutputDetector.waitsForContinuation('echo "abc\r\n> '), isTrue);
+      expect(
+          PtyOutputDetector.waitsForContinuation('echo "abc\r\n> ',
+              unclosedSyntaxConfirmed: true),
+          isTrue);
       expect(PtyOutputDetector.waitsForContinuation('cmd\r\ndquote> '), isTrue);
       expect(PtyOutputDetector.waitsForContinuation('a\nbquote> '), isTrue);
       // 带 ANSI 色的自定义提示符（去色后是标准形态）
-      expect(PtyOutputDetector.waitsForContinuation('a\r\n\x1B[31m> \x1B[0m'), isTrue);
+      expect(
+          PtyOutputDetector.waitsForContinuation('a\r\n\x1B[31m> \x1B[0m',
+              unclosedSyntaxConfirmed: true),
+          isTrue);
     });
 
     test('普通以 > 结尾的输出不得命中（回归：避免误杀长命令）', () {
-      expect(PtyOutputDetector.waitsForContinuation('last line ends with angle >'), isFalse);
+      expect(
+          PtyOutputDetector.waitsForContinuation('last line ends with angle >'),
+          isFalse);
       expect(PtyOutputDetector.waitsForContinuation('echo abc >'), isFalse);
-      expect(PtyOutputDetector.waitsForContinuation('total 3\r\necho abc >'), isFalse);
+      expect(PtyOutputDetector.waitsForContinuation('total 3\r\necho abc >'),
+          isFalse);
       expect(PtyOutputDetector.waitsForContinuation('> b'), isFalse);
+      expect(PtyOutputDetector.waitsForContinuation('diff\r\n> '), isFalse);
       expect(PtyOutputDetector.waitsForContinuation(''), isFalse);
     });
   });

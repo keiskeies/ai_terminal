@@ -67,9 +67,7 @@ class CrashReporter {
     _sessionCrashCount++;
     _lastCrashTime = DateTime.now();
     final errStr = error.toString();
-    _lastCrashSummary = errStr.length > 200
-        ? errStr.substring(0, 200)
-        : errStr;
+    _lastCrashSummary = errStr.length > 200 ? errStr.substring(0, 200) : errStr;
 
     final file = _crashFile;
     if (file == null) {
@@ -81,15 +79,18 @@ class CrashReporter {
     final entry = StringBuffer()
       ..writeln('=== CRASH ${now.toIso8601String()} ===')
       ..writeln('context: ${context ?? "unknown"}')
-      ..writeln('appVersion: ${_appVersion ?? "unknown"}+${_buildNumber ?? "0"}')
-      ..writeln('platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}')
+      ..writeln(
+          'appVersion: ${_appVersion ?? "unknown"}+${_buildNumber ?? "0"}')
+      ..writeln(
+          'platform: ${Platform.operatingSystem} ${Platform.operatingSystemVersion}')
       ..writeln('error: $errStr')
       ..writeln('stack:')
       ..writeln(stack?.toString() ?? '<no stack>')
       ..writeln('');
 
     try {
-      await file.writeAsString(entry.toString(), mode: FileMode.append, flush: true);
+      await file.writeAsString(entry.toString(),
+          mode: FileMode.append, flush: true);
       await _rotateIfNeeded(file);
     } catch (e) {
       debugPrint('[CrashReporter] 写入失败: $e');
@@ -146,9 +147,8 @@ class CrashReporter {
         _lastCrashTime = DateTime.tryParse(lastTimeStr);
       }
       if (lastError != null) {
-        _lastCrashSummary = lastError.length > 200
-            ? lastError.substring(0, 200)
-            : lastError;
+        _lastCrashSummary =
+            lastError.length > 200 ? lastError.substring(0, 200) : lastError;
       }
     } catch (e) {
       debugPrint('[CrashReporter] 回扫失败: $e');

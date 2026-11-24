@@ -21,8 +21,7 @@ void main() {
     });
 
     test('混用冒号：ASCII 先出现，全角在括号内（修复前识别失败）', () {
-      final r = AgentEngine.declaredActionForTest(
-          '动作: finish（原因：磁盘已清理）');
+      final r = AgentEngine.declaredActionForTest('动作: finish（原因：磁盘已清理）');
       expect(r.declared, ActionType.finish,
           reason: '按全角优先会切到括号里的冒号，值成 finish（原因 → 未识别');
       expect(r.executes, isFalse);
@@ -67,7 +66,8 @@ void main() {
     });
 
     test('工具名全角冒号 + 注解', () {
-      final (name, _) = AgentEngine.parseToolAction(['工具：local_file_read 读取本地文件', '参数:'], 0);
+      final (name, _) =
+          AgentEngine.parseToolAction(['工具：local_file_read 读取本地文件', '参数:'], 0);
       expect(name, 'local_file_read');
     });
 

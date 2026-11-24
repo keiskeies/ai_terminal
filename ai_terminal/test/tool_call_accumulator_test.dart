@@ -95,7 +95,10 @@ void main() {
 
     test('toReActText 转换为 ReAct 多行 key:value 格式（不再用 JSON）', () {
       final calls = [
-        const ToolCall(id: 'call_1', name: 'sftp_upload', arguments: '{"local":"/a","remote":"/b"}'),
+        const ToolCall(
+            id: 'call_1',
+            name: 'sftp_upload',
+            arguments: '{"local":"/a","remote":"/b"}'),
       ];
       final text = ToolCallAccumulator.toReActText(calls);
       expect(text, contains('动作: tool'));
@@ -171,7 +174,10 @@ void main() {
         {
           'index': 0,
           'id': 'call_1',
-          'function': {'name': 'tool_x', 'arguments': '{"key":"value"'}, // 缺少尾部 }
+          'function': {
+            'name': 'tool_x',
+            'arguments': '{"key":"value"'
+          }, // 缺少尾部 }
         },
       ]);
       final calls = acc.finalize();
@@ -221,7 +227,8 @@ void main() {
       // 若 toReActText 开头无换行，拼接后变成 "好的，我来执行工具动作: tool\n..."
       // _parseReActResponse 找不到独立的 "动作:" 行，工具调用被忽略
       final calls = [
-        const ToolCall(id: '1', name: 'sftp_upload', arguments: '{"local":"/a"}'),
+        const ToolCall(
+            id: '1', name: 'sftp_upload', arguments: '{"local":"/a"}'),
       ];
       final thought = '好的，我来执行工具';
       final reactText = ToolCallAccumulator.toReActText(calls);
@@ -230,8 +237,7 @@ void main() {
       // 关键断言：fullResponse 中必须存在独立的 "动作: tool" 行
       // 即某行 trim 后正好是 "动作: tool"，不能与其他文本拼接
       final lines = fullResponse.split('\n');
-      final hasStandaloneActionLine =
-          lines.any((l) => l.trim() == '动作: tool');
+      final hasStandaloneActionLine = lines.any((l) => l.trim() == '动作: tool');
       expect(hasStandaloneActionLine, isTrue,
           reason: 'thought + tool_calls 拼接后 "动作: tool" 必须独立成行，'
               '否则 _parseReActResponse 会忽略工具调用。fullResponse=$fullResponse');
@@ -270,8 +276,7 @@ void main() {
           'type': 'function',
           'function': {
             'name': 'execute',
-            'arguments':
-                r'{"command":"<parameter=command>uptime</function>"}',
+            'arguments': r'{"command":"<parameter=command>uptime</function>"}',
           },
         },
       ]);

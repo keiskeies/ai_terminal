@@ -139,7 +139,8 @@ class NotificationService {
       ..writeln('状态: ${success ? "成功" : "失败"}')
       ..writeln('耗时: $durStr');
     if (!success && error != null && error.isNotEmpty) {
-      content.writeln('错误: ${error.length > 200 ? '${error.substring(0, 200)}...' : error}');
+      content.writeln(
+          '错误: ${error.length > 200 ? '${error.substring(0, 200)}...' : error}');
     }
 
     try {
@@ -154,7 +155,8 @@ class NotificationService {
   static Future<bool> sendTest() async {
     final cfg = config;
     if (cfg.webhookUrl.isEmpty) return false;
-    final content = '🔔 AI Terminal 通知测试\n时间: ${DateTime.now().toIso8601String()}\n如收到此消息，说明 webhook 配置正确。';
+    final content =
+        '🔔 AI Terminal 通知测试\n时间: ${DateTime.now().toIso8601String()}\n如收到此消息，说明 webhook 配置正确。';
     try {
       return await _sendWebhook(cfg.webhookUrl, content);
     } catch (e) {
@@ -173,7 +175,12 @@ class NotificationService {
     final uri = Uri.tryParse(trimmed);
     if (uri == null || uri.host.isEmpty) return 'URL 格式非法';
     final host = uri.host.toLowerCase();
-    const blockedHosts = ['localhost', '127.0.0.1', '0.0.0.0', 'metadata.google.internal'];
+    const blockedHosts = [
+      'localhost',
+      '127.0.0.1',
+      '0.0.0.0',
+      'metadata.google.internal'
+    ];
     if (blockedHosts.contains(host)) return '禁止使用本地/元数据地址';
     // 屏蔽内网 IP（10.x、172.16-31.x、192.168.x、169.254.x）
     final ipMatch = RegExp(r'^(\d+)\.(\d+)\.(\d+)\.(\d+)$').firstMatch(host);

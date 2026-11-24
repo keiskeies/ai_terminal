@@ -37,12 +37,8 @@ class LocalPathDecision {
 
 /// 本地文件工具的作用域策略
 ///
-/// 两道门，缺一不可：
-/// 1. **白名单**：路径必须落在用户显式授权的目录内。默认空 —— 装完不授权就一个文件都读不到。
-/// 2. **黑名单**：复用 [SafetyGuard.checkPath]（`~/.ssh`、`.env`、`/etc` 等）。
-///    白名单是"能进哪些门"，黑名单是"进了门也不能碰什么"，后者优先级更高：
-///    用户把整个家目录加进白名单时，`~/.ssh/authorized_keys` 仍然必须拒绝 ——
-///    否则 AI 拿到本机写权限就等于能持久化控制这台机器。
+/// 仅当总开关开启时启用白名单；无论开关状态，敏感路径黑名单与回收区都不可访问。
+/// 默认关闭且白名单为空：未授权前拒绝所有本地文件访问。
 ///
 /// 符号链接单独处理：[SafetyGuard._normalizePath] 只做字面量规范化，不解析链接。
 /// 允许 `work -> /home/user/.ssh` 这种软链存在就意味着白名单形同虚设，
@@ -74,14 +70,16 @@ class LocalFilePolicy {
   static LocalFilePolicy load() {
     try {
       final raw = SettingsDao.getCached(_settingsKey);
+      if (raw == null) return const LocalFilePolicy();
       if (raw is Map) {
         return LocalFilePolicy.fromMap(raw.cast<String, dynamic>());
       }
+      throw const FormatException('localFilePolicy 必须是 Map');
     } catch (e) {
-      // 配置读不出来时按"未授权"处理，绝不因为解析失败就放开文件访问
-      debugPrint('[LocalFilePolicy] 配置解析失败，按关闭处理: $e');
+      // 配置损坏时保持默认关闭且无授权目录，绝不能退化成开放语义。
+      debugPrint('[LocalFilePolicy] 配置解析失败，已拒绝本地文件访问: $e');
+      return const LocalFilePolicy();
     }
-    return const LocalFilePolicy();
   }
 
   Future<void> save() async {
@@ -95,10 +93,31 @@ class LocalFilePolicy {
       };
 
   factory LocalFilePolicy.fromMap(Map<String, dynamic> map) {
+    final enabledValue = map['enabled'];
+    if (enabledValue != null && enabledValue is! bool) {
+      throw const FormatException('enabled 必须是 bool');
+    }
+    final dirsValue = map['allowedDirs'];
+    if (dirsValue != null && dirsValue is! List) {
+      throw const FormatException('allowedDirs 必须是 List');
+    }
+    final dirs = dirsValue == null
+        ? const <String>[]
+        : (dirsValue as List).map((value) {
+            if (value is! String) {
+              throw const FormatException('allowedDirs 每项必须是字符串');
+            }
+            return value;
+          }).toList(growable: false);
+    final readLimit = map['maxReadBytes'];
+    if (readLimit != null &&
+        (readLimit is! int || readLimit <= 0 || readLimit > 16 * 1024 * 1024)) {
+      throw const FormatException('maxReadBytes 必须在 1..16MB 之间');
+    }
     return LocalFilePolicy(
-      enabled: map['enabled'] == true,
-      allowedDirs: (map['allowedDirs'] as List?)?.map((e) => '$e').toList() ?? const [],
-      maxReadBytes: map['maxReadBytes'] is int ? map['maxReadBytes'] as int : 2 * 1024 * 1024,
+      enabled: enabledValue == true,
+      allowedDirs: dirs,
+      maxReadBytes: readLimit as int? ?? 2 * 1024 * 1024,
     );
   }
 
@@ -117,62 +136,104 @@ class LocalFilePolicy {
   ///
   /// [extraRoots] 本次任务额外授权的根（如 project_analyze 记录过的项目目录）。
   /// 传空时只看用户白名单。
-  LocalPathDecision decide(String rawPath, {List<String> extraRoots = const []}) {
+  LocalPathDecision decide(String rawPath,
+      {List<String> extraRoots = const []}) {
     if (rawPath.trim().isEmpty) {
       return const LocalPathDecision(
           LocalPathVerdict.notInAllowlist, '', '路径为空');
     }
+
+    final expanded = _expand(rawPath);
+    final lexical = p.normalize(expanded);
+    // 字面路径本身命中黑名单/回收区时也不能借符号链接改名绕过。
+    final lexicalDenied = _hardDenial(lexical);
+    if (lexicalDenied != null) return lexicalDenied;
+
+    final resolved = _resolveNoFollow(lexical);
+    if (resolved == null) {
+      return LocalPathDecision(
+        LocalPathVerdict.escape,
+        lexical,
+        '符号链接解析失败，无法验证真实路径，已拒绝访问。',
+      );
+    }
+    final canonical = p.normalize(resolved);
+    final resolvedDenied = _hardDenial(canonical);
+    if (resolvedDenied != null) return resolvedDenied;
+
     if (!enabled) {
       return LocalPathDecision(
         LocalPathVerdict.notInAllowlist,
-        rawPath,
-        '本地文件访问未开启。请在 设置 → Agent → 本地文件 中添加允许访问的目录。',
+        canonical,
+        '本地文件访问总开关已关闭，请在设置中开启并授权目录。',
       );
     }
 
-    final absolute = _resolveNoFollow(_expand(rawPath));
-    final lexical = p.normalize(absolute);
-
-    // 0. 系统保留目录（回收区）先拒：它由删除工具自己写入，
-    //    AI 直接访问会破坏"删了还能捞回来"这个前提
-    if (p.split(lexical).contains(trashDirName)) {
-      return LocalPathDecision(
-        LocalPathVerdict.reserved,
-        lexical,
-        '$trashDirName 是回收区，只能由删除工具自身写入，不能直接访问。',
-      );
+    final roots = <String>[];
+    for (final root in [...allowedDirs, ...extraRoots]) {
+      if (root.trim().isEmpty) continue;
+      final normalizedRoot = _resolveNoFollow(_expand(root));
+      if (normalizedRoot == null) {
+        return LocalPathDecision(
+          LocalPathVerdict.escape,
+          canonical,
+          '授权目录符号链接解析失败，已拒绝访问。',
+        );
+      }
+      roots.add(_normalizeForCompare(normalizedRoot));
     }
-
-    // 1. 黑名单优先：进了白名单目录也不能碰敏感路径
-    final safety = SafetyGuard.checkPath(lexical);
-    if (safety.level == SafetyLevel.blocked) {
-      return LocalPathDecision(
-          LocalPathVerdict.sensitive, lexical, safety.reason ?? '敏感路径');
-    }
-
-    // 2. 白名单
-    final roots = [...allowedDirs, ...extraRoots]
-        .where((r) => r.trim().isNotEmpty)
-        .map((r) => _normalizeForCompare(_resolveNoFollow(_expand(r))))
-        .toList();
     if (roots.isEmpty) {
       return LocalPathDecision(
         LocalPathVerdict.notInAllowlist,
-        lexical,
-        '尚未配置任何允许访问的目录。',
+        canonical,
+        '尚未配置任何允许访问的目录，请先在设置中添加授权目录。',
       );
     }
-    final probe = _normalizeForCompare(lexical);
+    final probe = _normalizeForCompare(canonical);
     for (final root in roots) {
       if (_isWithin(probe, root)) {
-        return LocalPathDecision(LocalPathVerdict.allowed, lexical);
+        return LocalPathDecision(LocalPathVerdict.allowed, canonical);
       }
     }
     return LocalPathDecision(
       LocalPathVerdict.notInAllowlist,
-      lexical,
+      canonical,
       '路径不在授权目录内。当前授权: ${allowedDirs.join(', ')}',
     );
+  }
+
+  /// 在即将发生 I/O 前重新解析原始路径，并确认它仍指向本次已授权的同一对象。
+  /// 可拦截校验后发生的 link-swap；最后检查与打开文件之间仍存在无法消除的
+  /// 平台级 TOCTOU 窗口，因此调用方还应优先使用已打开的句柄写入。
+  LocalPathDecision verify(String rawPath, String expectedResolved,
+      {List<String> extraRoots = const []}) {
+    final current = decide(rawPath, extraRoots: extraRoots);
+    if (!current.isAllowed) return current;
+    if (_normalizeForCompare(current.resolved) !=
+        _normalizeForCompare(expectedResolved)) {
+      return LocalPathDecision(
+        LocalPathVerdict.escape,
+        current.resolved,
+        '路径在校验后发生变化，已拒绝访问。',
+      );
+    }
+    return current;
+  }
+
+  LocalPathDecision? _hardDenial(String path) {
+    if (p.split(path).contains(trashDirName)) {
+      return LocalPathDecision(
+        LocalPathVerdict.reserved,
+        path,
+        '$trashDirName 是回收区，只能由删除工具自身写入，不能直接访问。',
+      );
+    }
+    final safety = SafetyGuard.checkPath(path);
+    if (safety.level == SafetyLevel.blocked) {
+      return LocalPathDecision(
+          LocalPathVerdict.sensitive, path, safety.reason ?? '敏感路径');
+    }
+    return null;
   }
 
   /// 列出当前授权目录（设置页与错误提示用）
@@ -196,8 +257,8 @@ class LocalFilePolicy {
     return s;
   }
 
-  static String? _homeDir() => Platform.environment['HOME'] ??
-      Platform.environment['USERPROFILE'];
+  static String? _homeDir() =>
+      Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
 
   /// 比较用的规范化：统一分隔符 + Windows 下大小写不敏感
   String _normalizeForCompare(String path) {
@@ -208,54 +269,58 @@ class LocalFilePolicy {
 
   bool _isWithin(String child, String root) {
     if (child == root) return true;
-    return child.startsWith('$root/');
+    final prefix = root.endsWith('/') ? root : '$root/';
+    return child.startsWith(prefix);
   }
 
   /// 解析路径里的符号链接，但允许末段不存在（新建文件的场景）。
   ///
   /// 做法：从目标往上找到最深的**已存在**祖先，解析它的真实路径，再把剩余段拼回去。
   /// 这样 `work/evil -> /etc` 这类跳出会在祖先这一层就被识别出来。
-  String _resolveNoFollow(String absolute) {
-    final normalized = p.normalize(absolute);
-    final missing = <String>[];
-    var cursor = normalized;
-
-    while (!_exists(cursor)) {
-      final parent = p.dirname(cursor);
-      if (parent == cursor) break; // 已到根
-      missing.insert(0, p.basename(cursor));
-      cursor = parent;
-    }
-
-    String real = cursor;
+  String? _resolveNoFollow(String absolute) {
     try {
-      
-      if (FileSystemEntity.isFileSync(cursor)) {
-        real = File(cursor).resolveSymbolicLinksSync();
-      } else if (FileSystemEntity.isDirectorySync(cursor)) {
-        real = Directory(cursor).resolveSymbolicLinksSync();
+      var normalized = p.normalize(absolute);
+      // POSIX 下前导 // 的实现定义且可能绕过字符串前缀比较，统一收敛为 /。
+      // Windows 的 UNC 根必须保留，不能按 POSIX 规则折叠。
+      if (!Platform.isWindows) {
+        normalized = normalized.replaceFirst(RegExp(r'^/+'), '/');
       }
+      if (normalized.isEmpty) return null;
+
+      final missing = <String>[];
+      var cursor = normalized;
+      var type = FileSystemEntity.typeSync(cursor, followLinks: false);
+      while (type == FileSystemEntityType.notFound) {
+        final parent = p.dirname(cursor);
+        if (parent == cursor) return null;
+        missing.insert(0, p.basename(cursor));
+        cursor = parent;
+        type = FileSystemEntity.typeSync(cursor, followLinks: false);
+      }
+
+      final String real;
+      switch (type) {
+        case FileSystemEntityType.link:
+          // Link.resolveSymbolicLinksSync 会解析目标；断链同样抛错，必须拒绝。
+          real = Link(cursor).resolveSymbolicLinksSync();
+          break;
+        case FileSystemEntityType.file:
+          real = File(cursor).resolveSymbolicLinksSync();
+          break;
+        case FileSystemEntityType.directory:
+          real = Directory(cursor).resolveSymbolicLinksSync();
+          break;
+        default:
+          return null;
+      }
+      final result = missing.isEmpty
+          ? p.normalize(real)
+          : p.normalize(p.joinAll([real, ...missing]));
+      return result;
     } catch (e) {
-      // 解析失败（权限、平台不支持）时退回字面量路径。
-      // 注意这里不能"失败即放行"：退回的字面量仍要过白名单与黑名单判定，
-      // 只是少了一层链接解析的强度。
-      debugPrint('[LocalFilePolicy] 符号链接解析失败($cursor): $e');
-    }
-
-    if (missing.isEmpty) return p.normalize(real);
-    return p.normalize(p.joinAll([real, ...missing]));
-  }
-
-  bool _exists(String path) {
-    try {
-      // 三种实体都查一遍：File/Directory 的 existsSync 会跟随链接，
-      // 断链两者都返回 false，只有 Link 查得出来 —— 而断链也必须算"存在"，
-      // 否则 _resolveNoFollow 会把祖先一路走到根，判定就失效了。
-      return File(path).existsSync() ||
-          Directory(path).existsSync() ||
-          Link(path).existsSync();
-    } catch (_) {
-      return false;
+      // 权限、断链、平台不支持等任何解析失败都 fail-closed，不能退回字面量。
+      debugPrint('[LocalFilePolicy] 符号链接解析失败($absolute): $e');
+      return null;
     }
   }
 }

@@ -50,7 +50,9 @@ class LogoWidget extends StatelessWidget {
     }
 
     return SvgPicture.asset(
-      isLight ? 'assets/icons/logo_mark_light.svg' : 'assets/icons/logo_mark.svg',
+      isLight
+          ? 'assets/icons/logo_mark_light.svg'
+          : 'assets/icons/logo_mark.svg',
       width: effectiveIconSize,
       height: effectiveIconSize,
     );

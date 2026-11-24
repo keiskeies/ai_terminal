@@ -55,8 +55,7 @@ void main() {
   void expectNoDialog() {
     expect(find.byType(AlertDialog), findsNothing,
         reason: '设置里不允许再弹 AlertDialog');
-    expect(find.byType(Dialog), findsNothing,
-        reason: '设置里不允许再弹 Dialog');
+    expect(find.byType(Dialog), findsNothing, reason: '设置里不允许再弹 Dialog');
     expect(find.byType(SimpleDialog), findsNothing,
         reason: '设置里不允许再弹 SimpleDialog');
   }

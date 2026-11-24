@@ -17,7 +17,7 @@ class TailTextBuffer {
       final text = _buffer.toString();
       _buffer
         ..clear()
-        ..write(text.substring(text.length - maxChars));
+        ..write(text.substring(_tailStart(text, maxChars)));
     }
   }
 
@@ -27,8 +27,22 @@ class TailTextBuffer {
   String tail() {
     final text = _buffer.toString();
     return text.length > maxChars
-        ? text.substring(text.length - maxChars)
+        ? text.substring(_tailStart(text, maxChars))
         : text;
+  }
+
+  int _tailStart(String text, int limit) {
+    if (limit <= 0) return text.length;
+    var start = text.length - limit;
+    final previous = text.codeUnitAt(start - 1);
+    final first = text.codeUnitAt(start);
+    if (previous >= 0xD800 &&
+        previous <= 0xDBFF &&
+        first >= 0xDC00 &&
+        first <= 0xDFFF) {
+      start++;
+    }
+    return start;
   }
 
   @override

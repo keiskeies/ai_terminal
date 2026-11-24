@@ -10,6 +10,24 @@ import 'package:ai_terminal/services/local_terminal_service.dart';
 /// 匹配（这条严格形状是为了不吃命令回显）→ 每条 cmdlet 都白等满 60 秒并记成失败，
 /// 面板显示"0 成功 4 失败"而终端里输出全对。
 void main() {
+  group('windowsShellLaunch', () {
+    test('PowerShell 探测成功才启用 PowerShell 包装', () {
+      final launch =
+          LocalTerminalService.windowsShellLaunch(powerShellAvailable: true);
+      expect(launch.shell, 'cmd.exe');
+      expect(launch.args, ['/K', 'powershell.exe', '-NoLogo']);
+      expect(launch.isPowerShell, isTrue);
+    });
+
+    test('PowerShell 文件存在但无法执行时回退 cmd 包装', () {
+      final launch =
+          LocalTerminalService.windowsShellLaunch(powerShellAvailable: false);
+      expect(launch.shell, 'cmd.exe');
+      expect(launch.args, isEmpty);
+      expect(launch.isPowerShell, isFalse);
+    });
+  });
+
   group('wrapCommandWithExitMarker', () {
     test(r'bash 分支用 $? 且不置空 LASTEXITCODE', () {
       final w = LocalTerminalService.wrapCommandWithExitMarker(
@@ -46,6 +64,75 @@ void main() {
       expect(w, endsWith('\necho "EXITCODE_1:\$?"'));
     });
 
+    test('反斜杠换行折叠后的后台运算符在包装前拒绝', () {
+      expect(
+        () => LocalTerminalService.wrapCommandWithExitMarker(
+          'echo ok \\\n&',
+          'EXITCODE_1:',
+          isWindows: false,
+          isPowerShell: false,
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('多行命令末尾注释续行未闭合时拒绝追加 marker', () {
+      expect(
+        () => LocalTerminalService.wrapCommandWithExitMarker(
+          'echo ok\n# note \\',
+          'EXITCODE_1:',
+          isWindows: false,
+          isPowerShell: false,
+        ),
+        throwsStateError,
+      );
+    });
+
+    test('正常反斜杠续行仍可执行并输出 marker', () async {
+      final wrapped = LocalTerminalService.wrapCommandWithExitMarker(
+        'echo ok \\\n  done',
+        'EXITCODE_CONTINUATION:',
+        isWindows: false,
+        isPowerShell: false,
+      );
+      final result = await Process.run('bash', ['-c', wrapped]);
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      expect('${result.stdout}', contains('EXITCODE_CONTINUATION:0'));
+    });
+
+    test('POSIX 行尾注释不会吞掉 marker', () async {
+      final wrapped = LocalTerminalService.wrapCommandWithExitMarker(
+        'printf "ok # literal" # trailing comment',
+        'EXITCODE_COMMENT:',
+        isWindows: false,
+        isPowerShell: false,
+      );
+      final result = await Process.run('bash', ['-c', wrapped]);
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      expect('${result.stdout}', contains('ok # literal'));
+      expect('${result.stdout}', contains('EXITCODE_COMMENT:0'));
+    });
+
+    test('POSIX 注释前悬空运算符拒绝包装，避免 assignment 伪造成功', () {
+      for (final command in [
+        'true && # comment',
+        'true || # comment',
+        'printf x | # comment',
+        'echo value > # comment',
+      ]) {
+        expect(
+          () => LocalTerminalService.wrapCommandWithExitMarker(
+            command,
+            'EXITCODE_COMMENT:',
+            isWindows: false,
+            isPowerShell: false,
+          ),
+          throwsStateError,
+          reason: command,
+        );
+      }
+    });
+
     test('cmd 分支用 call echo 取新鲜 %errorlevel%（M1）', () {
       final w = LocalTerminalService.wrapCommandWithExitMarker(
         'dir',
@@ -74,6 +161,41 @@ void main() {
       expect(w, startsWith(r'$LASTEXITCODE=$null; '));
     });
 
+    test('PowerShell 引号内与转义的 # 不作为注释', () {
+      for (final command in [
+        r'Write-Output "value # literal"',
+        "Write-Output 'value # literal'",
+        r'Write-Output value\#literal',
+      ]) {
+        final wrapped = LocalTerminalService.wrapCommandWithExitMarker(
+          command,
+          'EXITCODE_HASH:',
+          isWindows: true,
+          isPowerShell: true,
+        );
+        expect(wrapped, contains('EXITCODE_HASH:\$__ec"'));
+      }
+    });
+
+    test('PowerShell 行尾注释安全拒绝而非吞掉 marker', () {
+      for (final command in [
+        'Get-Date # trailing comment',
+        r'Write-Output "$(Write-Output value # interpolation comment)"',
+        'Get-Date <# block comment #>',
+      ]) {
+        expect(
+          () => LocalTerminalService.wrapCommandWithExitMarker(
+            command,
+            'EXITCODE_HASH:',
+            isWindows: true,
+            isPowerShell: true,
+          ),
+          throwsStateError,
+          reason: command,
+        );
+      }
+    });
+
     group('真在 PowerShell 里跑一遍（Windows 才跑）', () {
       Future<int?> runAndDetect(String command, String marker) async {
         final wrapped = LocalTerminalService.wrapCommandWithExitMarker(
@@ -90,9 +212,8 @@ void main() {
         // R8 的完成判定正则必须能吃下这行，否则就是原来的挂死路径
         expect(RegExp('${RegExp.escape(marker)}\\d+').hasMatch(out), isTrue,
             reason: 'marker 未带数字，output=${out.trim()}');
-        final digits = RegExp('${RegExp.escape(marker)}(\\d+)')
-            .firstMatch(out)
-            ?.group(1);
+        final digits =
+            RegExp('${RegExp.escape(marker)}(\\d+)').firstMatch(out)?.group(1);
         return digits == null ? null : int.parse(digits);
       }
 
@@ -117,8 +238,7 @@ void main() {
           isWindows: true,
           isPowerShell: true,
         );
-        final first = await Process.run(
-            'powershell.exe',
+        final first = await Process.run('powershell.exe',
             ['-NoProfile', '-NonInteractive', '-Command', wrapped]);
         expect(RegExp('EXITCODE_94:7').hasMatch('${first.stdout}'), isTrue);
         // 第二条复用同一会话变量语义（新的 powershell 进程自然为 null，
@@ -129,11 +249,12 @@ void main() {
           isWindows: true,
           isPowerShell: true,
         );
-        final second = await Process.run(
-            'powershell.exe',
+        final second = await Process.run('powershell.exe',
             ['-NoProfile', '-NonInteractive', '-Command', combo]);
         expect(
-            RegExp('EXITCODE_95:(\\d+)').firstMatch('${second.stdout}')?.group(1),
+            RegExp('EXITCODE_95:(\\d+)')
+                .firstMatch('${second.stdout}')
+                ?.group(1),
             '1',
             reason: 'cmdlet 失败不能被前一条原生命令的 0 冒充成功');
       }, skip: !Platform.isWindows);

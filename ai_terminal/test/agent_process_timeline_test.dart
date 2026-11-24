@@ -24,13 +24,14 @@ Widget _wrap(Widget child) => MaterialApp(
     );
 
 Widget _content(List<AgentEvent> events,
-    {bool isLoading = false,
-    String? executingCommand,
-    bool agentExecuting = false,
-    String? pendingConfirmCommand,
-    bool isWaitingChoice = false,
-    List<String> pendingOptions = const [],
-    void Function(String)? onSelectChoice}) => Builder(
+        {bool isLoading = false,
+        String? executingCommand,
+        bool agentExecuting = false,
+        String? pendingConfirmCommand,
+        bool isWaitingChoice = false,
+        List<String> pendingOptions = const [],
+        void Function(String)? onSelectChoice}) =>
+    Builder(
       builder: (context) => AgentEventContent(
         events: events,
         tc: ThemeColors.of(context),
@@ -126,8 +127,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('local_file_read').evaluate().length, 2);
-    expect(find.text('全部完成'), findsNothing,
-        reason: '不做批次折叠：无论几条命令都不会冒出折叠头');
+    expect(find.text('全部完成'), findsNothing, reason: '不做批次折叠：无论几条命令都不会冒出折叠头');
   });
 
   testWidgets('命令之间夹着日志与思考：各自留在原位，不折叠', (tester) async {
@@ -153,13 +153,12 @@ void main() {
     expect(find.text('全部完成'), findsNothing);
   });
 
-  testWidgets('运行中的命令留在原位并切到「执行中」（相邻命令不折叠）',
-      (tester) async {
+  testWidgets('运行中的命令留在原位并切到「执行中」（相邻命令不折叠）', (tester) async {
     final events = <AgentEvent>[];
     for (var i = 0; i < 3; i++) {
       events.add(AgentEvent.command('echo done$i', id: 'd$i'));
-      events.add(AgentEvent.result(
-          commandId: 'd$i', success: true, output: 'ok$i'));
+      events.add(
+          AgentEvent.result(commandId: 'd$i', success: true, output: 'ok$i'));
     }
     events.add(AgentEvent.command('sleep 300', id: 'running'));
     await tester.pumpWidget(_wrap(_content(
@@ -169,8 +168,7 @@ void main() {
     )));
     await tester.pump();
 
-    expect(find.text('终端命令'), findsNWidgets(3),
-        reason: '已完成的命令照常各占一行');
+    expect(find.text('终端命令'), findsNWidgets(3), reason: '已完成的命令照常各占一行');
     expect(find.textContaining('sleep 300'), findsWidgets,
         reason: '运行中的行必须直接可见');
     expect(find.text('执行中'), findsOneWidget);
@@ -315,8 +313,7 @@ void main() {
     expect(find.text('全部完成'), findsNothing);
   });
 
-  testWidgets('询问之后的过程事件必须渲染在询问下方（按原始顺序交错）',
-      (tester) async {
+  testWidgets('询问之后的过程事件必须渲染在询问下方（按原始顺序交错）', (tester) async {
     final events = [
       AgentEvent.command('echo first', id: 'c1'),
       AgentEvent.result(commandId: 'c1', success: true, output: 'ok'),
@@ -331,12 +328,10 @@ void main() {
     final askY = tester.getTopLeft(find.text('要不要继续？')).dy;
     final laterCommandY =
         tester.getTopLeft(find.textContaining('echo second')).dy;
-    expect(askY, lessThan(laterCommandY),
-        reason: '询问卡片不能永远沉在消息底部，后续过程事件应在它下面');
+    expect(askY, lessThan(laterCommandY), reason: '询问卡片不能永远沉在消息底部，后续过程事件应在它下面');
   });
 
-  testWidgets('正文之后的过程事件渲染在正文下方（不把正文统一挪到最后）',
-      (tester) async {
+  testWidgets('正文之后的过程事件渲染在正文下方（不把正文统一挪到最后）', (tester) async {
     final events = [
       AgentEvent.command('echo one', id: 'a1'),
       AgentEvent.result(commandId: 'a1', success: true, output: 'ok'),
@@ -369,8 +364,7 @@ void main() {
     await tester.pump();
 
     // 历史询问收成一行（问题 + 无答案胶囊），展开才见选项；点它不触发作答
-    expect(find.text('旧选项'), findsNothing,
-        reason: '已回答的询问默认收起，不占步骤流');
+    expect(find.text('旧选项'), findsNothing, reason: '已回答的询问默认收起，不占步骤流');
     await tester.tap(find.text('旧问题'));
     await tester.pump();
     expect(picked, isEmpty, reason: '历史询问不能再被当成当前问题作答');
@@ -410,8 +404,7 @@ void main() {
     ));
     await tester.pump();
 
-    expect(find.text('确认执行'), findsOneWidget,
-        reason: '没有批准入口的确认门等于把任务挂死');
+    expect(find.text('确认执行'), findsOneWidget, reason: '没有批准入口的确认门等于把任务挂死');
     expect(find.text('取消'), findsOneWidget);
 
     await tester.tap(find.text('确认执行'));
@@ -420,13 +413,13 @@ void main() {
 
   testWidgets('工具调用在没有等待确认时不显示批准按钮', (tester) async {
     final events = [
-      AgentEvent.command('local_file_read\n  path: /a', id: 'r-1', toolName: 'local_file_read'),
+      AgentEvent.command('local_file_read\n  path: /a',
+          id: 'r-1', toolName: 'local_file_read'),
     ];
     await tester.pumpWidget(_wrap(_content(events, isLoading: true)));
     await tester.pump();
 
-    expect(find.text('确认执行'), findsNothing,
-        reason: '只读工具不该被标成待确认');
+    expect(find.text('确认执行'), findsNothing, reason: '只读工具不该被标成待确认');
   });
 
   testWidgets('找不到对应命令的结果仍要露出来', (tester) async {
@@ -488,7 +481,8 @@ void main() {
             events: [ask, ...extraEvents],
             tc: ThemeColors.of(context),
             isWaitingChoice: isWaitingChoice,
-            pendingOptions: isWaitingChoice ? (ask.options ?? const []) : const [],
+            pendingOptions:
+                isWaitingChoice ? (ask.options ?? const []) : const [],
             markdownBuilder: (text, tc) => Text(text),
             onSelectChoice: onSelectChoice,
           ),
@@ -508,7 +502,9 @@ void main() {
       const question = '**重点**\n\n| 方案 | 代价 |\n|---|---|\n| A | 低 |';
       await tester.pumpWidget(_wrap(Builder(
         builder: (context) => AgentEventContent(
-          events: [AgentEvent.ask(question, ['继续'])],
+          events: [
+            AgentEvent.ask(question, ['继续'])
+          ],
           tc: ThemeColors.of(context),
           isWaitingChoice: true,
           pendingOptions: const ['继续'],
@@ -545,8 +541,7 @@ void main() {
 
       // 收起态：一行问题 + 绿色答案胶囊，选项不铺开
       expect(find.text('选哪个？'), findsOneWidget);
-      expect(find.text('Java 17'), findsOneWidget,
-          reason: '用户选了什么必须一直可见');
+      expect(find.text('Java 17'), findsOneWidget, reason: '用户选了什么必须一直可见');
       expect(find.text('Java 8'), findsNothing);
 
       // 点开：完整问题与当时的选项仍可回看
@@ -572,8 +567,7 @@ void main() {
       expect(picked, isEmpty);
     });
 
-    testWidgets('答完后提问步骤仍在，且答案来自事件本身（不靠事后扫描）',
-        (tester) async {
+    testWidgets('答完后提问步骤仍在，且答案来自事件本身（不靠事后扫描）', (tester) async {
       final ask = AgentEvent.ask('选哪个？', ['Java 8', 'Java 17'])
         ..chosenAnswer = 'Java 17';
       await tester.pumpWidget(_wrap(askContent(
@@ -587,8 +581,7 @@ void main() {
       expect(find.text('Java 17'), findsOneWidget);
     });
 
-    testWidgets('两轮内容相同的提问都留档，不会因 id 相同互相顶掉',
-        (tester) async {
+    testWidgets('两轮内容相同的提问都留档，不会因 id 相同互相顶掉', (tester) async {
       // 复现真实 bug：两轮 AI 调用里选项完全相同，若事件 id 撞车，
       // Flutter 同层重复 key 会让整块提问步骤渲染失败（"问完就没"）。
       final a1 = AgentEvent.ask('选哪个？', ['Java 8', 'Java 17'], id: 'evt_1_aaa')
@@ -608,16 +601,13 @@ void main() {
 
       // 两个提问都要在（至少各出现一次）
       expect(find.text('选哪个？'), findsNWidgets(2));
-      expect(tester.takeException(), isNull,
-          reason: '重复 key 会让整块提问渲染失败');
+      expect(tester.takeException(), isNull, reason: '重复 key 会让整块提问渲染失败');
     });
 
-    testWidgets('完整流程：提问出现 → 用户作答 → 提问仍在，可展开看选项',
-        (tester) async {
+    testWidgets('完整流程：提问出现 → 用户作答 → 提问仍在，可展开看选项', (tester) async {
       // 复现用户描述的场景："输出过程中出现提问，等提问结束后提问就不见了"。
       // 这里模拟真实的状态迁移：同一批事件，先等待作答，答完后再渲染。
-      final ask = AgentEvent.ask('有多个 Java 版本可装，选哪个？',
-        ['Java 8', 'Java 17']);
+      final ask = AgentEvent.ask('有多个 Java 版本可装，选哪个？', ['Java 8', 'Java 17']);
 
       // 阶段一：等待作答 —— 完整卡片 + 可点选项
       await tester.pumpWidget(_wrap(askContent(
@@ -640,8 +630,7 @@ void main() {
       // 提问必须还在，且答案可见
       expect(find.text('有多个 Java 版本可装，选哪个？'), findsOneWidget,
           reason: '答完问题就消失 = 步骤流断档');
-      expect(find.text('Java 17'), findsOneWidget,
-          reason: '用户选了什么必须留在提问步骤里');
+      expect(find.text('Java 17'), findsOneWidget, reason: '用户选了什么必须留在提问步骤里');
 
       // 点开：完整问题与当时的选项仍可回看
       await tester.tap(find.text('有多个 Java 版本可装，选哪个？'));
@@ -660,8 +649,7 @@ void main() {
       await tester.pump();
 
       expect(find.byType(TextField), findsOneWidget);
-      await tester.enterText(
-          find.byType(TextField), '  用官方脚本安装，但不加组  ');
+      await tester.enterText(find.byType(TextField), '  用官方脚本安装，但不加组  ');
       await tester.tap(find.byIcon(Icons.send));
       await tester.pump();
 
@@ -770,7 +758,8 @@ void main() {
     await tester.pump();
     expect(find.text('local_file_read').evaluate().length, 12);
 
-    await tester.pumpWidget(_wrap(_content(_turn(steps: 12), isLoading: false)));
+    await tester
+        .pumpWidget(_wrap(_content(_turn(steps: 12), isLoading: false)));
     await tester.pump();
     expect(find.text('local_file_read').evaluate().length, 12,
         reason: '结果页也要能看到完整过程');

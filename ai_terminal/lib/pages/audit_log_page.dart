@@ -70,8 +70,11 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
     final l10n = AppLocalizations.of(context)!;
     final tc = ThemeColors.of(context);
     if (_filteredLogs.isEmpty) {
-      showTopSnackBar(context, 
-        SnackBar(content: Text(l10n.auditLogNoRecordsToCopy), behavior: SnackBarBehavior.floating),
+      showTopSnackBar(
+        context,
+        SnackBar(
+            content: Text(l10n.auditLogNoRecordsToCopy),
+            behavior: SnackBarBehavior.floating),
       );
       return;
     }
@@ -81,7 +84,8 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
     buffer.writeln(l10n.auditLogExportTotal(_filteredLogs.length));
     buffer.writeln('---');
     for (final log in _filteredLogs) {
-      buffer.writeln('[${log['timestamp']}] host=${log['hostId']} level=${log['safetyLevel']} executed=${log['executed']}');
+      buffer.writeln(
+          '[${log['timestamp']}] host=${log['hostId']} level=${log['safetyLevel']} executed=${log['executed']}');
       buffer.writeln('  cmd: ${log['command']}');
       if (log['output'] != null && (log['output'] as String).isNotEmpty) {
         buffer.writeln('  out: ${log['output']}');
@@ -90,7 +94,8 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
     }
     final text = buffer.toString();
     Clipboard.setData(ClipboardData(text: text));
-    showTopSnackBar(context, 
+    showTopSnackBar(
+      context,
       SnackBar(
         content: Text(l10n.auditLogCopied(_filteredLogs.length)),
         backgroundColor: tc.ok,
@@ -152,7 +157,8 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
     final l10n = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_filterHostId != null ? l10n.auditLogTitle : l10n.auditLogAllTitle),
+        title: Text(
+            _filterHostId != null ? l10n.auditLogTitle : l10n.auditLogAllTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.download, size: 20),
@@ -179,9 +185,12 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
             },
             itemBuilder: (ctx) => [
               PopupMenuItem(value: 'all', child: Text(l10n.auditLogFilterAll)),
-              PopupMenuItem(value: 'blocked', child: Text(l10n.auditLogFilterBlocked)),
+              PopupMenuItem(
+                  value: 'blocked', child: Text(l10n.auditLogFilterBlocked)),
               if (widget.hostId != null)
-                PopupMenuItem(value: 'thisHost', child: Text(l10n.auditLogFilterThisHost)),
+                PopupMenuItem(
+                    value: 'thisHost',
+                    child: Text(l10n.auditLogFilterThisHost)),
             ],
           ),
         ],
@@ -191,72 +200,80 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
           constraints: const BoxConstraints(maxWidth: 960),
           child: Column(
             children: [
-          // 搜索框
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: pStandard, vertical: 8),
-            child: TextField(
-              controller: _searchController,
-              style: TextStyle(color: tc.textMain, fontSize: fBody),
-              decoration: InputDecoration(
-                hintText: l10n.auditLogSearchHint,
-                hintStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
-                prefixIcon: Icon(Icons.search, size: 18, color: tc.textSub),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: Icon(Icons.clear, size: 18, color: tc.textSub),
-                        onPressed: () {
-                          _searchController.clear();
-                          _searchQuery = '';
-                          _applyFilter();
-                        },
-                      )
-                    : null,
-                filled: true,
-                fillColor: tc.card,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(rSmall),
-                  borderSide: BorderSide(color: tc.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(rSmall),
-                  borderSide: BorderSide(color: tc.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(rSmall),
-                  borderSide: BorderSide(color: tc.brand),
-                ),
-                isDense: true,
-              ),
-              onChanged: (value) {
-                _searchQuery = value.trim();
-                _applyFilter();
-              },
-            ),
-          ),
-          Expanded(
-            child: _filteredLogs.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.history, size: 48, color: tc.textMuted),
-                        const SizedBox(height: 8),
-                        Text(_searchQuery.isNotEmpty ? l10n.auditLogNoMatch : l10n.auditLogEmpty,
-                            style: TextStyle(color: tc.textSub, fontSize: fBody)),
-                      ],
+              // 搜索框
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: pStandard, vertical: 8),
+                child: TextField(
+                  controller: _searchController,
+                  style: TextStyle(color: tc.textMain, fontSize: fBody),
+                  decoration: InputDecoration(
+                    hintText: l10n.auditLogSearchHint,
+                    hintStyle: TextStyle(color: tc.textSub, fontSize: fSmall),
+                    prefixIcon: Icon(Icons.search, size: 18, color: tc.textSub),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon:
+                                Icon(Icons.clear, size: 18, color: tc.textSub),
+                            onPressed: () {
+                              _searchController.clear();
+                              _searchQuery = '';
+                              _applyFilter();
+                            },
+                          )
+                        : null,
+                    filled: true,
+                    fillColor: tc.card,
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(rSmall),
+                      borderSide: BorderSide(color: tc.border),
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(pStandard, 0, pStandard, pStandard),
-                    itemCount: _filteredLogs.length,
-                    itemBuilder: (context, index) {
-                      final log = _filteredLogs[index];
-                      return _buildLogCard(log);
-                    },
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(rSmall),
+                      borderSide: BorderSide(color: tc.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(rSmall),
+                      borderSide: BorderSide(color: tc.brand),
+                    ),
+                    isDense: true,
                   ),
-          ),
-        ],
+                  onChanged: (value) {
+                    _searchQuery = value.trim();
+                    _applyFilter();
+                  },
+                ),
+              ),
+              Expanded(
+                child: _filteredLogs.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.history, size: 48, color: tc.textMuted),
+                            const SizedBox(height: 8),
+                            Text(
+                                _searchQuery.isNotEmpty
+                                    ? l10n.auditLogNoMatch
+                                    : l10n.auditLogEmpty,
+                                style: TextStyle(
+                                    color: tc.textSub, fontSize: fBody)),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(
+                            pStandard, 0, pStandard, pStandard),
+                        itemCount: _filteredLogs.length,
+                        itemBuilder: (context, index) {
+                          final log = _filteredLogs[index];
+                          return _buildLogCard(log);
+                        },
+                      ),
+              ),
+            ],
           ),
         ),
       ),
@@ -280,7 +297,8 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
     String formattedTime = '';
     try {
       final dt = DateTime.parse(timestamp);
-      formattedTime = '${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')} '
+      formattedTime =
+          '${dt.month.toString().padLeft(2, '0')}/${dt.day.toString().padLeft(2, '0')} '
           '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}:${dt.second.toString().padLeft(2, '0')}';
     } catch (_) {
       formattedTime = timestamp;
@@ -296,14 +314,18 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
             // 头部：安全等级 + 时间 + 执行状态
             Row(
               children: [
-                Icon(_safetyIcon(safetyLevel), size: 16, color: _safetyColor(safetyLevel)),
+                Icon(_safetyIcon(safetyLevel),
+                    size: 16, color: _safetyColor(safetyLevel)),
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
                     color: _safetyColor(safetyLevel).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rXSmall),
-                    border: Border.all(color: _safetyColor(safetyLevel).withValues(alpha: 0.2)),
+                    border: Border.all(
+                        color:
+                            _safetyColor(safetyLevel).withValues(alpha: 0.2)),
                   ),
                   child: Text(
                     _safetyLabel(safetyLevel),
@@ -315,10 +337,16 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                   ),
                 ),
                 const Spacer(),
-                Text(formattedTime, style: TextStyle(fontSize: fMicro, color: tc.textMuted, fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback)),
+                Text(formattedTime,
+                    style: TextStyle(
+                        fontSize: fMicro,
+                        color: tc.textMuted,
+                        fontFamily: 'JetBrainsMono',
+                        fontFamilyFallback: kMonoFontFallback)),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                   decoration: BoxDecoration(
                     color: (executed ? tc.ok : tc.error).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(rXSmall),
@@ -346,7 +374,8 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
               child: SelectableText(
                 command,
                 style: TextStyle(
-                  fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: kMonoFontFallback,
                   fontSize: fMono,
                   color: tc.terminalGreen,
                 ),
@@ -358,7 +387,8 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
               children: [
                 Icon(Icons.dns_outlined, size: 10, color: tc.textMuted),
                 const SizedBox(width: 4),
-                Text(hostName, style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
+                Text(hostName,
+                    style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
               ],
             ),
             // 输出（如果有）
@@ -368,7 +398,8 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: EdgeInsets.zero,
                 dense: true,
-                title: Text(l10n.auditLogOutput, style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
+                title: Text(l10n.auditLogOutput,
+                    style: TextStyle(fontSize: fMicro, color: tc.textMuted)),
                 children: [
                   Container(
                     width: double.infinity,
@@ -382,7 +413,8 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                       child: Text(
                         output,
                         style: TextStyle(
-                          fontFamily: 'JetBrainsMono', fontFamilyFallback: kMonoFontFallback,
+                          fontFamily: 'JetBrainsMono',
+                          fontFamilyFallback: kMonoFontFallback,
                           fontSize: fMicro,
                           color: tc.textSub,
                         ),

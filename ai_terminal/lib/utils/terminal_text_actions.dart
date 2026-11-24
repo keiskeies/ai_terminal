@@ -80,13 +80,12 @@ bool isMultiLine(String text) {
   var body = text;
   if (body.endsWith('\r\n')) {
     body = body.substring(0, body.length - 2);
-  } else if (body.endsWith('\n') || body.endsWith('\r') ||
+  } else if (body.endsWith('\n') ||
+      body.endsWith('\r') ||
       body.endsWith('\u2028')) {
     body = body.substring(0, body.length - 1);
   }
-  return body.contains('\n') ||
-      body.contains('\r') ||
-      body.contains('\u2028');
+  return body.contains('\n') || body.contains('\r') || body.contains('\u2028');
 }
 
 /// 去掉提示符前缀后，是否像一条可执行命令（单行、首 token 不含空格）
@@ -108,29 +107,26 @@ String stripPromptPrefix(String text) =>
     text.replaceFirst(_promptPrefix, '').trimRight();
 
 /// 发送给 Agent 的解释请求
-String agentExplainPrompt(String selection) =>
-    UiText.t(
+String agentExplainPrompt(String selection) => UiText.t(
       '解释下面这段终端输出，指出关键信息、风险和下一步建议：\n```\n${selection.trim()}\n```',
       'Explain the following terminal output. Point out the key information, risks, and recommended next steps:\n```\n${selection.trim()}\n```',
     );
 
 /// 发送给 Agent 的排错请求
-String agentErrorPrompt(String line) =>
-    UiText.t(
+String agentErrorPrompt(String line) => UiText.t(
       '这段终端报错是什么意思？给出原因、影响和修复步骤：\n```\n${line.trim()}\n```',
       'What does this terminal error mean? Give the cause, impact, and fix steps:\n```\n${line.trim()}\n```',
     );
 
 /// 发送给 Agent 的「整条命令 + 它的输出」请求（OSC 133 命令块）。
 /// 与单行排错的差别在于：这里有完整上下文，可以让它先判断命令意图再看输出。
-String agentBlockPrompt(String block) =>
-    UiText.t(
+String agentBlockPrompt(String block) => UiText.t(
       '下面是一次命令及其完整输出（```` 代码块内，第一行通常是命令本身）。'
-      '先说明这条命令在做什么，再判断结果是成功还是失败；失败就给出原因和修复步骤：\n'
-      '````\n${block.trim()}\n````',
+          '先说明这条命令在做什么，再判断结果是成功还是失败；失败就给出原因和修复步骤：\n'
+          '````\n${block.trim()}\n````',
       'Below is one command with its full output (inside the ```` fence; the first line is usually the command). '
-      'First state what the command does, then say whether it succeeded; if it failed, give the cause and the fix:\n'
-      '````\n${block.trim()}\n````',
+          'First state what the command does, then say whether it succeeded; if it failed, give the cause and the fix:\n'
+          '````\n${block.trim()}\n````',
     );
 
 /// 取路径所在目录（SFTP 定位用）：`/a/b/c.log` → `/a/b`，`~/x` → `~`

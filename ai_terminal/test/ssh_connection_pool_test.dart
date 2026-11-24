@@ -89,8 +89,10 @@ void main() {
   });
 
   test('空闲清理回收无借用者的过期条目，跳过仍被借用的条目', () async {
-    final idle = await SSHConnectionPool.acquire('tab-idle', _config('host-idle'));
-    final busy = await SSHConnectionPool.acquire('tab-busy', _config('host-busy'));
+    final idle =
+        await SSHConnectionPool.acquire('tab-idle', _config('host-idle'));
+    final busy =
+        await SSHConnectionPool.acquire('tab-busy', _config('host-busy'));
     await SSHConnectionPool.acquire('tab-busy', _config('host-busy'));
     expect(created.length, 2);
 

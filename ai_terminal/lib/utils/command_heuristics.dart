@@ -7,9 +7,31 @@ bool isDescriptiveText(String text) {
   final chineseCount = RegExp(r'[\u4e00-\u9fa5]').allMatches(text).length;
   if (text.isNotEmpty && chineseCount / text.length > 0.5) return true;
   // 常见的说明性开头
-  final descriptiveStarts = ['请', '可以', '需要', '应该', '将', '这个', '该',
-    '命令', '说明', '例如', '如下', '包括', '用于', '表示', '输出', '结果',
-    '检查', '查看', '确认', '注意', '提示', '警告', '步骤'];
+  final descriptiveStarts = [
+    '请',
+    '可以',
+    '需要',
+    '应该',
+    '将',
+    '这个',
+    '该',
+    '命令',
+    '说明',
+    '例如',
+    '如下',
+    '包括',
+    '用于',
+    '表示',
+    '输出',
+    '结果',
+    '检查',
+    '查看',
+    '确认',
+    '注意',
+    '提示',
+    '警告',
+    '步骤'
+  ];
   for (final s in descriptiveStarts) {
     if (text.startsWith(s)) return true;
   }
@@ -39,10 +61,11 @@ bool looksLikeCommand(String text) {
 }
 
 /// 拆出非空子命令（引号/heredoc 感知，与安全层同一套拆分逻辑）
-List<String> _subCommands(String command) => SafetyGuard.splitSubCommands(command)
-    .map((s) => s.trim())
-    .where((s) => s.isNotEmpty)
-    .toList();
+List<String> _subCommands(String command) =>
+    SafetyGuard.splitSubCommands(command)
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
 
 /// 判断命令是否是查询/只读类命令（输出不应截断，agent 需要完整结果定位问题）
 ///
@@ -156,8 +179,22 @@ String? unreliableExitCodeReason(String command) {
 
 /// 纯格式化/拼接类尾段：只消费 stdin、不改系统状态，前段失败仍会体现在输出里。
 const _pipeFormatters = <String>[
-  'jq', 'yq', 'column', 'fmt', 'fold', 'paste', 'join', 'expand',
-  'unexpand', 'rev', 'base64', 'iconv', 'strings', 'numfmt', 'echo', 'printf',
+  'jq',
+  'yq',
+  'column',
+  'fmt',
+  'fold',
+  'paste',
+  'join',
+  'expand',
+  'unexpand',
+  'rev',
+  'base64',
+  'iconv',
+  'strings',
+  'numfmt',
+  'echo',
+  'printf',
 ];
 
 /// 管道某一段是否只读（查询命令、纯格式化命令、或 xargs 调用只读命令）。
@@ -193,7 +230,8 @@ bool isBlockingInteractiveCommand(String command) =>
     _subCommands(command).any(_isBlockingInteractiveSingle);
 
 bool _isBlockingInteractiveSingle(String command) {
-  final parts = command.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+  final parts =
+      command.split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
   if (parts.isEmpty) return false;
 
   // 跳过前置 env 赋值（FOO=bar top）与 sudo/nice 及其参数
@@ -230,7 +268,10 @@ bool _isBlockingInteractiveSingle(String command) {
   // dmesg -w 与 tail -f 同构（永不返回），但首词不是交互程序，需按子命令 + flag 判定。
   // man/git log 不在此列：会话已 export PAGER=cat / GIT_PAGER=cat，它们会直接输出退出。
   const followSubcommands = [
-    'docker logs', 'kubectl logs', 'journalctl', 'dmesg',
+    'docker logs',
+    'kubectl logs',
+    'journalctl',
+    'dmesg',
   ];
   final lower = command.trim().toLowerCase();
   final isFollowScope =
@@ -255,9 +296,23 @@ bool _isBlockingInteractiveSingle(String command) {
   // 无参数的交互式 REPL / shell；带 -c 或脚本参数则是一次性执行，放行
   if (rest.isEmpty) {
     const repls = {
-      'python', 'python2', 'python3', 'node', 'ruby', 'php', 'lua',
-      'mysql', 'psql', 'sqlite3', 'redis-cli', 'mongo', 'irb',
-      'sh', 'bash', 'zsh', 'dash',
+      'python',
+      'python2',
+      'python3',
+      'node',
+      'ruby',
+      'php',
+      'lua',
+      'mysql',
+      'psql',
+      'sqlite3',
+      'redis-cli',
+      'mongo',
+      'irb',
+      'sh',
+      'bash',
+      'zsh',
+      'dash',
     };
     return repls.contains(cmd);
   }
@@ -287,8 +342,10 @@ bool _isSingleQueryCommand(String command) {
     // 日志查看
     'journalctl', 'dmesg', 'last', 'lastb', 'w', 'who',
     // 容器/编排（只读子命令，扩充 stats/top/history/version/info）
-    'docker ps', 'docker images', 'docker logs', 'docker inspect', 'docker search',
-    'docker stats', 'docker top', 'docker history', 'docker version', 'docker info',
+    'docker ps', 'docker images', 'docker logs', 'docker inspect',
+    'docker search',
+    'docker stats', 'docker top', 'docker history', 'docker version',
+    'docker info',
     'kubectl get', 'kubectl describe', 'kubectl logs', 'kubectl top',
     'kubectl explain', 'kubectl version', 'kubectl cluster-info',
     // 包管理（只读子命令）
@@ -323,13 +380,27 @@ bool _isSingleQueryCommand(String command) {
   // 这些命令会让 agent 卡住到超时，不应作为只读
   final cmdLower = command.trim().toLowerCase();
   const interactivePrefixes = [
-    'tail -f', 'tail --follow', 'tailf',
-    'top ', 'top\n', 'htop',
-    'less ', 'less\n', 'more ', 'more\n',
-    'man ', 'vim ', 'vi ', 'nano ',
+    'tail -f',
+    'tail --follow',
+    'tailf',
+    'top ',
+    'top\n',
+    'htop',
+    'less ',
+    'less\n',
+    'more ',
+    'more\n',
+    'man ',
+    'vim ',
+    'vi ',
+    'nano ',
   ];
-  if (cmdLower == 'top' || cmdLower == 'less' || cmdLower == 'more' ||
-      cmdLower == 'vi' || cmdLower == 'vim' || cmdLower == 'nano') {
+  if (cmdLower == 'top' ||
+      cmdLower == 'less' ||
+      cmdLower == 'more' ||
+      cmdLower == 'vi' ||
+      cmdLower == 'vim' ||
+      cmdLower == 'nano') {
     return false;
   }
   for (final p in interactivePrefixes) {
@@ -339,9 +410,15 @@ bool _isSingleQueryCommand(String command) {
 }
 
 const _taskCompleteKeywords = [
-  '任务完成', '任务已完成',
-  '已全部完成', '全部完成', '所有步骤已完成',
-  '操作完成', '安装完成', '配置完成', '部署完成',
+  '任务完成',
+  '任务已完成',
+  '已全部完成',
+  '全部完成',
+  '所有步骤已完成',
+  '操作完成',
+  '安装完成',
+  '配置完成',
+  '部署完成',
   '已完成',
 ];
 
@@ -493,7 +570,8 @@ Duration _singleCommandTimeout(String command, double multiplier) {
   final mediumTimeout = Duration(minutes: (3 * multiplier).round());
   const mediumPrefixes = <String>[
     // 服务/进程状态
-    'systemctl status', 'systemctl restart', 'systemctl start', 'systemctl stop',
+    'systemctl status', 'systemctl restart', 'systemctl start',
+    'systemctl stop',
     'service ', 'journalctl', 'dmesg',
     // 进程查看
     'ps aux', 'ps -ef',

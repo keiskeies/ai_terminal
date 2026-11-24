@@ -8,12 +8,15 @@ class ChatItem {
   final String role; // 'user' | 'assistant'
   final String content;
   final bool isStreaming;
+
   /// 关联的命令（若该消息对应一条执行的命令）
   final String? command;
   final bool? commandSuccess;
+
   /// 结构化事件列表（仅 assistant 消息有）
   /// 流式过程中实时更新，UI 按事件类型分别渲染卡片
   final List<AgentEvent> events;
+
   /// 当前这一轮流式中尚未解析为事件的增量文本
   /// 流式过程中：events（已完成步骤） + streamingContent（正在生成）
   /// 流式结束后：新内容解析为 events 追加，streamingContent 清空
@@ -60,7 +63,9 @@ class ChatItem {
         // 旧数据没有 events 时，fallback 到重新解析
         try {
           events = ReActStreamParser.parse(msg.content);
-        } catch (e) { debugPrint('[AgentNotifier] 事件解析失败: $e'); }
+        } catch (e) {
+          debugPrint('[AgentNotifier] 事件解析失败: $e');
+        }
       }
     }
     return ChatItem(

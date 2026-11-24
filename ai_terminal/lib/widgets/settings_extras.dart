@@ -258,8 +258,8 @@ class _SettingsAboutRowsState extends ConsumerState<SettingsAboutRows> {
             '${snap.sshDeadConnections}'),
         _diagRow(tc, UiText.t('磁盘可写', 'Disk writable'),
             snap.diskWritable ? UiText.t('是', 'Yes') : UiText.t('否', 'No')),
-        _diagRow(tc, UiText.t('检查时间', 'Checked at'),
-            _formatTime(snap.timestamp)),
+        _diagRow(
+            tc, UiText.t('检查时间', 'Checked at'), _formatTime(snap.timestamp)),
         const SizedBox(height: 8),
         Row(
           children: [
@@ -271,8 +271,7 @@ class _SettingsAboutRowsState extends ConsumerState<SettingsAboutRows> {
                   showTopSnackBar(
                       context,
                       SnackBar(
-                        content:
-                            Text(UiText.t('崩溃日志为空', 'Crash log is empty')),
+                        content: Text(UiText.t('崩溃日志为空', 'Crash log is empty')),
                         behavior: SnackBarBehavior.floating,
                       ));
                   return;
@@ -298,8 +297,7 @@ class _SettingsAboutRowsState extends ConsumerState<SettingsAboutRows> {
                 showTopSnackBar(
                     context,
                     SnackBar(
-                      content: Text(
-                          UiText.t('已清除崩溃日志', 'Crash log cleared')),
+                      content: Text(UiText.t('已清除崩溃日志', 'Crash log cleared')),
                       behavior: SnackBarBehavior.floating,
                     ));
               },
@@ -414,12 +412,11 @@ class _VersionCardState extends State<_VersionCard> {
     try {
       final latest = await UpdateCheckService.instance.fetchLatest();
       if (!mounted) return;
-      final newer = _version.isEmpty ||
-          compareVersions(latest.version, _version) > 0;
+      final newer =
+          _version.isEmpty || compareVersions(latest.version, _version) > 0;
       setState(() {
         _latest = latest;
-        _state =
-            newer ? _UpdateState.available : _UpdateState.upToDate;
+        _state = newer ? _UpdateState.available : _UpdateState.upToDate;
       });
     } on UpdateCheckException catch (e) {
       if (!mounted) return;
@@ -466,8 +463,7 @@ class _VersionCardState extends State<_VersionCard> {
   }
 
   Future<void> _copyVersion() async {
-    await Clipboard.setData(
-        ClipboardData(text: 'AI Terminal $_version'));
+    await Clipboard.setData(ClipboardData(text: 'AI Terminal $_version'));
     if (!mounted) return;
     showTopSnackBar(
       context,
@@ -554,8 +550,9 @@ class _VersionCardState extends State<_VersionCard> {
                       sub,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style:
-                          TextStyle(fontSize: widget.dense ? fMicro : fSmall, color: subColor),
+                      style: TextStyle(
+                          fontSize: widget.dense ? fMicro : fSmall,
+                          color: subColor),
                     ),
                   ],
                 ),
@@ -571,4 +568,3 @@ class _VersionCardState extends State<_VersionCard> {
 }
 
 enum _UpdateState { idle, checking, upToDate, available, failed }
-

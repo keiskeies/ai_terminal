@@ -154,7 +154,8 @@ class PortForwardService extends ChangeNotifier {
           try {
             final socket = await Socket.connect(targetHost, targetPort,
                 timeout: const Duration(seconds: 10));
-            await pipeEndpoints(socketEndpoint(socket), channelEndpoint(channel));
+            await pipeEndpoints(
+                socketEndpoint(socket), channelEndpoint(channel));
           } catch (_) {
             channel.destroy();
           }
