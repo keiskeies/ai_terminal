@@ -471,6 +471,7 @@ class LocalFileSearchTool extends LocalFileTool {
     final hits = <String>[];
     final denied = <String>[];
     final oversized = <String>[];
+    final changed = <String>[];
     var scanned = 0;
     // 项目根等额外授权必须参与逐文件复判：漏掉它时 project_analyze 根下
     // 的每个文件都会被判为未授权，最终误报“扫描 0 个文件、未命中”。
@@ -478,11 +479,7 @@ class LocalFileSearchTool extends LocalFileTool {
     for (final f in files) {
       if (hits.length >= maxMatches) break;
       // 根目录授权不能继承给后代：每个文件在打开前重新判定，且打开后再判定一次。
-      final decision = _policy.decide(f, extraRoots: roots);
-      if (!decision.isAllowed) {
-        denied.add(f);
-        continue;
-      }
+      // 不做循环外预判，避免同一文件重复跑三次策略判定。
       final didScan = await _scanFileLines(
         file: f,
         needle: needle,
@@ -496,6 +493,7 @@ class LocalFileSearchTool extends LocalFileTool {
         },
         onDenied: denied.add,
         onOversize: oversized.add,
+        onChanged: changed.add,
       );
       if (!didScan) continue;
       scanned++;
@@ -516,14 +514,20 @@ class LocalFileSearchTool extends LocalFileTool {
         ? ''
         : '\n已跳过 ${oversized.length} 个超过 2MB 的文件（未搜索）: '
             '${oversized.take(10).join(', ')}${oversized.length > 10 ? ' …' : ''}';
+    // 身份变化是“扫描期间文件被换掉”的并发信号，不是用户未授权；分开报告，
+    // 否则 AI 会把并发写文件误判成权限配置问题，反复去调授权。
+    final changedNote = changed.isEmpty
+        ? ''
+        : '\n已跳过 ${changed.length} 个在扫描期间发生变化的文件（结果不可信）: '
+            '${changed.take(10).join(', ')}${changed.length > 10 ? ' …' : ''}';
     if (hits.isEmpty) {
       return ToolResult.success(
-          '未命中。搜索 "$query"，实际扫描 $scanned 个文件（发现 ${files.length} 个，$path）$deniedNote$oversizedNote$walkNote');
+          '未命中。搜索 "$query"，实际扫描 $scanned 个文件（发现 ${files.length} 个，$path）$deniedNote$oversizedNote$changedNote$walkNote');
     }
     final more =
         hits.length >= maxMatches ? '\n...已达 $maxMatches 条上限，用 glob 缩小范围' : '';
     return ToolResult.success(
-        '${hits.length} 处命中（扫描 $scanned 个文件）\n${hits.join('\n')}$deniedNote$oversizedNote$more$walkNote');
+        '${hits.length} 处命中（扫描 $scanned 个文件）\n${hits.join('\n')}$deniedNote$oversizedNote$changedNote$more$walkNote');
   }
 
   String _rel(String file, String root) {
@@ -542,6 +546,7 @@ class LocalFileSearchTool extends LocalFileTool {
     required Future<String?> Function() authorize,
     required void Function(String) onDenied,
     required void Function(String) onOversize,
+    required void Function(String) onChanged,
   }) async {
     RandomAccessFile? handle;
     try {
@@ -569,7 +574,7 @@ class LocalFileSearchTool extends LocalFileTool {
           before.mode != after.mode ||
           before.type != after.type ||
           await handle.length() != after.size) {
-        onDenied(file); // 打开期间身份变化，fail-closed。
+        onChanged(file); // 打开期间身份变化，fail-closed。
         return false;
       }
       var lineNo = 0;

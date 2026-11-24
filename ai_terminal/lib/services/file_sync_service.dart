@@ -134,6 +134,12 @@ class FileSyncService {
     required SyncConfig config,
     LocalPathAuthorizer? validateLocalPath,
   }) async {
+    // R2: disposeTools 可能在工具等待授权期间执行；释放后绝不能再挂新资源，
+    // 否则新 watcher/timer 无人回收。
+    if (_disposed) {
+      debugPrint('[FileSync] 服务已释放，拒绝启动');
+      return false;
+    }
     if (isRunning) {
       debugPrint('[FileSync] 已在运行，先停止再启动');
       return false;
@@ -147,6 +153,7 @@ class FileSyncService {
     if (_validateLocalPath != null) {
       final denial =
           await _validateLocalPath!(config.localDir, config.localDir);
+      if (_disposed) return false;
       if (denial != null) {
         _emit(SyncEventType.uploadFailed, '本地目录未获授权: $denial');
         return false;
@@ -157,19 +164,23 @@ class FileSyncService {
     if (!await _ensureClient()) {
       return false;
     }
+    if (_disposed) return false;
 
     // 校验本地目录
     final localDir = Directory(config.localDir);
     if (!await localDir.exists()) {
+      if (_disposed) return false;
       _emit(SyncEventType.uploadFailed, '本地目录不存在: ${config.localDir}');
       return false;
     }
+    if (_disposed) return false;
 
     // 1. 启动本地 watcher（localToRemote 或 bidirectional）
     if (config.direction == SyncDirection.localToRemote ||
         config.direction == SyncDirection.bidirectional) {
       await _startLocalWatcher(config);
     }
+    if (_disposed) return false;
 
     // 2. 启动远端轮询（仅 bidirectional）
     if (config.direction == SyncDirection.bidirectional) {
@@ -214,6 +225,7 @@ class FileSyncService {
 
   /// 启动本地文件监听
   Future<void> _startLocalWatcher(SyncConfig config) async {
+    if (_disposed) return;
     final watcher = DirectoryWatcher(config.localDir);
     final stream = watcher.events;
 
@@ -298,8 +310,9 @@ class FileSyncService {
 
   /// 启动远端轮询
   void _startRemotePolling(SyncConfig config) {
+    if (_disposed) return;
     _pollTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
-      if (!config.enabled) return;
+      if (_disposed || !config.enabled) return;
       if (_isSyncing) return;
       await _pollRemoteChanges(config);
     });

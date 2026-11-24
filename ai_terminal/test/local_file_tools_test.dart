@@ -976,4 +976,15 @@ void main() {
     expect(r.success, isFalse);
     expect(r.error, contains('本地路径未获授权'));
   });
+
+  test('file_sync 服务已释放后拒绝启动，避免泄漏 watcher/timer', () async {
+    // disposeTools 可能在工具等待授权期间执行；释放后不能再挂新资源。
+    final service = FileSyncService()..dispose();
+    final started = await service.start(
+      clientGetter: () => null,
+      config: SyncConfig(localDir: outside.path, remoteDir: '/tmp/story'),
+    );
+    expect(started, isFalse);
+    expect(service.isRunning, isFalse);
+  });
 }

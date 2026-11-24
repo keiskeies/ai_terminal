@@ -89,6 +89,10 @@ class AgentLogger {
 
   Timer? _flushTimer;
   bool _fileWriting = false;
+
+  /// 连续写失败次数：失败后按指数退避重排，避免尾部日志要等下一次 log 才落盘，
+  /// 也避免磁盘持续故障时每 500ms 空转。
+  int _flushFailures = 0;
   Completer<void>? _fileWriteDone;
   final Completer<void> _initDone = Completer<void>();
 
@@ -155,9 +159,9 @@ class AgentLogger {
   }
 
   /// 调度异步刷盘（500ms 内的多条日志合并为一次 IO）
-  void _scheduleFlush() {
+  void _scheduleFlush({Duration delay = const Duration(milliseconds: 500)}) {
     if (_flushTimer != null) return;
-    _flushTimer = Timer(const Duration(milliseconds: 500), _flushToFile);
+    _flushTimer = Timer(delay, _flushToFile);
   }
 
   Future<void> _flushToFile() async {
@@ -179,15 +183,22 @@ class AgentLogger {
     _fileWriteDone = writeDone;
     try {
       await file.writeAsString(pending, mode: FileMode.append, flush: false);
+      _flushFailures = 0;
       // 日志轮转：文件超过 5MB 时保留尾部 2MB，防止无限增长
       await _rotateIfNeeded(file);
     } catch (e) {
+      _flushFailures++;
       debugPrint('[AgentLogger] 日志文件写入失败: $e');
       // 写失败的旧内容不能把等待期间新产生的日志挤掉：先旧后新重新合并，
       // TailTextBuffer 只保留最新的有限尾部。
       final newer = _takeFileBuffer();
       _appendFileBuffer(pending);
       _appendFileBuffer(newer);
+      // 失败后必须自己重排：否则尾部日志要等下一次 log() 才可能落盘。
+      final shift = _flushFailures > 6 ? 6 : _flushFailures;
+      final backoffMs = 500 * (1 << shift);
+      _scheduleFlush(
+          delay: Duration(milliseconds: backoffMs > 30000 ? 30000 : backoffMs));
     } finally {
       _fileWriting = false;
       if (identical(_fileWriteDone, writeDone)) _fileWriteDone = null;
