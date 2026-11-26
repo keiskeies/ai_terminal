@@ -177,6 +177,7 @@
   "confirm": "ยืนยัน",
   "connErrAuth": "การยืนยันตัวตนล้มเหลว ตรวจสอบชื่อผู้ใช้และรหัสผ่าน/คีย์",
   "connErrGeneric": "ตรวจสอบการเชื่อมต่อเครือข่ายและสถานะเซิร์ฟเวอร์",
+  "connErrHostKey": "ตรวจสอบคีย์ของโฮสต์ไม่ผ่าน (คุณปฏิเสธคีย์ หรือคีย์ไม่ตรงกับที่บันทึกไว้)",
   "connErrNoRoute": "ไม่มีเส้นทางไปยังโฮสต์ ตรวจสอบที่อยู่เซิร์ฟเวอร์",
   "connErrRefused": "เซิร์ฟเวอร์ปฏิเสธการเชื่อมต่อ ตรวจสอบพอร์ต SSH",
   "connErrTimeout": "หมดเวลารอเชื่อมต่อ ตรวจสอบเครือข่ายหรือความพร้อมของเซิร์ฟเวอร์",
@@ -530,6 +531,13 @@
   "thinkingNextStep": "🤔 กำลังคิดขั้นตอนถัดไป...",
   "toolRetryExhausted": "เกินขีดจำกัดการลองใหม่ของเครื่องมือ งานถูกสิ้นสุด",
   "username": "ชื่อผู้ใช้",
+  "@aiBaseUrlReplacedByPreset": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
   "@aiModelDeleteConfirm": {
     "placeholders": {
       "name": {
@@ -1285,6 +1293,7 @@
   "aiModelValidationModelId": "กรุณากรอกรหัสรุ่น",
   "aiModelValidationBaseUrl": "กรุณากรอกที่อยู่ API",
   "aiModelValidationModels": "เพิ่มอย่างน้อยหนึ่งรุ่น",
+  "aiBaseUrlReplacedByPreset": "แทนที่ Base URL ด้วยที่อยู่จากค่าที่ตั้งไว้ ก่อนหน้า: {url}",
   "terminalConfigureModel": "กำหนดค่าโมเดล",
   "terminalModelAndReasoning": "แบบจำลองและการคิด",
   "terminalReasoning": "ระดับของการคิด",
@@ -3439,7 +3448,7 @@
       }
     }
   },
-  "ut_7234d250c6": "รวม {length} รายการ · แสดงรายการ {length}",
+  "ut_7234d250c6": "รวม {length} รายการ · แสดงรายการ {length2}",
   "@ut_7234d250c6": {
     "placeholders": {
       "length": {

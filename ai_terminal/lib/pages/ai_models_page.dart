@@ -354,6 +354,7 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
   void _onProviderChanged(String id) {
     final oldPreset = ProviderConfigService.getProviderById(_providerId);
     final preset = ProviderConfigService.getProviderById(id);
+    final previousBaseUrl = _baseUrlController.text.trim();
     setState(() {
       _providerId = id;
       if (!_isEditing && preset != null) {
@@ -370,6 +371,19 @@ class _EndpointEditorDialogState extends State<EndpointEditorDialog> {
         }
       }
     });
+    // 手填过代理/中转地址的用户切服务商时会被预设覆盖，且原先看不出任何区别。
+    // 覆盖本身是对的（换服务商后旧地址通常已不可用），所以只在确实擦掉了
+    // 非预设值时提示一次，并把原值打出来方便抄回去。
+    final wasCustom = previousBaseUrl.isNotEmpty &&
+        previousBaseUrl != preset?.baseUrl &&
+        previousBaseUrl != oldPreset?.baseUrl;
+    if (wasCustom && preset != null && preset.baseUrl.isNotEmpty) {
+      final message = AppLocalizations.of(context)!
+          .aiBaseUrlReplacedByPreset(previousBaseUrl);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showSnack(message);
+      });
+    }
   }
 
   Future<void> _addModel() async {

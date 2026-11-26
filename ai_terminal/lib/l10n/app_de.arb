@@ -177,6 +177,7 @@
   "confirm": "Bestätigen",
   "connErrAuth": "Authentifizierung fehlgeschlagen, Benutzername und Passwort/Schlüssel prüfen",
   "connErrGeneric": "Netzwerkverbindung und Serverstatus prüfen",
+  "connErrHostKey": "Der Host-Schlüssel wurde nicht verifiziert (abgelehnt oder weicht vom gespeicherten Schlüssel ab)",
   "connErrNoRoute": "Keine Route zum Host, Serveradresse prüfen",
   "connErrRefused": "Server hat Verbindung abgelehnt, SSH-Port prüfen",
   "connErrTimeout": "Verbindungszeitüberschreitung, Netzwerk oder Serververfügbarkeit prüfen",
@@ -530,6 +531,13 @@
   "thinkingNextStep": "🤔 Nächsten Schritt überlegen...",
   "toolRetryExhausted": "Wiederholungslimit für Tools überschritten, Aufgabe beendet",
   "username": "Benutzername",
+  "@aiBaseUrlReplacedByPreset": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
   "@aiModelDeleteConfirm": {
     "placeholders": {
       "name": {
@@ -1285,6 +1293,7 @@
   "aiModelValidationModelId": "Bitte geben Sie die Modell-ID ein",
   "aiModelValidationBaseUrl": "Bitte geben Sie die API-Adresse ein",
   "aiModelValidationModels": "Fügen Sie mindestens ein Modell hinzu",
+  "aiBaseUrlReplacedByPreset": "Base-URL durch die voreingestellte Adresse ersetzt. Vorher: {url}",
   "terminalConfigureModel": "Modell konfigurieren",
   "terminalModelAndReasoning": "Modelle und Denken",
   "terminalReasoning": "Grad des Denkens",

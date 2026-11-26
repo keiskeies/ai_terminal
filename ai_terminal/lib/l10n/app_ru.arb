@@ -177,6 +177,7 @@
   "confirm": "Подтвердить",
   "connErrAuth": "Сбой аутентификации, проверьте имя пользователя и пароль/ключ",
   "connErrGeneric": "Проверьте сетевое подключение и статус сервера",
+  "connErrHostKey": "Ключ хоста не прошёл проверку (вы отклонили его или он не совпадает с сохранённым)",
   "connErrNoRoute": "Нет маршрута к хосту, проверьте адрес сервера",
   "connErrRefused": "Сервер отказал в подключении, проверьте SSH-порт",
   "connErrTimeout": "Тайм-аут подключения, проверьте сеть или доступность сервера",
@@ -530,6 +531,13 @@
   "thinkingNextStep": "🤔 Обдумываю следующий шаг...",
   "toolRetryExhausted": "Превышен лимит повторов инструмента, задача завершена",
   "username": "Имя пользователя",
+  "@aiBaseUrlReplacedByPreset": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
   "@aiModelDeleteConfirm": {
     "placeholders": {
       "name": {
@@ -1285,6 +1293,7 @@
   "aiModelValidationModelId": "Пожалуйста, заполните идентификатор модели",
   "aiModelValidationBaseUrl": "Пожалуйста, заполните адрес API",
   "aiModelValidationModels": "Добавьте хотя бы одну модель",
+  "aiBaseUrlReplacedByPreset": "Base URL заменён адресом из пресета. Прежний: {url}",
   "terminalConfigureModel": "Настроить модель",
   "terminalModelAndReasoning": "Модели и мышление",
   "terminalReasoning": "степень мышления",
@@ -3439,7 +3448,7 @@
       }
     }
   },
-  "ut_7234d250c6": "Всего элементов {length} · Показаны элементы {length}",
+  "ut_7234d250c6": "Всего элементов {length} · Показаны элементы {length2}",
   "@ut_7234d250c6": {
     "placeholders": {
       "length": {

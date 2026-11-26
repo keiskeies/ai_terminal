@@ -178,6 +178,7 @@
   "confirm": "确认",
   "connErrAuth": "认证失败，请检查用户名和密码/私钥是否正确",
   "connErrGeneric": "请检查网络连接和服务器状态",
+  "connErrHostKey": "主机密钥未通过验证（你拒绝了该密钥，或服务器密钥与已记录的不一致）",
   "connErrNoRoute": "无法到达主机，请检查服务器地址是否正确",
   "connErrRefused": "服务器拒绝连接，请检查 SSH 端口是否正确",
   "connErrTimeout": "连接超时，请检查网络或服务器是否可达",
@@ -531,6 +532,13 @@
   "thinkingNextStep": "🤔 正在思考下一步...",
   "toolRetryExhausted": "工具调用重试次数耗尽，任务终止",
   "username": "用户名",
+  "@aiBaseUrlReplacedByPreset": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
   "@aiModelDeleteConfirm": {
     "placeholders": {
       "name": {
@@ -1286,6 +1294,7 @@
   "aiModelValidationModelId": "请填写模型 ID",
   "aiModelValidationBaseUrl": "请填写 API 地址",
   "aiModelValidationModels": "至少添加一个模型",
+  "aiBaseUrlReplacedByPreset": "Base URL 已替换为预设地址，原为 {url}",
   "terminalConfigureModel": "配置模型",
   "terminalModelAndReasoning": "模型与思考",
   "terminalReasoning": "思考程度",
@@ -3477,7 +3486,7 @@
       }
     }
   },
-  "ut_7234d250c6": "共 {length} 条 · 显示 {length} 条",
+  "ut_7234d250c6": "共 {length} 条 · 显示 {length2} 条",
   "@ut_7234d250c6": {
     "placeholders": {
       "length": {

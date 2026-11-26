@@ -23,6 +23,13 @@ const int failureHeadChars = 2000;
 /// 失败输出保留的尾部字符数
 const int failureTailChars = 6000;
 
+/// 空输出的占位串。
+///
+/// 调用方要靠它区分「真的没有输出」和「有输出但被打成了占位串」：预检拦截的
+/// 命令从未执行，output 为空，真实原因只在 `AgentResult.error`。UI 侧据此改取
+/// error 作正文，否则会显示这句占位话。
+const String kNoOutputPlaceholder = '(无输出)';
+
 /// 查询命令输出截断：保留尾部 [maxQueryOutputChars] 字符
 /// R8: 查询命令不截断会导致 cat/journalctl/find 等输出撑爆 AI 上下文
 String truncateQueryOutput(String? output) =>
@@ -35,7 +42,7 @@ String truncateSuccessOutput(String? output) =>
 /// 失败输出截断：头 [failureHeadChars] + 尾 [failureTailChars]，
 /// 中间标注 `…(中间省略 N 字符)…`；总长不超过两者之和时原样返回（不截断）。
 String truncateFailureOutput(String? output) {
-  if (output == null || output.isEmpty) return '(无输出)';
+  if (output == null || output.isEmpty) return kNoOutputPlaceholder;
   const keep = failureHeadChars + failureTailChars;
   // R8 边界：长度恰好等于上限时不截断，避免头尾重叠拼接出重复内容
   if (output.length <= keep) return output;
@@ -46,7 +53,7 @@ String truncateFailureOutput(String? output) {
 }
 
 String _tailTruncate(String? output, int maxChars) {
-  if (output == null || output.isEmpty) return '(无输出)';
+  if (output == null || output.isEmpty) return kNoOutputPlaceholder;
   if (output.length <= maxChars) return output;
   return '...(输出过长，已截断前 ${output.length - maxChars} 字符)\n'
       '${output.substring(output.length - maxChars)}';

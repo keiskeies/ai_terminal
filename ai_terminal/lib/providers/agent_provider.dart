@@ -1039,6 +1039,14 @@ class AgentNotifier extends StateNotifier<AgentState> {
     if (isActiveScope) _executor = executor;
 
     if (executor != null && engine != null) {
+      // enableOrchestratorMode 在引擎未建立时会写一条「请先初始化 Agent」到本
+      // scope 的 error；横幅没有超时机制，重连后一直挂着就是假告警。executor +
+      // engine 都到位即说明该前提已满足，按 scope 清掉（R3：读本 scope 的 state，
+      // 不是活跃 tab 的）。
+      if (scopeId != null &&
+          _stateForScope(scopeId)?.error == L10n.str.agentNotInitialized) {
+        _updateScopeState(scopeId, (s) => s.copyWith(clearError: true));
+      }
       // 同步刷新 engine 的 executor 引用：解决 sudo reboot 后用户重连 SSH
       // 创建新 SSHService 实例，但 ReAct 循环仍持有旧引用导致连续失败的问题。
       engine.setExecutor(executor);

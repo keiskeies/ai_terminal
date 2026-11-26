@@ -177,6 +177,7 @@
   "confirm": "पुष्टि करें",
   "connErrAuth": "प्रमाणीकरण विफल, उपयोगकर्ता नाम और पासवर्ड/कुंजी जांचें",
   "connErrGeneric": "नेटवर्क कनेक्शन और सर्वर स्थिति जांचें",
+  "connErrHostKey": "होस्ट कुंजा सत्यापन विफल (आपने इसे अस्वीकार किया या यह सहेजी गई कुंजा से मेल नहीं खाता)",
   "connErrNoRoute": "होस्ट का मार्ग नहीं, सर्वर पता जांचें",
   "connErrRefused": "सर्वर ने कनेक्शन अस्वीकार किया, SSH पोर्ट जांचें",
   "connErrTimeout": "कनेक्शन समय समाप्त, नेटवर्क या सर्वर उपलब्धता जांचें",
@@ -530,6 +531,13 @@
   "thinkingNextStep": "🤔 अगला कदम सोच रहा हूं...",
   "toolRetryExhausted": "टूल पुनः प्रयास सीमा पार, कार्य समाप्त",
   "username": "उपयोगकर्ता नाम",
+  "@aiBaseUrlReplacedByPreset": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
   "@aiModelDeleteConfirm": {
     "placeholders": {
       "name": {
@@ -1285,6 +1293,7 @@
   "aiModelValidationModelId": "कृपया मॉडल आईडी भरें",
   "aiModelValidationBaseUrl": "कृपया एपीआई पता भरें",
   "aiModelValidationModels": "कम से कम एक मॉडल जोड़ें",
+  "aiBaseUrlReplacedByPreset": "Base URL को प्रीसेट पते से बदल दिया गया। पहले: {url}",
   "terminalConfigureModel": "मॉडल कॉन्फ़िगर करें",
   "terminalModelAndReasoning": "मॉडल और सोच",
   "terminalReasoning": "सोच की डिग्री",

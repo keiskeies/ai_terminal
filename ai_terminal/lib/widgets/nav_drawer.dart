@@ -757,11 +757,19 @@ class _NavDrawerState extends State<NavDrawer> {
                     () {
                       _close();
                       widget.onRunSnippet!(s);
-                    }
+                    },
+                    false
                   ),
                 (
                   UiText.t('编辑', 'Edit'),
-                  () => _openForm(_FormKind.snippet, itemId: s.id)
+                  () => _openForm(_FormKind.snippet, itemId: s.id),
+                  false
+                ),
+                // 手机端没有 /snippets 整页入口，删除必须能在抽屉里完成
+                (
+                  UiText.t('删除', 'Delete'),
+                  () => _confirmDeleteSnippet(tc, s),
+                  true
                 ),
               ]),
             ],
@@ -770,6 +778,37 @@ class _NavDrawerState extends State<NavDrawer> {
       if (matched.isEmpty)
         _empty(tc, UiText.t('没有匹配的快捷命令', 'No matching snippet')),
     ]);
+  }
+
+  /// 删除前确认：与 /snippets 整页的长按删除同一语义
+  void _confirmDeleteSnippet(ThemeColors tc, CommandSnippet s) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: tc.cardElevated,
+        title: Text(L10n.str.snippetDeleteTitle,
+            style: TextStyle(color: tc.textMain, fontSize: fBody)),
+        content: Text(L10n.str.snippetDeleteConfirm(s.name),
+            style: TextStyle(color: tc.textSub, fontSize: fSmall)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: Text(L10n.str.commonCancel,
+                style: TextStyle(color: tc.textSub)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              await SnippetsDao.delete(s.id);
+              if (mounted) setState(() {});
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: tc.error),
+            child: Text(L10n.str.delete,
+                style: const TextStyle(fontSize: fSmall)),
+          ),
+        ],
+      ),
+    );
   }
 
   // ==================== 工作流 ====================
@@ -808,11 +847,13 @@ class _NavDrawerState extends State<NavDrawer> {
                     () {
                       _close();
                       widget.onRunRunbook!(rb);
-                    }
+                    },
+                    false
                   ),
                 (
                   UiText.t('编辑', 'Edit'),
-                  () => _openForm(_FormKind.runbook, itemId: rb.id)
+                  () => _openForm(_FormKind.runbook, itemId: rb.id),
+                  false
                 ),
               ]),
             ],
@@ -880,6 +921,10 @@ class _NavDrawerState extends State<NavDrawer> {
 
   Widget _auditRow(ThemeColors tc, Map<String, dynamic> log) {
     final blocked = (log['safetyLevel'] as String?) == 'blocked';
+    // chip 说「放行」的门槛必须是这条记录真的执行过：执行前预写行、
+    // 只读档被拒的 warn 命令都是 executed=false，此前只看 safetyLevel
+    // 会出现列表写 Allowed、详情写「未执行」的自相矛盾
+    final executed = log['executed'] as bool? ?? false;
     final ts = log['timestamp'] as String? ?? '';
     final id = 'audit:$ts:${log['command']}';
     final out = log['output'] as String? ?? '';
@@ -889,16 +934,18 @@ class _NavDrawerState extends State<NavDrawer> {
     final hostLabel = host.isEmpty
         ? UiText.t('本机', 'This machine')
         : (HostsDao.getCachedById(host)?.name ?? host);
+    final (chipText, chipFg, chipBg) = blocked
+        ? (UiText.t('拦截', 'Blocked'), tc.error, tc.errorBg)
+        : executed
+            ? (UiText.t('放行', 'Allowed'), tc.ok, tc.okBg)
+            : (UiText.t('未执行', 'Not run'), tc.warn, tc.warnBg);
     return _RowCard(
       tc: tc,
       title: '${_hhmm(ts)}  ${log['command'] as String? ?? ''}',
       subtitle: '$hostLabel'
           '${out.isEmpty ? ' · ${UiText.t('无输出', 'no output')}' : ' · ${out.split('\n').first}'}',
       titleMono: true,
-      trailing: _statusChip(tc,
-          text: blocked ? UiText.t('拦截', 'Blocked') : UiText.t('放行', 'Allowed'),
-          fg: blocked ? tc.error : tc.ok,
-          bg: blocked ? tc.errorBg : tc.okBg),
+      trailing: _statusChip(tc, text: chipText, fg: chipFg, bg: chipBg),
       expanded: _expanded.contains(id),
       onToggle: () => _toggle(id),
       detail: [
@@ -922,7 +969,8 @@ class _NavDrawerState extends State<NavDrawer> {
                   behavior: SnackBarBehavior.floating,
                 ),
               );
-            }
+            },
+            false
           ),
         ]),
       ],
@@ -1265,13 +1313,13 @@ class _NavDrawerState extends State<NavDrawer> {
     );
   }
 
-  Widget _cardActions(ThemeColors tc, List<(String, VoidCallback)> actions) {
+  Widget _cardActions(ThemeColors tc, List<(String, VoidCallback, bool)> actions) {
     return Padding(
       padding: const EdgeInsets.only(top: 4),
       child: Row(
         children: [
-          for (final (label, onTap) in actions) ...[
-            _MiniButton(tc: tc, label: label, onTap: onTap),
+          for (final (label, onTap, danger) in actions) ...[
+            _MiniButton(tc: tc, label: label, onTap: onTap, danger: danger),
             const SizedBox(width: 8),
           ],
         ],
@@ -1521,14 +1569,22 @@ class _RowCard extends StatelessWidget {
 
 class _MiniButton extends StatelessWidget {
   const _MiniButton(
-      {required this.tc, required this.label, required this.onTap});
+      {required this.tc,
+      required this.label,
+      required this.onTap,
+      this.danger = false});
 
   final ThemeColors tc;
   final String label;
   final VoidCallback onTap;
 
+  /// 不可逆操作（删除）用警示色，和普通动作区分开
+  final bool danger;
+
   @override
   Widget build(BuildContext context) {
+    final accent = danger ? tc.error : tc.brand;
+    final hoverBg = danger ? tc.error.withValues(alpha: 0.08) : tc.brandBg;
     return _Hover(
       builder: (hovering) => _Tap(
         onTap: onTap,
@@ -1537,12 +1593,11 @@ class _MiniButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: hovering ? tc.brandBg : null,
+            color: hovering ? hoverBg : null,
             borderRadius: BorderRadius.circular(rSmall),
-            border: Border.all(color: tc.brand),
+            border: Border.all(color: accent),
           ),
-          child:
-              Text(label, style: TextStyle(fontSize: fSmall, color: tc.brand)),
+          child: Text(label, style: TextStyle(fontSize: fSmall, color: accent)),
         ),
       ),
     );

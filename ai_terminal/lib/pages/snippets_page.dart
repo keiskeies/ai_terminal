@@ -20,6 +20,14 @@ class SnippetsPage extends ConsumerStatefulWidget {
 
 class _SnippetsPageState extends ConsumerState<SnippetsPage> {
   @override
+  void initState() {
+    super.initState();
+    // 抽屉的增删改直接写 SnippetsDao，provider 只在构造时加载过一次；
+    // 进页面时从 DAO 缓存重载，避免读到陈旧数据
+    ref.read(snippetsProvider.notifier).loadSnippets();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final tc = ThemeColors.of(context);

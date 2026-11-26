@@ -177,6 +177,7 @@
   "confirm": "Confirmar",
   "connErrAuth": "Autenticación fallida, verifique el usuario y la contraseña/clave",
   "connErrGeneric": "Verifique la conexión de red y el estado del servidor",
+  "connErrHostKey": "La clave del host no superó la verificación (la rechazaste o no coincide con la guardada)",
   "connErrNoRoute": "No hay ruta al host, verifique la dirección del servidor",
   "connErrRefused": "El servidor rechazó la conexión, verifique el puerto SSH",
   "connErrTimeout": "Tiempo de conexión agotado, verifique la red o la disponibilidad del servidor",
@@ -530,6 +531,13 @@
   "thinkingNextStep": "🤔 Pensando en el siguiente paso...",
   "toolRetryExhausted": "Límite de reintentos de herramientas excedido, tarea terminada",
   "username": "Nombre de usuario",
+  "@aiBaseUrlReplacedByPreset": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
   "@aiModelDeleteConfirm": {
     "placeholders": {
       "name": {
@@ -1285,6 +1293,7 @@
   "aiModelValidationModelId": "Por favor complete el ID del modelo",
   "aiModelValidationBaseUrl": "Por favor complete la dirección API",
   "aiModelValidationModels": "Añade al menos un modelo",
+  "aiBaseUrlReplacedByPreset": "La base URL se sustituyó por la dirección preestablecida. Anterior: {url}",
   "terminalConfigureModel": "Configurar modelo",
   "terminalModelAndReasoning": "Modelos y pensamiento",
   "terminalReasoning": "grado de pensamiento",

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
@@ -14,6 +15,8 @@ import 'package:ai_terminal/models/token_usage.dart';
 import 'package:ai_terminal/services/agent_engine.dart';
 import 'package:ai_terminal/services/ai_service.dart';
 import 'package:ai_terminal/services/command_executor.dart';
+import 'package:ai_terminal/utils/output_processor.dart'
+    show kNoOutputPlaceholder;
 import 'package:ai_terminal/utils/tool_call_accumulator.dart';
 
 /// F1 失败观测重建端到端测试（R9）
@@ -56,10 +59,13 @@ void main() {
   Future<({AgentEvent result, List<ChatMessage> obsHistory})> runFailure({
     required String command,
     required _MockExecutor executor,
+    List<String> finishTurns = const [finishTurn],
   }) async {
     final provider = _MockAIProvider();
     provider.enqueueStream(['思考: 执行\n动作: execute\n命令: $command\n']);
-    provider.enqueueStream([finishTurn]);
+    for (final turn in finishTurns) {
+      provider.enqueueStream([turn]);
+    }
     final engine = makeEngine(provider);
     engine.setPermissionMode(AgentPermissionMode.auto);
     final events = <AgentEvent>[];
@@ -72,6 +78,12 @@ void main() {
     final obsHistory = provider.receivedHistories.last;
     return (result: result, obsHistory: obsHistory);
   }
+
+  /// 未执行任何命令时 finish 会被幻觉门控拦下两轮，所以被预检拦截的用例
+  /// 必须先声明纯问答，才轮到 finish 放行。
+  const qaFinishTurn = '思考: 纯问答，无需执行命令\n'
+      '结论: 命令被拦下\n现状: 未执行\n变更: 无\n建议: 无\n'
+      '动作: finish\n';
 
   test('退出码 127：观测含真实报错与退出码（修复前恒为 "(无输出)"）', () async {
     final executor = _MockExecutor()
@@ -141,6 +153,54 @@ void main() {
     expect(run.result.outputTruncated, isTrue);
   });
 
+  group('预检拦截的命令：拦截原因不能塌成 "(无输出)"', () {
+    test('交互式命令：结果卡正文取 error 里的拦截原因，命令未进执行器', () async {
+      final executor = _MockExecutor();
+
+      final (:result, :obsHistory) = await runFailure(
+        command: 'top',
+        executor: executor,
+        finishTurns: const [qaFinishTurn],
+      );
+
+      expect(executor.executeAndWaitCalls, 0,
+          reason: '预检拦截的命令从未进 shell，执行器一次都不该被调用');
+      expect(result.success, isFalse);
+      // 修复前：error 与 output 同为占位串，卡片上只写着「(无输出)」
+      expect(result.output, kNoOutputPlaceholder,
+          reason: 'output 保持占位串：截断徽标与 outputTail 逻辑都以它为准');
+      expect(result.error, contains('交互式命令会持续运行不返回'),
+          reason: '真实拦截原因必须落在 error，供结果卡与时间线取用');
+      expect(result.error, isNot(equals(kNoOutputPlaceholder)));
+      expect(result.failureKind, 'syntaxError');
+
+      final observationMsg = observationOf(obsHistory);
+      expect(observationMsg.content, contains('检测到交互式命令'),
+          reason: 'AI 要拿到改写建议（ps aux 代替 top），否则下一轮还交同一条');
+    });
+
+    test('未闭合命令：拦截原因进 error，观测带补全指引', () async {
+      final executor = _MockExecutor();
+
+      final (:result, :obsHistory) = await runFailure(
+        command: "echo \"未闭合的引号",
+        executor: executor,
+        finishTurns: const [qaFinishTurn],
+      );
+
+      expect(executor.executeAndWaitCalls, 0);
+      expect(result.output, kNoOutputPlaceholder);
+      expect(result.error, contains('命令未闭合'),
+          reason: '未闭合命令的 shell 报错永远不会出现，唯一的原因在这里');
+
+      final observationMsg = observationOf(obsHistory);
+      expect(observationMsg.content, contains('命令未闭合'));
+      expect(observationMsg.content, contains('引号/圆括号必须成对'));
+    }, skip: Platform.isWindows
+        ? '闭合预检按 POSIX 规则判定，Windows 本地 shell 直接放行'
+        : false);
+  });
+
   group('ReActObservation.format() 四形态', () {
     test('成功：不变', () {
       const o = ReActObservation(command: 'ls', output: 'file1');
@@ -192,6 +252,9 @@ class _MockExecutor implements CommandExecutor {
   String? failureKind;
   String? failureReason;
 
+  /// 真正下发到 shell 的次数（预检拦截的命令必须保持 0）
+  int executeAndWaitCalls = 0;
+
   @override
   bool get isConnected => true;
 
@@ -208,20 +271,21 @@ class _MockExecutor implements CommandExecutor {
     Completer<void>? cancelToken,
     String? sudoPassword,
     Future<String?> Function(String prompt)? onInteractivePrompt,
-  }) async =>
-      CommandResult(
-        stdout: stdout,
-        // 真实执行器契约：stderr 恒空
-        stderr: '',
-        exitCode: exitCode,
-        duration: Duration.zero,
-        timedOut: timedOut,
-        failureKind: failureKind == null
-            ? CommandFailureKind.none
-            : CommandFailureKind.values
-                .firstWhere((k) => k.name == failureKind),
-        failureReason: failureReason,
-      );
+  }) async {
+    executeAndWaitCalls++;
+    return CommandResult(
+      stdout: stdout,
+      // 真实执行器契约：stderr 恒空
+      stderr: '',
+      exitCode: exitCode,
+      duration: Duration.zero,
+      timedOut: timedOut,
+      failureKind: failureKind == null
+          ? CommandFailureKind.none
+          : CommandFailureKind.values.firstWhere((k) => k.name == failureKind),
+      failureReason: failureReason,
+    );
+  }
 
   @override
   Future<String> runOnce(String command,

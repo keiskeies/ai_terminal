@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dartssh2/dartssh2.dart' show SSHHostkeyError;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -8,11 +9,17 @@ import '../services/local_terminal_service.dart';
 import '../services/ssh_connection_pool.dart';
 import '../core/credentials_store.dart';
 import '../core/l10n_holder.dart';
+import '../core/security/ssh_client_security.dart';
+import '../core/security/ssh_host_key_verifier.dart';
+import '../services/daos.dart';
 import '../utils/reconnect_policy.dart';
 import 'agent_provider.dart';
 import 'app_providers.dart';
 
 const _uuid = Uuid();
+
+/// 打开的 SSH 标签持久化键（冷启动恢复用）
+const kOpenTabsKey = 'openTabsV1';
 
 /// 标签连接阶段
 ///
@@ -46,6 +53,10 @@ class TerminalTab {
   /// 连接失败原因（已带分类提示），仅在 [TabStatus.failed] / [TabStatus.lost] 时有值
   String? connectionError;
 
+  /// 失败原因的本地化消息键。失败瞬间存下的文本会把当时的语言冻结进 tab，
+  /// 切换语言后仍显示旧语言；带键的已知消息会在渲染时按当前语言重新取词。
+  String? errorL10nKey;
+
   SSHService? service; // SSH 连接
   LocalTerminalService? localService; // 本地终端
   final StreamController<String> outputController;
@@ -73,9 +84,11 @@ class TerminalTab {
   bool get everConnected => service != null || localService != null;
 
   /// 标记一次建连失败
-  void markFailed(String error, {required bool hadConnectedBefore}) {
+  void markFailed(String error,
+      {required bool hadConnectedBefore, String? l10nKey}) {
     status = hadConnectedBefore ? TabStatus.lost : TabStatus.failed;
     connectionError = error;
+    errorL10nKey = l10nKey;
   }
 
   /// 设置输出流转发订阅（保存引用以便关闭时取消）
@@ -185,7 +198,7 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
 
     if (!LocalTerminalService.isSupported) {
       tab.markFailed(L10n.str.terminalLocalStartFailed,
-          hadConnectedBefore: ever);
+          hadConnectedBefore: ever, l10nKey: 'terminalLocalStartFailed');
       _publish();
       return null;
     }
@@ -203,7 +216,7 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
     if (!localService.isConnected) {
       localService.dispose();
       tab.markFailed(L10n.str.terminalLocalStartFailed,
-          hadConnectedBefore: ever);
+          hadConnectedBefore: ever, l10nKey: 'terminalLocalStartFailed');
       _publish();
       return null;
     }
@@ -239,7 +252,40 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
       tabs: [...state.tabs, tab],
       activeTabId: tab.id,
     );
+    persistOpenTabs();
     return tab;
+  }
+
+  /// 记录当前打开的 SSH 标签，供冷启动后恢复。
+  ///
+  /// 只记 SSH 标签：本地标签绑的是当次进程的 PTY，跨启动既没有回滚内容也没有
+  /// 恢复价值（Android/iOS 上根本起不来）。tab id 是随机 UUID，重启后无意义，
+  /// 所以持久化 hostId 顺序 + 「哪个位置是活动标签」。
+  void persistOpenTabs() {
+    final hostIds = state.tabs.where((t) => !t.isLocal).map((t) => t.hostId).toList();
+    final active = _findTab(state.activeTabId ?? '');
+    final activeIndex =
+        active == null || active.isLocal ? 0 : hostIds.indexOf(active.hostId);
+    SettingsDao.set(kOpenTabsKey, {
+      'hostIds': hostIds,
+      'activeIndex': activeIndex >= 0 ? activeIndex : 0,
+    });
+  }
+
+  /// 冷启动要恢复的标签（hostId 按打开顺序）；无记录时返回空列表
+  static ({List<String> hostIds, int activeIndex}) readOpenTabsToRestore() {
+    final raw = SettingsDao.getCached(kOpenTabsKey);
+    if (raw is! Map) return (hostIds: const [], activeIndex: 0);
+    final hostIds = (raw['hostIds'] as List?)
+            ?.map((e) => e.toString())
+            .where((e) => e.isNotEmpty && e != 'local')
+            .toList() ??
+        const <String>[];
+    final activeIndex = raw['activeIndex'] is int ? raw['activeIndex'] as int : 0;
+    return (
+      hostIds: hostIds,
+      activeIndex: activeIndex >= 0 && activeIndex < hostIds.length ? activeIndex : 0,
+    );
   }
 
   /// 本地标签的标题在创建时取自当前语言；切换语言后由页面同步为新标题。
@@ -415,8 +461,13 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
 
   /// 把底层异常翻译成人话 + 分类排查提示
   String _describeConnectionError(Object error) {
-    final message = error.toString();
+    // 主机密钥被拒绝时 dartssh2 只会报 SSHAuthAbortError(…before authentication)，
+    // 不还原原因就会被下面的认证分支接管，把用户送去查密码。
+    final cause = SshClientSecurity.unwrapConnectionFailure(error);
+    final message = cause.toString();
     final hint = L10n.str;
+    if (cause is SshHostKeyVerificationException || cause is SSHHostkeyError)
+      return '$message\n\n💡 ${hint.connErrHostKey}';
     if (message.contains('Connection refused'))
       return '$message\n\n💡 ${hint.connErrRefused}';
     if (message.contains('timeout') || message.contains('Timeout'))
@@ -457,6 +508,7 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
       tabs: newTabs,
       activeTabId: newActiveTabId,
     );
+    persistOpenTabs();
   }
 
   /// 发送命令
@@ -485,7 +537,22 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
   void setActiveTab(String tabId) {
     if (state.tabs.any((t) => t.id == tabId)) {
       state = state.copyWith(activeTabId: tabId);
+      // 切到本地标签时不落盘：本地标签不参与恢复，覆盖后会把「上次活跃的
+      // SSH 标签」位置擦成 0，重启后焦点跑到最先打开的那个。
+      final tab = _findTab(tabId);
+      if (tab != null && !tab.isLocal) persistOpenTabs();
     }
+  }
+
+  /// 恢复流程专用：把 activeTabId 指向已注册的标签并落盘。
+  ///
+  /// [setActiveTab] 是用户点击的入口；冷启动恢复时页面注册完一串标签后，
+  /// 每个标签都会把 activeTabId 覆盖成最后一个，需要这一步把焦点放回
+  /// 上次关闭时的活动标签。
+  void activateTabForRestore(String tabId) {
+    if (!state.tabs.any((t) => t.id == tabId)) return;
+    state = state.copyWith(activeTabId: tabId);
+    persistOpenTabs();
   }
 
   /// 重连：在原 tab 上重建 SSH 连接（保留 tabId、终端内容、outputController）

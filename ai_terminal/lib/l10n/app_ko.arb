@@ -177,6 +177,7 @@
   "confirm": "확인",
   "connErrAuth": "인증에 실패했습니다. 사용자 이름과 비밀번호/키를 확인하세요",
   "connErrGeneric": "네트워크 연결과 서버 상태를 확인하세요",
+  "connErrHostKey": "호스트 키 검증에 실패했습니다(거부했거나 저장된 키와 일치하지 않습니다)",
   "connErrNoRoute": "호스트에 대한 경로가 없습니다. 서버 주소를 확인하세요",
   "connErrRefused": "서버가 연결을 거부했습니다. SSH 포트를 확인하세요",
   "connErrTimeout": "연결 시간이 초과되었습니다. 네트워크나 서버 가용성을 확인하세요",
@@ -530,6 +531,13 @@
   "thinkingNextStep": "🤔 다음 단계를 생각하는 중...",
   "toolRetryExhausted": "도구 재시도 한도를 초과하여 작업이 종료되었습니다",
   "username": "사용자 이름",
+  "@aiBaseUrlReplacedByPreset": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
   "@aiModelDeleteConfirm": {
     "placeholders": {
       "name": {
@@ -1285,6 +1293,7 @@
   "aiModelValidationModelId": "모델 ID를 입력하세요.",
   "aiModelValidationBaseUrl": "API 주소를 입력해주세요",
   "aiModelValidationModels": "모델을 하나 이상 추가하세요.",
+  "aiBaseUrlReplacedByPreset": "Base URL이 프리셋 주소로 대체되었습니다. 이전 값: {url}",
   "terminalConfigureModel": "모델 구성",
   "terminalModelAndReasoning": "모델과 사고",
   "terminalReasoning": "사고의 정도",
@@ -3439,7 +3448,7 @@
       }
     }
   },
-  "ut_7234d250c6": "총 {length}개 항목 · {length}개 항목 표시",
+  "ut_7234d250c6": "총 {length}개 항목 · {length2}개 항목 표시",
   "@ut_7234d250c6": {
     "placeholders": {
       "length": {

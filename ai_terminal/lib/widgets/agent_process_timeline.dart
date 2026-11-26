@@ -4,6 +4,7 @@ import '../core/theme_colors.dart';
 import '../models/agent_event.dart';
 import '../providers/terminal_provider.dart' as tp;
 import '../utils/agent_ui_text.dart';
+import '../utils/output_processor.dart' show kNoOutputPlaceholder;
 import '../utils/risk_explainer.dart';
 import 'agent_command_block.dart';
 
@@ -797,7 +798,7 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
           const SizedBox(width: 6),
           Expanded(
             child: Text(
-              (result.output ?? result.error ?? '').split('\n').first,
+              _resultLine(result),
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: tc.textSub, fontSize: fMicro),
             ),
@@ -805,6 +806,17 @@ class _AgentProcessTimelineState extends State<AgentProcessTimeline> {
         ],
       ),
     );
+  }
+
+  /// 预检拦截的命令没有输出，只有占位串：单行摘要取 error 才看得出拦下原因
+  static String _resultLine(AgentEvent result) {
+    final output = result.output;
+    final fallback = result.error ?? '';
+    if (result.success != true &&
+        (output == null || output == kNoOutputPlaceholder)) {
+      return fallback.split('\n').first;
+    }
+    return (output ?? fallback).split('\n').first;
   }
 }
 

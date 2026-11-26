@@ -177,6 +177,7 @@
   "confirm": "تأكيد",
   "connErrAuth": "فشل المصادقة، تحقق من اسم المستخدم وكلمة المرور/المفتاح",
   "connErrGeneric": "تحقق من اتصال الشبكة وحالة الخادم",
+  "connErrHostKey": "لم يجتز مفتاح المضيف عملية التحقق (رفضته أو لم يعد مطابقًا للمفتاح المحفوظ)",
   "connErrNoRoute": "لا يوجد مسار إلى المضيف، تحقق من عنوان الخادم",
   "connErrRefused": "رفض الخادم الاتصال، تحقق من منفذ SSH",
   "connErrTimeout": "انتهت مهلة الاتصال، تحقق من الشبكة أو توفر الخادم",
@@ -530,6 +531,13 @@
   "thinkingNextStep": "🤔 أفكر في الخطوة التالية...",
   "toolRetryExhausted": "تم تجاوز حد إعادة محاولة الأدوات، تم إنهاء المهمة",
   "username": "اسم المستخدم",
+  "@aiBaseUrlReplacedByPreset": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
   "@aiModelDeleteConfirm": {
     "placeholders": {
       "name": {
@@ -1285,6 +1293,7 @@
   "aiModelValidationModelId": "يرجى ملء معرف النموذج",
   "aiModelValidationBaseUrl": "يرجى ملء عنوان API",
   "aiModelValidationModels": "أضف نموذجًا واحدًا على الأقل",
+  "aiBaseUrlReplacedByPreset": "تم استبدال عنوان Base URL بعنوان الإعداد المسبق. السابق: {url}",
   "terminalConfigureModel": "تكوين النموذج",
   "terminalModelAndReasoning": "النماذج والتفكير",
   "terminalReasoning": "درجة التفكير",

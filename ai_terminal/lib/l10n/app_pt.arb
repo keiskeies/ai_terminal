@@ -177,6 +177,7 @@
   "confirm": "Confirmar",
   "connErrAuth": "Autenticação falhou, verifique o usuário e a senha/chave",
   "connErrGeneric": "Verifique a conexão de rede e o status do servidor",
+  "connErrHostKey": "A chave do host não passou na verificação (você a recusou ou ela não corresponde à registrada)",
   "connErrNoRoute": "Sem rota para o host, verifique o endereço do servidor",
   "connErrRefused": "O servidor recusou a conexão, verifique a porta SSH",
   "connErrTimeout": "Tempo de conexão esgotado, verifique a rede ou a disponibilidade do servidor",
@@ -530,6 +531,13 @@
   "thinkingNextStep": "🤔 Pensando no próximo passo...",
   "toolRetryExhausted": "Limite de retentativas de ferramentas excedido, tarefa terminada",
   "username": "Nome de usuário",
+  "@aiBaseUrlReplacedByPreset": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
   "@aiModelDeleteConfirm": {
     "placeholders": {
       "name": {
@@ -1285,6 +1293,7 @@
   "aiModelValidationModelId": "Por favor preencha o ID do modelo",
   "aiModelValidationBaseUrl": "Por favor preencha o endereço da API",
   "aiModelValidationModels": "Adicione pelo menos um modelo",
+  "aiBaseUrlReplacedByPreset": "Base URL substituído pelo endereço predefinido. Anterior: {url}",
   "terminalConfigureModel": "Configurar modelo",
   "terminalModelAndReasoning": "Modelos e pensamento",
   "terminalReasoning": "grau de pensamento",
@@ -3439,7 +3448,7 @@
       }
     }
   },
-  "ut_7234d250c6": "Total de itens {length} · Mostrando itens {length}",
+  "ut_7234d250c6": "Total de itens {length} · Mostrando itens {length2}",
   "@ut_7234d250c6": {
     "placeholders": {
       "length": {

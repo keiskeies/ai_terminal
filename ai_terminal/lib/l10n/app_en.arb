@@ -178,6 +178,7 @@
   "confirm": "Confirm",
   "connErrAuth": "Authentication failed, check username and password/key",
   "connErrGeneric": "Check network connection and server status",
+  "connErrHostKey": "Host key failed verification (you rejected it, or it no longer matches the stored key)",
   "connErrNoRoute": "No route to host, check server address",
   "connErrRefused": "Server refused connection, check SSH port",
   "connErrTimeout": "Connection timeout, check network or server availability",
@@ -531,6 +532,13 @@
   "thinkingNextStep": "🤔 Thinking about the next step...",
   "toolRetryExhausted": "Tool retry limit exceeded, task terminated",
   "username": "Username",
+  "@aiBaseUrlReplacedByPreset": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
   "@aiModelDeleteConfirm": {
     "placeholders": {
       "name": {
@@ -1286,6 +1294,7 @@
   "aiModelValidationModelId": "Model ID is required",
   "aiModelValidationBaseUrl": "API URL is required",
   "aiModelValidationModels": "Add at least one model",
+  "aiBaseUrlReplacedByPreset": "Base URL replaced by the preset. Previous: {url}",
   "terminalConfigureModel": "Configure model",
   "terminalModelAndReasoning": "Model & reasoning",
   "terminalReasoning": "Reasoning",
@@ -3439,7 +3448,7 @@
       }
     }
   },
-  "ut_7234d250c6": "{length} entries · showing {length}",
+  "ut_7234d250c6": "{length} entries · showing {length2}",
   "@ut_7234d250c6": {
     "placeholders": {
       "length": {

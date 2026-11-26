@@ -443,6 +443,47 @@ void main() {
         reason: '没有对应命令的结果也要渲染，否则失败被吞掉');
   });
 
+  testWidgets('预检拦截的结果卡显示拦截原因，不写「(无输出)」', (tester) async {
+    // 未闭合/交互式命令从未进 shell，引擎把占位串留在 output、原因放在 error。
+    // 卡片若只读 output，用户看到的就是一句「(无输出)」，不知道为什么被拦下。
+    final events = [
+      AgentEvent.command('top', id: 'blk-1'),
+      AgentEvent.result(
+        commandId: 'blk-1',
+        success: false,
+        output: '(无输出)',
+        error: '交互式命令会持续运行不返回',
+        toolName: 'exec_command',
+      ),
+    ];
+    await tester.pumpWidget(_wrap(_content(events)));
+    await tester.pump();
+
+    await tester.tap(find.text('终端命令').first);
+    await tester.pump();
+
+    expect(find.textContaining('交互式命令会持续运行不返回'), findsWidgets,
+        reason: '拦截原因就是卡片正文');
+    expect(find.text('(无输出)'), findsNothing);
+  });
+
+  testWidgets('预检拦截的孤儿结果行取 error 作摘要', (tester) async {
+    final events = [
+      AgentEvent.result(
+        commandId: 'blk-vanished',
+        success: false,
+        output: '(无输出)',
+        error: '命令未闭合：双引号未闭合',
+        toolName: 'exec_command',
+      ),
+    ];
+    await tester.pumpWidget(_wrap(_content(events)));
+    await tester.pump();
+
+    expect(find.textContaining('命令未闭合：双引号未闭合'), findsWidgets);
+    expect(find.text('(无输出)'), findsNothing);
+  });
+
   testWidgets('本机文件工具的确认框说"本机"，不说"服务器"', (tester) async {
     // 回归：影响面板曾用 RiskExplainer.explain(展示串)，工具的展示串按
     // shell 语义推不出类型 → other 分支输出"修改服务器状态，请确认影响范围"。

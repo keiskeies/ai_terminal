@@ -177,6 +177,7 @@
   "confirm": "Xác nhận",
   "connErrAuth": "Xác thực thất bại, kiểm tra tên người dùng và mật khẩu/khóa",
   "connErrGeneric": "Kiểm tra kết nối mạng và trạng thái máy chủ",
+  "connErrHostKey": "Khóa máy chủ không qua được xác thực (bạn đã từ chối hoặc nó không khớp với khóa đã lưu)",
   "connErrNoRoute": "Không có đường đến máy chủ, kiểm tra địa chỉ máy chủ",
   "connErrRefused": "Máy chủ từ chối kết nối, kiểm tra cổng SSH",
   "connErrTimeout": "Hết thời gian kết nối, kiểm tra mạng hoặc tình trạng máy chủ",
@@ -530,6 +531,13 @@
   "thinkingNextStep": "🤔 Đang suy nghĩ bước tiếp theo...",
   "toolRetryExhausted": "Vượt giới hạn thử lại công cụ, tác vụ bị kết thúc",
   "username": "Tên người dùng",
+  "@aiBaseUrlReplacedByPreset": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
   "@aiModelDeleteConfirm": {
     "placeholders": {
       "name": {
@@ -1285,6 +1293,7 @@
   "aiModelValidationModelId": "Vui lòng điền ID mẫu",
   "aiModelValidationBaseUrl": "Vui lòng điền địa chỉ API",
   "aiModelValidationModels": "Thêm ít nhất một mô hình",
+  "aiBaseUrlReplacedByPreset": "Base URL đã thay bằng địa chỉ có sẵn. Trước đó: {url}",
   "terminalConfigureModel": "Cấu hình mô hình",
   "terminalModelAndReasoning": "Mô hình và tư duy",
   "terminalReasoning": "mức độ suy nghĩ",
@@ -3439,7 +3448,7 @@
       }
     }
   },
-  "ut_7234d250c6": "Tổng số vật phẩm {length} · Hiển thị các vật phẩm {length}",
+  "ut_7234d250c6": "Tổng số vật phẩm {length} · Hiển thị các vật phẩm {length2}",
   "@ut_7234d250c6": {
     "placeholders": {
       "length": {

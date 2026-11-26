@@ -3730,6 +3730,9 @@ class AgentEngine {
     final failureBody = rollbackHint != null
         ? '$outputText\n\n【失败回滚提示】修改前已快照:\n${snapshot?.snapshotOutput ?? "(无快照)"}\n$rollbackHint'
         : outputText;
+    // 预检拦截（未闭合/交互式/退出码取不到）从未执行过命令，真实原因只在
+    // result.error，output 为空 → outputText 退化成占位串 '(无输出)'。
+    final degradedOutput = outputText == kNoOutputPlaceholder;
 
     final observation = ReActObservation(
       command: command,
@@ -3752,9 +3755,11 @@ class AgentEngine {
       output: outputText,
       error: result.success
           ? null
-          : (rollbackHint != null
+          : rollbackHint != null
               ? '$outputText\n\n$rollbackHint'
-              : outputText),
+              : degradedOutput && hasRealError
+                  ? errorText
+                  : outputText,
       hostId: hostId,
       toolName: 'exec_command',
       durationMs: result.duration?.inMilliseconds,
@@ -3783,7 +3788,9 @@ class AgentEngine {
 
     // 变更台账：非 safe 级命令（即修改性命令）记录到台账，便于事后追溯和回滚
     // safe 级命令（ls/cat/grep 等只读命令）不记录，避免台账膨胀
-    if (safetyLevel != SafetyLevel.safe && hostId != null) {
+    // commandStarted 门槛：闭合预检/交互预检/取消都在 _executeCommand 内返回
+    // 失败结果并继续到这里，命令从未进过 shell，不能出现在变更台账里
+    if (commandStarted && safetyLevel != SafetyLevel.safe && hostId != null) {
       // R1: await 期间用户可能 cancel + startTask 开启新任务。下面的台账写入
       // 是共享 list（_operationChanges/_operationChangeIds），捕获本任务代际，
       // await 回来后若代际已变，说明命令属于旧任务，不能污染新 operation 报告。

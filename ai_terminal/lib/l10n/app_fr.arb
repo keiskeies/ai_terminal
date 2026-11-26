@@ -177,6 +177,7 @@
   "confirm": "Confirmer",
   "connErrAuth": "Échec de l'authentification, vérifiez le nom d'utilisateur et le mot de passe/clé",
   "connErrGeneric": "Vérifiez la connexion réseau et l'état du serveur",
+  "connErrHostKey": "La clé d’hôte n’a pas passé la vérification (vous l’avez refusée ou elle ne correspond plus à celle enregistrée)",
   "connErrNoRoute": "Aucune route vers l'hôte, vérifiez l'adresse du serveur",
   "connErrRefused": "Le serveur a refusé la connexion, vérifiez le port SSH",
   "connErrTimeout": "Délai de connexion dépassé, vérifiez le réseau ou la disponibilité du serveur",
@@ -530,6 +531,13 @@
   "thinkingNextStep": "🤔 Réflexion sur la prochaine étape...",
   "toolRetryExhausted": "Limite de relances d'outils dépassée, tâche terminée",
   "username": "Nom d'utilisateur",
+  "@aiBaseUrlReplacedByPreset": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
   "@aiModelDeleteConfirm": {
     "placeholders": {
       "name": {
@@ -1285,6 +1293,7 @@
   "aiModelValidationModelId": "Veuillez remplir l'ID du modèle",
   "aiModelValidationBaseUrl": "Veuillez remplir l'adresse API",
   "aiModelValidationModels": "Ajouter au moins un modèle",
+  "aiBaseUrlReplacedByPreset": "Base URL remplacée par l’adresse du préréglage. Précédente : {url}",
   "terminalConfigureModel": "Configurer le modèle",
   "terminalModelAndReasoning": "Modèles et réflexion",
   "terminalReasoning": "degré de réflexion",

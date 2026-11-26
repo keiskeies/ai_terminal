@@ -49,6 +49,7 @@ import '../utils/conversation_export.dart';
 import '../utils/goal_continuation.dart';
 import '../services/agent_tracer.dart';
 import '../services/agent_logger.dart';
+import '../services/local_terminal_service.dart';
 import 'package:flutter/services.dart';
 import '../services/daos.dart';
 import '../models/runbook.dart';
@@ -484,13 +485,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     _agentNotifier!.secretRequestHandler = _requestSecret;
     _agentNotifier!.localDirRequestHandler = _requestLocalDir;
     _agentNotifier!.interactiveInputRequestHandler = _requestInteractiveInput;
-    // 延迟到帧构建完成后执行连接，避免在 build 阶段修改 provider 状态
+    // 延迟到帧构建完成后执行连接，避免在 build 阶段修改 provider 状态。
+    // 无本地 PTY 的平台（Android/iOS）上 _connectLocalTerminal 自身直接返回，
+    // 空态由 _buildEmptyConnectionsView 引导「新建连接」
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         if (widget.hostId != null) {
           _connectToHost();
         } else {
-          _connectLocalTerminal();
+          _restoreOpenTabs();
         }
       }
     });
@@ -805,8 +808,50 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     if (connected.id == _currentTabId) _scheduleSizeSync(connected);
   }
 
+  /// 冷启动恢复上次打开的 SSH 标签。
+  ///
+  /// 注册全部标签后再逐个建连：先让顶栏把标签都画出来，用户立刻能看到
+  /// 「哪几个在连」，而不是等第一台连上才有画面。任一标签连不上不影响其余
+  /// （失败状态由 tab.status 承担，页面上是失败卡 + 手动重连）。
+  Future<void> _restoreOpenTabs() async {
+    final saved = tp.TerminalNotifier.readOpenTabsToRestore();
+    if (saved.hostIds.isEmpty) {
+      await _connectLocalTerminal();
+      return;
+    }
+    final notifier = ref.read(tp.terminalProvider.notifier);
+    final hostsNotifier = ref.read(hostsProvider.notifier);
+    final opened = <tp.TerminalTab>[];
+    for (final hostId in saved.hostIds) {
+      final host = hostsNotifier.getHostById(hostId);
+      // 主机已删除：跳过。落盘记录里保留该 hostId，用户恢复配置后还能回来
+      if (host == null) continue;
+      opened.add(notifier.registerTab(host));
+    }
+    if (opened.isEmpty) {
+      await _connectLocalTerminal();
+      return;
+    }
+    final activeIndex = saved.activeIndex.clamp(0, opened.length - 1);
+    _switchToTab(opened[activeIndex]);
+    notifier.activateTabForRestore(opened[activeIndex].id);
+    for (final tab in opened) {
+      if (!mounted) return;
+      final host = hostsNotifier.getHostById(tab.hostId);
+      if (host == null) continue;
+      final connected = await notifier.connectTab(tab, host);
+      if (connected == null || !mounted) continue;
+      ref.read(agentProvider.notifier).setExecutor(connected.service,
+          hostId: connected.hostId, tabId: connected.id);
+      if (connected.id == _currentTabId) _scheduleSizeSync(connected);
+    }
+  }
+
   /// 连接本地终端
   Future<void> _connectLocalTerminal() async {
+    // 兜底守卫：Android/iOS 上注册本地标签必然失败，所有回退路径统一在此拦截，
+    // 由空态引导视图接管（见 _buildConnectionPlaceholder）
+    if (!LocalTerminalService.isSupported) return;
     final notifier = ref.read(tp.terminalProvider.notifier);
     final tab = notifier.registerLocalTab();
     _switchToTab(tab);
@@ -2991,9 +3036,13 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   Widget? _buildConnectionPlaceholder(tp.TerminalTab? tab) {
     if (tab == null) {
       final notice = _placeholderError;
-      return notice != null
-          ? _buildNoticeView(notice)
-          : _buildConnectingView(null);
+      if (notice != null) return _buildNoticeView(notice);
+      // 平台上没有本地 PTY（Android/iOS）时空态不能停在「连接中」转圈——
+      // 那是在等一次永远不会发起的连接
+      if (!LocalTerminalService.isSupported) {
+        return _buildEmptyConnectionsView();
+      }
+      return _buildConnectingView(null);
     }
     switch (tab.status) {
       case tp.TabStatus.connecting:
@@ -3056,6 +3105,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   Widget _buildTabErrorView(tp.TerminalTab tab) {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
+    // 带键的已知消息按当前语言重新取词：失败瞬间冻结的文本会在切换语言后
+    // 继续显示旧语言（真机实测：英文环境失败 → 切中文仍是英文）
+    final errorText = tab.errorL10nKey == 'terminalLocalStartFailed'
+        ? l10n.terminalLocalStartFailed
+        : (tab.connectionError ?? l10n.connectionFailedHint);
     return Container(
       key: const ValueKey('tab-connect-failed'),
       color: tc.bg,
@@ -3079,7 +3133,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                 // 底层异常可能很长，允许滚动和复制，别把它截成看不懂的半句
                 child: SingleChildScrollView(
                   child: SelectableText(
-                    tab.connectionError ?? l10n.connectionFailedHint,
+                    errorText,
                     style: TextStyle(color: tc.error, fontSize: fSmall),
                     textAlign: TextAlign.center,
                   ),
@@ -3104,19 +3158,22 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                     child: Text(l10n.retry,
                         style: const TextStyle(fontSize: fBody)),
                   ),
-                  OutlinedButton(
-                    onPressed: () => context.push('/host/edit/${tab.hostId}'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: tc.textSub,
-                      side: BorderSide(color: tc.border),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 10),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(rMedium)),
+                  // 本地标签没有可编辑的主机配置：/host/edit/local 打开的是
+                  // 空白 SSH 编辑表单，保存会凭空造出一台叫 "local" 的服务器。
+                  if (!tab.isLocal)
+                    OutlinedButton(
+                      onPressed: () => context.push('/host/edit/${tab.hostId}'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: tc.textSub,
+                        side: BorderSide(color: tc.border),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 10),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(rMedium)),
+                      ),
+                      child: Text(l10n.edit,
+                          style: const TextStyle(fontSize: fBody)),
                     ),
-                    child: Text(l10n.edit,
-                        style: const TextStyle(fontSize: fBody)),
-                  ),
                   OutlinedButton(
                     onPressed: () => _removeTab(tab),
                     style: OutlinedButton.styleFrom(
@@ -3140,6 +3197,52 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   }
 
   /// 无法归属到任何标签的提示（例如路由里的 hostId 已被删除）
+  /// 无任何标签且平台不支持本地 PTY（Android/iOS）时的引导空态
+  Widget _buildEmptyConnectionsView() {
+    final tc = ThemeColors.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    return Container(
+      key: const ValueKey('tab-empty-connections'),
+      color: tc.bg,
+      padding: const EdgeInsets.all(32),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.dns_outlined, size: 40, color: tc.textMuted),
+              const SizedBox(height: 12),
+              Text(UiText.t('还没有打开的连接', 'No connection open'),
+                  style: TextStyle(color: tc.textSub, fontSize: fBody)),
+              const SizedBox(height: 4),
+              Text(
+                UiText.t('连接一台服务器开始使用', 'Connect to a server to get started'),
+                style: TextStyle(color: tc.textMuted, fontSize: fSmall),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: _showAddHostDialog,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: tc.brand,
+                  foregroundColor: tc.onAccent,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(rMedium)),
+                ),
+                icon: const Icon(Icons.add_circle_outline, size: 18),
+                label: Text(l10n.terminalNewConnection,
+                    style: const TextStyle(fontSize: fBody)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildNoticeView(String message) {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
@@ -5797,6 +5900,113 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             s.status == AgentStatus.waitingConfirm);
   }
 
+  /// 常驻批准条要接住的待确认命令（引擎优先，其次手动播放），无则 null。
+  /// 与命令卡片渲染处（buildEventContent）的合并口径保持一致。
+  String? _pendingConfirmForBar(AgentState agentState, tp.TerminalTab? tab) {
+    final engine = agentState.isWaitingConfirm
+        ? agentState.pendingConfirmCommand
+        : null;
+    if (engine != null && engine.isNotEmpty) return engine;
+    final manual =
+        tab == null ? _pendingConfirmCommand : _tabPendingConfirm[tab.id];
+    return (manual == null || manual.isEmpty) ? null : manual;
+  }
+
+  /// 竖屏手机批准入口：风险卡片底部的 Run/Cancel 在 140-220px 的聊天视口里
+  /// 滚不出来（真机实测），这里把同一对动作钉在底栏（永远可见）。
+  Widget _buildPinnedConfirmBar(ThemeColors tc, AgentState agentState,
+      String command, tp.TerminalTab? tab) {
+    final ui = AgentUiText.of(context);
+    final singleLine = command.replaceAll(RegExp(r'\s*\n\s*'), ' ');
+    // 归属判定只用传入的 per-tab 状态：非活跃 tab 的底栏也在工作区里构建，
+    // 此时 ref.read(agentProvider) 拿到的是活跃 tab 的状态（R3），会认错来源。
+    final isEngine = agentState.isWaitingConfirm &&
+        agentState.pendingConfirmCommand == command.trim();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+        decoration: BoxDecoration(
+          color: tc.warn.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(rSmall),
+          border: Border.all(color: tc.warn.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.warning_amber, size: 14, color: tc.warn),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                singleLine,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'JetBrainsMono',
+                  fontFamilyFallback: kMonoFontFallback,
+                  fontSize: fMicro,
+                  color: tc.warn,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            _clickable(
+              onTap: () {
+                if (isEngine) {
+                  ref.read(agentProvider.notifier).rejectCommand();
+                } else if (tab != null) {
+                  setState(() => _tabPendingConfirm[tab.id] = null);
+                } else {
+                  setState(() => _pendingConfirmCommand = null);
+                }
+              },
+              child: Container(
+                height: 28,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: tc.surface,
+                  borderRadius: BorderRadius.circular(rSmall),
+                  border: Border.all(color: tc.border),
+                ),
+                child: Text(ui.cancel,
+                    style: TextStyle(
+                        fontSize: fSmall,
+                        color: tc.textSub,
+                        fontWeight: FontWeight.w500)),
+              ),
+            ),
+            const SizedBox(width: 4),
+            _clickable(
+              onTap: () {
+                if (isEngine) {
+                  ref.read(agentProvider.notifier).confirmCommand();
+                } else if (tab != null) {
+                  _executeLineDirectly(command, true, tab);
+                }
+              },
+              child: Container(
+                height: 28,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: tc.warn.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(rSmall),
+                  border: Border.all(color: tc.warn.withValues(alpha: 0.4)),
+                ),
+                child: Text(ui.confirmExecute,
+                    style: TextStyle(
+                        fontSize: fSmall,
+                        color: tc.warn,
+                        fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBottomBar(AgentState agentState, tp.TerminalTab? tab) {
     final isConnected = tab?.isConnected == true;
     // 端点状态已注入 API Key；当前模型优先取活跃 host 实际使用的配置
@@ -5845,6 +6055,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          // 待确认命令的常驻批准条。
+          //
+          // 卡片里的 Run/Cancel 是风险面板的最后一个子节点，而竖屏手机聊天视口
+          // 只有 140-220px（真机实测 [0,1043][1080,1923] 的面板里视口仅到 y=1299），
+          // 按钮排在折线以下就点不到——高危命令在手机上只能被拒绝或等 10 分钟超时
+          // 自动拒绝。批准入口必须落在「永远可见」的区域：运行条下方、输入框上方。
+          // 卡片内的按钮保留，桌面端仍与影响说明同屏。
+          // 两种待确认来源都要接住：引擎自动流程（enginePendingConfirm）与
+          // 手动播放（_tabPendingConfirm），口径与卡片渲染处一致。
+          if (_pendingConfirmForBar(agentState, tab) != null)
+            _buildPinnedConfirmBar(
+                tc, agentState, _pendingConfirmForBar(agentState, tab)!, tab),
           // 重连状态
           if (_reconnectingHostLabel != null)
             ReconnectingBanner(

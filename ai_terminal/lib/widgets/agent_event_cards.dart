@@ -6,6 +6,7 @@ import '../core/theme_colors.dart';
 import '../models/agent_event.dart';
 import '../providers/terminal_provider.dart' as tp;
 import '../utils/agent_ui_text.dart';
+import '../utils/output_processor.dart' show kNoOutputPlaceholder;
 import '../core/ui_text.dart';
 import 'agent_process_timeline.dart';
 import 'agent_ask_card.dart';
@@ -358,8 +359,17 @@ class AgentEventContent extends StatelessWidget {
       AgentEvent event, ThemeColors tc, BuildContext context) {
     final ui = AgentUiText.of(context);
     final success = event.success ?? false;
-    final output =
-        event.output ?? event.error ?? UiText.t('(无输出)', '(no output)');
+    // 预检拦截的命令从未执行，output 只有占位串，真实原因在 error：
+    // 直接取 output 会让卡片写着「(无输出)」，用户看不到为什么被拦下。
+    final output = success
+        ? (event.output ??
+            event.error ??
+            UiText.t('(无输出)', '(no output)'))
+        : (event.output != null && event.output != kNoOutputPlaceholder
+            ? event.output!
+            : (event.error ??
+                event.output ??
+                UiText.t('(无输出)', '(no output)')));
     final lines = output.split('\n');
     final hostResults = event.hostResults;
     final showMatrix = hostResults != null && hostResults.length > 1;

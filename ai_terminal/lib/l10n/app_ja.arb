@@ -177,6 +177,7 @@
   "confirm": "確認",
   "connErrAuth": "認証に失敗しました。ユーザー名とパスワード/鍵を確認してください",
   "connErrGeneric": "ネットワーク接続とサーバーの状態を確認してください",
+  "connErrHostKey": "ホスト鍵の検証に失敗しました（拒否したか、保存済みの鍵と一致しません）",
   "connErrNoRoute": "ホストへの経路がありません。サーバーアドレスを確認してください",
   "connErrRefused": "サーバーが接続を拒否しました。SSHポートを確認してください",
   "connErrTimeout": "接続がタイムアウトしました。ネットワークまたはサーバーの可用性を確認してください",
@@ -530,6 +531,13 @@
   "thinkingNextStep": "🤔 次のステップを考えています...",
   "toolRetryExhausted": "ツールの再試行回数が上限を超えました。タスクを終了しました",
   "username": "ユーザー名",
+  "@aiBaseUrlReplacedByPreset": {
+    "placeholders": {
+      "url": {
+        "type": "String"
+      }
+    }
+  },
   "@aiModelDeleteConfirm": {
     "placeholders": {
       "name": {
@@ -1285,6 +1293,7 @@
   "aiModelValidationModelId": "モデルIDを入力してください",
   "aiModelValidationBaseUrl": "APIアドレスを入力してください",
   "aiModelValidationModels": "少なくとも 1 つのモデルを追加します",
+  "aiBaseUrlReplacedByPreset": "Base URL をプリセットのアドレスに置き換えました。以前の値: {url}",
   "terminalConfigureModel": "モデルの構成",
   "terminalModelAndReasoning": "模型与思考",
   "terminalReasoning": "思考の程度",
@@ -3439,7 +3448,7 @@
       }
     }
   },
-  "ut_7234d250c6": "合計 {length} 個のアイテム · {length} 個のアイテムを表示中",
+  "ut_7234d250c6": "合計 {length} 個のアイテム · {length2} 個のアイテムを表示中",
   "@ut_7234d250c6": {
     "placeholders": {
       "length": {

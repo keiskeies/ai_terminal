@@ -110,7 +110,17 @@ class CredentialsStore {
     }
 
     // 策略 3（降级）：legacy key（仅在其他方式全部失败时使用）
-    debugPrint('CredentialsStore: ⚠️ 降级使用旧版密钥（不推荐，可能导致数据不兼容）');
+    //
+    // Android/iOS 的 getMasterKey 本来就没实现（MainActivity 直接 result.success(null)，
+    // iOS 连通道都没注册），这两端的凭据落点是 flutter_secure_storage，AES 只是
+    // 兜底，属于设计内路径；每次冷启动都打「不推荐/可能数据不兼容」会让人以为
+    // 出了故障。桌面端才是真的异常（原生主密钥应当可用），保留警告。
+    if (Platform.isAndroid || Platform.isIOS) {
+      debugPrint('CredentialsStore: 使用兼容主密钥（移动端未提供原生主密钥，'
+          '凭据以系统安全存储为准）');
+    } else {
+      debugPrint('CredentialsStore: ⚠️ 降级使用旧版密钥（不推荐，可能导致数据不兼容）');
+    }
     _masterKey = _legacyKey;
     _encrypter = Encrypter(AES(_masterKey!));
   }

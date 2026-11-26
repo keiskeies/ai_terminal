@@ -16,8 +16,10 @@ final RegExp _errorPattern = RegExp(
   r'|错误|失败|异常|拒绝|超时|不存在',
   caseSensitive: false,
 );
+// RHEL/CentOS 默认 PS1 是 [user@host dir]# 形态，与 user@host:path$ 并列支持；
+// 缺了它 CommandTracker 闸门 1 永远拒绝，命令历史在 RHEL 系服务器上全量失效。
 final RegExp _promptPrefix = RegExp(
-  r'^\s*(?:PS [^>]*>|\$|#|>|[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+:[^\s$#]*[$#])\s*',
+  r'^\s*(?:PS [^>]*>|\$|#|>|[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+:[^\s$#]*[$#]|\[[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+[^\]]*\][#$])\s*',
 );
 
 String _trimTrailingPunctuation(String value) =>

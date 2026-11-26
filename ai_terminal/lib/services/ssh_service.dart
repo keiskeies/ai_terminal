@@ -19,6 +19,7 @@ import 'ssh_keepalive_socket.dart';
 import '../core/l10n_holder.dart';
 import '../core/security/ssh_client_security.dart';
 import '../core/security/ssh_host_key_policy.dart';
+import '../core/security/ssh_host_key_verifier.dart';
 
 /// SSH 连接状态
 enum SSHConnectionState {
@@ -477,14 +478,20 @@ class SSHService implements CommandExecutor {
       _addOutput('OS: $_osInfo\r\n');
       _addOutput('\$ ');
     } catch (e) {
+      // 终端里那行「连接失败」是用户唯一能直接看到的失败原因，必须是真实原因：
+      // 主机密钥被拒绝时原始异常已被包成 SSHAuthAbortError（见 unwrapConnectionFailure）。
+      final cause = SshClientSecurity.unwrapConnectionFailure(e);
       if (generation == _connectionGeneration) {
         _isConnected = false;
         _intentionalDisconnect = true; // 建连失败不是掉线通知。
         await _closeResources();
-        _addOutput('\r\n❌ ${UiText.t('连接失败: ', 'Connection failed: ')}$e\r\n');
+        _addOutput('\r\n❌ ${UiText.t('连接失败: ', 'Connection failed: ')}$cause\r\n');
       } else {
         // 过期请求只关闭自己创建的资源，不能重置状态或关闭较新连接。
         closeOwnedResources();
+      }
+      if (!identical(cause, e) && cause is SshHostKeyVerificationException) {
+        throw cause;
       }
       rethrow;
     } finally {
@@ -1156,8 +1163,12 @@ class SSHService implements CommandExecutor {
   @override
   void execute(String command) {
     if (_session == null || !_isConnected) {
-      outputController
-          .add('${UiText.t('[错误] 未连接', '[error] Not connected')}\r\n');
+      // service 可能已随 tab 关闭 dispose（controller 已 close），直接 add 会抛
+      // StateError 并被上层静默吞进 crash.log
+      if (!outputController.isClosed) {
+        outputController
+            .add('${UiText.t('[错误] 未连接', '[error] Not connected')}\r\n');
+      }
       return;
     }
 

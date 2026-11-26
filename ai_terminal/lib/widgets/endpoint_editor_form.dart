@@ -110,6 +110,7 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
   void _onProviderChanged(String id) {
     final oldPreset = ProviderConfigService.getProviderById(_providerId);
     final preset = ProviderConfigService.getProviderById(id);
+    final previousBaseUrl = _baseUrlController.text.trim();
     setState(() {
       _providerId = id;
       if (!_isEditing && preset != null) {
@@ -126,6 +127,18 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
         }
       }
     });
+    // 手填过代理/中转地址的用户切服务商时会被预设覆盖，且原先看不出任何区别。
+    // 覆盖本身是对的（换服务商后旧地址通常已不可用），所以只在确实擦掉了
+    // 非预设值时提示一次，并把原值打出来方便抄回去。
+    final wasCustom = previousBaseUrl.isNotEmpty &&
+        previousBaseUrl != preset?.baseUrl &&
+        previousBaseUrl != oldPreset?.baseUrl;
+    if (wasCustom && preset != null && preset.baseUrl.isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _snack(UiText.t('Base URL 已替换为预设地址，原为 $previousBaseUrl',
+            'Base URL replaced by the preset. Previous: $previousBaseUrl'));
+      });
+    }
   }
 
   List<FallbackChoice> _fallbackChoices({required String? excludeId}) {

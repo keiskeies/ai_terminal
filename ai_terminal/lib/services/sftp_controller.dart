@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import '../core/credentials_store.dart';
+import '../core/security/ssh_client_security.dart';
 import '../models/host_config.dart';
 import 'sftp_service.dart';
 
@@ -87,7 +88,8 @@ class SftpController extends ChangeNotifier {
       await loadDirectory(cwd);
     } catch (e) {
       isConnecting = false;
-      error = '连接失败: $e';
+      // 主机密钥被拒绝时底层只剩 SSHAuthAbortError，展开后才看得出真实原因。
+      error = '连接失败: ${SshClientSecurity.unwrapConnectionFailure(e)}';
       notifyListeners();
     }
   }
