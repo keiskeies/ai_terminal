@@ -849,11 +849,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
   /// 连接本地终端
   Future<void> _connectLocalTerminal() async {
-    // 兜底守卫：Android/iOS 上注册本地标签必然失败，所有回退路径统一在此拦截，
+    // 平台没有本地 PTY（Android/iOS）时 registerLocalTab 返回 null，
     // 由空态引导视图接管（见 _buildConnectionPlaceholder）
-    if (!LocalTerminalService.isSupported) return;
     final notifier = ref.read(tp.terminalProvider.notifier);
     final tab = notifier.registerLocalTab();
+    if (tab == null) return;
     _switchToTab(tab);
 
     final connected = await notifier.connectLocalTab(tab);
@@ -1944,7 +1944,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
               // 快捷按键行（仅 Android / iOS 显示，桌面端不需要）
               // 当 AI 输入框获焦（键盘弹出）时隐藏快捷按键栏，节省空间
-              if (Platform.isAndroid || Platform.isIOS && !_aiInputFocused)
+              if (_isMobile && !_aiInputFocused)
                 _buildQuickKeysBar(activeTab),
             ],
           ),

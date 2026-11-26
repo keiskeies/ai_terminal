@@ -174,10 +174,15 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
     return null;
   }
 
-  /// 注册本地终端标签（不建连）。
+  /// 注册本地终端标签（不建连），平台不支持本地 PTY 时返回 null。
   /// 拆成"注册 + 建连"两步，是为了让页面能立刻切过去显示过渡态，
   /// 而不是等 PTY 起好才换屏——期间用户看到的还是上一个标签。
-  TerminalTab registerLocalTab() {
+  ///
+  /// 守卫必须在这一层：注册出标签就等于在 tab 条上落了席位，
+  /// Android/iOS 上必然连不起来，只会留一个死的「本地终端」空标签。
+  /// 只把守卫放在页面层的话，任何绕过页面直接调 provider 的路径都会漏。
+  TerminalTab? registerLocalTab() {
+    if (!LocalTerminalService.isSupported) return null;
     final tab = TerminalTab(
       id: _uuid.v4(),
       hostId: 'local',
@@ -601,6 +606,7 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
   /// 本地终端重连：在原 tab 上重启 PTY（保留 tabId、终端内容）
   /// 返回重连后的 tab；失败返回 null（原因写在 tab.connectionError）。
   Future<TerminalTab?> reconnectLocal(String tabId) async {
+    if (!LocalTerminalService.isSupported) return null;
     cancelAutoReconnect(tabId, keepAttempts: true);
     final existingTab = state.tabs.cast<TerminalTab?>().firstWhere(
           (t) => t?.id == tabId,
@@ -609,7 +615,7 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
     if (existingTab == null) {
       // 原 tab 已不在列表中，新建一个
       final tab = registerLocalTab();
-      return connectLocalTab(tab);
+      return tab == null ? null : connectLocalTab(tab);
     }
     if (!existingTab.isLocal) return null;
 

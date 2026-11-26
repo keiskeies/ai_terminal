@@ -46,7 +46,8 @@ void main() {
     notifier.scheduleAutoReconnect(ssh.id);
     expect(notifier.pendingReconnectCount, 0, reason: 'connected 不该触发自动重连');
 
-    final local = notifier.registerLocalTab();
+    // 注册本地标签只在桌面端成立（flutter test 跑在桌面上）
+    final local = notifier.registerLocalTab()!;
     local.status = TabStatus.lost;
     notifier.scheduleAutoReconnect(local.id);
     expect(notifier.pendingReconnectCount, 0, reason: '本地 PTY 退出是正常结束，不自动重启');
