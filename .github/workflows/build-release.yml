@@ -221,6 +221,10 @@ jobs:
             - **主机密钥验证全面落地**：SSH/SFTP 直连与跳板首连确认信任（TOFU），指纹变更即告警拒连；known_hosts 支持导入导出
             - **命令意图与移动端加密**：命令分级新增 unknown 语义、本地目录访问改任务级授权、破坏性操作按破坏程度确认；Android/iOS 本地库整体 SQLCipher 加密，密钥入 Keystore/Keychain 并支持轮换与迁移；fetch_url 增加 SSRF 防护；数据库初始化失败给出可读失败页而非白屏
 
+            - **手机端确认命令不再滚出视口**：竖屏下待确认命令的批准按钮被顶出屏幕，改钉底栏常驻；片段执行命中已释放终端不再抛异常；抽屉补「删除」，手机端能删快捷命令
+            - **SSH 标签冷启动恢复**：重启后按上次顺序恢复标签并自动重连；主机密钥被拒的原因如实还原，不再误报成认证失败；本地终端能力判定收口一处，Android/iOS 不再注册连不上的空标签
+            - **未执行的命令不进变更台账**：拦截与取消的命令此前被记成已变更，审计标记改为 拦截/放行/未执行 三态；失败原因跟随当前语言渲染
+
             #### 📁 继续包含
             - v1.5.3 的断连治理：半开断连秒级发现、任务跑一半也能自动重连续跑、连接超时配置真正生效、会话标题自动命名、命令卡执行中态与实时耗时、各平台包名统一
             - v1.5.2 的引擎架构治理：单文件引擎拆成各自带单测的分层（`ReActParser` / `EventStore` / `HistoryPolicy` / `PromptBuilder` / `TerminationGuard` / `CommandRunner` / `ToolOrchestrator`），全部终态写入收口到一个守卫并固化「终态硬禁令基线归零」，安全门禁学会 Windows（只读档拦下 `Set-Content` / `Out-File` / `Remove-Item`，分级前剥离 `powershell -Command` 包装），约 200 处硬编码色改为主题感知令牌让浅色主题全线达标
@@ -312,6 +316,10 @@ jobs:
             - **Ctrl+C stops misfiring**: after an interrupt the app waits 300ms before the follow-up newline, so an empty password never feeds sudo and a dangling continuation state cannot swallow the next command
             - **Host key verification everywhere**: SSH/SFTP direct and jump-host connections confirm the fingerprint on first use (TOFU) and refuse to connect when it changes; known_hosts import and export included
             - **Command intent and mobile encryption**: safety grading gained an unknown verdict, local directory access became task-scoped authorization, destructive operations confirm by severity; the Android/iOS local database moves fully behind SQLCipher with keys in Keystore/Keychain plus rotation and migration; fetch_url gained SSRF protection; a failed database init now shows a readable failure page instead of a white screen
+
+            - **Approval buttons stay on screen**: portrait phones pushed Run/Cancel below the fold and the user could only watch the command time out; approval now lives in a pinned bottom bar. Running a snippet against a disposed terminal no longer throws, and the drawer gained Delete so phone users can remove their own quick commands
+            - **SSH tabs survive a cold start**: tabs reopen in the order they were left and reconnect automatically; a rejected host key reports its real reason instead of masquerading as an auth failure, and the local-terminal capability check moved to one place so mobile never registers a tab that cannot connect
+            - **Never-executed commands leave the changelog**: intercepted and cancelled commands were logged as if they had run; audit entries now distinguish intercepted / allowed / not executed, and failure reasons render in the current language
 
             #### 📁 Still included
             - The v1.5.3 disconnect program: half-open disconnects surfaced in seconds, reconnect-and-continue mid-task, connection settings that actually apply, AI session naming, running-state command cards with live elapsed time, and one bundle id per platform
