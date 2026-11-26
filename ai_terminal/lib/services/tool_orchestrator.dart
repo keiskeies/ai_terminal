@@ -14,7 +14,7 @@ import 'agent_tool.dart';
 /// 为什么 `_handleToolAction` 主体没搬过来：它要写 `_currentTask.status`
 /// （executing/thinking）、做破坏性工具的用户确认握手（`_confirmCompleter`
 /// 与危险命令、`cancelTask` 三方共享）、累计 `_toolCalls`/`_noCommandRetryCount`
-/// 并按重试上限收口终态、记录 `_currentProjectRoot` 与文件变更台账。
+/// 并按重试上限收口终态、记录工具调用与文件变更台账。
 /// 这些都是引擎生命周期状态，搬走会让取消路径只 complete 引擎侧 Completer，
 /// 而编排器侧的 await 永久挂起（违反 R1）。因此编排状态机留在 `AgentEngine`，
 /// 这里只做「判定」和「格式化」。

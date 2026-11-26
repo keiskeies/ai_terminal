@@ -19,6 +19,7 @@ import '../utils/local_file_ops.dart';
 import '../utils/tool_args_parser.dart';
 import 'local_file_tools.dart';
 import 'local_file_policy.dart';
+import 'local_access.dart';
 import 'local_exec_tool.dart';
 import 'project_tools.dart';
 import 'web_tools.dart';
@@ -170,16 +171,16 @@ abstract class AgentTool {
   /// 对话历史并被模型读到（AGENTS.md R7）。
   Future<bool> Function(String reason)? sudoPasswordRequest;
 
-  /// 请用户授权本机目录（local_exec 使用，由 AgentEngine 在 execute 前注入）。
-  ///
-  /// 返回 true = 用户允许访问该目录，调用方应重新读取 LocalFilePolicy 再判定一次。
-  /// 只负责“问用户”，不直接改策略；策略写回由 UI 层完成。
-  Future<bool> Function(String path, String reason)?
-      localDirAuthorizationRequest;
+  /// 当前任务的本地授权上下文（由 AgentEngine 在 execute 前注入）。
+  /// 授权按 read / write / execute 分离，任务结束即失效。
+  LocalAccessService? localAccess;
 
   /// 当前任务是否仍有效（local_exec 在用户授权等待后、真正执行前检查）。
   /// 授权弹窗可能停留很久，期间任务被取消/暂停时不能继续产生本机副作用。
   bool Function()? isTaskActive;
+
+  /// 本次工具调用的权限档位快照，仅供审计使用，不参与授权判定。
+  AgentPermissionMode? permissionMode;
 
   /// 只读工具（kind == read）
   bool get isReadOnly => kind == ToolKind.read;
@@ -266,33 +267,79 @@ abstract class AgentTool {
 String _quotePosixArgument(String value) =>
     "'${value.replaceAll("'", "'\\''")}'";
 
-LocalPathDecision _decideLocalPath(String path) =>
-    LocalFilePolicy.load().decide(path);
+LocalPathDecision _decideLocalPath(
+  String path, {
+  LocalAccessService? access,
+  LocalAccessMode mode = LocalAccessMode.read,
+}) {
+  final policy = LocalFilePolicy.load();
+  final initial = policy.decide(path);
+  if (initial.verdict == LocalPathVerdict.sensitive ||
+      initial.verdict == LocalPathVerdict.reserved ||
+      initial.verdict == LocalPathVerdict.escape) {
+    return initial;
+  }
+  return verifyLocalPathAccess(
+    rawPath: path,
+    expectedResolved: initial.resolved,
+    mode: mode,
+    access: access,
+    policy: policy,
+  );
+}
 
-LocalPathDecision _verifyLocalPath(String rawPath, String expectedResolved) =>
-    LocalFilePolicy.load().verify(rawPath, expectedResolved);
+LocalPathDecision _verifyLocalPath(
+  String rawPath,
+  String expectedResolved, {
+  LocalAccessService? access,
+  LocalAccessMode mode = LocalAccessMode.read,
+}) =>
+    verifyLocalPathAccess(
+      rawPath: rawPath,
+      expectedResolved: expectedResolved,
+      mode: mode,
+      access: access,
+      policy: LocalFilePolicy.load(),
+    );
 
 String _localPathDeniedMessage(String path, LocalPathDecision decision) =>
     '本地路径未获授权: $path${decision.reason == null ? '' : '\n${decision.reason}'}';
 
-String? _freshLocalPathDenial(String rawPath, String expectedResolved) {
-  final decision = _verifyLocalPath(rawPath, expectedResolved);
+String? _freshLocalPathDenial(
+  String rawPath,
+  String expectedResolved, {
+  LocalAccessService? access,
+  LocalAccessMode mode = LocalAccessMode.read,
+}) {
+  final decision = _verifyLocalPath(
+    rawPath,
+    expectedResolved,
+    access: access,
+    mode: mode,
+  );
   return decision.isAllowed ? null : _localPathDeniedMessage(rawPath, decision);
 }
 
 Future<String?> _createVerifiedLocalDirectory(
   String path,
-  Completer<void>? cancelToken,
-) async {
+  Completer<void>? cancelToken, {
+  LocalAccessService? access,
+}) async {
   if (cancelToken?.isCompleted == true) return '下载已取消';
-  if (await Directory(path).exists()) return _freshLocalPathDenial(path, path);
+  if (await Directory(path).exists()) {
+    return _freshLocalPathDenial(path, path,
+        access: access, mode: LocalAccessMode.write);
+  }
   final parent = p.dirname(path);
-  final parentDenial = _freshLocalPathDenial(parent, parent);
+  final parentDenial = _freshLocalPathDenial(parent, parent,
+      access: access, mode: LocalAccessMode.write);
   if (parentDenial != null) return parentDenial;
-  final denial = _freshLocalPathDenial(path, path);
+  final denial = _freshLocalPathDenial(path, path,
+      access: access, mode: LocalAccessMode.write);
   if (denial != null) return denial;
   await Directory(path).create(recursive: true);
-  return _freshLocalPathDenial(path, path);
+  return _freshLocalPathDenial(path, path,
+      access: access, mode: LocalAccessMode.write);
 }
 
 /// 返回空字符串表示已确认是 POSIX shell；否则给出保守拒绝原因。
@@ -327,8 +374,12 @@ String? _normalizedRemotePath(String path) {
 /// 目录上传会在 SftpService 内再次遍历。这里先按相同排除规则检查所有实际
 /// 文件/目录，避免只检查根目录后，把授权目录内的敏感文件一并读走。
 Future<String?> _preflightDirectoryUpload(
-    String rawPath, List<String> excludeNames) async {
-  final decision = _decideLocalPath(rawPath);
+  String rawPath,
+  List<String> excludeNames, {
+  LocalAccessService? access,
+}) async {
+  final decision =
+      _decideLocalPath(rawPath, access: access, mode: LocalAccessMode.read);
   if (!decision.isAllowed) return _localPathDeniedMessage(rawPath, decision);
   final root = Directory(decision.resolved);
   if (!await root.exists()) return '本地目录不存在: ${decision.resolved}';
@@ -340,7 +391,8 @@ Future<String?> _preflightDirectoryUpload(
     final relative = p.relative(entity.path, from: decision.resolved);
     if (p.split(relative).any(excludeNames.contains)) continue;
     if (entity is! File && entity is! Directory) continue;
-    final entityDecision = _decideLocalPath(entity.path);
+    final entityDecision = _decideLocalPath(entity.path,
+        access: access, mode: LocalAccessMode.read);
     if (!entityDecision.isAllowed) {
       return _localPathDeniedMessage(entity.path, entityDecision);
     }
@@ -376,6 +428,7 @@ Future<_DirectoryDownloadPlan> _planDirectoryDownload({
   required String remoteDir,
   required String localRoot,
   required List<String> excludeNames,
+  LocalAccessService? access,
 }) async {
   final plan = _DirectoryDownloadPlan();
   var scannedEntries = 0;
@@ -399,7 +452,8 @@ Future<_DirectoryDownloadPlan> _planDirectoryDownload({
       final relative = p.posix.joinAll(childParts);
       if (entry.isDirectory) {
         final localDir = p.joinAll([localRoot, ...childParts]);
-        final decision = _decideLocalPath(localDir);
+        final decision = _decideLocalPath(localDir,
+            access: access, mode: LocalAccessMode.write);
         if (!decision.isAllowed) {
           plan.error = _localPathDeniedMessage(localDir, decision);
           return;
@@ -416,7 +470,8 @@ Future<_DirectoryDownloadPlan> _planDirectoryDownload({
         plan.result.skippedLinks.add(relative);
       } else {
         final localFile = p.joinAll([localRoot, ...childParts]);
-        final decision = _decideLocalPath(localFile);
+        final decision = _decideLocalPath(localFile,
+            access: access, mode: LocalAccessMode.write);
         if (!decision.isAllowed) {
           plan.error = _localPathDeniedMessage(localFile, decision);
           return;
@@ -446,14 +501,17 @@ Future<ToolResult> _runDirectoryUploadWithCancel({
   required void Function(String message)? onProgress,
   required Completer<void>? cancelToken,
   required bool Function()? isTaskActive,
+  LocalAccessService? access,
   String prefix = '',
 }) async {
   if (isTaskActive?.call() == false || cancelToken?.isCompleted == true) {
     return ToolResult.failure('$prefix上传已取消');
   }
-  final policyError = await _preflightDirectoryUpload(local, excludeNames);
+  final policyError =
+      await _preflightDirectoryUpload(local, excludeNames, access: access);
   if (policyError != null) return ToolResult.failure('$prefix$policyError');
-  final checked = _verifyLocalPath(local, local);
+  final checked =
+      _decideLocalPath(local, access: access, mode: LocalAccessMode.read);
   if (!checked.isAllowed) {
     return ToolResult.failure(
         '$prefix${_localPathDeniedMessage(local, checked)}');
@@ -479,7 +537,8 @@ Future<ToolResult> _runDirectoryUploadWithCancel({
     }
     await DirectoryUploadLock.acquire(lockKey, cancelToken: transferCancel);
     locked = true;
-    final beforeUpload = _verifyLocalPath(local, local);
+    final beforeUpload =
+        _decideLocalPath(local, access: access, mode: LocalAccessMode.read);
     if (!beforeUpload.isAllowed) {
       return ToolResult.failure(
           '$prefix${_localPathDeniedMessage(local, beforeUpload)}');
@@ -492,8 +551,9 @@ Future<ToolResult> _runDirectoryUploadWithCancel({
       effectiveRemote,
       excludeNames: excludeNames,
       cancelToken: transferCancel,
-      validateLocalPath: (raw, expected) async =>
-          _freshLocalPathDenial(raw, expected),
+      validateLocalPath: (raw, expected) async => _freshLocalPathDenial(
+          raw, expected,
+          access: access, mode: LocalAccessMode.read),
       onProgress: (uploaded, total) {
         final now = progressWatch.elapsedMilliseconds;
         if (uploaded >= total || now - lastProgressMs >= 1000) {
@@ -564,17 +624,24 @@ class SftpUploadTool extends AgentTool {
       return ToolResult.failure('上传已取消');
     }
 
-    // 本地源文件/目录与远程目标不同，必须先过本机路径策略。
-    final localDecision = _decideLocalPath(local);
-    if (!localDecision.isAllowed) {
-      return ToolResult.failure(_localPathDeniedMessage(local, localDecision));
-    }
-    final localPath = localDecision.resolved;
-
     // 仅支持 SSH 远程会话
     if (executor is! SSHService) {
       return ToolResult.failure('sftp_upload 仅支持 SSH 远程会话，当前为本地终端');
     }
+
+    // 本地源文件/目录与远程目标不同，必须先获得本机读取授权。
+    final policy = LocalFilePolicy.load();
+    final localDecision = await authorizeLocalPath(
+      rawPath: local,
+      mode: LocalAccessMode.read,
+      access: localAccess,
+      policy: policy,
+      reason: 'sftp_upload 需要读取本地文件或目录并上传到远程服务器：$local',
+    );
+    if (!localDecision.isAllowed) {
+      return ToolResult.failure(_localPathDeniedMessage(local, localDecision));
+    }
+    final localPath = localDecision.resolved;
 
     // 校验本地路径存在
     bool isDir;
@@ -600,8 +667,9 @@ class SftpUploadTool extends AgentTool {
     List<String> excludeNames =
         excludeArg.isEmpty ? ['node_modules', '.git', '.DS_Store'] : excludeArg;
     if (isDir) {
-      final policyError =
-          await _preflightDirectoryUpload(localPath, excludeNames);
+      final policyError = await _preflightDirectoryUpload(
+          localPath, excludeNames,
+          access: localAccess);
       if (policyError != null) return ToolResult.failure(policyError);
     }
 
@@ -624,7 +692,8 @@ class SftpUploadTool extends AgentTool {
     try {
       if (!isDir) {
         // 连接/备份等异步步骤后再次验证，链接换目标不得读出敏感文件。
-        final checked = _verifyLocalPath(local, localPath);
+        final checked = _decideLocalPath(local,
+            access: localAccess, mode: LocalAccessMode.read);
         if (!checked.isAllowed) {
           return ToolResult.failure(_localPathDeniedMessage(local, checked));
         }
@@ -638,8 +707,9 @@ class SftpUploadTool extends AgentTool {
           localPath,
           remote,
           cancelToken: cancelToken,
-          validateLocalPath: (raw, expected) async =>
-              _freshLocalPathDenial(raw, expected),
+          validateLocalPath: (raw, expected) async => _freshLocalPathDenial(
+              raw, expected,
+              access: localAccess, mode: LocalAccessMode.read),
         );
         if (cancelToken?.isCompleted == true || isTaskActive?.call() == false) {
           return ToolResult.failure('上传已取消');
@@ -667,6 +737,7 @@ class SftpUploadTool extends AgentTool {
           onProgress: onProgress,
           cancelToken: cancelToken,
           isTaskActive: isTaskActive,
+          access: localAccess,
         );
       }
     } on SftpTransferCancelled {
@@ -724,8 +795,15 @@ class SftpDownloadTool extends AgentTool {
     required String localRoot,
     required Future<List<SftpEntry>> Function(String remotePath) listDirectory,
     List<String> excludeNames = const ['node_modules', '.git', '.DS_Store'],
+    LocalAccessService? access,
   }) async {
-    final rootDecision = _decideLocalPath(localRoot);
+    final rootDecision = await authorizeLocalPath(
+      rawPath: localRoot,
+      mode: LocalAccessMode.write,
+      access: access,
+      policy: LocalFilePolicy.load(),
+      reason: 'sftp_download 需要写入本地目录：$localRoot',
+    );
     if (!rootDecision.isAllowed) {
       return _localPathDeniedMessage(localRoot, rootDecision);
     }
@@ -734,6 +812,7 @@ class SftpDownloadTool extends AgentTool {
       remoteDir: remoteDir,
       localRoot: rootDecision.resolved,
       excludeNames: excludeNames,
+      access: access,
     );
     return plan.error;
   }
@@ -753,14 +832,30 @@ class SftpDownloadTool extends AgentTool {
     if (remote == null || local.isEmpty) {
       return ToolResult.failure('参数缺失或无效: remote 必须是 POSIX 绝对路径，local 必填');
     }
-    // local 可能是目标文件，也可能是目标目录；先在连接/任何本地写入前判定。
-    final localDecision = _decideLocalPath(local);
-    if (!localDecision.isAllowed) {
-      return ToolResult.failure(_localPathDeniedMessage(local, localDecision));
-    }
-    final localPath = localDecision.resolved;
     if (executor is! SSHService) {
       return ToolResult.failure('sftp_download 仅支持 SSH 远程会话，当前为本地终端');
+    }
+    final policy = LocalFilePolicy.load();
+    final initial = policy.decide(local);
+    if (initial.verdict == LocalPathVerdict.sensitive ||
+        initial.verdict == LocalPathVerdict.reserved ||
+        initial.verdict == LocalPathVerdict.escape) {
+      return ToolResult.failure(_localPathDeniedMessage(local, initial));
+    }
+    final localPath = initial.resolved;
+    final localIsDirectory = await Directory(localPath).exists();
+    final authorizationRoot =
+        localIsDirectory ? localPath : p.dirname(localPath);
+    final localDecision = await authorizeLocalPath(
+      rawPath: authorizationRoot,
+      mode: LocalAccessMode.write,
+      access: localAccess,
+      policy: policy,
+      reason: 'sftp_download 需要写入本地目标 $local（含父目录中的临时文件）',
+    );
+    if (!localDecision.isAllowed) {
+      return ToolResult.failure(
+          _localPathDeniedMessage(authorizationRoot, localDecision));
     }
     final client = executor.client;
     if (client == null) {
@@ -787,7 +882,8 @@ class SftpDownloadTool extends AgentTool {
           target = p.join(localPath, p.posix.basename(remote));
         }
         // 最终 target 可能与最初传入的 local 不同，必须在 downloadFile 前再次判定。
-        final targetDecision = _decideLocalPath(target);
+        final targetDecision = _decideLocalPath(target,
+            access: localAccess, mode: LocalAccessMode.write);
         if (!targetDecision.isAllowed) {
           return ToolResult.failure(
               _localPathDeniedMessage(target, targetDecision));
@@ -796,7 +892,8 @@ class SftpDownloadTool extends AgentTool {
         if (cancelToken?.isCompleted == true) {
           return ToolResult.failure('下载已取消');
         }
-        final beforeWrite = _verifyLocalPath(target, target);
+        final beforeWrite = _decideLocalPath(target,
+            access: localAccess, mode: LocalAccessMode.write);
         if (!beforeWrite.isAllowed) {
           return ToolResult.failure(
               _localPathDeniedMessage(target, beforeWrite));
@@ -807,8 +904,9 @@ class SftpDownloadTool extends AgentTool {
           remote,
           target,
           cancelToken: cancelToken,
-          validateLocalPath: (raw, expected) async =>
-              _freshLocalPathDenial(raw, expected),
+          validateLocalPath: (raw, expected) async => _freshLocalPathDenial(
+              raw, expected,
+              access: localAccess, mode: LocalAccessMode.write),
         );
         if (cancelToken?.isCompleted == true) {
           return ToolResult.failure('下载已取消');
@@ -832,7 +930,8 @@ class SftpDownloadTool extends AgentTool {
       if (p.basename(localPath) != remoteBase) {
         effectiveLocal = p.join(localPath, remoteBase);
       }
-      final rootDecision = _decideLocalPath(effectiveLocal);
+      final rootDecision = _decideLocalPath(effectiveLocal,
+          access: localAccess, mode: LocalAccessMode.write);
       if (!rootDecision.isAllowed) {
         return ToolResult.failure(
             _localPathDeniedMessage(effectiveLocal, rootDecision));
@@ -848,30 +947,35 @@ class SftpDownloadTool extends AgentTool {
         remoteDir: remote,
         localRoot: effectiveLocal,
         excludeNames: excludeNames,
+        access: localAccess,
       );
       if (plan.error != null) return ToolResult.failure(plan.error!);
       if (cancelToken?.isCompleted == true) return ToolResult.failure('下载已取消');
 
       // 全部最终路径已授权，以下才允许创建目录和写入文件。
-      final beforeCreate = _verifyLocalPath(effectiveLocal, effectiveLocal);
+      final beforeCreate = _decideLocalPath(effectiveLocal,
+          access: localAccess, mode: LocalAccessMode.write);
       if (!beforeCreate.isAllowed) {
         return ToolResult.failure(
             _localPathDeniedMessage(effectiveLocal, beforeCreate));
       }
-      final createError =
-          await _createVerifiedLocalDirectory(effectiveLocal, cancelToken);
+      final createError = await _createVerifiedLocalDirectory(
+          effectiveLocal, cancelToken,
+          access: localAccess);
       if (createError != null) return ToolResult.failure(createError);
       for (final directory in plan.directories) {
         if (cancelToken?.isCompleted == true) {
           return ToolResult.failure('下载已取消', output: plan.result.summary);
         }
-        final checked = _verifyLocalPath(directory, directory);
+        final checked = _decideLocalPath(directory,
+            access: localAccess, mode: LocalAccessMode.write);
         if (!checked.isAllowed) {
           return ToolResult.failure(
               _localPathDeniedMessage(directory, checked));
         }
-        final directoryError =
-            await _createVerifiedLocalDirectory(directory, cancelToken);
+        final directoryError = await _createVerifiedLocalDirectory(
+            directory, cancelToken,
+            access: localAccess);
         if (directoryError != null) {
           return ToolResult.failure(directoryError,
               output: plan.result.summary);
@@ -882,7 +986,8 @@ class SftpDownloadTool extends AgentTool {
           return ToolResult.failure('下载已取消', output: plan.result.summary);
         }
         try {
-          final checked = _verifyLocalPath(file.local, file.local);
+          final checked = _decideLocalPath(file.local,
+              access: localAccess, mode: LocalAccessMode.write);
           if (!checked.isAllowed) {
             throw FileSystemException(
                 _localPathDeniedMessage(file.local, checked));
@@ -891,8 +996,9 @@ class SftpDownloadTool extends AgentTool {
             file.remote,
             file.local,
             cancelToken: cancelToken,
-            validateLocalPath: (raw, expected) async =>
-                _freshLocalPathDenial(raw, expected),
+            validateLocalPath: (raw, expected) async => _freshLocalPathDenial(
+                raw, expected,
+                access: localAccess, mode: LocalAccessMode.write),
           );
           if (cancelToken?.isCompleted == true) {
             return ToolResult.failure('下载已取消', output: plan.result.summary);
@@ -1197,6 +1303,10 @@ class FileSyncTool extends AgentTool {
     }
 
     if (action == 'start') {
+      final taskLocalAccess = localAccess;
+      final taskActive = isTaskActive;
+      bool taskAuthorizationValid() =>
+          taskActive?.call() != false && (taskLocalAccess?.isCurrent ?? true);
       final localDir = args.getString('localDir');
       final remoteDir = args.getString('remoteDir');
       final directionStr =
@@ -1207,50 +1317,93 @@ class FileSyncTool extends AgentTool {
         return ToolResult.failure('start 需要 localDir 和 remoteDir 参数');
       }
 
-      // 同步会持续读本地目录并往本地写回下载文件，必须与 local_* 工具
-      // 共用 LocalFilePolicy 白名单；仅靠提示词约束目录范围不算授权。
-      final localDecision = _decideLocalPath(localDir);
+      final direction = directionStr == 'bidirectional'
+          ? SyncDirection.bidirectional
+          : SyncDirection.localToRemote;
+      final policy = LocalFilePolicy.load();
+      final localDecision = await authorizeLocalPath(
+        rawPath: localDir,
+        mode: LocalAccessMode.read,
+        access: taskLocalAccess,
+        policy: policy,
+        reason: 'file_sync 需要持续读取本地目录以同步到远程服务器：$localDir',
+      );
       if (!localDecision.isAllowed) {
         return ToolResult.failure(
             _localPathDeniedMessage(localDir, localDecision));
       }
+      final resolvedLocalDir = localDecision.resolved;
+      if (direction == SyncDirection.bidirectional) {
+        final writeDecision = await authorizeLocalPath(
+          rawPath: localDir,
+          mode: LocalAccessMode.write,
+          access: taskLocalAccess,
+          policy: policy,
+          reason: '双向 file_sync 还需要把远程变化写入本地目录：$localDir',
+        );
+        if (!writeDecision.isAllowed ||
+            writeDecision.resolved != resolvedLocalDir) {
+          return ToolResult.failure(
+              _localPathDeniedMessage(localDir, writeDecision));
+        }
+      }
 
+      if (!taskAuthorizationValid()) {
+        return ToolResult.failure('任务已结束、暂停或取消，本地授权失效');
+      }
       if (executor is! SSHService) {
         return ToolResult.failure('file_sync 仅支持 SSH 远程会话');
       }
-
-      final sshService = executor;
-      if (sshService.client == null) {
+      if (executor.client == null) {
         return ToolResult.failure('SSH 连接未建立');
       }
-
-      final direction = directionStr == 'bidirectional'
-          ? SyncDirection.bidirectional
-          : SyncDirection.localToRemote;
+      final sshService = executor;
 
       List<String> excludeNames = excludeArg.isEmpty
           ? ['node_modules', '.git', '.DS_Store']
           : excludeArg;
 
       final config = SyncConfig(
-        localDir: localDir,
+        localDir: resolvedLocalDir,
         remoteDir: remoteDir,
         direction: direction,
         excludeNames: excludeNames,
       );
 
       onProgress?.call(UiText.t('正在启动文件同步...', 'Starting file sync...'));
+      String? validateSyncPath(String rawPath, String expectedResolved) {
+        if (!taskAuthorizationValid()) {
+          return '任务已结束、暂停或取消，本地授权失效';
+        }
+        final readDenial = _freshLocalPathDenial(
+          rawPath,
+          expectedResolved,
+          access: taskLocalAccess,
+          mode: LocalAccessMode.read,
+        );
+        if (readDenial != null) return readDenial;
+        if (direction == SyncDirection.localToRemote) return null;
+        return _freshLocalPathDenial(
+          rawPath,
+          expectedResolved,
+          access: taskLocalAccess,
+          mode: LocalAccessMode.write,
+        );
+      }
+
       // 传 getter 而非 client 引用：SSHService 重连后 getter 返回新 client
       final ok = await _service.start(
         clientGetter: () => sshService.client,
         config: config,
-        // 每次实际上传/下载前重读策略：watcher 运行期间用户可能收窄白名单。
+        // watcher/轮询期间持续复验；任务结束或暂停后所有 I/O 立即失效。
         validateLocalPath: (rawPath, expectedResolved) async =>
-            _freshLocalPathDenial(rawPath, expectedResolved),
+            validateSyncPath(rawPath, expectedResolved),
+        authorizationCheck: () =>
+            validateSyncPath(resolvedLocalDir, resolvedLocalDir) == null,
       );
       if (ok) {
         return ToolResult.success(
-          '文件同步已启动: $localDir ↔ $remoteDir (方向: ${direction.name})\n'
+          '文件同步已启动: $resolvedLocalDir ↔ $remoteDir (方向: ${direction.name})\n'
           '本地文件修改将自动上传到远程${direction == SyncDirection.bidirectional ? '，远程变化也会同步到本地' : ''}',
         );
       } else {
@@ -1551,8 +1704,14 @@ class UploadToTool extends AgentTool {
       return ToolResult.failure('[$hostId] 上传已取消');
     }
 
-    // 本地源路径策略必须先于远程连接与文件读取。
-    final localDecision = _decideLocalPath(local);
+    // 本地源路径必须在远程连接与文件读取前获得任务级读取授权。
+    final localDecision = await authorizeLocalPath(
+      rawPath: local,
+      mode: LocalAccessMode.read,
+      access: localAccess,
+      policy: LocalFilePolicy.load(),
+      reason: 'upload_to 需要读取本地文件并上传到主机 $hostId：$local',
+    );
     if (!localDecision.isAllowed) {
       return ToolResult.failure(_localPathDeniedMessage(local, localDecision));
     }
@@ -1576,8 +1735,9 @@ class UploadToTool extends AgentTool {
     List<String> excludeNames =
         excludeArg.isEmpty ? ['node_modules', '.git', '.DS_Store'] : excludeArg;
     if (isDir) {
-      final policyError =
-          await _preflightDirectoryUpload(localPath, excludeNames);
+      final policyError = await _preflightDirectoryUpload(
+          localPath, excludeNames,
+          access: localAccess);
       if (policyError != null) {
         return ToolResult.failure('[$hostId] $policyError');
       }
@@ -1607,7 +1767,8 @@ class UploadToTool extends AgentTool {
 
     try {
       if (!isDir) {
-        final checked = _verifyLocalPath(local, localPath);
+        final checked = _decideLocalPath(local,
+            access: localAccess, mode: LocalAccessMode.read);
         if (!checked.isAllowed) {
           return ToolResult.failure(_localPathDeniedMessage(local, checked));
         }
@@ -1620,8 +1781,9 @@ class UploadToTool extends AgentTool {
           localPath,
           remote,
           cancelToken: cancelToken,
-          validateLocalPath: (raw, expected) async =>
-              _freshLocalPathDenial(raw, expected),
+          validateLocalPath: (raw, expected) async => _freshLocalPathDenial(
+              raw, expected,
+              access: localAccess, mode: LocalAccessMode.read),
         );
         if (cancelToken?.isCompleted == true || isTaskActive?.call() == false) {
           return ToolResult.failure('上传已取消');
@@ -1647,6 +1809,7 @@ class UploadToTool extends AgentTool {
           onProgress: onProgress,
           cancelToken: cancelToken,
           isTaskActive: isTaskActive,
+          access: localAccess,
           prefix: '[$hostId] ',
         );
       }
@@ -1714,7 +1877,13 @@ class BroadcastUploadTool extends AgentTool {
 
     // remote 是目标目录：单文件必须拼上本地文件名，否则会把目录名当成文件名。
     // 目录上传由 UploadToTool 自己追加 basename(local)。
-    final localDecision = _decideLocalPath(local);
+    final localDecision = await authorizeLocalPath(
+      rawPath: local,
+      mode: LocalAccessMode.read,
+      access: localAccess,
+      policy: LocalFilePolicy.load(),
+      reason: 'broadcast_upload 需要读取本地文件并广播到多台主机：$local',
+    );
     if (!localDecision.isAllowed) {
       return ToolResult.failure(_localPathDeniedMessage(local, localDecision));
     }
@@ -1726,6 +1895,7 @@ class BroadcastUploadTool extends AgentTool {
     // 复用 UploadToTool 的逻辑：逐台上传
     final uploadTool = UploadToTool(_executor)
       ..cancelToken = cancelToken
+      ..localAccess = localAccess
       ..isTaskActive = () =>
           !_executor.isTaskCancelled(taskToken) &&
           cancelToken?.isCompleted != true &&
@@ -1807,7 +1977,13 @@ class CollectFileTool extends AgentTool {
     }
     final taskToken = _executor.cancelToken;
 
-    final rootDecision = _decideLocalPath(localDir);
+    final rootDecision = await authorizeLocalPath(
+      rawPath: localDir,
+      mode: LocalAccessMode.write,
+      access: localAccess,
+      policy: LocalFilePolicy.load(),
+      reason: 'collect_file 需要把多台主机的文件写入本地目录：$localDir',
+    );
     if (!rootDecision.isAllowed) {
       return ToolResult.failure(
           _localPathDeniedMessage(localDir, rootDecision));
@@ -1825,7 +2001,8 @@ class CollectFileTool extends AgentTool {
         return ToolResult.failure('hostId 不能包含路径分隔符: $hid');
       }
       final rawTarget = p.join(rootPath, '${hid}_$remoteBasename');
-      final targetDecision = _decideLocalPath(rawTarget);
+      final targetDecision = _decideLocalPath(rawTarget,
+          access: localAccess, mode: LocalAccessMode.write);
       if (!targetDecision.isAllowed) {
         return ToolResult.failure(
             _localPathDeniedMessage(rawTarget, targetDecision));
@@ -1842,13 +2019,15 @@ class CollectFileTool extends AgentTool {
 
     final dir = Directory(rootPath);
     if (!await dir.exists()) {
-      final beforeCreate = _verifyLocalPath(localDir, rootPath);
+      final beforeCreate = _decideLocalPath(localDir,
+          access: localAccess, mode: LocalAccessMode.write);
       if (!beforeCreate.isAllowed) {
         return ToolResult.failure(
             _localPathDeniedMessage(localDir, beforeCreate));
       }
-      final createError =
-          await _createVerifiedLocalDirectory(rootPath, taskToken);
+      final createError = await _createVerifiedLocalDirectory(
+          rootPath, taskToken,
+          access: localAccess);
       if (createError != null) return ToolResult.failure(createError);
     }
 
@@ -1875,7 +2054,8 @@ class CollectFileTool extends AgentTool {
       try {
         await sftp.attachToClient(client);
         final localPath = targetPaths[hid]!;
-        final checked = _verifyLocalPath(localPath, localPath);
+        final checked = _decideLocalPath(localPath,
+            access: localAccess, mode: LocalAccessMode.write);
         if (!checked.isAllowed) {
           throw FileSystemException(
               _localPathDeniedMessage(localPath, checked));
@@ -1884,8 +2064,9 @@ class CollectFileTool extends AgentTool {
           remote,
           localPath,
           cancelToken: taskToken,
-          validateLocalPath: (raw, expected) async =>
-              _freshLocalPathDenial(raw, expected),
+          validateLocalPath: (raw, expected) async => _freshLocalPathDenial(
+              raw, expected,
+              access: localAccess, mode: LocalAccessMode.write),
         );
         if (_executor.isTaskCancelled(taskToken)) {
           throw const FileSystemException('采集已取消');
@@ -2746,18 +2927,37 @@ class FileWriteTool extends AgentTool {
 
     // 本地终端：共享非截断打开、句柄身份校验与句柄回滚实现。
     if (executor is LocalTerminalService) {
-      final decision = _decideLocalPath(path);
+      final policy = LocalFilePolicy.load();
+      final initial = policy.decide(path);
+      if (initial.verdict == LocalPathVerdict.sensitive ||
+          initial.verdict == LocalPathVerdict.reserved ||
+          initial.verdict == LocalPathVerdict.escape) {
+        return ToolResult.failure(_localPathDeniedMessage(path, initial));
+      }
+      final decision = await authorizeLocalPath(
+        rawPath: p.dirname(path),
+        mode: LocalAccessMode.write,
+        access: localAccess,
+        policy: policy,
+        reason: 'file_write 需要写入本地文件 $path（含父目录中的临时/备份文件）',
+      );
       if (!decision.isAllowed) {
         return ToolResult.failure(_localPathDeniedMessage(path, decision));
       }
-      final localPath = decision.resolved;
+      final verified = _decideLocalPath(path,
+          access: localAccess, mode: LocalAccessMode.write);
+      if (!verified.isAllowed) {
+        return ToolResult.failure(_localPathDeniedMessage(path, verified));
+      }
+      final localPath = verified.resolved;
       final outcome = await writeLocalFile(
         path: localPath,
         bytes: contentBytes,
         append: mode == 'append',
         backup: backup,
-        authorizePath: (raw, expected) async =>
-            _freshLocalPathDenial(raw, expected),
+        authorizePath: (raw, expected) async => _freshLocalPathDenial(
+            raw, expected,
+            access: localAccess, mode: LocalAccessMode.write),
       );
       if (outcome.success) {
         onProgress?.call(UiText.t('写入完成', 'Write complete'));
@@ -2778,7 +2978,8 @@ class FileWriteTool extends AgentTool {
           !(outcome.error ?? '').contains('原子性校验') &&
           !(outcome.error ?? '').contains('授权') &&
           cancelToken?.isCompleted != true) {
-        final fallbackCheck = _verifyLocalPath(path, localPath);
+        final fallbackCheck = _decideLocalPath(path,
+            access: localAccess, mode: LocalAccessMode.write);
         if (!fallbackCheck.isAllowed) {
           return ToolResult.failure(
               _localPathDeniedMessage(path, fallbackCheck));
@@ -2804,7 +3005,8 @@ class FileWriteTool extends AgentTool {
           return ToolResult.failure(UiText.t(
               '用户取消任务，PTY 写入中止', 'Task cancelled by user, PTY write aborted'));
         }
-        final sudoCheck = _verifyLocalPath(path, localPath);
+        final sudoCheck = _decideLocalPath(path,
+            access: localAccess, mode: LocalAccessMode.write);
         if (!sudoCheck.isAllowed) {
           return ToolResult.failure(_localPathDeniedMessage(path, sudoCheck));
         }
@@ -3134,13 +3336,31 @@ class FilePatchTool extends AgentTool {
       }
     }
 
-    // 本地终端：字节级补丁走共享句柆实现，保留非 UTF-8 内容并绑定写时授权。
+    // 本地终端：字节级补丁走共享句柄实现，保留非 UTF-8 内容并绑定写时授权。
     if (executor is LocalTerminalService) {
-      final decision = _decideLocalPath(path);
+      final policy = LocalFilePolicy.load();
+      final initial = policy.decide(path);
+      if (initial.verdict == LocalPathVerdict.sensitive ||
+          initial.verdict == LocalPathVerdict.reserved ||
+          initial.verdict == LocalPathVerdict.escape) {
+        return ToolResult.failure(_localPathDeniedMessage(path, initial));
+      }
+      final decision = await authorizeLocalPath(
+        rawPath: p.dirname(path),
+        mode: LocalAccessMode.write,
+        access: localAccess,
+        policy: policy,
+        reason: 'file_patch 需要读取并修改本地文件 $path（含父目录中的临时/备份文件）',
+      );
       if (!decision.isAllowed) {
         return ToolResult.failure(_localPathDeniedMessage(path, decision));
       }
-      final localPath = decision.resolved;
+      final verified = _decideLocalPath(path,
+          access: localAccess, mode: LocalAccessMode.write);
+      if (!verified.isAllowed) {
+        return ToolResult.failure(_localPathDeniedMessage(path, verified));
+      }
+      final localPath = verified.resolved;
       final file = File(localPath);
       if (!await file.exists()) {
         return ToolResult.failure(
@@ -3162,8 +3382,9 @@ class FilePatchTool extends AgentTool {
         backup: backup,
         maxBytes: _maxFileSize,
         maxPatchedBytes: _maxPatchedFileSize,
-        authorizePath: (raw, expected) async =>
-            _freshLocalPathDenial(raw, expected),
+        authorizePath: (raw, expected) async => _freshLocalPathDenial(
+            raw, expected,
+            access: localAccess, mode: LocalAccessMode.write),
       );
       if (!outcome.success) {
         return ToolResult.failure(outcome.error ?? 'file_patch 失败');
@@ -3383,17 +3604,6 @@ class AgentToolRegistry {
   /// 编排命令权限档位提供者：由拥有本 registry 的引擎注入，锁定任务归属 tab。
   AgentPermissionMode? Function()? permissionModeProvider;
 
-  /// 本地文件工具的额外授权根（由引擎注入，返回本次任务记录的项目目录）
-  List<String> Function()? _localFileRoots;
-
-  /// 设置本地文件工具的额外授权根提供者
-  ///
-  /// 用闭包而不是直接传值：项目根是在 project_analyze 执行过程中才确定的，
-  /// 工具必须读到最新值，而不是注册时的快照。
-  void setLocalFileRoots(List<String> Function()? provider) {
-    _localFileRoots = provider;
-  }
-
   AgentToolRegistry() {
     // 注册默认工具
     register(SftpUploadTool());
@@ -3414,8 +3624,7 @@ class AgentToolRegistry {
     register(PackageProjectTool(), scope: ToolScope.localSession);
     // 本地文件工具：作用域不限（SSH 会话里也要能改本机的部署配置），
     // 但每个路径都要过 LocalFilePolicy 的白名单 + 黑名单判定。
-    registerLocalFileTools(this,
-        extraRoots: () => _localFileRoots?.call() ?? const []);
+    registerLocalFileTools(this);
     // 本机 shell：只在 SSH 会话暴露。本地会话的 execute 已经在本机，
     // 再暴露 local_exec 只会让模型在两个等价入口之间犹豫。
     if (Platform.isWindows || Platform.isMacOS || Platform.isLinux) {

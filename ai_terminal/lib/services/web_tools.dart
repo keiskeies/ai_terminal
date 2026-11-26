@@ -3,8 +3,8 @@ import 'package:dio/dio.dart';
 import 'agent_tool.dart';
 import 'command_executor.dart';
 import 'web_search_config.dart';
-import 'web_search_http.dart';
 import 'web_search_service.dart';
+import 'web_fetch_security.dart';
 import '../core/ui_text.dart';
 import '../utils/tool_args_parser.dart';
 import '../core/l10n_holder.dart';
@@ -162,6 +162,12 @@ class FetchUrlTool extends AgentTool {
   /// 网页抓取通常比搜索 API 慢，取全局配置与 20s 的较大值
   static const int _minTimeoutMs = 20000;
 
+  /// 压缩前/解压后共享的连接层字节上限
+  static const int _maxResponseBytes = 4 * 1024 * 1024;
+
+  /// 防止模型把 max_chars 调到无限大
+  static const int _maxMaxChars = 200000;
+
   @override
   String get name => 'fetch_url';
 
@@ -169,14 +175,15 @@ class FetchUrlTool extends AgentTool {
   ToolKind get kind => ToolKind.network;
 
   @override
-  String get description => '抓取指定 URL 的网页正文（纯文本格式）。'
+  String get description => '抓取公网 HTTPS URL 的网页正文（纯文本格式）。'
+      '仅允许公网 HTTPS，逐跳复检重定向并锁定已校验的 DNS 地址。'
       '配合 web_search 工具使用：搜索得到 URL 后，可调本工具读取详细内容。'
       '也可独立用于已知 URL 的文档/页面抓取。';
 
   @override
   String get paramSpec => '参数列表（多行 key:value 格式）：\n'
-      '  url: 要抓取的 URL（必填，需以 http:// 或 https:// 开头）\n'
-      '  max_chars: 正文最大字符数（可选，默认 20000）';
+      '  url: 要抓取的公网 HTTPS URL（必填，不得包含用户名或密码）\n'
+      '  max_chars: 正文最大字符数（可选，默认 20000，上限 200000）';
 
   @override
   Map<String, dynamic>? toJsonSchema() {
@@ -185,11 +192,11 @@ class FetchUrlTool extends AgentTool {
       'properties': {
         'url': {
           'type': 'string',
-          'description': '要抓取的 URL',
+          'description': '要抓取的公网 HTTPS URL，不得包含内嵌凭据',
         },
         'max_chars': {
           'type': 'integer',
-          'description': '正文最大字符数（默认 20000）',
+          'description': '正文最大字符数（默认 20000，上限 200000）',
         },
       },
       'required': ['url'],
@@ -208,21 +215,32 @@ class FetchUrlTool extends AgentTool {
     if (url.isEmpty) {
       return ToolResult.failure('参数缺失: url 为必填项');
     }
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      return ToolResult.failure('参数错误: url 必须以 http:// 或 https:// 开头');
+    final Uri uri;
+    try {
+      uri = WebFetchPolicy.validate(Uri.parse(url));
+    } on FormatException {
+      return ToolResult.failure('参数错误: url 不是有效的 HTTPS URL');
+    } on WebFetchBlockedException catch (e) {
+      return ToolResult.failure('抓取被安全策略拒绝: ${e.message}');
     }
 
-    final cap = maxChars > 0 ? maxChars : _defaultMaxChars;
+    final cap =
+        maxChars > 0 ? maxChars.clamp(1, _maxMaxChars) : _defaultMaxChars;
 
-    onProgress?.call(L10n.str.ut_8bc3df095a(url));
-
-    final dioCancel = CancelToken();
-    StreamSubscription<void>? sub;
+    final config = WebSearchConfig.load();
+    if (config.proxy.trim().isNotEmpty) {
+      return ToolResult.failure(
+          '代理在远端解析目标地址，无法验证 SSRF 目的地；请关闭搜索代理后使用 fetch_url');
+    }
     final ct = cancelToken;
-    // 如果任务在工具执行前已被取消，直接返回，不发起无意义的网络请求
     if (ct != null && ct.isCompleted) {
       return ToolResult.failure('抓取已被取消', output: '');
     }
+
+    onProgress?.call(L10n.str.ut_8bc3df095a(uri.toString()));
+
+    final dioCancel = CancelToken();
+    StreamSubscription<void>? sub;
     if (ct != null && !ct.isCompleted) {
       sub = ct.future.asStream().listen((_) {
         if (!dioCancel.isCancelled) {
@@ -231,27 +249,15 @@ class FetchUrlTool extends AgentTool {
       });
     }
 
-    // 超时：取全局配置与 _minTimeoutMs 的较大值；出站代理与搜索共用
-    final config = WebSearchConfig.load();
     final timeoutMs = config.backendTimeoutMs.clamp(_minTimeoutMs, 120000);
-    final dio = createSearchDio(
+    final fetcher = WebFetchClient(
       timeout: Duration(milliseconds: timeoutMs),
-      proxy: config.proxy,
-      headers: {
-        'User-Agent':
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-        'Accept':
-            'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      },
+      maxBytes: _maxResponseBytes,
     );
 
     try {
-      final resp = await dio.get<String>(
-        url,
-        options: Options(responseType: ResponseType.plain),
-        cancelToken: dioCancel,
-      );
-      final html = resp.data ?? '';
+      final fetched = await fetcher.fetch(uri, cancelToken: dioCancel);
+      final html = fetched.body;
       if (html.isEmpty) {
         return ToolResult.success(UiText.t('抓取成功，但页面内容为空。',
             'Fetched successfully, but the page content is empty.'));
@@ -267,7 +273,7 @@ class FetchUrlTool extends AgentTool {
         buffer.writeln(L10n.str.ut_571ec497a6(title));
         buffer.writeln();
       }
-      buffer.writeln('URL: $url');
+      buffer.writeln('URL: ${fetched.finalUri}');
       buffer.writeln();
       buffer.writeln('正文:');
       // R8: 应用 cap；保留头部（已在类文档说明偏离原因）
@@ -283,23 +289,24 @@ class FetchUrlTool extends AgentTool {
       if (e.type == DioExceptionType.cancel) {
         return ToolResult.failure('抓取已被取消', output: '');
       }
-      final code = e.response?.statusCode;
-      if (code == 404) {
+      return ToolResult.failure('抓取失败: ${e.message ?? e.toString()}');
+    } on WebFetchBlockedException catch (e) {
+      return ToolResult.failure('抓取被安全策略拒绝: ${e.message}');
+    } on WebFetchTooLargeException catch (e) {
+      return ToolResult.failure('抓取失败: ${e.toString()}');
+    } on WebFetchHttpException catch (e) {
+      if (e.statusCode == 404) {
         return ToolResult.failure('URL 不存在 (HTTP 404)：请确认链接是否正确');
       }
-      if (code == 403) {
+      if (e.statusCode == 403) {
         return ToolResult.failure('目标站点拒绝访问 (HTTP 403)：可能需要登录或有反爬机制');
       }
-      if (e.type == DioExceptionType.connectionTimeout ||
-          e.type == DioExceptionType.receiveTimeout ||
-          e.type == DioExceptionType.connectionError) {
-        return ToolResult.failure('网络错误：${e.message ?? e.type.name}');
-      }
-      return ToolResult.failure('抓取失败: ${e.message ?? e.toString()}');
+      return ToolResult.failure('抓取失败: HTTP ${e.statusCode}');
+    } on WebFetchNetworkException catch (e) {
+      return ToolResult.failure('网络错误：${e.cause}');
     } catch (e) {
       return ToolResult.failure('抓取失败: $e');
     } finally {
-      dio.close();
       await sub?.cancel();
     }
   }

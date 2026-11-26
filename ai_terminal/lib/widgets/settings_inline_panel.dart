@@ -30,6 +30,7 @@ import 'inline_form.dart';
 import 'keybinding_editor.dart';
 import 'mcp_server_editor_form.dart';
 import 'rule_editor_form.dart';
+import 'ssh_host_key_manager_dialog.dart';
 import '../core/l10n_holder.dart';
 
 /// 设置页里每一组的就地编辑区。
@@ -463,17 +464,6 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
               : () =>
                   _setCommandTimeoutMultiplier(_commandTimeoutMultiplier + 0.5),
         ),
-        const SizedBox(height: 8),
-        // 确认类提示（[Y/n]、Press ENTER）按保守规则自动应答；默认关。
-        // 密码类提示永不自动应答（R7），无默认值的确认仍弹窗问人。
-        _toggleRow(
-          tc,
-          UiText.t('确认提示自动应答', 'Auto-answer confirmations'),
-          SettingsDao.getCached('agentAutoAnswerEnabled',
-                  defaultValue: false) ==
-              true,
-          (v) => _set('agentAutoAnswerEnabled', v),
-        ),
         const SizedBox(height: 10),
         Row(
           children: [
@@ -581,6 +571,13 @@ class _SettingsInlinePanelState extends ConsumerState<SettingsInlinePanel> {
         _kv(tc, UiText.t('高危命令', 'Dangerous commands'),
             UiText.t('执行前二次确认', 'Always confirmed before running'),
             color: tc.gold),
+        const SizedBox(height: 10),
+        _ChipButton(
+          tc: tc,
+          label: UiText.t('SSH 主机信任', 'SSH host trust'),
+          selected: false,
+          onTap: () => showSshHostKeyManagerDialog(context),
+        ),
         const SizedBox(height: 14),
         Container(height: 1, color: tc.hairline),
         const SizedBox(height: 12),

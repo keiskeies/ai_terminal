@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'package:sqflite/sqflite.dart' as plain_sqflite;
+import 'package:sqflite_sqlcipher/sqflite.dart' as sqlcipher;
 import 'package:crypto/crypto.dart' as crypto;
 import 'dart:async';
 import 'dart:io';
@@ -11,6 +13,10 @@ import '../services/conversation_service.dart';
 import '../services/agent_logger.dart';
 import '../providers/agent_provider.dart';
 import 'credentials_store.dart';
+import 'security/database_key_manager.dart';
+import 'security/database_key_rotation.dart';
+import 'security/database_migration.dart';
+import 'security/ssh_host_key_store.dart';
 
 /// 应用主数据库初始化（替代 HiveInit）
 ///
@@ -19,7 +25,7 @@ import 'credentials_store.dart';
 /// 升级时通过 onUpgrade 回调做增量迁移。
 class DbInit {
   static Database? _db;
-  static const int _schemaVersion = 10;
+  static const int _schemaVersion = 13;
 
   /// 数据库文件名
   static const String dbFileName = 'app_data.db';
@@ -37,22 +43,34 @@ class DbInit {
 
   /// 初始化数据库
   ///
-  /// 前置条件：必须先调用 [CredentialsStore.loadMasterKey] 获取 OS 主密钥
-  /// （主密钥用作 SQLCipher/sqlite3mc 全库加密的密码）
+  /// 桌面端前置条件：必须先调用 [CredentialsStore.loadMasterKey]。
+  /// 移动端密钥由 [DatabaseKeyManager] 管理，不依赖 CredentialsStore。
   static Future<void> init() async {
     if (_db != null) return;
-
-    // 桌面端使用 sqflite_ffi
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
-      sqfliteFfiInit();
-      databaseFactory = databaseFactoryFfi;
-    }
 
     final dbPath = await _getDbPath();
     final dbDir = Directory(p.dirname(dbPath));
     if (!await dbDir.exists()) {
       await dbDir.create(recursive: true);
     }
+
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      await _initDesktop(dbPath);
+    } else if (Platform.isAndroid || Platform.isIOS) {
+      await _initMobile(dbPath);
+    } else {
+      throw const DatabaseMigrationException('不支持的平台，无法打开加密数据库');
+    }
+
+    // 加载所有 DAO 内存缓存（供 sync 读路径使用）
+    await _loadAllCaches();
+
+    debugPrint('[DbInit] 初始化成功: $dbPath (v$_schemaVersion, encrypted)');
+  }
+
+  static Future<void> _initDesktop(String dbPath) async {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
 
     // 获取数据库加密密码（基于 OS 主密钥）
     final password = CredentialsStore.getDatabasePassword();
@@ -89,12 +107,184 @@ class DbInit {
     // （因密钥交替问题导致数据丢失），从 .bak 恢复用户数据。
     // 顺序很重要：先恢复到 DB，再加载缓存，否则缓存为空 → UI 显示空数据。
     await _recoverFromBakIfNeeded(dbPath);
+  }
 
-    // 加载所有 DAO 内存缓存（供 sync 读路径使用）
-    // 必须在 _recoverFromBakIfNeeded 之后，确保缓存包含已恢复的数据
-    await _loadAllCaches();
+  /// 移动端初始化：真实 SQLCipher + 平台安全存储密钥。
+  ///
+  /// 与桌面端的根本差异：
+  /// - 不尝试任何硬编码旧密钥；
+  /// - 密钥缺失/失效时 fail closed，不归档旧库、不新建空库；
+  /// - 明文库必须通过带校验与回滚副本的状态机迁移。
+  static Future<void> _initMobile(String dbPath) async {
+    final keyManager = DatabaseKeyManager.instance;
+    await DatabaseKeyRotationService(
+      keyManager: keyManager,
+      openEncrypted: _openMobileEncryptedDb,
+    ).recoverIfNeeded(dbPath);
+    final migrator = _mobileMigrator(keyManager);
+    await migrator.recoverIfNeeded(dbPath);
 
-    debugPrint('[DbInit] 初始化成功: $dbPath (v$_schemaVersion, encrypted)');
+    final dbFile = File(dbPath);
+    final exists = await dbFile.exists();
+    final isPlaintext = exists && await _isPlaintextSqliteFile(dbPath);
+
+    if (!exists || isPlaintext) {
+      final key = await keyManager.getOrCreateActive();
+      if (isPlaintext) {
+        await migrator.migratePlaintext(dbPath, key);
+      }
+      _db = await _openMobileEncryptedDb(
+        dbPath,
+        key.secret,
+        version: _schemaVersion,
+      );
+      try {
+        await _verifyEncryptedFile(dbPath);
+      } catch (e) {
+        await _closeAfterFailedOpen();
+        rethrow;
+      }
+      return;
+    }
+
+    final candidates = await keyManager.candidates();
+    if (candidates.isEmpty) {
+      throw const DatabaseKeyUnavailableException(
+        '检测到已有加密数据库，但设备安全存储中没有数据库密钥；拒绝新建空库',
+      );
+    }
+
+    Object? lastError;
+    for (final key in candidates) {
+      try {
+        _db = await _openMobileEncryptedDb(
+          dbPath,
+          key.secret,
+          version: _schemaVersion,
+        );
+        await _verifyEncryptedFile(dbPath);
+        final active = await keyManager.readActive();
+        if (active == null || active.id != key.id) {
+          await keyManager.promotePending();
+          debugPrint('[DbInit] 已用 pending 密钥打开数据库并提升为 active');
+        }
+        return;
+      } catch (e) {
+        lastError = e;
+        await _closeAfterFailedOpen();
+      }
+    }
+
+    throw DatabaseMigrationException(
+      '现有加密数据库无法用设备安全存储中的密钥打开；为避免数据丢失，已停止初始化',
+      cause: lastError,
+    );
+  }
+
+  /// 手动轮换移动端数据库密钥。
+  ///
+  /// 调用方必须保证当前没有 Agent 任务/终端写操作在进行。方法内部会先刷盘并
+  /// 关闭数据库，轮换完成后重新初始化并加载缓存。失败时由 rotation_state 与
+  /// pending/active 密钥恢复，不自动新建空库。
+  static Future<void> rotateMobileDatabaseKey() async {
+    if (!Platform.isAndroid && !Platform.isIOS) {
+      throw const DatabaseMigrationException('仅移动端支持数据库密钥轮换');
+    }
+    if (_db == null) {
+      throw const DatabaseMigrationException('数据库尚未初始化，无法轮换密钥');
+    }
+    final active = await DatabaseKeyManager.instance.requireActive();
+    final dbPath = await _getDbPath();
+    await close();
+    try {
+      await DatabaseKeyRotationService(
+        keyManager: DatabaseKeyManager.instance,
+        openEncrypted: _openMobileEncryptedDb,
+      ).rotate(dbPath, active);
+    } finally {
+      await init();
+    }
+  }
+
+  static DatabaseMigrationService _mobileMigrator(
+    DatabaseKeyManager keyManager,
+  ) =>
+      DatabaseMigrationService(
+        keyManager: keyManager,
+        openEncrypted: _openMobileEncryptedDb,
+        openPlain: _openMobilePlainDb,
+        schemaVersion: _schemaVersion,
+        onCreate: _onCreate,
+        onUpgrade: _onUpgrade,
+      );
+
+  static Future<Database> _openMobileEncryptedDb(
+    String path,
+    String password, {
+    int? version,
+    OnDatabaseCreateFn? onCreate,
+    OnDatabaseVersionChangeFn? onUpgrade,
+    bool readOnly = false,
+    bool singleInstance = true,
+  }) {
+    return sqlcipher.openDatabase(
+      path,
+      password: password,
+      version: version,
+      onCreate: onCreate ?? _onCreate,
+      onUpgrade: onUpgrade ?? _onUpgrade,
+      readOnly: readOnly,
+      singleInstance: singleInstance,
+    );
+  }
+
+  static Future<Database> _openMobilePlainDb(
+    String path, {
+    bool readOnly = false,
+    bool singleInstance = true,
+  }) {
+    // 明文源库必须走普通 SQLite。SQLCipher 插件会把 null 口令转成空串，
+    // 某些实现会把它当成空密钥，反而读不了明文库。
+    return plain_sqflite.openDatabase(
+      path,
+      readOnly: readOnly,
+      singleInstance: singleInstance,
+    );
+  }
+
+  static Future<bool> _isPlaintextSqliteFile(String path) async {
+    final header = await _readHeader(path);
+    return header != null && _isPlaintextSqliteHeader(header);
+  }
+
+  static Future<void> _verifyEncryptedFile(String path) async {
+    final header = await _readHeader(path);
+    if (header == null || header.length != 16) {
+      throw const DatabaseMigrationException('加密数据库文件头不可读');
+    }
+    if (_isPlaintextSqliteHeader(header)) {
+      throw const DatabaseMigrationException(
+        '数据库仍是明文 SQLite；移动端加密未生效，已停止初始化',
+      );
+    }
+  }
+
+  static Future<Uint8List?> _readHeader(String path) async {
+    try {
+      final raf = await File(path).open();
+      try {
+        return await raf.read(16);
+      } finally {
+        await raf.close();
+      }
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static bool _isPlaintextSqliteHeader(Uint8List header) {
+    const expected = 'SQLite format 3\u0000';
+    return header.length == 16 && String.fromCharCodes(header) == expected;
   }
 
   /// 从 .bak（明文备份）恢复数据到当前加密 DB
@@ -700,7 +890,8 @@ class DbInit {
         command TEXT NOT NULL,
         safetyLevel TEXT NOT NULL,
         output TEXT,
-        executed INTEGER NOT NULL
+        executed INTEGER NOT NULL,
+        metadata TEXT
       )
     ''');
     batch.execute('CREATE INDEX idx_audit_logs_hostId ON audit_logs(hostId)');
@@ -742,6 +933,9 @@ class DbInit {
       )
     ''');
 
+    // ===== ssh_host_keys =====
+    batch.execute(sshHostKeysCreateSql);
+
     // ===== knowledge_rules（用户自维护的内部运维规范）=====
     batch.execute(_knowledgeRulesCreateSql);
 
@@ -763,6 +957,14 @@ class DbInit {
       updatedAt INTEGER NOT NULL
     )
   ''';
+
+  @visibleForTesting
+  static Future<void> migrateSchemaForTesting(
+    Database db,
+    int oldVersion,
+    int newVersion,
+  ) =>
+      _onUpgrade(db, oldVersion, newVersion);
 
   /// 升级数据库（未来版本在此追加迁移脚本）
   static Future<void> _onUpgrade(
@@ -843,9 +1045,33 @@ class DbInit {
         "ALTER TABLE conversations ADD COLUMN titleSource TEXT NOT NULL DEFAULT 'user'",
       );
     }
+    // v11: SSH 主机身份信任记录，按路由、地址和算法隔离
+    if (oldVersion < 11) {
+      await db.execute(sshHostKeysCreateSql);
+    } else if (oldVersion < 12) {
+      await db.execute(
+        'ALTER TABLE ssh_host_keys ADD COLUMN public_key_base64 TEXT',
+      );
+    }
+    // v13: 命令解析与权限决策的结构化审计元数据；旧记录保持 null。
+    if (oldVersion < 13) {
+      await db.execute('ALTER TABLE audit_logs ADD COLUMN metadata TEXT');
+    }
   }
 
   /// 关闭数据库
+  /// 初始化阶段打开/校验失败时只关库，不触发刷盘与 DAO 队列等待。
+  static Future<void> _closeAfterFailedOpen() async {
+    final db = _db;
+    _db = null;
+    if (db == null) return;
+    try {
+      await db.close();
+    } catch (_) {
+      // 已进入失败路径，关闭异常不覆盖原始初始化错误
+    }
+  }
+
   static Future<void> close() async {
     // 先等延迟刷盘与目标写链落盘，再等 DAO 队列，最后关库：否则 detached
     // 时最后一批消息/目标/active 选择会对着已关闭的数据库执行，

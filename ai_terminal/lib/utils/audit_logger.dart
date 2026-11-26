@@ -1,4 +1,8 @@
 import 'package:flutter/foundation.dart';
+import '../core/permission_policy.dart';
+import '../core/safety_guard.dart';
+import '../core/security/command_intent.dart';
+import '../models/agent_permission_mode.dart';
 import '../services/daos.dart';
 
 class AuditLogEntry {
@@ -8,6 +12,7 @@ class AuditLogEntry {
   final String safetyLevel;
   final String? output;
   final bool executed;
+  final Map<String, dynamic>? metadata;
 
   AuditLogEntry({
     required this.timestamp,
@@ -16,6 +21,7 @@ class AuditLogEntry {
     required this.safetyLevel,
     this.output,
     required this.executed,
+    this.metadata,
   });
 
   Map<String, dynamic> toJson() => {
@@ -25,6 +31,7 @@ class AuditLogEntry {
         'safetyLevel': safetyLevel,
         'output': output,
         'executed': executed,
+        if (metadata != null) 'metadata': metadata,
       };
 
   static AuditLogEntry fromJson(Map<dynamic, dynamic> json) => AuditLogEntry(
@@ -34,6 +41,9 @@ class AuditLogEntry {
         safetyLevel: json['safetyLevel'] as String,
         output: json['output'] as String?,
         executed: json['executed'] as bool,
+        metadata: json['metadata'] is Map<String, dynamic>
+            ? Map<String, dynamic>.from(json['metadata'] as Map)
+            : null,
       );
 }
 
@@ -51,6 +61,7 @@ class AuditLogger {
     required String safetyLevel,
     String? output,
     required bool executed,
+    Map<String, dynamic>? metadata,
   }) async {
     try {
       await AuditLogsDao.add(
@@ -59,10 +70,50 @@ class AuditLogger {
         safetyLevel: safetyLevel,
         output: output,
         executed: executed,
+        metadata: metadata,
       );
     } catch (e) {
       debugPrint('[AuditLogger] 记录失败: $e');
     }
+  }
+
+  static Map<String, dynamic> commandMetadata({
+    required String command,
+    AgentPermissionMode? permissionMode,
+    CommandGateDecision? decision,
+    String? policyReason,
+  }) {
+    final intent = SafetyGuard.intent(command);
+    final gateDecision = permissionMode == null
+        ? decision
+        : (decision ??
+            decideCommand(SafetyGuard.check(command), permissionMode));
+    final unknownSyntaxReason =
+        permissionMode == AgentPermissionMode.fullAuto &&
+                intent.unresolved.isNotEmpty
+            ? 'explicit_full_auto_unknown_syntax'
+            : null;
+    return {
+      'parserVersion': CommandIntentParser.parserVersion,
+      'shell': intent.shell,
+      'executable': intent.executable,
+      'confidence': intent.confidence,
+      'conservativeSafe': intent.conservativeSafe,
+      'effects': intent.effects.map((effect) => effect.name).toList(),
+      'unresolved': intent.unresolved
+          .take(20)
+          .map((item) => {
+                'kind': item.kind,
+                'detail': item.detail.length <= 300
+                    ? item.detail
+                    : '${item.detail.substring(0, 300)}…',
+              })
+          .toList(),
+      if (permissionMode != null) 'permissionMode': permissionMode.id,
+      if (gateDecision != null) 'permissionDecision': gateDecision.name,
+      if ((policyReason ?? unknownSyntaxReason) != null)
+        'policyReason': policyReason ?? unknownSyntaxReason,
+    };
   }
 
   /// 获取主机的审计日志（最近的 limit 条，正序：最早到最新）

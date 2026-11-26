@@ -8,6 +8,7 @@ import '../core/prompts.dart';
 import '../utils/tool_call_accumulator.dart';
 import 'daos.dart';
 import 'rules_injection.dart';
+import 'ai_endpoint_security.dart';
 
 abstract class AIProvider {
   /// 调用 AI 模型返回流式响应。
@@ -75,6 +76,9 @@ bool shouldRetryWithoutStreamOptions({
 
 /// 将 Dio 异常映射为用户友好的错误消息（OpenAI / Ernie 等 provider 共用）
 String mapDioError(dynamic error) {
+  if (error is DioException && error.error is AiEndpointSecurityException) {
+    return (error.error as AiEndpointSecurityException).message;
+  }
   if (error is DioException) {
     switch (error.type) {
       case DioExceptionType.connectionTimeout:
@@ -353,17 +357,13 @@ class OpenAIProvider implements AIProvider {
     if (withStreamOptions) {
       body['stream_options'] = {'include_usage': true};
     }
-    return _dio.post<ResponseBody>(
-      '${config.baseUrl}/chat/completions',
+    return AiEndpointClient(_dio).post<ResponseBody>(
+      config.baseUrl,
+      'chat/completions',
       data: body,
-      options: Options(
-        headers: {
-          'Authorization': 'Bearer ${config.apiKey}',
-          'Content-Type': 'application/json',
-        },
-        responseType: ResponseType.stream,
-        receiveTimeout: responseTimeout,
-      ),
+      apiKey: config.apiKey,
+      responseType: ResponseType.stream,
+      receiveTimeout: responseTimeout,
       cancelToken: cancelToken,
     );
   }
@@ -461,21 +461,18 @@ class ErnieProvider implements AIProvider {
     messages.add({'role': 'user', 'content': effectivePrompt});
 
     try {
-      final Response<ResponseBody> response = await _dio.post<ResponseBody>(
-        '${config.baseUrl}/chat/completions',
+      final Response<ResponseBody> response =
+          await AiEndpointClient(_dio).post<ResponseBody>(
+        config.baseUrl,
+        'chat/completions',
         data: {
           'model': config.modelName,
           'messages': messages,
           'stream': true,
         },
-        options: Options(
-          headers: {
-            'Authorization': 'Bearer ${config.apiKey}',
-            'Content-Type': 'application/json',
-          },
-          responseType: ResponseType.stream,
-          receiveTimeout: responseTimeout,
-        ),
+        apiKey: config.apiKey,
+        responseType: ResponseType.stream,
+        receiveTimeout: responseTimeout,
         cancelToken: cancelToken,
       );
 

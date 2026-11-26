@@ -21,6 +21,9 @@ import 'services/crash_reporter.dart';
 import 'services/health_check_service.dart';
 import 'services/mcp_manager.dart';
 import 'core/builtin_runbooks.dart';
+import 'core/security/ssh_host_key_verifier.dart';
+import 'pages/database_startup_failure_page.dart';
+import 'widgets/ssh_host_key_dialog.dart';
 
 void main() {
   LicenseRegistry.addLicense(() async* {
@@ -69,10 +72,17 @@ void main() {
       });
     };
 
-    // 先加载 OS 主密钥（不依赖 DB），用于 SQLCipher 全库加密
-    await CredentialsStore.loadMasterKey();
-    // 初始化加密 SQLite 数据库（用 OS 主密钥作为 PRAGMA key）
-    await DbInit.init();
+    // 先加载 OS 主密钥（不依赖 DB），用于桌面端 SQLCipher 全库加密。
+    // 移动端由 DatabaseKeyManager 从 Keystore/Keychain 取随机密钥。
+    try {
+      await CredentialsStore.loadMasterKey();
+      await DbInit.init();
+    } catch (e, st) {
+      agentLogger.error('DbInit', '数据库初始化失败: $e（栈见 crash.log）');
+      unawaited(crashReporter.report(e, st, context: 'DbInit.init'));
+      runApp(DatabaseStartupFailureApp(error: e, stackTrace: st));
+      return;
+    }
     // 重新加载 DAO 内存缓存，保证 sync 读路径数据一致
     await DbInit.reloadCaches();
     // 初始化内置运维工作流模板（首次安装时写入，已有则跳过）
@@ -101,6 +111,13 @@ void main() {
     unawaited(McpManager.instance.init());
 
     runApp(const ProviderScope(child: AISTerminalApp()));
+    SshHostKeyPromptService.setHandler((request) {
+      final context = appNavigatorKey.currentContext;
+      if (context == null) {
+        throw const SshHostKeyVerificationException('当前没有可用的主机密钥确认界面');
+      }
+      return showSshHostKeyDialog(context, request);
+    });
   }, (error, stack) {
     // Zone 级异常兜底：所有未被 try/catch 捕获的异步异常都到这里
     // 记录到 agent 日志而非让 app 崩溃，确保用户操作不中断

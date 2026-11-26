@@ -358,7 +358,7 @@ void main() {
       expect(exec.lastFailureKind, CommandFailureKind.interactivePrompt);
     });
 
-    test('自动应答开关打开：[Y/n] 命中规则直接答 Y，不弹 UI', () async {
+    test('旧自动应答设置即使开启，[Y/n] 仍必须交回 UI', () async {
       await SettingsDao.set('agentAutoAnswerEnabled', true);
       addTearDown(() => SettingsDao.set('agentAutoAnswerEnabled', false));
 
@@ -375,15 +375,15 @@ void main() {
 
       await engine.startTask('测试目标', exec);
 
-      expect(exec.lastAnswer, 'Y');
-      expect(uiCalls, 0);
+      expect(exec.lastAnswer, 'UI');
+      expect(uiCalls, 1);
       expect(
         events.any((e) => e.isInfo && (e.text ?? '').contains('自动应答')),
-        isTrue,
+        isFalse,
       );
     });
 
-    test('自动应答开关打开：无安全默认值仍走 UI', () async {
+    test('旧自动应答设置即使开启，Press ENTER 也必须交回 UI', () async {
       await SettingsDao.set('agentAutoAnswerEnabled', true);
       addTearDown(() => SettingsDao.set('agentAutoAnswerEnabled', false));
 
@@ -392,14 +392,14 @@ void main() {
       var uiCalls = 0;
       engine.onInteractiveInputRequest = (_) async {
         uiCalls++;
-        return 'yes';
+        return '';
       };
-      final exec = _BridgeExecutor(prompt: '(yes/no)? ');
+      final exec = _BridgeExecutor(prompt: 'Press ENTER to continue');
 
       await engine.startTask('测试目标', exec);
 
       expect(uiCalls, 1);
-      expect(exec.lastAnswer, 'yes');
+      expect(exec.lastAnswer, '');
     });
 
     test('自动应答默认关闭：[Y/n] 也走 UI', () async {

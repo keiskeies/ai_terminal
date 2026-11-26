@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:go_router/go_router.dart';
 import 'route_observer.dart';
 import '../pages/terminal_page.dart';
@@ -11,7 +12,10 @@ import '../pages/sftp_page.dart';
 import '../pages/audit_log_page.dart';
 import '../pages/change_records_page.dart';
 
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
 final GoRouter appRouter = GoRouter(
+  navigatorKey: appNavigatorKey,
   initialLocation: '/',
   observers: [appRouteObserver],
   routes: [

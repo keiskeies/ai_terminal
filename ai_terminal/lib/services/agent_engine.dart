@@ -58,6 +58,7 @@ import '../utils/tail_text_buffer.dart';
 import '../utils/shell_syntax.dart';
 import 'change_record_service.dart';
 import 'notification_service.dart';
+import 'local_access.dart';
 
 /// Agent 执行引擎 - 核心自动执行系统
 class AgentEngine {
@@ -219,6 +220,9 @@ class AgentEngine {
   /// 防止取消+立即发送导致旧循环与新循环并发
   int _currentTaskGeneration = 0;
 
+  /// 当前任务的本机能力授权；暂停、取消或完成后立即撤销。
+  LocalAccessService? _localAccess;
+
   /// R5: 终态收口器（每引擎一个实例，严禁 static）。
   /// 延迟初始化以闭包读取当前代际；多 scope 各自独立，避免终态串台。
   late final TerminationGuard _terminationGuard = TerminationGuard(
@@ -257,10 +261,6 @@ class AgentEngine {
   /// 对 cat/head/tail 等读取命令做路径校验时使用此字段
   // ignore: unused_field
   bool _sessionSourceCodeGranted = false;
-
-  /// 当前任务的项目根目录（用于路径白名单判断）
-  /// 由 project_analyze 工具首次调用时设置，任务结束后重置
-  String? _currentProjectRoot;
 
   /// 编排任务的取消令牌：覆盖整个 ReAct 循环周期（比 _commandCancelToken 生命周期长）。
   /// 在 _executeAutomatic 开始时创建并注入到 MultiHostExecutor，cancelTask 时 complete。
@@ -445,9 +445,13 @@ class AgentEngine {
   /// 仍按 interactivePrompt 中断走 provide_password 流程。
   Future<String?> Function(String prompt)? onInteractiveInputRequest;
 
-  /// 请求用户授权本机目录（local_exec 使用），由 AgentNotifier 注入 UI 弹窗。
-  /// 返回 true 表示用户已允许；调用方必须重新读取 LocalFilePolicy 再判定。
-  Future<bool> Function(String path, String reason)? onLocalDirRequest;
+  /// 请求当前任务的本机目录权限，由 AgentNotifier 注入 UI 弹窗。
+  /// 单次确认只签发任务级授权，不修改全局本地文件白名单。
+  Future<bool> Function(
+    String path,
+    String reason,
+    LocalAccessMode mode,
+  )? onLocalDirRequest;
 
   int maxSteps = 0; // 0 = 无限制（运行时兜底为 _defaultMaxSteps）
 
@@ -586,13 +590,7 @@ class AgentEngine {
         _modelConfig = modelConfig,
         _memory = memory,
         _fallbackProvider = fallbackProvider,
-        _fallbackConfig = fallbackConfig {
-    // 本地文件工具的额外授权根 = 本次任务里 project_analyze 记录的项目根。
-    // 用闭包传引用：项目根在任务中途才知道，注册时快照会拿不到。
-    _tools.setLocalFileRoots(
-      () => _currentProjectRoot == null ? const [] : [_currentProjectRoot!],
-    );
-  }
+        _fallbackConfig = fallbackConfig;
 
   /// 破坏性工具的用户确认通道
   ///
@@ -667,7 +665,7 @@ class AgentEngine {
     _confirmCompleter!.complete(false);
   }
 
-  /// 确认类交互式提示的输入桥：自动应答规则优先，否则弹窗问用户。
+  /// 确认类交互式提示的输入桥：所有确认都交回 UI 让人决定。
   ///
   /// 由执行器在命令卡在 yes/no、[Y/n]、Press ENTER 等提示时回调。
   /// 返回答案（空串 = 直接回车）；null = 取消/超时/未接 UI，执行器按
@@ -689,26 +687,6 @@ class AgentEngine {
     bool active() => _isTaskActive(generation, ownerTaskId);
     if (!stillCurrent() || !active()) return null;
     final echoes = interactiveEchoes ?? _interactiveEchoes;
-
-    // 自动应答（设置项 agentAutoAnswerEnabled，默认关）：
-    // 只有保守规则表命中（[Y/n]→Y、Press ENTER→回车）才自动答，其余仍弹窗。
-    final autoEnabled =
-        SettingsDao.getCached('agentAutoAnswerEnabled', defaultValue: false) ==
-            true;
-    if (autoEnabled) {
-      final auto = PtyOutputDetector.confirmationAutoAnswer(prompt);
-      if (auto != null) {
-        if (!stillCurrent() || !active()) return null;
-        // 只记"规则命中"，提示文本本身已在命令输出里，无需重复进日志
-        agentLogger.info('ReAct', '确认提示命中自动应答规则');
-        onEvent?.call(AgentEvent.info(UiText.t(
-          '⌨️ 已自动应答确认提示: ${auto.isEmpty ? "(回车)" : auto}',
-          '⌨️ Auto-answered prompt: ${auto.isEmpty ? "(Enter)" : auto}',
-        )));
-        echoes.add((prompt: prompt, answer: auto));
-        return auto;
-      }
-    }
 
     final request = onInteractiveInputRequest;
     if (request == null) {
@@ -988,6 +966,14 @@ class AgentEngine {
         confirmWaitSeconds: _confirmWaitSeconds,
       );
     }
+    final status = _currentTask!.status;
+    if (status == AgentStatus.completed ||
+        status == AgentStatus.failed ||
+        status == AgentStatus.cancelled ||
+        status == AgentStatus.paused) {
+      _localAccess?.revokeAll();
+      _localAccess = null;
+    }
     final updateCb = onTaskUpdated;
     if (updateCb != null) updateCb(_currentTask!);
   }
@@ -1021,6 +1007,8 @@ class AgentEngine {
   /// 用于 clearHistory / restoreHistory / startTask 开头
   /// R2: 确保旧任务残留的 Completer/Subscription/Timer/CancelToken 不污染新任务
   void _resetTransientState() {
+    _localAccess?.revokeAll();
+    _localAccess = null;
     _accumulatedMessage = '';
     _steeringQueue.clear(); // O5: 旧任务的补充指令不能带进新任务
     _currentTaskIsGoalRound = false;
@@ -1189,6 +1177,28 @@ class AgentEngine {
       phase: '理解需求',
       rounds: _roundIndex,
     );
+    final accessTaskId = _currentTask!.id;
+    _localAccess = LocalAccessService(
+      taskId: accessTaskId,
+      generation: myGeneration,
+      isActive: () {
+        final status = _currentTask?.status;
+        return _currentTaskGeneration == myGeneration &&
+            _currentTask?.id == accessTaskId &&
+            (status == AgentStatus.thinking ||
+                status == AgentStatus.executing ||
+                status == AgentStatus.waitingConfirm);
+      },
+      authorizationRequest: (path, reason, mode) async {
+        if (_currentTaskGeneration != myGeneration ||
+            _currentTask?.id != accessTaskId) {
+          return false;
+        }
+        final request = onLocalDirRequest;
+        if (request == null) return false;
+        return request(path, reason, mode);
+      },
+    );
     _notifyTaskUpdate();
 
     // P0-2: trace 任务开始
@@ -1273,6 +1283,8 @@ class AgentEngine {
   }
 
   void cancelTask() {
+    _localAccess?.revokeAll();
+    _localAccess = null;
     // 无论当前处于何种状态（thinking/executing/waitingConfirm），都标记为取消
     final wasActive = _currentTask != null &&
         _currentTask!.status != AgentStatus.cancelled &&
@@ -1387,6 +1399,8 @@ class AgentEngine {
       status: AgentStatus.paused,
       phase: UiText.t('已暂停', 'Paused'),
     );
+    _localAccess?.revokeAll();
+    _localAccess = null;
     _notifyTaskUpdate();
     agentLogger.info('AgentEngine', '任务已暂停 (暂停前状态: $s)');
 
@@ -1501,6 +1515,28 @@ class AgentEngine {
       aiCalls: _aiRounds,
       blockedCount: _blockedCount,
       toolCalls: _toolCalls,
+    );
+    final accessTaskId = _currentTask!.id;
+    _localAccess = LocalAccessService(
+      taskId: accessTaskId,
+      generation: myGeneration,
+      isActive: () {
+        final status = _currentTask?.status;
+        return _currentTaskGeneration == myGeneration &&
+            _currentTask?.id == accessTaskId &&
+            (status == AgentStatus.thinking ||
+                status == AgentStatus.executing ||
+                status == AgentStatus.waitingConfirm);
+      },
+      authorizationRequest: (path, reason, mode) async {
+        if (_currentTaskGeneration != myGeneration ||
+            _currentTask?.id != accessTaskId) {
+          return false;
+        }
+        final request = onLocalDirRequest;
+        if (request == null) return false;
+        return request(path, reason, mode);
+      },
     );
     _notifyTaskUpdate();
     AgentTracer.instance
@@ -3364,6 +3400,13 @@ class AgentEngine {
     agentLogger.debug('ReAct',
         '步骤 $_currentStepCount · 安全检查 $safetyLevel · ${_logCommand(command)}');
 
+    var decision = decideCommand(safetyLevel, _permissionMode);
+    var auditMetadata = AuditLogger.commandMetadata(
+      command: command,
+      permissionMode: _permissionMode,
+      decision: decision,
+    );
+
     // 审计日志（执行前写入）：即使执行中崩溃，也能追溯"曾发起过这条命令"
     // 所有命令都记录（含 safe 级），因为 cat /etc/shadow 等只读命令也可能泄露敏感信息
     if (hostId != null) {
@@ -3374,6 +3417,7 @@ class AgentEngine {
           safetyLevel: safetyLevel.name,
           output: null, // 执行前无输出，执行后会追加一条带结果的记录
           executed: false,
+          metadata: auditMetadata,
         );
       } catch (e) {
         agentLogger.warn('Audit', '审计日志写入失败(执行前): $e');
@@ -3388,12 +3432,17 @@ class AgentEngine {
       onSuccess(false, 'task_already_terminal', 0);
       return _EarlyExecutionResult(shouldContinue: false, command: command);
     }
+    decision = decideCommand(safetyLevel, _permissionMode);
+    auditMetadata = AuditLogger.commandMetadata(
+      command: command,
+      permissionMode: _permissionMode,
+      decision: decision,
+    );
+    agentLogger.debug('ReAct',
+        '步骤 $_currentStepCount · 权限 ${_permissionMode.id} → ${decision.name}');
 
     // 执行前五道守卫（顺序敏感，语义见 CommandPreflight）。
     // 判定本身无状态；审计写入留在引擎侧——它要 hostId 且会 await。
-    final decision = decideCommand(safetyLevel, _permissionMode);
-    agentLogger.debug('ReAct',
-        '步骤 $_currentStepCount · 权限 ${_permissionMode.id} → ${decision.name}');
     final block = CommandPreflight.evaluate(
       command: command,
       safetyLevel: safetyLevel,
@@ -3414,6 +3463,7 @@ class AgentEngine {
             safetyLevel: safetyLevel.name,
             output: block.auditOutput!,
             executed: false,
+            metadata: {...auditMetadata, 'policyReason': block.reasonCode},
           );
         } catch (e) {
           agentLogger.warn(
@@ -3781,6 +3831,7 @@ class AgentEngine {
                   ? _truncateForAudit(result.error!)
                   : '(无错误信息)'),
           executed: true,
+          metadata: auditMetadata,
         );
       } catch (e) {
         agentLogger.warn(
@@ -4256,18 +4307,9 @@ class AgentEngine {
     // 标记本任务已实际执行过工具（防止 AI 幻觉 finish）
     _hasExecutedAnyCommand = true;
 
-    // 本地项目部署工作流：记录项目根目录用于路径白名单
-    if (toolName == 'project_analyze' ||
-        toolName == 'build_project' ||
-        toolName == 'package_project') {
-      final projectPath = args.getString('path');
-      if (projectPath.isNotEmpty && _currentProjectRoot == null) {
-        _currentProjectRoot = projectPath;
-        agentLogger.info('ReAct', '已记录项目根目录: $projectPath');
-      }
-    }
-
     final toolStopwatch = Stopwatch()..start();
+    final taskLocalAccess = _localAccess;
+    final taskPermissionMode = _permissionMode;
     try {
       // 注入当前任务的取消令牌给工具，让工具内部调用 executeAndWait / writeFileViaPty
       // 时能透传 cancelToken，cancelTask 时立即中断工具内的命令执行。
@@ -4279,17 +4321,10 @@ class AgentEngine {
         return requestSudoPassword(
             reason: reason, myGeneration: myGeneration, taskId: toolTaskId);
       };
-      // 本机目录授权：与密码弹窗同一套“跨 await 先查代际”的约束。
-      // 只负责把路径/原因转给 UI；策略写回由页面完成后，工具重新判定。
-      tool.localDirAuthorizationRequest = (path, reason) async {
-        if (!active()) return false;
-        final request = onLocalDirRequest;
-        if (request == null) return false;
-        final approved = await request(path, reason);
-        return approved && active();
-      };
+      tool.localAccess = taskLocalAccess;
       // 授权弹窗可能在任务取消后才返回；工具在真正执行前用它再拦一次。
       tool.isTaskActive = active;
+      tool.permissionMode = taskPermissionMode;
       final result = await tool.execute(
         executor: executor,
         args: args,
@@ -4409,6 +4444,13 @@ class AgentEngine {
       );
       _notifyTaskUpdate();
       return true;
+    } finally {
+      if (identical(tool.localAccess, taskLocalAccess)) {
+        tool.localAccess = null;
+      }
+      if (tool.permissionMode == taskPermissionMode) {
+        tool.permissionMode = null;
+      }
     }
   }
 
@@ -4607,9 +4649,8 @@ class AgentEngine {
 
     // 任务完成通知（异步，不阻塞引擎）
     _notifyTaskCompletion(success: success, startTime: startTime);
-    // 重置会话级本地项目状态（R2：资源生命周期 — 任务结束清理）
+    // 重置会话级源码读取授权状态（R2：资源生命周期 — 任务结束清理）
     _sessionSourceCodeGranted = false;
-    _currentProjectRoot = null;
   }
 
   /// 终态后的瞬态资源清理（供 TerminationGuard 的 finally 调用）。
@@ -4617,6 +4658,8 @@ class AgentEngine {
   /// R2: 不依赖下次 startTask 才清理；不清理 _currentTask /
   /// _accumulatedMessage / _conversationHistory（任务结果数据要保留）。
   void _cleanupAfterTermination() {
+    _localAccess?.revokeAll();
+    _localAccess = null;
     _aiWatchdog?.cancel();
     _aiWatchdog = null;
     _aiStreamSub?.cancel();
@@ -4886,7 +4929,7 @@ class AgentEngine {
         timeout: getCommandTimeout(command),
         cancelToken: commandCancelToken,
         sudoPassword: sudoPassword,
-        // 确认类交互提示桥接：自动应答规则优先，否则 UI 弹窗（见方法注释）。
+        // 确认类交互提示桥接：统一交回 UI 弹窗（见方法注释）。
         // 密码类提示不走此桥，检测器仍按 interactivePrompt 中断（R7）。
         onInteractivePrompt: (prompt) => _requestInteractiveInput(
           prompt,

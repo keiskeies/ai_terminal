@@ -57,6 +57,19 @@ void main() {
     });
   });
 
+  group('runLocalProcess', () {
+    test('直接进程保留非零退出码', () async {
+      final result = await runLocalProcess(
+        executable: 'cmd.exe',
+        args: const ['/d', '/c', 'exit', '9'],
+        cwd: Directory.current.path,
+        timeout: const Duration(seconds: 20),
+      );
+      expect(result.exitCode, 9);
+      expect(result.success, isFalse);
+    }, skip: !Platform.isWindows);
+  });
+
   group('runLocalCommand（Windows 真机）', () {
     test('PowerShell 中文输出与成功退出码', () async {
       final result = await runLocalCommand(

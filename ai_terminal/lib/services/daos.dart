@@ -1251,6 +1251,8 @@ class SettingsDao {
 // ═══════════════════════════════════════════════════════════
 class AuditLogsDao {
   static const _maxEntries = 1000;
+  static Database? databaseOverride;
+  static Database get _db => databaseOverride ?? DbInit.db;
 
   // 内存缓存：最近 N 条审计日志，启动时加载
   // AuditLogger 的 sync 读方法（getLogsForHost/getRecentLogs）依赖此缓存
@@ -1258,13 +1260,13 @@ class AuditLogsDao {
 
   static Future<void> loadCache() async {
     _cache.clear();
-    final rows = await DbInit.db
-        .query('audit_logs', orderBy: 'timestamp DESC', limit: _maxEntries);
+    final rows = await _db.query('audit_logs',
+        orderBy: 'timestamp DESC', limit: _maxEntries);
     for (final r in rows.reversed) {
       _cache.add(_rowToMap(r));
     }
     // 旧版本可能留下超过上限的行；启动时一次性收敛，之后按溢出量增量清理
-    await DbInit.db.rawDelete(
+    await _db.rawDelete(
       'DELETE FROM audit_logs WHERE id NOT IN '
       '(SELECT id FROM audit_logs ORDER BY timestamp DESC LIMIT ?)',
       [_maxEntries],
@@ -1298,6 +1300,7 @@ class AuditLogsDao {
     required String safetyLevel,
     String? output,
     required bool executed,
+    Map<String, dynamic>? metadata,
   }) async {
     final entry = {
       'timestamp': DateTime.now().toIso8601String(),
@@ -1306,6 +1309,7 @@ class AuditLogsDao {
       'safetyLevel': safetyLevel,
       'output': output,
       'executed': executed,
+      if (metadata != null) 'metadata': metadata,
     };
     // 同步更新缓存
     _cache.add(entry);
@@ -1316,21 +1320,22 @@ class AuditLogsDao {
     // 异步写入数据库
     // 与 SettingsDao / KnowledgeRulesDao 同口径：DbInit 未初始化时只写缓存
     // （单测路径），生产环境 main.dart 已保证 DbInit 先于本 DAO 使用完成初始化。
-    if (!DbInit.isInitialized) {
+    if (databaseOverride == null && !DbInit.isInitialized) {
       debugPrint('[AuditLogsDao] WARN: DbInit 未初始化，add() 仅写缓存');
       return;
     }
-    await DbInit.db.insert('audit_logs', {
+    await _db.insert('audit_logs', {
       'timestamp': DateTime.now().millisecondsSinceEpoch,
       'hostId': hostId,
       'command': command,
       'safetyLevel': safetyLevel,
       'output': output,
       'executed': executed ? 1 : 0,
+      if (metadata != null) 'metadata': jsonEncode(metadata),
     });
     // 容量控制：只按新增溢出量删除，避免每条命令都 COUNT(*) 全表
     if (overflow > 0) {
-      await DbInit.db.rawDelete(
+      await _db.rawDelete(
         'DELETE FROM audit_logs WHERE id IN (SELECT id FROM audit_logs ORDER BY timestamp ASC LIMIT ?)',
         [overflow],
       );
@@ -1339,7 +1344,7 @@ class AuditLogsDao {
 
   static Future<List<Map<String, dynamic>>> getLogsForHost(String hostId,
       {int limit = 100}) async {
-    final rows = await DbInit.db.query('audit_logs',
+    final rows = await _db.query('audit_logs',
         where: 'hostId = ?',
         whereArgs: [hostId],
         orderBy: 'timestamp DESC',
@@ -1349,20 +1354,35 @@ class AuditLogsDao {
 
   static Future<List<Map<String, dynamic>>> getRecentLogs(
       {int limit = 100}) async {
-    final rows = await DbInit.db
-        .query('audit_logs', orderBy: 'timestamp DESC', limit: limit);
+    final rows =
+        await _db.query('audit_logs', orderBy: 'timestamp DESC', limit: limit);
     return rows.map(_rowToMap).toList();
   }
 
-  static Map<String, dynamic> _rowToMap(Map<String, dynamic> r) => {
-        'timestamp': DateTime.fromMillisecondsSinceEpoch(r['timestamp'] as int)
-            .toIso8601String(),
-        'hostId': r['hostId'],
-        'command': r['command'],
-        'safetyLevel': r['safetyLevel'],
-        'output': r['output'],
-        'executed': (r['executed'] as int) == 1,
-      };
+  static Map<String, dynamic> _rowToMap(Map<String, dynamic> r) {
+    final rawMetadata = r['metadata'];
+    Map<String, dynamic>? metadata;
+    if (rawMetadata is String && rawMetadata.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(rawMetadata);
+        if (decoded is Map<String, dynamic>) metadata = decoded;
+      } catch (e) {
+        debugPrint('[AuditLogsDao] 元数据解析失败: $e');
+      }
+    } else if (rawMetadata is Map<String, dynamic>) {
+      metadata = rawMetadata;
+    }
+    return {
+      'timestamp': DateTime.fromMillisecondsSinceEpoch(r['timestamp'] as int)
+          .toIso8601String(),
+      'hostId': r['hostId'],
+      'command': r['command'],
+      'safetyLevel': r['safetyLevel'],
+      'output': r['output'],
+      'executed': (r['executed'] as int) == 1,
+      if (metadata != null) 'metadata': metadata,
+    };
+  }
 }
 
 // ═══════════════════════════════════════════════════════════

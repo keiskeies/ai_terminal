@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:ai_terminal/services/agent_tool.dart';
 import 'package:ai_terminal/services/command_executor.dart';
 import 'package:ai_terminal/services/daos.dart';
+import 'package:ai_terminal/services/local_access.dart';
 import 'package:ai_terminal/services/local_file_tools.dart';
 import 'package:ai_terminal/utils/local_file_ops.dart';
 import 'package:ai_terminal/utils/tool_args_parser.dart';
@@ -72,6 +74,40 @@ void main() {
       'maxReadBytes': 2 * 1024 * 1024,
     });
     await sandbox.delete(recursive: true);
+  });
+
+  test('project_analyze 的任务读取授权不写入全局白名单', () async {
+    final project = Directory(p.join(sandbox.path, 'project'));
+    await project.create();
+    final file = File(p.join(project.path, 'pubspec.yaml'));
+    await file.writeAsString('name: demo\n');
+    await SettingsDao.set('localFilePolicy', {
+      'enabled': true,
+      'allowedDirs': <String>[],
+      'maxReadBytes': 16,
+    });
+
+    final registry = AgentToolRegistry();
+    final analysisTool = registry.get('project_analyze')!
+      ..localAccess = LocalAccessService(
+        taskId: 'analyze-only',
+        generation: 1,
+        isActive: () => true,
+        authorizationRequest: (path, reason, mode) async =>
+            mode == LocalAccessMode.read,
+      );
+    final analysis = await analysisTool.execute(
+      executor: _NullExecutor(),
+      args: ToolArgs({'path': project.path}),
+    );
+    expect(analysis.success, isTrue, reason: analysis.error);
+
+    final read = await registry.get('local_file_read')!.execute(
+          executor: _NullExecutor(),
+          args: ToolArgs({'path': file.path}),
+        );
+    expect(read.success, isFalse);
+    expect(read.error, contains('路径未获授权'));
   });
 
   test('patch 在读取前拒绝超限文件且不修改原内容', () async {

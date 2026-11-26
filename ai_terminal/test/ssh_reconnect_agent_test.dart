@@ -7,6 +7,7 @@ import 'package:dio/dio.dart';
 import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/l10n/app_localizations_zh.dart';
 import 'package:ai_terminal/models/agent_memory.dart';
+import 'package:ai_terminal/models/agent_permission_mode.dart';
 import 'package:ai_terminal/models/ai_model_config.dart';
 import 'package:ai_terminal/models/chat_session.dart';
 import 'package:ai_terminal/models/token_usage.dart';
@@ -47,7 +48,7 @@ void main() {
         ),
         memory: AgentMemory(),
         maxSteps: 6,
-      );
+      )..setPermissionMode(AgentPermissionMode.auto);
 
   const finishTurn = '思考: 结论: 完成\n现状: 已确认\n变更: 无\n建议: 无\n动作: finish\n';
 

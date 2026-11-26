@@ -9,6 +9,7 @@ import 'package:ai_terminal/services/agent_tool.dart';
 import 'package:ai_terminal/services/change_window_service.dart';
 import 'package:ai_terminal/services/command_executor.dart';
 import 'package:ai_terminal/services/daos.dart';
+import 'package:ai_terminal/services/local_access.dart';
 import 'package:ai_terminal/services/multi_host_executor.dart';
 import 'package:ai_terminal/services/sftp_service.dart';
 import 'package:ai_terminal/services/ssh_service.dart';
@@ -196,6 +197,54 @@ void main() {
         expect(result.success, isFalse);
         expect(result.error, contains('未获授权'));
       }
+    });
+
+    test('SFTP 与多机传输不能复用错误方向的本地授权', () async {
+      final source = File(p.join(outside.path, 'secret.txt'))
+        ..writeAsStringSync('secret');
+      LocalAccessService access(LocalAccessMode mode) => LocalAccessService(
+            taskId: 'transfer-$mode',
+            generation: 1,
+            isActive: () => true,
+          )..issue(
+              canonicalPath: outside.path,
+              mode: mode,
+              reason: 'test',
+            );
+      final readOnly = access(LocalAccessMode.read);
+      final writeOnly = access(LocalAccessMode.write);
+      final results = await Future.wait([
+        run(SftpUploadTool()..localAccess = writeOnly, {
+          'local': source.path,
+          'remote': '/tmp/x',
+        }),
+        run(UploadToTool(multi)..localAccess = writeOnly, {
+          'hostId': 'missing',
+          'local': source.path,
+          'remote': '/tmp',
+        }),
+        run(BroadcastUploadTool(multi)..localAccess = writeOnly, {
+          'hostIds': ['h1'],
+          'local': source.path,
+          'remote': '/tmp',
+        }),
+        run(SftpDownloadTool()..localAccess = readOnly, {
+          'remote': '/remote/file.txt',
+          'local': p.join(outside.path, 'new', 'download.txt'),
+        }),
+        run(CollectFileTool(multi)..localAccess = readOnly, {
+          'hostIds': ['h1'],
+          'remote': '/remote/app.log',
+          'localDir': p.join(outside.path, 'collected'),
+        }),
+      ]);
+      for (final result in results) {
+        expect(result.success, isFalse);
+        expect(result.error, contains('未获授权'));
+      }
+      expect(source.readAsStringSync(), 'secret');
+      expect(
+          await Directory(p.join(outside.path, 'collected')).exists(), isFalse);
     });
 
     test('目录上传逐个文件预检，敏感嵌套文件不会走到远程连接', () async {

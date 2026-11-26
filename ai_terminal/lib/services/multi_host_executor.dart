@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 
 import '../core/l10n_holder.dart';
 import '../core/permission_policy.dart';
@@ -8,13 +7,10 @@ import '../models/agent_permission_mode.dart';
 import '../models/host_config.dart';
 import '../models/orchestrator_state.dart';
 import '../utils/command_heuristics.dart';
-import '../utils/shell_syntax.dart';
 import 'agent_host_registry.dart';
 import 'command_executor.dart';
 import 'command_runner.dart';
 import 'daos.dart';
-import 'local_terminal_service.dart';
-import 'ssh_service.dart';
 
 /// 多机执行器：在单个 AgentEngine 内部按 hostId 路由命令
 ///
@@ -184,8 +180,10 @@ class MultiHostExecutor {
       emitInfo: (_) {},
     );
     if (block != null) {
-      return _blockedResult(
-          block.observation, CommandFailureKind.permissionDenied);
+      final kind = block.reasonCode == 'command_syntax_error'
+          ? CommandFailureKind.syntaxError
+          : CommandFailureKind.permissionDenied;
+      return _blockedResult(block.observation, kind);
     }
     // fullAuto 在通用权限策略里会放行 blocked；多机入口按要求仍硬拒绝高危命令。
     if (level == SafetyLevel.blocked) {
@@ -193,26 +191,6 @@ class MultiHostExecutor {
       return _blockedResult(reason, CommandFailureKind.permissionDenied);
     }
 
-    final remoteOs =
-        executor is SSHService ? executor.osInfo.toLowerCase() : '';
-    final isWindows = executor is LocalTerminalService
-        ? Platform.isWindows
-        : (executor is SSHService &&
-            (remoteOs.contains('windows') ||
-                remoteOs.contains('mingw') ||
-                remoteOs.contains('cygwin')));
-    final unclosed = ShellSyntax.unclosedReason(command, isWindows: isWindows);
-    if (unclosed != null) {
-      return _blockedResult('命令未闭合: $unclosed', CommandFailureKind.syntaxError);
-    }
-    if (!isWindows) {
-      final reliability =
-          ShellSyntax.scanPosixCommand(command).reliabilityReason;
-      if (reliability != null) {
-        return _blockedResult(
-            '命令无法可靠执行: $reliability', CommandFailureKind.syntaxError);
-      }
-    }
     if (isBlockingInteractiveCommand(command)) {
       return _blockedResult('交互阻塞命令禁止通过多机工具执行，请改用非交互参数或后台服务',
           CommandFailureKind.interactivePrompt);

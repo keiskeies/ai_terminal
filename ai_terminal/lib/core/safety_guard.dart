@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'ui_text.dart';
 import '../core/l10n_holder.dart';
+import 'security/command_intent.dart';
 
 /// 命令安全等级
 enum SafetyLevel {
@@ -274,22 +275,16 @@ class SafetyGuard {
         'Moves a file into the system config directory; may overwrite the existing configuration'),
   ];
 
-  // 仅高亮提示的命令模式
+  // 仅高亮提示的只读或低风险模式；修改系统/文件系统的命令必须走 warn
   static final List<RegExp> _infoPatterns = [
     RegExp(r'curl\s+http'),
     RegExp(r'wget\s+http'),
-    RegExp(r'git\s+clone'),
-    RegExp(r'^(firewall-cmd|ufw|iptables).*port'),
-    RegExp(r'^systemctl\s+(start|restart|reload)\s+'),
-    RegExp(r'^service\s+\w+\s+(start|restart|reload)'),
-    RegExp(r'^npm\s+install\s+-g'),
-    RegExp(r'^pip\s+install\s+'),
-    RegExp(r'^brew\s+install\s+'),
-    RegExp(r'^sudo\s+(apt|apt-get)\s+update\s*$'),
-    RegExp(r'^sudo\s+yum\s+makecache'),
     RegExp(r'^update-alternatives\s+--(list|display)\s+'),
-    RegExp(r'^export\s+'),
   ];
+
+  /// 返回可审计的保守命令意图；解析失败不会回退为 safe。
+  static CommandIntent intent(String command) =>
+      CommandIntentParser.parse(command);
 
   /// 检查命令安全等级（带缓存）
   static SafetyLevel check(String command) {
@@ -349,7 +344,9 @@ class SafetyGuard {
         return SafetyLevel.info;
       }
     }
-    return SafetyLevel.safe;
+    return CommandIntentParser.parse(command).conservativeSafe
+        ? SafetyLevel.safe
+        : SafetyLevel.warn;
   }
 
   /// 命令规范化：去除常见绕过手法
@@ -608,6 +605,10 @@ class SafetyGuard {
     bool inDouble = false;
     for (int i = 0; i < chars.length; i++) {
       final c = chars[i];
+      if (c == 0x5C && !inSingle && i + 1 < chars.length) {
+        i++;
+        continue;
+      }
       if (c == 0x27 && !inDouble) {
         inSingle = !inSingle; // '
       } else if (c == 0x22 && !inSingle) {

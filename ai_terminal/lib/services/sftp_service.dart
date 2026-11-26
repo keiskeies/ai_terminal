@@ -10,6 +10,8 @@ import 'package:path/path.dart' as p;
 import '../models/host_config.dart';
 import '../core/ssh_algorithms.dart';
 import '../core/credentials_store.dart';
+import '../core/security/ssh_client_security.dart';
+import '../core/security/ssh_host_key_policy.dart';
 import '../utils/adaptive_concurrency.dart';
 import '../utils/local_file_ops.dart';
 
@@ -270,6 +272,20 @@ class SftpService {
           jumpSocket,
           username: jumpConfig.username,
           onPasswordRequest: () => jumpPassword ?? '',
+          onVerifyHostKey: (keyType, fingerprint) =>
+              SshClientSecurity.verifier.verify(
+            alias: SshHostKeyPolicy.alias(jumpConfig.host, jumpConfig.port),
+            routeKey: SshHostKeyPolicy.jumpRoute(
+              username: jumpConfig.username,
+              host: jumpConfig.host,
+              port: jumpConfig.port,
+            ),
+            routeLabel: '${jumpConfig.host}:${jumpConfig.port}',
+            keyType: keyType,
+            fingerprint:
+                SshHostKeyPolicy.normalizeFingerprintBytes(fingerprint),
+            isJumpHost: true,
+          ),
           algorithms: kFastSshAlgorithms,
           identities: jumpPrivateKey != null
               ? [...SSHKeyPair.fromPem(jumpPrivateKey)]
@@ -284,6 +300,15 @@ class SftpService {
         socket,
         username: config.username,
         onPasswordRequest: () => password ?? '',
+        onVerifyHostKey: (keyType, fingerprint) =>
+            SshClientSecurity.verifier.verify(
+          alias: SshHostKeyPolicy.alias(config.host, config.port),
+          routeKey: SshHostKeyPolicy.directRoute,
+          routeLabel: '${config.host}:${config.port}',
+          keyType: keyType,
+          fingerprint: SshHostKeyPolicy.normalizeFingerprintBytes(fingerprint),
+          isJumpHost: false,
+        ),
         algorithms: kFastSshAlgorithms,
         identities: privateKeyContent != null
             ? [...SSHKeyPair.fromPem(privateKeyContent)]
@@ -291,6 +316,7 @@ class SftpService {
       );
 
       sftp = await client.sftp();
+      SshClientSecurity.markVerified(client);
 
       _jumpSocket = jumpSocket;
       _jumpClient = jumpClient;
@@ -300,6 +326,7 @@ class SftpService {
       _isConnected = true;
     } catch (e) {
       _isConnected = false;
+      if (client != null) SshClientSecurity.clearVerified(client);
       try {
         sftp?.close();
       } catch (_) {}
@@ -322,6 +349,7 @@ class SftpService {
   /// 复用已有 SSH 连接打开 SFTP 子系统（避免重新建连）
   /// 用于 agent 工具调用场景：从 SSHService 拿到已认证的 SSHClient
   Future<void> attachToClient(SSHClient client) async {
+    SshClientSecurity.requireVerified(client);
     try {
       final sftp = await client.sftp();
       _client = client;
@@ -1386,7 +1414,9 @@ class SftpService {
 
   /// 断开连接
   Future<void> disconnect() async {
+    final client = _client;
     _isConnected = false;
+    if (client != null) SshClientSecurity.clearVerified(client);
     _sftp?.close();
     _sftp = null;
     _client?.close();

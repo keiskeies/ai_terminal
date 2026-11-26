@@ -7,6 +7,7 @@ import 'package:ai_terminal/l10n/app_localizations_zh.dart';
 import 'package:ai_terminal/models/agent_event.dart';
 import 'package:ai_terminal/models/agent_memory.dart';
 import 'package:ai_terminal/models/agent_model.dart';
+import 'package:ai_terminal/models/agent_permission_mode.dart';
 import 'package:ai_terminal/models/ai_model_config.dart';
 import 'package:ai_terminal/models/chat_session.dart';
 import 'package:ai_terminal/models/token_usage.dart';
@@ -60,6 +61,7 @@ void main() {
     provider.enqueueStream(['思考: 执行\n动作: execute\n命令: $command\n']);
     provider.enqueueStream([finishTurn]);
     final engine = makeEngine(provider);
+    engine.setPermissionMode(AgentPermissionMode.auto);
     final events = <AgentEvent>[];
     engine.onEvent = events.add;
     await engine.startTask('失败观测测试', executor);

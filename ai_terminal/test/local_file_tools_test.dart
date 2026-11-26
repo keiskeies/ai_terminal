@@ -11,6 +11,7 @@ import 'package:ai_terminal/services/agent_tool.dart';
 import 'package:ai_terminal/services/command_executor.dart';
 import 'package:ai_terminal/services/daos.dart';
 import 'package:ai_terminal/services/local_file_policy.dart';
+import 'package:ai_terminal/services/local_access.dart';
 import 'package:ai_terminal/models/host_config.dart';
 import 'package:ai_terminal/services/local_file_tools.dart';
 import 'package:ai_terminal/utils/local_file_ops.dart';
@@ -567,6 +568,36 @@ void main() {
       expect(File(dst).readAsStringSync(), 'src');
     });
 
+    test('move 覆盖失败时恢复原目标且不丢源文件', () async {
+      final src = sandboxFile('restore-src.txt', 'source');
+      final dst = sandboxFile('restore-dst.txt', 'original');
+      var active = true;
+      var policyReads = 0;
+      final tool = LocalFileMoveTool(policyLoader: () {
+        policyReads++;
+        if (policyReads == 5) active = false;
+        return LocalFilePolicy(enabled: true, allowedDirs: [sandbox.path]);
+      })
+        ..localAccess = LocalAccessService(
+          taskId: 'move-restore',
+          generation: 1,
+          isActive: () => active,
+        );
+
+      final result =
+          await _run(tool, {'path': src, 'dst': dst, 'overwrite': true});
+
+      expect(result.success, isFalse);
+      expect(result.error, contains('授权状态已变化'));
+      expect(File(src).readAsStringSync(), 'source');
+      expect(File(dst).readAsStringSync(), 'original');
+      expect(
+        sandbox.listSync().where((entity) =>
+            p.basename(entity.path).startsWith('.ai_terminal_overwrite_')),
+        isEmpty,
+      );
+    });
+
     test('move 到白名单外被拒绝', () async {
       final src = sandboxFile('s.txt', 'x');
       final r = await _run(
@@ -609,6 +640,48 @@ void main() {
       final r = await _run(LocalFileDeleteTool(), {'path': victim.path});
       expect(r.success, isFalse);
       expect(victim.existsSync(), isTrue);
+    });
+
+    test('回收区符号链接不能把删除文件转移到授权目录外', () async {
+      if (Platform.isWindows) return;
+      final path = sandboxFile('trash-link-victim.txt', 'keep');
+      final link = Link('${sandbox.path}/.ai_terminal_trash');
+      try {
+        link.createSync(outside.path);
+      } on FileSystemException {
+        return;
+      }
+
+      final result = await _run(LocalFileDeleteTool(), {'path': path});
+
+      expect(result.success, isFalse);
+      expect(result.error, contains('符号链接'));
+      expect(File(path).readAsStringSync(), 'keep');
+      expect(outside.listSync(), isEmpty);
+    });
+
+    test('递归删除前发现目录内符号链接则拒绝', () async {
+      if (Platform.isWindows) return;
+      final dir = Directory('${sandbox.path}/linked-tree')..createSync();
+      File('${dir.path}/inside.txt').writeAsStringSync('inside');
+      final outsideFile = File('${outside.path}/outside.txt')
+        ..writeAsStringSync('outside');
+      try {
+        Link('${dir.path}/escape').createSync(outsideFile.path);
+      } on FileSystemException {
+        return;
+      }
+
+      final result = await _run(LocalFileDeleteTool(), {
+        'path': dir.path,
+        'recursive': true,
+        'hard': true,
+      });
+
+      expect(result.success, isFalse);
+      expect(result.error, contains('符号链接'));
+      expect(File('${dir.path}/inside.txt').readAsStringSync(), 'inside');
+      expect(outsideFile.readAsStringSync(), 'outside');
     });
 
     test('回收区是保留目录：AI 不能读、改、再删', () async {

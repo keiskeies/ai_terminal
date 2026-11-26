@@ -83,7 +83,9 @@ class SyncConfig {
 /// - 双向：合并两种模式，冲突时以 mtime 较新的为准
 /// - 单连接：复用 SSHService 的 SSHClient 打开 SFTP
 class FileSyncService {
-  final SftpService _sftp = SftpService();
+  final SftpService _sftp;
+
+  FileSyncService({SftpService? sftp}) : _sftp = sftp ?? SftpService();
 
   /// client getter：每次操作时获取最新 SSHClient（避免持有重连后过期的 client）
   SSHClient? Function()? _clientGetter;
@@ -95,12 +97,17 @@ class FileSyncService {
   LocalPathAuthorizer? _validateLocalPath;
   StreamSubscription<WatchEvent>? _watchSub;
   Timer? _pollTimer;
-  bool _isSyncing = false;
+  Timer? _authorizationTimer;
+  bool Function()? _authorizationCheck;
+  int _runEpoch = 0;
+  int? _activeSyncEpoch;
+  bool _starting = false;
   bool _disposed = false;
 
   /// watcher 待处理变更队列：path → 变更类型（同路径多次修改自动合并为最后一次）
   final Map<String, ChangeType> _pendingChanges = {};
   bool _watcherProcessing = false;
+  int _watcherProcessingEpoch = -1;
   final Map<String, DateTime> _lastSyncTime = {};
 
   /// _lastSyncTime 容量上限（R8：避免无限增长）
@@ -111,7 +118,8 @@ class FileSyncService {
       StreamController<SyncEvent>.broadcast();
   Stream<SyncEvent> get events => _eventController.stream;
 
-  bool get isRunning => _watchSub != null || _pollTimer != null;
+  bool get isRunning =>
+      _watchSub != null || _pollTimer != null || _authorizationTimer != null;
   SyncConfig? get config => _config;
 
   /// R2: 统一的事件发射，守卫 isClosed
@@ -133,11 +141,13 @@ class FileSyncService {
     required SSHClient? Function() clientGetter,
     required SyncConfig config,
     LocalPathAuthorizer? validateLocalPath,
+    bool Function()? authorizationCheck,
+    Duration authorizationCheckInterval = const Duration(seconds: 1),
   }) async {
     // R2: disposeTools 可能在工具等待授权期间执行；释放后绝不能再挂新资源，
     // 否则新 watcher/timer 无人回收。
-    if (_disposed) {
-      debugPrint('[FileSync] 服务已释放，拒绝启动');
+    if (_disposed || _starting) {
+      debugPrint('[FileSync] 服务已释放或正在启动，拒绝重复启动');
       return false;
     }
     if (isRunning) {
@@ -145,56 +155,96 @@ class FileSyncService {
       return false;
     }
 
-    _clientGetter = clientGetter;
-    _config = config;
-    _validateLocalPath = validateLocalPath;
-
-    // 启动时先授权根目录；之后每个文件/下载目标还会再次授权。
-    if (_validateLocalPath != null) {
-      final denial =
-          await _validateLocalPath!(config.localDir, config.localDir);
-      if (_disposed) return false;
-      if (denial != null) {
-        _emit(SyncEventType.uploadFailed, '本地目录未获授权: $denial');
+    _starting = true;
+    final runEpoch = ++_runEpoch;
+    try {
+      _clientGetter = clientGetter;
+      _config = config;
+      _validateLocalPath = validateLocalPath;
+      _authorizationCheck = authorizationCheck;
+      if (_authorizationCheck?.call() == false) {
+        _emit(SyncEventType.info, '本地目录授权已失效，同步未启动');
         return false;
       }
-    }
 
-    // 初次 attach
-    if (!await _ensureClient()) {
-      return false;
-    }
-    if (_disposed) return false;
+      // 启动时先授权根目录；之后每个文件/下载目标还会再次授权。
+      if (validateLocalPath != null) {
+        final denial =
+            await validateLocalPath(config.localDir, config.localDir);
+        if (_disposed || _runEpoch != runEpoch) return false;
+        if (denial != null) {
+          _emit(SyncEventType.uploadFailed, '本地目录未获授权: $denial');
+          return false;
+        }
+      }
 
-    // 校验本地目录
-    final localDir = Directory(config.localDir);
-    if (!await localDir.exists()) {
-      if (_disposed) return false;
-      _emit(SyncEventType.uploadFailed, '本地目录不存在: ${config.localDir}');
-      return false;
-    }
-    if (_disposed) return false;
+      // 初次 attach
+      if (!await _ensureClient(runEpoch: runEpoch)) return false;
+      if (_disposed || _runEpoch != runEpoch) return false;
 
-    // 1. 启动本地 watcher（localToRemote 或 bidirectional）
-    if (config.direction == SyncDirection.localToRemote ||
-        config.direction == SyncDirection.bidirectional) {
-      await _startLocalWatcher(config);
-    }
-    if (_disposed) return false;
+      // 校验本地目录
+      final localDir = Directory(config.localDir);
+      if (!await localDir.exists()) {
+        if (_disposed || _runEpoch != runEpoch) return false;
+        _emit(SyncEventType.uploadFailed, '本地目录不存在: ${config.localDir}');
+        return false;
+      }
+      if (_disposed || _runEpoch != runEpoch) return false;
 
-    // 2. 启动远端轮询（仅 bidirectional）
-    if (config.direction == SyncDirection.bidirectional) {
-      _startRemotePolling(config);
-    }
+      // 1. 启动本地 watcher（localToRemote 或 bidirectional）
+      if (config.direction == SyncDirection.localToRemote ||
+          config.direction == SyncDirection.bidirectional) {
+        await _startLocalWatcher(config, runEpoch);
+      }
+      if (_disposed || _runEpoch != runEpoch) return false;
 
-    _emit(
-        SyncEventType.info, '同步已启动: ${config.localDir} ↔ ${config.remoteDir}');
-    return true;
+      // 2. 启动远端轮询（仅 bidirectional）
+      if (config.direction == SyncDirection.bidirectional) {
+        _startRemotePolling(config, runEpoch);
+      }
+
+      if (authorizationCheck != null) {
+        _authorizationTimer = Timer.periodic(authorizationCheckInterval, (_) {
+          if (_disposed || _runEpoch != runEpoch) return;
+          var authorized = false;
+          try {
+            authorized = authorizationCheck();
+          } catch (e) {
+            debugPrint('[FileSync] 授权复验失败: $e');
+          }
+          if (!authorized) {
+            _emit(SyncEventType.info, '本地目录授权已失效，同步已停止');
+            unawaited(stop());
+          }
+        });
+      }
+
+      _emit(SyncEventType.info,
+          '同步已启动: ${config.localDir} ↔ ${config.remoteDir}');
+      return true;
+    } finally {
+      _starting = false;
+    }
   }
 
   /// 确保持有有效的 SFTP 连接：检测 client 变化（重连）并重新 attach
-  Future<bool> _ensureClient() async {
-    if (_disposed || _clientGetter == null) return false;
+  Future<bool> _ensureClient({int? runEpoch}) async {
+    if (_disposed ||
+        _clientGetter == null ||
+        (runEpoch != null && _runEpoch != runEpoch)) {
+      return false;
+    }
+    var authorized = false;
+    try {
+      authorized = _authorizationCheck?.call() ?? true;
+    } catch (e) {
+      debugPrint('[FileSync] 授权复验失败: $e');
+    }
+    if (!authorized) {
+      _emit(SyncEventType.info, '本地目录授权已失效，同步已停止');
+      unawaited(stop());
+      return false;
+    }
     final current = _clientGetter!();
     if (current == null) {
       _emit(SyncEventType.uploadFailed, 'SSH 连接已断开，请重连后重启同步');
@@ -204,6 +254,15 @@ class FileSyncService {
     if (current != _lastAttachedClient) {
       try {
         await _sftp.attachToClient(current);
+        if (_disposed || (runEpoch != null && _runEpoch != runEpoch)) {
+          return false;
+        }
+        authorized = _authorizationCheck?.call() ?? true;
+        if (!authorized) {
+          _emit(SyncEventType.info, '本地目录授权已失效，同步已停止');
+          unawaited(stop());
+          return false;
+        }
         _lastAttachedClient = current;
       } catch (e) {
         _emit(SyncEventType.uploadFailed, 'SFTP 连接失败: $e');
@@ -215,22 +274,29 @@ class FileSyncService {
 
   /// 停止同步
   Future<void> stop() async {
-    await _watchSub?.cancel();
-    _watchSub = null;
+    _runEpoch++;
+    _activeSyncEpoch = null;
+    _lastSyncTime.clear();
+    _authorizationTimer?.cancel();
+    _authorizationTimer = null;
     _pollTimer?.cancel();
     _pollTimer = null;
+    final watchSub = _watchSub;
+    _watchSub = null;
+    _pendingChanges.clear();
     _lastAttachedClient = null;
+    await watchSub?.cancel();
     _emit(SyncEventType.info, '同步已停止');
   }
 
   /// 启动本地文件监听
-  Future<void> _startLocalWatcher(SyncConfig config) async {
+  Future<void> _startLocalWatcher(SyncConfig config, int runEpoch) async {
     if (_disposed) return;
     final watcher = DirectoryWatcher(config.localDir);
     final stream = watcher.events;
 
     _watchSub = stream.listen((event) {
-      if (_disposed || !config.enabled) return;
+      if (_disposed || _runEpoch != runEpoch || !config.enabled) return;
 
       // 检查排除项
       final relative = p.relative(event.path, from: config.localDir);
@@ -243,31 +309,39 @@ class FileSyncService {
       _pendingChanges[event.path] = event.type;
 
       // 启动处理循环（如果未运行）
-      _kickWatcherQueue(config);
+      _kickWatcherQueue(config, runEpoch);
     });
   }
 
   /// 启动 watcher 队列处理（如果未在运行）
-  void _kickWatcherQueue(SyncConfig config) {
-    if (_watcherProcessing || _disposed) return;
+  void _kickWatcherQueue(SyncConfig config, int runEpoch) {
+    if ((_watcherProcessing && _watcherProcessingEpoch == runEpoch) ||
+        _disposed ||
+        _runEpoch != runEpoch) {
+      return;
+    }
     if (_pendingChanges.isEmpty) return;
     _watcherProcessing = true;
+    _watcherProcessingEpoch = runEpoch;
     // 不 await：让 stream 继续接收事件
-    _processWatcherQueue(config);
+    _processWatcherQueue(config, runEpoch);
   }
 
   /// 串行处理 watcher 待处理变更队列
-  Future<void> _processWatcherQueue(SyncConfig config) async {
+  Future<void> _processWatcherQueue(SyncConfig config, int runEpoch) async {
     try {
       // 初始延迟让连续写入聚集
       await Future.delayed(const Duration(milliseconds: 300));
-      while (_pendingChanges.isNotEmpty && config.enabled && !_disposed) {
+      while (_pendingChanges.isNotEmpty &&
+          config.enabled &&
+          !_disposed &&
+          _runEpoch == runEpoch) {
         // 批量取出当前所有待处理
         final batch = _pendingChanges.entries.toList();
         _pendingChanges.clear();
 
         for (final entry in batch) {
-          if (!config.enabled || _disposed) break;
+          if (!config.enabled || _disposed || _runEpoch != runEpoch) break;
           final path = entry.key;
           final type = entry.value;
 
@@ -290,9 +364,9 @@ class FileSyncService {
 
           try {
             if (type == ChangeType.MODIFY || type == ChangeType.ADD) {
-              await _uploadSingleFile(path, config);
+              await _uploadSingleFile(path, config, runEpoch);
             } else if (type == ChangeType.REMOVE) {
-              await _deleteRemoteFile(path, config);
+              await _deleteRemoteFile(path, config, runEpoch);
             }
           } catch (e) {
             debugPrint('[FileSync] 处理变更失败 $path: $e');
@@ -304,23 +378,37 @@ class FileSyncService {
         }
       }
     } finally {
-      _watcherProcessing = false;
+      if (_watcherProcessingEpoch == runEpoch) {
+        _watcherProcessing = false;
+      }
     }
   }
 
+  bool _beginSync(int runEpoch) {
+    if (_disposed || _runEpoch != runEpoch || _activeSyncEpoch != null) {
+      return false;
+    }
+    _activeSyncEpoch = runEpoch;
+    return true;
+  }
+
+  void _endSync(int runEpoch) {
+    if (_activeSyncEpoch == runEpoch) _activeSyncEpoch = null;
+  }
+
   /// 启动远端轮询
-  void _startRemotePolling(SyncConfig config) {
+  void _startRemotePolling(SyncConfig config, int runEpoch) {
     if (_disposed) return;
     _pollTimer = Timer.periodic(const Duration(seconds: 30), (timer) async {
-      if (_disposed || !config.enabled) return;
-      if (_isSyncing) return;
-      await _pollRemoteChanges(config);
+      if (_disposed || _runEpoch != runEpoch || !config.enabled) return;
+      await _pollRemoteChanges(config, runEpoch);
     });
   }
 
   /// 上传单个文件
-  Future<void> _uploadSingleFile(String localPath, SyncConfig config) async {
-    if (!await _ensureClient()) return;
+  Future<void> _uploadSingleFile(
+      String localPath, SyncConfig config, int runEpoch) async {
+    if (!await _ensureClient(runEpoch: runEpoch)) return;
     try {
       final file = File(localPath);
       if (!await file.exists()) return;
@@ -337,7 +425,10 @@ class FileSyncService {
       await _sftp.ensureDirectory(remoteParent);
 
       await _sftp.uploadFile(localPath, remotePath,
-          validateLocalPath: _validateLocalPath);
+          validateLocalPath: (raw, expected) async {
+        if (_disposed || _runEpoch != runEpoch) return '同步已停止';
+        return _validateLocalPath?.call(raw, expected);
+      });
 
       _emit(SyncEventType.uploadSuccess, '已上传: $relative', filePath: localPath);
     } catch (e) {
@@ -346,9 +437,19 @@ class FileSyncService {
   }
 
   /// 删除远端文件（本地删除时同步删除远端）
-  Future<void> _deleteRemoteFile(String localPath, SyncConfig config) async {
-    if (!await _ensureClient()) return;
+  Future<void> _deleteRemoteFile(
+      String localPath, SyncConfig config, int runEpoch) async {
+    if (!await _ensureClient(runEpoch: runEpoch)) return;
     try {
+      final validate = _validateLocalPath;
+      if (validate != null) {
+        final denial = await validate(localPath, localPath);
+        if (denial != null) {
+          _emit(SyncEventType.info, '本地授权失效，未删除远端: $denial');
+          return;
+        }
+      }
+      if (_disposed || _runEpoch != runEpoch) return;
       final relative = p.relative(localPath, from: config.localDir);
       final remotePath =
           p.posix.joinAll([config.remoteDir, ...p.split(relative)]);
@@ -362,15 +463,16 @@ class FileSyncService {
   }
 
   /// 轮询远端变化，下载新增/修改的文件
-  Future<void> _pollRemoteChanges(SyncConfig config) async {
-    if (!await _ensureClient()) return;
-    _isSyncing = true;
+  Future<void> _pollRemoteChanges(SyncConfig config, int runEpoch) async {
+    if (!_beginSync(runEpoch)) return;
     try {
+      if (!await _ensureClient(runEpoch: runEpoch)) return;
       final remoteFiles = <_RemoteFileInfo>[];
-      await _collectRemoteFiles(
-          config.remoteDir, config.remoteDir, remoteFiles, config.excludeNames);
+      await _collectRemoteFiles(config.remoteDir, config.remoteDir, remoteFiles,
+          config.excludeNames, runEpoch);
 
       for (final remoteFile in remoteFiles) {
+        if (_disposed || _runEpoch != runEpoch) break;
         final localPath = p.join(config.localDir, remoteFile.relativePath);
         final localFile = File(localPath);
 
@@ -385,15 +487,38 @@ class FileSyncService {
           }
         }
 
-        if (needDownload) {
+        if (needDownload && !_disposed && _runEpoch == runEpoch) {
           _emit(SyncEventType.downloadStart, '下载: ${remoteFile.relativePath}',
               filePath: localPath);
           try {
-            // 确保本地父目录存在
+            // 创建父目录也是本地写入，必须先授权；downloadFile 的内部验证发生得更晚。
             final localParent = p.dirname(localPath);
+            final validate = _validateLocalPath;
+            if (validate != null) {
+              final parentDenial = await validate(localParent, localParent);
+              if (_disposed || _runEpoch != runEpoch) return;
+              if (parentDenial != null) {
+                throw FileSystemException('本地父目录未获授权: $parentDenial');
+              }
+              final targetDenial = await validate(localPath, localPath);
+              if (_disposed || _runEpoch != runEpoch) return;
+              if (targetDenial != null) {
+                throw FileSystemException('本地目标未获授权: $targetDenial');
+              }
+            }
             await Directory(localParent).create(recursive: true);
+            if (_disposed || _runEpoch != runEpoch) return;
+            if (validate != null) {
+              final postCreateDenial = await validate(localParent, localParent);
+              if (postCreateDenial != null) {
+                throw FileSystemException('本地父目录授权已失效: $postCreateDenial');
+              }
+            }
             await _sftp.downloadFile(remoteFile.fullPath, localPath,
-                validateLocalPath: _validateLocalPath);
+                validateLocalPath: (raw, expected) async {
+              if (_disposed || _runEpoch != runEpoch) return '同步已停止';
+              return _validateLocalPath?.call(raw, expected);
+            });
             _emit(SyncEventType.downloadSuccess,
                 '已下载: ${remoteFile.relativePath}',
                 filePath: localPath);
@@ -406,7 +531,7 @@ class FileSyncService {
     } catch (e) {
       _emit(SyncEventType.info, '轮询远端失败: $e');
     } finally {
-      _isSyncing = false;
+      _endSync(runEpoch);
     }
   }
 
@@ -416,16 +541,20 @@ class FileSyncService {
     String currentPath,
     List<_RemoteFileInfo> result,
     List<String> excludeNames,
+    int runEpoch,
   ) async {
     try {
+      if (_disposed || _runEpoch != runEpoch) return;
       final entries = await _sftp.listDirectory(currentPath);
       for (final entry in entries) {
+        if (_disposed || _runEpoch != runEpoch) return;
         if (excludeNames.contains(entry.name)) continue;
         final fullPath = p.posix.join(currentPath, entry.name);
         final relative = p.posix.relative(fullPath, from: rootPath);
 
         if (entry.isDirectory) {
-          await _collectRemoteFiles(rootPath, fullPath, result, excludeNames);
+          await _collectRemoteFiles(
+              rootPath, fullPath, result, excludeNames, runEpoch);
         } else {
           // 文件项
           result.add(_RemoteFileInfo(
@@ -442,42 +571,51 @@ class FileSyncService {
 
   /// 立即执行一次全量同步（不等待 watcher 触发）
   Future<void> fullSync() async {
-    if (_config == null) return;
-    if (_disposed) return;
-    // 避免与 watcher 上传 / poll 下载并发操作 SFTP
-    if (_isSyncing) {
+    final config = _config;
+    if (config == null || _disposed) return;
+    final runEpoch = _runEpoch;
+    final validate = _validateLocalPath;
+    // 避免与 poll 下载并发操作 SFTP；旧运行不能占用新运行的同步槽。
+    if (!_beginSync(runEpoch)) {
       _emit(SyncEventType.info, '同步进行中，全量同步已跳过');
       return;
     }
-    if (!await _ensureClient()) return;
-    final config = _config!;
-
-    _isSyncing = true;
     _emit(SyncEventType.info, '开始全量同步...');
 
     try {
+      if (!await _ensureClient(runEpoch: runEpoch)) return;
       final result = await _sftp.uploadDirectory(
         config.localDir,
         config.remoteDir,
         excludeNames: config.excludeNames,
-        validateLocalPath: _validateLocalPath,
+        validateLocalPath: (raw, expected) async {
+          if (_disposed || _runEpoch != runEpoch) return '同步已停止';
+          return validate?.call(raw, expected);
+        },
         onProgress: (uploaded, total) {
+          if (_disposed || _runEpoch != runEpoch) return;
           _emit(SyncEventType.uploadProgress,
               L10n.str.ut_6f51e792f4(uploaded, total),
               uploaded: uploaded, total: total);
         },
       );
+      if (_disposed || _runEpoch != runEpoch) return;
       _emit(SyncEventType.uploadSuccess, result.summary);
     } catch (e) {
       _emit(SyncEventType.uploadFailed, '全量同步失败: $e');
     } finally {
-      _isSyncing = false;
+      _endSync(runEpoch);
     }
   }
 
   /// R2: 同步清理资源（不依赖 async stop，避免 dispose 后 async 回调写已关闭的 controller）
   void dispose() {
     _disposed = true;
+    _runEpoch++;
+    _activeSyncEpoch = null;
+    _lastSyncTime.clear();
+    _authorizationTimer?.cancel();
+    _authorizationTimer = null;
     // 同步取消订阅和定时器（watcher 的 cancel 返回 Future 但我们不等它，事件流已关闭后回调无效）
     _watchSub?.cancel();
     _watchSub = null;
@@ -485,6 +623,7 @@ class FileSyncService {
     _pollTimer = null;
     _pendingChanges.clear();
     _clientGetter = null;
+    _authorizationCheck = null;
     _lastAttachedClient = null;
     if (!_eventController.isClosed) {
       _eventController.close();

@@ -12,6 +12,7 @@ import 'package:ai_terminal/models/agent_event.dart';
 import 'package:ai_terminal/models/agent_goal.dart';
 import 'package:ai_terminal/models/agent_memory.dart';
 import 'package:ai_terminal/models/agent_model.dart';
+import 'package:ai_terminal/models/agent_permission_mode.dart';
 import 'package:ai_terminal/models/ai_model_config.dart';
 import 'package:ai_terminal/models/token_usage.dart';
 import 'package:ai_terminal/models/chat_session.dart';
@@ -198,7 +199,7 @@ void main() {
       memory: AgentMemory(),
       maxSteps: 8,
       hostId: 'test-host',
-    );
+    )..setPermissionMode(AgentPermissionMode.auto);
   }
 
   group('引擎 FC-first 端到端', () {

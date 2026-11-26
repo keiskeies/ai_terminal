@@ -178,41 +178,4 @@ void main() {
       expect(r.shouldAnswer('Password: '), isFalse);
     });
   });
-
-  group('保守自动应答规则', () {
-    test('[Y/n]（默认 Yes）→ Y', () {
-      expect(
-          PtyOutputDetector.confirmationAutoAnswer(
-              'Do you want to continue? [Y/n] '),
-          'Y');
-      expect(
-          PtyOutputDetector.confirmationAutoAnswer('Continue? [Y/n]: '), 'Y');
-    });
-
-    test('Press ENTER → 空串（直接回车），大小写不敏感', () {
-      expect(
-          PtyOutputDetector.confirmationAutoAnswer('Press ENTER to continue'),
-          '');
-      expect(
-          PtyOutputDetector.confirmationAutoAnswer(
-              'press enter or type a value'),
-          '');
-    });
-
-    test('无安全默认值的提示一律 null（交回 UI）', () {
-      expect(PtyOutputDetector.confirmationAutoAnswer('Overwrite? [y/N] '),
-          isNull);
-      expect(PtyOutputDetector.confirmationAutoAnswer('(yes/no)? '), isNull);
-      expect(PtyOutputDetector.confirmationAutoAnswer('Continue? '), isNull);
-    });
-
-    test('密码类提示永不自动应答（R7），即使带 [Y/n] 字样', () {
-      expect(PtyOutputDetector.confirmationAutoAnswer('Password: '), isNull);
-      expect(
-          PtyOutputDetector.confirmationAutoAnswer('Enter passphrase'), isNull);
-      expect(PtyOutputDetector.confirmationAutoAnswer('输入密码：'), isNull);
-      expect(
-          PtyOutputDetector.confirmationAutoAnswer('[Y/n] Password:'), isNull);
-    });
-  });
 }

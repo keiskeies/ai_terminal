@@ -199,7 +199,7 @@ void main() {
     final events = <AgentEvent>[
       AgentEvent.command('echo done', id: 'e1'),
       AgentEvent.result(commandId: 'e1', success: true, output: 'ok'),
-      AgentEvent.command('Start-Sleep -Seconds 20', id: 'e2'),
+      AgentEvent.command('tail -f /var/log/syslog', id: 'e2'),
     ];
     await tester.pumpWidget(_wrap(_content(
       events,
@@ -217,7 +217,7 @@ void main() {
     final events = <AgentEvent>[
       AgentEvent.command('echo done', id: 't1'),
       AgentEvent.result(commandId: 't1', success: true, output: 'ok'),
-      AgentEvent.command('Start-Sleep -Seconds 20', id: 't2'),
+      AgentEvent.command('tail -f /var/log/syslog', id: 't2'),
     ];
     await tester.pumpWidget(_wrap(_content(
       events,

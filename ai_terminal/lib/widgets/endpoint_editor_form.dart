@@ -10,6 +10,7 @@ import '../core/theme_colors.dart';
 import '../core/ui_text.dart';
 import '../l10n/app_localizations.dart';
 import '../models/ai_endpoint.dart';
+import '../services/ai_endpoint_security.dart';
 import '../services/daos.dart';
 import '../services/provider_config_service.dart';
 import 'inline_form.dart';
@@ -181,21 +182,19 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
       _fetching = true;
       _error = null;
     });
+    final dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 15),
+    ));
     try {
       final key = _apiKeyController.text.trim().isNotEmpty
           ? _apiKeyController.text.trim()
           : (widget.initial?.apiKey ?? '');
-      final dio = Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 10),
+      final response = await AiEndpointClient(dio).get<dynamic>(
+        baseUrl,
+        'models',
+        apiKey: key,
         receiveTimeout: const Duration(seconds: 15),
-      ));
-      final normalizedBase = baseUrl.replaceAll(RegExp(r'/+$'), '');
-      final response = await dio.get<dynamic>(
-        '$normalizedBase/models',
-        options: Options(headers: {
-          if (key.isNotEmpty) 'Authorization': 'Bearer $key',
-          'Content-Type': 'application/json',
-        }),
       );
       final ids = _parseModelIds(response.data);
       final existing = _models.map((m) => m.modelName).toSet();
@@ -216,6 +215,7 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
     } catch (e) {
       if (mounted) _snack('$e', error: true);
     } finally {
+      dio.close(force: true);
       if (mounted) setState(() => _fetching = false);
     }
   }
@@ -255,6 +255,9 @@ class _EndpointEditorFormState extends State<EndpointEditorForm> {
   }
 
   String _dioMessage(DioException e) {
+    if (e.error is AiEndpointSecurityException) {
+      return (e.error as AiEndpointSecurityException).message;
+    }
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.sendTimeout:

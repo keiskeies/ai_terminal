@@ -488,7 +488,7 @@ class LocalTerminalService implements CommandExecutor {
     var lastEvaluateAtMs = -evaluateIntervalMs;
     // sudo 提示应答器：命中提示时把密码写进 stdin，而不是让检测器中断命令
     final sudoResponder = SudoPromptResponder();
-    // 确认类提示应答器：命中提示时桥接给上层（UI/自动应答），而不是中断命令
+    // 确认类提示应答器：命中提示时桥接给上层 UI，而不是中断命令
     final confirmationResponder = ConfirmationPromptResponder();
     final incrementalDetector = PtyIncrementalOutputDetector();
     // 桥接回调进行中：同一提示的增量 chunk 不再重复触发回调
@@ -534,7 +534,7 @@ class LocalTerminalService implements CommandExecutor {
         } catch (_) {}
       }
       // 确认类提示（yes/no、[Y/n]、Press ENTER 等）：调用方提供桥接回调时，
-      // 把提示尾部文本交给上层（UI 弹窗 / 自动应答），等待期间不打断命令。
+      // 把提示尾部文本交给上层 UI 弹窗，等待期间不打断命令。
       // 答案只写进 stdin，不进 buffer/命令串；密码类提示不走此桥（R7）。
       // 门槛：命令回显行已结束（出现换行）且超过 300ms —— 本地 PTY 逐字符
       // 回显时，命令串里恰好含 `[Y/n]` 等字样会在回显中途短暂卡在缓冲尾部。

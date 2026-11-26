@@ -16,8 +16,35 @@ import 'package:ai_terminal/models/chat_session.dart';
 import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/l10n/app_localizations_zh.dart';
 import 'package:ai_terminal/utils/tool_call_accumulator.dart';
+import 'package:ai_terminal/utils/audit_logger.dart';
+import 'package:ai_terminal/services/daos.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 /// 用于集成测试的 Mock CommandExecutor
+class _GatedAuditDatabase implements Database {
+  final started = Completer<void>();
+  final release = Completer<void>();
+  int inserts = 0;
+
+  @override
+  Future<int> insert(
+    String table,
+    Map<String, Object?> values, {
+    String? nullColumnHack,
+    ConflictAlgorithm? conflictAlgorithm,
+  }) async {
+    inserts++;
+    if (inserts == 1) {
+      started.complete();
+      await release.future;
+    }
+    return inserts;
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
 class _MockExecutor implements CommandExecutor {
   String stdout = '';
   final List<String> executedCommands = [];
@@ -406,6 +433,7 @@ void main() {
       ]);
 
       final engine = makeEngine(provider: provider);
+      engine.setPermissionMode(AgentPermissionMode.auto);
       final events = <AgentEvent>[];
       engine.onEvent = events.add;
       await engine.startTask('检查 GDM 状态', _MockExecutor()..stdout = 'active');
@@ -432,6 +460,7 @@ void main() {
       ]);
 
       final engine = makeEngine(provider: provider);
+      engine.setPermissionMode(AgentPermissionMode.auto);
       final events = <AgentEvent>[];
       engine.onEvent = events.add;
       await engine.startTask('检查 Nginx', _MockExecutor()..stdout = 'active');
@@ -908,6 +937,40 @@ void main() {
           events.firstWhere((e) => e.isCommand && e.command == blockedCmd);
       expect(cmdEvent.riskLevel, 'blocked');
       expect(cmdEvent.permissionDecision, 'execute');
+    });
+
+    test('审计写入期间切到只读会刷新决策并拒绝执行', () async {
+      const command = 'rm -rf /';
+      final provider = _MockAIProvider();
+      provider.enqueueStream([
+        '思考: 检查状态\n动作: execute\n命令: $command\n',
+      ]);
+      for (var i = 0; i < 3; i++) {
+        provider.enqueueStream([finishTurn]);
+      }
+      final engine = makeEngine(provider: provider);
+      engine.setPermissionMode(AgentPermissionMode.fullAuto);
+      final executor = _MockExecutor();
+      final database = _GatedAuditDatabase();
+      AuditLogsDao.databaseOverride = database;
+      addTearDown(() => AuditLogsDao.databaseOverride = null);
+
+      final running = engine.startTask('权限刷新回归', executor);
+      await database.started.future.timeout(const Duration(seconds: 3));
+      engine.setPermissionMode(AgentPermissionMode.readOnly);
+      database.release.complete();
+      await running;
+
+      expect(executor.executedCommands, isEmpty);
+      final logs = AuditLogger.getLogsForHost('test-host')
+          .where((entry) => entry['command'] == command)
+          .toList();
+      expect(logs, hasLength(2));
+      expect(logs.first['metadata']['permissionMode'], 'fullAuto');
+      expect(logs.first['metadata']['permissionDecision'], 'execute');
+      expect(logs.last['metadata']['permissionMode'], 'readOnly');
+      expect(logs.last['metadata']['permissionDecision'], 'reject');
+      expect(logs.last['metadata']['policyReason'], 'read_only_blocked');
     });
 
     test('只读档：blocked 命令直接拒绝，不进入确认', () async {

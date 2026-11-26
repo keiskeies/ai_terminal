@@ -6,11 +6,14 @@ import 'package:path/path.dart' as p;
 import 'agent_tool.dart';
 import 'command_executor.dart';
 import 'local_terminal_service.dart';
+import 'local_file_policy.dart';
+import 'local_access.dart';
 import '../core/safety_guard.dart';
 import '../core/ui_text.dart';
 import '../utils/command_heuristics.dart';
 import '../utils/tool_args_parser.dart';
 import '../core/l10n_holder.dart';
+import '../utils/local_shell.dart';
 
 /// 本地项目构建锁 — 全局单例，保证同一时刻只有一个构建任务在运行
 /// 遵循用户决策：单项目串行，避免本地资源争抢
@@ -72,6 +75,11 @@ class CancellationException implements Exception {
 ///
 /// 不读取源码文件（需 L3 授权，使用 local_file_read 工具）
 class ProjectAnalyzeTool extends AgentTool {
+  final LocalFilePolicy Function() _policyLoader;
+
+  ProjectAnalyzeTool({LocalFilePolicy Function()? policyLoader})
+      : _policyLoader = policyLoader ?? LocalFilePolicy.load;
+
   @override
   String get name => 'project_analyze';
 
@@ -95,18 +103,27 @@ class ProjectAnalyzeTool extends AgentTool {
     required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final path = args.getString('path');
-    if (path.isEmpty) {
+    final rawPath = args.getString('path');
+    if (rawPath.isEmpty) {
       return ToolResult.failure(
           UiText.t('参数缺失: path 为必填项', 'Missing parameter: path is required'));
     }
 
-    // 路径安全检查
-    final pathCheck = SafetyGuard.checkPath(path);
-    if (pathCheck.level == SafetyLevel.blocked) {
-      return ToolResult.failure('路径被安全策略拦截: ${pathCheck.reason}');
+    final policy = _policyLoader();
+    final authorization = await authorizeLocalPath(
+      rawPath: rawPath,
+      mode: LocalAccessMode.read,
+      access: localAccess,
+      policy: policy,
+      reason: 'project_analyze 需要读取项目元数据：$rawPath',
+    );
+    if (!authorization.isAllowed) {
+      return ToolResult.failure('项目路径未授权读取: ${authorization.reason}');
     }
-
+    if (isTaskActive?.call() == false) {
+      return ToolResult.failure('任务已取消或暂停，项目分析未执行。');
+    }
+    final path = authorization.resolved;
     final dir = Directory(path);
     if (!await dir.exists()) {
       return ToolResult.failure(L10n.str.ut_b01822a097(path));
@@ -121,6 +138,14 @@ class ProjectAnalyzeTool extends AgentTool {
     result.writeln();
 
     // 收集项目根目录下的文件
+    final rootDenial = _verifyProjectRead(
+      rawPath: rawPath,
+      policy: policy,
+      access: localAccess,
+    );
+    if (rootDenial != null) {
+      return ToolResult.failure('项目路径授权已变化: ${rootDenial.reason}');
+    }
     final entities =
         await dir.list(recursive: false, followLinks: false).toList();
     final fileNames = <String>{};
@@ -136,7 +161,8 @@ class ProjectAnalyzeTool extends AgentTool {
 
     // 1. 识别项目类型 + 构建命令
     result.writeln('--- 项目类型识别 ---');
-    final projectType = await _detectProjectType(path, fileNames, dirNames);
+    final projectType =
+        await _detectProjectType(path, fileNames, dirNames, policy);
     result.writeln('类型: ${projectType.type}');
     if (projectType.buildCommand != null) {
       result.writeln('推荐构建命令: ${projectType.buildCommand}');
@@ -175,7 +201,7 @@ class ProjectAnalyzeTool extends AgentTool {
     for (final name in metadataFiles) {
       if (fileNames.contains(name)) {
         final content = await _readFileSafely(p.join(path, name),
-            maxSize: 20000, projectRoot: path);
+            maxSize: 20000, projectRoot: path, policy: policy);
         if (content != null) {
           result.writeln('[$name]');
           result.writeln(content);
@@ -197,7 +223,7 @@ class ProjectAnalyzeTool extends AgentTool {
     for (final name in readmeFiles) {
       if (fileNames.contains(name)) {
         final content = await _readFileSafely(p.join(path, name),
-            maxSize: 30000, projectRoot: path);
+            maxSize: 30000, projectRoot: path, policy: policy);
         if (content != null) {
           result.writeln('[$name]');
           result.writeln(content);
@@ -220,7 +246,7 @@ class ProjectAnalyzeTool extends AgentTool {
     for (final name in deployFiles) {
       if (fileNames.contains(name)) {
         final content = await _readFileSafely(p.join(path, name),
-            maxSize: 15000, projectRoot: path);
+            maxSize: 15000, projectRoot: path, policy: policy);
         if (content != null) {
           result.writeln('[$name]');
           result.writeln(content);
@@ -231,7 +257,12 @@ class ProjectAnalyzeTool extends AgentTool {
 
     // 5. CI 配置（仅文件名列表，避免 token 爆炸）
     final githubWorkflowsDir = Directory(p.join(path, '.github', 'workflows'));
-    if (await githubWorkflowsDir.exists()) {
+    final workflowDenial = _verifyProjectRead(
+      rawPath: githubWorkflowsDir.path,
+      policy: policy,
+      access: localAccess,
+    );
+    if (workflowDenial == null && await githubWorkflowsDir.exists()) {
       result.writeln('--- CI 配置 ---');
       try {
         final workflows = githubWorkflowsDir.list();
@@ -289,6 +320,12 @@ class ProjectAnalyzeTool extends AgentTool {
     for (final d in outputDirs) {
       if (dirNames.contains(d)) {
         final outputDir = Directory(p.join(path, d));
+        final outputDenial = _verifyProjectRead(
+          rawPath: outputDir.path,
+          policy: policy,
+          access: localAccess,
+        );
+        if (outputDenial != null) continue;
         try {
           final stat = await outputDir.stat();
           result.writeln(
@@ -307,14 +344,24 @@ class ProjectAnalyzeTool extends AgentTool {
 
   /// 检测项目类型
   Future<_ProjectTypeInfo> _detectProjectType(
-      String projectPath, Set<String> files, Set<String> dirs) async {
+    String projectPath,
+    Set<String> files,
+    Set<String> dirs,
+    LocalFilePolicy policy,
+  ) async {
     // Flutter / Dart
     if (files.contains('pubspec.yaml')) {
       // 区分 Flutter 和纯 Dart
       try {
-        final content =
-            await File(p.join(projectPath, 'pubspec.yaml')).readAsString();
-        if (content.contains('flutter:') && !content.contains('sdk: dart')) {
+        final content = await _readFileSafely(
+          p.join(projectPath, 'pubspec.yaml'),
+          maxSize: 20000,
+          projectRoot: projectPath,
+          policy: policy,
+        );
+        if (content != null &&
+            content.contains('flutter:') &&
+            !content.contains('sdk: dart')) {
           return const _ProjectTypeInfo(
             type: 'Flutter',
             buildCommand: 'flutter build web',
@@ -356,21 +403,27 @@ class ProjectAnalyzeTool extends AgentTool {
       }
       // 检查 package.json scripts
       try {
-        final content =
-            await File(p.join(projectPath, 'package.json')).readAsString();
-        final pkg = jsonDecode(content) as Map<String, dynamic>;
-        final scripts = pkg['scripts'] as Map<String, dynamic>?;
-        if (scripts != null) {
-          if (scripts.containsKey('build')) {
-            final buildCmd = scripts['build'].toString();
-            return _ProjectTypeInfo(
-              type: 'Node.js',
-              buildCommand: 'npm run build',
-              buildOutput: _inferBuildOutput(buildCmd, dirs),
-              packageManager: pkg.containsKey('packageManager')
-                  ? pkg['packageManager'].toString().split('@').first
-                  : 'npm',
-            );
+        final content = await _readFileSafely(
+          p.join(projectPath, 'package.json'),
+          maxSize: 20000,
+          projectRoot: projectPath,
+          policy: policy,
+        );
+        if (content != null) {
+          final pkg = jsonDecode(content) as Map<String, dynamic>;
+          final scripts = pkg['scripts'] as Map<String, dynamic>?;
+          if (scripts != null) {
+            if (scripts.containsKey('build')) {
+              final buildCmd = scripts['build'].toString();
+              return _ProjectTypeInfo(
+                type: 'Node.js',
+                buildCommand: 'npm run build',
+                buildOutput: _inferBuildOutput(buildCmd, dirs),
+                packageManager: pkg.containsKey('packageManager')
+                    ? pkg['packageManager'].toString().split('@').first
+                    : 'npm',
+              );
+            }
           }
         }
       } catch (_) {}
@@ -463,9 +516,22 @@ class ProjectAnalyzeTool extends AgentTool {
   }
 
   /// 安全读取文件（带路径检查 + 大小限制）
-  Future<String?> _readFileSafely(String filePath,
-      {required int maxSize, required String projectRoot}) async {
+  Future<String?> _readFileSafely(
+    String filePath, {
+    required int maxSize,
+    required String projectRoot,
+    required LocalFilePolicy policy,
+  }) async {
     try {
+      final denial = _verifyProjectRead(
+        rawPath: filePath,
+        policy: policy,
+        access: localAccess,
+      );
+      if (denial != null) {
+        debugPrint('[ProjectAnalyze] 跳过未授权文件: $filePath (${denial.reason})');
+        return null;
+      }
       final check =
           SafetyGuard.checkReadPath(filePath, projectRoot: projectRoot);
       if (check.level == SafetyLevel.blocked) {
@@ -474,7 +540,19 @@ class ProjectAnalyzeTool extends AgentTool {
       }
       final file = File(filePath);
       if (!await file.exists()) return null;
+      final afterExists = _verifyProjectRead(
+        rawPath: filePath,
+        policy: policy,
+        access: localAccess,
+      );
+      if (afterExists != null) return null;
       final stat = await file.stat();
+      final beforeRead = _verifyProjectRead(
+        rawPath: filePath,
+        policy: policy,
+        access: localAccess,
+      );
+      if (beforeRead != null) return null;
       if (stat.size > maxSize) {
         // 只读前缀，别把整个大文件先读进内存再截断
         final prefix = await file
@@ -489,6 +567,27 @@ class ProjectAnalyzeTool extends AgentTool {
       return null;
     }
   }
+}
+
+LocalPathDecision? _verifyProjectRead({
+  required String rawPath,
+  required LocalFilePolicy policy,
+  required LocalAccessService? access,
+}) {
+  final initial = policy.decide(rawPath);
+  if (initial.verdict == LocalPathVerdict.sensitive ||
+      initial.verdict == LocalPathVerdict.reserved ||
+      initial.verdict == LocalPathVerdict.escape) {
+    return initial;
+  }
+  final current = verifyLocalPathAccess(
+    rawPath: rawPath,
+    expectedResolved: initial.resolved,
+    mode: LocalAccessMode.read,
+    access: access,
+    policy: policy,
+  );
+  return current.isAllowed ? null : current;
 }
 
 class _ProjectTypeInfo {
@@ -516,11 +615,20 @@ class _ProjectTypeInfo {
 /// 通过 LocalTerminalService 在本地执行，自动 cd 到项目目录
 /// 构建失败时返回失败结果，由 AI 决定是否 ask 用户"修复还是停止"
 class BuildProjectTool extends AgentTool {
+  final LocalFilePolicy Function() _policyLoader;
+  final LocalCommandRunner? _runner;
+
+  BuildProjectTool({
+    LocalFilePolicy Function()? policyLoader,
+    LocalCommandRunner? runner,
+  })  : _policyLoader = policyLoader ?? LocalFilePolicy.load,
+        _runner = runner;
+
   @override
   String get name => 'build_project';
 
   @override
-  ToolKind get kind => ToolKind.write;
+  ToolKind get kind => ToolKind.destructive;
 
   @override
   // 构建/打包改的是产物目录，不是可逐文件回滚的配置变更；台账只收文件级变更
@@ -543,40 +651,58 @@ class BuildProjectTool extends AgentTool {
     required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final path = args.getString('path');
-    final command = args.getString('command');
+    final rawPath = args.getString('path');
+    final suppliedCommand = args.getString('command');
 
-    if (path.isEmpty) {
+    if (rawPath.isEmpty) {
       return ToolResult.failure(
           UiText.t('参数缺失: path 为必填项', 'Missing parameter: path is required'));
     }
 
-    // 路径安全检查
-    final pathCheck = SafetyGuard.checkPath(path);
-    if (pathCheck.level == SafetyLevel.blocked) {
-      return ToolResult.failure('路径被安全策略拦截: ${pathCheck.reason}');
-    }
-
-    final dir = Directory(path);
-    if (!await dir.exists()) {
-      return ToolResult.failure('项目目录不存在: $path');
-    }
-
-    // 必须使用本地终端执行
     if (executor is! LocalTerminalService) {
       return ToolResult.failure(
           'build_project 仅支持本地终端会话，当前为 SSH 远程会话。请切换到本地终端标签页。');
     }
-
     if (!executor.isConnected) {
       return ToolResult.failure('本地终端未连接');
     }
 
-    // 确定构建命令
-    String buildCmd = command;
+    final policy = _policyLoader();
+    final authorization = await authorizeLocalPath(
+      rawPath: rawPath,
+      mode: LocalAccessMode.execute,
+      access: localAccess,
+      policy: policy,
+      reason: 'build_project 将在项目目录执行构建命令'
+          '${suppliedCommand.isEmpty ? '（自动推断）' : '：$suppliedCommand'}；'
+          '构建命令可能读取或修改项目内外的文件，执行授权不是操作系统沙箱。',
+    );
+    if (!authorization.isAllowed) {
+      return ToolResult.failure('项目目录未授权执行: ${authorization.reason}');
+    }
+    if (isTaskActive?.call() == false) {
+      return ToolResult.failure('任务已取消或暂停，构建未执行。');
+    }
+    final path = authorization.resolved;
+    final dir = Directory(path);
+    if (!await dir.exists()) {
+      return ToolResult.failure('项目目录不存在: $rawPath');
+    }
+
+    final inferredCommand = suppliedCommand.isEmpty;
+    String buildCmd = suppliedCommand;
     if (buildCmd.isEmpty) {
-      // 默认根据项目类型推断
-      buildCmd = await _inferBuildCommand(path);
+      final readAuthorization = await authorizeLocalPath(
+        rawPath: rawPath,
+        mode: LocalAccessMode.read,
+        access: localAccess,
+        policy: policy,
+        reason: 'build_project 需要读取项目元数据以推断构建命令：$rawPath',
+      );
+      if (!readAuthorization.isAllowed) {
+        return ToolResult.failure('项目元数据未授权读取: ${readAuthorization.reason}');
+      }
+      buildCmd = await _inferBuildCommand(path, policy);
       if (buildCmd.isEmpty) {
         return ToolResult.failure(
             '未提供构建命令，且无法自动识别项目类型。请提供 command 参数（如 npm run build）');
@@ -584,34 +710,60 @@ class BuildProjectTool extends AgentTool {
       onProgress?.call(L10n.str.ut_8a884e053e(buildCmd));
     }
 
-    // 安全检查构建命令
     final cmdSafety = SafetyGuard.check(buildCmd);
     if (cmdSafety == SafetyLevel.blocked) {
       return ToolResult.failure(
           L10n.str.ut_5ab7922da3(SafetyGuard.getReason(buildCmd) ?? ''));
     }
+    final shell = resolveDefaultLocalShell();
+    if (shell == null) {
+      return ToolResult.failure('当前平台不支持本地构建命令');
+    }
 
-    // 获取构建锁（串行化）
     onProgress?.call(UiText.t('等待构建锁...', 'Waiting for build lock...'));
     try {
-      await BuildLock.instance.acquire();
+      await BuildLock.instance.acquire(cancelToken: cancelToken);
     } on CancellationException {
       return ToolResult.failure(
           UiText.t('等待构建锁时被取消', 'Cancelled while waiting for the build lock'));
     }
 
     try {
+      if (isTaskActive?.call() == false) {
+        return ToolResult.failure('任务已取消或暂停，构建未执行。');
+      }
+      bool authorizationStillValid() {
+        final executeCheck = verifyLocalPathAccess(
+          rawPath: rawPath,
+          expectedResolved: path,
+          mode: LocalAccessMode.execute,
+          access: localAccess,
+          policy: policy,
+        );
+        if (!executeCheck.isAllowed) return false;
+        if (!inferredCommand) return true;
+        final readCheck = _verifyProjectRead(
+          rawPath: rawPath,
+          policy: policy,
+          access: localAccess,
+        );
+        return readCheck == null;
+      }
+
+      if (!authorizationStillValid()) {
+        return ToolResult.failure('构建授权已过期或路径状态发生变化，构建未执行。');
+      }
       onProgress?.call(L10n.str.ut_323ecc4b40(buildCmd));
       debugPrint('[BuildProject] 在 $path 执行: $buildCmd');
 
-      // 拼接完整命令：cd 到项目目录 + 执行构建
-      // 使用 && 确保目录切换成功后才执行
-      final fullCommand = 'cd "${_escapePath(path)}" && $buildCmd';
       final timeout = getCommandTimeout(buildCmd);
-
-      final result = await executor.executeAndWait(
-        fullCommand,
+      final run = _runner ?? runLocalCommand;
+      final result = await run(
+        command: buildCmd,
+        cwd: path,
+        shell: shell,
         timeout: timeout,
+        cancelToken: cancelToken,
       );
 
       final output = result.stdout;
@@ -646,8 +798,10 @@ class BuildProjectTool extends AgentTool {
     }
   }
 
-  /// 推断默认构建命令
-  Future<String> _inferBuildCommand(String path) async {
+  Future<String> _inferBuildCommand(
+    String path,
+    LocalFilePolicy policy,
+  ) async {
     try {
       final entities = await Directory(path)
           .list(recursive: false, followLinks: false)
@@ -655,47 +809,35 @@ class BuildProjectTool extends AgentTool {
       final fileNames =
           entities.whereType<File>().map((e) => p.basename(e.path)).toSet();
 
-      // Flutter
       if (fileNames.contains('pubspec.yaml')) {
-        try {
-          final content =
-              await File(p.join(path, 'pubspec.yaml')).readAsString();
-          if (content.contains('flutter:')) {
-            return 'flutter build web --release';
-          }
-          return 'dart compile exe bin/main.dart';
-        } catch (_) {}
+        final content = await _readBuildMetadata(
+          p.join(path, 'pubspec.yaml'),
+          policy,
+        );
+        if (content != null) {
+          return content.contains('flutter:')
+              ? 'flutter build web --release'
+              : 'dart compile exe bin/main.dart';
+        }
       }
 
-      // Node.js
       if (fileNames.contains('package.json')) {
-        try {
-          final content =
-              await File(p.join(path, 'package.json')).readAsString();
+        final content = await _readBuildMetadata(
+          p.join(path, 'package.json'),
+          policy,
+        );
+        if (content != null) {
           final pkg = jsonDecode(content) as Map<String, dynamic>;
           final scripts = pkg['scripts'] as Map<String, dynamic>?;
           if (scripts != null && scripts.containsKey('build')) {
             return 'npm run build';
           }
-        } catch (_) {}
+        }
       }
 
-      // Rust
-      if (fileNames.contains('Cargo.toml')) {
-        return 'cargo build --release';
-      }
-
-      // Go
-      if (fileNames.contains('go.mod')) {
-        return 'go build -o bin/app .';
-      }
-
-      // Maven
-      if (fileNames.contains('pom.xml')) {
-        return 'mvn clean package -DskipTests';
-      }
-
-      // Gradle
+      if (fileNames.contains('Cargo.toml')) return 'cargo build --release';
+      if (fileNames.contains('go.mod')) return 'go build -o bin/app .';
+      if (fileNames.contains('pom.xml')) return 'mvn clean package -DskipTests';
       if (fileNames.contains('build.gradle') ||
           fileNames.contains('build.gradle.kts')) {
         return './gradlew build -x test';
@@ -706,9 +848,27 @@ class BuildProjectTool extends AgentTool {
     return '';
   }
 
-  String _escapePath(String path) {
-    // 双引号包裹，转义内部双引号
-    return path.replaceAll('"', '\\"');
+  Future<String?> _readBuildMetadata(
+    String filePath,
+    LocalFilePolicy policy,
+  ) async {
+    final denial = _verifyProjectRead(
+      rawPath: filePath,
+      policy: policy,
+      access: localAccess,
+    );
+    if (denial != null) return null;
+    final file = File(filePath);
+    if (!await file.exists()) return null;
+    final stat = await file.length();
+    if (stat > 1024 * 1024) return null;
+    final beforeRead = _verifyProjectRead(
+      rawPath: filePath,
+      policy: policy,
+      access: localAccess,
+    );
+    if (beforeRead != null) return null;
+    return file.readAsString();
   }
 }
 
@@ -722,11 +882,20 @@ class BuildProjectTool extends AgentTool {
 ///   - format: 格式 tar.gz 或 zip（可选，默认 tar.gz）
 ///   - exclude: 排除的文件名（可选，逗号分隔）
 class PackageProjectTool extends AgentTool {
+  final LocalFilePolicy Function() _policyLoader;
+  final LocalProcessRunner? _runner;
+
+  PackageProjectTool({
+    LocalFilePolicy Function()? policyLoader,
+    LocalProcessRunner? runner,
+  })  : _policyLoader = policyLoader ?? LocalFilePolicy.load,
+        _runner = runner;
+
   @override
   String get name => 'package_project';
 
   @override
-  ToolKind get kind => ToolKind.write;
+  ToolKind get kind => ToolKind.destructive;
 
   @override
   // 构建/打包改的是产物目录，不是可逐文件回滚的配置变更；台账只收文件级变更
@@ -741,7 +910,7 @@ class PackageProjectTool extends AgentTool {
   String get paramSpec => '参数列表（多行 key:value 格式）：\n'
       '  path: 项目根目录绝对路径（必填）\n'
       '  artifact_dir: 构建产物目录相对路径（必填，如 build/web 或 dist）\n'
-      '  output: 输出文件路径（可选，默认 /tmp/<name>-<timestamp>.tar.gz）\n'
+      '  output: 输出文件绝对路径（可选，默认使用系统临时目录）\n'
       '  format: 格式 tar.gz 或 zip（可选，默认 tar.gz）\n'
       '  exclude: 排除项（可选，逗号分隔）';
 
@@ -751,37 +920,18 @@ class PackageProjectTool extends AgentTool {
     required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final path = args.getString('path');
+    final rawPath = args.getString('path');
     final artifactDir = args.getString('artifact_dir');
     final output = args.getString('output');
     final format =
         args.getString('format', defaultValue: 'tar.gz').toLowerCase();
 
-    if (path.isEmpty || artifactDir.isEmpty) {
+    if (rawPath.isEmpty || artifactDir.isEmpty) {
       return ToolResult.failure('参数缺失: path 和 artifact_dir 为必填项');
     }
-
-    // 路径安全检查
-    final pathCheck = SafetyGuard.checkPath(path);
-    if (pathCheck.level == SafetyLevel.blocked) {
-      return ToolResult.failure('项目路径被安全策略拦截: ${pathCheck.reason}');
+    if (format != 'zip' && format != 'tar.gz') {
+      return ToolResult.failure('format 仅支持 zip 或 tar.gz');
     }
-
-    // 拼接产物目录绝对路径并检查
-    final artifactAbsPath = p.join(path, artifactDir);
-    final artifactCheck =
-        SafetyGuard.checkPath(artifactAbsPath, projectRoot: path);
-    if (artifactCheck.level == SafetyLevel.blocked) {
-      return ToolResult.failure('产物路径被安全策略拦截: ${artifactCheck.reason}');
-    }
-
-    final artifactDirectory = Directory(artifactAbsPath);
-    if (!await artifactDirectory.exists()) {
-      return ToolResult.failure(
-          '构建产物目录不存在: $artifactAbsPath。请先调用 build_project 工具构建项目。');
-    }
-
-    // 必须使用本地终端
     if (executor is! LocalTerminalService) {
       return ToolResult.failure('package_project 仅支持本地终端会话');
     }
@@ -789,17 +939,72 @@ class PackageProjectTool extends AgentTool {
       return ToolResult.failure('本地终端未连接');
     }
 
-    // 确定输出路径
-    final projectName = p.basename(path);
+    final policy = _policyLoader();
+    final projectDecision = policy.decide(rawPath);
+    if (projectDecision.verdict == LocalPathVerdict.sensitive ||
+        projectDecision.verdict == LocalPathVerdict.reserved ||
+        projectDecision.verdict == LocalPathVerdict.escape) {
+      return ToolResult.failure('项目路径被安全策略拦截: ${projectDecision.reason}');
+    }
+    final projectPath = projectDecision.resolved;
+    final artifactAbsPath = p.normalize(p.join(projectPath, artifactDir));
+    if (artifactAbsPath != projectPath &&
+        !p.isWithin(projectPath, artifactAbsPath)) {
+      return ToolResult.failure('artifact_dir 不能跳出项目根目录');
+    }
+
+    final readAuthorization = await authorizeLocalPath(
+      rawPath: artifactAbsPath,
+      mode: LocalAccessMode.read,
+      access: localAccess,
+      policy: policy,
+      reason: 'package_project 需要读取构建产物：$artifactAbsPath',
+    );
+    if (!readAuthorization.isAllowed) {
+      return ToolResult.failure('构建产物未授权读取: ${readAuthorization.reason}');
+    }
+    if (isTaskActive?.call() == false) {
+      return ToolResult.failure('任务已取消或暂停，打包未执行。');
+    }
+    final resolvedArtifact = readAuthorization.resolved;
+    final artifactDirectory = Directory(resolvedArtifact);
+    if (!await artifactDirectory.exists()) {
+      return ToolResult.failure(
+          '构建产物目录不存在: $artifactAbsPath。请先调用 build_project 工具构建项目。');
+    }
+
+    final projectName = p.basename(projectPath);
     final timestamp = DateTime.now().millisecondsSinceEpoch;
     final defaultExt = format == 'zip' ? 'zip' : 'tar.gz';
-    final outputFile =
-        output.isNotEmpty ? output : '/tmp/$projectName-$timestamp.$defaultExt';
+    final outputPath = output.isNotEmpty
+        ? output
+        : p.join(
+            Directory.systemTemp.path, '$projectName-$timestamp.$defaultExt');
+    if (!p.isAbsolute(outputPath)) {
+      return ToolResult.failure('output 必须是绝对路径');
+    }
+    if (p.equals(resolvedArtifact, p.normalize(outputPath)) ||
+        p.isWithin(resolvedArtifact, p.normalize(outputPath))) {
+      return ToolResult.failure('output 不能放在构建产物目录内，以免打包自身');
+    }
+    if (!await Directory(p.dirname(outputPath)).exists()) {
+      return ToolResult.failure('输出目录不存在: ${p.dirname(outputPath)}');
+    }
 
-    // 输出路径安全检查
-    final outputCheck = SafetyGuard.checkPath(outputFile);
-    if (outputCheck.level == SafetyLevel.blocked) {
-      return ToolResult.failure('输出路径被安全策略拦截: ${outputCheck.reason}');
+    final writeAuthorization = await authorizeLocalPath(
+      rawPath: outputPath,
+      mode: LocalAccessMode.write,
+      access: localAccess,
+      policy: policy,
+      reason: 'package_project 需要写入或覆盖打包文件：$outputPath',
+    );
+    if (!writeAuthorization.isAllowed) {
+      return ToolResult.failure('打包输出未授权写入: ${writeAuthorization.reason}');
+    }
+    final resolvedOutput = writeAuthorization.resolved;
+    if (p.equals(resolvedArtifact, resolvedOutput) ||
+        p.isWithin(resolvedArtifact, resolvedOutput)) {
+      return ToolResult.failure('output 不能放在构建产物目录内，以免打包自身');
     }
 
     // 解析排除列表
@@ -808,48 +1013,79 @@ class PackageProjectTool extends AgentTool {
       defaultValue: const ['.DS_Store', '.git', 'node_modules', '.svn'],
     );
 
-    // 构建打包命令
-    String packageCmd;
-    if (format == 'zip') {
-      // zip 命令
-      final excludeArgs =
-          excludes.map((e) => '-x "./$e" -x "./$e/*"').join(' ');
-      // cd 到产物目录，打包其内容
-      packageCmd =
-          'cd "${_escapePath(artifactAbsPath)}" && zip -r "${_escapePath(outputFile)}" . $excludeArgs';
-    } else {
-      // tar.gz 命令
-      final excludeArgs = excludes.map((e) => '--exclude="./$e"').join(' ');
-      packageCmd =
-          'cd "${_escapePath(artifactAbsPath)}" && tar -czf "${_escapePath(outputFile)}" $excludeArgs .';
+    final executable = format == 'zip' ? 'zip' : 'tar';
+    final packageArgs = <String>[
+      if (format == 'zip') ...[
+        '-r',
+        resolvedOutput,
+        '.'
+      ] else ...[
+        '-czf',
+        resolvedOutput
+      ],
+      for (final exclude in excludes)
+        if (format == 'zip') ...['-x', './$exclude', '-x', './$exclude/*'] else
+          '--exclude=./$exclude',
+      if (format == 'tar.gz') '.',
+    ];
+
+    final readCheck = verifyLocalPathAccess(
+      rawPath: resolvedArtifact,
+      expectedResolved: resolvedArtifact,
+      mode: LocalAccessMode.read,
+      access: localAccess,
+      policy: policy,
+    );
+    final writeCheck = verifyLocalPathAccess(
+      rawPath: outputPath,
+      expectedResolved: resolvedOutput,
+      mode: LocalAccessMode.write,
+      access: localAccess,
+      policy: policy,
+    );
+    if (!readCheck.isAllowed || !writeCheck.isAllowed) {
+      return ToolResult.failure('打包授权已过期或路径状态发生变化，打包未执行。');
     }
 
-    // 安全检查打包命令
-    final cmdSafety = SafetyGuard.check(packageCmd);
-    if (cmdSafety == SafetyLevel.blocked) {
-      return ToolResult.failure(
-          L10n.str.ut_2192f982a0(SafetyGuard.getReason(packageCmd) ?? ''));
-    }
-
-    onProgress?.call(L10n.str.ut_5e9fa40ae2(artifactDir, outputFile));
-    debugPrint('[PackageProject] 执行: $packageCmd');
+    onProgress?.call(L10n.str.ut_5e9fa40ae2(artifactDir, resolvedOutput));
+    debugPrint('[PackageProject] 执行: $executable $packageArgs');
 
     try {
-      final result = await executor.executeAndWait(
-        packageCmd,
+      final run = _runner ?? runLocalProcess;
+      final result = await run(
+        executable: executable,
+        args: packageArgs,
+        cwd: resolvedArtifact,
         timeout: const Duration(minutes: 3),
+        cancelToken: cancelToken,
       );
 
       if (result.success) {
-        // 检查输出文件是否存在
-        final outputFileObj = File(outputFile);
+        final finalReadCheck = verifyLocalPathAccess(
+          rawPath: resolvedArtifact,
+          expectedResolved: resolvedArtifact,
+          mode: LocalAccessMode.read,
+          access: localAccess,
+          policy: policy,
+        );
+        final finalWriteCheck = verifyLocalPathAccess(
+          rawPath: outputPath,
+          expectedResolved: resolvedOutput,
+          mode: LocalAccessMode.write,
+          access: localAccess,
+          policy: policy,
+        );
+        if (!finalReadCheck.isAllowed || !finalWriteCheck.isAllowed) {
+          return ToolResult.failure('打包后授权状态或输出路径已变化。');
+        }
+        final outputFileObj = File(resolvedOutput);
         if (!await outputFileObj.exists()) {
           return ToolResult.failure(
-              '打包命令执行成功，但输出文件不存在: $outputFile\n输出: ${result.stdout}');
+              '打包命令执行成功，但输出文件不存在: $resolvedOutput\n输出: ${result.stdout}');
         }
         final fileSize = await outputFileObj.length();
         final sizeStr = _formatFileSize(fileSize);
-        final summary = L10n.str.ut_9c3df15635(outputFile, sizeStr);
+        final summary = L10n.str.ut_9c3df15635(resolvedOutput, sizeStr);
         onProgress?.call(L10n.str.ut_7884351654(sizeStr));
         return ToolResult.success(summary);
       } else {
@@ -863,15 +1099,12 @@ class PackageProjectTool extends AgentTool {
     }
   }
 
-  String _escapePath(String path) {
-    return path.replaceAll('"', '\\"');
-  }
-
   String _formatFileSize(int bytes) {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024)
+    if (bytes < 1024 * 1024 * 1024) {
       return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 }

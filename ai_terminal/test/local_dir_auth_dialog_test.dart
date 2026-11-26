@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 
 import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/l10n/app_localizations_en.dart';
+import 'package:ai_terminal/services/local_access.dart';
 import 'package:ai_terminal/widgets/local_dir_auth_dialog.dart';
 
 void main() {
@@ -26,6 +27,7 @@ void main() {
                 context,
                 path: missingPath,
                 reason: 'local_exec 需要在该目录执行本机命令：docker save',
+                mode: LocalAccessMode.execute,
               );
             },
             child: const Text('open'),
@@ -45,6 +47,10 @@ void main() {
     expect(find.textContaining(missingPath), findsOneWidget);
     expect(find.textContaining('will be created'), findsOneWidget);
     expect(find.textContaining('Sensitive paths'), findsOneWidget);
+    expect(find.textContaining('current task'), findsOneWidget);
+    expect(find.textContaining('not added to the persistent allowlist'),
+        findsOneWidget);
+    expect(find.textContaining('not an OS sandbox'), findsOneWidget);
     expect(find.text('Allow and continue'), findsOneWidget);
     expect(find.text('Cancel'), findsOneWidget);
   });
@@ -61,6 +67,7 @@ void main() {
                 context,
                 path: missingPath,
                 reason: 'local_exec 需要在该目录执行本机命令',
+                mode: LocalAccessMode.execute,
               );
             },
             child: const Text('open'),
@@ -87,6 +94,7 @@ void main() {
                 context,
                 path: missingPath,
                 reason: 'local_exec 需要在该目录执行本机命令',
+                mode: LocalAccessMode.execute,
               );
             },
             child: const Text('open'),

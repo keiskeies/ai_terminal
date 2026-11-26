@@ -216,9 +216,11 @@ void main() {
       expect(registry.isChangeRecordingTool('sftp_upload'), isTrue);
       expect(registry.isChangeRecordingTool('cert_check'), isFalse);
       expect(registry.isChangeRecordingTool('unknown_tool'), isFalse);
-      // 构建/打包改的是产物目录，不产生可回滚的文件级变更
-      expect(registry.get('build_project')!.kind, ToolKind.write);
+      // 构建/打包会执行项目代码并产生不可逐文件回滚的产物，必须走破坏性确认。
+      expect(registry.get('build_project')!.kind, ToolKind.destructive);
+      expect(registry.get('package_project')!.kind, ToolKind.destructive);
       expect(registry.get('build_project')!.recordsChanges, isFalse);
+      expect(registry.get('package_project')!.recordsChanges, isFalse);
     });
 
     test('mcpDescriptor 暴露 MCP 形状的注解', () {

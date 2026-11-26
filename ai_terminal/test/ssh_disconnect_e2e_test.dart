@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:ai_terminal/core/l10n_holder.dart';
 import 'package:ai_terminal/l10n/app_localizations_zh.dart';
 import 'package:ai_terminal/models/agent_memory.dart';
+import 'package:ai_terminal/models/agent_permission_mode.dart';
 import 'package:ai_terminal/models/ai_model_config.dart';
 import 'package:ai_terminal/models/chat_session.dart';
 import 'package:ai_terminal/models/host_config.dart';
@@ -88,7 +89,7 @@ void main() {
       ),
       memory: AgentMemory(),
       maxSteps: 8,
-    );
+    )..setPermissionMode(AgentPermissionMode.auto);
     killLink();
 
     provider.onCall = (call) {

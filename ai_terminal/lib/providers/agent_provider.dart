@@ -17,6 +17,7 @@ import '../services/ai_model_selection_service.dart';
 import '../services/command_executor.dart';
 import '../services/conversation_service.dart';
 import '../services/conversation_title_service.dart';
+import '../services/local_access.dart';
 import '../core/credentials_store.dart';
 import '../services/daos.dart';
 import '../utils/goal_continuation.dart';
@@ -121,8 +122,12 @@ class AgentNotifier extends StateNotifier<AgentState> {
   /// 密码类提示不走此通道（AGENTS.md R7）。
   Future<String?> Function(String prompt)? interactiveInputRequestHandler;
 
-  /// 本机目录授权弹窗（local_exec 使用）。由 TerminalPage 注入。
-  Future<bool> Function(String path, String reason)? localDirRequestHandler;
+  /// 当前任务的本机目录权限弹窗。由 TerminalPage 注入，不修改全局白名单。
+  Future<bool> Function(
+    String path,
+    String reason,
+    LocalAccessMode mode,
+  )? localDirRequestHandler;
 
   final ConversationService _convService = ConversationService();
   final ConversationTitleService _titleService = ConversationTitleService();
@@ -684,10 +689,10 @@ class AgentNotifier extends StateNotifier<AgentState> {
     engine.onInteractiveInputRequest =
         (prompt) async => interactiveInputRequestHandler?.call(prompt);
     // 透传本机目录授权：页面可能晚于 engine 注册处理器，不能在创建 engine 时捕获 null
-    engine.onLocalDirRequest = (path, reason) async {
+    engine.onLocalDirRequest = (path, reason, mode) async {
       final handler = localDirRequestHandler;
       if (handler == null) return false;
-      return handler(path, reason);
+      return handler(path, reason, mode);
     };
     engine.onThinking = (msg) {
       // 新一轮 AI 流式开始：先把上一轮的 streamingContent 累积到 content 并保存

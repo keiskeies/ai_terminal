@@ -210,27 +210,6 @@ class PtyOutputDetector {
     return lines.isEmpty ? '' : lines.last.trim();
   }
 
-  /// 确认类提示的保守自动应答规则（纯函数，可单测）
-  ///
-  /// 只在**默认值明确安全**时给答案：
-  /// - `[Y/n]`（默认 Yes）→ `'Y'`
-  /// - `Press ENTER`（等待回车）→ `''`（空串 = 直接回车）
-  /// 其余（`[y/N]` 默认 No、裸 `(yes/no)` 无默认值等）一律返回 null，
-  /// 交回 UI 弹窗让人决定。
-  ///
-  /// R7：密码类提示（password/passphrase/密码）绝不自动应答，返回 null。
-  static String? confirmationAutoAnswer(String prompt) {
-    if (RegExp(r'password|passphrase|密码', caseSensitive: false)
-        .hasMatch(prompt)) {
-      return null;
-    }
-    if (prompt.contains('[Y/n]')) return 'Y';
-    if (RegExp(r'press enter', caseSensitive: false).hasMatch(prompt)) {
-      return '';
-    }
-    return null;
-  }
-
   /// 检测输出并返回失败原因（null 表示未检测到异常）
   ///
   /// [buffer] 当前累积的输出
@@ -243,7 +222,7 @@ class PtyOutputDetector {
   /// [unclosedSyntaxConfirmed] 仅在整个命令已由静态扫描确认未闭合时允许裸 `> `
   /// 作为 PS2；普通输出中的裸 `> ` 永不触发续行失败。
   /// [confirmationPromptWillBeBridged] 调用方会把确认类提示桥接给上层
-  ///   （UI 弹窗 / 自动应答）。为 true 时确认提示不再算异常；密码类提示
+  ///   （UI 弹窗）。为 true 时确认提示不再算异常；密码类提示
   ///   **不受此开关影响**，永远打断（R7：密码不走自由文本桥）。
   ///
   /// 注意：marker 字符串本身会出现在命令回显里（如 `echo "EXITCODE_1:$?"`），
@@ -348,7 +327,7 @@ class PtyOutputDetector {
           reason: '命令进入交互式密码提示，无法在非交互模式完成',
         );
       } else if (_confirmationPromptAtEnd.hasMatch(buffer)) {
-        // 确认类提示：调用方声明桥接时不打断，等 UI/自动应答写入答案
+        // 确认类提示：调用方声明桥接时不打断，等 UI 写入答案
         if (!confirmationPromptWillBeBridged) {
           return CommandFailureDiagnostic(
             kind: CommandFailureKind.interactivePrompt,
@@ -494,7 +473,7 @@ class ConfirmationPromptResponder {
   String? _lastFingerprint;
   bool _promptPresent = false;
 
-  /// 此刻是否应该把确认提示桥接给上层（UI 弹窗 / 自动应答）。
+  /// 此刻是否应该把确认提示桥接给上层（UI 弹窗）。
   bool shouldAnswer(String buffer) {
     final match = PtyOutputDetector.confirmationPromptMatch(buffer);
     if (match == null) {

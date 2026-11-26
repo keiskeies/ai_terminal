@@ -17,6 +17,8 @@ import 'pty_output_detector.dart';
 import 'session_log_service.dart';
 import 'ssh_keepalive_socket.dart';
 import '../core/l10n_holder.dart';
+import '../core/security/ssh_client_security.dart';
+import '../core/security/ssh_host_key_policy.dart';
 
 /// SSH 连接状态
 enum SSHConnectionState {
@@ -226,6 +228,8 @@ class SSHService implements CommandExecutor {
       if (identical(_client, ownedClient)) _client = null;
       if (identical(_jumpSocket, ownedJumpSocket)) _jumpSocket = null;
       if (identical(_jumpClient, ownedJumpClient)) _jumpClient = null;
+      final staleClient = ownedClient;
+      if (staleClient != null) SshClientSecurity.clearVerified(staleClient);
       ownedSession = null;
       ownedSocket = null;
       ownedClient = null;
@@ -265,6 +269,25 @@ class SSHService implements CommandExecutor {
           _jumpSocket!,
           username: jumpHostConfig.username,
           onPasswordRequest: () => jumpPassword ?? '',
+          onVerifyHostKey: (keyType, fingerprint) async {
+            checkCurrent();
+            final verified = await SshClientSecurity.verifier.verify(
+              alias: SshHostKeyPolicy.alias(
+                  jumpHostConfig.host, jumpHostConfig.port),
+              routeKey: SshHostKeyPolicy.jumpRoute(
+                username: jumpHostConfig.username,
+                host: jumpHostConfig.host,
+                port: jumpHostConfig.port,
+              ),
+              routeLabel: '${jumpHostConfig.host}:${jumpHostConfig.port}',
+              keyType: keyType,
+              fingerprint:
+                  SshHostKeyPolicy.normalizeFingerprintBytes(fingerprint),
+              isJumpHost: true,
+            );
+            checkCurrent();
+            return verified;
+          },
           algorithms: kFastSshAlgorithms,
           identities: jumpPrivateKeyContent != null
               ? [...SSHKeyPair.fromPem(jumpPrivateKeyContent)]
@@ -297,6 +320,20 @@ class SSHService implements CommandExecutor {
         _socket!,
         username: config.username,
         onPasswordRequest: () => password ?? '',
+        onVerifyHostKey: (keyType, fingerprint) async {
+          checkCurrent();
+          final verified = await SshClientSecurity.verifier.verify(
+            alias: SshHostKeyPolicy.alias(config.host, config.port),
+            routeKey: SshHostKeyPolicy.directRoute,
+            routeLabel: '${config.host}:${config.port}',
+            keyType: keyType,
+            fingerprint:
+                SshHostKeyPolicy.normalizeFingerprintBytes(fingerprint),
+            isJumpHost: false,
+          );
+          checkCurrent();
+          return verified;
+        },
         algorithms: kFastSshAlgorithms,
         identities: privateKeyContent != null
             ? [
@@ -420,6 +457,7 @@ class SSHService implements CommandExecutor {
         ),
       );
 
+      SshClientSecurity.markVerified(client);
       _isConnected = true;
 
       await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -524,6 +562,7 @@ class SSHService implements CommandExecutor {
     _socket = null;
     _jumpClient = null;
     _jumpSocket = null;
+    if (client != null) SshClientSecurity.clearVerified(client);
     try {
       session?.close();
     } catch (e) {
@@ -754,7 +793,7 @@ class SSHService implements CommandExecutor {
         (silenceLimitForTesting ?? silenceLimitFor(timeout)).inMilliseconds;
     // sudo 提示应答器：命中提示时把密码写进 stdin，而不是让检测器中断命令
     final sudoResponder = SudoPromptResponder();
-    // 确认类提示应答器：命中提示时桥接给上层（UI/自动应答），而不是中断命令
+    // 确认类提示应答器：命中提示时桥接给上层 UI，而不是中断命令
     final confirmationResponder = ConfirmationPromptResponder();
     final incrementalDetector = PtyIncrementalOutputDetector();
     // 桥接回调进行中：同一提示的增量 chunk 不再重复触发回调
@@ -796,7 +835,7 @@ class SSHService implements CommandExecutor {
         _writeTextQuietly('$sudoPassword\n');
       }
       // 确认类提示（yes/no、[Y/n]、Press ENTER 等）：调用方提供桥接回调时，
-      // 把提示尾部文本交给上层（UI 弹窗 / 自动应答），等待期间不打断命令。
+      // 把提示尾部文本交给上层 UI 弹窗，等待期间不打断命令。
       // 答案只写进 stdin，不进 buffer/命令串；密码类提示不走此桥（R7），
       // 仍由 detect() 按 interactivePrompt 中断。
       // 门槛：命令回显行已结束（出现换行）且超过 300ms —— 本地 PTY 逐字符

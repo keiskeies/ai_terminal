@@ -9,6 +9,7 @@ import '../models/agent_model.dart';
 import '../models/agent_permission_mode.dart';
 import '../utils/command_heuristics.dart';
 import '../utils/local_command_detector.dart';
+import '../utils/shell_syntax.dart';
 import 'change_window_service.dart';
 import 'command_executor.dart';
 import 'local_terminal_service.dart';
@@ -100,6 +101,9 @@ class CommandRunner {
     'read_only_blocked',
     'safety_blocked',
     'chained_modification_blocked',
+    'command_syntax_error',
+    'ps5_and_operator_unsupported',
+    'local_command_on_remote',
     'user_rejected',
     'confirm_timeout',
     'permission_changed_during_confirm',
@@ -152,6 +156,33 @@ class CommandPreflight {
     required CommandGateDecision decision,
     required void Function(AgentEvent) emitInfo,
   }) {
+    final remoteOs =
+        executor is SSHService ? executor.osInfo.toLowerCase() : '';
+    final isWindows = executor is LocalTerminalService
+        ? Platform.isWindows
+        : (executor is SSHService &&
+            (remoteOs.contains('windows') ||
+                remoteOs.contains('mingw') ||
+                remoteOs.contains('cygwin')));
+    final unclosed = ShellSyntax.unclosedReason(command, isWindows: isWindows);
+    final reliability = isWindows
+        ? null
+        : ShellSyntax.scanPosixCommand(command).reliabilityReason;
+    final syntaxReason = unclosed ?? reliability;
+    if (syntaxReason != null) {
+      emitInfo(AgentEvent.info(
+          '🧩 ${UiText.t('命令无法可靠执行: $syntaxReason', 'Command cannot be executed reliably: $syntaxReason')}\n${UiText.t('命令', 'Command')}: `$command`'));
+      return CommandBlock(
+        reasonCode: 'command_syntax_error',
+        observation: ReActObservation(
+          command: command,
+          output: '命令无法可靠执行: $syntaxReason',
+          success: false,
+          error: syntaxReason,
+        ).format(),
+      );
+    }
+
     // ── 1. O1 硬保证：只读管道/链式允许，但修改类命令必须每轮一条 ──
     // 不依赖模型自觉：任一子命令 ≥ warn 即拦截，回传观测让模型拆分重试。
     final subCommands = SafetyGuard.splitSubCommands(command)
@@ -202,8 +233,6 @@ class CommandPreflight {
     // SSH 到非 Windows 主机时，明显是本机 Windows/PowerShell 的命令先给一条
     // 可读观测，避免把 PowerShell 原样发给 bash。
     // 放在安全时段检查之前：这是本机命令，不应被远程的安全时段规则拦成"封网期"。
-    final remoteOs =
-        executor is SSHService ? executor.osInfo.toLowerCase() : '';
     final remoteLooksWindows = remoteOs.contains('windows') ||
         remoteOs.contains('mingw') ||
         remoteOs.contains('cygwin');

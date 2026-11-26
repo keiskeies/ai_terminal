@@ -295,7 +295,7 @@ void main() {
     });
   });
 
-  group('SafetyGuard.check - info 命令', () {
+  group('SafetyGuard.check - 低风险与修改型分类', () {
     test('curl http:// 返回 info', () {
       expect(
         SafetyGuard.check('curl http://example.com'),
@@ -303,18 +303,19 @@ void main() {
       );
     });
 
-    test('git clone 返回 info', () {
+    test('修改型低风险模式已收紧为 warn', () {
       expect(
         SafetyGuard.check('git clone https://github.com/repo.git'),
-        SafetyLevel.info,
+        SafetyLevel.warn,
       );
-    });
-
-    test('systemctl restart 返回 info', () {
       expect(
         SafetyGuard.check('systemctl restart nginx'),
-        SafetyLevel.info,
+        SafetyLevel.warn,
       );
+      expect(SafetyGuard.check('npm install -g pm2'), SafetyLevel.warn);
+      expect(SafetyGuard.check('pip install requests'), SafetyLevel.warn);
+      expect(SafetyGuard.check('brew install jq'), SafetyLevel.warn);
+      expect(SafetyGuard.check('sudo apt update'), SafetyLevel.warn);
     });
   });
 
@@ -341,10 +342,10 @@ void main() {
       expect(SafetyGuard.check('ls && cat file'), SafetyLevel.safe);
     });
 
-    test('ls || systemctl restart nginx 返回 info', () {
+    test('ls || systemctl restart nginx 返回 warn', () {
       expect(
         SafetyGuard.check('ls || systemctl restart nginx'),
-        SafetyLevel.info,
+        SafetyLevel.warn,
       );
     });
 

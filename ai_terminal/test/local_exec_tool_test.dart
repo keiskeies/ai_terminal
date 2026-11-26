@@ -3,10 +3,15 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'package:ai_terminal/core/db_init.dart';
+import 'package:ai_terminal/models/agent_permission_mode.dart';
 import 'package:ai_terminal/services/agent_tool.dart';
 import 'package:ai_terminal/services/command_executor.dart';
+import 'package:ai_terminal/services/daos.dart';
 import 'package:ai_terminal/services/local_exec_tool.dart';
+import 'package:ai_terminal/services/local_access.dart';
 import 'package:ai_terminal/services/local_file_policy.dart';
 import 'package:ai_terminal/utils/local_shell.dart';
 import 'package:ai_terminal/utils/tool_args_parser.dart';
@@ -27,7 +32,10 @@ class _FakePolicy extends LocalFilePolicy {
     if (rawPath.contains('sensitive')) {
       return LocalPathDecision(LocalPathVerdict.sensitive, rawPath, '敏感路径');
     }
-    if (allow) {
+    final grantedByExtraRoot = extraRoots.any(
+      (root) => rawPath == root || p.isWithin(root, rawPath),
+    );
+    if (allow || grantedByExtraRoot) {
       return LocalPathDecision(LocalPathVerdict.allowed, rawPath);
     }
     return LocalPathDecision(LocalPathVerdict.notInAllowlist, rawPath, '未授权');
@@ -104,10 +112,15 @@ void main() {
     test('敏感目录直接拒绝，不触发授权弹窗', () async {
       final tool = LocalExecTool(policyLoader: () => _FakePolicy(allow: false));
       var asked = false;
-      tool.localDirAuthorizationRequest = (path, reason) async {
-        asked = true;
-        return true;
-      };
+      tool.localAccess = LocalAccessService(
+        taskId: 'sensitive-task',
+        generation: 1,
+        isActive: () => true,
+        authorizationRequest: (path, reason, mode) async {
+          asked = true;
+          return true;
+        },
+      );
       final result = await tool.execute(
           executor: _NoopExecutor(),
           args: args('echo hi', p.join(temp.path, 'sensitive')));
@@ -118,7 +131,7 @@ void main() {
   });
 
   group('LocalExecTool 目录授权', () {
-    test('未授权 → 用户允许 → 重新判定并执行', () async {
+    test('未授权 → 用户允许 → 仅签发执行授权并执行', () async {
       final policy = _FakePolicy(allow: false);
       var runs = 0;
       final tool = LocalExecTool(
@@ -135,15 +148,30 @@ void main() {
         },
       );
       var askedPath = '';
-      tool.localDirAuthorizationRequest = (path, reason) async {
-        askedPath = path;
-        policy.allow = true;
-        return true;
-      };
+      LocalAccessMode? askedMode;
+      final access = LocalAccessService(
+        taskId: 'execute-task',
+        generation: 1,
+        isActive: () => true,
+        authorizationRequest: (path, reason, mode) async {
+          askedPath = path;
+          askedMode = mode;
+          return true;
+        },
+      );
+      tool.localAccess = access;
       final cwd = p.join(temp.path, 'work');
       final result = await tool.execute(
           executor: _NoopExecutor(), args: args('echo hi', cwd));
       expect(askedPath, cwd);
+      expect(askedMode, LocalAccessMode.execute);
+      expect(policy.allow, isFalse, reason: '单次授权不得修改全局策略');
+      expect(
+          access.decide(cwd, LocalAccessMode.execute), isA<LocalAccessGrant>());
+      expect(
+          access.decide(cwd, LocalAccessMode.read), isA<LocalAccessDenial>());
+      expect(
+          access.decide(cwd, LocalAccessMode.write), isA<LocalAccessDenial>());
       expect(result.success, isTrue);
       expect(result.output, contains('hello from local'));
       expect(runs, 1);
@@ -166,12 +194,17 @@ void main() {
           return _ok('should not run');
         },
       );
-      tool.localDirAuthorizationRequest = (path, reason) async => false;
+      tool.localAccess = LocalAccessService(
+        taskId: 'reject-task',
+        generation: 1,
+        isActive: () => true,
+        authorizationRequest: (path, reason, mode) async => false,
+      );
       final result = await tool.execute(
           executor: _NoopExecutor(),
           args: args('echo hi', p.join(temp.path, 'work')));
       expect(result.success, isFalse);
-      expect(result.error, contains('拒绝授权'));
+      expect(result.error, contains('未授权'));
       expect(runs, 0);
     });
 
@@ -202,22 +235,77 @@ void main() {
       );
       var active = true;
       tool.isTaskActive = () => active;
-      tool.localDirAuthorizationRequest = (path, reason) async {
-        active = false;
-        policy.allow = true;
-        return true;
-      };
+      final access = LocalAccessService(
+        taskId: 'cancel-task',
+        generation: 1,
+        isActive: () => active,
+        authorizationRequest: (path, reason, mode) async {
+          active = false;
+          return true;
+        },
+      );
+      tool.localAccess = access;
       final cwd = p.join(temp.path, 'work_after_cancel');
       final result = await tool.execute(
           executor: _NoopExecutor(), args: args('echo hi', cwd));
       expect(result.success, isFalse);
       expect(result.error, contains('取消'));
+      expect(policy.allow, isFalse);
+      expect(access.decide(cwd, LocalAccessMode.execute),
+          isA<LocalAccessDenial>());
       expect(runs, 0);
       expect(Directory(cwd).existsSync(), isFalse);
     });
   });
 
   group('LocalExecTool 执行结果', () {
+    test('fullAuto 未解析语法写入审计且不泄露命令参数', () async {
+      sqfliteFfiInit();
+      final db = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath,
+          options: OpenDatabaseOptions(singleInstance: false));
+      AuditLogsDao.databaseOverride = db;
+      addTearDown(() async {
+        AuditLogsDao.databaseOverride = null;
+        await db.close();
+      });
+      await db.execute('''
+        CREATE TABLE audit_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          timestamp INTEGER NOT NULL,
+          hostId TEXT NOT NULL,
+          command TEXT NOT NULL,
+          safetyLevel TEXT NOT NULL,
+          output TEXT,
+          executed INTEGER NOT NULL,
+          metadata TEXT
+        )
+      ''');
+      final tool = LocalExecTool(
+        policyLoader: () => _FakePolicy(allow: true),
+        runner: ({
+          required String command,
+          required String cwd,
+          required LocalShellKind shell,
+          required Duration timeout,
+          Completer<void>? cancelToken,
+        }) async =>
+            _ok('ok'),
+      )..permissionMode = AgentPermissionMode.fullAuto;
+
+      final result = await tool.execute(
+        executor: _NoopExecutor(),
+        args: args("bash -c 'unknown-tool --token SUPER_SECRET'", temp.path),
+      );
+      expect(result.success, isTrue);
+
+      final logs = await AuditLogsDao.getLogsForHost(LocalExecTool.localHostId);
+      expect(logs, hasLength(2));
+      final metadata = logs.first['metadata'] as Map;
+      expect(metadata['permissionMode'], 'fullAuto');
+      expect(metadata['policyReason'], 'explicit_full_auto_unknown_syntax');
+      expect(metadata.toString(), isNot(contains('SUPER_SECRET')));
+    });
+
     test('成功输出包含状态/cwd/退出码', () async {
       final tool = LocalExecTool(
         policyLoader: () => _FakePolicy(allow: true),

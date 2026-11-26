@@ -8,6 +8,7 @@ import '../utils/local_file_ops.dart';
 import '../utils/tool_args_parser.dart';
 import 'agent_tool.dart';
 import 'command_executor.dart';
+import 'local_access.dart';
 import 'local_file_policy.dart';
 import '../core/l10n_holder.dart';
 
@@ -20,7 +21,7 @@ import '../core/l10n_holder.dart';
 /// 所有路径都要先过 [LocalFilePolicy.decide]：白名单 + 敏感黑名单 + 符号链接解析。
 /// 判定不通过时不执行任何 I/O，直接把拒绝原因回给 AI。
 abstract class LocalFileTool extends AgentTool {
-  /// 授权根之外的额外目录（如本次任务里 project_analyze 记录的项目根）
+  /// 显式注入的额外授权目录；项目分析结果不会自动成为授权根。
   final List<String> Function()? extraRoots;
 
   /// 测试注入点；生产始终重新读取设置，不缓存授权快照。
@@ -29,19 +30,37 @@ abstract class LocalFileTool extends AgentTool {
 
   LocalFileTool({this.extraRoots, this.policyLoader});
 
-  Future<String?> _freshDenial(String rawPath, String expectedResolved) async {
-    final decision = _policy.verify(rawPath, expectedResolved,
-        extraRoots: extraRoots?.call() ?? const []);
+  Future<String?> _freshDenial(String rawPath, String expectedResolved,
+      {LocalAccessMode? mode}) async {
+    final decision = verifyLocalPathAccess(
+      rawPath: rawPath,
+      expectedResolved: expectedResolved,
+      mode: mode ?? accessMode,
+      access: localAccess,
+      policy: _policy,
+      extraRoots: extraRoots?.call() ?? const [],
+    );
     return decision.isAllowed ? null : decision.reason ?? '路径授权状态已变化';
   }
 
   /// 本工具是否为写操作（决定拒绝信息里要不要提示关闭只读模式）
   bool get isWriteOperation => false;
 
+  LocalAccessMode get accessMode =>
+      isWriteOperation ? LocalAccessMode.write : LocalAccessMode.read;
+
   /// 解析并判定路径。返回 decision；被拒绝时返回一个失败 ToolResult。
-  Future<Object> _resolve(String rawPath, LocalFilePolicy policy) async {
-    final decision =
-        policy.decide(rawPath, extraRoots: extraRoots?.call() ?? const []);
+  Future<Object> _resolve(String rawPath, LocalFilePolicy policy,
+      {LocalAccessMode? mode}) async {
+    final access = mode ?? accessMode;
+    final decision = await authorizeLocalPath(
+      rawPath: rawPath,
+      mode: access,
+      access: localAccess,
+      policy: policy,
+      extraRoots: extraRoots?.call() ?? const [],
+      reason: '$name 需要${access.label}本机路径：$rawPath',
+    );
     if (!decision.isAllowed) {
       final prefix = switch (decision.verdict) {
         LocalPathVerdict.sensitive => '敏感路径禁止访问',
@@ -57,6 +76,76 @@ abstract class LocalFileTool extends AgentTool {
       );
     }
     return decision;
+  }
+
+  Future<Object> _resolveWrite(String rawPath, LocalFilePolicy policy) async {
+    final extra = extraRoots?.call() ?? const <String>[];
+    final initial = policy.decide(rawPath, extraRoots: extra);
+    if (initial.verdict == LocalPathVerdict.sensitive ||
+        initial.verdict == LocalPathVerdict.reserved ||
+        initial.verdict == LocalPathVerdict.escape) {
+      return _writePathFailure(rawPath, initial);
+    }
+
+    // 原子写入、备份和续传临时文件都落在同一父目录，授权必须覆盖该目录。
+    final parent = p.dirname(rawPath);
+    final parentDecision = await authorizeLocalPath(
+      rawPath: parent,
+      mode: LocalAccessMode.write,
+      access: localAccess,
+      policy: policy,
+      extraRoots: extra,
+      reason: '$name 需要写入本机文件 $rawPath（含父目录中的临时/备份文件）',
+    );
+    if (!parentDecision.isAllowed) {
+      return _writePathFailure(rawPath, parentDecision);
+    }
+
+    final verified = verifyLocalPathAccess(
+      rawPath: rawPath,
+      expectedResolved: initial.resolved,
+      mode: LocalAccessMode.write,
+      access: localAccess,
+      policy: policy,
+      extraRoots: extra,
+    );
+    return verified.isAllowed ? verified : _writePathFailure(rawPath, verified);
+  }
+
+  Future<String?> _verifyMutationTree(
+    String root,
+    String rawRoot,
+    String expectedRoot,
+  ) async {
+    if (_kindOf(root) != _PathKind.directory) return null;
+    var entries = 0;
+    try {
+      await for (final entity
+          in Directory(root).list(recursive: true, followLinks: false)) {
+        if (++entries > 10000) return '目录条目超过 10000，拒绝递归变更';
+        if (entity is Link) return '目录包含符号链接，拒绝递归变更: ${entity.path}';
+        final denial = await _freshDenial(entity.path, entity.path);
+        if (denial != null) return denial;
+      }
+    } catch (e) {
+      return '无法安全预检目录: $e';
+    }
+    return _freshDenial(rawRoot, expectedRoot);
+  }
+
+  ToolResult _writePathFailure(String rawPath, LocalPathDecision decision) {
+    final prefix = switch (decision.verdict) {
+      LocalPathVerdict.sensitive => '敏感路径禁止访问',
+      LocalPathVerdict.reserved => '系统保留目录',
+      LocalPathVerdict.notInAllowlist => '路径未获授权',
+      LocalPathVerdict.escape => '路径跳出授权目录',
+      LocalPathVerdict.allowed => '路径不可用',
+    };
+    return ToolResult.failure(
+      '$prefix: $rawPath\n原因: ${decision.reason ?? '未通过白名单判定'}\n'
+      '若确需访问，请让用户在 设置 → Agent → 本地文件 中添加该目录。'
+      '${_remotePathHint(rawPath, decision.verdict)}',
+    );
   }
 
   /// 反向混淆提示：在 Windows 本机上传来一个 `/etc/...` 路径，多半是想改服务器
@@ -489,7 +578,7 @@ class LocalFileSearchTool extends LocalFileTool {
         root: path,
         authorize: () async {
           final current = _policy.decide(f, extraRoots: roots);
-          return current.isAllowed ? null : current.reason ?? '路径授权状态已变化';
+          return _freshDenial(f, current.resolved);
         },
         onDenied: denied.add,
         onOversize: oversized.add,
@@ -665,7 +754,7 @@ class LocalFileWriteTool extends LocalFileTool {
     if (mode != 'write' && mode != 'append') {
       return ToolResult.failure(L10n.str.ut_132456dcfb(mode));
     }
-    final resolved = await _resolve(rawPath, _policy);
+    final resolved = await _resolveWrite(rawPath, _policy);
     if (resolved is ToolResult) return resolved;
     final path = (resolved as LocalPathDecision).resolved;
 
@@ -765,7 +854,7 @@ class LocalFilePatchTool extends LocalFileTool {
   }) async {
     final rawPath = args.getString('path');
     final policy = _policy;
-    final resolved = await _resolve(rawPath, policy);
+    final resolved = await _resolveWrite(rawPath, policy);
     if (resolved is ToolResult) return resolved;
     final path = (resolved as LocalPathDecision).resolved;
 
@@ -845,7 +934,7 @@ class LocalFilePatchTool extends LocalFileTool {
 
 /// 移动/重命名本机文件
 class LocalFileMoveTool extends LocalFileTool {
-  LocalFileMoveTool({super.extraRoots});
+  LocalFileMoveTool({super.extraRoots, super.policyLoader});
 
   @override
   String get name => 'local_file_move';
@@ -880,32 +969,122 @@ class LocalFileMoveTool extends LocalFileTool {
     required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final src = await _resolve(args.getString('path'), _policy);
-    if (src is ToolResult) return src;
-    final dst = await _resolve(args.getString('dst'), _policy);
-    if (dst is ToolResult) return dst;
-    final srcPath = (src as LocalPathDecision).resolved;
-    final dstPath = (dst as LocalPathDecision).resolved;
+    final policy = _policy;
+    final rawSrc = args.getString('path');
+    final rawDst = args.getString('dst');
+    final srcRead = await _resolve(rawSrc, policy, mode: LocalAccessMode.read);
+    if (srcRead is ToolResult) return srcRead;
+    final srcWrite = await _resolveWrite(rawSrc, policy);
+    if (srcWrite is ToolResult) return srcWrite;
+    final dstWrite = await _resolveWrite(rawDst, policy);
+    if (dstWrite is ToolResult) return dstWrite;
+    final srcPath = (srcWrite as LocalPathDecision).resolved;
+    final dstPath = (dstWrite as LocalPathDecision).resolved;
+    final sourceReadDenial =
+        await _freshDenial(rawSrc, srcPath, mode: LocalAccessMode.read);
+    if (sourceReadDenial != null) {
+      return ToolResult.failure('源读取授权已失效: $sourceReadDenial');
+    }
+    if (srcPath == dstPath) return ToolResult.failure('源和目标路径相同');
 
     final type = _kindOf(srcPath);
     if (type == _PathKind.missing) {
       return ToolResult.failure('源不存在: $srcPath');
     }
+    if (type == _PathKind.directory && p.isWithin(dstPath, srcPath)) {
+      return ToolResult.failure('不能把目录移动到它自身内部: $srcPath -> $dstPath');
+    }
     final exists = _kindOf(dstPath) != _PathKind.missing;
     if (exists && !args.getBool('overwrite')) {
       return ToolResult.failure('目标已存在: $dstPath\n确认要覆盖请传 overwrite: true。');
     }
-    if (exists) {
+
+    final treeDenial = await _verifyMutationTree(srcPath, rawSrc, srcPath);
+    if (treeDenial != null) {
+      return ToolResult.failure('移动被拒绝: $srcPath\n原因: $treeDenial');
+    }
+    String? overwriteBackup;
+    Future<ToolResult> failWithRestore(String message) async {
+      final backup = overwriteBackup;
+      if (backup != null && _kindOf(dstPath) == _PathKind.missing) {
+        try {
+          await Directory(p.dirname(backup)).create(recursive: true);
+          if (_kindOf(backup) == _PathKind.directory) {
+            await Directory(backup).rename(dstPath);
+          } else {
+            await File(backup).rename(dstPath);
+          }
+          overwriteBackup = null;
+        } catch (e) {
+          message = '$message\n恢复原目标失败: $e\n原目标保留在: $backup';
+        }
+      } else if (backup != null) {
+        message = '$message\n原目标备份保留在: $backup';
+      }
+      return ToolResult.failure(message);
+    }
+
+    Future<String> cleanupOverwriteBackup() async {
+      final backup = overwriteBackup;
+      if (backup == null) return '';
       try {
-        await _deleteRecursively(dstPath);
+        final denial = await _verifyMutationTree(backup, backup, backup);
+        if (denial != null) throw FileSystemException(denial);
+        await _deleteRecursively(backup);
+        overwriteBackup = null;
+        return '';
       } catch (e) {
-        return ToolResult.failure('无法清理目标: $e');
+        return '\n原目标备份清理失败，已保留: $backup ($e)';
+      }
+    }
+
+    if (exists) {
+      final targetTreeDenial =
+          await _verifyMutationTree(dstPath, rawDst, dstPath);
+      if (targetTreeDenial != null) {
+        return ToolResult.failure('拒绝覆盖目标: $dstPath\n原因: $targetTreeDenial');
+      }
+      final srcDenial =
+          await _freshDenial(rawSrc, srcPath, mode: LocalAccessMode.read);
+      final dstDenial = await _freshDenial(rawDst, dstPath);
+      if (srcDenial != null || dstDenial != null) {
+        return ToolResult.failure('授权状态已变化，未覆盖目标: ${srcDenial ?? dstDenial}');
+      }
+      final targetType = _kindOf(dstPath);
+      var stamp = DateTime.now().microsecondsSinceEpoch;
+      overwriteBackup =
+          p.join(p.dirname(dstPath), '.ai_terminal_overwrite_$stamp');
+      while (FileSystemEntity.typeSync(overwriteBackup!) !=
+          FileSystemEntityType.notFound) {
+        overwriteBackup =
+            p.join(p.dirname(dstPath), '.ai_terminal_overwrite_${++stamp}');
+      }
+      try {
+        if (targetType == _PathKind.directory) {
+          await Directory(dstPath).rename(overwriteBackup!);
+        } else {
+          await File(dstPath).rename(overwriteBackup!);
+        }
+      } catch (e) {
+        overwriteBackup = null;
+        return ToolResult.failure('无法备份目标: $e');
       }
     }
 
     try {
+      final srcDenial =
+          await _freshDenial(rawSrc, srcPath, mode: LocalAccessMode.read);
+      final dstDenial = await _freshDenial(rawDst, dstPath);
+      if (srcDenial != null || dstDenial != null) {
+        return await failWithRestore(
+            '授权状态已变化，移动未执行: ${srcDenial ?? dstDenial}');
+      }
       // 目标父目录可能还不存在；先建出来，rename 才能成功
       await Directory(p.dirname(dstPath)).create(recursive: true);
+      final postCreateDenial = await _freshDenial(rawDst, dstPath);
+      if (postCreateDenial != null) {
+        return await failWithRestore('目标授权在创建父目录后失效，移动未执行: $postCreateDenial');
+      }
       if (type == _PathKind.directory) {
         await Directory(srcPath).rename(dstPath);
       } else {
@@ -914,24 +1093,56 @@ class LocalFileMoveTool extends LocalFileTool {
     } catch (e) {
       // rename 跨盘会失败；退化成 copy + delete
       try {
+        if (await _freshDenial(rawSrc, srcPath, mode: LocalAccessMode.read) !=
+            null) {
+          return await failWithRestore('源读取授权已失效，跨盘复制未执行');
+        }
         if (type == _PathKind.directory) {
-          await _copyDirectory(Directory(srcPath), Directory(dstPath));
+          var copied = 0;
+          await _copyDirectory(Directory(srcPath), Directory(dstPath),
+              validate: (source, target) async {
+            if (++copied > 10000) return '目录条目超过 10000，拒绝跨盘复制';
+            final sourceDenial =
+                await _freshDenial(source, source, mode: LocalAccessMode.read);
+            if (sourceDenial != null) return sourceDenial;
+            return _freshDenial(target, target);
+          });
+        } else {
+          if (await _freshDenial(rawDst, dstPath) != null) {
+            return await failWithRestore('目标写入授权已失效，跨盘复制未执行');
+          }
+          await File(srcPath).copy(dstPath);
+        }
+        final sourceDenial =
+            await _freshDenial(rawSrc, srcPath, mode: LocalAccessMode.read);
+        final deleteDenial = await _freshDenial(rawSrc, srcPath);
+        final treeDenial = type == _PathKind.directory
+            ? await _verifyMutationTree(srcPath, rawSrc, srcPath)
+            : null;
+        if (sourceDenial != null ||
+            deleteDenial != null ||
+            treeDenial != null) {
+          return await failWithRestore(
+              '复制后源授权失效，未删除源: ${sourceDenial ?? deleteDenial ?? treeDenial}');
+        }
+        if (type == _PathKind.directory) {
           await Directory(srcPath).delete(recursive: true);
         } else {
-          await File(srcPath).copy(dstPath);
           await File(srcPath).delete();
         }
+        final backupWarning = await cleanupOverwriteBackup();
         return ToolResult.success(
-          '本机移动成功（跨盘，已用复制+删除）: $srcPath -> $dstPath',
+          '本机移动成功（跨盘，已用复制+删除）: $srcPath -> $dstPath$backupWarning',
           restoreFrom: dstPath,
           restoreTo: srcPath,
         );
       } catch (e2) {
-        return ToolResult.failure('移动失败: $e\n退化复制也失败: $e2');
+        return await failWithRestore('移动失败: $e\n退化复制也失败: $e2');
       }
     }
+    final backupWarning = await cleanupOverwriteBackup();
     return ToolResult.success(
-      '本机移动成功: $srcPath -> $dstPath',
+      '本机移动成功: $srcPath -> $dstPath$backupWarning',
       restoreFrom: dstPath,
       restoreTo: srcPath,
     );
@@ -940,7 +1151,7 @@ class LocalFileMoveTool extends LocalFileTool {
 
 /// 删除本机文件（默认移入回收目录）
 class LocalFileDeleteTool extends LocalFileTool {
-  LocalFileDeleteTool({super.extraRoots});
+  LocalFileDeleteTool({super.extraRoots, super.policyLoader});
 
   @override
   String get name => 'local_file_delete';
@@ -978,7 +1189,9 @@ class LocalFileDeleteTool extends LocalFileTool {
     required ToolArgs args,
     void Function(String message)? onProgress,
   }) async {
-    final resolved = await _resolve(args.getString('path'), _policy);
+    final policy = _policy;
+    final rawPath = args.getString('path');
+    final resolved = await _resolveWrite(rawPath, policy);
     if (resolved is ToolResult) return resolved;
     final path = (resolved as LocalPathDecision).resolved;
 
@@ -991,8 +1204,21 @@ class LocalFileDeleteTool extends LocalFileTool {
     if (isDir && !recursive) {
       return ToolResult.failure('$path 是目录。确认要连内容一起删除请传 recursive: true。');
     }
+    final treeDenial = await _verifyMutationTree(path, rawPath, path);
+    if (treeDenial != null) {
+      return ToolResult.failure('删除被拒绝: $path\n原因: $treeDenial');
+    }
 
     if (args.getBool('hard')) {
+      final denial = await _freshDenial(rawPath, path);
+      if (denial != null) return ToolResult.failure('授权已失效，未删除: $denial');
+      if (_kindOf(path) != type) {
+        return ToolResult.failure('路径类型在删除前发生变化，已中止: $path');
+      }
+      final finalTreeDenial = await _verifyMutationTree(path, rawPath, path);
+      if (finalTreeDenial != null) {
+        return ToolResult.failure('删除前目录复检失败: $finalTreeDenial');
+      }
       try {
         await _deleteRecursively(path);
         return ToolResult.success('已永久删除: $path');
@@ -1005,10 +1231,41 @@ class LocalFileDeleteTool extends LocalFileTool {
     // 回收区目录名由 LocalFilePolicy 统一定义并列为保留目录 —— 工具自身走
     // rename 写入不经过策略判定，但 AI 用其它 local_* 工具碰它会被拒。
     final trashRoot = p.join(p.dirname(path), LocalFilePolicy.trashDirName);
-    final stamp = DateTime.now().millisecondsSinceEpoch;
-    final target = p.join(trashRoot, '$stamp', p.basename(path));
+    final beforeCreate = await _freshDenial(rawPath, path);
+    if (beforeCreate != null) {
+      return ToolResult.failure('授权已失效，未移入回收区: $beforeCreate');
+    }
+    String target;
     try {
-      await Directory(p.join(trashRoot, '$stamp')).create(recursive: true);
+      if (await FileSystemEntity.isLink(trashRoot)) {
+        return ToolResult.failure('回收区是符号链接，拒绝移入: $trashRoot');
+      }
+      var canonicalTrashRoot = p.normalize(trashRoot);
+      if (await FileSystemEntity.isDirectory(trashRoot)) {
+        canonicalTrashRoot = await Directory(trashRoot).resolveSymbolicLinks();
+        if (!_samePathIdentity(canonicalTrashRoot, trashRoot)) {
+          return ToolResult.failure('回收区路径身份发生变化，拒绝移入: $trashRoot');
+        }
+      } else if (await FileSystemEntity.type(trashRoot) !=
+          FileSystemEntityType.notFound) {
+        return ToolResult.failure('回收区不是目录，拒绝移入: $trashRoot');
+      }
+
+      final stamp = DateTime.now().microsecondsSinceEpoch;
+      final stampDir = Directory(p.join(canonicalTrashRoot, '$stamp'));
+      await stampDir.create(recursive: true);
+      final canonicalStamp = await stampDir.resolveSymbolicLinks();
+      if (!_samePathIdentity(p.dirname(canonicalStamp), canonicalTrashRoot)) {
+        return ToolResult.failure('回收区子目录身份校验失败，拒绝移入: $canonicalStamp');
+      }
+      target = p.join(canonicalStamp, p.basename(path));
+      final beforeMove = await _freshDenial(rawPath, path);
+      if (beforeMove != null) {
+        return ToolResult.failure('授权已失效，未移入回收区: $beforeMove');
+      }
+      if (_kindOf(path) != type) {
+        return ToolResult.failure('路径类型在移动前发生变化，已中止: $path');
+      }
       if (isDir) {
         await Directory(path).rename(target);
       } else {
@@ -1037,6 +1294,14 @@ _PathKind _kindOf(String path) {
   return _PathKind.missing;
 }
 
+bool _samePathIdentity(String a, String b) {
+  final left = p.normalize(a);
+  final right = p.normalize(b);
+  return Platform.isWindows
+      ? left.toLowerCase() == right.toLowerCase()
+      : left == right;
+}
+
 Future<void> _deleteRecursively(String path) async {
   final type = _kindOf(path);
   if (type == _PathKind.directory) {
@@ -1046,12 +1311,19 @@ Future<void> _deleteRecursively(String path) async {
   }
 }
 
-Future<void> _copyDirectory(Directory src, Directory dst) async {
+Future<void> _copyDirectory(
+  Directory src,
+  Directory dst, {
+  Future<String?> Function(String source, String target)? validate,
+}) async {
   await dst.create(recursive: true);
   await for (final e in src.list(recursive: false, followLinks: false)) {
     final target = p.join(dst.path, p.basename(e.path));
+    final denial = await validate?.call(e.path, target);
+    if (denial != null) throw FileSystemException(denial);
     if (e is Directory) {
-      await _copyDirectory(e, Directory(target));
+      await _copyDirectory(Directory(e.path), Directory(target),
+          validate: validate);
     } else if (e is File) {
       await e.copy(target);
     }
@@ -1060,7 +1332,7 @@ Future<void> _copyDirectory(Directory src, Directory dst) async {
 
 /// 注册本地文件工具到注册表
 ///
-/// 单独成函数是因为它们需要 [extraRoots] 提供者（项目根），而其它工具不需要。
+/// 单独成函数是因为它们可选接收 [extraRoots] 提供者，而其它工具不需要。
 void registerLocalFileTools(
   AgentToolRegistry registry, {
   List<String> Function()? extraRoots,

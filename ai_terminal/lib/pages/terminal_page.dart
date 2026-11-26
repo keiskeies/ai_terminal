@@ -71,7 +71,7 @@ import '../services/command_executor.dart';
 import '../services/server_monitor_service.dart';
 import '../services/change_record_service.dart';
 import '../services/change_window_service.dart';
-import '../services/local_file_policy.dart';
+import '../services/local_access.dart';
 import '../services/session_log_service.dart';
 import '../services/port_forward_service.dart';
 import '../widgets/port_forward_dialog.dart';
@@ -5137,27 +5137,24 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     ).whenComplete(disposeController);
   }
 
-  /// 本机目录授权弹窗 —— local_exec 的 cwd 不在白名单时走这里。
-  ///
-  /// 弹窗必须列出具体路径、原因和“会开启本地文件访问并授权该目录”，
-  /// 不能静默扩权；敏感路径在工具层就被拒绝，不会走到这里。
-  Future<bool> _requestLocalDir(String path, String reason) async {
+  /// 本机目录权限弹窗。只返回当前任务的一次性确认，不修改长期白名单。
+  /// 敏感路径在工具层就被拒绝，不会走到这里。
+  Future<bool> _requestLocalDir(
+    String path,
+    String reason,
+    LocalAccessMode mode,
+  ) async {
     if (!mounted) return false;
     final ui = AgentUiText.of(context);
     final approved = await showLocalDirAuthDialog(
       context,
       path: path,
       reason: reason,
+      mode: mode,
     );
     if (!approved || !mounted) return false;
-    // 弹窗期间任务可能已被取消：不再保存授权，也不让工具继续执行
+    // 弹窗期间任务可能已被取消；引擎授权服务还会按代际再次复核。
     if (!ref.read(agentProvider).isRunning) return false;
-
-    final policy = LocalFilePolicy.load();
-    final dirs = [...policy.allowedDirs];
-    if (!dirs.contains(path)) dirs.add(path);
-    await policy.copyWith(enabled: true, allowedDirs: dirs).save();
-    if (!mounted) return true;
     showTopSnackBar(
       context,
       SnackBar(

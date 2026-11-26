@@ -67,6 +67,7 @@ dependencies:
   # 图表（服务器监控面板的 CPU/内存/带宽折线图）
   fl_chart: ^0.68.0
   desktop_drop: ^0.8.4
+  sqflite_sqlcipher: 3.4.1
 
 dev_dependencies:
   flutter_test:

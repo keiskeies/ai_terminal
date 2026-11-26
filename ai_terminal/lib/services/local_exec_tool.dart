@@ -9,6 +9,7 @@ import '../utils/local_shell.dart';
 import '../utils/tool_args_parser.dart';
 import 'agent_tool.dart';
 import 'command_executor.dart';
+import 'local_access.dart';
 import 'local_file_policy.dart';
 import '../core/l10n_holder.dart';
 
@@ -108,62 +109,6 @@ class LocalExecTool extends AgentTool {
       return ToolResult.failure('cwd 必须是绝对路径（收到: $rawCwd）。不要使用 . 或相对路径。');
     }
 
-    // ── 1. 目录白名单 + 敏感黑名单 ──────────────────────────────
-    var policy = _policyLoader();
-    var decision = policy.decide(cwd);
-    switch (decision.verdict) {
-      case LocalPathVerdict.sensitive:
-      case LocalPathVerdict.reserved:
-      case LocalPathVerdict.escape:
-        return ToolResult.failure(
-            '本机目录被安全策略拒绝: ${decision.resolved}\n原因: ${decision.reason ?? '敏感路径'}');
-      case LocalPathVerdict.allowed:
-        break;
-      case LocalPathVerdict.notInAllowlist:
-        final request = localDirAuthorizationRequest;
-        if (request == null) {
-          return ToolResult.failure('本机目录未授权: ${decision.resolved}\n'
-              '原因: ${decision.reason ?? '不在授权目录内'}\n'
-              '请让用户在 设置 → Agent → 本地文件 中添加该目录，或改用远程 execute。');
-        }
-        final willCreate = !Directory(decision.resolved).existsSync();
-        final approved = await request(
-          decision.resolved,
-          'local_exec 需要在该目录执行本机命令：${_clipForProgress(command)}'
-          '${willCreate ? '（目录不存在，允许后将创建）' : ''}',
-        );
-        if (!approved) {
-          return ToolResult.failure('用户拒绝授权本机目录: ${decision.resolved}，命令未执行。'
-              '请用 ask 询问用户是否授权，或改用远程 execute；不要反复重试同一目录。');
-        }
-        // 弹窗确认后页面已写回 LocalFilePolicy，重新读取再判定
-        policy = _policyLoader();
-        decision = policy.decide(cwd);
-        if (!decision.isAllowed) {
-          return ToolResult.failure('授权后仍无法访问本机目录: ${decision.resolved}\n'
-              '原因: ${decision.reason ?? '未通过白名单判定'}');
-        }
-        break;
-    }
-
-    final resolvedCwd = decision.resolved;
-
-    // 目录授权弹窗可能停留很久；用户期间取消任务时，不能再创建目录/执行命令。
-    if (isTaskActive?.call() == false) {
-      return ToolResult.failure('任务已取消，本机命令未执行。');
-    }
-
-    final dir = Directory(resolvedCwd);
-    if (!await dir.exists()) {
-      try {
-        await dir.create(recursive: true);
-        onProgress?.call(L10n.str.ut_cf4b2fdeb1(resolvedCwd));
-      } catch (e) {
-        return ToolResult.failure(L10n.str.ut_93ba05fcda(resolvedCwd, e));
-      }
-    }
-
-    // ── 2. Shell / 超时 ────────────────────────────────────────
     final rawShell = args.getString('shell').trim();
     final parsedShell = parseLocalShell(rawShell);
     if (rawShell.isNotEmpty && parsedShell == null) {
@@ -182,14 +127,81 @@ class LocalExecTool extends AgentTool {
     final timeoutSeconds =
         args.getInt('timeout', defaultValue: 120).clamp(1, 600).toInt();
 
-    // ── 3. 审计（执行前）──────────────────────────────────────
+    // ── 1. 目录授权 + 敏感黑名单 ──────────────────────────────
+    final policy = _policyLoader();
+    final initial = policy.decide(cwd);
+    final willCreate = !Directory(initial.resolved).existsSync();
+    final decision = await authorizeLocalPath(
+      rawPath: cwd,
+      mode: LocalAccessMode.execute,
+      access: localAccess,
+      policy: policy,
+      reason: 'local_exec 需要在该目录执行本机命令：${_clipForProgress(command)}'
+          '${willCreate ? '（目录不存在，允许后将创建）' : ''}',
+    );
+    if (isTaskActive?.call() == false) {
+      return ToolResult.failure('任务已取消，本机命令未执行。');
+    }
+    if (!decision.isAllowed) {
+      final prefix = switch (decision.verdict) {
+        LocalPathVerdict.sensitive => '敏感路径禁止访问',
+        LocalPathVerdict.reserved => '系统保留目录',
+        LocalPathVerdict.notInAllowlist => '本机目录未授权',
+        LocalPathVerdict.escape => '路径跳出授权目录',
+        LocalPathVerdict.allowed => '路径不可用',
+      };
+      return ToolResult.failure('$prefix: ${decision.resolved}\n'
+          '原因: ${decision.reason ?? '未通过授权判定'}\n'
+          '单次确认只对当前任务生效；也可在设置中配置长期目录，或改用远程 execute。');
+    }
+
+    final resolvedCwd = decision.resolved;
+    bool authorizationStillValid() {
+      if (isTaskActive?.call() == false) return false;
+      final rechecked = verifyLocalPathAccess(
+        rawPath: cwd,
+        expectedResolved: resolvedCwd,
+        mode: LocalAccessMode.execute,
+        access: localAccess,
+        policy: policy,
+      );
+      return rechecked.isAllowed && rechecked.resolved == resolvedCwd;
+    }
+
+    if (!authorizationStillValid()) {
+      return ToolResult.failure('任务已取消或本机目录授权已变化，命令未执行: $resolvedCwd');
+    }
+
+    final dir = Directory(resolvedCwd);
+    if (!await dir.exists()) {
+      try {
+        await dir.create(recursive: true);
+        onProgress?.call(L10n.str.ut_cf4b2fdeb1(resolvedCwd));
+      } catch (e) {
+        return ToolResult.failure(L10n.str.ut_93ba05fcda(resolvedCwd, e));
+      }
+    }
+
+    if (!authorizationStillValid()) {
+      return ToolResult.failure('本机目录授权在创建后发生变化，命令未执行: $resolvedCwd');
+    }
+
+    // ── 2. 审计（执行前）──────────────────────────────────────
     final safetyLevel = SafetyGuard.check(command);
+    final auditMetadata = AuditLogger.commandMetadata(
+      command: command,
+      permissionMode: permissionMode,
+    );
     await AuditLogger.log(
       hostId: localHostId,
       command: command,
       safetyLevel: safetyLevel.name,
       executed: false,
+      metadata: auditMetadata,
     );
+    if (!authorizationStillValid()) {
+      return ToolResult.failure('任务已取消或本机目录授权已失效，命令未执行: $resolvedCwd');
+    }
 
     onProgress?.call(L10n.str
         .ut_bb63c6672a(localShellLabel(shell), _clipForProgress(command)));
@@ -220,6 +232,7 @@ class LocalExecTool extends AgentTool {
       safetyLevel: safetyLevel.name,
       output: _clipForAudit(auditOutput),
       executed: true,
+      metadata: auditMetadata,
     );
 
     // ── 5. 结果反馈 ───────────────────────────────────────────

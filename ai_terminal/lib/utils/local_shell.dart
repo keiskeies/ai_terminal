@@ -174,24 +174,51 @@ Future<LocalCommandResult> runLocalCommand({
   required LocalShellKind shell,
   required Duration timeout,
   Completer<void>? cancelToken,
-}) async {
+}) {
   final invocation = buildLocalShellInvocation(shell, command);
+  return runLocalProcess(
+    executable: invocation.executable,
+    args: invocation.args,
+    cwd: cwd,
+    timeout: timeout,
+    cancelToken: cancelToken,
+    encoding: shell == LocalShellKind.cmd
+        ? systemEncoding
+        : const Utf8Codec(allowMalformed: true),
+  );
+}
+
+typedef LocalProcessRunner = Future<LocalCommandResult> Function({
+  required String executable,
+  required List<String> args,
+  required String cwd,
+  required Duration timeout,
+  Completer<void>? cancelToken,
+  Encoding? encoding,
+});
+
+/// 直接启动进程，不经过 shell；路径和参数不会被重新解释。
+Future<LocalCommandResult> runLocalProcess({
+  required String executable,
+  required List<String> args,
+  required String cwd,
+  required Duration timeout,
+  Completer<void>? cancelToken,
+  Encoding? encoding,
+}) async {
   final stopwatch = Stopwatch()..start();
   final process = await Process.start(
-    invocation.executable,
-    invocation.args,
+    executable,
+    args,
     workingDirectory: cwd,
     runInShell: false,
   );
-  // 非交互：立即关闭 stdin，避免 grep/docker 等命令等待输入把任务挂死
   unawaited(process.stdin.close().catchError((Object _) {}));
 
-  final encoding = shell == LocalShellKind.cmd
-      ? systemEncoding
-      : const Utf8Codec(allowMalformed: true);
+  final outputEncoding = encoding ?? const Utf8Codec(allowMalformed: true);
   const captureCap = 200000;
-  final outFuture = _capture(process.stdout, encoding, captureCap);
-  final errFuture = _capture(process.stderr, encoding, captureCap);
+  final outFuture = _capture(process.stdout, outputEncoding, captureCap);
+  final errFuture = _capture(process.stderr, outputEncoding, captureCap);
 
   var cancelled = false;
   var processDone = false;
