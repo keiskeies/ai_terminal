@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.5.3-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.5.5-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.5.3</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>Download v1.5.5</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">Visit the website</a>
 </p>
@@ -53,6 +53,18 @@ A chat assistant tells you what to run. AI Terminal runs it on your servers and 
 ## At a glance
 
 `5 platforms` · `14 UI languages` · `22 AI providers` · `90+ preset models` · `27 built-in tools` · `8 slash commands` · `11 web search backends`
+
+## New in 1.5.5
+
+This release buries three classes of hazard in the command execution path — hangs, fake successes, and forged completion markers — and lands a full security-hardening pass: host key verification, command intent grading, and encrypted mobile databases.
+
+- **Unclosed commands never reach the terminal** — a missing quote or heredoc terminator leaves the shell parked at PS2 waiting for input, so the completion marker never fires and the task stares down a timeout. A static shell-syntax precheck now rejects these before dispatch with a repair suggestion; two consecutive rejects of the same kind stop the task and ask for a human. Perpetually blocking commands (`tail -f`, `top`, vim) are intercepted the same way and answered with one-shot equivalents (`tail -n 50`, `ps aux`); three fully-blocked rounds hard-stop the task instead of burning AI turns.
+- **Fake successes stop fooling the AI** — trailing `&` background jobs and modifying pipelines report the exit code of only the last segment, so the model used to receive a confident "success" observation for work that never ran. Those unreliable-exit-code commands are now intercepted with rewrite suggestions, while read-only query pipelines (`ps | head`) still pass through.
+- **Completion markers can't be forged** — the exit-code marker now carries a per-execution random nonce, so text like `EXITCODE_1:0` appearing in command output (e.g. from grepping old logs) no longer reads as "command finished" and truncates the real output.
+- **Ctrl+C stops misfiring** — after an interrupt the app waits 300ms before sending the follow-up newline, so an empty password never feeds sudo and a dangling continuation state can't swallow the next command.
+- **Host key verification everywhere** — SSH/SFTP direct and jump-host connections confirm the fingerprint on first use (TOFU) and refuse to connect when it changes; known_hosts import and export included.
+- **Command intent admits uncertainty** — safety grading gained an unknown verdict, local directory access became task-scoped authorization, and destructive operations confirm by severity.
+- **Encrypted databases on mobile** — the Android/iOS local database moves fully behind SQLCipher with keys in Keystore/Keychain, rotation and migration support; `fetch_url` gained SSRF protection; a failed database init now shows a readable failure page instead of a white screen.
 
 ## New in 1.5.3
 
@@ -230,11 +242,11 @@ Get the latest build from [GitHub Releases](https://github.com/keiskeies/ai_term
 
 | Platform | File |
 |---|---|
-| macOS | `AI_Terminal_v1.5.3_macOS.zip` |
-| iOS | `AI_Terminal_v1.5.3_iOS.ipa` (unsigned) |
-| Android | `AI_Terminal_v1.5.3_Android.apk` |
-| Windows | `AI_Terminal_v1.5.3_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.5.3_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.5.5_macOS.zip` |
+| iOS | `AI_Terminal_v1.5.5_iOS.ipa` (unsigned) |
+| Android | `AI_Terminal_v1.5.5_Android.apk` |
+| Windows | `AI_Terminal_v1.5.5_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.5.5_Linux_x64.tar.gz` |
 
 If macOS reports that the developer cannot be verified:
 

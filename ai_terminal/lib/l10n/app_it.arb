@@ -442,7 +442,7 @@
   "settingsSnippets": "Comandi di scelta rapida",
   "settingsSnippetsDesc": "Salva i comandi utilizzati di frequente ed eseguili con un clic la prossima volta",
   "settingsTitle": "impostazioni",
-  "settingsVersion": "Versione 1.5.3",
+  "settingsVersion": "Versione 1.5.5",
   "simplifiedChinese": "简体中文",
   "snippetCommandHint": "Ad esempio: docker exec -it '{container}' /bin/bash",
   "snippetCommandLabel": "Comando:",

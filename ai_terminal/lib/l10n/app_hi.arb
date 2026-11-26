@@ -442,7 +442,7 @@
   "settingsSnippets": "शॉर्टकट कमांड",
   "settingsSnippetsDesc": "बार-बार उपयोग किए जाने वाले आदेशों को सहेजें और अगली बार एक क्लिक से उन्हें निष्पादित करें",
   "settingsTitle": "सेटिंग्स",
-  "settingsVersion": "संस्करण 1.5.3",
+  "settingsVersion": "संस्करण 1.5.5",
   "simplifiedChinese": "简体中文",
   "snippetCommandHint": "उदाहरण के लिए: docker exec -it '{container}' /bin/bash",
   "snippetCommandLabel": "आदेश:",

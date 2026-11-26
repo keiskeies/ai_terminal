@@ -210,18 +210,19 @@ jobs:
 
             AI Terminal 是一款将 AI 助手与 SSH / 本地终端深度集成的跨平台应用。无论你是刚买服务器的小白、不想记命令的开发者、还是需要批量管理服务器的运维人员——打开它，用中文告诉 AI 你要干什么，它帮你连服务器、跑命令、装软件、查问题。全程安全可控。
 
-            ### 🆕 v1.5.3 断连不再让用户干等
+            ### 🆕 v1.5.5 命令不再卡死、假成功、被伪造
 
-            Agent 一次任务要等几十条命令，最可怕的从来不是命令失败，而是链路静默失效——用户体感是「卡住干等到超时」。1.5.3 把它改成秒级发现、任务续跑，顺手让会话列表和命令卡都说得清自己在干什么。
+            这一版埋掉命令执行链路里的三类隐患——卡住、假成功、被伪造——外加一轮安全加固落地：主机密钥验证、命令意图分级、移动端数据库加密。
 
-            - **半开断连秒级发现**：NAT 悄悄回收映射、服务器掉电时客户端收不到 FIN/RST，旧检测全部失效——探活写的是即发即忘的 PTY 换行（永不抛错），断线事件只由输出流的 onDone 驱动（半开时根本不会来）。等待期改由活性看门狗接管：输出静默达阈值才发传输层 ping（自带超时、连续 2 次失败才判死），如实以「已断连」收尾，不再把断线压成「超时」
-            - **任务跑一半也能自动重连续跑**：重连不再被「任务运行中」一口拒掉（旧逻辑只有那一个入口，拒掉就没有下一次），改为只换执行器、不碰任务与终端视图；退避窗口 7s→63s 覆盖对端重启。重连成功按 tab 通知对应引擎：放宽连续失败预算，并注入一次性「新会话状态已丢失」提示，防止盲目重跑非幂等命令
-            - **连接配置不再骗人**：连接超时滑杆此前只存而不用，现在真正生效；建连自建 socket 下发 TCP keepalive（Windows 尽力而为）；初始化串中和 TMOUT，等保基线常见的 300s 空闲登出不会再半路踢掉你的 shell
-            - **会话标题看得出了**：占位标题从 20 字扩到首条诉求前 50 字、历史列表按 60 字两行展示；首轮结束后由 AI 自动命名，你改过名的会话永不再覆盖（新增来源门控，存量会话统一视为用户命名）；首轮报错、次轮才成功的会话用真正的结论命名，不会把警告符写进标题
-            - **命令卡知道自己在跑**：引擎执行一条 25 秒的命令时卡片此前一直挂着「可执行」——运行信号改由任务阶段推导，头部换成「执行中」+ 进度圈 + 秒级刷新的已用时间（12s / 3m05s），计时从真正开始执行的那一刻算起，不把等待确认的时间混进耗时
-            - **各平台包名统一**：Android applicationId 与 iOS/macOS bundle id 收拢到统一标识、清除 com.example 残留，Android/iOS 桌面显示名与其他平台对齐，升级安装不再并存两个 App
+            - **未闭合命令不再进终端**：少半个引号、缺结束行的 heredoc 会把 shell 停在 PS2 等输入，完成标记永不出现，用户体感是卡住干等到超时。下发前先做静态语法判定，未闭合命令直接打回并附补全建议，同类错误连犯两次即停机请求人工；tail -f / top / vim 等持续阻塞命令同批拦截，回灌一次性等价建议（tail -n 50 / ps aux）；连续 3 轮全被拦则任务硬停止，不再空烧 AI 轮次
+            - **假成功不再骗过 AI**：结尾 & 后台与修改类管道的退出码只取最后一段，AI 曾据此收到「成功」的假观测；这类命令现在下发前拦截并回灌改写建议，纯只读查询管道（ps | head 等）照常放行，不误伤
+            - **完成标记伪造不了**：退出码 marker 换成每次执行随机 nonce，命令输出里出现旧格式文本（比如 grep 到旧日志）不再被误判为命令完成，真实输出不再被提前截断
+            - **Ctrl+C 之后不再误伤**：中断后等 300ms 再补换行，空密码不会喂给 sudo，残留续行状态也吞不掉下一条命令
+            - **主机密钥验证全面落地**：SSH/SFTP 直连与跳板首连确认信任（TOFU），指纹变更即告警拒连；known_hosts 支持导入导出
+            - **命令意图与移动端加密**：命令分级新增 unknown 语义、本地目录访问改任务级授权、破坏性操作按破坏程度确认；Android/iOS 本地库整体 SQLCipher 加密，密钥入 Keystore/Keychain 并支持轮换与迁移；fetch_url 增加 SSRF 防护；数据库初始化失败给出可读失败页而非白屏
 
             #### 📁 继续包含
+            - v1.5.3 的断连治理：半开断连秒级发现、任务跑一半也能自动重连续跑、连接超时配置真正生效、会话标题自动命名、命令卡执行中态与实时耗时、各平台包名统一
             - v1.5.2 的引擎架构治理：单文件引擎拆成各自带单测的分层（`ReActParser` / `EventStore` / `HistoryPolicy` / `PromptBuilder` / `TerminationGuard` / `CommandRunner` / `ToolOrchestrator`），全部终态写入收口到一个守卫并固化「终态硬禁令基线归零」，安全门禁学会 Windows（只读档拦下 `Set-Content` / `Out-File` / `Remove-Item`，分级前剥离 `powershell -Command` 包装），约 200 处硬编码色改为主题感知令牌让浅色主题全线达标
             - v1.5.1 的观测链路重建：失败命令把真实输出、退出码与失败分类交回模型，清洗不再吃掉 `[INFO]` 与 JSON，退出码不再跨命令串值，半截响应与纯分析正文一律不执行，无事件的老会话改结构化渲染，联网搜索设置改成行内抽屉，内置命令知识库整体下线
             - v1.5.0 的操作单国际化：188 个成员改走 ARB 键、14 种语言全覆盖、单复数拆成独立键、MCP 数字插值改模板键
@@ -301,18 +302,19 @@ jobs:
 
             AI Terminal is a cross-platform app that deeply integrates an AI assistant with SSH and local terminals. Whether you're a beginner who just rented a VPS, a developer tired of googling commands, or a DevOps engineer managing dozens of servers — open it, tell the AI what you want in plain English (or Chinese), and it handles the rest. Safe, transparent, and under your control.
 
-            ### 🆕 What's New in v1.5.3 · No More Staring at a Dead Connection
+            ### 🆕 What's New in v1.5.5 · Commands Stop Hanging, Faking Success, and Being Forged
 
-            One agent task waits on dozens of commands, and the worst failure is not a command erroring out but the link going silent — the user just watches a spinner until something times out. 1.5.3 detects that in seconds and lets the task carry on, and makes the session list and the command cards say what they are actually doing.
+            This release buries three classes of hazard in the command execution path — hangs, fake successes, and forged completion markers — and lands a full security pass: host key verification, command intent grading, and encrypted mobile databases.
 
-            - **Half-open disconnects surface in seconds**: when a NAT drops its mapping or a server loses power, no FIN/RST ever reaches the client and every previous check missed it — the keepalive wrote a fire-and-forget newline into the PTY (which cannot throw) while disconnects came only from the output stream's onDone (which never arrives half-open). An activity watchdog now owns the waiting period: only after output stays quiet past a threshold does it send a transport-level ping, with its own timeout and two consecutive failures before the link is declared dead, so a task closes honestly as disconnected instead of being dressed up as a timeout
-            - **Reconnect mid-task and keep going**: reconnecting is no longer refused outright while a task runs — that was the single entry point, so refusing once meant never retrying. It now swaps only the executor, leaving the task and the terminal view untouched, and the backoff window grows from 7s to 63s to cover a peer restart. On success the engine for that tab is told: the consecutive-failure budget relaxes and a one-shot "the new session lost its state" note lands in the conversation so a non-idempotent command is never blindly re-run
-            - **Connection settings stop lying**: the connection-timeout slider used to be stored and ignored, and now applies; sockets request TCP keepalive at connect time (best effort on Windows); initialization neutralizes TMOUT, so the 300s idle logout common in hardening baselines no longer kicks your shell out mid-task
-            - **Session titles become readable**: the placeholder takes the first 50 characters of the opening request instead of a hard 20, and the history list shows 60 across two lines; the AI names a session after its first completed turn but never overwrites a name you set (new titleSource gate, existing rows treated as user-named); a session that errors on turn one and succeeds on turn two is named from the real answer, so "⚠️" never lands in a title
-            - **Command cards know they are running**: while the engine ran a 25-second command the card still read "executable" — the running signal now derives from the task phase, so the header shows "running" with a progress ring and elapsed time refreshing every second (12s / 3m05s), measured from when execution actually starts rather than including the confirmation wait
-            - **One bundle id per platform**: the Android applicationId and the iOS/macOS bundle identifiers move under one namespace with the com.example leftovers removed, and the Android/iOS display names match the other platforms, so an upgrade no longer leaves two apps side by side
+            - **Unclosed commands never reach the terminal**: a missing quote or heredoc terminator parks the shell at PS2 waiting for input, the completion marker never fires, and the user stares at a spinner until timeout. A static syntax precheck now rejects these before dispatch with a repair suggestion; two consecutive rejects of the same kind stop the task and ask for a human. Perpetually blocking commands (tail -f, top, vim) are intercepted the same way and answered with one-shot equivalents (tail -n 50, ps aux); three fully-blocked rounds hard-stop the task instead of burning AI turns
+            - **Fake successes stop fooling the AI**: trailing & background jobs and modifying pipelines report only the last segment's exit code, so the model used to receive a confident "success" observation for work that never ran. Those commands are now intercepted with rewrite suggestions, while read-only query pipelines (ps | head) still pass through
+            - **Completion markers can't be forged**: the exit-code marker now carries a per-execution random nonce, so text like the old marker format appearing in output (e.g. from grepping old logs) no longer reads as "command finished" and truncates the real output
+            - **Ctrl+C stops misfiring**: after an interrupt the app waits 300ms before the follow-up newline, so an empty password never feeds sudo and a dangling continuation state cannot swallow the next command
+            - **Host key verification everywhere**: SSH/SFTP direct and jump-host connections confirm the fingerprint on first use (TOFU) and refuse to connect when it changes; known_hosts import and export included
+            - **Command intent and mobile encryption**: safety grading gained an unknown verdict, local directory access became task-scoped authorization, destructive operations confirm by severity; the Android/iOS local database moves fully behind SQLCipher with keys in Keystore/Keychain plus rotation and migration; fetch_url gained SSRF protection; a failed database init now shows a readable failure page instead of a white screen
 
             #### 📁 Still included
+            - The v1.5.3 disconnect program: half-open disconnects surfaced in seconds, reconnect-and-continue mid-task, connection settings that actually apply, AI session naming, running-state command cards with live elapsed time, and one bundle id per platform
             - The v1.5.2 engine governance program: the single-file agent split into unit-tested layers (`ReActParser`, `EventStore`, `HistoryPolicy`, `PromptBuilder`, `TerminationGuard`, `CommandRunner`, `ToolOrchestrator`), every terminal-state write funneled through one guard with the task-revival race pinned at a zero baseline, safety grading that finally understands Windows (read-only mode blocks `Set-Content` / `Out-File` / `Remove-Item`, and `powershell -Command "…"` unwraps before grading), and roughly 200 hard-coded colors replaced by theme-aware tokens so light theme meets contrast
             - The v1.5.1 observation rebuild: failed commands report their real output, exit code and failure category to the model, sanitizing stops eating `[INFO]` and JSON, exit codes stop bleeding across commands, half-streamed responses and analysis prose never execute, event-less sessions render structurally, web search settings became an inline drawer, and the bundled command knowledge base was retired
             - The v1.5.0 operation sheet localization: all 188 members resolved through ARB keys in 14 languages, singulars split into separate keys, and MCP count interpolation moved to template keys

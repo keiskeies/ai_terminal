@@ -442,7 +442,7 @@
   "settingsSnippets": "أوامر الاختصار",
   "settingsSnippetsDesc": "احفظ الأوامر المستخدمة بشكل متكرر وقم بتنفيذها بنقرة واحدة في المرة القادمة",
   "settingsTitle": "الإعدادات",
-  "settingsVersion": "الإصدار 1.5.3",
+  "settingsVersion": "الإصدار 1.5.5",
   "simplifiedChinese": "简体中文",
   "snippetCommandHint": "على سبيل المثال: docker exec -it '{container}' /bin/bash",
   "snippetCommandLabel": "الأمر:",

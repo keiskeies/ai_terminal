@@ -10,7 +10,7 @@
     <a href="https://github.com/keiskeies/ai_terminal/issues">Issues</a>
   </p>
   <p align="center">
-    <img src="https://img.shields.io/badge/version-1.5.3-orange?style=flat-square" alt="Version" />
+    <img src="https://img.shields.io/badge/version-1.5.5-orange?style=flat-square" alt="Version" />
     <img src="https://img.shields.io/badge/Flutter-3.47.8-02569B?style=flat-square&logo=flutter" alt="Flutter" />
     <img src="https://img.shields.io/badge/platforms-5-green?style=flat-square" alt="Platforms" />
     <img src="https://img.shields.io/badge/languages-14-blue?style=flat-square" alt="Languages" />
@@ -33,7 +33,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.5.3</strong></a>
+  <a href="https://github.com/keiskeies/ai_terminal/releases"><strong>下载最新版 v1.5.5</strong></a>
   ·
   <a href="https://ai-terminal.keiskei.top">访问官网</a>
 </p>
@@ -53,6 +53,18 @@
 ## 一眼看懂
 
 `5 个平台` · `14 种界面语言` · `22 个 AI 供应商` · `90+ 预设模型` · `27 个内置工具` · `8 个斜杠命令` · `11 种联网搜索后端`
+
+## 1.5.5 新增
+
+这一版埋掉了命令执行链路里的三类隐患——卡住、假成功、被伪造——外加一轮安全加固落地：主机密钥验证、命令意图分级、移动端数据库加密。
+
+- **未闭合命令不再进终端**——少半个引号、缺结束行的 heredoc 会把 shell 停在 PS2 等输入，完成标记永不出现，干等到超时。现在下发前先做 shell 语法静态判定：未闭合命令直接打回并附上补全建议，同类错误连犯两次即停机请求人工介入。`tail -f` / `top` / vim 这类持续阻塞命令同样下发前拦截，回灌 `tail -n 50` / `ps aux` 等一次性等价建议；连续 3 轮全部被拦则任务硬停止，不再空烧 AI 轮次
+- **假成功不再骗过 AI**——结尾 `&` 后台与修改类管道的退出码只取最后一段，AI 曾据此收到「成功」的假观测。现在这类退出码不可靠的命令下发前拦截并回灌改写建议；纯只读查询管道（`ps | head` 等）照常放行，不误伤
+- **完成标记伪造不了**——退出码 marker 换成每次执行带随机 nonce 的格式，命令输出里出现 `EXITCODE_1:0` 这类文本（比如 grep 到旧日志）不再被误判为命令完成，真实输出不再被提前截断
+- **Ctrl+C 之后不再误伤**——中断后等 300ms 再补换行，避免空密码喂给 sudo、避免残留续行状态吞掉下一条命令
+- **主机密钥验证全面落地**——SSH/SFTP 直连与跳板首连确认信任（TOFU），指纹变更即告警拒连；known_hosts 支持导入导出
+- **命令意图认得「不确定」**——命令分级新增 unknown 语义，本地目录访问改为任务级授权，破坏性操作按破坏程度确认
+- **移动端数据库加密**——Android/iOS 本地库整体 SQLCipher 加密，密钥进 Keystore/Keychain 并支持轮换与迁移；`fetch_url` 增加 SSRF 防护；数据库初始化失败给出可读失败页而非白屏
 
 ## 1.5.3 新增
 
@@ -230,11 +242,11 @@ Agent 也能直接读写跑着这个 App 的这台电脑，而不只是服务器
 
 | 平台 | 文件 |
 |---|---|
-| macOS | `AI_Terminal_v1.5.3_macOS.zip` |
-| iOS | `AI_Terminal_v1.5.3_iOS.ipa`（未签名） |
-| Android | `AI_Terminal_v1.5.3_Android.apk` |
-| Windows | `AI_Terminal_v1.5.3_Windows.zip` |
-| Linux x64 | `AI_Terminal_v1.5.3_Linux_x64.tar.gz` |
+| macOS | `AI_Terminal_v1.5.5_macOS.zip` |
+| iOS | `AI_Terminal_v1.5.5_iOS.ipa`（未签名） |
+| Android | `AI_Terminal_v1.5.5_Android.apk` |
+| Windows | `AI_Terminal_v1.5.5_Windows.zip` |
+| Linux x64 | `AI_Terminal_v1.5.5_Linux_x64.tar.gz` |
 
 macOS 首次打开如提示“无法验证开发者”，可执行：
 
