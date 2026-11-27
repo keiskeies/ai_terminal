@@ -99,6 +99,17 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
   final xterm.TerminalController _controller = xterm.TerminalController();
   final GlobalKey _terminalContainerKey = GlobalKey();
 
+  // ---- 全屏程序（vi/vim/less/htop…）里的选区保活 ----
+  // xterm 的选区是锚点（CellAnchor）语义，锚点挂在 BufferLine 上。全屏程序
+  // 滚动窗口会发 DL(ESC[M)/IL(ESC[L)，而 Buffer 平移行用的是
+  // `lines[i] = lines[i + count]`；IndexAwareCircularBuffer._adoptChild 会先
+  // `_detach()` 掉目标槽里原有的行——那一行恰恰是上一轮刚挂到新槽的同一个
+  // 对象。于是整段被平移的行仍留在 buffer 里、内容也对，却丢了 _owner，
+  // 挂在其上的锚点 attached == false → controller.selection 变 null →
+  // 右键菜单没有「复制」、Ctrl+Insert 报「没有选中的内容」。
+  // 修复：每次输出后把这些「在位但失联」的行原地重新挂载一次，xterm 自己的
+  // 锚点随之复活，选区继续跟着内容走（不缓存坐标，不会跟错行）。
+
   // ---- 终端搜索（默认可见 Ctrl+Shift+F / mac ⌘F，可在外观设置里改）----
   // 高亮走 xterm 内置 controller.highlight()（渲染器原生绘制，锚点随 buffer
   // 变动自动跟随），匹配计算遍历 buffer 文本，见 utils/terminal_search.dart。
@@ -131,6 +142,7 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
   void initState() {
     super.initState();
     widget.terminal?.onBell = _onBell;
+    widget.terminal?.addListener(_reviveDetachedLines);
     _focusNode.addListener(_onFocusForIme);
     _nativeImeChannel.setMethodCallHandler(_handleNativeIme);
     if (widget.active) _nativeImeTarget = this;
@@ -151,6 +163,11 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     }
     final terminalChanged =
         widget.terminal != null && widget.terminal != oldWidget.terminal;
+    if (widget.terminal != oldWidget.terminal) {
+      // 换了终端 = 换了 buffer：选区保活监听要搬家
+      oldWidget.terminal?.removeListener(_reviveDetachedLines);
+      widget.terminal?.addListener(_reviveDetachedLines);
+    }
     if (terminalChanged) {
       widget.terminal?.onBell = _onBell;
       if (_searchOpen) {
@@ -179,6 +196,7 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     _closeIme();
     _focusNode.dispose();
     widget.terminal?.removeListener(_onTerminalChangedForSearch);
+    widget.terminal?.removeListener(_reviveDetachedLines);
     _searchDebounce?.cancel();
     _clearSearchHighlights();
     _searchQueryController.dispose();
@@ -534,6 +552,35 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     // 普通字符由 CustomKeyboardListener 的 character 兜底插入；
     // IME 组字/上屏走本 State 自建的 TextInput 连接（见 _openIme）。
     return KeyEventResult.ignored;
+  }
+
+  // ---- 全屏程序选区保活 ----
+
+  /// 每次终端输出后调用：把「还挂在 buffer 上却丢了宿主引用」的行原地重新
+  /// 挂载，让 xterm 自己的选区锚点（以及搜索高亮锚点）重新 attached。
+  ///
+  /// 只处理 DL/IL 平移造成的失联：判定条件是行对象仍在 lines 里、但
+  /// attached == false。真正被换掉的行（ED 清屏、退出全屏）已经不在 lines
+  /// 中或本身就是新行，不会命中，锚点按 xterm 的语义正常失效。
+  ///
+  /// 必须先于 controller 读取：_controller.selection 读的是锚点的 attached
+  /// 状态，行一旦重新挂载，selection 立刻自己回来了。渲染层在 paint 阶段才
+  /// 读 selection（write 的 notify 只是 markNeedsPaint），我们这个监听跑完
+  /// 之后才真正重绘，选区高亮自然是对的，不用额外补发通知。
+  void _reviveDetachedLines() {
+    final buffer = widget.terminal?.buffer;
+    if (buffer == null) return;
+    // 主屏有回滚区：DL 平移会把上方行推进 scrollback，重新挂载反而会打乱
+    // 滚动区里已有的行序。全屏程序在副屏（无回滚区），平移是纯原地换槽，
+    // 重新挂载才是安全的；主屏追加输出不替换行对象，锚点本来也不会失联。
+    if (!buffer.isAltBuffer) return;
+    final lines = buffer.lines;
+    for (var y = 0; y < lines.length; y++) {
+      // 同一个行对象写回原来的槽位：内容、文本都不变，只补回 _owner。
+      if (!lines[y].attached) {
+        lines[y] = lines[y];
+      }
+    }
   }
 
   // ---- 终端搜索 ----
