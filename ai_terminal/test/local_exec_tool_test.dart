@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
-import 'package:ai_terminal/core/db_init.dart';
 import 'package:ai_terminal/models/agent_permission_mode.dart';
 import 'package:ai_terminal/services/agent_tool.dart';
 import 'package:ai_terminal/services/command_executor.dart';
