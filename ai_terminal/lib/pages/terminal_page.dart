@@ -1943,8 +1943,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               ),
 
               // 快捷按键行（仅 Android / iOS 显示，桌面端不需要）
-              // 当 AI 输入框获焦（键盘弹出）时隐藏快捷按键栏，节省空间
-              if (_isMobile && !_aiInputFocused)
+              //
+              // 键盘顶起时隐藏这一行腾出空间。判据必须带上 viewInsets：只用输入框
+              // 焦点会把「按返回键收起键盘但输入框仍持有焦点」也算成隐藏，此时键盘
+              // 已不在，而这行是 Column 最后一段、负责顶开底部 inset —— 一隐藏，
+              // 那 90px 就空出来，底栏内容被手势导航条压住（真机实测）。
+              if (_isMobile &&
+                  !(_aiInputFocused &&
+                      MediaQuery.viewInsetsOf(context).bottom > 0))
                 _buildQuickKeysBar(activeTab),
             ],
           ),
@@ -2371,11 +2377,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   Widget _buildTopBar(
       dynamic host, tp.TerminalState terminalState, tp.TerminalTab? activeTab) {
     final tc = ThemeColors.of(context);
+    // 移动端整窗从 y=0 起绘制，状态栏 inset 必须由这条栏自己避让，
+    // 否则标签与右侧动作组会画在状态栏底下（真机实测 padding.top=32.7dp）。
+    final topInset = MediaQuery.paddingOf(context).top;
     return Container(
       // 设计稿 .topbar：42px 高、左右 8px 内边距，控件统一 32px 见方。
       // 比原来的 48px 更贴终端类应用的密度，也让 32px 的标签/按钮上下各留 5px。
-      height: _kTopBarHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      height: _kTopBarHeight + topInset,
+      padding: EdgeInsets.fromLTRB(8, topInset, 8, 0),
       decoration: BoxDecoration(
         color: tc.bg,
         border: Border(bottom: BorderSide(color: tc.border, width: 1)),
@@ -6042,12 +6051,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
       // 设计稿 .ai-footer：上下 8/10、左右 10。左右从 14 收到 12，和消息列表
       // 的 12 对齐；上边线用发丝线（hairline），面板内部的横向分隔比外框
       // 12% 更轻，否则底栏像被焊死在面板上。
-      padding: EdgeInsets.only(
-        left: 12,
-        right: 12,
-        top: 8,
-        bottom: 10 + (_isMobile ? MediaQuery.of(context).padding.bottom : 0),
-      ),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+      // 底部 inset 不在此处补偿：移动端这一栏下方还有快捷按键行，由它统一顶开
+      // 手势导航条；键盘弹出时快捷行隐藏，但那时 IME 已经盖住导航条区域。
       decoration: BoxDecoration(
         color: tc.card,
         border: Border(top: BorderSide(color: tc.hairline)),
@@ -6465,6 +6471,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   Widget _buildQuickKeysBar(tp.TerminalTab? activeTab) {
     final tc = ThemeColors.of(context);
     final isConnected = activeTab?.isConnected == true;
+    // edge-to-edge 后窗口铺满整屏，手势导航条压在最后一行上，
+    // 这一行是 Column 的最后一段，必须自己把底部 inset 顶开。
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
 
     // 高频组合键（始终显示）
     final coreKeys = [
@@ -6500,7 +6509,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     final coreCount = coreKeys.length;
 
     return Container(
-      height: 36,
+      height: 36 + bottomInset,
+      padding: EdgeInsets.only(bottom: bottomInset),
       decoration: BoxDecoration(
         color: tc.card,
         border: Border(top: BorderSide(color: tc.hairline)),

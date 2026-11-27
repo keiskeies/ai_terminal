@@ -1,10 +1,13 @@
 package top.keiskei.ai_terminal
 
 import android.content.Context
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import android.view.View
+import android.view.WindowManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -24,6 +27,22 @@ class MainActivity : FlutterActivity() {
         const val GCM_TAG_BITS = 128
         const val DB_KEY_BYTES = 32
         val SLOTS = setOf("active", "pending")
+    }
+
+    override fun onCreate(savedInstanceState: android.os.Bundle?) {
+        // targetSdk 34 下 Flutter 不会自动开 edge-to-edge，窗口只把导航栏 inset
+        // 让给内容、状态栏 inset 却没让：surface 比 Flutter 的视口矮整整一个状态栏，
+        // 底部 90px 画到屏幕外（真机实测视口 2296px / surface 2206px）。
+        // 显式接管系统栏，让 surface、视口、inset 三者一致，inset 由 Dart 侧消费。
+        window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            window.setDecorFitsSystemWindows(false)
+        } else {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility =
+                View.SYSTEM_UI_FLAG_LAYOUT_STABLE or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+        }
+        super.onCreate(savedInstanceState)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
