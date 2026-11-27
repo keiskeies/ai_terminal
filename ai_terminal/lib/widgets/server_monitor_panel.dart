@@ -24,6 +24,10 @@ class ServerMonitorPanel extends ConsumerStatefulWidget {
   final Duration interval;
   final double height;
 
+  /// 顶栏开关撤下后（手机端），横幅自己是收起监控的唯一入口。
+  /// 不传就是桌面端：那里顶栏常驻按钮还在，横幅里不该多一个 ×。
+  final VoidCallback? onHide;
+
   /// [interval] 默认 10s：一次本地采集是同步起子进程跑完全部指标，实测
   /// macOS 单轮 real 2.2s（其中 top 占 sys 1.34s ≈ 一个核的 27%@5s），
   /// Windows 还要冷启 powershell + 8 次 Get-CimInstance。监控条不是仪表盘，
@@ -33,6 +37,7 @@ class ServerMonitorPanel extends ConsumerStatefulWidget {
     required this.service,
     this.interval = const Duration(seconds: 10),
     this.height = 30,
+    this.onHide,
   });
 
   @override
@@ -275,117 +280,139 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
         color: tc.card,
         border: Border(top: BorderSide(color: tc.hairline)),
       ),
-      child: Listener(
-        // 点击面板外部时隐藏浮层
-        onPointerDown: (_) {
-          if (_overlayEntry != null) {
-            // 延迟隐藏，让指标项的 tap 先处理
-            Future.microtask(() {
-              if (_activeMetric != null) _hideOverlay();
-            });
-          }
-        },
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            // 显式 min + start：内容从左对齐，不因全屏宽而被居中或拉伸
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.start,
-            children: [
-              // 采集状态指示器
-              _buildStatusIndicator(tc),
-              const SizedBox(width: 4),
-              _buildMetricChipWithChart(
-                metric: 'cpu',
-                // 芯片=CPU；旧的 bolt 是闪电，表达的是电源而非处理器
-                icon: Icons.memory,
-                label: 'CPU',
-                showLabel: false,
-                value: '${(snap?.cpuPercent ?? 0).toStringAsFixed(1)}%',
-                color: staleColor(monitorColorByPercent(
-                    snap?.cpuPercent ?? 0, tc,
-                    normal: tc.brand)),
-                chartData: history.map((s) => s.cpuPercent).toList(),
-                chartMax: 100,
+      child: Row(
+        children: [
+          Expanded(
+            child: Listener(
+              // 点击面板外部时隐藏浮层
+              onPointerDown: (_) {
+                if (_overlayEntry != null) {
+                  // 延迟隐藏，让指标项的 tap 先处理
+                  Future.microtask(() {
+                    if (_activeMetric != null) _hideOverlay();
+                  });
+                }
+              },
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  // 显式 min + start：内容从左对齐，不因全屏宽而被居中或拉伸
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    // 采集状态指示器
+                    _buildStatusIndicator(tc),
+                    const SizedBox(width: 4),
+                    _buildMetricChipWithChart(
+                      metric: 'cpu',
+                      // 芯片=CPU；旧的 bolt 是闪电，表达的是电源而非处理器
+                      icon: Icons.memory,
+                      label: 'CPU',
+                      showLabel: false,
+                      value: '${(snap?.cpuPercent ?? 0).toStringAsFixed(1)}%',
+                      color: staleColor(monitorColorByPercent(
+                          snap?.cpuPercent ?? 0, tc,
+                          normal: tc.brand)),
+                      chartData: history.map((s) => s.cpuPercent).toList(),
+                      chartMax: 100,
+                    ),
+                    _divider(tc),
+                    // 内存/上传/下载只展示当前值：mini 图各自要建 LineChart + 起
+                    // 150ms 补间，整页重建时四个图一起重放动画，但 60px 宽的趋势
+                    // 条实际没人读，只留 CPU 一个
+                    _buildMetricChip(
+                      metric: 'mem',
+                      icon: Icons.memory,
+                      // 内存条画成条形+金手指（梳齿），不是方块芯片
+                      memoryStick: true,
+                      label: l10n.monitorMemory,
+                      showLabel: false,
+                      value: snap != null && snap.memTotalMB > 0
+                          ? '${fmtFromMB(snap.memUsedMB)}/${fmtFromMB(snap.memTotalMB)}'
+                          : '-',
+                      color: staleColor(
+                          monitorColorByPercent(snap?.memPercent ?? 0, tc)),
+                      valueColor: staleColor(
+                          monitorColorByPercent(snap?.memPercent ?? 0, tc)),
+                      valueMaxWidth: 110,
+                    ),
+                    _divider(tc),
+                    _buildMetricChip(
+                      metric: 'netUp',
+                      icon: Icons.arrow_upward,
+                      label: l10n.monitorUpload,
+                      showLabel: false,
+                      value: fmtRate(snap?.netUpKBps ?? 0),
+                      color: staleColor(tc.brand),
+                      valueColor: staleColor(tc.brand),
+                      valueMaxWidth: 90,
+                    ),
+                    _divider(tc),
+                    _buildMetricChip(
+                      metric: 'netDown',
+                      icon: Icons.arrow_downward,
+                      label: l10n.monitorDownload,
+                      showLabel: false,
+                      value: fmtRate(snap?.netDownKBps ?? 0),
+                      color: staleColor(tc.ok),
+                      valueColor: staleColor(tc.ok),
+                      valueMaxWidth: 90,
+                    ),
+                    _divider(tc),
+                    _buildMetricChip(
+                      metric: 'disk',
+                      icon: Icons.storage,
+                      label: l10n.monitorDisk,
+                      showLabel: false,
+                      value: '${(snap?.diskPercent ?? 0).toStringAsFixed(1)}%',
+                      color: staleColor(monitorColorByPercent(
+                          snap?.diskPercent ?? 0, tc,
+                          normal: tc.warn)),
+                    ),
+                    _divider(tc),
+                    _buildMetricChip(
+                      metric: 'uptime',
+                      icon: Icons.access_time,
+                      label: l10n.monitorUptime,
+                      showLabel: false,
+                      value: snap?.uptime ?? '-',
+                      color: isStale ? tc.textMuted : tc.textSub,
+                      valueMaxWidth: 100,
+                    ),
+                    _divider(tc),
+                    _buildMetricChip(
+                      metric: 'user',
+                      icon: Icons.person_outline,
+                      label: l10n.monitorUser,
+                      showLabel: false,
+                      value:
+                          (snap?.hostname.isNotEmpty ?? false) ? snap!.hostname : '-',
+                      color: isStale ? tc.textMuted : tc.textSub,
+                      valueMaxWidth: 120,
+                    ),
+                  ],
+                ),
               ),
-              _divider(tc),
-              // 内存/上传/下载只展示当前值：mini 图各自要建 LineChart + 起
-              // 150ms 补间，整页重建时四个图一起重放动画，但 60px 宽的趋势
-              // 条实际没人读，只留 CPU 一个
-              _buildMetricChip(
-                metric: 'mem',
-                icon: Icons.memory,
-                // 内存条画成条形+金手指（梳齿），不是方块芯片
-                memoryStick: true,
-                label: l10n.monitorMemory,
-                showLabel: false,
-                value: snap != null && snap.memTotalMB > 0
-                    ? '${fmtFromMB(snap.memUsedMB)}/${fmtFromMB(snap.memTotalMB)}'
-                    : '-',
-                color: staleColor(
-                    monitorColorByPercent(snap?.memPercent ?? 0, tc)),
-                valueColor: staleColor(
-                    monitorColorByPercent(snap?.memPercent ?? 0, tc)),
-                valueMaxWidth: 110,
-              ),
-              _divider(tc),
-              _buildMetricChip(
-                metric: 'netUp',
-                icon: Icons.arrow_upward,
-                label: l10n.monitorUpload,
-                showLabel: false,
-                value: fmtRate(snap?.netUpKBps ?? 0),
-                color: staleColor(tc.brand),
-                valueColor: staleColor(tc.brand),
-                valueMaxWidth: 90,
-              ),
-              _divider(tc),
-              _buildMetricChip(
-                metric: 'netDown',
-                icon: Icons.arrow_downward,
-                label: l10n.monitorDownload,
-                showLabel: false,
-                value: fmtRate(snap?.netDownKBps ?? 0),
-                color: staleColor(tc.ok),
-                valueColor: staleColor(tc.ok),
-                valueMaxWidth: 90,
-              ),
-              _divider(tc),
-              _buildMetricChip(
-                metric: 'disk',
-                icon: Icons.storage,
-                label: l10n.monitorDisk,
-                showLabel: false,
-                value: '${(snap?.diskPercent ?? 0).toStringAsFixed(1)}%',
-                color: staleColor(monitorColorByPercent(
-                    snap?.diskPercent ?? 0, tc,
-                    normal: tc.warn)),
-              ),
-              _divider(tc),
-              _buildMetricChip(
-                metric: 'uptime',
-                icon: Icons.access_time,
-                label: l10n.monitorUptime,
-                showLabel: false,
-                value: snap?.uptime ?? '-',
-                color: isStale ? tc.textMuted : tc.textSub,
-                valueMaxWidth: 100,
-              ),
-              _divider(tc),
-              _buildMetricChip(
-                metric: 'user',
-                icon: Icons.person_outline,
-                label: l10n.monitorUser,
-                showLabel: false,
-                value:
-                    (snap?.hostname.isNotEmpty ?? false) ? snap!.hostname : '-',
-                color: isStale ? tc.textMuted : tc.textSub,
-                valueMaxWidth: 120,
-              ),
-            ],
+            ),
           ),
-        ),
+          // 收起：顶栏开关撤下后（手机端），这是关掉横幅的唯一入口。
+          // 桌面端不传 onHide，横幅里不会出现这个 ×。
+          if (widget.onHide != null)
+            Semantics(
+              button: true,
+              label: l10n.ut_c56382e3ee,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onHide,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child:
+                      Icon(Icons.close_rounded, size: 14, color: tc.textMuted),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

@@ -2069,7 +2069,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         ? Column(
             children: [
               Expanded(child: terminalView),
-              ServerMonitorPanel(service: monitorService),
+              // 手机端顶栏撤了监控开关，横幅自己是唯一的收起入口（桌面端不传）
+              ServerMonitorPanel(
+                service: monitorService,
+                onHide: _isMobile ? () => _toggleMonitorVisible(tab) : null,
+              ),
             ],
           )
         : terminalView;
@@ -2133,25 +2137,28 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         }
 
         final tc = ThemeColors.of(context);
-        // 手机端不显示拖拽手柄
+        // 手机端右侧布局没有手柄（面板固定在底部），底部布局则给一条手指可抓的横杠。
         final dragHandle = _isMobile
             ? (isRight
                 ? const SizedBox.shrink()
                 : GestureDetector(
                     // 移动端底部布局：可拖拽调整高度的手柄
+                    behavior: HitTestBehavior.opaque,
                     onPanUpdate: onDrag,
                     onPanEnd: (_) => _savePanelLayout(savePosition: false),
                     child: Container(
-                      height: 20,
+                      // 手指按不准 20×4：热区给到 28 高，横杠加长到 80×6。
+                      // 再高就要从已经很紧的 AI 面板里抢高度了。
+                      height: 28,
                       width: double.infinity,
                       color: Colors.transparent,
                       child: Center(
                         child: Container(
-                          width: 40,
-                          height: 4,
+                          width: 80,
+                          height: 6,
                           decoration: BoxDecoration(
                             color: tc.textMuted.withValues(alpha: 0.6),
-                            borderRadius: BorderRadius.circular(2),
+                            borderRadius: BorderRadius.circular(3),
                           ),
                         ),
                       ),
@@ -2426,8 +2433,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             ),
           ),
           // 命令面板入口（零占位导航的常驻把手）
-          _buildCommandPaletteButton(),
-          const SizedBox(width: 4),
+          //
+          // 手机端挪进 ⋯：这一格 + 外观/SFTP/监控 四个开关合计约 212px（77dp），
+          // 直接挤掉标签区宽度。手机上四个都是低频动作，且各自都有兜底入口 ——
+          // 见 [_buildGridMenuButton] 的「视图」组。AI 开关留下：它是唯一一个
+          // 既要点开又要收回、且没有别的常驻入口的开关。
+          if (!_isMobile) ...[
+            _buildCommandPaletteButton(),
+            const SizedBox(width: 4),
+          ],
           // 右侧操作区：设计稿这里只有 5 个 32px 图标（菜单 / AI / SFTP / 监控），
           // 之前还塞了专注模式与字号，8 个图标连成一排占掉顶栏 37% 的宽度，
           // 视觉上比标签区还抢眼。专注模式在网格菜单里已有入口，字号归到
@@ -2500,18 +2514,26 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// 以前这里是两个平级菜单（四宫格「功能菜单」+ ⋯「更多」），SFTP 和监控在两个
   /// 菜单里各有一份，设置也有两个入口 —— 用户不知道点哪个、也不知道点了会有什么
   /// 区别。现在只剩一个菜单，而且菜单里**不再出现顶栏已有的开关**。
+  ///
+  /// 手机端只留 AI + 菜单：屏幕 393dp，顶栏还要放会话标签。外观/SFTP/监控 挪进
+  /// ⋯ 的「视图」「本终端」组（见 [_buildGridMenuButton]），那边不再受「不与顶栏
+  /// 重复」约束 —— 顶栏这里本来就没有它们了。
   Widget _buildTopBarActions() {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        _buildAppearanceButton(),
-        const SizedBox(width: 4),
+        if (!_isMobile) ...[
+          _buildAppearanceButton(),
+          const SizedBox(width: 4),
+        ],
         _buildAIPanelToggleButton(),
-        const SizedBox(width: 4),
-        // SFTP 常驻开关（设计稿右侧动作组：菜单 / AI / SFTP / 监控）
-        _buildSftpToggleButton(),
-        const SizedBox(width: 4),
-        _buildMonitorToggleButton(),
+        if (!_isMobile) ...[
+          const SizedBox(width: 4),
+          // SFTP 常驻开关（设计稿右侧动作组：菜单 / AI / SFTP / 监控）
+          _buildSftpToggleButton(),
+          const SizedBox(width: 4),
+          _buildMonitorToggleButton(),
+        ],
         const SizedBox(width: 4),
         _buildGridMenuButton(),
       ],
@@ -2552,6 +2574,32 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         tooltip: UiText.t('终端配色与字号', 'Terminal colors & font size'),
         active: controller.isOpen,
         onTap: () => controller.isOpen ? controller.close() : controller.open(),
+      ),
+    );
+  }
+
+  /// 手机端的外观入口：⋯ 是 PopupMenu，装不下带预览的子面板，
+  /// 所以整块 [TerminalAppearancePanel] 走底部弹层，实时预览原样保留。
+  void _showAppearanceSheet() {
+    final tc = ThemeColors.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: tc.cardElevated,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
+      ),
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          child: Center(
+            child: TerminalAppearancePanel(
+              width: 344,
+              onMore: () {
+                Navigator.of(context).pop();
+                _showNavDrawer(NavDrawer.sectionSettings, group: 'terminal');
+              },
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -2653,6 +2701,19 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           case 'act:portforward':
             _showPortForwardDialog();
             break;
+          case 'act:palette':
+            _showCommandPalette();
+            break;
+          case 'act:appearance':
+            _showAppearanceSheet();
+            break;
+          case 'act:sftp':
+            _toggleSftpPanel();
+            break;
+          case 'act:monitor':
+            final tab = ref.read(tp.terminalProvider).activeTab;
+            if (tab != null) _toggleMonitorVisible(tab);
+            break;
         }
       },
       itemBuilder: (context) => [
@@ -2661,6 +2722,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         // 也有自己的「管理」按钮指向同一个分区 —— 同一目的地三条路径，用户
         // 只能靠记。菜单省下来的两条高度让「本终端」组进得了首屏。
         _menuGroupLabel(tc, UiText.t('前往', 'Go to')),
+        // 顶栏的命令面板按钮在手机上撤了（省 77dp 换标签区宽度），
+        // 这里补一个入口：命令面板是它的替代品，也顺带是 Ctrl+K 的可视替身。
+        if (_isMobile)
+          _gridMenuItem('act:palette', Icons.search_rounded,
+              UiText.t('命令面板 (Ctrl+K)', 'Command palette (Ctrl+K)')),
         _gridMenuItem('drawer:${NavDrawer.sectionHosts}', Icons.dns_outlined,
             UiText.t('主机管理', 'Hosts'),
             trailing: counts['drawer:${NavDrawer.sectionHosts}']),
@@ -2693,6 +2759,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         if (_isMobile)
           _gridMenuItem('act:clear', Icons.cleaning_services_rounded,
               l10n.terminalClearScreen),
+        // 顶栏撤下的两个面板开关：本地终端没有远端文件系统，SFTP 不出现
+        if (_isMobile && activeTab != null && !activeTab.isLocal)
+          _gridMenuItem('act:sftp', Icons.folder_outlined,
+              UiText.t('SFTP 文件面板', 'SFTP file panel')),
+        if (_isMobile && activeTab != null && activeTab.isConnected)
+          _gridMenuItem('act:monitor', Icons.show_chart_rounded,
+              _monitorVisibleFor(activeTab)
+                  ? l10n.ut_c56382e3ee
+                  : l10n.ut_55b60aaf25),
         if (snippets.isNotEmpty) ...[
           const PopupMenuDivider(height: 8),
           _menuGroupLabel(tc, l10n.quickCommands),
@@ -2702,6 +2777,11 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
         const PopupMenuDivider(height: 8),
         _menuGroupLabel(tc, UiText.t('视图', 'View')),
+        // 顶栏的外观浮层在手机上撤了：它是「设一次就不碰」的低频项，
+        // 但带实时预览，所以整块搬进底部弹层，不降级成设置页里的下拉框。
+        if (_isMobile)
+          _gridMenuItem('act:appearance', Icons.palette_outlined,
+              UiText.t('终端配色与字号', 'Terminal colors & font size')),
         _gridMenuItem('act:focus', Icons.fullscreen_rounded,
             UiText.t('专注模式', 'Focus mode'),
             trailing: UiText.t('终端全宽', 'Terminal only')),
@@ -2997,26 +3077,27 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           ? l10n.terminalCollapseMonitorPanel
           : l10n.terminalExpandMonitorPanel,
       active: isOn,
-      onTap: canShow
-          ? () {
-              final tab = ref.read(tp.terminalProvider).activeTab;
-              if (tab == null) return;
-              final next = !_monitorVisibleFor(tab);
-              final hostKey = tab.isLocal ? 'local' : tab.hostId;
-              setState(() {
-                _tabMonitorVisible[tab.id] = next;
-                // 同步 host 默认值，供之后新开的 tab 继承；已有 tab 不受影响
-                if (next) {
-                  _monitorDefaultVisibleHosts.add(hostKey);
-                } else {
-                  _monitorDefaultVisibleHosts.remove(hostKey);
-                }
-              });
-              SettingsDao.set(
-                  'monitorVisibleHosts', _monitorDefaultVisibleHosts.toList());
-            }
-          : null,
+      onTap: canShow ? () => _toggleMonitorVisible(activeTab) : null,
     );
+  }
+
+  /// 指定 tab 的监控横幅开/关，同步 host 级默认值供后续新 tab 继承。
+  ///
+  /// 收 tab 而不是读 activeTab：横幅是跟着某个 tab 渲染的，收起它的 × 必须作用在
+  /// 那个 tab 上（见 R3，活动 tab 不等于归属 tab）。
+  void _toggleMonitorVisible(tp.TerminalTab tab) {
+    final next = !_monitorVisibleFor(tab);
+    final hostKey = tab.isLocal ? 'local' : tab.hostId;
+    setState(() {
+      _tabMonitorVisible[tab.id] = next;
+      // 同步 host 默认值，供之后新开的 tab 继承；已有 tab 不受影响
+      if (next) {
+        _monitorDefaultVisibleHosts.add(hostKey);
+      } else {
+        _monitorDefaultVisibleHosts.remove(hostKey);
+      }
+    });
+    SettingsDao.set('monitorVisibleHosts', _monitorDefaultVisibleHosts.toList());
   }
 
   /// 获取或创建当前 tab 对应的监控服务
@@ -3408,7 +3489,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           if (agentState.isCompacting) _buildCompactingBanner(tc),
           // 面板头（设计稿 .ai-head）：星形 + 标题 + 模型胶囊。
           // 位置切换钮仍留在分隔条上，这里只做身份标识。
-          _buildAiPanelHead(),
+          //
+          // 移动端整行不渲染：模型胶囊要 >560dp 宽才显示（输入框下方已有模型
+          // 胶囊），切换方位/收起按钮也只给桌面端，手机上这 38dp 纯粹是装饰。
+          if (!_isMobile) _buildAiPanelHead(),
           // 目标横幅已下移到输入框之上（见 _buildBottomBar），与参考图顺序一致：
           // 清单 → 目标 → 输入 → 底边指标。这里不再渲染，避免同屏两条目标行。
           // 消息列表 + 回到底部按钮
@@ -3513,8 +3597,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
               ],
             ),
           ),
-          if (!_isMobile)
-            _buildAiHeadControls(ref.read(tp.terminalProvider).activeTab?.id),
+          _buildAiHeadControls(ref.read(tp.terminalProvider).activeTab?.id),
         ],
       ),
     );
@@ -3524,6 +3607,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   ///
   /// 设计稿的面板头只有「星 + 标题 + 模型胶囊」，没有一条常驻竖条放这些
   /// 操作；把两个入口收进头部后，终端与面板之间就只剩 1px 发丝线。
+  ///
+  /// 只在桌面端调用：移动端连面板头一起渲染掉了（见 `_buildAIPanel`）。
   Widget _buildAiHeadControls(String? tabId) {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
@@ -6137,128 +6222,151 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           // 最右边的按钮直接出了可视区、点不到。改成「左侧整组可横向滚动 +
           // spaceBetween」：宽度够时和原来一模一样（贴左排布、状态贴右），不够时
           // 按钮能滚出来，而不是消失。
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Agent / 编排模式胶囊
-                      _ModeCapsule(
-                        isOrchestratorMode: agentState.isOrchestratorMode,
-                        connectedCount: ref
-                            .read(tp.terminalProvider)
-                            .tabs
-                            .where((t) => t.isConnected && !t.isLocal)
-                            .length,
-                        totalHosts: HostsDao.cached.length,
-                        onTap: agentState.isOrchestratorMode
-                            ? () => _showOrchestratorHosts(tc)
-                            : null,
-                      ),
-                      const SizedBox(width: 6),
-                      // 日志按钮
-                      _buildToolbarIconButton(
-                        icon: Icons.terminal_outlined,
-                        tooltip: l10n.terminalAgentLog,
-                        onTap: () => _showAgentLogDialog(context),
-                        tc: tc,
-                      ),
-                      const SizedBox(width: 4),
-                      // 历史按钮
-                      _buildToolbarIconButton(
-                        icon: Icons.history_outlined,
-                        tooltip: l10n.terminalSessionHistory,
-                        onTap: () => _showSessionHistoryPanel(context),
-                        tc: tc,
-                      ),
-                      const SizedBox(width: 4),
-                      // 新建会话：不用先打开历史面板
-                      _buildToolbarIconButton(
-                        icon: Icons.add_comment_outlined,
-                        tooltip: l10n.sessionNew,
-                        onTap: _startNewSession,
-                        tc: tc,
-                      ),
-                      const SizedBox(width: 4),
-                      // 联网搜索切换（会话级，覆盖全局开关；下次任务生效）
-                      _buildToolbarIconButton(
-                        icon: Icons.travel_explore_rounded,
-                        tooltip: agentState.isWebSearchEnabled
-                            ? UiText.t('联网搜索：已启用（下次任务生效）',
-                                'Web search: on (applies to the next task)')
-                            : UiText.t('联网搜索：未启用（点击启用，下次任务生效）',
-                                'Web search: off (click to enable, applies to the next task)'),
-                        onTap: () {
-                          ref.read(agentProvider.notifier).toggleWebSearch();
-                        },
-                        tc: tc,
-                        active: agentState.isWebSearchEnabled,
-                      ),
-                      const SizedBox(width: 4),
-                      // 运维模板（Runbook）
-                      _buildToolbarIconButton(
-                        icon: Icons.bolt_outlined,
-                        tooltip: l10n.terminalRunbookTemplates,
-                        onTap: () => _showRunbookTemplates(tc),
-                        tc: tc,
-                      ),
-                      const SizedBox(width: 4),
-                      // 多机编排开关：原来挤在输入框里和发送按钮并排，挪到这一排工具按钮之后
-                      _buildToolbarIconButton(
-                        icon: Icons.hub_outlined,
-                        tooltip: agentState.isOrchestratorMode
-                            ? l10n.orchExitMode
-                            : l10n.orchEnterMode,
-                        onTap: () {
-                          ref
-                              .read(agentProvider.notifier)
-                              .toggleOrchestratorMode();
-                        },
-                        tc: tc,
-                        active: agentState.isOrchestratorMode,
-                      ),
-                    ],
+          //
+          // 移动端整行不渲染，6 个动作折进输入框底部的工具菜单
+          // （[_AgentToolMenu]）。这一行在手机上没有信息量：
+          // 模式胶囊不编排时只是一个「Agent」字样；右侧的「思考中/执行中」
+          // 与常驻运行条 LiveOperationBar 的阶段重复（operation_sheet.dart
+          // _phaseLabelForStatus 走的就是同一组 thinking/executing 文案）。
+          if (!_isMobile)
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Agent / 编排模式胶囊
+                        _ModeCapsule(
+                          isOrchestratorMode: agentState.isOrchestratorMode,
+                          connectedCount: ref
+                              .read(tp.terminalProvider)
+                              .tabs
+                              .where((t) => t.isConnected && !t.isLocal)
+                              .length,
+                          totalHosts: HostsDao.cached.length,
+                          onTap: agentState.isOrchestratorMode
+                              ? () => _showOrchestratorHosts(tc)
+                              : null,
+                        ),
+                        const SizedBox(width: 6),
+                        // 日志按钮
+                        _buildToolbarIconButton(
+                          icon: Icons.terminal_outlined,
+                          tooltip: l10n.terminalAgentLog,
+                          onTap: () => _showAgentLogDialog(context),
+                          tc: tc,
+                        ),
+                        const SizedBox(width: 4),
+                        // 历史按钮
+                        _buildToolbarIconButton(
+                          icon: Icons.history_outlined,
+                          tooltip: l10n.terminalSessionHistory,
+                          onTap: () => _showSessionHistoryPanel(context),
+                          tc: tc,
+                        ),
+                        const SizedBox(width: 4),
+                        // 新建会话：不用先打开历史面板
+                        _buildToolbarIconButton(
+                          icon: Icons.add_comment_outlined,
+                          tooltip: l10n.sessionNew,
+                          onTap: _startNewSession,
+                          tc: tc,
+                        ),
+                        const SizedBox(width: 4),
+                        // 联网搜索切换（会话级，覆盖全局开关；下次任务生效）
+                        _buildToolbarIconButton(
+                          icon: Icons.travel_explore_rounded,
+                          tooltip: agentState.isWebSearchEnabled
+                              ? UiText.t('联网搜索：已启用（下次任务生效）',
+                                  'Web search: on (applies to the next task)')
+                              : UiText.t('联网搜索：未启用（点击启用，下次任务生效）',
+                                  'Web search: off (click to enable, applies to the next task)'),
+                          onTap: () {
+                            ref.read(agentProvider.notifier).toggleWebSearch();
+                          },
+                          tc: tc,
+                          active: agentState.isWebSearchEnabled,
+                        ),
+                        const SizedBox(width: 4),
+                        // 运维模板（Runbook）
+                        _buildToolbarIconButton(
+                          icon: Icons.bolt_outlined,
+                          tooltip: l10n.terminalRunbookTemplates,
+                          onTap: () => _showRunbookTemplates(tc),
+                          tc: tc,
+                        ),
+                        const SizedBox(width: 4),
+                        // 多机编排开关：原来挤在输入框里和发送按钮并排，挪到这一排工具按钮之后
+                        _buildToolbarIconButton(
+                          icon: Icons.hub_outlined,
+                          tooltip: agentState.isOrchestratorMode
+                              ? l10n.orchExitMode
+                              : l10n.orchEnterMode,
+                          onTap: () {
+                            ref
+                                .read(agentProvider.notifier)
+                                .toggleOrchestratorMode();
+                          },
+                          tc: tc,
+                          active: agentState.isOrchestratorMode,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
+                // 运行状态指示
+                if (agentState.isRunning)
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: tc.brand.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(rFull),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 10,
+                          height: 10,
+                          child: CircularProgressIndicator(
+                              strokeWidth: 1.5, color: tc.brand),
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          agentState.status == AgentStatus.executing
+                              ? UiText.t('执行中', 'Executing')
+                              : UiText.t('思考中', 'Thinking'),
+                          style: TextStyle(
+                              fontSize: fMicro,
+                              color: tc.brand,
+                              fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          // 编排态的模式胶囊：手机上工具栏整行撤了，但这里带的是活信息
+          // （已连接主机数 + 雷达动画），点进去还要选机器，所以单独留下。
+          if (_isMobile && agentState.isOrchestratorMode)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _ModeCapsule(
+                isOrchestratorMode: true,
+                connectedCount: ref
+                    .read(tp.terminalProvider)
+                    .tabs
+                    .where((t) => t.isConnected && !t.isLocal)
+                    .length,
+                totalHosts: HostsDao.cached.length,
+                onTap: () => _showOrchestratorHosts(tc),
               ),
-              // 运行状态指示
-              if (agentState.isRunning)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: tc.brand.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(rFull),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 10,
-                        height: 10,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 1.5, color: tc.brand),
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        agentState.status == AgentStatus.executing
-                            ? UiText.t('执行中', 'Executing')
-                            : UiText.t('思考中', 'Thinking'),
-                        style: TextStyle(
-                            fontSize: fMicro,
-                            color: tc.brand,
-                            fontWeight: FontWeight.w500),
-                      ),
-                    ],
-                  ),
-                ),
-            ],
-          ),
+            ),
           const SizedBox(height: 8),
           // 输入框
           AIPromptInput(
@@ -6285,7 +6393,31 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
             onStop: () => ref.read(agentProvider.notifier).cancel(),
             onSend: (text) => _sendToAgent(text, isConnected: isConnected),
             onSteer: (text) => _steerToAgent(text, isConnected: isConnected),
-            footer: _buildModelCapsule(currentModel, endpoints, tc),
+            // 手机上工具栏撤了，6 个动作挪到权限胶囊右边这一枚图标胶囊里。
+            footer: _isMobile
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _AgentToolMenu(
+                        tc: tc,
+                        webSearchOn: agentState.isWebSearchEnabled,
+                        orchestratorOn: agentState.isOrchestratorMode,
+                        onWebSearch: () =>
+                            ref.read(agentProvider.notifier).toggleWebSearch(),
+                        onOrchestrator: () => ref
+                            .read(agentProvider.notifier)
+                            .toggleOrchestratorMode(),
+                        onAgentLog: () => _showAgentLogDialog(context),
+                        onSessionHistory: () =>
+                            _showSessionHistoryPanel(context),
+                        onNewSession: _startNewSession,
+                        onRunbook: () => _showRunbookTemplates(tc),
+                      ),
+                      const SizedBox(width: 6),
+                      _buildModelCapsule(currentModel, endpoints, tc),
+                    ],
+                  )
+                : _buildModelCapsule(currentModel, endpoints, tc),
           ),
           // 底边状态条：参考界面把数字放在输入框之下、贴着窗口底边，运行中与终态
           // 共用同一条。位置不随任务结束而改变，用户不用来回找数字。
@@ -7413,6 +7545,183 @@ class _QuickKey {
   final String label;
   final String sequence;
   const _QuickKey(this.label, this.sequence);
+}
+
+/// 移动端输入框底部的工具菜单：桌面端工具栏那一排 6 个动作折进这一枚胶囊。
+///
+/// 样式与 [PermissionModeSelector] 一致（透明底 + 1px 同色描边，向上弹菜单）。
+/// 联网搜索与多机编排是开关，右侧带勾选且点击后菜单保持打开，方便连着看两个
+/// 状态；其余四个是动作，先关菜单再执行，免得对话框压在菜单上面。
+class _AgentToolMenu extends StatefulWidget {
+  final ThemeColors tc;
+  final bool webSearchOn;
+  final bool orchestratorOn;
+  final VoidCallback onWebSearch;
+  final VoidCallback onOrchestrator;
+  final VoidCallback onAgentLog;
+  final VoidCallback onSessionHistory;
+  final VoidCallback onNewSession;
+  final VoidCallback onRunbook;
+
+  const _AgentToolMenu({
+    required this.tc,
+    required this.webSearchOn,
+    required this.orchestratorOn,
+    required this.onWebSearch,
+    required this.onOrchestrator,
+    required this.onAgentLog,
+    required this.onSessionHistory,
+    required this.onNewSession,
+    required this.onRunbook,
+  });
+
+  @override
+  State<_AgentToolMenu> createState() => _AgentToolMenuState();
+}
+
+class _AgentToolMenuState extends State<_AgentToolMenu> {
+  final _controller = MenuController();
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final tc = widget.tc;
+    // 有开关处于开启态时整枚胶囊转成 warn 色，收起菜单也看得出「有东西开着」
+    final anyOn = widget.webSearchOn || widget.orchestratorOn;
+    final color = anyOn ? tc.warn : tc.textSub;
+
+    Widget item({
+      required IconData icon,
+      required String label,
+      required VoidCallback onTap,
+      bool on = false,
+      bool keepOpen = false,
+    }) {
+      return _clickable(
+        onTap: () {
+          if (!keepOpen) _controller.close();
+          onTap();
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            children: [
+              Icon(icon, size: 15, color: on ? tc.warn : tc.textSub),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: on ? tc.warn : tc.textMain,
+                    fontSize: fSmall,
+                    fontWeight: on ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (on)
+                Icon(Icons.check, size: 15, color: tc.warn)
+              else
+                const SizedBox(width: 15),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return MenuAnchor(
+      controller: _controller,
+      alignmentOffset: const Offset(0, -8),
+      style: MenuStyle(
+        backgroundColor: WidgetStatePropertyAll(tc.cardElevated),
+        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+        elevation: const WidgetStatePropertyAll(10),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(rMedium),
+            side: BorderSide(color: tc.border),
+          ),
+        ),
+      ),
+      menuChildren: [
+        SizedBox(
+          width: 236,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              item(
+                icon: Icons.terminal_outlined,
+                label: l10n.terminalAgentLog,
+                onTap: widget.onAgentLog,
+              ),
+              item(
+                icon: Icons.history_outlined,
+                label: l10n.terminalSessionHistory,
+                onTap: widget.onSessionHistory,
+              ),
+              item(
+                icon: Icons.add_comment_outlined,
+                label: l10n.sessionNew,
+                onTap: widget.onNewSession,
+              ),
+              item(
+                icon: Icons.travel_explore_rounded,
+                label: UiText.t('联网搜索', 'Web search'),
+                onTap: widget.onWebSearch,
+                on: widget.webSearchOn,
+                keepOpen: true,
+              ),
+              item(
+                icon: Icons.bolt_outlined,
+                label: l10n.terminalRunbookTemplates,
+                onTap: widget.onRunbook,
+              ),
+              item(
+                icon: Icons.hub_outlined,
+                label: widget.orchestratorOn
+                    ? l10n.orchExitMode
+                    : l10n.orchEnterMode,
+                onTap: widget.onOrchestrator,
+                on: widget.orchestratorOn,
+                keepOpen: true,
+              ),
+              const SizedBox(height: 4),
+            ],
+          ),
+        ),
+      ],
+      builder: (context, controller, child) {
+        return _clickable(
+          onTap: () =>
+              controller.isOpen ? controller.close() : controller.open(),
+          child: Container(
+            height: 30,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(rFull),
+              border: Border.all(color: color.withValues(alpha: 0.75)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.auto_fix_high_rounded, size: 13, color: color),
+                if (anyOn) ...[
+                  const SizedBox(width: 4),
+                  Container(
+                    width: 5,
+                    height: 5,
+                    decoration: BoxDecoration(color: tc.warn, shape: BoxShape.circle),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 }
 
 /// Agent / 编排模式胶囊
