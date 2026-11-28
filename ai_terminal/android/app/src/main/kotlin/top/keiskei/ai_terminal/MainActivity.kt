@@ -22,6 +22,7 @@ import javax.crypto.spec.GCMParameterSpec
 class MainActivity : FlutterActivity() {
     private companion object {
         const val CHANNEL = "com.keiskei.aiterminal/security"
+        const val PATHS_CHANNEL = "com.keiskei.aiterminal/paths"
         const val PREFS = "ai_terminal_security"
         const val WRAP_KEY_ALIAS = "ai_terminal.db_wrap.v1"
         const val GCM_TAG_BITS = 128
@@ -47,6 +48,15 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // 终端的 busybox/bash 随 jniLibs 打进 APK，只有 nativeLibraryDir 里的
+        // 文件带 apk_data_file 标签、能被 execve；Dart 侧拿不到这个路径。
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PATHS_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "nativeLibraryDir" -> result.success(applicationInfo.nativeLibraryDir)
+                    else -> result.notImplemented()
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->
                 try {
