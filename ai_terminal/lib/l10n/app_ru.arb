@@ -967,6 +967,7 @@
   "monitorDiskColPercent": "Загрузка",
   "monitorCpuDetail": "Детали CPU",
   "monitorCpuTotalUsage": "Общая загрузка",
+  "monitorCpuScopeProcess": "Только это приложение",
   "monitorCpuUser": "Пользователь",
   "monitorCpuSystem": "Система",
   "monitorCpuIdle": "Простой",

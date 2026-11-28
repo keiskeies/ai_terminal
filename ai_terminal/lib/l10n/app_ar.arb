@@ -967,6 +967,7 @@
   "monitorDiskColPercent": "الاستخدام",
   "monitorCpuDetail": "تفاصيل المعالج",
   "monitorCpuTotalUsage": "الاستخدام الإجمالي",
+  "monitorCpuScopeProcess": "هذا التطبيق فقط",
   "monitorCpuUser": "المستخدم",
   "monitorCpuSystem": "النظام",
   "monitorCpuIdle": "خامل",

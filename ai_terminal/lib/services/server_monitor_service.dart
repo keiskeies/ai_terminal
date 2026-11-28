@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import '../core/l10n_holder.dart';
 import 'ssh_service.dart';
 import 'local_terminal_service.dart';
@@ -191,6 +192,16 @@ class ServerSnapshot {
   /// 主机名
   final String hostname;
 
+
+  /// 这一帧有没有 CPU 读数。Android 上整机 CPU 没有任何可读来源（见
+  /// [_collectAndroidLocal]），拿不到时面板显示 -，不能拿 0 冒充「空闲」。
+  final bool cpuAvailable;
+
+  /// [cpuPercent] 的口径：true = 本应用进程，false = 整个系统。
+  /// 面板必须标出来，否则手机上的进程占用会被误读成整机占用。
+  final bool cpuIsProcessScoped;
+
+
   /// 采集时间戳
   final DateTime timestamp;
 
@@ -229,6 +240,8 @@ class ServerSnapshot {
     this.processCount = 0,
     this.kernelVersion = '',
     this.hostname = '',
+    this.cpuAvailable = true,
+    this.cpuIsProcessScoped = false,
     required this.timestamp,
     this.error,
   });
@@ -906,12 +919,187 @@ class ServerMonitorService {
     final local = executor as LocalTerminalService;
     if (Platform.isWindows) {
       return _collectWindowsLocal(local);
+    } else if (Platform.isAndroid) {
+      return _collectAndroidLocal();
     } else if (Platform.isMacOS) {
       return _collectMacOSLocal(local);
     } else {
       return _collectLinuxLocal(local);
     }
   }
+
+  /// Android 本地采集。刻意不接 [LocalTerminalService]：这条路一个进程都不起。
+  ///
+  /// 这里没有 shell 脚本可读：真机实测应用 uid（u0_a352，untrusted_app）对
+  /// `/proc/stat`、`/proc/meminfo`、`/proc/loadavg`、`/proc/net/dev` 全是
+  /// `Permission denied`，adb shell 能读只是因为 shell uid 有 readproc 组。
+  /// 连带后果是 top/free/vmstat/uptime 一个都跑不起来（都要 /proc/stat），
+  /// dumpsys 又需要只有 shell uid 才有的 DUMP 权限。所以指标只能走 Kotlin
+  /// 侧的公开 SDK（ActivityManager / StatFs / SystemClock / TrafficStats），
+  /// 见 MainActivity.collectStats。
+  ///
+  /// 整机 CPU 与负载在 Android 上不存在可读来源，只有本进程的 `/proc/self/stat`
+  /// 能读，因此 CPU 走进程口径并在面板上标注；取不到时显示 -，而不是拿 0
+  /// 冒充「空闲」。
+  Future<ServerSnapshot> _collectAndroidLocal() async {
+    final now = DateTime.now();
+    Map<Object?, Object?> raw;
+    try {
+      final res = await _androidStatsChannel
+          .invokeMethod<Map<Object?, Object?>>('collectStats');
+      raw = res ?? const {};
+    } catch (e) {
+      debugPrint('[Monitor] Android 原生采集失败: $e');
+      return ServerSnapshot(
+          timestamp: now, error: L10n.str.monitorErrorEmptyOutput);
+    }
+
+    final selfCpu = await _selfCpuPercent(now);
+    return mapAndroidStats(raw, now, selfCpuPct: selfCpu);
+  }
+
+  /// 把原生 collectStats 的原始 map 映射成快照。抽成方法是为了能单测：真机上
+  /// 唯一可信的验证要跑在设备上，而这个映射（单位换算、-1 当未知、缺键不造假）
+  /// 在桌面就能判对错。
+  @visibleForTesting
+  ServerSnapshot mapAndroidStats(Map<Object?, Object?> raw, DateTime now,
+      {double? selfCpuPct}) {
+    double? val(String key) {
+      final v = raw[key];
+      return v is num ? v.toDouble() : null;
+    }
+
+    final memTotalMB = (val('memTotalBytes') ?? 0) / (1024 * 1024);
+    final memAvailMB = (val('memAvailBytes') ?? 0) / (1024 * 1024);
+    final memUsedMB =
+        memTotalMB > 0 ? (memTotalMB - memAvailMB).clamp(0.0, memTotalMB) : 0.0;
+
+    const gb = 1024 * 1024 * 1024;
+    final diskTotalGB = (val('diskTotalBytes') ?? 0) / gb;
+    final diskFreeGB = (val('diskFreeBytes') ?? 0) / gb;
+    final diskUsedGB =
+        diskTotalGB > 0 ? (diskTotalGB - diskFreeGB).clamp(0.0, diskTotalGB) : 0.0;
+
+    // TrafficStats 在 Android 10+ 可能返回 -1（UNSUPPORTED）；-1 一律当未知，
+    // 不能让它参与差分，否则第一帧会算出一个巨大的负/正速率。
+    final rx = val('rxBytes');
+    final tx = val('txBytes');
+    final netKnown = (rx ?? -1) >= 0 && (tx ?? -1) >= 0;
+    List<NetInterface> interfaces = const [];
+    double upRate = 0, downRate = 0;
+    if (netKnown) {
+      final iface = NetInterface(
+          name: _androidNetAlias, rxBytes: rx!.round(), txBytes: tx!.round());
+      final (down, up) =
+          _computeInterfaceRate(_androidNetAlias, rx.round(), tx.round(), now);
+      interfaces = [iface.copyWithRate(down, up)];
+      downRate = down;
+      upRate = up;
+    }
+
+    final uptimeMs = val('uptimeMs');
+    final uptime = uptimeMs == null
+        ? '-'
+        : _formatUptime(Duration(milliseconds: uptimeMs.round()));
+
+    return ServerSnapshot(
+      memPercent: memTotalMB > 0 ? (memUsedMB / memTotalMB * 100).clamp(0.0, 100.0) : 0,
+      memUsedMB: memUsedMB,
+      memTotalMB: memTotalMB,
+      memAvailableMB: memAvailMB,
+      memFreeMB: memAvailMB,
+      diskPercent:
+          diskTotalGB > 0 ? (diskUsedGB / diskTotalGB * 100).clamp(0.0, 100.0) : 0,
+      diskUsedGB: diskUsedGB,
+      diskTotalGB: diskTotalGB,
+      diskFreeGB: diskFreeGB,
+      diskPartitions: diskTotalGB > 0
+          ? [
+              DiskPartition(
+                filesystem: 'userdata',
+                mountPoint: '/data',
+                totalGB: diskTotalGB,
+                usedGB: diskUsedGB,
+                freeGB: diskFreeGB,
+                usePercent: (diskUsedGB / diskTotalGB * 100).clamp(0.0, 100.0),
+              )
+            ]
+          : const [],
+      netUpKBps: upRate,
+      netDownKBps: downRate,
+      netTotalUpBytes: netKnown ? tx!.round() : 0,
+      netTotalDownBytes: netKnown ? rx!.round() : 0,
+      interfaces: interfaces,
+      uptime: uptime,
+      kernelVersion: '${raw['kernel'] ?? ''}',
+      hostname: '${raw['model'] ?? ''}',
+      cpuAvailable: selfCpuPct != null,
+      cpuIsProcessScoped: true,
+      cpuPercent: selfCpuPct ?? 0,
+      timestamp: now,
+    );
+  }
+
+  /// 本应用进程的 CPU 占用，来自 `/proc/self/stat` 的 utime+stime。
+  ///
+  /// 这是 Android 上唯一可读的 CPU 来源（`/proc/stat` 被 SELinux 拒了），口
+  /// 径只有「这个 app」，所以只能叫进程占用。区间差分除以墙上时间；单位按
+  /// USER_HZ=100 换算——/proc 的 CPU 时间恒定以 1/100 秒计，与内核 CONFIG_HZ
+  /// 无关。读不到就返回 null，让面板显示 -，而不是 0。
+  Future<double?> _selfCpuPercent(DateTime now) async {
+    try {
+      final ticks =
+          parseSelfCpuTicks(await File('/proc/self/stat').readAsString());
+      if (ticks == null) return null;
+      final prev = _selfCpuSample;
+      _selfCpuSample = _CpuSample(ticks, now);
+      // 第一帧没有基准；计数器回退意味着读到的不是同一个进程，同样丢弃。
+      if (prev == null || ticks < prev.ticks) return null;
+      final elapsedMs = now.difference(prev.at).inMilliseconds;
+      if (elapsedMs <= 0) return null;
+      final busyMs = (ticks - prev.ticks) * 1000 / 100;
+      return (busyMs / elapsedMs * 100).clamp(0.0, 100.0);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 从 `/proc/self/stat` 一行里取出 utime+stime（单位 1/100 秒）。
+  ///
+  /// 第 2 个字段是进程名，可以含空格甚至括号（`(wa)` 这种状态之外的字符也由
+  /// 内核原样写出），所以必须从**最后一个** `)` 之后再按空格切；直接 split 整
+  /// 行会让下标随名字长度漂移，把别的字段当成 utime 读出一个荒谬的百分比。
+  @visibleForTesting
+  static int? parseSelfCpuTicks(String line) {
+    final close = line.lastIndexOf(')');
+    if (close < 0) return null;
+    final rest = line.substring(close + 1).trim().split(RegExp(r'\s+'));
+    // rest[0] 是 stat 的第 3 字段（state），字段 N 落在下标 N-3：utime/stime
+    // 是第 14/15 → 下标 11/12，所以至少要 13 个。
+    if (rest.length < 13) return null;
+    final utime = int.tryParse(rest[11]);
+    final stime = int.tryParse(rest[12]);
+    if (utime == null || stime == null) return null;
+    return utime + stime;
+  }
+
+  _CpuSample? _selfCpuSample;
+
+  /// 开机时长，形如 "3 days, 02:15" / "02:15" —— 和另外两条采集路径拼出的
+  /// 形状一致（见 _collectWindowsLocal 的 UPTIME 分支）。面板直接显示这个串。
+  static String _formatUptime(Duration d) {
+    final h = d.inHours % 24;
+    final m = d.inMinutes % 60;
+    final hm = '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+    return d.inDays > 0 ? '${d.inDays} days, $hm' : hm;
+  }
+
+  /// Android 只有一个「本应用」的流量计数，没有网卡维度；接口名是合成标签，
+  /// 仅用于速率差分与明细里认得出来。
+  static const String _androidNetAlias = 'app';
+
+  static const MethodChannel _androidStatsChannel =
+      MethodChannel('com.keiskei.aiterminal/stats');
 
   Future<ServerSnapshot> _collectLinuxLocal(LocalTerminalService local) async {
     final script = [
@@ -1447,4 +1635,11 @@ class _NetCounter {
   final int tx;
   final DateTime time;
   _NetCounter({required this.rx, required this.tx, required this.time});
+}
+
+/// 一次 `/proc/self/stat` CPU 时间采样，用于区间差分。
+class _CpuSample {
+  final int ticks;
+  final DateTime at;
+  const _CpuSample(this.ticks, this.at);
 }

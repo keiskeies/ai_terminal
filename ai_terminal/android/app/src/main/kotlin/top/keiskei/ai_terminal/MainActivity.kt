@@ -1,7 +1,11 @@
 package top.keiskei.ai_terminal
 
+import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
+import android.os.StatFs
+import android.os.SystemClock
+import android.net.TrafficStats
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyPermanentlyInvalidatedException
 import android.security.keystore.KeyProperties
@@ -23,6 +27,7 @@ class MainActivity : FlutterActivity() {
     private companion object {
         const val CHANNEL = "com.keiskei.aiterminal/security"
         const val PATHS_CHANNEL = "com.keiskei.aiterminal/paths"
+        const val STATS_CHANNEL = "com.keiskei.aiterminal/stats"
         const val PREFS = "ai_terminal_security"
         const val WRAP_KEY_ALIAS = "ai_terminal.db_wrap.v1"
         const val GCM_TAG_BITS = 128
@@ -54,6 +59,17 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "nativeLibraryDir" -> result.success(applicationInfo.nativeLibraryDir)
+                    else -> result.notImplemented()
+                }
+            }
+        // 监控面板的 Android 数据源。/proc/stat 与 /proc/net/dev 对应用进程是
+        // SELinux 拒绝的（真机 EACCES），top/free/vmstat 都要读 /proc/stat，
+        // dumpsys 又需要只有 shell uid 才有的 DUMP 权限 —— 所以本机的 CPU/负载
+        // 在这台设备上根本读不到，只能取公开 SDK 能给的这几项。
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, STATS_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "collectStats" -> result.success(collectStats())
                     else -> result.notImplemented()
                 }
             }
@@ -95,6 +111,40 @@ class MainActivity : FlutterActivity() {
             throw KeyUnavailableException("未知密钥槽: $value")
         }
         return value
+    }
+
+    /// 监控面板要的几个指标，全部走公开 SDK：拿不到的一律不放键，
+    /// Dart 侧按「未知」渲染成 -，不拿 0 冒充测量结果。
+    private fun collectStats(): Map<String, Any> {
+        val out = mutableMapOf<String, Any>()
+        runCatching {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val mi = ActivityManager.MemoryInfo().also { am.getMemoryInfo(it) }
+            out["memTotalBytes"] = mi.totalMem
+            out["memAvailBytes"] = mi.availMem
+        }
+        runCatching { out["uptimeMs"] = SystemClock.elapsedRealtime() }
+        runCatching {
+            val stat = StatFs(dataDir.path)
+            val total = stat.blockCountLong * stat.blockSizeLong
+            val free = stat.availableBlocksLong * stat.blockSizeLong
+            out["diskTotalBytes"] = total
+            // 应用可见的可用空间：DataKeeper 预留的量普通进程用不了，
+            // 用 free 而不是 availableBytesOfData 更接近用户点的「还剩多少」。
+            out["diskFreeBytes"] = free
+        }
+        // TrafficStats 在 Android 10+ 对非系统应用可能返回 -1（不支持），
+        // 原样透传，由 Dart 侧当作未知处理。
+        runCatching {
+            val uid = android.os.Process.myUid()
+            out["rxBytes"] = TrafficStats.getUidRxBytes(uid)
+            out["txBytes"] = TrafficStats.getUidTxBytes(uid)
+        }
+        runCatching { out["model"] = Build.MODEL }
+        runCatching {
+            out["kernel"] = System.getProperty("os.version") ?: ""
+        }
+        return out
     }
 
     private fun prefs() = getSharedPreferences(PREFS, Context.MODE_PRIVATE)

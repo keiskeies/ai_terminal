@@ -134,9 +134,13 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
     try {
       final snap = await widget.service.collect();
       if (!mounted) return;
+      // collect() 采集失败时不抛异常，而是返回带 error 的快照（见
+      // ServerMonitorService.parseLinuxOutput 一路的返回）。只数 catch 里的
+      // 分支等于永远绿点——曾经就是这样把「折线图永远是 …」瞒过去的。
+      final failed = snap.error != null;
       setState(() {
         _last = snap;
-        _consecutiveFailures = 0;
+        _consecutiveFailures = failed ? _consecutiveFailures + 1 : 0;
       });
       _isCollecting = false;
       // 如果浮层正在显示，刷新浮层数据
@@ -310,11 +314,20 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
                       icon: Icons.memory,
                       label: 'CPU',
                       showLabel: false,
-                      value: '${(snap?.cpuPercent ?? 0).toStringAsFixed(1)}%',
+                      // 无读数时显示 - 而不是 0.0%：手机上取不到 CPU 是常态
+                      // （见 ServerMonitorService._collectAndroidLocal），
+                      // 0% 会被读成「很空闲」。
+                      value: snap == null || !snap.cpuAvailable
+                          ? '-'
+                          : '${snap.cpuPercent.toStringAsFixed(1)}%',
                       color: staleColor(monitorColorByPercent(
                           snap?.cpuPercent ?? 0, tc,
                           normal: tc.brand)),
-                      chartData: history.map((s) => s.cpuPercent).toList(),
+                      // 无读数的帧不进折线：补一个 0 会在趋势上画出一道假谷底
+                      chartData: history
+                          .where((s) => s.cpuAvailable)
+                          .map((s) => s.cpuPercent)
+                          .toList(),
                       chartMax: 100,
                     ),
                     _divider(tc),
@@ -948,17 +961,22 @@ class _ServerMonitorPanelState extends ConsumerState<ServerMonitorPanel> {
     final l10n = AppLocalizations.of(context)!;
     switch (metric) {
       case 'cpu':
+        // 手机上只有本应用进程的 CPU，整机的读不到（SELinux 拒 /proc/stat）。
+        // 口径不同的两个数不能共用一个不带限定的标签，否则进程占用会被读成
+        // 整机占用。取不到的行一律 -。
+        String pct(double v) => s.cpuAvailable ? '${v.toStringAsFixed(1)}%' : '-';
+        final scope = s.cpuIsProcessScoped ? ' · ${l10n.monitorCpuScopeProcess}' : '';
         return (
-          l10n.monitorCpuDetail,
+          '${l10n.monitorCpuDetail}$scope',
           [
-            (l10n.monitorCpuTotalUsage, '${s.cpuPercent.toStringAsFixed(1)}%'),
-            (l10n.monitorCpuUser, '${s.cpuUser.toStringAsFixed(1)}%'),
-            (l10n.monitorCpuSystem, '${s.cpuSystem.toStringAsFixed(1)}%'),
-            (l10n.monitorCpuIdle, '${s.cpuIdle.toStringAsFixed(1)}%'),
-            (l10n.monitorLoad1, s.loadAvg1.toStringAsFixed(2)),
-            (l10n.monitorLoad5, s.loadAvg5.toStringAsFixed(2)),
-            (l10n.monitorLoad15, s.loadAvg15.toStringAsFixed(2)),
-            (l10n.monitorProcessCount, '${s.processCount}'),
+            (l10n.monitorCpuTotalUsage, pct(s.cpuPercent)),
+            (l10n.monitorCpuUser, pct(s.cpuUser)),
+            (l10n.monitorCpuSystem, pct(s.cpuSystem)),
+            (l10n.monitorCpuIdle, pct(s.cpuIdle)),
+            (l10n.monitorLoad1, s.cpuAvailable ? s.loadAvg1.toStringAsFixed(2) : '-'),
+            (l10n.monitorLoad5, s.cpuAvailable ? s.loadAvg5.toStringAsFixed(2) : '-'),
+            (l10n.monitorLoad15, s.cpuAvailable ? s.loadAvg15.toStringAsFixed(2) : '-'),
+            (l10n.monitorProcessCount, s.processCount > 0 ? '${s.processCount}' : '-'),
           ],
         );
       case 'mem':

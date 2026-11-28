@@ -967,6 +967,7 @@
   "monitorDiskColPercent": "Tỷ lệ dùng",
   "monitorCpuDetail": "Chi tiết CPU",
   "monitorCpuTotalUsage": "Tỷ lệ dùng tổng",
+  "monitorCpuScopeProcess": "Chỉ ứng dụng này",
   "monitorCpuUser": "Người dùng",
   "monitorCpuSystem": "Hệ thống",
   "monitorCpuIdle": "Nhàn rỗi",

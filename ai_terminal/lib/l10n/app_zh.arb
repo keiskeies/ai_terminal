@@ -968,6 +968,7 @@
   "monitorDiskColPercent": "使用率",
   "monitorCpuDetail": "CPU 详情",
   "monitorCpuTotalUsage": "总使用率",
+  "monitorCpuScopeProcess": "仅本应用进程",
   "monitorCpuUser": "用户态",
   "monitorCpuSystem": "内核态",
   "monitorCpuIdle": "空闲",

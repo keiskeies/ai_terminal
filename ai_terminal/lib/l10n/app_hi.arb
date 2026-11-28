@@ -967,6 +967,7 @@
   "monitorDiskColPercent": "उपयोग",
   "monitorCpuDetail": "CPU विवरण",
   "monitorCpuTotalUsage": "कुल उपयोग",
+  "monitorCpuScopeProcess": "केवल यह ऐप",
   "monitorCpuUser": "उपयोगकर्ता",
   "monitorCpuSystem": "सिस्टम",
   "monitorCpuIdle": "निष्क्रिय",

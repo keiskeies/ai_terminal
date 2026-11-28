@@ -967,6 +967,7 @@
   "monitorDiskColPercent": "使用率",
   "monitorCpuDetail": "CPU詳細",
   "monitorCpuTotalUsage": "総使用率",
+  "monitorCpuScopeProcess": "このアプリのみ",
   "monitorCpuUser": "ユーザー",
   "monitorCpuSystem": "システム",
   "monitorCpuIdle": "アイドル",

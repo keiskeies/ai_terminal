@@ -122,6 +122,40 @@ String buildAndroidRc({
   return buf.toString();
 }
 
+/// 一次性命令（runOnce）用的 POSIX shell。
+///
+/// Android 上没有 `/bin/sh`——真机实测那里不存在，系统的 mksh 在
+/// `/system/bin/sh`。原先写死 `/bin/sh`，spawn 直接抛 ProcessException，
+/// 上层按「失败返回空串」吞掉，监控面板于是永远拿不到数据：错误被翻译成了
+/// 一个看起来只是「还没数据」的界面，这才是它难查的原因。
+///
+/// 桌面端保留 `/bin/sh`，探测不到时退回裸 `sh` 让 PATH 去解析。
+String posixShForRunOnce({required bool isAndroid}) {
+  if (isAndroid) return '/system/bin/sh';
+  return File('/bin/sh').existsSync() ? '/bin/sh' : 'sh';
+}
+
+/// 系统命令目录，按可用优先级排。
+const List<String> kAndroidSystemBinDirs = [
+  '/system/bin',
+  '/system/xbin',
+  '/system_ext/bin',
+  '/product/bin',
+  '/vendor/bin',
+];
+
+/// 把系统命令目录补进现有 PATH（缺啥补啥，保留原有条目与顺序）。
+String androidSystemBinPath(String existingPath) {
+  final parts = existingPath
+      .split(':')
+      .where((p) => p.trim().isNotEmpty)
+      .toList(growable: true);
+  for (final dir in kAndroidSystemBinDirs) {
+    if (!parts.contains(dir)) parts.add(dir);
+  }
+  return parts.join(':');
+}
+
 String _shQuote(String value) {
   if (value.isEmpty) return "''";
   final safe = RegExp(r'^[A-Za-z0-9_@%+=:,./-]+$').hasMatch(value);

@@ -967,6 +967,7 @@
   "monitorDiskColPercent": "Utilisation",
   "monitorCpuDetail": "Détails CPU",
   "monitorCpuTotalUsage": "Utilisation totale",
+  "monitorCpuScopeProcess": "Cette app uniquement",
   "monitorCpuUser": "Utilisateur",
   "monitorCpuSystem": "Système",
   "monitorCpuIdle": "Inactif",
