@@ -51,13 +51,20 @@ LocalShellKind? parseLocalShell(String? raw) {
   }
 }
 
-/// 当前平台是否支持本机命令执行（桌面端）。
+/// 当前平台是否支持本机命令执行。
+///
+/// Android 通过内置 PTY + 系统 mksh 可直接执行本机命令（无虚拟化）；
+/// iOS 的 SDK 不提供 fork/exec，仍排除。
 bool isLocalExecPlatformSupported() =>
-    Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+    Platform.isWindows ||
+    Platform.isMacOS ||
+    Platform.isLinux ||
+    Platform.isAndroid;
 
-/// 当前平台的默认 shell；移动端返回 null。
+/// 当前平台的默认 shell；不支持的平台返回 null。
 LocalShellKind? resolveDefaultLocalShell() {
   if (Platform.isWindows) return LocalShellKind.powershell;
+  if (Platform.isAndroid) return LocalShellKind.sh;
   if (Platform.isMacOS || Platform.isLinux) {
     return File('/bin/bash').existsSync()
         ? LocalShellKind.bash
@@ -69,6 +76,7 @@ LocalShellKind? resolveDefaultLocalShell() {
 /// 指定 shell 是否能在当前平台运行。
 bool isShellCompatibleWithPlatform(LocalShellKind kind) {
   if (Platform.isWindows) return kind.isWindowsShell;
+  if (Platform.isAndroid) return !kind.isWindowsShell;
   if (Platform.isMacOS || Platform.isLinux) return !kind.isWindowsShell;
   return false;
 }

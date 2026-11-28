@@ -3,7 +3,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_pty/flutter_pty.dart';
+import 'package:path_provider/path_provider.dart';
 import '../core/ui_text.dart';
+import '../utils/android_userland.dart';
 import '../utils/command_markers.dart';
 import '../utils/exit_marker_scanner.dart';
 import '../utils/output_processor.dart';
@@ -110,6 +112,54 @@ class LocalTerminalService implements CommandExecutor {
     );
   }
 
+  /// 探测这台设备的 userland 是否可用；任何一步失败都返回 null，
+  /// 让调用方回落到 /system/bin/sh，终端至少还能用。
+  Future<AndroidUserland?> _provisionAndroidUserland({
+    required String home,
+    required String bashRcPath,
+    required String mkshRcPath,
+  }) async {
+    try {
+      final userland = await _userlandProvisioner.provision(home: home);
+      if (userland == null) return null;
+      // rc 内容只取决于路径，路径每次启动都一样，所以只在缺失或不一致时写，
+      // 避免每次开终端都产生一次磁盘写。
+      await _writeIfChanged(
+          bashRcPath, buildAndroidRc(home: home, userland: userland));
+      // mksh 回落后 ENV 指向我们的 rc，必须先加载系统 mkshrc，否则连提示符
+      // 都会丢——原来 ENV 就是直接指它的。
+      await _writeIfChanged(
+        mkshRcPath,
+        buildAndroidRc(
+          home: home,
+          userland: userland,
+          sourceFirst: '/system/etc/mkshrc',
+        ),
+      );
+      return userland;
+    } catch (e) {
+      debugPrint('[LocalTerminal] userland 准备失败，回落 mksh: $e');
+      return null;
+    }
+  }
+
+  static Future<void> _writeIfChanged(String path, String content) async {
+    final f = File(path);
+    try {
+      if (await f.exists() && await f.readAsString() == content) return;
+      await f.writeAsString(content);
+    } on FileSystemException catch (e) {
+      debugPrint('[LocalTerminal] 写 rc 失败 $path: ${e.osError}');
+    }
+  }
+
+  /// 懒建的探测器；测试里直接替换 [_provisioner] 注入假探针。
+  @visibleForTesting
+  AndroidUserlandProvisioner? provisionerForTesting;
+
+  AndroidUserlandProvisioner get _userlandProvisioner =>
+      provisionerForTesting ??= AndroidUserlandProvisioner();
+
   /// 启动本地 PTY shell
   Future<void> start({int columns = 80, int rows = 24}) async {
     if (_disposed) throw StateError('本地终端已释放');
@@ -120,8 +170,11 @@ class LocalTerminalService implements CommandExecutor {
     try {
       final injected = ptyForTesting;
       ptyForTesting = null;
+      final ptyEnv = Map<String, String>.from(Platform.environment);
+      ptyEnv['TERM'] = 'xterm-256color';
       String shell;
       List<String> args;
+      String workingDirectory;
 
       if (Platform.isWindows) {
         final powerShellAvailable = injected != null ||
@@ -132,6 +185,54 @@ class LocalTerminalService implements CommandExecutor {
         shell = launch.shell;
         args = launch.args;
         _isPowerShell = launch.isPowerShell;
+        workingDirectory = Platform.environment['USERPROFILE'] ??
+            Directory.current.path;
+      } else if (Platform.isAndroid) {
+        // Android 沙箱里 CWD 是 "/"（不可写），HOME 也不保证存在；
+        // mksh 的提示符与 `cd ~` 都依赖一个可写目录，用应用私有 files 目录。
+        final appDir = await getApplicationSupportDirectory();
+        if (generation != _ptyGeneration) return;
+        workingDirectory = appDir.path;
+        // 应用私有目录必须真实存在，否则 chdir 失败后 shell 留在 "/" 上。
+        try {
+          await Directory(workingDirectory).create(recursive: true);
+        } catch (e) {
+          debugPrint('[LocalTerminal] 创建 Android 工作目录失败: $e');
+        }
+        ptyEnv['HOME'] = appDir.path;
+        // 应用进程的 PATH 由 Zygote 继承，通常已含 /system/bin；
+        // 万一为空，用 toybox 的目录兜底，否则 mksh 找不到任何命令。
+        if (ptyEnv['PATH']?.isNotEmpty != true) {
+          ptyEnv['PATH'] =
+              '/system/bin:/system/xbin:/system_ext/bin:/product/bin:/vendor/bin';
+        }
+        // mkshrc 的 PS1 是 `$HOSTNAME:$PWD $`；flutter_pty 只拷贝
+        // HOME/PATH/USER 等少量变量，HOSTNAME 缺失时提示符会变成 ":<pwd> $"。
+        if (ptyEnv['HOSTNAME']?.isNotEmpty != true) {
+          ptyEnv['HOSTNAME'] = Platform.localHostname;
+        }
+        // 关分页器：PTY 下的 top/tail -f 之类会停在分页提示，命令不退出。
+        ptyEnv['PAGER'] = 'cat';
+        // busybox/bash 随 APK 装在 nativeLibraryDir；探测失败时返回 null，
+        // 继续用系统 mksh，终端功能不受影响。
+        final userland = await _provisionAndroidUserland(
+          home: appDir.path,
+          bashRcPath: androidBashRcPath(appDir.path),
+          mkshRcPath: androidMkshRcPath(appDir.path),
+        );
+        if (generation != _ptyGeneration) return;
+        final launch = androidShellLaunch(
+          userland: userland,
+          bashRcPath: androidBashRcPath(appDir.path),
+        );
+        shell = launch.shell;
+        args = launch.args;
+        // mksh 只在 ENV 指向时才读 rc。用生成的 rc（内部先 source 系统
+        // mkshrc）才能同时拿到系统提示符和 applet 函数。
+        ptyEnv['ENV'] = userland == null
+            ? '/system/etc/mkshrc'
+            : androidMkshRcPath(appDir.path);
+        ptyEnv.addAll(androidUserlandEnv(userland: userland));
       } else {
         final userShell = Platform.environment['SHELL'];
         if (userShell != null && File(userShell).existsSync()) {
@@ -146,11 +247,11 @@ class LocalTerminalService implements CommandExecutor {
           shell = 'bash';
         }
         args = ['-l'];
+        workingDirectory =
+            Platform.environment['HOME'] ?? Directory.current.path;
       }
 
-      final ptyEnv = Map<String, String>.from(Platform.environment);
-      ptyEnv['TERM'] = 'xterm-256color';
-      if (!Platform.isWindows) {
+      if (!Platform.isWindows && !Platform.isAndroid) {
         // 关闭分页器：PTY 下的 journalctl/systemctl/git/man 会停在 (END)，
         // 命令不退出，执行器只能干等超时。
         ptyEnv['PAGER'] = 'cat';
@@ -167,10 +268,7 @@ class LocalTerminalService implements CommandExecutor {
           Pty.start(
             shell,
             arguments: args,
-            workingDirectory: Platform.isWindows
-                ? (Platform.environment['USERPROFILE'] ??
-                    Directory.current.path)
-                : (Platform.environment['HOME'] ?? Directory.current.path),
+            workingDirectory: workingDirectory,
             environment: ptyEnv,
             columns: columns,
             rows: rows,
@@ -1312,7 +1410,13 @@ class LocalTerminalService implements CommandExecutor {
     }));
   }
 
-  /// 是否支持本地终端
+  /// 是否支持本地终端。
+  ///
+  /// Android 复用系统内核与 mksh，无需虚拟化；iOS 的 SDK 不提供 fork/exec，
+  /// PTY 无关如何都无法拉起子进程，必须排除。
   static bool get isSupported =>
-      Platform.isMacOS || Platform.isLinux || Platform.isWindows;
+      Platform.isMacOS ||
+      Platform.isLinux ||
+      Platform.isWindows ||
+      Platform.isAndroid;
 }
