@@ -3,7 +3,17 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/gestures.dart' show kSecondaryButton;
+import 'package:flutter/gestures.dart'
+    show
+        GestureDisposition,
+        OneSequenceGestureRecognizer,
+        PointerCancelEvent,
+        PointerDeviceKind,
+        PointerDownEvent,
+        PointerEvent,
+        PointerMoveEvent,
+        PointerUpEvent,
+        kSecondaryButton;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart' as xterm;
@@ -60,6 +70,11 @@ class TerminalView extends StatefulWidget {
   /// CallbackShortcuts 只能覆盖焦点在终端之外的场景。
   final VoidCallback? onCommandPalette;
 
+  /// 测试缝隙：强制开启/关闭双指缩放。生产恒为 null，按平台决定
+  /// （移动端开启，桌面端用 Ctrl +/- 与外观浮层）。
+  @visibleForTesting
+  final bool? pinchZoomEnabledForTesting;
+
   const TerminalView({
     super.key,
     this.terminal,
@@ -74,6 +89,7 @@ class TerminalView extends StatefulWidget {
     this.blockTracker,
     this.panes,
     this.onCommandPalette,
+    this.pinchZoomEnabledForTesting,
   });
 
   @override
@@ -95,6 +111,11 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
   static _TerminalViewState? _nativeImeTarget;
   bool get _isDesktop =>
       Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+
+  /// 双指缩放是否启用。桌面端用 Ctrl +/- 与外观浮层，不做捏合；
+  /// [TerminalView.pinchZoomEnabledForTesting] 非空时优先采用（测试用）。
+  bool get _pinchZoomEnabled =>
+      widget.pinchZoomEnabledForTesting ?? !_isDesktop;
   // TerminalController 用于管理终端选区，右键复制时读取选中文本
   final xterm.TerminalController _controller = xterm.TerminalController();
   final GlobalKey _terminalContainerKey = GlobalKey();
@@ -132,6 +153,12 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
   bool _searchScrolled = false;
   Timer? _searchDebounce;
   static const int _searchMaxMatches = 5000;
+
+  // 双指缩放的「已应用台阶」：手势开始时清零，手势中按 log2(scale) 取整，
+  // 只有跨越新的整数台阶才真正改字号（见 _handlePinchScale）。
+  int _pinchAppliedSteps = 0;
+  // 手势开始时的字号基准，见 _handlePinchScale 的注释。
+  double? _pinchBaseFontSize;
 
   xterm.TerminalTheme get _theme => resolveTerminalTheme(
         paletteId: widget.paletteId,
@@ -442,6 +469,29 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
         panes.onFocusNeighbor(action == TerminalKeyAction.focusNextPane);
         return true;
     }
+  }
+
+  /// 双指缩放字号。
+  ///
+  /// [scale] 是本次手势内相对起点的累计缩放倍数：放大往 +1 步、缩小往 -1 步，
+  /// 每跨过一个台阶才改一次字号，避免指头微抖就连续触发几十次 setState。
+  /// 只在移动端生效——桌面用 Ctrl +/- 或外观浮层，鼠标捏合不是常见操作。
+  ///
+  /// 基准字号在手势开始时锁定（[_pinchBaseFontSize]），不能用 `widget.fontSize`：
+  /// 回调会触发页面 setState → 重建 → `widget.fontSize` 变化，但同一帧里可能
+  /// 又来一次 onScale，若以新值为基准叠算，字号会被连续台阶放大/缩小翻倍。
+  void _handlePinchScale(double scale) {
+    final callback = widget.onFontSizeChanged;
+    if (callback == null || _pinchBaseFontSize == null) return;
+    final steps = (math.log(scale) / math.ln2).round();
+    if (steps == _pinchAppliedSteps) return;
+    _pinchAppliedSteps = steps;
+    callback(_pinchBaseFontSize! + steps);
+  }
+
+  void _handlePinchStart() {
+    _pinchAppliedSteps = 0;
+    _pinchBaseFontSize = widget.fontSize;
   }
 
   /// Ctrl/Cmd+点击：打开光标处的 URL。cell 列号按宽字符折算成字符串下标。
@@ -1585,21 +1635,39 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
       child: ClipRect(
         child: Container(
           key: _terminalContainerKey,
-          child: xterm.TerminalView(
-            widget.terminal!,
-            controller: _controller,
-            scrollController: _scrollController,
-            focusNode: _focusNode,
-            autofocus: widget.active,
-            hardwareKeyboardOnly: _isDesktop,
-            onKeyEvent: _handleKeyEvent,
-            onTapUp: _handleTapUp,
-            textStyle: xterm.TerminalStyle(
-              fontSize: widget.fontSize,
-              fontFamily: 'JetBrainsMono',
-              fontFamilyFallback: kMonoFontFallback,
+          child: RawGestureDetector(
+            gestures: _pinchZoomEnabled
+                ? {
+                    _PinchScaleGestureRecognizer:
+                        GestureRecognizerFactoryWithHandlers<
+                            _PinchScaleGestureRecognizer>(
+                      () => _PinchScaleGestureRecognizer(debugOwner: this),
+                      (instance) {
+                        instance.onScale =
+                            widget.onFontSizeChanged == null
+                                ? null
+                                : _handlePinchScale;
+                        instance.onScaleStart = _handlePinchStart;
+                      },
+                    ),
+                  }
+                : const <Type, GestureRecognizerFactory>{},
+            child: xterm.TerminalView(
+              widget.terminal!,
+              controller: _controller,
+              scrollController: _scrollController,
+              focusNode: _focusNode,
+              autofocus: widget.active,
+              hardwareKeyboardOnly: _isDesktop,
+              onKeyEvent: _handleKeyEvent,
+              onTapUp: _handleTapUp,
+              textStyle: xterm.TerminalStyle(
+                fontSize: widget.fontSize,
+                fontFamily: 'JetBrainsMono',
+                fontFamilyFallback: kMonoFontFallback,
+              ),
+              theme: _theme,
             ),
-            theme: _theme,
           ),
         ),
       ),
@@ -1613,6 +1681,96 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
       ],
     );
   }
+}
+
+/// 只识别「双指触摸捏合」的缩放识别器。
+///
+/// 为什么不直接用 [ScaleGestureRecognizer]：它在单指拖动超过 pan slop 时也会
+/// 声明胜利，而 xterm 的滚动/选区就靠这条单指拖动。放在这里会二选一——
+/// 要么抢走滚动，要么永远赢不了。<br>
+/// 所以这里自己实现：
+/// - 只跟踪 [PointerDeviceKind.touch]；
+/// - 单指阶段绝不接受手势（保持 `possible`，让 xterm 的 Scrollable 在竞技中
+///   按正常 slop 获胜）；
+/// - 只有第二根手指落下、两根手指都在跟踪时，才 `resolve(accepted)` 抢下
+///   这三条 pointer 的竞技，随后按两指间距比例回调 [onScale]。
+///
+/// 手势一旦被接受，xterm 的单指拖动就被取消，不会再边缩放边滚动。
+class _PinchScaleGestureRecognizer extends OneSequenceGestureRecognizer {
+  _PinchScaleGestureRecognizer({super.debugOwner});
+
+  /// 手势内的累计缩放倍数（相对两指初始间距）。
+  void Function(double scale)? onScale;
+  VoidCallback? onScaleStart;
+
+  // 当前跟踪的 pointer 及其位置，用于算两指间距。
+  final Map<int, Offset> _pointers = {};
+
+  // 两指初始间距；一旦 < 2 指或手势结束就清空，下个手势重新量。
+  double? _initialSpan;
+  double _currentSpan = 0;
+  bool _accepted = false;
+
+  @override
+  bool isPointerAllowed(PointerDownEvent event) =>
+      event.kind == PointerDeviceKind.touch &&
+      super.isPointerAllowed(event);
+
+  @override
+  void addAllowedPointer(PointerDownEvent event) {
+    super.addAllowedPointer(event);
+    _pointers[event.pointer] = event.position;
+    if (_pointers.length == 1) {
+      // 新手势：单指阶段一律不接受，把竞技主动权留给 xterm。
+      _accepted = false;
+      _initialSpan = null;
+      _currentSpan = 0;
+    } else if (_pointers.length == 2) {
+      // 第二指落下：量初始间距并抢下手势。此时 xterm 的单指拖动还没到 slop
+      // （它需要移动才获胜），双指捏合优先。
+      _initialSpan = _span();
+      _currentSpan = _initialSpan!;
+      _accepted = true;
+      resolve(GestureDisposition.accepted);
+      onScaleStart?.call();
+    }
+  }
+
+  @override
+  void handleEvent(PointerEvent event) {
+    if (event is PointerMoveEvent) {
+      _pointers[event.pointer] = event.position;
+      if (!_accepted || _initialSpan == null) return;
+      _currentSpan = _span();
+      if (_initialSpan! <= 0) return;
+      onScale?.call(_currentSpan / _initialSpan!);
+    } else if (event is PointerUpEvent || event is PointerCancelEvent) {
+      _pointers.remove(event.pointer);
+      // 抬到只剩一指/零指后结束本次手势；下一指落下重新开始。
+      if (_pointers.length < 2) {
+        _initialSpan = null;
+        _accepted = false;
+      }
+    }
+    stopTrackingIfPointerNoLongerDown(event);
+  }
+
+  double _span() {
+    if (_pointers.length < 2) return 0;
+    final values = _pointers.values.toList(growable: false);
+    // 只取前两根：三指以上按最近两根的间距缩放没有稳定语义，直接用前两根。
+    return (values[0] - values[1]).distance;
+  }
+
+  @override
+  void didStopTrackingLastPointer(int pointer) {
+    _pointers.clear();
+    _initialSpan = null;
+    _accepted = false;
+  }
+
+  @override
+  String get debugDescription => 'pinch scale';
 }
 
 /// 中键判定：必须**只有**中键按下。

@@ -83,6 +83,7 @@ import '../widgets/terminal_context_menu.dart';
 import '../widgets/terminal_appearance_panel.dart';
 import '../utils/terminal_text_actions.dart';
 import '../utils/terminal_panes.dart';
+import '../utils/quick_keys.dart';
 import '../services/pane_session_service.dart';
 import '../core/app_toast.dart';
 import '../widgets/ai_fox_avatar.dart';
@@ -285,6 +286,9 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   // 专注模式（per-tab）：终端独占。只压制可见性，不销毁 AI/SFTP/监控的
   // 各自状态 —— 退出专注模式后一切按原样回来。
   final Map<String, bool> _tabFocusMode = {};
+  // 每个 tab 的粘滞修饰键状态（底部快捷栏 Ctrl/Shift/Alt）。下一个输入字符
+  // 消费一次后复位；见 utils/quick_keys.dart 的 encodeWithModifiers。
+  final Map<String, StickyModifiers> _tabStickyMods = {};
   bool _isFocusModeFor(String? tabId) =>
       tabId != null && (_tabFocusMode[tabId] ?? false);
 
@@ -896,6 +900,27 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         return;
       }
       _agentKeyGateHinted.remove(tab.id);
+      // 粘滞修饰键：底部快捷栏点了 Ctrl/Shift/Alt 后，把接下来这一个普通字符
+      // 编码成组合键字节，然后复位。只对单字符可见输入生效——控制字符（方向键
+      // 等已是 ESC 序列）、多字上屏/粘贴原样放行，避免被误编码。
+      final mods = _tabStickyMods[tab.id];
+      if (mods != null && mods.any) {
+        final encoded = encodeWithModifiers(data, mods);
+        if (encoded != null) {
+          _tabStickyMods.remove(tab.id);
+          if (mounted) setState(() {});
+          _tabCommandTrackers[tab.id]?.onInput(encoded, currentInputLine: () {
+            _flushTermWrite(tab.id);
+            return currentInputLineOf(term);
+          });
+          if (tab.isLocal) {
+            tab.localService?.writeToTerminal(encoded);
+          } else {
+            tab.service?.writeToTerminal(encoded);
+          }
+          return;
+        }
+      }
       _tabCommandTrackers[tab.id]?.onInput(data, currentInputLine: () {
         // 刚敲的字符其回显可能还躺在批处理缓冲里（最多 16ms），不先落进
         // buffer 就会读到半条命令。闭包只在回车时执行，不影响按键热路径。
@@ -2083,25 +2108,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     // SFTP 会横铺整屏、把 AI 一起顶上去。
     final showSftp = _sftpVisibleFor(tab);
 
-    // P0-1: AI 面板支持完全收起 + 移动端上滑手势展开
+    // P0-1: AI 面板支持完全收起
     Widget mainContent;
     if (!_effectiveAiVisible(tab?.id)) {
-      // AI 面板收起状态：终端占满全屏，移动端支持上滑展开 AI 面板
-      final bareTerminal = _isMobile
-          ? GestureDetector(
-              onVerticalDragEnd: (details) {
-                // 上滑速度超过阈值时展开 AI 面板
-                if (details.primaryVelocity != null &&
-                    details.primaryVelocity! < -300) {
-                  setState(() => _setAiPanelVisible(tab?.id, true));
-                }
-              },
-              child: terminalArea,
-            )
-          : terminalArea;
+      // AI 面板收起状态：终端占满全屏。
+      // 早先这里包了一层「上滑展开 AI」的 GestureDetector，但终端本身就要靠
+      // 单指纵向拖动来滚动回滚区 / 给全屏程序发方向键，两者必然抢手势；而且
+      // 顶栏右侧已经有明确的 AI 开关按钮。终端操作优先，不再用滑动换面板。
       mainContent = showSftp && tab != null
-          ? _withSftpRight(bareTerminal, tab, active: isActive)
-          : bareTerminal;
+          ? _withSftpRight(terminalArea, tab, active: isActive)
+          : terminalArea;
     } else {
       // AI 面板展开状态：保持现有分栏布局
       mainContent = LayoutBuilder(builder: (context, constraints) {
@@ -2111,8 +2127,17 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         // 设计稿「窄窗口自动上下堆叠」：窗口放不下「80 列终端 + 240px 面板」时，
         // 右侧分栏自动退回底部，否则终端会被硬挤到 80 列以下（vim/htop 先坏）。
         // 只影响本次渲染，不改用户存下来的方位偏好。
-        final tooNarrowForRight =
-            totalW < minTerminalWidthForFontSize(_terminalFontSize) + 240 + 20;
+        //
+        // 例外：手机横屏。这时的宽度本来就只有 ~900dp，按 80 列 + 240 面板算永远
+        // 「太窄」→ 右栏永远退回底部，用户看到的「横屏 AI 在右边」等于没实现。
+        // 横屏是手机并排看终端+AI 的主场景，放宽到约 50 列（vim 仍可用）即可：
+        // 面板右置优先，终端按实际宽度自适应列数。
+        final isMobileLandscape =
+            _isMobile && MediaQuery.of(context).orientation == Orientation.landscape;
+        final minTerminalW = isMobileLandscape
+            ? minTerminalWidthForFontSize(_terminalFontSize) * 0.62
+            : minTerminalWidthForFontSize(_terminalFontSize);
+        final tooNarrowForRight = totalW < minTerminalW + 240 + 20;
         final isRight =
             position == _AiPanelPosition.right && !tooNarrowForRight;
         // 非底部态的 SFTP（右列）挂在分栏结果外侧。
@@ -2519,15 +2544,18 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   /// ⋯ 的「视图」「本终端」组（见 [_buildGridMenuButton]），那边不再受「不与顶栏
   /// 重复」约束 —— 顶栏这里本来就没有它们了。
   Widget _buildTopBarActions() {
+    // 手机竖屏顶栏横向空间紧张，外观/SFTP/监控折进 ⋯ 菜单（v1.5.5 的空间回收）。
+    // 横屏宽度足够，把这三个入口直接放回来——横屏本来就是多面板并排的使用场景。
+    final compact = _isMobile && MediaQuery.of(context).orientation != Orientation.landscape;
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (!_isMobile) ...[
+        if (!compact) ...[
           _buildAppearanceButton(),
           const SizedBox(width: 4),
         ],
         _buildAIPanelToggleButton(),
-        if (!_isMobile) ...[
+        if (!compact) ...[
           const SizedBox(width: 4),
           // SFTP 常驻开关（设计稿右侧动作组：菜单 / AI / SFTP / 监控）
           _buildSftpToggleButton(),
@@ -2627,6 +2655,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
   Widget _buildGridMenuButton() {
     final tc = ThemeColors.of(context);
     final l10n = AppLocalizations.of(context)!;
+    // 横屏顶栏空间够、外观/SFTP/监控已放回顶栏，菜单里就不再重复这三项
+    // （同一件事两个入口，见本方法开头的注释）。
+    final topBarShowsPanels =
+        !_isMobile || MediaQuery.of(context).orientation == Orientation.landscape;
     final activeTab = ref.read(tp.terminalProvider).activeTab;
     final snippets = SnippetsDao.cached.toList();
     final auditToday = AuditLogsDao.getCachedRecentLogs(limit: 200)
@@ -2760,10 +2792,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
           _gridMenuItem('act:clear', Icons.cleaning_services_rounded,
               l10n.terminalClearScreen),
         // 顶栏撤下的两个面板开关：本地终端没有远端文件系统，SFTP 不出现
-        if (_isMobile && activeTab != null && !activeTab.isLocal)
+        if (!topBarShowsPanels && activeTab != null && !activeTab.isLocal)
           _gridMenuItem('act:sftp', Icons.folder_outlined,
               UiText.t('SFTP 文件面板', 'SFTP file panel')),
-        if (_isMobile && activeTab != null && activeTab.isConnected)
+        if (!topBarShowsPanels && activeTab != null && activeTab.isConnected)
           _gridMenuItem('act:monitor', Icons.show_chart_rounded,
               _monitorVisibleFor(activeTab)
                   ? l10n.ut_c56382e3ee
@@ -2777,9 +2809,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
         const PopupMenuDivider(height: 8),
         _menuGroupLabel(tc, UiText.t('视图', 'View')),
-        // 顶栏的外观浮层在手机上撤了：它是「设一次就不碰」的低频项，
+        // 顶栏的外观浮层在竖屏手机上撤了：它是「设一次就不碰」的低频项，
         // 但带实时预览，所以整块搬进底部弹层，不降级成设置页里的下拉框。
-        if (_isMobile)
+        // 横屏顶栏已有外观按钮，这里不再重复。
+        if (!topBarShowsPanels)
           _gridMenuItem('act:appearance', Icons.palette_outlined,
               UiText.t('终端配色与字号', 'Terminal colors & font size')),
         _gridMenuItem('act:focus', Icons.fullscreen_rounded,
@@ -6607,38 +6640,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     // 这一行是 Column 的最后一段，必须自己把底部 inset 顶开。
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-    // 高频组合键（始终显示）
-    final coreKeys = [
-      const _QuickKey('ESC', '\x1b'),
-      const _QuickKey('Tab', '\t'),
-      const _QuickKey('⌃C', '\x03'),
-      const _QuickKey('⌃D', '\x04'),
-      const _QuickKey('⌃Z', '\x1a'),
-      const _QuickKey('⌃L', '\x0c'),
-    ];
-    // readline 快捷键
-    final readlineKeys = [
-      const _QuickKey('⌃A', '\x01'),
-      const _QuickKey('⌃E', '\x05'),
-      const _QuickKey('⌃U', '\x15'), // 删除行首到光标
-      const _QuickKey('⌃K', '\x0b'), // 删除光标到行尾
-      const _QuickKey('⌃W', '\x17'), // 删除前一个单词
-      const _QuickKey('⌃R', '\x12'), // 搜索历史命令
-    ];
-    // 方向 + 导航键
-    final navKeys = [
-      const _QuickKey('↑', '\x1b[A'),
-      const _QuickKey('↓', '\x1b[B'),
-      const _QuickKey('←', '\x1b[D'),
-      const _QuickKey('→', '\x1b[C'),
-      const _QuickKey('Home', '\x1b[H'),
-      const _QuickKey('End', '\x1b[F'),
-      const _QuickKey('PgUp', '\x1b[5~'),
-      const _QuickKey('PgDn', '\x1b[6~'),
-    ];
-    final keys = [...coreKeys, ...readlineKeys, ...navKeys];
-    // 分组索引：高频键用主色高亮
-    final coreCount = coreKeys.length;
+    // 键表见 utils/quick_keys.dart（常用优先，含粘滞 Ctrl/Shift/Alt 与 Ins）。
+    const keys = kQuickKeys;
+    // 分组索引：前 8 个是导航/编辑高频键，用主色；中间修饰键另配色。
+    const navCount = 8;
 
     return Container(
       height: 36 + bottomInset,
@@ -6652,9 +6657,8 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
         itemCount: keys.length,
         separatorBuilder: (_, index) {
-          // 在高频键和其他键之间加分隔线
-          if (index == coreCount - 1 ||
-              index == coreCount + readlineKeys.length - 1) {
+          // 导航键与修饰键之间、修饰键与 Ctrl 组合键之间各一条分隔线。
+          if (index == navCount - 1 || index == navCount + 4 - 1) {
             return Container(
               width: 1,
               margin: const EdgeInsets.symmetric(vertical: 4),
@@ -6665,24 +6669,51 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         },
         itemBuilder: (context, index) {
           final key = keys[index];
-          final isCore = index < coreCount;
-          final isNav = index >= coreCount + readlineKeys.length;
+          final isNav = index < navCount;
+          final isSticky = key.isModifier;
+          final sticky = _stickyModsFor(activeTab);
+          final active = switch (key.modifier) {
+            'ctrl' => sticky.ctrl,
+            'shift' => sticky.shift,
+            'alt' => sticky.alt,
+            _ => false,
+          };
+          final onTap = !isConnected || activeTab == null
+              ? null
+              : isSticky
+                  ? () => setState(() => _toggleStickyModifier(
+                        activeTab, key.modifier!))
+                  : () => _sendKey(key.sequence, activeTab);
+          final bg = active
+              ? tc.brand.withValues(alpha: 0.22)
+              : isNav
+                  ? tc.brand.withValues(alpha: isConnected ? 0.12 : 0.05)
+                  : isSticky
+                      ? tc.brand.withValues(alpha: isConnected ? 0.08 : 0.03)
+                      : tc.surface;
+          final fg = active
+              ? tc.brand
+              : isNav
+                  ? (isConnected ? tc.brand : tc.textMuted)
+                  : isSticky
+                      ? (isConnected ? tc.brand : tc.textMuted)
+                      : (isConnected ? tc.textSub : tc.textMuted);
           return _clickable(
-            onTap: isConnected ? () => _sendKey(key.sequence, activeTab) : null,
+            onTap: onTap,
             child: Container(
+              // 方向键使用频率最高，给它更宽的点击区；其余键保持紧凑。
+              constraints: key.wide
+                  ? const BoxConstraints(minWidth: 52)
+                  : const BoxConstraints(minWidth: 40),
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: isCore
-                    ? tc.brand.withValues(alpha: isConnected ? 0.12 : 0.05)
-                    : isNav
-                        ? tc.ok.withValues(alpha: isConnected ? 0.08 : 0.03)
-                        : tc.surface,
+                color: bg,
                 borderRadius: BorderRadius.circular(rXSmall),
                 border: Border.all(
-                  color: isCore
-                      ? tc.brand.withValues(alpha: isConnected ? 0.3 : 0.1)
-                      : isNav
-                          ? tc.ok.withValues(alpha: isConnected ? 0.2 : 0.05)
+                  color: active
+                      ? tc.brand.withValues(alpha: 0.6)
+                      : isNav || isSticky
+                          ? tc.brand.withValues(alpha: isConnected ? 0.3 : 0.1)
                           : tc.border,
                 ),
               ),
@@ -6691,14 +6722,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
                   key.label,
                   style: TextStyle(
                     fontSize: fMicro,
-                    color: isCore
-                        ? (isConnected ? tc.brand : tc.textMuted)
-                        : isNav
-                            ? (isConnected ? tc.ok : tc.textMuted)
-                            : (isConnected ? tc.textSub : tc.textMuted),
+                    color: fg,
                     fontFamily: 'JetBrainsMono',
                     fontFamilyFallback: kMonoFontFallback,
-                    fontWeight: isCore ? FontWeight.w600 : FontWeight.w500,
+                    fontWeight: isNav || active ? FontWeight.w600 : FontWeight.w500,
                     height: 1.0,
                   ),
                 ),
@@ -6708,6 +6735,14 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
         },
       ),
     );
+  }
+
+  StickyModifiers _stickyModsFor(tp.TerminalTab? tab) =>
+      (tab == null ? null : _tabStickyMods[tab.id]) ?? StickyModifiers.none;
+
+  void _toggleStickyModifier(tp.TerminalTab tab, String modifier) {
+    final current = _tabStickyMods[tab.id] ?? StickyModifiers.none;
+    _tabStickyMods[tab.id] = current.toggle(modifier);
   }
 
   void _sendKey(String sequence, tp.TerminalTab? tab) {
@@ -7538,13 +7573,6 @@ class _ContentSegment {
   /// 代码块语言标识（如 bash、text、python 等），非代码块时为 null
   final String? language;
   _ContentSegment(this.content, this.isCodeBlock, {this.language});
-}
-
-/// 快捷按键定义
-class _QuickKey {
-  final String label;
-  final String sequence;
-  const _QuickKey(this.label, this.sequence);
 }
 
 /// 移动端输入框底部的工具菜单：桌面端工具栏那一排 6 个动作折进这一枚胶囊。
