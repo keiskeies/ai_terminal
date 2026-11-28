@@ -2613,6 +2613,10 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: tc.cardElevated,
+      // 默认弹层最高只有屏幕 9/16，比内容矮时里面的 SingleChildScrollView 也出不去
+      // （它拿到的就是这块被截断的高度），「字号」和「终端设置」会被挤到视口外且滚不到。
+      // 放开高度上限，弹层按内容长，装不下时才由滚动视图接手。
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(14)),
       ),
