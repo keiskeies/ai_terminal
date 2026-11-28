@@ -195,10 +195,16 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
     return tab;
   }
 
+  /// 仅供测试：替换本地 PTY 服务的构造，免得测试里真的起一个 shell。
+  @visibleForTesting
+  LocalTerminalService Function()? localServiceFactoryForTesting;
+
   /// 在已注册的标签上启动本地 PTY；成功返回该标签，失败返回 null（状态已写入标签）
   /// [hadConnectedBefore] 覆盖默认的"曾连接"判定，供重连路径保留终端回滚内容
+  /// [columns]/[rows] 是终端视图当前实测的可视区尺寸，用于让 shell 第一条提示符
+  /// 就打在正确的宽度上；不传则退回 Pty.start 的 80×24。
   Future<TerminalTab?> connectLocalTab(TerminalTab tab,
-      {bool? hadConnectedBefore}) async {
+      {bool? hadConnectedBefore, int? columns, int? rows}) async {
     final ever = hadConnectedBefore ?? tab.everConnected;
 
     if (!LocalTerminalService.isSupported) {
@@ -208,9 +214,18 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
       return null;
     }
 
-    final localService = LocalTerminalService();
+    final localService = localServiceFactoryForTesting?.call() ??
+        LocalTerminalService();
     try {
-      await localService.start();
+      // 尺寸能传就必须传：xterm 新建的 Terminal 固定从 80×24 起算，onResize 只在
+      // 「变化」时才回调，而此刻 tab.localService 还是 null —— 视图实测到的真实
+      // 宽度就在这一帧里丢了。shell 于是按 80 列打第一条提示符，150ms 后才被
+      // 改成实测列数：readline 的换行/光标推算停在旧宽度上，回显会盖到相邻行、
+      // 长命令看着像重复了一屏。
+      await localService.start(
+        columns: columns ?? 80,
+        rows: rows ?? 24,
+      );
     } catch (e) {
       localService.dispose();
       tab.markFailed(_describeConnectionError(e), hadConnectedBefore: ever);
@@ -605,7 +620,8 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
 
   /// 本地终端重连：在原 tab 上重启 PTY（保留 tabId、终端内容）
   /// 返回重连后的 tab；失败返回 null（原因写在 tab.connectionError）。
-  Future<TerminalTab?> reconnectLocal(String tabId) async {
+  Future<TerminalTab?> reconnectLocal(String tabId,
+      {int? columns, int? rows}) async {
     if (!LocalTerminalService.isSupported) return null;
     cancelAutoReconnect(tabId, keepAttempts: true);
     final existingTab = state.tabs.cast<TerminalTab?>().firstWhere(
@@ -615,7 +631,9 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
     if (existingTab == null) {
       // 原 tab 已不在列表中，新建一个
       final tab = registerLocalTab();
-      return tab == null ? null : connectLocalTab(tab);
+      return tab == null
+          ? null
+          : connectLocalTab(tab, columns: columns, rows: rows);
     }
     if (!existingTab.isLocal) return null;
 
@@ -632,7 +650,7 @@ class TerminalNotifier extends StateNotifier<TerminalState> {
     _publish();
 
     final result = await connectLocalTab(existingTab,
-        hadConnectedBefore: hadConnectedBefore);
+        hadConnectedBefore: hadConnectedBefore, columns: columns, rows: rows);
     if (result != null) _finishReconnect(result);
     return result;
   }

@@ -860,7 +860,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     if (tab == null) return;
     _switchToTab(tab);
 
-    final connected = await notifier.connectLocalTab(tab);
+    // 把视图实测的可视区尺寸交给 PTY，shell 的第一条提示符才不会按 80 列打
+    // （原因见 connectLocalTab）。
+    final term = _tabTerminals[tab.id];
+    await _awaitViewportLayout(term);
+    final connected = await notifier.connectLocalTab(tab,
+        columns: term?.viewWidth, rows: term?.viewHeight);
     if (connected == null || !mounted) return;
 
     // 本地终端连接成功后立即设置 executor，使 Agent 模式可用
@@ -1075,9 +1080,15 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     }
     _paneOpening.add(paneId);
     PaneSession? session;
+    // 本地分屏要先把 Terminal 建出来，并等它完成一次布局，才能在开 PTY 之前读到
+    // 这一屏实测的可视区尺寸。分屏刚切开时宽度由比例决定，按 PTY 默认的 80 列
+    // 起算会让 shell 的换行推算停在一个从没存在过的宽度上（原因见 connectLocalTab）。
+    final paneTerm = isLocal ? _ensurePaneTerminal(tabId, paneId) : null;
+    if (isLocal) await _awaitViewportLayout(paneTerm);
     try {
       session = isLocal
-          ? await LocalPaneSession.start()
+          ? await LocalPaneSession.start(
+              columns: paneTerm?.viewWidth, rows: paneTerm?.viewHeight)
           : await SshPaneSession.open(client!, encoding: encoding);
     } catch (e) {
       session?.close();
@@ -1547,6 +1558,16 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     _scheduleSizeSync(tab);
   }
 
+  /// 等一帧让 xterm 完成布局，之后 `viewWidth/viewHeight` 才是实测出来的可视区
+  /// 尺寸。新建的 Terminal 固定从 80×24 起算，不布局就读不到真实列数。
+  /// 超时只是退回 80×24（与加这段之前的行为一致），建连不能卡在这里 ——
+  /// 息屏时 endOfFrame 可能迟迟不来，所以必须带超时。
+  Future<void> _awaitViewportLayout(Terminal? term) async {
+    if (term == null) return;
+    await WidgetsBinding.instance.endOfFrame
+        .timeout(const Duration(milliseconds: 300), onTimeout: () {});
+  }
+
   /// 延迟到 xterm 完成自身布局后，把终端视图尺寸推给 PTY/SSH 通道
   /// R2: 保留 Timer 引用，切换 tab / dispose 时取消，避免 Timer 在 widget 销毁后仍 pending
   void _scheduleSizeSync(tp.TerminalTab tab) {
@@ -1592,8 +1613,12 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
 
     tp.TerminalTab? newTab;
     if (tab.isLocal) {
-      newTab =
-          await ref.read(tp.terminalProvider.notifier).reconnectLocal(tab.id);
+      // 重连会换一个全新 PTY，而 Terminal 是原来那个（保留回滚）。把它此刻实测的
+      // 可视区尺寸传下去，新 shell 的第一条提示符才不会按 80 列打。
+      final term = _tabTerminals[tab.id];
+      newTab = await ref
+          .read(tp.terminalProvider.notifier)
+          .reconnectLocal(tab.id, columns: term?.viewWidth, rows: term?.viewHeight);
     } else {
       final host = ref.read(hostsProvider.notifier).getHostById(tab.hostId);
       if (host == null) {

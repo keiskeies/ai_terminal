@@ -30,6 +30,17 @@ class LocalTerminalService implements CommandExecutor {
   bool _disposed = false;
   int _ptyGeneration = 0;
 
+  /// 当前 PTY 的可视区尺寸（列 × 行）。start 时取调用方实测值，之后由 resize 更新。
+  /// shell 的换行/光标推算依赖它，与终端视图不一致就会出现回显盖到相邻行的现象。
+  int _winsizeColumns = 80;
+  int _winsizeRows = 24;
+
+  @visibleForTesting
+  int get winsizeColumnsForTesting => _winsizeColumns;
+
+  @visibleForTesting
+  int get winsizeRowsForTesting => _winsizeRows;
+
   /// 每个实例一把锁：同一 PTY 串行，不同终端互不阻塞。
   final PtyExecutionMutex _executionMutex = PtyExecutionMutex();
   final List<StreamSubscription<dynamic>> _ptySubscriptions = [];
@@ -165,6 +176,8 @@ class LocalTerminalService implements CommandExecutor {
     if (_disposed) throw StateError('本地终端已释放');
     if (_isConnected) return;
     _isExited = false;
+    _winsizeColumns = columns;
+    _winsizeRows = rows;
     final generation = ++_ptyGeneration;
 
     try {
@@ -396,7 +409,18 @@ class LocalTerminalService implements CommandExecutor {
     try {
       process = Platform.isWindows
           ? await Process.start('cmd', ['/c', command])
-          : await Process.start('/bin/sh', ['-c', command]);
+          : await Process.start(
+              posixShForRunOnce(isAndroid: Platform.isAndroid),
+              ['-c', command],
+              environment: Platform.isAndroid
+                  ? {
+                      // 子进程继承的是应用进程的 env，PATH 未必含 /system/bin
+                      // ——那里才有 df/uname/uptime。原值仍保留，只是补进去。
+                      ...Platform.environment,
+                      'PATH': androidSystemBinPath(
+                          Platform.environment['PATH'] ?? ''),
+                    }
+                  : null);
       stdoutSub = utf8.decoder.bind(process.stdout).listen(
         output.write,
         onError: (Object e) {
@@ -1375,6 +1399,8 @@ class LocalTerminalService implements CommandExecutor {
   void resize(int columns, int rows) {
     if (_pty == null || !_isConnected) return;
     if (columns <= 0 || rows <= 0) return;
+    _winsizeColumns = columns;
+    _winsizeRows = rows;
     _pty!.resize(rows, columns);
   }
 

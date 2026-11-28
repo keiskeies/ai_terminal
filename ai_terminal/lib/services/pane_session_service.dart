@@ -60,11 +60,13 @@ class LocalPaneSession implements PaneSession {
     _out.add(data);
   }
 
-  static Future<LocalPaneSession?> start() async {
+  /// [columns]/[rows] 传这一屏实测到的可视区尺寸，让新 shell 的第一条提示符就落在
+  /// 正确宽度上；不传则退回 PTY 默认的 80×24（见 `connectLocalTab` 的说明）。
+  static Future<LocalPaneSession?> start({int? columns, int? rows}) async {
     if (!LocalTerminalService.isSupported) return null;
     final service = LocalTerminalService();
     try {
-      await service.start();
+      await service.start(columns: columns ?? 80, rows: rows ?? 24);
     } catch (e) {
       service.dispose();
       debugPrint('[LocalPaneSession] PTY 启动失败: $e');

@@ -18,6 +18,8 @@ class _NoConnectTerminalNotifier extends TerminalNotifier {
   Future<TerminalTab?> connectLocalTab(
     TerminalTab tab, {
     bool? hadConnectedBefore,
+    int? columns,
+    int? rows,
   }) async {
     return null;
   }
