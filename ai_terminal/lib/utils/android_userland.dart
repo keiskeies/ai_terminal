@@ -103,7 +103,12 @@ String buildAndroidRc({
     for (final name in shimmableApplets()) {
       // busybox 是 multi-call：靠 argv[0] 选 applet，实测给它传 applet 名
       // 参数只会回 "applet not found"。exec -a 在 mksh 和 bash 里都可用。
-      buf.writeln('$name() { exec -a $name ${_shQuote(bb)} "\$@"; }');
+      //
+      // 必须套一层子 shell。函数里不加 exec 的话，busybox 的绝对路径会占掉
+      // $0 传给 applet；加了 exec 又不套子 shell，替换掉的就是 shell 自己：
+      // 输出一条 ls 之后 shell 进程就没了，终端表现为「随便敲个命令就断连」。
+      // 子 shell 里 exec 只替换那一层，退出码照常往上传，marker 协议不受影响。
+      buf.writeln('$name() { ( exec -a $name ${_shQuote(bb)} "\$@" ); }');
     }
     buf.writeln(r"alias ll='ls -l'");
     buf.writeln(r"alias la='ls -a'");

@@ -34,7 +34,7 @@ void main() {
   });
 
   group('buildAndroidRc', () {
-    test('每个 applet 生成 exec -a 转调 busybox 绝对路径的函数', () {
+    test('每个 applet 在子 shell 里 exec -a 转调 busybox 绝对路径', () {
       final rc = buildAndroidRc(
         home: '/data/user/0/x/files',
         userland: userland(),
@@ -42,10 +42,26 @@ void main() {
       // busybox 按 argv[0] 选 applet，所以名字必须走 exec -a，不能当第一个参数。
       expect(
         rc,
-        contains(r'''ls() { exec -a ls /data/app/x/lib/arm64/libbbmain.so "$@"; }'''),
+        contains(
+            r'''ls() { ( exec -a ls /data/app/x/lib/arm64/libbbmain.so "$@" ); }'''),
       );
       // 不依赖环境变量：路径必须写在文件里。
       expect(rc, isNot(contains(r'$AI_BB')));
+    });
+
+    test('函数体顶层不能出现裸 exec，否则一条命令就把 shell 换掉', () {
+      // 回归：垫片写成 `name() { exec -a ...; }` 时 exec 替换的是 shell 自己，
+      // 用户敲 ls/cat/ps 之后 shell 进程消失，表现为「随便输个命令就断连退出」。
+      // bash 和 mksh 都一样，真机上验证过。
+      final rc = buildAndroidRc(home: '/h', userland: userland());
+      for (final line in rc.split('\n')) {
+        if (!line.contains('() {')) continue;
+        final body = line.substring(line.indexOf('{') + 1, line.lastIndexOf('}'));
+        expect(body.trimLeft(), startsWith('('),
+            reason: '函数体顶层必须是子 shell：$line');
+        expect(RegExp(r'(^|;)\s*exec\b').hasMatch(body), isFalse,
+            reason: '函数体顶层有裸 exec：$line');
+      }
     });
 
     test('无 userland 时只剩提示符与 cd，不生成任何函数', () {
