@@ -58,6 +58,7 @@ class _LogEntry {
 
 class _AgentLogDialogState extends State<AgentLogDialog> {
   List<_LogEntry> _all = const [];
+  String _lastTail = '';
   final ScrollController _scrollController = ScrollController();
   bool _autoScroll = true;
   Timer? _refreshTimer;
@@ -87,7 +88,12 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
         return;
       }
       final newLogs = agentLogger.getLogs();
-      if (newLogs.length != _all.length) {
+      // 判定不能只看条数：日志是 1000 条的环形缓冲，满了之后长度恒定不变，
+      // 只比长度会让这一屏永远停在满仓那一刻（表头读数与实际内容脱节）。
+      // 缓冲只在尾部追加，所以「长度相同且末行相同」等价于「没有新日志」。
+      final tail = newLogs.isEmpty ? '' : newLogs.last;
+      if (newLogs.length != _all.length || tail != _lastTail) {
+        _lastTail = tail;
         setState(() {
           _all = [for (final line in newLogs) _LogEntry.parse(line)];
         });
@@ -105,7 +111,9 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
   }
 
   void _loadLogs() {
-    _all = [for (final line in agentLogger.getLogs()) _LogEntry.parse(line)];
+    final lines = agentLogger.getLogs();
+    _lastTail = lines.isEmpty ? '' : lines.last;
+    _all = [for (final line in lines) _LogEntry.parse(line)];
   }
 
   @override
@@ -191,12 +199,16 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
   Widget build(BuildContext context) {
     final tc = ThemeColors.of(context);
     final visible = _visible;
+    final screenWidth = MediaQuery.of(context).size.width;
+    // 手机宽度按 0.78 折算只有 ~300 逻辑像素，表头那几项（图标 + 标题 + 条数 +
+    // 两个按钮） intrinsic 宽度就超了；窄屏让日志器基本占满宽度。
+    final dialogWidth = screenWidth * (screenWidth < 520 ? 0.94 : 0.78);
     return Dialog(
       backgroundColor: tc.card,
       shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(rLarge)),
       child: Container(
-        width: MediaQuery.of(context).size.width * 0.78,
+        width: dialogWidth,
         height: MediaQuery.of(context).size.height * 0.7,
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -206,14 +218,22 @@ class _AgentLogDialogState extends State<AgentLogDialog> {
               children: [
                 Icon(Icons.terminal, color: tc.brand, size: 18),
                 const SizedBox(width: 8),
-                Text(UiText.t('Agent 日志', 'Agent logs'),
-                    style: TextStyle(
-                        color: tc.textMain,
-                        fontSize: fBody,
-                        fontWeight: FontWeight.w600)),
+                Flexible(
+                  child: Text(UiText.t('Agent 日志', 'Agent logs'),
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                      style: TextStyle(
+                          color: tc.textMain,
+                          fontSize: fBody,
+                          fontWeight: FontWeight.w600)),
+                ),
                 const SizedBox(width: 8),
-                Text(L10n.str.ut_7234d250c6(_all.length, visible.length),
-                    style: TextStyle(color: tc.textMuted, fontSize: fMicro)),
+                Flexible(
+                  child: Text(L10n.str.ut_7234d250c6(_all.length, visible.length),
+                      overflow: TextOverflow.ellipsis,
+                      softWrap: false,
+                      style: TextStyle(color: tc.textMuted, fontSize: fMicro)),
+                ),
                 const Spacer(),
                 IconButton(
                   tooltip: UiText.t('复制当前筛选结果', 'Copy filtered view'),
