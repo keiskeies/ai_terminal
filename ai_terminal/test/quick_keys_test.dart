@@ -11,8 +11,12 @@ void main() {
           ['ESC', 'Tab', '↑', '↓', '←', '→', 'Home', 'End']);
     });
 
-    test('修饰键与 Ins 紧跟其后', () {
-      expect(labels().sublist(8, 12), ['Ctrl', 'Shift', 'Alt', 'Ins']);
+    test('修饰键紧跟其后', () {
+      expect(labels().sublist(8, 11), ['Ctrl', 'Shift', 'Alt']);
+    });
+
+    test('没有 Ins：ESC[2~ 只改 shell 编辑模式，复制/粘贴走长按菜单', () {
+      expect(labels(), isNot(contains('Ins')));
     });
 
     test('常见 Ctrl 组合仍在表内（只是排到后面）', () {
@@ -22,7 +26,7 @@ void main() {
       }
     });
 
-    test('方向键 / Home / End / Ins 有正确的 VT 序列', () {
+    test('方向键 / Home / End 有正确的 VT 序列', () {
       Map<String, String> seq = {
         for (final k in kQuickKeys) k.label: k.sequence
       };
@@ -32,7 +36,6 @@ void main() {
       expect(seq['→'], '\x1b[C');
       expect(seq['Home'], '\x1b[H');
       expect(seq['End'], '\x1b[F');
-      expect(seq['Ins'], '\x1b[2~');
       expect(seq['ESC'], '\x1b');
       expect(seq['Tab'], '\t');
     });

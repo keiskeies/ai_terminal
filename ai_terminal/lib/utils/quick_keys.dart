@@ -27,9 +27,12 @@ class QuickKey {
 /// 底部栏的键位，按「常用优先」排列。
 ///
 /// 顺序取舍：ESC/Tab/方向键/Home/End 是交互式程序与 shell 行编辑最高频的；
-/// 修饰键紧随其后，方便紧接着敲一个普通字符；Ins 是移动端补全缺失的硬件键
-/// （远程/本地 shell 的 Ctrl+Insert 复制、Shift+Insert 粘贴都依赖它）。
+/// 修饰键紧随其后，方便紧接着敲一个普通字符。
 /// 高频 Ctrl 组合（⌃C/⌃D/⌃Z/⌃L）与 readline 键放后面，需要横向滑动才看到。
+///
+/// 这里没有 Ins：往 PTY 写 ESC[2~ 只是把 shell 的编辑模式切成覆盖式，
+/// 复制/粘贴要的是应用层读选区/写剪贴板，字节序列到不了那一层（真机验证）。
+/// 触摸长按终端会弹出复制/粘贴菜单，见 TerminalView。
 const List<QuickKey> kQuickKeys = [
   QuickKey('ESC', '\x1b'),
   QuickKey('Tab', '\t'),
@@ -42,7 +45,6 @@ const List<QuickKey> kQuickKeys = [
   QuickKey('Ctrl', '', modifier: 'ctrl'),
   QuickKey('Shift', '', modifier: 'shift'),
   QuickKey('Alt', '', modifier: 'alt'),
-  QuickKey('Ins', '\x1b[2~'),
   QuickKey('⌃C', '\x03'),
   QuickKey('⌃D', '\x04'),
   QuickKey('⌃Z', '\x1a'),

@@ -6640,7 +6640,7 @@ class _TerminalPageState extends ConsumerState<TerminalPage> with RouteAware {
     // 这一行是 Column 的最后一段，必须自己把底部 inset 顶开。
     final bottomInset = MediaQuery.paddingOf(context).bottom;
 
-    // 键表见 utils/quick_keys.dart（常用优先，含粘滞 Ctrl/Shift/Alt 与 Ins）。
+    // 键表见 utils/quick_keys.dart（常用优先，含粘滞 Ctrl/Shift/Alt）。
     const keys = kQuickKeys;
     // 分组索引：前 8 个是导航/编辑高频键，用主色；中间修饰键另配色。
     const navCount = 8;
