@@ -13,7 +13,8 @@ import 'package:flutter/gestures.dart'
         PointerEvent,
         PointerMoveEvent,
         PointerUpEvent,
-        kSecondaryButton;
+        kSecondaryButton,
+        kTouchSlop;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:xterm/xterm.dart' as xterm;
@@ -160,6 +161,53 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
   // 手势开始时的字号基准，见 _handlePinchScale 的注释。
   double? _pinchBaseFontSize;
 
+  // ---- 触摸长按菜单 ----
+  // 桌面用右键，手机没有右键。xterm 的长按只做到「选中一个词」，它的
+  // CustomTextEdit.showToolbar 是空实现，所以选完之后屏幕上没有任何复制入口，
+  // 而粘贴要按 Ins/Ctrl+V——没有实体键盘就够不着。这里在外层 Listener 上自己
+  // 计时弹菜单：Listener 不参与手势竞技，抢不走 xterm 的滚动和选区扩展。
+  // 阈值刻意大于 xterm 的 500ms 长按选词，等选区成型再弹，菜单里才有「复制」。
+  // 判定只看指针类型不看操作系统：桌面触屏长按同样缺复制入口。
+  Timer? _touchMenuTimer;
+  int? _touchMenuPointer;
+  Offset? _touchMenuDownAt;
+  static const Duration _touchMenuDelay = Duration(milliseconds: 600);
+
+  void _armTouchMenu(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.touch) return;
+    if (_touchMenuPointer != null) {
+      // 第二根手指落下 = 捏合/多指手势，长按菜单让路
+      _cancelTouchMenu();
+      return;
+    }
+    _touchMenuPointer = event.pointer;
+    _touchMenuDownAt = event.position;
+    _touchMenuTimer = Timer(_touchMenuDelay, () {
+      _touchMenuTimer = null;
+      final at = _touchMenuDownAt;
+      _touchMenuPointer = null;
+      _touchMenuDownAt = null;
+      if (at == null || !mounted) return;
+      _showContextMenu(at, touch: true);
+    });
+  }
+
+  void _updateTouchMenu(PointerEvent event) {
+    if (event.pointer != _touchMenuPointer) return;
+    final down = _touchMenuDownAt;
+    if (down != null && (event.position - down).distance > kTouchSlop) {
+      // 手指移开 = 用户想滚动/扩选，不是长按
+      _cancelTouchMenu();
+    }
+  }
+
+  void _cancelTouchMenu() {
+    _touchMenuTimer?.cancel();
+    _touchMenuTimer = null;
+    _touchMenuPointer = null;
+    _touchMenuDownAt = null;
+  }
+
   xterm.TerminalTheme get _theme => resolveTerminalTheme(
         paletteId: widget.paletteId,
         isLight: ThemeColors.of(context).isLight,
@@ -225,6 +273,7 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     widget.terminal?.removeListener(_onTerminalChangedForSearch);
     widget.terminal?.removeListener(_reviveDetachedLines);
     _searchDebounce?.cancel();
+    _cancelTouchMenu();
     _clearSearchHighlights();
     _searchQueryController.dispose();
     _searchFocusNode.dispose();
@@ -965,9 +1014,10 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     );
   }
 
-  /// 右键菜单：本地动作（复制/粘贴/清屏/字号/保存）就地完成，
+  /// 终端弹出菜单：本地动作（复制/粘贴/清屏/字号/保存）就地完成，
   /// 需要页面能力的动作（Agent/SFTP/片段/审计）通过 [TerminalView.onMenuIntent] 上抛。
-  void _showContextMenu(Offset globalPosition) {
+  /// [touch] 表示来源是触摸长按：行加高、去掉快捷键提示、去掉桌面专属动作。
+  void _showContextMenu(Offset globalPosition, {bool touch = false}) {
     final terminal = widget.terminal;
     if (terminal == null) return;
 
@@ -990,17 +1040,24 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
       entry.remove();
     }
 
+    final allItems = _buildMenuItems(
+      terminal: terminal,
+      selectedText: selectedText,
+      lineTexts: lineTexts,
+      lineY: lineY,
+      touch: touch,
+    );
+    final items =
+        touch ? allItems.where((i) => !i.touchHidden).toList() : allItems;
+    if (items.isEmpty) return;
+
     entry = OverlayEntry(
       builder: (ctx) => TerminalContextMenu(
         position: globalPosition,
-        items: _buildMenuItems(
-          terminal: terminal,
-          selectedText: selectedText,
-          lineTexts: lineTexts,
-          lineY: lineY,
-        ),
+        items: items,
         onDismiss: dismiss,
         tc: tc,
+        compact: touch,
       ),
     );
     overlay.insert(entry);
@@ -1047,6 +1104,7 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
     required String? selectedText,
     required List<String> lineTexts,
     required int? lineY,
+    bool touch = false,
   }) {
     final items = <TerminalMenuItem>[];
     final onIntent = widget.onMenuIntent;
@@ -1089,7 +1147,9 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
       label: UiText.t('粘贴', 'Paste'),
       icon: Icons.paste_rounded,
       shortcut: terminalShortcutLabel(TerminalMenuAction.paste, isMac: isMac),
-      onTap: _pasteFromClipboard,
+      // 触摸端跳过逐行确认：确认弹窗在窄屏上要往下滑才够得到按钮，
+      // 而拇指长按这个动作本身就是明确意图，粘贴惯例也是全量一次发。
+      onTap: () => _pasteFromClipboard(skipConfirm: touch),
     ));
 
     // —— 视图与导出 ——
@@ -1103,6 +1163,7 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
       label: UiText.t('清空回滚缓冲', 'Clear scrollback'),
       icon: Icons.layers_clear_outlined,
       danger: true,
+      touchHidden: true,
       onTap: terminal.buffer.clearScrollback,
     ));
     items.add(TerminalMenuItem(
@@ -1617,13 +1678,13 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
         }
         // onPointerDown 会收到所有鼠标按钮按下+触摸。
         // kSecondaryButton = 2，对应右键（Mac 双指点击 / Windows 右键）
-        if (event.buttons == kSecondaryButton) {
-          // event.position 是相对 Listener 的局部坐标，转换为全局坐标
-          final renderBox =
-              _terminalContainerKey.currentContext?.findRenderObject();
-          if (renderBox is RenderBox) {
-            _showContextMenu(renderBox.localToGlobal(event.position));
-          }
+        if (event.kind == PointerDeviceKind.touch) {
+          _armTouchMenu(event);
+        } else if (event.buttons == kSecondaryButton) {
+          // PointerEvent.position 是全局坐标（局部坐标在 localPosition），
+          // 直接交给 _showContextMenu。曾经多套了一层 localToGlobal，
+          // 终端不在原点时（顶栏下方、分屏右屏）菜单会偏出整整一个终端偏移量。
+          _showContextMenu(event.position);
         } else if (isMiddleClick(event.buttons) && !Platform.isMacOS) {
           // 中键粘贴（X11 惯例，Windows Terminal 也支持）。与 Shift+Insert
           // 同口径：单发全量、不做多行确认。
@@ -1632,6 +1693,9 @@ class _TerminalViewState extends State<TerminalView> with TextInputClient {
           _pasteFromClipboard(skipConfirm: true);
         }
       },
+      onPointerMove: _updateTouchMenu,
+      onPointerUp: (event) => _cancelTouchMenu(),
+      onPointerCancel: (event) => _cancelTouchMenu(),
       child: ClipRect(
         child: Container(
           key: _terminalContainerKey,

@@ -27,6 +27,7 @@ class TerminalMenuItem {
     this.enabled = true,
     this.danger = false,
     this.separatorBefore = false,
+    this.touchHidden = false,
     this.onTap,
   });
 
@@ -38,10 +39,16 @@ class TerminalMenuItem {
   /// 危险动作（执行命令、清空缓冲）用警示色，和普通项区分开
   final bool danger;
   final bool separatorBefore;
+
+  /// 只在鼠标/键盘场景出现的动作：分屏没法用手指拖、字号有捏合和外观浮层、
+  /// 清空回滚缓冲这种破坏性项不该出现在拇指会扫到的位置。
+  final bool touchHidden;
   final VoidCallback? onTap;
 }
 
 /// 终端右键菜单：分组、键盘提示、悬停高亮，超长时内部滚动。
+/// [compact] 用于触摸端（安卓/iOS）：手指点不准 32px 的行，也读不到没有
+/// 鼠标悬停可依赖的快捷键列，所以行加高到 44px、去掉 shortcut。
 class TerminalContextMenu extends StatefulWidget {
   const TerminalContextMenu({
     super.key,
@@ -49,12 +56,14 @@ class TerminalContextMenu extends StatefulWidget {
     required this.items,
     required this.onDismiss,
     required this.tc,
+    this.compact = false,
   });
 
   final Offset position;
   final List<TerminalMenuItem> items;
   final VoidCallback onDismiss;
   final ThemeColors tc;
+  final bool compact;
 
   @override
   State<TerminalContextMenu> createState() => _TerminalContextMenuState();
@@ -66,6 +75,9 @@ class _TerminalContextMenuState extends State<TerminalContextMenu> {
 
   static const double _width = 224;
   static const double _itemHeight = 32;
+  static const double _itemHeightTouch = 44;
+
+  double get _rowHeight => widget.compact ? _itemHeightTouch : _itemHeight;
 
   @override
   void initState() {
@@ -85,7 +97,7 @@ class _TerminalContextMenuState extends State<TerminalContextMenu> {
     var height = 8.0;
     for (final item in widget.items) {
       if (item.separatorBefore) height += 9;
-      height += _itemHeight;
+      height += _rowHeight;
     }
     return height;
   }
@@ -176,6 +188,7 @@ class _TerminalContextMenuState extends State<TerminalContextMenu> {
   }
 
   Widget _buildItem(TerminalMenuItem item, ThemeColors tc) {
+    final compact = widget.compact;
     final enabled = item.enabled && item.onTap != null;
     final color = !enabled
         ? tc.textMuted
@@ -196,7 +209,7 @@ class _TerminalContextMenuState extends State<TerminalContextMenu> {
               }
             : null,
         child: Container(
-          height: _itemHeight,
+          height: _rowHeight,
           padding: const EdgeInsets.symmetric(horizontal: 10),
           color: hovered && enabled
               ? tc.brand.withValues(alpha: 0.10)
@@ -204,7 +217,7 @@ class _TerminalContextMenuState extends State<TerminalContextMenu> {
           child: Row(
             children: [
               if (item.icon != null) ...[
-                Icon(item.icon, size: 14, color: color),
+                Icon(item.icon, size: compact ? 18 : 14, color: color),
                 const SizedBox(width: 8),
               ],
               Expanded(
@@ -212,10 +225,11 @@ class _TerminalContextMenuState extends State<TerminalContextMenu> {
                   item.label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: fSmall, color: color),
+                  style: TextStyle(
+                      fontSize: compact ? fBody : fSmall, color: color),
                 ),
               ),
-              if (item.shortcut != null) ...[
+              if (item.shortcut != null && !compact) ...[
                 const SizedBox(width: 8),
                 // 长 URL/路径不能把标签挤没，最多占 120px 后省略
                 ConstrainedBox(
